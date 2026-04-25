@@ -32,264 +32,331 @@ fn _pcre2_update_classbits_8(ptype: c_uint, pdata: c_uint, negated: c_int, __par
 
         set_bit
 
-        match ptype {
-            0 => {
-                (chartype = prop.chartype)
+        while true {
+            match ptype {
+                0 => {
+                    (chartype = prop.chartype)
 
-                var __ci_expr_logic_1: c_int
+                    var __ci_expr_logic_1: c_int
 
-                var __ci_expr_logic_0: c_int
+                    var __ci_expr_logic_0: c_int
 
-                if ((if chartype == ucp_Lu: 1 else: 0) != 0) {
-                    (__ci_expr_logic_0 = (if true: 1 else: 0))
-                } else {
-                    (__ci_expr_logic_0 = (if (if chartype == ucp_Ll: 1 else: 0) != 0: 1 else: 0))
-                }
+                    if ((if chartype == ucp_Lu: 1 else: 0) != 0) {
+                        (__ci_expr_logic_0 = (if true: 1 else: 0))
+                    } else {
+                        (__ci_expr_logic_0 = (if (if chartype == ucp_Ll: 1 else: 0) != 0: 1 else: 0))
+                    }
 
-                if (__ci_expr_logic_0 != 0) {
-                    (__ci_expr_logic_1 = (if true: 1 else: 0))
-                } else {
-                    (__ci_expr_logic_1 = (if (if chartype == ucp_Lt: 1 else: 0) != 0: 1 else: 0))
-                }
+                    if (__ci_expr_logic_0 != 0) {
+                        (__ci_expr_logic_1 = (if true: 1 else: 0))
+                    } else {
+                        (__ci_expr_logic_1 = (if (if chartype == ucp_Lt: 1 else: 0) != 0: 1 else: 0))
+                    }
 
-                (set_bit = __ci_expr_logic_1)
-
-
-            },
-            1 => {
-                (set_bit = (if _pcre2_ucp_gentype_8[prop.chartype] == pdata: 1 else: 0))
-            },
-            2 => {
-                (set_bit = (if prop.chartype == pdata: 1 else: 0))
-            },
-            3 => {
-                (set_bit = (if prop.script == pdata: 1 else: 0))
-            },
-            4 => {
-                var __ci_expr_logic_2: c_int
-
-                if ((if prop.script == pdata: 1 else: 0) != 0) {
-                    (__ci_expr_logic_2 = (if true: 1 else: 0))
-                } else {
-                    (__ci_expr_logic_2 = (if (if ((unsafe: ((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((prop.scriptx_bidiclass & 1023) as isize) as usize))[(pdata / 32)]) & ((1 as c_uint) << ((pdata % 32) as c_uint))) != 0: 1 else: 0) != 0: 1 else: 0))
-                }
-
-                (set_bit = __ci_expr_logic_2)
-
-            },
-            5 => {
-                (gentype = _pcre2_ucp_gentype_8[prop.chartype])
-
-                var __ci_expr_logic_3: c_int
-
-                if ((if gentype == 1: 1 else: 0) != 0) {
-                    (__ci_expr_logic_3 = (if true: 1 else: 0))
-                } else {
-                    (__ci_expr_logic_3 = (if (if gentype == 3: 1 else: 0) != 0: 1 else: 0))
-                }
-
-                (set_bit = __ci_expr_logic_3)
+                    (set_bit = __ci_expr_logic_1)
 
 
-            },
-            6 | 7 => {
-                match c {
-                    9 | 32 | 160 | 10 | 11 | 12 | 13 | 133 => {
-                        (set_bit = 1)
-                    },
-                    _ => {
-                        (set_bit = (if _pcre2_ucp_gentype_8[prop.chartype] == 6: 1 else: 0))
-                    },
-                }
-            },
-            8 => {
-                (chartype = prop.chartype)
+                },
+                1 => {
+                    (set_bit = (if _pcre2_ucp_gentype_8[prop.chartype] == pdata: 1 else: 0))
+                },
+                2 => {
+                    (set_bit = (if prop.chartype == pdata: 1 else: 0))
+                },
+                3 => {
+                    (set_bit = (if prop.script == pdata: 1 else: 0))
+                },
+                4 => {
+                    var __ci_expr_logic_2: c_int
 
-                (gentype = _pcre2_ucp_gentype_8[chartype])
+                    if ((if prop.script == pdata: 1 else: 0) != 0) {
+                        (__ci_expr_logic_2 = (if true: 1 else: 0))
+                    } else {
+                        (__ci_expr_logic_2 = (if (if ((unsafe: ((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((prop.scriptx_bidiclass & 1023) as isize) as usize))[(pdata / 32)]) & ((1 as c_uint) << ((pdata % 32) as c_uint))) != 0: 1 else: 0) != 0: 1 else: 0))
+                    }
 
-                var __ci_expr_logic_6: c_int
+                    (set_bit = __ci_expr_logic_2)
 
-                var __ci_expr_logic_5: c_int
+                },
+                5 => {
+                    (gentype = _pcre2_ucp_gentype_8[prop.chartype])
 
-                var __ci_expr_logic_4: c_int
+                    var __ci_expr_logic_3: c_int
 
-                if ((if gentype == 1: 1 else: 0) != 0) {
-                    (__ci_expr_logic_4 = (if true: 1 else: 0))
-                } else {
-                    (__ci_expr_logic_4 = (if (if gentype == 3: 1 else: 0) != 0: 1 else: 0))
-                }
+                    if ((if gentype == 1: 1 else: 0) != 0) {
+                        (__ci_expr_logic_3 = (if true: 1 else: 0))
+                    } else {
+                        (__ci_expr_logic_3 = (if (if gentype == 3: 1 else: 0) != 0: 1 else: 0))
+                    }
 
-                if (__ci_expr_logic_4 != 0) {
-                    (__ci_expr_logic_5 = (if true: 1 else: 0))
-                } else {
-                    (__ci_expr_logic_5 = (if (if chartype == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
-                }
-
-                if (__ci_expr_logic_5 != 0) {
-                    (__ci_expr_logic_6 = (if true: 1 else: 0))
-                } else {
-                    (__ci_expr_logic_6 = (if (if chartype == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
-                }
-
-                (set_bit = __ci_expr_logic_6)
+                    (set_bit = __ci_expr_logic_3)
 
 
-            },
-            10 => {
-                var __ci_expr_logic_9: c_int
+                },
+                6 => {
+                    while true {
+                        match c {
+                            9 => {
+                                (set_bit = 1)
+                            },
+                            32 => {
+                                (set_bit = 1)
+                            },
+                            160 => {
+                                (set_bit = 1)
+                            },
+                            10 => {
+                                (set_bit = 1)
+                            },
+                            11 => {
+                                (set_bit = 1)
+                            },
+                            12 => {
+                                (set_bit = 1)
+                            },
+                            13 => {
+                                (set_bit = 1)
+                            },
+                            133 => {
+                                (set_bit = 1)
+                            },
+                            _ => {
+                                (set_bit = (if _pcre2_ucp_gentype_8[prop.chartype] == 6: 1 else: 0))
+                            },
+                        }
 
-                var __ci_expr_logic_8: c_int
+                        break
 
-                var __ci_expr_logic_7: c_int
+                    }
+                },
+                7 => {
+                    while true {
+                        match c {
+                            9 => {
+                                (set_bit = 1)
+                            },
+                            32 => {
+                                (set_bit = 1)
+                            },
+                            160 => {
+                                (set_bit = 1)
+                            },
+                            10 => {
+                                (set_bit = 1)
+                            },
+                            11 => {
+                                (set_bit = 1)
+                            },
+                            12 => {
+                                (set_bit = 1)
+                            },
+                            13 => {
+                                (set_bit = 1)
+                            },
+                            133 => {
+                                (set_bit = 1)
+                            },
+                            _ => {
+                                (set_bit = (if _pcre2_ucp_gentype_8[prop.chartype] == 6: 1 else: 0))
+                            },
+                        }
 
-                if ((if c == 36: 1 else: 0) != 0) {
-                    (__ci_expr_logic_7 = (if true: 1 else: 0))
-                } else {
-                    (__ci_expr_logic_7 = (if (if c == 64: 1 else: 0) != 0: 1 else: 0))
-                }
+                        break
 
-                if (__ci_expr_logic_7 != 0) {
-                    (__ci_expr_logic_8 = (if true: 1 else: 0))
-                } else {
-                    (__ci_expr_logic_8 = (if (if c == 96: 1 else: 0) != 0: 1 else: 0))
-                }
+                    }
+                },
+                8 => {
+                    (chartype = prop.chartype)
 
-                if (__ci_expr_logic_8 != 0) {
-                    (__ci_expr_logic_9 = (if true: 1 else: 0))
-                } else {
-                    (__ci_expr_logic_9 = (if (if c >= 160: 1 else: 0) != 0: 1 else: 0))
-                }
+                    (gentype = _pcre2_ucp_gentype_8[chartype])
 
-                (set_bit = __ci_expr_logic_9)
+                    var __ci_expr_logic_7: c_int
 
-            },
-            11 => {
-                (set_bit = (if ((prop.scriptx_bidiclass as c_int) >> (11 as c_uint)) == pdata: 1 else: 0))
-            },
-            12 => {
-                (set_bit = (if ((unsafe: ((&_pcre2_ucd_boolprop_sets_8[0] as *const c_uint) + (((prop.bprops & 4095) as isize) as usize))[(pdata / 32)]) & ((1 as c_uint) << ((pdata % 32) as c_uint))) != 0: 1 else: 0))
-            },
-            14 => {
-                (chartype = prop.chartype)
+                    var __ci_expr_logic_6: c_int
 
-                (gentype = _pcre2_ucp_gentype_8[chartype])
+                    var __ci_expr_logic_5: c_int
 
-                var __ci_expr_logic_11: c_int = 0
+                    if ((if gentype == 1: 1 else: 0) != 0) {
+                        (__ci_expr_logic_5 = (if true: 1 else: 0))
+                    } else {
+                        (__ci_expr_logic_5 = (if (if gentype == 3: 1 else: 0) != 0: 1 else: 0))
+                    }
 
-                if ((if gentype != 6: 1 else: 0) != 0) {
+                    if (__ci_expr_logic_5 != 0) {
+                        (__ci_expr_logic_6 = (if true: 1 else: 0))
+                    } else {
+                        (__ci_expr_logic_6 = (if (if chartype == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
+                    }
+
+                    if (__ci_expr_logic_6 != 0) {
+                        (__ci_expr_logic_7 = (if true: 1 else: 0))
+                    } else {
+                        (__ci_expr_logic_7 = (if (if chartype == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
+                    }
+
+                    (set_bit = __ci_expr_logic_7)
+
+
+                },
+                10 => {
                     var __ci_expr_logic_10: c_int
 
-                    if ((if gentype != 0: 1 else: 0) != 0) {
+                    var __ci_expr_logic_9: c_int
+
+                    var __ci_expr_logic_8: c_int
+
+                    if ((if c == 36: 1 else: 0) != 0) {
+                        (__ci_expr_logic_8 = (if true: 1 else: 0))
+                    } else {
+                        (__ci_expr_logic_8 = (if (if c == 64: 1 else: 0) != 0: 1 else: 0))
+                    }
+
+                    if (__ci_expr_logic_8 != 0) {
+                        (__ci_expr_logic_9 = (if true: 1 else: 0))
+                    } else {
+                        (__ci_expr_logic_9 = (if (if c == 96: 1 else: 0) != 0: 1 else: 0))
+                    }
+
+                    if (__ci_expr_logic_9 != 0) {
                         (__ci_expr_logic_10 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_10 = (if (if chartype == ucp_Cf: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_10 = (if (if c >= 160: 1 else: 0) != 0: 1 else: 0))
                     }
 
-                    (__ci_expr_logic_11 = (if __ci_expr_logic_10 != 0: 1 else: 0))
+                    (set_bit = __ci_expr_logic_10)
 
-                }
+                },
+                11 => {
+                    (set_bit = (if ((prop.scriptx_bidiclass as c_int) >> (11 as c_uint)) == pdata: 1 else: 0))
+                },
+                12 => {
+                    (set_bit = (if ((unsafe: ((&_pcre2_ucd_boolprop_sets_8[0] as *const c_uint) + (((prop.bprops & 4095) as isize) as usize))[(pdata / 32)]) & ((1 as c_uint) << ((pdata % 32) as c_uint))) != 0: 1 else: 0))
+                },
+                14 => {
+                    (chartype = prop.chartype)
 
-                (set_bit = __ci_expr_logic_11)
+                    (gentype = _pcre2_ucp_gentype_8[chartype])
 
+                    var __ci_expr_logic_12: c_int = 0
 
-            },
-            15 => {
-                (chartype = prop.chartype)
+                    if ((if gentype != 6: 1 else: 0) != 0) {
+                        var __ci_expr_logic_11: c_int
 
-                var __ci_expr_logic_14: c_int = 0
+                        if ((if gentype != 0: 1 else: 0) != 0) {
+                            (__ci_expr_logic_11 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_11 = (if (if chartype == ucp_Cf: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                var __ci_expr_logic_12: c_int = 0
+                        (__ci_expr_logic_12 = (if __ci_expr_logic_11 != 0: 1 else: 0))
 
-                if ((if chartype != ucp_Zl: 1 else: 0) != 0) {
-                    (__ci_expr_logic_12 = (if (if chartype != ucp_Zp: 1 else: 0) != 0: 1 else: 0))
-                }
-
-                if (__ci_expr_logic_12 != 0) {
-                    var __ci_expr_logic_13: c_int
-
-                    if ((if _pcre2_ucp_gentype_8[chartype] != 0: 1 else: 0) != 0) {
-                        (__ci_expr_logic_13 = (if true: 1 else: 0))
-                    } else {
-                        (__ci_expr_logic_13 = (if (if chartype == ucp_Cf: 1 else: 0) != 0: 1 else: 0))
                     }
 
-                    (__ci_expr_logic_14 = (if __ci_expr_logic_13 != 0: 1 else: 0))
-
-                }
-
-                (set_bit = __ci_expr_logic_14)
+                    (set_bit = __ci_expr_logic_12)
 
 
-            },
-            16 => {
-                (gentype = _pcre2_ucp_gentype_8[prop.chartype])
+                },
+                15 => {
+                    (chartype = prop.chartype)
 
-                var __ci_expr_logic_16: c_int
-
-                if ((if gentype == 4: 1 else: 0) != 0) {
-                    (__ci_expr_logic_16 = (if true: 1 else: 0))
-                } else {
                     var __ci_expr_logic_15: c_int = 0
 
-                    if ((if c < 128: 1 else: 0) != 0) {
-                        (__ci_expr_logic_15 = (if (if gentype == 5: 1 else: 0) != 0: 1 else: 0))
+                    var __ci_expr_logic_13: c_int = 0
+
+                    if ((if chartype != ucp_Zl: 1 else: 0) != 0) {
+                        (__ci_expr_logic_13 = (if (if chartype != ucp_Zp: 1 else: 0) != 0: 1 else: 0))
                     }
 
-                    (__ci_expr_logic_16 = (if __ci_expr_logic_15 != 0: 1 else: 0))
+                    if (__ci_expr_logic_13 != 0) {
+                        var __ci_expr_logic_14: c_int
 
-                }
+                        if ((if _pcre2_ucp_gentype_8[chartype] != 0: 1 else: 0) != 0) {
+                            (__ci_expr_logic_14 = (if true: 1 else: 0))
+                        } else {
+                            (__ci_expr_logic_14 = (if (if chartype == ucp_Cf: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                (set_bit = __ci_expr_logic_16)
+                        (__ci_expr_logic_15 = (if __ci_expr_logic_14 != 0: 1 else: 0))
 
-
-            },
-            _ => {
-                while true {
-                    if (not (0 != 0)) {
-                        break
                     }
-                }
 
-                var __ci_expr_logic_21: c_int
+                    (set_bit = __ci_expr_logic_15)
 
-                var __ci_expr_logic_19: c_int
 
-                var __ci_expr_logic_17: c_int = 0
+                },
+                16 => {
+                    (gentype = _pcre2_ucp_gentype_8[prop.chartype])
 
-                if ((if c >= 48: 1 else: 0) != 0) {
-                    (__ci_expr_logic_17 = (if (if c <= 57: 1 else: 0) != 0: 1 else: 0))
-                }
+                    var __ci_expr_logic_17: c_int
 
-                if (__ci_expr_logic_17 != 0) {
-                    (__ci_expr_logic_19 = (if true: 1 else: 0))
-                } else {
+                    if ((if gentype == 4: 1 else: 0) != 0) {
+                        (__ci_expr_logic_17 = (if true: 1 else: 0))
+                    } else {
+                        var __ci_expr_logic_16: c_int = 0
+
+                        if ((if c < 128: 1 else: 0) != 0) {
+                            (__ci_expr_logic_16 = (if (if gentype == 5: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        (__ci_expr_logic_17 = (if __ci_expr_logic_16 != 0: 1 else: 0))
+
+                    }
+
+                    (set_bit = __ci_expr_logic_17)
+
+
+                },
+                _ => {
+                    while true {
+                        if (not (0 != 0)) {
+                            break
+                        }
+                    }
+
+                    var __ci_expr_logic_22: c_int
+
+                    var __ci_expr_logic_20: c_int
+
                     var __ci_expr_logic_18: c_int = 0
 
-                    if ((if c >= 65: 1 else: 0) != 0) {
-                        (__ci_expr_logic_18 = (if (if c <= 70: 1 else: 0) != 0: 1 else: 0))
+                    if ((if c >= 48: 1 else: 0) != 0) {
+                        (__ci_expr_logic_18 = (if (if c <= 57: 1 else: 0) != 0: 1 else: 0))
                     }
 
-                    (__ci_expr_logic_19 = (if __ci_expr_logic_18 != 0: 1 else: 0))
+                    if (__ci_expr_logic_18 != 0) {
+                        (__ci_expr_logic_20 = (if true: 1 else: 0))
+                    } else {
+                        var __ci_expr_logic_19: c_int = 0
 
-                }
+                        if ((if c >= 65: 1 else: 0) != 0) {
+                            (__ci_expr_logic_19 = (if (if c <= 70: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                if (__ci_expr_logic_19 != 0) {
-                    (__ci_expr_logic_21 = (if true: 1 else: 0))
-                } else {
-                    var __ci_expr_logic_20: c_int = 0
+                        (__ci_expr_logic_20 = (if __ci_expr_logic_19 != 0: 1 else: 0))
 
-                    if ((if c >= 97: 1 else: 0) != 0) {
-                        (__ci_expr_logic_20 = (if (if c <= 102: 1 else: 0) != 0: 1 else: 0))
                     }
 
-                    (__ci_expr_logic_21 = (if __ci_expr_logic_20 != 0: 1 else: 0))
+                    if (__ci_expr_logic_20 != 0) {
+                        (__ci_expr_logic_22 = (if true: 1 else: 0))
+                    } else {
+                        var __ci_expr_logic_21: c_int = 0
 
-                }
+                        if ((if c >= 97: 1 else: 0) != 0) {
+                            (__ci_expr_logic_21 = (if (if c <= 102: 1 else: 0) != 0: 1 else: 0))
+                        }
 
-                (set_bit = __ci_expr_logic_21)
+                        (__ci_expr_logic_22 = (if __ci_expr_logic_21 != 0: 1 else: 0))
+
+                    }
+
+                    (set_bit = __ci_expr_logic_22)
 
 
-            },
+                },
+            }
+
+            break
+
         }
 
         if (negated != 0) {
@@ -512,7 +579,98 @@ fn _pcre2_compile_class_not_nested_8(options: c_uint, xoptions: c_uint, start_pt
                             }
 
                             if (__ci_expr_logic_5 != 0) {
-                                0
+                                match posix_class__goto_1176_7 {
+                                    8 => {
+                                        var __ci_expr_ternary_7: c_int = 0
+
+                                        if ((if posix_class__goto_1176_7 == 8: 1 else: 0) != 0) {
+                                            (__ci_expr_ternary_7 = 14)
+                                        } else {
+                                            var __ci_expr_ternary_6: c_int = 0
+
+                                            if ((if posix_class__goto_1176_7 == 9: 1 else: 0) != 0) {
+                                                (__ci_expr_ternary_6 = 15)
+                                            } else {
+                                                (__ci_expr_ternary_6 = 16)
+                                            }
+
+                                            (__ci_expr_ternary_7 = __ci_expr_ternary_6)
+
+                                        }
+
+                                        (ptype__goto_1211_16 = __ci_expr_ternary_7)
+
+
+                                        _pcre2_update_classbits_8(ptype__goto_1211_16, 0, local_negate__goto_1175_8, classbits__goto_1082_16)
+
+                                        if ((if (xclass_props__goto_1093_10 & 16) == 0: 1 else: 0) != 0) {
+                                            if ((if lengthptr != null: 1 else: 0) != 0) {
+                                                ((unsafe: *lengthptr) = (unsafe: *lengthptr) + 3)
+                                            } else {
+                                                var __ci_expr_old_8: *mut u8 = class_uchardata__goto_1094_14
+
+                                                (class_uchardata__goto_1094_14 = class_uchardata__goto_1094_14 + 1)
+
+                                                var __ci_expr_ternary_9: c_int = 0
+
+                                                if (local_negate__goto_1175_8 != 0) {
+                                                    (__ci_expr_ternary_9 = 4)
+                                                } else {
+                                                    (__ci_expr_ternary_9 = 3)
+                                                }
+
+                                                ((unsafe: *__ci_expr_old_8) = __ci_expr_ternary_9)
+
+
+                                                if (__goto_pending != 0) {
+                                                    break
+                                                }
+
+                                                var __ci_expr_old_10: *mut u8 = class_uchardata__goto_1094_14
+
+                                                (class_uchardata__goto_1094_14 = class_uchardata__goto_1094_14 + 1)
+
+                                                ((unsafe: *__ci_expr_old_10) = ((ptype__goto_1211_16 as u8)))
+
+
+                                                if (__goto_pending != 0) {
+                                                    break
+                                                }
+
+                                                var __ci_expr_old_11: *mut u8 = class_uchardata__goto_1094_14
+
+                                                (class_uchardata__goto_1094_14 = class_uchardata__goto_1094_14 + 1)
+
+                                                ((unsafe: *__ci_expr_old_11) = 0)
+
+
+                                                if (__goto_pending != 0) {
+                                                    break
+                                                }
+
+                                            }
+
+                                            if (__goto_pending != 0) {
+                                                break
+                                            }
+
+                                            (xclass_props__goto_1093_10 = xclass_props__goto_1093_10 | 5)
+
+                                            if (__goto_pending != 0) {
+                                                break
+                                            }
+
+                                        }
+
+                                        continue
+
+                                    },
+                                }
+
+                                if (__goto_pending != 0) {
+                                    break
+                                }
+
                             }
 
 
@@ -617,13 +775,6 @@ fn _pcre2_compile_class_not_nested_8(options: c_uint, xoptions: c_uint, start_pt
                             (xclass_props__goto_1093_10 = xclass_props__goto_1093_10 | 2)
 
                             continue
-
-                            var __ci_expr_old_12: *mut c_uint = pptr__goto_1076_11
-
-                            (pptr__goto_1076_11 = pptr__goto_1076_11 + 1)
-
-                            (meta__goto_1174_12 = (unsafe: *__ci_expr_old_12))
-
 
                         },
                         2147811328 => {
@@ -893,14 +1044,6 @@ fn _pcre2_compile_class_not_nested_8(options: c_uint, xoptions: c_uint, start_pt
                             (xclass_props__goto_1093_10 = xclass_props__goto_1093_10 | 2)
 
                             continue
-
-                            if ((if meta__goto_1174_12 < 2147483648: 1 else: 0) != 0) {
-                                break
-                            }
-
-                            __pc = 1
-                            __goto_pending = 1
-
 
                         },
                         _ => {
@@ -1326,7 +1469,7 @@ fn _pcre2_compile_class_not_nested_8(options: c_uint, xoptions: c_uint, start_pt
                             continue
                         }
                         if ((if lengthptr != null: 1 else: 0) != 0) {
-                            (char_lists_size__goto_1748_12 = (char_lists_size__goto_1748_12 +% 3) & (~3))
+                            (char_lists_size__goto_1748_12 = (char_lists_size__goto_1748_12 +% (sizeof[c_uint]() -% 1)) & (~(sizeof[c_uint]() -% 1)))
                             if (__goto_pending != 0) {
                                 continue
                             }
@@ -1414,7 +1557,7 @@ fn _pcre2_compile_class_not_nested_8(options: c_uint, xoptions: c_uint, start_pt
                             if (__goto_pending != 0) {
                                 continue
                             }
-                            (cb.char_lists_size = (char_lists_size__goto_1748_12 +% 3) & (~3))
+                            (cb.char_lists_size = (char_lists_size__goto_1748_12 +% (sizeof[c_uint]() -% 1)) & (~(sizeof[c_uint]() -% 1)))
                             if (__goto_pending != 0) {
                                 continue
                             }
@@ -2300,142 +2443,180 @@ fn parse_class(__param_ptr: *mut c_uint, options: c_uint, __param_buffer: *mut c
     var start_char: c_uint
 
     while (1 != 0) {
-        match ((unsafe: *ptr) & (4294901760 as c_uint)) {
-            2149318656 => {
-                (meta_arg = (unsafe: *ptr) & 65535)
+        var __ci_expr_switch_continue_2: i32 = 0
 
-                match meta_arg {
-                    6 | 10 | 8 => {
-                        (buffer = append_non_ascii_range(options, buffer))
+        while true {
+            match ((unsafe: *ptr) & (4294901760 as c_uint)) {
+                2149318656 => {
+                    (meta_arg = (unsafe: *ptr) & 65535)
 
-                        (total_size = total_size + 2)
+                    while true {
+                        match meta_arg {
+                            6 => {
+                                (buffer = append_non_ascii_range(options, buffer))
 
-                    },
-                    19 => {
-                        (size = append_char_list((&_pcre2_hspace_list_8[0] as *mut c_uint), buffer))
+                                (total_size = total_size + 2)
 
-                        (total_size = total_size + size)
+                            },
+                            10 => {
+                                (buffer = append_non_ascii_range(options, buffer))
 
-                        if ((if buffer != null: 1 else: 0) != 0) {
-                            (buffer = buffer + size)
+                                (total_size = total_size + 2)
+
+                            },
+                            8 => {
+                                (buffer = append_non_ascii_range(options, buffer))
+
+                                (total_size = total_size + 2)
+
+                            },
+                            19 => {
+                                (size = append_char_list((&_pcre2_hspace_list_8[0] as *mut c_uint), buffer))
+
+                                (total_size = total_size + size)
+
+                                if ((if buffer != null: 1 else: 0) != 0) {
+                                    (buffer = buffer + size)
+                                }
+
+                            },
+                            18 => {
+                                (size = append_negated_char_list((&_pcre2_hspace_list_8[0] as *mut c_uint), options, buffer))
+
+                                (total_size = total_size + size)
+
+                                if ((if buffer != null: 1 else: 0) != 0) {
+                                    (buffer = buffer + size)
+                                }
+
+                            },
+                            21 => {
+                                (size = append_char_list((&_pcre2_vspace_list_8[0] as *mut c_uint), buffer))
+
+                                (total_size = total_size + size)
+
+                                if ((if buffer != null: 1 else: 0) != 0) {
+                                    (buffer = buffer + size)
+                                }
+
+                            },
+                            20 => {
+                                (size = append_negated_char_list((&_pcre2_vspace_list_8[0] as *mut c_uint), options, buffer))
+
+                                (total_size = total_size + size)
+
+                                if ((if buffer != null: 1 else: 0) != 0) {
+                                    (buffer = buffer + size)
+                                }
+
+                            },
+                            16 => {
+                                (ptr = ptr + 1)
+
+                                var __ci_expr_logic_0: c_int = 0
+
+                                if ((if meta_arg == 16: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_0 = (if (if (((unsafe: *ptr) as c_uint) >> (16 as c_uint)) == 13: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_0 != 0) {
+                                    if ((if buffer != null: 1 else: 0) != 0) {
+                                        ((unsafe: buffer[0]) = 0)
+
+                                        ((unsafe: buffer[1]) = get_highest_char(options))
+
+                                        (buffer = buffer + 2)
+
+                                    }
+
+                                    (total_size = total_size + 2)
+
+                                }
+
+
+                            },
+                            15 => {
+                                (ptr = ptr + 1)
+
+                                var __ci_expr_logic_0: c_int = 0
+
+                                if ((if meta_arg == 16: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_0 = (if (if (((unsafe: *ptr) as c_uint) >> (16 as c_uint)) == 13: 1 else: 0) != 0: 1 else: 0))
+                                }
+
+                                if (__ci_expr_logic_0 != 0) {
+                                    if ((if buffer != null: 1 else: 0) != 0) {
+                                        ((unsafe: buffer[0]) = 0)
+
+                                        ((unsafe: buffer[1]) = get_highest_char(options))
+
+                                        (buffer = buffer + 2)
+
+                                    }
+
+                                    (total_size = total_size + 2)
+
+                                }
+
+
+                            },
                         }
 
-                    },
-                    18 => {
-                        (size = append_negated_char_list((&_pcre2_hspace_list_8[0] as *mut c_uint), options, buffer))
+                        break
 
-                        (total_size = total_size + size)
+                    }
 
-                        if ((if buffer != null: 1 else: 0) != 0) {
-                            (buffer = buffer + size)
-                        }
+                    (ptr = ptr + 1)
 
-                    },
-                    21 => {
-                        (size = append_char_list((&_pcre2_vspace_list_8[0] as *mut c_uint), buffer))
+                    continue
 
-                        (total_size = total_size + size)
+                },
+                2149646336 => {
+                    (buffer = append_non_ascii_range(options, buffer))
 
-                        if ((if buffer != null: 1 else: 0) != 0) {
-                            (buffer = buffer + size)
-                        }
+                    (total_size = total_size + 2)
 
-                    },
-                    20 => {
-                        (size = append_negated_char_list((&_pcre2_vspace_list_8[0] as *mut c_uint), options, buffer))
+                    (ptr = ptr + 2)
 
-                        (total_size = total_size + size)
+                    continue
 
-                        if ((if buffer != null: 1 else: 0) != 0) {
-                            (buffer = buffer + size)
-                        }
+                },
+                2149580800 => {
+                    (ptr = ptr + 2)
 
-                    },
-                    16 | 15 => {
-                        (ptr = ptr + 1)
+                    continue
 
-                        var __ci_expr_logic_0: c_int = 0
+                },
+                2147811328 => {
+                    (ptr = ptr + 1)
+                },
+                _ => {
+                    if ((if (unsafe: *ptr) >= 2147483648: 1 else: 0) != 0) {
+                        return total_size
+                    }
+                },
+            }
 
-                        if ((if meta_arg == 16: 1 else: 0) != 0) {
-                            (__ci_expr_logic_0 = (if (if (((unsafe: *ptr) as c_uint) >> (16 as c_uint)) == 13: 1 else: 0) != 0: 1 else: 0))
-                        }
+            break
 
-                        if (__ci_expr_logic_0 != 0) {
-                            if ((if buffer != null: 1 else: 0) != 0) {
-                                ((unsafe: buffer[0]) = 0)
-
-                                ((unsafe: buffer[1]) = get_highest_char(options))
-
-                                (buffer = buffer + 2)
-
-                            }
-
-                            (total_size = total_size + 2)
-
-                        }
-
-
-                    },
-                }
-
-                (ptr = ptr + 1)
-
-                continue
-
-                (buffer = append_non_ascii_range(options, buffer))
-
-                (total_size = total_size + 2)
-
-                (ptr = ptr + 2)
-
-                continue
-
-
-            },
-            2149646336 => {
-                (buffer = append_non_ascii_range(options, buffer))
-
-                (total_size = total_size + 2)
-
-                (ptr = ptr + 2)
-
-                continue
-
-                (ptr = ptr + 2)
-
-                continue
-
-
-            },
-            2149580800 => {
-                (ptr = ptr + 2)
-
-                continue
-
-                (ptr = ptr + 1)
-
-            },
-            2147811328 => {
-                (ptr = ptr + 1)
-            },
-            _ => {
-                if ((if (unsafe: *ptr) >= 2147483648: 1 else: 0) != 0) {
-                    return total_size
-                }
-            },
         }
+
+        if (__ci_expr_switch_continue_2 != 0) {
+            continue
+        }
+
 
         (start_char = (unsafe: *ptr))
 
-        var __ci_expr_logic_1: c_int
+        var __ci_expr_logic_3: c_int
 
         if ((if (unsafe: ptr[1]) == 2149777408: 1 else: 0) != 0) {
-            (__ci_expr_logic_1 = (if true: 1 else: 0))
+            (__ci_expr_logic_3 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_1 = (if (if (unsafe: ptr[1]) == 2149711872: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_3 = (if (if (unsafe: ptr[1]) == 2149711872: 1 else: 0) != 0: 1 else: 0))
         }
 
-        if (__ci_expr_logic_1 != 0) {
+        if (__ci_expr_logic_3 != 0) {
             (ptr = ptr + 2)
 
             while true {
@@ -2452,11 +2633,11 @@ fn parse_class(__param_ptr: *mut c_uint, options: c_uint, __param_buffer: *mut c
 
 
         if ((options & 2) != 0) {
-            var __ci_expr_old_2: *mut c_uint = ptr
+            var __ci_expr_old_4: *mut c_uint = ptr
 
             (ptr = ptr + 1)
 
-            (size = utf_caseless_extend(start_char, (unsafe: *__ci_expr_old_2), options, buffer))
+            (size = utf_caseless_extend(start_char, (unsafe: *__ci_expr_old_4), options, buffer))
 
 
             if ((if buffer != null: 1 else: 0) != 0) {
@@ -3189,187 +3370,192 @@ fn fold_negation(pop_info: *mut eclass_op_info, lengthptr: *mut c_ulong, preserv
 }
 
 fn fold_binary(op: c_int, lhs_op_info: *mut eclass_op_info, rhs_op_info: *mut eclass_op_info, lengthptr: *mut c_ulong) {
-    match op {
-        1 => {
-            if (not ((if rhs_op_info.op_single_type == 6: 1 else: 0) != 0)) {
-                if ((if lhs_op_info.op_single_type == 6: 1 else: 0) != 0) {
-                    if ((if lengthptr == null: 1 else: 0) != 0) {
-                        with_memmove((lhs_op_info.code_start as *i8), (rhs_op_info.code_start as *i8), ((rhs_op_info.length *% 1) as i64))
-                    }
-
-                    (lhs_op_info.length = rhs_op_info.length)
-
-                    (lhs_op_info.op_single_type = rhs_op_info.op_single_type)
-
-                } else {
-                    if ((if rhs_op_info.op_single_type == 7: 1 else: 0) != 0) {
+    while true {
+        match op {
+            1 => {
+                if (not ((if rhs_op_info.op_single_type == 6: 1 else: 0) != 0)) {
+                    if ((if lhs_op_info.op_single_type == 6: 1 else: 0) != 0) {
                         if ((if lengthptr == null: 1 else: 0) != 0) {
-                            ((unsafe: lhs_op_info.code_start[0]) = 7)
+                            with_memmove((lhs_op_info.code_start as *i8), (rhs_op_info.code_start as *i8), ((rhs_op_info.length *% 1) as i64))
                         }
 
-                        (lhs_op_info.length = 1)
+                        (lhs_op_info.length = rhs_op_info.length)
 
-                        (lhs_op_info.op_single_type = 7)
+                        (lhs_op_info.op_single_type = rhs_op_info.op_single_type)
 
                     } else {
-                        if (not ((if lhs_op_info.op_single_type == 7: 1 else: 0) != 0)) {
-                            if ((if lengthptr != null: 1 else: 0) != 0) {
-                                ((unsafe: *lengthptr) = (unsafe: *lengthptr) + 1)
-                            } else {
-                                while true {
-                                    if (not (0 != 0)) {
-                                        break
-                                    }
-                                }
-
-                                ((unsafe: rhs_op_info.code_start[rhs_op_info.length]) = 1)
-
-                            }
-
-                            (lhs_op_info.length = lhs_op_info.length + (rhs_op_info.length +% 1))
-
-                            (lhs_op_info.op_single_type = 0)
-
-                        }
-                    }
-                }
-            }
-
-            var i: c_int = 0
-
-            while ((if i < 8: 1 else: 0) != 0) {
-                (lhs_op_info.bits.classwords[i] = lhs_op_info.bits.classwords[i] & rhs_op_info.bits.classwords[i])
-
-                (i = i + 1)
-
-            }
-
-
-        },
-        2 => {
-            if (not ((if rhs_op_info.op_single_type == 7: 1 else: 0) != 0)) {
-                if ((if lhs_op_info.op_single_type == 7: 1 else: 0) != 0) {
-                    if ((if lengthptr == null: 1 else: 0) != 0) {
-                        with_memmove((lhs_op_info.code_start as *i8), (rhs_op_info.code_start as *i8), ((rhs_op_info.length *% 1) as i64))
-                    }
-
-                    (lhs_op_info.length = rhs_op_info.length)
-
-                    (lhs_op_info.op_single_type = rhs_op_info.op_single_type)
-
-                } else {
-                    if ((if rhs_op_info.op_single_type == 6: 1 else: 0) != 0) {
-                        if ((if lengthptr == null: 1 else: 0) != 0) {
-                            ((unsafe: lhs_op_info.code_start[0]) = 6)
-                        }
-
-                        (lhs_op_info.length = 1)
-
-                        (lhs_op_info.op_single_type = 6)
-
-                    } else {
-                        if (not ((if lhs_op_info.op_single_type == 6: 1 else: 0) != 0)) {
-                            if ((if lengthptr != null: 1 else: 0) != 0) {
-                                ((unsafe: *lengthptr) = (unsafe: *lengthptr) + 1)
-                            } else {
-                                while true {
-                                    if (not (0 != 0)) {
-                                        break
-                                    }
-                                }
-
-                                ((unsafe: rhs_op_info.code_start[rhs_op_info.length]) = 2)
-
-                            }
-
-                            (lhs_op_info.length = lhs_op_info.length + (rhs_op_info.length +% 1))
-
-                            (lhs_op_info.op_single_type = 0)
-
-                        }
-                    }
-                }
-            }
-
-            var i_1: c_int = 0
-
-            while ((if i_1 < 8: 1 else: 0) != 0) {
-                (lhs_op_info.bits.classwords[i_1] = lhs_op_info.bits.classwords[i_1] | rhs_op_info.bits.classwords[i_1])
-
-                (i_1 = i_1 + 1)
-
-            }
-
-
-        },
-        3 => {
-            if (not ((if rhs_op_info.op_single_type == 7: 1 else: 0) != 0)) {
-                if ((if lhs_op_info.op_single_type == 7: 1 else: 0) != 0) {
-                    if ((if lengthptr == null: 1 else: 0) != 0) {
-                        with_memmove((lhs_op_info.code_start as *i8), (rhs_op_info.code_start as *i8), ((rhs_op_info.length *% 1) as i64))
-                    }
-
-                    (lhs_op_info.length = rhs_op_info.length)
-
-                    (lhs_op_info.op_single_type = rhs_op_info.op_single_type)
-
-                } else {
-                    if ((if rhs_op_info.op_single_type == 6: 1 else: 0) != 0) {
-                        fold_negation(lhs_op_info, lengthptr, 1)
-
-                    } else {
-                        if ((if lhs_op_info.op_single_type == 6: 1 else: 0) != 0) {
+                        if ((if rhs_op_info.op_single_type == 7: 1 else: 0) != 0) {
                             if ((if lengthptr == null: 1 else: 0) != 0) {
-                                with_memmove((lhs_op_info.code_start as *i8), (rhs_op_info.code_start as *i8), ((rhs_op_info.length *% 1) as i64))
+                                ((unsafe: lhs_op_info.code_start[0]) = 7)
                             }
 
-                            (lhs_op_info.length = rhs_op_info.length)
+                            (lhs_op_info.length = 1)
 
-                            (lhs_op_info.op_single_type = rhs_op_info.op_single_type)
+                            (lhs_op_info.op_single_type = 7)
 
+                        } else {
+                            if (not ((if lhs_op_info.op_single_type == 7: 1 else: 0) != 0)) {
+                                if ((if lengthptr != null: 1 else: 0) != 0) {
+                                    ((unsafe: *lengthptr) = (unsafe: *lengthptr) + 1)
+                                } else {
+                                    while true {
+                                        if (not (0 != 0)) {
+                                            break
+                                        }
+                                    }
+
+                                    ((unsafe: rhs_op_info.code_start[rhs_op_info.length]) = 1)
+
+                                }
+
+                                (lhs_op_info.length = lhs_op_info.length + (rhs_op_info.length +% 1))
+
+                                (lhs_op_info.op_single_type = 0)
+
+                            }
+                        }
+                    }
+                }
+
+                var i: c_int = 0
+
+                while ((if i < 8: 1 else: 0) != 0) {
+                    (lhs_op_info.bits.classwords[i] = lhs_op_info.bits.classwords[i] & rhs_op_info.bits.classwords[i])
+
+                    (i = i + 1)
+
+                }
+
+
+            },
+            2 => {
+                if (not ((if rhs_op_info.op_single_type == 7: 1 else: 0) != 0)) {
+                    if ((if lhs_op_info.op_single_type == 7: 1 else: 0) != 0) {
+                        if ((if lengthptr == null: 1 else: 0) != 0) {
+                            with_memmove((lhs_op_info.code_start as *i8), (rhs_op_info.code_start as *i8), ((rhs_op_info.length *% 1) as i64))
+                        }
+
+                        (lhs_op_info.length = rhs_op_info.length)
+
+                        (lhs_op_info.op_single_type = rhs_op_info.op_single_type)
+
+                    } else {
+                        if ((if rhs_op_info.op_single_type == 6: 1 else: 0) != 0) {
+                            if ((if lengthptr == null: 1 else: 0) != 0) {
+                                ((unsafe: lhs_op_info.code_start[0]) = 6)
+                            }
+
+                            (lhs_op_info.length = 1)
+
+                            (lhs_op_info.op_single_type = 6)
+
+                        } else {
+                            if (not ((if lhs_op_info.op_single_type == 6: 1 else: 0) != 0)) {
+                                if ((if lengthptr != null: 1 else: 0) != 0) {
+                                    ((unsafe: *lengthptr) = (unsafe: *lengthptr) + 1)
+                                } else {
+                                    while true {
+                                        if (not (0 != 0)) {
+                                            break
+                                        }
+                                    }
+
+                                    ((unsafe: rhs_op_info.code_start[rhs_op_info.length]) = 2)
+
+                                }
+
+                                (lhs_op_info.length = lhs_op_info.length + (rhs_op_info.length +% 1))
+
+                                (lhs_op_info.op_single_type = 0)
+
+                            }
+                        }
+                    }
+                }
+
+                var i_1: c_int = 0
+
+                while ((if i_1 < 8: 1 else: 0) != 0) {
+                    (lhs_op_info.bits.classwords[i_1] = lhs_op_info.bits.classwords[i_1] | rhs_op_info.bits.classwords[i_1])
+
+                    (i_1 = i_1 + 1)
+
+                }
+
+
+            },
+            3 => {
+                if (not ((if rhs_op_info.op_single_type == 7: 1 else: 0) != 0)) {
+                    if ((if lhs_op_info.op_single_type == 7: 1 else: 0) != 0) {
+                        if ((if lengthptr == null: 1 else: 0) != 0) {
+                            with_memmove((lhs_op_info.code_start as *i8), (rhs_op_info.code_start as *i8), ((rhs_op_info.length *% 1) as i64))
+                        }
+
+                        (lhs_op_info.length = rhs_op_info.length)
+
+                        (lhs_op_info.op_single_type = rhs_op_info.op_single_type)
+
+                    } else {
+                        if ((if rhs_op_info.op_single_type == 6: 1 else: 0) != 0) {
                             fold_negation(lhs_op_info, lengthptr, 1)
 
                         } else {
-                            if ((if lengthptr != null: 1 else: 0) != 0) {
-                                ((unsafe: *lengthptr) = (unsafe: *lengthptr) + 1)
-                            } else {
-                                while true {
-                                    if (not (0 != 0)) {
-                                        break
-                                    }
+                            if ((if lhs_op_info.op_single_type == 6: 1 else: 0) != 0) {
+                                if ((if lengthptr == null: 1 else: 0) != 0) {
+                                    with_memmove((lhs_op_info.code_start as *i8), (rhs_op_info.code_start as *i8), ((rhs_op_info.length *% 1) as i64))
                                 }
 
-                                ((unsafe: rhs_op_info.code_start[rhs_op_info.length]) = 3)
+                                (lhs_op_info.length = rhs_op_info.length)
+
+                                (lhs_op_info.op_single_type = rhs_op_info.op_single_type)
+
+                                fold_negation(lhs_op_info, lengthptr, 1)
+
+                            } else {
+                                if ((if lengthptr != null: 1 else: 0) != 0) {
+                                    ((unsafe: *lengthptr) = (unsafe: *lengthptr) + 1)
+                                } else {
+                                    while true {
+                                        if (not (0 != 0)) {
+                                            break
+                                        }
+                                    }
+
+                                    ((unsafe: rhs_op_info.code_start[rhs_op_info.length]) = 3)
+
+                                }
+
+                                (lhs_op_info.length = lhs_op_info.length + (rhs_op_info.length +% 1))
+
+                                (lhs_op_info.op_single_type = 0)
 
                             }
-
-                            (lhs_op_info.length = lhs_op_info.length + (rhs_op_info.length +% 1))
-
-                            (lhs_op_info.op_single_type = 0)
-
                         }
                     }
                 }
-            }
 
-            var i_2: c_int = 0
+                var i_2: c_int = 0
 
-            while ((if i_2 < 8: 1 else: 0) != 0) {
-                (lhs_op_info.bits.classwords[i_2] = lhs_op_info.bits.classwords[i_2] ^ rhs_op_info.bits.classwords[i_2])
+                while ((if i_2 < 8: 1 else: 0) != 0) {
+                    (lhs_op_info.bits.classwords[i_2] = lhs_op_info.bits.classwords[i_2] ^ rhs_op_info.bits.classwords[i_2])
 
-                (i_2 = i_2 + 1)
+                    (i_2 = i_2 + 1)
 
-            }
-
-
-        },
-        _ => {
-            while true {
-                if (not (0 != 0)) {
-                    break
                 }
-            }
-        },
+
+
+            },
+            _ => {
+                while true {
+                    if (not (0 != 0)) {
+                        break
+                    }
+                }
+            },
+        }
+
+        break
+
     }
 
 }
@@ -4611,3 +4797,5 @@ fn compile_class_binary_loose(context: *mut eclass_context, negated: c_int, pptr
     return 1
 
 }
+
+let char_list_starts: [3]c_uint = [0x10000, 0x8000, 0x100]

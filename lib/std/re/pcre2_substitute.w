@@ -1117,7 +1117,108 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                 (__goto_pending = 0)
                 (new_forcecase__goto_1476_18 = case_state { to_case: 0, single_char: 0 })
                 if ((if ptr__goto_763_12 < (repend__goto_764_12 - ((1 as isize) as usize)): 1 else: 0) != 0) {
-                    0
+                    match (unsafe: ptr__goto_763_12[1]) {
+                        76 => {
+                            (new_forcecase__goto_1476_18.to_case = 1)
+
+                            (new_forcecase__goto_1476_18.single_char = 0)
+
+                            (ptr__goto_763_12 = ptr__goto_763_12 + 2)
+
+                        },
+                        108 => {
+                            (new_forcecase__goto_1476_18.to_case = 1)
+
+                            (new_forcecase__goto_1476_18.single_char = 1)
+
+                            (ptr__goto_763_12 = ptr__goto_763_12 + 2)
+
+                            var __ci_expr_logic_25: c_int = 0
+
+                            var __ci_expr_logic_24: c_int = 0
+
+                            if ((if (ptr__goto_763_12 + ((2 as isize) as usize)) < repend__goto_764_12: 1 else: 0) != 0) {
+                                (__ci_expr_logic_24 = (if (if (unsafe: ptr__goto_763_12[0]) == 92: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_24 != 0) {
+                                (__ci_expr_logic_25 = (if (if (unsafe: ptr__goto_763_12[1]) == 85: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_25 != 0) {
+                                (new_forcecase__goto_1476_18.to_case = 4)
+
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
+                                (new_forcecase__goto_1476_18.single_char = 0)
+
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
+                                (ptr__goto_763_12 = ptr__goto_763_12 + 2)
+
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
+                            }
+
+
+                        },
+                        85 => {
+                            (new_forcecase__goto_1476_18.to_case = 2)
+
+                            (new_forcecase__goto_1476_18.single_char = 0)
+
+                            (ptr__goto_763_12 = ptr__goto_763_12 + 2)
+
+                        },
+                        117 => {
+                            (new_forcecase__goto_1476_18.to_case = 3)
+
+                            (new_forcecase__goto_1476_18.single_char = 1)
+
+                            (ptr__goto_763_12 = ptr__goto_763_12 + 2)
+
+                            var __ci_expr_logic_27: c_int = 0
+
+                            var __ci_expr_logic_26: c_int = 0
+
+                            if ((if (ptr__goto_763_12 + ((2 as isize) as usize)) < repend__goto_764_12: 1 else: 0) != 0) {
+                                (__ci_expr_logic_26 = (if (if (unsafe: ptr__goto_763_12[0]) == 92: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_26 != 0) {
+                                (__ci_expr_logic_27 = (if (if (unsafe: ptr__goto_763_12[1]) == 76: 1 else: 0) != 0: 1 else: 0))
+                            }
+
+                            if (__ci_expr_logic_27 != 0) {
+                                (new_forcecase__goto_1476_18.to_case = 3)
+
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
+                                (new_forcecase__goto_1476_18.single_char = 0)
+
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
+                                (ptr__goto_763_12 = ptr__goto_763_12 + 2)
+
+                                if (__goto_pending != 0) {
+                                    continue
+                                }
+
+                            }
+
+
+                        },
+                    }
                 }
                 if (__goto_pending != 0) {
                     continue
@@ -1287,349 +1388,14 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                     continue
                 }
                 match rc__goto_748_5 {
-                    ESC_E => {
+                    25 => {
                         __pc = 4
                         __goto_pending = 1
                     },
-                    ESC_Q => {
+                    26 => {
                         (escaped_literal__goto_754_6 = 1)
 
                         continue
-
-                        if ((if rc__goto_748_5 == ESC_b: 1 else: 0) != 0) {
-                            (ch__goto_1066_14 = 8)
-                        }
-
-                        if ((if rc__goto_748_5 == ESC_v: 1 else: 0) != 0) {
-                            (ch__goto_1066_14 = 11)
-                        }
-
-                        if (utf__goto_758_6 != 0) {
-                            (chlen__goto_1067_18 = _pcre2_ord2utf_8(ch__goto_1066_14, (&temp__goto_760_13[0] as *mut u8)))
-                        } else {
-                            (temp__goto_760_13[0] = ch__goto_1066_14)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (chlen__goto_1067_18 = 1)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        }
-
-                        var __ci_expr_logic_29: c_int = 0
-
-                        if ((if forcecase__goto_975_14.to_case != 0: 1 else: 0) != 0) {
-                            (__ci_expr_logic_29 = (if (if substitute_case_callout__goto_771_14 == null: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_29 != 0) {
-                            while true {
-                                var __ci_expr_ternary_30: c_ulong = 0
-
-                                if (overflowed__goto_755_6 != 0) {
-                                    (__ci_expr_ternary_30 = 0)
-                                } else {
-                                    (__ci_expr_ternary_30 = lengthleft__goto_766_38)
-                                }
-
-                                (chkcc_rc__goto_1573_11 = default_substitute_case_callout((&temp__goto_760_13[0] as *mut u8), chkcc_length__goto_1573_11, (buffer + buff_offset__goto_766_12), __ci_expr_ternary_30, (&mut forcecase__goto_975_14 as *mut case_state), code))
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                if (overflowed__goto_755_6 != 0) {
-                                    if ((if chkcc_rc__goto_1573_11 > ((~(0 as c_ulong)) -% extra_needed__goto_765_12): 1 else: 0) != 0) {
-                                        __pc = 9
-                                        __goto_pending = 1
-                                    }
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    (extra_needed__goto_765_12 = extra_needed__goto_765_12 + chkcc_rc__goto_1573_11)
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    break
-
-                                }
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                if ((if lengthleft__goto_766_38 < chkcc_rc__goto_1573_11: 1 else: 0) != 0) {
-                                    if ((if (suboptions__goto_752_10 & 4096) == 0: 1 else: 0) != 0) {
-                                        __pc = 7
-                                        __goto_pending = 1
-                                    }
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    (overflowed__goto_755_6 = 1)
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    (extra_needed__goto_765_12 = (chkcc_rc__goto_1573_11 -% lengthleft__goto_766_38))
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                } else {
-                                    (buff_offset__goto_766_12 = buff_offset__goto_766_12 + chkcc_rc__goto_1573_11)
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    (lengthleft__goto_766_38 = lengthleft__goto_766_38 - chkcc_rc__goto_1573_11)
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                }
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                if (not (0 != 0)) {
-                                    break
-                                }
-
-                            }
-                        } else {
-                            while true {
-                                if (overflowed__goto_755_6 != 0) {
-                                    if ((if chkmc_length__goto_1575_11 > ((~(0 as c_ulong)) -% extra_needed__goto_765_12): 1 else: 0) != 0) {
-                                        __pc = 9
-                                        __goto_pending = 1
-                                    }
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    (extra_needed__goto_765_12 = extra_needed__goto_765_12 + chkmc_length__goto_1575_11)
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                } else {
-                                    if ((if lengthleft__goto_766_38 < chkmc_length__goto_1575_11: 1 else: 0) != 0) {
-                                        if ((if (suboptions__goto_752_10 & 4096) == 0: 1 else: 0) != 0) {
-                                            __pc = 7
-                                            __goto_pending = 1
-                                        }
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (overflowed__goto_755_6 = 1)
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (extra_needed__goto_765_12 = (chkmc_length__goto_1575_11 -% lengthleft__goto_766_38))
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                    } else {
-                                        with_memcpy(((buffer + buff_offset__goto_766_12) as *i8), ((&temp__goto_760_13[0] as *mut u8) as *i8), ((chkmc_length__goto_1575_11 *% 1) as i64))
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (buff_offset__goto_766_12 = buff_offset__goto_766_12 + chkmc_length__goto_1575_11)
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (lengthleft__goto_766_38 = lengthleft__goto_766_38 - chkmc_length__goto_1575_11)
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                    }
-                                }
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                if (not (0 != 0)) {
-                                    break
-                                }
-
-                            }
-                        }
-
-
-                        continue
-
-                        var __ci_expr_logic_31: c_int
-
-                        if ((if ptr__goto_763_12 >= repend__goto_764_12: 1 else: 0) != 0) {
-                            (__ci_expr_logic_31 = (if true: 1 else: 0))
-                        } else {
-                            (__ci_expr_logic_31 = (if (if (unsafe: *ptr__goto_763_12) != 60: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_31 != 0) {
-                            __pc = 11
-                            __goto_pending = 1
-                        }
-
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        (ptr__goto_763_12 = ptr__goto_763_12 + 1)
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        (name_start__goto_1581_22 = ptr__goto_763_12)
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        if ((if not (read_name_subst((&mut ptr__goto_763_12 as *mut *const u8), repend__goto_764_12, utf__goto_758_6, (code.tables + (((512 + 320) as isize) as usize))) != 0): 1 else: 0) != 0) {
-                            __pc = 11
-                            __goto_pending = 1
-                        }
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        (name_len__goto_1580_22 = ((ptr__goto_763_12 as usize) -% (name_start__goto_1581_22 as usize)) / sizeof[u8]())
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        var __ci_expr_logic_32: c_int
-
-                        if ((if ptr__goto_763_12 >= repend__goto_764_12: 1 else: 0) != 0) {
-                            (__ci_expr_logic_32 = (if true: 1 else: 0))
-                        } else {
-                            (__ci_expr_logic_32 = (if (if (unsafe: *ptr__goto_763_12) != 62: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_32 != 0) {
-                            __pc = 11
-                            __goto_pending = 1
-                        }
-
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        (ptr__goto_763_12 = ptr__goto_763_12 + 1)
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        (special__goto_1069_14 = 0)
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        (group__goto_1068_9 = -1)
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        with_memcpy(((&name__goto_1074_17[0] as *mut u8) as *i8), (name_start__goto_1581_22 as *i8), ((name_len__goto_1580_22 *% 1) as i64))
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        (name__goto_1074_17[name_len__goto_1580_22] = 0)
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        __pc = 1
-                        __goto_pending = 1
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-
-                        if ((if rc__goto_748_5 < 0: 1 else: 0) != 0) {
-                            (special__goto_1069_14 = 0)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (group__goto_1068_9 = (0 - rc__goto_748_5) - 1)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            __pc = 1
-                            __goto_pending = 1
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        }
-
-                        __pc = 11
-                        __goto_pending = 1
-
-
-
 
                     },
                     0 => {
@@ -1839,136 +1605,8 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
 
                         continue
 
-                        var __ci_expr_logic_31: c_int
-
-                        if ((if ptr__goto_763_12 >= repend__goto_764_12: 1 else: 0) != 0) {
-                            (__ci_expr_logic_31 = (if true: 1 else: 0))
-                        } else {
-                            (__ci_expr_logic_31 = (if (if (unsafe: *ptr__goto_763_12) != 60: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_31 != 0) {
-                            __pc = 11
-                            __goto_pending = 1
-                        }
-
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        (ptr__goto_763_12 = ptr__goto_763_12 + 1)
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        (name_start__goto_1581_22 = ptr__goto_763_12)
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        if ((if not (read_name_subst((&mut ptr__goto_763_12 as *mut *const u8), repend__goto_764_12, utf__goto_758_6, (code.tables + (((512 + 320) as isize) as usize))) != 0): 1 else: 0) != 0) {
-                            __pc = 11
-                            __goto_pending = 1
-                        }
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        (name_len__goto_1580_22 = ((ptr__goto_763_12 as usize) -% (name_start__goto_1581_22 as usize)) / sizeof[u8]())
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        var __ci_expr_logic_32: c_int
-
-                        if ((if ptr__goto_763_12 >= repend__goto_764_12: 1 else: 0) != 0) {
-                            (__ci_expr_logic_32 = (if true: 1 else: 0))
-                        } else {
-                            (__ci_expr_logic_32 = (if (if (unsafe: *ptr__goto_763_12) != 62: 1 else: 0) != 0: 1 else: 0))
-                        }
-
-                        if (__ci_expr_logic_32 != 0) {
-                            __pc = 11
-                            __goto_pending = 1
-                        }
-
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        (ptr__goto_763_12 = ptr__goto_763_12 + 1)
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        (special__goto_1069_14 = 0)
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        (group__goto_1068_9 = -1)
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        with_memcpy(((&name__goto_1074_17[0] as *mut u8) as *i8), (name_start__goto_1581_22 as *i8), ((name_len__goto_1580_22 *% 1) as i64))
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        (name__goto_1074_17[name_len__goto_1580_22] = 0)
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-                        __pc = 1
-                        __goto_pending = 1
-
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-
-
-                        if ((if rc__goto_748_5 < 0: 1 else: 0) != 0) {
-                            (special__goto_1069_14 = 0)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (group__goto_1068_9 = (0 - rc__goto_748_5) - 1)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            __pc = 1
-                            __goto_pending = 1
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        }
-
-                        __pc = 11
-                        __goto_pending = 1
-
-
-
                     },
-                    ESC_g => {
+                    27 => {
                         var __ci_expr_logic_31: c_int
 
                         if ((if ptr__goto_763_12 >= repend__goto_764_12: 1 else: 0) != 0) {
@@ -3882,7 +3520,79 @@ fn find_text_end(code: *const pcre2_real_code_8, ptrptr: *mut *const u8, ptrend:
                                     }
                                 } else {
                                     if ((if (unsafe: *ptr__goto_83_12) == 92: 1 else: 0) != 0) {
-                                        0
+                                        if ((if ptr__goto_83_12 < (ptrend - ((1 as isize) as usize)): 1 else: 0) != 0) {
+                                            match (unsafe: ptr__goto_83_12[1]) {
+                                                76 => {
+                                                    (ptr__goto_83_12 = ptr__goto_83_12 + 1)
+
+                                                    (ptr__goto_83_12 = ptr__goto_83_12 + 1)
+
+                                                    continue
+
+
+                                                },
+                                            }
+                                        }
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+                                        (ptr__goto_83_12 = ptr__goto_83_12 + 1)
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+                                        (erc__goto_115_9 = _pcre2_check_escape_8((&mut ptr__goto_83_12 as *mut *const u8), ptrend, (&mut ch__goto_117_14 as *mut c_uint), (&mut errorcode__goto_116_9 as *mut c_int), code.overall_options, code.extra_options, code.top_bracket, 0, null))
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+                                        if ((if errorcode__goto_116_9 != 0: 1 else: 0) != 0) {
+                                            (rc__goto_80_5 = -57)
+                                            if (__goto_pending != 0) {
+                                                break
+                                            }
+                                            __pc = 1
+                                            __goto_pending = 1
+                                            if (__goto_pending != 0) {
+                                                break
+                                            }
+                                        }
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+                                        (esc_end_ptr__goto_118_16 = ptr__goto_83_12)
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+                                        (ptr__goto_83_12 = ptr__goto_83_12 - 1)
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
+                                        match erc__goto_115_9 {
+                                            0 => {
+                                                0
+                                            },
+                                            26 => {
+                                                (literal__goto_82_6 = 1)
+                                            },
+                                            27 => {
+                                                0
+                                            },
+                                            _ => {
+                                                if ((if erc__goto_115_9 < 0: 1 else: 0) != 0) {
+                                                    break
+                                                }
+
+                                                (ptr__goto_83_12 = esc_end_ptr__goto_118_16)
+
+                                                (rc__goto_80_5 = -57)
+
+                                                __pc = 1
+                                                __goto_pending = 1
+
+                                            },
+                                        }
+                                        if (__goto_pending != 0) {
+                                            break
+                                        }
                                     }
                                 }
                             }
@@ -4134,44 +3844,50 @@ fn default_substitute_case_callout(__param_input: *const u8, input_len: c_ulong,
         return 0
     }
 
-    match state.to_case {
-        1 | 2 => {
-            (rest_to_upper = (if state.to_case == 2: 1 else: 0))
+    while true {
+        match state.to_case {
+            1 => {
+                (rest_to_upper = (if state.to_case == 2: 1 else: 0))
 
-            (next_to_upper = rest_to_upper)
+                (next_to_upper = rest_to_upper)
 
-        },
-        3 => {
-            (next_to_upper = 1)
+            },
+            2 => {
+                (rest_to_upper = (if state.to_case == 2: 1 else: 0))
 
-            (rest_to_upper = 0)
+                (next_to_upper = rest_to_upper)
 
-            (state.to_case = 1)
+            },
+            3 => {
+                (next_to_upper = 1)
 
-        },
-        4 => {
-            (next_to_upper = 0)
+                (rest_to_upper = 0)
 
-            (rest_to_upper = 1)
+                (state.to_case = 1)
 
-            (state.to_case = 2)
+            },
+            4 => {
+                (next_to_upper = 0)
 
-        },
-        _ => {
-            while true {
-                if (not (0 != 0)) {
-                    break
+                (rest_to_upper = 1)
+
+                (state.to_case = 2)
+
+            },
+            _ => {
+                while true {
+                    if (not (0 != 0)) {
+                        break
+                    }
                 }
-            }
 
-            return 0
+                return 0
 
-            (rest_to_upper = (if state.to_case == 2: 1 else: 0))
+            },
+        }
 
-            (next_to_upper = rest_to_upper)
+        break
 
-
-        },
     }
 
     (single_char = state.single_char)
@@ -4185,26 +3901,26 @@ fn default_substitute_case_callout(__param_input: *const u8, input_len: c_ulong,
 
         var chlen: c_uint
 
-        var __ci_expr_old_0: *const u8 = input
+        var __ci_expr_old_1: *const u8 = input
 
         (input = input + 1)
 
-        (ch = (unsafe: *__ci_expr_old_0))
+        (ch = (unsafe: *__ci_expr_old_1))
 
 
-        var __ci_expr_logic_1: c_int = 0
+        var __ci_expr_logic_2: c_int = 0
 
         if (utf != 0) {
-            (__ci_expr_logic_1 = (if (if ch >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_2 = (if (if ch >= 192: 1 else: 0) != 0: 1 else: 0))
         }
 
-        if (__ci_expr_logic_1 != 0) {
+        if (__ci_expr_logic_2 != 0) {
             if ((if (ch & 32) == 0: 1 else: 0) != 0) {
-                var __ci_expr_old_2: *const u8 = input
+                var __ci_expr_old_3: *const u8 = input
 
                 (input = input + 1)
 
-                (ch = (((ch & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_2) & 63))
+                (ch = (((ch & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_3) & 63))
 
             } else {
                 if ((if (ch & 16) == 0: 1 else: 0) != 0) {
@@ -4237,54 +3953,54 @@ fn default_substitute_case_callout(__param_input: *const u8, input_len: c_ulong,
         }
 
 
-        var __ci_expr_logic_4: c_int = 0
+        var __ci_expr_logic_5: c_int = 0
 
-        var __ci_expr_logic_3: c_int
+        var __ci_expr_logic_4: c_int
 
         if (utf != 0) {
-            (__ci_expr_logic_3 = (if true: 1 else: 0))
+            (__ci_expr_logic_4 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_3 = (if ucp != 0: 1 else: 0))
-        }
-
-        if (__ci_expr_logic_3 != 0) {
-            (__ci_expr_logic_4 = (if (if ch >= 128: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_4 = (if ucp != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_4 != 0) {
+            (__ci_expr_logic_5 = (if (if ch >= 128: 1 else: 0) != 0: 1 else: 0))
+        }
+
+        if (__ci_expr_logic_5 != 0) {
             var type_: c_uint = ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((ch as c_int) / 128)] * 128) + ((ch as c_int) % 128))] as isize) as usize)).chartype
 
-            var __ci_expr_logic_6: c_int = 0
+            var __ci_expr_logic_7: c_int = 0
 
             if ((if _pcre2_ucp_gentype_8[type_] == 1: 1 else: 0) != 0) {
-                var __ci_expr_ternary_5: c_int = 0
+                var __ci_expr_ternary_6: c_int = 0
 
                 if (next_to_upper != 0) {
-                    (__ci_expr_ternary_5 = ucp_Lu)
+                    (__ci_expr_ternary_6 = ucp_Lu)
                 } else {
-                    (__ci_expr_ternary_5 = ucp_Ll)
+                    (__ci_expr_ternary_6 = ucp_Ll)
                 }
 
-                (__ci_expr_logic_6 = (if (if type_ != __ci_expr_ternary_5: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_7 = (if (if type_ != __ci_expr_ternary_6: 1 else: 0) != 0: 1 else: 0))
 
             }
 
-            if (__ci_expr_logic_6 != 0) {
+            if (__ci_expr_logic_7 != 0) {
                 (ch = ((((ch as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((ch as c_int) / 128)] * 128) + ((ch as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
             }
 
 
         } else {
             if (1 != 0) {
-                var __ci_expr_ternary_7: c_int = 0
+                var __ci_expr_ternary_8: c_int = 0
 
                 if (next_to_upper != 0) {
-                    (__ci_expr_ternary_7 = 96)
+                    (__ci_expr_ternary_8 = 96)
                 } else {
-                    (__ci_expr_ternary_7 = 128)
+                    (__ci_expr_ternary_8 = 128)
                 }
 
-                if ((if ((unsafe: ((code.tables + ((512 as isize) as usize)) + ((__ci_expr_ternary_7 as isize) as usize))[(ch / 8)]) & ((1 as c_uint) << ((ch % 8) as c_uint))) == 0: 1 else: 0) != 0) {
+                if ((if ((unsafe: ((code.tables + ((512 as isize) as usize)) + ((__ci_expr_ternary_8 as isize) as usize))[(ch / 8)]) & ((1 as c_uint) << ((ch % 8) as c_uint))) == 0: 1 else: 0) != 0) {
                     (ch = (unsafe: (code.tables + ((256 as isize) as usize))[ch]))
                 }
 
@@ -4302,13 +4018,13 @@ fn default_substitute_case_callout(__param_input: *const u8, input_len: c_ulong,
 
         }
 
-        var __ci_expr_logic_8: c_int = 0
+        var __ci_expr_logic_9: c_int = 0
 
         if ((if not (overflow != 0): 1 else: 0) != 0) {
-            (__ci_expr_logic_8 = (if (if chlen <= output_cap: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_9 = (if (if chlen <= output_cap: 1 else: 0) != 0: 1 else: 0))
         }
 
-        if (__ci_expr_logic_8 != 0) {
+        if (__ci_expr_logic_9 != 0) {
             with_memcpy((output as *i8), ((&temp[0] as *mut u8) as *i8), ((chlen *% 1) as i64))
 
             (output = output + chlen)
@@ -4332,13 +4048,13 @@ fn default_substitute_case_callout(__param_input: *const u8, input_len: c_ulong,
         if (single_char != 0) {
             var rest_len: c_ulong = (((input_end as usize) -% (input as usize)) / sizeof[u8]())
 
-            var __ci_expr_logic_9: c_int = 0
+            var __ci_expr_logic_10: c_int = 0
 
             if ((if not (overflow != 0): 1 else: 0) != 0) {
-                (__ci_expr_logic_9 = (if (if rest_len <= output_cap: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_10 = (if (if rest_len <= output_cap: 1 else: 0) != 0: 1 else: 0))
             }
 
-            if (__ci_expr_logic_9 != 0) {
+            if (__ci_expr_logic_10 != 0) {
                 with_memcpy((output as *i8), (input as *i8), ((rest_len *% 1) as i64))
             }
 
@@ -4390,82 +4106,105 @@ fn do_case_copy(input_output: *mut u8, input_len: c_ulong, output_cap: c_ulong, 
         }
     }
 
-    match state.to_case {
-        1 | 2 | 3 => {
-            if ((if state.single_char == 0: 1 else: 0) != 0) {
-                (rc = substitute_case_callout(input, input_len, output, output_cap, state.to_case, substitute_case_callout_data))
+    while true {
+        match state.to_case {
+            1 => {
+                if ((if state.single_char == 0: 1 else: 0) != 0) {
+                    (rc = substitute_case_callout(input, input_len, output, output_cap, state.to_case, substitute_case_callout_data))
 
-                if ((if state.to_case == 3: 1 else: 0) != 0) {
-                    (state.to_case = 1)
+                    if ((if state.to_case == 3: 1 else: 0) != 0) {
+                        (state.to_case = 1)
+                    }
+
+                    return rc
+
                 }
 
-                return rc
+                (ch1_to_case = state.to_case)
 
-            }
+                (rest_to_case = 0)
 
-            (ch1_to_case = state.to_case)
+            },
+            2 => {
+                if ((if state.single_char == 0: 1 else: 0) != 0) {
+                    (rc = substitute_case_callout(input, input_len, output, output_cap, state.to_case, substitute_case_callout_data))
 
-            (rest_to_case = 0)
+                    if ((if state.to_case == 3: 1 else: 0) != 0) {
+                        (state.to_case = 1)
+                    }
 
-        },
-        4 => {
-            (ch1_to_case = 1)
+                    return rc
 
-            (rest_to_case = 2)
-
-        },
-        _ => {
-            while true {
-                if (not (0 != 0)) {
-                    break
-                }
-            }
-
-            return 0
-
-            if ((if state.single_char == 0: 1 else: 0) != 0) {
-                (rc = substitute_case_callout(input, input_len, output, output_cap, state.to_case, substitute_case_callout_data))
-
-                if ((if state.to_case == 3: 1 else: 0) != 0) {
-                    (state.to_case = 1)
                 }
 
-                return rc
+                (ch1_to_case = state.to_case)
 
-            }
+                (rest_to_case = 0)
 
-            (ch1_to_case = state.to_case)
+            },
+            3 => {
+                if ((if state.single_char == 0: 1 else: 0) != 0) {
+                    (rc = substitute_case_callout(input, input_len, output, output_cap, state.to_case, substitute_case_callout_data))
 
-            (rest_to_case = 0)
+                    if ((if state.to_case == 3: 1 else: 0) != 0) {
+                        (state.to_case = 1)
+                    }
 
+                    return rc
 
-        },
+                }
+
+                (ch1_to_case = state.to_case)
+
+                (rest_to_case = 0)
+
+            },
+            4 => {
+                (ch1_to_case = 1)
+
+                (rest_to_case = 2)
+
+            },
+            _ => {
+                while true {
+                    if (not (0 != 0)) {
+                        break
+                    }
+                }
+
+                return 0
+
+            },
+        }
+
+        break
+
     }
 
     var ch_end: *const u8 = input
 
     var ch: c_uint
 
-    var __ci_expr_old_0: *const u8 = ch_end
+    var __ci_expr_old_1: *const u8 = ch_end
 
     (ch_end = ch_end + 1)
 
-    (ch = (unsafe: *__ci_expr_old_0))
+    (ch = (unsafe: *__ci_expr_old_1))
 
 
-    var __ci_expr_logic_1: c_int = 0
+    var __ci_expr_logic_2: c_int = 0
 
     if (utf != 0) {
-        (__ci_expr_logic_1 = (if (if ch >= 192: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_2 = (if (if ch >= 192: 1 else: 0) != 0: 1 else: 0))
     }
 
-    if (__ci_expr_logic_1 != 0) {
+    if (__ci_expr_logic_2 != 0) {
         if ((if (ch & 32) == 0: 1 else: 0) != 0) {
-            var __ci_expr_old_2: *const u8 = ch_end
+            var __ci_expr_old_3: *const u8 = ch_end
 
             (ch_end = ch_end + 1)
 
-            (ch = (((ch & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_2) & 63))
+            (ch = (((ch & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_3) & 63))
 
         } else {
             if ((if (ch & 16) == 0: 1 else: 0) != 0) {
@@ -4575,47 +4314,47 @@ fn do_case_copy(input_output: *mut u8, input_len: c_ulong, output_cap: c_ulong, 
     } else {
         var dummy: [1]u8
 
-        var __ci_expr_ternary_3: *mut u8 = null
+        var __ci_expr_ternary_4: *mut u8 = null
 
         if (ch1_overflow != 0) {
-            (__ci_expr_ternary_3 = (&dummy[0] as *mut u8))
+            (__ci_expr_ternary_4 = (&dummy[0] as *mut u8))
         } else {
-            (__ci_expr_ternary_3 = output + rc)
+            (__ci_expr_ternary_4 = output + rc)
         }
 
-        var __ci_expr_ternary_4: c_ulong = 0
+        var __ci_expr_ternary_5: c_ulong = 0
 
         if (ch1_overflow != 0) {
-            (__ci_expr_ternary_4 = 0)
+            (__ci_expr_ternary_5 = 0)
         } else {
-            (__ci_expr_ternary_4 = (output_cap -% rc))
+            (__ci_expr_ternary_5 = (output_cap -% rc))
         }
 
-        (rc2 = substitute_case_callout(rest, rest_len, __ci_expr_ternary_3, __ci_expr_ternary_4, rest_to_case, substitute_case_callout_data))
+        (rc2 = substitute_case_callout(rest, rest_len, __ci_expr_ternary_4, __ci_expr_ternary_5, rest_to_case, substitute_case_callout_data))
 
 
         if ((if rc2 == (~(0 as c_ulong)): 1 else: 0) != 0) {
             return rc2
         }
 
-        var __ci_expr_logic_5: c_int = 0
+        var __ci_expr_logic_6: c_int = 0
 
         if ((if not (ch1_overflow != 0): 1 else: 0) != 0) {
-            (__ci_expr_logic_5 = (if (if rc2 > (output_cap -% rc): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_6 = (if (if rc2 > (output_cap -% rc): 1 else: 0) != 0: 1 else: 0))
         }
 
-        if (__ci_expr_logic_5 != 0) {
+        if (__ci_expr_logic_6 != 0) {
             (rest_overflow = 1)
         }
 
 
-        var __ci_expr_logic_6: c_int = 0
+        var __ci_expr_logic_7: c_int = 0
 
         if (ch1_overflow != 0) {
-            (__ci_expr_logic_6 = (if (if rc2 < rest_len: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_7 = (if (if rc2 < rest_len: 1 else: 0) != 0: 1 else: 0))
         }
 
-        if (__ci_expr_logic_6 != 0) {
+        if (__ci_expr_logic_7 != 0) {
             (rc2 = rest_len)
         }
 

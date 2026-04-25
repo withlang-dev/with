@@ -2602,7 +2602,29 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         continue
                     }
                     if ((if codevalue__goto_756_14 >= 85: 1 else: 0) != 0) {
-                        0
+                        match d__goto_703_15 {
+                            14 => {
+                                return -42
+                            },
+                            15 => {
+                                (codevalue__goto_756_14 = codevalue__goto_756_14 + 300)
+                            },
+                            17 => {
+                                (codevalue__goto_756_14 = codevalue__goto_756_14 + 340)
+                            },
+                            22 => {
+                                (codevalue__goto_756_14 = codevalue__goto_756_14 + 320)
+                            },
+                            18 => {
+                                (codevalue__goto_756_14 = codevalue__goto_756_14 + 360)
+                            },
+                            20 => {
+                                (codevalue__goto_756_14 = codevalue__goto_756_14 + 380)
+                            },
+                        }
+                        if (__goto_pending != 0) {
+                            continue
+                        }
                     }
                     if (__goto_pending != 0) {
                         continue
@@ -11413,7 +11435,47 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         }
 
                         if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                            0
+                            (ncount__goto_1590_13 = 0)
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                            match c__goto_703_12 {
+                                11 => {
+                                    if ((if mb.bsr_convention == 2: 1 else: 0) != 0) {
+                                        break
+                                    }
+
+                                    __pc = 1
+                                    __goto_pending = 1
+
+                                },
+                                13 => {
+                                    var __ci_expr_logic_255: c_int = 0
+
+                                    if ((if (ptr__goto_545_12 + ((1 as isize) as usize)) < end_subject__goto_554_12: 1 else: 0) != 0) {
+                                        (__ci_expr_logic_255 = (if (if (unsafe: ptr__goto_545_12[1]) == 10: 1 else: 0) != 0: 1 else: 0))
+                                    }
+
+                                    if (__ci_expr_logic_255 != 0) {
+                                        (ncount__goto_1590_13 = 1)
+                                    }
+
+
+                                    __pc = 1
+                                    __goto_pending = 1
+
+                                    continue
+
+
+                                },
+                            }
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
                         }
 
                     },
@@ -11456,7 +11518,47 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         }
 
                         if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                            0
+                            (ncount__goto_1590_13 = 0)
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                            match c__goto_703_12 {
+                                11 => {
+                                    if ((if mb.bsr_convention == 2: 1 else: 0) != 0) {
+                                        break
+                                    }
+
+                                    __pc = 1
+                                    __goto_pending = 1
+
+                                },
+                                13 => {
+                                    var __ci_expr_logic_255: c_int = 0
+
+                                    if ((if (ptr__goto_545_12 + ((1 as isize) as usize)) < end_subject__goto_554_12: 1 else: 0) != 0) {
+                                        (__ci_expr_logic_255 = (if (if (unsafe: ptr__goto_545_12[1]) == 10: 1 else: 0) != 0: 1 else: 0))
+                                    }
+
+                                    if (__ci_expr_logic_255 != 0) {
+                                        (ncount__goto_1590_13 = 1)
+                                    }
+
+
+                                    __pc = 1
+                                    __goto_pending = 1
+
+                                    continue
+
+
+                                },
+                            }
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
                         }
 
                     },
@@ -11499,7 +11601,47 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         }
 
                         if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                            0
+                            (ncount__goto_1590_13 = 0)
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                            match c__goto_703_12 {
+                                11 => {
+                                    if ((if mb.bsr_convention == 2: 1 else: 0) != 0) {
+                                        break
+                                    }
+
+                                    __pc = 1
+                                    __goto_pending = 1
+
+                                },
+                                13 => {
+                                    var __ci_expr_logic_255: c_int = 0
+
+                                    if ((if (ptr__goto_545_12 + ((1 as isize) as usize)) < end_subject__goto_554_12: 1 else: 0) != 0) {
+                                        (__ci_expr_logic_255 = (if (if (unsafe: ptr__goto_545_12[1]) == 10: 1 else: 0) != 0: 1 else: 0))
+                                    }
+
+                                    if (__ci_expr_logic_255 != 0) {
+                                        (ncount__goto_1590_13 = 1)
+                                    }
+
+
+                                    __pc = 1
+                                    __goto_pending = 1
+
+                                    continue
+
+
+                                },
+                            }
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
                         }
 
                     },
@@ -11507,11 +11649,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         (count__goto_759_9 = current_state__goto_753_17.count)
 
                         if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                            var __ci_expr_old_257: c_int = active_count__goto_548_5
+                            var __ci_expr_old_256: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_257 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_256 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = state_offset__goto_757_9 + 2)
 
                                 if (__goto_pending != 0) {
@@ -11556,13 +11698,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if ((if OK__goto_1632_14 == (if d__goto_703_15 == 21: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_258: c_int = 0
+                                var __ci_expr_logic_257: c_int = 0
 
                                 if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_258 = (if (if codevalue__goto_756_14 == 475: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_257 = (if (if codevalue__goto_756_14 == 475: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_258 != 0) {
+                                if (__ci_expr_logic_257 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -11588,11 +11730,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_259: c_int = new_count__goto_548_19
+                                var __ci_expr_old_258: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_259 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_258 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = 0 - state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -11639,11 +11781,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         (count__goto_759_9 = current_state__goto_753_17.count)
 
                         if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                            var __ci_expr_old_257: c_int = active_count__goto_548_5
+                            var __ci_expr_old_256: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_257 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_256 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = state_offset__goto_757_9 + 2)
 
                                 if (__goto_pending != 0) {
@@ -11688,13 +11830,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if ((if OK__goto_1632_14 == (if d__goto_703_15 == 21: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_258: c_int = 0
+                                var __ci_expr_logic_257: c_int = 0
 
                                 if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_258 = (if (if codevalue__goto_756_14 == 475: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_257 = (if (if codevalue__goto_756_14 == 475: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_258 != 0) {
+                                if (__ci_expr_logic_257 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -11720,11 +11862,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_259: c_int = new_count__goto_548_19
+                                var __ci_expr_old_258: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_259 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_258 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = 0 - state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -11771,11 +11913,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         (count__goto_759_9 = current_state__goto_753_17.count)
 
                         if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                            var __ci_expr_old_257: c_int = active_count__goto_548_5
+                            var __ci_expr_old_256: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_257 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_256 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = state_offset__goto_757_9 + 2)
 
                                 if (__goto_pending != 0) {
@@ -11820,13 +11962,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if ((if OK__goto_1632_14 == (if d__goto_703_15 == 21: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_258: c_int = 0
+                                var __ci_expr_logic_257: c_int = 0
 
                                 if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_258 = (if (if codevalue__goto_756_14 == 475: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_257 = (if (if codevalue__goto_756_14 == 475: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_258 != 0) {
+                                if (__ci_expr_logic_257 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -11852,11 +11994,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_259: c_int = new_count__goto_548_19
+                                var __ci_expr_old_258: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_259 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_258 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = 0 - state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -11903,11 +12045,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         (count__goto_759_9 = current_state__goto_753_17.count)
 
                         if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                            var __ci_expr_old_260: c_int = active_count__goto_548_5
+                            var __ci_expr_old_259: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_260 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_259 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = state_offset__goto_757_9 + 2)
 
                                 if (__goto_pending != 0) {
@@ -11952,13 +12094,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if ((if OK__goto_1665_14 == (if d__goto_703_15 == 19: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_261: c_int = 0
+                                var __ci_expr_logic_260: c_int = 0
 
                                 if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_261 = (if (if codevalue__goto_756_14 == 455: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_260 = (if (if codevalue__goto_756_14 == 455: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_261 != 0) {
+                                if (__ci_expr_logic_260 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -11984,11 +12126,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_262: c_int = new_count__goto_548_19
+                                var __ci_expr_old_261: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_262 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_261 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = 0 - state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -12035,11 +12177,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         (count__goto_759_9 = current_state__goto_753_17.count)
 
                         if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                            var __ci_expr_old_260: c_int = active_count__goto_548_5
+                            var __ci_expr_old_259: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_260 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_259 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = state_offset__goto_757_9 + 2)
 
                                 if (__goto_pending != 0) {
@@ -12084,13 +12226,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if ((if OK__goto_1665_14 == (if d__goto_703_15 == 19: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_261: c_int = 0
+                                var __ci_expr_logic_260: c_int = 0
 
                                 if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_261 = (if (if codevalue__goto_756_14 == 455: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_260 = (if (if codevalue__goto_756_14 == 455: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_261 != 0) {
+                                if (__ci_expr_logic_260 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -12116,11 +12258,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_262: c_int = new_count__goto_548_19
+                                var __ci_expr_old_261: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_262 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_261 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = 0 - state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -12167,11 +12309,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         (count__goto_759_9 = current_state__goto_753_17.count)
 
                         if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                            var __ci_expr_old_260: c_int = active_count__goto_548_5
+                            var __ci_expr_old_259: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_260 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_259 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = state_offset__goto_757_9 + 2)
 
                                 if (__goto_pending != 0) {
@@ -12216,13 +12358,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if ((if OK__goto_1665_14 == (if d__goto_703_15 == 19: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_261: c_int = 0
+                                var __ci_expr_logic_260: c_int = 0
 
                                 if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_261 = (if (if codevalue__goto_756_14 == 455: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_260 = (if (if codevalue__goto_756_14 == 455: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_261 != 0) {
+                                if (__ci_expr_logic_260 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -12248,11 +12390,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_262: c_int = new_count__goto_548_19
+                                var __ci_expr_old_261: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_262 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_261 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = 0 - state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -12319,937 +12461,31 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                     385 => {
                         (count__goto_759_9 = 0)
 
-                        var __ci_expr_old_263: c_int = active_count__goto_548_5
+                        __pc = 2
+                        __goto_pending = 1
 
-                        (active_count__goto_548_5 = active_count__goto_548_5 + 1)
+                        continue
 
-                        if ((if __ci_expr_old_263 < wscount: 1 else: 0) != 0) {
-                            (next_active_state__goto_543_13.offset = state_offset__goto_757_9 + 4)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (next_active_state__goto_543_13.count = 0)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (next_active_state__goto_543_13 = next_active_state__goto_543_13 + 1)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            return -43
-                        }
-
-
-                        if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                            (prop__goto_1711_28 = (&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((c__goto_703_12 as c_int) / 128)] * 128) + ((c__goto_703_12 as c_int) % 128))] as isize) as usize))
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            match (unsafe: code__goto_755_16[2]) {
-                                0 => {
-                                    (chartype__goto_1709_13 = prop__goto_1711_28.chartype)
-
-                                    var __ci_expr_logic_265: c_int
-
-                                    var __ci_expr_logic_264: c_int
-
-                                    if ((if chartype__goto_1709_13 == ucp_Lu: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_264 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_264 = (if (if chartype__goto_1709_13 == ucp_Ll: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (__ci_expr_logic_264 != 0) {
-                                        (__ci_expr_logic_265 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_265 = (if (if chartype__goto_1709_13 == ucp_Lt: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    (OK__goto_1708_14 = __ci_expr_logic_265)
-
-
-                                },
-                                1 => {
-                                    (OK__goto_1708_14 = (if _pcre2_ucp_gentype_8[prop__goto_1711_28.chartype] == (unsafe: code__goto_755_16[3]): 1 else: 0))
-                                },
-                                2 => {
-                                    (OK__goto_1708_14 = (if prop__goto_1711_28.chartype == (unsafe: code__goto_755_16[3]): 1 else: 0))
-                                },
-                                3 => {
-                                    (OK__goto_1708_14 = (if prop__goto_1711_28.script == (unsafe: code__goto_755_16[3]): 1 else: 0))
-                                },
-                                4 => {
-                                    var __ci_expr_logic_266: c_int
-
-                                    if ((if prop__goto_1711_28.script == (unsafe: code__goto_755_16[3]): 1 else: 0) != 0) {
-                                        (__ci_expr_logic_266 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_266 = (if (if ((unsafe: ((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((prop__goto_1711_28.scriptx_bidiclass & 1023) as isize) as usize))[((unsafe: code__goto_755_16[3]) / 32)]) & ((1 as c_uint) << (((unsafe: code__goto_755_16[3]) % 32) as c_uint))) != 0: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    (OK__goto_1708_14 = __ci_expr_logic_266)
-
-                                },
-                                5 => {
-                                    (chartype__goto_1709_13 = prop__goto_1711_28.chartype)
-
-                                    var __ci_expr_logic_267: c_int
-
-                                    if ((if _pcre2_ucp_gentype_8[chartype__goto_1709_13] == 1: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_267 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_267 = (if (if _pcre2_ucp_gentype_8[chartype__goto_1709_13] == 3: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    (OK__goto_1708_14 = __ci_expr_logic_267)
-
-
-                                },
-                                6 => {
-                                    match c__goto_703_12 {
-                                        9 => {
-                                            (OK__goto_1708_14 = 1)
-                                        },
-                                        _ => {
-                                            (OK__goto_1708_14 = (if _pcre2_ucp_gentype_8[prop__goto_1711_28.chartype] == 6: 1 else: 0))
-                                        },
-                                    }
-                                },
-                                8 => {
-                                    (chartype__goto_1709_13 = prop__goto_1711_28.chartype)
-
-                                    var __ci_expr_logic_270: c_int
-
-                                    var __ci_expr_logic_269: c_int
-
-                                    var __ci_expr_logic_268: c_int
-
-                                    if ((if _pcre2_ucp_gentype_8[chartype__goto_1709_13] == 1: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_268 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_268 = (if (if _pcre2_ucp_gentype_8[chartype__goto_1709_13] == 3: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (__ci_expr_logic_268 != 0) {
-                                        (__ci_expr_logic_269 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_269 = (if (if chartype__goto_1709_13 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (__ci_expr_logic_269 != 0) {
-                                        (__ci_expr_logic_270 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_270 = (if (if chartype__goto_1709_13 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    (OK__goto_1708_14 = __ci_expr_logic_270)
-
-
-                                },
-                                9 => {
-                                    (cp__goto_1710_25 = (&_pcre2_ucd_caseless_sets_8[0] as *const c_uint) + (((unsafe: code__goto_755_16[3]) as isize) as usize))
-
-                                    while true {
-                                        if ((if c__goto_703_12 < (unsafe: *cp__goto_1710_25): 1 else: 0) != 0) {
-                                            (OK__goto_1708_14 = 0)
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            break
-
-                                        }
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        var __ci_expr_old_271: *const c_uint = cp__goto_1710_25
-
-                                        (cp__goto_1710_25 = cp__goto_1710_25 + 1)
-
-                                        if ((if c__goto_703_12 == (unsafe: *__ci_expr_old_271): 1 else: 0) != 0) {
-                                            (OK__goto_1708_14 = 1)
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            break
-
-                                        }
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                    }
-
-                                },
-                                10 => {
-                                    var __ci_expr_logic_276: c_int
-
-                                    var __ci_expr_logic_275: c_int
-
-                                    var __ci_expr_logic_273: c_int
-
-                                    var __ci_expr_logic_272: c_int
-
-                                    if ((if c__goto_703_12 == 36: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_272 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_272 = (if (if c__goto_703_12 == 64: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (__ci_expr_logic_272 != 0) {
-                                        (__ci_expr_logic_273 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_273 = (if (if c__goto_703_12 == 96: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (__ci_expr_logic_273 != 0) {
-                                        (__ci_expr_logic_275 = (if true: 1 else: 0))
-                                    } else {
-                                        var __ci_expr_logic_274: c_int = 0
-
-                                        if ((if c__goto_703_12 >= 160: 1 else: 0) != 0) {
-                                            (__ci_expr_logic_274 = (if (if c__goto_703_12 <= 55295: 1 else: 0) != 0: 1 else: 0))
-                                        }
-
-                                        (__ci_expr_logic_275 = (if __ci_expr_logic_274 != 0: 1 else: 0))
-
-                                    }
-
-                                    if (__ci_expr_logic_275 != 0) {
-                                        (__ci_expr_logic_276 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_276 = (if (if c__goto_703_12 >= 57344: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    (OK__goto_1708_14 = __ci_expr_logic_276)
-
-                                },
-                                11 => {
-                                    (OK__goto_1708_14 = (if ((((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((c__goto_703_12 as c_int) / 128)] * 128) + ((c__goto_703_12 as c_int) % 128))] as isize) as usize)).scriptx_bidiclass as c_int) >> (11 as c_uint)) == (unsafe: code__goto_755_16[3]): 1 else: 0))
-                                },
-                                12 => {
-                                    (OK__goto_1708_14 = (if ((unsafe: ((&_pcre2_ucd_boolprop_sets_8[0] as *const c_uint) + (((prop__goto_1711_28.bprops & 4095) as isize) as usize))[((unsafe: code__goto_755_16[3]) / 32)]) & ((1 as c_uint) << (((unsafe: code__goto_755_16[3]) % 32) as c_uint))) != 0: 1 else: 0))
-                                },
-                                _ => {
-                                    (OK__goto_1708_14 = (if codevalue__goto_756_14 != 16: 1 else: 0))
-                                },
-                            }
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            if ((if OK__goto_1708_14 == (if d__goto_703_15 == 16: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_277: c_int
-
-                                if ((if codevalue__goto_756_14 == 394: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_277 = (if true: 1 else: 0))
-                                } else {
-                                    (__ci_expr_logic_277 = (if (if codevalue__goto_756_14 == 396: 1 else: 0) != 0: 1 else: 0))
-                                }
-
-                                if (__ci_expr_logic_277 != 0) {
-                                    (active_count__goto_548_5 = active_count__goto_548_5 - 1)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_active_state__goto_543_13 = next_active_state__goto_543_13 - 1)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                }
-
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                var __ci_expr_old_278: c_int = new_count__goto_548_19
-
-                                (new_count__goto_548_19 = new_count__goto_548_19 + 1)
-
-                                if ((if __ci_expr_old_278 < wscount: 1 else: 0) != 0) {
-                                    (next_new_state__goto_543_33.offset = state_offset__goto_757_9 + count__goto_759_9)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_new_state__goto_543_33.count = 0)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_new_state__goto_543_33 = next_new_state__goto_543_33 + 1)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                } else {
-                                    return -43
-                                }
-
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            }
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        }
 
                     },
                     386 => {
                         (count__goto_759_9 = 0)
 
-                        var __ci_expr_old_263: c_int = active_count__goto_548_5
+                        __pc = 2
+                        __goto_pending = 1
 
-                        (active_count__goto_548_5 = active_count__goto_548_5 + 1)
+                        continue
 
-                        if ((if __ci_expr_old_263 < wscount: 1 else: 0) != 0) {
-                            (next_active_state__goto_543_13.offset = state_offset__goto_757_9 + 4)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (next_active_state__goto_543_13.count = 0)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (next_active_state__goto_543_13 = next_active_state__goto_543_13 + 1)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            return -43
-                        }
-
-
-                        if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                            (prop__goto_1711_28 = (&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((c__goto_703_12 as c_int) / 128)] * 128) + ((c__goto_703_12 as c_int) % 128))] as isize) as usize))
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            match (unsafe: code__goto_755_16[2]) {
-                                0 => {
-                                    (chartype__goto_1709_13 = prop__goto_1711_28.chartype)
-
-                                    var __ci_expr_logic_265: c_int
-
-                                    var __ci_expr_logic_264: c_int
-
-                                    if ((if chartype__goto_1709_13 == ucp_Lu: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_264 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_264 = (if (if chartype__goto_1709_13 == ucp_Ll: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (__ci_expr_logic_264 != 0) {
-                                        (__ci_expr_logic_265 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_265 = (if (if chartype__goto_1709_13 == ucp_Lt: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    (OK__goto_1708_14 = __ci_expr_logic_265)
-
-
-                                },
-                                1 => {
-                                    (OK__goto_1708_14 = (if _pcre2_ucp_gentype_8[prop__goto_1711_28.chartype] == (unsafe: code__goto_755_16[3]): 1 else: 0))
-                                },
-                                2 => {
-                                    (OK__goto_1708_14 = (if prop__goto_1711_28.chartype == (unsafe: code__goto_755_16[3]): 1 else: 0))
-                                },
-                                3 => {
-                                    (OK__goto_1708_14 = (if prop__goto_1711_28.script == (unsafe: code__goto_755_16[3]): 1 else: 0))
-                                },
-                                4 => {
-                                    var __ci_expr_logic_266: c_int
-
-                                    if ((if prop__goto_1711_28.script == (unsafe: code__goto_755_16[3]): 1 else: 0) != 0) {
-                                        (__ci_expr_logic_266 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_266 = (if (if ((unsafe: ((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((prop__goto_1711_28.scriptx_bidiclass & 1023) as isize) as usize))[((unsafe: code__goto_755_16[3]) / 32)]) & ((1 as c_uint) << (((unsafe: code__goto_755_16[3]) % 32) as c_uint))) != 0: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    (OK__goto_1708_14 = __ci_expr_logic_266)
-
-                                },
-                                5 => {
-                                    (chartype__goto_1709_13 = prop__goto_1711_28.chartype)
-
-                                    var __ci_expr_logic_267: c_int
-
-                                    if ((if _pcre2_ucp_gentype_8[chartype__goto_1709_13] == 1: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_267 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_267 = (if (if _pcre2_ucp_gentype_8[chartype__goto_1709_13] == 3: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    (OK__goto_1708_14 = __ci_expr_logic_267)
-
-
-                                },
-                                6 => {
-                                    match c__goto_703_12 {
-                                        9 => {
-                                            (OK__goto_1708_14 = 1)
-                                        },
-                                        _ => {
-                                            (OK__goto_1708_14 = (if _pcre2_ucp_gentype_8[prop__goto_1711_28.chartype] == 6: 1 else: 0))
-                                        },
-                                    }
-                                },
-                                8 => {
-                                    (chartype__goto_1709_13 = prop__goto_1711_28.chartype)
-
-                                    var __ci_expr_logic_270: c_int
-
-                                    var __ci_expr_logic_269: c_int
-
-                                    var __ci_expr_logic_268: c_int
-
-                                    if ((if _pcre2_ucp_gentype_8[chartype__goto_1709_13] == 1: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_268 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_268 = (if (if _pcre2_ucp_gentype_8[chartype__goto_1709_13] == 3: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (__ci_expr_logic_268 != 0) {
-                                        (__ci_expr_logic_269 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_269 = (if (if chartype__goto_1709_13 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (__ci_expr_logic_269 != 0) {
-                                        (__ci_expr_logic_270 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_270 = (if (if chartype__goto_1709_13 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    (OK__goto_1708_14 = __ci_expr_logic_270)
-
-
-                                },
-                                9 => {
-                                    (cp__goto_1710_25 = (&_pcre2_ucd_caseless_sets_8[0] as *const c_uint) + (((unsafe: code__goto_755_16[3]) as isize) as usize))
-
-                                    while true {
-                                        if ((if c__goto_703_12 < (unsafe: *cp__goto_1710_25): 1 else: 0) != 0) {
-                                            (OK__goto_1708_14 = 0)
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            break
-
-                                        }
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        var __ci_expr_old_271: *const c_uint = cp__goto_1710_25
-
-                                        (cp__goto_1710_25 = cp__goto_1710_25 + 1)
-
-                                        if ((if c__goto_703_12 == (unsafe: *__ci_expr_old_271): 1 else: 0) != 0) {
-                                            (OK__goto_1708_14 = 1)
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            break
-
-                                        }
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                    }
-
-                                },
-                                10 => {
-                                    var __ci_expr_logic_276: c_int
-
-                                    var __ci_expr_logic_275: c_int
-
-                                    var __ci_expr_logic_273: c_int
-
-                                    var __ci_expr_logic_272: c_int
-
-                                    if ((if c__goto_703_12 == 36: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_272 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_272 = (if (if c__goto_703_12 == 64: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (__ci_expr_logic_272 != 0) {
-                                        (__ci_expr_logic_273 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_273 = (if (if c__goto_703_12 == 96: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (__ci_expr_logic_273 != 0) {
-                                        (__ci_expr_logic_275 = (if true: 1 else: 0))
-                                    } else {
-                                        var __ci_expr_logic_274: c_int = 0
-
-                                        if ((if c__goto_703_12 >= 160: 1 else: 0) != 0) {
-                                            (__ci_expr_logic_274 = (if (if c__goto_703_12 <= 55295: 1 else: 0) != 0: 1 else: 0))
-                                        }
-
-                                        (__ci_expr_logic_275 = (if __ci_expr_logic_274 != 0: 1 else: 0))
-
-                                    }
-
-                                    if (__ci_expr_logic_275 != 0) {
-                                        (__ci_expr_logic_276 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_276 = (if (if c__goto_703_12 >= 57344: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    (OK__goto_1708_14 = __ci_expr_logic_276)
-
-                                },
-                                11 => {
-                                    (OK__goto_1708_14 = (if ((((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((c__goto_703_12 as c_int) / 128)] * 128) + ((c__goto_703_12 as c_int) % 128))] as isize) as usize)).scriptx_bidiclass as c_int) >> (11 as c_uint)) == (unsafe: code__goto_755_16[3]): 1 else: 0))
-                                },
-                                12 => {
-                                    (OK__goto_1708_14 = (if ((unsafe: ((&_pcre2_ucd_boolprop_sets_8[0] as *const c_uint) + (((prop__goto_1711_28.bprops & 4095) as isize) as usize))[((unsafe: code__goto_755_16[3]) / 32)]) & ((1 as c_uint) << (((unsafe: code__goto_755_16[3]) % 32) as c_uint))) != 0: 1 else: 0))
-                                },
-                                _ => {
-                                    (OK__goto_1708_14 = (if codevalue__goto_756_14 != 16: 1 else: 0))
-                                },
-                            }
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            if ((if OK__goto_1708_14 == (if d__goto_703_15 == 16: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_277: c_int
-
-                                if ((if codevalue__goto_756_14 == 394: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_277 = (if true: 1 else: 0))
-                                } else {
-                                    (__ci_expr_logic_277 = (if (if codevalue__goto_756_14 == 396: 1 else: 0) != 0: 1 else: 0))
-                                }
-
-                                if (__ci_expr_logic_277 != 0) {
-                                    (active_count__goto_548_5 = active_count__goto_548_5 - 1)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_active_state__goto_543_13 = next_active_state__goto_543_13 - 1)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                }
-
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                var __ci_expr_old_278: c_int = new_count__goto_548_19
-
-                                (new_count__goto_548_19 = new_count__goto_548_19 + 1)
-
-                                if ((if __ci_expr_old_278 < wscount: 1 else: 0) != 0) {
-                                    (next_new_state__goto_543_33.offset = state_offset__goto_757_9 + count__goto_759_9)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_new_state__goto_543_33.count = 0)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_new_state__goto_543_33 = next_new_state__goto_543_33 + 1)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                } else {
-                                    return -43
-                                }
-
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            }
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        }
 
                     },
                     394 => {
                         (count__goto_759_9 = 0)
 
-                        var __ci_expr_old_263: c_int = active_count__goto_548_5
+                        __pc = 2
+                        __goto_pending = 1
 
-                        (active_count__goto_548_5 = active_count__goto_548_5 + 1)
+                        continue
 
-                        if ((if __ci_expr_old_263 < wscount: 1 else: 0) != 0) {
-                            (next_active_state__goto_543_13.offset = state_offset__goto_757_9 + 4)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (next_active_state__goto_543_13.count = 0)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (next_active_state__goto_543_13 = next_active_state__goto_543_13 + 1)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            return -43
-                        }
-
-
-                        if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                            (prop__goto_1711_28 = (&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((c__goto_703_12 as c_int) / 128)] * 128) + ((c__goto_703_12 as c_int) % 128))] as isize) as usize))
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            match (unsafe: code__goto_755_16[2]) {
-                                0 => {
-                                    (chartype__goto_1709_13 = prop__goto_1711_28.chartype)
-
-                                    var __ci_expr_logic_265: c_int
-
-                                    var __ci_expr_logic_264: c_int
-
-                                    if ((if chartype__goto_1709_13 == ucp_Lu: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_264 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_264 = (if (if chartype__goto_1709_13 == ucp_Ll: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (__ci_expr_logic_264 != 0) {
-                                        (__ci_expr_logic_265 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_265 = (if (if chartype__goto_1709_13 == ucp_Lt: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    (OK__goto_1708_14 = __ci_expr_logic_265)
-
-
-                                },
-                                1 => {
-                                    (OK__goto_1708_14 = (if _pcre2_ucp_gentype_8[prop__goto_1711_28.chartype] == (unsafe: code__goto_755_16[3]): 1 else: 0))
-                                },
-                                2 => {
-                                    (OK__goto_1708_14 = (if prop__goto_1711_28.chartype == (unsafe: code__goto_755_16[3]): 1 else: 0))
-                                },
-                                3 => {
-                                    (OK__goto_1708_14 = (if prop__goto_1711_28.script == (unsafe: code__goto_755_16[3]): 1 else: 0))
-                                },
-                                4 => {
-                                    var __ci_expr_logic_266: c_int
-
-                                    if ((if prop__goto_1711_28.script == (unsafe: code__goto_755_16[3]): 1 else: 0) != 0) {
-                                        (__ci_expr_logic_266 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_266 = (if (if ((unsafe: ((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((prop__goto_1711_28.scriptx_bidiclass & 1023) as isize) as usize))[((unsafe: code__goto_755_16[3]) / 32)]) & ((1 as c_uint) << (((unsafe: code__goto_755_16[3]) % 32) as c_uint))) != 0: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    (OK__goto_1708_14 = __ci_expr_logic_266)
-
-                                },
-                                5 => {
-                                    (chartype__goto_1709_13 = prop__goto_1711_28.chartype)
-
-                                    var __ci_expr_logic_267: c_int
-
-                                    if ((if _pcre2_ucp_gentype_8[chartype__goto_1709_13] == 1: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_267 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_267 = (if (if _pcre2_ucp_gentype_8[chartype__goto_1709_13] == 3: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    (OK__goto_1708_14 = __ci_expr_logic_267)
-
-
-                                },
-                                6 => {
-                                    match c__goto_703_12 {
-                                        9 => {
-                                            (OK__goto_1708_14 = 1)
-                                        },
-                                        _ => {
-                                            (OK__goto_1708_14 = (if _pcre2_ucp_gentype_8[prop__goto_1711_28.chartype] == 6: 1 else: 0))
-                                        },
-                                    }
-                                },
-                                8 => {
-                                    (chartype__goto_1709_13 = prop__goto_1711_28.chartype)
-
-                                    var __ci_expr_logic_270: c_int
-
-                                    var __ci_expr_logic_269: c_int
-
-                                    var __ci_expr_logic_268: c_int
-
-                                    if ((if _pcre2_ucp_gentype_8[chartype__goto_1709_13] == 1: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_268 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_268 = (if (if _pcre2_ucp_gentype_8[chartype__goto_1709_13] == 3: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (__ci_expr_logic_268 != 0) {
-                                        (__ci_expr_logic_269 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_269 = (if (if chartype__goto_1709_13 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (__ci_expr_logic_269 != 0) {
-                                        (__ci_expr_logic_270 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_270 = (if (if chartype__goto_1709_13 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    (OK__goto_1708_14 = __ci_expr_logic_270)
-
-
-                                },
-                                9 => {
-                                    (cp__goto_1710_25 = (&_pcre2_ucd_caseless_sets_8[0] as *const c_uint) + (((unsafe: code__goto_755_16[3]) as isize) as usize))
-
-                                    while true {
-                                        if ((if c__goto_703_12 < (unsafe: *cp__goto_1710_25): 1 else: 0) != 0) {
-                                            (OK__goto_1708_14 = 0)
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            break
-
-                                        }
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        var __ci_expr_old_271: *const c_uint = cp__goto_1710_25
-
-                                        (cp__goto_1710_25 = cp__goto_1710_25 + 1)
-
-                                        if ((if c__goto_703_12 == (unsafe: *__ci_expr_old_271): 1 else: 0) != 0) {
-                                            (OK__goto_1708_14 = 1)
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            break
-
-                                        }
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                    }
-
-                                },
-                                10 => {
-                                    var __ci_expr_logic_276: c_int
-
-                                    var __ci_expr_logic_275: c_int
-
-                                    var __ci_expr_logic_273: c_int
-
-                                    var __ci_expr_logic_272: c_int
-
-                                    if ((if c__goto_703_12 == 36: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_272 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_272 = (if (if c__goto_703_12 == 64: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (__ci_expr_logic_272 != 0) {
-                                        (__ci_expr_logic_273 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_273 = (if (if c__goto_703_12 == 96: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (__ci_expr_logic_273 != 0) {
-                                        (__ci_expr_logic_275 = (if true: 1 else: 0))
-                                    } else {
-                                        var __ci_expr_logic_274: c_int = 0
-
-                                        if ((if c__goto_703_12 >= 160: 1 else: 0) != 0) {
-                                            (__ci_expr_logic_274 = (if (if c__goto_703_12 <= 55295: 1 else: 0) != 0: 1 else: 0))
-                                        }
-
-                                        (__ci_expr_logic_275 = (if __ci_expr_logic_274 != 0: 1 else: 0))
-
-                                    }
-
-                                    if (__ci_expr_logic_275 != 0) {
-                                        (__ci_expr_logic_276 = (if true: 1 else: 0))
-                                    } else {
-                                        (__ci_expr_logic_276 = (if (if c__goto_703_12 >= 57344: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    (OK__goto_1708_14 = __ci_expr_logic_276)
-
-                                },
-                                11 => {
-                                    (OK__goto_1708_14 = (if ((((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((c__goto_703_12 as c_int) / 128)] * 128) + ((c__goto_703_12 as c_int) % 128))] as isize) as usize)).scriptx_bidiclass as c_int) >> (11 as c_uint)) == (unsafe: code__goto_755_16[3]): 1 else: 0))
-                                },
-                                12 => {
-                                    (OK__goto_1708_14 = (if ((unsafe: ((&_pcre2_ucd_boolprop_sets_8[0] as *const c_uint) + (((prop__goto_1711_28.bprops & 4095) as isize) as usize))[((unsafe: code__goto_755_16[3]) / 32)]) & ((1 as c_uint) << (((unsafe: code__goto_755_16[3]) % 32) as c_uint))) != 0: 1 else: 0))
-                                },
-                                _ => {
-                                    (OK__goto_1708_14 = (if codevalue__goto_756_14 != 16: 1 else: 0))
-                                },
-                            }
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            if ((if OK__goto_1708_14 == (if d__goto_703_15 == 16: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_277: c_int
-
-                                if ((if codevalue__goto_756_14 == 394: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_277 = (if true: 1 else: 0))
-                                } else {
-                                    (__ci_expr_logic_277 = (if (if codevalue__goto_756_14 == 396: 1 else: 0) != 0: 1 else: 0))
-                                }
-
-                                if (__ci_expr_logic_277 != 0) {
-                                    (active_count__goto_548_5 = active_count__goto_548_5 - 1)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_active_state__goto_543_13 = next_active_state__goto_543_13 - 1)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                }
-
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                var __ci_expr_old_278: c_int = new_count__goto_548_19
-
-                                (new_count__goto_548_19 = new_count__goto_548_19 + 1)
-
-                                if ((if __ci_expr_old_278 < wscount: 1 else: 0) != 0) {
-                                    (next_new_state__goto_543_33.offset = state_offset__goto_757_9 + count__goto_759_9)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_new_state__goto_543_33.count = 0)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_new_state__goto_543_33 = next_new_state__goto_543_33 + 1)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                } else {
-                                    return -43
-                                }
-
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            }
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        }
 
                     },
                     409 => {
@@ -13276,340 +12512,31 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                     405 => {
                         (count__goto_759_9 = 0)
 
-                        var __ci_expr_old_279: c_int = active_count__goto_548_5
+                        __pc = 3
+                        __goto_pending = 1
 
-                        (active_count__goto_548_5 = active_count__goto_548_5 + 1)
+                        continue
 
-                        if ((if __ci_expr_old_279 < wscount: 1 else: 0) != 0) {
-                            (next_active_state__goto_543_13.offset = state_offset__goto_757_9 + 2)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (next_active_state__goto_543_13.count = 0)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (next_active_state__goto_543_13 = next_active_state__goto_543_13 + 1)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            return -43
-                        }
-
-
-                        if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                            (ncount__goto_1838_13 = 0)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            var __ci_expr_logic_280: c_int
-
-                            if ((if codevalue__goto_756_14 == 414: 1 else: 0) != 0) {
-                                (__ci_expr_logic_280 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_280 = (if (if codevalue__goto_756_14 == 416: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_280 != 0) {
-                                (active_count__goto_548_5 = active_count__goto_548_5 - 1)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (next_active_state__goto_543_13 = next_active_state__goto_543_13 - 1)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            _pcre2_extuni_8(c__goto_703_12, (ptr__goto_545_12 + ((clen__goto_702_7 as isize) as usize)), mb.start_subject, end_subject__goto_554_12, utf__goto_558_6, (&mut ncount__goto_1838_13 as *mut c_int))
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            var __ci_expr_old_281: c_int = new_count__goto_548_19
-
-                            (new_count__goto_548_19 = new_count__goto_548_19 + 1)
-
-                            if ((if __ci_expr_old_281 < wscount: 1 else: 0) != 0) {
-                                (next_new_state__goto_543_33.offset = 0 - (state_offset__goto_757_9 + count__goto_759_9))
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (next_new_state__goto_543_33.count = 0)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (next_new_state__goto_543_33.data = ncount__goto_1838_13)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (next_new_state__goto_543_33 = next_new_state__goto_543_33 + 1)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            } else {
-                                return -43
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        }
 
                     },
                     406 => {
                         (count__goto_759_9 = 0)
 
-                        var __ci_expr_old_279: c_int = active_count__goto_548_5
+                        __pc = 3
+                        __goto_pending = 1
 
-                        (active_count__goto_548_5 = active_count__goto_548_5 + 1)
+                        continue
 
-                        if ((if __ci_expr_old_279 < wscount: 1 else: 0) != 0) {
-                            (next_active_state__goto_543_13.offset = state_offset__goto_757_9 + 2)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (next_active_state__goto_543_13.count = 0)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (next_active_state__goto_543_13 = next_active_state__goto_543_13 + 1)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            return -43
-                        }
-
-
-                        if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                            (ncount__goto_1838_13 = 0)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            var __ci_expr_logic_280: c_int
-
-                            if ((if codevalue__goto_756_14 == 414: 1 else: 0) != 0) {
-                                (__ci_expr_logic_280 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_280 = (if (if codevalue__goto_756_14 == 416: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_280 != 0) {
-                                (active_count__goto_548_5 = active_count__goto_548_5 - 1)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (next_active_state__goto_543_13 = next_active_state__goto_543_13 - 1)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            _pcre2_extuni_8(c__goto_703_12, (ptr__goto_545_12 + ((clen__goto_702_7 as isize) as usize)), mb.start_subject, end_subject__goto_554_12, utf__goto_558_6, (&mut ncount__goto_1838_13 as *mut c_int))
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            var __ci_expr_old_281: c_int = new_count__goto_548_19
-
-                            (new_count__goto_548_19 = new_count__goto_548_19 + 1)
-
-                            if ((if __ci_expr_old_281 < wscount: 1 else: 0) != 0) {
-                                (next_new_state__goto_543_33.offset = 0 - (state_offset__goto_757_9 + count__goto_759_9))
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (next_new_state__goto_543_33.count = 0)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (next_new_state__goto_543_33.data = ncount__goto_1838_13)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (next_new_state__goto_543_33 = next_new_state__goto_543_33 + 1)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            } else {
-                                return -43
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        }
 
                     },
                     414 => {
                         (count__goto_759_9 = 0)
 
-                        var __ci_expr_old_279: c_int = active_count__goto_548_5
+                        __pc = 3
+                        __goto_pending = 1
 
-                        (active_count__goto_548_5 = active_count__goto_548_5 + 1)
+                        continue
 
-                        if ((if __ci_expr_old_279 < wscount: 1 else: 0) != 0) {
-                            (next_active_state__goto_543_13.offset = state_offset__goto_757_9 + 2)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (next_active_state__goto_543_13.count = 0)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (next_active_state__goto_543_13 = next_active_state__goto_543_13 + 1)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            return -43
-                        }
-
-
-                        if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                            (ncount__goto_1838_13 = 0)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            var __ci_expr_logic_280: c_int
-
-                            if ((if codevalue__goto_756_14 == 414: 1 else: 0) != 0) {
-                                (__ci_expr_logic_280 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_280 = (if (if codevalue__goto_756_14 == 416: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_280 != 0) {
-                                (active_count__goto_548_5 = active_count__goto_548_5 - 1)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (next_active_state__goto_543_13 = next_active_state__goto_543_13 - 1)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            _pcre2_extuni_8(c__goto_703_12, (ptr__goto_545_12 + ((clen__goto_702_7 as isize) as usize)), mb.start_subject, end_subject__goto_554_12, utf__goto_558_6, (&mut ncount__goto_1838_13 as *mut c_int))
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            var __ci_expr_old_281: c_int = new_count__goto_548_19
-
-                            (new_count__goto_548_19 = new_count__goto_548_19 + 1)
-
-                            if ((if __ci_expr_old_281 < wscount: 1 else: 0) != 0) {
-                                (next_new_state__goto_543_33.offset = 0 - (state_offset__goto_757_9 + count__goto_759_9))
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (next_new_state__goto_543_33.count = 0)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (next_new_state__goto_543_33.data = ncount__goto_1838_13)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                (next_new_state__goto_543_33 = next_new_state__goto_543_33 + 1)
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            } else {
-                                return -43
-                            }
-
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        }
 
                     },
                     429 => {
@@ -13636,109 +12563,31 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                     425 => {
                         (count__goto_759_9 = 0)
 
-                        var __ci_expr_old_282: c_int = active_count__goto_548_5
+                        __pc = 4
+                        __goto_pending = 1
 
-                        (active_count__goto_548_5 = active_count__goto_548_5 + 1)
+                        continue
 
-                        if ((if __ci_expr_old_282 < wscount: 1 else: 0) != 0) {
-                            (next_active_state__goto_543_13.offset = state_offset__goto_757_9 + 2)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (next_active_state__goto_543_13.count = 0)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (next_active_state__goto_543_13 = next_active_state__goto_543_13 + 1)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            return -43
-                        }
-
-
-                        if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                            0
-                        }
 
                     },
                     426 => {
                         (count__goto_759_9 = 0)
 
-                        var __ci_expr_old_282: c_int = active_count__goto_548_5
+                        __pc = 4
+                        __goto_pending = 1
 
-                        (active_count__goto_548_5 = active_count__goto_548_5 + 1)
+                        continue
 
-                        if ((if __ci_expr_old_282 < wscount: 1 else: 0) != 0) {
-                            (next_active_state__goto_543_13.offset = state_offset__goto_757_9 + 2)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (next_active_state__goto_543_13.count = 0)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (next_active_state__goto_543_13 = next_active_state__goto_543_13 + 1)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            return -43
-                        }
-
-
-                        if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                            0
-                        }
 
                     },
                     434 => {
                         (count__goto_759_9 = 0)
 
-                        var __ci_expr_old_282: c_int = active_count__goto_548_5
+                        __pc = 4
+                        __goto_pending = 1
 
-                        (active_count__goto_548_5 = active_count__goto_548_5 + 1)
+                        continue
 
-                        if ((if __ci_expr_old_282 < wscount: 1 else: 0) != 0) {
-                            (next_active_state__goto_543_13.offset = state_offset__goto_757_9 + 2)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (next_active_state__goto_543_13.count = 0)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (next_active_state__goto_543_13 = next_active_state__goto_543_13 + 1)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            return -43
-                        }
-
-
-                        if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                            0
-                        }
 
                     },
                     469 => {
@@ -13765,364 +12614,31 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                     465 => {
                         (count__goto_759_9 = 0)
 
-                        var __ci_expr_old_285: c_int = active_count__goto_548_5
+                        __pc = 6
+                        __goto_pending = 1
 
-                        (active_count__goto_548_5 = active_count__goto_548_5 + 1)
+                        continue
 
-                        if ((if __ci_expr_old_285 < wscount: 1 else: 0) != 0) {
-                            (next_active_state__goto_543_13.offset = state_offset__goto_757_9 + 2)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (next_active_state__goto_543_13.count = 0)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (next_active_state__goto_543_13 = next_active_state__goto_543_13 + 1)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            return -43
-                        }
-
-
-                        if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                            match c__goto_703_12 {
-                                10 => {
-                                    (OK__goto_1918_14 = 1)
-                                },
-                                _ => {
-                                    (OK__goto_1918_14 = 0)
-                                },
-                            }
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            if ((if OK__goto_1918_14 == (if d__goto_703_15 == 21: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_286: c_int
-
-                                if ((if codevalue__goto_756_14 == 474: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_286 = (if true: 1 else: 0))
-                                } else {
-                                    (__ci_expr_logic_286 = (if (if codevalue__goto_756_14 == 476: 1 else: 0) != 0: 1 else: 0))
-                                }
-
-                                if (__ci_expr_logic_286 != 0) {
-                                    (active_count__goto_548_5 = active_count__goto_548_5 - 1)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_active_state__goto_543_13 = next_active_state__goto_543_13 - 1)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                }
-
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                var __ci_expr_old_287: c_int = new_count__goto_548_19
-
-                                (new_count__goto_548_19 = new_count__goto_548_19 + 1)
-
-                                if ((if __ci_expr_old_287 < wscount: 1 else: 0) != 0) {
-                                    (next_new_state__goto_543_33.offset = 0 - (state_offset__goto_757_9 + count__goto_759_9))
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_new_state__goto_543_33.count = 0)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_new_state__goto_543_33.data = 0)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_new_state__goto_543_33 = next_new_state__goto_543_33 + 1)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                } else {
-                                    return -43
-                                }
-
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            }
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        }
 
                     },
                     466 => {
                         (count__goto_759_9 = 0)
 
-                        var __ci_expr_old_285: c_int = active_count__goto_548_5
+                        __pc = 6
+                        __goto_pending = 1
 
-                        (active_count__goto_548_5 = active_count__goto_548_5 + 1)
+                        continue
 
-                        if ((if __ci_expr_old_285 < wscount: 1 else: 0) != 0) {
-                            (next_active_state__goto_543_13.offset = state_offset__goto_757_9 + 2)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (next_active_state__goto_543_13.count = 0)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (next_active_state__goto_543_13 = next_active_state__goto_543_13 + 1)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            return -43
-                        }
-
-
-                        if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                            match c__goto_703_12 {
-                                10 => {
-                                    (OK__goto_1918_14 = 1)
-                                },
-                                _ => {
-                                    (OK__goto_1918_14 = 0)
-                                },
-                            }
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            if ((if OK__goto_1918_14 == (if d__goto_703_15 == 21: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_286: c_int
-
-                                if ((if codevalue__goto_756_14 == 474: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_286 = (if true: 1 else: 0))
-                                } else {
-                                    (__ci_expr_logic_286 = (if (if codevalue__goto_756_14 == 476: 1 else: 0) != 0: 1 else: 0))
-                                }
-
-                                if (__ci_expr_logic_286 != 0) {
-                                    (active_count__goto_548_5 = active_count__goto_548_5 - 1)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_active_state__goto_543_13 = next_active_state__goto_543_13 - 1)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                }
-
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                var __ci_expr_old_287: c_int = new_count__goto_548_19
-
-                                (new_count__goto_548_19 = new_count__goto_548_19 + 1)
-
-                                if ((if __ci_expr_old_287 < wscount: 1 else: 0) != 0) {
-                                    (next_new_state__goto_543_33.offset = 0 - (state_offset__goto_757_9 + count__goto_759_9))
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_new_state__goto_543_33.count = 0)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_new_state__goto_543_33.data = 0)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_new_state__goto_543_33 = next_new_state__goto_543_33 + 1)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                } else {
-                                    return -43
-                                }
-
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            }
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        }
 
                     },
                     474 => {
                         (count__goto_759_9 = 0)
 
-                        var __ci_expr_old_285: c_int = active_count__goto_548_5
+                        __pc = 6
+                        __goto_pending = 1
 
-                        (active_count__goto_548_5 = active_count__goto_548_5 + 1)
+                        continue
 
-                        if ((if __ci_expr_old_285 < wscount: 1 else: 0) != 0) {
-                            (next_active_state__goto_543_13.offset = state_offset__goto_757_9 + 2)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (next_active_state__goto_543_13.count = 0)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (next_active_state__goto_543_13 = next_active_state__goto_543_13 + 1)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            return -43
-                        }
-
-
-                        if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                            match c__goto_703_12 {
-                                10 => {
-                                    (OK__goto_1918_14 = 1)
-                                },
-                                _ => {
-                                    (OK__goto_1918_14 = 0)
-                                },
-                            }
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            if ((if OK__goto_1918_14 == (if d__goto_703_15 == 21: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_286: c_int
-
-                                if ((if codevalue__goto_756_14 == 474: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_286 = (if true: 1 else: 0))
-                                } else {
-                                    (__ci_expr_logic_286 = (if (if codevalue__goto_756_14 == 476: 1 else: 0) != 0: 1 else: 0))
-                                }
-
-                                if (__ci_expr_logic_286 != 0) {
-                                    (active_count__goto_548_5 = active_count__goto_548_5 - 1)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_active_state__goto_543_13 = next_active_state__goto_543_13 - 1)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                }
-
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                var __ci_expr_old_287: c_int = new_count__goto_548_19
-
-                                (new_count__goto_548_19 = new_count__goto_548_19 + 1)
-
-                                if ((if __ci_expr_old_287 < wscount: 1 else: 0) != 0) {
-                                    (next_new_state__goto_543_33.offset = 0 - (state_offset__goto_757_9 + count__goto_759_9))
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_new_state__goto_543_33.count = 0)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_new_state__goto_543_33.data = 0)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_new_state__goto_543_33 = next_new_state__goto_543_33 + 1)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                } else {
-                                    return -43
-                                }
-
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            }
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        }
 
                     },
                     449 => {
@@ -14149,373 +12665,40 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                     445 => {
                         (count__goto_759_9 = 0)
 
-                        var __ci_expr_old_288: c_int = active_count__goto_548_5
+                        __pc = 7
+                        __goto_pending = 1
 
-                        (active_count__goto_548_5 = active_count__goto_548_5 + 1)
+                        continue
 
-                        if ((if __ci_expr_old_288 < wscount: 1 else: 0) != 0) {
-                            (next_active_state__goto_543_13.offset = state_offset__goto_757_9 + 2)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (next_active_state__goto_543_13.count = 0)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (next_active_state__goto_543_13 = next_active_state__goto_543_13 + 1)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            return -43
-                        }
-
-
-                        if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                            match c__goto_703_12 {
-                                9 => {
-                                    (OK__goto_1958_14 = 1)
-                                },
-                                _ => {
-                                    (OK__goto_1958_14 = 0)
-                                },
-                            }
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            if ((if OK__goto_1958_14 == (if d__goto_703_15 == 19: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_289: c_int
-
-                                if ((if codevalue__goto_756_14 == 454: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_289 = (if true: 1 else: 0))
-                                } else {
-                                    (__ci_expr_logic_289 = (if (if codevalue__goto_756_14 == 456: 1 else: 0) != 0: 1 else: 0))
-                                }
-
-                                if (__ci_expr_logic_289 != 0) {
-                                    (active_count__goto_548_5 = active_count__goto_548_5 - 1)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_active_state__goto_543_13 = next_active_state__goto_543_13 - 1)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                }
-
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                var __ci_expr_old_290: c_int = new_count__goto_548_19
-
-                                (new_count__goto_548_19 = new_count__goto_548_19 + 1)
-
-                                if ((if __ci_expr_old_290 < wscount: 1 else: 0) != 0) {
-                                    (next_new_state__goto_543_33.offset = 0 - (state_offset__goto_757_9 + count__goto_759_9))
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_new_state__goto_543_33.count = 0)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_new_state__goto_543_33.data = 0)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_new_state__goto_543_33 = next_new_state__goto_543_33 + 1)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                } else {
-                                    return -43
-                                }
-
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            }
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        }
 
                     },
                     446 => {
                         (count__goto_759_9 = 0)
 
-                        var __ci_expr_old_288: c_int = active_count__goto_548_5
+                        __pc = 7
+                        __goto_pending = 1
 
-                        (active_count__goto_548_5 = active_count__goto_548_5 + 1)
+                        continue
 
-                        if ((if __ci_expr_old_288 < wscount: 1 else: 0) != 0) {
-                            (next_active_state__goto_543_13.offset = state_offset__goto_757_9 + 2)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (next_active_state__goto_543_13.count = 0)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (next_active_state__goto_543_13 = next_active_state__goto_543_13 + 1)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            return -43
-                        }
-
-
-                        if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                            match c__goto_703_12 {
-                                9 => {
-                                    (OK__goto_1958_14 = 1)
-                                },
-                                _ => {
-                                    (OK__goto_1958_14 = 0)
-                                },
-                            }
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            if ((if OK__goto_1958_14 == (if d__goto_703_15 == 19: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_289: c_int
-
-                                if ((if codevalue__goto_756_14 == 454: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_289 = (if true: 1 else: 0))
-                                } else {
-                                    (__ci_expr_logic_289 = (if (if codevalue__goto_756_14 == 456: 1 else: 0) != 0: 1 else: 0))
-                                }
-
-                                if (__ci_expr_logic_289 != 0) {
-                                    (active_count__goto_548_5 = active_count__goto_548_5 - 1)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_active_state__goto_543_13 = next_active_state__goto_543_13 - 1)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                }
-
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                var __ci_expr_old_290: c_int = new_count__goto_548_19
-
-                                (new_count__goto_548_19 = new_count__goto_548_19 + 1)
-
-                                if ((if __ci_expr_old_290 < wscount: 1 else: 0) != 0) {
-                                    (next_new_state__goto_543_33.offset = 0 - (state_offset__goto_757_9 + count__goto_759_9))
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_new_state__goto_543_33.count = 0)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_new_state__goto_543_33.data = 0)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_new_state__goto_543_33 = next_new_state__goto_543_33 + 1)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                } else {
-                                    return -43
-                                }
-
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            }
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        }
 
                     },
                     454 => {
                         (count__goto_759_9 = 0)
 
-                        var __ci_expr_old_288: c_int = active_count__goto_548_5
+                        __pc = 7
+                        __goto_pending = 1
 
-                        (active_count__goto_548_5 = active_count__goto_548_5 + 1)
+                        continue
 
-                        if ((if __ci_expr_old_288 < wscount: 1 else: 0) != 0) {
-                            (next_active_state__goto_543_13.offset = state_offset__goto_757_9 + 2)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (next_active_state__goto_543_13.count = 0)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            (next_active_state__goto_543_13 = next_active_state__goto_543_13 + 1)
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        } else {
-                            return -43
-                        }
-
-
-                        if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                            match c__goto_703_12 {
-                                9 => {
-                                    (OK__goto_1958_14 = 1)
-                                },
-                                _ => {
-                                    (OK__goto_1958_14 = 0)
-                                },
-                            }
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                            if ((if OK__goto_1958_14 == (if d__goto_703_15 == 19: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_289: c_int
-
-                                if ((if codevalue__goto_756_14 == 454: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_289 = (if true: 1 else: 0))
-                                } else {
-                                    (__ci_expr_logic_289 = (if (if codevalue__goto_756_14 == 456: 1 else: 0) != 0: 1 else: 0))
-                                }
-
-                                if (__ci_expr_logic_289 != 0) {
-                                    (active_count__goto_548_5 = active_count__goto_548_5 - 1)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_active_state__goto_543_13 = next_active_state__goto_543_13 - 1)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                }
-
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                                var __ci_expr_old_290: c_int = new_count__goto_548_19
-
-                                (new_count__goto_548_19 = new_count__goto_548_19 + 1)
-
-                                if ((if __ci_expr_old_290 < wscount: 1 else: 0) != 0) {
-                                    (next_new_state__goto_543_33.offset = 0 - (state_offset__goto_757_9 + count__goto_759_9))
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_new_state__goto_543_33.count = 0)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_new_state__goto_543_33.data = 0)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                    (next_new_state__goto_543_33 = next_new_state__goto_543_33 + 1)
-
-                                    if (__goto_pending != 0) {
-                                        continue
-                                    }
-
-                                } else {
-                                    return -43
-                                }
-
-
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-
-                            }
-
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-
-                        }
 
                     },
                     393 => {
                         if ((if codevalue__goto_756_14 != 393: 1 else: 0) != 0) {
-                            var __ci_expr_old_291: c_int = active_count__goto_548_5
+                            var __ci_expr_old_262: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_291 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_262 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = ((state_offset__goto_757_9 + 1) + 2) + 3)
 
                                 if (__goto_pending != 0) {
@@ -14558,23 +12741,23 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 0 => {
                                     (chartype__goto_1995_13 = prop__goto_1997_28.chartype)
 
-                                    var __ci_expr_logic_293: c_int
+                                    var __ci_expr_logic_264: c_int
 
-                                    var __ci_expr_logic_292: c_int
+                                    var __ci_expr_logic_263: c_int
 
                                     if ((if chartype__goto_1995_13 == ucp_Lu: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_292 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_263 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_292 = (if (if chartype__goto_1995_13 == ucp_Ll: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_263 = (if (if chartype__goto_1995_13 == ucp_Ll: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_292 != 0) {
-                                        (__ci_expr_logic_293 = (if true: 1 else: 0))
+                                    if (__ci_expr_logic_263 != 0) {
+                                        (__ci_expr_logic_264 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_293 = (if (if chartype__goto_1995_13 == ucp_Lt: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_264 = (if (if chartype__goto_1995_13 == ucp_Lt: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (OK__goto_1994_14 = __ci_expr_logic_293)
+                                    (OK__goto_1994_14 = __ci_expr_logic_264)
 
 
                                 },
@@ -14588,29 +12771,29 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     (OK__goto_1994_14 = (if prop__goto_1997_28.script == (unsafe: code__goto_755_16[((1 + 2) + 2)]): 1 else: 0))
                                 },
                                 4 => {
-                                    var __ci_expr_logic_294: c_int
+                                    var __ci_expr_logic_265: c_int
 
                                     if ((if prop__goto_1997_28.script == (unsafe: code__goto_755_16[((1 + 2) + 2)]): 1 else: 0) != 0) {
-                                        (__ci_expr_logic_294 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_265 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_294 = (if (if ((unsafe: ((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((prop__goto_1997_28.scriptx_bidiclass & 1023) as isize) as usize))[((unsafe: code__goto_755_16[((1 + 2) + 2)]) / 32)]) & ((1 as c_uint) << (((unsafe: code__goto_755_16[((1 + 2) + 2)]) % 32) as c_uint))) != 0: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_265 = (if (if ((unsafe: ((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((prop__goto_1997_28.scriptx_bidiclass & 1023) as isize) as usize))[((unsafe: code__goto_755_16[((1 + 2) + 2)]) / 32)]) & ((1 as c_uint) << (((unsafe: code__goto_755_16[((1 + 2) + 2)]) % 32) as c_uint))) != 0: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (OK__goto_1994_14 = __ci_expr_logic_294)
+                                    (OK__goto_1994_14 = __ci_expr_logic_265)
 
                                 },
                                 5 => {
                                     (chartype__goto_1995_13 = prop__goto_1997_28.chartype)
 
-                                    var __ci_expr_logic_295: c_int
+                                    var __ci_expr_logic_266: c_int
 
                                     if ((if _pcre2_ucp_gentype_8[chartype__goto_1995_13] == 1: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_295 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_266 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_295 = (if (if _pcre2_ucp_gentype_8[chartype__goto_1995_13] == 3: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_266 = (if (if _pcre2_ucp_gentype_8[chartype__goto_1995_13] == 3: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (OK__goto_1994_14 = __ci_expr_logic_295)
+                                    (OK__goto_1994_14 = __ci_expr_logic_266)
 
 
                                 },
@@ -14627,31 +12810,31 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 8 => {
                                     (chartype__goto_1995_13 = prop__goto_1997_28.chartype)
 
-                                    var __ci_expr_logic_298: c_int
+                                    var __ci_expr_logic_269: c_int
 
-                                    var __ci_expr_logic_297: c_int
+                                    var __ci_expr_logic_268: c_int
 
-                                    var __ci_expr_logic_296: c_int
+                                    var __ci_expr_logic_267: c_int
 
                                     if ((if _pcre2_ucp_gentype_8[chartype__goto_1995_13] == 1: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_296 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_267 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_296 = (if (if _pcre2_ucp_gentype_8[chartype__goto_1995_13] == 3: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_267 = (if (if _pcre2_ucp_gentype_8[chartype__goto_1995_13] == 3: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_296 != 0) {
-                                        (__ci_expr_logic_297 = (if true: 1 else: 0))
+                                    if (__ci_expr_logic_267 != 0) {
+                                        (__ci_expr_logic_268 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_297 = (if (if chartype__goto_1995_13 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_268 = (if (if chartype__goto_1995_13 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_297 != 0) {
-                                        (__ci_expr_logic_298 = (if true: 1 else: 0))
+                                    if (__ci_expr_logic_268 != 0) {
+                                        (__ci_expr_logic_269 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_298 = (if (if chartype__goto_1995_13 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_269 = (if (if chartype__goto_1995_13 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (OK__goto_1994_14 = __ci_expr_logic_298)
+                                    (OK__goto_1994_14 = __ci_expr_logic_269)
 
 
                                 },
@@ -14674,11 +12857,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                             break
                                         }
 
-                                        var __ci_expr_old_299: *const c_uint = cp__goto_1996_25
+                                        var __ci_expr_old_270: *const c_uint = cp__goto_1996_25
 
                                         (cp__goto_1996_25 = cp__goto_1996_25 + 1)
 
-                                        if ((if c__goto_703_12 == (unsafe: *__ci_expr_old_299): 1 else: 0) != 0) {
+                                        if ((if c__goto_703_12 == (unsafe: *__ci_expr_old_270): 1 else: 0) != 0) {
                                             (OK__goto_1994_14 = 1)
 
                                             if (__goto_pending != 0) {
@@ -14701,46 +12884,46 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                 },
                                 10 => {
-                                    var __ci_expr_logic_304: c_int
+                                    var __ci_expr_logic_275: c_int
 
-                                    var __ci_expr_logic_303: c_int
+                                    var __ci_expr_logic_274: c_int
 
-                                    var __ci_expr_logic_301: c_int
+                                    var __ci_expr_logic_272: c_int
 
-                                    var __ci_expr_logic_300: c_int
+                                    var __ci_expr_logic_271: c_int
 
                                     if ((if c__goto_703_12 == 36: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_300 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_271 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_300 = (if (if c__goto_703_12 == 64: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_271 = (if (if c__goto_703_12 == 64: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_300 != 0) {
-                                        (__ci_expr_logic_301 = (if true: 1 else: 0))
+                                    if (__ci_expr_logic_271 != 0) {
+                                        (__ci_expr_logic_272 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_301 = (if (if c__goto_703_12 == 96: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_272 = (if (if c__goto_703_12 == 96: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_301 != 0) {
-                                        (__ci_expr_logic_303 = (if true: 1 else: 0))
+                                    if (__ci_expr_logic_272 != 0) {
+                                        (__ci_expr_logic_274 = (if true: 1 else: 0))
                                     } else {
-                                        var __ci_expr_logic_302: c_int = 0
+                                        var __ci_expr_logic_273: c_int = 0
 
                                         if ((if c__goto_703_12 >= 160: 1 else: 0) != 0) {
-                                            (__ci_expr_logic_302 = (if (if c__goto_703_12 <= 55295: 1 else: 0) != 0: 1 else: 0))
+                                            (__ci_expr_logic_273 = (if (if c__goto_703_12 <= 55295: 1 else: 0) != 0: 1 else: 0))
                                         }
 
-                                        (__ci_expr_logic_303 = (if __ci_expr_logic_302 != 0: 1 else: 0))
+                                        (__ci_expr_logic_274 = (if __ci_expr_logic_273 != 0: 1 else: 0))
 
                                     }
 
-                                    if (__ci_expr_logic_303 != 0) {
-                                        (__ci_expr_logic_304 = (if true: 1 else: 0))
+                                    if (__ci_expr_logic_274 != 0) {
+                                        (__ci_expr_logic_275 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_304 = (if (if c__goto_703_12 >= 57344: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_275 = (if (if c__goto_703_12 >= 57344: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (OK__goto_1994_14 = __ci_expr_logic_304)
+                                    (OK__goto_1994_14 = __ci_expr_logic_275)
 
                                 },
                                 11 => {
@@ -14781,11 +12964,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 (count__goto_759_9 = count__goto_759_9 + 1)
 
                                 if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                    var __ci_expr_old_305: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_276: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_305 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_276 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = ((state_offset__goto_757_9 + 1) + 2) + 3)
 
                                         if (__goto_pending != 0) {
@@ -14814,11 +12997,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                 } else {
-                                    var __ci_expr_old_306: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_277: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_306 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_277 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -14864,11 +13047,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                     },
                     391 => {
                         if ((if codevalue__goto_756_14 != 393: 1 else: 0) != 0) {
-                            var __ci_expr_old_291: c_int = active_count__goto_548_5
+                            var __ci_expr_old_262: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_291 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_262 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = ((state_offset__goto_757_9 + 1) + 2) + 3)
 
                                 if (__goto_pending != 0) {
@@ -14911,23 +13094,23 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 0 => {
                                     (chartype__goto_1995_13 = prop__goto_1997_28.chartype)
 
-                                    var __ci_expr_logic_293: c_int
+                                    var __ci_expr_logic_264: c_int
 
-                                    var __ci_expr_logic_292: c_int
+                                    var __ci_expr_logic_263: c_int
 
                                     if ((if chartype__goto_1995_13 == ucp_Lu: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_292 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_263 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_292 = (if (if chartype__goto_1995_13 == ucp_Ll: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_263 = (if (if chartype__goto_1995_13 == ucp_Ll: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_292 != 0) {
-                                        (__ci_expr_logic_293 = (if true: 1 else: 0))
+                                    if (__ci_expr_logic_263 != 0) {
+                                        (__ci_expr_logic_264 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_293 = (if (if chartype__goto_1995_13 == ucp_Lt: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_264 = (if (if chartype__goto_1995_13 == ucp_Lt: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (OK__goto_1994_14 = __ci_expr_logic_293)
+                                    (OK__goto_1994_14 = __ci_expr_logic_264)
 
 
                                 },
@@ -14941,29 +13124,29 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     (OK__goto_1994_14 = (if prop__goto_1997_28.script == (unsafe: code__goto_755_16[((1 + 2) + 2)]): 1 else: 0))
                                 },
                                 4 => {
-                                    var __ci_expr_logic_294: c_int
+                                    var __ci_expr_logic_265: c_int
 
                                     if ((if prop__goto_1997_28.script == (unsafe: code__goto_755_16[((1 + 2) + 2)]): 1 else: 0) != 0) {
-                                        (__ci_expr_logic_294 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_265 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_294 = (if (if ((unsafe: ((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((prop__goto_1997_28.scriptx_bidiclass & 1023) as isize) as usize))[((unsafe: code__goto_755_16[((1 + 2) + 2)]) / 32)]) & ((1 as c_uint) << (((unsafe: code__goto_755_16[((1 + 2) + 2)]) % 32) as c_uint))) != 0: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_265 = (if (if ((unsafe: ((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((prop__goto_1997_28.scriptx_bidiclass & 1023) as isize) as usize))[((unsafe: code__goto_755_16[((1 + 2) + 2)]) / 32)]) & ((1 as c_uint) << (((unsafe: code__goto_755_16[((1 + 2) + 2)]) % 32) as c_uint))) != 0: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (OK__goto_1994_14 = __ci_expr_logic_294)
+                                    (OK__goto_1994_14 = __ci_expr_logic_265)
 
                                 },
                                 5 => {
                                     (chartype__goto_1995_13 = prop__goto_1997_28.chartype)
 
-                                    var __ci_expr_logic_295: c_int
+                                    var __ci_expr_logic_266: c_int
 
                                     if ((if _pcre2_ucp_gentype_8[chartype__goto_1995_13] == 1: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_295 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_266 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_295 = (if (if _pcre2_ucp_gentype_8[chartype__goto_1995_13] == 3: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_266 = (if (if _pcre2_ucp_gentype_8[chartype__goto_1995_13] == 3: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (OK__goto_1994_14 = __ci_expr_logic_295)
+                                    (OK__goto_1994_14 = __ci_expr_logic_266)
 
 
                                 },
@@ -14980,31 +13163,31 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 8 => {
                                     (chartype__goto_1995_13 = prop__goto_1997_28.chartype)
 
-                                    var __ci_expr_logic_298: c_int
+                                    var __ci_expr_logic_269: c_int
 
-                                    var __ci_expr_logic_297: c_int
+                                    var __ci_expr_logic_268: c_int
 
-                                    var __ci_expr_logic_296: c_int
+                                    var __ci_expr_logic_267: c_int
 
                                     if ((if _pcre2_ucp_gentype_8[chartype__goto_1995_13] == 1: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_296 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_267 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_296 = (if (if _pcre2_ucp_gentype_8[chartype__goto_1995_13] == 3: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_267 = (if (if _pcre2_ucp_gentype_8[chartype__goto_1995_13] == 3: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_296 != 0) {
-                                        (__ci_expr_logic_297 = (if true: 1 else: 0))
+                                    if (__ci_expr_logic_267 != 0) {
+                                        (__ci_expr_logic_268 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_297 = (if (if chartype__goto_1995_13 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_268 = (if (if chartype__goto_1995_13 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_297 != 0) {
-                                        (__ci_expr_logic_298 = (if true: 1 else: 0))
+                                    if (__ci_expr_logic_268 != 0) {
+                                        (__ci_expr_logic_269 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_298 = (if (if chartype__goto_1995_13 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_269 = (if (if chartype__goto_1995_13 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (OK__goto_1994_14 = __ci_expr_logic_298)
+                                    (OK__goto_1994_14 = __ci_expr_logic_269)
 
 
                                 },
@@ -15027,11 +13210,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                             break
                                         }
 
-                                        var __ci_expr_old_299: *const c_uint = cp__goto_1996_25
+                                        var __ci_expr_old_270: *const c_uint = cp__goto_1996_25
 
                                         (cp__goto_1996_25 = cp__goto_1996_25 + 1)
 
-                                        if ((if c__goto_703_12 == (unsafe: *__ci_expr_old_299): 1 else: 0) != 0) {
+                                        if ((if c__goto_703_12 == (unsafe: *__ci_expr_old_270): 1 else: 0) != 0) {
                                             (OK__goto_1994_14 = 1)
 
                                             if (__goto_pending != 0) {
@@ -15054,46 +13237,46 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                 },
                                 10 => {
-                                    var __ci_expr_logic_304: c_int
+                                    var __ci_expr_logic_275: c_int
 
-                                    var __ci_expr_logic_303: c_int
+                                    var __ci_expr_logic_274: c_int
 
-                                    var __ci_expr_logic_301: c_int
+                                    var __ci_expr_logic_272: c_int
 
-                                    var __ci_expr_logic_300: c_int
+                                    var __ci_expr_logic_271: c_int
 
                                     if ((if c__goto_703_12 == 36: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_300 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_271 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_300 = (if (if c__goto_703_12 == 64: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_271 = (if (if c__goto_703_12 == 64: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_300 != 0) {
-                                        (__ci_expr_logic_301 = (if true: 1 else: 0))
+                                    if (__ci_expr_logic_271 != 0) {
+                                        (__ci_expr_logic_272 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_301 = (if (if c__goto_703_12 == 96: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_272 = (if (if c__goto_703_12 == 96: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_301 != 0) {
-                                        (__ci_expr_logic_303 = (if true: 1 else: 0))
+                                    if (__ci_expr_logic_272 != 0) {
+                                        (__ci_expr_logic_274 = (if true: 1 else: 0))
                                     } else {
-                                        var __ci_expr_logic_302: c_int = 0
+                                        var __ci_expr_logic_273: c_int = 0
 
                                         if ((if c__goto_703_12 >= 160: 1 else: 0) != 0) {
-                                            (__ci_expr_logic_302 = (if (if c__goto_703_12 <= 55295: 1 else: 0) != 0: 1 else: 0))
+                                            (__ci_expr_logic_273 = (if (if c__goto_703_12 <= 55295: 1 else: 0) != 0: 1 else: 0))
                                         }
 
-                                        (__ci_expr_logic_303 = (if __ci_expr_logic_302 != 0: 1 else: 0))
+                                        (__ci_expr_logic_274 = (if __ci_expr_logic_273 != 0: 1 else: 0))
 
                                     }
 
-                                    if (__ci_expr_logic_303 != 0) {
-                                        (__ci_expr_logic_304 = (if true: 1 else: 0))
+                                    if (__ci_expr_logic_274 != 0) {
+                                        (__ci_expr_logic_275 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_304 = (if (if c__goto_703_12 >= 57344: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_275 = (if (if c__goto_703_12 >= 57344: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (OK__goto_1994_14 = __ci_expr_logic_304)
+                                    (OK__goto_1994_14 = __ci_expr_logic_275)
 
                                 },
                                 11 => {
@@ -15134,11 +13317,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 (count__goto_759_9 = count__goto_759_9 + 1)
 
                                 if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                    var __ci_expr_old_305: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_276: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_305 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_276 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = ((state_offset__goto_757_9 + 1) + 2) + 3)
 
                                         if (__goto_pending != 0) {
@@ -15167,11 +13350,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                 } else {
-                                    var __ci_expr_old_306: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_277: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_306 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_277 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -15217,11 +13400,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                     },
                     392 => {
                         if ((if codevalue__goto_756_14 != 393: 1 else: 0) != 0) {
-                            var __ci_expr_old_291: c_int = active_count__goto_548_5
+                            var __ci_expr_old_262: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_291 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_262 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = ((state_offset__goto_757_9 + 1) + 2) + 3)
 
                                 if (__goto_pending != 0) {
@@ -15264,23 +13447,23 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 0 => {
                                     (chartype__goto_1995_13 = prop__goto_1997_28.chartype)
 
-                                    var __ci_expr_logic_293: c_int
+                                    var __ci_expr_logic_264: c_int
 
-                                    var __ci_expr_logic_292: c_int
+                                    var __ci_expr_logic_263: c_int
 
                                     if ((if chartype__goto_1995_13 == ucp_Lu: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_292 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_263 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_292 = (if (if chartype__goto_1995_13 == ucp_Ll: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_263 = (if (if chartype__goto_1995_13 == ucp_Ll: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_292 != 0) {
-                                        (__ci_expr_logic_293 = (if true: 1 else: 0))
+                                    if (__ci_expr_logic_263 != 0) {
+                                        (__ci_expr_logic_264 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_293 = (if (if chartype__goto_1995_13 == ucp_Lt: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_264 = (if (if chartype__goto_1995_13 == ucp_Lt: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (OK__goto_1994_14 = __ci_expr_logic_293)
+                                    (OK__goto_1994_14 = __ci_expr_logic_264)
 
 
                                 },
@@ -15294,29 +13477,29 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     (OK__goto_1994_14 = (if prop__goto_1997_28.script == (unsafe: code__goto_755_16[((1 + 2) + 2)]): 1 else: 0))
                                 },
                                 4 => {
-                                    var __ci_expr_logic_294: c_int
+                                    var __ci_expr_logic_265: c_int
 
                                     if ((if prop__goto_1997_28.script == (unsafe: code__goto_755_16[((1 + 2) + 2)]): 1 else: 0) != 0) {
-                                        (__ci_expr_logic_294 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_265 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_294 = (if (if ((unsafe: ((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((prop__goto_1997_28.scriptx_bidiclass & 1023) as isize) as usize))[((unsafe: code__goto_755_16[((1 + 2) + 2)]) / 32)]) & ((1 as c_uint) << (((unsafe: code__goto_755_16[((1 + 2) + 2)]) % 32) as c_uint))) != 0: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_265 = (if (if ((unsafe: ((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((prop__goto_1997_28.scriptx_bidiclass & 1023) as isize) as usize))[((unsafe: code__goto_755_16[((1 + 2) + 2)]) / 32)]) & ((1 as c_uint) << (((unsafe: code__goto_755_16[((1 + 2) + 2)]) % 32) as c_uint))) != 0: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (OK__goto_1994_14 = __ci_expr_logic_294)
+                                    (OK__goto_1994_14 = __ci_expr_logic_265)
 
                                 },
                                 5 => {
                                     (chartype__goto_1995_13 = prop__goto_1997_28.chartype)
 
-                                    var __ci_expr_logic_295: c_int
+                                    var __ci_expr_logic_266: c_int
 
                                     if ((if _pcre2_ucp_gentype_8[chartype__goto_1995_13] == 1: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_295 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_266 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_295 = (if (if _pcre2_ucp_gentype_8[chartype__goto_1995_13] == 3: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_266 = (if (if _pcre2_ucp_gentype_8[chartype__goto_1995_13] == 3: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (OK__goto_1994_14 = __ci_expr_logic_295)
+                                    (OK__goto_1994_14 = __ci_expr_logic_266)
 
 
                                 },
@@ -15333,31 +13516,31 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 8 => {
                                     (chartype__goto_1995_13 = prop__goto_1997_28.chartype)
 
-                                    var __ci_expr_logic_298: c_int
+                                    var __ci_expr_logic_269: c_int
 
-                                    var __ci_expr_logic_297: c_int
+                                    var __ci_expr_logic_268: c_int
 
-                                    var __ci_expr_logic_296: c_int
+                                    var __ci_expr_logic_267: c_int
 
                                     if ((if _pcre2_ucp_gentype_8[chartype__goto_1995_13] == 1: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_296 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_267 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_296 = (if (if _pcre2_ucp_gentype_8[chartype__goto_1995_13] == 3: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_267 = (if (if _pcre2_ucp_gentype_8[chartype__goto_1995_13] == 3: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_296 != 0) {
-                                        (__ci_expr_logic_297 = (if true: 1 else: 0))
+                                    if (__ci_expr_logic_267 != 0) {
+                                        (__ci_expr_logic_268 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_297 = (if (if chartype__goto_1995_13 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_268 = (if (if chartype__goto_1995_13 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_297 != 0) {
-                                        (__ci_expr_logic_298 = (if true: 1 else: 0))
+                                    if (__ci_expr_logic_268 != 0) {
+                                        (__ci_expr_logic_269 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_298 = (if (if chartype__goto_1995_13 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_269 = (if (if chartype__goto_1995_13 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (OK__goto_1994_14 = __ci_expr_logic_298)
+                                    (OK__goto_1994_14 = __ci_expr_logic_269)
 
 
                                 },
@@ -15380,11 +13563,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                             break
                                         }
 
-                                        var __ci_expr_old_299: *const c_uint = cp__goto_1996_25
+                                        var __ci_expr_old_270: *const c_uint = cp__goto_1996_25
 
                                         (cp__goto_1996_25 = cp__goto_1996_25 + 1)
 
-                                        if ((if c__goto_703_12 == (unsafe: *__ci_expr_old_299): 1 else: 0) != 0) {
+                                        if ((if c__goto_703_12 == (unsafe: *__ci_expr_old_270): 1 else: 0) != 0) {
                                             (OK__goto_1994_14 = 1)
 
                                             if (__goto_pending != 0) {
@@ -15407,46 +13590,46 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                 },
                                 10 => {
-                                    var __ci_expr_logic_304: c_int
+                                    var __ci_expr_logic_275: c_int
 
-                                    var __ci_expr_logic_303: c_int
+                                    var __ci_expr_logic_274: c_int
 
-                                    var __ci_expr_logic_301: c_int
+                                    var __ci_expr_logic_272: c_int
 
-                                    var __ci_expr_logic_300: c_int
+                                    var __ci_expr_logic_271: c_int
 
                                     if ((if c__goto_703_12 == 36: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_300 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_271 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_300 = (if (if c__goto_703_12 == 64: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_271 = (if (if c__goto_703_12 == 64: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_300 != 0) {
-                                        (__ci_expr_logic_301 = (if true: 1 else: 0))
+                                    if (__ci_expr_logic_271 != 0) {
+                                        (__ci_expr_logic_272 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_301 = (if (if c__goto_703_12 == 96: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_272 = (if (if c__goto_703_12 == 96: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_301 != 0) {
-                                        (__ci_expr_logic_303 = (if true: 1 else: 0))
+                                    if (__ci_expr_logic_272 != 0) {
+                                        (__ci_expr_logic_274 = (if true: 1 else: 0))
                                     } else {
-                                        var __ci_expr_logic_302: c_int = 0
+                                        var __ci_expr_logic_273: c_int = 0
 
                                         if ((if c__goto_703_12 >= 160: 1 else: 0) != 0) {
-                                            (__ci_expr_logic_302 = (if (if c__goto_703_12 <= 55295: 1 else: 0) != 0: 1 else: 0))
+                                            (__ci_expr_logic_273 = (if (if c__goto_703_12 <= 55295: 1 else: 0) != 0: 1 else: 0))
                                         }
 
-                                        (__ci_expr_logic_303 = (if __ci_expr_logic_302 != 0: 1 else: 0))
+                                        (__ci_expr_logic_274 = (if __ci_expr_logic_273 != 0: 1 else: 0))
 
                                     }
 
-                                    if (__ci_expr_logic_303 != 0) {
-                                        (__ci_expr_logic_304 = (if true: 1 else: 0))
+                                    if (__ci_expr_logic_274 != 0) {
+                                        (__ci_expr_logic_275 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_304 = (if (if c__goto_703_12 >= 57344: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_275 = (if (if c__goto_703_12 >= 57344: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (OK__goto_1994_14 = __ci_expr_logic_304)
+                                    (OK__goto_1994_14 = __ci_expr_logic_275)
 
                                 },
                                 11 => {
@@ -15487,11 +13670,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 (count__goto_759_9 = count__goto_759_9 + 1)
 
                                 if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                    var __ci_expr_old_305: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_276: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_305 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_276 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = ((state_offset__goto_757_9 + 1) + 2) + 3)
 
                                         if (__goto_pending != 0) {
@@ -15520,11 +13703,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                 } else {
-                                    var __ci_expr_old_306: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_277: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_306 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_277 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -15570,11 +13753,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                     },
                     397 => {
                         if ((if codevalue__goto_756_14 != 393: 1 else: 0) != 0) {
-                            var __ci_expr_old_291: c_int = active_count__goto_548_5
+                            var __ci_expr_old_262: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_291 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_262 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = ((state_offset__goto_757_9 + 1) + 2) + 3)
 
                                 if (__goto_pending != 0) {
@@ -15617,23 +13800,23 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 0 => {
                                     (chartype__goto_1995_13 = prop__goto_1997_28.chartype)
 
-                                    var __ci_expr_logic_293: c_int
+                                    var __ci_expr_logic_264: c_int
 
-                                    var __ci_expr_logic_292: c_int
+                                    var __ci_expr_logic_263: c_int
 
                                     if ((if chartype__goto_1995_13 == ucp_Lu: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_292 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_263 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_292 = (if (if chartype__goto_1995_13 == ucp_Ll: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_263 = (if (if chartype__goto_1995_13 == ucp_Ll: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_292 != 0) {
-                                        (__ci_expr_logic_293 = (if true: 1 else: 0))
+                                    if (__ci_expr_logic_263 != 0) {
+                                        (__ci_expr_logic_264 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_293 = (if (if chartype__goto_1995_13 == ucp_Lt: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_264 = (if (if chartype__goto_1995_13 == ucp_Lt: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (OK__goto_1994_14 = __ci_expr_logic_293)
+                                    (OK__goto_1994_14 = __ci_expr_logic_264)
 
 
                                 },
@@ -15647,29 +13830,29 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     (OK__goto_1994_14 = (if prop__goto_1997_28.script == (unsafe: code__goto_755_16[((1 + 2) + 2)]): 1 else: 0))
                                 },
                                 4 => {
-                                    var __ci_expr_logic_294: c_int
+                                    var __ci_expr_logic_265: c_int
 
                                     if ((if prop__goto_1997_28.script == (unsafe: code__goto_755_16[((1 + 2) + 2)]): 1 else: 0) != 0) {
-                                        (__ci_expr_logic_294 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_265 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_294 = (if (if ((unsafe: ((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((prop__goto_1997_28.scriptx_bidiclass & 1023) as isize) as usize))[((unsafe: code__goto_755_16[((1 + 2) + 2)]) / 32)]) & ((1 as c_uint) << (((unsafe: code__goto_755_16[((1 + 2) + 2)]) % 32) as c_uint))) != 0: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_265 = (if (if ((unsafe: ((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((prop__goto_1997_28.scriptx_bidiclass & 1023) as isize) as usize))[((unsafe: code__goto_755_16[((1 + 2) + 2)]) / 32)]) & ((1 as c_uint) << (((unsafe: code__goto_755_16[((1 + 2) + 2)]) % 32) as c_uint))) != 0: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (OK__goto_1994_14 = __ci_expr_logic_294)
+                                    (OK__goto_1994_14 = __ci_expr_logic_265)
 
                                 },
                                 5 => {
                                     (chartype__goto_1995_13 = prop__goto_1997_28.chartype)
 
-                                    var __ci_expr_logic_295: c_int
+                                    var __ci_expr_logic_266: c_int
 
                                     if ((if _pcre2_ucp_gentype_8[chartype__goto_1995_13] == 1: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_295 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_266 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_295 = (if (if _pcre2_ucp_gentype_8[chartype__goto_1995_13] == 3: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_266 = (if (if _pcre2_ucp_gentype_8[chartype__goto_1995_13] == 3: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (OK__goto_1994_14 = __ci_expr_logic_295)
+                                    (OK__goto_1994_14 = __ci_expr_logic_266)
 
 
                                 },
@@ -15686,31 +13869,31 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 8 => {
                                     (chartype__goto_1995_13 = prop__goto_1997_28.chartype)
 
-                                    var __ci_expr_logic_298: c_int
+                                    var __ci_expr_logic_269: c_int
 
-                                    var __ci_expr_logic_297: c_int
+                                    var __ci_expr_logic_268: c_int
 
-                                    var __ci_expr_logic_296: c_int
+                                    var __ci_expr_logic_267: c_int
 
                                     if ((if _pcre2_ucp_gentype_8[chartype__goto_1995_13] == 1: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_296 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_267 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_296 = (if (if _pcre2_ucp_gentype_8[chartype__goto_1995_13] == 3: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_267 = (if (if _pcre2_ucp_gentype_8[chartype__goto_1995_13] == 3: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_296 != 0) {
-                                        (__ci_expr_logic_297 = (if true: 1 else: 0))
+                                    if (__ci_expr_logic_267 != 0) {
+                                        (__ci_expr_logic_268 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_297 = (if (if chartype__goto_1995_13 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_268 = (if (if chartype__goto_1995_13 == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_297 != 0) {
-                                        (__ci_expr_logic_298 = (if true: 1 else: 0))
+                                    if (__ci_expr_logic_268 != 0) {
+                                        (__ci_expr_logic_269 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_298 = (if (if chartype__goto_1995_13 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_269 = (if (if chartype__goto_1995_13 == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (OK__goto_1994_14 = __ci_expr_logic_298)
+                                    (OK__goto_1994_14 = __ci_expr_logic_269)
 
 
                                 },
@@ -15733,11 +13916,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                             break
                                         }
 
-                                        var __ci_expr_old_299: *const c_uint = cp__goto_1996_25
+                                        var __ci_expr_old_270: *const c_uint = cp__goto_1996_25
 
                                         (cp__goto_1996_25 = cp__goto_1996_25 + 1)
 
-                                        if ((if c__goto_703_12 == (unsafe: *__ci_expr_old_299): 1 else: 0) != 0) {
+                                        if ((if c__goto_703_12 == (unsafe: *__ci_expr_old_270): 1 else: 0) != 0) {
                                             (OK__goto_1994_14 = 1)
 
                                             if (__goto_pending != 0) {
@@ -15760,46 +13943,46 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                 },
                                 10 => {
-                                    var __ci_expr_logic_304: c_int
+                                    var __ci_expr_logic_275: c_int
 
-                                    var __ci_expr_logic_303: c_int
+                                    var __ci_expr_logic_274: c_int
 
-                                    var __ci_expr_logic_301: c_int
+                                    var __ci_expr_logic_272: c_int
 
-                                    var __ci_expr_logic_300: c_int
+                                    var __ci_expr_logic_271: c_int
 
                                     if ((if c__goto_703_12 == 36: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_300 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_271 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_300 = (if (if c__goto_703_12 == 64: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_271 = (if (if c__goto_703_12 == 64: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_300 != 0) {
-                                        (__ci_expr_logic_301 = (if true: 1 else: 0))
+                                    if (__ci_expr_logic_271 != 0) {
+                                        (__ci_expr_logic_272 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_301 = (if (if c__goto_703_12 == 96: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_272 = (if (if c__goto_703_12 == 96: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_301 != 0) {
-                                        (__ci_expr_logic_303 = (if true: 1 else: 0))
+                                    if (__ci_expr_logic_272 != 0) {
+                                        (__ci_expr_logic_274 = (if true: 1 else: 0))
                                     } else {
-                                        var __ci_expr_logic_302: c_int = 0
+                                        var __ci_expr_logic_273: c_int = 0
 
                                         if ((if c__goto_703_12 >= 160: 1 else: 0) != 0) {
-                                            (__ci_expr_logic_302 = (if (if c__goto_703_12 <= 55295: 1 else: 0) != 0: 1 else: 0))
+                                            (__ci_expr_logic_273 = (if (if c__goto_703_12 <= 55295: 1 else: 0) != 0: 1 else: 0))
                                         }
 
-                                        (__ci_expr_logic_303 = (if __ci_expr_logic_302 != 0: 1 else: 0))
+                                        (__ci_expr_logic_274 = (if __ci_expr_logic_273 != 0: 1 else: 0))
 
                                     }
 
-                                    if (__ci_expr_logic_303 != 0) {
-                                        (__ci_expr_logic_304 = (if true: 1 else: 0))
+                                    if (__ci_expr_logic_274 != 0) {
+                                        (__ci_expr_logic_275 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_304 = (if (if c__goto_703_12 >= 57344: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_275 = (if (if c__goto_703_12 >= 57344: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (OK__goto_1994_14 = __ci_expr_logic_304)
+                                    (OK__goto_1994_14 = __ci_expr_logic_275)
 
                                 },
                                 11 => {
@@ -15840,11 +14023,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 (count__goto_759_9 = count__goto_759_9 + 1)
 
                                 if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                    var __ci_expr_old_305: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_276: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_305 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_276 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = ((state_offset__goto_757_9 + 1) + 2) + 3)
 
                                         if (__goto_pending != 0) {
@@ -15873,11 +14056,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                 } else {
-                                    var __ci_expr_old_306: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_277: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_306 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_277 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -15923,11 +14106,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                     },
                     413 => {
                         if ((if codevalue__goto_756_14 != 413: 1 else: 0) != 0) {
-                            var __ci_expr_old_307: c_int = active_count__goto_548_5
+                            var __ci_expr_old_278: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_307 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_278 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + 2) + 2)
 
                                 if (__goto_pending != 0) {
@@ -15991,13 +14174,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_308: c_int = 0
+                            var __ci_expr_logic_279: c_int = 0
 
                             if ((if nptr__goto_2120_20 >= end_subject__goto_554_12: 1 else: 0) != 0) {
-                                (__ci_expr_logic_308 = (if (if (mb.moptions & 32) != 0: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_279 = (if (if (mb.moptions & 32) != 0: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if (__ci_expr_logic_308 != 0) {
+                            if (__ci_expr_logic_279 != 0) {
                                 (reset_could_continue__goto_564_6 = 1)
                             }
 
@@ -16009,11 +14192,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             (count__goto_759_9 = count__goto_759_9 + 1)
 
                             if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                var __ci_expr_old_309: c_int = new_count__goto_548_19
+                                var __ci_expr_old_280: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_309 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_280 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = 0 - ((state_offset__goto_757_9 + 2) + 2))
 
                                     if (__goto_pending != 0) {
@@ -16048,11 +14231,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                             } else {
-                                var __ci_expr_old_310: c_int = new_count__goto_548_19
+                                var __ci_expr_old_281: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_310 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_281 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = 0 - state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -16098,11 +14281,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                     },
                     411 => {
                         if ((if codevalue__goto_756_14 != 413: 1 else: 0) != 0) {
-                            var __ci_expr_old_307: c_int = active_count__goto_548_5
+                            var __ci_expr_old_278: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_307 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_278 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + 2) + 2)
 
                                 if (__goto_pending != 0) {
@@ -16166,13 +14349,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_308: c_int = 0
+                            var __ci_expr_logic_279: c_int = 0
 
                             if ((if nptr__goto_2120_20 >= end_subject__goto_554_12: 1 else: 0) != 0) {
-                                (__ci_expr_logic_308 = (if (if (mb.moptions & 32) != 0: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_279 = (if (if (mb.moptions & 32) != 0: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if (__ci_expr_logic_308 != 0) {
+                            if (__ci_expr_logic_279 != 0) {
                                 (reset_could_continue__goto_564_6 = 1)
                             }
 
@@ -16184,11 +14367,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             (count__goto_759_9 = count__goto_759_9 + 1)
 
                             if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                var __ci_expr_old_309: c_int = new_count__goto_548_19
+                                var __ci_expr_old_280: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_309 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_280 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = 0 - ((state_offset__goto_757_9 + 2) + 2))
 
                                     if (__goto_pending != 0) {
@@ -16223,11 +14406,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                             } else {
-                                var __ci_expr_old_310: c_int = new_count__goto_548_19
+                                var __ci_expr_old_281: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_310 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_281 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = 0 - state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -16273,11 +14456,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                     },
                     412 => {
                         if ((if codevalue__goto_756_14 != 413: 1 else: 0) != 0) {
-                            var __ci_expr_old_307: c_int = active_count__goto_548_5
+                            var __ci_expr_old_278: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_307 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_278 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + 2) + 2)
 
                                 if (__goto_pending != 0) {
@@ -16341,13 +14524,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_308: c_int = 0
+                            var __ci_expr_logic_279: c_int = 0
 
                             if ((if nptr__goto_2120_20 >= end_subject__goto_554_12: 1 else: 0) != 0) {
-                                (__ci_expr_logic_308 = (if (if (mb.moptions & 32) != 0: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_279 = (if (if (mb.moptions & 32) != 0: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if (__ci_expr_logic_308 != 0) {
+                            if (__ci_expr_logic_279 != 0) {
                                 (reset_could_continue__goto_564_6 = 1)
                             }
 
@@ -16359,11 +14542,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             (count__goto_759_9 = count__goto_759_9 + 1)
 
                             if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                var __ci_expr_old_309: c_int = new_count__goto_548_19
+                                var __ci_expr_old_280: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_309 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_280 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = 0 - ((state_offset__goto_757_9 + 2) + 2))
 
                                     if (__goto_pending != 0) {
@@ -16398,11 +14581,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                             } else {
-                                var __ci_expr_old_310: c_int = new_count__goto_548_19
+                                var __ci_expr_old_281: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_310 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_281 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = 0 - state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -16448,11 +14631,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                     },
                     417 => {
                         if ((if codevalue__goto_756_14 != 413: 1 else: 0) != 0) {
-                            var __ci_expr_old_307: c_int = active_count__goto_548_5
+                            var __ci_expr_old_278: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_307 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_278 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + 2) + 2)
 
                                 if (__goto_pending != 0) {
@@ -16516,13 +14699,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_308: c_int = 0
+                            var __ci_expr_logic_279: c_int = 0
 
                             if ((if nptr__goto_2120_20 >= end_subject__goto_554_12: 1 else: 0) != 0) {
-                                (__ci_expr_logic_308 = (if (if (mb.moptions & 32) != 0: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_279 = (if (if (mb.moptions & 32) != 0: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if (__ci_expr_logic_308 != 0) {
+                            if (__ci_expr_logic_279 != 0) {
                                 (reset_could_continue__goto_564_6 = 1)
                             }
 
@@ -16534,11 +14717,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             (count__goto_759_9 = count__goto_759_9 + 1)
 
                             if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                var __ci_expr_old_309: c_int = new_count__goto_548_19
+                                var __ci_expr_old_280: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_309 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_280 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = 0 - ((state_offset__goto_757_9 + 2) + 2))
 
                                     if (__goto_pending != 0) {
@@ -16573,11 +14756,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                             } else {
-                                var __ci_expr_old_310: c_int = new_count__goto_548_19
+                                var __ci_expr_old_281: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_310 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_281 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = 0 - state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -16623,11 +14806,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                     },
                     433 => {
                         if ((if codevalue__goto_756_14 != 433: 1 else: 0) != 0) {
-                            var __ci_expr_old_311: c_int = active_count__goto_548_5
+                            var __ci_expr_old_282: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_311 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_282 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + 2) + 2)
 
                                 if (__goto_pending != 0) {
@@ -16660,17 +14843,57 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         (count__goto_759_9 = current_state__goto_753_17.count)
 
                         if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                            0
+                            (ncount__goto_2149_13 = 0)
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                            match c__goto_703_12 {
+                                11 => {
+                                    if ((if mb.bsr_convention == 2: 1 else: 0) != 0) {
+                                        break
+                                    }
+
+                                    __pc = 8
+                                    __goto_pending = 1
+
+                                },
+                                13 => {
+                                    var __ci_expr_logic_283: c_int = 0
+
+                                    if ((if (ptr__goto_545_12 + ((1 as isize) as usize)) < end_subject__goto_554_12: 1 else: 0) != 0) {
+                                        (__ci_expr_logic_283 = (if (if (unsafe: ptr__goto_545_12[1]) == 10: 1 else: 0) != 0: 1 else: 0))
+                                    }
+
+                                    if (__ci_expr_logic_283 != 0) {
+                                        (ncount__goto_2149_13 = 1)
+                                    }
+
+
+                                    __pc = 8
+                                    __goto_pending = 1
+
+                                    continue
+
+
+                                },
+                            }
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
                         }
 
                     },
                     431 => {
                         if ((if codevalue__goto_756_14 != 433: 1 else: 0) != 0) {
-                            var __ci_expr_old_311: c_int = active_count__goto_548_5
+                            var __ci_expr_old_282: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_311 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_282 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + 2) + 2)
 
                                 if (__goto_pending != 0) {
@@ -16703,17 +14926,57 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         (count__goto_759_9 = current_state__goto_753_17.count)
 
                         if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                            0
+                            (ncount__goto_2149_13 = 0)
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                            match c__goto_703_12 {
+                                11 => {
+                                    if ((if mb.bsr_convention == 2: 1 else: 0) != 0) {
+                                        break
+                                    }
+
+                                    __pc = 8
+                                    __goto_pending = 1
+
+                                },
+                                13 => {
+                                    var __ci_expr_logic_283: c_int = 0
+
+                                    if ((if (ptr__goto_545_12 + ((1 as isize) as usize)) < end_subject__goto_554_12: 1 else: 0) != 0) {
+                                        (__ci_expr_logic_283 = (if (if (unsafe: ptr__goto_545_12[1]) == 10: 1 else: 0) != 0: 1 else: 0))
+                                    }
+
+                                    if (__ci_expr_logic_283 != 0) {
+                                        (ncount__goto_2149_13 = 1)
+                                    }
+
+
+                                    __pc = 8
+                                    __goto_pending = 1
+
+                                    continue
+
+
+                                },
+                            }
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
                         }
 
                     },
                     432 => {
                         if ((if codevalue__goto_756_14 != 433: 1 else: 0) != 0) {
-                            var __ci_expr_old_311: c_int = active_count__goto_548_5
+                            var __ci_expr_old_282: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_311 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_282 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + 2) + 2)
 
                                 if (__goto_pending != 0) {
@@ -16746,17 +15009,57 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         (count__goto_759_9 = current_state__goto_753_17.count)
 
                         if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                            0
+                            (ncount__goto_2149_13 = 0)
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                            match c__goto_703_12 {
+                                11 => {
+                                    if ((if mb.bsr_convention == 2: 1 else: 0) != 0) {
+                                        break
+                                    }
+
+                                    __pc = 8
+                                    __goto_pending = 1
+
+                                },
+                                13 => {
+                                    var __ci_expr_logic_283: c_int = 0
+
+                                    if ((if (ptr__goto_545_12 + ((1 as isize) as usize)) < end_subject__goto_554_12: 1 else: 0) != 0) {
+                                        (__ci_expr_logic_283 = (if (if (unsafe: ptr__goto_545_12[1]) == 10: 1 else: 0) != 0: 1 else: 0))
+                                    }
+
+                                    if (__ci_expr_logic_283 != 0) {
+                                        (ncount__goto_2149_13 = 1)
+                                    }
+
+
+                                    __pc = 8
+                                    __goto_pending = 1
+
+                                    continue
+
+
+                                },
+                            }
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
                         }
 
                     },
                     437 => {
                         if ((if codevalue__goto_756_14 != 433: 1 else: 0) != 0) {
-                            var __ci_expr_old_311: c_int = active_count__goto_548_5
+                            var __ci_expr_old_282: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_311 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_282 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + 2) + 2)
 
                                 if (__goto_pending != 0) {
@@ -16789,17 +15092,57 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         (count__goto_759_9 = current_state__goto_753_17.count)
 
                         if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                            0
+                            (ncount__goto_2149_13 = 0)
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
+                            match c__goto_703_12 {
+                                11 => {
+                                    if ((if mb.bsr_convention == 2: 1 else: 0) != 0) {
+                                        break
+                                    }
+
+                                    __pc = 8
+                                    __goto_pending = 1
+
+                                },
+                                13 => {
+                                    var __ci_expr_logic_283: c_int = 0
+
+                                    if ((if (ptr__goto_545_12 + ((1 as isize) as usize)) < end_subject__goto_554_12: 1 else: 0) != 0) {
+                                        (__ci_expr_logic_283 = (if (if (unsafe: ptr__goto_545_12[1]) == 10: 1 else: 0) != 0: 1 else: 0))
+                                    }
+
+                                    if (__ci_expr_logic_283 != 0) {
+                                        (ncount__goto_2149_13 = 1)
+                                    }
+
+
+                                    __pc = 8
+                                    __goto_pending = 1
+
+                                    continue
+
+
+                                },
+                            }
+
+                            if (__goto_pending != 0) {
+                                continue
+                            }
+
                         }
 
                     },
                     473 => {
                         if ((if codevalue__goto_756_14 != 473: 1 else: 0) != 0) {
-                            var __ci_expr_old_315: c_int = active_count__goto_548_5
+                            var __ci_expr_old_284: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_315 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_284 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + 2) + 2)
 
                                 if (__goto_pending != 0) {
@@ -16886,11 +15229,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 (count__goto_759_9 = count__goto_759_9 + 1)
 
                                 if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                    var __ci_expr_old_316: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_285: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_316 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_285 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = 0 - ((state_offset__goto_757_9 + 2) + 2))
 
                                         if (__goto_pending != 0) {
@@ -16925,11 +15268,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                 } else {
-                                    var __ci_expr_old_317: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_286: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_317 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_286 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = 0 - state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -16981,11 +15324,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                     },
                     471 => {
                         if ((if codevalue__goto_756_14 != 473: 1 else: 0) != 0) {
-                            var __ci_expr_old_315: c_int = active_count__goto_548_5
+                            var __ci_expr_old_284: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_315 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_284 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + 2) + 2)
 
                                 if (__goto_pending != 0) {
@@ -17072,11 +15415,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 (count__goto_759_9 = count__goto_759_9 + 1)
 
                                 if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                    var __ci_expr_old_316: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_285: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_316 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_285 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = 0 - ((state_offset__goto_757_9 + 2) + 2))
 
                                         if (__goto_pending != 0) {
@@ -17111,11 +15454,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                 } else {
-                                    var __ci_expr_old_317: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_286: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_317 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_286 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = 0 - state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -17167,11 +15510,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                     },
                     472 => {
                         if ((if codevalue__goto_756_14 != 473: 1 else: 0) != 0) {
-                            var __ci_expr_old_315: c_int = active_count__goto_548_5
+                            var __ci_expr_old_284: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_315 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_284 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + 2) + 2)
 
                                 if (__goto_pending != 0) {
@@ -17258,11 +15601,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 (count__goto_759_9 = count__goto_759_9 + 1)
 
                                 if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                    var __ci_expr_old_316: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_285: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_316 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_285 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = 0 - ((state_offset__goto_757_9 + 2) + 2))
 
                                         if (__goto_pending != 0) {
@@ -17297,11 +15640,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                 } else {
-                                    var __ci_expr_old_317: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_286: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_317 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_286 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = 0 - state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -17353,11 +15696,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                     },
                     477 => {
                         if ((if codevalue__goto_756_14 != 473: 1 else: 0) != 0) {
-                            var __ci_expr_old_315: c_int = active_count__goto_548_5
+                            var __ci_expr_old_284: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_315 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_284 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + 2) + 2)
 
                                 if (__goto_pending != 0) {
@@ -17444,11 +15787,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 (count__goto_759_9 = count__goto_759_9 + 1)
 
                                 if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                    var __ci_expr_old_316: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_285: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_316 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_285 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = 0 - ((state_offset__goto_757_9 + 2) + 2))
 
                                         if (__goto_pending != 0) {
@@ -17483,11 +15826,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                 } else {
-                                    var __ci_expr_old_317: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_286: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_317 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_286 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = 0 - state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -17539,11 +15882,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                     },
                     453 => {
                         if ((if codevalue__goto_756_14 != 453: 1 else: 0) != 0) {
-                            var __ci_expr_old_318: c_int = active_count__goto_548_5
+                            var __ci_expr_old_287: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_318 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_287 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + 2) + 2)
 
                                 if (__goto_pending != 0) {
@@ -17612,11 +15955,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 (count__goto_759_9 = count__goto_759_9 + 1)
 
                                 if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                    var __ci_expr_old_319: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_288: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_319 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_288 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = 0 - ((state_offset__goto_757_9 + 2) + 2))
 
                                         if (__goto_pending != 0) {
@@ -17651,11 +15994,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                 } else {
-                                    var __ci_expr_old_320: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_289: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_320 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_289 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = 0 - state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -17707,11 +16050,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                     },
                     451 => {
                         if ((if codevalue__goto_756_14 != 453: 1 else: 0) != 0) {
-                            var __ci_expr_old_318: c_int = active_count__goto_548_5
+                            var __ci_expr_old_287: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_318 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_287 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + 2) + 2)
 
                                 if (__goto_pending != 0) {
@@ -17780,11 +16123,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 (count__goto_759_9 = count__goto_759_9 + 1)
 
                                 if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                    var __ci_expr_old_319: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_288: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_319 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_288 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = 0 - ((state_offset__goto_757_9 + 2) + 2))
 
                                         if (__goto_pending != 0) {
@@ -17819,11 +16162,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                 } else {
-                                    var __ci_expr_old_320: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_289: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_320 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_289 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = 0 - state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -17875,11 +16218,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                     },
                     452 => {
                         if ((if codevalue__goto_756_14 != 453: 1 else: 0) != 0) {
-                            var __ci_expr_old_318: c_int = active_count__goto_548_5
+                            var __ci_expr_old_287: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_318 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_287 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + 2) + 2)
 
                                 if (__goto_pending != 0) {
@@ -17948,11 +16291,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 (count__goto_759_9 = count__goto_759_9 + 1)
 
                                 if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                    var __ci_expr_old_319: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_288: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_319 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_288 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = 0 - ((state_offset__goto_757_9 + 2) + 2))
 
                                         if (__goto_pending != 0) {
@@ -17987,11 +16330,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                 } else {
-                                    var __ci_expr_old_320: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_289: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_320 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_289 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = 0 - state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -18043,11 +16386,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                     },
                     457 => {
                         if ((if codevalue__goto_756_14 != 453: 1 else: 0) != 0) {
-                            var __ci_expr_old_318: c_int = active_count__goto_548_5
+                            var __ci_expr_old_287: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_318 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_287 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + 2) + 2)
 
                                 if (__goto_pending != 0) {
@@ -18116,11 +16459,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 (count__goto_759_9 = count__goto_759_9 + 1)
 
                                 if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                    var __ci_expr_old_319: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_288: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_319 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_288 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = 0 - ((state_offset__goto_757_9 + 2) + 2))
 
                                         if (__goto_pending != 0) {
@@ -18155,11 +16498,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                 } else {
-                                    var __ci_expr_old_320: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_289: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_320 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_289 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = 0 - state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -18210,18 +16553,18 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                     },
                     29 => {
-                        var __ci_expr_logic_321: c_int = 0
+                        var __ci_expr_logic_290: c_int = 0
 
                         if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                            (__ci_expr_logic_321 = (if (if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_290 = (if (if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_321 != 0) {
-                            var __ci_expr_old_322: c_int = new_count__goto_548_19
+                        if (__ci_expr_logic_290 != 0) {
+                            var __ci_expr_old_291: c_int = new_count__goto_548_19
 
                             (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                            if ((if __ci_expr_old_322 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_291 < wscount: 1 else: 0) != 0) {
                                 (next_new_state__goto_543_33.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                                 if (__goto_pending != 0) {
@@ -18259,11 +16602,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                         if (utf_or_ucp__goto_559_6 != 0) {
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                var __ci_expr_old_323: c_int = new_count__goto_548_19
+                                var __ci_expr_old_292: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_323 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_292 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                                     if (__goto_pending != 0) {
@@ -18303,11 +16646,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                                 if ((if d__goto_703_15 == othercase__goto_2278_24: 1 else: 0) != 0) {
-                                    var __ci_expr_old_324: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_293: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_324 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_293 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                                         if (__goto_pending != 0) {
@@ -18349,11 +16692,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                         } else {
                             if ((if (unsafe: lcc__goto_544_25[c__goto_703_12]) == (unsafe: lcc__goto_544_25[d__goto_703_15]): 1 else: 0) != 0) {
-                                var __ci_expr_old_325: c_int = new_count__goto_548_19
+                                var __ci_expr_old_294: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_325 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_294 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = state_offset__goto_757_9 + 2)
 
                                     if (__goto_pending != 0) {
@@ -18404,13 +16747,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_326: c_int = 0
+                            var __ci_expr_logic_295: c_int = 0
 
                             if ((if nptr__goto_2306_20 >= end_subject__goto_554_12: 1 else: 0) != 0) {
-                                (__ci_expr_logic_326 = (if (if (mb.moptions & 32) != 0: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_295 = (if (if (mb.moptions & 32) != 0: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if (__ci_expr_logic_326 != 0) {
+                            if (__ci_expr_logic_295 != 0) {
                                 (reset_could_continue__goto_564_6 = 1)
                             }
 
@@ -18419,11 +16762,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_old_327: c_int = new_count__goto_548_19
+                            var __ci_expr_old_296: c_int = new_count__goto_548_19
 
                             (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                            if ((if __ci_expr_old_327 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_296 < wscount: 1 else: 0) != 0) {
                                 (next_new_state__goto_543_33.offset = 0 - (state_offset__goto_757_9 + 1))
 
                                 if (__goto_pending != 0) {
@@ -18467,11 +16810,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         break
                                     }
 
-                                    var __ci_expr_old_328: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_297: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_328 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_297 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9 + 1)
 
                                         if (__goto_pending != 0) {
@@ -18501,11 +16844,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         break
                                     }
 
-                                    var __ci_expr_old_328: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_297: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_328 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_297 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9 + 1)
 
                                         if (__goto_pending != 0) {
@@ -18535,11 +16878,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         break
                                     }
 
-                                    var __ci_expr_old_328: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_297: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_328 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_297 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9 + 1)
 
                                         if (__goto_pending != 0) {
@@ -18569,11 +16912,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         break
                                     }
 
-                                    var __ci_expr_old_328: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_297: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_328 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_297 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9 + 1)
 
                                         if (__goto_pending != 0) {
@@ -18603,11 +16946,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         break
                                     }
 
-                                    var __ci_expr_old_328: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_297: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_328 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_297 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9 + 1)
 
                                         if (__goto_pending != 0) {
@@ -18633,11 +16976,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                 },
                                 10 => {
-                                    var __ci_expr_old_328: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_297: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_328 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_297 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9 + 1)
 
                                         if (__goto_pending != 0) {
@@ -18663,11 +17006,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 },
                                 13 => {
                                     if ((if (ptr__goto_545_12 + ((1 as isize) as usize)) >= end_subject__goto_554_12: 1 else: 0) != 0) {
-                                        var __ci_expr_old_329: c_int = new_count__goto_548_19
+                                        var __ci_expr_old_298: c_int = new_count__goto_548_19
 
                                         (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                        if ((if __ci_expr_old_329 < wscount: 1 else: 0) != 0) {
+                                        if ((if __ci_expr_old_298 < wscount: 1 else: 0) != 0) {
                                             (next_new_state__goto_543_33.offset = state_offset__goto_757_9 + 1)
 
                                             if (__goto_pending != 0) {
@@ -18705,11 +17048,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                     } else {
                                         if ((if (unsafe: ptr__goto_545_12[1]) == 10: 1 else: 0) != 0) {
-                                            var __ci_expr_old_330: c_int = new_count__goto_548_19
+                                            var __ci_expr_old_299: c_int = new_count__goto_548_19
 
                                             (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                            if ((if __ci_expr_old_330 < wscount: 1 else: 0) != 0) {
+                                            if ((if __ci_expr_old_299 < wscount: 1 else: 0) != 0) {
                                                 (next_new_state__goto_543_33.offset = 0 - (state_offset__goto_757_9 + 1))
 
                                                 if (__goto_pending != 0) {
@@ -18744,11 +17087,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                             }
 
                                         } else {
-                                            var __ci_expr_old_331: c_int = new_count__goto_548_19
+                                            var __ci_expr_old_300: c_int = new_count__goto_548_19
 
                                             (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                            if ((if __ci_expr_old_331 < wscount: 1 else: 0) != 0) {
+                                            if ((if __ci_expr_old_300 < wscount: 1 else: 0) != 0) {
                                                 (next_new_state__goto_543_33.offset = state_offset__goto_757_9 + 1)
 
                                                 if (__goto_pending != 0) {
@@ -18784,37 +17127,163 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                     },
                     20 => {
                         if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                            0
+                            match c__goto_703_12 {
+                                10 => {
+                                    0
+                                },
+                                _ => {
+                                    var __ci_expr_old_301: c_int = new_count__goto_548_19
+
+                                    (new_count__goto_548_19 = new_count__goto_548_19 + 1)
+
+                                    if ((if __ci_expr_old_301 < wscount: 1 else: 0) != 0) {
+                                        (next_new_state__goto_543_33.offset = state_offset__goto_757_9 + 1)
+
+                                        if (__goto_pending != 0) {
+                                            continue
+                                        }
+
+                                        (next_new_state__goto_543_33.count = 0)
+
+                                        if (__goto_pending != 0) {
+                                            continue
+                                        }
+
+                                        (next_new_state__goto_543_33 = next_new_state__goto_543_33 + 1)
+
+                                        if (__goto_pending != 0) {
+                                            continue
+                                        }
+
+                                    } else {
+                                        return -43
+                                    }
+
+                                },
+                            }
                         }
                     },
                     21 => {
                         if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                            0
+                            match c__goto_703_12 {
+                                10 => {
+                                    var __ci_expr_old_302: c_int = new_count__goto_548_19
+
+                                    (new_count__goto_548_19 = new_count__goto_548_19 + 1)
+
+                                    if ((if __ci_expr_old_302 < wscount: 1 else: 0) != 0) {
+                                        (next_new_state__goto_543_33.offset = state_offset__goto_757_9 + 1)
+
+                                        if (__goto_pending != 0) {
+                                            continue
+                                        }
+
+                                        (next_new_state__goto_543_33.count = 0)
+
+                                        if (__goto_pending != 0) {
+                                            continue
+                                        }
+
+                                        (next_new_state__goto_543_33 = next_new_state__goto_543_33 + 1)
+
+                                        if (__goto_pending != 0) {
+                                            continue
+                                        }
+
+                                    } else {
+                                        return -43
+                                    }
+
+                                },
+                            }
                         }
                     },
                     18 => {
                         if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                            0
+                            match c__goto_703_12 {
+                                9 => {
+                                    0
+                                },
+                                _ => {
+                                    var __ci_expr_old_303: c_int = new_count__goto_548_19
+
+                                    (new_count__goto_548_19 = new_count__goto_548_19 + 1)
+
+                                    if ((if __ci_expr_old_303 < wscount: 1 else: 0) != 0) {
+                                        (next_new_state__goto_543_33.offset = state_offset__goto_757_9 + 1)
+
+                                        if (__goto_pending != 0) {
+                                            continue
+                                        }
+
+                                        (next_new_state__goto_543_33.count = 0)
+
+                                        if (__goto_pending != 0) {
+                                            continue
+                                        }
+
+                                        (next_new_state__goto_543_33 = next_new_state__goto_543_33 + 1)
+
+                                        if (__goto_pending != 0) {
+                                            continue
+                                        }
+
+                                    } else {
+                                        return -43
+                                    }
+
+                                },
+                            }
                         }
                     },
                     19 => {
                         if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                            0
+                            match c__goto_703_12 {
+                                9 => {
+                                    var __ci_expr_old_304: c_int = new_count__goto_548_19
+
+                                    (new_count__goto_548_19 = new_count__goto_548_19 + 1)
+
+                                    if ((if __ci_expr_old_304 < wscount: 1 else: 0) != 0) {
+                                        (next_new_state__goto_543_33.offset = state_offset__goto_757_9 + 1)
+
+                                        if (__goto_pending != 0) {
+                                            continue
+                                        }
+
+                                        (next_new_state__goto_543_33.count = 0)
+
+                                        if (__goto_pending != 0) {
+                                            continue
+                                        }
+
+                                        (next_new_state__goto_543_33 = next_new_state__goto_543_33 + 1)
+
+                                        if (__goto_pending != 0) {
+                                            continue
+                                        }
+
+                                    } else {
+                                        return -43
+                                    }
+
+                                },
+                            }
                         }
                     },
                     31 => {
-                        var __ci_expr_logic_334: c_int = 0
+                        var __ci_expr_logic_305: c_int = 0
 
                         if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                            (__ci_expr_logic_334 = (if (if c__goto_703_12 != d__goto_703_15: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_305 = (if (if c__goto_703_12 != d__goto_703_15: 1 else: 0) != 0: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_334 != 0) {
-                            var __ci_expr_old_335: c_int = new_count__goto_548_19
+                        if (__ci_expr_logic_305 != 0) {
+                            var __ci_expr_old_306: c_int = new_count__goto_548_19
 
                             (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                            if ((if __ci_expr_old_335 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_306 < wscount: 1 else: 0) != 0) {
                                 (next_new_state__goto_543_33.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                                 if (__goto_pending != 0) {
@@ -18847,13 +17316,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                     },
                     32 => {
                         if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                            var __ci_expr_logic_336: c_int = 0
+                            var __ci_expr_logic_307: c_int = 0
 
                             if (utf_or_ucp__goto_559_6 != 0) {
-                                (__ci_expr_logic_336 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_307 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if (__ci_expr_logic_336 != 0) {
+                            if (__ci_expr_logic_307 != 0) {
                                 (otherd__goto_2421_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                             } else {
                                 (otherd__goto_2421_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -18864,18 +17333,18 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_337: c_int = 0
+                            var __ci_expr_logic_308: c_int = 0
 
                             if ((if c__goto_703_12 != d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_337 = (if (if c__goto_703_12 != otherd__goto_2421_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_308 = (if (if c__goto_703_12 != otherd__goto_2421_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if (__ci_expr_logic_337 != 0) {
-                                var __ci_expr_old_338: c_int = new_count__goto_548_19
+                            if (__ci_expr_logic_308 != 0) {
+                                var __ci_expr_old_309: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_338 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_309 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                                     if (__goto_pending != 0) {
@@ -18920,11 +17389,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         (count__goto_759_9 = current_state__goto_753_17.count)
 
                         if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                            var __ci_expr_old_339: c_int = active_count__goto_548_5
+                            var __ci_expr_old_310: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_339 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_310 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                                 if (__goto_pending != 0) {
@@ -18962,13 +17431,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_340: c_int = 0
+                                var __ci_expr_logic_311: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_340 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_311 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_340 != 0) {
+                                if (__ci_expr_logic_311 != 0) {
                                     (otherd__goto_2454_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2454_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -18985,31 +17454,31 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_341: c_int
+                            var __ci_expr_logic_312: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_341 = (if true: 1 else: 0))
+                                (__ci_expr_logic_312 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_341 = (if (if c__goto_703_12 == otherd__goto_2454_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_312 = (if (if c__goto_703_12 == otherd__goto_2454_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_341 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_343: c_int = 0
+                            if ((if __ci_expr_logic_312 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_314: c_int = 0
 
                                 if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                                    var __ci_expr_logic_342: c_int
+                                    var __ci_expr_logic_313: c_int
 
                                     if ((if codevalue__goto_756_14 == 43: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_342 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_313 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_342 = (if (if codevalue__goto_756_14 == 69: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_313 = (if (if codevalue__goto_756_14 == 69: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (__ci_expr_logic_343 = (if __ci_expr_logic_342 != 0: 1 else: 0))
+                                    (__ci_expr_logic_314 = (if __ci_expr_logic_313 != 0: 1 else: 0))
 
                                 }
 
-                                if (__ci_expr_logic_343 != 0) {
+                                if (__ci_expr_logic_314 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -19035,11 +17504,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_344: c_int = new_count__goto_548_19
+                                var __ci_expr_old_315: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_344 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_315 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -19086,11 +17555,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         (count__goto_759_9 = current_state__goto_753_17.count)
 
                         if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                            var __ci_expr_old_339: c_int = active_count__goto_548_5
+                            var __ci_expr_old_310: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_339 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_310 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                                 if (__goto_pending != 0) {
@@ -19128,13 +17597,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_340: c_int = 0
+                                var __ci_expr_logic_311: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_340 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_311 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_340 != 0) {
+                                if (__ci_expr_logic_311 != 0) {
                                     (otherd__goto_2454_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2454_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -19151,31 +17620,31 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_341: c_int
+                            var __ci_expr_logic_312: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_341 = (if true: 1 else: 0))
+                                (__ci_expr_logic_312 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_341 = (if (if c__goto_703_12 == otherd__goto_2454_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_312 = (if (if c__goto_703_12 == otherd__goto_2454_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_341 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_343: c_int = 0
+                            if ((if __ci_expr_logic_312 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_314: c_int = 0
 
                                 if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                                    var __ci_expr_logic_342: c_int
+                                    var __ci_expr_logic_313: c_int
 
                                     if ((if codevalue__goto_756_14 == 43: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_342 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_313 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_342 = (if (if codevalue__goto_756_14 == 69: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_313 = (if (if codevalue__goto_756_14 == 69: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (__ci_expr_logic_343 = (if __ci_expr_logic_342 != 0: 1 else: 0))
+                                    (__ci_expr_logic_314 = (if __ci_expr_logic_313 != 0: 1 else: 0))
 
                                 }
 
-                                if (__ci_expr_logic_343 != 0) {
+                                if (__ci_expr_logic_314 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -19201,11 +17670,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_344: c_int = new_count__goto_548_19
+                                var __ci_expr_old_315: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_344 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_315 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -19252,11 +17721,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         (count__goto_759_9 = current_state__goto_753_17.count)
 
                         if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                            var __ci_expr_old_339: c_int = active_count__goto_548_5
+                            var __ci_expr_old_310: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_339 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_310 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                                 if (__goto_pending != 0) {
@@ -19294,13 +17763,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_340: c_int = 0
+                                var __ci_expr_logic_311: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_340 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_311 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_340 != 0) {
+                                if (__ci_expr_logic_311 != 0) {
                                     (otherd__goto_2454_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2454_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -19317,31 +17786,31 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_341: c_int
+                            var __ci_expr_logic_312: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_341 = (if true: 1 else: 0))
+                                (__ci_expr_logic_312 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_341 = (if (if c__goto_703_12 == otherd__goto_2454_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_312 = (if (if c__goto_703_12 == otherd__goto_2454_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_341 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_343: c_int = 0
+                            if ((if __ci_expr_logic_312 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_314: c_int = 0
 
                                 if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                                    var __ci_expr_logic_342: c_int
+                                    var __ci_expr_logic_313: c_int
 
                                     if ((if codevalue__goto_756_14 == 43: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_342 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_313 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_342 = (if (if codevalue__goto_756_14 == 69: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_313 = (if (if codevalue__goto_756_14 == 69: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (__ci_expr_logic_343 = (if __ci_expr_logic_342 != 0: 1 else: 0))
+                                    (__ci_expr_logic_314 = (if __ci_expr_logic_313 != 0: 1 else: 0))
 
                                 }
 
-                                if (__ci_expr_logic_343 != 0) {
+                                if (__ci_expr_logic_314 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -19367,11 +17836,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_344: c_int = new_count__goto_548_19
+                                var __ci_expr_old_315: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_344 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_315 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -19418,11 +17887,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         (count__goto_759_9 = current_state__goto_753_17.count)
 
                         if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                            var __ci_expr_old_339: c_int = active_count__goto_548_5
+                            var __ci_expr_old_310: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_339 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_310 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                                 if (__goto_pending != 0) {
@@ -19460,13 +17929,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_340: c_int = 0
+                                var __ci_expr_logic_311: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_340 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_311 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_340 != 0) {
+                                if (__ci_expr_logic_311 != 0) {
                                     (otherd__goto_2454_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2454_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -19483,31 +17952,31 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_341: c_int
+                            var __ci_expr_logic_312: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_341 = (if true: 1 else: 0))
+                                (__ci_expr_logic_312 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_341 = (if (if c__goto_703_12 == otherd__goto_2454_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_312 = (if (if c__goto_703_12 == otherd__goto_2454_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_341 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_343: c_int = 0
+                            if ((if __ci_expr_logic_312 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_314: c_int = 0
 
                                 if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                                    var __ci_expr_logic_342: c_int
+                                    var __ci_expr_logic_313: c_int
 
                                     if ((if codevalue__goto_756_14 == 43: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_342 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_313 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_342 = (if (if codevalue__goto_756_14 == 69: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_313 = (if (if codevalue__goto_756_14 == 69: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (__ci_expr_logic_343 = (if __ci_expr_logic_342 != 0: 1 else: 0))
+                                    (__ci_expr_logic_314 = (if __ci_expr_logic_313 != 0: 1 else: 0))
 
                                 }
 
-                                if (__ci_expr_logic_343 != 0) {
+                                if (__ci_expr_logic_314 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -19533,11 +18002,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_344: c_int = new_count__goto_548_19
+                                var __ci_expr_old_315: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_344 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_315 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -19584,11 +18053,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         (count__goto_759_9 = current_state__goto_753_17.count)
 
                         if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                            var __ci_expr_old_339: c_int = active_count__goto_548_5
+                            var __ci_expr_old_310: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_339 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_310 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                                 if (__goto_pending != 0) {
@@ -19626,13 +18095,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_340: c_int = 0
+                                var __ci_expr_logic_311: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_340 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_311 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_340 != 0) {
+                                if (__ci_expr_logic_311 != 0) {
                                     (otherd__goto_2454_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2454_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -19649,31 +18118,31 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_341: c_int
+                            var __ci_expr_logic_312: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_341 = (if true: 1 else: 0))
+                                (__ci_expr_logic_312 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_341 = (if (if c__goto_703_12 == otherd__goto_2454_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_312 = (if (if c__goto_703_12 == otherd__goto_2454_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_341 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_343: c_int = 0
+                            if ((if __ci_expr_logic_312 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_314: c_int = 0
 
                                 if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                                    var __ci_expr_logic_342: c_int
+                                    var __ci_expr_logic_313: c_int
 
                                     if ((if codevalue__goto_756_14 == 43: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_342 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_313 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_342 = (if (if codevalue__goto_756_14 == 69: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_313 = (if (if codevalue__goto_756_14 == 69: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (__ci_expr_logic_343 = (if __ci_expr_logic_342 != 0: 1 else: 0))
+                                    (__ci_expr_logic_314 = (if __ci_expr_logic_313 != 0: 1 else: 0))
 
                                 }
 
-                                if (__ci_expr_logic_343 != 0) {
+                                if (__ci_expr_logic_314 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -19699,11 +18168,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_344: c_int = new_count__goto_548_19
+                                var __ci_expr_old_315: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_344 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_315 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -19750,11 +18219,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         (count__goto_759_9 = current_state__goto_753_17.count)
 
                         if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                            var __ci_expr_old_339: c_int = active_count__goto_548_5
+                            var __ci_expr_old_310: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_339 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_310 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                                 if (__goto_pending != 0) {
@@ -19792,13 +18261,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_340: c_int = 0
+                                var __ci_expr_logic_311: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_340 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_311 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_340 != 0) {
+                                if (__ci_expr_logic_311 != 0) {
                                     (otherd__goto_2454_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2454_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -19815,31 +18284,31 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_341: c_int
+                            var __ci_expr_logic_312: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_341 = (if true: 1 else: 0))
+                                (__ci_expr_logic_312 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_341 = (if (if c__goto_703_12 == otherd__goto_2454_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_312 = (if (if c__goto_703_12 == otherd__goto_2454_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_341 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_343: c_int = 0
+                            if ((if __ci_expr_logic_312 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_314: c_int = 0
 
                                 if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                                    var __ci_expr_logic_342: c_int
+                                    var __ci_expr_logic_313: c_int
 
                                     if ((if codevalue__goto_756_14 == 43: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_342 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_313 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_342 = (if (if codevalue__goto_756_14 == 69: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_313 = (if (if codevalue__goto_756_14 == 69: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (__ci_expr_logic_343 = (if __ci_expr_logic_342 != 0: 1 else: 0))
+                                    (__ci_expr_logic_314 = (if __ci_expr_logic_313 != 0: 1 else: 0))
 
                                 }
 
-                                if (__ci_expr_logic_343 != 0) {
+                                if (__ci_expr_logic_314 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -19865,11 +18334,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_344: c_int = new_count__goto_548_19
+                                var __ci_expr_old_315: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_344 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_315 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -19912,11 +18381,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         (count__goto_759_9 = current_state__goto_753_17.count)
 
                         if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                            var __ci_expr_old_339: c_int = active_count__goto_548_5
+                            var __ci_expr_old_310: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_339 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_310 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                                 if (__goto_pending != 0) {
@@ -19954,13 +18423,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_340: c_int = 0
+                                var __ci_expr_logic_311: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_340 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_311 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_340 != 0) {
+                                if (__ci_expr_logic_311 != 0) {
                                     (otherd__goto_2454_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2454_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -19977,31 +18446,31 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_341: c_int
+                            var __ci_expr_logic_312: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_341 = (if true: 1 else: 0))
+                                (__ci_expr_logic_312 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_341 = (if (if c__goto_703_12 == otherd__goto_2454_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_312 = (if (if c__goto_703_12 == otherd__goto_2454_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_341 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_343: c_int = 0
+                            if ((if __ci_expr_logic_312 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_314: c_int = 0
 
                                 if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                                    var __ci_expr_logic_342: c_int
+                                    var __ci_expr_logic_313: c_int
 
                                     if ((if codevalue__goto_756_14 == 43: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_342 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_313 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_342 = (if (if codevalue__goto_756_14 == 69: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_313 = (if (if codevalue__goto_756_14 == 69: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (__ci_expr_logic_343 = (if __ci_expr_logic_342 != 0: 1 else: 0))
+                                    (__ci_expr_logic_314 = (if __ci_expr_logic_313 != 0: 1 else: 0))
 
                                 }
 
-                                if (__ci_expr_logic_343 != 0) {
+                                if (__ci_expr_logic_314 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -20027,11 +18496,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_344: c_int = new_count__goto_548_19
+                                var __ci_expr_old_315: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_344 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_315 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -20073,11 +18542,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         (count__goto_759_9 = current_state__goto_753_17.count)
 
                         if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                            var __ci_expr_old_339: c_int = active_count__goto_548_5
+                            var __ci_expr_old_310: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_339 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_310 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                                 if (__goto_pending != 0) {
@@ -20115,13 +18584,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_340: c_int = 0
+                                var __ci_expr_logic_311: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_340 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_311 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_340 != 0) {
+                                if (__ci_expr_logic_311 != 0) {
                                     (otherd__goto_2454_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2454_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -20138,31 +18607,31 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_341: c_int
+                            var __ci_expr_logic_312: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_341 = (if true: 1 else: 0))
+                                (__ci_expr_logic_312 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_341 = (if (if c__goto_703_12 == otherd__goto_2454_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_312 = (if (if c__goto_703_12 == otherd__goto_2454_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_341 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_343: c_int = 0
+                            if ((if __ci_expr_logic_312 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_314: c_int = 0
 
                                 if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                                    var __ci_expr_logic_342: c_int
+                                    var __ci_expr_logic_313: c_int
 
                                     if ((if codevalue__goto_756_14 == 43: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_342 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_313 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_342 = (if (if codevalue__goto_756_14 == 69: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_313 = (if (if codevalue__goto_756_14 == 69: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (__ci_expr_logic_343 = (if __ci_expr_logic_342 != 0: 1 else: 0))
+                                    (__ci_expr_logic_314 = (if __ci_expr_logic_313 != 0: 1 else: 0))
 
                                 }
 
-                                if (__ci_expr_logic_343 != 0) {
+                                if (__ci_expr_logic_314 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -20188,11 +18657,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_344: c_int = new_count__goto_548_19
+                                var __ci_expr_old_315: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_344 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_315 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -20234,11 +18703,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         (count__goto_759_9 = current_state__goto_753_17.count)
 
                         if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                            var __ci_expr_old_339: c_int = active_count__goto_548_5
+                            var __ci_expr_old_310: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_339 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_310 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                                 if (__goto_pending != 0) {
@@ -20276,13 +18745,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_340: c_int = 0
+                                var __ci_expr_logic_311: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_340 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_311 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_340 != 0) {
+                                if (__ci_expr_logic_311 != 0) {
                                     (otherd__goto_2454_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2454_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -20299,31 +18768,31 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_341: c_int
+                            var __ci_expr_logic_312: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_341 = (if true: 1 else: 0))
+                                (__ci_expr_logic_312 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_341 = (if (if c__goto_703_12 == otherd__goto_2454_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_312 = (if (if c__goto_703_12 == otherd__goto_2454_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_341 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_343: c_int = 0
+                            if ((if __ci_expr_logic_312 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_314: c_int = 0
 
                                 if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                                    var __ci_expr_logic_342: c_int
+                                    var __ci_expr_logic_313: c_int
 
                                     if ((if codevalue__goto_756_14 == 43: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_342 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_313 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_342 = (if (if codevalue__goto_756_14 == 69: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_313 = (if (if codevalue__goto_756_14 == 69: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (__ci_expr_logic_343 = (if __ci_expr_logic_342 != 0: 1 else: 0))
+                                    (__ci_expr_logic_314 = (if __ci_expr_logic_313 != 0: 1 else: 0))
 
                                 }
 
-                                if (__ci_expr_logic_343 != 0) {
+                                if (__ci_expr_logic_314 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -20349,11 +18818,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_344: c_int = new_count__goto_548_19
+                                var __ci_expr_old_315: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_344 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_315 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -20395,11 +18864,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         (count__goto_759_9 = current_state__goto_753_17.count)
 
                         if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                            var __ci_expr_old_339: c_int = active_count__goto_548_5
+                            var __ci_expr_old_310: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_339 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_310 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                                 if (__goto_pending != 0) {
@@ -20437,13 +18906,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_340: c_int = 0
+                                var __ci_expr_logic_311: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_340 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_311 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_340 != 0) {
+                                if (__ci_expr_logic_311 != 0) {
                                     (otherd__goto_2454_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2454_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -20460,31 +18929,31 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_341: c_int
+                            var __ci_expr_logic_312: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_341 = (if true: 1 else: 0))
+                                (__ci_expr_logic_312 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_341 = (if (if c__goto_703_12 == otherd__goto_2454_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_312 = (if (if c__goto_703_12 == otherd__goto_2454_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_341 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_343: c_int = 0
+                            if ((if __ci_expr_logic_312 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_314: c_int = 0
 
                                 if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                                    var __ci_expr_logic_342: c_int
+                                    var __ci_expr_logic_313: c_int
 
                                     if ((if codevalue__goto_756_14 == 43: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_342 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_313 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_342 = (if (if codevalue__goto_756_14 == 69: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_313 = (if (if codevalue__goto_756_14 == 69: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (__ci_expr_logic_343 = (if __ci_expr_logic_342 != 0: 1 else: 0))
+                                    (__ci_expr_logic_314 = (if __ci_expr_logic_313 != 0: 1 else: 0))
 
                                 }
 
-                                if (__ci_expr_logic_343 != 0) {
+                                if (__ci_expr_logic_314 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -20510,11 +18979,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_344: c_int = new_count__goto_548_19
+                                var __ci_expr_old_315: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_344 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_315 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -20556,11 +19025,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         (count__goto_759_9 = current_state__goto_753_17.count)
 
                         if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                            var __ci_expr_old_339: c_int = active_count__goto_548_5
+                            var __ci_expr_old_310: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_339 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_310 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                                 if (__goto_pending != 0) {
@@ -20598,13 +19067,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_340: c_int = 0
+                                var __ci_expr_logic_311: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_340 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_311 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_340 != 0) {
+                                if (__ci_expr_logic_311 != 0) {
                                     (otherd__goto_2454_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2454_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -20621,31 +19090,31 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_341: c_int
+                            var __ci_expr_logic_312: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_341 = (if true: 1 else: 0))
+                                (__ci_expr_logic_312 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_341 = (if (if c__goto_703_12 == otherd__goto_2454_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_312 = (if (if c__goto_703_12 == otherd__goto_2454_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_341 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_343: c_int = 0
+                            if ((if __ci_expr_logic_312 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_314: c_int = 0
 
                                 if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                                    var __ci_expr_logic_342: c_int
+                                    var __ci_expr_logic_313: c_int
 
                                     if ((if codevalue__goto_756_14 == 43: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_342 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_313 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_342 = (if (if codevalue__goto_756_14 == 69: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_313 = (if (if codevalue__goto_756_14 == 69: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (__ci_expr_logic_343 = (if __ci_expr_logic_342 != 0: 1 else: 0))
+                                    (__ci_expr_logic_314 = (if __ci_expr_logic_313 != 0: 1 else: 0))
 
                                 }
 
-                                if (__ci_expr_logic_343 != 0) {
+                                if (__ci_expr_logic_314 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -20671,11 +19140,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_344: c_int = new_count__goto_548_19
+                                var __ci_expr_old_315: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_344 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_315 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -20717,11 +19186,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         (count__goto_759_9 = current_state__goto_753_17.count)
 
                         if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                            var __ci_expr_old_339: c_int = active_count__goto_548_5
+                            var __ci_expr_old_310: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_339 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_310 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                                 if (__goto_pending != 0) {
@@ -20759,13 +19228,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_340: c_int = 0
+                                var __ci_expr_logic_311: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_340 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_311 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_340 != 0) {
+                                if (__ci_expr_logic_311 != 0) {
                                     (otherd__goto_2454_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2454_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -20782,31 +19251,31 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_341: c_int
+                            var __ci_expr_logic_312: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_341 = (if true: 1 else: 0))
+                                (__ci_expr_logic_312 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_341 = (if (if c__goto_703_12 == otherd__goto_2454_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_312 = (if (if c__goto_703_12 == otherd__goto_2454_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_341 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_343: c_int = 0
+                            if ((if __ci_expr_logic_312 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_314: c_int = 0
 
                                 if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                                    var __ci_expr_logic_342: c_int
+                                    var __ci_expr_logic_313: c_int
 
                                     if ((if codevalue__goto_756_14 == 43: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_342 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_313 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_342 = (if (if codevalue__goto_756_14 == 69: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_313 = (if (if codevalue__goto_756_14 == 69: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    (__ci_expr_logic_343 = (if __ci_expr_logic_342 != 0: 1 else: 0))
+                                    (__ci_expr_logic_314 = (if __ci_expr_logic_313 != 0: 1 else: 0))
 
                                 }
 
-                                if (__ci_expr_logic_343 != 0) {
+                                if (__ci_expr_logic_314 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -20832,11 +19301,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_344: c_int = new_count__goto_548_19
+                                var __ci_expr_old_315: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_344 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_315 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -20879,11 +19348,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                         (codevalue__goto_756_14 = codevalue__goto_756_14 - 13)
 
-                        var __ci_expr_old_345: c_int = active_count__goto_548_5
+                        var __ci_expr_old_316: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_345 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_316 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                             if (__goto_pending != 0) {
@@ -20915,13 +19384,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_346: c_int = 0
+                                var __ci_expr_logic_317: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_346 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_317 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_346 != 0) {
+                                if (__ci_expr_logic_317 != 0) {
                                     (otherd__goto_2497_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2497_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -20938,24 +19407,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_347: c_int
+                            var __ci_expr_logic_318: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_347 = (if true: 1 else: 0))
+                                (__ci_expr_logic_318 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_347 = (if (if c__goto_703_12 == otherd__goto_2497_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_318 = (if (if c__goto_703_12 == otherd__goto_2497_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_347 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_348: c_int
+                            if ((if __ci_expr_logic_318 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_319: c_int
 
                                 if ((if codevalue__goto_756_14 == 44: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_348 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_319 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_348 = (if (if codevalue__goto_756_14 == 70: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_319 = (if (if codevalue__goto_756_14 == 70: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_348 != 0) {
+                                if (__ci_expr_logic_319 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -20975,11 +19444,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_349: c_int = new_count__goto_548_19
+                                var __ci_expr_old_320: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_349 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_320 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                                     if (__goto_pending != 0) {
@@ -21023,11 +19492,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                         (codevalue__goto_756_14 = codevalue__goto_756_14 - 13)
 
-                        var __ci_expr_old_345: c_int = active_count__goto_548_5
+                        var __ci_expr_old_316: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_345 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_316 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                             if (__goto_pending != 0) {
@@ -21059,13 +19528,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_346: c_int = 0
+                                var __ci_expr_logic_317: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_346 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_317 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_346 != 0) {
+                                if (__ci_expr_logic_317 != 0) {
                                     (otherd__goto_2497_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2497_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -21082,24 +19551,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_347: c_int
+                            var __ci_expr_logic_318: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_347 = (if true: 1 else: 0))
+                                (__ci_expr_logic_318 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_347 = (if (if c__goto_703_12 == otherd__goto_2497_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_318 = (if (if c__goto_703_12 == otherd__goto_2497_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_347 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_348: c_int
+                            if ((if __ci_expr_logic_318 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_319: c_int
 
                                 if ((if codevalue__goto_756_14 == 44: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_348 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_319 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_348 = (if (if codevalue__goto_756_14 == 70: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_319 = (if (if codevalue__goto_756_14 == 70: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_348 != 0) {
+                                if (__ci_expr_logic_319 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -21119,11 +19588,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_349: c_int = new_count__goto_548_19
+                                var __ci_expr_old_320: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_349 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_320 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                                     if (__goto_pending != 0) {
@@ -21167,11 +19636,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                         (codevalue__goto_756_14 = codevalue__goto_756_14 - 13)
 
-                        var __ci_expr_old_345: c_int = active_count__goto_548_5
+                        var __ci_expr_old_316: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_345 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_316 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                             if (__goto_pending != 0) {
@@ -21203,13 +19672,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_346: c_int = 0
+                                var __ci_expr_logic_317: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_346 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_317 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_346 != 0) {
+                                if (__ci_expr_logic_317 != 0) {
                                     (otherd__goto_2497_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2497_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -21226,24 +19695,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_347: c_int
+                            var __ci_expr_logic_318: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_347 = (if true: 1 else: 0))
+                                (__ci_expr_logic_318 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_347 = (if (if c__goto_703_12 == otherd__goto_2497_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_318 = (if (if c__goto_703_12 == otherd__goto_2497_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_347 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_348: c_int
+                            if ((if __ci_expr_logic_318 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_319: c_int
 
                                 if ((if codevalue__goto_756_14 == 44: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_348 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_319 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_348 = (if (if codevalue__goto_756_14 == 70: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_319 = (if (if codevalue__goto_756_14 == 70: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_348 != 0) {
+                                if (__ci_expr_logic_319 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -21263,11 +19732,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_349: c_int = new_count__goto_548_19
+                                var __ci_expr_old_320: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_349 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_320 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                                     if (__goto_pending != 0) {
@@ -21311,11 +19780,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                         (codevalue__goto_756_14 = codevalue__goto_756_14 - 13)
 
-                        var __ci_expr_old_345: c_int = active_count__goto_548_5
+                        var __ci_expr_old_316: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_345 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_316 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                             if (__goto_pending != 0) {
@@ -21347,13 +19816,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_346: c_int = 0
+                                var __ci_expr_logic_317: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_346 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_317 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_346 != 0) {
+                                if (__ci_expr_logic_317 != 0) {
                                     (otherd__goto_2497_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2497_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -21370,24 +19839,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_347: c_int
+                            var __ci_expr_logic_318: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_347 = (if true: 1 else: 0))
+                                (__ci_expr_logic_318 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_347 = (if (if c__goto_703_12 == otherd__goto_2497_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_318 = (if (if c__goto_703_12 == otherd__goto_2497_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_347 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_348: c_int
+                            if ((if __ci_expr_logic_318 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_319: c_int
 
                                 if ((if codevalue__goto_756_14 == 44: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_348 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_319 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_348 = (if (if codevalue__goto_756_14 == 70: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_319 = (if (if codevalue__goto_756_14 == 70: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_348 != 0) {
+                                if (__ci_expr_logic_319 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -21407,11 +19876,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_349: c_int = new_count__goto_548_19
+                                var __ci_expr_old_320: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_349 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_320 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                                     if (__goto_pending != 0) {
@@ -21455,11 +19924,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                         (codevalue__goto_756_14 = codevalue__goto_756_14 - 13)
 
-                        var __ci_expr_old_345: c_int = active_count__goto_548_5
+                        var __ci_expr_old_316: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_345 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_316 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                             if (__goto_pending != 0) {
@@ -21491,13 +19960,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_346: c_int = 0
+                                var __ci_expr_logic_317: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_346 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_317 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_346 != 0) {
+                                if (__ci_expr_logic_317 != 0) {
                                     (otherd__goto_2497_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2497_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -21514,24 +19983,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_347: c_int
+                            var __ci_expr_logic_318: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_347 = (if true: 1 else: 0))
+                                (__ci_expr_logic_318 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_347 = (if (if c__goto_703_12 == otherd__goto_2497_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_318 = (if (if c__goto_703_12 == otherd__goto_2497_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_347 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_348: c_int
+                            if ((if __ci_expr_logic_318 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_319: c_int
 
                                 if ((if codevalue__goto_756_14 == 44: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_348 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_319 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_348 = (if (if codevalue__goto_756_14 == 70: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_319 = (if (if codevalue__goto_756_14 == 70: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_348 != 0) {
+                                if (__ci_expr_logic_319 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -21551,11 +20020,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_349: c_int = new_count__goto_548_19
+                                var __ci_expr_old_320: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_349 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_320 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                                     if (__goto_pending != 0) {
@@ -21599,11 +20068,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                         (codevalue__goto_756_14 = codevalue__goto_756_14 - 13)
 
-                        var __ci_expr_old_345: c_int = active_count__goto_548_5
+                        var __ci_expr_old_316: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_345 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_316 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                             if (__goto_pending != 0) {
@@ -21635,13 +20104,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_346: c_int = 0
+                                var __ci_expr_logic_317: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_346 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_317 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_346 != 0) {
+                                if (__ci_expr_logic_317 != 0) {
                                     (otherd__goto_2497_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2497_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -21658,24 +20127,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_347: c_int
+                            var __ci_expr_logic_318: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_347 = (if true: 1 else: 0))
+                                (__ci_expr_logic_318 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_347 = (if (if c__goto_703_12 == otherd__goto_2497_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_318 = (if (if c__goto_703_12 == otherd__goto_2497_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_347 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_348: c_int
+                            if ((if __ci_expr_logic_318 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_319: c_int
 
                                 if ((if codevalue__goto_756_14 == 44: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_348 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_319 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_348 = (if (if codevalue__goto_756_14 == 70: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_319 = (if (if codevalue__goto_756_14 == 70: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_348 != 0) {
+                                if (__ci_expr_logic_319 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -21695,11 +20164,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_349: c_int = new_count__goto_548_19
+                                var __ci_expr_old_320: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_349 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_320 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                                     if (__goto_pending != 0) {
@@ -21739,11 +20208,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                     },
                     37 => {
-                        var __ci_expr_old_345: c_int = active_count__goto_548_5
+                        var __ci_expr_old_316: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_345 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_316 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                             if (__goto_pending != 0) {
@@ -21775,13 +20244,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_346: c_int = 0
+                                var __ci_expr_logic_317: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_346 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_317 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_346 != 0) {
+                                if (__ci_expr_logic_317 != 0) {
                                     (otherd__goto_2497_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2497_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -21798,24 +20267,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_347: c_int
+                            var __ci_expr_logic_318: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_347 = (if true: 1 else: 0))
+                                (__ci_expr_logic_318 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_347 = (if (if c__goto_703_12 == otherd__goto_2497_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_318 = (if (if c__goto_703_12 == otherd__goto_2497_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_347 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_348: c_int
+                            if ((if __ci_expr_logic_318 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_319: c_int
 
                                 if ((if codevalue__goto_756_14 == 44: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_348 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_319 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_348 = (if (if codevalue__goto_756_14 == 70: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_319 = (if (if codevalue__goto_756_14 == 70: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_348 != 0) {
+                                if (__ci_expr_logic_319 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -21835,11 +20304,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_349: c_int = new_count__goto_548_19
+                                var __ci_expr_old_320: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_349 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_320 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                                     if (__goto_pending != 0) {
@@ -21878,11 +20347,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                     },
                     38 => {
-                        var __ci_expr_old_345: c_int = active_count__goto_548_5
+                        var __ci_expr_old_316: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_345 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_316 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                             if (__goto_pending != 0) {
@@ -21914,13 +20383,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_346: c_int = 0
+                                var __ci_expr_logic_317: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_346 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_317 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_346 != 0) {
+                                if (__ci_expr_logic_317 != 0) {
                                     (otherd__goto_2497_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2497_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -21937,24 +20406,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_347: c_int
+                            var __ci_expr_logic_318: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_347 = (if true: 1 else: 0))
+                                (__ci_expr_logic_318 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_347 = (if (if c__goto_703_12 == otherd__goto_2497_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_318 = (if (if c__goto_703_12 == otherd__goto_2497_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_347 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_348: c_int
+                            if ((if __ci_expr_logic_318 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_319: c_int
 
                                 if ((if codevalue__goto_756_14 == 44: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_348 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_319 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_348 = (if (if codevalue__goto_756_14 == 70: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_319 = (if (if codevalue__goto_756_14 == 70: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_348 != 0) {
+                                if (__ci_expr_logic_319 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -21974,11 +20443,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_349: c_int = new_count__goto_548_19
+                                var __ci_expr_old_320: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_349 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_320 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                                     if (__goto_pending != 0) {
@@ -22017,11 +20486,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                     },
                     44 => {
-                        var __ci_expr_old_345: c_int = active_count__goto_548_5
+                        var __ci_expr_old_316: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_345 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_316 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                             if (__goto_pending != 0) {
@@ -22053,13 +20522,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_346: c_int = 0
+                                var __ci_expr_logic_317: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_346 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_317 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_346 != 0) {
+                                if (__ci_expr_logic_317 != 0) {
                                     (otherd__goto_2497_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2497_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -22076,24 +20545,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_347: c_int
+                            var __ci_expr_logic_318: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_347 = (if true: 1 else: 0))
+                                (__ci_expr_logic_318 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_347 = (if (if c__goto_703_12 == otherd__goto_2497_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_318 = (if (if c__goto_703_12 == otherd__goto_2497_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_347 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_348: c_int
+                            if ((if __ci_expr_logic_318 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_319: c_int
 
                                 if ((if codevalue__goto_756_14 == 44: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_348 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_319 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_348 = (if (if codevalue__goto_756_14 == 70: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_319 = (if (if codevalue__goto_756_14 == 70: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_348 != 0) {
+                                if (__ci_expr_logic_319 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -22113,11 +20582,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_349: c_int = new_count__goto_548_19
+                                var __ci_expr_old_320: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_349 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_320 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                                     if (__goto_pending != 0) {
@@ -22156,11 +20625,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                     },
                     63 => {
-                        var __ci_expr_old_345: c_int = active_count__goto_548_5
+                        var __ci_expr_old_316: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_345 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_316 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                             if (__goto_pending != 0) {
@@ -22192,13 +20661,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_346: c_int = 0
+                                var __ci_expr_logic_317: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_346 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_317 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_346 != 0) {
+                                if (__ci_expr_logic_317 != 0) {
                                     (otherd__goto_2497_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2497_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -22215,24 +20684,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_347: c_int
+                            var __ci_expr_logic_318: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_347 = (if true: 1 else: 0))
+                                (__ci_expr_logic_318 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_347 = (if (if c__goto_703_12 == otherd__goto_2497_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_318 = (if (if c__goto_703_12 == otherd__goto_2497_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_347 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_348: c_int
+                            if ((if __ci_expr_logic_318 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_319: c_int
 
                                 if ((if codevalue__goto_756_14 == 44: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_348 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_319 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_348 = (if (if codevalue__goto_756_14 == 70: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_319 = (if (if codevalue__goto_756_14 == 70: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_348 != 0) {
+                                if (__ci_expr_logic_319 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -22252,11 +20721,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_349: c_int = new_count__goto_548_19
+                                var __ci_expr_old_320: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_349 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_320 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                                     if (__goto_pending != 0) {
@@ -22295,11 +20764,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                     },
                     64 => {
-                        var __ci_expr_old_345: c_int = active_count__goto_548_5
+                        var __ci_expr_old_316: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_345 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_316 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                             if (__goto_pending != 0) {
@@ -22331,13 +20800,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_346: c_int = 0
+                                var __ci_expr_logic_317: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_346 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_317 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_346 != 0) {
+                                if (__ci_expr_logic_317 != 0) {
                                     (otherd__goto_2497_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2497_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -22354,24 +20823,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_347: c_int
+                            var __ci_expr_logic_318: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_347 = (if true: 1 else: 0))
+                                (__ci_expr_logic_318 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_347 = (if (if c__goto_703_12 == otherd__goto_2497_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_318 = (if (if c__goto_703_12 == otherd__goto_2497_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_347 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_348: c_int
+                            if ((if __ci_expr_logic_318 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_319: c_int
 
                                 if ((if codevalue__goto_756_14 == 44: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_348 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_319 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_348 = (if (if codevalue__goto_756_14 == 70: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_319 = (if (if codevalue__goto_756_14 == 70: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_348 != 0) {
+                                if (__ci_expr_logic_319 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -22391,11 +20860,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_349: c_int = new_count__goto_548_19
+                                var __ci_expr_old_320: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_349 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_320 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                                     if (__goto_pending != 0) {
@@ -22434,11 +20903,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                     },
                     70 => {
-                        var __ci_expr_old_345: c_int = active_count__goto_548_5
+                        var __ci_expr_old_316: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_345 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_316 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                             if (__goto_pending != 0) {
@@ -22470,13 +20939,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_346: c_int = 0
+                                var __ci_expr_logic_317: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_346 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_317 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_346 != 0) {
+                                if (__ci_expr_logic_317 != 0) {
                                     (otherd__goto_2497_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2497_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -22493,24 +20962,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_347: c_int
+                            var __ci_expr_logic_318: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_347 = (if true: 1 else: 0))
+                                (__ci_expr_logic_318 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_347 = (if (if c__goto_703_12 == otherd__goto_2497_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_318 = (if (if c__goto_703_12 == otherd__goto_2497_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_347 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_348: c_int
+                            if ((if __ci_expr_logic_318 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_319: c_int
 
                                 if ((if codevalue__goto_756_14 == 44: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_348 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_319 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_348 = (if (if codevalue__goto_756_14 == 70: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_319 = (if (if codevalue__goto_756_14 == 70: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_348 != 0) {
+                                if (__ci_expr_logic_319 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -22530,11 +20999,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_349: c_int = new_count__goto_548_19
+                                var __ci_expr_old_320: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_349 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_320 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                                     if (__goto_pending != 0) {
@@ -22577,11 +21046,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                         (codevalue__goto_756_14 = codevalue__goto_756_14 - 13)
 
-                        var __ci_expr_old_350: c_int = active_count__goto_548_5
+                        var __ci_expr_old_321: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_350 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_321 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                             if (__goto_pending != 0) {
@@ -22613,13 +21082,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_351: c_int = 0
+                                var __ci_expr_logic_322: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_351 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_322 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_351 != 0) {
+                                if (__ci_expr_logic_322 != 0) {
                                     (otherd__goto_2538_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2538_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -22636,24 +21105,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_352: c_int
+                            var __ci_expr_logic_323: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_352 = (if true: 1 else: 0))
+                                (__ci_expr_logic_323 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_352 = (if (if c__goto_703_12 == otherd__goto_2538_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_323 = (if (if c__goto_703_12 == otherd__goto_2538_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_352 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_353: c_int
+                            if ((if __ci_expr_logic_323 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_324: c_int
 
                                 if ((if codevalue__goto_756_14 == 42: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_353 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_324 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_353 = (if (if codevalue__goto_756_14 == 68: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_324 = (if (if codevalue__goto_756_14 == 68: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_353 != 0) {
+                                if (__ci_expr_logic_324 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -22673,11 +21142,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_354: c_int = new_count__goto_548_19
+                                var __ci_expr_old_325: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_354 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_325 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -22721,11 +21190,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                         (codevalue__goto_756_14 = codevalue__goto_756_14 - 13)
 
-                        var __ci_expr_old_350: c_int = active_count__goto_548_5
+                        var __ci_expr_old_321: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_350 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_321 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                             if (__goto_pending != 0) {
@@ -22757,13 +21226,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_351: c_int = 0
+                                var __ci_expr_logic_322: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_351 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_322 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_351 != 0) {
+                                if (__ci_expr_logic_322 != 0) {
                                     (otherd__goto_2538_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2538_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -22780,24 +21249,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_352: c_int
+                            var __ci_expr_logic_323: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_352 = (if true: 1 else: 0))
+                                (__ci_expr_logic_323 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_352 = (if (if c__goto_703_12 == otherd__goto_2538_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_323 = (if (if c__goto_703_12 == otherd__goto_2538_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_352 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_353: c_int
+                            if ((if __ci_expr_logic_323 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_324: c_int
 
                                 if ((if codevalue__goto_756_14 == 42: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_353 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_324 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_353 = (if (if codevalue__goto_756_14 == 68: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_324 = (if (if codevalue__goto_756_14 == 68: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_353 != 0) {
+                                if (__ci_expr_logic_324 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -22817,11 +21286,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_354: c_int = new_count__goto_548_19
+                                var __ci_expr_old_325: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_354 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_325 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -22865,11 +21334,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                         (codevalue__goto_756_14 = codevalue__goto_756_14 - 13)
 
-                        var __ci_expr_old_350: c_int = active_count__goto_548_5
+                        var __ci_expr_old_321: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_350 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_321 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                             if (__goto_pending != 0) {
@@ -22901,13 +21370,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_351: c_int = 0
+                                var __ci_expr_logic_322: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_351 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_322 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_351 != 0) {
+                                if (__ci_expr_logic_322 != 0) {
                                     (otherd__goto_2538_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2538_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -22924,24 +21393,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_352: c_int
+                            var __ci_expr_logic_323: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_352 = (if true: 1 else: 0))
+                                (__ci_expr_logic_323 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_352 = (if (if c__goto_703_12 == otherd__goto_2538_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_323 = (if (if c__goto_703_12 == otherd__goto_2538_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_352 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_353: c_int
+                            if ((if __ci_expr_logic_323 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_324: c_int
 
                                 if ((if codevalue__goto_756_14 == 42: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_353 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_324 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_353 = (if (if codevalue__goto_756_14 == 68: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_324 = (if (if codevalue__goto_756_14 == 68: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_353 != 0) {
+                                if (__ci_expr_logic_324 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -22961,11 +21430,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_354: c_int = new_count__goto_548_19
+                                var __ci_expr_old_325: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_354 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_325 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -23009,11 +21478,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                         (codevalue__goto_756_14 = codevalue__goto_756_14 - 13)
 
-                        var __ci_expr_old_350: c_int = active_count__goto_548_5
+                        var __ci_expr_old_321: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_350 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_321 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                             if (__goto_pending != 0) {
@@ -23045,13 +21514,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_351: c_int = 0
+                                var __ci_expr_logic_322: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_351 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_322 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_351 != 0) {
+                                if (__ci_expr_logic_322 != 0) {
                                     (otherd__goto_2538_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2538_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -23068,24 +21537,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_352: c_int
+                            var __ci_expr_logic_323: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_352 = (if true: 1 else: 0))
+                                (__ci_expr_logic_323 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_352 = (if (if c__goto_703_12 == otherd__goto_2538_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_323 = (if (if c__goto_703_12 == otherd__goto_2538_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_352 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_353: c_int
+                            if ((if __ci_expr_logic_323 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_324: c_int
 
                                 if ((if codevalue__goto_756_14 == 42: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_353 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_324 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_353 = (if (if codevalue__goto_756_14 == 68: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_324 = (if (if codevalue__goto_756_14 == 68: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_353 != 0) {
+                                if (__ci_expr_logic_324 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -23105,11 +21574,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_354: c_int = new_count__goto_548_19
+                                var __ci_expr_old_325: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_354 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_325 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -23153,11 +21622,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                         (codevalue__goto_756_14 = codevalue__goto_756_14 - 13)
 
-                        var __ci_expr_old_350: c_int = active_count__goto_548_5
+                        var __ci_expr_old_321: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_350 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_321 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                             if (__goto_pending != 0) {
@@ -23189,13 +21658,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_351: c_int = 0
+                                var __ci_expr_logic_322: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_351 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_322 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_351 != 0) {
+                                if (__ci_expr_logic_322 != 0) {
                                     (otherd__goto_2538_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2538_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -23212,24 +21681,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_352: c_int
+                            var __ci_expr_logic_323: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_352 = (if true: 1 else: 0))
+                                (__ci_expr_logic_323 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_352 = (if (if c__goto_703_12 == otherd__goto_2538_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_323 = (if (if c__goto_703_12 == otherd__goto_2538_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_352 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_353: c_int
+                            if ((if __ci_expr_logic_323 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_324: c_int
 
                                 if ((if codevalue__goto_756_14 == 42: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_353 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_324 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_353 = (if (if codevalue__goto_756_14 == 68: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_324 = (if (if codevalue__goto_756_14 == 68: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_353 != 0) {
+                                if (__ci_expr_logic_324 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -23249,11 +21718,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_354: c_int = new_count__goto_548_19
+                                var __ci_expr_old_325: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_354 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_325 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -23297,11 +21766,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                         (codevalue__goto_756_14 = codevalue__goto_756_14 - 13)
 
-                        var __ci_expr_old_350: c_int = active_count__goto_548_5
+                        var __ci_expr_old_321: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_350 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_321 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                             if (__goto_pending != 0) {
@@ -23333,13 +21802,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_351: c_int = 0
+                                var __ci_expr_logic_322: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_351 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_322 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_351 != 0) {
+                                if (__ci_expr_logic_322 != 0) {
                                     (otherd__goto_2538_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2538_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -23356,24 +21825,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_352: c_int
+                            var __ci_expr_logic_323: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_352 = (if true: 1 else: 0))
+                                (__ci_expr_logic_323 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_352 = (if (if c__goto_703_12 == otherd__goto_2538_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_323 = (if (if c__goto_703_12 == otherd__goto_2538_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_352 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_353: c_int
+                            if ((if __ci_expr_logic_323 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_324: c_int
 
                                 if ((if codevalue__goto_756_14 == 42: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_353 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_324 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_353 = (if (if codevalue__goto_756_14 == 68: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_324 = (if (if codevalue__goto_756_14 == 68: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_353 != 0) {
+                                if (__ci_expr_logic_324 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -23393,11 +21862,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_354: c_int = new_count__goto_548_19
+                                var __ci_expr_old_325: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_354 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_325 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -23437,11 +21906,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                     },
                     33 => {
-                        var __ci_expr_old_350: c_int = active_count__goto_548_5
+                        var __ci_expr_old_321: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_350 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_321 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                             if (__goto_pending != 0) {
@@ -23473,13 +21942,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_351: c_int = 0
+                                var __ci_expr_logic_322: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_351 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_322 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_351 != 0) {
+                                if (__ci_expr_logic_322 != 0) {
                                     (otherd__goto_2538_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2538_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -23496,24 +21965,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_352: c_int
+                            var __ci_expr_logic_323: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_352 = (if true: 1 else: 0))
+                                (__ci_expr_logic_323 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_352 = (if (if c__goto_703_12 == otherd__goto_2538_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_323 = (if (if c__goto_703_12 == otherd__goto_2538_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_352 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_353: c_int
+                            if ((if __ci_expr_logic_323 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_324: c_int
 
                                 if ((if codevalue__goto_756_14 == 42: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_353 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_324 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_353 = (if (if codevalue__goto_756_14 == 68: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_324 = (if (if codevalue__goto_756_14 == 68: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_353 != 0) {
+                                if (__ci_expr_logic_324 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -23533,11 +22002,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_354: c_int = new_count__goto_548_19
+                                var __ci_expr_old_325: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_354 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_325 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -23576,11 +22045,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                     },
                     34 => {
-                        var __ci_expr_old_350: c_int = active_count__goto_548_5
+                        var __ci_expr_old_321: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_350 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_321 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                             if (__goto_pending != 0) {
@@ -23612,13 +22081,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_351: c_int = 0
+                                var __ci_expr_logic_322: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_351 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_322 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_351 != 0) {
+                                if (__ci_expr_logic_322 != 0) {
                                     (otherd__goto_2538_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2538_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -23635,24 +22104,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_352: c_int
+                            var __ci_expr_logic_323: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_352 = (if true: 1 else: 0))
+                                (__ci_expr_logic_323 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_352 = (if (if c__goto_703_12 == otherd__goto_2538_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_323 = (if (if c__goto_703_12 == otherd__goto_2538_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_352 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_353: c_int
+                            if ((if __ci_expr_logic_323 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_324: c_int
 
                                 if ((if codevalue__goto_756_14 == 42: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_353 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_324 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_353 = (if (if codevalue__goto_756_14 == 68: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_324 = (if (if codevalue__goto_756_14 == 68: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_353 != 0) {
+                                if (__ci_expr_logic_324 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -23672,11 +22141,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_354: c_int = new_count__goto_548_19
+                                var __ci_expr_old_325: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_354 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_325 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -23715,11 +22184,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                     },
                     42 => {
-                        var __ci_expr_old_350: c_int = active_count__goto_548_5
+                        var __ci_expr_old_321: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_350 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_321 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                             if (__goto_pending != 0) {
@@ -23751,13 +22220,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_351: c_int = 0
+                                var __ci_expr_logic_322: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_351 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_322 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_351 != 0) {
+                                if (__ci_expr_logic_322 != 0) {
                                     (otherd__goto_2538_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2538_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -23774,24 +22243,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_352: c_int
+                            var __ci_expr_logic_323: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_352 = (if true: 1 else: 0))
+                                (__ci_expr_logic_323 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_352 = (if (if c__goto_703_12 == otherd__goto_2538_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_323 = (if (if c__goto_703_12 == otherd__goto_2538_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_352 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_353: c_int
+                            if ((if __ci_expr_logic_323 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_324: c_int
 
                                 if ((if codevalue__goto_756_14 == 42: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_353 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_324 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_353 = (if (if codevalue__goto_756_14 == 68: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_324 = (if (if codevalue__goto_756_14 == 68: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_353 != 0) {
+                                if (__ci_expr_logic_324 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -23811,11 +22280,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_354: c_int = new_count__goto_548_19
+                                var __ci_expr_old_325: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_354 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_325 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -23854,11 +22323,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                     },
                     59 => {
-                        var __ci_expr_old_350: c_int = active_count__goto_548_5
+                        var __ci_expr_old_321: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_350 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_321 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                             if (__goto_pending != 0) {
@@ -23890,13 +22359,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_351: c_int = 0
+                                var __ci_expr_logic_322: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_351 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_322 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_351 != 0) {
+                                if (__ci_expr_logic_322 != 0) {
                                     (otherd__goto_2538_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2538_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -23913,24 +22382,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_352: c_int
+                            var __ci_expr_logic_323: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_352 = (if true: 1 else: 0))
+                                (__ci_expr_logic_323 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_352 = (if (if c__goto_703_12 == otherd__goto_2538_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_323 = (if (if c__goto_703_12 == otherd__goto_2538_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_352 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_353: c_int
+                            if ((if __ci_expr_logic_323 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_324: c_int
 
                                 if ((if codevalue__goto_756_14 == 42: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_353 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_324 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_353 = (if (if codevalue__goto_756_14 == 68: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_324 = (if (if codevalue__goto_756_14 == 68: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_353 != 0) {
+                                if (__ci_expr_logic_324 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -23950,11 +22419,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_354: c_int = new_count__goto_548_19
+                                var __ci_expr_old_325: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_354 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_325 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -23993,11 +22462,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                     },
                     60 => {
-                        var __ci_expr_old_350: c_int = active_count__goto_548_5
+                        var __ci_expr_old_321: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_350 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_321 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                             if (__goto_pending != 0) {
@@ -24029,13 +22498,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_351: c_int = 0
+                                var __ci_expr_logic_322: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_351 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_322 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_351 != 0) {
+                                if (__ci_expr_logic_322 != 0) {
                                     (otherd__goto_2538_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2538_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -24052,24 +22521,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_352: c_int
+                            var __ci_expr_logic_323: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_352 = (if true: 1 else: 0))
+                                (__ci_expr_logic_323 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_352 = (if (if c__goto_703_12 == otherd__goto_2538_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_323 = (if (if c__goto_703_12 == otherd__goto_2538_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_352 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_353: c_int
+                            if ((if __ci_expr_logic_323 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_324: c_int
 
                                 if ((if codevalue__goto_756_14 == 42: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_353 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_324 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_353 = (if (if codevalue__goto_756_14 == 68: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_324 = (if (if codevalue__goto_756_14 == 68: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_353 != 0) {
+                                if (__ci_expr_logic_324 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -24089,11 +22558,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_354: c_int = new_count__goto_548_19
+                                var __ci_expr_old_325: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_354 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_325 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -24132,11 +22601,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                     },
                     68 => {
-                        var __ci_expr_old_350: c_int = active_count__goto_548_5
+                        var __ci_expr_old_321: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_350 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_321 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + dlen__goto_702_13) + 1)
 
                             if (__goto_pending != 0) {
@@ -24168,13 +22637,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_351: c_int = 0
+                                var __ci_expr_logic_322: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_351 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_322 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_351 != 0) {
+                                if (__ci_expr_logic_322 != 0) {
                                     (otherd__goto_2538_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2538_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -24191,24 +22660,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_352: c_int
+                            var __ci_expr_logic_323: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_352 = (if true: 1 else: 0))
+                                (__ci_expr_logic_323 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_352 = (if (if c__goto_703_12 == otherd__goto_2538_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_323 = (if (if c__goto_703_12 == otherd__goto_2538_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_352 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_353: c_int
+                            if ((if __ci_expr_logic_323 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_324: c_int
 
                                 if ((if codevalue__goto_756_14 == 42: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_353 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_324 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_353 = (if (if codevalue__goto_756_14 == 68: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_324 = (if (if codevalue__goto_756_14 == 68: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_353 != 0) {
+                                if (__ci_expr_logic_324 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -24228,11 +22697,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_354: c_int = new_count__goto_548_19
+                                var __ci_expr_old_325: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_354 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_325 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                     if (__goto_pending != 0) {
@@ -24285,13 +22754,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_355: c_int = 0
+                                var __ci_expr_logic_326: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_355 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_326 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_355 != 0) {
+                                if (__ci_expr_logic_326 != 0) {
                                     (otherd__goto_2571_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2571_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -24308,23 +22777,23 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_356: c_int
+                            var __ci_expr_logic_327: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_356 = (if true: 1 else: 0))
+                                (__ci_expr_logic_327 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_356 = (if (if c__goto_703_12 == otherd__goto_2571_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_327 = (if (if c__goto_703_12 == otherd__goto_2571_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_356 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                            if ((if __ci_expr_logic_327 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
                                 (count__goto_759_9 = count__goto_759_9 + 1)
 
                                 if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                    var __ci_expr_old_357: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_328: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_357 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_328 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = ((state_offset__goto_757_9 + dlen__goto_702_13) + 1) + 2)
 
                                         if (__goto_pending != 0) {
@@ -24353,11 +22822,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                 } else {
-                                    var __ci_expr_old_358: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_329: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_358 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_329 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -24418,13 +22887,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_355: c_int = 0
+                                var __ci_expr_logic_326: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_355 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_326 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_355 != 0) {
+                                if (__ci_expr_logic_326 != 0) {
                                     (otherd__goto_2571_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2571_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -24441,23 +22910,23 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_356: c_int
+                            var __ci_expr_logic_327: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_356 = (if true: 1 else: 0))
+                                (__ci_expr_logic_327 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_356 = (if (if c__goto_703_12 == otherd__goto_2571_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_327 = (if (if c__goto_703_12 == otherd__goto_2571_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_356 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                            if ((if __ci_expr_logic_327 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
                                 (count__goto_759_9 = count__goto_759_9 + 1)
 
                                 if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                    var __ci_expr_old_357: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_328: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_357 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_328 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = ((state_offset__goto_757_9 + dlen__goto_702_13) + 1) + 2)
 
                                         if (__goto_pending != 0) {
@@ -24486,11 +22955,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                 } else {
-                                    var __ci_expr_old_358: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_329: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_358 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_329 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -24547,13 +23016,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_355: c_int = 0
+                                var __ci_expr_logic_326: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_355 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_326 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_355 != 0) {
+                                if (__ci_expr_logic_326 != 0) {
                                     (otherd__goto_2571_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2571_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -24570,23 +23039,23 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_356: c_int
+                            var __ci_expr_logic_327: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_356 = (if true: 1 else: 0))
+                                (__ci_expr_logic_327 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_356 = (if (if c__goto_703_12 == otherd__goto_2571_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_327 = (if (if c__goto_703_12 == otherd__goto_2571_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_356 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                            if ((if __ci_expr_logic_327 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
                                 (count__goto_759_9 = count__goto_759_9 + 1)
 
                                 if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                    var __ci_expr_old_357: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_328: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_357 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_328 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = ((state_offset__goto_757_9 + dlen__goto_702_13) + 1) + 2)
 
                                         if (__goto_pending != 0) {
@@ -24615,11 +23084,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                 } else {
-                                    var __ci_expr_old_358: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_329: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_358 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_329 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -24675,13 +23144,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_355: c_int = 0
+                                var __ci_expr_logic_326: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_355 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_326 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_355 != 0) {
+                                if (__ci_expr_logic_326 != 0) {
                                     (otherd__goto_2571_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2571_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -24698,23 +23167,23 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_356: c_int
+                            var __ci_expr_logic_327: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_356 = (if true: 1 else: 0))
+                                (__ci_expr_logic_327 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_356 = (if (if c__goto_703_12 == otherd__goto_2571_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_327 = (if (if c__goto_703_12 == otherd__goto_2571_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_356 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                            if ((if __ci_expr_logic_327 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
                                 (count__goto_759_9 = count__goto_759_9 + 1)
 
                                 if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                    var __ci_expr_old_357: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_328: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_357 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_328 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = ((state_offset__goto_757_9 + dlen__goto_702_13) + 1) + 2)
 
                                         if (__goto_pending != 0) {
@@ -24743,11 +23212,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                 } else {
-                                    var __ci_expr_old_358: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_329: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_358 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_329 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -24797,11 +23266,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                         (codevalue__goto_756_14 = codevalue__goto_756_14 - 13)
 
-                        var __ci_expr_old_359: c_int = active_count__goto_548_5
+                        var __ci_expr_old_330: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_359 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_330 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = ((state_offset__goto_757_9 + dlen__goto_702_13) + 1) + 2)
 
                             if (__goto_pending != 0) {
@@ -24835,13 +23304,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_360: c_int = 0
+                                var __ci_expr_logic_331: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_360 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_331 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_360 != 0) {
+                                if (__ci_expr_logic_331 != 0) {
                                     (otherd__goto_2611_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2611_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -24858,24 +23327,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_361: c_int
+                            var __ci_expr_logic_332: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_361 = (if true: 1 else: 0))
+                                (__ci_expr_logic_332 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_361 = (if (if c__goto_703_12 == otherd__goto_2611_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_332 = (if (if c__goto_703_12 == otherd__goto_2611_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_361 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_362: c_int
+                            if ((if __ci_expr_logic_332 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_333: c_int
 
                                 if ((if codevalue__goto_756_14 == 45: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_362 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_333 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_362 = (if (if codevalue__goto_756_14 == 71: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_333 = (if (if codevalue__goto_756_14 == 71: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_362 != 0) {
+                                if (__ci_expr_logic_333 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -24898,11 +23367,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 (count__goto_759_9 = count__goto_759_9 + 1)
 
                                 if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                    var __ci_expr_old_363: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_334: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_363 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_334 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = ((state_offset__goto_757_9 + dlen__goto_702_13) + 1) + 2)
 
                                         if (__goto_pending != 0) {
@@ -24931,11 +23400,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                 } else {
-                                    var __ci_expr_old_364: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_335: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_364 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_335 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -24986,11 +23455,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                         (codevalue__goto_756_14 = codevalue__goto_756_14 - 13)
 
-                        var __ci_expr_old_359: c_int = active_count__goto_548_5
+                        var __ci_expr_old_330: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_359 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_330 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = ((state_offset__goto_757_9 + dlen__goto_702_13) + 1) + 2)
 
                             if (__goto_pending != 0) {
@@ -25024,13 +23493,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_360: c_int = 0
+                                var __ci_expr_logic_331: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_360 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_331 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_360 != 0) {
+                                if (__ci_expr_logic_331 != 0) {
                                     (otherd__goto_2611_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2611_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -25047,24 +23516,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_361: c_int
+                            var __ci_expr_logic_332: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_361 = (if true: 1 else: 0))
+                                (__ci_expr_logic_332 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_361 = (if (if c__goto_703_12 == otherd__goto_2611_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_332 = (if (if c__goto_703_12 == otherd__goto_2611_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_361 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_362: c_int
+                            if ((if __ci_expr_logic_332 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_333: c_int
 
                                 if ((if codevalue__goto_756_14 == 45: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_362 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_333 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_362 = (if (if codevalue__goto_756_14 == 71: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_333 = (if (if codevalue__goto_756_14 == 71: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_362 != 0) {
+                                if (__ci_expr_logic_333 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -25087,11 +23556,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 (count__goto_759_9 = count__goto_759_9 + 1)
 
                                 if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                    var __ci_expr_old_363: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_334: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_363 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_334 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = ((state_offset__goto_757_9 + dlen__goto_702_13) + 1) + 2)
 
                                         if (__goto_pending != 0) {
@@ -25120,11 +23589,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                 } else {
-                                    var __ci_expr_old_364: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_335: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_364 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_335 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -25175,11 +23644,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                         (codevalue__goto_756_14 = codevalue__goto_756_14 - 13)
 
-                        var __ci_expr_old_359: c_int = active_count__goto_548_5
+                        var __ci_expr_old_330: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_359 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_330 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = ((state_offset__goto_757_9 + dlen__goto_702_13) + 1) + 2)
 
                             if (__goto_pending != 0) {
@@ -25213,13 +23682,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_360: c_int = 0
+                                var __ci_expr_logic_331: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_360 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_331 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_360 != 0) {
+                                if (__ci_expr_logic_331 != 0) {
                                     (otherd__goto_2611_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2611_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -25236,24 +23705,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_361: c_int
+                            var __ci_expr_logic_332: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_361 = (if true: 1 else: 0))
+                                (__ci_expr_logic_332 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_361 = (if (if c__goto_703_12 == otherd__goto_2611_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_332 = (if (if c__goto_703_12 == otherd__goto_2611_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_361 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_362: c_int
+                            if ((if __ci_expr_logic_332 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_333: c_int
 
                                 if ((if codevalue__goto_756_14 == 45: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_362 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_333 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_362 = (if (if codevalue__goto_756_14 == 71: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_333 = (if (if codevalue__goto_756_14 == 71: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_362 != 0) {
+                                if (__ci_expr_logic_333 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -25276,11 +23745,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 (count__goto_759_9 = count__goto_759_9 + 1)
 
                                 if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                    var __ci_expr_old_363: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_334: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_363 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_334 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = ((state_offset__goto_757_9 + dlen__goto_702_13) + 1) + 2)
 
                                         if (__goto_pending != 0) {
@@ -25309,11 +23778,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                 } else {
-                                    var __ci_expr_old_364: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_335: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_364 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_335 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -25364,11 +23833,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                         (codevalue__goto_756_14 = codevalue__goto_756_14 - 13)
 
-                        var __ci_expr_old_359: c_int = active_count__goto_548_5
+                        var __ci_expr_old_330: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_359 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_330 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = ((state_offset__goto_757_9 + dlen__goto_702_13) + 1) + 2)
 
                             if (__goto_pending != 0) {
@@ -25402,13 +23871,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_360: c_int = 0
+                                var __ci_expr_logic_331: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_360 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_331 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_360 != 0) {
+                                if (__ci_expr_logic_331 != 0) {
                                     (otherd__goto_2611_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2611_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -25425,24 +23894,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_361: c_int
+                            var __ci_expr_logic_332: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_361 = (if true: 1 else: 0))
+                                (__ci_expr_logic_332 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_361 = (if (if c__goto_703_12 == otherd__goto_2611_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_332 = (if (if c__goto_703_12 == otherd__goto_2611_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_361 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_362: c_int
+                            if ((if __ci_expr_logic_332 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_333: c_int
 
                                 if ((if codevalue__goto_756_14 == 45: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_362 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_333 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_362 = (if (if codevalue__goto_756_14 == 71: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_333 = (if (if codevalue__goto_756_14 == 71: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_362 != 0) {
+                                if (__ci_expr_logic_333 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -25465,11 +23934,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 (count__goto_759_9 = count__goto_759_9 + 1)
 
                                 if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                    var __ci_expr_old_363: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_334: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_363 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_334 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = ((state_offset__goto_757_9 + dlen__goto_702_13) + 1) + 2)
 
                                         if (__goto_pending != 0) {
@@ -25498,11 +23967,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                 } else {
-                                    var __ci_expr_old_364: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_335: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_364 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_335 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -25553,11 +24022,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                         (codevalue__goto_756_14 = codevalue__goto_756_14 - 13)
 
-                        var __ci_expr_old_359: c_int = active_count__goto_548_5
+                        var __ci_expr_old_330: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_359 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_330 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = ((state_offset__goto_757_9 + dlen__goto_702_13) + 1) + 2)
 
                             if (__goto_pending != 0) {
@@ -25591,13 +24060,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_360: c_int = 0
+                                var __ci_expr_logic_331: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_360 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_331 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_360 != 0) {
+                                if (__ci_expr_logic_331 != 0) {
                                     (otherd__goto_2611_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2611_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -25614,24 +24083,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_361: c_int
+                            var __ci_expr_logic_332: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_361 = (if true: 1 else: 0))
+                                (__ci_expr_logic_332 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_361 = (if (if c__goto_703_12 == otherd__goto_2611_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_332 = (if (if c__goto_703_12 == otherd__goto_2611_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_361 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_362: c_int
+                            if ((if __ci_expr_logic_332 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_333: c_int
 
                                 if ((if codevalue__goto_756_14 == 45: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_362 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_333 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_362 = (if (if codevalue__goto_756_14 == 71: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_333 = (if (if codevalue__goto_756_14 == 71: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_362 != 0) {
+                                if (__ci_expr_logic_333 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -25654,11 +24123,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 (count__goto_759_9 = count__goto_759_9 + 1)
 
                                 if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                    var __ci_expr_old_363: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_334: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_363 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_334 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = ((state_offset__goto_757_9 + dlen__goto_702_13) + 1) + 2)
 
                                         if (__goto_pending != 0) {
@@ -25687,11 +24156,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                 } else {
-                                    var __ci_expr_old_364: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_335: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_364 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_335 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -25742,11 +24211,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                         (codevalue__goto_756_14 = codevalue__goto_756_14 - 13)
 
-                        var __ci_expr_old_359: c_int = active_count__goto_548_5
+                        var __ci_expr_old_330: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_359 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_330 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = ((state_offset__goto_757_9 + dlen__goto_702_13) + 1) + 2)
 
                             if (__goto_pending != 0) {
@@ -25780,13 +24249,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_360: c_int = 0
+                                var __ci_expr_logic_331: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_360 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_331 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_360 != 0) {
+                                if (__ci_expr_logic_331 != 0) {
                                     (otherd__goto_2611_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2611_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -25803,24 +24272,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_361: c_int
+                            var __ci_expr_logic_332: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_361 = (if true: 1 else: 0))
+                                (__ci_expr_logic_332 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_361 = (if (if c__goto_703_12 == otherd__goto_2611_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_332 = (if (if c__goto_703_12 == otherd__goto_2611_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_361 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_362: c_int
+                            if ((if __ci_expr_logic_332 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_333: c_int
 
                                 if ((if codevalue__goto_756_14 == 45: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_362 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_333 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_362 = (if (if codevalue__goto_756_14 == 71: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_333 = (if (if codevalue__goto_756_14 == 71: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_362 != 0) {
+                                if (__ci_expr_logic_333 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -25843,11 +24312,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 (count__goto_759_9 = count__goto_759_9 + 1)
 
                                 if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                    var __ci_expr_old_363: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_334: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_363 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_334 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = ((state_offset__goto_757_9 + dlen__goto_702_13) + 1) + 2)
 
                                         if (__goto_pending != 0) {
@@ -25876,11 +24345,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                 } else {
-                                    var __ci_expr_old_364: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_335: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_364 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_335 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -25927,11 +24396,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                     },
                     39 => {
-                        var __ci_expr_old_359: c_int = active_count__goto_548_5
+                        var __ci_expr_old_330: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_359 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_330 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = ((state_offset__goto_757_9 + dlen__goto_702_13) + 1) + 2)
 
                             if (__goto_pending != 0) {
@@ -25965,13 +24434,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_360: c_int = 0
+                                var __ci_expr_logic_331: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_360 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_331 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_360 != 0) {
+                                if (__ci_expr_logic_331 != 0) {
                                     (otherd__goto_2611_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2611_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -25988,24 +24457,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_361: c_int
+                            var __ci_expr_logic_332: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_361 = (if true: 1 else: 0))
+                                (__ci_expr_logic_332 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_361 = (if (if c__goto_703_12 == otherd__goto_2611_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_332 = (if (if c__goto_703_12 == otherd__goto_2611_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_361 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_362: c_int
+                            if ((if __ci_expr_logic_332 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_333: c_int
 
                                 if ((if codevalue__goto_756_14 == 45: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_362 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_333 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_362 = (if (if codevalue__goto_756_14 == 71: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_333 = (if (if codevalue__goto_756_14 == 71: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_362 != 0) {
+                                if (__ci_expr_logic_333 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -26028,11 +24497,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 (count__goto_759_9 = count__goto_759_9 + 1)
 
                                 if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                    var __ci_expr_old_363: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_334: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_363 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_334 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = ((state_offset__goto_757_9 + dlen__goto_702_13) + 1) + 2)
 
                                         if (__goto_pending != 0) {
@@ -26061,11 +24530,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                 } else {
-                                    var __ci_expr_old_364: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_335: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_364 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_335 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -26111,11 +24580,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                     },
                     40 => {
-                        var __ci_expr_old_359: c_int = active_count__goto_548_5
+                        var __ci_expr_old_330: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_359 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_330 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = ((state_offset__goto_757_9 + dlen__goto_702_13) + 1) + 2)
 
                             if (__goto_pending != 0) {
@@ -26149,13 +24618,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_360: c_int = 0
+                                var __ci_expr_logic_331: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_360 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_331 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_360 != 0) {
+                                if (__ci_expr_logic_331 != 0) {
                                     (otherd__goto_2611_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2611_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -26172,24 +24641,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_361: c_int
+                            var __ci_expr_logic_332: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_361 = (if true: 1 else: 0))
+                                (__ci_expr_logic_332 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_361 = (if (if c__goto_703_12 == otherd__goto_2611_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_332 = (if (if c__goto_703_12 == otherd__goto_2611_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_361 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_362: c_int
+                            if ((if __ci_expr_logic_332 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_333: c_int
 
                                 if ((if codevalue__goto_756_14 == 45: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_362 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_333 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_362 = (if (if codevalue__goto_756_14 == 71: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_333 = (if (if codevalue__goto_756_14 == 71: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_362 != 0) {
+                                if (__ci_expr_logic_333 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -26212,11 +24681,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 (count__goto_759_9 = count__goto_759_9 + 1)
 
                                 if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                    var __ci_expr_old_363: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_334: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_363 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_334 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = ((state_offset__goto_757_9 + dlen__goto_702_13) + 1) + 2)
 
                                         if (__goto_pending != 0) {
@@ -26245,11 +24714,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                 } else {
-                                    var __ci_expr_old_364: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_335: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_364 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_335 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -26295,11 +24764,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                     },
                     45 => {
-                        var __ci_expr_old_359: c_int = active_count__goto_548_5
+                        var __ci_expr_old_330: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_359 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_330 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = ((state_offset__goto_757_9 + dlen__goto_702_13) + 1) + 2)
 
                             if (__goto_pending != 0) {
@@ -26333,13 +24802,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_360: c_int = 0
+                                var __ci_expr_logic_331: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_360 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_331 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_360 != 0) {
+                                if (__ci_expr_logic_331 != 0) {
                                     (otherd__goto_2611_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2611_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -26356,24 +24825,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_361: c_int
+                            var __ci_expr_logic_332: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_361 = (if true: 1 else: 0))
+                                (__ci_expr_logic_332 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_361 = (if (if c__goto_703_12 == otherd__goto_2611_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_332 = (if (if c__goto_703_12 == otherd__goto_2611_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_361 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_362: c_int
+                            if ((if __ci_expr_logic_332 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_333: c_int
 
                                 if ((if codevalue__goto_756_14 == 45: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_362 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_333 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_362 = (if (if codevalue__goto_756_14 == 71: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_333 = (if (if codevalue__goto_756_14 == 71: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_362 != 0) {
+                                if (__ci_expr_logic_333 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -26396,11 +24865,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 (count__goto_759_9 = count__goto_759_9 + 1)
 
                                 if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                    var __ci_expr_old_363: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_334: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_363 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_334 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = ((state_offset__goto_757_9 + dlen__goto_702_13) + 1) + 2)
 
                                         if (__goto_pending != 0) {
@@ -26429,11 +24898,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                 } else {
-                                    var __ci_expr_old_364: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_335: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_364 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_335 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -26479,11 +24948,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                     },
                     65 => {
-                        var __ci_expr_old_359: c_int = active_count__goto_548_5
+                        var __ci_expr_old_330: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_359 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_330 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = ((state_offset__goto_757_9 + dlen__goto_702_13) + 1) + 2)
 
                             if (__goto_pending != 0) {
@@ -26517,13 +24986,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_360: c_int = 0
+                                var __ci_expr_logic_331: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_360 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_331 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_360 != 0) {
+                                if (__ci_expr_logic_331 != 0) {
                                     (otherd__goto_2611_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2611_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -26540,24 +25009,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_361: c_int
+                            var __ci_expr_logic_332: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_361 = (if true: 1 else: 0))
+                                (__ci_expr_logic_332 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_361 = (if (if c__goto_703_12 == otherd__goto_2611_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_332 = (if (if c__goto_703_12 == otherd__goto_2611_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_361 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_362: c_int
+                            if ((if __ci_expr_logic_332 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_333: c_int
 
                                 if ((if codevalue__goto_756_14 == 45: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_362 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_333 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_362 = (if (if codevalue__goto_756_14 == 71: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_333 = (if (if codevalue__goto_756_14 == 71: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_362 != 0) {
+                                if (__ci_expr_logic_333 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -26580,11 +25049,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 (count__goto_759_9 = count__goto_759_9 + 1)
 
                                 if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                    var __ci_expr_old_363: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_334: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_363 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_334 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = ((state_offset__goto_757_9 + dlen__goto_702_13) + 1) + 2)
 
                                         if (__goto_pending != 0) {
@@ -26613,11 +25082,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                 } else {
-                                    var __ci_expr_old_364: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_335: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_364 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_335 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -26663,11 +25132,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                     },
                     66 => {
-                        var __ci_expr_old_359: c_int = active_count__goto_548_5
+                        var __ci_expr_old_330: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_359 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_330 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = ((state_offset__goto_757_9 + dlen__goto_702_13) + 1) + 2)
 
                             if (__goto_pending != 0) {
@@ -26701,13 +25170,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_360: c_int = 0
+                                var __ci_expr_logic_331: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_360 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_331 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_360 != 0) {
+                                if (__ci_expr_logic_331 != 0) {
                                     (otherd__goto_2611_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2611_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -26724,24 +25193,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_361: c_int
+                            var __ci_expr_logic_332: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_361 = (if true: 1 else: 0))
+                                (__ci_expr_logic_332 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_361 = (if (if c__goto_703_12 == otherd__goto_2611_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_332 = (if (if c__goto_703_12 == otherd__goto_2611_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_361 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_362: c_int
+                            if ((if __ci_expr_logic_332 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_333: c_int
 
                                 if ((if codevalue__goto_756_14 == 45: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_362 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_333 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_362 = (if (if codevalue__goto_756_14 == 71: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_333 = (if (if codevalue__goto_756_14 == 71: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_362 != 0) {
+                                if (__ci_expr_logic_333 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -26764,11 +25233,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 (count__goto_759_9 = count__goto_759_9 + 1)
 
                                 if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                    var __ci_expr_old_363: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_334: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_363 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_334 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = ((state_offset__goto_757_9 + dlen__goto_702_13) + 1) + 2)
 
                                         if (__goto_pending != 0) {
@@ -26797,11 +25266,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                 } else {
-                                    var __ci_expr_old_364: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_335: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_364 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_335 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -26847,11 +25316,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                     },
                     71 => {
-                        var __ci_expr_old_359: c_int = active_count__goto_548_5
+                        var __ci_expr_old_330: c_int = active_count__goto_548_5
 
                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                        if ((if __ci_expr_old_359 < wscount: 1 else: 0) != 0) {
+                        if ((if __ci_expr_old_330 < wscount: 1 else: 0) != 0) {
                             (next_active_state__goto_543_13.offset = ((state_offset__goto_757_9 + dlen__goto_702_13) + 1) + 2)
 
                             if (__goto_pending != 0) {
@@ -26885,13 +25354,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (caseless__goto_754_10 != 0) {
-                                var __ci_expr_logic_360: c_int = 0
+                                var __ci_expr_logic_331: c_int = 0
 
                                 if (utf_or_ucp__goto_559_6 != 0) {
-                                    (__ci_expr_logic_360 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_331 = (if (if d__goto_703_15 >= 128: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_360 != 0) {
+                                if (__ci_expr_logic_331 != 0) {
                                     (otherd__goto_2611_18 = ((((d__goto_703_15 as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((d__goto_703_15 as c_int) / 128)] * 128) + ((d__goto_703_15 as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
                                 } else {
                                     (otherd__goto_2611_18 = (unsafe: fcc__goto_544_31[d__goto_703_15]))
@@ -26908,24 +25377,24 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_361: c_int
+                            var __ci_expr_logic_332: c_int
 
                             if ((if c__goto_703_12 == d__goto_703_15: 1 else: 0) != 0) {
-                                (__ci_expr_logic_361 = (if true: 1 else: 0))
+                                (__ci_expr_logic_332 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_361 = (if (if c__goto_703_12 == otherd__goto_2611_18: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_332 = (if (if c__goto_703_12 == otherd__goto_2611_18: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_361 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
-                                var __ci_expr_logic_362: c_int
+                            if ((if __ci_expr_logic_332 == (if codevalue__goto_756_14 < 59: 1 else: 0): 1 else: 0) != 0) {
+                                var __ci_expr_logic_333: c_int
 
                                 if ((if codevalue__goto_756_14 == 45: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_362 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_333 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_362 = (if (if codevalue__goto_756_14 == 71: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_333 = (if (if codevalue__goto_756_14 == 71: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_362 != 0) {
+                                if (__ci_expr_logic_333 != 0) {
                                     (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                     if (__goto_pending != 0) {
@@ -26948,11 +25417,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 (count__goto_759_9 = count__goto_759_9 + 1)
 
                                 if ((if count__goto_759_9 >= (((((((unsafe: code__goto_755_16[1]) as c_int) << (8 as c_uint)) | (unsafe: code__goto_755_16[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                    var __ci_expr_old_363: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_334: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_363 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_334 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = ((state_offset__goto_757_9 + dlen__goto_702_13) + 1) + 2)
 
                                         if (__goto_pending != 0) {
@@ -26981,11 +25450,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                 } else {
-                                    var __ci_expr_old_364: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_335: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_364 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_335 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -27076,15 +25545,15 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                                 if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                                    var __ci_expr_ternary_365: c_int = 0
+                                    var __ci_expr_ternary_336: c_int = 0
 
                                     if ((if c__goto_703_12 > 255: 1 else: 0) != 0) {
-                                        (__ci_expr_ternary_365 = (if codevalue__goto_756_14 == 111: 1 else: 0))
+                                        (__ci_expr_ternary_336 = (if codevalue__goto_756_14 == 111: 1 else: 0))
                                     } else {
-                                        (__ci_expr_ternary_365 = (if ((unsafe: (code__goto_755_16 + ((1 as isize) as usize))[(c__goto_703_12 / 8)]) & ((1 as c_uint) << ((c__goto_703_12 & 7) as c_uint))) != 0: 1 else: 0))
+                                        (__ci_expr_ternary_336 = (if ((unsafe: (code__goto_755_16 + ((1 as isize) as usize))[(c__goto_703_12 / 8)]) & ((1 as c_uint) << ((c__goto_703_12 & 7) as c_uint))) != 0: 1 else: 0))
                                     }
 
-                                    (isinclass__goto_2647_14 = __ci_expr_ternary_365)
+                                    (isinclass__goto_2647_14 = __ci_expr_ternary_336)
 
 
                                     if (__goto_pending != 0) {
@@ -27111,12 +25580,12 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         }
 
                         match (unsafe: *ecode__goto_2649_20) {
-                            OP_CRSTAR => {
-                                var __ci_expr_old_366: c_int = active_count__goto_548_5
+                            98 => {
+                                var __ci_expr_old_337: c_int = active_count__goto_548_5
 
                                 (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                                if ((if __ci_expr_old_366 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_337 < wscount: 1 else: 0) != 0) {
                                     (next_active_state__goto_543_13.offset = next_state_offset__goto_2648_13 + 1)
 
                                     if (__goto_pending != 0) {
@@ -27160,11 +25629,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         continue
                                     }
 
-                                    var __ci_expr_old_367: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_338: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_367 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_338 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -27195,15 +25664,15 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                             },
-                            OP_CRPLUS => {
+                            100 => {
                                 (count__goto_759_9 = current_state__goto_753_17.count)
 
                                 if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                                    var __ci_expr_old_368: c_int = active_count__goto_548_5
+                                    var __ci_expr_old_339: c_int = active_count__goto_548_5
 
                                     (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                                    if ((if __ci_expr_old_368 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_339 < wscount: 1 else: 0) != 0) {
                                         (next_active_state__goto_543_13.offset = next_state_offset__goto_2648_13 + 1)
 
                                         if (__goto_pending != 0) {
@@ -27234,13 +25703,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                                 if (isinclass__goto_2647_14 != 0) {
-                                    var __ci_expr_logic_369: c_int = 0
+                                    var __ci_expr_logic_340: c_int = 0
 
                                     if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_369 = (if (if (unsafe: *ecode__goto_2649_20) == OP_CRPOSPLUS: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_340 = (if (if (unsafe: *ecode__goto_2649_20) == OP_CRPOSPLUS: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_369 != 0) {
+                                    if (__ci_expr_logic_340 != 0) {
                                         (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                         if (__goto_pending != 0) {
@@ -27266,11 +25735,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         continue
                                     }
 
-                                    var __ci_expr_old_370: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_341: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_370 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_341 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -27301,12 +25770,12 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                             },
-                            OP_CRQUERY => {
-                                var __ci_expr_old_371: c_int = active_count__goto_548_5
+                            102 => {
+                                var __ci_expr_old_342: c_int = active_count__goto_548_5
 
                                 (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                                if ((if __ci_expr_old_371 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_342 < wscount: 1 else: 0) != 0) {
                                     (next_active_state__goto_543_13.offset = next_state_offset__goto_2648_13 + 1)
 
                                     if (__goto_pending != 0) {
@@ -27350,11 +25819,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         continue
                                     }
 
-                                    var __ci_expr_old_372: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_343: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_372 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_343 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = next_state_offset__goto_2648_13 + 1)
 
                                         if (__goto_pending != 0) {
@@ -27385,15 +25854,15 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                             },
-                            OP_CRRANGE => {
+                            104 => {
                                 (count__goto_759_9 = current_state__goto_753_17.count)
 
                                 if ((if count__goto_759_9 >= (((((((unsafe: ecode__goto_2649_20[1]) as c_int) << (8 as c_uint)) | (unsafe: ecode__goto_2649_20[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                    var __ci_expr_old_373: c_int = active_count__goto_548_5
+                                    var __ci_expr_old_344: c_int = active_count__goto_548_5
 
                                     (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                                    if ((if __ci_expr_old_373 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_344 < wscount: 1 else: 0) != 0) {
                                         (next_active_state__goto_543_13.offset = (next_state_offset__goto_2648_13 + 1) + (2 * 2))
 
                                         if (__goto_pending != 0) {
@@ -27430,13 +25899,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         continue
                                     }
 
-                                    var __ci_expr_logic_374: c_int = 0
+                                    var __ci_expr_logic_345: c_int = 0
 
                                     if ((if (unsafe: *ecode__goto_2649_20) == OP_CRPOSRANGE: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_374 = (if (if count__goto_759_9 >= (((((((unsafe: ecode__goto_2649_20[1]) as c_int) << (8 as c_uint)) | (unsafe: ecode__goto_2649_20[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_345 = (if (if count__goto_759_9 >= (((((((unsafe: ecode__goto_2649_20[1]) as c_int) << (8 as c_uint)) | (unsafe: ecode__goto_2649_20[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_374 != 0) {
+                                    if (__ci_expr_logic_345 != 0) {
                                         (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                         if (__goto_pending != 0) {
@@ -27456,20 +25925,20 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         continue
                                     }
 
-                                    var __ci_expr_logic_375: c_int = 0
+                                    var __ci_expr_logic_346: c_int = 0
 
                                     (count__goto_759_9 = count__goto_759_9 + 1)
 
                                     if ((if count__goto_759_9 >= max__goto_2753_17: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_375 = (if (if max__goto_2753_17 != 0: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_346 = (if (if max__goto_2753_17 != 0: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_375 != 0) {
-                                        var __ci_expr_old_376: c_int = new_count__goto_548_19
+                                    if (__ci_expr_logic_346 != 0) {
+                                        var __ci_expr_old_347: c_int = new_count__goto_548_19
 
                                         (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                        if ((if __ci_expr_old_376 < wscount: 1 else: 0) != 0) {
+                                        if ((if __ci_expr_old_347 < wscount: 1 else: 0) != 0) {
                                             (next_new_state__goto_543_33.offset = (next_state_offset__goto_2648_13 + 1) + (2 * 2))
 
                                             if (__goto_pending != 0) {
@@ -27498,11 +25967,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         }
 
                                     } else {
-                                        var __ci_expr_old_377: c_int = new_count__goto_548_19
+                                        var __ci_expr_old_348: c_int = new_count__goto_548_19
 
                                         (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                        if ((if __ci_expr_old_377 < wscount: 1 else: 0) != 0) {
+                                        if ((if __ci_expr_old_348 < wscount: 1 else: 0) != 0) {
                                             (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                             if (__goto_pending != 0) {
@@ -27542,11 +26011,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             },
                             _ => {
                                 if (isinclass__goto_2647_14 != 0) {
-                                    var __ci_expr_old_378: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_349: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_378 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_349 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = next_state_offset__goto_2648_13)
 
                                         if (__goto_pending != 0) {
@@ -27629,15 +26098,15 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                                 if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                                    var __ci_expr_ternary_365: c_int = 0
+                                    var __ci_expr_ternary_336: c_int = 0
 
                                     if ((if c__goto_703_12 > 255: 1 else: 0) != 0) {
-                                        (__ci_expr_ternary_365 = (if codevalue__goto_756_14 == 111: 1 else: 0))
+                                        (__ci_expr_ternary_336 = (if codevalue__goto_756_14 == 111: 1 else: 0))
                                     } else {
-                                        (__ci_expr_ternary_365 = (if ((unsafe: (code__goto_755_16 + ((1 as isize) as usize))[(c__goto_703_12 / 8)]) & ((1 as c_uint) << ((c__goto_703_12 & 7) as c_uint))) != 0: 1 else: 0))
+                                        (__ci_expr_ternary_336 = (if ((unsafe: (code__goto_755_16 + ((1 as isize) as usize))[(c__goto_703_12 / 8)]) & ((1 as c_uint) << ((c__goto_703_12 & 7) as c_uint))) != 0: 1 else: 0))
                                     }
 
-                                    (isinclass__goto_2647_14 = __ci_expr_ternary_365)
+                                    (isinclass__goto_2647_14 = __ci_expr_ternary_336)
 
 
                                     if (__goto_pending != 0) {
@@ -27664,12 +26133,12 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         }
 
                         match (unsafe: *ecode__goto_2649_20) {
-                            OP_CRSTAR => {
-                                var __ci_expr_old_366: c_int = active_count__goto_548_5
+                            98 => {
+                                var __ci_expr_old_337: c_int = active_count__goto_548_5
 
                                 (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                                if ((if __ci_expr_old_366 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_337 < wscount: 1 else: 0) != 0) {
                                     (next_active_state__goto_543_13.offset = next_state_offset__goto_2648_13 + 1)
 
                                     if (__goto_pending != 0) {
@@ -27713,11 +26182,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         continue
                                     }
 
-                                    var __ci_expr_old_367: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_338: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_367 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_338 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -27748,15 +26217,15 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                             },
-                            OP_CRPLUS => {
+                            100 => {
                                 (count__goto_759_9 = current_state__goto_753_17.count)
 
                                 if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                                    var __ci_expr_old_368: c_int = active_count__goto_548_5
+                                    var __ci_expr_old_339: c_int = active_count__goto_548_5
 
                                     (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                                    if ((if __ci_expr_old_368 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_339 < wscount: 1 else: 0) != 0) {
                                         (next_active_state__goto_543_13.offset = next_state_offset__goto_2648_13 + 1)
 
                                         if (__goto_pending != 0) {
@@ -27787,13 +26256,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                                 if (isinclass__goto_2647_14 != 0) {
-                                    var __ci_expr_logic_369: c_int = 0
+                                    var __ci_expr_logic_340: c_int = 0
 
                                     if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_369 = (if (if (unsafe: *ecode__goto_2649_20) == OP_CRPOSPLUS: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_340 = (if (if (unsafe: *ecode__goto_2649_20) == OP_CRPOSPLUS: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_369 != 0) {
+                                    if (__ci_expr_logic_340 != 0) {
                                         (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                         if (__goto_pending != 0) {
@@ -27819,11 +26288,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         continue
                                     }
 
-                                    var __ci_expr_old_370: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_341: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_370 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_341 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -27854,12 +26323,12 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                             },
-                            OP_CRQUERY => {
-                                var __ci_expr_old_371: c_int = active_count__goto_548_5
+                            102 => {
+                                var __ci_expr_old_342: c_int = active_count__goto_548_5
 
                                 (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                                if ((if __ci_expr_old_371 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_342 < wscount: 1 else: 0) != 0) {
                                     (next_active_state__goto_543_13.offset = next_state_offset__goto_2648_13 + 1)
 
                                     if (__goto_pending != 0) {
@@ -27903,11 +26372,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         continue
                                     }
 
-                                    var __ci_expr_old_372: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_343: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_372 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_343 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = next_state_offset__goto_2648_13 + 1)
 
                                         if (__goto_pending != 0) {
@@ -27938,15 +26407,15 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                             },
-                            OP_CRRANGE => {
+                            104 => {
                                 (count__goto_759_9 = current_state__goto_753_17.count)
 
                                 if ((if count__goto_759_9 >= (((((((unsafe: ecode__goto_2649_20[1]) as c_int) << (8 as c_uint)) | (unsafe: ecode__goto_2649_20[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                    var __ci_expr_old_373: c_int = active_count__goto_548_5
+                                    var __ci_expr_old_344: c_int = active_count__goto_548_5
 
                                     (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                                    if ((if __ci_expr_old_373 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_344 < wscount: 1 else: 0) != 0) {
                                         (next_active_state__goto_543_13.offset = (next_state_offset__goto_2648_13 + 1) + (2 * 2))
 
                                         if (__goto_pending != 0) {
@@ -27983,13 +26452,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         continue
                                     }
 
-                                    var __ci_expr_logic_374: c_int = 0
+                                    var __ci_expr_logic_345: c_int = 0
 
                                     if ((if (unsafe: *ecode__goto_2649_20) == OP_CRPOSRANGE: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_374 = (if (if count__goto_759_9 >= (((((((unsafe: ecode__goto_2649_20[1]) as c_int) << (8 as c_uint)) | (unsafe: ecode__goto_2649_20[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_345 = (if (if count__goto_759_9 >= (((((((unsafe: ecode__goto_2649_20[1]) as c_int) << (8 as c_uint)) | (unsafe: ecode__goto_2649_20[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_374 != 0) {
+                                    if (__ci_expr_logic_345 != 0) {
                                         (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                         if (__goto_pending != 0) {
@@ -28009,20 +26478,20 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         continue
                                     }
 
-                                    var __ci_expr_logic_375: c_int = 0
+                                    var __ci_expr_logic_346: c_int = 0
 
                                     (count__goto_759_9 = count__goto_759_9 + 1)
 
                                     if ((if count__goto_759_9 >= max__goto_2753_17: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_375 = (if (if max__goto_2753_17 != 0: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_346 = (if (if max__goto_2753_17 != 0: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_375 != 0) {
-                                        var __ci_expr_old_376: c_int = new_count__goto_548_19
+                                    if (__ci_expr_logic_346 != 0) {
+                                        var __ci_expr_old_347: c_int = new_count__goto_548_19
 
                                         (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                        if ((if __ci_expr_old_376 < wscount: 1 else: 0) != 0) {
+                                        if ((if __ci_expr_old_347 < wscount: 1 else: 0) != 0) {
                                             (next_new_state__goto_543_33.offset = (next_state_offset__goto_2648_13 + 1) + (2 * 2))
 
                                             if (__goto_pending != 0) {
@@ -28051,11 +26520,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         }
 
                                     } else {
-                                        var __ci_expr_old_377: c_int = new_count__goto_548_19
+                                        var __ci_expr_old_348: c_int = new_count__goto_548_19
 
                                         (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                        if ((if __ci_expr_old_377 < wscount: 1 else: 0) != 0) {
+                                        if ((if __ci_expr_old_348 < wscount: 1 else: 0) != 0) {
                                             (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                             if (__goto_pending != 0) {
@@ -28095,11 +26564,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             },
                             _ => {
                                 if (isinclass__goto_2647_14 != 0) {
-                                    var __ci_expr_old_378: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_349: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_378 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_349 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = next_state_offset__goto_2648_13)
 
                                         if (__goto_pending != 0) {
@@ -28182,15 +26651,15 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                                 if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                                    var __ci_expr_ternary_365: c_int = 0
+                                    var __ci_expr_ternary_336: c_int = 0
 
                                     if ((if c__goto_703_12 > 255: 1 else: 0) != 0) {
-                                        (__ci_expr_ternary_365 = (if codevalue__goto_756_14 == 111: 1 else: 0))
+                                        (__ci_expr_ternary_336 = (if codevalue__goto_756_14 == 111: 1 else: 0))
                                     } else {
-                                        (__ci_expr_ternary_365 = (if ((unsafe: (code__goto_755_16 + ((1 as isize) as usize))[(c__goto_703_12 / 8)]) & ((1 as c_uint) << ((c__goto_703_12 & 7) as c_uint))) != 0: 1 else: 0))
+                                        (__ci_expr_ternary_336 = (if ((unsafe: (code__goto_755_16 + ((1 as isize) as usize))[(c__goto_703_12 / 8)]) & ((1 as c_uint) << ((c__goto_703_12 & 7) as c_uint))) != 0: 1 else: 0))
                                     }
 
-                                    (isinclass__goto_2647_14 = __ci_expr_ternary_365)
+                                    (isinclass__goto_2647_14 = __ci_expr_ternary_336)
 
 
                                     if (__goto_pending != 0) {
@@ -28217,12 +26686,12 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         }
 
                         match (unsafe: *ecode__goto_2649_20) {
-                            OP_CRSTAR => {
-                                var __ci_expr_old_366: c_int = active_count__goto_548_5
+                            98 => {
+                                var __ci_expr_old_337: c_int = active_count__goto_548_5
 
                                 (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                                if ((if __ci_expr_old_366 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_337 < wscount: 1 else: 0) != 0) {
                                     (next_active_state__goto_543_13.offset = next_state_offset__goto_2648_13 + 1)
 
                                     if (__goto_pending != 0) {
@@ -28266,11 +26735,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         continue
                                     }
 
-                                    var __ci_expr_old_367: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_338: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_367 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_338 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -28301,15 +26770,15 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                             },
-                            OP_CRPLUS => {
+                            100 => {
                                 (count__goto_759_9 = current_state__goto_753_17.count)
 
                                 if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                                    var __ci_expr_old_368: c_int = active_count__goto_548_5
+                                    var __ci_expr_old_339: c_int = active_count__goto_548_5
 
                                     (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                                    if ((if __ci_expr_old_368 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_339 < wscount: 1 else: 0) != 0) {
                                         (next_active_state__goto_543_13.offset = next_state_offset__goto_2648_13 + 1)
 
                                         if (__goto_pending != 0) {
@@ -28340,13 +26809,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                                 if (isinclass__goto_2647_14 != 0) {
-                                    var __ci_expr_logic_369: c_int = 0
+                                    var __ci_expr_logic_340: c_int = 0
 
                                     if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_369 = (if (if (unsafe: *ecode__goto_2649_20) == OP_CRPOSPLUS: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_340 = (if (if (unsafe: *ecode__goto_2649_20) == OP_CRPOSPLUS: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_369 != 0) {
+                                    if (__ci_expr_logic_340 != 0) {
                                         (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                         if (__goto_pending != 0) {
@@ -28372,11 +26841,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         continue
                                     }
 
-                                    var __ci_expr_old_370: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_341: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_370 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_341 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -28407,12 +26876,12 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                             },
-                            OP_CRQUERY => {
-                                var __ci_expr_old_371: c_int = active_count__goto_548_5
+                            102 => {
+                                var __ci_expr_old_342: c_int = active_count__goto_548_5
 
                                 (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                                if ((if __ci_expr_old_371 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_342 < wscount: 1 else: 0) != 0) {
                                     (next_active_state__goto_543_13.offset = next_state_offset__goto_2648_13 + 1)
 
                                     if (__goto_pending != 0) {
@@ -28456,11 +26925,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         continue
                                     }
 
-                                    var __ci_expr_old_372: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_343: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_372 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_343 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = next_state_offset__goto_2648_13 + 1)
 
                                         if (__goto_pending != 0) {
@@ -28491,15 +26960,15 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                             },
-                            OP_CRRANGE => {
+                            104 => {
                                 (count__goto_759_9 = current_state__goto_753_17.count)
 
                                 if ((if count__goto_759_9 >= (((((((unsafe: ecode__goto_2649_20[1]) as c_int) << (8 as c_uint)) | (unsafe: ecode__goto_2649_20[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                    var __ci_expr_old_373: c_int = active_count__goto_548_5
+                                    var __ci_expr_old_344: c_int = active_count__goto_548_5
 
                                     (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                                    if ((if __ci_expr_old_373 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_344 < wscount: 1 else: 0) != 0) {
                                         (next_active_state__goto_543_13.offset = (next_state_offset__goto_2648_13 + 1) + (2 * 2))
 
                                         if (__goto_pending != 0) {
@@ -28536,13 +27005,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         continue
                                     }
 
-                                    var __ci_expr_logic_374: c_int = 0
+                                    var __ci_expr_logic_345: c_int = 0
 
                                     if ((if (unsafe: *ecode__goto_2649_20) == OP_CRPOSRANGE: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_374 = (if (if count__goto_759_9 >= (((((((unsafe: ecode__goto_2649_20[1]) as c_int) << (8 as c_uint)) | (unsafe: ecode__goto_2649_20[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_345 = (if (if count__goto_759_9 >= (((((((unsafe: ecode__goto_2649_20[1]) as c_int) << (8 as c_uint)) | (unsafe: ecode__goto_2649_20[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_374 != 0) {
+                                    if (__ci_expr_logic_345 != 0) {
                                         (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                         if (__goto_pending != 0) {
@@ -28562,20 +27031,20 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         continue
                                     }
 
-                                    var __ci_expr_logic_375: c_int = 0
+                                    var __ci_expr_logic_346: c_int = 0
 
                                     (count__goto_759_9 = count__goto_759_9 + 1)
 
                                     if ((if count__goto_759_9 >= max__goto_2753_17: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_375 = (if (if max__goto_2753_17 != 0: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_346 = (if (if max__goto_2753_17 != 0: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_375 != 0) {
-                                        var __ci_expr_old_376: c_int = new_count__goto_548_19
+                                    if (__ci_expr_logic_346 != 0) {
+                                        var __ci_expr_old_347: c_int = new_count__goto_548_19
 
                                         (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                        if ((if __ci_expr_old_376 < wscount: 1 else: 0) != 0) {
+                                        if ((if __ci_expr_old_347 < wscount: 1 else: 0) != 0) {
                                             (next_new_state__goto_543_33.offset = (next_state_offset__goto_2648_13 + 1) + (2 * 2))
 
                                             if (__goto_pending != 0) {
@@ -28604,11 +27073,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         }
 
                                     } else {
-                                        var __ci_expr_old_377: c_int = new_count__goto_548_19
+                                        var __ci_expr_old_348: c_int = new_count__goto_548_19
 
                                         (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                        if ((if __ci_expr_old_377 < wscount: 1 else: 0) != 0) {
+                                        if ((if __ci_expr_old_348 < wscount: 1 else: 0) != 0) {
                                             (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                             if (__goto_pending != 0) {
@@ -28648,11 +27117,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             },
                             _ => {
                                 if (isinclass__goto_2647_14 != 0) {
-                                    var __ci_expr_old_378: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_349: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_378 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_349 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = next_state_offset__goto_2648_13)
 
                                         if (__goto_pending != 0) {
@@ -28735,15 +27204,15 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                                 if ((if clen__goto_702_7 > 0: 1 else: 0) != 0) {
-                                    var __ci_expr_ternary_365: c_int = 0
+                                    var __ci_expr_ternary_336: c_int = 0
 
                                     if ((if c__goto_703_12 > 255: 1 else: 0) != 0) {
-                                        (__ci_expr_ternary_365 = (if codevalue__goto_756_14 == 111: 1 else: 0))
+                                        (__ci_expr_ternary_336 = (if codevalue__goto_756_14 == 111: 1 else: 0))
                                     } else {
-                                        (__ci_expr_ternary_365 = (if ((unsafe: (code__goto_755_16 + ((1 as isize) as usize))[(c__goto_703_12 / 8)]) & ((1 as c_uint) << ((c__goto_703_12 & 7) as c_uint))) != 0: 1 else: 0))
+                                        (__ci_expr_ternary_336 = (if ((unsafe: (code__goto_755_16 + ((1 as isize) as usize))[(c__goto_703_12 / 8)]) & ((1 as c_uint) << ((c__goto_703_12 & 7) as c_uint))) != 0: 1 else: 0))
                                     }
 
-                                    (isinclass__goto_2647_14 = __ci_expr_ternary_365)
+                                    (isinclass__goto_2647_14 = __ci_expr_ternary_336)
 
 
                                     if (__goto_pending != 0) {
@@ -28770,12 +27239,12 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         }
 
                         match (unsafe: *ecode__goto_2649_20) {
-                            OP_CRSTAR => {
-                                var __ci_expr_old_366: c_int = active_count__goto_548_5
+                            98 => {
+                                var __ci_expr_old_337: c_int = active_count__goto_548_5
 
                                 (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                                if ((if __ci_expr_old_366 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_337 < wscount: 1 else: 0) != 0) {
                                     (next_active_state__goto_543_13.offset = next_state_offset__goto_2648_13 + 1)
 
                                     if (__goto_pending != 0) {
@@ -28819,11 +27288,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         continue
                                     }
 
-                                    var __ci_expr_old_367: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_338: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_367 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_338 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -28854,15 +27323,15 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                             },
-                            OP_CRPLUS => {
+                            100 => {
                                 (count__goto_759_9 = current_state__goto_753_17.count)
 
                                 if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                                    var __ci_expr_old_368: c_int = active_count__goto_548_5
+                                    var __ci_expr_old_339: c_int = active_count__goto_548_5
 
                                     (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                                    if ((if __ci_expr_old_368 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_339 < wscount: 1 else: 0) != 0) {
                                         (next_active_state__goto_543_13.offset = next_state_offset__goto_2648_13 + 1)
 
                                         if (__goto_pending != 0) {
@@ -28893,13 +27362,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                                 if (isinclass__goto_2647_14 != 0) {
-                                    var __ci_expr_logic_369: c_int = 0
+                                    var __ci_expr_logic_340: c_int = 0
 
                                     if ((if count__goto_759_9 > 0: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_369 = (if (if (unsafe: *ecode__goto_2649_20) == OP_CRPOSPLUS: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_340 = (if (if (unsafe: *ecode__goto_2649_20) == OP_CRPOSPLUS: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_369 != 0) {
+                                    if (__ci_expr_logic_340 != 0) {
                                         (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                         if (__goto_pending != 0) {
@@ -28925,11 +27394,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         continue
                                     }
 
-                                    var __ci_expr_old_370: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_341: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_370 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_341 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                         if (__goto_pending != 0) {
@@ -28960,12 +27429,12 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                             },
-                            OP_CRQUERY => {
-                                var __ci_expr_old_371: c_int = active_count__goto_548_5
+                            102 => {
+                                var __ci_expr_old_342: c_int = active_count__goto_548_5
 
                                 (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                                if ((if __ci_expr_old_371 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_342 < wscount: 1 else: 0) != 0) {
                                     (next_active_state__goto_543_13.offset = next_state_offset__goto_2648_13 + 1)
 
                                     if (__goto_pending != 0) {
@@ -29009,11 +27478,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         continue
                                     }
 
-                                    var __ci_expr_old_372: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_343: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_372 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_343 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = next_state_offset__goto_2648_13 + 1)
 
                                         if (__goto_pending != 0) {
@@ -29044,15 +27513,15 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                             },
-                            OP_CRRANGE => {
+                            104 => {
                                 (count__goto_759_9 = current_state__goto_753_17.count)
 
                                 if ((if count__goto_759_9 >= (((((((unsafe: ecode__goto_2649_20[1]) as c_int) << (8 as c_uint)) | (unsafe: ecode__goto_2649_20[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0) {
-                                    var __ci_expr_old_373: c_int = active_count__goto_548_5
+                                    var __ci_expr_old_344: c_int = active_count__goto_548_5
 
                                     (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                                    if ((if __ci_expr_old_373 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_344 < wscount: 1 else: 0) != 0) {
                                         (next_active_state__goto_543_13.offset = (next_state_offset__goto_2648_13 + 1) + (2 * 2))
 
                                         if (__goto_pending != 0) {
@@ -29089,13 +27558,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         continue
                                     }
 
-                                    var __ci_expr_logic_374: c_int = 0
+                                    var __ci_expr_logic_345: c_int = 0
 
                                     if ((if (unsafe: *ecode__goto_2649_20) == OP_CRPOSRANGE: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_374 = (if (if count__goto_759_9 >= (((((((unsafe: ecode__goto_2649_20[1]) as c_int) << (8 as c_uint)) | (unsafe: ecode__goto_2649_20[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_345 = (if (if count__goto_759_9 >= (((((((unsafe: ecode__goto_2649_20[1]) as c_int) << (8 as c_uint)) | (unsafe: ecode__goto_2649_20[(1 + 1)])) as c_uint) as c_int)): 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_374 != 0) {
+                                    if (__ci_expr_logic_345 != 0) {
                                         (active_count__goto_548_5 = active_count__goto_548_5 - 1)
 
                                         if (__goto_pending != 0) {
@@ -29115,20 +27584,20 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         continue
                                     }
 
-                                    var __ci_expr_logic_375: c_int = 0
+                                    var __ci_expr_logic_346: c_int = 0
 
                                     (count__goto_759_9 = count__goto_759_9 + 1)
 
                                     if ((if count__goto_759_9 >= max__goto_2753_17: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_375 = (if (if max__goto_2753_17 != 0: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_346 = (if (if max__goto_2753_17 != 0: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_375 != 0) {
-                                        var __ci_expr_old_376: c_int = new_count__goto_548_19
+                                    if (__ci_expr_logic_346 != 0) {
+                                        var __ci_expr_old_347: c_int = new_count__goto_548_19
 
                                         (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                        if ((if __ci_expr_old_376 < wscount: 1 else: 0) != 0) {
+                                        if ((if __ci_expr_old_347 < wscount: 1 else: 0) != 0) {
                                             (next_new_state__goto_543_33.offset = (next_state_offset__goto_2648_13 + 1) + (2 * 2))
 
                                             if (__goto_pending != 0) {
@@ -29157,11 +27626,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         }
 
                                     } else {
-                                        var __ci_expr_old_377: c_int = new_count__goto_548_19
+                                        var __ci_expr_old_348: c_int = new_count__goto_548_19
 
                                         (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                        if ((if __ci_expr_old_377 < wscount: 1 else: 0) != 0) {
+                                        if ((if __ci_expr_old_348 < wscount: 1 else: 0) != 0) {
                                             (next_new_state__goto_543_33.offset = state_offset__goto_757_9)
 
                                             if (__goto_pending != 0) {
@@ -29201,11 +27670,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             },
                             _ => {
                                 if (isinclass__goto_2647_14 != 0) {
-                                    var __ci_expr_old_378: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_349: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_378 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_349 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = next_state_offset__goto_2648_13)
 
                                         if (__goto_pending != 0) {
@@ -29328,13 +27797,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             continue
                         }
 
-                        var __ci_expr_logic_379: c_int = 0
+                        var __ci_expr_logic_350: c_int = 0
 
                         if ((if rc__goto_2789_13 < 0: 1 else: 0) != 0) {
-                            (__ci_expr_logic_379 = (if (if rc__goto_2789_13 != -1: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_350 = (if (if rc__goto_2789_13 != -1: 1 else: 0) != 0: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_379 != 0) {
+                        if (__ci_expr_logic_350 != 0) {
                             return rc__goto_2789_13
                         }
 
@@ -29343,20 +27812,20 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             continue
                         }
 
-                        var __ci_expr_logic_380: c_int
+                        var __ci_expr_logic_351: c_int
 
                         if ((if codevalue__goto_756_14 == 128: 1 else: 0) != 0) {
-                            (__ci_expr_logic_380 = (if true: 1 else: 0))
+                            (__ci_expr_logic_351 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_380 = (if (if codevalue__goto_756_14 == 130: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_351 = (if (if codevalue__goto_756_14 == 130: 1 else: 0) != 0: 1 else: 0))
                         }
 
-                        if ((if (if rc__goto_2789_13 >= 0: 1 else: 0) == __ci_expr_logic_380: 1 else: 0) != 0) {
-                            var __ci_expr_old_381: c_int = active_count__goto_548_5
+                        if ((if (if rc__goto_2789_13 >= 0: 1 else: 0) == __ci_expr_logic_351: 1 else: 0) != 0) {
+                            var __ci_expr_old_352: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_381 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_352 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = (((((((endasscode__goto_2792_20 + ((2 as isize) as usize)) + ((1 as isize) as usize)) as usize) -% (start_code__goto_555_12 as usize)) / sizeof[u8]()) as c_int)))
 
                                 if (__goto_pending != 0) {
@@ -29475,13 +27944,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             continue
                         }
 
-                        var __ci_expr_logic_379: c_int = 0
+                        var __ci_expr_logic_350: c_int = 0
 
                         if ((if rc__goto_2789_13 < 0: 1 else: 0) != 0) {
-                            (__ci_expr_logic_379 = (if (if rc__goto_2789_13 != -1: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_350 = (if (if rc__goto_2789_13 != -1: 1 else: 0) != 0: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_379 != 0) {
+                        if (__ci_expr_logic_350 != 0) {
                             return rc__goto_2789_13
                         }
 
@@ -29490,20 +27959,20 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             continue
                         }
 
-                        var __ci_expr_logic_380: c_int
+                        var __ci_expr_logic_351: c_int
 
                         if ((if codevalue__goto_756_14 == 128: 1 else: 0) != 0) {
-                            (__ci_expr_logic_380 = (if true: 1 else: 0))
+                            (__ci_expr_logic_351 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_380 = (if (if codevalue__goto_756_14 == 130: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_351 = (if (if codevalue__goto_756_14 == 130: 1 else: 0) != 0: 1 else: 0))
                         }
 
-                        if ((if (if rc__goto_2789_13 >= 0: 1 else: 0) == __ci_expr_logic_380: 1 else: 0) != 0) {
-                            var __ci_expr_old_381: c_int = active_count__goto_548_5
+                        if ((if (if rc__goto_2789_13 >= 0: 1 else: 0) == __ci_expr_logic_351: 1 else: 0) != 0) {
+                            var __ci_expr_old_352: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_381 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_352 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = (((((((endasscode__goto_2792_20 + ((2 as isize) as usize)) + ((1 as isize) as usize)) as usize) -% (start_code__goto_555_12 as usize)) / sizeof[u8]()) as c_int)))
 
                                 if (__goto_pending != 0) {
@@ -29622,13 +28091,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             continue
                         }
 
-                        var __ci_expr_logic_379: c_int = 0
+                        var __ci_expr_logic_350: c_int = 0
 
                         if ((if rc__goto_2789_13 < 0: 1 else: 0) != 0) {
-                            (__ci_expr_logic_379 = (if (if rc__goto_2789_13 != -1: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_350 = (if (if rc__goto_2789_13 != -1: 1 else: 0) != 0: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_379 != 0) {
+                        if (__ci_expr_logic_350 != 0) {
                             return rc__goto_2789_13
                         }
 
@@ -29637,20 +28106,20 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             continue
                         }
 
-                        var __ci_expr_logic_380: c_int
+                        var __ci_expr_logic_351: c_int
 
                         if ((if codevalue__goto_756_14 == 128: 1 else: 0) != 0) {
-                            (__ci_expr_logic_380 = (if true: 1 else: 0))
+                            (__ci_expr_logic_351 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_380 = (if (if codevalue__goto_756_14 == 130: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_351 = (if (if codevalue__goto_756_14 == 130: 1 else: 0) != 0: 1 else: 0))
                         }
 
-                        if ((if (if rc__goto_2789_13 >= 0: 1 else: 0) == __ci_expr_logic_380: 1 else: 0) != 0) {
-                            var __ci_expr_old_381: c_int = active_count__goto_548_5
+                        if ((if (if rc__goto_2789_13 >= 0: 1 else: 0) == __ci_expr_logic_351: 1 else: 0) != 0) {
+                            var __ci_expr_old_352: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_381 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_352 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = (((((((endasscode__goto_2792_20 + ((2 as isize) as usize)) + ((1 as isize) as usize)) as usize) -% (start_code__goto_555_12 as usize)) / sizeof[u8]()) as c_int)))
 
                                 if (__goto_pending != 0) {
@@ -29769,13 +28238,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             continue
                         }
 
-                        var __ci_expr_logic_379: c_int = 0
+                        var __ci_expr_logic_350: c_int = 0
 
                         if ((if rc__goto_2789_13 < 0: 1 else: 0) != 0) {
-                            (__ci_expr_logic_379 = (if (if rc__goto_2789_13 != -1: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_350 = (if (if rc__goto_2789_13 != -1: 1 else: 0) != 0: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_379 != 0) {
+                        if (__ci_expr_logic_350 != 0) {
                             return rc__goto_2789_13
                         }
 
@@ -29784,20 +28253,20 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             continue
                         }
 
-                        var __ci_expr_logic_380: c_int
+                        var __ci_expr_logic_351: c_int
 
                         if ((if codevalue__goto_756_14 == 128: 1 else: 0) != 0) {
-                            (__ci_expr_logic_380 = (if true: 1 else: 0))
+                            (__ci_expr_logic_351 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_380 = (if (if codevalue__goto_756_14 == 130: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_351 = (if (if codevalue__goto_756_14 == 130: 1 else: 0) != 0: 1 else: 0))
                         }
 
-                        if ((if (if rc__goto_2789_13 >= 0: 1 else: 0) == __ci_expr_logic_380: 1 else: 0) != 0) {
-                            var __ci_expr_old_381: c_int = active_count__goto_548_5
+                        if ((if (if rc__goto_2789_13 >= 0: 1 else: 0) == __ci_expr_logic_351: 1 else: 0) != 0) {
+                            var __ci_expr_old_352: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_381 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_352 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = (((((((endasscode__goto_2792_20 + ((2 as isize) as usize)) + ((1 as isize) as usize)) as usize) -% (start_code__goto_555_12 as usize)) / sizeof[u8]()) as c_int)))
 
                                 if (__goto_pending != 0) {
@@ -29840,15 +28309,15 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             continue
                         }
 
-                        var __ci_expr_logic_382: c_int
+                        var __ci_expr_logic_353: c_int
 
                         if ((if (unsafe: code__goto_755_16[(2 + 1)]) == OP_CALLOUT: 1 else: 0) != 0) {
-                            (__ci_expr_logic_382 = (if true: 1 else: 0))
+                            (__ci_expr_logic_353 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_382 = (if (if (unsafe: code__goto_755_16[(2 + 1)]) == OP_CALLOUT_STR: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_353 = (if (if (unsafe: code__goto_755_16[(2 + 1)]) == OP_CALLOUT_STR: 1 else: 0) != 0: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_382 != 0) {
+                        if (__ci_expr_logic_353 != 0) {
                             (rrc__goto_758_9 = do_callout_dfa(code__goto_755_16, offsets, current_subject, ptr__goto_545_12, mb, 3, (&mut callout_length__goto_2842_22 as *mut c_ulong)))
 
                             if (__goto_pending != 0) {
@@ -29890,23 +28359,23 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             continue
                         }
 
-                        var __ci_expr_logic_384: c_int
+                        var __ci_expr_logic_355: c_int
 
-                        var __ci_expr_logic_383: c_int
+                        var __ci_expr_logic_354: c_int
 
                         if ((if condcode__goto_2833_21 == OP_CREF: 1 else: 0) != 0) {
-                            (__ci_expr_logic_383 = (if true: 1 else: 0))
+                            (__ci_expr_logic_354 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_383 = (if (if condcode__goto_2833_21 == OP_DNCREF: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_354 = (if (if condcode__goto_2833_21 == OP_DNCREF: 1 else: 0) != 0: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_383 != 0) {
-                            (__ci_expr_logic_384 = (if true: 1 else: 0))
+                        if (__ci_expr_logic_354 != 0) {
+                            (__ci_expr_logic_355 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_384 = (if (if condcode__goto_2833_21 == OP_DNRREF: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_355 = (if (if condcode__goto_2833_21 == OP_DNRREF: 1 else: 0) != 0: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_384 != 0) {
+                        if (__ci_expr_logic_355 != 0) {
                             return -40
                         }
 
@@ -29915,20 +28384,20 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             continue
                         }
 
-                        var __ci_expr_logic_385: c_int
+                        var __ci_expr_logic_356: c_int
 
                         if ((if condcode__goto_2833_21 == OP_FALSE: 1 else: 0) != 0) {
-                            (__ci_expr_logic_385 = (if true: 1 else: 0))
+                            (__ci_expr_logic_356 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_385 = (if (if condcode__goto_2833_21 == OP_FAIL: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_356 = (if (if condcode__goto_2833_21 == OP_FAIL: 1 else: 0) != 0: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_385 != 0) {
-                            var __ci_expr_old_386: c_int = active_count__goto_548_5
+                        if (__ci_expr_logic_356 != 0) {
+                            var __ci_expr_old_357: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_386 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_357 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = ((state_offset__goto_757_9 + codelink__goto_2832_13) + 2) + 1)
 
                                 if (__goto_pending != 0) {
@@ -29958,11 +28427,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                         } else {
                             if ((if condcode__goto_2833_21 == OP_TRUE: 1 else: 0) != 0) {
-                                var __ci_expr_old_387: c_int = active_count__goto_548_5
+                                var __ci_expr_old_358: c_int = active_count__goto_548_5
 
                                 (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                                if ((if __ci_expr_old_387 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_358 < wscount: 1 else: 0) != 0) {
                                     (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + 2) + 2)
 
                                     if (__goto_pending != 0) {
@@ -30007,11 +28476,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                     if ((if mb.recursive != null: 1 else: 0) != 0) {
-                                        var __ci_expr_old_388: c_int = active_count__goto_548_5
+                                        var __ci_expr_old_359: c_int = active_count__goto_548_5
 
                                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                                        if ((if __ci_expr_old_388 < wscount: 1 else: 0) != 0) {
+                                        if ((if __ci_expr_old_359 < wscount: 1 else: 0) != 0) {
                                             (next_active_state__goto_543_13.offset = ((state_offset__goto_757_9 + 2) + 2) + 2)
 
                                             if (__goto_pending != 0) {
@@ -30040,11 +28509,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         }
 
                                     } else {
-                                        var __ci_expr_old_389: c_int = active_count__goto_548_5
+                                        var __ci_expr_old_360: c_int = active_count__goto_548_5
 
                                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                                        if ((if __ci_expr_old_389 < wscount: 1 else: 0) != 0) {
+                                        if ((if __ci_expr_old_360 < wscount: 1 else: 0) != 0) {
                                             (next_active_state__goto_543_13.offset = ((state_offset__goto_757_9 + codelink__goto_2832_13) + 2) + 1)
 
                                             if (__goto_pending != 0) {
@@ -30167,13 +28636,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         continue
                                     }
 
-                                    var __ci_expr_logic_390: c_int = 0
+                                    var __ci_expr_logic_361: c_int = 0
 
                                     if ((if rc__goto_2887_15 < 0: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_390 = (if (if rc__goto_2887_15 != -1: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_361 = (if (if rc__goto_2887_15 != -1: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_390 != 0) {
+                                    if (__ci_expr_logic_361 != 0) {
                                         return rc__goto_2887_15
                                     }
 
@@ -30182,20 +28651,20 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         continue
                                     }
 
-                                    var __ci_expr_logic_391: c_int
+                                    var __ci_expr_logic_362: c_int
 
                                     if ((if condcode__goto_2833_21 == OP_ASSERT: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_391 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_362 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_391 = (if (if condcode__goto_2833_21 == OP_ASSERTBACK: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_362 = (if (if condcode__goto_2833_21 == OP_ASSERTBACK: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if ((if (if rc__goto_2887_15 >= 0: 1 else: 0) == __ci_expr_logic_391: 1 else: 0) != 0) {
-                                        var __ci_expr_old_392: c_int = active_count__goto_548_5
+                                    if ((if (if rc__goto_2887_15 >= 0: 1 else: 0) == __ci_expr_logic_362: 1 else: 0) != 0) {
+                                        var __ci_expr_old_363: c_int = active_count__goto_548_5
 
                                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                                        if ((if __ci_expr_old_392 < wscount: 1 else: 0) != 0) {
+                                        if ((if __ci_expr_old_363 < wscount: 1 else: 0) != 0) {
                                             (next_active_state__goto_543_13.offset = (((((((endasscode__goto_2891_22 + ((2 as isize) as usize)) + ((1 as isize) as usize)) as usize) -% (start_code__goto_555_12 as usize)) / sizeof[u8]()) as c_int)))
 
                                             if (__goto_pending != 0) {
@@ -30224,11 +28693,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         }
 
                                     } else {
-                                        var __ci_expr_old_393: c_int = active_count__goto_548_5
+                                        var __ci_expr_old_364: c_int = active_count__goto_548_5
 
                                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                                        if ((if __ci_expr_old_393 < wscount: 1 else: 0) != 0) {
+                                        if ((if __ci_expr_old_364 < wscount: 1 else: 0) != 0) {
                                             (next_active_state__goto_543_13.offset = ((state_offset__goto_757_9 + codelink__goto_2832_13) + 2) + 1)
 
                                             if (__goto_pending != 0) {
@@ -30280,15 +28749,15 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             continue
                         }
 
-                        var __ci_expr_logic_382: c_int
+                        var __ci_expr_logic_353: c_int
 
                         if ((if (unsafe: code__goto_755_16[(2 + 1)]) == OP_CALLOUT: 1 else: 0) != 0) {
-                            (__ci_expr_logic_382 = (if true: 1 else: 0))
+                            (__ci_expr_logic_353 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_382 = (if (if (unsafe: code__goto_755_16[(2 + 1)]) == OP_CALLOUT_STR: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_353 = (if (if (unsafe: code__goto_755_16[(2 + 1)]) == OP_CALLOUT_STR: 1 else: 0) != 0: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_382 != 0) {
+                        if (__ci_expr_logic_353 != 0) {
                             (rrc__goto_758_9 = do_callout_dfa(code__goto_755_16, offsets, current_subject, ptr__goto_545_12, mb, 3, (&mut callout_length__goto_2842_22 as *mut c_ulong)))
 
                             if (__goto_pending != 0) {
@@ -30330,23 +28799,23 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             continue
                         }
 
-                        var __ci_expr_logic_384: c_int
+                        var __ci_expr_logic_355: c_int
 
-                        var __ci_expr_logic_383: c_int
+                        var __ci_expr_logic_354: c_int
 
                         if ((if condcode__goto_2833_21 == OP_CREF: 1 else: 0) != 0) {
-                            (__ci_expr_logic_383 = (if true: 1 else: 0))
+                            (__ci_expr_logic_354 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_383 = (if (if condcode__goto_2833_21 == OP_DNCREF: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_354 = (if (if condcode__goto_2833_21 == OP_DNCREF: 1 else: 0) != 0: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_383 != 0) {
-                            (__ci_expr_logic_384 = (if true: 1 else: 0))
+                        if (__ci_expr_logic_354 != 0) {
+                            (__ci_expr_logic_355 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_384 = (if (if condcode__goto_2833_21 == OP_DNRREF: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_355 = (if (if condcode__goto_2833_21 == OP_DNRREF: 1 else: 0) != 0: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_384 != 0) {
+                        if (__ci_expr_logic_355 != 0) {
                             return -40
                         }
 
@@ -30355,20 +28824,20 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             continue
                         }
 
-                        var __ci_expr_logic_385: c_int
+                        var __ci_expr_logic_356: c_int
 
                         if ((if condcode__goto_2833_21 == OP_FALSE: 1 else: 0) != 0) {
-                            (__ci_expr_logic_385 = (if true: 1 else: 0))
+                            (__ci_expr_logic_356 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_385 = (if (if condcode__goto_2833_21 == OP_FAIL: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_356 = (if (if condcode__goto_2833_21 == OP_FAIL: 1 else: 0) != 0: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_385 != 0) {
-                            var __ci_expr_old_386: c_int = active_count__goto_548_5
+                        if (__ci_expr_logic_356 != 0) {
+                            var __ci_expr_old_357: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_386 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_357 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = ((state_offset__goto_757_9 + codelink__goto_2832_13) + 2) + 1)
 
                                 if (__goto_pending != 0) {
@@ -30398,11 +28867,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                         } else {
                             if ((if condcode__goto_2833_21 == OP_TRUE: 1 else: 0) != 0) {
-                                var __ci_expr_old_387: c_int = active_count__goto_548_5
+                                var __ci_expr_old_358: c_int = active_count__goto_548_5
 
                                 (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                                if ((if __ci_expr_old_387 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_358 < wscount: 1 else: 0) != 0) {
                                     (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + 2) + 2)
 
                                     if (__goto_pending != 0) {
@@ -30447,11 +28916,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                     if ((if mb.recursive != null: 1 else: 0) != 0) {
-                                        var __ci_expr_old_388: c_int = active_count__goto_548_5
+                                        var __ci_expr_old_359: c_int = active_count__goto_548_5
 
                                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                                        if ((if __ci_expr_old_388 < wscount: 1 else: 0) != 0) {
+                                        if ((if __ci_expr_old_359 < wscount: 1 else: 0) != 0) {
                                             (next_active_state__goto_543_13.offset = ((state_offset__goto_757_9 + 2) + 2) + 2)
 
                                             if (__goto_pending != 0) {
@@ -30480,11 +28949,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         }
 
                                     } else {
-                                        var __ci_expr_old_389: c_int = active_count__goto_548_5
+                                        var __ci_expr_old_360: c_int = active_count__goto_548_5
 
                                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                                        if ((if __ci_expr_old_389 < wscount: 1 else: 0) != 0) {
+                                        if ((if __ci_expr_old_360 < wscount: 1 else: 0) != 0) {
                                             (next_active_state__goto_543_13.offset = ((state_offset__goto_757_9 + codelink__goto_2832_13) + 2) + 1)
 
                                             if (__goto_pending != 0) {
@@ -30607,13 +29076,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         continue
                                     }
 
-                                    var __ci_expr_logic_390: c_int = 0
+                                    var __ci_expr_logic_361: c_int = 0
 
                                     if ((if rc__goto_2887_15 < 0: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_390 = (if (if rc__goto_2887_15 != -1: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_361 = (if (if rc__goto_2887_15 != -1: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if (__ci_expr_logic_390 != 0) {
+                                    if (__ci_expr_logic_361 != 0) {
                                         return rc__goto_2887_15
                                     }
 
@@ -30622,20 +29091,20 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         continue
                                     }
 
-                                    var __ci_expr_logic_391: c_int
+                                    var __ci_expr_logic_362: c_int
 
                                     if ((if condcode__goto_2833_21 == OP_ASSERT: 1 else: 0) != 0) {
-                                        (__ci_expr_logic_391 = (if true: 1 else: 0))
+                                        (__ci_expr_logic_362 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_391 = (if (if condcode__goto_2833_21 == OP_ASSERTBACK: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_362 = (if (if condcode__goto_2833_21 == OP_ASSERTBACK: 1 else: 0) != 0: 1 else: 0))
                                     }
 
-                                    if ((if (if rc__goto_2887_15 >= 0: 1 else: 0) == __ci_expr_logic_391: 1 else: 0) != 0) {
-                                        var __ci_expr_old_392: c_int = active_count__goto_548_5
+                                    if ((if (if rc__goto_2887_15 >= 0: 1 else: 0) == __ci_expr_logic_362: 1 else: 0) != 0) {
+                                        var __ci_expr_old_363: c_int = active_count__goto_548_5
 
                                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                                        if ((if __ci_expr_old_392 < wscount: 1 else: 0) != 0) {
+                                        if ((if __ci_expr_old_363 < wscount: 1 else: 0) != 0) {
                                             (next_active_state__goto_543_13.offset = (((((((endasscode__goto_2891_22 + ((2 as isize) as usize)) + ((1 as isize) as usize)) as usize) -% (start_code__goto_555_12 as usize)) / sizeof[u8]()) as c_int)))
 
                                             if (__goto_pending != 0) {
@@ -30664,11 +29133,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         }
 
                                     } else {
-                                        var __ci_expr_old_393: c_int = active_count__goto_548_5
+                                        var __ci_expr_old_364: c_int = active_count__goto_548_5
 
                                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                                        if ((if __ci_expr_old_393 < wscount: 1 else: 0) != 0) {
+                                        if ((if __ci_expr_old_364 < wscount: 1 else: 0) != 0) {
                                             (next_active_state__goto_543_13.offset = ((state_offset__goto_757_9 + codelink__goto_2832_13) + 2) + 1)
 
                                             if (__goto_pending != 0) {
@@ -30726,15 +29195,15 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             continue
                         }
 
-                        var __ci_expr_ternary_394: c_uint = 0
+                        var __ci_expr_ternary_365: c_uint = 0
 
                         if ((if callpat__goto_2938_20 == mb.start_code: 1 else: 0) != 0) {
-                            (__ci_expr_ternary_394 = 0)
+                            (__ci_expr_ternary_365 = 0)
                         } else {
-                            (__ci_expr_ternary_394 = ((((((unsafe: callpat__goto_2938_20[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: callpat__goto_2938_20[((1 + 2) + 1)])) as c_uint)))
+                            (__ci_expr_ternary_365 = ((((((unsafe: callpat__goto_2938_20[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: callpat__goto_2938_20[((1 + 2) + 1)])) as c_uint)))
                         }
 
-                        (recno__goto_2939_18 = __ci_expr_ternary_394)
+                        (recno__goto_2939_18 = __ci_expr_ternary_365)
 
 
                         if (__goto_pending != 0) {
@@ -30797,19 +29266,19 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         (ri__goto_2960_34 = mb.recursive)
 
                         while ((if ri__goto_2960_34 != null: 1 else: 0) != 0) {
-                            var __ci_expr_logic_396: c_int = 0
+                            var __ci_expr_logic_367: c_int = 0
 
-                            var __ci_expr_logic_395: c_int = 0
+                            var __ci_expr_logic_366: c_int = 0
 
                             if ((if recno__goto_2939_18 == ri__goto_2960_34.group_num: 1 else: 0) != 0) {
-                                (__ci_expr_logic_395 = (if (if ptr__goto_545_12 == ri__goto_2960_34.subject_position: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_366 = (if (if ptr__goto_545_12 == ri__goto_2960_34.subject_position: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if (__ci_expr_logic_395 != 0) {
-                                (__ci_expr_logic_396 = (if (if mb.last_used_ptr == ri__goto_2960_34.last_used_ptr: 1 else: 0) != 0: 1 else: 0))
+                            if (__ci_expr_logic_366 != 0) {
+                                (__ci_expr_logic_367 = (if (if mb.last_used_ptr == ri__goto_2960_34.last_used_ptr: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if (__ci_expr_logic_396 != 0) {
+                            if (__ci_expr_logic_367 != 0) {
                                 return -52
                             }
 
@@ -30910,11 +29379,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                     while ((if p__goto_3009_26 < pp__goto_3010_26: 1 else: 0) != 0) {
-                                        var __ci_expr_old_397: *const u8 = p__goto_3009_26
+                                        var __ci_expr_old_368: *const u8 = p__goto_3009_26
 
                                         (p__goto_3009_26 = p__goto_3009_26 + 1)
 
-                                        if ((if ((unsafe: *__ci_expr_old_397) & 192) == 128: 1 else: 0) != 0) {
+                                        if ((if ((unsafe: *__ci_expr_old_368) & 192) == 128: 1 else: 0) != 0) {
                                             (charcount__goto_3005_24 = charcount__goto_3005_24 - 1)
                                         }
 
@@ -30935,11 +29404,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                                 if ((if charcount__goto_3005_24 > 0: 1 else: 0) != 0) {
-                                    var __ci_expr_old_398: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_369: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_398 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_369 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = 0 - ((state_offset__goto_757_9 + 2) + 1))
 
                                         if (__goto_pending != 0) {
@@ -30974,11 +29443,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                 } else {
-                                    var __ci_expr_old_399: c_int = active_count__goto_548_5
+                                    var __ci_expr_old_370: c_int = active_count__goto_548_5
 
                                     (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                                    if ((if __ci_expr_old_399 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_370 < wscount: 1 else: 0) != 0) {
                                         (next_active_state__goto_543_13.offset = (state_offset__goto_757_9 + 2) + 1)
 
                                         if (__goto_pending != 0) {
@@ -31180,15 +29649,15 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             continue
                         }
 
-                        var __ci_expr_logic_400: c_int
+                        var __ci_expr_logic_371: c_int
 
                         if ((if matched_count__goto_3039_31 > 0: 1 else: 0) != 0) {
-                            (__ci_expr_logic_400 = (if true: 1 else: 0))
+                            (__ci_expr_logic_371 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_400 = (if allow_zero__goto_3042_14 != 0: 1 else: 0))
+                            (__ci_expr_logic_371 = (if allow_zero__goto_3042_14 != 0: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_400 != 0) {
+                        if (__ci_expr_logic_371 != 0) {
                             (end_subpattern__goto_3102_22 = code__goto_755_16)
 
                             if (__goto_pending != 0) {
@@ -31222,13 +29691,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_401: c_int = 0
+                            var __ci_expr_logic_372: c_int = 0
 
                             if ((if (i__goto_701_7 + 1) >= active_count__goto_548_5: 1 else: 0) != 0) {
-                                (__ci_expr_logic_401 = (if (if new_count__goto_548_19 == 0: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_372 = (if (if new_count__goto_548_19 == 0: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if (__ci_expr_logic_401 != 0) {
+                            if (__ci_expr_logic_372 != 0) {
                                 (ptr__goto_545_12 = local_ptr__goto_3040_20)
 
                                 if (__goto_pending != 0) {
@@ -31241,11 +29710,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_402: c_int = new_count__goto_548_19
+                                var __ci_expr_old_373: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_402 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_373 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = next_state_offset__goto_3103_15)
 
                                     if (__goto_pending != 0) {
@@ -31294,11 +29763,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                 if (utf__goto_558_6 != 0) {
                                     while ((if p__goto_3123_24 < pp__goto_3124_24: 1 else: 0) != 0) {
-                                        var __ci_expr_old_403: *const u8 = p__goto_3123_24
+                                        var __ci_expr_old_374: *const u8 = p__goto_3123_24
 
                                         (p__goto_3123_24 = p__goto_3123_24 + 1)
 
-                                        if ((if ((unsafe: *__ci_expr_old_403) & 192) == 128: 1 else: 0) != 0) {
+                                        if ((if ((unsafe: *__ci_expr_old_374) & 192) == 128: 1 else: 0) != 0) {
                                             (charcount__goto_3039_20 = charcount__goto_3039_20 - 1)
                                         }
 
@@ -31313,11 +29782,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_404: c_int = new_count__goto_548_19
+                                var __ci_expr_old_375: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_404 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_375 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = 0 - next_state_offset__goto_3103_15)
 
                                     if (__goto_pending != 0) {
@@ -31510,15 +29979,15 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             continue
                         }
 
-                        var __ci_expr_logic_400: c_int
+                        var __ci_expr_logic_371: c_int
 
                         if ((if matched_count__goto_3039_31 > 0: 1 else: 0) != 0) {
-                            (__ci_expr_logic_400 = (if true: 1 else: 0))
+                            (__ci_expr_logic_371 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_400 = (if allow_zero__goto_3042_14 != 0: 1 else: 0))
+                            (__ci_expr_logic_371 = (if allow_zero__goto_3042_14 != 0: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_400 != 0) {
+                        if (__ci_expr_logic_371 != 0) {
                             (end_subpattern__goto_3102_22 = code__goto_755_16)
 
                             if (__goto_pending != 0) {
@@ -31552,13 +30021,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_401: c_int = 0
+                            var __ci_expr_logic_372: c_int = 0
 
                             if ((if (i__goto_701_7 + 1) >= active_count__goto_548_5: 1 else: 0) != 0) {
-                                (__ci_expr_logic_401 = (if (if new_count__goto_548_19 == 0: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_372 = (if (if new_count__goto_548_19 == 0: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if (__ci_expr_logic_401 != 0) {
+                            if (__ci_expr_logic_372 != 0) {
                                 (ptr__goto_545_12 = local_ptr__goto_3040_20)
 
                                 if (__goto_pending != 0) {
@@ -31571,11 +30040,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_402: c_int = new_count__goto_548_19
+                                var __ci_expr_old_373: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_402 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_373 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = next_state_offset__goto_3103_15)
 
                                     if (__goto_pending != 0) {
@@ -31624,11 +30093,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                 if (utf__goto_558_6 != 0) {
                                     while ((if p__goto_3123_24 < pp__goto_3124_24: 1 else: 0) != 0) {
-                                        var __ci_expr_old_403: *const u8 = p__goto_3123_24
+                                        var __ci_expr_old_374: *const u8 = p__goto_3123_24
 
                                         (p__goto_3123_24 = p__goto_3123_24 + 1)
 
-                                        if ((if ((unsafe: *__ci_expr_old_403) & 192) == 128: 1 else: 0) != 0) {
+                                        if ((if ((unsafe: *__ci_expr_old_374) & 192) == 128: 1 else: 0) != 0) {
                                             (charcount__goto_3039_20 = charcount__goto_3039_20 - 1)
                                         }
 
@@ -31643,11 +30112,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_404: c_int = new_count__goto_548_19
+                                var __ci_expr_old_375: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_404 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_375 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = 0 - next_state_offset__goto_3103_15)
 
                                     if (__goto_pending != 0) {
@@ -31840,15 +30309,15 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             continue
                         }
 
-                        var __ci_expr_logic_400: c_int
+                        var __ci_expr_logic_371: c_int
 
                         if ((if matched_count__goto_3039_31 > 0: 1 else: 0) != 0) {
-                            (__ci_expr_logic_400 = (if true: 1 else: 0))
+                            (__ci_expr_logic_371 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_400 = (if allow_zero__goto_3042_14 != 0: 1 else: 0))
+                            (__ci_expr_logic_371 = (if allow_zero__goto_3042_14 != 0: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_400 != 0) {
+                        if (__ci_expr_logic_371 != 0) {
                             (end_subpattern__goto_3102_22 = code__goto_755_16)
 
                             if (__goto_pending != 0) {
@@ -31882,13 +30351,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_401: c_int = 0
+                            var __ci_expr_logic_372: c_int = 0
 
                             if ((if (i__goto_701_7 + 1) >= active_count__goto_548_5: 1 else: 0) != 0) {
-                                (__ci_expr_logic_401 = (if (if new_count__goto_548_19 == 0: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_372 = (if (if new_count__goto_548_19 == 0: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if (__ci_expr_logic_401 != 0) {
+                            if (__ci_expr_logic_372 != 0) {
                                 (ptr__goto_545_12 = local_ptr__goto_3040_20)
 
                                 if (__goto_pending != 0) {
@@ -31901,11 +30370,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_402: c_int = new_count__goto_548_19
+                                var __ci_expr_old_373: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_402 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_373 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = next_state_offset__goto_3103_15)
 
                                     if (__goto_pending != 0) {
@@ -31954,11 +30423,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                 if (utf__goto_558_6 != 0) {
                                     while ((if p__goto_3123_24 < pp__goto_3124_24: 1 else: 0) != 0) {
-                                        var __ci_expr_old_403: *const u8 = p__goto_3123_24
+                                        var __ci_expr_old_374: *const u8 = p__goto_3123_24
 
                                         (p__goto_3123_24 = p__goto_3123_24 + 1)
 
-                                        if ((if ((unsafe: *__ci_expr_old_403) & 192) == 128: 1 else: 0) != 0) {
+                                        if ((if ((unsafe: *__ci_expr_old_374) & 192) == 128: 1 else: 0) != 0) {
                                             (charcount__goto_3039_20 = charcount__goto_3039_20 - 1)
                                         }
 
@@ -31973,11 +30442,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_404: c_int = new_count__goto_548_19
+                                var __ci_expr_old_375: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_404 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_375 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = 0 - next_state_offset__goto_3103_15)
 
                                     if (__goto_pending != 0) {
@@ -32170,15 +30639,15 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             continue
                         }
 
-                        var __ci_expr_logic_400: c_int
+                        var __ci_expr_logic_371: c_int
 
                         if ((if matched_count__goto_3039_31 > 0: 1 else: 0) != 0) {
-                            (__ci_expr_logic_400 = (if true: 1 else: 0))
+                            (__ci_expr_logic_371 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_400 = (if allow_zero__goto_3042_14 != 0: 1 else: 0))
+                            (__ci_expr_logic_371 = (if allow_zero__goto_3042_14 != 0: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_400 != 0) {
+                        if (__ci_expr_logic_371 != 0) {
                             (end_subpattern__goto_3102_22 = code__goto_755_16)
 
                             if (__goto_pending != 0) {
@@ -32212,13 +30681,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_401: c_int = 0
+                            var __ci_expr_logic_372: c_int = 0
 
                             if ((if (i__goto_701_7 + 1) >= active_count__goto_548_5: 1 else: 0) != 0) {
-                                (__ci_expr_logic_401 = (if (if new_count__goto_548_19 == 0: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_372 = (if (if new_count__goto_548_19 == 0: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if (__ci_expr_logic_401 != 0) {
+                            if (__ci_expr_logic_372 != 0) {
                                 (ptr__goto_545_12 = local_ptr__goto_3040_20)
 
                                 if (__goto_pending != 0) {
@@ -32231,11 +30700,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_402: c_int = new_count__goto_548_19
+                                var __ci_expr_old_373: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_402 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_373 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = next_state_offset__goto_3103_15)
 
                                     if (__goto_pending != 0) {
@@ -32284,11 +30753,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                 if (utf__goto_558_6 != 0) {
                                     while ((if p__goto_3123_24 < pp__goto_3124_24: 1 else: 0) != 0) {
-                                        var __ci_expr_old_403: *const u8 = p__goto_3123_24
+                                        var __ci_expr_old_374: *const u8 = p__goto_3123_24
 
                                         (p__goto_3123_24 = p__goto_3123_24 + 1)
 
-                                        if ((if ((unsafe: *__ci_expr_old_403) & 192) == 128: 1 else: 0) != 0) {
+                                        if ((if ((unsafe: *__ci_expr_old_374) & 192) == 128: 1 else: 0) != 0) {
                                             (charcount__goto_3039_20 = charcount__goto_3039_20 - 1)
                                         }
 
@@ -32303,11 +30772,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_404: c_int = new_count__goto_548_19
+                                var __ci_expr_old_375: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_404 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_375 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = 0 - next_state_offset__goto_3103_15)
 
                                     if (__goto_pending != 0) {
@@ -32500,15 +30969,15 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             continue
                         }
 
-                        var __ci_expr_logic_400: c_int
+                        var __ci_expr_logic_371: c_int
 
                         if ((if matched_count__goto_3039_31 > 0: 1 else: 0) != 0) {
-                            (__ci_expr_logic_400 = (if true: 1 else: 0))
+                            (__ci_expr_logic_371 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_400 = (if allow_zero__goto_3042_14 != 0: 1 else: 0))
+                            (__ci_expr_logic_371 = (if allow_zero__goto_3042_14 != 0: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_400 != 0) {
+                        if (__ci_expr_logic_371 != 0) {
                             (end_subpattern__goto_3102_22 = code__goto_755_16)
 
                             if (__goto_pending != 0) {
@@ -32542,13 +31011,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_logic_401: c_int = 0
+                            var __ci_expr_logic_372: c_int = 0
 
                             if ((if (i__goto_701_7 + 1) >= active_count__goto_548_5: 1 else: 0) != 0) {
-                                (__ci_expr_logic_401 = (if (if new_count__goto_548_19 == 0: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_372 = (if (if new_count__goto_548_19 == 0: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if (__ci_expr_logic_401 != 0) {
+                            if (__ci_expr_logic_372 != 0) {
                                 (ptr__goto_545_12 = local_ptr__goto_3040_20)
 
                                 if (__goto_pending != 0) {
@@ -32561,11 +31030,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_402: c_int = new_count__goto_548_19
+                                var __ci_expr_old_373: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_402 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_373 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = next_state_offset__goto_3103_15)
 
                                     if (__goto_pending != 0) {
@@ -32614,11 +31083,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                                 if (utf__goto_558_6 != 0) {
                                     while ((if p__goto_3123_24 < pp__goto_3124_24: 1 else: 0) != 0) {
-                                        var __ci_expr_old_403: *const u8 = p__goto_3123_24
+                                        var __ci_expr_old_374: *const u8 = p__goto_3123_24
 
                                         (p__goto_3123_24 = p__goto_3123_24 + 1)
 
-                                        if ((if ((unsafe: *__ci_expr_old_403) & 192) == 128: 1 else: 0) != 0) {
+                                        if ((if ((unsafe: *__ci_expr_old_374) & 192) == 128: 1 else: 0) != 0) {
                                             (charcount__goto_3039_20 = charcount__goto_3039_20 - 1)
                                         }
 
@@ -32633,11 +31102,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     continue
                                 }
 
-                                var __ci_expr_old_404: c_int = new_count__goto_548_19
+                                var __ci_expr_old_375: c_int = new_count__goto_548_19
 
                                 (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                if ((if __ci_expr_old_404 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_375 < wscount: 1 else: 0) != 0) {
                                     (next_new_state__goto_543_33.offset = 0 - next_state_offset__goto_3103_15)
 
                                     if (__goto_pending != 0) {
@@ -32790,23 +31259,23 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 continue
                             }
 
-                            var __ci_expr_ternary_406: c_int = 0
+                            var __ci_expr_ternary_377: c_int = 0
 
-                            var __ci_expr_logic_405: c_int
+                            var __ci_expr_logic_376: c_int
 
                             if ((if (unsafe: *end_subpattern__goto_3170_22) == OP_KETRMAX: 1 else: 0) != 0) {
-                                (__ci_expr_logic_405 = (if true: 1 else: 0))
+                                (__ci_expr_logic_376 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_405 = (if (if (unsafe: *end_subpattern__goto_3170_22) == OP_KETRMIN: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_376 = (if (if (unsafe: *end_subpattern__goto_3170_22) == OP_KETRMIN: 1 else: 0) != 0: 1 else: 0))
                             }
 
-                            if (__ci_expr_logic_405 != 0) {
-                                (__ci_expr_ternary_406 = ((((((end_subpattern__goto_3170_22 as usize) -% (start_code__goto_555_12 as usize)) / sizeof[u8]()) - (((((unsafe: end_subpattern__goto_3170_22[1]) as c_int) << (8 as c_uint)) | (unsafe: end_subpattern__goto_3170_22[(1 + 1)])) as c_uint)) as c_int)))
+                            if (__ci_expr_logic_376 != 0) {
+                                (__ci_expr_ternary_377 = ((((((end_subpattern__goto_3170_22 as usize) -% (start_code__goto_555_12 as usize)) / sizeof[u8]()) - (((((unsafe: end_subpattern__goto_3170_22[1]) as c_int) << (8 as c_uint)) | (unsafe: end_subpattern__goto_3170_22[(1 + 1)])) as c_uint)) as c_int)))
                             } else {
-                                (__ci_expr_ternary_406 = -1)
+                                (__ci_expr_ternary_377 = -1)
                             }
 
-                            (repeat_state_offset__goto_3172_34 = __ci_expr_ternary_406)
+                            (repeat_state_offset__goto_3172_34 = __ci_expr_ternary_377)
 
 
                             if (__goto_pending != 0) {
@@ -32814,11 +31283,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if ((if charcount__goto_3171_22 == 0: 1 else: 0) != 0) {
-                                var __ci_expr_old_407: c_int = active_count__goto_548_5
+                                var __ci_expr_old_378: c_int = active_count__goto_548_5
 
                                 (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                                if ((if __ci_expr_old_407 < wscount: 1 else: 0) != 0) {
+                                if ((if __ci_expr_old_378 < wscount: 1 else: 0) != 0) {
                                     (next_active_state__goto_543_13.offset = next_state_offset__goto_3172_15)
 
                                     if (__goto_pending != 0) {
@@ -32847,13 +31316,13 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 }
 
                             } else {
-                                var __ci_expr_logic_408: c_int = 0
+                                var __ci_expr_logic_379: c_int = 0
 
                                 if ((if (i__goto_701_7 + 1) >= active_count__goto_548_5: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_408 = (if (if new_count__goto_548_19 == 0: 1 else: 0) != 0: 1 else: 0))
+                                    (__ci_expr_logic_379 = (if (if new_count__goto_548_19 == 0: 1 else: 0) != 0: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_408 != 0) {
+                                if (__ci_expr_logic_379 != 0) {
                                     (ptr__goto_545_12 = ptr__goto_545_12 + charcount__goto_3171_22)
 
                                     if (__goto_pending != 0) {
@@ -32866,11 +31335,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         continue
                                     }
 
-                                    var __ci_expr_old_409: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_380: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_409 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_380 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = next_state_offset__goto_3172_15)
 
                                         if (__goto_pending != 0) {
@@ -32917,11 +31386,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                             continue
                                         }
 
-                                        var __ci_expr_old_410: c_int = active_count__goto_548_5
+                                        var __ci_expr_old_381: c_int = active_count__goto_548_5
 
                                         (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                                        if ((if __ci_expr_old_410 < wscount: 1 else: 0) != 0) {
+                                        if ((if __ci_expr_old_381 < wscount: 1 else: 0) != 0) {
                                             (next_active_state__goto_543_13.offset = repeat_state_offset__goto_3172_34)
 
                                             if (__goto_pending != 0) {
@@ -32970,11 +31439,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         }
 
                                         while ((if p__goto_3226_26 < pp__goto_3227_26: 1 else: 0) != 0) {
-                                            var __ci_expr_old_411: *const u8 = p__goto_3226_26
+                                            var __ci_expr_old_382: *const u8 = p__goto_3226_26
 
                                             (p__goto_3226_26 = p__goto_3226_26 + 1)
 
-                                            if ((if ((unsafe: *__ci_expr_old_411) & 192) == 128: 1 else: 0) != 0) {
+                                            if ((if ((unsafe: *__ci_expr_old_382) & 192) == 128: 1 else: 0) != 0) {
                                                 (charcount__goto_3171_22 = charcount__goto_3171_22 - 1)
                                             }
 
@@ -32994,11 +31463,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         continue
                                     }
 
-                                    var __ci_expr_old_412: c_int = new_count__goto_548_19
+                                    var __ci_expr_old_383: c_int = new_count__goto_548_19
 
                                     (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                    if ((if __ci_expr_old_412 < wscount: 1 else: 0) != 0) {
+                                    if ((if __ci_expr_old_383 < wscount: 1 else: 0) != 0) {
                                         (next_new_state__goto_543_33.offset = 0 - next_state_offset__goto_3172_15)
 
                                         if (__goto_pending != 0) {
@@ -33033,11 +31502,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     }
 
                                     if ((if repeat_state_offset__goto_3172_34 >= 0: 1 else: 0) != 0) {
-                                        var __ci_expr_old_413: c_int = new_count__goto_548_19
+                                        var __ci_expr_old_384: c_int = new_count__goto_548_19
 
                                         (new_count__goto_548_19 = new_count__goto_548_19 + 1)
 
-                                        if ((if __ci_expr_old_413 < wscount: 1 else: 0) != 0) {
+                                        if ((if __ci_expr_old_384 < wscount: 1 else: 0) != 0) {
                                             (next_new_state__goto_543_33.offset = 0 - repeat_state_offset__goto_3172_34)
 
                                             if (__goto_pending != 0) {
@@ -33112,11 +31581,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         }
 
                         if ((if rrc__goto_758_9 == 0: 1 else: 0) != 0) {
-                            var __ci_expr_old_414: c_int = active_count__goto_548_5
+                            var __ci_expr_old_385: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_414 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_385 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = state_offset__goto_757_9 + (callout_length__goto_3247_20 as c_int))
 
                                 if (__goto_pending != 0) {
@@ -33167,11 +31636,11 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                         }
 
                         if ((if rrc__goto_758_9 == 0: 1 else: 0) != 0) {
-                            var __ci_expr_old_414: c_int = active_count__goto_548_5
+                            var __ci_expr_old_385: c_int = active_count__goto_548_5
 
                             (active_count__goto_548_5 = active_count__goto_548_5 + 1)
 
-                            if ((if __ci_expr_old_414 < wscount: 1 else: 0) != 0) {
+                            if ((if __ci_expr_old_385 < wscount: 1 else: 0) != 0) {
                                 (next_active_state__goto_543_13.offset = state_offset__goto_757_9 + (callout_length__goto_3247_20 as c_int))
 
                                 if (__goto_pending != 0) {
@@ -33237,6 +31706,39 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
             15 => {  // __if_then
                 (__goto_pending = 0)
                 (ncount__goto_1590_13 = 0)
+                match c__goto_703_12 {
+                    11 => {
+                        if ((if mb.bsr_convention == 2: 1 else: 0) != 0) {
+                            break
+                        }
+
+                        __pc = 1
+                        __goto_pending = 1
+
+                    },
+                    13 => {
+                        var __ci_expr_logic_255: c_int = 0
+
+                        if ((if (ptr__goto_545_12 + ((1 as isize) as usize)) < end_subject__goto_554_12: 1 else: 0) != 0) {
+                            (__ci_expr_logic_255 = (if (if (unsafe: ptr__goto_545_12[1]) == 10: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_255 != 0) {
+                            (ncount__goto_1590_13 = 1)
+                        }
+
+
+                        __pc = 1
+                        __goto_pending = 1
+
+                        continue
+
+
+                    },
+                }
+                if (__goto_pending != 0) {
+                    continue
+                }
                 __pc = 16
                 __goto_pending = 1
                 continue
@@ -33255,9 +31757,9 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
             },
             2 => {  // QS1
                 (__goto_pending = 0)
-                var __ci_expr_old_263: c_int = active_count__goto_548_5
+                var __ci_expr_old_386: c_int = active_count__goto_548_5
                 (active_count__goto_548_5 = active_count__goto_548_5 + 1)
-                if ((if __ci_expr_old_263 < wscount: 1 else: 0) != 0) {
+                if ((if __ci_expr_old_386 < wscount: 1 else: 0) != 0) {
                     (next_active_state__goto_543_13.offset = state_offset__goto_757_9 + 4)
                     if (__goto_pending != 0) {
                         continue
@@ -33282,9 +31784,9 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
             },
             3 => {  // QS2
                 (__goto_pending = 0)
-                var __ci_expr_old_279: c_int = active_count__goto_548_5
+                var __ci_expr_old_387: c_int = active_count__goto_548_5
                 (active_count__goto_548_5 = active_count__goto_548_5 + 1)
-                if ((if __ci_expr_old_279 < wscount: 1 else: 0) != 0) {
+                if ((if __ci_expr_old_387 < wscount: 1 else: 0) != 0) {
                     (next_active_state__goto_543_13.offset = state_offset__goto_757_9 + 2)
                     if (__goto_pending != 0) {
                         continue
@@ -33309,9 +31811,9 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
             },
             4 => {  // QS3
                 (__goto_pending = 0)
-                var __ci_expr_old_282: c_int = active_count__goto_548_5
+                var __ci_expr_old_388: c_int = active_count__goto_548_5
                 (active_count__goto_548_5 = active_count__goto_548_5 + 1)
-                if ((if __ci_expr_old_282 < wscount: 1 else: 0) != 0) {
+                if ((if __ci_expr_old_388 < wscount: 1 else: 0) != 0) {
                     (next_active_state__goto_543_13.offset = state_offset__goto_757_9 + 2)
                     if (__goto_pending != 0) {
                         continue
@@ -33348,6 +31850,39 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
             18 => {  // __if_then
                 (__goto_pending = 0)
                 (ncount__goto_1868_13 = 0)
+                match c__goto_703_12 {
+                    11 => {
+                        if ((if mb.bsr_convention == 2: 1 else: 0) != 0) {
+                            break
+                        }
+
+                        __pc = 5
+                        __goto_pending = 1
+
+                    },
+                    13 => {
+                        var __ci_expr_logic_389: c_int = 0
+
+                        if ((if (ptr__goto_545_12 + ((1 as isize) as usize)) < end_subject__goto_554_12: 1 else: 0) != 0) {
+                            (__ci_expr_logic_389 = (if (if (unsafe: ptr__goto_545_12[1]) == 10: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_389 != 0) {
+                            (ncount__goto_1868_13 = 1)
+                        }
+
+
+                        __pc = 5
+                        __goto_pending = 1
+
+                        continue
+
+
+                    },
+                }
+                if (__goto_pending != 0) {
+                    continue
+                }
                 __pc = 19
                 __goto_pending = 1
                 continue
@@ -33366,9 +31901,9 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
             },
             6 => {  // QS4
                 (__goto_pending = 0)
-                var __ci_expr_old_285: c_int = active_count__goto_548_5
+                var __ci_expr_old_390: c_int = active_count__goto_548_5
                 (active_count__goto_548_5 = active_count__goto_548_5 + 1)
-                if ((if __ci_expr_old_285 < wscount: 1 else: 0) != 0) {
+                if ((if __ci_expr_old_390 < wscount: 1 else: 0) != 0) {
                     (next_active_state__goto_543_13.offset = state_offset__goto_757_9 + 2)
                     if (__goto_pending != 0) {
                         continue
@@ -33393,9 +31928,9 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
             },
             7 => {  // QS5
                 (__goto_pending = 0)
-                var __ci_expr_old_288: c_int = active_count__goto_548_5
+                var __ci_expr_old_391: c_int = active_count__goto_548_5
                 (active_count__goto_548_5 = active_count__goto_548_5 + 1)
-                if ((if __ci_expr_old_288 < wscount: 1 else: 0) != 0) {
+                if ((if __ci_expr_old_391 < wscount: 1 else: 0) != 0) {
                     (next_active_state__goto_543_13.offset = state_offset__goto_757_9 + 2)
                     if (__goto_pending != 0) {
                         continue
@@ -33432,6 +31967,39 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
             21 => {  // __if_then
                 (__goto_pending = 0)
                 (ncount__goto_2149_13 = 0)
+                match c__goto_703_12 {
+                    11 => {
+                        if ((if mb.bsr_convention == 2: 1 else: 0) != 0) {
+                            break
+                        }
+
+                        __pc = 8
+                        __goto_pending = 1
+
+                    },
+                    13 => {
+                        var __ci_expr_logic_283: c_int = 0
+
+                        if ((if (ptr__goto_545_12 + ((1 as isize) as usize)) < end_subject__goto_554_12: 1 else: 0) != 0) {
+                            (__ci_expr_logic_283 = (if (if (unsafe: ptr__goto_545_12[1]) == 10: 1 else: 0) != 0: 1 else: 0))
+                        }
+
+                        if (__ci_expr_logic_283 != 0) {
+                            (ncount__goto_2149_13 = 1)
+                        }
+
+
+                        __pc = 8
+                        __goto_pending = 1
+
+                        continue
+
+
+                    },
+                }
+                if (__goto_pending != 0) {
+                    continue
+                }
                 __pc = 22
                 __goto_pending = 1
                 continue
@@ -33474,41 +32042,41 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
             12 => {  // __after_loop
                 (__goto_pending = 0)
                 if ((if new_count__goto_548_19 <= 0: 1 else: 0) != 0) {
-                    var __ci_expr_logic_421: c_int = 0
-                    var __ci_expr_logic_417: c_int = 0
+                    var __ci_expr_logic_398: c_int = 0
+                    var __ci_expr_logic_394: c_int = 0
                     if (could_continue__goto_705_8 != 0) {
-                        var __ci_expr_logic_416: c_int
+                        var __ci_expr_logic_393: c_int
                         if ((if (mb.moptions & 32) != 0: 1 else: 0) != 0) {
-                            (__ci_expr_logic_416 = (if true: 1 else: 0))
+                            (__ci_expr_logic_393 = (if true: 1 else: 0))
                         } else {
-                            var __ci_expr_logic_415: c_int = 0
+                            var __ci_expr_logic_392: c_int = 0
                             if ((if (mb.moptions & 16) != 0: 1 else: 0) != 0) {
-                                (__ci_expr_logic_415 = (if (if match_count__goto_548_30 < 0: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_392 = (if (if match_count__goto_548_30 < 0: 1 else: 0) != 0: 1 else: 0))
                             }
-                            (__ci_expr_logic_416 = (if __ci_expr_logic_415 != 0: 1 else: 0))
+                            (__ci_expr_logic_393 = (if __ci_expr_logic_392 != 0: 1 else: 0))
                         }
-                        (__ci_expr_logic_417 = (if __ci_expr_logic_416 != 0: 1 else: 0))
+                        (__ci_expr_logic_394 = (if __ci_expr_logic_393 != 0: 1 else: 0))
                     }
-                    if (__ci_expr_logic_417 != 0) {
-                        var __ci_expr_logic_420: c_int
+                    if (__ci_expr_logic_394 != 0) {
+                        var __ci_expr_logic_397: c_int
                         if (partial_newline__goto_704_8 != 0) {
-                            (__ci_expr_logic_420 = (if true: 1 else: 0))
+                            (__ci_expr_logic_397 = (if true: 1 else: 0))
                         } else {
-                            var __ci_expr_logic_419: c_int = 0
+                            var __ci_expr_logic_396: c_int = 0
                             if ((if ptr__goto_545_12 >= end_subject__goto_554_12: 1 else: 0) != 0) {
-                                var __ci_expr_logic_418: c_int
+                                var __ci_expr_logic_395: c_int
                                 if ((if ptr__goto_545_12 > mb.start_used_ptr: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_418 = (if true: 1 else: 0))
+                                    (__ci_expr_logic_395 = (if true: 1 else: 0))
                                 } else {
-                                    (__ci_expr_logic_418 = (if mb.allowemptypartial != 0: 1 else: 0))
+                                    (__ci_expr_logic_395 = (if mb.allowemptypartial != 0: 1 else: 0))
                                 }
-                                (__ci_expr_logic_419 = (if __ci_expr_logic_418 != 0: 1 else: 0))
+                                (__ci_expr_logic_396 = (if __ci_expr_logic_395 != 0: 1 else: 0))
                             }
-                            (__ci_expr_logic_420 = (if __ci_expr_logic_419 != 0: 1 else: 0))
+                            (__ci_expr_logic_397 = (if __ci_expr_logic_396 != 0: 1 else: 0))
                         }
-                        (__ci_expr_logic_421 = (if __ci_expr_logic_420 != 0: 1 else: 0))
+                        (__ci_expr_logic_398 = (if __ci_expr_logic_397 != 0: 1 else: 0))
                     }
-                    if (__ci_expr_logic_421 != 0) {
+                    if (__ci_expr_logic_398 != 0) {
                         (match_count__goto_548_30 = -2)
                     }
                     if (__goto_pending != 0) {
@@ -33526,15 +32094,15 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                 __pc = 10
                 __goto_pending = 1
                 continue
-                var __ci_expr_logic_423: c_int = 0
-                var __ci_expr_logic_422: c_int = 0
+                var __ci_expr_logic_400: c_int = 0
+                var __ci_expr_logic_399: c_int = 0
                 if ((if match_count__goto_548_30 >= 0: 1 else: 0) != 0) {
-                    (__ci_expr_logic_422 = (if (if ((mb.moptions | mb.poptions) & 536870912) != 0: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_399 = (if (if ((mb.moptions | mb.poptions) & 536870912) != 0: 1 else: 0) != 0: 1 else: 0))
                 }
-                if (__ci_expr_logic_422 != 0) {
-                    (__ci_expr_logic_423 = (if (if ptr__goto_545_12 < end_subject__goto_554_12: 1 else: 0) != 0: 1 else: 0))
+                if (__ci_expr_logic_399 != 0) {
+                    (__ci_expr_logic_400 = (if (if ptr__goto_545_12 < end_subject__goto_554_12: 1 else: 0) != 0: 1 else: 0))
                 }
-                if (__ci_expr_logic_423 != 0) {
+                if (__ci_expr_logic_400 != 0) {
                     (match_count__goto_548_30 = -1)
                 }
                 if (__goto_pending != 0) {
@@ -33551,3 +32119,8 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
         }
     }
 }
+
+let coptable: [173]u8 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, (1 + 2), (1 + 2), (1 + 2), 1, 1, 1, (1 + 2), 1, 1, 1, 1, 1, 1, (1 + 2), (1 + 2), (1 + 2), 1, 1, 1, (1 + 2), 1, 1, 1, 1, 1, 1, (1 + 2), (1 + 2), (1 + 2), 1, 1, 1, (1 + 2), 1, 1, 1, 1, 1, 1, (1 + 2), (1 + 2), (1 + 2), 1, 1, 1, (1 + 2), 1, 1, 1, 1, 1, 1, (1 + 2), (1 + 2), (1 + 2), 1, 1, 1, (1 + 2), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+let poptable: [173]u8 = [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1]
+let toptable1: [14]u8 = [0, 0, 0, 0, 0, 0, 0x08, 0x08, 0x01, 0x01, 0x10, 0x10, 0, 0]
+let toptable2: [14]u8 = [0, 0, 0, 0, 0, 0, 0x08, 0, 0x01, 0, 0x10, 0, 1, 1]

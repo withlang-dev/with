@@ -80,7 +80,13 @@ fn do_bumpalong(match_data: *mut pcre2_real_match_data_8, offset: c_ulong) -> c_
 
     if (__ci_expr_logic_1 != 0) {
         match match_data.code.newline_convention {
-            3 | 4 | 5 => {
+            3 => {
+                return (offset +% 2)
+            },
+            4 => {
+                return (offset +% 2)
+            },
+            5 => {
                 return (offset +% 2)
             },
         }

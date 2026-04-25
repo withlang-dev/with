@@ -125,128 +125,149 @@ fn _pcre2_script_run_8(__param_ptr: *const u8, endptr: *const u8, utf: c_int) ->
             }
 
 
-            match require_state {
-                0 => {
-                    match script {
-                        30 => {
-                            (require_state = 2)
-                        },
-                        27 | 28 => {
-                            (require_state = 3)
-                        },
-                        29 => {
-                            (require_state = 4)
-                        },
-                        22 => {
-                            (require_state = 5)
-                        },
-                        _ => {
-                            with_memcpy(((&require_map[0] as *mut c_uint) as *i8), ((&map[0] as *mut c_uint) as *i8), ((6 *% sizeof[c_uint]()) as i64))
+            while true {
+                match require_state {
+                    0 => {
+                        while true {
+                            match script {
+                                30 => {
+                                    (require_state = 2)
+                                },
+                                27 => {
+                                    (require_state = 3)
+                                },
+                                28 => {
+                                    (require_state = 3)
+                                },
+                                29 => {
+                                    (require_state = 4)
+                                },
+                                22 => {
+                                    (require_state = 5)
+                                },
+                                _ => {
+                                    with_memcpy(((&require_map[0] as *mut c_uint) as *i8), ((&map[0] as *mut c_uint) as *i8), ((6 *% sizeof[c_uint]()) as i64))
 
-                            (require_state = 1)
+                                    (require_state = 1)
 
-                        },
-                    }
-                },
-                2 => {
-                    if ((if script != 30: 1 else: 0) != 0) {
-                        var chspecial: c_uint = 0
+                                },
+                            }
 
-                        if ((if (map[(ucp_Bopomofo / 32)] & ((1 as c_uint) << ((ucp_Bopomofo % 32) as c_uint))) != 0: 1 else: 0) != 0) {
-                            (chspecial = chspecial | 1)
+                            break
+
+                        }
+                    },
+                    2 => {
+                        if ((if script != 30: 1 else: 0) != 0) {
+                            var chspecial: c_uint = 0
+
+                            if ((if (map[(ucp_Bopomofo / 32)] & ((1 as c_uint) << ((ucp_Bopomofo % 32) as c_uint))) != 0: 1 else: 0) != 0) {
+                                (chspecial = chspecial | 1)
+                            }
+
+                            if ((if (map[(ucp_Hiragana / 32)] & ((1 as c_uint) << ((ucp_Hiragana % 32) as c_uint))) != 0: 1 else: 0) != 0) {
+                                (chspecial = chspecial | 2)
+                            }
+
+                            if ((if (map[(ucp_Katakana / 32)] & ((1 as c_uint) << ((ucp_Katakana % 32) as c_uint))) != 0: 1 else: 0) != 0) {
+                                (chspecial = chspecial | 4)
+                            }
+
+                            if ((if (map[(ucp_Hangul / 32)] & ((1 as c_uint) << ((ucp_Hangul % 32) as c_uint))) != 0: 1 else: 0) != 0) {
+                                (chspecial = chspecial | 8)
+                            }
+
+                            if ((if chspecial == 0: 1 else: 0) != 0) {
+                                return 0
+                            }
+
+                            if ((if chspecial == 1: 1 else: 0) != 0) {
+                                (require_state = 4)
+                            } else {
+                                if ((if chspecial == 6: 1 else: 0) != 0) {
+                                    (require_state = 3)
+                                }
+                            }
+
+                        }
+                    },
+                    3 => {
+                        if ((if (((map[(ucp_Han / 32)] & ((1 as c_uint) << ((ucp_Han % 32) as c_uint))) +% (map[(ucp_Hiragana / 32)] & ((1 as c_uint) << ((ucp_Hiragana % 32) as c_uint)))) +% (map[(ucp_Katakana / 32)] & ((1 as c_uint) << ((ucp_Katakana % 32) as c_uint)))) == 0: 1 else: 0) != 0) {
+                            return 0
+                        }
+                    },
+                    4 => {
+                        if ((if ((map[(ucp_Han / 32)] & ((1 as c_uint) << ((ucp_Han % 32) as c_uint))) +% (map[(ucp_Bopomofo / 32)] & ((1 as c_uint) << ((ucp_Bopomofo % 32) as c_uint)))) == 0: 1 else: 0) != 0) {
+                            return 0
+                        }
+                    },
+                    5 => {
+                        if ((if ((map[(ucp_Han / 32)] & ((1 as c_uint) << ((ucp_Han % 32) as c_uint))) +% (map[(ucp_Hangul / 32)] & ((1 as c_uint) << ((ucp_Hangul % 32) as c_uint)))) == 0: 1 else: 0) != 0) {
+                            return 0
+                        }
+                    },
+                    1 => {
+                        (OK = 0)
+
+                        var i_1: c_int = 0
+
+                        while ((if i_1 < ((ucp_Script_Count / 32) + 1): 1 else: 0) != 0) {
+                            if ((if (require_map[i_1] & map[i_1]) != 0: 1 else: 0) != 0) {
+                                (OK = 1)
+
+                                break
+
+                            }
+
+
+                            (i_1 = i_1 + 1)
+
                         }
 
-                        if ((if (map[(ucp_Hiragana / 32)] & ((1 as c_uint) << ((ucp_Hiragana % 32) as c_uint))) != 0: 1 else: 0) != 0) {
-                            (chspecial = chspecial | 2)
-                        }
 
-                        if ((if (map[(ucp_Katakana / 32)] & ((1 as c_uint) << ((ucp_Katakana % 32) as c_uint))) != 0: 1 else: 0) != 0) {
-                            (chspecial = chspecial | 4)
-                        }
-
-                        if ((if (map[(ucp_Hangul / 32)] & ((1 as c_uint) << ((ucp_Hangul % 32) as c_uint))) != 0: 1 else: 0) != 0) {
-                            (chspecial = chspecial | 8)
-                        }
-
-                        if ((if chspecial == 0: 1 else: 0) != 0) {
+                        if ((if not (OK != 0): 1 else: 0) != 0) {
                             return 0
                         }
 
-                        if ((if chspecial == 1: 1 else: 0) != 0) {
-                            (require_state = 4)
-                        } else {
-                            if ((if chspecial == 6: 1 else: 0) != 0) {
-                                (require_state = 3)
+                        while true {
+                            match script {
+                                30 => {
+                                    (require_state = 2)
+                                },
+                                27 => {
+                                    (require_state = 3)
+                                },
+                                28 => {
+                                    (require_state = 3)
+                                },
+                                29 => {
+                                    (require_state = 4)
+                                },
+                                22 => {
+                                    (require_state = 5)
+                                },
+                                _ => {
+                                    var i_2: c_int = 0
+
+                                    while ((if i_2 < ((ucp_Script_Count / 32) + 1): 1 else: 0) != 0) {
+                                        (require_map[i_2] = require_map[i_2] & map[i_2])
+
+                                        (i_2 = i_2 + 1)
+
+                                    }
+
+                                },
                             }
-                        }
-
-                    }
-                },
-                3 => {
-                    if ((if (((map[(ucp_Han / 32)] & ((1 as c_uint) << ((ucp_Han % 32) as c_uint))) +% (map[(ucp_Hiragana / 32)] & ((1 as c_uint) << ((ucp_Hiragana % 32) as c_uint)))) +% (map[(ucp_Katakana / 32)] & ((1 as c_uint) << ((ucp_Katakana % 32) as c_uint)))) == 0: 1 else: 0) != 0) {
-                        return 0
-                    }
-                },
-                4 => {
-                    if ((if ((map[(ucp_Han / 32)] & ((1 as c_uint) << ((ucp_Han % 32) as c_uint))) +% (map[(ucp_Bopomofo / 32)] & ((1 as c_uint) << ((ucp_Bopomofo % 32) as c_uint)))) == 0: 1 else: 0) != 0) {
-                        return 0
-                    }
-                },
-                5 => {
-                    if ((if ((map[(ucp_Han / 32)] & ((1 as c_uint) << ((ucp_Han % 32) as c_uint))) +% (map[(ucp_Hangul / 32)] & ((1 as c_uint) << ((ucp_Hangul % 32) as c_uint)))) == 0: 1 else: 0) != 0) {
-                        return 0
-                    }
-                },
-                1 => {
-                    (OK = 0)
-
-                    var i_1: c_int = 0
-
-                    while ((if i_1 < ((ucp_Script_Count / 32) + 1): 1 else: 0) != 0) {
-                        if ((if (require_map[i_1] & map[i_1]) != 0: 1 else: 0) != 0) {
-                            (OK = 1)
 
                             break
 
                         }
 
+                    },
+                }
 
-                        (i_1 = i_1 + 1)
+                break
 
-                    }
-
-
-                    if ((if not (OK != 0): 1 else: 0) != 0) {
-                        return 0
-                    }
-
-                    match script {
-                        30 => {
-                            (require_state = 2)
-                        },
-                        27 | 28 => {
-                            (require_state = 3)
-                        },
-                        29 => {
-                            (require_state = 4)
-                        },
-                        22 => {
-                            (require_state = 5)
-                        },
-                        _ => {
-                            var i_2: c_int = 0
-
-                            while ((if i_2 < ((ucp_Script_Count / 32) + 1): 1 else: 0) != 0) {
-                                (require_map[i_2] = require_map[i_2] & map[i_2])
-
-                                (i_2 = i_2 + 1)
-
-                            }
-
-                        },
-                    }
-
-                },
             }
 
         }
@@ -298,26 +319,26 @@ fn _pcre2_script_run_8(__param_ptr: *const u8, endptr: *const u8, utf: c_int) ->
             return 1
         }
 
-        var __ci_expr_old_6: *const u8 = ptr
+        var __ci_expr_old_9: *const u8 = ptr
 
         (ptr = ptr + 1)
 
-        (c = (unsafe: *__ci_expr_old_6))
+        (c = (unsafe: *__ci_expr_old_9))
 
 
-        var __ci_expr_logic_7: c_int = 0
+        var __ci_expr_logic_10: c_int = 0
 
         if (utf != 0) {
-            (__ci_expr_logic_7 = (if (if c >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_10 = (if (if c >= 192: 1 else: 0) != 0: 1 else: 0))
         }
 
-        if (__ci_expr_logic_7 != 0) {
+        if (__ci_expr_logic_10 != 0) {
             if ((if (c & 32) == 0: 1 else: 0) != 0) {
-                var __ci_expr_old_8: *const u8 = ptr
+                var __ci_expr_old_11: *const u8 = ptr
 
                 (ptr = ptr + 1)
 
-                (c = (((c & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_8) & 63))
+                (c = (((c & 31) as c_uint) << (6 as c_uint)) | ((unsafe: *__ci_expr_old_11) & 63))
 
             } else {
                 if ((if (c & 16) == 0: 1 else: 0) != 0) {

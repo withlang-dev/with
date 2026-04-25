@@ -89,12 +89,16 @@ fn pcre2_compile_context_free_8(ccontext: *mut pcre2_real_compile_context_8) {
 
 fn pcre2_set_bsr_8(ccontext: *mut pcre2_real_compile_context_8, value: c_uint) -> c_int {
     match value {
-        2 | 1 => {
+        2 => {
             (ccontext.bsr_convention = value)
 
             return 0
 
-            return -29
+        },
+        1 => {
+            (ccontext.bsr_convention = value)
+
+            return 0
 
         },
         _ => {
@@ -141,12 +145,40 @@ fn pcre2_set_max_varlookbehind_8(ccontext: *mut pcre2_real_compile_context_8, li
 
 fn pcre2_set_newline_8(ccontext: *mut pcre2_real_compile_context_8, newline: c_uint) -> c_int {
     match newline {
-        1 | 2 | 3 | 4 | 5 | 6 => {
+        1 => {
             (ccontext.newline_convention = newline)
 
             return 0
 
-            return -29
+        },
+        2 => {
+            (ccontext.newline_convention = newline)
+
+            return 0
+
+        },
+        3 => {
+            (ccontext.newline_convention = newline)
+
+            return 0
+
+        },
+        4 => {
+            (ccontext.newline_convention = newline)
+
+            return 0
+
+        },
+        5 => {
+            (ccontext.newline_convention = newline)
+
+            return 0
+
+        },
+        6 => {
+            (ccontext.newline_convention = newline)
+
+            return 0
 
         },
         _ => {
@@ -177,35 +209,40 @@ fn pcre2_set_optimize_8(ccontext: *mut pcre2_real_compile_context_8, directive: 
         return -51
     }
 
-    match directive {
-        0 => {
-            (ccontext.optimization_flags = 0)
-        },
-        1 => {
-            (ccontext.optimization_flags = 7)
-        },
-        _ => {
-            var __ci_expr_logic_0: c_int = 0
+    while true {
+        match directive {
+            0 => {
+                (ccontext.optimization_flags = 0)
+            },
+            1 => {
+                (ccontext.optimization_flags = 7)
+            },
+            _ => {
+                var __ci_expr_logic_0: c_int = 0
 
-            if ((if directive >= 64: 1 else: 0) != 0) {
-                (__ci_expr_logic_0 = (if (if directive <= 69: 1 else: 0) != 0: 1 else: 0))
-            }
-
-            if (__ci_expr_logic_0 != 0) {
-                if ((if (directive & 1) != 0: 1 else: 0) != 0) {
-                    (ccontext.optimization_flags = ccontext.optimization_flags & (~((1 as c_uint) << ((((directive as c_uint) >> (1 as c_uint)) -% 32) as c_uint))))
-                } else {
-                    (ccontext.optimization_flags = ccontext.optimization_flags | ((1 as c_uint) << ((((directive as c_uint) >> (1 as c_uint)) -% 32) as c_uint)))
+                if ((if directive >= 64: 1 else: 0) != 0) {
+                    (__ci_expr_logic_0 = (if (if directive <= 69: 1 else: 0) != 0: 1 else: 0))
                 }
 
-                return 0
+                if (__ci_expr_logic_0 != 0) {
+                    if ((if (directive & 1) != 0: 1 else: 0) != 0) {
+                        (ccontext.optimization_flags = ccontext.optimization_flags & (~((1 as c_uint) << ((((directive as c_uint) >> (1 as c_uint)) -% 32) as c_uint))))
+                    } else {
+                        (ccontext.optimization_flags = ccontext.optimization_flags | ((1 as c_uint) << ((((directive as c_uint) >> (1 as c_uint)) -% 32) as c_uint)))
+                    }
 
-            }
+                    return 0
+
+                }
 
 
-            return -34
+                return -34
 
-        },
+            },
+        }
+
+        break
+
     }
 
     return 0
@@ -457,3 +494,5 @@ fn default_free(block: *mut c_void, data: *mut c_void) {
     with_free((block as *mut i8))
 
 }
+
+var globpunct: *const i8 = "\x21\x22\x23\x24\x25\x26\x27\x28\x29\x2a\x2b\x2c\x2d\x2e\x2f\x3a\x3b\x3c\x3d\x3e\x3f\x40\x5b\x5c\x5d\x5e\x5f\x60\x7b\x7c\x7d\x7e"
