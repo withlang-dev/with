@@ -2456,6 +2456,152 @@ EOF
   echo "PASS(cli-selfhost-migrate) goto_loop_conditions"
 }
 
+expect_migrate_goto_loop_continue_state() {
+  local case_dir="$tmpdir/migrate_goto_loop_continue_state_case"
+  local src="$case_dir/goto_loop_continue_state.c"
+  local out_w="$case_dir/goto_loop_continue_state.w"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+int lifted_continue(int n) {
+  int i = 0;
+  int acc = 0;
+  while (i < n) {
+    i++;
+    if (i == 2) goto MARK;
+    if (i == 3) continue;
+    acc += 10;
+MARK:
+    if (i == 4) continue;
+    acc += i;
+  }
+  return acc;
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) goto_loop_continue_state"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! python3 - "$out_w" <<'PY'
+from __future__ import annotations
+
+import re
+import sys
+from pathlib import Path
+
+text = Path(sys.argv[1]).read_text()
+if "match __pc {" not in text:
+    raise SystemExit(1)
+if "__loop_top" not in text and "__while_top" not in text:
+    raise SystemExit(1)
+if any(re.match(r"^\s*(fn|if|else|while|for|match)\b.*:\s*$", line) for line in text.splitlines()):
+    raise SystemExit(1)
+PY
+  then
+    echo "FAIL(cli-selfhost-migrate-output) goto_loop_continue_state"
+    sed -n '1,220p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  cat >>"$out_w" <<'EOF'
+
+fn main() -> i32 {
+    if lifted_continue(5) != 38 { return 1 }
+    0
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" run "$out_w"; then
+    echo "FAIL(cli-selfhost-run) goto_loop_continue_state"
+    cat "$tmpdir/err" || true
+    sed -n '1,260p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) goto_loop_continue_state"
+}
+
+expect_migrate_goto_after_if_label_bridge() {
+  local case_dir="$tmpdir/migrate_goto_after_if_label_bridge_case"
+  local src="$case_dir/goto_after_if_label_bridge.c"
+  local out_w="$case_dir/goto_after_if_label_bridge.w"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+int after_if_label_bridge(int n) {
+  int out = 0;
+  while (n < 3) {
+    n++;
+    if (n == 99) goto INNER;
+    if (n == 1) {
+INNER:
+      out += 10;
+    } else if (n == 2) {
+      out += 20;
+    } else {
+      out += 30;
+    }
+AFTER:
+    out += 1;
+  }
+  return out;
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) goto_after_if_label_bridge"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! python3 - "$out_w" <<'PY'
+from __future__ import annotations
+
+import re
+import sys
+from pathlib import Path
+
+text = Path(sys.argv[1]).read_text()
+if "match __pc {" not in text:
+    raise SystemExit(1)
+if "__after_if" not in text:
+    raise SystemExit(1)
+if any(re.match(r"^\s*(fn|if|else|while|for|match)\b.*:\s*$", line) for line in text.splitlines()):
+    raise SystemExit(1)
+PY
+  then
+    echo "FAIL(cli-selfhost-migrate-output) goto_after_if_label_bridge"
+    sed -n '1,260p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  cat >>"$out_w" <<'EOF'
+
+fn main() -> i32 {
+    if after_if_label_bridge(0) != 63 { return 1 }
+    0
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" run "$out_w"; then
+    echo "FAIL(cli-selfhost-run) goto_after_if_label_bridge"
+    cat "$tmpdir/err" || true
+    sed -n '1,320p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) goto_after_if_label_bridge"
+}
+
 expect_migrate_switch_macro_goto_terminators() {
   local case_dir="$tmpdir/migrate_switch_macro_goto_case"
   local src="$case_dir/switch_macro_goto.c"
@@ -3345,6 +3491,8 @@ expect_migrate_goto_shadowed_local
 expect_migrate_goto_label_preserves_block_scope
 expect_migrate_goto_switch_label_tail
 expect_migrate_goto_loop_conditions
+expect_migrate_goto_loop_continue_state
+expect_migrate_goto_after_if_label_bridge
 expect_migrate_switch_macro_goto_terminators
 expect_migrate_statement_macro_spelling_text
 expect_migrate_recursive_anonymous_records
