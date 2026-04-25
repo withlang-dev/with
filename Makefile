@@ -300,7 +300,17 @@ __seed:
 	fi; \
 	tag="$(SEED_VERSION)"; \
 	if [ -z "$$tag" ]; then \
-		tag="$$(gh release list --repo "$$repo" --limit 10 --json tagName,assets -q '[.[] | select(.assets | map(.name) | index("main"))] | .[0].tagName' 2>/dev/null || true)"; \
+		tag="$$( \
+			gh release list --repo "$$repo" --limit 10 --json tagName,isDraft -q '.[] | select(.isDraft | not) | .tagName' 2>/dev/null | \
+			while IFS= read -r candidate; do \
+				if [ -z "$$candidate" ]; then continue; fi; \
+				if gh release view "$$candidate" --repo "$$repo" --json assets -q '.assets[].name' 2>/dev/null | grep -qx main; then \
+					printf '%s\n' "$$candidate"; \
+					break; \
+				fi; \
+			done \
+			|| true \
+		)"; \
 		if [ -z "$$tag" ]; then \
 			echo "error: could not find a release with seed binary" >&2; \
 			echo "install gh CLI and authenticate, or specify one:" >&2; \
