@@ -1737,6 +1737,44 @@ EOF
   echo "PASS(cli-selfhost-migrate) switch_case_constant_exprs"
 }
 
+expect_migrate_sizeof_pointer_type_syntax() {
+  local case_dir="$tmpdir/migrate_sizeof_pointer_type_syntax_case"
+  local src="$case_dir/sizeof_pointer_type_syntax.c"
+  local out_w="$case_dir/sizeof_pointer_type_syntax.w"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+static const char *items[] = { "a", "b", "c" };
+
+int in_range(int i) {
+  return i < sizeof(items) / sizeof(char *);
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) sizeof_pointer_type_syntax"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_literal "$out_w" "sizeof[* c_char]()" || file_has_literal "$out_w" "sizeof[*mut " || file_has_literal "$out_w" "sizeof[*const "; then
+    echo "FAIL(cli-selfhost-migrate-output) sizeof_pointer_type_syntax"
+    cat "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" check "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate-check) sizeof_pointer_type_syntax"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) sizeof_pointer_type_syntax"
+}
+
 expect_migrate_for_continue_switch_break_semantics() {
   local case_dir="$tmpdir/migrate_for_continue_switch_break_case"
   local src="$case_dir/for_continue_switch_break.c"
@@ -2837,6 +2875,7 @@ expect_migrate_prefer_brace_no_trailing_ws
 expect_migrate_typed_cast_macros
 expect_migrate_pcre2test_cfprintf_helper
 expect_migrate_switch_case_constant_exprs
+expect_migrate_sizeof_pointer_type_syntax
 expect_migrate_for_continue_switch_break_semantics
 expect_migrate_goto_shadowed_local
 expect_migrate_goto_label_preserves_block_scope

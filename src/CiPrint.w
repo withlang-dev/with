@@ -331,6 +331,19 @@ fn ci_print_type(types: &CiTypePool, id: CiTypeId) -> str:
         return out ++ ") -> " ++ ci_print_type(types, ret)
     "<ci:ty:unimpl>"
 
+fn ci_print_sizeof_type_text(text: str) -> str:
+    if ci_starts_with_str(text, "*const "):
+        return "* " ++ ci_print_sizeof_type_text(text.slice(7, text.len()))
+    if ci_starts_with_str(text, "*mut "):
+        return "* " ++ ci_print_sizeof_type_text(text.slice(5, text.len()))
+    if text.len() > 0 and text.byte_at(0) == 91:
+        var i = 1
+        while i < text.len() as i32 and text.byte_at(i as i64) != 93:
+            i = i + 1
+        if i < text.len() as i32:
+            return text.slice(0, (i + 1) as i64) ++ ci_print_sizeof_type_text(text.slice((i + 1) as i64, text.len()))
+    text
+
 fn i32_to_string(n: i32) -> str:
     i64_to_string(n as i64)
 
@@ -487,7 +500,7 @@ fn ci_print_expr(exprs: &CiExprPool, types: &CiTypePool, id: CiExprId, parent_pr
     // the C-style `sizeof(T)` would be a plain call.
     if kind == CiExprKind.CIE_SIZEOF_TYPE:
         let t = (exprs.get_d0(id)) as CiTypeId
-        return "sizeof[" ++ ci_print_type(types, t) ++ "]()"
+        return "sizeof[" ++ ci_print_sizeof_type_text(ci_print_type(types, t)) ++ "]()"
     if kind == CiExprKind.CIE_SIZEOF_EXPR:
         return "<ci:unimpl:SIZEOF_EXPR>"
 
