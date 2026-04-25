@@ -41,9 +41,9 @@ body. Rust's `'label:` form would put two colons close together
 in colon-form constructs (`'outer: while cond:`), with the first
 colon doing label-attachment and the second doing body-introduction.
 That breaks With's colon rule. We drop the post-label colon and
-require labels to appear as the first token of a statement, which
-preserves the colon rule while keeping the apostrophe-label
-convention.
+require label declarations to appear as the first token of a
+statement, which preserves the colon rule while keeping the
+apostrophe-label convention.
 
 ## Syntax
 
@@ -499,9 +499,9 @@ A label is a prefix on a `while` statement, a `for` statement, a
 brace block, or a colon block. The label has no following colon;
 the next token after the label is the construct it attaches to.
 
-A label may only appear as the first token of a statement. The
-parser rejects labels appearing elsewhere with the
-"label-not-at-statement-start" diagnostic.
+A label declaration may only appear as the first token of a
+statement. The parser rejects label declarations appearing elsewhere
+with the "label-not-at-statement-start" diagnostic.
 
 Grammar:
 
@@ -656,6 +656,8 @@ Phase 4: Codegen.
 
 Phase 5: Tests.
 - Selfhost regression tests for each form.
+- Lexer disambiguation tests for labels alongside character
+  literals, byte literals, and apostrophes inside strings.
 - Diagnostic tests for each error.
 - End-to-end runtime tests verifying control flow.
 
@@ -703,13 +705,30 @@ The feature is considered complete when:
      nested function or closure that fails to find an outer label
    - Label not at statement start: rejected with the appropriate
      diagnostic
-3. `make build`, `make fixpoint`, and `make test` all pass at each
+3. The lexer regression suite includes explicit disambiguation tests
+   for byte literals, closed character literals, labels, and
+   apostrophes inside strings. At minimum, it covers source equivalent
+   to:
+
+   ```with
+   'outer while true:
+       if ch in 'a'..='z':
+           continue 'outer
+
+   let at = '@'
+   let newline = '\n'
+   let byte = b'X'
+   let escaped_byte = b'\n'
+   let s = "apostrophe isn't a label"
+   ```
+
+4. `make build`, `make fixpoint`, and `make test` all pass at each
    phase boundary.
-4. The compiler emits correct LLVM IR for nested labeled loops,
+5. The compiler emits correct LLVM IR for nested labeled loops,
    verified against hand-written equivalents and with cleanup
    ordering for `defer`, `Drop`, and `with` guards (and
    `errdefer` correctly skipped).
-5. The migrator port can use the feature to lower goto-containing
+6. The migrator port can use the feature to lower goto-containing
    C functions.
 
 ## References
