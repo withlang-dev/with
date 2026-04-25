@@ -61,7 +61,7 @@ else
   # lexer/, parser/, internals/ excluded from default run — they test compiler
   # internals via `use Lexer`/`use Token`/`use compiler.foundation.*` which
   # have known codegen bugs. Run explicitly: scripts/run_tests.sh test/lexer/*.w
-  for dir in test/behavior test/compile_errors test/codegen; do
+  for dir in test/behavior test/compile_errors test/codegen test/spec; do
     for f in "$dir"/*.w; do
       [[ -e "$f" ]] && test_files+=("$f")
     done
