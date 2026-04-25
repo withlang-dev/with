@@ -1737,6 +1737,67 @@ EOF
   echo "PASS(cli-selfhost-migrate) switch_case_constant_exprs"
 }
 
+expect_migrate_split_multi_value_match_arms() {
+  local case_dir="$tmpdir/migrate_split_multi_value_match_arms_case"
+  local src="$case_dir/split_multi_value_match_arms.c"
+  local out_w="$case_dir/split_multi_value_match_arms.w"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+int classify_grouped_cases(int x) {
+  switch (x) {
+    case 1:
+    case 2:
+      return 7;
+    case 5:
+      return 9;
+    default:
+      return 0;
+  }
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) split_multi_value_match_arms"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! python3 - "$out_w" <<'PY'
+from __future__ import annotations
+
+import re
+import sys
+from pathlib import Path
+
+text = Path(sys.argv[1]).read_text()
+if "1 | 2 =>" in text:
+    raise SystemExit(1)
+if not re.search(r"(?m)^\s*1 => \{$", text):
+    raise SystemExit(1)
+if not re.search(r"(?m)^\s*2 => \{$", text):
+    raise SystemExit(1)
+if any(re.match(r"^\s*(if|while|for|match)\b.*:\s*$", line) for line in text.splitlines()):
+    raise SystemExit(1)
+PY
+  then
+    echo "FAIL(cli-selfhost-migrate-output) split_multi_value_match_arms"
+    cat "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" check "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate-check) split_multi_value_match_arms"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) split_multi_value_match_arms"
+}
+
 expect_migrate_sizeof_pointer_type_syntax() {
   local case_dir="$tmpdir/migrate_sizeof_pointer_type_syntax_case"
   local src="$case_dir/sizeof_pointer_type_syntax.c"
@@ -2875,6 +2936,7 @@ expect_migrate_prefer_brace_no_trailing_ws
 expect_migrate_typed_cast_macros
 expect_migrate_pcre2test_cfprintf_helper
 expect_migrate_switch_case_constant_exprs
+expect_migrate_split_multi_value_match_arms
 expect_migrate_sizeof_pointer_type_syntax
 expect_migrate_for_continue_switch_break_semantics
 expect_migrate_goto_shadowed_local

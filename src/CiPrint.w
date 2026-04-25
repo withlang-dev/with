@@ -677,41 +677,43 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
         while ai < arm_count:
             let value_count = stmts.get_extra(cursor)
             cursor = cursor + 1
-            var arm_head = ""
+            var arm_heads: Vec[str] = Vec.new()
             if value_count == 0:
-                arm_head = "_"
+                arm_heads.push("_")
             else:
                 var vi: i32 = 0
                 while vi < value_count:
-                    if vi > 0:
-                        arm_head = arm_head ++ " | "
                     let v_id = (stmts.get_extra(cursor)) as CiExprId
-                    arm_head = arm_head ++ ci_print_expr(exprs, types, v_id, 0, 0)
+                    arm_heads.push(ci_print_expr(exprs, types, v_id, 0, 0))
                     cursor = cursor + 1
                     vi = vi + 1
             let body_id = (stmts.get_extra(cursor)) as CiStmtId
             cursor = cursor + 1
-            if brace:
-                out = out ++ ci_make_indent(depth + 4) ++ arm_head ++ " => {\n"
-                if (body_id as i32) == 0:
-                    out = out ++ ci_make_indent(depth + 8) ++ "0\n"
-                else:
-                    let body_text = ci_print_stmt(stmts, exprs, types, body_id, 0)
-                    if body_text.len() > 0:
-                        out = out ++ ci_reindent_spaces(body_text, depth + 8)
-                    else:
+            var hi: i32 = 0
+            while hi < arm_heads.len() as i32:
+                let arm_head = arm_heads.get(hi as i64)
+                if brace:
+                    out = out ++ ci_make_indent(depth + 4) ++ arm_head ++ " => {\n"
+                    if (body_id as i32) == 0:
                         out = out ++ ci_make_indent(depth + 8) ++ "0\n"
-                out = out ++ ci_make_indent(depth + 4) ++ "},\n"
-            else:
-                out = out ++ ci_make_indent(depth + 4) ++ arm_head ++ " =>\n"
-                if (body_id as i32) == 0:
-                    out = out ++ ci_make_indent(depth + 8) ++ "0\n"
-                else:
-                    let body_text = ci_print_stmt(stmts, exprs, types, body_id, 0)
-                    if body_text.len() > 0:
-                        out = out ++ ci_reindent_spaces(body_text, depth + 8)
                     else:
+                        let body_text = ci_print_stmt(stmts, exprs, types, body_id, 0)
+                        if body_text.len() > 0:
+                            out = out ++ ci_reindent_spaces(body_text, depth + 8)
+                        else:
+                            out = out ++ ci_make_indent(depth + 8) ++ "0\n"
+                    out = out ++ ci_make_indent(depth + 4) ++ "},\n"
+                else:
+                    out = out ++ ci_make_indent(depth + 4) ++ arm_head ++ " =>\n"
+                    if (body_id as i32) == 0:
                         out = out ++ ci_make_indent(depth + 8) ++ "0\n"
+                    else:
+                        let body_text = ci_print_stmt(stmts, exprs, types, body_id, 0)
+                        if body_text.len() > 0:
+                            out = out ++ ci_reindent_spaces(body_text, depth + 8)
+                        else:
+                            out = out ++ ci_make_indent(depth + 8) ++ "0\n"
+                hi = hi + 1
             ai = ai + 1
         if brace:
             out = out ++ indent ++ "}\n"
