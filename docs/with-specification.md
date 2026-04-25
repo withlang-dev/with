@@ -186,7 +186,7 @@ With prioritizes joy. The common case should be effortless:
 - **Pattern `for` loops** — `for (key, value) in map:` and
   `for Some(item) in optional_items:` destructure directly in the
   loop header. (§13.5)
-- **Labeled break and continue** — `'outer: for ...` plus
+- **Labeled break and continue** — `'outer for ...` plus
   `break 'outer` or `continue 'outer` targets outer loops and
   labeled blocks without flag-variable cascades. (§13.5a)
 - **Iterators just work** — hold two items, zip, peek. The compiler
@@ -2470,7 +2470,7 @@ fn process_all(lock: &Mutex[Vec[Item]]) -> Result[Unit, AppError]:
     // implicit Ok(())
 
 fn process_until_done(lock: &Mutex[Vec[Item]]):
-    'outer: for i in 0..10:
+    'outer for i in 0..10:
         with lock.lock() as items:
             if items[i].is_terminal():
                 break 'outer             // exits the labeled outer loop
@@ -5041,29 +5041,31 @@ explicit `&`.
 
 Labels provide named structured control-flow targets for nested loops
 and early-exit blocks. A label is an identifier prefixed with a single
-quote and followed immediately by a colon before the construct it
-labels:
+quote. It appears as the first token of a statement and is followed
+immediately by the construct it labels:
 
 ```
-'outer: while running:
+'outer while running:
     ...
 
-'rows: for row in grid {
+'rows for row in grid {
     ...
 }
 
 'parse:
     ...
 
-'cleanup: {
+'cleanup {
     ...
 }
 ```
 
-The colon belongs to the label. Labeled `while` and `for` loops may
-use either colon-form or brace-form bodies. A bare labeled block may
-also use either body style. In colon-form labeled blocks, the label
-colon is also the block-body introducer.
+A label has no trailing colon of its own. Labeled `while` and `for`
+loops may use either colon-form or brace-form bodies; the body
+introducer is the same `:` or `{ }` the loop would use without a
+label. A bare labeled block may also use either body style: the token
+after the label is either `{` for a brace-form block or `:` for a
+colon-form block.
 
 The existing unlabeled forms are unchanged:
 
@@ -5078,6 +5080,10 @@ continue    // continues the innermost enclosing loop
 break 'outer       // exits the loop or block labeled 'outer
 continue 'outer    // continues the loop labeled 'outer
 ```
+
+Labeled `break` and `continue` are statements and have no value.
+`break 'label value` is reserved for a future value-carrying
+labeled-block design and is invalid in this version.
 
 `break 'label` transfers control to the statement immediately after
 the construct labeled `'label`. The target may be a labeled `while`,
@@ -5111,9 +5117,8 @@ let result = 'parse:          // ERROR: labeled block is not an expression
 
 Labels are in scope throughout the labeled construct's body,
 including nested constructs. For brace-form constructs, the body
-starts at the opening brace. For colon-form `while` and `for` loops,
-the body starts at the loop-body colon, not the label colon. For
-colon-form labeled blocks, the label colon is the body introducer.
+starts at the opening brace. For colon-form constructs, the body
+starts at the body colon.
 Labels live in a separate namespace from ordinary identifiers, types,
 and keywords, so a variable named `outer` and a label named `'outer`
 do not collide.
@@ -5124,7 +5129,7 @@ inside a nested `fn`, closure, `async:` block, or `gen fn` body.
 outside a `with` block remains visible inside the `with` body.
 
 ```
-'outer: for item in items:
+'outer for item in items:
     with item.acquire() as guard:
         if guard.is_done():
             break 'outer       // valid: with is label-transparent
@@ -5133,8 +5138,8 @@ outside a `with` block remains visible inside the `with` body.
 Nested active labels must have distinct names:
 
 ```
-'l: while a:
-    'l: while b:               // ERROR: label 'l shadows enclosing 'l
+'l while a:
+    'l while b:                // ERROR: label 'l shadows enclosing 'l
         break 'l
 ```
 
@@ -5142,15 +5147,23 @@ The same label name may be reused after the earlier labeled construct
 has gone out of scope:
 
 ```
-'l: while a: ...
-'l: while b: ...               // OK: sibling label, first 'l is gone
+'l while a: ...
+'l while b: ...                // OK: sibling label, first 'l is gone
 ```
 
-A label declaration must be followed immediately by a `while`, `for`,
-or block body. A label before any other statement is a syntax error:
+A label declaration must be followed immediately by `while`, `for`,
+`{`, or `:`. A label before any other statement is a syntax error:
 
 ```
-'l: let x = 1                  // ERROR: label must target loop or block
+'l let x = 1                   // ERROR: label must target loop or block
+```
+
+A label token that is not the first token of a statement is also a
+syntax error:
+
+```
+if cond: 'outer while true:    // ERROR: label must start a statement
+    tick()
 ```
 
 A labeled `break` or `continue` exits every intervening scope between
@@ -5170,7 +5183,8 @@ The compiler must diagnose at least these errors:
 - Undefined label: no visible enclosing loop or block has that label.
 - `continue` targeting a labeled block.
 - Nested label collision with an already-active label of the same name.
-- Label not followed immediately by a loop or block.
+- Label token not at the start of a statement.
+- Label not followed immediately by `while`, `for`, `{`, or `:`.
 - Label use across a nested function, closure, `async:`, or `gen fn`
   boundary.
 
@@ -8928,29 +8942,29 @@ block-introducer.
 
 **Labeled bodies:**
 
-Labels use the uniform label-colon rule (§13.5a). The label colon is
-separate from the labeled construct's body syntax:
+Labels are statement prefixes (§13.5a). A label has no trailing colon
+of its own; the token after the label is the labeled construct:
 
 ```
-'outer: while running:
+'outer while running:
     tick()
 
-'outer: while running { tick() }
+'outer while running { tick() }
 
-'scan: for item in list:
+'scan for item in list:
     process(item)
 
-'scan: for item in list { process(item) }
+'scan for item in list { process(item) }
 
 'early:
     maybe_exit()
 
-'early: { maybe_exit() }
+'early { maybe_exit() }
 ```
 
 For labeled `while` and `for`, the loop still has its own body
-introducer. For colon-form labeled blocks, the label colon is also
-the block-body introducer.
+introducer. For colon-form labeled blocks, the colon after the label
+is the block-body introducer.
 
 **Applies uniformly to all block-introducers:**
 
@@ -9090,7 +9104,12 @@ HASHES      := { '#' }
 
 ```
 LABEL       := "'" IDENT
+LABEL_STMT_PREFIX := LABEL ( 'while' | 'for' | ':' | '{' )
 ```
+
+`LABEL` may appear as a statement prefix or as the target operand of
+`break` and `continue`. As a statement prefix, it must be the first
+token of the statement and has no trailing colon of its own.
 
 ### 30.3 Declarations
 
@@ -9157,11 +9176,12 @@ IF_STMT     := 'if' EXPR BODY [ 'else' ( IF_STMT | BODY ) ]
               | 'if' 'let' PATTERN '=' EXPR BODY [ 'else' BODY ]
 MATCH_STMT  := 'match' EXPR BODY_ARMS
 MATCH_ARM   := PATTERN [ 'if' EXPR ] '=>' EXPR
-FOR_STMT    := [ LABEL ':' ] 'for' PATTERN 'in' EXPR BODY
-WHILE_STMT  := [ LABEL ':' ] 'while' EXPR BODY
+FOR_STMT    := [ LABEL ] 'for' PATTERN 'in' EXPR BODY
+WHILE_STMT  := [ LABEL ] 'while' EXPR BODY
+LABELED_BLOCK := LABEL ( COLON_BODY | BRACE_BODY )
 WITH_STMT   := 'with' EXPR 'as' [ 'mut' ] IDENT BODY
 RETURN_STMT := 'return' [ EXPR ]
-BREAK_STMT  := 'break' [ LABEL ] [ EXPR ]
+BREAK_STMT  := 'break' ( LABEL | [ EXPR ] )
 CONTINUE_STMT := 'continue' [ LABEL ]
 DEFER_STMT  := 'defer' EXPR
 ```
@@ -9242,8 +9262,8 @@ BRACE_BODY  := '{' [ STMT { ( NEWLINE | ';' ) STMT } ] '}'
 ```
 
 Both forms are interchangeable for all constructs: `fn`, `if`,
-`else`, `while`, `for`, `match`, `type`, `enum`, `impl`, `trait`,
-and closures.
+`else`, `while`, `for`, labeled blocks, `match`, `type`, `enum`,
+`impl`, `trait`, and closures.
 
 ### 30.9 Reserved Keywords
 
