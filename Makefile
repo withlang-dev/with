@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 
-.PHONY: all build stage1 stage2 stage3 runtime selfcheck smoke test fixpoint install install-user update-seed clean seed print-version emit-c-test emit-c-fixpoint cross regex-migrate-raw regex-prepare regex-check regex-promote \
-	__build __stage1 __stage2 __stage3 __runtime __selfcheck __smoke __test __fixpoint __install __install-user __update-seed __clean __seed __regex-migrate-raw __regex-prepare __regex-check __regex-promote
+.PHONY: all build stage1 stage2 stage3 runtime selfcheck smoke test test-pcre2 fixpoint install install-user update-seed clean seed print-version emit-c-test emit-c-fixpoint cross regex-migrate-raw regex-prepare regex-check regex-promote \
+	__build __stage1 __stage2 __stage3 __runtime __selfcheck __smoke __test __test-pcre2 __fixpoint __install __install-user __update-seed __clean __seed __regex-migrate-raw __regex-prepare __regex-check __regex-promote
 
 ROOT_DIR := $(CURDIR)
 REPO_FULL_NAME ?= QuixiAI/with
@@ -673,11 +673,21 @@ $(CANONICAL_BIN): $(STAGE2_BIN) $(RT_WITH_ARTIFACTS) $(RT_WITH_REFRESH_STAMP) | 
 test: | $(OUT_TMP_DIR)
 	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __test)
 
+test-pcre2: | $(OUT_TMP_DIR)
+	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __test-pcre2)
+
 __test: $(STAGE2_BIN)
 	./scripts/run_tests.sh
 	WITH=$(STAGE2_BIN) ./scripts/run_cli_selfhost_tests.sh
 	./scripts/run_issue61_noop_local_regression.sh
 	./scripts/run_embedded_runtime_extract_regression.sh
+
+__test-pcre2: $(REGEX_PREPARE_STAMP) scripts/pcre2_generated_workflow.sh scripts/verify_pcre2_works.sh $(CANONICAL_BIN)
+	@bash "$(ROOT_DIR)/scripts/pcre2_generated_workflow.sh" check \
+		"$(ROOT_DIR)/$(CANONICAL_BIN)" \
+		"$(ROOT_DIR)/$(REGEX_RAW_DIR)" \
+		"$(ROOT_DIR)/$(REGEX_GENERATED_DIR)"
+	@WITH_BIN="$(ROOT_DIR)/$(CANONICAL_BIN)" bash "$(ROOT_DIR)/scripts/verify_pcre2_works.sh"
 
 # Generate LLVM bridge stubs for C-only builds (no LLVM available).
 # Two files: wl_decls.h (declarations) and wl_stubs.c (stub implementations).

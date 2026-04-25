@@ -10616,7 +10616,7 @@ fn ci_goto_body_walk_subtree(session: i64, cursor: i32, scope: str, stmts: &mut 
             while si < sbnc:
                 let sc = with_ci_child(session, switch_body, si)
                 let sck = with_ci_cursor_kind(session, sc)
-                if scan_has_content:
+                if scan_has_content or scan_state_has_inbound:
                     let tail_terminated = ci_goto_append_switch_tail_child(session, sc, &mut switch_scope, stmts, exprs, types, label_map, next_synthetic, entry_init_id, &mut scan_state, &mut scan_label_str_idx, &mut scan_children, &mut scan_has_content, &mut scan_state_has_inbound, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, loop_top_state, after_switch_state)
                     if tail_terminated:
                         ci_goto_flush_arm(stmts, entry_init_id, after_switch_state, &mut scan_state, &mut scan_label_str_idx, &mut scan_children, &mut scan_has_content, &mut scan_state_has_inbound, arm_states, arm_labels, arm_child_starts, arm_child_counts, arm_children_flat, stmts.add_string("__after_switch"))
