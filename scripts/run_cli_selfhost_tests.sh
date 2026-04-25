@@ -2008,6 +2008,52 @@ PY
   echo "PASS(cli-selfhost-migrate) for_continue_switch_break"
 }
 
+expect_migrate_nested_switch_break() {
+  local case_dir="$tmpdir/migrate_nested_switch_break_case"
+  local src="$case_dir/nested_switch_break.c"
+  local out_w="$case_dir/nested_switch_break.w"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+int nested_switch_break(int x, int y) {
+  int out = 30;
+  switch (x) {
+  case 1:
+    if (y) break;
+    out = 10;
+    break;
+  case 2:
+    out = 20;
+    break;
+  }
+  return out;
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) nested_switch_break"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_literal "$out_w" "while true {" || ! file_has_literal "$out_w" "match x {"; then
+    echo "FAIL(cli-selfhost-migrate-output) nested_switch_break"
+    cat "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" check "$out_w"; then
+    echo "FAIL(cli-selfhost-check) nested_switch_break"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) nested_switch_break"
+}
+
 expect_migrate_goto_shadowed_local() {
   local case_dir="$tmpdir/migrate_goto_shadowed_local_case"
   local src="$case_dir/shadowed_local.c"
@@ -3031,6 +3077,7 @@ expect_migrate_split_multi_value_match_arms
 expect_migrate_realloc_runtime_helper
 expect_migrate_sizeof_pointer_type_syntax
 expect_migrate_for_continue_switch_break_semantics
+expect_migrate_nested_switch_break
 expect_migrate_goto_shadowed_local
 expect_migrate_goto_label_preserves_block_scope
 expect_migrate_switch_macro_goto_terminators

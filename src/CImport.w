@@ -4062,6 +4062,94 @@ fn ci_rewrite_breaks_to_state_ir(stmts: &mut CiStmtPool, stmt_id: CiStmtId, stat
         return stmts.if_stmt(cond, then_id, else_id)
     stmt_id
 
+fn ci_subtree_has_break_for_current_switch(session: i64, cursor: i32) -> bool:
+    let kind = with_ci_cursor_kind(session, cursor)
+    if kind == CXK_BREAK_STMT:
+        return true
+    if kind == CXK_SWITCH_STMT or kind == CXK_FOR_STMT or kind == CXK_WHILE_STMT or kind == CXK_DO_STMT:
+        return false
+    let nc = with_ci_num_children(session, cursor)
+    var i = 0
+    while i < nc:
+        if ci_subtree_has_break_for_current_switch(session, with_ci_child(session, cursor, i)):
+            return true
+        i = i + 1
+    false
+
+fn ci_subtree_has_continue_for_current_loop(session: i64, cursor: i32) -> bool:
+    let kind = with_ci_cursor_kind(session, cursor)
+    if kind == CXK_CONTINUE_STMT:
+        return true
+    if kind == CXK_FOR_STMT or kind == CXK_WHILE_STMT or kind == CXK_DO_STMT:
+        return false
+    let nc = with_ci_num_children(session, cursor)
+    var i = 0
+    while i < nc:
+        if ci_subtree_has_continue_for_current_loop(session, with_ci_child(session, cursor, i)):
+            return true
+        i = i + 1
+    false
+
+fn ci_rewrite_switch_continues_ir(stmts: &mut CiStmtPool, exprs: &mut CiExprPool, stmt_id: CiStmtId, flag_expr_sym: i32, flag_ty: CiTypeId) -> CiStmtId:
+    if (stmt_id as i32) == 0:
+        return stmt_id
+    let kind = stmts.kind(stmt_id)
+    if kind == CiStmtKind.CIS_CONTINUE:
+        let lhs = exprs.ident(flag_expr_sym, flag_ty)
+        let one_idx = exprs.add_string("1")
+        let one = exprs.int_lit(one_idx, flag_ty)
+        return ci_stmt_merge_ir(stmts, stmts.assign(lhs, one), stmts.break_())
+    if kind == CiStmtKind.CIS_BLOCK:
+        let start = stmts.get_d0(stmt_id)
+        let count = stmts.get_d1(stmt_id)
+        var ids: Vec[i32] = Vec.new()
+        var i = 0
+        while i < count:
+            let child = (stmts.get_extra(start + i)) as CiStmtId
+            let rewritten = ci_rewrite_switch_continues_ir(stmts, exprs, child, flag_expr_sym, flag_ty)
+            if (rewritten as i32) != 0:
+                ids.push(rewritten as i32)
+            i = i + 1
+        return ci_stmt_from_flat_ids(stmts, &ids)
+    if kind == CiStmtKind.CIS_IF:
+        let cond = (stmts.get_d0(stmt_id)) as CiExprId
+        let then_id = ci_rewrite_switch_continues_ir(stmts, exprs, (stmts.get_d1(stmt_id)) as CiStmtId, flag_expr_sym, flag_ty)
+        let else_id = ci_rewrite_switch_continues_ir(stmts, exprs, (stmts.get_d2(stmt_id)) as CiStmtId, flag_expr_sym, flag_ty)
+        return stmts.if_stmt(cond, then_id, else_id)
+    stmt_id
+
+fn ci_wrap_switch_match_breaks_ir(session: i64, body_cursor: i32, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, match_id: CiStmtId) -> CiStmtId:
+    if (match_id as i32) == 0:
+        return match_id
+    let has_break = ci_subtree_has_break_for_current_switch(session, body_cursor)
+    let has_continue = ci_subtree_has_continue_for_current_loop(session, body_cursor)
+    if not has_break and not has_continue:
+        return match_id
+    let flag_ty = ci_named_type_from_text(types, "i32")
+    if (flag_ty as i32) == 0:
+        return 0 as CiStmtId
+    let flag_name = ci_expr_temp_name(session, body_cursor, "switch_continue")
+    let flag_stmt_sym = stmts.add_string(flag_name)
+    let flag_expr_sym = exprs.add_string(flag_name)
+    let zero_idx = exprs.add_string("0")
+    let zero = exprs.int_lit(zero_idx, flag_ty)
+    let flag_decl = stmts.var_decl(flag_stmt_sym, flag_ty, zero, 1)
+    let rewritten_match = if has_continue:
+        ci_rewrite_switch_continues_ir(stmts, exprs, match_id, flag_expr_sym, flag_ty)
+    else:
+        match_id
+    let true_cond = exprs.bool_lit(1, 0 as CiTypeId)
+    let loop_body = ci_stmt_merge_ir(stmts, rewritten_match, stmts.break_())
+    let loop_id = stmts.while_stmt(true_cond, loop_body)
+    if not has_continue:
+        return loop_id
+    let flag_read = exprs.ident(flag_expr_sym, flag_ty)
+    let zero_cmp_idx = exprs.add_string("0")
+    let zero_cmp = exprs.int_lit(zero_cmp_idx, flag_ty)
+    let cond = exprs.binary(CiBinOp.CIBO_NEQ, flag_read, zero_cmp, 0 as CiTypeId)
+    let continue_if = stmts.if_stmt(cond, stmts.continue_(), 0 as CiStmtId)
+    ci_stmt_merge3_ir(stmts, flag_decl, loop_id, continue_if)
+
 fn ci_goto_clear_pending_ir(stmts: &mut CiStmtPool, exprs: &mut CiExprPool) -> CiStmtId:
     let pending_idx = exprs.add_string("__goto_pending")
     let pending_id = exprs.ident(pending_idx, 0 as CiTypeId)
@@ -7375,7 +7463,10 @@ fn ci_lower_switch_stmt_ir_structural(session: i64, cursor: i32, stmts: &mut CiS
         let _ = stmts.add_extra(arm_records.get(ri))
         ri = ri + 1
     let match_id = stmts.add(CiStmtKind.CIS_MATCH, subject_id as i32, arms_start, arm_count, 0)
-    ci_stmt_merge_ir(stmts, prepared_subject.setup_stmt, match_id)
+    let switch_id = ci_wrap_switch_match_breaks_ir(session, body_cursor, stmts, exprs, types, match_id)
+    if (switch_id as i32) == 0:
+        return 0 as CiStmtId
+    ci_stmt_merge_ir(stmts, prepared_subject.setup_stmt, switch_id)
 
 fn ci_lower_case_value_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiExprId:
     if with_ci_eval_int_valid(session, cursor) != 0:
