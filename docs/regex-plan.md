@@ -70,9 +70,9 @@ make regex-promote       # copy to lib/std/re/
 Compile each module in `lib/std/re/` to `.o` files via
 `with build --emit-obj`. Link into a static library.
 
-### Step 5: Test with pcre2test -- TODO
+### Step 5: Test with migrated pcre2test -- TODO
 
-Build `pcre2test` as C, linking against the compiled With modules.
+Build migrated `pcre2test`, importing the compiled With modules.
 Run PCRE2's test suite:
 
 ```

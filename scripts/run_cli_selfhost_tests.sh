@@ -2072,6 +2072,72 @@ EOF
   echo "PASS(cli-selfhost-migrate) switch_continue_reloads"
 }
 
+expect_migrate_lifted_if_tail_break_stays_in_switch() {
+  local case_dir="$tmpdir/migrate_lifted_if_tail_break_case"
+  local src="$case_dir/lifted_if_tail_break.c"
+  local out_w="$case_dir/lifted_if_tail_break.w"
+  local bin="$case_dir/lifted_if_tail_break"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+int lifted_if_tail_break(int op, int x) {
+  switch (op) {
+  case 1:
+    goto L;
+  L:
+    if (x) {
+      if (x > 1) goto A;
+    A:
+      x += 10;
+    } else {
+      x += 20;
+    }
+    break;
+  B:
+    x += 100;
+    break;
+  case 2:
+    return 2;
+  }
+  return x;
+}
+
+int main(void) {
+  return lifted_if_tail_break(1, 1) == 11 ? 0 : 1;
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) lifted_if_tail_break"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_literal "$out_w" "__after_if" || ! file_has_literal "$out_w" "__after_switch"; then
+    echo "FAIL(cli-selfhost-migrate-output) lifted_if_tail_break"
+    cat "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" build "$out_w" -o "$bin"; then
+    echo "FAIL(cli-selfhost-build) lifted_if_tail_break"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! "$bin"; then
+    echo "FAIL(cli-selfhost-run) lifted_if_tail_break"
+    "$bin" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) lifted_if_tail_break"
+}
+
 expect_migrate_nested_switch_break() {
   local case_dir="$tmpdir/migrate_nested_switch_break_case"
   local src="$case_dir/nested_switch_break.c"
@@ -3551,6 +3617,7 @@ expect_migrate_realloc_runtime_helper
 expect_migrate_sizeof_pointer_type_syntax
 expect_migrate_for_continue_switch_break_semantics
 expect_migrate_switch_continue_reloads_outer_loop_subject
+expect_migrate_lifted_if_tail_break_stays_in_switch
 expect_migrate_nested_switch_break
 expect_migrate_goto_shadowed_local
 expect_migrate_goto_label_preserves_block_scope

@@ -458,8 +458,9 @@ PCRE2 is the target use case. ~70K lines of C.
   migration and linked as a C object, or dropped entirely (the
   interpreter is sufficient).
 
-- **pcre2test.c** — the test harness. This stays as C and tests
-  the migrated library through its C-compatible API.
+- **pcre2test.c** — the test harness. This is migrated too, and
+  tests the migrated library through the same With module imports
+  that stdlib users exercise.
 
 ### Memory allocator
 
@@ -472,14 +473,10 @@ by changing the context setup.
 
 ### API preservation
 
-PCRE2's public API is all `pcre2_*` functions with C calling
-convention. After migration, these functions exist as With
-functions. To maintain C ABI compatibility (so existing C code
-can call the migrated library), decorate them with
-`@[c_export("pcre2_compile")]`.
-
-This means: migrate PCRE2 source → build as With → existing C
-callers (including pcre2test) link against it unchanged.
+PCRE2's public API is all `pcre2_*` functions. For stdlib
+integration these are regular With module functions; external C ABI
+exports are optional and separate from the migrated `pcre2test`
+validation path.
 
 ---
 

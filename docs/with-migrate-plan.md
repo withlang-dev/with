@@ -537,13 +537,12 @@ Not implementation work — validation and bug fixing.
 3. Exclude `pcre2_jit_compile.c` (inline asm, code gen — skip)
 4. Build migrated code with `with build`
 5. Fix translation bugs found by compilation failures
-6. Build `pcre2test` (stays as C) linking against migrated library
-   via `@[c_export]` on public API functions
+6. Build migrated `pcre2test` against the migrated With PCRE2 modules
 7. Run PCRE2's test suite
 8. Fix any remaining bugs
 9. Iterate until all tests pass
 
-**Done when:** `pcre2test` passes against With-compiled PCRE2.
+**Done when:** migrated `pcre2test` passes against With-compiled PCRE2.
 
 ---
 
