@@ -1,3 +1,3 @@
-*.w linguist-detectable=false
+*.w linguist-language=With
 bootstrap/** linguist-vendored
 out/** linguist-generated
