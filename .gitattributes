@@ -1,0 +1,3 @@
+*.w linguist-detectable=false
+bootstrap/** linguist-vendored
+out/** linguist-generated
