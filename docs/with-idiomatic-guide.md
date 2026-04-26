@@ -194,6 +194,95 @@ const VERSION: str = "1.0.0"
 
 ---
 
+## Use `pub` for Published API Contracts
+
+With names are reachable by default. `pub` is not access control; it is a
+published-API marker. Use it when you want to promise that downstream With
+code can depend on a declaration staying compatible.
+
+```with
+// ✓ published With-level API
+pub fn parse(source: str) -> Ast:
+    source |> tokenize |> build_ast
+
+// ✓ reachable, but not a stability promise
+fn parse_expr(tokens: Tokens) -> Expr:
+    ...
+```
+
+Use `@[c_export]` for ABI/linkage contracts. That is a separate boundary:
+
+```with
+@[c_export("with_parse")]
+fn parse_c(ptr: *u8, len: i64) -> i32:
+    ...
+```
+
+The model:
+
+- ordinary declarations are reachable but may be implementation details
+- `pub` marks the supported With-level API
+- `@[c_export]` exports an ABI symbol
+
+---
+
+## Mutability Belongs to the Binding
+
+Do not write Rust-shaped `&mut` parameters or `&mut` call sites. If a value is
+bound with `var`, functions may mutate it. If you want to protect the original,
+pass a copy.
+
+```with
+var graph = Graph.new()
+add_block(graph, "entry")      // may mutate graph
+
+let snapshot = graph.copy()
+add_block(snapshot, "other")   // mutate the copy
+```
+
+Function signatures describe values, not borrow modes:
+
+```with
+// ✗ Rust-brain
+fn add_block(g: &mut Graph, name: str):
+    ...
+add_block(&mut graph, "entry")
+
+// ✓ idiomatic With
+fn add_block(g: Graph, name: str):
+    ...
+add_block(graph, "entry")
+```
+
+---
+
+## Use `Option` / `Result`, Not Sentinel Values
+
+Don't encode absence or failure as magic values like an empty string or `-1`
+when the type can say what is happening.
+
+```with
+// ✗ sentinel string
+fn validate(config: Config):
+    if config.port <= 0 then return "bad port"
+    ""
+
+// ✓ explicit absence/presence
+fn validate(config: Config):
+    if config.port <= 0 then return Some("bad port")
+    None
+```
+
+Use `Result` when the caller should propagate or handle an error:
+
+```with
+fn load_config(path: str) -> Result[Config, ConfigError]:
+    let text = read_file(path)?
+    parse_config(text)
+```
+
+---
+
 ## Don't Return What's Implied
 
 **Don't write trailing `0`.** If a function returns a type
@@ -296,7 +385,7 @@ must map to specific integers (protocol codes, file formats, FFI):
 
 ```
 // ✓ discriminant enum — explicit integer mapping
-type HttpMethod: i32 =
+enum HttpMethod:
     Get = 1
     Post = 2
     Put = 3
@@ -304,7 +393,7 @@ type HttpMethod: i32 =
 
 // ✓ @[flags] for bitfield enums
 @[flags]
-type Perms: i32 =
+enum Perms:
     Read         // 1
     Write        // 2
     Execute      // 4
@@ -335,11 +424,10 @@ Works in struct literals, patterns, and destructuring.
 Struct fields with defaults can be omitted at construction.
 
 ```
-type ServerConfig = {
-    host: str = "localhost",
-    port: i32 = 8080,
-    max_connections: i32 = 100,
-}
+type ServerConfig:
+    host: str = "localhost"
+    port: i32 = 8080
+    max_connections: i32 = 100
 
 // ✗ specifying defaults
 let config = ServerConfig {
@@ -747,6 +835,33 @@ trait Neg[Output]:
 trait Neg[Output]: fn neg(self: Self) -> Output
 ```
 
+### Choose One Block Style Per Codebase
+
+With supports both colon blocks and brace blocks on block-bearing constructs.
+Prefer one house style within a codebase — usually colon blocks for multi-line
+code.
+
+```with
+// ✓ default multi-line style
+type Point:
+    x: i32
+    y: i32
+
+fn render(point: Point):
+    println(f"{point.x}, {point.y}")
+```
+
+Use braces when they improve locality, especially for short one-liners or
+expression-level literals:
+
+```with
+type Point { x: i32, y: i32 }
+let origin = Point { x: 0, y: 0 }
+```
+
+Avoid mixing colon and brace declaration styles for similar neighboring
+constructs unless there is a concrete ergonomic reason.
+
 ---
 
 ## Use Handles, Not Pointers
@@ -758,19 +873,17 @@ mismatch.
 
 ```
 // ✗ pointer-based — fragile, cache-unfriendly
-type Entity = {
-    parent: *Entity,
-    children: Vec[*Entity],
-}
+type Entity:
+    parent: *Entity
+    children: Vec[*Entity]
 
 // ✓ idiomatic — handle-based, data-oriented
 type Entity = Handle[EntityRow]
 
-type World = {
-    entities: SlotMap[EntityRow],
-    transforms: DenseStorage[Transform],
-    sprites: DenseStorage[Sprite],
-}
+type World:
+    entities: SlotMap[EntityRow]
+    transforms: DenseStorage[Transform]
+    sprites: DenseStorage[Sprite]
 
 // Handles are Copy — store them freely
 let player = world.spawn("player")
@@ -1089,15 +1202,14 @@ Prelude traits (`Eq`, `Ord`, `Debug`, `Display`, `Default`, `Drop`) are
 always in scope — no `use` needed to implement them:
 
 ```
-type Point = { x: i32, y: i32 }
+type Point { x: i32, y: i32 }
 
-impl Eq for Point =
-    fn eq(self: Point, other: Point) -> bool:
+impl Eq for Point:
+    fn eq(self: Point, other: Point):
         self.x == other.x and self.y == other.y
 
-impl Default for Point =
-    fn default() -> Point:
-        Point { x: 0, y: 0 }
+impl Default for Point:
+    fn default: Point { x: 0, y: 0 }
 ```
 
 Primitive types have prelude-provided impls for `Eq` and `Default`:
@@ -1199,12 +1311,23 @@ let esc = b'\x1B'
 let newline = b'\n'
 ```
 
-### Discard Explicitly With `_`
+### Use `_` for Unused Bindings, Not Ignored Calls
 
-If a binding is intentionally unused, write `_`:
+If a binding or pattern slot is intentionally unused, write `_`:
 
 ```
+let (_, value) = pair
+```
+
+Do not write `let _ =` just to call a function for its side effects. A call
+statement may ignore its result naturally:
+
+```
+// ✗ defensive noise
 let _ = cache.delete(key)
+
+// ✓ idiomatic
+cache.delete(key)
 ```
 
 ### No Shadowing: Prefer Pipelines

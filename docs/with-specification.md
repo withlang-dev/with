@@ -4,6 +4,7 @@
 **Changelog v6.7:** Reorganized — extracted test cases to `test/spec/`,
 roadmap to `docs/roadmap.md`, design rationale to `docs/design-rationale.md`,
 stdlib API tables to `docs/libstd-spec.md`. Added grammar appendix (§30).
+Added labels on arbitrary statements and `goto` (§13.5a, §13.5b).
 **Positioning:** Systems programming that feels like a modern language.
 **Principle:** Make the common case delightful. Be safe where it matters. Trust the programmer at the edges.
 
@@ -398,10 +399,10 @@ fn process(path: str) -> Result[Unit, IoError]:
 `defer` statements execute in LIFO order.
 
 **Control flow restriction:** `return`, labeled or unlabeled `break`,
-labeled or unlabeled `continue`, and `?` are **compile errors**
-inside `defer` blocks. Defer runs during scope cleanup — non-local
-control flow would silently swallow the function's actual return value
-or jump to unexpected locations:
+labeled or unlabeled `continue`, `goto`, and `?` are **compile errors**
+inside `defer` or `errdefer` blocks. Defer runs during scope cleanup
+— non-local control flow would silently swallow the function's actual
+return value or jump to unexpected locations:
 
 ```
 // ERROR: return inside defer
@@ -2451,6 +2452,9 @@ inline lambdas or non-escaping closures):
 - Labeled `break 'label` and `continue 'label` inside a `with`
   block may target any visible label in the enclosing function;
   `with` does not create a label-scope boundary.
+- **`goto 'label`** inside a `with` block may target a visible label
+  in the enclosing function, subject to the normal goto restrictions
+  (§13.5b).
 - **`?`** propagates errors to the **enclosing function**.
 
 ```
@@ -5037,35 +5041,60 @@ continues. Reference-pattern ergonomics (§9.7) apply here too, so
 patterns over `.iter()` output usually bind references without
 explicit `&`.
 
-### 13.5a Labeled Loops and Blocks
+### 13.5a Labels, Labeled Break, and Continue
 
-Labels provide named structured control-flow targets for nested loops
-and early-exit blocks. A label declaration is an identifier prefixed
-with a single quote. It appears as the first token of a statement and
-is followed immediately by the construct it labels:
+Labels provide named control-flow targets within a function. A label
+declaration is an identifier prefixed with a single quote:
 
 ```
-'outer while running:
-    ...
+'outer
+'search
+'L0
+```
 
-'rows for row in grid {
+A label appears as the first token of a statement. It may precede any
+statement: a block, a loop, a `let` or `var` binding, a `return`, an
+expression statement, or another label. The label and the statement
+it precedes are syntactically a single statement; the label does not
+declare a new scope. A label may appear alone on a line and label the
+next statement:
+
+```
+'top
+if done:
+    goto 'finish
+
+'outer for row in grid:
     ...
-}
 
 'parse:
     ...
 
-'cleanup {
-    ...
-}
+'finish return
 ```
 
 A label has no trailing colon of its own. Labeled `while` and `for`
 loops may use either colon-form or brace-form bodies; the body
 introducer is the same `:` or `{ }` the loop would use without a
-label. A bare labeled block may also use either body style: the token
-after the label is either `{` for a brace-form block or `:` for a
-colon-form block.
+label. A labeled block uses a body directly after the label: `:` for
+colon form or `{` for brace form.
+
+Every label name must be unique within its function. The label
+namespace is shared by `goto`, `break`, and `continue`, but is
+separate from ordinary identifiers, types, and keywords. A variable
+named `outer` and a label named `'outer` do not collide.
+
+Labels are function-local control-flow targets. They are not visible
+inside a nested `fn`, closure, `async:` block, or `gen fn` body.
+`with` blocks are transparent for label scoping: a label declared
+outside a `with` block remains visible inside the `with` body.
+
+```
+'outer for item in items:
+    with item.acquire() as guard:
+        if guard.is_done():
+            break 'outer       // valid: with is label-transparent
+```
 
 The existing unlabeled forms are unchanged:
 
@@ -5086,14 +5115,18 @@ Labeled `break` and `continue` are statements and have no value.
 labeled-block design and is invalid in this version.
 
 `break 'label` transfers control to the statement immediately after
-the construct labeled `'label`. The target may be a labeled `while`,
-a labeled `for`, or a labeled block.
+the construct labeled `'label`. The target label must be declared on
+a labeled `while`, labeled `for`, or labeled block that lexically
+encloses the `break`.
 
 `continue 'label` transfers control to the next iteration of the
 loop labeled `'label`. For a `while` loop, this means the condition
 check. For a `for` loop, this means the iterator-advance or
-next-element step. `continue 'label` is a compile error if the label
-names a block rather than a loop.
+next-element step. The target label must be declared on a labeled
+`while` or `for` that lexically encloses the `continue`.
+
+Labels on other statement forms are valid `goto` targets (§13.5b),
+but they are not valid targets for `break` or `continue`.
 
 Labeled blocks are statement-position only. They are not expressions,
 and they do not produce a value. This is valid:
@@ -5115,51 +5148,8 @@ let result = 'parse:          // ERROR: labeled block is not an expression
     ...
 ```
 
-Labels are in scope throughout the labeled construct's body,
-including nested constructs. For brace-form constructs, the body
-starts at the opening brace. For colon-form constructs, the body
-starts at the body colon.
-Labels live in a separate namespace from ordinary identifiers, types,
-and keywords, so a variable named `outer` and a label named `'outer`
-do not collide.
-
-Labels are function-local control-flow targets. They are not visible
-inside a nested `fn`, closure, `async:` block, or `gen fn` body.
-`with` blocks are transparent for label scoping: a label declared
-outside a `with` block remains visible inside the `with` body.
-
-```
-'outer for item in items:
-    with item.acquire() as guard:
-        if guard.is_done():
-            break 'outer       // valid: with is label-transparent
-```
-
-Nested active labels must have distinct names:
-
-```
-'l while a:
-    'l while b:                // ERROR: label 'l shadows enclosing 'l
-        break 'l
-```
-
-The same label name may be reused after the earlier labeled construct
-has gone out of scope:
-
-```
-'l while a: ...
-'l while b: ...                // OK: sibling label, first 'l is gone
-```
-
-A label declaration must be followed immediately by `while`, `for`,
-`{`, or `:`. A label before any other statement is a syntax error:
-
-```
-'l let x = 1                   // ERROR: label must target loop or block
-```
-
-A label token that is not the first token of a statement is also a
-syntax error:
+A label token that is not the first token of a statement is a syntax
+error:
 
 ```
 if cond: 'outer while true:    // ERROR: label must start a statement
@@ -5180,13 +5170,108 @@ because these are normal control transfers, not error returns.
 
 The compiler must diagnose at least these errors:
 
-- Undefined label: no visible enclosing loop or block has that label.
-- `continue` targeting a labeled block.
-- Nested label collision with an already-active label of the same name.
+- Duplicate label name in the same function.
+- Undefined label.
+- `break` targeting a label that is not on an enclosing loop or block.
+- `continue` targeting a label that is not on an enclosing loop.
 - Label token not at the start of a statement.
-- Label not followed immediately by `while`, `for`, `{`, or `:`.
 - Label use across a nested function, closure, `async:`, or `gen fn`
   boundary.
+
+A label that is not targeted by `goto`, `break`, or `continue`
+produces an `unused-label` warning. Labels exist to name control-flow
+targets; code that wants to name a construct purely for readability
+should use a comment.
+
+### 13.5b Goto Statement
+
+`goto` transfers control unconditionally to a labeled statement
+within the same function:
+
+```
+goto 'label
+```
+
+Conditional gotos are written by composition with `if`:
+
+```
+if cond: goto 'label
+```
+
+Example:
+
+```
+fn example:
+    var i = 0
+    'top
+    if i >= 10:
+        goto 'done
+    process(i)
+    i = i + 1
+    goto 'top
+    'done
+    print("finished")
+```
+
+The compiler rejects any `goto` that violates these static
+restrictions:
+
+**Function-local.** The target label must be declared in the same
+function as the `goto` statement. `goto` cannot cross function,
+closure, `async:`, or `gen fn` boundaries.
+
+**No entry into a block from outside.** The target label's enclosing
+scope chain must be a prefix of the goto site's enclosing scope
+chain. Equivalently, a `goto` may exit scopes, but it may not enter a
+scope that is not already active at the goto site.
+
+This forbids jumping from outside a loop into the loop body, jumping
+from one branch of an `if` into the other branch, and jumping from
+outside a `match` into one of its arms.
+
+**No skipping of variable initialization.** A `goto` must not jump
+over a binding declaration when that binding would be in scope at the
+target. Otherwise the target scope could observe, drop, or assign over
+a value that was never initialized.
+
+When a `goto` exits one or more scopes, cleanup is identical to
+falling out of those scopes normally or to an equivalent labeled
+`break`:
+
+- `defer` blocks run.
+- `Drop` destructors for owned values run.
+- `with` guards are released.
+
+`errdefer` blocks do not run for `goto`, because `goto` is a normal
+control transfer, not an error return.
+
+A backward `goto` to a point before a local binding's declaration ends
+that binding's current lifetime before the jump. Its cleanup runs
+before control transfers, and the binding is initialized again if
+execution later reaches its declaration.
+
+The compiler must diagnose at least these errors:
+
+- Undefined target label.
+- Target label declared outside the current function.
+- `goto` across a nested function, closure, `async:`, or `gen fn`
+  boundary.
+- `goto` that would enter a block from outside.
+- `goto` that would skip variable initialization.
+
+`with migrate` may emit `goto` when C source contains control flow
+that cannot be expressed with structured constructs, such as an
+irreducible control-flow graph. For reducible C, the migrator should
+prefer structured With using `while`, `if`, labeled `break`, and
+labeled `continue`. For irreducible C, each basic block may become a
+labeled statement at function scope, and each control-flow edge may
+become a `goto` or conditional `goto`.
+
+Computed goto (`goto *ptr`) and non-local jumps such as
+`setjmp`/`longjmp` are not supported. If `with migrate` encounters a
+function that requires one of those patterns, it must emit a
+diagnostic naming the function and source location, produce no
+misleading placeholder translation, and exit non-zero.
 
 ### 13.6 Collection Comprehensions
 
@@ -8429,8 +8514,8 @@ See §4.2.
 ### 20b.6 Unreachable Code
 
 Code after an unconditional `return`, labeled or unlabeled `break`,
-labeled or unlabeled `continue`, or diverging expression is dead. It
-is always either a bug or leftover from refactoring.
+labeled or unlabeled `continue`, `goto`, or diverging expression is
+dead. It is always either a bug or leftover from refactoring.
 
 ```
 // ERROR:
@@ -8448,8 +8533,21 @@ for x in items:
 The compiler detects unreachable code via control flow analysis and
 rejects it. This applies to all code after unconditional control
 flow transfers, including `return`, labeled or unlabeled `break`,
-labeled or unlabeled `continue`, and calls to functions with return
-type `Never` (e.g., `exit()`, `panic()`).
+labeled or unlabeled `continue`, `goto`, and calls to functions with
+return type `Never` (e.g., `exit()`, `panic()`).
+
+A labeled statement may be reachable only via `goto`. Ordinary
+unreachable-code diagnostics are suppressed for a labeled statement
+and for following statements until the next control-flow terminator
+or the next labeled statement:
+
+```
+fn example:
+    goto 'done
+    print("never")    // unreachable
+    'done
+    print("finished") // reachable via goto
+```
 
 **Exception for `comptime if`:** The unreachable code check runs
 **after** comptime evaluation. Branches eliminated by `comptime if`
@@ -8649,6 +8747,9 @@ observable behaviors are required:
 - Labeled `break 'label` and `continue 'label` inside a `with` block
   may target visible labels in the enclosing function; `with` blocks
   do not hide labels.
+- `goto 'label` inside a `with` block may target a visible label in
+  the enclosing function, subject to the normal goto restrictions
+  (§13.5b).
 - `?` inside a `with` block propagates to the **enclosing function**.
 
 The mechanism by which the compiler achieves this is unspecified.
@@ -8793,7 +8894,8 @@ The identifier part follows the ordinary identifier spelling rules:
 it starts with a letter or underscore and may contain letters,
 digits, and underscores. Labels are syntactically distinct from
 ordinary identifiers because of the leading quote and live in a
-separate namespace.
+separate namespace. That namespace is shared by label declarations
+and the target operands of `goto`, `break`, and `continue`.
 
 Single-quoted character literals are also valid syntax. A character
 literal is a single quote, followed by one character or escape
@@ -8863,6 +8965,7 @@ The following keywords are reserved and cannot be used as identifiers:
 | `match` | Pattern matching |
 | `for` | Loop over iterables |
 | `while` | Conditional loop |
+| `goto` | Unconditional jump to label |
 | `yield` | Generator / comprehension yield |
 | `return` | Early return |
 | `break` | Break from loop or labeled block |
@@ -8890,7 +8993,7 @@ The following keywords are reserved and cannot be used as identifiers:
 
 | Code | Description |
 |------|-------------|
-| E0901 | Non-local control flow (`return`, `break`, `continue`, `?`) inside `defer`/`errdefer` |
+| E0901 | Non-local control flow (`return`, `break`, `continue`, `goto`, `?`) inside `defer`/`errdefer` |
 | E0951 | Nested implicit `it` is ambiguous — use explicit `param => expr` for inner closure |
 | E0952 | `it` used in context expecting N != 1 parameters |
 | E0953 | `it` is a reserved keyword and cannot be used as an identifier |
@@ -8959,8 +9062,11 @@ block-introducer.
 
 **Labeled bodies:**
 
-Labels are statement prefixes (§13.5a). A label has no trailing colon
-of its own; the token after the label is the labeled construct:
+Labels are statement prefixes (§13.5a). A label may prefix any
+statement, either on the same line or on its own line immediately
+before the statement it labels. A label has no trailing colon of its
+own; when the labeled statement is a block, loop, or other body form,
+that construct still supplies its normal body introducer:
 
 ```
 'outer while running:
@@ -8977,11 +9083,14 @@ of its own; the token after the label is the labeled construct:
     maybe_exit()
 
 'early { maybe_exit() }
+
+'done return
 ```
 
 For labeled `while` and `for`, the loop still has its own body
 introducer. For colon-form labeled blocks, the colon after the label
-is the block-body introducer.
+is the block-body introducer. Labels on non-body statements, such as
+`'done return`, do not introduce a block.
 
 **Applies uniformly to all block-introducers:**
 
@@ -9125,12 +9234,11 @@ When the lexer sees a bare apostrophe, it tries `CHAR_LIT` before
 
 ```
 LABEL       := "'" IDENT
-LABEL_STMT_PREFIX := LABEL ( 'while' | 'for' | ':' | '{' )
 ```
 
 `LABEL` may appear as a statement prefix or as the target operand of
-`break` and `continue`. As a statement prefix, it must be the first
-token of the statement and has no trailing colon of its own.
+`goto`, `break`, and `continue`. As a statement prefix, it must be
+the first token of the statement and has no trailing colon of its own.
 
 ### 30.3 Declarations
 
@@ -9189,21 +9297,26 @@ LET_STMT    := 'let' [ 'mut' ] PATTERN [ ':' TYPE ] '=' EXPR
 VAR_STMT    := 'var' IDENT [ ':' TYPE ] '=' EXPR
 ```
 
-**Control flow** (§9, §13.5a):
+**Control flow** (§9, §13.5a, §13.5b):
 
 ```
+STMT        := LABEL_STMT | LET_STMT | VAR_STMT | IF_STMT | MATCH_STMT
+              | FOR_STMT | WHILE_STMT | WITH_STMT
+              | RETURN_STMT | BREAK_STMT | CONTINUE_STMT | GOTO_STMT
+              | DEFER_STMT | EXPR
+LABEL_STMT  := LABEL ( STMT | COLON_BODY | BRACE_BODY )
 IF_STMT     := 'if' EXPR BODY [ 'else' ( IF_STMT | BODY ) ]
               | 'if' EXPR 'then' EXPR [ 'else' EXPR ]
               | 'if' 'let' PATTERN '=' EXPR BODY [ 'else' BODY ]
 MATCH_STMT  := 'match' EXPR BODY_ARMS
 MATCH_ARM   := PATTERN [ 'if' EXPR ] '=>' EXPR
-FOR_STMT    := [ LABEL ] 'for' PATTERN 'in' EXPR BODY
-WHILE_STMT  := [ LABEL ] 'while' EXPR BODY
-LABELED_BLOCK := LABEL ( COLON_BODY | BRACE_BODY )
+FOR_STMT    := 'for' PATTERN 'in' EXPR BODY
+WHILE_STMT  := 'while' EXPR BODY
 WITH_STMT   := 'with' EXPR 'as' [ 'mut' ] IDENT BODY
 RETURN_STMT := 'return' [ EXPR ]
 BREAK_STMT  := 'break' [ LABEL ]
 CONTINUE_STMT := 'continue' [ LABEL ]
+GOTO_STMT   := 'goto' LABEL
 DEFER_STMT  := 'defer' EXPR
 ```
 
@@ -9293,12 +9406,12 @@ The following identifiers are reserved (§29.11):
 ```
 and       as        async     await     break     comptime
 const     continue  defer     else      enum      errdefer
-false     fn        for       gen       if        impl
-import    in        is        it        let       match
-mod       move      mut       not       or        pub
-return    self      sealed    struct    then      todo
-trait     true      type      unsafe    use       var
-where     while     with      yield
+false     fn        for       gen       goto      if
+impl      import    in        is        it        let
+match     mod       move      mut       not       or
+pub       return    self      sealed    struct    then
+todo      trait     true      type      unsafe    use
+var       where     while     with      yield
 ```
 
 ---
