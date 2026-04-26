@@ -951,10 +951,11 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
     // Body translation failed — emit stub with original C
     let loud_bail = ci_get_bail_message()
     if loud_bail.len() > 0:
+        g_migrate_fn_untranslatable = g_migrate_fn_untranslatable + 1
         let bail_loc = ci_get_bail_location()
         let loc_suffix = if bail_loc.len() > 0: " at " ++ bail_loc else: ""
-        ci_migrate_set_error("migrate: untranslatable function '" ++ name ++ "': stackify: " ++ loud_bail ++ loc_suffix)
-        return ""
+        eprint(f"migrate: untranslatable function '{name}': {loud_bail}{loc_suffix}")
+        return ci_migrate_render_stub(name, safe_name, params, ret, g_migrate_current_input_path, fn_cursor, session, bail_loc, loud_bail)
 
     if g_migrate_no_c_export != 0:
         let is_definition = with_ci_cursor_is_definition(session, ci_find_fn_cursor(session, name))
