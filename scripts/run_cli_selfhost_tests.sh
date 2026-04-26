@@ -2107,7 +2107,7 @@ int main(void) {
 }
 EOF
 
-  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace --convert-goto-to-structured -o "$out_w"; then
     echo "FAIL(cli-selfhost-migrate) lifted_if_tail_break"
     cat "$tmpdir/err" || true
     failures=$((failures + 1))
@@ -2236,7 +2236,7 @@ done:
 }
 EOF
 
-  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace --convert-goto-to-structured -o "$out_w"; then
     echo "FAIL(cli-selfhost-migrate) goto_stackify_core"
     cat "$tmpdir/err" || true
     failures=$((failures + 1))
@@ -2438,7 +2438,7 @@ int g(int mode) {
 }
 EOF
 
-  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace --convert-goto-to-structured -o "$out_w"; then
     echo "FAIL(cli-selfhost-migrate) goto_label_scope"
     cat "$tmpdir/err" || true
     failures=$((failures + 1))
@@ -2520,7 +2520,7 @@ int f(int mode) {
 }
 EOF
 
-  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace --convert-goto-to-structured -o "$out_w"; then
     echo "FAIL(cli-selfhost-migrate) goto_switch_label_tail"
     cat "$tmpdir/err" || true
     failures=$((failures + 1))
@@ -2652,7 +2652,7 @@ L:
 }
 EOF
 
-  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace --convert-goto-to-structured -o "$out_w"; then
     echo "FAIL(cli-selfhost-migrate) goto_loop_conditions"
     cat "$tmpdir/err" || true
     failures=$((failures + 1))
@@ -2785,7 +2785,7 @@ MARK:
 }
 EOF
 
-  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace --convert-goto-to-structured -o "$out_w"; then
     echo "FAIL(cli-selfhost-migrate) goto_loop_continue_state"
     cat "$tmpdir/err" || true
     failures=$((failures + 1))
@@ -2860,7 +2860,7 @@ AFTER:
 }
 EOF
 
-  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace --convert-goto-to-structured -o "$out_w"; then
     echo "FAIL(cli-selfhost-migrate) goto_after_if_label_bridge"
     cat "$tmpdir/err" || true
     failures=$((failures + 1))
@@ -2995,7 +2995,7 @@ RETURN_SWITCH:
 }
 EOF
 
-  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace --convert-goto-to-structured -o "$out_w"; then
     echo "FAIL(cli-selfhost-migrate) switch_macro_goto"
     cat "$tmpdir/err" || true
     failures=$((failures + 1))
