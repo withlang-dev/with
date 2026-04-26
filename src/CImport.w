@@ -8310,6 +8310,17 @@ fn ci_trim(s: str) -> str:
 fn ci_is_space(c: i32) -> bool:
     c == 32 or c == 9 or c == 10 or c == 13
 
+fn ci_is_integer_type_name(name: str) -> bool:
+    if ci_starts_with(name, "c_"):
+        return true
+    if name == "u8" or name == "u16" or name == "u32" or name == "u64":
+        return true
+    if name == "i8" or name == "i16" or name == "i32" or name == "i64":
+        return true
+    if name == "usize" or name == "isize":
+        return true
+    false
+
 fn ci_starts_with(s: str, prefix: str) -> bool:
     if prefix.len() > s.len():
         return false
@@ -10642,7 +10653,32 @@ fn ci_native_goto_emit_terminator(cfg: CiGotoCfg, block: i32, labels: &Vec[i32],
 
     ci_native_goto_fail("native goto emitter: block has no terminator")
 
-fn ci_native_goto_emit_cfg(cfg: CiGotoCfg, hoisted_stmt_ids: &Vec[i32], stmts: &mut CiStmtPool, exprs: &mut CiExprPool) -> CiStmtId:
+fn ci_native_goto_default_expr(ty_id: CiTypeId, types: &CiTypePool, exprs: &mut CiExprPool) -> CiExprId:
+    let tk = types.kind(ty_id)
+    if tk == CiTypeKind.CT_POINTER or tk == CiTypeKind.CT_FN_PTR:
+        return exprs.null_ptr(ty_id)
+    if tk == CiTypeKind.CT_BOOL:
+        return exprs.bool_lit(0, ty_id)
+    if tk == CiTypeKind.CT_FLOAT:
+        let idx = exprs.add_string("0.0")
+        return exprs.add(CiExprKind.CIE_FLOAT_LIT, idx, 0, 0, ty_id)
+    if tk == CiTypeKind.CT_NAMED:
+        let name = types.get_string(types.get_d0(ty_id))
+        if ci_starts_with(name, "*"):
+            return exprs.null_ptr(ty_id)
+        if name == "bool":
+            return exprs.bool_lit(0, ty_id)
+        if name == "f32" or name == "f64" or name == "c_longdouble":
+            let idx = exprs.add_string("0.0")
+            return exprs.add(CiExprKind.CIE_FLOAT_LIT, idx, 0, 0, ty_id)
+        if not ci_is_integer_type_name(name):
+            return 0 as CiExprId
+    if tk == CiTypeKind.CT_STRUCT or tk == CiTypeKind.CT_ARRAY:
+        return 0 as CiExprId
+    let zero_idx = exprs.add_string("0")
+    exprs.int_lit(zero_idx, ty_id)
+
+fn ci_native_goto_emit_cfg(cfg: CiGotoCfg, hoisted_stmt_ids: &Vec[i32], stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &CiTypePool) -> CiStmtId:
     let labels = ci_native_goto_label_syms(cfg, stmts)
     if cfg.graph.entry < 0 or cfg.graph.entry >= labels.len() as i32:
         return ci_native_goto_fail("native goto emitter: entry block out of range")
@@ -10653,12 +10689,43 @@ fn ci_native_goto_emit_cfg(cfg: CiGotoCfg, hoisted_stmt_ids: &Vec[i32], stmts: &
         ids.push(hoisted_stmt_ids.get(hi))
         hi = hi + 1
 
+    let replace_ids: Vec[i32] = Vec.new()
+    var ri: i64 = 0
+    while ri < cfg.stmt_ids.len():
+        let sid = cfg.stmt_ids.get(ri) as CiStmtId
+        if stmts.kind(sid) == CiStmtKind.CIS_VAR_DECL:
+            let name_sym = stmts.get_d0(sid)
+            let ty_id = stmts.get_d1(sid) as CiTypeId
+            let init_expr = stmts.get_d2(sid) as CiExprId
+            let flags = stmts.get_flags(sid)
+            let is_mut = flags & 1
+            let zero = ci_native_goto_default_expr(ty_id, types, exprs)
+            ids.push(stmts.var_decl(name_sym, ty_id, zero, is_mut) as i32)
+            if (init_expr as i32) != 0:
+                let name_str = stmts.get_string(name_sym)
+                let lhs_sym = exprs.add_string(name_str)
+                let lhs = exprs.ident(lhs_sym, ty_id)
+                replace_ids.push(stmts.assign(lhs, init_expr) as i32)
+            else:
+                replace_ids.push(0)
+        else:
+            replace_ids.push(0)
+        ri = ri + 1
+
     ids.push(stmts.goto_label(labels.get(cfg.graph.entry as i64)) as i32)
 
     var block: i32 = 0
     while block < cfg.graph.blocks.len() as i32:
         let block_ids: Vec[i32] = Vec.new()
-        ci_native_goto_collect_leaf_ids(cfg, block, &mut block_ids)
+        var li: i64 = 0
+        while li < cfg.stmt_ids.len():
+            if cfg.stmt_blocks.get(li) == block:
+                let rep = replace_ids.get(li)
+                if rep != 0:
+                    block_ids.push(rep)
+                else if stmts.kind(cfg.stmt_ids.get(li) as CiStmtId) != CiStmtKind.CIS_VAR_DECL:
+                    block_ids.push(cfg.stmt_ids.get(li))
+            li = li + 1
         let term = ci_native_goto_emit_terminator(cfg, block, &labels, stmts, exprs)
         if (term as i32) == 0:
             return 0 as CiStmtId
@@ -10716,7 +10783,7 @@ fn ci_lower_goto_body_stackify(session: i64, body_cursor: i32, scope: str, stmts
         return 0 as CiStmtId
 
     if not migrate_convert_goto_to_structured():
-        return ci_native_goto_emit_cfg(ctx.cfg, &hoisted_stmt_ids, stmts, exprs)
+        return ci_native_goto_emit_cfg(ctx.cfg, &hoisted_stmt_ids, stmts, exprs, types)
 
     let result = stackify_graph(ctx.cfg.graph)
     if not result.ok:
