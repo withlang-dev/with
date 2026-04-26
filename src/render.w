@@ -400,6 +400,28 @@ fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
             out = out ++ render_expr(pool, intern, (tail) as NodeId, body_indent)
         return out
 
+    if kind == NodeKind.NK_LABEL:
+        let label = pool.get_data0(node)
+        let stmt = pool.get_data1(node)
+        if stmt != 0:
+            let sk = pool.kind(stmt)
+            if sk == NodeKind.NK_WHILE and pool.get_data2(stmt) == label:
+                return render_expr(pool, intern, (stmt) as NodeId, indent)
+            if sk == NodeKind.NK_LOOP and pool.get_data1(stmt) == label:
+                return render_expr(pool, intern, (stmt) as NodeId, indent)
+            if sk == NodeKind.NK_FOR:
+                let fm = pool.find_for_meta(stmt as NodeId)
+                if fm >= 0 and pool.for_meta_label(fm) == label:
+                    return render_expr(pool, intern, (stmt) as NodeId, indent)
+            if sk == NodeKind.NK_BLOCK:
+                let bm = pool.find_block_meta(stmt as NodeId)
+                if bm >= 0 and pool.block_meta_label(bm) == label:
+                    return render_expr(pool, intern, (stmt) as NodeId, indent)
+        return prefix ++ "'" ++ intern.resolve(label) ++ " " ++ render_expr(pool, intern, (stmt) as NodeId, 0)
+
+    if kind == NodeKind.NK_GOTO:
+        return prefix ++ "goto '" ++ intern.resolve(pool.get_data0(node))
+
     if kind == NodeKind.NK_IF_EXPR:
         let cond = pool.get_data0(node)
         let then_body = pool.get_data1(node)
@@ -554,7 +576,11 @@ fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
 
     if kind == NodeKind.NK_LOOP:
         let body = pool.get_data0(node)
-        return prefix ++ "loop:\n" ++ render_expr(pool, intern, (body) as NodeId, indent + 2)
+        let label = pool.get_data1(node)
+        var out = prefix
+        if label != 0:
+            out = out ++ "'" ++ intern.resolve(label) ++ " "
+        return out ++ "loop:\n" ++ render_expr(pool, intern, (body) as NodeId, indent + 2)
 
     if kind == NodeKind.NK_FOR:
         let binding = pool.get_data0(node)

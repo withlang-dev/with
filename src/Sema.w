@@ -18,6 +18,7 @@ extern fn with_str_eq(a: str, b: str) -> i32
 extern fn with_getenv_str(name: str) -> str
 extern fn with_str_clone(s: str) -> str
 extern fn with_hashmap_new(key_size: i64, val_size: i64) -> *i8
+extern fn i64_to_string(n: i64) -> str
 
 // ── Type kind constants ──────────────────────────────────────────
 
@@ -58,6 +59,24 @@ enum LabelFrameKind: i32:
     LFK_WHILE = 1
     LFK_FOR = 2
     LFK_BLOCK = 3
+
+type LabelRegistryState {
+    label_syms: Vec[i32],
+    label_nodes: Vec[i32],
+    label_paths: Vec[str],
+    label_orders: Vec[i32],
+    label_used: Vec[i32],
+    goto_syms: Vec[i32],
+    goto_nodes: Vec[i32],
+    goto_paths: Vec[str],
+    goto_orders: Vec[i32],
+    init_nodes: Vec[i32],
+    init_paths: Vec[str],
+    init_orders: Vec[i32],
+    scope_stack: Vec[i32],
+    next_scope_id: i32,
+    order_counter: i32,
+}
 
 enum DeriveReq: i32:
     COPY = 0
@@ -284,6 +303,21 @@ type Sema {
     label_syms: Vec[i32],
     label_kinds: Vec[i32],
     label_nodes: Vec[i32],
+    fn_label_syms: Vec[i32],
+    fn_label_nodes: Vec[i32],
+    fn_label_paths: Vec[str],
+    fn_label_orders: Vec[i32],
+    fn_label_used: Vec[i32],
+    fn_goto_syms: Vec[i32],
+    fn_goto_nodes: Vec[i32],
+    fn_goto_paths: Vec[str],
+    fn_goto_orders: Vec[i32],
+    fn_init_nodes: Vec[i32],
+    fn_init_paths: Vec[str],
+    fn_init_orders: Vec[i32],
+    fn_label_scope_stack: Vec[i32],
+    fn_label_next_scope_id: i32,
+    fn_label_order_counter: i32,
 
     // Borrow tracking
     borrow_kinds: Vec[i32],
@@ -727,6 +761,21 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         label_syms: Vec.new(),
         label_kinds: Vec.new(),
         label_nodes: Vec.new(),
+        fn_label_syms: Vec.new(),
+        fn_label_nodes: Vec.new(),
+        fn_label_paths: Vec.new(),
+        fn_label_orders: Vec.new(),
+        fn_label_used: Vec.new(),
+        fn_goto_syms: Vec.new(),
+        fn_goto_nodes: Vec.new(),
+        fn_goto_paths: Vec.new(),
+        fn_goto_orders: Vec.new(),
+        fn_init_nodes: Vec.new(),
+        fn_init_paths: Vec.new(),
+        fn_init_orders: Vec.new(),
+        fn_label_scope_stack: Vec.new(),
+        fn_label_next_scope_id: 0,
+        fn_label_order_counter: 0,
         borrow_kinds: Vec.new(),
         borrow_places: Vec.new(),
         borrow_fields: Vec.new(),

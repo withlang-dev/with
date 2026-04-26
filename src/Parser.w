@@ -168,7 +168,7 @@ fn parser_is_keyword_tag(tag: i32) -> bool:
         return true
     if tag == TokenKind.TK_KW_CONST or tag == TokenKind.TK_KW_IT or tag == TokenKind.TK_KW_ERRDEFER or tag == TokenKind.TK_KW_MOVE:
         return true
-    if tag == TokenKind.TK_KW_WHERE or tag == TokenKind.TK_KW_OPAQUE or tag == TokenKind.TK_KW_NULL or tag == TokenKind.TK_KW_UNION or tag == TokenKind.TK_KW_ENUM:
+    if tag == TokenKind.TK_KW_WHERE or tag == TokenKind.TK_KW_OPAQUE or tag == TokenKind.TK_KW_NULL or tag == TokenKind.TK_KW_UNION or tag == TokenKind.TK_KW_ENUM or tag == TokenKind.TK_KW_GOTO:
         return true
     false
 
@@ -260,7 +260,8 @@ fn Parser.recover_to_statement(self: Parser):
            t == TokenKind.TK_KW_RETURN or t == TokenKind.TK_KW_IF or
            t == TokenKind.TK_KW_FOR or t == TokenKind.TK_KW_WHILE or
            t == TokenKind.TK_KW_MATCH or t == TokenKind.TK_KW_BREAK or
-           t == TokenKind.TK_KW_CONTINUE or t == TokenKind.TK_KW_DEFER:
+           t == TokenKind.TK_KW_CONTINUE or t == TokenKind.TK_KW_GOTO or
+           t == TokenKind.TK_LABEL or t == TokenKind.TK_KW_DEFER:
             // Check this is at the start of a line (preceded by newline or BOF)
             if tok_start == 0:
                 return
@@ -2507,6 +2508,7 @@ fn Parser.parse_primary(self: Parser) -> NodeId:
     if t == TokenKind.TK_KW_RETURN: return self.parse_return()
     if t == TokenKind.TK_KW_BREAK: return self.parse_break()
     if t == TokenKind.TK_KW_CONTINUE: return self.parse_continue()
+    if t == TokenKind.TK_KW_GOTO: return self.parse_goto()
     if t == TokenKind.TK_LABEL: return self.parse_labeled_statement()
     if t == TokenKind.TK_KW_UNSAFE: return self.parse_unsafe()
     if t == TokenKind.TK_KW_ASM: return self.parse_asm_expr()
@@ -4606,21 +4608,48 @@ fn Parser.parse_labeled_statement(self: Parser) -> NodeId:
     let label_text = self.source.slice((start + 1) as i64, label_end as i64)
     let label_sym = self.intern.intern(label_text)
     self.advance()
+    self.skip_separators()
 
     let t = self.peek()
-    if t == TokenKind.TK_KW_FOR: return self.parse_for(label_sym)
-    if t == TokenKind.TK_KW_WHILE: return self.parse_while(label_sym)
+    var stmt: NodeId = 0 as NodeId
+    if t == TokenKind.TK_KW_FOR:
+        stmt = self.parse_for(label_sym)
+        return self.pool.add_node(NodeKind.NK_LABEL, start, self.pool.get_end(stmt), label_sym, stmt, 0)
+    if t == TokenKind.TK_KW_WHILE:
+        stmt = self.parse_while(label_sym)
+        return self.pool.add_node(NodeKind.NK_LABEL, start, self.pool.get_end(stmt), label_sym, stmt, 0)
+    if t == TokenKind.TK_KW_LOOP:
+        stmt = self.parse_loop(label_sym)
+        return self.pool.add_node(NodeKind.NK_LABEL, start, self.pool.get_end(stmt), label_sym, stmt, 0)
     if t == TokenKind.TK_L_BRACE:
         self.advance()
         let body = self.parse_braced_body()
-        return self.finish_labeled_block(start, label_sym, body)
+        stmt = self.finish_labeled_block(start, label_sym, body)
+        return self.pool.add_node(NodeKind.NK_LABEL, start, self.pool.get_end(stmt), label_sym, stmt, 0)
     if t == TokenKind.TK_COLON:
         self.advance()
         let body = self.parse_block_or_expr()
-        return self.finish_labeled_block(start, label_sym, body)
+        stmt = self.finish_labeled_block(start, label_sym, body)
+        return self.pool.add_node(NodeKind.NK_LABEL, start, self.pool.get_end(stmt), label_sym, stmt, 0)
+    if t == TokenKind.TK_EOF or t == TokenKind.TK_DEDENT or t == TokenKind.TK_R_BRACE:
+        self.emit_error("label must be followed by a statement")
+        return self.poisoned_expr()
 
-    self.emit_error("label must be followed by 'while', 'for', '{', or ':'")
-    self.poisoned_expr()
+    stmt = self.parse_expr()
+    self.pool.add_node(NodeKind.NK_LABEL, start, self.pool.get_end(stmt), label_sym, stmt, 0)
+
+fn Parser.parse_goto(self: Parser) -> NodeId:
+    let start = self.current_start()
+    self.advance()
+    self.skip_newlines()
+    if self.peek() != TokenKind.TK_LABEL:
+        self.emit_error("expected label after 'goto'")
+        return self.poisoned_expr()
+    let ls = self.current_start()
+    let le = self.current_end()
+    let label = self.intern.intern(self.source.slice((ls + 1) as i64, le as i64))
+    self.advance()
+    self.pool.add_node(NodeKind.NK_GOTO, start, self.prev_end(), label, 0, 0)
 
 fn Parser.parse_break(self: Parser) -> NodeId:
     let start = self.current_start()
@@ -5634,7 +5663,7 @@ fn Parser.parse_block_or_expr(self: Parser) -> NodeId:
         // (not a newline). Check column to decide if it's still in this block.
         if cur != TokenKind.TK_NEWLINE and cur != TokenKind.TK_SEMICOLON:
             let cur_col = column_of(self.source, self.current_start())
-            if cur_col >= block_col and (cur == TokenKind.TK_KW_LET or cur == TokenKind.TK_KW_VAR or cur == TokenKind.TK_KW_RETURN or cur == TokenKind.TK_KW_IF or cur == TokenKind.TK_KW_FOR or cur == TokenKind.TK_KW_WHILE or cur == TokenKind.TK_KW_MATCH or cur == TokenKind.TK_KW_DEFER):
+            if cur_col >= block_col and (cur == TokenKind.TK_KW_LET or cur == TokenKind.TK_KW_VAR or cur == TokenKind.TK_KW_RETURN or cur == TokenKind.TK_KW_IF or cur == TokenKind.TK_KW_FOR or cur == TokenKind.TK_KW_WHILE or cur == TokenKind.TK_KW_MATCH or cur == TokenKind.TK_KW_BREAK or cur == TokenKind.TK_KW_CONTINUE or cur == TokenKind.TK_KW_GOTO or cur == TokenKind.TK_LABEL or cur == TokenKind.TK_KW_DEFER):
                 stmts.push(last_expr as i32)
                 last_expr = self.parse_expr()
                 continue

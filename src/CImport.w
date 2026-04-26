@@ -10574,6 +10574,106 @@ fn ci_stack_emit_tree(tree: StackifyTree, cfg: CiGotoCfg, stmts: &mut CiStmtPool
         return 0 as CiStmtId
     ci_stack_emit_stmt_block(stmts, &ids)
 
+fn ci_native_goto_fail(msg: str) -> CiStmtId:
+    g_ci_bail_kind = CXK_GOTO_STMT
+    g_ci_bail_message = msg
+    0 as CiStmtId
+
+fn ci_native_goto_label_syms(cfg: CiGotoCfg, stmts: &mut CiStmtPool) -> Vec[i32]:
+    let labels: Vec[i32] = Vec.new()
+    var block: i32 = 0
+    while block < cfg.graph.blocks.len() as i32:
+        labels.push(stmts.add_string("__ci_bb_" ++ i64_to_string(block as i64)))
+        block = block + 1
+    labels
+
+fn ci_native_goto_collect_leaf_ids(cfg: CiGotoCfg, block: i32, out: &mut Vec[i32]):
+    var i: i64 = 0
+    while i < cfg.stmt_ids.len():
+        if cfg.stmt_blocks.get(i) == block:
+            out.push(cfg.stmt_ids.get(i))
+        i = i + 1
+
+fn ci_native_goto_unreachable_stmt(stmts: &mut CiStmtPool, exprs: &mut CiExprPool) -> CiStmtId:
+    let name = exprs.add_string("unreachable")
+    let callee = exprs.ident(name, 0 as CiTypeId)
+    let args_start = exprs.extra.len() as i32
+    let call = exprs.add(CiExprKind.CIE_CALL, callee as i32, args_start, 0, 0 as CiTypeId)
+    stmts.expr_stmt(call)
+
+fn ci_native_goto_single_goto(stmts: &mut CiStmtPool, label_sym: i32) -> CiStmtId:
+    stmts.goto_label(label_sym)
+
+fn ci_native_goto_emit_terminator(cfg: CiGotoCfg, block: i32, labels: &Vec[i32], stmts: &mut CiStmtPool, exprs: &mut CiExprPool) -> CiStmtId:
+    if block < 0 or block >= cfg.graph.blocks.len() as i32:
+        return ci_native_goto_fail("native goto emitter: block out of range")
+    let b = cfg.graph.blocks.get(block as i64)
+    if b.term_kind == StackifyTermKind.Br:
+        if b.targets_count != 1:
+            return ci_native_goto_fail("native goto emitter: malformed branch terminator")
+        let target = cfg.graph.targets.get(b.targets_start as i64).block
+        if target < 0 or target >= labels.len() as i32:
+            return ci_native_goto_fail("native goto emitter: branch target out of range")
+        return ci_native_goto_single_goto(stmts, labels.get(target as i64))
+
+    if b.term_kind == StackifyTermKind.CondBr:
+        if b.targets_count != 2 or b.cond_value == 0:
+            return ci_native_goto_fail("native goto emitter: malformed conditional branch")
+        let true_target = cfg.graph.targets.get(b.targets_start as i64).block
+        let false_target = cfg.graph.targets.get((b.targets_start + 1) as i64).block
+        if true_target < 0 or true_target >= labels.len() as i32 or false_target < 0 or false_target >= labels.len() as i32:
+            return ci_native_goto_fail("native goto emitter: conditional target out of range")
+        let then_id = ci_native_goto_single_goto(stmts, labels.get(true_target as i64))
+        let else_id = ci_native_goto_single_goto(stmts, labels.get(false_target as i64))
+        return stmts.if_stmt(b.cond_value as CiExprId, then_id, else_id)
+
+    if b.term_kind == StackifyTermKind.Return:
+        if b.return_values_count == 0:
+            return stmts.return_(0 as CiExprId)
+        if b.return_values_count == 1:
+            return stmts.return_(cfg.graph.return_values.get(b.return_values_start as i64) as CiExprId)
+        return ci_native_goto_fail("native goto emitter: multiple return values are not supported")
+
+    if b.term_kind == StackifyTermKind.Unreachable:
+        return ci_native_goto_unreachable_stmt(stmts, exprs)
+
+    if b.term_kind == StackifyTermKind.Select:
+        return ci_native_goto_fail("native goto emitter: select terminator is not supported")
+
+    ci_native_goto_fail("native goto emitter: block has no terminator")
+
+fn ci_native_goto_emit_cfg(cfg: CiGotoCfg, hoisted_stmt_ids: &Vec[i32], stmts: &mut CiStmtPool, exprs: &mut CiExprPool) -> CiStmtId:
+    let labels = ci_native_goto_label_syms(cfg, stmts)
+    if cfg.graph.entry < 0 or cfg.graph.entry >= labels.len() as i32:
+        return ci_native_goto_fail("native goto emitter: entry block out of range")
+
+    let ids: Vec[i32] = Vec.new()
+    var hi: i64 = 0
+    while hi < hoisted_stmt_ids.len():
+        ids.push(hoisted_stmt_ids.get(hi))
+        hi = hi + 1
+
+    ids.push(stmts.goto_label(labels.get(cfg.graph.entry as i64)) as i32)
+
+    var block: i32 = 0
+    while block < cfg.graph.blocks.len() as i32:
+        let block_ids: Vec[i32] = Vec.new()
+        ci_native_goto_collect_leaf_ids(cfg, block, &mut block_ids)
+        let term = ci_native_goto_emit_terminator(cfg, block, &labels, stmts, exprs)
+        if (term as i32) == 0:
+            return 0 as CiStmtId
+        block_ids.push(term as i32)
+
+        let start = stmts.extra.len() as i32
+        var bi: i64 = 0
+        while bi < block_ids.len():
+            let _ = stmts.add_extra(block_ids.get(bi))
+            bi = bi + 1
+        ids.push(stmts.block_labeled(start, block_ids.len() as i32, labels.get(block as i64)) as i32)
+        block = block + 1
+
+    ci_stmt_from_flat_ids(stmts, &ids)
+
 fn ci_goto_cfg_verify_labels(ctx: &mut CiGotoCfgContext):
     var i = 0
     while i < ctx.label_names.len() as i32 and ctx.ok:
@@ -10617,9 +10717,13 @@ fn ci_lower_goto_body_stackify(session: i64, body_cursor: i32, scope: str, stmts
 
     let result = stackify_graph(ctx.cfg.graph)
     if not result.ok:
+        let native_body_id = ci_native_goto_emit_cfg(ctx.cfg, &hoisted_stmt_ids, stmts, exprs)
+        if (native_body_id as i32) != 0:
+            return native_body_id
         g_ci_bail_location = if ctx.location.len() > 0: ctx.location else: with_ci_cursor_location(session, body_cursor)
+        if g_ci_bail_message.len() == 0:
+            g_ci_bail_message = result.message
         g_ci_bail_kind = CXK_GOTO_STMT
-        g_ci_bail_message = result.message
         return 0 as CiStmtId
     let body_id = ci_stack_emit_tree(result.tree, ctx.cfg, stmts, exprs, types)
     if (body_id as i32) == 0:

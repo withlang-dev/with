@@ -2294,16 +2294,29 @@ EOF
     return
   fi
 
-  if ! grep -Fq "irreducible control flow" "$tmpdir/err"; then
-    echo "FAIL(cli-selfhost-migrate-output) goto_irreducible diagnostic missing"
-    cat "$tmpdir/err" || true
+  if ! grep -Fq "goto '__ci_bb_" "$bad_out" \
+      || ! grep -Fq "'__ci_bb_" "$bad_out" \
+      || grep -Fq "MIGRATOR_UNTRANSLATED" "$bad_out" \
+      || grep -Fq "migrator: untranslatable function 'irreducible'" "$bad_out"; then
+    echo "FAIL(cli-selfhost-migrate-output) goto_irreducible native goto missing"
+    sed -n '1,160p' "$bad_out" || true
     failures=$((failures + 1))
     return
   fi
 
-  if ! grep -Fq "MIGRATOR_UNTRANSLATED" "$bad_out"; then
-    echo "FAIL(cli-selfhost-migrate-output) goto_irreducible stub missing"
-    sed -n '1,160p' "$bad_out" || true
+  cat >>"$bad_out" <<'EOF'
+
+fn main() -> i32 {
+    if irreducible(0) != 10 { return 1 }
+    if irreducible(12) != 12 { return 2 }
+    0
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" run "$bad_out"; then
+    echo "FAIL(cli-selfhost-run) goto_irreducible"
+    cat "$tmpdir/err" || true
+    sed -n '1,220p' "$bad_out" || true
     failures=$((failures + 1))
     return
   fi
@@ -2698,8 +2711,8 @@ expect_migrate_goto_into_loop_switch_label_rejected() {
   mkdir -p "$case_dir"
 
   # A goto before the loop can enter a label inside the loop's switch body.
-  # That gives the loop two entries, so the stackify-based migrator must reject
-  # it loudly instead of falling back to the removed state-machine lowering.
+  # That gives the loop two entries, so structured stackification cannot
+  # represent it; native With goto must preserve the CFG without stubbing.
   cat >"$src" <<'EOF'
 int switch_label_scan_after_switch(int n) {
   int out = 0;
@@ -2736,15 +2749,11 @@ EOF
     return
   fi
 
-  if ! grep -Fq "irreducible control flow" "$tmpdir/err"; then
-    echo "FAIL(cli-selfhost-migrate-output) goto_into_loop_switch_label diagnostic missing"
-    cat "$tmpdir/err" || true
-    failures=$((failures + 1))
-    return
-  fi
-
-  if ! grep -Fq "MIGRATOR_UNTRANSLATED" "$out_w"; then
-    echo "FAIL(cli-selfhost-migrate-output) goto_into_loop_switch_label stub missing"
+  if ! grep -Fq "goto '__ci_bb_" "$out_w" \
+      || ! grep -Fq "'__ci_bb_" "$out_w" \
+      || grep -Fq "MIGRATOR_UNTRANSLATED" "$out_w" \
+      || grep -Fq "migrator: untranslatable function 'switch_label_scan_after_switch'" "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate-output) goto_into_loop_switch_label native goto missing"
     sed -n '1,160p' "$out_w" || true
     failures=$((failures + 1))
     return

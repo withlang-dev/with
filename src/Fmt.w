@@ -312,6 +312,7 @@ fn needs_space_before(cur: i32, prev: i32) -> bool:
     if prev == TokenKind.TK_KW_COMPTIME or prev == TokenKind.TK_KW_DEFER: return true
     if prev == TokenKind.TK_KW_AS or prev == TokenKind.TK_KW_CONST: return true
     if prev == TokenKind.TK_KW_BREAK or prev == TokenKind.TK_KW_CONTINUE: return true
+    if prev == TokenKind.TK_KW_GOTO: return true
     if prev == TokenKind.TK_KW_MUT or prev == TokenKind.TK_KW_DYN: return true
     if prev == TokenKind.TK_KW_GEN or prev == TokenKind.TK_KW_YIELD: return true
     if prev == TokenKind.TK_KW_ERRDEFER or prev == TokenKind.TK_KW_MOVE: return true

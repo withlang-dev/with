@@ -88,7 +88,7 @@ fn build_cfg(pool: AstPool, expr_node: i32) -> CfgGraph:
 
     // Connect to exit
     let kind = pool.kind(expr_node)
-    if kind != NodeKind.NK_RETURN and kind != NodeKind.NK_BREAK:
+    if kind != NodeKind.NK_RETURN and kind != NodeKind.NK_BREAK and kind != NodeKind.NK_GOTO:
         graph.add_edge(result, graph.exit)
 
     graph
@@ -101,6 +101,9 @@ fn build_expr(graph: CfgGraph, pool: AstPool, node: i32) -> i32:
     if kind == NodeKind.NK_BLOCK:
         return build_block(graph, pool, node)
 
+    if kind == NodeKind.NK_LABEL:
+        return build_expr(graph, pool, pool.get_data1(node))
+
     if kind == NodeKind.NK_IF_EXPR:
         return build_if(graph, pool, node)
 
@@ -110,7 +113,7 @@ fn build_expr(graph: CfgGraph, pool: AstPool, node: i32) -> i32:
     if kind == NodeKind.NK_LOOP:
         return build_loop(graph, pool, node)
 
-    if kind == NodeKind.NK_RETURN or kind == NodeKind.NK_BREAK:
+    if kind == NodeKind.NK_RETURN or kind == NodeKind.NK_BREAK or kind == NodeKind.NK_GOTO:
         let n = graph.add_node(CfgNodeKind.Expr, start, end)
         graph.add_edge(n, graph.exit)
         return n

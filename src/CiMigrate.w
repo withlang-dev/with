@@ -948,13 +948,29 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
             return export_prefix ++ "fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ " {\n" ++ body ++ "}\n\n"
         return export_prefix ++ "fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ ":\n" ++ body ++ "\n"
 
-    // Body translation failed — emit stub with original C
+    // Body translation failed. Unsupported non-local/computed control flow is
+    // a hard migration error; other legacy failure paths still render an
+    // untranslated marker for now.
+    if fn_cursor >= 0 and ci_str_contains(with_ci_cursor_source_text(session, fn_cursor), "goto *"):
+        let bail_loc0 = ci_get_bail_location()
+        let fn_loc0 = with_ci_cursor_location(session, fn_cursor)
+        let loc0 = if bail_loc0.len() > 0: bail_loc0 else: fn_loc0
+        let loc_suffix0 = if loc0.len() > 0: " at " ++ loc0 else: ""
+        let msg0 = f"migrate: untranslatable function '{name}': computed goto is not supported{loc_suffix0}"
+        eprint(msg0)
+        ci_migrate_set_error(msg0)
+        return ""
+
     let loud_bail = ci_get_bail_message()
     if loud_bail.len() > 0:
-        g_migrate_fn_untranslatable = g_migrate_fn_untranslatable + 1
         let bail_loc = ci_get_bail_location()
         let loc_suffix = if bail_loc.len() > 0: " at " ++ bail_loc else: ""
-        eprint(f"migrate: untranslatable function '{name}': {loud_bail}{loc_suffix}")
+        let msg = f"migrate: untranslatable function '{name}': {loud_bail}{loc_suffix}"
+        eprint(msg)
+        if ci_str_contains(loud_bail, "computed or unresolved goto"):
+            ci_migrate_set_error(msg)
+            return ""
+        g_migrate_fn_untranslatable = g_migrate_fn_untranslatable + 1
         return ci_migrate_render_stub(name, safe_name, params, ret, g_migrate_current_input_path, fn_cursor, session, bail_loc, loud_bail)
 
     if g_migrate_no_c_export != 0:
