@@ -2287,16 +2287,23 @@ B:
 }
 EOF
 
-  if run_cli "$tmpdir/out" "$tmpdir/err" migrate "$bad_src" --no-c-export --prefer-brace -o "$bad_out"; then
-    echo "FAIL(cli-selfhost-migrate) goto_irreducible accepted"
-    sed -n '1,160p' "$bad_out" || true
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$bad_src" --no-c-export --prefer-brace -o "$bad_out"; then
+    echo "FAIL(cli-selfhost-migrate) goto_irreducible rejected whole file"
+    cat "$tmpdir/err" || true
     failures=$((failures + 1))
     return
   fi
 
-  if ! grep -Fq "stackify: irreducible control flow" "$tmpdir/err"; then
-    echo "FAIL(cli-selfhost-migrate-output) goto_irreducible diagnostic"
+  if ! grep -Fq "irreducible control flow" "$tmpdir/err"; then
+    echo "FAIL(cli-selfhost-migrate-output) goto_irreducible diagnostic missing"
     cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! grep -Fq "MIGRATOR_UNTRANSLATED" "$bad_out"; then
+    echo "FAIL(cli-selfhost-migrate-output) goto_irreducible stub missing"
+    sed -n '1,160p' "$bad_out" || true
     failures=$((failures + 1))
     return
   fi
@@ -2722,16 +2729,23 @@ int switch_label_scan_after_switch(int n) {
 }
 EOF
 
-  if run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
-    echo "FAIL(cli-selfhost-migrate) goto_into_loop_switch_label accepted"
-    sed -n '1,220p' "$out_w" || true
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) goto_into_loop_switch_label rejected whole file"
+    cat "$tmpdir/err" || true
     failures=$((failures + 1))
     return
   fi
 
-  if ! grep -Fq "stackify: irreducible control flow" "$tmpdir/err"; then
-    echo "FAIL(cli-selfhost-migrate-output) goto_into_loop_switch_label diagnostic"
+  if ! grep -Fq "irreducible control flow" "$tmpdir/err"; then
+    echo "FAIL(cli-selfhost-migrate-output) goto_into_loop_switch_label diagnostic missing"
     cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! grep -Fq "MIGRATOR_UNTRANSLATED" "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate-output) goto_into_loop_switch_label stub missing"
+    sed -n '1,160p' "$out_w" || true
     failures=$((failures + 1))
     return
   fi
