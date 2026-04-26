@@ -379,41 +379,17 @@ type CiStmtId = distinct i32
 enum CiStmtKind: i32:
     CIS_EXPR = 1             // d0 = expr_id
     CIS_RETURN = 2           // d0 = expr_id (0 = bare return)
-    CIS_BLOCK = 3            // d0 = stmts_extra_start, d1 = stmts_count
+    CIS_BLOCK = 3            // d0 = stmts_extra_start, d1 = stmts_count, d2 = label_sym (0 if none)
     CIS_IF = 4               // d0 = cond_expr, d1 = then_block, d2 = else_block (0 if none)
-    CIS_WHILE = 5            // d0 = cond_expr, d1 = body_block
+    CIS_WHILE = 5            // d0 = cond_expr, d1 = body_block, d2 = label_sym (0 if none)
     CIS_DO_WHILE = 6         // d0 = body_block, d1 = cond_expr
     CIS_FOR = 7              // d0 = extra_start holding [init_stmt, cond_expr, inc_expr], d1 = body_block
     CIS_MATCH = 8            // d0 = subject_expr, d1 = arms_extra_start, d2 = arm_count
-    CIS_BREAK = 9            // no data
-    CIS_CONTINUE = 10        // no data
+    CIS_BREAK = 9            // d0 = label_sym (0 if none)
+    CIS_CONTINUE = 10        // d0 = label_sym (0 if none)
     CIS_VAR_DECL = 11        // d0 = name_sym, d1 = type_id, d2 = init_expr (0 if none); flags in extra
     CIS_ASSIGN = 12          // d0 = lhs_expr, d1 = rhs_expr
     CIS_LABEL = 13           // d0 = label_sym
-    CIS_GOTO_SYM = 14        // d0 = label_sym — resolved by B8a
-    CIS_GOTO_STATE = 15      // d0 = state_num (rewritten in B8b from CIS_GOTO_SYM)
-
-    // Complete goto state-machine body (B8b structural lowering).
-    // d0 = meta_extra_start into the stmt pool's `extra` Vec
-    // d1 = hoisted_decl_count
-    // d2 = arm_count (excluding the implicit `_ => break` default
-    //                  which the printer emits automatically)
-    //
-    // Meta layout in extra (all i32):
-    //   [hoisted_decl_0_stmt_id, ..., hoisted_decl_(N-1)_stmt_id,
-    //    arm_0_state, arm_0_label_str_idx, arm_0_child_count,
-    //    arm_0_child_0, arm_0_child_1, ..., arm_0_child_(K-1),
-    //    arm_1_state, arm_1_label_str_idx, arm_1_child_count,
-    //    arm_1_child_0, ..., arm_1_child_(L-1),
-    //    ...]
-    //
-    // Arm children are concatenated inline by the printer with
-    // no CIS_BLOCK blank separators — goto state-machine arms
-    // compact their statements directly onto consecutive lines.
-    //
-    // label_str_idx is an index into the stmt pool's strings Vec;
-    // 0 means the entry arm (no label comment on the arm header).
-    CIS_GOTO_BODY = 16
 
 // A match arm is stored in the stmt pool's `extra` as:
 //   [value_count, value0_expr, value1_expr, ..., body_block_stmt_id]
@@ -447,6 +423,7 @@ fn CiStmtPool.new -> CiStmtPool:
     pool.data1.push(0)
     pool.data2.push(0)
     pool.flags.push(0)
+    pool.strings.push("")
     pool
 
 fn CiStmtPool.add(self: &mut CiStmtPool, kind: i32, d0: i32, d1: i32, d2: i32, flags: i32) -> CiStmtId:
@@ -511,6 +488,12 @@ fn CiStmtPool.break_(self: &mut CiStmtPool) -> CiStmtId:
 fn CiStmtPool.continue_(self: &mut CiStmtPool) -> CiStmtId:
     self.add(CiStmtKind.CIS_CONTINUE, 0, 0, 0, 0)
 
+fn CiStmtPool.break_label(self: &mut CiStmtPool, label_sym: i32) -> CiStmtId:
+    self.add(CiStmtKind.CIS_BREAK, label_sym, 0, 0, 0)
+
+fn CiStmtPool.continue_label(self: &mut CiStmtPool, label_sym: i32) -> CiStmtId:
+    self.add(CiStmtKind.CIS_CONTINUE, label_sym, 0, 0, 0)
+
 fn CiStmtPool.assign(self: &mut CiStmtPool, lhs: CiExprId, rhs: CiExprId) -> CiStmtId:
     self.add(CiStmtKind.CIS_ASSIGN, lhs as i32, rhs as i32, 0, 0)
 
@@ -519,11 +502,17 @@ fn CiStmtPool.assign(self: &mut CiStmtPool, lhs: CiExprId, rhs: CiExprId) -> CiS
 fn CiStmtPool.block(self: &mut CiStmtPool, stmts_start: i32, stmts_count: i32) -> CiStmtId:
     self.add(CiStmtKind.CIS_BLOCK, stmts_start, stmts_count, 0, 0)
 
+fn CiStmtPool.block_labeled(self: &mut CiStmtPool, stmts_start: i32, stmts_count: i32, label_sym: i32) -> CiStmtId:
+    self.add(CiStmtKind.CIS_BLOCK, stmts_start, stmts_count, label_sym, 0)
+
 fn CiStmtPool.if_stmt(self: &mut CiStmtPool, cond: CiExprId, then_block: CiStmtId, else_block: CiStmtId) -> CiStmtId:
     self.add(CiStmtKind.CIS_IF, cond as i32, then_block as i32, else_block as i32, 0)
 
 fn CiStmtPool.while_stmt(self: &mut CiStmtPool, cond: CiExprId, body: CiStmtId) -> CiStmtId:
     self.add(CiStmtKind.CIS_WHILE, cond as i32, body as i32, 0, 0)
+
+fn CiStmtPool.while_labeled(self: &mut CiStmtPool, cond: CiExprId, body: CiStmtId, label_sym: i32) -> CiStmtId:
+    self.add(CiStmtKind.CIS_WHILE, cond as i32, body as i32, label_sym, 0)
 
 // Variable decl. flags bit0 = is_mut, bit1 = has_init.
 fn CiStmtPool.var_decl(self: &mut CiStmtPool, name_sym: i32, ty: CiTypeId, init: CiExprId, is_mut: i32) -> CiStmtId:
@@ -536,12 +525,6 @@ fn CiStmtPool.var_decl(self: &mut CiStmtPool, name_sym: i32, ty: CiTypeId, init:
 
 fn CiStmtPool.label(self: &mut CiStmtPool, label_sym: i32) -> CiStmtId:
     self.add(CiStmtKind.CIS_LABEL, label_sym, 0, 0, 0)
-
-fn CiStmtPool.goto_sym(self: &mut CiStmtPool, label_sym: i32) -> CiStmtId:
-    self.add(CiStmtKind.CIS_GOTO_SYM, label_sym, 0, 0, 0)
-
-fn CiStmtPool.goto_state(self: &mut CiStmtPool, state_num: i32) -> CiStmtId:
-    self.add(CiStmtKind.CIS_GOTO_STATE, state_num, 0, 0, 0)
 
 // ── CiDecl ────────────────────────────────────────────────────
 

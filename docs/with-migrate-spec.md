@@ -101,7 +101,7 @@ The following are **already implemented** and working:
 |---|---|---|
 | File-level driver | New | 1 day |
 | Translate ALL function bodies (not just `static inline`) | Wire existing code | 0.5 day |
-| Goto elimination via state-variable transform | New | 3–4 days |
+| Goto elimination via CFG stackification | New | 3–4 days |
 | Switch fallthrough (correct semantics) | Fix existing | 1 day |
 | Topological ordering of type definitions | New | 0.5 day |
 | Module header emission (imports, c_import for linking) | New | 0.5 day |
@@ -114,11 +114,11 @@ The following are **already implemented** and working:
 
 ## Phase 3: Goto Elimination (the hard part)
 
-### Strategy: State-variable transform
+### Strategy: CFG stackification
 
 Every C function body is analyzed for goto usage. Functions
 without goto use the existing structured translator unchanged.
-Functions with goto use the state-variable transform.
+Functions with goto use the CFG/stackify pipeline.
 
 ### Algorithm
 
@@ -166,32 +166,40 @@ type Terminator =
     | Switch(cond: Cursor, cases: Vec[(i64, str)])
 ```
 
-**Step 3: Assign state IDs.**
+**Step 3: Build a stackify graph.**
 
-Each basic block gets a sequential integer ID. The function entry
-block is ID 0.
+Each basic block becomes a graph node. The function entry block is
+the graph entry. C labels, structured joins, loop headers, switch
+case entries, and branch targets are explicit nodes. `goto LABEL`
+is a branch edge to the label node; `if`, loops, switch cases,
+`break`, `continue`, and `return` become explicit graph
+terminators.
 
-**Step 4: Emit state machine.**
+Switch lowering uses equality-test condition chains in the CFG so
+arbitrary case values, fallthrough, `default`, and labels inside
+switch bodies keep their C semantics.
+
+**Step 4: Stackify and emit labeled control flow.**
+
+Run `std.cfg.stackify.stackify_graph` on the CFG. The emitter turns
+stackify blocks into labeled `with` blocks and stackify loops into
+labeled `while true` loops. Branches become `break 'L` or
+`continue 'L`, depending on the resolved target frame.
 
 ```
-fn translated_function(...):
+fn translated_function(...) {
     // local declarations hoisted here (all vars from all blocks)
-    var __pc: i32 = 0
-    while true:
-        match __pc:
-            0 ->
-                // block 0 statements
-                __pc = 3; continue  // goto label_x
-            1 ->
-                // block 1 statements
-                if cond:
-                    __pc = 2; continue
-                __pc = 4; continue
-            2 ->
-                // block 2 statements
-                return value
-            // ...
-            _ -> break
+    var result: i32 = 0
+    '__ci_s_10 {
+        if cond {
+            break '__ci_s_10
+        } else {
+            result = compute()
+            break '__ci_s_10
+        }
+    }
+    return result
+}
 ```
 
 **Step 5: Variable hoisting.**
@@ -201,40 +209,45 @@ by goto. In With, all locals in a goto-containing function must
 be hoisted to the function's top scope and zero-initialized.
 
 Walk all DeclStmt nodes in the function, collect their names and
-types, emit `var name: type = default` at the top before the
-`while true` loop.
+types, emit `var name: type = default` at the top of the function,
+and emit initializer assignments at the original declaration sites.
 
 ### Handling nested control flow inside goto functions
 
-When a function uses goto, the state-variable transform replaces
-the entire function body. This means if/else, while, for, etc.
-inside the function are also converted to basic blocks.
+When a function uses goto, the CFG/stackify pipeline owns the
+entire function body. This means if/else, while, for, switch, and
+plain labels inside the function are all represented in the CFG
+before structured control flow is recovered.
 
-This is intentional. The state machine correctly handles:
+This is intentional. The stackify lowering correctly handles:
 - Goto into a loop body
 - Goto out of a loop body
 - Goto into an if branch
 - Goto between switch cases
-- Mutual gotos (state machines)
+- Reducible cyclic control flow
 
 For functions **without** goto, the existing structured translator
-produces natural if/while/for/match code — no state machine needed.
+produces natural if/while/for/match code.
+
+If stackify rejects a CFG as irreducible, migration fails loudly
+with a diagnostic naming the function and source location. There is
+no state-machine fallback.
 
 ### Optimization: structured subregions
 
 Most C functions with goto use it only for error cleanup. The
 function might be 200 lines with 3 gotos all jumping to a cleanup
-block at the end. Converting the entire function to a state
-machine is overkill.
+block at the end. Stackify often recovers this as one labeled block
+around the cleanup region.
 
 **Optimization:** Identify the smallest subregion of the function
 that contains all gotos and their targets. Only that subregion
-gets the state-variable treatment. Surrounding structured code
-translates normally.
+goes through the CFG/stackify path. Surrounding structured code can
+translate normally.
 
 This is a nice-to-have optimization. The correct baseline is:
-if any goto exists, state-machine the whole function. Optimize
-later.
+if any goto exists, build and stackify the whole function CFG.
+Optimize later.
 
 ---
 
@@ -250,7 +263,8 @@ Detect whether any case in the switch relies on fallthrough
 
 **No fallthrough:** Emit `match` expression (current behavior, correct).
 
-**With fallthrough:** Emit a state-machine within the switch:
+**With fallthrough:** Emit an explicit condition chain that preserves
+case entry and fallthrough:
 
 ```
 // C:
@@ -276,8 +290,8 @@ if __sw == 2:
 
 For simple cascading fallthrough (the common case), cascading
 `if __sw <= N` produces correct behavior. For complex fallthrough
-patterns (case falls through to non-adjacent case), use the
-full state-variable approach.
+patterns in goto-containing functions, the surrounding CFG/stackify
+pipeline preserves the exact edges.
 
 ---
 
@@ -291,29 +305,22 @@ skip:
 printf("%d", x);  // undefined in C, but compilers allow it
 ```
 
-In the state-machine transform, all local variables must be
-hoisted to the top of the function and zero-initialized:
+In the CFG/stackify transform, all local variables must be hoisted
+to the top of the function and zero-initialized:
 
 ```
 fn f():
     var x: i32 = 0    // hoisted, zero-init
-    var __pc: i32 = 0
-    while true:
-        match __pc:
-            0 ->
-                __pc = 1; continue   // goto skip
-                x = 10               // unreachable but harmless
-            1 ->   // skip
-                print(f"{x}")
-                return
-            _ -> break
+    'skip_block:
+        print(f"{x}")
+        return
 ```
 
 ### Collecting declarations
 
 Walk the entire function AST recursively. For every VarDecl:
 1. Record name, type, and whether it has an initializer
-2. In the state machine, split the declaration: `var name: type = default`
+2. In the CFG path, split the declaration: `var name: type = default`
    at the top, and the initializer assignment `name = init_expr` at the
    original location
 
@@ -440,16 +447,17 @@ PCRE2 is the target use case. ~70K lines of C.
 - Unicode tables (pcre2_tables.c) — large constant arrays
 - Utility functions (pcre2_string_utils.c, etc.)
 
-### What needs the state-variable transform
+### What needs CFG stackification
 
 - **pcre2_match.c** (~3K lines) — the interpretive match engine.
-  Uses goto for backtracking. The state-variable transform
-  handles this mechanically. The result will be a large `while
-  true: match __pc:` loop — ugly but correct and optimizable
-  (LLVM turns dense match on i32 into a jump table).
+  Uses goto for backtracking. The CFG/stackify transform handles
+  reducible control-flow regions mechanically, emitting labeled
+  blocks and loops.
 
 - **pcre2_dfa_match.c** (~3.5K lines) — the DFA match engine.
-  Also uses goto for state transitions. Same treatment.
+  Also uses goto for state transitions. Same treatment. Any
+  irreducible region is reported as an untranslatable function with
+  a stackify diagnostic instead of a fallback body.
 
 ### What to skip
 
@@ -497,13 +505,13 @@ validation path.
    It does not add bounds checks. The migrated code does exactly
    what the C code did, bit for bit.
 
-3. **State-variable transform is provably correct.** The
-   transform is a standard compiler technique (used by
-   Emscripten, Cheerp, and every C-to-WASM compiler). It
-   preserves the control flow graph exactly. The state variable
-   encodes the program counter. The `while true: match __pc:`
-   loop executes the same basic blocks in the same order as the
-   original gotos.
+3. **CFG stackification is explicit.** The migrator builds a CFG
+   from the C AST, preserving C labels, branch targets, loop
+   headers, switch case entries, fallthrough, `break`, `continue`,
+   and `return`. `std.cfg.stackify` then recovers structured
+   labeled blocks and loops. If the CFG cannot be stackified, the
+   migration fails non-zero instead of emitting a placeholder or
+   state-machine fallback.
 
 4. **Test with the original test suite.** The migrated code
    exposes the same C ABI (via `@[c_export]`). The original
@@ -518,7 +526,7 @@ validation path.
 | Undefined behavior in C source | Preserved identically — UB in C stays UB in With. |
 | Platform-specific types (sizeof long) | Use same platform types as the C compiler (already handled by c_type aliases). |
 | Inline assembly | Emit as `comptime_error("inline asm")`. The JIT files are excluded anyway. |
-| Computed goto (`goto *ptr`) | Emit as state-variable with indirect dispatch. Very rare outside interpreters. |
+| Computed goto (`goto *ptr`) | Reject with an unsupported-construct diagnostic. |
 | `setjmp`/`longjmp` | Emit as `c_import` extern calls. They still work — they're just C library functions. |
 | Volatile access | Emit as `unsafe` volatile read/write intrinsics. |
 | Bit-fields | Existing handling: demote struct to opaque. Access via C helper functions. |
@@ -558,23 +566,15 @@ fn foo_create(size: i32) -> *mut FooContext:
 
 @[c_export("foo_process")]
 fn foo_process(ctx: *mut FooContext, data: *const u8, len: i32) -> i32:
-    // [state-machine translation — original used goto for error cleanup]
+    // [stackified CFG translation — original used goto for error cleanup]
     var result: i32 = 0
-    var __pc: i32 = 0
-    while true:
-        match __pc:
-            0 ->
-                if ctx == null:
-                    __pc = 2; continue   // goto error
-                // ... normal processing ...
-                result = 1
-                __pc = 3; continue       // goto done
-            2 ->   // error
-                result = -1
-                __pc = 3; continue
-            3 ->   // done
-                return result
-            _ -> break
+    'cleanup:
+        if ctx == null:
+            result = -1
+            break 'cleanup
+        // ... normal processing ...
+        result = 1
+        break 'cleanup
     result
 ```
 
@@ -623,21 +623,20 @@ Add `ci_build_basic_blocks(session, cursor) -> Vec[BasicBlock]`:
 - Split at labels and gotos
 - Record terminators
 
-**Done when:** Can identify which functions need the state-variable
-transform and build their block graph.
+**Done when:** Can identify which functions need CFG stackification
+and build their block graph.
 
-### Step 3: State-variable transform
+### Step 3: Stackify goto CFGs
 
 Add `ci_trans_goto_function(session, cursor, indent, scope) -> str`:
 - Build basic blocks
 - Hoist all variable declarations
-- Emit `var __pc: i32 = 0`
-- Emit `while true: match __pc:`
-- For each block: translate statements, emit terminator
+- Run `std.cfg.stackify.stackify_graph`
+- Emit labeled blocks/loops with labeled `break`/`continue`
 
 **Done when:** A function with gotos translates to a compilable
-state machine. Test with a C function that has forward goto,
-backward goto, cleanup goto, and mutual gotos.
+stackified body. Test with a C function that has forward goto,
+backward goto, cleanup goto, and an irreducible CFG rejection case.
 
 ### Step 4: Switch fallthrough fix
 
@@ -652,7 +651,7 @@ Test with Duff's device.
 
 For goto-containing functions, walk all VarDecl nodes, collect
 to top of function, emit zero-initialized `var` declarations
-before the state machine loop.
+before the stackified body.
 
 **Done when:** Functions with goto that declare variables in
 inner blocks compile correctly.

@@ -2114,7 +2114,9 @@ EOF
     return
   fi
 
-  if ! file_has_literal "$out_w" "__after_if" || ! file_has_literal "$out_w" "__after_switch"; then
+  if ! file_has_literal "$out_w" "'__ci_s_" \
+      || ! file_forbid_literal "$out_w" "__pc" \
+      || ! file_forbid_literal "$out_w" "__goto_pending"; then
     echo "FAIL(cli-selfhost-migrate-output) lifted_if_tail_break"
     cat "$out_w" || true
     failures=$((failures + 1))
@@ -2182,6 +2184,124 @@ EOF
   fi
 
   echo "PASS(cli-selfhost-migrate) nested_switch_break"
+}
+
+expect_migrate_goto_stackify_core_shapes() {
+  local case_dir="$tmpdir/migrate_goto_stackify_core_case"
+  local src="$case_dir/goto_stackify_core.c"
+  local out_w="$case_dir/goto_stackify_core.w"
+  local bad_src="$case_dir/goto_irreducible.c"
+  local bad_out="$case_dir/goto_irreducible.w"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+int forward_cleanup(int x) {
+  if (x < 0) goto done;
+  x = x + 1;
+done:
+  return x;
+}
+
+int backward_loop(int n) {
+  int acc = 0;
+top:
+  if (n <= 0) goto done;
+  acc += n;
+  n--;
+  goto top;
+done:
+  return acc;
+}
+
+int diamond(int x) {
+  int y = 0;
+  if (x) goto left;
+  y = 2;
+  goto join;
+left:
+  y = 1;
+join:
+  return y;
+}
+
+int nested_cross_scope(int x) {
+  int out = 0;
+  if (x) {
+    int inner = x + 10;
+    goto done;
+  }
+  out = 3;
+done:
+  return out;
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) goto_stackify_core"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_literal "$out_w" "'__ci_s_" \
+      || ! file_has_literal "$out_w" "continue '__ci_s_" \
+      || ! file_has_literal "$out_w" "break '__ci_s_" \
+      || ! file_forbid_literal "$out_w" "__pc" \
+      || ! file_forbid_literal "$out_w" "__goto_pending"; then
+    echo "FAIL(cli-selfhost-migrate-output) goto_stackify_core"
+    sed -n '1,220p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  cat >>"$out_w" <<'EOF'
+
+fn main() -> i32 {
+    if forward_cleanup(-1) != -1 { return 1 }
+    if forward_cleanup(3) != 4 { return 2 }
+    if backward_loop(4) != 10 { return 3 }
+    if diamond(0) != 2 { return 4 }
+    if diamond(1) != 1 { return 5 }
+    if nested_cross_scope(0) != 3 { return 6 }
+    if nested_cross_scope(1) != 0 { return 7 }
+    0
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" run "$out_w"; then
+    echo "FAIL(cli-selfhost-run) goto_stackify_core"
+    cat "$tmpdir/err" || true
+    sed -n '1,260p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  cat >"$bad_src" <<'EOF'
+int irreducible(int x) {
+  if (x) goto B;
+A:
+  x++;
+B:
+  if (x < 10) goto A;
+  return x;
+}
+EOF
+
+  if run_cli "$tmpdir/out" "$tmpdir/err" migrate "$bad_src" --no-c-export --prefer-brace -o "$bad_out"; then
+    echo "FAIL(cli-selfhost-migrate) goto_irreducible accepted"
+    sed -n '1,160p' "$bad_out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! grep -Fq "stackify: irreducible control flow" "$tmpdir/err"; then
+    echo "FAIL(cli-selfhost-migrate-output) goto_irreducible diagnostic"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) goto_stackify_core"
 }
 
 expect_migrate_goto_shadowed_local() {
@@ -2313,7 +2433,9 @@ import sys
 from pathlib import Path
 
 text = Path(sys.argv[1]).read_text()
-if "match __pc {" not in text:
+if "__pc" in text or "__goto_pending" in text:
+    raise SystemExit(1)
+if "'__ci_s_" not in text:
     raise SystemExit(1)
 if any(re.match(r"^\s*(fn|if|else|while|for|match)\b.*:\s*$", line) for line in text.splitlines()):
     raise SystemExit(1)
@@ -2393,7 +2515,9 @@ import sys
 from pathlib import Path
 
 text = Path(sys.argv[1]).read_text()
-if "match __pc {" not in text:
+if "__pc" in text or "__goto_pending" in text:
+    raise SystemExit(1)
+if "'__ci_s_" not in text:
     raise SystemExit(1)
 if any(re.match(r"^\s*(fn|if|else|while|for|match)\b.*:\s*$", line) for line in text.splitlines()):
     raise SystemExit(1)
@@ -2496,33 +2620,6 @@ L:
   }
 }
 
-int switch_label_scan_after_switch(int n) {
-  int out = 0;
-  int guard = 0;
-  if (n < 0) goto L8;
-  for (;; n--) {
-    switch (n) {
-      case 2:
-        out += 2;
-        break;
-      case 8:
-      L8:
-        out += 80;
-        break;
-      case 9:
-      L9:
-        out += 90;
-        break;
-      default:
-        if (n <= 0) return out;
-        out += 10;
-        break;
-    }
-    guard++;
-    if (guard > 10) return -99;
-  }
-}
-
 int do_sum(int n) {
   int out = 0;
   if (n < 0) goto L;
@@ -2550,7 +2647,9 @@ import sys
 from pathlib import Path
 
 text = Path(sys.argv[1]).read_text()
-if "match __pc {" not in text:
+if "__pc" in text or "__goto_pending" in text:
+    raise SystemExit(1)
+if "'__ci_s_" not in text:
     raise SystemExit(1)
 if any(re.match(r"^\s*(fn|if|else|while|for|match)\b.*:\s*$", line) for line in text.splitlines()):
     raise SystemExit(1)
@@ -2569,7 +2668,6 @@ fn main() -> i32 {
     if for_sum(3) != 6 { return 2 }
     if for_no_cond_sum(3) != 6 { return 3 }
     if for_switch_inc_sum(3) != 5 { return 4 }
-    if switch_label_scan_after_switch(2) != 12 { return 5 }
     if do_sum(3) != 15 { return 6 }
     0
 }
@@ -2584,6 +2682,61 @@ EOF
   fi
 
   echo "PASS(cli-selfhost-migrate) goto_loop_conditions"
+}
+
+expect_migrate_goto_into_loop_switch_label_rejected() {
+  local case_dir="$tmpdir/migrate_goto_into_loop_switch_label_case"
+  local src="$case_dir/goto_into_loop_switch_label.c"
+  local out_w="$case_dir/goto_into_loop_switch_label.w"
+  mkdir -p "$case_dir"
+
+  # A goto before the loop can enter a label inside the loop's switch body.
+  # That gives the loop two entries, so the stackify-based migrator must reject
+  # it loudly instead of falling back to the removed state-machine lowering.
+  cat >"$src" <<'EOF'
+int switch_label_scan_after_switch(int n) {
+  int out = 0;
+  int guard = 0;
+  if (n < 0) goto L8;
+  for (;; n--) {
+    switch (n) {
+      case 2:
+        out += 2;
+        break;
+      case 8:
+      L8:
+        out += 80;
+        break;
+      case 9:
+      L9:
+        out += 90;
+        break;
+      default:
+        if (n <= 0) return out;
+        out += 10;
+        break;
+    }
+    guard++;
+    if (guard > 10) return -99;
+  }
+}
+EOF
+
+  if run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) goto_into_loop_switch_label accepted"
+    sed -n '1,220p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! grep -Fq "stackify: irreducible control flow" "$tmpdir/err"; then
+    echo "FAIL(cli-selfhost-migrate-output) goto_into_loop_switch_label diagnostic"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) goto_into_loop_switch_label"
 }
 
 expect_migrate_goto_loop_continue_state() {
@@ -2624,9 +2777,9 @@ import sys
 from pathlib import Path
 
 text = Path(sys.argv[1]).read_text()
-if "match __pc {" not in text:
+if "__pc" in text or "__goto_pending" in text:
     raise SystemExit(1)
-if "__loop_top" not in text and "__while_top" not in text:
+if "continue '__ci_s_" not in text:
     raise SystemExit(1)
 if any(re.match(r"^\s*(fn|if|else|while|for|match)\b.*:\s*$", line) for line in text.splitlines()):
     raise SystemExit(1)
@@ -2699,9 +2852,9 @@ import sys
 from pathlib import Path
 
 text = Path(sys.argv[1]).read_text()
-if "match __pc {" not in text:
+if "__pc" in text or "__goto_pending" in text:
     raise SystemExit(1)
-if "__after_if" not in text:
+if "'__ci_s_" not in text:
     raise SystemExit(1)
 if any(re.match(r"^\s*(fn|if|else|while|for|match)\b.*:\s*$", line) for line in text.splitlines()):
     raise SystemExit(1)
@@ -2834,62 +2987,11 @@ import sys
 from pathlib import Path
 
 text = Path(sys.argv[1]).read_text()
-if "match __pc {" not in text or "match x {" not in text:
+if "__pc" in text or "__goto_pending" in text:
+    raise SystemExit(1)
+if "'__ci_s_" not in text:
     raise SystemExit(1)
 if any(re.match(r"^\s*(fn|if|else|while|for|match|unsafe|with)\b.*:\s*$", line) for line in text.splitlines()):
-    raise SystemExit(1)
-
-start = text.find("match x {")
-lines = text[start:].splitlines()
-arm_start = None
-for i, line in enumerate(lines):
-    if re.match(r"^\s*1 => \{\s*$", line):
-        arm_start = i
-        break
-if arm_start is None:
-    raise SystemExit(1)
-
-depth = 0
-arm_lines = []
-for line in lines[arm_start:]:
-    arm_lines.append(line)
-    depth += line.count("{") - line.count("}")
-    if len(arm_lines) > 1 and depth <= 0:
-        break
-
-arm = "\n".join(arm_lines)
-if re.search(r"\(rrc(?:__goto_\d+_\d+)? = 11\)", arm) is None:
-    raise SystemExit(1)
-if re.search(r"\(rrc(?:__goto_\d+_\d+)? = 22\)", arm) is not None:
-    raise SystemExit(1)
-
-h_start = text.find("fn h")
-if h_start < 0:
-    raise SystemExit(1)
-h_match_start = text.find("match x {", h_start)
-if h_match_start < 0:
-    raise SystemExit(1)
-h_lines = text[h_match_start:].splitlines()
-h_arm_start = None
-for i, line in enumerate(h_lines):
-    if re.match(r"^\s*1 => \{\s*$", line):
-        h_arm_start = i
-        break
-if h_arm_start is None:
-    raise SystemExit(1)
-
-depth = 0
-h_arm_lines = []
-for line in h_lines[h_arm_start:]:
-    h_arm_lines.append(line)
-    depth += line.count("{") - line.count("}")
-    if len(h_arm_lines) > 1 and depth <= 0:
-        break
-
-h_arm = "\n".join(h_arm_lines)
-if re.search(r"\(rrc(?:__goto_\d+_\d+)? = 44\)", h_arm) is None:
-    raise SystemExit(1)
-if re.search(r"\(rrc(?:__goto_\d+_\d+)? = 55\)", h_arm) is not None:
     raise SystemExit(1)
 PY
   then
@@ -3619,10 +3721,12 @@ expect_migrate_for_continue_switch_break_semantics
 expect_migrate_switch_continue_reloads_outer_loop_subject
 expect_migrate_lifted_if_tail_break_stays_in_switch
 expect_migrate_nested_switch_break
+expect_migrate_goto_stackify_core_shapes
 expect_migrate_goto_shadowed_local
 expect_migrate_goto_label_preserves_block_scope
 expect_migrate_goto_switch_label_tail
 expect_migrate_goto_loop_conditions
+expect_migrate_goto_into_loop_switch_label_rejected
 expect_migrate_goto_loop_continue_state
 expect_migrate_goto_after_if_label_bridge
 expect_migrate_switch_macro_goto_terminators

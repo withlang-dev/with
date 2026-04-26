@@ -192,6 +192,17 @@ fn ci_print_compact_stmt_local(stmts: &CiStmtPool, exprs: &CiExprPool, types: &C
     if kind == CiStmtKind.CIS_BLOCK:
         let start = stmts.get_d0(id)
         let count = stmts.get_d1(id)
+        let label_sym = stmts.get_d2(id)
+        if label_sym != 0:
+            let brace = migrate_prefer_brace()
+            var out = indent ++ "'" ++ stmts.get_string(label_sym) ++ (if brace: " {\n" else: ":\n")
+            var i: i32 = 0
+            while i < count:
+                out = out ++ ci_print_compact_stmt_local(stmts, exprs, types, (stmts.get_extra(start + i)) as CiStmtId, depth + 4)
+                i = i + 1
+            if brace:
+                out = out ++ indent ++ "}\n"
+            return out
         var out = ""
         var i: i32 = 0
         while i < count:
@@ -237,8 +248,10 @@ fn ci_print_compact_stmt_local(stmts: &CiStmtPool, exprs: &CiExprPool, types: &C
     if kind == CiStmtKind.CIS_WHILE:
         let cond = (stmts.get_d0(id)) as CiExprId
         let body = (stmts.get_d1(id)) as CiStmtId
+        let label_sym = stmts.get_d2(id)
+        let label_prefix = if label_sym != 0: "'" ++ stmts.get_string(label_sym) ++ " " else: ""
         let brace = migrate_prefer_brace()
-        var out = indent ++ "while " ++ ci_print_expr(exprs, types, cond, 0, 0) ++ (if brace: " {\n" else: ":\n")
+        var out = indent ++ label_prefix ++ "while " ++ ci_print_expr(exprs, types, cond, 0, 0) ++ (if brace: " {\n" else: ":\n")
         let body_text = ci_print_compact_stmt_local(stmts, exprs, types, body, depth + 4)
         if body_text.len() > 0:
             out = out ++ body_text
@@ -277,8 +290,14 @@ fn ci_print_compact_stmt_local(stmts: &CiStmtPool, exprs: &CiExprPool, types: &C
         return indent ++ "(" ++ ci_print_expr(exprs, types, lhs, 0, 0) ++ " = " ++ rhs_str ++ ")\n"
 
     if kind == CiStmtKind.CIS_BREAK:
+        let label_sym = stmts.get_d0(id)
+        if label_sym != 0:
+            return indent ++ "break '" ++ stmts.get_string(label_sym) ++ "\n"
         return indent ++ "break\n"
     if kind == CiStmtKind.CIS_CONTINUE:
+        let label_sym = stmts.get_d0(id)
+        if label_sym != 0:
+            return indent ++ "continue '" ++ stmts.get_string(label_sym) ++ "\n"
         return indent ++ "continue\n"
 
     ci_print_stmt(stmts, exprs, types, id, depth)
@@ -567,6 +586,17 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
     if kind == CiStmtKind.CIS_BLOCK:
         let start = stmts.get_d0(id)
         let count = stmts.get_d1(id)
+        let label_sym = stmts.get_d2(id)
+        if label_sym != 0:
+            var out = indent ++ "'" ++ stmts.get_string(label_sym) ++ " {\n"
+            var li: i32 = 0
+            while li < count:
+                let child = (stmts.get_extra(start + li)) as CiStmtId
+                let child_text = ci_print_stmt(stmts, exprs, types, child, 0)
+                out = out ++ ci_reindent_spaces(child_text, depth + 4)
+                li = li + 1
+            out = out ++ indent ++ "}\n"
+            return out
         if count >= 3:
             let first = (stmts.get_extra(start)) as CiStmtId
             let last = (stmts.get_extra(start + count - 1)) as CiStmtId
@@ -637,7 +667,9 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
         // then re-indented by 4 at the while's container level.
         let cond = (stmts.get_d0(id)) as CiExprId
         let body = (stmts.get_d1(id)) as CiStmtId
-        var out = indent ++ "while " ++ ci_print_expr(exprs, types, cond, 0, 0) ++ " {\n"
+        let label_sym = stmts.get_d2(id)
+        let label_prefix = if label_sym != 0: "'" ++ stmts.get_string(label_sym) ++ " " else: ""
+        var out = indent ++ label_prefix ++ "while " ++ ci_print_expr(exprs, types, cond, 0, 0) ++ " {\n"
         let body_text = ci_print_stmt(stmts, exprs, types, body, 0)
         if body_text.len() > 0:
             out = out ++ ci_reindent_spaces(body_text, 4)
@@ -653,16 +685,6 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
         return indent ++ "<ci:unimpl:FOR>\n"
 
     if kind == CiStmtKind.CIS_MATCH:
-        // Legacy match emission format:
-        //     match SUBJECT
-        //         VALUE =>
-        //             BODY
-        //         _ => DEFAULT_BODY
-        //
-        // The goto state machine uses this kind with
-        // SUBJECT = raw ident "__pc" and arms keyed on
-        // state numbers, plus a default `_ => break` arm.
-        //
         // Arm layout in stmts.extra (from CiIR.w comment):
         //     [value_count, value0_expr, value1_expr, ...,
         //      body_stmt_id]
@@ -720,8 +742,14 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
         return out
 
     if kind == CiStmtKind.CIS_BREAK:
+        let label_sym = stmts.get_d0(id)
+        if label_sym != 0:
+            return indent ++ "break '" ++ stmts.get_string(label_sym) ++ "\n"
         return indent ++ "break\n"
     if kind == CiStmtKind.CIS_CONTINUE:
+        let label_sym = stmts.get_d0(id)
+        if label_sym != 0:
+            return indent ++ "continue '" ++ stmts.get_string(label_sym) ++ "\n"
         return indent ++ "continue\n"
 
     if kind == CiStmtKind.CIS_VAR_DECL:
@@ -755,95 +783,6 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
     if kind == CiStmtKind.CIS_LABEL:
         let sym = stmts.get_d0(id)
         return indent ++ "// label: " ++ stmts.get_string(sym) ++ "\n"
-    if kind == CiStmtKind.CIS_GOTO_SYM:
-        let sym = stmts.get_d0(id)
-        return indent ++ "// goto: " ++ stmts.get_string(sym) ++ "\n"
-    if kind == CiStmtKind.CIS_GOTO_STATE:
-        let n = stmts.get_d0(id)
-        return indent ++ "__pc = " ++ i32_to_string(n) ++ "\n" ++ indent ++ "__goto_pending = 1\n"
-
-    if kind == CiStmtKind.CIS_GOTO_BODY:
-        // Full goto state-machine body. Layout matches the
-        // legacy ci_lower_goto_body byte-for-byte so pcre2
-        // diffs stay at zero.
-        //
-        // Output shape (at depth=0):
-        //     <hoisted decls>
-        //     var __pc: i32 = 0
-        //     var __goto_pending: i32 = 0
-        //     while true:
-        //         match __pc
-        //             0 =>
-        //                 <arm 0 body>
-        //             N =>  // label_name
-        //                 <arm N body>
-        //             _ => break
-        //
-        // Depths: var/while at `depth`, match at depth+4, arm
-        // header at depth+8, arm body at depth+12. Arm child
-        // statements are concatenated inline (no blank line
-        // separators) — the goto state machine compacts
-        // consecutive statements.
-        let meta_start = stmts.get_d0(id)
-        let hoisted_count = stmts.get_d1(id)
-        let arm_count = stmts.get_d2(id)
-        var out = ""
-
-        // Hoisted decl stmts.
-        var hi: i32 = 0
-        while hi < hoisted_count:
-            let decl_id = (stmts.get_extra(meta_start + hi)) as CiStmtId
-            let decl_text = ci_print_stmt(stmts, exprs, types, decl_id, depth)
-            out = out ++ decl_text
-            hi = hi + 1
-
-        // State-machine frame.
-        let ds = ci_make_indent(depth)
-        let ds1 = ci_make_indent(depth + 4)
-        let ds2 = ci_make_indent(depth + 8)
-        let brace = migrate_prefer_brace()
-        out = out ++ ds ++ "var __pc: i32 = 0\n"
-        out = out ++ ds ++ "var __goto_pending: i32 = 0\n"
-        out = out ++ ds ++ "while true {\n"
-        out = out ++ ds1 ++ (if brace: "match __pc {\n" else: "match __pc:\n")
-
-        // Each arm: variable-length meta [state, label_str_idx,
-        // child_count, child_stmt_0, ..., child_stmt_(K-1)].
-        // Arm children are compact-printed inline.
-        var ai: i32 = 0
-        var arm_cursor = meta_start + hoisted_count
-        while ai < arm_count:
-            let state_num = stmts.get_extra(arm_cursor)
-            let label_str_idx = stmts.get_extra(arm_cursor + 1)
-            let child_count = stmts.get_extra(arm_cursor + 2)
-            arm_cursor = arm_cursor + 3
-
-            out = out ++ ds2 ++ i32_to_string(state_num) ++ " =>"
-            if brace:
-                out = out ++ " {"
-            if label_str_idx != 0:
-                out = out ++ "  // " ++ stmts.get_string(label_str_idx)
-            out = out ++ "\n"
-
-            var ci: i32 = 0
-            while ci < child_count:
-                let child_id = (stmts.get_extra(arm_cursor + ci)) as CiStmtId
-                out = out ++ ci_print_compact_stmt_local(stmts, exprs, types, child_id, depth + 12)
-                ci = ci + 1
-            if brace:
-                out = out ++ ds2 ++ "},\n"
-            arm_cursor = arm_cursor + child_count
-            ai = ai + 1
-
-        if brace:
-            out = out ++ ds2 ++ "_ => {\n"
-            out = out ++ ci_make_indent(depth + 12) ++ "break\n"
-            out = out ++ ds2 ++ "},\n"
-            out = out ++ ds1 ++ "}\n"
-        else:
-            out = out ++ ds2 ++ "_ => break\n"
-        out = out ++ ds ++ "}\n"
-        return out
 
     indent ++ "<ci:stmt:unknown>\n"
 
