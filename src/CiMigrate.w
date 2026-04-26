@@ -700,7 +700,7 @@ fn ci_migrate_file_inner(input_path: str, output_path: str, project_active: bool
         return 1
 
     // Print stats
-    let goto_count = ci_count_substring(output, "__pc =")
+    let goto_count = ci_count_substring(with_fs_read_file(input_path), "goto ")
     let unsafe_count = ci_count_substring(output, "unsafe")
     let fn_total = g_migrate_fn_translated + g_migrate_fn_untranslatable
     if g_migrate_fn_untranslatable > 0:
@@ -949,6 +949,13 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
         return export_prefix ++ "fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ ":\n" ++ body ++ "\n"
 
     // Body translation failed — emit stub with original C
+    let loud_bail = ci_get_bail_message()
+    if loud_bail.len() > 0:
+        let bail_loc = ci_get_bail_location()
+        let loc_suffix = if bail_loc.len() > 0: " at " ++ bail_loc else: ""
+        ci_migrate_set_error("migrate: untranslatable function '" ++ name ++ "': stackify: " ++ loud_bail ++ loc_suffix)
+        return ""
+
     if g_migrate_no_c_export != 0:
         let is_definition = with_ci_cursor_is_definition(session, ci_find_fn_cursor(session, name))
         if is_definition != 0:

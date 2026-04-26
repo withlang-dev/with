@@ -1,5 +1,11 @@
 # Design: Nested Label Lowering in Goto State Machine
 
+> Historical design note: this document describes the removed
+> `__pc`/`__goto_pending` lowering. Current goto lowering builds a
+> migrator CFG, runs `std.cfg.stackify`, and emits labeled
+> blocks/loops. Irreducible CFGs fail migration loudly instead of
+> falling back to a state machine.
+
 ## Scope of the Bug
 
 Two interacting bugs prevent correct goto state machine lowering

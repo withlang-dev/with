@@ -23,10 +23,9 @@ The migrator needs to produce code shaped like the output of
 structured control-flow algorithms (Beyond Relooper, Stackifier,
 Relooper). These algorithms emit branches that target specific
 named scopes — the WASM analogue is `br N`, "break out of N
-scopes." Without labeled break, the migrator either synthesizes
-flag-variable cascades (poor output) or falls back to state-machine
-dispatch (defeats the purpose of using these algorithms in the
-first place).
+scopes." Without labeled break, the migrator would have to synthesize
+flag-variable cascades or fall back to dispatch machinery instead of
+emitting structured control flow.
 
 Hand-written code wants this for the obvious reasons. Searching a
 2D grid, parsing nested structures, breaking out of polling loops
@@ -445,15 +444,16 @@ lowering a C function with non-trivial goto structure:
     cleanup
 ```
 
-Compare to today's state-machine output for the same structure:
+This replaces the older state-machine lowering that encoded C goto
+targets in a program-counter variable:
 
 ```
-var __pc: i32 = 0
+var pc: i32 = 0
 while true:
-    match __pc:
-        0 => { ...; __pc = 1; continue }
-        1 => { ...; __pc = 2; continue }
-        2 => { ...; if cond4 { __pc = 5; continue } else { __pc = 3 } }
+    match pc:
+        0 => { ...; pc = 1; continue }
+        1 => { ...; pc = 2; continue }
+        2 => { ...; if cond4 { pc = 5; continue } else { pc = 3 } }
         3 => { ...; break }
         _ => { break }
 ```

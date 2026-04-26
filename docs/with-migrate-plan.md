@@ -1,5 +1,10 @@
 # `with migrate` — Implementation Plan
 
+> Historical note: sections that discuss `__pc` state-machine goto
+> lowering describe the old plan. Current goto lowering builds a
+> migrator CFG and emits labeled blocks/loops through
+> `std.cfg.stackify`.
+
 **Spec:** `docs/with-migrate-spec.md`
 **Reference:** `.reference/translate-c/` (Zig's translate-c, 10,469 LOC)
 **Goal:** Guaranteed-correct C-to-With translation.
