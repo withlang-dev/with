@@ -417,6 +417,7 @@ fn stackify_dfs_post(graph: StackifyGraph, start: i32, visited: &mut Vec[i32], o
         let idx = stack_idx.get(top)
         let b = graph.blocks.get(blk as i64)
         if idx < b.succs_count:
+            // #183: succ must be computed before set_i32 — codegen re-reads idx after mutation
             let succ = graph.succs.get((b.succs_start + idx) as i64)
             stack_idx.set_i32(top, idx + 1)
             if succ >= 0 and succ < graph.blocks.len() as i32 and visited.get(succ as i64) == 0:
