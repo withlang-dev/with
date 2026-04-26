@@ -244,6 +244,25 @@ fn Codegen.mir_get_or_create_local_ptr(self: Codegen, local_id: i32, ty: i64) ->
     self.mir_local_ptrs.insert(local_id, ptr)
     ptr
 
+fn Codegen.mir_local_llvm_type(self: Codegen, body: MirBody, local_id: i32) -> i64:
+    let known = self.mir_local_types.get(local_id)
+    if known.is_some():
+        return known.unwrap() as i64
+    if local_id < 0 or local_id >= body.local_type_ids.len() as i32:
+        return 0
+    let sema_ty = body.local_type_ids.get(local_id as i64)
+    if sema_ty <= 0:
+        return 0
+    var llvm_ty: i64 = 0
+    let type_name_sym = self.mir_input.mir_get_type_name(sema_ty)
+    if type_name_sym != 0:
+        llvm_ty = self.resolve_named_type(self.sema_sym_to_codegen_sym(type_name_sym))
+    if llvm_ty == 0:
+        llvm_ty = self.mir_sema_type_to_llvm(sema_ty)
+    if llvm_ty != 0:
+        self.mir_local_types.insert(local_id, llvm_ty)
+    llvm_ty
+
 fn Codegen.mir_try_init_const_local(self: Codegen, body: MirBody, local_id: i32, ptr: i64, llvm_ty: i64) -> bool:
     if local_id < 0 or local_id >= body.local_names.len() as i32:
         return false
@@ -2397,11 +2416,13 @@ fn Codegen.mir_emit_stmt(self: Codegen, body: MirBody, stmt_id: i32) -> bool:
         if d0 < 0 or d0 >= body.place_locals.len() as i32:
             return false
         let local_id = body.place_locals.get(d0 as i64)
-        let ty_opt = self.mir_local_types.get(local_id)
-        let ptr = self.mir_place_ptr(body, d0, false, 0)
+        let drop_ty = self.mir_local_llvm_type(body, local_id)
+        var ptr = self.mir_place_ptr(body, d0, false, 0)
+        if ptr == 0 and drop_ty != 0:
+            ptr = self.mir_place_ptr(body, d0, true, drop_ty)
         if ptr != 0:
-            if ty_opt.is_some():
-                self.mir_emit_drop_ptr(ptr, ty_opt.unwrap() as i64)
+            if drop_ty != 0:
+                self.mir_emit_drop_ptr(ptr, drop_ty)
         return true
 
     if sk == StmtKind.Nop:
@@ -6038,11 +6059,13 @@ fn Codegen.mir_emit_term(self: Codegen, body: MirBody, bb: i32) -> bool:
         if d0 < 0 or d0 >= body.place_locals.len() as i32:
             return false
         let local_id = body.place_locals.get(d0 as i64)
-        let ty_opt = self.mir_local_types.get(local_id)
-        let ptr = self.mir_place_ptr(body, d0, false, 0)
+        let drop_ty = self.mir_local_llvm_type(body, local_id)
+        var ptr = self.mir_place_ptr(body, d0, false, 0)
+        if ptr == 0 and drop_ty != 0:
+            ptr = self.mir_place_ptr(body, d0, true, drop_ty)
         if ptr != 0:
-            if ty_opt.is_some():
-                self.mir_emit_drop_ptr(ptr, ty_opt.unwrap() as i64)
+            if drop_ty != 0:
+                self.mir_emit_drop_ptr(ptr, drop_ty)
         if d1 < 0 or d1 >= self.mir_bb_values.len() as i32:
             return false
         let target_bb = self.mir_bb_values.get(d1 as i64)
@@ -7780,6 +7803,11 @@ fn Codegen.collect_captures(self: Codegen, node: i32):
         for si in 0..stmt_count:
             self.collect_captures(self.pool.get_extra(extra_start + si))
         self.collect_captures(self.pool.get_data2(node))
+        return
+    if kind == NodeKind.NK_LABEL:
+        self.collect_captures(self.pool.get_data1(node))
+        return
+    if kind == NodeKind.NK_GOTO:
         return
     if kind == NodeKind.NK_IF_EXPR:
         self.collect_captures(self.pool.get_data0(node))

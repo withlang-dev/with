@@ -390,6 +390,7 @@ enum CiStmtKind: i32:
     CIS_VAR_DECL = 11        // d0 = name_sym, d1 = type_id, d2 = init_expr (0 if none); flags in extra
     CIS_ASSIGN = 12          // d0 = lhs_expr, d1 = rhs_expr
     CIS_LABEL = 13           // d0 = label_sym
+    CIS_GOTO = 14            // d0 = label_sym
 
 // A match arm is stored in the stmt pool's `extra` as:
 //   [value_count, value0_expr, value1_expr, ..., body_block_stmt_id]
@@ -525,6 +526,9 @@ fn CiStmtPool.var_decl(self: &mut CiStmtPool, name_sym: i32, ty: CiTypeId, init:
 
 fn CiStmtPool.label(self: &mut CiStmtPool, label_sym: i32) -> CiStmtId:
     self.add(CiStmtKind.CIS_LABEL, label_sym, 0, 0, 0)
+
+fn CiStmtPool.goto_label(self: &mut CiStmtPool, label_sym: i32) -> CiStmtId:
+    self.add(CiStmtKind.CIS_GOTO, label_sym, 0, 0, 0)
 
 // ── CiDecl ────────────────────────────────────────────────────
 

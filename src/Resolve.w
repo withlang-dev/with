@@ -567,6 +567,13 @@ fn ResolveState.walk_expr(self: ResolveState, pool: AstPool, module_id: i32, par
         self.walk_expr(pool, module_id, parent_def, block_scope, pool.get_data2(node))
         return
 
+    if kind == NodeKind.NK_LABEL:
+        self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data1(node))
+        return
+
+    if kind == NodeKind.NK_GOTO:
+        return
+
     if kind == NodeKind.NK_LET_BINDING:
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data1(node))
 

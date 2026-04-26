@@ -1330,6 +1330,12 @@ fn lsp_collect_bindings_rec(pool: AstPool, intern: InternPool, node: i32, offset
                     return result
         return empty
 
+    if kind == NodeKind.NK_LABEL:
+        return lsp_collect_bindings_rec(pool, intern, pool.get_data1(nid), offset)
+
+    if kind == NodeKind.NK_GOTO:
+        return empty
+
     if kind == NodeKind.NK_FOR:
         var result: Vec[str] = Vec.new()
         if node_start < offset and offset <= node_end and not pool.for_binding_is_pattern(nid):
@@ -1415,6 +1421,13 @@ fn lsp_collect_bindings(pool: AstPool, intern: InternPool, node: i32, offset: i3
                 if name.len() > 0 and lsp_vec_str_contains(seen, name) == 0:
                     names.push(name)
                     seen.push(name)
+        return
+
+    if kind == NodeKind.NK_LABEL:
+        lsp_collect_bindings(pool, intern, pool.get_data1(nid), offset, names, seen)
+        return
+
+    if kind == NodeKind.NK_GOTO:
         return
 
     if kind == NodeKind.NK_FOR:
@@ -1525,6 +1538,7 @@ fn lsp_keywords() -> Vec[str]:
     k.push("break")
     k.push("continue")
     k.push("defer")
+    k.push("goto")
     k.push("const")
     k.push("pub")
     k.push("extern")

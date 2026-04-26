@@ -66,6 +66,15 @@ type MirBuilder {
     loop_labels: Vec[i32],
     loop_target_kinds: Vec[i32],
 
+    // First-class goto labels. Blocks are allocated on demand so forward
+    // gotos can branch before the label statement is lowered.
+    goto_label_syms: Vec[i32],
+    goto_label_bbs: Vec[i32],
+    goto_label_scope_depths: Vec[i32],
+    goto_label_drop_depths: Vec[i32],
+    goto_label_defer_depths: Vec[i32],
+    goto_label_defined: Vec[i32],
+
     next_temp: i32,
     cur_node: i32,
     expected_type: i32,
@@ -102,6 +111,12 @@ fn MirBuilder.init(sema: Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> M
         loop_break_scope_depths: Vec.new(),
         loop_labels: Vec.new(),
         loop_target_kinds: Vec.new(),
+        goto_label_syms: Vec.new(),
+        goto_label_bbs: Vec.new(),
+        goto_label_scope_depths: Vec.new(),
+        goto_label_drop_depths: Vec.new(),
+        goto_label_defer_depths: Vec.new(),
+        goto_label_defined: Vec.new(),
         next_temp: 0,
         cur_node: 0,
         expected_type: 0,
@@ -347,6 +362,187 @@ fn MirBuilder.find_control_target(self: MirBuilder, label: i32, want_continue: i
             }
         i = i - 1
     LoopInfo { label: 0, target_kind: 0, continue_bb: 0 - 1, break_bb: 0 - 1, break_drop_depth: 0, break_defer_depth: 0, break_scope_depth: 0 }
+
+fn MirBuilder.find_goto_label_index(self: MirBuilder, label: i32) -> i32:
+    var i = 0
+    while i < self.goto_label_syms.len() as i32:
+        if self.goto_label_syms.get(i as i64) == label:
+            return i
+        i = i + 1
+    0 - 1
+
+fn MirBuilder.ensure_goto_label(self: MirBuilder, label: i32, scope_depth: i32) -> i32:
+    let existing = self.find_goto_label_index(label)
+    if existing >= 0:
+        if scope_depth >= 0 and self.goto_label_scope_depths.get(existing as i64) < 0:
+            self.goto_label_scope_depths.set_i32(existing as i64, scope_depth)
+        return existing
+    let bb = self.new_block()
+    self.goto_label_syms.push(label)
+    self.goto_label_bbs.push(bb)
+    self.goto_label_scope_depths.push(scope_depth)
+    self.goto_label_drop_depths.push(0)
+    self.goto_label_defer_depths.push(0)
+    self.goto_label_defined.push(0)
+    self.goto_label_syms.len() as i32 - 1
+
+fn MirBuilder.collect_goto_label_depths(self: MirBuilder, node: i32, scope_depth: i32):
+    if node == 0:
+        return
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_LABEL:
+        let _ = self.ensure_goto_label(self.ast.get_data0(node), scope_depth)
+        self.collect_goto_label_depths(self.ast.get_data1(node), scope_depth)
+        return
+    if kind == NodeKind.NK_CLOSURE or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_ASYNC_SCOPE:
+        return
+    if kind == NodeKind.NK_BLOCK:
+        let stmt_start = self.ast.get_data0(node)
+        let stmt_count = self.ast.get_data1(node)
+        for si in 0..stmt_count:
+            self.collect_goto_label_depths(self.ast.get_extra(stmt_start + si), scope_depth + 1)
+        self.collect_goto_label_depths(self.ast.get_data2(node), scope_depth + 1)
+        return
+    if kind == NodeKind.NK_IF_EXPR:
+        self.collect_goto_label_depths(self.ast.get_data0(node), scope_depth)
+        self.collect_goto_label_depths(self.ast.get_data1(node), scope_depth)
+        self.collect_goto_label_depths(self.ast.get_data2(node), scope_depth)
+        return
+    if kind == NodeKind.NK_WHILE:
+        self.collect_goto_label_depths(self.ast.get_data0(node), scope_depth)
+        self.collect_goto_label_depths(self.ast.get_data1(node), scope_depth)
+        return
+    if kind == NodeKind.NK_LOOP:
+        self.collect_goto_label_depths(self.ast.get_data0(node), scope_depth)
+        return
+    if kind == NodeKind.NK_FOR:
+        self.collect_goto_label_depths(self.ast.get_data1(node), scope_depth)
+        self.collect_goto_label_depths(self.ast.get_data2(node), scope_depth)
+        return
+    if kind == NodeKind.NK_MATCH:
+        self.collect_goto_label_depths(self.ast.get_data0(node), scope_depth)
+        let arm_start = self.ast.get_data1(node)
+        let arm_count = self.ast.get_data2(node)
+        for ai in 0..arm_count:
+            self.collect_goto_label_depths(self.ast.get_extra(arm_start + ai), scope_depth)
+        return
+    if kind == NodeKind.NK_MATCH_ARM:
+        self.collect_goto_label_depths(self.ast.get_data2(node), scope_depth)
+        self.collect_goto_label_depths(self.ast.get_data1(node), scope_depth)
+        return
+    if kind == NodeKind.NK_RETURN or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_UNSAFE_BLOCK:
+        self.collect_goto_label_depths(self.ast.get_data0(node), scope_depth)
+        return
+    if kind == NodeKind.NK_BINARY:
+        self.collect_goto_label_depths(self.ast.get_data1(node), scope_depth)
+        self.collect_goto_label_depths(self.ast.get_data2(node), scope_depth)
+        return
+    if kind == NodeKind.NK_UNARY:
+        self.collect_goto_label_depths(self.ast.get_data1(node), scope_depth)
+        return
+    if kind == NodeKind.NK_LET_BINDING:
+        self.collect_goto_label_depths(self.ast.get_data1(node), scope_depth)
+        return
+    if kind == NodeKind.NK_LET_ELSE:
+        self.collect_goto_label_depths(self.ast.get_data1(node), scope_depth)
+        self.collect_goto_label_depths(self.ast.get_data2(node), scope_depth)
+        return
+    if kind == NodeKind.NK_TUPLE_DESTRUCTURE:
+        self.collect_goto_label_depths(self.ast.get_data2(node), scope_depth)
+        return
+    if kind == NodeKind.NK_ASSIGN or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_INDEX or kind == NodeKind.NK_PIPELINE or kind == NodeKind.NK_RANGE:
+        self.collect_goto_label_depths(self.ast.get_data0(node), scope_depth)
+        self.collect_goto_label_depths(self.ast.get_data1(node), scope_depth)
+        return
+    if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_CAST:
+        self.collect_goto_label_depths(self.ast.get_data0(node), scope_depth)
+        return
+    if kind == NodeKind.NK_SLICE:
+        self.collect_goto_label_depths(self.ast.get_data0(node), scope_depth)
+        self.collect_goto_label_depths(self.ast.get_data1(node), scope_depth)
+        self.collect_goto_label_depths(self.ast.get_data2(node), scope_depth)
+        return
+    if kind == NodeKind.NK_CALL:
+        self.collect_goto_label_depths(self.ast.get_data0(node), scope_depth)
+        let arg_start = self.ast.get_data1(node)
+        let arg_count = self.ast.get_data2(node)
+        for ai2 in 0..arg_count:
+            self.collect_goto_label_depths(self.ast.get_extra(arg_start + ai2), scope_depth)
+        return
+    if kind == NodeKind.NK_TUPLE or kind == NodeKind.NK_ARRAY_LIT:
+        let elem_start = self.ast.get_data0(node)
+        let elem_count = self.ast.get_data1(node)
+        for ei in 0..elem_count:
+            self.collect_goto_label_depths(self.ast.get_extra(elem_start + ei), scope_depth)
+        return
+    if kind == NodeKind.NK_STRUCT_LIT:
+        let field_start = self.ast.get_data1(node)
+        let field_count = self.ast.get_data2(node)
+        for fi in 0..field_count:
+            self.collect_goto_label_depths(self.ast.get_extra(field_start + fi * 2 + 1), scope_depth)
+        return
+    if kind == NodeKind.NK_RECORD_UPDATE:
+        self.collect_goto_label_depths(self.ast.get_data0(node), scope_depth)
+        let field_start2 = self.ast.get_data1(node)
+        let field_count2 = self.ast.get_data2(node)
+        for fi2 in 0..field_count2:
+            self.collect_goto_label_depths(self.ast.get_extra(field_start2 + fi2 * 2 + 1), scope_depth)
+        return
+    if kind == NodeKind.NK_WITH_EXPR or kind == NodeKind.NK_WITH_IMPLICIT:
+        self.collect_goto_label_depths(self.ast.get_data0(node), scope_depth)
+        self.collect_goto_label_depths(self.ast.get_data1(node), scope_depth + 1)
+        return
+    if kind == NodeKind.NK_SELECT_AWAIT:
+        let arm_start2 = self.ast.get_data0(node)
+        let arm_count2 = self.ast.get_data1(node)
+        for sai in 0..arm_count2:
+            self.collect_goto_label_depths(self.ast.get_extra(arm_start2 + sai * 3 + 1), scope_depth)
+            self.collect_goto_label_depths(self.ast.get_extra(arm_start2 + sai * 3 + 2), scope_depth + 1)
+        return
+
+fn MirBuilder.define_goto_label(self: MirBuilder, label: i32) -> i32:
+    let idx = self.ensure_goto_label(label, self.drop_scope_starts.len() as i32)
+    let bb = self.goto_label_bbs.get(idx as i64)
+    self.goto_label_drop_depths.set_i32(idx as i64, self.drop_local_ids.len() as i32)
+    self.goto_label_defer_depths.set_i32(idx as i64, self.defer_nodes.len() as i32)
+    self.goto_label_scope_depths.set_i32(idx as i64, self.drop_scope_starts.len() as i32)
+    self.goto_label_defined.set_i32(idx as i64, 1)
+    if self.cur_bb != bb and self.body.term_kind(self.cur_bb) == TermKind.TK_UNREACHABLE:
+        self.terminate(TermKind.TK_GOTO, bb, 0, 0, 0)
+    self.switch_to(bb)
+    bb
+
+fn MirBuilder.goto_target_info(self: MirBuilder, label: i32) -> LoopInfo:
+    let idx = self.ensure_goto_label(label, 0 - 1)
+    let bb = self.goto_label_bbs.get(idx as i64)
+    if self.goto_label_defined.get(idx as i64) != 0:
+        return LoopInfo {
+            label,
+            target_kind: ControlTargetKind.CT_BLOCK,
+            continue_bb: 0 - 1,
+            break_bb: bb,
+            break_drop_depth: self.goto_label_drop_depths.get(idx as i64),
+            break_defer_depth: self.goto_label_defer_depths.get(idx as i64),
+            break_scope_depth: self.goto_label_scope_depths.get(idx as i64),
+        }
+    var scope_depth = self.goto_label_scope_depths.get(idx as i64)
+    if scope_depth < 0:
+        scope_depth = self.drop_scope_starts.len() as i32
+    var drop_depth = self.drop_local_ids.len() as i32
+    if scope_depth < self.drop_scope_starts.len() as i32:
+        drop_depth = self.drop_scope_starts.get(scope_depth as i64)
+    var defer_depth = self.defer_nodes.len() as i32
+    if scope_depth < self.defer_scope_starts.len() as i32:
+        defer_depth = self.defer_scope_starts.get(scope_depth as i64)
+    LoopInfo {
+        label,
+        target_kind: ControlTargetKind.CT_BLOCK,
+        continue_bb: 0 - 1,
+        break_bb: bb,
+        break_drop_depth: drop_depth,
+        break_defer_depth: defer_depth,
+        break_scope_depth: scope_depth,
+    }
 
 fn MirBuilder.bind_local(self: MirBuilder, sym: i32, local_id: i32):
     self.bind_syms.push(sym)
@@ -2217,6 +2413,13 @@ fn MirBuilder.lower_block(self: MirBuilder, node: i32) -> i32:
         if sk == NodeKind.NK_CONTINUE:
             let _ = self.lower_continue(stmt)
             continue
+        if sk == NodeKind.NK_GOTO:
+            let _ = self.lower_goto(stmt)
+            continue
+        if sk == NodeKind.NK_LABEL:
+            let _ = self.lower_label(stmt)
+            continue
+        
         if sk == NodeKind.NK_DEFER:
             let defer_body = self.ast.get_data0(stmt)
             if defer_body != 0:
@@ -2816,6 +3019,24 @@ fn MirBuilder.lower_continue(self: MirBuilder, node: i32) -> i32:
     self.terminate(TermKind.TK_GOTO, loop_info.continue_bb, 0, 0, 0)
     self.switch_to(self.new_block())
     self.unit_operand()
+
+fn MirBuilder.lower_goto(self: MirBuilder, node: i32) -> i32:
+    let label = self.ast.get_data0(node)
+    let target = self.goto_target_info(label)
+    if target.break_bb < 0:
+        return self.unit_operand()
+    self.emit_cleanup_to_target(target)
+    self.terminate(TermKind.TK_GOTO, target.break_bb, 0, 0, 0)
+    self.switch_to(self.new_block())
+    self.unit_operand()
+
+fn MirBuilder.lower_label(self: MirBuilder, node: i32) -> i32:
+    let label = self.ast.get_data0(node)
+    let stmt = self.ast.get_data1(node)
+    let _ = self.define_goto_label(label)
+    if stmt == 0:
+        return self.unit_operand()
+    self.lower_expr(stmt)
 
 fn MirBuilder.lower_return(self: MirBuilder, node: i32) -> i32:
     let value_expr = self.ast.get_data0(node)
@@ -4388,6 +4609,12 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
     if kind == NodeKind.NK_BLOCK:
         return self.lower_block(node)
 
+    if kind == NodeKind.NK_LABEL:
+        return self.lower_label(node)
+
+    if kind == NodeKind.NK_GOTO:
+        return self.lower_goto(node)
+
     if kind == NodeKind.NK_LET_BINDING:
         self.lower_let_binding(node)
         return self.unit_operand()
@@ -5067,6 +5294,8 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody
             builder.body.local_type_ids.set_i32(0, builder.sema.ty_void)
 
     builder.push_scope()
+    let body_expr = builder.ast.get_data1(fn_node)
+    builder.collect_goto_label_depths(body_expr, builder.drop_scope_starts.len() as i32)
 
     // Parameters: locals 1..n
     let meta = builder.ast.find_fn_meta(fn_node)
@@ -5098,7 +5327,6 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody
     let ret_ty = builder.body.local_type_ids.get(0)
     builder.expected_type = ret_ty
 
-    let body_expr = builder.ast.get_data1(fn_node)
     var result = builder.lower_expr(body_expr)
 
     // Implicit Ok wrapping: if return type is Result[T, E] and body type is T,

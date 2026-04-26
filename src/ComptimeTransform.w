@@ -628,6 +628,13 @@ fn ct_clone_tree_with_subst(pool: &mut AstPool, node: i32, subst_sym: i32, subst
             pool.add_block_meta(cloned as NodeId, pool.block_meta_label(block_meta))
         return cloned
 
+    if kind == NodeKind.NK_LABEL:
+        let stmt = ct_clone_tree_with_subst(pool, pool.get_data1(node), subst_sym, subst_node, index_sym, index_node)
+        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), pool.get_data0(node), stmt, 0, pool.literal_suffix(node))
+
+    if kind == NodeKind.NK_GOTO:
+        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), pool.get_data0(node), 0, 0, pool.literal_suffix(node))
+
     if kind == NodeKind.NK_LET_BINDING:
         let value = ct_clone_tree_with_subst(pool, pool.get_data1(node), subst_sym, subst_node, index_sym, index_node)
         let cloned = ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), pool.get_data0(node), value, pool.get_data2(node), pool.literal_suffix(node))
@@ -970,6 +977,13 @@ fn ct_transform_expr(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, i
             pool.extra.set_i32(stmt_idx as i64, ct_transform_expr(source_ast, pool, sema, intern, diags, pool.get_extra(stmt_idx)))
         if pool.get_data2(node) != 0:
             pool.set_data2(node, ct_transform_expr(source_ast, pool, sema, intern, diags, pool.get_data2(node)))
+        return node
+
+    if kind == NodeKind.NK_LABEL:
+        pool.set_data1(node, ct_transform_expr(source_ast, pool, sema, intern, diags, pool.get_data1(node)))
+        return node
+
+    if kind == NodeKind.NK_GOTO:
         return node
 
     if kind == NodeKind.NK_LET_BINDING:

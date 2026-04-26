@@ -751,6 +751,9 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
         if label_sym != 0:
             return indent ++ "continue '" ++ stmts.get_string(label_sym) ++ "\n"
         return indent ++ "continue\n"
+    if kind == CiStmtKind.CIS_GOTO:
+        let label_sym = stmts.get_d0(id)
+        return indent ++ "goto '" ++ stmts.get_string(label_sym) ++ "\n"
 
     if kind == CiStmtKind.CIS_VAR_DECL:
         let name_sym = stmts.get_d0(id)
@@ -782,7 +785,7 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
 
     if kind == CiStmtKind.CIS_LABEL:
         let sym = stmts.get_d0(id)
-        return indent ++ "// label: " ++ stmts.get_string(sym) ++ "\n"
+        return indent ++ "'" ++ stmts.get_string(sym) ++ "\n"
 
     indent ++ "<ci:stmt:unknown>\n"
 

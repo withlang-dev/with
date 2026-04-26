@@ -135,6 +135,8 @@ fn typed_expr_kind_name(kind: i32) -> str:
     if kind == NodeKind.NK_INDEX: return "index"
     if kind == NodeKind.NK_SLICE: return "slice"
     if kind == NodeKind.NK_BLOCK: return "block"
+    if kind == NodeKind.NK_LABEL: return "label"
+    if kind == NodeKind.NK_GOTO: return "goto"
     if kind == NodeKind.NK_IF_EXPR: return "if_expr"
     if kind == NodeKind.NK_RETURN: return "return_expr"
     if kind == NodeKind.NK_LET_BINDING: return "let_binding"
@@ -626,6 +628,13 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
         for si in 0..safe_stmt_count:
             out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + si), indent + 1)
         out = out ++ self.dump_typed_expr_tree(tail, indent + 1)
+        return out
+
+    if kind == NodeKind.NK_LABEL:
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        return out
+
+    if kind == NodeKind.NK_GOTO:
         return out
 
     if kind == NodeKind.NK_IF_EXPR:

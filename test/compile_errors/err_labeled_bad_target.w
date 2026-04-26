@@ -1,4 +1,4 @@
-//! expect-check-fail: label must be followed by 'while', 'for', '{', or ':'
+//! expect-check-fail: label must be followed by a statement
 
 fn main:
-    'bad let x = 1
+    'bad

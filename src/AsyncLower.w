@@ -210,6 +210,13 @@ fn AsyncLower.walk_expr(self: AsyncLower, node: i32):
         self.walk_expr(async_ast_get_data2(self.ast, node))
         return
 
+    if kind == NodeKind.NK_LABEL:
+        self.walk_expr(async_ast_get_data1(self.ast, node))
+        return
+
+    if kind == NodeKind.NK_GOTO:
+        return
+
     if kind == NodeKind.NK_LET_BINDING:
         self.walk_expr(async_ast_get_data1(self.ast, node))
         return

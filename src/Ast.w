@@ -90,6 +90,12 @@ enum NodeKind: i32:
     NK_MULTI_INDEX = 77
     // NK_INDEX_SPEC: d0=start_or_expr, d1=stop, d2=step_and_kind (kind * INDEX_KIND_SHIFT + step_node)
     NK_INDEX_SPEC = 78
+    // Labels and unstructured jumps. Values are appended after existing
+    // expression/pattern nodes to avoid renumbering bootstrap-visible kinds.
+    // NK_LABEL: d0=label_sym, d1=statement, d2=0
+    // NK_GOTO:  d0=label_sym, d1=0, d2=0
+    NK_LABEL = 115
+    NK_GOTO = 116
     // Type expressions
     NK_TYPE_NAMED = 80
     NK_TYPE_GENERIC = 81
@@ -1313,6 +1319,8 @@ fn AstPool.for_binding_is_pattern(self: &AstPool, node: NodeId) -> bool:
 //                   extra: [index_binding(sym,0=none), label(sym,0=none)]
 // NodeKind.NK_BREAK:         d0=value(node,0=none), d1=label(sym,0=none), d2=0
 // NodeKind.NK_CONTINUE:      d0=label(sym,0=none), d1=0, d2=0
+// NodeKind.NK_LABEL:         d0=label_sym, d1=statement(node), d2=0
+// NodeKind.NK_GOTO:          d0=label_sym, d1=0, d2=0
 // NodeKind.NK_MATCH:         d0=subject(node), d1=extra_start, d2=arm_count
 // NodeKind.NK_MATCH_ARM:     d0=pattern(node), d1=body(node), d2=guard(node,0=none)
 // NodeKind.NK_TUPLE:         d0=extra_start, d1=elem_count, d2=0

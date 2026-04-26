@@ -338,12 +338,18 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
     let saved_has_et = self.has_expected_type
     let saved_loop_depth = self.loop_depth
     self.loop_depth = 0
+    let saved_label_registry = self.save_label_registry()
+    self.reset_label_registry()
+    self.collect_function_labels(body)
+    self.validate_function_gotos()
     self.push_label_boundary()
     if body_expected_ret != 0 and body_expected_ret != self.ty_void:
         self.expected_expr_type = body_expected_ret
         self.has_expected_type = 1
     let body_ty = self.check_expr(body)
     self.pop_label_frame()
+    self.emit_unused_label_warnings()
+    self.restore_label_registry(saved_label_registry)
     self.loop_depth = saved_loop_depth
     self.expected_expr_type = saved_expected_et
     self.has_expected_type = saved_has_et
@@ -389,6 +395,325 @@ fn Sema.check_fn_body(self: Sema, node: i32):
 
 fn Sema.label_name(self: Sema, sym: i32) -> str:
     "'" ++ self.pool_resolve(sym)
+
+fn Sema.save_label_registry(self: Sema) -> LabelRegistryState:
+    LabelRegistryState {
+        label_syms: self.fn_label_syms,
+        label_nodes: self.fn_label_nodes,
+        label_paths: self.fn_label_paths,
+        label_orders: self.fn_label_orders,
+        label_used: self.fn_label_used,
+        goto_syms: self.fn_goto_syms,
+        goto_nodes: self.fn_goto_nodes,
+        goto_paths: self.fn_goto_paths,
+        goto_orders: self.fn_goto_orders,
+        init_nodes: self.fn_init_nodes,
+        init_paths: self.fn_init_paths,
+        init_orders: self.fn_init_orders,
+        scope_stack: self.fn_label_scope_stack,
+        next_scope_id: self.fn_label_next_scope_id,
+        order_counter: self.fn_label_order_counter,
+    }
+
+fn Sema.restore_label_registry(self: Sema, state: LabelRegistryState):
+    self.fn_label_syms = state.label_syms
+    self.fn_label_nodes = state.label_nodes
+    self.fn_label_paths = state.label_paths
+    self.fn_label_orders = state.label_orders
+    self.fn_label_used = state.label_used
+    self.fn_goto_syms = state.goto_syms
+    self.fn_goto_nodes = state.goto_nodes
+    self.fn_goto_paths = state.goto_paths
+    self.fn_goto_orders = state.goto_orders
+    self.fn_init_nodes = state.init_nodes
+    self.fn_init_paths = state.init_paths
+    self.fn_init_orders = state.init_orders
+    self.fn_label_scope_stack = state.scope_stack
+    self.fn_label_next_scope_id = state.next_scope_id
+    self.fn_label_order_counter = state.order_counter
+
+fn Sema.reset_label_registry(self: Sema):
+    self.fn_label_syms = Vec.new()
+    self.fn_label_nodes = Vec.new()
+    self.fn_label_paths = Vec.new()
+    self.fn_label_orders = Vec.new()
+    self.fn_label_used = Vec.new()
+    self.fn_goto_syms = Vec.new()
+    self.fn_goto_nodes = Vec.new()
+    self.fn_goto_paths = Vec.new()
+    self.fn_goto_orders = Vec.new()
+    self.fn_init_nodes = Vec.new()
+    self.fn_init_paths = Vec.new()
+    self.fn_init_orders = Vec.new()
+    self.fn_label_scope_stack = Vec.new()
+    self.fn_label_next_scope_id = 1
+    self.fn_label_order_counter = 0
+    self.fn_label_scope_stack.push(1)
+
+fn Sema.label_registry_next_order(self: Sema) -> i32:
+    self.fn_label_order_counter = self.fn_label_order_counter + 1
+    self.fn_label_order_counter
+
+fn Sema.label_registry_path(self: Sema) -> str:
+    var out = "|"
+    for i in 0..self.fn_label_scope_stack.len() as i32:
+        out = out ++ i64_to_string(self.fn_label_scope_stack.get(i as i64) as i64) ++ "|"
+    out
+
+fn sema_label_path_is_prefix(prefix: str, path: str) -> bool:
+    if prefix.len() > path.len():
+        return false
+    path.slice(0, prefix.len()) == prefix
+
+fn Sema.label_registry_enter_scope(self: Sema):
+    self.fn_label_next_scope_id = self.fn_label_next_scope_id + 1
+    self.fn_label_scope_stack.push(self.fn_label_next_scope_id)
+
+fn Sema.label_registry_exit_scope(self: Sema):
+    if self.fn_label_scope_stack.len() as i32 > 0:
+        self.fn_label_scope_stack.pop()
+
+fn Sema.find_function_label(self: Sema, sym: i32) -> i32:
+    for i in 0..self.fn_label_syms.len() as i32:
+        if self.fn_label_syms.get(i as i64) == sym:
+            return i
+    0 - 1
+
+fn Sema.mark_function_label_used(self: Sema, sym: i32):
+    let idx = self.find_function_label(sym)
+    if idx >= 0:
+        self.fn_label_used.set_i32(idx as i64, 1)
+
+fn Sema.register_function_label(self: Sema, sym: i32, node: i32, order: i32):
+    if sym == 0:
+        return
+    let existing = self.find_function_label(sym)
+    if existing >= 0:
+        self.emit_error("duplicate label " ++ self.label_name(sym), node)
+        return
+    self.fn_label_syms.push(sym)
+    self.fn_label_nodes.push(node)
+    self.fn_label_paths.push(self.label_registry_path())
+    self.fn_label_orders.push(order)
+    self.fn_label_used.push(0)
+
+fn Sema.register_goto_site(self: Sema, sym: i32, node: i32, order: i32):
+    self.fn_goto_syms.push(sym)
+    self.fn_goto_nodes.push(node)
+    self.fn_goto_paths.push(self.label_registry_path())
+    self.fn_goto_orders.push(order)
+
+fn Sema.register_init_barrier(self: Sema, node: i32, order: i32):
+    self.fn_init_nodes.push(node)
+    self.fn_init_paths.push(self.label_registry_path())
+    self.fn_init_orders.push(order)
+
+fn Sema.collect_function_labels(self: Sema, node: i32):
+    if node == 0:
+        return
+    let order = self.label_registry_next_order()
+    let kind = self.ast.kind(node)
+
+    if kind == NodeKind.NK_LABEL:
+        self.register_function_label(self.ast.get_data0(node), node, order)
+        self.collect_function_labels(self.ast.get_data1(node))
+        return
+
+    if kind == NodeKind.NK_GOTO:
+        self.register_goto_site(self.ast.get_data0(node), node, order)
+        return
+
+    if kind == NodeKind.NK_LET_BINDING or kind == NodeKind.NK_LET_ELSE or kind == NodeKind.NK_TUPLE_DESTRUCTURE or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER:
+        self.register_init_barrier(node, order)
+
+    if kind == NodeKind.NK_CLOSURE or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_ASYNC_SCOPE:
+        return
+
+    if kind == NodeKind.NK_LET_BINDING:
+        self.collect_function_labels(self.ast.get_data1(node))
+        return
+
+    if kind == NodeKind.NK_LET_ELSE:
+        self.collect_function_labels(self.ast.get_data1(node))
+        self.collect_function_labels(self.ast.get_data2(node))
+        return
+
+    if kind == NodeKind.NK_TUPLE_DESTRUCTURE:
+        self.collect_function_labels(self.ast.get_data2(node))
+        return
+
+    if kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER:
+        self.collect_function_labels(self.ast.get_data0(node))
+        return
+
+    if kind == NodeKind.NK_BLOCK:
+        self.label_registry_enter_scope()
+        let extra_start = self.ast.get_data0(node)
+        let stmt_count = self.ast.get_data1(node)
+        for si in 0..stmt_count:
+            self.collect_function_labels(self.ast.get_extra(extra_start + si))
+        self.collect_function_labels(self.ast.get_data2(node))
+        self.label_registry_exit_scope()
+        return
+
+    if kind == NodeKind.NK_IF_EXPR:
+        self.collect_function_labels(self.ast.get_data0(node))
+        self.label_registry_enter_scope()
+        self.collect_function_labels(self.ast.get_data1(node))
+        self.label_registry_exit_scope()
+        if self.ast.get_data2(node) != 0:
+            self.label_registry_enter_scope()
+            self.collect_function_labels(self.ast.get_data2(node))
+            self.label_registry_exit_scope()
+        return
+
+    if kind == NodeKind.NK_WHILE:
+        self.collect_function_labels(self.ast.get_data0(node))
+        self.label_registry_enter_scope()
+        self.collect_function_labels(self.ast.get_data1(node))
+        self.label_registry_exit_scope()
+        return
+
+    if kind == NodeKind.NK_LOOP:
+        self.label_registry_enter_scope()
+        self.collect_function_labels(self.ast.get_data0(node))
+        self.label_registry_exit_scope()
+        return
+
+    if kind == NodeKind.NK_FOR:
+        self.collect_function_labels(self.ast.get_data1(node))
+        self.label_registry_enter_scope()
+        self.collect_function_labels(self.ast.get_data2(node))
+        self.label_registry_exit_scope()
+        return
+
+    if kind == NodeKind.NK_MATCH:
+        self.collect_function_labels(self.ast.get_data0(node))
+        let arm_start = self.ast.get_data1(node)
+        let arm_count = self.ast.get_data2(node)
+        for ai in 0..arm_count:
+            self.label_registry_enter_scope()
+            self.collect_function_labels(self.ast.get_extra(arm_start + ai))
+            self.label_registry_exit_scope()
+        return
+
+    if kind == NodeKind.NK_MATCH_ARM:
+        self.collect_function_labels(self.ast.get_data2(node))
+        self.collect_function_labels(self.ast.get_data1(node))
+        return
+
+    if kind == NodeKind.NK_RETURN or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_UNSAFE_BLOCK:
+        self.collect_function_labels(self.ast.get_data0(node))
+        return
+
+    if kind == NodeKind.NK_BINARY:
+        self.collect_function_labels(self.ast.get_data1(node))
+        self.collect_function_labels(self.ast.get_data2(node))
+        return
+
+    if kind == NodeKind.NK_UNARY:
+        self.collect_function_labels(self.ast.get_data1(node))
+        return
+
+    if kind == NodeKind.NK_ASSIGN or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_INDEX or kind == NodeKind.NK_PIPELINE or kind == NodeKind.NK_RANGE:
+        self.collect_function_labels(self.ast.get_data0(node))
+        self.collect_function_labels(self.ast.get_data1(node))
+        return
+
+    if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_CAST:
+        self.collect_function_labels(self.ast.get_data0(node))
+        return
+
+    if kind == NodeKind.NK_SLICE:
+        self.collect_function_labels(self.ast.get_data0(node))
+        self.collect_function_labels(self.ast.get_data1(node))
+        self.collect_function_labels(self.ast.get_data2(node))
+        return
+
+    if kind == NodeKind.NK_CALL:
+        self.collect_function_labels(self.ast.get_data0(node))
+        let extra_start2 = self.ast.get_data1(node)
+        let arg_count = self.ast.get_data2(node)
+        for ai in 0..arg_count:
+            self.collect_function_labels(self.ast.get_extra(extra_start2 + ai))
+        return
+
+    if kind == NodeKind.NK_TUPLE or kind == NodeKind.NK_ARRAY_LIT:
+        let extra_start3 = self.ast.get_data0(node)
+        let count = self.ast.get_data1(node)
+        for ei in 0..count:
+            self.collect_function_labels(self.ast.get_extra(extra_start3 + ei))
+        return
+
+    if kind == NodeKind.NK_STRUCT_LIT:
+        let extra_start4 = self.ast.get_data1(node)
+        let field_count = self.ast.get_data2(node)
+        for fi in 0..field_count:
+            self.collect_function_labels(self.ast.get_extra(extra_start4 + fi * 2 + 1))
+        return
+
+    if kind == NodeKind.NK_RECORD_UPDATE:
+        self.collect_function_labels(self.ast.get_data0(node))
+        let extra_start5 = self.ast.get_data1(node)
+        let field_count2 = self.ast.get_data2(node)
+        for fi2 in 0..field_count2:
+            self.collect_function_labels(self.ast.get_extra(extra_start5 + fi2 * 2 + 1))
+        return
+
+    if kind == NodeKind.NK_WITH_EXPR or kind == NodeKind.NK_WITH_IMPLICIT:
+        self.collect_function_labels(self.ast.get_data0(node))
+        self.label_registry_enter_scope()
+        self.collect_function_labels(self.ast.get_data1(node))
+        self.label_registry_exit_scope()
+        return
+
+    if kind == NodeKind.NK_SELECT_AWAIT:
+        let arm_start2 = self.ast.get_data0(node)
+        let arm_count2 = self.ast.get_data1(node)
+        for sai in 0..arm_count2:
+            self.collect_function_labels(self.ast.get_extra(arm_start2 + sai * 3 + 1))
+            self.label_registry_enter_scope()
+            self.collect_function_labels(self.ast.get_extra(arm_start2 + sai * 3 + 2))
+            self.label_registry_exit_scope()
+        return
+
+fn Sema.validate_function_gotos(self: Sema):
+    for gi in 0..self.fn_goto_syms.len() as i32:
+        let target_sym = self.fn_goto_syms.get(gi as i64)
+        let target_idx = self.find_function_label(target_sym)
+        let goto_node = self.fn_goto_nodes.get(gi as i64)
+        if target_idx < 0:
+            self.emit_error("undefined goto target " ++ self.label_name(target_sym), goto_node)
+            continue
+        let target_path = self.fn_label_paths.get(target_idx as i64)
+        let goto_path = self.fn_goto_paths.get(gi as i64)
+        if not sema_label_path_is_prefix(target_path, goto_path):
+            self.emit_error("goto would enter a block from outside", goto_node)
+            continue
+        let goto_order = self.fn_goto_orders.get(gi as i64)
+        let target_order = self.fn_label_orders.get(target_idx as i64)
+        if target_order > goto_order:
+            for ii in 0..self.fn_init_orders.len() as i32:
+                let init_order = self.fn_init_orders.get(ii as i64)
+                if init_order > goto_order and init_order < target_order and self.fn_init_paths.get(ii as i64) == target_path:
+                    let init_node = self.fn_init_nodes.get(ii as i64)
+                    let ik = self.ast.kind(init_node)
+                    if ik == NodeKind.NK_DEFER or ik == NodeKind.NK_ERRDEFER:
+                        self.emit_error("goto would skip deferred cleanup registration", goto_node)
+                    else:
+                        self.emit_error("goto would skip variable initialization", goto_node)
+                    break
+
+fn Sema.emit_unused_label_warnings(self: Sema):
+    for li in 0..self.fn_label_syms.len() as i32:
+        if self.fn_label_used.get(li as i64) != 0:
+            continue
+        let node = self.fn_label_nodes.get(li as i64)
+        let start = self.ast.get_start(node)
+        let end = self.ast.get_end(node)
+        var diag = Diagnostic.warn("unused label " ++ self.label_name(self.fn_label_syms.get(li as i64)), Span { file: self.local_file_id, start, end })
+        diag.set_code("unused-label")
+        self.diags.emit(diag)
 
 fn Sema.push_label_boundary(self: Sema):
     self.label_syms.push(0)
@@ -586,6 +911,13 @@ fn Sema.check_expr_reachable_comptime_errors(self: Sema, node: i32, seen: &mut H
 
     if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_RETURN or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_UNSAFE_BLOCK:
         self.check_expr_reachable_comptime_errors(self.ast.get_data0(node), seen, visiting, decl_indices)
+        return
+
+    if kind == NodeKind.NK_LABEL:
+        self.check_expr_reachable_comptime_errors(self.ast.get_data1(node), seen, visiting, decl_indices)
+        return
+
+    if kind == NodeKind.NK_GOTO:
         return
 
     if kind == NodeKind.NK_BLOCK:
@@ -1090,6 +1422,17 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
     if kind == NodeKind.NK_BLOCK:
         return self.check_block(node) as TypeId
 
+    if kind == NodeKind.NK_LABEL:
+        return self.check_expr(self.ast.get_data1(node))
+
+    if kind == NodeKind.NK_GOTO:
+        if self.in_defer != 0:
+            self.emit_error("goto not allowed in defer", node)
+        let label = self.ast.get_data0(node)
+        if self.find_function_label(label) >= 0:
+            self.mark_function_label_used(label)
+        return self.ty_void
+
     if kind == NodeKind.NK_LET_BINDING:
         return self.check_let_binding(node) as TypeId
 
@@ -1119,7 +1462,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
 
     if kind == NodeKind.NK_LOOP:
         self.loop_depth = self.loop_depth + 1
-        self.push_label_frame(0, LabelFrameKind.LFK_WHILE, node)
+        self.push_label_frame(self.ast.get_data1(node), LabelFrameKind.LFK_WHILE, node)
         self.check_expr(self.ast.get_data0(node))
         self.pop_label_frame()
         self.loop_depth = self.loop_depth - 1
@@ -1138,6 +1481,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         let label = self.ast.get_data1(node)
         if label != 0:
             let _ = self.resolve_labeled_control(label, node)
+            self.mark_function_label_used(label)
         else:
             let _ = self.resolve_innermost_loop_control(node, "break")
         return self.ty_void
@@ -1150,6 +1494,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
             let target = self.resolve_labeled_control(label, node)
             if target >= 0 and self.label_kinds.get(target as i64) == LabelFrameKind.LFK_BLOCK:
                 self.emit_error("cannot continue a labeled block; only loops support continue", node)
+            self.mark_function_label_used(label)
         else:
             let _ = self.resolve_innermost_loop_control(node, "continue")
         return self.ty_void
@@ -1330,9 +1675,15 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
     if kind == NodeKind.NK_ASYNC_BLOCK:
         if self.in_comptime_fn != 0:
             self.emit_error("async is not allowed in comptime", node)
+        let ab_saved_label_registry = self.save_label_registry()
+        self.reset_label_registry()
+        self.collect_function_labels(self.ast.get_data0(node))
+        self.validate_function_gotos()
         self.push_label_boundary()
         let ab_body_ty = self.check_expr(self.ast.get_data0(node))
         self.pop_label_frame()
+        self.emit_unused_label_warnings()
+        self.restore_label_registry(ab_saved_label_registry)
         // Wrap in Task[T] — async blocks spawn a fiber and return a Task
         let ab_task_args: Vec[i32] = Vec.new()
         ab_task_args.push(ab_body_ty as i32)
@@ -1371,9 +1722,15 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         self.push_scope()
         self.scope_put(name, self.ty_void, 0)
         self.async_scope_names.push(name)
+        let as_saved_label_registry = self.save_label_registry()
+        self.reset_label_registry()
+        self.collect_function_labels(body)
+        self.validate_function_gotos()
         self.push_label_boundary()
         let result = self.check_expr(body)
         self.pop_label_frame()
+        self.emit_unused_label_warnings()
+        self.restore_label_registry(as_saved_label_registry)
         self.async_scope_names.pop()
         self.pop_scope()
         return result
@@ -1885,11 +2242,14 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
     let value = self.ast.get_data1(node)
     let flags = self.ast.get_data2(node)
     let is_mut = flags % 2
-    if value != 0 and self.ast.kind(value) == NodeKind.NK_BLOCK:
-        let value_block_meta = self.ast.find_block_meta(value)
-        if value_block_meta >= 0 and self.ast.block_meta_label(value_block_meta) != 0:
-            self.emit_error("labeled block used as an expression", value)
-
+    if value != 0:
+        var labeled_value = value
+        if self.ast.kind(value) == NodeKind.NK_LABEL:
+            labeled_value = self.ast.get_data1(value)
+        if labeled_value != 0 and self.ast.kind(labeled_value) == NodeKind.NK_BLOCK:
+            let value_block_meta = self.ast.find_block_meta(labeled_value)
+            if value_block_meta >= 0 and self.ast.block_meta_label(value_block_meta) != 0:
+                self.emit_error("labeled block used as an expression", labeled_value)
     let ann_extra = self.local_let_type_ann_extra(flags)
     var ann_type: TypeId = 0 as TypeId
     var ann_type_node = 0
@@ -3277,9 +3637,15 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
                         break
         self.scope_put(p_sym, p_ty, 0)
         self.type_extra.push(p_ty)
+    let saved_label_registry = self.save_label_registry()
+    self.reset_label_registry()
+    self.collect_function_labels(body)
+    self.validate_function_gotos()
     self.push_label_boundary()
     self.check_expr(body)
     self.pop_label_frame()
+    self.emit_unused_label_warnings()
+    self.restore_label_registry(saved_label_registry)
 
     // Phase 1 ephemerality rule: closures cannot capture ephemeral refs/values.
     var bi = 0
@@ -6341,6 +6707,10 @@ fn Sema.expr_uses_symbol(self: Sema, node: i32, sym: i32) -> i32:
         return self.expr_uses_symbol(self.ast.get_data1(node), sym)
     if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_COMPTIME:
         return self.expr_uses_symbol(self.ast.get_data0(node), sym)
+    if kind == NodeKind.NK_LABEL:
+        return self.expr_uses_symbol(self.ast.get_data1(node), sym)
+    if kind == NodeKind.NK_GOTO:
+        return 0
     if kind == NodeKind.NK_CALL:
         if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
             return 1
@@ -6528,6 +6898,10 @@ fn Sema.expr_mutates_place(self: Sema, node: i32, sym: i32) -> i32:
             if self.expr_mutates_place(self.ast.get_extra(extra_start + si), sym) != 0:
                 return 1
         return self.expr_mutates_place(tail, sym)
+    if kind == NodeKind.NK_LABEL:
+        return self.expr_mutates_place(self.ast.get_data1(node), sym)
+    if kind == NodeKind.NK_GOTO:
+        return 0
     if kind == NodeKind.NK_IF_EXPR:
         if self.expr_mutates_place(self.ast.get_data0(node), sym) != 0:
             return 1
@@ -6627,6 +7001,10 @@ fn Sema.capture_is_field_only(self: Sema, node: i32, sym: i32) -> i32:
             if self.capture_is_field_only(self.ast.get_extra(ea + si), sym) == 0:
                 return 0
         return self.capture_is_field_only(tail, sym)
+    if kind == NodeKind.NK_LABEL:
+        return self.capture_is_field_only(self.ast.get_data1(node), sym)
+    if kind == NodeKind.NK_GOTO:
+        return 1
     if kind == NodeKind.NK_ASSIGN:
         if self.capture_is_field_only(self.ast.get_data0(node), sym) == 0:
             return 0
@@ -6734,6 +7112,11 @@ fn Sema.collect_capture_fields(self: Sema, node: i32, sym: i32):
         for si in 0..sc:
             self.collect_capture_fields(self.ast.get_extra(ea + si), sym)
         self.collect_capture_fields(tail, sym)
+        return
+    if kind == NodeKind.NK_LABEL:
+        self.collect_capture_fields(self.ast.get_data1(node), sym)
+        return
+    if kind == NodeKind.NK_GOTO:
         return
     if kind == NodeKind.NK_CALL:
         self.collect_capture_fields(self.ast.get_data0(node), sym)

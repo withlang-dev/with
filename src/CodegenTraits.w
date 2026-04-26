@@ -1177,6 +1177,10 @@ fn Codegen.module_const_contains_runtime_collection(self: Codegen, node: i32) ->
     let kind = self.pool.kind(node)
     if kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_RETURN:
         return self.module_const_contains_runtime_collection(self.pool.get_data0(node))
+    if kind == NodeKind.NK_LABEL:
+        return self.module_const_contains_runtime_collection(self.pool.get_data1(node))
+    if kind == NodeKind.NK_GOTO:
+        return false
     if kind == NodeKind.NK_UNARY:
         return self.module_const_contains_runtime_collection(self.pool.get_data1(node))
     if kind == NodeKind.NK_BINARY or kind == NodeKind.NK_ASSIGN or kind == NodeKind.NK_INDEX:
