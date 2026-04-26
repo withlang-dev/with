@@ -375,14 +375,14 @@ type MacroSession:
 
 // ── String helpers ──────────────────────────────────────────────
 
-fn c_strlen(s: *const u8) -> i64:
+unsafe fn c_strlen(s: *const u8) -> i64:
     if s as i64 == 0: return 0
     var i: i64 = 0
     while *((s as i64 + i) as *const u8) != 0:
         i = i + 1
     i
 
-fn c_strdup(s: *const u8) -> *mut u8:
+unsafe fn c_strdup(s: *const u8) -> *mut u8:
     if s as i64 == 0: return 0 as *mut u8
     let len = c_strlen(s)
     let out = with_alloc(len + 1)
@@ -392,7 +392,7 @@ fn c_strdup(s: *const u8) -> *mut u8:
     *((out as i64 + len) as *mut u8) = 0
     out
 
-fn c_strcmp(a: *const u8, b: *const u8) -> i32:
+unsafe fn c_strcmp(a: *const u8, b: *const u8) -> i32:
     if a as i64 == 0 and b as i64 == 0: return 0
     if a as i64 == 0: return -1
     if b as i64 == 0: return 1
@@ -405,7 +405,7 @@ fn c_strcmp(a: *const u8, b: *const u8) -> i32:
         i = i + 1
     0
 
-fn c_strncmp(a: *const u8, b: *const u8, n: i64) -> i32:
+unsafe fn c_strncmp(a: *const u8, b: *const u8, n: i64) -> i32:
     if n <= 0: return 0
     var i: i64 = 0
     while i < n:
@@ -416,7 +416,7 @@ fn c_strncmp(a: *const u8, b: *const u8, n: i64) -> i32:
         i = i + 1
     0
 
-fn c_strstr(haystack: *const u8, needle: *const u8) -> *const u8:
+unsafe fn c_strstr(haystack: *const u8, needle: *const u8) -> *const u8:
     if haystack as i64 == 0 or needle as i64 == 0: return 0 as *const u8
     let nlen = c_strlen(needle)
     if nlen == 0: return haystack
@@ -428,7 +428,7 @@ fn c_strstr(haystack: *const u8, needle: *const u8) -> *const u8:
         i = i + 1
     0 as *const u8
 
-fn c_strchr(s: *const u8, c: u8) -> *const u8:
+unsafe fn c_strchr(s: *const u8, c: u8) -> *const u8:
     if s as i64 == 0: return 0 as *const u8
     var i: i64 = 0
     while *((s as i64 + i) as *const u8) != 0:
@@ -439,7 +439,7 @@ fn c_strchr(s: *const u8, c: u8) -> *const u8:
     0 as *const u8
 
 // Allocate and copy a with_str to a null-terminated C string
-fn str_to_cstr(s: str) -> *mut u8:
+unsafe fn str_to_cstr(s: str) -> *mut u8:
     let out = with_alloc(s.len() + 1)
     if out as i64 == 0: return 0 as *mut u8
     if s.len() > 0:
@@ -448,7 +448,7 @@ fn str_to_cstr(s: str) -> *mut u8:
     *((out as i64 + s.len()) as *mut u8) = 0
     out
 
-fn make_str(p: *const u8) -> str:
+unsafe fn make_str(p: *const u8) -> str:
     if p as i64 == 0 or *p == 0:
         return ""
     let len = c_strlen(p)
@@ -461,7 +461,7 @@ fn make_str(p: *const u8) -> str:
     *sp
 
 // Session-tracked string allocation (freed on dispose)
-fn session_strdup(s: *mut CImportSession, p: *const u8) -> *mut u8:
+unsafe fn session_strdup(s: *mut CImportSession, p: *const u8) -> *mut u8:
     if p as i64 == 0: return 0 as *mut u8
     let copy = c_strdup(p)
     if copy as i64 == 0: return 0 as *mut u8
@@ -478,7 +478,7 @@ fn session_strdup(s: *mut CImportSession, p: *const u8) -> *mut u8:
     (*s).str_count = (*s).str_count + 1
     copy
 
-fn session_make_str(s: *mut CImportSession, p: *const u8) -> str:
+unsafe fn session_make_str(s: *mut CImportSession, p: *const u8) -> str:
     if p as i64 == 0 or *p == 0:
         return ""
     let copy = session_strdup(s, p)
@@ -488,7 +488,7 @@ fn session_make_str(s: *mut CImportSession, p: *const u8) -> str:
     let sp = &raw as *const str
     *sp
 
-fn clang_str_to_with(s: *mut CImportSession, cxs: CXString) -> str:
+unsafe fn clang_str_to_with(s: *mut CImportSession, cxs: CXString) -> str:
     let cstr = clang_getCString(cxs)
     let r = session_make_str(s, cstr)
     clang_disposeString(cxs)
@@ -496,7 +496,7 @@ fn clang_str_to_with(s: *mut CImportSession, cxs: CXString) -> str:
 
 // ── Buffer builder (replaces snprintf) ──────────────────────────
 
-fn buf_append_str(buf: *mut u8, pos: *mut i64, cap: i64, s: *const u8):
+unsafe fn buf_append_str(buf: *mut u8, pos: *mut i64, cap: i64, s: *const u8):
     if s as i64 == 0: return
     let len = c_strlen(s)
     var i: i64 = 0
@@ -507,7 +507,7 @@ fn buf_append_str(buf: *mut u8, pos: *mut i64, cap: i64, s: *const u8):
     *((buf as i64 + *pos) as *mut u8) = 0
 
 // Append a string to a buffer, replacing each ' with '\'' for shell safety.
-fn buf_append_shell_escaped(buf: *mut u8, pos: *mut i64, cap: i64, s: *const u8):
+unsafe fn buf_append_shell_escaped(buf: *mut u8, pos: *mut i64, cap: i64, s: *const u8):
     if s as i64 == 0: return
     let len = c_strlen(s)
     var i: i64 = 0
@@ -529,7 +529,7 @@ fn buf_append_shell_escaped(buf: *mut u8, pos: *mut i64, cap: i64, s: *const u8)
         i = i + 1
     *((buf as i64 + *pos) as *mut u8) = 0
 
-fn buf_append_i64(buf: *mut u8, pos: *mut i64, cap: i64, val: i64):
+unsafe fn buf_append_i64(buf: *mut u8, pos: *mut i64, cap: i64, val: i64):
     var tmp: [32]u8 = [0 as u8; 32]
     var v = val
     if v < 0:
@@ -547,7 +547,7 @@ fn buf_append_i64(buf: *mut u8, pos: *mut i64, cap: i64, val: i64):
 
 // ── Dynamic array helpers ───────────────────────────────────────
 
-fn grow_ptr_array(arr: *mut *mut u8, count: i32, cap: *mut i32, elem_size: i64) -> *mut u8:
+unsafe fn grow_ptr_array(arr: *mut *mut u8, count: i32, cap: *mut i32, elem_size: i64) -> *mut u8:
     if count < *cap: return *arr
     *cap = if *cap > 0: *cap * 2 else: 64
     let new_size = (*cap) as i64 * elem_size
@@ -578,7 +578,7 @@ var resource_dir_resolved: i32 = 0
 
 // ── SDK path detection ──────────────────────────────────────────
 
-fn get_sdk_path() -> *const u8:
+unsafe fn get_sdk_path() -> *const u8:
     if sdk_path_resolved == 0:
         sdk_path_resolved = 1
         let p = popen("xcrun --show-sdk-path 2>/dev/null\0" as *const u8, "r\0" as *const u8)
@@ -593,7 +593,7 @@ fn get_sdk_path() -> *const u8:
         return &sdk_path_buf as *const [1024]u8 as *const u8
     0 as *const u8
 
-fn get_clang_resource_dir() -> *const u8:
+unsafe fn get_clang_resource_dir() -> *const u8:
     if resource_dir_resolved == 0:
         resource_dir_resolved = 1
         // Try LLVM_PREFIX/lib/clang/<version> by listing the directory
@@ -611,7 +611,7 @@ fn get_clang_resource_dir() -> *const u8:
 
 // ── Name deduplication ──────────────────────────────────────────
 
-fn is_name_emitted(name: *const u8) -> i32:
+unsafe fn is_name_emitted(name: *const u8) -> i32:
     var i: i32 = 0
     while i < g_emitted_count:
         let entry = *((g_emitted_names as i64 + i as i64 * 8) as *const *const u8)
@@ -619,7 +619,7 @@ fn is_name_emitted(name: *const u8) -> i32:
         i = i + 1
     0
 
-fn mark_name_emitted(name: *const u8):
+unsafe fn mark_name_emitted(name: *const u8):
     if is_name_emitted(name) != 0: return
     if g_emitted_count >= g_emitted_cap:
         g_emitted_cap = if g_emitted_cap > 0: g_emitted_cap * 2 else: 256
@@ -634,7 +634,7 @@ fn mark_name_emitted(name: *const u8):
 
 // ── Type translation helpers ────────────────────────────────────
 
-fn strip_qualifiers(s: *mut CImportSession, spelling: *const u8) -> *mut u8:
+unsafe fn strip_qualifiers(s: *mut CImportSession, spelling: *const u8) -> *mut u8:
     if spelling as i64 == 0: return session_strdup(s, "\0" as *const u8)
     let buf = c_strdup(spelling)
     if buf as i64 == 0: return session_strdup(s, "\0" as *const u8)
@@ -644,7 +644,7 @@ fn strip_qualifiers(s: *mut CImportSession, spelling: *const u8) -> *mut u8:
     with_free(buf)
     result
 
-fn get_type_spelling(s: *mut CImportSession, ty: CXType) -> str:
+unsafe fn get_type_spelling(s: *mut CImportSession, ty: CXType) -> str:
     let canonical = clang_getCanonicalType(ty)
     let cxs = clang_getTypeSpelling(canonical)
     let cstr = clang_getCString(cxs)
@@ -655,7 +655,7 @@ fn get_type_spelling(s: *mut CImportSession, ty: CXType) -> str:
 // Forward declaration pattern: translate_fn_type calls translate_type_recursive and vice versa.
 // In With, both are defined at module scope so mutual recursion works.
 
-fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, depth: i32, is_last_struct_field: i32, preserve_incomplete_arrays: i32) -> *mut u8:
+unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, depth: i32, is_last_struct_field: i32, preserve_incomplete_arrays: i32) -> *mut u8:
     if depth > MAX_TYPE_DEPTH:
         return session_strdup(s, "__UNSUPPORTED:type too complex\0" as *const u8)
     let canonical = clang_getCanonicalType(ty)
@@ -819,13 +819,13 @@ fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, depth: i32,
     // Default: unsupported — must produce a loud compile error
     session_strdup(s, "__UNSUPPORTED:unknown_type_kind\0" as *const u8)
 
-fn translate_type_recursive(s: *mut CImportSession, ty: CXType, depth: i32, is_last_struct_field: i32) -> *mut u8:
+unsafe fn translate_type_recursive(s: *mut CImportSession, ty: CXType, depth: i32, is_last_struct_field: i32) -> *mut u8:
     translate_type_recursive_mode(s, ty, depth, is_last_struct_field, 0)
 
-fn translate_storage_type_recursive(s: *mut CImportSession, ty: CXType, depth: i32, is_last_struct_field: i32) -> *mut u8:
+unsafe fn translate_storage_type_recursive(s: *mut CImportSession, ty: CXType, depth: i32, is_last_struct_field: i32) -> *mut u8:
     translate_type_recursive_mode(s, ty, depth, is_last_struct_field, 1)
 
-fn cimport_path_to_cstr(path: str) -> *mut u8:
+unsafe fn cimport_path_to_cstr(path: str) -> *mut u8:
     let buf = with_alloc(path.len() + 1)
     if buf as i64 == 0:
         return 0 as *mut u8
@@ -836,7 +836,7 @@ fn cimport_path_to_cstr(path: str) -> *mut u8:
     *((buf as i64 + path.len() as i64) as *mut u8) = 0
     buf
 
-fn cimport_type_is_const_storage(ty: CXType) -> i32:
+unsafe fn cimport_type_is_const_storage(ty: CXType) -> i32:
     let canonical = clang_getCanonicalType(ty)
     if clang_isConstQualifiedType(canonical) != 0:
         return 1
@@ -845,7 +845,7 @@ fn cimport_type_is_const_storage(ty: CXType) -> i32:
         return cimport_type_is_const_storage(clang_getArrayElementType(canonical))
     0
 
-fn translate_fn_type(s: *mut CImportSession, fn_type: CXType, depth: i32) -> *mut u8:
+unsafe fn translate_fn_type(s: *mut CImportSession, fn_type: CXType, depth: i32) -> *mut u8:
     if depth > MAX_TYPE_DEPTH:
         return session_strdup(s, "__UNSUPPORTED:type too complex\0" as *const u8)
     let ret_type = clang_getResultType(fn_type)
@@ -885,34 +885,34 @@ fn translate_fn_type(s: *mut CImportSession, fn_type: CXType, depth: i32) -> *mu
 // These receive CXCursor by pointer (With calling convention matches C ABI for >16B structs)
 
 @[callconv("c")]
-fn collect_decl(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
+unsafe fn collect_decl(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
     let s = data as *mut CImportSession
     let kind = clang_getCursorKind(cursor)
     if kind != CXCursor_FunctionDecl and kind != CXCursor_StructDecl and kind != CXCursor_UnionDecl and kind != CXCursor_EnumDecl and kind != CXCursor_TypedefDecl and kind != CXCursor_VarDecl and kind != CXCursor_StaticAssert:
         return CXChildVisit_Continue
     // Filter transitive includes
-    if (*s).header_file as i64 != 0:
+    if (unsafe: *s).header_file as i64 != 0:
         let loc = clang_getCursorLocation(cursor)
         var file: *mut u8 = 0 as *mut u8
         clang_getFileLocation(loc, &mut file, 0 as *mut u32, 0 as *mut u32, 0 as *mut u32)
-        if file as i64 != 0 and clang_File_isEqual(file, (*s).header_file) == 0:
+        if file as i64 != 0 and clang_File_isEqual(file, (unsafe: *s).header_file) == 0:
             return CXChildVisit_Continue
     // Grow decl array
-    if (*s).decl_count >= (*s).decl_cap:
-        (*s).decl_cap = if (*s).decl_cap > 0: (*s).decl_cap * 2 else: 256
-        let new_buf = with_alloc((*s).decl_cap as i64 * 32)  // sizeof(CXCursor) = 32
-        if (*s).decls as i64 != 0 and (*s).decl_count > 0:
-            with_memcpy(new_buf, (*s).decls as *const u8, (*s).decl_count as i64 * 32)
-        if (*s).decls as i64 != 0:
-            with_free((*s).decls as *mut u8)
-        (*s).decls = new_buf as *mut CXCursor
-    let dst = ((*s).decls as i64 + (*s).decl_count as i64 * 32) as *mut CXCursor
-    *dst = cursor
-    (*s).decl_count = (*s).decl_count + 1
+    if (unsafe: *s).decl_count >= (unsafe: *s).decl_cap:
+        (unsafe: *s).decl_cap = if (unsafe: *s).decl_cap > 0: (unsafe: *s).decl_cap * 2 else: 256
+        let new_buf = with_alloc((unsafe: *s).decl_cap as i64 * 32)  // sizeof(CXCursor) = 32
+        if (unsafe: *s).decls as i64 != 0 and (unsafe: *s).decl_count > 0:
+            with_memcpy(new_buf, (unsafe: *s).decls as *const u8, (unsafe: *s).decl_count as i64 * 32)
+        if (unsafe: *s).decls as i64 != 0:
+            with_free((unsafe: *s).decls as *mut u8)
+        (unsafe: *s).decls = new_buf as *mut CXCursor
+    let dst = (((unsafe: *s).decls as i64) + ((unsafe: *s).decl_count as i64 * 32)) as *mut CXCursor
+    unsafe: *dst = cursor
+    (unsafe: *s).decl_count = (unsafe: *s).decl_count + 1
     CXChildVisit_Continue
 
 @[callconv("c")]
-fn collect_field(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
+unsafe fn collect_field(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
     let fc = data as *mut FieldCollector
     if clang_getCursorKind(cursor) != CXCursor_FieldDecl:
         return CXChildVisit_Continue
@@ -940,7 +940,7 @@ fn collect_field(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
     clang_disposeString(type_str)
     CXChildVisit_Continue
 
-fn ensure_fields_cached(s: *mut CImportSession, idx: i32):
+unsafe fn ensure_fields_cached(s: *mut CImportSession, idx: i32):
     if idx < 0 or idx >= (*s).decl_count: return
     if (*s).caches as i64 == 0:
         let size = (*s).decl_count as i64 * 48  // sizeof(DeclCache) ≈ 48
@@ -956,7 +956,7 @@ fn ensure_fields_cached(s: *mut CImportSession, idx: i32):
     (*cache).field_count = fc.count
 
 @[callconv("c")]
-fn collect_enum_const(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
+unsafe fn collect_enum_const(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
     let ec = data as *mut EnumConstCollector
     if clang_getCursorKind(cursor) != CXCursor_EnumConstantDecl:
         return CXChildVisit_Continue
@@ -978,7 +978,7 @@ fn collect_enum_const(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
     clang_disposeString(name)
     CXChildVisit_Continue
 
-fn ensure_enum_consts_cached(s: *mut CImportSession, idx: i32):
+unsafe fn ensure_enum_consts_cached(s: *mut CImportSession, idx: i32):
     if idx < 0 or idx >= (*s).decl_count: return
     if (*s).caches as i64 == 0:
         let size = (*s).decl_count as i64 * 48
@@ -998,10 +998,11 @@ fn ensure_enum_consts_cached(s: *mut CImportSession, idx: i32):
 // ═══════════════════════════════════════════════════════════
 
 @[c_export("with_cimport_available")]
-pub fn cimport_available() -> i32: 1
+pub unsafe fn cimport_available() -> i32:
+    1
 
 @[c_export("with_cimport_is_name_emitted")]
-pub fn cimport_is_name_emitted(name: str) -> i32:
+pub unsafe fn cimport_is_name_emitted(name: str) -> i32:
     if name.len() <= 0: return 0
     var buf: [512]u8 = [0 as u8; 512]
     let len = if name.len() < 511: name.len() else: 511
@@ -1012,7 +1013,7 @@ pub fn cimport_is_name_emitted(name: str) -> i32:
     is_name_emitted(&buf as *const [512]u8 as *const u8)
 
 @[c_export("with_cimport_mark_name_emitted")]
-pub fn cimport_mark_name_emitted(name: str):
+pub unsafe fn cimport_mark_name_emitted(name: str):
     if name.len() <= 0: return
     var buf: [512]u8 = [0 as u8; 512]
     let len = if name.len() < 511: name.len() else: 511
@@ -1023,7 +1024,7 @@ pub fn cimport_mark_name_emitted(name: str):
     mark_name_emitted(&buf as *const [512]u8 as *const u8)
 
 @[c_export("with_cimport_reset_names")]
-pub fn cimport_reset_names():
+pub unsafe fn cimport_reset_names():
     var i: i32 = 0
     while i < g_emitted_count:
         let entry = *((g_emitted_names as i64 + i as i64 * 8) as *const *mut u8)
@@ -1036,7 +1037,7 @@ pub fn cimport_reset_names():
     g_emitted_cap = 0
 
 @[c_export("with_cimport_add_include_path")]
-pub fn cimport_add_include_path(path: str):
+pub unsafe fn cimport_add_include_path(path: str):
     if g_cimport_include_count >= 32 or path.len() <= 0: return
     let buf = with_alloc(path.len() + 1)
     if buf as i64 == 0: return
@@ -1047,7 +1048,7 @@ pub fn cimport_add_include_path(path: str):
     g_cimport_include_count = g_cimport_include_count + 1
 
 @[c_export("with_cimport_clear_include_paths")]
-pub fn cimport_clear_include_paths():
+pub unsafe fn cimport_clear_include_paths():
     var i: i32 = 0
     while i < g_cimport_include_count:
         with_free(g_cimport_include_paths[i as i64])
@@ -1058,7 +1059,7 @@ pub fn cimport_clear_include_paths():
 // ── Parse ───────────────────────────────────────────────────
 
 @[c_export("with_cimport_parse")]
-pub fn cimport_parse(header_code: str) -> i64:
+pub unsafe fn cimport_parse(header_code: str) -> i64:
     let size = 232  // sizeof(CImportSession) — all pointer fields
     let s = with_alloc(size) as *mut CImportSession
     if s as i64 == 0: return 0
@@ -1142,7 +1143,7 @@ pub fn cimport_parse(header_code: str) -> i64:
 // ── Dispose ─────────────────────────────────────────────────
 
 @[c_export("with_cimport_dispose")]
-pub fn cimport_dispose(session: i64):
+pub unsafe fn cimport_dispose(session: i64):
     let s = session as *mut CImportSession
     if s as i64 == 0: return
     if (*s).caches as i64 != 0:
@@ -1193,7 +1194,7 @@ pub fn cimport_dispose(session: i64):
 // ── Error ───────────────────────────────────────────────────
 
 @[c_export("with_cimport_error")]
-pub fn cimport_error(session: i64) -> str:
+pub unsafe fn cimport_error(session: i64) -> str:
     let s = session as *mut CImportSession
     if s as i64 == 0: return ""
     if (*s).err_msg as i64 != 0:
@@ -1203,27 +1204,27 @@ pub fn cimport_error(session: i64) -> str:
 // ── Declaration queries ─────────────────────────────────────
 
 @[c_export("with_cimport_decl_count")]
-pub fn cimport_decl_count(session: i64) -> i32:
+pub unsafe fn cimport_decl_count(session: i64) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0: return 0
     (*s).decl_count
 
 @[c_export("with_cimport_decl_kind")]
-pub fn cimport_decl_kind(session: i64, idx: i32) -> i32:
+pub unsafe fn cimport_decl_kind(session: i64, idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return 0
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
     clang_getCursorKind(cursor)
 
 @[c_export("with_cimport_decl_name")]
-pub fn cimport_decl_name(session: i64, idx: i32) -> str:
+pub unsafe fn cimport_decl_name(session: i64, idx: i32) -> str:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return ""
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
     clang_str_to_with(s, clang_getCursorSpelling(cursor))
 
 @[c_export("with_cimport_decl_cursor")]
-pub fn cimport_decl_cursor(session: i64, idx: i32) -> i32:
+pub unsafe fn cimport_decl_cursor(session: i64, idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return -1
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
@@ -1232,7 +1233,7 @@ pub fn cimport_decl_cursor(session: i64, idx: i32) -> i32:
 // ── Function queries ────────────────────────────────────────
 
 @[c_export("with_cimport_fn_return_type")]
-pub fn cimport_fn_return_type(session: i64, idx: i32) -> str:
+pub unsafe fn cimport_fn_return_type(session: i64, idx: i32) -> str:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return ""
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
@@ -1241,14 +1242,14 @@ pub fn cimport_fn_return_type(session: i64, idx: i32) -> str:
     get_type_spelling(s, ret)
 
 @[c_export("with_cimport_fn_param_count")]
-pub fn cimport_fn_param_count(session: i64, idx: i32) -> i32:
+pub unsafe fn cimport_fn_param_count(session: i64, idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return 0
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
     clang_Cursor_getNumArguments(cursor)
 
 @[c_export("with_cimport_fn_param_name")]
-pub fn cimport_fn_param_name(session: i64, idx: i32, param: i32) -> str:
+pub unsafe fn cimport_fn_param_name(session: i64, idx: i32, param: i32) -> str:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return ""
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
@@ -1256,7 +1257,7 @@ pub fn cimport_fn_param_name(session: i64, idx: i32, param: i32) -> str:
     clang_str_to_with(s, clang_getCursorSpelling(arg))
 
 @[c_export("with_cimport_fn_param_type")]
-pub fn cimport_fn_param_type(session: i64, idx: i32, param: i32) -> str:
+pub unsafe fn cimport_fn_param_type(session: i64, idx: i32, param: i32) -> str:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return ""
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
@@ -1265,7 +1266,7 @@ pub fn cimport_fn_param_type(session: i64, idx: i32, param: i32) -> str:
     get_type_spelling(s, ty)
 
 @[c_export("with_cimport_param_is_restrict")]
-pub fn cimport_param_is_restrict(session: i64, idx: i32, param: i32) -> i32:
+pub unsafe fn cimport_param_is_restrict(session: i64, idx: i32, param: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return 0
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
@@ -1274,7 +1275,7 @@ pub fn cimport_param_is_restrict(session: i64, idx: i32, param: i32) -> i32:
     clang_isRestrictQualifiedType(ty)
 
 @[c_export("with_cimport_fn_is_variadic")]
-pub fn cimport_fn_is_variadic(session: i64, idx: i32) -> i32:
+pub unsafe fn cimport_fn_is_variadic(session: i64, idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return 0
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
@@ -1282,21 +1283,21 @@ pub fn cimport_fn_is_variadic(session: i64, idx: i32) -> i32:
     clang_isFunctionTypeVariadic(ty)
 
 @[c_export("with_cimport_fn_storage_class")]
-pub fn cimport_fn_storage_class(session: i64, idx: i32) -> i32:
+pub unsafe fn cimport_fn_storage_class(session: i64, idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return 0
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
     clang_Cursor_getStorageClass(cursor)
 
 @[c_export("with_cimport_fn_is_inline")]
-pub fn cimport_fn_is_inline(session: i64, idx: i32) -> i32:
+pub unsafe fn cimport_fn_is_inline(session: i64, idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return 0
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
     clang_Cursor_isFunctionInlined(cursor)
 
 @[c_export("with_cimport_fn_calling_conv")]
-pub fn cimport_fn_calling_conv(session: i64, idx: i32) -> str:
+pub unsafe fn cimport_fn_calling_conv(session: i64, idx: i32) -> str:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return ""
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
@@ -1312,7 +1313,7 @@ pub fn cimport_fn_calling_conv(session: i64, idx: i32) -> str:
     "c"
 
 @[c_export("with_cimport_fn_is_noreturn")]
-pub fn cimport_fn_is_noreturn(session: i64, idx: i32) -> i32:
+pub unsafe fn cimport_fn_is_noreturn(session: i64, idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return 0
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
@@ -1341,7 +1342,7 @@ pub fn cimport_fn_is_noreturn(session: i64, idx: i32) -> i32:
 // ── Translated type functions ───────────────────────────────
 
 @[c_export("with_cimport_fn_param_type_translated")]
-pub fn cimport_fn_param_type_translated(session: i64, idx: i32, param: i32) -> str:
+pub unsafe fn cimport_fn_param_type_translated(session: i64, idx: i32, param: i32) -> str:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return ""
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
@@ -1352,7 +1353,7 @@ pub fn cimport_fn_param_type_translated(session: i64, idx: i32, param: i32) -> s
     session_make_str(s, result as *const u8)
 
 @[c_export("with_cimport_fn_return_type_translated")]
-pub fn cimport_fn_return_type_translated(session: i64, idx: i32) -> str:
+pub unsafe fn cimport_fn_return_type_translated(session: i64, idx: i32) -> str:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return ""
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
@@ -1365,7 +1366,7 @@ pub fn cimport_fn_return_type_translated(session: i64, idx: i32) -> str:
 // ── Struct queries ──────────────────────────────────────────
 
 @[c_export("with_cimport_struct_has_definition")]
-pub fn cimport_struct_has_definition(session: i64, idx: i32) -> i32:
+pub unsafe fn cimport_struct_has_definition(session: i64, idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return 0
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
@@ -1374,7 +1375,7 @@ pub fn cimport_struct_has_definition(session: i64, idx: i32) -> i32:
     1
 
 @[c_export("with_cimport_struct_field_count")]
-pub fn cimport_struct_field_count(session: i64, idx: i32) -> i32:
+pub unsafe fn cimport_struct_field_count(session: i64, idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0: return 0
     ensure_fields_cached(s, idx)
@@ -1383,7 +1384,7 @@ pub fn cimport_struct_field_count(session: i64, idx: i32) -> i32:
     (*cache).field_count
 
 @[c_export("with_cimport_struct_field_name")]
-pub fn cimport_struct_field_name(session: i64, idx: i32, field: i32) -> str:
+pub unsafe fn cimport_struct_field_name(session: i64, idx: i32, field: i32) -> str:
     let s = session as *mut CImportSession
     if s as i64 == 0: return ""
     ensure_fields_cached(s, idx)
@@ -1394,7 +1395,7 @@ pub fn cimport_struct_field_name(session: i64, idx: i32, field: i32) -> str:
     make_str((*fi).name as *const u8)
 
 @[c_export("with_cimport_struct_field_type")]
-pub fn cimport_struct_field_type(session: i64, idx: i32, field: i32) -> str:
+pub unsafe fn cimport_struct_field_type(session: i64, idx: i32, field: i32) -> str:
     let s = session as *mut CImportSession
     if s as i64 == 0: return ""
     ensure_fields_cached(s, idx)
@@ -1405,7 +1406,7 @@ pub fn cimport_struct_field_type(session: i64, idx: i32, field: i32) -> str:
     make_str((*fi).type_spelling as *const u8)
 
 @[c_export("with_cimport_struct_field_is_bitfield")]
-pub fn cimport_struct_field_is_bitfield(session: i64, idx: i32, field: i32) -> i32:
+pub unsafe fn cimport_struct_field_is_bitfield(session: i64, idx: i32, field: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0: return 0
     ensure_fields_cached(s, idx)
@@ -1416,7 +1417,7 @@ pub fn cimport_struct_field_is_bitfield(session: i64, idx: i32, field: i32) -> i
     (*fi).is_bitfield
 
 @[c_export("with_cimport_struct_field_offset")]
-pub fn cimport_struct_field_offset(session: i64, idx: i32, field: i32) -> i64:
+pub unsafe fn cimport_struct_field_offset(session: i64, idx: i32, field: i32) -> i64:
     let s = session as *mut CImportSession
     if s as i64 == 0: return -1
     ensure_fields_cached(s, idx)
@@ -1431,7 +1432,7 @@ pub fn cimport_struct_field_offset(session: i64, idx: i32, field: i32) -> i64:
     offset_bits / 8
 
 @[c_export("with_cimport_struct_size")]
-pub fn cimport_struct_size(session: i64, idx: i32) -> i64:
+pub unsafe fn cimport_struct_size(session: i64, idx: i32) -> i64:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return -1
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
@@ -1439,7 +1440,7 @@ pub fn cimport_struct_size(session: i64, idx: i32) -> i64:
     clang_Type_getSizeOf(ty)
 
 @[c_export("with_cimport_struct_field_size")]
-pub fn cimport_struct_field_size(session: i64, idx: i32, field: i32) -> i64:
+pub unsafe fn cimport_struct_field_size(session: i64, idx: i32, field: i32) -> i64:
     let s = session as *mut CImportSession
     if s as i64 == 0: return -1
     ensure_fields_cached(s, idx)
@@ -1450,7 +1451,7 @@ pub fn cimport_struct_field_size(session: i64, idx: i32, field: i32) -> i64:
     clang_Type_getSizeOf((*fi).clang_type)
 
 @[c_export("with_cimport_struct_is_opaque")]
-pub fn cimport_struct_is_opaque(session: i64, idx: i32) -> i32:
+pub unsafe fn cimport_struct_is_opaque(session: i64, idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return 1
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
@@ -1458,7 +1459,7 @@ pub fn cimport_struct_is_opaque(session: i64, idx: i32) -> i32:
     1
 
 @[c_export("with_cimport_struct_is_packed")]
-pub fn cimport_struct_is_packed(session: i64, idx: i32) -> i32:
+pub unsafe fn cimport_struct_is_packed(session: i64, idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return 0
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
@@ -1468,7 +1469,7 @@ pub fn cimport_struct_is_packed(session: i64, idx: i32) -> i32:
     0
 
 @[c_export("with_cimport_struct_align")]
-pub fn cimport_struct_align(session: i64, idx: i32) -> i64:
+pub unsafe fn cimport_struct_align(session: i64, idx: i32) -> i64:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return -1
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
@@ -1476,7 +1477,7 @@ pub fn cimport_struct_align(session: i64, idx: i32) -> i64:
     clang_Type_getAlignOf(ty)
 
 @[c_export("with_cimport_struct_field_type_translated")]
-pub fn cimport_struct_field_type_translated(session: i64, idx: i32, field: i32) -> str:
+pub unsafe fn cimport_struct_field_type_translated(session: i64, idx: i32, field: i32) -> str:
     let s = session as *mut CImportSession
     if s as i64 == 0: return ""
     ensure_fields_cached(s, idx)
@@ -1490,7 +1491,7 @@ pub fn cimport_struct_field_type_translated(session: i64, idx: i32, field: i32) 
     session_make_str(s, result as *const u8)
 
 @[c_export("with_cimport_struct_field_align")]
-pub fn cimport_struct_field_align(session: i64, idx: i32, field: i32) -> i64:
+pub unsafe fn cimport_struct_field_align(session: i64, idx: i32, field: i32) -> i64:
     let s = session as *mut CImportSession
     if s as i64 == 0: return -1
     ensure_fields_cached(s, idx)
@@ -1503,7 +1504,7 @@ pub fn cimport_struct_field_align(session: i64, idx: i32, field: i32) -> i64:
 // ── Enum queries ────────────────────────────────────────────
 
 @[c_export("with_cimport_enum_const_count")]
-pub fn cimport_enum_const_count(session: i64, idx: i32) -> i32:
+pub unsafe fn cimport_enum_const_count(session: i64, idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0: return 0
     ensure_enum_consts_cached(s, idx)
@@ -1512,7 +1513,7 @@ pub fn cimport_enum_const_count(session: i64, idx: i32) -> i32:
     (*cache).enum_const_count
 
 @[c_export("with_cimport_enum_const_name")]
-pub fn cimport_enum_const_name(session: i64, idx: i32, ci: i32) -> str:
+pub unsafe fn cimport_enum_const_name(session: i64, idx: i32, ci: i32) -> str:
     let s = session as *mut CImportSession
     if s as i64 == 0: return ""
     ensure_enum_consts_cached(s, idx)
@@ -1523,7 +1524,7 @@ pub fn cimport_enum_const_name(session: i64, idx: i32, ci: i32) -> str:
     make_str((*eci).name as *const u8)
 
 @[c_export("with_cimport_enum_const_value")]
-pub fn cimport_enum_const_value(session: i64, idx: i32, ci: i32) -> i64:
+pub unsafe fn cimport_enum_const_value(session: i64, idx: i32, ci: i32) -> i64:
     let s = session as *mut CImportSession
     if s as i64 == 0: return 0
     ensure_enum_consts_cached(s, idx)
@@ -1534,7 +1535,7 @@ pub fn cimport_enum_const_value(session: i64, idx: i32, ci: i32) -> i64:
     (*eci).value
 
 @[c_export("with_cimport_enum_int_type")]
-pub fn cimport_enum_int_type(session: i64, idx: i32) -> str:
+pub unsafe fn cimport_enum_int_type(session: i64, idx: i32) -> str:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return ""
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
@@ -1544,7 +1545,7 @@ pub fn cimport_enum_int_type(session: i64, idx: i32) -> str:
 // ── Variable queries ────────────────────────────────────────
 
 @[c_export("with_cimport_var_type")]
-pub fn cimport_var_type(session: i64, idx: i32) -> str:
+pub unsafe fn cimport_var_type(session: i64, idx: i32) -> str:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return ""
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
@@ -1552,7 +1553,7 @@ pub fn cimport_var_type(session: i64, idx: i32) -> str:
     get_type_spelling(s, ty)
 
 @[c_export("with_cimport_var_is_const")]
-pub fn cimport_var_is_const(session: i64, idx: i32) -> i32:
+pub unsafe fn cimport_var_is_const(session: i64, idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return 0
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
@@ -1560,13 +1561,13 @@ pub fn cimport_var_is_const(session: i64, idx: i32) -> i32:
     cimport_type_is_const_storage(ty)
 
 @[c_export("with_cimport_var_storage_class")]
-pub fn cimport_var_storage_class(session: i64, idx: i32) -> i32:
+pub unsafe fn cimport_var_storage_class(session: i64, idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return 0
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
     clang_Cursor_getStorageClass(cursor)
 
-fn cimport_var_decl_has_initializer_text(s: str) -> i32:
+unsafe fn cimport_var_decl_has_initializer_text(s: str) -> i32:
     let slen = s.len() as i32
     var paren_depth = 0
     var bracket_depth = 0
@@ -1617,7 +1618,7 @@ fn cimport_var_decl_has_initializer_text(s: str) -> i32:
     0
 
 @[c_export("with_cimport_var_definition_kind")]
-pub fn cimport_var_definition_kind(session: i64, idx: i32) -> i32:
+pub unsafe fn cimport_var_definition_kind(session: i64, idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return 0
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
@@ -1628,7 +1629,7 @@ pub fn cimport_var_definition_kind(session: i64, idx: i32) -> i32:
     1
 
 @[c_export("with_cimport_var_type_translated")]
-pub fn cimport_var_type_translated(session: i64, idx: i32) -> str:
+pub unsafe fn cimport_var_type_translated(session: i64, idx: i32) -> str:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return ""
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
@@ -1638,7 +1639,7 @@ pub fn cimport_var_type_translated(session: i64, idx: i32) -> str:
     session_make_str(s, result as *const u8)
 
 @[c_export("with_cimport_var_storage_type_translated")]
-pub fn cimport_var_storage_type_translated(session: i64, idx: i32) -> str:
+pub unsafe fn cimport_var_storage_type_translated(session: i64, idx: i32) -> str:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return ""
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
@@ -1648,7 +1649,7 @@ pub fn cimport_var_storage_type_translated(session: i64, idx: i32) -> str:
     session_make_str(s, result as *const u8)
 
 @[c_export("with_ci_cursor_in_file")]
-pub fn ci_cursor_in_file(session: i64, cursor_idx: i32, path: str) -> i32:
+pub unsafe fn ci_cursor_in_file(session: i64, cursor_idx: i32, path: str) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count or path.len() == 0:
         return 0
@@ -1719,7 +1720,7 @@ pub fn ci_cursor_in_file(session: i64, cursor_idx: i32, path: str) -> i32:
 // ── Typedef queries ─────────────────────────────────────────
 
 @[c_export("with_cimport_typedef_underlying")]
-pub fn cimport_typedef_underlying(session: i64, idx: i32) -> str:
+pub unsafe fn cimport_typedef_underlying(session: i64, idx: i32) -> str:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return ""
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
@@ -1727,7 +1728,7 @@ pub fn cimport_typedef_underlying(session: i64, idx: i32) -> str:
     get_type_spelling(s, ty)
 
 @[c_export("with_cimport_typedef_underlying_translated")]
-pub fn cimport_typedef_underlying_translated(session: i64, idx: i32) -> str:
+pub unsafe fn cimport_typedef_underlying_translated(session: i64, idx: i32) -> str:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return ""
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
@@ -1739,7 +1740,7 @@ pub fn cimport_typedef_underlying_translated(session: i64, idx: i32) -> str:
 // ── Hex float conversion ────────────────────────────────────
 
 @[c_export("with_cimport_hex_float_to_decimal")]
-pub fn cimport_hex_float_to_decimal(hex_str: str) -> str:
+pub unsafe fn cimport_hex_float_to_decimal(hex_str: str) -> str:
     let cstr = str_to_cstr(hex_str)
     if cstr as i64 == 0: return ""
     var endptr: *mut u8 = 0 as *mut u8
@@ -1757,7 +1758,7 @@ pub fn cimport_hex_float_to_decimal(hex_str: str) -> str:
 // ── Path utilities ──────────────────────────────────────────
 
 @[c_export("with_cimport_realpath")]
-pub fn cimport_realpath(path: str) -> str:
+pub unsafe fn cimport_realpath(path: str) -> str:
     let cpath = str_to_cstr(path)
     if cpath as i64 == 0: return ""
     var buf: [1024]u8 = [0 as u8; 1024]
@@ -1769,7 +1770,7 @@ pub fn cimport_realpath(path: str) -> str:
 // ── Macro extraction ────────────────────────────────────────
 
 @[c_export("with_cimport_parse_macros")]
-pub fn cimport_parse_macros(header_code: str) -> i64:
+pub unsafe fn cimport_parse_macros(header_code: str) -> i64:
     let ms_size = 56  // sizeof(MacroSession)
     let ms = with_alloc(ms_size) as *mut MacroSession
     if ms as i64 == 0: return 0
@@ -1925,7 +1926,7 @@ pub fn cimport_parse_macros(header_code: str) -> i64:
     ms as i64
 
 @[c_export("with_cimport_preprocess_text")]
-pub fn cimport_preprocess_text(source_code: str) -> str:
+pub unsafe fn cimport_preprocess_text(source_code: str) -> str:
     var template_path: [40]u8 = [0 as u8; 40]
     let tmpl = "/tmp/with_cimport_pp_XXXXXX\0"
     let tp = *(&tmpl as *const *const u8)
@@ -2011,7 +2012,7 @@ pub fn cimport_preprocess_text(source_code: str) -> str:
     result
 
 @[c_export("with_cimport_collect_object_macro_types")]
-pub fn cimport_collect_object_macro_types(header_code: str, macro_names: str) -> str:
+pub unsafe fn cimport_collect_object_macro_types(header_code: str, macro_names: str) -> str:
     if macro_names.len() == 0:
         return ""
 
@@ -2109,31 +2110,31 @@ pub fn cimport_collect_object_macro_types(header_code: str, macro_names: str) ->
     result
 
 @[c_export("with_cimport_macro_count")]
-pub fn cimport_macro_count(session: i64) -> i32:
+pub unsafe fn cimport_macro_count(session: i64) -> i32:
     let ms = session as *mut MacroSession
     if ms as i64 == 0: return 0
     (*ms).count
 
 @[c_export("with_cimport_macro_name")]
-pub fn cimport_macro_name(session: i64, idx: i32) -> str:
+pub unsafe fn cimport_macro_name(session: i64, idx: i32) -> str:
     let ms = session as *mut MacroSession
     if ms as i64 == 0 or idx < 0 or idx >= (*ms).count: return ""
     make_str(*(((*ms).names as i64 + idx as i64 * 8) as *const *const u8))
 
 @[c_export("with_cimport_macro_value")]
-pub fn cimport_macro_value(session: i64, idx: i32) -> str:
+pub unsafe fn cimport_macro_value(session: i64, idx: i32) -> str:
     let ms = session as *mut MacroSession
     if ms as i64 == 0 or idx < 0 or idx >= (*ms).count: return ""
     make_str(*(((*ms).values as i64 + idx as i64 * 8) as *const *const u8))
 
 @[c_export("with_cimport_macro_is_fn_like")]
-pub fn cimport_macro_is_fn_like(session: i64, idx: i32) -> i32:
+pub unsafe fn cimport_macro_is_fn_like(session: i64, idx: i32) -> i32:
     let ms = session as *mut MacroSession
     if ms as i64 == 0 or idx < 0 or idx >= (*ms).count: return 0
     *(((*ms).fn_like as i64 + idx as i64 * 4) as *const i32)
 
 @[c_export("with_cimport_dispose_macros")]
-pub fn cimport_dispose_macros(session: i64):
+pub unsafe fn cimport_dispose_macros(session: i64):
     let ms = session as *mut MacroSession
     if ms as i64 == 0: return
     var i: i32 = 0
@@ -2158,13 +2159,13 @@ pub fn cimport_dispose_macros(session: i64):
     with_free(ms as *mut u8)
 
 @[c_export("with_cimport_macro_param_count")]
-pub fn cimport_macro_param_count(session: i64, idx: i32) -> i32:
+pub unsafe fn cimport_macro_param_count(session: i64, idx: i32) -> i32:
     let ms = session as *mut MacroSession
     if ms as i64 == 0 or idx < 0 or idx >= (*ms).count: return 0
     *(((*ms).param_counts as i64 + idx as i64 * 4) as *const i32)
 
 @[c_export("with_cimport_macro_param_name")]
-pub fn cimport_macro_param_name(session: i64, idx: i32, param: i32) -> str:
+pub unsafe fn cimport_macro_param_name(session: i64, idx: i32, param: i32) -> str:
     let ms = session as *mut MacroSession
     if ms as i64 == 0 or idx < 0 or idx >= (*ms).count: return ""
     let pc = *(((*ms).param_counts as i64 + idx as i64 * 4) as *const i32)
@@ -2176,7 +2177,7 @@ pub fn cimport_macro_param_name(session: i64, idx: i32, param: i32) -> str:
 // ── Variable extras ─────────────────────────────────────────
 
 @[c_export("with_cimport_var_alignment")]
-pub fn cimport_var_alignment(session: i64, idx: i32) -> i32:
+pub unsafe fn cimport_var_alignment(session: i64, idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return 0
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
@@ -2186,7 +2187,7 @@ pub fn cimport_var_alignment(session: i64, idx: i32) -> i32:
     align as i32
 
 @[c_export("with_cimport_var_is_threadlocal")]
-pub fn cimport_var_is_threadlocal(session: i64, idx: i32) -> i32:
+pub unsafe fn cimport_var_is_threadlocal(session: i64, idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return 0
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
@@ -2195,7 +2196,7 @@ pub fn cimport_var_is_threadlocal(session: i64, idx: i32) -> i32:
 // ── Anonymous struct/union in struct fields ──────────────────
 
 @[c_export("with_cimport_struct_field_is_anonymous_record")]
-pub fn cimport_struct_field_is_anonymous_record(session: i64, idx: i32, field: i32) -> i32:
+pub unsafe fn cimport_struct_field_is_anonymous_record(session: i64, idx: i32, field: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0: return 0
     ensure_fields_cached(s, idx)
@@ -2214,7 +2215,7 @@ pub fn cimport_struct_field_is_anonymous_record(session: i64, idx: i32, field: i
 // ── Typedef anonymous record ────────────────────────────────
 
 @[c_export("with_cimport_typedef_anon_record_field_count")]
-pub fn cimport_typedef_anon_record_field_count(session: i64, idx: i32) -> i32:
+pub unsafe fn cimport_typedef_anon_record_field_count(session: i64, idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return -1
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
@@ -2229,7 +2230,7 @@ pub fn cimport_typedef_anon_record_field_count(session: i64, idx: i32) -> i32:
     -1  // TODO: implement full anonymous record field enumeration
 
 @[c_export("with_cimport_typedef_anon_is_union")]
-pub fn cimport_typedef_anon_is_union(session: i64, idx: i32) -> i32:
+pub unsafe fn cimport_typedef_anon_is_union(session: i64, idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return 0
     let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
@@ -2242,7 +2243,7 @@ pub fn cimport_typedef_anon_is_union(session: i64, idx: i32) -> i32:
 
 // ── Phase 1: AST traversal ─────────────────────────────────
 
-fn store_cursor(s: *mut CImportSession, cursor: CXCursor) -> i32:
+unsafe fn store_cursor(s: *mut CImportSession, cursor: CXCursor) -> i32:
     if (*s).cursor_count >= (*s).cursor_cap:
         (*s).cursor_cap = if (*s).cursor_cap > 0: (*s).cursor_cap * 2 else: 256
         let new_buf = with_alloc((*s).cursor_cap as i64 * 32)
@@ -2256,7 +2257,7 @@ fn store_cursor(s: *mut CImportSession, cursor: CXCursor) -> i32:
     (*s).cursor_count = (*s).cursor_count + 1
     idx
 
-fn store_type(s: *mut CImportSession, ty: CXType) -> i32:
+unsafe fn store_type(s: *mut CImportSession, ty: CXType) -> i32:
     if (*s).type_count >= (*s).type_cap:
         (*s).type_cap = if (*s).type_cap > 0: (*s).type_cap * 2 else: 256
         let new_buf = with_alloc((*s).type_cap as i64 * 24)
@@ -2271,21 +2272,21 @@ fn store_type(s: *mut CImportSession, ty: CXType) -> i32:
     idx
 
 @[callconv("c")]
-fn collect_child_cursor(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
+unsafe fn collect_child_cursor(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
     let cc = data as *mut ChildCollector
-    if (*cc).count >= (*cc).cap:
-        (*cc).cap = if (*cc).cap > 0: (*cc).cap * 2 else: 64
-        let new_buf = with_alloc((*cc).cap as i64 * 4)
-        if (*cc).indices as i64 != 0 and (*cc).count > 0:
-            with_memcpy(new_buf, (*cc).indices as *const u8, (*cc).count as i64 * 4)
-        if (*cc).indices as i64 != 0: with_free((*cc).indices as *mut u8)
-        (*cc).indices = new_buf as *mut i32
-    let stored_idx = store_cursor((*cc).session, cursor)
-    *(((*cc).indices as i64 + (*cc).count as i64 * 4) as *mut i32) = stored_idx
-    (*cc).count = (*cc).count + 1
+    if (unsafe: *cc).count >= (unsafe: *cc).cap:
+        (unsafe: *cc).cap = if (unsafe: *cc).cap > 0: (unsafe: *cc).cap * 2 else: 64
+        let new_buf = with_alloc((unsafe: *cc).cap as i64 * 4)
+        if (unsafe: *cc).indices as i64 != 0 and (unsafe: *cc).count > 0:
+            with_memcpy(new_buf, (unsafe: *cc).indices as *const u8, (unsafe: *cc).count as i64 * 4)
+        if (unsafe: *cc).indices as i64 != 0: with_free((unsafe: *cc).indices as *mut u8)
+        (unsafe: *cc).indices = new_buf as *mut i32
+    let stored_idx = store_cursor((unsafe: *cc).session, cursor)
+    unsafe: *((((unsafe: *cc).indices as i64) + ((unsafe: *cc).count as i64 * 4)) as *mut i32) = stored_idx
+    (unsafe: *cc).count = (unsafe: *cc).count + 1
     CXChildVisit_Continue
 
-fn ensure_children_cached(s: *mut CImportSession, cursor_idx: i32):
+unsafe fn ensure_children_cached(s: *mut CImportSession, cursor_idx: i32):
     if cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return
     // Grow cache arrays if needed
     if cursor_idx >= (*s).children_cache_cap:
@@ -2329,14 +2330,14 @@ fn ensure_children_cached(s: *mut CImportSession, cursor_idx: i32):
     *(((*s).child_counts as i64 + cursor_idx as i64 * 4) as *mut i32) = cc.count
 
 @[c_export("with_ci_root_cursor")]
-pub fn ci_root_cursor(session: i64) -> i32:
+pub unsafe fn ci_root_cursor(session: i64) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or (*s).tu as i64 == 0: return -1
     let root = clang_getTranslationUnitCursor((*s).tu)
     store_cursor(s, root)
 
 @[c_export("with_ci_num_children")]
-pub fn ci_num_children(session: i64, cursor_idx: i32) -> i32:
+pub unsafe fn ci_num_children(session: i64, cursor_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return 0
     ensure_children_cached(s, cursor_idx)
@@ -2344,7 +2345,7 @@ pub fn ci_num_children(session: i64, cursor_idx: i32) -> i32:
     *(((*s).child_counts as i64 + cursor_idx as i64 * 4) as *const i32)
 
 @[c_export("with_ci_child")]
-pub fn ci_child(session: i64, cursor_idx: i32, child_index: i32) -> i32:
+pub unsafe fn ci_child(session: i64, cursor_idx: i32, child_index: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return -1
     ensure_children_cached(s, cursor_idx)
@@ -2355,21 +2356,21 @@ pub fn ci_child(session: i64, cursor_idx: i32, child_index: i32) -> i32:
     *(((*s).child_indices as i64 + (start + child_index) as i64 * 4) as *const i32)
 
 @[c_export("with_ci_cursor_kind")]
-pub fn ci_cursor_kind(session: i64, cursor_idx: i32) -> i32:
+pub unsafe fn ci_cursor_kind(session: i64, cursor_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return 0
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
     clang_getCursorKind(cursor)
 
 @[c_export("with_ci_cursor_spelling")]
-pub fn ci_cursor_spelling(session: i64, cursor_idx: i32) -> str:
+pub unsafe fn ci_cursor_spelling(session: i64, cursor_idx: i32) -> str:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return ""
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
     clang_str_to_with(s, clang_getCursorSpelling(cursor))
 
 @[c_export("with_ci_cursor_kind_name")]
-pub fn ci_cursor_kind_name(session: i64, cursor_idx: i32) -> str:
+pub unsafe fn ci_cursor_kind_name(session: i64, cursor_idx: i32) -> str:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return ""
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
@@ -2377,7 +2378,7 @@ pub fn ci_cursor_kind_name(session: i64, cursor_idx: i32) -> str:
     clang_str_to_with(s, clang_getCursorKindSpelling(kind))
 
 @[c_export("with_ci_cursor_type")]
-pub fn ci_cursor_type(session: i64, cursor_idx: i32) -> i32:
+pub unsafe fn ci_cursor_type(session: i64, cursor_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return -1
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
@@ -2385,49 +2386,49 @@ pub fn ci_cursor_type(session: i64, cursor_idx: i32) -> i32:
     store_type(s, ty)
 
 @[c_export("with_ci_type_kind")]
-pub fn ci_type_kind(session: i64, type_idx: i32) -> i32:
+pub unsafe fn ci_type_kind(session: i64, type_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or type_idx < 0 or type_idx >= (*s).type_count: return 0
     let ty = *(((*s).types as i64 + type_idx as i64 * 24) as *const CXType)
     ty.kind
 
 @[c_export("with_ci_type_spelling")]
-pub fn ci_type_spelling(session: i64, type_idx: i32) -> str:
+pub unsafe fn ci_type_spelling(session: i64, type_idx: i32) -> str:
     let s = session as *mut CImportSession
     if s as i64 == 0 or type_idx < 0 or type_idx >= (*s).type_count: return ""
     let ty = *(((*s).types as i64 + type_idx as i64 * 24) as *const CXType)
     clang_str_to_with(s, clang_getTypeSpelling(ty))
 
 @[c_export("with_ci_type_sizeof")]
-pub fn ci_type_sizeof(session: i64, type_idx: i32) -> i64:
+pub unsafe fn ci_type_sizeof(session: i64, type_idx: i32) -> i64:
     let s = session as *mut CImportSession
     if s as i64 == 0 or type_idx < 0 or type_idx >= (*s).type_count: return -1
     let ty = *(((*s).types as i64 + type_idx as i64 * 24) as *const CXType)
     clang_Type_getSizeOf(ty)
 
 @[c_export("with_ci_type_alignof")]
-pub fn ci_type_alignof(session: i64, type_idx: i32) -> i64:
+pub unsafe fn ci_type_alignof(session: i64, type_idx: i32) -> i64:
     let s = session as *mut CImportSession
     if s as i64 == 0 or type_idx < 0 or type_idx >= (*s).type_count: return -1
     let ty = *(((*s).types as i64 + type_idx as i64 * 24) as *const CXType)
     clang_Type_getAlignOf(ty)
 
 @[c_export("with_ci_type_is_const")]
-pub fn ci_type_is_const(session: i64, type_idx: i32) -> i32:
+pub unsafe fn ci_type_is_const(session: i64, type_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or type_idx < 0 or type_idx >= (*s).type_count: return 0
     let ty = *(((*s).types as i64 + type_idx as i64 * 24) as *const CXType)
     clang_isConstQualifiedType(ty)
 
 @[c_export("with_ci_type_is_volatile")]
-pub fn ci_type_is_volatile(session: i64, type_idx: i32) -> i32:
+pub unsafe fn ci_type_is_volatile(session: i64, type_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or type_idx < 0 or type_idx >= (*s).type_count: return 0
     let ty = *(((*s).types as i64 + type_idx as i64 * 24) as *const CXType)
     clang_isVolatileQualifiedType(ty)
 
 @[c_export("with_ci_type_pointee")]
-pub fn ci_type_pointee(session: i64, type_idx: i32) -> i32:
+pub unsafe fn ci_type_pointee(session: i64, type_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or type_idx < 0 or type_idx >= (*s).type_count: return -1
     let ty = *(((*s).types as i64 + type_idx as i64 * 24) as *const CXType)
@@ -2436,7 +2437,7 @@ pub fn ci_type_pointee(session: i64, type_idx: i32) -> i32:
     store_type(s, pt)
 
 @[c_export("with_ci_type_canonical")]
-pub fn ci_type_canonical(session: i64, type_idx: i32) -> i32:
+pub unsafe fn ci_type_canonical(session: i64, type_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or type_idx < 0 or type_idx >= (*s).type_count: return -1
     let ty = *(((*s).types as i64 + type_idx as i64 * 24) as *const CXType)
@@ -2444,7 +2445,7 @@ pub fn ci_type_canonical(session: i64, type_idx: i32) -> i32:
     store_type(s, ct)
 
 @[c_export("with_ci_type_result")]
-pub fn ci_type_result(session: i64, type_idx: i32) -> i32:
+pub unsafe fn ci_type_result(session: i64, type_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or type_idx < 0 or type_idx >= (*s).type_count: return -1
     let ty = *(((*s).types as i64 + type_idx as i64 * 24) as *const CXType)
@@ -2453,14 +2454,14 @@ pub fn ci_type_result(session: i64, type_idx: i32) -> i32:
     store_type(s, rt)
 
 @[c_export("with_ci_type_arg_count")]
-pub fn ci_type_arg_count(session: i64, type_idx: i32) -> i32:
+pub unsafe fn ci_type_arg_count(session: i64, type_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or type_idx < 0 or type_idx >= (*s).type_count: return 0
     let ty = *(((*s).types as i64 + type_idx as i64 * 24) as *const CXType)
     clang_getNumArgTypes(ty)
 
 @[c_export("with_ci_type_arg")]
-pub fn ci_type_arg(session: i64, type_idx: i32, index: i32) -> i32:
+pub unsafe fn ci_type_arg(session: i64, type_idx: i32, index: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or type_idx < 0 or type_idx >= (*s).type_count: return -1
     let ty = *(((*s).types as i64 + type_idx as i64 * 24) as *const CXType)
@@ -2469,21 +2470,21 @@ pub fn ci_type_arg(session: i64, type_idx: i32, index: i32) -> i32:
     store_type(s, at)
 
 @[c_export("with_ci_type_is_variadic")]
-pub fn ci_type_is_variadic(session: i64, type_idx: i32) -> i32:
+pub unsafe fn ci_type_is_variadic(session: i64, type_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or type_idx < 0 or type_idx >= (*s).type_count: return 0
     let ty = *(((*s).types as i64 + type_idx as i64 * 24) as *const CXType)
     clang_isFunctionTypeVariadic(ty)
 
 @[c_export("with_ci_type_array_size")]
-pub fn ci_type_array_size(session: i64, type_idx: i32) -> i64:
+pub unsafe fn ci_type_array_size(session: i64, type_idx: i32) -> i64:
     let s = session as *mut CImportSession
     if s as i64 == 0 or type_idx < 0 or type_idx >= (*s).type_count: return -1
     let ty = *(((*s).types as i64 + type_idx as i64 * 24) as *const CXType)
     clang_getArraySize(ty)
 
 @[c_export("with_ci_type_array_element")]
-pub fn ci_type_array_element(session: i64, type_idx: i32) -> i32:
+pub unsafe fn ci_type_array_element(session: i64, type_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or type_idx < 0 or type_idx >= (*s).type_count: return -1
     let ty = *(((*s).types as i64 + type_idx as i64 * 24) as *const CXType)
@@ -2492,7 +2493,7 @@ pub fn ci_type_array_element(session: i64, type_idx: i32) -> i32:
     store_type(s, et)
 
 @[c_export("with_ci_type_named")]
-pub fn ci_type_named(session: i64, type_idx: i32) -> i32:
+pub unsafe fn ci_type_named(session: i64, type_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or type_idx < 0 or type_idx >= (*s).type_count: return -1
     let ty = *(((*s).types as i64 + type_idx as i64 * 24) as *const CXType)
@@ -2501,7 +2502,7 @@ pub fn ci_type_named(session: i64, type_idx: i32) -> i32:
     store_type(s, nt)
 
 @[c_export("with_ci_type_declaration")]
-pub fn ci_type_declaration(session: i64, type_idx: i32) -> i32:
+pub unsafe fn ci_type_declaration(session: i64, type_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or type_idx < 0 or type_idx >= (*s).type_count: return -1
     let ty = *(((*s).types as i64 + type_idx as i64 * 24) as *const CXType)
@@ -2510,7 +2511,7 @@ pub fn ci_type_declaration(session: i64, type_idx: i32) -> i32:
     store_cursor(s, decl)
 
 @[c_export("with_ci_type_translated")]
-pub fn ci_type_translated(session: i64, type_idx: i32) -> str:
+pub unsafe fn ci_type_translated(session: i64, type_idx: i32) -> str:
     let s = session as *mut CImportSession
     if s as i64 == 0 or type_idx < 0 or type_idx >= (*s).type_count: return ""
     let ty = *(((*s).types as i64 + type_idx as i64 * 24) as *const CXType)
@@ -2521,42 +2522,42 @@ pub fn ci_type_translated(session: i64, type_idx: i32) -> str:
 // ── Cursor extras ───────────────────────────────────────────
 
 @[c_export("with_ci_cursor_linkage")]
-pub fn ci_cursor_linkage(session: i64, cursor_idx: i32) -> i32:
+pub unsafe fn ci_cursor_linkage(session: i64, cursor_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return 0
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
     clang_getCursorLinkage(cursor)
 
 @[c_export("with_ci_cursor_storage_class")]
-pub fn ci_cursor_storage_class(session: i64, cursor_idx: i32) -> i32:
+pub unsafe fn ci_cursor_storage_class(session: i64, cursor_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return 0
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
     clang_Cursor_getStorageClass(cursor)
 
 @[c_export("with_ci_cursor_is_inline")]
-pub fn ci_cursor_is_inline(session: i64, cursor_idx: i32) -> i32:
+pub unsafe fn ci_cursor_is_inline(session: i64, cursor_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return 0
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
     clang_Cursor_isFunctionInlined(cursor)
 
 @[c_export("with_ci_cursor_is_anonymous")]
-pub fn ci_cursor_is_anonymous(session: i64, cursor_idx: i32) -> i32:
+pub unsafe fn ci_cursor_is_anonymous(session: i64, cursor_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return 0
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
     clang_Cursor_isAnonymous(cursor)
 
 @[c_export("with_ci_cursor_is_bitfield")]
-pub fn ci_cursor_is_bitfield(session: i64, cursor_idx: i32) -> i32:
+pub unsafe fn ci_cursor_is_bitfield(session: i64, cursor_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return 0
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
     clang_Cursor_isBitField(cursor)
 
 @[c_export("with_ci_field_offset_bits")]
-pub fn ci_field_offset_bits(session: i64, cursor_idx: i32) -> i64:
+pub unsafe fn ci_field_offset_bits(session: i64, cursor_idx: i32) -> i64:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return -1
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
@@ -2569,14 +2570,14 @@ pub fn ci_field_offset_bits(session: i64, cursor_idx: i32) -> i64:
     offset
 
 @[c_export("with_ci_enum_const_value_new")]
-pub fn ci_enum_const_value_new(session: i64, cursor_idx: i32) -> i64:
+pub unsafe fn ci_enum_const_value_new(session: i64, cursor_idx: i32) -> i64:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return 0
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
     clang_getEnumConstantDeclValue(cursor)
 
 @[c_export("with_ci_cursor_is_definition")]
-pub fn ci_cursor_is_definition(session: i64, cursor_idx: i32) -> i32:
+pub unsafe fn ci_cursor_is_definition(session: i64, cursor_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return 0
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
@@ -2585,24 +2586,24 @@ pub fn ci_cursor_is_definition(session: i64, cursor_idx: i32) -> i32:
 // ── Target info ─────────────────────────────────────────────
 
 @[c_export("with_ci_pointer_width")]
-pub fn ci_pointer_width(session: i64) -> i32:
+pub unsafe fn ci_pointer_width(session: i64) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or (*s).tu as i64 == 0: return 8
     // On 64-bit platforms, pointer width is 8
     8
 
 @[c_export("with_ci_sizeof_long")]
-pub fn ci_sizeof_long(session: i64) -> i32:
+pub unsafe fn ci_sizeof_long(session: i64) -> i32:
     // On aarch64 Darwin, sizeof(long) = 8
     8
 
 @[c_export("with_ci_char_is_signed")]
-pub fn ci_char_is_signed(session: i64) -> i32:
+pub unsafe fn ci_char_is_signed(session: i64) -> i32:
     // On aarch64 Darwin, char is signed
     1
 
 @[c_export("with_ci_target_triple")]
-pub fn ci_target_triple(session: i64) -> str:
+pub unsafe fn ci_target_triple(session: i64) -> str:
     let s = session as *mut CImportSession
     if s as i64 == 0 or (*s).tu as i64 == 0: return ""
     let ti = clang_getTranslationUnitTargetInfo((*s).tu)
@@ -2615,7 +2616,7 @@ pub fn ci_target_triple(session: i64) -> str:
 // ── Evaluation ──────────────────────────────────────────────
 
 @[c_export("with_ci_eval_int_valid")]
-pub fn ci_eval_int_valid(session: i64, cursor_idx: i32) -> i32:
+pub unsafe fn ci_eval_int_valid(session: i64, cursor_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return 0
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
@@ -2627,7 +2628,7 @@ pub fn ci_eval_int_valid(session: i64, cursor_idx: i32) -> i32:
     0
 
 @[c_export("with_ci_eval_int_value")]
-pub fn ci_eval_int_value(session: i64, cursor_idx: i32) -> i64:
+pub unsafe fn ci_eval_int_value(session: i64, cursor_idx: i32) -> i64:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return 0
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
@@ -2638,7 +2639,7 @@ pub fn ci_eval_int_value(session: i64, cursor_idx: i32) -> i64:
     val
 
 @[c_export("with_ci_eval_int_is_unsigned")]
-pub fn ci_eval_int_is_unsigned(session: i64, cursor_idx: i32) -> i32:
+pub unsafe fn ci_eval_int_is_unsigned(session: i64, cursor_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return 0
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
@@ -2649,7 +2650,7 @@ pub fn ci_eval_int_is_unsigned(session: i64, cursor_idx: i32) -> i32:
     is_unsigned
 
 @[c_export("with_ci_eval_as_int")]
-pub fn ci_eval_as_int(session: i64, cursor_idx: i32, out: *mut i64) -> i32:
+pub unsafe fn ci_eval_as_int(session: i64, cursor_idx: i32, out: *mut i64) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return 0
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
@@ -2664,7 +2665,7 @@ pub fn ci_eval_as_int(session: i64, cursor_idx: i32, out: *mut i64) -> i32:
     0
 
 @[c_export("with_ci_eval_as_float")]
-pub fn ci_eval_as_float(session: i64, cursor_idx: i32, out: *mut f64) -> i32:
+pub unsafe fn ci_eval_as_float(session: i64, cursor_idx: i32, out: *mut f64) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return 0
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
@@ -2679,7 +2680,7 @@ pub fn ci_eval_as_float(session: i64, cursor_idx: i32, out: *mut f64) -> i32:
     0
 
 @[c_export("with_ci_eval_as_str")]
-pub fn ci_eval_as_str(session: i64, cursor_idx: i32) -> str:
+pub unsafe fn ci_eval_as_str(session: i64, cursor_idx: i32) -> str:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return ""
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
@@ -2697,14 +2698,14 @@ pub fn ci_eval_as_str(session: i64, cursor_idx: i32) -> str:
 // ── Calling convention ──────────────────────────────────────
 
 @[c_export("with_ci_calling_conv")]
-pub fn ci_calling_conv(session: i64, type_idx: i32) -> i32:
+pub unsafe fn ci_calling_conv(session: i64, type_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or type_idx < 0 or type_idx >= (*s).type_count: return 0
     let ty = *(((*s).types as i64 + type_idx as i64 * 24) as *const CXType)
     clang_getFunctionTypeCallingConv(ty)
 
 @[c_export("with_ci_typedef_underlying_type")]
-pub fn ci_typedef_underlying_type(session: i64, cursor_idx: i32) -> i32:
+pub unsafe fn ci_typedef_underlying_type(session: i64, cursor_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return -1
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
@@ -2713,7 +2714,7 @@ pub fn ci_typedef_underlying_type(session: i64, cursor_idx: i32) -> i32:
     store_type(s, ty)
 
 @[c_export("with_ci_enum_int_type")]
-pub fn ci_enum_int_type(session: i64, cursor_idx: i32) -> i32:
+pub unsafe fn ci_enum_int_type(session: i64, cursor_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return -1
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
@@ -2724,7 +2725,7 @@ pub fn ci_enum_int_type(session: i64, cursor_idx: i32) -> i32:
 // ── Type predicates ─────────────────────────────────────────
 
 @[c_export("with_ci_type_is_unsigned")]
-pub fn ci_type_is_unsigned(session: i64, cursor_idx: i32) -> i32:
+pub unsafe fn ci_type_is_unsigned(session: i64, cursor_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return 0
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
@@ -2736,7 +2737,7 @@ pub fn ci_type_is_unsigned(session: i64, cursor_idx: i32) -> i32:
     0
 
 @[c_export("with_ci_type_is_pointer")]
-pub fn ci_type_is_pointer(session: i64, cursor_idx: i32) -> i32:
+pub unsafe fn ci_type_is_pointer(session: i64, cursor_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return 0
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
@@ -2746,7 +2747,7 @@ pub fn ci_type_is_pointer(session: i64, cursor_idx: i32) -> i32:
     0
 
 @[c_export("with_ci_type_is_float")]
-pub fn ci_type_is_float(session: i64, cursor_idx: i32) -> i32:
+pub unsafe fn ci_type_is_float(session: i64, cursor_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return 0
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
@@ -2758,7 +2759,7 @@ pub fn ci_type_is_float(session: i64, cursor_idx: i32) -> i32:
     0
 
 @[c_export("with_ci_type_is_bool")]
-pub fn ci_type_is_bool(session: i64, cursor_idx: i32) -> i32:
+pub unsafe fn ci_type_is_bool(session: i64, cursor_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return 0
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
@@ -2770,7 +2771,7 @@ pub fn ci_type_is_bool(session: i64, cursor_idx: i32) -> i32:
 // ── Cursor location and source text ─────────────────────────
 
 @[c_export("with_ci_cursor_location")]
-pub fn ci_cursor_location(session: i64, cursor_idx: i32) -> str:
+pub unsafe fn ci_cursor_location(session: i64, cursor_idx: i32) -> str:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return ""
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
@@ -2807,17 +2808,17 @@ pub fn ci_cursor_location(session: i64, cursor_idx: i32) -> str:
     clang_disposeString(presumed_file)
     session_make_str(s, &buf as *const [1024]u8 as *const u8)
 
-fn source_location_expansion_offset(loc: CXSourceLocation, file: *mut *mut u8, offset: *mut u32):
+unsafe fn source_location_expansion_offset(loc: CXSourceLocation, file: *mut *mut u8, offset: *mut u32):
     clang_getExpansionLocation(loc, file, 0 as *mut u32, 0 as *mut u32, offset)
     if (*file as i64) == 0:
         clang_getFileLocation(loc, file, 0 as *mut u32, 0 as *mut u32, offset)
 
-fn source_location_spelling_offset(loc: CXSourceLocation, file: *mut *mut u8, offset: *mut u32):
+unsafe fn source_location_spelling_offset(loc: CXSourceLocation, file: *mut *mut u8, offset: *mut u32):
     clang_getSpellingLocation(loc, file, 0 as *mut u32, 0 as *mut u32, offset)
     if (*file as i64) == 0:
         clang_getFileLocation(loc, file, 0 as *mut u32, 0 as *mut u32, offset)
 
-fn source_range_expansion_offsets(range: CXSourceRange, file: *mut *mut u8, start_off: *mut u32, end_off: *mut u32) -> i32:
+unsafe fn source_range_expansion_offsets(range: CXSourceRange, file: *mut *mut u8, start_off: *mut u32, end_off: *mut u32) -> i32:
     var start_file: *mut u8 = 0 as *mut u8
     var end_file: *mut u8 = 0 as *mut u8
     source_location_expansion_offset(clang_getRangeStart(range), &mut start_file, start_off)
@@ -2829,7 +2830,7 @@ fn source_range_expansion_offsets(range: CXSourceRange, file: *mut *mut u8, star
     *file = start_file
     1
 
-fn source_range_spelling_offsets(range: CXSourceRange, file: *mut *mut u8, start_off: *mut u32, end_off: *mut u32) -> i32:
+unsafe fn source_range_spelling_offsets(range: CXSourceRange, file: *mut *mut u8, start_off: *mut u32, end_off: *mut u32) -> i32:
     var start_file: *mut u8 = 0 as *mut u8
     var end_file: *mut u8 = 0 as *mut u8
     source_location_spelling_offset(clang_getRangeStart(range), &mut start_file, start_off)
@@ -2841,7 +2842,7 @@ fn source_range_spelling_offsets(range: CXSourceRange, file: *mut *mut u8, start
     *file = start_file
     1
 
-fn source_range_preferred_text_offsets(range: CXSourceRange, file: *mut *mut u8, start_off: *mut u32, end_off: *mut u32) -> i32:
+unsafe fn source_range_preferred_text_offsets(range: CXSourceRange, file: *mut *mut u8, start_off: *mut u32, end_off: *mut u32) -> i32:
     var expansion_file: *mut u8 = 0 as *mut u8
     var expansion_start: u32 = 0
     var expansion_end: u32 = 0
@@ -2873,7 +2874,7 @@ fn source_range_preferred_text_offsets(range: CXSourceRange, file: *mut *mut u8,
 // Returns the start byte offset of a cursor's source range, or -1 if unavailable.
 // Used by the for-loop handler to classify children as init/cond/inc by position.
 @[c_export("with_ci_cursor_start_offset")]
-pub fn ci_cursor_start_offset(session: i64, cursor_idx: i32) -> i32:
+pub unsafe fn ci_cursor_start_offset(session: i64, cursor_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return -1
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
@@ -2885,7 +2886,7 @@ pub fn ci_cursor_start_offset(session: i64, cursor_idx: i32) -> i32:
     if file as i64 == 0: return -1
     start_off as i32
 
-fn cursor_source_text_from_cursor(s: *mut CImportSession, cursor: CXCursor) -> str:
+unsafe fn cursor_source_text_from_cursor(s: *mut CImportSession, cursor: CXCursor) -> str:
     let range = clang_getCursorExtent(cursor)
     var file: *mut u8 = 0 as *mut u8
     var start_off: u32 = 0
@@ -2904,7 +2905,7 @@ fn cursor_source_text_from_cursor(s: *mut CImportSession, cursor: CXCursor) -> s
     with_free(text)
     result
 
-fn cursor_token_text_from_cursor(s: *mut CImportSession, cursor: CXCursor) -> str:
+unsafe fn cursor_token_text_from_cursor(s: *mut CImportSession, cursor: CXCursor) -> str:
     let tu = clang_Cursor_getTranslationUnit(cursor)
     if tu as i64 == 0:
         return ""
@@ -2964,21 +2965,21 @@ fn cursor_token_text_from_cursor(s: *mut CImportSession, cursor: CXCursor) -> st
     result
 
 @[c_export("with_ci_cursor_source_text")]
-pub fn ci_cursor_source_text(session: i64, cursor_idx: i32) -> str:
+pub unsafe fn ci_cursor_source_text(session: i64, cursor_idx: i32) -> str:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return ""
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
     cursor_source_text_from_cursor(s, cursor)
 
 @[c_export("with_ci_cursor_token_text")]
-pub fn ci_cursor_token_text(session: i64, cursor_idx: i32) -> str:
+pub unsafe fn ci_cursor_token_text(session: i64, cursor_idx: i32) -> str:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return ""
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
     cursor_token_text_from_cursor(s, cursor)
 
 @[c_export("with_ci_cursor_pointee_type")]
-pub fn ci_cursor_pointee_type(session: i64, cursor_idx: i32) -> str:
+pub unsafe fn ci_cursor_pointee_type(session: i64, cursor_idx: i32) -> str:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return ""
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
@@ -2993,7 +2994,7 @@ pub fn ci_cursor_pointee_type(session: i64, cursor_idx: i32) -> str:
 // ── Member expression ───────────────────────────────────────
 
 @[c_export("with_ci_member_is_arrow")]
-pub fn ci_member_is_arrow(session: i64, cursor_idx: i32) -> i32:
+pub unsafe fn ci_member_is_arrow(session: i64, cursor_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return 0
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
@@ -3015,13 +3016,13 @@ pub fn ci_member_is_arrow(session: i64, cursor_idx: i32) -> i32:
     0
 
 @[c_export("with_ci_member_field_name")]
-pub fn ci_member_field_name(session: i64, cursor_idx: i32) -> str:
+pub unsafe fn ci_member_field_name(session: i64, cursor_idx: i32) -> str:
     ci_cursor_spelling(session, cursor_idx)
 
 // ── Binary/unary operators ──────────────────────────────────
 
 @[c_export("with_ci_binary_op")]
-pub fn ci_binary_op(session: i64, cursor_idx: i32) -> i32:
+pub unsafe fn ci_binary_op(session: i64, cursor_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return -1
     ensure_children_cached(s, cursor_idx)
@@ -3129,7 +3130,7 @@ pub fn ci_binary_op(session: i64, cursor_idx: i32) -> i32:
     -1
 
 @[c_export("with_ci_unary_op")]
-pub fn ci_unary_op(session: i64, cursor_idx: i32) -> i32:
+pub unsafe fn ci_unary_op(session: i64, cursor_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return -1
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
@@ -3227,21 +3228,21 @@ let CIC_BOOL_TO_FLOAT: i32 = 26
 let CIC_BITCAST: i32 = 28
 let CIC_INT_WIDEN_SIGN: i32 = 29
 
-fn is_int_kind(k: i32) -> i32:
+unsafe fn is_int_kind(k: i32) -> i32:
     if k >= CXType_Char_U and k <= CXType_UInt128: return 1
     if k >= CXType_Char_S and k <= CXType_Int128: return 1
     0
 
-fn is_float_kind(k: i32) -> i32:
+unsafe fn is_float_kind(k: i32) -> i32:
     if k == CXType_Float or k == CXType_Double or k == CXType_LongDouble: return 1
     0
 
-fn is_unsigned_kind(k: i32) -> i32:
+unsafe fn is_unsigned_kind(k: i32) -> i32:
     if k >= CXType_Char_U and k <= CXType_UInt128: return 1
     0
 
 @[c_export("with_ci_implicit_cast_kind")]
-pub fn ci_implicit_cast_kind(session: i64, cursor_idx: i32) -> i32:
+pub unsafe fn ci_implicit_cast_kind(session: i64, cursor_idx: i32) -> i32:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return CIC_NOOP
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
@@ -3297,26 +3298,26 @@ pub fn ci_implicit_cast_kind(session: i64, cursor_idx: i32) -> i32:
 // ── Anonymous struct field enumeration (simplified stubs) ────
 
 @[c_export("with_cimport_struct_field_anon_field_count")]
-pub fn cimport_struct_field_anon_field_count(session: i64, idx: i32, field: i32) -> i32:
+pub unsafe fn cimport_struct_field_anon_field_count(session: i64, idx: i32, field: i32) -> i32:
     // TODO: implement full anonymous record field enumeration
     0
 
 @[c_export("with_cimport_struct_field_anon_field_name")]
-pub fn cimport_struct_field_anon_field_name(session: i64, idx: i32, field: i32, sub_field: i32) -> str:
+pub unsafe fn cimport_struct_field_anon_field_name(session: i64, idx: i32, field: i32, sub_field: i32) -> str:
     ""
 
 @[c_export("with_cimport_struct_field_anon_field_type")]
-pub fn cimport_struct_field_anon_field_type(session: i64, idx: i32, field: i32, sub_field: i32) -> str:
+pub unsafe fn cimport_struct_field_anon_field_type(session: i64, idx: i32, field: i32, sub_field: i32) -> str:
     ""
 
 @[c_export("with_cimport_typedef_anon_field_name")]
-pub fn cimport_typedef_anon_field_name(session: i64, idx: i32, field: i32) -> str:
+pub unsafe fn cimport_typedef_anon_field_name(session: i64, idx: i32, field: i32) -> str:
     ""
 
 @[c_export("with_cimport_typedef_anon_field_type")]
-pub fn cimport_typedef_anon_field_type(session: i64, idx: i32, field: i32) -> str:
+pub unsafe fn cimport_typedef_anon_field_type(session: i64, idx: i32, field: i32) -> str:
     ""
 
 @[c_export("with_cimport_typedef_anon_field_is_bitfield")]
-pub fn cimport_typedef_anon_field_is_bitfield(session: i64, idx: i32, field: i32) -> i32:
+pub unsafe fn cimport_typedef_anon_field_is_bitfield(session: i64, idx: i32, field: i32) -> i32:
     0
