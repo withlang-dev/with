@@ -1264,6 +1264,14 @@ pub fn migrate_set_block_style(val: i32):
 pub fn migrate_prefer_brace() -> bool:
     g_migrate_block_style == 2
 
+var g_migrate_convert_goto_to_structured: i32 = 0
+
+pub fn migrate_set_convert_goto_to_structured(val: i32):
+    g_migrate_convert_goto_to_structured = val
+
+pub fn migrate_convert_goto_to_structured() -> bool:
+    g_migrate_convert_goto_to_structured != 0
+
 // Per-file and cumulative counters for translated vs untranslatable functions.
 var g_migrate_fn_translated: i32 = 0
 var g_migrate_fn_untranslatable: i32 = 0

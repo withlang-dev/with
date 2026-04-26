@@ -1094,6 +1094,10 @@ fn run_migrate_command(argc: i32) -> i32:
             migrate_set_no_c_export(1)
             ai = ai + 1
             continue
+        if arg == "--convert-goto-to-structured":
+            migrate_set_convert_goto_to_structured(1)
+            ai = ai + 1
+            continue
         if arg == "--prefer-curly":
             eprint("error: --prefer-curly was renamed to --prefer-brace")
             return 1

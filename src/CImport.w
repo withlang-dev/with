@@ -10715,14 +10715,13 @@ fn ci_lower_goto_body_stackify(session: i64, body_cursor: i32, scope: str, stmts
     if not ctx.ok:
         return 0 as CiStmtId
 
+    if not migrate_convert_goto_to_structured():
+        return ci_native_goto_emit_cfg(ctx.cfg, &hoisted_stmt_ids, stmts, exprs)
+
     let result = stackify_graph(ctx.cfg.graph)
     if not result.ok:
-        let native_body_id = ci_native_goto_emit_cfg(ctx.cfg, &hoisted_stmt_ids, stmts, exprs)
-        if (native_body_id as i32) != 0:
-            return native_body_id
         g_ci_bail_location = if ctx.location.len() > 0: ctx.location else: with_ci_cursor_location(session, body_cursor)
-        if g_ci_bail_message.len() == 0:
-            g_ci_bail_message = result.message
+        g_ci_bail_message = "stackify: " ++ result.message
         g_ci_bail_kind = CXK_GOTO_STMT
         return 0 as CiStmtId
     let body_id = ci_stack_emit_tree(result.tree, ctx.cfg, stmts, exprs, types)
