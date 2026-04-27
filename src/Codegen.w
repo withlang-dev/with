@@ -624,9 +624,6 @@ type Codegen {
     codegen_error_detail: str,
     had_error: i32,
 
-    // Safety mode: emit bounds/overflow checks when true
-    safety_checks: bool,
-
     // Monomorphization context (for duck-typing error messages)
     mono_inst_name: i32,
     mono_inst_node: i32,
@@ -918,7 +915,6 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         comptime_error_msg: "",
         codegen_error_detail: "",
         had_error: 0,
-        safety_checks: false,
         gen_state_ptr: 0,
         gen_state_type: 0,
         gen_field_indices: HashMap.new(),

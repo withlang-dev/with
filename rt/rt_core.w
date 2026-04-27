@@ -616,31 +616,6 @@ pub fn assert_impl(cond: i32, msg: str):
         let empty = make_str("" as *const u8, 0)
         panic_impl(msg, empty, 0)
 
-// ── Safety check panics ─────────────────────────────────────��─────
-
-@[c_export("with_panic_oob")]
-pub fn panic_oob(index: i64, len: i64):
-    write_all(2, "panic: index out of bounds: index " as *const u8, 34)
-    var ibuf: [21]u8 = [0 as u8; 21]
-    let ilen = i64_to_buf(index, &ibuf as *mut u8)
-    write_all(2, &ibuf as *const u8, ilen)
-    write_all(2, ", len " as *const u8, 6)
-    var lbuf: [21]u8 = [0 as u8; 21]
-    let llen = i64_to_buf(len, &lbuf as *mut u8)
-    write_all(2, &lbuf as *const u8, llen)
-    let _ = rt_write(2, "\n" as *const u8, 1)
-    rt_exit(1)
-
-@[c_export("with_panic_overflow")]
-pub fn panic_overflow():
-    write_all(2, "panic: integer overflow\n" as *const u8, 24)
-    rt_exit(1)
-
-@[c_export("with_panic_divide_by_zero")]
-pub fn panic_divide_by_zero():
-    write_all(2, "panic: division by zero\n" as *const u8, 24)
-    rt_exit(1)
-
 // ── Integer formatting ─────────────────────────────────────────────
 
 // Write signed i64 to buf, return length. buf must be >= 21 bytes.

@@ -10,7 +10,6 @@ type CompilationConfig {
     is_test: bool,
     prelude_mode: i32,
     debug_info: bool,
-    safety_checks: bool,
 }
 
 fn PRELUDE_FULL -> i32: 0
@@ -34,7 +33,6 @@ fn compilation_config_default -> CompilationConfig:
         is_test: false,
         prelude_mode: PRELUDE_FULL(),
         debug_info: true,
-        safety_checks: false,
     }
 
 fn compilation_config_from_cli(opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32) -> CompilationConfig:

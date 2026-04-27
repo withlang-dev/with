@@ -647,17 +647,6 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
             if elem_sema > 0:
                 cur_sema_ty = elem_sema
             if wl_get_type_kind(cur_ty) == wl_array_type_kind():
-                if self.safety_checks:
-                    let arr_len = wl_get_array_length(cur_ty)
-                    let i64_ty_bc = wl_i64_type(self.context)
-                    let len_val = wl_const_int(i64_ty_bc, arr_len, 0)
-                    let oob = wl_build_icmp(self.builder, wl_int_uge(), idx_val, len_val)
-                    let ok_bb = wl_append_bb(self.context, self.current_function, "bounds.ok")
-                    let fail_bb = wl_append_bb(self.context, self.current_function, "bounds.fail")
-                    wl_build_cond_br(self.builder, oob, fail_bb, ok_bb)
-                    wl_position_at_end(self.builder, fail_bb)
-                    self.emit_panic_oob(idx_val, len_val)
-                    wl_position_at_end(self.builder, ok_bb)
                 let indices: Vec[i64] = Vec.new()
                 indices.push(idx_val)
                 cur_ptr = wl_build_gep(self.builder, elem_llvm, cur_ptr, vec_data_i64(&indices), 1)
@@ -675,17 +664,6 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
                 // Vec, str, and slices all store their data pointer in field 0.
                 if elem_llvm == 0:
                     return 0
-                if self.safety_checks:
-                    let i64_ty_bc = wl_i64_type(self.context)
-                    let len_gep = wl_build_struct_gep(self.builder, cur_ty, cur_ptr, 1)
-                    let len_val = wl_build_load(self.builder, i64_ty_bc, len_gep)
-                    let oob = wl_build_icmp(self.builder, wl_int_uge(), idx_val, len_val)
-                    let ok_bb = wl_append_bb(self.context, self.current_function, "bounds.ok")
-                    let fail_bb = wl_append_bb(self.context, self.current_function, "bounds.fail")
-                    wl_build_cond_br(self.builder, oob, fail_bb, ok_bb)
-                    wl_position_at_end(self.builder, fail_bb)
-                    self.emit_panic_oob(idx_val, len_val)
-                    wl_position_at_end(self.builder, ok_bb)
                 let data_gep = wl_build_struct_gep(self.builder, cur_ty, cur_ptr, 0)
                 let raw_ptr = wl_build_load(self.builder, wl_ptr_type(self.context), data_gep)
                 let indices: Vec[i64] = Vec.new()
@@ -1202,28 +1180,18 @@ fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs: i64, rhs: i64, is_unsig
             let ms_clamped = wl_build_select(self.builder, ms_too_small, ms_min_val, ms_clamped_hi)
             return wl_build_trunc(self.builder, ms_clamped, wider_ty)
     if op == BinaryOp.OP_ADD:
-        if self.safety_checks:
-            return self.emit_checked_arith(l, r, is_unsigned, "add", wider_ty)
         if is_unsigned: return wl_build_add(self.builder, l, r)
         return wl_build_nsw_add(self.builder, l, r)
     if op == BinaryOp.OP_SUB:
-        if self.safety_checks:
-            return self.emit_checked_arith(l, r, is_unsigned, "sub", wider_ty)
         if is_unsigned: return wl_build_sub(self.builder, l, r)
         return wl_build_nsw_sub(self.builder, l, r)
     if op == BinaryOp.OP_MUL:
-        if self.safety_checks:
-            return self.emit_checked_arith(l, r, is_unsigned, "mul", wider_ty)
         if is_unsigned: return wl_build_mul(self.builder, l, r)
         return wl_build_nsw_mul(self.builder, l, r)
     if op == BinaryOp.OP_DIV:
-        if self.safety_checks:
-            self.emit_div_zero_check(r, wider_ty)
         if is_unsigned: return wl_build_udiv(self.builder, l, r)
         return wl_build_sdiv(self.builder, l, r)
     if op == BinaryOp.OP_MOD:
-        if self.safety_checks:
-            self.emit_div_zero_check(r, wider_ty)
         if is_unsigned: return wl_build_urem(self.builder, l, r)
         return wl_build_srem(self.builder, l, r)
     if op == BinaryOp.OP_EQ: return wl_build_icmp(self.builder, wl_int_eq(), l, r)
@@ -6332,13 +6300,10 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
             if not self.mir_emit_stmt(body, stmt_id):
                 if self.debug_mir_codegen_enabled():
                     with_eprint(f"[mir-cg] fn={name_str} bb={bb} stmt_fail={stmt_id}")
-                let fail_bb = wl_get_insert_block(self.builder)
-                if wl_get_bb_terminator(fail_bb) == 0:
+                if wl_get_bb_terminator(llbb) == 0:
                     wl_build_unreachable(self.builder)
                 break
-        let cur_bb = wl_get_insert_block(self.builder)
-        let needs_term = wl_get_bb_terminator(llbb) == 0 or (cur_bb != llbb and wl_get_bb_terminator(cur_bb) == 0)
-        if needs_term:
+        if wl_get_bb_terminator(llbb) == 0:
             let term_span = body.bb_term_spans.get(bb as i64)
             if term_span > 0:
                 self.debug_set_location(term_span)
@@ -6348,8 +6313,7 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
                 if ok:
                     ok_i = 1
                 with_eprint(f"[mir-cg] fn={name_str} bb={bb} term_ok={ok_i}")
-            let cur_bb2 = wl_get_insert_block(self.builder)
-            if not ok and wl_get_bb_terminator(cur_bb2) == 0:
+            if not ok and wl_get_bb_terminator(llbb) == 0:
                 wl_build_unreachable(self.builder)
 
     self.di_current_scope = saved_fn_scope
@@ -8616,107 +8580,5 @@ fn Codegen.gen_async_block(self: Codegen, node: i32) -> i64:
     task_val = wl_build_insert_value(self.builder, task_val, fiber_id, 0)
     task_val = wl_build_insert_value(self.builder, task_val, result_buf, 1)
     task_val
-
-// ── Safety check panic helpers ────────────────────────────────────
-
-fn Codegen.emit_panic_oob(self: Codegen, index: i64, len: i64):
-    let i64_ty = wl_i64_type(self.context)
-    let void_ty = wl_void_type(self.context)
-    let param_types: Vec[i64] = Vec.new()
-    param_types.push(i64_ty)
-    param_types.push(i64_ty)
-    let ft = wl_function_type(void_ty, vec_data_i64(&param_types), 2, 0)
-    let sym = self.intern.intern("with_panic_oob")
-    var func = 0 as i64
-    let fv = self.fn_values.get(sym)
-    if fv.is_some():
-        func = fv.unwrap() as i64
-    else:
-        func = wl_add_function(self.llmod, "with_panic_oob", ft)
-        self.fn_values.insert(sym, func)
-        self.fn_fn_types.insert(sym, ft)
-    let args: Vec[i64] = Vec.new()
-    args.push(index)
-    args.push(len)
-    wl_build_call(self.builder, ft, func, vec_data_i64(&args), 2)
-    wl_build_unreachable(self.builder)
-
-fn Codegen.emit_panic_overflow(self: Codegen):
-    let void_ty = wl_void_type(self.context)
-    let ft = wl_function_type(void_ty, 0, 0, 0)
-    let sym = self.intern.intern("with_panic_overflow")
-    var func = 0 as i64
-    let fv = self.fn_values.get(sym)
-    if fv.is_some():
-        func = fv.unwrap() as i64
-    else:
-        func = wl_add_function(self.llmod, "with_panic_overflow", ft)
-        self.fn_values.insert(sym, func)
-        self.fn_fn_types.insert(sym, ft)
-    wl_build_call(self.builder, ft, func, 0, 0)
-    wl_build_unreachable(self.builder)
-
-fn Codegen.emit_panic_divide_by_zero(self: Codegen):
-    let void_ty = wl_void_type(self.context)
-    let ft = wl_function_type(void_ty, 0, 0, 0)
-    let sym = self.intern.intern("with_panic_divide_by_zero")
-    var func = 0 as i64
-    let fv = self.fn_values.get(sym)
-    if fv.is_some():
-        func = fv.unwrap() as i64
-    else:
-        func = wl_add_function(self.llmod, "with_panic_divide_by_zero", ft)
-        self.fn_values.insert(sym, func)
-        self.fn_fn_types.insert(sym, ft)
-    wl_build_call(self.builder, ft, func, 0, 0)
-    wl_build_unreachable(self.builder)
-
-fn Codegen.emit_checked_arith(self: Codegen, l: i64, r: i64, is_unsigned: bool, kind: str, ty: i64) -> i64:
-    let width = wl_get_int_type_width(ty)
-    let prefix = if is_unsigned: "llvm.u" ++ kind ++ ".with.overflow.i" else: "llvm.s" ++ kind ++ ".with.overflow.i"
-    let intrinsic_name = if width == 8: prefix ++ "8" else: if width == 16: prefix ++ "16" else: if width == 32: prefix ++ "32" else: prefix ++ "64"
-    let sym = self.intern.intern(intrinsic_name)
-    var func = 0 as i64
-    var ft = 0 as i64
-    let fv = self.fn_values.get(sym)
-    let ftv = self.fn_fn_types.get(sym)
-    if fv.is_some() and ftv.is_some():
-        func = fv.unwrap() as i64
-        ft = ftv.unwrap() as i64
-    else:
-        let i1_ty = wl_i1_type(self.context)
-        let ret_fields: Vec[i64] = Vec.new()
-        ret_fields.push(ty)
-        ret_fields.push(i1_ty)
-        let ret_ty = wl_struct_type(self.context, vec_data_i64(&ret_fields), 2, 0)
-        let param_types: Vec[i64] = Vec.new()
-        param_types.push(ty)
-        param_types.push(ty)
-        ft = wl_function_type(ret_ty, vec_data_i64(&param_types), 2, 0)
-        func = wl_add_function(self.llmod, intrinsic_name, ft)
-        self.fn_values.insert(sym, func)
-        self.fn_fn_types.insert(sym, ft)
-    let args: Vec[i64] = Vec.new()
-    args.push(l)
-    args.push(r)
-    let result_agg = wl_build_call(self.builder, ft, func, vec_data_i64(&args), 2)
-    let value = wl_build_extract_value(self.builder, result_agg, 0)
-    let overflow = wl_build_extract_value(self.builder, result_agg, 1)
-    let ok_bb = wl_append_bb(self.context, self.current_function, "arith.ok")
-    let fail_bb = wl_append_bb(self.context, self.current_function, "arith.overflow")
-    wl_build_cond_br(self.builder, overflow, fail_bb, ok_bb)
-    wl_position_at_end(self.builder, fail_bb)
-    self.emit_panic_overflow()
-    wl_position_at_end(self.builder, ok_bb)
-    value
-
-fn Codegen.emit_div_zero_check(self: Codegen, divisor: i64, ty: i64):
-    let is_zero = wl_build_icmp(self.builder, wl_int_eq(), divisor, wl_const_int(ty, 0, 0))
-    let ok_bb = wl_append_bb(self.context, self.current_function, "div.ok")
-    let fail_bb = wl_append_bb(self.context, self.current_function, "div.zero")
-    wl_build_cond_br(self.builder, is_zero, fail_bb, ok_bb)
-    wl_position_at_end(self.builder, fail_bb)
-    self.emit_panic_divide_by_zero()
-    wl_position_at_end(self.builder, ok_bb)
 
 // ── Option method dispatch ────────────────────────────────────────
