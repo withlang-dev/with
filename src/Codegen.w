@@ -3498,10 +3498,6 @@ fn Codegen.apply_noalias_param_attrs_with_offset(self: Codegen, function: i64, p
         let flags = self.pool.fn_param_flags(param_start, pi)
         if fn_param_is_noalias(flags) != 0:
             wl_add_param_attr(self.context, function, actual_idx, "noalias")
-            continue
-        let type_node = self.pool.fn_param_type(param_start, pi)
-        if type_node != 0 and self.pool.kind(type_node) == NodeKind.NK_TYPE_REF:
-            wl_add_param_attr(self.context, function, actual_idx, "noalias")
 
 fn Codegen.record_dyn_param(self: Codegen, fn_sym: i32, idx: i32, count: i32, trait_sym: i32):
     if not self.fn_dyn_param_starts.get(fn_sym).is_some():
