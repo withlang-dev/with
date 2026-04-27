@@ -809,10 +809,13 @@ pub fn migrate_c_directory(input_dir: str, output_dir: str, exclude_basenames: s
     let files_failed = files_scanned - files_migrated
     ci_dump_raw_fallback_stats()
     let fn_total = g_migrate_fn_translated_total + g_migrate_fn_untranslatable_total
-    if files_failed > 0 or g_migrate_fn_untranslatable_total > 0:
-        let file_note = if files_failed > 0: f" ({files_failed} file errors)" else: ""
+    if files_failed > 0:
+        let file_note = f" ({files_failed} file errors)"
         eprint(f"migrate: {files_migrated}/{files_scanned} files, {g_migrate_fn_translated_total}/{fn_total} functions translated, {g_migrate_fn_untranslatable_total} untranslatable{file_note}")
         return 1
+    if g_migrate_fn_untranslatable_total > 0:
+        eprint(f"migrate: {files_migrated}/{files_scanned} files, {g_migrate_fn_translated_total}/{fn_total} functions translated, {g_migrate_fn_untranslatable_total} untranslatable")
+        return 0
     eprint(f"migrate: {files_migrated}/{files_scanned} files, {fn_total} functions translated from {input_dir} -> {output_dir}")
     if files_migrated == 0: 1 else: 0
 

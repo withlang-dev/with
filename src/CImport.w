@@ -8310,17 +8310,6 @@ fn ci_trim(s: str) -> str:
 fn ci_is_space(c: i32) -> bool:
     c == 32 or c == 9 or c == 10 or c == 13
 
-fn ci_is_integer_type_name(name: str) -> bool:
-    if ci_starts_with(name, "c_"):
-        return true
-    if name == "u8" or name == "u16" or name == "u32" or name == "u64":
-        return true
-    if name == "i8" or name == "i16" or name == "i32" or name == "i64":
-        return true
-    if name == "usize" or name == "isize":
-        return true
-    false
-
 fn ci_starts_with(s: str, prefix: str) -> bool:
     if prefix.len() > s.len():
         return false
@@ -10109,6 +10098,8 @@ fn ci_goto_cfg_lower_while(session: i64, cursor: i32, ctx: &mut CiGotoCfgContext
     ci_goto_cfg_pop_target(&mut ctx.continue_targets)
     ci_goto_cfg_pop_target(&mut ctx.break_targets)
     ci_goto_cfg_set_current(ctx, after_block)
+    if not ci_goto_cfg_block_has_pred(ctx, after_block):
+        ci_goto_cfg_unreachable_current(ctx)
 
 fn ci_goto_cfg_lower_do(session: i64, cursor: i32, ctx: &mut CiGotoCfgContext, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str):
     let nc = with_ci_num_children(session, cursor)
@@ -10137,6 +10128,8 @@ fn ci_goto_cfg_lower_do(session: i64, cursor: i32, ctx: &mut CiGotoCfgContext, s
     ci_goto_cfg_append_stmt(ctx, stmts, prepared_cond.setup_stmt)
     ci_goto_cfg_cond_current(ctx, prepared_cond.value_expr, body_block, after_block, with_ci_cursor_location(session, cursor))
     ci_goto_cfg_set_current(ctx, after_block)
+    if not ci_goto_cfg_block_has_pred(ctx, after_block):
+        ci_goto_cfg_unreachable_current(ctx)
 
 fn ci_goto_cfg_lower_for(session: i64, cursor: i32, ctx: &mut CiGotoCfgContext, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str):
     let parts = ci_extract_for_parts(session, cursor)
@@ -10653,7 +10646,7 @@ fn ci_native_goto_emit_terminator(cfg: CiGotoCfg, block: i32, labels: &Vec[i32],
 
     ci_native_goto_fail("native goto emitter: block has no terminator")
 
-fn ci_native_goto_default_expr(ty_id: CiTypeId, types: &CiTypePool, exprs: &mut CiExprPool) -> CiExprId:
+fn ci_default_for_ci_type(ty_id: CiTypeId, types: &CiTypePool, exprs: &mut CiExprPool) -> CiExprId:
     let tk = types.kind(ty_id)
     if tk == CiTypeKind.CT_POINTER or tk == CiTypeKind.CT_FN_PTR:
         return exprs.null_ptr(ty_id)
@@ -10662,6 +10655,8 @@ fn ci_native_goto_default_expr(ty_id: CiTypeId, types: &CiTypePool, exprs: &mut 
     if tk == CiTypeKind.CT_FLOAT:
         let idx = exprs.add_string("0.0")
         return exprs.add(CiExprKind.CIE_FLOAT_LIT, idx, 0, 0, ty_id)
+    if tk == CiTypeKind.CT_STRUCT or tk == CiTypeKind.CT_ARRAY:
+        return 0 as CiExprId
     if tk == CiTypeKind.CT_NAMED:
         let name = types.get_string(types.get_d0(ty_id))
         if ci_starts_with(name, "*"):
@@ -10671,10 +10666,8 @@ fn ci_native_goto_default_expr(ty_id: CiTypeId, types: &CiTypePool, exprs: &mut 
         if name == "f32" or name == "f64" or name == "c_longdouble":
             let idx = exprs.add_string("0.0")
             return exprs.add(CiExprKind.CIE_FLOAT_LIT, idx, 0, 0, ty_id)
-        if not ci_is_integer_type_name(name):
+        if not ci_starts_with(name, "c_") and name != "u8" and name != "u16" and name != "u32" and name != "u64" and name != "i8" and name != "i16" and name != "i32" and name != "i64" and name != "usize" and name != "isize":
             return 0 as CiExprId
-    if tk == CiTypeKind.CT_STRUCT or tk == CiTypeKind.CT_ARRAY:
-        return 0 as CiExprId
     let zero_idx = exprs.add_string("0")
     exprs.int_lit(zero_idx, ty_id)
 
@@ -10699,7 +10692,7 @@ fn ci_native_goto_emit_cfg(cfg: CiGotoCfg, hoisted_stmt_ids: &Vec[i32], stmts: &
             let init_expr = stmts.get_d2(sid) as CiExprId
             let flags = stmts.get_flags(sid)
             let is_mut = flags & 1
-            let zero = ci_native_goto_default_expr(ty_id, types, exprs)
+            let zero = ci_default_for_ci_type(ty_id, types, exprs)
             ids.push(stmts.var_decl(name_sym, ty_id, zero, is_mut) as i32)
             if (init_expr as i32) != 0:
                 let name_str = stmts.get_string(name_sym)
