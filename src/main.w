@@ -167,11 +167,21 @@ fn cli_opt_level(argc: i32) -> i32:
             level = 2
         else if arg == "-O3":
             level = 3
+        else if arg == "-OReleaseFast" or arg == "-OReleaseSafe":
+            level = 3
         else if arg == "--release":
             if level < 2:
                 level = 2
         i = i + 1
     level
+
+fn cli_safety_checks(argc: i32) -> bool:
+    var i = 2
+    while i < argc:
+        if with_arg_at(i) == "-OReleaseSafe":
+            return true
+        i = i + 1
+    false
 
 fn cli_test_verbose(argc: i32) -> bool:
     cli_has_flag(argc, "-v") or cli_has_flag(argc, "--verbose")
@@ -252,6 +262,7 @@ fn run_cli(argc: i32) -> i32:
     let dump_mir_flag = cli_has_flag(argc, "--dump-mir")
     let dump_async_mir_flag = cli_has_flag(argc, "--dump-async-mir")
     let debug_info = not cli_has_flag(argc, "-g0") and not cli_has_flag(argc, "--release")
+    let safety_checks = cli_safety_checks(argc)
 
     // Cache source and output paths — scanned once, used by all subcommands.
     let source = find_source_arg(argc)
@@ -259,15 +270,15 @@ fn run_cli(argc: i32) -> i32:
 
     // `with hello.w` is shorthand for `with run hello.w`
     if cli_is_implicit_run(argc):
-        return run_run_command(cli_command(argc), opt_level, no_std, alloc_mode, prelude_mode, debug_info)
+        return run_run_command(cli_command(argc), opt_level, no_std, alloc_mode, prelude_mode, debug_info, safety_checks)
 
     if cli_command(argc) == "build":
-        return run_build_command(source, opt_level, no_std, alloc_mode, emit_c_mode, emit_obj_mode, output, prelude_mode, debug_info)
+        return run_build_command(source, opt_level, no_std, alloc_mode, emit_c_mode, emit_obj_mode, output, prelude_mode, debug_info, safety_checks)
     if cli_command(argc) == "run":
         if emit_c_mode:
             with_eprint("error: '--emit-c' is only supported with 'build'")
             return 1
-        return run_run_command(source, opt_level, no_std, alloc_mode, prelude_mode, debug_info)
+        return run_run_command(source, opt_level, no_std, alloc_mode, prelude_mode, debug_info, safety_checks)
     if cli_command(argc) == "ir":
         if source == "":
             with_eprint("error: 'ir' requires a source file argument")
@@ -324,9 +335,9 @@ fn run_cli(argc: i32) -> i32:
             return 1
         return dump_tokens(source, deterministic_mode)
     if cli_command(argc) == "test":
-        return run_test_command(argc, opt_level, no_std, alloc_mode, prelude_mode, debug_info)
+        return run_test_command(argc, opt_level, no_std, alloc_mode, prelude_mode, debug_info, safety_checks)
     if cli_command(argc) == "bench":
-        return run_bench_command(argc, opt_level, no_std, alloc_mode, prelude_mode, debug_info)
+        return run_bench_command(argc, opt_level, no_std, alloc_mode, prelude_mode, debug_info, safety_checks)
     if cli_command(argc) == "version" or cli_command(argc) == "--version":
         with_write("with WITH_VERSION_PLACEHOLDER\n")
         return 0
@@ -421,7 +432,7 @@ fn test_unique_binary_path(source_file: str) -> str:
     let base = link_stage_output_path_for_source(source_file)
     f"{base}.test.{with_getpid()}.{with_clock_nanos()}"
 
-fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: bool, emit_c_mode: bool, emit_obj_mode: bool, output_path: str, prelude_mode: i32, debug_info: bool) -> i32:
+fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: bool, emit_c_mode: bool, emit_obj_mode: bool, output_path: str, prelude_mode: i32, debug_info: bool, safety_checks: bool) -> i32:
     if source_file == "":
         with_eprint("error: 'build' requires a source file argument")
         return 1
@@ -429,6 +440,7 @@ fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode:
     comp.configure(opt_level, no_std, alloc_mode)
     comp.set_prelude_mode(prelude_mode)
     comp.set_debug_info(debug_info)
+    comp.set_safety_checks(safety_checks)
     if emit_c_mode:
         let c_path = comp.emit_c(source_file, output_path)
         if c_path == "":
@@ -456,7 +468,7 @@ fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode:
     comp.print_warnings()
     0
 
-fn run_run_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> i32:
+fn run_run_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool, safety_checks: bool) -> i32:
     if source_file == "":
         with_eprint("error: 'run' requires a source file argument")
         return 1
@@ -464,6 +476,7 @@ fn run_run_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: b
     comp.configure(opt_level, no_std, alloc_mode)
     comp.set_prelude_mode(prelude_mode)
     comp.set_debug_info(debug_info)
+    comp.set_safety_checks(safety_checks)
     let bin_path = comp.build_binary(source_file)
     if bin_path == "":
         with_eprint("error: run failed")
@@ -929,13 +942,14 @@ fn run_test_binary_checked(bin_path: str, target: str, test_name: str, quiet: bo
         return 0
     1
 
-fn run_test_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, filter: str) -> i32:
+fn run_test_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool, safety_checks: bool, verbose: bool, quiet: bool, filter: str) -> i32:
     let discovery = discover_tests_for_target(target)
     let directives = parse_test_directives_for_target(target)
     var comp = Compilation.init()
     comp.configure(opt_level, no_std, alloc_mode)
     comp.set_prelude_mode(prelude_mode)
     comp.set_debug_info(debug_info)
+    comp.set_safety_checks(safety_checks)
     let synthetic_source = maybe_synthesize_test_source(target)
     let test_bin_path = test_unique_binary_path(target)
     let bin_path = if synthetic_source.len() > 0: comp.build_binary_from_source_to_path(target, synthetic_source, test_bin_path) else: comp.build_binary_to_path(target, test_bin_path)
@@ -979,7 +993,7 @@ fn run_test_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, pr
     print_test_summary(target, 0, 1, quiet and not verbose)
     run_rc
 
-fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> i32:
+fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool, safety_checks: bool) -> i32:
     let verbose = cli_test_verbose(argc)
     let quiet = if verbose: false else: cli_test_quiet(argc)
     let filter = cli_test_filter(argc)
@@ -995,14 +1009,14 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, p
             return 1
         for ti in 0..test_files.len() as i32:
             let test_file = test_files.get(ti as i64)
-            let run_rc = run_test_file(test_file, opt_level, no_std, alloc_mode, prelude_mode, debug_info, verbose, quiet, filter)
+            let run_rc = run_test_file(test_file, opt_level, no_std, alloc_mode, prelude_mode, debug_info, safety_checks, verbose, quiet, filter)
             if run_rc != 0:
                 with_eprint("error: test failed in '" ++ test_file ++ "'")
                 return run_rc
         return 0
-    run_test_file(target, opt_level, no_std, alloc_mode, prelude_mode, debug_info, verbose, quiet, filter)
+    run_test_file(target, opt_level, no_std, alloc_mode, prelude_mode, debug_info, safety_checks, verbose, quiet, filter)
 
-fn run_bench_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool, filter: str) -> i32:
+fn run_bench_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool, safety_checks: bool, filter: str) -> i32:
     let text = with_fs_read_file(target)
     if text.len() == 0:
         with_eprint("error: could not read '" ++ target ++ "'")
@@ -1019,6 +1033,7 @@ fn run_bench_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, p
     comp.configure(opt_level, no_std, alloc_mode)
     comp.set_prelude_mode(prelude_mode)
     comp.set_debug_info(debug_info)
+    comp.set_safety_checks(safety_checks)
     let bin_path = comp.build_binary_from_source(target, synthetic_source)
     if bin_path == "":
         with_eprint("error: bench build failed for '" ++ target ++ "'")
@@ -1030,7 +1045,7 @@ fn run_bench_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, p
     cleanup_binary_artifacts(bin_path)
     rc
 
-fn run_bench_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> i32:
+fn run_bench_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool, safety_checks: bool) -> i32:
     let filter = cli_test_filter(argc)
     let target = find_source_arg(argc)
     if target == "":
@@ -1050,13 +1065,13 @@ fn run_bench_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, 
             let disc = discover_bench_functions(text)
             if not disc.parse_ok or disc.bench_names.len() == 0:
                 continue
-            let rc = run_bench_file(file, opt_level, no_std, alloc_mode, prelude_mode, debug_info, filter)
+            let rc = run_bench_file(file, opt_level, no_std, alloc_mode, prelude_mode, debug_info, safety_checks, filter)
             if rc != 0:
                 any_failed = true
         if any_failed:
             return 1
         return 0
-    run_bench_file(target, opt_level, no_std, alloc_mode, prelude_mode, debug_info, filter)
+    run_bench_file(target, opt_level, no_std, alloc_mode, prelude_mode, debug_info, safety_checks, filter)
 
 fn run_migrate_command(argc: i32) -> i32:
     if argc < 3:
@@ -1249,6 +1264,8 @@ fn print_usage:
     with_write("\n")
     with_write("  -h, --help       Print this help and exit\n")
     with_write("  -O0|-O1|-O2|-O3  Set optimization level\n")
+    with_write("  -OReleaseFast    Optimize for speed (O3, no safety checks)\n")
+    with_write("  -OReleaseSafe    Optimize with safety (O3, bounds + overflow checks)\n")
     with_write("  -o <path>        Write output to path\n")
     with_write("  --release        Enable release defaults\n")
     with_write("  --emit-c         Emit C instead of a binary\n")

@@ -14,7 +14,7 @@ fn backend_debug_pool_flow_enabled() -> i32:
         return 0
     1
 
-fn Zcu.compile_to_object_backend(self: Zcu, pool: AstPool, opt_level: i32, output_path: str, debug_info: bool, module_object_mode: bool) -> i32:
+fn Zcu.compile_to_object_backend(self: Zcu, pool: AstPool, opt_level: i32, output_path: str, debug_info: bool, module_object_mode: bool, safety_checks: bool) -> i32:
     if self.last_mir_module.body_count() == 0:
         with_eprint("error: missing MIR input for LLVM backend")
         return 1
@@ -30,6 +30,7 @@ fn Zcu.compile_to_object_backend(self: Zcu, pool: AstPool, opt_level: i32, outpu
     cg.decl_source_paths = self.decl_source_paths
     cg.current_decl_source_file = self.current_source_path
     cg.module_object_mode = if module_object_mode: 1 else: 0
+    cg.safety_checks = safety_checks
     if not debug_info:
         cg.debug_info = 0
     if self.pool.state.symbol_texts.len() as i32 <= 4 or self.last_sema.pool.state.symbol_texts.len() as i32 <= 4 or backend_debug_pool_flow_enabled() != 0:
