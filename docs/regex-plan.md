@@ -5,8 +5,8 @@ PCRE2 auto-migrated from C via `with migrate`. 4 phases.
 **Spec:** `docs/regex-spec.md`
 **Engine source:** `.reference/pcre2/src/` (73K lines, 39 .c files)
 **Migration tool:** `with migrate` (src/CImport.w)
-**Generated output:** `lib/std/re/` (80K lines, 32 .w files)
-**Workflow:** `make regex-migrate-raw`, `make regex-prepare`, `make regex-check`, `make regex-promote`
+**Generated output:** `lib/std/re/` (~160K lines, 32 .w files + defs.w)
+**Workflow:** `make test-pcre2` (migrate, prepare, check, verify)
 
 ---
 
@@ -18,13 +18,21 @@ PCRE2 auto-migrated from C via `with migrate`. 4 phases.
 with migrate .reference/pcre2/src/ -o out/pcre2_migrate_raw/ \
     --no-c-export \
     --prefer-brace \
+    --width-slice 8 \
+    --shared-defs std.re.defs \
+    --exclude pcre2demo.c --exclude pcre2grep.c \
+    --exclude pcre2posix.c --exclude pcre2posix_test.c \
+    --exclude pcre2_jit_test.c --exclude pcre2_dftables.c \
+    --exclude pcre2_fuzzsupport.c --exclude pcre2_jit_match.c \
+    --exclude pcre2_jit_misc.c \
     -I .reference/pcre2/src \
     -D PCRE2_CODE_UNIT_WIDTH=8 \
     -D HAVE_CONFIG_H=1
 ```
 
-Produces 39 `.w` files. 8 files are excluded from the library
-subset (test harnesses, JIT compiler, fuzzer).
+Produces 32 `.w` files + `defs.w` shared definitions. 9 files
+are excluded (test harnesses, JIT compiler, fuzzer, POSIX wrapper,
+dftables).
 
 **Prerequisites** (handled automatically by Makefile):
 - `pcre2.h` generated from `pcre2.h.generic`
@@ -33,55 +41,56 @@ subset (test harnesses, JIT compiler, fuzzer).
 
 ### Step 2: Fix compilation errors -- DONE
 
-All 978 initial `with check` errors resolved to 0 through
-migrator fixes (not patches to generated code). Key fixes:
+All compilation errors resolved to 0 through migrator fixes
+(not patches to generated code). Three rounds of fixes:
 
+**Round 1 (978 errors):** Initial migration errors.
 - Implicit cast handling via `CXCursor_UnexposedExpr` (kind 100)
 - Array-to-pointer decay (`CI_CAST_ARRAY_TO_PTR`)
 - Chained assignment decomposition (`a = b++`, `*ptr++ = val`)
 - Pointer-to-pointer casts (void* <-> typed*)
 - Large integer literals (decimal emission, context-aware casts)
 - Zero-initialization (`var x: T` without initializer)
-- Variable shadowing prevention in goto state machines
 - `--no-c-export` flag for stdlib integration
+
+**Round 2 (893 errors):** Cross-pool string index bug in native
+goto emitter — stmts-pool string indices used in exprs-pool ident
+expressions.
+
+**Round 3 (3 errors):** Type-aware defaults for hoisted variables —
+struct-typed `CT_NAMED` values got `int_lit(0)` instead of no-init.
 
 ### Step 3: Prepare and promote -- DONE
 
-The workflow script (`scripts/pcre2_generated_workflow.sh`) handles:
+The Makefile handles the full pipeline:
 
-1. **prepare** — copies raw migration, extracts shared preamble
-   into `defs.w`, strips 16/32-bit variants, concatenates adjacent
-   string literals, expands XSTRING macros, casts `with_alloc`
-2. **check** — runs `with check` on each module with combined
-   preamble, reports error count
-3. **promote** — copies to `lib/std/re/` if 0 errors
+1. **migrate** — runs `with migrate` producing raw `.w` files
+2. **prepare** — copies raw migration to `out/pcre2_generated/`
+3. **stage** — copies to `lib/std/re/` for compilation
+4. **verify** — builds test harness, runs 20 pattern/subject cases
+   against system `pcre2test`, requires byte-for-byte match
 
-Current status: **OK=31, TOTAL_ERRORS=0**
-
-```
-make regex-migrate-raw   # migrate .reference/pcre2/src/ -> out/pcre2_migrate_raw/
-make regex-prepare       # prepare -> out/pcre2_generated/
-make regex-check         # verify 0 errors
-make regex-promote       # copy to lib/std/re/
-```
-
-### Step 4: Build as object files -- TODO
-
-Compile each module in `lib/std/re/` to `.o` files via
-`with build --emit-obj`. Link into a static library.
-
-### Step 5: Test with migrated pcre2test -- TODO
-
-Build migrated `pcre2test`, importing the compiled With modules.
-Run PCRE2's test suite:
+Current status: **32/32 files, 287/287 functions, 0 stubs, 0 errors**
 
 ```
-./pcre2test .reference/pcre2/testdata/testinput1
-./pcre2test .reference/pcre2/testdata/testinput2
+make test-pcre2   # full pipeline: migrate -> prepare -> stage -> verify
 ```
 
-Fix any runtime failures (pointer arithmetic, memory layout,
-goto state machine correctness).
+### Step 4: Build as object files -- PARTIAL
+
+Individual modules build successfully via `with build --emit-obj`
+(verified by selfhost tests: `pcre2_match_heapframe`,
+`pcre2_compile_builds`). Full static library linking not yet wired.
+
+### Step 5: Test with pcre2test -- PARTIAL
+
+`scripts/verify_pcre2_works.sh` builds a test harness that runs
+the migrated PCRE2 against 20 pattern/subject test cases and
+diffs output byte-for-byte against system `/opt/homebrew/bin/pcre2test`.
+All 20 cases pass.
+
+Full PCRE2 test suite (`testdata/testinput1` etc.) not yet run.
+Requires building migrated `pcre2test` binary.
 
 ---
 
@@ -182,8 +191,8 @@ Phase 1: Migrate + Build
   Step 1 (migrate)  DONE
   Step 2 (fix)      DONE
   Step 3 (prepare)  DONE
-  Step 4 (build)    TODO  <-- next
-  Step 5 (test)     TODO
+  Step 4 (build)    PARTIAL — individual modules build, library not wired
+  Step 5 (test)     PARTIAL — 20/20 verify cases pass, full suite TODO
 
 Phase 2: Wrapper API
   Step 6 (Regex type) → Step 7 (match/capture) → Step 8 (replace/split)
@@ -202,14 +211,14 @@ Phase 4: Optimization
 
 | Component | Est. LOC | Status |
 |---|---|---|
-| Migrated PCRE2 | 80,000 | Done — auto-generated, 0 errors |
+| Migrated PCRE2 | ~160,000 | Done — auto-generated, 0 errors, 287/287 functions |
 | Fix-up patches | 0 | Not needed — all fixes in migrator |
 | Wrapper API | ~300 | TODO |
 | Lexer changes | ~80 | TODO |
 | Parser changes | ~150 | TODO |
 | Sema changes | ~80 | TODO |
 | Codegen changes | ~100 | TODO |
-| **Total new hand-written code** | **~700** | Plus 80K auto-migrated |
+| **Total new hand-written code** | **~700** | Plus ~160K auto-migrated |
 
 ---
 
