@@ -3486,9 +3486,6 @@ fn Codegen.apply_noalias_param_attrs_with_offset(self: Codegen, function: i64, p
         return
     let fn_type = wl_global_get_value_type(function)
     for pi in 0..param_count:
-        let flags = self.pool.fn_param_flags(param_start, pi)
-        if fn_param_is_noalias(flags) == 0:
-            continue
         let actual_idx = pi + param_offset
         var param_ty = if fn_type != 0: wl_get_fn_param_type(fn_type, actual_idx) else: 0
         if param_ty == 0:
@@ -3498,7 +3495,13 @@ fn Codegen.apply_noalias_param_attrs_with_offset(self: Codegen, function: i64, p
             param_ty = wl_type_of(param)
         if wl_get_type_kind(param_ty) != wl_pointer_type_kind():
             continue
-        wl_add_param_attr(self.context, function, actual_idx, "noalias")
+        let flags = self.pool.fn_param_flags(param_start, pi)
+        if fn_param_is_noalias(flags) != 0:
+            wl_add_param_attr(self.context, function, actual_idx, "noalias")
+            continue
+        let type_node = self.pool.fn_param_type(param_start, pi)
+        if type_node != 0 and self.pool.kind(type_node) == NodeKind.NK_TYPE_REF:
+            wl_add_param_attr(self.context, function, actual_idx, "noalias")
 
 fn Codegen.record_dyn_param(self: Codegen, fn_sym: i32, idx: i32, count: i32, trait_sym: i32):
     if not self.fn_dyn_param_starts.get(fn_sym).is_some():
