@@ -9779,6 +9779,7 @@ type CiGotoCfgContext {
     label_defined: Vec[i32],
     break_targets: Vec[i32],
     continue_targets: Vec[i32],
+    switch_cases: *mut CiGotoSwitchCase,
 }
 
 type CiGotoSwitchCase {
@@ -9825,6 +9826,7 @@ fn ci_goto_cfg_new(entry_desc: str) -> CiGotoCfgContext:
         label_defined: Vec.new(),
         break_targets: Vec.new(),
         continue_targets: Vec.new(),
+        switch_cases: 0 as *mut CiGotoSwitchCase,
     }
 
 fn ci_goto_cfg_fail(ctx: &mut CiGotoCfgContext, msg: str, loc: str):
@@ -10200,6 +10202,8 @@ fn ci_goto_switch_record_case(cases: &mut CiGotoSwitchCase, value: CiExprId, blo
     cases.blocks.push(block)
 
 fn ci_goto_cfg_lower_case_children(session: i64, cursor: i32, first_child: i32, ctx: &mut CiGotoCfgContext, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str, cases: &mut CiGotoSwitchCase):
+    let saved_cases = ctx.switch_cases
+    ctx.switch_cases = cases as *mut CiGotoSwitchCase
     var case_scope = scope
     let nc = with_ci_num_children(session, cursor)
     var i = first_child
@@ -10224,6 +10228,7 @@ fn ci_goto_cfg_lower_case_children(session: i64, cursor: i32, first_child: i32, 
         if ck == CXK_LABEL_STMT:
             case_scope = ci_goto_scope_after_label_stmt(session, child, case_scope)
         i = i + 1
+    ctx.switch_cases = saved_cases
 
 fn ci_goto_cfg_lower_case_node(session: i64, cursor: i32, ctx: &mut CiGotoCfgContext, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str, cases: &mut CiGotoSwitchCase):
     if not ctx.ok:
@@ -10251,6 +10256,8 @@ fn ci_goto_cfg_lower_case_node(session: i64, cursor: i32, ctx: &mut CiGotoCfgCon
     ci_goto_cfg_fail(ctx, "expected switch case/default in goto CFG", with_ci_cursor_location(session, cursor))
 
 fn ci_goto_cfg_lower_switch_body(session: i64, body_cursor: i32, ctx: &mut CiGotoCfgContext, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str, cases: &mut CiGotoSwitchCase):
+    let saved_cases = ctx.switch_cases
+    ctx.switch_cases = cases as *mut CiGotoSwitchCase
     let nc = with_ci_num_children(session, body_cursor)
     var switch_scope = scope
     var i = 0
@@ -10285,6 +10292,7 @@ fn ci_goto_cfg_lower_switch_body(session: i64, body_cursor: i32, ctx: &mut CiGot
         if ck == CXK_LABEL_STMT:
             switch_scope = ci_goto_scope_after_label_stmt(session, child, switch_scope)
         i = i + 1
+    ctx.switch_cases = saved_cases
 
 fn ci_goto_cfg_emit_switch_dispatch(ctx: &mut CiGotoCfgContext, exprs: &mut CiExprPool, subject_id: CiExprId, dispatch_block: i32, after_block: i32, cases: CiGotoSwitchCase, loc: str):
     if not ctx.ok:
@@ -10369,7 +10377,25 @@ fn ci_goto_cfg_lower_stmt(session: i64, cursor: i32, ctx: &mut CiGotoCfgContext,
             ci_goto_cfg_branch_current(ctx, label_block, with_ci_cursor_location(session, cursor))
         ci_goto_cfg_set_current(ctx, label_block)
         if nc > 0:
-            ci_goto_cfg_lower_stmt(session, with_ci_child(session, cursor, 0), ctx, stmts, exprs, types, scope)
+            var child_cursor = with_ci_child(session, cursor, 0)
+            var child_kind = with_ci_cursor_kind(session, child_cursor)
+            while child_kind == CXK_LABEL_STMT and ctx.ok:
+                let inner_name = with_ci_cursor_spelling(session, child_cursor)
+                if inner_name.len() == 0:
+                    ci_goto_cfg_fail(ctx, "empty C label in goto CFG", with_ci_cursor_location(session, child_cursor))
+                    return
+                let inner_block = ci_goto_cfg_define_label(ctx, inner_name, with_ci_cursor_location(session, child_cursor))
+                if ctx.current >= 0 and ctx.current != inner_block:
+                    ci_goto_cfg_branch_current(ctx, inner_block, with_ci_cursor_location(session, child_cursor))
+                ci_goto_cfg_set_current(ctx, inner_block)
+                if with_ci_num_children(session, child_cursor) == 0:
+                    return
+                child_cursor = with_ci_child(session, child_cursor, 0)
+                child_kind = with_ci_cursor_kind(session, child_cursor)
+            if (child_kind == CXK_CASE_STMT or child_kind == CXK_DEFAULT_STMT) and (ctx.switch_cases as i64) != 0:
+                ci_goto_cfg_lower_case_node(session, child_cursor, ctx, stmts, exprs, types, scope, ctx.switch_cases)
+            else:
+                ci_goto_cfg_lower_stmt(session, child_cursor, ctx, stmts, exprs, types, scope)
         return
     if kind == CXK_GOTO_STMT:
         let target_label = ci_goto_cfg_target_label_from_goto(session, cursor)
