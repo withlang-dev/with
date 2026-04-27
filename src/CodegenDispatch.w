@@ -3199,22 +3199,13 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
             elem_ty = self.mir_vec_elem_type(body, recv_op)
         if elem_ty == 0:
             elem_ty = i64_ty
-        if not self.safety_checks:
-            let vg_vec_ty = self.get_or_create_vec_type(0, elem_ty)
-            let vg_data_gep = wl_build_struct_gep(self.builder, vg_vec_ty, recv_ptr, 0)
-            let vg_data_ptr = wl_build_load(self.builder, ptr_ty, vg_data_gep)
-            let vg_indices: Vec[i64] = Vec.new()
-            vg_indices.push(idx64)
-            let vg_elem_ptr = wl_build_gep(self.builder, elem_ty, vg_data_ptr, vec_data_i64(&vg_indices), 1)
-            result = wl_build_load(self.builder, elem_ty, vg_elem_ptr)
-        else:
-            let get_fn = self.ensure_vec_runtime_fn("with_vec_get_ptr", ptr_ty, 2)
-            let get_ty = self.get_vec_fn_type("with_vec_get_ptr", ptr_ty, 2)
-            let args: Vec[i64] = Vec.new()
-            args.push(recv_ptr)
-            args.push(idx64)
-            let raw_ptr = wl_build_call(self.builder, get_ty, get_fn, vec_data_i64(&args), 2)
-            result = wl_build_load(self.builder, elem_ty, raw_ptr)
+        let get_fn = self.ensure_vec_runtime_fn("with_vec_get_ptr", ptr_ty, 2)
+        let get_ty = self.get_vec_fn_type("with_vec_get_ptr", ptr_ty, 2)
+        let args: Vec[i64] = Vec.new()
+        args.push(recv_ptr)
+        args.push(idx64)
+        let raw_ptr = wl_build_call(self.builder, get_ty, get_fn, vec_data_i64(&args), 2)
+        result = wl_build_load(self.builder, elem_ty, raw_ptr)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_LEN:
         let recv = self.mir_intrinsic_recv_vec_value(body, args_id)
