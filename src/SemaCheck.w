@@ -2468,6 +2468,18 @@ fn Sema.check_assign(self: Sema, node: i32) -> i32:
         if self.scope_has(target_sym) != 0:
             if self.scope_lookup_mut(target_sym) == 0:
                 self.emit_error("cannot assign to immutable variable", node)
+    else:
+        // docs/mut.md Rev 8 §6 — assignment LHS must be a mutable place.
+        // Already covered above for plain identifiers via binding-mut. For
+        // projection LHS (field, index, deref), consult classify_place.
+        // Warnings during P7..P11; promoted to errors at P12 lockdown.
+        let lhs_packed = self.classify_place(target)
+        let lhs_kind = unpack_place_kind(lhs_packed)
+        let lhs_mut_state = unpack_place_mut(lhs_packed)
+        if lhs_kind == PlaceKind.PK_NotPlace:
+            self.emit_warning("cannot assign to a non-place expression", node)
+        else if lhs_mut_state == PlaceMut.PM_ReadOnly:
+            self.emit_warning("cannot assign through a read-only place (e.g., dereferenced &T or *const T) (§15.10)", node)
 
     // Check type compatibility
     if target_type != 0 and value_type != 0:
@@ -7096,9 +7108,17 @@ fn Sema.classify_place(self: Sema, node: i32) -> i64:
         let op = self.ast.get_data0(node)
         if op == UnaryOp.UOP_DEREF:
             let operand_node = self.ast.get_data1(node)
-            let operand_ty_opt = self.typed_expr_types.get(operand_node)
-            if operand_ty_opt.is_some():
-                return self.classify_deref(operand_ty_opt.unwrap())
+            // typed_expr_types is sparse; for binary-expr operands (pointer
+            // arithmetic) it's not cached. Look up via check_expr if cache
+            // misses — sema is idempotent for already-typed nodes.
+            var operand_ty: i32 = 0
+            let cached = self.typed_expr_types.get(operand_node)
+            if cached.is_some():
+                operand_ty = cached.unwrap()
+            else:
+                operand_ty = self.check_expr(operand_node) as i32
+            if operand_ty != 0:
+                return self.classify_deref(operand_ty)
             return pack_place(PlaceKind.PK_NotPlace, PlaceMut.PM_NoMut)
     // §2.5 — function call results, arithmetic, literals are not places.
     pack_place(PlaceKind.PK_NotPlace, PlaceMut.PM_NoMut)
