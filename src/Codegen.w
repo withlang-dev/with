@@ -1604,7 +1604,7 @@ fn Codegen.find_dyn_concrete_arg(self: Codegen, arg_node: i32, arg_ty: i64) -> D
 
     if arg_node != 0 and self.pool.kind(arg_node) == NodeKind.NK_UNARY:
         let uop = self.pool.get_data0(arg_node)
-        if uop == UnaryOp.UOP_REF or uop == UnaryOp.UOP_MUT_REF:
+        if uop == UnaryOp.UOP_REF or uop == UnaryOp.UOP_MUT_REF or uop == UnaryOp.UOP_RAW_REF_CONST or uop == UnaryOp.UOP_RAW_REF_MUT:
             let inner = self.pool.get_data1(arg_node)
             if self.pool.kind(inner) == NodeKind.NK_IDENT:
                 let base_sym = self.pool.get_data0(inner)
@@ -1715,7 +1715,7 @@ fn Codegen.infer_local_pointee_struct(self: Codegen, value_node: i32, declared_t
 
     if value_node != 0 and self.pool.kind(value_node) == NodeKind.NK_UNARY:
         let uop = self.pool.get_data0(value_node)
-        if uop == UnaryOp.UOP_REF or uop == UnaryOp.UOP_MUT_REF:
+        if uop == UnaryOp.UOP_REF or uop == UnaryOp.UOP_MUT_REF or uop == UnaryOp.UOP_RAW_REF_CONST or uop == UnaryOp.UOP_RAW_REF_MUT:
             let inner = self.pool.get_data1(value_node)
             if self.pool.kind(inner) == NodeKind.NK_IDENT:
                 let base_sym = self.pool.get_data0(inner)
@@ -1760,7 +1760,7 @@ fn Codegen.infer_local_concrete_struct(self: Codegen, value_node: i32, storage_t
                 return alias_known
     if vk == NodeKind.NK_UNARY:
         let uop = self.pool.get_data0(value_node)
-        if uop == UnaryOp.UOP_REF or uop == UnaryOp.UOP_MUT_REF:
+        if uop == UnaryOp.UOP_REF or uop == UnaryOp.UOP_MUT_REF or uop == UnaryOp.UOP_RAW_REF_CONST or uop == UnaryOp.UOP_RAW_REF_MUT:
             let inner = self.pool.get_data1(value_node)
             if self.pool.kind(inner) == NodeKind.NK_IDENT:
                 let sym = self.pool.get_data0(inner)
@@ -3655,13 +3655,13 @@ fn Codegen.declare_extern_var(self: Codegen, node: i32):
     let link_name = self.canonical_extern_name(name_str)
 
     let existing = wl_get_named_global(self.llmod, link_name)
-    var global = existing
+    var gv = existing
     if existing == 0:
-        global = wl_add_global(self.llmod, var_ty, link_name)
+        gv = wl_add_global(self.llmod, var_ty, link_name)
     // External linkage is the default — no need to set it
     if is_mut == 0:
-        wl_set_global_constant(global, 1)
-    self.module_constants.insert(name_sym, global)
+        wl_set_global_constant(gv, 1)
+    self.module_constants.insert(name_sym, gv)
 
 fn Codegen.canonical_extern_name(self: Codegen, name: str) -> str:
     // c_import may suffix C symbols as "name.<n>" — strip the suffix for linking.

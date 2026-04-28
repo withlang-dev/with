@@ -16,6 +16,12 @@ extern fn with_eprint(s: str) -> void
 extern fn with_fs_file_exists(path: str) -> i32
 extern fn with_str_eq(a: str, b: str) -> i32
 
+// docs/mut.md Rev 8 — bridge sentinel.
+// 0 during P1..P11: parser still accepts `&mut T`, `&mut expr`, and `&mut self`;
+//   sema treats `mut self: Self` as an alias for `&mut self`.
+// 1 at P12 lockdown: legacy `&mut` surface rejected as a syntax error.
+const STRICT_NO_MUT_REF: i32 = 0
+
 fn sema_dirname(path: str) -> str:
     var last_slash = 0 - 1
     for i in 0..path.len() as i32:
@@ -1335,7 +1341,7 @@ fn Sema.expr_is_ephemeral_value(self: Sema, node: i32) -> i32:
         return 0
     if kind == NodeKind.NK_UNARY:
         let op = self.ast.get_data0(node)
-        if op == UnaryOp.UOP_REF or op == UnaryOp.UOP_MUT_REF:
+        if op == UnaryOp.UOP_REF or op == UnaryOp.UOP_MUT_REF or op == UnaryOp.UOP_RAW_REF_CONST or op == UnaryOp.UOP_RAW_REF_MUT:
             return 1
         return self.expr_is_ephemeral_value(self.ast.get_data1(node))
     if kind == NodeKind.NK_SLICE:
@@ -2132,7 +2138,7 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
     let op = self.ast.get_data0(node)
     let operand_node = self.ast.get_data1(node)
     var expected_operand = 0
-    if (op == UnaryOp.UOP_REF or op == UnaryOp.UOP_MUT_REF) and self.has_expected_type != 0 and self.expected_expr_type != 0:
+    if (op == UnaryOp.UOP_REF or op == UnaryOp.UOP_MUT_REF or op == UnaryOp.UOP_RAW_REF_CONST or op == UnaryOp.UOP_RAW_REF_MUT) and self.has_expected_type != 0 and self.expected_expr_type != 0:
         let expected_ref = self.resolve_alias(self.expected_expr_type)
         let expected_ref_kind = self.get_type_kind(expected_ref)
         if expected_ref_kind == TypeKind.TY_REF or expected_ref_kind == TypeKind.TY_PTR:
@@ -2149,7 +2155,7 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
         return operand as i32
     if op == UnaryOp.UOP_NOT:
         return self.ty_bool as i32
-    if op == UnaryOp.UOP_REF or op == UnaryOp.UOP_MUT_REF:
+    if op == UnaryOp.UOP_REF or op == UnaryOp.UOP_MUT_REF or op == UnaryOp.UOP_RAW_REF_CONST or op == UnaryOp.UOP_RAW_REF_MUT:
         // Reject address-of bitpacked fields — they may not be byte-aligned
         if self.ast.kind(operand_node) == NodeKind.NK_FIELD_ACCESS:
             let ref_recv = self.ast.get_data0(operand_node)
@@ -2157,7 +2163,11 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
             if self.bitpacked_types.contains(ref_recv_ty as i32):
                 self.emit_error("cannot take address of bitpacked field", node)
                 return 0
-        if op == UnaryOp.UOP_REF:
+        // P1 bridge: raw refs route through the same borrow + ref-type path as
+        // their safe-ref siblings. P2 will refine raw forms to produce *const T
+        // / *mut T (TY_PTR) instead of TY_REF.
+        let is_exclusive = op == UnaryOp.UOP_MUT_REF or op == UnaryOp.UOP_RAW_REF_MUT
+        if not is_exclusive:
             self.check_borrow_create(operand_node, BorrowKind.SHARED, node)
             return self.add_type(TypeKind.TY_REF, operand as i32, 0, 0) as i32
         self.check_borrow_create(operand_node, BorrowKind.EXCLUSIVE, node)
@@ -2171,6 +2181,14 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
             if self.in_unsafe == 0:
                 self.emit_error("raw pointer dereference requires unsafe context", node)
             return self.get_type_d0(resolved)
+        // docs/mut.md Rev 8 §15.16 — deref-precedence diagnostic.
+        // `*x.field` parses as `*(x.field)`; if the field type is not a
+        // pointer/reference, the user almost certainly meant `(*x).field`.
+        // Emit a precedence-aware message in that case.
+        if self.ast.kind(operand_node) == NodeKind.NK_FIELD_ACCESS:
+            self.emit_error("cannot dereference non-pointer value; `*x.field` parses as `*(x.field)` (unary `*` has lower precedence than `.`); write `(*x).field` to dereference x first", node)
+        else:
+            self.emit_error("cannot dereference non-pointer value", node)
         return 0
     if op == UnaryOp.UOP_TRY:
         if self.in_defer != 0:
@@ -2323,7 +2341,7 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
     // If this let binds a borrow, tie the newest active borrow to this binding.
     if self.ast.kind(value) == NodeKind.NK_UNARY:
         let uop = self.ast.get_data0(value)
-        if uop == UnaryOp.UOP_REF or uop == UnaryOp.UOP_MUT_REF:
+        if uop == UnaryOp.UOP_REF or uop == UnaryOp.UOP_MUT_REF or uop == UnaryOp.UOP_RAW_REF_CONST or uop == UnaryOp.UOP_RAW_REF_MUT:
             let blen = self.borrow_refs.len() as i32
             if blen > 0:
                 self.borrow_refs.set_i32((blen - 1) as i64, name)
@@ -6877,10 +6895,10 @@ fn Sema.expr_mutates_place(self: Sema, node: i32, sym: i32) -> i32:
             return 1
         // Also check value side for nested mutations
         return self.expr_mutates_place(self.ast.get_data1(node), sym)
-    // &mut borrow of sym
+    // &mut / &raw mut borrow of sym
     if kind == NodeKind.NK_UNARY:
         let op = self.ast.get_data0(node)
-        if op == UnaryOp.UOP_MUT_REF:
+        if op == UnaryOp.UOP_MUT_REF or op == UnaryOp.UOP_RAW_REF_MUT:
             let operand = self.ast.get_data1(node)
             if self.place_root_sym(operand) == sym:
                 return 1
@@ -7080,8 +7098,8 @@ fn Sema.collect_capture_fields(self: Sema, node: i32, sym: i32):
     if kind == NodeKind.NK_UNARY:
         let op = self.ast.get_data0(node)
         let operand = self.ast.get_data1(node)
-        if op == UnaryOp.UOP_MUT_REF:
-            // &mut sym.field — mark field as exclusive
+        if op == UnaryOp.UOP_MUT_REF or op == UnaryOp.UOP_RAW_REF_MUT:
+            // &mut sym.field / &raw mut sym.field — mark field as exclusive
             if self.ast.kind(operand) == NodeKind.NK_FIELD_ACCESS:
                 let fbase = self.ast.get_data0(operand)
                 if self.ast.kind(fbase) == NodeKind.NK_IDENT and self.ast.get_data0(fbase) == sym:

@@ -567,7 +567,7 @@ fn Parser.parse_decl(self: Parser) -> NodeId:
         return self.parse_enum_decl(is_pub, start)
     if t == TokenKind.TK_KW_USE:
         return self.parse_use_decl(start)
-    if t == TokenKind.TK_KW_LET or t == TokenKind.TK_KW_VAR:
+    if t == TokenKind.TK_KW_LET or t == TokenKind.TK_KW_VAR or t == TokenKind.TK_KW_GLOBAL:
         return self.parse_top_level_let(is_pub, start)
     if t == TokenKind.TK_KW_EXTERN:
         return self.parse_extern_decl(start)
@@ -1770,8 +1770,20 @@ fn Parser.parse_c_import(self: Parser, start: i32) -> NodeId:
 // ── let decl ─────────────────────────────────────────────────────
 
 fn Parser.parse_top_level_let(self: Parser, is_pub: i32, start: i32) -> NodeId:
+    // docs/mut.md Rev 8 §12 — `global` (stable) and `global var` (rebindable)
+    // are module-level place declarations. During the bridge phase (P1..P11)
+    // they desugar to existing NK_LET_DECL with the same mutability semantics
+    // as `let`/`var`; the GLOBAL marker is metadata that later phases will
+    // store explicitly. Plain top-level `let`/`var` remain accepted.
+    let is_global = self.peek() == TokenKind.TK_KW_GLOBAL
+    if is_global:
+        self.advance()  // consume 'global'
     let is_var = self.peek() == TokenKind.TK_KW_VAR
-    self.advance()
+    if is_var:
+        self.advance()  // consume 'var' (covers both 'var' and 'global var')
+    else if not is_global:
+        self.advance()  // consume 'let'
+    // For bare `global X = ...`, no further keyword to consume; cursor is at the name.
     var is_mut = is_var
     if not is_var and self.peek() == TokenKind.TK_KW_MUT:
         self.emit_error("'let mut' is not supported; use 'var' for mutable bindings")
@@ -3851,7 +3863,23 @@ fn Parser.parse_ref_of(self: Parser) -> NodeId:
     let start = self.current_start()
     self.advance()
     var op = UnaryOp.UOP_REF
-    if self.peek() == TokenKind.TK_KW_MUT:
+    // docs/mut.md Rev 8 §13.2 — `&raw const P` / `&raw mut P`.
+    // `raw` is contextual: only treated as the raw-address-of marker when it
+    // immediately follows `&` AND the next token after it is `const` or `mut`.
+    // The two-token lookahead avoids stealing `&raw` where `raw` is an
+    // ordinary identifier (e.g., `&raw as *const T`).
+    var matched_raw = false
+    if self.is_ident_named("raw") and self.pos + 1 < self.tokens.len():
+        let next_tag = self.tokens.get_tag(self.pos + 1)
+        if next_tag == TokenKind.TK_KW_CONST or next_tag == TokenKind.TK_KW_MUT:
+            self.advance()  // consume `raw`
+            if next_tag == TokenKind.TK_KW_CONST:
+                op = UnaryOp.UOP_RAW_REF_CONST
+            else:
+                op = UnaryOp.UOP_RAW_REF_MUT
+            self.advance()  // consume `const` or `mut`
+            matched_raw = true
+    if not matched_raw and self.peek() == TokenKind.TK_KW_MUT:
         op = UnaryOp.UOP_MUT_REF
         self.advance()
     let operand = self.parse_primary()
@@ -6005,6 +6033,11 @@ fn Parser.parse_param_list(self: Parser) -> i32:
 
         var type_node: NodeId = 0 as NodeId
         var extra_flags = 0
+        // docs/mut.md Rev 8 §5.1 — `mut self: Self` is a receiver-place mode.
+        // Tag the param so later sema phases can require a mutable place at
+        // the call site without re-inspecting the AST.
+        if is_mut == 1 and name != 0 and self.intern.resolve(name) == "self":
+            extra_flags = extra_flags + FN_PARAM_FLAG_MUT_SELF
         if self.peek() == TokenKind.TK_COLON:
             self.advance()
             self.skip_newlines()
@@ -6012,7 +6045,7 @@ fn Parser.parse_param_list(self: Parser) -> i32:
             if self.peek() == TokenKind.TK_IDENT:
                 let maybe_implicit = self.intern_current()
                 if self.intern.resolve(maybe_implicit) == "implicit":
-                    extra_flags = FN_PARAM_FLAG_IMPLICIT
+                    extra_flags = extra_flags + FN_PARAM_FLAG_IMPLICIT
                     self.advance()
                     self.skip_newlines()
             type_node = self.parse_type_expr()

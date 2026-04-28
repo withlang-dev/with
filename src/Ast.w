@@ -202,6 +202,12 @@ const FN_META_REQUIRED_UNIT: i32 = 65536
 const FN_PARAM_STRIDE: i32 = 3
 const FN_PARAM_FLAG_NOALIAS: i32 = 1
 const FN_PARAM_FLAG_IMPLICIT: i32 = 2
+// docs/mut.md Rev 8 §5.1 — receiver-place mode `mut self: Self`.
+// Set by the parser when the param name is `self` and was preceded by `mut`.
+// Stored as a flag bit so callers can detect a mutating receiver without
+// reparsing. No semantic effect during the bridge phase (P1..P11);
+// at P11 sema reads this bit to require a mutable place at the call site.
+const FN_PARAM_FLAG_MUT_SELF: i32 = 4
 
 // Multi-index spec kind constants (stored in NK_INDEX_SPEC.d2 high bits)
 const INDEX_SCALAR: i32 = 0
@@ -215,6 +221,9 @@ fn fn_param_is_noalias(flags: i32) -> i32:
 
 fn fn_param_is_implicit(flags: i32) -> i32:
     (flags / FN_PARAM_FLAG_IMPLICIT) % 2
+
+fn fn_param_is_mut_self(flags: i32) -> i32:
+    (flags / FN_PARAM_FLAG_MUT_SELF) % 2
 
 // Visibility flags
 enum Visibility: i32:
@@ -262,6 +271,12 @@ enum UnaryOp: i32:
     UOP_DEREF = 4
     UOP_TRY = 5
     UOP_BIT_NOT = 6
+    // docs/mut.md Rev 8 §13.2 — explicit raw-address-of forms.
+    // P1 routes these through the same paths as UOP_REF / UOP_MUT_REF,
+    // producing the same safe-reference type. P2 refines the typing so
+    // they produce *const T / *mut T raw pointers.
+    UOP_RAW_REF_CONST = 7
+    UOP_RAW_REF_MUT = 8
 
 // Literal suffix metadata (stored out-of-line in AstPool.literal_suffixes)
 enum LiteralSuffix: i32:

@@ -1119,6 +1119,8 @@ fn mir_unop_name(op: i32) -> str:
     if op == UnaryOp.UOP_NOT: return "not"
     if op == UnaryOp.UOP_REF: return "ref"
     if op == UnaryOp.UOP_MUT_REF: return "mut_ref"
+    if op == UnaryOp.UOP_RAW_REF_CONST: return "raw_const_ref"
+    if op == UnaryOp.UOP_RAW_REF_MUT: return "raw_mut_ref"
     if op == UnaryOp.UOP_DEREF: return "deref"
     if op == UnaryOp.UOP_TRY: return "try"
     f"uop{op}"
