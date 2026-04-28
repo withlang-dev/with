@@ -2163,10 +2163,14 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
             if self.bitpacked_types.contains(ref_recv_ty as i32):
                 self.emit_error("cannot take address of bitpacked field", node)
                 return 0
-        // P1 bridge: raw refs route through the same borrow + ref-type path as
-        // their safe-ref siblings. P2 will refine raw forms to produce *const T
-        // / *mut T (TY_PTR) instead of TY_REF.
-        let is_exclusive = op == UnaryOp.UOP_MUT_REF or op == UnaryOp.UOP_RAW_REF_MUT
+        // docs/mut.md Rev 8 §13 — raw forms produce TY_PTR (*const T / *mut T)
+        // and do not participate in borrow tracking. Forming a raw pointer is
+        // safe; dereferencing or writing through it requires unsafe (§13.3).
+        let is_raw = op == UnaryOp.UOP_RAW_REF_CONST or op == UnaryOp.UOP_RAW_REF_MUT
+        if is_raw:
+            let raw_mut = if op == UnaryOp.UOP_RAW_REF_MUT: 1 else: 0
+            return self.add_type(TypeKind.TY_PTR, operand as i32, raw_mut, 0) as i32
+        let is_exclusive = op == UnaryOp.UOP_MUT_REF
         if not is_exclusive:
             self.check_borrow_create(operand_node, BorrowKind.SHARED, node)
             return self.add_type(TypeKind.TY_REF, operand as i32, 0, 0) as i32

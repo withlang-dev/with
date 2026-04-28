@@ -35,17 +35,21 @@ fn test_mut_self_receiver:
 
 fn test_raw_addr_of_const:
     let x: i32 = 5
-    // P1 bridge: `&raw const x` parses and routes through the existing
-    // &T path (TY_REF). P2 will refine to TY_PTR (`*const T`).
-    let p = &raw const x
-    assert(*p == 5)
+    // §13 — `&raw const x` produces *const i32. Forming is safe;
+    // dereferencing requires unsafe.
+    let p: *const i32 = &raw const x
+    let v = unsafe *p
+    assert(v == 5)
 
 fn test_raw_addr_of_mut:
     var y: i32 = 7
-    // P1 bridge: `&raw mut y` parses and routes through the existing
-    // &mut T path. P2 will refine to TY_PTR (`*mut T`) and require unsafe.
-    let q = &raw mut y
-    assert(*q == 7)
+    // §13 — `&raw mut y` produces *mut i32. Forming is safe;
+    // dereferencing/writing requires unsafe.
+    let q: *mut i32 = &raw mut y
+    let w = unsafe *q
+    assert(w == 7)
+    unsafe *q = 11
+    assert(y == 11)
 
 fn main:
     test_globals()
