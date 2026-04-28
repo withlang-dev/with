@@ -153,28 +153,27 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
 
     out
 
-fn ct_new_node_copy(pool: &mut AstPool, kind: i32, start: i32, end: i32, d0: i32, d1: i32, d2: i32, suffix: i32) -> i32:
-    let node = pool.add_node(kind, start, end, d0, d1, d2)
-    pool.set_literal_suffix(node, suffix)
+fn AstPool.ct_new_node_copy(mut self: AstPool, kind: i32, start: i32, end: i32, d0: i32, d1: i32, d2: i32, suffix: i32) -> i32:
+    let node = self.add_node(kind, start, end, d0, d1, d2)
+    self.set_literal_suffix(node, suffix)
     node as i32
 
-fn ct_clone_leaf(pool: &mut AstPool, node: i32) -> i32:
-    let cloned = ct_new_node_copy(
-        pool,
-        pool.kind(node),
-        pool.get_start(node),
-        pool.get_end(node),
-        pool.get_data0(node),
-        pool.get_data1(node),
-        pool.get_data2(node),
-        pool.literal_suffix(node)
+fn AstPool.ct_clone_leaf(mut self: AstPool, node: i32) -> i32:
+    let cloned = self.ct_new_node_copy(
+        self.kind(node),
+        self.get_start(node),
+        self.get_end(node),
+        self.get_data0(node),
+        self.get_data1(node),
+        self.get_data2(node),
+        self.literal_suffix(node)
     )
-    if pool.has_int_literal_exact(node):
-        pool.set_int_literal_exact(cloned as NodeId, pool.int_literal_digit_idx(node), pool.int_literal_radix(node))
+    if self.has_int_literal_exact(node):
+        self.set_int_literal_exact(cloned as NodeId, self.int_literal_digit_idx(node), self.int_literal_radix(node))
     cloned
 
-fn ct_empty_block(pool: &mut AstPool, node: i32) -> i32:
-    pool.add_node(NodeKind.NK_BLOCK, pool.get_start(node), pool.get_end(node), pool.extra_len(), 0, 0) as i32
+fn AstPool.ct_empty_block(mut self: AstPool, node: i32) -> i32:
+    self.add_node(NodeKind.NK_BLOCK, self.get_start(node), self.get_end(node), self.extra_len(), 0, 0) as i32
 
 fn ct_fresh_sym(intern: &mut InternPool, prefix: str, seed: i32) -> i32:
     intern.intern(prefix ++ f"{seed}" ++ "_" ++ f"{intern.symbol_count() + 1}")
@@ -265,11 +264,11 @@ fn ct_build_type_expr(pool: &mut AstPool, intern: &mut InternPool, sema: &mut Se
     let type_sym = intern.intern(sema.type_name(type_id))
     pool.add_node(NodeKind.NK_TYPE_NAMED, start, end, type_sym, 0, 0) as i32
 
-fn ct_build_call(pool: &mut AstPool, node: i32, callee: i32, args: Vec[i32]) -> i32:
-    let extra_start = pool.extra_len()
+fn AstPool.ct_build_call(mut self: AstPool, node: i32, callee: i32, args: Vec[i32]) -> i32:
+    let extra_start = self.extra_len()
     for ai in 0..args.len() as i32:
-        pool.add_extra(args.get(ai as i64))
-    pool.add_node(NodeKind.NK_CALL, pool.get_start(node), pool.get_end(node), callee, extra_start, args.len() as i32) as i32
+        self.add_extra(args.get(ai as i64))
+    self.add_node(NodeKind.NK_CALL, self.get_start(node), self.get_end(node), callee, extra_start, args.len() as i32) as i32
 
 fn ct_build_collection_ctor(pool: &mut AstPool, intern: &mut InternPool, sema: &mut Sema, type_id: i32, node: i32) -> i32:
     let type_node = ct_build_type_expr(pool, intern, sema, type_id, node)
@@ -278,7 +277,7 @@ fn ct_build_collection_ctor(pool: &mut AstPool, intern: &mut InternPool, sema: &
     let new_sym = intern.intern("new")
     let callee = pool.add_node(NodeKind.NK_FIELD_ACCESS, pool.get_start(node), pool.get_end(node), type_node, new_sym, 0)
     let no_args: Vec[i32] = Vec.new()
-    ct_build_call(pool, node, callee as i32, no_args)
+    pool.ct_build_call(node, callee as i32, no_args)
 
 fn ct_build_typed_binding(pool: &mut AstPool, intern: &mut InternPool, sema: &mut Sema, name_sym: i32, value: i32, type_id: i32, node: i32, is_mut: i32) -> i32:
     let type_node = ct_build_type_expr(pool, intern, sema, type_id, node)
@@ -309,7 +308,7 @@ fn ct_build_vec_value_tree(pool: &mut AstPool, intern: &mut InternPool, sema: &m
         let callee = pool.add_node(NodeKind.NK_FIELD_ACCESS, pool.get_start(node), pool.get_end(node), recv_ident as i32, push_sym, 0)
         let args: Vec[i32] = Vec.new()
         args.push(elem_node)
-        stmts.push(ct_build_call(pool, node, callee as i32, args))
+        stmts.push(pool.ct_build_call(node, callee as i32, args))
     let stmt_extra = pool.extra_len()
     for si in 0..stmts.len() as i32:
         pool.add_extra(stmts.get(si as i64))
@@ -338,7 +337,7 @@ fn ct_build_map_value_tree(pool: &mut AstPool, intern: &mut InternPool, sema: &m
         let args: Vec[i32] = Vec.new()
         args.push(key_node)
         args.push(item_node)
-        stmts.push(ct_build_call(pool, node, callee as i32, args))
+        stmts.push(pool.ct_build_call(node, callee as i32, args))
     let stmt_extra = pool.extra_len()
     for si in 0..stmts.len() as i32:
         pool.add_extra(stmts.get(si as i64))
@@ -368,7 +367,7 @@ fn ct_build_value_tree(pool: &mut AstPool, intern: &mut InternPool, sema: &mut S
         let sym = intern.intern(value.text)
         return pool.add_node(NodeKind.NK_STRING_LIT, pool.get_start(node), pool.get_end(node), sym, 0, 0) as i32
     if value.kind == ComptimeValueKind.CV_VOID:
-        return ct_empty_block(pool, node)
+        return pool.ct_empty_block(node)
     if value.kind == ComptimeValueKind.CV_ARRAY or value.kind == ComptimeValueKind.CV_TUPLE:
         let elem_nodes: Vec[i32] = Vec.new()
         for i in 0..value.extra_count:
@@ -472,11 +471,11 @@ fn ct_rewrite_comptime_if(source_ast: AstPool, pool: &mut AstPool, sema: &mut Se
         let then_body = pool.get_data1(inner)
         if then_body != 0:
             return ct_transform_expr(source_ast, pool, sema, intern, diags, then_body)
-        return ct_empty_block(pool, wrapper)
+        return pool.ct_empty_block(wrapper)
     let else_body = pool.get_data2(inner)
     if else_body != 0:
         return ct_transform_expr(source_ast, pool, sema, intern, diags, else_body)
-    ct_empty_block(pool, wrapper)
+    pool.ct_empty_block(wrapper)
 
 fn ct_iter_count(value: ComptimeValue) -> i32:
     if value.kind == ComptimeValueKind.CV_ARRAY or value.kind == ComptimeValueKind.CV_TUPLE or value.kind == ComptimeValueKind.CV_VEC:
@@ -497,15 +496,15 @@ fn ct_iter_item_node(pool: &mut AstPool, intern: &mut InternPool, sema: &mut Sem
         return ct_build_value_tree(pool, intern, sema, item, node, extras)
     0
 
-fn ct_struct_lit_field_value(pool: &mut AstPool, node: i32, field: i32) -> i32:
-    if node == 0 or pool.kind(node) != NodeKind.NK_STRUCT_LIT:
+fn AstPool.ct_struct_lit_field_value(mut self: AstPool, node: i32, field: i32) -> i32:
+    if node == 0 or self.kind(node) != NodeKind.NK_STRUCT_LIT:
         return 0
-    let extra_start = pool.get_data1(node)
-    let field_count = pool.get_data2(node)
+    let extra_start = self.get_data1(node)
+    let field_count = self.get_data2(node)
     for fi in 0..field_count:
         let base = extra_start + fi * 2
-        if pool.get_extra(base) == field:
-            return pool.get_extra(base + 1)
+        if self.get_extra(base) == field:
+            return self.get_extra(base + 1)
     0
 
 fn ct_sync_sema_ast(sema: &mut Sema, pool: &mut AstPool):
@@ -533,314 +532,314 @@ fn ct_try_fold_type_call(pool: &mut AstPool, sema: &mut Sema, intern: &mut Inter
         return folded
     node
 
-fn ct_clone_tree_with_subst(pool: &mut AstPool, node: i32, subst_sym: i32, subst_node: i32, index_sym: i32, index_node: i32) -> i32:
+fn AstPool.ct_clone_tree_with_subst(mut self: AstPool, node: i32, subst_sym: i32, subst_node: i32, index_sym: i32, index_node: i32) -> i32:
     if node == 0:
         return 0
-    let kind = pool.kind(node)
+    let kind = self.kind(node)
 
     if kind == NodeKind.NK_IDENT:
-        let sym = pool.get_data0(node)
+        let sym = self.get_data0(node)
         if subst_sym != 0 and sym == subst_sym:
-            return ct_clone_tree_with_subst(pool, subst_node, 0, 0, 0, 0)
+            return self.ct_clone_tree_with_subst(subst_node, 0, 0, 0, 0)
         if index_sym != 0 and sym == index_sym:
-            return ct_clone_tree_with_subst(pool, index_node, 0, 0, 0, 0)
-        return ct_clone_leaf(pool, node)
+            return self.ct_clone_tree_with_subst(index_node, 0, 0, 0, 0)
+        return self.ct_clone_leaf(node)
 
     if kind == NodeKind.NK_INT_LIT or kind == NodeKind.NK_FLOAT_LIT or kind == NodeKind.NK_STRING_LIT or kind == NodeKind.NK_C_STRING_LIT or kind == NodeKind.NK_BOOL_LIT or kind == NodeKind.NK_NULL_LIT or kind == NodeKind.NK_TYPE_NAMED or kind == NodeKind.NK_TYPE_INFERRED or kind == NodeKind.NK_COMPTIME_ERROR or kind == NodeKind.NK_PAT_WILDCARD or kind == NodeKind.NK_PAT_IDENT or kind == NodeKind.NK_PAT_INT or kind == NodeKind.NK_PAT_BOOL or kind == NodeKind.NK_PAT_STRING or kind == NodeKind.NK_PAT_TYPED_BIND:
-        return ct_clone_leaf(pool, node)
+        return self.ct_clone_leaf(node)
 
     if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_RETURN or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_YIELD:
-        let child = ct_clone_tree_with_subst(pool, pool.get_data0(node), subst_sym, subst_node, index_sym, index_node)
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), child, pool.get_data1(node), pool.get_data2(node), pool.literal_suffix(node))
+        let child = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), child, self.get_data1(node), self.get_data2(node), self.literal_suffix(node))
 
     if kind == NodeKind.NK_UNARY:
-        let operand = ct_clone_tree_with_subst(pool, pool.get_data1(node), subst_sym, subst_node, index_sym, index_node)
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), pool.get_data0(node), operand, pool.get_data2(node), pool.literal_suffix(node))
+        let operand = self.ct_clone_tree_with_subst(self.get_data1(node), subst_sym, subst_node, index_sym, index_node)
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), self.get_data0(node), operand, self.get_data2(node), self.literal_suffix(node))
 
     if kind == NodeKind.NK_BINARY:
-        let lhs = ct_clone_tree_with_subst(pool, pool.get_data1(node), subst_sym, subst_node, index_sym, index_node)
-        let rhs = ct_clone_tree_with_subst(pool, pool.get_data2(node), subst_sym, subst_node, index_sym, index_node)
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), pool.get_data0(node), lhs, rhs, pool.literal_suffix(node))
+        let lhs = self.ct_clone_tree_with_subst(self.get_data1(node), subst_sym, subst_node, index_sym, index_node)
+        let rhs = self.ct_clone_tree_with_subst(self.get_data2(node), subst_sym, subst_node, index_sym, index_node)
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), self.get_data0(node), lhs, rhs, self.literal_suffix(node))
 
     if kind == NodeKind.NK_ASSIGN or kind == NodeKind.NK_PIPELINE:
-        let lhs = ct_clone_tree_with_subst(pool, pool.get_data0(node), subst_sym, subst_node, index_sym, index_node)
-        let rhs = ct_clone_tree_with_subst(pool, pool.get_data1(node), subst_sym, subst_node, index_sym, index_node)
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), lhs, rhs, pool.get_data2(node), pool.literal_suffix(node))
+        let lhs = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
+        let rhs = self.ct_clone_tree_with_subst(self.get_data1(node), subst_sym, subst_node, index_sym, index_node)
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), lhs, rhs, self.get_data2(node), self.literal_suffix(node))
 
     if kind == NodeKind.NK_FIELD_ACCESS:
-        let base = ct_clone_tree_with_subst(pool, pool.get_data0(node), subst_sym, subst_node, index_sym, index_node)
-        let folded_value = ct_struct_lit_field_value(pool, base, pool.get_data1(node))
+        let base = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
+        let folded_value = self.ct_struct_lit_field_value(base, self.get_data1(node))
         if folded_value != 0:
-            return ct_clone_tree_with_subst(pool, folded_value, 0, 0, 0, 0)
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), base, pool.get_data1(node), 0, pool.literal_suffix(node))
+            return self.ct_clone_tree_with_subst(folded_value, 0, 0, 0, 0)
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), base, self.get_data1(node), 0, self.literal_suffix(node))
 
     if kind == NodeKind.NK_COMPUTED_FIELD_ACCESS:
-        let base = ct_clone_tree_with_subst(pool, pool.get_data0(node), subst_sym, subst_node, index_sym, index_node)
-        let field_expr = ct_clone_tree_with_subst(pool, pool.get_data1(node), subst_sym, subst_node, index_sym, index_node)
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), base, field_expr, 0, pool.literal_suffix(node))
+        let base = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
+        let field_expr = self.ct_clone_tree_with_subst(self.get_data1(node), subst_sym, subst_node, index_sym, index_node)
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), base, field_expr, 0, self.literal_suffix(node))
 
     if kind == NodeKind.NK_INDEX:
-        let base = ct_clone_tree_with_subst(pool, pool.get_data0(node), subst_sym, subst_node, index_sym, index_node)
-        let index_expr = ct_clone_tree_with_subst(pool, pool.get_data1(node), subst_sym, subst_node, index_sym, index_node)
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), base, index_expr, 0, pool.literal_suffix(node))
+        let base = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
+        let index_expr = self.ct_clone_tree_with_subst(self.get_data1(node), subst_sym, subst_node, index_sym, index_node)
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), base, index_expr, 0, self.literal_suffix(node))
 
     if kind == NodeKind.NK_SLICE:
-        let base = ct_clone_tree_with_subst(pool, pool.get_data0(node), subst_sym, subst_node, index_sym, index_node)
-        let start_node = ct_clone_tree_with_subst(pool, pool.get_data1(node), subst_sym, subst_node, index_sym, index_node)
-        let end_node = ct_clone_tree_with_subst(pool, pool.get_data2(node), subst_sym, subst_node, index_sym, index_node)
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), base, start_node, end_node, pool.literal_suffix(node))
+        let base = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
+        let start_node = self.ct_clone_tree_with_subst(self.get_data1(node), subst_sym, subst_node, index_sym, index_node)
+        let end_node = self.ct_clone_tree_with_subst(self.get_data2(node), subst_sym, subst_node, index_sym, index_node)
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), base, start_node, end_node, self.literal_suffix(node))
 
     if kind == NodeKind.NK_IF_EXPR:
-        let cond = ct_clone_tree_with_subst(pool, pool.get_data0(node), subst_sym, subst_node, index_sym, index_node)
-        let then_body = ct_clone_tree_with_subst(pool, pool.get_data1(node), subst_sym, subst_node, index_sym, index_node)
-        let else_body = ct_clone_tree_with_subst(pool, pool.get_data2(node), subst_sym, subst_node, index_sym, index_node)
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), cond, then_body, else_body, pool.literal_suffix(node))
+        let cond = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
+        let then_body = self.ct_clone_tree_with_subst(self.get_data1(node), subst_sym, subst_node, index_sym, index_node)
+        let else_body = self.ct_clone_tree_with_subst(self.get_data2(node), subst_sym, subst_node, index_sym, index_node)
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), cond, then_body, else_body, self.literal_suffix(node))
 
     if kind == NodeKind.NK_CALL or kind == NodeKind.NK_TUPLE or kind == NodeKind.NK_ARRAY_LIT or kind == NodeKind.NK_PAT_TUPLE or kind == NodeKind.NK_PAT_OR:
-        let extra_start = if kind == NodeKind.NK_CALL: pool.get_data1(node) else: pool.get_data0(node)
-        let count = if kind == NodeKind.NK_CALL: pool.get_data2(node) else: pool.get_data1(node)
+        let extra_start = if kind == NodeKind.NK_CALL: self.get_data1(node) else: self.get_data0(node)
+        let count = if kind == NodeKind.NK_CALL: self.get_data2(node) else: self.get_data1(node)
         let cloned_items: Vec[i32] = Vec.new()
         for i in 0..count:
-            let child = ct_clone_tree_with_subst(pool, pool.get_extra(extra_start + i), subst_sym, subst_node, index_sym, index_node)
+            let child = self.ct_clone_tree_with_subst(self.get_extra(extra_start + i), subst_sym, subst_node, index_sym, index_node)
             cloned_items.push(child)
-        let new_extra = pool.extra_len()
+        let new_extra = self.extra_len()
         for i in 0..cloned_items.len() as i32:
-            pool.add_extra(cloned_items.get(i as i64))
+            self.add_extra(cloned_items.get(i as i64))
         if kind == NodeKind.NK_CALL:
-            let callee = ct_clone_tree_with_subst(pool, pool.get_data0(node), subst_sym, subst_node, index_sym, index_node)
-            return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), callee, new_extra, count, pool.literal_suffix(node))
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), new_extra, count, 0, pool.literal_suffix(node))
+            let callee = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
+            return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), callee, new_extra, count, self.literal_suffix(node))
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), new_extra, count, 0, self.literal_suffix(node))
 
     if kind == NodeKind.NK_BLOCK:
-        let extra_start = pool.get_data0(node)
-        let stmt_count = pool.get_data1(node)
+        let extra_start = self.get_data0(node)
+        let stmt_count = self.get_data1(node)
         let stmt_nodes: Vec[i32] = Vec.new()
         for i in 0..stmt_count:
-            let stmt = ct_clone_tree_with_subst(pool, pool.get_extra(extra_start + i), subst_sym, subst_node, index_sym, index_node)
+            let stmt = self.ct_clone_tree_with_subst(self.get_extra(extra_start + i), subst_sym, subst_node, index_sym, index_node)
             stmt_nodes.push(stmt)
-        let stmt_extra = pool.extra_len()
+        let stmt_extra = self.extra_len()
         for i in 0..stmt_nodes.len() as i32:
-            pool.add_extra(stmt_nodes.get(i as i64))
-        let tail = ct_clone_tree_with_subst(pool, pool.get_data2(node), subst_sym, subst_node, index_sym, index_node)
-        let cloned = ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), stmt_extra, stmt_count, tail, pool.literal_suffix(node))
-        let block_meta = pool.find_block_meta(node)
+            self.add_extra(stmt_nodes.get(i as i64))
+        let tail = self.ct_clone_tree_with_subst(self.get_data2(node), subst_sym, subst_node, index_sym, index_node)
+        let cloned = self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), stmt_extra, stmt_count, tail, self.literal_suffix(node))
+        let block_meta = self.find_block_meta(node)
         if block_meta >= 0:
-            pool.add_block_meta(cloned as NodeId, pool.block_meta_label(block_meta))
+            self.add_block_meta(cloned as NodeId, self.block_meta_label(block_meta))
         return cloned
 
     if kind == NodeKind.NK_LABEL:
-        let stmt = ct_clone_tree_with_subst(pool, pool.get_data1(node), subst_sym, subst_node, index_sym, index_node)
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), pool.get_data0(node), stmt, 0, pool.literal_suffix(node))
+        let stmt = self.ct_clone_tree_with_subst(self.get_data1(node), subst_sym, subst_node, index_sym, index_node)
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), self.get_data0(node), stmt, 0, self.literal_suffix(node))
 
     if kind == NodeKind.NK_GOTO:
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), pool.get_data0(node), 0, 0, pool.literal_suffix(node))
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), self.get_data0(node), 0, 0, self.literal_suffix(node))
 
     if kind == NodeKind.NK_LET_BINDING:
-        let value = ct_clone_tree_with_subst(pool, pool.get_data1(node), subst_sym, subst_node, index_sym, index_node)
-        let cloned = ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), pool.get_data0(node), value, pool.get_data2(node), pool.literal_suffix(node))
-        let ann_extra = pool.get_data2(node) / 2
+        let value = self.ct_clone_tree_with_subst(self.get_data1(node), subst_sym, subst_node, index_sym, index_node)
+        let cloned = self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), self.get_data0(node), value, self.get_data2(node), self.literal_suffix(node))
+        let ann_extra = self.get_data2(node) / 2
         if ann_extra > 0:
-            let new_ann_extra = pool.extra_len()
-            pool.add_extra(pool.get_extra(ann_extra - 1))
-            pool.set_data2(cloned, pool.get_data2(node) % 2 + (new_ann_extra + 1) * 2)
+            let new_ann_extra = self.extra_len()
+            self.add_extra(self.get_extra(ann_extra - 1))
+            self.set_data2(cloned, self.get_data2(node) % 2 + (new_ann_extra + 1) * 2)
         return cloned
 
     if kind == NodeKind.NK_WHILE:
-        let cond = ct_clone_tree_with_subst(pool, pool.get_data0(node), subst_sym, subst_node, index_sym, index_node)
-        let body = ct_clone_tree_with_subst(pool, pool.get_data1(node), subst_sym, subst_node, index_sym, index_node)
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), cond, body, pool.get_data2(node), pool.literal_suffix(node))
+        let cond = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
+        let body = self.ct_clone_tree_with_subst(self.get_data1(node), subst_sym, subst_node, index_sym, index_node)
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), cond, body, self.get_data2(node), self.literal_suffix(node))
 
     if kind == NodeKind.NK_LOOP:
-        let body = ct_clone_tree_with_subst(pool, pool.get_data0(node), subst_sym, subst_node, index_sym, index_node)
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), body, pool.get_data1(node), 0, pool.literal_suffix(node))
+        let body = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), body, self.get_data1(node), 0, self.literal_suffix(node))
 
     if kind == NodeKind.NK_FOR:
-        let iterable = ct_clone_tree_with_subst(pool, pool.get_data1(node), subst_sym, subst_node, index_sym, index_node)
-        let body = ct_clone_tree_with_subst(pool, pool.get_data2(node), subst_sym, subst_node, index_sym, index_node)
-        let cloned = ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), pool.get_data0(node), iterable, body, pool.literal_suffix(node))
-        let for_meta = pool.find_for_meta(node)
+        let iterable = self.ct_clone_tree_with_subst(self.get_data1(node), subst_sym, subst_node, index_sym, index_node)
+        let body = self.ct_clone_tree_with_subst(self.get_data2(node), subst_sym, subst_node, index_sym, index_node)
+        let cloned = self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), self.get_data0(node), iterable, body, self.literal_suffix(node))
+        let for_meta = self.find_for_meta(node)
         if for_meta >= 0:
-            pool.add_for_meta(cloned as NodeId, pool.for_meta_index_binding(for_meta), pool.for_meta_label(for_meta))
+            self.add_for_meta(cloned as NodeId, self.for_meta_index_binding(for_meta), self.for_meta_label(for_meta))
         return cloned
 
     if kind == NodeKind.NK_BREAK:
-        let value = ct_clone_tree_with_subst(pool, pool.get_data0(node), subst_sym, subst_node, index_sym, index_node)
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), value, pool.get_data1(node), 0, pool.literal_suffix(node))
+        let value = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), value, self.get_data1(node), 0, self.literal_suffix(node))
 
     if kind == NodeKind.NK_MATCH:
-        let extra_start = pool.get_data1(node)
-        let arm_count = pool.get_data2(node)
+        let extra_start = self.get_data1(node)
+        let arm_count = self.get_data2(node)
         let arm_nodes: Vec[i32] = Vec.new()
         for i in 0..arm_count:
-            let arm = ct_clone_tree_with_subst(pool, pool.get_extra(extra_start + i), subst_sym, subst_node, index_sym, index_node)
+            let arm = self.ct_clone_tree_with_subst(self.get_extra(extra_start + i), subst_sym, subst_node, index_sym, index_node)
             arm_nodes.push(arm)
-        let new_extra = pool.extra_len()
+        let new_extra = self.extra_len()
         for i in 0..arm_nodes.len() as i32:
-            pool.add_extra(arm_nodes.get(i as i64))
-        let subject = ct_clone_tree_with_subst(pool, pool.get_data0(node), subst_sym, subst_node, index_sym, index_node)
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), subject, new_extra, arm_count, pool.literal_suffix(node))
+            self.add_extra(arm_nodes.get(i as i64))
+        let subject = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), subject, new_extra, arm_count, self.literal_suffix(node))
 
     if kind == NodeKind.NK_MATCH_ARM:
-        let pat = ct_clone_tree_with_subst(pool, pool.get_data0(node), subst_sym, subst_node, index_sym, index_node)
-        let body = ct_clone_tree_with_subst(pool, pool.get_data1(node), subst_sym, subst_node, index_sym, index_node)
-        let guard = ct_clone_tree_with_subst(pool, pool.get_data2(node), subst_sym, subst_node, index_sym, index_node)
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), pat, body, guard, pool.literal_suffix(node))
+        let pat = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
+        let body = self.ct_clone_tree_with_subst(self.get_data1(node), subst_sym, subst_node, index_sym, index_node)
+        let guard = self.ct_clone_tree_with_subst(self.get_data2(node), subst_sym, subst_node, index_sym, index_node)
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), pat, body, guard, self.literal_suffix(node))
 
     if kind == NodeKind.NK_STRUCT_LIT or kind == NodeKind.NK_RECORD_UPDATE:
-        let extra_start = pool.get_data1(node)
-        let field_count = pool.get_data2(node)
+        let extra_start = self.get_data1(node)
+        let field_count = self.get_data2(node)
         let field_extras: Vec[i32] = Vec.new()
         for i in 0..field_count:
             let base = extra_start + i * 2
-            field_extras.push(pool.get_extra(base))
-            let value = ct_clone_tree_with_subst(pool, pool.get_extra(base + 1), subst_sym, subst_node, index_sym, index_node)
+            field_extras.push(self.get_extra(base))
+            let value = self.ct_clone_tree_with_subst(self.get_extra(base + 1), subst_sym, subst_node, index_sym, index_node)
             field_extras.push(value)
-        let new_extra = pool.extra_len()
+        let new_extra = self.extra_len()
         for i in 0..field_extras.len() as i32:
-            pool.add_extra(field_extras.get(i as i64))
-        let source = if kind == NodeKind.NK_RECORD_UPDATE: ct_clone_tree_with_subst(pool, pool.get_data0(node), subst_sym, subst_node, index_sym, index_node) else: pool.get_data0(node)
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), source, new_extra, field_count, pool.literal_suffix(node))
+            self.add_extra(field_extras.get(i as i64))
+        let source = if kind == NodeKind.NK_RECORD_UPDATE: self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node) else: self.get_data0(node)
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), source, new_extra, field_count, self.literal_suffix(node))
 
     if kind == NodeKind.NK_CAST:
-        let expr = ct_clone_tree_with_subst(pool, pool.get_data0(node), subst_sym, subst_node, index_sym, index_node)
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), expr, pool.get_data1(node), 0, pool.literal_suffix(node))
+        let expr = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), expr, self.get_data1(node), 0, self.literal_suffix(node))
 
     if kind == NodeKind.NK_RANGE:
-        let start_node = ct_clone_tree_with_subst(pool, pool.get_data0(node), subst_sym, subst_node, index_sym, index_node)
-        let end_node = ct_clone_tree_with_subst(pool, pool.get_data1(node), subst_sym, subst_node, index_sym, index_node)
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), start_node, end_node, pool.get_data2(node), pool.literal_suffix(node))
+        let start_node = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
+        let end_node = self.ct_clone_tree_with_subst(self.get_data1(node), subst_sym, subst_node, index_sym, index_node)
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), start_node, end_node, self.get_data2(node), self.literal_suffix(node))
 
     if kind == NodeKind.NK_VARIANT_SHORTHAND:
-        let arg_count = pool.get_data2(node)
-        let extra_start = pool.get_data1(node)
+        let arg_count = self.get_data2(node)
+        let extra_start = self.get_data1(node)
         let arg_nodes: Vec[i32] = Vec.new()
         for i in 0..arg_count:
-            let arg = ct_clone_tree_with_subst(pool, pool.get_extra(extra_start + i), subst_sym, subst_node, index_sym, index_node)
+            let arg = self.ct_clone_tree_with_subst(self.get_extra(extra_start + i), subst_sym, subst_node, index_sym, index_node)
             arg_nodes.push(arg)
-        let new_extra = pool.extra_len()
+        let new_extra = self.extra_len()
         for i in 0..arg_nodes.len() as i32:
-            pool.add_extra(arg_nodes.get(i as i64))
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), pool.get_data0(node), new_extra, arg_count, pool.literal_suffix(node))
+            self.add_extra(arg_nodes.get(i as i64))
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), self.get_data0(node), new_extra, arg_count, self.literal_suffix(node))
 
     if kind == NodeKind.NK_ENUM_VARIANT:
-        let old_extra = pool.get_data2(node)
-        let arg_count = pool.get_extra(old_extra)
+        let old_extra = self.get_data2(node)
+        let arg_count = self.get_extra(old_extra)
         let arg_nodes: Vec[i32] = Vec.new()
         for i in 0..arg_count:
-            let arg = ct_clone_tree_with_subst(pool, pool.get_extra(old_extra + 1 + i), subst_sym, subst_node, index_sym, index_node)
+            let arg = self.ct_clone_tree_with_subst(self.get_extra(old_extra + 1 + i), subst_sym, subst_node, index_sym, index_node)
             arg_nodes.push(arg)
-        let new_extra = pool.extra_len()
-        pool.add_extra(arg_count)
+        let new_extra = self.extra_len()
+        self.add_extra(arg_count)
         for i in 0..arg_nodes.len() as i32:
-            pool.add_extra(arg_nodes.get(i as i64))
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), pool.get_data0(node), pool.get_data1(node), new_extra, pool.literal_suffix(node))
+            self.add_extra(arg_nodes.get(i as i64))
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), self.get_data0(node), self.get_data1(node), new_extra, self.literal_suffix(node))
 
     if kind == NodeKind.NK_OPTIONAL_CHAIN:
-        let old_extra = pool.get_data2(node)
-        let has_args = pool.get_extra(old_extra)
+        let old_extra = self.get_data2(node)
+        let has_args = self.get_extra(old_extra)
         let arg_nodes: Vec[i32] = Vec.new()
-        let arg_count = if has_args != 0: pool.get_extra(old_extra + 1) else: 0
+        let arg_count = if has_args != 0: self.get_extra(old_extra + 1) else: 0
         if has_args != 0:
             for i in 0..arg_count:
-                let arg = ct_clone_tree_with_subst(pool, pool.get_extra(old_extra + 2 + i), subst_sym, subst_node, index_sym, index_node)
+                let arg = self.ct_clone_tree_with_subst(self.get_extra(old_extra + 2 + i), subst_sym, subst_node, index_sym, index_node)
                 arg_nodes.push(arg)
-        let new_extra = pool.extra_len()
-        pool.add_extra(has_args)
+        let new_extra = self.extra_len()
+        self.add_extra(has_args)
         if has_args != 0:
-            pool.add_extra(arg_count)
+            self.add_extra(arg_count)
             for i in 0..arg_nodes.len() as i32:
-                pool.add_extra(arg_nodes.get(i as i64))
-        let base = ct_clone_tree_with_subst(pool, pool.get_data0(node), subst_sym, subst_node, index_sym, index_node)
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), base, pool.get_data1(node), new_extra, pool.literal_suffix(node))
+                self.add_extra(arg_nodes.get(i as i64))
+        let base = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), base, self.get_data1(node), new_extra, self.literal_suffix(node))
 
     if kind == NodeKind.NK_WITH_EXPR:
-        let source = ct_clone_tree_with_subst(pool, pool.get_data0(node), subst_sym, subst_node, index_sym, index_node)
-        let body = ct_clone_tree_with_subst(pool, pool.get_data1(node), subst_sym, subst_node, index_sym, index_node)
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), source, body, pool.get_data2(node), pool.literal_suffix(node))
+        let source = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
+        let body = self.ct_clone_tree_with_subst(self.get_data1(node), subst_sym, subst_node, index_sym, index_node)
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), source, body, self.get_data2(node), self.literal_suffix(node))
 
     if kind == NodeKind.NK_WITH_IMPLICIT:
-        let wi_source = ct_clone_tree_with_subst(pool, pool.get_data0(node), subst_sym, subst_node, index_sym, index_node)
-        let wi_body = ct_clone_tree_with_subst(pool, pool.get_data1(node), subst_sym, subst_node, index_sym, index_node)
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), wi_source, wi_body, pool.get_data2(node), pool.literal_suffix(node))
+        let wi_source = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
+        let wi_body = self.ct_clone_tree_with_subst(self.get_data1(node), subst_sym, subst_node, index_sym, index_node)
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), wi_source, wi_body, self.get_data2(node), self.literal_suffix(node))
 
     if kind == NodeKind.NK_LET_ELSE:
-        let value = ct_clone_tree_with_subst(pool, pool.get_data1(node), subst_sym, subst_node, index_sym, index_node)
-        let else_body = ct_clone_tree_with_subst(pool, pool.get_data2(node), subst_sym, subst_node, index_sym, index_node)
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), pool.get_data0(node), value, else_body, pool.literal_suffix(node))
+        let value = self.ct_clone_tree_with_subst(self.get_data1(node), subst_sym, subst_node, index_sym, index_node)
+        let else_body = self.ct_clone_tree_with_subst(self.get_data2(node), subst_sym, subst_node, index_sym, index_node)
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), self.get_data0(node), value, else_body, self.literal_suffix(node))
 
     if kind == NodeKind.NK_TUPLE_DESTRUCTURE:
-        let value = ct_clone_tree_with_subst(pool, pool.get_data2(node), subst_sym, subst_node, index_sym, index_node)
-        let new_extra = pool.extra_len()
-        let extra_start = pool.get_data0(node)
-        let name_count = pool.get_data1(node)
+        let value = self.ct_clone_tree_with_subst(self.get_data2(node), subst_sym, subst_node, index_sym, index_node)
+        let new_extra = self.extra_len()
+        let extra_start = self.get_data0(node)
+        let name_count = self.get_data1(node)
         for i in 0..name_count:
-            pool.add_extra(pool.get_extra(extra_start + i))
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), new_extra, name_count, value, pool.literal_suffix(node))
+            self.add_extra(self.get_extra(extra_start + i))
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), new_extra, name_count, value, self.literal_suffix(node))
 
     if kind == NodeKind.NK_ARRAY_COMPREHENSION:
-        let expr = ct_clone_tree_with_subst(pool, pool.get_data0(node), subst_sym, subst_node, index_sym, index_node)
-        let iterable = ct_clone_tree_with_subst(pool, pool.get_data2(node), subst_sym, subst_node, index_sym, index_node)
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), expr, pool.get_data1(node), iterable, pool.literal_suffix(node))
+        let expr = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
+        let iterable = self.ct_clone_tree_with_subst(self.get_data2(node), subst_sym, subst_node, index_sym, index_node)
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), expr, self.get_data1(node), iterable, self.literal_suffix(node))
 
     if kind == NodeKind.NK_ASYNC_SCOPE:
-        let body = ct_clone_tree_with_subst(pool, pool.get_data1(node), subst_sym, subst_node, index_sym, index_node)
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), pool.get_data0(node), body, 0, pool.literal_suffix(node))
+        let body = self.ct_clone_tree_with_subst(self.get_data1(node), subst_sym, subst_node, index_sym, index_node)
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), self.get_data0(node), body, 0, self.literal_suffix(node))
 
     if kind == NodeKind.NK_SELECT_AWAIT:
-        let extra_start = pool.get_data0(node)
-        let arm_count = pool.get_data1(node)
+        let extra_start = self.get_data0(node)
+        let arm_count = self.get_data1(node)
         let arm_extras: Vec[i32] = Vec.new()
         for i in 0..arm_count:
             let base = extra_start + i * 3
-            arm_extras.push(pool.get_extra(base))
-            let task_expr = ct_clone_tree_with_subst(pool, pool.get_extra(base + 1), subst_sym, subst_node, index_sym, index_node)
-            let body = ct_clone_tree_with_subst(pool, pool.get_extra(base + 2), subst_sym, subst_node, index_sym, index_node)
+            arm_extras.push(self.get_extra(base))
+            let task_expr = self.ct_clone_tree_with_subst(self.get_extra(base + 1), subst_sym, subst_node, index_sym, index_node)
+            let body = self.ct_clone_tree_with_subst(self.get_extra(base + 2), subst_sym, subst_node, index_sym, index_node)
             arm_extras.push(task_expr)
             arm_extras.push(body)
-        let new_extra = pool.extra_len()
+        let new_extra = self.extra_len()
         for i in 0..arm_extras.len() as i32:
-            pool.add_extra(arm_extras.get(i as i64))
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), new_extra, arm_count, 0, pool.literal_suffix(node))
+            self.add_extra(arm_extras.get(i as i64))
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), new_extra, arm_count, 0, self.literal_suffix(node))
 
     if kind == NodeKind.NK_FSTRING:
-        let seg_count = pool.get_data0(node)
-        let old_extra = pool.get_data1(node)
+        let seg_count = self.get_data0(node)
+        let old_extra = self.get_data1(node)
         let seg_extras: Vec[i32] = Vec.new()
         var pos = old_extra
         for _ in 0..seg_count:
-            let seg_kind = pool.get_extra(pos)
+            let seg_kind = self.get_extra(pos)
             seg_extras.push(seg_kind)
             if seg_kind == FStringSegmentKind.EXPR:
-                let expr_node = ct_clone_tree_with_subst(pool, pool.get_extra(pos + 1), subst_sym, subst_node, index_sym, index_node)
-                let spec_node = ct_clone_tree_with_subst(pool, pool.get_extra(pos + 2), subst_sym, subst_node, index_sym, index_node)
+                let expr_node = self.ct_clone_tree_with_subst(self.get_extra(pos + 1), subst_sym, subst_node, index_sym, index_node)
+                let spec_node = self.ct_clone_tree_with_subst(self.get_extra(pos + 2), subst_sym, subst_node, index_sym, index_node)
                 seg_extras.push(expr_node)
                 seg_extras.push(spec_node)
                 pos = pos + 3
             else:
-                seg_extras.push(pool.get_extra(pos + 1))
+                seg_extras.push(self.get_extra(pos + 1))
                 pos = pos + 2
-        let new_extra = pool.extra_len()
+        let new_extra = self.extra_len()
         for i in 0..seg_extras.len() as i32:
-            pool.add_extra(seg_extras.get(i as i64))
-        return ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), seg_count, new_extra, 0, pool.literal_suffix(node))
+            self.add_extra(seg_extras.get(i as i64))
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), seg_count, new_extra, 0, self.literal_suffix(node))
 
     if kind == NodeKind.NK_CLOSURE:
-        let param_count = pool.get_data2(node)
-        let old_extra = pool.get_data1(node)
-        let new_extra = pool.extra_len()
+        let param_count = self.get_data2(node)
+        let old_extra = self.get_data1(node)
+        let new_extra = self.extra_len()
         for i in 0..param_count:
             let base = old_extra + i * 2
-            pool.add_extra(pool.get_extra(base))
-            pool.add_extra(pool.get_extra(base + 1))
-        let body = ct_clone_tree_with_subst(pool, pool.get_data0(node), subst_sym, subst_node, index_sym, index_node)
-        let cloned = ct_new_node_copy(pool, kind, pool.get_start(node), pool.get_end(node), body, new_extra, param_count, pool.literal_suffix(node))
-        if pool.is_move_closure(node) != 0:
-            pool.mark_move_closure(cloned as NodeId)
-        if pool.is_non_escaping_closure(node) != 0:
-            pool.mark_non_escaping_closure(cloned as NodeId)
+            self.add_extra(self.get_extra(base))
+            self.add_extra(self.get_extra(base + 1))
+        let body = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
+        let cloned = self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), body, new_extra, param_count, self.literal_suffix(node))
+        if self.is_move_closure(node) != 0:
+            self.mark_move_closure(cloned as NodeId)
+        if self.is_non_escaping_closure(node) != 0:
+            self.mark_non_escaping_closure(cloned as NodeId)
         return cloned
 
-    ct_clone_leaf(pool, node)
+    self.ct_clone_leaf(node)
 
 fn ct_rewrite_comptime_for(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, intern: &mut InternPool, diags: &mut DiagnosticList, wrapper: i32, inner: i32) -> i32:
     let iterable_node = pool.get_data1(inner)
@@ -869,7 +868,7 @@ fn ct_rewrite_comptime_for(source_ast: AstPool, pool: &mut AstPool, sema: &mut S
             let index_value = comptime_value_int(sema.ty_i64 as i32, i as i64)
             let empty_values: Vec[ComptimeValue] = Vec.new()
             index_node = ct_build_value_tree(pool, intern, sema, index_value, wrapper, empty_values)
-        let cloned_body = ct_clone_tree_with_subst(pool, template_body, binding, item_node, index_binding, index_node)
+        let cloned_body = pool.ct_clone_tree_with_subst(template_body, binding, item_node, index_binding, index_node)
         let eval_ast = unsafe: *pool
         stmt_nodes.push(ct_transform_expr(eval_ast, pool, sema, intern, diags, cloned_body))
     let stmt_extra = pool.extra_len()
@@ -880,7 +879,7 @@ fn ct_rewrite_comptime_for(source_ast: AstPool, pool: &mut AstPool, sema: &mut S
 fn ct_rewrite_comptime(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, intern: &mut InternPool, diags: &mut DiagnosticList, node: i32) -> i32:
     let inner = pool.get_data0(node)
     if inner == 0:
-        return ct_empty_block(pool, node)
+        return pool.ct_empty_block(node)
     let inner_kind = pool.kind(inner)
     if inner_kind == NodeKind.NK_INT_LIT:
         return inner
@@ -936,9 +935,9 @@ fn ct_transform_expr(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, i
     if kind == NodeKind.NK_FIELD_ACCESS:
         let base = ct_transform_expr(source_ast, pool, sema, intern, diags, pool.get_data0(node))
         pool.set_data0(node, base)
-        let folded_value = ct_struct_lit_field_value(pool, base, pool.get_data1(node))
+        let folded_value = pool.ct_struct_lit_field_value(base, pool.get_data1(node))
         if folded_value != 0:
-            return ct_clone_tree_with_subst(pool, folded_value, 0, 0, 0, 0)
+            return pool.ct_clone_tree_with_subst(folded_value, 0, 0, 0, 0)
         return node
 
     if kind == NodeKind.NK_COMPUTED_FIELD_ACCESS:
