@@ -94,7 +94,7 @@ unsafe fn poly1305_update(ctx: *mut Poly1305, data: *const u8, len: i32):
     if off < len:
         // Partial block: copy bytes + append 0x01 sentinel + zero-pad to 16
         var pad: [u8; 16] = [0 as u8; 16]
-        let pp = &mut pad[0] as *mut u8
+        let pp = &raw mut pad[0] as *mut u8
         let remaining = len - off
         for i in 0..remaining:
             *(pp + i as u64) = *(data + (off + i) as u64)

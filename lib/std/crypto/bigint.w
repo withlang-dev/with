@@ -213,11 +213,11 @@ unsafe fn i31_to_monty(x: *mut u32, m: *const u32):
 unsafe fn i31_from_monty(x: *mut u32, m: *const u32, m0i: u32):
     let mlen = i31_word_count(*(m + 0u64))
     var one: [u32; 80] = [0u32; 80]
-    let op = &mut one[0] as *mut u32
+    let op = &raw mut one[0] as *mut u32
     *(op + 0u64) = *(m + 0u64)
     *(op + 1u64) = 1u32
     var d: [u32; 80] = [0u32; 80]
-    let dp = &mut d[0] as *mut u32
+    let dp = &raw mut d[0] as *mut u32
     i31_montmul(dp, x as *const u32, op as *const u32, m, m0i)
     var ci = 0
     while ci <= mlen:

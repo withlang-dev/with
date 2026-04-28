@@ -12,7 +12,7 @@ fn HmacSha256.new(key: *const u8, key_len: i32) -> HmacSha256:
     var padded_key: [u8; 64] = [0 as u8; 64]
     if key_len > 64:
         var key_hash: [u8; 32] = [0 as u8; 32]
-        sha256_hash(key, key_len, &mut key_hash[0] as *mut u8)
+        sha256_hash(key, key_len, &raw mut key_hash[0] as *mut u8)
         for i in 0..32:
             padded_key[i] = key_hash[i]
     else:
@@ -26,7 +26,7 @@ fn HmacSha256.new(key: *const u8, key_len: i32) -> HmacSha256:
         outer_key[i] = padded_key[i] ^ (0x5C as u8)
 
     var inner = Sha256.new()
-    let ip = &mut inner as *mut Sha256
+    let ip = &raw mut inner as *mut Sha256
     unsafe: sha256_update(ip, &ipad_key[0] as *const u8, 64)
 
     HmacSha256 { inner, outer_key }
@@ -34,16 +34,16 @@ fn HmacSha256.new(key: *const u8, key_len: i32) -> HmacSha256:
 unsafe fn hmac_update(ctx: *mut HmacSha256, data: *const u8, len: i32):
     // Copy inner state, update, copy back
     var inner = ctx.inner
-    let ip = &mut inner as *mut Sha256
+    let ip = &raw mut inner as *mut Sha256
     sha256_update(ip, data, len)
     ctx.inner = inner
 
 unsafe fn hmac_finish(ctx: *mut HmacSha256, out: *mut u8):
     // Finish inner hash
     var inner = ctx.inner
-    let ip = &mut inner as *mut Sha256
+    let ip = &raw mut inner as *mut Sha256
     var inner_digest: [u8; 32] = [0 as u8; 32]
-    let idp = &mut inner_digest[0] as *mut u8
+    let idp = &raw mut inner_digest[0] as *mut u8
     sha256_finish(ip, idp)
 
     // Copy outer_key to stack
@@ -53,14 +53,14 @@ unsafe fn hmac_finish(ctx: *mut HmacSha256, out: *mut u8):
 
     // Outer hash: SHA-256(outer_key ++ inner_digest)
     var outer = Sha256.new()
-    let op = &mut outer as *mut Sha256
+    let op = &raw mut outer as *mut Sha256
     sha256_update(op, &ok[0] as *const u8, 64)
     sha256_update(op, idp as *const u8, 32)
     sha256_finish(op, out)
 
 fn hmac_sha256(key: *const u8, key_len: i32, data: *const u8, data_len: i32, out: *mut u8):
     var ctx = HmacSha256.new(key, key_len)
-    let p = &mut ctx as *mut HmacSha256
+    let p = &raw mut ctx as *mut HmacSha256
     unsafe: hmac_update(p, data, data_len)
     unsafe: hmac_finish(p, out)
 

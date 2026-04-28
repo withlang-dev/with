@@ -54,7 +54,7 @@ fn xtime(x: u8) -> u8:
 
 // Key schedule
 unsafe fn aes128_init(ctx: *mut Aes128, key: *const u8):
-    let rk = &mut ctx.round_keys[0] as *mut u8
+    let rk = &raw mut ctx.round_keys[0] as *mut u8
     for i in 0..16:
         *(rk + i as u64) = *(key + i as u64)
     for i in 1..11:
@@ -73,7 +73,7 @@ unsafe fn aes128_init(ctx: *mut Aes128, key: *const u8):
 
 fn Aes128.new(key: *const u8) -> Aes128:
     var ctx = Aes128 { round_keys: [0 as u8; 176] }
-    unsafe: aes128_init(&mut ctx as *mut Aes128, key)
+    unsafe: aes128_init(&raw mut ctx as *mut Aes128, key)
     ctx
 
 // Block cipher operations
@@ -119,12 +119,12 @@ unsafe fn aes_mix_columns(s: *mut u8):
 // Encrypt a single 16-byte block in-place
 unsafe fn aes128_encrypt_block(ctx: *const Aes128, block: *mut u8):
     var s: [u8; 16] = [0 as u8; 16]
-    let sp = &mut s[0] as *mut u8
+    let sp = &raw mut s[0] as *mut u8
     for i in 0..16:
         *(sp + i as u64) = *(block + i as u64)
 
     var rk: [u8; 176] = [0 as u8; 176]
-    let rkp = &mut rk[0] as *mut u8
+    let rkp = &raw mut rk[0] as *mut u8
     for i in 0..176:
         *(rkp + i as u64) = ctx.round_keys[i]
 

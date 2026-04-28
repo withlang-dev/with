@@ -69,7 +69,7 @@ unsafe fn rsa_check_pkcs1_sha256(em: *const u8, em_len: i32, hash: *const u8) ->
 
     // Check DigestInfo prefix
     var di_prefix: [u8; 19] = [0u8; 19]
-    write_digestinfo_sha256(&mut di_prefix[0] as *mut u8)
+    write_digestinfo_sha256(&raw mut di_prefix[0] as *mut u8)
     let t_start = 3 + ps_len
     i = 0
     while i < DIGESTINFO_SHA256_LEN:
@@ -114,10 +114,10 @@ unsafe fn rsa_pkcs1_sha256_verify(
     var t1: [u32; 140] = [0u32; 140]
     var t2: [u32; 140] = [0u32; 140]
 
-    let mp = &mut m[0] as *mut u32
-    let xp = &mut x[0] as *mut u32
-    let t1p = &mut t1[0] as *mut u32
-    let t2p = &mut t2[0] as *mut u32
+    let mp = &raw mut m[0] as *mut u32
+    let xp = &raw mut x[0] as *mut u32
+    let t1p = &raw mut t1[0] as *mut u32
+    let t2p = &raw mut t2[0] as *mut u32
 
     // Decode modulus
     i31_decode(mp, n, n_len)
@@ -131,7 +131,7 @@ unsafe fn rsa_pkcs1_sha256_verify(
 
     // Encode result back to big-endian bytes
     var em: [u8; 512] = [0u8; 512]
-    let emp = &mut em[0] as *mut u8
+    let emp = &raw mut em[0] as *mut u8
     i31_encode(emp, n_len, xp as *const u32)
 
     // Check PKCS#1 v1.5 padding
