@@ -3903,53 +3903,60 @@ fn ci_value_ir_plain(value_expr: CiExprId) -> CiValueExprIR:
 fn ci_value_ir_valid(lowered: CiValueExprIR) -> bool:
     (lowered.value_expr as i32) != 0
 
-fn ci_stmt_collect_flat_ids(stmts: &CiStmtPool, stmt_id: CiStmtId, out: &mut Vec[i32]):
+// docs/mut.md Rev 8 §5.1 — accumulator helper. Owned-by-value `out` Vec
+// is threaded through the recursion; the underlying buffer is shared by
+// reference but the {len, cap} triple is reassigned on push so we return
+// the updated Vec to avoid losing growth on the caller side.
+fn ci_stmt_collect_flat_ids(stmts: &CiStmtPool, stmt_id: CiStmtId, out: Vec[i32]) -> Vec[i32]:
     if (stmt_id as i32) == 0:
-        return
+        return out
     if stmts.kind(stmt_id) == CiStmtKind.CIS_BLOCK:
         if stmts.get_d2(stmt_id) != 0:
             out.push(stmt_id as i32)
-            return
+            return out
         let start = stmts.get_d0(stmt_id)
         let count = stmts.get_d1(stmt_id)
+        var acc = out
         var i: i32 = 0
         while i < count:
-            ci_stmt_collect_flat_ids(stmts, (stmts.get_extra(start + i)) as CiStmtId, out)
+            acc = ci_stmt_collect_flat_ids(stmts, (stmts.get_extra(start + i)) as CiStmtId, acc)
             i = i + 1
-        return
+        return acc
     out.push(stmt_id as i32)
+    out
 
-fn ci_stmt_from_flat_ids(stmts: &mut CiStmtPool, ids: &Vec[i32]) -> CiStmtId:
+fn CiStmtPool.from_flat_ids(mut self: CiStmtPool, ids: &Vec[i32]) -> CiStmtId:
     if ids.len() == 0:
         return 0 as CiStmtId
     if ids.len() == 1:
         return (ids.get(0)) as CiStmtId
-    let start = stmts.extra.len() as i32
+    let start = self.extra.len() as i32
     var i: i64 = 0
     while i < ids.len():
-        let _ = stmts.add_extra(ids.get(i))
+        let _ = self.add_extra(ids.get(i))
         i = i + 1
-    stmts.block(start, ids.len() as i32)
+    self.block(start, ids.len() as i32)
 
-fn ci_stmt_merge_ir(stmts: &mut CiStmtPool, first: CiStmtId, second: CiStmtId) -> CiStmtId:
+fn CiStmtPool.merge_ir(mut self: CiStmtPool, first: CiStmtId, second: CiStmtId) -> CiStmtId:
     if (first as i32) == 0:
         return second
     if (second as i32) == 0:
         return first
     var ids: Vec[i32] = Vec.new()
-    ci_stmt_collect_flat_ids(stmts, first, &mut ids)
-    ci_stmt_collect_flat_ids(stmts, second, &mut ids)
-    ci_stmt_from_flat_ids(stmts, &ids)
+    ids = ci_stmt_collect_flat_ids(&self, first, ids)
+    ids = ci_stmt_collect_flat_ids(&self, second, ids)
+    self.from_flat_ids(&ids)
 
-fn ci_stmt_merge3_ir(stmts: &mut CiStmtPool, first: CiStmtId, second: CiStmtId, third: CiStmtId) -> CiStmtId:
-    ci_stmt_merge_ir(stmts, ci_stmt_merge_ir(stmts, first, second), third)
+fn CiStmtPool.merge3_ir(mut self: CiStmtPool, first: CiStmtId, second: CiStmtId, third: CiStmtId) -> CiStmtId:
+    let intermediate = self.merge_ir(first, second)
+    self.merge_ir(intermediate, third)
 
 fn ci_for_continue_runs_inc_ir(stmts: &mut CiStmtPool, stmt_id: CiStmtId, inc_stmt_id: CiStmtId) -> CiStmtId:
     if (stmt_id as i32) == 0 or (inc_stmt_id as i32) == 0:
         return stmt_id
     let kind = stmts.kind(stmt_id)
     if kind == CiStmtKind.CIS_CONTINUE:
-        return ci_stmt_merge_ir(stmts, inc_stmt_id, stmts.continue_())
+        return stmts.merge_ir( inc_stmt_id, stmts.continue_())
     if kind == CiStmtKind.CIS_BLOCK:
         let extra_start = stmts.get_d0(stmt_id)
         let count = stmts.get_d1(stmt_id)
@@ -4059,7 +4066,7 @@ fn ci_rewrite_switch_continues_ir(stmts: &mut CiStmtPool, exprs: &mut CiExprPool
         let lhs = exprs.ident(flag_expr_sym, flag_ty)
         let one_idx = exprs.add_string("1")
         let one = exprs.int_lit(one_idx, flag_ty)
-        return ci_stmt_merge_ir(stmts, stmts.assign(lhs, one), stmts.break_())
+        return stmts.merge_ir( stmts.assign(lhs, one), stmts.break_())
     if kind == CiStmtKind.CIS_BLOCK:
         let start = stmts.get_d0(stmt_id)
         let count = stmts.get_d1(stmt_id)
@@ -4071,7 +4078,7 @@ fn ci_rewrite_switch_continues_ir(stmts: &mut CiStmtPool, exprs: &mut CiExprPool
             if (rewritten as i32) != 0:
                 ids.push(rewritten as i32)
             i = i + 1
-        return ci_stmt_from_flat_ids(stmts, &ids)
+        return stmts.from_flat_ids(&ids)
     if kind == CiStmtKind.CIS_IF:
         let cond = (stmts.get_d0(stmt_id)) as CiExprId
         let then_id = ci_rewrite_switch_continues_ir(stmts, exprs, (stmts.get_d1(stmt_id)) as CiStmtId, flag_expr_sym, flag_ty)
@@ -4127,7 +4134,7 @@ fn ci_wrap_switch_match_breaks_ir(session: i64, body_cursor: i32, stmts: &mut Ci
     else:
         match_id
     let true_cond = exprs.bool_lit(1, 0 as CiTypeId)
-    let loop_body = ci_stmt_merge_ir(stmts, rewritten_match, stmts.break_())
+    let loop_body = stmts.merge_ir( rewritten_match, stmts.break_())
     let loop_id = stmts.while_stmt(true_cond, loop_body)
     if not has_continue:
         return loop_id
@@ -4137,7 +4144,7 @@ fn ci_wrap_switch_match_breaks_ir(session: i64, body_cursor: i32, stmts: &mut Ci
     let cond = exprs.binary(CiBinOp.CIBO_NEQ, flag_read, zero_cmp, 0 as CiTypeId)
     let continue_body = stmts.continue_()
     let continue_if = stmts.if_stmt(cond, continue_body, 0 as CiStmtId)
-    ci_stmt_merge3_ir(stmts, flag_decl, loop_id, continue_if)
+    stmts.merge3_ir( flag_decl, loop_id, continue_if)
 
 fn ci_bool_expr_from_value_ir(session: i64, cursor: i32, value_id: CiExprId, exprs: &mut CiExprPool, types: &mut CiTypePool) -> CiExprId:
     if (value_id as i32) == 0:
@@ -4318,7 +4325,7 @@ fn ci_lower_cfprintf_effect_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool
         let lowered = ci_lower_value_expr_ir(session, with_ci_child(session, cursor, ai), stmts, exprs, types, scope)
         if not ci_value_ir_valid(lowered):
             return 0 as CiStmtId
-        setup = ci_stmt_merge_ir(stmts, setup, lowered.setup_stmt)
+        setup = stmts.merge_ir( setup, lowered.setup_stmt)
         arg_ids.push(lowered.value_expr as i32)
         ai = ai + 1
 
@@ -4341,7 +4348,7 @@ fn ci_lower_cfprintf_effect_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool
     let begin_stmt = stmts.expr_stmt(begin_call)
     let fprintf_stmt = stmts.expr_stmt(fprintf_call)
     let end_stmt = stmts.expr_stmt(end_call)
-    ci_stmt_merge_ir(stmts, setup, ci_stmt_merge3_ir(stmts, begin_stmt, fprintf_stmt, end_stmt))
+    stmts.merge_ir( setup, stmts.merge3_ir( begin_stmt, fprintf_stmt, end_stmt))
 
 fn ci_lower_effect_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiStmtId:
     let kind = with_ci_cursor_kind(session, cursor)
@@ -4374,7 +4381,7 @@ fn ci_lower_effect_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, ex
     if kind == CXK_BINARY_OP and nc >= 2 and with_ci_binary_op(session, cursor) == BO_COMMA:
         let lhs_stmt = ci_lower_effect_expr_ir(session, with_ci_child(session, cursor, 0), stmts, exprs, types, scope)
         let rhs_stmt = ci_lower_effect_expr_ir(session, with_ci_child(session, cursor, 1), stmts, exprs, types, scope)
-        return ci_stmt_merge_ir(stmts, lhs_stmt, rhs_stmt)
+        return stmts.merge_ir( lhs_stmt, rhs_stmt)
 
     if kind == CXK_UNARY_OP and nc >= 1:
         let op = with_ci_unary_op(session, cursor)
@@ -4388,7 +4395,7 @@ fn ci_lower_effect_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, ex
             let delta_op = if op == UO_PRE_INC or op == UO_POST_INC: CiBinOp.CIBO_ADD else: CiBinOp.CIBO_SUB
             let rhs_expr = exprs.binary(delta_op, operand.value_expr, one, 0 as CiTypeId)
             let assign_stmt = stmts.assign(operand.value_expr, rhs_expr)
-            return ci_stmt_merge_ir(stmts, operand.setup_stmt, assign_stmt)
+            return stmts.merge_ir( operand.setup_stmt, assign_stmt)
 
     let lowered = ci_lower_value_expr_ir(session, cursor, stmts, exprs, types, scope)
     if not ci_value_ir_valid(lowered):
@@ -4397,7 +4404,7 @@ fn ci_lower_effect_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, ex
     var tail_stmt = 0 as CiStmtId
     if ci_effect_expr_needs_terminal_stmt(session, cursor):
         tail_stmt = stmts.expr_stmt(lowered.value_expr)
-    ci_stmt_merge_ir(stmts, lowered.setup_stmt, tail_stmt)
+    stmts.merge_ir( lowered.setup_stmt, tail_stmt)
 
 fn ci_prepare_stmt_subject_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str, tag: str) -> CiValueExprIR:
     let lowered = ci_lower_value_expr_ir(session, cursor, stmts, exprs, types, scope)
@@ -4413,7 +4420,7 @@ fn ci_prepare_stmt_subject_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool,
     let temp_expr_name = exprs.add_string(temp)
     let decl_id = stmts.var_decl(temp_stmt_name, temp_ty, lowered.value_expr, 1)
     return CiValueExprIR {
-        setup_stmt: ci_stmt_merge_ir(stmts, lowered.setup_stmt, decl_id),
+        setup_stmt: stmts.merge_ir( lowered.setup_stmt, decl_id),
         value_expr: exprs.ident(temp_expr_name, temp_ty),
     }
 
@@ -4441,7 +4448,7 @@ fn ci_render_value_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, ex
         return ci_print_expr(exprs, types, lowered.value_expr, 0, 0)
     let seq_name = ci_expr_temp_name(session, cursor, "seq")
     let tail_stmt = stmts.expr_stmt(lowered.value_expr)
-    let body_stmt = ci_stmt_merge_ir(stmts, lowered.setup_stmt, tail_stmt)
+    let body_stmt = stmts.merge_ir( lowered.setup_stmt, tail_stmt)
     if migrate_prefer_brace():
         return "with 0 as " ++ seq_name ++ " {\n" ++ ci_print_compact_stmt(stmts, exprs, types, body_stmt, 4) ++ "}"
     "with 0 as " ++ seq_name ++ ":\n" ++ ci_print_compact_stmt(stmts, exprs, types, body_stmt, 4)
@@ -6473,7 +6480,7 @@ fn ci_lower_lvalue_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, ex
             let raw_ptr_index = ci_index_base_is_raw_pointer(session, arr_cursor, arr.value_expr, exprs, types)
             let index_id = exprs.add(CiExprKind.CIE_INDEX, arr.value_expr as i32, idx.value_expr as i32, raw_ptr_index, 0 as CiTypeId)
             return CiValueExprIR {
-                setup_stmt: ci_stmt_merge_ir(stmts, arr.setup_stmt, idx.setup_stmt),
+                setup_stmt: stmts.merge_ir( arr.setup_stmt, idx.setup_stmt),
                 value_expr: index_id,
             }
         return ci_value_ir_invalid()
@@ -6576,7 +6583,7 @@ fn ci_lower_value_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exp
                 rhs_value = coerced_rhs
                 let assign_stmt = stmts.assign(lhs.value_expr, rhs_value)
                 return CiValueExprIR {
-                    setup_stmt: ci_stmt_merge3_ir(stmts, lhs.setup_stmt, rhs.setup_stmt, assign_stmt),
+                    setup_stmt: stmts.merge3_ir( lhs.setup_stmt, rhs.setup_stmt, assign_stmt),
                     value_expr: lhs.value_expr,
                 }
             return ci_value_ir_invalid()
@@ -6586,7 +6593,7 @@ fn ci_lower_value_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exp
             let rhs = ci_lower_value_expr_ir(session, rhs_cursor, stmts, exprs, types, scope)
             if ci_value_ir_valid(lhs) and ci_value_ir_valid(rhs):
                 return CiValueExprIR {
-                    setup_stmt: ci_stmt_merge_ir(stmts, ci_lower_effect_expr_ir(session, lhs_cursor, stmts, exprs, types, scope), rhs.setup_stmt),
+                    setup_stmt: stmts.merge_ir( ci_lower_effect_expr_ir(session, lhs_cursor, stmts, exprs, types, scope), rhs.setup_stmt),
                     value_expr: rhs.value_expr,
                 }
             return ci_value_ir_invalid()
@@ -6613,18 +6620,18 @@ fn ci_lower_value_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exp
                     return ci_value_ir_invalid()
                 let result_ident = exprs.ident(result_expr_name, result_ty)
                 let rhs_assign = stmts.assign(result_ident, rhs_value)
-                let then_body = ci_stmt_merge_ir(stmts, rhs.setup_stmt, rhs_assign)
+                let then_body = stmts.merge_ir( rhs.setup_stmt, rhs_assign)
                 if op == BO_LAND:
                     let if_stmt = stmts.if_stmt(lhs_truthy, then_body, 0 as CiStmtId)
                     return CiValueExprIR {
-                        setup_stmt: ci_stmt_merge3_ir(stmts, decl_id, lhs.setup_stmt, if_stmt),
+                        setup_stmt: stmts.merge3_ir( decl_id, lhs.setup_stmt, if_stmt),
                         value_expr: exprs.ident(result_expr_name, result_ty),
                     }
                 let true_value = ci_bool_value_expr_ir(session, cursor, exprs.bool_lit(1, 0 as CiTypeId), exprs, types)
                 let true_assign = stmts.assign(exprs.ident(result_expr_name, result_ty), true_value)
                 let if_stmt = stmts.if_stmt(lhs_truthy, true_assign, then_body)
                 return CiValueExprIR {
-                    setup_stmt: ci_stmt_merge3_ir(stmts, decl_id, lhs.setup_stmt, if_stmt),
+                    setup_stmt: stmts.merge3_ir( decl_id, lhs.setup_stmt, if_stmt),
                     value_expr: exprs.ident(result_expr_name, result_ty),
                 }
             return ci_value_ir_invalid()
@@ -6635,7 +6642,7 @@ fn ci_lower_value_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exp
             let expr_id = ci_build_binary_value_expr_from_ids(session, cursor, lhs_cursor, lhs.value_expr, rhs_cursor, rhs.value_expr, exprs, types)
             if (expr_id as i32) != 0:
                 return CiValueExprIR {
-                    setup_stmt: ci_stmt_merge_ir(stmts, lhs.setup_stmt, rhs.setup_stmt),
+                    setup_stmt: stmts.merge_ir( lhs.setup_stmt, rhs.setup_stmt),
                     value_expr: expr_id,
                 }
         if with_ci_eval_int_valid(session, cursor) != 0:
@@ -6663,7 +6670,7 @@ fn ci_lower_value_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exp
             let rhs_expr = exprs.binary(ci_op, lhs_value, rhs_value, 0 as CiTypeId)
             let assign_stmt = stmts.assign(lhs.value_expr, rhs_expr)
             return CiValueExprIR {
-                setup_stmt: ci_stmt_merge3_ir(stmts, lhs.setup_stmt, rhs.setup_stmt, assign_stmt),
+                setup_stmt: stmts.merge3_ir( lhs.setup_stmt, rhs.setup_stmt, assign_stmt),
                 value_expr: lhs.value_expr,
             }
         return ci_value_ir_invalid()
@@ -6681,7 +6688,7 @@ fn ci_lower_value_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exp
                 let assign_stmt = stmts.assign(operand.value_expr, rhs_expr)
                 if op == UO_PRE_INC or op == UO_PRE_DEC:
                     return CiValueExprIR {
-                        setup_stmt: ci_stmt_merge_ir(stmts, operand.setup_stmt, assign_stmt),
+                        setup_stmt: stmts.merge_ir( operand.setup_stmt, assign_stmt),
                         value_expr: operand.value_expr,
                     }
                 let old_name = ci_expr_temp_name(session, cursor, "old")
@@ -6694,7 +6701,7 @@ fn ci_lower_value_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exp
                 let old_expr_name = exprs.add_string(old_name)
                 let decl_id = stmts.var_decl(old_stmt_name, old_ty, operand.value_expr, 1)
                 return CiValueExprIR {
-                    setup_stmt: ci_stmt_merge3_ir(stmts, operand.setup_stmt, decl_id, assign_stmt),
+                    setup_stmt: stmts.merge3_ir( operand.setup_stmt, decl_id, assign_stmt),
                     value_expr: exprs.ident(old_expr_name, old_ty),
                 }
             return ci_value_ir_invalid()
@@ -6731,14 +6738,14 @@ fn ci_lower_value_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exp
                 return ci_value_ir_invalid()
             let then_assign = stmts.assign(result_ident, then_value)
             let else_assign = stmts.assign(exprs.ident(result_expr_name, result_ty), else_value)
-            let then_body = ci_stmt_merge_ir(stmts, then_v.setup_stmt, then_assign)
-            let else_body = ci_stmt_merge_ir(stmts, else_v.setup_stmt, else_assign)
+            let then_body = stmts.merge_ir( then_v.setup_stmt, then_assign)
+            let else_body = stmts.merge_ir( else_v.setup_stmt, else_assign)
             let cond_truthy = ci_bool_expr_from_value_ir(session, cond_cursor, cond.value_expr, exprs, types)
             if (cond_truthy as i32) == 0:
                 return ci_value_ir_invalid()
             let if_stmt = stmts.if_stmt(cond_truthy, then_body, else_body)
             return CiValueExprIR {
-                setup_stmt: ci_stmt_merge3_ir(stmts, decl_id, cond.setup_stmt, if_stmt),
+                setup_stmt: stmts.merge3_ir( decl_id, cond.setup_stmt, if_stmt),
                 value_expr: exprs.ident(result_expr_name, result_ty),
             }
         if with_ci_eval_int_valid(session, cursor) != 0:
@@ -6798,7 +6805,7 @@ fn ci_lower_value_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exp
             let lowered_arg = ci_lower_value_expr_ir(session, arg_cursor, stmts, exprs, types, scope)
             if not ci_value_ir_valid(lowered_arg):
                 return ci_value_ir_invalid()
-            setup = ci_stmt_merge_ir(stmts, setup, lowered_arg.setup_stmt)
+            setup = stmts.merge_ir( setup, lowered_arg.setup_stmt)
             var arg_id = lowered_arg.value_expr
             let arg_peeled = ci_peel_transparent(session, arg_cursor)
             if ci_cursor_is_array_type(session, arg_peeled):
@@ -6858,7 +6865,7 @@ fn ci_lower_value_expr_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exp
         if ci_value_ir_valid(arr) and ci_value_ir_valid(idx):
             let raw_ptr_index = ci_index_base_is_raw_pointer(session, arr_cursor, arr.value_expr, exprs, types)
             return CiValueExprIR {
-                setup_stmt: ci_stmt_merge_ir(stmts, arr.setup_stmt, idx.setup_stmt),
+                setup_stmt: stmts.merge_ir( arr.setup_stmt, idx.setup_stmt),
                 value_expr: exprs.add(CiExprKind.CIE_INDEX, arr.value_expr as i32, idx.value_expr as i32, raw_ptr_index, 0 as CiTypeId),
             }
         return ci_value_ir_invalid()
@@ -7180,7 +7187,7 @@ fn ci_lower_for_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs
         while_id = stmts.while_stmt(cond_id, while_body_id)
     else:
         let if_break = ci_build_if_not_break_ir(stmts, exprs, cond_id)
-        let loop_body_id = ci_stmt_merge3_ir(stmts, cond_setup_id, if_break, while_body_id)
+        let loop_body_id = stmts.merge3_ir( cond_setup_id, if_break, while_body_id)
         let true_cond = exprs.bool_lit(1, 0 as CiTypeId)
         while_id = stmts.while_stmt(true_cond, loop_body_id)
 
@@ -7248,26 +7255,26 @@ fn ci_lower_switch_prong_forward_ir(session: i64, body_cursor: i32, start_idx: i
                     return 0 as CiStmtId
                 part_ids.push(inner_id as i32)
             if ci_stmt_ends_with_terminator(session, inner):
-                return ci_stmt_from_flat_ids(stmts, &part_ids)
+                return stmts.from_flat_ids(&part_ids)
     var j = start_idx + 1
     while j < total:
         let next_child = with_ci_child(session, body_cursor, j)
         let next_kind = with_ci_cursor_kind(session, next_child)
         if next_kind == CXK_BREAK_STMT:
-            return ci_stmt_from_flat_ids(stmts, &part_ids)
+            return stmts.from_flat_ids(&part_ids)
         if next_kind == CXK_CASE_STMT or next_kind == CXK_DEFAULT_STMT:
             let dup_id = ci_lower_switch_prong_forward_ir(session, body_cursor, j, total, stmts, exprs, types, scope)
             if (dup_id as i32) != 0:
                 part_ids.push(dup_id as i32)
-            return ci_stmt_from_flat_ids(stmts, &part_ids)
+            return stmts.from_flat_ids(&part_ids)
         if not ci_is_null_like_stmt(session, next_child):
             let next_id = ci_lower_stmt_ir(session, next_child, stmts, exprs, types, 0, scope)
             if (next_id as i32) != 0:
                 part_ids.push(next_id as i32)
             if ci_stmt_ends_with_terminator(session, next_child):
-                return ci_stmt_from_flat_ids(stmts, &part_ids)
+                return stmts.from_flat_ids(&part_ids)
         j = j + 1
-    ci_stmt_from_flat_ids(stmts, &part_ids)
+    stmts.from_flat_ids(&part_ids)
 
 // Structural lowering for CXK_SWITCH_STMT. Builds a CIS_MATCH
 // with structural subject and arm bodies. Mirrors the branching
@@ -7366,7 +7373,7 @@ fn ci_lower_switch_stmt_ir_structural(session: i64, cursor: i32, stmts: &mut CiS
                         return 0 as CiStmtId
                     if (fwd_id as i32) != 0:
                         body_ids.push(fwd_id as i32)
-            let raw_body = ci_stmt_from_flat_ids(stmts, &body_ids)
+            let raw_body = stmts.from_flat_ids(&body_ids)
             let body_id = ci_strip_trailing_break_ir(stmts, raw_body)
             if (body_id as i32) == 0 and body_ids.len() > 0 and not hit_break:
                 return 0 as CiStmtId
@@ -7420,7 +7427,7 @@ fn ci_lower_switch_stmt_ir_structural(session: i64, cursor: i32, stmts: &mut CiS
                         return 0 as CiStmtId
                     if (fwd_id as i32) != 0:
                         body_ids.push(fwd_id as i32)
-            let raw_body = ci_stmt_from_flat_ids(stmts, &body_ids)
+            let raw_body = stmts.from_flat_ids(&body_ids)
             let body_id = ci_strip_trailing_break_ir(stmts, raw_body)
             if (body_id as i32) == 0 and body_ids.len() > 0 and not hit_break:
                 return 0 as CiStmtId
@@ -7448,7 +7455,7 @@ fn ci_lower_switch_stmt_ir_structural(session: i64, cursor: i32, stmts: &mut CiS
     let switch_id = ci_wrap_switch_match_breaks_ir(session, body_cursor, stmts, exprs, types, match_id, -1)
     if (switch_id as i32) == 0:
         return 0 as CiStmtId
-    ci_stmt_merge_ir(stmts, prepared_subject.setup_stmt, switch_id)
+    stmts.merge_ir( prepared_subject.setup_stmt, switch_id)
 
 fn ci_lower_case_value_ir(session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiExprId:
     if with_ci_eval_int_valid(session, cursor) != 0:
@@ -7493,7 +7500,7 @@ fn ci_lower_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &m
                         return 0 as CiStmtId
                     ret_value = exprs.add(CiExprKind.CIE_ARRAY_DECAY, ret_value as i32, elem_ty_id as i32, 0, 0 as CiTypeId)
             let return_id = stmts.return_(ret_value)
-            return ci_stmt_merge_ir(stmts, lowered_ret.setup_stmt, return_id)
+            return stmts.merge_ir( lowered_ret.setup_stmt, return_id)
 
     // Structural if statement. Sequenced conditions are emitted
     // as setup statements before the `if`.
@@ -7520,10 +7527,10 @@ fn ci_lower_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &m
                     if then_empty and (else_id as i32) != 0:
                         let neg_cond = exprs.unary(CiUnaryOp.CIUO_LOGICAL_NOT, prepared_cond.value_expr, 0 as CiTypeId)
                         let if_id = stmts.if_stmt(neg_cond, else_id, 0 as CiStmtId)
-                        return ci_stmt_merge_ir(stmts, prepared_cond.setup_stmt, if_id)
+                        return stmts.merge_ir( prepared_cond.setup_stmt, if_id)
                     if not then_empty:
                         let if_id = stmts.if_stmt(prepared_cond.value_expr, then_id, else_id)
-                        return ci_stmt_merge_ir(stmts, prepared_cond.setup_stmt, if_id)
+                        return stmts.merge_ir( prepared_cond.setup_stmt, if_id)
 
     // Structural while statement. Sequenced conditions are
     // desugared to `while true: <setup>; if not cond: break; body`.
@@ -7540,7 +7547,7 @@ fn ci_lower_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &m
                     if (prepared_cond.setup_stmt as i32) == 0:
                         return stmts.while_stmt(prepared_cond.value_expr, body_id)
                     let if_break = ci_build_if_not_break_ir(stmts, exprs, prepared_cond.value_expr)
-                    let loop_body_id = ci_stmt_merge3_ir(stmts, prepared_cond.setup_stmt, if_break, body_id)
+                    let loop_body_id = stmts.merge3_ir( prepared_cond.setup_stmt, if_break, body_id)
                     let true_cond = exprs.bool_lit(1, 0 as CiTypeId)
                     return stmts.while_stmt(true_cond, loop_body_id)
 
@@ -7577,7 +7584,7 @@ fn ci_lower_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &m
                 let body_id = ci_lower_stmt_ir(session, body_cursor, stmts, exprs, types, 0, scope)
                 if (body_id as i32) != 0:
                     let if_break = ci_build_if_not_break_ir(stmts, exprs, prepared_cond.value_expr)
-                    let block_id = ci_stmt_merge3_ir(stmts, body_id, prepared_cond.setup_stmt, if_break)
+                    let block_id = stmts.merge3_ir( body_id, prepared_cond.setup_stmt, if_break)
                     let true_cond = exprs.bool_lit(1, 0 as CiTypeId)
                     return stmts.while_stmt(true_cond, block_id)
 
@@ -8152,7 +8159,7 @@ fn ci_lower_decl_stmt_structural(session: i64, cursor: i32, scope: str, hoisted:
                     let lhs_idx = exprs.add_string(storage_name)
                     let lhs_id = exprs.ident(lhs_idx, 0 as CiTypeId)
                     let assign_id = stmts.assign(lhs_id, init_id)
-                    child_stmt_ids.push((ci_stmt_merge_ir(stmts, init_setup_id, assign_id)) as i32)
+                    child_stmt_ids.push((stmts.merge_ir( init_setup_id, assign_id)) as i32)
             else:
                 if (init_setup_id as i32) == 0:
                     // Non-hoisted simple init: CIS_VAR_DECL with is_mut=1.
@@ -8163,7 +8170,7 @@ fn ci_lower_decl_stmt_structural(session: i64, cursor: i32, scope: str, hoisted:
                     let lhs_idx = exprs.add_string(storage_name)
                     let lhs_id = exprs.ident(lhs_idx, vty_id)
                     let assign_id = stmts.assign(lhs_id, init_id)
-                    child_stmt_ids.push((ci_stmt_merge3_ir(stmts, decl_id, init_setup_id, assign_id)) as i32)
+                    child_stmt_ids.push((stmts.merge3_ir( decl_id, init_setup_id, assign_id)) as i32)
         i = i + 1
 
     let count = child_stmt_ids.len() as i32
@@ -10544,9 +10551,9 @@ fn ci_stack_emit_node(tree: StackifyTree, node_id: i32, ctx: &mut CiStackEmitCon
         ci_stack_emit_push_frame(ctx, CI_STACK_FRAME_BLOCK, label_sym)
         let body = ci_stack_emit_children(tree, node.first_child_start, node.first_child_count, ctx, stmts, exprs, types)
         ci_stack_emit_pop_frame(ctx)
-        let ids: Vec[i32] = Vec.new()
+        var ids: Vec[i32] = Vec.new()
         if (body as i32) != 0:
-            ci_stmt_collect_flat_ids(stmts, body, &mut ids)
+            ids = ci_stmt_collect_flat_ids(stmts, body, ids)
         let start = stmts.extra.len() as i32
         var i: i64 = 0
         while i < ids.len():
@@ -10758,7 +10765,7 @@ fn ci_native_goto_emit_cfg(cfg: CiGotoCfg, hoisted_stmt_ids: &Vec[i32], stmts: &
         ids.push(stmts.block_labeled(start, block_ids.len() as i32, labels.get(block as i64)) as i32)
         block = block + 1
 
-    ci_stmt_from_flat_ids(stmts, &ids)
+    stmts.from_flat_ids(&ids)
 
 fn ci_goto_cfg_verify_labels(ctx: &mut CiGotoCfgContext):
     var i = 0
@@ -10823,8 +10830,8 @@ fn ci_lower_goto_body_stackify(session: i64, body_cursor: i32, scope: str, stmts
     while hi < hoisted_stmt_ids.len():
         ids.push(hoisted_stmt_ids.get(hi))
         hi = hi + 1
-    ci_stmt_collect_flat_ids(stmts, body_id, &mut ids)
-    ci_stmt_from_flat_ids(stmts, &ids)
+    ids = ci_stmt_collect_flat_ids(stmts, body_id, ids)
+    stmts.from_flat_ids(&ids)
 
 // Find a function cursor in the cursor tree by name.
 fn ci_find_var_cursor(session: i64, name: str) -> i32:
