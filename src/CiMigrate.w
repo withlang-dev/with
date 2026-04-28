@@ -407,18 +407,18 @@ fn ci_migrate_project_var_owner_rank(definition_kind: i32) -> i32:
         return 1
     0
 
-fn ci_migrate_project_var_type_id(session: i64, idx: i32, owner_type: str, project: &mut CiProject) -> CiTypeId:
+fn CiProject.migrate_var_type_id(mut self: CiProject, session: i64, idx: i32, owner_type: str) -> CiTypeId:
     let cursor = with_cimport_decl_cursor(session, idx)
     if cursor < 0:
         return 0 as CiTypeId
-    var ty_id = ci_type_from_libclang(session, with_ci_cursor_type(session, cursor), &mut project.types)
+    var ty_id = ci_type_from_libclang(session, with_ci_cursor_type(session, cursor), &mut self.types)
     if owner_type.len() == 0:
         return ty_id
-    if (ty_id as i32) == 0 or ci_print_type(project.types, ty_id) != owner_type:
-        ty_id = ci_type_from_translated_text(&mut project.types, owner_type)
+    if (ty_id as i32) == 0 or ci_print_type(self.types, ty_id) != owner_type:
+        ty_id = ci_type_from_translated_text(&mut self.types, owner_type)
     ty_id
 
-fn ci_migrate_project_scan_file(input_path: str, project: &mut CiProject) -> i32:
+fn CiProject.migrate_scan_file(mut self: CiProject, input_path: str) -> i32:
     ci_migrate_prepare_include_path(input_path)
     let source = ci_migrate_wrapped_source(input_path)
     if source.len() == 0:
@@ -436,7 +436,7 @@ fn ci_migrate_project_scan_file(input_path: str, project: &mut CiProject) -> i32
         with_cimport_dispose(session)
         return 1
 
-    let module_id = project.ensure_module(input_path)
+    let module_id = self.ensure_module(input_path)
     let count = with_cimport_decl_count(session)
     var i = 0
     while i < count:
@@ -450,10 +450,10 @@ fn ci_migrate_project_scan_file(input_path: str, project: &mut CiProject) -> i32
             if with_cimport_var_storage_class(session, i) == CX_SC_STATIC:
                 i = i + 1
                 continue
-            let symbol_id = project.ensure_symbol(CiProjectSymbolKind.CIPS_VAR, name)
-            var symbol = project.symbols.get(symbol_id as i64)
+            let symbol_id = self.ensure_symbol(CiProjectSymbolKind.CIPS_VAR, name)
+            var symbol = self.symbols.get(symbol_id as i64)
             symbol.add_consumer(module_id)
-            project.update_symbol(symbol_id, symbol)
+            self.update_symbol(symbol_id, symbol)
 
             let owner_kind = ci_migrate_var_definition_kind(session, i)
             if cursor < 0 or owner_kind == CI_VAR_DECL_ONLY:
@@ -472,12 +472,12 @@ fn ci_migrate_project_scan_file(input_path: str, project: &mut CiProject) -> i32
                 symbol.owner_rank = owner_rank
                 symbol.owner_definition_kind = owner_kind
                 symbol.resolved_ty_text = owner_type
-                symbol.resolved_ty = ci_migrate_project_var_type_id(session, i, owner_type, project)
-                project.update_symbol(symbol_id, symbol)
+                symbol.resolved_ty = self.migrate_var_type_id(session, i, owner_type)
+                self.update_symbol(symbol_id, symbol)
                 i = i + 1
                 continue
 
-            let existing_path = project.owner_module_path(symbol_id)
+            let existing_path = self.owner_module_path(symbol_id)
             if symbol.owner_rank == owner_rank:
                 if symbol.owner_definition_kind == CI_VAR_FULL_DEF and owner_kind == CI_VAR_FULL_DEF and existing_path != input_path:
                     eprint("migrate: duplicate full global definition for " ++ name ++ " in " ++ existing_path ++ " and " ++ input_path)
@@ -492,8 +492,8 @@ fn ci_migrate_project_scan_file(input_path: str, project: &mut CiProject) -> i32
                 symbol.owner_rank = owner_rank
                 symbol.owner_definition_kind = owner_kind
                 symbol.resolved_ty_text = owner_type
-                symbol.resolved_ty = ci_migrate_project_var_type_id(session, i, owner_type, project)
-                project.update_symbol(symbol_id, symbol)
+                symbol.resolved_ty = self.migrate_var_type_id(session, i, owner_type)
+                self.update_symbol(symbol_id, symbol)
         i = i + 1
 
     with_cimport_dispose(session)
@@ -772,7 +772,7 @@ pub fn migrate_c_directory(input_dir: str, output_dir: str, exclude_basenames: s
 
     var fi = 0
     while fi < files.len() as i32:
-        if ci_migrate_project_scan_file(files.get(fi as i64), &mut project) != 0:
+        if project.migrate_scan_file(files.get(fi as i64)) != 0:
             return 1
         fi = fi + 1
 
