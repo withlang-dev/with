@@ -1512,11 +1512,11 @@ fn ComptimeEvaluator.eval_expr(self: ComptimeEvaluator, diags: &mut DiagnosticLi
         return self.eval_comptime_error(diags, node)
     self.unsupported(diags, node)
 
-fn Sema.force_eval_comptime_expr(self: &mut Sema, node: i32) -> i32:
+fn Sema.force_eval_comptime_expr(mut self: Sema, node: i32) -> i32:
     let value = comptime_force_eval_expr(self as *mut Sema, &mut self.diags, self.ast, self.pool, node)
     comptime_value_is_valid(value)
 
-fn Sema.check_top_level_comptime_let_values(self: &mut Sema):
+fn Sema.check_top_level_comptime_let_values(mut self: Sema):
     if self.diags.has_errors():
         return
     for di in 0..self.ast.decl_count():

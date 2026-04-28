@@ -2121,7 +2121,7 @@ fn codegen_owned_text(text: str) -> str:
         return ""
     with_str_clone(text)
 
-fn Codegen.capture_sema_symbol_texts(self: &mut Codegen):
+fn Codegen.capture_sema_symbol_texts(mut self: Codegen):
     let texts: Vec[str] = Vec.new()
     for i in 0..self.sema.pool.state.symbol_texts.len() as i32:
         texts.push(codegen_owned_text(self.sema.pool.state.symbol_texts.get(i as i64)))

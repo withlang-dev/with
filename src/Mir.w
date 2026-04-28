@@ -375,10 +375,10 @@ fn MirModule.mir_get_type_name(self: MirModule, tid: i32) -> i32:
     0
 
 // No-op: reserved for future manual memory management.
-fn MirModule.deinit(self: &mut MirModule):
+fn MirModule.deinit(mut self: MirModule):
     return
 
-fn MirModule.add_body(self: &mut MirModule, body: MirBody):
+fn MirModule.add_body(mut self: MirModule, body: MirBody):
     let body_idx = self.bodies.len() as i32
     self.bodies.push(body)
     self.body_fn_syms.push(body.fn_sym)
@@ -463,7 +463,7 @@ fn MirBody.init(fn_sym: i32, sema: Sema) -> MirBody:
         body.local_type_ids.set_i32(0, sema.ty_void)
     body
 
-fn MirBody.new_block(self: &mut MirBody) -> BlockId:
+fn MirBody.new_block(mut self: MirBody) -> BlockId:
     let id = self.bb_stmt_starts.len() as i32
     self.bb_stmt_starts.push(self.stmt_kinds.len() as i32)
     self.bb_stmt_counts.push(0)
@@ -476,7 +476,7 @@ fn MirBody.new_block(self: &mut MirBody) -> BlockId:
     self.bb_term_spans.push(0)
     BlockId(id)
 
-fn MirBody.push_stmt(self: &mut MirBody, bb: i32, kind: i32, d0: i32, d1: i32, span: i32):
+fn MirBody.push_stmt(mut self: MirBody, bb: i32, kind: i32, d0: i32, d1: i32, span: i32):
     let stmt_id = self.stmt_kinds.len() as i32
     self.stmt_kinds.push(kind)
     self.stmt_d0.push(d0)
@@ -489,7 +489,7 @@ fn MirBody.push_stmt(self: &mut MirBody, bb: i32, kind: i32, d0: i32, d1: i32, s
             self.bb_stmt_starts.set_i32(bb, stmt_id)
         self.bb_stmt_counts.set_i32(bb, old_count + 1)
 
-fn MirBody.set_terminator(self: &mut MirBody, bb: i32, kind: i32, d0: i32, d1: i32, d2: i32, d3: i32, span: i32):
+fn MirBody.set_terminator(mut self: MirBody, bb: i32, kind: i32, d0: i32, d1: i32, d2: i32, d3: i32, span: i32):
     if bb < 0 or bb >= self.bb_term_kinds.len() as i32:
         return
     self.bb_term_kinds.set_i32(bb, kind)
@@ -499,7 +499,7 @@ fn MirBody.set_terminator(self: &mut MirBody, bb: i32, kind: i32, d0: i32, d1: i
     self.bb_term_d3.set_i32(bb, d3)
     self.bb_term_spans.set_i32(bb, span)
 
-fn MirBody.new_local(self: &mut MirBody, type_id: i32, mutable: i32, name: i32, is_user_var: i32) -> i32:
+fn MirBody.new_local(mut self: MirBody, type_id: i32, mutable: i32, name: i32, is_user_var: i32) -> i32:
     let id = self.local_type_ids.len() as i32
     self.local_type_ids.push(type_id)
     self.local_mutables.push(mutable)
@@ -507,10 +507,10 @@ fn MirBody.new_local(self: &mut MirBody, type_id: i32, mutable: i32, name: i32, 
     self.local_is_user_var.push(is_user_var)
     id
 
-fn MirBody.new_temp(self: &mut MirBody, type_id: i32) -> i32:
+fn MirBody.new_temp(mut self: MirBody, type_id: i32) -> i32:
     self.new_local(type_id, 1, 0, 0)
 
-fn MirBody.new_place(self: &mut MirBody, local_id: i32) -> i32:
+fn MirBody.new_place(mut self: MirBody, local_id: i32) -> i32:
     let id = self.place_locals.len() as i32
     self.place_locals.push(local_id)
     // Sema type defaults to the local's type (overridden by projected places)
@@ -520,7 +520,7 @@ fn MirBody.new_place(self: &mut MirBody, local_id: i32) -> i32:
     self.place_proj_counts.push(0)
     id
 
-fn MirBody.new_place_typed(self: &mut MirBody, local_id: i32, sema_ty: i32) -> i32:
+fn MirBody.new_place_typed(mut self: MirBody, local_id: i32, sema_ty: i32) -> i32:
     let id = self.place_locals.len() as i32
     self.place_locals.push(local_id)
     self.place_sema_types.push(sema_ty)
@@ -528,7 +528,7 @@ fn MirBody.new_place_typed(self: &mut MirBody, local_id: i32, sema_ty: i32) -> i
     self.place_proj_counts.push(0)
     id
 
-fn MirBody.new_place_with_projection(self: &mut MirBody, base: i32, proj_kind: i32, proj_data: i32, sema_ty: i32) -> i32:
+fn MirBody.new_place_with_projection(mut self: MirBody, base: i32, proj_kind: i32, proj_data: i32, sema_ty: i32) -> i32:
     if base < 0 or base >= self.place_locals.len() as i32:
         return self.new_place(0)
 
@@ -551,19 +551,19 @@ fn MirBody.new_place_with_projection(self: &mut MirBody, base: i32, proj_kind: i
     self.place_proj_counts.push(base_proj_count + 1)
     id
 
-fn MirBody.new_field_place(self: &mut MirBody, base: i32, field_idx: i32, sema_ty: i32) -> i32:
+fn MirBody.new_field_place(mut self: MirBody, base: i32, field_idx: i32, sema_ty: i32) -> i32:
     self.new_place_with_projection(base, ProjKind.PK_FIELD, field_idx, sema_ty)
 
-fn MirBody.new_index_place(self: &mut MirBody, base: i32, idx_local: i32, sema_ty: i32) -> i32:
+fn MirBody.new_index_place(mut self: MirBody, base: i32, idx_local: i32, sema_ty: i32) -> i32:
     self.new_place_with_projection(base, ProjKind.PK_INDEX, idx_local, sema_ty)
 
-fn MirBody.new_deref_place(self: &mut MirBody, base: i32) -> i32:
+fn MirBody.new_deref_place(mut self: MirBody, base: i32) -> i32:
     self.new_place_with_projection(base, ProjKind.PK_DEREF, 0, 0)
 
-fn MirBody.new_downcast_place(self: &mut MirBody, base: i32, variant_idx: i32, sema_ty: i32) -> i32:
+fn MirBody.new_downcast_place(mut self: MirBody, base: i32, variant_idx: i32, sema_ty: i32) -> i32:
     self.new_place_with_projection(base, ProjKind.PK_DOWNCAST, variant_idx, sema_ty)
 
-fn MirBody.new_rvalue(self: &mut MirBody, kind: i32, d0: i32, d1: i32, d2: i32) -> i32:
+fn MirBody.new_rvalue(mut self: MirBody, kind: i32, d0: i32, d1: i32, d2: i32) -> i32:
     let id = self.rval_kinds.len() as i32
     self.rval_kinds.push(kind)
     self.rval_d0.push(d0)
@@ -571,13 +571,13 @@ fn MirBody.new_rvalue(self: &mut MirBody, kind: i32, d0: i32, d1: i32, d2: i32) 
     self.rval_d2.push(d2)
     id
 
-fn MirBody.new_operand(self: &mut MirBody, kind: i32, d0: i32) -> i32:
+fn MirBody.new_operand(mut self: MirBody, kind: i32, d0: i32) -> i32:
     let id = self.operand_kinds.len() as i32
     self.operand_kinds.push(kind)
     self.operand_d0.push(d0)
     id
 
-fn MirBody.new_const(self: &mut MirBody, kind: i32, d0: i32, d1: i32, d2: i32, type_id: i32) -> i32:
+fn MirBody.new_const(mut self: MirBody, kind: i32, d0: i32, d1: i32, d2: i32, type_id: i32) -> i32:
     let id = self.const_kinds.len() as i32
     self.const_kinds.push(kind)
     self.const_d0.push(d0)
@@ -593,7 +593,7 @@ fn mir_const_int_value(body: MirBody, const_id: i32) -> i64:
         body.const_d2.get(const_id as i64),
     )
 
-fn MirBody.new_switch_table(self: &mut MirBody, vals: Vec[i32], targets: Vec[i32]) -> i32:
+fn MirBody.new_switch_table(mut self: MirBody, vals: Vec[i32], targets: Vec[i32]) -> i32:
     let id = self.switch_table_starts.len() as i32
     let start = self.switch_table_vals.len() as i32
     let count = vals.len() as i32
@@ -609,7 +609,7 @@ fn MirBody.new_switch_table(self: &mut MirBody, vals: Vec[i32], targets: Vec[i32
 
     id
 
-fn MirBody.new_agg_fields(self: &mut MirBody, operands: Vec[i32], name_syms: Vec[i32]) -> i32:
+fn MirBody.new_agg_fields(mut self: MirBody, operands: Vec[i32], name_syms: Vec[i32]) -> i32:
     let id = self.agg_field_starts.len() as i32
     let start = self.agg_field_operands.len() as i32
     let count = operands.len() as i32
@@ -620,7 +620,7 @@ fn MirBody.new_agg_fields(self: &mut MirBody, operands: Vec[i32], name_syms: Vec
         self.agg_field_name_syms.push(name_syms.get(i as i64))
     id
 
-fn MirBody.new_call_args(self: &mut MirBody, operands: Vec[i32]) -> i32:
+fn MirBody.new_call_args(mut self: MirBody, operands: Vec[i32]) -> i32:
     let id = self.call_arg_starts.len() as i32
     let start = self.call_arg_operands.len() as i32
     let count = operands.len() as i32
@@ -632,7 +632,7 @@ fn MirBody.new_call_args(self: &mut MirBody, operands: Vec[i32]) -> i32:
         self.call_arg_operands.push(operands.get(i as i64))
     id
 
-fn MirBody.set_call_intrinsic(self: &mut MirBody, call_id: i32, kind: i32):
+fn MirBody.set_call_intrinsic(mut self: MirBody, call_id: i32, kind: i32):
     if call_id >= 0 and call_id < self.call_intrinsic_kinds.len() as i32:
         self.call_intrinsic_kinds.set_i32(call_id, kind)
 
@@ -641,7 +641,7 @@ fn MirBody.call_intrinsic(self: &MirBody, call_id: i32) -> i32:
         return MirIntrinsic.MIR_INTRINSIC_NONE
     self.call_intrinsic_kinds.get(call_id as i64)
 
-fn MirBody.set_call_ast_node(self: &mut MirBody, call_id: i32, node: i32):
+fn MirBody.set_call_ast_node(mut self: MirBody, call_id: i32, node: i32):
     if call_id >= 0 and call_id < self.call_ast_nodes.len() as i32:
         self.call_ast_nodes.set_i32(call_id, node)
 

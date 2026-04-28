@@ -488,11 +488,11 @@ fn AstPool.new -> AstPool:
     pool
 
 // Mark the pool as immutable. Any subsequent mutation will print an error.
-fn AstPool.freeze(self: &mut AstPool):
+fn AstPool.freeze(mut self: AstPool):
     self.frozen = 1
 
 // Add a node to the pool, returns the node index.
-fn AstPool.add_node(self: &mut AstPool, kind: i32, start: i32, end: i32, d0: i32, d1: i32, d2: i32) -> NodeId:
+fn AstPool.add_node(mut self: AstPool, kind: i32, start: i32, end: i32, d0: i32, d1: i32, d2: i32) -> NodeId:
     if self.frozen != 0:
         with_eprint("BUG: AstPool.add_node called after freeze")
     let idx = self.kinds.len() as i32
@@ -508,7 +508,7 @@ fn AstPool.add_node(self: &mut AstPool, kind: i32, start: i32, end: i32, d0: i32
     idx as NodeId
 
 // Add extra data, returns the index in the extra array.
-fn AstPool.add_extra(self: &mut AstPool, value: i32) -> i32:
+fn AstPool.add_extra(mut self: AstPool, value: i32) -> i32:
     if self.frozen != 0:
         with_eprint("BUG: AstPool.add_extra called after freeze")
     let idx = self.extra.len() as i32
@@ -516,7 +516,7 @@ fn AstPool.add_extra(self: &mut AstPool, value: i32) -> i32:
     idx
 
 // Add a string to the string table, returns the string index.
-fn AstPool.add_string(self: &mut AstPool, s: str) -> i32:
+fn AstPool.add_string(mut self: AstPool, s: str) -> i32:
     if self.frozen != 0:
         with_eprint("BUG: AstPool.add_string called after freeze")
     let idx = self.strings.len() as i32
@@ -540,7 +540,7 @@ fn AstPool.get_data2(self: &AstPool, idx: NodeId) -> i32:
 fn AstPool.literal_suffix(self: &AstPool, idx: NodeId) -> i32:
     self.literal_suffixes.get((idx as i32) as i64)
 
-fn AstPool.set_literal_suffix(self: &mut AstPool, idx: NodeId, suffix: i32):
+fn AstPool.set_literal_suffix(mut self: AstPool, idx: NodeId, suffix: i32):
     self.literal_suffixes.set_i32((idx as i32) as i64, suffix)
 
 fn AstPool.int_literal_digit_idx(self: &AstPool, idx: NodeId) -> i32:
@@ -549,7 +549,7 @@ fn AstPool.int_literal_digit_idx(self: &AstPool, idx: NodeId) -> i32:
 fn AstPool.int_literal_radix(self: &AstPool, idx: NodeId) -> i32:
     self.int_literal_radices.get((idx as i32) as i64)
 
-fn AstPool.set_int_literal_exact(self: &mut AstPool, idx: NodeId, digit_idx: i32, radix: i32):
+fn AstPool.set_int_literal_exact(mut self: AstPool, idx: NodeId, digit_idx: i32, radix: i32):
     self.int_literal_digit_idxs.set_i32((idx as i32) as i64, digit_idx)
     self.int_literal_radices.set_i32((idx as i32) as i64, radix)
 
@@ -951,7 +951,7 @@ fn AstPool.get_end(self: &AstPool, idx: NodeId) -> i32:
 fn AstPool.node_count(self: &AstPool) -> i32:
     self.kinds.len() as i32
 
-fn AstPool.add_decl(self: &mut AstPool, node_idx: NodeId):
+fn AstPool.add_decl(mut self: AstPool, node_idx: NodeId):
     if self.frozen != 0:
         with_eprint("BUG: AstPool.add_decl called after freeze")
     self.decls.push(node_idx as i32)
@@ -962,13 +962,13 @@ fn AstPool.decl_count(self: &AstPool) -> i32:
 fn AstPool.get_decl(self: &AstPool, idx: i32) -> NodeId:
     (self.decls.get(idx as i64)) as NodeId
 
-fn AstPool.set_local_decl_count(self: &mut AstPool, n: i32):
+fn AstPool.set_local_decl_count(mut self: AstPool, n: i32):
     self.local_decl_count = n
 
 fn AstPool.local_decl_count(self: &AstPool) -> i32:
     self.local_decl_count
 
-fn AstPool.set_prelude_decl_count(self: &mut AstPool, n: i32):
+fn AstPool.set_prelude_decl_count(mut self: AstPool, n: i32):
     self.prelude_decl_count = n
 
 fn AstPool.prelude_decl_count(self: &AstPool) -> i32:
@@ -977,23 +977,23 @@ fn AstPool.prelude_decl_count(self: &AstPool) -> i32:
 fn AstPool.extra_len(self: &AstPool) -> i32:
     self.extra.len() as i32
 
-fn AstPool.set_data0(self: &mut AstPool, idx: NodeId, val: i32):
+fn AstPool.set_data0(mut self: AstPool, idx: NodeId, val: i32):
     self.data0.set_i32((idx as i32) as i64, val)
 
-fn AstPool.set_data1(self: &mut AstPool, idx: NodeId, val: i32):
+fn AstPool.set_data1(mut self: AstPool, idx: NodeId, val: i32):
     self.data1.set_i32((idx as i32) as i64, val)
 
-fn AstPool.set_data2(self: &mut AstPool, idx: NodeId, val: i32):
+fn AstPool.set_data2(mut self: AstPool, idx: NodeId, val: i32):
     self.data2.set_i32((idx as i32) as i64, val)
 
-fn AstPool.set_start(self: &mut AstPool, idx: NodeId, val: i32):
+fn AstPool.set_start(mut self: AstPool, idx: NodeId, val: i32):
     self.starts.set_i32((idx as i32) as i64, val)
 
-fn AstPool.set_end(self: &mut AstPool, idx: NodeId, val: i32):
+fn AstPool.set_end(mut self: AstPool, idx: NodeId, val: i32):
     self.ends.set_i32((idx as i32) as i64, val)
 
 // Store fn decl metadata: [node, flags, ret_type, param_start, param_count, tp_start, tp_count]
-fn AstPool.add_fn_meta(self: &mut AstPool, node: NodeId, flags: i32, ret: i32, ps: i32, pc: i32, ts: i32, tc: i32):
+fn AstPool.add_fn_meta(mut self: AstPool, node: NodeId, flags: i32, ret: i32, ps: i32, pc: i32, ts: i32, tc: i32):
     let idx = self.fn_meta.len() as i32
     self.fn_meta.push(node as i32)
     self.fn_meta.push(flags)
@@ -1038,7 +1038,7 @@ fn AstPool.fn_param_type(self: &AstPool, param_start: i32, param_idx: i32) -> i3
 fn AstPool.fn_param_flags(self: &AstPool, param_start: i32, param_idx: i32) -> i32:
     self.get_extra(param_start + param_idx * FN_PARAM_STRIDE + 2)
 
-fn AstPool.set_fn_param_default(self: &mut AstPool, param_start: i32, param_idx: i32, default_node: i32):
+fn AstPool.set_fn_param_default(mut self: AstPool, param_start: i32, param_idx: i32, default_node: i32):
     let key = param_start * 1000 + param_idx
     self.fn_param_defaults.insert(key, default_node)
 
@@ -1048,7 +1048,7 @@ fn AstPool.get_fn_param_default(self: &AstPool, param_start: i32, param_idx: i32
         return self.fn_param_defaults.get(key).unwrap()
     0
 
-fn AstPool.set_call_named_args(self: &mut AstPool, call_node: NodeId, names_extra_start: i32):
+fn AstPool.set_call_named_args(mut self: AstPool, call_node: NodeId, names_extra_start: i32):
     self.call_named_args.insert(call_node as i32, names_extra_start)
 
 fn AstPool.get_call_named_arg(self: &AstPool, call_node: NodeId, arg_idx: i32) -> i32:
@@ -1060,7 +1060,7 @@ fn AstPool.get_call_named_arg(self: &AstPool, call_node: NodeId, arg_idx: i32) -
 fn AstPool.has_call_named_args(self: &AstPool, call_node: NodeId) -> i32:
     if self.call_named_args.contains(call_node as i32): 1 else: 0
 
-fn AstPool.add_type_meta(self: &mut AstPool, node: NodeId, derive_start: i32, derive_count: i32):
+fn AstPool.add_type_meta(mut self: AstPool, node: NodeId, derive_start: i32, derive_count: i32):
     let idx = self.type_meta.len() as i32
     self.type_meta.push(node as i32)
     self.type_meta.push(derive_start)
@@ -1079,7 +1079,7 @@ fn AstPool.type_meta_derive_start(self: &AstPool, meta: i32) -> i32:
 fn AstPool.type_meta_derive_count(self: &AstPool, meta: i32) -> i32:
     self.type_meta.get((meta + 2) as i64)
 
-fn AstPool.add_pattern_qualifier(self: &mut AstPool, node: NodeId, type_sym: i32):
+fn AstPool.add_pattern_qualifier(mut self: AstPool, node: NodeId, type_sym: i32):
     let idx = self.pattern_qualifiers.len() as i32
     self.pattern_qualifiers.push(node as i32)
     self.pattern_qualifiers.push(type_sym)
@@ -1091,7 +1091,7 @@ fn AstPool.pattern_qualifier(self: &AstPool, node: NodeId) -> i32:
         return self.pattern_qualifiers.get((opt.unwrap() + 1) as i64)
     0
 
-fn AstPool.mark_must_use_type(self: &mut AstPool, node: NodeId):
+fn AstPool.mark_must_use_type(mut self: AstPool, node: NodeId):
     self.must_use_type_nodes.push(node as i32)
     self.must_use_type_set.insert(node as i32, 1)
 
@@ -1099,7 +1099,7 @@ fn AstPool.is_must_use_type_node(self: &AstPool, node: NodeId) -> i32:
     if self.must_use_type_set.contains(node as i32): return 1
     0
 
-fn AstPool.mark_sealed_trait(self: &mut AstPool, node: NodeId):
+fn AstPool.mark_sealed_trait(mut self: AstPool, node: NodeId):
     self.sealed_trait_nodes.push(node as i32)
     self.sealed_trait_set.insert(node as i32, 1)
 
@@ -1107,7 +1107,7 @@ fn AstPool.is_sealed_trait_node(self: &AstPool, node: NodeId) -> i32:
     if self.sealed_trait_set.contains(node as i32): return 1
     0
 
-fn AstPool.mark_comptime_decl(self: &mut AstPool, node: NodeId):
+fn AstPool.mark_comptime_decl(mut self: AstPool, node: NodeId):
     self.comptime_decl_nodes.push(node as i32)
     self.comptime_decl_set.insert(node as i32, 1)
 
@@ -1115,7 +1115,7 @@ fn AstPool.is_comptime_decl_node(self: &AstPool, node: NodeId) -> i32:
     if self.comptime_decl_set.contains(node as i32): return 1
     0
 
-fn AstPool.mark_move_closure(self: &mut AstPool, node: NodeId):
+fn AstPool.mark_move_closure(mut self: AstPool, node: NodeId):
     self.move_closure_nodes.push(node as i32)
     self.move_closure_set.insert(node as i32, 1)
 
@@ -1123,7 +1123,7 @@ fn AstPool.is_move_closure(self: &AstPool, node: NodeId) -> i32:
     if self.move_closure_set.contains(node as i32): return 1
     0
 
-fn AstPool.mark_non_escaping_closure(self: &mut AstPool, node: NodeId):
+fn AstPool.mark_non_escaping_closure(mut self: AstPool, node: NodeId):
     self.non_escaping_closure_nodes.push(node as i32)
     self.non_escaping_closure_set.insert(node as i32, 1)
 
@@ -1131,7 +1131,7 @@ fn AstPool.is_non_escaping_closure(self: &AstPool, node: NodeId) -> i32:
     if self.non_escaping_closure_set.contains(node as i32): return 1
     0
 
-fn AstPool.add_where_meta(self: &mut AstPool, fn_node: NodeId, extra_start: i32, clause_count: i32):
+fn AstPool.add_where_meta(mut self: AstPool, fn_node: NodeId, extra_start: i32, clause_count: i32):
     let idx = self.where_meta.len() as i32
     self.where_meta.push(fn_node as i32)
     self.where_meta.push(extra_start)
@@ -1144,7 +1144,7 @@ fn AstPool.find_where_meta(self: &AstPool, fn_node: NodeId) -> i32:
         return opt.unwrap()
     0 - 1
 
-fn AstPool.add_impl_type_params(self: &mut AstPool, impl_node: NodeId, tp_start: i32, tp_count: i32):
+fn AstPool.add_impl_type_params(mut self: AstPool, impl_node: NodeId, tp_start: i32, tp_count: i32):
     let idx = self.impl_type_params.len() as i32
     self.impl_type_params.push(impl_node as i32)
     self.impl_type_params.push(tp_start)
@@ -1157,7 +1157,7 @@ fn AstPool.find_impl_type_params(self: &AstPool, impl_node: NodeId) -> i32:
         return opt.unwrap()
     0 - 1
 
-fn AstPool.add_impl_target_type_node(self: &mut AstPool, impl_node: NodeId, type_node: NodeId):
+fn AstPool.add_impl_target_type_node(mut self: AstPool, impl_node: NodeId, type_node: NodeId):
     self.impl_target_type_nodes.push(impl_node as i32)
     self.impl_target_type_nodes.push(type_node as i32)
     self.impl_target_type_nodes_map.insert(impl_node as i32, type_node as i32)
@@ -1173,7 +1173,7 @@ fn AstPool.find_impl_target_type_node(self: &AstPool, impl_node: NodeId) -> Node
         i = i + 2
     0 as NodeId
 
-fn AstPool.add_impl_trait_type_args(self: &mut AstPool, impl_node: NodeId, args_start: i32, args_count: i32):
+fn AstPool.add_impl_trait_type_args(mut self: AstPool, impl_node: NodeId, args_start: i32, args_count: i32):
     let idx = self.impl_trait_type_args.len() as i32
     self.impl_trait_type_args.push(impl_node as i32)
     self.impl_trait_type_args.push(args_start)
@@ -1189,13 +1189,13 @@ fn AstPool.find_impl_trait_type_args(self: &AstPool, impl_node: NodeId) -> i32:
 fn AstPool.fn_param_patterns_len(self: &AstPool) -> i32:
     self.fn_param_patterns.len() as i32
 
-fn AstPool.add_fn_param_pattern_value(self: &mut AstPool, node: NodeId):
+fn AstPool.add_fn_param_pattern_value(mut self: AstPool, node: NodeId):
     self.fn_param_patterns.push(node as i32)
 
 fn AstPool.fn_param_pattern_value(self: &AstPool, idx: i32) -> NodeId:
     (self.fn_param_patterns.get(idx as i64)) as NodeId
 
-fn AstPool.add_fn_param_pattern_meta(self: &mut AstPool, node: NodeId, start: i32, count: i32):
+fn AstPool.add_fn_param_pattern_meta(mut self: AstPool, node: NodeId, start: i32, count: i32):
     let idx = self.fn_param_pattern_meta.len() as i32
     self.fn_param_pattern_meta.push(node as i32)
     self.fn_param_pattern_meta.push(start)
@@ -1214,7 +1214,7 @@ fn AstPool.fn_param_pattern_meta_start(self: &AstPool, meta: i32) -> i32:
 fn AstPool.fn_param_pattern_meta_count(self: &AstPool, meta: i32) -> i32:
     self.fn_param_pattern_meta.get((meta + 2) as i64)
 
-fn AstPool.add_for_meta(self: &mut AstPool, node: NodeId, index_binding: i32, label: i32):
+fn AstPool.add_for_meta(mut self: AstPool, node: NodeId, index_binding: i32, label: i32):
     let idx = self.for_meta.len() as i32
     self.for_meta.push(node as i32)
     self.for_meta.push(index_binding)
@@ -1233,7 +1233,7 @@ fn AstPool.for_meta_index_binding(self: &AstPool, meta: i32) -> i32:
 fn AstPool.for_meta_label(self: &AstPool, meta: i32) -> i32:
     self.for_meta.get((meta + 2) as i64)
 
-fn AstPool.add_block_meta(self: &mut AstPool, node: NodeId, label: i32):
+fn AstPool.add_block_meta(mut self: AstPool, node: NodeId, label: i32):
     let idx = self.block_meta.len() as i32
     self.block_meta.push(node as i32)
     self.block_meta.push(label)
