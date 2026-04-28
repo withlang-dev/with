@@ -892,44 +892,44 @@ fn Codegen.emit_vec_new_global(self: Codegen, name_sym: i32, vec_tid: i32, is_mu
     let _ = self.record_module_binding_global(name_sym, vec_llvm, init, is_mut)
     true
 
-fn Codegen.finalize_module_binding_global(self: Codegen, global: i64, is_mut: i32):
+fn Codegen.finalize_module_binding_global(self: Codegen, gv: i64, is_mut: i32):
     if self.module_object_mode != 0:
         if is_mut == 0:
-            wl_set_global_constant(global, 1)
-        wl_set_linkage(global, 0)
+            wl_set_global_constant(gv, 1)
+        wl_set_linkage(gv, 0)
         return
     if is_mut == 0:
-        wl_set_global_constant(global, 1)
-        wl_set_linkage(global, wl_internal_linkage())
+        wl_set_global_constant(gv, 1)
+        wl_set_linkage(gv, wl_internal_linkage())
         return
-    wl_set_linkage(global, 0)
+    wl_set_linkage(gv, 0)
 
 fn Codegen.declare_module_binding_global(self: Codegen, name_sym: i32, global_ty: i64, is_mut: i32) -> i64:
     let name_str = self.current_decl_module_link_name(self.intern.resolve(name_sym))
     let existing = wl_get_named_global(self.llmod, name_str)
-    let global =
+    let gv =
         if existing != 0:
             existing
         else:
             wl_add_global(self.llmod, global_ty, name_str)
     if is_mut == 0:
-        wl_set_global_constant(global, 1)
-    wl_set_linkage(global, 0)
-    self.module_constants.insert(name_sym, global)
-    global
+        wl_set_global_constant(gv, 1)
+    wl_set_linkage(gv, 0)
+    self.module_constants.insert(name_sym, gv)
+    gv
 
 fn Codegen.define_module_binding_global(self: Codegen, name_sym: i32, global_ty: i64, init: i64, is_mut: i32) -> i64:
     let name_str = self.current_decl_module_link_name(self.intern.resolve(name_sym))
     let existing = wl_get_named_global(self.llmod, name_str)
-    let global =
+    let gv =
         if existing != 0:
             existing
         else:
             wl_add_global(self.llmod, global_ty, name_str)
-    wl_set_initializer(global, init)
-    self.finalize_module_binding_global(global, is_mut)
-    self.module_constants.insert(name_sym, global)
-    global
+    wl_set_initializer(gv, init)
+    self.finalize_module_binding_global(gv, is_mut)
+    self.module_constants.insert(name_sym, gv)
+    gv
 
 fn Codegen.record_module_binding_global(self: Codegen, name_sym: i32, global_ty: i64, init: i64, is_mut: i32) -> i64:
     if self.current_decl_is_imported_module_symbol():
@@ -1331,15 +1331,15 @@ fn Codegen.try_eval_const_pointer_llvm(self: Codegen, node: i32, expected_tid: i
 
     if kind == NodeKind.NK_UNARY:
         let uop = self.pool.get_data0(cur)
-        if uop == UnaryOp.UOP_REF or uop == UnaryOp.UOP_MUT_REF:
+        if uop == UnaryOp.UOP_REF or uop == UnaryOp.UOP_MUT_REF or uop == UnaryOp.UOP_RAW_REF_CONST or uop == UnaryOp.UOP_RAW_REF_MUT:
             let target = self.unwrap_const_expr_node(self.pool.get_data1(cur))
             if target == 0:
                 return 0
             if self.pool.kind(target) == NodeKind.NK_IDENT:
                 let target_sym = self.pool.get_data0(target)
-                let global = self.module_constants.get(target_sym)
-                if global.is_some():
-                    return self.coerce_const_value_to_type(global.unwrap() as i64, ptr_ty)
+                let gv = self.module_constants.get(target_sym)
+                if gv.is_some():
+                    return self.coerce_const_value_to_type(gv.unwrap() as i64, ptr_ty)
                 return 0
             if self.pool.kind(target) == NodeKind.NK_INDEX:
                 let base = self.unwrap_const_expr_node(self.pool.get_data0(target))
@@ -1349,9 +1349,9 @@ fn Codegen.try_eval_const_pointer_llvm(self: Codegen, node: i32, expected_tid: i
                     return 0
                 if base != 0 and self.pool.kind(base) == NodeKind.NK_IDENT:
                     let base_sym = self.pool.get_data0(base)
-                    let global = self.module_constants.get(base_sym)
-                    if global.is_some():
-                        return self.coerce_const_value_to_type(global.unwrap() as i64, ptr_ty)
+                    let gv = self.module_constants.get(base_sym)
+                    if gv.is_some():
+                        return self.coerce_const_value_to_type(gv.unwrap() as i64, ptr_ty)
                 return 0
 
     let ptr_zero = self.try_eval_const_int(cur)

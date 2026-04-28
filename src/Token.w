@@ -152,6 +152,8 @@ enum TokenKind: i32:
     TK_STAR_SAT_EQ = 131
     TK_KW_ASM = 132
     TK_KW_GOTO = 133
+    // docs/mut.md Rev 8 §12 — module-level place declarations.
+    TK_KW_GLOBAL = 134
 
 // Lookup table: keyword string -> tag. Returns -1 if not a keyword.
 fn tag_from_keyword(s: str) -> i32:
@@ -209,6 +211,7 @@ fn tag_from_keyword(s: str) -> i32:
     if s == "enum": return TokenKind.TK_KW_ENUM
     if s == "asm": return TokenKind.TK_KW_ASM
     if s == "goto": return TokenKind.TK_KW_GOTO
+    if s == "global": return TokenKind.TK_KW_GLOBAL
     -1
 
 // Returns a human-readable name for a token tag (for diagnostics).
@@ -289,6 +292,7 @@ fn tag_name(tag: i32) -> str:
     if tag == TokenKind.TK_STAR_SAT: return "'*|'"
     if tag == TokenKind.TK_KW_ASM: return "'asm'"
     if tag == TokenKind.TK_KW_GOTO: return "'goto'"
+    if tag == TokenKind.TK_KW_GLOBAL: return "'global'"
     if tag == TokenKind.TK_EQ: return "'='"
     if tag == TokenKind.TK_EQ_EQ: return "'=='"
     if tag == TokenKind.TK_BANG: return "'!'"
