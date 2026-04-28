@@ -17,8 +17,6 @@ extern fn with_interrupt_requested() -> i32
 fn cc_intern_resolve(intern: InternPool, sym: i32) -> str:
     intern.resolve_symbol(sym)
 
-fn cc_intern_intern(intern: &mut InternPool, s: str) -> i32:
-    intern.intern(s)
 
 fn cc_lbrace -> str:
     str_from_byte(123)
@@ -304,8 +302,7 @@ type CCodegen {
 }
 
 fn CCodegen.intern_intern(self: CCodegen, s: str) -> i32:
-    let intern = &mut self.intern
-    cc_intern_intern(intern, s)
+    self.intern.intern(s)
 
 fn c_emit_module(mir_mod: MirModule, ast: AstPool, intern: InternPool, sema: Sema, source_path: str, source_text: str) -> CEmitResult:
     var cg = CCodegen {
