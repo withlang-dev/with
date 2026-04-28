@@ -4651,58 +4651,70 @@ fn CCodegen.emit_term(self: CCodegen, body: MirBody, bb: i32) -> str:
     self.fail(f"unsupported terminator kind {tk}")
     "    abort();"
 
-fn CCodegen.collect_struct_types_from_tid(self: CCodegen, out: &mut Vec[i32], seen_names: &mut HashMap[i32, i32], tid: i32):
+// docs/mut.md Rev 8 §5.1 — accumulator state for struct-type collection.
+// Bundling out + seen_names into a single CollectStructTypes value lets the
+// recursive walk be a method with `mut self: Self` instead of taking two
+// separate `&mut` accumulators.
+type CollectStructTypes {
+    out: Vec[i32],
+    seen_names: HashMap[i32, i32],
+}
+
+fn CollectStructTypes.new -> CollectStructTypes:
+    CollectStructTypes { out: Vec.new(), seen_names: HashMap.new() }
+
+fn CCodegen.collect_struct_types_from_tid(self: CCodegen, mut acc: CollectStructTypes, tid: i32) -> CollectStructTypes:
     let resolved = self.sema.resolve_alias(tid)
     if resolved == 0:
-        return
+        return acc
     let tk = self.sema.get_type_kind(resolved)
     if tk == TypeKind.TY_STRUCT:
         let name_sym = self.sema.get_type_d0(resolved)
-        if not seen_names.contains(name_sym):
-            seen_names.insert(name_sym, 1)
-            out.push(resolved as i32)
-        return
+        if not acc.seen_names.contains(name_sym):
+            acc.seen_names.insert(name_sym, 1)
+            acc.out.push(resolved as i32)
+        return acc
     if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
         let inner_tid = self.sema.get_type_d0(resolved)
-        self.collect_struct_types_from_tid(out, seen_names, inner_tid)
+        return self.collect_struct_types_from_tid(acc, inner_tid)
+    acc
 
 fn CCodegen.collect_used_struct_types(self: CCodegen) -> Vec[i32]:
-    var out: Vec[i32] = Vec.new()
-    var seen_names: HashMap[i32, i32] = HashMap.new()
+    var acc = CollectStructTypes.new()
 
     for bi in 0..self.mir_mod.bodies.len() as i32:
         if self.check_interrupted() != 0:
-            return out
+            return acc.out
         let body: MirBody = self.mir_mod.bodies.get(bi as i64)
         for li in 0..body.local_type_ids.len() as i32:
             if self.check_interrupted() != 0:
-                return out
+                return acc.out
             let tid = body.local_type_ids.get(li as i64)
-            self.collect_struct_types_from_tid(&mut out, &mut seen_names, tid)
+            acc = self.collect_struct_types_from_tid(acc, tid)
         let sig_idx = self.body_sig_index(body.fn_sym)
         if sig_idx >= 0:
             let ret_tid = self.sema.sig_return_type(sig_idx)
-            self.collect_struct_types_from_tid(&mut out, &mut seen_names, ret_tid)
+            acc = self.collect_struct_types_from_tid(acc, ret_tid)
             let param_count = self.sema.sig_get_param_count(sig_idx)
             for pi in 0..param_count:
                 let p_tid = self.sema.sig_param_type(sig_idx, pi)
-                self.collect_struct_types_from_tid(&mut out, &mut seen_names, p_tid)
+                acc = self.collect_struct_types_from_tid(acc, p_tid)
 
     var i = 0
-    while i < out.len() as i32:
+    while i < acc.out.len() as i32:
         if self.check_interrupted() != 0:
-            return out
-        let tid = out.get(i as i64)
+            return acc.out
+        let tid = acc.out.get(i as i64)
         i = i + 1
         let start = self.sema.get_type_d1(tid)
         let count = self.sema.get_type_d2(tid)
         for fi in 0..count:
             if self.check_interrupted() != 0:
-                return out
+                return acc.out
             let raw_field_tid = self.sema.type_extra.get((start + fi * 3 + 1) as i64)
-            self.collect_struct_types_from_tid(&mut out, &mut seen_names, raw_field_tid)
+            acc = self.collect_struct_types_from_tid(acc, raw_field_tid)
 
-    out
+    acc.out
 
 fn CCodegen.emit_struct_type_defs(self: CCodegen) -> str:
     let struct_tids = self.collect_used_struct_types()
