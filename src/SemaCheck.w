@@ -5905,6 +5905,16 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
                 self.emit_warning("mutating method requires a place receiver (§15.3)", node)
             else if recv_mut_state == PlaceMut.PM_ReadOnly or recv_via_ro_ref != 0:
                 self.emit_warning("cannot call mutating method through a read-only place (§15.2)", node)
+            else:
+                // §15.6 — only check view-liveness when the receiver actually
+                // is a mutable place we'd be mutating.
+                self.check_mutation_against_views(expr, node)
+        else if type_name_sym != 0 and self.builtin_method_requires_mutable_receiver(type_name_sym, field) != 0:
+            // §15.6 — view-liveness for builtin mutating methods (push, pop,
+            // insert, etc.). The earlier hardcoded path already rejected
+            // shared-ref / read-only receivers; here we additionally check
+            // for outstanding SHARED borrows of the receiver place.
+            self.check_mutation_against_views(expr, node)
 
     // Static enum variant constructor: Shape.Rect(1, 2), Option[i32].Some(1)
     if self.static_receiver_type_is_known(expr) != 0 and self.enum_has_variant(obj_type, field) != 0:
@@ -6701,6 +6711,46 @@ fn Sema.check_borrow_create(self: Sema, operand_node: i32, kind: i32, err_node: 
     self.borrow_refs.push(0)
     self.borrow_path_starts.push(path_start)
     self.borrow_path_counts.push(path_count)
+
+// docs/mut.md Rev 8 §8.4 / §15.6 — a mutating access to place P conflicts
+// with any live shared borrow (read-only view) of P or an overlapping
+// projection. The lexical-borrow infrastructure tracks per-place SHARED
+// borrows; this check scans them when a mutation lands and warns when any
+// overlapping borrow is still live. Warnings during P7..P11; promoted to
+// errors at P12 lockdown. NLL last-use tightening lands in P6 future work.
+//
+// We only fire on SHARED borrows tied to a NAMED reference (borrow_refs[i]
+// != 0). Unnamed temporary borrows — e.g., `&xs[0]` materialized as a
+// function argument — already expire when the enclosing call returns
+// from a value-flow standpoint, even if the lexical infrastructure leaves
+// them in the table. Reporting on those would be spec-noise (the spec's
+// liveness rule is bound to view bindings, not anonymous temporaries).
+fn Sema.check_mutation_against_views(self: Sema, place_node: i32, err_node: i32):
+    let place = self.borrow_root_place(place_node)
+    if place == 0:
+        return
+    let path_start = self.borrow_path_data.len() as i32
+    let path_count = self.borrow_collect_path(place_node)
+    var i = 0
+    while i < self.borrow_kinds.len() as i32:
+        let existing_place = self.borrow_places.get(i as i64)
+        if existing_place != place:
+            i = i + 1
+            continue
+        let existing_kind = self.borrow_kinds.get(i as i64)
+        if existing_kind != BorrowKind.SHARED:
+            i = i + 1
+            continue
+        if self.borrow_refs.get(i as i64) == 0:
+            i = i + 1
+            continue
+        let ex_path_start = self.borrow_path_starts.get(i as i64)
+        let ex_path_count = self.borrow_path_counts.get(i as i64)
+        if self.are_borrows_disjoint_paths(path_start, path_count, ex_path_start, ex_path_count) != 0:
+            i = i + 1
+            continue
+        self.emit_warning("cannot mutate place: a read-only view of it is still live (§15.6)", err_node)
+        return
 
 // Register a borrow with pre-computed place/kind/field/path.
 // Used by closure capture registration.
