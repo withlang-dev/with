@@ -130,7 +130,7 @@ unsafe fn sha256_finish(ctx: *mut Sha256, out: *mut u8):
 
     // Append length in bits (big-endian, 8 bytes)
     var len_buf: [u8; 8] = [0 as u8; 8]
-    u64_to_be(&mut len_buf[0] as *mut u8, 0, total_bits)
+    u64_to_be(&raw mut len_buf[0] as *mut u8, 0, total_bits)
     sha256_update(ctx, &len_buf[0] as *const u8, 8)
 
     // Output digest (big-endian)
@@ -140,7 +140,7 @@ unsafe fn sha256_finish(ctx: *mut Sha256, out: *mut u8):
 // Convenience: hash a byte buffer and return 32-byte digest
 fn sha256_hash(data: *const u8, len: i32, out: *mut u8):
     var ctx = Sha256.new()
-    let p = &mut ctx as *mut Sha256
+    let p = &raw mut ctx as *mut Sha256
     unsafe: sha256_update(p, data, len)
     unsafe: sha256_finish(p, out)
 

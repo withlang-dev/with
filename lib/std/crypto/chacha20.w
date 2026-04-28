@@ -22,7 +22,7 @@ unsafe fn qr(s: *mut u32, a: i32, b: i32, c: i32, d: i32):
 
 unsafe fn chacha20_block(key: *const u8, nonce: *const u8, counter: u32, out: *mut u8):
     var state: [u32; 16] = [0 as u32; 16]
-    let sp = &mut state[0] as *mut u32
+    let sp = &raw mut state[0] as *mut u32
     // "expand 32-byte k"
     *(sp + 0 as u64) = 0x61707865 as u32
     *(sp + 1 as u64) = 0x3320646e as u32
@@ -35,7 +35,7 @@ unsafe fn chacha20_block(key: *const u8, nonce: *const u8, counter: u32, out: *m
         *(sp + (13 + i) as u64) = u32_from_le(nonce, i * 4)
 
     var working: [u32; 16] = [0 as u32; 16]
-    let wp = &mut working[0] as *mut u32
+    let wp = &raw mut working[0] as *mut u32
     for i in 0..16:
         *(wp + i as u64) = state[i]
 
@@ -60,7 +60,7 @@ unsafe fn chacha20_crypt(key: *const u8, nonce: *const u8, counter: u32, data: *
     var off = 0
     while off < len:
         var block: [u8; 64] = [0 as u8; 64]
-        let bp = &mut block[0] as *mut u8
+        let bp = &raw mut block[0] as *mut u8
         chacha20_block(key, nonce, ctr, bp)
         let remaining = len - off
         let chunk = if remaining < 64: remaining else: 64

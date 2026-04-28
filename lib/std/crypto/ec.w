@@ -111,7 +111,7 @@ unsafe fn fe_inv(dst: *mut u32, a: *const u32, p: *const u32, p0i: u32):
         i = i + 1
     var t1: [u32; 12] = [0u32; 12]
     var t2: [u32; 12] = [0u32; 12]
-    i31_modpow(dst, &pm2[0] as *const u8, 32, p, p0i, &mut t1[0] as *mut u32, &mut t2[0] as *mut u32)
+    i31_modpow(dst, &pm2[0] as *const u8, 32, p, p0i, &raw mut t1[0] as *mut u32, &raw mut t2[0] as *mut u32)
 
 // Copy field element
 unsafe fn fe_copy(dst: *mut u32, src: *const u32):
@@ -194,11 +194,11 @@ unsafe fn point_double(r: *mut u32, pt: *const u32, p: *const u32, p0i: u32):
     var c: [u32; 12] = [0u32; 12]
     var d: [u32; 12] = [0u32; 12]
     var t: [u32; 12] = [0u32; 12]
-    let ap = &mut a[0] as *mut u32
-    let bp = &mut b[0] as *mut u32
-    let cp = &mut c[0] as *mut u32
-    let dp = &mut d[0] as *mut u32
-    let tp = &mut t[0] as *mut u32
+    let ap = &raw mut a[0] as *mut u32
+    let bp = &raw mut b[0] as *mut u32
+    let cp = &raw mut c[0] as *mut u32
+    let dp = &raw mut d[0] as *mut u32
+    let tp = &raw mut t[0] as *mut u32
 
     let px = point_x_const(pt)
     let py = point_y_const(pt)
@@ -253,14 +253,14 @@ unsafe fn point_add(r: *mut u32, pt1: *const u32, pt2: *const u32, p: *const u32
     var rr: [u32; 12] = [0u32; 12]
     var t: [u32; 12] = [0u32; 12]
     var t2v: [u32; 12] = [0u32; 12]
-    let u1p = &mut u1[0] as *mut u32
-    let u2p = &mut u2[0] as *mut u32
-    let s1p = &mut s1[0] as *mut u32
-    let s2p = &mut s2[0] as *mut u32
-    let hp = &mut h[0] as *mut u32
-    let rrp = &mut rr[0] as *mut u32
-    let tp = &mut t[0] as *mut u32
-    let t2p = &mut t2v[0] as *mut u32
+    let u1p = &raw mut u1[0] as *mut u32
+    let u2p = &raw mut u2[0] as *mut u32
+    let s1p = &raw mut s1[0] as *mut u32
+    let s2p = &raw mut s2[0] as *mut u32
+    let hp = &raw mut h[0] as *mut u32
+    let rrp = &raw mut rr[0] as *mut u32
+    let tp = &raw mut t[0] as *mut u32
+    let t2p = &raw mut t2v[0] as *mut u32
 
     let p1x = point_x_const(pt1)
     let p1y = point_y_const(pt1)
@@ -278,9 +278,9 @@ unsafe fn point_add(r: *mut u32, pt1: *const u32, pt2: *const u32, p: *const u32
     // S1 = Y1*Z2³, S2 = Y2*Z1³ (separate buffers to avoid montmul aliasing)
     var z2_cubed: [u32; 12] = [0u32; 12]
     var z1_cubed: [u32; 12] = [0u32; 12]
-    fe_mul(&mut z2_cubed[0] as *mut u32, tp as *const u32, p2z, p, p0i)
+    fe_mul(&raw mut z2_cubed[0] as *mut u32, tp as *const u32, p2z, p, p0i)
     fe_mul(s1p, p1y, &z2_cubed[0] as *const u32, p, p0i)
-    fe_mul(&mut z1_cubed[0] as *mut u32, t2p as *const u32, p1z, p, p0i)
+    fe_mul(&raw mut z1_cubed[0] as *mut u32, t2p as *const u32, p1z, p, p0i)
     fe_mul(s2p, p2y, &z1_cubed[0] as *const u32, p, p0i)
 
     fe_sub(hp, u2p as *const u32, u1p as *const u32, p)
@@ -303,7 +303,7 @@ unsafe fn point_add(r: *mut u32, pt1: *const u32, pt2: *const u32, p: *const u32
 
     // u1h2 = U1*H² (separate buffer to avoid aliasing u1p as both dst and src)
     var u1h2: [u32; 12] = [0u32; 12]
-    fe_mul(&mut u1h2[0] as *mut u32, u1p as *const u32, tp as *const u32, p, p0i)
+    fe_mul(&raw mut u1h2[0] as *mut u32, u1p as *const u32, tp as *const u32, p, p0i)
     fe_sqr(rx, rrp as *const u32, p, p0i)
     fe_sub(rx, rx as *const u32, t2p as *const u32, p)
     fe_sub(rx, rx as *const u32, &u1h2[0] as *const u32, p)
@@ -316,7 +316,7 @@ unsafe fn point_add(r: *mut u32, pt1: *const u32, pt2: *const u32, p: *const u32
 
     // z1z2 = Z1*Z2 (separate buffer to avoid aliasing rz as both dst and src in next mul)
     var z1z2: [u32; 12] = [0u32; 12]
-    fe_mul(&mut z1z2[0] as *mut u32, p1z, p2z, p, p0i)
+    fe_mul(&raw mut z1z2[0] as *mut u32, p1z, p2z, p, p0i)
     fe_mul(rz, &z1z2[0] as *const u32, hp as *const u32, p, p0i)
 
 // Scalar multiplication: R = k * P
@@ -325,7 +325,7 @@ unsafe fn point_mul(r: *mut u32, k: *const u8, pt: *const u32, p: *const u32, p0
     point_zero(r, p)
 
     var tmp: [u32; 36] = [0u32; 36]
-    let tmpp = &mut tmp[0] as *mut u32
+    let tmpp = &raw mut tmp[0] as *mut u32
 
     // Double-and-add, MSB first
     var bi = 0
@@ -358,12 +358,12 @@ unsafe fn point_to_affine(x_out: *mut u8, y_out: *mut u8, pt: *const u32, p: *co
     var ax: [u32; 12] = [0u32; 12]
     var ay: [u32; 12] = [0u32; 12]
 
-    let zcp = &mut z_copy[0] as *mut u32
-    let zip = &mut z_inv[0] as *mut u32
-    let zi2p = &mut z_inv2[0] as *mut u32
-    let zi3p = &mut z_inv3[0] as *mut u32
-    let axp = &mut ax[0] as *mut u32
-    let ayp = &mut ay[0] as *mut u32
+    let zcp = &raw mut z_copy[0] as *mut u32
+    let zip = &raw mut z_inv[0] as *mut u32
+    let zi2p = &raw mut z_inv2[0] as *mut u32
+    let zi3p = &raw mut z_inv3[0] as *mut u32
+    let axp = &raw mut ax[0] as *mut u32
+    let ayp = &raw mut ay[0] as *mut u32
 
     let pz = point_z_const(pt)
     let px = point_x_const(pt)
@@ -402,7 +402,7 @@ unsafe fn point_to_affine(x_out: *mut u8, y_out: *mut u8, pt: *const u32, p: *co
 // public_key: 65 bytes output (0x04 || X || Y, uncompressed)
 unsafe fn p256_compute_public(private_key: *const u8, public_key: *mut u8):
     var p: [u32; 12] = [0u32; 12]
-    p256_load_p(&mut p[0] as *mut u32)
+    p256_load_p(&raw mut p[0] as *mut u32)
     let pp = &p[0] as *const u32
     let p0i = i31_ninv31(p[1])
 
@@ -410,23 +410,23 @@ unsafe fn p256_compute_public(private_key: *const u8, public_key: *mut u8):
     var gx: [u32; 12] = [0u32; 12]
     var gy: [u32; 12] = [0u32; 12]
     var gz: [u32; 12] = [0u32; 12]
-    p256_load_gx(&mut gx[0] as *mut u32, pp)
-    p256_load_gy(&mut gy[0] as *mut u32, pp)
-    fe_one(&mut gz[0] as *mut u32, pp)
-    fe_to_monty(&mut gx[0] as *mut u32, pp)
-    fe_to_monty(&mut gy[0] as *mut u32, pp)
-    fe_to_monty(&mut gz[0] as *mut u32, pp)
+    p256_load_gx(&raw mut gx[0] as *mut u32, pp)
+    p256_load_gy(&raw mut gy[0] as *mut u32, pp)
+    fe_one(&raw mut gz[0] as *mut u32, pp)
+    fe_to_monty(&raw mut gx[0] as *mut u32, pp)
+    fe_to_monty(&raw mut gy[0] as *mut u32, pp)
+    fe_to_monty(&raw mut gz[0] as *mut u32, pp)
 
     // Pack into point
     var g_pt: [u32; 36] = [0u32; 36]
-    let gp = &mut g_pt[0] as *mut u32
+    let gp = &raw mut g_pt[0] as *mut u32
     fe_copy(point_x(gp), &gx[0] as *const u32)
     fe_copy(point_y(gp), &gy[0] as *const u32)
     fe_copy(point_z(gp), &gz[0] as *const u32)
 
     // R = k * G
     var r_pt: [u32; 36] = [0u32; 36]
-    let rp = &mut r_pt[0] as *mut u32
+    let rp = &raw mut r_pt[0] as *mut u32
     point_mul(rp, private_key, gp as *const u32, pp, p0i)
 
     // Convert to affine and output
@@ -439,7 +439,7 @@ unsafe fn p256_compute_public(private_key: *const u8, public_key: *mut u8):
 // secret: 32 bytes output (x-coordinate of k * peer_public)
 unsafe fn p256_ecdh(private_key: *const u8, peer_public: *const u8, secret: *mut u8):
     var p: [u32; 12] = [0u32; 12]
-    p256_load_p(&mut p[0] as *mut u32)
+    p256_load_p(&raw mut p[0] as *mut u32)
     let pp = &p[0] as *const u32
     let p0i = i31_ninv31(p[1])
 
@@ -447,24 +447,24 @@ unsafe fn p256_ecdh(private_key: *const u8, peer_public: *const u8, secret: *mut
     var qx: [u32; 12] = [0u32; 12]
     var qy: [u32; 12] = [0u32; 12]
     var qz: [u32; 12] = [0u32; 12]
-    i31_decode_reduce(&mut qx[0] as *mut u32, peer_public + 1u64, 32, pp)
-    i31_decode_reduce(&mut qy[0] as *mut u32, peer_public + 33u64, 32, pp)
-    fe_one(&mut qz[0] as *mut u32, pp)
-    fe_to_monty(&mut qx[0] as *mut u32, pp)
-    fe_to_monty(&mut qy[0] as *mut u32, pp)
-    fe_to_monty(&mut qz[0] as *mut u32, pp)
+    i31_decode_reduce(&raw mut qx[0] as *mut u32, peer_public + 1u64, 32, pp)
+    i31_decode_reduce(&raw mut qy[0] as *mut u32, peer_public + 33u64, 32, pp)
+    fe_one(&raw mut qz[0] as *mut u32, pp)
+    fe_to_monty(&raw mut qx[0] as *mut u32, pp)
+    fe_to_monty(&raw mut qy[0] as *mut u32, pp)
+    fe_to_monty(&raw mut qz[0] as *mut u32, pp)
 
     var q_pt: [u32; 36] = [0u32; 36]
-    let qp = &mut q_pt[0] as *mut u32
+    let qp = &raw mut q_pt[0] as *mut u32
     fe_copy(point_x(qp), &qx[0] as *const u32)
     fe_copy(point_y(qp), &qy[0] as *const u32)
     fe_copy(point_z(qp), &qz[0] as *const u32)
 
     // R = k * Q
     var r_pt: [u32; 36] = [0u32; 36]
-    let rp = &mut r_pt[0] as *mut u32
+    let rp = &raw mut r_pt[0] as *mut u32
     point_mul(rp, private_key, qp as *const u32, pp, p0i)
 
     // Output x-coordinate
     var y_dummy: [u8; 32] = [0u8; 32]
-    point_to_affine(secret, &mut y_dummy[0] as *mut u8, rp as *const u32, pp, p0i)
+    point_to_affine(secret, &raw mut y_dummy[0] as *mut u8, rp as *const u32, pp, p0i)

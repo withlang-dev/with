@@ -7,7 +7,7 @@ use std.crypto.endian
 unsafe fn chacha20_poly1305_encrypt(key: *const u8, nonce: *const u8, aad: *const u8, aad_len: i32, plaintext: *const u8, pt_len: i32, ciphertext: *mut u8, tag: *mut u8):
     // Generate Poly1305 key from ChaCha20 block 0
     var poly_key: [u8; 64] = [0 as u8; 64]
-    let pkp = &mut poly_key[0] as *mut u8
+    let pkp = &raw mut poly_key[0] as *mut u8
     chacha20_block(key, nonce, 0 as u32, pkp)
 
     // Encrypt with ChaCha20 (counter starts at 1)
@@ -17,7 +17,7 @@ unsafe fn chacha20_poly1305_encrypt(key: *const u8, nonce: *const u8, aad: *cons
 
     // Poly1305 MAC over: AAD || pad || ciphertext || pad || lengths
     var mac = Poly1305.new(pkp as *const u8)
-    let mp = &mut mac as *mut Poly1305
+    let mp = &raw mut mac as *mut Poly1305
 
     // Process AAD
     if aad_len > 0:
@@ -38,7 +38,7 @@ unsafe fn chacha20_poly1305_encrypt(key: *const u8, nonce: *const u8, aad: *cons
 
     // Lengths block (8 bytes each, little-endian)
     var len_block: [u8; 16] = [0 as u8; 16]
-    let lbp = &mut len_block[0] as *mut u8
+    let lbp = &raw mut len_block[0] as *mut u8
     u64_to_le(lbp, 0, aad_len as u64)
     u64_to_le(lbp, 8, pt_len as u64)
     poly1305_update(mp, lbp as *const u8, 16)

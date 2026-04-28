@@ -66,7 +66,7 @@ unsafe fn der_skip(buf: *const u8, buf_len: i32, pos: i32) -> i32:
     var tag: u8 = 0u8
     var cs: i32 = 0
     var cl: i32 = 0
-    der_read_tl(buf, buf_len, pos, &mut tag as *mut u8, &mut cs as *mut i32, &mut cl as *mut i32)
+    der_read_tl(buf, buf_len, pos, &raw mut tag as *mut u8, &raw mut cs as *mut i32, &raw mut cl as *mut i32)
     if cs < 0:
         return -1
     cs + cl
@@ -191,9 +191,9 @@ unsafe fn x509_parse(cert: *mut X509Cert, buf: *const u8, buf_len: i32) -> i32:
     var tag: u8 = 0u8
     var cs: i32 = 0
     var cl: i32 = 0
-    let tp = &mut tag as *mut u8
-    let csp = &mut cs as *mut i32
-    let clp = &mut cl as *mut i32
+    let tp = &raw mut tag as *mut u8
+    let csp = &raw mut cs as *mut i32
+    let clp = &raw mut cl as *mut i32
 
     // Outer SEQUENCE
     der_read_tl(buf, buf_len, 0, tp, csp, clp)
@@ -333,10 +333,10 @@ unsafe fn x509_parse(cert: *mut X509Cert, buf: *const u8, buf_len: i32) -> i32:
 // Identify signature algorithm from OID
 unsafe fn identify_sig_alg(buf: *const u8, oid_start: i32, oid_len: i32) -> i32:
     var oid_buf: [u8; 9] = [0u8; 9]
-    oid_sha256_rsa(&mut oid_buf[0] as *mut u8)
+    oid_sha256_rsa(&raw mut oid_buf[0] as *mut u8)
     if oid_match(buf, oid_start, oid_len, &oid_buf[0] as *const u8, OID_SHA256_RSA_LEN) != 0:
         return SIG_ALG_SHA256_RSA
-    oid_ecdsa_sha256(&mut oid_buf[0] as *mut u8)
+    oid_ecdsa_sha256(&raw mut oid_buf[0] as *mut u8)
     if oid_match(buf, oid_start, oid_len, &oid_buf[0] as *const u8, OID_ECDSA_SHA256_LEN) != 0:
         return SIG_ALG_ECDSA_SHA256
     SIG_ALG_UNKNOWN
@@ -344,10 +344,10 @@ unsafe fn identify_sig_alg(buf: *const u8, oid_start: i32, oid_len: i32) -> i32:
 // Identify key type from algorithm OID
 unsafe fn identify_key_type(buf: *const u8, oid_start: i32, oid_len: i32) -> i32:
     var oid_buf: [u8; 9] = [0u8; 9]
-    oid_rsa_enc(&mut oid_buf[0] as *mut u8)
+    oid_rsa_enc(&raw mut oid_buf[0] as *mut u8)
     if oid_match(buf, oid_start, oid_len, &oid_buf[0] as *const u8, OID_RSA_ENC_LEN) != 0:
         return KEY_TYPE_RSA
-    oid_ec_pub(&mut oid_buf[0] as *mut u8)
+    oid_ec_pub(&raw mut oid_buf[0] as *mut u8)
     if oid_match(buf, oid_start, oid_len, &oid_buf[0] as *const u8, OID_EC_PUB_LEN) != 0:
         return KEY_TYPE_EC
     KEY_TYPE_UNKNOWN
@@ -364,7 +364,7 @@ unsafe fn x509_verify_signature(
 ) -> i32:
     // Hash the tbsCertificate
     var tbs_hash: [u8; 32] = [0u8; 32]
-    sha256_hash(cert_buf + cert.tbs_start as u64, cert.tbs_len, &mut tbs_hash[0] as *mut u8)
+    sha256_hash(cert_buf + cert.tbs_start as u64, cert.tbs_len, &raw mut tbs_hash[0] as *mut u8)
 
     let sig_alg = cert.sig_alg
 
@@ -384,11 +384,11 @@ unsafe fn x509_verify_signature(
         var scs: i32 = 0
         var scl: i32 = 0
         // Outer SEQUENCE
-        der_read_tl(cert_buf, sig_end, sig_pos, &mut stag as *mut u8, &mut scs as *mut i32, &mut scl as *mut i32)
+        der_read_tl(cert_buf, sig_end, sig_pos, &raw mut stag as *mut u8, &raw mut scs as *mut i32, &raw mut scl as *mut i32)
         if scs < 0 or stag != ASN1_SEQUENCE:
             return 0
         // r INTEGER
-        der_read_tl(cert_buf, sig_end, scs, &mut stag as *mut u8, &mut scs as *mut i32, &mut scl as *mut i32)
+        der_read_tl(cert_buf, sig_end, scs, &raw mut stag as *mut u8, &raw mut scs as *mut i32, &raw mut scl as *mut i32)
         if scs < 0 or stag != ASN1_INTEGER:
             return 0
         var r_start = scs
@@ -405,7 +405,7 @@ unsafe fn x509_verify_signature(
             ri = ri + 1
 
         // s INTEGER
-        der_read_tl(cert_buf, sig_end, scs + scl - (scs - r_start - 1), &mut stag as *mut u8, &mut scs as *mut i32, &mut scl as *mut i32)
+        der_read_tl(cert_buf, sig_end, scs + scl - (scs - r_start - 1), &raw mut stag as *mut u8, &raw mut scs as *mut i32, &raw mut scl as *mut i32)
         // Hmm, need to track position properly. Let me use the end of r.
         let r_der_end = r_start + r_len
         // Actually, r had a leading zero stripped. Go back to original position.
@@ -423,9 +423,9 @@ unsafe fn ecdsa_verify_der_sig(
     var tag: u8 = 0u8
     var cs: i32 = 0
     var cl: i32 = 0
-    let tp = &mut tag as *mut u8
-    let csp = &mut cs as *mut i32
-    let clp = &mut cl as *mut i32
+    let tp = &raw mut tag as *mut u8
+    let csp = &raw mut cs as *mut i32
+    let clp = &raw mut cl as *mut i32
 
     let sig_start = cert.sig_start
     let sig_end = sig_start + cert.sig_len

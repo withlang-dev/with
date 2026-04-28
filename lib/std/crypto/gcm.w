@@ -43,7 +43,7 @@ unsafe fn ghash_update(state: *mut u8, h: *const u8, block: *const u8):
     for i in 0..16:
         *(state + i as u64) = *(state + i as u64) ^ *(block + i as u64)
     var tmp: [u8; 16] = [0 as u8; 16]
-    let tp = &mut tmp[0] as *mut u8
+    let tp = &raw mut tmp[0] as *mut u8
     ghash_mult(state as *const u8, h, tp)
     for i in 0..16:
         *(state + i as u64) = tmp[i]
@@ -60,7 +60,7 @@ unsafe fn increment_counter(ctr: *mut u8):
 fn AesGcm.new(key: *const u8, iv: *const u8, iv_len: i32) -> AesGcm:
     let aes_ctx = Aes128.new(key)
     var h: [u8; 16] = [0 as u8; 16]
-    let hp = &mut h[0] as *mut u8
+    let hp = &raw mut h[0] as *mut u8
     Aes128.encrypt_block(&aes_ctx as *const Aes128, hp)
 
     var j0: [u8; 16] = [0 as u8; 16]
@@ -72,7 +72,7 @@ fn AesGcm.new(key: *const u8, iv: *const u8, iv_len: i32) -> AesGcm:
     var counter: [u8; 16] = [0 as u8; 16]
     for i in 0..16:
         counter[i] = j0[i]
-    unsafe: increment_counter(&mut counter[0] as *mut u8)
+    unsafe: increment_counter(&raw mut counter[0] as *mut u8)
 
     AesGcm {
         aes: aes_ctx, h, j0, counter,
@@ -87,7 +87,7 @@ unsafe fn aesgcm_aad(ctx: *mut AesGcm, data: *const u8, len: i32):
     for i in 0..16:
         gs[i] = ctx.ghash_state[i]
         hh[i] = ctx.h[i]
-    let gsp = &mut gs[0] as *mut u8
+    let gsp = &raw mut gs[0] as *mut u8
     let hhp = &hh[0] as *const u8
     var off = 0
     while off + 16 <= len:
@@ -95,7 +95,7 @@ unsafe fn aesgcm_aad(ctx: *mut AesGcm, data: *const u8, len: i32):
         off = off + 16
     if off < len:
         var pad: [u8; 16] = [0 as u8; 16]
-        let pp = &mut pad[0] as *mut u8
+        let pp = &raw mut pad[0] as *mut u8
         for i in 0..(len - off):
             *(pp + i as u64) = *(data + (off + i) as u64)
         ghash_update(gsp, hhp, pp as *const u8)
@@ -114,15 +114,15 @@ unsafe fn aesgcm_encrypt(ctx: *mut AesGcm, pt: *const u8, ct: *mut u8, len: i32)
         ctr[i] = ctx.counter[i]
         gs[i] = ctx.ghash_state[i]
         hh[i] = ctx.h[i]
-    let ctrp = &mut ctr[0] as *mut u8
-    let gsp = &mut gs[0] as *mut u8
+    let ctrp = &raw mut ctr[0] as *mut u8
+    let gsp = &raw mut gs[0] as *mut u8
     let hhp = &hh[0] as *const u8
     var aes_copy = ctx.aes
 
     var off = 0
     while off < len:
         var ks: [u8; 16] = [0 as u8; 16]
-        let ksp = &mut ks[0] as *mut u8
+        let ksp = &raw mut ks[0] as *mut u8
         for i in 0..16:
             *(ksp + i as u64) = ctr[i]
         Aes128.encrypt_block(&aes_copy as *const Aes128, ksp)
@@ -154,8 +154,8 @@ unsafe fn aesgcm_decrypt(ctx: *mut AesGcm, ct_in: *const u8, pt_out: *mut u8, le
         ctr[i] = ctx.counter[i]
         gs[i] = ctx.ghash_state[i]
         hh[i] = ctx.h[i]
-    let ctrp = &mut ctr[0] as *mut u8
-    let gsp = &mut gs[0] as *mut u8
+    let ctrp = &raw mut ctr[0] as *mut u8
+    let gsp = &raw mut gs[0] as *mut u8
     let hhp = &hh[0] as *const u8
     var aes_copy = ctx.aes
 
@@ -172,7 +172,7 @@ unsafe fn aesgcm_decrypt(ctx: *mut AesGcm, ct_in: *const u8, pt_out: *mut u8, le
 
         // XOR with keystream to decrypt
         var ks: [u8; 16] = [0 as u8; 16]
-        let ksp = &mut ks[0] as *mut u8
+        let ksp = &raw mut ks[0] as *mut u8
         for i in 0..16:
             *(ksp + i as u64) = ctr[i]
         Aes128.encrypt_block(&aes_copy as *const Aes128, ksp)
@@ -197,18 +197,18 @@ unsafe fn aesgcm_tag(ctx: *mut AesGcm, out: *mut u8):
         gs[i] = ctx.ghash_state[i]
         hh[i] = ctx.h[i]
         j0[i] = ctx.j0[i]
-    let gsp = &mut gs[0] as *mut u8
+    let gsp = &raw mut gs[0] as *mut u8
     let hhp = &hh[0] as *const u8
 
     var len_block: [u8; 16] = [0 as u8; 16]
-    let lbp = &mut len_block[0] as *mut u8
+    let lbp = &raw mut len_block[0] as *mut u8
     u64_to_be(lbp, 0, ctx.aad_len * 8 as u64)
     u64_to_be(lbp, 8, ctx.ct_len * 8 as u64)
     ghash_update(gsp, hhp, lbp as *const u8)
 
     var aes_copy = ctx.aes
     var j0_enc: [u8; 16] = [0 as u8; 16]
-    let jp = &mut j0_enc[0] as *mut u8
+    let jp = &raw mut j0_enc[0] as *mut u8
     for i in 0..16:
         *(jp + i as u64) = j0[i]
     Aes128.encrypt_block(&aes_copy as *const Aes128, jp)
