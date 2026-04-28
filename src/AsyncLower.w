@@ -52,20 +52,8 @@ fn async_ast_get_start(ast: AstPool, node: i32) -> i32:
 fn async_ast_kind(ast: AstPool, node: i32) -> i32:
     ast.kind(node)
 
-fn async_body_add_suspend(body: &mut AsyncMirBody, suspend_kind: i32, span_start: i32, span_end: i32, resume_bb: i32, live_locals: i32, storage_dead: i32, drop_count: i32):
-    body.add_suspend(suspend_kind, span_start, span_end, resume_bb, live_locals, storage_dead, drop_count)
-
-fn async_body_finalize_states(body: &mut AsyncMirBody):
-    body.finalize_states()
-
 fn async_body_suspend_count(body: AsyncMirBody) -> i32:
     body.suspend_count()
-
-fn async_diags_emit(diags: &mut DiagnosticList, diag: Diagnostic):
-    diags.emit(diag)
-
-fn async_mod_add_body(out_mod: &mut AsyncMirModule, body: AsyncMirBody):
-    out_mod.add_body(body)
 
 fn lower_async_module(mir_mod: MirModule, ast: AstPool, pool: InternPool, sema: Sema, diags: DiagnosticList) -> AsyncLowerResult:
     var lower = AsyncLower {
@@ -105,10 +93,8 @@ fn AsyncLower.lower_body(self: AsyncLower, mir_body: MirBody):
                 self.emit_error_at_span("yield used outside generator function", self.cur_body.suspend_span_starts.get(si as i64), self.cur_body.suspend_span_ends.get(si as i64))
                 break
 
-    let cur_body = &mut self.cur_body
-    async_body_finalize_states(cur_body)
-    let out_mod = &mut self.out_mod
-    async_mod_add_body(out_mod, self.cur_body)
+    self.cur_body.finalize_states()
+    self.out_mod.add_body(self.cur_body)
 
 fn AsyncLower.emit_error_at_span(self: AsyncLower, message: str, start: i32, end: i32):
     let span = Span {
@@ -116,15 +102,13 @@ fn AsyncLower.emit_error_at_span(self: AsyncLower, message: str, start: i32, end
         start,
         end,
     }
-    let diags = &mut self.diags
-    async_diags_emit(diags, Diagnostic.err(message, span))
+    self.diags.emit(Diagnostic.err(message, span))
 
 fn AsyncLower.record_suspend(self: AsyncLower, node: i32, suspend_kind: i32):
     let span_start = async_ast_get_start(self.ast, node)
     let span_end = async_ast_get_end(self.ast, node)
     let snap = async_snapshot_for_span(self.cur_mir_body, span_start)
-    let cur_body = &mut self.cur_body
-    async_body_add_suspend(cur_body, suspend_kind, span_start, span_end, snap.resume_bb, snap.live_locals, snap.storage_dead, snap.drop_count)
+    self.cur_body.add_suspend(suspend_kind, span_start, span_end, snap.resume_bb, snap.live_locals, snap.storage_dead, snap.drop_count)
 
 fn AsyncLower.walk_expr(self: AsyncLower, node: i32):
     if not async_node_valid(self.ast, node):
