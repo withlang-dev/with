@@ -7144,16 +7144,38 @@ fn Sema.classify_place(self: Sema, node: i32) -> i64:
     // Parenthesized: classify inner.
     if kind == NodeKind.NK_GROUPED:
         return self.classify_place(self.ast.get_data0(node))
-    // Index: §2.4 — only a place projection when the base type implements
-    // IndexPlace. Mutability inherits from base, downgraded to ReadOnly when
-    // the base is auto-derefed from `&T` or `*const T`.
+    // `unsafe: <expr>` form wraps a single expression; classify the inner.
+    // Block form (NK_UNSAFE_BLOCK over NK_BLOCK) won't classify as a place
+    // because NK_BLOCK isn't in any of the place arms.
+    if kind == NodeKind.NK_UNSAFE_BLOCK:
+        return self.classify_place(self.ast.get_data0(node))
+    // Index: §2.2 / §2.4 — `p[i]` for raw pointer `p` is always a place
+    // (mutability from the pointer's mut bit, unsafe required to access),
+    // regardless of whether `p` itself is a place. For non-pointer bases,
+    // indexing is a place only when the base is a place AND the base type
+    // implements IndexPlace.
     if kind == NodeKind.NK_INDEX:
         let base_node = self.ast.get_data0(node)
+        let cached_base_ty = self.typed_expr_types.get(base_node)
+        var base_ty: i32 = 0
+        if cached_base_ty.is_some():
+            base_ty = cached_base_ty.unwrap()
+        else:
+            base_ty = self.check_expr(base_node) as i32
+        if base_ty != 0:
+            let base_resolved = self.resolve_alias(base_ty as TypeId)
+            let base_tk = self.get_type_kind(base_resolved)
+            // Raw pointer indexing: p[i] where p: *const T → read-only;
+            // p: *mut T → mutable. Source-level §13.3 still requires unsafe
+            // for the actual memory access; that's enforced elsewhere.
+            if base_tk == TypeKind.TY_PTR:
+                if self.get_type_d1(base_resolved) != 0:
+                    return pack_place(PlaceKind.PK_DerefMutPtr, PlaceMut.PM_Mutable)
+                return pack_place(PlaceKind.PK_DerefConstPtr, PlaceMut.PM_ReadOnly)
         let base_packed = self.classify_place(base_node)
         if unpack_place_kind(base_packed) == PlaceKind.PK_NotPlace:
             return pack_place(PlaceKind.PK_NotPlace, PlaceMut.PM_NoMut)
-        let base_ty = self.typed_expr_types.get(base_node)
-        if base_ty.is_some() and self.type_is_index_place(base_ty.unwrap()) != 0:
+        if base_ty != 0 and self.type_is_index_place(base_ty) != 0:
             if self.place_base_is_read_only_ref(base_node) != 0:
                 return pack_place(unpack_place_kind(base_packed), PlaceMut.PM_ReadOnly)
             return base_packed
