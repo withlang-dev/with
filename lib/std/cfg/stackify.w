@@ -612,79 +612,79 @@ fn stackify_compute_analysis(graph: StackifyGraph) -> StackifyAnalysis:
         message: "",
     }
 
-fn stackify_result_push(ctx: &mut StackifyContext, node_id: i32):
-    if ctx.result_starts.len() == 0:
+fn StackifyContext.result_push(mut self: StackifyContext, node_id: i32):
+    if self.result_starts.len() == 0:
         return
-    ctx.result_items.push(node_id)
-    let top = ctx.result_counts.len() as i32 - 1
-    let new_count = ctx.result_counts.get(top as i64) + 1
-    ctx.result_counts.set_i32(top as i64, new_count)
+    self.result_items.push(node_id)
+    let top = self.result_counts.len() as i32 - 1
+    let new_count = self.result_counts.get(top as i64) + 1
+    self.result_counts.set_i32(top as i64, new_count)
 
-fn stackify_result_push_frame(ctx: &mut StackifyContext):
-    ctx.result_starts.push(ctx.result_items.len() as i32)
-    ctx.result_counts.push(0)
+fn StackifyContext.result_push_frame(mut self: StackifyContext):
+    self.result_starts.push(self.result_items.len() as i32)
+    self.result_counts.push(0)
 
-fn stackify_result_pop_frame(ctx: &mut StackifyContext) -> i32:
-    if ctx.result_starts.len() == 0:
+fn StackifyContext.result_pop_frame(mut self: StackifyContext) -> i32:
+    if self.result_starts.len() == 0:
         return 0
-    let idx = ctx.result_starts.len() as i32 - 1
-    let start = ctx.result_starts.get(idx as i64)
-    let _ = ctx.result_starts.pop()
-    let _ = ctx.result_counts.pop()
+    let idx = self.result_starts.len() as i32 - 1
+    let start = self.result_starts.get(idx as i64)
+    let _ = self.result_starts.pop()
+    let _ = self.result_counts.pop()
     start
 
-fn stackify_result_frame_count(ctx: StackifyContext, start: i32) -> i32:
-    ctx.result_items.len() as i32 - start
+fn StackifyContext.result_frame_count(self: StackifyContext, start: i32) -> i32:
+    self.result_items.len() as i32 - start
 
-fn stackify_result_truncate(ctx: &mut StackifyContext, start: i32):
-    while ctx.result_items.len() as i32 > start:
-        let _ = ctx.result_items.pop()
+fn StackifyContext.result_truncate(mut self: StackifyContext, start: i32):
+    while self.result_items.len() as i32 > start:
+        let _ = self.result_items.pop()
     return
 
-fn stackify_tree_add_child_range(ctx: &mut StackifyContext, start: i32, count: i32) -> i32:
-    let child_start = ctx.tree.children.len() as i32
+fn StackifyContext.tree_add_child_range(mut self: StackifyContext, start: i32, count: i32) -> i32:
+    let child_start = self.tree.children.len() as i32
     var i = 0
     while i < count:
-        ctx.tree.children.push(ctx.result_items.get((start + i) as i64))
+        self.tree.children.push(self.result_items.get((start + i) as i64))
         i = i + 1
     child_start
 
-fn stackify_tree_add_child_vec(ctx: &mut StackifyContext, children: Vec[i32]) -> i32:
-    let child_start = ctx.tree.children.len() as i32
+fn StackifyContext.tree_add_child_vec(mut self: StackifyContext, children: Vec[i32]) -> i32:
+    let child_start = self.tree.children.len() as i32
     var i: i64 = 0
     while i < children.len():
-        ctx.tree.children.push(children.get(i))
+        self.tree.children.push(children.get(i))
         i = i + 1
     child_start
 
-fn stackify_tree_add_values_from_vec(ctx: &mut StackifyContext, values: Vec[i32]) -> i32:
-    let start = ctx.tree.values.len() as i32
+fn StackifyContext.tree_add_values_from_vec(mut self: StackifyContext, values: Vec[i32]) -> i32:
+    let start = self.tree.values.len() as i32
     var i: i64 = 0
     while i < values.len():
-        ctx.tree.values.push(values.get(i))
+        self.tree.values.push(values.get(i))
         i = i + 1
     start
 
-fn stackify_tree_add_target_args(ctx: &mut StackifyContext, target: StackifyTarget) -> i32:
-    let start = ctx.tree.values.len() as i32
+fn StackifyContext.tree_add_target_args(mut self: StackifyContext, target: StackifyTarget) -> i32:
+    let start = self.tree.values.len() as i32
     var i = 0
     while i < target.args_count:
-        ctx.tree.values.push(ctx.graph.target_args.get((target.args_start + i) as i64))
+        self.tree.values.push(self.graph.target_args.get((target.args_start + i) as i64))
         i = i + 1
     start
 
-fn stackify_tree_add_block_params(ctx: &mut StackifyContext, block: i32) -> i32:
-    let b = ctx.graph.blocks.get(block as i64)
-    let start = ctx.tree.values.len() as i32
+fn StackifyContext.tree_add_block_params(mut self: StackifyContext, block: i32) -> i32:
+    let b = self.graph.blocks.get(block as i64)
+    let start = self.tree.values.len() as i32
     var i = 0
     while i < b.params_count:
-        ctx.tree.values.push(ctx.graph.block_params.get((b.params_start + i) as i64))
+        self.tree.values.push(self.graph.block_params.get((b.params_start + i) as i64))
         i = i + 1
     start
 
-fn stackify_tree_add_node(ctx: &mut StackifyContext, node: StackifyNode) -> i32:
-    let id = ctx.tree.nodes.len() as i32
-    ctx.tree.nodes.push(node)
+fn StackifyContext.tree_add_node(mut self: StackifyContext, node: StackifyNode) -> i32:
+    let id = self.tree.nodes.len() as i32
+    self.tree.nodes.push(node)
     id
 
 fn stackify_empty_node(kind: i32) -> StackifyNode:
@@ -706,101 +706,101 @@ fn stackify_empty_node(kind: i32) -> StackifyNode:
         to_values_count: 0,
     }
 
-fn stackify_push_process(ctx: &mut StackifyContext, kind: i32, block: i32, index: i32, value: i32, target: i32):
-    ctx.process_stack.push(StackifyProcessEntry { kind, block, index, value, target })
+fn StackifyContext.push_process(mut self: StackifyContext, kind: i32, block: i32, index: i32, value: i32, target: i32):
+    self.process_stack.push(StackifyProcessEntry { kind, block, index, value, target })
 
-fn stackify_pop_process(ctx: &mut StackifyContext) -> StackifyProcessEntry:
-    ctx.process_stack.pop()
+fn StackifyContext.pop_process(mut self: StackifyContext) -> StackifyProcessEntry:
+    self.process_stack.pop()
 
-fn stackify_push_ctrl(ctx: &mut StackifyContext, kind: i32, label_block: i32):
-    ctx.ctrl_stack.push(StackifyCtrlEntry { kind, label_block })
+fn StackifyContext.push_ctrl(mut self: StackifyContext, kind: i32, label_block: i32):
+    self.ctrl_stack.push(StackifyCtrlEntry { kind, label_block })
 
 fn stackify_ctrl_label(entry: StackifyCtrlEntry) -> i32:
     if entry.kind == StackifyCtrlKind.IfThenElse:
         return stackify_invalid()
     entry.label_block
 
-fn stackify_resolve_target(ctx: StackifyContext, target: i32) -> i32:
+fn StackifyContext.resolve_target(self: StackifyContext, target: i32) -> i32:
     var depth = 0
-    var i = ctx.ctrl_stack.len() as i32 - 1
+    var i = self.ctrl_stack.len() as i32 - 1
     while i >= 0:
-        if stackify_ctrl_label(ctx.ctrl_stack.get(i as i64)) == target:
+        if stackify_ctrl_label(self.ctrl_stack.get(i as i64)) == target:
             return depth
         depth = depth + 1
         i = i - 1
     stackify_invalid()
 
-fn stackify_add_param_transfer(ctx: &mut StackifyContext, target: StackifyTarget):
-    let id = stackify_make_param_transfer(ctx, target)
-    stackify_result_push(ctx, id)
+fn StackifyContext.add_param_transfer(mut self: StackifyContext, target: StackifyTarget):
+    let id = self.make_param_transfer(target)
+    self.result_push(id)
 
-fn stackify_make_param_transfer(ctx: &mut StackifyContext, target: StackifyTarget) -> i32:
-    let from_start = stackify_tree_add_target_args(ctx, target)
-    let to_start = stackify_tree_add_block_params(ctx, target.block)
+fn StackifyContext.make_param_transfer(mut self: StackifyContext, target: StackifyTarget) -> i32:
+    let from_start = self.tree_add_target_args(target)
+    let to_start = self.tree_add_block_params(target.block)
     var node = stackify_empty_node(StackifyNodeKind.ParamTransfer)
     node.values_start = from_start
     node.values_count = target.args_count
     node.to_values_start = to_start
-    node.to_values_count = ctx.graph.blocks.get(target.block as i64).params_count
-    stackify_tree_add_node(ctx, node)
+    node.to_values_count = self.graph.blocks.get(target.block as i64).params_count
+    self.tree_add_node(node)
 
-fn stackify_push_merge_children(ctx: &mut StackifyContext, block: i32):
-    let start = ctx.merge_items.len() as i32
-    var ri = ctx.analysis.rpo.len() as i32 - 1
+fn StackifyContext.push_merge_children(mut self: StackifyContext, block: i32):
+    let start = self.merge_items.len() as i32
+    var ri = self.analysis.rpo.len() as i32 - 1
     while ri >= 0:
-        let child = ctx.analysis.rpo.get(ri as i64)
-        if ctx.analysis.idom.get(child as i64) == block and ctx.analysis.merge_nodes.get(child as i64) != 0:
-            ctx.merge_items.push(child)
+        let child = self.analysis.rpo.get(ri as i64)
+        if self.analysis.idom.get(child as i64) == block and self.analysis.merge_nodes.get(child as i64) != 0:
+            self.merge_items.push(child)
         ri = ri - 1
-    ctx.merge_starts.push(start)
-    ctx.merge_counts.push(ctx.merge_items.len() as i32 - start)
+    self.merge_starts.push(start)
+    self.merge_counts.push(self.merge_items.len() as i32 - start)
 
-fn stackify_pop_merge_children(ctx: &mut StackifyContext):
-    if ctx.merge_starts.len() == 0:
+fn StackifyContext.pop_merge_children(mut self: StackifyContext):
+    if self.merge_starts.len() == 0:
         return
-    let idx = ctx.merge_starts.len() as i32 - 1
-    let start = ctx.merge_starts.get(idx as i64)
-    while ctx.merge_items.len() as i32 > start:
-        let _ = ctx.merge_items.pop()
-    let _ = ctx.merge_starts.pop()
-    let _ = ctx.merge_counts.pop()
+    let idx = self.merge_starts.len() as i32 - 1
+    let start = self.merge_starts.get(idx as i64)
+    while self.merge_items.len() as i32 > start:
+        let _ = self.merge_items.pop()
+    let _ = self.merge_starts.pop()
+    let _ = self.merge_counts.pop()
 
-fn stackify_do_branch(ctx: &mut StackifyContext, source: i32, target_index: i32):
-    let target = ctx.graph.targets.get(target_index as i64)
-    let source_rpo = ctx.analysis.rpo_pos.get(source as i64)
-    let target_rpo = ctx.analysis.rpo_pos.get(target.block as i64)
-    if ctx.analysis.merge_nodes.get(target.block as i64) != 0 or target_rpo <= source_rpo:
-        let label = stackify_resolve_target(*ctx, target.block)
+fn StackifyContext.do_branch(mut self: StackifyContext, source: i32, target_index: i32):
+    let target = self.graph.targets.get(target_index as i64)
+    let source_rpo = self.analysis.rpo_pos.get(source as i64)
+    let target_rpo = self.analysis.rpo_pos.get(target.block as i64)
+    if self.analysis.merge_nodes.get(target.block as i64) != 0 or target_rpo <= source_rpo:
+        let label = self.resolve_target(target.block)
         if label < 0:
-            ctx.ok = false
-            ctx.message = "stackify: branch target is not on the control stack"
+            self.ok = false
+            self.message = "stackify: branch target is not on the control stack"
             return
-        stackify_add_param_transfer(ctx, target)
+        self.add_param_transfer(target)
         var node = stackify_empty_node(StackifyNodeKind.Br)
         node.label = label
-        let id = stackify_tree_add_node(ctx, node)
-        stackify_result_push(ctx, id)
+        let id = self.tree_add_node(node)
+        self.result_push(id)
         return
-    if not stackify_dominates(ctx.analysis.idom, source, target.block):
-        ctx.ok = false
-        ctx.message = "stackify: forward branch target is not dominated by source"
+    if not stackify_dominates(self.analysis.idom, source, target.block):
+        self.ok = false
+        self.message = "stackify: forward branch target is not dominated by source"
         return
-    stackify_add_param_transfer(ctx, target)
-    stackify_push_process(ctx, StackifyProcessKind.DomSubtree, target.block, 0, 0, 0)
+    self.add_param_transfer(target)
+    self.push_process(StackifyProcessKind.DomSubtree, target.block, 0, 0, 0)
 
-fn stackify_do_select(ctx: &mut StackifyContext, block: i32):
-    let b = ctx.graph.blocks.get(block as i64)
-    let labels_start = ctx.tree.labels.len() as i32
+fn StackifyContext.do_select(mut self: StackifyContext, block: i32):
+    let b = self.graph.blocks.get(block as i64)
+    let labels_start = self.tree.labels.len() as i32
     var ti = 0
     while ti < b.targets_count:
-        ctx.tree.labels.push(ti)
+        self.tree.labels.push(ti)
         ti = ti + 1
     var select_node = stackify_empty_node(StackifyNodeKind.Select)
     select_node.value = b.selector_value
     select_node.labels_start = labels_start
     select_node.labels_count = b.targets_count
     select_node.default_label = b.targets_count
-    let select_id = stackify_tree_add_node(ctx, select_node)
+    let select_id = self.tree_add_node(select_node)
 
     var body: Vec[i32] = Vec.new()
     body.push(select_id)
@@ -809,139 +809,139 @@ fn stackify_do_select(ctx: &mut StackifyContext, block: i32):
     while idx < b.targets_count + 1:
         extra = extra - 1
         let target_index = if idx < b.targets_count: b.targets_start + idx else: b.default_target
-        let target = ctx.graph.targets.get(target_index as i64)
-        let resolved = stackify_resolve_target(*ctx, target.block)
+        let target = self.graph.targets.get(target_index as i64)
+        let resolved = self.resolve_target(target.block)
         if resolved < 0:
-            ctx.ok = false
-            ctx.message = "stackify: select target is not on the control stack"
+            self.ok = false
+            self.message = "stackify: select target is not on the control stack"
             return
         let outer: Vec[i32] = Vec.new()
-        let child_start = stackify_tree_add_child_vec(ctx, body)
+        let child_start = self.tree_add_child_vec(body)
         var block_node = stackify_empty_node(StackifyNodeKind.Block)
         block_node.block = stackify_invalid()
         block_node.first_child_start = child_start
         block_node.first_child_count = body.len() as i32
-        outer.push(stackify_tree_add_node(ctx, block_node))
-        outer.push(stackify_make_param_transfer(ctx, target))
+        outer.push(self.tree_add_node(block_node))
+        outer.push(self.make_param_transfer(target))
         var br = stackify_empty_node(StackifyNodeKind.Br)
         br.label = resolved + extra
-        outer.push(stackify_tree_add_node(ctx, br))
+        outer.push(self.tree_add_node(br))
         body = outer
         idx = idx + 1
     var bi: i64 = 0
     while bi < body.len():
-        stackify_result_push(ctx, body.get(bi))
+        self.result_push(body.get(bi))
         bi = bi + 1
 
-fn stackify_handle_dom_subtree(ctx: &mut StackifyContext, block: i32):
-    stackify_push_merge_children(ctx, block)
-    stackify_push_process(ctx, StackifyProcessKind.EndDomSubtree, 0, 0, 0, 0)
-    if ctx.analysis.loop_headers.get(block as i64) != 0:
-        stackify_push_ctrl(ctx, StackifyCtrlKind.Loop, block)
-        stackify_result_push_frame(ctx)
-        stackify_push_process(ctx, StackifyProcessKind.FinishLoop, block, 0, 0, 0)
-        stackify_push_process(ctx, StackifyProcessKind.NodeWithin, block, 0, 0, 0)
+fn StackifyContext.handle_dom_subtree(mut self: StackifyContext, block: i32):
+    self.push_merge_children(block)
+    self.push_process(StackifyProcessKind.EndDomSubtree, 0, 0, 0, 0)
+    if self.analysis.loop_headers.get(block as i64) != 0:
+        self.push_ctrl(StackifyCtrlKind.Loop, block)
+        self.result_push_frame()
+        self.push_process(StackifyProcessKind.FinishLoop, block, 0, 0, 0)
+        self.push_process(StackifyProcessKind.NodeWithin, block, 0, 0, 0)
     else:
-        stackify_push_process(ctx, StackifyProcessKind.NodeWithin, block, 0, 0, 0)
+        self.push_process(StackifyProcessKind.NodeWithin, block, 0, 0, 0)
 
-fn stackify_finish_loop(ctx: &mut StackifyContext, header: i32):
-    let _ = ctx.ctrl_stack.pop()
-    let start = stackify_result_pop_frame(ctx)
-    let count = stackify_result_frame_count(*ctx, start)
-    let child_start = stackify_tree_add_child_range(ctx, start, count)
-    stackify_result_truncate(ctx, start)
+fn StackifyContext.finish_loop(mut self: StackifyContext, header: i32):
+    let _ = self.ctrl_stack.pop()
+    let start = self.result_pop_frame()
+    let count = self.result_frame_count(start)
+    let child_start = self.tree_add_child_range(start, count)
+    self.result_truncate(start)
     var node = stackify_empty_node(StackifyNodeKind.Loop)
     node.block = header
     node.first_child_start = child_start
     node.first_child_count = count
-    let id = stackify_tree_add_node(ctx, node)
-    stackify_result_push(ctx, id)
+    let id = self.tree_add_node(node)
+    self.result_push(id)
 
-fn stackify_finish_block(ctx: &mut StackifyContext, out: i32):
-    let _ = ctx.ctrl_stack.pop()
-    let start = stackify_result_pop_frame(ctx)
-    let count = stackify_result_frame_count(*ctx, start)
-    let child_start = stackify_tree_add_child_range(ctx, start, count)
-    stackify_result_truncate(ctx, start)
+fn StackifyContext.finish_block(mut self: StackifyContext, out: i32):
+    let _ = self.ctrl_stack.pop()
+    let start = self.result_pop_frame()
+    let count = self.result_frame_count(start)
+    let child_start = self.tree_add_child_range(start, count)
+    self.result_truncate(start)
     var node = stackify_empty_node(StackifyNodeKind.Block)
     node.block = out
     node.first_child_start = child_start
     node.first_child_count = count
-    let id = stackify_tree_add_node(ctx, node)
-    stackify_result_push(ctx, id)
+    let id = self.tree_add_node(node)
+    self.result_push(id)
 
-fn stackify_else(ctx: &mut StackifyContext):
-    stackify_result_push_frame(ctx)
+fn StackifyContext.else(mut self: StackifyContext):
+    self.result_push_frame()
 
-fn stackify_finish_if(ctx: &mut StackifyContext, cond: i32):
-    let else_start = stackify_result_pop_frame(ctx)
-    let else_count = stackify_result_frame_count(*ctx, else_start)
-    let else_child_start = stackify_tree_add_child_range(ctx, else_start, else_count)
-    stackify_result_truncate(ctx, else_start)
-    let then_start = stackify_result_pop_frame(ctx)
-    let then_count = stackify_result_frame_count(*ctx, then_start)
-    let then_child_start = stackify_tree_add_child_range(ctx, then_start, then_count)
-    stackify_result_truncate(ctx, then_start)
-    let _ = ctx.ctrl_stack.pop()
+fn StackifyContext.finish_if(mut self: StackifyContext, cond: i32):
+    let else_start = self.result_pop_frame()
+    let else_count = self.result_frame_count(else_start)
+    let else_child_start = self.tree_add_child_range(else_start, else_count)
+    self.result_truncate(else_start)
+    let then_start = self.result_pop_frame()
+    let then_count = self.result_frame_count(then_start)
+    let then_child_start = self.tree_add_child_range(then_start, then_count)
+    self.result_truncate(then_start)
+    let _ = self.ctrl_stack.pop()
     var node = stackify_empty_node(StackifyNodeKind.If)
     node.value = cond
     node.first_child_start = then_child_start
     node.first_child_count = then_count
     node.second_child_start = else_child_start
     node.second_child_count = else_count
-    let id = stackify_tree_add_node(ctx, node)
-    stackify_result_push(ctx, id)
+    let id = self.tree_add_node(node)
+    self.result_push(id)
 
-fn stackify_node_within(ctx: &mut StackifyContext, block: i32, merge_start: i32):
-    let frame_idx = ctx.merge_starts.len() as i32 - 1
-    let start = ctx.merge_starts.get(frame_idx as i64)
-    let count = ctx.merge_counts.get(frame_idx as i64)
+fn StackifyContext.node_within(mut self: StackifyContext, block: i32, merge_start: i32):
+    let frame_idx = self.merge_starts.len() as i32 - 1
+    let start = self.merge_starts.get(frame_idx as i64)
+    let count = self.merge_counts.get(frame_idx as i64)
     let rel = merge_start
     if rel < count:
-        let first = ctx.merge_items.get((start + rel) as i64)
-        stackify_push_process(ctx, StackifyProcessKind.DomSubtree, first, 0, 0, 0)
-        stackify_push_ctrl(ctx, StackifyCtrlKind.Block, first)
-        stackify_result_push_frame(ctx)
-        stackify_push_process(ctx, StackifyProcessKind.FinishBlock, first, 0, 0, 0)
-        stackify_push_process(ctx, StackifyProcessKind.NodeWithin, block, rel + 1, 0, 0)
+        let first = self.merge_items.get((start + rel) as i64)
+        self.push_process(StackifyProcessKind.DomSubtree, first, 0, 0, 0)
+        self.push_ctrl(StackifyCtrlKind.Block, first)
+        self.result_push_frame()
+        self.push_process(StackifyProcessKind.FinishBlock, first, 0, 0, 0)
+        self.push_process(StackifyProcessKind.NodeWithin, block, rel + 1, 0, 0)
         return
 
     var leaf = stackify_empty_node(StackifyNodeKind.Leaf)
     leaf.block = block
-    let leaf_id = stackify_tree_add_node(ctx, leaf)
-    stackify_result_push(ctx, leaf_id)
-    let b = ctx.graph.blocks.get(block as i64)
+    let leaf_id = self.tree_add_node(leaf)
+    self.result_push(leaf_id)
+    let b = self.graph.blocks.get(block as i64)
     if b.term_kind == StackifyTermKind.Br:
-        stackify_push_process(ctx, StackifyProcessKind.DoBranch, block, 0, 0, b.targets_start)
+        self.push_process(StackifyProcessKind.DoBranch, block, 0, 0, b.targets_start)
         return
     if b.term_kind == StackifyTermKind.CondBr:
         let true_target = b.targets_start
         let false_target = b.targets_start + 1
-        stackify_push_ctrl(ctx, StackifyCtrlKind.IfThenElse, stackify_invalid())
-        stackify_push_process(ctx, StackifyProcessKind.FinishIf, 0, 0, b.cond_value, 0)
-        stackify_push_process(ctx, StackifyProcessKind.DoBranch, block, 0, 0, false_target)
-        stackify_push_process(ctx, StackifyProcessKind.Else, 0, 0, 0, 0)
-        stackify_push_process(ctx, StackifyProcessKind.DoBranch, block, 0, 0, true_target)
-        stackify_result_push_frame(ctx)
+        self.push_ctrl(StackifyCtrlKind.IfThenElse, stackify_invalid())
+        self.push_process(StackifyProcessKind.FinishIf, 0, 0, b.cond_value, 0)
+        self.push_process(StackifyProcessKind.DoBranch, block, 0, 0, false_target)
+        self.push_process(StackifyProcessKind.Else, 0, 0, 0, 0)
+        self.push_process(StackifyProcessKind.DoBranch, block, 0, 0, true_target)
+        self.result_push_frame()
         return
     if b.term_kind == StackifyTermKind.Select:
-        stackify_push_process(ctx, StackifyProcessKind.DoSelect, block, 0, 0, 0)
+        self.push_process(StackifyProcessKind.DoSelect, block, 0, 0, 0)
         return
     if b.term_kind == StackifyTermKind.Return:
         let vals: Vec[i32] = Vec.new()
         var i = 0
         while i < b.return_values_count:
-            vals.push(ctx.graph.return_values.get((b.return_values_start + i) as i64))
+            vals.push(self.graph.return_values.get((b.return_values_start + i) as i64))
             i = i + 1
         var ret = stackify_empty_node(StackifyNodeKind.Return)
-        ret.values_start = stackify_tree_add_values_from_vec(ctx, vals)
+        ret.values_start = self.tree_add_values_from_vec(vals)
         ret.values_count = b.return_values_count
-        let id = stackify_tree_add_node(ctx, ret)
-        stackify_result_push(ctx, id)
+        let id = self.tree_add_node(ret)
+        self.result_push(id)
         return
     let un = stackify_empty_node(StackifyNodeKind.Unreachable)
-    let uid = stackify_tree_add_node(ctx, un)
-    stackify_result_push(ctx, uid)
+    let uid = self.tree_add_node(un)
+    self.result_push(uid)
 
 fn stackify_context_new(graph: StackifyGraph, analysis: StackifyAnalysis) -> StackifyContext:
     StackifyContext {
@@ -960,33 +960,33 @@ fn stackify_context_new(graph: StackifyGraph, analysis: StackifyAnalysis) -> Sta
         message: "",
     }
 
-fn stackify_process(ctx: &mut StackifyContext, entry: StackifyProcessEntry):
+fn StackifyContext.process(mut self: StackifyContext, entry: StackifyProcessEntry):
     if entry.kind == StackifyProcessKind.DomSubtree:
-        stackify_handle_dom_subtree(ctx, entry.block)
+        self.handle_dom_subtree(entry.block)
         return
     if entry.kind == StackifyProcessKind.EndDomSubtree:
-        stackify_pop_merge_children(ctx)
+        self.pop_merge_children()
         return
     if entry.kind == StackifyProcessKind.NodeWithin:
-        stackify_node_within(ctx, entry.block, entry.index)
+        self.node_within(entry.block, entry.index)
         return
     if entry.kind == StackifyProcessKind.FinishLoop:
-        stackify_finish_loop(ctx, entry.block)
+        self.finish_loop(entry.block)
         return
     if entry.kind == StackifyProcessKind.FinishBlock:
-        stackify_finish_block(ctx, entry.block)
+        self.finish_block(entry.block)
         return
     if entry.kind == StackifyProcessKind.Else:
-        stackify_else(ctx)
+        self.else()
         return
     if entry.kind == StackifyProcessKind.FinishIf:
-        stackify_finish_if(ctx, entry.value)
+        self.finish_if(entry.value)
         return
     if entry.kind == StackifyProcessKind.DoBranch:
-        stackify_do_branch(ctx, entry.block, entry.target)
+        self.do_branch(entry.block, entry.target)
         return
     if entry.kind == StackifyProcessKind.DoSelect:
-        stackify_do_select(ctx, entry.block)
+        self.do_select(entry.block)
         return
 
 pub fn stackify_graph(graph: StackifyGraph) -> StackifyResult:
@@ -994,15 +994,15 @@ pub fn stackify_graph(graph: StackifyGraph) -> StackifyResult:
     if not analysis.ok:
         return stackify_result_error(analysis.message)
     var ctx = stackify_context_new(graph, analysis)
-    stackify_result_push_frame(&mut ctx)
-    stackify_push_process(&mut ctx, StackifyProcessKind.DomSubtree, ctx.graph.entry, 0, 0, 0)
+    ctx.result_push_frame()
+    ctx.push_process(StackifyProcessKind.DomSubtree, ctx.graph.entry, 0, 0, 0)
     while ctx.ok and ctx.process_stack.len() > 0:
-        let entry = stackify_pop_process(&mut ctx)
-        stackify_process(&mut ctx, entry)
+        let entry = ctx.pop_process()
+        ctx.process(entry)
     if not ctx.ok:
         return stackify_result_error(ctx.message)
-    let root_start = stackify_result_pop_frame(&mut ctx)
-    let root_count = stackify_result_frame_count(ctx, root_start)
-    ctx.tree.roots_start = stackify_tree_add_child_range(&mut ctx, root_start, root_count)
+    let root_start = ctx.result_pop_frame()
+    let root_count = ctx.result_frame_count(root_start)
+    ctx.tree.roots_start = ctx.tree_add_child_range(root_start, root_count)
     ctx.tree.roots_count = root_count
     stackify_result_ok(ctx.tree)
