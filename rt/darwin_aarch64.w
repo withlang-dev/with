@@ -31,7 +31,7 @@ type MachTimebaseInfo:
     numer: u32
     denom: u32
 
-extern fn mach_timebase_info(info: &mut MachTimebaseInfo) -> i32
+extern fn mach_timebase_info(info: *mut MachTimebaseInfo) -> i32
 
 // ── Helpers ─────────────────────────────────────────────────────
 
@@ -177,7 +177,7 @@ var timebase_denom: i64 = 0
 pub fn rt_clock_ns_impl() -> i64:
     if timebase_denom == 0:
         var info = MachTimebaseInfo { numer: 0, denom: 0 }
-        let _ = mach_timebase_info(&mut info)
+        let _ = mach_timebase_info(&raw mut info)
         timebase_numer = info.numer as i64
         timebase_denom = info.denom as i64
     let ticks = mach_absolute_time() as i64
@@ -197,7 +197,7 @@ pub fn rt_nanosleep_impl(ns: i64) -> i32:
     var rem = Timespec { tv_sec: 0, tv_nsec: 0 }
     var r: i32 = 0
     loop:
-        r = nanosleep(&req, &mut rem)
+        r = nanosleep(&req, &raw mut rem)
         if r >= 0 or get_errno() != 4:
             break
         // EINTR: use remaining time for next attempt
@@ -285,13 +285,13 @@ pub fn rt_sysinfo_impl(out: *mut RtSysInfo) -> i32:
     // CPU cores: sysctl hw.logicalcpu
     var cores: i32 = 0
     var cores_len: i64 = 4
-    let _ = sysctlbyname("hw.logicalcpu" as *const u8, &cores as *mut u8, &mut cores_len, 0 as *const u8, 0)
+    let _ = sysctlbyname("hw.logicalcpu" as *const u8, &cores as *mut u8, &raw mut cores_len, 0 as *const u8, 0)
     (unsafe: *out).cpu_cores = if cores > 0: cores else: 1
 
     // Total memory: sysctl hw.memsize
     var memsize: i64 = 0
     var memsize_len: i64 = 8
-    let _ = sysctlbyname("hw.memsize" as *const u8, &memsize as *mut u8, &mut memsize_len, 0 as *const u8, 0)
+    let _ = sysctlbyname("hw.memsize" as *const u8, &memsize as *mut u8, &raw mut memsize_len, 0 as *const u8, 0)
     (unsafe: *out).memory_total = memsize
 
     // Page size: sysconf(_SC_PAGESIZE)

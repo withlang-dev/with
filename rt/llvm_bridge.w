@@ -348,7 +348,7 @@ fn to_cstr(s: str) -> *const u8:
     cstr_idx = (cstr_idx + 1) & 3
     let n = if s.len() < 4095: s.len() else: 4095
     let src = unsafe: *(&s as *const *const u8)
-    let dst = &mut cstr_bufs[cstr_idx as i64] as *mut u8
+    let dst = &raw mut cstr_bufs[cstr_idx as i64] as *mut u8
     with_memcpy(dst, src, n)
     unsafe: *((dst as i64 + n) as *mut u8) = 0
     dst as *const u8
@@ -414,7 +414,7 @@ pub fn init_target_machine(mod_ref: i64, level: i32) -> i64:
     let triple = LLVMGetDefaultTargetTriple()
     var target: *mut u8 = 0 as *mut u8
     var err: *mut u8 = 0 as *mut u8
-    if LLVMGetTargetFromTriple(triple as *const u8, &mut target, &mut err) != 0:
+    if LLVMGetTargetFromTriple(triple as *const u8, &raw mut target, &raw mut err) != 0:
         if err as i64 != 0: LLVMDisposeMessage(err)
         LLVMDisposeMessage(triple)
         return 0
@@ -993,7 +993,7 @@ pub fn get_fn_param_type(fn_ty: i64, index: i32) -> i64:
 @[c_export("wl_verify_module")]
 pub fn verify_module(m: i64) -> i32:
     var err: *mut u8 = 0 as *mut u8
-    let result = LLVMVerifyModule(m as *mut u8, LLVM_ReturnStatusAction, &mut err)
+    let result = LLVMVerifyModule(m as *mut u8, LLVM_ReturnStatusAction, &raw mut err)
     if err as i64 != 0:
         if result != 0:
             let msg = "LLVM verify error\n"
@@ -1013,7 +1013,7 @@ pub fn emit_object(tm: i64, m: i64, path: str) -> i32:
     with_memcpy(&path_buf as *mut u8, sp, n)
     path_buf[n] = 0
     var err: *mut u8 = 0 as *mut u8
-    let result = LLVMTargetMachineEmitToFile(tm as *mut u8, m as *mut u8, &path_buf as *mut u8, LLVM_ObjectFile, &mut err)
+    let result = LLVMTargetMachineEmitToFile(tm as *mut u8, m as *mut u8, &path_buf as *mut u8, LLVM_ObjectFile, &raw mut err)
     if result != 0 and err as i64 != 0:
         let msg = "LLVM emit error\n"
         let _ = rt_write(2, msg as *const u8, 16)
