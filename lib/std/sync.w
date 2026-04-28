@@ -61,9 +61,9 @@ pub fn MutexGuardMut.exit(self: MutexGuardMut) -> i64:
 pub fn mutex_get(m: Mutex) -> i64:
     m.value
 
-/// Set the value inside a Mutex.
-pub fn mutex_set(m: &mut Mutex, value: i64) -> void:
-    m.value = value
+/// Set the value inside a Mutex (mutating receiver).
+pub fn Mutex.set(mut self: Mutex, value: i64) -> void:
+    self.value = value
 
 /// Create a new RwLock with the given initial value.
 pub fn rwlock_new(value: i64) -> RwLock:
@@ -89,9 +89,9 @@ pub fn RwWriteGuard.exit(self: RwWriteGuard) -> i64:
 pub fn rwlock_read(rw: RwLock) -> i64:
     rw.value
 
-/// Write a new value inside a RwLock.
-pub fn rwlock_write(rw: &mut RwLock, value: i64) -> void:
-    rw.value = value
+/// Write a new value inside a RwLock (mutating receiver).
+pub fn RwLock.write(mut self: RwLock, value: i64) -> void:
+    self.value = value
 
 /// Create a new AtomicI64 with the given initial value.
 pub fn atomic_new(value: i64) -> AtomicI64:
@@ -101,11 +101,11 @@ pub fn atomic_new(value: i64) -> AtomicI64:
 pub fn atomic_load(a: AtomicI64) -> i64:
     a.value
 
-/// Store a new value atomically.
-pub fn atomic_store(a: &mut AtomicI64, value: i64) -> void:
-    a.value = value
+/// Store a new value atomically (mutating receiver).
+pub fn AtomicI64.store(mut self: AtomicI64, value: i64) -> void:
+    self.value = value
 
-/// Add `delta` atomically and return the new value.
-pub fn atomic_add(a: &mut AtomicI64, delta: i64) -> i64:
-    a.value = a.value + delta
-    a.value
+/// Add `delta` atomically and return the new value (mutating receiver).
+pub fn AtomicI64.add(mut self: AtomicI64, delta: i64) -> i64:
+    self.value = self.value + delta
+    self.value
