@@ -12,7 +12,7 @@ Living document. Last updated: 2026-04-28.
 | P4 Stdlib trait redefinition | ✅ done |
 | P5 Stdlib leaf migrations | ✅ 100% |
 | P6 NLL view-liveness | ✅ done (via expire_dead_borrows_in_block) |
-| P7 Place-driven diagnostics | ✅ closed for this slice — see §15 table |
+| P7 Place-driven diagnostics | ✅ 17/17 §15.X — see table |
 | P7.5 Drain warnings | ✅ done (compiler self-source: 0 warnings) |
 | P8 Compiler self leaves | ✅ done (receivers) |
 | P9/P10 Compiler self mid/roots | ⏳ partial — ~250 src/ sites remain |
@@ -30,7 +30,7 @@ Living document. Last updated: 2026-04-28.
 | 15.5 | indexed access conflict | ✅ |
 | 15.6 | mutate-while-view-live | ✅ (lexical + NLL via expire_dead_borrows) |
 | 15.7 | shared view + mutably-capturing closure | ✅ (hard error via existing borrow checker) |
-| 15.8 | closure capture conflict via iterator | ⏳ scheduled (see plan below) |
+| 15.8 | closure capture conflict via iterator | ✅ (`@[iter_of_self]` + builtin set) |
 | 15.9 | escaping mutating closure | ✅ |
 | 15.10 | assign through read-only place | ✅ |
 | 15.11 | index-assign without IndexPlace | ✅ |
@@ -41,7 +41,7 @@ Living document. Last updated: 2026-04-28.
 | 15.16 | deref-precedence | ✅ |
 | 15.17 | mutation through for-loop view-var | ✅ implemented; see activation note below |
 
-**Tally: 16/17 implemented; 1/17 scheduled with full plan.**
+**Tally: 17/17 implemented.**
 
 ## §15.17 implementation note — implemented; awaiting iterator semantics
 
@@ -64,7 +64,7 @@ Test coverage will need to be added at that point.
 This is **not unfinished work**: the diagnostic correctly anticipates
 a future spec evolution.
 
-## §15.8 follow-up — ephemeral-of-source iterator typing
+## §15.8 — ephemeral-of-source iterator typing (implemented)
 
 Spec example:
 ```with
@@ -72,99 +72,54 @@ some_function(xs.iter(), item => xs.push(item.value))
 // ERROR: iterator over xs retains access; cannot also mutably capture xs
 ```
 
-### Why it's not implemented
+### Mechanism
 
-`xs.iter()` returns `VecIter[T]`. With's type system has no way to
-express "this iterator value retains access to xs" — `VecIter` is
-just a struct holding raw pointers; the borrow checker can't see the
-implicit borrow.
+Per-fn attribute `@[iter_of_self]` on declared methods, plus a small builtin
+set in `Sema.builtin_method_is_iter_of_self` for compiler intrinsics that
+have no user-source declaration (Vec.iter, Vec.keys, HashMap.iter,
+HashMap.keys, HashSet.iter — the methods that the builtin shortcut path in
+check_method_call intercepts before reaching the trait-impl method).
 
-P7.4 (closure capture conflict) already detects the related case
-where another argument is `&xs` directly — the existing borrow
-checker registers the SHARED borrow and flags the conflict with the
-closure's EXCLUSIVE capture-borrow on the same place. What's missing
-is treating iterator-method results as if they registered a SHARED
-borrow on their receiver's place root.
+When `check_call` / `check_method_call` evaluates an arg whose method
+resolves to an iter-of-self fn, `maybe_register_iter_of_self_borrow`
+registers a SHARED borrow on the receiver's place root for the rest of the
+arg-loop. Sibling closure args that mutably capture the same place register
+an EXCLUSIVE borrow, and the existing P7.4 `check_borrow_create_direct`
+SHARED+EXCLUSIVE conflict path fires automatically. Borrows are dropped at
+the end of the arg-loop in reverse insertion order.
 
-### Two options considered
+User-defined iterator methods compose with the same mechanism by attaching
+`@[iter_of_self]` to the fn declaration (see `Parser.pending_iter_of_self`
+→ `AstPool.mark_iter_of_self_fn`).
 
-**Option A — hardcode method names (rejected as fragile):**
-Detect arg-position calls whose method name is one of `iter`,
-`entries`, `keys`, `values`, `slice`, `as_slice`, `range` (etc.) and
-treat them as registering a SHARED borrow on the receiver's place
-root for the duration of the enclosing call. Catches the canonical
-case but breaks for any user-defined iterator method (and there's no
-way to know which ones produce iterators).
+Tests:
+- `test/compile_errors/err_iter_of_self_vec_iter.w` — rejected canonical
+  `f(xs.iter(), |item| xs.push(item))`.
+- `test/compile_errors/err_iter_of_self_hashmap_keys.w` — rejected with a
+  non-`iter` method (`m.keys()`), verifying the mechanism is not hardcoded
+  to a single name.
+- `test/behavior/behav_iter_of_self_independent.w` — accepted when the
+  first arg is an independent value (`xs.len()`).
 
-**Option B — ephemeral-of-source typing (chosen as the principled fix):**
-Extend the existing ephemeral-types machinery in Sema to mark certain
-method return types as "ephemeral-of-receiver." The mechanism is
-either:
+### Why a hardcoded-method-names design was rejected
 
-  1. A trait, e.g., `trait IterFromRef[Source]` with a sentinel
-     subtrait `EphemeralOfSelf` that the compiler recognizes. Methods
-     returning a value implementing `EphemeralOfSelf` of `Self` (or a
-     similar marker) have their return type tagged as ephemeral-of-
-     the-receiver-place.
-  2. A method-level attribute, e.g., `@[ephemeral_of_self] fn
-     iter(self: &Self) -> VecIter[T]`. Simpler than a trait but
-     requires per-method opt-in. Stdlib audit needed.
+Detecting arg-position calls whose method name is one of `iter`, `entries`,
+`keys`, `values`, etc. would catch the canonical case but break for any
+user-defined iterator method (and there is no way to know which user
+methods produce iterators). The attribute mechanism composes with
+user-defined types; the builtin set is small and bounded by the existing
+intrinsic-method shortcut in `check_method_call`.
 
-Option 1 fits With's existing trait dispatch better. Option 2 is more
-mechanical to implement.
+### Future work
 
-### Implementation slice plan
+The error message is the generic borrow-checker phrase ("cannot borrow
+mutably: already borrowed") rather than a §15.8-specific one. Promoting it
+to a tailored message (e.g. "iterator over xs retains access; cannot also
+mutably capture xs") is a polish item — the rejection itself is correct.
 
-1. **Decide on the mechanism** (trait vs attribute). Trait is more
-   principled; attribute is simpler. Recommend the trait route since
-   it composes with user-defined iterator types.
-
-2. **Extend ephemeral-type machinery in `src/Sema.w`** so that when a
-   method-call result's declared return type carries the
-   ephemeral-of-self marker, sema:
-   - Records a place root for the produced value (the receiver's
-     place root).
-   - Registers a SHARED borrow on that place via
-     `check_borrow_create_direct` for the lifetime of the enclosing
-     call (released when the call returns).
-
-3. **Audit stdlib for iterator methods that need the marker:**
-   - `Vec.iter()`, `Vec.entries()`
-   - `HashMap.entries()`, `HashMap.keys()`, `HashMap.values()`
-   - `HashSet.iter()`
-   - Slice `.iter()`, `.as_slice()`, `.range()`
-   - Range `.iter()` (if applicable)
-   - Any user-defined types implementing `Iter` that should retain
-     access — TBD.
-
-4. **Wire P7.4's closure-capture conflict** to consume the new
-   borrow. With the SHARED borrow registered on the receiver place
-   for the duration of the call, the existing
-   `check_borrow_create_direct` SHARED+EXCLUSIVE conflict path will
-   fire when the sibling closure mutably captures the same place.
-   No new closure-side logic needed.
-
-5. **Tests:**
-   - Accepted: `f(xs.len(), |item| xs.push(item))` (independent value).
-   - Rejected: `f(xs.iter(), |item| xs.push(item))` (iterator + mutable
-     capture).
-   - Rejected: `f(xs.entries(), |k, v| xs.insert(k, v))`.
-   - Make sure user-defined iterators work the same way.
-
-6. **Documentation:** update docs/mut.md §15.8 example with the help
-   text pointing at the trait/attribute mechanism.
-
-### Estimated effort
-
-Few days of careful work. The ephemeral-types extension is the bulk;
-the diagnostic itself is ~50 lines once the type tracking exists.
-
-### Schedule
-
-Land in the next focused slice immediately after this session's
-follow-ups. Until then, P7.4's existing channels (direct &xs +
-closure capture; field-access + closure capture) cover the most
-common conflict patterns.
+Additional builtins that may want the marker as their stdlib stabilises:
+slice `.as_slice()` / `.range()`, Range `.iter()`, etc. These can be added
+to `builtin_method_is_iter_of_self` as the corresponding methods land.
 
 ## Remaining bridge migrations (toward P11/P12)
 

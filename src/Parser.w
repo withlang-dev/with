@@ -43,6 +43,7 @@ type Parser {
     pending_callconv: i32,
     pending_stack_size: i32,
     pending_unsafe_fn: i32,
+    pending_iter_of_self: i32,
     saw_implicit_it: i32,
     implicit_it_depth: i32,
     last_param_pattern_start: i32,
@@ -97,6 +98,7 @@ fn Parser.init_with_pool(tokens: TokenList, source: str, file_id: i32, intern: I
         pending_callconv: 0,
         pending_stack_size: 0,
         pending_unsafe_fn: 0,
+        pending_iter_of_self: 0,
         saw_implicit_it: 0,
         implicit_it_depth: 0,
         last_param_pattern_start: 0,
@@ -322,6 +324,7 @@ fn Parser.skip_attributes(self: Parser):
     self.pending_weak = 0
     self.pending_callconv = 0
     self.pending_stack_size = 0
+    self.pending_iter_of_self = 0
     var derive_syms: Vec[i32] = Vec.new()
 
     while self.peek() == TokenKind.TK_AT:
@@ -368,6 +371,9 @@ fn Parser.skip_attributes(self: Parser):
                     self.advance()
         else if self.is_ident_named("tailrec"):
             self.pending_tailrec = 1
+            self.advance()
+        else if self.is_ident_named("iter_of_self"):
+            self.pending_iter_of_self = 1
             self.advance()
         else if self.is_ident_named("inline"):
             self.pending_inline = 1
@@ -786,6 +792,9 @@ fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is
     if self.pending_weak != 0:
         self.pool.fn_weak_flags.insert(fn_node as i32, 1)
         self.pending_weak = 0
+    if self.pending_iter_of_self != 0:
+        self.pool.mark_iter_of_self_fn(fn_node)
+        self.pending_iter_of_self = 0
     fn_node
 
 // ── extern fn ────────────────────────────────────────────────────
@@ -2266,6 +2275,9 @@ fn Parser.parse_impl_block(self: Parser, vis: i32):
         let meta_flags = flags + required_param_count * FN_META_REQUIRED_UNIT
         let final_m_tp_start = if m_tp_count > 0: m_tp_start else: 0
         self.pool.add_fn_meta(fn_node, meta_flags, ret_type, m_params_start, param_count, final_m_tp_start, m_tp_count)
+        if self.pending_iter_of_self != 0:
+            self.pool.mark_iter_of_self_fn(fn_node)
+            self.pending_iter_of_self = 0
         self.pool.add_decl(fn_node)
         method_count = method_count + 1
         self.skip_newlines()

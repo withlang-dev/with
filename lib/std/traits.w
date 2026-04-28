@@ -62,7 +62,10 @@ pub trait Iter[T] =
 pub trait IntoIter[T] =
     fn iter(self) -> VecIter[T]
 
-// IntoIter for Vec — enables `for x in vec.iter()` via trait dispatch
+// IntoIter for Vec — enables `for x in vec.iter()` via trait dispatch.
+// docs/mut.md Rev 8 §15.8 — `@[iter_of_self]` registers a SHARED borrow on
+// the receiver place root for the duration of the enclosing call, so a
+// sibling closure that mutably captures the same place is rejected.
 impl[T] IntoIter[T] for Vec[T] =
     fn iter(self: Vec[T]) -> VecIter[T]:
         self.iter()
