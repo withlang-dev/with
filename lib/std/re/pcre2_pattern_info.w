@@ -1398,7 +1398,7 @@ fn pcre2_callout_enumerate_8(code: *const pcre2_real_code_8, callback: *const fn
 
                     (cb.callout_string = null)
 
-                    (rc = callback((&mut cb as *mut pcre2_callout_enumerate_block_8), callout_data))
+                    (rc = callback((&raw mut cb as *mut pcre2_callout_enumerate_block_8), callout_data))
 
                     if ((if rc != 0: 1 else: 0) != 0) {
                         return rc
@@ -1420,7 +1420,7 @@ fn pcre2_callout_enumerate_8(code: *const pcre2_real_code_8, callback: *const fn
 
                     (cb.callout_string = (cc + (((1 + (4 * 2)) as isize) as usize)) + ((1 as isize) as usize))
 
-                    (rc = callback((&mut cb as *mut pcre2_callout_enumerate_block_8), callout_data))
+                    (rc = callback((&raw mut cb as *mut pcre2_callout_enumerate_block_8), callout_data))
 
                     if ((if rc != 0: 1 else: 0) != 0) {
                         return rc

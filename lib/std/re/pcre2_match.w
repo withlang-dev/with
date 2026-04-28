@@ -73,7 +73,7 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
                 (utf__goto_7015_6 = 0)
                 (ucp__goto_7018_6 = 0)
                 (fragment_options__goto_7020_10 = 0)
-                (mb__goto_7034_14 = ((&mut actual_match_block__goto_7033_13 as *mut match_block_8)))
+                (mb__goto_7034_14 = ((&raw mut actual_match_block__goto_7033_13 as *mut match_block_8)))
                 var __ci_expr_logic_0: c_int = 0
                 if ((if subject == null: 1 else: 0) != 0) {
                     (__ci_expr_logic_0 = (if (if length == 0: 1 else: 0) != 0: 1 else: 0))
@@ -423,7 +423,7 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
                     continue
                 }
                 if ((if mcontext == null: 1 else: 0) != 0) {
-                    (mcontext = ((&mut _pcre2_default_match_context_8 as *mut pcre2_real_match_context_8)))
+                    (mcontext = ((&raw mut _pcre2_default_match_context_8 as *mut pcre2_real_match_context_8)))
                     if (__goto_pending != 0) {
                         continue
                     }
@@ -463,7 +463,7 @@ fn pcre2_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8, __p
                 if (__goto_pending != 0) {
                     continue
                 }
-                (mb__goto_7034_14.cb = ((&mut cb__goto_7032_21 as *mut pcre2_callout_block_8)))
+                (mb__goto_7034_14.cb = ((&raw mut cb__goto_7032_21 as *mut pcre2_callout_block_8)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -24657,7 +24657,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                         },
                         119 => {
-                            (rrc__goto_706_5 = do_callout(F__goto_690_12, mb, (&mut length__goto_704_12 as *mut c_ulong)))
+                            (rrc__goto_706_5 = do_callout(F__goto_690_12, mb, (&raw mut length__goto_704_12 as *mut c_ulong)))
 
                             if ((if rrc__goto_706_5 > 0: 1 else: 0) != 0) {
                                 while true {
@@ -24715,7 +24715,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                         },
                         120 => {
-                            (rrc__goto_706_5 = do_callout(F__goto_690_12, mb, (&mut length__goto_704_12 as *mut c_ulong)))
+                            (rrc__goto_706_5 = do_callout(F__goto_690_12, mb, (&raw mut length__goto_704_12 as *mut c_ulong)))
 
                             if ((if rrc__goto_706_5 > 0: 1 else: 0) != 0) {
                                 while true {
@@ -24790,7 +24790,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                             }
 
                             if (__ci_expr_logic_223 != 0) {
-                                (rrc__goto_706_5 = do_callout(F__goto_690_12, mb, (&mut length__goto_704_12 as *mut c_ulong)))
+                                (rrc__goto_706_5 = do_callout(F__goto_690_12, mb, (&raw mut length__goto_704_12 as *mut c_ulong)))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -25319,7 +25319,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                             }
 
                             if (__ci_expr_logic_223 != 0) {
-                                (rrc__goto_706_5 = do_callout(F__goto_690_12, mb, (&mut length__goto_704_12 as *mut c_ulong)))
+                                (rrc__goto_706_5 = do_callout(F__goto_690_12, mb, (&raw mut length__goto_704_12 as *mut c_ulong)))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -64451,7 +64451,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
 
                         },
                         _ => {
-                            (rrc__goto_706_5 = match_ref(F__goto_690_12.fields.ref_repeat.offset, F__goto_690_12.byte1, F__goto_690_12.byte2, F__goto_690_12, mb, (&mut length__goto_704_12 as *mut c_ulong)))
+                            (rrc__goto_706_5 = match_ref(F__goto_690_12.fields.ref_repeat.offset, F__goto_690_12.byte1, F__goto_690_12.byte2, F__goto_690_12, mb, (&raw mut length__goto_704_12 as *mut c_ulong)))
 
                             if (__goto_pending != 0) {
                                 break
@@ -64613,7 +64613,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                 }
                 (i__goto_711_10 = 1)
                 while ((if i__goto_711_10 <= F__goto_690_12.fields.ref_repeat.min: 1 else: 0) != 0) {
-                    (rrc__goto_706_5 = match_ref(F__goto_690_12.fields.ref_repeat.offset, F__goto_690_12.byte1, F__goto_690_12.byte2, F__goto_690_12, mb, (&mut slength__goto_5341_18 as *mut c_ulong)))
+                    (rrc__goto_706_5 = match_ref(F__goto_690_12.fields.ref_repeat.offset, F__goto_690_12.byte1, F__goto_690_12.byte2, F__goto_690_12, mb, (&raw mut slength__goto_5341_18 as *mut c_ulong)))
                     if (__goto_pending != 0) {
                         break
                     }
@@ -64737,7 +64737,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                 }
                 (i__goto_711_10 = F__goto_690_12.fields.ref_repeat.min)
                 while ((if i__goto_711_10 < F__goto_690_12.fields.ref_repeat.max: 1 else: 0) != 0) {
-                    (rrc__goto_706_5 = match_ref(F__goto_690_12.fields.ref_repeat.offset, F__goto_690_12.byte1, F__goto_690_12.byte2, F__goto_690_12, mb, (&mut slength__goto_5390_20 as *mut c_ulong)))
+                    (rrc__goto_706_5 = match_ref(F__goto_690_12.fields.ref_repeat.offset, F__goto_690_12.byte1, F__goto_690_12.byte2, F__goto_690_12, mb, (&raw mut slength__goto_5390_20 as *mut c_ulong)))
                     if (__goto_pending != 0) {
                         break
                     }
@@ -64894,7 +64894,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                 }
                 (i__goto_711_10 = F__goto_690_12.fields.ref_repeat.min)
                 while ((if i__goto_711_10 < F__goto_690_12.fields.ref_repeat.max: 1 else: 0) != 0) {
-                    match_ref(F__goto_690_12.fields.ref_repeat.offset, F__goto_690_12.byte1, F__goto_690_12.byte2, F__goto_690_12, mb, (&mut slength__goto_5444_24 as *mut c_ulong))
+                    match_ref(F__goto_690_12.fields.ref_repeat.offset, F__goto_690_12.byte1, F__goto_690_12.byte2, F__goto_690_12, mb, (&raw mut slength__goto_5444_24 as *mut c_ulong))
                     if (__goto_pending != 0) {
                         break
                     }
@@ -65141,7 +65141,7 @@ fn match_(start_eptr: *const u8, __param_start_ecode: *const u8, top_bracket: c_
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rrc__goto_706_5 = match_ref(F__goto_690_12.fields.ref_repeat.offset, F__goto_690_12.byte1, F__goto_690_12.byte2, F__goto_690_12, mb, (&mut slength__goto_5362_20 as *mut c_ulong)))
+                (rrc__goto_706_5 = match_ref(F__goto_690_12.fields.ref_repeat.offset, F__goto_690_12.byte1, F__goto_690_12.byte2, F__goto_690_12, mb, (&raw mut slength__goto_5362_20 as *mut c_ulong)))
                 if (__goto_pending != 0) {
                     continue
                 }

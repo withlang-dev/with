@@ -82,7 +82,7 @@ fn _pcre2_auto_possessify_8(__param_code: *mut u8, cb: *const compile_block_8) -
             var __ci_expr_logic_5: c_int = 0
 
             if ((if end != null: 1 else: 0) != 0) {
-                (__ci_expr_logic_5 = (if compare_opcodes(end, utf, ucp, cb, (&list[0] as *mut c_uint), end, (&mut rec_limit as *mut c_int)) != 0: 1 else: 0))
+                (__ci_expr_logic_5 = (if compare_opcodes(end, utf, ucp, cb, (&list[0] as *mut c_uint), end, (&raw mut rec_limit as *mut c_int)) != 0: 1 else: 0))
             }
 
             if (__ci_expr_logic_5 != 0) {
@@ -180,7 +180,7 @@ fn _pcre2_auto_possessify_8(__param_code: *mut u8, cb: *const compile_block_8) -
                     var __ci_expr_logic_12: c_int = 0
 
                     if ((if end != null: 1 else: 0) != 0) {
-                        (__ci_expr_logic_12 = (if compare_opcodes(end, utf, ucp, cb, (&list[0] as *mut c_uint), end, (&mut rec_limit as *mut c_int)) != 0: 1 else: 0))
+                        (__ci_expr_logic_12 = (if compare_opcodes(end, utf, ucp, cb, (&list[0] as *mut c_uint), end, (&raw mut rec_limit as *mut c_int)) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_12 != 0) {

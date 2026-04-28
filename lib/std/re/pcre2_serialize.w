@@ -241,7 +241,7 @@ fn pcre2_serialize_decode_8(codes: *mut *mut pcre2_real_code_8, __param_number_o
                 }
                 (i__goto_171_9 = 0)
                 while ((if i__goto_171_9 < number_of_codes: 1 else: 0) != 0) {
-                    with_memcpy(((&mut blocksize__goto_206_23 as *mut c_ulong) as *i8), ((src_bytes__goto_168_16 + 72) as *i8), (sizeof[c_ulong]() as i64))
+                    with_memcpy(((&raw mut blocksize__goto_206_23 as *mut c_ulong) as *i8), ((src_bytes__goto_168_16 + 72) as *i8), (sizeof[c_ulong]() as i64))
                     if (__goto_pending != 0) {
                         break
                     }

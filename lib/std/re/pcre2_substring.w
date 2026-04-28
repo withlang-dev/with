@@ -18,7 +18,7 @@ fn pcre2_substring_copy_byname_8(match_data: *mut pcre2_real_match_data_8, strin
         return -41
     }
 
-    (entrysize = pcre2_substring_nametable_scan_8(match_data.code, stringname, (&mut first as *mut *const u8), (&mut last as *mut *const u8)))
+    (entrysize = pcre2_substring_nametable_scan_8(match_data.code, stringname, (&raw mut first as *mut *const u8), (&raw mut last as *mut *const u8)))
 
     if ((if entrysize < 0: 1 else: 0) != 0) {
         return entrysize
@@ -55,7 +55,7 @@ fn pcre2_substring_copy_bynumber_8(match_data: *mut pcre2_real_match_data_8, str
 
     var size: c_ulong
 
-    (rc = pcre2_substring_length_bynumber_8(match_data, stringnumber, (&mut size as *mut c_ulong)))
+    (rc = pcre2_substring_length_bynumber_8(match_data, stringnumber, (&raw mut size as *mut c_ulong)))
 
     if ((if rc < 0: 1 else: 0) != 0) {
         return rc
@@ -104,7 +104,7 @@ fn pcre2_substring_get_byname_8(match_data: *mut pcre2_real_match_data_8, string
         return -41
     }
 
-    (entrysize = pcre2_substring_nametable_scan_8(match_data.code, stringname, (&mut first as *mut *const u8), (&mut last as *mut *const u8)))
+    (entrysize = pcre2_substring_nametable_scan_8(match_data.code, stringname, (&raw mut first as *mut *const u8), (&raw mut last as *mut *const u8)))
 
     if ((if entrysize < 0: 1 else: 0) != 0) {
         return entrysize
@@ -143,7 +143,7 @@ fn pcre2_substring_get_bynumber_8(match_data: *mut pcre2_real_match_data_8, stri
 
     var yield_: *mut u8
 
-    (rc = pcre2_substring_length_bynumber_8(match_data, stringnumber, (&mut size as *mut c_ulong)))
+    (rc = pcre2_substring_length_bynumber_8(match_data, stringnumber, (&raw mut size as *mut c_ulong)))
 
     if ((if rc < 0: 1 else: 0) != 0) {
         return rc
@@ -188,7 +188,7 @@ fn pcre2_substring_length_byname_8(match_data: *mut pcre2_real_match_data_8, str
         return -41
     }
 
-    (entrysize = pcre2_substring_nametable_scan_8(match_data.code, stringname, (&mut first as *mut *const u8), (&mut last as *mut *const u8)))
+    (entrysize = pcre2_substring_nametable_scan_8(match_data.code, stringname, (&raw mut first as *mut *const u8), (&raw mut last as *mut *const u8)))
 
     if ((if entrysize < 0: 1 else: 0) != 0) {
         return entrysize

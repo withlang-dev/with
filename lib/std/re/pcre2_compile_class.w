@@ -1777,7 +1777,7 @@ fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *
     ((unsafe: *__ci_expr_old_2) = 0)
 
 
-    if ((if not (compile_eclass_nested((&mut context as *mut eclass_context), 0, pptr, (&mut code as *mut *mut u8), (&mut op_info as *mut eclass_op_info), lengthptr) != 0): 1 else: 0) != 0) {
+    if ((if not (compile_eclass_nested((&raw mut context as *mut eclass_context), 0, pptr, (&raw mut code as *mut *mut u8), (&raw mut op_info as *mut eclass_op_info), lengthptr) != 0): 1 else: 0) != 0) {
         return 0
     }
 
@@ -3759,7 +3759,7 @@ fn compile_class_operand(context: *mut eclass_context, negated: c_int, pptr: *mu
                         },
                         2148139008 => {
                             if ((if ((unsafe: *ptr__goto_2135_11) & 1) != 0: 1 else: 0) != 0) {
-                                if ((if not (compile_eclass_nested(context, negated, (&mut ptr__goto_2135_11 as *mut *mut c_uint), (&mut code__goto_2137_14 as *mut *mut u8), pop_info, lengthptr) != 0): 1 else: 0) != 0) {
+                                if ((if not (compile_eclass_nested(context, negated, (&raw mut ptr__goto_2135_11 as *mut *mut c_uint), (&raw mut code__goto_2137_14 as *mut *mut u8), pop_info, lengthptr) != 0): 1 else: 0) != 0) {
                                     return 0
                                 }
 
@@ -3791,7 +3791,7 @@ fn compile_class_operand(context: *mut eclass_context, negated: c_int, pptr: *mu
 
                             (prev_ptr__goto_2136_11 = ptr__goto_2135_11)
 
-                            (ptr__goto_2135_11 = _pcre2_compile_class_not_nested_8(context.options, context.xoptions, ptr__goto_2135_11, (&mut code__goto_2137_14 as *mut *mut u8), (if (if meta__goto_2141_10 != 2148401152: 1 else: 0) == negated: 1 else: 0), ((&context.needs_bitmap as *const c_int) as *mut c_int), context.errorcodeptr, context.cb, lengthptr))
+                            (ptr__goto_2135_11 = _pcre2_compile_class_not_nested_8(context.options, context.xoptions, ptr__goto_2135_11, (&raw mut code__goto_2137_14 as *mut *mut u8), (if (if meta__goto_2141_10 != 2148401152: 1 else: 0) == negated: 1 else: 0), ((&context.needs_bitmap as *const c_int) as *mut c_int), context.errorcodeptr, context.cb, lengthptr))
 
                             if ((if ptr__goto_2135_11 == null: 1 else: 0) != 0) {
                                 return 0
@@ -4020,7 +4020,7 @@ fn compile_class_operand(context: *mut eclass_context, negated: c_int, pptr: *mu
                         },
                         2148401152 => {
                             if ((if ((unsafe: *ptr__goto_2135_11) & 1) != 0: 1 else: 0) != 0) {
-                                if ((if not (compile_eclass_nested(context, negated, (&mut ptr__goto_2135_11 as *mut *mut c_uint), (&mut code__goto_2137_14 as *mut *mut u8), pop_info, lengthptr) != 0): 1 else: 0) != 0) {
+                                if ((if not (compile_eclass_nested(context, negated, (&raw mut ptr__goto_2135_11 as *mut *mut c_uint), (&raw mut code__goto_2137_14 as *mut *mut u8), pop_info, lengthptr) != 0): 1 else: 0) != 0) {
                                     return 0
                                 }
 
@@ -4052,7 +4052,7 @@ fn compile_class_operand(context: *mut eclass_context, negated: c_int, pptr: *mu
 
                             (prev_ptr__goto_2136_11 = ptr__goto_2135_11)
 
-                            (ptr__goto_2135_11 = _pcre2_compile_class_not_nested_8(context.options, context.xoptions, ptr__goto_2135_11, (&mut code__goto_2137_14 as *mut *mut u8), (if (if meta__goto_2141_10 != 2148401152: 1 else: 0) == negated: 1 else: 0), ((&context.needs_bitmap as *const c_int) as *mut c_int), context.errorcodeptr, context.cb, lengthptr))
+                            (ptr__goto_2135_11 = _pcre2_compile_class_not_nested_8(context.options, context.xoptions, ptr__goto_2135_11, (&raw mut code__goto_2137_14 as *mut *mut u8), (if (if meta__goto_2141_10 != 2148401152: 1 else: 0) == negated: 1 else: 0), ((&context.needs_bitmap as *const c_int) as *mut c_int), context.errorcodeptr, context.cb, lengthptr))
 
                             if ((if ptr__goto_2135_11 == null: 1 else: 0) != 0) {
                                 return 0
@@ -4282,7 +4282,7 @@ fn compile_class_operand(context: *mut eclass_context, negated: c_int, pptr: *mu
                         _ => {
                             (prev_ptr__goto_2136_11 = ptr__goto_2135_11)
 
-                            (ptr__goto_2135_11 = _pcre2_compile_class_not_nested_8(context.options, context.xoptions, ptr__goto_2135_11, (&mut code__goto_2137_14 as *mut *mut u8), (if (if meta__goto_2141_10 != 2148401152: 1 else: 0) == negated: 1 else: 0), ((&context.needs_bitmap as *const c_int) as *mut c_int), context.errorcodeptr, context.cb, lengthptr))
+                            (ptr__goto_2135_11 = _pcre2_compile_class_not_nested_8(context.options, context.xoptions, ptr__goto_2135_11, (&raw mut code__goto_2137_14 as *mut *mut u8), (if (if meta__goto_2141_10 != 2148401152: 1 else: 0) == negated: 1 else: 0), ((&context.needs_bitmap as *const c_int) as *mut c_int), context.errorcodeptr, context.cb, lengthptr))
 
                             if ((if ptr__goto_2135_11 == null: 1 else: 0) != 0) {
                                 return 0
@@ -4571,7 +4571,7 @@ fn compile_class_juxtaposition(context: *mut eclass_context, negated: c_int, ppt
 
     var code: *mut u8 = (unsafe: *pcode)
 
-    if ((if not (compile_class_operand(context, negated, (&mut ptr as *mut *mut c_uint), (&mut code as *mut *mut u8), pop_info, lengthptr) != 0): 1 else: 0) != 0) {
+    if ((if not (compile_class_operand(context, negated, (&raw mut ptr as *mut *mut c_uint), (&raw mut code as *mut *mut u8), pop_info, lengthptr) != 0): 1 else: 0) != 0) {
         return 0
     }
 
@@ -4611,11 +4611,11 @@ fn compile_class_juxtaposition(context: *mut eclass_context, negated: c_int, ppt
 
         }
 
-        if ((if not (compile_class_operand(context, rhs_negated, (&mut ptr as *mut *mut c_uint), (&mut code as *mut *mut u8), (&mut rhs_op_info as *mut eclass_op_info), lengthptr) != 0): 1 else: 0) != 0) {
+        if ((if not (compile_class_operand(context, rhs_negated, (&raw mut ptr as *mut *mut c_uint), (&raw mut code as *mut *mut u8), (&raw mut rhs_op_info as *mut eclass_op_info), lengthptr) != 0): 1 else: 0) != 0) {
             return 0
         }
 
-        fold_binary(op, pop_info, (&mut rhs_op_info as *mut eclass_op_info), lengthptr)
+        fold_binary(op, pop_info, (&raw mut rhs_op_info as *mut eclass_op_info), lengthptr)
 
         if ((if lengthptr == null: 1 else: 0) != 0) {
             (code = pop_info.code_start + pop_info.length)
@@ -4669,7 +4669,7 @@ fn compile_class_binary_tight(context: *mut eclass_context, negated: c_int, pptr
 
     var code: *mut u8 = (unsafe: *pcode)
 
-    if ((if not (compile_class_unary(context, negated, (&mut ptr as *mut *mut c_uint), (&mut code as *mut *mut u8), pop_info, lengthptr) != 0): 1 else: 0) != 0) {
+    if ((if not (compile_class_unary(context, negated, (&raw mut ptr as *mut *mut c_uint), (&raw mut code as *mut *mut u8), pop_info, lengthptr) != 0): 1 else: 0) != 0) {
         return 0
     }
 
@@ -4694,11 +4694,11 @@ fn compile_class_binary_tight(context: *mut eclass_context, negated: c_int, pptr
 
         (ptr = ptr + 1)
 
-        if ((if not (compile_class_unary(context, rhs_negated, (&mut ptr as *mut *mut c_uint), (&mut code as *mut *mut u8), (&mut rhs_op_info as *mut eclass_op_info), lengthptr) != 0): 1 else: 0) != 0) {
+        if ((if not (compile_class_unary(context, rhs_negated, (&raw mut ptr as *mut *mut c_uint), (&raw mut code as *mut *mut u8), (&raw mut rhs_op_info as *mut eclass_op_info), lengthptr) != 0): 1 else: 0) != 0) {
             return 0
         }
 
-        fold_binary(op, pop_info, (&mut rhs_op_info as *mut eclass_op_info), lengthptr)
+        fold_binary(op, pop_info, (&raw mut rhs_op_info as *mut eclass_op_info), lengthptr)
 
         if ((if lengthptr == null: 1 else: 0) != 0) {
             (code = pop_info.code_start + pop_info.length)
@@ -4725,7 +4725,7 @@ fn compile_class_binary_loose(context: *mut eclass_context, negated: c_int, pptr
 
     var code: *mut u8 = (unsafe: *pcode)
 
-    if ((if not (compile_class_binary_tight(context, negated, (&mut ptr as *mut *mut c_uint), (&mut code as *mut *mut u8), pop_info, lengthptr) != 0): 1 else: 0) != 0) {
+    if ((if not (compile_class_binary_tight(context, negated, (&raw mut ptr as *mut *mut c_uint), (&raw mut code as *mut *mut u8), pop_info, lengthptr) != 0): 1 else: 0) != 0) {
         return 0
     }
 
@@ -4802,11 +4802,11 @@ fn compile_class_binary_loose(context: *mut eclass_context, negated: c_int, pptr
 
         (ptr = ptr + 1)
 
-        if ((if not (compile_class_binary_tight(context, rhs_negated, (&mut ptr as *mut *mut c_uint), (&mut code as *mut *mut u8), (&mut rhs_op_info as *mut eclass_op_info), lengthptr) != 0): 1 else: 0) != 0) {
+        if ((if not (compile_class_binary_tight(context, rhs_negated, (&raw mut ptr as *mut *mut c_uint), (&raw mut code as *mut *mut u8), (&raw mut rhs_op_info as *mut eclass_op_info), lengthptr) != 0): 1 else: 0) != 0) {
             return 0
         }
 
-        fold_binary(op, pop_info, (&mut rhs_op_info as *mut eclass_op_info), lengthptr)
+        fold_binary(op, pop_info, (&raw mut rhs_op_info as *mut eclass_op_info), lengthptr)
 
         if (op_neg != 0) {
             fold_negation(pop_info, lengthptr, 0)

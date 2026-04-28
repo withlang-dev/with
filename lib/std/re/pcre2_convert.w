@@ -77,7 +77,7 @@ fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plength: c_ulong,
     }
 
     if ((if ccontext == null: 1 else: 0) != 0) {
-        (ccontext = ((&mut _pcre2_default_convert_context_8 as *mut pcre2_real_convert_context_8)))
+        (ccontext = ((&raw mut _pcre2_default_convert_context_8 as *mut pcre2_real_convert_context_8)))
     }
 
     var __ci_expr_logic_4: c_int = 0
@@ -89,7 +89,7 @@ fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plength: c_ulong,
     if (__ci_expr_logic_4 != 0) {
         var erroroffset: c_ulong
 
-        (rc = _pcre2_valid_utf_8(pattern, plength, (&mut erroroffset as *mut c_ulong)))
+        (rc = _pcre2_valid_utf_8(pattern, plength, (&raw mut erroroffset as *mut c_ulong)))
 
         if ((if rc != 0: 1 else: 0) != 0) {
             ((unsafe: *bufflenptr) = erroroffset)
@@ -2278,7 +2278,7 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
 
     (out.out_str[3] = 41)
 
-    convert_glob_write_str((&mut out as *mut pcre2_output_context), 4)
+    convert_glob_write_str((&raw mut out as *mut pcre2_output_context), 4)
 
     (is_start = 1)
 
@@ -2318,7 +2318,7 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
 
         (out.out_str[1] = 65)
 
-        convert_glob_write_str((&mut out as *mut pcre2_output_context), 2)
+        convert_glob_write_str((&raw mut out as *mut pcre2_output_context), 2)
 
     }
 
@@ -2334,7 +2334,7 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
             (is_start = (if pattern == (pattern_start + ((1 as isize) as usize)): 1 else: 0))
 
             if (in_atomic != 0) {
-                convert_glob_write((&mut out as *mut pcre2_output_context), 41)
+                convert_glob_write((&raw mut out as *mut pcre2_output_context), 41)
 
                 (in_atomic = 0)
 
@@ -2434,11 +2434,11 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
 
                     (out.out_str[5] = 124)
 
-                    convert_glob_write_str((&mut out as *mut pcre2_output_context), 6)
+                    convert_glob_write_str((&raw mut out as *mut pcre2_output_context), 6)
 
-                    convert_glob_print_separator((&mut out as *mut pcre2_output_context), separator, with_escape)
+                    convert_glob_print_separator((&raw mut out as *mut pcre2_output_context), separator, with_escape)
 
-                    convert_glob_write((&mut out as *mut pcre2_output_context), 41)
+                    convert_glob_write((&raw mut out as *mut pcre2_output_context), 41)
 
                     (pattern = pattern + 1)
 
@@ -2446,7 +2446,7 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
 
                 }
 
-                convert_glob_print_commit((&mut out as *mut pcre2_output_context))
+                convert_glob_print_commit((&raw mut out as *mut pcre2_output_context))
 
                 var __ci_expr_logic_14: c_int
 
@@ -2463,7 +2463,7 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
 
                     (out.out_str[2] = 63)
 
-                    convert_glob_write_str((&mut out as *mut pcre2_output_context), 3)
+                    convert_glob_write_str((&raw mut out as *mut pcre2_output_context), 3)
 
                     continue
 
@@ -2482,9 +2482,9 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
 
                 (out.out_str[5] = 63)
 
-                convert_glob_write_str((&mut out as *mut pcre2_output_context), 6)
+                convert_glob_write_str((&raw mut out as *mut pcre2_output_context), 6)
 
-                convert_glob_print_separator((&mut out as *mut pcre2_output_context), separator, with_escape)
+                convert_glob_print_separator((&raw mut out as *mut pcre2_output_context), separator, with_escape)
 
                 (out.out_str[0] = 41)
 
@@ -2492,7 +2492,7 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
 
                 (out.out_str[2] = 63)
 
-                convert_glob_write_str((&mut out as *mut pcre2_output_context), 3)
+                convert_glob_write_str((&raw mut out as *mut pcre2_output_context), 3)
 
                 (pattern = pattern + 1)
 
@@ -2548,20 +2548,20 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
 
                     (out.out_str[2] = 62)
 
-                    convert_glob_write_str((&mut out as *mut pcre2_output_context), 3)
+                    convert_glob_write_str((&raw mut out as *mut pcre2_output_context), 3)
 
                     (in_atomic = 1)
 
                 } else {
-                    convert_glob_print_commit((&mut out as *mut pcre2_output_context))
+                    convert_glob_print_commit((&raw mut out as *mut pcre2_output_context))
                 }
 
             }
 
             if (no_wildsep != 0) {
-                convert_glob_write((&mut out as *mut pcre2_output_context), 46)
+                convert_glob_write((&raw mut out as *mut pcre2_output_context), 46)
             } else {
-                convert_glob_print_wildcard((&mut out as *mut pcre2_output_context), separator, with_escape)
+                convert_glob_print_wildcard((&raw mut out as *mut pcre2_output_context), separator, with_escape)
             }
 
             (out.out_str[0] = 42)
@@ -2572,7 +2572,7 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
                 (out.out_str[1] = 43)
             }
 
-            convert_glob_write_str((&mut out as *mut pcre2_output_context), 2)
+            convert_glob_write_str((&raw mut out as *mut pcre2_output_context), 2)
 
             continue
 
@@ -2580,9 +2580,9 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
 
         if ((if c == 63: 1 else: 0) != 0) {
             if (no_wildsep != 0) {
-                convert_glob_write((&mut out as *mut pcre2_output_context), 46)
+                convert_glob_write((&raw mut out as *mut pcre2_output_context), 46)
             } else {
-                convert_glob_print_wildcard((&mut out as *mut pcre2_output_context), separator, with_escape)
+                convert_glob_print_wildcard((&raw mut out as *mut pcre2_output_context), separator, with_escape)
             }
 
             continue
@@ -2590,7 +2590,7 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
         }
 
         if ((if c == 91: 1 else: 0) != 0) {
-            (result = convert_glob_parse_range((&mut pattern as *mut *const u8), pattern_end, (&mut out as *mut pcre2_output_context), utf, separator, with_escape, escape, no_wildsep))
+            (result = convert_glob_parse_range((&raw mut pattern as *mut *const u8), pattern_end, (&raw mut out as *mut pcre2_output_context), utf, separator, with_escape, escape, no_wildsep))
 
             if ((if result != 0: 1 else: 0) != 0) {
                 break
@@ -2631,11 +2631,11 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
         }
 
         if (__ci_expr_logic_19 != 0) {
-            convert_glob_write((&mut out as *mut pcre2_output_context), 92)
+            convert_glob_write((&raw mut out as *mut pcre2_output_context), 92)
         }
 
 
-        convert_glob_write((&mut out as *mut pcre2_output_context), c)
+        convert_glob_write((&raw mut out as *mut pcre2_output_context), c)
 
     }
 
@@ -2645,15 +2645,15 @@ fn convert_glob(options: c_uint, __param_pattern: *const u8, plength: c_ulong, u
 
             (out.out_str[1] = 122)
 
-            convert_glob_write_str((&mut out as *mut pcre2_output_context), 2)
+            convert_glob_write_str((&raw mut out as *mut pcre2_output_context), 2)
 
         }
 
         if (in_atomic != 0) {
-            convert_glob_write((&mut out as *mut pcre2_output_context), 41)
+            convert_glob_write((&raw mut out as *mut pcre2_output_context), 41)
         }
 
-        convert_glob_write((&mut out as *mut pcre2_output_context), 0)
+        convert_glob_write((&raw mut out as *mut pcre2_output_context), 0)
 
         var __ci_expr_logic_20: c_int = 0
 
