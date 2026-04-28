@@ -5362,87 +5362,87 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody
 
     // Self-tail-call optimization for @[tailrec] functions.
     if (fn_flags / FnFlags.TAILREC) % 2 == 1:
-        optimize_self_tail_calls(&mut builder.body)
+        builder.body.optimize_self_tail_calls()
 
     builder.body
 
-fn optimize_self_tail_calls(body: &mut MirBody):
-    let fn_sym = body.fn_sym
-    if fn_sym == 0 or body.n_params == 0:
+fn MirBody.optimize_self_tail_calls(mut self: MirBody):
+    let fn_sym = self.fn_sym
+    if fn_sym == 0 or self.n_params == 0:
         return
-    let bb_count = body.block_count()
+    let bb_count = self.block_count()
     var bb = 0
     while bb < bb_count:
-        if body.term_kind(bb) != TermKind.TK_CALL:
+        if self.term_kind(bb) != TermKind.TK_CALL:
             bb = bb + 1
             continue
-        let callee_op_id = body.term_data0(bb)
-        let args_id = body.term_data1(bb)
-        let result_place = body.term_data2(bb)
-        let next_bb = body.term_data3(bb)
+        let callee_op_id = self.term_data0(bb)
+        let args_id = self.term_data1(bb)
+        let result_place = self.term_data2(bb)
+        let next_bb = self.term_data3(bb)
         // Check: callee is this function
-        if callee_op_id < 0 or callee_op_id >= body.operand_kinds.len() as i32:
+        if callee_op_id < 0 or callee_op_id >= self.operand_kinds.len() as i32:
             bb = bb + 1
             continue
-        let op_kind = body.operand_kinds.get(callee_op_id as i64)
+        let op_kind = self.operand_kinds.get(callee_op_id as i64)
         if op_kind != OperandKind.OK_CONSTANT:
             bb = bb + 1
             continue
-        let const_id = body.operand_d0.get(callee_op_id as i64)
-        if const_id < 0 or const_id >= body.const_kinds.len() as i32:
+        let const_id = self.operand_d0.get(callee_op_id as i64)
+        if const_id < 0 or const_id >= self.const_kinds.len() as i32:
             bb = bb + 1
             continue
-        if body.const_kinds.get(const_id as i64) != ConstKind.CK_FN:
+        if self.const_kinds.get(const_id as i64) != ConstKind.CK_FN:
             bb = bb + 1
             continue
-        if body.const_d0.get(const_id as i64) != fn_sym:
+        if self.const_d0.get(const_id as i64) != fn_sym:
             bb = bb + 1
             continue
         // Check: result goes to local 0 (return place)
-        if result_place >= 0 and result_place < body.place_locals.len() as i32:
-            if body.place_locals.get(result_place as i64) != 0:
+        if result_place >= 0 and result_place < self.place_locals.len() as i32:
+            if self.place_locals.get(result_place as i64) != 0:
                 bb = bb + 1
                 continue
         // Check: next block is pure TK_RETURN (no statements)
         if next_bb < 0 or next_bb >= bb_count:
             bb = bb + 1
             continue
-        if body.term_kind(next_bb) != TermKind.TK_RETURN:
+        if self.term_kind(next_bb) != TermKind.TK_RETURN:
             bb = bb + 1
             continue
-        if body.bb_stmt_counts.get(next_bb as i64) != 0:
+        if self.bb_stmt_counts.get(next_bb as i64) != 0:
             bb = bb + 1
             continue
         // This is a self-tail-call. Transform it.
         // Step 1: Read call args into temp locals (aliasing safety)
-        let arg_start = body.call_arg_starts.get(args_id as i64)
-        let arg_count = body.call_arg_counts.get(args_id as i64)
-        let n_params = body.n_params
-        let span = body.bb_term_spans.get(bb as i64)
+        let arg_start = self.call_arg_starts.get(args_id as i64)
+        let arg_count = self.call_arg_counts.get(args_id as i64)
+        let n_params = self.n_params
+        let span = self.bb_term_spans.get(bb as i64)
         // Copy args to temps
         for ai in 0..arg_count:
             if ai >= n_params: break
-            let arg_op = body.call_arg_operands.get((arg_start + ai) as i64)
+            let arg_op = self.call_arg_operands.get((arg_start + ai) as i64)
             let param_local = ai + 1  // params are locals 1..n_params
-            let param_ty = body.local_type_ids.get(param_local as i64)
-            let tmp = body.new_temp(param_ty)
-            let tmp_place = body.new_place(tmp)
-            let rv = body.new_rvalue(RvalueKind.RK_USE, arg_op, 0, 0)
-            body.push_stmt(bb, StmtKind.Assign, tmp_place, rv, span)
+            let param_ty = self.local_type_ids.get(param_local as i64)
+            let tmp = self.new_temp(param_ty)
+            let tmp_place = self.new_place(tmp)
+            let rv = self.new_rvalue(RvalueKind.RK_USE, arg_op, 0, 0)
+            self.push_stmt(bb, StmtKind.Assign, tmp_place, rv, span)
         // Copy temps back to params
         // We pushed n temps starting at (local_count - n_params) before temps were added
-        let first_tmp = body.local_type_ids.len() as i32 - arg_count
+        let first_tmp = self.local_type_ids.len() as i32 - arg_count
         for ai in 0..arg_count:
             if ai >= n_params: break
             let tmp_local = first_tmp + ai
             let param_local = ai + 1
-            let param_place = body.new_place(param_local)
-            let tmp_place_read = body.new_place(tmp_local)
-            let tmp_op = body.new_operand(OperandKind.OK_COPY, tmp_place_read)
-            let rv = body.new_rvalue(RvalueKind.RK_USE, tmp_op, 0, 0)
-            body.push_stmt(bb, StmtKind.Assign, param_place, rv, span)
+            let param_place = self.new_place(param_local)
+            let tmp_place_read = self.new_place(tmp_local)
+            let tmp_op = self.new_operand(OperandKind.OK_COPY, tmp_place_read)
+            let rv = self.new_rvalue(RvalueKind.RK_USE, tmp_op, 0, 0)
+            self.push_stmt(bb, StmtKind.Assign, param_place, rv, span)
         // Replace terminator with GOTO to entry block (bb0)
-        body.set_terminator(bb, TermKind.TK_GOTO, 0, 0, 0, 0, span)
+        self.set_terminator(bb, TermKind.TK_GOTO, 0, 0, 0, 0, span)
         bb = bb + 1
 
 fn lower_module(sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirModule:
