@@ -5916,6 +5916,23 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
             // for outstanding SHARED borrows of the receiver place.
             self.check_mutation_against_views(expr, node)
 
+        // §8.2 / §15.5 — indexed access conflict in a single mutating call.
+        // If the receiver and any argument both reach through NK_INDEX into
+        // the same base symbol, the call is conservatively rejected. Only
+        // fires when the call is a known-mutating receiver (builtin or user
+        // mut self), to avoid noise on read-only method calls.
+        let is_mut_recv_call = self.method_has_mut_self_flag(type_name_sym, field) != 0 or self.builtin_method_requires_mutable_receiver(type_name_sym, field) != 0
+        if is_mut_recv_call:
+            let recv_idx_sym = self.expr_indexed_into(expr)
+            if recv_idx_sym != 0:
+                var ai = 0
+                while ai < arg_count:
+                    let arg_node = self.ast.get_extra(extra_start + ai)
+                    if self.expr_indexed_into(arg_node) == recv_idx_sym:
+                        self.emit_warning("conflicting accesses through indexed base in the same call (§15.5)", node)
+                        break
+                    ai = ai + 1
+
     // Static enum variant constructor: Shape.Rect(1, 2), Option[i32].Some(1)
     if self.static_receiver_type_is_known(expr) != 0 and self.enum_has_variant(obj_type, field) != 0:
         let payload_tys = self.enum_variant_payload_types(obj_type, field)
@@ -7053,6 +7070,32 @@ fn Sema.expr_mutates_place(self: Sema, node: i32, sym: i32) -> i32:
         if self.expr_mutates_place(self.ast.get_data1(node), sym) != 0:
             return 1
         return self.expr_mutates_place(self.ast.get_data2(node), sym)
+    0
+
+// docs/mut.md Rev 8 §8.2 / §15.5 — returns the symbol of the indexed base
+// when the expression includes any NK_INDEX projection, e.g.:
+//
+//   xs[0]            → returns sym(xs)
+//   xs[0].field      → returns sym(xs)
+//   xs[i].method()   → returns sym(xs) (the receiver's indexed base)
+//
+// Returns 0 when the expression has no indexed projection along its
+// place chain. Used to detect two accesses through the same indexed
+// base in a single call, which §8.2 conservatively rejects.
+fn Sema.expr_indexed_into(self: Sema, node: i32) -> i32:
+    if node == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_INDEX:
+        return self.place_root_sym(self.ast.get_data0(node))
+    if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_GROUPED:
+        return self.expr_indexed_into(self.ast.get_data0(node))
+    if kind == NodeKind.NK_UNSAFE_BLOCK:
+        return self.expr_indexed_into(self.ast.get_data0(node))
+    if kind == NodeKind.NK_UNARY:
+        let op = self.ast.get_data0(node)
+        if op == UnaryOp.UOP_DEREF:
+            return self.expr_indexed_into(self.ast.get_data1(node))
     0
 
 // Get the root symbol of a place expression (ident, field access chain, index).
