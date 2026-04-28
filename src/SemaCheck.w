@@ -2156,6 +2156,10 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
     if op == UnaryOp.UOP_NOT:
         return self.ty_bool as i32
     if op == UnaryOp.UOP_REF or op == UnaryOp.UOP_MUT_REF or op == UnaryOp.UOP_RAW_REF_CONST or op == UnaryOp.UOP_RAW_REF_MUT:
+        // docs/mut.md Rev 8 §15.1 — at P12 lockdown, reject legacy &mut
+        // surface in source. Until then, the bridge accepts both forms.
+        if STRICT_NO_MUT_REF != 0 and op == UnaryOp.UOP_MUT_REF:
+            self.emit_error("`&mut T` is not part of safe With (§15.1); use mut self / mutating method / scoped `with` access / `&raw mut` for FFI", node)
         // Reject address-of bitpacked fields — they may not be byte-aligned
         if self.ast.kind(operand_node) == NodeKind.NK_FIELD_ACCESS:
             let ref_recv = self.ast.get_data0(operand_node)
