@@ -6976,6 +6976,120 @@ fn Sema.place_root_sym(self: Sema, node: i32) -> i32:
         return self.place_root_sym(self.ast.get_data0(node))
     0
 
+// ── docs/mut.md Rev 8 §2 — Place classification ──────────────────
+//
+// The mutation model is built on the concept of a *place* — a storage
+// location that can be named or reached from a named storage root.
+// Place identity is determined syntactically. classify_place walks an
+// expression and returns a packed (PlaceKind, PlaceMut) i64 describing
+// it. P2.4 lands the analysis as infrastructure only; later phases
+// (P11) consume the result for diagnostics on assignment LHS, mutating
+// receivers, &raw mut, scoped with-bindings, etc.
+
+enum PlaceKind: i32:
+    PK_NotPlace = 0
+    PK_Local = 1
+    PK_OwnedParam = 2
+    PK_Global = 3
+    PK_GlobalVar = 4
+    PK_Captured = 5
+    PK_WithBound = 6
+    PK_CompilerTemp = 7
+    PK_ForVar = 8
+    PK_DerefRef = 9         // *r where r: &T  → ReadOnly
+    PK_DerefConstPtr = 10   // *p where p: *const T → ReadOnly (unsafe)
+    PK_DerefMutPtr = 11     // *p where p: *mut T → Mutable (unsafe)
+
+enum PlaceMut: i32:
+    PM_NoMut = 0    // not a place
+    PM_ReadOnly = 1
+    PM_Mutable = 2
+
+fn pack_place(kind: i32, mut_state: i32) -> i64:
+    (kind as i64) * 4294967296 + (mut_state as i64)
+
+fn unpack_place_kind(packed: i64) -> i32:
+    (packed / 4294967296) as i32
+
+fn unpack_place_mut(packed: i64) -> i32:
+    (packed % 4294967296) as i32
+
+// IndexPlace probe (P2.4 stub — hardcoded for stdlib container types).
+// P4 will replace this with an impl-table lookup once lib/std/traits.w
+// declares the IndexPlace trait and Vec/Array/HashMap implement it.
+fn Sema.type_is_index_place(self: Sema, tid: i32) -> i32:
+    if tid == 0:
+        return 0
+    let resolved = self.resolve_alias(tid as TypeId)
+    let tk = self.get_type_kind(resolved)
+    if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE:
+        return 1
+    if tk == TypeKind.TY_GENERIC_INST:
+        let base_sym = self.get_type_d0(resolved)
+        if base_sym == self.syms.vec or base_sym == self.syms.hashmap:
+            return 1
+    0
+
+// Classify the operand of a UOP_DEREF expression. Returns the packed
+// (kind, mut) for the place produced by *operand.
+fn Sema.classify_deref(self: Sema, operand_type: i32) -> i64:
+    if operand_type == 0:
+        return pack_place(PlaceKind.PK_NotPlace, PlaceMut.PM_NoMut)
+    let resolved = self.resolve_alias(operand_type as TypeId)
+    let tk = self.get_type_kind(resolved)
+    if tk == TypeKind.TY_REF:
+        // *r where r: &T is always read-only (§2.3).
+        return pack_place(PlaceKind.PK_DerefRef, PlaceMut.PM_ReadOnly)
+    if tk == TypeKind.TY_PTR:
+        if self.get_type_d1(resolved) != 0:
+            return pack_place(PlaceKind.PK_DerefMutPtr, PlaceMut.PM_Mutable)
+        return pack_place(PlaceKind.PK_DerefConstPtr, PlaceMut.PM_ReadOnly)
+    pack_place(PlaceKind.PK_NotPlace, PlaceMut.PM_NoMut)
+
+fn Sema.classify_place(self: Sema, node: i32) -> i64:
+    if node == 0:
+        return pack_place(PlaceKind.PK_NotPlace, PlaceMut.PM_NoMut)
+    let kind = self.ast.kind(node)
+    // Identifier root — local binding, parameter, or global. P2.4 stub
+    // uses scope_lookup to confirm the symbol resolves to a binding;
+    // later phases will distinguish OwnedParam / Global / Captured /
+    // WithBound / ForVar based on richer scope metadata.
+    if kind == NodeKind.NK_IDENT:
+        let sym = self.ast.get_data0(node)
+        if self.scope_lookup(sym) >= 0:
+            // §1 — `let` and `var` bindings both produce mutable places;
+            // the binding-mut flag governs rebinding only.
+            return pack_place(PlaceKind.PK_Local, PlaceMut.PM_Mutable)
+        return pack_place(PlaceKind.PK_NotPlace, PlaceMut.PM_NoMut)
+    // Field projection: §2.2 — projection inherits base mutability.
+    if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS:
+        return self.classify_place(self.ast.get_data0(node))
+    // Parenthesized: classify inner.
+    if kind == NodeKind.NK_GROUPED:
+        return self.classify_place(self.ast.get_data0(node))
+    // Index: §2.4 — only a place projection when the base type implements
+    // IndexPlace. Mutability inherits from base.
+    if kind == NodeKind.NK_INDEX:
+        let base_node = self.ast.get_data0(node)
+        let base_packed = self.classify_place(base_node)
+        if unpack_place_kind(base_packed) == PlaceKind.PK_NotPlace:
+            return pack_place(PlaceKind.PK_NotPlace, PlaceMut.PM_NoMut)
+        let base_ty = self.typed_expr_types.get(base_node)
+        if base_ty.is_some() and self.type_is_index_place(base_ty.unwrap()) != 0:
+            return base_packed
+        return pack_place(PlaceKind.PK_NotPlace, PlaceMut.PM_NoMut)
+    // Dereference: §2.3 — *r / *p mutability comes from the pointer kind.
+    if kind == NodeKind.NK_UNARY:
+        let op = self.ast.get_data0(node)
+        if op == UnaryOp.UOP_DEREF:
+            let operand_node = self.ast.get_data1(node)
+            let operand_ty_opt = self.typed_expr_types.get(operand_node)
+            if operand_ty_opt.is_some():
+                return self.classify_deref(operand_ty_opt.unwrap())
+            return pack_place(PlaceKind.PK_NotPlace, PlaceMut.PM_NoMut)
+    // §2.5 — function call results, arithmetic, literals are not places.
+    pack_place(PlaceKind.PK_NotPlace, PlaceMut.PM_NoMut)
+
 // Check if a captured variable is used only through field accesses, never whole.
 // Returns 1 if all uses of `sym` in `node` are of the form `sym.field`.
 // Returns 0 if `sym` is used directly (passed as arg, assigned, etc).
