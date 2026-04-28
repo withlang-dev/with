@@ -2486,7 +2486,18 @@ fn Sema.check_assign(self: Sema, node: i32) -> i32:
         let lhs_kind = unpack_place_kind(lhs_packed)
         let lhs_mut_state = unpack_place_mut(lhs_packed)
         if lhs_kind == PlaceKind.PK_NotPlace:
-            self.emit_warning("cannot assign to a non-place expression", node)
+            // docs/mut.md Rev 8 §15.11 — distinguish "type does not support
+            // index assignment" (no IndexPlace impl) from generic non-place
+            // when the LHS is an index expression on an ordinary place.
+            if self.ast.kind(target) == NodeKind.NK_INDEX:
+                let idx_base = self.ast.get_data0(target)
+                let base_packed = self.classify_place(idx_base)
+                if unpack_place_kind(base_packed) != PlaceKind.PK_NotPlace:
+                    self.emit_warning("type does not support index assignment (no IndexPlace impl) (§15.11)", node)
+                else:
+                    self.emit_warning("cannot assign to a non-place expression", node)
+            else:
+                self.emit_warning("cannot assign to a non-place expression", node)
         else if lhs_mut_state == PlaceMut.PM_ReadOnly:
             self.emit_warning("cannot assign through a read-only place (e.g., dereferenced &T or *const T) (§15.10)", node)
 
