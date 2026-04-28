@@ -2166,8 +2166,21 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
         // docs/mut.md Rev 8 §13 — raw forms produce TY_PTR (*const T / *mut T)
         // and do not participate in borrow tracking. Forming a raw pointer is
         // safe; dereferencing or writing through it requires unsafe (§13.3).
+        // §15.13/15.14 — `&raw mut` requires a mutable place; `&raw const`
+        // requires a place. Warnings during P7..P11; promoted to errors at
+        // P12 lockdown.
         let is_raw = op == UnaryOp.UOP_RAW_REF_CONST or op == UnaryOp.UOP_RAW_REF_MUT
         if is_raw:
+            let raw_packed = self.classify_place(operand_node)
+            let raw_kind = unpack_place_kind(raw_packed)
+            let raw_mut_state = unpack_place_mut(raw_packed)
+            if raw_kind == PlaceKind.PK_NotPlace:
+                if op == UnaryOp.UOP_RAW_REF_MUT:
+                    self.emit_warning("`&raw mut` requires a place; this expression is not a place (§15.13)", node)
+                else:
+                    self.emit_warning("`&raw const` requires a place; this expression is not a place", node)
+            else if op == UnaryOp.UOP_RAW_REF_MUT and raw_mut_state == PlaceMut.PM_ReadOnly:
+                self.emit_warning("`&raw mut` requires a mutable place; this place is read-only (e.g., dereferenced &T or *const T) (§15.14)", node)
             let raw_mut = if op == UnaryOp.UOP_RAW_REF_MUT: 1 else: 0
             return self.add_type(TypeKind.TY_PTR, operand as i32, raw_mut, 0) as i32
         let is_exclusive = op == UnaryOp.UOP_MUT_REF
