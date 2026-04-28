@@ -51,9 +51,43 @@ fn test_raw_addr_of_mut:
     unsafe *q = 11
     assert(y == 11)
 
+fn test_nll_last_use_in_block:
+    // §8.4 NLL — borrow ends at last use within the block, not at scope end.
+    let xs: Vec[i32] = Vec.new()
+    xs.push(0)
+    let r = &xs[0]
+    let v = *r          // last use of r
+    assert(v == 0)
+    xs.push(1)          // OK — r's borrow ended at line above
+    assert(xs.len() == 2)
+
+fn test_nll_last_use_in_nested_if:
+    let xs: Vec[i32] = Vec.new()
+    xs.push(0)
+    let r = &xs[0]
+    if true:
+        let _ = *r      // last use is inside the if
+    xs.push(1)          // OK — r's last use was in the if body
+    assert(xs.len() == 2)
+
+fn test_nll_last_use_after_loop:
+    let xs: Vec[i32] = Vec.new()
+    xs.push(0)
+    xs.push(1)
+    let r = &xs[0]
+    var i = 0
+    while i < 1:
+        let _ = *r      // used inside loop
+        i = i + 1
+    xs.push(2)          // OK — no future uses of r
+    assert(xs.len() == 3)
+
 fn main:
     test_globals()
     test_mut_self_receiver()
     test_raw_addr_of_const()
     test_raw_addr_of_mut()
+    test_nll_last_use_in_block()
+    test_nll_last_use_in_nested_if()
+    test_nll_last_use_after_loop()
     print("ok")

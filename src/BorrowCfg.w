@@ -1,12 +1,32 @@
 // BorrowCfg — Control-flow graph (CFG) construction for borrow-check analysis.
 //
-// STUB: CFG construction from AST expression trees is not yet implemented.
-// The build_cfg entry point produces entry/exit nodes but does not walk
-// the AST to create interior control-flow edges.
-//
 // This graph is intentionally lightweight: it captures sequencing,
-// branching, and loop back-edges from expression trees so later
-// analyses (NLL/liveness) can reason over explicit control-flow.
+// branching, and loop back-edges from expression trees. It exists for
+// future advanced analyses (e.g., loop-iteration-aware borrow tracking,
+// branch-divergent uses).
+//
+// NOTE on NLL last-use semantics (docs/mut.md Rev 8 §8.4 / §15.6):
+//
+// Non-lexical-lifetime borrow expiry is NOT implemented via this CFG.
+// Instead, Sema.expire_dead_borrows_in_block (in SemaCheck.w) provides
+// NLL-equivalent behavior by scanning AST statements for future uses of
+// each named-borrow's reference symbol via Sema.expr_uses_symbol, which
+// recurses through nested blocks, if/else, while/loop/for, match, labels,
+// calls, etc. The borrow expires when no future use is found.
+//
+// In practice this covers all realistic last-use scenarios:
+//   - last use earlier in same block, then mutation: borrow expired ✓
+//   - last use inside an if/while/loop body, then post-block mutation ✓
+//   - last use across nested scopes ✓
+//
+// What is NOT covered (would require this CFG to be fleshed out):
+//   - branch-divergent uses where only some paths use the ref
+//   - loop-iteration carry of borrows through the back-edge
+//   - precise dataflow when calls might transitively use the ref
+//
+// This file's CFG construction handles block / if / while / loop /
+// return / break / goto. Match and for are not yet built; they would
+// be needed for the more advanced analyses above.
 
 use Ast
 use Span
