@@ -401,14 +401,23 @@ fn stackify_validate_graph(graph: StackifyGraph) -> str:
         b = b + 1
     ""
 
-fn stackify_dfs_post(graph: StackifyGraph, start: i32, visited: &mut Vec[i32], out: &mut Vec[i32]):
+// Accumulator state for the iterative post-order DFS used by
+// stackify_compute_analysis. Bundled into a struct so the traversal is
+// a method on StackifyDfsState rather than a free fn with `&mut Vec`
+// output parameters.
+type StackifyDfsState {
+    visited: Vec[i32],
+    out: Vec[i32],
+}
+
+fn StackifyDfsState.dfs_post(mut self: StackifyDfsState, graph: StackifyGraph, start: i32):
     if start < 0 or start >= graph.blocks.len() as i32:
         return
-    if visited.get(start as i64) != 0:
+    if self.visited.get(start as i64) != 0:
         return
     let stack_block: Vec[i32] = Vec.new()
     let stack_idx: Vec[i32] = Vec.new()
-    visited.set_i32(start as i64, 1)
+    self.visited.set_i32(start as i64, 1)
     stack_block.push(start)
     stack_idx.push(0)
     while stack_block.len() > 0:
@@ -420,12 +429,12 @@ fn stackify_dfs_post(graph: StackifyGraph, start: i32, visited: &mut Vec[i32], o
             // #183: succ must be computed before set_i32 — codegen re-reads idx after mutation
             let succ = graph.succs.get((b.succs_start + idx) as i64)
             stack_idx.set_i32(top, idx + 1)
-            if succ >= 0 and succ < graph.blocks.len() as i32 and visited.get(succ as i64) == 0:
-                visited.set_i32(succ as i64, 1)
+            if succ >= 0 and succ < graph.blocks.len() as i32 and self.visited.get(succ as i64) == 0:
+                self.visited.set_i32(succ as i64, 1)
                 stack_block.push(succ)
                 stack_idx.push(0)
         else:
-            out.push(blk)
+            self.out.push(blk)
             let _ = stack_block.pop()
             let _ = stack_idx.pop()
 
@@ -543,9 +552,9 @@ fn stackify_compute_analysis(graph: StackifyGraph) -> StackifyAnalysis:
             message: err,
         }
     let n = graph.blocks.len() as i32
-    var visited = stackify_bool_vec(n, 0)
-    let post_ord: Vec[i32] = Vec.new()
-    stackify_dfs_post(graph, graph.entry, &mut visited, &mut post_ord)
+    var dfs = StackifyDfsState { visited: stackify_bool_vec(n, 0), out: Vec.new() }
+    dfs.dfs_post(graph, graph.entry)
+    let post_ord = dfs.out
     var rpo_pos = stackify_bool_vec(n, stackify_invalid())
     var ri = post_ord.len() as i32 - 1
     while ri >= 0:
