@@ -7038,7 +7038,29 @@ fn Sema.expr_mutates_place(self: Sema, node: i32, sym: i32) -> i32:
             return 1
         return self.expr_mutates_place(self.ast.get_data2(node), sym)
     if kind == NodeKind.NK_CALL:
-        if self.expr_mutates_place(self.ast.get_data0(node), sym) != 0:
+        // docs/mut.md Rev 8 §5.1 — a method call `sym.method(...)` whose
+        // method takes a mutating receiver is a mutation of `sym`. Detect
+        // both builtin mutating methods (push, pop, …) and user-defined
+        // `mut self: Self` methods.
+        let callee = self.ast.get_data0(node)
+        if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS:
+            let cbase = self.ast.get_data0(callee)
+            if self.ast.kind(cbase) == NodeKind.NK_IDENT and self.ast.get_data0(cbase) == sym:
+                let method_sym = self.ast.get_data1(callee)
+                let cap_ty = self.scope_lookup(sym)
+                if cap_ty >= 0:
+                    let recv_resolved = self.resolve_alias(cap_ty as TypeId)
+                    var recv_inner = recv_resolved
+                    let recv_tk = self.get_type_kind(recv_inner)
+                    if recv_tk == TypeKind.TY_PTR or recv_tk == TypeKind.TY_REF:
+                        recv_inner = self.resolve_alias(self.get_type_d0(recv_inner) as TypeId)
+                    let owner_sym = self.method_owner_symbol_for_type(recv_inner as i32)
+                    if owner_sym != 0:
+                        if self.builtin_method_requires_mutable_receiver(owner_sym, method_sym) != 0:
+                            return 1
+                        if self.method_has_mut_self_flag(owner_sym, method_sym) != 0:
+                            return 1
+        if self.expr_mutates_place(callee, sym) != 0:
             return 1
         let ea = self.ast.get_data1(node)
         let ac = self.ast.get_data2(node)
@@ -7324,7 +7346,17 @@ fn Sema.capture_is_field_only(self: Sema, node: i32, sym: i32) -> i32:
         // &mut sym.field or &sym.field — check the operand
         return self.capture_is_field_only(operand, sym)
     if kind == NodeKind.NK_CALL:
-        if self.capture_is_field_only(self.ast.get_data0(node), sym) == 0:
+        // docs/mut.md Rev 8 §9 — a method call `sym.method(...)` parses as
+        // NK_CALL whose callee is NK_FIELD_ACCESS on `sym`. From a capture
+        // standpoint that's a *method call on the captured variable*, not
+        // a field-only access — fall through to whole-variable capture so
+        // the EXCLUSIVE/SHARED determination uses expr_mutates_place.
+        let callee = self.ast.get_data0(node)
+        if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS:
+            let cbase = self.ast.get_data0(callee)
+            if self.ast.kind(cbase) == NodeKind.NK_IDENT and self.ast.get_data0(cbase) == sym:
+                return 0
+        if self.capture_is_field_only(callee, sym) == 0:
             return 0
         let ea = self.ast.get_data1(node)
         let ac = self.ast.get_data2(node)
