@@ -3754,6 +3754,11 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
     // Mark captured non-Copy variables as moved so subsequent uses error.
     let is_escaping = not is_non_escaping
     if is_escaping:
+        // docs/mut.md Rev 8 §9.4 / §15.9 — a mutating closure may not
+        // escape the scope containing the captured place. If the closure
+        // is in escape position (e.g., returned, stored in a long-lived
+        // binding) AND mutates any capture, warn.
+        var emitted_escape_warn = 0
         var ci = 0
         while ci < outer_count:
             let cap_sym = self.bind_names.get(ci as i64)
@@ -3761,6 +3766,9 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
                 let cap_ty = self.bind_types.get(ci as i64)
                 if not self.is_copy(cap_ty as TypeId):
                     self.scope_set_state(cap_sym, VarState.MOVED)
+                if emitted_escape_warn == 0 and self.expr_mutates_place(body, cap_sym) != 0:
+                    self.emit_warning("closure that mutates captured place cannot escape its defining scope (§15.9)", node)
+                    emitted_escape_warn = 1
             ci = ci + 1
 
     // Use callee return type for partial application closures
