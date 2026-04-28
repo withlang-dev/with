@@ -303,7 +303,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                     if (__goto_pending != 0) {
                         continue
                     }
-                    (internal_match_data__goto_753_19 = pcre2_match_data_create_from_pattern_8(code, (&mut gcontext__goto_889_25 as *mut pcre2_real_general_context_8)))
+                    (internal_match_data__goto_753_19 = pcre2_match_data_create_from_pattern_8(code, (&raw mut gcontext__goto_889_25 as *mut pcre2_real_general_context_8)))
                     (match_data = internal_match_data__goto_753_19)
                     if (__goto_pending != 0) {
                         continue
@@ -336,7 +336,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                         if (__goto_pending != 0) {
                             continue
                         }
-                        (internal_match_data__goto_753_19 = pcre2_match_data_create_8(match_data.oveccount, (&mut gcontext__goto_901_25 as *mut pcre2_real_general_context_8)))
+                        (internal_match_data__goto_753_19 = pcre2_match_data_create_8(match_data.oveccount, (&raw mut gcontext__goto_901_25 as *mut pcre2_real_general_context_8)))
                         if (__goto_pending != 0) {
                             continue
                         }
@@ -986,7 +986,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                         } else {
                             (__ci_expr_ternary_23 = lengthleft__goto_766_38)
                         }
-                        (chkcc_rc__goto_1628_9 = default_substitute_case_callout(ch_start__goto_1619_18, chkcc_length__goto_1628_9, (buffer + buff_offset__goto_766_12), __ci_expr_ternary_23, (&mut forcecase__goto_975_14 as *mut case_state), code))
+                        (chkcc_rc__goto_1628_9 = default_substitute_case_callout(ch_start__goto_1619_18, chkcc_length__goto_1628_9, (buffer + buff_offset__goto_766_12), __ci_expr_ternary_23, (&raw mut forcecase__goto_975_14 as *mut case_state), code))
                         if (__goto_pending != 0) {
                             break
                         }
@@ -1278,7 +1278,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                     break
                                 }
                                 while true {
-                                    (chkcc_rc__goto_1534_11 = do_case_copy((buffer + buff_offset__goto_766_12), chkcc_length__goto_1534_11, lengthleft__goto_766_38, (&mut forcecase__goto_975_14 as *mut case_state), utf__goto_758_6, substitute_case_callout__goto_771_14, substitute_case_callout_data__goto_773_7))
+                                    (chkcc_rc__goto_1534_11 = do_case_copy((buffer + buff_offset__goto_766_12), chkcc_length__goto_1534_11, lengthleft__goto_766_38, (&raw mut forcecase__goto_975_14 as *mut case_state), utf__goto_758_6, substitute_case_callout__goto_771_14, substitute_case_callout_data__goto_773_7))
                                     if (__goto_pending != 0) {
                                         break
                                     }
@@ -1379,7 +1379,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_748_5 = _pcre2_check_escape_8((&mut ptr__goto_763_12 as *mut *const u8), repend__goto_764_12, (&mut ch__goto_1066_14 as *mut c_uint), (&mut errorcode__goto_1475_11 as *mut c_int), code.overall_options, code.extra_options, code.top_bracket, 0, null))
+                (rc__goto_748_5 = _pcre2_check_escape_8((&raw mut ptr__goto_763_12 as *mut *const u8), repend__goto_764_12, (&raw mut ch__goto_1066_14 as *mut c_uint), (&raw mut errorcode__goto_1475_11 as *mut c_int), code.overall_options, code.extra_options, code.top_bracket, 0, null))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -1445,7 +1445,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                         (__ci_expr_ternary_31 = lengthleft__goto_766_38)
                                     }
 
-                                    (chkcc_rc__goto_1573_11 = default_substitute_case_callout((&temp__goto_760_13[0] as *mut u8), chkcc_length__goto_1573_11, (buffer + buff_offset__goto_766_12), __ci_expr_ternary_31, (&mut forcecase__goto_975_14 as *mut case_state), code))
+                                    (chkcc_rc__goto_1573_11 = default_substitute_case_callout((&temp__goto_760_13[0] as *mut u8), chkcc_length__goto_1573_11, (buffer + buff_offset__goto_766_12), __ci_expr_ternary_31, (&raw mut forcecase__goto_975_14 as *mut case_state), code))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -1642,7 +1642,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                 break
                             }
 
-                            if ((if not (read_name_subst((&mut ptr__goto_763_12 as *mut *const u8), repend__goto_764_12, utf__goto_758_6, (code.tables + (((512 + 320) as isize) as usize))) != 0): 1 else: 0) != 0) {
+                            if ((if not (read_name_subst((&raw mut ptr__goto_763_12 as *mut *const u8), repend__goto_764_12, utf__goto_758_6, (code.tables + (((512 + 320) as isize) as usize))) != 0): 1 else: 0) != 0) {
                                 __pc = 11
                                 __goto_pending = 1
                             }
@@ -1856,7 +1856,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                     if (__goto_pending != 0) {
                         continue
                     }
-                    (rc__goto_748_5 = pcre2_substring_length_bynumber_8(match_data, 0, (&mut sublength__goto_1106_18 as *mut c_ulong)))
+                    (rc__goto_748_5 = pcre2_substring_length_bynumber_8(match_data, 0, (&raw mut sublength__goto_1106_18 as *mut c_ulong)))
                     if (__goto_pending != 0) {
                         continue
                     }
@@ -2187,7 +2187,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                     if (__goto_pending != 0) {
                         continue
                     }
-                    if ((if not (read_name_subst((&mut ptr__goto_763_12 as *mut *const u8), repend__goto_764_12, utf__goto_758_6, (code.tables + (((512 + 320) as isize) as usize))) != 0): 1 else: 0) != 0) {
+                    if ((if not (read_name_subst((&raw mut ptr__goto_763_12 as *mut *const u8), repend__goto_764_12, utf__goto_758_6, (code.tables + (((512 + 320) as isize) as usize))) != 0): 1 else: 0) != 0) {
                         __pc = 10
                         __goto_pending = 1
                     }
@@ -2260,7 +2260,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                         if (__goto_pending != 0) {
                             continue
                         }
-                        (rc__goto_748_5 = find_text_end(code, (&mut ptr__goto_763_12 as *mut *const u8), repend__goto_764_12, (if special__goto_1069_14 == 45: 1 else: 0)))
+                        (rc__goto_748_5 = find_text_end(code, (&raw mut ptr__goto_763_12 as *mut *const u8), repend__goto_764_12, (if special__goto_1069_14 == 45: 1 else: 0)))
                         if (__goto_pending != 0) {
                             continue
                         }
@@ -2285,7 +2285,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                             if (__goto_pending != 0) {
                                 continue
                             }
-                            (rc__goto_748_5 = find_text_end(code, (&mut ptr__goto_763_12 as *mut *const u8), repend__goto_764_12, 1))
+                            (rc__goto_748_5 = find_text_end(code, (&raw mut ptr__goto_763_12 as *mut *const u8), repend__goto_764_12, 1))
                             if (__goto_pending != 0) {
                                 continue
                             }
@@ -2382,7 +2382,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                     } else {
                                         (__ci_expr_ternary_53 = lengthleft__goto_766_38)
                                     }
-                                    (chkcc_rc__goto_1348_15 = default_substitute_case_callout(mark__goto_1340_22, chkcc_length__goto_1348_15, (buffer + buff_offset__goto_766_12), __ci_expr_ternary_53, (&mut forcecase__goto_975_14 as *mut case_state), code))
+                                    (chkcc_rc__goto_1348_15 = default_substitute_case_callout(mark__goto_1340_22, chkcc_length__goto_1348_15, (buffer + buff_offset__goto_766_12), __ci_expr_ternary_53, (&raw mut forcecase__goto_975_14 as *mut case_state), code))
                                     if (__goto_pending != 0) {
                                         break
                                     }
@@ -2537,7 +2537,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
             1 => {  // GROUP_SUBSTITUTE
                 (__goto_pending = 0)
                 if ((if group__goto_1068_9 < 0: 1 else: 0) != 0) {
-                    (rc__goto_748_5 = pcre2_substring_nametable_scan_8(code, (&name__goto_1074_17[0] as *mut u8), (&mut first__goto_1369_22 as *mut *const u8), (&mut last__goto_1369_29 as *mut *const u8)))
+                    (rc__goto_748_5 = pcre2_substring_nametable_scan_8(code, (&name__goto_1074_17[0] as *mut u8), (&raw mut first__goto_1369_22 as *mut *const u8), (&raw mut last__goto_1369_29 as *mut *const u8)))
                     if (__goto_pending != 0) {
                         continue
                     }
@@ -2607,7 +2607,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_748_5 = pcre2_substring_length_bynumber_8(match_data, group__goto_1068_9, (&mut sublength__goto_1106_18 as *mut c_ulong)))
+                (rc__goto_748_5 = pcre2_substring_length_bynumber_8(match_data, group__goto_1068_9, (&raw mut sublength__goto_1106_18 as *mut c_ulong)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -2754,7 +2754,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                         } else {
                             (__ci_expr_ternary_59 = lengthleft__goto_766_38)
                         }
-                        (chkcc_rc__goto_1461_11 = default_substitute_case_callout(subptr__goto_1108_18, chkcc_length__goto_1461_11, (buffer + buff_offset__goto_766_12), __ci_expr_ternary_59, (&mut forcecase__goto_975_14 as *mut case_state), code))
+                        (chkcc_rc__goto_1461_11 = default_substitute_case_callout(subptr__goto_1108_18, chkcc_length__goto_1461_11, (buffer + buff_offset__goto_766_12), __ci_expr_ternary_59, (&raw mut forcecase__goto_975_14 as *mut case_state), code))
                         if (__goto_pending != 0) {
                             break
                         }
@@ -2933,7 +2933,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                                     break
                                 }
                                 while true {
-                                    (chkcc_rc__goto_1643_5 = do_case_copy((buffer + buff_offset__goto_766_12), chkcc_length__goto_1643_5, lengthleft__goto_766_38, (&mut forcecase__goto_975_14 as *mut case_state), utf__goto_758_6, substitute_case_callout__goto_771_14, substitute_case_callout_data__goto_773_7))
+                                    (chkcc_rc__goto_1643_5 = do_case_copy((buffer + buff_offset__goto_766_12), chkcc_length__goto_1643_5, lengthleft__goto_766_38, (&raw mut forcecase__goto_975_14 as *mut case_state), utf__goto_758_6, substitute_case_callout__goto_771_14, substitute_case_callout_data__goto_773_7))
                                     if (__goto_pending != 0) {
                                         break
                                     }
@@ -3019,7 +3019,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                         if (__goto_pending != 0) {
                             continue
                         }
-                        (rc__goto_748_5 = mcontext.substitute_callout((&mut scb__goto_769_32 as *mut pcre2_substitute_callout_block_8), mcontext.substitute_callout_data))
+                        (rc__goto_748_5 = mcontext.substitute_callout((&raw mut scb__goto_769_32 as *mut pcre2_substitute_callout_block_8), mcontext.substitute_callout_data))
                         if (__goto_pending != 0) {
                             continue
                         }
@@ -3165,7 +3165,7 @@ fn pcre2_substitute_8(code: *const pcre2_real_code_8, __param_subject: *const u8
                 if ((if (suboptions__goto_752_10 & 256) == 0: 1 else: 0) != 0) {
                     (__ci_expr_logic_63 = (if true: 1 else: 0))
                 } else {
-                    (__ci_expr_logic_63 = (if (if not (pcre2_next_match_8(match_data, (&mut start_offset as *mut c_ulong), (&mut goptions__goto_751_10 as *mut c_uint)) != 0): 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_63 = (if (if not (pcre2_next_match_8(match_data, (&raw mut start_offset as *mut c_ulong), (&raw mut goptions__goto_751_10 as *mut c_uint)) != 0): 1 else: 0) != 0: 1 else: 0))
                 }
                 if (__ci_expr_logic_63 != 0) {
                     (start_offset = (unsafe: ovector__goto_767_13[1]))
@@ -3555,7 +3555,7 @@ fn find_text_end(code: *const pcre2_real_code_8, ptrptr: *mut *const u8, ptrend:
                                         if (__goto_pending != 0) {
                                             break
                                         }
-                                        (erc__goto_115_9 = _pcre2_check_escape_8((&mut ptr__goto_83_12 as *mut *const u8), ptrend, (&mut ch__goto_117_14 as *mut c_uint), (&mut errorcode__goto_116_9 as *mut c_int), code.overall_options, code.extra_options, code.top_bracket, 0, null))
+                                        (erc__goto_115_9 = _pcre2_check_escape_8((&raw mut ptr__goto_83_12 as *mut *const u8), ptrend, (&raw mut ch__goto_117_14 as *mut c_uint), (&raw mut errorcode__goto_116_9 as *mut c_int), code.overall_options, code.extra_options, code.top_bracket, 0, null))
                                         if (__goto_pending != 0) {
                                             break
                                         }

@@ -50,7 +50,7 @@ fn _pcre2_study_8(re: *mut pcre2_real_code_8) -> c_int {
             3 => {  // __if_then
                 (__goto_pending = 0)
                 (depth__goto_1932_7 = 0)
-                (rc__goto_1933_7 = set_start_bits(re, code__goto_1918_14, utf__goto_1919_6, ucp__goto_1920_6, (&mut depth__goto_1932_7 as *mut c_int)))
+                (rc__goto_1933_7 = set_start_bits(re, code__goto_1918_14, utf__goto_1919_6, ucp__goto_1920_6, (&raw mut depth__goto_1932_7 as *mut c_int)))
                 if ((if rc__goto_1933_7 == SSB_UNKNOWN: 1 else: 0) != 0) {
                     if (__goto_pending != 0) {
                         continue
@@ -296,7 +296,7 @@ fn _pcre2_study_8(re: *mut pcre2_real_code_8) -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
-                    (min__goto_2056_7 = find_minlength(re, code__goto_1918_14, code__goto_1918_14, utf__goto_1919_6, null, (&mut count__goto_1917_5 as *mut c_int), (&backref_cache__goto_2057_7[0] as *mut c_int)))
+                    (min__goto_2056_7 = find_minlength(re, code__goto_1918_14, code__goto_1918_14, utf__goto_1919_6, null, (&raw mut count__goto_1917_5 as *mut c_int), (&backref_cache__goto_2057_7[0] as *mut c_int)))
                     if (__goto_pending != 0) {
                         continue
                     }
@@ -2472,7 +2472,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                                         break
                                                     }
 
-                                                    (dd__goto_492_13 = find_minlength(re, cs__goto_139_14, startcode, utf, (&mut this_recurse__goto_117_15 as *mut recurse_check), countptr, backref_cache))
+                                                    (dd__goto_492_13 = find_minlength(re, cs__goto_139_14, startcode, utf, (&raw mut this_recurse__goto_117_15 as *mut recurse_check), countptr, backref_cache))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -2744,7 +2744,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                                         break
                                                     }
 
-                                                    (dd__goto_492_13 = find_minlength(re, cs__goto_139_14, startcode, utf, (&mut this_recurse__goto_117_15 as *mut recurse_check), countptr, backref_cache))
+                                                    (dd__goto_492_13 = find_minlength(re, cs__goto_139_14, startcode, utf, (&raw mut this_recurse__goto_117_15 as *mut recurse_check), countptr, backref_cache))
 
                                                     if (__goto_pending != 0) {
                                                         break
@@ -2979,7 +2979,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                                     break
                                                 }
 
-                                                (d__goto_137_7 = find_minlength(re, cs__goto_139_14, startcode, utf, (&mut this_recurse__goto_117_15 as *mut recurse_check), countptr, backref_cache))
+                                                (d__goto_137_7 = find_minlength(re, cs__goto_139_14, startcode, utf, (&raw mut this_recurse__goto_117_15 as *mut recurse_check), countptr, backref_cache))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -3183,7 +3183,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                                     break
                                                 }
 
-                                                (d__goto_137_7 = find_minlength(re, cs__goto_139_14, startcode, utf, (&mut this_recurse__goto_117_15 as *mut recurse_check), countptr, backref_cache))
+                                                (d__goto_137_7 = find_minlength(re, cs__goto_139_14, startcode, utf, (&raw mut this_recurse__goto_117_15 as *mut recurse_check), countptr, backref_cache))
 
                                                 if (__goto_pending != 0) {
                                                     break
@@ -3348,7 +3348,7 @@ fn find_minlength(re: *const pcre2_real_code_8, code: *const u8, startcode: *con
                                             break
                                         }
 
-                                        (prev_recurse_d__goto_111_5 = find_minlength(re, cs__goto_139_14, startcode, utf, (&mut this_recurse__goto_117_15 as *mut recurse_check), countptr, backref_cache))
+                                        (prev_recurse_d__goto_111_5 = find_minlength(re, cs__goto_139_14, startcode, utf, (&raw mut this_recurse__goto_117_15 as *mut recurse_check), countptr, backref_cache))
 
                                         if (__goto_pending != 0) {
                                             break

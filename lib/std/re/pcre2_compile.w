@@ -162,7 +162,7 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                     continue
                 }
                 if ((if ccontext == null: 1 else: 0) != 0) {
-                    (ccontext = ((&mut _pcre2_default_compile_context_8 as *mut pcre2_real_compile_context_8)))
+                    (ccontext = ((&raw mut _pcre2_default_compile_context_8 as *mut pcre2_real_compile_context_8)))
                 }
                 if (__goto_pending != 0) {
                     continue
@@ -1091,7 +1091,7 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                 if (__goto_pending != 0) {
                     continue
                 }
-                (errorcode__goto_10314_5 = parse_regex(ptr__goto_10294_12, cb__goto_10288_15.external_options, xoptions__goto_10305_10, (&mut has_lookbehind__goto_10285_6 as *mut c_int), (&mut cb__goto_10288_15 as *mut compile_block_8)))
+                (errorcode__goto_10314_5 = parse_regex(ptr__goto_10294_12, cb__goto_10288_15.external_options, xoptions__goto_10305_10, (&raw mut has_lookbehind__goto_10285_6 as *mut c_int), (&raw mut cb__goto_10288_15 as *mut compile_block_8)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -1138,7 +1138,7 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                     if (__goto_pending != 0) {
                         continue
                     }
-                    (errorcode__goto_10314_5 = check_lookbehinds(cb__goto_10288_15.parsed_pattern, null, null, (&mut cb__goto_10288_15 as *mut compile_block_8), (&mut loopcount__goto_10776_7 as *mut c_int)))
+                    (errorcode__goto_10314_5 = check_lookbehinds(cb__goto_10288_15.parsed_pattern, null, null, (&raw mut cb__goto_10288_15 as *mut compile_block_8), (&raw mut loopcount__goto_10776_7 as *mut c_int)))
                     if (__goto_pending != 0) {
                         continue
                     }
@@ -1169,7 +1169,7 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                 if (__goto_pending != 0) {
                     continue
                 }
-                compile_regex(cb__goto_10288_15.external_options, xoptions__goto_10305_10, (&mut code__goto_10292_14 as *mut *mut u8), (&mut pptr__goto_10295_11 as *mut *mut c_uint), (&mut errorcode__goto_10314_5 as *mut c_int), 0, (&mut firstcu__goto_10303_10 as *mut c_uint), (&mut firstcuflags__goto_10302_10 as *mut c_uint), (&mut reqcu__goto_10303_19 as *mut c_uint), (&mut reqcuflags__goto_10302_24 as *mut c_uint), null, null, (&mut cb__goto_10288_15 as *mut compile_block_8), (&mut length__goto_10297_12 as *mut c_ulong))
+                compile_regex(cb__goto_10288_15.external_options, xoptions__goto_10305_10, (&raw mut code__goto_10292_14 as *mut *mut u8), (&raw mut pptr__goto_10295_11 as *mut *mut c_uint), (&raw mut errorcode__goto_10314_5 as *mut c_int), 0, (&raw mut firstcu__goto_10303_10 as *mut c_uint), (&raw mut firstcuflags__goto_10302_10 as *mut c_uint), (&raw mut reqcu__goto_10303_19 as *mut c_uint), (&raw mut reqcuflags__goto_10302_24 as *mut c_uint), null, null, (&raw mut cb__goto_10288_15 as *mut compile_block_8), (&raw mut length__goto_10297_12 as *mut c_ulong))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -1428,7 +1428,7 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                     (i__goto_10317_10 = 0)
                     while ((if i__goto_10317_10 < cb__goto_10288_15.names_found: 1 else: 0) != 0) {
                         if ((if ng__goto_10951_16.length > 0: 1 else: 0) != 0) {
-                            (tablecount__goto_10952_12 = _pcre2_compile_add_name_to_table8((&mut cb__goto_10288_15 as *mut compile_block_8), ng__goto_10951_16, tablecount__goto_10952_12))
+                            (tablecount__goto_10952_12 = _pcre2_compile_add_name_to_table8((&raw mut cb__goto_10288_15 as *mut compile_block_8), ng__goto_10951_16, tablecount__goto_10952_12))
                         }
                         if (__goto_pending != 0) {
                             break
@@ -1458,7 +1458,7 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                 if (__goto_pending != 0) {
                     continue
                 }
-                (regexrc__goto_10315_5 = compile_regex(re__goto_10287_18.overall_options, re__goto_10287_18.extra_options, (&mut code__goto_10292_14 as *mut *mut u8), (&mut pptr__goto_10295_11 as *mut *mut c_uint), (&mut errorcode__goto_10314_5 as *mut c_int), 0, (&mut firstcu__goto_10303_10 as *mut c_uint), (&mut firstcuflags__goto_10302_10 as *mut c_uint), (&mut reqcu__goto_10303_19 as *mut c_uint), (&mut reqcuflags__goto_10302_24 as *mut c_uint), null, null, (&mut cb__goto_10288_15 as *mut compile_block_8), null))
+                (regexrc__goto_10315_5 = compile_regex(re__goto_10287_18.overall_options, re__goto_10287_18.extra_options, (&raw mut code__goto_10292_14 as *mut *mut u8), (&raw mut pptr__goto_10295_11 as *mut *mut c_uint), (&raw mut errorcode__goto_10314_5 as *mut c_int), 0, (&raw mut firstcu__goto_10303_10 as *mut c_uint), (&raw mut firstcuflags__goto_10302_10 as *mut c_uint), (&raw mut reqcu__goto_10303_19 as *mut c_uint), (&raw mut reqcuflags__goto_10302_24 as *mut c_uint), null, null, (&raw mut cb__goto_10288_15 as *mut compile_block_8), null))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -1663,7 +1663,7 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                     if (__goto_pending != 0) {
                         continue
                     }
-                    (possessify_rc__goto_11087_7 = _pcre2_auto_possessify_8(temp__goto_11086_16, (&mut cb__goto_10288_15 as *mut compile_block_8)))
+                    (possessify_rc__goto_11087_7 = _pcre2_auto_possessify_8(temp__goto_11086_16, (&raw mut cb__goto_10288_15 as *mut compile_block_8)))
                     if (__goto_pending != 0) {
                         continue
                     }
@@ -1699,7 +1699,7 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                     if (__goto_pending != 0) {
                         continue
                     }
-                    if (is_anchored(codestart__goto_10293_14, 0, (&mut cb__goto_10288_15 as *mut compile_block_8), 0, 0, dotstar_anchor__goto_11110_8) != 0) {
+                    if (is_anchored(codestart__goto_10293_14, 0, (&raw mut cb__goto_10288_15 as *mut compile_block_8), 0, 0, dotstar_anchor__goto_11110_8) != 0) {
                         (re__goto_10287_18.overall_options = re__goto_10287_18.overall_options | 2147483648)
                     }
                     if (__goto_pending != 0) {
@@ -1719,7 +1719,7 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                         if (__goto_pending != 0) {
                             continue
                         }
-                        (assertedcu__goto_11133_14 = find_firstassertedcu(codestart__goto_10293_14, (&mut assertedcuflags__goto_11132_14 as *mut c_uint), 0))
+                        (assertedcu__goto_11133_14 = find_firstassertedcu(codestart__goto_10293_14, (&raw mut assertedcuflags__goto_11132_14 as *mut c_uint), 0))
                         if (__goto_pending != 0) {
                             continue
                         }
@@ -1805,7 +1805,7 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
                             if (__goto_pending != 0) {
                                 continue
                             }
-                            if (is_startline(codestart__goto_10293_14, 0, (&mut cb__goto_10288_15 as *mut compile_block_8), 0, 0, dotstar_anchor__goto_11188_10) != 0) {
+                            if (is_startline(codestart__goto_10293_14, 0, (&raw mut cb__goto_10288_15 as *mut compile_block_8), 0, 0, dotstar_anchor__goto_11188_10) != 0) {
                                 (re__goto_10287_18.flags = re__goto_10287_18.flags | 512)
                             }
                             if (__goto_pending != 0) {
@@ -2484,7 +2484,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                     }
                                 } else {
                                     var __ci_expr_logic_19: c_int = 0
-                                    if ((if not (read_repeat_counts((&mut p__goto_1546_18 as *mut *const u8), ptrend, null, null, errorcodeptr) != 0): 1 else: 0) != 0) {
+                                    if ((if not (read_repeat_counts((&raw mut p__goto_1546_18 as *mut *const u8), ptrend, null, null, errorcodeptr) != 0): 1 else: 0) != 0) {
                                         (__ci_expr_logic_19 = (if (if (unsafe: *errorcodeptr) == 0: 1 else: 0) != 0: 1 else: 0))
                                     }
                                     if (__ci_expr_logic_19 != 0) {
@@ -2895,7 +2895,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                     break
                                 }
 
-                                if ((if not (read_number((&mut p__goto_1757_18 as *mut *const u8), ptrend, -1, 65535, 161, (&mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
+                                if ((if not (read_number((&raw mut p__goto_1757_18 as *mut *const u8), ptrend, -1, 65535, 161, (&raw mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
                                     if ((if (unsafe: *errorcodeptr) == 0: 1 else: 0) != 0) {
                                         (escape__goto_1499_5 = ESC_g)
                                     }
@@ -3017,7 +3017,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                     break
                                 }
 
-                                if ((if not (read_number((&mut p__goto_1800_18 as *mut *const u8), ptrend, bracount, 65535, 161, (&mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
+                                if ((if not (read_number((&raw mut p__goto_1800_18 as *mut *const u8), ptrend, bracount, 65535, 161, (&raw mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
                                     if ((if (unsafe: *errorcodeptr) == 0: 1 else: 0) != 0) {
                                         (escape__goto_1499_5 = ESC_k)
                                     }
@@ -3103,7 +3103,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                 }
 
                             } else {
-                                if ((if not (read_number((&mut ptr__goto_1497_12 as *mut *const u8), ptrend, bracount, 65535, 161, (&mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
+                                if ((if not (read_number((&raw mut ptr__goto_1497_12 as *mut *const u8), ptrend, bracount, 65535, 161, (&raw mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
                                     if ((if (unsafe: *errorcodeptr) == 0: 1 else: 0) != 0) {
                                         ((unsafe: *errorcodeptr) = ERR57)
                                     }
@@ -3180,7 +3180,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                             break
                                         }
 
-                                        if ((if not (read_number((&mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
+                                        if ((if not (read_number((&raw mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&raw mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
                                             ((unsafe: *errorcodeptr) = ERR61)
 
                                             if (__goto_pending != 0) {
@@ -3223,7 +3223,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                         break
                                     }
 
-                                    if ((if not (read_number((&mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
+                                    if ((if not (read_number((&raw mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&raw mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
                                         (s__goto_1611_7 = 2147483647)
                                     }
 
@@ -3409,7 +3409,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                             break
                                         }
 
-                                        if ((if not (read_number((&mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
+                                        if ((if not (read_number((&raw mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&raw mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
                                             ((unsafe: *errorcodeptr) = ERR61)
 
                                             if (__goto_pending != 0) {
@@ -3452,7 +3452,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                         break
                                     }
 
-                                    if ((if not (read_number((&mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
+                                    if ((if not (read_number((&raw mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&raw mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
                                         (s__goto_1611_7 = 2147483647)
                                     }
 
@@ -3638,7 +3638,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                             break
                                         }
 
-                                        if ((if not (read_number((&mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
+                                        if ((if not (read_number((&raw mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&raw mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
                                             ((unsafe: *errorcodeptr) = ERR61)
 
                                             if (__goto_pending != 0) {
@@ -3681,7 +3681,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                         break
                                     }
 
-                                    if ((if not (read_number((&mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
+                                    if ((if not (read_number((&raw mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&raw mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
                                         (s__goto_1611_7 = 2147483647)
                                     }
 
@@ -3867,7 +3867,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                             break
                                         }
 
-                                        if ((if not (read_number((&mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
+                                        if ((if not (read_number((&raw mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&raw mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
                                             ((unsafe: *errorcodeptr) = ERR61)
 
                                             if (__goto_pending != 0) {
@@ -3910,7 +3910,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                         break
                                     }
 
-                                    if ((if not (read_number((&mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
+                                    if ((if not (read_number((&raw mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&raw mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
                                         (s__goto_1611_7 = 2147483647)
                                     }
 
@@ -4096,7 +4096,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                             break
                                         }
 
-                                        if ((if not (read_number((&mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
+                                        if ((if not (read_number((&raw mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&raw mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
                                             ((unsafe: *errorcodeptr) = ERR61)
 
                                             if (__goto_pending != 0) {
@@ -4139,7 +4139,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                         break
                                     }
 
-                                    if ((if not (read_number((&mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
+                                    if ((if not (read_number((&raw mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&raw mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
                                         (s__goto_1611_7 = 2147483647)
                                     }
 
@@ -4325,7 +4325,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                             break
                                         }
 
-                                        if ((if not (read_number((&mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
+                                        if ((if not (read_number((&raw mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&raw mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
                                             ((unsafe: *errorcodeptr) = ERR61)
 
                                             if (__goto_pending != 0) {
@@ -4368,7 +4368,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                         break
                                     }
 
-                                    if ((if not (read_number((&mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
+                                    if ((if not (read_number((&raw mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&raw mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
                                         (s__goto_1611_7 = 2147483647)
                                     }
 
@@ -4554,7 +4554,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                             break
                                         }
 
-                                        if ((if not (read_number((&mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
+                                        if ((if not (read_number((&raw mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&raw mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
                                             ((unsafe: *errorcodeptr) = ERR61)
 
                                             if (__goto_pending != 0) {
@@ -4597,7 +4597,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                         break
                                     }
 
-                                    if ((if not (read_number((&mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
+                                    if ((if not (read_number((&raw mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&raw mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
                                         (s__goto_1611_7 = 2147483647)
                                     }
 
@@ -4783,7 +4783,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                             break
                                         }
 
-                                        if ((if not (read_number((&mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
+                                        if ((if not (read_number((&raw mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&raw mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
                                             ((unsafe: *errorcodeptr) = ERR61)
 
                                             if (__goto_pending != 0) {
@@ -4826,7 +4826,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                         break
                                     }
 
-                                    if ((if not (read_number((&mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
+                                    if ((if not (read_number((&raw mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&raw mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
                                         (s__goto_1611_7 = 2147483647)
                                     }
 
@@ -5012,7 +5012,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                             break
                                         }
 
-                                        if ((if not (read_number((&mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
+                                        if ((if not (read_number((&raw mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&raw mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
                                             ((unsafe: *errorcodeptr) = ERR61)
 
                                             if (__goto_pending != 0) {
@@ -5055,7 +5055,7 @@ fn _pcre2_check_escape_8(ptrptr: *mut *const u8, ptrend: *const u8, chptr: *mut 
                                         break
                                     }
 
-                                    if ((if not (read_number((&mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
+                                    if ((if not (read_number((&raw mut ptr__goto_1497_12 as *mut *const u8), ptrend, -1, 65535, 0, (&raw mut s__goto_1611_7 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
                                         (s__goto_1611_7 = 2147483647)
                                     }
 
@@ -6559,7 +6559,7 @@ fn compile_regex(options: c_uint, xoptions: c_uint, codeptr: *mut *mut u8, pptrp
 
         (capitem.assert_depth = cb.assert_depth)
 
-        (open_caps = ((&mut capitem as *mut open_capitem)))
+        (open_caps = ((&raw mut capitem as *mut open_capitem)))
 
     }
 
@@ -6650,10 +6650,10 @@ fn compile_regex(options: c_uint, xoptions: c_uint, codeptr: *mut *mut u8, pptrp
         if ((if lengthptr == null: 1 else: 0) != 0) {
             (__ci_expr_ternary_7 = ((null as *mut c_ulong)))
         } else {
-            (__ci_expr_ternary_7 = ((&mut length as *mut c_ulong)))
+            (__ci_expr_ternary_7 = ((&raw mut length as *mut c_ulong)))
         }
 
-        (branch_return = compile_branch((&mut options as *mut c_uint), (&mut xoptions as *mut c_uint), (&mut code as *mut *mut u8), (&mut pptr as *mut *mut c_uint), errorcodeptr, (&mut branchfirstcu as *mut c_uint), (&mut branchfirstcuflags as *mut c_uint), (&mut branchreqcu as *mut c_uint), (&mut branchreqcuflags as *mut c_uint), (&mut bc as *mut branch_chain_8), open_caps, cb, __ci_expr_ternary_7))
+        (branch_return = compile_branch((&raw mut options as *mut c_uint), (&raw mut xoptions as *mut c_uint), (&raw mut code as *mut *mut u8), (&raw mut pptr as *mut *mut c_uint), errorcodeptr, (&raw mut branchfirstcu as *mut c_uint), (&raw mut branchfirstcuflags as *mut c_uint), (&raw mut branchreqcu as *mut c_uint), (&raw mut branchreqcuflags as *mut c_uint), (&raw mut bc as *mut branch_chain_8), open_caps, cb, __ci_expr_ternary_7))
 
         if ((if branch_return == 0: 1 else: 0) != 0) {
             return 0
@@ -7132,7 +7132,7 @@ fn get_branchlength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, errcodeptr: *
 
                         },
                         2150039552 => {
-                            ((unsafe: *errcodeptr) = check_lookbehinds((pptr__goto_9592_11 + ((1 as isize) as usize)), (&mut pptr__goto_9592_11 as *mut *mut c_uint), recurses, cb, lcptr))
+                            ((unsafe: *errcodeptr) = check_lookbehinds((pptr__goto_9592_11 + ((1 as isize) as usize)), (&raw mut pptr__goto_9592_11 as *mut *mut c_uint), recurses, cb, lcptr))
 
                             if ((if (unsafe: *errcodeptr) != 0: 1 else: 0) != 0) {
                                 return -1
@@ -7154,7 +7154,7 @@ fn get_branchlength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, errcodeptr: *
 
                         },
                         2150105088 => {
-                            ((unsafe: *errcodeptr) = check_lookbehinds((pptr__goto_9592_11 + ((1 as isize) as usize)), (&mut pptr__goto_9592_11 as *mut *mut c_uint), recurses, cb, lcptr))
+                            ((unsafe: *errcodeptr) = check_lookbehinds((pptr__goto_9592_11 + ((1 as isize) as usize)), (&raw mut pptr__goto_9592_11 as *mut *mut c_uint), recurses, cb, lcptr))
 
                             if ((if (unsafe: *errcodeptr) != 0: 1 else: 0) != 0) {
                                 return -1
@@ -7176,7 +7176,7 @@ fn get_branchlength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, errcodeptr: *
 
                         },
                         2150301696 => {
-                            ((unsafe: *errcodeptr) = check_lookbehinds((pptr__goto_9592_11 + ((1 as isize) as usize)), (&mut pptr__goto_9592_11 as *mut *mut c_uint), recurses, cb, lcptr))
+                            ((unsafe: *errcodeptr) = check_lookbehinds((pptr__goto_9592_11 + ((1 as isize) as usize)), (&raw mut pptr__goto_9592_11 as *mut *mut c_uint), recurses, cb, lcptr))
 
                             if ((if (unsafe: *errcodeptr) != 0: 1 else: 0) != 0) {
                                 return -1
@@ -7198,7 +7198,7 @@ fn get_branchlength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, errcodeptr: *
 
                         },
                         2148990976 => {
-                            ((unsafe: *errcodeptr) = check_lookbehinds((pptr__goto_9592_11 + ((1 as isize) as usize)), (&mut pptr__goto_9592_11 as *mut *mut c_uint), recurses, cb, lcptr))
+                            ((unsafe: *errcodeptr) = check_lookbehinds((pptr__goto_9592_11 + ((1 as isize) as usize)), (&raw mut pptr__goto_9592_11 as *mut *mut c_uint), recurses, cb, lcptr))
 
                             if ((if (unsafe: *errcodeptr) != 0: 1 else: 0) != 0) {
                                 return -1
@@ -7220,17 +7220,17 @@ fn get_branchlength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, errcodeptr: *
 
                         },
                         2150170624 => {
-                            if ((if not (set_lookbehind_lengths((&mut pptr__goto_9592_11 as *mut *mut c_uint), errcodeptr, lcptr, recurses, cb) != 0): 1 else: 0) != 0) {
+                            if ((if not (set_lookbehind_lengths((&raw mut pptr__goto_9592_11 as *mut *mut c_uint), errcodeptr, lcptr, recurses, cb) != 0): 1 else: 0) != 0) {
                                 return -1
                             }
                         },
                         2150236160 => {
-                            if ((if not (set_lookbehind_lengths((&mut pptr__goto_9592_11 as *mut *mut c_uint), errcodeptr, lcptr, recurses, cb) != 0): 1 else: 0) != 0) {
+                            if ((if not (set_lookbehind_lengths((&raw mut pptr__goto_9592_11 as *mut *mut c_uint), errcodeptr, lcptr, recurses, cb) != 0): 1 else: 0) != 0) {
                                 return -1
                             }
                         },
                         2150367232 => {
-                            if ((if not (set_lookbehind_lengths((&mut pptr__goto_9592_11 as *mut *mut c_uint), errcodeptr, lcptr, recurses, cb) != 0): 1 else: 0) != 0) {
+                            if ((if not (set_lookbehind_lengths((&raw mut pptr__goto_9592_11 as *mut *mut c_uint), errcodeptr, lcptr, recurses, cb) != 0): 1 else: 0) != 0) {
                                 return -1
                             }
                         },
@@ -7829,7 +7829,7 @@ fn get_branchlength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, errcodeptr: *
                 if (__goto_pending != 0) {
                     continue
                 }
-                (grouplength__goto_9589_5 = get_grouplength((&mut gptr__goto_9611_13 as *mut *mut c_uint), (&mut groupminlength__goto_9589_18 as *mut c_int), 0, errcodeptr, lcptr, group__goto_9614_12, (&mut this_recurse__goto_9594_22 as *mut parsed_recurse_check), cb))
+                (grouplength__goto_9589_5 = get_grouplength((&raw mut gptr__goto_9611_13 as *mut *mut c_uint), (&raw mut groupminlength__goto_9589_18 as *mut c_int), 0, errcodeptr, lcptr, group__goto_9614_12, (&raw mut this_recurse__goto_9594_22 as *mut parsed_recurse_check), cb))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -7866,7 +7866,7 @@ fn get_branchlength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, errcodeptr: *
             },
             2 => {  // CHECK_GROUP
                 (__goto_pending = 0)
-                (grouplength__goto_9589_5 = get_grouplength((&mut pptr__goto_9592_11 as *mut *mut c_uint), (&mut groupminlength__goto_9589_18 as *mut c_int), 1, errcodeptr, lcptr, group__goto_9614_12, recurses, cb))
+                (grouplength__goto_9589_5 = get_grouplength((&raw mut pptr__goto_9592_11 as *mut *mut c_uint), (&raw mut groupminlength__goto_9589_18 as *mut c_int), 1, errcodeptr, lcptr, group__goto_9614_12, recurses, cb))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -8071,7 +8071,7 @@ fn set_lookbehind_lengths(pptrptr: *mut *mut c_uint, errcodeptr: *mut c_int, lcp
 
         ((unsafe: *pptrptr) = (unsafe: *pptrptr) + 1)
 
-        (branchlength = get_branchlength(pptrptr, (&mut branchminlength as *mut c_int), errcodeptr, lcptr, recurses, cb))
+        (branchlength = get_branchlength(pptrptr, (&raw mut branchminlength as *mut c_int), errcodeptr, lcptr, recurses, cb))
 
         if ((if branchlength < 0: 1 else: 0) != 0) {
             if ((if (unsafe: *errcodeptr) == 0: 1 else: 0) != 0) {
@@ -8382,17 +8382,17 @@ fn check_lookbehinds(__param_pptr: *mut c_uint, retptr: *mut *mut c_uint, recurs
                     (pptr = pptr + (1 +% (unsafe: pptr[1])))
                 },
                 2150170624 => {
-                    if ((if not (set_lookbehind_lengths((&mut pptr as *mut *mut c_uint), (&mut errorcode as *mut c_int), lcptr, recurses, cb) != 0): 1 else: 0) != 0) {
+                    if ((if not (set_lookbehind_lengths((&raw mut pptr as *mut *mut c_uint), (&raw mut errorcode as *mut c_int), lcptr, recurses, cb) != 0): 1 else: 0) != 0) {
                         return errorcode
                     }
                 },
                 2150236160 => {
-                    if ((if not (set_lookbehind_lengths((&mut pptr as *mut *mut c_uint), (&mut errorcode as *mut c_int), lcptr, recurses, cb) != 0): 1 else: 0) != 0) {
+                    if ((if not (set_lookbehind_lengths((&raw mut pptr as *mut *mut c_uint), (&raw mut errorcode as *mut c_int), lcptr, recurses, cb) != 0): 1 else: 0) != 0) {
                         return errorcode
                     }
                 },
                 2150367232 => {
-                    if ((if not (set_lookbehind_lengths((&mut pptr as *mut *mut c_uint), (&mut errorcode as *mut c_int), lcptr, recurses, cb) != 0): 1 else: 0) != 0) {
+                    if ((if not (set_lookbehind_lengths((&raw mut pptr as *mut *mut c_uint), (&raw mut errorcode as *mut c_int), lcptr, recurses, cb) != 0): 1 else: 0) != 0) {
                         return errorcode
                     }
                 },
@@ -8817,7 +8817,7 @@ fn read_repeat_counts(ptrptr: *mut *const u8, ptrend: *const u8, minp: *mut c_ui
                 if (__goto_pending != 0) {
                     continue
                 }
-                if ((if not (read_number((&mut p__goto_1353_12 as *mut *const u8), ptrend, -1, 65535, 105, (&mut min__goto_1357_9 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
+                if ((if not (read_number((&raw mut p__goto_1353_12 as *mut *const u8), ptrend, -1, 65535, 105, (&raw mut min__goto_1357_9 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
                     if ((if (unsafe: *errorcodeptr) != 0: 1 else: 0) != 0) {
                         __pc = 1
                         __goto_pending = 1
@@ -8851,7 +8851,7 @@ fn read_repeat_counts(ptrptr: *mut *const u8, ptrend: *const u8, minp: *mut c_ui
                     if (__goto_pending != 0) {
                         continue
                     }
-                    if ((if not (read_number((&mut p__goto_1353_12 as *mut *const u8), ptrend, -1, 65535, 105, (&mut max__goto_1358_9 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
+                    if ((if not (read_number((&raw mut p__goto_1353_12 as *mut *const u8), ptrend, -1, 65535, 105, (&raw mut max__goto_1358_9 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
                         if ((if (unsafe: *errorcodeptr) != 0: 1 else: 0) != 0) {
                             __pc = 1
                             __goto_pending = 1
@@ -8918,7 +8918,7 @@ fn read_repeat_counts(ptrptr: *mut *const u8, ptrend: *const u8, minp: *mut c_ui
                         if (__goto_pending != 0) {
                             continue
                         }
-                        if ((if not (read_number((&mut p__goto_1353_12 as *mut *const u8), ptrend, -1, 65535, 105, (&mut max__goto_1358_9 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
+                        if ((if not (read_number((&raw mut p__goto_1353_12 as *mut *const u8), ptrend, -1, 65535, 105, (&raw mut max__goto_1358_9 as *mut c_int), errorcodeptr) != 0): 1 else: 0) != 0) {
                             if ((if (unsafe: *errorcodeptr) != 0: 1 else: 0) != 0) {
                                 __pc = 1
                                 __goto_pending = 1
@@ -10189,7 +10189,7 @@ fn parse_capture_list(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, __p
                     if (__goto_pending != 0) {
                         break
                     }
-                    if (read_number((&mut ptr__goto_2737_12 as *mut *const u8), ptrend, cb.bracount, 65535, 161, (&mut i__goto_2741_5 as *mut c_int), errorcodeptr) != 0) {
+                    if (read_number((&raw mut ptr__goto_2737_12 as *mut *const u8), ptrend, cb.bracount, 65535, 161, (&raw mut i__goto_2741_5 as *mut c_int), errorcodeptr) != 0) {
                         if (__goto_pending != 0) {
                             break
                         }
@@ -10240,7 +10240,7 @@ fn parse_capture_list(ptrptr: *mut *const u8, ptrend: *const u8, utf: c_int, __p
                             if (__goto_pending != 0) {
                                 break
                             }
-                            if ((if not (read_name((&mut ptr__goto_2737_12 as *mut *const u8), ptrend, utf, terminator__goto_2739_13, (&mut next_offset__goto_2736_12 as *mut c_ulong), (&mut name__goto_2738_12 as *mut *const u8), (&mut namelen__goto_2740_16 as *mut c_uint), errorcodeptr, cb) != 0): 1 else: 0) != 0) {
+                            if ((if not (read_name((&raw mut ptr__goto_2737_12 as *mut *const u8), ptrend, utf, terminator__goto_2739_13, (&raw mut next_offset__goto_2736_12 as *mut c_ulong), (&raw mut name__goto_2738_12 as *mut *const u8), (&raw mut namelen__goto_2740_16 as *mut c_uint), errorcodeptr, cb) != 0): 1 else: 0) != 0) {
                                 __pc = 2
                                 __goto_pending = 1
                             }
@@ -10823,7 +10823,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                             break
                         }
                         if (auto_callout__goto_3143_6 != 0) {
-                            (parsed_pattern__goto_3125_11 = manage_callouts(thisptr__goto_3147_12, (&mut previous_callout__goto_3124_11 as *mut *mut c_uint), auto_callout__goto_3143_6, parsed_pattern__goto_3125_11, cb))
+                            (parsed_pattern__goto_3125_11 = manage_callouts(thisptr__goto_3147_12, (&raw mut previous_callout__goto_3124_11 as *mut *mut c_uint), auto_callout__goto_3143_6, parsed_pattern__goto_3125_11, cb))
                         }
                         if (__goto_pending != 0) {
                             break
@@ -11031,7 +11031,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                             var __ci_expr_old_14: c_int = after_manual_callout__goto_3135_5
                             (after_manual_callout__goto_3135_5 = after_manual_callout__goto_3135_5 - 1)
                             if ((if __ci_expr_old_14 <= 0: 1 else: 0) != 0) {
-                                (parsed_pattern__goto_3125_11 = manage_callouts(thisptr__goto_3147_12, (&mut previous_callout__goto_3124_11 as *mut *mut c_uint), auto_callout__goto_3143_6, parsed_pattern__goto_3125_11, cb))
+                                (parsed_pattern__goto_3125_11 = manage_callouts(thisptr__goto_3147_12, (&raw mut previous_callout__goto_3124_11 as *mut *mut c_uint), auto_callout__goto_3143_6, parsed_pattern__goto_3125_11, cb))
                             }
                             if (__goto_pending != 0) {
                                 continue
@@ -11157,7 +11157,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                             },
                             92 => {
                                 if ((if (options & 4194304) != 0: 1 else: 0) != 0) {
-                                    (escape__goto_3138_5 = _pcre2_check_escape_8((&mut ptr as *mut *const u8), ptrend__goto_3149_12, (&mut c__goto_3115_10 as *mut c_uint), (&mut errorcode__goto_3137_5 as *mut c_int), options, xoptions, cb.bracount, 0, cb))
+                                    (escape__goto_3138_5 = _pcre2_check_escape_8((&raw mut ptr as *mut *const u8), ptrend__goto_3149_12, (&raw mut c__goto_3115_10 as *mut c_uint), (&raw mut errorcode__goto_3137_5 as *mut c_int), options, xoptions, cb.bracount, 0, cb))
 
                                     if (__goto_pending != 0) {
                                         break
@@ -11451,7 +11451,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                         (__ci_expr_logic_52 = (if true: 1 else: 0))
                     } else {
                         (tempptr__goto_3235_14 = ptr)
-                        (__ci_expr_logic_52 = (if (if not (read_repeat_counts((&mut tempptr__goto_3235_14 as *mut *const u8), ptrend__goto_3149_12, null, null, (&mut errorcode__goto_3137_5 as *mut c_int)) != 0): 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_52 = (if (if not (read_repeat_counts((&raw mut tempptr__goto_3235_14 as *mut *const u8), ptrend__goto_3149_12, null, null, (&raw mut errorcode__goto_3137_5 as *mut c_int)) != 0): 1 else: 0) != 0: 1 else: 0))
                     }
                     (__ci_expr_logic_53 = (if __ci_expr_logic_52 != 0: 1 else: 0))
                 }
@@ -11459,7 +11459,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                     var __ci_expr_old_54: c_int = after_manual_callout__goto_3135_5
                     (after_manual_callout__goto_3135_5 = after_manual_callout__goto_3135_5 - 1)
                     if ((if __ci_expr_old_54 <= 0: 1 else: 0) != 0) {
-                        (parsed_pattern__goto_3125_11 = manage_callouts(thisptr__goto_3147_12, (&mut previous_callout__goto_3124_11 as *mut *mut c_uint), auto_callout__goto_3143_6, parsed_pattern__goto_3125_11, cb))
+                        (parsed_pattern__goto_3125_11 = manage_callouts(thisptr__goto_3147_12, (&raw mut previous_callout__goto_3124_11 as *mut *mut c_uint), auto_callout__goto_3143_6, parsed_pattern__goto_3125_11, cb))
                         if (__goto_pending != 0) {
                             continue
                         }
@@ -11631,7 +11631,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                         92 => {
                             (tempptr__goto_3235_14 = ptr)
 
-                            (escape__goto_3138_5 = _pcre2_check_escape_8((&mut ptr as *mut *const u8), ptrend__goto_3149_12, (&mut c__goto_3115_10 as *mut c_uint), (&mut errorcode__goto_3137_5 as *mut c_int), options, xoptions, cb.bracount, 0, cb))
+                            (escape__goto_3138_5 = _pcre2_check_escape_8((&raw mut ptr as *mut *const u8), ptrend__goto_3149_12, (&raw mut c__goto_3115_10 as *mut c_uint), (&raw mut errorcode__goto_3137_5 as *mut c_int), options, xoptions, cb.bracount, 0, cb))
 
                             if ((if errorcode__goto_3137_5 != 0: 1 else: 0) != 0) {
                                 if ((if (xoptions & 2) == 0: 1 else: 0) != 0) {
@@ -11929,7 +11929,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                     break
                                                 }
 
-                                                if ((if not (get_ucp((&mut ptr as *mut *const u8), utf__goto_3142_6, (&mut negated__goto_3722_14 as *mut c_int), (&mut ptype__goto_3723_18 as *mut c_ushort), (&mut pdata__goto_3723_29 as *mut c_ushort), (&mut errorcode__goto_3137_5 as *mut c_int), cb) != 0): 1 else: 0) != 0) {
+                                                if ((if not (get_ucp((&raw mut ptr as *mut *const u8), utf__goto_3142_6, (&raw mut negated__goto_3722_14 as *mut c_int), (&raw mut ptype__goto_3723_18 as *mut c_ushort), (&raw mut pdata__goto_3723_29 as *mut c_ushort), (&raw mut errorcode__goto_3137_5 as *mut c_int), cb) != 0): 1 else: 0) != 0) {
                                                     __pc = 1
                                                     __goto_pending = 1
                                                 }
@@ -12065,7 +12065,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                         break
                                                     }
 
-                                                    if (read_number((&mut p__goto_3759_20 as *mut *const u8), ptrend__goto_3149_12, cb.bracount, 65535, 161, (&mut i__goto_3139_5 as *mut c_int), (&mut errorcode__goto_3137_5 as *mut c_int)) != 0) {
+                                                    if (read_number((&raw mut p__goto_3759_20 as *mut *const u8), ptrend__goto_3149_12, cb.bracount, 65535, 161, (&raw mut i__goto_3139_5 as *mut c_int), (&raw mut errorcode__goto_3137_5 as *mut c_int)) != 0) {
                                                         var __ci_expr_logic_88: c_int
 
                                                         if ((if p__goto_3759_20 >= ptrend__goto_3149_12: 1 else: 0) != 0) {
@@ -12132,7 +12132,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                 }
 
 
-                                                if ((if not (read_name((&mut ptr as *mut *const u8), ptrend__goto_3149_12, utf__goto_3142_6, terminator__goto_3232_12, (&mut offset__goto_3236_14 as *mut c_ulong), (&mut name__goto_3148_12 as *mut *const u8), (&mut namelen__goto_3117_10 as *mut c_uint), (&mut errorcode__goto_3137_5 as *mut c_int), cb) != 0): 1 else: 0) != 0) {
+                                                if ((if not (read_name((&raw mut ptr as *mut *const u8), ptrend__goto_3149_12, utf__goto_3142_6, terminator__goto_3232_12, (&raw mut offset__goto_3236_14 as *mut c_ulong), (&raw mut name__goto_3148_12 as *mut *const u8), (&raw mut namelen__goto_3117_10 as *mut c_uint), (&raw mut errorcode__goto_3137_5 as *mut c_int), cb) != 0): 1 else: 0) != 0) {
                                                     __pc = 1
                                                     __goto_pending = 1
                                                 }
@@ -12259,7 +12259,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
 
                         },
                         123 => {
-                            if ((if not (read_repeat_counts((&mut ptr as *mut *const u8), ptrend__goto_3149_12, (&mut min_repeat__goto_3229_12 as *mut c_uint), (&mut max_repeat__goto_3229_28 as *mut c_uint), (&mut errorcode__goto_3137_5 as *mut c_int)) != 0): 1 else: 0) != 0) {
+                            if ((if not (read_repeat_counts((&raw mut ptr as *mut *const u8), ptrend__goto_3149_12, (&raw mut min_repeat__goto_3229_12 as *mut c_uint), (&raw mut max_repeat__goto_3229_28 as *mut c_uint), (&raw mut errorcode__goto_3137_5 as *mut c_int)) != 0): 1 else: 0) != 0) {
                                 if ((if errorcode__goto_3137_5 != 0: 1 else: 0) != 0) {
                                     __pc = 19
                                     __goto_pending = 1
@@ -12480,7 +12480,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                             }
 
                             if (__ci_expr_logic_113 != 0) {
-                                (__ci_expr_logic_114 = (if check_posix_syntax(ptr, ptrend__goto_3149_12, (&mut tempptr__goto_3235_14 as *mut *const u8)) != 0: 1 else: 0))
+                                (__ci_expr_logic_114 = (if check_posix_syntax(ptr, ptrend__goto_3149_12, (&raw mut tempptr__goto_3235_14 as *mut *const u8)) != 0: 1 else: 0))
                             }
 
                             if (__ci_expr_logic_114 != 0) {
@@ -12630,7 +12630,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                 break
                                             }
 
-                                            if ((if not (read_name((&mut ptr as *mut *const u8), ptrend__goto_3149_12, utf__goto_3142_6, 0, (&mut offset__goto_3236_14 as *mut c_ulong), (&mut name__goto_3148_12 as *mut *const u8), (&mut namelen__goto_3117_10 as *mut c_uint), (&mut errorcode__goto_3137_5 as *mut c_int), cb) != 0): 1 else: 0) != 0) {
+                                            if ((if not (read_name((&raw mut ptr as *mut *const u8), ptrend__goto_3149_12, utf__goto_3142_6, 0, (&raw mut offset__goto_3236_14 as *mut c_ulong), (&raw mut name__goto_3148_12 as *mut *const u8), (&raw mut namelen__goto_3117_10 as *mut c_uint), (&raw mut errorcode__goto_3137_5 as *mut c_int), cb) != 0): 1 else: 0) != 0) {
                                                 __pc = 19
                                                 __goto_pending = 1
                                             }
@@ -12794,7 +12794,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                         ((unsafe: *__ci_expr_old_125) = 2148990976)
 
 
-                                                        (parsed_pattern__goto_3125_11 = parse_capture_list((&mut ptr as *mut *const u8), ptrend__goto_3149_12, utf__goto_3142_6, parsed_pattern__goto_3125_11, 0, (&mut errorcode__goto_3137_5 as *mut c_int), cb))
+                                                        (parsed_pattern__goto_3125_11 = parse_capture_list((&raw mut ptr as *mut *const u8), ptrend__goto_3149_12, utf__goto_3142_6, parsed_pattern__goto_3125_11, 0, (&raw mut errorcode__goto_3137_5 as *mut c_int), cb))
 
                                                         if ((if parsed_pattern__goto_3125_11 == null: 1 else: 0) != 0) {
                                                             __pc = 19
@@ -12922,7 +12922,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                 break
                                             }
 
-                                            if ((if not (read_name((&mut ptr as *mut *const u8), ptrend__goto_3149_12, utf__goto_3142_6, 0, (&mut offset__goto_3236_14 as *mut c_ulong), (&mut name__goto_3148_12 as *mut *const u8), (&mut namelen__goto_3117_10 as *mut c_uint), (&mut errorcode__goto_3137_5 as *mut c_int), cb) != 0): 1 else: 0) != 0) {
+                                            if ((if not (read_name((&raw mut ptr as *mut *const u8), ptrend__goto_3149_12, utf__goto_3142_6, 0, (&raw mut offset__goto_3236_14 as *mut c_ulong), (&raw mut name__goto_3148_12 as *mut *const u8), (&raw mut namelen__goto_3117_10 as *mut c_uint), (&raw mut errorcode__goto_3137_5 as *mut c_int), cb) != 0): 1 else: 0) != 0) {
                                                 __pc = 19
                                                 __goto_pending = 1
                                             }
@@ -13244,7 +13244,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
 
                                         }
 
-                                        if ((if not (read_name((&mut ptr as *mut *const u8), ptrend__goto_3149_12, utf__goto_3142_6, 41, (&mut offset__goto_3236_14 as *mut c_ulong), (&mut name__goto_3148_12 as *mut *const u8), (&mut namelen__goto_3117_10 as *mut c_uint), (&mut errorcode__goto_3137_5 as *mut c_int), cb) != 0): 1 else: 0) != 0) {
+                                        if ((if not (read_name((&raw mut ptr as *mut *const u8), ptrend__goto_3149_12, utf__goto_3142_6, 41, (&raw mut offset__goto_3236_14 as *mut c_ulong), (&raw mut name__goto_3148_12 as *mut *const u8), (&raw mut namelen__goto_3117_10 as *mut c_uint), (&raw mut errorcode__goto_3137_5 as *mut c_int), cb) != 0): 1 else: 0) != 0) {
                                             __pc = 19
                                             __goto_pending = 1
                                         }
@@ -13916,7 +13916,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                         }
 
 
-                                        if (read_number((&mut ptr as *mut *const u8), ptrend__goto_3149_12, cb.bracount, 65535, 161, (&mut i__goto_3139_5 as *mut c_int), (&mut errorcode__goto_3137_5 as *mut c_int)) != 0) {
+                                        if (read_number((&raw mut ptr as *mut *const u8), ptrend__goto_3149_12, cb.bracount, 65535, 161, (&raw mut i__goto_3139_5 as *mut c_int), (&raw mut errorcode__goto_3137_5 as *mut c_int)) != 0) {
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -14105,7 +14105,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                         break
                                                     }
 
-                                                    if ((if not (read_number((&mut ptr as *mut *const u8), ptrend__goto_3149_12, -1, 1000, 179, (&mut major__goto_5473_13 as *mut c_int), (&mut errorcode__goto_3137_5 as *mut c_int)) != 0): 1 else: 0) != 0) {
+                                                    if ((if not (read_number((&raw mut ptr as *mut *const u8), ptrend__goto_3149_12, -1, 1000, 179, (&raw mut major__goto_5473_13 as *mut c_int), (&raw mut errorcode__goto_3137_5 as *mut c_int)) != 0): 1 else: 0) != 0) {
                                                         __pc = 19
                                                         __goto_pending = 1
                                                     }
@@ -14168,7 +14168,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                             break
                                                         }
 
-                                                        if ((if not (read_number((&mut ptr as *mut *const u8), ptrend__goto_3149_12, -1, 1000, 179, (&mut minor__goto_5474_13 as *mut c_int), (&mut errorcode__goto_3137_5 as *mut c_int)) != 0): 1 else: 0) != 0) {
+                                                        if ((if not (read_number((&raw mut ptr as *mut *const u8), ptrend__goto_3149_12, -1, 1000, 179, (&raw mut minor__goto_5474_13 as *mut c_int), (&raw mut errorcode__goto_3137_5 as *mut c_int)) != 0): 1 else: 0) != 0) {
                                                             __pc = 19
                                                             __goto_pending = 1
                                                         }
@@ -14332,7 +14332,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                         break
                                                     }
 
-                                                    if ((if not (read_name((&mut ptr as *mut *const u8), ptrend__goto_3149_12, utf__goto_3142_6, terminator__goto_3232_12, (&mut offset__goto_3236_14 as *mut c_ulong), (&mut name__goto_3148_12 as *mut *const u8), (&mut namelen__goto_3117_10 as *mut c_uint), (&mut errorcode__goto_3137_5 as *mut c_int), cb) != 0): 1 else: 0) != 0) {
+                                                    if ((if not (read_name((&raw mut ptr as *mut *const u8), ptrend__goto_3149_12, utf__goto_3142_6, terminator__goto_3232_12, (&raw mut offset__goto_3236_14 as *mut c_ulong), (&raw mut name__goto_3148_12 as *mut *const u8), (&raw mut namelen__goto_3117_10 as *mut c_uint), (&raw mut errorcode__goto_3137_5 as *mut c_int), cb) != 0): 1 else: 0) != 0) {
                                                         __pc = 19
                                                         __goto_pending = 1
                                                     }
@@ -14775,7 +14775,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                 break
                                             }
 
-                                            (optset__goto_3230_25 = ((&mut set__goto_3230_12 as *mut c_uint)))
+                                            (optset__goto_3230_25 = ((&raw mut set__goto_3230_12 as *mut c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -14790,7 +14790,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                 break
                                             }
 
-                                            (xoptset__goto_3231_27 = ((&mut xset__goto_3231_12 as *mut c_uint)))
+                                            (xoptset__goto_3231_27 = ((&raw mut xset__goto_3231_12 as *mut c_uint)))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -14876,9 +14876,9 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
 
                                                             }
 
-                                                            (optset__goto_3230_25 = ((&mut unset__goto_3230_17 as *mut c_uint)))
+                                                            (optset__goto_3230_25 = ((&raw mut unset__goto_3230_17 as *mut c_uint)))
 
-                                                            (xoptset__goto_3231_27 = ((&mut xunset__goto_3231_18 as *mut c_uint)))
+                                                            (xoptset__goto_3231_27 = ((&raw mut xunset__goto_3231_18 as *mut c_uint)))
 
                                                             (hyphenok__goto_5025_14 = 0)
 
@@ -15692,7 +15692,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                     (__ci_expr_logic_241 = (if __ci_expr_logic_240 != 0: 1 else: 0))
                 }
                 if (__ci_expr_logic_241 != 0) {
-                    (__ci_expr_logic_242 = (if check_posix_syntax(ptr, ptrend__goto_3149_12, (&mut tempptr__goto_3235_14 as *mut *const u8)) != 0: 1 else: 0))
+                    (__ci_expr_logic_242 = (if check_posix_syntax(ptr, ptrend__goto_3149_12, (&raw mut tempptr__goto_3235_14 as *mut *const u8)) != 0: 1 else: 0))
                 }
                 if (__ci_expr_logic_242 != 0) {
                     (posix_negate__goto_4021_14 = 0)
@@ -16893,7 +16893,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                     if (__goto_pending != 0) {
                         continue
                     }
-                    (escape__goto_3138_5 = _pcre2_check_escape_8((&mut ptr as *mut *const u8), ptrend__goto_3149_12, (&mut c__goto_3115_10 as *mut c_uint), (&mut errorcode__goto_3137_5 as *mut c_int), options, xoptions, cb.bracount, 1, cb))
+                    (escape__goto_3138_5 = _pcre2_check_escape_8((&raw mut ptr as *mut *const u8), ptrend__goto_3149_12, (&raw mut c__goto_3115_10 as *mut c_uint), (&raw mut errorcode__goto_3137_5 as *mut c_int), options, xoptions, cb.bracount, 1, cb))
                     if (__goto_pending != 0) {
                         continue
                     }
@@ -17121,7 +17121,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                     break
                                 }
 
-                                if ((if not (get_ucp((&mut ptr as *mut *const u8), utf__goto_3142_6, (&mut negated__goto_4538_18 as *mut c_int), (&mut ptype__goto_4539_22 as *mut c_ushort), (&mut pdata__goto_4539_33 as *mut c_ushort), (&mut errorcode__goto_3137_5 as *mut c_int), cb) != 0): 1 else: 0) != 0) {
+                                if ((if not (get_ucp((&raw mut ptr as *mut *const u8), utf__goto_3142_6, (&raw mut negated__goto_4538_18 as *mut c_int), (&raw mut ptype__goto_4539_22 as *mut c_ushort), (&raw mut pdata__goto_4539_33 as *mut c_ushort), (&raw mut errorcode__goto_3137_5 as *mut c_int), cb) != 0): 1 else: 0) != 0) {
                                     __pc = 19
                                     __goto_pending = 1
                                 }
@@ -17229,7 +17229,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                     break
                                 }
 
-                                if ((if not (get_ucp((&mut ptr as *mut *const u8), utf__goto_3142_6, (&mut negated__goto_4538_18 as *mut c_int), (&mut ptype__goto_4539_22 as *mut c_ushort), (&mut pdata__goto_4539_33 as *mut c_ushort), (&mut errorcode__goto_3137_5 as *mut c_int), cb) != 0): 1 else: 0) != 0) {
+                                if ((if not (get_ucp((&raw mut ptr as *mut *const u8), utf__goto_3142_6, (&raw mut negated__goto_4538_18 as *mut c_int), (&raw mut ptype__goto_4539_22 as *mut c_ushort), (&raw mut pdata__goto_4539_33 as *mut c_ushort), (&raw mut errorcode__goto_3137_5 as *mut c_int), cb) != 0): 1 else: 0) != 0) {
                                     __pc = 19
                                     __goto_pending = 1
                                 }
@@ -17922,7 +17922,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
 
                             }
 
-                            if ((if not (read_name((&mut ptr as *mut *const u8), ptrend__goto_3149_12, utf__goto_3142_6, 41, (&mut offset__goto_3236_14 as *mut c_ulong), (&mut name__goto_3148_12 as *mut *const u8), (&mut namelen__goto_3117_10 as *mut c_uint), (&mut errorcode__goto_3137_5 as *mut c_int), cb) != 0): 1 else: 0) != 0) {
+                            if ((if not (read_name((&raw mut ptr as *mut *const u8), ptrend__goto_3149_12, utf__goto_3142_6, 41, (&raw mut offset__goto_3236_14 as *mut c_ulong), (&raw mut name__goto_3148_12 as *mut *const u8), (&raw mut namelen__goto_3117_10 as *mut c_uint), (&raw mut errorcode__goto_3137_5 as *mut c_int), cb) != 0): 1 else: 0) != 0) {
                                 __pc = 19
                                 __goto_pending = 1
                             }
@@ -18594,7 +18594,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                             }
 
 
-                            if (read_number((&mut ptr as *mut *const u8), ptrend__goto_3149_12, cb.bracount, 65535, 161, (&mut i__goto_3139_5 as *mut c_int), (&mut errorcode__goto_3137_5 as *mut c_int)) != 0) {
+                            if (read_number((&raw mut ptr as *mut *const u8), ptrend__goto_3149_12, cb.bracount, 65535, 161, (&raw mut i__goto_3139_5 as *mut c_int), (&raw mut errorcode__goto_3137_5 as *mut c_int)) != 0) {
 
                                 if (__goto_pending != 0) {
                                     break
@@ -18783,7 +18783,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                             break
                                         }
 
-                                        if ((if not (read_number((&mut ptr as *mut *const u8), ptrend__goto_3149_12, -1, 1000, 179, (&mut major__goto_5473_13 as *mut c_int), (&mut errorcode__goto_3137_5 as *mut c_int)) != 0): 1 else: 0) != 0) {
+                                        if ((if not (read_number((&raw mut ptr as *mut *const u8), ptrend__goto_3149_12, -1, 1000, 179, (&raw mut major__goto_5473_13 as *mut c_int), (&raw mut errorcode__goto_3137_5 as *mut c_int)) != 0): 1 else: 0) != 0) {
                                             __pc = 19
                                             __goto_pending = 1
                                         }
@@ -18846,7 +18846,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                                 break
                                             }
 
-                                            if ((if not (read_number((&mut ptr as *mut *const u8), ptrend__goto_3149_12, -1, 1000, 179, (&mut minor__goto_5474_13 as *mut c_int), (&mut errorcode__goto_3137_5 as *mut c_int)) != 0): 1 else: 0) != 0) {
+                                            if ((if not (read_number((&raw mut ptr as *mut *const u8), ptrend__goto_3149_12, -1, 1000, 179, (&raw mut minor__goto_5474_13 as *mut c_int), (&raw mut errorcode__goto_3137_5 as *mut c_int)) != 0): 1 else: 0) != 0) {
                                                 __pc = 19
                                                 __goto_pending = 1
                                             }
@@ -19010,7 +19010,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                             break
                                         }
 
-                                        if ((if not (read_name((&mut ptr as *mut *const u8), ptrend__goto_3149_12, utf__goto_3142_6, terminator__goto_3232_12, (&mut offset__goto_3236_14 as *mut c_ulong), (&mut name__goto_3148_12 as *mut *const u8), (&mut namelen__goto_3117_10 as *mut c_uint), (&mut errorcode__goto_3137_5 as *mut c_int), cb) != 0): 1 else: 0) != 0) {
+                                        if ((if not (read_name((&raw mut ptr as *mut *const u8), ptrend__goto_3149_12, utf__goto_3142_6, terminator__goto_3232_12, (&raw mut offset__goto_3236_14 as *mut c_ulong), (&raw mut name__goto_3148_12 as *mut *const u8), (&raw mut namelen__goto_3117_10 as *mut c_uint), (&raw mut errorcode__goto_3137_5 as *mut c_int), cb) != 0): 1 else: 0) != 0) {
                                             __pc = 19
                                             __goto_pending = 1
                                         }
@@ -19453,7 +19453,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                     break
                                 }
 
-                                (optset__goto_3230_25 = ((&mut set__goto_3230_12 as *mut c_uint)))
+                                (optset__goto_3230_25 = ((&raw mut set__goto_3230_12 as *mut c_uint)))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -19468,7 +19468,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                                     break
                                 }
 
-                                (xoptset__goto_3231_27 = ((&mut xset__goto_3231_12 as *mut c_uint)))
+                                (xoptset__goto_3231_27 = ((&raw mut xset__goto_3231_12 as *mut c_uint)))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -19554,9 +19554,9 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
 
                                                 }
 
-                                                (optset__goto_3230_25 = ((&mut unset__goto_3230_17 as *mut c_uint)))
+                                                (optset__goto_3230_25 = ((&raw mut unset__goto_3230_17 as *mut c_uint)))
 
-                                                (xoptset__goto_3231_27 = ((&mut xunset__goto_3231_18 as *mut c_uint)))
+                                                (xoptset__goto_3231_27 = ((&raw mut xunset__goto_3231_18 as *mut c_uint)))
 
                                                 (hyphenok__goto_5025_14 = 0)
 
@@ -19904,7 +19904,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                 } else {
                     (__ci_expr_ternary_344 = ((cb.bracount as c_int)))
                 }
-                if ((if not (read_number((&mut ptr as *mut *const u8), ptrend__goto_3149_12, __ci_expr_ternary_344, 65535, 161, (&mut i__goto_3139_5 as *mut c_int), (&mut errorcode__goto_3137_5 as *mut c_int)) != 0): 1 else: 0) != 0) {
+                if ((if not (read_number((&raw mut ptr as *mut *const u8), ptrend__goto_3149_12, __ci_expr_ternary_344, 65535, 161, (&raw mut i__goto_3139_5 as *mut c_int), (&raw mut errorcode__goto_3137_5 as *mut c_int)) != 0): 1 else: 0) != 0) {
                     __pc = 19
                     __goto_pending = 1
                 }
@@ -19940,7 +19940,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
             },
             8 => {  // RECURSE_BY_NAME
                 (__goto_pending = 0)
-                if ((if not (read_name((&mut ptr as *mut *const u8), ptrend__goto_3149_12, utf__goto_3142_6, 0, (&mut offset__goto_3236_14 as *mut c_ulong), (&mut name__goto_3148_12 as *mut *const u8), (&mut namelen__goto_3117_10 as *mut c_uint), (&mut errorcode__goto_3137_5 as *mut c_int), cb) != 0): 1 else: 0) != 0) {
+                if ((if not (read_name((&raw mut ptr as *mut *const u8), ptrend__goto_3149_12, utf__goto_3142_6, 0, (&raw mut offset__goto_3236_14 as *mut c_ulong), (&raw mut name__goto_3148_12 as *mut *const u8), (&raw mut namelen__goto_3117_10 as *mut c_uint), (&raw mut errorcode__goto_3137_5 as *mut c_int), cb) != 0): 1 else: 0) != 0) {
                     __pc = 19
                     __goto_pending = 1
                 }
@@ -20001,7 +20001,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                     (__ci_expr_logic_350 = (if (if (unsafe: *ptr) == 40: 1 else: 0) != 0: 1 else: 0))
                 }
                 if (__ci_expr_logic_350 != 0) {
-                    (parsed_pattern__goto_3125_11 = parse_capture_list((&mut ptr as *mut *const u8), ptrend__goto_3149_12, utf__goto_3142_6, parsed_pattern__goto_3125_11, offset__goto_3236_14, (&mut errorcode__goto_3137_5 as *mut c_int), cb))
+                    (parsed_pattern__goto_3125_11 = parse_capture_list((&raw mut ptr as *mut *const u8), ptrend__goto_3149_12, utf__goto_3142_6, parsed_pattern__goto_3125_11, offset__goto_3236_14, (&raw mut errorcode__goto_3137_5 as *mut c_int), cb))
                     if (__goto_pending != 0) {
                         continue
                     }
@@ -20208,7 +20208,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
             },
             16 => {  // DEFINE_NAME
                 (__goto_pending = 0)
-                if ((if not (read_name((&mut ptr as *mut *const u8), ptrend__goto_3149_12, utf__goto_3142_6, terminator__goto_3232_12, (&mut offset__goto_3236_14 as *mut c_ulong), (&mut name__goto_3148_12 as *mut *const u8), (&mut namelen__goto_3117_10 as *mut c_uint), (&mut errorcode__goto_3137_5 as *mut c_int), cb) != 0): 1 else: 0) != 0) {
+                if ((if not (read_name((&raw mut ptr as *mut *const u8), ptrend__goto_3149_12, utf__goto_3142_6, terminator__goto_3232_12, (&raw mut offset__goto_3236_14 as *mut c_ulong), (&raw mut name__goto_3148_12 as *mut *const u8), (&raw mut namelen__goto_3117_10 as *mut c_uint), (&raw mut errorcode__goto_3137_5 as *mut c_int), cb) != 0): 1 else: 0) != 0) {
                     __pc = 19
                     __goto_pending = 1
                 }
@@ -20493,7 +20493,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                 if (__goto_pending != 0) {
                     continue
                 }
-                (parsed_pattern__goto_3125_11 = manage_callouts(ptr, (&mut previous_callout__goto_3124_11 as *mut *mut c_uint), auto_callout__goto_3143_6, parsed_pattern__goto_3125_11, cb))
+                (parsed_pattern__goto_3125_11 = manage_callouts(ptr, (&raw mut previous_callout__goto_3124_11 as *mut *mut c_uint), auto_callout__goto_3143_6, parsed_pattern__goto_3125_11, cb))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -21398,7 +21398,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                             (matched_char__goto_6101_6 = 1)
 
                             if ((if ((unsafe: *pptr__goto_6084_11) & 1) != 0: 1 else: 0) != 0) {
-                                if ((if not (_pcre2_compile_class_nested_8(options__goto_6080_10, xoptions__goto_6081_10, (&mut pptr__goto_6084_11 as *mut *mut c_uint), (&mut code__goto_6093_14 as *mut *mut u8), errorcodeptr, cb, lengthptr) != 0): 1 else: 0) != 0) {
+                                if ((if not (_pcre2_compile_class_nested_8(options__goto_6080_10, xoptions__goto_6081_10, (&raw mut pptr__goto_6084_11 as *mut *mut c_uint), (&raw mut code__goto_6093_14 as *mut *mut u8), errorcodeptr, cb, lengthptr) != 0): 1 else: 0) != 0) {
                                     return 0
                                 }
 
@@ -21832,7 +21832,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                             }
 
 
-                            (pptr__goto_6084_11 = _pcre2_compile_class_not_nested_8(options__goto_6080_10, xoptions__goto_6081_10, (pptr__goto_6084_11 + ((1 as isize) as usize)), (&mut code__goto_6093_14 as *mut *mut u8), (if meta__goto_6085_10 == 2148401152: 1 else: 0), null, errorcodeptr, cb, lengthptr))
+                            (pptr__goto_6084_11 = _pcre2_compile_class_not_nested_8(options__goto_6080_10, xoptions__goto_6081_10, (pptr__goto_6084_11 + ((1 as isize) as usize)), (&raw mut code__goto_6093_14 as *mut *mut u8), (if meta__goto_6085_10 == 2148401152: 1 else: 0), null, errorcodeptr, cb, lengthptr))
 
                             if ((if pptr__goto_6084_11 == null: 1 else: 0) != 0) {
                                 return 0
@@ -21850,7 +21850,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                             (matched_char__goto_6101_6 = 1)
 
                             if ((if ((unsafe: *pptr__goto_6084_11) & 1) != 0: 1 else: 0) != 0) {
-                                if ((if not (_pcre2_compile_class_nested_8(options__goto_6080_10, xoptions__goto_6081_10, (&mut pptr__goto_6084_11 as *mut *mut c_uint), (&mut code__goto_6093_14 as *mut *mut u8), errorcodeptr, cb, lengthptr) != 0): 1 else: 0) != 0) {
+                                if ((if not (_pcre2_compile_class_nested_8(options__goto_6080_10, xoptions__goto_6081_10, (&raw mut pptr__goto_6084_11 as *mut *mut c_uint), (&raw mut code__goto_6093_14 as *mut *mut u8), errorcodeptr, cb, lengthptr) != 0): 1 else: 0) != 0) {
                                     return 0
                                 }
 
@@ -22284,7 +22284,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                             }
 
 
-                            (pptr__goto_6084_11 = _pcre2_compile_class_not_nested_8(options__goto_6080_10, xoptions__goto_6081_10, (pptr__goto_6084_11 + ((1 as isize) as usize)), (&mut code__goto_6093_14 as *mut *mut u8), (if meta__goto_6085_10 == 2148401152: 1 else: 0), null, errorcodeptr, cb, lengthptr))
+                            (pptr__goto_6084_11 = _pcre2_compile_class_not_nested_8(options__goto_6080_10, xoptions__goto_6081_10, (pptr__goto_6084_11 + ((1 as isize) as usize)), (&raw mut code__goto_6093_14 as *mut *mut u8), (if meta__goto_6085_10 == 2148401152: 1 else: 0), null, errorcodeptr, cb, lengthptr))
 
                             if ((if pptr__goto_6084_11 == null: 1 else: 0) != 0) {
                                 return 0
@@ -22545,7 +22545,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
 
                                             (index__goto_6597_18 = 0)
 
-                                            if ((if not (_pcre2_compile_find_dupname_details8(ng__goto_6598_20.name, ng__goto_6598_20.length, (&mut index__goto_6597_18 as *mut c_int), (&mut count__goto_6597_11 as *mut c_int), errorcodeptr, cb) != 0): 1 else: 0) != 0) {
+                                            if ((if not (_pcre2_compile_find_dupname_details8(ng__goto_6598_20.name, ng__goto_6598_20.length, (&raw mut index__goto_6597_18 as *mut c_int), (&raw mut count__goto_6597_11 as *mut c_int), errorcodeptr, cb) != 0): 1 else: 0) != 0) {
                                                 return 0
                                             }
 
@@ -22976,7 +22976,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     break
                                 }
 
-                                if ((if not (_pcre2_compile_find_dupname_details8(ng__goto_6748_20.name, ng__goto_6748_20.length, (&mut index__goto_6747_18 as *mut c_int), (&mut count__goto_6747_11 as *mut c_int), errorcodeptr, cb) != 0): 1 else: 0) != 0) {
+                                if ((if not (_pcre2_compile_find_dupname_details8(ng__goto_6748_20.name, ng__goto_6748_20.length, (&raw mut index__goto_6747_18 as *mut c_int), (&raw mut count__goto_6747_11 as *mut c_int), errorcodeptr, cb) != 0): 1 else: 0) != 0) {
                                     return 0
                                 }
 
@@ -23393,7 +23393,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     break
                                 }
 
-                                if ((if not (_pcre2_compile_find_dupname_details8(ng__goto_6748_20.name, ng__goto_6748_20.length, (&mut index__goto_6747_18 as *mut c_int), (&mut count__goto_6747_11 as *mut c_int), errorcodeptr, cb) != 0): 1 else: 0) != 0) {
+                                if ((if not (_pcre2_compile_find_dupname_details8(ng__goto_6748_20.name, ng__goto_6748_20.length, (&raw mut index__goto_6747_18 as *mut c_int), (&raw mut count__goto_6747_11 as *mut c_int), errorcodeptr, cb) != 0): 1 else: 0) != 0) {
                                     return 0
                                 }
 
@@ -23810,7 +23810,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     break
                                 }
 
-                                if ((if not (_pcre2_compile_find_dupname_details8(ng__goto_6748_20.name, ng__goto_6748_20.length, (&mut index__goto_6747_18 as *mut c_int), (&mut count__goto_6747_11 as *mut c_int), errorcodeptr, cb) != 0): 1 else: 0) != 0) {
+                                if ((if not (_pcre2_compile_find_dupname_details8(ng__goto_6748_20.name, ng__goto_6748_20.length, (&raw mut index__goto_6747_18 as *mut c_int), (&raw mut count__goto_6747_11 as *mut c_int), errorcodeptr, cb) != 0): 1 else: 0) != 0) {
                                     return 0
                                 }
 
@@ -24292,7 +24292,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                             var __ci_expr_logic_60: c_int = 0
 
                             if ((if lengthptr == null: 1 else: 0) != 0) {
-                                (__ci_expr_logic_60 = (if (if not (_pcre2_compile_find_dupname_details8(name__goto_7126_18, length__goto_7128_16, (&mut index__goto_7125_18 as *mut c_int), (&mut count__goto_7125_11 as *mut c_int), errorcodeptr, cb) != 0): 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_60 = (if (if not (_pcre2_compile_find_dupname_details8(name__goto_7126_18, length__goto_7128_16, (&raw mut index__goto_7125_18 as *mut c_int), (&raw mut count__goto_7125_11 as *mut c_int), errorcodeptr, cb) != 0): 1 else: 0) != 0: 1 else: 0))
                             }
 
                             if (__ci_expr_logic_60 != 0) {
@@ -24531,7 +24531,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                             var __ci_expr_logic_60: c_int = 0
 
                             if ((if lengthptr == null: 1 else: 0) != 0) {
-                                (__ci_expr_logic_60 = (if (if not (_pcre2_compile_find_dupname_details8(name__goto_7126_18, length__goto_7128_16, (&mut index__goto_7125_18 as *mut c_int), (&mut count__goto_7125_11 as *mut c_int), errorcodeptr, cb) != 0): 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_60 = (if (if not (_pcre2_compile_find_dupname_details8(name__goto_7126_18, length__goto_7128_16, (&raw mut index__goto_7125_18 as *mut c_int), (&raw mut count__goto_7125_11 as *mut c_int), errorcodeptr, cb) != 0): 1 else: 0) != 0: 1 else: 0))
                             }
 
                             if (__ci_expr_logic_60 != 0) {
@@ -25607,9 +25607,9 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                 if ((if lengthptr == null: 1 else: 0) != 0) {
                     (__ci_expr_ternary_95 = ((null as *mut c_ulong)))
                 } else {
-                    (__ci_expr_ternary_95 = ((&mut length_prevgroup__goto_6092_12 as *mut c_ulong)))
+                    (__ci_expr_ternary_95 = ((&raw mut length_prevgroup__goto_6092_12 as *mut c_ulong)))
                 }
-                (group_return__goto_6076_5 = compile_regex(options__goto_6080_10, xoptions__goto_6081_10, (&mut tempcode__goto_6096_14 as *mut *mut u8), (&mut pptr__goto_6084_11 as *mut *mut c_uint), errorcodeptr, skipunits__goto_6148_12, (&mut subfirstcu__goto_6149_22 as *mut c_uint), (&mut subfirstcuflags__goto_6152_27 as *mut c_uint), (&mut subreqcu__goto_6149_12 as *mut c_uint), (&mut subreqcuflags__goto_6152_12 as *mut c_uint), bcptr, open_caps, cb, __ci_expr_ternary_95))
+                (group_return__goto_6076_5 = compile_regex(options__goto_6080_10, xoptions__goto_6081_10, (&raw mut tempcode__goto_6096_14 as *mut *mut u8), (&raw mut pptr__goto_6084_11 as *mut *mut c_uint), errorcodeptr, skipunits__goto_6148_12, (&raw mut subfirstcu__goto_6149_22 as *mut c_uint), (&raw mut subfirstcuflags__goto_6152_27 as *mut c_uint), (&raw mut subreqcu__goto_6149_12 as *mut c_uint), (&raw mut subreqcuflags__goto_6152_12 as *mut c_uint), bcptr, open_caps, cb, __ci_expr_ternary_95))
                 if ((if group_return__goto_6076_5 == 0: 1 else: 0) != 0) {
                     return 0
                 }
@@ -27434,7 +27434,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if ((if lengthptr != null: 1 else: 0) != 0) {
                                     var __ci_expr_logic_124: c_int
 
-                                    if (_pcre2_ckd_smul_8((&mut delta__goto_7476_22 as *mut c_ulong), replicate__goto_7466_13, (length_prevgroup__goto_6092_12 as c_int)) != 0) {
+                                    if (_pcre2_ckd_smul_8((&raw mut delta__goto_7476_22 as *mut c_ulong), replicate__goto_7466_13, (length_prevgroup__goto_6092_12 as c_int)) != 0) {
                                         (__ci_expr_logic_124 = (if true: 1 else: 0))
                                     } else {
                                         (__ci_expr_logic_124 = (if (if (2147483627 -% (unsafe: *lengthptr)) < delta__goto_7476_22: 1 else: 0) != 0: 1 else: 0))
@@ -27816,7 +27816,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     if ((if lengthptr != null: 1 else: 0) != 0) {
                                         var __ci_expr_logic_136: c_int
 
-                                        if (_pcre2_ckd_smul_8((&mut delta__goto_7646_26 as *mut c_ulong), (repeat_min__goto_6077_10 -% 1), (length_prevgroup__goto_6092_12 as c_int)) != 0) {
+                                        if (_pcre2_ckd_smul_8((&raw mut delta__goto_7646_26 as *mut c_ulong), (repeat_min__goto_6077_10 -% 1), (length_prevgroup__goto_6092_12 as c_int)) != 0) {
                                             (__ci_expr_logic_136 = (if true: 1 else: 0))
                                         } else {
                                             (__ci_expr_logic_136 = (if (if (2147483627 -% (unsafe: *lengthptr)) < delta__goto_7646_26: 1 else: 0) != 0: 1 else: 0))
@@ -27939,7 +27939,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (__ci_expr_logic_138 != 0) {
                                     var __ci_expr_logic_139: c_int
 
-                                    if (_pcre2_ckd_smul_8((&mut delta__goto_7696_24 as *mut c_ulong), repeat_max__goto_6077_26, ((((length_prevgroup__goto_6092_12 as c_int) + 1) + 2) + (2 * 2))) != 0) {
+                                    if (_pcre2_ckd_smul_8((&raw mut delta__goto_7696_24 as *mut c_ulong), repeat_max__goto_6077_26, ((((length_prevgroup__goto_6092_12 as c_int) + 1) + 2) + (2 * 2))) != 0) {
                                         (__ci_expr_logic_139 = (if true: 1 else: 0))
                                     } else {
                                         (__ci_expr_logic_139 = (if (if (2147483633 -% (unsafe: *lengthptr)) < delta__goto_7696_24: 1 else: 0) != 0: 1 else: 0))
@@ -28576,7 +28576,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     if ((if lengthptr != null: 1 else: 0) != 0) {
                                         var __ci_expr_logic_136: c_int
 
-                                        if (_pcre2_ckd_smul_8((&mut delta__goto_7646_26 as *mut c_ulong), (repeat_min__goto_6077_10 -% 1), (length_prevgroup__goto_6092_12 as c_int)) != 0) {
+                                        if (_pcre2_ckd_smul_8((&raw mut delta__goto_7646_26 as *mut c_ulong), (repeat_min__goto_6077_10 -% 1), (length_prevgroup__goto_6092_12 as c_int)) != 0) {
                                             (__ci_expr_logic_136 = (if true: 1 else: 0))
                                         } else {
                                             (__ci_expr_logic_136 = (if (if (2147483627 -% (unsafe: *lengthptr)) < delta__goto_7646_26: 1 else: 0) != 0: 1 else: 0))
@@ -28699,7 +28699,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (__ci_expr_logic_138 != 0) {
                                     var __ci_expr_logic_139: c_int
 
-                                    if (_pcre2_ckd_smul_8((&mut delta__goto_7696_24 as *mut c_ulong), repeat_max__goto_6077_26, ((((length_prevgroup__goto_6092_12 as c_int) + 1) + 2) + (2 * 2))) != 0) {
+                                    if (_pcre2_ckd_smul_8((&raw mut delta__goto_7696_24 as *mut c_ulong), repeat_max__goto_6077_26, ((((length_prevgroup__goto_6092_12 as c_int) + 1) + 2) + (2 * 2))) != 0) {
                                         (__ci_expr_logic_139 = (if true: 1 else: 0))
                                     } else {
                                         (__ci_expr_logic_139 = (if (if (2147483633 -% (unsafe: *lengthptr)) < delta__goto_7696_24: 1 else: 0) != 0: 1 else: 0))
@@ -29335,7 +29335,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     if ((if lengthptr != null: 1 else: 0) != 0) {
                                         var __ci_expr_logic_136: c_int
 
-                                        if (_pcre2_ckd_smul_8((&mut delta__goto_7646_26 as *mut c_ulong), (repeat_min__goto_6077_10 -% 1), (length_prevgroup__goto_6092_12 as c_int)) != 0) {
+                                        if (_pcre2_ckd_smul_8((&raw mut delta__goto_7646_26 as *mut c_ulong), (repeat_min__goto_6077_10 -% 1), (length_prevgroup__goto_6092_12 as c_int)) != 0) {
                                             (__ci_expr_logic_136 = (if true: 1 else: 0))
                                         } else {
                                             (__ci_expr_logic_136 = (if (if (2147483627 -% (unsafe: *lengthptr)) < delta__goto_7646_26: 1 else: 0) != 0: 1 else: 0))
@@ -29458,7 +29458,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (__ci_expr_logic_138 != 0) {
                                     var __ci_expr_logic_139: c_int
 
-                                    if (_pcre2_ckd_smul_8((&mut delta__goto_7696_24 as *mut c_ulong), repeat_max__goto_6077_26, ((((length_prevgroup__goto_6092_12 as c_int) + 1) + 2) + (2 * 2))) != 0) {
+                                    if (_pcre2_ckd_smul_8((&raw mut delta__goto_7696_24 as *mut c_ulong), repeat_max__goto_6077_26, ((((length_prevgroup__goto_6092_12 as c_int) + 1) + 2) + (2 * 2))) != 0) {
                                         (__ci_expr_logic_139 = (if true: 1 else: 0))
                                     } else {
                                         (__ci_expr_logic_139 = (if (if (2147483633 -% (unsafe: *lengthptr)) < delta__goto_7696_24: 1 else: 0) != 0: 1 else: 0))
@@ -30094,7 +30094,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     if ((if lengthptr != null: 1 else: 0) != 0) {
                                         var __ci_expr_logic_136: c_int
 
-                                        if (_pcre2_ckd_smul_8((&mut delta__goto_7646_26 as *mut c_ulong), (repeat_min__goto_6077_10 -% 1), (length_prevgroup__goto_6092_12 as c_int)) != 0) {
+                                        if (_pcre2_ckd_smul_8((&raw mut delta__goto_7646_26 as *mut c_ulong), (repeat_min__goto_6077_10 -% 1), (length_prevgroup__goto_6092_12 as c_int)) != 0) {
                                             (__ci_expr_logic_136 = (if true: 1 else: 0))
                                         } else {
                                             (__ci_expr_logic_136 = (if (if (2147483627 -% (unsafe: *lengthptr)) < delta__goto_7646_26: 1 else: 0) != 0: 1 else: 0))
@@ -30217,7 +30217,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (__ci_expr_logic_138 != 0) {
                                     var __ci_expr_logic_139: c_int
 
-                                    if (_pcre2_ckd_smul_8((&mut delta__goto_7696_24 as *mut c_ulong), repeat_max__goto_6077_26, ((((length_prevgroup__goto_6092_12 as c_int) + 1) + 2) + (2 * 2))) != 0) {
+                                    if (_pcre2_ckd_smul_8((&raw mut delta__goto_7696_24 as *mut c_ulong), repeat_max__goto_6077_26, ((((length_prevgroup__goto_6092_12 as c_int) + 1) + 2) + (2 * 2))) != 0) {
                                         (__ci_expr_logic_139 = (if true: 1 else: 0))
                                     } else {
                                         (__ci_expr_logic_139 = (if (if (2147483633 -% (unsafe: *lengthptr)) < delta__goto_7696_24: 1 else: 0) != 0: 1 else: 0))
@@ -30853,7 +30853,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     if ((if lengthptr != null: 1 else: 0) != 0) {
                                         var __ci_expr_logic_136: c_int
 
-                                        if (_pcre2_ckd_smul_8((&mut delta__goto_7646_26 as *mut c_ulong), (repeat_min__goto_6077_10 -% 1), (length_prevgroup__goto_6092_12 as c_int)) != 0) {
+                                        if (_pcre2_ckd_smul_8((&raw mut delta__goto_7646_26 as *mut c_ulong), (repeat_min__goto_6077_10 -% 1), (length_prevgroup__goto_6092_12 as c_int)) != 0) {
                                             (__ci_expr_logic_136 = (if true: 1 else: 0))
                                         } else {
                                             (__ci_expr_logic_136 = (if (if (2147483627 -% (unsafe: *lengthptr)) < delta__goto_7646_26: 1 else: 0) != 0: 1 else: 0))
@@ -30976,7 +30976,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (__ci_expr_logic_138 != 0) {
                                     var __ci_expr_logic_139: c_int
 
-                                    if (_pcre2_ckd_smul_8((&mut delta__goto_7696_24 as *mut c_ulong), repeat_max__goto_6077_26, ((((length_prevgroup__goto_6092_12 as c_int) + 1) + 2) + (2 * 2))) != 0) {
+                                    if (_pcre2_ckd_smul_8((&raw mut delta__goto_7696_24 as *mut c_ulong), repeat_max__goto_6077_26, ((((length_prevgroup__goto_6092_12 as c_int) + 1) + 2) + (2 * 2))) != 0) {
                                         (__ci_expr_logic_139 = (if true: 1 else: 0))
                                     } else {
                                         (__ci_expr_logic_139 = (if (if (2147483633 -% (unsafe: *lengthptr)) < delta__goto_7696_24: 1 else: 0) != 0: 1 else: 0))
@@ -31612,7 +31612,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     if ((if lengthptr != null: 1 else: 0) != 0) {
                                         var __ci_expr_logic_136: c_int
 
-                                        if (_pcre2_ckd_smul_8((&mut delta__goto_7646_26 as *mut c_ulong), (repeat_min__goto_6077_10 -% 1), (length_prevgroup__goto_6092_12 as c_int)) != 0) {
+                                        if (_pcre2_ckd_smul_8((&raw mut delta__goto_7646_26 as *mut c_ulong), (repeat_min__goto_6077_10 -% 1), (length_prevgroup__goto_6092_12 as c_int)) != 0) {
                                             (__ci_expr_logic_136 = (if true: 1 else: 0))
                                         } else {
                                             (__ci_expr_logic_136 = (if (if (2147483627 -% (unsafe: *lengthptr)) < delta__goto_7646_26: 1 else: 0) != 0: 1 else: 0))
@@ -31735,7 +31735,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (__ci_expr_logic_138 != 0) {
                                     var __ci_expr_logic_139: c_int
 
-                                    if (_pcre2_ckd_smul_8((&mut delta__goto_7696_24 as *mut c_ulong), repeat_max__goto_6077_26, ((((length_prevgroup__goto_6092_12 as c_int) + 1) + 2) + (2 * 2))) != 0) {
+                                    if (_pcre2_ckd_smul_8((&raw mut delta__goto_7696_24 as *mut c_ulong), repeat_max__goto_6077_26, ((((length_prevgroup__goto_6092_12 as c_int) + 1) + 2) + (2 * 2))) != 0) {
                                         (__ci_expr_logic_139 = (if true: 1 else: 0))
                                     } else {
                                         (__ci_expr_logic_139 = (if (if (2147483633 -% (unsafe: *lengthptr)) < delta__goto_7696_24: 1 else: 0) != 0: 1 else: 0))
@@ -32371,7 +32371,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     if ((if lengthptr != null: 1 else: 0) != 0) {
                                         var __ci_expr_logic_136: c_int
 
-                                        if (_pcre2_ckd_smul_8((&mut delta__goto_7646_26 as *mut c_ulong), (repeat_min__goto_6077_10 -% 1), (length_prevgroup__goto_6092_12 as c_int)) != 0) {
+                                        if (_pcre2_ckd_smul_8((&raw mut delta__goto_7646_26 as *mut c_ulong), (repeat_min__goto_6077_10 -% 1), (length_prevgroup__goto_6092_12 as c_int)) != 0) {
                                             (__ci_expr_logic_136 = (if true: 1 else: 0))
                                         } else {
                                             (__ci_expr_logic_136 = (if (if (2147483627 -% (unsafe: *lengthptr)) < delta__goto_7646_26: 1 else: 0) != 0: 1 else: 0))
@@ -32494,7 +32494,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (__ci_expr_logic_138 != 0) {
                                     var __ci_expr_logic_139: c_int
 
-                                    if (_pcre2_ckd_smul_8((&mut delta__goto_7696_24 as *mut c_ulong), repeat_max__goto_6077_26, ((((length_prevgroup__goto_6092_12 as c_int) + 1) + 2) + (2 * 2))) != 0) {
+                                    if (_pcre2_ckd_smul_8((&raw mut delta__goto_7696_24 as *mut c_ulong), repeat_max__goto_6077_26, ((((length_prevgroup__goto_6092_12 as c_int) + 1) + 2) + (2 * 2))) != 0) {
                                         (__ci_expr_logic_139 = (if true: 1 else: 0))
                                     } else {
                                         (__ci_expr_logic_139 = (if (if (2147483633 -% (unsafe: *lengthptr)) < delta__goto_7696_24: 1 else: 0) != 0: 1 else: 0))
@@ -33130,7 +33130,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     if ((if lengthptr != null: 1 else: 0) != 0) {
                                         var __ci_expr_logic_136: c_int
 
-                                        if (_pcre2_ckd_smul_8((&mut delta__goto_7646_26 as *mut c_ulong), (repeat_min__goto_6077_10 -% 1), (length_prevgroup__goto_6092_12 as c_int)) != 0) {
+                                        if (_pcre2_ckd_smul_8((&raw mut delta__goto_7646_26 as *mut c_ulong), (repeat_min__goto_6077_10 -% 1), (length_prevgroup__goto_6092_12 as c_int)) != 0) {
                                             (__ci_expr_logic_136 = (if true: 1 else: 0))
                                         } else {
                                             (__ci_expr_logic_136 = (if (if (2147483627 -% (unsafe: *lengthptr)) < delta__goto_7646_26: 1 else: 0) != 0: 1 else: 0))
@@ -33253,7 +33253,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (__ci_expr_logic_138 != 0) {
                                     var __ci_expr_logic_139: c_int
 
-                                    if (_pcre2_ckd_smul_8((&mut delta__goto_7696_24 as *mut c_ulong), repeat_max__goto_6077_26, ((((length_prevgroup__goto_6092_12 as c_int) + 1) + 2) + (2 * 2))) != 0) {
+                                    if (_pcre2_ckd_smul_8((&raw mut delta__goto_7696_24 as *mut c_ulong), repeat_max__goto_6077_26, ((((length_prevgroup__goto_6092_12 as c_int) + 1) + 2) + (2 * 2))) != 0) {
                                         (__ci_expr_logic_139 = (if true: 1 else: 0))
                                     } else {
                                         (__ci_expr_logic_139 = (if (if (2147483633 -% (unsafe: *lengthptr)) < delta__goto_7696_24: 1 else: 0) != 0: 1 else: 0))
@@ -33889,7 +33889,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     if ((if lengthptr != null: 1 else: 0) != 0) {
                                         var __ci_expr_logic_136: c_int
 
-                                        if (_pcre2_ckd_smul_8((&mut delta__goto_7646_26 as *mut c_ulong), (repeat_min__goto_6077_10 -% 1), (length_prevgroup__goto_6092_12 as c_int)) != 0) {
+                                        if (_pcre2_ckd_smul_8((&raw mut delta__goto_7646_26 as *mut c_ulong), (repeat_min__goto_6077_10 -% 1), (length_prevgroup__goto_6092_12 as c_int)) != 0) {
                                             (__ci_expr_logic_136 = (if true: 1 else: 0))
                                         } else {
                                             (__ci_expr_logic_136 = (if (if (2147483627 -% (unsafe: *lengthptr)) < delta__goto_7646_26: 1 else: 0) != 0: 1 else: 0))
@@ -34012,7 +34012,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (__ci_expr_logic_138 != 0) {
                                     var __ci_expr_logic_139: c_int
 
-                                    if (_pcre2_ckd_smul_8((&mut delta__goto_7696_24 as *mut c_ulong), repeat_max__goto_6077_26, ((((length_prevgroup__goto_6092_12 as c_int) + 1) + 2) + (2 * 2))) != 0) {
+                                    if (_pcre2_ckd_smul_8((&raw mut delta__goto_7696_24 as *mut c_ulong), repeat_max__goto_6077_26, ((((length_prevgroup__goto_6092_12 as c_int) + 1) + 2) + (2 * 2))) != 0) {
                                         (__ci_expr_logic_139 = (if true: 1 else: 0))
                                     } else {
                                         (__ci_expr_logic_139 = (if (if (2147483633 -% (unsafe: *lengthptr)) < delta__goto_7696_24: 1 else: 0) != 0: 1 else: 0))
@@ -34648,7 +34648,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     if ((if lengthptr != null: 1 else: 0) != 0) {
                                         var __ci_expr_logic_136: c_int
 
-                                        if (_pcre2_ckd_smul_8((&mut delta__goto_7646_26 as *mut c_ulong), (repeat_min__goto_6077_10 -% 1), (length_prevgroup__goto_6092_12 as c_int)) != 0) {
+                                        if (_pcre2_ckd_smul_8((&raw mut delta__goto_7646_26 as *mut c_ulong), (repeat_min__goto_6077_10 -% 1), (length_prevgroup__goto_6092_12 as c_int)) != 0) {
                                             (__ci_expr_logic_136 = (if true: 1 else: 0))
                                         } else {
                                             (__ci_expr_logic_136 = (if (if (2147483627 -% (unsafe: *lengthptr)) < delta__goto_7646_26: 1 else: 0) != 0: 1 else: 0))
@@ -34771,7 +34771,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (__ci_expr_logic_138 != 0) {
                                     var __ci_expr_logic_139: c_int
 
-                                    if (_pcre2_ckd_smul_8((&mut delta__goto_7696_24 as *mut c_ulong), repeat_max__goto_6077_26, ((((length_prevgroup__goto_6092_12 as c_int) + 1) + 2) + (2 * 2))) != 0) {
+                                    if (_pcre2_ckd_smul_8((&raw mut delta__goto_7696_24 as *mut c_ulong), repeat_max__goto_6077_26, ((((length_prevgroup__goto_6092_12 as c_int) + 1) + 2) + (2 * 2))) != 0) {
                                         (__ci_expr_logic_139 = (if true: 1 else: 0))
                                     } else {
                                         (__ci_expr_logic_139 = (if (if (2147483633 -% (unsafe: *lengthptr)) < delta__goto_7696_24: 1 else: 0) != 0: 1 else: 0))
@@ -35407,7 +35407,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     if ((if lengthptr != null: 1 else: 0) != 0) {
                                         var __ci_expr_logic_136: c_int
 
-                                        if (_pcre2_ckd_smul_8((&mut delta__goto_7646_26 as *mut c_ulong), (repeat_min__goto_6077_10 -% 1), (length_prevgroup__goto_6092_12 as c_int)) != 0) {
+                                        if (_pcre2_ckd_smul_8((&raw mut delta__goto_7646_26 as *mut c_ulong), (repeat_min__goto_6077_10 -% 1), (length_prevgroup__goto_6092_12 as c_int)) != 0) {
                                             (__ci_expr_logic_136 = (if true: 1 else: 0))
                                         } else {
                                             (__ci_expr_logic_136 = (if (if (2147483627 -% (unsafe: *lengthptr)) < delta__goto_7646_26: 1 else: 0) != 0: 1 else: 0))
@@ -35530,7 +35530,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (__ci_expr_logic_138 != 0) {
                                     var __ci_expr_logic_139: c_int
 
-                                    if (_pcre2_ckd_smul_8((&mut delta__goto_7696_24 as *mut c_ulong), repeat_max__goto_6077_26, ((((length_prevgroup__goto_6092_12 as c_int) + 1) + 2) + (2 * 2))) != 0) {
+                                    if (_pcre2_ckd_smul_8((&raw mut delta__goto_7696_24 as *mut c_ulong), repeat_max__goto_6077_26, ((((length_prevgroup__goto_6092_12 as c_int) + 1) + 2) + (2 * 2))) != 0) {
                                         (__ci_expr_logic_139 = (if true: 1 else: 0))
                                     } else {
                                         (__ci_expr_logic_139 = (if (if (2147483633 -% (unsafe: *lengthptr)) < delta__goto_7696_24: 1 else: 0) != 0: 1 else: 0))
@@ -36166,7 +36166,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     if ((if lengthptr != null: 1 else: 0) != 0) {
                                         var __ci_expr_logic_136: c_int
 
-                                        if (_pcre2_ckd_smul_8((&mut delta__goto_7646_26 as *mut c_ulong), (repeat_min__goto_6077_10 -% 1), (length_prevgroup__goto_6092_12 as c_int)) != 0) {
+                                        if (_pcre2_ckd_smul_8((&raw mut delta__goto_7646_26 as *mut c_ulong), (repeat_min__goto_6077_10 -% 1), (length_prevgroup__goto_6092_12 as c_int)) != 0) {
                                             (__ci_expr_logic_136 = (if true: 1 else: 0))
                                         } else {
                                             (__ci_expr_logic_136 = (if (if (2147483627 -% (unsafe: *lengthptr)) < delta__goto_7646_26: 1 else: 0) != 0: 1 else: 0))
@@ -36289,7 +36289,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (__ci_expr_logic_138 != 0) {
                                     var __ci_expr_logic_139: c_int
 
-                                    if (_pcre2_ckd_smul_8((&mut delta__goto_7696_24 as *mut c_ulong), repeat_max__goto_6077_26, ((((length_prevgroup__goto_6092_12 as c_int) + 1) + 2) + (2 * 2))) != 0) {
+                                    if (_pcre2_ckd_smul_8((&raw mut delta__goto_7696_24 as *mut c_ulong), repeat_max__goto_6077_26, ((((length_prevgroup__goto_6092_12 as c_int) + 1) + 2) + (2 * 2))) != 0) {
                                         (__ci_expr_logic_139 = (if true: 1 else: 0))
                                     } else {
                                         (__ci_expr_logic_139 = (if (if (2147483633 -% (unsafe: *lengthptr)) < delta__goto_7696_24: 1 else: 0) != 0: 1 else: 0))
@@ -36925,7 +36925,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                     if ((if lengthptr != null: 1 else: 0) != 0) {
                                         var __ci_expr_logic_136: c_int
 
-                                        if (_pcre2_ckd_smul_8((&mut delta__goto_7646_26 as *mut c_ulong), (repeat_min__goto_6077_10 -% 1), (length_prevgroup__goto_6092_12 as c_int)) != 0) {
+                                        if (_pcre2_ckd_smul_8((&raw mut delta__goto_7646_26 as *mut c_ulong), (repeat_min__goto_6077_10 -% 1), (length_prevgroup__goto_6092_12 as c_int)) != 0) {
                                             (__ci_expr_logic_136 = (if true: 1 else: 0))
                                         } else {
                                             (__ci_expr_logic_136 = (if (if (2147483627 -% (unsafe: *lengthptr)) < delta__goto_7646_26: 1 else: 0) != 0: 1 else: 0))
@@ -37048,7 +37048,7 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 if (__ci_expr_logic_138 != 0) {
                                     var __ci_expr_logic_139: c_int
 
-                                    if (_pcre2_ckd_smul_8((&mut delta__goto_7696_24 as *mut c_ulong), repeat_max__goto_6077_26, ((((length_prevgroup__goto_6092_12 as c_int) + 1) + 2) + (2 * 2))) != 0) {
+                                    if (_pcre2_ckd_smul_8((&raw mut delta__goto_7696_24 as *mut c_ulong), repeat_max__goto_6077_26, ((((length_prevgroup__goto_6092_12 as c_int) + 1) + 2) + (2 * 2))) != 0) {
                                         (__ci_expr_logic_139 = (if true: 1 else: 0))
                                     } else {
                                         (__ci_expr_logic_139 = (if (if (2147483633 -% (unsafe: *lengthptr)) < delta__goto_7696_24: 1 else: 0) != 0: 1 else: 0))
@@ -39788,7 +39788,7 @@ fn find_firstassertedcu(__param_code: *const u8, flags: *mut c_uint, inassert: c
                         (__ci_expr_ternary_5 = 0)
                     }
 
-                    (d = find_firstassertedcu(scode, (&mut dflags as *mut c_uint), (inassert +% __ci_expr_ternary_5)))
+                    (d = find_firstassertedcu(scode, (&raw mut dflags as *mut c_uint), (inassert +% __ci_expr_ternary_5)))
 
 
                     if ((if dflags >= 4294967294: 1 else: 0) != 0) {
@@ -39833,7 +39833,7 @@ fn find_firstassertedcu(__param_code: *const u8, flags: *mut c_uint, inassert: c
                         (__ci_expr_ternary_5 = 0)
                     }
 
-                    (d = find_firstassertedcu(scode, (&mut dflags as *mut c_uint), (inassert +% __ci_expr_ternary_5)))
+                    (d = find_firstassertedcu(scode, (&raw mut dflags as *mut c_uint), (inassert +% __ci_expr_ternary_5)))
 
 
                     if ((if dflags >= 4294967294: 1 else: 0) != 0) {
@@ -39878,7 +39878,7 @@ fn find_firstassertedcu(__param_code: *const u8, flags: *mut c_uint, inassert: c
                         (__ci_expr_ternary_5 = 0)
                     }
 
-                    (d = find_firstassertedcu(scode, (&mut dflags as *mut c_uint), (inassert +% __ci_expr_ternary_5)))
+                    (d = find_firstassertedcu(scode, (&raw mut dflags as *mut c_uint), (inassert +% __ci_expr_ternary_5)))
 
 
                     if ((if dflags >= 4294967294: 1 else: 0) != 0) {
@@ -39923,7 +39923,7 @@ fn find_firstassertedcu(__param_code: *const u8, flags: *mut c_uint, inassert: c
                         (__ci_expr_ternary_5 = 0)
                     }
 
-                    (d = find_firstassertedcu(scode, (&mut dflags as *mut c_uint), (inassert +% __ci_expr_ternary_5)))
+                    (d = find_firstassertedcu(scode, (&raw mut dflags as *mut c_uint), (inassert +% __ci_expr_ternary_5)))
 
 
                     if ((if dflags >= 4294967294: 1 else: 0) != 0) {
@@ -39968,7 +39968,7 @@ fn find_firstassertedcu(__param_code: *const u8, flags: *mut c_uint, inassert: c
                         (__ci_expr_ternary_5 = 0)
                     }
 
-                    (d = find_firstassertedcu(scode, (&mut dflags as *mut c_uint), (inassert +% __ci_expr_ternary_5)))
+                    (d = find_firstassertedcu(scode, (&raw mut dflags as *mut c_uint), (inassert +% __ci_expr_ternary_5)))
 
 
                     if ((if dflags >= 4294967294: 1 else: 0) != 0) {
@@ -40013,7 +40013,7 @@ fn find_firstassertedcu(__param_code: *const u8, flags: *mut c_uint, inassert: c
                         (__ci_expr_ternary_5 = 0)
                     }
 
-                    (d = find_firstassertedcu(scode, (&mut dflags as *mut c_uint), (inassert +% __ci_expr_ternary_5)))
+                    (d = find_firstassertedcu(scode, (&raw mut dflags as *mut c_uint), (inassert +% __ci_expr_ternary_5)))
 
 
                     if ((if dflags >= 4294967294: 1 else: 0) != 0) {
@@ -40058,7 +40058,7 @@ fn find_firstassertedcu(__param_code: *const u8, flags: *mut c_uint, inassert: c
                         (__ci_expr_ternary_5 = 0)
                     }
 
-                    (d = find_firstassertedcu(scode, (&mut dflags as *mut c_uint), (inassert +% __ci_expr_ternary_5)))
+                    (d = find_firstassertedcu(scode, (&raw mut dflags as *mut c_uint), (inassert +% __ci_expr_ternary_5)))
 
 
                     if ((if dflags >= 4294967294: 1 else: 0) != 0) {
@@ -40103,7 +40103,7 @@ fn find_firstassertedcu(__param_code: *const u8, flags: *mut c_uint, inassert: c
                         (__ci_expr_ternary_5 = 0)
                     }
 
-                    (d = find_firstassertedcu(scode, (&mut dflags as *mut c_uint), (inassert +% __ci_expr_ternary_5)))
+                    (d = find_firstassertedcu(scode, (&raw mut dflags as *mut c_uint), (inassert +% __ci_expr_ternary_5)))
 
 
                     if ((if dflags >= 4294967294: 1 else: 0) != 0) {
@@ -40148,7 +40148,7 @@ fn find_firstassertedcu(__param_code: *const u8, flags: *mut c_uint, inassert: c
                         (__ci_expr_ternary_5 = 0)
                     }
 
-                    (d = find_firstassertedcu(scode, (&mut dflags as *mut c_uint), (inassert +% __ci_expr_ternary_5)))
+                    (d = find_firstassertedcu(scode, (&raw mut dflags as *mut c_uint), (inassert +% __ci_expr_ternary_5)))
 
 
                     if ((if dflags >= 4294967294: 1 else: 0) != 0) {
@@ -40193,7 +40193,7 @@ fn find_firstassertedcu(__param_code: *const u8, flags: *mut c_uint, inassert: c
                         (__ci_expr_ternary_5 = 0)
                     }
 
-                    (d = find_firstassertedcu(scode, (&mut dflags as *mut c_uint), (inassert +% __ci_expr_ternary_5)))
+                    (d = find_firstassertedcu(scode, (&raw mut dflags as *mut c_uint), (inassert +% __ci_expr_ternary_5)))
 
 
                     if ((if dflags >= 4294967294: 1 else: 0) != 0) {
@@ -40669,7 +40669,7 @@ fn get_grouplength(pptrptr: *mut *mut c_uint, minptr: *mut c_int, isinline: c_in
                     continue
                 }
                 while true {
-                    (branchlength__goto_9514_5 = get_branchlength(pptrptr, (&mut branchminlength__goto_9514_19 as *mut c_int), errcodeptr, lcptr, recurses, cb))
+                    (branchlength__goto_9514_5 = get_branchlength(pptrptr, (&raw mut branchminlength__goto_9514_19 as *mut c_int), errcodeptr, lcptr, recurses, cb))
                     if (__goto_pending != 0) {
                         break
                     }

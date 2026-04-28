@@ -64,7 +64,7 @@ fn pcre2_dfa_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8,
                 (req_cu__goto_3367_13 = 0)
                 (req_cu2__goto_3368_13 = 0)
                 (start_bits__goto_3370_16 = ((null as *const u8)))
-                (mb__goto_3377_18 = ((&mut actual_match_block__goto_3376_17 as *mut dfa_match_block_8)))
+                (mb__goto_3377_18 = ((&raw mut actual_match_block__goto_3376_17 as *mut dfa_match_block_8)))
                 (rws__goto_3385_13 = (&base_recursion_workspace__goto_3384_5[0] as *mut RWS_anchor))
                 (rws__goto_3385_13.next = ((null as *mut RWS_anchor)))
                 if (__goto_pending != 0) {
@@ -308,7 +308,7 @@ fn pcre2_dfa_match_8(code: *const pcre2_real_code_8, __param_subject: *const u8,
                 if (__goto_pending != 0) {
                     continue
                 }
-                (mb__goto_3377_18.cb = ((&mut cb__goto_3375_21 as *mut pcre2_callout_block_8)))
+                (mb__goto_3377_18.cb = ((&raw mut cb__goto_3375_21 as *mut pcre2_callout_block_8)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -11152,7 +11152,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     break
                                 }
 
-                                _pcre2_extuni_8(c__goto_703_12, (ptr__goto_545_12 + ((clen__goto_702_7 as isize) as usize)), mb.start_subject, end_subject__goto_554_12, utf__goto_558_6, (&mut ncount__goto_1568_13 as *mut c_int))
+                                _pcre2_extuni_8(c__goto_703_12, (ptr__goto_545_12 + ((clen__goto_702_7 as isize) as usize)), mb.start_subject, end_subject__goto_554_12, utf__goto_558_6, (&raw mut ncount__goto_1568_13 as *mut c_int))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -11276,7 +11276,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     break
                                 }
 
-                                _pcre2_extuni_8(c__goto_703_12, (ptr__goto_545_12 + ((clen__goto_702_7 as isize) as usize)), mb.start_subject, end_subject__goto_554_12, utf__goto_558_6, (&mut ncount__goto_1568_13 as *mut c_int))
+                                _pcre2_extuni_8(c__goto_703_12, (ptr__goto_545_12 + ((clen__goto_702_7 as isize) as usize)), mb.start_subject, end_subject__goto_554_12, utf__goto_558_6, (&raw mut ncount__goto_1568_13 as *mut c_int))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -11400,7 +11400,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     break
                                 }
 
-                                _pcre2_extuni_8(c__goto_703_12, (ptr__goto_545_12 + ((clen__goto_702_7 as isize) as usize)), mb.start_subject, end_subject__goto_554_12, utf__goto_558_6, (&mut ncount__goto_1568_13 as *mut c_int))
+                                _pcre2_extuni_8(c__goto_703_12, (ptr__goto_545_12 + ((clen__goto_702_7 as isize) as usize)), mb.start_subject, end_subject__goto_554_12, utf__goto_558_6, (&raw mut ncount__goto_1568_13 as *mut c_int))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -14310,7 +14310,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     break
                                 }
 
-                                (nptr__goto_2120_20 = _pcre2_extuni_8(c__goto_703_12, (ptr__goto_545_12 + ((clen__goto_702_7 as isize) as usize)), mb.start_subject, end_subject__goto_554_12, utf__goto_558_6, (&mut ncount__goto_2121_13 as *mut c_int)))
+                                (nptr__goto_2120_20 = _pcre2_extuni_8(c__goto_703_12, (ptr__goto_545_12 + ((clen__goto_702_7 as isize) as usize)), mb.start_subject, end_subject__goto_554_12, utf__goto_558_6, (&raw mut ncount__goto_2121_13 as *mut c_int)))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -14485,7 +14485,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     break
                                 }
 
-                                (nptr__goto_2120_20 = _pcre2_extuni_8(c__goto_703_12, (ptr__goto_545_12 + ((clen__goto_702_7 as isize) as usize)), mb.start_subject, end_subject__goto_554_12, utf__goto_558_6, (&mut ncount__goto_2121_13 as *mut c_int)))
+                                (nptr__goto_2120_20 = _pcre2_extuni_8(c__goto_703_12, (ptr__goto_545_12 + ((clen__goto_702_7 as isize) as usize)), mb.start_subject, end_subject__goto_554_12, utf__goto_558_6, (&raw mut ncount__goto_2121_13 as *mut c_int)))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -14660,7 +14660,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     break
                                 }
 
-                                (nptr__goto_2120_20 = _pcre2_extuni_8(c__goto_703_12, (ptr__goto_545_12 + ((clen__goto_702_7 as isize) as usize)), mb.start_subject, end_subject__goto_554_12, utf__goto_558_6, (&mut ncount__goto_2121_13 as *mut c_int)))
+                                (nptr__goto_2120_20 = _pcre2_extuni_8(c__goto_703_12, (ptr__goto_545_12 + ((clen__goto_702_7 as isize) as usize)), mb.start_subject, end_subject__goto_554_12, utf__goto_558_6, (&raw mut ncount__goto_2121_13 as *mut c_int)))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -14835,7 +14835,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     break
                                 }
 
-                                (nptr__goto_2120_20 = _pcre2_extuni_8(c__goto_703_12, (ptr__goto_545_12 + ((clen__goto_702_7 as isize) as usize)), mb.start_subject, end_subject__goto_554_12, utf__goto_558_6, (&mut ncount__goto_2121_13 as *mut c_int)))
+                                (nptr__goto_2120_20 = _pcre2_extuni_8(c__goto_703_12, (ptr__goto_545_12 + ((clen__goto_702_7 as isize) as usize)), mb.start_subject, end_subject__goto_554_12, utf__goto_558_6, (&raw mut ncount__goto_2121_13 as *mut c_int)))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -16943,7 +16943,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                     break
                                 }
 
-                                (nptr__goto_2306_20 = _pcre2_extuni_8(c__goto_703_12, (ptr__goto_545_12 + ((clen__goto_702_7 as isize) as usize)), mb.start_subject, end_subject__goto_554_12, utf__goto_558_6, (&mut ncount__goto_2305_13 as *mut c_int)))
+                                (nptr__goto_2306_20 = _pcre2_extuni_8(c__goto_703_12, (ptr__goto_545_12 + ((clen__goto_702_7 as isize) as usize)), mb.start_subject, end_subject__goto_554_12, utf__goto_558_6, (&raw mut ncount__goto_2305_13 as *mut c_int)))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -27975,7 +27975,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if ((if rws__goto_2793_21.free < (1000 +% ((2 as c_uint) *% 2)): 1 else: 0) != 0) {
-                                (rc__goto_2789_13 = more_workspace((&mut rws__goto_2793_21 as *mut *mut RWS_anchor), 4, mb))
+                                (rc__goto_2789_13 = more_workspace((&raw mut rws__goto_2793_21 as *mut *mut RWS_anchor), 4, mb))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -28122,7 +28122,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if ((if rws__goto_2793_21.free < (1000 +% ((2 as c_uint) *% 2)): 1 else: 0) != 0) {
-                                (rc__goto_2789_13 = more_workspace((&mut rws__goto_2793_21 as *mut *mut RWS_anchor), 4, mb))
+                                (rc__goto_2789_13 = more_workspace((&raw mut rws__goto_2793_21 as *mut *mut RWS_anchor), 4, mb))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -28269,7 +28269,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if ((if rws__goto_2793_21.free < (1000 +% ((2 as c_uint) *% 2)): 1 else: 0) != 0) {
-                                (rc__goto_2789_13 = more_workspace((&mut rws__goto_2793_21 as *mut *mut RWS_anchor), 4, mb))
+                                (rc__goto_2789_13 = more_workspace((&raw mut rws__goto_2793_21 as *mut *mut RWS_anchor), 4, mb))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -28416,7 +28416,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if ((if rws__goto_2793_21.free < (1000 +% ((2 as c_uint) *% 2)): 1 else: 0) != 0) {
-                                (rc__goto_2789_13 = more_workspace((&mut rws__goto_2793_21 as *mut *mut RWS_anchor), 4, mb))
+                                (rc__goto_2789_13 = more_workspace((&raw mut rws__goto_2793_21 as *mut *mut RWS_anchor), 4, mb))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -28565,7 +28565,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (__ci_expr_logic_372 != 0) {
-                                (rrc__goto_758_9 = do_callout_dfa(code__goto_755_16, offsets, current_subject, ptr__goto_545_12, mb, 3, (&mut callout_length__goto_2842_22 as *mut c_ulong)))
+                                (rrc__goto_758_9 = do_callout_dfa(code__goto_755_16, offsets, current_subject, ptr__goto_545_12, mb, 3, (&raw mut callout_length__goto_2842_22 as *mut c_ulong)))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -28814,7 +28814,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         }
 
                                         if ((if rws__goto_2892_23.free < (1000 +% ((2 as c_uint) *% 2)): 1 else: 0) != 0) {
-                                            (rc__goto_2887_15 = more_workspace((&mut rws__goto_2892_23 as *mut *mut RWS_anchor), 4, mb))
+                                            (rc__goto_2887_15 = more_workspace((&raw mut rws__goto_2892_23 as *mut *mut RWS_anchor), 4, mb))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -29005,7 +29005,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if (__ci_expr_logic_372 != 0) {
-                                (rrc__goto_758_9 = do_callout_dfa(code__goto_755_16, offsets, current_subject, ptr__goto_545_12, mb, 3, (&mut callout_length__goto_2842_22 as *mut c_ulong)))
+                                (rrc__goto_758_9 = do_callout_dfa(code__goto_755_16, offsets, current_subject, ptr__goto_545_12, mb, 3, (&raw mut callout_length__goto_2842_22 as *mut c_ulong)))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -29254,7 +29254,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                         }
 
                                         if ((if rws__goto_2892_23.free < (1000 +% ((2 as c_uint) *% 2)): 1 else: 0) != 0) {
-                                            (rc__goto_2887_15 = more_workspace((&mut rws__goto_2892_23 as *mut *mut RWS_anchor), 4, mb))
+                                            (rc__goto_2887_15 = more_workspace((&raw mut rws__goto_2892_23 as *mut *mut RWS_anchor), 4, mb))
 
                                             if (__goto_pending != 0) {
                                                 break
@@ -29466,7 +29466,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if ((if rws__goto_2937_21.free < (1000 +% ((1000 as c_uint) *% 2)): 1 else: 0) != 0) {
-                                (rc__goto_2934_13 = more_workspace((&mut rws__goto_2937_21 as *mut *mut RWS_anchor), 2000, mb))
+                                (rc__goto_2934_13 = more_workspace((&raw mut rws__goto_2937_21 as *mut *mut RWS_anchor), 2000, mb))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -29570,7 +29570,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                                 break
                             }
 
-                            (mb.recursive = ((&mut new_recursive__goto_547_20 as *mut dfa_recursion_info)))
+                            (mb.recursive = ((&raw mut new_recursive__goto_547_20 as *mut dfa_recursion_info)))
 
                             if (__goto_pending != 0) {
                                 break
@@ -29766,7 +29766,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if ((if rws__goto_3041_21.free < (1000 +% ((2 as c_uint) *% 2)): 1 else: 0) != 0) {
-                                (rc__goto_3036_13 = more_workspace((&mut rws__goto_3041_21 as *mut *mut RWS_anchor), 4, mb))
+                                (rc__goto_3036_13 = more_workspace((&raw mut rws__goto_3041_21 as *mut *mut RWS_anchor), 4, mb))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -30096,7 +30096,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if ((if rws__goto_3041_21.free < (1000 +% ((2 as c_uint) *% 2)): 1 else: 0) != 0) {
-                                (rc__goto_3036_13 = more_workspace((&mut rws__goto_3041_21 as *mut *mut RWS_anchor), 4, mb))
+                                (rc__goto_3036_13 = more_workspace((&raw mut rws__goto_3041_21 as *mut *mut RWS_anchor), 4, mb))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -30426,7 +30426,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if ((if rws__goto_3041_21.free < (1000 +% ((2 as c_uint) *% 2)): 1 else: 0) != 0) {
-                                (rc__goto_3036_13 = more_workspace((&mut rws__goto_3041_21 as *mut *mut RWS_anchor), 4, mb))
+                                (rc__goto_3036_13 = more_workspace((&raw mut rws__goto_3041_21 as *mut *mut RWS_anchor), 4, mb))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -30756,7 +30756,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if ((if rws__goto_3041_21.free < (1000 +% ((2 as c_uint) *% 2)): 1 else: 0) != 0) {
-                                (rc__goto_3036_13 = more_workspace((&mut rws__goto_3041_21 as *mut *mut RWS_anchor), 4, mb))
+                                (rc__goto_3036_13 = more_workspace((&raw mut rws__goto_3041_21 as *mut *mut RWS_anchor), 4, mb))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -31086,7 +31086,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if ((if rws__goto_3041_21.free < (1000 +% ((2 as c_uint) *% 2)): 1 else: 0) != 0) {
-                                (rc__goto_3036_13 = more_workspace((&mut rws__goto_3041_21 as *mut *mut RWS_anchor), 4, mb))
+                                (rc__goto_3036_13 = more_workspace((&raw mut rws__goto_3041_21 as *mut *mut RWS_anchor), 4, mb))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -31410,7 +31410,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                             }
 
                             if ((if rws__goto_3141_21.free < (1000 +% ((2 as c_uint) *% 2)): 1 else: 0) != 0) {
-                                (rc__goto_3138_13 = more_workspace((&mut rws__goto_3141_21 as *mut *mut RWS_anchor), 4, mb))
+                                (rc__goto_3138_13 = more_workspace((&raw mut rws__goto_3141_21 as *mut *mut RWS_anchor), 4, mb))
 
                                 if (__goto_pending != 0) {
                                     break
@@ -31813,7 +31813,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                         },
                         119 => {
-                            (rrc__goto_758_9 = do_callout_dfa(code__goto_755_16, offsets, current_subject, ptr__goto_545_12, mb, 0, (&mut callout_length__goto_3247_20 as *mut c_ulong)))
+                            (rrc__goto_758_9 = do_callout_dfa(code__goto_755_16, offsets, current_subject, ptr__goto_545_12, mb, 0, (&raw mut callout_length__goto_3247_20 as *mut c_ulong)))
 
                             if (__goto_pending != 0) {
                                 break
@@ -31868,7 +31868,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
 
                         },
                         120 => {
-                            (rrc__goto_758_9 = do_callout_dfa(code__goto_755_16, offsets, current_subject, ptr__goto_545_12, mb, 0, (&mut callout_length__goto_3247_20 as *mut c_ulong)))
+                            (rrc__goto_758_9 = do_callout_dfa(code__goto_755_16, offsets, current_subject, ptr__goto_545_12, mb, 0, (&raw mut callout_length__goto_3247_20 as *mut c_ulong)))
 
                             if (__goto_pending != 0) {
                                 break
@@ -32345,7 +32345,7 @@ fn internal_dfa_match(mb: *mut dfa_match_block_8, this_start_code: *const u8, __
                     if (__goto_pending != 0) {
                         continue
                     }
-                    _pcre2_extuni_8(c__goto_703_12, (ptr__goto_545_12 + ((clen__goto_702_7 as isize) as usize)), mb.start_subject, end_subject__goto_554_12, utf__goto_558_6, (&mut ncount__goto_1838_13 as *mut c_int))
+                    _pcre2_extuni_8(c__goto_703_12, (ptr__goto_545_12 + ((clen__goto_702_7 as isize) as usize)), mb.start_subject, end_subject__goto_554_12, utf__goto_558_6, (&raw mut ncount__goto_1838_13 as *mut c_int))
                     if (__goto_pending != 0) {
                         continue
                     }

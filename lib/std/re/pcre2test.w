@@ -7202,7 +7202,7 @@ fn pchars_8(clr: c_int, __param_p: *const u8, __param_length: c_long, utf: c_int
         }
 
         if (utf != 0) {
-            var rc: c_int = utf8_to_ord(p, end, (&mut c as *mut c_uint))
+            var rc: c_int = utf8_to_ord(p, end, (&raw mut c as *mut c_uint))
 
             var __ci_expr_logic_2: c_int = 0
 
@@ -7782,11 +7782,11 @@ fn show_memory_info_8() {
 
     (cblock_size = sizeof[pcre2_real_code_8]())
 
-    pattern_info_8(22, (&mut size as *mut c_ulong), 0)
+    pattern_info_8(22, (&raw mut size as *mut c_ulong), 0)
 
-    pattern_info_8(17, (&mut name_count as *mut c_uint), 0)
+    pattern_info_8(17, (&raw mut name_count as *mut c_uint), 0)
 
-    pattern_info_8(18, (&mut name_entry_size as *mut c_uint), 0)
+    pattern_info_8(18, (&raw mut name_entry_size as *mut c_uint), 0)
 
     (data_size = (((name_count as c_ulong) *% (name_entry_size as c_ulong)) *% 1))
 
@@ -7807,7 +7807,7 @@ fn show_memory_info_8() {
     }
 
     if ((if pat_patctl.jit != 0: 1 else: 0) != 0) {
-        pattern_info_8(10, (&mut size as *mut c_ulong), 0)
+        pattern_info_8(10, (&raw mut size as *mut c_ulong), 0)
 
         colour_begin(36, outfile)
 
@@ -7823,7 +7823,7 @@ fn show_memory_info_8() {
 fn show_framesize_8() {
     var frame_size: c_ulong
 
-    pattern_info_8(24, (&mut frame_size as *mut c_ulong), 0)
+    pattern_info_8(24, (&raw mut frame_size as *mut c_ulong), 0)
 
     colour_begin(36, outfile)
 
@@ -8073,7 +8073,7 @@ fn show_pattern_info_8() -> c_int {
 
 
         while true {
-            match pattern_info_8(25, (&mut heap_limit as *mut c_uint), 1) {
+            match pattern_info_8(25, (&raw mut heap_limit as *mut c_uint), 1) {
                 0 => {
                     (heap_limit_set = 1)
                 },
@@ -8090,7 +8090,7 @@ fn show_pattern_info_8() -> c_int {
         }
 
         while true {
-            match pattern_info_8(14, (&mut match_limit as *mut c_uint), 1) {
+            match pattern_info_8(14, (&raw mut match_limit as *mut c_uint), 1) {
                 0 => {
                     (match_limit_set = 1)
                 },
@@ -8107,7 +8107,7 @@ fn show_pattern_info_8() -> c_int {
         }
 
         while true {
-            match pattern_info_8(21, (&mut depth_limit as *mut c_uint), 1) {
+            match pattern_info_8(21, (&raw mut depth_limit as *mut c_uint), 1) {
                 0 => {
                     (depth_limit_set = 1)
                 },
@@ -8123,7 +8123,7 @@ fn show_pattern_info_8() -> c_int {
 
         }
 
-        if ((if ((((((((((((((((pattern_info_8(2, (&mut backrefmax as *mut c_uint), 0) + pattern_info_8(3, (&mut bsr_convention as *mut c_uint), 0)) + pattern_info_8(4, (&mut capture_count as *mut c_uint), 0)) + pattern_info_8(7, (&mut start_bits as *mut *mut u8), 0)) + pattern_info_8(5, (&mut first_cunit as *mut c_uint), 0)) + pattern_info_8(6, (&mut first_ctype as *mut c_uint), 0)) + pattern_info_8(23, (&mut hasbackslashc as *mut c_uint), 0)) + pattern_info_8(8, (&mut hascrorlf as *mut c_uint), 0)) + pattern_info_8(9, (&mut jchanged as *mut c_uint), 0)) + pattern_info_8(11, (&mut last_cunit as *mut c_uint), 0)) + pattern_info_8(12, (&mut last_ctype as *mut c_uint), 0)) + pattern_info_8(13, (&mut match_empty as *mut c_uint), 0)) + pattern_info_8(16, (&mut minlength as *mut c_uint), 0)) + pattern_info_8(17, (&mut namecount as *mut c_uint), 0)) + pattern_info_8(18, (&mut nameentrysize as *mut c_uint), 0)) + pattern_info_8(19, (&mut nametable as *mut *const u8), 0)) + pattern_info_8(20, (&mut newline_convention as *mut c_uint), 0)) != 0: 1 else: 0) != 0) {
+        if ((if ((((((((((((((((pattern_info_8(2, (&raw mut backrefmax as *mut c_uint), 0) + pattern_info_8(3, (&raw mut bsr_convention as *mut c_uint), 0)) + pattern_info_8(4, (&raw mut capture_count as *mut c_uint), 0)) + pattern_info_8(7, (&raw mut start_bits as *mut *mut u8), 0)) + pattern_info_8(5, (&raw mut first_cunit as *mut c_uint), 0)) + pattern_info_8(6, (&raw mut first_ctype as *mut c_uint), 0)) + pattern_info_8(23, (&raw mut hasbackslashc as *mut c_uint), 0)) + pattern_info_8(8, (&raw mut hascrorlf as *mut c_uint), 0)) + pattern_info_8(9, (&raw mut jchanged as *mut c_uint), 0)) + pattern_info_8(11, (&raw mut last_cunit as *mut c_uint), 0)) + pattern_info_8(12, (&raw mut last_ctype as *mut c_uint), 0)) + pattern_info_8(13, (&raw mut match_empty as *mut c_uint), 0)) + pattern_info_8(16, (&raw mut minlength as *mut c_uint), 0)) + pattern_info_8(17, (&raw mut namecount as *mut c_uint), 0)) + pattern_info_8(18, (&raw mut nameentrysize as *mut c_uint), 0)) + pattern_info_8(19, (&raw mut nametable as *mut *const u8), 0)) + pattern_info_8(20, (&raw mut newline_convention as *mut c_uint), 0)) != 0: 1 else: 0) != 0) {
             return PR_ABEND
         }
 
@@ -8201,11 +8201,11 @@ fn show_pattern_info_8() -> c_int {
             fprintf(outfile, "May match empty string\n")
         }
 
-        pattern_info_8(1, (&mut compile_options as *mut c_uint), 0)
+        pattern_info_8(1, (&raw mut compile_options as *mut c_uint), 0)
 
-        pattern_info_8(0, (&mut overall_options as *mut c_uint), 0)
+        pattern_info_8(0, (&raw mut overall_options as *mut c_uint), 0)
 
-        pattern_info_8(26, (&mut extra_options as *mut c_uint), 0)
+        pattern_info_8(26, (&raw mut extra_options as *mut c_uint), 0)
 
         if ((if (pat_patctl.options & 4096) == 0: 1 else: 0) != 0) {
             (compile_options = compile_options & (~4096))
@@ -8649,7 +8649,7 @@ fn process_command_8() -> c_int {
                 (restrict_for_perl_test = 1)
             },
             6 => {
-                decode_modifiers_8(argptr, CTX_DEFPAT, (&mut def_patctl as *mut patctl), null)
+                decode_modifiers_8(argptr, CTX_DEFPAT, (&raw mut def_patctl as *mut patctl), null)
 
                 var __ci_expr_logic_8: c_int = 0
 
@@ -8664,7 +8664,7 @@ fn process_command_8() -> c_int {
 
             },
             11 => {
-                decode_modifiers_8(argptr, CTX_DEFDAT, null, (&mut def_datctl as *mut datctl))
+                decode_modifiers_8(argptr, CTX_DEFDAT, null, (&raw mut def_datctl as *mut datctl))
             },
             5 => {
                 (local_newline_default = 0)
@@ -8742,9 +8742,9 @@ fn process_command_8() -> c_int {
 
                 }
 
-                patctl_zero((&mut pat_patctl as *mut patctl))
+                patctl_zero((&raw mut pat_patctl as *mut patctl))
 
-                if ((if not (decode_modifiers_8(argptr, CTX_POPPAT, (&mut pat_patctl as *mut patctl), null) != 0): 1 else: 0) != 0) {
+                if ((if not (decode_modifiers_8(argptr, CTX_POPPAT, (&raw mut pat_patctl as *mut patctl), null) != 0): 1 else: 0) != 0) {
                     return PR_SKIP
                 }
 
@@ -8784,9 +8784,9 @@ fn process_command_8() -> c_int {
 
                 }
 
-                patctl_zero((&mut pat_patctl as *mut patctl))
+                patctl_zero((&raw mut pat_patctl as *mut patctl))
 
-                if ((if not (decode_modifiers_8(argptr, CTX_POPPAT, (&mut pat_patctl as *mut patctl), null) != 0): 1 else: 0) != 0) {
+                if ((if not (decode_modifiers_8(argptr, CTX_POPPAT, (&raw mut pat_patctl as *mut patctl), null) != 0): 1 else: 0) != 0) {
                     return PR_SKIP
                 }
 
@@ -8826,13 +8826,13 @@ fn process_command_8() -> c_int {
 
                 }
 
-                (rc = open_file((argptr + ((1 as isize) as usize)), "wb", (&mut f as *mut *mut c_void), "#save"))
+                (rc = open_file((argptr + ((1 as isize) as usize)), "wb", (&raw mut f as *mut *mut c_void), "#save"))
 
                 if ((if rc != PR_OK: 1 else: 0) != 0) {
                     return rc
                 }
 
-                (rc = pcre2_serialize_encode_8((&patstack_8[0] as *mut *const pcre2_real_code_8), patstacknext_8, (&mut serial as *mut *mut u8), (&mut serial_size as *mut c_ulong), general_context_8))
+                (rc = pcre2_serialize_encode_8((&patstack_8[0] as *mut *const pcre2_real_code_8), patstacknext_8, (&raw mut serial as *mut *mut u8), (&raw mut serial_size as *mut c_ulong), general_context_8))
 
                 if ((if rc < 0: 1 else: 0) != 0) {
                     fclose(f)
@@ -8887,7 +8887,7 @@ fn process_command_8() -> c_int {
 
             },
             3 => {
-                (rc = open_file((argptr + ((1 as isize) as usize)), "rb", (&mut f as *mut *mut c_void), "#load"))
+                (rc = open_file((argptr + ((1 as isize) as usize)), "rb", (&raw mut f as *mut *mut c_void), "#load"))
 
                 if ((if rc != PR_OK: 1 else: 0) != 0) {
                     return rc
@@ -8998,7 +8998,7 @@ fn process_command_8() -> c_int {
 
             },
             4 => {
-                (rc = open_file((argptr + ((1 as isize) as usize)), "rb", (&mut f as *mut *mut c_void), "#loadtables"))
+                (rc = open_file((argptr + ((1 as isize) as usize)), "rb", (&raw mut f as *mut *mut c_void), "#loadtables"))
 
                 if ((if rc != PR_OK: 1 else: 0) != 0) {
                     return rc
@@ -9007,7 +9007,7 @@ fn process_command_8() -> c_int {
                 if ((if tables3 == null: 1 else: 0) != 0) {
                     var r: c_int
 
-                    (r = pcre2_config_8(15, (&mut loadtables_length as *mut c_uint)))
+                    (r = pcre2_config_8(15, (&raw mut loadtables_length as *mut c_uint)))
 
                     if ((if r >= 0: 1 else: 0) != 0) {
                         (tables3 = ((with_alloc((loadtables_length as i64)) as *mut c_void)))
@@ -9261,7 +9261,7 @@ fn process_pattern_8() -> c_int {
                 if (__goto_pending != 0) {
                     continue
                 }
-                with_memcpy(((&mut pat_patctl as *mut patctl) as *i8), ((&mut def_patctl as *mut patctl) as *i8), (sizeof[patctl]() as i64))
+                with_memcpy(((&raw mut pat_patctl as *mut patctl) as *i8), ((&raw mut def_patctl as *mut patctl) as *i8), (sizeof[patctl]() as i64))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -9347,7 +9347,7 @@ fn process_pattern_8() -> c_int {
                 if (__goto_pending != 0) {
                     continue
                 }
-                if ((if not (decode_modifiers_8(p__goto_2041_10, CTX_PAT, (&mut pat_patctl as *mut patctl), null) != 0): 1 else: 0) != 0) {
+                if ((if not (decode_modifiers_8(p__goto_2041_10, CTX_PAT, (&raw mut pat_patctl as *mut patctl), null) != 0): 1 else: 0) != 0) {
                     return PR_SKIP
                 }
                 if (__goto_pending != 0) {
@@ -9655,7 +9655,7 @@ fn process_pattern_8() -> c_int {
                                         if (__goto_pending != 0) {
                                             break
                                         }
-                                        (uli__goto_2247_25 = strtoul((pe__goto_2240_16 as *const c_char), (&mut endptr__goto_2248_17 as *mut *mut c_char), 10))
+                                        (uli__goto_2247_25 = strtoul((pe__goto_2240_16 as *const c_char), (&raw mut endptr__goto_2248_17 as *mut *mut c_char), 10))
                                         if (__goto_pending != 0) {
                                             break
                                         }
@@ -9958,37 +9958,37 @@ fn process_pattern_8() -> c_int {
                         continue
                     }
                     if ((if pat_patctl.locale[0] != 255: 1 else: 0) != 0) {
-                        prmsg((&mut msg__goto_2382_15 as *mut *const c_char), "locale")
+                        prmsg((&raw mut msg__goto_2382_15 as *mut *const c_char), "locale")
                     }
                     if (__goto_pending != 0) {
                         continue
                     }
                     if ((if pat_patctl.replacement[0] != 255: 1 else: 0) != 0) {
-                        prmsg((&mut msg__goto_2382_15 as *mut *const c_char), "replace")
+                        prmsg((&raw mut msg__goto_2382_15 as *mut *const c_char), "replace")
                     }
                     if (__goto_pending != 0) {
                         continue
                     }
                     if ((if pat_patctl.tables_id != 0: 1 else: 0) != 0) {
-                        prmsg((&mut msg__goto_2382_15 as *mut *const c_char), "tables")
+                        prmsg((&raw mut msg__goto_2382_15 as *mut *const c_char), "tables")
                     }
                     if (__goto_pending != 0) {
                         continue
                     }
                     if ((if pat_patctl.stackguard_test != 0: 1 else: 0) != 0) {
-                        prmsg((&mut msg__goto_2382_15 as *mut *const c_char), "stackguard")
+                        prmsg((&raw mut msg__goto_2382_15 as *mut *const c_char), "stackguard")
                     }
                     if (__goto_pending != 0) {
                         continue
                     }
                     if ((if timeit > 0: 1 else: 0) != 0) {
-                        prmsg((&mut msg__goto_2382_15 as *mut *const c_char), "timing")
+                        prmsg((&raw mut msg__goto_2382_15 as *mut *const c_char), "timing")
                     }
                     if (__goto_pending != 0) {
                         continue
                     }
                     if ((if pat_patctl.jit != 0: 1 else: 0) != 0) {
-                        prmsg((&mut msg__goto_2382_15 as *mut *const c_char), "JIT")
+                        prmsg((&raw mut msg__goto_2382_15 as *mut *const c_char), "JIT")
                     }
                     if (__goto_pending != 0) {
                         continue
@@ -10047,25 +10047,25 @@ fn process_pattern_8() -> c_int {
                         continue
                     }
                     if ((if local_newline_default != 0: 1 else: 0) != 0) {
-                        prmsg((&mut msg__goto_2382_15 as *mut *const c_char), "#newline_default")
+                        prmsg((&raw mut msg__goto_2382_15 as *mut *const c_char), "#newline_default")
                     }
                     if (__goto_pending != 0) {
                         continue
                     }
                     if ((if pat_context_8.max_pattern_length != (~(0 as c_ulong)): 1 else: 0) != 0) {
-                        prmsg((&mut msg__goto_2382_15 as *mut *const c_char), "max_pattern_length")
+                        prmsg((&raw mut msg__goto_2382_15 as *mut *const c_char), "max_pattern_length")
                     }
                     if (__goto_pending != 0) {
                         continue
                     }
                     if ((if pat_context_8.max_pattern_compiled_length != (~(0 as c_ulong)): 1 else: 0) != 0) {
-                        prmsg((&mut msg__goto_2382_15 as *mut *const c_char), "max_pattern_compiled_length")
+                        prmsg((&raw mut msg__goto_2382_15 as *mut *const c_char), "max_pattern_compiled_length")
                     }
                     if (__goto_pending != 0) {
                         continue
                     }
                     if ((if pat_context_8.parens_nest_limit != 220: 1 else: 0) != 0) {
-                        prmsg((&mut msg__goto_2382_15 as *mut *const c_char), "parens_nest_limit")
+                        prmsg((&raw mut msg__goto_2382_15 as *mut *const c_char), "parens_nest_limit")
                     }
                     if (__goto_pending != 0) {
                         continue
@@ -10137,7 +10137,7 @@ fn process_pattern_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
-                    (rc__goto_2043_5 = pcre2_regcomp((&mut preg as *mut regex_t), (pbuffer8 as *mut c_char), cflags__goto_2381_7))
+                    (rc__goto_2043_5 = pcre2_regcomp((&raw mut preg as *mut regex_t), (pbuffer8 as *mut c_char), cflags__goto_2381_7))
                     if (__goto_pending != 0) {
                         continue
                     }
@@ -10168,7 +10168,7 @@ fn process_pattern_8() -> c_int {
                         if (__goto_pending != 0) {
                             continue
                         }
-                        (usize__goto_2468_19 = pcre2_regerror(rc__goto_2043_5, (&mut preg as *mut regex_t), regbuffer__goto_2467_11, bsize__goto_2468_12))
+                        (usize__goto_2468_19 = pcre2_regerror(rc__goto_2043_5, (&raw mut preg as *mut regex_t), regbuffer__goto_2467_11, bsize__goto_2468_12))
                         if (__goto_pending != 0) {
                             continue
                         }
@@ -10513,7 +10513,7 @@ fn process_pattern_8() -> c_int {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_2043_5 = pcre2_pattern_convert_8(use_pbuffer__goto_2045_12, patlen__goto_2047_12, convert_options__goto_2595_12, (&mut converted_pattern__goto_2596_16 as *mut *mut u8), (&mut converted_length__goto_2597_14 as *mut c_ulong), con_context_8))
+                (rc__goto_2043_5 = pcre2_pattern_convert_8(use_pbuffer__goto_2045_12, patlen__goto_2047_12, convert_options__goto_2595_12, (&raw mut converted_pattern__goto_2596_16 as *mut *mut u8), (&raw mut converted_length__goto_2597_14 as *mut c_ulong), con_context_8))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -10675,7 +10675,7 @@ fn process_pattern_8() -> c_int {
                         if (__goto_pending != 0) {
                             break
                         }
-                        (compiled_code_8 = pcre2_compile_8(use_pbuffer__goto_2045_12, patlen__goto_2047_12, (pat_patctl.options | use_forbid_utf__goto_2046_10), (&mut errorcode__goto_2043_9 as *mut c_int), (&mut erroroffset__goto_2049_12 as *mut c_ulong), use_pat_context__goto_2044_24))
+                        (compiled_code_8 = pcre2_compile_8(use_pbuffer__goto_2045_12, patlen__goto_2047_12, (pat_patctl.options | use_forbid_utf__goto_2046_10), (&raw mut errorcode__goto_2043_9 as *mut c_int), (&raw mut erroroffset__goto_2049_12 as *mut c_ulong), use_pat_context__goto_2044_24))
                         if (__goto_pending != 0) {
                             break
                         }
@@ -10715,7 +10715,7 @@ fn process_pattern_8() -> c_int {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (compiled_code_8 = pcre2_compile_8(use_pbuffer__goto_2045_12, patlen__goto_2047_12, (pat_patctl.options | use_forbid_utf__goto_2046_10), (&mut errorcode__goto_2043_9 as *mut c_int), (&mut erroroffset__goto_2049_12 as *mut c_ulong), use_pat_context__goto_2044_24))
+                (compiled_code_8 = pcre2_compile_8(use_pbuffer__goto_2045_12, patlen__goto_2047_12, (pat_patctl.options | use_forbid_utf__goto_2046_10), (&raw mut errorcode__goto_2043_9 as *mut c_int), (&raw mut erroroffset__goto_2049_12 as *mut c_ulong), use_pat_context__goto_2044_24))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -10741,7 +10741,7 @@ fn process_pattern_8() -> c_int {
                         if (__goto_pending != 0) {
                             break
                         }
-                        (compiled_code_8 = pcre2_compile_8(use_pbuffer__goto_2045_12, patlen__goto_2047_12, (pat_patctl.options | use_forbid_utf__goto_2046_10), (&mut errorcode__goto_2043_9 as *mut c_int), (&mut erroroffset__goto_2049_12 as *mut c_ulong), use_pat_context__goto_2044_24))
+                        (compiled_code_8 = pcre2_compile_8(use_pbuffer__goto_2045_12, patlen__goto_2047_12, (pat_patctl.options | use_forbid_utf__goto_2046_10), (&raw mut errorcode__goto_2043_9 as *mut c_int), (&raw mut erroroffset__goto_2049_12 as *mut c_ulong), use_pat_context__goto_2044_24))
                         if (__goto_pending != 0) {
                             break
                         }
@@ -10812,7 +10812,7 @@ fn process_pattern_8() -> c_int {
                             if (__goto_pending != 0) {
                                 break
                             }
-                            (compiled_code_8 = pcre2_compile_8(use_pbuffer__goto_2045_12, patlen__goto_2047_12, (pat_patctl.options | use_forbid_utf__goto_2046_10), (&mut errorcode__goto_2043_9 as *mut c_int), (&mut erroroffset__goto_2049_12 as *mut c_ulong), use_pat_context__goto_2044_24))
+                            (compiled_code_8 = pcre2_compile_8(use_pbuffer__goto_2045_12, patlen__goto_2047_12, (pat_patctl.options | use_forbid_utf__goto_2046_10), (&raw mut errorcode__goto_2043_9 as *mut c_int), (&raw mut erroroffset__goto_2049_12 as *mut c_ulong), use_pat_context__goto_2044_24))
                             if (__goto_pending != 0) {
                                 break
                             }
@@ -10889,7 +10889,7 @@ fn process_pattern_8() -> c_int {
                             if (__goto_pending != 0) {
                                 break
                             }
-                            (compiled_code_8 = pcre2_compile_8(use_pbuffer__goto_2045_12, patlen__goto_2047_12, (pat_patctl.options | use_forbid_utf__goto_2046_10), (&mut errorcode__goto_2043_9 as *mut c_int), (&mut erroroffset__goto_2049_12 as *mut c_ulong), use_pat_context__goto_2044_24))
+                            (compiled_code_8 = pcre2_compile_8(use_pbuffer__goto_2045_12, patlen__goto_2047_12, (pat_patctl.options | use_forbid_utf__goto_2046_10), (&raw mut errorcode__goto_2043_9 as *mut c_int), (&raw mut erroroffset__goto_2049_12 as *mut c_ulong), use_pat_context__goto_2044_24))
                             if (__goto_pending != 0) {
                                 break
                             }
@@ -11008,7 +11008,7 @@ fn process_pattern_8() -> c_int {
                             if (not (__ci_expr_logic_40 != 0)) {
                                 break
                             }
-                            (n__goto_2915_9 = utf8_to_ord(q__goto_2916_23, q_end__goto_2916_37, (&mut cc__goto_2914_14 as *mut c_uint)))
+                            (n__goto_2915_9 = utf8_to_ord(q__goto_2916_23, q_end__goto_2916_37, (&raw mut cc__goto_2914_14 as *mut c_uint)))
                             if (__goto_pending != 0) {
                                 break
                             }
@@ -11161,13 +11161,13 @@ fn process_pattern_8() -> c_int {
                 if (__goto_pending != 0) {
                     continue
                 }
-                if ((if pattern_info_8(15, (&mut maxlookbehind as *mut c_uint), 0) != 0: 1 else: 0) != 0) {
+                if ((if pattern_info_8(15, (&raw mut maxlookbehind as *mut c_uint), 0) != 0: 1 else: 0) != 0) {
                     return PR_ABEND
                 }
                 if (__goto_pending != 0) {
                     continue
                 }
-                if ((if pattern_info_8(4, (&mut maxcapcount as *mut c_uint), 0) < 0: 1 else: 0) != 0) {
+                if ((if pattern_info_8(4, (&raw mut maxcapcount as *mut c_uint), 0) < 0: 1 else: 0) != 0) {
                     return PR_ABEND
                 }
                 if (__goto_pending != 0) {
@@ -11192,7 +11192,7 @@ fn process_pattern_8() -> c_int {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (serialize_rc__goto_2050_9 = pcre2_serialize_encode_8(((&mut compiled_code_8 as *mut *mut pcre2_real_code_8) as *mut *const pcre2_real_code_8), 1, (&mut serialized_bytes__goto_2051_10 as *mut *mut u8), (&mut serialized_size__goto_2052_12 as *mut c_ulong), general_context_8))
+                (serialize_rc__goto_2050_9 = pcre2_serialize_encode_8(((&raw mut compiled_code_8 as *mut *mut pcre2_real_code_8) as *mut *const pcre2_real_code_8), 1, (&raw mut serialized_bytes__goto_2051_10 as *mut *mut u8), (&raw mut serialized_size__goto_2052_12 as *mut c_ulong), general_context_8))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -11640,7 +11640,7 @@ fn substitute_case_callout_function_8(input: *const u8, input_len: c_ulong, outp
                     if (__goto_pending != 0) {
                         break
                     }
-                    if ((if not (case_transform(to_case, num_in__goto_3314_7, (&mut num_read__goto_3317_7 as *mut c_int), (&mut num_write__goto_3318_7 as *mut c_int), (&mut c1__goto_3315_12 as *mut c_uint), (&mut c2__goto_3316_12 as *mut c_uint)) != 0): 1 else: 0) != 0) {
+                    if ((if not (case_transform(to_case, num_in__goto_3314_7, (&raw mut num_read__goto_3317_7 as *mut c_int), (&raw mut num_write__goto_3318_7 as *mut c_int), (&raw mut c1__goto_3315_12 as *mut c_uint), (&raw mut c2__goto_3316_12 as *mut c_uint)) != 0): 1 else: 0) != 0) {
                         (written__goto_3295_12 = (~(0 as c_ulong)))
                         if (__goto_pending != 0) {
                             break
@@ -12166,7 +12166,7 @@ fn copy_and_get_8(utf: c_int, capcount: c_int) -> c_int {
 
         (length = (256 * sizeof[u8]()) / sizeof[u8]())
 
-        (rc = pcre2_substring_copy_bynumber_8(match_data_8, n, (&copybuffer[0] as *mut u8), (&mut length as *mut c_ulong)))
+        (rc = pcre2_substring_copy_bynumber_8(match_data_8, n, (&copybuffer[0] as *mut u8), (&raw mut length as *mut c_ulong)))
 
         if ((if rc < 0: 1 else: 0) != 0) {
             colour_begin(35, outfile)
@@ -12189,7 +12189,7 @@ fn copy_and_get_8(utf: c_int, capcount: c_int) -> c_int {
 
         }
 
-        (rc2 = pcre2_substring_length_bynumber_8(match_data_8, n, (&mut length2 as *mut c_ulong)))
+        (rc2 = pcre2_substring_length_bynumber_8(match_data_8, n, (&raw mut length2 as *mut c_ulong)))
 
         if ((if rc2 < 0: 1 else: 0) != 0) {
             colour_begin(35, outfile)
@@ -12272,7 +12272,7 @@ fn copy_and_get_8(utf: c_int, capcount: c_int) -> c_int {
 
         (length_1 = (256 * sizeof[u8]()) / sizeof[u8]())
 
-        (rc_1 = pcre2_substring_copy_byname_8(match_data_8, pbuffer8, (&copybuffer_1[0] as *mut u8), (&mut length_1 as *mut c_ulong)))
+        (rc_1 = pcre2_substring_copy_byname_8(match_data_8, pbuffer8, (&copybuffer_1[0] as *mut u8), (&raw mut length_1 as *mut c_ulong)))
 
         if ((if rc_1 < 0: 1 else: 0) != 0) {
             colour_begin(35, outfile)
@@ -12301,7 +12301,7 @@ fn copy_and_get_8(utf: c_int, capcount: c_int) -> c_int {
 
         }
 
-        (rc2_1 = pcre2_substring_length_byname_8(match_data_8, pbuffer8, (&mut length2_1 as *mut c_ulong)))
+        (rc2_1 = pcre2_substring_length_byname_8(match_data_8, pbuffer8, (&raw mut length2_1 as *mut c_ulong)))
 
         if ((if rc2_1 < 0: 1 else: 0) != 0) {
             colour_begin(35, outfile)
@@ -12359,7 +12359,7 @@ fn copy_and_get_8(utf: c_int, capcount: c_int) -> c_int {
 
         var n_1: c_uint = ((dat_datctl.get_numbers[i] as c_uint))
 
-        (rc_2 = pcre2_substring_get_bynumber_8(match_data_8, n_1, (&mut gotbuffer as *mut *mut u8), (&mut length_2 as *mut c_ulong)))
+        (rc_2 = pcre2_substring_get_bynumber_8(match_data_8, n_1, (&raw mut gotbuffer as *mut *mut u8), (&raw mut length_2 as *mut c_ulong)))
 
         if ((if rc_2 < 0: 1 else: 0) != 0) {
             colour_begin(35, outfile)
@@ -12426,7 +12426,7 @@ fn copy_and_get_8(utf: c_int, capcount: c_int) -> c_int {
         }
 
 
-        (rc_3 = pcre2_substring_get_byname_8(match_data_8, pbuffer8, (&mut gotbuffer_1 as *mut *mut u8), (&mut length_3 as *mut c_ulong)))
+        (rc_3 = pcre2_substring_get_byname_8(match_data_8, pbuffer8, (&raw mut gotbuffer_1 as *mut *mut u8), (&raw mut length_3 as *mut c_ulong)))
 
         if ((if rc_3 < 0: 1 else: 0) != 0) {
             colour_begin(35, outfile)
@@ -12468,7 +12468,7 @@ fn copy_and_get_8(utf: c_int, capcount: c_int) -> c_int {
 
         var lengths: *mut c_ulong
 
-        (rc_4 = pcre2_substring_list_get_8(match_data_8, (&mut stringlist as *mut *mut *mut u8), (&mut lengths as *mut *mut c_ulong)))
+        (rc_4 = pcre2_substring_list_get_8(match_data_8, (&raw mut stringlist as *mut *mut *mut u8), (&raw mut lengths as *mut *mut c_ulong)))
 
         if ((if rc_4 < 0: 1 else: 0) != 0) {
             colour_begin(35, outfile)
@@ -12531,7 +12531,7 @@ fn copy_substitute_string_8(utf: c_int, __param_input: *mut u8, inlen: c_ulong, 
     var badutf: c_int = 0
 
     if (utf != 0) {
-        (badutf = valid_utf(input, inlen, (&mut erroroffset as *mut c_ulong)))
+        (badutf = valid_utf(input, inlen, (&raw mut erroroffset as *mut c_ulong)))
     }
 
     var __ci_expr_logic_0: c_int
@@ -12740,7 +12740,7 @@ fn process_data_8() -> c_int {
                 if (__goto_pending != 0) {
                     continue
                 }
-                with_memcpy(((&mut dat_datctl as *mut datctl) as *i8), ((&mut def_datctl as *mut datctl) as *i8), (sizeof[datctl]() as i64))
+                with_memcpy(((&raw mut dat_datctl as *mut datctl) as *i8), ((&raw mut def_datctl as *mut datctl) as *i8), (sizeof[datctl]() as i64))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -12856,7 +12856,7 @@ fn process_data_8() -> c_int {
                         if (not (__ci_expr_logic_2 != 0)) {
                             break
                         }
-                        (n__goto_3959_7 = utf8_to_ord(ptmp__goto_3957_12, ptmp_end__goto_3960_12, (&mut cc__goto_3958_12 as *mut c_uint)))
+                        (n__goto_3959_7 = utf8_to_ord(ptmp__goto_3957_12, ptmp_end__goto_3960_12, (&raw mut cc__goto_3958_12 as *mut c_uint)))
                         if (__goto_pending != 0) {
                             break
                         }
@@ -12975,7 +12975,7 @@ fn process_data_8() -> c_int {
                         if (__goto_pending != 0) {
                             break
                         }
-                        (li__goto_4016_10 = strtol((p__goto_3893_10 as *const c_char), (&mut endptr__goto_4017_11 as *mut *mut c_char), 10))
+                        (li__goto_4016_10 = strtol((p__goto_3893_10 as *const c_char), (&raw mut endptr__goto_4017_11 as *mut *mut c_char), 10))
                         if (__goto_pending != 0) {
                             break
                         }
@@ -14031,7 +14031,7 @@ fn process_data_8() -> c_int {
                                             break
                                         }
 
-                                        (uli__goto_4215_21 = strtoul((p__goto_3893_10 as *const c_char), (&mut endptr__goto_4214_13 as *mut *mut c_char), 16))
+                                        (uli__goto_4215_21 = strtoul((p__goto_3893_10 as *const c_char), (&raw mut endptr__goto_4214_13 as *mut *mut c_char), 16))
 
                                         if (__goto_pending != 0) {
                                             break
@@ -14258,7 +14258,7 @@ fn process_data_8() -> c_int {
                 }
                 var __ci_expr_logic_39: c_int = 0
                 if ((if (unsafe: p__goto_3893_10[-1]) != 0: 1 else: 0) != 0) {
-                    (__ci_expr_logic_39 = (if (if not (decode_modifiers_8(p__goto_3893_10, CTX_DAT, null, (&mut dat_datctl as *mut datctl)) != 0): 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_39 = (if (if not (decode_modifiers_8(p__goto_3893_10, CTX_DAT, null, (&raw mut dat_datctl as *mut datctl)) != 0): 1 else: 0) != 0: 1 else: 0))
                 }
                 if (__ci_expr_logic_39 != 0) {
                     return PR_OK
@@ -14466,7 +14466,7 @@ fn process_data_8() -> c_int {
                         (__ci_expr_logic_47 = (if (if dat_datctl.cerror[1] != 4294967295: 1 else: 0) != 0: 1 else: 0))
                     }
                     if (__ci_expr_logic_47 != 0) {
-                        prmsg((&mut msg__goto_4449_15 as *mut *const c_char), "callout_error")
+                        prmsg((&raw mut msg__goto_4449_15 as *mut *const c_char), "callout_error")
                     }
                     if (__goto_pending != 0) {
                         continue
@@ -14478,7 +14478,7 @@ fn process_data_8() -> c_int {
                         (__ci_expr_logic_48 = (if (if dat_datctl.cfail[1] != 4294967295: 1 else: 0) != 0: 1 else: 0))
                     }
                     if (__ci_expr_logic_48 != 0) {
-                        prmsg((&mut msg__goto_4449_15 as *mut *const c_char), "callout_fail")
+                        prmsg((&raw mut msg__goto_4449_15 as *mut *const c_char), "callout_fail")
                     }
                     if (__goto_pending != 0) {
                         continue
@@ -14490,7 +14490,7 @@ fn process_data_8() -> c_int {
                         (__ci_expr_logic_49 = (if (if dat_datctl.copy_names[0] != 0: 1 else: 0) != 0: 1 else: 0))
                     }
                     if (__ci_expr_logic_49 != 0) {
-                        prmsg((&mut msg__goto_4449_15 as *mut *const c_char), "copy")
+                        prmsg((&raw mut msg__goto_4449_15 as *mut *const c_char), "copy")
                     }
                     if (__goto_pending != 0) {
                         continue
@@ -14502,19 +14502,19 @@ fn process_data_8() -> c_int {
                         (__ci_expr_logic_50 = (if (if dat_datctl.get_names[0] != 0: 1 else: 0) != 0: 1 else: 0))
                     }
                     if (__ci_expr_logic_50 != 0) {
-                        prmsg((&mut msg__goto_4449_15 as *mut *const c_char), "get")
+                        prmsg((&raw mut msg__goto_4449_15 as *mut *const c_char), "get")
                     }
                     if (__goto_pending != 0) {
                         continue
                     }
                     if ((if dat_datctl.jitstack != 0: 1 else: 0) != 0) {
-                        prmsg((&mut msg__goto_4449_15 as *mut *const c_char), "jitstack")
+                        prmsg((&raw mut msg__goto_4449_15 as *mut *const c_char), "jitstack")
                     }
                     if (__goto_pending != 0) {
                         continue
                     }
                     if ((if dat_datctl.offset != 0: 1 else: 0) != 0) {
-                        prmsg((&mut msg__goto_4449_15 as *mut *const c_char), "offset")
+                        prmsg((&raw mut msg__goto_4449_15 as *mut *const c_char), "offset")
                     }
                     if (__goto_pending != 0) {
                         continue
@@ -14589,7 +14589,7 @@ fn process_data_8() -> c_int {
                     }
                     if ((if dat_datctl.startend[0] != 4294967295: 1 else: 0) != 0) {
                         if ((if pmatch__goto_4447_15 == null: 1 else: 0) != 0) {
-                            (pmatch__goto_4447_15 = ((&mut startend_buf__goto_4448_14 as *mut regmatch_t)))
+                            (pmatch__goto_4447_15 = ((&raw mut startend_buf__goto_4448_14 as *mut regmatch_t)))
                         }
                         if (__goto_pending != 0) {
                             continue
@@ -14634,12 +14634,12 @@ fn process_data_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
-                    (rc__goto_4445_7 = pcre2_regexec((&mut preg as *mut regex_t), (pp__goto_3906_14 as *const c_char), dat_datctl.oveccount, pmatch__goto_4447_15, eflags__goto_4446_7))
+                    (rc__goto_4445_7 = pcre2_regexec((&raw mut preg as *mut regex_t), (pp__goto_3906_14 as *const c_char), dat_datctl.oveccount, pmatch__goto_4447_15, eflags__goto_4446_7))
                     if (__goto_pending != 0) {
                         continue
                     }
                     if ((if rc__goto_4445_7 != 0: 1 else: 0) != 0) {
-                        (usize__goto_4506_12 = pcre2_regerror(rc__goto_4445_7, (&mut preg as *mut regex_t), (pbuffer8 as *mut c_char), pbuffer8_size))
+                        (usize__goto_4506_12 = pcre2_regerror(rc__goto_4445_7, (&raw mut preg as *mut regex_t), (pbuffer8 as *mut c_char), pbuffer8_size))
                         if (__goto_pending != 0) {
                             continue
                         }
@@ -14770,7 +14770,7 @@ fn process_data_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
-                    if ((if pmatch__goto_4447_15 != ((&mut startend_buf__goto_4448_14 as *mut regmatch_t)): 1 else: 0) != 0) {
+                    if ((if pmatch__goto_4447_15 != ((&raw mut startend_buf__goto_4448_14 as *mut regmatch_t)): 1 else: 0) != 0) {
                         with_free((pmatch__goto_4447_15 as *mut i8))
                     }
                     if (__goto_pending != 0) {
@@ -15221,7 +15221,7 @@ fn process_data_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
-                    copy_substitute_string_8(utf__goto_3897_6, pr__goto_4700_12, (((prend__goto_4700_17 as usize) -% (pr__goto_4700_12 as usize)) / sizeof[u8]()), rep_in_buffer_8, (&mut rlen__goto_4706_17 as *mut c_ulong))
+                    copy_substitute_string_8(utf__goto_3897_6, pr__goto_4700_12, (((prend__goto_4700_17 as usize) -% (pr__goto_4700_12 as usize)) / sizeof[u8]()), rep_in_buffer_8, (&raw mut rlen__goto_4706_17 as *mut c_ulong))
                     if (__goto_pending != 0) {
                         continue
                     }
@@ -15254,7 +15254,7 @@ fn process_data_8() -> c_int {
                         continue
                     }
                     if ((if dat_datctl.substitute_subject[0] != 255: 1 else: 0) != 0) {
-                        copy_substitute_string_8(utf__goto_3897_6, ((&dat_datctl.substitute_subject[0] as *mut u8) + ((1 as isize) as usize)), dat_datctl.substitute_subject[0], (&sbuffer__goto_4701_15[0] as *mut u8), (&mut slen__goto_4706_54 as *mut c_ulong))
+                        copy_substitute_string_8(utf__goto_3897_6, ((&dat_datctl.substitute_subject[0] as *mut u8) + ((1 as isize) as usize)), dat_datctl.substitute_subject[0], (&sbuffer__goto_4701_15[0] as *mut u8), (&raw mut slen__goto_4706_54 as *mut c_ulong))
                         if (__goto_pending != 0) {
                             continue
                         }
@@ -15369,7 +15369,7 @@ fn process_data_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
-                    (rc__goto_4699_7 = pcre2_substitute_8(compiled_code_8, sbptr__goto_4703_16, slen__goto_4706_54, dat_datctl.offset, (dat_datctl.options | xoptions__goto_4704_12), smatch_data__goto_4707_21, use_dat_context__goto_3896_22, rbptr__goto_4702_16, rlen__goto_4706_17, rep_out_buffer_8, (&mut nsize__goto_4706_34 as *mut c_ulong)))
+                    (rc__goto_4699_7 = pcre2_substitute_8(compiled_code_8, sbptr__goto_4703_16, slen__goto_4706_54, dat_datctl.offset, (dat_datctl.options | xoptions__goto_4704_12), smatch_data__goto_4707_21, use_dat_context__goto_3896_22, rbptr__goto_4702_16, rlen__goto_4706_17, rep_out_buffer_8, (&raw mut nsize__goto_4706_34 as *mut c_ulong)))
                     if (__goto_pending != 0) {
                         continue
                     }
@@ -15424,7 +15424,7 @@ fn process_data_8() -> c_int {
                             if (__goto_pending != 0) {
                                 break
                             }
-                            (rc__goto_4699_7 = pcre2_substitute_8(compiled_code_8, sbptr__goto_4703_16, slen__goto_4706_54, dat_datctl.offset, (dat_datctl.options | xoptions__goto_4704_12), smatch_data__goto_4707_21, use_dat_context__goto_3896_22, rbptr__goto_4702_16, rlen__goto_4706_17, rep_out_buffer_8, (&mut nsize__goto_4706_34 as *mut c_ulong)))
+                            (rc__goto_4699_7 = pcre2_substitute_8(compiled_code_8, sbptr__goto_4703_16, slen__goto_4706_54, dat_datctl.offset, (dat_datctl.options | xoptions__goto_4704_12), smatch_data__goto_4707_21, use_dat_context__goto_3896_22, rbptr__goto_4702_16, rlen__goto_4706_17, rep_out_buffer_8, (&raw mut nsize__goto_4706_34 as *mut c_ulong)))
                             if (__goto_pending != 0) {
                                 break
                             }
@@ -16029,7 +16029,7 @@ fn process_data_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
-                    (rc_nextmatch__goto_5162_12 = pcre2_next_match_8(match_data_8, (&mut tmp_offset__goto_5163_18 as *mut c_ulong), (&mut tmp_options__goto_5164_16 as *mut c_uint)))
+                    (rc_nextmatch__goto_5162_12 = pcre2_next_match_8(match_data_8, (&raw mut tmp_offset__goto_5163_18 as *mut c_ulong), (&raw mut tmp_options__goto_5164_16 as *mut c_uint)))
                     if (__goto_pending != 0) {
                         continue
                     }
@@ -16822,7 +16822,7 @@ fn process_data_8() -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
-                    (rc_nextmatch__goto_5542_10 = pcre2_next_match_8(match_data_8, (&mut new_start_offset__goto_5541_16 as *mut c_ulong), (&mut g_notempty__goto_3892_10 as *mut c_uint)))
+                    (rc_nextmatch__goto_5542_10 = pcre2_next_match_8(match_data_8, (&raw mut new_start_offset__goto_5541_16 as *mut c_ulong), (&raw mut g_notempty__goto_3892_10 as *mut c_uint)))
                     if (__goto_pending != 0) {
                         continue
                     }
@@ -17050,7 +17050,7 @@ fn unittest_8() {
                 (invalid_code__goto_5717_7 = null)
                 (test_tables__goto_5718_16 = ((null as *const u8)))
                 (subs_other_code__goto_5723_13 = ((null as *mut pcre2_real_code_8)))
-                with_memset(((&mut test_preg__goto_5715_9 as *mut regex_t) as *i8), 0, (sizeof[regex_t]() as i64))
+                with_memset(((&raw mut test_preg__goto_5715_9 as *mut regex_t) as *i8), 0, (sizeof[regex_t]() as i64))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -17518,7 +17518,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_config_8(4, (&mut uval__goto_5682_10 as *mut c_uint)))
+                (rc__goto_5681_5 = pcre2_config_8(4, (&raw mut uval__goto_5682_10 as *mut c_uint)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -17576,7 +17576,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_config_8(999, (&mut uval__goto_5682_10 as *mut c_uint)))
+                (rc__goto_5681_5 = pcre2_config_8(999, (&raw mut uval__goto_5682_10 as *mut c_uint)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -17605,7 +17605,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_config_8(8, (&mut uval__goto_5682_10 as *mut c_uint)))
+                (rc__goto_5681_5 = pcre2_config_8(8, (&raw mut uval__goto_5682_10 as *mut c_uint)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -17634,7 +17634,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_config_8(3, (&mut uval__goto_5682_10 as *mut c_uint)))
+                (rc__goto_5681_5 = pcre2_config_8(3, (&raw mut uval__goto_5682_10 as *mut c_uint)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -18714,7 +18714,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (test_compiled_code__goto_5691_13 = pcre2_compile_8((&pattern__goto_5692_13[0] as *mut u8), (~(0 as c_ulong)), 0, null, (&mut erroroffset__goto_5711_12 as *mut c_ulong), test_pat_context__goto_5687_24))
+                (test_compiled_code__goto_5691_13 = pcre2_compile_8((&pattern__goto_5692_13[0] as *mut u8), (~(0 as c_ulong)), 0, null, (&raw mut erroroffset__goto_5711_12 as *mut c_ulong), test_pat_context__goto_5687_24))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -18743,7 +18743,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (test_compiled_code__goto_5691_13 = pcre2_compile_8((&pattern__goto_5692_13[0] as *mut u8), (~(0 as c_ulong)), 0, (&mut errorcode__goto_5710_5 as *mut c_int), null, test_pat_context__goto_5687_24))
+                (test_compiled_code__goto_5691_13 = pcre2_compile_8((&pattern__goto_5692_13[0] as *mut u8), (~(0 as c_ulong)), 0, (&raw mut errorcode__goto_5710_5 as *mut c_int), null, test_pat_context__goto_5687_24))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -18776,7 +18776,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (test_compiled_code__goto_5691_13 = pcre2_compile_8((&pattern__goto_5692_13[0] as *mut u8), (~(0 as c_ulong)), 0, (&mut errorcode__goto_5710_5 as *mut c_int), (&mut erroroffset__goto_5711_12 as *mut c_ulong), test_pat_context__goto_5687_24))
+                (test_compiled_code__goto_5691_13 = pcre2_compile_8((&pattern__goto_5692_13[0] as *mut u8), (~(0 as c_ulong)), 0, (&raw mut errorcode__goto_5710_5 as *mut c_int), (&raw mut erroroffset__goto_5711_12 as *mut c_ulong), test_pat_context__goto_5687_24))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -19189,7 +19189,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_pattern_info_8(null, 20, (&mut uval__goto_5682_10 as *mut c_uint)))
+                (rc__goto_5681_5 = pcre2_pattern_info_8(null, 20, (&raw mut uval__goto_5682_10 as *mut c_uint)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -19247,7 +19247,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_pattern_info_8(test_compiled_code__goto_5691_13, 999, (&mut uval__goto_5682_10 as *mut c_uint)))
+                (rc__goto_5681_5 = pcre2_pattern_info_8(test_compiled_code__goto_5691_13, 999, (&raw mut uval__goto_5682_10 as *mut c_uint)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -19309,7 +19309,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_pattern_info_8(invalid_code__goto_5717_7, 20, (&mut uval__goto_5682_10 as *mut c_uint)))
+                (rc__goto_5681_5 = pcre2_pattern_info_8(invalid_code__goto_5717_7, 20, (&raw mut uval__goto_5682_10 as *mut c_uint)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -19338,7 +19338,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_regcomp((&mut test_preg__goto_5715_9 as *mut regex_t), "abc", 0))
+                (rc__goto_5681_5 = pcre2_regcomp((&raw mut test_preg__goto_5715_9 as *mut regex_t), "abc", 0))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -19367,7 +19367,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_regexec((&mut test_preg__goto_5715_9 as *mut regex_t), "zabcz", 0, null, 0))
+                (rc__goto_5681_5 = pcre2_regexec((&raw mut test_preg__goto_5715_9 as *mut regex_t), "zabcz", 0, null, 0))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -19396,7 +19396,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_regexec((&mut test_preg__goto_5715_9 as *mut regex_t), "zabcz", 0, null, 128))
+                (rc__goto_5681_5 = pcre2_regexec((&raw mut test_preg__goto_5715_9 as *mut regex_t), "zabcz", 0, null, 128))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -19895,7 +19895,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (test_compiled_code__goto_5691_13 = pcre2_compile_8((&callout_int_pattern__goto_5693_13[0] as *mut u8), (~(0 as c_ulong)), 0, (&mut errorcode__goto_5710_5 as *mut c_int), (&mut erroroffset__goto_5711_12 as *mut c_ulong), null))
+                (test_compiled_code__goto_5691_13 = pcre2_compile_8((&callout_int_pattern__goto_5693_13[0] as *mut u8), (~(0 as c_ulong)), 0, (&raw mut errorcode__goto_5710_5 as *mut c_int), (&raw mut erroroffset__goto_5711_12 as *mut c_ulong), null))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -19924,7 +19924,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_callout_enumerate_8(test_compiled_code__goto_5691_13, callout_enumerate_function_void_8, (&mut errorcode__goto_5710_5 as *mut c_int)))
+                (rc__goto_5681_5 = pcre2_callout_enumerate_8(test_compiled_code__goto_5691_13, callout_enumerate_function_void_8, (&raw mut errorcode__goto_5710_5 as *mut c_int)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -19957,7 +19957,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_callout_enumerate_8(test_compiled_code__goto_5691_13, callout_enumerate_function_fail_8, (&mut errorcode__goto_5710_5 as *mut c_int)))
+                (rc__goto_5681_5 = pcre2_callout_enumerate_8(test_compiled_code__goto_5691_13, callout_enumerate_function_fail_8, (&raw mut errorcode__goto_5710_5 as *mut c_int)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -19990,7 +19990,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (test_compiled_code__goto_5691_13 = pcre2_compile_8((&callout_str_pattern__goto_5695_13[0] as *mut u8), (~(0 as c_ulong)), 0, (&mut errorcode__goto_5710_5 as *mut c_int), (&mut erroroffset__goto_5711_12 as *mut c_ulong), null))
+                (test_compiled_code__goto_5691_13 = pcre2_compile_8((&callout_str_pattern__goto_5695_13[0] as *mut u8), (~(0 as c_ulong)), 0, (&raw mut errorcode__goto_5710_5 as *mut c_int), (&raw mut erroroffset__goto_5711_12 as *mut c_ulong), null))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -20023,7 +20023,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_callout_enumerate_8(test_compiled_code__goto_5691_13, callout_enumerate_function_fail_8, (&mut errorcode__goto_5710_5 as *mut c_int)))
+                (rc__goto_5681_5 = pcre2_callout_enumerate_8(test_compiled_code__goto_5691_13, callout_enumerate_function_fail_8, (&raw mut errorcode__goto_5710_5 as *mut c_int)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -20064,7 +20064,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (test_compiled_code__goto_5691_13 = pcre2_compile_8((&capture_pattern__goto_5698_13[0] as *mut u8), (~(0 as c_ulong)), 0, (&mut errorcode__goto_5710_5 as *mut c_int), (&mut erroroffset__goto_5711_12 as *mut c_ulong), null))
+                (test_compiled_code__goto_5691_13 = pcre2_compile_8((&capture_pattern__goto_5698_13[0] as *mut u8), (~(0 as c_ulong)), 0, (&raw mut errorcode__goto_5710_5 as *mut c_int), (&raw mut erroroffset__goto_5711_12 as *mut c_ulong), null))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -20159,7 +20159,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_substring_copy_byname_8(test_match_data__goto_5690_19, (&name_n__goto_5705_13[0] as *mut u8), (&copy_buf__goto_5719_13[0] as *mut u8), (&mut sizeval__goto_5683_12 as *mut c_ulong)))
+                (rc__goto_5681_5 = pcre2_substring_copy_byname_8(test_match_data__goto_5690_19, (&name_n__goto_5705_13[0] as *mut u8), (&copy_buf__goto_5719_13[0] as *mut u8), (&raw mut sizeval__goto_5683_12 as *mut c_ulong)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -20196,7 +20196,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_substring_copy_byname_8(test_match_data__goto_5690_19, (&name_n__goto_5705_13[0] as *mut u8), (&copy_buf__goto_5719_13[0] as *mut u8), (&mut sizeval__goto_5683_12 as *mut c_ulong)))
+                (rc__goto_5681_5 = pcre2_substring_copy_byname_8(test_match_data__goto_5690_19, (&name_n__goto_5705_13[0] as *mut u8), (&copy_buf__goto_5719_13[0] as *mut u8), (&raw mut sizeval__goto_5683_12 as *mut c_ulong)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -20233,7 +20233,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_substring_copy_byname_8(test_match_data__goto_5690_19, (&name_n__goto_5705_13[0] as *mut u8), (&copy_buf__goto_5719_13[0] as *mut u8), (&mut sizeval__goto_5683_12 as *mut c_ulong)))
+                (rc__goto_5681_5 = pcre2_substring_copy_byname_8(test_match_data__goto_5690_19, (&name_n__goto_5705_13[0] as *mut u8), (&copy_buf__goto_5719_13[0] as *mut u8), (&raw mut sizeval__goto_5683_12 as *mut c_ulong)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -20270,7 +20270,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_substring_copy_bynumber_8(test_match_data__goto_5690_19, 1, (&copy_buf__goto_5719_13[0] as *mut u8), (&mut sizeval__goto_5683_12 as *mut c_ulong)))
+                (rc__goto_5681_5 = pcre2_substring_copy_bynumber_8(test_match_data__goto_5690_19, 1, (&copy_buf__goto_5719_13[0] as *mut u8), (&raw mut sizeval__goto_5683_12 as *mut c_ulong)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -20307,7 +20307,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_substring_copy_bynumber_8(test_match_data__goto_5690_19, 1, (&copy_buf__goto_5719_13[0] as *mut u8), (&mut sizeval__goto_5683_12 as *mut c_ulong)))
+                (rc__goto_5681_5 = pcre2_substring_copy_bynumber_8(test_match_data__goto_5690_19, 1, (&copy_buf__goto_5719_13[0] as *mut u8), (&raw mut sizeval__goto_5683_12 as *mut c_ulong)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -20352,7 +20352,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_substring_get_byname_8(test_match_data__goto_5690_19, (&name_n__goto_5705_13[0] as *mut u8), (&mut sptrval__goto_5684_14 as *mut *mut u8), (&mut sizeval__goto_5683_12 as *mut c_ulong)))
+                (rc__goto_5681_5 = pcre2_substring_get_byname_8(test_match_data__goto_5690_19, (&name_n__goto_5705_13[0] as *mut u8), (&raw mut sptrval__goto_5684_14 as *mut *mut u8), (&raw mut sizeval__goto_5683_12 as *mut c_ulong)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -20389,7 +20389,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_substring_get_bynumber_8(test_match_data__goto_5690_19, 1, (&mut sptrval__goto_5684_14 as *mut *mut u8), (&mut sizeval__goto_5683_12 as *mut c_ulong)))
+                (rc__goto_5681_5 = pcre2_substring_get_bynumber_8(test_match_data__goto_5690_19, 1, (&raw mut sptrval__goto_5684_14 as *mut *mut u8), (&raw mut sizeval__goto_5683_12 as *mut c_ulong)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -20430,7 +20430,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_substring_length_bynumber_8(test_match_data__goto_5690_19, 1, (&mut sizeval__goto_5683_12 as *mut c_ulong)))
+                (rc__goto_5681_5 = pcre2_substring_length_bynumber_8(test_match_data__goto_5690_19, 1, (&raw mut sizeval__goto_5683_12 as *mut c_ulong)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -20496,7 +20496,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_substring_length_byname_8(test_match_data__goto_5690_19, (&name_n__goto_5705_13[0] as *mut u8), (&mut sizeval__goto_5683_12 as *mut c_ulong)))
+                (rc__goto_5681_5 = pcre2_substring_length_byname_8(test_match_data__goto_5690_19, (&name_n__goto_5705_13[0] as *mut u8), (&raw mut sizeval__goto_5683_12 as *mut c_ulong)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -20558,7 +20558,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_substring_list_get_8(test_match_data__goto_5690_19, (&mut stringlist__goto_5720_15 as *mut *mut *mut u8), (&mut lengthslist__goto_5721_13 as *mut *mut c_ulong)))
+                (rc__goto_5681_5 = pcre2_substring_list_get_8(test_match_data__goto_5690_19, (&raw mut stringlist__goto_5720_15 as *mut *mut *mut u8), (&raw mut lengthslist__goto_5721_13 as *mut *mut c_ulong)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -20603,7 +20603,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_substring_list_get_8(test_match_data__goto_5690_19, (&mut stringlist__goto_5720_15 as *mut *mut *mut u8), null))
+                (rc__goto_5681_5 = pcre2_substring_list_get_8(test_match_data__goto_5690_19, (&raw mut stringlist__goto_5720_15 as *mut *mut *mut u8), null))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -20648,7 +20648,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_substring_list_get_8(test_match_data__goto_5690_19, (&mut stringlist__goto_5720_15 as *mut *mut *mut u8), (&mut lengthslist__goto_5721_13 as *mut *mut c_ulong)))
+                (rc__goto_5681_5 = pcre2_substring_list_get_8(test_match_data__goto_5690_19, (&raw mut stringlist__goto_5720_15 as *mut *mut *mut u8), (&raw mut lengthslist__goto_5721_13 as *mut *mut c_ulong)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -20718,7 +20718,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_substring_copy_byname_8(test_match_data__goto_5690_19, (&name_n__goto_5705_13[0] as *mut u8), (&copy_buf__goto_5719_13[0] as *mut u8), (&mut sizeval__goto_5683_12 as *mut c_ulong)))
+                (rc__goto_5681_5 = pcre2_substring_copy_byname_8(test_match_data__goto_5690_19, (&name_n__goto_5705_13[0] as *mut u8), (&copy_buf__goto_5719_13[0] as *mut u8), (&raw mut sizeval__goto_5683_12 as *mut c_ulong)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -20747,7 +20747,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_substring_copy_bynumber_8(test_match_data__goto_5690_19, 1, (&copy_buf__goto_5719_13[0] as *mut u8), (&mut sizeval__goto_5683_12 as *mut c_ulong)))
+                (rc__goto_5681_5 = pcre2_substring_copy_bynumber_8(test_match_data__goto_5690_19, 1, (&copy_buf__goto_5719_13[0] as *mut u8), (&raw mut sizeval__goto_5683_12 as *mut c_ulong)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -20776,7 +20776,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_substring_get_byname_8(test_match_data__goto_5690_19, (&name_n__goto_5705_13[0] as *mut u8), (&mut sptrval__goto_5684_14 as *mut *mut u8), (&mut sizeval__goto_5683_12 as *mut c_ulong)))
+                (rc__goto_5681_5 = pcre2_substring_get_byname_8(test_match_data__goto_5690_19, (&name_n__goto_5705_13[0] as *mut u8), (&raw mut sptrval__goto_5684_14 as *mut *mut u8), (&raw mut sizeval__goto_5683_12 as *mut c_ulong)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -20809,7 +20809,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_substring_get_bynumber_8(test_match_data__goto_5690_19, 1, (&mut sptrval__goto_5684_14 as *mut *mut u8), (&mut sizeval__goto_5683_12 as *mut c_ulong)))
+                (rc__goto_5681_5 = pcre2_substring_get_bynumber_8(test_match_data__goto_5690_19, 1, (&raw mut sptrval__goto_5684_14 as *mut *mut u8), (&raw mut sizeval__goto_5683_12 as *mut c_ulong)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -20846,7 +20846,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (test_compiled_code__goto_5691_13 = pcre2_compile_8((&pattern__goto_5692_13[0] as *mut u8), (~(0 as c_ulong)), 0, (&mut errorcode__goto_5710_5 as *mut c_int), (&mut erroroffset__goto_5711_12 as *mut c_ulong), null))
+                (test_compiled_code__goto_5691_13 = pcre2_compile_8((&pattern__goto_5692_13[0] as *mut u8), (~(0 as c_ulong)), 0, (&raw mut errorcode__goto_5710_5 as *mut c_int), (&raw mut erroroffset__goto_5711_12 as *mut c_ulong), null))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -20875,7 +20875,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (subs_other_code__goto_5723_13 = pcre2_compile_8((&pattern__goto_5692_13[0] as *mut u8), (~(0 as c_ulong)), 0, (&mut errorcode__goto_5710_5 as *mut c_int), (&mut erroroffset__goto_5711_12 as *mut c_ulong), null))
+                (subs_other_code__goto_5723_13 = pcre2_compile_8((&pattern__goto_5692_13[0] as *mut u8), (~(0 as c_ulong)), 0, (&raw mut errorcode__goto_5710_5 as *mut c_int), (&raw mut erroroffset__goto_5711_12 as *mut c_ulong), null))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -20978,7 +20978,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_substitute_8(test_compiled_code__goto_5691_13, (&substitute_subject__goto_5704_13[0] as *mut u8), (~(0 as c_ulong)), 0, 65536, test_match_data__goto_5690_19, null, null, 0, (&replace_buf__goto_5722_13[0] as *mut u8), (&mut sizeval__goto_5683_12 as *mut c_ulong)))
+                (rc__goto_5681_5 = pcre2_substitute_8(test_compiled_code__goto_5691_13, (&substitute_subject__goto_5704_13[0] as *mut u8), (~(0 as c_ulong)), 0, 65536, test_match_data__goto_5690_19, null, null, 0, (&replace_buf__goto_5722_13[0] as *mut u8), (&raw mut sizeval__goto_5683_12 as *mut c_ulong)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -21015,7 +21015,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_substitute_8(test_compiled_code__goto_5691_13, ((&substitute_subject__goto_5704_13[0] as *mut u8) + ((1 as isize) as usize)), (~(0 as c_ulong)), 0, 65536, test_match_data__goto_5690_19, null, null, 0, (&replace_buf__goto_5722_13[0] as *mut u8), (&mut sizeval__goto_5683_12 as *mut c_ulong)))
+                (rc__goto_5681_5 = pcre2_substitute_8(test_compiled_code__goto_5691_13, ((&substitute_subject__goto_5704_13[0] as *mut u8) + ((1 as isize) as usize)), (~(0 as c_ulong)), 0, 65536, test_match_data__goto_5690_19, null, null, 0, (&replace_buf__goto_5722_13[0] as *mut u8), (&raw mut sizeval__goto_5683_12 as *mut c_ulong)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -21060,7 +21060,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_substitute_8(test_compiled_code__goto_5691_13, (&substitute_subject__goto_5704_13[0] as *mut u8), (~(0 as c_ulong)), 0, 65536, test_match_data__goto_5690_19, null, null, 0, (&replace_buf__goto_5722_13[0] as *mut u8), (&mut sizeval__goto_5683_12 as *mut c_ulong)))
+                (rc__goto_5681_5 = pcre2_substitute_8(test_compiled_code__goto_5691_13, (&substitute_subject__goto_5704_13[0] as *mut u8), (~(0 as c_ulong)), 0, 65536, test_match_data__goto_5690_19, null, null, 0, (&replace_buf__goto_5722_13[0] as *mut u8), (&raw mut sizeval__goto_5683_12 as *mut c_ulong)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -21097,7 +21097,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_substitute_8(test_compiled_code__goto_5691_13, (&substitute_subject__goto_5704_13[0] as *mut u8), (~(0 as c_ulong)), 1, 65536, test_match_data__goto_5690_19, null, null, 0, (&replace_buf__goto_5722_13[0] as *mut u8), (&mut sizeval__goto_5683_12 as *mut c_ulong)))
+                (rc__goto_5681_5 = pcre2_substitute_8(test_compiled_code__goto_5691_13, (&substitute_subject__goto_5704_13[0] as *mut u8), (~(0 as c_ulong)), 1, 65536, test_match_data__goto_5690_19, null, null, 0, (&replace_buf__goto_5722_13[0] as *mut u8), (&raw mut sizeval__goto_5683_12 as *mut c_ulong)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -21134,7 +21134,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_substitute_8(test_compiled_code__goto_5691_13, (&substitute_subject__goto_5704_13[0] as *mut u8), (~(0 as c_ulong)), 0, (65536 | 4), test_match_data__goto_5690_19, null, null, 0, (&replace_buf__goto_5722_13[0] as *mut u8), (&mut sizeval__goto_5683_12 as *mut c_ulong)))
+                (rc__goto_5681_5 = pcre2_substitute_8(test_compiled_code__goto_5691_13, (&substitute_subject__goto_5704_13[0] as *mut u8), (~(0 as c_ulong)), 0, (65536 | 4), test_match_data__goto_5690_19, null, null, 0, (&replace_buf__goto_5722_13[0] as *mut u8), (&raw mut sizeval__goto_5683_12 as *mut c_ulong)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -21171,7 +21171,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_substitute_8(subs_other_code__goto_5723_13, (&substitute_subject__goto_5704_13[0] as *mut u8), (~(0 as c_ulong)), 0, 65536, test_match_data__goto_5690_19, null, null, 0, (&replace_buf__goto_5722_13[0] as *mut u8), (&mut sizeval__goto_5683_12 as *mut c_ulong)))
+                (rc__goto_5681_5 = pcre2_substitute_8(subs_other_code__goto_5723_13, (&substitute_subject__goto_5704_13[0] as *mut u8), (~(0 as c_ulong)), 0, 65536, test_match_data__goto_5690_19, null, null, 0, (&replace_buf__goto_5722_13[0] as *mut u8), (&raw mut sizeval__goto_5683_12 as *mut c_ulong)))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -21200,7 +21200,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (serialize_code__goto_6303_15 = pcre2_compile_8((&pattern__goto_5692_13[0] as *mut u8), (~(0 as c_ulong)), 0, (&mut errorcode__goto_5710_5 as *mut c_int), (&mut erroroffset__goto_5711_12 as *mut c_ulong), null))
+                (serialize_code__goto_6303_15 = pcre2_compile_8((&pattern__goto_5692_13[0] as *mut u8), (~(0 as c_ulong)), 0, (&raw mut errorcode__goto_5710_5 as *mut c_int), (&raw mut erroroffset__goto_5711_12 as *mut c_ulong), null))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -21241,7 +21241,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_serialize_encode_8(((&mut serialize_code__goto_6303_15 as *mut *mut pcre2_real_code_8) as *mut *const pcre2_real_code_8), 1, (&mut serialized_bytes__goto_6305_12 as *mut *mut u8), (&mut serialized_size__goto_6306_14 as *mut c_ulong), null))
+                (rc__goto_5681_5 = pcre2_serialize_encode_8(((&raw mut serialize_code__goto_6303_15 as *mut *mut pcre2_real_code_8) as *mut *const pcre2_real_code_8), 1, (&raw mut serialized_bytes__goto_6305_12 as *mut *mut u8), (&raw mut serialized_size__goto_6306_14 as *mut c_ulong), null))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -21479,11 +21479,11 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (multi_codes__goto_6363_17[0] = pcre2_compile_8((&pattern__goto_5692_13[0] as *mut u8), (~(0 as c_ulong)), 0, (&mut errorcode__goto_5710_5 as *mut c_int), (&mut erroroffset__goto_5711_12 as *mut c_ulong), null))
+                (multi_codes__goto_6363_17[0] = pcre2_compile_8((&pattern__goto_5692_13[0] as *mut u8), (~(0 as c_ulong)), 0, (&raw mut errorcode__goto_5710_5 as *mut c_int), (&raw mut erroroffset__goto_5711_12 as *mut c_ulong), null))
                 if (__goto_pending != 0) {
                     continue
                 }
-                (multi_codes__goto_6363_17[1] = pcre2_compile_8((&pattern__goto_5692_13[0] as *mut u8), (~(0 as c_ulong)), 0, (&mut errorcode__goto_5710_5 as *mut c_int), (&mut erroroffset__goto_5711_12 as *mut c_ulong), null))
+                (multi_codes__goto_6363_17[1] = pcre2_compile_8((&pattern__goto_5692_13[0] as *mut u8), (~(0 as c_ulong)), 0, (&raw mut errorcode__goto_5710_5 as *mut c_int), (&raw mut erroroffset__goto_5711_12 as *mut c_ulong), null))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -21516,7 +21516,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                (rc__goto_5681_5 = pcre2_serialize_encode_8((&multi_codes__goto_6363_17[0] as *mut *const pcre2_real_code_8), 2, (&mut multi_serialized_bytes__goto_6365_14 as *mut *mut u8), (&mut multi_serialized_size__goto_6366_16 as *mut c_ulong), null))
+                (rc__goto_5681_5 = pcre2_serialize_encode_8((&multi_codes__goto_6363_17[0] as *mut *const pcre2_real_code_8), 2, (&raw mut multi_serialized_bytes__goto_6365_14 as *mut *mut u8), (&raw mut multi_serialized_size__goto_6366_16 as *mut c_ulong), null))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -21557,7 +21557,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                with_memcpy(((&mut first_blocksize__goto_6367_25 as *mut c_ulong) as *i8), ((multi_serialized_bytes__goto_6365_14 + first_blocksize_offset__goto_6368_12) as *i8), (sizeof[c_ulong]() as i64))
+                with_memcpy(((&raw mut first_blocksize__goto_6367_25 as *mut c_ulong) as *i8), ((multi_serialized_bytes__goto_6365_14 + first_blocksize_offset__goto_6368_12) as *i8), (sizeof[c_ulong]() as i64))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -21638,7 +21638,7 @@ fn unittest_8() {
                 if (__goto_pending != 0) {
                     continue
                 }
-                pcre2_regfree((&mut test_preg__goto_5715_9 as *mut regex_t))
+                pcre2_regfree((&raw mut test_preg__goto_5715_9 as *mut regex_t))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -21994,7 +21994,7 @@ fn c_option(arg: *const i8) -> c_int {
         while true {
             match coptlist[i].type_ {
                 0 => {
-                    pcre2_config_(coptlist[i].value, (&mut optval as *mut c_uint))
+                    pcre2_config_(coptlist[i].value, (&raw mut optval as *mut c_uint))
 
                     var __ci_expr_ternary_1: *mut c_char = null
 
@@ -22015,13 +22015,13 @@ fn c_option(arg: *const i8) -> c_int {
 
                 },
                 2 => {
-                    pcre2_config_(coptlist[i].value, (&mut yield_ as *mut c_int))
+                    pcre2_config_(coptlist[i].value, (&raw mut yield_ as *mut c_int))
 
                     printf("%d\n", yield_)
 
                 },
                 3 => {
-                    pcre2_config_(coptlist[i].value, (&mut optval as *mut c_uint))
+                    pcre2_config_(coptlist[i].value, (&raw mut optval as *mut c_uint))
 
                     print_newline_config(optval, 1)
 
@@ -22067,7 +22067,7 @@ fn c_option(arg: *const i8) -> c_int {
 
     printf("Compiled with\n")
 
-    pcre2_config_(14, (&mut optval as *mut c_uint))
+    pcre2_config_(14, (&raw mut optval as *mut c_uint))
 
     if ((optval & 1) != 0) {
         printf("  8-bit support\n")
@@ -22081,7 +22081,7 @@ fn c_option(arg: *const i8) -> c_int {
         printf("  32-bit support\n")
     }
 
-    pcre2_config_(9, (&mut optval as *mut c_uint))
+    pcre2_config_(9, (&raw mut optval as *mut c_uint))
 
     if ((if optval != 0: 1 else: 0) != 0) {
         printf("  UTF and UCP support (")
@@ -22094,7 +22094,7 @@ fn c_option(arg: *const i8) -> c_int {
         printf("  No Unicode support\n")
     }
 
-    pcre2_config_(1, (&mut optval as *mut c_uint))
+    pcre2_config_(1, (&raw mut optval as *mut c_uint))
 
     if ((if optval != 0: 1 else: 0) != 0) {
         printf("  Just-in-time compiler support\n")
@@ -22146,11 +22146,11 @@ fn c_option(arg: *const i8) -> c_int {
 
     }
 
-    pcre2_config_(5, (&mut optval as *mut c_uint))
+    pcre2_config_(5, (&raw mut optval as *mut c_uint))
 
     print_newline_config(optval, 0)
 
-    pcre2_config_(0, (&mut optval as *mut c_uint))
+    pcre2_config_(0, (&raw mut optval as *mut c_uint))
 
     var __ci_expr_ternary_5: *mut c_char = null
 
@@ -22163,7 +22163,7 @@ fn c_option(arg: *const i8) -> c_int {
     printf("  \\R matches %s\n", __ci_expr_ternary_5)
 
 
-    pcre2_config_(13, (&mut optval as *mut c_uint))
+    pcre2_config_(13, (&raw mut optval as *mut c_uint))
 
     var __ci_expr_ternary_6: *mut c_char = null
 
@@ -22178,27 +22178,27 @@ fn c_option(arg: *const i8) -> c_int {
 
     printf("  Internal link size\n")
 
-    pcre2_config_(3, (&mut optval as *mut c_uint))
+    pcre2_config_(3, (&raw mut optval as *mut c_uint))
 
     printf("    Requested = %d\n", optval)
 
-    pcre2_config_(16, (&mut optval as *mut c_uint))
+    pcre2_config_(16, (&raw mut optval as *mut c_uint))
 
     printf("    Effective = %d\n", optval)
 
-    pcre2_config_(6, (&mut optval as *mut c_uint))
+    pcre2_config_(6, (&raw mut optval as *mut c_uint))
 
     printf("  Parentheses nest limit = %d\n", optval)
 
-    pcre2_config_(12, (&mut optval as *mut c_uint))
+    pcre2_config_(12, (&raw mut optval as *mut c_uint))
 
     printf("  Default heap limit = %d kibibytes\n", optval)
 
-    pcre2_config_(4, (&mut optval as *mut c_uint))
+    pcre2_config_(4, (&raw mut optval as *mut c_uint))
 
     printf("  Default match limit = %d\n", optval)
 
-    pcre2_config_(7, (&mut optval as *mut c_uint))
+    pcre2_config_(7, (&raw mut optval as *mut c_uint))
 
     printf("  Default depth limit = %d\n", optval)
 
@@ -22777,11 +22777,11 @@ fn main(__param_argc: c_int, argv: *mut *mut i8) -> c_int {
                 if (__goto_pending != 0) {
                     continue
                 }
-                patctl_zero((&mut def_patctl as *mut patctl))
+                patctl_zero((&raw mut def_patctl as *mut patctl))
                 if (__goto_pending != 0) {
                     continue
                 }
-                datctl_zero((&mut def_datctl as *mut datctl))
+                datctl_zero((&raw mut def_datctl as *mut datctl))
                 if (__goto_pending != 0) {
                     continue
                 }
@@ -23000,7 +23000,7 @@ fn main(__param_argc: c_int, argv: *mut *mut i8) -> c_int {
                     (__ci_expr_logic_2 = (if (if argc > 2: 1 else: 0) != 0: 1 else: 0))
                 }
                 if (__ci_expr_logic_2 != 0) {
-                    (uli__goto_3683_17 = strtoul((unsafe: argv[(op__goto_3644_10 +% 1)]), (&mut endptr__goto_3681_9 as *mut *mut c_char), 10))
+                    (uli__goto_3683_17 = strtoul((unsafe: argv[(op__goto_3644_10 +% 1)]), (&raw mut endptr__goto_3681_9 as *mut *mut c_char), 10))
                     (__ci_expr_logic_3 = (if (if (unsafe: *endptr__goto_3681_9) == 0: 1 else: 0) != 0: 1 else: 0))
                 }
                 if (__ci_expr_logic_3 != 0) {
@@ -23027,7 +23027,7 @@ fn main(__param_argc: c_int, argv: *mut *mut i8) -> c_int {
                     if (__goto_pending != 0) {
                         continue
                     }
-                    getrlimit(3, (&mut rlim_old__goto_3781_25 as *mut rlimit))
+                    getrlimit(3, (&raw mut rlim_old__goto_3781_25 as *mut rlimit))
                     if (__goto_pending != 0) {
                         continue
                     }
@@ -23085,7 +23085,7 @@ fn main(__param_argc: c_int, argv: *mut *mut i8) -> c_int {
                         (__ci_expr_logic_6 = (if (if rlim__goto_3781_19.rlim_cur > rlim_old__goto_3781_25.rlim_cur: 1 else: 0) != 0: 1 else: 0))
                     }
                     if (__ci_expr_logic_6 != 0) {
-                        (rc__goto_3779_9 = setrlimit(3, (&mut rlim__goto_3781_19 as *mut rlimit)))
+                        (rc__goto_3779_9 = setrlimit(3, (&raw mut rlim__goto_3781_19 as *mut rlimit)))
                     }
                     if (__goto_pending != 0) {
                         continue
@@ -23330,7 +23330,7 @@ fn main(__param_argc: c_int, argv: *mut *mut i8) -> c_int {
                     }
                     var __ci_expr_logic_12: c_int = 0
                     if ((if argc > 2: 1 else: 0) != 0) {
-                        (uli__goto_3683_17 = strtoul((unsafe: argv[(op__goto_3644_10 +% 1)]), (&mut endptr__goto_3681_9 as *mut *mut c_char), 10))
+                        (uli__goto_3683_17 = strtoul((unsafe: argv[(op__goto_3644_10 +% 1)]), (&raw mut endptr__goto_3681_9 as *mut *mut c_char), 10))
                         (__ci_expr_logic_12 = (if (if (unsafe: *endptr__goto_3681_9) == 0: 1 else: 0) != 0: 1 else: 0))
                     }
                     if (__ci_expr_logic_12 != 0) {
@@ -23879,7 +23879,7 @@ fn main(__param_argc: c_int, argv: *mut *mut i8) -> c_int {
                 (__goto_pending = 0)
                 if ((if arg_error__goto_3652_7 != null: 1 else: 0) != 0) {
                     while true {
-                        (li__goto_3963_8 = strtol(arg_error__goto_3652_7, (&mut endptr__goto_3962_9 as *mut *mut c_char), 10))
+                        (li__goto_3963_8 = strtol(arg_error__goto_3652_7, (&raw mut endptr__goto_3962_9 as *mut *mut c_char), 10))
                         if (__goto_pending != 0) {
                             break
                         }
@@ -23971,14 +23971,14 @@ fn main(__param_argc: c_int, argv: *mut *mut i8) -> c_int {
                 var __ci_expr_logic_22: c_int
                 var __ci_expr_logic_20: c_int = 0
                 if ((if arg_pattern__goto_3651_7 != null: 1 else: 0) != 0) {
-                    (__ci_expr_logic_20 = (if (if not (decode_modifiers((arg_pattern__goto_3651_7 as *mut u8), CTX_DEFPAT, (&mut def_patctl as *mut patctl), null) != 0): 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_20 = (if (if not (decode_modifiers((arg_pattern__goto_3651_7 as *mut u8), CTX_DEFPAT, (&raw mut def_patctl as *mut patctl), null) != 0): 1 else: 0) != 0: 1 else: 0))
                 }
                 if (__ci_expr_logic_20 != 0) {
                     (__ci_expr_logic_22 = (if true: 1 else: 0))
                 } else {
                     var __ci_expr_logic_21: c_int = 0
                     if ((if arg_subject__goto_3650_7 != null: 1 else: 0) != 0) {
-                        (__ci_expr_logic_21 = (if (if not (decode_modifiers((arg_subject__goto_3650_7 as *mut u8), CTX_DEFDAT, null, (&mut def_datctl as *mut datctl)) != 0): 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_21 = (if (if not (decode_modifiers((arg_subject__goto_3650_7 as *mut u8), CTX_DEFDAT, null, (&raw mut def_datctl as *mut datctl)) != 0): 1 else: 0) != 0: 1 else: 0))
                     }
                     (__ci_expr_logic_22 = (if __ci_expr_logic_21 != 0: 1 else: 0))
                 }
@@ -24231,7 +24231,7 @@ fn main(__param_argc: c_int, argv: *mut *mut i8) -> c_int {
                     if (__ci_expr_logic_37 != 0) {
                         if ((if (unsafe: *p_notsp__goto_4052_18) == 0: 1 else: 0) != 0) {
                             if ((if preg.re_pcre2_code != null: 1 else: 0) != 0) {
-                                pcre2_regfree((&mut preg as *mut regex_t))
+                                pcre2_regfree((&raw mut preg as *mut regex_t))
                                 if (__goto_pending != 0) {
                                     break
                                 }
@@ -24454,7 +24454,7 @@ fn main(__param_argc: c_int, argv: *mut *mut i8) -> c_int {
                     continue
                 }
                 if ((if preg.re_pcre2_code != null: 1 else: 0) != 0) {
-                    pcre2_regfree((&mut preg as *mut regex_t))
+                    pcre2_regfree((&raw mut preg as *mut regex_t))
                 }
                 if (__goto_pending != 0) {
                     continue
