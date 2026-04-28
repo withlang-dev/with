@@ -5890,6 +5890,21 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
                 if (deref_tk == TypeKind.TY_PTR or deref_tk == TypeKind.TY_REF) and self.get_type_d1(deref_ty) == 0:
                     self.emit_builtin_mutable_receiver_error(type_name_sym, field, node)
                     return 0
+        // docs/mut.md Rev 8 §5.1 — user-defined methods declared with
+        // `mut self: Self` require a mutable place receiver. Warnings during
+        // P7..P11; promoted to errors at P12 lockdown. Builtins are already
+        // handled above via the hardcoded list.
+        if self.method_has_mut_self_flag(type_name_sym, field) != 0:
+            let recv_packed = self.classify_place(expr)
+            let recv_kind = unpack_place_kind(recv_packed)
+            let recv_mut_state = unpack_place_mut(recv_packed)
+            // Receiver auto-deref through &T or *const T produces a read-only
+            // place (§2.3) regardless of the binding's mutability.
+            let recv_via_ro_ref = self.place_base_is_read_only_ref(expr)
+            if recv_kind == PlaceKind.PK_NotPlace:
+                self.emit_warning("mutating method requires a place receiver (§15.3)", node)
+            else if recv_mut_state == PlaceMut.PM_ReadOnly or recv_via_ro_ref != 0:
+                self.emit_warning("cannot call mutating method through a read-only place (§15.2)", node)
 
     // Static enum variant constructor: Shape.Rect(1, 2), Option[i32].Some(1)
     if self.static_receiver_type_is_known(expr) != 0 and self.enum_has_variant(obj_type, field) != 0:
@@ -7462,6 +7477,28 @@ fn Sema.lookup_method_fn(self: Sema, type_sym: i32, method_sym: i32) -> i32:
     if self.method_lookup.fn_lookup.contains(key):
         return self.method_lookup.fn_lookup.get(key).unwrap()
     0
+
+// docs/mut.md Rev 8 §5.1 — returns 1 when the resolved (concrete) method
+// for `type_sym.method_sym` was declared with `mut self: Self` (the parser
+// records this via FN_PARAM_FLAG_MUT_SELF on the first param). Used by
+// check_method_call to warn when a mutating receiver is invoked on a
+// non-place or read-only-place receiver.
+fn Sema.method_has_mut_self_flag(self: Sema, type_sym: i32, method_sym: i32) -> i32:
+    let fn_sym = self.lookup_method_fn(type_sym, method_sym)
+    if fn_sym == 0:
+        return 0
+    if not self.fn_decl_nodes.contains(fn_sym):
+        return 0
+    let fn_node = self.fn_decl_nodes.get(fn_sym).unwrap()
+    let meta = self.ast.find_fn_meta(fn_node)
+    if meta < 0:
+        return 0
+    let pc = self.ast.fn_meta_param_count(meta)
+    if pc == 0:
+        return 0
+    let ps = self.ast.fn_meta_param_start(meta)
+    let pflags = self.ast.fn_param_flags(ps, 0)
+    fn_param_is_mut_self(pflags)
 
 fn Sema.get_type_name(self: Sema, tid: TypeId) -> i32:
     let resolved = self.resolve_alias(tid)
