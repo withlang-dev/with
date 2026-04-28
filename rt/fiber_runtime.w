@@ -39,9 +39,9 @@ fn fiber_report_unhandled_panics() -> i32:
         var panic_msg: *const u8 = 0 as *const u8
         var panic_msg_len: i32 = 0
         if with_runtime_take_panicked_fiber(
-            &mut fiber_id as *mut i32,
-            &mut panic_msg as *mut *const u8,
-            &mut panic_msg_len as *mut i32
+            &raw mut fiber_id as *mut i32,
+            &raw mut panic_msg as *mut *const u8,
+            &raw mut panic_msg_len as *mut i32
         ) == 0:
             return had_unhandled
 
@@ -106,7 +106,7 @@ pub fn fiber_await(fiber_id: i32):
         var panic_msg: *const u8 = 0 as *const u8
         var panic_msg_len: i32 = 0
         var cancelled_return: i32 = 0
-        if with_runtime_take_completed_fiber(fiber_id, &mut panic_msg as *mut *const u8, &mut panic_msg_len as *mut i32, &mut cancelled_return as *mut i32) != 0:
+        if with_runtime_take_completed_fiber(fiber_id, &raw mut panic_msg as *mut *const u8, &raw mut panic_msg_len as *mut i32, &raw mut cancelled_return as *mut i32) != 0:
             last_await_fiber_id = fiber_id
             last_await_cancelled_return = cancelled_return
             if panic_msg as i64 != 0 and panic_msg_len > 0:
@@ -134,7 +134,7 @@ pub fn fiber_cleanup_await(fiber_id: i32):
         var panic_msg: *const u8 = 0 as *const u8
         var panic_msg_len: i32 = 0
         var cancelled_return: i32 = 0
-        if with_runtime_take_completed_fiber(fiber_id, &mut panic_msg as *mut *const u8, &mut panic_msg_len as *mut i32, &mut cancelled_return as *mut i32) != 0:
+        if with_runtime_take_completed_fiber(fiber_id, &raw mut panic_msg as *mut *const u8, &raw mut panic_msg_len as *mut i32, &raw mut cancelled_return as *mut i32) != 0:
             last_await_fiber_id = fiber_id
             last_await_cancelled_return = cancelled_return
             if panic_msg as i64 != 0 and panic_msg_len > 0:

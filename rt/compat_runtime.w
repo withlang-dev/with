@@ -70,7 +70,7 @@ fn str_to_c_buf(s: str) -> *mut u8:
 
 fn restore_default_signal_handler(signo: i32):
     var sa: [16]u8 = [0 as u8; 16]
-    let sa_base = (&mut sa) as *mut [16]u8 as i64
+    let sa_base = (&raw mut sa) as *mut [16]u8 as i64
     with_memset(sa_base as *mut u8, 0, SIGACTION_SIZE)
     let _ = sigaction(signo, sa_base as *const u8, 0 as *mut u8)
 
@@ -89,7 +89,7 @@ fn restore_signal_mask(prev_mask: *const u32):
 fn wait_for_child_process(pid: i32) -> i32:
     var status: i32 = -1
     while true:
-        let waited = waitpid(pid, &mut status, 0)
+        let waited = waitpid(pid, &raw mut status, 0)
         if waited == pid:
             let termsig = status & 0x7f
             if termsig == 0:
@@ -105,7 +105,7 @@ fn wait_for_child_process(pid: i32) -> i32:
 
 fn run_shell_command(cmd: *const u8) -> i32:
     var prev_mask: u32 = 0 as u32
-    let mask_rc = block_interrupt_signals(&mut prev_mask)
+    let mask_rc = block_interrupt_signals(&raw mut prev_mask)
     let pid = fork()
     if pid == 0:
         if mask_rc == 0:
@@ -159,7 +159,7 @@ pub fn setenv_str(name: str, value: str) -> i32:
 @[c_export("with_install_interrupt_handlers")]
 pub fn install_interrupt_handlers():
     var sa: [16]u8 = [0 as u8; 16]
-    let sa_base = (&mut sa) as *mut [16]u8 as i64
+    let sa_base = (&raw mut sa) as *mut [16]u8 as i64
     with_memset(sa_base as *mut u8, 0, SIGACTION_SIZE)
     store_i64(sa_base, SIGACTION_OFF_HANDLER, interrupt_signal_handler as i64)
     let _ = sigaction(SIGINT, sa_base as *const u8, 0 as *mut u8)
@@ -169,7 +169,7 @@ pub fn install_interrupt_handlers():
 @[c_export("with_raise_stack_limit")]
 pub fn raise_stack_limit():
     var lim: [16]u8 = [0 as u8; 16]
-    let lim_base = (&mut lim) as *mut [16]u8 as i64
+    let lim_base = (&raw mut lim) as *mut [16]u8 as i64
     if getrlimit(RLIMIT_STACK, lim_base as *mut u8) != 0:
         return
     var want: u64 = (64 * 1024 * 1024) as u64

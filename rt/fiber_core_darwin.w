@@ -97,28 +97,28 @@ var panicked_fiber_count: i32 = 0
 var fiber_alt_stack_buf: [131072]u8 = [0 as u8; 131072]
 
 fn scheduler_ctx_ptr() -> *mut u8:
-    (&mut scheduler_ctx) as *mut [168]u8 as *mut u8
+    (&raw mut scheduler_ctx) as *mut [168]u8 as *mut u8
 
 fn alt_stack_ptr() -> *mut u8:
-    (&mut fiber_alt_stack_buf) as *mut [131072]u8 as *mut u8
+    (&raw mut fiber_alt_stack_buf) as *mut [131072]u8 as *mut u8
 
 fn ready_queue_base() -> i64:
-    (&mut ready_queue) as *mut [1024]i64 as i64
+    (&raw mut ready_queue) as *mut [1024]i64 as i64
 
 fn steal_queue_base() -> i64:
-    (&mut steal_queue) as *mut [1024]i64 as i64
+    (&raw mut steal_queue) as *mut [1024]i64 as i64
 
 fn fibers_by_slot_base() -> i64:
-    (&mut fibers_by_slot) as *mut [1024]i64 as i64
+    (&raw mut fibers_by_slot) as *mut [1024]i64 as i64
 
 fn fiber_slot_generations_base() -> i64:
-    (&mut fiber_slot_generations) as *mut [1024]u32 as i64
+    (&raw mut fiber_slot_generations) as *mut [1024]u32 as i64
 
 fn free_fiber_slots_base() -> i64:
-    (&mut free_fiber_slots) as *mut [1024]i32 as i64
+    (&raw mut free_fiber_slots) as *mut [1024]i32 as i64
 
 fn panicked_fiber_ids_base() -> i64:
-    (&mut panicked_fiber_ids) as *mut [1024]i32 as i64
+    (&raw mut panicked_fiber_ids) as *mut [1024]i32 as i64
 
 fn load_i32_index(base: i64, index: i32) -> i32:
     unsafe:
@@ -460,14 +460,14 @@ pub fn fiber_stack_overflow_handler(sig: i32, info: *const u8, ucontext: *mut u8
                 _exit(134)
 
     var sa: [16]u8 = [0 as u8; 16]
-    let sa_base = (&mut sa) as *mut [16]u8 as i64
+    let sa_base = (&raw mut sa) as *mut [16]u8 as i64
     with_memset(sa_base as *mut u8, 0, SIGACTION_SIZE)
     let _ = sigaction(sig, sa_base as *const u8, 0 as *mut u8)
     let _ = raise(sig)
 
 fn fiber_install_signal_handlers():
     var ss: [24]u8 = [0 as u8; 24]
-    let ss_base = (&mut ss) as *mut [24]u8 as i64
+    let ss_base = (&raw mut ss) as *mut [24]u8 as i64
     with_memset(ss_base as *mut u8, 0, STACK_T_SIZE)
     store_i64(ss_base, STACK_T_OFF_SP, alt_stack_ptr() as i64)
     store_i64(ss_base, STACK_T_OFF_SIZE, FIBER_ALT_STACK_SIZE)
@@ -475,7 +475,7 @@ fn fiber_install_signal_handlers():
     let _ = sigaltstack(ss_base as *const u8, 0 as *mut u8)
 
     var sa: [16]u8 = [0 as u8; 16]
-    let sa_base = (&mut sa) as *mut [16]u8 as i64
+    let sa_base = (&raw mut sa) as *mut [16]u8 as i64
     with_memset(sa_base as *mut u8, 0, SIGACTION_SIZE)
     store_i64(sa_base, SIGACTION_OFF_HANDLER, fiber_stack_overflow_handler as i64)
     store_i32(sa_base, SIGACTION_OFF_FLAGS, SA_SIGINFO | SA_ONSTACK)

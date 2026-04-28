@@ -2414,7 +2414,7 @@ pub fn sysinfo_arch() -> str:
 @[c_export("with_sysinfo_hostname")]
 pub fn sysinfo_hostname() -> str:
     var buf: [256]u8 = [0 as u8; 256]
-    let buf_ptr = (&mut buf) as *mut [256]u8 as *mut u8
+    let buf_ptr = (&raw mut buf) as *mut [256]u8 as *mut u8
     if gethostname(buf_ptr, 256 as u64) != 0:
         return make_str("unknown" as *const u8, 7)
     buf[255] = 0
