@@ -272,6 +272,11 @@ type Sema {
     task_fns: HashMap[i32, i32],
     fn_stack_sizes: HashMap[i32, i32],
     mutable_global_syms: HashMap[i32, i32],
+    // docs/mut.md Rev 8 §12 / §15.12 — symbols declared via `global X = ...`
+    // (stable) recorded here. Used by check_assign to emit a specific
+    // diagnostic on rebind attempts. `global var X = ...` does NOT register
+    // here — it's rebindable.
+    stable_global_syms: HashMap[i32, i32],
     global_value_decl_kinds: HashMap[i32, i32],
 
     // Hot intrinsic symbols used in semantic dispatch paths.
@@ -649,6 +654,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let task_fns = sema_new_map_i32_i32()
     let fn_stack_sizes = sema_new_map_i32_i32()
     let mutable_global_syms = sema_new_map_i32_i32()
+    let stable_global_syms = sema_new_map_i32_i32()
     let global_value_decl_kinds = sema_new_map_i32_i32()
     let method_impl_nodes = sema_new_map_i32_i32()
     let method_decl_origins = sema_new_map_i32_i32()
@@ -741,6 +747,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         task_fns,
         fn_stack_sizes,
         mutable_global_syms,
+        stable_global_syms,
         global_value_decl_kinds,
         syms: sema_builtin_symbols_zero(),
         method_impl_nodes,
@@ -2086,6 +2093,12 @@ fn Sema.scope_has(self: Sema, sym: i32) -> i32:
 
 fn Sema.is_mutable_global(self: Sema, sym: i32) -> i32:
     if self.mutable_global_syms.contains(sym): return 1
+    0
+
+// docs/mut.md Rev 8 §15.12 — declared via `global X = ...`, no `var`.
+// Rebinding such a symbol is the §15.12 diagnostic.
+fn Sema.is_stable_global(self: Sema, sym: i32) -> i32:
+    if self.stable_global_syms.contains(sym): return 1
     0
 
 fn Sema.is_active_async_scope_symbol(self: Sema, sym: i32) -> i32:

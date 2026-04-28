@@ -10,6 +10,7 @@
 
 global G_STABLE: i32 = 7
 global var g_counter: i32 = 0
+global var g_rebindable: i32 = 0
 
 type Counter { value: i32 }
 
@@ -82,6 +83,21 @@ fn test_nll_last_use_after_loop:
     xs.push(2)          // OK — no future uses of r
     assert(xs.len() == 3)
 
+fn test_global_var_rebind:
+    // §12 — `global var` is rebindable; rebinds compile cleanly.
+    g_rebindable = 5
+    assert(g_rebindable == 5)
+    g_rebindable = 11
+    assert(g_rebindable == 11)
+
+fn test_method_call_normal:
+    // §15.4 — `Vec.push` as a value is rejected; ordinary method-call
+    // dispatch on a mutable place works as expected.
+    let xs: Vec[i32] = Vec.new()
+    xs.push(7)
+    xs.push(11)
+    assert(xs.len() == 2)
+
 fn main:
     test_globals()
     test_mut_self_receiver()
@@ -90,4 +106,6 @@ fn main:
     test_nll_last_use_in_block()
     test_nll_last_use_in_nested_if()
     test_nll_last_use_after_loop()
+    test_global_var_rebind()
+    test_method_call_normal()
     print("ok")

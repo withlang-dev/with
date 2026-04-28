@@ -1362,7 +1362,7 @@ fn MirBuilder.try_resolve_module_const_type(self: MirBuilder, sym: i32) -> i32:
         if self.sema.typed_binding_types.contains(decl as i32):
             return self.sema.typed_binding_types.get(decl as i32).unwrap() as i32
         let flags = self.ast.get_data2(decl)
-        let type_extra_packed = flags / 4
+        let type_extra_packed = flags / 16
         if type_extra_packed > 0:
             let type_ann_node = self.ast.get_extra(type_extra_packed - 1)
             let resolved = self.sema.resolve_type_expr(type_ann_node) as i32
@@ -1660,7 +1660,7 @@ fn MirBuilder.ensure_global_local(self: MirBuilder, sym: i32) -> i32:
         // Prefer an explicit type annotation. Otherwise infer from the
         // unwrapped initializer expression instead of the raw comptime wrapper.
         var gty = 0
-        let type_extra_packed = flags / 4
+        let type_extra_packed = flags / 16
         if type_extra_packed > 0:
             let type_node = self.ast.get_extra(type_extra_packed - 1)
             let annotated = self.sema.resolve_type_expr(type_node) as i32

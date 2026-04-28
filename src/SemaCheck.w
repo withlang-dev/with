@@ -2476,7 +2476,15 @@ fn Sema.check_assign(self: Sema, node: i32) -> i32:
         let target_sym = self.ast.get_data0(target)
         if self.scope_has(target_sym) != 0:
             if self.scope_lookup_mut(target_sym) == 0:
-                self.emit_error("cannot assign to immutable variable", node)
+                // docs/mut.md Rev 8 §15.12 — when the immutable binding is
+                // a stable global (`global X = ...`), emit the more
+                // specific diagnostic suggesting `global var` for
+                // rebindability.
+                if self.is_stable_global(target_sym) != 0:
+                    let gn = self.pool_resolve(target_sym)
+                    self.emit_error("cannot rebind global `" ++ gn ++ "`; declared as `global` (stable). Use `global var " ++ gn ++ " = ...` to allow rebinding, or mutate the existing value (§15.12)", node)
+                else:
+                    self.emit_error("cannot assign to immutable variable", node)
     else:
         // docs/mut.md Rev 8 §6 — assignment LHS must be a mutable place.
         // Already covered above for plain identifiers via binding-mut. For
@@ -2695,6 +2703,21 @@ fn Sema.check_field_access(self: Sema, node: i32) -> i32:
             let static_named = self.lookup_named_type_visible(static_type_sym)
             if static_named != 0:
                 obj_type = static_named as TypeId
+        // docs/mut.md Rev 8 §5.3 / §15.4 — `Vec.push` (etc.) parsed as a
+        // first-class value expression. Method calls dispatch through
+        // check_method_call, which never invokes check_field_access on the
+        // callee node. Reaching this point with a static-type base means
+        // the field-access is being USED AS A VALUE — i.e., as a method
+        // reference. Reject when the resolved method is mutating.
+        // Helper: closure-wrap the call:
+        //     let f = (xs, value) => xs.push(value)
+        let static_owner_sym = self.method_owner_symbol_for_type(obj_type as i32)
+        if static_owner_sym != 0:
+            let mutating = self.method_has_mut_self_flag(static_owner_sym, field) != 0 or self.builtin_method_requires_mutable_receiver(static_owner_sym, field) != 0
+            if mutating:
+                let owner_name = self.pool_resolve(static_type_sym)
+                let method_name = self.pool_resolve(field)
+                self.emit_warning("cannot reference mutating method `" ++ owner_name ++ "." ++ method_name ++ "` as a first-class function value (§15.4); wrap in a closure: `(x, ...) => x." ++ method_name ++ "(...)`", node)
 
     if obj_type == 0:
         return 0
