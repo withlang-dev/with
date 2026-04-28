@@ -31,10 +31,10 @@ pub fn hasher -> Hasher:
 pub fn default_hasher -> DefaultHasher:
     hasher()
 
-fn Hasher.update_i64(self: &mut Hasher, value: i64) -> void:
+fn Hasher.update_i64(mut self: Hasher, value: i64) -> void:
     self.state = combine(self.state, value)
 
-fn Hasher.update_str(self: &mut Hasher, s: str) -> void:
+fn Hasher.update_str(mut self: Hasher, s: str) -> void:
     var i: i64 = 0
     while i < s.len():
         self.state = combine(self.state, s[i])

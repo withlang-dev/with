@@ -82,7 +82,7 @@ fn https_get(url: str) -> str:
     var host: str = ""
     var path: str = "/"
     var port: i32 = 443
-    http_parse_url(url, &mut host as *mut str, &mut path as *mut str, &mut port as *mut i32)
+    http_parse_url(url, &raw mut host, &raw mut path, &raw mut port)
 
     if host.len() == 0:
         return ""
@@ -94,7 +94,7 @@ fn https_get(url: str) -> str:
     let req = http_build_get(host, path)
     let req_p = req as *const u8
     let req_len = req.len() as i32
-    let sent = unsafe: tls_send(&mut conn as *mut TlsConn, req_p, req_len)
+    let sent = unsafe: tls_send(&raw mut conn, req_p, req_len)
     if sent < 0:
         socket_close(conn.fd)
         return ""
@@ -104,13 +104,13 @@ fn https_get(url: str) -> str:
     var done = false
     while not done:
         var buf: [u8; 4096] = [0u8; 4096]
-        let n = unsafe: tls_recv(&mut conn as *mut TlsConn, &mut buf[0] as *mut u8, 4096)
+        let n = unsafe: tls_recv(&raw mut conn, &raw mut buf[0], 4096)
         if n <= 0:
             done = true
         else:
             // Convert buf to str and append
             var chunk_s: str = ""
-            let sp = &mut chunk_s as *mut u8
+            let sp = &raw mut chunk_s as *mut u8
             unsafe:
                 *(sp as *mut u64) = &buf[0] as u64
                 *((sp + 8u64) as *mut i64) = n as i64
