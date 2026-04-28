@@ -1771,10 +1771,11 @@ fn Parser.parse_c_import(self: Parser, start: i32) -> NodeId:
 
 fn Parser.parse_top_level_let(self: Parser, is_pub: i32, start: i32) -> NodeId:
     // docs/mut.md Rev 8 §12 — `global` (stable) and `global var` (rebindable)
-    // are module-level place declarations. During the bridge phase (P1..P11)
-    // they desugar to existing NK_LET_DECL with the same mutability semantics
-    // as `let`/`var`; the GLOBAL marker is metadata that later phases will
-    // store explicitly. Plain top-level `let`/`var` remain accepted.
+    // are module-level place declarations. The GLOBAL / GLOBAL_VAR markers
+    // are stored in NK_LET_DECL.d2 bits 2 and 3 (see Ast.w LET_FLAG_GLOBAL /
+    // LET_FLAG_GLOBAL_VAR). Plain top-level `let`/`var` (without `global`)
+    // leave those bits clear; sema's check_assign treats stable globals as
+    // non-rebindable per §15.12.
     let is_global = self.peek() == TokenKind.TK_KW_GLOBAL
     if is_global:
         self.advance()  // consume 'global'
@@ -1798,15 +1799,20 @@ fn Parser.parse_top_level_let(self: Parser, is_pub: i32, start: i32) -> NodeId:
         self.advance()
         type_ann = self.parse_type_expr()
 
+    let global_bits = if is_global:
+        if is_var: LET_FLAG_GLOBAL_VAR else: LET_FLAG_GLOBAL
+    else: 0
+
     // var x: T (no initializer) — zero-initialized
     if self.peek() != TokenKind.TK_EQ:
         if is_mut and type_ann != 0:
             var flags = 1  // mut
             if is_pub == Visibility.Public:
                 flags = flags + 2
+            flags = flags + global_bits
             let type_extra = self.pool.extra_len()
             self.pool.add_extra(type_ann)
-            flags = flags + (type_extra + 1) * 4
+            flags = flags + (type_extra + 1) * 16
             return self.pool.add_node(NodeKind.NK_LET_DECL, start, self.prev_end(), name, 0, flags)
         if not is_mut:
             self.emit_error("let binding requires initializer")
@@ -1825,11 +1831,12 @@ fn Parser.parse_top_level_let(self: Parser, is_pub: i32, start: i32) -> NodeId:
         flags = flags + 1
     if is_pub == Visibility.Public:
         flags = flags + 2
+    flags = flags + global_bits
     if type_ann != 0:
         let type_extra = self.pool.extra_len()
         self.pool.add_extra(type_ann)
-        // Keep lower 2 bits for mut/pub; encode optional type at bit 2+.
-        flags = flags + (type_extra + 1) * 4
+        // Lower 4 bits: mut, pub, GLOBAL, GLOBAL_VAR. Type-extra at bit 4+.
+        flags = flags + (type_extra + 1) * 16
 
     self.pool.add_node(NodeKind.NK_LET_DECL, start, self.prev_end(), name, value, flags)
 

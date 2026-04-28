@@ -1157,7 +1157,7 @@ fn Sema.register_method_sig_alias(self: Sema, node: i32, fn_sym: i32, sig_idx: i
     self.method_symbol_flags.insert(fn_sym, 1)
 
 fn Sema.top_level_let_type_ann_extra(self: Sema, flags: i32) -> i32:
-    let packed = flags / 4
+    let packed = flags / 16
     if packed <= 0:
         return -1
     packed - 1
@@ -1179,6 +1179,11 @@ fn Sema.collect_let_decl(self: Sema, node: i32, is_local: i32):
     let is_mut = flags % 2
     if is_mut != 0:
         self.mutable_global_syms.insert(name, 1)
+    // docs/mut.md Rev 8 §12 / §15.12 — register stable globals so
+    // check_assign can emit the §15.12 diagnostic on rebind attempts
+    // with a more helpful message than the generic immutable-binding error.
+    if let_decl_is_global(flags) != 0 and let_decl_is_global_var(flags) == 0:
+        self.stable_global_syms.insert(name, 1)
     var bind_ty: TypeId = 0 as TypeId
     let type_extra = self.top_level_let_type_ann_extra(flags)
     if type_extra >= 0:

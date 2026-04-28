@@ -1024,7 +1024,7 @@ fn type_decl_is_pub(pool: AstPool, extra_start: i32, sub_kind: i32) -> bool:
     return pool.get_extra(extra_start + 1) == Visibility.Public
 
 fn top_level_let_type_ann(pool: AstPool, flags: i32) -> i32:
-    let encoded = flags / 4
+    let encoded = flags / 16
     if encoded > 0:
         return pool.get_extra(encoded - 1)
     0

@@ -225,6 +225,23 @@ fn fn_param_is_implicit(flags: i32) -> i32:
 fn fn_param_is_mut_self(flags: i32) -> i32:
     (flags / FN_PARAM_FLAG_MUT_SELF) % 2
 
+// docs/mut.md Rev 8 §12 — module-level place declarations.
+// NK_LET_DECL flags layout:
+//   bit 0 (mask 1):  is_mut (var vs let)
+//   bit 1 (mask 2):  is_pub
+//   bit 2 (mask 4):  LET_FLAG_GLOBAL     — declared via `global`
+//   bit 3 (mask 8):  LET_FLAG_GLOBAL_VAR — declared via `global var`
+//   bits 4+       :  (type_extra index + 1) * 16   (0 means no type)
+// Plain top-level `let`/`var` (without `global`) leave bits 2/3 clear.
+const LET_FLAG_GLOBAL: i32 = 4
+const LET_FLAG_GLOBAL_VAR: i32 = 8
+
+fn let_decl_is_global(flags: i32) -> i32:
+    (flags / LET_FLAG_GLOBAL) % 2
+
+fn let_decl_is_global_var(flags: i32) -> i32:
+    (flags / LET_FLAG_GLOBAL_VAR) % 2
+
 // Visibility flags
 enum Visibility: i32:
     Private = 0

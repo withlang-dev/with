@@ -852,7 +852,7 @@ fn Codegen.try_resolve_vec_new_global_type(self: Codegen, value_node: i32, flags
     if not recv_is_vec:
         return 0
 
-    let type_extra_packed = flags / 4
+    let type_extra_packed = flags / 16
     if type_extra_packed > 0:
         let type_ann_node = self.pool.get_extra(type_extra_packed - 1)
         let annotated = self.sema.resolve_type_expr(type_ann_node)
