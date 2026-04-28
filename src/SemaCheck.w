@@ -134,6 +134,11 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> TypeId:
     if kind == NodeKind.NK_TYPE_REF:
         let pointee = self.resolve_type_expr(self.ast.get_data0(node))
         let is_mut = self.ast.get_data1(node)
+        // docs/mut.md Rev 8 §15.1 — at P12 lockdown, reject `&mut T` in
+        // type position. Use `mut self: Self`, `*mut T` (FFI), or
+        // owned-by-value parameters per the migration guide §16.
+        if STRICT_NO_MUT_REF != 0 and is_mut != 0:
+            self.emit_error("`&mut T` is not part of safe With (§15.1); use mut self / *mut T (unsafe) / owned-by-value parameter", node)
         return self.ensure_exact_type(TypeKind.TY_REF, pointee as i32, is_mut, 0)
 
     if kind == NodeKind.NK_TYPE_FN:
