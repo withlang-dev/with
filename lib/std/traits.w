@@ -48,9 +48,15 @@ pub trait ScopedMut =
     fn enter(self) -> Self
     fn exit(self) -> void
 
-/// Iterator protocol. Call `.next()` to get `Option[T]` — `Some(val)` or `None`.
+/// Iterator protocol. Call `.next()` to advance the iterator and return
+/// `Option[T]` — `Some(val)` or `None`. The receiver is `mut self: Self`
+/// (docs/mut.md Rev 8 §11.1) — the iterator's place is mutated in-place
+/// without consuming it, so an iterator bound to a local can be reused
+/// across calls. During the bridge phase (P1..P11), `mut self: Self` and
+/// consuming `self` produce the same MIR; existing impls written either
+/// way continue to satisfy this trait.
 pub trait Iter[T] =
-    fn next(self) -> Option[T]
+    fn next(mut self: Self) -> Option[T]
 
 /// Conversion to iterator. Enables `for x in collection.iter()`.
 pub trait IntoIter[T] =
@@ -130,3 +136,22 @@ impl Hash for str =
 pub trait MultiIndex =
     fn multi_index(self: &Self, specs: &[IndexSpec], count: i32) -> Self
     fn multi_index_set(self: &mut Self, specs: &[IndexSpec], count: i32, value: Self)
+
+/// Single-axis read-only indexing (docs/mut.md Rev 8 §2.4).
+/// `P[i]` on an `IndexGet`-only type returns a value, not a place — the
+/// expression cannot appear on the LHS of an assignment, take a `&raw mut`,
+/// or be a mutating-receiver target.
+pub trait IndexGet[I, V] =
+    fn get(self: &Self, index: I) -> V
+
+/// Place-projection indexing (docs/mut.md Rev 8 §2.4).
+/// `IndexPlace` is a compiler-recognized syntax trait: implementations
+/// grant the compiler permission to treat `P[i]` as a place projection of
+/// `P`. The compiler lowers reads, writes, and scoped access directly on
+/// the underlying storage so that nested place mutation
+/// (`xs[i].field = v`, `xs[i].method()`) does not copy the indexed element
+/// out and back. The exact contract is implementation-defined and may
+/// evolve; the minimal operational shape is value-read + value-write.
+pub trait IndexPlace[I, V] =
+    fn get(self: &Self, index: I) -> V
+    fn set(mut self: Self, index: I, value: V)
