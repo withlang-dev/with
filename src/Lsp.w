@@ -239,7 +239,7 @@ unsafe fn jsmn_parse(parser: *mut JsonParser, js: str, len: i32, tokens: *mut Js
 
 fn lsp_json_parse(js: str, tokens: *mut JsonToken, num_tokens: i32) -> i32:
     var parser = JsonParser { pos: 0, toknext: 0, toksuper: -1 }
-    unsafe: jsmn_parse(&mut parser as *mut JsonParser, js, js.len() as i32, tokens, num_tokens)
+    unsafe: jsmn_parse(&raw mut parser as *mut JsonParser, js, js.len() as i32, tokens, num_tokens)
 
 fn json_tok_str(js: str, tokens: *mut JsonToken, idx: i32) -> str:
     if idx < 0:
@@ -2019,7 +2019,7 @@ fn run_lsp() -> i32:
             let uri = lsp_extract_uri(msg, tokens, params_idx)
             var line: i32 = 0
             var character: i32 = 0
-            lsp_extract_position(msg, tokens, params_idx, &mut line as *mut i32, &mut character as *mut i32)
+            lsp_extract_position(msg, tokens, params_idx, &raw mut line as *mut i32, &raw mut character as *mut i32)
             let idx = state.find_doc(uri)
             if idx >= 0:
                 let doc = state.documents.get(idx as i64)
@@ -2031,7 +2031,7 @@ fn run_lsp() -> i32:
             let uri = lsp_extract_uri(msg, tokens, params_idx)
             var line: i32 = 0
             var character: i32 = 0
-            lsp_extract_position(msg, tokens, params_idx, &mut line as *mut i32, &mut character as *mut i32)
+            lsp_extract_position(msg, tokens, params_idx, &raw mut line as *mut i32, &raw mut character as *mut i32)
             let idx = state.find_doc(uri)
             if idx >= 0:
                 let doc = state.documents.get(idx as i64)
@@ -2058,7 +2058,7 @@ fn run_lsp() -> i32:
             let uri = lsp_extract_uri(msg, tokens, params_idx)
             var line: i32 = 0
             var character: i32 = 0
-            lsp_extract_position(msg, tokens, params_idx, &mut line as *mut i32, &mut character as *mut i32)
+            lsp_extract_position(msg, tokens, params_idx, &raw mut line as *mut i32, &raw mut character as *mut i32)
             let idx = state.find_doc(uri)
             if idx >= 0:
                 let doc = state.documents.get(idx as i64)
@@ -2070,7 +2070,7 @@ fn run_lsp() -> i32:
             let uri = lsp_extract_uri(msg, tokens, params_idx)
             var line: i32 = 0
             var character: i32 = 0
-            lsp_extract_position(msg, tokens, params_idx, &mut line as *mut i32, &mut character as *mut i32)
+            lsp_extract_position(msg, tokens, params_idx, &raw mut line as *mut i32, &raw mut character as *mut i32)
             let idx = state.find_doc(uri)
             if idx >= 0:
                 let doc = state.documents.get(idx as i64)
@@ -2082,7 +2082,7 @@ fn run_lsp() -> i32:
             let uri = lsp_extract_uri(msg, tokens, params_idx)
             var line: i32 = 0
             var character: i32 = 0
-            lsp_extract_position(msg, tokens, params_idx, &mut line as *mut i32, &mut character as *mut i32)
+            lsp_extract_position(msg, tokens, params_idx, &raw mut line as *mut i32, &raw mut character as *mut i32)
             let idx = state.find_doc(uri)
             if idx >= 0:
                 let doc = state.documents.get(idx as i64)
@@ -2103,7 +2103,7 @@ fn run_lsp() -> i32:
             let uri = lsp_extract_uri(msg, tokens, params_idx)
             var line: i32 = 0
             var character: i32 = 0
-            lsp_extract_position(msg, tokens, params_idx, &mut line as *mut i32, &mut character as *mut i32)
+            lsp_extract_position(msg, tokens, params_idx, &raw mut line as *mut i32, &raw mut character as *mut i32)
             let new_name = json_tok_str(msg, tokens, json_find(msg, tokens, params_idx, "newName"))
             let idx = state.find_doc(uri)
             if idx >= 0:
