@@ -5475,7 +5475,7 @@ fn lower_module(sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirModule:
     // other @[tailrec] functions in tail position, transform mutual
     // tail calls into parameter reassignment + tag dispatch (trampoline).
     if tailrec_syms.len() > 1:
-        optimize_mutual_tail_calls(&mut mir_mod, tailrec_syms)
+        mir_mod.optimize_mutual_tail_calls(tailrec_syms)
 
     mir_mod
 
@@ -5516,7 +5516,7 @@ fn mir_is_tail_call_to(body: &MirBody, bb: i32, target_sym: i32) -> bool:
         return false
     true
 
-fn optimize_mutual_tail_calls(mir_mod: &mut MirModule, tailrec_syms: Vec[i32]):
+fn MirModule.optimize_mutual_tail_calls(mut self: MirModule, tailrec_syms: Vec[i32]):
     // Find pairs of @[tailrec] functions that tail-call each other.
     // For each pair (or cycle), transform mutual tail calls into
     // parameter reassignment + tag update + jump to entry, reusing
@@ -5530,7 +5530,7 @@ fn optimize_mutual_tail_calls(mir_mod: &mut MirModule, tailrec_syms: Vec[i32]):
     var i = 0
     while i < sym_count:
         let fn_a = tailrec_syms.get(i as i64)
-        let body_idx_a = mir_mod.find_body(fn_a)
+        let body_idx_a = self.find_body(fn_a)
         if body_idx_a < 0:
             i = i + 1
             continue
@@ -5538,14 +5538,14 @@ fn optimize_mutual_tail_calls(mir_mod: &mut MirModule, tailrec_syms: Vec[i32]):
         var j = i + 1
         while j < sym_count:
             let fn_b = tailrec_syms.get(j as i64)
-            let body_idx_b = mir_mod.find_body(fn_b)
+            let body_idx_b = self.find_body(fn_b)
             if body_idx_b < 0:
                 j = j + 1
                 continue
 
             // Check if fn_a tail-calls fn_b AND fn_b tail-calls fn_a
-            let body_a = mir_mod.bodies.get(body_idx_a as i64)
-            let body_b = mir_mod.bodies.get(body_idx_b as i64)
+            let body_a = self.bodies.get(body_idx_a as i64)
+            let body_b = self.bodies.get(body_idx_b as i64)
 
             var a_calls_b = false
             for bb in 0..body_a.block_count():
@@ -5604,19 +5604,19 @@ fn optimize_mutual_tail_calls(mir_mod: &mut MirModule, tailrec_syms: Vec[i32]):
             // For the simplest v1: just transform to self-calls via a wrapper.
             // fn_a's tail call to fn_b(args) → reassign fn_a's params = args, goto bb0
             // This works when both functions have identical param types.
-            transform_mutual_pair(mir_mod, body_idx_a, body_idx_b, fn_a, fn_b)
+            self.transform_mutual_pair(body_idx_a, body_idx_b, fn_a, fn_b)
 
             j = j + 1
         i = i + 1
 
-fn mark_mutual_tail_calls(bodies: &mut Vec[MirBody], body_idx: i32, target_sym: i32):
-    let body = bodies.get(body_idx as i64)
+fn MirModule.mark_mutual_tail_calls(mut self: MirModule, body_idx: i32, target_sym: i32):
+    let body = self.bodies.get(body_idx as i64)
     let bb_count = body.block_count()
     for bb in 0..bb_count:
         if mir_is_tail_call_to(&body, bb, target_sym):
             body.mutual_tail_bbs.push(bb)
 
-fn transform_mutual_pair(mir_mod: &mut MirModule, idx_a: i32, idx_b: i32, fn_a: i32, fn_b: i32):
+fn MirModule.transform_mutual_pair(mut self: MirModule, idx_a: i32, idx_b: i32, fn_a: i32, fn_b: i32):
     // Transform each function into a trampoline that contains both bodies
     // with a tag-based dispatch loop. This eliminates mutual tail calls
     // by converting them into parameter reassignment + tag update + loop.
@@ -5664,5 +5664,5 @@ fn transform_mutual_pair(mir_mod: &mut MirModule, idx_a: i32, idx_b: i32, fn_a: 
     // This delegates the actual optimization to LLVM, which is correct
     // and handles edge cases (register allocation, stack frame cleanup).
     // We just need to mark the calls.
-    mark_mutual_tail_calls(&mut mir_mod.bodies, idx_a, fn_b)
-    mark_mutual_tail_calls(&mut mir_mod.bodies, idx_b, fn_a)
+    self.mark_mutual_tail_calls(idx_a, fn_b)
+    self.mark_mutual_tail_calls(idx_b, fn_a)
