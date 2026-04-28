@@ -384,6 +384,14 @@ type AstPool {
     // Must-use type declaration nodes
     must_use_type_nodes: Vec[i32],
 
+    // docs/mut.md Rev 8 §15.8 — fn-decl nodes marked with
+    // `@[iter_of_self]`. The marker indicates the fn's return value
+    // retains access to its receiver place (e.g., Vec.iter, HashMap.entries).
+    // check_method_call registers a SHARED borrow on the receiver when
+    // such a method is dispatched, so sibling closure captures conflict
+    // via the existing P7.4 borrow-check path.
+    iter_of_self_fn_nodes: Vec[i32],
+
     // Sealed trait declaration nodes
     sealed_trait_nodes: Vec[i32],
 
@@ -422,6 +430,7 @@ type AstPool {
     // Default value nodes for function parameters: key = param_start * 1000 + param_idx
     fn_param_defaults: HashMap[i32, i32],
     must_use_type_set: HashMap[i32, i32],
+    iter_of_self_fn_set: HashMap[i32, i32],
     sealed_trait_set: HashMap[i32, i32],
     comptime_decl_set: HashMap[i32, i32],
     move_closure_set: HashMap[i32, i32],
@@ -463,6 +472,7 @@ fn AstPool.new -> AstPool:
         for_meta: Vec.new(),
         block_meta: Vec.new(),
         must_use_type_nodes: Vec.new(),
+        iter_of_self_fn_nodes: Vec.new(),
         sealed_trait_nodes: Vec.new(),
         comptime_decl_nodes: Vec.new(),
         move_closure_nodes: Vec.new(),
@@ -483,6 +493,7 @@ fn AstPool.new -> AstPool:
         block_meta_map: HashMap.new(),
         fn_param_defaults: HashMap.new(),
         must_use_type_set: HashMap.new(),
+        iter_of_self_fn_set: HashMap.new(),
         sealed_trait_set: HashMap.new(),
         comptime_decl_set: HashMap.new(),
         move_closure_set: HashMap.new(),
@@ -1114,6 +1125,14 @@ fn AstPool.mark_must_use_type(mut self: AstPool, node: NodeId):
 
 fn AstPool.is_must_use_type_node(self: &AstPool, node: NodeId) -> i32:
     if self.must_use_type_set.contains(node as i32): return 1
+    0
+
+fn AstPool.mark_iter_of_self_fn(mut self: AstPool, node: NodeId):
+    self.iter_of_self_fn_nodes.push(node as i32)
+    self.iter_of_self_fn_set.insert(node as i32, 1)
+
+fn AstPool.is_iter_of_self_fn_node(self: &AstPool, node: NodeId) -> i32:
+    if self.iter_of_self_fn_set.contains(node as i32): return 1
     0
 
 fn AstPool.mark_sealed_trait(mut self: AstPool, node: NodeId):

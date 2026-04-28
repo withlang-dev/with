@@ -4339,6 +4339,10 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
     // calling a known function signature).
     let has_resolved = self.has_resolved_call_args(node)
     let arg_types: Vec[i32] = Vec.new()
+    // docs/mut.md Rev 8 §15.8 — borrow indices to remove after this call's
+    // arg-loop completes. Iterator-of-self borrows live for the duration of
+    // the enclosing call so sibling closures conflict with them.
+    let iter_borrow_idxs: Vec[i32] = Vec.new()
     for ai in 0..resolved_arg_count:
         let arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
         var expected_ty = 0
@@ -4364,6 +4368,14 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         if is_closure_arg:
             self.closure_direct_arg_depth = self.closure_direct_arg_depth - 1
         arg_types.push(arg_ty as i32)
+        let iter_idx = self.maybe_register_iter_of_self_borrow(arg_node)
+        if iter_idx >= 0:
+            iter_borrow_idxs.push(iter_idx)
+    // Drop iter-of-self borrows in reverse insertion order so indices stay valid.
+    var ibi = iter_borrow_idxs.len() as i32 - 1
+    while ibi >= 0:
+        self.remove_borrow_at(iter_borrow_idxs.get(ibi as i64))
+        ibi = ibi - 1
 
     // Mark non-Copy args as moved
     for ai in 0..resolved_arg_count:
@@ -5818,6 +5830,24 @@ fn Sema.substitute_method_return_for_generic_inst(self: Sema, gi_tid: i32, type_
         td_tp_count = self.ast.get_extra(epos + 2)
     self.resolve_generic_return_type_node(ret_node, td_tp_start, td_tp_count)
 
+// docs/mut.md Rev 8 §15.8 — builtins for which `lookup_method_fn` returns
+// nothing but whose return value retains access to the receiver. Counterpart
+// to the @[iter_of_self] attribute used for user-declared methods. The set
+// is small and corresponds to types whose methods are intercepted by the
+// builtin codegen path (see `if field == self.syms.iter` in check_method_call).
+fn Sema.builtin_method_is_iter_of_self(self: Sema, type_name_sym: i32, field: i32) -> i32:
+    let _ = self
+    if type_name_sym == self.syms.vec:
+        if field == self.syms.iter or field == self.syms.keys:
+            return 1
+    if type_name_sym == self.syms.hashmap:
+        if field == self.syms.iter or field == self.syms.keys:
+            return 1
+    if type_name_sym == self.syms.hashset:
+        if field == self.syms.iter:
+            return 1
+    0
+
 fn Sema.builtin_method_requires_mutable_receiver(self: Sema, type_name_sym: i32, field: i32) -> i32:
     let _ = self
     if type_name_sym == self.syms.vec:
@@ -5875,6 +5905,8 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
     // Check all arguments (with expected-type propagation for Atomic ordering params)
     let mc_order_type = self.resolve_atomic_order_type(obj_type as i32)
     let arg_types: Vec[i32] = Vec.new()
+    // docs/mut.md Rev 8 §15.8 — see check_call.
+    let mc_iter_borrow_idxs: Vec[i32] = Vec.new()
     for ai in 0..arg_count:
         let mc_arg_node = self.ast.get_extra(extra_start + ai)
         let mc_is_closure = self.ast.kind(mc_arg_node) == NodeKind.NK_CLOSURE
@@ -5887,6 +5919,13 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
         arg_types.push(mc_arg_ty as i32)
         if mc_is_closure:
             self.closure_direct_arg_depth = self.closure_direct_arg_depth - 1
+        let mc_iter_idx = self.maybe_register_iter_of_self_borrow(mc_arg_node)
+        if mc_iter_idx >= 0:
+            mc_iter_borrow_idxs.push(mc_iter_idx)
+    var mc_ibi = mc_iter_borrow_idxs.len() as i32 - 1
+    while mc_ibi >= 0:
+        self.remove_borrow_at(mc_iter_borrow_idxs.get(mc_ibi as i64))
+        mc_ibi = mc_ibi - 1
 
     let inferred_pending_receiver = self.infer_pending_generic_method_receiver(expr, field, arg_types, arg_count, node)
     if inferred_pending_receiver != 0:
@@ -7681,6 +7720,61 @@ fn Sema.lookup_method_fn(self: Sema, type_sym: i32, method_sym: i32) -> i32:
 // records this via FN_PARAM_FLAG_MUT_SELF on the first param). Used by
 // check_method_call to warn when a mutating receiver is invoked on a
 // non-place or read-only-place receiver.
+// docs/mut.md Rev 8 §15.8 — if `arg_node` is a method call to a fn marked
+// `@[iter_of_self]`, register a SHARED borrow on the receiver's place root
+// and return its index in the borrow vectors. Returns -1 otherwise. Caller
+// is responsible for calling remove_borrow_at on the returned index after
+// the enclosing call's arg-loop has finished (i.e., once the iterator and
+// any sibling closures have been checked together).
+fn Sema.maybe_register_iter_of_self_borrow(self: Sema, arg_node: i32) -> i32:
+    if arg_node <= 0:
+        return 0 - 1
+    if self.ast.kind(arg_node) != NodeKind.NK_CALL:
+        return 0 - 1
+    let arg_callee = self.ast.get_data0(arg_node)
+    if self.ast.kind(arg_callee) != NodeKind.NK_FIELD_ACCESS:
+        return 0 - 1
+    let recv = self.ast.get_data0(arg_callee)
+    let method = self.ast.get_data1(arg_callee)
+    let recv_root = self.place_root_sym(recv)
+    if recv_root == 0:
+        return 0 - 1
+    var recv_ty = 0
+    let recv_ty_opt = self.typed_expr_types.get(recv)
+    if recv_ty_opt.is_some():
+        recv_ty = recv_ty_opt.unwrap()
+    else:
+        recv_ty = self.check_expr(recv) as i32
+    if recv_ty == 0:
+        return 0 - 1
+    let owner_sym = self.method_owner_symbol_for_type(recv_ty)
+    if owner_sym == 0:
+        return 0 - 1
+    if self.method_is_iter_of_self_fn(owner_sym, method) == 0:
+        return 0 - 1
+    let pre_count = self.borrow_kinds.len() as i32
+    let path_start = self.borrow_path_data.len() as i32
+    self.check_borrow_create_direct(recv_root, BorrowKind.SHARED, 0, path_start, 0, arg_node)
+    if (self.borrow_kinds.len() as i32) > pre_count:
+        return pre_count
+    0 - 1
+
+// docs/mut.md Rev 8 §15.8 — returns 1 when the method's fn-decl is marked
+// `@[iter_of_self]`, indicating the produced value retains access to its
+// receiver place (e.g., Vec.iter, HashMap.entries). Used by check_call's
+// arg-loop to register a SHARED borrow on the receiver place root for the
+// duration of the enclosing call so that sibling closure mutations conflict.
+fn Sema.method_is_iter_of_self_fn(self: Sema, type_sym: i32, method_sym: i32) -> i32:
+    if self.builtin_method_is_iter_of_self(type_sym, method_sym) != 0:
+        return 1
+    let fn_sym = self.lookup_method_fn(type_sym, method_sym)
+    if fn_sym == 0:
+        return 0
+    if not self.fn_decl_nodes.contains(fn_sym):
+        return 0
+    let fn_node = self.fn_decl_nodes.get(fn_sym).unwrap()
+    self.ast.is_iter_of_self_fn_node(fn_node)
+
 fn Sema.method_has_mut_self_flag(self: Sema, type_sym: i32, method_sym: i32) -> i32:
     let fn_sym = self.lookup_method_fn(type_sym, method_sym)
     if fn_sym == 0:
