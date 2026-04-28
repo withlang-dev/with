@@ -7055,6 +7055,35 @@ fn Sema.type_is_index_place(self: Sema, tid: i32) -> i32:
             return 1
     0
 
+// Returns 1 when the base expression has a type that auto-derefs to a
+// read-only place: `&T` (TY_REF, regardless of mut bit on legacy &mut) or
+// `*const T` (TY_PTR with d1 == 0). Used so projections through such bases
+// correctly classify as read-only places per §2.3.
+//
+// Note: legacy `&mut T` (TY_REF with d1=1) is NOT treated as read-only here
+// — that distinction was already special-cased in earlier sema. After P12
+// lockdown TY_REF will only ever be `&T` (d1=0).
+fn Sema.place_base_is_read_only_ref(self: Sema, base_node: i32) -> i32:
+    let cached = self.typed_expr_types.get(base_node)
+    var ty: i32 = 0
+    if cached.is_some():
+        ty = cached.unwrap()
+    else:
+        ty = self.check_expr(base_node) as i32
+    if ty == 0:
+        return 0
+    let resolved = self.resolve_alias(ty as TypeId)
+    let tk = self.get_type_kind(resolved)
+    if tk == TypeKind.TY_REF:
+        if self.get_type_d1(resolved) == 0:
+            return 1
+        return 0
+    if tk == TypeKind.TY_PTR:
+        if self.get_type_d1(resolved) == 0:
+            return 1
+        return 0
+    0
+
 // Classify the operand of a UOP_DEREF expression. Returns the packed
 // (kind, mut) for the place produced by *operand.
 fn Sema.classify_deref(self: Sema, operand_type: i32) -> i64:
@@ -7086,14 +7115,23 @@ fn Sema.classify_place(self: Sema, node: i32) -> i64:
             // the binding-mut flag governs rebinding only.
             return pack_place(PlaceKind.PK_Local, PlaceMut.PM_Mutable)
         return pack_place(PlaceKind.PK_NotPlace, PlaceMut.PM_NoMut)
-    // Field projection: §2.2 — projection inherits base mutability.
+    // Field projection: §2.2 — projection inherits base mutability. But if
+    // the base value is `&T` or `*const T`, auto-deref produces a read-only
+    // place (§2.3) that overrides the underlying binding's mutability.
     if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS:
-        return self.classify_place(self.ast.get_data0(node))
+        let fa_base = self.ast.get_data0(node)
+        let base_packed = self.classify_place(fa_base)
+        if unpack_place_kind(base_packed) == PlaceKind.PK_NotPlace:
+            return pack_place(PlaceKind.PK_NotPlace, PlaceMut.PM_NoMut)
+        if self.place_base_is_read_only_ref(fa_base) != 0:
+            return pack_place(unpack_place_kind(base_packed), PlaceMut.PM_ReadOnly)
+        return base_packed
     // Parenthesized: classify inner.
     if kind == NodeKind.NK_GROUPED:
         return self.classify_place(self.ast.get_data0(node))
     // Index: §2.4 — only a place projection when the base type implements
-    // IndexPlace. Mutability inherits from base.
+    // IndexPlace. Mutability inherits from base, downgraded to ReadOnly when
+    // the base is auto-derefed from `&T` or `*const T`.
     if kind == NodeKind.NK_INDEX:
         let base_node = self.ast.get_data0(node)
         let base_packed = self.classify_place(base_node)
@@ -7101,6 +7139,8 @@ fn Sema.classify_place(self: Sema, node: i32) -> i64:
             return pack_place(PlaceKind.PK_NotPlace, PlaceMut.PM_NoMut)
         let base_ty = self.typed_expr_types.get(base_node)
         if base_ty.is_some() and self.type_is_index_place(base_ty.unwrap()) != 0:
+            if self.place_base_is_read_only_ref(base_node) != 0:
+                return pack_place(unpack_place_kind(base_packed), PlaceMut.PM_ReadOnly)
             return base_packed
         return pack_place(PlaceKind.PK_NotPlace, PlaceMut.PM_NoMut)
     // Dereference: §2.3 — *r / *p mutability comes from the pointer kind.
