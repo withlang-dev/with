@@ -440,6 +440,11 @@ type Sema {
     // Auto-defer: c_import constructor/destructor pairs
     ci_type_destructors: HashMap[i32, i32],   // type_name_sym → destructor_fn_sym
     ci_auto_defer_bindings: HashMap[i32, i32], // binding_sym → destructor_fn_sym
+    // Reachable-comptime-error traversal accumulators (formerly free-fn
+    // &mut HashMap params). Reset on each entry to check_reachable_comptime_errors.
+    reachable_seen: HashMap[i32, i32],
+    reachable_visiting: HashMap[i32, i32],
+    reachable_decl_indices: HashMap[i32, i32],
 }
 
 fn sema_debug_stage1_enabled -> i32:
@@ -853,6 +858,9 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         current_module_has_ci: 0,
         ci_type_destructors: sema_new_map_i32_i32(),
         ci_auto_defer_bindings: sema_new_map_i32_i32(),
+        reachable_seen: sema_new_map_i32_i32(),
+        reachable_visiting: sema_new_map_i32_i32(),
+        reachable_decl_indices: sema_new_map_i32_i32(),
     }
     return s
 
