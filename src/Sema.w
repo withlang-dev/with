@@ -493,7 +493,7 @@ fn Sema.pool_lookup_symbol(self: Sema, name: str) -> i32:
         i = i + 1
     0
 
-fn Sema.pool_intern(self: &mut Sema, name: str) -> i32:
+fn Sema.pool_intern(mut self: Sema, name: str) -> i32:
     if self.symbols_frozen != 0:
         let existing = self.pool_lookup_symbol(name)
         if existing != 0:
@@ -925,11 +925,11 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     s.init_intrinsic_symbols()
     s
 
-fn Sema.register_prim(self: &mut Sema, name: str, tid: i32):
+fn Sema.register_prim(mut self: Sema, name: str, tid: i32):
     let sym = self.pool_intern(name)
     self.record_named_type(sym, tid)
 
-fn Sema.record_named_type(self: &mut Sema, sym: i32, tid: i32):
+fn Sema.record_named_type(mut self: Sema, sym: i32, tid: i32):
     self.named_types.insert(sym, tid)
     self.named_type_candidate_syms.push(sym)
     self.named_type_candidate_tids.push(tid)
@@ -1008,7 +1008,7 @@ fn Sema.has_named_type_visible(self: Sema, sym: i32) -> i32:
         return 1
     0
 
-fn Sema.register_builtin_struct_type(self: &mut Sema, name: str, field_names: Vec[str], field_types: Vec[i32], field_count: i32) -> i32:
+fn Sema.register_builtin_struct_type(mut self: Sema, name: str, field_names: Vec[str], field_types: Vec[i32], field_count: i32) -> i32:
     let name_sym = self.pool_intern(name)
     let te_start = self.type_extra.len() as i32
     for fi in 0..field_count:
@@ -1023,7 +1023,7 @@ fn Sema.register_builtin_struct_type(self: &mut Sema, name: str, field_names: Ve
     self.pretty_symbol_names.insert(name_sym, sema_owned_text(name))
     tid as i32
 
-fn Sema.init_builtin_reflection_types(self: &mut Sema):
+fn Sema.init_builtin_reflection_types(mut self: Sema):
     let field_info_names: Vec[str] = Vec.new()
     field_info_names.push("name")
     field_info_names.push("type_name")
@@ -1050,7 +1050,7 @@ fn Sema.init_builtin_reflection_types(self: &mut Sema):
     variant_info_types.push(self.ty_str as i32)
     self.ty_variant_info = self.register_builtin_struct_type("VariantInfo", variant_info_names, variant_info_types, 4) as TypeId
 
-fn Sema.init_intrinsic_symbols(self: &mut Sema):
+fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.syms.task = self.pool_intern("Task")
     self.syms.channel = self.pool_intern("Channel")
     self.syms.send = self.pool_intern("send")
