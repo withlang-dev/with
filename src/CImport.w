@@ -3951,64 +3951,64 @@ fn CiStmtPool.merge3_ir(mut self: CiStmtPool, first: CiStmtId, second: CiStmtId,
     let intermediate = self.merge_ir(first, second)
     self.merge_ir(intermediate, third)
 
-fn ci_for_continue_runs_inc_ir(stmts: &mut CiStmtPool, stmt_id: CiStmtId, inc_stmt_id: CiStmtId) -> CiStmtId:
+fn CiStmtPool.for_continue_runs_inc_ir(mut self: CiStmtPool, stmt_id: CiStmtId, inc_stmt_id: CiStmtId) -> CiStmtId:
     if (stmt_id as i32) == 0 or (inc_stmt_id as i32) == 0:
         return stmt_id
-    let kind = stmts.kind(stmt_id)
+    let kind = self.kind(stmt_id)
     if kind == CiStmtKind.CIS_CONTINUE:
-        return stmts.merge_ir( inc_stmt_id, stmts.continue_())
+        return self.merge_ir( inc_stmt_id, self.continue_())
     if kind == CiStmtKind.CIS_BLOCK:
-        let extra_start = stmts.get_d0(stmt_id)
-        let count = stmts.get_d1(stmt_id)
+        let extra_start = self.get_d0(stmt_id)
+        let count = self.get_d1(stmt_id)
         var rewritten_ids: Vec[i32] = Vec.new()
         var i: i32 = 0
         while i < count:
-            let child_id = (stmts.get_extra(extra_start + i)) as CiStmtId
-            let rewritten = ci_for_continue_runs_inc_ir(stmts, child_id, inc_stmt_id)
+            let child_id = (self.get_extra(extra_start + i)) as CiStmtId
+            let rewritten = self.for_continue_runs_inc_ir(child_id, inc_stmt_id)
             rewritten_ids.push(rewritten as i32)
             i = i + 1
-        let new_start = stmts.extra.len() as i32
+        let new_start = self.extra.len() as i32
         var ri: i64 = 0
         while ri < rewritten_ids.len():
-            let _ = stmts.add_extra(rewritten_ids.get(ri))
+            let _ = self.add_extra(rewritten_ids.get(ri))
             ri = ri + 1
-        return stmts.block(new_start, count)
+        return self.block(new_start, count)
     if kind == CiStmtKind.CIS_IF:
-        let cond_id = (stmts.get_d0(stmt_id)) as CiExprId
-        let then_id = (stmts.get_d1(stmt_id)) as CiStmtId
-        let else_id = (stmts.get_d2(stmt_id)) as CiStmtId
-        let rewritten_then = ci_for_continue_runs_inc_ir(stmts, then_id, inc_stmt_id)
+        let cond_id = (self.get_d0(stmt_id)) as CiExprId
+        let then_id = (self.get_d1(stmt_id)) as CiStmtId
+        let else_id = (self.get_d2(stmt_id)) as CiStmtId
+        let rewritten_then = self.for_continue_runs_inc_ir(then_id, inc_stmt_id)
         var rewritten_else: CiStmtId = 0 as CiStmtId
         if (else_id as i32) != 0:
-            rewritten_else = ci_for_continue_runs_inc_ir(stmts, else_id, inc_stmt_id)
-        return stmts.if_stmt(cond_id, rewritten_then, rewritten_else)
+            rewritten_else = self.for_continue_runs_inc_ir(else_id, inc_stmt_id)
+        return self.if_stmt(cond_id, rewritten_then, rewritten_else)
     if kind == CiStmtKind.CIS_MATCH:
-        let subject_id = stmts.get_d0(stmt_id)
-        let arms_start = stmts.get_d1(stmt_id)
-        let arm_count = stmts.get_d2(stmt_id)
+        let subject_id = self.get_d0(stmt_id)
+        let arms_start = self.get_d1(stmt_id)
+        let arm_count = self.get_d2(stmt_id)
         var rewritten_records: Vec[i32] = Vec.new()
         var cursor = arms_start
         var ai: i32 = 0
         while ai < arm_count:
-            let value_count = stmts.get_extra(cursor)
+            let value_count = self.get_extra(cursor)
             rewritten_records.push(value_count)
             cursor = cursor + 1
             var vi: i32 = 0
             while vi < value_count:
-                rewritten_records.push(stmts.get_extra(cursor))
+                rewritten_records.push(self.get_extra(cursor))
                 cursor = cursor + 1
                 vi = vi + 1
-            let body_id = (stmts.get_extra(cursor)) as CiStmtId
+            let body_id = (self.get_extra(cursor)) as CiStmtId
             cursor = cursor + 1
-            let rewritten_body = ci_for_continue_runs_inc_ir(stmts, body_id, inc_stmt_id)
+            let rewritten_body = self.for_continue_runs_inc_ir(body_id, inc_stmt_id)
             rewritten_records.push(rewritten_body as i32)
             ai = ai + 1
-        let new_start = stmts.extra.len() as i32
+        let new_start = self.extra.len() as i32
         var ri: i64 = 0
         while ri < rewritten_records.len():
-            let _ = stmts.add_extra(rewritten_records.get(ri))
+            let _ = self.add_extra(rewritten_records.get(ri))
             ri = ri + 1
-        return stmts.add(CiStmtKind.CIS_MATCH, subject_id, new_start, arm_count, 0)
+        return self.add(CiStmtKind.CIS_MATCH, subject_id, new_start, arm_count, 0)
     if kind == CiStmtKind.CIS_WHILE or kind == CiStmtKind.CIS_DO_WHILE or kind == CiStmtKind.CIS_FOR:
         return stmt_id
     stmt_id
@@ -7172,7 +7172,7 @@ fn ci_lower_for_stmt_ir(session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs
                 g_ci_bail_location = with_ci_cursor_location(session, parts.inc_cursor)
                 g_ci_bail_kind = with_ci_cursor_kind(session, parts.inc_cursor)
             return 0 as CiStmtId
-        body_id = ci_for_continue_runs_inc_ir(stmts, body_id, inc_stmt_id)
+        body_id = stmts.for_continue_runs_inc_ir( body_id, inc_stmt_id)
 
     // Body + inc wrapped in a block (if we have an inc).
     var while_body_id: CiStmtId = body_id
