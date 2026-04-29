@@ -1876,7 +1876,7 @@ fn Parser.parse_const_decl(self: Parser, is_pub: i32, start: i32) -> NodeId:
     if type_ann != 0:
         let type_extra = self.pool.extra_len()
         self.pool.add_extra(type_ann)
-        flags = flags + (type_extra + 1) * 4
+        flags = flags + (type_extra + 1) * 16
 
     self.pool.add_node(NodeKind.NK_LET_DECL, start, self.prev_end(), name, value, flags)
 
