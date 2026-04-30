@@ -8,13 +8,12 @@ extern fn with_eprint(s: str) -> void
 extern fn with_i32_to_str(n: i32) -> str
 extern fn with_fs_write_file(path: str, data: str) -> i32
 
-// Parse "https://host/path" into components.
-// Returns host via out params. Path is everything after host.
-fn http_parse_url(url: str, host_out: *mut str, path_out: *mut str, port_out: *mut i32):
-    unsafe:
-        *(port_out + 0u64) = 443
-        *(host_out + 0u64) = ""
-        *(path_out + 0u64) = "/"
+type HttpUrl { host: str, path: str, port: i32 }
+
+fn http_parse_url(url: str) -> HttpUrl:
+    var host: str = ""
+    var path: str = "/"
+    let port = 443
 
     // Skip "https://"
     var start = 0
@@ -29,12 +28,12 @@ fn http_parse_url(url: str, host_out: *mut str, path_out: *mut str, port_out: *m
             break
         host_end = host_end + 1
 
-    let host = url.slice(start as i64, host_end as i64)
-    unsafe: *(host_out + 0u64) = host
+    host = url.slice(start as i64, host_end as i64)
 
     if host_end < url_len:
-        let path = url.slice(host_end as i64, url_len as i64)
-        unsafe: *(path_out + 0u64) = path
+        path = url.slice(host_end as i64, url_len as i64)
+
+    HttpUrl { host, path, port }
 
 // Build an HTTP GET request string.
 fn http_build_get(host: str, path: str) -> str:
@@ -79,19 +78,16 @@ fn http_is_chunked(headers: str) -> bool:
 
 // HTTP GET request over TLS. Returns response body or empty string on error.
 fn https_get(url: str) -> str:
-    var host: str = ""
-    var path: str = "/"
-    var port: i32 = 443
-    http_parse_url(url, &raw mut host, &raw mut path, &raw mut port)
+    let parsed = http_parse_url(url)
 
-    if host.len() == 0:
+    if parsed.host.len() == 0:
         return ""
 
-    var conn = tls_connect(host, port)
+    var conn = tls_connect(parsed.host, parsed.port)
     if conn.fd < 0:
         return ""
 
-    let req = http_build_get(host, path)
+    let req = http_build_get(parsed.host, parsed.path)
     let req_p = req as *const u8
     let req_len = req.len() as i32
     let sent = unsafe: tls_send(&raw mut conn, req_p, req_len)
