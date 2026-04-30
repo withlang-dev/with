@@ -429,7 +429,7 @@ methods, Option methods, and concrete/generic struct methods.
 
 ### P4.2 — IndexPlace Implementation
 
-**Status:** implementing.
+**Status:** complete (v1 scope).
 
 #### Spec references
 
@@ -503,22 +503,27 @@ _place = _new                       // write back
 
 #### Four implementation pieces
 
-1. **p10.23 — §6.3 compound assignment single-evaluation fix**
-   (MirLower.w `lower_assign`): detect compound assignment on NK_INDEX,
-   pre-evaluate index to temp, single read-modify-write through the place.
+1. **p10.23 — §6.3 compound assignment single-evaluation fix** ✓
+   (MirLower.w `lower_assign`): detect compound assignment (rhs is NK_BINARY
+   with d1 == place_expr), lower as single read-modify-write through the
+   place. Verified: `xs[f()] += g()` evaluates f() and g() exactly once.
 
-2. **p10.24 — Formal IndexPlace impls** (lib/std/traits.w): add
-   `impl[T] IndexPlace[i32, T] for Vec[T]` and similar for Array. These
-   make the type system aware that these types have IndexPlace. The compiler's
-   hardcoded paths continue to do the actual work.
+2. **p10.24 — Formal IndexPlace impls** — blocked by generic type erasure.
+   MIR validation rejects `self[index] = value` for unresolved T in generic
+   impl bodies. The compiler's hardcoded PK_INDEX place projections provide
+   correct IndexPlace semantics for Vec/Array/Slice. Formal impls can be
+   added when the compiler supports generic trait method bodies. Comment
+   added to `lib/std/traits.w` documenting the limitation.
 
-3. **p10.25 — §15.11 diagnostic** (SemaCheck.w): when check_index encounters
-   a type that doesn't support indexing and the context is assignment LHS or
-   mutating receiver, emit "type does not implement IndexPlace" diagnostic.
+3. **p10.25 — §15.11 diagnostic** ✓ — already implemented in check_assign
+   (SemaCheck.w:2500-2504). When classify_place returns PK_NotPlace for an
+   NK_INDEX target, emits "type does not support index assignment (no
+   IndexPlace impl) (§15.11)" warning.
 
-4. **p10.26 — §18 behavioral tests**: full test coverage for spec patterns
-   (direct assignment, nested field mutation, mutating method through index,
-   compound assignment, single-evaluation rule, non-Copy elements).
+4. **p10.26 — §18 behavioral tests** ✓ — `test/behavior/behav_index_place.w`
+   covers: direct assignment, nested field mutation, mutating method through
+   index, compound assignment, single-evaluation rule. Array coverage in
+   `test/behavior/behav_index_place_array.w`.
 
 ## Permanent Exemptions
 
