@@ -6391,7 +6391,7 @@ fn Sema.check_intrinsic_call(self: Sema, fn_sym: i32, node: i32, arg_types: Vec[
             self.emit_error("embed_file() argument must be str-compatible", self.ast.get_extra(args_start))
             return self.ty_str as i32
         let path_node = self.ast.get_extra(args_start)
-        let path_value = comptime_force_eval_expr(self as *mut Sema, &mut self.diags, self.ast, self.pool, path_node)
+        let path_value = comptime_force_eval_expr(self as *mut Sema, self.ast, self.pool, path_node)
         if comptime_value_is_valid(path_value) == 0 or path_value.kind != ComptimeValueKind.CV_STR:
             self.emit_error("embed_file() argument must be a comptime string", path_node)
             return self.ty_str as i32

@@ -947,7 +947,7 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
         // pre-sema prepared, otherwise cloned AST symbol ids may be resolved
         // against a stale symbol table in the transform pass.
         self.pool = pre_sema.pool
-        pool = comptime_transform_module(pool, &mut pre_sema, &mut self.pool)
+        pool = comptime_transform_module(pool, &mut pre_sema, self.pool)
         self.diagnostics = pre_sema.diags
         self.decl_source_paths = pre_sema.decl_source_paths
         self.decl_source_file_ids = pre_sema.decl_source_file_ids
