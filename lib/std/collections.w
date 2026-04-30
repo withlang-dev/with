@@ -51,6 +51,10 @@ type Atomic[T]  {
 /// Call `.next()` to get `Option[T]` — `Some(val)` or `None`.
 type VecIter[T]  { data_ptr: i64, len: i64, idx: i64 }
 
+impl[T] Iter[T] for VecIter[T] =
+    fn next(mut self: Self) -> Option[T]:
+        self.next()
+
 /// Index specification for multi-dimensional indexing.
 /// Used by the MultiIndex trait. kind: 0=scalar, 1=slice, 2=ellipsis, 3=newaxis.
 pub type IndexSpec {
