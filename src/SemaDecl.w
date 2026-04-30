@@ -1259,6 +1259,11 @@ fn Sema.check_direct_overlap(self: Sema, type_name: i32, trait_sym: i32, node: i
     for bi in 0..self.blanket_trait_syms.len() as i32:
         if self.blanket_trait_syms.get(bi as i64) != trait_sym:
             continue
+        // If the blanket targets a specific type (e.g. impl[T] Trait for Vec[T]),
+        // it only overlaps if this direct impl is for that same base type.
+        let target_base = self.blanket_target_base_syms.get(bi as i64)
+        if target_base != 0 and target_base != type_name:
+            continue
         let b_start = self.blanket_bound_starts.get(bi as i64)
         let b_count = self.blanket_bound_counts.get(bi as i64)
         var all_ok = 1
@@ -1271,9 +1276,12 @@ fn Sema.check_direct_overlap(self: Sema, type_name: i32, trait_sym: i32, node: i
             self.emit_error("overlapping implementations of '" ++ tn ++ "'", node)
 
 // Check if a new blanket impl overlaps with any existing direct impl
-fn Sema.check_blanket_overlap(self: Sema, trait_sym: i32, bound_start: i32, bound_count: i32, node: i32):
+fn Sema.check_blanket_overlap(self: Sema, trait_sym: i32, bound_start: i32, bound_count: i32, target_base: i32, node: i32):
     for ti in 0..self.impl_type_syms.len() as i32:
         let t_sym = self.impl_type_syms.get(ti as i64)
+        // If the blanket targets a specific type, only check that type.
+        if target_base != 0 and target_base != t_sym:
+            continue
         let t_start = self.impl_starts.get(ti as i64)
         let t_count = self.impl_counts.get(ti as i64)
         var has_trait = 0
@@ -1417,12 +1425,12 @@ fn Sema.collect_impl_decl(self: Sema, node: i32, is_local_impl: i32):
         self.blanket_bound_counts.push(total_bounds)
         // Store target base sym for generic blanket impls (e.g., impl[T] Trait for Vec[T])
         let target_type_nd = self.ast.find_impl_target_type_node(node)
+        var target_base_sym = 0
         if target_type_nd != 0 and self.ast.kind(target_type_nd) == NodeKind.NK_TYPE_GENERIC:
-            self.blanket_target_base_syms.push(self.ast.get_data0(target_type_nd))
-        else:
-            self.blanket_target_base_syms.push(0)
+            target_base_sym = self.ast.get_data0(target_type_nd)
+        self.blanket_target_base_syms.push(target_base_sym)
         // Overlap check: blanket vs existing direct impls
-        self.check_blanket_overlap(trait_sym, bound_start, total_bounds, node)
+        self.check_blanket_overlap(trait_sym, bound_start, total_bounds, target_base_sym, node)
         return
 
     // If the impl target is a generic type (e.g., impl Trait for Vec[i32]),
