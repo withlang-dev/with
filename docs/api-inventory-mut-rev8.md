@@ -32,19 +32,18 @@ callee would not propagate to the caller).
 occupied by a different type's `mut self`. Method extraction cannot solve
 these because you can only have one receiver per method.
 
-**Structural options for the 75 secondary-param sites:**
-1. **Handle-type refactoring**: Convert CiExprPool/CiStmtPool/CiTypePool and
-   AstPool to handle types (thin struct wrapping `*mut State`, like InternPool).
-   Then by-value passing works because copies share underlying state.
-2. **Context struct**: Bundle related pools into a single context type
-   (e.g., `CiContext { exprs: CiExprPool, stmts: CiStmtPool, types: CiTypePool }`)
-   and make all translation methods take `mut self: CiContext`.
-3. **Defer to P12**: Keep `&mut` on these internal compiler types during bridge;
-   resolve as part of P12 lockdown when the structural approach is decided.
+**Migration pattern for the 75 secondary-param sites:**
 
-Option 1 is the most incremental (one pool at a time, each commit independently
-passes fixpoint). Option 2 is cleaner but larger. Option 3 risks P12 becoming
-a large structural change under deadline pressure.
+The spec-prescribed migration (§16) for `fn(&mut T, ...)` is: mutating receiver
+method on T, or — when the function is already a method on a different type —
+handle-type wrapping `*mut State` so by-value passing shares state. This is the
+InternPool pattern, already proven in the codebase. Context-struct bundling would
+be an architectural change beyond migration scope and is out of band for this work.
+
+Implementation order is determined by call-graph frequency: pools that appear
+most often as secondary `&mut` params convert first, removing the most sites
+per commit. See `docs/p10-structural-sites-audit.md` "Handle-Type Conversion
+Plan" section for the per-pool plan.
 
 ---
 
@@ -72,16 +71,13 @@ create a copy; Vec length/capacity updates in the callee would not propagate to
 the caller. The p10.14-p10.22 conversions worked by making the pool the `self`
 receiver (pointer-passing), not by downgrading `&mut` to by-value.
 
-**Target shape:** Handle-type refactoring (recommended, most incremental):
-Convert each pool to a handle type wrapping `*mut PoolState`:
-```
-type CiExprPool { state: *mut CiExprPoolState }
-```
-Then by-value passing works (copies share state). One pool at a time,
-each conversion independently passes fixpoint.
+**Target shape:** Handle-type (§16, InternPool pattern). Convert each pool to a
+handle wrapping `*mut PoolState`. By-value passing then shares state. One pool
+at a time, each conversion independently passes fixpoint.
 
-**Disposition:** Structural work in P10 finish. Handle-type conversion for
-CiTypePool first (most secondary params), then CiExprPool, then CiStmtPool.
+**Disposition:** P10 finish. CiTypePool first (24 secondary-param sites across
+CImport.w + ComptimeTransform.w — highest per-commit yield), then CiExprPool,
+then CiStmtPool.
 
 ### 1b. Free functions with single `&mut` (3 sites) — MECHANICAL
 
@@ -128,14 +124,13 @@ analysis as CImport.w pool types: Vec len/cap updates in callee don't propagate)
 InternPool IS a handle type (`*mut InternPoolState`), so `&mut InternPool` →
 `InternPool` is safe for that parameter specifically.
 
-**Target shape:** Same structural options as CImport.w section 1a:
-- Handle-type conversion for AstPool (wrap state in `*mut AstPoolState`)
-- Context struct bundling pool+sema+intern
-- Or convert ct_* free functions to methods on a comptime context type
+**Target shape:** Handle-type (§16, InternPool pattern). AstPool wraps state in
+`*mut AstPoolState`. Sema wraps state in `*mut SemaState` (or leverages existing
+`*mut Sema` raw-pointer usage pattern — see section 3a analysis). InternPool params
+are already mechanical (`&mut InternPool` → `InternPool`, handle type).
 
-**Disposition:** Structural work. InternPool params can be downgraded mechanically
-(`&mut InternPool` → `InternPool`); AstPool and Sema params require handle-type
-refactoring or architectural change.
+**Disposition:** P10 finish. InternPool params first (mechanical), then AstPool
+handle-type, then Sema handle-type (most complex — see Sema sub-analysis).
 
 ### 2b. Single-`&mut` free functions (4 sites)
 
@@ -392,8 +387,8 @@ Binary needs reinstall via `make install-user` after current work stabilizes.
 | P12 lockdown: Delete MultiIndex.multi_index_set | 1 | Remove deprecated alias | Part of P12 commit |
 | P12 lockdown: Update comments | 19 | Text-only changes | Part of P12 commit |
 
-**Key insight:** The mechanical work (29 sites) is real — it can be done now.
-The structural work (75 sites) requires a design decision: handle-type
-refactoring vs context-struct bundling. Handle-type is most incremental
-(one type at a time, each commit independently passes fixpoint). This
-decision should be made before starting the structural conversions.
+**Migration path:** The 29 mechanical sites convert now. The 75 structural
+sites use the spec-prescribed handle-type pattern (§16, InternPool as
+existing reference). One pool at a time, ordered by secondary-param
+frequency: CiTypePool (24), CiExprPool (16), CiStmtPool (16), AstPool,
+Sema. Each conversion independently passes fixpoint.
