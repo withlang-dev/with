@@ -2627,12 +2627,29 @@ fn MirBuilder.lower_for(self: MirBuilder, for_node: i32) -> i32:
                             if recv_name == "Vec":
                                 return self.lower_for_vec(for_node, pat_or_sym, recv, body_expr)
 
-    // Iterator protocol: not yet fully implemented in MIR.
-    // Fall back to AST codegen for functions using iterator-based for loops.
-    self.mark_unsupported()
+    // Generic iterator protocol: resolve next() on the iterator type.
+    let next_sym = self.pool.intern("next")
+    let callee_sym = self.resolve_method_callee_sym(iter_expr, next_sym)
+    if callee_sym == next_sym:
+        self.mark_unsupported()
+
     let iter_op = self.lower_expr(iter_expr)
     let iter_place = self.materialize_operand(iter_op, iter_ty, self.ast.get_start(iter_expr))
     let elem_ty = self.sema.infer_for_element_type(iter_ty)
+
+    // Determine next()'s return type (Option[T]) from the method signature.
+    let resolved_iter = self.sema.resolve_alias(iter_ty)
+    let owner_sym = self.sema.method_owner_symbol_for_type(resolved_iter as i32)
+    let sema_next_sym = self.sema.pool_lookup_symbol("next")
+    var next_ret_ty = 0
+    if owner_sym != 0 and sema_next_sym > 0:
+        let sig_idx = self.sema.lookup_method_sig(owner_sym, sema_next_sym)
+        if sig_idx >= 0:
+            next_ret_ty = self.sema.sig_return_type(sig_idx)
+    if next_ret_ty == 0:
+        next_ret_ty = iter_ty
+
+    let fn_op = self.const_operand(ConstKind.CK_FN, callee_sym, self.sema.ty_void)
 
     let header_bb = self.new_block()
     let body_bb = self.new_block()
@@ -2645,15 +2662,16 @@ fn MirBuilder.lower_for(self: MirBuilder, for_node: i32) -> i32:
     let next_args: Vec[i32] = Vec.new()
     next_args.push(self.body.new_operand(OperandKind.OK_COPY, iter_place))
     let args_id = self.body.new_call_args(next_args)
-    let next_local = self.new_temp(iter_ty)
+    let next_local = self.new_temp(next_ret_ty)
     let next_place = self.place_for_local(next_local)
     let after_next_bb = self.new_block()
-    self.terminate(TermKind.TK_CALL, self.unit_operand(), args_id, next_place, after_next_bb)
+    self.terminate(TermKind.TK_CALL, fn_op, args_id, next_place, after_next_bb)
 
     self.switch_to(after_next_bb)
     let disc = self.lower_enum_discriminant(next_place)
+    let some_idx = self.success_variant_index()
     let vals: Vec[i32] = Vec.new()
-    vals.push(1)
+    vals.push(some_idx)
     let targets: Vec[i32] = Vec.new()
     targets.push(body_bb as i32)
     let table = self.body.new_switch_table(vals, targets)
@@ -2662,7 +2680,9 @@ fn MirBuilder.lower_for(self: MirBuilder, for_node: i32) -> i32:
     self.switch_to(body_bb)
     let item_local = self.new_temp(elem_ty)
     let item_place = self.place_for_local(item_local)
-    let next_payload = self.body.new_operand(OperandKind.OK_COPY, next_place)
+    let downcast_place = self.body.new_downcast_place(next_place, some_idx, next_ret_ty)
+    let payload_place = self.body.new_field_place(downcast_place, 0, elem_ty)
+    let next_payload = self.body.new_operand(OperandKind.OK_COPY, payload_place)
     self.assign_operand_to_place(item_place, next_payload, self.ast.get_start(iter_expr))
 
     self.bind_for_element(for_node, pat_or_sym, item_place, elem_ty, body_expr)

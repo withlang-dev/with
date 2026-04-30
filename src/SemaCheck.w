@@ -7678,6 +7678,22 @@ fn Sema.infer_for_element_type(self: Sema, iter_type: i32) -> i32:
         let base_name = self.pool_resolve(self.get_type_d0(resolved))
         if base_name == "Vec" and self.get_generic_inst_arg_count(resolved as i32) > 0:
             return self.get_generic_inst_arg(resolved as i32, 0)
+    // Generic Iter[T] protocol: look up next() method on the type,
+    // extract T from its Option[T] return type.
+    let owner_sym = self.method_owner_symbol_for_type(resolved as i32)
+    if owner_sym != 0:
+        let next_sym = self.pool_lookup_symbol("next")
+        if next_sym > 0:
+            let sig_idx = self.lookup_method_sig(owner_sym, next_sym)
+            if sig_idx >= 0:
+                let ret_ty = self.sig_return_type(sig_idx)
+                if ret_ty != 0:
+                    let ret_resolved = self.resolve_alias(ret_ty as TypeId)
+                    let ret_tk = self.get_type_kind(ret_resolved)
+                    if ret_tk == TypeKind.TY_GENERIC_INST:
+                        let ret_base = self.pool_resolve(self.get_type_d0(ret_resolved))
+                        if ret_base == "Option" and self.get_generic_inst_arg_count(ret_resolved as i32) > 0:
+                            return self.get_generic_inst_arg(ret_resolved as i32, 0)
     self.ty_i32 as i32
 
 fn Sema.mark_moved_if_consumed(self: Sema, node: i32):
