@@ -7,7 +7,7 @@ use Sema
 use SemaCheck
 use Span
 
-fn ct_emit_error(sema: &mut Sema, diags: &mut DiagnosticList, ast: AstPool, node: i32, msg: str):
+fn ct_emit_error(sema: &Sema, diags: &mut DiagnosticList, ast: AstPool, node: i32, msg: str):
     let start = ast.get_start(node)
     let end = ast.get_end(node)
     diags.emit(Diagnostic.err(msg, Span { file: sema.local_file_id, start, end }))
@@ -178,7 +178,7 @@ fn AstPool.ct_empty_block(mut self: AstPool, node: i32) -> i32:
 fn ct_fresh_sym(intern: &mut InternPool, prefix: str, seed: i32) -> i32:
     intern.intern(prefix ++ f"{seed}" ++ "_" ++ f"{intern.symbol_count() + 1}")
 
-fn ct_build_type_expr(pool: &mut AstPool, intern: &mut InternPool, sema: &mut Sema, type_id: i32, node: i32) -> i32:
+fn ct_build_type_expr(pool: &mut AstPool, intern: &mut InternPool, sema: &Sema, type_id: i32, node: i32) -> i32:
     let resolved = sema.resolve_alias(type_id)
     let start = pool.get_start(node)
     let end = pool.get_end(node)
@@ -270,7 +270,7 @@ fn AstPool.ct_build_call(mut self: AstPool, node: i32, callee: i32, args: Vec[i3
         self.add_extra(args.get(ai as i64))
     self.add_node(NodeKind.NK_CALL, self.get_start(node), self.get_end(node), callee, extra_start, args.len() as i32) as i32
 
-fn ct_build_collection_ctor(pool: &mut AstPool, intern: &mut InternPool, sema: &mut Sema, type_id: i32, node: i32) -> i32:
+fn ct_build_collection_ctor(pool: &mut AstPool, intern: &mut InternPool, sema: &Sema, type_id: i32, node: i32) -> i32:
     let type_node = ct_build_type_expr(pool, intern, sema, type_id, node)
     if type_node == 0:
         return 0
@@ -279,7 +279,7 @@ fn ct_build_collection_ctor(pool: &mut AstPool, intern: &mut InternPool, sema: &
     let no_args: Vec[i32] = Vec.new()
     pool.ct_build_call(node, callee as i32, no_args)
 
-fn ct_build_typed_binding(pool: &mut AstPool, intern: &mut InternPool, sema: &mut Sema, name_sym: i32, value: i32, type_id: i32, node: i32, is_mut: i32) -> i32:
+fn ct_build_typed_binding(pool: &mut AstPool, intern: &mut InternPool, sema: &Sema, name_sym: i32, value: i32, type_id: i32, node: i32, is_mut: i32) -> i32:
     let type_node = ct_build_type_expr(pool, intern, sema, type_id, node)
     if type_node == 0:
         return 0
@@ -288,7 +288,7 @@ fn ct_build_typed_binding(pool: &mut AstPool, intern: &mut InternPool, sema: &mu
     let flags = (if is_mut != 0: 1 else: 0) + (type_extra + 1) * 2
     pool.add_node(NodeKind.NK_LET_BINDING, pool.get_start(node), pool.get_end(node), name_sym, value, flags) as i32
 
-fn ct_build_vec_value_tree(pool: &mut AstPool, intern: &mut InternPool, sema: &mut Sema, value: ComptimeValue, node: i32, extras: Vec[ComptimeValue]) -> i32:
+fn ct_build_vec_value_tree(pool: &mut AstPool, intern: &mut InternPool, sema: &Sema, value: ComptimeValue, node: i32, extras: Vec[ComptimeValue]) -> i32:
     let tmp_sym = ct_fresh_sym(intern, "__ct_vec_", node)
     let ctor = ct_build_collection_ctor(pool, intern, sema, value.type_id, node)
     if ctor == 0:
@@ -315,7 +315,7 @@ fn ct_build_vec_value_tree(pool: &mut AstPool, intern: &mut InternPool, sema: &m
     let tail = pool.add_node(NodeKind.NK_IDENT, pool.get_start(node), pool.get_end(node), tmp_sym, 0, 0)
     pool.add_node(NodeKind.NK_BLOCK, pool.get_start(node), pool.get_end(node), stmt_extra, stmts.len() as i32, tail as i32) as i32
 
-fn ct_build_map_value_tree(pool: &mut AstPool, intern: &mut InternPool, sema: &mut Sema, value: ComptimeValue, node: i32, extras: Vec[ComptimeValue]) -> i32:
+fn ct_build_map_value_tree(pool: &mut AstPool, intern: &mut InternPool, sema: &Sema, value: ComptimeValue, node: i32, extras: Vec[ComptimeValue]) -> i32:
     let tmp_sym = ct_fresh_sym(intern, "__ct_map_", node)
     let ctor = ct_build_collection_ctor(pool, intern, sema, value.type_id, node)
     if ctor == 0:
@@ -344,7 +344,7 @@ fn ct_build_map_value_tree(pool: &mut AstPool, intern: &mut InternPool, sema: &m
     let tail = pool.add_node(NodeKind.NK_IDENT, pool.get_start(node), pool.get_end(node), tmp_sym, 0, 0)
     pool.add_node(NodeKind.NK_BLOCK, pool.get_start(node), pool.get_end(node), stmt_extra, stmts.len() as i32, tail as i32) as i32
 
-fn ct_build_value_tree(pool: &mut AstPool, intern: &mut InternPool, sema: &mut Sema, value: ComptimeValue, node: i32, extras: Vec[ComptimeValue]) -> i32:
+fn ct_build_value_tree(pool: &mut AstPool, intern: &mut InternPool, sema: &Sema, value: ComptimeValue, node: i32, extras: Vec[ComptimeValue]) -> i32:
     if value.kind == ComptimeValueKind.CV_INT:
         return pool.add_node(
             NodeKind.NK_INT_LIT,
@@ -487,7 +487,7 @@ fn ct_iter_count(value: ComptimeValue) -> i32:
         return span as i32
     0 - 1
 
-fn ct_iter_item_node(pool: &mut AstPool, intern: &mut InternPool, sema: &mut Sema, iterable: ComptimeValue, index: i32, node: i32, extras: Vec[ComptimeValue]) -> i32:
+fn ct_iter_item_node(pool: &mut AstPool, intern: &mut InternPool, sema: &Sema, iterable: ComptimeValue, index: i32, node: i32, extras: Vec[ComptimeValue]) -> i32:
     if iterable.kind == ComptimeValueKind.CV_RANGE:
         let item = comptime_value_int(0, iterable.data0 + index as i64)
         return ct_build_value_tree(pool, intern, sema, item, node, extras)
@@ -507,7 +507,7 @@ fn AstPool.ct_struct_lit_field_value(mut self: AstPool, node: i32, field: i32) -
             return self.get_extra(base + 1)
     0
 
-fn ct_sync_sema_ast(sema: &mut Sema, pool: &mut AstPool):
+fn ct_sync_sema_ast(sema: &mut Sema, pool: &AstPool):
     let live_ast = unsafe: *pool
     sema.ast = live_ast
 
@@ -1189,17 +1189,17 @@ fn ct_transform_type_decl(source_ast: AstPool, pool: &mut AstPool, sema: &mut Se
         if field_default != 0:
             pool.extra.set_i32(default_idx as i64, ct_transform_expr(source_ast, pool, sema, intern, diags, field_default))
 
-fn ct_decl_source_path(sema: &mut Sema, di: i32) -> str:
+fn ct_decl_source_path(sema: &Sema, di: i32) -> str:
     if di >= 0 and di < sema.decl_source_paths.len() as i32:
         return sema.decl_source_paths.get(di as i64)
     ""
 
-fn ct_decl_source_file_id(sema: &mut Sema, di: i32) -> i32:
+fn ct_decl_source_file_id(sema: &Sema, di: i32) -> i32:
     if di >= 0 and di < sema.decl_source_file_ids.len() as i32:
         return sema.decl_source_file_ids.get(di as i64)
     0
 
-fn ct_decl_is_c_import(sema: &mut Sema, di: i32) -> i32:
+fn ct_decl_is_c_import(sema: &Sema, di: i32) -> i32:
     if di >= 0 and di < sema.decl_is_c_import.len() as i32:
         return sema.decl_is_c_import.get(di as i64)
     0
