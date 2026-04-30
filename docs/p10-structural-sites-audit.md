@@ -273,6 +273,26 @@ Net: 13 `&mut` sites eliminated.
 | 6 | CImport.w call-site coercion downgrades | 16 lines | **DONE** (p10.22) |
 | — | E,G,H,I: exempt or deferred to P12 | ~30 | — |
 
+## P4 Status
+
+**P4.1 (Iter.next → mut self):** Already complete. `lib/std/traits.w:58-59`
+defines `fn next(mut self: Self) -> Option[T]`. VecIter.next() is a compiler
+intrinsic (`MIR_INTRINSIC_VECITER_NEXT` in `src/MirLower.w:3922`), not a
+trait-dispatched method. No stdlib changes needed.
+
+**P4.2 (IndexPlace trait-dispatched):** The trait is defined
+(`lib/std/traits.w:158-160`) with `get(self: &Self, ...)` and
+`set(mut self: Self, ...)`. But:
+- Zero `impl IndexPlace` blocks exist in stdlib
+- `check_index` (`src/SemaCheck.w:2817`) is fully hardcoded for Array, Slice,
+  Vec, HashMap — no trait dispatch
+- Adding impls without compiler integration is meaningless
+- Compiler integration (trait-dispatched index resolution) is P7 work, not P4
+
+**Conclusion:** P4.1 is done. P4.2's trait definition is done; the compiler
+integration belongs to P7 (place analysis). No further P4 work needed before
+P11.
+
 ## Permanent Exemptions
 
 1. **String/comment mentions** of `&mut` — not code. (22 sites)
