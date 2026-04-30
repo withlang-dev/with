@@ -61,16 +61,16 @@ fn Diagnostic.err(message: str, span: Span) -> Diagnostic:
 fn Diagnostic.warn(message: str, span: Span) -> Diagnostic:
     diagnostic_warning(message, span)
 
-fn Diagnostic.set_code(self: Diagnostic, code: str):
+fn Diagnostic.set_code(mut self: Diagnostic, code: str):
     self.code = code
 
-fn Diagnostic.add_label(self: Diagnostic, span: Span, message: str):
+fn Diagnostic.add_label(mut self: Diagnostic, span: Span, message: str):
     self.labels.push(DiagnosticLabel { span, message })
 
-fn Diagnostic.add_note(self: Diagnostic, message: str):
+fn Diagnostic.add_note(mut self: Diagnostic, message: str):
     self.notes.push(message)
 
-fn Diagnostic.add_help(self: Diagnostic, message: str):
+fn Diagnostic.add_help(mut self: Diagnostic, message: str):
     self.helps.push(message)
 
 fn Diagnostic.render(self: Diagnostic, source: Source):
@@ -112,7 +112,7 @@ fn DiagnosticList.init -> DiagnosticList:
 fn DiagnosticList.deinit(self: DiagnosticList):
     return
 
-fn DiagnosticList.emit(self: DiagnosticList, diag: Diagnostic):
+fn DiagnosticList.emit(mut self: DiagnosticList, diag: Diagnostic):
     self.items.push(diag)
 
 fn DiagnosticList.count(self: DiagnosticList) -> i32:
