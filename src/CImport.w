@@ -9961,12 +9961,19 @@ fn ci_goto_cfg_target_label_from_goto(session: i64, cursor: i32) -> str:
             return child_name
     with_ci_cursor_spelling(session, cursor)
 
-fn ci_goto_cfg_push_target(stack: &mut Vec[i32], target: i32):
-    stack.push(target)
+fn CiGotoCfgContext.push_break_target(self: CiGotoCfgContext, target: i32):
+    self.break_targets.push(target)
 
-fn ci_goto_cfg_pop_target(stack: &mut Vec[i32]):
-    if stack.len() > 0:
-        let _ = stack.pop()
+fn CiGotoCfgContext.pop_break_target(self: CiGotoCfgContext):
+    if self.break_targets.len() > 0:
+        let _ = self.break_targets.pop()
+
+fn CiGotoCfgContext.push_continue_target(self: CiGotoCfgContext, target: i32):
+    self.continue_targets.push(target)
+
+fn CiGotoCfgContext.pop_continue_target(self: CiGotoCfgContext):
+    if self.continue_targets.len() > 0:
+        let _ = self.continue_targets.pop()
 
 fn ci_goto_cfg_top_target(stack: &Vec[i32]) -> i32:
     if stack.len() == 0:
@@ -10098,14 +10105,14 @@ fn CiGotoCfgContext.lower_while(mut self: CiGotoCfgContext, session: i64, cursor
     self.append_stmt(stmts, prepared_cond.setup_stmt)
     self.cond_current(prepared_cond.value_expr, body_block, after_block, with_ci_cursor_location(session, cursor))
 
-    ci_goto_cfg_push_target(&mut self.break_targets, after_block)
-    ci_goto_cfg_push_target(&mut self.continue_targets, cond_block)
+    self.push_break_target(after_block)
+    self.push_continue_target(cond_block)
     self.set_current(body_block)
     self.lower_stmt(session, with_ci_child(session, cursor, 1), stmts, exprs, types, scope)
     if self.current >= 0:
         self.branch_current(cond_block, with_ci_cursor_location(session, cursor))
-    ci_goto_cfg_pop_target(&mut self.continue_targets)
-    ci_goto_cfg_pop_target(&mut self.break_targets)
+    self.pop_continue_target()
+    self.pop_break_target()
     self.set_current(after_block)
     if not self.block_has_pred(after_block):
         self.unreachable_current()
@@ -10119,14 +10126,14 @@ fn CiGotoCfgContext.lower_do(mut self: CiGotoCfgContext, session: i64, cursor: i
     let cond_block = self.new_block("do cond")
     let after_block = self.new_block("do after")
     self.branch_current(body_block, with_ci_cursor_location(session, cursor))
-    ci_goto_cfg_push_target(&mut self.break_targets, after_block)
-    ci_goto_cfg_push_target(&mut self.continue_targets, cond_block)
+    self.push_break_target(after_block)
+    self.push_continue_target(cond_block)
     self.set_current(body_block)
     self.lower_stmt(session, with_ci_child(session, cursor, 0), stmts, exprs, types, scope)
     if self.current >= 0:
         self.branch_current(cond_block, with_ci_cursor_location(session, cursor))
-    ci_goto_cfg_pop_target(&mut self.continue_targets)
-    ci_goto_cfg_pop_target(&mut self.break_targets)
+    self.pop_continue_target()
+    self.pop_break_target()
 
     self.set_current(cond_block)
     let cond_cursor = with_ci_child(session, cursor, 1)
@@ -10175,14 +10182,14 @@ fn CiGotoCfgContext.lower_for(mut self: CiGotoCfgContext, session: i64, cursor: 
     else:
         self.branch_current(body_block, with_ci_cursor_location(session, cursor))
 
-    ci_goto_cfg_push_target(&mut self.break_targets, after_block)
-    ci_goto_cfg_push_target(&mut self.continue_targets, inc_block)
+    self.push_break_target(after_block)
+    self.push_continue_target(inc_block)
     self.set_current(body_block)
     self.lower_stmt(session, parts.body_cursor, stmts, exprs, types, loop_scope)
     if self.current >= 0:
         self.branch_current(inc_block, with_ci_cursor_location(session, cursor))
-    ci_goto_cfg_pop_target(&mut self.continue_targets)
-    ci_goto_cfg_pop_target(&mut self.break_targets)
+    self.pop_continue_target()
+    self.pop_break_target()
 
     self.set_current(inc_block)
     if parts.inc_cursor >= 0:
@@ -10347,13 +10354,13 @@ fn CiGotoCfgContext.lower_switch(mut self: CiGotoCfgContext, session: i64, curso
     let after_block = self.new_block("switch after")
     self.branch_current(dispatch_block, with_ci_cursor_location(session, cursor))
 
-    ci_goto_cfg_push_target(&mut self.break_targets, after_block)
+    self.push_break_target(after_block)
     var cases = ci_goto_switch_case_new()
     self.current = -1
     self.lower_switch_body(session, body_cursor, stmts, exprs, types, scope, &mut cases)
     if self.current >= 0:
         self.branch_current(after_block, with_ci_cursor_location(session, cursor))
-    ci_goto_cfg_pop_target(&mut self.break_targets)
+    self.pop_break_target()
     self.emit_switch_dispatch(exprs, prepared_subject.value_expr, dispatch_block, after_block, cases, with_ci_cursor_location(session, cursor))
     self.set_current(after_block)
     if not self.block_has_pred(after_block):

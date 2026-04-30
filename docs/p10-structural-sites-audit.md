@@ -1,15 +1,16 @@
 # P10 Structural `&mut` Sites Audit
 
-Comprehensive audit of all `&mut` code sites remaining after p10.12–p10.19
-method conversions, read-only param downgrades, and diag-threading. Started at
-221 sites; reduced to 165 via p10.17–p10.19 (12 ComptimeTransform.w downgrades
-+ 55 CImport.w pool param downgrades + 39 ComptimeEval.w diag-threading).
+Comprehensive audit of all `&mut` code sites remaining after p10.12–p10.20
+method conversions, read-only param downgrades, diag-threading, and method
+extraction. Started at 221 sites; reduced to 149 via p10.17–p10.20
+(12 ComptimeTransform.w downgrades + 55 CImport.w pool param downgrades
++ 39 ComptimeEval.w diag-threading + 16 CImport.w push/pop → methods).
 
 ## Codebase-Wide Summary
 
 | File | Sites | Category |
 |------|-------|----------|
-| src/CImport.w | 98 | multi-pool params, coercions, free fns, field proj |
+| src/CImport.w | 82 | multi-pool params, coercions, free fns |
 | src/ComptimeEval.w | 5 | entry-point free fns (4 sigs + 1 call site) |
 | src/ComptimeTransform.w | 24 | multi-pool params, diag-threading |
 | src/compiler/Frontend.w | 7 | multi-pool params (Sema, HashMap, Vec) |
@@ -29,7 +30,7 @@ method conversions, read-only param downgrades, and diag-threading. Started at
 | src/bootstrap_main.w | 1 | help text string |
 | lib/std/traits.w | 1 | `multi_index_set(self: &mut Self, ...)` (deprecated) |
 | lib/std/cfg/stackify.w | 1 | comment |
-| **Total** | **165** | |
+| **Total** | **149** | |
 
 ## Actionable Sites by Category
 
@@ -208,7 +209,7 @@ got the same transform.
 | 1 | B: ComptimeTransform.w read-only downgrades | 12 | **DONE** (p10.17) |
 | 2 | C: CImport.w read-only pool params | 55 | **DONE** (p10.18) |
 | 3 | A: ComptimeEval.w diag-threading | 39 | **DONE** (p10.19) |
-| 4 | F: CImport.w push/pop → CiGotoCfgContext methods | 14 | future |
+| 4 | F: CImport.w push/pop → CiGotoCfgContext methods | 16 | **DONE** (p10.20) |
 | — | E,G,H,I: exempt or deferred to P12 | ~30 | — |
 
 ## Permanent Exemptions
