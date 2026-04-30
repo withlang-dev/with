@@ -275,12 +275,13 @@ Net: 13 `&mut` sites eliminated.
 
 ## P4 Status
 
-### P4.1 Verification (2026-04-29)
+### P4.1 Verification (2026-04-30)
 
 **Trait definition:** `lib/std/traits.w:58-59` defines
 `fn next(mut self: Self) -> Option[T]`. Correct shape. ✓
 
 **Check 1 — For-loop desugaring calling convention:**
+
 `src/MirLower.w:2582` (`lower_for`) has hardcoded paths for:
 - Range literals (NK_RANGE) → `lower_for_range`
 - Range variables (TY_RANGE) → `lower_for_range_var`
@@ -289,9 +290,11 @@ Net: 13 `&mut` sites eliminated.
 - `vec.iter()` (method name == "iter" on Vec receiver) → `lower_for_vec`
 
 Generic iterator fallback (line 2630-2675): calls `self.mark_unsupported()`
-which forces fallback to AST codegen. The MIR it generates after that uses
-`OK_COPY` (line 2646) — consistent with `mut self: Self`, not `&mut self`.
-**Custom types implementing Iter[T] do NOT work in for-loops via MIR.**
+at line 2632. AST codegen has been removed — functions that hit this path
+get a hard error: "MIR lowering failed for function ... AST codegen was
+removed, so this function cannot be compiled."
+
+**`for x in custom_iter` is a compile-time error for any non-builtin type.**
 
 VecIter.next() (line 3921-3922): dispatched as `MIR_INTRINSIC_VECITER_NEXT`,
 entirely compiler-intrinsic. CodegenDispatch.w:3595 takes receiver as pointer
@@ -300,33 +303,63 @@ via `mir_intrinsic_recv_ptr` and mutates `idx` field in place (line 3644:
 with `mut self: Self` (struct self is passed as pointer, mutations visible
 to caller).
 
-**Check 2 — Iterator impl enumeration:**
-Types implementing Iter[T] in stdlib: **zero**. `grep -rn 'impl.*Iter\[' lib/std/`
-finds only `impl[T] IntoIter[T] for Vec[T]` (traits.w:69). No type has
-`impl Iter[T] for X`. VecIter[T] conceptually satisfies Iter[T] but does so
-through compiler intrinsics, not trait dispatch.
+Sema check_for (`src/SemaCheck.w:2554`) delegates to `infer_for_element_type`
+(line 7666), which is hardcoded for Range, Array, Slice, Vec — no trait
+dispatch. No `&mut` shape anywhere in the for-loop pipeline.
 
-IntoIter[T] trait (traits.w:62-63) returns `VecIter[T]`, not a generic
+**Check 2 — Iterator impl enumeration:**
+
+Types implementing `Iter[T]` in stdlib: **zero**. No `impl Iter[T] for X`
+blocks exist anywhere in `lib/std/`. `VecIter[T]` (defined in
+`lib/std/collections.w:52`) has no source-level `next()` method — its
+`next()` is a compiler intrinsic.
+
+`IntoIter[T]` (traits.w:62-63) returns `VecIter[T]`, not a generic
 iterator. Only impl is `Vec[T]` (traits.w:69-71).
 
-**Check 3 — Behavioral tests:**
-- `test/behavior/behav_iter_mut_self.w`: Manual while-loop calling
-  `iter.next()` on VecIter[i32] and VecIter[str]. Passes. ✓
-- `test/behavior/behav_for_iter_mut_self.w`: For-loop over `nums.iter()`
-  and directly over Vec. Passes. ✓
-- Full `make test`: 723 pass, 1 pre-existing failure (issue114_condition_assign).
-  No regressions. ✓
+No range iterators, string char/byte iterators, or HashMap iterators exist
+as types with `next()`. All for-loop iteration for these types goes through
+hardcoded MIR lowering paths, not trait dispatch.
 
-**Conclusion:** P4.1 (trait definition shape) is complete. The operational
-iteration machinery is entirely intrinsic-based — VecIter.next() works through
-hardcoded compiler dispatch, not trait dispatch. Generic iterator protocol
-in MirLower.w (line 2630) is marked "not yet fully implemented" and falls
-back to AST codegen via `mark_unsupported()`.
+**Check 3 — Behavioral test:**
 
-**What this means for P11:** The `mut self: Self` shape on Iter.next is
-correct and the VecIter intrinsic path is ABI-compatible with it. Custom
-user-defined iterators in for-loops are a separate feature gap (generic
-iterator protocol), not a P4/P10/P11 blocker. P11 can proceed.
+Test: `test/behavior/behav_iter_mut_self.w` — defines `CountUp` struct
+implementing `impl Iter[i32] for CountUp` with `fn next(mut self: Self)`.
+
+- **Manual while-loop** calling `iter.next()`: **passes.** Output: `10`. ✓
+  The `mut self: Self` shape works — `self.current` is mutated and visible
+  across successive calls.
+- **For-loop** (`for x in iter`): **compile error.** ✗
+  ```
+  error: MIR lowering failed for function 'main' in
+  test/behavior/behav_iter_mut_self.w; AST codegen was removed,
+  so this function cannot be compiled
+  ```
+  MIR lowering hits the generic iterator fallback at MirLower.w:2632
+  (`mark_unsupported()`), which used to fall back to AST codegen. AST
+  codegen has been removed, so this is now a hard error.
+
+**Conclusion — GAP FOUND:**
+
+P4.1 is **partially complete**:
+- ✓ Trait definition has correct `mut self: Self` shape
+- ✓ `VecIter.next()` intrinsic is ABI-compatible with `mut self: Self`
+- ✓ Manual `.next()` calls on custom iterators work correctly
+- ✗ `for x in custom_iter` fails — generic iterator protocol in MIR is
+  unimplemented (`mark_unsupported()` + AST codegen removed)
+- ✗ Zero stdlib types formally implement `Iter[T]` via trait dispatch
+
+The gap is in MirLower.w: the generic iterator protocol (line 2630-2675)
+needs to be completed so that `for x in expr` works for any type
+implementing `Iter[T]`. The MIR it generates after `mark_unsupported()` is
+structurally correct (uses OK_COPY, builds Option switch) — the blocker is
+solely the `mark_unsupported()` call that prevents MIR codegen.
+
+**Impact on P11:** This gap exists independent of the `&mut` migration.
+Custom iterators in for-loops were broken before P4.1 too (AST codegen
+removal predates the mut migration). The `mut self: Self` trait shape is
+correct and the intrinsic path works. Whether this gap blocks P11 is a
+project-owner decision.
 
 ### P4.2 — AWAITING SUPERVISOR DECISION
 
