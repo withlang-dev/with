@@ -158,3 +158,9 @@ pub trait IndexGet[I, V] =
 pub trait IndexPlace[I, V] =
     fn get(self: &Self, index: I) -> V
     fn set(mut self: Self, index: I, value: V)
+
+// Vec, Array, and Slice have IndexPlace semantics via the compiler's
+// hardcoded place-projection machinery (PK_INDEX in MIR, GEP in codegen).
+// Formal `impl IndexPlace for Vec[T]` cannot be added until the compiler
+// supports compiling generic trait method bodies — currently MIR validation
+// rejects `self[index] = value` for unresolved T.
