@@ -9740,7 +9740,7 @@ fn ci_find_substr(haystack: str, needle: str) -> i32:
 // Collect all variable declarations in a goto-lowered function body.
 // Names are made unique at the declaration site because all locals are hoisted
 // into one With function scope.
-fn ci_find_hoisted_var_decl_index(decls: &Vec[CiHoistedVarDecl], name: str) -> i32:
+fn ci_find_hoisted_var_decl_index(decls: Vec[CiHoistedVarDecl], name: str) -> i32:
     var i = 0
     while i < decls.len() as i32:
         if decls.get(i as i64).name == name:
@@ -9748,7 +9748,8 @@ fn ci_find_hoisted_var_decl_index(decls: &Vec[CiHoistedVarDecl], name: str) -> i
         i = i + 1
     -1
 
-fn ci_collect_var_decls(session: i64, cursor: i32, decls: &mut Vec[CiHoistedVarDecl]):
+fn ci_collect_var_decls(session: i64, cursor: i32, decls_in: Vec[CiHoistedVarDecl]) -> Vec[CiHoistedVarDecl]:
+    var decls = decls_in
     let kind = with_ci_cursor_kind(session, cursor)
     if kind == CXK_DECL_STMT:
         let nc = with_ci_num_children(session, cursor)
@@ -9762,12 +9763,12 @@ fn ci_collect_var_decls(session: i64, cursor: i32, decls: &mut Vec[CiHoistedVarD
                 if ci_find_hoisted_var_decl_index(decls, vname) < 0:
                     decls.push(CiHoistedVarDecl { name: vname, ty: vty_str })
             i = i + 1
-    // Recurse into children
     let nc = with_ci_num_children(session, cursor)
     var ci = 0
     while ci < nc:
-        ci_collect_var_decls(session, with_ci_child(session, cursor, ci), decls)
+        decls = ci_collect_var_decls(session, with_ci_child(session, cursor, ci), decls)
         ci = ci + 1
+    decls
 
 type CiGotoCfg {
     graph: StackifyGraph,
@@ -10211,9 +10212,9 @@ fn ci_goto_switch_case_new() -> CiGotoSwitchCase:
         default_block: -1,
     }
 
-fn ci_goto_switch_record_case(cases: &mut CiGotoSwitchCase, value: CiExprId, block: i32):
-    cases.values.push(value as i32)
-    cases.blocks.push(block)
+fn CiGotoSwitchCase.record_case(mut self: CiGotoSwitchCase, value: CiExprId, block: i32):
+    self.values.push(value as i32)
+    self.blocks.push(block)
 
 fn CiGotoCfgContext.lower_case_children(mut self: CiGotoCfgContext, session: i64, cursor: i32, first_child: i32, stmts: &mut CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, scope: str, cases: &mut CiGotoSwitchCase):
     let saved_cases = self.switch_cases
@@ -10257,7 +10258,7 @@ fn CiGotoCfgContext.lower_case_node(mut self: CiGotoCfgContext, session: i64, cu
         if (case_val as i32) == 0:
             self.fail("unsupported case value in goto CFG", with_ci_cursor_location(session, cursor))
             return
-        ci_goto_switch_record_case(cases, case_val, self.current)
+        cases.record_case(case_val, self.current)
         if nc >= 2:
             self.lower_case_children(session, cursor, 1, stmts, exprs, types, scope, cases)
         return
@@ -10631,12 +10632,14 @@ fn CiStmtPool.native_goto_label_syms(mut self: CiStmtPool, cfg: CiGotoCfg) -> Ve
         block = block + 1
     labels
 
-fn ci_native_goto_collect_leaf_ids(cfg: CiGotoCfg, block: i32, out: &mut Vec[i32]):
+fn ci_native_goto_collect_leaf_ids(cfg: CiGotoCfg, block: i32) -> Vec[i32]:
+    var out: Vec[i32] = Vec.new()
     var i: i64 = 0
     while i < cfg.stmt_ids.len():
         if cfg.stmt_blocks.get(i) == block:
             out.push(cfg.stmt_ids.get(i))
         i = i + 1
+    out
 
 fn CiStmtPool.native_goto_unreachable_stmt(mut self: CiStmtPool, exprs: &mut CiExprPool) -> CiStmtId:
     let name = exprs.add_string("unreachable")
@@ -10782,8 +10785,8 @@ fn CiGotoCfgContext.verify_labels(mut self: CiGotoCfgContext):
         i = i + 1
 
 fn CiStmtPool.lower_goto_body_stackify(mut self: CiStmtPool, session: i64, body_cursor: i32, scope: str, exprs: &mut CiExprPool, types: &mut CiTypePool) -> CiStmtId:
-    let hoisted_decls: Vec[CiHoistedVarDecl] = Vec.new()
-    ci_collect_var_decls(session, body_cursor, &mut hoisted_decls)
+    var hoisted_decls: Vec[CiHoistedVarDecl] = Vec.new()
+    hoisted_decls = ci_collect_var_decls(session, body_cursor, hoisted_decls)
 
     var hoisted_stmt_ids: Vec[i32] = Vec.new()
     var hvi: i32 = 0

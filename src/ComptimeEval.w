@@ -144,37 +144,37 @@ fn comptime_eval_result_invalid() -> ComptimeEvalResult:
         error_msg: "",
     }
 
-fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, diags: &mut DiagnosticList, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
+fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
     var sema = unsafe: *sema_ptr
     sema.ast = ast
     var evaluator = ComptimeEvaluator.init(sema, ast, pool, 0)
     let value = evaluator.eval_root(node)
     if evaluator.has_pending_diag != 0:
-        diags.emit(evaluator.pending_diag)
+        sema_ptr.diags.emit(evaluator.pending_diag)
     ComptimeEvalResult {
         value,
         extras: evaluator.extra_values,
         error_msg: evaluator.last_error_msg,
     }
 
-fn comptime_force_eval_expr_result(sema_ptr: *mut Sema, diags: &mut DiagnosticList, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
+fn comptime_force_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
     var sema = unsafe: *sema_ptr
     sema.ast = ast
     var evaluator = ComptimeEvaluator.init(sema, ast, pool, 1)
     let value = evaluator.eval_root(node)
     if evaluator.has_pending_diag != 0:
-        diags.emit(evaluator.pending_diag)
+        sema_ptr.diags.emit(evaluator.pending_diag)
     ComptimeEvalResult {
         value,
         extras: evaluator.extra_values,
         error_msg: evaluator.last_error_msg,
     }
 
-fn comptime_try_eval_expr(sema_ptr: *mut Sema, diags: &mut DiagnosticList, ast: AstPool, pool: InternPool, node: i32) -> ComptimeValue:
-    comptime_try_eval_expr_result(sema_ptr, diags, ast, pool, node).value
+fn comptime_try_eval_expr(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeValue:
+    comptime_try_eval_expr_result(sema_ptr, ast, pool, node).value
 
-fn comptime_force_eval_expr(sema_ptr: *mut Sema, diags: &mut DiagnosticList, ast: AstPool, pool: InternPool, node: i32) -> ComptimeValue:
-    comptime_force_eval_expr_result(sema_ptr, diags, ast, pool, node).value
+fn comptime_force_eval_expr(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeValue:
+    comptime_force_eval_expr_result(sema_ptr, ast, pool, node).value
 
 fn ComptimeEvaluator.eval_root(self: ComptimeEvaluator, node: i32) -> ComptimeValue:
     let signal = self.eval_expr(node)
@@ -1522,7 +1522,7 @@ fn ComptimeEvaluator.eval_expr(self: ComptimeEvaluator, node: i32) -> ComptimeCo
     self.unsupported(node)
 
 fn Sema.force_eval_comptime_expr(mut self: Sema, node: i32) -> i32:
-    let value = comptime_force_eval_expr(self as *mut Sema, &mut self.diags, self.ast, self.pool, node)
+    let value = comptime_force_eval_expr(self as *mut Sema, self.ast, self.pool, node)
     comptime_value_is_valid(value)
 
 fn Sema.check_top_level_comptime_let_values(mut self: Sema):

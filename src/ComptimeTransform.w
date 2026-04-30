@@ -175,10 +175,10 @@ fn AstPool.ct_clone_leaf(mut self: AstPool, node: i32) -> i32:
 fn AstPool.ct_empty_block(mut self: AstPool, node: i32) -> i32:
     self.add_node(NodeKind.NK_BLOCK, self.get_start(node), self.get_end(node), self.extra_len(), 0, 0) as i32
 
-fn ct_fresh_sym(intern: &mut InternPool, prefix: str, seed: i32) -> i32:
+fn ct_fresh_sym(intern: InternPool, prefix: str, seed: i32) -> i32:
     intern.intern(prefix ++ f"{seed}" ++ "_" ++ f"{intern.symbol_count() + 1}")
 
-fn ct_build_type_expr(pool: &mut AstPool, intern: &mut InternPool, sema: &Sema, type_id: i32, node: i32) -> i32:
+fn ct_build_type_expr(pool: &mut AstPool, intern: InternPool, sema: &Sema, type_id: i32, node: i32) -> i32:
     let resolved = sema.resolve_alias(type_id)
     let start = pool.get_start(node)
     let end = pool.get_end(node)
@@ -270,7 +270,7 @@ fn AstPool.ct_build_call(mut self: AstPool, node: i32, callee: i32, args: Vec[i3
         self.add_extra(args.get(ai as i64))
     self.add_node(NodeKind.NK_CALL, self.get_start(node), self.get_end(node), callee, extra_start, args.len() as i32) as i32
 
-fn ct_build_collection_ctor(pool: &mut AstPool, intern: &mut InternPool, sema: &Sema, type_id: i32, node: i32) -> i32:
+fn ct_build_collection_ctor(pool: &mut AstPool, intern: InternPool, sema: &Sema, type_id: i32, node: i32) -> i32:
     let type_node = ct_build_type_expr(pool, intern, sema, type_id, node)
     if type_node == 0:
         return 0
@@ -279,7 +279,7 @@ fn ct_build_collection_ctor(pool: &mut AstPool, intern: &mut InternPool, sema: &
     let no_args: Vec[i32] = Vec.new()
     pool.ct_build_call(node, callee as i32, no_args)
 
-fn ct_build_typed_binding(pool: &mut AstPool, intern: &mut InternPool, sema: &Sema, name_sym: i32, value: i32, type_id: i32, node: i32, is_mut: i32) -> i32:
+fn ct_build_typed_binding(pool: &mut AstPool, intern: InternPool, sema: &Sema, name_sym: i32, value: i32, type_id: i32, node: i32, is_mut: i32) -> i32:
     let type_node = ct_build_type_expr(pool, intern, sema, type_id, node)
     if type_node == 0:
         return 0
@@ -288,7 +288,7 @@ fn ct_build_typed_binding(pool: &mut AstPool, intern: &mut InternPool, sema: &Se
     let flags = (if is_mut != 0: 1 else: 0) + (type_extra + 1) * 2
     pool.add_node(NodeKind.NK_LET_BINDING, pool.get_start(node), pool.get_end(node), name_sym, value, flags) as i32
 
-fn ct_build_vec_value_tree(pool: &mut AstPool, intern: &mut InternPool, sema: &Sema, value: ComptimeValue, node: i32, extras: Vec[ComptimeValue]) -> i32:
+fn ct_build_vec_value_tree(pool: &mut AstPool, intern: InternPool, sema: &Sema, value: ComptimeValue, node: i32, extras: Vec[ComptimeValue]) -> i32:
     let tmp_sym = ct_fresh_sym(intern, "__ct_vec_", node)
     let ctor = ct_build_collection_ctor(pool, intern, sema, value.type_id, node)
     if ctor == 0:
@@ -315,7 +315,7 @@ fn ct_build_vec_value_tree(pool: &mut AstPool, intern: &mut InternPool, sema: &S
     let tail = pool.add_node(NodeKind.NK_IDENT, pool.get_start(node), pool.get_end(node), tmp_sym, 0, 0)
     pool.add_node(NodeKind.NK_BLOCK, pool.get_start(node), pool.get_end(node), stmt_extra, stmts.len() as i32, tail as i32) as i32
 
-fn ct_build_map_value_tree(pool: &mut AstPool, intern: &mut InternPool, sema: &Sema, value: ComptimeValue, node: i32, extras: Vec[ComptimeValue]) -> i32:
+fn ct_build_map_value_tree(pool: &mut AstPool, intern: InternPool, sema: &Sema, value: ComptimeValue, node: i32, extras: Vec[ComptimeValue]) -> i32:
     let tmp_sym = ct_fresh_sym(intern, "__ct_map_", node)
     let ctor = ct_build_collection_ctor(pool, intern, sema, value.type_id, node)
     if ctor == 0:
@@ -344,7 +344,7 @@ fn ct_build_map_value_tree(pool: &mut AstPool, intern: &mut InternPool, sema: &S
     let tail = pool.add_node(NodeKind.NK_IDENT, pool.get_start(node), pool.get_end(node), tmp_sym, 0, 0)
     pool.add_node(NodeKind.NK_BLOCK, pool.get_start(node), pool.get_end(node), stmt_extra, stmts.len() as i32, tail as i32) as i32
 
-fn ct_build_value_tree(pool: &mut AstPool, intern: &mut InternPool, sema: &Sema, value: ComptimeValue, node: i32, extras: Vec[ComptimeValue]) -> i32:
+fn ct_build_value_tree(pool: &mut AstPool, intern: InternPool, sema: &Sema, value: ComptimeValue, node: i32, extras: Vec[ComptimeValue]) -> i32:
     if value.kind == ComptimeValueKind.CV_INT:
         return pool.add_node(
             NodeKind.NK_INT_LIT,
@@ -428,7 +428,7 @@ fn ct_build_value_tree(pool: &mut AstPool, intern: &mut InternPool, sema: &Sema,
     0
 
 fn ct_eval_truthy(source_ast: AstPool, sema: &mut Sema, node: i32) -> i32:
-    let value = comptime_force_eval_expr(sema as *mut Sema, &mut sema.diags, source_ast, sema.pool, node)
+    let value = comptime_force_eval_expr(sema as *mut Sema, source_ast, sema.pool, node)
     if comptime_value_is_valid(value) == 0:
         return 0 - 1
     let truthy = comptime_value_truthy(value)
@@ -437,7 +437,7 @@ fn ct_eval_truthy(source_ast: AstPool, sema: &mut Sema, node: i32) -> i32:
     ct_emit_error(sema, source_ast, node, "comptime condition must be bool or integer")
     0 - 1
 
-fn ct_transform_fstring(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, intern: &mut InternPool, node: i32):
+fn ct_transform_fstring(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, intern: InternPool, node: i32):
     let seg_count = pool.get_data0(node)
     let extra_start = pool.get_data1(node)
     var pos = extra_start
@@ -454,7 +454,7 @@ fn ct_transform_fstring(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema
             pool.extra.set_i32((pos + 2) as i64, ct_transform_expr(source_ast, pool, sema, intern, spec_node))
         pos = pos + 3
 
-fn ct_transform_match_arm(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, intern: &mut InternPool, node: i32):
+fn ct_transform_match_arm(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, intern: InternPool, node: i32):
     let body = pool.get_data1(node)
     let guard = pool.get_data2(node)
     if body != 0:
@@ -462,7 +462,7 @@ fn ct_transform_match_arm(source_ast: AstPool, pool: &mut AstPool, sema: &mut Se
     if guard != 0:
         pool.set_data2(node, ct_transform_expr(source_ast, pool, sema, intern, guard))
 
-fn ct_rewrite_comptime_if(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, intern: &mut InternPool, wrapper: i32, inner: i32) -> i32:
+fn ct_rewrite_comptime_if(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, intern: InternPool, wrapper: i32, inner: i32) -> i32:
     let cond = pool.get_data0(inner)
     let truthy = ct_eval_truthy(source_ast, sema, cond)
     if truthy < 0:
@@ -487,7 +487,7 @@ fn ct_iter_count(value: ComptimeValue) -> i32:
         return span as i32
     0 - 1
 
-fn ct_iter_item_node(pool: &mut AstPool, intern: &mut InternPool, sema: &Sema, iterable: ComptimeValue, index: i32, node: i32, extras: Vec[ComptimeValue]) -> i32:
+fn ct_iter_item_node(pool: &mut AstPool, intern: InternPool, sema: &Sema, iterable: ComptimeValue, index: i32, node: i32, extras: Vec[ComptimeValue]) -> i32:
     if iterable.kind == ComptimeValueKind.CV_RANGE:
         let item = comptime_value_int(0, iterable.data0 + index as i64)
         return ct_build_value_tree(pool, intern, sema, item, node, extras)
@@ -511,7 +511,7 @@ fn ct_sync_sema_ast(sema: &mut Sema, pool: &AstPool):
     let live_ast = unsafe: *pool
     sema.ast = live_ast
 
-fn ct_try_fold_type_call(pool: &mut AstPool, sema: &mut Sema, intern: &mut InternPool, node: i32) -> i32:
+fn ct_try_fold_type_call(pool: &mut AstPool, sema: &mut Sema, intern: InternPool, node: i32) -> i32:
     if node == 0 or pool.kind(node) != NodeKind.NK_CALL:
         return node
     ct_sync_sema_ast(sema, pool)
@@ -524,7 +524,7 @@ fn ct_try_fold_type_call(pool: &mut AstPool, sema: &mut Sema, intern: &mut Inter
     if sema.static_receiver_type_is_known(recv) == 0:
         return node
     let eval_ast = unsafe: *pool
-    let evald = comptime_try_eval_expr_result(sema as *mut Sema, &mut sema.diags, eval_ast, sema.pool, node)
+    let evald = comptime_try_eval_expr_result(sema as *mut Sema, eval_ast, sema.pool, node)
     if comptime_value_is_valid(evald.value) == 0:
         return node
     let folded = ct_build_value_tree(pool, intern, sema, evald.value, node, evald.extras)
@@ -841,9 +841,9 @@ fn AstPool.ct_clone_tree_with_subst(mut self: AstPool, node: i32, subst_sym: i32
 
     self.ct_clone_leaf(node)
 
-fn ct_rewrite_comptime_for(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, intern: &mut InternPool, wrapper: i32, inner: i32) -> i32:
+fn ct_rewrite_comptime_for(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, intern: InternPool, wrapper: i32, inner: i32) -> i32:
     let iterable_node = pool.get_data1(inner)
-    let evald = comptime_force_eval_expr_result(sema as *mut Sema, &mut sema.diags, source_ast, sema.pool, iterable_node)
+    let evald = comptime_force_eval_expr_result(sema as *mut Sema, source_ast, sema.pool, iterable_node)
     let iterable = evald.value
     if comptime_value_is_valid(iterable) == 0:
         return wrapper
@@ -876,7 +876,7 @@ fn ct_rewrite_comptime_for(source_ast: AstPool, pool: &mut AstPool, sema: &mut S
         pool.add_extra(stmt_nodes.get(i as i64))
     pool.add_node(NodeKind.NK_BLOCK, pool.get_start(wrapper), pool.get_end(wrapper), stmt_extra, iter_count, 0) as i32
 
-fn ct_rewrite_comptime(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, intern: &mut InternPool, node: i32) -> i32:
+fn ct_rewrite_comptime(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, intern: InternPool, node: i32) -> i32:
     let inner = pool.get_data0(node)
     if inner == 0:
         return pool.ct_empty_block(node)
@@ -889,7 +889,7 @@ fn ct_rewrite_comptime(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema,
         return ct_rewrite_comptime_for(source_ast, pool, sema, intern, node, inner)
 
     let diag_count_before = sema.diags.count()
-    let evald = comptime_force_eval_expr_result(sema as *mut Sema, &mut sema.diags, source_ast, sema.pool, inner)
+    let evald = comptime_force_eval_expr_result(sema as *mut Sema, source_ast, sema.pool, inner)
     let value = evald.value
     if comptime_value_is_valid(value) == 0:
         if evald.error_msg.len() > 0 and sema.diags.count() == diag_count_before:
@@ -901,7 +901,7 @@ fn ct_rewrite_comptime(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema,
         return node
     folded
 
-fn ct_transform_expr(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, intern: &mut InternPool, node: i32) -> i32:
+fn ct_transform_expr(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, intern: InternPool, node: i32) -> i32:
     if node == 0:
         return 0
     ct_sync_sema_ast(sema, pool)
@@ -946,7 +946,7 @@ fn ct_transform_expr(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, i
         pool.set_data0(node, base)
         pool.set_data1(node, field_expr)
         let eval_ast = unsafe: *pool
-        let evald = comptime_try_eval_expr_result(sema as *mut Sema, &mut sema.diags, eval_ast, sema.pool, field_expr)
+        let evald = comptime_try_eval_expr_result(sema as *mut Sema, eval_ast, sema.pool, field_expr)
         if comptime_value_is_valid(evald.value) == 0:
             return node
         if evald.value.kind != ComptimeValueKind.CV_STR:
@@ -1138,7 +1138,7 @@ fn ct_transform_expr(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, i
 
     node
 
-fn ct_transform_fn_param_defaults(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, intern: &mut InternPool, fn_node: i32):
+fn ct_transform_fn_param_defaults(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, intern: InternPool, fn_node: i32):
     let meta = pool.find_fn_meta(fn_node)
     if meta < 0:
         return
@@ -1150,7 +1150,7 @@ fn ct_transform_fn_param_defaults(source_ast: AstPool, pool: &mut AstPool, sema:
             continue
         pool.set_fn_param_default(param_start, pi, ct_transform_expr(source_ast, pool, sema, intern, default_node))
 
-fn ct_transform_trait_decl(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, intern: &mut InternPool, node: i32):
+fn ct_transform_trait_decl(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, intern: InternPool, node: i32):
     var pos = pool.get_data1(node)
     let _tp_count = pool.get_extra(pos)
     pos = pos + 1
@@ -1176,7 +1176,7 @@ fn ct_transform_trait_decl(source_ast: AstPool, pool: &mut AstPool, sema: &mut S
                 pool.set_fn_param_default(param_start, pi, ct_transform_expr(source_ast, pool, sema, intern, default_node))
         pos = pos + 6
 
-fn ct_transform_type_decl(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, intern: &mut InternPool, node: i32):
+fn ct_transform_type_decl(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, intern: InternPool, node: i32):
     let packed = pool.get_data2(node)
     let sub_kind = type_decl_sub_kind(packed)
     if sub_kind != TypeDeclKind.Struct and sub_kind != TypeDeclKind.Union:
@@ -1213,7 +1213,7 @@ fn ct_source_decl_is_local(ast: AstPool, decl_index: i32) -> i32:
         return 1
     0
 
-fn ct_transform_decl(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, intern: &mut InternPool, node: i32):
+fn ct_transform_decl(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, intern: InternPool, node: i32):
     let kind = pool.kind(node)
     if kind == NodeKind.NK_FN_DECL:
         let body = pool.get_data1(node)
@@ -1233,7 +1233,7 @@ fn ct_transform_decl(source_ast: AstPool, pool: &mut AstPool, sema: &mut Sema, i
         ct_transform_trait_decl(source_ast, pool, sema, intern, node)
         return
 
-fn comptime_transform_module(source_ast: AstPool, sema: &mut Sema, intern: &mut InternPool) -> AstPool:
+fn comptime_transform_module(source_ast: AstPool, sema: &mut Sema, intern: InternPool) -> AstPool:
     var out = astpool_clone_deep(source_ast)
 
     let clone_trait_sym = intern.intern("Clone")
@@ -1319,7 +1319,7 @@ fn comptime_transform_module(source_ast: AstPool, sema: &mut Sema, intern: &mut 
     sema.decl_source_file_ids = ordered_file_ids
     sema.decl_is_c_import = ordered_ci
 
-    let transform_pool = unsafe: *intern
+    let transform_pool = intern
     var transform_sema = Sema.init(transform_pool, sema.diags, out)
     transform_sema.source_text = sema.source_text
     transform_sema.decl_source_paths = sema.decl_source_paths
