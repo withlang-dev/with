@@ -1,16 +1,14 @@
 # P10 Structural `&mut` Sites Audit
 
 Comprehensive audit of all `&mut` code sites (lines containing `&mut`)
-remaining after p10.12–p10.21. Started at 221 sites; reduced to 154 via
-p10.17–p10.21. Note: ComptimeTransform.w diag-threading (p10.21) traded 13
-`diags: &mut DiagnosticList` params for 5 `&mut sema.diags` call sites — net
-line count went up but 13 threaded parameters were eliminated.
+remaining after p10.12–p10.22. Started at 221 sites; reduced to 138 via
+p10.17–p10.22.
 
 ## Codebase-Wide Summary
 
 | File | Sites | Category |
 |------|-------|----------|
-| src/CImport.w | 82 | multi-pool params, coercions, free fns |
+| src/CImport.w | 66 | multi-pool params, genuine coercions, free fns |
 | src/ComptimeEval.w | 5 | entry-point free fns (4 sigs + 1 call site) |
 | src/ComptimeTransform.w | 29 | multi-pool params + `&mut sema.diags` call sites |
 | src/compiler/Frontend.w | 6 | multi-pool params (Sema, HashMap, Vec) |
@@ -30,7 +28,7 @@ line count went up but 13 threaded parameters were eliminated.
 | src/bootstrap_main.w | 1 | help text string |
 | lib/std/traits.w | 1 | `multi_index_set(self: &mut Self, ...)` (deprecated) |
 | lib/std/cfg/stackify.w | 1 | comment |
-| **Total** | **154** | |
+| **Total** | **138** | |
 
 ## Actionable Sites by Category
 
@@ -161,6 +159,32 @@ They stay as-is (the text is describing syntax, not using it).
 
 `fn multi_index_set(self: &mut Self, ...)` — deprecated alias, removed at P12.
 
+## CImport.w 66-site Audit
+
+After p10.22 coercion downgrades. 54 in function declarations, 11 in call
+sites, 1 comment.
+
+**Function declarations (54):** All are methods on pool types (CiStmtPool,
+CiExprPool, CiGotoCfgContext, CiStackEmitContext) or free utility functions.
+Every `&mut Pool` param was verified by the p10.18 build-driven oracle as
+genuinely needing mutability. The remaining pattern is multi-pool threading:
+methods that operate on one pool (`mut self`) while passing another pool
+(`&mut OtherPool`) to sub-calls. No further read-only downgrades are available.
+
+**Call-site coercions (11):** `&mut exprs`/`&mut types` passed to methods
+that genuinely mutate them (6 sites), `&mut self` to mutating methods (3),
+`&mut cases`/`&mut hoisted_decls` to functions that push to Vec/struct (2).
+
+**Comment (1):** Line 11283 describes `&mut self` in a comment.
+
+**Free functions (3):** `ci_collect_var_decls` (pushes to `&mut Vec`),
+`ci_goto_switch_record_case` (writes to `&mut CiGotoSwitchCase`),
+`ci_native_goto_collect_leaf_ids` (pushes to `&mut Vec`). All genuine
+mutations. Method extraction possible but marginal gain.
+
+**p10.22 eliminated 18 call-site coercions** where `&mut self` was passed to
+free functions that only needed `&Pool`. Changed to `&self` at call sites.
+
 ## Diag-Threading Pilot: ComptimeEval.w
 
 ### Design Decision
@@ -246,6 +270,7 @@ Net: 13 `&mut` sites eliminated.
 | 3 | A: ComptimeEval.w diag-threading | 39 | **DONE** (p10.19) |
 | 4 | F: CImport.w push/pop → CiGotoCfgContext methods | 16 | **DONE** (p10.20) |
 | 5 | ComptimeTransform.w diag → sema.diags | 13 params | **DONE** (p10.21) |
+| 6 | CImport.w call-site coercion downgrades | 16 lines | **DONE** (p10.22) |
 | — | E,G,H,I: exempt or deferred to P12 | ~30 | — |
 
 ## Permanent Exemptions

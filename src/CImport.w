@@ -4450,8 +4450,8 @@ fn CiStmtPool.render_value_expr_ir(mut self: CiStmtPool, session: i64, cursor: i
     let tail_stmt = self.expr_stmt(lowered.value_expr)
     let body_stmt = self.merge_ir( lowered.setup_stmt, tail_stmt)
     if migrate_prefer_brace():
-        return "with 0 as " ++ seq_name ++ " {\n" ++ ci_print_compact_stmt(&mut self, exprs, types, body_stmt, 4) ++ "}"
-    "with 0 as " ++ seq_name ++ ":\n" ++ ci_print_compact_stmt(&mut self, exprs, types, body_stmt, 4)
+        return "with 0 as " ++ seq_name ++ " {\n" ++ ci_print_compact_stmt(&self, exprs, types, body_stmt, 4) ++ "}"
+    "with 0 as " ++ seq_name ++ ":\n" ++ ci_print_compact_stmt(&self, exprs, types, body_stmt, 4)
 
 fn ci_cursor_is_simple_storage_ref(session: i64, cursor: i32) -> bool:
     let kind = with_ci_cursor_kind(session, cursor)
@@ -4733,10 +4733,10 @@ fn ci_expr_is_string_lit(exprs: &CiExprPool, id: CiExprId) -> bool:
 fn CiExprPool.coerce_init_expr_to_type(mut self: CiExprPool, types: &mut CiTypePool, value_id: CiExprId, ty: str) -> CiExprId:
     if (value_id as i32) == 0 or ty.len() == 0:
         return value_id
-    if ci_expr_is_zero_int_lit(&mut self, value_id) and (ci_starts_with(ty, "*") or ci_starts_with(ty, "Option[")):
+    if ci_expr_is_zero_int_lit(&self, value_id) and (ci_starts_with(ty, "*") or ci_starts_with(ty, "Option[")):
         let ty_id = types.type_from_translated_text(ty)
         return self.null_ptr(ty_id)
-    if ci_expr_is_string_lit(&mut self, value_id) and ci_starts_with(ty, "*"):
+    if ci_expr_is_string_lit(&self, value_id) and ci_starts_with(ty, "*"):
         let target_ty = types.type_from_translated_text(ty)
         if (target_ty as i32) == 0:
             return value_id
@@ -5010,7 +5010,7 @@ fn CiExprPool.lower_expr_ir(mut self: CiExprPool, session: i64, cursor: i32, typ
             let arr_id = self.lower_expr_ir(session, arr_cursor, types, scope)
             let idx_id = self.lower_expr_ir(session, idx_cursor, types, scope)
             if (arr_id as i32) != 0 and (idx_id as i32) != 0:
-                let raw_ptr_index = ci_index_base_is_raw_pointer(session, arr_cursor, arr_id, &mut self, types)
+                let raw_ptr_index = ci_index_base_is_raw_pointer(session, arr_cursor, arr_id, &self, types)
                 return self.add(CiExprKind.CIE_INDEX, arr_id as i32, idx_id as i32, raw_ptr_index, 0 as CiTypeId)
         return 0 as CiExprId
 
@@ -5200,8 +5200,8 @@ fn CiExprPool.lower_binary_simple(mut self: CiExprPool, session: i64, cursor: i3
     var lhs_value = lhs_id
     var rhs_value = rhs_id
     if op != BO_ASSIGN:
-        let lhs_str = ci_print_expr(&mut self, types, lhs_id, 0, 0)
-        let rhs_str = ci_print_expr(&mut self, types, rhs_id, 0, 0)
+        let lhs_str = ci_print_expr(&self, types, lhs_id, 0, 0)
+        let rhs_str = ci_print_expr(&self, types, rhs_id, 0, 0)
         let lhs_large = ci_is_large_decimal(lhs_str)
         let rhs_large = ci_is_large_decimal(rhs_str)
         let operand_unsigned = ci_non_literal_operand_is_unsigned(session, lhs_cursor, rhs_cursor, lhs_large, rhs_large)
@@ -5331,8 +5331,8 @@ fn CiExprPool.lower_binary_comparison(mut self: CiExprPool, session: i64, cursor
     rhs_id = self.decay_binary_comparison_array_operands(session, lhs_cursor, lhs_id, rhs_cursor, rhs_id, 0, types)
     if (rhs_id as i32) == 0:
         return 0 as CiExprId
-    let lhs_str = ci_print_expr(&mut self, types, lhs_id, 0, 0)
-    let rhs_str = ci_print_expr(&mut self, types, rhs_id, 0, 0)
+    let lhs_str = ci_print_expr(&self, types, lhs_id, 0, 0)
+    let rhs_str = ci_print_expr(&self, types, rhs_id, 0, 0)
 
     // Large-decimal operands get the `(... as c_uint)` cast treatment
     // in the legacy's non-comparison path, but the comparison path
@@ -5685,7 +5685,7 @@ fn CiExprPool.cast_if_needed(mut self: CiExprPool, target_ty_id: CiTypeId, inner
         return inner_id
     if types.kind(target_ty_id) == CiTypeKind.CT_VOID:
         return inner_id
-    if types.kind(target_ty_id) == CiTypeKind.CT_POINTER and ci_expr_is_zero_int_lit(&mut self, inner_id):
+    if types.kind(target_ty_id) == CiTypeKind.CT_POINTER and ci_expr_is_zero_int_lit(&self, inner_id):
         return self.null_ptr(target_ty_id)
     let target_str = ci_print_type(types, target_ty_id)
     let inner_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, inner_cursor))
@@ -6088,8 +6088,8 @@ fn CiExprPool.build_binary_value_expr_from_ids(mut self: CiExprPool, session: i6
     if lhs_is_ptr or rhs_is_ptr or lhs_is_array or rhs_is_array:
         return 0 as CiExprId
 
-    let lhs_text = ci_print_expr(&mut self, types, lhs_id, 0, 0)
-    let rhs_text = ci_print_expr(&mut self, types, rhs_id, 0, 0)
+    let lhs_text = ci_print_expr(&self, types, lhs_id, 0, 0)
+    let rhs_text = ci_print_expr(&self, types, rhs_id, 0, 0)
     let lhs_large = ci_is_large_decimal(lhs_text)
     let rhs_large = ci_is_large_decimal(rhs_text)
     let operand_unsigned = ci_non_literal_operand_is_unsigned(session, lhs_cursor, rhs_cursor, lhs_large, rhs_large)
@@ -6103,7 +6103,7 @@ fn CiExprPool.build_binary_value_expr_from_ids(mut self: CiExprPool, session: i6
         var shift_lhs_anchor_ty_str = ""
         if ci_type_is_integer_shift_anchor(shift_result_ty_str):
             shift_lhs_anchor_ty_str = shift_result_ty_str
-        else if ci_shift_lhs_needs_integer_promotion(lhs_ty_str, lhs_peeled_ty, lhs_expr_ty_str) or ci_index_expr_element_type_is_small_int(&mut self, types, lhs_id) or ci_array_subscript_element_type_is_small_int(session, lhs_cursor) or ci_expr_tree_contains_small_int(&mut self, types, lhs_id, 0):
+        else if ci_shift_lhs_needs_integer_promotion(lhs_ty_str, lhs_peeled_ty, lhs_expr_ty_str) or ci_index_expr_element_type_is_small_int(&self, types, lhs_id) or ci_array_subscript_element_type_is_small_int(session, lhs_cursor) or ci_expr_tree_contains_small_int(&self, types, lhs_id, 0):
             shift_lhs_anchor_ty_str = "c_int"
         if ci_type_is_small_int(shift_lhs_anchor_ty_str):
             shift_lhs_anchor_ty_str = "c_int"
@@ -6112,12 +6112,12 @@ fn CiExprPool.build_binary_value_expr_from_ids(mut self: CiExprPool, session: i6
             if (shift_lhs_anchor_ty as i32) == 0:
                 return 0 as CiExprId
             lhs_value = self.cast(shift_lhs_anchor_ty, lhs_value)
-        else if ci_shift_lhs_needs_integer_promotion(lhs_ty_str, lhs_peeled_ty, lhs_expr_ty_str) or ci_index_expr_element_type_is_small_int(&mut self, types, lhs_id) or ci_array_subscript_element_type_is_small_int(session, lhs_cursor) or ci_expr_tree_contains_small_int(&mut self, types, lhs_id, 0):
+        else if ci_shift_lhs_needs_integer_promotion(lhs_ty_str, lhs_peeled_ty, lhs_expr_ty_str) or ci_index_expr_element_type_is_small_int(&self, types, lhs_id) or ci_array_subscript_element_type_is_small_int(session, lhs_cursor) or ci_expr_tree_contains_small_int(&self, types, lhs_id, 0):
             let c_int_ty = types.named_type_from_text("c_int")
             if (c_int_ty as i32) == 0:
                 return 0 as CiExprId
             lhs_value = self.cast(c_int_ty, lhs_value)
-    if (op == BO_SHL or op == BO_SHR) and self.kind(lhs_value) != CiExprKind.CIE_CAST and ci_expr_tree_contains_small_int(&mut self, types, rhs_value, 0):
+    if (op == BO_SHL or op == BO_SHR) and self.kind(lhs_value) != CiExprKind.CIE_CAST and ci_expr_tree_contains_small_int(&self, types, rhs_value, 0):
         let c_int_ty = types.named_type_from_text("c_int")
         if (c_int_ty as i32) == 0:
             return 0 as CiExprId
@@ -10837,7 +10837,7 @@ fn CiStmtPool.lower_goto_body_stackify(mut self: CiStmtPool, session: i64, body_
     while hi < hoisted_stmt_ids.len():
         ids.push(hoisted_stmt_ids.get(hi))
         hi = hi + 1
-    ids = ci_stmt_collect_flat_ids(&mut self, body_id, ids)
+    ids = ci_stmt_collect_flat_ids(&self, body_id, ids)
     self.from_flat_ids(&ids)
 
 // Find a function cursor in the cursor tree by name.
