@@ -427,62 +427,98 @@ passes the method sym + receiver + args to codegen, which dispatches via
 the AST node's sema information. This is the same path used for disc enum
 methods, Option methods, and concrete/generic struct methods.
 
-### P4.2 — IndexPlace Trait Dispatch — Design Analysis
+### P4.2 — IndexPlace Implementation
 
-**Status:** AWAITING SUPERVISOR DECISION — proposed reclassification to P7.
+**Status:** implementing.
 
-**Trait definition** (lib/std/traits.w:158-160): `IndexPlace[I, V]` with
-`get(self: &Self, index: I) -> V` and `set(mut self: Self, index: I, value: V)`.
-Zero impls exist. Compiler integration: none.
+#### Spec references
 
-**Current `check_index` (SemaCheck.w:2817-2920) — fully hardcoded:**
+- **§2.4**: IndexPlace is a syntax trait. `P[i]` is a place projection only
+  when P's type implements IndexPlace. The compiler operates on the indexed
+  slot directly — no get/set value copies.
+- **§6.2**: Nested mutation (`xs[i].field = v`, `xs[i].method()`) operates on
+  storage directly. Non-Copy elements can't be moved out and back.
+- **§6.3**: Single-evaluation rule. `xs[f()] += g()` evaluates f() and g()
+  exactly once. Read and write happen as place operations on the same
+  projection.
+- **§19.7**: v1 may restrict IndexPlace to stdlib types. User-defined impls
+  are a follow-up design question.
+- **§20.3**: v1 hardcodes for Vec, Array, similar. The compiler's place-
+  projection machinery handles indexed projections alongside field projections.
 
-The function handles five cases via type kind matching:
-1. `TY_PTR` → unsafe pointer indexing, elem_ty from `get_type_d0` (line 2831)
-2. `TY_ARRAY` → elem_ty from `get_type_d0` (line 2852)
-3. `TY_SLICE` → elem_ty from `get_type_d0` (line 2857)
-4. `TY_GENERIC_INST` base "Vec" → elem_ty from generic arg (line 2862-2876)
-5. `TY_STRUCT` + ident base → type-level indexing for `Vec[T]`, `HashMap[K,V]` construction (line 2880-2919)
+#### v1 scope: stdlib-only, hardcoded recognition
 
-No fallback to trait lookup. Returns 0 (error) for unknown types.
+Per §19.7 and §20.3, v1 restricts IndexPlace to stdlib types recognized by
+the compiler: Vec, Array, Slice. These already have hardcoded fast paths in
+both `check_index` (sema) and `lower_index` (MIR). The recognition mechanism
+is existing name/type-kind matching — no attribute or whitelist needed because
+the types are compiler-built-in.
 
-**Current `lower_index` (MirLower.w:2046-2063) — generic but type-agnostic:**
+Formal `impl IndexPlace` blocks are added to `lib/std/traits.w` so the type
+system records the relationship. The compiler does NOT use trait lookup for
+v1 dispatch — the hardcoded type checks are the dispatch mechanism.
 
-Creates a place via `new_index_place(base, idx_local, elem_ty)`. This is a
-MIR place projection, not a function call. Codegen resolves index places to
-GEP instructions for arrays/slices/vecs. For trait-dispatched indexing, we'd
-need to emit a method CALL instead of a place projection.
+#### Existing behavior (already correct for v1)
 
-**What IndexPlace integration requires:**
+Testing confirms that the compiler's place-projection machinery already
+handles IndexPlace semantics for Vec/Array/Slice:
 
-1. **Sema (check_index):** After all hardcoded cases, look up
-   `impl IndexPlace[I, V] for T` in the impl registry. Extract V as result type.
-   Requires: `select_trait_impl(type_name, indexplace_sym)` + extracting
-   V from the impl's associated type args or the trait's generic params.
+- `xs[i] = value` — stores directly via PK_INDEX place projection ✓
+- `xs[i].field = value` — chains PK_INDEX + PK_FIELD projections ✓
+- `xs[i].method()` with `mut self: Self` — mutates element in place ✓
+- `xs[i] += value` — reads/writes through place projection ✓
 
-2. **MIR lowering (lower_index):** When the type has IndexPlace but isn't a
-   hardcoded type, emit a method call to `get(self, index)` or
-   `set(self, index, value)` instead of `new_index_place`. Determining get
-   vs set requires knowing whether the index is on the LHS of an assignment.
-   This is the hard part — `lower_index` doesn't know its context.
+Codegen (CodegenDispatch.w:615-672) resolves PK_INDEX as:
+- Array types → direct GEP
+- Pointer types → load ptr, GEP
+- Vec/Slice/str → load data ptr (field 0), GEP to element
 
-3. **Assignment lowering:** `lower_assign` currently lowers `x[i] = v` by
-   lowering the LHS as a place, then storing to it. For IndexPlace, LHS
-   `x[i]` should NOT be lowered as a place — it should emit `x.set(i, v)`.
-   This requires splitting the assign path to detect IndexPlace on the LHS
-   and emit the `set` call instead.
+This IS the place-projection behavior §2.4 specifies.
 
-4. **Compound assignment:** `x[i] += v` must evaluate `x[i]` once (§6.3),
-   then emit `x.set(i, x.get(i) + v)` or use a scoped-slot approach.
+#### Bug: §6.3 single-evaluation rule violated
 
-**Assessment: genuine larger refactor, not a small fix.** The interaction
-between index-as-place (current model) and index-as-method-call (IndexPlace
-model) touches Sema check_index, MIR lower_index, MIR lower_assign,
-and compound assignment lowering. This aligns with P7 place analysis.
+`xs[f()] += g()` calls f() **twice**. The parser desugars compound assignment:
+```
+xs[f()] += g()  →  NK_ASSIGN(target=xs[f()], value=NK_BINARY(ADD, xs[f()], g()))
+```
+Both `xs[f()]` in the ASSIGN and BINARY are the SAME AST node ID, but MIR
+lowering evaluates it twice: once via `lower_expr_place(target)` and once
+via `lower_expr(binary.d1)`.
 
-**Recommendation:** Confirm P4.2 → P7 reclassification. The trait definition
-(already in traits.w) is all P4 can deliver. Compiler integration requires
-the place-analysis infrastructure from P7.
+**Fix in `lower_assign` (MirLower.w:2167):** Detect compound assignment on
+indexed target (rhs is NK_BINARY with d1 == place_expr, and place_expr is
+NK_INDEX). Pre-evaluate the index expression to a temp local, build the
+index place using the temp, read the current value, evaluate only the
+increment expression (binary.d2), apply the operation, write back.
+
+Lowering shape for `xs[f()] += g()`:
+```mir
+_idx = f()                          // evaluate index once
+_place = xs[_idx]                   // build index place with temp
+_cur = copy _place                  // read current value
+_inc = g()                          // evaluate increment once
+_new = _cur + _inc                  // compute result
+_place = _new                       // write back
+```
+
+#### Four implementation pieces
+
+1. **p10.23 — §6.3 compound assignment single-evaluation fix**
+   (MirLower.w `lower_assign`): detect compound assignment on NK_INDEX,
+   pre-evaluate index to temp, single read-modify-write through the place.
+
+2. **p10.24 — Formal IndexPlace impls** (lib/std/traits.w): add
+   `impl[T] IndexPlace[i32, T] for Vec[T]` and similar for Array. These
+   make the type system aware that these types have IndexPlace. The compiler's
+   hardcoded paths continue to do the actual work.
+
+3. **p10.25 — §15.11 diagnostic** (SemaCheck.w): when check_index encounters
+   a type that doesn't support indexing and the context is assignment LHS or
+   mutating receiver, emit "type does not implement IndexPlace" diagnostic.
+
+4. **p10.26 — §18 behavioral tests**: full test coverage for spec patterns
+   (direct assignment, nested field mutation, mutating method through index,
+   compound assignment, single-evaluation rule, non-Copy elements).
 
 ## Permanent Exemptions
 
