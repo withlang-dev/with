@@ -275,23 +275,80 @@ Net: 13 `&mut` sites eliminated.
 
 ## P4 Status
 
-**P4.1 (Iter.next → mut self):** Already complete. `lib/std/traits.w:58-59`
-defines `fn next(mut self: Self) -> Option[T]`. VecIter.next() is a compiler
-intrinsic (`MIR_INTRINSIC_VECITER_NEXT` in `src/MirLower.w:3922`), not a
-trait-dispatched method. No stdlib changes needed.
+### P4.1 Verification (2026-04-29)
 
-**P4.2 (IndexPlace trait-dispatched):** The trait is defined
-(`lib/std/traits.w:158-160`) with `get(self: &Self, ...)` and
-`set(mut self: Self, ...)`. But:
-- Zero `impl IndexPlace` blocks exist in stdlib
-- `check_index` (`src/SemaCheck.w:2817`) is fully hardcoded for Array, Slice,
-  Vec, HashMap — no trait dispatch
+**Trait definition:** `lib/std/traits.w:58-59` defines
+`fn next(mut self: Self) -> Option[T]`. Correct shape. ✓
+
+**Check 1 — For-loop desugaring calling convention:**
+`src/MirLower.w:2582` (`lower_for`) has hardcoded paths for:
+- Range literals (NK_RANGE) → `lower_for_range`
+- Range variables (TY_RANGE) → `lower_for_range_var`
+- Slice/Array (TY_SLICE, TY_ARRAY) → `lower_for_slice`
+- Vec (name == "Vec") → `lower_for_vec`
+- `vec.iter()` (method name == "iter" on Vec receiver) → `lower_for_vec`
+
+Generic iterator fallback (line 2630-2675): calls `self.mark_unsupported()`
+which forces fallback to AST codegen. The MIR it generates after that uses
+`OK_COPY` (line 2646) — consistent with `mut self: Self`, not `&mut self`.
+**Custom types implementing Iter[T] do NOT work in for-loops via MIR.**
+
+VecIter.next() (line 3921-3922): dispatched as `MIR_INTRINSIC_VECITER_NEXT`,
+entirely compiler-intrinsic. CodegenDispatch.w:3595 takes receiver as pointer
+via `mir_intrinsic_recv_ptr` and mutates `idx` field in place (line 3644:
+`wl_build_store(self.builder, next_idx, idx_ptr)`). This is ABI-compatible
+with `mut self: Self` (struct self is passed as pointer, mutations visible
+to caller).
+
+**Check 2 — Iterator impl enumeration:**
+Types implementing Iter[T] in stdlib: **zero**. `grep -rn 'impl.*Iter\[' lib/std/`
+finds only `impl[T] IntoIter[T] for Vec[T]` (traits.w:69). No type has
+`impl Iter[T] for X`. VecIter[T] conceptually satisfies Iter[T] but does so
+through compiler intrinsics, not trait dispatch.
+
+IntoIter[T] trait (traits.w:62-63) returns `VecIter[T]`, not a generic
+iterator. Only impl is `Vec[T]` (traits.w:69-71).
+
+**Check 3 — Behavioral tests:**
+- `test/behavior/behav_iter_mut_self.w`: Manual while-loop calling
+  `iter.next()` on VecIter[i32] and VecIter[str]. Passes. ✓
+- `test/behavior/behav_for_iter_mut_self.w`: For-loop over `nums.iter()`
+  and directly over Vec. Passes. ✓
+- Full `make test`: 723 pass, 1 pre-existing failure (issue114_condition_assign).
+  No regressions. ✓
+
+**Conclusion:** P4.1 (trait definition shape) is complete. The operational
+iteration machinery is entirely intrinsic-based — VecIter.next() works through
+hardcoded compiler dispatch, not trait dispatch. Generic iterator protocol
+in MirLower.w (line 2630) is marked "not yet fully implemented" and falls
+back to AST codegen via `mark_unsupported()`.
+
+**What this means for P11:** The `mut self: Self` shape on Iter.next is
+correct and the VecIter intrinsic path is ABI-compatible with it. Custom
+user-defined iterators in for-loops are a separate feature gap (generic
+iterator protocol), not a P4/P10/P11 blocker. P11 can proceed.
+
+### P4.2 — AWAITING SUPERVISOR DECISION
+
+**Status:** P4.2 (IndexPlace trait-dispatched) was originally scoped as P4
+work in the plan. After investigation, the actual implementation requires
+compiler integration in `check_index` (SemaCheck.w:2817), which is hardcoded
+for Array, Slice, Vec, HashMap with no trait dispatch path.
+
+**Current state:**
+- Trait defined: `lib/std/traits.w:158-160` with `get(self: &Self, ...)` and
+  `set(mut self: Self, ...)`
+- Implementations: zero `impl IndexPlace` blocks exist in stdlib
+- Compiler integration: none — `check_index` does not query the impl registry
 - Adding impls without compiler integration is meaningless
-- Compiler integration (trait-dispatched index resolution) is P7 work, not P4
 
-**Conclusion:** P4.1 is done. P4.2's trait definition is done; the compiler
-integration belongs to P7 (place analysis). No further P4 work needed before
-P11.
+**Proposed reclassification:** Move P4.2 compiler integration to P7 (place
+analysis). Rationale: IndexPlace dispatch requires the place-analysis
+infrastructure (§2 places, §6 compound assignment) that P7 builds. The trait
+definition (already done) is all that P4 can deliver.
+
+**Decision needed:** Confirm P4.2 → P7 reclassification, or specify
+alternative scope/timeline.
 
 ## Permanent Exemptions
 
