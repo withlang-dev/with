@@ -2179,6 +2179,22 @@ fn MirBuilder.lower_assign(self: MirBuilder, place_expr: i32, rhs_expr: i32):
         self.terminate(TermKind.TK_CALL, self.unit_operand(), mi_args_id, self.place_for_local(0), mi_next_bb)
         self.switch_to(mi_next_bb)
         return
+    // §6.3 compound assignment single-evaluation: xs[f()] += g() must
+    // evaluate f() and g() exactly once.  The parser desugars += to
+    // NK_ASSIGN(target, NK_BINARY(op, target, rhs)) sharing the same AST
+    // node for both occurrences of target.  Detect this and lower as a
+    // single read-modify-write through the place.
+    if self.ast.kind(rhs_expr) == NodeKind.NK_BINARY and self.ast.get_data1(rhs_expr) == place_expr:
+        let ca_op = self.ast.get_data0(rhs_expr)
+        let ca_inc_expr = self.ast.get_data2(rhs_expr)
+        let ca_place = self.lower_expr_place(place_expr)
+        let ca_elem_ty = self.expr_type(place_expr)
+        let ca_cur = self.body.new_operand(OperandKind.OK_COPY, ca_place)
+        let ca_inc = self.lower_expr(ca_inc_expr)
+        let ca_result = self.lower_bin_op_operand(ca_op, ca_cur, ca_inc, ca_elem_ty, self.ast.get_start(place_expr))
+        self.assign_operand_to_place(ca_place, ca_result, self.ast.get_start(place_expr))
+        return
+
     let place = self.lower_expr_place(place_expr)
     let saved_expected = self.expected_type
     let dest_ty = self.expr_type(place_expr)
