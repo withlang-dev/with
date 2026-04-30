@@ -1,16 +1,17 @@
 # P10 Structural `&mut` Sites Audit
 
-Comprehensive audit of all `&mut` code sites remaining after p10.12–p10.16
-method conversions (95 free functions → pool methods). Counts as of commit
-`6c7609b` (p10.16).
+Comprehensive audit of all `&mut` code sites remaining after p10.12–p10.18
+method conversions and read-only param downgrades. Counts as of commit
+`020b75d` (p10.18). Started at 221 sites; reduced to 204 via p10.17–p10.18
+(12 ComptimeTransform.w downgrades + 55 CImport.w pool param downgrades).
 
 ## Codebase-Wide Summary
 
 | File | Sites | Category |
 |------|-------|----------|
-| src/CImport.w | 117 | multi-pool params, coercions, free fns, field proj |
+| src/CImport.w | 98 | multi-pool params, coercions, free fns, field proj |
 | src/ComptimeEval.w | 44 | diag-threading (all `diags: &mut DiagnosticList`) |
-| src/ComptimeTransform.w | 27 | multi-pool params, diag-threading |
+| src/ComptimeTransform.w | 24 | multi-pool params, diag-threading |
 | src/compiler/Frontend.w | 7 | multi-pool params (Sema, HashMap, Vec) |
 | src/compiler/Compilation.w | 1 | `&mut sema` passed to seed function |
 | src/compiler/Link.w | 1 | `&mut out as *mut u8` (raw pointer cast) |
@@ -28,7 +29,7 @@ method conversions (95 free functions → pool methods). Counts as of commit
 | src/bootstrap_main.w | 1 | help text string |
 | lib/std/traits.w | 1 | `multi_index_set(self: &mut Self, ...)` (deprecated) |
 | lib/std/cfg/stackify.w | 1 | comment |
-| **Total** | **221** | |
+| **Total** | **204** | |
 
 ## Actionable Sites by Category
 
@@ -161,12 +162,12 @@ They stay as-is (the text is describing syntax, not using it).
 
 ## Conversion Plan
 
-| Priority | Category | Sites | Commit |
+| Priority | Category | Sites | Status |
 |----------|----------|-------|--------|
-| 1 | B: ComptimeTransform.w read-only downgrades | 7-8 | p10.17 |
-| 2 | A: ComptimeEval.w diag-threading | 44 | p10.18 |
-| 3 | C+D: CImport.w read-only pool params + coercion cleanup | 5-10 | p10.19 |
-| 4 | F: CImport.w push/pop → CiGotoCfgContext methods | 14 | p10.20 |
+| 1 | B: ComptimeTransform.w read-only downgrades | 12 | **DONE** (p10.17) |
+| 2 | C: CImport.w read-only pool params | 55 | **DONE** (p10.18) |
+| 3 | A: ComptimeEval.w diag-threading | 44 | needs raw ptr field |
+| 4 | F: CImport.w push/pop → CiGotoCfgContext methods | 14 | future |
 | — | E,G,H,I: exempt or deferred to P12 | ~30 | — |
 
 ## Permanent Exemptions
