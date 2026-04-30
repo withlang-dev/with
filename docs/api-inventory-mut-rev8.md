@@ -4,103 +4,105 @@ Written inventory per docs/mut.md Rev 8 §20.0. Every remaining `&mut` site
 in `src/` and `lib/std/` is listed with its old pattern, target shape, and
 planned disposition.
 
-**Summary counts** (at commit f40dcc9):
+**Summary counts** (at commit 0469cf9):
 
-| Category | Sites | Target |
-|---|---|---|
-| `&mut Pool` free-fn params (CImport.w) | 67 | `mut self: Pool` method receivers |
-| `&mut AstPool/Sema/InternPool` free-fn params (ComptimeTransform.w) | 53 | `mut self` method or owned-value param |
-| `&mut DiagnosticList` params (ComptimeEval.w) | 5 | Owned-value param or `mut self` method |
-| `&mut self` call-site expressions | 9 | Remove when receiver becomes `mut self` method |
-| Comment/string-literal references to `&mut` | 19 | Update text at P12 lockdown |
-| Render/diagnostic output of `&mut T` types | 4 | Keep until UOP_MUT_REF deleted at P12 |
-| `MultiIndex.multi_index_set(self: &mut Self, ...)` | 1 | Delete at P12 (deprecated alias) |
+| Category | Sites | Target | Effort |
+|---|---|---|---|
+| Secondary `&mut Pool` params (CImport.w) | 56 | Handle-type refactoring or context struct | **Structural** |
+| Call-site `&mut` expressions (CImport.w) | 11 | Resolve when params converted | Automatic |
+| Free functions with `&mut` (CImport.w) | 3 | Return-value or method extraction | Mechanical |
+| Multi-`&mut` free functions (ComptimeTransform.w) | 19 | Handle-type or context struct | **Structural** |
+| Single-`&mut` free functions (ComptimeTransform.w) | 10 | Method extraction or by-value | Mechanical |
+| `&mut DiagnosticList` params (ComptimeEval.w) | 5 | By-value (Vec interior mut) | Mechanical |
+| Comment/string-literal references to `&mut` | 19 | Update text at P12 lockdown | Trivial |
+| Render/diagnostic output of `&mut T` types | 4 | Keep until UOP_MUT_REF deleted at P12 | Trivial |
+| `MultiIndex.multi_index_set(self: &mut Self, ...)` | 1 | Delete at P12 (deprecated alias) | Trivial |
 
-Total: 129 sites in src/, 1 site in lib/std/. Runtime (rt/) and stdlib
-(lib/std/ minus traits.w) are clean.
+Total: 128 sites in src/, 1 in lib/std/. Runtime and stdlib clean.
+
+**Critical correction:** The initial inventory classified all pool-parameter
+conversions as "mechanical: `&mut Pool` → `Pool` (interior mut)." This was
+wrong. CiExprPool, CiStmtPool, and CiTypePool are regular structs with Vec
+fields — they do NOT use pointer-indirected interior mutability like InternPool.
+Passing by value would break mutation visibility (Vec len/cap updates in the
+callee would not propagate to the caller).
+
+56 of 67 CImport.w sites and 19 of 29 ComptimeTransform.w sites are
+**secondary `&mut` parameters** on methods whose receiver slot is already
+occupied by a different type's `mut self`. Method extraction cannot solve
+these because you can only have one receiver per method.
+
+**Structural options for the 75 secondary-param sites:**
+1. **Handle-type refactoring**: Convert CiExprPool/CiStmtPool/CiTypePool and
+   AstPool to handle types (thin struct wrapping `*mut State`, like InternPool).
+   Then by-value passing works because copies share underlying state.
+2. **Context struct**: Bundle related pools into a single context type
+   (e.g., `CiContext { exprs: CiExprPool, stmts: CiStmtPool, types: CiTypePool }`)
+   and make all translation methods take `mut self: CiContext`.
+3. **Defer to P12**: Keep `&mut` on these internal compiler types during bridge;
+   resolve as part of P12 lockdown when the structural approach is decided.
+
+Option 1 is the most incremental (one pool at a time, each commit independently
+passes fixpoint). Option 2 is cleaner but larger. Option 3 risks P12 becoming
+a large structural change under deadline pressure.
 
 ---
 
 ## 1. CImport.w — 67 sites
 
-### 1a. `&mut CiExprPool` parameters (20 sites)
+### 1a. Secondary `&mut` pool parameters (56 sites) — STRUCTURAL
 
-**Old pattern:** `fn CiStmtPool.method(mut self: CiStmtPool, ..., exprs: &mut CiExprPool, ...) -> T`
+These are `&mut CiExprPool`, `&mut CiTypePool`, or `&mut CiStmtPool` parameters
+on methods whose receiver is already a DIFFERENT pool type's `mut self`.
 
-**Target shape:** Two options, depending on call pattern:
+| Receiver type | Secondary `&mut` param | Count |
+|---|---|---|
+| `mut self: CiStmtPool` | `&mut CiExprPool` | 16 |
+| `mut self: CiExprPool` | `&mut CiTypePool` | 17 |
+| `mut self: CiStmtPool` | `&mut CiTypePool` | 7 |
+| `mut self: CiGotoCfgContext` | `&mut CiStmtPool` | 11 |
+| `mut self: CiStackEmitContext` | `&mut CiStmtPool` | 5 |
 
-- If the method only passes `exprs` through to sub-calls: **owned-value parameter**
-  `fn CiStmtPool.method(mut self: CiStmtPool, ..., exprs: CiExprPool, ...) -> T`
-  Works because CiExprPool uses pointer-indirected interior mutability (like InternPool).
+Method extraction cannot solve these — the receiver slot is taken.
 
-- If the method takes `&mut self` at a call site (e.g., `stmts.method(..., &mut exprs, ...)`):
-  Convert the call-site expression from `&mut exprs` to `exprs` (by-value, interior mut).
+**Why `&mut Pool` → `Pool` (by-value) does NOT work:** CiExprPool/CiStmtPool/CiTypePool
+are regular structs with Vec fields (`kinds: Vec[i32]`, `data0: Vec[i32]`, etc.).
+They do NOT use pointer-indirected state like InternPool. Passing by value would
+create a copy; Vec length/capacity updates in the callee would not propagate to
+the caller. The p10.14-p10.22 conversions worked by making the pool the `self`
+receiver (pointer-passing), not by downgrading `&mut` to by-value.
 
-**Conversion pattern:** Same as p10.18 (read-only downgrade) but for mutating access.
-CiExprPool, CiStmtPool, CiTypePool all use Vec-backed interior state through
-pointer indirection. The `&mut` is unnecessary — the mutation flows through
-the internal pointer regardless.
+**Target shape:** Handle-type refactoring (recommended, most incremental):
+Convert each pool to a handle type wrapping `*mut PoolState`:
+```
+type CiExprPool { state: *mut CiExprPoolState }
+```
+Then by-value passing works (copies share state). One pool at a time,
+each conversion independently passes fixpoint.
 
-**Disposition:** Convert in P10 finish. Mechanical: `&mut CiExprPool` → `CiExprPool`
-in parameter types, `&mut exprs` → `exprs` at call sites.
+**Disposition:** Structural work in P10 finish. Handle-type conversion for
+CiTypePool first (most secondary params), then CiExprPool, then CiStmtPool.
 
-**Risk:** Low. Same pattern proven in p10.18 for read-only downgrades.
-
-### 1b. `&mut CiTypePool` parameters (25 sites)
-
-Same analysis as 1a. 25 parameters across lower_expr_ir, lower_stmt_ir, and
-related functions take `&mut CiTypePool` but the pool uses interior mutability.
-
-**Disposition:** Convert in P10 finish alongside 1a. Same mechanical pattern.
-
-### 1c. `&mut CiStmtPool` parameters (16 sites)
-
-Same analysis. 16 sites where CiStmtPool is passed as `&mut` parameter.
-
-Special case: `stmts.lower_compound(session, body_cursor, &mut self, exprs, types, scope)`
-at line 10806 — the method passes itself by `&mut`. This becomes `self` (by-value,
-interior mut) when the parameter type changes.
-
-**Disposition:** Convert in P10 finish.
-
-### 1d. `&mut Vec[T]` parameters (2 sites)
+### 1b. Free functions with single `&mut` (3 sites) — MECHANICAL
 
 - `ci_collect_var_decls(session, cursor, decls: &mut Vec[CiHoistedVarDecl])` (line 9751)
-- `ci_native_goto_collect_leaf_ids(cfg, block, out: &mut Vec[i32])` (line 10634)
-
-**Old pattern:** Free function taking mutable Vec out-param.
-
-**Target shape:** Return value from function.
-- `ci_collect_var_decls` → return `Vec[CiHoistedVarDecl]`
-- `ci_native_goto_collect_leaf_ids` → return `Vec[i32]` or accept `Vec` by value (interior mut)
-
-**Disposition:** Convert in P10 finish. Return-value pattern preferred per §20.0 table.
-
-### 1e. `&mut CiGotoSwitchCase` parameters (4 sites)
-
+  → return `Vec[CiHoistedVarDecl]` (§16.1 out-param → return value)
 - `ci_goto_switch_record_case(cases: &mut CiGotoSwitchCase, ...)` (line 10214)
-- Three methods taking `cases: &mut CiGotoSwitchCase` (lines 10218, 10247, 10272)
+  → `CiGotoSwitchCase.record_case(mut self, ...)` (§16.2 method extraction)
+- `ci_native_goto_collect_leaf_ids(cfg, block, out: &mut Vec[i32])` (line 10634)
+  → return `Vec[i32]` (§16.1 out-param → return value)
 
-**Old pattern:** Mutable out-accumulator passed by reference.
+**Disposition:** Convert in P10 finish. Genuinely mechanical.
 
-**Target shape:** `mut self: CiGotoSwitchCase` method receiver (for the methods),
-or return-value (for the free function). Since CiGotoSwitchCase is a simple accumulator,
-making it a method receiver is most natural.
+### 1c. Call-site `&mut` expressions (11 sites) — AUTOMATIC
 
-**Disposition:** Convert in P10 finish.
+Lines 5822, 5825, 6229, 7689, 9423, 9426, 10344, 10360, 10613, 10786, 10806.
+These are `&mut exprs`, `&mut types`, `&mut self` at call sites. They resolve
+automatically when the corresponding parameter types are converted.
 
-### 1f. `&mut self` call-site expressions (4 sites)
+**Disposition:** Automatic.
 
-- `&mut self` at line 10613 (CiStackEmitContext passing self to CiStmtPool method)
-- `&mut self` at line 10806 (CiGotoCfgContext passing self)
-- `&mut exprs` / `&mut types` at lines 5822, 5825, 6229, 7689, 9423, 9426, 10786, 10344, 10360
-
-These are call-site expressions, not parameter declarations. They disappear automatically
-when the corresponding parameter types are converted in 1a–1e.
-
-**Disposition:** Automatic — resolved when parameters are converted.
-
-### 1g. Comment reference (1 site)
+### 1d. Comment reference (1 site)
 
 - Line 11283: `// Push args into the &mut self pool's extra vec.`
 
@@ -110,87 +112,92 @@ when the corresponding parameter types are converted in 1a–1e.
 
 ## 2. ComptimeTransform.w — 29 sites
 
-### 2a. `&mut AstPool` parameters (18 sites)
+### 2a. Multi-`&mut` free functions (19 sites) — STRUCTURAL
 
-All ct_* functions take `pool: &mut AstPool` to build new AST nodes.
+19 functions take `pool: &mut AstPool, intern: &mut InternPool, sema: &mut Sema`
+(or subsets). Example:
 
-**Old pattern:** Free function taking mutable AstPool.
+```
+fn ct_build_type_expr(pool: &mut AstPool, intern: &mut InternPool, sema: &Sema, type_id: i32, node: i32) -> i32
+```
 
-**Target shape:** AstPool is already a struct with Vec-backed fields (`nodes`, `extra`,
-`strings`, `decls`). Its mutating methods already use `mut self: AstPool`.
-The free functions should become AstPool methods, or accept AstPool by value
-(interior mutability via Vec).
+AstPool and Sema are regular structs with Vec fields — NOT handle types.
+`&mut AstPool` → `AstPool` by-value would break mutation visibility (same
+analysis as CImport.w pool types: Vec len/cap updates in callee don't propagate).
 
-**Conversion pattern:** Change `pool: &mut AstPool` to `pool: AstPool` in parameter types.
-AstPool's add_node/add_extra/add_string already work through Vec interior mutability.
-Call sites change from `&mut pool` / `&mut out` to `pool` / `out`.
+InternPool IS a handle type (`*mut InternPoolState`), so `&mut InternPool` →
+`InternPool` is safe for that parameter specifically.
 
-**Disposition:** Convert in P10 finish. Same mechanical pattern as CImport.w pools.
+**Target shape:** Same structural options as CImport.w section 1a:
+- Handle-type conversion for AstPool (wrap state in `*mut AstPoolState`)
+- Context struct bundling pool+sema+intern
+- Or convert ct_* free functions to methods on a comptime context type
 
-### 2b. `&mut Sema` parameters (15 sites)
+**Disposition:** Structural work. InternPool params can be downgraded mechanically
+(`&mut InternPool` → `InternPool`); AstPool and Sema params require handle-type
+refactoring or architectural change.
 
-Functions like `ct_emit_error(sema: &mut Sema, ...)`, `ct_eval_truthy(source_ast, sema: &mut Sema, ...)`,
-`ct_transform_decl(source_ast, pool, sema: &mut Sema, ...)`.
+### 2b. Single-`&mut` free functions (4 sites)
 
-**Old pattern:** Free function taking mutable Sema to emit diagnostics or read sema state.
+- `ct_fresh_sym(intern: &mut InternPool, ...)` — InternPool is handle type,
+  `&mut` → by-value is mechanical.
+- `ct_emit_error(sema: &mut Sema, ...)` — only calls `sema.diags.emit()`.
+  Could become a Sema method: `Sema.ct_emit_error(mut self, ...)`.
+- `ct_sync_sema_ast(sema: &mut Sema, pool: &AstPool)` — sets `sema.ast`.
+  Could become a Sema method.
+- `comptime_transform_module(source_ast, sema: &mut Sema, intern: &mut InternPool)` —
+  entry point. InternPool is mechanical; Sema needs method extraction or handle type.
 
-**Target shape:** Two sub-categories:
+**Disposition:** Partially mechanical (InternPool), partially structural (Sema/AstPool).
 
-- **Read + emit diagnostics** (e.g., ct_emit_error): Sema.diags is a DiagnosticList
-  which uses Vec interior mutability. Can accept `sema: Sema` (by-value, interior mut).
+### 2c. Call-site `&mut sema.diags` expressions (5 sites)
 
-- **Transform functions** (e.g., ct_transform_decl): These read sema state and build
-  AST output. The `&mut` is for diagnostic emission. Same downgrade to by-value.
+Lines 431, 527, 846, 892, 949: `comptime_*_eval_expr(..., &mut sema.diags, ...)`
 
-**Disposition:** Convert in P10 finish. `&mut Sema` → `Sema`.
+These pass DiagnosticList by mutable reference. DiagnosticList is a regular struct
+(`items: Vec[Diagnostic]`) — NOT a handle type. By-value would lose emitted diagnostics.
 
-### 2c. `&mut InternPool` parameters (20 sites — some shared with 2a/2b)
+However, these call sites are redundant: the functions also take `sema_ptr: *mut Sema`,
+and `sema_ptr.diags` gives the same access. The fix is to remove the `diags` parameter
+and access through `sema_ptr` (see section 3a).
 
-Functions take `intern: &mut InternPool` to intern strings during AST construction.
-
-**Old pattern:** Free function taking mutable InternPool for string interning.
-
-**Target shape:** InternPool uses pointer-indirected state (`*mut InternPoolState`).
-Already works with `self: InternPool` (by-value). Change to `intern: InternPool`.
-
-**Disposition:** Convert in P10 finish. Mechanical.
-
-### 2d. `&mut sema.diags` call-site expressions (5 sites)
-
-- Lines 431, 527, 846, 892, 949: `comptime_*_eval_expr(..., &mut sema.diags, ...)`
-
-These pass DiagnosticList by mutable reference to the comptime evaluator.
-
-**Target shape:** Once DiagnosticList.emit is `mut self` (done in this session),
-the evaluator can accept `diags: DiagnosticList` by value (interior mutability
-via Vec). Call sites change to `sema.diags`.
-
-**Disposition:** Convert in P10 finish alongside 3a.
+**Disposition:** Resolves when ComptimeEval.w params are fixed (section 3a).
 
 ---
 
 ## 3. ComptimeEval.w — 5 sites
 
-### 3a. `diags: &mut DiagnosticList` parameter (4 function signatures)
+### 3a. `diags: &mut DiagnosticList` parameter (4 function signatures) — MECHANICAL
 
 - `comptime_try_eval_expr_result(sema_ptr: *mut Sema, diags: &mut DiagnosticList, ...)`
 - `comptime_force_eval_expr_result(sema_ptr: *mut Sema, diags: &mut DiagnosticList, ...)`
 - `comptime_try_eval_expr(sema_ptr: *mut Sema, diags: &mut DiagnosticList, ...)`
 - `comptime_force_eval_expr(sema_ptr: *mut Sema, diags: &mut DiagnosticList, ...)`
 
-**Old pattern:** Free function taking mutable DiagnosticList for error emission.
+**Old pattern:** Free function taking both `sema_ptr: *mut Sema` and
+`diags: &mut DiagnosticList` — but `diags` IS `sema_ptr.diags`. The
+parameter is redundant.
 
-**Target shape:** `diags: DiagnosticList` (by-value, interior mut through Vec).
+**Target shape:** Remove the `diags` parameter. Access `sema_ptr.diags` directly
+through the raw pointer (§13.1: `*mut` deref is a mutable unsafe place).
+Change `diags.emit(...)` to `sema_ptr.diags.emit(...)`.
 
-**Disposition:** Convert in P10 finish.
+DiagnosticList is a regular struct (`items: Vec[Diagnostic]`), NOT a handle type.
+`&mut DiagnosticList` → `DiagnosticList` by-value would break mutation visibility
+(caller wouldn't see emitted diagnostics). But removing the redundant parameter
+and accessing through `sema_ptr` sidesteps the issue entirely.
 
-### 3b. `&mut self.diags` call-site (1 site)
+**Disposition:** Mechanical. Remove redundant parameter, access through `sema_ptr`.
+
+### 3b. `&mut self.diags` call-sites (6 sites)
 
 - Line 1525 in SemaCheck.w: `comptime_force_eval_expr(self as *mut Sema, &mut self.diags, ...)`
+- Lines 431, 527, 846, 892, 949 in ComptimeTransform.w (section 2c above)
 
-Resolves automatically when 3a parameters are converted.
+These call-site `&mut self.diags` / `&mut sema.diags` expressions disappear
+when the `diags` parameter is removed from the function signatures.
 
-**Disposition:** Automatic.
+**Disposition:** Automatic — resolves when 3a parameters are removed.
 
 ---
 
@@ -376,9 +383,17 @@ Binary needs reinstall via `make install-user` after current work stabilizes.
 
 | Step | Sites | Pattern | Effort |
 |---|---|---|---|
-| P10 finish: CImport.w pool params | 67 | `&mut Pool` → `Pool` (interior mut) | Mechanical, 2-3 commits |
-| P10 finish: ComptimeTransform.w params | 29 | `&mut T` → `T` (interior mut or by-value) | Mechanical, 1-2 commits |
-| P10 finish: ComptimeEval.w params | 5 | `&mut DiagnosticList` → `DiagnosticList` | Mechanical, 1 commit |
+| P10 mechanical: CImport.w free functions | 3 | Return-value / method extraction | 1 commit |
+| P10 mechanical: ComptimeEval.w redundant params | 5+6 | Remove param, access through `sema_ptr` | 1 commit |
+| P10 mechanical: InternPool `&mut` params | ~20 | `&mut InternPool` → `InternPool` (handle type) | 1 commit |
+| P10 structural: CImport.w secondary pool params | 56 | Handle-type refactoring for CiTypePool/CiExprPool/CiStmtPool | 3-6 commits |
+| P10 structural: ComptimeTransform.w AstPool/Sema | ~19 | Handle-type or context-struct refactoring | 2-4 commits |
 | P12 lockdown: Delete UOP_MUT_REF | — | Parser/sema/render/help text | Coordinated, 1 commit |
 | P12 lockdown: Delete MultiIndex.multi_index_set | 1 | Remove deprecated alias | Part of P12 commit |
 | P12 lockdown: Update comments | 19 | Text-only changes | Part of P12 commit |
+
+**Key insight:** The mechanical work (29 sites) is real — it can be done now.
+The structural work (75 sites) requires a design decision: handle-type
+refactoring vs context-struct bundling. Handle-type is most incremental
+(one type at a time, each commit independently passes fixpoint). This
+decision should be made before starting the structural conversions.
