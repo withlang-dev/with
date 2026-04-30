@@ -4146,7 +4146,7 @@ fn CiStmtPool.wrap_switch_match_breaks_ir(mut self: CiStmtPool, session: i64, bo
     let continue_if = self.if_stmt(cond, continue_body, 0 as CiStmtId)
     self.merge3_ir( flag_decl, loop_id, continue_if)
 
-fn CiExprPool.bool_expr_from_value_ir(mut self: CiExprPool, session: i64, cursor: i32, value_id: CiExprId, types: &mut CiTypePool) -> CiExprId:
+fn CiExprPool.bool_expr_from_value_ir(mut self: CiExprPool, session: i64, cursor: i32, value_id: CiExprId, types: &CiTypePool) -> CiExprId:
     if (value_id as i32) == 0:
         return 0 as CiExprId
     if with_ci_type_is_bool(session, cursor) != 0:
@@ -4303,7 +4303,7 @@ fn ci_effect_expr_needs_terminal_stmt(session: i64, cursor: i32) -> bool:
 
     true
 
-fn CiStmtPool.lower_cfprintf_effect_ir(mut self: CiStmtPool, session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiStmtId:
+fn CiStmtPool.lower_cfprintf_effect_ir(mut self: CiStmtPool, session: i64, cursor: i32, exprs: &mut CiExprPool, types: &CiTypePool, scope: str) -> CiStmtId:
     if with_ci_cursor_kind(session, cursor) != CXK_CALL_EXPR:
         return 0 as CiStmtId
     let callee_name = ci_call_name_from_source_text(with_ci_cursor_source_text(session, cursor))
@@ -4350,7 +4350,7 @@ fn CiStmtPool.lower_cfprintf_effect_ir(mut self: CiStmtPool, session: i64, curso
     let end_stmt = self.expr_stmt(end_call)
     self.merge_ir( setup, self.merge3_ir( begin_stmt, fprintf_stmt, end_stmt))
 
-fn CiStmtPool.lower_effect_expr_ir(mut self: CiStmtPool, session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiStmtId:
+fn CiStmtPool.lower_effect_expr_ir(mut self: CiStmtPool, session: i64, cursor: i32, exprs: &mut CiExprPool, types: &CiTypePool, scope: str) -> CiStmtId:
     let kind = with_ci_cursor_kind(session, cursor)
     let nc = with_ci_num_children(session, cursor)
 
@@ -4424,7 +4424,7 @@ fn CiStmtPool.prepare_stmt_subject_ir(mut self: CiStmtPool, session: i64, cursor
         value_expr: exprs.ident(temp_expr_name, temp_ty),
     }
 
-fn CiStmtPool.prepare_stmt_condition_ir(mut self: CiStmtPool, session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiValueExprIR:
+fn CiStmtPool.prepare_stmt_condition_ir(mut self: CiStmtPool, session: i64, cursor: i32, exprs: &mut CiExprPool, types: &CiTypePool, scope: str) -> CiValueExprIR:
     let lowered = self.lower_value_expr_ir(session, cursor, exprs, types, scope)
     if not ci_value_ir_valid(lowered):
         return ci_value_ir_invalid()
@@ -4441,7 +4441,7 @@ fn CiStmtPool.build_if_not_break_ir(mut self: CiStmtPool, exprs: &mut CiExprPool
     let break_id = self.break_()
     self.if_stmt(not_cond_id, break_id, 0 as CiStmtId)
 
-fn CiStmtPool.render_value_expr_ir(mut self: CiStmtPool, session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, lowered: CiValueExprIR) -> str:
+fn CiStmtPool.render_value_expr_ir(mut self: CiStmtPool, session: i64, cursor: i32, exprs: &CiExprPool, types: &CiTypePool, lowered: CiValueExprIR) -> str:
     if not ci_value_ir_valid(lowered):
         return ""
     if (lowered.setup_stmt as i32) == 0:
@@ -5277,7 +5277,7 @@ fn ci_peel_transparent(session: i64, cursor: i32) -> i32:
         depth = depth + 1
     c
 
-fn CiExprPool.lower_binary_pointer(mut self: CiExprPool, session: i64, cursor: i32, types: &mut CiTypePool, scope: str) -> CiExprId:
+fn CiExprPool.lower_binary_pointer(mut self: CiExprPool, session: i64, cursor: i32, types: &CiTypePool, scope: str) -> CiExprId:
     self.lower_plain_value_expr_ir(session, cursor, types, scope)
 
 fn CiExprPool.lower_binary_ptr_assign(mut self: CiExprPool, session: i64, cursor: i32, types: &mut CiTypePool, scope: str) -> CiExprId:
@@ -5301,10 +5301,10 @@ fn CiExprPool.lower_binary_ptr_assign(mut self: CiExprPool, session: i64, cursor
     let assign_id = self.add(CiExprKind.CIE_ASSIGN, lhs_id as i32, rhs_cast as i32, 0, 0 as CiTypeId)
     self.add(CiExprKind.CIE_PAREN, assign_id as i32, 0, 0, 0 as CiTypeId)
 
-fn CiExprPool.lower_binary_shift(mut self: CiExprPool, session: i64, cursor: i32, types: &mut CiTypePool, scope: str) -> CiExprId:
+fn CiExprPool.lower_binary_shift(mut self: CiExprPool, session: i64, cursor: i32, types: &CiTypePool, scope: str) -> CiExprId:
     self.lower_plain_value_expr_ir(session, cursor, types, scope)
 
-fn CiExprPool.lower_binary_comparison(mut self: CiExprPool, session: i64, cursor: i32, types: &mut CiTypePool, scope: str) -> CiExprId:
+fn CiExprPool.lower_binary_comparison(mut self: CiExprPool, session: i64, cursor: i32, types: &CiTypePool, scope: str) -> CiExprId:
     let nc = with_ci_num_children(session, cursor)
     if nc < 2:
         return 0 as CiExprId
@@ -5358,7 +5358,7 @@ fn CiExprPool.lower_binary_comparison(mut self: CiExprPool, session: i64, cursor
     let zero = self.int_lit(zero_s, 0 as CiTypeId)
     self.add(CiExprKind.CIE_TERNARY, cond_id as i32, one as i32, zero as i32, 0 as CiTypeId)
 
-fn CiExprPool.lower_binary_logical(mut self: CiExprPool, session: i64, cursor: i32, types: &mut CiTypePool, scope: str) -> CiExprId:
+fn CiExprPool.lower_binary_logical(mut self: CiExprPool, session: i64, cursor: i32, types: &CiTypePool, scope: str) -> CiExprId:
     let nc = with_ci_num_children(session, cursor)
     if nc < 2:
         return 0 as CiExprId
@@ -5404,7 +5404,7 @@ fn CiExprPool.cast_shift_count_expr(mut self: CiExprPool, types: &mut CiTypePool
         return 0 as CiExprId
     self.cast(c_uint_ty, rhs)
 
-fn CiExprPool.lower_compound_assign(mut self: CiExprPool, session: i64, cursor: i32, types: &mut CiTypePool, scope: str) -> CiExprId:
+fn CiExprPool.lower_compound_assign(mut self: CiExprPool, session: i64, cursor: i32, types: &CiTypePool, scope: str) -> CiExprId:
     let nc = with_ci_num_children(session, cursor)
     if nc < 2:
         return 0 as CiExprId
@@ -5427,7 +5427,7 @@ fn CiExprPool.lower_compound_assign(mut self: CiExprPool, session: i64, cursor: 
             return 0 as CiExprId
     self.add(CiExprKind.CIE_COMPOUND_ASSIGN, base_op, lhs_id as i32, rhs_value as i32, 0 as CiTypeId)
 
-fn CiExprPool.lower_unary_simple(mut self: CiExprPool, session: i64, cursor: i32, types: &mut CiTypePool, scope: str) -> CiExprId:
+fn CiExprPool.lower_unary_simple(mut self: CiExprPool, session: i64, cursor: i32, types: &CiTypePool, scope: str) -> CiExprId:
     let nc = with_ci_num_children(session, cursor)
     if nc < 1:
         return 0 as CiExprId
@@ -5680,7 +5680,7 @@ fn CiExprPool.lower_implicit_cast(mut self: CiExprPool, session: i64, cursor: i3
 // inner). The comparison uses the PRINTED form of target_ty
 // against libclang's with_ci_type_translated of the inner
 // cursor — same strings both sides.
-fn CiExprPool.cast_if_needed(mut self: CiExprPool, target_ty_id: CiTypeId, inner_id: CiExprId, inner_cursor: i32, session: i64, types: &mut CiTypePool) -> CiExprId:
+fn CiExprPool.cast_if_needed(mut self: CiExprPool, target_ty_id: CiTypeId, inner_id: CiExprId, inner_cursor: i32, session: i64, types: &CiTypePool) -> CiExprId:
     if (target_ty_id as i32) == 0:
         return inner_id
     if types.kind(target_ty_id) == CiTypeKind.CT_VOID:
@@ -5751,10 +5751,10 @@ fn ci_call_callee_name(session: i64, cursor: i32) -> str:
         return with_ci_cursor_spelling(session, c)
     ""
 
-fn CiExprPool.lower_call_simple(mut self: CiExprPool, session: i64, cursor: i32, types: &mut CiTypePool, scope: str) -> CiExprId:
+fn CiExprPool.lower_call_simple(mut self: CiExprPool, session: i64, cursor: i32, types: &CiTypePool, scope: str) -> CiExprId:
     self.lower_plain_value_expr_ir(session, cursor, types, scope)
 
-fn CiExprPool.lower_literal_or_ref(mut self: CiExprPool, session: i64, cursor: i32, kind: i32, types: &mut CiTypePool, scope: str) -> CiExprId:
+fn CiExprPool.lower_literal_or_ref(mut self: CiExprPool, session: i64, cursor: i32, kind: i32, types: &CiTypePool, scope: str) -> CiExprId:
     if kind == CXK_INT_LITERAL:
         var text: str = ""
         if with_ci_eval_int_valid(session, cursor) != 0:
@@ -6224,7 +6224,7 @@ fn CiExprPool.build_unary_value_expr_from_id(mut self: CiExprPool, session: i64,
 
     0 as CiExprId
 
-fn CiExprPool.lower_plain_value_expr_ir(mut self: CiExprPool, session: i64, cursor: i32, types: &mut CiTypePool, scope: str) -> CiExprId:
+fn CiExprPool.lower_plain_value_expr_ir(mut self: CiExprPool, session: i64, cursor: i32, types: &CiTypePool, scope: str) -> CiExprId:
     var stmts = CiStmtPool.new()
     let lowered = stmts.lower_value_expr_ir(session, cursor, &mut self, types, scope)
     if not ci_value_ir_valid(lowered):
@@ -6923,7 +6923,7 @@ fn ci_condition_unwrap_cursor(session: i64, cursor: i32) -> i32:
 //
 // Returns 0 as CiExprId only when the inner expression itself can't
 // be structurally lowered (ci_lower_expr_ir returns 0).
-fn CiExprPool.lower_bool_expr(mut self: CiExprPool, session: i64, cursor: i32, types: &mut CiTypePool, scope: str) -> CiExprId:
+fn CiExprPool.lower_bool_expr(mut self: CiExprPool, session: i64, cursor: i32, types: &CiTypePool, scope: str) -> CiExprId:
     let kind = with_ci_cursor_kind(session, cursor)
 
     if kind == CXK_UNEXPOSED_STMT:
@@ -7113,7 +7113,7 @@ fn ci_extract_for_parts(session: i64, cursor: i32) -> CiForParts:
 // where init becomes a leading statement in an enclosing CIS_BLOCK,
 // cond becomes a structural boolean CiExpr, and inc becomes the
 // last structural statement in the while body.
-fn CiStmtPool.lower_for_stmt_ir(mut self: CiStmtPool, session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiStmtId:
+fn CiStmtPool.lower_for_stmt_ir(mut self: CiStmtPool, session: i64, cursor: i32, exprs: &mut CiExprPool, types: &CiTypePool, scope: str) -> CiStmtId:
     let parts = ci_extract_for_parts(session, cursor)
     if parts.body_cursor < 0:
         if g_ci_bail_location.len() == 0:
@@ -7204,7 +7204,7 @@ fn CiStmtPool.lower_for_stmt_ir(mut self: CiStmtPool, session: i64, cursor: i32,
 // the same value-position lowering as ci_lower_value_expr_ir, then
 // decides whether the terminal expression itself must still be
 // evaluated for effect.
-fn CiStmtPool.lower_stmt_expr_ir(mut self: CiStmtPool, session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiStmtId:
+fn CiStmtPool.lower_stmt_expr_ir(mut self: CiStmtPool, session: i64, cursor: i32, exprs: &CiExprPool, types: &CiTypePool, scope: str) -> CiStmtId:
     self.lower_effect_expr_ir(session, cursor, exprs, types, scope)
 
 // Strip trailing CIS_BREAK children from a structural CIS_BLOCK,
@@ -7239,7 +7239,7 @@ fn CiStmtPool.strip_trailing_break_ir(mut self: CiStmtPool, stmt_id: CiStmtId) -
         i = i + 1
     self.block(new_start, new_count)
 
-fn CiStmtPool.lower_switch_prong_forward_ir(mut self: CiStmtPool, session: i64, body_cursor: i32, start_idx: i32, total: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiStmtId:
+fn CiStmtPool.lower_switch_prong_forward_ir(mut self: CiStmtPool, session: i64, body_cursor: i32, start_idx: i32, total: i32, exprs: &CiExprPool, types: &CiTypePool, scope: str) -> CiStmtId:
     var part_ids: Vec[i32] = Vec.new()
     let start_child = with_ci_child(session, body_cursor, start_idx)
     let start_kind = with_ci_cursor_kind(session, start_child)
@@ -7286,7 +7286,7 @@ fn CiStmtPool.lower_switch_prong_forward_ir(mut self: CiStmtPool, session: i64, 
 //
 // Returns 0 when something in the switch body doesn't map cleanly
 // so the enclosing structural lowering attempt can bail.
-fn CiStmtPool.lower_switch_stmt_ir(mut self: CiStmtPool, session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiStmtId:
+fn CiStmtPool.lower_switch_stmt_ir(mut self: CiStmtPool, session: i64, cursor: i32, exprs: &CiExprPool, types: &CiTypePool, scope: str) -> CiStmtId:
     let nc = with_ci_num_children(session, cursor)
     if nc < 2:
         return 0 as CiStmtId
@@ -7300,7 +7300,7 @@ fn CiStmtPool.lower_switch_stmt_ir(mut self: CiStmtPool, session: i64, cursor: i
 // and ci_strip_trailing_break_ir to remove the terminating break
 // from each case body. Bails (returns 0) on unsupported switch
 // shapes so the enclosing structural lowering attempt can abort.
-fn CiStmtPool.lower_switch_stmt_ir_structural(mut self: CiStmtPool, session: i64, cursor: i32, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str) -> CiStmtId:
+fn CiStmtPool.lower_switch_stmt_ir_structural(mut self: CiStmtPool, session: i64, cursor: i32, exprs: &mut CiExprPool, types: &CiTypePool, scope: str) -> CiStmtId:
     let nc = with_ci_num_children(session, cursor)
     if nc < 2:
         return 0 as CiStmtId
@@ -7457,7 +7457,7 @@ fn CiStmtPool.lower_switch_stmt_ir_structural(mut self: CiStmtPool, session: i64
         return 0 as CiStmtId
     self.merge_ir( prepared_subject.setup_stmt, switch_id)
 
-fn CiExprPool.lower_case_value_ir(mut self: CiExprPool, session: i64, cursor: i32, types: &mut CiTypePool, scope: str) -> CiExprId:
+fn CiExprPool.lower_case_value_ir(mut self: CiExprPool, session: i64, cursor: i32, types: &CiTypePool, scope: str) -> CiExprId:
     if with_ci_eval_int_valid(session, cursor) != 0:
         let text_idx = self.add_string(ci_eval_int_text(session, cursor))
         return self.int_lit(text_idx, 0 as CiTypeId)
@@ -9973,7 +9973,7 @@ fn ci_goto_cfg_top_target(stack: &Vec[i32]) -> i32:
         return -1
     stack.get(stack.len() - 1)
 
-fn CiGotoCfgContext.append_lowered_leaf(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str):
+fn CiGotoCfgContext.append_lowered_leaf(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, scope: str):
     if not self.ok or self.current < 0:
         return
     let stmt_id = stmts.lower_stmt_ir(session, cursor, exprs, types, 0, scope)
@@ -10010,7 +10010,7 @@ fn CiGotoCfgContext.lower_return(mut self: CiGotoCfgContext, session: i64, curso
     values.push(ret_value as i32)
     self.return_current(values)
 
-fn CiGotoCfgContext.lower_compound(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str):
+fn CiGotoCfgContext.lower_compound(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, scope: str):
     let nc = with_ci_num_children(session, cursor)
     var block_scope = scope
     var i = 0
@@ -10036,7 +10036,7 @@ fn CiGotoCfgContext.lower_compound(mut self: CiGotoCfgContext, session: i64, cur
                 block_scope = ci_goto_scope_after_label_stmt(session, child, block_scope)
         i = i + 1
 
-fn CiGotoCfgContext.lower_if(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str):
+fn CiGotoCfgContext.lower_if(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, scope: str):
     let nc = with_ci_num_children(session, cursor)
     if nc < 2:
         self.fail("malformed if statement in goto CFG", with_ci_cursor_location(session, cursor))
@@ -10079,7 +10079,7 @@ fn CiGotoCfgContext.lower_if(mut self: CiGotoCfgContext, session: i64, cursor: i
         if not self.block_has_pred(after_block):
             self.unreachable_current()
 
-fn CiGotoCfgContext.lower_while(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str):
+fn CiGotoCfgContext.lower_while(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, scope: str):
     let nc = with_ci_num_children(session, cursor)
     if nc < 2:
         self.fail("malformed while statement in goto CFG", with_ci_cursor_location(session, cursor))
@@ -10110,7 +10110,7 @@ fn CiGotoCfgContext.lower_while(mut self: CiGotoCfgContext, session: i64, cursor
     if not self.block_has_pred(after_block):
         self.unreachable_current()
 
-fn CiGotoCfgContext.lower_do(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str):
+fn CiGotoCfgContext.lower_do(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, scope: str):
     let nc = with_ci_num_children(session, cursor)
     if nc < 2:
         self.fail("malformed do statement in goto CFG", with_ci_cursor_location(session, cursor))
@@ -10140,7 +10140,7 @@ fn CiGotoCfgContext.lower_do(mut self: CiGotoCfgContext, session: i64, cursor: i
     if not self.block_has_pred(after_block):
         self.unreachable_current()
 
-fn CiGotoCfgContext.lower_for(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str):
+fn CiGotoCfgContext.lower_for(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, scope: str):
     let parts = ci_extract_for_parts(session, cursor)
     if parts.body_cursor < 0:
         self.fail("malformed for statement in goto CFG", with_ci_cursor_location(session, cursor))
@@ -10208,7 +10208,7 @@ fn ci_goto_switch_record_case(cases: &mut CiGotoSwitchCase, value: CiExprId, blo
     cases.values.push(value as i32)
     cases.blocks.push(block)
 
-fn CiGotoCfgContext.lower_case_children(mut self: CiGotoCfgContext, session: i64, cursor: i32, first_child: i32, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str, cases: &mut CiGotoSwitchCase):
+fn CiGotoCfgContext.lower_case_children(mut self: CiGotoCfgContext, session: i64, cursor: i32, first_child: i32, stmts: &mut CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, scope: str, cases: &mut CiGotoSwitchCase):
     let saved_cases = self.switch_cases
     self.switch_cases = cases as *mut CiGotoSwitchCase
     var case_scope = scope
@@ -10237,7 +10237,7 @@ fn CiGotoCfgContext.lower_case_children(mut self: CiGotoCfgContext, session: i64
         i = i + 1
     self.switch_cases = saved_cases
 
-fn CiGotoCfgContext.lower_case_node(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str, cases: &mut CiGotoSwitchCase):
+fn CiGotoCfgContext.lower_case_node(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: &CiStmtPool, exprs: &mut CiExprPool, types: &CiTypePool, scope: str, cases: &mut CiGotoSwitchCase):
     if not self.ok:
         return
     let kind = with_ci_cursor_kind(session, cursor)
@@ -10262,7 +10262,7 @@ fn CiGotoCfgContext.lower_case_node(mut self: CiGotoCfgContext, session: i64, cu
         return
     self.fail("expected switch case/default in goto CFG", with_ci_cursor_location(session, cursor))
 
-fn CiGotoCfgContext.lower_switch_body(mut self: CiGotoCfgContext, session: i64, body_cursor: i32, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str, cases: &mut CiGotoSwitchCase):
+fn CiGotoCfgContext.lower_switch_body(mut self: CiGotoCfgContext, session: i64, body_cursor: i32, stmts: &mut CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, scope: str, cases: &mut CiGotoSwitchCase):
     let saved_cases = self.switch_cases
     self.switch_cases = cases as *mut CiGotoSwitchCase
     let nc = with_ci_num_children(session, body_cursor)
@@ -10325,7 +10325,7 @@ fn CiGotoCfgContext.emit_switch_dispatch(mut self: CiGotoCfgContext, exprs: &mut
         chain_block = false_block
         i = i + 1
 
-fn CiGotoCfgContext.lower_switch(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str):
+fn CiGotoCfgContext.lower_switch(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, scope: str):
     let nc = with_ci_num_children(session, cursor)
     if nc < 2:
         self.fail("malformed switch statement in goto CFG", with_ci_cursor_location(session, cursor))
@@ -10359,7 +10359,7 @@ fn CiGotoCfgContext.lower_switch(mut self: CiGotoCfgContext, session: i64, curso
     if not self.block_has_pred(after_block):
         self.unreachable_current()
 
-fn CiGotoCfgContext.lower_stmt(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool, scope: str):
+fn CiGotoCfgContext.lower_stmt(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: &mut CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, scope: str):
     if not self.ok:
         return
     let kind = with_ci_cursor_kind(session, cursor)
@@ -10506,7 +10506,7 @@ fn CiStackEmitContext.leaf(mut self: CiStackEmitContext, stmts: &mut CiStmtPool,
         i = i + 1
     stmts.stack_emit_stmt_block(&ids)
 
-fn CiStackEmitContext.children(mut self: CiStackEmitContext, tree: StackifyTree, start: i32, count: i32, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool) -> CiStmtId:
+fn CiStackEmitContext.children(mut self: CiStackEmitContext, tree: StackifyTree, start: i32, count: i32, stmts: &mut CiStmtPool, exprs: &CiExprPool, types: &CiTypePool) -> CiStmtId:
     let ids: Vec[i32] = Vec.new()
     var i = 0
     while i < count and self.ok:
@@ -10540,7 +10540,7 @@ fn CiStackEmitContext.emit_return(mut self: CiStackEmitContext, tree: StackifyTr
     self.fail("stackify emitter: multiple return values are not supported")
     0 as CiStmtId
 
-fn CiStackEmitContext.node(mut self: CiStackEmitContext, tree: StackifyTree, node_id: i32, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &mut CiTypePool) -> CiStmtId:
+fn CiStackEmitContext.node(mut self: CiStackEmitContext, tree: StackifyTree, node_id: i32, stmts: &mut CiStmtPool, exprs: &mut CiExprPool, types: &CiTypePool) -> CiStmtId:
     if not self.ok:
         return 0 as CiStmtId
     let node = tree.nodes.get(node_id as i64)
@@ -10592,7 +10592,7 @@ fn CiStackEmitContext.node(mut self: CiStackEmitContext, tree: StackifyTree, nod
     self.fail("stackify emitter: unsupported stackify node")
     0 as CiStmtId
 
-fn CiStmtPool.stack_emit_tree(mut self: CiStmtPool, tree: StackifyTree, cfg: CiGotoCfg, exprs: &mut CiExprPool, types: &mut CiTypePool) -> CiStmtId:
+fn CiStmtPool.stack_emit_tree(mut self: CiStmtPool, tree: StackifyTree, cfg: CiGotoCfg, exprs: &CiExprPool, types: &CiTypePool) -> CiStmtId:
     var ctx = CiStackEmitContext {
         cfg,
         frames: Vec.new(),
@@ -10641,7 +10641,7 @@ fn CiStmtPool.native_goto_unreachable_stmt(mut self: CiStmtPool, exprs: &mut CiE
 fn CiStmtPool.native_goto_single_goto(mut self: CiStmtPool, label_sym: i32) -> CiStmtId:
     self.goto_label(label_sym)
 
-fn CiStmtPool.native_goto_emit_terminator(mut self: CiStmtPool, cfg: CiGotoCfg, block: i32, labels: &Vec[i32], exprs: &mut CiExprPool) -> CiStmtId:
+fn CiStmtPool.native_goto_emit_terminator(mut self: CiStmtPool, cfg: CiGotoCfg, block: i32, labels: &Vec[i32], exprs: &CiExprPool) -> CiStmtId:
     if block < 0 or block >= cfg.graph.blocks.len() as i32:
         return ci_native_goto_fail("native goto emitter: block out of range")
     let b = cfg.graph.blocks.get(block as i64)
