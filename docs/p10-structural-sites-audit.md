@@ -1,16 +1,16 @@
 # P10 Structural `&mut` Sites Audit
 
-Comprehensive audit of all `&mut` code sites remaining after p10.12–p10.18
-method conversions and read-only param downgrades. Counts as of commit
-`020b75d` (p10.18). Started at 221 sites; reduced to 204 via p10.17–p10.18
-(12 ComptimeTransform.w downgrades + 55 CImport.w pool param downgrades).
+Comprehensive audit of all `&mut` code sites remaining after p10.12–p10.19
+method conversions, read-only param downgrades, and diag-threading. Started at
+221 sites; reduced to 165 via p10.17–p10.19 (12 ComptimeTransform.w downgrades
++ 55 CImport.w pool param downgrades + 39 ComptimeEval.w diag-threading).
 
 ## Codebase-Wide Summary
 
 | File | Sites | Category |
 |------|-------|----------|
 | src/CImport.w | 98 | multi-pool params, coercions, free fns, field proj |
-| src/ComptimeEval.w | 44 | diag-threading (all `diags: &mut DiagnosticList`) |
+| src/ComptimeEval.w | 5 | entry-point free fns (4 sigs + 1 call site) |
 | src/ComptimeTransform.w | 24 | multi-pool params, diag-threading |
 | src/compiler/Frontend.w | 7 | multi-pool params (Sema, HashMap, Vec) |
 | src/compiler/Compilation.w | 1 | `&mut sema` passed to seed function |
@@ -29,7 +29,7 @@ method conversions and read-only param downgrades. Counts as of commit
 | src/bootstrap_main.w | 1 | help text string |
 | lib/std/traits.w | 1 | `multi_index_set(self: &mut Self, ...)` (deprecated) |
 | lib/std/cfg/stackify.w | 1 | comment |
-| **Total** | **204** | |
+| **Total** | **165** | |
 
 ## Actionable Sites by Category
 
@@ -160,13 +160,54 @@ They stay as-is (the text is describing syntax, not using it).
 
 `fn multi_index_set(self: &mut Self, ...)` — deprecated alias, removed at P12.
 
+## Diag-Threading Pilot: ComptimeEval.w
+
+### Design Decision
+
+**Natural receiver:** `ComptimeEvaluator` — already `self` on all 39
+diags-taking methods. Holds sema, ast, pool, eval state (slots/scopes/labels),
+step counter, error state. Currently has no `diags` field.
+
+**Diags usage:** `diags.emit()` is called in exactly ONE place — line 190 in
+`fail()`. No method reads from `diags`. The evaluator is a pure diagnostic
+producer. At most one diagnostic is emitted per evaluation (because `fail()`
+checks `self.had_error == 0` before emitting).
+
+**Pattern:** Store the pending diagnostic in the evaluator itself. Add
+`has_pending_diag: i32` and `pending_diag: Diagnostic` fields. In `fail()`,
+set these fields instead of calling `diags.emit()`. The 4 entry-point free
+functions emit `evaluator.pending_diag` to the caller's `&mut DiagnosticList`
+after eval completes. No raw pointers, no Vec handle divergence.
+
+**Scope:** All 39 methods converted at once. The call graph is a tight mesh:
+`eval_expr` dispatches to all eval methods, and all eval methods call back to
+`eval_expr` for sub-expression evaluation. A partial 5-10 function pilot would
+create fragile boundaries (some call sites pass `diags`, some don't; `eval_expr`
+would need mixed dispatch). The conversion is purely mechanical — same transform
+applied 39 times — so all-at-once is lower-risk than a partial boundary.
+
+**Two-commit approach:**
+1. Add `pending_diag` fields to struct, change `fail()` to store instead of
+   emit, update entry-point copy-back. All signatures unchanged. Build+fixpoint
+   verifies the pattern.
+2. Mechanically remove `diags: &mut DiagnosticList` from all 39 method sigs
+   and all internal call sites. Build+fixpoint verifies the payoff.
+
+**Eliminates:** 39 `&mut` sites (39 method-sig params removed). 5 remain in
+entry-point free functions (4 sigs + 1 call site) — genuine external API.
+
+**Result:** Completed in single build+fixpoint cycle. Pattern generalized
+cleanly: all 39 methods converted with zero surprises. The tight call graph
+that made partial piloting risky also made all-at-once trivial — every method
+got the same transform.
+
 ## Conversion Plan
 
 | Priority | Category | Sites | Status |
 |----------|----------|-------|--------|
 | 1 | B: ComptimeTransform.w read-only downgrades | 12 | **DONE** (p10.17) |
 | 2 | C: CImport.w read-only pool params | 55 | **DONE** (p10.18) |
-| 3 | A: ComptimeEval.w diag-threading | 44 | needs raw ptr field |
+| 3 | A: ComptimeEval.w diag-threading | 39 | **DONE** (p10.19) |
 | 4 | F: CImport.w push/pop → CiGotoCfgContext methods | 14 | future |
 | — | E,G,H,I: exempt or deferred to P12 | ~30 | — |
 
