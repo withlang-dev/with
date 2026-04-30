@@ -79,7 +79,7 @@ fn Lexer.init(source: str, file_id: i32) -> Lexer:
     Lexer { source, pos: 0, file_id, token_start: 0, emit_comments: 0 }
 
 // Tokenize the entire source, returning a token list ending with EOF.
-fn Lexer.tokenize(self: Lexer) -> TokenList:
+fn Lexer.tokenize(mut self: Lexer) -> TokenList:
     var tokens = TokenList.new()
     loop:
         let tag = self.next_token()
@@ -88,12 +88,12 @@ fn Lexer.tokenize(self: Lexer) -> TokenList:
             break
     tokens
 
-fn Lexer.tokenize_with_comments(self: Lexer) -> TokenList:
+fn Lexer.tokenize_with_comments(mut self: Lexer) -> TokenList:
     self.emit_comments = 1
     self.tokenize()
 
 // Produce the next token. Sets token_start/pos and returns the tag.
-fn Lexer.next_token(self: Lexer) -> i32:
+fn Lexer.next_token(mut self: Lexer) -> i32:
     self.skip_whitespace()
 
     let src = self.source
@@ -398,7 +398,7 @@ fn Lexer.next_token(self: Lexer) -> i32:
 
 // --- Internal helpers ---
 
-fn Lexer.skip_whitespace(self: Lexer):
+fn Lexer.skip_whitespace(mut self: Lexer):
     let src = self.source
     let slen = src.len() as i32
     while self.pos < slen:
@@ -407,7 +407,7 @@ fn Lexer.skip_whitespace(self: Lexer):
             break
         self.pos = self.pos + 1
 
-fn Lexer.lex_string(self: Lexer) -> i32:
+fn Lexer.lex_string(mut self: Lexer) -> i32:
     let src = self.source
     let slen = src.len() as i32
     self.pos = self.pos + 1  // skip opening "
@@ -440,7 +440,7 @@ fn Lexer.lex_string(self: Lexer) -> i32:
     // Unterminated — return STRING_LIT for parser recovery.
     TokenKind.TK_STRING_LIT
 
-fn Lexer.lex_number(self: Lexer) -> i32:
+fn Lexer.lex_number(mut self: Lexer) -> i32:
     let src = self.source
     let slen = src.len() as i32
     var is_float = false
@@ -558,7 +558,7 @@ fn suffix_accept(src: str, pos: i32, slen: i32, suffix: str, suf_len: i32) -> bo
 fn lex_fstring_quote_source_backslash_count(raw_backslashes: i32) -> i32:
     raw_backslashes / 2
 
-fn Lexer.lex_ident(self: Lexer) -> i32:
+fn Lexer.lex_ident(mut self: Lexer) -> i32:
     let src = self.source
     let slen = src.len() as i32
     let start = self.token_start
@@ -665,14 +665,14 @@ fn Lexer.lex_ident(self: Lexer) -> i32:
         return kw
     TokenKind.TK_IDENT
 
-fn Lexer.lex_dot_ident(self: Lexer) -> i32:
+fn Lexer.lex_dot_ident(mut self: Lexer) -> i32:
     let src = self.source
     let slen = src.len() as i32
     while self.pos < slen and is_ident_continue(src.byte_at((self.pos) as i64)):
         self.pos = self.pos + 1
     TokenKind.TK_DOT_IDENT
 
-fn Lexer.lex_raw_string_prefixed(self: Lexer) -> i32:
+fn Lexer.lex_raw_string_prefixed(mut self: Lexer) -> i32:
     let src = self.source
     let slen = src.len() as i32
     var p = self.pos
@@ -698,7 +698,7 @@ fn Lexer.lex_raw_string_prefixed(self: Lexer) -> i32:
     // Unterminated raw string: still emit string token for recovery.
     TokenKind.TK_STRING_LIT
 
-fn Lexer.lex_byte_char_prefixed(self: Lexer) -> i32:
+fn Lexer.lex_byte_char_prefixed(mut self: Lexer) -> i32:
     let src = self.source
     let slen = src.len() as i32
     if self.pos >= slen or src.byte_at((self.pos) as i64) != CharCode.Squote:
