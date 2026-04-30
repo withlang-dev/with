@@ -1,10 +1,10 @@
 # P10 Structural `&mut` Sites Audit
 
-Comprehensive audit of all `&mut` code sites remaining after p10.12–p10.20
-method conversions, read-only param downgrades, diag-threading, and method
-extraction. Started at 221 sites; reduced to 149 via p10.17–p10.20
-(12 ComptimeTransform.w downgrades + 55 CImport.w pool param downgrades
-+ 39 ComptimeEval.w diag-threading + 16 CImport.w push/pop → methods).
+Comprehensive audit of all `&mut` code sites (lines containing `&mut`)
+remaining after p10.12–p10.21. Started at 221 sites; reduced to 154 via
+p10.17–p10.21. Note: ComptimeTransform.w diag-threading (p10.21) traded 13
+`diags: &mut DiagnosticList` params for 5 `&mut sema.diags` call sites — net
+line count went up but 13 threaded parameters were eliminated.
 
 ## Codebase-Wide Summary
 
@@ -12,11 +12,11 @@ extraction. Started at 221 sites; reduced to 149 via p10.17–p10.20
 |------|-------|----------|
 | src/CImport.w | 82 | multi-pool params, coercions, free fns |
 | src/ComptimeEval.w | 5 | entry-point free fns (4 sigs + 1 call site) |
-| src/ComptimeTransform.w | 24 | multi-pool params, diag-threading |
-| src/compiler/Frontend.w | 7 | multi-pool params (Sema, HashMap, Vec) |
+| src/ComptimeTransform.w | 29 | multi-pool params + `&mut sema.diags` call sites |
+| src/compiler/Frontend.w | 6 | multi-pool params (Sema, HashMap, Vec) |
 | src/compiler/Compilation.w | 1 | `&mut sema` passed to seed function |
 | src/compiler/Link.w | 1 | `&mut out as *mut u8` (raw pointer cast) |
-| src/SemaCheck.w | 10 | strings/comments (7), code (1), borrow checker comments (2) |
+| src/SemaCheck.w | 16 | strings/comments, code, borrow checker comments |
 | src/render.w | 2 | string output `"&mut "` |
 | src/SemaDiag.w | 1 | string output `"&mut "` |
 | src/CiPrint.w | 1 | string output `"&mut "` / `"&"` |
@@ -30,7 +30,7 @@ extraction. Started at 221 sites; reduced to 149 via p10.17–p10.20
 | src/bootstrap_main.w | 1 | help text string |
 | lib/std/traits.w | 1 | `multi_index_set(self: &mut Self, ...)` (deprecated) |
 | lib/std/cfg/stackify.w | 1 | comment |
-| **Total** | **149** | |
+| **Total** | **154** | |
 
 ## Actionable Sites by Category
 
@@ -202,6 +202,41 @@ cleanly: all 39 methods converted with zero surprises. The tight call graph
 that made partial piloting risky also made all-at-once trivial — every method
 got the same transform.
 
+## Diag-Threading: ComptimeTransform.w
+
+### Design Decision
+
+**No natural receiver type.** Unlike ComptimeEval.w, all 13 diags-taking
+functions are free functions with signature `ct_*(source_ast, pool, sema,
+intern, diags, node)`. There is no `ComptimeTransformer` struct.
+
+**diags is already `sema.diags`.** The entry point `comptime_transform_module`
+creates `transform_sema = Sema.init(transform_pool, sema.diags, out)` and
+passes `&mut transform_sema.diags` alongside `&mut transform_sema` to
+`ct_transform_decl`. The `diags` parameter is redundant — every function
+already has `sema: &mut Sema` which owns `sema.diags`.
+
+**Multiple emit points.** `ct_emit_error` is called from 6 sites. Plus
+`comptime_*_eval_*` functions receive `diags` directly (4 sites via
+`comptime_force_eval_expr` / `comptime_try_eval_expr_result`).
+
+**diags is read.** Line 891: `diags.count()` checks whether comptime eval
+added a diagnostic. This becomes `sema.diags.count()`.
+
+**Pattern:** Drop `diags: &mut DiagnosticList` from all 13 function sigs.
+Use `sema.diags` everywhere: `sema.diags.emit(...)` in `ct_emit_error`,
+`&mut sema.diags` when calling comptime entry-point functions,
+`sema.diags.count()` for the read. Upgrade `ct_emit_error` from
+`sema: &Sema` to `sema: &mut Sema` (needed for `sema.diags.emit()`; all
+callers already hold `&mut Sema`). At the entry point, replace
+`ct_transform_decl(..., &mut transform_sema.diags, ...)` with just
+`ct_transform_decl(..., ...)`.
+
+**Eliminates:** 13 `diags: &mut DiagnosticList` params + 1 call-site coercion
+(`&mut transform_sema.diags`). `ct_emit_error` trades `sema: &Sema, diags:
+&mut DiagnosticList` for `sema: &mut Sema` (1 `&mut` replaces 1 `&mut`).
+Net: 13 `&mut` sites eliminated.
+
 ## Conversion Plan
 
 | Priority | Category | Sites | Status |
@@ -210,6 +245,7 @@ got the same transform.
 | 2 | C: CImport.w read-only pool params | 55 | **DONE** (p10.18) |
 | 3 | A: ComptimeEval.w diag-threading | 39 | **DONE** (p10.19) |
 | 4 | F: CImport.w push/pop → CiGotoCfgContext methods | 16 | **DONE** (p10.20) |
+| 5 | ComptimeTransform.w diag → sema.diags | 13 params | **DONE** (p10.21) |
 | — | E,G,H,I: exempt or deferred to P12 | ~30 | — |
 
 ## Permanent Exemptions
