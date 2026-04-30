@@ -356,8 +356,15 @@ Binary needs reinstall via `make install-user` after current work stabilizes.
   (commit e2daccd). Now correct.
 - `Diagnostic.w` — Fixed in this session: `set_code`, `add_label`, `add_note`, `add_help`,
   `DiagnosticList.emit` converted to `mut self` (commit 2507b11). Now correct.
-- `InternPool.w` — Interior mutability via `*mut InternPoolState`. `self: InternPool`
-  is intentional — mutations flow through the pointer. Correct for this pattern.
+- `InternPool.w` — Two layers verified separately:
+  - `InternPool` handle type: `self: InternPool` is correct — InternPool is a thin
+    handle wrapping `*mut InternPoolState`. Copies share state. The handle doesn't
+    mutate; mutations flow through the raw pointer. §16 doesn't require `mut self`
+    on handle types because the handle value itself is unchanged.
+  - `InternStringArena.store`: Fixed (commit 2ec3179). Was `self: InternStringArena`
+    but mutates `self.offset` and `self.pages.push()`. The mutation worked at runtime
+    because callers access it through `*mut InternPoolState` → field dereference, but
+    the API shape violated §16.2. Now `mut self: InternStringArena`.
 - `Span.w` — All read-only value methods. Correct.
 - `Source.w` — All read-only or destructor. Correct.
 - `Diag.w` — Re-export facade, no methods. Correct.
