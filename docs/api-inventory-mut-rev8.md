@@ -4,21 +4,21 @@ Written inventory per docs/mut.md Rev 8 §20.0. Every remaining `&mut` site
 in `src/` and `lib/std/` is listed with its old pattern, target shape, and
 planned disposition.
 
-**Summary counts** (at commit 0469cf9):
+**Summary counts** (updated at commit b7bf86b, Slice A complete):
 
-| Category | Sites | Target | Effort |
-|---|---|---|---|
-| Secondary `&mut Pool` params (CImport.w) | 56 | Handle-type refactoring or context struct | **Structural** |
-| Call-site `&mut` expressions (CImport.w) | 11 | Resolve when params converted | Automatic |
-| Free functions with `&mut` (CImport.w) | 3 | Return-value or method extraction | Mechanical |
-| Multi-`&mut` free functions (ComptimeTransform.w) | 19 | Handle-type or context struct | **Structural** |
-| Single-`&mut` free functions (ComptimeTransform.w) | 10 | Method extraction or by-value | Mechanical |
-| `&mut DiagnosticList` params (ComptimeEval.w) | 5 | By-value (Vec interior mut) | Mechanical |
-| Comment/string-literal references to `&mut` | 19 | Update text at P12 lockdown | Trivial |
-| Render/diagnostic output of `&mut T` types | 4 | Keep until UOP_MUT_REF deleted at P12 | Trivial |
-| `MultiIndex.multi_index_set(self: &mut Self, ...)` | 1 | Delete at P12 (deprecated alias) | Trivial |
+| Category | Sites | Target | Effort | Status |
+|---|---|---|---|---|
+| Secondary `&mut Pool` params (CImport.w) | 56 | Handle-type refactoring | **Structural** | Pending (Slice B) |
+| Call-site `&mut` expressions (CImport.w) | 8 | Resolve when params converted | Automatic | 3 resolved by Slice A |
+| Free functions with `&mut` (CImport.w) | 0 | — | — | **Done** (Slice A) |
+| Multi-`&mut` free functions (ComptimeTransform.w) | 19 | Handle-type | **Structural** | `&mut InternPool` done; `&mut AstPool`/`&mut Sema` pending |
+| Single-`&mut` free functions (ComptimeTransform.w) | 6 | Method extraction or by-value | Mechanical | `&mut InternPool` params done |
+| `&mut DiagnosticList` params (ComptimeEval.w) | 0 | — | — | **Done** (Slice A) |
+| Comment/string-literal references to `&mut` | 19 | Update text at P12 lockdown | Trivial | Pending |
+| Render/diagnostic output of `&mut T` types | 4 | Keep until UOP_MUT_REF deleted at P12 | Trivial | Pending |
+| `MultiIndex.multi_index_set(self: &mut Self, ...)` | 1 | Delete at P12 (deprecated alias) | Trivial | Pending |
 
-Total: 128 sites in src/, 1 in lib/std/. Runtime and stdlib clean.
+Total remaining: 120 sites in src/ (down from 128), 2 in lib/std/. Runtime clean.
 
 **Critical correction:** The initial inventory classified all pool-parameter
 conversions as "mechanical: `&mut Pool` → `Pool` (interior mut)." This was
@@ -79,16 +79,16 @@ at a time, each conversion independently passes fixpoint.
 CImport.w + ComptimeTransform.w — highest per-commit yield), then CiExprPool,
 then CiStmtPool.
 
-### 1b. Free functions with single `&mut` (3 sites) — MECHANICAL
+### 1b. Free functions with single `&mut` (3 sites) — ~~MECHANICAL~~ **DONE**
 
-- `ci_collect_var_decls(session, cursor, decls: &mut Vec[CiHoistedVarDecl])` (line 9751)
-  → return `Vec[CiHoistedVarDecl]` (§16.1 out-param → return value)
-- `ci_goto_switch_record_case(cases: &mut CiGotoSwitchCase, ...)` (line 10214)
-  → `CiGotoSwitchCase.record_case(mut self, ...)` (§16.2 method extraction)
-- `ci_native_goto_collect_leaf_ids(cfg, block, out: &mut Vec[i32])` (line 10634)
-  → return `Vec[i32]` (§16.1 out-param → return value)
+- ~~`ci_collect_var_decls(session, cursor, decls: &mut Vec[CiHoistedVarDecl])`~~
+  → pass-in/return-out `Vec[CiHoistedVarDecl]` (§16.1). Done in Slice A (b7bf86b).
+- ~~`ci_goto_switch_record_case(cases: &mut CiGotoSwitchCase, ...)`~~
+  → `CiGotoSwitchCase.record_case(mut self, ...)` (§16.2). Done in Slice A (b7bf86b).
+- ~~`ci_native_goto_collect_leaf_ids(cfg, block, out: &mut Vec[i32])`~~
+  → return `Vec[i32]` (§16.1). Done in Slice A (b7bf86b).
 
-**Disposition:** Convert in P10 finish. Genuinely mechanical.
+**Disposition:** Complete.
 
 ### 1c. Call-site `&mut` expressions (11 sites) — AUTOMATIC
 
@@ -132,67 +132,39 @@ are already mechanical (`&mut InternPool` → `InternPool`, handle type).
 **Disposition:** P10 finish. InternPool params first (mechanical), then AstPool
 handle-type, then Sema handle-type (most complex — see Sema sub-analysis).
 
-### 2b. Single-`&mut` free functions (4 sites)
+### 2b. Single-`&mut` free functions (4 sites — 2 done, 2 pending)
 
-- `ct_fresh_sym(intern: &mut InternPool, ...)` — InternPool is handle type,
-  `&mut` → by-value is mechanical.
+- ~~`ct_fresh_sym(intern: &mut InternPool, ...)`~~ — Done in Slice A (b7bf86b).
 - `ct_emit_error(sema: &mut Sema, ...)` — only calls `sema.diags.emit()`.
   Could become a Sema method: `Sema.ct_emit_error(mut self, ...)`.
 - `ct_sync_sema_ast(sema: &mut Sema, pool: &AstPool)` — sets `sema.ast`.
   Could become a Sema method.
-- `comptime_transform_module(source_ast, sema: &mut Sema, intern: &mut InternPool)` —
-  entry point. InternPool is mechanical; Sema needs method extraction or handle type.
+- ~~`comptime_transform_module(source_ast, sema: &mut Sema, intern: &mut InternPool)`~~
+  InternPool param done in Slice A. Sema param pending (structural).
 
-**Disposition:** Partially mechanical (InternPool), partially structural (Sema/AstPool).
+**Disposition:** InternPool params complete. Sema params pending (structural).
 
-### 2c. Call-site `&mut sema.diags` expressions (5 sites)
+### 2c. Call-site `&mut sema.diags` expressions (5 sites) — **DONE**
 
-Lines 431, 527, 846, 892, 949: `comptime_*_eval_expr(..., &mut sema.diags, ...)`
-
-These pass DiagnosticList by mutable reference. DiagnosticList is a regular struct
-(`items: Vec[Diagnostic]`) — NOT a handle type. By-value would lose emitted diagnostics.
-
-However, these call sites are redundant: the functions also take `sema_ptr: *mut Sema`,
-and `sema_ptr.diags` gives the same access. The fix is to remove the `diags` parameter
-and access through `sema_ptr` (see section 3a).
-
-**Disposition:** Resolves when ComptimeEval.w params are fixed (section 3a).
+All 5 call sites resolved when ComptimeEval.w `diags` parameter was removed
+in Slice A (b7bf86b).
 
 ---
 
 ## 3. ComptimeEval.w — 5 sites
 
-### 3a. `diags: &mut DiagnosticList` parameter (4 function signatures) — MECHANICAL
+### 3a. `diags: &mut DiagnosticList` parameter (4 function signatures) — ~~MECHANICAL~~ **DONE**
 
-- `comptime_try_eval_expr_result(sema_ptr: *mut Sema, diags: &mut DiagnosticList, ...)`
-- `comptime_force_eval_expr_result(sema_ptr: *mut Sema, diags: &mut DiagnosticList, ...)`
-- `comptime_try_eval_expr(sema_ptr: *mut Sema, diags: &mut DiagnosticList, ...)`
-- `comptime_force_eval_expr(sema_ptr: *mut Sema, diags: &mut DiagnosticList, ...)`
+All 4 functions had redundant `diags` parameter removed. Now access
+`sema_ptr.diags` directly. Done in Slice A (b7bf86b).
 
-**Old pattern:** Free function taking both `sema_ptr: *mut Sema` and
-`diags: &mut DiagnosticList` — but `diags` IS `sema_ptr.diags`. The
-parameter is redundant.
+**Disposition:** Complete.
 
-**Target shape:** Remove the `diags` parameter. Access `sema_ptr.diags` directly
-through the raw pointer (§13.1: `*mut` deref is a mutable unsafe place).
-Change `diags.emit(...)` to `sema_ptr.diags.emit(...)`.
+### 3b. `&mut self.diags` call-sites (6 sites) — ~~AUTOMATIC~~ **DONE**
 
-DiagnosticList is a regular struct (`items: Vec[Diagnostic]`), NOT a handle type.
-`&mut DiagnosticList` → `DiagnosticList` by-value would break mutation visibility
-(caller wouldn't see emitted diagnostics). But removing the redundant parameter
-and accessing through `sema_ptr` sidesteps the issue entirely.
+All 6 call sites resolved when 3a parameters were removed. Done in Slice A (b7bf86b).
 
-**Disposition:** Mechanical. Remove redundant parameter, access through `sema_ptr`.
-
-### 3b. `&mut self.diags` call-sites (6 sites)
-
-- Line 1525 in SemaCheck.w: `comptime_force_eval_expr(self as *mut Sema, &mut self.diags, ...)`
-- Lines 431, 527, 846, 892, 949 in ComptimeTransform.w (section 2c above)
-
-These call-site `&mut self.diags` / `&mut sema.diags` expressions disappear
-when the `diags` parameter is removed from the function signatures.
-
-**Disposition:** Automatic — resolves when 3a parameters are removed.
+**Disposition:** Complete.
 
 ---
 
@@ -215,11 +187,9 @@ Comments documenting how `&mut` is handled during the bridge period.
 
 **Disposition:** Update or remove at P12 lockdown when bridge code is deleted.
 
-### 4c. `&mut self.diags` call-site (1 site)
+### 4c. `&mut self.diags` call-site (1 site) — **DONE**
 
-Line 6394: `comptime_force_eval_expr(self as *mut Sema, &mut self.diags, ...)`
-
-**Disposition:** Automatic — resolves when ComptimeEval.w parameter types change (3a).
+Resolved when ComptimeEval.w parameters were changed (3a). Done in Slice A (b7bf86b).
 
 ### 4d. `&mut` in comment describing legacy borrow semantics (2 sites)
 
