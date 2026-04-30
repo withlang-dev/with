@@ -46,7 +46,7 @@ fn InternStringArena.new() -> InternStringArena:
     arena.pages.push(first)
     arena
 
-fn InternStringArena.store(self: InternStringArena, s: str) -> str:
+fn InternStringArena.store(mut self: InternStringArena, s: str) -> str:
     if s.len() == 0:
         return ""
     let src = unsafe: *(&s as *const *const u8)
