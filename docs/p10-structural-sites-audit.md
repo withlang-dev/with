@@ -355,11 +355,55 @@ implementing `Iter[T]`. The MIR it generates after `mark_unsupported()` is
 structurally correct (uses OK_COPY, builds Option switch) — the blocker is
 solely the `mark_unsupported()` call that prevents MIR codegen.
 
-**Impact on P11:** This gap exists independent of the `&mut` migration.
-Custom iterators in for-loops were broken before P4.1 too (AST codegen
-removal predates the mut migration). The `mut self: Self` trait shape is
-correct and the intrinsic path works. Whether this gap blocks P11 is a
-project-owner decision.
+### MIR Generic Iterator Protocol — Design
+
+**What does `mark_unsupported()` do?** Sets `self.body.lowering_failed = 1`
+(MirLower.w:1404). This is just a flag. The MIR generation after line 2632
+executes fully — blocks, terminators, operands are all created. But
+CodegenDispatch.w:49 checks `body.lowering_failed == 0` and rejects the
+whole function if the flag is set. So the MIR IS generated but never consumed.
+
+**What MIR does the stub generate?** (lines 2633-2675):
+1. Lower iter_expr, materialize into iter_place (line 2633-2634)
+2. Infer elem_ty via `infer_for_element_type` (line 2635)
+3. Create header_bb, body_bb, exit_bb (lines 2637-2639)
+4. In header: push OK_COPY of iter_place as arg, emit TK_CALL with
+   `unit_operand()` as callee, store result in next_local (lines 2645-2651)
+5. After call: extract discriminant, switch disc==1 → body, else exit
+6. In body: copy next_place to item_place, bind element, lower body, goto header
+
+**Three bugs in the stub:**
+
+1. **No callee resolution.** Line 2651 uses `unit_operand()` as the
+   callee — codegen doesn't know what function to call. Normal method
+   calls use `resolve_method_callee_sym` to get a fn symbol, or
+   `set_call_intrinsic` for intrinsics. The generic path does neither.
+   **Fix:** resolve `next` method on the iterator type via
+   `resolve_method_callee_sym` or the GENERIC_CALL intrinsic path.
+
+2. **Wrong result type.** Line 2648 allocates `next_local` with type
+   `iter_ty` (the iterator type itself). But `next()` returns
+   `Option[T]`, not the iterator. **Fix:** look up the return type of
+   `next()` or construct `Option[elem_ty]`.
+
+3. **Hardcoded element type inference.** `infer_for_element_type`
+   (SemaCheck.w:7666-7681) only handles Range/Array/Slice/Vec, falling
+   back to `ty_i32`. For custom iterators, it must look up the Iter[T]
+   trait impl and extract T. **Fix:** add trait lookup fallback.
+
+**What's the fix shape?** Medium fix. Three changes:
+- `infer_for_element_type`: add fallback that looks up Iter[T] impl for
+  the iterator type and extracts T from the generic args.
+- Generic iterator path in `lower_for`: resolve `next` callee via
+  GENERIC_CALL intrinsic (same path used for unresolved method calls),
+  fix result type to match next()'s return type.
+- Remove `mark_unsupported()` call.
+
+The GENERIC_CALL path (lines 4050-4090) handles exactly this case: method
+calls where the callee can't be statically resolved to a fn symbol. It
+passes the method sym + receiver + args to codegen, which dispatches via
+the AST node's sema information. This is the same path used for disc enum
+methods, Option methods, and concrete/generic struct methods.
 
 ### P4.2 — AWAITING SUPERVISOR DECISION
 

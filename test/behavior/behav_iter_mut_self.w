@@ -1,12 +1,8 @@
+//! expect-stdout: 6
 //! expect-stdout: 10
 
 // P4.1 verification: custom iterator type implementing Iter[T] with
-// mut self: Self next.
-//
-// Manual while-loop iteration works. For-loop (`for x in iter`) does NOT —
-// MIR lowering's generic iterator path calls mark_unsupported() and AST
-// codegen has been removed, so `for x in custom_iter` is a compile error.
-// See docs/p10-structural-sites-audit.md "P4.1 Verification" for details.
+// mut self: Self next, used in both for-loop and manual while-loop.
 
 type CountUp { current: i32, limit: i32 }
 
@@ -22,14 +18,21 @@ impl Iter[i32] for CountUp =
         .Some(val)
 
 fn main:
-    // Manual while-loop: works correctly with mut self: Self.
-    let iter = CountUp.new(5)
+    // Test 1: custom iterator in a for loop
+    let iter = CountUp.new(4)
     var sum = 0
+    for x in iter:
+        sum = sum + x
+    print(int_to_string(sum as i64))
+
+    // Test 2: manual while-loop with next()
+    let iter2 = CountUp.new(5)
+    var sum2 = 0
     var done = false
     while not done:
-        let item = iter.next()
+        let item = iter2.next()
         if item.is_some():
-            sum = sum + item.unwrap()
+            sum2 = sum2 + item.unwrap()
         else:
             done = true
-    print(int_to_string(sum as i64))
+    print(int_to_string(sum2 as i64))
