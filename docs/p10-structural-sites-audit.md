@@ -339,21 +339,43 @@ implementing `impl Iter[i32] for CountUp` with `fn next(mut self: Self)`.
   (`mark_unsupported()`), which used to fall back to AST codegen. AST
   codegen has been removed, so this is now a hard error.
 
-**Conclusion — GAP FOUND:**
+**Conclusion — COMPLETE (2026-04-30):**
 
-P4.1 is **partially complete**:
+P4.1 is **complete**:
 - ✓ Trait definition has correct `mut self: Self` shape
 - ✓ `VecIter.next()` intrinsic is ABI-compatible with `mut self: Self`
 - ✓ Manual `.next()` calls on custom iterators work correctly
-- ✗ `for x in custom_iter` fails — generic iterator protocol in MIR is
-  unimplemented (`mark_unsupported()` + AST codegen removed)
-- ✗ Zero stdlib types formally implement `Iter[T]` via trait dispatch
+- ✓ `for x in custom_iter` works — generic iterator protocol implemented
+- ✓ `VecIter[T]` formally implements `Iter[T]` via trait dispatch
 
-The gap is in MirLower.w: the generic iterator protocol (line 2630-2675)
-needs to be completed so that `for x in expr` works for any type
-implementing `Iter[T]`. The MIR it generates after `mark_unsupported()` is
-structurally correct (uses OK_COPY, builds Option switch) — the blocker is
-solely the `mark_unsupported()` call that prevents MIR codegen.
+**Fixes applied:**
+- `src/MirLower.w`: generic iterator fallback resolves `next` callee via
+  `resolve_method_callee_sym`, looks up return type from method signature,
+  uses `success_variant_index()` for discriminant, extracts payload via
+  downcast+field projection. `mark_unsupported()` only fires if method
+  resolution fails.
+- `src/SemaCheck.w`: `infer_for_element_type` has trait-based fallback that
+  looks up `next()` method return type and extracts T from Option[T].
+- `lib/std/collections.w`: `impl[T] Iter[T] for VecIter[T]` added.
+- `src/SemaDecl.w`: overlap detection fixed to consult `blanket_target_base_syms`
+  for targeted blankets like `impl[T] Trait for SpecificType[T]`.
+
+**Remaining stdlib Iter impls — structural blockers:**
+
+1. **Range**: `TY_RANGE` is a compiler primitive, not a named struct. Can't
+   write `impl Iter for Range` — there's no type to impl on. For-loop
+   iteration is handled by efficient counter-based MIR lowering. Adding Iter
+   support requires either making Range a named type or adding compiler-level
+   trait impl support for primitives.
+
+2. **String char/byte iteration**: No char type exists. `byte_at(i)` intrinsic
+   exists but no `str.len()` MIR intrinsic. A `ByteIter` type would need new
+   runtime infrastructure (string length, byte access by index). Character
+   iteration would additionally require UTF-8 decoding.
+
+3. **HashMap**: Opaque pointer type (`ptr: *const i8`). `keys()` copies all
+   keys to a Vec. No cursor-based iteration support. Would need new runtime
+   functions for hash table traversal.
 
 ### MIR Generic Iterator Protocol — Design
 
@@ -405,27 +427,62 @@ passes the method sym + receiver + args to codegen, which dispatches via
 the AST node's sema information. This is the same path used for disc enum
 methods, Option methods, and concrete/generic struct methods.
 
-### P4.2 — AWAITING SUPERVISOR DECISION
+### P4.2 — IndexPlace Trait Dispatch — Design Analysis
 
-**Status:** P4.2 (IndexPlace trait-dispatched) was originally scoped as P4
-work in the plan. After investigation, the actual implementation requires
-compiler integration in `check_index` (SemaCheck.w:2817), which is hardcoded
-for Array, Slice, Vec, HashMap with no trait dispatch path.
+**Status:** AWAITING SUPERVISOR DECISION — proposed reclassification to P7.
 
-**Current state:**
-- Trait defined: `lib/std/traits.w:158-160` with `get(self: &Self, ...)` and
-  `set(mut self: Self, ...)`
-- Implementations: zero `impl IndexPlace` blocks exist in stdlib
-- Compiler integration: none — `check_index` does not query the impl registry
-- Adding impls without compiler integration is meaningless
+**Trait definition** (lib/std/traits.w:158-160): `IndexPlace[I, V]` with
+`get(self: &Self, index: I) -> V` and `set(mut self: Self, index: I, value: V)`.
+Zero impls exist. Compiler integration: none.
 
-**Proposed reclassification:** Move P4.2 compiler integration to P7 (place
-analysis). Rationale: IndexPlace dispatch requires the place-analysis
-infrastructure (§2 places, §6 compound assignment) that P7 builds. The trait
-definition (already done) is all that P4 can deliver.
+**Current `check_index` (SemaCheck.w:2817-2920) — fully hardcoded:**
 
-**Decision needed:** Confirm P4.2 → P7 reclassification, or specify
-alternative scope/timeline.
+The function handles five cases via type kind matching:
+1. `TY_PTR` → unsafe pointer indexing, elem_ty from `get_type_d0` (line 2831)
+2. `TY_ARRAY` → elem_ty from `get_type_d0` (line 2852)
+3. `TY_SLICE` → elem_ty from `get_type_d0` (line 2857)
+4. `TY_GENERIC_INST` base "Vec" → elem_ty from generic arg (line 2862-2876)
+5. `TY_STRUCT` + ident base → type-level indexing for `Vec[T]`, `HashMap[K,V]` construction (line 2880-2919)
+
+No fallback to trait lookup. Returns 0 (error) for unknown types.
+
+**Current `lower_index` (MirLower.w:2046-2063) — generic but type-agnostic:**
+
+Creates a place via `new_index_place(base, idx_local, elem_ty)`. This is a
+MIR place projection, not a function call. Codegen resolves index places to
+GEP instructions for arrays/slices/vecs. For trait-dispatched indexing, we'd
+need to emit a method CALL instead of a place projection.
+
+**What IndexPlace integration requires:**
+
+1. **Sema (check_index):** After all hardcoded cases, look up
+   `impl IndexPlace[I, V] for T` in the impl registry. Extract V as result type.
+   Requires: `select_trait_impl(type_name, indexplace_sym)` + extracting
+   V from the impl's associated type args or the trait's generic params.
+
+2. **MIR lowering (lower_index):** When the type has IndexPlace but isn't a
+   hardcoded type, emit a method call to `get(self, index)` or
+   `set(self, index, value)` instead of `new_index_place`. Determining get
+   vs set requires knowing whether the index is on the LHS of an assignment.
+   This is the hard part — `lower_index` doesn't know its context.
+
+3. **Assignment lowering:** `lower_assign` currently lowers `x[i] = v` by
+   lowering the LHS as a place, then storing to it. For IndexPlace, LHS
+   `x[i]` should NOT be lowered as a place — it should emit `x.set(i, v)`.
+   This requires splitting the assign path to detect IndexPlace on the LHS
+   and emit the `set` call instead.
+
+4. **Compound assignment:** `x[i] += v` must evaluate `x[i]` once (§6.3),
+   then emit `x.set(i, x.get(i) + v)` or use a scoped-slot approach.
+
+**Assessment: genuine larger refactor, not a small fix.** The interaction
+between index-as-place (current model) and index-as-method-call (IndexPlace
+model) touches Sema check_index, MIR lower_index, MIR lower_assign,
+and compound assignment lowering. This aligns with P7 place analysis.
+
+**Recommendation:** Confirm P4.2 → P7 reclassification. The trait definition
+(already in traits.w) is all P4 can deliver. Compiler integration requires
+the place-analysis infrastructure from P7.
 
 ## Permanent Exemptions
 
