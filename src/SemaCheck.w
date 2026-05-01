@@ -6882,6 +6882,9 @@ fn Sema.check_borrow_create_direct(self: Sema, place: i32, kind: i32, field: i32
             continue
         if existing_kind == BorrowKind.EXCLUSIVE:
             self.emit_error("cannot borrow mutably: already mutably borrowed", err_node)
+        else if self.borrow_refs.get(i as i64) == 0 - 1:
+            let place_name = self.pool_resolve(place)
+            self.emit_error("iterator over `" ++ place_name ++ "` retains access; cannot also mutably capture `" ++ place_name ++ "` (§15.8)", err_node)
         else:
             self.emit_error("cannot borrow mutably: already borrowed", err_node)
         return
@@ -7772,6 +7775,7 @@ fn Sema.maybe_register_iter_of_self_borrow(self: Sema, arg_node: i32) -> i32:
     let path_start = self.borrow_path_data.len() as i32
     self.check_borrow_create_direct(recv_root, BorrowKind.SHARED, 0, path_start, 0, arg_node)
     if (self.borrow_kinds.len() as i32) > pre_count:
+        self.borrow_refs.set_i32(pre_count as i64, 0 - 1)
         return pre_count
     0 - 1
 
