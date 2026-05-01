@@ -5,7 +5,7 @@ AstPool, and Sema. Pools convert to handle types wrapping `*mut State` (proven
 by InternPool). Sema converts via §16.2 method extraction — free functions
 taking `&mut Sema` become `mut self: Self` methods on Sema.
 
-**Status:** Awaiting friend review before implementation.
+**Status:** Ready for implementation.
 
 ---
 
@@ -596,8 +596,16 @@ After AstPool conversion:
 | AstPool | 18 | 67 | Handle-type | Medium |
 | Sema | 16 | — | §16.2 method conversion | Low |
 
-Total: 95 `&mut` sites removed. Remaining: ~25 comments/diagnostics/lockdown
-items.
+After Slice B, 34 `&mut` lines remain (from 120 total). Breakdown of remaining:
+
+- 19 comment lines (bridge docs, legacy semantics refs — update at P12)
+- 9 string literals (render output, diagnostic text, help text — delete at P12)
+- 1 Link.w FFI (`&mut out as *mut u8` — unsafe, keep)
+- 3 CiGotoSwitchCase (`lower_switch_body` param + 2 call sites — §16.2 candidate)
+- 2 Frontend.w out-param functions (`collect_module_dependency_order_frontend`,
+  `reorder_import_tier_frontend` — §16.1 candidates, 5 `&mut` params total)
+
+All resolve at P12 lockdown or in minor follow-up commits.
 
 **Implementation order within Slice B:**
 
@@ -615,11 +623,11 @@ handle-type first means those signatures already have `pool: AstPool` when
 the Sema method conversion replaces the function with a `mut self: Self`
 method.
 
-**Decision points for friend review:**
+**Open decisions** (resolve during implementation):
 
-1. **Per-pool commit shape.** Is one commit per pool correct, or should
-   state-struct + handle definition be a separate commit from method updates?
-   (One commit is simpler but produces larger diffs.)
+1. **Per-pool commit shape.** One commit per pool, or split state-struct +
+   handle definition from method updates? One commit is simpler but produces
+   larger diffs.
 
-2. **Allocation size.** Is over-allocating (256 for CI pools, 4096 for
-   AstPool) adequate, or should we add a runtime size check?
+2. **Allocation size.** Over-allocating (256 for CI pools, 4096 for AstPool)
+   adequate, or add a runtime size check?
