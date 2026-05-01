@@ -334,6 +334,13 @@ type Sema {
     borrow_path_starts: Vec[i32],
     borrow_path_counts: Vec[i32],
     borrow_path_data: Vec[i32],
+    borrow_scope_depths: Vec[i32],
+    borrow_creation_nodes: Vec[i32],
+    // Block context for §15.6 three-location diagnostics
+    current_block_extra_start: i32,
+    current_block_stmt_count: i32,
+    current_block_stmt_index: i32,
+    current_block_tail: i32,
     // Transient storage for closure field-level capture analysis.
     capture_field_syms: Vec[i32],
     capture_field_kinds: Vec[i32],
@@ -795,6 +802,12 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         borrow_path_starts: Vec.new(),
         borrow_path_counts: Vec.new(),
         borrow_path_data: Vec.new(),
+        borrow_scope_depths: Vec.new(),
+        borrow_creation_nodes: Vec.new(),
+        current_block_extra_start: 0,
+        current_block_stmt_count: 0,
+        current_block_stmt_index: 0,
+        current_block_tail: 0,
         capture_field_syms: Vec.new(),
         capture_field_kinds: Vec.new(),
         call_resolved_args_map: sema_new_map_i32_i32(),
@@ -2602,12 +2615,16 @@ fn Sema.expire_borrows_in_scope(self: Sema, scope_start: i32):
                     self.borrow_refs.set_i32(bi as i64, self.borrow_refs.get(last as i64))
                     self.borrow_path_starts.set_i32(bi as i64, self.borrow_path_starts.get(last as i64))
                     self.borrow_path_counts.set_i32(bi as i64, self.borrow_path_counts.get(last as i64))
+                    self.borrow_scope_depths.set_i32(bi as i64, self.borrow_scope_depths.get(last as i64))
+                    self.borrow_creation_nodes.set_i32(bi as i64, self.borrow_creation_nodes.get(last as i64))
                 self.borrow_kinds.pop()
                 self.borrow_places.pop()
                 self.borrow_fields.pop()
                 self.borrow_refs.pop()
                 self.borrow_path_starts.pop()
                 self.borrow_path_counts.pop()
+                self.borrow_scope_depths.pop()
+                self.borrow_creation_nodes.pop()
                 bi = bi  // keep same type as else branch for phi
             else:
                 bi = bi + 1

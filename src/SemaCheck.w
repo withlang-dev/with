@@ -2240,7 +2240,16 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
     if block_label != 0:
         self.push_label_frame(block_label, LabelFrameKind.LFK_BLOCK, node)
 
+    let saved_block_extra = self.current_block_extra_start
+    let saved_block_count = self.current_block_stmt_count
+    let saved_block_index = self.current_block_stmt_index
+    let saved_block_tail = self.current_block_tail
+    self.current_block_extra_start = extra_start
+    self.current_block_stmt_count = stmt_count
+    self.current_block_tail = tail
+
     for i in 0..stmt_count:
+        self.current_block_stmt_index = i
         let stmt = self.ast.get_extra(extra_start + i)
         let saved_stmt_pos = self.match_in_stmt_pos
         let saved_label_stmt_pos = self.stmt_pos_depth
@@ -2269,6 +2278,11 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
         self.match_in_stmt_pos = saved_stmt_pos
         self.typed_expr_types.insert(tail, result as i32)
     self.expire_dead_borrows_in_block(extra_start, stmt_count, stmt_count, 0)
+
+    self.current_block_extra_start = saved_block_extra
+    self.current_block_stmt_count = saved_block_count
+    self.current_block_stmt_index = saved_block_index
+    self.current_block_tail = saved_block_tail
 
     if block_label != 0:
         self.pop_label_frame()
@@ -6818,20 +6832,21 @@ fn Sema.check_borrow_create(self: Sema, operand_node: i32, kind: i32, err_node: 
     self.borrow_refs.push(0)
     self.borrow_path_starts.push(path_start)
     self.borrow_path_counts.push(path_count)
+    self.borrow_scope_depths.push(self.scope_starts.len() as i32)
+    self.borrow_creation_nodes.push(err_node)
 
-// docs/mut.md Rev 8 §8.4 / §15.6 — a mutating access to place P conflicts
-// with any live shared borrow (read-only view) of P or an overlapping
-// projection. The lexical-borrow infrastructure tracks per-place SHARED
-// borrows; this check scans them when a mutation lands and warns when any
-// overlapping borrow is still live. Warnings during P7..P11; promoted to
-// errors at P12 lockdown. NLL last-use tightening lands in P6 future work.
-//
-// We only fire on SHARED borrows tied to a NAMED reference (borrow_refs[i]
-// != 0). Unnamed temporary borrows — e.g., `&xs[0]` materialized as a
-// function argument — already expire when the enclosing call returns
-// from a value-flow standpoint, even if the lexical infrastructure leaves
-// them in the table. Reporting on those would be spec-noise (the spec's
-// liveness rule is bound to view bindings, not anonymous temporaries).
+fn Sema.find_last_use_in_block(self: Sema, block_extra_start: i32, stmt_count: i32, start_index: i32, tail_node: i32, sym: i32) -> i32:
+    var last_node = 0
+    var si = start_index
+    while si < stmt_count:
+        let stmt = self.ast.get_extra(block_extra_start + si)
+        if self.expr_uses_symbol(stmt, sym) != 0:
+            last_node = stmt
+        si = si + 1
+    if tail_node != 0 and self.expr_uses_symbol(tail_node, sym) != 0:
+        last_node = tail_node
+    last_node
+
 fn Sema.check_mutation_against_views(self: Sema, place_node: i32, err_node: i32):
     let place = self.borrow_root_place(place_node)
     if place == 0:
@@ -6848,7 +6863,8 @@ fn Sema.check_mutation_against_views(self: Sema, place_node: i32, err_node: i32)
         if existing_kind != BorrowKind.SHARED:
             i = i + 1
             continue
-        if self.borrow_refs.get(i as i64) == 0:
+        let ref_sym = self.borrow_refs.get(i as i64)
+        if ref_sym == 0:
             i = i + 1
             continue
         let ex_path_start = self.borrow_path_starts.get(i as i64)
@@ -6856,7 +6872,22 @@ fn Sema.check_mutation_against_views(self: Sema, place_node: i32, err_node: i32)
         if self.are_borrows_disjoint_paths(path_start, path_count, ex_path_start, ex_path_count) != 0:
             i = i + 1
             continue
-        self.emit_warning("cannot mutate place: a read-only view of it is still live (§15.6)", err_node)
+        let place_name = self.pool_resolve(place)
+        let ref_name = self.pool_resolve(ref_sym)
+        let creation_node = self.borrow_creation_nodes.get(i as i64)
+        let last_use = self.find_last_use_in_block(self.current_block_extra_start, self.current_block_stmt_count, self.current_block_stmt_index + 1, self.current_block_tail, ref_sym)
+        let mutation_start = self.ast.get_start(err_node)
+        let mutation_end = self.ast.get_end(err_node)
+        let diag = Diagnostic.warn("cannot mutate `" ++ place_name ++ "` while read-only view `" ++ ref_name ++ "` is live (§15.6)", Span { file: self.local_file_id, start: mutation_start, end: mutation_end })
+        if creation_node != 0:
+            let cr_start = self.ast.get_start(creation_node)
+            let cr_end = self.ast.get_end(creation_node)
+            diag.add_label(Span { file: self.local_file_id, start: cr_start, end: cr_end }, "view created here")
+        if last_use != 0:
+            let lu_start = self.ast.get_start(last_use)
+            let lu_end = self.ast.get_end(last_use)
+            diag.add_label(Span { file: self.local_file_id, start: lu_start, end: lu_end }, "view used here")
+        self.diags.emit(diag)
         return
 
 // Register a borrow with pre-computed place/kind/field/path.
@@ -6894,6 +6925,8 @@ fn Sema.check_borrow_create_direct(self: Sema, place: i32, kind: i32, field: i32
     self.borrow_refs.push(0)
     self.borrow_path_starts.push(path_start)
     self.borrow_path_counts.push(path_count)
+    self.borrow_scope_depths.push(self.scope_starts.len() as i32)
+    self.borrow_creation_nodes.push(err_node)
 
 fn Sema.remove_borrow_at(self: Sema, idx: i32):
     let last = self.borrow_refs.len() as i32 - 1
@@ -6906,12 +6939,16 @@ fn Sema.remove_borrow_at(self: Sema, idx: i32):
         self.borrow_refs.set_i32(idx as i64, self.borrow_refs.get(last as i64))
         self.borrow_path_starts.set_i32(idx as i64, self.borrow_path_starts.get(last as i64))
         self.borrow_path_counts.set_i32(idx as i64, self.borrow_path_counts.get(last as i64))
+        self.borrow_scope_depths.set_i32(idx as i64, self.borrow_scope_depths.get(last as i64))
+        self.borrow_creation_nodes.set_i32(idx as i64, self.borrow_creation_nodes.get(last as i64))
     self.borrow_kinds.pop()
     self.borrow_places.pop()
     self.borrow_fields.pop()
     self.borrow_refs.pop()
     self.borrow_path_starts.pop()
     self.borrow_path_counts.pop()
+    self.borrow_scope_depths.pop()
+    self.borrow_creation_nodes.pop()
 
 fn Sema.expr_uses_symbol(self: Sema, node: i32, sym: i32) -> i32:
     if node == 0:
@@ -7608,14 +7645,19 @@ fn Sema.collect_capture_fields(self: Sema, node: i32, sym: i32):
         self.collect_capture_fields(self.ast.get_data0(node), sym)
 
 fn Sema.expire_dead_borrows_in_block(self: Sema, block_extra_start: i32, stmt_count: i32, next_stmt_index: i32, tail_node: i32):
+    let current_depth = self.scope_starts.len() as i32
     var bi = 0
     while bi < self.borrow_refs.len() as i32:
         let ref_sym = self.borrow_refs.get(bi as i64)
         if ref_sym == 0:
-            // Unnamed temporary borrows (e.g. &mut x as *mut T passed to a call)
-            // have no named reference holding them, so they expire at statement
-            // boundaries — the borrow is consumed by the enclosing expression.
             self.remove_borrow_at(bi)
+            continue
+
+        // Only expire borrows owned by this scope or deeper — borrows from
+        // outer scopes must be expired by the outer scope's own block walk,
+        // which has the full forward context (§8.4 NLL scoped expiry).
+        if self.borrow_scope_depths.get(bi as i64) < current_depth:
+            bi = bi + 1
             continue
 
         var live = 0
