@@ -1,26 +1,25 @@
-//! skip
-// Spec test: Section 3.5 — NLL Borrow Scoping (formerly 25.4)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+//! check-only
+// Spec test: §8.4 NLL view-liveness — accepted cases.
+// Views expire at last use; mutation after last use is legal.
 
-// PASS: borrow ends at last use
-fn test:
-    var x = 5
-    let r = &x
-    print(r)
-    x = 10           // OK
+fn test_straight_line:
+    var xs: Vec[i32] = Vec.new()
+    xs.push(1)
+    xs.push(2)
+    let first = &xs[0]
+    print(first)
+    // first is dead here — mutation allowed
+    xs.push(3)
 
-// FAIL: mutation while borrow active
-fn test:
-    var x = 5
-    let r = &x
-    x = 10           // ERROR
-    print(r)
+type Point { x: i32, y: i32 }
 
-// PASS: mutable then shared
-fn test:
-    var x = 5
-    let r = &mut x
-    *r = 10          // last use
-    let s = &x       // OK
-    print(s)
+fn test_disjoint_fields:
+    var p = Point { x: 1, y: 2 }
+    let rx = &p.x
+    // p.y is a disjoint field — mutation allowed
+    p.y = 10
+    print(rx)
+
+fn main:
+    test_straight_line()
+    test_disjoint_fields()
