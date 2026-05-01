@@ -2522,6 +2522,11 @@ fn Sema.check_assign(self: Sema, node: i32) -> i32:
                 self.emit_warning("cannot assign to a non-place expression", node)
         else if lhs_mut_state == PlaceMut.PM_ReadOnly:
             self.emit_warning("cannot assign through a read-only place (e.g., dereferenced &T or *const T) (§15.10)", node)
+        // docs/mut.md Rev 8 §15.17 — mutation through a view-bound
+        // for-loop variable (e.g., `for u in xs.iter(): u.age += 1`).
+        let assign_root = self.place_root_sym(target)
+        if assign_root != 0 and self.scope_is_view_bound(assign_root) != 0:
+            self.emit_warning("cannot mutate through read-only view yielded by iterator (§15.17)", node)
 
     // Check type compatibility
     if target_type != 0 and value_type != 0:
@@ -2573,11 +2578,19 @@ fn Sema.check_for(self: Sema, node: i32) -> i32:
     let iter_type = self.check_expr(iterable)
     let elem_type = self.infer_for_element_type(iter_type as i32)
 
+    // docs/mut.md Rev 8 §11.4 / §15.17 — when the iterable is a .iter()
+    // call (or any iter_of_self method), the iterator yields &T views.
+    // Mark the binding as a view-bound variable so check_assign can emit
+    // §15.17 when mutation through it is attempted.
+    let yields_views = self.for_iterable_yields_views(iterable)
+
     self.push_scope()
     if self.ast.for_binding_is_pattern(node):
         self.check_pattern(binding, elem_type)
     else:
         self.scope_put(binding, elem_type, 0)
+    if yields_views != 0 and binding != 0:
+        self.scope_set_is_view_bound(binding)
     let for_meta = self.ast.find_for_meta(node)
     var label = 0
     if for_meta >= 0:
@@ -5997,6 +6010,11 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
                 if (deref_tk == TypeKind.TY_PTR or deref_tk == TypeKind.TY_REF) and self.get_type_d1(deref_ty) == 0:
                     self.emit_builtin_mutable_receiver_error(type_name_sym, field, node)
                     return 0
+            // docs/mut.md Rev 8 §15.17 — mutating method on a view-bound
+            // for-loop variable (e.g., `for u in xs.iter(): u.push(1)`).
+            let mc_root = self.place_root_sym(expr)
+            if mc_root != 0 and self.scope_is_view_bound(mc_root) != 0:
+                self.emit_warning("cannot mutate through read-only view yielded by iterator (§15.17)", node)
         // docs/mut.md Rev 8 §5.1 — user-defined methods declared with
         // `mut self: Self` require a mutable place receiver. Warnings during
         // P7..P11; promoted to errors at P12 lockdown. Builtins are already
@@ -6016,6 +6034,9 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
                 // §15.6 — only check view-liveness when the receiver actually
                 // is a mutable place we'd be mutating.
                 self.check_mutation_against_views(expr, node)
+            let ms_root = self.place_root_sym(expr)
+            if ms_root != 0 and self.scope_is_view_bound(ms_root) != 0:
+                self.emit_warning("cannot mutate through read-only view yielded by iterator (§15.17)", node)
         else if type_name_sym != 0 and self.builtin_method_requires_mutable_receiver(type_name_sym, field) != 0:
             // §15.6 — view-liveness for builtin mutating methods (push, pop,
             // insert, etc.). The earlier hardcoded path already rejected
@@ -7823,6 +7844,28 @@ fn Sema.maybe_register_iter_of_self_borrow(self: Sema, arg_node: i32) -> i32:
         self.borrow_refs.set_i32(pre_count as i64, 0 - 1)
         return pre_count
     0 - 1
+
+// docs/mut.md Rev 8 §11.4 / §15.17 — returns 1 when the for-loop iterable
+// is a .iter() call (or any iter_of_self method), meaning the iterator
+// yields &T views rather than owned T values.
+fn Sema.for_iterable_yields_views(self: Sema, iterable: i32) -> i32:
+    if self.ast.kind(iterable) != NodeKind.NK_CALL:
+        return 0
+    let callee = self.ast.get_data0(iterable)
+    if self.ast.kind(callee) != NodeKind.NK_FIELD_ACCESS:
+        return 0
+    let recv_node = self.ast.get_data0(callee)
+    let method_sym = self.ast.get_data1(callee)
+    var recv_type = 0
+    if self.typed_expr_types.contains(recv_node):
+        recv_type = self.typed_expr_types.get(recv_node).unwrap()
+    if recv_type == 0:
+        return 0
+    let resolved = self.resolve_alias(recv_type as TypeId)
+    let owner_sym = self.method_owner_symbol_for_type(resolved as i32)
+    if owner_sym == 0:
+        return 0
+    self.method_is_iter_of_self_fn(owner_sym, method_sym)
 
 // docs/mut.md Rev 8 §15.8 — returns 1 when the method's fn-decl is marked
 // `@[iter_of_self]`, indicating the produced value retains access to its

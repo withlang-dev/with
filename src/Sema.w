@@ -299,6 +299,7 @@ type Sema {
     bind_is_task: Vec[i32],
     bind_is_scoped_task: Vec[i32],
     bind_is_ephemeral_task: Vec[i32],
+    bind_is_view_bound: Vec[i32],
     scope_starts: Vec[i32],
     scope_name_map: HashMap[i32, i32],
     pending_generic_binding_base: HashMap[i32, i32],
@@ -771,6 +772,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         bind_is_task: Vec.new(),
         bind_is_scoped_task: Vec.new(),
         bind_is_ephemeral_task: Vec.new(),
+        bind_is_view_bound: Vec.new(),
         scope_starts: Vec.new(),
         scope_name_map: HashMap.new(),
         pending_generic_binding_base: sema_new_map_i32_i32(),
@@ -1950,6 +1952,7 @@ fn Sema.pop_scope(self: Sema):
         self.bind_is_task.pop()
         self.bind_is_scoped_task.pop()
         self.bind_is_ephemeral_task.pop()
+        self.bind_is_view_bound.pop()
     self.scope_starts.pop()
 
 fn Sema.is_discard_binding_symbol(self: Sema, sym: i32) -> i32:
@@ -1971,6 +1974,7 @@ fn Sema.scope_insert_at(self: Sema, sym: i32, tid: i32, is_mut: i32):
     self.bind_is_task.push(0)
     self.bind_is_scoped_task.push(0)
     self.bind_is_ephemeral_task.push(0)
+    self.bind_is_view_bound.push(0)
     self.scope_name_map.insert(sym, idx)
 
 fn Sema.scope_put_at(self: Sema, sym: i32, tid: i32, is_mut: i32, node: i32):
@@ -2094,6 +2098,17 @@ fn Sema.scope_set_is_ephemeral_task(self: Sema, sym: i32, is_ephemeral_task: i32
     let opt = self.scope_name_map.get(sym)
     if opt.is_some():
         self.bind_is_ephemeral_task.set_i32(opt.unwrap() as i64, is_ephemeral_task)
+
+fn Sema.scope_is_view_bound(self: Sema, sym: i32) -> i32:
+    let opt = self.scope_name_map.get(sym)
+    if opt.is_some():
+        return self.bind_is_view_bound.get(opt.unwrap() as i64)
+    0
+
+fn Sema.scope_set_is_view_bound(self: Sema, sym: i32):
+    let opt = self.scope_name_map.get(sym)
+    if opt.is_some():
+        self.bind_is_view_bound.set_i32(opt.unwrap() as i64, 1)
 
 fn Sema.scope_set_state(self: Sema, sym: i32, state: i32):
     let opt = self.scope_name_map.get(sym)
