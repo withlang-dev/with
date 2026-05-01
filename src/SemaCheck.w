@@ -4834,8 +4834,8 @@ fn Sema.check_generic_call(self: Sema, fn_sym: i32, fn_node: i32, arg_types: Vec
     // Also check where clause bounds if present
     let where_idx = self.ast.find_where_meta(fn_node)
     if where_idx >= 0:
-        let where_start = self.ast.where_meta.get((where_idx + 1) as i64)
-        let where_count = self.ast.where_meta.get((where_idx + 2) as i64)
+        let where_start = self.ast.state.where_meta.get((where_idx + 1) as i64)
+        let where_count = self.ast.state.where_meta.get((where_idx + 2) as i64)
         self.check_generic_trait_bounds(where_start, where_count, call_node)
     self.ensure_generic_substitutions(tp_start, tp_count, param_start, param_count, call_node)
 

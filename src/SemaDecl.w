@@ -1019,8 +1019,8 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
     if (flags / FnFlags.ASYNC) % 2 == 1:
         self.task_fns.insert(fn_name, 1)
     // Track @[stack_size(N)]
-    if self.ast.fn_stack_sizes.contains(node as i32):
-        let ss = self.ast.fn_stack_sizes.get(node as i32).unwrap()
+    if self.ast.state.fn_stack_sizes.contains(node as i32):
+        let ss = self.ast.state.fn_stack_sizes.get(node as i32).unwrap()
         self.fn_stack_sizes.insert(fn_name, ss)
 
     // Unbind Self
@@ -1407,8 +1407,8 @@ fn Sema.collect_impl_decl(self: Sema, node: i32, is_local_impl: i32):
     let tp_meta_idx = self.ast.find_impl_type_params(node)
     if tp_meta_idx >= 0:
         // Blanket impl: collect bounds and register
-        let tp_start = self.ast.impl_type_params.get((tp_meta_idx + 1) as i64)
-        let tp_count = self.ast.impl_type_params.get((tp_meta_idx + 2) as i64)
+        let tp_start = self.ast.state.impl_type_params.get((tp_meta_idx + 1) as i64)
+        let tp_count = self.ast.state.impl_type_params.get((tp_meta_idx + 2) as i64)
         let bound_start = self.blanket_bound_syms.len() as i32
         var total_bounds = 0
         var tp_off = tp_start
@@ -1635,8 +1635,8 @@ fn Sema.validate_where_clause(self: Sema, fn_node: i32, tp_start: i32, tp_count:
     let where_idx = self.ast.find_where_meta(fn_node)
     if where_idx < 0:
         return
-    let where_start = self.ast.where_meta.get((where_idx + 1) as i64)
-    let where_count = self.ast.where_meta.get((where_idx + 2) as i64)
+    let where_start = self.ast.state.where_meta.get((where_idx + 1) as i64)
+    let where_count = self.ast.state.where_meta.get((where_idx + 2) as i64)
     var pos = where_start
     for wi in 0..where_count:
         let wp_name = self.ast.get_extra(pos)

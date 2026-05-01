@@ -230,8 +230,8 @@ fn Codegen.resolve_trait_method_type_for_impl_with_trait(self: Codegen, type_nod
             let tp_start = self.trait_tp_starts.get(trait_sym).unwrap()
             let tta_idx = self.pool.find_impl_trait_type_args(impl_node)
             if tta_idx >= 0:
-                let arg_start = self.pool.impl_trait_type_args.get((tta_idx + 1) as i64)
-                let arg_count = self.pool.impl_trait_type_args.get((tta_idx + 2) as i64)
+                let arg_start = self.pool.state.impl_trait_type_args.get((tta_idx + 1) as i64)
+                let arg_count = self.pool.state.impl_trait_type_args.get((tta_idx + 2) as i64)
                 var ti = 0
                 while ti < tp_count and ti < arg_count:
                     let tp_sym = self.trait_tp_flat_syms.get((tp_start + ti) as i64)
@@ -266,8 +266,8 @@ fn Codegen.generate_default_trait_method_for_impl_ext(self: Codegen, impl_type_s
             // Try to bind from explicit trait type args (impl Trait[i32] for Type)
             let tta_idx = self.pool.find_impl_trait_type_args(impl_node)
             if tta_idx >= 0:
-                let arg_start = self.pool.impl_trait_type_args.get((tta_idx + 1) as i64)
-                let arg_count = self.pool.impl_trait_type_args.get((tta_idx + 2) as i64)
+                let arg_start = self.pool.state.impl_trait_type_args.get((tta_idx + 1) as i64)
+                let arg_count = self.pool.state.impl_trait_type_args.get((tta_idx + 2) as i64)
                 var ti = 0
                 while ti < tp_count and ti < arg_count:
                     let tp_sym = self.trait_tp_flat_syms.get((tp_start + ti) as i64)
@@ -1585,7 +1585,7 @@ fn Codegen.try_eval_const_llvm(self: Codegen, node: i32, expected_tid: i32) -> i
         if self.pool.kind(float_node) != NodeKind.NK_FLOAT_LIT:
             return 0
         let str_idx = self.pool.get_data0(float_node)
-        if str_idx < 0 or str_idx >= self.pool.strings.len() as i32:
+        if str_idx < 0 or str_idx >= self.pool.state.strings.len() as i32:
             return 0
         var fval = with_parse_float(self.pool.get_string(str_idx))
         if float_negate:
@@ -1737,7 +1737,7 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
     if self.pool.kind(float_node) == NodeKind.NK_FLOAT_LIT:
         let str_idx = self.pool.get_data0(float_node)
         var fval: f64 = 0.0
-        if str_idx >= 0 and str_idx < self.pool.strings.len() as i32:
+        if str_idx >= 0 and str_idx < self.pool.state.strings.len() as i32:
             let float_text = self.pool.get_string(str_idx)
             if float_text.len() > 0:
                 fval = with_parse_float(float_text)

@@ -3391,7 +3391,7 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
 
     // @[weak] — set weak linkage (LLVMWeakAnyLinkage = 5)
     // Must be checked before c_export which also sets linkage.
-    let is_weak = self.pool.fn_weak_flags.contains(fn_node)
+    let is_weak = self.pool.state.fn_weak_flags.contains(fn_node)
 
     // @[c_export] overrides internal linkage to external for C/linker visibility
     if cc_name.len() > 0:
