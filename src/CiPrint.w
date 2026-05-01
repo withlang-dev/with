@@ -183,7 +183,7 @@ fn ci_float_type_name(bits: i32) -> str:
 fn ci_wrap_unsafe(inner: str) -> str:
     "(unsafe: " ++ inner ++ ")"
 
-fn ci_print_compact_stmt_local(stmts: &CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: CiStmtId, depth: i32) -> str:
+fn ci_print_compact_stmt_local(stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: CiStmtId, depth: i32) -> str:
     if (id as i32) == 0:
         return ""
     let kind = stmts.kind(id)
@@ -564,7 +564,7 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
 
 // ── CiStmt printing ──────────────────────────────────────────
 
-fn ci_print_stmt(stmts: &CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: CiStmtId, depth: i32) -> str:
+fn ci_print_stmt(stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: CiStmtId, depth: i32) -> str:
     if (id as i32) == 0:
         return ci_make_indent(depth) ++ "<ci:stmt:0>\n"
     let kind = stmts.kind(id)
@@ -791,7 +791,7 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: C
 
 // ── CiDecl printing ──────────────────────────────────────────
 
-fn ci_print_decl(decls: &CiDeclPool, stmts: &CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: CiDeclId) -> str:
+fn ci_print_decl(decls: &CiDeclPool, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: CiDeclId) -> str:
     if (id as i32) == 0:
         return "<ci:decl:0>\n"
     let kind = decls.kind(id)
@@ -929,7 +929,7 @@ fn ci_roundtrip_fn_decl -> i32:
     let body = stmts.block(start, 1)
     let name_idx = decls.add_string("foo")
     let fn_d = decls.fn_decl(name_idx, i32_ty, body, 0)
-    let actual = ci_print_decl(&decls, &stmts, exprs, types, fn_d)
+    let actual = ci_print_decl(&decls, stmts, exprs, types, fn_d)
     // CIS_BLOCK now appends a bare `\n` separator after each
     // child to match the legacy compound_stmt's blank-line
     // convention.

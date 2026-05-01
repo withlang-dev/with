@@ -413,127 +413,142 @@ enum CiStmtKind: i32:
 //   [value_count, value0_expr, value1_expr, ..., body_block_stmt_id]
 // For _ / default arms, value_count == 0.
 
-type CiStmtPool {
+type CiStmtPoolState {
     kinds: Vec[i32],
     data0: Vec[i32],
     data1: Vec[i32],
     data2: Vec[i32],
     extra: Vec[i32],
     strings: Vec[str],
-    // Per-stmt flags (bit0 = var_decl is_mut, bit1 = var_decl has_init).
     flags: Vec[i32],
     frozen: i32,
 }
 
-fn CiStmtPool.new -> CiStmtPool:
-    var pool = CiStmtPool {
-        kinds: Vec.new(),
-        data0: Vec.new(),
-        data1: Vec.new(),
-        data2: Vec.new(),
-        extra: Vec.new(),
-        strings: Vec.new(),
-        flags: Vec.new(),
-        frozen: 0,
-    }
-    pool.kinds.push(0)
-    pool.data0.push(0)
-    pool.data1.push(0)
-    pool.data2.push(0)
-    pool.flags.push(0)
-    pool.strings.push("")
-    pool
+type CiStmtPool {
+    state: *mut CiStmtPoolState,
+}
 
-fn CiStmtPool.add(mut self: CiStmtPool, kind: i32, d0: i32, d1: i32, d2: i32, flags: i32) -> CiStmtId:
-    if self.frozen != 0:
+fn CiStmtPool.new -> CiStmtPool:
+    let ptr = with_alloc(256) as *mut CiStmtPoolState
+    unsafe:
+        *ptr = CiStmtPoolState {
+            kinds: Vec.new(),
+            data0: Vec.new(),
+            data1: Vec.new(),
+            data2: Vec.new(),
+            extra: Vec.new(),
+            strings: Vec.new(),
+            flags: Vec.new(),
+            frozen: 0,
+        }
+    let st = ptr
+    st.kinds.push(0)
+    st.data0.push(0)
+    st.data1.push(0)
+    st.data2.push(0)
+    st.flags.push(0)
+    st.strings.push("")
+    CiStmtPool { state: ptr }
+
+fn CiStmtPool.add(self: CiStmtPool, kind: i32, d0: i32, d1: i32, d2: i32, flags: i32) -> CiStmtId:
+    let st = self.state
+    if st.frozen != 0:
         with_eprint("BUG: CiStmtPool.add called after freeze")
-    let id = self.kinds.len() as i32
-    self.kinds.push(kind)
-    self.data0.push(d0)
-    self.data1.push(d1)
-    self.data2.push(d2)
-    self.flags.push(flags)
+    let id = st.kinds.len() as i32
+    st.kinds.push(kind)
+    st.data0.push(d0)
+    st.data1.push(d1)
+    st.data2.push(d2)
+    st.flags.push(flags)
     id as CiStmtId
 
-fn CiStmtPool.add_extra(mut self: CiStmtPool, value: i32) -> i32:
-    if self.frozen != 0:
+fn CiStmtPool.add_extra(self: CiStmtPool, value: i32) -> i32:
+    let st = self.state
+    if st.frozen != 0:
         with_eprint("BUG: CiStmtPool.add_extra called after freeze")
-    let idx = self.extra.len() as i32
-    self.extra.push(value)
+    let idx = st.extra.len() as i32
+    st.extra.push(value)
     idx
 
-fn CiStmtPool.add_string(mut self: CiStmtPool, s: str) -> i32:
-    if self.frozen != 0:
+fn CiStmtPool.add_string(self: CiStmtPool, s: str) -> i32:
+    let st = self.state
+    if st.frozen != 0:
         with_eprint("BUG: CiStmtPool.add_string called after freeze")
-    let idx = self.strings.len() as i32
-    self.strings.push(s)
+    let idx = st.strings.len() as i32
+    st.strings.push(s)
     idx
 
-fn CiStmtPool.freeze(mut self: CiStmtPool):
-    self.frozen = 1
+fn CiStmtPool.freeze(self: CiStmtPool):
+    self.state.frozen = 1
 
-fn CiStmtPool.kind(self: &CiStmtPool, id: CiStmtId) -> i32:
-    self.kinds.get((id as i32) as i64)
+fn CiStmtPool.extra_len(self: CiStmtPool) -> i32:
+    self.state.extra.len() as i32
 
-fn CiStmtPool.get_d0(self: &CiStmtPool, id: CiStmtId) -> i32:
-    self.data0.get((id as i32) as i64)
+fn CiStmtPool.val(self: CiStmtPool) -> CiStmtPool:
+    CiStmtPool { state: self.state }
 
-fn CiStmtPool.get_d1(self: &CiStmtPool, id: CiStmtId) -> i32:
-    self.data1.get((id as i32) as i64)
+fn CiStmtPool.kind(self: CiStmtPool, id: CiStmtId) -> i32:
+    self.state.kinds.get((id as i32) as i64)
 
-fn CiStmtPool.get_d2(self: &CiStmtPool, id: CiStmtId) -> i32:
-    self.data2.get((id as i32) as i64)
+fn CiStmtPool.get_d0(self: CiStmtPool, id: CiStmtId) -> i32:
+    self.state.data0.get((id as i32) as i64)
 
-fn CiStmtPool.get_flags(self: &CiStmtPool, id: CiStmtId) -> i32:
-    self.flags.get((id as i32) as i64)
+fn CiStmtPool.get_d1(self: CiStmtPool, id: CiStmtId) -> i32:
+    self.state.data1.get((id as i32) as i64)
 
-fn CiStmtPool.get_extra(self: &CiStmtPool, idx: i32) -> i32:
-    self.extra.get(idx as i64)
+fn CiStmtPool.get_d2(self: CiStmtPool, id: CiStmtId) -> i32:
+    self.state.data2.get((id as i32) as i64)
 
-fn CiStmtPool.get_string(self: &CiStmtPool, idx: i32) -> str:
-    self.strings.get(idx as i64)
+fn CiStmtPool.get_flags(self: CiStmtPool, id: CiStmtId) -> i32:
+    self.state.flags.get((id as i32) as i64)
+
+fn CiStmtPool.get_extra(self: CiStmtPool, idx: i32) -> i32:
+    self.state.extra.get(idx as i64)
+
+fn CiStmtPool.get_string(self: CiStmtPool, idx: i32) -> str:
+    self.state.strings.get(idx as i64)
 
 // Statement constructor helpers.
-fn CiStmtPool.expr_stmt(mut self: CiStmtPool, expr: CiExprId) -> CiStmtId:
+fn CiStmtPool.expr_stmt(self: CiStmtPool, expr: CiExprId) -> CiStmtId:
     self.add(CiStmtKind.CIS_EXPR, expr as i32, 0, 0, 0)
 
-fn CiStmtPool.return_(mut self: CiStmtPool, expr: CiExprId) -> CiStmtId:
+fn CiStmtPool.return_(self: CiStmtPool, expr: CiExprId) -> CiStmtId:
     self.add(CiStmtKind.CIS_RETURN, expr as i32, 0, 0, 0)
 
-fn CiStmtPool.break_(mut self: CiStmtPool) -> CiStmtId:
+fn CiStmtPool.break_(self: CiStmtPool) -> CiStmtId:
     self.add(CiStmtKind.CIS_BREAK, 0, 0, 0, 0)
 
-fn CiStmtPool.continue_(mut self: CiStmtPool) -> CiStmtId:
+fn CiStmtPool.continue_(self: CiStmtPool) -> CiStmtId:
     self.add(CiStmtKind.CIS_CONTINUE, 0, 0, 0, 0)
 
-fn CiStmtPool.break_label(mut self: CiStmtPool, label_sym: i32) -> CiStmtId:
+fn CiStmtPool.break_label(self: CiStmtPool, label_sym: i32) -> CiStmtId:
     self.add(CiStmtKind.CIS_BREAK, label_sym, 0, 0, 0)
 
-fn CiStmtPool.continue_label(mut self: CiStmtPool, label_sym: i32) -> CiStmtId:
+fn CiStmtPool.continue_label(self: CiStmtPool, label_sym: i32) -> CiStmtId:
     self.add(CiStmtKind.CIS_CONTINUE, label_sym, 0, 0, 0)
 
-fn CiStmtPool.assign(mut self: CiStmtPool, lhs: CiExprId, rhs: CiExprId) -> CiStmtId:
+fn CiStmtPool.assign(self: CiStmtPool, lhs: CiExprId, rhs: CiExprId) -> CiStmtId:
     self.add(CiStmtKind.CIS_ASSIGN, lhs as i32, rhs as i32, 0, 0)
 
 // Block: caller has already pushed `count` stmt ids into pool.extra and
 // knows the start index.
-fn CiStmtPool.block(mut self: CiStmtPool, stmts_start: i32, stmts_count: i32) -> CiStmtId:
+fn CiStmtPool.block(self: CiStmtPool, stmts_start: i32, stmts_count: i32) -> CiStmtId:
     self.add(CiStmtKind.CIS_BLOCK, stmts_start, stmts_count, 0, 0)
 
-fn CiStmtPool.block_labeled(mut self: CiStmtPool, stmts_start: i32, stmts_count: i32, label_sym: i32) -> CiStmtId:
+fn CiStmtPool.block_labeled(self: CiStmtPool, stmts_start: i32, stmts_count: i32, label_sym: i32) -> CiStmtId:
     self.add(CiStmtKind.CIS_BLOCK, stmts_start, stmts_count, label_sym, 0)
 
-fn CiStmtPool.if_stmt(mut self: CiStmtPool, cond: CiExprId, then_block: CiStmtId, else_block: CiStmtId) -> CiStmtId:
+fn CiStmtPool.if_stmt(self: CiStmtPool, cond: CiExprId, then_block: CiStmtId, else_block: CiStmtId) -> CiStmtId:
     self.add(CiStmtKind.CIS_IF, cond as i32, then_block as i32, else_block as i32, 0)
 
-fn CiStmtPool.while_stmt(mut self: CiStmtPool, cond: CiExprId, body: CiStmtId) -> CiStmtId:
+fn CiStmtPool.while_stmt(self: CiStmtPool, cond: CiExprId, body: CiStmtId) -> CiStmtId:
     self.add(CiStmtKind.CIS_WHILE, cond as i32, body as i32, 0, 0)
 
-fn CiStmtPool.while_labeled(mut self: CiStmtPool, cond: CiExprId, body: CiStmtId, label_sym: i32) -> CiStmtId:
+fn CiStmtPool.while_labeled(self: CiStmtPool, cond: CiExprId, body: CiStmtId, label_sym: i32) -> CiStmtId:
     self.add(CiStmtKind.CIS_WHILE, cond as i32, body as i32, label_sym, 0)
 
 // Variable decl. flags bit0 = is_mut, bit1 = has_init.
-fn CiStmtPool.var_decl(mut self: CiStmtPool, name_sym: i32, ty: CiTypeId, init: CiExprId, is_mut: i32) -> CiStmtId:
+fn CiStmtPool.var_decl(self: CiStmtPool, name_sym: i32, ty: CiTypeId, init: CiExprId, is_mut: i32) -> CiStmtId:
     var f: i32 = 0
     if is_mut != 0:
         f = f + 1
@@ -541,10 +556,10 @@ fn CiStmtPool.var_decl(mut self: CiStmtPool, name_sym: i32, ty: CiTypeId, init: 
         f = f + 2
     self.add(CiStmtKind.CIS_VAR_DECL, name_sym, ty as i32, init as i32, f)
 
-fn CiStmtPool.label(mut self: CiStmtPool, label_sym: i32) -> CiStmtId:
+fn CiStmtPool.label(self: CiStmtPool, label_sym: i32) -> CiStmtId:
     self.add(CiStmtKind.CIS_LABEL, label_sym, 0, 0, 0)
 
-fn CiStmtPool.goto_label(mut self: CiStmtPool, label_sym: i32) -> CiStmtId:
+fn CiStmtPool.goto_label(self: CiStmtPool, label_sym: i32) -> CiStmtId:
     self.add(CiStmtKind.CIS_GOTO, label_sym, 0, 0, 0)
 
 // ── CiDecl ────────────────────────────────────────────────────
