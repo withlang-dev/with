@@ -1158,21 +1158,15 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
                 self.emit_missing_import_frontend(merged_pool, decl)
         ui2 = ui2 + 1
 
-    let prelude_reordered: Vec[i32] = Vec.new()
-    let prelude_reordered_paths: Vec[str] = Vec.new()
-    let prelude_reordered_file_ids: Vec[i32] = Vec.new()
-    self.reorder_import_tier_frontend(prelude_ordered, prelude_paths, prelude_file_ids, prelude_reordered, prelude_reordered_paths, prelude_reordered_file_ids)
-    prelude_ordered = prelude_reordered
-    prelude_paths = prelude_reordered_paths
-    prelude_file_ids = prelude_reordered_file_ids
+    let prelude_reordered = self.reorder_import_tier_frontend(prelude_ordered, prelude_paths, prelude_file_ids)
+    prelude_ordered = prelude_reordered.decls
+    prelude_paths = prelude_reordered.paths
+    prelude_file_ids = prelude_reordered.file_ids
 
-    let user_reordered: Vec[i32] = Vec.new()
-    let user_reordered_paths: Vec[str] = Vec.new()
-    let user_reordered_file_ids: Vec[i32] = Vec.new()
-    self.reorder_import_tier_frontend(user_import_ordered, user_import_paths, user_import_file_ids, user_reordered, user_reordered_paths, user_reordered_file_ids)
-    user_import_ordered = user_reordered
-    user_import_paths = user_reordered_paths
-    user_import_file_ids = user_reordered_file_ids
+    let user_reordered = self.reorder_import_tier_frontend(user_import_ordered, user_import_paths, user_import_file_ids)
+    user_import_ordered = user_reordered.decls
+    user_import_paths = user_reordered.paths
+    user_import_file_ids = user_reordered.file_ids
 
     // Collect fn names from higher-priority tiers for deduplication.
     var root_fn_names: Vec[i32] = Vec.new()
@@ -1359,7 +1353,27 @@ fn Zcu.find_module_id_by_path_frontend(self: Zcu, path: str) -> i32:
             return mod.module_id
     -1
 
-fn Zcu.collect_module_dependency_order_frontend(self: Zcu, path: str, wanted_paths: HashMap[str, i32], seen_paths: &mut HashMap[str, i32], out_paths: &mut Vec[str]):
+type DepOrderAccumState {
+    order: Vec[str],
+}
+
+type DepOrderAccum {
+    state: *mut DepOrderAccumState,
+}
+
+fn DepOrderAccum.new() -> DepOrderAccum:
+    let ptr = with_alloc(32) as *mut DepOrderAccumState
+    unsafe:
+        *ptr = DepOrderAccumState { order: Vec.new() }
+    DepOrderAccum { state: ptr }
+
+type ReorderedTier {
+    decls: Vec[i32],
+    paths: Vec[str],
+    file_ids: Vec[i32],
+}
+
+fn Zcu.collect_module_dependency_order_frontend(self: Zcu, path: str, wanted_paths: HashMap[str, i32], seen_paths: HashMap[str, i32], accum: DepOrderAccum):
     if path.len() == 0:
         return
     if seen_paths.contains(path):
@@ -1374,10 +1388,10 @@ fn Zcu.collect_module_dependency_order_frontend(self: Zcu, path: str, wanted_pat
                 continue
             let dep = self.last_resolved.modules.get(imp.target_module as i64)
             if wanted_paths.contains(dep.path):
-                self.collect_module_dependency_order_frontend(dep.path, wanted_paths, seen_paths, out_paths)
-    out_paths.push(frontend_owned_text(path))
+                self.collect_module_dependency_order_frontend(dep.path, wanted_paths, seen_paths, accum)
+    accum.state.order.push(frontend_owned_text(path))
 
-fn Zcu.reorder_import_tier_frontend(self: Zcu, decls: Vec[i32], paths: Vec[str], file_ids: Vec[i32], out_decls: &mut Vec[i32], out_paths: &mut Vec[str], out_file_ids: &mut Vec[i32]):
+fn Zcu.reorder_import_tier_frontend(self: Zcu, decls: Vec[i32], paths: Vec[str], file_ids: Vec[i32]) -> ReorderedTier:
     let wanted_paths: HashMap[str, i32] = HashMap.new()
     let first_seen_paths: Vec[str] = Vec.new()
     for i in 0..paths.len() as i32:
@@ -1389,11 +1403,15 @@ fn Zcu.reorder_import_tier_frontend(self: Zcu, decls: Vec[i32], paths: Vec[str],
         wanted_paths.insert(frontend_owned_text(path), 1)
         first_seen_paths.push(frontend_owned_text(path))
 
-    let module_order: Vec[str] = Vec.new()
+    let accum = DepOrderAccum.new()
     let seen_paths: HashMap[str, i32] = HashMap.new()
     for i in 0..first_seen_paths.len() as i32:
-        self.collect_module_dependency_order_frontend(first_seen_paths.get(i as i64), wanted_paths, seen_paths, module_order)
+        self.collect_module_dependency_order_frontend(first_seen_paths.get(i as i64), wanted_paths, seen_paths, accum)
 
+    let module_order = accum.state.order
+    let out_decls: Vec[i32] = Vec.new()
+    let out_paths: Vec[str] = Vec.new()
+    let out_file_ids: Vec[i32] = Vec.new()
     for oi in 0..module_order.len() as i32:
         let module_path = module_order.get(oi as i64)
         for di in 0..decls.len() as i32:
@@ -1409,6 +1427,7 @@ fn Zcu.reorder_import_tier_frontend(self: Zcu, decls: Vec[i32], paths: Vec[str],
         out_decls.push(decls.get(di as i64))
         out_paths.push(frontend_owned_text(path))
         out_file_ids.push(file_ids.get(di as i64))
+    ReorderedTier { decls: out_decls, paths: out_paths, file_ids: out_file_ids }
 
 fn frontend_parent_module_rel(module_rel: str) -> str:
     var last_slash = -1
