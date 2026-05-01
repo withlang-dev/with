@@ -601,7 +601,7 @@ const CID_FLAG_VAR_EXTERN: i32 = 2     // (on CID_VAR_GLOBAL)
 const CID_FLAG_DEFINITION: i32 = 4
 const CID_FLAG_VAR_STATIC: i32 = 8
 
-type CiDeclPool {
+type CiDeclPoolState {
     kinds: Vec[i32],
     data0: Vec[i32],
     data1: Vec[i32],
@@ -609,99 +609,107 @@ type CiDeclPool {
     extra: Vec[i32],
     strings: Vec[str],
     flags: Vec[i32],
-    // Owner module id (-1 = unknown / single-file mode). Populated by
-    // Pass 3 (project symbol resolution) in Phase C.
     owner_module: Vec[i32],
     frozen: i32,
 }
 
-fn CiDeclPool.new -> CiDeclPool:
-    var pool = CiDeclPool {
-        kinds: Vec.new(),
-        data0: Vec.new(),
-        data1: Vec.new(),
-        data2: Vec.new(),
-        extra: Vec.new(),
-        strings: Vec.new(),
-        flags: Vec.new(),
-        owner_module: Vec.new(),
-        frozen: 0,
-    }
-    pool.kinds.push(0)
-    pool.data0.push(0)
-    pool.data1.push(0)
-    pool.data2.push(0)
-    pool.flags.push(0)
-    pool.owner_module.push(0 - 1)
-    pool
+type CiDeclPool {
+    state: *mut CiDeclPoolState,
+}
 
-fn CiDeclPool.add(mut self: CiDeclPool, kind: i32, d0: i32, d1: i32, d2: i32, flags: i32) -> CiDeclId:
-    if self.frozen != 0:
+fn CiDeclPool.new -> CiDeclPool:
+    let ptr = with_alloc(256) as *mut CiDeclPoolState
+    unsafe:
+        *ptr = CiDeclPoolState {
+            kinds: Vec.new(),
+            data0: Vec.new(),
+            data1: Vec.new(),
+            data2: Vec.new(),
+            extra: Vec.new(),
+            strings: Vec.new(),
+            flags: Vec.new(),
+            owner_module: Vec.new(),
+            frozen: 0,
+        }
+    let st = ptr
+    st.kinds.push(0)
+    st.data0.push(0)
+    st.data1.push(0)
+    st.data2.push(0)
+    st.flags.push(0)
+    st.owner_module.push(0 - 1)
+    CiDeclPool { state: ptr }
+
+fn CiDeclPool.add(self: CiDeclPool, kind: i32, d0: i32, d1: i32, d2: i32, flags: i32) -> CiDeclId:
+    let st = self.state
+    if st.frozen != 0:
         with_eprint("BUG: CiDeclPool.add called after freeze")
-    let id = self.kinds.len() as i32
-    self.kinds.push(kind)
-    self.data0.push(d0)
-    self.data1.push(d1)
-    self.data2.push(d2)
-    self.flags.push(flags)
-    self.owner_module.push(0 - 1)
+    let id = st.kinds.len() as i32
+    st.kinds.push(kind)
+    st.data0.push(d0)
+    st.data1.push(d1)
+    st.data2.push(d2)
+    st.flags.push(flags)
+    st.owner_module.push(0 - 1)
     id as CiDeclId
 
-fn CiDeclPool.add_extra(mut self: CiDeclPool, value: i32) -> i32:
-    if self.frozen != 0:
+fn CiDeclPool.add_extra(self: CiDeclPool, value: i32) -> i32:
+    let st = self.state
+    if st.frozen != 0:
         with_eprint("BUG: CiDeclPool.add_extra called after freeze")
-    let idx = self.extra.len() as i32
-    self.extra.push(value)
+    let idx = st.extra.len() as i32
+    st.extra.push(value)
     idx
 
-fn CiDeclPool.add_string(mut self: CiDeclPool, s: str) -> i32:
-    if self.frozen != 0:
+fn CiDeclPool.add_string(self: CiDeclPool, s: str) -> i32:
+    let st = self.state
+    if st.frozen != 0:
         with_eprint("BUG: CiDeclPool.add_string called after freeze")
-    let idx = self.strings.len() as i32
-    self.strings.push(s)
+    let idx = st.strings.len() as i32
+    st.strings.push(s)
     idx
 
-fn CiDeclPool.freeze(mut self: CiDeclPool):
-    self.frozen = 1
+fn CiDeclPool.freeze(self: CiDeclPool):
+    self.state.frozen = 1
 
-fn CiDeclPool.kind(self: &CiDeclPool, id: CiDeclId) -> i32:
-    self.kinds.get((id as i32) as i64)
+fn CiDeclPool.kind(self: CiDeclPool, id: CiDeclId) -> i32:
+    self.state.kinds.get((id as i32) as i64)
 
-fn CiDeclPool.get_d0(self: &CiDeclPool, id: CiDeclId) -> i32:
-    self.data0.get((id as i32) as i64)
+fn CiDeclPool.get_d0(self: CiDeclPool, id: CiDeclId) -> i32:
+    self.state.data0.get((id as i32) as i64)
 
-fn CiDeclPool.get_d1(self: &CiDeclPool, id: CiDeclId) -> i32:
-    self.data1.get((id as i32) as i64)
+fn CiDeclPool.get_d1(self: CiDeclPool, id: CiDeclId) -> i32:
+    self.state.data1.get((id as i32) as i64)
 
-fn CiDeclPool.get_d2(self: &CiDeclPool, id: CiDeclId) -> i32:
-    self.data2.get((id as i32) as i64)
+fn CiDeclPool.get_d2(self: CiDeclPool, id: CiDeclId) -> i32:
+    self.state.data2.get((id as i32) as i64)
 
-fn CiDeclPool.get_flags(self: &CiDeclPool, id: CiDeclId) -> i32:
-    self.flags.get((id as i32) as i64)
+fn CiDeclPool.get_flags(self: CiDeclPool, id: CiDeclId) -> i32:
+    self.state.flags.get((id as i32) as i64)
 
-fn CiDeclPool.get_extra(self: &CiDeclPool, idx: i32) -> i32:
-    self.extra.get(idx as i64)
+fn CiDeclPool.get_extra(self: CiDeclPool, idx: i32) -> i32:
+    self.state.extra.get(idx as i64)
 
-fn CiDeclPool.get_string(self: &CiDeclPool, idx: i32) -> str:
-    self.strings.get(idx as i64)
+fn CiDeclPool.get_string(self: CiDeclPool, idx: i32) -> str:
+    self.state.strings.get(idx as i64)
 
 // Decl constructor helpers.
-fn CiDeclPool.fn_decl(mut self: CiDeclPool, name_sym: i32, ret_ty: CiTypeId, body: CiStmtId, flags: i32) -> CiDeclId:
+fn CiDeclPool.fn_decl(self: CiDeclPool, name_sym: i32, ret_ty: CiTypeId, body: CiStmtId, flags: i32) -> CiDeclId:
     self.add(CiDeclKind.CID_FN_DECL, name_sym, ret_ty as i32, body as i32, flags)
 
-fn CiDeclPool.var_global(mut self: CiDeclPool, name_sym: i32, ty: CiTypeId, init: CiExprId, flags: i32) -> CiDeclId:
+fn CiDeclPool.var_global(self: CiDeclPool, name_sym: i32, ty: CiTypeId, init: CiExprId, flags: i32) -> CiDeclId:
     self.add(CiDeclKind.CID_VAR_GLOBAL, name_sym, ty as i32, init as i32, flags)
 
-fn CiDeclPool.typedef(mut self: CiDeclPool, name_sym: i32, target: CiTypeId) -> CiDeclId:
+fn CiDeclPool.typedef(self: CiDeclPool, name_sym: i32, target: CiTypeId) -> CiDeclId:
     self.add(CiDeclKind.CID_TYPEDEF, name_sym, target as i32, 0, 0)
 
-fn CiDeclPool.struct_def(mut self: CiDeclPool, name_sym: i32, fields_start: i32, field_count: i32) -> CiDeclId:
+fn CiDeclPool.struct_def(self: CiDeclPool, name_sym: i32, fields_start: i32, field_count: i32) -> CiDeclId:
     self.add(CiDeclKind.CID_STRUCT_DEF, name_sym, fields_start, field_count, 0)
 
-fn CiDeclPool.enum_def(mut self: CiDeclPool, name_sym: i32, variants_start: i32, variant_count: i32) -> CiDeclId:
+fn CiDeclPool.enum_def(self: CiDeclPool, name_sym: i32, variants_start: i32, variant_count: i32) -> CiDeclId:
     self.add(CiDeclKind.CID_ENUM_DEF, name_sym, variants_start, variant_count, 0)
 
-fn CiDeclPool.extern_fn(mut self: CiDeclPool, name_sym: i32, ret_ty: CiTypeId, flags: i32) -> CiDeclId:
+fn CiDeclPool.extern_fn(self: CiDeclPool, name_sym: i32, ret_ty: CiTypeId, flags: i32) -> CiDeclId:
     self.add(CiDeclKind.CID_EXTERN_FN, name_sym, ret_ty as i32, 0, flags)
 
 
