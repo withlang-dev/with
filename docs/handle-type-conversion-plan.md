@@ -5,7 +5,8 @@ AstPool, and Sema. Pools convert to handle types wrapping `*mut State` (proven
 by InternPool). Sema converts via §16.2 method extraction — free functions
 taking `&mut Sema` become `mut self: Self` methods on Sema.
 
-**Status:** Ready for implementation.
+**Status:** Complete. All pool handle-type conversions and Sema §16.2 method
+extraction are committed and fixpoint-verified.
 
 ---
 
@@ -310,7 +311,7 @@ corresponding call-site `&pool` → `pool` edits), not complexity.
 
 ## 3. Conversion Order
 
-**Proposed:** CiTypePool → CiExprPool → CiStmtPool → AstPool → Sema §16.2
+**Completed:** CiTypePool → CiExprPool → CiStmtPool → CiDeclPool → AstPool → Sema §16.2
 
 **Rationale:** Descending by secondary-param count (25, 20, 16, 18). CI pools
 first because they're self-contained in CImport.w/CiIR.w. AstPool next because
@@ -420,7 +421,7 @@ unnecessary — `mut self: Self` provides mutation visibility natively.
 
 **Frontend.w — 1 function:**
 
-| 16 | `Zcu.seed_sema_module_graph_frontend(self: Zcu, sema: &mut Sema)` | `Sema.init_module_graph(mut self: Self, zcu: Zcu)` | 13 `sema.field` → `self.field`, 8 `self.` (Zcu) → `zcu.` |
+| 16 | `Zcu.seed_sema_module_graph_frontend(self: Zcu, sema: &mut Sema)` | `Sema.init_module_graph(mut self: Sema, resolved: &ResolveResult)` | 13 `sema.field` → `self.field`, `self.last_resolved` → `resolved`; pass `&ResolveResult` to avoid seed large-struct ABI bug |
 
 ### 5b. Call-Site Changes
 
@@ -445,19 +446,18 @@ self.ct_sync_sema_ast(pool)
   `comptime_transform_module(source_ast, &mut sema, intern)`
   → `sema.comptime_transform_module(source_ast, intern)`
 
-- `seed_sema_module_graph_frontend` is called from Frontend.w (2 sites):
+- `seed_sema_module_graph_frontend` is called from Frontend.w (2 sites) +
+  Compilation.w (1 site):
   `self.seed_sema_module_graph_frontend(&mut sema)`
-  → `sema.init_module_graph(self)`
+  → `sema.init_module_graph(&self.last_resolved)`
+  Note: takes `&ResolveResult` instead of `Zcu` by value to avoid seed
+  large-struct ABI bug (two large-struct params in one method).
 
-**Calls to `sema: &Sema` (read-only) free functions.** ComptimeTransform.w
-has 10 functions taking `sema: &Sema` (ct_build_type_expr, ct_build_value_tree,
-ct_decl_source_path, etc.). These are NOT in the 16 `&mut Sema` sites and
-stay as free functions. After conversion, calls from inside a `mut self: Self`
-method body pass `&self` where they previously passed `sema`:
-```
-ct_build_value_tree(pool, intern, &self, value, node, extras)
-ct_decl_source_path(&self, di)
-```
+**Read-only free functions also converted to Sema methods.** The 10 functions
+taking `sema: &Sema` (ct_build_type_expr, ct_build_value_tree,
+ct_decl_source_path, etc.) were also converted to `self: Sema` methods to
+avoid the seed's `&self` → `**Sema` double-indirection bug on large structs.
+All 25 functions in ComptimeTransform.w are now Sema methods.
 
 ### 5c. The `*mut Sema` Raw Pointer Paths
 
