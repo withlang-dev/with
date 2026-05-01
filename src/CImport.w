@@ -9787,14 +9787,18 @@ type CiGotoCfgContext {
     label_defined: Vec[i32],
     break_targets: Vec[i32],
     continue_targets: Vec[i32],
-    switch_cases: *mut CiGotoSwitchCase,
+    switch_cases: CiGotoSwitchCase,
 }
 
-type CiGotoSwitchCase {
+type CiGotoSwitchCaseState {
     values: Vec[i32],
     blocks: Vec[i32],
     has_default: bool = false,
     default_block: i32 = -1,
+}
+
+type CiGotoSwitchCase {
+    state: *mut CiGotoSwitchCaseState,
 }
 
 type CiStackEmitFrame {
@@ -9834,7 +9838,7 @@ fn ci_goto_cfg_new(entry_desc: str) -> CiGotoCfgContext:
         label_defined: Vec.new(),
         break_targets: Vec.new(),
         continue_targets: Vec.new(),
-        switch_cases: 0 as *mut CiGotoSwitchCase,
+        switch_cases: CiGotoSwitchCase { state: 0 as *mut CiGotoSwitchCaseState },
     }
 
 fn CiGotoCfgContext.fail(mut self: CiGotoCfgContext, msg: str, loc: str):
@@ -10205,20 +10209,23 @@ fn CiGotoCfgContext.lower_for(mut self: CiGotoCfgContext, session: i64, cursor: 
         self.unreachable_current()
 
 fn ci_goto_switch_case_new() -> CiGotoSwitchCase:
-    CiGotoSwitchCase {
-        values: Vec.new(),
-        blocks: Vec.new(),
-        has_default: false,
-        default_block: -1,
-    }
+    let ptr = with_alloc(64) as *mut CiGotoSwitchCaseState
+    unsafe:
+        *ptr = CiGotoSwitchCaseState {
+            values: Vec.new(),
+            blocks: Vec.new(),
+            has_default: false,
+            default_block: -1,
+        }
+    CiGotoSwitchCase { state: ptr }
 
-fn CiGotoSwitchCase.record_case(mut self: CiGotoSwitchCase, value: CiExprId, block: i32):
-    self.values.push(value as i32)
-    self.blocks.push(block)
+fn CiGotoSwitchCase.record_case(self: CiGotoSwitchCase, value: CiExprId, block: i32):
+    self.state.values.push(value as i32)
+    self.state.blocks.push(block)
 
-fn CiGotoCfgContext.lower_case_children(mut self: CiGotoCfgContext, session: i64, cursor: i32, first_child: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: str, cases: &mut CiGotoSwitchCase):
+fn CiGotoCfgContext.lower_case_children(mut self: CiGotoCfgContext, session: i64, cursor: i32, first_child: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: str, cases: CiGotoSwitchCase):
     let saved_cases = self.switch_cases
-    self.switch_cases = cases as *mut CiGotoSwitchCase
+    self.switch_cases = cases
     var case_scope = scope
     let nc = with_ci_num_children(session, cursor)
     var i = first_child
@@ -10245,7 +10252,7 @@ fn CiGotoCfgContext.lower_case_children(mut self: CiGotoCfgContext, session: i64
         i = i + 1
     self.switch_cases = saved_cases
 
-fn CiGotoCfgContext.lower_case_node(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: str, cases: &mut CiGotoSwitchCase):
+fn CiGotoCfgContext.lower_case_node(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: str, cases: CiGotoSwitchCase):
     if not self.ok:
         return
     let kind = with_ci_cursor_kind(session, cursor)
@@ -10263,16 +10270,16 @@ fn CiGotoCfgContext.lower_case_node(mut self: CiGotoCfgContext, session: i64, cu
             self.lower_case_children(session, cursor, 1, stmts, exprs, types, scope, cases)
         return
     if kind == CXK_DEFAULT_STMT:
-        cases.has_default = true
-        cases.default_block = self.current
+        cases.state.has_default = true
+        cases.state.default_block = self.current
         if nc >= 1:
             self.lower_case_children(session, cursor, 0, stmts, exprs, types, scope, cases)
         return
     self.fail("expected switch case/default in goto CFG", with_ci_cursor_location(session, cursor))
 
-fn CiGotoCfgContext.lower_switch_body(mut self: CiGotoCfgContext, session: i64, body_cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: str, cases: &mut CiGotoSwitchCase):
+fn CiGotoCfgContext.lower_switch_body(mut self: CiGotoCfgContext, session: i64, body_cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: str, cases: CiGotoSwitchCase):
     let saved_cases = self.switch_cases
-    self.switch_cases = cases as *mut CiGotoSwitchCase
+    self.switch_cases = cases
     let nc = with_ci_num_children(session, body_cursor)
     var switch_scope = scope
     var i = 0
@@ -10312,19 +10319,19 @@ fn CiGotoCfgContext.lower_switch_body(mut self: CiGotoCfgContext, session: i64, 
 fn CiGotoCfgContext.emit_switch_dispatch(mut self: CiGotoCfgContext, exprs: CiExprPool, subject_id: CiExprId, dispatch_block: i32, after_block: i32, cases: CiGotoSwitchCase, loc: str):
     if not self.ok:
         return
-    let value_count = cases.values.len() as i32
+    let value_count = cases.state.values.len() as i32
     if value_count == 0:
-        let target = if cases.has_default: cases.default_block else: after_block
+        let target = if cases.state.has_default: cases.state.default_block else: after_block
         self.current = dispatch_block
         self.branch_current(target, loc)
         return
     var chain_block = dispatch_block
     var i = 0
     while i < value_count and self.ok:
-        let case_value = cases.values.get(i as i64) as CiExprId
-        let case_block = cases.blocks.get(i as i64)
+        let case_value = cases.state.values.get(i as i64) as CiExprId
+        let case_block = cases.state.blocks.get(i as i64)
         let false_block = if i == value_count - 1:
-            if cases.has_default: cases.default_block else: after_block
+            if cases.state.has_default: cases.state.default_block else: after_block
         else:
             self.new_block("switch dispatch")
         let cond = exprs.binary(CiBinOp.CIBO_EQ, subject_id, case_value, 0 as CiTypeId)
@@ -10342,7 +10349,7 @@ fn CiGotoCfgContext.lower_switch(mut self: CiGotoCfgContext, session: i64, curso
         let body_cursor = with_ci_child(session, cursor, 1)
         if ci_subtree_has_labels(session, body_cursor):
             var dead_cases = ci_goto_switch_case_new()
-            self.lower_switch_body(session, body_cursor, stmts, exprs, types, scope, &mut dead_cases)
+            self.lower_switch_body(session, body_cursor, stmts, exprs, types, scope, dead_cases)
         return
     let subject_cursor = with_ci_child(session, cursor, 0)
     let body_cursor = with_ci_child(session, cursor, 1)
@@ -10358,7 +10365,7 @@ fn CiGotoCfgContext.lower_switch(mut self: CiGotoCfgContext, session: i64, curso
     self.push_break_target(after_block)
     var cases = ci_goto_switch_case_new()
     self.current = -1
-    self.lower_switch_body(session, body_cursor, stmts, exprs, types, scope, &mut cases)
+    self.lower_switch_body(session, body_cursor, stmts, exprs, types, scope, cases)
     if self.current >= 0:
         self.branch_current(after_block, with_ci_cursor_location(session, cursor))
     self.pop_break_target()
@@ -10407,7 +10414,7 @@ fn CiGotoCfgContext.lower_stmt(mut self: CiGotoCfgContext, session: i64, cursor:
                     return
                 child_cursor = with_ci_child(session, child_cursor, 0)
                 child_kind = with_ci_cursor_kind(session, child_cursor)
-            if (child_kind == CXK_CASE_STMT or child_kind == CXK_DEFAULT_STMT) and (self.switch_cases as i64) != 0:
+            if (child_kind == CXK_CASE_STMT or child_kind == CXK_DEFAULT_STMT) and (self.switch_cases.state as i64) != 0:
                 self.lower_case_node(session, child_cursor, stmts, exprs, types, scope, self.switch_cases)
             else:
                 self.lower_stmt(session, child_cursor, stmts, exprs, types, scope)
