@@ -4404,6 +4404,11 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         self.remove_borrow_at(iter_borrow_idxs.get(ibi as i64))
         ibi = ibi - 1
 
+    // docs/mut.md Rev 8 §9.2 — closure capture conflict detection.
+    // When a mutating closure captures a place, sibling arguments may not
+    // retain access to the same place (owned move, view, or iterator).
+    self.check_closure_capture_conflicts(resolved_extra_start, resolved_arg_count, has_resolved, node)
+
     // Mark non-Copy args as moved
     for ai in 0..resolved_arg_count:
         let arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
@@ -5953,6 +5958,9 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
     while mc_ibi >= 0:
         self.remove_borrow_at(mc_iter_borrow_idxs.get(mc_ibi as i64))
         mc_ibi = mc_ibi - 1
+
+    // docs/mut.md Rev 8 §9.2 — closure capture conflict detection.
+    self.check_closure_capture_conflicts(extra_start, arg_count, 0, node)
 
     let inferred_pending_receiver = self.infer_pending_generic_method_receiver(expr, field, arg_types, arg_count, node)
     if inferred_pending_receiver != 0:
@@ -7866,6 +7874,81 @@ fn Sema.for_iterable_yields_views(self: Sema, iterable: i32) -> i32:
     if owner_sym == 0:
         return 0
     self.method_is_iter_of_self_fn(owner_sym, method_sym)
+
+// docs/mut.md Rev 8 §9.2 / §15.7 — when a call passes a mutating closure,
+// check that no sibling argument retains access to the mutably captured place.
+fn Sema.check_closure_capture_conflicts(self: Sema, extra_start: i32, arg_count: i32, has_resolved: i32, node: i32):
+    // Collect closure args that mutably capture a place.
+    var ci = 0
+    while ci < arg_count:
+        let closure_node = if has_resolved != 0: self.get_resolved_call_arg(node, ci) else: self.ast.get_extra(extra_start + ci)
+        if closure_node <= 0 or self.ast.kind(closure_node) != NodeKind.NK_CLOSURE:
+            ci = ci + 1
+            continue
+        let closure_body = self.ast.get_data0(closure_node)
+        // Scan all in-scope variables for mutating captures.
+        let bind_count = self.bind_names.len() as i32
+        var bi = 0
+        while bi < bind_count:
+            let cap_sym = self.bind_names.get(bi as i64)
+            if self.expr_mutates_place(closure_body, cap_sym) != 0:
+                // Found a mutating capture. Check sibling args.
+                var si = 0
+                while si < arg_count:
+                    if si == ci:
+                        si = si + 1
+                        continue
+                    let sib_node = if has_resolved != 0: self.get_resolved_call_arg(node, si) else: self.ast.get_extra(extra_start + si)
+                    if sib_node <= 0:
+                        si = si + 1
+                        continue
+                    if self.arg_retains_access_to(sib_node, cap_sym) != 0:
+                        let cap_name = self.pool_resolve(cap_sym)
+                        self.emit_warning("argument retains access to `" ++ cap_name ++ "` which is mutably captured by a closure in the same call (§15.7)", node)
+                    si = si + 1
+            bi = bi + 1
+        ci = ci + 1
+
+// Returns 1 when the expression retains access to the given symbol —
+// i.e., the expression is or contains the symbol itself (owned move),
+// a reference to it, or an iter-of-self call on it.
+fn Sema.arg_retains_access_to(self: Sema, arg_node: i32, sym: i32) -> i32:
+    if arg_node == 0:
+        return 0
+    let kind = self.ast.kind(arg_node)
+    // Direct use of the symbol (owned move)
+    if kind == NodeKind.NK_IDENT:
+        if self.ast.get_data0(arg_node) == sym:
+            return 1
+        return 0
+    // Reference to the symbol (&sym or &sym.field)
+    if kind == NodeKind.NK_UNARY:
+        let op = self.ast.get_data0(arg_node)
+        if op == UnaryOp.UOP_REF or op == UnaryOp.UOP_MUT_REF or op == UnaryOp.UOP_RAW_REF_CONST or op == UnaryOp.UOP_RAW_REF_MUT:
+            let operand = self.ast.get_data1(arg_node)
+            if self.place_root_sym(operand) == sym:
+                return 1
+    // Method call that is iter_of_self (e.g., sym.iter())
+    if kind == NodeKind.NK_CALL:
+        let callee = self.ast.get_data0(arg_node)
+        if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS:
+            let recv = self.ast.get_data0(callee)
+            if self.ast.kind(recv) == NodeKind.NK_IDENT and self.ast.get_data0(recv) == sym:
+                let method = self.ast.get_data1(callee)
+                let cap_ty = self.scope_lookup(sym)
+                if cap_ty >= 0:
+                    let resolved = self.resolve_alias(cap_ty as TypeId)
+                    var inner = resolved
+                    let tk = self.get_type_kind(inner)
+                    if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
+                        inner = self.resolve_alias(self.get_type_d0(inner) as TypeId)
+                    let owner = self.method_owner_symbol_for_type(inner as i32)
+                    if owner != 0 and self.method_is_iter_of_self_fn(owner, method) != 0:
+                        return 1
+    // Grouped expression
+    if kind == NodeKind.NK_GROUPED:
+        return self.arg_retains_access_to(self.ast.get_data0(arg_node), sym)
+    0
 
 // docs/mut.md Rev 8 §15.8 — returns 1 when the method's fn-decl is marked
 // `@[iter_of_self]`, indicating the produced value retains access to its
