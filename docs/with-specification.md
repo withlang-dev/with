@@ -1,5 +1,6 @@
 # The With Programming Language — Specification v6.7
 
+**Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
 **Changelog v6.7:** Reorganized — extracted test cases to `test/spec/`,
 roadmap to `docs/roadmap.md`, design rationale to `docs/design-rationale.md`,
