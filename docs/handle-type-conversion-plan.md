@@ -1,9 +1,9 @@
-# Handle-Type Conversion Plan (Slice B)
+# Slice B Conversion Plan
 
-Design document for converting CiTypePool, CiExprPool, CiStmtPool, AstPool,
-and Sema from value types to handle types wrapping `*mut State`. This is the
-spec-prescribed §16 migration pattern for multi-pool mutation, proven by
-InternPool.
+Design document for removing `&mut` from CiTypePool, CiExprPool, CiStmtPool,
+AstPool, and Sema. Pools convert to handle types wrapping `*mut State` (proven
+by InternPool). Sema converts via §16.2 method extraction — free functions
+taking `&mut Sema` become `mut self: Self` methods on Sema.
 
 **Status:** Awaiting friend review before implementation.
 
@@ -304,13 +304,13 @@ sites are lower count and spread across 21 files, but each is a one-line
 edit. The main risk is the sheer count (67 + 18 = 85 parameter changes plus
 corresponding call-site `&pool` → `pool` edits), not complexity.
 
-### 2e. Sema — see Section 5 below
+### 2e. Sema — see Section 5 below (§16.2 method conversion, not handle-type)
 
 ---
 
 ## 3. Conversion Order
 
-**Proposed:** CiTypePool → CiExprPool → CiStmtPool → AstPool → Sema (deferred?)
+**Proposed:** CiTypePool → CiExprPool → CiStmtPool → AstPool → Sema §16.2
 
 **Rationale:** Descending by secondary-param count (25, 20, 16, 18). CI pools
 first because they're self-contained in CImport.w/CiIR.w. AstPool next because
@@ -357,264 +357,171 @@ Each subsequent commit converts one more pool, removing one more `&mut` param
 type from these mixed signatures. Build + fixpoint pass at every intermediate
 state.
 
-**Same pattern for AstPool ↔ Sema:** After AstPool is converted but Sema isn't:
+**AstPool → Sema transition:** After AstPool is converted but before Sema's
+§16.2 method conversions:
 ```
 fn ct_transform_expr(
     source_ast: AstPool,        // by-value handle (was AstPool, still AstPool)
     pool: AstPool,              // was &mut AstPool — now by-value handle
-    sema: &mut Sema,            // still &mut — not yet converted (or deferred)
+    sema: &mut Sema,            // still &mut — converted in next slice
     intern: InternPool,         // already a handle
+    node: i32,
+) -> i32:
+```
+
+After Sema's §16.2 conversion, `ct_transform_expr` becomes a Sema method:
+```
+fn Sema.ct_transform_expr(
+    mut self: Self,              // was sema: &mut Sema
+    source_ast: AstPool,
+    pool: AstPool,               // by-value handle
+    intern: InternPool,
     node: i32,
 ) -> i32:
 ```
 
 ---
 
-## 5. Sema-Specific Analysis
+## 5. Sema Treatment per §16
 
-Sema is genuinely different from the other pools and deserves careful analysis
-before committing to handle-type conversion.
+Per docs/mut.md §16.2 and §20.0:
 
-### 5a. Scale
+> `fn(&mut T, ...)` free fn → Mutating receiver method on T
 
-- **127 fields** (vs 7-9 for CI pools, 45 for AstPool)
-- **384 methods** across Sema.w (103), SemaCheck.w (211), SemaDecl.w (51),
-  SemaDiag.w (19) — original count of 333 missed SemaDecl.w
-- **378 of 384 methods** contain at least one `self.field` access that needs
-  `self.field` → `self.state.field` rewriting. Only 6 methods have no direct
-  field access (delegate entirely to other methods).
-- **6,547 individual `self.field` occurrences** across all 4 files — this is the
-  actual textual-change count for Option A.
-- **0 signature changes** needed — all 384 methods already take `self: Sema`
-  by value (382) or `mut self: Sema` (6). No `self: &Sema` exists.
-- **16 `&mut Sema` sites** — 15 in ComptimeTransform.w, 1 in Frontend.w
+All 16 `&mut Sema` sites convert to `mut self: Self` methods on Sema.
+No handle-type wrapper. No deferral. Sema stays as a value type.
 
-### 5b. Existing Raw Pointer Usage
+`mut self: Self` is a **receiver-place mode** (§5.1): the method has scoped
+in-place access to the caller's place. Mutations propagate because the method
+operates on the original, not a copy. This is why handle-type wrapping is
+unnecessary — `mut self: Self` provides mutation visibility natively.
 
-The compiler already passes `*mut Sema` in several places:
-
-**As function parameters (4 functions):**
-- `comptime_try_eval_expr_result(sema_ptr: *mut Sema, ...)`
-- `comptime_force_eval_expr_result(sema_ptr: *mut Sema, ...)`
-- `comptime_try_eval_expr(sema_ptr: *mut Sema, ...)`
-- `comptime_force_eval_expr(sema_ptr: *mut Sema, ...)`
-
-**As cast expressions at call sites (7 sites):**
-- `self as *mut Sema` in ComptimeEval.w:1525, SemaCheck.w:6394
-- `sema as *mut Sema` in ComptimeTransform.w:431, 527, 846, 892, 949
-
-**Unsafe dereferences (2 sites):**
-- ComptimeEval.w:148: `var sema = unsafe: *sema_ptr` then `sema.ast = ast`
-- ComptimeEval.w:161: same pattern
-
-### 5c. Impact of Handle-Type Conversion on Existing Patterns
-
-If Sema becomes a handle (`type Sema { state: *mut SemaState }`):
-
-**Q: Does `self as *mut Sema` continue to work?**
-A: It would create a pointer to the handle struct (8 bytes), not to the state.
-The ComptimeEval functions expect `*mut Sema` to point at the state fields
-(they dereference it and access `.ast`, `.diags`, etc.). After conversion,
-`self as *mut Sema` gives a pointer to `{ state: *mut SemaState }`, and
-`*sema_ptr` yields the handle, not the state.
-
-**Fix required:** The 4 ComptimeEval functions need updating. Options:
-1. Change parameter type to `*mut SemaState` and pass `self.state`.
-2. Change to take `Sema` by value (handle) and access `sema.state.ast`.
-3. Remove the raw-pointer indirection entirely — since Sema would be a handle,
-   pass it by value and access fields through `sema.state`.
-
-Option 3 is cleanest. The functions become:
-```
-fn comptime_try_eval_expr_result(sema: Sema, ast: AstPool, pool: InternPool, node: i32)
-```
-The `var sema = unsafe: *sema_ptr; sema.ast = ast` pattern becomes
-`sema.state.ast = ast` (direct field write through handle). No `unsafe` needed.
-
-**Impact on cast sites:** The 7 `as *mut Sema` casts disappear. The 2
-`unsafe: *sema_ptr` dereferences disappear. Net reduction in unsafe code.
-
-**Q: Are there places that allocate Sema on the stack as an owned value?**
-A: Yes — 10 sites across 5 files:
-- `Sema.init(pool, diags, ast)` in Codegen.w, ComptimeTransform.w,
-  Frontend.w (×2), Compilation.w (×2)
-- `Sema.placeholder(pool, diags, ast)` in Sema.w, Zcu.w (×2)
-- Direct struct literal in `sema_empty_state()` (Sema.w:672)
-
-After conversion, `Sema.init()` and `Sema.placeholder()` return handles.
-Call sites don't change — they receive a `Sema` value either way.
-The `sema_empty_state()` function builds the `SemaState` struct and wraps it:
-
-```
-fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
-    let ptr = with_alloc(SEMA_STATE_SIZE) as *mut SemaState
-    unsafe: *ptr = SemaState { ... all 127 fields ... }
-    Sema { state: ptr }
-```
-
-**Q: Does existing `sema.field` access work?**
-A: No. Every `sema.ast`, `sema.diags`, `sema.pool`, `sema.type_kinds`, etc.
-becomes `sema.state.ast`, `sema.state.diags`, etc. With 333 methods across
-3 files, this is a massive mechanical edit.
-
-### 5d. Per-Site Analysis of the 16 `&mut Sema` Functions
+### 5a. The 16 Conversions
 
 **ComptimeTransform.w — 15 functions:**
 
-| # | Function | Sema usage | Natural Sema method? |
+| # | Current signature | New signature | Body changes |
 |---|---|---|---|
-| 1 | `ct_emit_error(sema: &mut Sema, ast, node, msg)` | `sema.diags.emit()`, `sema.local_file_id` | **YES** — `Sema.ct_emit_error(mut self, ast, node, msg)` |
-| 2 | `ct_eval_truthy(source_ast, sema: &mut Sema, node)` | `sema as *mut Sema`, `sema.pool`, passes to ct_emit_error | Feasible — `Sema.ct_eval_truthy(mut self, source_ast, node)` |
-| 3 | `ct_transform_fstring(source_ast, pool: &mut AstPool, sema: &mut Sema, intern, node)` | Passed to ct_transform_expr only | **NO** — sema is transport |
-| 4 | `ct_transform_match_arm(source_ast, pool: &mut AstPool, sema: &mut Sema, intern, node)` | Passed to ct_transform_expr only | **NO** — sema is transport |
-| 5 | `ct_rewrite_comptime_if(source_ast, pool: &mut AstPool, sema: &mut Sema, intern, wrapper, inner)` | Passed to ct_eval_truthy, ct_transform_expr | **NO** — sema is transport |
-| 6 | `ct_sync_sema_ast(sema: &mut Sema, pool: &AstPool)` | `sema.ast = live_ast` | **YES** — `Sema.sync_ast(mut self, pool)` |
-| 7 | `ct_try_fold_type_call(pool: &mut AstPool, sema: &mut Sema, intern, node)` | `sema.static_receiver_type_is_known()`, `sema as *mut Sema`, `sema.pool` | Feasible but awkward |
-| 8 | `ct_rewrite_comptime_for(source_ast, pool: &mut AstPool, sema: &mut Sema, intern, wrapper, inner)` | `sema as *mut Sema`, `sema.pool`, `sema.ty_i64`, `ct_emit_error(sema, ...)` | **NO** — complex multi-concern |
-| 9 | `ct_rewrite_comptime(source_ast, pool: &mut AstPool, sema: &mut Sema, intern, node)` | `sema.diags.count()`, `sema as *mut Sema`, `sema.pool`, `ct_emit_error(sema, ...)` | **NO** — complex multi-concern |
-| 10 | `ct_transform_expr(source_ast, pool: &mut AstPool, sema: &mut Sema, intern, node)` | `ct_sync_sema_ast(sema, pool)`, recursive dispatch | **NO** — tree walker |
-| 11 | `ct_transform_fn_param_defaults(source_ast, pool: &mut AstPool, sema: &mut Sema, intern, fn_node)` | Passed to ct_transform_expr only | **NO** — sema is transport |
-| 12 | `ct_transform_trait_decl(source_ast, pool: &mut AstPool, sema: &mut Sema, intern, node)` | Passed to ct_transform_expr only | **NO** — sema is transport |
-| 13 | `ct_transform_type_decl(source_ast, pool: &mut AstPool, sema: &mut Sema, intern, node)` | Passed to ct_transform_expr only | **NO** — sema is transport |
-| 14 | `ct_transform_decl(source_ast, pool: &mut AstPool, sema: &mut Sema, intern, node)` | Dispatches to ct_transform_* functions | **NO** — dispatch hub |
-| 15 | `comptime_transform_module(source_ast, sema: &mut Sema, intern)` | Heavy: sema.diags, sema.pool, sema.source_text, sema.decl_source_paths, sema.module_*, sema.type_decl_has_derive(), sema.lookup_method_sig(), sema.select_trait_impl(), sema.prepare_for_comptime_transform() | Feasible — `Sema.transform_comptime_module(mut self, source_ast, intern)` |
+| 1 | `ct_emit_error(sema: &mut Sema, ast, node, msg)` | `Sema.ct_emit_error(mut self: Self, ast, node, msg)` | `sema.field` → `self.field` (2 refs) |
+| 2 | `ct_eval_truthy(source_ast, sema: &mut Sema, node)` | `Sema.ct_eval_truthy(mut self: Self, source_ast, node)` | 1 `as *mut Sema` cast, 2 internal calls |
+| 3 | `ct_transform_fstring(source_ast, pool, sema: &mut Sema, intern, node)` | `Sema.ct_transform_fstring(mut self: Self, source_ast, pool, intern, node)` | 3 internal calls |
+| 4 | `ct_transform_match_arm(source_ast, pool, sema: &mut Sema, intern, node)` | `Sema.ct_transform_match_arm(mut self: Self, source_ast, pool, intern, node)` | 3 internal calls |
+| 5 | `ct_rewrite_comptime_if(source_ast, pool, sema: &mut Sema, intern, wrapper, inner)` | `Sema.ct_rewrite_comptime_if(mut self: Self, source_ast, pool, intern, wrapper, inner)` | 4 internal calls |
+| 6 | `ct_sync_sema_ast(sema: &mut Sema, pool)` | `Sema.ct_sync_sema_ast(mut self: Self, pool)` | `sema.ast` → `self.ast` |
+| 7 | `ct_try_fold_type_call(pool, sema: &mut Sema, intern, node)` | `Sema.ct_try_fold_type_call(mut self: Self, pool, intern, node)` | 1 `as *mut Sema` cast, 3 internal calls |
+| 8 | `ct_rewrite_comptime_for(source_ast, pool, sema: &mut Sema, intern, wrapper, inner)` | `Sema.ct_rewrite_comptime_for(mut self: Self, source_ast, pool, intern, wrapper, inner)` | 1 `as *mut Sema` cast, 7 internal calls |
+| 9 | `ct_rewrite_comptime(source_ast, pool, sema: &mut Sema, intern, node)` | `Sema.ct_rewrite_comptime(mut self: Self, source_ast, pool, intern, node)` | 1 `as *mut Sema` cast, 2 `sema.field` refs, 6 internal calls |
+| 10 | `ct_transform_expr(source_ast, pool, sema: &mut Sema, intern, node)` | `Sema.ct_transform_expr(mut self: Self, source_ast, pool, intern, node)` | 1 `as *mut Sema` cast, ~62 internal calls |
+| 11 | `ct_transform_fn_param_defaults(source_ast, pool, sema: &mut Sema, intern, fn_node)` | `Sema.ct_transform_fn_param_defaults(mut self: Self, source_ast, pool, intern, fn_node)` | 2 internal calls |
+| 12 | `ct_transform_trait_decl(source_ast, pool, sema: &mut Sema, intern, node)` | `Sema.ct_transform_trait_decl(mut self: Self, source_ast, pool, intern, node)` | 3 internal calls |
+| 13 | `ct_transform_type_decl(source_ast, pool, sema: &mut Sema, intern, node)` | `Sema.ct_transform_type_decl(mut self: Self, source_ast, pool, intern, node)` | 2 internal calls |
+| 14 | `ct_transform_decl(source_ast, pool, sema: &mut Sema, intern, node)` | `Sema.ct_transform_decl(mut self: Self, source_ast, pool, intern, node)` | 6 internal calls |
+| 15 | `comptime_transform_module(source_ast, sema: &mut Sema, intern)` | `Sema.comptime_transform_module(mut self: Self, source_ast, intern)` | 34 `sema.field` refs, 4 internal calls |
 
 **Frontend.w — 1 function:**
 
-| 16 | `Zcu.seed_sema_module_graph_frontend(self: Zcu, sema: &mut Sema)` | `sema.module_paths = Vec.new()`, `sema.module_import_*`, `sema.module_index_by_path`, `sema.global_visible_*`, `sema.module_visibility_cache` — all field assignments | **YES** — `Sema.init_module_graph(mut self)` |
+| 16 | `Zcu.seed_sema_module_graph_frontend(self: Zcu, sema: &mut Sema)` | `Sema.init_module_graph(mut self: Self, zcu: Zcu)` | 13 `sema.field` → `self.field`, 8 `self.` (Zcu) → `zcu.` |
 
-**Summary:** Of 16 functions, only 3-4 are natural Sema method candidates
-(ct_emit_error, ct_sync_sema_ast, comptime_transform_module, seed_sema_module_graph_frontend).
-The remaining 12 pass sema as a transport parameter through the ct_transform_*
-call tree. Method extraction for those 12 would move tree-walking logic into
-Sema methods, which is architecturally wrong — the comptime transform pipeline
-is about AST rewriting, not semantic analysis.
+### 5b. Call-Site Changes
 
-### 5e. Three Options for Sema
+**Internal calls between the 16 functions.** These are the bulk of the
+mechanical work. Currently:
+```
+ct_transform_expr(source_ast, pool, sema, intern, node)
+ct_emit_error(sema, ast, node, msg)
+ct_sync_sema_ast(sema, pool)
+```
 
-**Option A: Handle-type Sema**
+After conversion (all are now Sema methods; `sema` is now `self`):
+```
+self.ct_transform_expr(source_ast, pool, intern, node)
+self.ct_emit_error(ast, node, msg)
+self.ct_sync_sema_ast(pool)
+```
 
-Convert Sema to `type Sema { state: *mut SemaState }` following the same
-pattern as the other pools.
+**External call sites.** The 16 functions are called from outside:
 
-*Cost:*
-- 378 method bodies need `self.field` → `self.state.field` (6 methods
-  have no field access and need no body change)
-- 6,547 individual `self.field` occurrences across 4 files — but bulk
-  text substitution is safe since field names are disjoint from method
-  names (methods are followed by `(`)
-- 0 method signature changes (all 384 already take `self: Sema` by value)
-- 4 ComptimeEval function signatures change `sema_ptr: *mut Sema` → `sema: Sema`
-- 7 cast sites (`as *mut Sema`) removed
-- 2 unsafe dereference sites removed
-- 10 construction sites updated (Sema.init/placeholder/sema_empty_state)
-- **Total: 6,547 textual substitutions + ~23 structural changes across
-  4 Sema files + ComptimeEval.w**
+- `comptime_transform_module` is called from Frontend.w (2 sites):
+  `comptime_transform_module(source_ast, &mut sema, intern)`
+  → `sema.comptime_transform_module(source_ast, intern)`
 
-*Benefit:*
-- All 16 `&mut Sema` sites removed
-- Full migration complete in bridge phase — no P12 surprise
-- Consistent handle-type pattern across all pool types
-- Net reduction in unsafe code (7 casts + 2 derefs removed)
+- `seed_sema_module_graph_frontend` is called from Frontend.w (2 sites):
+  `self.seed_sema_module_graph_frontend(&mut sema)`
+  → `sema.init_module_graph(self)`
 
-*Risk:*
-- The 6,547 textual substitutions are individually trivial (bulk
-  `self.field` → `self.state.field`) and the compiler catches misses.
-  But the volume means the diff is enormous — ~4 files, each with
-  hundreds of changed lines. Review is hard; errors are caught at
-  build, not at review.
-- Sema.w + SemaCheck.w + SemaDecl.w + SemaDiag.w are 4 files totaling
-  ~10,000 lines
+**Calls to `sema: &Sema` (read-only) free functions.** ComptimeTransform.w
+has 10 functions taking `sema: &Sema` (ct_build_type_expr, ct_build_value_tree,
+ct_decl_source_path, etc.). These are NOT in the 16 `&mut Sema` sites and
+stay as free functions. After conversion, calls from inside a `mut self: Self`
+method body pass `&self` where they previously passed `sema`:
+```
+ct_build_value_tree(pool, intern, &self, value, node, extras)
+ct_decl_source_path(&self, di)
+```
 
-**Option B: Targeted method extraction**
+### 5c. The `*mut Sema` Raw Pointer Paths
 
-Extract the 3-4 natural Sema methods (ct_emit_error, ct_sync_sema_ast,
-comptime_transform_module, seed_sema_module_graph_frontend). For the
-remaining 12 transport-parameter functions, change `sema: &mut Sema` to
-`sema: *mut Sema` (raw pointer) and update call sites to pass
-`sema as *mut Sema`.
+5 of the 16 functions cast `sema as *mut Sema` to call ComptimeEval functions:
 
-*Cost:*
-- 3-4 method extractions (substantive, requires understanding each function)
-- 12 parameter type changes (`&mut Sema` → `*mut Sema`) + corresponding
-  call-site updates
-- Bodies of the 12 functions need `sema.field` → `sema_ptr.field` or
-  `(unsafe: *sema_ptr).field`
-- **Total: ~16 substantive changes + ~50 mechanical in-body changes**
+```
+// Current pattern (in ct_eval_truthy, ct_try_fold_type_call,
+// ct_rewrite_comptime_for, ct_rewrite_comptime, ct_transform_expr):
+let value = comptime_force_eval_expr(sema as *mut Sema, source_ast, sema.pool, node)
+```
 
-*Benefit:*
-- All 16 `&mut Sema` sites removed
-- No 6,547-substitution rewrite of Sema internals
-- Sema stays as a value type (no handle-type indirection added)
+ComptimeEval.w has 4 functions taking `sema_ptr: *mut Sema`:
+```
+fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
+    var sema = unsafe: *sema_ptr     // creates a local copy with different ast
+    sema.ast = ast
+    var evaluator = ComptimeEvaluator.init(sema, ast, pool, 0)
+    ...
+    sema_ptr.diags.emit(evaluator.pending_diag)  // writes back to original
+```
 
-*Cost / architectural concern:*
-- Moves 3-4 comptime functions from ComptimeTransform.w to Sema methods.
-  This changes which type "owns" the comptime pipeline — comptime transform
-  logic becomes Sema-owned rather than free-function-organized. This is a
-  directional architectural change, not just a migration.
-- The 12 `*mut Sema` transport-parameter functions are uglier than `&mut Sema`.
-  This trades one pre-lockdown pattern for another that's harder to read.
-  Both go away at P12, but `*mut Sema` is a worse bridge-state than `&mut Sema`.
+The pattern: copy Sema to set a different `ast`, run the evaluator, write
+diagnostics back through the raw pointer. After conversion, `sema` is `self`
+(receiver-place mode), so the cast becomes `self as *mut Sema`.
 
-*Asymmetry:* Option B is clean for the 4 natural method candidates — those
-genuinely belong on Sema and the extraction makes the code better. For the
-12 transport-parameter cases, both subforms are worse than the current
-`&mut Sema`:
-- `*mut Sema` raw pointers threaded through tree-walking functions are less
-  safe and less readable than `&mut Sema`
-- Forcing tree-walking logic (`ct_transform_expr`, `ct_rewrite_comptime_for`,
-  etc.) onto Sema as methods is architecturally wrong — these functions are
-  about AST rewriting, not semantic analysis
+**Investigation needed before implementation:**
 
-Option B's "low cost" is true only if you accept that 12 of 16 sites get a
-worse bridge state than what they have now. The 4 clean extractions may be
-worth doing regardless (they improve the code), but the remaining 12 are the
-reason Option B isn't a uniformly cheaper alternative to A or C.
+Option 1: Keep `*mut Sema` cast. `self as *mut Sema` gives a pointer to the
+caller's place. The ComptimeEval functions dereference it to create a modified
+copy (`var sema = unsafe: *sema_ptr; sema.ast = ast`). This works but keeps
+the unsafe indirection.
 
-*Variant B': Instead of `*mut Sema` for the 12 transport functions, pass
-Sema by value and accept that mutations through the copied value struct
-may not propagate.* This only works if AstPool is already a handle type
-(so `sema.ast` assignment through the copy is visible via the handle's
-shared state). But other Sema field mutations (sema.diags.emit, etc.)
-would still need to propagate. DiagnosticList is NOT a handle type, so
-by-value Sema would lose emitted diagnostics. **Variant B' does not work.**
+Option 2: Convert ComptimeEval functions to Sema methods. The "copy Sema with
+different ast" pattern becomes unclear — a `mut self: Self` method operates on
+the original place, but the evaluator needs a separate Sema with a different
+`ast`. This may require the evaluator to take `ast` as a separate parameter
+rather than embedding it in the Sema copy.
 
-**Option C: Defer to P12**
+Option 3: Pass Sema by value to ComptimeEval functions (change `sema_ptr: *mut
+Sema` → `sema: Sema`). The copy semantics match the current `var sema = unsafe:
+*sema_ptr` pattern. The `sema_ptr.diags.emit(...)` write-back changes to
+returning diagnostics or using DiagnosticList as a handle. Requires
+DiagnosticList investigation.
 
-Leave all 16 `&mut Sema` sites in place. They resolve at P12 lockdown
-when `STRICT_NO_MUT_REF = 1` makes `&mut` a hard error and the migration
-becomes mandatory.
+**Decision:** investigate during implementation. The 5 cast sites are localized
+in ComptimeTransform.w; any of the 3 options works mechanically. Document
+what's left after the 16 method conversions.
 
-*Cost:*
-- Zero implementation cost in bridge phase
-- P12 lockdown becomes larger by 16 sites (but P12 is already a large
-  commit — it deletes UOP_MUT_REF, the bridge code, and promotes all
-  warnings to errors)
+### 5d. Work Summary
 
-*Benefit:*
-- No bridge-phase Sema work at all
-- §20.0 inventory carves these out with rationale: "deferred to P12 —
-  Sema's 333-method surface makes bridge-phase handle-typing cost-
-  prohibitive; the 16 sites are acceptable debt resolved at lockdown"
+| Item | Count |
+|---|---|
+| Functions converted to Sema methods | 16 |
+| `sema.field` → `self.field` in bodies | ~55 refs |
+| Internal call-site rewrites (`ct_fn(args, sema)` → `self.ct_fn(args)`) | ~100 calls |
+| External call-site rewrites | 4 |
+| `as *mut Sema` casts (may stay or simplify) | 5 |
+| `sema: &Sema` free functions (unchanged) | 10 |
+| Existing Sema methods (unchanged) | 384 |
 
-*Risk:*
-- P12 must handle Sema alongside everything else. If P12 is already risky,
-  adding 16 more sites (plus the Sema handle-type rewrite if that's the
-  P12 resolution) makes it riskier.
-- The 16 sites are the last `&mut` in non-lockdown code — they may cause
-  confusion about whether the migration is "done" during the bridge phase.
-
-**Factors for friend review:**
-- How soon is P12 expected? If weeks away, deferral cost is low. If months
-  away, bridge-state debt accumulates.
-- Is ComptimeTransform.w stable? If it's being actively edited, `&mut Sema`
-  parameters add friction to every change.
-- Does moving ct_* logic to Sema methods make architectural sense independent
-  of the migration? If so, Option B has value beyond `&mut` removal. If not,
-  it's migration-driven architecture distortion.
-- Is bridge-phase debt (16 sites) acceptable? The CI pools + AstPool reduce
-  the total from 120 to ~41 (16 Sema + 25 comments/lockdown). The Sema sites
-  are the only remaining *functional* `&mut` usage.
+Sema stays as a value type. Existing 384 methods are unaffected — no
+`self.field` → `self.state.field` rewrite. The work is confined to
+ComptimeTransform.w (15 functions + their internal call sites) and
+Frontend.w (1 function + 2 call sites)
 
 ---
 
@@ -681,16 +588,32 @@ After AstPool conversion:
 
 ## 9. Summary
 
-| Pool | `&mut` removed | `&` removed | Methods | State fields | Risk |
-|---|---|---|---|---|---|
-| CiTypePool | 25 | 34 | 21 + 1 ext | 7 | Low |
-| CiExprPool | 20 | 23 | 22 | 8 | Low |
-| CiStmtPool | 16 | 13 | 27 + ~40 ext | 9 | Medium |
-| AstPool | 18 | 67 | 101 | 45 | Medium |
-| Sema | 16 | — | 384 (378 need body changes) | 127 | **High** (see §5e options) |
+| Pool | `&mut` removed | `&` removed | Pattern | Risk |
+|---|---|---|---|---|
+| CiTypePool | 25 | 34 | Handle-type | Low |
+| CiExprPool | 20 | 23 | Handle-type | Low |
+| CiStmtPool | 16 | 13 | Handle-type | Medium |
+| AstPool | 18 | 67 | Handle-type | Medium |
+| Sema | 16 | — | §16.2 method conversion | Low |
 
-Total after CI + AstPool: 79 `&mut` sites removed. Remaining: ~41 sites
-(16 Sema + ~25 comments/diagnostics/lockdown items).
+Total: 95 `&mut` sites removed. Remaining: ~25 comments/diagnostics/lockdown
+items.
+
+**Implementation order within Slice B:**
+
+1. CiTypePool handle-type conversion (one commit)
+2. CiExprPool handle-type conversion (one commit)
+3. CiStmtPool handle-type conversion (one commit)
+4. AstPool handle-type conversion (one commit)
+5. Sema 16 method conversions per §16.2 (one commit)
+
+Build + fixpoint after each. Push individually.
+
+Sema is ordered last because some ComptimeTransform.w functions have both
+`pool: &mut AstPool` and `sema: &mut Sema` parameters. Converting AstPool to
+handle-type first means those signatures already have `pool: AstPool` when
+the Sema method conversion replaces the function with a `mut self: Self`
+method.
 
 **Decision points for friend review:**
 
@@ -698,33 +621,5 @@ Total after CI + AstPool: 79 `&mut` sites removed. Remaining: ~41 sites
    state-struct + handle definition be a separate commit from method updates?
    (One commit is simpler but produces larger diffs.)
 
-2. **Sema treatment.** Three options with documented tradeoffs (§5e):
-   - **Option A** (handle-type): 6,547 textual substitutions + ~23 structural
-     changes. Bulk `self.field` → `self.state.field` is safe (field names
-     disjoint from method names). No signature changes needed. Full consistency.
-   - **Option B** (targeted method extraction): ~16 substantive changes. Clean
-     for 4 natural method candidates, but asymmetric — 12 transport-parameter
-     sites get either ugly `*mut Sema` or architecturally wrong method extraction.
-     Both are worse bridge state than the current `&mut Sema`.
-   - **Option C** (defer to P12): zero bridge-phase cost, 16 sites remain
-     as bridge debt, P12 lockdown handles them alongside the spec change
-
-3. **Allocation size.** Is over-allocating (256 for CI pools, 4096 for
+2. **Allocation size.** Is over-allocating (256 for CI pools, 4096 for
    AstPool) adequate, or should we add a runtime size check?
-
-4. **Sema's slice assignment.** The Sema option chosen determines the
-   slice structure downstream:
-   - **Option A:** Sema is its own conversion within Slice B, after AstPool
-     (since AstPool conversion may simplify some ComptimeTransform.w sites
-     that share function signatures with the `&mut Sema` parameters).
-   - **Option B:** The 4 method extractions land alongside AstPool conversion
-     (they share ComptimeTransform.w / Frontend.w). The 12 transport-parameter
-     sites land as a separate step (or are deferred if the `*mut Sema` bridge
-     state is rejected).
-   - **Option C:** Sema doesn't appear in Slice B at all. Implementation plan
-     ends after AstPool. Sema resolves at P12 lockdown.
-
-**What this is not:** This is not "reconsider whether handle-type is the
-right migration pattern." That's settled (§16). This is "given handle-type
-is the pattern, what does the implementation look like, and what do we do
-about Sema's unique cost profile?"
