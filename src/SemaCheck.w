@@ -5988,8 +5988,11 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
             if self.is_shared_ref_like_receiver(obj_type as i32) != 0:
                 self.emit_builtin_mutable_receiver_error(type_name_sym, field, node)
                 return 0
-            if self.ast.kind(expr) == NodeKind.NK_UNARY and self.ast.get_data0(expr) == UnaryOp.UOP_DEREF:
-                let deref_ty = self.resolve_alias(self.check_expr(self.ast.get_data1(expr)) as TypeId)
+            var deref_expr = expr
+            if self.ast.kind(deref_expr) == NodeKind.NK_GROUPED:
+                deref_expr = self.ast.get_data0(deref_expr)
+            if self.ast.kind(deref_expr) == NodeKind.NK_UNARY and self.ast.get_data0(deref_expr) == UnaryOp.UOP_DEREF:
+                let deref_ty = self.resolve_alias(self.check_expr(self.ast.get_data1(deref_expr)) as TypeId)
                 let deref_tk = self.get_type_kind(deref_ty)
                 if (deref_tk == TypeKind.TY_PTR or deref_tk == TypeKind.TY_REF) and self.get_type_d1(deref_ty) == 0:
                     self.emit_builtin_mutable_receiver_error(type_name_sym, field, node)
