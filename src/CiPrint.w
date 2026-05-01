@@ -183,7 +183,7 @@ fn ci_float_type_name(bits: i32) -> str:
 fn ci_wrap_unsafe(inner: str) -> str:
     "(unsafe: " ++ inner ++ ")"
 
-fn ci_print_compact_stmt_local(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id: CiStmtId, depth: i32) -> str:
+fn ci_print_compact_stmt_local(stmts: &CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: CiStmtId, depth: i32) -> str:
     if (id as i32) == 0:
         return ""
     let kind = stmts.kind(id)
@@ -304,7 +304,7 @@ fn ci_print_compact_stmt_local(stmts: &CiStmtPool, exprs: &CiExprPool, types: &C
 
 // ── CiType printing ──────────────────────────────────────────
 
-fn ci_print_type(types: &CiTypePool, id: CiTypeId) -> str:
+fn ci_print_type(types: CiTypePool, id: CiTypeId) -> str:
     if (id as i32) == 0:
         return "<ci:ty:0>"
     let kind = types.kind(id)
@@ -378,7 +378,7 @@ extern fn i64_to_string(n: i64) -> str
 // this position must be emitted as `&base[0] as *mut T`. Also
 // unused in A2; B4 turns it on.
 
-fn ci_print_expr(exprs: &CiExprPool, types: &CiTypePool, id: CiExprId, parent_prec: i32, wants_ptr: i32) -> str:
+fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec: i32, wants_ptr: i32) -> str:
     if (id as i32) == 0:
         return "<ci:expr:0>"
     let kind = exprs.kind(id)
@@ -564,7 +564,7 @@ fn ci_print_expr(exprs: &CiExprPool, types: &CiTypePool, id: CiExprId, parent_pr
 
 // ── CiStmt printing ──────────────────────────────────────────
 
-fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id: CiStmtId, depth: i32) -> str:
+fn ci_print_stmt(stmts: &CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: CiStmtId, depth: i32) -> str:
     if (id as i32) == 0:
         return ci_make_indent(depth) ++ "<ci:stmt:0>\n"
     let kind = stmts.kind(id)
@@ -791,7 +791,7 @@ fn ci_print_stmt(stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id:
 
 // ── CiDecl printing ──────────────────────────────────────────
 
-fn ci_print_decl(decls: &CiDeclPool, stmts: &CiStmtPool, exprs: &CiExprPool, types: &CiTypePool, id: CiDeclId) -> str:
+fn ci_print_decl(decls: &CiDeclPool, stmts: &CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: CiDeclId) -> str:
     if (id as i32) == 0:
         return "<ci:decl:0>\n"
     let kind = decls.kind(id)
@@ -871,12 +871,12 @@ fn ci_roundtrip_types -> i32:
     let arr_10_i32 = types.ty_array(i32_ty, 10)
     let arr_open_u8 = types.ty_array(u8_ty, CI_SIZE_INCOMPLETE)
     var fails: i32 = 0
-    fails = fails + ci_expect_eq("ty_int_32_signed", ci_print_type(&types, i32_ty), "i32")
-    fails = fails + ci_expect_eq("ty_int_8_unsigned", ci_print_type(&types, u8_ty), "u8")
-    fails = fails + ci_expect_eq("ty_bool", ci_print_type(&types, bool_ty), "bool")
-    fails = fails + ci_expect_eq("ty_ptr_mut_i32", ci_print_type(&types, ptr_i32), "*mut i32")
-    fails = fails + ci_expect_eq("ty_array_10_i32", ci_print_type(&types, arr_10_i32), "[10]i32")
-    fails = fails + ci_expect_eq("ty_array_open_u8", ci_print_type(&types, arr_open_u8), "[]u8")
+    fails = fails + ci_expect_eq("ty_int_32_signed", ci_print_type(types, i32_ty), "i32")
+    fails = fails + ci_expect_eq("ty_int_8_unsigned", ci_print_type(types, u8_ty), "u8")
+    fails = fails + ci_expect_eq("ty_bool", ci_print_type(types, bool_ty), "bool")
+    fails = fails + ci_expect_eq("ty_ptr_mut_i32", ci_print_type(types, ptr_i32), "*mut i32")
+    fails = fails + ci_expect_eq("ty_array_10_i32", ci_print_type(types, arr_10_i32), "[10]i32")
+    fails = fails + ci_expect_eq("ty_array_open_u8", ci_print_type(types, arr_open_u8), "[]u8")
     fails
 
 fn ci_roundtrip_exprs -> i32:
@@ -904,14 +904,14 @@ fn ci_roundtrip_exprs -> i32:
     let str_idx = exprs.add_string("\"hello\"")
     let str_lit = exprs.add(CiExprKind.CIE_STRING_LIT, str_idx, 0, 0, 0 as CiTypeId)
     var fails: i32 = 0
-    fails = fails + ci_expect_eq("expr_int_lit", ci_print_expr(&exprs, &types, lit, 0, 0), "42")
-    fails = fails + ci_expect_eq("expr_ident", ci_print_expr(&exprs, &types, a, 0, 0), "a")
-    fails = fails + ci_expect_eq("expr_binary_add", ci_print_expr(&exprs, &types, add, 0, 0), "(a + b)")
-    fails = fails + ci_expect_eq("expr_unary_neg", ci_print_expr(&exprs, &types, neg, 0, 0), "(-42)")
-    fails = fails + ci_expect_eq("expr_cast_u8", ci_print_expr(&exprs, &types, cast_u8, 0, 0), "(a as u8)")
-    fails = fails + ci_expect_eq("expr_float_lit", ci_print_expr(&exprs, &types, float_lit, 0, 0), "3.14")
-    fails = fails + ci_expect_eq("expr_char_lit", ci_print_expr(&exprs, &types, char_lit, 0, 0), "65")
-    fails = fails + ci_expect_eq("expr_string_lit", ci_print_expr(&exprs, &types, str_lit, 0, 0), "\"hello\"")
+    fails = fails + ci_expect_eq("expr_int_lit", ci_print_expr(exprs, types, lit, 0, 0), "42")
+    fails = fails + ci_expect_eq("expr_ident", ci_print_expr(exprs, types, a, 0, 0), "a")
+    fails = fails + ci_expect_eq("expr_binary_add", ci_print_expr(exprs, types, add, 0, 0), "(a + b)")
+    fails = fails + ci_expect_eq("expr_unary_neg", ci_print_expr(exprs, types, neg, 0, 0), "(-42)")
+    fails = fails + ci_expect_eq("expr_cast_u8", ci_print_expr(exprs, types, cast_u8, 0, 0), "(a as u8)")
+    fails = fails + ci_expect_eq("expr_float_lit", ci_print_expr(exprs, types, float_lit, 0, 0), "3.14")
+    fails = fails + ci_expect_eq("expr_char_lit", ci_print_expr(exprs, types, char_lit, 0, 0), "65")
+    fails = fails + ci_expect_eq("expr_string_lit", ci_print_expr(exprs, types, str_lit, 0, 0), "\"hello\"")
     fails
 
 fn ci_roundtrip_fn_decl -> i32:
@@ -929,7 +929,7 @@ fn ci_roundtrip_fn_decl -> i32:
     let body = stmts.block(start, 1)
     let name_idx = decls.add_string("foo")
     let fn_d = decls.fn_decl(name_idx, i32_ty, body, 0)
-    let actual = ci_print_decl(&decls, &stmts, &exprs, &types, fn_d)
+    let actual = ci_print_decl(&decls, &stmts, exprs, types, fn_d)
     // CIS_BLOCK now appends a bare `\n` separator after each
     // child to match the legacy compound_stmt's blank-line
     // convention.

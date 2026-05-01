@@ -26,6 +26,7 @@
 
 extern fn with_eprint(s: str) -> void
 extern fn with_str_clone(s: str) -> str
+extern fn with_alloc(size: i64) -> *mut u8
 
 fn ci_ir_owned_text(text: str) -> str:
     if text.len() == 0:
@@ -50,7 +51,7 @@ enum CiTypeKind: i32:
 
 const CI_SIZE_INCOMPLETE: i32 = 0 - 1
 
-type CiTypePool {
+type CiTypePoolState {
     kinds: Vec[i32],
     data0: Vec[i32],
     data1: Vec[i32],
@@ -60,8 +61,13 @@ type CiTypePool {
     frozen: i32,
 }
 
+type CiTypePool {
+    state: *mut CiTypePoolState,
+}
+
 fn CiTypePool.new -> CiTypePool:
-    var pool = CiTypePool {
+    let ptr = with_alloc(256) as *mut CiTypePoolState
+    unsafe: *ptr = CiTypePoolState {
         kinds: Vec.new(),
         data0: Vec.new(),
         data1: Vec.new(),
@@ -70,87 +76,89 @@ fn CiTypePool.new -> CiTypePool:
         strings: Vec.new(),
         frozen: 0,
     }
-    // Reserve id 0 as the null sentinel.
-    pool.kinds.push(0)
-    pool.data0.push(0)
-    pool.data1.push(0)
-    pool.data2.push(0)
-    pool
+    ptr.kinds.push(0)
+    ptr.data0.push(0)
+    ptr.data1.push(0)
+    ptr.data2.push(0)
+    CiTypePool { state: ptr }
 
-fn CiTypePool.add(mut self: CiTypePool, kind: i32, d0: i32, d1: i32, d2: i32) -> CiTypeId:
-    if self.frozen != 0:
+fn CiTypePool.add(self: CiTypePool, kind: i32, d0: i32, d1: i32, d2: i32) -> CiTypeId:
+    let st = self.state
+    if st.frozen != 0:
         with_eprint("BUG: CiTypePool.add called after freeze")
-    let id = self.kinds.len() as i32
-    self.kinds.push(kind)
-    self.data0.push(d0)
-    self.data1.push(d1)
-    self.data2.push(d2)
+    let id = st.kinds.len() as i32
+    st.kinds.push(kind)
+    st.data0.push(d0)
+    st.data1.push(d1)
+    st.data2.push(d2)
     id as CiTypeId
 
-fn CiTypePool.add_extra(mut self: CiTypePool, value: i32) -> i32:
-    if self.frozen != 0:
+fn CiTypePool.add_extra(self: CiTypePool, value: i32) -> i32:
+    let st = self.state
+    if st.frozen != 0:
         with_eprint("BUG: CiTypePool.add_extra called after freeze")
-    let idx = self.extra.len() as i32
-    self.extra.push(value)
+    let idx = st.extra.len() as i32
+    st.extra.push(value)
     idx
 
-fn CiTypePool.add_string(mut self: CiTypePool, s: str) -> i32:
-    if self.frozen != 0:
+fn CiTypePool.add_string(self: CiTypePool, s: str) -> i32:
+    let st = self.state
+    if st.frozen != 0:
         with_eprint("BUG: CiTypePool.add_string called after freeze")
-    let idx = self.strings.len() as i32
-    self.strings.push(s)
+    let idx = st.strings.len() as i32
+    st.strings.push(s)
     idx
 
-fn CiTypePool.freeze(mut self: CiTypePool):
-    self.frozen = 1
+fn CiTypePool.freeze(self: CiTypePool):
+    self.state.frozen = 1
 
-fn CiTypePool.kind(self: &CiTypePool, id: CiTypeId) -> i32:
-    self.kinds.get((id as i32) as i64)
+fn CiTypePool.kind(self: CiTypePool, id: CiTypeId) -> i32:
+    self.state.kinds.get((id as i32) as i64)
 
-fn CiTypePool.get_d0(self: &CiTypePool, id: CiTypeId) -> i32:
-    self.data0.get((id as i32) as i64)
+fn CiTypePool.get_d0(self: CiTypePool, id: CiTypeId) -> i32:
+    self.state.data0.get((id as i32) as i64)
 
-fn CiTypePool.get_d1(self: &CiTypePool, id: CiTypeId) -> i32:
-    self.data1.get((id as i32) as i64)
+fn CiTypePool.get_d1(self: CiTypePool, id: CiTypeId) -> i32:
+    self.state.data1.get((id as i32) as i64)
 
-fn CiTypePool.get_d2(self: &CiTypePool, id: CiTypeId) -> i32:
-    self.data2.get((id as i32) as i64)
+fn CiTypePool.get_d2(self: CiTypePool, id: CiTypeId) -> i32:
+    self.state.data2.get((id as i32) as i64)
 
-fn CiTypePool.get_extra(self: &CiTypePool, idx: i32) -> i32:
-    self.extra.get(idx as i64)
+fn CiTypePool.get_extra(self: CiTypePool, idx: i32) -> i32:
+    self.state.extra.get(idx as i64)
 
-fn CiTypePool.get_string(self: &CiTypePool, idx: i32) -> str:
-    self.strings.get(idx as i64)
+fn CiTypePool.get_string(self: CiTypePool, idx: i32) -> str:
+    self.state.strings.get(idx as i64)
 
 // Type constructor helpers.
-fn CiTypePool.ty_void(mut self: CiTypePool) -> CiTypeId:
+fn CiTypePool.ty_void(self: CiTypePool) -> CiTypeId:
     self.add(CiTypeKind.CT_VOID, 0, 0, 0)
 
-fn CiTypePool.ty_bool(mut self: CiTypePool) -> CiTypeId:
+fn CiTypePool.ty_bool(self: CiTypePool) -> CiTypeId:
     self.add(CiTypeKind.CT_BOOL, 0, 0, 0)
 
-fn CiTypePool.ty_int(mut self: CiTypePool, bits: i32, is_unsigned: i32) -> CiTypeId:
+fn CiTypePool.ty_int(self: CiTypePool, bits: i32, is_unsigned: i32) -> CiTypeId:
     self.add(CiTypeKind.CT_INT, bits, is_unsigned, 0)
 
-fn CiTypePool.ty_float(mut self: CiTypePool, bits: i32) -> CiTypeId:
+fn CiTypePool.ty_float(self: CiTypePool, bits: i32) -> CiTypeId:
     self.add(CiTypeKind.CT_FLOAT, bits, 0, 0)
 
-fn CiTypePool.ty_pointer(mut self: CiTypePool, pointee: CiTypeId, is_const: i32) -> CiTypeId:
+fn CiTypePool.ty_pointer(self: CiTypePool, pointee: CiTypeId, is_const: i32) -> CiTypeId:
     self.add(CiTypeKind.CT_POINTER, pointee as i32, is_const, 0)
 
-fn CiTypePool.ty_array(mut self: CiTypePool, elem: CiTypeId, size: i32) -> CiTypeId:
+fn CiTypePool.ty_array(self: CiTypePool, elem: CiTypeId, size: i32) -> CiTypeId:
     self.add(CiTypeKind.CT_ARRAY, elem as i32, size, 0)
 
-fn CiTypePool.ty_struct(mut self: CiTypePool, name_sym: i32) -> CiTypeId:
+fn CiTypePool.ty_struct(self: CiTypePool, name_sym: i32) -> CiTypeId:
     self.add(CiTypeKind.CT_STRUCT, name_sym, 0, 0)
 
-fn CiTypePool.ty_enum(mut self: CiTypePool, name_sym: i32) -> CiTypeId:
+fn CiTypePool.ty_enum(self: CiTypePool, name_sym: i32) -> CiTypeId:
     self.add(CiTypeKind.CT_ENUM, name_sym, 0, 0)
 
-fn CiTypePool.ty_named(mut self: CiTypePool, name_sym: i32) -> CiTypeId:
+fn CiTypePool.ty_named(self: CiTypePool, name_sym: i32) -> CiTypeId:
     self.add(CiTypeKind.CT_NAMED, name_sym, 0, 0)
 
-fn CiTypePool.ty_fn_ptr(mut self: CiTypePool, ret: CiTypeId, params_start: i32, param_count: i32) -> CiTypeId:
+fn CiTypePool.ty_fn_ptr(self: CiTypePool, ret: CiTypeId, params_start: i32, param_count: i32) -> CiTypeId:
     self.add(CiTypeKind.CT_FN_PTR, ret as i32, params_start, param_count)
 
 
@@ -245,19 +253,24 @@ enum CiUnaryOp: i32:
     CIUO_LOGICAL_NOT = 2
     CIUO_BIT_NOT = 3
 
-type CiExprPool {
+type CiExprPoolState {
     kinds: Vec[i32],
     data0: Vec[i32],
     data1: Vec[i32],
     data2: Vec[i32],
-    types: Vec[i32],    // CiTypeId per expr; 0 means unresolved / unknown
+    types: Vec[i32],
     extra: Vec[i32],
     strings: Vec[str],
     frozen: i32,
 }
 
+type CiExprPool {
+    state: *mut CiExprPoolState,
+}
+
 fn CiExprPool.new -> CiExprPool:
-    var pool = CiExprPool {
+    let ptr = with_alloc(256) as *mut CiExprPoolState
+    unsafe: *ptr = CiExprPoolState {
         kinds: Vec.new(),
         data0: Vec.new(),
         data1: Vec.new(),
@@ -267,109 +280,113 @@ fn CiExprPool.new -> CiExprPool:
         strings: Vec.new(),
         frozen: 0,
     }
-    pool.kinds.push(0)
-    pool.data0.push(0)
-    pool.data1.push(0)
-    pool.data2.push(0)
-    pool.types.push(0)
-    pool
+    ptr.kinds.push(0)
+    ptr.data0.push(0)
+    ptr.data1.push(0)
+    ptr.data2.push(0)
+    ptr.types.push(0)
+    CiExprPool { state: ptr }
 
-fn CiExprPool.add(mut self: CiExprPool, kind: i32, d0: i32, d1: i32, d2: i32, ty: CiTypeId) -> CiExprId:
-    if self.frozen != 0:
+fn CiExprPool.add(self: CiExprPool, kind: i32, d0: i32, d1: i32, d2: i32, ty: CiTypeId) -> CiExprId:
+    let st = self.state
+    if st.frozen != 0:
         with_eprint("BUG: CiExprPool.add called after freeze")
-    let id = self.kinds.len() as i32
-    self.kinds.push(kind)
-    self.data0.push(d0)
-    self.data1.push(d1)
-    self.data2.push(d2)
-    self.types.push(ty as i32)
+    let id = st.kinds.len() as i32
+    st.kinds.push(kind)
+    st.data0.push(d0)
+    st.data1.push(d1)
+    st.data2.push(d2)
+    st.types.push(ty as i32)
     id as CiExprId
 
-fn CiExprPool.add_extra(mut self: CiExprPool, value: i32) -> i32:
-    if self.frozen != 0:
+fn CiExprPool.add_extra(self: CiExprPool, value: i32) -> i32:
+    let st = self.state
+    if st.frozen != 0:
         with_eprint("BUG: CiExprPool.add_extra called after freeze")
-    let idx = self.extra.len() as i32
-    self.extra.push(value)
+    let idx = st.extra.len() as i32
+    st.extra.push(value)
     idx
 
-fn CiExprPool.add_string(mut self: CiExprPool, s: str) -> i32:
-    if self.frozen != 0:
+fn CiExprPool.add_string(self: CiExprPool, s: str) -> i32:
+    let st = self.state
+    if st.frozen != 0:
         with_eprint("BUG: CiExprPool.add_string called after freeze")
-    let idx = self.strings.len() as i32
-    self.strings.push(s)
+    let idx = st.strings.len() as i32
+    st.strings.push(s)
     idx
 
-fn CiExprPool.freeze(mut self: CiExprPool):
-    self.frozen = 1
+fn CiExprPool.freeze(self: CiExprPool):
+    self.state.frozen = 1
 
-fn CiExprPool.kind(self: &CiExprPool, id: CiExprId) -> i32:
-    self.kinds.get((id as i32) as i64)
+fn CiExprPool.kind(self: CiExprPool, id: CiExprId) -> i32:
+    self.state.kinds.get((id as i32) as i64)
 
-fn CiExprPool.get_d0(self: &CiExprPool, id: CiExprId) -> i32:
-    self.data0.get((id as i32) as i64)
+fn CiExprPool.get_d0(self: CiExprPool, id: CiExprId) -> i32:
+    self.state.data0.get((id as i32) as i64)
 
-fn CiExprPool.get_d1(self: &CiExprPool, id: CiExprId) -> i32:
-    self.data1.get((id as i32) as i64)
+fn CiExprPool.get_d1(self: CiExprPool, id: CiExprId) -> i32:
+    self.state.data1.get((id as i32) as i64)
 
-fn CiExprPool.get_d2(self: &CiExprPool, id: CiExprId) -> i32:
-    self.data2.get((id as i32) as i64)
+fn CiExprPool.get_d2(self: CiExprPool, id: CiExprId) -> i32:
+    self.state.data2.get((id as i32) as i64)
 
-fn CiExprPool.get_type(self: &CiExprPool, id: CiExprId) -> CiTypeId:
-    (self.types.get((id as i32) as i64)) as CiTypeId
+fn CiExprPool.get_type(self: CiExprPool, id: CiExprId) -> CiTypeId:
+    (self.state.types.get((id as i32) as i64)) as CiTypeId
 
-fn CiExprPool.set_type(mut self: CiExprPool, id: CiExprId, ty: CiTypeId):
-    if self.frozen != 0:
+fn CiExprPool.set_type(self: CiExprPool, id: CiExprId, ty: CiTypeId):
+    let st = self.state
+    if st.frozen != 0:
         with_eprint("BUG: CiExprPool.set_type called after freeze")
-    // Vec.set isn't universal in this codebase; we rebuild the slot via
-    // a temporary copy. Consumers hitting perf will batch type
-    // assignment at construction time instead.
     let idx = (id as i32) as i64
     var i: i64 = 0
     var out: Vec[i32] = Vec.new()
-    let n = self.types.len()
+    let n = st.types.len()
     while i < n:
         if i == idx:
             out.push(ty as i32)
         else:
-            out.push(self.types.get(i))
+            out.push(st.types.get(i))
         i = i + 1
-    self.types = out
+    st.types = out
 
-fn CiExprPool.get_extra(self: &CiExprPool, idx: i32) -> i32:
-    self.extra.get(idx as i64)
+fn CiExprPool.get_extra(self: CiExprPool, idx: i32) -> i32:
+    self.state.extra.get(idx as i64)
 
-fn CiExprPool.get_string(self: &CiExprPool, idx: i32) -> str:
-    self.strings.get(idx as i64)
+fn CiExprPool.get_string(self: CiExprPool, idx: i32) -> str:
+    self.state.strings.get(idx as i64)
 
-// Expression constructor helpers — not exhaustive; extended as Phase B
-// lowering lands one kind at a time.
+fn CiExprPool.extra_len(self: CiExprPool) -> i32:
+    self.state.extra.len() as i32
 
-fn CiExprPool.int_lit(mut self: CiExprPool, text_idx: i32, ty: CiTypeId) -> CiExprId:
+fn CiExprPool.int_lit(self: CiExprPool, text_idx: i32, ty: CiTypeId) -> CiExprId:
     self.add(CiExprKind.CIE_INT_LIT, text_idx, 0, 0, ty)
 
-fn CiExprPool.bool_lit(mut self: CiExprPool, value: i32, ty: CiTypeId) -> CiExprId:
+fn CiExprPool.bool_lit(self: CiExprPool, value: i32, ty: CiTypeId) -> CiExprId:
     self.add(CiExprKind.CIE_BOOL_LIT, value, 0, 0, ty)
 
-fn CiExprPool.null_ptr(mut self: CiExprPool, ty: CiTypeId) -> CiExprId:
+fn CiExprPool.null_ptr(self: CiExprPool, ty: CiTypeId) -> CiExprId:
     self.add(CiExprKind.CIE_NULL_PTR, 0, 0, 0, ty)
 
-fn CiExprPool.ident(mut self: CiExprPool, name_sym: i32, ty: CiTypeId) -> CiExprId:
+fn CiExprPool.ident(self: CiExprPool, name_sym: i32, ty: CiTypeId) -> CiExprId:
     self.add(CiExprKind.CIE_IDENT, name_sym, 0, 0, ty)
 
-fn CiExprPool.binary(mut self: CiExprPool, op: i32, lhs: CiExprId, rhs: CiExprId, ty: CiTypeId) -> CiExprId:
+fn CiExprPool.binary(self: CiExprPool, op: i32, lhs: CiExprId, rhs: CiExprId, ty: CiTypeId) -> CiExprId:
     self.add(CiExprKind.CIE_BINARY, op, lhs as i32, rhs as i32, ty)
 
-fn CiExprPool.unary(mut self: CiExprPool, op: i32, operand: CiExprId, ty: CiTypeId) -> CiExprId:
+fn CiExprPool.unary(self: CiExprPool, op: i32, operand: CiExprId, ty: CiTypeId) -> CiExprId:
     self.add(CiExprKind.CIE_UNARY, op, operand as i32, 0, ty)
 
-fn CiExprPool.cast(mut self: CiExprPool, target: CiTypeId, operand: CiExprId) -> CiExprId:
+fn CiExprPool.cast(self: CiExprPool, target: CiTypeId, operand: CiExprId) -> CiExprId:
     self.add(CiExprKind.CIE_CAST, target as i32, operand as i32, 0, target)
 
-fn CiExprPool.init_list(mut self: CiExprPool, items_start: i32, item_count: i32, ty: CiTypeId) -> CiExprId:
+fn CiExprPool.init_list(self: CiExprPool, items_start: i32, item_count: i32, ty: CiTypeId) -> CiExprId:
     self.add(CiExprKind.CIE_INIT_LIST, items_start, item_count, 0, ty)
 
-fn CiExprPool.designated_init(mut self: CiExprPool, fields_start: i32, field_count: i32, ty: CiTypeId) -> CiExprId:
+fn CiExprPool.designated_init(self: CiExprPool, fields_start: i32, field_count: i32, ty: CiTypeId) -> CiExprId:
     self.add(CiExprKind.CIE_DESIGNATED_INIT, fields_start, field_count, 0, ty)
+
+fn CiExprPool.val(self: CiExprPool) -> CiExprPool:
+    CiExprPool { state: self.state }
 
 
 // ── CiStmt ────────────────────────────────────────────────────
