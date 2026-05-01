@@ -236,7 +236,7 @@ fn print_help_operators:
         "  << >>\n" ++
         "  + - ++ ??\n" ++
         "  * / %\n" ++
-        "  unary: not - & &mut\n" ++
+        "  unary: not - & &raw const &raw mut\n" ++
         "  postfix: .await ? .field [i] ()\n"
     )
 

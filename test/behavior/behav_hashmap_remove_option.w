@@ -12,9 +12,8 @@ fn main:
     var borrowed: HashMap[str, i32] = HashMap.new()
     borrowed.insert("x", 9)
     borrowed.insert("y", 10)
-    let borrowed_ref = &mut borrowed
-    assert(borrowed_ref.remove("x").unwrap() == 9)
-    assert(borrowed_ref.len() == 1)
-    assert(borrowed_ref.remove("x").is_none())
+    assert(borrowed.remove("x").unwrap() == 9)
+    assert(borrowed.len() == 1)
+    assert(borrowed.remove("x").is_none())
 
     print("ok")

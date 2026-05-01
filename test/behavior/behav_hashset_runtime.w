@@ -13,9 +13,8 @@ fn main:
 
     var shared_mut: HashSet[i32] = HashSet.new()
     shared_mut.insert(9)
-    let shared_mut_ref = &mut shared_mut
-    assert(shared_mut_ref.remove(9))
-    assert(shared_mut_ref.len() == 0)
+    assert(shared_mut.remove(9))
+    assert(shared_mut.len() == 0)
 
     let strings: HashSet[str] = HashSet.new()
     strings.insert("alpha")

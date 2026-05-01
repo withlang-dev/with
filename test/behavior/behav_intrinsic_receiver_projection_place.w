@@ -13,15 +13,6 @@ fn seed_items() -> Vec[Inner]:
     items.push(Inner { tags: Vec.new() })
     items
 
-fn ref_chain(items: &mut Vec[Inner]):
-    items.get(0).tags.push(55)
-
-fn ref_alias_chain(items: &mut InnerList):
-    items.get(0).tags.push(66)
-
-fn ref_nested_chain(outer: &mut Outer):
-    outer.items.get(0).tags.push(77)
-
 fn main:
     var items = seed_items()
     items.get(0).tags.push(11)
@@ -44,16 +35,16 @@ fn main:
     assert(outer.items.get(0).tags.get(0) == 44)
 
     var ref_items = seed_items()
-    ref_chain(&mut ref_items)
+    ref_items.get(0).tags.push(55)
     assert(ref_items.get(0).tags.len() == 1)
     assert(ref_items.get(0).tags.get(0) == 55)
 
     var ref_alias_items: InnerList = seed_items()
-    ref_alias_chain(&mut ref_alias_items)
+    ref_alias_items.get(0).tags.push(66)
     assert(ref_alias_items.get(0).tags.len() == 1)
     assert(ref_alias_items.get(0).tags.get(0) == 66)
 
     var ref_outer = Outer { items: seed_items() }
-    ref_nested_chain(&mut ref_outer)
+    ref_outer.items.get(0).tags.push(77)
     assert(ref_outer.items.get(0).tags.len() == 1)
     assert(ref_outer.items.get(0).tags.get(0) == 77)

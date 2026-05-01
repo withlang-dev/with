@@ -2,5 +2,4 @@
 
 fn main:
     var lookup: HashMap[str, i32] = HashMap.new()
-    let borrowed = &mut lookup
-    borrowed.insert(1, "x")
+    lookup.insert(1, "x")

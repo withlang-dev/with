@@ -86,9 +86,9 @@ fn counter_inc(c: *mut Counter):
 
 fn test_struct_pointer:
     var c = Counter { value: 0 }
-    counter_inc(&mut c)
-    counter_inc(&mut c)
-    counter_inc(&mut c)
+    counter_inc(&raw mut c)
+    counter_inc(&raw mut c)
+    counter_inc(&raw mut c)
     assert(c.value == 3)
 
 type Pair { first: i32, second: i32 }

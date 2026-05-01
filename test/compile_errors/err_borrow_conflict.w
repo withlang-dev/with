@@ -1,6 +1,6 @@
-//! expect-check-fail: cannot borrow mutably: already borrowed
+//! expect-check-fail: `&mut` is not part of safe With
 
-// Test: borrow checker detects conflict between shared and mutable borrow.
+// Test: &mut is rejected at P12 lockdown.
 
 fn main:
     var x = 5

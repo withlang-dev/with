@@ -1331,7 +1331,7 @@ fn Codegen.try_eval_const_pointer_llvm(self: Codegen, node: i32, expected_tid: i
 
     if kind == NodeKind.NK_UNARY:
         let uop = self.pool.get_data0(cur)
-        if uop == UnaryOp.UOP_REF or uop == UnaryOp.UOP_MUT_REF or uop == UnaryOp.UOP_RAW_REF_CONST or uop == UnaryOp.UOP_RAW_REF_MUT:
+        if uop == UnaryOp.UOP_REF or uop == UnaryOp.UOP_RAW_REF_CONST or uop == UnaryOp.UOP_RAW_REF_MUT:
             let target = self.unwrap_const_expr_node(self.pool.get_data1(cur))
             if target == 0:
                 return 0

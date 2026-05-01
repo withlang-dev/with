@@ -16,7 +16,7 @@ type GContext {
 
 fn main:
     var calls: i32 = 0
-    let memctl = MemCtl { free: &free_impl, memory_data: &mut calls }
+    let memctl = MemCtl { free: &free_impl, memory_data: &raw mut calls }
     let gcontext = GContext { memctl }
     gcontext.memctl.free(0 as *mut u8, gcontext.memctl.memory_data)
     assert(calls == 1)

@@ -1604,7 +1604,7 @@ fn Codegen.find_dyn_concrete_arg(self: Codegen, arg_node: i32, arg_ty: i64) -> D
 
     if arg_node != 0 and self.pool.kind(arg_node) == NodeKind.NK_UNARY:
         let uop = self.pool.get_data0(arg_node)
-        if uop == UnaryOp.UOP_REF or uop == UnaryOp.UOP_MUT_REF or uop == UnaryOp.UOP_RAW_REF_CONST or uop == UnaryOp.UOP_RAW_REF_MUT:
+        if uop == UnaryOp.UOP_REF or uop == UnaryOp.UOP_RAW_REF_CONST or uop == UnaryOp.UOP_RAW_REF_MUT:
             let inner = self.pool.get_data1(arg_node)
             if self.pool.kind(inner) == NodeKind.NK_IDENT:
                 let base_sym = self.pool.get_data0(inner)
@@ -1715,7 +1715,7 @@ fn Codegen.infer_local_pointee_struct(self: Codegen, value_node: i32, declared_t
 
     if value_node != 0 and self.pool.kind(value_node) == NodeKind.NK_UNARY:
         let uop = self.pool.get_data0(value_node)
-        if uop == UnaryOp.UOP_REF or uop == UnaryOp.UOP_MUT_REF or uop == UnaryOp.UOP_RAW_REF_CONST or uop == UnaryOp.UOP_RAW_REF_MUT:
+        if uop == UnaryOp.UOP_REF or uop == UnaryOp.UOP_RAW_REF_CONST or uop == UnaryOp.UOP_RAW_REF_MUT:
             let inner = self.pool.get_data1(value_node)
             if self.pool.kind(inner) == NodeKind.NK_IDENT:
                 let base_sym = self.pool.get_data0(inner)
@@ -1760,7 +1760,7 @@ fn Codegen.infer_local_concrete_struct(self: Codegen, value_node: i32, storage_t
                 return alias_known
     if vk == NodeKind.NK_UNARY:
         let uop = self.pool.get_data0(value_node)
-        if uop == UnaryOp.UOP_REF or uop == UnaryOp.UOP_MUT_REF or uop == UnaryOp.UOP_RAW_REF_CONST or uop == UnaryOp.UOP_RAW_REF_MUT:
+        if uop == UnaryOp.UOP_REF or uop == UnaryOp.UOP_RAW_REF_CONST or uop == UnaryOp.UOP_RAW_REF_MUT:
             let inner = self.pool.get_data1(value_node)
             if self.pool.kind(inner) == NodeKind.NK_IDENT:
                 let sym = self.pool.get_data0(inner)
