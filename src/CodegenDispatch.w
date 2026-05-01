@@ -794,7 +794,7 @@ fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected
             float_ty = wl_f64_type(self.context)
         var fval: f64 = 0.0
         // ConstKind.CK_FLOAT d0 is an AstPool string table index (from Parser.add_string)
-        if cd >= 0 and cd < self.pool.strings.len() as i32:
+        if cd >= 0 and cd < self.pool.state.strings.len() as i32:
             let float_text = self.pool.get_string(cd)
             if float_text.len() > 0:
                 fval = with_parse_float(float_text)

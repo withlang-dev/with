@@ -1070,7 +1070,7 @@ fn CCodegen.const_text(self: CCodegen, body: MirBody, const_id: i32) -> str:
         return "0"
     if ck == ConstKind.CK_FLOAT:
         if cd != 0:
-            let lit = if cd >= 0 and cd < self.ast.strings.len() as i32: self.ast.get_string(cd) else: ""
+            let lit = if cd >= 0 and cd < self.ast.state.strings.len() as i32: self.ast.get_string(cd) else: ""
             if lit.len() > 0:
                 return lit
         return "0.0"

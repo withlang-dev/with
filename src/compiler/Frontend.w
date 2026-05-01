@@ -298,7 +298,7 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
             di = di + 1
 
     while out.decl_count() > 0:
-        out.decls.pop()
+        out.state.decls.pop()
     for oi in 0..ordered.len() as i32:
         out.add_decl(ordered.get(oi as i64))
     self.decl_source_paths = ordered_paths
@@ -1047,7 +1047,7 @@ fn Zcu.strip_use_decls_frontend(self: Zcu, pool: AstPool) -> AstPool:
             ordered_c_import.push(ci_flag)
 
     while out.decl_count() > 0:
-        out.decls.pop()
+        out.state.decls.pop()
     for oi in 0..ordered.len() as i32:
         out.add_decl(ordered.get(oi as i64))
     self.decl_source_paths = ordered_paths
@@ -1192,7 +1192,7 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     // Rebuild decl list: prelude → user imports → root.
     // Drop fn/extern_fn decls shadowed by a higher-priority tier.
     while merged_pool.decl_count() > 0:
-        merged_pool.decls.pop()
+        merged_pool.state.decls.pop()
     let rebuilt_paths: Vec[str] = Vec.new()
     let rebuilt_file_ids: Vec[i32] = Vec.new()
     // Combine user + root fn names for prelude cross-tier shadowing.

@@ -598,7 +598,7 @@ fn Parser.mark_decl_comptime(self: Parser, decl: NodeId):
     if meta >= 0:
         let meta_flags = self.pool.fn_meta_flags(meta)
         if (meta_flags / FnFlags.COMPTIME) % 2 == 0:
-            self.pool.fn_meta.set_i32((meta + 1) as i64, meta_flags + FnFlags.COMPTIME)
+            self.pool.state.fn_meta.set_i32((meta + 1) as i64, meta_flags + FnFlags.COMPTIME)
 
 fn Parser.mark_new_comptime_decls(self: Parser, start_decl_count: i32):
     var di = start_decl_count
@@ -787,10 +787,10 @@ fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is
     if self.last_where_count > 0:
         self.pool.add_where_meta(fn_node, self.last_where_start, self.last_where_count)
     if self.pending_stack_size > 0:
-        self.pool.fn_stack_sizes.insert(fn_node as i32, self.pending_stack_size)
+        self.pool.state.fn_stack_sizes.insert(fn_node as i32, self.pending_stack_size)
         self.pending_stack_size = 0
     if self.pending_weak != 0:
-        self.pool.fn_weak_flags.insert(fn_node as i32, 1)
+        self.pool.state.fn_weak_flags.insert(fn_node as i32, 1)
         self.pending_weak = 0
     if self.pending_iter_of_self != 0:
         self.pool.mark_iter_of_self_fn(fn_node)
@@ -1905,7 +1905,7 @@ fn Parser.parse_error_decl(self: Parser, is_pub: i32, start: i32) -> NodeId:
                 break
             self.advance()
             self.skip_newlines()
-        self.pool.extra.set_i32(count_idx as i64, variant_count)
+        self.pool.state.extra.set_i32(count_idx as i64, variant_count)
         self.pool.add_extra(is_pub)
         self.pool.add_extra(0)
         self.pool.add_extra(0)
@@ -5181,7 +5181,7 @@ fn Parser.parse_slice_pattern(self: Parser, start: i32) -> NodeId:
 
     self.skip_newlines()
     self.expect(TokenKind.TK_R_BRACKET)
-    self.pool.extra.set_i32(has_rest_idx as i64, has_rest)
+    self.pool.state.extra.set_i32(has_rest_idx as i64, has_rest)
     self.pool.add_extra(tail_syms.len() as i32)
     for ti in 0..tail_syms.len() as i32:
         self.pool.add_extra(tail_syms.get(ti as i64))
@@ -6168,7 +6168,7 @@ fn Parser.parse_one_type_param(self: Parser) -> i32:
             let b2 = self.parse_type_bound_symbol()
             self.pool.add_extra(b2)
             bound_count = bound_count + 1
-    self.pool.extra.set_i32(count_idx as i64, bound_count)
+    self.pool.state.extra.set_i32(count_idx as i64, bound_count)
     1
 
 fn Parser.parse_type_bound_symbol(self: Parser) -> i32:
