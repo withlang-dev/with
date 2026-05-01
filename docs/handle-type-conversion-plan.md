@@ -623,11 +623,56 @@ handle-type first means those signatures already have `pool: AstPool` when
 the Sema method conversion replaces the function with a `mut self: Self`
 method.
 
-**Open decisions** (resolve during implementation):
+**Decisions resolved:**
 
-1. **Per-pool commit shape.** One commit per pool, or split state-struct +
-   handle definition from method updates? One commit is simpler but produces
-   larger diffs.
+1. **Per-pool commit shape.** One commit per pool. Larger diffs but each is
+   self-contained and fixpoint-verified.
 
-2. **Allocation size.** Over-allocating (256 for CI pools, 4096 for AstPool)
-   adequate, or add a runtime size check?
+2. **Allocation size.** Over-allocating (64–4096) is adequate for all pools.
+
+---
+
+## 7. §20.0 Post-Slice-B Inventory
+
+**Date:** 2026-05-01
+**Baseline:** src/ 399, rt/ 157, lib/std/ 48 = 604 total `&mut` sites.
+
+### What Slice B converted
+
+| Commit | Scope | Sites removed |
+|---|---|---|
+| CiTypePool + CiExprPool handle | CImport.w, CiIR.w | ~45 `&mut CiTypePool/CiExprPool` |
+| CiStmtPool handle | CImport.w, CiIR.w | ~16 `&mut CiStmtPool` |
+| CiDeclPool handle | CImport.w, CiIR.w | ~8 `&mut CiDeclPool` |
+| AstPool handle | Ast.w, ComptimeTransform.w, 21 files | ~85 (`&mut AstPool` + `&AstPool`) |
+| Sema §16.2 methods | ComptimeTransform.w, Frontend.w, Compilation.w | 25 functions, ~400 internal refs |
+| CiGotoSwitchCase handle | CImport.w | 5 `&mut CiGotoSwitchCase` |
+| Frontend out-param restructure | Frontend.w | 7 `&mut Vec`/`&mut HashMap` params |
+| rt/ and lib/std/ prior passes | rt/*.w, lib/std/*.w | 157 + 46 |
+
+### Current state (post-Slice-B)
+
+**Total remaining `&mut` sites: 30** (src/ 28, lib/std/ 2, rt/ 0)
+
+**Zero `&mut` in function parameter or return type positions.**
+
+All 30 are P12 lockdown items:
+
+| Bucket | Count | Examples |
+|---|---|---|
+| Comments describing `&mut` behavior | 21 | SemaCheck.w borrow checker comments, CiIR.w enum doc |
+| String literals (diagnostics, help text) | 7 | `"&mut T is not part of safe With"`, `"unary: not - & &mut"` |
+| Render/display code emitting `"&mut "` | 2 | render.w:911, render.w:1079 |
+| Unsafe raw pointer cast | 1 | Link.w:34 `&mut out as *mut u8` → `&raw mut` at P1 |
+| Deprecated trait method | 1 | traits.w:141 `multi_index_set(self: &mut Self, ...)` → deleted at P12 |
+
+### Resolution timeline
+
+- **P1:** Link.w:34 converts to `&raw mut out as *mut u8` when `&raw mut` is parsed.
+- **P12:** All remaining sites resolve:
+  - Comments referencing `&mut`: update to use new terminology.
+  - String literals: update diagnostic text (or delete if UOP_MUT_REF is removed).
+  - Render output: delete `UOP_MUT_REF` branch and `&mut T` type rendering.
+  - Deprecated `multi_index_set`: delete with the MultiIndex trait.
+
+Slice B is structurally complete. No further conversions needed before P6.
