@@ -37,6 +37,41 @@ via `self.state.field_name` (the compiler generates GEP through the pointer).
 
 Each pool conversion follows this pattern exactly. No design variation needed.
 
+### Shared references also convert to by-value
+
+Handle-typing converts BOTH `&mut Pool` and `&Pool` parameters to by-value
+`Pool`. The handle is 8 bytes (one pointer); passing `&Handle` adds a
+needless indirection through a pointer-to-a-pointer. After conversion, all
+parameter positions use `Pool` by value.
+
+This is a significant additional surface: CiTypePool has 34 `&CiTypePool`
+sites, CiExprPool 23, CiStmtPool 13, AstPool 67. These are mostly reader
+method `self` parameters (`self: &CiTypePool`) and read-only function
+parameters. All convert to by-value.
+
+**Semantics verification:** In With, `&T` and `T` differ in that `&T` is a
+reference (pointer to the value) while `T` is an owned copy. For handle types,
+this distinction is irrelevant: copying the handle copies the pointer, and
+both the reference-to-handle and the copied-handle access the same underlying
+`*mut State`. Specifically:
+
+- **No trait dispatch differences.** None of these pool types implement traits
+  where `&Self` vs `Self` matters. All methods are inherent (no trait impls
+  on any pool type).
+- **No auto-ref behavior.** With's method dispatch doesn't distinguish
+  `&self` from `self` for method resolution — both resolve to the same
+  method. The `self: &CiTypePool` annotation is a calling convention, not a
+  dispatch discriminator.
+- **No lifetime tracking impact.** With's borrow checker tracks references
+  for conflict detection, but the conversion eliminates references entirely —
+  by-value handles don't create borrows, which is strictly simpler.
+- **InternPool precedent.** InternPool has zero `&InternPool` references
+  anywhere in the codebase. It has always been by-value only, and this works
+  correctly. The other pools will follow the same pattern.
+
+**Conclusion:** The `&Pool` → `Pool` conversion is semantics-preserving for
+handle types. No behavioral difference.
+
 ---
 
 ## 2. Per-Pool Plans
@@ -178,11 +213,23 @@ type CiStmtPool {
 
 **Construction sites:** CiIR.w (1), CImport.w (4), CiPrint.w (1).
 
-**Note on CiStmtPool methods in CImport.w:** CiStmtPool has many methods
-defined in CImport.w (goto lowering, stackify emit, native goto emit — ~40
-methods). These already use `mut self: CiStmtPool`. After conversion, they
-access state through `self.state`. Large surface area but mechanical: every
-`self.kinds` becomes `self.state.kinds`, etc.
+**Method distribution:** 57 total methods across 2 files:
+- CiIR.w: 27 methods (core: new, add, freeze, accessors, statement constructors)
+- CImport.w: 30 methods (IR lowering: lower_stmt_ir, lower_switch_stmt_ir,
+  stack_emit_tree, native_goto_emit_cfg, lower_goto_body_stackify, etc.)
+
+All 57 methods are in CiIR.w or CImport.w. No other files define CiStmtPool
+methods. After conversion, each method's `self.field` → `self.state.field`.
+
+**Reference site distribution:**
+- `&mut CiStmtPool`: 16 sites, all in CImport.w (secondary params on
+  CiGotoCfgContext and CiStackEmitContext methods)
+- `&CiStmtPool` (read-only): 14 sites — CiIR.w (7), CImport.w (4), CiPrint.w (3)
+
+**Risk is contained:** All method definitions and all `&mut` sites are in 2
+files (CiIR.w, CImport.w) that are already well-understood from Slice A work.
+The 30 CImport.w method definitions are large in count but mechanical — each
+needs `self.field` → `self.state.field` for field accesses within the body.
 
 ### 2d. AstPool (18 `&mut` sites in ComptimeTransform.w)
 
@@ -209,27 +256,53 @@ type AstPool {
 }
 ```
 
-**Method dispatch:** 101 methods across Ast.w. Same pattern — all field
-accesses route through `self.state`. Large but mechanical.
+**Method distribution:** 107 total methods across 2 files:
+- Ast.w: 101 methods (core pool implementation)
+- ComptimeTransform.w: 6 methods (ct_new_node_copy, ct_clone_leaf,
+  ct_empty_block, ct_build_call, ct_struct_lit_field_value,
+  ct_clone_tree_with_subst)
+
+All method definitions are in 2 files. No other files define AstPool methods.
 
 **Allocation size:** ~45 fields. ~30 Vecs × 32 + ~20 HashMaps × 48 +
-~3 scalars = ~1920 bytes. Allocate 2048.
+~3 scalars = ~1920 bytes. Allocate 4096 to be safe.
 
 **Construction sites:** 25+ (Ast.w, Parser.w, Codegen.w, Frontend.w,
 ComptimeTransform.w, Lsp.w, Zcu.w). All call `AstPool.new()` — the return
 type stays the same, so call sites don't change.
 
-**All 18 `&mut AstPool` sites are in ComptimeTransform.w.** After AstPool is a
-handle type, these become `pool: AstPool`. The `unsafe: *pool` dereference
+**`&mut AstPool` sites:** All 18 are in ComptimeTransform.w. After AstPool is
+a handle type, these become `pool: AstPool`. The `unsafe: *pool` dereference
 pattern (4 sites in ComptimeTransform.w: lines 511, 526, 872, 948) currently
 dereferences `&mut AstPool` → `AstPool`. After conversion, `pool` is already
 an `AstPool` handle — the dereference becomes unnecessary; replace with
 `let eval_ast = pool` (copy the handle).
 
-**Files using AstPool:** 21 files. But only ComptimeTransform.w has `&mut`
-params. All other files pass AstPool by value or `&AstPool`. The `&AstPool`
-references (read-only) change to by-value (handle copy), which is a broader
-change but purely mechanical — grep for `&AstPool` and remove the `&`.
+**`&AstPool` reference distribution** (67 sites across 2 files):
+- Ast.w: 67 sites (reader method `self: &AstPool` parameters)
+- ComptimeTransform.w: 1 site (`ct_sync_sema_ast(sema, pool: &AstPool)`)
+
+The 67 Ast.w sites are all method `self` parameters — mechanical conversion
+to `self: AstPool`. The 1 ComptimeTransform.w site resolves alongside `&mut`.
+
+**Files that USE AstPool** (21 files, by parameter-site count):
+- Ast.w: 104, Frontend.w: 19, Compilation.w: 18, ComptimeTransform.w: 22,
+  Lsp.w: 16, Resolve.w: 13, render.w: 12, AsyncLower.w: 12, Zcu.w: 7,
+  ComptimeEval.w: 6, Parser.w: 6, BorrowCfg.w: 6, Sema.w: 5, Codegen.w: 5,
+  MirLower.w: 4, Backend.w: 3, SemaCheck.w: 2, CCodegen.w: 2, Parse.w: 2,
+  Mir.w: 1, CodegenDispatch.w: 1
+
+These files pass AstPool by value or `&AstPool`. After conversion, `&AstPool`
+parameters and call-site `&pool` expressions become by-value `AstPool`. The
+bulk of the work is in Ast.w (67 `self: &AstPool` → `self: AstPool`); the
+remaining files have scattered `&AstPool` parameters that convert mechanically.
+
+**Risk reassessment:** Medium, but concentrated. 94% of method definitions are
+in one file (Ast.w). The `self: &AstPool` → `self: AstPool` conversion is
+pure search-and-replace within Ast.w. The cross-file `&AstPool` parameter
+sites are lower count and spread across 21 files, but each is a one-line
+edit. The main risk is the sheer count (67 + 18 = 85 parameter changes plus
+corresponding call-site `&pool` → `pool` edits), not complexity.
 
 ### 2e. Sema — see Section 5 below
 
@@ -376,48 +449,139 @@ A: No. Every `sema.ast`, `sema.diags`, `sema.pool`, `sema.type_kinds`, etc.
 becomes `sema.state.ast`, `sema.state.diags`, etc. With 333 methods across
 3 files, this is a massive mechanical edit.
 
-### 5d. The Deferral Question
+### 5d. Per-Site Analysis of the 16 `&mut Sema` Functions
 
-**Should Sema's conversion be deferred?**
+**ComptimeTransform.w — 15 functions:**
 
-Arguments for deferring:
-- Only 16 `&mut Sema` sites (15 in ComptimeTransform.w, 1 in Frontend.w).
-  After CiTypePool/CiExprPool/CiStmtPool/AstPool are done, these are the only
-  remaining structural `&mut` sites outside P12 lockdown items.
-- 333 methods need `self.field` → `self.state.field` rewriting. That's a
-  massive mechanical edit with high risk of typos.
-- The existing `*mut Sema` raw-pointer pattern would need updating (7 cast
-  sites, 2 unsafe deref sites, 4 function signatures).
-- 10 construction sites need updating.
-- The 16 sites are acceptable bridge-state debt that resolves cleanly at P12
-  lockdown when `&mut` is banned and the migration is mandatory.
+| # | Function | Sema usage | Natural Sema method? |
+|---|---|---|---|
+| 1 | `ct_emit_error(sema: &mut Sema, ast, node, msg)` | `sema.diags.emit()`, `sema.local_file_id` | **YES** — `Sema.ct_emit_error(mut self, ast, node, msg)` |
+| 2 | `ct_eval_truthy(source_ast, sema: &mut Sema, node)` | `sema as *mut Sema`, `sema.pool`, passes to ct_emit_error | Feasible — `Sema.ct_eval_truthy(mut self, source_ast, node)` |
+| 3 | `ct_transform_fstring(source_ast, pool: &mut AstPool, sema: &mut Sema, intern, node)` | Passed to ct_transform_expr only | **NO** — sema is transport |
+| 4 | `ct_transform_match_arm(source_ast, pool: &mut AstPool, sema: &mut Sema, intern, node)` | Passed to ct_transform_expr only | **NO** — sema is transport |
+| 5 | `ct_rewrite_comptime_if(source_ast, pool: &mut AstPool, sema: &mut Sema, intern, wrapper, inner)` | Passed to ct_eval_truthy, ct_transform_expr | **NO** — sema is transport |
+| 6 | `ct_sync_sema_ast(sema: &mut Sema, pool: &AstPool)` | `sema.ast = live_ast` | **YES** — `Sema.sync_ast(mut self, pool)` |
+| 7 | `ct_try_fold_type_call(pool: &mut AstPool, sema: &mut Sema, intern, node)` | `sema.static_receiver_type_is_known()`, `sema as *mut Sema`, `sema.pool` | Feasible but awkward |
+| 8 | `ct_rewrite_comptime_for(source_ast, pool: &mut AstPool, sema: &mut Sema, intern, wrapper, inner)` | `sema as *mut Sema`, `sema.pool`, `sema.ty_i64`, `ct_emit_error(sema, ...)` | **NO** — complex multi-concern |
+| 9 | `ct_rewrite_comptime(source_ast, pool: &mut AstPool, sema: &mut Sema, intern, node)` | `sema.diags.count()`, `sema as *mut Sema`, `sema.pool`, `ct_emit_error(sema, ...)` | **NO** — complex multi-concern |
+| 10 | `ct_transform_expr(source_ast, pool: &mut AstPool, sema: &mut Sema, intern, node)` | `ct_sync_sema_ast(sema, pool)`, recursive dispatch | **NO** — tree walker |
+| 11 | `ct_transform_fn_param_defaults(source_ast, pool: &mut AstPool, sema: &mut Sema, intern, fn_node)` | Passed to ct_transform_expr only | **NO** — sema is transport |
+| 12 | `ct_transform_trait_decl(source_ast, pool: &mut AstPool, sema: &mut Sema, intern, node)` | Passed to ct_transform_expr only | **NO** — sema is transport |
+| 13 | `ct_transform_type_decl(source_ast, pool: &mut AstPool, sema: &mut Sema, intern, node)` | Passed to ct_transform_expr only | **NO** — sema is transport |
+| 14 | `ct_transform_decl(source_ast, pool: &mut AstPool, sema: &mut Sema, intern, node)` | Dispatches to ct_transform_* functions | **NO** — dispatch hub |
+| 15 | `comptime_transform_module(source_ast, sema: &mut Sema, intern)` | Heavy: sema.diags, sema.pool, sema.source_text, sema.decl_source_paths, sema.module_*, sema.type_decl_has_derive(), sema.lookup_method_sig(), sema.select_trait_impl(), sema.prepare_for_comptime_transform() | Feasible — `Sema.transform_comptime_module(mut self, source_ast, intern)` |
 
-Arguments against deferring:
-- §16 says `&mut Sema` must go. Deferring to P12 means the migration isn't
-  "complete" until lockdown.
-- The 15 ComptimeTransform.w sites could be cleaned up at the same time as
-  AstPool conversion (they share the same function signatures).
-- Leaving `&mut Sema` in place while everything else is handle-typed creates
-  an inconsistency in the codebase.
+**Frontend.w — 1 function:**
 
-**Recommendation:** Defer Sema's handle-type conversion. The cost/benefit
-ratio is unfavorable — 333 methods × `self.state.` rewriting for 16 sites.
-The CI pools (61 sites) and AstPool (18 sites) deliver 79 site reductions
-with far less risk. The remaining 16 Sema sites resolve at P12 lockdown
-as part of the mandatory `&mut` elimination.
+| 16 | `Zcu.seed_sema_module_graph_frontend(self: Zcu, sema: &mut Sema)` | `sema.module_paths = Vec.new()`, `sema.module_import_*`, `sema.module_index_by_path`, `sema.global_visible_*`, `sema.module_visibility_cache` — all field assignments | **YES** — `Sema.init_module_graph(mut self)` |
 
-An alternative middle ground: convert the 15 ComptimeTransform.w functions
-to take `sema: Sema` by value (keeping Sema as a value type) by restructuring
-them as Sema methods or passing `*mut Sema` explicitly. This eliminates
-`&mut Sema` without the handle-type rewrite. The 1 Frontend.w site
-(`seed_sema_module_graph_frontend`) similarly could become a Sema method.
-This is a smaller, safer change than full handle-type conversion.
+**Summary:** Of 16 functions, only 3-4 are natural Sema method candidates
+(ct_emit_error, ct_sync_sema_ast, comptime_transform_module, seed_sema_module_graph_frontend).
+The remaining 12 pass sema as a transport parameter through the ct_transform_*
+call tree. Method extraction for those 12 would move tree-walking logic into
+Sema methods, which is architecturally wrong — the comptime transform pipeline
+is about AST rewriting, not semantic analysis.
 
-**This is a real decision for friend review.** The spec doesn't prescribe
-*when* in the migration Sema converts — only that `&mut Sema` must eventually
-go. The question is whether the handle-type pattern (high cost, high
-consistency) or the targeted method-extraction (low cost, leaves Sema as
-value type) is the right call.
+### 5e. Three Options for Sema
+
+**Option A: Handle-type Sema**
+
+Convert Sema to `type Sema { state: *mut SemaState }` following the same
+pattern as the other pools.
+
+*Cost:*
+- 333 method bodies need `self.field` → `self.state.field`
+- 4 ComptimeEval function signatures change `sema_ptr: *mut Sema` → `sema: Sema`
+- 7 cast sites (`as *mut Sema`) removed
+- 2 unsafe dereference sites removed
+- 10 construction sites updated (Sema.init/placeholder/sema_empty_state)
+- **Total: ~350 mechanical changes across 5 files**
+
+*Benefit:*
+- All 16 `&mut Sema` sites removed
+- Full migration complete in bridge phase — no P12 surprise
+- Consistent handle-type pattern across all pool types
+- Net reduction in unsafe code (7 casts + 2 derefs removed)
+
+*Risk:*
+- High volume of mechanical edits (333 methods) — typo risk despite
+  compiler catching most errors
+- Sema.w + SemaCheck.w + SemaDiag.w are 3 large files totaling ~8000 lines
+
+**Option B: Targeted method extraction**
+
+Extract the 3-4 natural Sema methods (ct_emit_error, ct_sync_sema_ast,
+comptime_transform_module, seed_sema_module_graph_frontend). For the
+remaining 12 transport-parameter functions, change `sema: &mut Sema` to
+`sema: *mut Sema` (raw pointer) and update call sites to pass
+`sema as *mut Sema`.
+
+*Cost:*
+- 3-4 method extractions (substantive, requires understanding each function)
+- 12 parameter type changes (`&mut Sema` → `*mut Sema`) + corresponding
+  call-site updates
+- Bodies of the 12 functions need `sema.field` → `sema_ptr.field` or
+  `(unsafe: *sema_ptr).field`
+- **Total: ~16 substantive changes + ~50 mechanical in-body changes**
+
+*Benefit:*
+- All 16 `&mut Sema` sites removed
+- No 333-method rewrite of Sema internals
+- Sema stays as a value type (no handle-type indirection added)
+
+*Cost / architectural concern:*
+- Moves 3-4 comptime functions from ComptimeTransform.w to Sema methods.
+  This changes which type "owns" the comptime pipeline — comptime transform
+  logic becomes Sema-owned rather than free-function-organized. This is a
+  directional architectural change, not just a migration.
+- The 12 `*mut Sema` transport-parameter functions are uglier than `&mut Sema`.
+  This trades one pre-lockdown pattern for another that's harder to read.
+  Both go away at P12, but `*mut Sema` is a worse bridge-state than `&mut Sema`.
+
+*Variant B': Instead of `*mut Sema` for the 12 transport functions, pass
+Sema by value and accept that mutations through the copied value struct
+may not propagate.* This only works if AstPool is already a handle type
+(so `sema.ast` assignment through the copy is visible via the handle's
+shared state). But other Sema field mutations (sema.diags.emit, etc.)
+would still need to propagate. DiagnosticList is NOT a handle type, so
+by-value Sema would lose emitted diagnostics. **Variant B' does not work.**
+
+**Option C: Defer to P12**
+
+Leave all 16 `&mut Sema` sites in place. They resolve at P12 lockdown
+when `STRICT_NO_MUT_REF = 1` makes `&mut` a hard error and the migration
+becomes mandatory.
+
+*Cost:*
+- Zero implementation cost in bridge phase
+- P12 lockdown becomes larger by 16 sites (but P12 is already a large
+  commit — it deletes UOP_MUT_REF, the bridge code, and promotes all
+  warnings to errors)
+
+*Benefit:*
+- No bridge-phase Sema work at all
+- §20.0 inventory carves these out with rationale: "deferred to P12 —
+  Sema's 333-method surface makes bridge-phase handle-typing cost-
+  prohibitive; the 16 sites are acceptable debt resolved at lockdown"
+
+*Risk:*
+- P12 must handle Sema alongside everything else. If P12 is already risky,
+  adding 16 more sites (plus the Sema handle-type rewrite if that's the
+  P12 resolution) makes it riskier.
+- The 16 sites are the last `&mut` in non-lockdown code — they may cause
+  confusion about whether the migration is "done" during the bridge phase.
+
+**Factors for friend review:**
+- How soon is P12 expected? If weeks away, deferral cost is low. If months
+  away, bridge-state debt accumulates.
+- Is ComptimeTransform.w stable? If it's being actively edited, `&mut Sema`
+  parameters add friction to every change.
+- Does moving ct_* logic to Sema methods make architectural sense independent
+  of the migration? If so, Option B has value beyond `&mut` removal. If not,
+  it's migration-driven architecture distortion.
+- Is bridge-phase debt (16 sites) acceptable? The CI pools + AstPool reduce
+  the total from 120 to ~41 (16 Sema + 25 comments/lockdown). The Sema sites
+  are the only remaining *functional* `&mut` usage.
 
 ---
 
@@ -490,15 +654,30 @@ After AstPool conversion:
 | CiExprPool | 20 | 23 | 22 | 8 | Low |
 | CiStmtPool | 16 | 13 | 27 + ~40 ext | 9 | Medium |
 | AstPool | 18 | 67 | 101 | 45 | Medium |
-| Sema | 16 | — | 333 | 127 | **High** (recommend defer) |
+| Sema | 16 | — | 333 | 127 | **High** (see §5e options) |
 
 Total after CI + AstPool: 79 `&mut` sites removed. Remaining: ~41 sites
 (16 Sema + ~25 comments/diagnostics/lockdown items).
 
 **Decision points for friend review:**
-1. Is the per-pool commit shape correct, or should state-struct + handle be
-   a separate commit from method updates?
-2. Should Sema be deferred, or should we do targeted method-extraction for
-   the 16 sites instead of full handle-type conversion?
-3. Is the allocation size estimation adequate, or should we add a runtime
-   size check?
+
+1. **Per-pool commit shape.** Is one commit per pool correct, or should
+   state-struct + handle definition be a separate commit from method updates?
+   (One commit is simpler but produces larger diffs.)
+
+2. **Sema treatment.** Three options with documented tradeoffs (§5e):
+   - **Option A** (handle-type): ~350 mechanical changes, full consistency,
+     no P12 surprise
+   - **Option B** (targeted method extraction): ~16 substantive changes,
+     moves some ct_* logic to Sema ownership, `*mut Sema` transport params
+     are uglier bridge state than `&mut Sema`
+   - **Option C** (defer to P12): zero bridge-phase cost, 16 sites remain
+     as bridge debt, P12 lockdown handles them alongside the spec change
+
+3. **Allocation size.** Is over-allocating (256 for CI pools, 4096 for
+   AstPool) adequate, or should we add a runtime size check?
+
+**What this is not:** This is not "reconsider whether handle-type is the
+right migration pattern." That's settled (§16). This is "given handle-type
+is the pattern, what does the implementation look like, and what do we do
+about Sema's unique cost profile?"
