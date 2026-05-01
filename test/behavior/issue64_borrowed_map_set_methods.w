@@ -9,9 +9,8 @@ fn main:
     var map_mut: HashMap[str, i32] = HashMap.new()
     map_mut.insert("x", 9)
     map_mut.insert("y", 8)
-    let map_mut_ref = &mut map_mut
-    assert(map_mut_ref.remove("x").unwrap() == 9)
-    assert(map_mut_ref.len() == 1)
+    assert(map_mut.remove("x").unwrap() == 9)
+    assert(map_mut.len() == 1)
 
     let set: HashSet[i32] = HashSet.new()
     set.insert(4)
@@ -20,6 +19,5 @@ fn main:
 
     var set_mut: HashSet[i32] = HashSet.new()
     set_mut.insert(5)
-    let set_mut_ref = &mut set_mut
-    assert(set_mut_ref.remove(5))
-    assert(set_mut_ref.len() == 0)
+    assert(set_mut.remove(5))
+    assert(set_mut.len() == 0)

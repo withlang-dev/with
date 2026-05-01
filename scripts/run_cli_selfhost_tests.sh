@@ -1368,9 +1368,9 @@ EOF
     || grep -Fq 'extern fn ret_ctx()' "$out_w" \
     || grep -Fq 'as *const ctx' "$out_w" \
     || grep -Fq 'as *mut ctx)) as *mut ctx' "$out_w" \
-    || ! grep -Fq 'return ((&mut g as *mut ctx))' "$out_w" \
-    || ! grep -Fq 'var local: *mut ctx = ((&mut g as *mut ctx))' "$out_w" \
-    || ! grep -Fq '(ccontext = ((&mut g as *mut ctx)))' "$out_w"; then
+    || ! grep -Fq 'return ((&raw mut g as *mut ctx))' "$out_w" \
+    || ! grep -Fq 'var local: *mut ctx = ((&raw mut g as *mut ctx))' "$out_w" \
+    || ! grep -Fq '(ccontext = ((&raw mut g as *mut ctx)))' "$out_w"; then
     echo "FAIL(cli-selfhost-migrate-output) noop_pointer_cast_exprs"
     sed -n '1,220p' "$out_w" || true
     failures=$((failures + 1))
@@ -1514,7 +1514,7 @@ fn issue171_shift(p: *mut u8) -> u32:
 
 fn main:
     var buf: [3]u8 = [0, 1, 2]
-    let got = issue171_shift(&mut buf[0] as *mut u8)
+    let got = issue171_shift(&raw mut buf[0] as *mut u8)
     print(f"got {got}")
 EOF
 

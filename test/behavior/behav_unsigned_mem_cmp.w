@@ -22,8 +22,8 @@ fn test_u32_deref_cmp:
     var buf: [2]u32
     (buf[0] = opaque_u32(97))
     (buf[1] = opaque_u32(2147483648))
-    let p = (&mut buf[0] as *mut u32)
-    let q = (&mut buf[1] as *mut u32)
+    let p = (&raw mut buf[0] as *mut u32)
+    let q = (&raw mut buf[1] as *mut u32)
     assert((unsafe: *p) < (unsafe: *q))
     assert((unsafe: *q) > (unsafe: *p))
     assert((unsafe: *p) <= (unsafe: *q))

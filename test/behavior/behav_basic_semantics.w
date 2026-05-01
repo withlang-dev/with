@@ -14,7 +14,7 @@ fn test_global_variables:
 
 fn test_pointer_deref:
     var x: i32 = 3
-    let y = &mut x
+    let y = &raw mut x
     unsafe: *y = *y + 1
     assert(x == 4)
 
@@ -150,7 +150,7 @@ fn inc(x: *mut i32):
 
 fn test_pass_by_ptr:
     var val = 41
-    inc(&mut val)
+    inc(&raw mut val)
     assert(val == 42)
 
 fn test_multiple_returns:

@@ -29,7 +29,7 @@ fn test_auto_deref_read:
 
 fn test_auto_deref_write:
     var pt = Point { x: 0, y: 5 }
-    let p = &mut pt as *mut Point
+    let p = &raw mut pt as *mut Point
     unsafe: write_point_field(p, 42)
     assert(pt.x == 42)
     assert(pt.y == 5)
@@ -41,7 +41,7 @@ fn test_auto_deref_str_field:
     assert(s == "hello")
 
 fn test_auto_deref_ref:
-    // Also works through &T and &mut T
+    // Also works through &T
     let pt = Point { x: 3, y: 7 }
     let r = &pt
     assert(r.x == 3)

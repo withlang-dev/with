@@ -1,39 +1,40 @@
 //! expect-stdout: ok
 
-// Tests: exclusive-to-exclusive reborrowing (&mut self → helper taking &mut Self)
-
 type State {
     val: i32,
     count: i32,
 }
 
-fn increment(s: &mut State):
-    s.val = s.val + 1
-    s.count = s.count + 1
+fn State.increment(mut self: State):
+    self.val = self.val + 1
+    self.count = self.count + 1
 
-fn State.update(self: &mut State, n: i32):
+fn State.update(mut self: State, n: i32):
     var i = 0
     while i < n:
-        increment(self)
+        self.val = self.val + 1
+        self.count = self.count + 1
         i = i + 1
 
-fn test_reborrow_basic:
+fn test_mutating_receiver_basic:
     var s = State { val: 0, count: 0 }
     s.update(3)
     assert(s.val == 3)
     assert(s.count == 3)
 
-fn double_increment(s: &mut State):
-    increment(s)
-    increment(s)
+fn State.double_increment(mut self: State):
+    self.val = self.val + 1
+    self.count = self.count + 1
+    self.val = self.val + 1
+    self.count = self.count + 1
 
-fn test_reborrow_chained:
+fn test_mutating_receiver_chained:
     var s = State { val: 10, count: 0 }
-    double_increment(&mut s)
+    s.double_increment()
     assert(s.val == 12)
     assert(s.count == 2)
 
 fn main:
-    test_reborrow_basic()
-    test_reborrow_chained()
+    test_mutating_receiver_basic()
+    test_mutating_receiver_chained()
     print("ok")

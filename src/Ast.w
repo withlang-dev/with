@@ -285,14 +285,11 @@ enum UnaryOp: i32:
     UOP_NEGATE = 0
     UOP_NOT = 1
     UOP_REF = 2
-    UOP_MUT_REF = 3
+    UOP_MUT_REF = 3  // dead after P12 lockdown — parser rejects &mut
     UOP_DEREF = 4
     UOP_TRY = 5
     UOP_BIT_NOT = 6
     // docs/mut.md Rev 8 §13.2 — explicit raw-address-of forms.
-    // P1 routes these through the same paths as UOP_REF / UOP_MUT_REF,
-    // producing the same safe-reference type. P2 refines the typing so
-    // they produce *const T / *mut T raw pointers.
     UOP_RAW_REF_CONST = 7
     UOP_RAW_REF_MUT = 8
 

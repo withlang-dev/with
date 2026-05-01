@@ -26,13 +26,13 @@ fn test_unsafe_fn_read:
 
 fn test_unsafe_fn_write:
     var x = 0
-    let p = &mut x as *mut i32
+    let p = &raw mut x as *mut i32
     unsafe: write_ptr(p, 99)
     assert(x == 99)
 
 fn test_unsafe_fn_struct_deref:
     var d = Data { val: 5, flag: false }
-    let p = &mut d as *mut Data
+    let p = &raw mut d as *mut Data
     unsafe: modify_struct(p)
     assert(d.val == 15)
     assert(d.flag == true)

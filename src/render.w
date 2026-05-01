@@ -1076,7 +1076,6 @@ fn unary_op_str(op: i32) -> str:
     if op == UnaryOp.UOP_NEGATE: return "-"
     if op == UnaryOp.UOP_NOT: return "not "
     if op == UnaryOp.UOP_REF: return "&"
-    if op == UnaryOp.UOP_MUT_REF: return "&mut "
     if op == UnaryOp.UOP_RAW_REF_CONST: return "&raw const "
     if op == UnaryOp.UOP_RAW_REF_MUT: return "&raw mut "
     if op == UnaryOp.UOP_DEREF: return "*"

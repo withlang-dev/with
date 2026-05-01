@@ -56,7 +56,7 @@ fn test_fstring_expression:
 
 fn test_fstring_colon_exprs:
     var x = 7
-    let p = &mut x
+    let p = &raw mut x
     assert(f"{unsafe: *p}" == "7")
     assert(f"{if true: 1 else: 2}" == "1")
 

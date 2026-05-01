@@ -6,5 +6,4 @@ type Inner {
 
 fn main:
     var items: Vec[Inner] = Vec.new()
-    let borrowed = &mut items
-    borrowed.push(1)
+    items.push(1)

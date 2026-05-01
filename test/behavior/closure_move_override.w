@@ -1,4 +1,4 @@
-//! expect-stdout: 0
+//! expect-error: closure that mutates captured place cannot escape
 fn apply(f: fn(i32) -> i32, x: i32) -> i32: f(x)
 
 fn main:

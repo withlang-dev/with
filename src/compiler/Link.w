@@ -31,7 +31,7 @@ fn link_stage_str_from_raw_parts(ptr: *const u8, len: i64) -> str:
         return ""
     var out: str = ""
     unsafe:
-        let sp = &mut out as *mut u8
+        let sp = &raw mut out as *mut u8
         *(sp as *mut u64) = ptr as u64
         *((sp + 8u64) as *mut i64) = len
     out

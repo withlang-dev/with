@@ -16,11 +16,8 @@ extern fn with_eprint(s: str) -> void
 extern fn with_fs_file_exists(path: str) -> i32
 extern fn with_str_eq(a: str, b: str) -> i32
 
-// docs/mut.md Rev 8 — bridge sentinel.
-// 0 during P1..P11: parser still accepts `&mut T`, `&mut expr`, and `&mut self`;
-//   sema treats `mut self: Self` as an alias for `&mut self`.
-// 1 at P12 lockdown: legacy `&mut` surface rejected as a syntax error.
-const STRICT_NO_MUT_REF: i32 = 0
+// docs/mut.md Rev 8 — P12 lockdown active. `&mut T` is rejected.
+const STRICT_NO_MUT_REF: i32 = 1
 
 fn sema_dirname(path: str) -> str:
     var last_slash = 0 - 1
@@ -1346,7 +1343,7 @@ fn Sema.expr_is_ephemeral_value(self: Sema, node: i32) -> i32:
         return 0
     if kind == NodeKind.NK_UNARY:
         let op = self.ast.get_data0(node)
-        if op == UnaryOp.UOP_REF or op == UnaryOp.UOP_MUT_REF or op == UnaryOp.UOP_RAW_REF_CONST or op == UnaryOp.UOP_RAW_REF_MUT:
+        if op == UnaryOp.UOP_REF or op == UnaryOp.UOP_RAW_REF_CONST or op == UnaryOp.UOP_RAW_REF_MUT:
             return 1
         return self.expr_is_ephemeral_value(self.ast.get_data1(node))
     if kind == NodeKind.NK_SLICE:
@@ -2143,7 +2140,7 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
     let op = self.ast.get_data0(node)
     let operand_node = self.ast.get_data1(node)
     var expected_operand = 0
-    if (op == UnaryOp.UOP_REF or op == UnaryOp.UOP_MUT_REF or op == UnaryOp.UOP_RAW_REF_CONST or op == UnaryOp.UOP_RAW_REF_MUT) and self.has_expected_type != 0 and self.expected_expr_type != 0:
+    if (op == UnaryOp.UOP_REF or op == UnaryOp.UOP_RAW_REF_CONST or op == UnaryOp.UOP_RAW_REF_MUT) and self.has_expected_type != 0 and self.expected_expr_type != 0:
         let expected_ref = self.resolve_alias(self.expected_expr_type)
         let expected_ref_kind = self.get_type_kind(expected_ref)
         if expected_ref_kind == TypeKind.TY_REF or expected_ref_kind == TypeKind.TY_PTR:
@@ -2160,11 +2157,10 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
         return operand as i32
     if op == UnaryOp.UOP_NOT:
         return self.ty_bool as i32
-    if op == UnaryOp.UOP_REF or op == UnaryOp.UOP_MUT_REF or op == UnaryOp.UOP_RAW_REF_CONST or op == UnaryOp.UOP_RAW_REF_MUT:
-        // docs/mut.md Rev 8 §15.1 — at P12 lockdown, reject legacy &mut
-        // surface in source. Until then, the bridge accepts both forms.
-        if STRICT_NO_MUT_REF != 0 and op == UnaryOp.UOP_MUT_REF:
-            self.emit_error("`&mut T` is not part of safe With (§15.1); use mut self / mutating method / scoped `with` access / `&raw mut` for FFI", node)
+    if op == UnaryOp.UOP_MUT_REF:
+        self.emit_error("`&mut` is not part of safe With (§15.1); use `&raw mut` for FFI or mutating receiver methods", node)
+        return 0
+    if op == UnaryOp.UOP_REF or op == UnaryOp.UOP_RAW_REF_CONST or op == UnaryOp.UOP_RAW_REF_MUT:
         // Reject address-of bitpacked fields — they may not be byte-aligned
         if self.ast.kind(operand_node) == NodeKind.NK_FIELD_ACCESS:
             let ref_recv = self.ast.get_data0(operand_node)
@@ -2176,8 +2172,7 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
         // and do not participate in borrow tracking. Forming a raw pointer is
         // safe; dereferencing or writing through it requires unsafe (§13.3).
         // §15.13/15.14 — `&raw mut` requires a mutable place; `&raw const`
-        // requires a place. Warnings during P7..P11; promoted to errors at
-        // P12 lockdown.
+        // requires a place.
         let is_raw = op == UnaryOp.UOP_RAW_REF_CONST or op == UnaryOp.UOP_RAW_REF_MUT
         if is_raw:
             let raw_packed = self.classify_place(operand_node)
@@ -2185,19 +2180,15 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
             let raw_mut_state = unpack_place_mut(raw_packed)
             if raw_kind == PlaceKind.PK_NotPlace:
                 if op == UnaryOp.UOP_RAW_REF_MUT:
-                    self.emit_warning("`&raw mut` requires a place; this expression is not a place (§15.13)", node)
+                    self.emit_error("`&raw mut` requires a place; this expression is not a place (§15.13)", node)
                 else:
                     self.emit_warning("`&raw const` requires a place; this expression is not a place", node)
             else if op == UnaryOp.UOP_RAW_REF_MUT and raw_mut_state == PlaceMut.PM_ReadOnly:
-                self.emit_warning("`&raw mut` requires a mutable place; this place is read-only (e.g., dereferenced &T or *const T) (§15.14)", node)
+                self.emit_error("`&raw mut` requires a mutable place; this place is read-only (e.g., dereferenced &T or *const T) (§15.14)", node)
             let raw_mut = if op == UnaryOp.UOP_RAW_REF_MUT: 1 else: 0
             return self.add_type(TypeKind.TY_PTR, operand as i32, raw_mut, 0) as i32
-        let is_exclusive = op == UnaryOp.UOP_MUT_REF
-        if not is_exclusive:
-            self.check_borrow_create(operand_node, BorrowKind.SHARED, node)
-            return self.add_type(TypeKind.TY_REF, operand as i32, 0, 0) as i32
-        self.check_borrow_create(operand_node, BorrowKind.EXCLUSIVE, node)
-        return self.add_type(TypeKind.TY_REF, operand as i32, 1, 0) as i32
+        self.check_borrow_create(operand_node, BorrowKind.SHARED, node)
+        return self.add_type(TypeKind.TY_REF, operand as i32, 0, 0) as i32
     if op == UnaryOp.UOP_DEREF:
         let resolved = self.resolve_alias(operand)
         let tk = self.get_type_kind(resolved)
@@ -2381,7 +2372,7 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
     // If this let binds a borrow, tie the newest active borrow to this binding.
     if self.ast.kind(value) == NodeKind.NK_UNARY:
         let uop = self.ast.get_data0(value)
-        if uop == UnaryOp.UOP_REF or uop == UnaryOp.UOP_MUT_REF or uop == UnaryOp.UOP_RAW_REF_CONST or uop == UnaryOp.UOP_RAW_REF_MUT:
+        if uop == UnaryOp.UOP_REF or uop == UnaryOp.UOP_RAW_REF_CONST or uop == UnaryOp.UOP_RAW_REF_MUT:
             let blen = self.borrow_refs.len() as i32
             if blen > 0:
                 self.borrow_refs.set_i32((blen - 1) as i64, name)
@@ -2515,18 +2506,18 @@ fn Sema.check_assign(self: Sema, node: i32) -> i32:
                 let idx_base = self.ast.get_data0(target)
                 let base_packed = self.classify_place(idx_base)
                 if unpack_place_kind(base_packed) != PlaceKind.PK_NotPlace:
-                    self.emit_warning("type does not support index assignment (no IndexPlace impl) (§15.11)", node)
+                    self.emit_error("type does not support index assignment (no IndexPlace impl) (§15.11)", node)
                 else:
                     self.emit_warning("cannot assign to a non-place expression", node)
             else:
                 self.emit_warning("cannot assign to a non-place expression", node)
         else if lhs_mut_state == PlaceMut.PM_ReadOnly:
-            self.emit_warning("cannot assign through a read-only place (e.g., dereferenced &T or *const T) (§15.10)", node)
+            self.emit_error("cannot assign through a read-only place (e.g., dereferenced &T or *const T) (§15.10)", node)
         // docs/mut.md Rev 8 §15.17 — mutation through a view-bound
         // for-loop variable (e.g., `for u in xs.iter(): u.age += 1`).
         let assign_root = self.place_root_sym(target)
         if assign_root != 0 and self.scope_is_view_bound(assign_root) != 0:
-            self.emit_warning("cannot mutate through read-only view yielded by iterator (§15.17)", node)
+            self.emit_error("cannot mutate through read-only view yielded by iterator (§15.17)", node)
 
     // Check type compatibility
     if target_type != 0 and value_type != 0:
@@ -2744,7 +2735,7 @@ fn Sema.check_field_access(self: Sema, node: i32) -> i32:
             if mutating:
                 let owner_name = self.pool_resolve(static_type_sym)
                 let method_name = self.pool_resolve(field)
-                self.emit_warning("cannot reference mutating method `" ++ owner_name ++ "." ++ method_name ++ "` as a first-class function value (§15.4); wrap in a closure: `(x, ...) => x." ++ method_name ++ "(...)`", node)
+                self.emit_error("cannot reference mutating method `" ++ owner_name ++ "." ++ method_name ++ "` as a first-class function value (§15.4); wrap in a closure: `(x, ...) => x." ++ method_name ++ "(...)`", node)
 
     if obj_type == 0:
         return 0
@@ -3837,7 +3828,7 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
                 if not self.is_copy(cap_ty as TypeId):
                     self.scope_set_state(cap_sym, VarState.MOVED)
                 if emitted_escape_warn == 0 and self.expr_mutates_place(body, cap_sym) != 0:
-                    self.emit_warning("closure that mutates captured place cannot escape its defining scope (§15.9)", node)
+                    self.emit_error("closure that mutates captured place cannot escape its defining scope (§15.9)", node)
                     emitted_escape_warn = 1
             ci = ci + 1
 
@@ -6022,7 +6013,7 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
             // for-loop variable (e.g., `for u in xs.iter(): u.push(1)`).
             let mc_root = self.place_root_sym(expr)
             if mc_root != 0 and self.scope_is_view_bound(mc_root) != 0:
-                self.emit_warning("cannot mutate through read-only view yielded by iterator (§15.17)", node)
+                self.emit_error("cannot mutate through read-only view yielded by iterator (§15.17)", node)
         // docs/mut.md Rev 8 §5.1 — user-defined methods declared with
         // `mut self: Self` require a mutable place receiver. Warnings during
         // P7..P11; promoted to errors at P12 lockdown. Builtins are already
@@ -6035,16 +6026,16 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
             // place (§2.3) regardless of the binding's mutability.
             let recv_via_ro_ref = self.place_base_is_read_only_ref(expr)
             if recv_kind == PlaceKind.PK_NotPlace:
-                self.emit_warning("mutating method requires a place receiver (§15.3)", node)
+                self.emit_error("mutating method requires a place receiver (§15.3)", node)
             else if recv_mut_state == PlaceMut.PM_ReadOnly or recv_via_ro_ref != 0:
-                self.emit_warning("cannot call mutating method through a read-only place (§15.2)", node)
+                self.emit_error("cannot call mutating method through a read-only place (§15.2)", node)
             else:
                 // §15.6 — only check view-liveness when the receiver actually
                 // is a mutable place we'd be mutating.
                 self.check_mutation_against_views(expr, node)
             let ms_root = self.place_root_sym(expr)
             if ms_root != 0 and self.scope_is_view_bound(ms_root) != 0:
-                self.emit_warning("cannot mutate through read-only view yielded by iterator (§15.17)", node)
+                self.emit_error("cannot mutate through read-only view yielded by iterator (§15.17)", node)
         else if type_name_sym != 0 and self.builtin_method_requires_mutable_receiver(type_name_sym, field) != 0:
             // §15.6 — view-liveness for builtin mutating methods (push, pop,
             // insert, etc.). The earlier hardcoded path already rejected
@@ -6065,7 +6056,7 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
                 while ai < arg_count:
                     let arg_node = self.ast.get_extra(extra_start + ai)
                     if self.expr_indexed_into(arg_node) == recv_idx_sym:
-                        self.emit_warning("conflicting accesses through indexed base in the same call (§15.5)", node)
+                        self.emit_error("conflicting accesses through indexed base in the same call (§15.5)", node)
                         break
                     ai = ai + 1
 
@@ -7168,10 +7159,10 @@ fn Sema.expr_mutates_place(self: Sema, node: i32, sym: i32) -> i32:
             return 1
         // Also check value side for nested mutations
         return self.expr_mutates_place(self.ast.get_data1(node), sym)
-    // &mut / &raw mut borrow of sym
+    // &raw mut borrow of sym
     if kind == NodeKind.NK_UNARY:
         let op = self.ast.get_data0(node)
-        if op == UnaryOp.UOP_MUT_REF or op == UnaryOp.UOP_RAW_REF_MUT:
+        if op == UnaryOp.UOP_RAW_REF_MUT:
             let operand = self.ast.get_data1(node)
             if self.place_root_sym(operand) == sym:
                 return 1
@@ -7613,8 +7604,8 @@ fn Sema.collect_capture_fields(self: Sema, node: i32, sym: i32):
     if kind == NodeKind.NK_UNARY:
         let op = self.ast.get_data0(node)
         let operand = self.ast.get_data1(node)
-        if op == UnaryOp.UOP_MUT_REF or op == UnaryOp.UOP_RAW_REF_MUT:
-            // &mut sym.field / &raw mut sym.field — mark field as exclusive
+        if op == UnaryOp.UOP_RAW_REF_MUT:
+            // &raw mut sym.field — mark field as exclusive
             if self.ast.kind(operand) == NodeKind.NK_FIELD_ACCESS:
                 let fbase = self.ast.get_data0(operand)
                 if self.ast.kind(fbase) == NodeKind.NK_IDENT and self.ast.get_data0(fbase) == sym:
@@ -7904,7 +7895,7 @@ fn Sema.check_closure_capture_conflicts(self: Sema, extra_start: i32, arg_count:
                         continue
                     if self.arg_retains_access_to(sib_node, cap_sym) != 0:
                         let cap_name = self.pool_resolve(cap_sym)
-                        self.emit_warning("argument retains access to `" ++ cap_name ++ "` which is mutably captured by a closure in the same call (§15.7)", node)
+                        self.emit_error("argument retains access to `" ++ cap_name ++ "` which is mutably captured by a closure in the same call (§15.7)", node)
                     si = si + 1
             bi = bi + 1
         ci = ci + 1
@@ -7924,7 +7915,7 @@ fn Sema.arg_retains_access_to(self: Sema, arg_node: i32, sym: i32) -> i32:
     // Reference to the symbol (&sym or &sym.field)
     if kind == NodeKind.NK_UNARY:
         let op = self.ast.get_data0(arg_node)
-        if op == UnaryOp.UOP_REF or op == UnaryOp.UOP_MUT_REF or op == UnaryOp.UOP_RAW_REF_CONST or op == UnaryOp.UOP_RAW_REF_MUT:
+        if op == UnaryOp.UOP_REF or op == UnaryOp.UOP_RAW_REF_CONST or op == UnaryOp.UOP_RAW_REF_MUT:
             let operand = self.ast.get_data1(arg_node)
             if self.place_root_sym(operand) == sym:
                 return 1

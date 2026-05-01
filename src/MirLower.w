@@ -1986,12 +1986,12 @@ fn MirBuilder.lower_fn_address(self: MirBuilder, expr: i32, type_id: i32) -> i32
     0 - 1
 
 fn MirBuilder.lower_un_op(self: MirBuilder, op: i32, expr: i32, node: i32) -> i32:
-    if op == UnaryOp.UOP_REF or op == UnaryOp.UOP_MUT_REF or op == UnaryOp.UOP_RAW_REF_CONST or op == UnaryOp.UOP_RAW_REF_MUT:
+    if op == UnaryOp.UOP_REF or op == UnaryOp.UOP_RAW_REF_CONST or op == UnaryOp.UOP_RAW_REF_MUT:
         let fn_addr = self.lower_fn_address(expr, self.expr_type(node))
         if fn_addr >= 0:
             return fn_addr
         let place = self.lower_expr_place(expr)
-        let is_exclusive = op == UnaryOp.UOP_MUT_REF or op == UnaryOp.UOP_RAW_REF_MUT
+        let is_exclusive = op == UnaryOp.UOP_RAW_REF_MUT
         let rv = self.body.new_rvalue(RvalueKind.RK_REF, if is_exclusive: BorrowKind.EXCLUSIVE else: BorrowKind.SHARED, place, 0)
         let ty = self.expr_type(node)
         let temp = self.new_temp(ty)

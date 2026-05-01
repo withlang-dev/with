@@ -86,7 +86,7 @@ fn void_fn(x: *mut i32):
 
 fn test_void_function:
     var val = 0
-    void_fn(&mut val)
+    void_fn(&raw mut val)
     assert(val == 42)
 
 fn gcd(a: i32, b: i32) -> i32:
