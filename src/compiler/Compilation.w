@@ -388,7 +388,7 @@ fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
     sema.decl_source_paths = zcu.decl_source_paths
     sema.decl_source_file_ids = zcu.decl_source_file_ids
     sema.decl_is_c_import = zcu.decl_is_c_import
-    zcu.seed_sema_module_graph_frontend(&mut sema)
+    sema.init_module_graph(&zcu.last_resolved)
     if self.config.no_std:
         sema.no_std = 1
     if self.config.alloc_mode:

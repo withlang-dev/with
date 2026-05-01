@@ -149,33 +149,33 @@ fn frontend_dump_type_decl_names(stage: str, pool: AstPool, intern: InternPool):
         let msg = f"[type-names] {stage} decl={di} node={decl as i32} kind={kind_name} name_sym={name_sym} name={name}"
         with_eprint(msg)
 
-fn Zcu.seed_sema_module_graph_frontend(self: Zcu, sema: &mut Sema):
-    sema.module_paths = Vec.new()
-    sema.module_import_starts = Vec.new()
-    sema.module_import_counts = Vec.new()
-    sema.module_import_targets = Vec.new()
-    sema.module_index_by_path = HashMap.new()
-    sema.global_visible_module_paths = HashMap.new()
-    sema.module_visibility_cache = HashMap.new()
+fn Sema.init_module_graph(mut self: Sema, resolved: &ResolveResult):
+    self.module_paths = Vec.new()
+    self.module_import_starts = Vec.new()
+    self.module_import_counts = Vec.new()
+    self.module_import_targets = Vec.new()
+    self.module_index_by_path = HashMap.new()
+    self.global_visible_module_paths = HashMap.new()
+    self.module_visibility_cache = HashMap.new()
 
-    for mi in 0..self.last_resolved.modules.len() as i32:
-        let mod = self.last_resolved.modules.get(mi as i64)
+    for mi in 0..resolved.modules.len() as i32:
+        let mod = resolved.modules.get(mi as i64)
         let owned_path = frontend_owned_text(mod.path)
-        sema.module_paths.push(owned_path)
-        sema.module_import_starts.push(sema.module_import_targets.len() as i32)
+        self.module_paths.push(owned_path)
+        self.module_import_starts.push(self.module_import_targets.len() as i32)
         var visible_count = 0
         for ii in 0..mod.import_count:
-            let imp = self.last_resolved.imports.get((mod.import_start + ii) as i64)
+            let imp = resolved.imports.get((mod.import_start + ii) as i64)
             if imp.target_module >= 0:
-                sema.module_import_targets.push(imp.target_module)
+                self.module_import_targets.push(imp.target_module)
                 visible_count = visible_count + 1
-        sema.module_import_counts.push(visible_count)
-        sema.module_index_by_path.insert(owned_path, mod.module_id)
-    if self.last_resolved.modules.len() > 0:
+        self.module_import_counts.push(visible_count)
+        self.module_index_by_path.insert(owned_path, mod.module_id)
+    if resolved.modules.len() > 0:
         let global_frontier: Vec[i32] = Vec.new()
-        let root = self.last_resolved.modules.get(0)
+        let root = resolved.modules.get(0)
         for ii in 0..root.import_count:
-            let imp = self.last_resolved.imports.get((root.import_start + ii) as i64)
+            let imp = resolved.imports.get((root.import_start + ii) as i64)
             if imp.target_module < 0:
                 continue
             if imp.path_text == "std.prelude" or imp.path_text == "std.prelude_core":
@@ -188,10 +188,10 @@ fn Zcu.seed_sema_module_graph_frontend(self: Zcu, sema: &mut Sema):
             if seen_global.contains(mid):
                 continue
             seen_global.insert(mid, 1)
-            let mod = self.last_resolved.modules.get(mid as i64)
-            sema.global_visible_module_paths.insert(frontend_owned_text(mod.path), 1)
+            let mod = resolved.modules.get(mid as i64)
+            self.global_visible_module_paths.insert(frontend_owned_text(mod.path), 1)
             for ii in 0..mod.import_count:
-                let imp = self.last_resolved.imports.get((mod.import_start + ii) as i64)
+                let imp = resolved.imports.get((mod.import_start + ii) as i64)
                 if imp.target_module >= 0:
                     global_frontier.push(imp.target_module)
 
@@ -941,13 +941,13 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
         pre_sema.decl_source_paths = self.decl_source_paths
         pre_sema.decl_source_file_ids = self.decl_source_file_ids
         pre_sema.decl_is_c_import = self.decl_is_c_import
-        self.seed_sema_module_graph_frontend(&mut pre_sema)
+        pre_sema.init_module_graph(&self.last_resolved)
         pre_sema.prepare_for_comptime_transform()
         // The comptime transform must run against the same intern pool that
         // pre-sema prepared, otherwise cloned AST symbol ids may be resolved
         // against a stale symbol table in the transform pass.
         self.pool = pre_sema.pool
-        pool = comptime_transform_module(pool, &mut pre_sema, self.pool)
+        pool = pre_sema.comptime_transform_module(pool, self.pool)
         self.diagnostics = pre_sema.diags
         self.decl_source_paths = pre_sema.decl_source_paths
         self.decl_source_file_ids = pre_sema.decl_source_file_ids
@@ -973,7 +973,7 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
     sema.decl_source_paths = self.decl_source_paths
     sema.decl_source_file_ids = self.decl_source_file_ids
     sema.decl_is_c_import = self.decl_is_c_import
-    self.seed_sema_module_graph_frontend(&mut sema)
+    sema.init_module_graph(&self.last_resolved)
     sema.check_module()
     if do_profile:
         let sema_ns = with_clock_nanos() - t_sema

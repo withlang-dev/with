@@ -7,10 +7,10 @@ use Sema
 use SemaCheck
 use Span
 
-fn ct_emit_error(sema: &mut Sema, ast: AstPool, node: i32, msg: str):
+fn Sema.ct_emit_error(mut self: Sema, ast: AstPool, node: i32, msg: str):
     let start = ast.get_start(node)
     let end = ast.get_end(node)
-    sema.diags.emit(Diagnostic.err(msg, Span { file: sema.local_file_id, start, end }))
+    self.diags.emit(Diagnostic.err(msg, Span { file: self.local_file_id, start, end }))
 
 fn astpool_clone_deep(src: AstPool) -> AstPool:
     var out = AstPool.new()
@@ -178,20 +178,20 @@ fn AstPool.ct_empty_block(self: AstPool, node: i32) -> i32:
 fn ct_fresh_sym(intern: InternPool, prefix: str, seed: i32) -> i32:
     intern.intern(prefix ++ f"{seed}" ++ "_" ++ f"{intern.symbol_count() + 1}")
 
-fn ct_build_type_expr(pool: AstPool, intern: InternPool, sema: &Sema, type_id: i32, node: i32) -> i32:
-    let resolved = sema.resolve_alias(type_id)
+fn Sema.ct_build_type_expr(self: Sema, pool: AstPool, intern: InternPool, type_id: i32, node: i32) -> i32:
+    let resolved = self.resolve_alias(type_id)
     let start = pool.get_start(node)
     let end = pool.get_end(node)
-    let tk = sema.get_type_kind(resolved)
+    let tk = self.get_type_kind(resolved)
 
     if tk == TypeKind.TY_GENERIC_INST:
-        let base_sym = intern.intern(sema.pool_resolve(sema.get_type_d0(resolved)))
-        let extra_start = sema.get_type_d1(resolved)
-        let arg_count = sema.get_type_d2(resolved)
+        let base_sym = intern.intern(self.pool_resolve(self.get_type_d0(resolved)))
+        let extra_start = self.get_type_d1(resolved)
+        let arg_count = self.get_type_d2(resolved)
         let arg_nodes: Vec[i32] = Vec.new()
         for ai in 0..arg_count:
-            let arg_tid = sema.type_extra.get((extra_start + ai) as i64)
-            let arg_node = ct_build_type_expr(pool, intern, sema, arg_tid, node)
+            let arg_tid = self.type_extra.get((extra_start + ai) as i64)
+            let arg_node = self.ct_build_type_expr(pool, intern, arg_tid, node)
             if arg_node == 0:
                 return 0
             arg_nodes.push(arg_node)
@@ -201,24 +201,24 @@ fn ct_build_type_expr(pool: AstPool, intern: InternPool, sema: &Sema, type_id: i
         return pool.add_node(NodeKind.NK_TYPE_GENERIC, start, end, base_sym, new_extra, arg_count) as i32
 
     if tk == TypeKind.TY_ARRAY:
-        let elem_node = ct_build_type_expr(pool, intern, sema, sema.get_type_d0(resolved), node)
+        let elem_node = self.ct_build_type_expr(pool, intern, self.get_type_d0(resolved), node)
         if elem_node == 0:
             return 0
-        return pool.add_node(NodeKind.NK_TYPE_ARRAY, start, end, elem_node, sema.get_type_d1(resolved), 0) as i32
+        return pool.add_node(NodeKind.NK_TYPE_ARRAY, start, end, elem_node, self.get_type_d1(resolved), 0) as i32
 
     if tk == TypeKind.TY_SLICE:
-        let elem_node = ct_build_type_expr(pool, intern, sema, sema.get_type_d0(resolved), node)
+        let elem_node = self.ct_build_type_expr(pool, intern, self.get_type_d0(resolved), node)
         if elem_node == 0:
             return 0
         return pool.add_node(NodeKind.NK_TYPE_SLICE, start, end, elem_node, 0, 0) as i32
 
     if tk == TypeKind.TY_TUPLE:
-        let extra_start = sema.get_type_d0(resolved)
-        let elem_count = sema.get_type_d1(resolved)
+        let extra_start = self.get_type_d0(resolved)
+        let elem_count = self.get_type_d1(resolved)
         let elem_nodes: Vec[i32] = Vec.new()
         for ei in 0..elem_count:
-            let elem_tid = sema.type_extra.get((extra_start + ei) as i64)
-            let elem_node = ct_build_type_expr(pool, intern, sema, elem_tid, node)
+            let elem_tid = self.type_extra.get((extra_start + ei) as i64)
+            let elem_node = self.ct_build_type_expr(pool, intern, elem_tid, node)
             if elem_node == 0:
                 return 0
             elem_nodes.push(elem_node)
@@ -228,40 +228,40 @@ fn ct_build_type_expr(pool: AstPool, intern: InternPool, sema: &Sema, type_id: i
         return pool.add_node(NodeKind.NK_TYPE_TUPLE, start, end, new_extra, elem_count, 0) as i32
 
     if tk == TypeKind.TY_PTR:
-        let pointee = ct_build_type_expr(pool, intern, sema, sema.get_type_d0(resolved), node)
+        let pointee = self.ct_build_type_expr(pool, intern, self.get_type_d0(resolved), node)
         if pointee == 0:
             return 0
-        return pool.add_node(NodeKind.NK_TYPE_PTR, start, end, pointee, sema.get_type_d1(resolved), sema.get_type_d2(resolved)) as i32
+        return pool.add_node(NodeKind.NK_TYPE_PTR, start, end, pointee, self.get_type_d1(resolved), self.get_type_d2(resolved)) as i32
 
     if tk == TypeKind.TY_REF:
-        let pointee = ct_build_type_expr(pool, intern, sema, sema.get_type_d0(resolved), node)
+        let pointee = self.ct_build_type_expr(pool, intern, self.get_type_d0(resolved), node)
         if pointee == 0:
             return 0
-        return pool.add_node(NodeKind.NK_TYPE_REF, start, end, pointee, sema.get_type_d1(resolved), 0) as i32
+        return pool.add_node(NodeKind.NK_TYPE_REF, start, end, pointee, self.get_type_d1(resolved), 0) as i32
 
     if tk == TypeKind.TY_FN:
-        let param_start = sema.get_type_d0(resolved)
-        let param_count = sema.get_type_d1(resolved)
+        let param_start = self.get_type_d0(resolved)
+        let param_count = self.get_type_d1(resolved)
         let param_nodes: Vec[i32] = Vec.new()
         for pi in 0..param_count:
-            let param_tid = sema.type_extra.get((param_start + pi) as i64)
-            let param_node = ct_build_type_expr(pool, intern, sema, param_tid, node)
+            let param_tid = self.type_extra.get((param_start + pi) as i64)
+            let param_node = self.ct_build_type_expr(pool, intern, param_tid, node)
             if param_node == 0:
                 return 0
             param_nodes.push(param_node)
         let new_extra = pool.extra_len()
         for pi in 0..param_nodes.len() as i32:
             pool.add_extra(param_nodes.get(pi as i64))
-        let ret_node = ct_build_type_expr(pool, intern, sema, sema.get_type_d2(resolved), node)
+        let ret_node = self.ct_build_type_expr(pool, intern, self.get_type_d2(resolved), node)
         if ret_node == 0:
             return 0
         return pool.add_node(NodeKind.NK_TYPE_FN, start, end, new_extra, param_count, ret_node) as i32
 
     if tk == TypeKind.TY_TRAIT_OBJ:
-        let trait_sym = intern.intern(sema.pool_resolve(sema.get_type_d0(resolved)))
+        let trait_sym = intern.intern(self.pool_resolve(self.get_type_d0(resolved)))
         return pool.add_node(NodeKind.NK_TYPE_TRAIT_OBJ, start, end, trait_sym, 0, 0) as i32
 
-    let type_sym = intern.intern(sema.type_name(type_id))
+    let type_sym = intern.intern(self.type_name(type_id))
     pool.add_node(NodeKind.NK_TYPE_NAMED, start, end, type_sym, 0, 0) as i32
 
 fn AstPool.ct_build_call(self: AstPool, node: i32, callee: i32, args: Vec[i32]) -> i32:
@@ -270,8 +270,8 @@ fn AstPool.ct_build_call(self: AstPool, node: i32, callee: i32, args: Vec[i32]) 
         self.add_extra(args.get(ai as i64))
     self.add_node(NodeKind.NK_CALL, self.get_start(node), self.get_end(node), callee, extra_start, args.len() as i32) as i32
 
-fn ct_build_collection_ctor(pool: AstPool, intern: InternPool, sema: &Sema, type_id: i32, node: i32) -> i32:
-    let type_node = ct_build_type_expr(pool, intern, sema, type_id, node)
+fn Sema.ct_build_collection_ctor(self: Sema, pool: AstPool, intern: InternPool, type_id: i32, node: i32) -> i32:
+    let type_node = self.ct_build_type_expr(pool, intern, type_id, node)
     if type_node == 0:
         return 0
     let new_sym = intern.intern("new")
@@ -279,8 +279,8 @@ fn ct_build_collection_ctor(pool: AstPool, intern: InternPool, sema: &Sema, type
     let no_args: Vec[i32] = Vec.new()
     pool.ct_build_call(node, callee as i32, no_args)
 
-fn ct_build_typed_binding(pool: AstPool, intern: InternPool, sema: &Sema, name_sym: i32, value: i32, type_id: i32, node: i32, is_mut: i32) -> i32:
-    let type_node = ct_build_type_expr(pool, intern, sema, type_id, node)
+fn Sema.ct_build_typed_binding(self: Sema, pool: AstPool, intern: InternPool, name_sym: i32, value: i32, type_id: i32, node: i32, is_mut: i32) -> i32:
+    let type_node = self.ct_build_type_expr(pool, intern, type_id, node)
     if type_node == 0:
         return 0
     let type_extra = pool.extra_len()
@@ -288,20 +288,20 @@ fn ct_build_typed_binding(pool: AstPool, intern: InternPool, sema: &Sema, name_s
     let flags = (if is_mut != 0: 1 else: 0) + (type_extra + 1) * 2
     pool.add_node(NodeKind.NK_LET_BINDING, pool.get_start(node), pool.get_end(node), name_sym, value, flags) as i32
 
-fn ct_build_vec_value_tree(pool: AstPool, intern: InternPool, sema: &Sema, value: ComptimeValue, node: i32, extras: Vec[ComptimeValue]) -> i32:
+fn Sema.ct_build_vec_value_tree(self: Sema, pool: AstPool, intern: InternPool, value: ComptimeValue, node: i32, extras: Vec[ComptimeValue]) -> i32:
     let tmp_sym = ct_fresh_sym(intern, "__ct_vec_", node)
-    let ctor = ct_build_collection_ctor(pool, intern, sema, value.type_id, node)
+    let ctor = self.ct_build_collection_ctor(pool, intern, value.type_id, node)
     if ctor == 0:
         return 0
     let stmts: Vec[i32] = Vec.new()
-    let tmp_binding = ct_build_typed_binding(pool, intern, sema, tmp_sym, ctor, value.type_id, node, 1)
+    let tmp_binding = self.ct_build_typed_binding(pool, intern, tmp_sym, ctor, value.type_id, node, 1)
     if tmp_binding == 0:
         return 0
     stmts.push(tmp_binding)
     let push_sym = intern.intern("push")
     for i in 0..value.extra_count:
         let elem = extras.get((value.extra_start + i) as i64)
-        let elem_node = ct_build_value_tree(pool, intern, sema, elem, node, extras)
+        let elem_node = self.ct_build_value_tree(pool, intern, elem, node, extras)
         if elem_node == 0:
             return 0
         let recv_ident = pool.add_node(NodeKind.NK_IDENT, pool.get_start(node), pool.get_end(node), tmp_sym, 0, 0)
@@ -315,21 +315,21 @@ fn ct_build_vec_value_tree(pool: AstPool, intern: InternPool, sema: &Sema, value
     let tail = pool.add_node(NodeKind.NK_IDENT, pool.get_start(node), pool.get_end(node), tmp_sym, 0, 0)
     pool.add_node(NodeKind.NK_BLOCK, pool.get_start(node), pool.get_end(node), stmt_extra, stmts.len() as i32, tail as i32) as i32
 
-fn ct_build_map_value_tree(pool: AstPool, intern: InternPool, sema: &Sema, value: ComptimeValue, node: i32, extras: Vec[ComptimeValue]) -> i32:
+fn Sema.ct_build_map_value_tree(self: Sema, pool: AstPool, intern: InternPool, value: ComptimeValue, node: i32, extras: Vec[ComptimeValue]) -> i32:
     let tmp_sym = ct_fresh_sym(intern, "__ct_map_", node)
-    let ctor = ct_build_collection_ctor(pool, intern, sema, value.type_id, node)
+    let ctor = self.ct_build_collection_ctor(pool, intern, value.type_id, node)
     if ctor == 0:
         return 0
     let stmts: Vec[i32] = Vec.new()
-    let tmp_binding = ct_build_typed_binding(pool, intern, sema, tmp_sym, ctor, value.type_id, node, 1)
+    let tmp_binding = self.ct_build_typed_binding(pool, intern, tmp_sym, ctor, value.type_id, node, 1)
     if tmp_binding == 0:
         return 0
     stmts.push(tmp_binding)
     let insert_sym = intern.intern("insert")
     for i in 0..value.extra_count:
         let base = value.extra_start + i * 2
-        let key_node = ct_build_value_tree(pool, intern, sema, extras.get(base as i64), node, extras)
-        let item_node = ct_build_value_tree(pool, intern, sema, extras.get((base + 1) as i64), node, extras)
+        let key_node = self.ct_build_value_tree(pool, intern, extras.get(base as i64), node, extras)
+        let item_node = self.ct_build_value_tree(pool, intern, extras.get((base + 1) as i64), node, extras)
         if key_node == 0 or item_node == 0:
             return 0
         let recv_ident = pool.add_node(NodeKind.NK_IDENT, pool.get_start(node), pool.get_end(node), tmp_sym, 0, 0)
@@ -344,7 +344,7 @@ fn ct_build_map_value_tree(pool: AstPool, intern: InternPool, sema: &Sema, value
     let tail = pool.add_node(NodeKind.NK_IDENT, pool.get_start(node), pool.get_end(node), tmp_sym, 0, 0)
     pool.add_node(NodeKind.NK_BLOCK, pool.get_start(node), pool.get_end(node), stmt_extra, stmts.len() as i32, tail as i32) as i32
 
-fn ct_build_value_tree(pool: AstPool, intern: InternPool, sema: &Sema, value: ComptimeValue, node: i32, extras: Vec[ComptimeValue]) -> i32:
+fn Sema.ct_build_value_tree(self: Sema, pool: AstPool, intern: InternPool, value: ComptimeValue, node: i32, extras: Vec[ComptimeValue]) -> i32:
     if value.kind == ComptimeValueKind.CV_INT:
         return pool.add_node(
             NodeKind.NK_INT_LIT,
@@ -372,7 +372,7 @@ fn ct_build_value_tree(pool: AstPool, intern: InternPool, sema: &Sema, value: Co
         let elem_nodes: Vec[i32] = Vec.new()
         for i in 0..value.extra_count:
             let elem = extras.get((value.extra_start + i) as i64)
-            let elem_node = ct_build_value_tree(pool, intern, sema, elem, node, extras)
+            let elem_node = self.ct_build_value_tree(pool, intern, elem, node, extras)
             if elem_node == 0:
                 return 0
             elem_nodes.push(elem_node)
@@ -400,18 +400,18 @@ fn ct_build_value_tree(pool: AstPool, intern: InternPool, sema: &Sema, value: Co
         )
         return pool.add_node(NodeKind.NK_RANGE, pool.get_start(node), pool.get_end(node), start_node as i32, end_node as i32, value.extra_start) as i32
     if value.kind == ComptimeValueKind.CV_STRUCT:
-        let resolved = sema.resolve_alias(value.type_id)
-        if sema.get_type_kind(resolved) != TypeKind.TY_STRUCT:
+        let resolved = self.resolve_alias(value.type_id)
+        if self.get_type_kind(resolved) != TypeKind.TY_STRUCT:
             return 0
-        let name_sym = intern.intern(sema.pool_resolve(sema.get_type_d0(resolved)))
-        let te_start = sema.get_type_d1(resolved)
-        let field_count = sema.get_type_d2(resolved)
+        let name_sym = intern.intern(self.pool_resolve(self.get_type_d0(resolved)))
+        let te_start = self.get_type_d1(resolved)
+        let field_count = self.get_type_d2(resolved)
         let field_syms: Vec[i32] = Vec.new()
         let field_nodes: Vec[i32] = Vec.new()
         for fi in 0..field_count:
-            let field_sym = intern.intern(sema.pool_resolve(sema.type_extra.get((te_start + fi * 3) as i64)))
+            let field_sym = intern.intern(self.pool_resolve(self.type_extra.get((te_start + fi * 3) as i64)))
             let field_value = extras.get((value.extra_start + fi) as i64)
-            let field_node = ct_build_value_tree(pool, intern, sema, field_value, node, extras)
+            let field_node = self.ct_build_value_tree(pool, intern, field_value, node, extras)
             if field_node == 0:
                 return 0
             field_syms.push(field_sym)
@@ -422,22 +422,22 @@ fn ct_build_value_tree(pool: AstPool, intern: InternPool, sema: &Sema, value: Co
             pool.add_extra(field_nodes.get(fi as i64))
         return pool.add_node(NodeKind.NK_STRUCT_LIT, pool.get_start(node), pool.get_end(node), name_sym, struct_extra, field_count) as i32
     if value.kind == ComptimeValueKind.CV_VEC:
-        return ct_build_vec_value_tree(pool, intern, sema, value, node, extras)
+        return self.ct_build_vec_value_tree(pool, intern, value, node, extras)
     if value.kind == ComptimeValueKind.CV_MAP:
-        return ct_build_map_value_tree(pool, intern, sema, value, node, extras)
+        return self.ct_build_map_value_tree(pool, intern, value, node, extras)
     0
 
-fn ct_eval_truthy(source_ast: AstPool, sema: &mut Sema, node: i32) -> i32:
-    let value = comptime_force_eval_expr(sema as *mut Sema, source_ast, sema.pool, node)
+fn Sema.ct_eval_truthy(mut self: Sema, source_ast: AstPool, node: i32) -> i32:
+    let value = comptime_force_eval_expr(self as *mut Sema, source_ast, self.pool, node)
     if comptime_value_is_valid(value) == 0:
         return 0 - 1
     let truthy = comptime_value_truthy(value)
     if truthy >= 0:
         return truthy
-    ct_emit_error(sema, source_ast, node, "comptime condition must be bool or integer")
+    self.ct_emit_error(source_ast, node, "comptime condition must be bool or integer")
     0 - 1
 
-fn ct_transform_fstring(source_ast: AstPool, pool: AstPool, sema: &mut Sema, intern: InternPool, node: i32):
+fn Sema.ct_transform_fstring(mut self: Sema, source_ast: AstPool, pool: AstPool, intern: InternPool, node: i32):
     let seg_count = pool.get_data0(node)
     let extra_start = pool.get_data1(node)
     var pos = extra_start
@@ -449,32 +449,32 @@ fn ct_transform_fstring(source_ast: AstPool, pool: AstPool, sema: &mut Sema, int
         let expr_node = pool.get_extra(pos + 1)
         let spec_node = pool.get_extra(pos + 2)
         if expr_node != 0:
-            pool.state.extra.set_i32((pos + 1) as i64, ct_transform_expr(source_ast, pool, sema, intern, expr_node))
+            pool.state.extra.set_i32((pos + 1) as i64, self.ct_transform_expr(source_ast, pool, intern, expr_node))
         if spec_node != 0:
-            pool.state.extra.set_i32((pos + 2) as i64, ct_transform_expr(source_ast, pool, sema, intern, spec_node))
+            pool.state.extra.set_i32((pos + 2) as i64, self.ct_transform_expr(source_ast, pool, intern, spec_node))
         pos = pos + 3
 
-fn ct_transform_match_arm(source_ast: AstPool, pool: AstPool, sema: &mut Sema, intern: InternPool, node: i32):
+fn Sema.ct_transform_match_arm(mut self: Sema, source_ast: AstPool, pool: AstPool, intern: InternPool, node: i32):
     let body = pool.get_data1(node)
     let guard = pool.get_data2(node)
     if body != 0:
-        pool.set_data1(node, ct_transform_expr(source_ast, pool, sema, intern, body))
+        pool.set_data1(node, self.ct_transform_expr(source_ast, pool, intern, body))
     if guard != 0:
-        pool.set_data2(node, ct_transform_expr(source_ast, pool, sema, intern, guard))
+        pool.set_data2(node, self.ct_transform_expr(source_ast, pool, intern, guard))
 
-fn ct_rewrite_comptime_if(source_ast: AstPool, pool: AstPool, sema: &mut Sema, intern: InternPool, wrapper: i32, inner: i32) -> i32:
+fn Sema.ct_rewrite_comptime_if(mut self: Sema, source_ast: AstPool, pool: AstPool, intern: InternPool, wrapper: i32, inner: i32) -> i32:
     let cond = pool.get_data0(inner)
-    let truthy = ct_eval_truthy(source_ast, sema, cond)
+    let truthy = self.ct_eval_truthy(source_ast, cond)
     if truthy < 0:
         return wrapper
     if truthy != 0:
         let then_body = pool.get_data1(inner)
         if then_body != 0:
-            return ct_transform_expr(source_ast, pool, sema, intern, then_body)
+            return self.ct_transform_expr(source_ast, pool, intern, then_body)
         return pool.ct_empty_block(wrapper)
     let else_body = pool.get_data2(inner)
     if else_body != 0:
-        return ct_transform_expr(source_ast, pool, sema, intern, else_body)
+        return self.ct_transform_expr(source_ast, pool, intern, else_body)
     pool.ct_empty_block(wrapper)
 
 fn ct_iter_count(value: ComptimeValue) -> i32:
@@ -487,13 +487,13 @@ fn ct_iter_count(value: ComptimeValue) -> i32:
         return span as i32
     0 - 1
 
-fn ct_iter_item_node(pool: AstPool, intern: InternPool, sema: &Sema, iterable: ComptimeValue, index: i32, node: i32, extras: Vec[ComptimeValue]) -> i32:
+fn Sema.ct_iter_item_node(self: Sema, pool: AstPool, intern: InternPool, iterable: ComptimeValue, index: i32, node: i32, extras: Vec[ComptimeValue]) -> i32:
     if iterable.kind == ComptimeValueKind.CV_RANGE:
         let item = comptime_value_int(0, iterable.data0 + index as i64)
-        return ct_build_value_tree(pool, intern, sema, item, node, extras)
+        return self.ct_build_value_tree(pool, intern, item, node, extras)
     if iterable.kind == ComptimeValueKind.CV_ARRAY or iterable.kind == ComptimeValueKind.CV_TUPLE or iterable.kind == ComptimeValueKind.CV_VEC:
         let item = extras.get((iterable.extra_start + index) as i64)
-        return ct_build_value_tree(pool, intern, sema, item, node, extras)
+        return self.ct_build_value_tree(pool, intern, item, node, extras)
     0
 
 fn AstPool.ct_struct_lit_field_value(self: AstPool, node: i32, field: i32) -> i32:
@@ -507,25 +507,25 @@ fn AstPool.ct_struct_lit_field_value(self: AstPool, node: i32, field: i32) -> i3
             return self.get_extra(base + 1)
     0
 
-fn ct_sync_sema_ast(sema: &mut Sema, pool: AstPool):
-    sema.ast = pool
+fn Sema.ct_sync_sema_ast(mut self: Sema, pool: AstPool):
+    self.ast = pool
 
-fn ct_try_fold_type_call(pool: AstPool, sema: &mut Sema, intern: InternPool, node: i32) -> i32:
+fn Sema.ct_try_fold_type_call(mut self: Sema, pool: AstPool, intern: InternPool, node: i32) -> i32:
     if node == 0 or pool.kind(node) != NodeKind.NK_CALL:
         return node
-    ct_sync_sema_ast(sema, pool)
+    self.ct_sync_sema_ast(pool)
     let callee = pool.get_data0(node)
     if callee == 0 or pool.kind(callee) != NodeKind.NK_FIELD_ACCESS:
         return node
     if intern.resolve(pool.get_data1(callee)) == "new":
         return node
     let recv = pool.get_data0(callee)
-    if sema.static_receiver_type_is_known(recv) == 0:
+    if self.static_receiver_type_is_known(recv) == 0:
         return node
-    let evald = comptime_try_eval_expr_result(sema as *mut Sema, pool, sema.pool, node)
+    let evald = comptime_try_eval_expr_result(self as *mut Sema, pool, self.pool, node)
     if comptime_value_is_valid(evald.value) == 0:
         return node
-    let folded = ct_build_value_tree(pool, intern, sema, evald.value, node, evald.extras)
+    let folded = self.ct_build_value_tree(pool, intern, evald.value, node, evald.extras)
     if folded != 0:
         return folded
     node
@@ -839,41 +839,41 @@ fn AstPool.ct_clone_tree_with_subst(self: AstPool, node: i32, subst_sym: i32, su
 
     self.ct_clone_leaf(node)
 
-fn ct_rewrite_comptime_for(source_ast: AstPool, pool: AstPool, sema: &mut Sema, intern: InternPool, wrapper: i32, inner: i32) -> i32:
+fn Sema.ct_rewrite_comptime_for(mut self: Sema, source_ast: AstPool, pool: AstPool, intern: InternPool, wrapper: i32, inner: i32) -> i32:
     let iterable_node = pool.get_data1(inner)
-    let evald = comptime_force_eval_expr_result(sema as *mut Sema, source_ast, sema.pool, iterable_node)
+    let evald = comptime_force_eval_expr_result(self as *mut Sema, source_ast, self.pool, iterable_node)
     let iterable = evald.value
     if comptime_value_is_valid(iterable) == 0:
         return wrapper
 
     let iter_count = ct_iter_count(iterable)
     if iter_count < 0:
-        ct_emit_error(sema, source_ast, iterable_node, "comptime for requires an array, tuple, or range")
+        self.ct_emit_error(source_ast, iterable_node, "comptime for requires an array, tuple, or range")
         return wrapper
 
-    let template_body = ct_transform_expr(source_ast, pool, sema, intern, pool.get_data2(inner))
+    let template_body = self.ct_transform_expr(source_ast, pool, intern, pool.get_data2(inner))
     let stmt_nodes: Vec[i32] = Vec.new()
     let binding = pool.get_data0(inner)
     let for_meta = pool.find_for_meta(inner)
     let index_binding = if for_meta >= 0: pool.for_meta_index_binding(for_meta) else: 0
     for i in 0..iter_count:
-        let item_node = ct_iter_item_node(pool, intern, sema, iterable, i, wrapper, evald.extras)
+        let item_node = self.ct_iter_item_node(pool, intern, iterable, i, wrapper, evald.extras)
         if item_node == 0:
-            ct_emit_error(sema, source_ast, inner, "failed to materialize comptime for item")
+            self.ct_emit_error(source_ast, inner, "failed to materialize comptime for item")
             return wrapper
         var index_node = 0
         if index_binding != 0:
-            let index_value = comptime_value_int(sema.ty_i64 as i32, i as i64)
+            let index_value = comptime_value_int(self.ty_i64 as i32, i as i64)
             let empty_values: Vec[ComptimeValue] = Vec.new()
-            index_node = ct_build_value_tree(pool, intern, sema, index_value, wrapper, empty_values)
+            index_node = self.ct_build_value_tree(pool, intern, index_value, wrapper, empty_values)
         let cloned_body = pool.ct_clone_tree_with_subst(template_body, binding, item_node, index_binding, index_node)
-        stmt_nodes.push(ct_transform_expr(pool, pool, sema, intern, cloned_body))
+        stmt_nodes.push(self.ct_transform_expr(pool, pool, intern, cloned_body))
     let stmt_extra = pool.extra_len()
     for i in 0..stmt_nodes.len() as i32:
         pool.add_extra(stmt_nodes.get(i as i64))
     pool.add_node(NodeKind.NK_BLOCK, pool.get_start(wrapper), pool.get_end(wrapper), stmt_extra, iter_count, 0) as i32
 
-fn ct_rewrite_comptime(source_ast: AstPool, pool: AstPool, sema: &mut Sema, intern: InternPool, node: i32) -> i32:
+fn Sema.ct_rewrite_comptime(mut self: Sema, source_ast: AstPool, pool: AstPool, intern: InternPool, node: i32) -> i32:
     let inner = pool.get_data0(node)
     if inner == 0:
         return pool.ct_empty_block(node)
@@ -881,56 +881,56 @@ fn ct_rewrite_comptime(source_ast: AstPool, pool: AstPool, sema: &mut Sema, inte
     if inner_kind == NodeKind.NK_INT_LIT:
         return inner
     if inner_kind == NodeKind.NK_IF_EXPR:
-        return ct_rewrite_comptime_if(source_ast, pool, sema, intern, node, inner)
+        return self.ct_rewrite_comptime_if(source_ast, pool, intern, node, inner)
     if inner_kind == NodeKind.NK_FOR:
-        return ct_rewrite_comptime_for(source_ast, pool, sema, intern, node, inner)
+        return self.ct_rewrite_comptime_for(source_ast, pool, intern, node, inner)
 
-    let diag_count_before = sema.diags.count()
-    let evald = comptime_force_eval_expr_result(sema as *mut Sema, source_ast, sema.pool, inner)
+    let diag_count_before = self.diags.count()
+    let evald = comptime_force_eval_expr_result(self as *mut Sema, source_ast, self.pool, inner)
     let value = evald.value
     if comptime_value_is_valid(value) == 0:
-        if evald.error_msg.len() > 0 and sema.diags.count() == diag_count_before:
-            ct_emit_error(sema, source_ast, inner, evald.error_msg)
+        if evald.error_msg.len() > 0 and self.diags.count() == diag_count_before:
+            self.ct_emit_error(source_ast, inner, evald.error_msg)
         return node
-    let folded = ct_build_value_tree(pool, intern, sema, value, node, evald.extras)
+    let folded = self.ct_build_value_tree(pool, intern, value, node, evald.extras)
     if folded == 0:
-        ct_emit_error(sema, source_ast, inner, "comptime value cannot be embedded yet")
+        self.ct_emit_error(source_ast, inner, "comptime value cannot be embedded yet")
         return node
     folded
 
-fn ct_transform_expr(source_ast: AstPool, pool: AstPool, sema: &mut Sema, intern: InternPool, node: i32) -> i32:
+fn Sema.ct_transform_expr(mut self: Sema, source_ast: AstPool, pool: AstPool, intern: InternPool, node: i32) -> i32:
     if node == 0:
         return 0
-    ct_sync_sema_ast(sema, pool)
+    self.ct_sync_sema_ast(pool)
     let kind = pool.kind(node)
 
     if kind == NodeKind.NK_COMPTIME:
-        return ct_rewrite_comptime(source_ast, pool, sema, intern, node)
+        return self.ct_rewrite_comptime(source_ast, pool, intern, node)
 
     if kind == NodeKind.NK_BINARY:
-        pool.set_data1(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data1(node)))
-        pool.set_data2(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data2(node)))
+        pool.set_data1(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data1(node)))
+        pool.set_data2(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data2(node)))
         return node
 
     if kind == NodeKind.NK_UNARY:
-        pool.set_data1(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data1(node)))
+        pool.set_data1(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data1(node)))
         return node
 
     if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_RETURN or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_YIELD:
-        pool.set_data0(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data0(node)))
+        pool.set_data0(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data0(node)))
         return node
 
     if kind == NodeKind.NK_CALL:
-        pool.set_data0(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data0(node)))
+        pool.set_data0(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data0(node)))
         let extra_start = pool.get_data1(node)
         let arg_count = pool.get_data2(node)
         for i in 0..arg_count:
             let arg_idx = extra_start + i
-            pool.state.extra.set_i32(arg_idx as i64, ct_transform_expr(source_ast, pool, sema, intern, pool.get_extra(arg_idx)))
-        return ct_try_fold_type_call(pool, sema, intern, node)
+            pool.state.extra.set_i32(arg_idx as i64, self.ct_transform_expr(source_ast, pool, intern, pool.get_extra(arg_idx)))
+        return self.ct_try_fold_type_call(pool, intern, node)
 
     if kind == NodeKind.NK_FIELD_ACCESS:
-        let base = ct_transform_expr(source_ast, pool, sema, intern, pool.get_data0(node))
+        let base = self.ct_transform_expr(source_ast, pool, intern, pool.get_data0(node))
         pool.set_data0(node, base)
         let folded_value = pool.ct_struct_lit_field_value(base, pool.get_data1(node))
         if folded_value != 0:
@@ -938,30 +938,30 @@ fn ct_transform_expr(source_ast: AstPool, pool: AstPool, sema: &mut Sema, intern
         return node
 
     if kind == NodeKind.NK_COMPUTED_FIELD_ACCESS:
-        let base = ct_transform_expr(source_ast, pool, sema, intern, pool.get_data0(node))
-        let field_expr = ct_transform_expr(source_ast, pool, sema, intern, pool.get_data1(node))
+        let base = self.ct_transform_expr(source_ast, pool, intern, pool.get_data0(node))
+        let field_expr = self.ct_transform_expr(source_ast, pool, intern, pool.get_data1(node))
         pool.set_data0(node, base)
         pool.set_data1(node, field_expr)
-        let evald = comptime_try_eval_expr_result(sema as *mut Sema, pool, sema.pool, field_expr)
+        let evald = comptime_try_eval_expr_result(self as *mut Sema, pool, self.pool, field_expr)
         if comptime_value_is_valid(evald.value) == 0:
             return node
         if evald.value.kind != ComptimeValueKind.CV_STR:
-            ct_emit_error(sema, source_ast, node, "computed field access requires comptime string field name")
+            self.ct_emit_error(source_ast, node, "computed field access requires comptime string field name")
             return node
         let field_sym = intern.intern(evald.value.text)
         return pool.add_node(NodeKind.NK_FIELD_ACCESS, pool.get_start(node), pool.get_end(node), base, field_sym, 0) as i32
 
     if kind == NodeKind.NK_INDEX:
-        pool.set_data0(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data0(node)))
-        pool.set_data1(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data1(node)))
+        pool.set_data0(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data0(node)))
+        pool.set_data1(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data1(node)))
         return node
 
     if kind == NodeKind.NK_SLICE:
-        pool.set_data0(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data0(node)))
+        pool.set_data0(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data0(node)))
         if pool.get_data1(node) != 0:
-            pool.set_data1(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data1(node)))
+            pool.set_data1(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data1(node)))
         if pool.get_data2(node) != 0:
-            pool.set_data2(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data2(node)))
+            pool.set_data2(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data2(node)))
         return node
 
     if kind == NodeKind.NK_BLOCK:
@@ -969,61 +969,61 @@ fn ct_transform_expr(source_ast: AstPool, pool: AstPool, sema: &mut Sema, intern
         let stmt_count = pool.get_data1(node)
         for i in 0..stmt_count:
             let stmt_idx = extra_start + i
-            pool.state.extra.set_i32(stmt_idx as i64, ct_transform_expr(source_ast, pool, sema, intern, pool.get_extra(stmt_idx)))
+            pool.state.extra.set_i32(stmt_idx as i64, self.ct_transform_expr(source_ast, pool, intern, pool.get_extra(stmt_idx)))
         if pool.get_data2(node) != 0:
-            pool.set_data2(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data2(node)))
+            pool.set_data2(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data2(node)))
         return node
 
     if kind == NodeKind.NK_LABEL:
-        pool.set_data1(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data1(node)))
+        pool.set_data1(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data1(node)))
         return node
 
     if kind == NodeKind.NK_GOTO:
         return node
 
     if kind == NodeKind.NK_LET_BINDING:
-        pool.set_data1(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data1(node)))
+        pool.set_data1(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data1(node)))
         return node
 
     if kind == NodeKind.NK_IF_EXPR:
-        pool.set_data0(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data0(node)))
-        pool.set_data1(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data1(node)))
+        pool.set_data0(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data0(node)))
+        pool.set_data1(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data1(node)))
         if pool.get_data2(node) != 0:
-            pool.set_data2(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data2(node)))
+            pool.set_data2(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data2(node)))
         return node
 
     if kind == NodeKind.NK_ASSIGN:
-        pool.set_data0(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data0(node)))
-        pool.set_data1(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data1(node)))
+        pool.set_data0(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data0(node)))
+        pool.set_data1(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data1(node)))
         return node
 
     if kind == NodeKind.NK_WHILE:
-        pool.set_data0(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data0(node)))
-        pool.set_data1(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data1(node)))
+        pool.set_data0(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data0(node)))
+        pool.set_data1(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data1(node)))
         return node
 
     if kind == NodeKind.NK_LOOP:
-        pool.set_data0(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data0(node)))
+        pool.set_data0(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data0(node)))
         return node
 
     if kind == NodeKind.NK_FOR:
-        pool.set_data1(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data1(node)))
-        pool.set_data2(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data2(node)))
+        pool.set_data1(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data1(node)))
+        pool.set_data2(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data2(node)))
         return node
 
     if kind == NodeKind.NK_BREAK:
         if pool.get_data0(node) != 0:
-            pool.set_data0(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data0(node)))
+            pool.set_data0(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data0(node)))
         return node
 
     if kind == NodeKind.NK_MATCH:
-        pool.set_data0(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data0(node)))
+        pool.set_data0(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data0(node)))
         let extra_start = pool.get_data1(node)
         let arm_count = pool.get_data2(node)
         for i in 0..arm_count:
             let arm_idx = extra_start + i
             let arm = pool.get_extra(arm_idx)
-            ct_transform_match_arm(source_ast, pool, sema, intern, arm)
+            self.ct_transform_match_arm(source_ast, pool, intern, arm)
             pool.state.extra.set_i32(arm_idx as i64, arm)
         return node
 
@@ -1032,41 +1032,41 @@ fn ct_transform_expr(source_ast: AstPool, pool: AstPool, sema: &mut Sema, intern
         let count = pool.get_data1(node)
         for i in 0..count:
             let idx = extra_start + i
-            pool.state.extra.set_i32(idx as i64, ct_transform_expr(source_ast, pool, sema, intern, pool.get_extra(idx)))
+            pool.state.extra.set_i32(idx as i64, self.ct_transform_expr(source_ast, pool, intern, pool.get_extra(idx)))
         return node
 
     if kind == NodeKind.NK_STRUCT_LIT or kind == NodeKind.NK_RECORD_UPDATE:
         if kind == NodeKind.NK_RECORD_UPDATE:
-            pool.set_data0(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data0(node)))
+            pool.set_data0(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data0(node)))
         let extra_start = pool.get_data1(node)
         let field_count = pool.get_data2(node)
         for i in 0..field_count:
             let value_idx = extra_start + i * 2 + 1
-            pool.state.extra.set_i32(value_idx as i64, ct_transform_expr(source_ast, pool, sema, intern, pool.get_extra(value_idx)))
+            pool.state.extra.set_i32(value_idx as i64, self.ct_transform_expr(source_ast, pool, intern, pool.get_extra(value_idx)))
         return node
 
     if kind == NodeKind.NK_CLOSURE:
-        pool.set_data0(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data0(node)))
+        pool.set_data0(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data0(node)))
         return node
 
     if kind == NodeKind.NK_CAST:
-        pool.set_data0(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data0(node)))
+        pool.set_data0(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data0(node)))
         return node
 
     if kind == NodeKind.NK_PIPELINE:
-        pool.set_data0(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data0(node)))
-        pool.set_data1(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data1(node)))
+        pool.set_data0(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data0(node)))
+        pool.set_data1(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data1(node)))
         return node
 
     if kind == NodeKind.NK_RANGE:
         if pool.get_data0(node) != 0:
-            pool.set_data0(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data0(node)))
+            pool.set_data0(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data0(node)))
         if pool.get_data1(node) != 0:
-            pool.set_data1(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data1(node)))
+            pool.set_data1(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data1(node)))
         return node
 
     if kind == NodeKind.NK_FSTRING:
-        ct_transform_fstring(source_ast, pool, sema, intern, node)
+        self.ct_transform_fstring(source_ast, pool, intern, node)
         return node
 
     if kind == NodeKind.NK_VARIANT_SHORTHAND:
@@ -1074,17 +1074,17 @@ fn ct_transform_expr(source_ast: AstPool, pool: AstPool, sema: &mut Sema, intern
         let arg_count = pool.get_data2(node)
         for i in 0..arg_count:
             let idx = extra_start + i
-            pool.state.extra.set_i32(idx as i64, ct_transform_expr(source_ast, pool, sema, intern, pool.get_extra(idx)))
+            pool.state.extra.set_i32(idx as i64, self.ct_transform_expr(source_ast, pool, intern, pool.get_extra(idx)))
         return node
 
     if kind == NodeKind.NK_WITH_EXPR:
-        pool.set_data0(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data0(node)))
-        pool.set_data1(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data1(node)))
+        pool.set_data0(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data0(node)))
+        pool.set_data1(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data1(node)))
         return node
 
     if kind == NodeKind.NK_WITH_IMPLICIT:
-        pool.set_data0(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data0(node)))
-        pool.set_data1(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data1(node)))
+        pool.set_data0(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data0(node)))
+        pool.set_data1(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data1(node)))
         return node
 
     if kind == NodeKind.NK_ENUM_VARIANT:
@@ -1092,35 +1092,35 @@ fn ct_transform_expr(source_ast: AstPool, pool: AstPool, sema: &mut Sema, intern
         let arg_count = pool.get_extra(old_extra)
         for i in 0..arg_count:
             let idx = old_extra + 1 + i
-            pool.state.extra.set_i32(idx as i64, ct_transform_expr(source_ast, pool, sema, intern, pool.get_extra(idx)))
+            pool.state.extra.set_i32(idx as i64, self.ct_transform_expr(source_ast, pool, intern, pool.get_extra(idx)))
         return node
 
     if kind == NodeKind.NK_OPTIONAL_CHAIN:
-        pool.set_data0(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data0(node)))
+        pool.set_data0(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data0(node)))
         let extra_start = pool.get_data2(node)
         if pool.get_extra(extra_start) != 0:
             let arg_count = pool.get_extra(extra_start + 1)
             for i in 0..arg_count:
                 let idx = extra_start + 2 + i
-                pool.state.extra.set_i32(idx as i64, ct_transform_expr(source_ast, pool, sema, intern, pool.get_extra(idx)))
+                pool.state.extra.set_i32(idx as i64, self.ct_transform_expr(source_ast, pool, intern, pool.get_extra(idx)))
         return node
 
     if kind == NodeKind.NK_LET_ELSE:
-        pool.set_data1(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data1(node)))
-        pool.set_data2(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data2(node)))
+        pool.set_data1(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data1(node)))
+        pool.set_data2(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data2(node)))
         return node
 
     if kind == NodeKind.NK_TUPLE_DESTRUCTURE:
-        pool.set_data2(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data2(node)))
+        pool.set_data2(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data2(node)))
         return node
 
     if kind == NodeKind.NK_ARRAY_COMPREHENSION:
-        pool.set_data0(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data0(node)))
-        pool.set_data2(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data2(node)))
+        pool.set_data0(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data0(node)))
+        pool.set_data2(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data2(node)))
         return node
 
     if kind == NodeKind.NK_ASYNC_SCOPE:
-        pool.set_data1(node, ct_transform_expr(source_ast, pool, sema, intern, pool.get_data1(node)))
+        pool.set_data1(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data1(node)))
         return node
 
     if kind == NodeKind.NK_SELECT_AWAIT:
@@ -1128,13 +1128,13 @@ fn ct_transform_expr(source_ast: AstPool, pool: AstPool, sema: &mut Sema, intern
         let arm_count = pool.get_data1(node)
         for i in 0..arm_count:
             let base = extra_start + i * 3
-            pool.state.extra.set_i32((base + 1) as i64, ct_transform_expr(source_ast, pool, sema, intern, pool.get_extra(base + 1)))
-            pool.state.extra.set_i32((base + 2) as i64, ct_transform_expr(source_ast, pool, sema, intern, pool.get_extra(base + 2)))
+            pool.state.extra.set_i32((base + 1) as i64, self.ct_transform_expr(source_ast, pool, intern, pool.get_extra(base + 1)))
+            pool.state.extra.set_i32((base + 2) as i64, self.ct_transform_expr(source_ast, pool, intern, pool.get_extra(base + 2)))
         return node
 
     node
 
-fn ct_transform_fn_param_defaults(source_ast: AstPool, pool: AstPool, sema: &mut Sema, intern: InternPool, fn_node: i32):
+fn Sema.ct_transform_fn_param_defaults(mut self: Sema, source_ast: AstPool, pool: AstPool, intern: InternPool, fn_node: i32):
     let meta = pool.find_fn_meta(fn_node)
     if meta < 0:
         return
@@ -1144,9 +1144,9 @@ fn ct_transform_fn_param_defaults(source_ast: AstPool, pool: AstPool, sema: &mut
         let default_node = pool.get_fn_param_default(param_start, pi)
         if default_node == 0:
             continue
-        pool.set_fn_param_default(param_start, pi, ct_transform_expr(source_ast, pool, sema, intern, default_node))
+        pool.set_fn_param_default(param_start, pi, self.ct_transform_expr(source_ast, pool, intern, default_node))
 
-fn ct_transform_trait_decl(source_ast: AstPool, pool: AstPool, sema: &mut Sema, intern: InternPool, node: i32):
+fn Sema.ct_transform_trait_decl(mut self: Sema, source_ast: AstPool, pool: AstPool, intern: InternPool, node: i32):
     var pos = pool.get_data1(node)
     let _tp_count = pool.get_extra(pos)
     pos = pos + 1
@@ -1165,14 +1165,14 @@ fn ct_transform_trait_decl(source_ast: AstPool, pool: AstPool, sema: &mut Sema, 
         let body_idx = pos + 5
         let body = pool.get_extra(body_idx)
         if body != 0:
-            pool.state.extra.set_i32(body_idx as i64, ct_transform_expr(source_ast, pool, sema, intern, body))
+            pool.state.extra.set_i32(body_idx as i64, self.ct_transform_expr(source_ast, pool, intern, body))
         for pi in 0..param_count:
             let default_node = pool.get_fn_param_default(param_start, pi)
             if default_node != 0:
-                pool.set_fn_param_default(param_start, pi, ct_transform_expr(source_ast, pool, sema, intern, default_node))
+                pool.set_fn_param_default(param_start, pi, self.ct_transform_expr(source_ast, pool, intern, default_node))
         pos = pos + 6
 
-fn ct_transform_type_decl(source_ast: AstPool, pool: AstPool, sema: &mut Sema, intern: InternPool, node: i32):
+fn Sema.ct_transform_type_decl(mut self: Sema, source_ast: AstPool, pool: AstPool, intern: InternPool, node: i32):
     let packed = pool.get_data2(node)
     let sub_kind = type_decl_sub_kind(packed)
     if sub_kind != TypeDeclKind.Struct and sub_kind != TypeDeclKind.Union:
@@ -1183,21 +1183,21 @@ fn ct_transform_type_decl(source_ast: AstPool, pool: AstPool, sema: &mut Sema, i
         let default_idx = extra_start + 1 + fi * 3 + 2
         let field_default = pool.get_extra(default_idx)
         if field_default != 0:
-            pool.state.extra.set_i32(default_idx as i64, ct_transform_expr(source_ast, pool, sema, intern, field_default))
+            pool.state.extra.set_i32(default_idx as i64, self.ct_transform_expr(source_ast, pool, intern, field_default))
 
-fn ct_decl_source_path(sema: &Sema, di: i32) -> str:
-    if di >= 0 and di < sema.decl_source_paths.len() as i32:
-        return sema.decl_source_paths.get(di as i64)
+fn Sema.ct_decl_source_path(self: Sema, di: i32) -> str:
+    if di >= 0 and di < self.decl_source_paths.len() as i32:
+        return self.decl_source_paths.get(di as i64)
     ""
 
-fn ct_decl_source_file_id(sema: &Sema, di: i32) -> i32:
-    if di >= 0 and di < sema.decl_source_file_ids.len() as i32:
-        return sema.decl_source_file_ids.get(di as i64)
+fn Sema.ct_decl_source_file_id(self: Sema, di: i32) -> i32:
+    if di >= 0 and di < self.decl_source_file_ids.len() as i32:
+        return self.decl_source_file_ids.get(di as i64)
     0
 
-fn ct_decl_is_c_import(sema: &Sema, di: i32) -> i32:
-    if di >= 0 and di < sema.decl_is_c_import.len() as i32:
-        return sema.decl_is_c_import.get(di as i64)
+fn Sema.ct_decl_is_c_import(self: Sema, di: i32) -> i32:
+    if di >= 0 and di < self.decl_is_c_import.len() as i32:
+        return self.decl_is_c_import.get(di as i64)
     0
 
 fn ct_source_decl_is_local(ast: AstPool, decl_index: i32) -> i32:
@@ -1209,27 +1209,27 @@ fn ct_source_decl_is_local(ast: AstPool, decl_index: i32) -> i32:
         return 1
     0
 
-fn ct_transform_decl(source_ast: AstPool, pool: AstPool, sema: &mut Sema, intern: InternPool, node: i32):
+fn Sema.ct_transform_decl(mut self: Sema, source_ast: AstPool, pool: AstPool, intern: InternPool, node: i32):
     let kind = pool.kind(node)
     if kind == NodeKind.NK_FN_DECL:
         let body = pool.get_data1(node)
         if body != 0:
-            pool.set_data1(node, ct_transform_expr(source_ast, pool, sema, intern, body))
-        ct_transform_fn_param_defaults(source_ast, pool, sema, intern, node)
+            pool.set_data1(node, self.ct_transform_expr(source_ast, pool, intern, body))
+        self.ct_transform_fn_param_defaults(source_ast, pool, intern, node)
         return
     if kind == NodeKind.NK_LET_DECL:
         let value = pool.get_data1(node)
         if value != 0:
-            pool.set_data1(node, ct_transform_expr(source_ast, pool, sema, intern, value))
+            pool.set_data1(node, self.ct_transform_expr(source_ast, pool, intern, value))
         return
     if kind == NodeKind.NK_TYPE_DECL:
-        ct_transform_type_decl(source_ast, pool, sema, intern, node)
+        self.ct_transform_type_decl(source_ast, pool, intern, node)
         return
     if kind == NodeKind.NK_TRAIT_DECL:
-        ct_transform_trait_decl(source_ast, pool, sema, intern, node)
+        self.ct_transform_trait_decl(source_ast, pool, intern, node)
         return
 
-fn comptime_transform_module(source_ast: AstPool, sema: &mut Sema, intern: InternPool) -> AstPool:
+fn Sema.comptime_transform_module(mut self: Sema, source_ast: AstPool, intern: InternPool) -> AstPool:
     var out = astpool_clone_deep(source_ast)
 
     let clone_trait_sym = intern.intern("Clone")
@@ -1246,9 +1246,9 @@ fn comptime_transform_module(source_ast: AstPool, sema: &mut Sema, intern: Inter
 
     for di in 0..base_decl_count:
         let decl = out.get_decl(di)
-        let decl_path = ct_decl_source_path(sema, di)
-        let decl_file_id = ct_decl_source_file_id(sema, di)
-        let decl_ci = ct_decl_is_c_import(sema, di)
+        let decl_path = self.ct_decl_source_path(di)
+        let decl_file_id = self.ct_decl_source_file_id(di)
+        let decl_ci = self.ct_decl_is_c_import(di)
 
         ordered.push(decl as i32)
         ordered_paths.push(decl_path)
@@ -1257,15 +1257,15 @@ fn comptime_transform_module(source_ast: AstPool, sema: &mut Sema, intern: Inter
 
         if out.kind(decl) != NodeKind.NK_TYPE_DECL:
             continue
-        if sema.type_decl_has_derive(decl as i32, clone_trait_sym) == 0:
+        if self.type_decl_has_derive(decl as i32, clone_trait_sym) == 0:
             continue
         if type_decl_sub_kind(out.get_data2(decl)) != TypeDeclKind.Struct:
             continue
 
         let type_name_sym = out.get_data0(decl)
-        if sema.lookup_method_sig(type_name_sym, clone_method_sym) >= 0:
+        if self.lookup_method_sig(type_name_sym, clone_method_sym) >= 0:
             continue
-        if sema.select_trait_impl(type_name_sym, clone_trait_sym) != 0:
+        if self.select_trait_impl(type_name_sym, clone_trait_sym) != 0:
             continue
 
         let type_name = intern.resolve(type_name_sym)
@@ -1311,32 +1311,32 @@ fn comptime_transform_module(source_ast: AstPool, sema: &mut Sema, intern: Inter
     if local_limit >= 0:
         out.set_local_decl_count(local_limit + generated_local_count)
 
-    sema.decl_source_paths = ordered_paths
-    sema.decl_source_file_ids = ordered_file_ids
-    sema.decl_is_c_import = ordered_ci
+    self.decl_source_paths = ordered_paths
+    self.decl_source_file_ids = ordered_file_ids
+    self.decl_is_c_import = ordered_ci
 
     let transform_pool = intern
-    var transform_sema = Sema.init(transform_pool, sema.diags, out)
-    transform_sema.source_text = sema.source_text
-    transform_sema.decl_source_paths = sema.decl_source_paths
-    transform_sema.decl_source_file_ids = sema.decl_source_file_ids
-    transform_sema.decl_is_c_import = sema.decl_is_c_import
-    transform_sema.module_paths = sema.module_paths
-    transform_sema.module_import_starts = sema.module_import_starts
-    transform_sema.module_import_counts = sema.module_import_counts
-    transform_sema.module_import_targets = sema.module_import_targets
-    transform_sema.module_index_by_path = sema.module_index_by_path
-    transform_sema.global_visible_module_paths = sema.global_visible_module_paths
+    var transform_sema = Sema.init(transform_pool, self.diags, out)
+    transform_sema.source_text = self.source_text
+    transform_sema.decl_source_paths = self.decl_source_paths
+    transform_sema.decl_source_file_ids = self.decl_source_file_ids
+    transform_sema.decl_is_c_import = self.decl_is_c_import
+    transform_sema.module_paths = self.module_paths
+    transform_sema.module_import_starts = self.module_import_starts
+    transform_sema.module_import_counts = self.module_import_counts
+    transform_sema.module_import_targets = self.module_import_targets
+    transform_sema.module_index_by_path = self.module_index_by_path
+    transform_sema.global_visible_module_paths = self.global_visible_module_paths
     transform_sema.module_visibility_cache = HashMap.new()
     transform_sema.prepare_for_comptime_transform()
     if transform_sema.diags.has_errors():
-        sema.diags = transform_sema.diags
+        self.diags = transform_sema.diags
         return out
 
     for di in 0..out.decl_count():
         transform_sema.update_decl_source_context(di)
         let decl = out.get_decl(di)
         let live_ast = out
-        ct_transform_decl(live_ast, out, &mut transform_sema, intern, decl as i32)
-    sema.diags = transform_sema.diags
+        transform_sema.ct_transform_decl(live_ast, out, intern, decl as i32)
+    self.diags = transform_sema.diags
     out
