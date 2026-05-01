@@ -378,7 +378,15 @@ before committing to handle-type conversion.
 ### 5a. Scale
 
 - **127 fields** (vs 7-9 for CI pools, 45 for AstPool)
-- **333 methods** across Sema.w (103), SemaCheck.w (211), SemaDiag.w (19)
+- **384 methods** across Sema.w (103), SemaCheck.w (211), SemaDecl.w (51),
+  SemaDiag.w (19) — original count of 333 missed SemaDecl.w
+- **378 of 384 methods** contain at least one `self.field` access that needs
+  `self.field` → `self.state.field` rewriting. Only 6 methods have no direct
+  field access (delegate entirely to other methods).
+- **6,547 individual `self.field` occurrences** across all 4 files — this is the
+  actual textual-change count for Option A.
+- **0 signature changes** needed — all 384 methods already take `self: Sema`
+  by value (382) or `mut self: Sema` (6). No `self: &Sema` exists.
 - **16 `&mut Sema` sites** — 15 in ComptimeTransform.w, 1 in Frontend.w
 
 ### 5b. Existing Raw Pointer Usage
@@ -490,12 +498,18 @@ Convert Sema to `type Sema { state: *mut SemaState }` following the same
 pattern as the other pools.
 
 *Cost:*
-- 333 method bodies need `self.field` → `self.state.field`
+- 378 method bodies need `self.field` → `self.state.field` (6 methods
+  have no field access and need no body change)
+- 6,547 individual `self.field` occurrences across 4 files — but bulk
+  text substitution is safe since field names are disjoint from method
+  names (methods are followed by `(`)
+- 0 method signature changes (all 384 already take `self: Sema` by value)
 - 4 ComptimeEval function signatures change `sema_ptr: *mut Sema` → `sema: Sema`
 - 7 cast sites (`as *mut Sema`) removed
 - 2 unsafe dereference sites removed
 - 10 construction sites updated (Sema.init/placeholder/sema_empty_state)
-- **Total: ~350 mechanical changes across 5 files**
+- **Total: 6,547 textual substitutions + ~23 structural changes across
+  4 Sema files + ComptimeEval.w**
 
 *Benefit:*
 - All 16 `&mut Sema` sites removed
@@ -504,9 +518,13 @@ pattern as the other pools.
 - Net reduction in unsafe code (7 casts + 2 derefs removed)
 
 *Risk:*
-- High volume of mechanical edits (333 methods) — typo risk despite
-  compiler catching most errors
-- Sema.w + SemaCheck.w + SemaDiag.w are 3 large files totaling ~8000 lines
+- The 6,547 textual substitutions are individually trivial (bulk
+  `self.field` → `self.state.field`) and the compiler catches misses.
+  But the volume means the diff is enormous — ~4 files, each with
+  hundreds of changed lines. Review is hard; errors are caught at
+  build, not at review.
+- Sema.w + SemaCheck.w + SemaDecl.w + SemaDiag.w are 4 files totaling
+  ~10,000 lines
 
 **Option B: Targeted method extraction**
 
@@ -526,7 +544,7 @@ remaining 12 transport-parameter functions, change `sema: &mut Sema` to
 
 *Benefit:*
 - All 16 `&mut Sema` sites removed
-- No 333-method rewrite of Sema internals
+- No 6,547-substitution rewrite of Sema internals
 - Sema stays as a value type (no handle-type indirection added)
 
 *Cost / architectural concern:*
@@ -537,6 +555,21 @@ remaining 12 transport-parameter functions, change `sema: &mut Sema` to
 - The 12 `*mut Sema` transport-parameter functions are uglier than `&mut Sema`.
   This trades one pre-lockdown pattern for another that's harder to read.
   Both go away at P12, but `*mut Sema` is a worse bridge-state than `&mut Sema`.
+
+*Asymmetry:* Option B is clean for the 4 natural method candidates — those
+genuinely belong on Sema and the extraction makes the code better. For the
+12 transport-parameter cases, both subforms are worse than the current
+`&mut Sema`:
+- `*mut Sema` raw pointers threaded through tree-walking functions are less
+  safe and less readable than `&mut Sema`
+- Forcing tree-walking logic (`ct_transform_expr`, `ct_rewrite_comptime_for`,
+  etc.) onto Sema as methods is architecturally wrong — these functions are
+  about AST rewriting, not semantic analysis
+
+Option B's "low cost" is true only if you accept that 12 of 16 sites get a
+worse bridge state than what they have now. The 4 clean extractions may be
+worth doing regardless (they improve the code), but the remaining 12 are the
+reason Option B isn't a uniformly cheaper alternative to A or C.
 
 *Variant B': Instead of `*mut Sema` for the 12 transport functions, pass
 Sema by value and accept that mutations through the copied value struct
@@ -654,7 +687,7 @@ After AstPool conversion:
 | CiExprPool | 20 | 23 | 22 | 8 | Low |
 | CiStmtPool | 16 | 13 | 27 + ~40 ext | 9 | Medium |
 | AstPool | 18 | 67 | 101 | 45 | Medium |
-| Sema | 16 | — | 333 | 127 | **High** (see §5e options) |
+| Sema | 16 | — | 384 (378 need body changes) | 127 | **High** (see §5e options) |
 
 Total after CI + AstPool: 79 `&mut` sites removed. Remaining: ~41 sites
 (16 Sema + ~25 comments/diagnostics/lockdown items).
@@ -666,16 +699,30 @@ Total after CI + AstPool: 79 `&mut` sites removed. Remaining: ~41 sites
    (One commit is simpler but produces larger diffs.)
 
 2. **Sema treatment.** Three options with documented tradeoffs (§5e):
-   - **Option A** (handle-type): ~350 mechanical changes, full consistency,
-     no P12 surprise
-   - **Option B** (targeted method extraction): ~16 substantive changes,
-     moves some ct_* logic to Sema ownership, `*mut Sema` transport params
-     are uglier bridge state than `&mut Sema`
+   - **Option A** (handle-type): 6,547 textual substitutions + ~23 structural
+     changes. Bulk `self.field` → `self.state.field` is safe (field names
+     disjoint from method names). No signature changes needed. Full consistency.
+   - **Option B** (targeted method extraction): ~16 substantive changes. Clean
+     for 4 natural method candidates, but asymmetric — 12 transport-parameter
+     sites get either ugly `*mut Sema` or architecturally wrong method extraction.
+     Both are worse bridge state than the current `&mut Sema`.
    - **Option C** (defer to P12): zero bridge-phase cost, 16 sites remain
      as bridge debt, P12 lockdown handles them alongside the spec change
 
 3. **Allocation size.** Is over-allocating (256 for CI pools, 4096 for
    AstPool) adequate, or should we add a runtime size check?
+
+4. **Sema's slice assignment.** The Sema option chosen determines the
+   slice structure downstream:
+   - **Option A:** Sema is its own conversion within Slice B, after AstPool
+     (since AstPool conversion may simplify some ComptimeTransform.w sites
+     that share function signatures with the `&mut Sema` parameters).
+   - **Option B:** The 4 method extractions land alongside AstPool conversion
+     (they share ComptimeTransform.w / Frontend.w). The 12 transport-parameter
+     sites land as a separate step (or are deferred if the `*mut Sema` bridge
+     state is rejected).
+   - **Option C:** Sema doesn't appear in Slice B at all. Implementation plan
+     ends after AstPool. Sema resolves at P12 lockdown.
 
 **What this is not:** This is not "reconsider whether handle-type is the
 right migration pattern." That's settled (§16). This is "given handle-type
