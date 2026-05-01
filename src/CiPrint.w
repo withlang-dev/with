@@ -791,7 +791,7 @@ fn ci_print_stmt(stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: Ci
 
 // ── CiDecl printing ──────────────────────────────────────────
 
-fn ci_print_decl(decls: &CiDeclPool, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: CiDeclId) -> str:
+fn ci_print_decl(decls: CiDeclPool, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: CiDeclId) -> str:
     if (id as i32) == 0:
         return "<ci:decl:0>\n"
     let kind = decls.kind(id)
@@ -929,7 +929,7 @@ fn ci_roundtrip_fn_decl -> i32:
     let body = stmts.block(start, 1)
     let name_idx = decls.add_string("foo")
     let fn_d = decls.fn_decl(name_idx, i32_ty, body, 0)
-    let actual = ci_print_decl(&decls, stmts, exprs, types, fn_d)
+    let actual = ci_print_decl(decls, stmts, exprs, types, fn_d)
     // CIS_BLOCK now appends a bare `\n` separator after each
     // child to match the legacy compound_stmt's blank-line
     // convention.
