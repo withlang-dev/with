@@ -6778,6 +6778,12 @@ fn Sema.borrow_collect_path(self: Sema, node: i32) -> i32:
     self.borrow_collect_path_inner(node)
     self.borrow_path_data.len() as i32 - start
 
+// §8.1 sentinel for constant-index path elements. Values < INDEX_PATH_BASE
+// are constant indices encoded as INDEX_PATH_BASE - literal_value. A wildcard
+// (non-constant index) uses INDEX_PATH_WILDCARD which overlaps with everything.
+const INDEX_PATH_BASE: i32 = -100000
+const INDEX_PATH_WILDCARD: i32 = -99999
+
 fn Sema.borrow_collect_path_inner(self: Sema, node: i32):
     if node == 0:
         return
@@ -6789,7 +6795,17 @@ fn Sema.borrow_collect_path_inner(self: Sema, node: i32):
         return
     if kind == NodeKind.NK_COMPUTED_FIELD_ACCESS:
         self.borrow_collect_path_inner(self.ast.get_data0(node))
-    // NodeKind.NK_IDENT, NodeKind.NK_INDEX, NodeKind.NK_GROUPED: no field to add
+        return
+    if kind == NodeKind.NK_INDEX:
+        self.borrow_collect_path_inner(self.ast.get_data0(node))
+        let index_expr = self.ast.get_data1(node)
+        if self.ast.kind(index_expr) == NodeKind.NK_INT_LIT:
+            let lit_val = self.ast.get_data0(index_expr)
+            self.borrow_path_data.push(INDEX_PATH_BASE - lit_val)
+        else:
+            self.borrow_path_data.push(INDEX_PATH_WILDCARD)
+        return
+    // NodeKind.NK_IDENT, NodeKind.NK_GROUPED: no path element to add
 
 fn Sema.borrow_field(self: Sema, node: i32) -> i32:
     if node == 0:
@@ -6800,6 +6816,7 @@ fn Sema.borrow_field(self: Sema, node: i32) -> i32:
 
 // Two borrows are disjoint if their field paths diverge at some level.
 // A zero-length path (whole variable) overlaps with everything.
+// §8.1: index path elements use INDEX_PATH_BASE/WILDCARD sentinels.
 fn Sema.are_borrows_disjoint_paths(self: Sema, start_a: i32, count_a: i32, start_b: i32, count_b: i32) -> i32:
     if count_a == 0 or count_b == 0:
         return 0
@@ -6809,6 +6826,10 @@ fn Sema.are_borrows_disjoint_paths(self: Sema, start_a: i32, count_a: i32, start
         let fa = self.borrow_path_data.get((start_a + i) as i64)
         let fb = self.borrow_path_data.get((start_b + i) as i64)
         if fa != fb:
+            // Wildcard index overlaps with all indices at the same position
+            if fa == INDEX_PATH_WILDCARD or fb == INDEX_PATH_WILDCARD:
+                i = i + 1
+                continue
             return 1
         i = i + 1
     // One is a prefix of the other — overlapping
