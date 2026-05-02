@@ -3041,6 +3041,12 @@ fn Codegen.classify_generic_call_intrinsic(self: Codegen, recv_type: i32, method
         if method_name == "clear": return MirIntrinsic.MIR_INTRINSIC_MAP_CLEAR
         if method_name == "increment": return MirIntrinsic.MIR_INTRINSIC_MAP_INCREMENT
         if method_name == "keys": return MirIntrinsic.MIR_INTRINSIC_MAP_KEYS
+        if method_name == "entry": return MirIntrinsic.MIR_INTRINSIC_MAP_ENTRY
+        return MirIntrinsic.MIR_INTRINSIC_NONE
+    if type_name == "HashMapEntry":
+        if method_name == "or_insert": return MirIntrinsic.MIR_INTRINSIC_ENTRY_OR_INSERT
+        if method_name == "get": return MirIntrinsic.MIR_INTRINSIC_ENTRY_GET
+        if method_name == "set": return MirIntrinsic.MIR_INTRINSIC_ENTRY_SET
         return MirIntrinsic.MIR_INTRINSIC_NONE
     if type_name == "HashSet":
         if method_name == "new": return MirIntrinsic.MIR_INTRINSIC_MAP_NEW
@@ -3484,6 +3490,207 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         keys_args.push(wl_const_int(i64_ty, key_size, 0))
         let _ = wl_build_call(self.builder, keys_ty, keys_fn, vec_data_i64(&keys_args), 3)
         result = wl_build_load(self.builder, vec_ty, out_alloca)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_ENTRY:
+        // HashMap.entry(key) → HashMapEntry { map_ptr, key }
+        let me_map_ptr = self.mir_intrinsic_map_handle(body, args_id)
+        let me_recv_op = body.call_arg_operands.get(arg_start as i64)
+        let me_key_raw = self.mir_intrinsic_arg(body, args_id, 1)
+        var me_key_ty = self.mir_hashmap_key_type(body, me_recv_op)
+        if me_key_ty == 0:
+            me_key_ty = wl_type_of(me_key_raw)
+        let me_key = if me_key_ty != 0 and wl_type_of(me_key_raw) != me_key_ty: self.coerce_value_to_type(me_key_raw, me_key_ty) else: me_key_raw
+        let me_fields: Vec[i64] = Vec.new()
+        me_fields.push(ptr_ty)
+        me_fields.push(me_key_ty)
+        let me_struct_ty = wl_struct_type(self.context, vec_data_i64(&me_fields), 2, 0)
+        let me_alloca = wl_build_alloca(self.builder, me_struct_ty)
+        let me_f0 = wl_build_struct_gep(self.builder, me_struct_ty, me_alloca, 0)
+        wl_build_store(self.builder, me_map_ptr, me_f0)
+        let me_f1 = wl_build_struct_gep(self.builder, me_struct_ty, me_alloca, 1)
+        wl_build_store(self.builder, me_key, me_f1)
+        result = wl_build_load(self.builder, me_struct_ty, me_alloca)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ENTRY_OR_INSERT:
+        // HashMapEntry.or_insert(default) → contains? get : insert+get
+        let oi_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let oi_default = self.mir_intrinsic_arg(body, args_id, 1)
+        let oi_recv_op = body.call_arg_operands.get(arg_start as i64)
+        let oi_recv_sema = self.mir_operand_sema_type(body, oi_recv_op)
+        var oi_key_ty: i64 = i64_ty
+        var oi_val_ty: i64 = wl_type_of(oi_default)
+        if oi_recv_sema > 0:
+            let oi_resolved = self.mir_input.mir_resolve_alias(oi_recv_sema)
+            if self.mir_input.mir_get_type_kind(oi_resolved) == TypeKind.TY_GENERIC_INST:
+                let oi_te_start = self.mir_input.mir_get_type_d1(oi_resolved)
+                let oi_key_tid = self.mir_input.mir_get_type_extra(oi_te_start)
+                if oi_key_tid > 0:
+                    let oi_kt = self.mir_sema_type_to_llvm(oi_key_tid)
+                    if oi_kt != 0:
+                        oi_key_ty = oi_kt
+                let oi_val_tid = self.mir_input.mir_get_type_extra(oi_te_start + 1)
+                if oi_val_tid > 0:
+                    let oi_vt = self.mir_sema_type_to_llvm(oi_val_tid)
+                    if oi_vt != 0:
+                        oi_val_ty = oi_vt
+        let oi_entry_fields: Vec[i64] = Vec.new()
+        oi_entry_fields.push(ptr_ty)
+        oi_entry_fields.push(oi_key_ty)
+        let oi_entry_ty = wl_struct_type(self.context, vec_data_i64(&oi_entry_fields), 2, 0)
+        let oi_mp = wl_build_struct_gep(self.builder, oi_entry_ty, oi_ptr, 0)
+        let oi_map_ptr = wl_build_load(self.builder, ptr_ty, oi_mp)
+        let oi_kp = wl_build_struct_gep(self.builder, oi_entry_ty, oi_ptr, 1)
+        let oi_key = wl_build_load(self.builder, oi_key_ty, oi_kp)
+        let oi_is_str = wl_const_int(i64_ty, if self.is_str_type(oi_key_ty): 1 else: 0, 0)
+        let oi_key_alloca = wl_build_alloca(self.builder, oi_key_ty)
+        wl_build_store(self.builder, oi_key, oi_key_alloca)
+        // contains?
+        let oi_contains_fn = self.ensure_hm_fn("with_hashmap_contains", i64_ty)
+        let oi_c_params: Vec[i64] = Vec.new()
+        oi_c_params.push(ptr_ty)
+        oi_c_params.push(ptr_ty)
+        oi_c_params.push(i64_ty)
+        let oi_c_fn_ty = wl_function_type(i64_ty, vec_data_i64(&oi_c_params), 3, 0)
+        let oi_c_args: Vec[i64] = Vec.new()
+        oi_c_args.push(oi_map_ptr)
+        oi_c_args.push(oi_key_alloca)
+        oi_c_args.push(oi_is_str)
+        let oi_found = wl_build_call(self.builder, oi_c_fn_ty, oi_contains_fn, vec_data_i64(&oi_c_args), 3)
+        let oi_cond = wl_build_icmp(self.builder, wl_int_eq(), oi_found, wl_const_int(i64_ty, 0, 0))
+        let oi_insert_bb = wl_append_bb(self.context, self.current_function, "entry.insert")
+        let oi_get_bb = wl_append_bb(self.context, self.current_function, "entry.get")
+        wl_build_cond_br(self.builder, oi_cond, oi_insert_bb, oi_get_bb)
+        // insert default
+        wl_position_at_end(self.builder, oi_insert_bb)
+        let oi_val_alloca = wl_build_alloca(self.builder, oi_val_ty)
+        wl_build_store(self.builder, oi_default, oi_val_alloca)
+        let oi_ins_fn = self.ensure_hm_fn("with_hashmap_insert", void_ty)
+        let oi_i_params: Vec[i64] = Vec.new()
+        oi_i_params.push(ptr_ty)
+        oi_i_params.push(ptr_ty)
+        oi_i_params.push(ptr_ty)
+        oi_i_params.push(i64_ty)
+        let oi_i_fn_ty = wl_function_type(void_ty, vec_data_i64(&oi_i_params), 4, 0)
+        let oi_i_args: Vec[i64] = Vec.new()
+        oi_i_args.push(oi_map_ptr)
+        oi_i_args.push(oi_key_alloca)
+        oi_i_args.push(oi_val_alloca)
+        oi_i_args.push(oi_is_str)
+        let _ = wl_build_call(self.builder, oi_i_fn_ty, oi_ins_fn, vec_data_i64(&oi_i_args), 4)
+        wl_build_br(self.builder, oi_get_bb)
+        // get value
+        wl_position_at_end(self.builder, oi_get_bb)
+        let oi_out_alloca = wl_build_alloca(self.builder, oi_val_ty)
+        let oi_get_fn = self.ensure_hm_fn("with_hashmap_get", i64_ty)
+        let oi_g_params: Vec[i64] = Vec.new()
+        oi_g_params.push(ptr_ty)
+        oi_g_params.push(ptr_ty)
+        oi_g_params.push(ptr_ty)
+        oi_g_params.push(i64_ty)
+        let oi_g_fn_ty = wl_function_type(i64_ty, vec_data_i64(&oi_g_params), 4, 0)
+        let oi_g_args: Vec[i64] = Vec.new()
+        oi_g_args.push(oi_map_ptr)
+        oi_g_args.push(oi_key_alloca)
+        oi_g_args.push(oi_out_alloca)
+        oi_g_args.push(oi_is_str)
+        let _ = wl_build_call(self.builder, oi_g_fn_ty, oi_get_fn, vec_data_i64(&oi_g_args), 4)
+        result = wl_build_load(self.builder, oi_val_ty, oi_out_alloca)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ENTRY_GET:
+        // HashMapEntry.get() → hashmap_get(map_ptr, &key)
+        let eg_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let eg_recv_op = body.call_arg_operands.get(arg_start as i64)
+        let eg_recv_sema = self.mir_operand_sema_type(body, eg_recv_op)
+        var eg_key_ty: i64 = i64_ty
+        var eg_val_ty: i64 = i64_ty
+        if eg_recv_sema > 0:
+            let eg_resolved = self.mir_input.mir_resolve_alias(eg_recv_sema)
+            if self.mir_input.mir_get_type_kind(eg_resolved) == TypeKind.TY_GENERIC_INST:
+                let eg_te_start = self.mir_input.mir_get_type_d1(eg_resolved)
+                let eg_key_tid = self.mir_input.mir_get_type_extra(eg_te_start)
+                if eg_key_tid > 0:
+                    let eg_kt = self.mir_sema_type_to_llvm(eg_key_tid)
+                    if eg_kt != 0:
+                        eg_key_ty = eg_kt
+                let eg_val_tid = self.mir_input.mir_get_type_extra(eg_te_start + 1)
+                if eg_val_tid > 0:
+                    let eg_vt = self.mir_sema_type_to_llvm(eg_val_tid)
+                    if eg_vt != 0:
+                        eg_val_ty = eg_vt
+        let eg_dest_sema = self.mir_intrinsic_dest_sema_type(body, dest_place)
+        if eg_dest_sema > 0:
+            let eg_dt = self.mir_sema_type_to_llvm(self.mir_input.mir_resolve_alias(eg_dest_sema))
+            if eg_dt != 0:
+                eg_val_ty = eg_dt
+        let eg_entry_fields: Vec[i64] = Vec.new()
+        eg_entry_fields.push(ptr_ty)
+        eg_entry_fields.push(eg_key_ty)
+        let eg_entry_ty = wl_struct_type(self.context, vec_data_i64(&eg_entry_fields), 2, 0)
+        let eg_mp = wl_build_struct_gep(self.builder, eg_entry_ty, eg_ptr, 0)
+        let eg_map_ptr = wl_build_load(self.builder, ptr_ty, eg_mp)
+        let eg_kp = wl_build_struct_gep(self.builder, eg_entry_ty, eg_ptr, 1)
+        let eg_key = wl_build_load(self.builder, eg_key_ty, eg_kp)
+        let eg_is_str = wl_const_int(i64_ty, if self.is_str_type(eg_key_ty): 1 else: 0, 0)
+        let eg_key_alloca = wl_build_alloca(self.builder, eg_key_ty)
+        wl_build_store(self.builder, eg_key, eg_key_alloca)
+        let eg_out_alloca = wl_build_alloca(self.builder, eg_val_ty)
+        let eg_get_fn = self.ensure_hm_fn("with_hashmap_get", i64_ty)
+        let eg_g_params: Vec[i64] = Vec.new()
+        eg_g_params.push(ptr_ty)
+        eg_g_params.push(ptr_ty)
+        eg_g_params.push(ptr_ty)
+        eg_g_params.push(i64_ty)
+        let eg_g_fn_ty = wl_function_type(i64_ty, vec_data_i64(&eg_g_params), 4, 0)
+        let eg_g_args: Vec[i64] = Vec.new()
+        eg_g_args.push(eg_map_ptr)
+        eg_g_args.push(eg_key_alloca)
+        eg_g_args.push(eg_out_alloca)
+        eg_g_args.push(eg_is_str)
+        let _ = wl_build_call(self.builder, eg_g_fn_ty, eg_get_fn, vec_data_i64(&eg_g_args), 4)
+        result = wl_build_load(self.builder, eg_val_ty, eg_out_alloca)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ENTRY_SET:
+        // HashMapEntry.set(value) → hashmap_insert(map_ptr, &key, &value)
+        let es_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let es_val = self.mir_intrinsic_arg(body, args_id, 1)
+        let es_recv_op = body.call_arg_operands.get(arg_start as i64)
+        let es_recv_sema = self.mir_operand_sema_type(body, es_recv_op)
+        var es_key_ty: i64 = i64_ty
+        if es_recv_sema > 0:
+            let es_resolved = self.mir_input.mir_resolve_alias(es_recv_sema)
+            if self.mir_input.mir_get_type_kind(es_resolved) == TypeKind.TY_GENERIC_INST:
+                let es_te_start = self.mir_input.mir_get_type_d1(es_resolved)
+                let es_key_tid = self.mir_input.mir_get_type_extra(es_te_start)
+                if es_key_tid > 0:
+                    let es_kt = self.mir_sema_type_to_llvm(es_key_tid)
+                    if es_kt != 0:
+                        es_key_ty = es_kt
+        let es_entry_fields: Vec[i64] = Vec.new()
+        es_entry_fields.push(ptr_ty)
+        es_entry_fields.push(es_key_ty)
+        let es_entry_ty = wl_struct_type(self.context, vec_data_i64(&es_entry_fields), 2, 0)
+        let es_mp = wl_build_struct_gep(self.builder, es_entry_ty, es_ptr, 0)
+        let es_map_ptr = wl_build_load(self.builder, ptr_ty, es_mp)
+        let es_kp = wl_build_struct_gep(self.builder, es_entry_ty, es_ptr, 1)
+        let es_key = wl_build_load(self.builder, es_key_ty, es_kp)
+        let es_is_str = wl_const_int(i64_ty, if self.is_str_type(es_key_ty): 1 else: 0, 0)
+        let es_key_alloca = wl_build_alloca(self.builder, es_key_ty)
+        wl_build_store(self.builder, es_key, es_key_alloca)
+        let es_val_alloca = wl_build_alloca(self.builder, wl_type_of(es_val))
+        wl_build_store(self.builder, es_val, es_val_alloca)
+        let es_ins_fn = self.ensure_hm_fn("with_hashmap_insert", void_ty)
+        let es_i_params: Vec[i64] = Vec.new()
+        es_i_params.push(ptr_ty)
+        es_i_params.push(ptr_ty)
+        es_i_params.push(ptr_ty)
+        es_i_params.push(i64_ty)
+        let es_i_fn_ty = wl_function_type(void_ty, vec_data_i64(&es_i_params), 4, 0)
+        let es_i_args: Vec[i64] = Vec.new()
+        es_i_args.push(es_map_ptr)
+        es_i_args.push(es_key_alloca)
+        es_i_args.push(es_val_alloca)
+        es_i_args.push(es_is_str)
+        result = wl_build_call(self.builder, es_i_fn_ty, es_ins_fn, vec_data_i64(&es_i_args), 4)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_OPT_IS_SOME:
         let recv = self.mir_intrinsic_arg(body, args_id, 0)

@@ -6327,6 +6327,20 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
                 let key_vec_args: Vec[i32] = Vec.new()
                 key_vec_args.push(key_ty)
                 return self.ensure_generic_inst_type(self.syms.vec, key_vec_args, 1) as i32
+            if field == self.syms.entry:
+                let ek = self.get_generic_inst_arg(recv_type, 0)
+                let ev = self.get_generic_inst_arg(recv_type, 1)
+                let entry_args: Vec[i32] = Vec.new()
+                entry_args.push(ek)
+                entry_args.push(ev)
+                return self.ensure_generic_inst_type(self.syms.hashmapentry, entry_args, 2) as i32
+        if type_name_sym == self.syms.hashmapentry:
+            if field == self.syms.or_insert:
+                return self.get_generic_inst_arg(recv_type, 1)
+            if field == self.syms.get:
+                return self.get_generic_inst_arg(recv_type, 1)
+            if mc_method_name_raw == "set":
+                return self.ty_void as i32
         if type_name_sym == self.syms.hashset:
             if field == self.syms.insert or field == self.syms.clear:
                 return self.ty_void as i32
