@@ -989,6 +989,22 @@ fn MirBuilder.indexed_element_type(self: MirBuilder, collection_tid: i32) -> i32
             return self.sema.get_generic_inst_arg(resolved, 0)
     0
 
+fn MirBuilder.is_user_index_place(self: MirBuilder, base_ty: i32) -> i32:
+    if base_ty == 0:
+        return 0
+    let resolved = self.sema.resolve_alias(base_ty) as i32
+    let tk = self.sema.get_type_kind(resolved)
+    if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE or tk == TypeKind.TY_STR or tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
+        return 0
+    if tk == TypeKind.TY_GENERIC_INST:
+        let base_sym = self.sema.get_generic_inst_base(resolved)
+        let name = self.pool.resolve_symbol(base_sym)
+        if name == "Vec" or name == "HashMap":
+            return 0
+    if self.sema.type_is_index_place(base_ty) != 0:
+        return 1
+    0
+
 fn MirBuilder.enum_payload_type(self: MirBuilder, enum_tid: i32, variant_idx: i32, field_idx: i32) -> i32:
     let resolved = self.sema.resolve_alias(enum_tid)
     let tk = self.sema.get_type_kind(resolved)
@@ -2247,6 +2263,28 @@ fn MirBuilder.lower_assign(self: MirBuilder, place_expr: i32, rhs_expr: i32):
         self.terminate(TermKind.TK_CALL, self.unit_operand(), mi_args_id, self.place_for_local(0), mi_next_bb)
         self.switch_to(mi_next_bb)
         return
+    if self.ast.kind(place_expr) == NodeKind.NK_INDEX:
+        var ip_base_ty = self.expr_type(self.ast.get_data0(place_expr))
+        while ip_base_ty > 0 and self.sema.get_type_kind(self.sema.resolve_alias(ip_base_ty)) == TypeKind.TY_REF:
+            ip_base_ty = self.sema.get_type_d0(self.sema.resolve_alias(ip_base_ty))
+        if self.is_user_index_place(ip_base_ty) != 0:
+            let ip_set_sym = self.sema.pool_lookup_symbol("set")
+            let ip_type_sym = self.sema.get_type_name(ip_base_ty)
+            let ip_fn_sym = self.sema.lookup_method_fn(ip_type_sym, ip_set_sym)
+            if ip_fn_sym != 0:
+                let ip_recv_op = self.lower_expr(self.ast.get_data0(place_expr))
+                let ip_idx_op = self.lower_expr(self.ast.get_data1(place_expr))
+                let ip_val_op = self.lower_expr(rhs_expr)
+                let ip_fn_op = self.const_operand(ConstKind.CK_FN, ip_fn_sym, self.sema.ty_void)
+                let ip_args: Vec[i32] = Vec.new()
+                ip_args.push(ip_recv_op)
+                ip_args.push(ip_idx_op)
+                ip_args.push(ip_val_op)
+                let ip_args_id = self.body.new_call_args(ip_args)
+                let ip_next_bb = self.new_block()
+                self.terminate(TermKind.TK_CALL, ip_fn_op, ip_args_id, self.place_for_local(0), ip_next_bb)
+                self.switch_to(ip_next_bb)
+                return
     // §6.3 compound assignment single-evaluation: xs[f()] += g() must
     // evaluate f() and g() exactly once.  The parser desugars += to
     // NK_ASSIGN(target, NK_BINARY(op, target, rhs)) sharing the same AST
@@ -4798,6 +4836,28 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         let vec_ty = self.vec_literal_type(node)
         if vec_ty != 0:
             return self.lower_vec_literal(node, vec_ty)
+        var ip_rd_base_ty = self.expr_type(self.ast.get_data0(node))
+        while ip_rd_base_ty > 0 and self.sema.get_type_kind(self.sema.resolve_alias(ip_rd_base_ty)) == TypeKind.TY_REF:
+            ip_rd_base_ty = self.sema.get_type_d0(self.sema.resolve_alias(ip_rd_base_ty))
+        if self.is_user_index_place(ip_rd_base_ty) != 0:
+            let ip_get_sym = self.sema.pool_lookup_symbol("get")
+            let ip_rd_type_sym = self.sema.get_type_name(ip_rd_base_ty)
+            let ip_rd_fn_sym = self.sema.lookup_method_fn(ip_rd_type_sym, ip_get_sym)
+            if ip_rd_fn_sym != 0:
+                let ip_rd_recv_op = self.lower_expr(self.ast.get_data0(node))
+                let ip_rd_idx_op = self.lower_expr(self.ast.get_data1(node))
+                let ip_rd_ret_ty = self.expr_type(node)
+                let ip_rd_fn_op = self.const_operand(ConstKind.CK_FN, ip_rd_fn_sym, ip_rd_ret_ty)
+                let ip_rd_args: Vec[i32] = Vec.new()
+                ip_rd_args.push(ip_rd_recv_op)
+                ip_rd_args.push(ip_rd_idx_op)
+                let ip_rd_args_id = self.body.new_call_args(ip_rd_args)
+                let ip_rd_result = self.new_temp(ip_rd_ret_ty)
+                let ip_rd_place = self.place_for_local(ip_rd_result)
+                let ip_rd_next = self.new_block()
+                self.terminate(TermKind.TK_CALL, ip_rd_fn_op, ip_rd_args_id, ip_rd_place, ip_rd_next)
+                self.switch_to(ip_rd_next)
+                return self.body.new_operand(OperandKind.OK_COPY, ip_rd_place)
         let place = self.lower_index(self.ast.get_data0(node), self.ast.get_data1(node))
         return self.body.new_operand(OperandKind.OK_COPY, place)
 
