@@ -1,4 +1,4 @@
-//! expect-error: closure that mutates captured place cannot escape
+//! expect-stdout: 0
 fn apply(f: fn(i32) -> i32, x: i32) -> i32: f(x)
 
 fn main:
@@ -9,4 +9,5 @@ fn main:
             total
         , 10)
     assert(total == 0)
+    assert(result == 10)
     print(int_to_string(total))
