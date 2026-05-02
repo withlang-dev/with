@@ -91,6 +91,7 @@ the initial migration:
 | Feature | Section | Status |
 |---|---|---|
 | IndexPlace user impl dispatch | §2.4 | done — `5a6dd13` |
+| IndexPlace §6.3 compound single-eval | §6.3 | done — `32033b5` |
 | Scoped/ScopedMut traits removed | §17 | done — `9a9f7d3` |
 
 ## Still deferred (with precise blockers)
