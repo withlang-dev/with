@@ -191,6 +191,9 @@ enum MirIntrinsic: i32:
     MIR_INTRINSIC_VECRANGE_GET = 110
     MIR_INTRINSIC_VECRANGE_SET = 111
     MIR_INTRINSIC_VECRANGE_LEN = 112
+    MIR_INTRINSIC_VEC_ITER_REF = 113
+    MIR_INTRINSIC_VECITERREF_NEXT = 114
+    MIR_INTRINSIC_VEC_GET_REF = 115
 
 // ── Projection kinds ─────────────────────────────────────────────
 

@@ -3012,6 +3012,7 @@ fn Codegen.classify_generic_call_intrinsic(self: Codegen, recv_type: i32, method
         if method_name == "clear": return MirIntrinsic.MIR_INTRINSIC_VEC_CLEAR
         if method_name == "pop": return MirIntrinsic.MIR_INTRINSIC_VEC_POP
         if method_name == "iter": return MirIntrinsic.MIR_INTRINSIC_VEC_ITER
+        if method_name == "iter_ref": return MirIntrinsic.MIR_INTRINSIC_VEC_ITER_REF
         if method_name == "slot": return MirIntrinsic.MIR_INTRINSIC_VEC_SLOT
         if method_name == "get_disjoint": return MirIntrinsic.MIR_INTRINSIC_VEC_GET_DISJOINT
         if method_name == "range": return MirIntrinsic.MIR_INTRINSIC_VEC_RANGE
@@ -3025,6 +3026,10 @@ fn Codegen.classify_generic_call_intrinsic(self: Codegen, recv_type: i32, method
     if type_name == "VecIter":
         if method_name == "next":
             return MirIntrinsic.MIR_INTRINSIC_VECITER_NEXT
+        return MirIntrinsic.MIR_INTRINSIC_NONE
+    if type_name == "VecIterRef":
+        if method_name == "next":
+            return MirIntrinsic.MIR_INTRINSIC_VECITERREF_NEXT
         return MirIntrinsic.MIR_INTRINSIC_NONE
     if type_name == "VecSlot":
         if method_name == "get": return MirIntrinsic.MIR_INTRINSIC_VECSLOT_GET
@@ -3196,6 +3201,17 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         args.push(idx64)
         let raw_ptr = wl_build_call(self.builder, get_ty, get_fn, vec_data_i64(&args), 2)
         result = wl_build_load(self.builder, elem_ty, raw_ptr)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_GET_REF:
+        let gr_recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let gr_idx = self.mir_intrinsic_arg(body, args_id, 1)
+        let gr_idx64 = self.coerce_int(gr_idx, i64_ty)
+        let gr_fn = self.ensure_vec_runtime_fn("with_vec_get_ptr", ptr_ty, 2)
+        let gr_ty = self.get_vec_fn_type("with_vec_get_ptr", ptr_ty, 2)
+        let gr_args: Vec[i64] = Vec.new()
+        gr_args.push(gr_recv_ptr)
+        gr_args.push(gr_idx64)
+        result = wl_build_call(self.builder, gr_ty, gr_fn, vec_data_i64(&gr_args), 2)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_LEN:
         let recv = self.mir_intrinsic_recv_vec_value(body, args_id)
@@ -3903,6 +3919,73 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let f2 = wl_build_struct_gep(self.builder, iter_struct_ty, iter_alloca, 2)
         wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), f2)
         result = wl_build_load(self.builder, iter_struct_ty, iter_alloca)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_ITER_REF:
+        // Vec.iter_ref() — create VecIterRef[T] from Vec (same layout as VecIter)
+        let iref_recv = self.mir_intrinsic_recv_vec_value(body, args_id)
+        let iref_fields: Vec[i64] = Vec.new()
+        iref_fields.push(i64_ty)
+        iref_fields.push(i64_ty)
+        iref_fields.push(i64_ty)
+        let iref_struct_ty = wl_struct_type(self.context, vec_data_i64(&iref_fields), 3, 0)
+        let iref_alloca = wl_build_alloca(self.builder, iref_struct_ty)
+        let iref_data_raw = wl_build_extract_value(self.builder, iref_recv, 0)
+        let iref_data_i64 = wl_build_ptr_to_int(self.builder, iref_data_raw, i64_ty)
+        let iref_f0 = wl_build_struct_gep(self.builder, iref_struct_ty, iref_alloca, 0)
+        wl_build_store(self.builder, iref_data_i64, iref_f0)
+        let iref_vlen = wl_build_extract_value(self.builder, iref_recv, 1)
+        let iref_f1 = wl_build_struct_gep(self.builder, iref_struct_ty, iref_alloca, 1)
+        wl_build_store(self.builder, iref_vlen, iref_f1)
+        let iref_f2 = wl_build_struct_gep(self.builder, iref_struct_ty, iref_alloca, 2)
+        wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), iref_f2)
+        result = wl_build_load(self.builder, iref_struct_ty, iref_alloca)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VECITERREF_NEXT:
+        // VecIterRef[T].next() — advance iterator, return Option[&T] (nullable pointer)
+        let irn_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let irn_fields: Vec[i64] = Vec.new()
+        irn_fields.push(i64_ty)
+        irn_fields.push(i64_ty)
+        irn_fields.push(i64_ty)
+        let irn_struct_ty = wl_struct_type(self.context, vec_data_i64(&irn_fields), 3, 0)
+        let irn_dp_ptr = wl_build_struct_gep(self.builder, irn_struct_ty, irn_ptr, 0)
+        let irn_dp = wl_build_load(self.builder, i64_ty, irn_dp_ptr)
+        let irn_len_ptr = wl_build_struct_gep(self.builder, irn_struct_ty, irn_ptr, 1)
+        let irn_len = wl_build_load(self.builder, i64_ty, irn_len_ptr)
+        let irn_idx_ptr = wl_build_struct_gep(self.builder, irn_struct_ty, irn_ptr, 2)
+        let irn_idx = wl_build_load(self.builder, i64_ty, irn_idx_ptr)
+        let irn_cond = wl_build_icmp(self.builder, wl_int_slt(), irn_idx, irn_len)
+        let irn_some_bb = wl_append_bb(self.context, self.current_function, "iterref.some")
+        let irn_none_bb = wl_append_bb(self.context, self.current_function, "iterref.none")
+        let irn_merge_bb = wl_append_bb(self.context, self.current_function, "iterref.merge")
+        wl_build_cond_br(self.builder, irn_cond, irn_some_bb, irn_none_bb)
+        wl_position_at_end(self.builder, irn_some_bb)
+        let irn_recv_op = body.call_arg_operands.get(arg_start as i64)
+        var irn_elem_ty = self.mir_vec_elem_type(body, irn_recv_op)
+        if irn_elem_ty == 0:
+            irn_elem_ty = i32_ty
+        let irn_typed_ptr = wl_build_int_to_ptr(self.builder, irn_dp, ptr_ty)
+        let irn_gep: Vec[i64] = Vec.new()
+        irn_gep.push(irn_idx)
+        let irn_elem_ptr = wl_build_gep(self.builder, irn_elem_ty, irn_typed_ptr, vec_data_i64(&irn_gep), 1)
+        let irn_next_idx = wl_build_add(self.builder, irn_idx, wl_const_int(i64_ty, 1, 0))
+        wl_build_store(self.builder, irn_next_idx, irn_idx_ptr)
+        wl_build_br(self.builder, irn_merge_bb)
+        let irn_some_bb_end = wl_get_insert_block(self.builder)
+        wl_position_at_end(self.builder, irn_none_bb)
+        let irn_null = wl_const_null(ptr_ty)
+        wl_build_br(self.builder, irn_merge_bb)
+        let irn_none_bb_end = wl_get_insert_block(self.builder)
+        wl_position_at_end(self.builder, irn_merge_bb)
+        let irn_phi = wl_build_phi(self.builder, ptr_ty)
+        let irn_phi_vals: Vec[i64] = Vec.new()
+        let irn_phi_bbs: Vec[i64] = Vec.new()
+        irn_phi_vals.push(irn_elem_ptr)
+        irn_phi_vals.push(irn_null)
+        irn_phi_bbs.push(irn_some_bb_end)
+        irn_phi_bbs.push(irn_none_bb_end)
+        wl_add_incoming(irn_phi, vec_data_i64(&irn_phi_vals), vec_data_i64(&irn_phi_bbs), 2)
+        result = irn_phi
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_SLOT:
         // Vec.slot(index) — create VecSlot[T] from Vec

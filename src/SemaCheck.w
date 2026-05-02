@@ -5905,7 +5905,7 @@ fn Sema.substitute_method_return_for_generic_inst(self: Sema, gi_tid: i32, type_
 fn Sema.builtin_method_is_iter_of_self(self: Sema, type_name_sym: i32, field: i32) -> i32:
     let _ = self
     if type_name_sym == self.syms.vec:
-        if field == self.syms.iter or field == self.syms.keys or field == self.syms.iter_place:
+        if field == self.syms.iter or field == self.syms.keys or field == self.syms.iter_place or field == self.syms.iter_ref:
             return 1
     if type_name_sym == self.syms.hashmap:
         if field == self.syms.iter or field == self.syms.keys:
@@ -6315,6 +6315,14 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
                 let vr_args: Vec[i32] = Vec.new()
                 vr_args.push(vr_elem_ty)
                 return self.ensure_generic_inst_type(self.syms.vecrange, vr_args, 1) as i32
+            if field == self.syms.iter_ref:
+                let iref_elem_ty = self.get_generic_inst_arg(recv_type, 0)
+                let iref_tid = self.find_generic_inst(self.syms.veciterref, iref_elem_ty)
+                if iref_tid != 0:
+                    return iref_tid
+                let iref_args: Vec[i32] = Vec.new()
+                iref_args.push(iref_elem_ty)
+                return self.ensure_generic_inst_type(self.syms.veciterref, iref_args, 1) as i32
             if field == self.syms.iter_place:
                 let ip_elem_ty = self.get_generic_inst_arg(recv_type, 0)
                 let ip_tid = self.find_generic_inst(self.syms.veciterplace, ip_elem_ty)
@@ -6376,6 +6384,18 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
                 let next_args: Vec[i32] = Vec.new()
                 next_args.push(next_elem_ty)
                 return self.ensure_generic_inst_type(self.syms.option, next_args, 1) as i32
+        if type_name_sym == self.syms.veciterref:
+            if field == self.syms.next:
+                let ref_elem_ty = self.get_generic_inst_arg(recv_type, 0)
+                let ref_ty = self.ensure_exact_type(TypeKind.TY_REF, ref_elem_ty, 0, 0) as i32
+                if ref_ty == 0:
+                    return 0
+                let ref_opt_tid = self.find_generic_inst(self.syms.option, ref_ty)
+                if ref_opt_tid != 0:
+                    return ref_opt_tid
+                let ref_opt_args: Vec[i32] = Vec.new()
+                ref_opt_args.push(ref_ty)
+                return self.ensure_generic_inst_type(self.syms.option, ref_opt_args, 1) as i32
         if type_name_sym == self.syms.hashmap:
             if field == self.syms.insert or field == self.syms.clear:
                 return self.ty_void as i32
@@ -7959,6 +7979,9 @@ fn Sema.infer_for_element_type(self: Sema, iter_type: i32) -> i32:
         let base_name = self.pool_resolve(self.get_type_d0(resolved))
         if base_name == "Vec" and self.get_generic_inst_arg_count(resolved as i32) > 0:
             return self.get_generic_inst_arg(resolved as i32, 0)
+        if base_name == "VecIterRef" and self.get_generic_inst_arg_count(resolved as i32) > 0:
+            let iref_elem = self.get_generic_inst_arg(resolved as i32, 0)
+            return self.ensure_exact_type(TypeKind.TY_REF, iref_elem, 0, 0) as i32
         if base_name == "VecIterPlace" and self.get_generic_inst_arg_count(resolved as i32) > 0:
             let vip_elem = self.get_generic_inst_arg(resolved as i32, 0)
             var vip_slot = self.find_generic_inst(self.syms.vecslot, vip_elem)
