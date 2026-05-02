@@ -7454,9 +7454,6 @@ fn unpack_place_kind(packed: i64) -> i32:
 fn unpack_place_mut(packed: i64) -> i32:
     (packed % 4294967296) as i32
 
-// IndexPlace probe (P2.4 stub — hardcoded for stdlib container types).
-// P4 will replace this with an impl-table lookup once lib/std/traits.w
-// declares the IndexPlace trait and Vec/Array/HashMap implement it.
 fn Sema.type_is_index_place(self: Sema, tid: i32) -> i32:
     if tid == 0:
         return 0
@@ -7468,6 +7465,16 @@ fn Sema.type_is_index_place(self: Sema, tid: i32) -> i32:
         let base_sym = self.get_type_d0(resolved)
         if base_sym == self.syms.vec or base_sym == self.syms.hashmap:
             return 1
+        let ip_sym = self.pool_lookup_symbol("IndexPlace")
+        if ip_sym > 0:
+            if self.select_trait_impl(base_sym, ip_sym) != 0:
+                return 1
+    if tk == TypeKind.TY_STRUCT:
+        let struct_sym = self.get_type_d0(resolved)
+        let ip_sym = self.pool_lookup_symbol("IndexPlace")
+        if ip_sym > 0 and struct_sym != 0:
+            if self.select_trait_impl(struct_sym, ip_sym) != 0:
+                return 1
     0
 
 // Returns 1 when the base expression has a type that auto-derefs to a
