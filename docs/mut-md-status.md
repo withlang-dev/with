@@ -69,12 +69,25 @@ Single coordinated commit: `STRICT_NO_MUT_REF=1`, 13 warning-to-error
 promotions, `UOP_MUT_REF` removed from active codepaths, migrator updated,
 49 test files migrated, `MultiIndex.multi_index_set` deprecated alias deleted.
 
-## What got deferred
+## Post-P12 precision & API work (2026-05-01)
 
-- **Disjoint field capture analysis**: §9.2 closure check operates at
-  variable granularity, not field granularity. Two closures accessing
-  different fields of the same `var` trigger a false conflict. Fixable by
-  extending `expr_mutates_place` to track field paths.
+Implemented the remaining mut.md Rev 8 features that were deferred during
+the initial migration:
+
+| Feature | Section | Status |
+|---|---|---|
+| Disjoint field captures | §9.2 | done — `034aff9` |
+| Nested mutating call detection | §5.4 | done — `034aff9` |
+| Disjoint constant-index borrows | §8.1 | done — `e3530a5` |
+| VecSlot scoped access | §10 | done — `83e956d` |
+| VecIterPlace (place-yielding iteration) | §19.5 | done — `903841f` |
+| HashMap.entry() scoped access | §10 | done — `2fa78c3` |
+| Compound assignment single-eval | §6.3 | verified — `7a33f7c` |
+| NLL branch-divergent | §8.4 | already works (AST-walk approach) |
+| Argument independence | §5.5 | already works for common cases |
+
+## Still deferred
+
 - **`move` closure semantics**: `move` closures capture by value (copy), so
   mutations inside them don't affect the original. The §15.9 escape check
   doesn't distinguish `move` from regular closures. Low priority since
@@ -86,6 +99,10 @@ promotions, `UOP_MUT_REF` removed from active codepaths, migrator updated,
 - **Iterator `&T` yields**: `Iter.next` yields owned `T`. When/if iterators
   yield `&T` views, the §15.17 view-bound diagnostic will activate
   automatically through §15.10's read-only-place path.
+- **Disjoint multi-slot access**: `get_disjoint(i, j)` returning tuple of
+  VecSlots. Requires tuple-destructuring in `with` blocks.
+- **Mutable slice APIs**: `split_at_mut`, `get_disjoint_mut` for raw pointer
+  slices. Low priority — VecSlot/VecIterPlace provide the safe alternative.
 
 ## What to watch for
 
