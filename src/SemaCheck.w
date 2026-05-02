@@ -668,7 +668,7 @@ fn Sema.collect_function_labels(self: Sema, node: i32):
             self.collect_function_labels(self.ast.get_extra(extra_start5 + fi2 * 2 + 1))
         return
 
-    if kind == NodeKind.NK_WITH_EXPR or kind == NodeKind.NK_WITH_IMPLICIT:
+    if kind == NodeKind.NK_WITH_EXPR or kind == NodeKind.NK_WITH_IMPLICIT or kind == NodeKind.NK_WITH_TUPLE:
         self.collect_function_labels(self.ast.get_data0(node))
         self.label_registry_enter_scope()
         self.collect_function_labels(self.ast.get_data1(node))
@@ -1040,7 +1040,7 @@ fn Sema.check_expr_reachable_comptime_errors(self: Sema, node: i32):
         self.check_expr_reachable_comptime_errors(self.ast.get_data0(node))
         return
 
-    if kind == NodeKind.NK_PIPELINE or kind == NodeKind.NK_RANGE or kind == NodeKind.NK_WITH_EXPR or kind == NodeKind.NK_WITH_IMPLICIT:
+    if kind == NodeKind.NK_PIPELINE or kind == NodeKind.NK_RANGE or kind == NodeKind.NK_WITH_EXPR or kind == NodeKind.NK_WITH_IMPLICIT or kind == NodeKind.NK_WITH_TUPLE:
         self.check_expr_reachable_comptime_errors(self.ast.get_data0(node))
         self.check_expr_reachable_comptime_errors(self.ast.get_data1(node))
         return
@@ -1627,6 +1627,9 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
 
     if kind == NodeKind.NK_WITH_EXPR:
         return self.check_with_expr(node) as TypeId
+
+    if kind == NodeKind.NK_WITH_TUPLE:
+        return self.check_with_tuple(node) as TypeId
 
     if kind == NodeKind.NK_WITH_IMPLICIT:
         return self.check_with_implicit(node) as TypeId
@@ -3910,7 +3913,48 @@ fn Sema.check_with_expr(self: Sema, node: i32) -> i32:
     self.pop_scope()
     // Form 2 builder rule: `with <expr> as mut x:` returns `x` when body
     // ends in Unit; otherwise returns the final expression value.
-    if is_mut != 0 and body_ty == self.ty_void:
+    if is_mut != 0 and self.with_body_is_unit(body, body_ty):
+        return source_ty as i32
+    body_ty as i32
+
+fn Sema.with_body_is_unit(self: Sema, body: i32, body_ty: TypeId) -> bool:
+    if body_ty == self.ty_void:
+        return true
+    let bk = self.ast.kind(body)
+    if bk == NodeKind.NK_ASSIGN:
+        return true
+    if bk == NodeKind.NK_BLOCK:
+        let tail = self.ast.get_data2(body)
+        if tail != 0 and self.ast.kind(tail) == NodeKind.NK_ASSIGN:
+            return true
+    false
+
+fn Sema.check_with_tuple(self: Sema, node: i32) -> i32:
+    let source = self.ast.get_data0(node)
+    let body = self.ast.get_data1(node)
+    let extra_start = self.ast.get_data2(node)
+    let name_count = self.ast.get_extra(extra_start)
+    let is_mut = self.ast.get_extra(extra_start + 1)
+    let source_ty = self.check_expr(source)
+    let resolved = self.resolve_alias(source_ty as TypeId)
+    let tk = self.get_type_kind(resolved)
+    if tk != TypeKind.TY_TUPLE:
+        self.emit_error("'with ... as (a, b)' requires a tuple expression", node)
+        return 0
+    let tuple_arity = self.get_type_d1(resolved)
+    if tuple_arity != name_count:
+        self.emit_error("tuple binding count does not match tuple arity", node)
+        return 0
+    self.push_scope()
+    let te_start = self.get_type_d0(resolved)
+    for i in 0..name_count:
+        let sym = self.ast.get_extra(extra_start + 2 + i)
+        if sym != 0:
+            let elem_ty = self.type_extra.get((te_start + i) as i64)
+            self.scope_put(sym, elem_ty, is_mut)
+    let body_ty = self.check_expr(body)
+    self.pop_scope()
+    if is_mut != 0 and self.with_body_is_unit(body, body_ty as TypeId):
         return source_ty as i32
     body_ty as i32
 
@@ -7190,6 +7234,10 @@ fn Sema.expr_uses_symbol(self: Sema, node: i32, sym: i32) -> i32:
             return 1
         return self.expr_uses_symbol(self.ast.get_data1(node), sym)
     if kind == NodeKind.NK_WITH_EXPR:
+        if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
+            return 1
+        return self.expr_uses_symbol(self.ast.get_data1(node), sym)
+    if kind == NodeKind.NK_WITH_TUPLE:
         if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
             return 1
         return self.expr_uses_symbol(self.ast.get_data1(node), sym)

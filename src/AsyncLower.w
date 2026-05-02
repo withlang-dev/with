@@ -297,7 +297,7 @@ fn AsyncLower.walk_expr(self: AsyncLower, node: i32):
             self.walk_expr(async_extra_or_zero(self.ast, extra_start + 1 + i))
         return
 
-    if kind == NodeKind.NK_WITH_EXPR:
+    if kind == NodeKind.NK_WITH_EXPR or kind == NodeKind.NK_WITH_TUPLE:
         self.walk_expr(async_ast_get_data0(self.ast, node))
         self.walk_expr(async_ast_get_data1(self.ast, node))
         return

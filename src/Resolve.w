@@ -742,6 +742,19 @@ fn ResolveState.walk_expr(self: ResolveState, pool: AstPool, module_id: i32, par
         self.walk_expr(pool, module_id, parent_def, wi_scope, pool.get_data1(node))
         return
 
+    if kind == NodeKind.NK_WITH_TUPLE:
+        self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data0(node))
+        let wt_scope = self.add_scope(module_id, current_scope, parent_def, ScopeKind.SK_BLOCK)
+        let wt_extra = pool.get_data2(node)
+        let wt_count = pool.get_extra(wt_extra)
+        for wti in 0..wt_count:
+            let wt_sym = pool.get_extra(wt_extra + 2 + wti)
+            if wt_sym != 0:
+                let wt_def = self.add_def(module_id, parent_def, DefKind.DK_LOCAL, wt_sym, pool.get_start(node), pool.get_end(node))
+                self.add_binding(wt_scope, wt_sym, wt_def)
+        self.walk_expr(pool, module_id, parent_def, wt_scope, pool.get_data1(node))
+        return
+
     if kind == NodeKind.NK_ASYNC_BLOCK:
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data0(node))
         return
