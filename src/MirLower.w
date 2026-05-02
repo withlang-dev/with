@@ -863,6 +863,22 @@ fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_nam
             if method_name == "get" or method_name == "remove":
                 if tk == TypeKind.TY_GENERIC_INST:
                     return self.sema.get_generic_inst_arg(resolved, 1)
+            if method_name == "entry":
+                if tk == TypeKind.TY_GENERIC_INST:
+                    let ek = self.sema.get_generic_inst_arg(resolved, 0)
+                    let ev = self.sema.get_generic_inst_arg(resolved, 1)
+                    let he_sym = self.sema.pool_lookup_symbol("HashMapEntry")
+                    let he_args: Vec[i32] = Vec.new()
+                    he_args.push(ek)
+                    he_args.push(ev)
+                    return self.sema.ensure_generic_inst_type(he_sym, he_args, 2) as i32
+            return self.sema.ty_void as i32
+        if type_name == "HashMapEntry":
+            if method_name == "or_insert" or method_name == "get":
+                if tk == TypeKind.TY_GENERIC_INST:
+                    return self.sema.get_generic_inst_arg(resolved, 1)
+            if method_name == "set":
+                return self.sema.ty_void as i32
             return self.sema.ty_void as i32
         if type_name == "HashSet":
             if method_name == "len": return self.sema.ty_i64 as i32
@@ -4103,6 +4119,12 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
         if method_name == "clear": return MirIntrinsic.MIR_INTRINSIC_MAP_CLEAR
         if method_name == "increment": return MirIntrinsic.MIR_INTRINSIC_MAP_INCREMENT
         if method_name == "keys": return MirIntrinsic.MIR_INTRINSIC_MAP_KEYS
+        if method_name == "entry": return MirIntrinsic.MIR_INTRINSIC_MAP_ENTRY
+        return MirIntrinsic.MIR_INTRINSIC_NONE
+    if type_name == "HashMapEntry":
+        if method_name == "or_insert": return MirIntrinsic.MIR_INTRINSIC_ENTRY_OR_INSERT
+        if method_name == "get": return MirIntrinsic.MIR_INTRINSIC_ENTRY_GET
+        if method_name == "set": return MirIntrinsic.MIR_INTRINSIC_ENTRY_SET
         return MirIntrinsic.MIR_INTRINSIC_NONE
     if type_name == "HashSet":
         if method_name == "new": return MirIntrinsic.MIR_INTRINSIC_MAP_NEW
