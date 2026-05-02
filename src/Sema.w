@@ -126,6 +126,7 @@ type SemaBuiltinSymbols {
     join: i32,
     iter: i32,
     slot: i32,
+    get_disjoint: i32,
     filter: i32,
     map: i32,
     fold: i32,
@@ -607,6 +608,7 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         join: 0,
         iter: 0,
         slot: 0,
+        get_disjoint: 0,
         filter: 0,
         map: 0,
         fold: 0,
@@ -1137,6 +1139,7 @@ fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.syms.join = self.pool_intern("join")
     self.syms.iter = self.pool_intern("iter")
     self.syms.slot = self.pool_intern("slot")
+    self.syms.get_disjoint = self.pool_intern("get_disjoint")
     self.syms.filter = self.pool_intern("filter")
     self.syms.map = self.pool_intern("map")
     self.syms.fold = self.pool_intern("fold")

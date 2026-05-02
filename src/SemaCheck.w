@@ -6296,6 +6296,17 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
                 let slot_args: Vec[i32] = Vec.new()
                 slot_args.push(slot_elem_ty)
                 return self.ensure_generic_inst_type(self.syms.vecslot, slot_args, 1) as i32
+            if field == self.syms.get_disjoint:
+                let gd_elem_ty = self.get_generic_inst_arg(recv_type, 0)
+                var gd_slot_tid = self.find_generic_inst(self.syms.vecslot, gd_elem_ty)
+                if gd_slot_tid == 0:
+                    let gd_args: Vec[i32] = Vec.new()
+                    gd_args.push(gd_elem_ty)
+                    gd_slot_tid = self.ensure_generic_inst_type(self.syms.vecslot, gd_args, 1) as i32
+                let gd_elems: Vec[i32] = Vec.new()
+                gd_elems.push(gd_slot_tid)
+                gd_elems.push(gd_slot_tid)
+                return self.ensure_tuple_type(gd_elems, 2) as i32
             if field == self.syms.iter_place:
                 let ip_elem_ty = self.get_generic_inst_arg(recv_type, 0)
                 let ip_tid = self.find_generic_inst(self.syms.veciterplace, ip_elem_ty)
