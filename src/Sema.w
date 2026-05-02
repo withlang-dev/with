@@ -102,6 +102,8 @@ type SemaBuiltinSymbols {
     vec: i32,
     veciter: i32,
     vecslot: i32,
+    veciterplace: i32,
+    iter_place: i32,
     option: i32,
     result: i32,
     hashmap: i32,
@@ -578,6 +580,8 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         vec: 0,
         veciter: 0,
         vecslot: 0,
+        veciterplace: 0,
+        iter_place: 0,
         option: 0,
         result: 0,
         hashmap: 0,
@@ -1103,6 +1107,8 @@ fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.syms.vec = self.pool_intern("Vec")
     self.syms.veciter = self.pool_intern("VecIter")
     self.syms.vecslot = self.pool_intern("VecSlot")
+    self.syms.veciterplace = self.pool_intern("VecIterPlace")
+    self.syms.iter_place = self.pool_intern("iter_place")
     self.syms.option = self.pool_intern("Option")
     self.syms.result = self.pool_intern("Result")
     self.syms.hashmap = self.pool_intern("HashMap")

@@ -180,6 +180,8 @@ enum MirIntrinsic: i32:
     MIR_INTRINSIC_VEC_SLOT = 99
     MIR_INTRINSIC_VECSLOT_GET = 100
     MIR_INTRINSIC_VECSLOT_SET = 101
+    MIR_INTRINSIC_VEC_ITER_PLACE = 102
+    MIR_INTRINSIC_VECITERPLACE_NEXT = 103
 
 // ── Projection kinds ─────────────────────────────────────────────
 

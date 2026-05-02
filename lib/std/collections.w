@@ -54,6 +54,10 @@ type Atomic[T]  {
 ///       s.set(v + 1)
 type VecSlot[T]  { data_ptr: i64, index: i64 }
 
+/// Iterator yielding VecSlot[T] handles for in-place element mutation (§19.5).
+/// Obtain via `vec.iter_place()`. Each `.next()` returns `Option[VecSlot[T]]`.
+type VecIterPlace[T]  { data_ptr: i64, len: i64, idx: i64 }
+
 // ── Iterators ─────────────────────────────────────────────────────
 
 /// Iterator over Vec[T]. Obtain via `vec.iter()`.
