@@ -186,6 +186,7 @@ enum MirIntrinsic: i32:
     MIR_INTRINSIC_ENTRY_OR_INSERT = 105
     MIR_INTRINSIC_ENTRY_GET = 106
     MIR_INTRINSIC_ENTRY_SET = 107
+    MIR_INTRINSIC_VEC_GET_DISJOINT = 108
 
 // ── Projection kinds ─────────────────────────────────────────────
 

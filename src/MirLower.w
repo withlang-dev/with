@@ -4154,6 +4154,7 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
         if method_name == "pop": return MirIntrinsic.MIR_INTRINSIC_VEC_POP
         if method_name == "iter": return MirIntrinsic.MIR_INTRINSIC_VEC_ITER
         if method_name == "slot": return MirIntrinsic.MIR_INTRINSIC_VEC_SLOT
+        if method_name == "get_disjoint": return MirIntrinsic.MIR_INTRINSIC_VEC_GET_DISJOINT
         if method_name == "iter_place": return MirIntrinsic.MIR_INTRINSIC_VEC_ITER_PLACE
         if method_name == "map": return MirIntrinsic.MIR_INTRINSIC_VEC_MAP
         if method_name == "filter": return MirIntrinsic.MIR_INTRINSIC_VEC_FILTER

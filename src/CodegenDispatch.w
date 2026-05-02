@@ -3013,6 +3013,7 @@ fn Codegen.classify_generic_call_intrinsic(self: Codegen, recv_type: i32, method
         if method_name == "pop": return MirIntrinsic.MIR_INTRINSIC_VEC_POP
         if method_name == "iter": return MirIntrinsic.MIR_INTRINSIC_VEC_ITER
         if method_name == "slot": return MirIntrinsic.MIR_INTRINSIC_VEC_SLOT
+        if method_name == "get_disjoint": return MirIntrinsic.MIR_INTRINSIC_VEC_GET_DISJOINT
         if method_name == "iter_place": return MirIntrinsic.MIR_INTRINSIC_VEC_ITER_PLACE
         if method_name == "map": return MirIntrinsic.MIR_INTRINSIC_VEC_MAP
         if method_name == "filter": return MirIntrinsic.MIR_INTRINSIC_VEC_FILTER
@@ -3914,6 +3915,59 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let sf1 = wl_build_struct_gep(self.builder, slot_struct_ty, slot_alloca, 1)
         wl_build_store(self.builder, vs_index, sf1)
         result = wl_build_load(self.builder, slot_struct_ty, slot_alloca)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_GET_DISJOINT:
+        // Vec.get_disjoint(i, j) — return (VecSlot[T], VecSlot[T])
+        // Panics if indices out of bounds or equal
+        let gd_recv = self.mir_intrinsic_recv_vec_value(body, args_id)
+        let gd_i = self.mir_intrinsic_arg(body, args_id, 1)
+        let gd_j = self.mir_intrinsic_arg(body, args_id, 2)
+        let gd_i64 = self.coerce_int(gd_i, i64_ty)
+        let gd_j64 = self.coerce_int(gd_j, i64_ty)
+        let gd_len = wl_build_extract_value(self.builder, gd_recv, 1)
+        let gd_oob_i = wl_build_icmp(self.builder, wl_int_sge(), gd_i64, gd_len)
+        let gd_oob_j = wl_build_icmp(self.builder, wl_int_sge(), gd_j64, gd_len)
+        let gd_oob = wl_build_or(self.builder, gd_oob_i, gd_oob_j)
+        let gd_neg_i = wl_build_icmp(self.builder, wl_int_slt(), gd_i64, wl_const_int(i64_ty, 0, 0))
+        let gd_neg_j = wl_build_icmp(self.builder, wl_int_slt(), gd_j64, wl_const_int(i64_ty, 0, 0))
+        let gd_neg = wl_build_or(self.builder, gd_neg_i, gd_neg_j)
+        let gd_bad_bounds = wl_build_or(self.builder, gd_oob, gd_neg)
+        let gd_same = wl_build_icmp(self.builder, wl_int_eq(), gd_i64, gd_j64)
+        let gd_fail = wl_build_or(self.builder, gd_bad_bounds, gd_same)
+        let gd_panic_bb = wl_append_bb(self.context, self.current_function, "gd.panic")
+        let gd_ok_bb = wl_append_bb(self.context, self.current_function, "gd.ok")
+        wl_build_cond_br(self.builder, gd_fail, gd_panic_bb, gd_ok_bb)
+        wl_position_at_end(self.builder, gd_panic_bb)
+        let _ = wl_build_unreachable(self.builder)
+        wl_position_at_end(self.builder, gd_ok_bb)
+        let gd_data_raw = wl_build_extract_value(self.builder, gd_recv, 0)
+        let gd_data_i64 = wl_build_ptr_to_int(self.builder, gd_data_raw, i64_ty)
+        let gd_slot_fields: Vec[i64] = Vec.new()
+        gd_slot_fields.push(i64_ty)
+        gd_slot_fields.push(i64_ty)
+        let gd_slot_ty = wl_struct_type(self.context, vec_data_i64(&gd_slot_fields), 2, 0)
+        let gd_sa = wl_build_alloca(self.builder, gd_slot_ty)
+        let gd_sa0 = wl_build_struct_gep(self.builder, gd_slot_ty, gd_sa, 0)
+        wl_build_store(self.builder, gd_data_i64, gd_sa0)
+        let gd_sa1 = wl_build_struct_gep(self.builder, gd_slot_ty, gd_sa, 1)
+        wl_build_store(self.builder, gd_i64, gd_sa1)
+        let gd_slot_a = wl_build_load(self.builder, gd_slot_ty, gd_sa)
+        let gd_sb = wl_build_alloca(self.builder, gd_slot_ty)
+        let gd_sb0 = wl_build_struct_gep(self.builder, gd_slot_ty, gd_sb, 0)
+        wl_build_store(self.builder, gd_data_i64, gd_sb0)
+        let gd_sb1 = wl_build_struct_gep(self.builder, gd_slot_ty, gd_sb, 1)
+        wl_build_store(self.builder, gd_j64, gd_sb1)
+        let gd_slot_b = wl_build_load(self.builder, gd_slot_ty, gd_sb)
+        let gd_tup_fields: Vec[i64] = Vec.new()
+        gd_tup_fields.push(gd_slot_ty)
+        gd_tup_fields.push(gd_slot_ty)
+        let gd_tup_ty = wl_struct_type(self.context, vec_data_i64(&gd_tup_fields), 2, 0)
+        let gd_tup = wl_build_alloca(self.builder, gd_tup_ty)
+        let gd_tf0 = wl_build_struct_gep(self.builder, gd_tup_ty, gd_tup, 0)
+        wl_build_store(self.builder, gd_slot_a, gd_tf0)
+        let gd_tf1 = wl_build_struct_gep(self.builder, gd_tup_ty, gd_tup, 1)
+        wl_build_store(self.builder, gd_slot_b, gd_tf1)
+        result = wl_build_load(self.builder, gd_tup_ty, gd_tup)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_ITER_PLACE:
         // Vec.iter_place() — create VecIterPlace[T] from Vec
