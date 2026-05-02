@@ -6059,6 +6059,20 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
                         self.emit_error("conflicting accesses through indexed base in the same call (§15.5)", node)
                         break
                     ai = ai + 1
+            // §5.4 — nested mutating calls on the same simple binding.
+            // Only fires when the outer receiver is a plain variable (not
+            // a field projection like `self.field`), since field-projected
+            // receivers have disjoint mutation targets.
+            if self.ast.kind(expr) == NodeKind.NK_IDENT:
+                let recv_root = self.ast.get_data0(expr)
+                if recv_root != 0:
+                    var ai = 0
+                    while ai < arg_count:
+                        let arg_node = self.ast.get_extra(extra_start + ai)
+                        if self.expr_has_nested_mutating_call_on(arg_node, recv_root) != 0:
+                            self.emit_error("nested mutating calls on the same place; bind the inner result to a local first (§5.4)", node)
+                            break
+                        ai = ai + 1
 
     // Static enum variant constructor: Shape.Rect(1, 2), Option[i32].Some(1)
     if self.static_receiver_type_is_known(expr) != 0 and self.enum_has_variant(obj_type, field) != 0:
@@ -7273,6 +7287,54 @@ fn Sema.expr_indexed_into(self: Sema, node: i32) -> i32:
             return self.expr_indexed_into(self.ast.get_data1(node))
     0
 
+// §5.4 — walk an expression subtree looking for a mutating method call
+// whose receiver is exactly `recv_sym` (a simple binding, not a field
+// projection). This catches `xs.push(xs.pop())` but NOT
+// `self.a.insert(self.b.pop())` where the inner and outer receivers are
+// disjoint fields of the same root.
+fn Sema.expr_has_nested_mutating_call_on(self: Sema, node: i32, recv_sym: i32) -> i32:
+    if node == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_CALL:
+        let callee = self.ast.get_data0(node)
+        if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS:
+            let inner_recv = self.ast.get_data0(callee)
+            // Only match when the inner receiver is directly `recv_sym`,
+            // not `recv_sym.field` (disjoint fields are safe).
+            if self.ast.kind(inner_recv) == NodeKind.NK_IDENT and self.ast.get_data0(inner_recv) == recv_sym:
+                let method = self.ast.get_data1(callee)
+                let inner_ty = self.typed_expr_types.get(inner_recv)
+                if inner_ty.is_some():
+                    let resolved = self.resolve_alias(inner_ty.unwrap() as TypeId)
+                    var inner_resolved = resolved
+                    let itk = self.get_type_kind(inner_resolved)
+                    if itk == TypeKind.TY_PTR or itk == TypeKind.TY_REF:
+                        inner_resolved = self.resolve_alias(self.get_type_d0(inner_resolved) as TypeId)
+                    let owner = self.method_owner_symbol_for_type(inner_resolved as i32)
+                    if owner != 0:
+                        if self.method_has_mut_self_flag(owner, method) != 0 or self.builtin_method_requires_mutable_receiver(owner, method) != 0:
+                            return 1
+        let ea = self.ast.get_data1(node)
+        let ac = self.ast.get_data2(node)
+        var ai = 0
+        while ai < ac:
+            if self.expr_has_nested_mutating_call_on(self.ast.get_extra(ea + ai), recv_sym) != 0:
+                return 1
+            ai = ai + 1
+        return self.expr_has_nested_mutating_call_on(self.ast.get_data0(node), recv_sym)
+    if kind == NodeKind.NK_BINARY:
+        if self.expr_has_nested_mutating_call_on(self.ast.get_data1(node), recv_sym) != 0:
+            return 1
+        return self.expr_has_nested_mutating_call_on(self.ast.get_data2(node), recv_sym)
+    if kind == NodeKind.NK_UNARY:
+        return self.expr_has_nested_mutating_call_on(self.ast.get_data1(node), recv_sym)
+    if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_INDEX or kind == NodeKind.NK_GROUPED:
+        return self.expr_has_nested_mutating_call_on(self.ast.get_data0(node), recv_sym)
+    if kind == NodeKind.NK_CAST:
+        return self.expr_has_nested_mutating_call_on(self.ast.get_data0(node), recv_sym)
+    0
+
 // Get the root symbol of a place expression (ident, field access chain, index).
 fn Sema.place_root_sym(self: Sema, node: i32) -> i32:
     if node == 0:
@@ -7868,6 +7930,34 @@ fn Sema.for_iterable_yields_views(self: Sema, iterable: i32) -> i32:
 
 // docs/mut.md Rev 8 §9.2 / §15.7 — when a call passes a mutating closure,
 // check that no sibling argument retains access to the mutably captured place.
+// §9.2 helper: when arg is `&sym.field` or `sym.field`, return the field sym.
+// Returns 0 for whole-variable access (`&sym`, `sym`, `sym.iter()`).
+// Returns -1 for no access to sym at all.
+fn Sema.arg_accessed_field_of(self: Sema, arg_node: i32, sym: i32) -> i32:
+    if arg_node == 0:
+        return -1
+    let kind = self.ast.kind(arg_node)
+    if kind == NodeKind.NK_UNARY:
+        let op = self.ast.get_data0(arg_node)
+        if op == UnaryOp.UOP_REF or op == UnaryOp.UOP_RAW_REF_CONST or op == UnaryOp.UOP_RAW_REF_MUT:
+            let operand = self.ast.get_data1(arg_node)
+            if self.ast.kind(operand) == NodeKind.NK_FIELD_ACCESS:
+                let base = self.ast.get_data0(operand)
+                if self.ast.kind(base) == NodeKind.NK_IDENT and self.ast.get_data0(base) == sym:
+                    return self.ast.get_data1(operand)
+            if self.place_root_sym(operand) == sym:
+                return 0
+    if kind == NodeKind.NK_FIELD_ACCESS:
+        let base = self.ast.get_data0(arg_node)
+        if self.ast.kind(base) == NodeKind.NK_IDENT and self.ast.get_data0(base) == sym:
+            return self.ast.get_data1(arg_node)
+    if kind == NodeKind.NK_IDENT:
+        if self.ast.get_data0(arg_node) == sym:
+            return 0
+    if kind == NodeKind.NK_GROUPED:
+        return self.arg_accessed_field_of(self.ast.get_data0(arg_node), sym)
+    -1
+
 fn Sema.check_closure_capture_conflicts(self: Sema, extra_start: i32, arg_count: i32, has_resolved: i32, node: i32):
     // Collect closure args that mutably capture a place.
     var ci = 0
@@ -7883,6 +7973,16 @@ fn Sema.check_closure_capture_conflicts(self: Sema, extra_start: i32, arg_count:
         while bi < bind_count:
             let cap_sym = self.bind_names.get(bi as i64)
             if self.expr_mutates_place(closure_body, cap_sym) != 0:
+                // §9.2: if the closure only accesses specific fields, use
+                // field-level disjointness to avoid false conflicts.
+                let field_only = self.capture_is_field_only(closure_body, cap_sym)
+                var closure_field_count = 0
+                if field_only != 0:
+                    while self.capture_field_syms.len() > 0:
+                        self.capture_field_syms.pop()
+                        self.capture_field_kinds.pop()
+                    self.collect_capture_fields(closure_body, cap_sym)
+                    closure_field_count = self.capture_field_syms.len() as i32
                 // Found a mutating capture. Check sibling args.
                 var si = 0
                 while si < arg_count:
@@ -7894,8 +7994,21 @@ fn Sema.check_closure_capture_conflicts(self: Sema, extra_start: i32, arg_count:
                         si = si + 1
                         continue
                     if self.arg_retains_access_to(sib_node, cap_sym) != 0:
-                        let cap_name = self.pool_resolve(cap_sym)
-                        self.emit_error("argument retains access to `" ++ cap_name ++ "` which is mutably captured by a closure in the same call (§15.7)", node)
+                        var conflict = 1
+                        if field_only != 0 and closure_field_count > 0:
+                            let sib_field = self.arg_accessed_field_of(sib_node, cap_sym)
+                            if sib_field > 0:
+                                // Sibling accesses a specific field — check overlap
+                                conflict = 0
+                                var fi = 0
+                                while fi < closure_field_count:
+                                    if self.capture_field_syms.get(fi as i64) == sib_field:
+                                        conflict = 1
+                                        break
+                                    fi = fi + 1
+                        if conflict != 0:
+                            let cap_name = self.pool_resolve(cap_sym)
+                            self.emit_error("argument retains access to `" ++ cap_name ++ "` which is mutably captured by a closure in the same call (§15.7)", node)
                     si = si + 1
             bi = bi + 1
         ci = ci + 1
