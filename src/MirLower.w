@@ -802,6 +802,18 @@ fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_nam
                                 return found
                     return self.sema.named_types.get(vs_sym).unwrap() as i32
                 return self.sema.ty_void as i32
+            if method_name == "iter_place":
+                // Vec.iter_place() returns VecIterPlace[T] with same T as Vec[T].
+                let vip_sym = self.sema.pool_lookup_symbol("VecIterPlace")
+                if self.sema.named_types.contains(vip_sym):
+                    if tk == TypeKind.TY_GENERIC_INST:
+                        let elem_ty = self.sema.get_generic_inst_arg(resolved, 0)
+                        if elem_ty > 0:
+                            let found = self.sema.find_generic_inst(vip_sym, elem_ty)
+                            if found != 0:
+                                return found
+                    return self.sema.named_types.get(vip_sym).unwrap() as i32
+                return self.sema.ty_void as i32
             return self.sema.ty_void as i32
         if type_name == "VecSlot":
             if method_name == "get":
@@ -811,6 +823,25 @@ fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_nam
                     return elem_ty
             if method_name == "set":
                 return self.sema.ty_void as i32
+            return self.sema.ty_void as i32
+        if type_name == "VecIterPlace":
+            if method_name == "next":
+                // VecIterPlace[T].next() returns Option[VecSlot[T]].
+                if tk == TypeKind.TY_GENERIC_INST:
+                    let elem_ty = self.sema.get_generic_inst_arg(resolved, 0)
+                    let vs_sym = self.sema.pool_lookup_symbol("VecSlot")
+                    var vs_tid = self.sema.find_generic_inst(vs_sym, elem_ty)
+                    if vs_tid == 0:
+                        let vs_args: Vec[i32] = Vec.new()
+                        vs_args.push(elem_ty)
+                        vs_tid = self.sema.ensure_generic_inst_type(vs_sym, vs_args, 1) as i32
+                    let opt_sym = self.sema.pool_lookup_symbol("Option")
+                    let opt_tid = self.sema.find_generic_inst(opt_sym, vs_tid)
+                    if opt_tid != 0:
+                        return opt_tid
+                    let opt_args: Vec[i32] = Vec.new()
+                    opt_args.push(vs_tid)
+                    return self.sema.ensure_generic_inst_type(opt_sym, opt_args, 1) as i32
             return self.sema.ty_void as i32
         if type_name == "VecIter":
             if method_name == "next":
@@ -2646,6 +2677,7 @@ fn MirBuilder.lower_for(self: MirBuilder, for_node: i32) -> i32:
                     return self.lower_for_vec(for_node, pat_or_sym, iter_expr, body_expr)
 
     // Handle for x in vec.iter() — redirect to lower_for_vec with the Vec receiver.
+    // Handle for slot in vec.iter_place() — redirect to lower_for_iter_place.
     if self.ast.kind(iter_expr) == NodeKind.NK_CALL:
         let call_callee = self.ast.get_data0(iter_expr)
         if self.ast.kind(call_callee) == NodeKind.NK_FIELD_ACCESS:
@@ -2663,6 +2695,17 @@ fn MirBuilder.lower_for(self: MirBuilder, for_node: i32) -> i32:
                             let recv_name = self.pool.resolve(recv_name_sym)
                             if recv_name == "Vec":
                                 return self.lower_for_vec(for_node, pat_or_sym, recv, body_expr)
+            if mname == "iter_place":
+                let ip_recv_ty = self.expr_type(recv)
+                if ip_recv_ty != 0:
+                    let ip_recv_resolved = self.sema.resolve_alias(ip_recv_ty)
+                    let ip_recv_tk = self.sema.get_type_kind(ip_recv_resolved)
+                    if ip_recv_tk == TypeKind.TY_GENERIC_INST:
+                        let ip_recv_name_sym = self.sema.get_type_name(ip_recv_resolved)
+                        if ip_recv_name_sym != 0:
+                            let ip_recv_name = self.pool.resolve(ip_recv_name_sym)
+                            if ip_recv_name == "Vec":
+                                return self.lower_for_iter_place(for_node, pat_or_sym, recv, body_expr)
 
     // Generic iterator protocol: resolve next() on the iterator type.
     let next_sym = self.pool.intern("next")
@@ -3048,6 +3091,69 @@ fn MirBuilder.lower_for_vec(self: MirBuilder, for_node: i32, pat_or_sym: i32, it
     self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, add_rv, self.ast.get_start(iter_expr))
     self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
 
+    self.pop_control_target()
+    self.switch_to(exit_bb)
+    self.unit_operand()
+
+fn MirBuilder.lower_for_iter_place(self: MirBuilder, for_node: i32, pat_or_sym: i32, vec_expr: i32, body_expr: i32) -> i32:
+    let vec_op = self.lower_expr(vec_expr)
+    let vec_ty = self.expr_type(vec_expr)
+    let slot_ty = self.sema.infer_for_element_type(self.expr_type(self.ast.get_data1(for_node)))
+    let vec_place = self.materialize_operand(vec_op, vec_ty, self.ast.get_start(vec_expr))
+    let len_local = self.new_temp(self.sema.ty_i64)
+    let len_place = self.place_for_local(len_local)
+    let len_args: Vec[i32] = Vec.new()
+    len_args.push(self.body.new_operand(OperandKind.OK_COPY, vec_place))
+    let len_args_id = self.body.new_call_args(len_args)
+    self.body.set_call_intrinsic(len_args_id, MirIntrinsic.MIR_INTRINSIC_VEC_LEN)
+    let len_after_bb = self.new_block()
+    self.terminate(TermKind.TK_CALL, self.unit_operand(), len_args_id, len_place, len_after_bb)
+    self.switch_to(len_after_bb)
+    let counter_local = self.new_temp(self.sema.ty_i64)
+    let counter_place = self.place_for_local(counter_local)
+    let zero_op = self.int_const_operand(0, self.sema.ty_i64)
+    let zero_rv = self.body.new_rvalue(RvalueKind.RK_USE, zero_op, 0, 0)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, zero_rv, self.ast.get_start(vec_expr))
+    let header_bb = self.new_block()
+    let body_bb = self.new_block()
+    let inc_bb = self.new_block()
+    let exit_bb = self.new_block()
+    self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
+    self.push_control_target(self.for_label(for_node), ControlTargetKind.CT_LOOP, inc_bb, exit_bb)
+    self.switch_to(header_bb)
+    let counter_op = self.body.new_operand(OperandKind.OK_COPY, counter_place)
+    let len_op = self.body.new_operand(OperandKind.OK_COPY, len_place)
+    let cmp_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_LT, counter_op, len_op)
+    let cmp_local = self.new_temp(self.sema.ty_bool)
+    let cmp_place = self.place_for_local(cmp_local)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(vec_expr))
+    let cmp_read = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
+    let vals: Vec[i32] = Vec.new()
+    vals.push(1)
+    let targets: Vec[i32] = Vec.new()
+    targets.push(body_bb as i32)
+    let table = self.body.new_switch_table(vals, targets)
+    self.terminate(TermKind.TK_SWITCH_INT, cmp_read, table, exit_bb, 0)
+    self.switch_to(body_bb)
+    let slot_local = self.new_temp(slot_ty)
+    let slot_place = self.place_for_local(slot_local)
+    let slot_args: Vec[i32] = Vec.new()
+    slot_args.push(self.body.new_operand(OperandKind.OK_COPY, vec_place))
+    slot_args.push(self.body.new_operand(OperandKind.OK_COPY, counter_place))
+    let slot_args_id = self.body.new_call_args(slot_args)
+    self.body.set_call_intrinsic(slot_args_id, MirIntrinsic.MIR_INTRINSIC_VEC_SLOT)
+    let slot_after_bb = self.new_block()
+    self.terminate(TermKind.TK_CALL, self.unit_operand(), slot_args_id, slot_place, slot_after_bb)
+    self.switch_to(slot_after_bb)
+    self.bind_for_element(for_node, pat_or_sym, slot_place, slot_ty, body_expr)
+    let _ = self.lower_expr(body_expr)
+    self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
+    self.switch_to(inc_bb)
+    let cur_op2 = self.body.new_operand(OperandKind.OK_COPY, counter_place)
+    let one_op = self.int_const_operand(1, self.sema.ty_i64)
+    let add_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_ADD, cur_op2, one_op)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, add_rv, self.ast.get_start(vec_expr))
+    self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
     self.pop_control_target()
     self.switch_to(exit_bb)
     self.unit_operand()
@@ -3970,6 +4076,7 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
         if method_name == "pop": return MirIntrinsic.MIR_INTRINSIC_VEC_POP
         if method_name == "iter": return MirIntrinsic.MIR_INTRINSIC_VEC_ITER
         if method_name == "slot": return MirIntrinsic.MIR_INTRINSIC_VEC_SLOT
+        if method_name == "iter_place": return MirIntrinsic.MIR_INTRINSIC_VEC_ITER_PLACE
         if method_name == "map": return MirIntrinsic.MIR_INTRINSIC_VEC_MAP
         if method_name == "filter": return MirIntrinsic.MIR_INTRINSIC_VEC_FILTER
         if method_name == "fold": return MirIntrinsic.MIR_INTRINSIC_VEC_FOLD
@@ -3982,6 +4089,9 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
     if type_name == "VecSlot":
         if method_name == "get": return MirIntrinsic.MIR_INTRINSIC_VECSLOT_GET
         if method_name == "set": return MirIntrinsic.MIR_INTRINSIC_VECSLOT_SET
+        return MirIntrinsic.MIR_INTRINSIC_NONE
+    if type_name == "VecIterPlace":
+        if method_name == "next": return MirIntrinsic.MIR_INTRINSIC_VECITERPLACE_NEXT
         return MirIntrinsic.MIR_INTRINSIC_NONE
     if type_name == "HashMap":
         if method_name == "new": return MirIntrinsic.MIR_INTRINSIC_MAP_NEW
