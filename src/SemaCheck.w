@@ -6307,6 +6307,14 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
                 gd_elems.push(gd_slot_tid)
                 gd_elems.push(gd_slot_tid)
                 return self.ensure_tuple_type(gd_elems, 2) as i32
+            if field == self.syms.range_method:
+                let vr_elem_ty = self.get_generic_inst_arg(recv_type, 0)
+                let vr_tid = self.find_generic_inst(self.syms.vecrange, vr_elem_ty)
+                if vr_tid != 0:
+                    return vr_tid
+                let vr_args: Vec[i32] = Vec.new()
+                vr_args.push(vr_elem_ty)
+                return self.ensure_generic_inst_type(self.syms.vecrange, vr_args, 1) as i32
             if field == self.syms.iter_place:
                 let ip_elem_ty = self.get_generic_inst_arg(recv_type, 0)
                 let ip_tid = self.find_generic_inst(self.syms.veciterplace, ip_elem_ty)
@@ -6338,6 +6346,13 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
                 return self.get_generic_inst_arg(recv_type, 0)
             if mc_method_name_raw == "set":
                 return self.ty_void as i32
+        if type_name_sym == self.syms.vecrange:
+            if field == self.syms.get:
+                return self.get_generic_inst_arg(recv_type, 0)
+            if mc_method_name_raw == "set":
+                return self.ty_void as i32
+            if mc_method_name_raw == "len":
+                return self.ty_i64 as i32
         if type_name_sym == self.syms.veciterplace:
             if field == self.syms.next:
                 let ip_elem_ty = self.get_generic_inst_arg(recv_type, 0)

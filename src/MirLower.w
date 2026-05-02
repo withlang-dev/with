@@ -4155,6 +4155,7 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
         if method_name == "iter": return MirIntrinsic.MIR_INTRINSIC_VEC_ITER
         if method_name == "slot": return MirIntrinsic.MIR_INTRINSIC_VEC_SLOT
         if method_name == "get_disjoint": return MirIntrinsic.MIR_INTRINSIC_VEC_GET_DISJOINT
+        if method_name == "range": return MirIntrinsic.MIR_INTRINSIC_VEC_RANGE
         if method_name == "iter_place": return MirIntrinsic.MIR_INTRINSIC_VEC_ITER_PLACE
         if method_name == "map": return MirIntrinsic.MIR_INTRINSIC_VEC_MAP
         if method_name == "filter": return MirIntrinsic.MIR_INTRINSIC_VEC_FILTER
@@ -4168,6 +4169,11 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
     if type_name == "VecSlot":
         if method_name == "get": return MirIntrinsic.MIR_INTRINSIC_VECSLOT_GET
         if method_name == "set": return MirIntrinsic.MIR_INTRINSIC_VECSLOT_SET
+        return MirIntrinsic.MIR_INTRINSIC_NONE
+    if type_name == "VecRange":
+        if method_name == "get": return MirIntrinsic.MIR_INTRINSIC_VECRANGE_GET
+        if method_name == "set": return MirIntrinsic.MIR_INTRINSIC_VECRANGE_SET
+        if method_name == "len": return MirIntrinsic.MIR_INTRINSIC_VECRANGE_LEN
         return MirIntrinsic.MIR_INTRINSIC_NONE
     if type_name == "VecIterPlace":
         if method_name == "next": return MirIntrinsic.MIR_INTRINSIC_VECITERPLACE_NEXT

@@ -376,6 +376,9 @@ type Codegen {
     sym_result: i32,
     sym_hashmap: i32,
     sym_hashset: i32,
+    sym_vecslot: i32,
+    sym_vecrange: i32,
+    sym_veciterplace: i32,
     sym_box: i32,
     sym_context_error: i32,
     sym_Self: i32,
@@ -710,6 +713,9 @@ fn Codegen.init_with_opt_and_intern(module_name: str, opt_level: i32, intern: In
     cg.sym_result = cg.intern.intern("Result")
     cg.sym_hashmap = cg.intern.intern("HashMap")
     cg.sym_hashset = cg.intern.intern("HashSet")
+    cg.sym_vecslot = cg.intern.intern("VecSlot")
+    cg.sym_vecrange = cg.intern.intern("VecRange")
+    cg.sym_veciterplace = cg.intern.intern("VecIterPlace")
     cg.sym_box = cg.intern.intern("Box")
     cg.sym_context_error = cg.intern.intern("ContextError")
     cg.sym_Self = cg.intern.intern("Self")
@@ -769,7 +775,8 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         current_function_name_sym: 0,
         current_method_owner_sym: 0,
         sym_vec: 0, sym_option: 0, sym_result: 0, sym_hashmap: 0,
-        sym_hashset: 0, sym_box: 0, sym_context_error: 0,
+        sym_hashset: 0, sym_vecslot: 0, sym_vecrange: 0, sym_veciterplace: 0,
+        sym_box: 0, sym_context_error: 0,
         sym_Self: 0, sym_self: 0, sym_unit: 0,
         sym_bool: 0, sym_usize: 0, sym_isize: 0, sym_void: 0,
         sym_never: 0, sym_str: 0,
@@ -2457,6 +2464,26 @@ fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
             let err_ty = self.sema_type_to_llvm(err_tid)
             if ok_ty != 0 and err_ty != 0:
                 return self.get_or_create_result_type(resolved_tid, ok_ty, err_ty)
+        // VecSlot[T] = { data_ptr: i64, index: i64 }
+        if cg_base_sym == self.sym_vecslot:
+            let vs_fields: Vec[i64] = Vec.new()
+            vs_fields.push(wl_i64_type(self.context))
+            vs_fields.push(wl_i64_type(self.context))
+            return wl_struct_type(self.context, vec_data_i64(&vs_fields), 2, 0)
+        // VecRange[T] = { data_ptr: i64, offset: i64, len: i64 }
+        if cg_base_sym == self.sym_vecrange:
+            let vr_fields: Vec[i64] = Vec.new()
+            vr_fields.push(wl_i64_type(self.context))
+            vr_fields.push(wl_i64_type(self.context))
+            vr_fields.push(wl_i64_type(self.context))
+            return wl_struct_type(self.context, vec_data_i64(&vr_fields), 3, 0)
+        // VecIterPlace[T] = { data_ptr: i64, len: i64, idx: i64 }
+        if cg_base_sym == self.sym_veciterplace:
+            let vip_fields: Vec[i64] = Vec.new()
+            vip_fields.push(wl_i64_type(self.context))
+            vip_fields.push(wl_i64_type(self.context))
+            vip_fields.push(wl_i64_type(self.context))
+            return wl_struct_type(self.context, vec_data_i64(&vip_fields), 3, 0)
         // User-defined generic structs: monomorphize via type bindings
         if cg_base_sym != 0 and self.generic_structs.contains(cg_base_sym):
             let saved_len = self.type_bindings_len
