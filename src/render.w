@@ -720,6 +720,29 @@ fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
         out = out ++ render_expr(pool, intern, (body) as NodeId, indent + 2)
         return out
 
+    if kind == NodeKind.NK_WITH_TUPLE:
+        let wt_source = pool.get_data0(node)
+        let wt_body = pool.get_data1(node)
+        let wt_extra = pool.get_data2(node)
+        let wt_count = pool.get_extra(wt_extra)
+        let wt_mut = pool.get_extra(wt_extra + 1)
+        var wt_out = prefix ++ "with " ++ render_expr(pool, intern, (wt_source) as NodeId, 0)
+        if wt_mut != 0:
+            wt_out = wt_out ++ " as mut ("
+        else:
+            wt_out = wt_out ++ " as ("
+        for wti in 0..wt_count:
+            if wti > 0:
+                wt_out = wt_out ++ ", "
+            let wt_sym = pool.get_extra(wt_extra + 2 + wti)
+            if wt_sym == 0:
+                wt_out = wt_out ++ "_"
+            else:
+                wt_out = wt_out ++ intern.resolve(wt_sym)
+        wt_out = wt_out ++ "):\n"
+        wt_out = wt_out ++ render_expr(pool, intern, (wt_body) as NodeId, indent + 2)
+        return wt_out
+
     if kind == NodeKind.NK_WITH_IMPLICIT:
         let wi_source = pool.get_data0(node)
         let wi_body = pool.get_data1(node)

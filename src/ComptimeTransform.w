@@ -750,7 +750,7 @@ fn AstPool.ct_clone_tree_with_subst(self: AstPool, node: i32, subst_sym: i32, su
         let base = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
         return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), base, self.get_data1(node), new_extra, self.literal_suffix(node))
 
-    if kind == NodeKind.NK_WITH_EXPR:
+    if kind == NodeKind.NK_WITH_EXPR or kind == NodeKind.NK_WITH_TUPLE:
         let source = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
         let body = self.ct_clone_tree_with_subst(self.get_data1(node), subst_sym, subst_node, index_sym, index_node)
         return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), source, body, self.get_data2(node), self.literal_suffix(node))
@@ -1077,7 +1077,7 @@ fn Sema.ct_transform_expr(mut self: Sema, source_ast: AstPool, pool: AstPool, in
             pool.state.extra.set_i32(idx as i64, self.ct_transform_expr(source_ast, pool, intern, pool.get_extra(idx)))
         return node
 
-    if kind == NodeKind.NK_WITH_EXPR:
+    if kind == NodeKind.NK_WITH_EXPR or kind == NodeKind.NK_WITH_TUPLE:
         pool.set_data0(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data0(node)))
         pool.set_data1(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data1(node)))
         return node

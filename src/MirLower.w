@@ -488,7 +488,7 @@ fn MirBuilder.collect_goto_label_depths(self: MirBuilder, node: i32, scope_depth
         for fi2 in 0..field_count2:
             self.collect_goto_label_depths(self.ast.get_extra(field_start2 + fi2 * 2 + 1), scope_depth)
         return
-    if kind == NodeKind.NK_WITH_EXPR or kind == NodeKind.NK_WITH_IMPLICIT:
+    if kind == NodeKind.NK_WITH_EXPR or kind == NodeKind.NK_WITH_IMPLICIT or kind == NodeKind.NK_WITH_TUPLE:
         self.collect_goto_label_depths(self.ast.get_data0(node), scope_depth)
         self.collect_goto_label_depths(self.ast.get_data1(node), scope_depth + 1)
         return
@@ -4544,11 +4544,64 @@ fn MirBuilder.lower_with_binding(self: MirBuilder, sym: i32, rhs_expr: i32, body
     self.assign_operand_to_place(self.place_for_local(local), rhs, self.ast.get_start(rhs_expr))
     let result = self.lower_expr(body_expr)
     // Form 2 builder rule: when mut and body is unit, return the binding
-    let body_ty = self.expr_type(body_expr)
-    if is_mut != 0 and (body_ty == 0 or body_ty == self.sema.ty_void):
+    if is_mut != 0 and self.with_body_is_unit(body_expr):
         let local_place = self.place_for_local(local)
         self.pop_scope_inline()
         return self.body.new_operand(OperandKind.OK_COPY, local_place)
+    self.pop_scope_inline()
+    result
+
+fn MirBuilder.with_body_is_unit(self: MirBuilder, body_expr: i32) -> bool:
+    let body_ty = self.expr_type(body_expr)
+    if body_ty == 0 or body_ty == self.sema.ty_void:
+        return true
+    let bk = self.ast.kind(body_expr)
+    if bk == NodeKind.NK_ASSIGN:
+        return true
+    if bk == NodeKind.NK_BLOCK:
+        let tail = self.ast.get_data2(body_expr)
+        if tail != 0 and self.ast.kind(tail) == NodeKind.NK_ASSIGN:
+            return true
+    false
+
+fn MirBuilder.lower_with_tuple(self: MirBuilder, node: i32) -> i32:
+    let source = self.ast.get_data0(node)
+    let body = self.ast.get_data1(node)
+    let extra_start = self.ast.get_data2(node)
+    let name_count = self.ast.get_extra(extra_start)
+    let is_mut = self.ast.get_extra(extra_start + 1)
+    let rhs_ty = self.expr_type(source)
+    let rhs_op = self.lower_expr(source)
+    let rhs_place = self.materialize_operand(rhs_op, rhs_ty, self.ast.get_start(source))
+    self.push_scope()
+    if is_mut != 0:
+        for ni in 0..name_count:
+            let n_sym = self.ast.get_extra(extra_start + 2 + ni)
+            if n_sym == 0:
+                continue
+            let elem_ty = self.tuple_elem_type(rhs_ty, ni)
+            let field_place = self.body.new_field_place(rhs_place, ni, elem_ty)
+            self.bind_alias_place(n_sym, field_place, elem_ty)
+        let body_result = self.lower_expr(body)
+        self.pop_scope_inline()
+        if self.with_body_is_unit(body):
+            return self.body.new_operand(OperandKind.OK_COPY, rhs_place)
+        return body_result
+    for ni in 0..name_count:
+        let n_sym = self.ast.get_extra(extra_start + 2 + ni)
+        if n_sym == 0:
+            continue
+        let elem_ty = self.tuple_elem_type(rhs_ty, ni)
+        let local_id = self.body.new_local(elem_ty, is_mut, n_sym, 1)
+        self.bind_local(n_sym, local_id)
+        self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(node))
+        if self.sema.is_copy(elem_ty) == 0:
+            self.schedule_drop(local_id, DropKind.DK_VALUE)
+        let field_place = self.body.new_field_place(rhs_place, ni, elem_ty)
+        let field_op = self.body.new_operand(OperandKind.OK_COPY, field_place)
+        let dst_place = self.place_for_local(local_id)
+        self.assign_operand_to_place(dst_place, field_op, self.ast.get_start(node))
+    let result = self.lower_expr(body)
     self.pop_scope_inline()
     result
 
@@ -5144,6 +5197,9 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         let wi_body = self.ast.get_data1(node)
         let wi_name = self.ast.get_data2(node)
         return self.lower_with_binding(wi_name, wi_source, wi_body, self.ast.get_start(node))
+
+    if kind == NodeKind.NK_WITH_TUPLE:
+        return self.lower_with_tuple(node)
 
     if kind == NodeKind.NK_STRUCT_LIT:
         let sl_fields_start = self.ast.get_data1(node)

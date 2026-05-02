@@ -97,6 +97,9 @@ enum NodeKind: i32:
     // NK_GOTO:  d0=label_sym, d1=0, d2=0
     NK_LABEL = 115
     NK_GOTO = 116
+    // NK_WITH_TUPLE: d0=source_expr, d1=body_expr, d2=extra_start
+    // Extra: [name_count, is_mut, sym0, sym1, ...]
+    NK_WITH_TUPLE = 117
     // Type expressions
     NK_TYPE_NAMED = 80
     NK_TYPE_GENERIC = 81

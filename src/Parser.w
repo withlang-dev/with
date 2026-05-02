@@ -5439,6 +5439,42 @@ fn Parser.parse_with_expr(self: Parser) -> NodeId:
     if self.peek() == TokenKind.TK_KW_MUT:
         is_mut = 1
         self.advance()
+    if self.peek() == TokenKind.TK_L_PAREN:
+        self.advance()
+        self.skip_newlines()
+        let names: Vec[i32] = Vec.new()
+        while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
+            if self.peek() == TokenKind.TK_IDENT:
+                let n_sym = self.intern_current()
+                self.advance()
+                if self.intern.resolve(n_sym) == "_":
+                    names.push(0)
+                else:
+                    names.push(n_sym)
+            else:
+                self.emit_error("tuple destructuring in 'with' requires identifier bindings")
+                break
+            self.skip_newlines()
+            if self.peek() == TokenKind.TK_COMMA:
+                self.advance()
+                self.skip_newlines()
+            else:
+                break
+        self.expect(TokenKind.TK_R_PAREN)
+        var tbody: NodeId = 0 as NodeId
+        if self.peek() == TokenKind.TK_L_BRACE:
+            self.advance()
+            tbody = self.parse_braced_body()
+        else:
+            if self.peek() == TokenKind.TK_COLON:
+                self.advance()
+            tbody = self.parse_block_or_expr()
+        let extra_start = self.pool.extra_len()
+        self.pool.add_extra(names.len() as i32)
+        self.pool.add_extra(is_mut)
+        for ni in 0..names.len() as i32:
+            self.pool.add_extra(names.get(ni as i64))
+        return self.pool.add_node(NodeKind.NK_WITH_TUPLE, start, self.prev_end(), source, tbody, extra_start)
     let name = self.expect_ident()
     var body: NodeId = 0 as NodeId
     if self.peek() == TokenKind.TK_L_BRACE:
