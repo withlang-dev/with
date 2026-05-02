@@ -38,16 +38,6 @@ pub trait Clone =
 pub trait Drop =
     fn drop(self) -> void
 
-/// Scoped access (immutable). Used with `with` blocks for lock-based access.
-pub trait Scoped =
-    fn enter(self) -> Self
-    fn exit(self) -> void
-
-/// Scoped access (mutable). Used with `with` blocks for mutable lock-based access.
-pub trait ScopedMut =
-    fn enter(self) -> Self
-    fn exit(self) -> void
-
 /// Iterator protocol. Call `.next()` to advance the iterator and return
 /// `Option[T]` — `Some(val)` or `None`. The receiver is `mut self: Self`
 /// (docs/mut.md Rev 8 §11.1) — the iterator's place is mutated in-place
