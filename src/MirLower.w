@@ -998,8 +998,7 @@ fn MirBuilder.is_user_index_place(self: MirBuilder, base_ty: i32) -> i32:
         return 0
     if tk == TypeKind.TY_GENERIC_INST:
         let base_sym = self.sema.get_generic_inst_base(resolved)
-        let name = self.pool.resolve_symbol(base_sym)
-        if name == "Vec" or name == "HashMap":
+        if base_sym == self.sema.syms.vec or base_sym == self.sema.syms.hashmap:
             return 0
     if self.sema.type_is_index_place(base_ty) != 0:
         return 1
@@ -2274,11 +2273,36 @@ fn MirBuilder.lower_assign(self: MirBuilder, place_expr: i32, rhs_expr: i32):
             if ip_fn_sym != 0:
                 let ip_recv_op = self.lower_expr(self.ast.get_data0(place_expr))
                 let ip_idx_op = self.lower_expr(self.ast.get_data1(place_expr))
-                let ip_val_op = self.lower_expr(rhs_expr)
+                let ip_idx_ty = self.expr_type(self.ast.get_data1(place_expr))
+                let ip_idx_tmp = self.new_temp(ip_idx_ty)
+                let ip_idx_place = self.place_for_local(ip_idx_tmp)
+                self.assign_operand_to_place(ip_idx_place, ip_idx_op, self.ast.get_start(place_expr))
+                var ip_val_op = 0
+                let ip_is_compound = self.ast.kind(rhs_expr) == NodeKind.NK_BINARY and self.ast.get_data1(rhs_expr) == place_expr
+                if ip_is_compound:
+                    let ip_get_sym = self.sema.pool_lookup_symbol("get")
+                    let ip_get_fn = self.sema.lookup_method_fn(ip_type_sym, ip_get_sym)
+                    let ip_get_fn_op = self.const_operand(ConstKind.CK_FN, ip_get_fn, self.expr_type(place_expr))
+                    let ip_get_args: Vec[i32] = Vec.new()
+                    ip_get_args.push(ip_recv_op)
+                    ip_get_args.push(self.body.new_operand(OperandKind.OK_COPY, ip_idx_place))
+                    let ip_get_args_id = self.body.new_call_args(ip_get_args)
+                    let ip_cur_ty = self.expr_type(place_expr)
+                    let ip_cur_tmp = self.new_temp(ip_cur_ty)
+                    let ip_cur_place = self.place_for_local(ip_cur_tmp)
+                    let ip_get_next = self.new_block()
+                    self.terminate(TermKind.TK_CALL, ip_get_fn_op, ip_get_args_id, ip_cur_place, ip_get_next)
+                    self.switch_to(ip_get_next)
+                    let ip_cur_val = self.body.new_operand(OperandKind.OK_COPY, ip_cur_place)
+                    let ip_ca_op = self.ast.get_data0(rhs_expr)
+                    let ip_inc_val = self.lower_expr(self.ast.get_data2(rhs_expr))
+                    ip_val_op = self.lower_bin_op_operand(ip_ca_op, ip_cur_val, ip_inc_val, ip_cur_ty, self.ast.get_start(place_expr))
+                else:
+                    ip_val_op = self.lower_expr(rhs_expr)
                 let ip_fn_op = self.const_operand(ConstKind.CK_FN, ip_fn_sym, self.sema.ty_void)
                 let ip_args: Vec[i32] = Vec.new()
                 ip_args.push(ip_recv_op)
-                ip_args.push(ip_idx_op)
+                ip_args.push(self.body.new_operand(OperandKind.OK_COPY, ip_idx_place))
                 ip_args.push(ip_val_op)
                 let ip_args_id = self.body.new_call_args(ip_args)
                 let ip_next_bb = self.new_block()
