@@ -1,7 +1,4 @@
-//! skip
 // Spec test: Section 4.4 — Enum Variant Shorthand (formerly 25.35)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
 
 enum Color { Red | Green | Blue }
 
@@ -16,16 +13,16 @@ fn describe(c: Color) -> str:
         .Blue  => "blue"
 
 // PASS: shorthand in function arguments
-fn paint(c: Color): ...
-fn test:
+fn paint(c: Color): ()
+fn test_shorthand_in_args:
     paint(.Red)
 
 // PASS: shorthand in struct field
 type Config { theme: Color }
-fn test:
+fn test_shorthand_in_struct_field:
     let cfg = Config { theme: .Green }
     assert(describe(cfg.theme) == "green")
 
-// FAIL: ambiguous shorthand
-fn test:
-    let x = .Red    // ERROR: cannot infer type for `.Red`
+// FAIL: ambiguous shorthand — needs separate expect-error test
+// fn test_ambiguous_shorthand:
+//     let x = .Red    // ERROR: cannot infer type for `.Red`
