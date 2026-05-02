@@ -3012,6 +3012,7 @@ fn Codegen.classify_generic_call_intrinsic(self: Codegen, recv_type: i32, method
         if method_name == "clear": return MirIntrinsic.MIR_INTRINSIC_VEC_CLEAR
         if method_name == "pop": return MirIntrinsic.MIR_INTRINSIC_VEC_POP
         if method_name == "iter": return MirIntrinsic.MIR_INTRINSIC_VEC_ITER
+        if method_name == "slot": return MirIntrinsic.MIR_INTRINSIC_VEC_SLOT
         if method_name == "map": return MirIntrinsic.MIR_INTRINSIC_VEC_MAP
         if method_name == "filter": return MirIntrinsic.MIR_INTRINSIC_VEC_FILTER
         if method_name == "fold": return MirIntrinsic.MIR_INTRINSIC_VEC_FOLD
@@ -3021,6 +3022,10 @@ fn Codegen.classify_generic_call_intrinsic(self: Codegen, recv_type: i32, method
     if type_name == "VecIter":
         if method_name == "next":
             return MirIntrinsic.MIR_INTRINSIC_VECITER_NEXT
+        return MirIntrinsic.MIR_INTRINSIC_NONE
+    if type_name == "VecSlot":
+        if method_name == "get": return MirIntrinsic.MIR_INTRINSIC_VECSLOT_GET
+        if method_name == "set": return MirIntrinsic.MIR_INTRINSIC_VECSLOT_SET
         return MirIntrinsic.MIR_INTRINSIC_NONE
     if type_name == "HashMap":
         if method_name == "new": return MirIntrinsic.MIR_INTRINSIC_MAP_NEW
@@ -3680,6 +3685,67 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let f2 = wl_build_struct_gep(self.builder, iter_struct_ty, iter_alloca, 2)
         wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), f2)
         result = wl_build_load(self.builder, iter_struct_ty, iter_alloca)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_SLOT:
+        // Vec.slot(index) — create VecSlot[T] from Vec
+        // VecSlot = { data_ptr: i64, index: i64 }
+        let vs_recv = self.mir_intrinsic_recv_vec_value(body, args_id)
+        let vs_index = self.mir_intrinsic_arg(body, args_id, 1)
+        let slot_fields: Vec[i64] = Vec.new()
+        slot_fields.push(i64_ty)
+        slot_fields.push(i64_ty)
+        let slot_struct_ty = wl_struct_type(self.context, vec_data_i64(&slot_fields), 2, 0)
+        let slot_alloca = wl_build_alloca(self.builder, slot_struct_ty)
+        let vs_data_raw = wl_build_extract_value(self.builder, vs_recv, 0)
+        let vs_data_i64 = wl_build_ptr_to_int(self.builder, vs_data_raw, i64_ty)
+        let sf0 = wl_build_struct_gep(self.builder, slot_struct_ty, slot_alloca, 0)
+        wl_build_store(self.builder, vs_data_i64, sf0)
+        let sf1 = wl_build_struct_gep(self.builder, slot_struct_ty, slot_alloca, 1)
+        wl_build_store(self.builder, vs_index, sf1)
+        result = wl_build_load(self.builder, slot_struct_ty, slot_alloca)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VECSLOT_GET:
+        // VecSlot[T].get() — load element from data_ptr[index]
+        // VecSlot = { data_ptr: i64, index: i64 }
+        let sg_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let sg_dest_sema = self.mir_intrinsic_dest_sema_type(body, dest_place)
+        var sg_elem_ty: i64 = 0
+        if sg_dest_sema > 0:
+            sg_elem_ty = self.mir_sema_type_to_llvm(self.mir_input.mir_resolve_alias(sg_dest_sema))
+        if sg_elem_ty == 0:
+            sg_elem_ty = i32_ty
+        let sg_fields: Vec[i64] = Vec.new()
+        sg_fields.push(i64_ty)
+        sg_fields.push(i64_ty)
+        let sg_struct_ty = wl_struct_type(self.context, vec_data_i64(&sg_fields), 2, 0)
+        let sg_dp = wl_build_struct_gep(self.builder, sg_struct_ty, sg_ptr, 0)
+        let sg_data = wl_build_load(self.builder, i64_ty, sg_dp)
+        let sg_ip = wl_build_struct_gep(self.builder, sg_struct_ty, sg_ptr, 1)
+        let sg_idx = wl_build_load(self.builder, i64_ty, sg_ip)
+        let sg_typed_ptr = wl_build_int_to_ptr(self.builder, sg_data, ptr_ty)
+        let sg_gep_indices: Vec[i64] = Vec.new()
+        sg_gep_indices.push(sg_idx)
+        let sg_elem_ptr = wl_build_gep(self.builder, sg_elem_ty, sg_typed_ptr, vec_data_i64(&sg_gep_indices), 1)
+        result = wl_build_load(self.builder, sg_elem_ty, sg_elem_ptr)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VECSLOT_SET:
+        // VecSlot[T].set(value) — store value at data_ptr[index]
+        let ss_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let ss_val = self.mir_intrinsic_arg(body, args_id, 1)
+        let ss_elem_ty = wl_type_of(ss_val)
+        let ss_fields: Vec[i64] = Vec.new()
+        ss_fields.push(i64_ty)
+        ss_fields.push(i64_ty)
+        let ss_struct_ty = wl_struct_type(self.context, vec_data_i64(&ss_fields), 2, 0)
+        let ss_dp = wl_build_struct_gep(self.builder, ss_struct_ty, ss_ptr, 0)
+        let ss_data = wl_build_load(self.builder, i64_ty, ss_dp)
+        let ss_ip = wl_build_struct_gep(self.builder, ss_struct_ty, ss_ptr, 1)
+        let ss_idx = wl_build_load(self.builder, i64_ty, ss_ip)
+        let ss_typed_ptr = wl_build_int_to_ptr(self.builder, ss_data, ptr_ty)
+        let ss_gep_indices: Vec[i64] = Vec.new()
+        ss_gep_indices.push(ss_idx)
+        let ss_elem_ptr = wl_build_gep(self.builder, ss_elem_ty, ss_typed_ptr, vec_data_i64(&ss_gep_indices), 1)
+        wl_build_store(self.builder, ss_val, ss_elem_ptr)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_LOAD:
         // Atomic[T].load(order) — atomic load from field 0 (val)

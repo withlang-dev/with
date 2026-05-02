@@ -45,6 +45,15 @@ type Atomic[T]  {
     val: T,
 }
 
+// ── Scoped access ────────────────────────────────────────────────
+
+/// Scoped handle to a single Vec element (docs/mut.md Rev 8 §10).
+/// Obtain via `vec.slot(index)`. Use with `with`:
+///   with xs.slot(i) as mut s:
+///       let v = s.get()
+///       s.set(v + 1)
+type VecSlot[T]  { data_ptr: i64, index: i64 }
+
 // ── Iterators ─────────────────────────────────────────────────────
 
 /// Iterator over Vec[T]. Obtain via `vec.iter()`.

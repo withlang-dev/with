@@ -101,6 +101,7 @@ type SemaBuiltinSymbols {
     self_type: i32,
     vec: i32,
     veciter: i32,
+    vecslot: i32,
     option: i32,
     result: i32,
     hashmap: i32,
@@ -119,6 +120,7 @@ type SemaBuiltinSymbols {
     contains: i32,
     join: i32,
     iter: i32,
+    slot: i32,
     filter: i32,
     map: i32,
     fold: i32,
@@ -575,6 +577,7 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         self_type: 0,
         vec: 0,
         veciter: 0,
+        vecslot: 0,
         option: 0,
         result: 0,
         hashmap: 0,
@@ -593,6 +596,7 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         contains: 0,
         join: 0,
         iter: 0,
+        slot: 0,
         filter: 0,
         map: 0,
         fold: 0,
@@ -1098,6 +1102,7 @@ fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.syms.self_type = self.pool_intern("Self")
     self.syms.vec = self.pool_intern("Vec")
     self.syms.veciter = self.pool_intern("VecIter")
+    self.syms.vecslot = self.pool_intern("VecSlot")
     self.syms.option = self.pool_intern("Option")
     self.syms.result = self.pool_intern("Result")
     self.syms.hashmap = self.pool_intern("HashMap")
@@ -1116,6 +1121,7 @@ fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.syms.contains = self.pool_intern("contains")
     self.syms.join = self.pool_intern("join")
     self.syms.iter = self.pool_intern("iter")
+    self.syms.slot = self.pool_intern("slot")
     self.syms.filter = self.pool_intern("filter")
     self.syms.map = self.pool_intern("map")
     self.syms.fold = self.pool_intern("fold")

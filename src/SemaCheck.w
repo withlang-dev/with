@@ -6244,6 +6244,14 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
                 let iter_args: Vec[i32] = Vec.new()
                 iter_args.push(iter_elem_ty)
                 return self.ensure_generic_inst_type(self.syms.veciter, iter_args, 1) as i32
+            if field == self.syms.slot:
+                let slot_elem_ty = self.get_generic_inst_arg(recv_type, 0)
+                let slot_tid = self.find_generic_inst(self.syms.vecslot, slot_elem_ty)
+                if slot_tid != 0:
+                    return slot_tid
+                let slot_args: Vec[i32] = Vec.new()
+                slot_args.push(slot_elem_ty)
+                return self.ensure_generic_inst_type(self.syms.vecslot, slot_args, 1) as i32
             if field == self.syms.filter:
                 return recv_type as i32
             if field == self.syms.map:
@@ -6262,6 +6270,11 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
                 if arg_count >= 1:
                     return arg_types.get(0)
                 return self.get_generic_inst_arg(recv_type, 0)
+        if type_name_sym == self.syms.vecslot:
+            if field == self.syms.get:
+                return self.get_generic_inst_arg(recv_type, 0)
+            if mc_method_name_raw == "set":
+                return self.ty_void as i32
         if type_name_sym == self.syms.veciter:
             if field == self.syms.next:
                 let next_elem_ty = self.get_generic_inst_arg(recv_type, 0)

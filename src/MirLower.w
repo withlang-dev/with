@@ -790,6 +790,27 @@ fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_nam
                                 return found
                     return self.sema.named_types.get(vi_sym).unwrap() as i32
                 return self.sema.ty_void as i32
+            if method_name == "slot":
+                // Vec.slot(i) returns VecSlot[T] with same T as Vec[T].
+                let vs_sym = self.sema.pool_lookup_symbol("VecSlot")
+                if self.sema.named_types.contains(vs_sym):
+                    if tk == TypeKind.TY_GENERIC_INST:
+                        let elem_ty = self.sema.get_generic_inst_arg(resolved, 0)
+                        if elem_ty > 0:
+                            let found = self.sema.find_generic_inst(vs_sym, elem_ty)
+                            if found != 0:
+                                return found
+                    return self.sema.named_types.get(vs_sym).unwrap() as i32
+                return self.sema.ty_void as i32
+            return self.sema.ty_void as i32
+        if type_name == "VecSlot":
+            if method_name == "get":
+                // VecSlot[T].get() returns T.
+                if tk == TypeKind.TY_GENERIC_INST:
+                    let elem_ty = self.sema.get_generic_inst_arg(resolved, 0)
+                    return elem_ty
+            if method_name == "set":
+                return self.sema.ty_void as i32
             return self.sema.ty_void as i32
         if type_name == "VecIter":
             if method_name == "next":
@@ -3948,6 +3969,7 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
         if method_name == "clear": return MirIntrinsic.MIR_INTRINSIC_VEC_CLEAR
         if method_name == "pop": return MirIntrinsic.MIR_INTRINSIC_VEC_POP
         if method_name == "iter": return MirIntrinsic.MIR_INTRINSIC_VEC_ITER
+        if method_name == "slot": return MirIntrinsic.MIR_INTRINSIC_VEC_SLOT
         if method_name == "map": return MirIntrinsic.MIR_INTRINSIC_VEC_MAP
         if method_name == "filter": return MirIntrinsic.MIR_INTRINSIC_VEC_FILTER
         if method_name == "fold": return MirIntrinsic.MIR_INTRINSIC_VEC_FOLD
@@ -3956,6 +3978,10 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
         return MirIntrinsic.MIR_INTRINSIC_NONE
     if type_name == "VecIter":
         if method_name == "next": return MirIntrinsic.MIR_INTRINSIC_VECITER_NEXT
+        return MirIntrinsic.MIR_INTRINSIC_NONE
+    if type_name == "VecSlot":
+        if method_name == "get": return MirIntrinsic.MIR_INTRINSIC_VECSLOT_GET
+        if method_name == "set": return MirIntrinsic.MIR_INTRINSIC_VECSLOT_SET
         return MirIntrinsic.MIR_INTRINSIC_NONE
     if type_name == "HashMap":
         if method_name == "new": return MirIntrinsic.MIR_INTRINSIC_MAP_NEW

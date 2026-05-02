@@ -177,6 +177,9 @@ enum MirIntrinsic: i32:
     MIR_INTRINSIC_FMT_BUF_WRITE_STR = 78
     MIR_INTRINSIC_FMT_BUF_WRITE_FMT = 79
     MIR_INTRINSIC_FMT_BUF_FINISH = 80
+    MIR_INTRINSIC_VEC_SLOT = 99
+    MIR_INTRINSIC_VECSLOT_GET = 100
+    MIR_INTRINSIC_VECSLOT_SET = 101
 
 // ── Projection kinds ─────────────────────────────────────────────
 
