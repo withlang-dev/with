@@ -3014,6 +3014,7 @@ fn Codegen.classify_generic_call_intrinsic(self: Codegen, recv_type: i32, method
         if method_name == "iter": return MirIntrinsic.MIR_INTRINSIC_VEC_ITER
         if method_name == "slot": return MirIntrinsic.MIR_INTRINSIC_VEC_SLOT
         if method_name == "get_disjoint": return MirIntrinsic.MIR_INTRINSIC_VEC_GET_DISJOINT
+        if method_name == "range": return MirIntrinsic.MIR_INTRINSIC_VEC_RANGE
         if method_name == "iter_place": return MirIntrinsic.MIR_INTRINSIC_VEC_ITER_PLACE
         if method_name == "map": return MirIntrinsic.MIR_INTRINSIC_VEC_MAP
         if method_name == "filter": return MirIntrinsic.MIR_INTRINSIC_VEC_FILTER
@@ -3028,6 +3029,11 @@ fn Codegen.classify_generic_call_intrinsic(self: Codegen, recv_type: i32, method
     if type_name == "VecSlot":
         if method_name == "get": return MirIntrinsic.MIR_INTRINSIC_VECSLOT_GET
         if method_name == "set": return MirIntrinsic.MIR_INTRINSIC_VECSLOT_SET
+        return MirIntrinsic.MIR_INTRINSIC_NONE
+    if type_name == "VecRange":
+        if method_name == "get": return MirIntrinsic.MIR_INTRINSIC_VECRANGE_GET
+        if method_name == "set": return MirIntrinsic.MIR_INTRINSIC_VECRANGE_SET
+        if method_name == "len": return MirIntrinsic.MIR_INTRINSIC_VECRANGE_LEN
         return MirIntrinsic.MIR_INTRINSIC_NONE
     if type_name == "VecIterPlace":
         if method_name == "next": return MirIntrinsic.MIR_INTRINSIC_VECITERPLACE_NEXT
@@ -3968,6 +3974,136 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let gd_tf1 = wl_build_struct_gep(self.builder, gd_tup_ty, gd_tup, 1)
         wl_build_store(self.builder, gd_slot_b, gd_tf1)
         result = wl_build_load(self.builder, gd_tup_ty, gd_tup)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_RANGE:
+        // Vec.range(start..end) — create VecRange[T] = { data_ptr: i64, offset: i64, len: i64 }
+        let vr_recv = self.mir_intrinsic_recv_vec_value(body, args_id)
+        let vr_range = self.mir_intrinsic_arg(body, args_id, 1)
+        let vr_range_ty = wl_type_of(vr_range)
+        let vr_range_alloca = wl_build_alloca(self.builder, vr_range_ty)
+        wl_build_store(self.builder, vr_range, vr_range_alloca)
+        let vr_elem_ty = wl_struct_get_type_at(vr_range_ty, 0)
+        let vr_start_ptr = wl_build_struct_gep(self.builder, vr_range_ty, vr_range_alloca, 0)
+        let vr_start_raw = wl_build_load(self.builder, vr_elem_ty, vr_start_ptr)
+        let vr_start = self.coerce_int(vr_start_raw, i64_ty)
+        let vr_end_ptr = wl_build_struct_gep(self.builder, vr_range_ty, vr_range_alloca, 1)
+        let vr_end_raw = wl_build_load(self.builder, vr_elem_ty, vr_end_ptr)
+        let vr_end = self.coerce_int(vr_end_raw, i64_ty)
+        let vr_vec_len = wl_build_extract_value(self.builder, vr_recv, 1)
+        let vr_bad_start = wl_build_icmp(self.builder, wl_int_slt(), vr_start, wl_const_int(i64_ty, 0, 0))
+        let vr_bad_end = wl_build_icmp(self.builder, wl_int_sgt(), vr_end, vr_vec_len)
+        let vr_bad_order = wl_build_icmp(self.builder, wl_int_sgt(), vr_start, vr_end)
+        let vr_bad1 = wl_build_or(self.builder, vr_bad_start, vr_bad_end)
+        let vr_bad2 = wl_build_or(self.builder, vr_bad1, vr_bad_order)
+        let vr_panic_bb = wl_append_bb(self.context, self.current_function, "vr.panic")
+        let vr_ok_bb = wl_append_bb(self.context, self.current_function, "vr.ok")
+        wl_build_cond_br(self.builder, vr_bad2, vr_panic_bb, vr_ok_bb)
+        wl_position_at_end(self.builder, vr_panic_bb)
+        let _ = wl_build_unreachable(self.builder)
+        wl_position_at_end(self.builder, vr_ok_bb)
+        let vr_range_len = wl_build_sub(self.builder, vr_end, vr_start)
+        let vr_data_raw = wl_build_extract_value(self.builder, vr_recv, 0)
+        let vr_data_i64 = wl_build_ptr_to_int(self.builder, vr_data_raw, i64_ty)
+        let vr_fields: Vec[i64] = Vec.new()
+        vr_fields.push(i64_ty)
+        vr_fields.push(i64_ty)
+        vr_fields.push(i64_ty)
+        let vr_struct_ty = wl_struct_type(self.context, vec_data_i64(&vr_fields), 3, 0)
+        let vr_alloca = wl_build_alloca(self.builder, vr_struct_ty)
+        let vr_f0 = wl_build_struct_gep(self.builder, vr_struct_ty, vr_alloca, 0)
+        wl_build_store(self.builder, vr_data_i64, vr_f0)
+        let vr_f1 = wl_build_struct_gep(self.builder, vr_struct_ty, vr_alloca, 1)
+        wl_build_store(self.builder, vr_start, vr_f1)
+        let vr_f2 = wl_build_struct_gep(self.builder, vr_struct_ty, vr_alloca, 2)
+        wl_build_store(self.builder, vr_range_len, vr_f2)
+        result = wl_build_load(self.builder, vr_struct_ty, vr_alloca)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VECRANGE_GET:
+        // VecRange[T].get(i) — load element at data_ptr[offset + i]
+        let vrg_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let vrg_idx = self.mir_intrinsic_arg(body, args_id, 1)
+        let vrg_idx64 = self.coerce_int(vrg_idx, i64_ty)
+        let vrg_dest_sema = self.mir_intrinsic_dest_sema_type(body, dest_place)
+        var vrg_elem_ty: i64 = 0
+        if vrg_dest_sema > 0:
+            vrg_elem_ty = self.mir_sema_type_to_llvm(self.mir_input.mir_resolve_alias(vrg_dest_sema))
+        if vrg_elem_ty == 0:
+            vrg_elem_ty = i32_ty
+        let vrg_fields: Vec[i64] = Vec.new()
+        vrg_fields.push(i64_ty)
+        vrg_fields.push(i64_ty)
+        vrg_fields.push(i64_ty)
+        let vrg_struct_ty = wl_struct_type(self.context, vec_data_i64(&vrg_fields), 3, 0)
+        let vrg_dp = wl_build_struct_gep(self.builder, vrg_struct_ty, vrg_ptr, 0)
+        let vrg_data = wl_build_load(self.builder, i64_ty, vrg_dp)
+        let vrg_off_ptr = wl_build_struct_gep(self.builder, vrg_struct_ty, vrg_ptr, 1)
+        let vrg_off = wl_build_load(self.builder, i64_ty, vrg_off_ptr)
+        let vrg_len_ptr = wl_build_struct_gep(self.builder, vrg_struct_ty, vrg_ptr, 2)
+        let vrg_len = wl_build_load(self.builder, i64_ty, vrg_len_ptr)
+        let vrg_oob = wl_build_icmp(self.builder, wl_int_sge(), vrg_idx64, vrg_len)
+        let vrg_neg = wl_build_icmp(self.builder, wl_int_slt(), vrg_idx64, wl_const_int(i64_ty, 0, 0))
+        let vrg_bad = wl_build_or(self.builder, vrg_oob, vrg_neg)
+        let vrg_panic_bb = wl_append_bb(self.context, self.current_function, "vrg.panic")
+        let vrg_ok_bb = wl_append_bb(self.context, self.current_function, "vrg.ok")
+        wl_build_cond_br(self.builder, vrg_bad, vrg_panic_bb, vrg_ok_bb)
+        wl_position_at_end(self.builder, vrg_panic_bb)
+        let _ = wl_build_unreachable(self.builder)
+        wl_position_at_end(self.builder, vrg_ok_bb)
+        let vrg_abs = wl_build_add(self.builder, vrg_off, vrg_idx64)
+        let vrg_typed_ptr = wl_build_int_to_ptr(self.builder, vrg_data, ptr_ty)
+        let vrg_gep: Vec[i64] = Vec.new()
+        vrg_gep.push(vrg_abs)
+        let vrg_elem_ptr = wl_build_gep(self.builder, vrg_elem_ty, vrg_typed_ptr, vec_data_i64(&vrg_gep), 1)
+        result = wl_build_load(self.builder, vrg_elem_ty, vrg_elem_ptr)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VECRANGE_SET:
+        // VecRange[T].set(i, value) — store value at data_ptr[offset + i]
+        let vrs_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let vrs_idx = self.mir_intrinsic_arg(body, args_id, 1)
+        let vrs_val = self.mir_intrinsic_arg(body, args_id, 2)
+        let vrs_idx64 = self.coerce_int(vrs_idx, i64_ty)
+        let vrs_elem_ty = wl_type_of(vrs_val)
+        let vrs_fields: Vec[i64] = Vec.new()
+        vrs_fields.push(i64_ty)
+        vrs_fields.push(i64_ty)
+        vrs_fields.push(i64_ty)
+        let vrs_struct_ty = wl_struct_type(self.context, vec_data_i64(&vrs_fields), 3, 0)
+        let vrs_dp = wl_build_struct_gep(self.builder, vrs_struct_ty, vrs_ptr, 0)
+        let vrs_data = wl_build_load(self.builder, i64_ty, vrs_dp)
+        let vrs_off_ptr = wl_build_struct_gep(self.builder, vrs_struct_ty, vrs_ptr, 1)
+        let vrs_off = wl_build_load(self.builder, i64_ty, vrs_off_ptr)
+        let vrs_len_ptr = wl_build_struct_gep(self.builder, vrs_struct_ty, vrs_ptr, 2)
+        let vrs_len = wl_build_load(self.builder, i64_ty, vrs_len_ptr)
+        let vrs_oob = wl_build_icmp(self.builder, wl_int_sge(), vrs_idx64, vrs_len)
+        let vrs_neg = wl_build_icmp(self.builder, wl_int_slt(), vrs_idx64, wl_const_int(i64_ty, 0, 0))
+        let vrs_bad = wl_build_or(self.builder, vrs_oob, vrs_neg)
+        let vrs_panic_bb = wl_append_bb(self.context, self.current_function, "vrs.panic")
+        let vrs_ok_bb = wl_append_bb(self.context, self.current_function, "vrs.ok")
+        wl_build_cond_br(self.builder, vrs_bad, vrs_panic_bb, vrs_ok_bb)
+        wl_position_at_end(self.builder, vrs_panic_bb)
+        let _ = wl_build_unreachable(self.builder)
+        wl_position_at_end(self.builder, vrs_ok_bb)
+        let vrs_abs = wl_build_add(self.builder, vrs_off, vrs_idx64)
+        let vrs_typed_ptr = wl_build_int_to_ptr(self.builder, vrs_data, ptr_ty)
+        let vrs_gep: Vec[i64] = Vec.new()
+        vrs_gep.push(vrs_abs)
+        let vrs_elem_ptr = wl_build_gep(self.builder, vrs_elem_ty, vrs_typed_ptr, vec_data_i64(&vrs_gep), 1)
+        wl_build_store(self.builder, vrs_val, vrs_elem_ptr)
+
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VECRANGE_LEN:
+        // VecRange[T].len() — return len field (field 2 of {i64,i64,i64})
+        let vrl_recv = self.mir_intrinsic_arg(body, args_id, 0)
+        if wl_get_type_kind(wl_type_of(vrl_recv)) == wl_struct_type_kind():
+            result = wl_build_extract_value(self.builder, vrl_recv, 2)
+        else:
+            let vrl_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+            let vrl_fields: Vec[i64] = Vec.new()
+            vrl_fields.push(i64_ty)
+            vrl_fields.push(i64_ty)
+            vrl_fields.push(i64_ty)
+            let vrl_struct_ty = wl_struct_type(self.context, vec_data_i64(&vrl_fields), 3, 0)
+            let vrl_len_ptr = wl_build_struct_gep(self.builder, vrl_struct_ty, vrl_ptr, 2)
+            result = wl_build_load(self.builder, i64_ty, vrl_len_ptr)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_ITER_PLACE:
         // Vec.iter_place() — create VecIterPlace[T] from Vec
