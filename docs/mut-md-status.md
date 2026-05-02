@@ -86,23 +86,35 @@ the initial migration:
 | NLL branch-divergent | §8.4 | already works (AST-walk approach) |
 | Argument independence | §5.5 | already works for common cases |
 
-## Still deferred
+## Post-P12 additional work (2026-05-02)
+
+| Feature | Section | Status |
+|---|---|---|
+| IndexPlace user impl dispatch | §2.4 | done — `5a6dd13` |
+| Scoped/ScopedMut traits removed | §17 | done — `9a9f7d3` |
+
+## Still deferred (with precise blockers)
 
 - **`move` closure semantics**: `move` closures capture by value (copy), so
   mutations inside them don't affect the original. The §15.9 escape check
   doesn't distinguish `move` from regular closures. Low priority since
   `move` closures are a niche pattern.
-- **Trait-based `IndexPlace` user implementations**: The trait is declared
-  and the compiler recognizes it, but user `impl IndexPlace for T` doesn't
-  yet lower through the full MIR place-projection pipeline. Vec/Array/HashMap
-  work via hardcoded intrinsics. User types need MIR generic-body compilation.
 - **Iterator `&T` yields**: `Iter.next` yields owned `T`. When/if iterators
   yield `&T` views, the §15.17 view-bound diagnostic will activate
   automatically through §15.10's read-only-place path.
-- **Disjoint multi-slot access**: `get_disjoint(i, j)` returning tuple of
-  VecSlots. Requires tuple-destructuring in `with` blocks.
-- **Mutable slice APIs**: `split_at_mut`, `get_disjoint_mut` for raw pointer
-  slices. Low priority — VecSlot/VecIterPlace provide the safe alternative.
+- **Disjoint multi-slot access** (`get_disjoint(i, j)`): Blocked by parser —
+  `with expr as (a, b):` tuple destructuring is not accepted. Parser expects
+  a single identifier after `as`. Once parser supports tuple patterns in
+  `with` bindings, `Vec.get_disjoint` can return `(VecSlot[T], VecSlot[T])`.
+- **Scoped sub-range access** (`Vec.range(0..n)`): Requires a new VecRange
+  type with IndexPlace impl, len(), and slot() methods. The spec §19.1
+  explicitly says "naming and exact API shape is a follow-up stdlib design
+  question." Implementable without language changes, just stdlib + codegen work.
+- **Mutable slice APIs**: §13.5 says mutable slices are removed from safe With.
+  The replacement is index-based loops (working), scoped `with` access (working
+  for single slots/entries), and raw pointers at the unsafe edge (working).
+  `split_at_mut`/`get_disjoint_mut` for raw pointers are low priority — the
+  safe VecSlot/VecIterPlace APIs cover the common cases.
 
 ## What to watch for
 
