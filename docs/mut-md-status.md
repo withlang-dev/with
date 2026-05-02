@@ -94,23 +94,18 @@ the initial migration:
 | IndexPlace §6.3 compound single-eval | §6.3 | done — `32033b5` |
 | Scoped/ScopedMut traits removed | §17 | done — `9a9f7d3` |
 
-## Still deferred (with precise blockers)
+## Deferred features now done (2026-05-02)
 
-- **`move` closure semantics**: `move` closures capture by value (copy), so
-  mutations inside them don't affect the original. The §15.9 escape check
-  doesn't distinguish `move` from regular closures. Low priority since
-  `move` closures are a niche pattern.
-- **Iterator `&T` yields**: `Iter.next` yields owned `T`. When/if iterators
-  yield `&T` views, the §15.17 view-bound diagnostic will activate
-  automatically through §15.10's read-only-place path.
-- **Disjoint multi-slot access** (`get_disjoint(i, j)`): Blocked by parser —
-  `with expr as (a, b):` tuple destructuring is not accepted. Parser expects
-  a single identifier after `as`. Once parser supports tuple patterns in
-  `with` bindings, `Vec.get_disjoint` can return `(VecSlot[T], VecSlot[T])`.
-- **Scoped sub-range access** (`Vec.range(0..n)`): Requires a new VecRange
-  type with IndexPlace impl, len(), and slot() methods. The spec §19.1
-  explicitly says "naming and exact API shape is a follow-up stdlib design
-  question." Implementable without language changes, just stdlib + codegen work.
+| Feature | Section | Commit |
+|---|---|---|
+| `move` closure semantics | §9.4 / §15.9 | `7219bfd` |
+| `with` tuple destructuring | §10.2 | `f3da561` |
+| `Vec.get_disjoint(i, j)` | §10.2 | `c480c4b` |
+| `Vec.range(start..end)` | §19.1 | `70dc768` |
+| `Vec.iter_ref()` (`&T` yields) | §19.5 / §15.17 | `862a456` |
+
+## Still deferred (stretch goals)
+
 - **Mutable slice APIs**: §13.5 says mutable slices are removed from safe With.
   The replacement is index-based loops (working), scoped `with` access (working
   for single slots/entries), and raw pointers at the unsafe edge (working).
