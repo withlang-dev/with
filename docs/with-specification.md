@@ -442,18 +442,26 @@ blocks run.
 ### 3.1 Reference Types
 
 ```
-&T          shared (immutable) borrow
-&mut T      exclusive (mutable) borrow
+&T          shared (read-only) borrow
 ```
+
+With has a single reference type: `&T`. There is no `&mut T` in safe
+code. Mutation is expressed through owned values (`mut self: Self`
+receivers), `with` scoped access, and `IndexPlace` projections.
+
+For unsafe FFI, raw pointers (`*const T`, `*mut T`) and address-of
+(`&raw mut x`) provide mutable pointer semantics (§19).
 
 ### 3.2 Aliasing Rule
 
-Within any scope, for a given value, either:
+Active shared borrows (`&T`) of a place are invalidated when that
+place is mutated. Mutation occurs through:
 
-- Any number of `&T` references exist, OR
-- Exactly one `&mut T` reference exists
+- Assignment to the place (`x = value`)
+- Calling a `mut self` method on the place (`x.push(v)`)
+- Mutation through `with` scoped access or `IndexPlace` projection
 
-Never both simultaneously. Enforced at compile time.
+Enforced at compile time via view-liveness analysis.
 
 ### 3.3 Second-Class Restriction
 
@@ -527,21 +535,21 @@ print(r)       // last use of r; borrow ends here
 x = 10           // OK: no active borrow
 ```
 
-### 3.6 Disjoint Field Borrowing
+### 3.6 Disjoint Field Access
 
-The compiler guarantees that simultaneous borrows of structurally
-disjoint fields are permitted, at any nesting depth.
+The compiler guarantees that simultaneous access to structurally
+disjoint fields is permitted, at any nesting depth.
 
 ```
-let a = &mut world.physics.positions
-let b = &world.physics.velocities     // OK: different field paths
+world.physics.positions[i] = new_pos    // mutates one field
+let v = &world.physics.velocities       // borrows a different field — OK
 ```
 
 Disjointness is defined over **static field paths**. Two paths are
 disjoint if they diverge at any field access.
 
-**Array/slice index disjointness is NOT guaranteed.** Use `get2_mut`,
-`split_at_mut`, or similar APIs for safe simultaneous element access.
+**Array/slice index disjointness is NOT guaranteed at compile time.**
+Use `get_disjoint(i, j)` for safe simultaneous element access.
 
 **Disjoint capture in closures:** Closures capture only the
 specific fields they access, not the enclosing struct as a whole.
@@ -550,10 +558,9 @@ This is critical for parallel data-oriented code:
 ```
 // Each closure captures disjoint fields of `world`
 scope s =>
-    s.spawn(() => run_physics(&world.transforms, &mut world.velocities))
-    s.spawn(() => run_render(&world.transforms, &world.sprites))
-// OK: both closures borrow world.transforms immutably,
-// only the first borrows world.velocities mutably.
+    s.spawn(() => run_physics(world.transforms, world.velocities))
+    s.spawn(() => run_render(world.transforms, world.sprites))
+// OK: both closures access non-overlapping field paths.
 // No conflict — the captures are disjoint.
 ```
 
@@ -578,9 +585,9 @@ let rr: &&User = &&alice
 let name = rr.name          // follows multiple layers automatically
 ```
 
-Auto-deref applies to `&T`, `&mut T`, `Box[T]`, `Arc[T]`, `Rc[T]`,
-and any type implementing the `Deref` trait. The compiler inserts as
-many dereferences as needed to reach the target field or method.
+Auto-deref applies to `&T`, `Box[T]`, `Arc[T]`, `Rc[T]`, and any
+type implementing the `Deref` trait. The compiler inserts as many
+dereferences as needed to reach the target field or method.
 
 **Raw pointers:** Auto-deref also applies to `*const T` and
 `*mut T`. When `p` has type `*mut Sha256`, `p.state[0]` is
@@ -611,16 +618,16 @@ print_user(alice)           // compiler inserts &alice automatically
 This also works for method calls: `alice.greet()` works whether
 `greet` takes `self: &Self` or `self: Self`.
 
-**Restriction:** Auto-referencing only applies to shared borrows
-(`&T`). Mutable borrows (`&mut T`) must be explicit — when data
-might be modified, the call site should show it:
+**Restriction:** Auto-referencing only creates shared borrows
+(`&T`). Mutation uses `mut self` receivers on owned values:
 
 ```
-fn update(u: &mut User): u.name = "Bob"
+extend User:
+    fn update(mut self: Self):
+        self.name = "Bob"
 
 var alice = User { name: "Alice" }
-update(&mut alice)          // explicit: mutation is visible
-update(alice)               // ERROR: won't auto-ref to &mut
+alice.update()              // mutates in place via mut self receiver
 ```
 
 **The vibe:** "The function just wants to look at the data. I
@@ -1528,7 +1535,6 @@ For a variant `Foo(T)`, the compiler generates:
 fn is_foo(self: &MyEnum) -> bool
 fn as_foo(self: MyEnum) -> Option[T]         // by value (moves)
 fn as_foo_ref(self: &MyEnum) -> Option[&T]   // by shared ref
-fn as_foo_mut(self: &mut MyEnum) -> Option[&mut T]  // by mutable ref
 ```
 
 Method names are the variant name converted to `snake_case`.
@@ -2005,8 +2011,8 @@ Ephemerality propagates through type constructors:
 
 ### 5.3 Canonical Ephemeral Types
 
-- References: `&T`, `&mut T`
-- Views: `StrView` / `&str`, `&[T]`, `&mut [T]`
+- References: `&T`
+- Views: `StrView` / `&str`, `&[T]`
 - Lock guards: `MutexGuard[T]`, `RwLockReadGuard[T]`, `RwLockWriteGuard[T]`
 - Iterators over borrowed data
 
@@ -2056,8 +2062,9 @@ type Parser = ephemeral {
     pos: usize,
 }
 
-fn next_token(parser: &mut Parser) -> Option[Token]:
-    // ... returns Token borrowing from parser.source
+extend Parser:
+    fn next_token(mut self: Self) -> Option[Token]:
+        // ... returns Token borrowing from self.source
 ```
 
 Ephemeral structs follow all the same rules as ephemeral values
@@ -2067,29 +2074,30 @@ structs.
 
 ```
 // OK: local use, pattern matching, passing around
-let tok = next_token(&mut parser)?
+let tok = parser.next_token()?
 match tok.kind:
     .Ident   => handle_ident(tok.text)
     .Number  => handle_number(tok.text)
     .String  => handle_string(tok.text)
 
 // OK: for-loop processes each token — tok drops at iteration end
-while let Some(tok) = next_token(&mut parser):
+while let Some(tok) = parser.next_token():
     process(tok)
 
 // LIMITATION: Cannot collect ephemeral tokens into a Vec directly.
-// Each Token borrows &mut parser (Rule 6, §21.1), so holding one
-// Token prevents calling next_token() again.
+// Each Token borrows from parser.source (Rule 6, §21.1), so holding
+// one Token prevents calling next_token() again.
 //
 // To collect, use owned tokens with offset indices:
 type OwnedToken { start: u32, end: u32, kind: TokenKind, span: Span }
 
-fn next_owned_token(parser: &mut Parser) -> Option[OwnedToken]:
-    let tok = next_raw_token(parser)?
-    Some(OwnedToken { start: tok.start, end: tok.end, kind: tok.kind, span: tok.span })
+extend Parser:
+    fn next_owned_token(mut self: Self) -> Option[OwnedToken]:
+        let tok = self.next_raw_token()?
+        Some(OwnedToken { start: tok.start, end: tok.end, kind: tok.kind, span: tok.span })
 
 let tokens = with Vec.new() as mut toks:
-    while let Some(tok) = next_owned_token(&mut parser):
+    while let Some(tok) = parser.next_owned_token():
         toks.push(tok)    // OwnedToken is NOT ephemeral — no borrows
 // tokens: Vec[OwnedToken] is storable
 
@@ -2135,14 +2143,13 @@ type SlotMap[T]
 
 | Method | Signature | Notes |
 |--------|-----------|-------|
-| `insert` | `(&mut Self, T) -> Handle[T]` | |
-| `get` | `(&Self, Handle[T]) -> Option[&T]` | Ephemeral return |
-| `get_mut` | `(&mut Self, Handle[T]) -> Option[&mut T]` | Ephemeral return |
-| `remove` | `(&mut Self, Handle[T]) -> Option[T]` | |
-| `replace` | `(&mut Self, Handle[T], T) -> Option[T]` | |
-| `for_each` | `(&Self, fn(Handle[T], &T))` | |
-| `for_each_mut` | `(&mut Self, fn(Handle[T], &mut T))` | |
-| `get2_mut` | `(&mut Self, Handle[T], Handle[T]) -> Option[(&mut T, &mut T)]` | `None` if equal |
+| `insert` | `(mut self: Self, T) -> Handle[T]` | |
+| `get` | `(self: &Self, Handle[T]) -> Option[&T]` | Ephemeral return |
+| `slot` | Scoped via `with sm.slot(h) as mut s:` | Place-based mutation |
+| `remove` | `(mut self: Self, Handle[T]) -> Option[T]` | |
+| `replace` | `(mut self: Self, Handle[T], T) -> Option[T]` | |
+| `for_each` | `(self: &Self, fn(Handle[T], &T))` | |
+| `get_disjoint` | `with sm.get_disjoint(h1, h2) as mut (a, b):` | Panics if equal |
 | `contains` | `(&Self, Handle[T]) -> bool` | |
 | `len` | `(&Self) -> usize` | |
 
@@ -2180,10 +2187,8 @@ the same idea — bounded, explicit interaction with data.
 ### 7.1 Form 1: Guarded Access
 
 When data lives behind a lock, arena, or resource guard, `with`
-provides scoped access. If the expression's type implements
-`Scoped` or `ScopedMut`, the compiler **automatically** dispatches
-through the guard. No keyword needed — the type tells the compiler
-everything.
+provides scoped access. The compiler ensures the binding cannot
+escape the block — the guard is released when the block exits.
 
 ```
 with lock.read() as data:
@@ -2197,38 +2202,24 @@ with world.entities[player_id] as mut player:
     player.last_hit = now()
 ```
 
-This form activates when the expression's type implements `Scoped`
-or `ScopedMut`. The block body receives a reference. The reference
-is ephemeral — it cannot escape the block.
+`with` is built-in compiler semantics. The binding is scoped to
+the block — it cannot escape. The `as mut` variant creates a
+mutable binding; without `mut`, the binding is read-only.
 
-**Traits:**
-
-```
-trait Scoped[T]:
-    fn enter[R](self: &Self, f: fn(&T) -> R) -> R
-
-trait ScopedMut[T]:
-    fn enter_mut[R](self: &Self, f: fn(&mut T) -> R) -> R
-```
-
-**Desugaring:**
 ```
 with lock.read() as data: body
-// → lock.read().enter(data => body)
+// data is scoped to block, read-only
 
 with store.write() as mut data: body
-// → store.write().enter_mut(data => body)
+// data is scoped to block, mutable
 ```
 
-Multiple guarded bindings are flat, nesting left-to-right:
+Multiple bindings are flat, nesting left-to-right:
 ```
 with a.read() as textures,
      b.read() as meshes,
      c.write() as mut materials:
     body
-// → a.read().enter(textures =>
-//     b.read().enter(meshes =>
-//       c.write().enter_mut(materials => body)))
 ```
 
 ### 7.2 Form 2: Scoped Mutation (Builder Pattern)
@@ -2282,9 +2273,7 @@ let config = with Config.default() as mut c:
 This gives you both builder and extraction patterns from the same
 construct. The type system tells you what you're getting.
 
-This form is used when the expression's type does **not** implement
-`Scoped`/`ScopedMut`. The value is bound as a mutable local inside
-the block.
+The value is bound as a mutable local inside the block.
 
 **Desugaring:**
 ```
@@ -2315,9 +2304,7 @@ let normalized = with vec.len() as len:
     if len > 1e-6 then vec.scale(1.0 / len) else Vec2.zero()
 ```
 
-This form is used when the expression's type does not implement
-`Scoped`/`ScopedMut` and `mut` is absent. The value is bound as
-an immutable local.
+When `mut` is absent, the value is bound as an immutable local.
 
 **Desugaring:**
 ```
@@ -2389,34 +2376,24 @@ expression:
 ```
 with name(expr):                  →  introduce implicit context for body
 
-// If expr implements Scoped → guarded access
-with lock.read() as data:          →  expr.enter(data => body)
-with store.write() as mut data:    →  expr.enter_mut(data => body)
+// Scoped access — binding cannot escape the block
+with lock.read() as data:          →  { let data = lock.read(); body }
+with store.write() as mut data:    →  { var data = store.write(); body; data }
 
-// Otherwise → simple binding
+// Simple binding
 with expr as mut name:             →  { var name = expr; body }
 with expr as name:                 →  { let name = expr; body }
 ```
 
-The compiler checks: does the expression's type implement `Scoped`
-or `ScopedMut`? If yes, it's guarded access. If no, it's a simple
-binding. No keyword needed — the type system does the work.
-
 ```
-// Guarded access — lock.read() returns a Scoped type
+// Guarded access — lock.write() returns a guard
 with lock.write() as data:
     data.x = 1                         // guard released at block exit
 
-// Builder — Config.default() doesn't implement Scoped
+// Builder — simple scoped mutation
 let config = with Config.default() as mut c:
     c.retries = 3
 ```
-
-**Semver note:** If a library type adds `Scoped` or `ScopedMut`
-in a new version, existing `with` blocks using that type will
-change dispatch. This is intentional — implementing `Scoped` is a
-deliberate API decision that says "this type is a guard." Types
-don't implement `Scoped` by accident.
 
 ### 7.6 `with` as Expression
 
@@ -2568,7 +2545,7 @@ let snapshot = with lock.read() as data:
 let result = fetch(snapshot.url).await   // OK: no guard live
 ```
 
-Other `Scoped` types — connection pools, transactions, file handles
+Other guarded types — connection pools, transactions, file handles
 — are not annotated and work naturally with `await`:
 
 ```
@@ -2683,7 +2660,7 @@ storable ones. The compiler enforces this automatically.
 type Shared[T] = Arc[RwLock[T]]
 ```
 
-Implements `Scoped[T]` and `ScopedMut[T]` for `with` blocks.
+Usable with `with` blocks for scoped access.
 
 ---
 
@@ -2987,7 +2964,7 @@ extend Vec[T]:
 | First parameter | Call syntax | Semantics |
 |-----------------|-------------|-----------|
 | `self: &T` | `x.method()` | Borrows `x` immutably |
-| `self: &mut T` | `x.method()` | Borrows `x` mutably |
+| `mut self: Self` | `x.method()` | Mutates `x` in place |
 | `self: T` | `x.method()` | Moves (consumes) `x` |
 
 **By-value `self` enables consuming method chains:**
@@ -3491,7 +3468,7 @@ see §4.2.7.
 | 9 | `<<`, `>>` | Left |
 | 10 | `+`, `-`, `++`, `??` | Left |
 | 11 | `*`, `/`, `%`, `@` | Left |
-| 12 | Unary prefix (`not`, `-`, `~`, `&`, `&mut`) | — |
+| 12 | Unary prefix (`not`, `-`, `~`, `&`, `&raw mut`) | — |
 | 13 | Postfix (`.await`, `?`, `.field`, `[i]`, `()`) | Left |
 
 This means:
@@ -4115,7 +4092,7 @@ Trait calls are monomorphized. Dynamic dispatch via explicit `dyn Trait`.
 **Object safety:** A trait can be used as `dyn Trait` only if all
 its methods are **object-safe**. A method is object-safe if:
 
-1. It takes `self` by **reference** (`&Self` or `&mut Self`), OR
+1. It takes `self` by **reference** (`&Self`) or as `mut self: Self`, OR
 2. It takes `self` by value (`Self`) and the trait specifies
    `Self: Sized` — but `dyn Trait` is unsized, so by-value self
    methods are excluded from the vtable.
@@ -4292,10 +4269,8 @@ need to name them.
 |-------|---------|--------|
 | `Iter[T]` | `for` loops | `for x in expr:` |
 | `Contains[T]` | Membership test | `x in collection`, `x not in collection` |
-| `Scoped[T]` | `with` blocks (guarded) | `with expr as name:` |
-| `ScopedMut[T]` | `with` blocks (guarded, mutable) | `with expr as mut name:` |
-| `Index[I, O]` | Subscript read | `expr[index]` |
-| `IndexMut[I, O]` | Subscript write | `expr[index] = val` |
+| `IndexGet[I, O]` | Subscript read | `expr[index]` |
+| `IndexPlace[I, O]` | Subscript read/write (place) | `expr[index] = val` |
 | `MultiIndex[O]` | Generalized subscript read | `expr[i, j]`, `expr[1:4, :, ...]` |
 | `MultiIndexMut[V]` | Generalized subscript write | `expr[i, j] = val`, `expr[:, 0] = val` |
 | `Try[T, E]` | `?` operator | `expr?` |
@@ -4734,7 +4709,7 @@ zero-copy parsing pipelines, it is real.
 
 ```
 trait Iter[T]:
-    fn next(self: &mut Self) -> Option[T]
+    fn next(mut self: Self) -> Option[T]
 ```
 
 **One-implementation rule:** A type may implement `Iter[T]` for
@@ -5025,8 +5000,9 @@ automatically:
 for item in my_vec:           // compiler inserts .iter()
 for item in my_vec.iter():    // explicit (also valid)
 
-// For mutable or consuming iteration, be explicit:
-for item in my_vec.iter_mut():    // mutable references
+// For place-based or consuming iteration, be explicit:
+for item in my_vec.iter_place():  // yields VecSlot handles for in-place mutation
+for item in my_vec.iter_ref():    // yields &T references (zero-copy)
 for item in my_vec.into_iter():   // consuming (moves elements)
 ```
 
@@ -5732,7 +5708,7 @@ raw OS thread code.
 
 ```
 var data = vec![1, 2, 3]
-let _ = process(&mut data)  // ephemeral task: runtime ensures fiber
+let _ = process(data)       // ephemeral task: runtime ensures fiber
                              // stops before proceeding (may yield)
 // data is safe — fiber is guaranteed stopped
 ```
@@ -6060,11 +6036,12 @@ See `lib/std/async.w` and `lib/std/async/` docs for API details.
 Because fibers have real stacks, references across `await` are safe:
 
 ```
-async fn process(data: &mut Vec[i32]):
+async fn process(mut data: Vec[i32]) -> Vec[i32]:
     let first = &data[0]
     some_io().await              // fiber suspends; reference still valid
     print(first)               // safe to use
     data.push(42)
+    data
 ```
 
 In Rust, this requires `Pin<&mut Self>` because the Future is a
@@ -6198,7 +6175,7 @@ async scope s =>
 | `i32`, `String`, owned types | Yes | Yes |
 | `Arc[T]` where `T: Send + Sync` | Yes | Yes |
 | `Rc[T]` | No | No |
-| `&T`, `&mut T` | No | Yes |
+| `&T` | No | Yes |
 | Ephemeral structs | No | Yes |
 | `Task[T]` (non-ephemeral) | Yes (if `T: Send`) | Yes |
 | `Task[T]` (ephemeral) | No | Yes |
@@ -6210,7 +6187,7 @@ async scope s =>
 - `Atomic[T]` — lock-free atomic operations
 - `Condvar` — condition variable
 
-All implement `Scoped`/`ScopedMut` for `with` blocks. Lock operations
+All are usable with `with` blocks for scoped access. Lock operations
 are fiber-aware: contended locks yield the fiber, not the OS thread.
 
 #### 14.17.1 Atomic[T]
@@ -6497,8 +6474,8 @@ let task = fetch_user(id)              // id: UserId is owned
 // task is Task[Result[User, DbError]], storable, Send
 
 // Borrowing task: ephemeral — cannot be stored or sent
-async fn process(data: &mut Vec[i32]) -> Unit: ...
-let task = process(&mut my_vec)        // captures &mut my_vec
+async fn process(data: &Vec[i32]) -> Unit: ...
+let task = process(&my_vec)            // captures &my_vec
 // task is ephemeral — it borrows my_vec
 // Cannot store in a struct, cannot send to another thread
 ```
@@ -6524,7 +6501,7 @@ fn store_globally(t: Task[i32]):
                                      // may be ephemeral at some call sites
 
 var v = vec![1, 2, 3]
-let task = process(&mut v)          // ephemeral task
+let task = process(&v)              // ephemeral task
 process_task(task)                   // OK: compiler sees task is consumed
 store_globally(task)                 // ERROR: compiler detects storage of
                                      // ephemeral value in a global
@@ -6552,7 +6529,7 @@ task.await?                       // OK: used immediately
 **`async scope` is the ergonomic solution** for borrowing tasks:
 
 ```
-async fn process_all(data: &mut Vec[i32]):
+async fn process_all(mut data: Vec[i32]) -> Vec[i32]:
     async scope s =>
         // These tasks borrow data — ephemeral
         let t1 = s.track(transform(&data[0..100]))
@@ -7000,7 +6977,7 @@ use c_import("sqlite3.h", link: "sqlite3")
 
 fn main:
     var db: *mut sqlite3 = null
-    let rc = sqlite3_open(":memory:", &mut db)   // direct call
+    let rc = sqlite3_open(":memory:", &raw mut db)   // direct call
     if rc != SQLITE_OK:
         panic("Failed to open database")
     defer sqlite3_close(db)
@@ -7488,7 +7465,7 @@ not require an unsafe context:
 
 - Raw pointer arithmetic (`p + n`, `p - n`, `p - q`)
 - Raw pointer comparison (`p == q`, `p < q`, etc.)
-- Taking the address of a value (`&x`, `&mut x`)
+- Taking the address of a value (`&x`, `&raw mut x`)
 - Casting a pointer to an integer (`p as usize`)
 - Casting an integer to a pointer (`n as *T`)
 
@@ -7702,12 +7679,13 @@ structure.
 comptime fn derive_serialize[T: type] -> impl Serialize for T:
     let fields = T.fields()
     impl Serialize for T:
-        fn serialize(self: &T, out: &mut JsonWriter):
+        fn serialize(self: &T, mut out: JsonWriter) -> JsonWriter:
             out.begin_object()
             for field in fields:       // cascade: inside comptime fn
                 out.key(field.name)
-                self.{field.name}.serialize(out)
+                out = self.{field.name}.serialize(out)
             out.end_object()
+            out
 
 // Usage: just annotate the type
 @[derive(Serialize)]
@@ -7715,13 +7693,13 @@ type User { name: String, age: i32, email: String }
 
 // The compiler generates (conceptually):
 // impl Serialize for User:
-//     fn serialize(self: &User, out: &mut JsonWriter):
+//     fn serialize(self: &User, mut out: JsonWriter) -> JsonWriter:
 //         out.begin_object()
-//         out.key("name"); self.name.serialize(out)
-//         out.key("age"); self.age.serialize(out)
-//         out.key("email"); self.email.serialize(out)
+//         out.key("name"); out = self.name.serialize(out)
+//         out.key("age"); out = self.age.serialize(out)
+//         out.key("email"); out = self.email.serialize(out)
 //         out.end_object()
-// }
+//         out
 ```
 
 `@[derive(Serialize)]` is sugar for invoking `derive_serialize[User]()`
@@ -7771,7 +7749,7 @@ inside is already compile-time by context.
 not compiled:
 
 ```
-fn serialize_value[T](val: &T, out: &mut Writer):
+fn serialize_value[T](val: &T, mut out: Writer) -> Writer:
     comptime if T.is_copy():
         // Fast path for small Copy types
         out.write_bytes(val as *const u8, T.size())
@@ -7985,7 +7963,7 @@ use math.vector.{Vec3, dot, cross}
 - Primitive types (`i32`, `i64`, `f64`, `bool`, `Int`, `UInt`, etc.)
 - `Unit`
 - `Vec[T]`, `String` / `str`
-- Traits: `Eq`, `Ord`, `Hash`, `Debug`, `Display`, `Default`, `Drop`, `Scoped`, `ScopedMut`
+- Traits: `Eq`, `Ord`, `Hash`, `Debug`, `Display`, `Default`, `Drop`
 - `print`, `eprint`
 - `assert`, `assert_eq`, `assert_ne`, `require`, `check`, `panic`, `unreachable`, `todo`
 - `drop[T](val: T)` — explicitly drop a value to trigger cleanup
@@ -8111,7 +8089,7 @@ that doesn't need a heap allocator or OS:
 | Primitives | `i8`–`i64`, `u8`–`u64`, `f32`, `f64`, `bool`, `usize` |
 | Traits | `Copy`, `Clone`, `Drop`, `Default`, `Debug`, `Eq`, `Ord`, `Hash` |
 | Option/Result | `Option[T]`, `Result[T, E]` and all methods |
-| Slices | `&[T]`, `&mut [T]` — borrowed views into arrays |
+| Slices | `&[T]` — borrowed views into arrays |
 | Fixed arrays | `[T; N]` — stack-allocated |
 | Tuples | `(A, B, ...)` |
 | Ranges | `0..10`, `0..=10` |
@@ -8326,7 +8304,7 @@ Functions that pervasively perform unsafe memory accesses may be
 declared `unsafe fn`:
 
 ```
-unsafe fn sha256_compress(ctx: &mut Sha256):
+unsafe fn sha256_compress(ctx: *mut Sha256):
     ctx.state[0] +%= a          // raw pointer indexing permitted
     let b = ctx.buf[off]        // auto-deref through pointer permitted
 ```
@@ -8341,7 +8319,7 @@ from safe code requires `unsafe:` at the call site (or being
 inside another `unsafe fn`):
 
 ```
-unsafe: sha256_compress(&mut ctx)    // caller acknowledges
+unsafe: sha256_compress(&raw mut ctx)    // caller acknowledges
 ```
 
 This preserves the audit trail — `grep unsafe` finds every
@@ -8436,7 +8414,7 @@ fetch(url).await
 ```
 
 This does NOT apply to connection pools, transactions, file handles,
-or other `Scoped` types that don't carry the annotation. See §7.9.
+or other guarded types that don't carry the annotation. See §7.9.
 
 ### 20b.2 Unused `Result` or `Option`
 
@@ -8594,9 +8572,11 @@ lifetime reasoning is never required.
 
 At every program point, the following must hold:
 
-1. **Aliasing rule.** For any place (variable or field path), either
-   any number of shared borrows (`&T`) are active, or exactly one
-   exclusive borrow (`&mut T`) is active. Never both.
+1. **View-liveness rule.** Active shared borrows (`&T`) of a place
+   are invalidated when the place is mutated. Mutation includes
+   assignment, calling a `mut self` method, and modification through
+   `with` or `IndexPlace`. The compiler rejects code that uses a
+   borrow after the borrowed place has been mutated.
 
 2. **Move validity.** A move of a place must not occur while any
    borrow of that place (or an overlapping place) is active.
@@ -8608,10 +8588,9 @@ At every program point, the following must hold:
    last program point that uses the borrowed reference. Not to the
    end of the enclosing block.
 
-5. **Disjoint field borrowing.** Two borrows of field paths that
-   diverge at any field access are non-overlapping and may coexist,
-   even if one is exclusive. Array/slice indices are conservatively
-   treated as overlapping.
+5. **Disjoint field access.** Two borrows of field paths that
+   diverge at any field access are non-overlapping and may coexist.
+   Array/slice indices are conservatively treated as overlapping.
 
 6. **Ephemeral return conservation.** When a function returns an
    ephemeral value and accepts multiple reference parameters, the
@@ -8641,23 +8620,10 @@ At every program point, the following must hold:
    variable being dropped, extending the borrow lifetime through
    the destructor.
 
-8. **Reborrowing.** When a function holds `&mut T` and calls
-   another function that also takes `&mut T`, the original borrow
-   is **reborrowed** for the duration of the call. This is not a
-   violation of the aliasing rule — only one `&mut` is active at
-   any point. The original borrow is suspended during the call
-   and resumes after it returns.
-
-   ```
-   fn update(self: &mut Sha256, data: *const u8, len: i32):
-       // self is &mut Sha256
-       compress(&mut self)    // OK: reborrow of self for call duration
-       // self is usable again after compress returns
-   ```
-
-   Without reborrowing, methods that delegate to helper functions
-   taking `&mut Self` would require raw pointers. Reborrowing
-   makes `&mut` method chains composable.
+8. **Mutation composability.** Mutation through `mut self` receivers
+   does not require reborrowing — the receiver is owned, so method
+   chains compose naturally. Each `mut self` call takes ownership,
+   mutates, and the place remains valid for subsequent calls.
 
 ---
 
@@ -8670,7 +8636,7 @@ determined structurally by types.
 
 | # | Condition | Result |
 |---|-----------|--------|
-| 1 | Type is `&T`, `&mut T`, `StrView`, `&[T]`, `&mut [T]` | Ephemeral |
+| 1 | Type is `&T`, `StrView`, `&[T]` | Ephemeral |
 | 2 | Type is declared `ephemeral` | Ephemeral |
 | 3 | Generic `F[T]` where `T` is ephemeral | Ephemeral |
 | 4 | Struct has ephemeral field but is not marked `ephemeral` | Reject definition |
@@ -8689,7 +8655,7 @@ enables common patterns like collecting tokens from a parser:
 ```
 // Token is ephemeral (contains StrView)
 let tokens = with Vec.new() as mut toks:
-    while let Some(tok) = next_token(&mut parser):
+    while let Some(tok) = parser.next_token():
         toks.push(tok)
 // tokens: Vec[Token] is itself ephemeral — valid only in this scope
 // Cannot store tokens in a struct or return it from the function
@@ -8698,11 +8664,11 @@ let tokens = with Vec.new() as mut toks:
 This is consistent with Rule 3 (generic container inherits
 ephemerality from its type parameter).
 
-Rule 10 applies only to Form 1 (where the expression implements
-`Scoped`/`ScopedMut`). The guard is released when the block exits,
-so any ephemeral borrowing from the guard's payload would dangle.
-Forms 2 and 3 desugar to plain `let`/`var` blocks — their results
-follow normal ephemeral rules (rules 5, 8).
+Rule 10 applies only to Form 1 (guarded access). The guard is
+released when the block exits, so any ephemeral borrowing from the
+guard's payload would dangle. Forms 2 and 3 desugar to plain
+`let`/`var` blocks — their results follow normal ephemeral rules
+(rules 5, 8).
 
 ### 22.2 Closure Escaping (v1.0)
 
@@ -8715,23 +8681,19 @@ argument to a function call. All other closures are escaping.
 
 ### 23.1 Dispatch Rule
 
-The compiler selects the `with` form based on the expression's type:
+The compiler desugars `with` based on the `mut` keyword:
 
-| Syntax | Type has `Scoped`/`ScopedMut`? | Desugaring |
-|--------|-------------------------------|------------|
-| `with e as x: body` | Yes (`Scoped`) | `e.enter(x => body)` |
-| `with e as mut x: body` | Yes (`ScopedMut`) | `e.enter_mut(x => body)` |
-| `with e as mut x: body` | No | `{ var x = e; body }` |
-| `with e as x: body` | No | `{ let x = e; body }` |
+| Syntax | Desugaring |
+|--------|------------|
+| `with e as mut x: body` | `{ var x = e; body; x }` (if body is Unit) |
+| `with e as x: body` | `{ let x = e; body }` |
 
-`Scoped`/`ScopedMut` implementations take priority. If the type
-implements the trait, the guarded form is used.
+The binding is scoped to the block and cannot escape.
 
 ### 23.2 Multiple Bindings
 
 Multiple bindings nest left-to-right:
-`with a as x, b as mut y: body` is equivalent to
-`a.enter(x => b.enter_mut(y => body))`.
+`with a as x, b as mut y: body` desugars to nested scoped blocks.
 
 Multiple bindings in the non-guarded (binding) forms follow the
 same nesting: each binding is in scope for all subsequent bindings
@@ -9338,7 +9300,7 @@ DEFER_STMT  := 'defer' EXPR
 | 9 | `<<`, `>>` | Left |
 | 10 | `+`, `-`, `++`, `??` | Left |
 | 11 | `*`, `/`, `%`, `@` | Left |
-| 12 | Unary prefix (`not`, `-`, `~`, `&`, `&mut`) | — |
+| 12 | Unary prefix (`not`, `-`, `~`, `&`, `&raw mut`) | — |
 | 13 | Postfix (`.await`, `?`, `.field`, `[i]`, `()`) | Left |
 
 **Comprehensions** (§13.6):
