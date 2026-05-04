@@ -893,6 +893,20 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
     let param_count = self.ast.fn_meta_param_count(meta)
     let tp_count = self.ast.fn_meta_tp_count(meta)
 
+    // docs/mutability.md — every method must declare an explicit receiver mode.
+    // Plain `self: Self` without &, mut, or move is a compile error.
+    if param_count > 0:
+        let p0_name = self.ast.fn_param_name(param_start, 0)
+        if self.pool_resolve(p0_name) == "self":
+            let p0_type = self.ast.fn_param_type(param_start, 0)
+            let p0_flags = self.ast.fn_param_flags(param_start, 0)
+            let has_mode = fn_param_is_mut_self(p0_flags) + fn_param_is_ref_self(p0_flags) + fn_param_is_move_self(p0_flags)
+            if has_mode == 0:
+                if p0_type != 0 and self.ast.kind(p0_type) == NodeKind.NK_TYPE_NAMED:
+                    let p0_ty_sym = self.ast.get_data0(p0_type)
+                    if self.pool_resolve(p0_ty_sym) == "Self":
+                        self.emit_error("method receiver requires an explicit mode: use 'self: &Self', 'mut self: Self', or 'move self: Self'", node)
+
     // Bind Self to method owner type for dot-name methods
     let self_sym = self.syms.self_type
     var self_type_id = 0
@@ -1245,7 +1259,22 @@ fn Sema.collect_trait_decl(self: Sema, node: i32, is_local: i32):
     let method_count = self.ast.get_extra(pos)
     pos = pos + 1
     for i in 0..method_count:
-        self.trait_method_names.push(self.ast.get_extra(pos))
+        let mt_name = self.ast.get_extra(pos)
+        let mt_param_start = self.ast.get_extra(pos + 2)
+        let mt_param_count = self.ast.get_extra(pos + 3)
+        // docs/mutability.md — trait method must declare explicit receiver mode.
+        if mt_param_count > 0:
+            let p0_name = self.ast.get_extra(mt_param_start)
+            if self.pool_resolve(p0_name) == "self":
+                let p0_type = self.ast.get_extra(mt_param_start + 1)
+                let p0_flags = self.ast.get_extra(mt_param_start + 2)
+                let has_mode = fn_param_is_mut_self(p0_flags) + fn_param_is_ref_self(p0_flags) + fn_param_is_move_self(p0_flags)
+                if has_mode == 0 and p0_type != 0 and self.ast.kind(p0_type as NodeId) == NodeKind.NK_TYPE_NAMED:
+                    let p0_ty_sym = self.ast.get_data0(p0_type as NodeId)
+                    if self.pool_resolve(p0_ty_sym) == "Self":
+                        let mt_name_str = self.pool_resolve(mt_name)
+                        self.emit_error(f"trait method '{mt_name_str}' requires an explicit receiver mode: use 'self: &Self', 'mut self: Self', or 'move self: Self'", node)
+        self.trait_method_names.push(mt_name)
         pos = pos + 6
     self.trait_method_counts.push(method_count)
     self.trait_lookup.insert(name, trait_idx)

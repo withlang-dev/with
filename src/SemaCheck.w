@@ -6102,6 +6102,13 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
             let ms_root = self.place_root_sym(expr)
             if ms_root != 0 and self.scope_is_view_bound(ms_root) != 0:
                 self.emit_error("cannot mutate through read-only view yielded by iterator (§15.17)", node)
+        else if self.method_has_move_self_flag(type_name_sym, field) != 0:
+            // docs/mutability.md — move self receiver: the call consumes the
+            // receiver binding. Invalidate it so subsequent uses are caught.
+            if self.ast.kind(expr) == NodeKind.NK_IDENT:
+                let recv_sym = self.ast.get_data0(expr)
+                if self.scope_has(recv_sym) != 0:
+                    self.scope_set_state(recv_sym, VarState.MOVED)
         else if type_name_sym != 0 and self.builtin_method_requires_mutable_receiver(type_name_sym, field) != 0:
             // §15.6 — view-liveness for builtin mutating methods (push, pop,
             // insert, etc.). The earlier hardcoded path already rejected
@@ -8296,6 +8303,23 @@ fn Sema.method_has_mut_self_flag(self: Sema, type_sym: i32, method_sym: i32) -> 
     let ps = self.ast.fn_meta_param_start(meta)
     let pflags = self.ast.fn_param_flags(ps, 0)
     fn_param_is_mut_self(pflags)
+
+fn Sema.method_has_move_self_flag(self: Sema, type_sym: i32, method_sym: i32) -> i32:
+    let fn_sym = self.lookup_method_fn(type_sym, method_sym)
+    if fn_sym == 0:
+        return 0
+    if not self.fn_decl_nodes.contains(fn_sym):
+        return 0
+    let fn_node = self.fn_decl_nodes.get(fn_sym).unwrap()
+    let meta = self.ast.find_fn_meta(fn_node)
+    if meta < 0:
+        return 0
+    let pc = self.ast.fn_meta_param_count(meta)
+    if pc == 0:
+        return 0
+    let ps = self.ast.fn_meta_param_start(meta)
+    let pflags = self.ast.fn_param_flags(ps, 0)
+    fn_param_is_move_self(pflags)
 
 fn Sema.get_type_name(self: Sema, tid: TypeId) -> i32:
     let resolved = self.resolve_alias(tid)

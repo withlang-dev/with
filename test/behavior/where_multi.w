@@ -1,10 +1,10 @@
 //! expect-stdout: ok
 
 trait Showable =
-    fn show(self: Self) -> str
+    fn show(self: &Self) -> str
 
 trait Sized =
-    fn size(self: Self) -> i32
+    fn size(self: &Self) -> i32
 
 type Box { value: i32 }
 

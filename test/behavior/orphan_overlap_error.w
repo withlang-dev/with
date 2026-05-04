@@ -1,14 +1,14 @@
 //! expect-check-fail: overlapping implementations
 
 trait Renderable:
-    fn render(self: Self) -> str
+    fn render(self: &Self) -> str
 
 impl Renderable for i32:
     fn render(self: i32) -> str:
         int_to_string(self)
 
 trait Showable:
-    fn show(self: Self) -> str
+    fn show(self: &Self) -> str
 
 impl Showable for i32:
     fn show(self: i32) -> str:

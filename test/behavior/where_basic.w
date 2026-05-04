@@ -1,7 +1,7 @@
 //! expect-stdout: ok
 
 trait Printable =
-    fn show(self: Self) -> str
+    fn show(self: &Self) -> str
 
 type Wrapper { value: i32 }
 

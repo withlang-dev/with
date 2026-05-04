@@ -1,10 +1,10 @@
 //! expect-check-fail: does not implement trait
 
 trait Readable:
-    fn read(self: Self) -> str
+    fn read(self: &Self) -> str
 
 trait Parseable:
-    fn parse(self: Self) -> str
+    fn parse(self: &Self) -> str
 
 impl[T: Readable] Parseable for T:
     fn parse(self: T) -> str:

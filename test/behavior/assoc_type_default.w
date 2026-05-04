@@ -2,7 +2,7 @@
 
 trait Transform =
     type Output = i32
-    fn apply(self: Self) -> i32
+    fn apply(self: &Self) -> i32
 
 type Doubler { value: i32 }
 

@@ -3,7 +3,7 @@
 // Behavior test: traits — declaration, impl, method dispatch
 
 trait Describable =
-    fn describe(self: Self) -> str
+    fn describe(self: &Self) -> str
 
 type Circle { radius: i32 }
 type Square { side: i32 }
@@ -23,7 +23,7 @@ fn test_trait_dispatch:
     assert(s.describe() == "square")
 
 trait HasArea =
-    fn area(self: Self) -> i32
+    fn area(self: &Self) -> i32
 
 impl HasArea for Circle =
     fn area(self: Circle) -> i32:

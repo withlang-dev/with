@@ -217,6 +217,12 @@ const FN_PARAM_FLAG_IMPLICIT: i32 = 2
 // reparsing. No semantic effect during the bridge phase (P1..P11);
 // at P11 sema reads this bit to require a mutable place at the call site.
 const FN_PARAM_FLAG_MUT_SELF: i32 = 4
+// docs/mutability.md — receiver-mode `self: &Self` (read-only view).
+// Set when param name is `self` and the declared type is a reference (&Self).
+const FN_PARAM_FLAG_REF_SELF: i32 = 8
+// docs/mutability.md — receiver-mode `move self: Self` (consuming).
+// Set when param name is `self` and was preceded by `move`.
+const FN_PARAM_FLAG_MOVE_SELF: i32 = 16
 
 // Multi-index spec kind constants (stored in NK_INDEX_SPEC.d2 high bits)
 const INDEX_SCALAR: i32 = 0
@@ -233,6 +239,12 @@ fn fn_param_is_implicit(flags: i32) -> i32:
 
 fn fn_param_is_mut_self(flags: i32) -> i32:
     (flags / FN_PARAM_FLAG_MUT_SELF) % 2
+
+fn fn_param_is_ref_self(flags: i32) -> i32:
+    (flags / FN_PARAM_FLAG_REF_SELF) % 2
+
+fn fn_param_is_move_self(flags: i32) -> i32:
+    (flags / FN_PARAM_FLAG_MOVE_SELF) % 2
 
 // docs/mut.md Rev 8 §12 — module-level place declarations.
 // NK_LET_DECL flags layout:

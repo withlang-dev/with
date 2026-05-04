@@ -2,7 +2,7 @@
 trait Mapper =
     type Input = i32
     type Output = i32
-    fn map(self: Self, x: Self.Input) -> Self.Output
+    fn map(self: &Self, x: Self.Input) -> Self.Output
 
 type Tripler {}
 impl Mapper for Tripler =

@@ -1,7 +1,7 @@
 //! expect-stdout: ok
 trait Transform =
     type Output
-    fn apply(self: Self, x: i32) -> Self.Output
+    fn apply(self: &Self, x: i32) -> Self.Output
 
 type Doubler {}
 impl Transform for Doubler =

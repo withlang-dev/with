@@ -9,7 +9,7 @@ type Guard {
 }
 
 impl Drop for Guard:
-    fn drop(self: Self):
+    fn drop(move self: Self):
         TRACE = TRACE ++ self.id
 
 fn test_labeled_for_break:

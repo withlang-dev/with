@@ -2,7 +2,7 @@
 
 // Local trait, foreign type (i32) — OK
 trait Describable =
-    fn describe(self: Self) -> str
+    fn describe(self: &Self) -> str
 
 impl Describable for i32 =
     fn describe(self: i32) -> str:

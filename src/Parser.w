@@ -5977,8 +5977,12 @@ fn Parser.parse_param_list(self: Parser) -> i32:
         self.skip_newlines()
         let param_flags = self.parse_param_attrs()
         var is_mut = 0
+        var is_move = 0
         if self.peek() == TokenKind.TK_KW_MUT:
             is_mut = 1
+            self.advance()
+        else if self.peek() == TokenKind.TK_KW_MOVE:
+            is_move = 1
             self.advance()
 
         var name = 0
@@ -5998,11 +6002,13 @@ fn Parser.parse_param_list(self: Parser) -> i32:
 
         var type_node: NodeId = 0 as NodeId
         var extra_flags = 0
-        // docs/mut.md Rev 8 §5.1 — `mut self: Self` is a receiver-place mode.
-        // Tag the param so later sema phases can require a mutable place at
-        // the call site without re-inspecting the AST.
-        if is_mut == 1 and name != 0 and self.intern.resolve(name) == "self":
+        // docs/mut.md Rev 8 §5.1 / docs/mutability.md — receiver-place modes.
+        // Tag the param so later sema phases can enforce receiver constraints.
+        let is_self_param = name != 0 and self.intern.resolve(name) == "self"
+        if is_mut == 1 and is_self_param:
             extra_flags = extra_flags + FN_PARAM_FLAG_MUT_SELF
+        if is_move == 1 and is_self_param:
+            extra_flags = extra_flags + FN_PARAM_FLAG_MOVE_SELF
         if self.peek() == TokenKind.TK_COLON:
             self.advance()
             self.skip_newlines()
@@ -6014,6 +6020,10 @@ fn Parser.parse_param_list(self: Parser) -> i32:
                     self.advance()
                     self.skip_newlines()
             type_node = self.parse_type_expr()
+            // `self: &T` receiver — read-only view.
+            if is_self_param and is_mut == 0 and is_move == 0:
+                if self.pool.kind(type_node) == NodeKind.NK_TYPE_REF:
+                    extra_flags = extra_flags + FN_PARAM_FLAG_REF_SELF
 
         // Default value
         var default_node = 0

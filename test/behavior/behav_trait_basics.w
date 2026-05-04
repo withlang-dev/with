@@ -3,7 +3,7 @@
 // Behavior test: traits — declaration, impl, method dispatch
 
 trait HasValue =
-    fn value(self: Self) -> i32
+    fn value(self: &Self) -> i32
 
 type Box { val: i32 }
 type Pair { a: i32, b: i32 }

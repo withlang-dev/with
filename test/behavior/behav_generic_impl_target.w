@@ -2,7 +2,7 @@
 // Verify parser accepts impl Trait for Type[args] syntax
 // and sema resolves the generic impl target correctly.
 trait Describable =
-    fn describe(self: Self) -> i32
+    fn describe(self: &Self) -> i32
 
 type Box { value: i32 }
 
