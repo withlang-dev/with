@@ -1727,6 +1727,28 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         self.in_comptime_fn = saved_comptime
         return result
 
+    // docs/mutability.md — call-site passing mode annotations.
+    if kind == NodeKind.NK_COPY_ARG:
+        let inner = self.ast.get_data0(node)
+        let ty = self.check_expr(inner)
+        if self.is_copy(ty) == 0:
+            self.emit_error("'copy' requires the type to implement Copy or Clone", node)
+        self.typed_expr_types.insert(node, ty as i32)
+        return ty
+
+    if kind == NodeKind.NK_MOVE_ARG:
+        let inner = self.ast.get_data0(node)
+        if self.ast.kind(inner) != NodeKind.NK_IDENT:
+            self.emit_error("'move' must be applied to a binding identifier", node)
+            return self.check_expr(inner)
+        let ty = self.check_expr(inner)
+        // Explicitly mark the inner binding as moved, even for Copy types.
+        let sym = self.ast.get_data0(inner)
+        if self.scope_has(sym) != 0:
+            self.scope_set_state(sym, VarState.MOVED)
+        self.typed_expr_types.insert(node, ty as i32)
+        return ty
+
     if kind == NodeKind.NK_ASYNC_SCOPE:
         let body = self.ast.get_data1(node)
         let name = self.ast.get_data0(node)
@@ -5226,7 +5248,7 @@ fn Sema.type_implements_trait(self: Sema, tid: i32, trait_sym: i32) -> i32:
     if tid == 0 or trait_sym == 0:
         return 0
     let resolved = self.resolve_alias(tid)
-    if trait_sym == self.syms.copy:
+    if trait_sym == self.syms.copy_trait:
         return self.is_copy(resolved)
     if trait_sym == self.syms.drop:
         let drop_name = self.get_type_name(resolved)
@@ -8026,6 +8048,12 @@ fn Sema.mark_moved_if_consumed(self: Sema, node: i32):
                 self.scope_set_state(sym, VarState.MOVED)
     if kind == NodeKind.NK_GROUPED:
         self.mark_moved_if_consumed(self.ast.get_data0(node))
+    // copy: source remains valid — do not mark as consumed.
+    if kind == NodeKind.NK_COPY_ARG:
+        return
+    // move: binding already invalidated in check_expr; avoid double-processing.
+    if kind == NodeKind.NK_MOVE_ARG:
+        return
 
 fn Sema.lookup_method_sig(self: Sema, type_sym: i32, method_sym: i32) -> i32:
     if type_sym <= 0 or method_sym <= 0:

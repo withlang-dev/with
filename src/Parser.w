@@ -168,7 +168,7 @@ fn Parser.expect_ident_or_keyword(self: Parser) -> i32:
 fn parser_is_keyword_tag(tag: i32) -> bool:
     if tag >= TokenKind.TK_KW_FN and tag <= TokenKind.TK_KW_OR:
         return true
-    if tag == TokenKind.TK_KW_CONST or tag == TokenKind.TK_KW_IT or tag == TokenKind.TK_KW_ERRDEFER or tag == TokenKind.TK_KW_MOVE:
+    if tag == TokenKind.TK_KW_CONST or tag == TokenKind.TK_KW_IT or tag == TokenKind.TK_KW_ERRDEFER or tag == TokenKind.TK_KW_MOVE or tag == TokenKind.TK_KW_COPY:
         return true
     if tag == TokenKind.TK_KW_WHERE or tag == TokenKind.TK_KW_OPAQUE or tag == TokenKind.TK_KW_NULL or tag == TokenKind.TK_KW_UNION or tag == TokenKind.TK_KW_ENUM or tag == TokenKind.TK_KW_GOTO:
         return true
@@ -2553,7 +2553,13 @@ fn Parser.parse_primary(self: Parser) -> NodeId:
         self.emit_error("use 'x => body' instead of '|x| body'")
         self.advance()
         return self.poisoned_expr()
+    if t == TokenKind.TK_KW_COPY:
+        let copy_start = self.current_start()
+        self.advance()
+        let inner = self.parse_expr()
+        return self.pool.add_node(NodeKind.NK_COPY_ARG, copy_start, self.prev_end(), inner, 0, 0)
     if t == TokenKind.TK_KW_MOVE:
+        let move_kw_start = self.current_start()
         self.advance()
         // move IDENT => expr
         if self.peek() == TokenKind.TK_IDENT:
@@ -2579,8 +2585,9 @@ fn Parser.parse_primary(self: Parser) -> NodeId:
                 let node = self.parse_fat_arrow_paren_closure()
                 if node != 0: self.pool.mark_move_closure(node)
                 return node
-        self.emit_error("'move' must be followed by a closure")
-        return self.poisoned_expr()
+        // move expr — explicit move at call site (not a closure)
+        let move_inner = self.parse_expr()
+        return self.pool.add_node(NodeKind.NK_MOVE_ARG, move_kw_start, self.prev_end(), move_inner, 0, 0)
 
     self.emit_error("expected expression")
     // Skip to next statement boundary for recovery

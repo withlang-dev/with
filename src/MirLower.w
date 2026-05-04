@@ -430,7 +430,7 @@ fn MirBuilder.collect_goto_label_depths(self: MirBuilder, node: i32, scope_depth
         self.collect_goto_label_depths(self.ast.get_data2(node), scope_depth)
         self.collect_goto_label_depths(self.ast.get_data1(node), scope_depth)
         return
-    if kind == NodeKind.NK_RETURN or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_UNSAFE_BLOCK:
+    if kind == NodeKind.NK_RETURN or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG:
         self.collect_goto_label_depths(self.ast.get_data0(node), scope_depth)
         return
     if kind == NodeKind.NK_BINARY:
@@ -1054,7 +1054,7 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
     let kind = self.ast.kind(node)
     if kind == NodeKind.NK_IDENT:
         return self.ident_type(self.ast.get_data0(node))
-    if kind == NodeKind.NK_GROUPED:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG:
         return self.expr_type(self.ast.get_data0(node))
     if kind == NodeKind.NK_FIELD_ACCESS:
         let base_node = self.ast.get_data0(node)
@@ -5442,7 +5442,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
     if kind == NodeKind.NK_CLOSURE:
         return self.lower_closure(0, 0, self.ast.get_data1(node), self.ast.get_data2(node), node)
 
-    if kind == NodeKind.NK_GROUPED:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG:
         return self.lower_expr(self.ast.get_data0(node))
 
     if kind == NodeKind.NK_OPTIONAL_CHAIN:
