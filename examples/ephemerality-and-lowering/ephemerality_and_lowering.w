@@ -12,7 +12,7 @@ type ConnectionPool { url: str }
 
 fn with_connection(pool: ConnectionPool) -> DbConnection:
     print(f"Acquiring connection to {pool.url}...")
-    defer print("Releasing connection...")
+    defer: print("Releasing connection...")
     DbConnection { id: 42 }
 
 // --- Scoped mutation with `with` ---
@@ -51,8 +51,8 @@ async fn test_async_scope:
 
 fn test_defer:
     print("start")
-    defer print("cleanup 1")
-    defer print("cleanup 2")
+    defer: print("cleanup 1")
+    defer: print("cleanup 2")
     print("middle")
     // defers run in reverse order: cleanup 2, then cleanup 1
 

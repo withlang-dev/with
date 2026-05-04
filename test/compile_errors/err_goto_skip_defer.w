@@ -2,5 +2,5 @@
 
 fn main:
     goto 'after
-    defer print("cleanup")
+    defer: print("cleanup")
     'after return

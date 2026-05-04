@@ -7,7 +7,7 @@ var global_counter: i32 = 0
 
 fn test_defer_basic:
     var x = 0
-    defer x = 10
+    defer: x = 10
     assert(x == 0)
     // After scope exits, x should have been set to 10
     // But since defer runs at scope exit and we check inside
@@ -16,16 +16,16 @@ fn test_defer_basic:
 fn test_defer_ordering:
     // Defer runs in LIFO order
     var trace = ""
-    defer trace = trace ++ "3"
-    defer trace = trace ++ "2"
-    defer trace = trace ++ "1"
+    defer: trace = trace ++ "3"
+    defer: trace = trace ++ "2"
+    defer: trace = trace ++ "1"
     // At scope exit, should execute: "1", then "2", then "3"
     // But we can't check after scope exit in same fn.
     // Verify defers don't execute prematurely:
     assert(trace == "")
 
 fn increment_counter:
-    defer global_counter = global_counter + 1
+    defer: global_counter = global_counter + 1
     // counter is still 0 here
     assert(global_counter == 0)
 
@@ -36,7 +36,7 @@ fn test_defer_on_scope_exit:
     assert(global_counter == 1)
 
 fn add_then_defer:
-    defer global_counter = global_counter + 100
+    defer: global_counter = global_counter + 100
     global_counter = global_counter + 1
 
 fn test_defer_after_body:

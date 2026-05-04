@@ -11,7 +11,7 @@ fn test_defer_runs_on_exit:
     assert(g_trace == 1)
 
 fn do_defer_work:
-    defer g_trace = 1
+    defer: g_trace = 1
     assert(g_trace == 0)
 
 fn test_defer_lifo_order:
@@ -25,9 +25,9 @@ fn test_defer_lifo_order:
     assert(g_trace == 123)
 
 fn do_lifo_defers:
-    defer g_trace = g_trace * 10 + 3
-    defer g_trace = g_trace * 10 + 2
-    defer g_trace = g_trace * 10 + 1
+    defer: g_trace = g_trace * 10 + 3
+    defer: g_trace = g_trace * 10 + 2
+    defer: g_trace = g_trace * 10 + 1
 
 fn test_defer_with_early_return:
     g_trace = 0
@@ -35,7 +35,7 @@ fn test_defer_with_early_return:
     assert(g_trace == 42)
 
 fn early_return_fn(early: bool):
-    defer g_trace = 42
+    defer: g_trace = 42
     if early:
         return
     g_trace = 99
@@ -47,7 +47,7 @@ fn test_defer_mutation:
     assert(g_trace == 15)
 
 fn defer_mutates:
-    defer g_trace = g_trace + 5
+    defer: g_trace = g_trace + 5
     g_trace = 10
 
 fn test_multiple_defers_with_early_return:
@@ -60,15 +60,15 @@ fn test_multiple_defers_with_early_return:
     assert(g_trace == 30)
 
 fn multiple_defers_early(early: bool):
-    defer g_trace = g_trace + 10
-    defer g_trace = g_trace + 20
+    defer: g_trace = g_trace + 10
+    defer: g_trace = g_trace + 20
     if early:
         return
     g_trace = 999
 
 fn test_defer_does_not_run_prematurely:
     g_trace = 0
-    defer g_trace = 100
+    defer: g_trace = 100
     // Within the same scope, defer hasn't run yet
     assert(g_trace == 0)
 
@@ -78,14 +78,14 @@ fn test_nested_function_defers:
     assert(g_trace == 3)
 
 fn inner_defer:
-    defer g_trace = g_trace + 1
+    defer: g_trace = g_trace + 1
 
 fn outer_defer:
-    defer g_trace = g_trace + 1
+    defer: g_trace = g_trace + 1
     inner_defer()
     // After inner_defer returns: g_trace = 1
     // Then our defer runs: g_trace = 2
-    defer g_trace = g_trace + 1
+    defer: g_trace = g_trace + 1
 
 fn main:
     test_defer_runs_on_exit()

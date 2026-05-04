@@ -6,7 +6,7 @@ async fn leaf() -> i32:
     7
 
 async fn middle() -> i32:
-    defer seen = 1
+    defer: seen = 1
     let t = leaf()
     t.await
 
