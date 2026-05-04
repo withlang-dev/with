@@ -70,7 +70,9 @@ Each form serves a distinct property:
 - **Indented colon** serves structural readability. Python-shaped indentation makes multi-line structure visible at a glance.
 - **Braces** serve whitespace independence. Code generators, minifiers, and embedded-expression contexts cannot rely on indentation or newlines.
 
-The three properties don't overlap. The three forms are the minimal set covering them. No fourth form exists because no fourth property exists.
+The three properties don't overlap. The three forms are the minimal set covering them.
+
+**Exception — `if` expression shorthand:** `if` additionally supports `then` as a body introducer for pure expression chains: `if cond then expr else expr`. The `then` form is not a general block form — it accepts only a single expression, not a block, and the `else` arm also takes a bare expression. It serves a fourth property: reading like a mathematical conditional without any punctuation overhead. Because it is expression-only and `if`-specific, it does not generalize to other constructs.
 
 ### Universal Application
 
@@ -79,7 +81,7 @@ The three-form rule applies to every construct that introduces a statement or ex
 The constructs subject to the rule are:
 
 - **Functions:** `fn name(params) -> T: body`
-- **Conditionals:** `if cond: body`, `else: body`, `else if cond: body`
+- **Conditionals:** `if cond: body`, `else: body`, `else if cond: body`, and the expression shorthand `if cond then expr else expr`
 - **Loops:** `for x in xs: body`, `while cond: body`, `loop: body`
 - **Scoped access:** `with expr as x: body`, `with expr as mut x: body`, `with expr as (a, b): body`
 - **Unsafe regions:** `unsafe: body`
@@ -144,9 +146,10 @@ After parsing a block-introducing construct's header, the parser dispatches base
 1. **`{` next** (with optional whitespace, no intervening colon): braced form. The body is delimited by the matching `}`.
 2. **`:` next, then non-whitespace content on the same line:** inline form. The body is a single block item terminated by the first top-level newline.
 3. **`:` next, then end-of-line:** indented form. The body is the indented block on subsequent lines.
-4. **Anything else:** parse error.
+4. **`then` next** (`if` only): expression shorthand form. The body is a single expression; `else` introduces the else expression directly, without a body introducer.
+5. **Anything else:** parse error.
 
-A line ending with `:` and no indented body following is a parse error. A construct with neither `:` nor `{` introducing a body is a parse error.
+A line ending with `:` and no indented body following is a parse error. A construct with no recognized body introducer is a parse error.
 
 If `{ ... }` appears after `:`, it is parsed as a single inline body expression (typically an anonymous record literal or a block expression), not as a braced body. This is what allows constructs like `fn make_user: { name: "Alice", age: 30 }` to parse correctly once anonymous record literals are in the language.
 
@@ -162,13 +165,12 @@ These rules compose cleanly across nesting. An inline colon body can contain bra
 
 ### Nesting and Dangling `else`
 
-Inline forms compose. The inner construct's body parses according to the same three-form rule.
+Inline forms compose. The inner construct's body parses according to the same rules.
 
 ```
 fn classify(n: i32) -> Category: if n < 0: .Negative else if n == 0: .Zero else: .Positive
+fn clamp(x: i32, lo: i32, hi: i32) -> i32: if x < lo then lo else if x > hi then hi else x
 ```
-
-Inner `:` tokens in expression position belong to the inner construct's header, not the outer body. The parser handles this by recursive descent.
 
 For the dangling `else` case: an `else` on the same line as an inline `if` binds to the nearest unmatched inline `if` on that line. An `else` on a following line participates in the outer indentation structure and binds according to indentation, not inline-line proximity.
 
@@ -187,7 +189,7 @@ Here `else: d` is on the following line. It participates in the outer structure 
 
 ### Body Type Rules
 
-The three body forms produce the same body AST and are type-checked by the existing rules for that construct.
+The three body forms (and the `then` expression shorthand) produce the same body AST and are type-checked by the existing rules for that construct.
 
 If a construct has an expected body type, the body must type-check against that expected type regardless of source form. If the construct participates in inference, such as function return type inference, the existing inference rules apply unchanged. This proposal does not define or alter those rules.
 
@@ -206,6 +208,13 @@ fn add(a: i32, b: i32) -> i32:
     a + b
 
 fn add(a: i32, b: i32) -> i32 { a + b }
+```
+
+For `if` expressions, the `then` form is also equivalent:
+
+```
+fn clamp(x: i32, lo: i32, hi: i32) -> i32: if x < lo then lo else if x > hi then hi else x
+fn clamp(x: i32, lo: i32, hi: i32) -> i32: if x < lo: lo else if x > hi: hi else: x
 ```
 
 Tools that parse and re-emit With source (formatters, refactoring tools, the `with migrate` C-import path) may convert between forms; the conversion is purely syntactic.
@@ -241,6 +250,6 @@ With aims to be a Python-shaped systems language. Python's indented blocks work 
 
 Three forms covering three properties lets the user write what reads best for the situation. The cost is style debates within a codebase; the benefit is that a natural-looking shape is always one form away.
 
-The "every construct, no exceptions" rule eliminates a class of papercut: users never need to remember which constructs allow which forms. If it introduces a statement or expression body, all three forms work. The rule is structural, not per-construct.
+The "every construct, no exceptions" rule eliminates a class of papercut: users never need to remember which constructs allow which forms. If it introduces a statement or expression body, all three forms work. The rule is structural, not per-construct. The single exception is the `then` shorthand, which is `if`-specific because it is expression-only and would not generalize cleanly to block-introducing constructs.
 
 The "trust the user" principle is a real design choice. The language could enforce a single form per construct, or warn when users mix forms within a function. With does neither. The language gives three tools that each serve a distinct property; the user decides which tool fits the situation.
