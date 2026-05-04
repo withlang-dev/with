@@ -26,7 +26,7 @@ fn main:
     let helper = helper_err("helper")
     assert(f"{helper}" == "Bad(helper)")
 
-    let if_err = if false then E.Empty else E.Bad("if-else")
+    let if_err = if false: E.Empty else E.Bad("if-else")
     assert(f"{if_err}" == "Bad(if-else)")
 
     let match_err = match false:

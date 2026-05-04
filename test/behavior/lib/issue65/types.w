@@ -36,7 +36,7 @@ pub fn imported_nest(msg: str, n: i32) -> ImportedNest:
     ImportedNest { holder: imported_holder(msg, n) }
 
 pub fn imported_if_err(ok: bool) -> ImportedErr:
-    if ok then ImportedErr.Empty else ImportedErr.Bad("imported-if")
+    if ok: ImportedErr.Empty else ImportedErr.Bad("imported-if")
 
 pub fn imported_match_tok(ok: bool) -> ImportedToken:
     match ok:

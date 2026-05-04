@@ -13,7 +13,7 @@ type Token = ephemeral {
 }
 
 fn first_token(src: StrView) -> Option[Token]:
-    if src.len() == 0 then return None
+    if src.len() == 0: return None
     Some(Token { text: src.slice(0, 1), kind: .Ident, line: 1 })
 
 fn test:

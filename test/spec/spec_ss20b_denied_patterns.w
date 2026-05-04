@@ -78,6 +78,6 @@ fn test:
 
 // PASS: conditionally reachable code
 fn test(flag: bool) -> i32:
-    if flag then return 42
+    if flag: return 42
     print("still reachable")   // OK: return is conditional
     0

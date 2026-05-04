@@ -18,7 +18,7 @@ fn test:
     let rs: Vec[Result[i32, str]] = vec![Ok(1), Ok(2)]
     assert(rs.sequence() == Ok(vec![1, 2]))
 
-// PASS: traverse applies function then sequences
+// PASS: traverse applies function: sequences
 fn test:
     let strs = vec!["1", "2", "3"]
     let parsed = strs.traverse(s => s.parse_int())

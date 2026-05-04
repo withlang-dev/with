@@ -19,7 +19,7 @@ fn test_named_args:
     assert(add(b: 4, a: 3) == 7)
 
 fn test_mixed_args:
-    // Positional then named
+    // Positional: named
     assert(add(3, b: 4) == 7)
     // All positional still works
     assert(add(3, 4) == 7)

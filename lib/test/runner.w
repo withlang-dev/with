@@ -30,4 +30,4 @@ pub fn summary(passed: i32, total: i32) -> i32:
     write(" failed, ")
     write(total)
     write(" total")
-    if passed == total then 0 else 1
+    if passed == total: 0 else 1

@@ -44,7 +44,7 @@ fn test_compound_bool:
 fn test_bool_in_if:
     let a = true
     let b = false
-    let result = if a and not b then 1 else 0
+    let result = if a and not b: 1 else 0
     assert(result == 1)
 
 fn test_equality_of_bools:

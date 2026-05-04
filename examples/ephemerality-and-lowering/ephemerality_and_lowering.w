@@ -54,7 +54,7 @@ fn test_defer:
     defer: print("cleanup 1")
     defer: print("cleanup 2")
     print("middle")
-    // defers run in reverse order: cleanup 2, then cleanup 1
+    // defers run in reverse order: cleanup 2,: cleanup 1
 
 // --- Vec mutation ---
 

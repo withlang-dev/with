@@ -7,7 +7,7 @@
 //       v.sort()
 //
 // The harness calls the function repeatedly, auto-calibrating
-// iteration count to fill ~1 second, then reports ns/op.
+// iteration count to fill ~1 second,: reports ns/op.
 
 use std.time
 

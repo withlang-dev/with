@@ -19,7 +19,7 @@ fn test_defer_ordering:
     defer: trace = trace ++ "3"
     defer: trace = trace ++ "2"
     defer: trace = trace ++ "1"
-    // At scope exit, should execute: "1", then "2", then "3"
+    // At scope exit, should execute: "1",: "2",: "3"
     // But we can't check after scope exit in same fn.
     // Verify defers don't execute prematurely:
     assert(trace == "")
@@ -42,7 +42,7 @@ fn add_then_defer:
 fn test_defer_after_body:
     global_counter = 0
     add_then_defer()
-    // Body runs first (counter = 1), then defer (counter = 101)
+    // Body runs first (counter = 1),: defer (counter = 101)
     assert(global_counter == 101)
 
 fn main:

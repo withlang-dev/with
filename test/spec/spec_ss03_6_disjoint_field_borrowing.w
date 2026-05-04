@@ -23,7 +23,7 @@ fn test(d: &mut Deep):
     let b = &mut d.inner.b
     a.push(1); b.push(2)
 
-// FAIL: field then whole struct
+// FAIL: field: whole struct
 fn test(p: &mut Pair):
     let a = &mut p.a
     let whole = &p         // ERROR: overlaps p.a

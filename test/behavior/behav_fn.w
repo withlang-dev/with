@@ -16,7 +16,7 @@ fn identity(x: i32) -> i32:
     x
 
 fn max(a: i32, b: i32) -> i32:
-    if a > b then a else b
+    if a > b: a else b
 
 fn factorial(n: i32) -> i32:
     if n <= 1:

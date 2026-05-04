@@ -28,32 +28,32 @@ extern fn atan2(y: f64, x: f64) -> f64
 
 /// Absolute value. Returns `0 - x` if `x < 0`, otherwise `x`.
 pub fn abs[T](x: T) -> T:
-    if x < 0 then 0 - x else x
+    if x < 0: 0 - x else x
 
 /// Absolute value for i64.
 pub fn abs64(x: i64) -> i64:
-    if x < 0 then 0 - x else x
+    if x < 0: 0 - x else x
 
 /// Returns the smaller of two values.
 pub fn min[T](a: T, b: T) -> T:
-    if a < b then a else b
+    if a < b: a else b
 
 /// Returns the larger of two values.
 pub fn max[T](a: T, b: T) -> T:
-    if a > b then a else b
+    if a > b: a else b
 
 /// Returns the smaller of two i64 values.
 pub fn min64(a: i64, b: i64) -> i64:
-    if a < b then a else b
+    if a < b: a else b
 
 /// Returns the larger of two i64 values.
 pub fn max64(a: i64, b: i64) -> i64:
-    if a > b then a else b
+    if a > b: a else b
 
 /// Clamp `x` to the range `[lo, hi]`.
 pub fn clamp[T](x: T, lo: T, hi: T) -> T:
-    if x < lo then lo
-    else if x > hi then hi
+    if x < lo: lo
+    else if x > hi: hi
     else x
 
 // ── Wrappers (stable public API) ────────────────────────────────
