@@ -11,7 +11,7 @@ var defer_order_fourth: i32 = 0
 
 fn with_connection(pool: ConnectionPool) -> DbConnection:
     print(f"Acquiring connection to {pool.url}...")
-    defer print("Releasing connection...")
+    defer: print("Releasing connection...")
     DbConnection { id: 42 }
 
 @[test]
@@ -27,11 +27,11 @@ fn test_with_blocks:
 fn run_defer_order:
     var order = Vec.new()
     order.push(1)
-    defer defer_order_len = order.len()
-    defer defer_order_third = order.get(2)
-    defer defer_order_fourth = order.get(3)
-    defer order.push(4)
-    defer order.push(3)
+    defer: defer_order_len = order.len()
+    defer: defer_order_third = order.get(2)
+    defer: defer_order_fourth = order.get(3)
+    defer: order.push(4)
+    defer: order.push(3)
     order.push(2)
 
 @[test]

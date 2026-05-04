@@ -9,12 +9,12 @@ fn might_fail(x: i32) -> MyResult:
         .Ok(x * 2)
 
 fn test_errdefer_on_error() -> MyResult:
-    errdefer print("cleanup-on-error")
+    errdefer: print("cleanup-on-error")
     let val = might_fail(0 - 1)?
     .Ok(val)
 
 fn test_errdefer_on_success() -> MyResult:
-    errdefer print("should-not-run")
+    errdefer: print("should-not-run")
     let val = might_fail(5)?
     .Ok(val)
 

@@ -3,7 +3,7 @@
 var seen: i32 = 0
 
 async fn inner_slow() -> i32:
-    defer seen = seen + 1
+    defer: seen = seen + 1
     5
 
 async fn inner_fast() -> i32:

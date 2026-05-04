@@ -5,8 +5,8 @@ var ISSUE163_DEFER_LEN: i64 = 0
 fn issue163_defer_push:
     var order = Vec.new()
     order.push(1)
-    defer ISSUE163_DEFER_LEN = order.len()
-    defer order.push(3)
+    defer: ISSUE163_DEFER_LEN = order.len()
+    defer: order.push(3)
     order.push(2)
 
 fn issue163_count(xs: &Vec[i32]) -> i64:

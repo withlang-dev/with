@@ -17,5 +17,5 @@ fn bad(n: Int) -> Int:
 @[tailrec]
 fn also_bad(n: Int) -> Int:
     if n <= 0: 0
-    defer log(n)
+    defer: log(n)
     also_bad(n - 1)                         // ERROR

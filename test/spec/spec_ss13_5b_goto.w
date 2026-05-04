@@ -41,9 +41,9 @@ fn test_adjacent_labels:
 fn test_cleanup_on_goto:
     TRACE = ""
     'outer:
-        defer TRACE = TRACE ++ "A"
+        defer: TRACE = TRACE ++ "A"
         'inner:
-            defer TRACE = TRACE ++ "B"
+            defer: TRACE = TRACE ++ "B"
             goto 'done
     'done:
         assert(TRACE == "BA")

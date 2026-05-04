@@ -5,12 +5,12 @@
 
 // FAIL: return inside defer
 fn test_fail:
-    defer return 42                    // ERROR E0901: non-local control flow in defer
+    defer: return 42                    // ERROR E0901: non-local control flow in defer
 
 // FAIL: ? inside defer
 fn test_fail:
-    defer conn.close()?                // ERROR E0901: ? in defer
+    defer: conn.close()?                // ERROR E0901: ? in defer
 
 // PASS: handle errors locally
 fn test:
-    defer conn.close().unwrap_or(())   // OK: error handled locally
+    defer: conn.close().unwrap_or(())   // OK: error handled locally

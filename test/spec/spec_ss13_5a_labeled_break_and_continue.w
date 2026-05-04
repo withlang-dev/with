@@ -68,10 +68,10 @@ fn test_with_transparency:
 fn test_cleanup_on_labeled_break:
     TRACE = ""
     'outer while true:
-        defer TRACE = TRACE ++ "A"
+        defer: TRACE = TRACE ++ "A"
         'inner:
-            defer TRACE = TRACE ++ "B"
-            errdefer TRACE = TRACE ++ "E"
+            defer: TRACE = TRACE ++ "B"
+            errdefer: TRACE = TRACE ++ "E"
             break 'outer
             TRACE = TRACE ++ "x"
     assert(TRACE == "BA")

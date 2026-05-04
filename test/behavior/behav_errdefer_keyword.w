@@ -5,7 +5,7 @@ extern fn with_eprint(s: str)
 var errdefer_ran: i32 = 0
 
 fn might_fail:
-    errdefer errdefer_ran = errdefer_ran + 1
+    errdefer: errdefer_ran = errdefer_ran + 1
 
 fn main:
     might_fail()

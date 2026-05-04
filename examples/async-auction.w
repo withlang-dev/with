@@ -33,7 +33,7 @@ type AuctionResult { winner_id: i32, winning_bid: i32, total_bids: i32 }
 // ---------------------------------------------------------------------------
 
 async fn bidder(id: i32, base_price: i32, tx: Sender[Bid]) -> i32:
-    defer cleanup_count = cleanup_count + 1
+    defer: cleanup_count = cleanup_count + 1
     var round: i32 = 0
     while round < 3:
         let amount = base_price + round * id * 7
@@ -47,7 +47,7 @@ async fn bidder(id: i32, base_price: i32, tx: Sender[Bid]) -> i32:
 // ---------------------------------------------------------------------------
 
 async fn slow_bidder(id: i32, tx: Sender[Bid]) -> i32:
-    defer cleanup_count = cleanup_count + 1
+    defer: cleanup_count = cleanup_count + 1
     // Simulate slow thinking with sleep
     sleep(Duration.millis(500)).await
     tx.send(Bid { bidder_id: id, amount: 9999 })
@@ -99,7 +99,7 @@ async fn validate_bid(amount: i32) -> Result[i32, str]:
 // BUG DISCOVERED: `.is_ok()` on Result returned from async fn `.await`
 // returns false for Ok values. Possibly async Result ABI issue.
 async fn process_winning_bid(amount: i32) -> Result[i32, str]:
-    errdefer cleanup_count = cleanup_count + 100
+    errdefer: cleanup_count = cleanup_count + 100
     if amount <= 0:
         return Err("bid must be positive")
     let valuation = full_valuation(Bid { bidder_id: 0, amount: amount }).await
@@ -117,9 +117,9 @@ fn spawn_valuation(bid: Bid) -> Task[i32]:
 // ---------------------------------------------------------------------------
 
 fn check_defer_lifo:
-    defer defer_trace = defer_trace * 10 + 3
-    defer defer_trace = defer_trace * 10 + 2
-    defer defer_trace = defer_trace * 10 + 1
+    defer: defer_trace = defer_trace * 10 + 3
+    defer: defer_trace = defer_trace * 10 + 2
+    defer: defer_trace = defer_trace * 10 + 1
 
 // ---------------------------------------------------------------------------
 // Main auction orchestration

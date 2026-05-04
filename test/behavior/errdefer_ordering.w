@@ -6,10 +6,10 @@ fn fail() -> MyResult:
     .Err("oops")
 
 fn test_ordering() -> MyResult:
-    defer write("defer-1")
-    errdefer write("errdefer-1")
-    defer write("defer-2")
-    errdefer write("errdefer-2")
+    defer: write("defer-1")
+    errdefer: write("errdefer-1")
+    defer: write("defer-2")
+    errdefer: write("errdefer-2")
     let val = fail()?
     .Ok(val)
 
