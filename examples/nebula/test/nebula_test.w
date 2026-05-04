@@ -37,9 +37,9 @@ fn status_label(s: Status) -> i32:
 // --- Temperature classification ---
 
 fn classify_temp(temp: f64) -> i32:
-    if temp > 100.0 then 3      // Critical
-    else if temp > 80.0 then 2  // High
-    else if temp > 60.0 then 1  // Medium
+    if temp > 100.0: 3      // Critical
+    else if temp > 80.0: 2  // High
+    else if temp > 60.0: 1  // Medium
     else 0                      // Low
 
 fn should_alert(severity: i32) -> bool:
@@ -86,8 +86,8 @@ fn parse_field_count(field_lens: [4]i32, total: i32) -> i32:
 // --- Batch builder ---
 
 fn build_batch_status(index: i32) -> i32:
-    if index % 10 == 0 then 2     // Fatal
-    else if index % 5 == 0 then 1 // Warning
+    if index % 10 == 0: 2     // Fatal
+    else if index % 5 == 0: 1 // Warning
     else 0                        // Ok
 
 fn batch_temp(index: i32) -> f64:
@@ -119,7 +119,7 @@ fn aggregate_stats(counts: [3]i32, packets: [3]i32, bytes: [3]i32) -> SessionSta
 // --- Sliding window count ---
 
 fn window_count(len: i32, size: i32) -> i32:
-    if len >= size then len - size + 1 else 0
+    if len >= size: len - size + 1 else 0
 
 // --- Tests ---
 

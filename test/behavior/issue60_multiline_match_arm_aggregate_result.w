@@ -15,7 +15,7 @@ fn parsed_source() -> Source:
     Source { ir, entry: "main" }
 
 fn parse(ok: bool) -> Result[Source, ParseErr]:
-    if ok then Ok(parsed_source()) else Err(.Bad)
+    if ok: Ok(parsed_source()) else Err(.Bad)
 
 fn compile_text_source(ok: bool) -> Source:
     match parse(ok):

@@ -89,9 +89,9 @@ pub fn load_config(env_port: Option[u16]) -> ServerConfig:
 pub enum Severity { Low | Medium | High | Critical }
 
 pub fn classify_temp(temp: f64) -> Severity:
-    if temp > 100.0 then .Critical
-    else if temp > 80.0 then .High
-    else if temp > 60.0 then .Medium
+    if temp > 100.0: .Critical
+    else if temp > 80.0: .High
+    else if temp > 60.0: .Medium
     else .Low
 
 pub fn should_alert(sev: Severity) -> bool:
@@ -104,8 +104,8 @@ pub fn should_alert(sev: Severity) -> bool:
 pub fn build_test_batch(count: usize) -> Vec[Telemetry]:
     with Vec.new() as mut batch:
         for i in 0..count:
-            let status = if i % 5 == 0 then .Warning("periodic check")
-                         else if i % 10 == 0 then .Fatal(code: 99)
+            let status = if i % 5 == 0: .Warning("periodic check")
+                         else if i % 10 == 0: .Fatal(code: 99)
                          else .Active
             batch.push(Telemetry {
                 device_id: f"dev-{i}",

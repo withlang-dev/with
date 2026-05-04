@@ -426,9 +426,9 @@ fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
         let cond = pool.get_data0(node)
         let then_body = pool.get_data1(node)
         let else_body = pool.get_data2(node)
-        var out = prefix ++ "if " ++ render_expr(pool, intern, (cond) as NodeId, 0) ++ " then " ++ render_expr(pool, intern, (then_body) as NodeId, 0)
+        var out = prefix ++ "if " ++ render_expr(pool, intern, (cond) as NodeId, 0) ++ ": " ++ render_expr(pool, intern, (then_body) as NodeId, 0)
         if else_body != 0:
-            out = out ++ " else " ++ render_expr(pool, intern, (else_body) as NodeId, 0)
+            out = out ++ " else: " ++ render_expr(pool, intern, (else_body) as NodeId, 0)
         return out
 
     if kind == NodeKind.NK_RETURN:

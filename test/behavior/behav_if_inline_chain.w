@@ -1,14 +1,14 @@
 //! expect-stdout: all inline if chain tests passed
 
 fn clamp(x: i32, lo: i32, hi: i32) -> i32:
-    if x < lo then lo
-    else if x > hi then hi
+    if x < lo: lo
+    else if x > hi: hi
     else x
 
 fn classify(x: i32) -> str:
-    if x > 100 then "big"
-    else if x > 50 then "medium"
-    else if x > 10 then "small"
+    if x > 100: "big"
+    else if x > 50: "medium"
+    else if x > 10: "small"
     else "tiny"
 
 fn main:
@@ -21,10 +21,10 @@ fn main:
     assert(classify(25) == "small")
     assert(classify(5) == "tiny")
 
-    let x = if true then 42 else 0
+    let x = if true: 42 else 0
     assert(x == 42)
 
-    let y = if false then 1 else 2
+    let y = if false: 1 else 2
     assert(y == 2)
 
     print("all inline if chain tests passed")

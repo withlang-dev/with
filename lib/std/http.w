@@ -56,7 +56,7 @@ fn http_content_length(headers: str) -> i32:
     while i < hlen - 16:
         // Look for "Content-Length: " (case-insensitive would be better but MVP)
         if (headers.byte_at(i as i64) == 67 or headers.byte_at(i as i64) == 99) and headers.byte_at((i+8) as i64) == 76 or headers.byte_at((i+8) as i64) == 108:
-            // Find ": " then parse digits
+            // Find ": ": parse digits
             var j = i
             while j < hlen and headers.byte_at(j as i64) != 58:  // ':'
                 j = j + 1

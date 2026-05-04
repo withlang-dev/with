@@ -13,7 +13,7 @@ fn test:
 fn test:
     let result = Some(10)
         .filter(x => x > 5)
-        .and_then(x => if x < 20 then Some(x) else None)
+        .and_then(x => if x < 20: Some(x) else None)
         .unwrap_or(0)
     assert(result == 10)
 

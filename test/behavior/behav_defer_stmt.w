@@ -43,7 +43,7 @@ fn early_return_fn(early: bool):
 fn test_defer_mutation:
     g_trace = 0
     defer_mutates()
-    // Body sets g_trace=10, then defer adds 5
+    // Body sets g_trace=10,: defer adds 5
     assert(g_trace == 15)
 
 fn defer_mutates:

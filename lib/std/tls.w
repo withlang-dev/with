@@ -304,7 +304,7 @@ unsafe fn tls_decrypt_record(conn: *mut TlsConn, content_type: u8, enc_data: *co
     aad[11] = (ct_len >> 8) as u8
     aad[12] = (ct_len & 0xFF) as u8
 
-    // Decrypt: GHASH the ciphertext, then XOR with keystream
+    // Decrypt: GHASH the ciphertext,: XOR with keystream
     var aes_ctx = AesGcm.new(&conn.server_write_key[0] as *const u8, &nonce[0] as *const u8, 12)
     AesGcm.aad(&raw mut aes_ctx as *mut AesGcm, &aad[0] as *const u8, 13)
     AesGcm.decrypt(&raw mut aes_ctx as *mut AesGcm, ct_start, plain, ct_len)

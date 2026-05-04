@@ -13,7 +13,7 @@ extend Vec2:
 
     fn normalized(self: &Vec2) -> Vec2:
         with self.length() as len:
-            if len > 1e-6 then Vec2 { x: self.x / len, y: self.y / len }
+            if len > 1e-6: Vec2 { x: self.x / len, y: self.y / len }
             else Vec2.zero()
 
     fn scale(self: &Vec2, s: f32) -> Vec2:

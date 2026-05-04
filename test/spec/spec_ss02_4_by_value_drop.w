@@ -16,7 +16,7 @@ impl Drop for Wrapper:
     fn drop(self: Self):
         print(f"dropping {self.name}")
         // after this returns, Handle::drop runs for self.handle
-        // then String::drop runs for self.name
+        //: String::drop runs for self.name
 
 // FAIL: Copy + Drop is still forbidden
 type Bad { x: i32 } with Copy

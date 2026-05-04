@@ -20,7 +20,7 @@ fn test:
 // PASS: consuming self in final method
 extend Builder:
     fn build(self: Builder) -> Result[Server, str]:
-        if self.host.is_empty() then Err("missing host")
+        if self.host.is_empty(): Err("missing host")
         else Ok(Server { host: self.host, port: self.port })
 
 fn test:

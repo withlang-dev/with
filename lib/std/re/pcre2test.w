@@ -21908,7 +21908,7 @@ fn usage() {
 
     printf("  -E            preprocess input only (#if ... #endif)\n")
 
-    printf("  -error <n,m,..>  show messages for error numbers, then exit\n")
+    printf("  -error <n,m,..>  show messages for error numbers,: exit\n")
 
     printf("  -help         show usage information\n")
 
@@ -21920,11 +21920,11 @@ fn usage() {
 
     printf("  -jitverify    set default pattern modifier 'jitverify'\n")
 
-    printf("  -LM           list pattern and subject modifiers, then exit\n")
+    printf("  -LM           list pattern and subject modifiers,: exit\n")
 
-    printf("  -LP           list non-script properties, then exit\n")
+    printf("  -LP           list non-script properties,: exit\n")
 
-    printf("  -LS           list supported scripts, then exit\n")
+    printf("  -LS           list supported scripts,: exit\n")
 
     printf("  -malloc       exercise malloc() failures\n")
 
@@ -21944,7 +21944,7 @@ fn usage() {
 
     printf("  -TM           same as -tm, but show total time at the end\n")
 
-    printf("  -unittest     run unit tests, then exit\n")
+    printf("  -unittest     run unit tests,: exit\n")
 
     printf("  -v|--version  show PCRE2 version and exit\n")
 

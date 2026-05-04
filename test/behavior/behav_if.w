@@ -12,9 +12,9 @@ fn test_basic_if:
 
 fn test_if_else_expression:
     let x = 3
-    let result = if x > 0 then 1 else -1
+    let result = if x > 0: 1 else -1
     assert(result == 1)
-    let result2 = if x < 0 then 1 else -1
+    let result2 = if x < 0: 1 else -1
     assert(result2 == -1)
 
 fn test_nested_if:
@@ -29,7 +29,7 @@ fn test_nested_if:
 
 fn test_if_else_chain:
     let x = 5
-    let label = if x < 0 then "negative" else if x == 0 then "zero" else "positive"
+    let label = if x < 0: "negative" else if x == 0: "zero" else "positive"
     assert(label == "positive")
 
 fn classify(n: i32) -> str:

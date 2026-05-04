@@ -53,7 +53,7 @@ pub fn count[T](arr: [T]) -> i32:
 /// Return true if `target` is in the array.
 pub fn contains(arr: [i32], target: i32) -> bool:
     for x in arr:
-        if x == target then return true
+        if x == target: return true
     false
 
 /// Sum all elements from a VecIter[i32].

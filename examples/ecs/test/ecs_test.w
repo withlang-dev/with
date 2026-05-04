@@ -64,9 +64,9 @@ fn check_collision(t1: Transform, c1: Collider, t2: Transform, c2: Collider) -> 
     let r_sum = c1.radius + c2.radius
     dist_sq < r_sum * r_sum
 
-fn max[T](a: T, b: T) -> T: if a > b then a else b
+fn max[T](a: T, b: T) -> T: if a > b: a else b
 
-fn min[T](a: T, b: T) -> T: if a < b then a else b
+fn min[T](a: T, b: T) -> T: if a < b: a else b
 
 fn clamp[T](val: T, lo: T, hi: T) -> T: min(max(val, lo), hi)
 

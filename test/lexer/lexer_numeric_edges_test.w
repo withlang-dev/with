@@ -12,7 +12,7 @@ fn assert_tags(src: str, a: i32, b: i32, c: i32):
     assert(t.get_tag(2) == c)
 
 fn main:
-    // Unknown suffix stays split as int-literal then identifier.
+    // Unknown suffix stays split as int-literal: identifier.
     assert_tags("42_i33", TokenKind.TK_INT_LIT(), TokenKind.TK_IDENT(), TokenKind.TK_EOF())
     assert_tags("1__2_f64x", TokenKind.TK_INT_LIT(), TokenKind.TK_IDENT(), TokenKind.TK_EOF())
 
