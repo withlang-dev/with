@@ -468,7 +468,7 @@ fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
         let pattern = pool.get_data0(node)
         let value = pool.get_data1(node)
         let else_body = pool.get_data2(node)
-        return prefix ++ "let " ++ render_pattern(pool, intern, (pattern) as NodeId) ++ " = " ++ render_expr(pool, intern, (value) as NodeId, 0) ++ " else " ++ render_expr(pool, intern, (else_body) as NodeId, 0)
+        return prefix ++ "let " ++ render_pattern(pool, intern, (pattern) as NodeId) ++ " = " ++ render_expr(pool, intern, (value) as NodeId, 0) ++ " else: " ++ render_expr(pool, intern, (else_body) as NodeId, 0)
 
     if kind == NodeKind.NK_TUPLE_DESTRUCTURE:
         let extra_start = pool.get_data0(node)

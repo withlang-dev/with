@@ -5,7 +5,7 @@
 
 // PASS: return ref, use locally
 fn first(xs: &Vec[i32]) -> Option[&i32]:
-    if xs.is_empty(): None else Some(&xs[0])
+    if xs.is_empty(): None else: Some(&xs[0])
 
 fn test:
     let v = vec![1, 2, 3]

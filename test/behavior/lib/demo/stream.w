@@ -53,7 +53,7 @@ fn run_relu(bindings: Bindings):
     let count = view_elem_count(a_view)
     while i < count:
         let value = unsafe: *(a_ptr + i as i64)
-        let relu = if value < 0: 0 else value
+        let relu = if value < 0: 0 else: value
         unsafe:
             *(out_ptr + i as i64) = relu
         i = i + 1usize

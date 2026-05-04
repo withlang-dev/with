@@ -22,10 +22,10 @@ fn test:
     let { name, .. } = u
     assert(name == "A")
 
-// PASS: let-else with Option
+// PASS: let-else: with Option
 fn test:
     let opt: Option[i32] = Some(42)
-    let Some(val) = opt else return
+    let Some(val) = opt else: return
     assert(val == 42)
 
 // PASS: nested destructuring

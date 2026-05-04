@@ -40,7 +40,7 @@ fn classify_temp(temp: f64) -> i32:
     if temp > 100.0: 3      // Critical
     else if temp > 80.0: 2  // High
     else if temp > 60.0: 1  // Medium
-    else 0                      // Low
+    else: 0                      // Low
 
 fn should_alert(severity: i32) -> bool:
     severity >= 2  // High or Critical
@@ -88,7 +88,7 @@ fn parse_field_count(field_lens: [4]i32, total: i32) -> i32:
 fn build_batch_status(index: i32) -> i32:
     if index % 10 == 0: 2     // Fatal
     else if index % 5 == 0: 1 // Warning
-    else 0                        // Ok
+    else: 0                        // Ok
 
 fn batch_temp(index: i32) -> f64:
     20.0 + (index as f64) * 0.5
@@ -119,7 +119,7 @@ fn aggregate_stats(counts: [3]i32, packets: [3]i32, bytes: [3]i32) -> SessionSta
 // --- Sliding window count ---
 
 fn window_count(len: i32, size: i32) -> i32:
-    if len >= size: len - size + 1 else 0
+    if len >= size: len - size + 1 else: 0
 
 // --- Tests ---
 
@@ -172,10 +172,10 @@ fn test_nebula_example:
     // Test batch status assignment
     assert(build_batch_status(0) == 2)   // 0 % 10 == 0 → Fatal
     assert(build_batch_status(5) == 1)   // 5 % 5 == 0 → Warning
-    assert(build_batch_status(3) == 0)   // else → Ok
+    assert(build_batch_status(3) == 0)   // else: → Ok
     assert(build_batch_status(10) == 2)  // 10 % 10 == 0 → Fatal
     assert(build_batch_status(15) == 1)  // 15 % 5 == 0 → Warning
-    assert(build_batch_status(7) == 0)   // else → Ok
+    assert(build_batch_status(7) == 0)   // else: → Ok
 
     // Test batch temperature
     assert(batch_temp(0) == 20.0)

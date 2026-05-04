@@ -216,7 +216,7 @@ fn print_help_extern:
 fn print_help_keywords:
     with_write(
         "Reserved words:\n\n" ++
-        "  fn let var if else match for in while loop return break continue\n" ++
+        "  fn let var if else: match for in while loop return break continue\n" ++
         "  with as mut type trait impl extend dyn use module pub async await spawn\n" ++
         "  unsafe comptime gen yield defer error extern c_import ephemeral select enum\n" ++
         "  true false not and or const it errdefer move where opaque null union\n"

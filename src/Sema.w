@@ -255,7 +255,7 @@ type Sema {
     blanket_bound_syms: Vec[i32],
     blanket_bound_starts: Vec[i32],
     blanket_bound_counts: Vec[i32],
-    // Blanket impl target type: 0 = bare type param, else = base_sym of generic target
+    // Blanket impl target type: 0 = bare type param, else: = base_sym of generic target
     blanket_target_base_syms: Vec[i32],
     // Trait obligations + deterministic selection cache
     obligation_trait_syms: Vec[i32],
@@ -2676,7 +2676,7 @@ fn Sema.expire_borrows_in_scope(self: Sema, scope_start: i32):
                 self.borrow_path_counts.pop()
                 self.borrow_scope_depths.pop()
                 self.borrow_creation_nodes.pop()
-                bi = bi  // keep same type as else branch for phi
+                bi = bi  // keep same type as else: branch for phi
             else:
                 bi = bi + 1
         i = i - 1

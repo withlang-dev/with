@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-// Behavior test: let-else pattern matching at runtime
+// Behavior test: let-else: pattern matching at runtime
 
 fn get_some() -> ?i32:
     Some(42)
@@ -9,7 +9,7 @@ fn get_none() -> ?i32:
     None
 
 fn extract_or_default(opt: ?i32) -> i32:
-    let .Some(v) = opt else return -1
+    let .Some(v) = opt else: return -1
     v
 
 fn main:

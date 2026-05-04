@@ -16,10 +16,10 @@ fn helper_pair_sum(seed: i32) -> i32:
     pair.left + pair.right
 
 fn option_from_if(ok: bool) -> Option[i32]:
-    if ok: Some(7) else None
+    if ok: Some(7) else: None
 
 fn result_from_if(ok: bool) -> Result[Pair, E]:
-    if ok: Ok(helper_pair(10)) else Err(.Bad)
+    if ok: Ok(helper_pair(10)) else: Err(.Bad)
 
 fn pair_from_match(ok: bool) -> Pair:
     match ok:

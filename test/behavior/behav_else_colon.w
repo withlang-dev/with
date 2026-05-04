@@ -1,7 +1,7 @@
 //! expect-stdout: ok
 
-// Behavior test: else: colon form (bare else blocks)
-// Tests: else: with block body, else: in if/else if/else chains
+// Behavior test: else: colon form (bare else: blocks)
+// Tests: else: with block body, else: in if/else: if/else: chains
 
 fn classify(n: i32) -> str:
     if n > 0:

@@ -1133,8 +1133,8 @@ fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs: i64, rhs: i64, is_unsig
     if op == BinaryOp.OP_MUL_WRAP: return wl_build_mul(self.builder, l, r)
     if op == BinaryOp.OP_ADD_SAT or op == BinaryOp.OP_SUB_SAT:
         let sat_width = wl_get_int_type_width(wider_ty)
-        let sat_prefix = if op == BinaryOp.OP_ADD_SAT: if is_unsigned: "llvm.uadd.sat.i" else: "llvm.sadd.sat.i" else: if is_unsigned: "llvm.usub.sat.i" else: "llvm.ssub.sat.i"
-        let sat_fn_name = if sat_width == 8: sat_prefix ++ "8" else: if sat_width == 16: sat_prefix ++ "16" else: if sat_width == 32: sat_prefix ++ "32" else: sat_prefix ++ "64"
+        let sat_prefix = if op == BinaryOp.OP_ADD_SAT: if is_unsigned: "llvm.uadd.sat.i" else: "llvm.sadd.sat.i" else if is_unsigned: "llvm.usub.sat.i" else: "llvm.ssub.sat.i"
+        let sat_fn_name = if sat_width == 8: sat_prefix ++ "8" else if sat_width == 16: sat_prefix ++ "16" else if sat_width == 32: sat_prefix ++ "32" else: sat_prefix ++ "64"
         let sat_sym = self.intern.intern(sat_fn_name)
         let sat_fv = self.fn_values.get(sat_sym)
         let sat_ft = self.fn_fn_types.get(sat_sym)
@@ -1159,7 +1159,7 @@ fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs: i64, rhs: i64, is_unsig
         // Widening multiply + clamp: multiply in 2x width, clamp to [MIN, MAX], truncate
         let ms_width = wl_get_int_type_width(wider_ty)
         let ms_dbl_width = ms_width * 2
-        let ms_dbl_ty = if ms_dbl_width == 16: wl_i16_type(self.context) else: if ms_dbl_width == 32: wl_i32_type(self.context) else: if ms_dbl_width == 64: wl_i64_type(self.context) else: wl_i128_type(self.context)
+        let ms_dbl_ty = if ms_dbl_width == 16: wl_i16_type(self.context) else if ms_dbl_width == 32: wl_i32_type(self.context) else if ms_dbl_width == 64: wl_i64_type(self.context) else: wl_i128_type(self.context)
         let ms_wide_l = if is_unsigned: wl_build_zext(self.builder, l, ms_dbl_ty) else: wl_build_sext(self.builder, l, ms_dbl_ty)
         let ms_wide_r = if is_unsigned: wl_build_zext(self.builder, r, ms_dbl_ty) else: wl_build_sext(self.builder, r, ms_dbl_ty)
         let ms_wide_result = wl_build_mul(self.builder, ms_wide_l, ms_wide_r)
@@ -4805,7 +4805,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
             result = sb_val
         else:
             // Call @llvm.bswap.i{16,32,64}
-            let sb_fn_name = if sb_width == 16: "llvm.bswap.i16" else: if sb_width == 32: "llvm.bswap.i32" else: "llvm.bswap.i64"
+            let sb_fn_name = if sb_width == 16: "llvm.bswap.i16" else if sb_width == 32: "llvm.bswap.i32" else: "llvm.bswap.i64"
             let sb_sym = self.intern.intern(sb_fn_name)
             let sb_fv = self.fn_values.get(sb_sym)
             let sb_ft = self.fn_fn_types.get(sb_sym)
@@ -4828,7 +4828,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         let pc_val = self.mir_intrinsic_arg(body, args_id, 0)
         let pc_ty = wl_type_of(pc_val)
         let pc_width = wl_get_int_type_width(pc_ty)
-        let pc_fn_name = if pc_width == 8: "llvm.ctpop.i8" else: if pc_width == 16: "llvm.ctpop.i16" else: if pc_width == 32: "llvm.ctpop.i32" else: "llvm.ctpop.i64"
+        let pc_fn_name = if pc_width == 8: "llvm.ctpop.i8" else if pc_width == 16: "llvm.ctpop.i16" else if pc_width == 32: "llvm.ctpop.i32" else: "llvm.ctpop.i64"
         let pc_sym = self.intern.intern(pc_fn_name)
         let pc_fv = self.fn_values.get(pc_sym)
         let pc_ft = self.fn_fn_types.get(pc_sym)
@@ -4854,7 +4854,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         let ct_ty = wl_type_of(ct_val)
         let ct_width = wl_get_int_type_width(ct_ty)
         let ct_prefix = if intrinsic == MirIntrinsic.MIR_INTRINSIC_CLZ: "llvm.ctlz.i" else: "llvm.cttz.i"
-        let ct_fn_name = if ct_width == 8: ct_prefix ++ "8" else: if ct_width == 16: ct_prefix ++ "16" else: if ct_width == 32: ct_prefix ++ "32" else: ct_prefix ++ "64"
+        let ct_fn_name = if ct_width == 8: ct_prefix ++ "8" else if ct_width == 16: ct_prefix ++ "16" else if ct_width == 32: ct_prefix ++ "32" else: ct_prefix ++ "64"
         let ct_sym = self.intern.intern(ct_fn_name)
         let ct_fv = self.fn_values.get(ct_sym)
         let ct_ft = self.fn_fn_types.get(ct_sym)
@@ -4884,7 +4884,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         let br_val = self.mir_intrinsic_arg(body, args_id, 0)
         let br_ty = wl_type_of(br_val)
         let br_width = wl_get_int_type_width(br_ty)
-        let br_fn_name = if br_width == 8: "llvm.bitreverse.i8" else: if br_width == 16: "llvm.bitreverse.i16" else: if br_width == 32: "llvm.bitreverse.i32" else: "llvm.bitreverse.i64"
+        let br_fn_name = if br_width == 8: "llvm.bitreverse.i8" else if br_width == 16: "llvm.bitreverse.i16" else if br_width == 32: "llvm.bitreverse.i32" else: "llvm.bitreverse.i64"
         let br_sym = self.intern.intern(br_fn_name)
         let br_fv = self.fn_values.get(br_sym)
         let br_ft = self.fn_fn_types.get(br_sym)
@@ -8626,7 +8626,7 @@ fn Codegen.ensure_c_fn(self: Codegen, name: str, ret_ty: i64, param_count: i32) 
 fn Codegen.get_runtime_fn_type(self: Codegen, name: str, ret_ty: i64, param_count: i32) -> i64:
     let str_sym = self.intern.intern("str")
     let st_opt = self.struct_type_map.get(str_sym)
-    let str_type = if st_opt.is_some(): self.struct_llvm_types.get(st_opt.unwrap() as i64) else wl_i64_type(self.context)
+    let str_type = if st_opt.is_some(): self.struct_llvm_types.get(st_opt.unwrap() as i64) else: wl_i64_type(self.context)
     let i64_ty = wl_i64_type(self.context)
     let params: Vec[i64] = Vec.new()
     if name == "with_str_contains" or
@@ -8844,7 +8844,7 @@ fn Codegen.emit_async_fn_spawn(self: Codegen, fn_sym: i32, callee: i64, call_ft:
     spawn_args.push(env_ptr)
     spawn_args.push(result_buf)
     spawn_args.push(wl_const_int(i32_ty, result_size, 0))
-    // Use @[stack_size(N)] if annotated, else 0 (runtime default)
+    // Use @[stack_size(N)] if annotated, else: 0 (runtime default)
     var spawn_stack_size = 0
     if self.sema.fn_stack_sizes.contains(fn_sym):
         spawn_stack_size = self.sema.fn_stack_sizes.get(fn_sym).unwrap()

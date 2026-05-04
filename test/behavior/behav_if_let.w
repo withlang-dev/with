@@ -1,7 +1,7 @@
 //! expect-stdout: ok
 
 // Behavior test: if-let pattern matching
-// Tests: if let .Some(x) = expr, with else branches
+// Tests: if let .Some(x) = expr, with else: branches
 
 fn find(n: i32) -> ?i32:
     if n > 0:

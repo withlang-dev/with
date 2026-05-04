@@ -1995,8 +1995,8 @@ fn MirBuilder.lower_membership(self: MirBuilder, op: i32, lhs_expr: i32, rhs_exp
     self.int_const_operand(0, self.sema.ty_bool as i32)
 
 fn MirBuilder.lower_short_circuit(self: MirBuilder, op: i32, lhs_expr: i32, rhs_expr: i32, node: i32) -> i32:
-    // Short-circuit: for `a or b`, evaluate a; if true, result is true, else evaluate b.
-    // For `a and b`, evaluate a; if false, result is false, else evaluate b.
+    // Short-circuit: for `a or b`, evaluate a; if true, result is true, else: evaluate b.
+    // For `a and b`, evaluate a; if false, result is false, else: evaluate b.
     let result = self.new_temp(self.sema.ty_bool)
     let result_place = self.place_for_local(result)
     let lhs = self.lower_expr(lhs_expr)
@@ -3410,7 +3410,7 @@ fn MirBuilder.lower_single_await(self: MirBuilder, task_op: i32, result_ty: i32,
     self.terminate(TermKind.TK_CALL, self.unit_operand(), ic_args_id, ic_place, check_self_bb)
     self.switch_to(check_self_bb)
 
-    // Branch: 0 → check child, else → self-cancel cleanup
+    // Branch: 0 → check child, else: → self-cancel cleanup
     let check_child_bb = self.new_block()
     let self_cancel_bb = self.new_block()
     let unwind_bb = self.new_block()
@@ -3453,7 +3453,7 @@ fn MirBuilder.lower_single_await(self: MirBuilder, task_op: i32, result_ty: i32,
     self.terminate(TermKind.TK_CALL, self.unit_operand(), wcr_args_id, wcr_place, check_child_cont)
     self.switch_to(check_child_cont)
 
-    // Branch: 0 → normal, else → unwind
+    // Branch: 0 → normal, else: → unwind
     let sw_vals2: Vec[i32] = Vec.new()
     sw_vals2.push(0)
     let sw_tgts2: Vec[i32] = Vec.new()

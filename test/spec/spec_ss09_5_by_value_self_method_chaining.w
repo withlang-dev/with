@@ -21,7 +21,7 @@ fn test:
 extend Builder:
     fn build(self: Builder) -> Result[Server, str]:
         if self.host.is_empty(): Err("missing host")
-        else Ok(Server { host: self.host, port: self.port })
+        else: Ok(Server { host: self.host, port: self.port })
 
 fn test:
     let server = Builder.new()

@@ -92,7 +92,7 @@ pub fn classify_temp(temp: f64) -> Severity:
     if temp > 100.0: .Critical
     else if temp > 80.0: .High
     else if temp > 60.0: .Medium
-    else .Low
+    else: .Low
 
 pub fn should_alert(sev: Severity) -> bool:
     sev in [.High, .Critical]
@@ -106,7 +106,7 @@ pub fn build_test_batch(count: usize) -> Vec[Telemetry]:
         for i in 0..count:
             let status = if i % 5 == 0: .Warning("periodic check")
                          else if i % 10 == 0: .Fatal(code: 99)
-                         else .Active
+                         else: .Active
             batch.push(Telemetry {
                 device_id: f"dev-{i}",
                 temp: 20.0 + (i as f64) * 0.5,

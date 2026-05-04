@@ -21868,7 +21868,7 @@ fn usage() {
 
     printf("  -C arg        show a specific compile-time option and exit with its\n")
 
-    printf("                  value if numeric (else 0). The arg can be:\n")
+    printf("                  value if numeric (else: 0). The arg can be:\n")
 
     printf("     backslash-C    use of \\C is enabled [0, 1]\n")
 
