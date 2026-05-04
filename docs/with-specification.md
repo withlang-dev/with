@@ -4,10 +4,10 @@
 **Status:** Reference specification for prototype implementation
 **Changelog v6.8:** Three universal body forms (§29.13) — inline colon,
 indented colon, and braced — now apply to every block-introducing construct
-including `defer`, `errdefer`, `comptime`, and `unsafe`. Removed `then`
-keyword; `if`/`else if`/`else` chains use `:` or `{ }` throughout.
-`else if` is a two-token keyword pair. A missing body introducer is now
-a parse error.
+including `defer`, `errdefer`, `comptime`, and `unsafe`. `if` additionally
+retains the `then` form as a pure expression shorthand (`if cond then expr
+else expr`). `else if` is a two-token keyword pair parsed as a chain
+continuation. A missing body introducer is now a parse error.
 **Changelog v6.7:** Reorganized — extracted test cases to `test/spec/`,
 roadmap to `docs/roadmap.md`, design rationale to `docs/design-rationale.md`,
 stdlib API tables to `docs/libstd-spec.md`. Added grammar appendix (§30).
@@ -8977,9 +8977,12 @@ The following keywords are reserved and cannot be used as identifiers:
 Every construct that introduces a statement or expression body supports
 three interchangeable body forms. The choice is purely stylistic; all
 three produce identical AST and compiled output. The three-form rule
-applies universally: `fn`, `if`/`else`/`else if`, `while`, `for`,
-`loop`, `with`, `defer`, `errdefer`, `comptime`, `unsafe`, labeled
-blocks, match arms, and any future block-introducing construct.
+applies universally: `fn`, `while`, `for`, `loop`, `with`, `defer`,
+`errdefer`, `comptime`, `unsafe`, labeled blocks, match arms, and any
+future block-introducing construct.
+
+`if`/`else if`/`else` support all three forms and additionally the
+`then` expression shorthand — see §9.1 for the full `if` syntax.
 
 **Form 1 — Inline colon.** A colon immediately followed by content
 on the same line.
@@ -9028,9 +9031,10 @@ Whitespace inside braces is insignificant. Statements are separated
 by newlines or semicolons. Empty brace body `{}` is legal (returns
 `Unit`).
 
-**After a construct's header, either `:` or `{` must follow. Anything
-else is a parse error.** Omitting the body introducer is not silently
-accepted.
+**After a construct's header, a body introducer is required.** For all
+constructs except `if`, the introducer must be `:` or `{`; omitting it
+is a parse error. For `if`, `then` is also a valid body introducer (see
+§9.1).
 
 **Illegal combinations:**
 
@@ -9377,10 +9381,10 @@ BRACE_BODY    := '{' [ STMT { ( NEWLINE | ';' ) STMT } ] '}'
 ```
 
 All three forms are interchangeable for every block-introducing
-construct: `fn`, `if`, `else if`, `else`, `while`, `for`, `loop`,
-`with`, `defer`, `errdefer`, `comptime`, `unsafe`, labeled blocks,
-and match arms. A missing body introducer (neither `:` nor `{`) is
-a parse error.
+construct: `fn`, `else`, `while`, `for`, `loop`, `with`, `defer`,
+`errdefer`, `comptime`, `unsafe`, labeled blocks, and match arms.
+`if` and `else if` additionally accept `then EXPR` (see IF_STMT in
+§30.4). A missing body introducer is a parse error.
 
 ### 30.9 Reserved Keywords
 
