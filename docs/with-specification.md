@@ -1,7 +1,13 @@
-# The With Programming Language — Specification v6.7
+# The With Programming Language — Specification v6.8
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
+**Changelog v6.8:** Three universal body forms (§29.13) — inline colon,
+indented colon, and braced — now apply to every block-introducing construct
+including `defer`, `errdefer`, `comptime`, and `unsafe`. Removed `then`
+keyword; `if`/`else if`/`else` chains use `:` or `{ }` throughout.
+`else if` is a two-token keyword pair. A missing body introducer is now
+a parse error.
 **Changelog v6.7:** Reorganized — extracted test cases to `test/spec/`,
 roadmap to `docs/roadmap.md`, design rationale to `docs/design-rationale.md`,
 stdlib API tables to `docs/libstd-spec.md`. Added grammar appendix (§30).
@@ -407,9 +413,9 @@ return value or jump to unexpected locations:
 
 ```
 // ERROR: return inside defer
-defer if file.has_error() then return Err(IoError)
-//                             ^^^^^^ ERROR E0901: non-local control
-//                             flow is forbidden inside defer
+defer if file.has_error(): return Err(IoError)
+//                         ^^^^^^ ERROR E0901: non-local control
+//                         flow is forbidden inside defer
 
 // ERROR: ? inside defer
 defer conn.close()?
@@ -499,7 +505,7 @@ owned, etc.) rather than returning it.
 
 ```
 fn first(xs: &Vec[i32]) -> Option[&i32]:
-    if xs.is_empty() then None else Some(&xs[0])
+    if xs.is_empty(): None else: Some(&xs[0])
 
 fn caller(xs: &Vec[i32]):
     let r = first(xs)        // OK: ephemeral local binding
@@ -1876,8 +1882,8 @@ fn save_all(items: &Vec[Item]) -> Result[Unit, DbError]:
 
 // Explicit Err still works normally
 fn validate(age: i32) -> Result[Unit, ValidationError]:
-    if age < 0 then return Err(.InvalidAge)
-    if age > 150 then return Err(.InvalidAge)
+    if age < 0: return Err(.InvalidAge)
+    if age > 150: return Err(.InvalidAge)
     // implicitly returns Ok(())
 ```
 
@@ -2301,7 +2307,7 @@ let label = with user.display_name.unwrap_or(user.username) as name:
     "{name} ({user.role})"
 
 let normalized = with vec.len() as len:
-    if len > 1e-6 then vec.scale(1.0 / len) else Vec2.zero()
+    if len > 1e-6: vec.scale(1.0 / len) else: Vec2.zero()
 ```
 
 When `mut` is absent, the value is bound as an immutable local.
@@ -2672,9 +2678,9 @@ Usable with `with` blocks for scoped access.
 fn add(a: i32, b: i32) -> i32: a + b
 
 fn clamp(x: i32, lo: i32, hi: i32) -> i32:
-    if x < lo then lo
-    else if x > hi then hi
-    else x
+    if x < lo: lo
+    else if x > hi: hi
+    else: x
 ```
 
 **Syntax:**
@@ -2686,13 +2692,11 @@ fn NAME -> TYPE: BODY            // no parameters, has return type
 fn NAME: BODY                    // no parameters, returns Unit
 ```
 
-Function bodies may use either colon form or brace form (§29.13):
+Function bodies support three interchangeable forms (§29.13):
 
 ```
-fn NAME(PARAMS) -> TYPE { BODY }
-fn NAME(PARAMS) { BODY }
-fn NAME -> TYPE { BODY }
-fn NAME { BODY }
+fn NAME(PARAMS) -> TYPE: BODY    // inline or indented colon
+fn NAME(PARAMS) -> TYPE { BODY } // braced
 ```
 
 Parentheses are required when a function takes parameters. When a
@@ -2700,8 +2704,8 @@ function takes no parameters, parentheses may be included or
 omitted — `fn greet:` and `fn greet():` are both legal. The
 idiomatic style omits them. The return type `-> TYPE` is omitted
 when the function returns `Unit` (void). The body is introduced by
-either `:` (colon form) or `{ }` (brace form) — see §29.13 for
-the full rules.
+`:` (colon form) or `{ }` (brace form) — see §29.13 for the full
+rules.
 
 ```
 fn greet: print("hello")               // colon inline
@@ -2715,38 +2719,35 @@ fn log(msg: str): print(msg)           // args, returns Unit
 
 **Conditional syntax:**
 
-Block `if` uses `:` plus an indented body. Inline `if` uses `then`
-and may appear in statement or expression position:
+`if` supports all three body forms. `else if` is a two-token keyword
+pair that continues the chain; `else` without `if` ends it:
 
 ```
-if cond:
-    body
-else:
-    body
+// Inline colon
+if x < 0: handle_negative()
+else if x == 0: handle_zero()
+else: handle_positive()
 
-if cond then body
-if cond then body else body
-let x = if cond then a else b
+// Inline expression
+let clamped = if x < lo: lo else if x > hi: hi else: x
 
-if x < lo then lo
-else if x > hi then hi
-else x
-
+// Indented colon
 if x < 0:
     handle_negative()
 else if x == 0:
     handle_zero()
 else:
     handle_positive()
+
+// Braced
+if x < 0 { handle_negative() } else if x == 0 { handle_zero() } else { handle_positive() }
 ```
 
-Both forms support arbitrarily long `else if` chains. `else if` is
-parsed as `else` followed by a new `if`. A single chain must use one
-form throughout; mixing inline and block forms in one chain is a
-compile error. Inline-if uses `then`; `else` is required in expression
-position unless the then-branch is `Never`-typed. `then` is reserved
-and valid only in inline-if syntax. Colon-based and brace-based
-inline-if forms are rejected.
+`else if` is always parsed as a chain continuation — the parser
+consumes `else`, then sees `if` and continues the same chain rather
+than nesting an `if` inside the else body. The three forms may be
+mixed freely within a single chain. `else` is required in expression
+position unless the if-branch is `Never`-typed.
 
 ### 9.1a Named Arguments, Default Parameters, and Implicit Parameters
 
@@ -7069,7 +7070,7 @@ perfecting). Phase 0 translates only `#define` constants:
 ```c
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
 // → NOT translated. Compiler warning: untranslated macro MAX
-// User must write: fn max[T](a: T, b: T) -> T: if a > b then a else b
+// User must write: fn max[T](a: T, b: T) -> T: if a > b: a else: b
 ```
 
 Complex macros (token pasting, stringification, variadic macros,
@@ -8504,7 +8505,7 @@ fn example -> i32:
 
 // ERROR:
 for x in items:
-    if should_skip(x) then
+    if should_skip(x):
         continue
         log("skipped")  // unreachable
 ```
@@ -8923,7 +8924,7 @@ The following keywords are reserved and cannot be used as identifiers:
 | `use` | Import |
 | `extern` | External function declaration |
 | `if` | Conditional |
-| `then` | Inline conditional body separator |
+| `else if` | Chained conditional continuation |
 | `else` | Conditional branch |
 | `match` | Pattern matching |
 | `for` | Loop over iterables |
@@ -8966,62 +8967,71 @@ The following keywords are reserved and cannot be used as identifiers:
 
 ### 29.13 Block Body Syntax
 
-Block bodies may use either `:` (colon form) or `{ }` (brace form).
-Both forms are semantically identical and interchangeable wherever a
-block body appears: `fn`, `if`, `else`, `while`, `for`, `match`,
-`with`, `type`, `enum`, `impl`, `trait`, closures, and any future
-block-introducer.
+Every construct that introduces a statement or expression body supports
+three interchangeable body forms. The choice is purely stylistic; all
+three produce identical AST and compiled output. The three-form rule
+applies universally: `fn`, `if`/`else`/`else if`, `while`, `for`,
+`loop`, `with`, `defer`, `errdefer`, `comptime`, `unsafe`, labeled
+blocks, match arms, and any future block-introducing construct.
 
-**Colon form (`:`):**
+**Form 1 — Inline colon.** A colon immediately followed by content
+on the same line.
 
-- **Inline:** same-line single-expression body.
-  ```
-  fn add(a: i32, b: i32) -> i32: a + b
-  fn is_empty(self: &Vec[T]) -> bool: self.len() == 0
-  ```
-- **Multi-line:** newline after `:`, body indented one level deeper
-  than the header.
-  ```
-  fn main:
-      let x = 5
-      print(x)
-  ```
-- Colon followed by a newline without indentation is a **syntax
-  error**.
-- Colon with a body that mixes same-line content plus subsequent
-  indented lines is a **syntax error**.
+```
+fn add(a: i32, b: i32) -> i32: a + b
+if ready: launch()
+for x in xs: total = total + x
+defer: f.close()
+```
 
-**Brace form (`{ }`):**
+The body is a single block item. The inline body ends at the first
+top-level newline. Newlines inside balanced delimiters (parentheses,
+brackets, braces) do not terminate the inline body.
 
-- Body delimited by `{` and matching `}`.
-- Whitespace inside braces is insignificant.
-- Statements are separated by newlines or semicolons (`;`).
-- Single-line:
-  ```
-  fn add(a: i32, b: i32) -> i32 { a + b }
-  fn main { print("hello") }
-  ```
-- Multi-line:
-  ```
-  fn main {
-      let x = 5
-      print(x)
-  }
-  ```
-- Empty brace body `{}` is legal (returns `Unit`).
-- Unindented bodies are legal (generators may emit flat output):
-  ```
-  fn main {
-  let x = 5
-  print(x)
-  }
-  ```
+**Form 2 — Indented colon.** The colon ends the line; the body is
+the indented block on subsequent lines.
+
+```
+fn main:
+    let x = 5
+    print(x)
+
+while running:
+    tick()
+    render()
+```
+
+The body ends when indentation returns to or below the introducing
+construct's level. A colon at end of line with nothing following
+(no indented block) is a syntax error.
+
+**Form 3 — Braced.** Curly braces follow the construct's header
+directly, with no intervening colon.
+
+```
+fn add(a: i32, b: i32) -> i32 { a + b }
+fn main {
+    let x = 5
+    print(x)
+}
+while running { tick(); render() }
+```
+
+Whitespace inside braces is insignificant. Statements are separated
+by newlines or semicolons. Empty brace body `{}` is legal (returns
+`Unit`).
+
+**After a construct's header, either `:` or `{` must follow. Anything
+else is a parse error.** Omitting the body introducer is not silently
+accepted.
 
 **Illegal combinations:**
 
-- Mixed colon + brace: `fn main: { body }` — syntax error.
-- Brace + colon: `fn main { : body }` — syntax error.
-- Empty colon body: `fn main:` with nothing following — syntax error.
+- Colon-then-brace: `fn f: { body }` — the `{ }` is parsed as an
+  inline body expression (e.g. a record literal), not a braced body.
+  This is valid only if `{ body }` is a meaningful expression.
+- No introducer: `while cond\n    body` — parse error; `:` or `{`
+  is required after the condition.
 
 **Labeled bodies:**
 
@@ -9268,8 +9278,7 @@ STMT        := LABEL_STMT | LET_STMT | VAR_STMT | IF_STMT | MATCH_STMT
               | RETURN_STMT | BREAK_STMT | CONTINUE_STMT | GOTO_STMT
               | DEFER_STMT | EXPR
 LABEL_STMT  := LABEL ( STMT | COLON_BODY | BRACE_BODY )
-IF_STMT     := 'if' EXPR BODY [ 'else' ( IF_STMT | BODY ) ]
-              | 'if' EXPR 'then' EXPR [ 'else' EXPR ]
+IF_STMT     := 'if' EXPR BODY { 'else' 'if' EXPR BODY } [ 'else' BODY ]
               | 'if' 'let' PATTERN '=' EXPR BODY [ 'else' BODY ]
 MATCH_STMT  := 'match' EXPR BODY_ARMS
 MATCH_ARM   := PATTERN [ 'if' EXPR ] '=>' EXPR
@@ -9280,7 +9289,8 @@ RETURN_STMT := 'return' [ EXPR ]
 BREAK_STMT  := 'break' [ LABEL ]
 CONTINUE_STMT := 'continue' [ LABEL ]
 GOTO_STMT   := 'goto' LABEL
-DEFER_STMT  := 'defer' EXPR
+DEFER_STMT  := 'defer' BODY
+ERRDEFER_STMT := 'errdefer' BODY
 ```
 
 ### 30.5 Expressions
@@ -9352,15 +9362,17 @@ MODE        := 'd' | 'x' | 'X' | 'b' | 'o' | 'f' | 'e' | 'g' | 's' | '?'
 **Body forms** (§29.13):
 
 ```
-BODY        := COLON_BODY | BRACE_BODY
-COLON_BODY  := ':' INLINE_EXPR
-              | ':' NEWLINE INDENT STMT { NEWLINE STMT } DEDENT
-BRACE_BODY  := '{' [ STMT { ( NEWLINE | ';' ) STMT } ] '}'
+BODY          := COLON_INLINE | COLON_INDENTED | BRACE_BODY
+COLON_INLINE  := ':' BLOCK_ITEM NEWLINE      // single item, same line
+COLON_INDENTED := ':' NEWLINE INDENT STMT { NEWLINE STMT } DEDENT
+BRACE_BODY    := '{' [ STMT { ( NEWLINE | ';' ) STMT } ] '}'
 ```
 
-Both forms are interchangeable for all constructs: `fn`, `if`,
-`else`, `while`, `for`, labeled blocks, `match`, `type`, `enum`,
-`impl`, `trait`, and closures.
+All three forms are interchangeable for every block-introducing
+construct: `fn`, `if`, `else if`, `else`, `while`, `for`, `loop`,
+`with`, `defer`, `errdefer`, `comptime`, `unsafe`, labeled blocks,
+and match arms. A missing body introducer (neither `:` nor `{`) is
+a parse error.
 
 ### 30.9 Reserved Keywords
 
@@ -9372,9 +9384,9 @@ const     continue  defer     else      enum      errdefer
 false     fn        for       gen       goto      if
 impl      import    in        is        it        let
 match     mod       move      mut       not       or
-pub       return    self      sealed    struct    then
-todo      trait     true      type      unsafe    use
-var       where     while     with      yield
+pub       return    self      sealed    struct    todo
+trait     true      type      unsafe    use       var
+where     while     with      yield
 ```
 
 ---
