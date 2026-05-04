@@ -2,7 +2,7 @@
 
 @[sealed]
 trait Shape =
-    fn area(self: Self) -> i32
+    fn area(self: &Self) -> i32
 
 type Circle { radius: i32 }
 

@@ -2,7 +2,7 @@
 
 trait Container =
     type Item
-    fn size(self: Self) -> i32
+    fn size(self: &Self) -> i32
 
 type Empty { x: i32 }
 

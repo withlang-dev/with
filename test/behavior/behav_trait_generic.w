@@ -3,7 +3,7 @@
 // Behavior test: generic traits — trait-bounded generics
 
 trait Showable =
-    fn show(self: Self) -> str
+    fn show(self: &Self) -> str
 
 type Wrapper { value: i32 }
 type Tag { label: str }

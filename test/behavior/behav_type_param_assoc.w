@@ -2,7 +2,7 @@
 
 trait Container =
     type Item
-    fn get(self: Self) -> Self.Item
+    fn get(self: &Self) -> Self.Item
 
 type Box32 { value: i32 }
 

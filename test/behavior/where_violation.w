@@ -1,7 +1,7 @@
 //! expect-error: does not implement trait
 
 trait Printable =
-    fn show(self: Self) -> str
+    fn show(self: &Self) -> str
 
 type Wrapper { value: i32 }
 

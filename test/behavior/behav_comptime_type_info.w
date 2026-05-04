@@ -1,7 +1,7 @@
 //! expect-stdout: ok
 
 trait Named =
-    fn label(self: Self) -> str
+    fn label(self: &Self) -> str
 
 type Point { x: i32, y: i32 }
 enum Val { Num(i32) | Empty }

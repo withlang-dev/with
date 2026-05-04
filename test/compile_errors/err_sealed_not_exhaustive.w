@@ -1,7 +1,7 @@
 //! expect-error: non-exhaustive
 @[sealed]
 trait Shape =
-    fn area(self: Self) -> i32
+    fn area(self: &Self) -> i32
 type Circle { radius: i32 }
 type Rect { width: i32, height: i32 }
 impl Shape for Circle =

@@ -1,7 +1,7 @@
 //! expect-error: impl missing required associated type
 trait Converter =
     type Output
-    fn convert(self: Self, x: i32) -> Self.Output
+    fn convert(self: &Self, x: i32) -> Self.Output
 
 type MyConv {}
 impl Converter for MyConv =

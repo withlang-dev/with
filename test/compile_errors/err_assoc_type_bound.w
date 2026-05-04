@@ -4,7 +4,7 @@ type NoEqType { x: i32 }
 
 trait Container =
     type Item: Eq
-    fn get(self: Self) -> i32
+    fn get(self: &Self) -> i32
 
 impl Container for NoEqType =
     type Item = NoEqType

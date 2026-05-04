@@ -1,7 +1,7 @@
 //! expect-stdout: ok
 
 trait Showable:
-    fn show(self: Self) -> str
+    fn show(self: &Self) -> str
 
 impl Showable for i32:
     fn show(self: i32) -> str:
@@ -9,7 +9,7 @@ impl Showable for i32:
 
 // Blanket impl: anything Showable is also Displayable
 trait Displayable:
-    fn display(self: Self) -> str
+    fn display(self: &Self) -> str
 
 impl[T: Showable] Displayable for T:
     fn display(self: T) -> str:

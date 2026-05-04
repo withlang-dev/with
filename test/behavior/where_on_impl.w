@@ -1,10 +1,10 @@
 //! expect-stdout: ok
 
 trait Describable =
-    fn describe(self: Self) -> str
+    fn describe(self: &Self) -> str
 
 trait Showable =
-    fn show(self: Self) -> str
+    fn show(self: &Self) -> str
 
 type Pair { a: i32, b: i32 }
 
