@@ -3930,7 +3930,14 @@ fn Parser.parse_if_expr(self: Parser) -> NodeId:
 
     let if_col = column_of(self.source, start)
     let is_stmt_if = is_first_on_line(self.source, start) != 0
-    let then_body = self.parse_body()
+    var use_then = false
+    var then_body: NodeId = 0 as NodeId
+    if self.peek() == TokenKind.TK_KW_THEN:
+        self.advance()
+        use_then = true
+        then_body = self.parse_expr()
+    else:
+        then_body = self.parse_body()
     var else_body: NodeId = 0 as NodeId
     let save = self.pos
     self.skip_newlines()
@@ -3943,6 +3950,8 @@ fn Parser.parse_if_expr(self: Parser) -> NodeId:
             self.advance()
             if self.peek() == TokenKind.TK_KW_IF:
                 else_body = self.parse_if_expr()
+            else if use_then:
+                else_body = self.parse_expr()
             else:
                 else_body = self.parse_body()
     else:
@@ -3989,7 +3998,14 @@ fn Parser.parse_if_let(self: Parser, start: i32) -> NodeId:
 
     let if_col = column_of(self.source, start)
     let is_stmt_if = is_first_on_line(self.source, start) != 0
-    let then_body = self.parse_body()
+    var use_then = false
+    var then_body: NodeId = 0 as NodeId
+    if self.peek() == TokenKind.TK_KW_THEN:
+        self.advance()
+        use_then = true
+        then_body = self.parse_expr()
+    else:
+        then_body = self.parse_body()
 
     var else_body: NodeId = 0 as NodeId
     let save = self.pos
@@ -4003,6 +4019,8 @@ fn Parser.parse_if_let(self: Parser, start: i32) -> NodeId:
             self.advance()
             if self.peek() == TokenKind.TK_KW_IF:
                 else_body = self.parse_if_expr()
+            else if use_then:
+                else_body = self.parse_expr()
             else:
                 else_body = self.parse_body()
     else:

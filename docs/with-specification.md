@@ -2719,17 +2719,18 @@ fn log(msg: str): print(msg)           // args, returns Unit
 
 **Conditional syntax:**
 
-`if` supports all three body forms. `else if` is a two-token keyword
-pair that continues the chain; `else` without `if` ends it:
+`if` supports four body forms. `else if` is a two-token keyword pair
+that continues the chain; `else` without `if` ends it:
 
 ```
-// Inline colon
+// Inline colon — body introducer is ':'
 if x < 0: handle_negative()
 else if x == 0: handle_zero()
 else: handle_positive()
 
-// Inline expression
-let clamped = if x < lo: lo else if x > hi: hi else: x
+// Inline then — body introducer is 'then'; else body needs no introducer
+let y = if x > 0 then x else if x == 0 then 0 else -x
+let clamped = if x < lo then lo else if x > hi then hi else x
 
 // Indented colon
 if x < 0:
@@ -2743,11 +2744,16 @@ else:
 if x < 0 { handle_negative() } else if x == 0 { handle_zero() } else { handle_positive() }
 ```
 
+The `then` form is strictly an expression form: `if cond then expr`.
+The body after `then` is a single expression (not a block), and the
+`else` clause is `else expr` with no body introducer. This makes
+`if/then/else` chains read like mathematical expressions.
+
 `else if` is always parsed as a chain continuation — the parser
-consumes `else`, then sees `if` and continues the same chain rather
-than nesting an `if` inside the else body. The three forms may be
-mixed freely within a single chain. `else` is required in expression
-position unless the if-branch is `Never`-typed.
+consumes `else`, sees `if`, and continues the same chain rather than
+nesting an `if` inside the else body. The forms may be mixed freely
+within a single chain. `else` is required in expression position
+unless the if-branch is `Never`-typed.
 
 ### 9.1a Named Arguments, Default Parameters, and Implicit Parameters
 
@@ -8924,6 +8930,7 @@ The following keywords are reserved and cannot be used as identifiers:
 | `use` | Import |
 | `extern` | External function declaration |
 | `if` | Conditional |
+| `then` | Inline `if` body introducer (expression form) |
 | `else if` | Chained conditional continuation |
 | `else` | Conditional branch |
 | `match` | Pattern matching |
@@ -9279,6 +9286,7 @@ STMT        := LABEL_STMT | LET_STMT | VAR_STMT | IF_STMT | MATCH_STMT
               | DEFER_STMT | EXPR
 LABEL_STMT  := LABEL ( STMT | COLON_BODY | BRACE_BODY )
 IF_STMT     := 'if' EXPR BODY { 'else' 'if' EXPR BODY } [ 'else' BODY ]
+              | 'if' EXPR 'then' EXPR { 'else' 'if' EXPR 'then' EXPR } [ 'else' EXPR ]
               | 'if' 'let' PATTERN '=' EXPR BODY [ 'else' BODY ]
 MATCH_STMT  := 'match' EXPR BODY_ARMS
 MATCH_ARM   := PATTERN [ 'if' EXPR ] '=>' EXPR
@@ -9384,9 +9392,9 @@ const     continue  defer     else      enum      errdefer
 false     fn        for       gen       goto      if
 impl      import    in        is        it        let
 match     mod       move      mut       not       or
-pub       return    self      sealed    struct    todo
-trait     true      type      unsafe    use       var
-where     while     with      yield
+pub       return    self      sealed    struct    then
+todo      trait     true      type      unsafe    use
+var       where     while     with      yield
 ```
 
 ---
