@@ -96,7 +96,7 @@ type SemaBuiltinSymbols {
     track: i32,
     src: i32,
     embed_file: i32,
-    copy: i32,
+    copy_trait: i32,
     drop: i32,
     self_type: i32,
     vec: i32,
@@ -582,7 +582,7 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         track: 0,
         src: 0,
         embed_file: 0,
-        copy: 0,
+        copy_trait: 0,
         drop: 0,
         self_type: 0,
         vec: 0,
@@ -1117,7 +1117,7 @@ fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.syms.track = self.pool_intern("track")
     self.syms.src = self.pool_intern("src")
     self.syms.embed_file = self.pool_intern("embed_file")
-    self.syms.copy = self.pool_intern("Copy")
+    self.syms.copy_trait = self.pool_intern("Copy")
     self.syms.drop = self.pool_intern("Drop")
     self.syms.self_type = self.pool_intern("Self")
     self.syms.vec = self.pool_intern("Vec")
@@ -1181,7 +1181,7 @@ fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.syms.is_copy = self.pool_intern("is_copy")
     // Language-level traits: these affect codegen semantics (copy vs move,
     // destruction, thread safety). Always recognized regardless of prelude.
-    self.lang_trait_syms.insert(self.syms.copy, 1)
+    self.lang_trait_syms.insert(self.syms.copy_trait, 1)
     self.lang_trait_syms.insert(self.syms.drop, 1)
     self.lang_trait_syms.insert(self.pool_intern("Send"), 1)
     self.lang_trait_syms.insert(self.pool_intern("ScopedSend"), 1)

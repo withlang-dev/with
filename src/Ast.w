@@ -100,6 +100,11 @@ enum NodeKind: i32:
     // NK_WITH_TUPLE: d0=source_expr, d1=body_expr, d2=extra_start
     // Extra: [name_count, is_mut, sym0, sym1, ...]
     NK_WITH_TUPLE = 117
+    // docs/mutability.md — call-site passing mode wrappers.
+    // NK_COPY_ARG: d0=inner(node), d1=0, d2=0  (explicit copy at call site)
+    // NK_MOVE_ARG: d0=inner(node), d1=0, d2=0  (explicit move at call site)
+    NK_COPY_ARG = 118
+    NK_MOVE_ARG = 119
     // Type expressions
     NK_TYPE_NAMED = 80
     NK_TYPE_GENERIC = 81

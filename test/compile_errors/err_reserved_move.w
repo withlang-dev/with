@@ -1,3 +1,3 @@
-//! expect-check-fail: 'move' must be followed by a closure
+//! expect-check-fail: expected expression
 fn main:
     move

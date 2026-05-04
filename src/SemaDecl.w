@@ -1720,7 +1720,7 @@ fn Sema.type_decl_has_derive(self: Sema, node: i32, trait_sym: i32) -> i32:
     0
 
 fn Sema.validate_copy_derives(self: Sema):
-    let copy_sym = self.syms.copy
+    let copy_sym = self.syms.copy_trait
     for di in 0..self.ast.decl_count():
         let decl = self.ast.get_decl(di)
         if self.ast.kind(decl) != NodeKind.NK_TYPE_DECL:
