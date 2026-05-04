@@ -1,8 +1,8 @@
 //! expect-stdout: ok
 
-// Test: else belongs to the outer if, not the inner if (dangling-else).
+// Test: else: belongs to the outer if, not the inner if (dangling-else).
 fn main:
-    // For loop inside if, else belongs to outer if
+    // For loop inside if, else: belongs to outer if
     var x = 0
     let condition = true
     if condition:
@@ -13,7 +13,7 @@ fn main:
         x = 100
     assert(x == 1)
 
-    // Nested if-inside-if, else belongs to outer
+    // Nested if-inside-if, else: belongs to outer
     var y = 0
     if false:
         if true:
@@ -32,7 +32,7 @@ fn main:
         z = 3
     assert(z == 3)
 
-    // Inline if-else expressions unaffected
+    // Inline if-else: expressions unaffected
     let v = if true: 42 else: 99
     assert(v == 42)
 

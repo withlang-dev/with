@@ -3111,7 +3111,7 @@ fn CCodegen.call_args_text(self: CCodegen, body: MirBody, args_id: i32, callee_o
     // Resolve callee signature to know which params expect pointers
     let callee_sig = self.callee_sig_from_operand(body, callee_operand)
     let callee_fn_tid = if callee_sig >= 0: 0 else: self.callee_fn_type_from_operand(body, callee_operand)
-    let callee_param_count = if callee_sig >= 0: self.sema.sig_get_param_count(callee_sig) else: if callee_fn_tid != 0: self.sema.get_type_d1(callee_fn_tid) else: 0
+    let callee_param_count = if callee_sig >= 0: self.sema.sig_get_param_count(callee_sig) else if callee_fn_tid != 0: self.sema.get_type_d1(callee_fn_tid) else: 0
     var out = ""
     for i in 0..count:
         if i > 0:
@@ -3727,7 +3727,7 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
         out = out ++ " if (__with_i < __with_n) " ++ cc_lbrace()
         out = out ++ " int64_t __with_elem = 0; memcpy(&__with_elem, with_vec_get_ptr(&(" ++ recv ++ "), __with_i), sizeof(int64_t));"
         out = out ++ " " ++ dst ++ " = __with_elem + 1; " ++ cc_rbrace()
-        out = out ++ " else " ++ cc_lbrace() ++ " " ++ dst ++ " = 0; " ++ cc_rbrace()
+        out = out ++ " else: " ++ cc_lbrace() ++ " " ++ dst ++ " = 0; " ++ cc_rbrace()
         out = out ++ " " ++ cc_rbrace() ++ "\n"
         out = out ++ f"    goto bb{next_bb};"
         return out
@@ -4585,11 +4585,11 @@ fn CCodegen.emit_switch_term(self: CCodegen, body: MirBody, d0: i32, d1: i32, d2
     for i in 0..count:
         let val = body.switch_table_vals.get((start + i) as i64)
         let tgt = body.switch_table_targets.get((start + i) as i64)
-        let head = if i == 0: "if" else: "else if"
+        let head = if i == 0: "if" else: "else: if"
         out = out ++ "    " ++ head ++ f" ({cond} == {val}) " ++ cc_lbrace() ++ "\n"
         out = out ++ f"        goto bb{tgt};\n"
         out = out ++ "    " ++ cc_rbrace() ++ "\n"
-    out = out ++ "    else " ++ cc_lbrace() ++ "\n"
+    out = out ++ "    else: " ++ cc_lbrace() ++ "\n"
     if d2 != 0:
         out = out ++ f"        goto bb{d2};\n"
     else:

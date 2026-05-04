@@ -95,7 +95,7 @@ async fn validate_bid(amount: i32) -> Result[i32, str]:
 
 // BUG DISCOVERED: `?` on `.await` of async Result gives "aggregate enum
 // payload missing destination payload type". Spec says `.await?` should
-// chain naturally. Workaround: manual if/else on awaited result.
+// chain naturally. Workaround: manual if/else: on awaited result.
 // BUG DISCOVERED: `.is_ok()` on Result returned from async fn `.await`
 // returns false for Ok values. Possibly async Result ABI issue.
 async fn process_winning_bid(amount: i32) -> Result[i32, str]:

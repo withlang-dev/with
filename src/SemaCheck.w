@@ -2027,7 +2027,7 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
 
     // Arithmetic — unsigned types wrap by default (rewrite to wrapping ops)
     if (op == BinaryOp.OP_ADD or op == BinaryOp.OP_SUB or op == BinaryOp.OP_MUL) and self.is_unsigned_int_type(lhs as i32) and self.is_unsigned_int_type(rhs as i32):
-        let wrap_op = if op == BinaryOp.OP_ADD: BinaryOp.OP_ADD_WRAP else: if op == BinaryOp.OP_SUB: BinaryOp.OP_SUB_WRAP else: BinaryOp.OP_MUL_WRAP
+        let wrap_op = if op == BinaryOp.OP_ADD: BinaryOp.OP_ADD_WRAP else if op == BinaryOp.OP_SUB: BinaryOp.OP_SUB_WRAP else: BinaryOp.OP_MUL_WRAP
         self.ast.set_data0(node, wrap_op)
         return self.arithmetic_result_type(lhs, rhs) as i32
 
@@ -6184,7 +6184,7 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
                     // Check argument types via substitute_type on stored sig param types
                     let mc_sig_pc = self.sig_get_param_count(sig_idx)
                     // sig params include self as first param; user args start at index 1
-                    let mc_sig_poff = if mc_sig_pc > 0: 1 else 0
+                    let mc_sig_poff = if mc_sig_pc > 0: 1 else: 0
                     for mc_ai in 0..arg_count:
                         let mc_sig_pi = mc_ai + mc_sig_poff
                         if mc_sig_pi >= mc_sig_pc:

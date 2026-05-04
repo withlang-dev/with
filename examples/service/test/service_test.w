@@ -30,7 +30,7 @@ fn find_user(users: [5]User, id: i32) -> ServiceResult:
     for i in 0..5:
         if users[i].id == id:
             found = true
-    if found: Ok else NotFound
+    if found: Ok else: NotFound
 
 fn get_user_score(users: [5]User, id: i32) -> i32:
     var score = 0
@@ -49,7 +49,7 @@ extend Service:
 
     fn get_timeout(self: Service) -> i32: self.config.timeout_ms
 
-fn validate_id(id: i32) -> ServiceResult: if id in 1..=1000: Ok else InvalidInput
+fn validate_id(id: i32) -> ServiceResult: if id in 1..=1000: Ok else: InvalidInput
 
 fn validate_and_find(users: [5]User, id: i32) -> ServiceResult:
     let validation = validate_id(id)

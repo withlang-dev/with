@@ -13,7 +13,7 @@ fn local_direct(seed: i32) -> LocalEntry:
     LocalEntry { name: "local-helper", rank: seed }
 
 fn local_if(ok: bool) -> LocalEntry:
-    if ok: LocalEntry { name: "local-if", rank: 10 } else LocalEntry { name: "local-else", rank: 11 }
+    if ok: LocalEntry { name: "local-if", rank: 10 } else: LocalEntry { name: "local-else", rank: 11 }
 
 fn local_match(ok: bool) -> LocalEntry:
     match ok:
@@ -21,10 +21,10 @@ fn local_match(ok: bool) -> LocalEntry:
         false => LocalEntry { name: "local-match-no", rank: 13 }
 
 fn local_option(ok: bool) -> Option[LocalEntry]:
-    if ok: Some(LocalEntry { name: "local-some", rank: 14 }) else None
+    if ok: Some(LocalEntry { name: "local-some", rank: 14 }) else: None
 
 fn local_result(ok: bool) -> Result[LocalEntry, LocalErr]:
-    if ok: Ok(LocalEntry { name: "local-ok", rank: 15 }) else Err(.LocalBad)
+    if ok: Ok(LocalEntry { name: "local-ok", rank: 15 }) else: Err(.LocalBad)
 
 fn test_local_aggregate_flow:
     let direct_lit = LocalEntry { name: "local-direct", rank: 1 }

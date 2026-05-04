@@ -5,7 +5,7 @@
 //     libclang AST  →  CiExpr / CiStmt / CiDecl  →  CiPrint  →  With source
 //
 // This module replaces the string-based `ci_trans_expr` / `ci_trans_stmt`
-// lowering in CImport.w. Structural correctness (if/else nesting,
+// lowering in CImport.w. Structural correctness (if/else: nesting,
 // array-to-pointer decay, operator precedence, temp uniqueness,
 // sequenced side effects) moves out of string concatenation and into
 // tree construction.

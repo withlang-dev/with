@@ -1640,7 +1640,7 @@ fn ci_translate_typedef(session: i64, idx: i32) -> str:
     // to be emitted under this name. Skip the self-referential alias.
     if translated == name or translated == ci_escape_reserved(name):
         // The struct was shadowed, so emit nothing — the typedef name IS the struct.
-        // Mark as emitted so nothing else claims it.
+        // Mark as emitted so nothing else: claims it.
         with_cimport_mark_name_emitted(name)
         return ""
 
@@ -3682,7 +3682,7 @@ fn ci_map_c_type_ctx(spelling: str, known_structs: str) -> str:
     if ci_starts_with(base, "volatile "):
         base = ci_trim(base.slice(9, base.len()))
 
-    // Handle struct/union types — use name if translated, else opaque
+    // Handle struct/union types — use name if translated, else: opaque
     if ci_starts_with(base, "struct "):
         let sname = ci_escape_reserved(ci_trim(base.slice(7, base.len())))
         if ci_str_contains(known_structs, "|" ++ sname ++ "|"):
@@ -4924,7 +4924,7 @@ fn CiExprPool.lower_expr_ir(self: CiExprPool, session: i64, cursor: i32, types: 
 
     // UnexposedExpr (kind 100) — libclang's transparent wrapper
     // used for ImplicitCastExpr in this libclang build. Const-foldable
-    // cursors short-circuit to CIE_INT_LIT; everything else dispatches
+    // cursors short-circuit to CIE_INT_LIT; everything else: dispatches
     // to ci_lower_implicit_cast, falling back to plain peel-and-recurse
     // if the cast handler bails.
     if kind == 100:
@@ -7465,7 +7465,7 @@ fn CiExprPool.lower_case_value_ir(self: CiExprPool, session: i64, cursor: i32, t
 
 // Recursive statement lowering helper: produces a CiStmtId from a
 // cursor. Specific handlers build real CIS_* nodes for kinds we
-// own structurally; everything else returns 0 so callers can bail
+// own structurally; everything else: returns 0 so callers can bail
 // transactionally. Returns 0 for the empty case (CXK_NULL_STMT).
 fn CiStmtPool.lower_stmt_ir(self: CiStmtPool, session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, indent: i32, scope: str) -> CiStmtId:
     let kind = with_ci_cursor_kind(session, cursor)
@@ -7647,7 +7647,7 @@ fn CiStmtPool.lower_stmt_ir(self: CiStmtPool, session: i64, cursor: i32, exprs: 
     if ci_cursor_kind_is_expression(kind):
         return self.lower_stmt_expr_ir(session, cursor, exprs, types, scope)
 
-    // Everything else — struct/union decls at statement position or
+    // Everything else: — struct/union decls at statement position or
     // any other unsupported stmt shape — returns 0 so the enclosing
     // structural lowering attempt can bail.
     if g_ci_bail_location.len() == 0:

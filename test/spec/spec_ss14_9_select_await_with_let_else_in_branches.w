@@ -3,13 +3,13 @@
 // These are pseudo-code test cases from the specification.
 // Remove the //! skip directive once the features are implemented.
 
-// PASS: let...else inside branch body
+// PASS: let...else: inside branch body
 async fn test(rx: Receiver[i32]):
     var items = Vec.new()
     loop:
         select await
             opt = rx.recv() =>
-                let Some(item) = opt else break
+                let Some(item) = opt else: break
                 items.push(item)
             _ = timeout(1.secs()) => break
 
@@ -18,8 +18,8 @@ async fn serve(listener: TcpListener, ctrl: Receiver[str]):
     loop:
         select await
             result = listener.accept() =>
-                let Ok(conn) = result else continue
+                let Ok(conn) = result else: continue
                 handle(conn)
             opt = ctrl.recv() =>
-                let Some(msg) = opt else break
+                let Some(msg) = opt else: break
                 process(msg)

@@ -16,9 +16,9 @@ fn classify_char(ch: i32) -> i32:
 fn update_depth(depth: i32, cls: i32) -> i32:
     if cls in [1, 3]: depth + 1
     else if cls in [2, 4]: depth - 1
-    else depth
+    else: depth
 
-fn max(a: i32, b: i32) -> i32: if a > b: a else b
+fn max(a: i32, b: i32) -> i32: if a > b: a else: b
 
 fn count_depth(input: [10]i32, len: i32) -> i32:
     var max_depth = 0
@@ -37,7 +37,7 @@ fn classify_value(first_char: i32) -> i32:
     else if first_char == 102: 2
     else if is_digit(first_char): 3
     else if first_char == 34: 4
-    else 5
+    else: 5
 
 fn is_json_char(ch: i32) -> bool:
     let cls = classify_char(ch)
@@ -45,7 +45,7 @@ fn is_json_char(ch: i32) -> bool:
 
 fn fib(n: i32) -> i32:
     if n <= 1: n
-    else fib(n - 1) + fib(n - 2)
+    else: fib(n - 1) + fib(n - 2)
 
 fn tag_to_int(t: JsonTag) -> i32:
     match t:
