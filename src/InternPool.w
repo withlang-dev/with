@@ -81,6 +81,7 @@ type InternPoolState {
 type InternPool {
     state: *mut InternPoolState,
 }
+impl Copy for InternPool
 
 fn intern_new_map_str_i32 -> HashMap[str, i32]:
     let map: HashMap[str, i32] = HashMap.new()

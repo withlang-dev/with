@@ -375,6 +375,15 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
     self.expected_expr_type = saved_expected_et
     self.has_expected_type = saved_has_et
     self.typed_expr_types.insert(body, body_ty as i32)
+    // Tail expression bodies participate in effect inference the same way an
+    // explicit `return expr` does. Without this, `fn id(x: T) -> T: x` fails
+    // to record escape_value/escape_view on `x`.
+    if body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never:
+        if self.is_copy(body_ty) == 0:
+            self.note_place_effect(body, EFF_ESCAPE_VALUE)
+        let body_kind = self.get_type_kind(self.resolve_alias(body_ty))
+        if body_kind == TypeKind.TY_REF or body_kind == TypeKind.TY_PTR:
+            self.note_place_effect(body, EFF_ESCAPE_VIEW)
     let has_ret_annotation = meta >= 0 and self.ast.fn_meta_ret(meta) != 0
     if not has_ret_annotation:
         let inferred_ret = if body_ty != 0: body_ty else: self.ty_void
@@ -1545,7 +1554,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
             self.mark_function_label_used(label)
         else:
             let _ = self.resolve_innermost_loop_control(node, "break")
-        return self.ty_void
+        return self.ty_never
 
     if kind == NodeKind.NK_CONTINUE:
         if self.in_defer != 0:
@@ -1558,7 +1567,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
             self.mark_function_label_used(label)
         else:
             let _ = self.resolve_innermost_loop_control(node, "continue")
-        return self.ty_void
+        return self.ty_never
 
     if kind == NodeKind.NK_FIELD_ACCESS:
         let result = self.check_field_access(node) as TypeId
@@ -2323,17 +2332,25 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
     self.current_block_stmt_count = stmt_count
     self.current_block_tail = tail
 
+    var last_stmt_ty: TypeId = 0 as TypeId
     for i in 0..stmt_count:
         self.current_block_stmt_index = i
         let stmt = self.ast.get_extra(extra_start + i)
         let saved_stmt_pos = self.match_in_stmt_pos
         let saved_label_stmt_pos = self.stmt_pos_depth
+        let saved_expected = self.expected_expr_type
+        let saved_has_expected = self.has_expected_type
         self.match_in_stmt_pos = 1
         self.stmt_pos_depth = self.stmt_pos_depth + 1
+        self.expected_expr_type = 0 as TypeId
+        self.has_expected_type = 0
         let stmt_ty = self.check_expr(stmt)
+        self.expected_expr_type = saved_expected
+        self.has_expected_type = saved_has_expected
         self.stmt_pos_depth = saved_label_stmt_pos
         self.match_in_stmt_pos = saved_stmt_pos
         self.typed_expr_types.insert(stmt, stmt_ty as i32)
+        last_stmt_ty = stmt_ty as TypeId
         let stmt_kind = self.ast.kind(stmt)
         let can_discard_task = stmt_kind == NodeKind.NK_CALL or stmt_kind == NodeKind.NK_IDENT or stmt_kind == NodeKind.NK_GROUPED or stmt_kind == NodeKind.NK_ASYNC_BLOCK or stmt_kind == NodeKind.NK_TUPLE
         let is_discarded_task = can_discard_task and stmt_kind != NodeKind.NK_SPAWN and self.expr_is_task_value(stmt) != 0 and self.expr_is_scoped_task_value(stmt) == 0
@@ -2341,7 +2358,7 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
             self.emit_error("E0801: unused Task value", stmt)
         self.expire_dead_borrows_in_block(extra_start, stmt_count, i + 1, tail)
 
-    var result: TypeId = self.ty_void
+    var result: TypeId = if tail == 0 and last_stmt_ty == self.ty_never: self.ty_never else: self.ty_void
     if tail != 0:
         // If the tail is a match in a void/unspecified-return context, treat as statement
         // position so partial enum match is allowed (value is not used).
@@ -2349,9 +2366,11 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
         let ret_is_void = self.current_return_type == self.ty_void or self.current_return_type == 0
         if ret_is_void and self.ast.kind(tail) == NodeKind.NK_MATCH:
             self.match_in_stmt_pos = 1
-        result = self.check_expr(tail)
+        let tail_type = self.check_expr(tail)
         self.match_in_stmt_pos = saved_stmt_pos
-        self.typed_expr_types.insert(tail, result as i32)
+        if tail_type as TypeId != self.ty_void and tail_type != 0:
+            result = tail_type
+        self.typed_expr_types.insert(tail, tail_type as i32)
     self.expire_dead_borrows_in_block(extra_start, stmt_count, stmt_count, 0)
 
     self.current_block_extra_start = saved_block_extra
@@ -2468,15 +2487,39 @@ fn Sema.check_if_expr(self: Sema, node: i32) -> i32:
     let then_body = self.ast.get_data1(node)
     let else_body = self.ast.get_data2(node)
 
+    let saved_expected = self.expected_expr_type
+    let saved_has_expected = self.has_expected_type
+    self.expected_expr_type = 0 as TypeId
+    self.has_expected_type = 0
     self.check_expr(cond)
+    self.expected_expr_type = saved_expected
+    self.has_expected_type = saved_has_expected
     let outer_expected: TypeId = if self.has_expected_type != 0: self.expected_expr_type else: 0 as TypeId
+    // Save scope states before then branch so early-return branches don't
+    // permanently mark outer variables as MOVED when control continues past the if.
+    let pre_then_states = self.save_scope_states()
     let then_type = if outer_expected != 0: self.check_expr_with_expected(then_body, outer_expected) else: self.check_expr(then_body)
+    // If then branch always terminates, restore pre-then states for the continuation.
+    if self.get_type_kind(self.resolve_alias(then_type as TypeId)) == TypeKind.TY_NEVER:
+        self.restore_scope_states(pre_then_states)
 
     var result_type: TypeId = self.ty_void
     if else_body != 0:
-        let else_expected: TypeId = if then_type != 0 and then_type != self.ty_void: then_type else: outer_expected
+        // Don't propagate ty_never as else_expected; use outer_expected instead.
+        let then_is_never = self.get_type_kind(self.resolve_alias(then_type as TypeId)) == TypeKind.TY_NEVER
+        let else_expected: TypeId = if then_type != 0 and then_type != self.ty_void and then_is_never == 0: then_type else: outer_expected
+        let pre_else_states = self.save_scope_states()
         let else_type = if else_expected != 0: self.check_expr_with_expected(else_body, else_expected) else: self.check_expr(else_body)
-        if then_type != 0 and else_type != 0:
+        // If else branch always terminates, restore pre-else states.
+        let else_is_never = self.get_type_kind(self.resolve_alias(else_type as TypeId)) == TypeKind.TY_NEVER
+        if else_is_never:
+            self.restore_scope_states(pre_else_states)
+        // When one branch is Never, the result is the other branch's type.
+        if then_is_never and else_type != 0:
+            result_type = else_type
+        else if else_is_never and then_type != 0:
+            result_type = then_type
+        else if then_type != 0 and else_type != 0:
             if self.types_compatible(then_type as i32, else_type as i32):
                 result_type = self.preferred_compatible_type(then_type, else_type)
             else:
@@ -2535,9 +2578,11 @@ fn Sema.check_return(self: Sema, node: i32) -> i32:
     if value != 0:
         let val_type = if self.current_return_type != 0: self.check_expr_with_expected(value, self.current_return_type) else: self.check_expr(value)
         // If returned value originates from a parameter, record effects:
-        // - EFF_ESCAPE_VALUE: any owned value escaping via return
+        // - EFF_ESCAPE_VALUE: a non-Copy owned value escaping via return
+        //   (returning a Copy field is a read, not a consumption)
         // - EFF_ESCAPE_VIEW: a reference (&T) escaping via return
-        self.note_place_effect(value, EFF_ESCAPE_VALUE)
+        if self.is_copy(val_type) == 0:
+            self.note_place_effect(value, EFF_ESCAPE_VALUE)
         let val_kind = self.get_type_kind(self.resolve_alias(val_type))
         if val_kind == TypeKind.TY_REF or val_kind == TypeKind.TY_PTR:
             self.note_place_effect(value, EFF_ESCAPE_VIEW)
@@ -2547,7 +2592,7 @@ fn Sema.check_return(self: Sema, node: i32) -> i32:
             if compat == 0:
                 if arith == 0:
                     self.emit_error("return type mismatch", node)
-    self.ty_void as i32
+    self.ty_never as i32
 
 fn Sema.check_assign(self: Sema, node: i32) -> i32:
     let target = self.ast.get_data0(node)
@@ -4535,11 +4580,13 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
     // retain access to the same place (owned move, view, or iterator).
     self.check_closure_capture_conflicts(resolved_extra_start, resolved_arg_count, has_resolved, node)
 
-    // Mark non-Copy args as moved
-    for ai in 0..resolved_arg_count:
-        let arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
-        if arg_node > 0:
-            self.mark_moved_if_consumed(arg_node)
+    // For unknown functions (no signature), conservatively mark all non-Copy args as moved.
+    // For known functions, consuming-effect args are marked moved in the per-param loop below.
+    if sig_idx < 0:
+        for ai in 0..resolved_arg_count:
+            let arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
+            if arg_node > 0:
+                self.mark_moved_if_consumed(arg_node)
 
     if self.check_comptime_call_restriction(fn_sym, node) != 0:
         return 0
@@ -4608,6 +4655,8 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
             if (param_eff & (EFF_CONSUME | EFF_ESCAPE_VALUE)) != 0:
                 let eff_arg_nd = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
                 if eff_arg_nd > 0:
+                    // Mark the arg as consumed so subsequent uses are caught.
+                    self.mark_moved_if_consumed(eff_arg_nd)
                     let anode_kind = self.ast.kind(eff_arg_nd)
                     if anode_kind != NodeKind.NK_COPY_ARG and anode_kind != NodeKind.NK_MOVE_ARG:
                         let eff_ty = if arg_ty != 0: arg_ty else: expected_ty
@@ -6022,7 +6071,6 @@ fn Sema.substitute_method_return_for_generic_inst(self: Sema, gi_tid: i32, type_
 // is small and corresponds to types whose methods are intercepted by the
 // builtin codegen path (see `if field == self.syms.iter` in check_method_call).
 fn Sema.builtin_method_is_iter_of_self(self: Sema, type_name_sym: i32, field: i32) -> i32:
-    let _ = self
     if type_name_sym == self.syms.vec:
         if field == self.syms.iter or field == self.syms.keys or field == self.syms.iter_place or field == self.syms.iter_ref:
             return 1
@@ -6035,7 +6083,6 @@ fn Sema.builtin_method_is_iter_of_self(self: Sema, type_name_sym: i32, field: i3
     0
 
 fn Sema.builtin_method_requires_mutable_receiver(self: Sema, type_name_sym: i32, field: i32) -> i32:
-    let _ = self
     if type_name_sym == self.syms.vec:
         if field == self.syms.push or field == self.syms.set_i32 or field == self.syms.remove or field == self.syms.clear or field == self.syms.pop:
             return 1
@@ -6719,7 +6766,6 @@ fn Sema.check_intrinsic_call(self: Sema, fn_sym: i32, node: i32, arg_types: Vec[
     0
 
 fn Sema.static_receiver_base_sym(self: Sema, expr: i32) -> i32:
-    let _ = self
     if expr == 0:
         return 0
     let kind = self.ast.kind(expr)
@@ -7101,7 +7147,6 @@ fn Sema.are_borrows_disjoint_paths(self: Sema, start_a: i32, count_a: i32, start
     0
 
 fn Sema.are_borrows_disjoint(self: Sema, new_field: i32, existing_field: i32) -> i32:
-    let _ = self
     if new_field == 0 or existing_field == 0:
         return 0
     if new_field != existing_field:

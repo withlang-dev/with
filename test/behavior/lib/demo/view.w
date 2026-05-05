@@ -2,13 +2,14 @@ use demo.core
 
 pub enum DType: i32:
     Int32 = 2
+impl Copy for DType
 
-pub type Shape {
+pub type Shape: Copy {
     d0: Size,
     rank: i32,
 }
 
-pub type View {
+pub type View: Copy {
     memory: Memory,
     shape: Shape,
     dtype: DType,

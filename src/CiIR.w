@@ -36,6 +36,7 @@ fn ci_ir_owned_text(text: str) -> str:
 // ── CiType ────────────────────────────────────────────────────
 
 type CiTypeId = distinct i32
+impl Copy for CiTypeId
 
 enum CiTypeKind: i32:
     CT_VOID = 1
@@ -165,6 +166,7 @@ fn CiTypePool.ty_fn_ptr(self: CiTypePool, ret: CiTypeId, params_start: i32, para
 // ── CiExpr ────────────────────────────────────────────────────
 
 type CiExprId = distinct i32
+impl Copy for CiExprId
 
 enum CiExprKind: i32:
     // Literals — d0 = string_idx of the already-formatted literal
@@ -392,6 +394,7 @@ fn CiExprPool.val(self: CiExprPool) -> CiExprPool:
 // ── CiStmt ────────────────────────────────────────────────────
 
 type CiStmtId = distinct i32
+impl Copy for CiStmtId
 
 enum CiStmtKind: i32:
     CIS_EXPR = 1             // d0 = expr_id
@@ -565,6 +568,7 @@ fn CiStmtPool.goto_label(self: CiStmtPool, label_sym: i32) -> CiStmtId:
 // ── CiDecl ────────────────────────────────────────────────────
 
 type CiDeclId = distinct i32
+impl Copy for CiDeclId
 
 enum CiDeclKind: i32:
     // d0 = name_sym, d1 = ret_ty_id, d2 = body_block_stmt (0 for extern)

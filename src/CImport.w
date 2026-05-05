@@ -3907,7 +3907,8 @@ fn ci_value_ir_valid(lowered: CiValueExprIR) -> bool:
 // is threaded through the recursion; the underlying buffer is shared by
 // reference but the {len, cap} triple is reassigned on push so we return
 // the updated Vec to avoid losing growth on the caller side.
-fn ci_stmt_collect_flat_ids(stmts: CiStmtPool, stmt_id: CiStmtId, out: Vec[i32]) -> Vec[i32]:
+fn ci_stmt_collect_flat_ids(stmts: CiStmtPool, stmt_id: CiStmtId) -> Vec[i32]:
+    var out: Vec[i32] = Vec.new()
     if (stmt_id as i32) == 0:
         return out
     if stmts.kind(stmt_id) == CiStmtKind.CIS_BLOCK:
@@ -3916,12 +3917,15 @@ fn ci_stmt_collect_flat_ids(stmts: CiStmtPool, stmt_id: CiStmtId, out: Vec[i32])
             return out
         let start = stmts.get_d0(stmt_id)
         let count = stmts.get_d1(stmt_id)
-        var acc = out
         var i: i32 = 0
         while i < count:
-            acc = ci_stmt_collect_flat_ids(stmts, (stmts.get_extra(start + i)) as CiStmtId, acc)
+            let child = ci_stmt_collect_flat_ids(stmts, (stmts.get_extra(start + i)) as CiStmtId)
+            var ci: i32 = 0
+            while ci < child.len() as i32:
+                out.push(child.get(ci as i64))
+                ci = ci + 1
             i = i + 1
-        return acc
+        return out
     out.push(stmt_id as i32)
     out
 
@@ -3942,9 +3946,12 @@ fn CiStmtPool.merge_ir(self: CiStmtPool, first: CiStmtId, second: CiStmtId) -> C
         return second
     if (second as i32) == 0:
         return first
-    var ids: Vec[i32] = Vec.new()
-    ids = ci_stmt_collect_flat_ids(self.val(), first, ids)
-    ids = ci_stmt_collect_flat_ids(self.val(), second, ids)
+    var ids: Vec[i32] = ci_stmt_collect_flat_ids(self.val(), first)
+    let ids2 = ci_stmt_collect_flat_ids(self.val(), second)
+    var si: i32 = 0
+    while si < ids2.len() as i32:
+        ids.push(ids2.get(si as i64))
+        si = si + 1
     self.from_flat_ids(&ids)
 
 fn CiStmtPool.merge3_ir(self: CiStmtPool, first: CiStmtId, second: CiStmtId, third: CiStmtId) -> CiStmtId:
@@ -9800,6 +9807,7 @@ type CiGotoSwitchCaseState {
 type CiGotoSwitchCase {
     state: *mut CiGotoSwitchCaseState,
 }
+impl Copy for CiGotoSwitchCase
 
 type CiStackEmitFrame {
     kind: i32 = 0,
@@ -10566,9 +10574,7 @@ fn CiStackEmitContext.node(mut self: CiStackEmitContext, tree: StackifyTree, nod
         self.push_frame(CI_STACK_FRAME_BLOCK, label_sym)
         let body = self.children(tree, node.first_child_start, node.first_child_count, stmts, exprs, types)
         self.pop_frame()
-        var ids: Vec[i32] = Vec.new()
-        if (body as i32) != 0:
-            ids = ci_stmt_collect_flat_ids(stmts, body, ids)
+        var ids: Vec[i32] = if (body as i32) != 0: ci_stmt_collect_flat_ids(stmts, body) else: Vec.new()
         let start = stmts.extra_len()
         var i: i64 = 0
         while i < ids.len():
@@ -10847,7 +10853,11 @@ fn CiStmtPool.lower_goto_body_stackify(self: CiStmtPool, session: i64, body_curs
     while hi < hoisted_stmt_ids.len():
         ids.push(hoisted_stmt_ids.get(hi))
         hi = hi + 1
-    ids = ci_stmt_collect_flat_ids(self.val(), body_id, ids)
+    let body_ids = ci_stmt_collect_flat_ids(self.val(), body_id)
+    var bi: i32 = 0
+    while bi < body_ids.len() as i32:
+        ids.push(body_ids.get(bi as i64))
+        bi = bi + 1
     self.from_flat_ids(&ids)
 
 // Find a function cursor in the cursor tree by name.

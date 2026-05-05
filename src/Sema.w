@@ -45,6 +45,7 @@ enum TypeKind: i32:
     TY_GENERIC_INST = 19
 
 type TypeId = distinct i32
+impl Copy for TypeId
 
 enum VarState: i32:
     LIVE = 0
@@ -160,6 +161,7 @@ type SemaBuiltinSymbols {
     implements: i32,
     is_copy: i32,
 }
+impl Copy for SemaBuiltinSymbols
 
 type SemaMethodLookup {
     sig_lookup: HashMap[i64, i32],
@@ -2181,6 +2183,20 @@ fn Sema.scope_has(self: Sema, sym: i32) -> i32:
     if self.scope_name_map.contains(sym): return 1
     0
 
+// Snapshot current bind_states so early-returning if/else branches don't
+// permanently mark outer variables as MOVED.
+fn Sema.save_scope_states(self: Sema) -> Vec[i32]:
+    let count = self.bind_states.len() as i32
+    var snapshot: Vec[i32] = Vec.new()
+    for i in 0..count:
+        snapshot.push(self.bind_states.get(i as i64))
+    snapshot
+
+fn Sema.restore_scope_states(self: Sema, snapshot: Vec[i32]):
+    let count = snapshot.len() as i32
+    for i in 0..count:
+        self.bind_states.set_i32(i as i64, snapshot.get(i as i64))
+
 fn Sema.is_mutable_global(self: Sema, sym: i32) -> i32:
     if self.mutable_global_syms.contains(sym): return 1
     0
@@ -2628,7 +2644,16 @@ fn Sema.is_copy(self: Sema, tid: TypeId) -> i32:
         return 1
     if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_FN or tk == TypeKind.TY_GENERIC_FN:
         return 1
-    if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_TUPLE or tk == TypeKind.TY_RANGE:
+    if tk == TypeKind.TY_STRUCT:
+        let name = self.get_type_d0(resolved)
+        if self.has_drop_method(name):
+            if sema_debug_move_enabled() != 0:
+                with_eprint("[noncopy] type=" ++ self.pool_resolve(name) ++ " reason=drop")
+            return 0
+        if name > 0:
+            return self.select_trait_impl(name, self.syms.copy_trait)
+        return 0
+    if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_TUPLE or tk == TypeKind.TY_RANGE:
         // Break copy-check recursion on cyclic type graphs.
         for vi in 0..self.copy_visit_stack.len() as i32:
             if self.copy_visit_stack.get(vi as i64) == resolved as i32:
@@ -2636,28 +2661,7 @@ fn Sema.is_copy(self: Sema, tid: TypeId) -> i32:
         self.copy_visit_stack.push(resolved as i32)
 
         var out = 1
-        if tk == TypeKind.TY_STRUCT:
-            let name = self.get_type_d0(resolved)
-            if self.has_drop_method(name):
-                if sema_debug_move_enabled() != 0:
-                    with_eprint("[noncopy] type=" ++ self.pool_resolve(name) ++ " reason=drop")
-                out = 0
-            else:
-                let struct_te_start = self.get_type_d1(resolved)
-                let struct_field_count = self.get_type_d2(resolved)
-                for fi in 0..struct_field_count:
-                    let ft = self.type_extra.get((struct_te_start + fi * 3 + 1) as i64)
-                    if self.is_copy(ft) == 0:
-                        if sema_debug_move_enabled() != 0:
-                            let field_name = self.type_extra.get((struct_te_start + fi * 3) as i64)
-                            with_eprint(
-                                "[noncopy] type=" ++ self.pool_resolve(name) ++
-                                " field=" ++ self.pool_resolve(field_name) ++
-                                " field_ty=" ++ self.type_name(ft)
-                            )
-                        out = 0
-                        break
-        else if tk == TypeKind.TY_ARRAY:
+        if tk == TypeKind.TY_ARRAY:
             out = self.is_copy(self.get_type_d0(resolved))
         else if tk == TypeKind.TY_TUPLE:
             let tuple_te_start = self.get_type_d0(resolved)
@@ -2672,9 +2676,23 @@ fn Sema.is_copy(self: Sema, tid: TypeId) -> i32:
         self.copy_visit_stack.pop()
         return out
     if tk == TypeKind.TY_ENUM:
-        return 1
+        // Enums are non-Copy by default; opt-in via `impl Copy for T`.
+        let enum_name = self.get_type_d0(resolved)
+        if enum_name > 0 and self.impl_lookup.contains(enum_name):
+            let idx = self.impl_lookup.get(enum_name).unwrap()
+            let start = self.impl_starts.get(idx as i64)
+            let count = self.impl_counts.get(idx as i64)
+            for di in 0..count:
+                if self.impl_extra.get((start + di) as i64) == self.syms.copy_trait:
+                    return 1
+        return 0
     if tk == TypeKind.TY_SLICE:
         return 1
+    if tk == TypeKind.TY_GENERIC_INST:
+        // Generic instances (Vec[T], etc.) are non-Copy by default.
+        // Copy iff there is an explicit `impl[T: Copy] Copy for Base[T]` registered.
+        // Do NOT call type_implements_trait(copy_trait) here — it just calls is_copy() back.
+        return self.select_trait_impl_for_generic_inst(resolved as i32, self.syms.copy_trait)
     1
 
 fn Sema.has_drop_method(self: Sema, type_name: i32) -> i32:

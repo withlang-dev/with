@@ -8194,7 +8194,7 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
         for ci in 0..capture_count:
             let sym = captures.get(ci as i64)
             let cap_ty = cap_types.get(ci as i64)
-            let alloca_opt = saved_allocas.get(sym)
+            let alloca_opt = self.local_allocas.get(sym)
             if alloca_opt.is_some():
                 let indices: Vec[i64] = Vec.new()
                 indices.push(wl_const_int(i32_ty, 0, 0))
@@ -9155,7 +9155,7 @@ fn Codegen.gen_async_block(self: Codegen, node: i32) -> i64:
         // Store captures into heap struct
         for ci in 0..capture_count:
             let sym = captures.get(ci as i64)
-            let src_opt = saved_allocas.get(sym)
+            let src_opt = self.local_allocas.get(sym)
             if src_opt.is_some():
                 let cap_ty = cap_types.get(ci as i64)
                 let val = wl_build_load(self.builder, cap_ty, src_opt.unwrap() as i64)

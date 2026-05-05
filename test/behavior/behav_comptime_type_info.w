@@ -3,7 +3,7 @@
 trait Named =
     fn label(self: &Self) -> str
 
-type Point { x: i32, y: i32 }
+type Point: Copy { x: i32, y: i32 }
 enum Val { Num(i32) | Empty }
 
 impl Named for Point =
