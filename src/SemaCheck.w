@@ -401,10 +401,18 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
     if (flags / FnFlags.TAILREC) % 2 == 1:
         self.verify_tail_position(body, fn_name, 1)
 
-    // Write accumulated per-param effects into sig_param_effects
+    // Write accumulated per-param effects into sig_param_effects.
+    // For &T-typed params, clamp to {read, escape_view}: they cannot have
+    // consume or escape_value since you cannot own through a reference.
     for pi in 0..self.current_fn_param_effs.len() as i32:
-        let eff = self.current_fn_param_effs.get(pi as i64)
+        var eff = self.current_fn_param_effs.get(pi as i64)
         if eff != 0:
+            if sig_idx >= 0:
+                let p_tid = self.sig_param_type(sig_idx, pi)
+                if p_tid > 0:
+                    let p_tk = self.get_type_kind(self.resolve_alias(p_tid))
+                    if p_tk == TypeKind.TY_REF or p_tk == TypeKind.TY_PTR:
+                        eff = eff & (EFF_READ | EFF_ESCAPE_VIEW)
             self.set_sig_param_effect(sig_idx, pi, eff)
 
     // @[effect(param = bits)] pin enforcement: floor and ceiling checks
