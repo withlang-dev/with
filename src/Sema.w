@@ -168,6 +168,13 @@ type SemaMethodLookup {
 const GLOBAL_VALUE_DECL_DEF: i32 = 1
 const GLOBAL_VALUE_DECL_EXTERN: i32 = 2
 
+// docs/mutability.md §5 — per-parameter effect bits.
+const EFF_READ: i32         = 1   // parameter is read
+const EFF_WRITE: i32        = 2   // parameter place is mutated (implies read)
+const EFF_CONSUME: i32      = 4   // parameter is moved/consumed in the body
+const EFF_ESCAPE_VALUE: i32 = 8   // owned value escapes the call (return / global store)
+const EFF_ESCAPE_VIEW: i32  = 16  // view into parameter escapes (return &param.field)
+
 // ── Sema state ───────────────────────────────────────────────────
 
 type Sema {
@@ -203,6 +210,11 @@ type Sema {
     sig_variadic: Vec[i32],
     sig_params: Vec[i32],
     sig_lookup: HashMap[i32, i32],
+    // docs/mutability.md Phase 4 — per-parameter effect bitsets.
+    // sig_param_effects[sig_param_eff_starts[si] + pi] = effect bits for param pi of sig si.
+    // Effects: EFF_READ=1, EFF_WRITE=2, EFF_CONSUME=4, EFF_ESCAPE_VALUE=8, EFF_ESCAPE_VIEW=16.
+    sig_param_effects: Vec[i32],
+    sig_param_eff_starts: Vec[i32],
 
     // Extern fn names
     extern_fn_names: HashMap[i32, i32],
@@ -391,6 +403,12 @@ type Sema {
     // When frozen, add_type and new semantic symbol interning will error.
     symbols_frozen: i32,
     types_frozen: i32,
+
+    // docs/mutability.md Phase 4 — per-function effect tracking during body analysis.
+    // Cleared and set by check_fn_body_with_sig; used to accumulate effects as the body is checked.
+    current_fn_param_syms: Vec[i32],   // param name symbols for the function being checked
+    current_fn_param_effs: Vec[i32],   // accumulated effect bits per param
+    current_fn_sig_idx: i32,           // sig index of current function (-1 if not in a fn body)
 
     // Current state
     source_text: str,
@@ -724,6 +742,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         sig_variadic: Vec.new(),
         sig_params: Vec.new(),
         sig_lookup,
+        sig_param_effects: Vec.new(),
+        sig_param_eff_starts: Vec.new(),
         extern_fn_names,
         fn_decl_nodes,
         generic_fn_nodes,
@@ -855,6 +875,9 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         assoc_type_bindings: sema_new_map_i32_i32(),
         symbols_frozen: 0,
         types_frozen: 0,
+        current_fn_param_syms: Vec.new(),
+        current_fn_param_effs: Vec.new(),
+        current_fn_sig_idx: 0 - 1,
         source_text: "",
         current_return_type: 0,
         current_gen_yield_type: 0,
@@ -2183,7 +2206,45 @@ fn Sema.add_sig(self: Sema, name: i32, fn_tid: i32, ret: i32, param_start: i32, 
     self.sig_param_starts.push(param_start)
     self.sig_param_counts.push(param_count)
     self.sig_variadic.push(variadic)
+    // docs/mutability.md Phase 4 — per-parameter effect storage.
+    self.sig_param_eff_starts.push(self.sig_param_effects.len() as i32)
+    for pi in 0..param_count:
+        self.sig_param_effects.push(0)
     self.sig_lookup.insert(name, idx)
+
+fn Sema.sig_param_effect(self: Sema, si: i32, pi: i32) -> i32:
+    if si < 0 or si >= self.sig_param_eff_starts.len() as i32:
+        return 0
+    let start = self.sig_param_eff_starts.get(si as i64)
+    let count = self.sig_param_counts.get(si as i64)
+    if pi < 0 or pi >= count:
+        return 0
+    self.sig_param_effects.get((start + pi) as i64)
+
+fn Sema.set_sig_param_effect(self: Sema, si: i32, pi: i32, eff: i32):
+    if si < 0 or si >= self.sig_param_eff_starts.len() as i32:
+        return
+    let start = self.sig_param_eff_starts.get(si as i64)
+    let count = self.sig_param_counts.get(si as i64)
+    if pi < 0 or pi >= count:
+        return
+    self.sig_param_effects.set_i32((start + pi) as i64, eff)
+
+fn Sema.note_param_effect(self: Sema, sym: i32, eff: i32):
+    if self.current_fn_sig_idx < 0 or sym == 0:
+        return
+    for pi in 0..self.current_fn_param_syms.len() as i32:
+        if self.current_fn_param_syms.get(pi as i64) == sym:
+            let cur = self.current_fn_param_effs.get(pi as i64)
+            self.current_fn_param_effs.set_i32(pi as i64, cur | eff)
+            return
+
+fn Sema.note_place_effect(self: Sema, expr_node: i32, eff: i32):
+    if self.current_fn_sig_idx < 0:
+        return
+    let root = self.place_root_sym(expr_node)
+    if root != 0:
+        self.note_param_effect(root, eff)
 
 fn Sema.get_sig(self: Sema, name: i32) -> i32:
     if self.sig_lookup.contains(name):
