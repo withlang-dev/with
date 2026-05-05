@@ -2500,8 +2500,13 @@ fn Sema.check_return(self: Sema, node: i32) -> i32:
     let value = self.ast.get_data0(node)
     if value != 0:
         let val_type = if self.current_return_type != 0: self.check_expr_with_expected(value, self.current_return_type) else: self.check_expr(value)
-        // If returned value originates from a parameter, record EFF_ESCAPE_VALUE
+        // If returned value originates from a parameter, record effects:
+        // - EFF_ESCAPE_VALUE: any owned value escaping via return
+        // - EFF_ESCAPE_VIEW: a reference (&T) escaping via return
         self.note_place_effect(value, EFF_ESCAPE_VALUE)
+        let val_kind = self.get_type_kind(self.resolve_alias(val_type))
+        if val_kind == TypeKind.TY_REF or val_kind == TypeKind.TY_PTR:
+            self.note_place_effect(value, EFF_ESCAPE_VIEW)
         if self.current_return_type != 0 and val_type != 0:
             let compat = self.types_compatible(self.current_return_type as i32, val_type as i32)
             let arith = if compat == 0: self.arithmetic_result_type(self.current_return_type, val_type) else: 1 as TypeId
@@ -4565,6 +4570,15 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
                         let eff_ty = if arg_ty != 0: arg_ty else: expected_ty
                         if self.is_copy(eff_ty) == 0:
                             self.emit_error("non-Copy argument passed to a function that consumes or escapes it; use 'move x' or 'copy x'", eff_arg_nd)
+            // escape_view: move/copy is forbidden because they invalidate the view's origin
+            if (param_eff & EFF_ESCAPE_VIEW) != 0:
+                let ev_arg_nd = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
+                if ev_arg_nd > 0:
+                    let ev_kind = self.ast.kind(ev_arg_nd)
+                    if ev_kind == NodeKind.NK_MOVE_ARG:
+                        self.emit_error("cannot use 'move' for argument when callee returns a view derived from it ('escape_view' effect)", ev_arg_nd)
+                    else if ev_kind == NodeKind.NK_COPY_ARG:
+                        self.emit_error("cannot use 'copy' for argument when callee returns a view derived from it ('escape_view' effect)", ev_arg_nd)
 
         self.check_dyn_trait_call_compat(fn_sym, resolved_extra_start, arg_types, resolved_arg_count, param_offset)
         self.typed_expr_types.insert(node, ret)
@@ -7577,6 +7591,10 @@ fn Sema.place_root_sym(self: Sema, node: i32) -> i32:
         return self.ast.get_data0(node)
     if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_INDEX or kind == NodeKind.NK_GROUPED:
         return self.place_root_sym(self.ast.get_data0(node))
+    // &x.field — strip the reference operator to get the underlying place's root
+    if kind == NodeKind.NK_UNARY:
+        if self.ast.get_data0(node) == UnaryOp.UOP_REF:
+            return self.place_root_sym(self.ast.get_data1(node))
     0
 
 // ── docs/mut.md Rev 8 §2 — Place classification ──────────────────
