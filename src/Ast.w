@@ -399,6 +399,8 @@ type AstPoolState {
     call_named_args: HashMap[i32, i32],
     fn_stack_sizes: HashMap[i32, i32],
     fn_weak_flags: HashMap[i32, i32],
+    fn_effect_pin_params: HashMap[i32, i32],   // fn_node → param_name_sym
+    fn_effect_pin_bits: HashMap[i32, i32],     // fn_node → effect bitmask
     frozen: i32,
 }
 
@@ -461,6 +463,8 @@ fn AstPool.new -> AstPool:
             call_named_args: HashMap.new(),
             fn_stack_sizes: HashMap.new(),
             fn_weak_flags: HashMap.new(),
+            fn_effect_pin_params: HashMap.new(),
+            fn_effect_pin_bits: HashMap.new(),
             frozen: 0,
         }
     let st = ptr

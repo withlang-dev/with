@@ -407,6 +407,28 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
         if eff != 0:
             self.set_sig_param_effect(sig_idx, pi, eff)
 
+    // @[effect(param = bits)] pin enforcement: floor and ceiling checks
+    if self.ast.state.fn_effect_pin_params.contains(node):
+        let pin_param_sym = self.ast.state.fn_effect_pin_params.get(node).unwrap()
+        let pin_bits = if self.ast.state.fn_effect_pin_bits.contains(node): self.ast.state.fn_effect_pin_bits.get(node).unwrap() else: 0
+        // Find which param index this pin covers
+        var pin_pi = 0 - 1
+        for pi in 0..self.current_fn_param_syms.len() as i32:
+            if self.current_fn_param_syms.get(pi as i64) == pin_param_sym:
+                pin_pi = pi
+                break
+        if pin_pi >= 0:
+            let inferred = self.sig_param_effect(sig_idx, pin_pi)
+            // Floor: exported effect is at least the pinned set (merge pin into stored effect)
+            let merged = inferred | pin_bits
+            if merged != inferred:
+                self.set_sig_param_effect(sig_idx, pin_pi, merged)
+            // Ceiling: inferred effects must not exceed pinned set
+            let excess = inferred & (pin_bits ^ 0x1f)  // bits inferred but not pinned (among EFF_*)
+            if excess != 0:
+                let param_name = self.pool_resolve(pin_param_sym)
+                self.emit_error(f"function body uses effects on '{param_name}' not permitted by @[effect(...)] pin; remove or expand the pin", node)
+
     // Restore state
     self.current_fn_sig_idx = saved_eff_sig_idx
     while self.current_fn_param_syms.len() > 0:

@@ -42,6 +42,8 @@ type Parser {
     pending_weak: i32,
     pending_callconv: i32,
     pending_stack_size: i32,
+    pending_effect_param: i32,    // param name sym (0 = no pin)
+    pending_effect_bits: i32,     // EFF_* bitmask
     pending_unsafe_fn: i32,
     pending_iter_of_self: i32,
     saw_implicit_it: i32,
@@ -97,6 +99,8 @@ fn Parser.init_with_pool(tokens: TokenList, source: str, file_id: i32, intern: I
         pending_weak: 0,
         pending_callconv: 0,
         pending_stack_size: 0,
+        pending_effect_param: 0,
+        pending_effect_bits: 0,
         pending_unsafe_fn: 0,
         pending_iter_of_self: 0,
         saw_implicit_it: 0,
@@ -324,6 +328,8 @@ fn Parser.skip_attributes(self: Parser):
     self.pending_weak = 0
     self.pending_callconv = 0
     self.pending_stack_size = 0
+    self.pending_effect_param = 0
+    self.pending_effect_bits = 0
     self.pending_iter_of_self = 0
     var derive_syms: Vec[i32] = Vec.new()
 
@@ -443,6 +449,55 @@ fn Parser.skip_attributes(self: Parser):
                     let val_text = self.source.slice(val_s as i64, val_e as i64)
                     self.pending_stack_size = parse_int(val_text) as i32
                     self.advance()
+                if self.peek() == TokenKind.TK_R_PAREN:
+                    self.advance()
+        else if self.is_ident_named("effect"):
+            // @[effect(param = effect_name)] — effect pin for one parameter.
+            // effect_name is one of: read, write, consume, escape_value, escape_view
+            // or a bracketed list: [read, write, ...]
+            self.advance()
+            if self.peek() == TokenKind.TK_L_PAREN:
+                self.advance()
+                if self.peek() == TokenKind.TK_IDENT:
+                    let p_sym = self.intern_current()
+                    self.advance()
+                    if self.peek() == TokenKind.TK_EQ:
+                        self.advance()
+                        var eff_bits = 0
+                        if self.peek() == TokenKind.TK_L_BRACKET:
+                            self.advance()
+                            while self.peek() != TokenKind.TK_R_BRACKET and self.peek() != TokenKind.TK_EOF:
+                                if self.peek() == TokenKind.TK_IDENT:
+                                    let es = self.current_start()
+                                    let ee = self.current_end()
+                                    let ef_name = self.source.slice(es as i64, ee as i64)
+                                    let ef_bit = if ef_name == "read": 1
+                                        else if ef_name == "write": 2
+                                        else if ef_name == "consume": 4
+                                        else if ef_name == "escape_value": 8
+                                        else if ef_name == "escape_view": 16
+                                        else: 0
+                                    eff_bits = eff_bits | ef_bit
+                                    self.advance()
+                                if self.peek() == TokenKind.TK_COMMA:
+                                    self.advance()
+                                    self.skip_newlines()
+                            if self.peek() == TokenKind.TK_R_BRACKET:
+                                self.advance()
+                        else if self.peek() == TokenKind.TK_IDENT:
+                            let es = self.current_start()
+                            let ee = self.current_end()
+                            let ef_name = self.source.slice(es as i64, ee as i64)
+                            eff_bits = if ef_name == "read": 1
+                                else if ef_name == "write": 2
+                                else if ef_name == "consume": 4
+                                else if ef_name == "escape_value": 8
+                                else if ef_name == "escape_view": 16
+                                else: 0
+                            self.advance()
+                        if eff_bits != 0:
+                            self.pending_effect_param = p_sym
+                            self.pending_effect_bits = eff_bits
                 if self.peek() == TokenKind.TK_R_PAREN:
                     self.advance()
 
@@ -786,6 +841,11 @@ fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is
     if self.pending_iter_of_self != 0:
         self.pool.mark_iter_of_self_fn(fn_node)
         self.pending_iter_of_self = 0
+    if self.pending_effect_param != 0:
+        self.pool.state.fn_effect_pin_params.insert(fn_node as i32, self.pending_effect_param)
+        self.pool.state.fn_effect_pin_bits.insert(fn_node as i32, self.pending_effect_bits)
+        self.pending_effect_param = 0
+        self.pending_effect_bits = 0
     fn_node
 
 // ── extern fn ────────────────────────────────────────────────────
