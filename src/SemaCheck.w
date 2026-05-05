@@ -3907,7 +3907,7 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
             let cap_sym = self.bind_names.get(ci as i64)
             if self.expr_uses_symbol(body, cap_sym) != 0:
                 let cap_ty = self.bind_types.get(ci as i64)
-                if not self.is_copy(cap_ty as TypeId):
+                if self.is_copy(cap_ty as TypeId) == 0:
                     self.scope_set_state(cap_sym, VarState.MOVED)
                 if emitted_escape_warn == 0 and self.ast.is_move_closure(node) == 0 and self.expr_mutates_place(body, cap_sym) != 0:
                     self.emit_error("closure that mutates captured place cannot escape its defining scope (§15.9)", node)
