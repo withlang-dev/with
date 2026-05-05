@@ -409,7 +409,7 @@ fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
         zcu.render_current_diagnostics()
         zcu.set_codegen_snapshot(MirModule.init(), "", AsyncMirModule.init(), "")
         self.zcu = zcu
-        return zcu.last_mir_module
+        return self.zcu.last_mir_module
 
     let t_mir = profile_now()
     let mir_mod: MirModule = lower_module(sema, active_pool, zcu.pool)
@@ -427,7 +427,7 @@ fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
         zcu.render_all_diagnostics_frontend()
         zcu.set_codegen_snapshot(MirModule.init(), "", AsyncMirModule.init(), "")
         self.zcu = zcu
-        return zcu.last_mir_module
+        return self.zcu.last_mir_module
     let t_async = profile_now()
     let async_artifacts: AsyncLowerResult = lower_async_module(mir_mod, active_pool, zcu.pool, sema, zcu.diagnostics)
     if do_profile:
@@ -441,7 +441,7 @@ fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
     compilation_debug_pool_flow("run_mir_lower:after_sync", zcu.pool, active_pool, zcu.last_sema)
     zcu.set_codegen_snapshot(mir_mod, "", async_artifacts.out_mod, "")
     self.zcu = zcu
-    zcu.last_mir_module
+    self.zcu.last_mir_module
 
 fn Compilation.run_async_mir_lower(self: Compilation, pool: AstPool) -> AsyncMirModule:
     let _ = self.run_mir_lower(pool)

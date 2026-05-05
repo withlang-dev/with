@@ -15,6 +15,7 @@ extern fn with_alloc(size: i64) -> *mut u8
 // ── Node kinds ───────────────────────────────────────────────────
 
 type NodeId = distinct i32
+impl Copy for NodeId
 
 enum NodeKind: i32:
     // Declarations
@@ -409,6 +410,7 @@ type AstPoolState {
 type AstPool {
     state: *mut AstPoolState,
 }
+impl Copy for AstPool
 
 fn AstPool.new -> AstPool:
     let ptr = with_alloc(2048) as *mut AstPoolState
@@ -581,6 +583,7 @@ type ExactIntValue {
     lo: i64,
     hi: i64,
 }
+impl Copy for ExactIntValue
 
 type ExactIntExpr {
     ok: i32,
@@ -589,11 +592,13 @@ type ExactIntExpr {
     lo: i64,
     hi: i64,
 }
+impl Copy for ExactIntExpr
 
 type ExactIntI64 {
     ok: i32,
     value: i64,
 }
+impl Copy for ExactIntI64
 
 fn exact_int_invalid() -> ExactIntValue:
     ExactIntValue { ok: 0, overflow: 1, lo: 0, hi: 0 }

@@ -11,6 +11,7 @@ type CompilationConfig {
     prelude_mode: i32,
     debug_info: bool,
 }
+impl Copy for CompilationConfig
 
 fn PRELUDE_FULL -> i32: 0
 fn PRELUDE_CORE -> i32: 1

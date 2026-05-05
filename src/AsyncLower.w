@@ -81,7 +81,7 @@ fn AsyncLower.lower_body(self: AsyncLower, mir_body: MirBody):
     let fn_decl = async_find_fn_decl(self.ast, mir_body.fn_sym)
     let flavor = async_fn_flavor(self.ast, fn_decl)
     self.cur_mir_body = mir_body
-    self.cur_body = AsyncMirBody.init(mir_body.fn_sym, flavor)
+    self.cur_body = AsyncMirBody.init(self.cur_mir_body.fn_sym, flavor)
 
     if fn_decl != 0:
         let fn_body_node = async_ast_get_data1(self.ast, fn_decl as i32)

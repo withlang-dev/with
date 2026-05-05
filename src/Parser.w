@@ -55,6 +55,7 @@ type Parser {
     last_where_count: i32,
     if_chain_form: i32,
     suppress_fat_arrow_closure: i32,
+    pending_post_decls: Vec[i32],
 }
 
 type InterpolatedExprParseAttempt {
@@ -112,6 +113,7 @@ fn Parser.init_with_pool(tokens: TokenList, source: str, file_id: i32, intern: I
         last_where_count: 0,
         if_chain_form: 0,
         suppress_fat_arrow_closure: 0,
+        pending_post_decls: Vec.new(),
     }
 
 // ── Token helpers ────────────────────────────────────────────────
@@ -578,6 +580,7 @@ fn Parser.parse_module(self: Parser) -> AstPool:
         let decl = self.parse_decl()
         if decl != 0:
             self.pool.add_decl(decl)
+            self.flush_pending_post_decls()
         else:
             self.recover_to_top_level()
         self.skip_separators()
@@ -639,6 +642,11 @@ fn Parser.parse_decl(self: Parser) -> NodeId:
 
     self.emit_error("expected declaration (fn, type, enum, let, use, extern)")
     0 as NodeId
+
+fn Parser.flush_pending_post_decls(self: Parser):
+    for i in 0..self.pending_post_decls.len() as i32:
+        self.pool.add_decl((self.pending_post_decls.get(i as i64)) as NodeId)
+    self.pending_post_decls = Vec.new()
 
 fn Parser.mark_decl_comptime(self: Parser, decl: NodeId):
     if decl == 0:
@@ -917,6 +925,7 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> NodeId:
     self.parse_optional_where_clause()
 
     var repr_type_node: NodeId = 0 as NodeId
+    var copy_opt_in = 0
     var is_ephemeral = 0
     if self.peek() == TokenKind.TK_KW_EPHEMERAL:
         is_ephemeral = 1
@@ -939,6 +948,23 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> NodeId:
             let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, struct_kind)
             return self.finish_type_decl(node)
         repr_type_node = self.parse_type_expr()
+        if repr_type_node != 0 and self.pool.kind(repr_type_node) == NodeKind.NK_TYPE_NAMED and self.pool.get_data0(repr_type_node) == self.intern.intern("Copy"):
+            copy_opt_in = 1
+            if self.peek() == TokenKind.TK_NEWLINE:
+                self.skip_newlines()
+                let extra_start = self.parse_struct_body_block()
+                self.pool.add_extra(is_pub)
+                self.pool.add_extra(tp_start)
+                self.pool.add_extra(tp_count)
+                var struct_kind = pack_type_decl_kind(TypeDeclKind.Struct, is_ephemeral)
+                if self.pending_packed != 0:
+                    struct_kind = struct_kind + TDK_FLAG_PACKED
+                if self.pending_bitpacked != 0:
+                    struct_kind = struct_kind + TDK_FLAG_BITPACKED
+                let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, struct_kind)
+                self.queue_synthetic_copy_impl(name, tp_start, tp_count, start, self.prev_end())
+                return self.finish_type_decl(node)
+        self.skip_newlines()
 
     if self.peek() == TokenKind.TK_L_BRACE:
         let extra_start = self.parse_struct_body()
@@ -951,6 +977,8 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> NodeId:
         if self.pending_bitpacked != 0:
             struct_kind = struct_kind + TDK_FLAG_BITPACKED
         let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, struct_kind)
+        if copy_opt_in != 0:
+            self.queue_synthetic_copy_impl(name, tp_start, tp_count, start, self.prev_end())
         return self.finish_type_decl(node)
 
     if self.peek() != TokenKind.TK_EQ:
@@ -1055,6 +1083,26 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> NodeId:
 
     self.emit_error("expected type body")
     0 as NodeId
+
+fn Parser.queue_synthetic_copy_impl(self: Parser, type_name: i32, tp_start: i32, tp_count: i32, start: i32, end: i32):
+    let copy_trait = self.intern.intern("Copy")
+    let impl_extra = self.pool.extra_len()
+    self.pool.add_extra(0)
+    self.pool.add_extra(0)
+    let impl_node = self.pool.add_node(NodeKind.NK_IMPL_DECL, start, end, type_name, impl_extra, copy_trait)
+    if tp_count > 0:
+        self.pool.add_impl_type_params(impl_node, tp_start, tp_count)
+        let targ_extra = self.pool.extra_len()
+        var tp_off = tp_start
+        for _ in 0..tp_count:
+            let tp_name = self.pool.get_extra(tp_off)
+            let tp_ref = self.pool.add_node(NodeKind.NK_TYPE_NAMED, start, end, tp_name, 0, 0)
+            self.pool.add_extra(tp_ref as i32)
+            let bound_count = self.pool.get_extra(tp_off + 1)
+            tp_off = tp_off + 2 + bound_count
+        let target_node = self.pool.add_node(NodeKind.NK_TYPE_GENERIC, start, end, type_name, targ_extra, tp_count)
+        self.pool.add_impl_target_type_node(impl_node, target_node)
+    self.pending_post_decls.push(impl_node as i32)
 
 fn Parser.parse_enum_decl(self: Parser, is_pub: i32, start: i32) -> NodeId:
     if self.expect(TokenKind.TK_KW_ENUM) == 0:

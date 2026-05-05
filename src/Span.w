@@ -9,6 +9,7 @@ type Span {
     start: i32,
     end: i32,
 }
+impl Copy for Span
 
 fn span_zero -> Span:
     Span {

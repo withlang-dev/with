@@ -8,6 +8,7 @@ use InternPool
 use Sema
 
 type BlockId = distinct i32
+impl Copy for BlockId
 
 extern fn with_i64_to_str(n: i64) -> str
 extern fn str_from_byte(b: i32) -> str
