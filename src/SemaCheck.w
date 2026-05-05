@@ -310,6 +310,19 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
                 if ppat != 0:
                     self.check_pattern(ppat, self.sig_param_type(sig_idx, pi))
 
+    // Effect tracking: save outer state and populate for this function
+    let saved_eff_sig_idx = self.current_fn_sig_idx
+    while self.current_fn_param_syms.len() > 0:
+        self.current_fn_param_syms.pop()
+        self.current_fn_param_effs.pop()
+    if meta >= 0:
+        let eff_ps = self.ast.fn_meta_param_start(meta)
+        let eff_pc = self.ast.fn_meta_param_count(meta)
+        for pi in 0..eff_pc:
+            self.current_fn_param_syms.push(self.ast.fn_param_name(eff_ps, pi))
+            self.current_fn_param_effs.push(0)
+    self.current_fn_sig_idx = sig_idx
+
     // Set current return type
     let saved_ret = self.current_return_type
     let saved_gen_yield_type = self.current_gen_yield_type
@@ -388,7 +401,17 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
     if (flags / FnFlags.TAILREC) % 2 == 1:
         self.verify_tail_position(body, fn_name, 1)
 
+    // Write accumulated per-param effects into sig_param_effects
+    for pi in 0..self.current_fn_param_effs.len() as i32:
+        let eff = self.current_fn_param_effs.get(pi as i64)
+        if eff != 0:
+            self.set_sig_param_effect(sig_idx, pi, eff)
+
     // Restore state
+    self.current_fn_sig_idx = saved_eff_sig_idx
+    while self.current_fn_param_syms.len() > 0:
+        self.current_fn_param_syms.pop()
+        self.current_fn_param_effs.pop()
     self.current_return_type = saved_ret
     self.current_gen_yield_type = saved_gen_yield_type
     self.has_gen_yield_type = saved_has_gen_yield_type
@@ -1746,6 +1769,8 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         let sym = self.ast.get_data0(inner)
         if self.scope_has(sym) != 0:
             self.scope_set_state(sym, VarState.MOVED)
+        // If the moved binding is a parameter, record EFF_CONSUME
+        self.note_param_effect(sym, EFF_CONSUME)
         self.typed_expr_types.insert(node, ty as i32)
         return ty
 
@@ -2475,6 +2500,8 @@ fn Sema.check_return(self: Sema, node: i32) -> i32:
     let value = self.ast.get_data0(node)
     if value != 0:
         let val_type = if self.current_return_type != 0: self.check_expr_with_expected(value, self.current_return_type) else: self.check_expr(value)
+        // If returned value originates from a parameter, record EFF_ESCAPE_VALUE
+        self.note_place_effect(value, EFF_ESCAPE_VALUE)
         if self.current_return_type != 0 and val_type != 0:
             let compat = self.types_compatible(self.current_return_type as i32, val_type as i32)
             let arith = if compat == 0: self.arithmetic_result_type(self.current_return_type, val_type) else: 1 as TypeId
@@ -2489,6 +2516,9 @@ fn Sema.check_assign(self: Sema, node: i32) -> i32:
 
     let target_type = self.check_expr(target)
     let value_type = if target_type != 0: self.check_expr_with_expected(value, target_type) else: self.check_expr(value)
+
+    // If assignment target's root is a parameter, record EFF_WRITE
+    self.note_place_effect(target, EFF_WRITE)
 
     // Multi-index assignment: a[i, j] = value → requires multi_index_set
     if self.ast.kind(target) == NodeKind.NK_MULTI_INDEX:
@@ -4525,6 +4555,16 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
             let eph_arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
             if eph_arg_node > 0 and self.expr_is_ephemeral_task(eph_arg_node) != 0 and self.param_is_by_reference(expected_ty) == 0:
                 self.emit_warning("ephemeral Task passed by value may escape", eph_arg_node)
+            // Effect enforcement: if the callee may consume/escape this arg, it must be explicitly moved or copied
+            let param_eff = self.sig_param_effect(sig_idx, param_i)
+            if (param_eff & (EFF_CONSUME | EFF_ESCAPE_VALUE)) != 0:
+                let eff_arg_nd = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
+                if eff_arg_nd > 0:
+                    let anode_kind = self.ast.kind(eff_arg_nd)
+                    if anode_kind != NodeKind.NK_COPY_ARG and anode_kind != NodeKind.NK_MOVE_ARG:
+                        let eff_ty = if arg_ty != 0: arg_ty else: expected_ty
+                        if self.is_copy(eff_ty) == 0:
+                            self.emit_error("non-Copy argument passed to a function that consumes or escapes it; use 'move x' or 'copy x'", eff_arg_nd)
 
         self.check_dyn_trait_call_compat(fn_sym, resolved_extra_start, arg_types, resolved_arg_count, param_offset)
         self.typed_expr_types.insert(node, ret)
