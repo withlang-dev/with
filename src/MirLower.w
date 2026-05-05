@@ -5442,8 +5442,16 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
     if kind == NodeKind.NK_CLOSURE:
         return self.lower_closure(0, 0, self.ast.get_data1(node), self.ast.get_data2(node), node)
 
-    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_MOVE_ARG:
         return self.lower_expr(self.ast.get_data0(node))
+
+    if kind == NodeKind.NK_COPY_ARG:
+        let inner = self.ast.get_data0(node)
+        if self.ast.state.copy_arg_needs_clone.contains(node):
+            // Clone-only type: emit inner.clone()
+            let clone_sym = self.pool.intern("clone")
+            return self.lower_method_call(inner, clone_sym, 0 - 1, 0, node)
+        return self.lower_expr(inner)
 
     if kind == NodeKind.NK_OPTIONAL_CHAIN:
         return self.lower_optional_chain(node)

@@ -1777,7 +1777,11 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         let inner = self.ast.get_data0(node)
         let ty = self.check_expr(inner)
         if self.is_copy(ty) == 0:
-            self.emit_error("'copy' requires the type to implement Copy or Clone", node)
+            if self.type_implements_trait(ty as i32, self.syms.clone_trait) == 0:
+                self.emit_error("'copy' requires the type to implement Copy or Clone", node)
+            else:
+                // Clone-only type: MirLower will emit a .clone() call for this node.
+                self.ast.state.copy_arg_needs_clone.insert(node, 1)
         self.typed_expr_types.insert(node, ty as i32)
         return ty
 
