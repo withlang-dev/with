@@ -97,6 +97,7 @@ type SemaBuiltinSymbols {
     src: i32,
     embed_file: i32,
     copy_trait: i32,
+    clone_trait: i32,
     drop: i32,
     self_type: i32,
     vec: i32,
@@ -601,6 +602,7 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         src: 0,
         embed_file: 0,
         copy_trait: 0,
+        clone_trait: 0,
         drop: 0,
         self_type: 0,
         vec: 0,
@@ -1141,6 +1143,7 @@ fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.syms.src = self.pool_intern("src")
     self.syms.embed_file = self.pool_intern("embed_file")
     self.syms.copy_trait = self.pool_intern("Copy")
+    self.syms.clone_trait = self.pool_intern("Clone")
     self.syms.drop = self.pool_intern("Drop")
     self.syms.self_type = self.pool_intern("Self")
     self.syms.vec = self.pool_intern("Vec")

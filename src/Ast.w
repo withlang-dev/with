@@ -401,6 +401,8 @@ type AstPoolState {
     fn_weak_flags: HashMap[i32, i32],
     fn_effect_pin_params: HashMap[i32, i32],   // fn_node → param_name_sym
     fn_effect_pin_bits: HashMap[i32, i32],     // fn_node → effect bitmask
+    // NK_COPY_ARG nodes that require a .clone() call (type is Clone-only, not Copy)
+    copy_arg_needs_clone: HashMap[i32, i32],   // node → 1
     frozen: i32,
 }
 
@@ -465,6 +467,7 @@ fn AstPool.new -> AstPool:
             fn_weak_flags: HashMap.new(),
             fn_effect_pin_params: HashMap.new(),
             fn_effect_pin_bits: HashMap.new(),
+            copy_arg_needs_clone: HashMap.new(),
             frozen: 0,
         }
     let st = ptr

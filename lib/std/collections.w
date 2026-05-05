@@ -14,6 +14,14 @@ type Vec[T]  {
     elem_size: i64,
 }
 
+/// Clone for Vec[T]: produces a deep copy by cloning each element.
+impl[T: Clone] Clone for Vec[T]:
+    fn clone(self: &Self) -> Self:
+        var out: Vec[T] = Vec.new()
+        for item in *self:
+            out.push(item.clone())
+        out
+
 /// An unordered key-value map. Create with `HashMap.new()`,
 /// insert with `.insert(key, val)`, read with `.get(key)`.
 type HashMap[K, V]  {
