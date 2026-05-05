@@ -4584,6 +4584,15 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
                 self.emit_warning("ephemeral Task passed by value may escape", eph_arg_node)
             // Effect enforcement: if the callee may consume/escape this arg, it must be explicitly moved or copied
             let param_eff = self.sig_param_effect(sig_idx, param_i)
+            // Transitive effect propagation: if this arg is a param of the current function,
+            // propagate callee's consuming/escaping effects to the current function's effect set.
+            let trans_bits = param_eff & (EFF_CONSUME | EFF_ESCAPE_VALUE | EFF_ESCAPE_VIEW)
+            if trans_bits != 0:
+                let trans_nd = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
+                if trans_nd > 0:
+                    let trans_sym = self.place_root_sym(trans_nd)
+                    if trans_sym != 0:
+                        self.note_param_effect(trans_sym, trans_bits)
             if (param_eff & (EFF_CONSUME | EFF_ESCAPE_VALUE)) != 0:
                 let eff_arg_nd = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
                 if eff_arg_nd > 0:
