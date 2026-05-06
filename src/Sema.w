@@ -217,6 +217,9 @@ type Sema {
     // sig_param_effects[sig_param_eff_starts[si] + pi] = effect bits for param pi of sig si.
     // Effects: EFF_READ=1, EFF_WRITE=2, EFF_CONSUME=4, EFF_ESCAPE_VALUE=8, EFF_ESCAPE_VIEW=16.
     sig_param_effects: Vec[i32],
+    // Parallel to sig_param_effects: bitmask of signature parameter indices that a returned
+    // view may originate from when this parameter participates in escape_view.
+    sig_param_view_origins: Vec[i32],
     sig_param_eff_starts: Vec[i32],
 
     // Extern fn names
@@ -327,6 +330,8 @@ type Sema {
     bind_is_scoped_task: Vec[i32],
     bind_is_ephemeral_task: Vec[i32],
     bind_is_view_bound: Vec[i32],
+    binding_decl_nodes: HashMap[i32, i32],
+    binding_value_nodes: HashMap[i32, i32],
     scope_starts: Vec[i32],
     scope_name_map: HashMap[i32, i32],
     pending_generic_binding_base: HashMap[i32, i32],
@@ -411,7 +416,26 @@ type Sema {
     // Cleared and set by check_fn_body_with_sig; used to accumulate effects as the body is checked.
     current_fn_param_syms: Vec[i32],   // param name symbols for the function being checked
     current_fn_param_effs: Vec[i32],   // accumulated effect bits per param
+    current_fn_param_origins: Vec[i32],// accumulated escape_view origin masks per param
     current_fn_sig_idx: i32,           // sig index of current function (-1 if not in a fn body)
+
+    // Closure capture summaries: closure node -> flat [capture_sym, effect_bits]* slice.
+    closure_capture_summary_starts: HashMap[i32, i32],
+    closure_capture_summary_counts: HashMap[i32, i32],
+    closure_capture_summary_data: Vec[i32],
+    // Binding -> originating closure node when initialized directly from a closure literal.
+    binding_closure_nodes: HashMap[i32, i32],
+    // Binding -> param-origin mask for live view values in the current function.
+    binding_view_param_origins: HashMap[i32, i32],
+    // Binding -> flat list of concrete origin symbols whose lifetime this binding depends on.
+    binding_view_dep_starts: HashMap[i32, i32],
+    binding_view_dep_counts: HashMap[i32, i32],
+    binding_view_dep_data: Vec[i32],
+    // Expression-level view metadata for call expressions and view-producing nodes.
+    expr_view_param_origins: HashMap[i32, i32],
+    expr_view_dep_starts: HashMap[i32, i32],
+    expr_view_dep_counts: HashMap[i32, i32],
+    expr_view_dep_data: Vec[i32],
 
     // Current state
     source_text: str,
@@ -747,6 +771,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         sig_params: Vec.new(),
         sig_lookup,
         sig_param_effects: Vec.new(),
+        sig_param_view_origins: Vec.new(),
         sig_param_eff_starts: Vec.new(),
         extern_fn_names,
         fn_decl_nodes,
@@ -821,6 +846,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         bind_is_scoped_task: Vec.new(),
         bind_is_ephemeral_task: Vec.new(),
         bind_is_view_bound: Vec.new(),
+        binding_decl_nodes: sema_new_map_i32_i32(),
+        binding_value_nodes: sema_new_map_i32_i32(),
         scope_starts: Vec.new(),
         scope_name_map: HashMap.new(),
         pending_generic_binding_base: sema_new_map_i32_i32(),
@@ -881,7 +908,20 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         types_frozen: 0,
         current_fn_param_syms: Vec.new(),
         current_fn_param_effs: Vec.new(),
+        current_fn_param_origins: Vec.new(),
         current_fn_sig_idx: 0 - 1,
+        closure_capture_summary_starts: sema_new_map_i32_i32(),
+        closure_capture_summary_counts: sema_new_map_i32_i32(),
+        closure_capture_summary_data: Vec.new(),
+        binding_closure_nodes: sema_new_map_i32_i32(),
+        binding_view_param_origins: sema_new_map_i32_i32(),
+        binding_view_dep_starts: sema_new_map_i32_i32(),
+        binding_view_dep_counts: sema_new_map_i32_i32(),
+        binding_view_dep_data: Vec.new(),
+        expr_view_param_origins: sema_new_map_i32_i32(),
+        expr_view_dep_starts: sema_new_map_i32_i32(),
+        expr_view_dep_counts: sema_new_map_i32_i32(),
+        expr_view_dep_data: Vec.new(),
         source_text: "",
         current_return_type: 0,
         current_gen_yield_type: 0,
@@ -1995,6 +2035,7 @@ fn Sema.pop_scope(self: Sema):
     let reported_pending_calls: Vec[i32] = Vec.new()
     while self.bind_names.len() as i32 > start:
         let removed_sym = self.bind_names.get(self.bind_names.len() - 1)
+        self.check_live_views_for_origin(removed_sym, self.binding_decl_node(removed_sym))
         if self.pending_generic_binding_base.contains(removed_sym):
             let pending_call = if self.pending_generic_binding_call.contains(removed_sym): self.pending_generic_binding_call.get(removed_sym).unwrap() else: 0
             let report_key = if pending_call != 0: pending_call else: removed_sym
@@ -2017,6 +2058,10 @@ fn Sema.pop_scope(self: Sema):
         self.bind_is_scoped_task.pop()
         self.bind_is_ephemeral_task.pop()
         self.bind_is_view_bound.pop()
+        self.binding_decl_nodes.remove(removed_sym)
+        self.binding_value_nodes.remove(removed_sym)
+        self.binding_closure_nodes.remove(removed_sym)
+        self.clear_binding_view_deps(removed_sym)
     self.scope_starts.pop()
 
 fn Sema.is_discard_binding_symbol(self: Sema, sym: i32) -> i32:
@@ -2177,6 +2222,8 @@ fn Sema.scope_set_is_view_bound(self: Sema, sym: i32):
 fn Sema.scope_set_state(self: Sema, sym: i32, state: i32):
     let opt = self.scope_name_map.get(sym)
     if opt.is_some():
+        if state == VarState.MOVED:
+            self.check_live_views_for_origin(sym, sym)
         self.bind_states.set_i32(opt.unwrap() as i64, state)
 
 fn Sema.scope_has(self: Sema, sym: i32) -> i32:
@@ -2196,6 +2243,143 @@ fn Sema.restore_scope_states(self: Sema, snapshot: Vec[i32]):
     let count = snapshot.len() as i32
     for i in 0..count:
         self.bind_states.set_i32(i as i64, snapshot.get(i as i64))
+
+fn Sema.clear_binding_view_deps(self: Sema, sym: i32):
+    self.binding_view_param_origins.remove(sym)
+    self.binding_view_dep_starts.remove(sym)
+    self.binding_view_dep_counts.remove(sym)
+
+fn Sema.set_binding_view_deps(self: Sema, sym: i32, param_mask: i32, deps: Vec[i32]):
+    if sym == 0:
+        return
+    if param_mask == 0 and deps.len() == 0:
+        self.clear_binding_view_deps(sym)
+        return
+    self.binding_view_param_origins.insert(sym, param_mask)
+    let start = self.binding_view_dep_data.len() as i32
+    for i in 0..deps.len() as i32:
+        self.binding_view_dep_data.push(deps.get(i as i64))
+    self.binding_view_dep_starts.insert(sym, start)
+    self.binding_view_dep_counts.insert(sym, deps.len() as i32)
+
+fn Sema.binding_view_origin_mask(self: Sema, sym: i32) -> i32:
+    if self.binding_view_param_origins.contains(sym):
+        return self.binding_view_param_origins.get(sym).unwrap()
+    0
+
+fn Sema.binding_view_dep_count(self: Sema, sym: i32) -> i32:
+    if self.binding_view_dep_counts.contains(sym):
+        return self.binding_view_dep_counts.get(sym).unwrap()
+    0
+
+fn Sema.binding_view_dep_at(self: Sema, sym: i32, idx: i32) -> i32:
+    if not self.binding_view_dep_starts.contains(sym):
+        return 0
+    if not self.binding_view_dep_counts.contains(sym):
+        return 0
+    let count = self.binding_view_dep_counts.get(sym).unwrap()
+    if idx < 0 or idx >= count:
+        return 0
+    let start = self.binding_view_dep_starts.get(sym).unwrap()
+    self.binding_view_dep_data.get((start + idx) as i64)
+
+fn Sema.binding_depends_on_origin(self: Sema, sym: i32, origin_sym: i32) -> i32:
+    let count = self.binding_view_dep_count(sym)
+    for i in 0..count:
+        if self.binding_view_dep_at(sym, i) == origin_sym:
+            return 1
+    0
+
+fn Sema.binding_decl_node(self: Sema, sym: i32) -> i32:
+    if self.binding_decl_nodes.contains(sym):
+        return self.binding_decl_nodes.get(sym).unwrap()
+    0
+
+fn Sema.check_live_views_for_origin(self: Sema, origin_sym: i32, node: i32):
+    if origin_sym == 0:
+        return
+    for bi in 0..self.bind_names.len() as i32:
+        let view_sym = self.bind_names.get(bi as i64)
+        if view_sym == origin_sym:
+            continue
+        if self.bind_states.get(bi as i64) != VarState.LIVE:
+            continue
+        if self.binding_depends_on_origin(view_sym, origin_sym) != 0:
+            let view_name = self.pool_resolve(view_sym)
+            let origin_name = self.pool_resolve(origin_sym)
+            let err_node = if node != 0: node else: self.binding_decl_node(view_sym)
+            self.emit_error("view '" ++ view_name ++ "' may outlive its origin '" ++ origin_name ++ "'", err_node)
+            return
+
+fn Sema.set_expr_view_deps(self: Sema, expr_node: i32, param_mask: i32, deps: Vec[i32]):
+    if expr_node == 0:
+        return
+    if param_mask == 0 and deps.len() == 0:
+        self.expr_view_param_origins.remove(expr_node)
+        self.expr_view_dep_starts.remove(expr_node)
+        self.expr_view_dep_counts.remove(expr_node)
+        return
+    self.expr_view_param_origins.insert(expr_node, param_mask)
+    let start = self.expr_view_dep_data.len() as i32
+    for i in 0..deps.len() as i32:
+        self.expr_view_dep_data.push(deps.get(i as i64))
+    self.expr_view_dep_starts.insert(expr_node, start)
+    self.expr_view_dep_counts.insert(expr_node, deps.len() as i32)
+
+fn Sema.expr_view_origin_mask(self: Sema, expr_node: i32) -> i32:
+    if self.expr_view_param_origins.contains(expr_node):
+        return self.expr_view_param_origins.get(expr_node).unwrap()
+    0
+
+fn Sema.expr_view_dep_count(self: Sema, expr_node: i32) -> i32:
+    if self.expr_view_dep_counts.contains(expr_node):
+        return self.expr_view_dep_counts.get(expr_node).unwrap()
+    0
+
+fn Sema.expr_view_dep_at(self: Sema, expr_node: i32, idx: i32) -> i32:
+    if not self.expr_view_dep_starts.contains(expr_node):
+        return 0
+    if not self.expr_view_dep_counts.contains(expr_node):
+        return 0
+    let count = self.expr_view_dep_counts.get(expr_node).unwrap()
+    if idx < 0 or idx >= count:
+        return 0
+    let start = self.expr_view_dep_starts.get(expr_node).unwrap()
+    self.expr_view_dep_data.get((start + idx) as i64)
+
+fn Sema.set_closure_capture_summary(self: Sema, closure_node: i32, capture_syms: Vec[i32], capture_effs: Vec[i32]):
+    if closure_node == 0:
+        return
+    let start = self.closure_capture_summary_data.len() as i32
+    let count = if capture_syms.len() < capture_effs.len(): capture_syms.len() as i32 else: capture_effs.len() as i32
+    for i in 0..count:
+        self.closure_capture_summary_data.push(capture_syms.get(i as i64))
+        self.closure_capture_summary_data.push(capture_effs.get(i as i64))
+    self.closure_capture_summary_starts.insert(closure_node, start)
+    self.closure_capture_summary_counts.insert(closure_node, count)
+
+fn Sema.closure_capture_summary_count(self: Sema, closure_node: i32) -> i32:
+    if self.closure_capture_summary_counts.contains(closure_node):
+        return self.closure_capture_summary_counts.get(closure_node).unwrap()
+    0
+
+fn Sema.closure_capture_summary_sym(self: Sema, closure_node: i32, idx: i32) -> i32:
+    if not self.closure_capture_summary_starts.contains(closure_node):
+        return 0
+    let count = self.closure_capture_summary_count(closure_node)
+    if idx < 0 or idx >= count:
+        return 0
+    let start = self.closure_capture_summary_starts.get(closure_node).unwrap()
+    self.closure_capture_summary_data.get((start + idx * 2) as i64)
+
+fn Sema.closure_capture_summary_eff(self: Sema, closure_node: i32, idx: i32) -> i32:
+    if not self.closure_capture_summary_starts.contains(closure_node):
+        return 0
+    let count = self.closure_capture_summary_count(closure_node)
+    if idx < 0 or idx >= count:
+        return 0
+    let start = self.closure_capture_summary_starts.get(closure_node).unwrap()
+    self.closure_capture_summary_data.get((start + idx * 2 + 1) as i64)
 
 fn Sema.is_mutable_global(self: Sema, sym: i32) -> i32:
     if self.mutable_global_syms.contains(sym): return 1
@@ -2229,6 +2413,7 @@ fn Sema.add_sig(self: Sema, name: i32, fn_tid: i32, ret: i32, param_start: i32, 
     self.sig_param_eff_starts.push(self.sig_param_effects.len() as i32)
     for pi in 0..param_count:
         self.sig_param_effects.push(0)
+        self.sig_param_view_origins.push(0)
     self.sig_lookup.insert(name, idx)
 
 fn Sema.sig_param_effect(self: Sema, si: i32, pi: i32) -> i32:
@@ -2249,14 +2434,47 @@ fn Sema.set_sig_param_effect(self: Sema, si: i32, pi: i32, eff: i32):
         return
     self.sig_param_effects.set_i32((start + pi) as i64, eff)
 
+fn Sema.sig_param_view_origin(self: Sema, si: i32, pi: i32) -> i32:
+    if si < 0 or si >= self.sig_param_eff_starts.len() as i32:
+        return 0
+    let start = self.sig_param_eff_starts.get(si as i64)
+    let count = self.sig_param_counts.get(si as i64)
+    if pi < 0 or pi >= count:
+        return 0
+    self.sig_param_view_origins.get((start + pi) as i64)
+
+fn Sema.set_sig_param_view_origin(self: Sema, si: i32, pi: i32, mask: i32):
+    if si < 0 or si >= self.sig_param_eff_starts.len() as i32:
+        return
+    let start = self.sig_param_eff_starts.get(si as i64)
+    let count = self.sig_param_counts.get(si as i64)
+    if pi < 0 or pi >= count:
+        return
+    self.sig_param_view_origins.set_i32((start + pi) as i64, mask)
+
+fn Sema.param_index_for_sym(self: Sema, sym: i32) -> i32:
+    for pi in 0..self.current_fn_param_syms.len() as i32:
+        if self.current_fn_param_syms.get(pi as i64) == sym:
+            return pi
+    0 - 1
+
 fn Sema.note_param_effect(self: Sema, sym: i32, eff: i32):
     if self.current_fn_sig_idx < 0 or sym == 0:
         return
-    for pi in 0..self.current_fn_param_syms.len() as i32:
-        if self.current_fn_param_syms.get(pi as i64) == sym:
-            let cur = self.current_fn_param_effs.get(pi as i64)
-            self.current_fn_param_effs.set_i32(pi as i64, cur | eff)
-            return
+    let pi = self.param_index_for_sym(sym)
+    if pi >= 0:
+        let cur = self.current_fn_param_effs.get(pi as i64)
+        self.current_fn_param_effs.set_i32(pi as i64, cur | eff)
+        return
+
+fn Sema.note_param_view_origin(self: Sema, sym: i32, mask: i32):
+    if self.current_fn_sig_idx < 0 or sym == 0 or mask == 0:
+        return
+    let pi = self.param_index_for_sym(sym)
+    if pi >= 0:
+        let cur = self.current_fn_param_origins.get(pi as i64)
+        self.current_fn_param_origins.set_i32(pi as i64, cur | mask)
+        return
 
 fn Sema.note_place_effect(self: Sema, expr_node: i32, eff: i32):
     if self.current_fn_sig_idx < 0:

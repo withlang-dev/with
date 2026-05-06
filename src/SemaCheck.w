@@ -315,12 +315,14 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
     while self.current_fn_param_syms.len() > 0:
         self.current_fn_param_syms.pop()
         self.current_fn_param_effs.pop()
+        self.current_fn_param_origins.pop()
     if meta >= 0:
         let eff_ps = self.ast.fn_meta_param_start(meta)
         let eff_pc = self.ast.fn_meta_param_count(meta)
         for pi in 0..eff_pc:
             self.current_fn_param_syms.push(self.ast.fn_param_name(eff_ps, pi))
             self.current_fn_param_effs.push(0)
+            self.current_fn_param_origins.push(0)
     self.current_fn_sig_idx = sig_idx
 
     // Set current return type
@@ -384,6 +386,11 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
         let body_kind = self.get_type_kind(self.resolve_alias(body_ty))
         if body_kind == TypeKind.TY_REF or body_kind == TypeKind.TY_PTR:
             self.note_place_effect(body, EFF_ESCAPE_VIEW)
+            let body_root = self.place_root_sym(body)
+            if body_root != 0:
+                self.note_param_view_origin(body_root, self.compute_expr_view_origin_mask(body))
+            if body_kind == TypeKind.TY_REF:
+                self.check_returned_view_origins(body, body)
     let has_ret_annotation = meta >= 0 and self.ast.fn_meta_ret(meta) != 0
     if not has_ret_annotation:
         let inferred_ret = if body_ty != 0: body_ty else: self.ty_void
@@ -423,6 +430,10 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
                     if p_tk == TypeKind.TY_REF or p_tk == TypeKind.TY_PTR:
                         eff = eff & (EFF_READ | EFF_ESCAPE_VIEW)
             self.set_sig_param_effect(sig_idx, pi, eff)
+            if (eff & EFF_ESCAPE_VIEW) != 0:
+                self.set_sig_param_view_origin(sig_idx, pi, self.current_fn_param_origins.get(pi as i64))
+            else:
+                self.set_sig_param_view_origin(sig_idx, pi, 0)
 
     // @[effect(param = bits)] pin enforcement: floor and ceiling checks
     if self.ast.state.fn_effect_pin_params.contains(node):
@@ -451,6 +462,7 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
     while self.current_fn_param_syms.len() > 0:
         self.current_fn_param_syms.pop()
         self.current_fn_param_effs.pop()
+        self.current_fn_param_origins.pop()
     self.current_return_type = saved_ret
     self.current_gen_yield_type = saved_gen_yield_type
     self.has_gen_yield_type = saved_has_gen_yield_type
@@ -2415,6 +2427,8 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
             self.emit_error("var without initializer requires type annotation", node)
             return self.ty_void as i32
         self.scope_put_at(name, ann_type as i32, is_mut, node)
+        self.binding_decl_nodes.insert(name, node)
+        self.binding_value_nodes.remove(name)
         self.typed_binding_types.insert(node, ann_type as i32)
         return self.ty_void as i32
 
@@ -2442,6 +2456,8 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
 
     let had_binding = self.scope_has(name)
     self.scope_put_at(name, bind_type as i32, is_mut, node)
+    self.binding_decl_nodes.insert(name, node)
+    self.binding_value_nodes.insert(name, value)
     self.typed_binding_types.insert(node, bind_type as i32)
     self.typed_binding_names.insert(node, name)
     self.typed_binding_muts.insert(node, is_mut)
@@ -2453,6 +2469,15 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
     self.scope_set_is_task(name, is_task_val)
     self.scope_set_is_scoped_task(name, self.expr_is_scoped_task_value(value))
     self.scope_set_is_ephemeral_task(name, self.expr_is_ephemeral_task(value))
+    if self.ast.kind(value) == NodeKind.NK_CLOSURE:
+        self.binding_closure_nodes.insert(name, value)
+    else:
+        self.binding_closure_nodes.remove(name)
+    let bind_kind = self.get_type_kind(self.resolve_alias(bind_type))
+    if bind_kind == TypeKind.TY_REF or bind_kind == TypeKind.TY_PTR:
+        self.record_view_binding_from_expr(name, value)
+    else:
+        self.clear_binding_view_deps(name)
 
     // Auto-defer: if this is an immutable let binding of a c_import type with a
     // destructor (e.g. let v = MyVec.new(...)), record it for auto-defer at scope exit.
@@ -2571,6 +2596,169 @@ fn Sema.check_comptime_method_restriction(self: Sema, method_sym: i32, node: i32
         return 1
     0
 
+fn Sema.push_unique_i32(self: Sema, xs: Vec[i32], value: i32):
+    if value == 0:
+        return
+    for i in 0..xs.len() as i32:
+        if xs.get(i as i64) == value:
+            return
+    xs.push(value)
+
+fn Sema.collect_expr_view_deps(self: Sema, node: i32, out: Vec[i32]):
+    if node == 0:
+        return
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_IDENT:
+        let sym = self.ast.get_data0(node)
+        let dep_count = self.binding_view_dep_count(sym)
+        if dep_count > 0:
+            for i in 0..dep_count:
+                self.push_unique_i32(out, self.binding_view_dep_at(sym, i))
+            return
+        let ty = self.scope_lookup(sym)
+        if ty > 0:
+            let tk = self.get_type_kind(self.resolve_alias(ty as TypeId))
+            if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
+                self.push_unique_i32(out, sym)
+        return
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COMPTIME:
+        self.collect_expr_view_deps(self.ast.get_data0(node), out)
+        return
+    if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_INDEX:
+        self.collect_expr_view_deps(self.ast.get_data0(node), out)
+        return
+    if kind == NodeKind.NK_UNARY:
+        self.collect_expr_view_deps(self.ast.get_data1(node), out)
+        return
+    if kind == NodeKind.NK_BLOCK:
+        self.collect_expr_view_deps(self.ast.get_data2(node), out)
+        return
+    if kind == NodeKind.NK_IF_EXPR:
+        self.collect_expr_view_deps(self.ast.get_data1(node), out)
+        self.collect_expr_view_deps(self.ast.get_data2(node), out)
+        return
+    let dep_count = self.expr_view_dep_count(node)
+    if dep_count > 0:
+        for i in 0..dep_count:
+            self.push_unique_i32(out, self.expr_view_dep_at(node, i))
+
+fn Sema.compute_expr_view_origin_mask(self: Sema, node: i32) -> i32:
+    if node == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_IDENT:
+        let sym = self.ast.get_data0(node)
+        let direct_pi = self.param_index_for_sym(sym)
+        if direct_pi >= 0:
+            return ((1 as i64) << (direct_pi as u32)) as i32
+        return self.binding_view_origin_mask(sym)
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COMPTIME:
+        return self.compute_expr_view_origin_mask(self.ast.get_data0(node))
+    if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_INDEX:
+        return self.compute_expr_view_origin_mask(self.ast.get_data0(node))
+    if kind == NodeKind.NK_UNARY:
+        return self.compute_expr_view_origin_mask(self.ast.get_data1(node))
+    if kind == NodeKind.NK_BLOCK:
+        return self.compute_expr_view_origin_mask(self.ast.get_data2(node))
+    if kind == NodeKind.NK_IF_EXPR:
+        let then_mask = self.compute_expr_view_origin_mask(self.ast.get_data1(node))
+        let else_mask = self.compute_expr_view_origin_mask(self.ast.get_data2(node))
+        return then_mask | else_mask
+    if self.expr_view_param_origins.contains(node):
+        return self.expr_view_origin_mask(node)
+    0
+
+fn Sema.record_view_binding_from_expr(self: Sema, sym: i32, expr_node: i32):
+    if sym == 0 or expr_node == 0:
+        return
+    let param_mask = self.compute_expr_view_origin_mask(expr_node)
+    let deps: Vec[i32] = Vec.new()
+    self.collect_expr_view_deps(expr_node, deps)
+    self.set_binding_view_deps(sym, param_mask, deps)
+
+fn Sema.check_returned_view_origins(self: Sema, expr_node: i32, report_node: i32):
+    if expr_node == 0:
+        return
+    if self.ast.kind(expr_node) == NodeKind.NK_CALL:
+        let callee = self.ast.get_data0(expr_node)
+        if self.ast.kind(callee) == NodeKind.NK_IDENT:
+            let fn_sym = if self.comp_resolved.contains(expr_node): self.comp_resolved.get(expr_node).unwrap() else: self.ast.get_data0(callee)
+            let sig_idx = self.get_sig(fn_sym)
+            if sig_idx >= 0:
+                let has_resolved = self.has_resolved_call_args(expr_node)
+                let extra_start = self.ast.get_data1(expr_node)
+                let arg_count = if has_resolved != 0: self.get_resolved_call_arg_count(expr_node) else: self.ast.get_data2(expr_node)
+                let param_count = self.sig_get_param_count(sig_idx)
+                for pi in 0..param_count:
+                    if (self.sig_param_effect(sig_idx, pi) & EFF_ESCAPE_VIEW) == 0:
+                        continue
+                    let origin_mask = self.sig_param_view_origin(sig_idx, pi)
+                    for origin_pi in 0..param_count:
+                        if (origin_mask & (((1 as i64) << (origin_pi as u32)) as i32)) == 0:
+                            continue
+                        if origin_pi >= arg_count:
+                            continue
+                        let origin_arg = if has_resolved != 0: self.get_resolved_call_arg(expr_node, origin_pi) else: self.ast.get_extra(extra_start + origin_pi)
+                        let origin_sym = self.place_root_sym(origin_arg)
+                        if origin_sym != 0 and self.param_index_for_sym(origin_sym) < 0 and self.scope_has(origin_sym) != 0:
+                            let origin_name = self.pool_resolve(origin_sym)
+                            self.emit_error("returned view may outlive its origin '" ++ origin_name ++ "'", report_node)
+                            return
+    if self.ast.kind(expr_node) == NodeKind.NK_IDENT:
+        let view_sym = self.ast.get_data0(expr_node)
+        let view_ty = self.scope_lookup(view_sym)
+        if view_ty > 0:
+            let view_tk = self.get_type_kind(self.resolve_alias(view_ty as TypeId))
+            if view_tk == TypeKind.TY_REF and self.param_index_for_sym(view_sym) < 0 and self.binding_view_origin_mask(view_sym) == 0 and self.binding_view_dep_count(view_sym) == 0:
+                if self.binding_value_nodes.contains(view_sym):
+                    let init_node = self.binding_value_nodes.get(view_sym).unwrap()
+                    let init_kind = self.ast.kind(init_node)
+                    if init_kind == NodeKind.NK_CALL or init_kind == NodeKind.NK_FIELD_ACCESS:
+                        let view_name = self.pool_resolve(view_sym)
+                        self.emit_error("returned view may outlive its origin via local binding '" ++ view_name ++ "'", report_node)
+                        return
+    let deps: Vec[i32] = Vec.new()
+    self.collect_expr_view_deps(expr_node, deps)
+    for i in 0..deps.len() as i32:
+        let origin_sym = deps.get(i as i64)
+        if origin_sym == 0:
+            continue
+        if self.param_index_for_sym(origin_sym) >= 0:
+            continue
+        if self.scope_has(origin_sym) != 0:
+            let origin_name = self.pool_resolve(origin_sym)
+            self.emit_error("returned view may outlive its origin '" ++ origin_name ++ "'", report_node)
+            return
+
+fn Sema.record_call_view_origins(self: Sema, call_node: i32, sig_idx: i32, param_offset: i32, recv_node: i32, extra_start: i32, arg_count: i32, has_resolved: i32):
+    if call_node == 0 or sig_idx < 0:
+        return
+    let param_count = self.sig_get_param_count(sig_idx)
+    var union_mask = 0
+    let concrete_deps: Vec[i32] = Vec.new()
+    for pi in 0..param_count:
+        if (self.sig_param_effect(sig_idx, pi) & EFF_ESCAPE_VIEW) == 0:
+            continue
+        let param_origin_mask = self.sig_param_view_origin(sig_idx, pi)
+        for origin_pi in 0..param_count:
+            if (param_origin_mask & (((1 as i64) << (origin_pi as u32)) as i32)) == 0:
+                continue
+            var origin_arg = 0
+            if param_offset == 1 and origin_pi == 0:
+                origin_arg = recv_node
+            else:
+                let arg_index = if param_offset == 1: origin_pi - 1 else: origin_pi
+                if arg_index >= 0 and arg_index < arg_count:
+                    origin_arg = if has_resolved != 0: self.get_resolved_call_arg(call_node, arg_index) else: self.ast.get_extra(extra_start + arg_index)
+            if origin_arg > 0:
+                union_mask = union_mask | self.compute_expr_view_origin_mask(origin_arg)
+                let dep_len_before = concrete_deps.len() as i32
+                self.collect_expr_view_deps(origin_arg, concrete_deps)
+                if concrete_deps.len() as i32 == dep_len_before:
+                    self.push_unique_i32(concrete_deps, self.place_root_sym(origin_arg))
+    if union_mask != 0 or concrete_deps.len() > 0:
+        self.set_expr_view_deps(call_node, union_mask, concrete_deps)
+
 fn Sema.check_return(self: Sema, node: i32) -> i32:
     if self.in_defer != 0:
         self.emit_error("return not allowed in defer", node)
@@ -2586,6 +2774,11 @@ fn Sema.check_return(self: Sema, node: i32) -> i32:
         let val_kind = self.get_type_kind(self.resolve_alias(val_type))
         if val_kind == TypeKind.TY_REF or val_kind == TypeKind.TY_PTR:
             self.note_place_effect(value, EFF_ESCAPE_VIEW)
+            let root = self.place_root_sym(value)
+            if root != 0:
+                self.note_param_view_origin(root, self.compute_expr_view_origin_mask(value))
+            if val_kind == TypeKind.TY_REF:
+                self.check_returned_view_origins(value, node)
         if self.current_return_type != 0 and val_type != 0:
             let compat = self.types_compatible(self.current_return_type as i32, val_type as i32)
             let arith = if compat == 0: self.arithmetic_result_type(self.current_return_type, val_type) else: 1 as TypeId
@@ -2671,9 +2864,19 @@ fn Sema.check_assign(self: Sema, node: i32) -> i32:
     if self.ast.kind(target) == NodeKind.NK_IDENT:
         let target_sym = self.ast.get_data0(target)
         self.scope_set_state(target_sym, VarState.LIVE)
+        self.binding_value_nodes.insert(target_sym, value)
         self.scope_set_is_task(target_sym, self.expr_is_task_value(value))
         self.scope_set_is_scoped_task(target_sym, self.expr_is_scoped_task_value(value))
         self.scope_set_is_ephemeral_task(target_sym, self.expr_is_ephemeral_task(value))
+        if self.ast.kind(value) == NodeKind.NK_CLOSURE:
+            self.binding_closure_nodes.insert(target_sym, value)
+        else:
+            self.binding_closure_nodes.remove(target_sym)
+        let tgt_kind = self.get_type_kind(self.resolve_alias(target_type as TypeId))
+        if tgt_kind == TypeKind.TY_REF or tgt_kind == TypeKind.TY_PTR:
+            self.record_view_binding_from_expr(target_sym, value)
+        else:
+            self.clear_binding_view_deps(target_sym)
 
     if target_type != 0:
         return target_type as i32
@@ -3843,6 +4046,27 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
     let extra_start = self.ast.get_data1(node)
     let param_count = self.ast.get_data2(node)
     let outer_count = self.bind_names.len() as i32
+    let saved_capture_sig_idx = self.current_fn_sig_idx
+    let saved_capture_syms: Vec[i32] = Vec.new()
+    let saved_capture_effs: Vec[i32] = Vec.new()
+    let saved_capture_origins: Vec[i32] = Vec.new()
+    for i in 0..self.current_fn_param_syms.len() as i32:
+        saved_capture_syms.push(self.current_fn_param_syms.get(i as i64))
+        saved_capture_effs.push(self.current_fn_param_effs.get(i as i64))
+        saved_capture_origins.push(self.current_fn_param_origins.get(i as i64))
+    while self.current_fn_param_syms.len() > 0:
+        self.current_fn_param_syms.pop()
+        self.current_fn_param_effs.pop()
+        self.current_fn_param_origins.pop()
+    let closure_capture_syms: Vec[i32] = Vec.new()
+    for ci in 0..outer_count:
+        let cap_sym = self.bind_names.get(ci as i64)
+        if self.expr_uses_symbol(body, cap_sym) != 0:
+            closure_capture_syms.push(cap_sym)
+            self.current_fn_param_syms.push(cap_sym)
+            self.current_fn_param_effs.push(0)
+            self.current_fn_param_origins.push(0)
+    self.current_fn_sig_idx = if closure_capture_syms.len() > 0: 0 else: saved_capture_sig_idx
 
     // `it` arity validation: if this is an implicit `it` closure (param_count==1,
     // param name is "__it") and the expected type is a fn with != 1 params, error.
@@ -3889,10 +4113,19 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
     self.collect_function_labels(body)
     self.validate_function_gotos()
     self.push_label_boundary()
-    self.check_expr(body)
+    let body_ty = self.check_expr(body)
     self.pop_label_frame()
     self.emit_unused_label_warnings()
     self.restore_label_registry(saved_label_registry)
+    if body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never:
+        if self.is_copy(body_ty) == 0:
+            self.note_place_effect(body, EFF_ESCAPE_VALUE)
+        let body_kind = self.get_type_kind(self.resolve_alias(body_ty))
+        if body_kind == TypeKind.TY_REF or body_kind == TypeKind.TY_PTR:
+            self.note_place_effect(body, EFF_ESCAPE_VIEW)
+            let body_root = self.place_root_sym(body)
+            if body_root != 0:
+                self.note_param_view_origin(body_root, self.compute_expr_view_origin_mask(body))
 
     // Phase 1 ephemerality rule: closures cannot capture ephemeral refs/values.
     var bi = 0
@@ -3905,6 +4138,20 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
                 break
         bi = bi + 1
     self.pop_scope()
+
+    let closure_capture_effs: Vec[i32] = Vec.new()
+    for ci in 0..closure_capture_syms.len() as i32:
+        closure_capture_effs.push(self.current_fn_param_effs.get(ci as i64))
+    self.set_closure_capture_summary(node, closure_capture_syms, closure_capture_effs)
+    while self.current_fn_param_syms.len() > 0:
+        self.current_fn_param_syms.pop()
+        self.current_fn_param_effs.pop()
+        self.current_fn_param_origins.pop()
+    for i in 0..saved_capture_syms.len() as i32:
+        self.current_fn_param_syms.push(saved_capture_syms.get(i as i64))
+        self.current_fn_param_effs.push(saved_capture_effs.get(i as i64))
+        self.current_fn_param_origins.push(saved_capture_origins.get(i as i64))
+    self.current_fn_sig_idx = saved_capture_sig_idx
 
     // Restore borrow state — discard borrows created inside closure body.
     while self.borrow_kinds.len() as i32 > saved_borrow_len:
@@ -4308,7 +4555,7 @@ fn Sema.transmute_target_type(self: Sema, callee: i32) -> i32:
         self.ast.get_data1(callee)
     self.resolve_type_expr(tp_node) as i32
 
-fn Sema.check_callable_value_call(self: Sema, call_name: str, fn_tid: i32, node: i32, extra_start: i32, arg_count: i32, param_offset: i32, has_resolved: i32, arg_types: Vec[i32]) -> i32:
+fn Sema.check_callable_value_call(self: Sema, call_name: str, fn_tid: i32, closure_node: i32, node: i32, extra_start: i32, arg_count: i32, param_offset: i32, has_resolved: i32, arg_types: Vec[i32]) -> i32:
     let expected = self.get_type_d1(fn_tid)
     let actual = arg_count + param_offset
     if self.ast.has_call_named_args(node) == 0 and self.has_resolved_call_args(node) == 0:
@@ -4334,6 +4581,40 @@ fn Sema.check_callable_value_call(self: Sema, call_name: str, fn_tid: i32, node:
         let eph_arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(extra_start + ai)
         if eph_arg_node > 0 and self.expr_is_ephemeral_task(eph_arg_node) != 0 and self.param_is_by_reference(expected_ty) == 0:
             self.emit_warning("ephemeral Task passed by value may escape", eph_arg_node)
+
+    if closure_node > 0:
+        let capture_count = self.closure_capture_summary_count(closure_node)
+        let closure_view_deps: Vec[i32] = Vec.new()
+        var closure_view_mask = 0
+        for ci in 0..capture_count:
+            let cap_sym = self.closure_capture_summary_sym(closure_node, ci)
+            let cap_eff = self.closure_capture_summary_eff(closure_node, ci)
+            let trans_bits = cap_eff & (EFF_CONSUME | EFF_ESCAPE_VALUE | EFF_ESCAPE_VIEW)
+            if trans_bits != 0:
+                self.note_param_effect(cap_sym, trans_bits)
+            if (cap_eff & EFF_ESCAPE_VIEW) != 0:
+                let cap_pi = self.param_index_for_sym(cap_sym)
+                if cap_pi >= 0:
+                    closure_view_mask = closure_view_mask | (((1 as i64) << (cap_pi as u32)) as i32)
+                else:
+                    closure_view_mask = closure_view_mask | self.binding_view_origin_mask(cap_sym)
+                let dep_count = self.binding_view_dep_count(cap_sym)
+                if dep_count > 0:
+                    for di in 0..dep_count:
+                        self.push_unique_i32(closure_view_deps, self.binding_view_dep_at(cap_sym, di))
+                else:
+                    let cap_tid = self.scope_lookup(cap_sym)
+                    if cap_tid > 0:
+                        let cap_tk = self.get_type_kind(self.resolve_alias(cap_tid as TypeId))
+                        if cap_tk == TypeKind.TY_REF or cap_tk == TypeKind.TY_PTR:
+                            self.push_unique_i32(closure_view_deps, cap_sym)
+            if (cap_eff & (EFF_CONSUME | EFF_ESCAPE_VALUE)) != 0 and self.scope_has(cap_sym) != 0:
+                let cap_tid = self.scope_lookup(cap_sym)
+                if self.is_copy(cap_tid as TypeId) == 0:
+                    self.scope_set_state(cap_sym, VarState.MOVED)
+        let ret_tk = self.get_type_kind(self.resolve_alias(self.get_type_d2(fn_tid) as TypeId))
+        if ret_tk == TypeKind.TY_REF or ret_tk == TypeKind.TY_PTR:
+            self.set_expr_view_deps(node, closure_view_mask, closure_view_deps)
 
     let ret = self.get_type_d2(fn_tid)
     self.typed_expr_types.insert(node, ret)
@@ -4368,7 +4649,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
                 arg_types_for_callable.push(arg_ty as i32)
             for cai2 in 0..arg_count:
                 self.mark_moved_if_consumed(self.ast.get_extra(extra_start + cai2))
-            return self.check_callable_value_call("", callable_tid, node, extra_start, arg_count, 0, 0, arg_types_for_callable)
+            return self.check_callable_value_call("", callable_tid, 0, node, extra_start, arg_count, 0, 0, arg_types_for_callable)
         let ret = self.check_method_call(callee, extra_start, arg_count, node)
         if ret != 0:
             self.typed_expr_types.insert(node, ret)
@@ -4378,6 +4659,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
     var fn_sym = 0
     var local_tid = 0 - 1
     var callable_value_tid = 0
+    var callable_closure_node = 0
     if self.ast.kind(callee) == NodeKind.NK_IDENT:
         fn_sym = self.ast.get_data0(callee)
         // Resolve for-comprehension _Payload marker to Some or Ok
@@ -4396,8 +4678,12 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         local_tid = self.scope_lookup(fn_sym)
         if local_tid >= 0:
             callable_value_tid = self.callable_fn_type(local_tid as TypeId)
+            if self.binding_closure_nodes.contains(fn_sym):
+                callable_closure_node = self.binding_closure_nodes.get(fn_sym).unwrap()
     else:
         callable_value_tid = self.callable_fn_type(self.check_expr(callee) as TypeId)
+        if self.ast.kind(callee) == NodeKind.NK_CLOSURE:
+            callable_closure_node = callee
 
     // Reject named args on closures and function pointers (spec §F4 rule 7)
     if self.ast.has_call_named_args(node) != 0:
@@ -4673,12 +4959,13 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
                         self.emit_error("cannot use 'copy' for argument when callee returns a view derived from it ('escape_view' effect)", ev_arg_nd)
 
         self.check_dyn_trait_call_compat(fn_sym, resolved_extra_start, arg_types, resolved_arg_count, param_offset)
+        self.record_call_view_origins(node, sig_idx, param_offset, 0, resolved_extra_start, resolved_arg_count, has_resolved)
         self.typed_expr_types.insert(node, ret)
         return ret
 
     if callable_value_tid != 0:
         let call_name = if self.ast.kind(callee) == NodeKind.NK_IDENT: self.pool_resolve(fn_sym) else: ""
-        return self.check_callable_value_call(call_name, callable_value_tid, node, resolved_extra_start, resolved_arg_count, param_offset, has_resolved, arg_types)
+        return self.check_callable_value_call(call_name, callable_value_tid, callable_closure_node, node, resolved_extra_start, resolved_arg_count, param_offset, has_resolved, arg_types)
 
     // Local variable (not callable)
     if local_tid >= 0:
@@ -6375,7 +6662,9 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
                                         self.emit_argument_type_mismatch(mc_method_name, method_fn_sym, mc_ai, mc_sig_pi, exp_ty, arg_ty, self.ast.get_extra(extra_start + mc_ai))
                 let mc_subst_ret = self.substitute_method_return_for_generic_inst(recv_type, type_name_sym, field, method_fn_sym, mc_ret)
                 if mc_subst_ret != 0:
+                    self.record_call_view_origins(node, sig_idx, 1, expr, extra_start, arg_count, 0)
                     return mc_subst_ret
+            self.record_call_view_origins(node, sig_idx, 1, expr, extra_start, arg_count, 0)
             return mc_ret
 
     // For TypeKind.TY_GENERIC_INST receivers without a registered signature,

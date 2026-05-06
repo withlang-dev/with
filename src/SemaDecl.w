@@ -994,8 +994,6 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
     if self.is_opaque_value_type(ret_type) != 0:
         self.emit_error("opaque types cannot be returned by value; use a pointer or reference", ret_node)
     if ret_node != 0:
-        if self.type_expr_contains_ref(ret_node) != 0:
-            self.emit_error("ephemeral references cannot be returned from functions", ret_node)
         let ret_kind = self.ast.kind(ret_node)
         if ret_kind == NodeKind.NK_TYPE_NAMED:
             let ret_sym = self.ast.get_data0(ret_node)
