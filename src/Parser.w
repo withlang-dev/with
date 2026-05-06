@@ -56,6 +56,10 @@ type Parser {
     if_chain_form: i32,
     suppress_fat_arrow_closure: i32,
     pending_post_decls: Vec[i32],
+    implicit_main_mode: i32,
+    implicit_main_has_main_hint: i32,
+    top_level_stmts: Vec[i32],
+    explicit_main_decl: i32,
 }
 
 type InterpolatedExprParseAttempt {
@@ -114,7 +118,112 @@ fn Parser.init_with_pool(tokens: TokenList, source: str, file_id: i32, intern: I
         if_chain_form: 0,
         suppress_fat_arrow_closure: 0,
         pending_post_decls: Vec.new(),
+        implicit_main_mode: 0,
+        implicit_main_has_main_hint: 0,
+        top_level_stmts: Vec.new(),
+        explicit_main_decl: 0,
     }
+
+fn Parser.enable_implicit_main_mode(self: Parser):
+    self.implicit_main_mode = 1
+    self.implicit_main_has_main_hint = self.has_top_level_main_decl()
+
+fn Parser.token_text_at(self: Parser, pos: i32) -> str:
+    if pos < 0 or pos >= self.tokens.len():
+        return ""
+    let s = self.tokens.get_start(pos)
+    let e = self.tokens.get_end(pos)
+    self.source.slice(s as i64, e as i64)
+
+fn Parser.has_top_level_main_decl(self: Parser) -> i32:
+    var brace_depth = 0
+    var p = 0
+    while p < self.tokens.len():
+        let tag = self.tokens.get_tag(p)
+        if tag == TokenKind.TK_L_BRACE:
+            brace_depth = brace_depth + 1
+            p = p + 1
+            continue
+        if tag == TokenKind.TK_R_BRACE:
+            if brace_depth > 0:
+                brace_depth = brace_depth - 1
+            p = p + 1
+            continue
+        if brace_depth != 0:
+            p = p + 1
+            continue
+        if tag == TokenKind.TK_NEWLINE or tag == TokenKind.TK_SEMICOLON:
+            p = p + 1
+            continue
+        let col = column_of(self.source, self.tokens.get_start(p))
+        if col != 0:
+            p = p + 1
+            continue
+        var q = p
+        if self.tokens.get_tag(q) == TokenKind.TK_KW_PUB:
+            q = q + 1
+        let lead = if q < self.tokens.len(): self.tokens.get_tag(q) else: TokenKind.TK_EOF
+        if lead == TokenKind.TK_KW_UNSAFE or lead == TokenKind.TK_KW_COMPTIME or lead == TokenKind.TK_KW_ASYNC or lead == TokenKind.TK_KW_GEN:
+            q = q + 1
+        if q + 1 < self.tokens.len() and self.tokens.get_tag(q) == TokenKind.TK_KW_FN and self.tokens.get_tag(q + 1) == TokenKind.TK_IDENT:
+            if self.token_text_at(q + 1) == "main":
+                return 1
+        p = p + 1
+    0
+
+fn Parser.top_level_starts_decl(self: Parser) -> i32:
+    let t = self.peek()
+    if t == TokenKind.TK_KW_FN or t == TokenKind.TK_KW_TYPE or t == TokenKind.TK_KW_ENUM or t == TokenKind.TK_KW_USE or t == TokenKind.TK_KW_EXTERN or t == TokenKind.TK_KW_ERROR or t == TokenKind.TK_KW_CONST or t == TokenKind.TK_KW_PUB or t == TokenKind.TK_KW_GLOBAL:
+        return 1
+    if t == TokenKind.TK_KW_UNSAFE or t == TokenKind.TK_KW_ASYNC or t == TokenKind.TK_KW_GEN:
+        if self.pos + 1 < self.tokens.len() and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_KW_FN:
+            return 1
+        return 0
+    if t == TokenKind.TK_KW_COMPTIME:
+        if self.pos + 1 < self.tokens.len():
+            let next = self.tokens.get_tag(self.pos + 1)
+            if next == TokenKind.TK_KW_FN or next == TokenKind.TK_COLON:
+                return 1
+        return 0
+    if t == TokenKind.TK_KW_LET or t == TokenKind.TK_KW_VAR:
+        if self.implicit_main_mode != 0 and self.implicit_main_has_main_hint == 0:
+            return 0
+        return 1
+    0
+
+fn Parser.record_top_level_stmt(self: Parser, stmt: NodeId):
+    if stmt != 0:
+        self.top_level_stmts.push(stmt as i32)
+
+fn Parser.emit_explicit_main_conflict(self: Parser, stmt: NodeId):
+    let stmt_span = Span { file: self.file_id, start: self.pool.get_start(stmt), end: self.pool.get_end(stmt) }
+    var diag = Diagnostic.err("file has both `fn main` and top-level executable statements", stmt_span)
+    if self.explicit_main_decl != 0:
+        let main_span = Span { file: self.file_id, start: self.pool.get_start(self.explicit_main_decl as NodeId), end: self.pool.get_end(self.explicit_main_decl as NodeId) }
+        diag.add_label(main_span, "`fn main` defined here")
+    diag.add_help("move the statement inside `fn main`, or remove `fn main` to use implicit main mode")
+    self.diags.emit(diag)
+
+fn Parser.synthesize_implicit_main(self: Parser):
+    if self.implicit_main_mode == 0:
+        return
+    if self.top_level_stmts.len() as i32 == 0:
+        return
+    if self.explicit_main_decl != 0:
+        self.emit_explicit_main_conflict(self.top_level_stmts.get(0) as NodeId)
+        return
+    let main_sym = self.intern.intern("main")
+    let stmt_count = self.top_level_stmts.len() as i32
+    let first_stmt = self.top_level_stmts.get(0) as NodeId
+    let last_stmt = self.top_level_stmts.get((stmt_count - 1) as i64) as NodeId
+    let extra_start = self.pool.extra_len()
+    for i in 0..stmt_count - 1:
+        self.pool.add_extra(self.top_level_stmts.get(i as i64))
+    let body = self.pool.add_node(NodeKind.NK_BLOCK, self.pool.get_start(first_stmt), self.pool.get_end(last_stmt), extra_start, stmt_count - 1, last_stmt as i32)
+    let fn_node = self.pool.add_node(NodeKind.NK_FN_DECL, self.pool.get_start(first_stmt), self.pool.get_end(last_stmt), main_sym, body, 0)
+    self.pool.add_fn_meta(fn_node, 0, 0, 0, 0, 0, 0)
+    self.pool.add_fn_param_pattern_meta(fn_node, 0, 0)
+    self.pool.add_decl(fn_node)
 
 // ── Token helpers ────────────────────────────────────────────────
 
@@ -524,6 +633,8 @@ fn Parser.skip_attributes(self: Parser):
 
 fn Parser.parse_module(self: Parser) -> AstPool:
     self.skip_separators()
+    self.top_level_stmts = Vec.new()
+    self.explicit_main_decl = 0
 
     // Skip optional module declaration
     if self.peek() == TokenKind.TK_KW_MODULE:
@@ -577,14 +688,24 @@ fn Parser.parse_module(self: Parser) -> AstPool:
                 self.skip_separators()
                 continue
 
-        let decl = self.parse_decl()
-        if decl != 0:
-            self.pool.add_decl(decl)
-            self.flush_pending_post_decls()
+        if self.implicit_main_mode != 0 and self.top_level_starts_decl() == 0:
+            let stmt = self.parse_expr()
+            if stmt != 0:
+                self.record_top_level_stmt(stmt)
+            else:
+                self.recover_to_top_level()
         else:
-            self.recover_to_top_level()
+            let decl = self.parse_decl()
+            if decl != 0:
+                self.pool.add_decl(decl)
+                if self.pool.kind(decl) == NodeKind.NK_FN_DECL and self.intern.resolve(self.pool.get_data0(decl)) == "main":
+                    self.explicit_main_decl = decl as i32
+                self.flush_pending_post_decls()
+            else:
+                self.recover_to_top_level()
         self.skip_separators()
 
+    self.synthesize_implicit_main()
     self.pool
 
 // ── Declaration parsing ──────────────────────────────────────────

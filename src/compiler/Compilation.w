@@ -155,6 +155,14 @@ fn Compilation.compile_file(self: Compilation, path: str) -> AstPool:
     compilation_debug_init(f"Compilation.compile_file:done decls={pool.decl_count()}")
     pool
 
+fn Compilation.compile_entry_file(self: Compilation, path: str) -> AstPool:
+    compilation_debug_init("Compilation.compile_entry_file:start " ++ path)
+    var zcu = self.zcu
+    let pool = zcu.compile_file_frontend_entry(path)
+    self.zcu = zcu
+    compilation_debug_init(f"Compilation.compile_entry_file:done decls={pool.decl_count()}")
+    pool
+
 fn Compilation.resolve_file(self: Compilation, path: str, emit_resolve_diags: bool) -> ResolveResult:
     let _ = emit_resolve_diags
     let _ = self.compile_file(path)
@@ -262,7 +270,7 @@ fn Compilation.build_binary_to_path(self: Compilation, source_path: str, bin_pat
     let _ = ("mkdir -p " ++ output_dir) |> with_system
     let _ = ("rm -rf " ++ bin_path ++ ".dSYM") |> with_system
 
-    let pool = self.compile_file(source_path)
+    let pool = self.compile_entry_file(source_path)
     self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
 
 fn Compilation.build_binary_from_source_to_path(self: Compilation, source_path: str, source_text: str, bin_path: str) -> str:
