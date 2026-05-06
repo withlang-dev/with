@@ -526,8 +526,10 @@ fn get_name_owned(user: &User) -> String:
 ```
 
 When a function returns an ephemeral value and accepts multiple
-reference parameters, the returned value is conservatively treated as
-borrowing from all reference inputs.
+potential origin parameters, the returned value is tracked as
+borrowing from the set of parameters the body may actually derive it
+from. This origin set is inferred from the function body and enforced
+at the call site.
 
 ### 3.5 Borrow Scope: Non-Lexical Lifetimes
 
@@ -621,8 +623,8 @@ let alice = User { name: "Alice" }
 print_user(alice)           // compiler inserts &alice automatically
 ```
 
-This also works for method calls: `alice.greet()` works whether
-`greet` takes `self: &Self` or `self: Self`.
+This also works for method calls: `alice.greet()` works when
+`greet` takes `self: &Self`.
 
 **Restriction:** Auto-referencing only creates shared borrows
 (`&T`). Mutation uses `mut self` receivers on owned values:
@@ -635,6 +637,19 @@ extend User:
 var alice = User { name: "Alice" }
 alice.update()              // mutates in place via mut self receiver
 ```
+
+When a call must use non-default ownership semantics, the caller
+writes them explicitly:
+
+```with
+take(move alice)   // transfer ownership into the callee
+dup(copy xs)       // duplicate via Copy or Clone semantics
+peek(&alice)       // explicit shared borrow
+```
+
+For non-`Copy` parameters, the default plain call `f(x)` is share-place:
+the callee operates on the caller's place unless the caller overrides
+that behavior with `move x`, `copy x`, or `&x`.
 
 **The vibe:** "The function just wants to look at the data. I
 shouldn't have to manually type `&`."
@@ -2972,9 +2987,9 @@ extend Vec[T]:
 |-----------------|-------------|-----------|
 | `self: &T` | `x.method()` | Borrows `x` immutably |
 | `mut self: Self` | `x.method()` | Mutates `x` in place |
-| `self: T` | `x.method()` | Moves (consumes) `x` |
+| `move self: Self` | `x.method()` | Moves (consumes) `x` |
 
-**By-value `self` enables consuming method chains:**
+**Consuming `self` enables consuming method chains:**
 
 ```
 type Builder { host: str, port: u16 }
@@ -4099,10 +4114,11 @@ Trait calls are monomorphized. Dynamic dispatch via explicit `dyn Trait`.
 **Object safety:** A trait can be used as `dyn Trait` only if all
 its methods are **object-safe**. A method is object-safe if:
 
-1. It takes `self` by **reference** (`&Self`) or as `mut self: Self`, OR
-2. It takes `self` by value (`Self`) and the trait specifies
-   `Self: Sized` — but `dyn Trait` is unsized, so by-value self
-   methods are excluded from the vtable.
+1. It uses an explicit object-safe receiver mode: `self: &Self` or
+   `mut self: Self`, OR
+2. It uses `move self: Self` and the trait specifies `Self: Sized` —
+   but `dyn Trait` is unsized, so consuming receiver methods are
+   excluded from the vtable.
 
 ```
 trait Drawable:
@@ -4110,20 +4126,20 @@ trait Drawable:
     fn name(self: &Self) -> str // OK: &Self, object-safe
 
 trait Consumable:
-    fn consume(self: Self)      // by-value self: NOT object-safe
+    fn consume(move self: Self) // consuming receiver: NOT object-safe
 
 let d: &dyn Drawable = &circle    // OK: all methods are object-safe
 let c: &dyn Consumable = &item    // ERROR: consume() takes self by value
 ```
 
-**By-value `self` behind `Box`:** To call a by-value method through
+**Consuming `self` behind `Box`:** To call a consuming method through
 a trait object, wrap it in `Box[dyn Trait]`. The compiler generates
 a shim that moves the value out of the box (which has a known
 pointer size):
 
 ```
 trait Builder:
-    fn build(self: Self) -> Config     // by-value self
+    fn build(move self: Self) -> Config // consuming receiver
     fn preview(self: &Self) -> str     // by-reference
 
 // Box[dyn Builder] can call build() via a generated shim:
@@ -4494,11 +4510,11 @@ and do not go through trait dispatch.
 ### 11.8 Derive
 
 `@[derive(...)]` generates trait implementations based on a type's
-structure. The following **structural traits** may be derived:
+structure. The following traits may be derived:
 
 | Trait | Condition | Behavior |
 |-------|-----------|----------|
-| `Copy` | All fields are `Copy`, no `Drop` | Bitwise copy |
+| `Copy` | Explicit opt-in only; all fields are `Copy`, no `Drop` | Bitwise copy |
 | `Clone` | All fields are `Clone` | Field-by-field clone |
 | `Default` | All fields are `Default` | Field-by-field default |
 | `Eq` | All fields are `Eq` | Field-by-field equality |
@@ -4515,27 +4531,34 @@ type Point { x: f64, y: f64 }
 enum Role { Admin | Member | Guest }
 ```
 
-**`@[derive(all)]`** derives every structural trait the type
+**`@[derive(all)]`** derives every eligible trait the type
 qualifies for:
 
 ```
 @[derive(all)]
 type Color { r: u8, g: u8, b: u8, a: u8 }
-// Derives: Copy, Clone, Default, Eq, Hash, Ord, Debug
-// (all fields are u8, which implements all of these)
+// Derives: Clone, Default, Eq, Hash, Ord, Debug
+// (NOT Copy — aggregate types require explicit Copy opt-in)
 
 @[derive(all)]
 type User { name: str, email: str, age: i32 }
 // Derives: Clone, Default, Eq, Hash, Debug
-// (NOT Copy — String is not Copy)
+// (NOT Copy — aggregate types require explicit Copy opt-in)
 // (NOT Ord — not all fields implement Ord by default)
 ```
 
+Aggregate types (`type`, anonymous records, and `enum`) are
+**non-`Copy` by default**, even when all fields are `Copy`.
+`Copy` is part of the type's API surface and must be opted into
+explicitly with `impl Copy for T` or equivalent declaration syntax
+such as `type Pair: Copy { ... }`.
+
 `@[derive(all)]` is conservative — it only derives traits where all
-fields satisfy the trait's requirements. If a field is added that
-doesn't implement `Eq`, the type silently loses its derived `Eq`.
-This is by design — no compile error, because `@[derive(all)]` means
-"whatever you can."
+fields satisfy the trait's requirements, and it never implicitly opts
+an aggregate type into `Copy`. If a field is added that doesn't
+implement `Eq`, the type silently loses its derived `Eq`. This is by
+design — no compile error, because `@[derive(all)]` means "whatever
+you can."
 
 For explicit control, list traits individually. `@[derive(Eq, Hash)]`
 will produce a compile error if a field doesn't implement `Eq` or
@@ -4647,6 +4670,35 @@ This is deliberately conservative. A closure bound to a named local
 variable is treated as escaping even if analysis could prove it never
 escapes the scope. This avoids complex escape analysis in v1.0 and
 can be relaxed in future versions.
+
+### 12.4 Capture Semantics and Effects
+
+Closure captures follow the same calling-convention model as ordinary
+function parameters:
+
+- For `Copy` values, default capture copies the value.
+- For non-`Copy` values, default capture is share-place: the closure
+  observes or mutates the original place according to its body.
+- `move ||` captures transfer ownership into the closure.
+
+Closure bodies receive inferred effect summaries over their captures.
+Invoking a closure is checked exactly like invoking a function: if a
+closure consumes, mutates, returns, or returns a view derived from a
+capture, those effects apply to the originating captured place.
+
+```with
+let xs = Vec.new()
+let f = || xs.push(1)   // capture effect on xs: {write}
+f()                     // mutates xs
+
+let n = 42
+let g = || n + 1        // n is Copy, captured by copy
+let m = g()             // n remains unchanged
+
+let owned = Vec.from([1, 2, 3])
+let h = move || owned.len()
+// owned is invalid after closure creation
+```
 
 ---
 
@@ -8571,9 +8623,12 @@ the companion document: *Implementation Notes*.
 
 ## 21. Borrow Checker Rules
 
-The borrow checker is intra-procedural only. Because references cannot
-be stored and cannot escape except as ephemeral returns, cross-function
-lifetime reasoning is never required.
+The borrow checker is primarily local, but function boundaries do
+participate in lifetime reasoning through inferred effect summaries.
+In particular, when a function returns a view derived from one or more
+parameters, the compiler tracks which parameters may be origins of that
+returned view and enforces that those origins outlive all uses of the
+result.
 
 ### 21.1 Rules
 
@@ -8599,14 +8654,28 @@ At every program point, the following must hold:
    diverge at any field access are non-overlapping and may coexist.
    Array/slice indices are conservatively treated as overlapping.
 
-6. **Ephemeral return conservation.** When a function returns an
-   ephemeral value and accepts multiple reference parameters, the
-   compiler **by default** treats the return as borrowing from all
-   reference inputs. However, the compiler has built-in knowledge
-   of stdlib types (HashMap, Vec, slice iterators, etc.) and
-   correctly narrows the borrow to the relevant parameter. For user
-   code, the conservative default applies. The stdlib achieves
-   correct narrowing via `unsafe` internally — users never see it.
+6. **Returned-view origin tracking.** When a function returns a
+   reference or other view derived from one or more parameters, the
+   compiler records the set of possible origin parameters in the
+   function's effect summary. At the call site, the result is tied to
+   the intersection of those origin lifetimes. If any possible origin
+   dies before the view's last use, the program is rejected.
+
+   ```
+   fn longest(a: String, b: String) -> &str:
+       if a.len() > b.len():
+           a.as_str()
+       else:
+           b.as_str()
+
+   let s1 = String.from("hello")
+   let view: &str
+   {
+       let s2 = String.from("world")
+       view = longest(s1, s2)
+   }
+   print(view) // ERROR: view may originate from s2
+   ```
 
 7. **Implicit drop is a use.** When a variable implementing `Drop`
    goes out of scope, its implicit destructor call is treated as a
@@ -8628,9 +8697,9 @@ At every program point, the following must hold:
    the destructor.
 
 8. **Mutation composability.** Mutation through `mut self` receivers
-   does not require reborrowing — the receiver is owned, so method
-   chains compose naturally. Each `mut self` call takes ownership,
-   mutates, and the place remains valid for subsequent calls.
+   does not require reborrowing — the receiver is the caller's place,
+   so method chains compose naturally. Each `mut self` call mutates
+   that place and leaves it valid for subsequent calls.
 
 ---
 
@@ -8956,7 +9025,7 @@ The following keywords are reserved and cannot be used as identifiers:
 | `newaxis` | Multi-index dimension insertion |
 | `it` | Implicit closure parameter |
 | `where` | Trait bound clauses |
-| `move` | Move closure (reserved for future use) |
+| `move` | Ownership-transfer annotation and move closure |
 | `unsafe` | Unsafe block |
 | `comptime` | Compile-time evaluation |
 
