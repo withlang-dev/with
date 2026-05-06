@@ -5,9 +5,9 @@ semantics for With, including the `@[tailrec]` guarantee, mutual tail
 recursion, implementation requirements, diagnostics, ABI constraints,
 and C migrator implications.
 
-This is a design target, not merely a description of the current
-implementation. Where current behavior falls short of the guarantee,
-that gap is called out explicitly.
+This document specifies the intended Tail Call Optimization (TCO)
+contract for With and records the guaranteed subset implemented by the
+compiler today.
 
 ---
 
@@ -726,7 +726,8 @@ Phase 3 is the gating phase for any correctness-preserving TCO-based C
 
 ### Phase 4: Backend Integration
 
-* Optionally emit `musttail` only when ABI constraints are proven.
+* Emit `musttail` only when ABI constraints are proven for the entire
+  recursive SCC.
 * Never use non-guaranteed backend `tail` hints to satisfy
   `@[tailrec]`.
 * Keep backend hints available for ordinary opportunistic TCO.
@@ -741,21 +742,27 @@ As of this document:
 
 * Self-recursive `@[tailrec]` lowering exists in MIR as parameter
   reassignment plus `goto` to entry.
-* Tail-position verification exists for `@[tailrec]`.
-* Mutual recursive functions are detected, but the current mutual path
-  marks tail calls for LLVM tail-call optimization rather than lowering
-  them to an explicit guaranteed trampoline.
+* Mutual `@[tailrec]` SCCs are guaranteed only when every member is a
+  compiler-visible local function, every member is explicitly
+  annotated, all signatures and calling conventions match, every
+  recursive edge is in verified tail position, and no active
+  `defer`/`errdefer` cleanup remains across the recursive edge.
+* For that guaranteed subset, the backend emits LLVM `musttail` on the
+  recursive SCC edges rather than relying on opportunistic `tail`
+  optimization.
+* When the guarantee cannot be proven, the compiler rejects the
+  program with a diagnostic. This includes unannotated SCC members,
+  incompatible signatures/calling conventions, and recursive edges that
+  are not in guaranteed tail position.
 
-Therefore, the current mutual recursion implementation should be
-treated as incomplete relative to this spec. It is not sufficient for
-features that require guaranteed stack-constant mutual control flow,
-such as a TCO-based C `goto` lowering.
+The current implementation is therefore sufficient for language-level
+`@[tailrec]` guarantees on homogeneous local recursive SCCs, including
+two-function and three-function cycles that lower to direct tail-edge
+forwarding in MIR.
 
-This is a language correctness issue independent of the C migrator:
-users who write `@[tailrec]` should receive the guarantee implied by the
-annotation. Until mutual-TCO lowering is implemented, the compiler
-should reject mutual `@[tailrec]` SCCs it cannot guarantee, rather than
-silently relying on backend optimization.
+The current implementation does not attempt heterogeneous trampoline
+lowering. Cycles that require differing parameter layouts or calling
+conventions are rejected rather than lowered through a tagged frame.
 
 ---
 
