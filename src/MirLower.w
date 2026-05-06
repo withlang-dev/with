@@ -6,6 +6,7 @@ use Ast
 use InternPool
 use Mir
 use Sema
+extern fn with_eprint(s: str) -> void
 
 // ── Builder state ────────────────────────────────────────────────
 
@@ -5883,9 +5884,6 @@ fn lower_module(sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirModule:
     // Snapshot sema type tables before any MirBuilder copy can realloc/free the buffer
     mir_mod.snapshot_sema_types(sema)
 
-    // Collect @[tailrec] function symbols for mutual TCO detection
-    let tailrec_syms: Vec[i32] = Vec.new()
-
     for di in 0..ast_pool.decl_count():
         let decl = ast_pool.get_decl(di)
         if ast_pool.kind(decl) != NodeKind.NK_FN_DECL:
@@ -5896,21 +5894,25 @@ fn lower_module(sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirModule:
         if meta >= 0 and ast_pool.fn_meta_tp_count(meta) > 0:
             continue
 
-        let fn_flags = ast_pool.get_data2(decl)
-        if (fn_flags / FnFlags.TAILREC) % 2 == 1:
-            tailrec_syms.push(fn_sym)
-
         var builder = MirBuilder.init(sema, ast_pool, pool, fn_sym)
         let body = lower_fn(builder, decl as i32)
         mir_mod.add_body(body)
 
-    // Mutual tail-call optimization: for @[tailrec] functions that call
-    // other @[tailrec] functions in tail position, transform mutual
-    // tail calls into parameter reassignment + tag dispatch (trampoline).
-    if tailrec_syms.len() > 1:
-        mir_mod.optimize_mutual_tail_calls(tailrec_syms)
-
     mir_mod
+
+fn collect_tailrec_fn_syms(ast_pool: AstPool) -> Vec[i32]:
+    let tailrec_syms: Vec[i32] = Vec.new()
+    for di in 0..ast_pool.decl_count():
+        let decl = ast_pool.get_decl(di)
+        if ast_pool.kind(decl) != NodeKind.NK_FN_DECL:
+            continue
+        let meta = ast_pool.find_fn_meta(decl)
+        if meta >= 0 and ast_pool.fn_meta_tp_count(meta) > 0:
+            continue
+        let fn_flags = ast_pool.get_data2(decl)
+        if (fn_flags / FnFlags.TAILREC) % 2 == 1:
+            tailrec_syms.push(ast_pool.get_data0(decl))
+    tailrec_syms
 
 // ── Mutual tail-call optimization ──────────────────────────────
 
@@ -5927,6 +5929,57 @@ fn mir_body_extract_callee_sym(body: &MirBody, callee_op_id: i32) -> i32:
         return 0
     body.const_d0.get(const_id as i64)
 
+fn mir_place_plain_local(body: &MirBody, place_id: i32) -> i32:
+    if place_id < 0 or place_id >= body.place_locals.len() as i32:
+        return -1
+    if body.place_proj_counts.get(place_id as i64) != 0:
+        return -1
+    body.place_locals.get(place_id as i64)
+
+fn mir_stmt_forward_local(body: &MirBody, stmt_id: i32, source_local: i32) -> i32:
+    if body.stmt_kind(stmt_id) != StmtKind.Assign:
+        return -1
+    let dest_place = body.stmt_data0(stmt_id)
+    let dest_local = mir_place_plain_local(body, dest_place)
+    if dest_local < 0:
+        return -1
+    let rv_id = body.stmt_data1(stmt_id)
+    if rv_id < 0 or rv_id >= body.rval_kinds.len() as i32:
+        return -1
+    if body.rval_kinds.get(rv_id as i64) != RvalueKind.RK_USE:
+        return -1
+    let operand_id = body.rval_d0.get(rv_id as i64)
+    if operand_id < 0 or operand_id >= body.operand_kinds.len() as i32:
+        return -1
+    let operand_kind = body.operand_kinds.get(operand_id as i64)
+    if operand_kind != OperandKind.OK_COPY and operand_kind != OperandKind.OK_MOVE:
+        return -1
+    let source_place = body.operand_d0.get(operand_id as i64)
+    if mir_place_plain_local(body, source_place) != source_local:
+        return -1
+    dest_local
+
+fn mir_is_tail_return_path(body: &MirBody, bb: i32, current_local: i32, depth: i32) -> bool:
+    if bb < 0 or bb >= body.block_count():
+        return false
+    if depth > body.block_count():
+        return false
+    let stmt_start = body.bb_stmt_starts.get(bb as i64)
+    let stmt_count = body.bb_stmt_counts.get(bb as i64)
+    var local = current_local
+    for si in 0..stmt_count:
+        let stmt_id = stmt_start + si
+        let next_local = mir_stmt_forward_local(body, stmt_id, local)
+        if next_local < 0:
+            return false
+        local = next_local
+    let tk = body.term_kind(bb)
+    if tk == TermKind.TK_RETURN:
+        return local == 0
+    if tk == TermKind.TK_GOTO:
+        return mir_is_tail_return_path(body, body.term_data0(bb), local, depth + 1)
+    false
+
 fn mir_is_tail_call_to(body: &MirBody, bb: i32, target_sym: i32) -> bool:
     // Check if block bb ends with a tail call to target_sym.
     if body.term_kind(bb) != TermKind.TK_CALL:
@@ -5936,166 +5989,325 @@ fn mir_is_tail_call_to(body: &MirBody, bb: i32, target_sym: i32) -> bool:
         return false
     // Result must go to local 0 (return place)
     let result_place = body.term_data2(bb)
-    if result_place >= 0 and result_place < body.place_locals.len() as i32:
-        if body.place_locals.get(result_place as i64) != 0:
-            return false
-    // Next block must be pure TK_RETURN
+    let result_local = mir_place_plain_local(body, result_place)
+    if result_local < 0:
+        return false
     let next_bb = body.term_data3(bb)
-    if next_bb < 0 or next_bb >= body.block_count():
-        return false
-    if body.term_kind(next_bb) != TermKind.TK_RETURN:
-        return false
-    if body.bb_stmt_counts.get(next_bb as i64) != 0:
-        return false
-    true
+    mir_is_tail_return_path(body, next_bb, result_local, 0)
 
-fn MirModule.optimize_mutual_tail_calls(mut self: MirModule, tailrec_syms: Vec[i32]):
-    // Find pairs of @[tailrec] functions that tail-call each other.
-    // For each pair (or cycle), transform mutual tail calls into
-    // parameter reassignment + tag update + jump to entry, reusing
-    // the self-TCO pattern but with a dispatch tag.
+fn mir_vec_contains_i32(v: &Vec[i32], value: i32) -> bool:
+    for i in 0..v.len() as i32:
+        if v.get(i as i64) == value:
+            return true
+    false
 
-    // Build adjacency: for each @[tailrec] fn, which other @[tailrec] fns
-    // does it tail-call?
-    let sym_count = tailrec_syms.len() as i32
+fn mir_push_unique_i32(v: Vec[i32], value: i32):
+    if not mir_vec_contains_i32(&v, value):
+        v.push(value)
 
-    // For each tailrec function, find mutual tail calls
-    var i = 0
-    while i < sym_count:
-        let fn_a = tailrec_syms.get(i as i64)
-        let body_idx_a = self.find_body(fn_a)
-        if body_idx_a < 0:
-            i = i + 1
+fn mir_body_has_call_to(body: &MirBody, target_sym: i32) -> bool:
+    for bb in 0..body.block_count():
+        if body.term_kind(bb) != TermKind.TK_CALL:
+            continue
+        if mir_body_extract_callee_sym(body, body.term_data0(bb)) == target_sym:
+            return true
+    false
+
+fn mir_body_has_non_tail_call_to(body: &MirBody, target_sym: i32) -> bool:
+    for bb in 0..body.block_count():
+        if body.term_kind(bb) != TermKind.TK_CALL:
+            continue
+        if mir_body_extract_callee_sym(body, body.term_data0(bb)) != target_sym:
+            continue
+        if not mir_is_tail_call_to(body, bb, target_sym):
+            return true
+    false
+
+fn tailrec_find_decl(ast_pool: AstPool, fn_sym: i32) -> i32:
+    for di in 0..ast_pool.decl_count():
+        let decl = ast_pool.get_decl(di)
+        if ast_pool.kind(decl) == NodeKind.NK_FN_DECL and ast_pool.get_data0(decl) == fn_sym:
+            return decl as i32
+    0
+
+fn mir_fn_is_tailrec(ast_pool: AstPool, fn_sym: i32) -> i32:
+    let fn_node = tailrec_find_decl(ast_pool, fn_sym)
+    if fn_node == 0:
+        return 0
+    let flags = ast_pool.get_data2(fn_node)
+    if (flags / FnFlags.TAILREC) % 2 == 1:
+        return 1
+    0
+
+fn mir_tailrec_sig_compatible(sema: Sema, ast_pool: AstPool, fn_a: i32, fn_b: i32) -> i32:
+    let sig_a = sema.get_sig(fn_a)
+    let sig_b = sema.get_sig(fn_b)
+    if sig_a < 0 or sig_b < 0:
+        return 0
+    if sema.sig_is_variadic(sig_a) != 0 or sema.sig_is_variadic(sig_b) != 0:
+        return 0
+    if sema.sig_return_type(sig_a) != sema.sig_return_type(sig_b):
+        return 0
+    let count_a = sema.sig_get_param_count(sig_a)
+    let count_b = sema.sig_get_param_count(sig_b)
+    if count_a != count_b:
+        return 0
+    for pi in 0..count_a:
+        if sema.sig_param_type(sig_a, pi) != sema.sig_param_type(sig_b, pi):
+            return 0
+    let node_a = tailrec_find_decl(ast_pool, fn_a)
+    let node_b = tailrec_find_decl(ast_pool, fn_b)
+    if node_a == 0 or node_b == 0:
+        return 0
+    let meta_a = ast_pool.find_fn_meta(node_a)
+    let meta_b = ast_pool.find_fn_meta(node_b)
+    let cc_a = if meta_a >= 0: ast_pool.fn_meta_tp_start(meta_a) else: 0
+    let cc_b = if meta_b >= 0: ast_pool.fn_meta_tp_start(meta_b) else: 0
+    if cc_a != cc_b:
+        return 0
+    1
+
+fn tailrec_scc_contains(scc: &Vec[i32], fn_sym: i32) -> bool:
+    for i in 0..scc.len() as i32:
+        if scc.get(i as i64) == fn_sym:
+            return true
+    false
+
+type TailrecViolation {
+    node: i32,
+    message: str,
+}
+
+fn tailrec_no_violation -> TailrecViolation:
+    TailrecViolation { node: 0, message: "" }
+
+fn tailrec_verify_recursive_edges(sema: Sema, node: i32, scc: &Vec[i32], in_tail: i32, active_cleanup: i32) -> TailrecViolation:
+    if node == 0:
+        return tailrec_no_violation()
+    let kind = sema.ast.kind(node)
+    if kind == NodeKind.NK_CALL:
+        let callee = sema.ast.get_data0(node)
+        if sema.ast.kind(callee) == NodeKind.NK_IDENT:
+            let callee_sym = sema.ast.get_data0(callee)
+            if tailrec_scc_contains(scc, callee_sym):
+                if in_tail == 0:
+                    return TailrecViolation { node, message: "recursive call is not in tail position (function is @[tailrec])" }
+                else if active_cleanup != 0:
+                    return TailrecViolation { node, message: "recursive call cannot be lowered stack-constantly for @[tailrec]: active defer/errdefer cleanup remains" }
+        let callee_violation = tailrec_verify_recursive_edges(sema, callee, scc, 0, active_cleanup)
+        if callee_violation.node != 0:
+            return callee_violation
+        let extra_start = sema.ast.get_data1(node)
+        let arg_count = sema.ast.get_data2(node)
+        for ai in 0..arg_count:
+            let arg_violation = tailrec_verify_recursive_edges(sema, sema.ast.get_extra(extra_start + ai), scc, 0, active_cleanup)
+            if arg_violation.node != 0:
+                return arg_violation
+        return tailrec_no_violation()
+    if kind == NodeKind.NK_BLOCK:
+        let extra_start = sema.ast.get_data0(node)
+        let stmt_count = sema.ast.get_data1(node)
+        let tail = sema.ast.get_data2(node)
+        var cleanup_depth = active_cleanup
+        for si in 0..stmt_count:
+            let stmt = sema.ast.get_extra(extra_start + si)
+            let stmt_kind = sema.ast.kind(stmt)
+            if stmt_kind == NodeKind.NK_DEFER or stmt_kind == NodeKind.NK_ERRDEFER:
+                let defer_violation = tailrec_verify_recursive_edges(sema, sema.ast.get_data0(stmt), scc, 0, cleanup_depth)
+                if defer_violation.node != 0:
+                    return defer_violation
+                cleanup_depth = cleanup_depth + 1
+            else:
+                let stmt_violation = tailrec_verify_recursive_edges(sema, stmt, scc, 0, cleanup_depth)
+                if stmt_violation.node != 0:
+                    return stmt_violation
+        return tailrec_verify_recursive_edges(sema, tail, scc, in_tail, cleanup_depth)
+    if kind == NodeKind.NK_IF_EXPR:
+        let cond_violation = tailrec_verify_recursive_edges(sema, sema.ast.get_data0(node), scc, 0, active_cleanup)
+        if cond_violation.node != 0:
+            return cond_violation
+        let then_violation = tailrec_verify_recursive_edges(sema, sema.ast.get_data1(node), scc, in_tail, active_cleanup)
+        if then_violation.node != 0:
+            return then_violation
+        return tailrec_verify_recursive_edges(sema, sema.ast.get_data2(node), scc, in_tail, active_cleanup)
+    if kind == NodeKind.NK_MATCH:
+        let subject_violation = tailrec_verify_recursive_edges(sema, sema.ast.get_data0(node), scc, 0, active_cleanup)
+        if subject_violation.node != 0:
+            return subject_violation
+        let arm_start = sema.ast.get_data1(node)
+        let arm_count = sema.ast.get_data2(node)
+        for ai in 0..arm_count:
+            let arm = sema.ast.get_extra(arm_start + ai)
+            let guard_violation = tailrec_verify_recursive_edges(sema, sema.ast.get_data2(arm), scc, 0, active_cleanup)
+            if guard_violation.node != 0:
+                return guard_violation
+            let body_violation = tailrec_verify_recursive_edges(sema, sema.ast.get_data1(arm), scc, in_tail, active_cleanup)
+            if body_violation.node != 0:
+                return body_violation
+        return tailrec_no_violation()
+    if kind == NodeKind.NK_RETURN:
+        return tailrec_verify_recursive_edges(sema, sema.ast.get_data0(node), scc, 1, active_cleanup)
+    if kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER:
+        return tailrec_verify_recursive_edges(sema, sema.ast.get_data0(node), scc, 0, active_cleanup)
+    if kind == NodeKind.NK_FOR or kind == NodeKind.NK_WHILE or kind == NodeKind.NK_LOOP:
+        return tailrec_verify_recursive_edges(sema, sema.ast.get_data2(node), scc, 0, active_cleanup)
+    if kind == NodeKind.NK_LET_DECL or kind == NodeKind.NK_LET_BINDING:
+        return tailrec_verify_recursive_edges(sema, sema.ast.get_data1(node), scc, 0, active_cleanup)
+    if kind == NodeKind.NK_BINARY:
+        let lhs_violation = tailrec_verify_recursive_edges(sema, sema.ast.get_data1(node), scc, 0, active_cleanup)
+        if lhs_violation.node != 0:
+            return lhs_violation
+        return tailrec_verify_recursive_edges(sema, sema.ast.get_data2(node), scc, 0, active_cleanup)
+    if kind == NodeKind.NK_UNARY or kind == NodeKind.NK_ASSIGN:
+        return tailrec_verify_recursive_edges(sema, sema.ast.get_data1(node), scc, 0, active_cleanup)
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_UNSAFE_BLOCK:
+        return tailrec_verify_recursive_edges(sema, sema.ast.get_data0(node), scc, in_tail, active_cleanup)
+    tailrec_no_violation()
+
+fn MirModule.body_reaches(mut self: MirModule, start_idx: i32, target_idx: i32) -> bool:
+    if start_idx == target_idx:
+        return true
+    let body_count = self.body_count()
+    var visited: Vec[i32] = Vec.new()
+    for _ in 0..body_count:
+        visited.push(0)
+    var stack: Vec[i32] = Vec.new()
+    stack.push(start_idx)
+    while stack.len() > 0:
+        let idx = stack.pop()
+        if idx < 0 or idx >= body_count:
+            continue
+        if visited.get(idx as i64) != 0:
+            continue
+        visited.set_i32(idx as i64, 1)
+        let body = self.bodies.get(idx as i64)
+        for bb in 0..body.block_count():
+            if body.term_kind(bb) != TermKind.TK_CALL:
+                continue
+            let callee_sym = mir_body_extract_callee_sym(&body, body.term_data0(bb))
+            if callee_sym == 0:
+                continue
+            let callee_idx = self.find_body(callee_sym)
+            if callee_idx < 0:
+                continue
+            if callee_idx == target_idx:
+                return true
+            if visited.get(callee_idx as i64) == 0:
+                stack.push(callee_idx)
+    false
+
+fn MirModule.collect_tailrec_scc(mut self: MirModule, start_idx: i32) -> Vec[i32]:
+    var members: Vec[i32] = Vec.new()
+    let body_count = self.body_count()
+    for idx in 0..body_count:
+        if self.body_reaches(start_idx, idx) and self.body_reaches(idx, start_idx):
+            members.push(idx)
+    members
+
+fn MirModule.mark_tailrec_scc_edges(mut self: MirModule, scc: &Vec[i32]):
+    for si in 0..scc.len() as i32:
+        let src_idx = scc.get(si as i64)
+        let body = self.bodies.get(src_idx as i64)
+        let bb_count = body.block_count()
+        for bb in 0..bb_count:
+            if body.term_kind(bb) != TermKind.TK_CALL:
+                continue
+            let callee_sym = mir_body_extract_callee_sym(&body, body.term_data0(bb))
+            if callee_sym == 0:
+                continue
+            for ti in 0..scc.len() as i32:
+                let dst_idx = scc.get(ti as i64)
+                let dst_body = self.bodies.get(dst_idx as i64)
+                if dst_body.fn_sym == callee_sym and mir_is_tail_call_to(&body, bb, callee_sym):
+                    mir_push_unique_i32(body.mutual_tail_bbs, bb)
+                    break
+
+fn MirModule.tailrec_scc_syms(mut self: MirModule, scc: &Vec[i32]) -> Vec[i32]:
+    var syms: Vec[i32] = Vec.new()
+    for si in 0..scc.len() as i32:
+        let body_idx = scc.get(si as i64)
+        if body_idx < 0 or body_idx >= self.body_count():
+            continue
+        syms.push(self.bodies.get(body_idx as i64).fn_sym)
+    syms
+
+fn MirModule.verify_tailrec_contracts(mut self: MirModule, sema: Sema, ast_pool: AstPool, tailrec_syms: Vec[i32]) -> Vec[TailrecViolation]:
+    let violations: Vec[TailrecViolation] = Vec.new()
+    let body_count = self.body_count()
+    var processed: Vec[i32] = Vec.new()
+    for _ in 0..body_count:
+        processed.push(0)
+    for ti in 0..tailrec_syms.len() as i32:
+        let fn_sym = tailrec_syms.get(ti as i64)
+        let body_idx = self.find_body(fn_sym)
+        if body_idx < 0:
+            continue
+        if processed.get(body_idx as i64) != 0:
+            continue
+        let scc = self.collect_tailrec_scc(body_idx)
+        let scc_syms = self.tailrec_scc_syms(&scc)
+        for bi in 0..body_count:
+            let body_sym = self.bodies.get(bi as i64).fn_sym
+            if tailrec_scc_contains(&scc_syms, body_sym):
+                processed.set_i32(bi as i64, 1)
+        let decl_node = tailrec_find_decl(ast_pool, fn_sym)
+        if decl_node == 0:
             continue
 
-        var j = i + 1
-        while j < sym_count:
-            let fn_b = tailrec_syms.get(j as i64)
-            let body_idx_b = self.find_body(fn_b)
-            if body_idx_b < 0:
-                j = j + 1
-                continue
+        if scc.len() == 1:
+            let recursive_violation = tailrec_verify_recursive_edges(sema, ast_pool.get_data1(decl_node), &scc_syms, 1, 0)
+            if recursive_violation.node != 0:
+                violations.push(recursive_violation)
+            continue
 
-            // Check if fn_a tail-calls fn_b AND fn_b tail-calls fn_a
-            let body_a = self.bodies.get(body_idx_a as i64)
-            let body_b = self.bodies.get(body_idx_b as i64)
+        var all_annotated = 1
+        for si in 0..scc_syms.len() as i32:
+            let member_sym = scc_syms.get(si as i64)
+            if mir_fn_is_tailrec(ast_pool, member_sym) == 0:
+                all_annotated = 0
+                break
+        if all_annotated == 0:
+            violations.push(TailrecViolation { node: decl_node, message: "mutual tail-recursive cycle cannot be guaranteed stack-constant: every function in the cycle must be annotated @[tailrec]" })
+            continue
 
-            var a_calls_b = false
-            for bb in 0..body_a.block_count():
-                if mir_is_tail_call_to(&body_a, bb, fn_b):
-                    a_calls_b = true
+        var recursive_violation_found = 0
+        for si in 0..scc_syms.len() as i32:
+            let member_sym = scc_syms.get(si as i64)
+            let member_decl = tailrec_find_decl(ast_pool, member_sym)
+            if member_decl != 0:
+                let recursive_violation = tailrec_verify_recursive_edges(sema, ast_pool.get_data1(member_decl), &scc_syms, 1, 0)
+                if recursive_violation.node != 0:
+                    violations.push(recursive_violation)
+                    recursive_violation_found = 1
                     break
+        if recursive_violation_found != 0:
+            continue
 
-            if not a_calls_b:
-                j = j + 1
-                continue
+        var compatible = 1
+        let leader_sym = scc_syms.get(0)
+        for si in 1..scc_syms.len() as i32:
+            let member_sym = scc_syms.get(si as i64)
+            if mir_tailrec_sig_compatible(sema, ast_pool, leader_sym, member_sym) == 0:
+                compatible = 0
+                break
+        if compatible == 0:
+            violations.push(TailrecViolation { node: decl_node, message: "mutual @[tailrec] cycle has differing function signatures or calling conventions" })
+            continue
 
-            var b_calls_a = false
-            for bb in 0..body_b.block_count():
-                if mir_is_tail_call_to(&body_b, bb, fn_a):
-                    b_calls_a = true
+        var bad_edge = 0
+        for si in 0..scc.len() as i32:
+            let src_idx = scc.get(si as i64)
+            let src_body = self.bodies.get(src_idx as i64)
+            for ti2 in 0..scc_syms.len() as i32:
+                let dst_sym = scc_syms.get(ti2 as i64)
+                if mir_body_has_non_tail_call_to(&src_body, dst_sym):
+                    bad_edge = 1
                     break
+            if bad_edge != 0:
+                break
+        if bad_edge != 0:
+            violations.push(TailrecViolation { node: decl_node, message: "mutual tail-recursive cycle cannot be guaranteed stack-constant: recursive edge is not in guaranteed tail position" })
+            continue
 
-            if not b_calls_a:
-                j = j + 1
-                continue
-
-            // Mutual recursion detected: fn_a ↔ fn_b
-            // Both functions must have the same number of params for trampoline.
-            if body_a.n_params != body_b.n_params:
-                j = j + 1
-                continue
-
-            // Transform: in fn_a, replace tail calls to fn_b with:
-            //   tag = 1; params = args; goto entry_b
-            // and in fn_b, replace tail calls to fn_a with:
-            //   tag = 0; params = args; goto entry_a
-            //
-            // We add a tag local to each body. On entry, tag=0 means "I'm the
-            // original function." After mutual tail call, tag indicates which
-            // function's body to re-execute on the next loop iteration.
-            //
-            // The trampoline is inlined into each function:
-            //   fn_a: loop { if tag==0: <a_body> elif tag==1: <b_body> }
-            //   fn_b: loop { if tag==0: <a_body> elif tag==1: <b_body> }
-            // This avoids creating a new function and changing call sites.
-            //
-            // Simpler approach: just replace mutual tail calls with parameter
-            // reassignment + self-call (which self-TCO then handles).
-            // fn_a calling fn_b → reassign params, set a flag, goto fn_a entry
-            //   where fn_a's entry checks the flag and jumps to fn_b's logic.
-            //
-            // Simplest correct approach for now: LLVM's own tail call
-            // optimization handles mutual recursion when we mark the calls
-            // as tail calls. We don't need a trampoline — just ensure the
-            // call is in tail position and let LLVM do the work.
-            //
-            // Transform mutual tail calls by reassigning params inline,
-            // similar to self-TCO. Each function gets a copy of the other's
-            // body as a dispatch branch.
-
-            // For the simplest v1: just transform to self-calls via a wrapper.
-            // fn_a's tail call to fn_b(args) → reassign fn_a's params = args, goto bb0
-            // This works when both functions have identical param types.
-            self.transform_mutual_pair(body_idx_a, body_idx_b, fn_a, fn_b)
-
-            j = j + 1
-        i = i + 1
-
-fn MirModule.mark_mutual_tail_calls(mut self: MirModule, body_idx: i32, target_sym: i32):
-    let body = self.bodies.get(body_idx as i64)
-    let bb_count = body.block_count()
-    for bb in 0..bb_count:
-        if mir_is_tail_call_to(&body, bb, target_sym):
-            body.mutual_tail_bbs.push(bb)
-
-fn MirModule.transform_mutual_pair(mut self: MirModule, idx_a: i32, idx_b: i32, fn_a: i32, fn_b: i32):
-    // Transform each function into a trampoline that contains both bodies
-    // with a tag-based dispatch loop. This eliminates mutual tail calls
-    // by converting them into parameter reassignment + tag update + loop.
-    //
-    // For even(n)/odd(n):
-    //   fn even(n) → var tag=0; loop { if tag==0: <even body> else: <odd body> }
-    //   fn odd(n)  → var tag=1; loop { if tag==0: <even body> else: <odd body> }
-    //
-    // Within each body, mutual tail calls become:
-    //   odd(n-1) → params = n-1; tag = 1; goto loop_header
-    //   even(n-1) → params = n-1; tag = 0; goto loop_header
-    //
-    // Self tail calls become: params = args; tag = same; goto loop_header
-
-    // For now: apply the simpler approach — just replace mutual tail calls
-    // with parameter reassignment + goto entry, turning them into self-calls.
-    // This works because both functions have the same params. The self-TCO
-    // pass (which already ran) handles the self-call optimization.
-    //
-    // Wait — self-TCO already ran. So we need to handle mutual calls directly.
-    // Replace mutual tail calls with: args → temps → params, goto bb0.
-    // The key insight: after goto bb0, the function re-executes its OWN body
-    // with the partner's arguments. This is WRONG for mutual recursion —
-    // even(n) calling odd(n-1) should execute odd's body, not even's.
-    //
-    // The correct approach: we need BOTH bodies in EACH function.
-    // For simplicity in this v1, we don't copy blocks. Instead, we rely on
-    // the pattern that most mutual recursion with identical signatures
-    // alternates — even→odd→even→odd... With the trampoline, each function
-    // re-enters itself with the partner's args AND a tag indicating which
-    // logic to execute. But implementing the full block copy + dispatch is
-    // complex.
-    //
-    // Pragmatic v1: rely on LLVM's own sibling call optimization.
-    // Mark the mutual tail calls as "tail" calls so LLVM can optimize them.
-    // The MIR stays as a regular call but we tag it for the codegen to
-    // emit with the "tail" attribute.
-    //
-    // Actually, the simplest correct approach: don't transform the MIR at all.
-    // Instead, during codegen, when emitting a TK_CALL that's a tail call
-    // to another @[tailrec] function, set the LLVM "tail" call attribute.
-    // LLVM's optimizer can then perform tail call optimization if the
-    // calling convention allows it.
-    //
-    // This delegates the actual optimization to LLVM, which is correct
-    // and handles edge cases (register allocation, stack frame cleanup).
-    // We just need to mark the calls.
-    self.mark_mutual_tail_calls(idx_a, fn_b)
-    self.mark_mutual_tail_calls(idx_b, fn_a)
+        self.mark_tailrec_scc_edges(&scc)
+    violations

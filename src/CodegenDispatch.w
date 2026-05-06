@@ -6496,9 +6496,9 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
         return self.emit_async_fn_spawn(callee_fn_sym, callee, call_ft, args, dest_place, body, next_bb)
 
     let call_val = wl_build_call(self.builder, call_ft, actual_callee, vec_data_i64(&args), actual_arg_count)
-    // Mark mutual tail calls so LLVM can optimize them
+    // Guaranteed mutual @[tailrec] edges are emitted as musttail.
     if self.mir_emit_mutual_tail_call != 0 and call_val != 0:
-        wl_set_tail_call(call_val)
+        wl_set_musttail_call(call_val)
 
     // Handle sret: load result from the sret buffer instead of using call_val
     if abi_has_sret != 0 and abi_sret_buf != 0 and abi_sret_ty != 0:
