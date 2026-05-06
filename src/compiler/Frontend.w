@@ -805,7 +805,7 @@ fn Zcu.inject_prelude_frontend(self: Zcu, pool: AstPool) -> AstPool:
 // source into the same pool so the prelude USE comes first in decl order.
 // This ensures prelude-provided types (Vec, HashMap, etc.) are imported
 // before any user modules that depend on them.
-fn Zcu.parse_with_prelude_first(self: Zcu, text: str, file_id: i32) -> AstPool:
+fn Zcu.parse_with_prelude_first_mode(self: Zcu, text: str, file_id: i32, implicit_main_mode: i32) -> AstPool:
     let prelude_module = if self.prelude_mode == PRELUDE_CORE(): "std.prelude_core" else: "std.prelude"
     let synthetic = "use " ++ prelude_module ++ "\n"
 
@@ -821,10 +821,15 @@ fn Zcu.parse_with_prelude_first(self: Zcu, text: str, file_id: i32) -> AstPool:
     var ulexer = Lexer.init(text, file_id)
     let utokens = ulexer.tokenize()
     var uparser = Parser.init_with_pool(utokens, text, file_id, self.pool, self.diagnostics, pool)
+    if implicit_main_mode != 0:
+        uparser.enable_implicit_main_mode()
     pool = uparser.parse_module()
     self.pool = uparser.intern
     self.diagnostics = uparser.diags
     pool
+
+fn Zcu.parse_with_prelude_first(self: Zcu, text: str, file_id: i32) -> AstPool:
+    self.parse_with_prelude_first_mode(text, file_id, 0)
 
 fn Zcu.compile_file_frontend(self: Zcu, path: str) -> AstPool:
     let do_profile = with_getenv_str("WITH_PROFILE").len() > 0
@@ -852,7 +857,34 @@ fn Zcu.compile_file_frontend(self: Zcu, path: str) -> AstPool:
         with_eprint("error: compiler produced an empty module for '" ++ path ++ "'")
     pool
 
+fn Zcu.compile_file_frontend_entry(self: Zcu, path: str) -> AstPool:
+    let do_profile = with_getenv_str("WITH_PROFILE").len() > 0
+    if zcu_debug_init_enabled() != 0:
+        with_eprint("[frontend] compile_file_entry:start " ++ path)
+    let source_dir = frontend_dirname(path)
+    self.reset_for_new_invocation(source_dir, path, "")
+    self.project_config = project_config_load_for_source(path)
+
+    let t_read = with_clock_nanos()
+    let text = with_fs_read_file(path)
+    if text.len() == 0:
+        with_eprint("error: cannot open '" ++ path ++ "'")
+        self.set_resolve_snapshot(ResolveResult.init(), path)
+        return AstPool.new()
+    if do_profile:
+        let read_ns = with_clock_nanos() - t_read
+        with_eprint(f"[profile] frontend.read  {read_ns / 1000000}.{(read_ns % 1000000) / 1000} ms  bytes={text.len() as i32}")
+
+    self.set_current_source(source_dir, path, text)
+    let pool = self.compile_source_frontend_mode(text, path, 0, 1)
+    if pool.decl_count() == 0 and not self.diagnostics.has_errors():
+        with_eprint("error: compiler produced an empty module for '" ++ path ++ "'")
+    pool
+
 fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) -> AstPool:
+    self.compile_source_frontend_mode(text, name, file_id, 0)
+
+fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i32, implicit_main_mode: i32) -> AstPool:
     let do_profile = with_getenv_str("WITH_PROFILE").len() > 0
     if zcu_debug_init_enabled() != 0:
         with_eprint("[frontend] compile_source:parse")
@@ -863,11 +895,13 @@ fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) ->
     let t_parse = with_clock_nanos()
     var pool: AstPool = AstPool.new()
     if self.prelude_mode != PRELUDE_NONE():
-        pool = self.parse_with_prelude_first(text, file_id)
+        pool = self.parse_with_prelude_first_mode(text, file_id, implicit_main_mode)
     else:
         var lexer = Lexer.init(text, file_id)
         let tokens = lexer.tokenize()
         var parser = Parser.init(tokens, text, file_id, self.pool, self.diagnostics)
+        if implicit_main_mode != 0:
+            parser.enable_implicit_main_mode()
         pool = parser.parse_module()
         self.pool = parser.intern
         self.diagnostics = parser.diags
