@@ -2866,6 +2866,9 @@ Tail position means:
 - The final expression of a block already in tail position
 - Both branches of an `if`/`else` already in tail position
 - Every arm of a `match` already in tail position
+- `return f(...)` only when the call result can be returned directly
+  with no post-call coercion, wrapping, storage, cleanup, or ABI
+  reshaping
 
 The following are **not** tail position:
 
@@ -2887,6 +2890,17 @@ equivalent frame-reusing form. Mutual tail recursion is permitted
 only when every function in the cycle is annotated `@[tailrec]` and
 the compiler can verify the cycle without stack growth; otherwise the
 program is ill-formed.
+
+In the currently guaranteed mutual-recursion subset, every recursive
+edge in the SCC must be in verified tail position, every member of the
+SCC must have a compatible signature and calling convention, and no
+active `defer` or `errdefer` cleanup may remain across the recursive
+edge. When those conditions are not met, the compiler must reject the
+program rather than falling back to ordinary stack-growing calls.
+
+The full `@[tailrec]` contract, diagnostics, ABI constraints, and
+current guaranteed lowering subset are specified in
+`docs/tco-spec.md`.
 
 ### 9.3 Closures
 
