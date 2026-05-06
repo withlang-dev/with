@@ -4,6 +4,178 @@ Three targeted improvements derived from Zig's March 2026 devlog.
 
 ---
 
+## §S.X Implicit Main
+
+### Spec Language
+
+The build or run entry file may omit `fn main` when it contains
+top-level executable statements. In that case, the compiler
+synthesizes an implicit:
+
+```with
+fn main:
+    ...
+```
+
+whose body contains the file's top-level statements in source
+order.
+
+Only the entry file is eligible. Imported modules, `with check`,
+and test-harness synthesis continue to use the existing
+declaration-only top-level model.
+
+Top-level declarations remain module-scoped:
+
+- `fn`
+- `type`
+- `enum`
+- `trait`
+- `impl`
+- `use`
+- `extern`
+- `const`
+
+Top-level executable statements become the implicit main body:
+
+- expression statements
+- assignments
+- control-flow statements
+- top-level `let` / `var` when script mode is active
+
+If a file defines `fn main`, top-level `let` / `var` retain their
+existing module-global meaning and no implicit main is synthesized.
+
+It is an error for an entry file to contain both:
+
+1. an explicit `fn main`, and
+2. any non-declaration top-level executable statement
+
+### Rationale
+
+The feature is meant to improve the first-run script experience
+without changing library semantics or breaking existing programs
+that use explicit `fn main` plus top-level globals.
+
+That distinction matters. The naive rule "in script mode, treat
+top-level `let` / `var` as statements" is not enough, because the
+parser sees items incrementally. If the compiler reclassifies
+top-level `var g = ...` before it has discovered a later explicit
+`fn main`, it silently changes module-global state into a local and
+then produces the wrong explicit-main conflict.
+
+The implemented rule is therefore:
+
+- entry-file parse mode is enabled only for build/run entry files
+- the parser performs a cheap top-level pre-scan for `fn main`
+- if `fn main` exists anywhere at top level, top-level `let` / `var`
+  stay declarations for the whole file
+- only files with no explicit main permit top-level statements to
+  accumulate into a synthesized main
+
+This preserves the existing meaning of files such as:
+
+```with
+var g_counter: i32 = 0
+
+fn main:
+    g_counter = g_counter + 1
+```
+
+while still allowing:
+
+```with
+let x = 3
+print(int_to_string(double(x) + 1))
+
+fn double(n: i32) -> i32:
+    n * 2
+```
+
+### Implementation Note
+
+The implementation lives entirely in the frontend/parser path.
+No sema, MIR, or codegen special cases are needed once the parser
+produces a normal synthesized `NK_FN_DECL`.
+
+#### Parser changes
+
+`Parser` now carries:
+
+- `implicit_main_mode`
+- `implicit_main_has_main_hint`
+- `top_level_stmts`
+- `explicit_main_decl`
+
+When implicit-main mode is enabled:
+
+1. The parser first performs a top-level token pre-scan to detect
+   whether the file contains `fn main`.
+2. If the file has no explicit main, non-declaration top-level items
+   are parsed as expressions/statements and appended to
+   `top_level_stmts`.
+3. At end of module parse, if `top_level_stmts` is non-empty, the
+   parser synthesizes:
+   - an `NK_BLOCK` containing those statements
+   - a normal `NK_FN_DECL` named `main`
+   - zero-parameter function metadata
+4. If the file has both explicit main and top-level executable
+   statements, the parser emits a hard error naming both sites.
+
+Because the synthesized node is an ordinary function declaration,
+the rest of the pipeline treats it exactly like handwritten
+`fn main`.
+
+#### Frontend wiring
+
+The mode is enabled only through dedicated entry-file frontend calls:
+
+- `Compilation.build_binary_to_path`
+- `Compilation.build_binary_from_source_to_path`
+
+The shared parse/check/import paths are unchanged:
+
+- `Compilation.compile_file`
+- `with check`
+- imported module parsing in `Resolve`
+- test/bench discovery parsers
+
+This is the critical containment boundary. Implicit main is a build
+entry feature, not a general parse mode.
+
+### Tests
+
+Coverage added:
+
+- `test/behavior/behav_implicit_main.w`
+  Verifies declaration hoisting, forward reference visibility, and
+  top-level `let` locality in synthesized main.
+- `test/compile_errors/err_implicit_main_check.w`
+  Verifies `with check` still rejects top-level executable
+  statements.
+- `test/compile_errors/err_implicit_main_conflict.w`
+  Verifies explicit `fn main` plus top-level executable statements
+  is a hard error.
+- `test/compile_errors/err_implicit_main_import_stmt.w`
+  Verifies imported files with top-level executable statements still
+  fail.
+
+### Verification
+
+The final implementation passed:
+
+- `make build`
+- `make fixpoint`
+- `make test`
+
+The important regression during development was explicit-main files
+with top-level globals. The first implementation incorrectly treated
+top-level `let` / `var` as statements too early, which broke files
+such as `behav_basic_semantics.w` and `behav_globals.w`. The root
+cause was classification without whole-file knowledge. The fix was
+the top-level `fn main` pre-scan described above.
+
+---
+
 ## §4.X Lazy Type Resolution
 
 ### Spec Language
