@@ -418,9 +418,9 @@ fn ci_migrate_preamble_text() -> str:
     p = p ++ "extern fn with_alloc(size: i64) -> *i8\n"
     p = p ++ "extern fn with_realloc(ptr: *i8, old_size: i64, new_size: i64) -> *i8\n"
     p = p ++ "extern fn with_free(ptr: *i8) -> void\n"
-    p = p ++ "extern fn with_memcpy(dst: *i8, src: *i8, n: i64) -> void\n"
-    p = p ++ "extern fn with_memmove(dst: *i8, src: *i8, n: i64) -> void\n"
-    p = p ++ "extern fn with_memset(ptr: *i8, c: i32, n: i64) -> void\n"
+    p = p ++ "extern fn with_memcpy(dst: *i8, src: *i8, n: i64) -> *i8\n"
+    p = p ++ "extern fn with_memmove(dst: *i8, src: *i8, n: i64) -> *i8\n"
+    p = p ++ "extern fn with_memset(ptr: *i8, c: i32, n: i64) -> *i8\n"
     p = p ++ "extern fn with_memcmp(a: *i8, b: *i8, n: i64) -> i32\n\n"
     p
 
@@ -1130,12 +1130,8 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
         var pname = with_cimport_fn_param_name(session, idx, pi)
         if pname.len() == 0:
             pname = ci_get_nth_pipe_entry(cursor_param_names, pi)
-        let escaped_pname = if pname.len() > 0: ci_escape_reserved(pname) else: f"p{pi}"
-        // If this param is mutated in the body, rename it in the signature
-        // to avoid shadowing when the body emits `var pname = __param_pname`
-        var sig_pname = escaped_pname
-        if fn_body_cursor >= 0 and ci_body_assigns_to(session, fn_body_cursor, escaped_pname):
-            sig_pname = "__param_" ++ escaped_pname
+        let escaped_pname = if pname.len() > 0: ci_escape_reserved(pname) else: ""
+        let sig_pname = ci_param_signature_name(escaped_pname, pi)
         params = params ++ sig_pname ++ ": " ++ ptype
 
     if is_variadic != 0:

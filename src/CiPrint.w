@@ -530,18 +530,28 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
     if kind == CiExprKind.CIE_ADDR_OF:
         let operand = (exprs.get_d0(id)) as CiExprId
         let is_mut = exprs.get_d1(id)
-        let kw = if is_mut != 0: "&raw mut " else: "&"
+        let kw = if is_mut != 0: "&raw mut " else: "&raw const "
+        if exprs.kind(operand) == CiExprKind.CIE_FIELD:
+            let base = (exprs.get_d0(operand)) as CiExprId
+            let field = exprs.get_string(exprs.get_d1(operand))
+            let base_ty = exprs.get_type(base)
+            if ci_field_base_needs_borrow(types, base_ty):
+                let base_kw = if is_mut != 0: "&raw mut " else: "&raw const "
+                let ptr_kw = if is_mut != 0: "*mut " else: "*const "
+                let base_text = ci_print_expr(exprs, types, base, 0, 0)
+                return f"{kw}(unsafe: *({base_kw}{base_text} as {ptr_kw}{ci_print_type(types, base_ty)})).{field}"
         return kw ++ ci_print_expr(exprs, types, operand, 0, 1)
     if kind == CiExprKind.CIE_ARRAY_DECAY:
         let operand = (exprs.get_d0(id)) as CiExprId
+        let indexed = ci_wrap_unsafe(ci_print_expr(exprs, types, operand, 0, 0) ++ "[0]")
         let target_ty = exprs.get_type(id)
         if (target_ty as i32) != 0 and types.kind(target_ty) == CiTypeKind.CT_POINTER:
             let pointee_ty = (types.get_d0(target_ty)) as CiTypeId
             let is_const = types.get_d1(target_ty)
             let ptr_kw = if is_const != 0: "*const " else: "*mut "
-            return "(&" ++ ci_print_expr(exprs, types, operand, 0, 0) ++ "[0] as " ++ ptr_kw ++ ci_print_type(types, pointee_ty) ++ ")"
+            return "(&" ++ indexed ++ " as " ++ ptr_kw ++ ci_print_type(types, pointee_ty) ++ ")"
         let elem_ty = (exprs.get_d1(id)) as CiTypeId
-        return "(&" ++ ci_print_expr(exprs, types, operand, 0, 0) ++ "[0] as *mut " ++ ci_print_type(types, elem_ty) ++ ")"
+        return "(&" ++ indexed ++ " as *mut " ++ ci_print_type(types, elem_ty) ++ ")"
 
     // Side-effecting
     if kind == CiExprKind.CIE_PRE_INC:

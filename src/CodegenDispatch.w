@@ -253,12 +253,7 @@ fn Codegen.mir_local_llvm_type(self: Codegen, body: MirBody, local_id: i32) -> i
     let sema_ty = body.local_type_ids.get(local_id as i64)
     if sema_ty <= 0:
         return 0
-    var llvm_ty: i64 = 0
-    let type_name_sym = self.mir_input.mir_get_type_name(sema_ty)
-    if type_name_sym != 0:
-        llvm_ty = self.resolve_named_type(self.sema_sym_to_codegen_sym(type_name_sym))
-    if llvm_ty == 0:
-        llvm_ty = self.mir_sema_type_to_llvm(sema_ty)
+    let llvm_ty = self.mir_sema_type_to_llvm(sema_ty)
     if llvm_ty != 0:
         self.mir_local_types.insert(local_id, llvm_ty)
     llvm_ty
@@ -364,11 +359,7 @@ fn Codegen.mir_place_projected_type(self: Codegen, body: MirBody, place_id: i32)
         cur_sema_ty = body.local_type_ids.get(base_local as i64)
     if cur_ty == 0 and base_local >= 0 and base_local < body.local_type_ids.len() as i32:
         if cur_sema_ty > 0:
-            let type_name_sym = self.mir_input.mir_get_type_name(cur_sema_ty)
-            if type_name_sym != 0:
-                cur_ty = self.resolve_named_type(self.sema_sym_to_codegen_sym(type_name_sym))
-            if cur_ty == 0:
-                cur_ty = self.mir_sema_type_to_llvm(cur_sema_ty)
+            cur_ty = self.mir_sema_type_to_llvm(cur_sema_ty)
     if cur_ty == 0:
         return 0
     let p_start = body.place_proj_starts.get(place_id as i64)
@@ -519,14 +510,11 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
         cur_ty = cur_ty_opt.unwrap() as i64
     if base_local >= 0 and base_local < body.local_type_ids.len() as i32:
         cur_sema_ty = body.local_type_ids.get(base_local as i64)
-    // Resolve type via sema snapshot if LLVM type not yet known
+    // Resolve the base storage type via sema snapshot if LLVM type is not yet known.
+    // For pointer globals this must remain ptr; field projection code resolves the pointee.
     if cur_ty == 0 and base_local >= 0 and base_local < body.local_type_ids.len() as i32:
         if cur_sema_ty > 0:
-            let type_name_sym = self.mir_input.mir_get_type_name(cur_sema_ty)
-            if type_name_sym != 0:
-                cur_ty = self.resolve_named_type(self.sema_sym_to_codegen_sym(type_name_sym))
-            if cur_ty == 0:
-                cur_ty = self.mir_sema_type_to_llvm(cur_sema_ty)
+            cur_ty = self.mir_sema_type_to_llvm(cur_sema_ty)
             if cur_ty != 0:
                 self.mir_local_types.insert(base_local, cur_ty)
     var active_variant_idx = 0 - 1
@@ -966,6 +954,18 @@ fn Codegen.mir_sema_type_is_unsigned(self: Codegen, sema_ty: i32) -> bool:
         return self.mir_input.mir_get_type_d1(resolved) == 0
     false
 
+fn Codegen.mir_coerce_value_to_sema_type(self: Codegen, val: i64, target_ty: i64, target_sema_ty: i32, src_unsigned: bool) -> i64:
+    if val == 0 or target_ty == 0:
+        return val
+    let val_ty = wl_type_of(val)
+    if val_ty == target_ty:
+        return val
+    let vk = wl_get_type_kind(val_ty)
+    let tk = wl_get_type_kind(target_ty)
+    if vk == wl_integer_type_kind() and tk == wl_integer_type_kind():
+        return self.coerce_int_ext(val, target_ty, src_unsigned or self.mir_sema_type_is_unsigned(target_sema_ty))
+    self.coerce_value_to_type(val, target_ty)
+
 fn Codegen.mir_compare_dispatch_kind(self: Codegen, sema_ty: i32) -> i32:
     if sema_ty <= 0:
         return 0
@@ -1082,11 +1082,11 @@ fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs: i64, rhs: i64, is_unsig
         if sema_cmp != 0:
             return sema_cmp
         if lk == wl_pointer_type_kind() and rk == wl_integer_type_kind():
-            if wl_is_constant(rhs) != 0 and wl_const_int_sext_val(rhs) == 0:
+            if self.is_const_int_value(rhs) and wl_const_int_sext_val(rhs) == 0:
                 let cmp_rhs = wl_const_null(wl_type_of(lhs))
                 return wl_build_icmp(self.builder, if op == BinaryOp.OP_EQ: wl_int_eq() else: wl_int_ne(), lhs, cmp_rhs)
         if rk == wl_pointer_type_kind() and lk == wl_integer_type_kind():
-            if wl_is_constant(lhs) != 0 and wl_const_int_sext_val(lhs) == 0:
+            if self.is_const_int_value(lhs) and wl_const_int_sext_val(lhs) == 0:
                 let cmp_lhs = wl_const_null(wl_type_of(rhs))
                 return wl_build_icmp(self.builder, if op == BinaryOp.OP_EQ: wl_int_eq() else: wl_int_ne(), cmp_lhs, rhs)
 
@@ -1130,8 +1130,10 @@ fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs: i64, rhs: i64, is_unsig
     if wl_get_type_kind(lty) == wl_integer_type_kind() and wl_get_type_kind(rty) == wl_integer_type_kind():
         if wl_get_int_type_width(rty) > wl_get_int_type_width(lty):
             wider_ty = rty
-    let l = self.coerce_int_ext(lhs, wider_ty, is_unsigned)
-    let r = self.coerce_int_ext(rhs, wider_ty, is_unsigned)
+    let lhs_unsigned = is_unsigned or self.mir_sema_type_is_unsigned(lhs_sema)
+    let rhs_unsigned = is_unsigned or self.mir_sema_type_is_unsigned(rhs_sema)
+    let l = self.coerce_int_ext(lhs, wider_ty, lhs_unsigned)
+    let r = self.coerce_int_ext(rhs, wider_ty, rhs_unsigned)
     if op == BinaryOp.OP_ADD_WRAP: return wl_build_add(self.builder, l, r)
     if op == BinaryOp.OP_SUB_WRAP: return wl_build_sub(self.builder, l, r)
     if op == BinaryOp.OP_MUL_WRAP: return wl_build_mul(self.builder, l, r)
@@ -1982,7 +1984,10 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
     let d2 = body.rval_d2.get(rval_id as i64)
 
     if rk == RvalueKind.RK_USE:
-        return self.mir_eval_operand(body, d0, dest_ty)
+        let val = self.mir_eval_operand(body, d0, 0)
+        if dest_ty != 0:
+            return self.mir_coerce_value_to_sema_type(val, dest_ty, dest_sema_ty, self.mir_operand_is_unsigned(body, d0))
+        return val
 
     if rk == RvalueKind.RK_BIN_OP:
         let lhs = self.mir_eval_operand(body, d1, 0)
@@ -2362,7 +2367,12 @@ fn Codegen.mir_emit_stmt(self: Codegen, body: MirBody, stmt_id: i32) -> bool:
         if final_ty == 0: return false
         var coerced = value
         if wl_type_of(value) != final_ty:
-            coerced = self.coerce_value_to_type(value, final_ty)
+            var src_unsigned = false
+            let rv_kind = if d1 >= 0 and d1 < body.rval_kinds.len() as i32: body.rval_kinds.get(d1 as i64) else: -1
+            if rv_kind == RvalueKind.RK_USE:
+                let operand_id = body.rval_d0.get(d1 as i64)
+                src_unsigned = self.mir_operand_is_unsigned(body, operand_id)
+            coerced = self.mir_coerce_value_to_sema_type(value, final_ty, dst_sema_ty, src_unsigned)
         // Bitpacked field store: read-modify-write the backing integer
         let bp_store_proj = self.bitpacked_place_proj.get(d0)
         if bp_store_proj.is_some():
@@ -4327,7 +4337,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         // GEP to field 0 (val)
         let al_val_ptr = wl_build_struct_gep(self.builder, al_recv_ty, al_recv_ptr, 0)
         // Extract ordering constant (default to seq_cst = 4)
-        let al_order = if wl_is_constant(al_order_raw) != 0: wl_const_int_sext_val(al_order_raw) as i32 else: AtomicOrdering.SEQ_CST
+        let al_order = if self.is_const_int_value(al_order_raw): wl_const_int_sext_val(al_order_raw) as i32 else: AtomicOrdering.SEQ_CST
         result = wl_build_atomic_load(self.builder, al_elem_ty, al_val_ptr, al_order)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_STORE:
@@ -4337,7 +4347,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let as_order_raw = self.mir_intrinsic_arg(body, args_id, 2)
         let as_recv_ty = wl_get_allocated_type(as_recv_ptr)
         let as_val_ptr = wl_build_struct_gep(self.builder, as_recv_ty, as_recv_ptr, 0)
-        let as_order = if wl_is_constant(as_order_raw) != 0: wl_const_int_sext_val(as_order_raw) as i32 else: AtomicOrdering.SEQ_CST
+        let as_order = if self.is_const_int_value(as_order_raw): wl_const_int_sext_val(as_order_raw) as i32 else: AtomicOrdering.SEQ_CST
         wl_build_atomic_store(self.builder, as_val, as_val_ptr, as_order)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_SWAP or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_ADD or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_SUB or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_AND or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_OR or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_XOR or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_MIN or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_MAX:
@@ -4347,7 +4357,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let ar_order_raw = self.mir_intrinsic_arg(body, args_id, 2)
         let ar_recv_ty = wl_get_allocated_type(ar_recv_ptr)
         let ar_val_ptr = wl_build_struct_gep(self.builder, ar_recv_ty, ar_recv_ptr, 0)
-        let ar_order = if wl_is_constant(ar_order_raw) != 0: wl_const_int_sext_val(ar_order_raw) as i32 else: AtomicOrdering.SEQ_CST
+        let ar_order = if self.is_const_int_value(ar_order_raw): wl_const_int_sext_val(ar_order_raw) as i32 else: AtomicOrdering.SEQ_CST
         let ar_rmw_op = if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_SWAP: AtomicRmwOp.XCHG
             else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_ADD: AtomicRmwOp.ADD
             else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_SUB: AtomicRmwOp.SUB
@@ -4368,8 +4378,8 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let cas_failure_raw = self.mir_intrinsic_arg(body, args_id, 4)
         let cas_recv_ty = wl_get_allocated_type(cas_recv_ptr)
         let cas_val_ptr = wl_build_struct_gep(self.builder, cas_recv_ty, cas_recv_ptr, 0)
-        let cas_success_order = if wl_is_constant(cas_success_raw) != 0: wl_const_int_sext_val(cas_success_raw) as i32 else: AtomicOrdering.SEQ_CST
-        let cas_failure_order = if wl_is_constant(cas_failure_raw) != 0: wl_const_int_sext_val(cas_failure_raw) as i32 else: AtomicOrdering.SEQ_CST
+        let cas_success_order = if self.is_const_int_value(cas_success_raw): wl_const_int_sext_val(cas_success_raw) as i32 else: AtomicOrdering.SEQ_CST
+        let cas_failure_order = if self.is_const_int_value(cas_failure_raw): wl_const_int_sext_val(cas_failure_raw) as i32 else: AtomicOrdering.SEQ_CST
         let cas_is_weak = if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_CAS_WEAK: 1 else: 0
         let cas_result = wl_build_cmpxchg(self.builder, cas_val_ptr, cas_expected, cas_desired, cas_success_order, cas_failure_order, cas_is_weak)
         // Extract old value (index 0) from {T, i1} result
@@ -4377,7 +4387,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FENCE:
         let fence_order_raw = self.mir_intrinsic_arg(body, args_id, 0)
-        let fence_order = if wl_is_constant(fence_order_raw) != 0: wl_const_int_sext_val(fence_order_raw) as i32 else: AtomicOrdering.SEQ_CST
+        let fence_order = if self.is_const_int_value(fence_order_raw): wl_const_int_sext_val(fence_order_raw) as i32 else: AtomicOrdering.SEQ_CST
         wl_build_fence(self.builder, fence_order)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ASM:

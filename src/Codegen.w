@@ -1206,6 +1206,11 @@ fn Codegen.get_fn_dyn_param_trait(self: Codegen, fn_sym: i32, param_idx: i32) ->
         return 0
     self.fn_dyn_param_data.get(slot as i64)
 
+fn Codegen.is_const_int_value(self: Codegen, val: i64) -> bool:
+    // LLVMIsConstant is broader than integer constants; only this kind is safe
+    // to pass to LLVMConstIntGetSExtValue.
+    val != 0 and wl_get_value_kind(val) == 18
+
 fn Codegen.coerce_value_to_type(self: Codegen, val: i64, target_ty: i64) -> i64:
     if val == 0 or target_ty == 0:
         return val
@@ -1219,7 +1224,7 @@ fn Codegen.coerce_value_to_type(self: Codegen, val: i64, target_ty: i64) -> i64:
     if tk == wl_pointer_type_kind() and self.is_str_type(val_ty):
         return self.extract_str_ptr(val)
     if vk == wl_integer_type_kind() and tk == wl_pointer_type_kind():
-        if wl_is_constant(val) != 0 and wl_const_int_sext_val(val) == 0:
+        if self.is_const_int_value(val) and wl_const_int_sext_val(val) == 0:
             return wl_const_null(target_ty)
     if tk == wl_pointer_type_kind() and vk == wl_pointer_type_kind():
         return wl_build_bitcast(self.builder, val, target_ty)
