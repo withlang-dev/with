@@ -103,6 +103,35 @@ ensure_generated_dependencies() {
         ' "$auto_possess_w" > "$auto_tmp"
         mv "$auto_tmp" "$auto_possess_w"
     fi
+
+    local pcre2test_w="$generated_dir/pcre2test.w"
+    if [ -f "$pcre2test_w" ] && ! grep -Fq 'use std.re.pcre2_context' "$pcre2test_w"; then
+        local pcre2test_tmp pcre2test_imports
+        pcre2test_tmp="$(mktemp "${TMPDIR:-/tmp}/pcre2test-imports.XXXXXX")"
+        pcre2test_imports="$(mktemp "${TMPDIR:-/tmp}/pcre2test-import-list.XXXXXX")"
+        CLEANUP_FILES+=("$pcre2test_tmp")
+        CLEANUP_FILES+=("$pcre2test_imports")
+        for mod_path in "$generated_dir"/*.w; do
+            mod="$(basename "$mod_path" .w)"
+            case "$mod" in
+                defs|pcre2test) continue ;;
+            esac
+            printf 'use std.re.%s\n' "$mod" >> "$pcre2test_imports"
+        done
+        sort -u "$pcre2test_imports" -o "$pcre2test_imports"
+        awk '
+            NR == 2 && $0 == "use std.re.defs" {
+                print
+                while ((getline import_line < imports) > 0) {
+                    print import_line
+                }
+                close(imports)
+                next
+            }
+            { print }
+        ' imports="$pcre2test_imports" "$pcre2test_w" > "$pcre2test_tmp"
+        mv "$pcre2test_tmp" "$pcre2test_w"
+    fi
 }
 
 module_defines_main() {

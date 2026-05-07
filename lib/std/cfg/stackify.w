@@ -217,15 +217,8 @@ pub fn StackifyGraph.add_branch_target(mut self: StackifyGraph, block: i32, args
 fn stackify_graph_update_block(mut self: StackifyGraph, block: i32, replacement: StackifyBlock):
     if block < 0 or block >= self.blocks.len() as i32:
         return
-    let updated: Vec[StackifyBlock] = Vec.new()
-    var i: i32 = 0
-    while i < self.blocks.len() as i32:
-        if i == block:
-            updated.push(replacement)
-        else:
-            updated.push(self.blocks.get(i as i64))
-        i = i + 1
-    self.blocks = updated
+    unsafe:
+        *((self.blocks.ptr as *mut StackifyBlock) + (block as usize)) = replacement
 
 fn stackify_graph_set_succs(mut self: StackifyGraph, block: i32, succs: Vec[i32]):
     var b = self.blocks.get(block as i64)

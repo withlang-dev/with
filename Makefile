@@ -43,7 +43,6 @@ REGEX_PROMOTE_DIR := lib/std/re
 REGEX_EXCLUDED_C_SOURCES := \
 	pcre2demo.c \
 	pcre2grep.c \
-	pcre2posix.c \
 	pcre2posix_test.c \
 	pcre2_jit_test.c \
 	pcre2_dftables.c \

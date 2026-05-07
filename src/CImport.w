@@ -809,6 +809,21 @@ fn ci_render_generated_fn_body(header: str, body: str) -> str:
         return header ++ " {\n" ++ body ++ "\n}"
     header ++ ":\n" ++ body
 
+fn ci_param_signature_name(escaped: str, idx: i32) -> str:
+    if escaped.len() > 0:
+        return f"__param_{escaped}"
+    f"p{idx}"
+
+fn ci_param_local_name(escaped: str, idx: i32) -> str:
+    if escaped.len() > 0:
+        return f"__local_{escaped}"
+    f"__local_p{idx}"
+
+fn ci_local_storage_name(escaped: str, cursor: i32) -> str:
+    if escaped.len() > 0:
+        return f"__local_{escaped}"
+    f"__local_{cursor}"
+
 fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
     // B9: fresh per-function temp counter.
     ci_temp_reset()
@@ -841,7 +856,7 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
                     si_params = si_params ++ ", "
                 let spname = with_cimport_fn_param_name(session, idx, spi)
                 let sptype = with_cimport_fn_param_type_translated(session, idx, spi)
-                let actual_pname = if spname.len() > 0: ci_escape_reserved(spname) else: f"p{spi}"
+                let actual_pname = ci_param_signature_name(ci_escape_reserved(spname), spi)
                 si_params = si_params ++ actual_pname ++ ": " ++ sptype
             let si_ret = with_cimport_fn_return_type_translated(session, idx)
             return ci_render_generated_fn_body("fn " ++ safe_name ++ "(" ++ si_params ++ ") -> " ++ si_ret, body)
@@ -872,10 +887,7 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
             has_unsupported = true
             unsupported_reason = ptype.slice(14, ptype.len())
 
-        if pname.len() > 0:
-            params = params ++ ci_escape_reserved(pname) ++ ": " ++ ptype
-        else:
-            params = params ++ f"p{pi}" ++ ": " ++ ptype
+        params = params ++ ci_param_signature_name(ci_escape_reserved(pname), pi) ++ ": " ++ ptype
 
     if is_variadic != 0:
         if param_count > 0:
@@ -3215,6 +3227,19 @@ fn ci_find_matching_brace(s: str, start: i32) -> i32:
     var i = start
     while i < s.len() as i32:
         let c = s.byte_at(i as i64)
+        if c == 34 or c == 39:
+            let quote = c
+            i = i + 1
+            while i < s.len() as i32:
+                let inner = s.byte_at(i as i64)
+                if inner == 92:
+                    i = i + 2
+                    continue
+                if inner == quote:
+                    break
+                i = i + 1
+            i = i + 1
+            continue
         if c == 123: depth = depth + 1
         if c == 125:
             depth = depth - 1
@@ -4744,13 +4769,7 @@ fn CiExprPool.coerce_init_expr_to_type(self: CiExprPool, types: CiTypePool, valu
         let ty_id = types.type_from_translated_text(ty)
         return self.null_ptr(ty_id)
     if ci_expr_is_string_lit(self.val(), value_id) and ci_starts_with(ty, "*"):
-        let target_ty = types.type_from_translated_text(ty)
-        if (target_ty as i32) == 0:
-            return value_id
-        if types.kind(target_ty) != CiTypeKind.CT_POINTER:
-            return value_id
-        let pointee_ty = (types.get_d0(target_ty)) as CiTypeId
-        return self.add(CiExprKind.CIE_ARRAY_DECAY, value_id as i32, pointee_ty as i32, 0, target_ty)
+        return value_id
     value_id
 
 fn ci_record_decl_cursor_for_type(session: i64, ty: i32) -> i32:
@@ -4818,23 +4837,98 @@ fn ci_record_type_field_cxtype(session: i64, ty: i32, field_idx: i32) -> i32:
         return -1
     with_ci_cursor_type(session, field)
 
+var g_ci_record_count_cache_keys: Vec[str] = Vec.new()
+var g_ci_record_count_cache_values: Vec[i32] = Vec.new()
+var g_ci_record_field_cache_keys: Vec[str] = Vec.new()
+var g_ci_record_field_name_cache_values: Vec[str] = Vec.new()
+var g_ci_record_field_type_cache_values: Vec[str] = Vec.new()
+
+fn ci_record_cache_type_text(session: i64, ty_text: str, ty: i32) -> str:
+    if ty_text.len() > 0:
+        return ty_text
+    if ty >= 0:
+        let translated = with_ci_type_translated(session, ty)
+        if translated.len() > 0:
+            return translated
+        let canonical = with_ci_type_canonical(session, ty)
+        if canonical >= 0 and canonical != ty:
+            let canonical_translated = with_ci_type_translated(session, canonical)
+            if canonical_translated.len() > 0:
+                return canonical_translated
+    f"#tyid:{ty}"
+
+fn ci_record_count_cache_key(session: i64, ty_key: str) -> str:
+    f"{session}:{ty_key}"
+
+fn ci_record_field_cache_key(session: i64, ty_key: str, field_idx: i32) -> str:
+    f"{session}:{ty_key}:{field_idx}"
+
+fn ci_record_count_cache_lookup(key: str) -> i32:
+    var i = 0
+    while i < g_ci_record_count_cache_keys.len() as i32:
+        if g_ci_record_count_cache_keys.get(i as i64) == key:
+            return g_ci_record_count_cache_values.get(i as i64)
+        i = i + 1
+    -1
+
+fn ci_record_count_cache_store(key: str, value: i32):
+    g_ci_record_count_cache_keys.push(key)
+    g_ci_record_count_cache_values.push(value)
+
+fn ci_record_field_cache_lookup_index(key: str) -> i32:
+    var i = 0
+    while i < g_ci_record_field_cache_keys.len() as i32:
+        if g_ci_record_field_cache_keys.get(i as i64) == key:
+            return i
+        i = i + 1
+    -1
+
+fn ci_record_field_cache_store(key: str, name: str, ty: str):
+    g_ci_record_field_cache_keys.push(key)
+    g_ci_record_field_name_cache_values.push(name)
+    g_ci_record_field_type_cache_values.push(ty)
+
 fn ci_init_list_record_field_count(session: i64, ty_text: str, ty: i32) -> i32:
-    let from_text = ci_type_field_count(session, ty_text)
-    if from_text > 0:
-        return from_text
-    ci_record_type_field_count(session, ty)
+    let ty_key = ci_record_cache_type_text(session, ty_text, ty)
+    let key = ci_record_count_cache_key(session, ty_key)
+    let cached = ci_record_count_cache_lookup(key)
+    if cached >= 0:
+        return cached
+    var count = ci_record_type_field_count(session, ty)
+    if count <= 0:
+        count = ci_type_field_count(session, ty_text)
+    ci_record_count_cache_store(key, count)
+    count
 
 fn ci_init_list_record_field_name(session: i64, ty_text: str, ty: i32, field_idx: i32) -> str:
-    let from_text = ci_type_field_name(session, ty_text, field_idx)
-    if from_text.len() > 0:
-        return from_text
-    ci_record_type_field_name(session, ty, field_idx)
+    let ty_key = ci_record_cache_type_text(session, ty_text, ty)
+    let key = ci_record_field_cache_key(session, ty_key, field_idx)
+    let cached = ci_record_field_cache_lookup_index(key)
+    if cached >= 0:
+        return g_ci_record_field_name_cache_values.get(cached as i64)
+    var name = ci_record_type_field_name(session, ty, field_idx)
+    var field_ty = ci_record_type_field_type(session, ty, field_idx)
+    if name.len() == 0:
+        name = ci_type_field_name(session, ty_text, field_idx)
+    if field_ty.len() == 0:
+        field_ty = ci_type_field_type(session, ty_text, field_idx)
+    ci_record_field_cache_store(key, name, field_ty)
+    name
 
 fn ci_init_list_record_field_type(session: i64, ty_text: str, ty: i32, field_idx: i32) -> str:
-    let from_text = ci_type_field_type(session, ty_text, field_idx)
-    if from_text.len() > 0:
-        return from_text
-    ci_record_type_field_type(session, ty, field_idx)
+    let ty_key = ci_record_cache_type_text(session, ty_text, ty)
+    let key = ci_record_field_cache_key(session, ty_key, field_idx)
+    let cached = ci_record_field_cache_lookup_index(key)
+    if cached >= 0:
+        return g_ci_record_field_type_cache_values.get(cached as i64)
+    var name = ci_record_type_field_name(session, ty, field_idx)
+    var field_ty = ci_record_type_field_type(session, ty, field_idx)
+    if name.len() == 0:
+        name = ci_type_field_name(session, ty_text, field_idx)
+    if field_ty.len() == 0:
+        field_ty = ci_type_field_type(session, ty_text, field_idx)
+    ci_record_field_cache_store(key, name, field_ty)
+    field_ty
 
 fn ci_init_list_record_field_cxtype(session: i64, ty_text: str, ty: i32, field_idx: i32) -> i32:
     if ci_type_field_count(session, ty_text) > 0:
@@ -4852,9 +4946,8 @@ fn CiExprPool.lower_init_list_ir(self: CiExprPool, session: i64, cursor: i32, ty
         let elem_ty_str = ci_array_element_type(ty_str)
         let elem_field_count = ci_init_list_record_field_count(session, elem_ty_str, elem_cxtype)
         let elem_ty_id = if elem_cxtype >= 0: types.type_from_libclang(session, elem_cxtype) else: 0 as CiTypeId
-        let items_start = self.extra_len() as i32
+        var item_ids: Vec[i32] = Vec.new()
         var ai = 0
-        var item_count = 0
         while ai < nc:
             let child = with_ci_child(session, cursor, ai)
             let child_kind = with_ci_cursor_kind(session, ci_peel_transparent(session, child))
@@ -4862,7 +4955,8 @@ fn CiExprPool.lower_init_list_ir(self: CiExprPool, session: i64, cursor: i32, ty
             if elem_field_count > 0 and (child_kind != CXK_INIT_LIST and child_kind != CXK_COMPOUND_LITERAL):
                 if ai + elem_field_count > nc:
                     return 0 as CiExprId
-                let fields_start = self.extra_len() as i32
+                var field_names: Vec[i32] = Vec.new()
+                var field_values: Vec[i32] = Vec.new()
                 var fi = 0
                 while fi < elem_field_count:
                     let field_name = ci_init_list_record_field_name(session, elem_ty_str, elem_cxtype, fi)
@@ -4874,9 +4968,15 @@ fn CiExprPool.lower_init_list_ir(self: CiExprPool, session: i64, cursor: i32, ty
                         return 0 as CiExprId
                     let coerced_id = self.coerce_init_expr_to_type(types, raw_id, field_type)
                     let field_idx = self.add_string(field_name)
-                    let _ = self.add_extra(field_idx)
-                    let _ = self.add_extra(coerced_id as i32)
+                    field_names.push(field_idx)
+                    field_values.push(coerced_id as i32)
                     fi = fi + 1
+                let fields_start = self.extra_len() as i32
+                var fj: i64 = 0
+                while fj < field_names.len():
+                    let _ = self.add_extra(field_names.get(fj))
+                    let _ = self.add_extra(field_values.get(fj))
+                    fj = fj + 1
                 item_id = self.designated_init(fields_start, elem_field_count, elem_ty_id)
                 ai = ai + elem_field_count
             else:
@@ -4884,13 +4984,18 @@ fn CiExprPool.lower_init_list_ir(self: CiExprPool, session: i64, cursor: i32, ty
                 ai = ai + 1
             if (item_id as i32) == 0:
                 return 0 as CiExprId
-            let _ = self.add_extra(item_id as i32)
-            item_count = item_count + 1
+            item_ids.push(item_id as i32)
         ci_trace_port("STRUCTURAL[b11.11.init_list]")
-        return self.init_list(items_start, item_count, init_ty_id)
+        let items_start = self.extra_len() as i32
+        var ii: i64 = 0
+        while ii < item_ids.len():
+            let _ = self.add_extra(item_ids.get(ii))
+            ii = ii + 1
+        return self.init_list(items_start, item_ids.len() as i32, init_ty_id)
     let aggregate_field_count = ci_init_list_record_field_count(session, ty_str, init_ty)
     if aggregate_field_count > 0:
-        let fields_start = self.extra_len() as i32
+        var field_names: Vec[i32] = Vec.new()
+        var field_values: Vec[i32] = Vec.new()
         var fi = 0
         while fi < nc:
             let field_name = ci_init_list_record_field_name(session, ty_str, init_ty, fi)
@@ -4902,23 +5007,34 @@ fn CiExprPool.lower_init_list_ir(self: CiExprPool, session: i64, cursor: i32, ty
                 return 0 as CiExprId
             let item_id = self.coerce_init_expr_to_type(types, item_id_raw, field_type)
             let field_idx = self.add_string(field_name)
-            let _ = self.add_extra(field_idx)
-            let _ = self.add_extra(item_id as i32)
+            field_names.push(field_idx)
+            field_values.push(item_id as i32)
             fi = fi + 1
+        let fields_start = self.extra_len() as i32
+        var fj: i64 = 0
+        while fj < field_names.len():
+            let _ = self.add_extra(field_names.get(fj))
+            let _ = self.add_extra(field_values.get(fj))
+            fj = fj + 1
         ci_trace_port("STRUCTURAL[b11.11.init_list]")
         return self.designated_init(fields_start, nc, init_ty_id)
     if nc == 1:
         return self.lower_expr_ir(session, with_ci_child(session, cursor, 0), types, scope)
-    let items_start = self.extra_len() as i32
+    var item_ids: Vec[i32] = Vec.new()
     var ii = 0
     while ii < nc:
         let item_id = self.lower_expr_ir(session, with_ci_child(session, cursor, ii), types, scope)
         if (item_id as i32) == 0:
             return 0 as CiExprId
-        let _ = self.add_extra(item_id as i32)
+        item_ids.push(item_id as i32)
         ii = ii + 1
     ci_trace_port("STRUCTURAL[b11.11.init_list]")
-    self.init_list(items_start, nc, init_ty_id)
+    let items_start = self.extra_len() as i32
+    var ij: i64 = 0
+    while ij < item_ids.len():
+        let _ = self.add_extra(item_ids.get(ij))
+        ij = ij + 1
+    self.init_list(items_start, item_ids.len() as i32, init_ty_id)
 
 fn CiExprPool.lower_expr_ir(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: str) -> CiExprId:
     let kind = with_ci_cursor_kind(session, cursor)
@@ -5614,18 +5730,23 @@ fn CiExprPool.lower_implicit_cast(self: CiExprPool, session: i64, cursor: i32, t
 
     if cast_kind == CI_CAST_ARRAY_TO_PTR:
         ci_trace_port("STRUCTURAL[b11.5.array_to_ptr]")
+        let scoped_inner_ty = ci_scope_type_for_cursor(session, inner_cursor, scope)
         // `(&inner[0] as DEST)` — DEST preserves pointee const
         // qualifiers from the cast's destination type. Structural:
-        //   CIE_INDEX(inner, int_lit(0)) → inner[0]
+        //   CIE_INDEX(inner, int_lit(0)) → unsafe pointer/array-param index
         //   CIE_ADDR_OF(idx_e, mut=0)    → &inner[0]
         //   CIE_CAST(dest_ty, addr_e)    → (&inner[0] as dest)
         let dest_cxtype = with_ci_cursor_type(session, cursor)
         let dest_ty_id = types.type_from_libclang(session, dest_cxtype)
         if (dest_ty_id as i32) == 0:
             return 0 as CiExprId
+        if with_ci_cursor_kind(session, ci_peel_transparent(session, inner_cursor)) == CXK_STRING_LITERAL:
+            return self.cast_if_needed(dest_ty_id, inner_id, inner_cursor, session, types)
+        if ci_starts_with(scoped_inner_ty, "*"):
+            return self.cast_if_needed(dest_ty_id, inner_id, inner_cursor, session, types)
         let zero_s = self.add_string("0")
         let zero_e = self.int_lit(zero_s, 0 as CiTypeId)
-        let idx_e = self.add(CiExprKind.CIE_INDEX, inner_id as i32, zero_e as i32, 0, 0 as CiTypeId)
+        let idx_e = self.add(CiExprKind.CIE_INDEX, inner_id as i32, zero_e as i32, 1, 0 as CiTypeId)
         let addr_e = self.add(CiExprKind.CIE_ADDR_OF, idx_e as i32, 0, 0, 0 as CiTypeId)
         return self.cast(dest_ty_id, addr_e)
 
@@ -5789,6 +5910,10 @@ fn CiExprPool.lower_literal_or_ref(self: CiExprPool, session: i64, cursor: i32, 
             let stringify_val = ci_try_expand_stringify_call(session, literal_src)
             if stringify_val.len() > 0:
                 text = stringify_val
+            else:
+                return 0 as CiExprId
+        else:
+            return 0 as CiExprId
         let s = self.add_string(text)
         return self.add(CiExprKind.CIE_STRING_LIT, s, 0, 0, 0 as CiTypeId)
 
@@ -5818,7 +5943,12 @@ fn CiExprPool.lower_literal_or_ref(self: CiExprPool, session: i64, cursor: i32, 
         else:
             text = escaped
         let s = self.add_string(text)
-        let ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
+        var ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
+        let scoped_ty = ci_scope_lookup_type(scope, escaped)
+        if scoped_ty.len() > 0:
+            let scoped_ty_id = types.type_from_translated_text(scoped_ty)
+            if (scoped_ty_id as i32) != 0:
+                ty = scoped_ty_id
         return self.ident(s, ty)
 
     0 as CiExprId
@@ -6182,7 +6312,11 @@ fn CiExprPool.build_unary_value_expr_from_id(self: CiExprPool, session: i64, cur
     if op == UO_PLUS:
         return child_id
     if op == UO_DEREF:
-        return self.add(CiExprKind.CIE_DEREF, child_id as i32, 0, 0, 0 as CiTypeId)
+        var deref_ty = 0 as CiTypeId
+        let child_ty = self.get_type(child_id)
+        if (child_ty as i32) != 0 and types.kind(child_ty) == CiTypeKind.CT_POINTER:
+            deref_ty = (types.get_d0(child_ty)) as CiTypeId
+        return self.add(CiExprKind.CIE_DEREF, child_id as i32, 0, 0, deref_ty)
 
     if op == UO_MINUS:
         if with_ci_type_is_unsigned(session, cursor) == 0:
@@ -6241,7 +6375,7 @@ fn CiExprPool.lower_plain_value_expr_ir(self: CiExprPool, session: i64, cursor: 
         return 0 as CiExprId
     lowered.value_expr
 
-fn CiExprPool.apply_implicit_cast_to_value_id(self: CiExprPool, session: i64, cursor: i32, inner_cursor: i32, inner_id: CiExprId, types: CiTypePool) -> CiExprId:
+fn CiExprPool.apply_implicit_cast_to_value_id(self: CiExprPool, session: i64, cursor: i32, inner_cursor: i32, inner_id: CiExprId, types: CiTypePool, scope: str) -> CiExprId:
     let cast_kind = ci_classify_implicit_cast_safe(session, cursor, inner_cursor)
 
     if cast_kind == CI_CAST_NULL_TO_PTR:
@@ -6282,9 +6416,12 @@ fn CiExprPool.apply_implicit_cast_to_value_id(self: CiExprPool, session: i64, cu
         let dest_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
         if (dest_ty as i32) == 0:
             return 0 as CiExprId
+        let scoped_inner_ty = ci_scope_type_for_cursor(session, inner_cursor, scope)
+        if ci_starts_with(scoped_inner_ty, "*"):
+            return self.cast_if_needed(dest_ty, inner_id, inner_cursor, session, types)
         let zero_idx = self.add_string("0")
         let zero = self.int_lit(zero_idx, 0 as CiTypeId)
-        let idx_e = self.add(CiExprKind.CIE_INDEX, inner_id as i32, zero as i32, 0, 0 as CiTypeId)
+        let idx_e = self.add(CiExprKind.CIE_INDEX, inner_id as i32, zero as i32, 1, 0 as CiTypeId)
         let addr_e = self.add(CiExprKind.CIE_ADDR_OF, idx_e as i32, 0, 0, 0 as CiTypeId)
         return self.cast(dest_ty, addr_e)
     if cast_kind == CI_CAST_BITCAST or cast_kind == CI_CAST_PTR_CAST or cast_kind == CI_CAST_INT_WIDEN or cast_kind == CI_CAST_INT_WIDEN_SIGN or cast_kind == CI_CAST_INT_TRUNC or cast_kind == CI_CAST_FLOAT_CAST or cast_kind == CI_CAST_FLOAT_TO_INT or cast_kind == CI_CAST_INT_TO_FLOAT:
@@ -6496,7 +6633,11 @@ fn CiStmtPool.lower_lvalue_expr_ir(self: CiStmtPool, session: i64, cursor: i32, 
     if kind == CXK_UNARY_OP and nc > 0 and with_ci_unary_op(session, cursor) == UO_DEREF:
         let operand = self.lower_value_expr_ir(session, with_ci_child(session, cursor, 0), exprs, types, scope)
         if ci_value_ir_valid(operand):
-            let deref_id = exprs.add(CiExprKind.CIE_DEREF, operand.value_expr as i32, 0, 0, 0 as CiTypeId)
+            var deref_ty = 0 as CiTypeId
+            let operand_ty = exprs.get_type(operand.value_expr)
+            if (operand_ty as i32) != 0 and types.kind(operand_ty) == CiTypeKind.CT_POINTER:
+                deref_ty = (types.get_d0(operand_ty)) as CiTypeId
+            let deref_id = exprs.add(CiExprKind.CIE_DEREF, operand.value_expr as i32, 0, 0, deref_ty)
             return CiValueExprIR {
                 setup_stmt: operand.setup_stmt,
                 value_expr: deref_id,
@@ -6511,7 +6652,6 @@ fn CiStmtPool.lower_lvalue_expr_ir(self: CiStmtPool, session: i64, cursor: i32, 
 fn CiStmtPool.lower_value_expr_ir(self: CiStmtPool, session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, scope: str) -> CiValueExprIR:
     let kind = with_ci_cursor_kind(session, cursor)
     let nc = with_ci_num_children(session, cursor)
-    let expanded_src = ci_expand_string_macro_sequence(session, with_ci_cursor_source_text(session, cursor))
 
     if kind == CXK_UNEXPOSED_STMT:
         let inner = ci_find_last_expr_child(session, cursor)
@@ -6527,12 +6667,6 @@ fn CiStmtPool.lower_value_expr_ir(self: CiStmtPool, session: i64, cursor: i32, e
             return self.lower_value_expr_ir(session, with_ci_child(session, cursor, 0), exprs, types, scope)
         if nc > 0:
             return self.lower_value_expr_ir(session, with_ci_child(session, cursor, 0), exprs, types, scope)
-
-    if expanded_src.len() > 0:
-        if ci_is_string_literal(expanded_src) or ci_is_concatenated_string(expanded_src):
-            let str_idx = exprs.add_string(expanded_src)
-            return ci_value_ir_plain(exprs.add(CiExprKind.CIE_STRING_LIT, str_idx, 0, 0, 0 as CiTypeId))
-        return ci_value_ir_invalid()
 
     if kind == CXK_PAREN_EXPR:
         if nc == 1:
@@ -6551,7 +6685,7 @@ fn CiStmtPool.lower_value_expr_ir(self: CiStmtPool, session: i64, cursor: i32, e
             return ci_value_ir_invalid()
         let inner = self.lower_value_expr_ir(session, inner_cursor, exprs, types, scope)
         if ci_value_ir_valid(inner):
-            let casted = exprs.apply_implicit_cast_to_value_id(session, cursor, inner_cursor, inner.value_expr, types)
+            let casted = exprs.apply_implicit_cast_to_value_id(session, cursor, inner_cursor, inner.value_expr, types, scope)
             if (casted as i32) != 0:
                 return CiValueExprIR {
                     setup_stmt: inner.setup_stmt,
@@ -6840,7 +6974,7 @@ fn CiStmtPool.lower_value_expr_ir(self: CiStmtPool, session: i64, cursor: i32, e
             }
         if has_mapped_call:
             return ci_value_ir_invalid()
-        if callee_text.len() > 0:
+        if callee_text.len() > 0 and ci_is_c_ident(callee_text) and not ci_scope_contains(scope, callee_text):
             if not ci_note_filtered_system_symbol_ref(session, callee_text, CI_LIBC_KIND_FN):
                 return ci_value_ir_invalid()
         let args_start = exprs.extra_len()
@@ -6889,6 +7023,14 @@ fn CiStmtPool.lower_value_expr_ir(self: CiStmtPool, session: i64, cursor: i32, e
 
     if kind == 122 and nc > 0:
         return self.lower_value_expr_ir(session, with_ci_child(session, cursor, nc - 1), exprs, types, scope)
+
+    if kind != CXK_INIT_LIST and kind != CXK_COMPOUND_LITERAL:
+        let expanded_src = ci_expand_string_macro_sequence(session, with_ci_cursor_source_text(session, cursor))
+        if expanded_src.len() > 0:
+            if ci_is_string_literal(expanded_src) or ci_is_concatenated_string(expanded_src):
+                let str_idx = exprs.add_string(expanded_src)
+                return ci_value_ir_plain(exprs.add(CiExprKind.CIE_STRING_LIT, str_idx, 0, 0, 0 as CiTypeId))
+            return ci_value_ir_invalid()
 
     let expr_id = exprs.lower_expr_ir(session, cursor, types, scope)
     if (expr_id as i32) != 0:
@@ -7747,6 +7889,38 @@ fn ci_array_elem_type(ty: str) -> str:
 fn ci_try_eval_var_init(session: i64, idx: i32) -> str:
     ci_try_eval_var_init_for_type(session, idx, "")
 
+fn ci_initializer_text_has_macro_reference(session: i64, text: str) -> bool:
+    let s = ci_strip_c_comments(text)
+    var i = 0
+    let slen = s.len() as i32
+    while i < slen:
+        let c = s.byte_at(i as i64)
+        if c == 34 or c == 39:
+            let quote = c
+            i = i + 1
+            while i < slen:
+                let inner = s.byte_at(i as i64)
+                if inner == 92:
+                    i = i + 2
+                    continue
+                if inner == quote:
+                    break
+                i = i + 1
+            i = i + 1
+            continue
+        if ci_is_ident_start(c):
+            var end = i + 1
+            while end < slen and ci_is_ident_char(s.byte_at(end as i64)):
+                end = end + 1
+            let name = s.slice(i as i64, end as i64)
+            let macro_value = ci_lookup_macro_value(session, name)
+            if macro_value.len() > 0:
+                return true
+            i = end
+            continue
+        i = i + 1
+    false
+
 fn ci_try_eval_var_init_for_type(session: i64, idx: i32, target_type: str) -> str:
     // Evaluate a variable initializer using the actual declaration cursor,
     // not a name-based re-lookup that may bind a forward declaration.
@@ -7759,6 +7933,19 @@ fn ci_try_eval_var_init_for_type(session: i64, idx: i32, target_type: str) -> st
             let init_peeled = ci_peel_transparent(session, init_cursor)
             let init_kind = with_ci_cursor_kind(session, init_peeled)
             if init_kind == CXK_INIT_LIST or init_kind == CXK_COMPOUND_LITERAL:
+                let init_child_count = with_ci_num_children(session, init_peeled)
+                let init_src = ci_extract_var_initializer_text(with_ci_cursor_source_text(session, var_cursor))
+                if init_src.len() > 0 and ci_initializer_text_has_macro_reference(session, init_src):
+                    let from_decl_source = ci_var_init_expr_from_decl_source_for_type(session, var_cursor, init_type)
+                    if from_decl_source.len() > 0:
+                        return from_decl_source
+                if init_child_count > 512:
+                    let from_decl_source = ci_var_init_expr_from_decl_source_for_type(session, var_cursor, init_type)
+                    if from_decl_source.len() > 0:
+                        return from_decl_source
+                let from_ast = ci_var_init_expr_for_type(session, var_cursor, "", init_type)
+                if from_ast.len() > 0:
+                    return from_ast
                 let from_decl_source = ci_var_init_expr_from_decl_source_for_type(session, var_cursor, init_type)
                 if from_decl_source.len() > 0:
                     return from_decl_source
@@ -7977,7 +8164,36 @@ fn ci_scope_add(scope: str, name: str) -> str:
     scope ++ "|" ++ name ++ "|"
 
 fn ci_scope_add_mangled(scope: str, original: str, mangled: str) -> str:
-    scope ++ "|" ++ original ++ "=" ++ mangled ++ "|"
+    scope ++ "|" ++ original ++ "=" ++ mangled ++ "|" ++ mangled ++ "|"
+
+fn ci_scope_add_type(scope: str, name: str, ty: str) -> str:
+    if name.len() == 0 or ty.len() == 0:
+        return scope
+    f"{scope}|#ty:{name}={ty}|"
+
+fn ci_scope_lookup_type(scope: str, name: str) -> str:
+    if name.len() == 0:
+        return ""
+    let needle = f"|#ty:{name}="
+    let slen = scope.len() as i32
+    let nlen = needle.len() as i32
+    var pos = slen - nlen
+    while pos >= 0:
+        if scope.slice(pos as i64, (pos + nlen) as i64) == needle:
+            let start = pos + nlen
+            var end = start
+            while end < slen and scope.byte_at(end as i64) != 124:
+                end = end + 1
+            return scope.slice(start as i64, end as i64)
+        pos = pos - 1
+    ""
+
+fn ci_scope_type_for_cursor(session: i64, cursor: i32, scope: str) -> str:
+    let peeled = ci_peel_transparent(session, cursor)
+    if with_ci_cursor_kind(session, peeled) != CXK_DECL_REF:
+        return ""
+    let name = ci_escape_reserved(with_ci_cursor_spelling(session, peeled))
+    ci_scope_lookup_type(scope, name)
 
 fn ci_find_char(s: str, c: i32) -> i32:
     var i = 0
@@ -8009,7 +8225,7 @@ fn ci_goto_decl_suffix(session: i64, var_cursor: i32) -> str:
     "__goto_" ++ i64_to_string(var_cursor as i64)
 
 fn ci_goto_hoisted_var_name(session: i64, var_cursor: i32) -> str:
-    ci_escape_reserved(with_ci_cursor_spelling(session, var_cursor)) ++ ci_goto_decl_suffix(session, var_cursor)
+    ci_local_storage_name(ci_escape_reserved(with_ci_cursor_spelling(session, var_cursor)), var_cursor) ++ ci_goto_decl_suffix(session, var_cursor)
 
 fn ci_goto_scope_add_decl_mappings(session: i64, cursor: i32, scope: str) -> str:
     if with_ci_cursor_kind(session, cursor) != CXK_DECL_STMT:
@@ -8103,14 +8319,12 @@ fn CiStmtPool.lower_decl_stmt_structural(self: CiStmtPool, session: i64, cursor:
                 new_scope = ci_scope_add_mangled(new_scope, escaped, storage_name)
                 ci_fn_var_names_register(storage_name)
             else:
-                var mangled = ci_scope_mangle(new_scope, escaped)
-                if mangled == escaped and ci_fn_var_names_contains(escaped):
-                    mangled = ci_fn_var_names_unique(escaped)
+                let base_name = ci_local_storage_name(escaped, child)
+                var mangled = ci_scope_mangle(new_scope, base_name)
+                if mangled == base_name and ci_fn_var_names_contains(base_name):
+                    mangled = ci_fn_var_names_unique(base_name)
                 storage_name = mangled
-                if mangled != escaped:
-                    new_scope = ci_scope_add_mangled(new_scope, escaped, mangled)
-                else:
-                    new_scope = ci_scope_add(new_scope, escaped)
+                new_scope = ci_scope_add_mangled(new_scope, escaped, storage_name)
                 ci_fn_var_names_register(storage_name)
             let init_cursor = ci_find_var_init_cursor(session, child)
             var init_id: CiExprId = 0 as CiExprId
@@ -8270,37 +8484,30 @@ fn ci_try_translate_fn_body(session: i64, decl_idx: i32) -> str:
     let ret_type = with_cimport_fn_return_type_translated(session, decl_idx)
     var init_scope = "RET:" ++ ret_type ++ "|"
 
-    // Get param names from cursor API (more reliable)
-    var cursor_params = ""
+    // Get param names from cursor API (more reliable) and map each
+    // original C parameter name to generated storage. Generated
+    // parameter names avoid collisions with top-level names from
+    // other migrated modules that are imported into the same build.
+    var param_rebinds = ""
     let fn_nc = with_ci_num_children(session, found_cursor)
     var cpi = 0
+    var param_index = 0
     while cpi < fn_nc:
         let child = with_ci_child(session, found_cursor, cpi)
         if with_ci_cursor_kind(session, child) == 10:  // CXCursor_ParmDecl
             let cpname = ci_escape_reserved(with_ci_cursor_spelling(session, child))
             if cpname.len() > 0:
-                cursor_params = cursor_params ++ "|" ++ cpname ++ "|"
-                init_scope = init_scope ++ "|" ++ cpname ++ "|"
+                let sig_name = ci_param_signature_name(cpname, param_index)
+                var storage_name = sig_name
+                if ci_body_assigns_to(session, body_cursor, cpname):
+                    storage_name = ci_param_local_name(cpname, param_index)
+                    param_rebinds = param_rebinds ++ f"    var {storage_name} = {sig_name}\n"
+                init_scope = ci_scope_add_mangled(init_scope, cpname, storage_name)
+                let raw_ptype = with_cimport_fn_param_type_translated(session, decl_idx, param_index)
+                let ptype = ci_pointer_type_explicit_mut(raw_ptype)
+                init_scope = ci_scope_add_type(init_scope, cpname, ptype)
+            param_index = param_index + 1
         cpi = cpi + 1
-
-    // C params are always mutable, With params are immutable.
-    // Detect which params are assigned to in the body and rebind those.
-    var param_rebinds = ""
-    var prpos2 = 1
-    let prlen2 = cursor_params.len() as i32
-    while prpos2 < prlen2:
-        var prend2 = prpos2
-        while prend2 < prlen2 and cursor_params.byte_at(prend2 as i64) != 124:
-            prend2 = prend2 + 1
-        if prend2 > prpos2:
-            let pname = cursor_params.slice(prpos2 as i64, prend2 as i64)
-            // Check if this param is assigned to anywhere in the body.
-            // The signature renames mutated params to __param_NAME.
-            if ci_body_assigns_to(session, body_cursor, pname):
-                param_rebinds = param_rebinds ++ "    var " ++ pname ++ " = __param_" ++ pname ++ "\n"
-        prpos2 = prend2 + 1
-        if prpos2 < prlen2 and cursor_params.byte_at(prpos2 as i64) == 124:
-            prpos2 = prpos2 + 1
 
     // Goto-containing bodies are lowered by ci_lower_stmt_ir's
     // CXK_COMPOUND_STMT + ci_has_goto check, which builds a
@@ -8664,31 +8871,37 @@ fn ci_char_to_int(s: str) -> str:
 // ── String concatenation support ────────────────────────────
 
 fn ci_strip_c_comments(s: str) -> str:
-    var result = ""
+    var parts: Vec[str] = Vec.new()
     var i = 0
+    var segment_start = 0
     let slen = s.len() as i32
     while i < slen:
         let c = s.byte_at(i as i64)
         if c == 47 and i + 1 < slen:
             let next = s.byte_at((i + 1) as i64)
             if next == 42:
-                result = result ++ " "
+                if i > segment_start:
+                    parts.push(s.slice(segment_start as i64, i as i64))
+                parts.push(" ")
                 i = i + 2
                 while i + 1 < slen:
                     if s.byte_at(i as i64) == 42 and s.byte_at((i + 1) as i64) == 47:
                         i = i + 2
                         break
                     i = i + 1
+                segment_start = i
                 continue
             if next == 47:
-                result = result ++ " "
+                if i > segment_start:
+                    parts.push(s.slice(segment_start as i64, i as i64))
+                parts.push(" ")
                 i = i + 2
                 while i < slen and s.byte_at(i as i64) != 10:
                     i = i + 1
+                segment_start = i
                 continue
         if c == 34 or c == 39:
             let quote = c
-            let start = i
             i = i + 1
             while i < slen:
                 let inner = s.byte_at(i as i64)
@@ -8699,11 +8912,11 @@ fn ci_strip_c_comments(s: str) -> str:
                     i = i + 1
                     break
                 i = i + 1
-            result = result ++ s.slice(start as i64, i as i64)
             continue
-        result = result ++ s.slice(i as i64, (i + 1) as i64)
         i = i + 1
-    result
+    if slen > segment_start:
+        parts.push(s.slice(segment_start as i64, slen as i64))
+    parts.join("")
 
 fn ci_find_string_literal_end(s: str, start: i32) -> i32:
     let slen = s.len() as i32
@@ -8756,6 +8969,123 @@ fn ci_byte_to_hex_escape(value: i32) -> str:
     let hi = (value >> 4) & 15
     let lo = value & 15
     "\\x" ++ hex.slice(hi as i64, (hi + 1) as i64) ++ hex.slice(lo as i64, (lo + 1) as i64)
+
+fn ci_is_byte_array_element_type(elem_ty: str) -> bool:
+    let t = ci_trim(elem_ty)
+    t == "u8" or t == "i8" or t == "c_char" or t == "c_schar" or t == "c_uchar"
+
+fn ci_byte_array_literal_value(byte: i32, elem_ty: str) -> str:
+    let t = ci_trim(elem_ty)
+    let b = byte & 255
+    if (t == "i8" or t == "c_char" or t == "c_schar") and b >= 128:
+        return i64_to_string((b - 256) as i64)
+    i64_to_string(b as i64)
+
+fn ci_is_hex_digit(c: i32) -> bool:
+    (c >= 48 and c <= 57) or (c >= 65 and c <= 70) or (c >= 97 and c <= 102)
+
+fn ci_hex_digit_value(c: i32) -> i32:
+    if c >= 48 and c <= 57: return c - 48
+    if c >= 65 and c <= 70: return c - 55
+    if c >= 97 and c <= 102: return c - 87
+    0
+
+fn ci_render_string_literal_as_byte_array(value: str, ty: str) -> str:
+    let elem_ty = ci_array_element_type(ty)
+    if not ci_is_byte_array_element_type(elem_ty):
+        return ""
+    let target_len = ci_array_length_from_type(ty)
+    var bytes: Vec[i32] = Vec.new()
+    var i = 0
+    let slen = value.len() as i32
+    var saw_literal = false
+    while i < slen:
+        let c = value.byte_at(i as i64)
+        if ci_is_space(c):
+            i = i + 1
+            continue
+        var quote_pos = i
+        if i + 2 < slen and value.slice(i as i64, (i + 2) as i64) == "u8":
+            quote_pos = i + 2
+        else if c == 76 or c == 85 or c == 117:
+            quote_pos = i + 1
+        if quote_pos >= slen or value.byte_at(quote_pos as i64) != 34:
+            return ""
+        saw_literal = true
+        i = quote_pos + 1
+        while i < slen:
+            let cc = value.byte_at(i as i64)
+            if cc == 34:
+                i = i + 1
+                break
+            if cc != 92:
+                bytes.push(cc & 255)
+                i = i + 1
+                continue
+            if i + 1 >= slen:
+                return ""
+            let esc = value.byte_at((i + 1) as i64)
+            if esc >= 48 and esc <= 55:
+                var byte = 0
+                var j = i + 1
+                var digits = 0
+                while j < slen and digits < 3:
+                    let d = value.byte_at(j as i64)
+                    if d < 48 or d > 55:
+                        break
+                    byte = byte * 8 + (d - 48)
+                    digits = digits + 1
+                    j = j + 1
+                bytes.push(byte & 255)
+                i = j
+                continue
+            if esc == 120 or esc == 88:
+                var byte = 0
+                var j = i + 2
+                var digits = 0
+                while j < slen and ci_is_hex_digit(value.byte_at(j as i64)):
+                    byte = byte * 16 + ci_hex_digit_value(value.byte_at(j as i64))
+                    digits = digits + 1
+                    j = j + 1
+                if digits == 0:
+                    return ""
+                bytes.push(byte & 255)
+                i = j
+                continue
+            if esc == 110: bytes.push(10)
+            else if esc == 116: bytes.push(9)
+            else if esc == 114: bytes.push(13)
+            else if esc == 97: bytes.push(7)
+            else if esc == 98: bytes.push(8)
+            else if esc == 102: bytes.push(12)
+            else if esc == 118: bytes.push(11)
+            else if esc == 92: bytes.push(92)
+            else if esc == 34: bytes.push(34)
+            else if esc == 39: bytes.push(39)
+            else if esc == 63: bytes.push(63)
+            else: bytes.push(esc & 255)
+            i = i + 2
+    if not saw_literal:
+        return ""
+    bytes.push(0)
+    if target_len >= 0:
+        if bytes.len() as i32 > target_len:
+            if bytes.len() as i32 == target_len + 1 and bytes.get((bytes.len() - 1) as i64) == 0:
+                let _ = bytes.pop()
+            else:
+                return ""
+        while bytes.len() as i32 < target_len:
+            bytes.push(0)
+    var parts: Vec[str] = Vec.new()
+    parts.push("[")
+    var bi = 0
+    while bi < bytes.len() as i32:
+        if bi > 0:
+            parts.push(", ")
+        parts.push(ci_byte_array_literal_value(bytes.get(bi as i64), elem_ty))
+        bi = bi + 1
+    parts.push("]")
+    parts.join("")
 
 fn ci_concat_strings(s: str) -> str:
     // Concatenate adjacent string literals "foo" "bar" -> "foobar"
@@ -9156,6 +9486,17 @@ fn ci_array_element_type(ty: str) -> str:
         return ""
     ci_trim(ty.slice((close + 1) as i64, ty.len()))
 
+fn ci_array_length_from_type(ty: str) -> i32:
+    if ty.len() == 0 or ty.byte_at(0) != 91:
+        return -1
+    let close = ci_find_substr(ty, "]")
+    if close <= 1:
+        return -1
+    let len_text = ci_trim(ty.slice(1, close as i64))
+    if len_text.len() == 0:
+        return -1
+    ci_parse_i64(len_text) as i32
+
 fn ci_split_top_level_items(s: str) -> Vec[str]:
     var parts: Vec[str] = Vec.new()
     var paren_depth = 0
@@ -9241,6 +9582,8 @@ fn ci_translate_c_initializer_for_cursor_type(session: i64, init_src: str, ty: s
         return ""
     if ci_is_concatenated_string(trimmed):
         return ci_coerce_init_value_for_type(ci_concat_strings(trimmed), ty)
+    if ci_is_string_literal(trimmed):
+        return ci_coerce_init_value_for_type(trimmed, ty)
     if ci_c_initializer_is_null_pointer_cast(ci_strip_parens(trimmed)):
         if ty.len() > 0 and (ty.byte_at(0) == 42 or ci_starts_with(ty, "Option[")):
             return "null"
@@ -9282,22 +9625,44 @@ fn ci_translate_c_initializer_for_cursor_type(session: i64, init_src: str, ty: s
             return ""
         let elem_cxtype = if cxtype >= 0: with_ci_type_array_element(session, cxtype) else: -1
         let items = ci_split_top_level_items(inner)
-        var rendered = ""
+        var expanded_items: Vec[str] = Vec.new()
+        var expand_i = 0
+        while expand_i < items.len() as i32:
+            let raw_item = items.get(expand_i as i64)
+            var expanded_any = false
+            if ci_c_initializer_is_identifier(raw_item):
+                let macro_value = ci_lookup_macro_value(session, ci_trim(raw_item))
+                if macro_value.len() > 0:
+                    let macro_items = ci_split_top_level_items(macro_value)
+                    if macro_items.len() > 1:
+                        var mi: i64 = 0
+                        while mi < macro_items.len():
+                            expanded_items.push(macro_items.get(mi))
+                            mi = mi + 1
+                        expanded_any = true
+            if not expanded_any:
+                expanded_items.push(raw_item)
+            expand_i = expand_i + 1
+        var rendered_parts: Vec[str] = Vec.new()
+        rendered_parts.push("[")
         var i = 0
-        while i < items.len() as i32:
-            let item = ci_translate_c_initializer_for_cursor_type(session, items.get(i as i64), elem_ty, elem_cxtype)
+        while i < expanded_items.len() as i32:
+            let item = ci_translate_c_initializer_for_cursor_type(session, expanded_items.get(i as i64), elem_ty, elem_cxtype)
             if item.len() == 0:
                 return ""
             if i > 0:
-                rendered = rendered ++ ", "
-            rendered = rendered ++ item
+                rendered_parts.push(", ")
+            rendered_parts.push(item)
             i = i + 1
-        return "[" ++ rendered ++ "]"
+        rendered_parts.push("]")
+        return rendered_parts.join("")
 
     let field_count = ci_init_list_record_field_count(session, ty, cxtype)
     if field_count > 0:
         let items = ci_split_top_level_items(inner)
-        var fields = ""
+        var field_parts: Vec[str] = Vec.new()
+        field_parts.push(ty)
+        field_parts.push(" { ")
         var i = 0
         while i < items.len() as i32:
             if i >= field_count:
@@ -9311,10 +9676,13 @@ fn ci_translate_c_initializer_for_cursor_type(session: i64, init_src: str, ty: s
             if item.len() == 0:
                 return ""
             if i > 0:
-                fields = fields ++ ", "
-            fields = fields ++ field_name ++ ": " ++ item
+                field_parts.push(", ")
+            field_parts.push(field_name)
+            field_parts.push(": ")
+            field_parts.push(item)
             i = i + 1
-        return ty ++ " { " ++ fields ++ " }"
+        field_parts.push(" }")
+        return field_parts.join("")
 
     if ci_split_top_level_items(inner).len() == 1:
         return ci_translate_c_initializer_for_cursor_type(session, inner, ty, cxtype)
@@ -9331,13 +9699,17 @@ fn ci_preprocess_initializer_text(session: i64, var_cursor: i32, raw_decl_src: s
     let second_colon = ci_find_last_char(path_and_line, 58)
     if second_colon < 0:
         return ""
+    let target_file_raw = path_and_line.slice(0, second_colon as i64)
+    let target_file_real = with_cimport_realpath(target_file_raw)
+    let target_file = if target_file_real.len() > 0: target_file_real else: target_file_raw
     let start_line = ci_parse_i64(path_and_line.slice((second_colon + 1) as i64, path_and_line.len())) as i32
     if start_line <= 0:
         return ""
     let target_end_line = start_line + ci_count_substring(raw_decl_src, "\n")
 
-    var collected = ""
+    var collected_parts: Vec[str] = Vec.new()
     var current_file = ""
+    var current_file_real = ""
     var current_line = 1
     var pos = 0
     let plen = g_migrate_preprocessed_source.len() as i32
@@ -9353,24 +9725,120 @@ fn ci_preprocess_initializer_text(session: i64, var_cursor: i32, raw_decl_src: s
             if marker_line > 0 and marker_file.len() > 0:
                 current_line = marker_line
                 current_file = marker_file
+                let marker_real = with_cimport_realpath(marker_file)
+                current_file_real = if marker_real.len() > 0: marker_real else: marker_file
         else:
-            if current_file == g_migrate_current_input_path and current_line >= start_line and current_line <= target_end_line:
-                collected = collected ++ line ++ "\n"
+            if (current_file == target_file or current_file_real == target_file) and current_line >= start_line and current_line <= target_end_line:
+                collected_parts.push(line)
+                collected_parts.push("\n")
             current_line = current_line + 1
         if end >= plen:
             break
         pos = end + 1
-    let preprocessed_decl = ci_trim(collected)
+    let preprocessed_decl = ci_trim(collected_parts.join(""))
     if preprocessed_decl.len() == 0:
         return ""
     ci_extract_var_initializer_text(preprocessed_decl)
+
+fn ci_preprocessed_var_initializer_by_name(var_name: str) -> str:
+    if g_migrate_preprocessed_source.len() == 0 or var_name.len() == 0:
+        return ""
+    let s = g_migrate_preprocessed_source
+    let slen = s.len() as i32
+    let nlen = var_name.len() as i32
+    var i = 0
+    while i + nlen <= slen:
+        let c = s.byte_at(i as i64)
+        if c == 34 or c == 39:
+            let quote = c
+            i = i + 1
+            while i < slen:
+                let inner = s.byte_at(i as i64)
+                if inner == 92:
+                    i = i + 2
+                    continue
+                if inner == quote:
+                    break
+                i = i + 1
+            i = i + 1
+            continue
+        if s.slice(i as i64, (i + nlen) as i64) == var_name:
+            let before = if i > 0: s.byte_at((i - 1) as i64) else: 0
+            let after = if i + nlen < slen: s.byte_at((i + nlen) as i64) else: 0
+            if not ci_is_ident_char(before) and not ci_is_ident_char(after):
+                var pos = i + nlen
+                var paren_depth = 0
+                var bracket_depth = 0
+                var brace_depth = 0
+                var eq_pos = 0 - 1
+                while pos < slen:
+                    let ch = s.byte_at(pos as i64)
+                    if ch == 34 or ch == 39:
+                        let quote = ch
+                        pos = pos + 1
+                        while pos < slen:
+                            let inner = s.byte_at(pos as i64)
+                            if inner == 92:
+                                pos = pos + 2
+                                continue
+                            if inner == quote:
+                                break
+                            pos = pos + 1
+                        pos = pos + 1
+                        continue
+                    if ch == 59 and paren_depth == 0 and bracket_depth == 0 and brace_depth == 0:
+                        break
+                    if ch == 40: paren_depth = paren_depth + 1
+                    if ch == 41 and paren_depth > 0: paren_depth = paren_depth - 1
+                    if ch == 91: bracket_depth = bracket_depth + 1
+                    if ch == 93 and bracket_depth > 0: bracket_depth = bracket_depth - 1
+                    if ch == 123: brace_depth = brace_depth + 1
+                    if ch == 125 and brace_depth > 0: brace_depth = brace_depth - 1
+                    if ch == 61 and paren_depth == 0 and bracket_depth == 0 and brace_depth == 0:
+                        eq_pos = pos
+                        break
+                    pos = pos + 1
+                if eq_pos >= 0:
+                    var end = eq_pos + 1
+                    paren_depth = 0
+                    bracket_depth = 0
+                    brace_depth = 0
+                    while end < slen:
+                        let ch = s.byte_at(end as i64)
+                        if ch == 34 or ch == 39:
+                            let quote = ch
+                            end = end + 1
+                            while end < slen:
+                                let inner = s.byte_at(end as i64)
+                                if inner == 92:
+                                    end = end + 2
+                                    continue
+                                if inner == quote:
+                                    break
+                                end = end + 1
+                            end = end + 1
+                            continue
+                        if ch == 59 and paren_depth == 0 and bracket_depth == 0 and brace_depth == 0:
+                            return ci_trim(s.slice((eq_pos + 1) as i64, end as i64))
+                        if ch == 40: paren_depth = paren_depth + 1
+                        if ch == 41 and paren_depth > 0: paren_depth = paren_depth - 1
+                        if ch == 91: bracket_depth = bracket_depth + 1
+                        if ch == 93 and bracket_depth > 0: bracket_depth = bracket_depth - 1
+                        if ch == 123: brace_depth = brace_depth + 1
+                        if ch == 125 and brace_depth > 0: brace_depth = brace_depth - 1
+                        end = end + 1
+        i = i + 1
+    ""
 
 fn ci_var_init_expr_from_decl_source(session: i64, var_cursor: i32) -> str:
     ci_var_init_expr_from_decl_source_for_type(session, var_cursor, "")
 
 fn ci_var_init_expr_from_decl_source_for_type(session: i64, var_cursor: i32, target_type: str) -> str:
     let raw_decl_src = with_ci_cursor_source_text(session, var_cursor)
-    let init_src = ci_extract_var_initializer_text(raw_decl_src)
+    var init_src = ci_extract_var_initializer_text(raw_decl_src)
+    let var_name = with_ci_cursor_spelling(session, var_cursor)
+    if init_src.len() == 0:
+        init_src = ci_preprocessed_var_initializer_by_name(var_name)
     if init_src.len() == 0:
         return ""
     let cursor_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, var_cursor))
@@ -9389,6 +9857,11 @@ fn ci_var_init_expr_from_decl_source_for_type(session: i64, var_cursor: i32, tar
     let translated = ci_translate_c_initializer_for_cursor_type(session, init_src, vty_str, var_cxtype)
     if ci_var_init_translation_is_valid(vty_str, translated):
         return translated
+    let preprocessed_by_name = ci_preprocessed_var_initializer_by_name(var_name)
+    if preprocessed_by_name.len() > 0 and preprocessed_by_name != init_src:
+        let by_name_translated = ci_translate_c_initializer_for_cursor_type(session, preprocessed_by_name, vty_str, var_cxtype)
+        if ci_var_init_translation_is_valid(vty_str, by_name_translated):
+            return by_name_translated
     ""
 
 fn ci_expr_has_unresolved_string_macro(s: str) -> bool:
@@ -9464,6 +9937,8 @@ fn ci_var_init_expr_for_type(session: i64, var_cursor: i32, scope: str, target_t
                 let init_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, init_peeled_ptr))
                 if init_ty_str.len() > 0 and init_ty_str != vty_str and with_ci_type_is_pointer(session, init_peeled_ptr) != 0:
                     init_expr = "(" ++ init_expr ++ " as " ++ vty_str ++ ")"
+        if vty_str.len() > 0 and vty_str.byte_at(0) == 91 and ci_is_string_literal(init_expr):
+            init_expr = ci_coerce_init_value_for_type(init_expr, vty_str)
         if ci_var_init_translation_is_valid(vty_str, init_expr):
             return init_expr
     if scope.len() == 0:
@@ -10218,7 +10693,7 @@ fn CiGotoCfgContext.lower_for(mut self: CiGotoCfgContext, session: i64, cursor: 
         self.unreachable_current()
 
 fn ci_goto_switch_case_new() -> CiGotoSwitchCase:
-    let ptr = with_alloc(64) as *mut CiGotoSwitchCaseState
+    let ptr = with_alloc(sizeof[CiGotoSwitchCaseState]()) as *mut CiGotoSwitchCaseState
     unsafe:
         *ptr = CiGotoSwitchCaseState {
             values: Vec.new(),
@@ -11010,8 +11485,12 @@ fn ci_type_field_type(session: i64, ty_name: str, field_idx: i32) -> str:
 fn ci_coerce_init_value_for_type(value: str, ty: str) -> str:
     if value == "0" and (ci_starts_with(ty, "*") or ci_starts_with(ty, "Option[")):
         return "null"
+    if ty.len() > 0 and ty.byte_at(0) == 91 and ci_is_string_literal(value):
+        let rendered = ci_render_string_literal_as_byte_array(value, ty)
+        if rendered.len() > 0:
+            return rendered
     if ci_starts_with(ty, "*") and ci_is_string_literal(value):
-        return "(&" ++ value ++ "[0] as " ++ ty ++ ")"
+        return value
     value
 
 fn ci_find_fn_cursor(session: i64, name: str) -> i32:

@@ -475,21 +475,24 @@ pub fn free_sized_export(ptr: *mut u8, size: i64):
     rt_free_sized(ptr, size)
 
 @[c_export("with_memcpy")]
-pub fn memcpy_export(dst: *mut u8, src: *const u8, n: i64):
+pub fn memcpy_export(dst: *mut u8, src: *const u8, n: i64) -> *mut u8:
     rt_memcpy(dst, src, n)
+    return dst
 
 @[c_export("with_memmove")]
-pub fn memmove_export(dst: *mut u8, src: *const u8, n: i64):
+pub fn memmove_export(dst: *mut u8, src: *const u8, n: i64) -> *mut u8:
     // Simple: copy to temp buffer then to dst (handles overlap)
-    if n <= 0: return
+    if n <= 0: return dst
     let tmp = rt_alloc(n)
     rt_memcpy(tmp, src, n)
     rt_memcpy(dst, tmp as *const u8, n)
     rt_free_sized(tmp, n)
+    return dst
 
 @[c_export("with_memset")]
-pub fn memset_export(dst: *mut u8, c: i32, n: i64):
+pub fn memset_export(dst: *mut u8, c: i32, n: i64) -> *mut u8:
     rt_memset(dst, c as u8, n)
+    return dst
 
 @[c_export("with_memcmp")]
 pub fn memcmp_export(a: *const u8, b: *const u8, n: i64) -> i32:

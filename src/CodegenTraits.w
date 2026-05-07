@@ -1307,6 +1307,19 @@ fn Codegen.coerce_const_value_to_type(self: Codegen, value: i64, expected_ty: i6
         return wl_const_bitcast(value, expected_ty)
     0
 
+fn Codegen.const_c_string_pointer(self: Codegen, text: str, ptr_ty: i64) -> i64:
+    if ptr_ty == 0:
+        return 0
+    let name = f"__with_cstr_{codegen_hash_name_component(with_str_hash(text))}_{text.len()}"
+    var bytes_global = wl_get_named_global(self.llmod, name)
+    if bytes_global == 0:
+        let bytes_ty = wl_array_type(wl_i8_type(self.context), text.len() + 1)
+        bytes_global = wl_add_global(self.llmod, bytes_ty, name)
+        wl_set_initializer(bytes_global, wl_const_string(self.context, text, 0))
+        wl_set_global_constant(bytes_global, 1)
+        wl_set_linkage(bytes_global, wl_private_linkage())
+    self.coerce_const_value_to_type(bytes_global, ptr_ty)
+
 fn Codegen.try_eval_const_pointer_llvm(self: Codegen, node: i32, expected_tid: i32) -> i64:
     if node == 0 or expected_tid <= 0:
         return 0
@@ -1321,6 +1334,10 @@ fn Codegen.try_eval_const_pointer_llvm(self: Codegen, node: i32, expected_tid: i
     let kind = self.pool.kind(cur)
     if kind == NodeKind.NK_NULL_LIT:
         return wl_const_null(ptr_ty)
+
+    let str_value = self.try_eval_const_string(cur, self.current_decl_source_file, 0)
+    if str_value.ok:
+        return self.const_c_string_pointer(str_value.text, ptr_ty)
 
     if kind == NodeKind.NK_IDENT:
         let sym = self.pool.get_data0(cur)
