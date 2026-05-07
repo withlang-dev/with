@@ -1,4 +1,4 @@
-//! skip
+//! skip: non-executable spec sketch for Section 14.7 — Ephemeral Task Cancellation (formerly 25.62); contains pseudo-code for unimplemented feature work
 // Spec test: Section 14.7 — Ephemeral Task Cancellation (formerly 25.62)
 // These are pseudo-code test cases from the specification.
 // Remove the //! skip directive once the features are implemented.

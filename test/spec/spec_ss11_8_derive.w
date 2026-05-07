@@ -1,4 +1,4 @@
-//! skip
+//! skip: non-executable spec sketch for Section 11.8 — Derive (formerly 25.40); contains pseudo-code for unimplemented feature work
 // Spec test: Section 11.8 — Derive (formerly 25.40)
 // These are pseudo-code test cases from the specification.
 // Remove the //! skip directive once the features are implemented.

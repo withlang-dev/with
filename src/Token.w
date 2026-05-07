@@ -156,6 +156,10 @@ enum TokenKind: i32:
     TK_KW_GLOBAL = 134
     // docs/mutability.md — call-site passing mode keywords.
     TK_KW_COPY = 135
+    // Regex integration.
+    TK_REGEX_LIT = 136
+    TK_EQ_TILDE = 137
+    TK_BANG_TILDE = 138
 
 // Lookup table: keyword string -> tag. Returns -1 if not a keyword.
 fn tag_from_keyword(s: str) -> i32:
@@ -297,10 +301,13 @@ fn tag_name(tag: i32) -> str:
     if tag == TokenKind.TK_KW_GOTO: return "'goto'"
     if tag == TokenKind.TK_KW_GLOBAL: return "'global'"
     if tag == TokenKind.TK_KW_COPY: return "'copy'"
+    if tag == TokenKind.TK_REGEX_LIT: return "regex literal"
     if tag == TokenKind.TK_EQ: return "'='"
     if tag == TokenKind.TK_EQ_EQ: return "'=='"
+    if tag == TokenKind.TK_EQ_TILDE: return "'=~'"
     if tag == TokenKind.TK_BANG: return "'!'"
     if tag == TokenKind.TK_BANG_EQ: return "'!='"
+    if tag == TokenKind.TK_BANG_TILDE: return "'!~'"
     if tag == TokenKind.TK_LT: return "'<'"
     if tag == TokenKind.TK_GT: return "'>'"
     if tag == TokenKind.TK_LT_EQ: return "'<='"

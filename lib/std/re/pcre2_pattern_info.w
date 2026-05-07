@@ -1,6 +1,7 @@
 // Migrated from PCRE2
 use std.re.defs
 
+@[c_export("pcre2_pattern_info_8")]
 fn pcre2_pattern_info_8(code: *const pcre2_real_code_8, what: c_uint, where_: *mut c_void) -> c_int {
     var re: *const pcre2_real_code_8 = code
 

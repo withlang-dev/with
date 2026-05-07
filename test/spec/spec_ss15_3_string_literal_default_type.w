@@ -1,4 +1,4 @@
-//! skip
+//! skip: non-executable spec sketch for Section 15.3 — String Literal Default Type (formerly 25.87); contains pseudo-code for unimplemented feature work
 // Spec test: Section 15.3 — String Literal Default Type (formerly 25.87)
 // These are pseudo-code test cases from the specification.
 // Remove the //! skip directive once the features are implemented.

@@ -1,4 +1,4 @@
-//! skip
+//! skip: non-executable spec sketch for Section 13.5 — Implicit Iteration (formerly 25.46); contains pseudo-code for unimplemented feature work
 // Spec test: Section 13.5 — Implicit Iteration (formerly 25.46)
 // These are pseudo-code test cases from the specification.
 // Remove the //! skip directive once the features are implemented.

@@ -452,19 +452,19 @@ unsafe fn make_str(p: *const u8) -> str:
     if p as i64 == 0 or *p == 0:
         return ""
     let len = c_strlen(p)
-    let copy = with_alloc(len + 1)
-    if copy as i64 == 0: return ""
-    with_memcpy(copy, p, len)
-    *((copy as i64 + len) as *mut u8) = 0
-    var raw: [2]i64 = [copy as i64, len]
+    let owned = with_alloc(len + 1)
+    if owned as i64 == 0: return ""
+    with_memcpy(owned, p, len)
+    *((owned as i64 + len) as *mut u8) = 0
+    var raw: [2]i64 = [owned as i64, len]
     let sp = &raw as *const str
     *sp
 
 // Session-tracked string allocation (freed on dispose)
 unsafe fn session_strdup(s: *mut CImportSession, p: *const u8) -> *mut u8:
     if p as i64 == 0: return 0 as *mut u8
-    let copy = c_strdup(p)
-    if copy as i64 == 0: return 0 as *mut u8
+    let dup = c_strdup(p)
+    if dup as i64 == 0: return 0 as *mut u8
     if (*s).str_count >= (*s).str_cap:
         (*s).str_cap = if (*s).str_cap > 0: (*s).str_cap * 2 else: 64
         let new_size = (*s).str_cap as i64 * 8
@@ -474,17 +474,17 @@ unsafe fn session_strdup(s: *mut CImportSession, p: *const u8) -> *mut u8:
         if (*s).strings as i64 != 0:
             with_free((*s).strings as *mut u8)
         (*s).strings = new_buf as *mut *mut u8
-    *(((*s).strings as i64 + (*s).str_count as i64 * 8) as *mut *mut u8) = copy
+    *(((*s).strings as i64 + (*s).str_count as i64 * 8) as *mut *mut u8) = dup
     (*s).str_count = (*s).str_count + 1
-    copy
+    dup
 
 unsafe fn session_make_str(s: *mut CImportSession, p: *const u8) -> str:
     if p as i64 == 0 or *p == 0:
         return ""
-    let copy = session_strdup(s, p)
-    if copy as i64 == 0: return ""
-    let len = c_strlen(copy)
-    var raw: [2]i64 = [copy as i64, len]
+    let dup = session_strdup(s, p)
+    if dup as i64 == 0: return ""
+    let len = c_strlen(dup)
+    var raw: [2]i64 = [dup as i64, len]
     let sp = &raw as *const str
     *sp
 

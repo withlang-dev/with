@@ -80,6 +80,19 @@ fn ci_starts_with_str(s: str, prefix: str) -> bool:
         return false
     s.slice(0, prefix.len()) == prefix
 
+fn ci_contains_str(s: str, needle: str) -> bool:
+    if needle.len() == 0:
+        return true
+    if needle.len() > s.len():
+        return false
+    var i = 0
+    let max_i = s.len() - needle.len()
+    while i <= max_i:
+        if s.slice(i, i + needle.len()) == needle:
+            return true
+        i = i + 1
+    false
+
 fn ci_strip_one_outer_paren(s: str) -> str:
     if s.len() < 2:
         return s
@@ -280,6 +293,9 @@ fn ci_print_compact_stmt_local(stmts: CiStmtPool, exprs: CiExprPool, types: CiTy
     if kind == CiStmtKind.CIS_ASSIGN:
         let lhs = (stmts.get_d0(id)) as CiExprId
         let rhs = (stmts.get_d1(id)) as CiExprId
+        let lhs_ty = exprs.get_type(lhs)
+        if ci_type_needs_memcpy_assignment(types, lhs_ty):
+            return ci_print_memcpy_assignment(indent, exprs, types, lhs, rhs, lhs_ty)
         var rhs_str = ci_print_expr(exprs, types, rhs, 0, 0)
         if exprs.kind(rhs) == CiExprKind.CIE_CAST:
             rhs_str = "(" ++ rhs_str ++ ")"
@@ -287,7 +303,7 @@ fn ci_print_compact_stmt_local(stmts: CiStmtPool, exprs: CiExprPool, types: CiTy
             let op = exprs.get_d0(rhs)
             if op == CiBinOp.CIBO_ADD or op == CiBinOp.CIBO_SUB or op == CiBinOp.CIBO_MUL or op == CiBinOp.CIBO_DIV or op == CiBinOp.CIBO_MOD or op == CiBinOp.CIBO_BIT_AND or op == CiBinOp.CIBO_BIT_OR or op == CiBinOp.CIBO_BIT_XOR or op == CiBinOp.CIBO_SHL or op == CiBinOp.CIBO_SHR:
                 rhs_str = ci_strip_one_outer_paren(rhs_str)
-        return indent ++ "(" ++ ci_print_expr(exprs, types, lhs, 0, 0) ++ " = " ++ rhs_str ++ ")\n"
+        return indent ++ "(" ++ ci_print_expr(exprs, types, lhs, 0, 1) ++ " = " ++ rhs_str ++ ")\n"
 
     if kind == CiStmtKind.CIS_BREAK:
         let label_sym = stmts.get_d0(id)
@@ -350,11 +366,53 @@ fn ci_print_type(types: CiTypePool, id: CiTypeId) -> str:
         return out ++ ") -> " ++ ci_print_type(types, ret)
     "<ci:ty:unimpl>"
 
+fn ci_field_base_needs_borrow(types: CiTypePool, ty: CiTypeId) -> bool:
+    if (ty as i32) == 0:
+        return false
+    let kind = types.kind(ty)
+    if kind == CiTypeKind.CT_STRUCT or kind == CiTypeKind.CT_NAMED:
+        let name = types.get_string(types.get_d0(ty))
+        if ci_starts_with_str(name, "*") or ci_contains_str(name, "::(") or ci_contains_str(name, "(unnamed"):
+            return false
+    kind == CiTypeKind.CT_STRUCT or kind == CiTypeKind.CT_NAMED
+
+fn ci_named_type_is_scalar(name: str) -> bool:
+    if name == "bool" or name == "void":
+        return true
+    if name == "usize" or name == "isize":
+        return true
+    if name == "u8" or name == "u16" or name == "u32" or name == "u64":
+        return true
+    if name == "i8" or name == "i16" or name == "i32" or name == "i64":
+        return true
+    if name == "f32" or name == "f64":
+        return true
+    ci_starts_with_str(name, "c_")
+
+fn ci_type_needs_memcpy_assignment(types: CiTypePool, ty: CiTypeId) -> bool:
+    if (ty as i32) == 0:
+        return false
+    let kind = types.kind(ty)
+    if kind == CiTypeKind.CT_STRUCT or kind == CiTypeKind.CT_ARRAY:
+        return true
+    if kind == CiTypeKind.CT_NAMED:
+        let name = types.get_string(types.get_d0(ty))
+        return not ci_named_type_is_scalar(name) and not ci_starts_with_str(name, "*")
+    false
+
+fn ci_print_memcpy_assignment(indent: str, exprs: CiExprPool, types: CiTypePool, lhs: CiExprId, rhs: CiExprId, ty: CiTypeId) -> str:
+    let lhs_str = ci_print_expr(exprs, types, lhs, 0, 1)
+    let rhs_str = ci_print_expr(exprs, types, rhs, 0, 0)
+    let ty_text = ci_print_sizeof_type_text(ci_print_type(types, ty))
+    indent ++ "with_memcpy((&raw mut " ++ lhs_str ++ " as *i8), (&raw const " ++ rhs_str ++ " as *i8), sizeof[" ++ ty_text ++ "]())\n"
+
 fn ci_print_sizeof_type_text(text: str) -> str:
     if ci_starts_with_str(text, "*const "):
-        return "* " ++ ci_print_sizeof_type_text(text.slice(7, text.len()))
+        return "usize"
     if ci_starts_with_str(text, "*mut "):
-        return "* " ++ ci_print_sizeof_type_text(text.slice(5, text.len()))
+        return "usize"
+    if ci_starts_with_str(text, "*"):
+        return "usize"
     if text.len() > 0 and text.byte_at(0) == 91:
         var i = 1
         while i < text.len() as i32 and text.byte_at(i as i64) != 93:
@@ -448,11 +506,15 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
     if kind == CiExprKind.CIE_FIELD:
         let base = (exprs.get_d0(id)) as CiExprId
         let field = exprs.get_string(exprs.get_d1(id))
-        return ci_print_expr(exprs, types, base, 0, 0) ++ "." ++ field
+        let base_text = ci_print_expr(exprs, types, base, 0, wants_ptr)
+        let base_ty = exprs.get_type(base)
+        if wants_ptr == 0 and ci_field_base_needs_borrow(types, base_ty):
+            return f"(&raw const {base_text} as *const {ci_print_type(types, base_ty)}).{field}"
+        return f"{base_text}.{field}"
     if kind == CiExprKind.CIE_INDEX:
         let base = (exprs.get_d0(id)) as CiExprId
         let idx = (exprs.get_d1(id)) as CiExprId
-        let rendered = ci_print_expr(exprs, types, base, 0, 0) ++ "[" ++ ci_print_expr(exprs, types, idx, 0, 0) ++ "]"
+        let rendered = ci_print_expr(exprs, types, base, 0, wants_ptr) ++ "[" ++ ci_print_expr(exprs, types, idx, 0, 0) ++ "]"
         let base_ty = exprs.get_type(base)
         let base_is_ptr = (base_ty as i32) != 0 and types.kind(base_ty) == CiTypeKind.CT_POINTER
         if exprs.get_d2(id) != 0 or base_is_ptr:
@@ -469,7 +531,7 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
         let operand = (exprs.get_d0(id)) as CiExprId
         let is_mut = exprs.get_d1(id)
         let kw = if is_mut != 0: "&raw mut " else: "&"
-        return kw ++ ci_print_expr(exprs, types, operand, 0, 0)
+        return kw ++ ci_print_expr(exprs, types, operand, 0, 1)
     if kind == CiExprKind.CIE_ARRAY_DECAY:
         let operand = (exprs.get_d0(id)) as CiExprId
         let target_ty = exprs.get_type(id)
@@ -494,13 +556,13 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
         let op = exprs.get_d0(id)
         let lhs = (exprs.get_d1(id)) as CiExprId
         let rhs = (exprs.get_d2(id)) as CiExprId
-        let lhs_str = ci_print_expr(exprs, types, lhs, 0, 0)
+        let lhs_str = ci_print_expr(exprs, types, lhs, 0, 1)
         let rhs_str = ci_print_expr(exprs, types, rhs, 0, 0)
-        return lhs_str ++ " = " ++ lhs_str ++ " " ++ ci_bin_op_str(op) ++ " " ++ rhs_str
+        return f"{lhs_str} = {lhs_str} {ci_bin_op_str(op)} {rhs_str}"
     if kind == CiExprKind.CIE_ASSIGN:
         let lhs = (exprs.get_d0(id)) as CiExprId
         let rhs = (exprs.get_d1(id)) as CiExprId
-        return ci_print_expr(exprs, types, lhs, 0, 0) ++ " = " ++ ci_print_expr(exprs, types, rhs, 0, 0)
+        return f"{ci_print_expr(exprs, types, lhs, 0, 1)} = {ci_print_expr(exprs, types, rhs, 0, 0)}"
 
     // Control-expr-shaped
     if kind == CiExprKind.CIE_TERNARY:
@@ -774,6 +836,9 @@ fn ci_print_stmt(stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: Ci
     if kind == CiStmtKind.CIS_ASSIGN:
         let lhs = (stmts.get_d0(id)) as CiExprId
         let rhs = (stmts.get_d1(id)) as CiExprId
+        let lhs_ty = exprs.get_type(lhs)
+        if ci_type_needs_memcpy_assignment(types, lhs_ty):
+            return ci_print_memcpy_assignment(indent, exprs, types, lhs, rhs, lhs_ty)
         var rhs_str = ci_print_expr(exprs, types, rhs, 0, 0)
         if exprs.kind(rhs) == CiExprKind.CIE_CAST:
             rhs_str = "(" ++ rhs_str ++ ")"
@@ -781,7 +846,7 @@ fn ci_print_stmt(stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: Ci
             let op = exprs.get_d0(rhs)
             if op == CiBinOp.CIBO_ADD or op == CiBinOp.CIBO_SUB or op == CiBinOp.CIBO_MUL or op == CiBinOp.CIBO_DIV or op == CiBinOp.CIBO_MOD or op == CiBinOp.CIBO_BIT_AND or op == CiBinOp.CIBO_BIT_OR or op == CiBinOp.CIBO_BIT_XOR or op == CiBinOp.CIBO_SHL or op == CiBinOp.CIBO_SHR:
                 rhs_str = ci_strip_one_outer_paren(rhs_str)
-        return indent ++ "(" ++ ci_print_expr(exprs, types, lhs, 0, 0) ++ " = " ++ rhs_str ++ ")\n"
+        return indent ++ "(" ++ ci_print_expr(exprs, types, lhs, 0, 1) ++ " = " ++ rhs_str ++ ")\n"
 
     if kind == CiStmtKind.CIS_LABEL:
         let sym = stmts.get_d0(id)

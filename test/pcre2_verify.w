@@ -91,8 +91,8 @@ fn main:
         (pattern as *const u8),
         pattern.len() as c_ulong,
         0 as c_uint,
-        (&mut error_code as *mut c_int),
-        (&mut error_offset as *mut c_ulong),
+        (&raw mut error_code as *mut c_int),
+        (&raw mut error_offset as *mut c_ulong),
         ccontext
     )
     if code as i64 == 0:

@@ -1,4 +1,4 @@
-//! skip
+//! skip: non-executable spec sketch for Section 18.7 — Freestanding Mode (formerly 25.99); contains pseudo-code for unimplemented feature work
 // Spec test: Section 18.7 — Freestanding Mode (formerly 25.99)
 // These are pseudo-code test cases from the specification.
 // Remove the //! skip directive once the features are implemented.

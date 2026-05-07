@@ -13,9 +13,8 @@
 #   5. `extern var` declarations
 #   6. `extern let` declarations
 #
-# By default the script stages the fresh output of `make regex-prepare`
-# (out/pcre2_generated/) into lib/std/re/ with snapshot/restore, then
-# audits that. This mirrors what `make regex-promote` would promote.
+# By default the script audits the checked output from `make regex-build`
+# (out/pcre2_build/lib/std/re). It never stages over lib/std/re.
 #
 # Override with:
 #   DEDUP_DIR=<path>   — audit <path> directly, skip staging
@@ -28,31 +27,11 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-STD_RE_DIR="$ROOT_DIR/lib/std/re"
-GEN_DIR="$ROOT_DIR/out/pcre2_generated"
-AUDIT_DIR="${DEDUP_DIR:-$STD_RE_DIR}"
-BACKUP_DIR=""
+BUILD_RE_DIR="$ROOT_DIR/out/pcre2_build/lib/std/re"
+AUDIT_DIR="${DEDUP_DIR:-$BUILD_RE_DIR}"
 
-cleanup() {
-    if [ -n "$BACKUP_DIR" ] && [ -d "$BACKUP_DIR" ]; then
-        rm -rf "$STD_RE_DIR"
-        mkdir -p "$STD_RE_DIR"
-        cp "$BACKUP_DIR"/*.w "$STD_RE_DIR/" 2>/dev/null || true
-        rm -rf "$BACKUP_DIR"
-    fi
-}
-trap cleanup EXIT INT TERM
-
-# Stage fresh generated output into lib/std/re/ unless DEDUP_DIR overrides.
 if [ -z "${DEDUP_DIR:-}" ]; then
-    [ -d "$GEN_DIR" ] || { echo "error: $GEN_DIR missing (run 'make regex-prepare' first)" >&2; exit 2; }
-    BACKUP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/std-re-backup.XXXXXX")"
-    if [ -d "$STD_RE_DIR" ]; then
-        cp "$STD_RE_DIR"/*.w "$BACKUP_DIR/" 2>/dev/null || true
-    fi
-    rm -rf "$STD_RE_DIR"
-    mkdir -p "$STD_RE_DIR"
-    cp "$GEN_DIR"/*.w "$STD_RE_DIR/"
+    [ -d "$BUILD_RE_DIR" ] || { echo "error: $BUILD_RE_DIR missing (run 'make regex-build' first)" >&2; exit 2; }
 fi
 
 [ -d "$AUDIT_DIR" ] || { echo "error: $AUDIT_DIR does not exist" >&2; exit 2; }

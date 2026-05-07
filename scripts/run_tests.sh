@@ -14,6 +14,7 @@ set -euo pipefail
 #   //! expect-check-fail: <msg> — check mode should fail with <msg>
 #   //! expect-build-fail: <msg> — build mode should fail with <msg>
 #   //! check-only               — only run check mode (no build/run)
+#   //! skip: <reason>           — skip with an explicit justification
 #
 # Environment:
 #   WITH_TEST_JOBS=N     — number of parallel jobs (default: CPU count)
@@ -88,11 +89,18 @@ parse_test_directives() {
   TEST_CHECK_ONLY=0
   TEST_EXTRA_ARGS=""
   TEST_SKIP=0
+  TEST_SKIP_REASON=""
 
   while IFS= read -r line; do
     case "$line" in
+      "//! skip: "*)
+        TEST_SKIP=1
+        TEST_SKIP_REASON="${line#//! skip: }"
+        return
+        ;;
       "//! skip"*)
         TEST_SKIP=1
+        TEST_SKIP_REASON=""
         return
         ;;
       "//! expect-stdout: "*)
@@ -205,7 +213,11 @@ run_single_test() {
 
   # Case 1: expect check to fail with message
   if [[ "$TEST_SKIP" -eq 1 ]]; then
-    _emit_result "PASS $name (skipped)"
+    if [[ -z "$TEST_SKIP_REASON" ]]; then
+      _emit_result "FAIL $name (skip missing reason)"
+    else
+      _emit_result "SKIP $name ($TEST_SKIP_REASON)"
+    fi
     rm -rf "$my_tmp"
     return
   fi
@@ -323,6 +335,7 @@ suite_elapsed_ms=$(( suite_end_ms - suite_start_ms ))
 # Collect results
 passed=0
 failed=0
+skipped=0
 failures_list=""
 timing_data=""
 
@@ -352,6 +365,9 @@ for result_file in "$results_dir"/result_*; do
     PASS*)
       passed=$((passed + 1))
       ;;
+    SKIP*)
+      skipped=$((skipped + 1))
+      ;;
     FAIL*)
       failed=$((failed + 1))
       failures_list="${failures_list}  ${msg}\n"
@@ -362,6 +378,7 @@ done
 echo ""
 echo "--- results ---"
 echo "passed: $passed"
+echo "skipped: $skipped"
 echo "failed: $failed"
 if [[ -n "$failures_list" ]]; then
   echo ""
@@ -371,7 +388,7 @@ fi
 
 if [[ "$SHOW_TIMING" == "1" ]]; then
   suite_elapsed_secs="$(awk -v ms="$suite_elapsed_ms" 'BEGIN { printf "%.3f", ms / 1000.0 }')"
-  tests_per_sec="$(awk -v count="$passed" -v failed="$failed" -v ms="$suite_elapsed_ms" 'BEGIN { if (ms <= 0) { print "0.00"; } else { printf "%.2f", (count + failed) * 1000.0 / ms } }')"
+  tests_per_sec="$(awk -v count="$passed" -v skipped="$skipped" -v failed="$failed" -v ms="$suite_elapsed_ms" 'BEGIN { if (ms <= 0) { print "0.00"; } else { printf "%.2f", (count + skipped + failed) * 1000.0 / ms } }')"
 
   echo ""
   echo "--- suite throughput ---"

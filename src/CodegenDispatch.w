@@ -1014,12 +1014,16 @@ fn Codegen.mir_build_eq_from_sema(self: Codegen, op: i32, lhs: i64, rhs: i64, lh
 
     0
 
-fn Codegen.coerce_float_operand_to(self: Codegen, val: i64, target_ty: i64) -> i64:
+fn Codegen.coerce_float_operand_to(self: Codegen, val: i64, target_ty: i64, is_unsigned: bool) -> i64:
     let val_ty = wl_type_of(val)
     if val_ty == target_ty or target_ty == 0:
         return val
     let vk = wl_get_type_kind(val_ty)
     let tk = wl_get_type_kind(target_ty)
+    if vk == wl_integer_type_kind() and (tk == wl_float_type_kind() or tk == wl_double_type_kind()):
+        if is_unsigned:
+            return wl_build_ui_to_fp(self.builder, val, target_ty)
+        return wl_build_si_to_fp(self.builder, val, target_ty)
     if (vk == wl_float_type_kind() or vk == wl_double_type_kind()) and (tk == wl_float_type_kind() or tk == wl_double_type_kind()):
         return wl_build_fp_cast(self.builder, val, target_ty)
     val
@@ -1093,8 +1097,8 @@ fn Codegen.mir_build_bin_op(self: Codegen, op: i32, lhs: i64, rhs: i64, is_unsig
                 wl_f64_type(self.context)
             else:
                 wl_f32_type(self.context)
-        let lhs_float = self.coerce_float_operand_to(lhs, common_float_ty)
-        let rhs_float = self.coerce_float_operand_to(rhs, common_float_ty)
+        let lhs_float = self.coerce_float_operand_to(lhs, common_float_ty, self.mir_sema_type_is_unsigned(lhs_sema))
+        let rhs_float = self.coerce_float_operand_to(rhs, common_float_ty, self.mir_sema_type_is_unsigned(rhs_sema))
         if op == BinaryOp.OP_ADD or op == BinaryOp.OP_ADD_WRAP: return wl_build_fadd(self.builder, lhs_float, rhs_float)
         if op == BinaryOp.OP_SUB or op == BinaryOp.OP_SUB_WRAP: return wl_build_fsub(self.builder, lhs_float, rhs_float)
         if op == BinaryOp.OP_MUL or op == BinaryOp.OP_MUL_WRAP: return wl_build_fmul(self.builder, lhs_float, rhs_float)
@@ -2448,10 +2452,18 @@ fn Codegen.mir_try_place_ptr_for_ref(self: Codegen, body: MirBody, operand_id: i
 
 fn Codegen.mir_eval_call_operand(self: Codegen, body: MirBody, operand_id: i32, expected_ty: i64, call_context: str, arg_index: i32) -> i64:
     let val = self.mir_eval_operand(body, operand_id, expected_ty)
+    var out = val
+    if out != 0 and expected_ty != 0:
+        let expected_kind = wl_get_type_kind(expected_ty)
+        let actual_kind = wl_get_type_kind(wl_type_of(out))
+        if expected_kind == wl_pointer_type_kind() and actual_kind == wl_struct_type_kind():
+            let place_ptr = self.mir_try_place_ptr_for_ref(body, operand_id)
+            if place_ptr != 0:
+                out = place_ptr
     let had_error_before = self.had_error
-    let coerced = self.enforce_coerced_type(val, expected_ty, "wrong argument type")
+    let coerced = self.enforce_coerced_type(out, expected_ty, "wrong argument type")
     if self.had_error != had_error_before:
-        self.debug_call_coerce_failure(call_context, 0, arg_index, 0, val, expected_ty)
+        self.debug_call_coerce_failure(call_context, 0, arg_index, 0, out, expected_ty)
     coerced
 
 fn Codegen.mir_unwrap_ref_like_sema_type(self: Codegen, sema_ty: i32) -> i32:

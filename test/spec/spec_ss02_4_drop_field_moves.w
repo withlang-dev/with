@@ -1,4 +1,4 @@
-//! skip
+//! skip: non-executable spec sketch for Section 2.4 — Drop Field Moves (formerly 25.80); contains pseudo-code for unimplemented feature work
 // Spec test: Section 2.4 — Drop Field Moves (formerly 25.80)
 // These are pseudo-code test cases from the specification.
 // Remove the //! skip directive once the features are implemented.

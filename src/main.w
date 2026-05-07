@@ -728,7 +728,9 @@ fn synthesize_test_main_source(text: str, test_names: Vec[str]) -> str:
     out = out ++ "    if __with_test_filter.len() > 0:\n"
     for ti in 0..test_names.len() as i32:
         let test_name = test_names.get(ti as i64)
-        let prefix = if ti == 0: "        if " else: "        else if "
+        var prefix = "        else if "
+        if ti == 0:
+            prefix = "        if "
         out = out ++ prefix ++ "__with_test_eq(__with_test_filter, \"" ++ test_name ++ "\"):\n"
         out = out ++ "            " ++ test_name ++ "()\n"
         out = out ++ "            return\n"
@@ -778,15 +780,17 @@ fn parse_test_directives_for_target(target: str) -> TestDirectives:
     let text = with_fs_read_file(target)
     if text.len() == 0:
         return result
+    let text_len = text.len() as i32
 
     let expect_stdout_prefix = "//! expect-stdout: "
     let expect_stderr_prefix = "//! expect-stderr: "
     let expect_exit_prefix = "//! expect-exit: "
     var start = 0
     var i = 0
-    while i <= text.len() as i32:
-        let at_end = i == text.len() as i32
-        let ch = if at_end: 10 else: text.byte_at(i as i64)
+    while i <= text_len:
+        var ch = 10
+        if i < text_len:
+            ch = text.byte_at(i as i64)
         if ch == 10:
             var line = text.slice(start as i64, i as i64)
             if line.len() > 0 and line.byte_at(line.len() as i64 - 1) == 13:
@@ -825,11 +829,13 @@ fn test_shell_quote(text: str) -> str:
 
 fn split_nonempty_lines(text: str) -> Vec[str]:
     let lines: Vec[str] = Vec.new()
+    let text_len = text.len() as i32
     var start = 0
     var i = 0
-    while i <= text.len() as i32:
-        let at_end = i == text.len() as i32
-        let ch = if at_end: 10 else: text.byte_at(i as i64)
+    while i <= text_len:
+        var ch = 10
+        if i < text_len:
+            ch = text.byte_at(i as i64)
         if ch == 10:
             var line = text.slice(start as i64, i as i64)
             if line.len() > 0 and line.byte_at(line.len() as i64 - 1) == 13:
@@ -938,18 +944,23 @@ fn run_test_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, pr
     comp.set_debug_info(debug_info)
     let synthetic_source = maybe_synthesize_test_source(target)
     let test_bin_path = test_unique_binary_path(target)
-    let bin_path = if synthetic_source.len() > 0: comp.build_binary_from_source_to_path(target, synthetic_source, test_bin_path) else: comp.build_binary_to_path(target, test_bin_path)
+    var bin_path = comp.build_binary_to_path(target, test_bin_path)
+    if synthetic_source.len() > 0:
+        bin_path = comp.build_binary_from_source_to_path(target, synthetic_source, test_bin_path)
     if bin_path == "":
         emit_test_stage_error("test build failed", target, "build", "")
         return 1
     if discovery.parse_ok and not discovery.has_main and discovery.test_names.len() > 0:
         if test_directives_have_run_expectations(directives) and filter.len() == 0:
-            let rc = run_test_binary_checked(bin_path, target, "", quiet and not verbose, directives)
+            var run_quiet = quiet
+            if verbose:
+                run_quiet = false
+            let rc = run_test_binary_checked(bin_path, target, "", run_quiet, directives)
             cleanup_binary_artifacts(bin_path)
             if rc == 0:
-                print_test_summary(target, discovery.test_names.len() as i32, 0, quiet and not verbose)
+                print_test_summary(target, discovery.test_names.len() as i32, 0, run_quiet)
                 return 0
-            print_test_summary(target, 0, 1, quiet and not verbose)
+            print_test_summary(target, 0, 1, run_quiet)
             return 1
         var passed = 0
         var failed = 0
@@ -957,7 +968,10 @@ fn run_test_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, pr
             let test_name = discovery.test_names.get(ti as i64)
             if filter.len() > 0 and with_str_contains(test_name, filter) == 0:
                 continue
-            let rc = run_test_binary_checked(bin_path, target, test_name, quiet and not verbose, empty_test_directives())
+            var run_quiet = quiet
+            if verbose:
+                run_quiet = false
+            let rc = run_test_binary_checked(bin_path, target, test_name, run_quiet, empty_test_directives())
             if rc == 0:
                 passed = passed + 1
                 if verbose:
@@ -967,21 +981,29 @@ fn run_test_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, pr
                 if verbose:
                     with_eprint("FAIL " ++ test_name)
         cleanup_binary_artifacts(bin_path)
-        print_test_summary(target, passed, failed, quiet and not verbose)
+        var summary_quiet = quiet
+        if verbose:
+            summary_quiet = false
+        print_test_summary(target, passed, failed, summary_quiet)
         if failed == 0:
             return 0
         return 1
-    let run_rc = run_test_binary_checked(bin_path, target, "", quiet and not verbose, directives)
+    var run_quiet = quiet
+    if verbose:
+        run_quiet = false
+    let run_rc = run_test_binary_checked(bin_path, target, "", run_quiet, directives)
     cleanup_binary_artifacts(bin_path)
     if run_rc == 0:
-        print_test_summary(target, 1, 0, quiet and not verbose)
+        print_test_summary(target, 1, 0, run_quiet)
         return 0
-    print_test_summary(target, 0, 1, quiet and not verbose)
+    print_test_summary(target, 0, 1, run_quiet)
     run_rc
 
 fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> i32:
     let verbose = cli_test_verbose(argc)
-    let quiet = if verbose: false else: cli_test_quiet(argc)
+    var quiet = cli_test_quiet(argc)
+    if verbose:
+        quiet = false
     let filter = cli_test_filter(argc)
     // Find test file/dir argument
     let target = find_source_arg(argc)
@@ -1072,6 +1094,7 @@ fn run_migrate_command(argc: i32) -> i32:
     var source_path = ""
     var output_path = ""
     var exclude_basenames = ""
+    var reinvoke_args = ""
     var ai = 2
     while ai < argc:
         let arg = with_arg_at(ai)
@@ -1081,10 +1104,12 @@ fn run_migrate_command(argc: i32) -> i32:
             continue
         if arg == "-I" and ai + 1 < argc:
             with_cimport_add_include_path(with_arg_at(ai + 1))
+            reinvoke_args = f"{reinvoke_args} -I {test_shell_quote(with_arg_at(ai + 1))}"
             ai = ai + 2
             continue
         if arg == "-D" and ai + 1 < argc:
             migrate_add_define(with_arg_at(ai + 1))
+            reinvoke_args = f"{reinvoke_args} -D {test_shell_quote(with_arg_at(ai + 1))}"
             ai = ai + 2
             continue
         if arg == "--check" or arg == "--diff" or arg == "--stats":
@@ -1092,10 +1117,12 @@ fn run_migrate_command(argc: i32) -> i32:
             continue  // TODO: implement modes
         if arg == "--no-c-export":
             migrate_set_no_c_export(1)
+            reinvoke_args = f"{reinvoke_args} --no-c-export"
             ai = ai + 1
             continue
         if arg == "--convert-goto-to-structured":
             migrate_set_convert_goto_to_structured(1)
+            reinvoke_args = f"{reinvoke_args} --convert-goto-to-structured"
             ai = ai + 1
             continue
         if arg == "--prefer-curly":
@@ -1103,26 +1130,40 @@ fn run_migrate_command(argc: i32) -> i32:
             return 1
         if arg == "--prefer-brace":
             migrate_set_block_style(2)
+            reinvoke_args = f"{reinvoke_args} --prefer-brace"
             ai = ai + 1
             continue
         if arg == "--prefer-colon":
             migrate_set_block_style(0)
+            reinvoke_args = f"{reinvoke_args} --prefer-colon"
             ai = ai + 1
             continue
         if arg == "--width-slice" and ai + 1 < argc:
             migrate_set_width_slice(cli_parse_small_int(with_arg_at(ai + 1)))
+            reinvoke_args = f"{reinvoke_args} --width-slice {test_shell_quote(with_arg_at(ai + 1))}"
             ai = ai + 2
             continue
         if arg == "--shared-defs" and ai + 1 < argc:
             migrate_set_shared_defs(with_arg_at(ai + 1))
+            reinvoke_args = f"{reinvoke_args} --shared-defs {test_shell_quote(with_arg_at(ai + 1))}"
+            ai = ai + 2
+            continue
+        if arg == "--migrate-one" and ai + 1 < argc:
+            migrate_set_directory_one_basename(with_arg_at(ai + 1))
+            ai = ai + 2
+            continue
+        if arg == "--shared-fragment" and ai + 1 < argc:
+            migrate_set_shared_fragment_path(with_arg_at(ai + 1))
             ai = ai + 2
             continue
         if arg == "--exclude" and ai + 1 < argc:
             exclude_basenames = exclude_basenames ++ "|" ++ with_arg_at(ai + 1) ++ "|"
+            reinvoke_args = f"{reinvoke_args} --exclude {test_shell_quote(with_arg_at(ai + 1))}"
             ai = ai + 2
             continue
         if arg.len() > 10 and arg.slice(0, 10) == "--exclude=":
             exclude_basenames = exclude_basenames ++ "|" ++ arg.slice(10, arg.len()) ++ "|"
+            reinvoke_args = f"{reinvoke_args} --exclude {test_shell_quote(arg.slice(10, arg.len()))}"
             ai = ai + 1
             continue
         if arg.len() > 0 and arg.byte_at(0) != 45:  // not a flag
@@ -1140,6 +1181,7 @@ fn run_migrate_command(argc: i32) -> i32:
         // Directory mode
         if output_path.len() == 0:
             output_path = source_path ++ "_migrated"
+        migrate_set_reinvoke_args(reinvoke_args)
         return migrate_c_directory(source_path, output_path, exclude_basenames)
 
     // Single file mode — default output: replace .c with .w
@@ -1472,7 +1514,9 @@ fn run_init_command(argc: i32) -> i32:
     let src_dir = resolve_join(target_dir, "src")
     let lib_path = resolve_join(src_dir, "lib.w")
     let main_path = resolve_join(src_dir, "main.w")
-    let created_path = if target_dir == ".": name else: target_dir
+    var created_path = target_dir
+    if target_dir == ".":
+        created_path = name
 
     // Check if with.toml already exists
     let existing = with_fs_read_file(manifest_path)
@@ -1539,7 +1583,9 @@ fn run_get_command(argc: i32) -> i32:
     let rc = conan_install(pkg_name, pkg_version, root)
     if rc != 0:
         return 1
-    let version_for_toml = if pkg_version.len() > 0: pkg_version else: "latest"
+    var version_for_toml = "latest"
+    if pkg_version.len() > 0:
+        version_for_toml = pkg_version
     let manifest_path = root ++ "/with.toml"
     let toml = with_fs_read_file(manifest_path)
     if toml.len() > 0:

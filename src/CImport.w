@@ -5818,7 +5818,8 @@ fn CiExprPool.lower_literal_or_ref(self: CiExprPool, session: i64, cursor: i32, 
         else:
             text = escaped
         let s = self.add_string(text)
-        return self.ident(s, 0 as CiTypeId)
+        let ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
+        return self.ident(s, ty)
 
     0 as CiExprId
 

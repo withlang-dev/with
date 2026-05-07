@@ -1,4 +1,4 @@
-//! skip
+//! skip: non-executable spec sketch for Section 10.3 — Optional Chaining (formerly 25.37); contains pseudo-code for unimplemented feature work
 // Spec test: Section 10.3 — Optional Chaining (formerly 25.37)
 // These are pseudo-code test cases from the specification.
 // Remove the //! skip directive once the features are implemented.

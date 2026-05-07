@@ -11,6 +11,8 @@ extern let with_embedded_compat_runtime_o_start: u8
 extern let with_embedded_compat_runtime_o_end: u8
 extern let with_embedded_panic_runtime_o_start: u8
 extern let with_embedded_panic_runtime_o_end: u8
+extern let with_embedded_regex_runtime_o_start: u8
+extern let with_embedded_regex_runtime_o_end: u8
 extern let with_embedded_fiber_stubs_o_start: u8
 extern let with_embedded_fiber_stubs_o_end: u8
 extern let with_embedded_channel_runtime_o_start: u8
@@ -49,6 +51,8 @@ fn link_stage_embedded_runtime_object(name: str) -> str:
         return link_stage_embedded_obj_slice(&with_embedded_compat_runtime_o_start as *const u8, &with_embedded_compat_runtime_o_end as *const u8)
     if name == "panic_runtime.o":
         return link_stage_embedded_obj_slice(&with_embedded_panic_runtime_o_start as *const u8, &with_embedded_panic_runtime_o_end as *const u8)
+    if name == "regex_runtime.o":
+        return link_stage_embedded_obj_slice(&with_embedded_regex_runtime_o_start as *const u8, &with_embedded_regex_runtime_o_end as *const u8)
     if name == "fiber_stubs.o":
         return link_stage_embedded_obj_slice(&with_embedded_fiber_stubs_o_start as *const u8, &with_embedded_fiber_stubs_o_end as *const u8)
     if name == "channel_runtime.o":
@@ -369,6 +373,12 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
                 return false
             let panic_ar = link_stage_make_archive(panic_rt_path)
             extras.push(if panic_ar.len() > 0: panic_ar else: panic_rt_path)
+            let regex_runtime_path = link_stage_find_runtime_object_path("regex_runtime.o")
+            if regex_runtime_path.len() == 0:
+                with_eprint("error: missing runtime/regex_runtime.o")
+                return false
+            let regex_runtime_ar = link_stage_make_archive(regex_runtime_path)
+            extras.push(if regex_runtime_ar.len() > 0: regex_runtime_ar else: regex_runtime_path)
             if needs_fiber_runtime == 0:
                 let fiber_stubs_path = link_stage_find_runtime_object_path("fiber_stubs.o")
                 if fiber_stubs_path.len() == 0:
@@ -400,6 +410,11 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
                 with_eprint("error: missing runtime/panic_runtime.o")
                 return false
             extras.push(panic_runtime_path)
+            let regex_runtime_path = link_stage_find_runtime_object_path("regex_runtime.o")
+            if regex_runtime_path.len() == 0:
+                with_eprint("error: missing runtime/regex_runtime.o")
+                return false
+            extras.push(regex_runtime_path)
             if needs_fiber_runtime == 0:
                 let fiber_stubs_path = link_stage_find_runtime_object_path("fiber_stubs.o")
                 if fiber_stubs_path.len() == 0:
@@ -431,6 +446,12 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
                 return false
             let panic_ar = link_stage_make_archive(panic_runtime_path)
             extras.push(if panic_ar.len() > 0: panic_ar else: panic_runtime_path)
+            let regex_runtime_path = link_stage_find_runtime_object_path("regex_runtime.o")
+            if regex_runtime_path.len() == 0:
+                with_eprint("error: missing runtime/regex_runtime.o")
+                return false
+            let regex_runtime_ar = link_stage_make_archive(regex_runtime_path)
+            extras.push(if regex_runtime_ar.len() > 0: regex_runtime_ar else: regex_runtime_path)
             if needs_fiber_runtime == 0:
                 let fiber_stubs_path = link_stage_find_runtime_object_path("fiber_stubs.o")
                 if fiber_stubs_path.len() == 0:

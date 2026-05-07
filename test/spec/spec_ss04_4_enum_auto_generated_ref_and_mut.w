@@ -1,4 +1,4 @@
-//! skip
+//! skip: non-executable spec sketch for Section 4.4 — Enum Auto-Generated _ref and _mut (formerly 25.93); contains pseudo-code for unimplemented feature work
 // Spec test: Section 4.4 — Enum Auto-Generated _ref and _mut (formerly 25.93)
 // These are pseudo-code test cases from the specification.
 // Remove the //! skip directive once the features are implemented.

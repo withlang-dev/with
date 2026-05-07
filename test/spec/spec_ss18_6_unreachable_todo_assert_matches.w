@@ -1,4 +1,4 @@
-//! skip
+//! skip: non-executable spec sketch for Section 18.6 — Unreachable, Todo, Assert_matches (formerly 25.49); contains pseudo-code for unimplemented feature work
 // Spec test: Section 18.6 — Unreachable, Todo, Assert_matches (formerly 25.49)
 // These are pseudo-code test cases from the specification.
 // Remove the //! skip directive once the features are implemented.

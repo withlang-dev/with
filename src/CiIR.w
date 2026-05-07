@@ -107,7 +107,7 @@ fn CiTypePool.add_string(self: CiTypePool, s: str) -> i32:
     if st.frozen != 0:
         with_eprint("BUG: CiTypePool.add_string called after freeze")
     let idx = st.strings.len() as i32
-    st.strings.push(s)
+    st.strings.push(ci_ir_owned_text(s))
     idx
 
 fn CiTypePool.freeze(self: CiTypePool):
@@ -314,7 +314,7 @@ fn CiExprPool.add_string(self: CiExprPool, s: str) -> i32:
     if st.frozen != 0:
         with_eprint("BUG: CiExprPool.add_string called after freeze")
     let idx = st.strings.len() as i32
-    st.strings.push(s)
+    st.strings.push(ci_ir_owned_text(s))
     idx
 
 fn CiExprPool.freeze(self: CiExprPool):
@@ -478,7 +478,7 @@ fn CiStmtPool.add_string(self: CiStmtPool, s: str) -> i32:
     if st.frozen != 0:
         with_eprint("BUG: CiStmtPool.add_string called after freeze")
     let idx = st.strings.len() as i32
-    st.strings.push(s)
+    st.strings.push(ci_ir_owned_text(s))
     idx
 
 fn CiStmtPool.freeze(self: CiStmtPool):
@@ -670,7 +670,7 @@ fn CiDeclPool.add_string(self: CiDeclPool, s: str) -> i32:
     if st.frozen != 0:
         with_eprint("BUG: CiDeclPool.add_string called after freeze")
     let idx = st.strings.len() as i32
-    st.strings.push(s)
+    st.strings.push(ci_ir_owned_text(s))
     idx
 
 fn CiDeclPool.freeze(self: CiDeclPool):
@@ -872,15 +872,8 @@ fn CiProject.ensure_symbol(mut self: CiProject, kind: i32, name: str) -> i32:
 fn CiProject.update_symbol(mut self: CiProject, symbol_id: i32, symbol: CiProjectSymbol):
     if symbol_id < 0 or symbol_id >= self.symbols.len() as i32:
         return
-    var updated: Vec[CiProjectSymbol] = Vec.new()
-    var i = 0
-    while i < self.symbols.len() as i32:
-        if i == symbol_id:
-            updated.push(symbol.owned_copy())
-        else:
-            updated.push(self.symbols.get(i as i64).owned_copy())
-        i = i + 1
-    self.symbols = updated
+    let dst = self.symbols.ptr as *mut CiProjectSymbol
+    unsafe: *(dst + ((symbol_id as isize) as usize)) = symbol.owned_copy()
 
 fn CiProject.owner_module_path(self: &CiProject, symbol_id: i32) -> str:
     if symbol_id < 0 or symbol_id >= self.symbols.len() as i32:

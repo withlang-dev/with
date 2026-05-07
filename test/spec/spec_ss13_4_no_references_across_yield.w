@@ -1,4 +1,4 @@
-//! skip
+//! skip: non-executable spec sketch for Section 13.4 — No References Across Yield (formerly 25.65); contains pseudo-code for unimplemented feature work
 // Spec test: Section 13.4 — No References Across Yield (formerly 25.65)
 // These are pseudo-code test cases from the specification.
 // Remove the //! skip directive once the features are implemented.

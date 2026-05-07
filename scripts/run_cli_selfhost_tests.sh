@@ -404,8 +404,8 @@ EOF
   fi
 
   if ! nm_has_defined_exact "$obj" "call_compile" \
-    || ! nm_has_undefined_regex "$obj" '^__with_mod_.*__pcre2_compile_8$' \
-    || ! nm_forbid_exact "$obj" "pcre2_compile_8"; then
+    || ! nm_has_undefined_exact "$obj" "pcre2_compile_8" \
+    || ! nm_forbid_regex "$obj" '^__with_mod_.*__pcre2_compile_8$'; then
     echo "FAIL(cli-selfhost-emit-obj-symbols) imported_pcre2_symbol"
     /usr/bin/nm "$obj" || true
     failures=$((failures + 1))
@@ -439,8 +439,8 @@ EOF
   fi
 
   if ! nm_has_defined_exact "$obj" "call_compile" \
-    || ! nm_has_undefined_regex "$obj" '^__with_mod_.*__pcre2_compile_8$' \
-    || ! nm_forbid_exact "$obj" "pcre2_compile_8"; then
+    || ! nm_has_undefined_exact "$obj" "pcre2_compile_8" \
+    || ! nm_forbid_regex "$obj" '^__with_mod_.*__pcre2_compile_8$'; then
     echo "FAIL(cli-selfhost-emit-obj-symbols) imported_pcre2_symbol_multi_import"
     /usr/bin/nm "$obj" || true
     failures=$((failures + 1))
@@ -1141,7 +1141,7 @@ fn main() -> i32 {
 }
 EOF
 
-  if ! summary="$(PCRE2_CHECK_TIMEOUT_SECS=25 bash "$ROOT_DIR/scripts/pcre2_generated_workflow.sh" check "$SELFHOST_BIN" "$raw_dir" "$generated_dir" 2>"$tmpdir/err")"; then
+  if ! summary="$(PCRE2_CHECK_TIMEOUT_SECS=25 bash "$ROOT_DIR/scripts/pcre2_generated_workflow.sh" check "$SELFHOST_BIN" "$generated_dir" 2>"$tmpdir/err")"; then
     echo "FAIL(cli-selfhost-regex) pcre2_check_existing_main"
     cat "$tmpdir/err" || true
     printf '%s\n' "$summary"
@@ -1909,7 +1909,7 @@ EOF
     return
   fi
 
-  if ! file_has_literal "$out_w" "sizeof[* c_char]()" || file_has_literal "$out_w" "sizeof[*mut " || file_has_literal "$out_w" "sizeof[*const "; then
+  if ! file_has_literal "$out_w" "sizeof[usize]()" || file_has_literal "$out_w" "sizeof[*mut " || file_has_literal "$out_w" "sizeof[*const "; then
     echo "FAIL(cli-selfhost-migrate-output) sizeof_pointer_type_syntax"
     cat "$out_w" || true
     failures=$((failures + 1))
@@ -3104,7 +3104,7 @@ if '"pcre2_config(NULL)"' not in text:
     raise SystemExit(1)
 if "ASSERT(rc" in text:
     raise SystemExit(1)
-if re.search(r"match_data\.memctl\.free\([^)]*heapframes[^)]*memory_data", text) is None:
+if re.search(r"\.free\([^)]*heapframes[^)]*memory_data", text) is None:
     raise SystemExit(1)
 if "CLEAR_HEAP_FRAMES(match_data" in text:
     raise SystemExit(1)

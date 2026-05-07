@@ -151,6 +151,18 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
         )
         impl_trait_args = impl_trait_args + 3
 
+    for ni in 1..src.node_count():
+        let node = ni as NodeId
+        if src.has_call_named_args(node) != 0:
+            out.set_call_named_args(node, src.state.call_named_args.get(ni).unwrap())
+        if src.state.fn_stack_sizes.contains(ni):
+            out.state.fn_stack_sizes.insert(ni, src.state.fn_stack_sizes.get(ni).unwrap())
+        if src.state.fn_weak_flags.contains(ni):
+            out.state.fn_weak_flags.insert(ni, src.state.fn_weak_flags.get(ni).unwrap())
+        if src.state.fn_effect_pin_params.contains(ni):
+            out.state.fn_effect_pin_params.insert(ni, src.state.fn_effect_pin_params.get(ni).unwrap())
+            out.state.fn_effect_pin_bits.insert(ni, src.state.fn_effect_pin_bits.get(ni).unwrap())
+
     out
 
 fn AstPool.ct_new_node_copy(self: AstPool, kind: i32, start: i32, end: i32, d0: i32, d1: i32, d2: i32, suffix: i32) -> i32:
@@ -605,7 +617,14 @@ fn AstPool.ct_clone_tree_with_subst(self: AstPool, node: i32, subst_sym: i32, su
             self.add_extra(cloned_items.get(i as i64))
         if kind == NodeKind.NK_CALL:
             let callee = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
-            return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), callee, new_extra, count, self.literal_suffix(node))
+            let cloned = self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), callee, new_extra, count, self.literal_suffix(node))
+            if self.has_call_named_args(node as NodeId) != 0:
+                let old_names = self.state.call_named_args.get(node).unwrap()
+                let new_names = self.extra_len()
+                for ni in 0..count:
+                    self.add_extra(self.get_extra(old_names + ni))
+                self.set_call_named_args(cloned as NodeId, new_names)
+            return cloned
         return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), new_extra, count, 0, self.literal_suffix(node))
 
     if kind == NodeKind.NK_BLOCK:

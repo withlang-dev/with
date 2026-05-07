@@ -1475,6 +1475,13 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
     if kind == NodeKind.NK_STRING_LIT:
         return self.ty_str
 
+    if kind == NodeKind.NK_REGEX_LIT:
+        let regex_ty = self.lookup_named_type_visible(self.syms.regex)
+        if regex_ty == 0:
+            self.emit_error("Regex type is not available; import std.regex", node)
+            return 0 as TypeId
+        return regex_ty as TypeId
+
     if kind == NodeKind.NK_FSTRING:
         return self.check_fstring(node) as TypeId
 
@@ -3844,6 +3851,11 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
         return
 
     if kind == NodeKind.NK_PAT_INT or kind == NodeKind.NK_PAT_BOOL or kind == NodeKind.NK_PAT_STRING:
+        return
+
+    if kind == NodeKind.NK_PAT_REGEX:
+        if subject_type != 0 and self.types_compatible(self.ty_str as i32, subject_type) == 0:
+            self.emit_error("regex pattern requires a str-compatible match subject", node)
         return
 
     if kind == NodeKind.NK_PAT_TYPED_BIND:

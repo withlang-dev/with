@@ -1,4 +1,4 @@
-//! skip
+//! skip: non-executable spec sketch for Section 7.9 — NLL-Based @[no_await_guard] (formerly 25.82); contains pseudo-code for unimplemented feature work
 // Spec test: Section 7.9 — NLL-Based @[no_await_guard] (formerly 25.82)
 // These are pseudo-code test cases from the specification.
 // Remove the //! skip directive once the features are implemented.

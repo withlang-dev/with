@@ -1,4 +1,4 @@
-//! skip
+//! skip: non-executable spec sketch for Section 16 — FFI and `c_import` (formerly 25.11); contains pseudo-code for unimplemented feature work
 // Spec test: Section 16 — FFI and `c_import` (formerly 25.11)
 // These are pseudo-code test cases from the specification.
 // Remove the //! skip directive once the features are implemented.

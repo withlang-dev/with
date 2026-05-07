@@ -4607,7 +4607,19 @@ fn Codegen.wrap_main_for_exit(self: Codegen) -> void:
         let init_value = wl_build_call(self.builder, init_ft, init_fn, 0, 0)
         wl_build_store(self.builder, init_value, init_global)
 
-    let main_call = wl_build_call(self.builder, main_ft, main_fn, 0, 0)
+    let main_param_count = wl_count_param_types(main_ft)
+    var main_call: i64 = 0
+    if main_param_count == 0:
+        main_call = wl_build_call(self.builder, main_ft, main_fn, 0, 0)
+    else if main_param_count == 2:
+        let main_args: Vec[i64] = Vec.new()
+        main_args.push(self.coerce_value_to_type(argc_val, wl_get_fn_param_type(main_ft, 0)))
+        main_args.push(self.coerce_value_to_type(argv_val, wl_get_fn_param_type(main_ft, 1)))
+        main_call = wl_build_call(self.builder, main_ft, main_fn, vec_data_i64(&main_args), 2)
+    else:
+        with_eprint("error: main must take either zero parameters or argc/argv")
+        self.had_error = 1
+        return
 
     // Drain pending fibers after main returns
     var runtime_run_fn = wl_get_named_function(self.llmod, "with_runtime_run")

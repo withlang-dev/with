@@ -1,4 +1,4 @@
-//! skip
+//! skip: non-executable spec sketch for Section 3.4 — Disjoint Slice Operations (formerly 25.78); contains pseudo-code for unimplemented feature work
 // Spec test: Section 3.4 — Disjoint Slice Operations (formerly 25.78)
 // These are pseudo-code test cases from the specification.
 // Remove the //! skip directive once the features are implemented.

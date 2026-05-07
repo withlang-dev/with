@@ -1,4 +1,4 @@
-//! skip
+//! skip: non-executable spec sketch for Section 13.3 — Collection Operations (formerly 25.15); contains pseudo-code for unimplemented feature work
 // Spec test: Section 13.3 — Collection Operations (formerly 25.15)
 // These are pseudo-code test cases from the specification.
 // Remove the //! skip directive once the features are implemented.
