@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v6.8
+# The With Programming Language — Specification v6.9
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -5172,8 +5172,10 @@ encloses the `break`.
 `continue 'label` transfers control to the next iteration of the
 loop labeled `'label`. For a `while` loop, this means the condition
 check. For a `for` loop, this means the iterator-advance or
-next-element step. The target label must be declared on a labeled
-`while` or `for` that lexically encloses the `continue`.
+next-element step. For a `do`-`while` loop, this means the trailing
+condition check (§13.5c). The target label must be declared on a
+labeled `while`, `for`, or `do` that lexically encloses the
+`continue`.
 
 Labels on other statement forms are valid `goto` targets (§13.5b),
 but they are not valid targets for `break` or `continue`.
@@ -5312,8 +5314,11 @@ The compiler must diagnose at least these errors:
 `with migrate` may emit `goto` when C source contains control flow
 that cannot be expressed with structured constructs, such as an
 irreducible control-flow graph. For reducible C, the migrator should
-prefer structured With using `while`, `if`, labeled `break`, and
-labeled `continue`. For irreducible C, each basic block may become a
+prefer structured With using `while`, `do`-`while` (§13.5c), `if`,
+labeled `break`, and labeled `continue`. In particular, C
+`do { ... } while (cond)` loops should be translated directly to
+With `do: ... while cond`, preserving `continue`-to-condition
+semantics. For irreducible C, each basic block may become a
 labeled statement at function scope, and each control-flow edge may
 become a `goto` or conditional `goto`.
 
@@ -5322,6 +5327,226 @@ Computed goto (`goto *ptr`) and non-local jumps such as
 function that requires one of those patterns, it must emit a
 diagnostic naming the function and source location, produce no
 misleading placeholder translation, and exit non-zero.
+
+### 13.5c `do`-`while` Loop
+
+A `do`-`while` loop executes its body at least once, then repeats
+while the trailing condition is true.
+
+```
+do_loop := 'do' body 'while' condition
+```
+
+The body uses the standard three forms:
+
+```
+// Indented colon
+do:
+    stmt1
+    stmt2
+while condition
+
+// Braced
+do {
+    stmt1
+    stmt2
+} while condition
+
+// Inline colon (single statement)
+do: stmt
+while condition
+```
+
+The `while` keyword following the body introduces the loop
+condition. It is not a separate `while` loop — the parser
+recognizes `while` at the same nesting level as `do` as the
+loop's trailing condition, not as a new statement.
+
+No colon or brace follows the trailing `while` — the condition
+is a single expression terminated by a newline or the end of the
+enclosing block.
+
+**Semantics:**
+
+1. The body executes unconditionally on the first iteration.
+2. After each iteration, the condition is evaluated.
+3. If the condition is true, the body executes again.
+4. If the condition is false, the loop exits.
+
+`break` exits the loop immediately.
+
+`continue` jumps to the **condition check**, not to the top of
+the body. This matches C semantics: any side-effects in the
+condition expression are executed on every `continue`.
+
+```
+// Equivalent to C: do { ... continue; ... } while (*(++p))
+var p = start
+do:
+    if should_skip:
+        continue        // jumps to the while condition below
+    process(p)
+while { p = p + 1; unsafe: *p != 0 }
+```
+
+**Labeled form:**
+
+`do` loops may be labeled for use with `break` and `continue`:
+
+```
+'outer do:
+    'inner do:
+        if done: break 'outer
+        if skip: continue 'inner
+        process()
+    while inner_condition
+while outer_condition
+```
+
+**Type:**
+
+A `do`-`while` loop is a statement. It does not produce a value.
+Unlike `loop` (which can produce a value via `break expr`), a
+`do`-`while` loop always evaluates to `Unit`.
+
+**Condition with side-effects:**
+
+The trailing condition may contain side-effects. When the
+condition is a block expression (braced), all statements in the
+block execute before the truthiness of the final expression
+determines whether to continue looping:
+
+```
+do:
+    process(current)
+while { current = current.next; current != null }
+```
+
+This is the direct translation of C's:
+
+```c
+do {
+    process(current);
+} while ((current = current->next) != NULL);
+```
+
+When the condition is a simple expression, it is evaluated
+normally:
+
+```
+do:
+    attempt()
+while retry_count > 0
+```
+
+**Desugaring:**
+
+The compiler treats `do`-`while` as a primitive loop form, not
+as syntactic sugar over `loop`. This ensures `continue` has the
+correct target (the condition check, not the body top).
+
+Conceptually, the semantics are equivalent to:
+
+```
+loop:
+    body
+    if not condition: break
+```
+
+except that `continue` anywhere in `body` jumps to the condition
+evaluation, not to the top of `loop`. This distinction only
+matters when the body contains `continue` statements.
+
+**Interaction with `defer` and `errdefer`:**
+
+`defer` statements inside the body execute at scope exit as
+usual — either when the loop exits via `break`, when the
+enclosing function returns, or at the end of a braced body on
+each iteration.
+
+`errdefer` follows the same scoping rules as in other loop
+bodies.
+
+**Examples:**
+
+Retry loop:
+
+```
+var attempts = 0
+do:
+    attempts = attempts + 1
+    let result = try_connect(host)
+    if result.is_ok():
+        return result
+while attempts < max_retries
+return Err(.MaxRetriesExceeded)
+```
+
+Processing a non-empty list:
+
+```
+var node = list.head
+do:
+    process(node.value)
+    node = node.next
+while node != null
+```
+
+Iterator with lookahead:
+
+```
+var p = start
+do:
+    let ch = unsafe: *p
+    if ch == delimiter: break
+    buffer.push(ch)
+while { p = p + 1; p < end }
+```
+
+C migration — PCRE2 list iteration:
+
+C source:
+```c
+do {
+    if (*list < new_start) {
+        if (*list + 1 == new_start) { new_start--; continue; }
+    } else if (*list > new_end) {
+        if (*list - 1 == new_end) { new_end++; continue; }
+    } else {
+        continue;
+    }
+    result += 2;
+    if (buffer != NULL) {
+        buffer[0] = *list;
+        buffer[1] = *list;
+        buffer += 2;
+    }
+} while (*(++list) != NOTACHAR);
+```
+
+With translation:
+```
+do:
+    if (unsafe: *list) < new_start:
+        if (unsafe: *list) + 1 == new_start:
+            new_start = new_start - 1
+            continue
+    else if (unsafe: *list) > new_end:
+        if (unsafe: *list) - 1 == new_end:
+            new_end = new_end + 1
+            continue
+    else:
+        continue
+    result = result + 2
+    if buffer != null:
+        unsafe: buffer[0] = unsafe: *list
+        unsafe: buffer[1] = unsafe: *list
+        buffer = buffer + 2
+while { list = list + 1; (unsafe: *list) != NOTACHAR }
+```
+
+No `goto` required. `continue` correctly jumps to the `while`
+condition, which increments `list` and checks the terminator.
 
 ### 13.6 Collection Comprehensions
 
@@ -9019,6 +9244,7 @@ The following keywords are reserved and cannot be used as identifiers:
 | `match` | Pattern matching |
 | `for` | Loop over iterables |
 | `while` | Conditional loop |
+| `do` | Do-while loop |
 | `goto` | Unconditional jump to label |
 | `yield` | Generator / comprehension yield |
 | `return` | Early return |
@@ -9364,11 +9590,11 @@ LET_STMT    := 'let' [ 'mut' ] PATTERN [ ':' TYPE ] '=' EXPR
 VAR_STMT    := 'var' IDENT [ ':' TYPE ] '=' EXPR
 ```
 
-**Control flow** (§9, §13.5a, §13.5b):
+**Control flow** (§9, §13.5a, §13.5b, §13.5c):
 
 ```
 STMT        := LABEL_STMT | LET_STMT | VAR_STMT | IF_STMT | MATCH_STMT
-              | FOR_STMT | WHILE_STMT | WITH_STMT
+              | FOR_STMT | WHILE_STMT | DO_WHILE_STMT | WITH_STMT
               | RETURN_STMT | BREAK_STMT | CONTINUE_STMT | GOTO_STMT
               | DEFER_STMT | EXPR
 LABEL_STMT  := LABEL ( STMT | COLON_BODY | BRACE_BODY )
@@ -9379,6 +9605,7 @@ MATCH_STMT  := 'match' EXPR BODY_ARMS
 MATCH_ARM   := PATTERN [ 'if' EXPR ] '=>' EXPR
 FOR_STMT    := 'for' PATTERN 'in' EXPR BODY
 WHILE_STMT  := 'while' EXPR BODY
+DO_WHILE_STMT := 'do' BODY 'while' EXPR
 WITH_STMT   := 'with' EXPR 'as' [ 'mut' ] IDENT BODY
 RETURN_STMT := 'return' [ EXPR ]
 BREAK_STMT  := 'break' [ LABEL ]

@@ -7717,12 +7717,6 @@ fn CiStmtPool.lower_stmt_ir(self: CiStmtPool, session: i64, cursor: i32, exprs: 
         if (switch_id as i32) != 0:
             return switch_id
 
-    // Structural do-while. Desugars to:
-    //     while true:
-    //         body
-    //         <cond-setup>
-    //         if not (cond):
-    //             break
     if kind == CXK_DO_STMT:
         let dnc = with_ci_num_children(session, cursor)
         if dnc >= 2:
@@ -7733,10 +7727,7 @@ fn CiStmtPool.lower_stmt_ir(self: CiStmtPool, session: i64, cursor: i32, exprs: 
                 ci_trace_port("STRUCTURAL[b11.1.do_stmt_ir]")
                 let body_id = self.lower_stmt_ir(session, body_cursor, exprs, types, 0, scope)
                 if (body_id as i32) != 0:
-                    let if_break = self.build_if_not_break_ir(exprs, prepared_cond.value_expr)
-                    let block_id = self.merge3_ir( body_id, prepared_cond.setup_stmt, if_break)
-                    let true_cond = exprs.bool_lit(1, 0 as CiTypeId)
-                    return self.while_stmt(true_cond, block_id)
+                    return self.do_while_stmt(body_id, prepared_cond.value_expr, prepared_cond.setup_stmt)
 
     // Compound statement with gotos. Lower the whole function body
     // to a CFG, recover structured control with std.cfg.stackify,

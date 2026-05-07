@@ -413,6 +413,10 @@ fn MirBuilder.collect_goto_label_depths(self: MirBuilder, node: i32, scope_depth
         self.collect_goto_label_depths(self.ast.get_data0(node), scope_depth)
         self.collect_goto_label_depths(self.ast.get_data1(node), scope_depth)
         return
+    if kind == NodeKind.NK_DO_WHILE:
+        self.collect_goto_label_depths(self.ast.get_data0(node), scope_depth)
+        self.collect_goto_label_depths(self.ast.get_data1(node), scope_depth)
+        return
     if kind == NodeKind.NK_LOOP:
         self.collect_goto_label_depths(self.ast.get_data0(node), scope_depth)
         return
@@ -2753,6 +2757,32 @@ fn MirBuilder.lower_while(self: MirBuilder, cond_expr: i32, body_expr: i32, node
     self.switch_to(body_bb)
     let _ = self.lower_expr(body_expr)
     self.terminate(TermKind.TK_GOTO, cond_bb, 0, 0, 0)
+
+    self.pop_control_target()
+    self.switch_to(exit_bb)
+    self.unit_operand()
+
+fn MirBuilder.lower_do_while(self: MirBuilder, body_expr: i32, cond_expr: i32, node: i32) -> i32:
+    let body_bb = self.new_block()
+    let cond_bb = self.new_block()
+    let exit_bb = self.new_block()
+
+    self.terminate(TermKind.TK_GOTO, body_bb, 0, 0, 0)
+
+    self.push_control_target(self.ast.get_data2(node), ControlTargetKind.CT_LOOP, cond_bb, exit_bb)
+
+    self.switch_to(body_bb)
+    let _ = self.lower_expr(body_expr)
+    self.terminate(TermKind.TK_GOTO, cond_bb, 0, 0, 0)
+
+    self.switch_to(cond_bb)
+    let cond_op = self.lower_expr(cond_expr)
+    let vals: Vec[i32] = Vec.new()
+    vals.push(1)
+    let targets: Vec[i32] = Vec.new()
+    targets.push(body_bb as i32)
+    let table = self.body.new_switch_table(vals, targets)
+    self.terminate(TermKind.TK_SWITCH_INT, cond_op, table, exit_bb, 0)
 
     self.pop_control_target()
     self.switch_to(exit_bb)
@@ -5167,6 +5197,9 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
     if kind == NodeKind.NK_WHILE:
         return self.lower_while(self.ast.get_data0(node), self.ast.get_data1(node), node)
 
+    if kind == NodeKind.NK_DO_WHILE:
+        return self.lower_do_while(self.ast.get_data0(node), self.ast.get_data1(node), node)
+
     if kind == NodeKind.NK_LOOP:
         return self.lower_loop(self.ast.get_data0(node), node)
 
@@ -6218,6 +6251,11 @@ fn tailrec_verify_recursive_edges(sema: Sema, node: i32, scc: &Vec[i32], in_tail
         return tailrec_verify_recursive_edges(sema, sema.ast.get_data0(node), scc, 1, active_cleanup)
     if kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER:
         return tailrec_verify_recursive_edges(sema, sema.ast.get_data0(node), scc, 0, active_cleanup)
+    if kind == NodeKind.NK_DO_WHILE:
+        let body_violation = tailrec_verify_recursive_edges(sema, sema.ast.get_data0(node), scc, 0, active_cleanup)
+        if body_violation.node != 0:
+            return body_violation
+        return tailrec_verify_recursive_edges(sema, sema.ast.get_data1(node), scc, 0, active_cleanup)
     if kind == NodeKind.NK_FOR or kind == NodeKind.NK_WHILE or kind == NodeKind.NK_LOOP:
         return tailrec_verify_recursive_edges(sema, sema.ast.get_data2(node), scc, 0, active_cleanup)
     if kind == NodeKind.NK_LET_DECL or kind == NodeKind.NK_LET_BINDING:

@@ -1387,6 +1387,12 @@ fn lsp_collect_bindings_rec(pool: AstPool, intern: InternPool, node: i32, offset
             return lsp_collect_bindings_rec(pool, intern, body, offset)
         return empty
 
+    if kind == NodeKind.NK_DO_WHILE:
+        let body = pool.get_data0(nid)
+        if body != 0:
+            return lsp_collect_bindings_rec(pool, intern, body, offset)
+        return empty
+
     if kind == NodeKind.NK_LOOP:
         let body = pool.get_data0(nid)
         if body != 0:
@@ -1464,6 +1470,12 @@ fn lsp_collect_bindings(pool: AstPool, intern: InternPool, node: i32, offset: i3
 
     if kind == NodeKind.NK_WHILE:
         let body = pool.get_data1(nid)
+        if body != 0:
+            lsp_collect_bindings(pool, intern, body, offset, names, seen)
+        return
+
+    if kind == NodeKind.NK_DO_WHILE:
+        let body = pool.get_data0(nid)
         if body != 0:
             lsp_collect_bindings(pool, intern, body, offset, names, seen)
         return

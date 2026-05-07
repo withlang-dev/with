@@ -656,6 +656,13 @@ fn Sema.collect_function_labels(self: Sema, node: i32):
         self.label_registry_exit_scope()
         return
 
+    if kind == NodeKind.NK_DO_WHILE:
+        self.label_registry_enter_scope()
+        self.collect_function_labels(self.ast.get_data0(node))
+        self.label_registry_exit_scope()
+        self.collect_function_labels(self.ast.get_data1(node))
+        return
+
     if kind == NodeKind.NK_LOOP:
         self.label_registry_enter_scope()
         self.collect_function_labels(self.ast.get_data0(node))
@@ -1035,6 +1042,11 @@ fn Sema.check_expr_reachable_comptime_errors(self: Sema, node: i32):
         return
 
     if kind == NodeKind.NK_WHILE:
+        self.check_expr_reachable_comptime_errors(self.ast.get_data0(node))
+        self.check_expr_reachable_comptime_errors(self.ast.get_data1(node))
+        return
+
+    if kind == NodeKind.NK_DO_WHILE:
         self.check_expr_reachable_comptime_errors(self.ast.get_data0(node))
         self.check_expr_reachable_comptime_errors(self.ast.get_data1(node))
         return
@@ -1547,6 +1559,18 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         self.check_expr(body)
         self.pop_label_frame()
         self.loop_depth = self.loop_depth - 1
+        return self.ty_void
+
+    if kind == NodeKind.NK_DO_WHILE:
+        let body = self.ast.get_data0(node)
+        let cond = self.ast.get_data1(node)
+        let label = self.ast.get_data2(node)
+        self.loop_depth = self.loop_depth + 1
+        self.push_label_frame(label, LabelFrameKind.LFK_WHILE, node)
+        self.check_expr(body)
+        self.pop_label_frame()
+        self.loop_depth = self.loop_depth - 1
+        self.check_expr(cond)
         return self.ty_void
 
     if kind == NodeKind.NK_LOOP:
@@ -5128,6 +5152,10 @@ fn Sema.verify_tail_position(self: Sema, node: i32, fn_sym: i32, in_tail: i32):
         return
 
     // Loops, defer: NOT tail position for body
+    if kind == NodeKind.NK_DO_WHILE:
+        self.verify_tail_position(self.ast.get_data0(node), fn_sym, 0)
+        self.verify_tail_position(self.ast.get_data1(node), fn_sym, 0)
+        return
     if kind == NodeKind.NK_FOR or kind == NodeKind.NK_WHILE or kind == NodeKind.NK_LOOP:
         self.verify_tail_position(self.ast.get_data2(node), fn_sym, 0)
         return
@@ -7743,6 +7771,10 @@ fn Sema.expr_uses_symbol(self: Sema, node: i32, sym: i32) -> i32:
         if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
             return 1
         return self.expr_uses_symbol(self.ast.get_data1(node), sym)
+    if kind == NodeKind.NK_DO_WHILE:
+        if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
+            return 1
+        return self.expr_uses_symbol(self.ast.get_data1(node), sym)
     if kind == NodeKind.NK_LOOP:
         return self.expr_uses_symbol(self.ast.get_data0(node), sym)
     if kind == NodeKind.NK_BREAK:
@@ -7888,6 +7920,10 @@ fn Sema.expr_mutates_place(self: Sema, node: i32, sym: i32) -> i32:
     if kind == NodeKind.NK_GROUPED:
         return self.expr_mutates_place(self.ast.get_data0(node), sym)
     if kind == NodeKind.NK_WHILE:
+        if self.expr_mutates_place(self.ast.get_data0(node), sym) != 0:
+            return 1
+        return self.expr_mutates_place(self.ast.get_data1(node), sym)
+    if kind == NodeKind.NK_DO_WHILE:
         if self.expr_mutates_place(self.ast.get_data0(node), sym) != 0:
             return 1
         return self.expr_mutates_place(self.ast.get_data1(node), sym)
