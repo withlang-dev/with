@@ -152,6 +152,7 @@ fn typed_expr_kind_name(kind: i32) -> str:
     if kind == NodeKind.NK_PIPELINE: return "pipeline"
     if kind == NodeKind.NK_GROUPED: return "grouped"
     if kind == NodeKind.NK_WHILE: return "while_expr"
+    if kind == NodeKind.NK_DO_WHILE: return "do_while_expr"
     if kind == NodeKind.NK_LOOP: return "loop_expr"
     if kind == NodeKind.NK_FOR: return "for_expr"
     if kind == NodeKind.NK_BREAK: return "break_expr"
@@ -701,6 +702,11 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         return out
 
+    if kind == NodeKind.NK_DO_WHILE:
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        return out
+
     if kind == NodeKind.NK_LOOP:
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         return out
@@ -953,6 +959,11 @@ fn Sema.emit_typed_expr_tree(self: Sema, node: i32, indent: i32):
         return
 
     if kind == NodeKind.NK_WHILE:
+        self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        return
+
+    if kind == NodeKind.NK_DO_WHILE:
         self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         return

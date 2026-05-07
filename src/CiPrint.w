@@ -274,6 +274,30 @@ fn ci_print_compact_stmt_local(stmts: CiStmtPool, exprs: CiExprPool, types: CiTy
             out = out ++ indent ++ "}\n"
         return out
 
+    if kind == CiStmtKind.CIS_DO_WHILE:
+        let body = (stmts.get_d0(id)) as CiStmtId
+        let cond = (stmts.get_d1(id)) as CiExprId
+        let cond_setup = (stmts.get_d2(id)) as CiStmtId
+        let brace = migrate_prefer_brace()
+        var out = indent ++ (if brace: "do {\n" else: "do:\n")
+        let body_text = ci_print_compact_stmt_local(stmts, exprs, types, body, depth + 4)
+        if body_text.len() > 0:
+            out = out ++ body_text
+        else:
+            out = out ++ ci_make_indent(depth + 4) ++ "0\n"
+        let cond_text = ci_print_expr(exprs, types, cond, 0, 0)
+        var while_cond = ""
+        if (cond_setup as i32) != 0:
+            let setup_text = ci_print_compact_stmt_local(stmts, exprs, types, cond_setup, depth + 4)
+            while_cond = "{ " ++ setup_text.trim() ++ "; " ++ cond_text ++ " }"
+        else:
+            while_cond = cond_text
+        if brace:
+            out = out ++ indent ++ "} while " ++ while_cond ++ "\n"
+        else:
+            out = out ++ indent ++ "while " ++ while_cond ++ "\n"
+        return out
+
     if kind == CiStmtKind.CIS_VAR_DECL:
         let name_sym = stmts.get_d0(id)
         let ty_id = (stmts.get_d1(id)) as CiTypeId
@@ -751,7 +775,24 @@ fn ci_print_stmt(stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: Ci
         return out
 
     if kind == CiStmtKind.CIS_DO_WHILE:
-        return indent ++ "<ci:unimpl:DO_WHILE>\n"
+        let body = (stmts.get_d0(id)) as CiStmtId
+        let cond = (stmts.get_d1(id)) as CiExprId
+        let cond_setup = (stmts.get_d2(id)) as CiStmtId
+        var out = indent ++ "do {\n"
+        let body_text = ci_print_stmt(stmts, exprs, types, body, 0)
+        if body_text.len() > 0:
+            out = out ++ ci_reindent_spaces(body_text, 4)
+        else:
+            out = out ++ ci_make_indent(depth + 4) ++ "0\n"
+        let cond_text = ci_print_expr(exprs, types, cond, 0, 0)
+        var while_cond = ""
+        if (cond_setup as i32) != 0:
+            let setup_text = ci_print_stmt(stmts, exprs, types, cond_setup, 0)
+            while_cond = "{ " ++ setup_text.trim() ++ "; " ++ cond_text ++ " }"
+        else:
+            while_cond = cond_text
+        out = out ++ indent ++ "} while " ++ while_cond ++ "\n"
+        return out
 
     if kind == CiStmtKind.CIS_FOR:
         return indent ++ "<ci:unimpl:FOR>\n"

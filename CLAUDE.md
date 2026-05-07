@@ -306,6 +306,11 @@ flag on `NK_LET_DECL`.
   Use `grep`, `nm`, `lldb`, or `with check` for diagnosis.
 - **Iterating unordered maps** or using pointer-address ordering.
   These break fixpoint determinism.
+- **Never use `git stash`.** It has destroyed uncommitted work
+  multiple times. There is no valid use case in this repo.
+  If you need to test something against a clean state, use
+  `git worktree` or a separate clone. `git stash`, `git stash pop`,
+  and `git stash drop` are all forbidden.
 
 ---
 

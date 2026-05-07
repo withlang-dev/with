@@ -1245,6 +1245,32 @@ fn ComptimeEvaluator.eval_while(self: ComptimeEvaluator, node: i32) -> ComptimeC
         return body_signal
     comptime_control_error()
 
+fn ComptimeEvaluator.eval_do_while(self: ComptimeEvaluator, node: i32) -> ComptimeControl:
+    let loop_label = self.ast.get_data2(node)
+    self.loop_labels.push(loop_label)
+    while true:
+        let body_signal = self.eval_expr(self.ast.get_data0(node))
+        if body_signal.kind != ComptimeControlKind.CTL_VALUE:
+            if self.signal_matches_loop(body_signal, loop_label) != 0:
+                if body_signal.kind != ComptimeControlKind.CTL_CONTINUE:
+                    self.loop_labels.pop()
+                    return comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
+            else:
+                self.loop_labels.pop()
+                return body_signal
+        let cond_signal = self.eval_expr(self.ast.get_data1(node))
+        if cond_signal.kind != ComptimeControlKind.CTL_VALUE:
+            self.loop_labels.pop()
+            return cond_signal
+        let truthy = comptime_value_truthy(cond_signal.value)
+        if truthy < 0:
+            self.loop_labels.pop()
+            return self.fail(node, "do-while condition must be bool or integer in comptime")
+        if truthy == 0:
+            self.loop_labels.pop()
+            return comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
+    comptime_control_error()
+
 fn ComptimeEvaluator.eval_for(self: ComptimeEvaluator, node: i32) -> ComptimeControl:
     let iterable_signal = self.eval_expr(self.ast.get_data1(node))
     if iterable_signal.kind != ComptimeControlKind.CTL_VALUE:
@@ -1499,6 +1525,8 @@ fn ComptimeEvaluator.eval_expr(self: ComptimeEvaluator, node: i32) -> ComptimeCo
         return self.eval_for(node)
     if kind == NodeKind.NK_WHILE:
         return self.eval_while(node)
+    if kind == NodeKind.NK_DO_WHILE:
+        return self.eval_do_while(node)
     if kind == NodeKind.NK_LOOP:
         return self.eval_loop(node)
     if kind == NodeKind.NK_CALL:

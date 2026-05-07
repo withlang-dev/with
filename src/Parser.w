@@ -375,7 +375,7 @@ fn Parser.recover_to_statement(self: Parser):
         // Statement keywords are safe sync points
         if t == TokenKind.TK_KW_LET or t == TokenKind.TK_KW_VAR or
            t == TokenKind.TK_KW_RETURN or t == TokenKind.TK_KW_IF or
-           t == TokenKind.TK_KW_FOR or t == TokenKind.TK_KW_WHILE or
+           t == TokenKind.TK_KW_FOR or t == TokenKind.TK_KW_WHILE or t == TokenKind.TK_KW_DO or
            t == TokenKind.TK_KW_MATCH or t == TokenKind.TK_KW_BREAK or
            t == TokenKind.TK_KW_CONTINUE or t == TokenKind.TK_KW_GOTO or
            t == TokenKind.TK_LABEL or t == TokenKind.TK_KW_DEFER:
@@ -2761,6 +2761,7 @@ fn Parser.parse_primary(self: Parser) -> NodeId:
     if t == TokenKind.TK_AMPERSAND: return self.parse_ref_of()
     if t == TokenKind.TK_STAR: return self.parse_deref_expr()
     if t == TokenKind.TK_KW_IF: return self.parse_if_expr()
+    if t == TokenKind.TK_KW_DO: return self.parse_do_while(0)
     if t == TokenKind.TK_KW_WHILE: return self.parse_while(0)
     if t == TokenKind.TK_KW_LOOP: return self.parse_loop(0)
     if t == TokenKind.TK_KW_FOR: return self.parse_for(0)
@@ -2785,7 +2786,7 @@ fn Parser.parse_primary(self: Parser) -> NodeId:
     if t == TokenKind.TK_KW_CONST: return self.parse_const_binding()
     if t == TokenKind.TK_KW_MATCH: return self.parse_match_expr()
     if t == TokenKind.TK_KW_WITH: return self.parse_with_expr()
-    if t == TokenKind.TK_L_BRACE: return self.parse_record_update()
+    if t == TokenKind.TK_L_BRACE: return self.parse_brace_expr()
     if t == TokenKind.TK_PIPE:
         self.emit_error("use 'x => body' instead of '|x| body'")
         self.advance()
@@ -4636,6 +4637,25 @@ fn Parser.parse_while(self: Parser, label: i32) -> NodeId:
     let body = self.parse_body()
     self.pool.add_node(NodeKind.NK_WHILE, start, self.prev_end(), cond, body, label)
 
+fn Parser.parse_do_while(self: Parser, label: i32) -> NodeId:
+    let start = self.current_start()
+    let do_col = column_of(self.source, start)
+    self.advance()
+    let body = self.parse_body()
+
+    let save = self.pos
+    self.skip_newlines()
+    if self.peek() == TokenKind.TK_KW_WHILE:
+        let while_col = column_of(self.source, self.current_start())
+        if while_col == do_col or not (is_first_on_line(self.source, self.current_start()) != 0):
+            self.advance()
+            self.skip_newlines()
+            let cond = self.parse_expr()
+            return self.pool.add_node(NodeKind.NK_DO_WHILE, start, self.prev_end(), body, cond, label)
+    self.pos = save
+    self.emit_error("expected 'while' after do body")
+    self.pool.add_node(NodeKind.NK_DO_WHILE, start, self.prev_end(), body, 0, label)
+
 fn Parser.parse_while_let(self: Parser, start: i32) -> NodeId:
     self.advance()  // consume let
     let pat = self.parse_pattern()
@@ -4874,6 +4894,9 @@ fn Parser.parse_labeled_statement(self: Parser) -> NodeId:
         return self.pool.add_node(NodeKind.NK_LABEL, start, self.pool.get_end(stmt), label_sym, stmt, 0)
     if t == TokenKind.TK_KW_WHILE:
         stmt = self.parse_while(label_sym)
+        return self.pool.add_node(NodeKind.NK_LABEL, start, self.pool.get_end(stmt), label_sym, stmt, 0)
+    if t == TokenKind.TK_KW_DO:
+        stmt = self.parse_do_while(label_sym)
         return self.pool.add_node(NodeKind.NK_LABEL, start, self.pool.get_end(stmt), label_sym, stmt, 0)
     if t == TokenKind.TK_KW_LOOP:
         stmt = self.parse_loop(label_sym)
@@ -5694,17 +5717,51 @@ fn Parser.parse_with_expr(self: Parser) -> NodeId:
     let encoded_name = encode_with_binding(name, is_mut)
     self.pool.add_node(NodeKind.NK_WITH_EXPR, start, self.prev_end(), source, body, encoded_name)
 
-// ── Record update ────────────────────────────────────────────────
+// ── Brace expression (block expr or record update) ──────────────
 
-fn Parser.parse_record_update(self: Parser) -> NodeId:
+fn Parser.parse_brace_expr(self: Parser) -> NodeId:
     let start = self.current_start()
     self.advance()  // consume {
-    self.skip_newlines()
-    let source = self.parse_expr()
-    if self.peek() != TokenKind.TK_KW_WITH:
-        self.emit_error("expected 'with' in record update")
-        return self.poisoned_expr()
-    self.advance()
+    self.skip_separators()
+
+    if self.peek() == TokenKind.TK_R_BRACE:
+        let end = self.current_end()
+        self.advance()
+        return self.pool.add_node(NodeKind.NK_BLOCK, start, end, 0, 0, 0)
+
+    var last_expr = self.parse_expr()
+
+    if self.peek() == TokenKind.TK_KW_WITH:
+        return self.finish_record_update(start, last_expr)
+
+    var stmts: Vec[i32] = Vec.new()
+    while true:
+        let cur = self.peek()
+        if cur == TokenKind.TK_EOF or cur == TokenKind.TK_R_BRACE:
+            break
+        if cur == TokenKind.TK_NEWLINE or cur == TokenKind.TK_SEMICOLON:
+            while self.peek() == TokenKind.TK_NEWLINE or self.peek() == TokenKind.TK_SEMICOLON:
+                self.advance()
+            if self.peek() == TokenKind.TK_R_BRACE or self.peek() == TokenKind.TK_EOF:
+                break
+            stmts.push(last_expr as i32)
+            last_expr = self.parse_expr()
+            continue
+        break
+
+    self.expect(TokenKind.TK_R_BRACE)
+
+    if stmts.len() == 0:
+        return last_expr
+
+    let extra_start = self.pool.extra_len()
+    for i in 0..stmts.len() as i32:
+        self.pool.add_extra(stmts.get(i as i64))
+    let stmt_count = stmts.len() as i32
+    self.pool.add_node(NodeKind.NK_BLOCK, self.pool.get_start(stmts.get(0)), self.pool.get_end(last_expr), extra_start, stmt_count, last_expr)
+
+fn Parser.finish_record_update(self: Parser, start: i32, source: NodeId) -> NodeId:
+    self.advance()  // consume 'with'
     self.skip_newlines()
 
     var fields: Vec[i32] = Vec.new()
@@ -5964,7 +6021,7 @@ fn Parser.parse_block_or_expr(self: Parser) -> NodeId:
         // (not a newline). Check column to decide if it's still in this block.
         if cur != TokenKind.TK_NEWLINE and cur != TokenKind.TK_SEMICOLON:
             let cur_col = column_of(self.source, self.current_start())
-            if cur_col >= block_col and (cur == TokenKind.TK_KW_LET or cur == TokenKind.TK_KW_VAR or cur == TokenKind.TK_KW_RETURN or cur == TokenKind.TK_KW_IF or cur == TokenKind.TK_KW_FOR or cur == TokenKind.TK_KW_WHILE or cur == TokenKind.TK_KW_MATCH or cur == TokenKind.TK_KW_BREAK or cur == TokenKind.TK_KW_CONTINUE or cur == TokenKind.TK_KW_GOTO or cur == TokenKind.TK_LABEL or cur == TokenKind.TK_KW_DEFER):
+            if cur_col >= block_col and (cur == TokenKind.TK_KW_LET or cur == TokenKind.TK_KW_VAR or cur == TokenKind.TK_KW_RETURN or cur == TokenKind.TK_KW_IF or cur == TokenKind.TK_KW_FOR or cur == TokenKind.TK_KW_WHILE or cur == TokenKind.TK_KW_DO or cur == TokenKind.TK_KW_MATCH or cur == TokenKind.TK_KW_BREAK or cur == TokenKind.TK_KW_CONTINUE or cur == TokenKind.TK_KW_GOTO or cur == TokenKind.TK_LABEL or cur == TokenKind.TK_KW_DEFER):
                 stmts.push(last_expr as i32)
                 last_expr = self.parse_expr()
                 continue

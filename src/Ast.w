@@ -139,6 +139,7 @@ enum NodeKind: i32:
     NK_PAT_SLICE = 113
     NK_PAT_TYPED_BIND = 114
     NK_PAT_REGEX = 121
+    NK_DO_WHILE = 122
 
 // With-expression binding encoding in d2:
 // - positive value: immutable binding symbol id
@@ -1341,6 +1342,7 @@ fn AstPool.for_binding_is_pattern(self: AstPool, node: NodeId) -> bool:
 // NodeKind.NK_TUPLE_DESTRUCTURE: d0=extra_start, d1=name_count, d2=value(node)
 // NodeKind.NK_ASSIGN:        d0=target(node), d1=value(node), d2=0
 // NodeKind.NK_WHILE:         d0=cond(node), d1=body(node), d2=label(sym,0=none)
+// NodeKind.NK_DO_WHILE:      d0=body(node), d1=cond(node), d2=label(sym,0=none)
 // NodeKind.NK_LOOP:          d0=body(node), d1=label(sym,0=none), d2=0
 // NodeKind.NK_FOR:           d0=binding(sym) or pattern(node), d1=iterable(node), d2=body(node)
 //                   extra: [index_binding(sym,0=none), label(sym,0=none)]

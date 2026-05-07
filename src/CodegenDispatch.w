@@ -8478,6 +8478,10 @@ fn Codegen.collect_captures(self: Codegen, node: i32):
         self.collect_captures(self.pool.get_data0(node))
         self.collect_captures(self.pool.get_data1(node))
         return
+    if kind == NodeKind.NK_DO_WHILE:
+        self.collect_captures(self.pool.get_data0(node))
+        self.collect_captures(self.pool.get_data1(node))
+        return
     if kind == NodeKind.NK_FOR:
         self.collect_captures(self.pool.get_data1(node))
         self.collect_captures(self.pool.get_data2(node))

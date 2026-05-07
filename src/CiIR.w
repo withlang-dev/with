@@ -550,6 +550,9 @@ fn CiStmtPool.while_stmt(self: CiStmtPool, cond: CiExprId, body: CiStmtId) -> Ci
 fn CiStmtPool.while_labeled(self: CiStmtPool, cond: CiExprId, body: CiStmtId, label_sym: i32) -> CiStmtId:
     self.add(CiStmtKind.CIS_WHILE, cond as i32, body as i32, label_sym, 0)
 
+fn CiStmtPool.do_while_stmt(self: CiStmtPool, body: CiStmtId, cond: CiExprId, cond_setup: CiStmtId) -> CiStmtId:
+    self.add(CiStmtKind.CIS_DO_WHILE, body as i32, cond as i32, cond_setup as i32, 0)
+
 // Variable decl. flags bit0 = is_mut, bit1 = has_init.
 fn CiStmtPool.var_decl(self: CiStmtPool, name_sym: i32, ty: CiTypeId, init: CiExprId, is_mut: i32) -> CiStmtId:
     var f: i32 = 0

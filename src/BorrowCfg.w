@@ -130,6 +130,9 @@ fn build_expr(graph: CfgGraph, pool: AstPool, node: i32) -> i32:
     if kind == NodeKind.NK_WHILE:
         return build_while(graph, pool, node)
 
+    if kind == NodeKind.NK_DO_WHILE:
+        return build_do_while(graph, pool, node)
+
     if kind == NodeKind.NK_LOOP:
         return build_loop(graph, pool, node)
 
@@ -210,6 +213,22 @@ fn build_while(graph: CfgGraph, pool: AstPool, node: i32) -> i32:
     graph.add_edge(body_n, cond)
 
     cond
+
+fn build_do_while(graph: CfgGraph, pool: AstPool, node: i32) -> i32:
+    let body_node_idx = pool.get_data0(node)
+    let cond_node_idx = pool.get_data1(node)
+    let start = pool.get_start(node)
+    let end = pool.get_end(node)
+
+    let body_n = build_expr(graph, pool, body_node_idx)
+    let cond = graph.add_node(CfgNodeKind.LoopCond, start, end)
+    let after = graph.add_node(CfgNodeKind.Expr, start, end)
+
+    graph.add_edge(body_n, cond)
+    graph.add_edge(cond, body_n)
+    graph.add_edge(cond, after)
+
+    body_n
 
 fn build_loop(graph: CfgGraph, pool: AstPool, node: i32) -> i32:
     let body_node_idx = pool.get_data0(node)

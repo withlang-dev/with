@@ -612,6 +612,12 @@ fn ResolveState.walk_expr(self: ResolveState, pool: AstPool, module_id: i32, par
         self.walk_expr(pool, module_id, parent_def, loop_scope, pool.get_data1(node))
         return
 
+    if kind == NodeKind.NK_DO_WHILE:
+        let loop_scope = self.add_scope(module_id, current_scope, parent_def, ScopeKind.SK_LOOP)
+        self.walk_expr(pool, module_id, parent_def, loop_scope, pool.get_data0(node))
+        self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data1(node))
+        return
+
     if kind == NodeKind.NK_LOOP:
         let loop_scope = self.add_scope(module_id, current_scope, parent_def, ScopeKind.SK_LOOP)
         self.walk_expr(pool, module_id, parent_def, loop_scope, pool.get_data0(node))

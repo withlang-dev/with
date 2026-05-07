@@ -407,6 +407,8 @@ fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
             let sk = pool.kind(stmt)
             if sk == NodeKind.NK_WHILE and pool.get_data2(stmt) == label:
                 return render_expr(pool, intern, (stmt) as NodeId, indent)
+            if sk == NodeKind.NK_DO_WHILE and pool.get_data2(stmt) == label:
+                return render_expr(pool, intern, (stmt) as NodeId, indent)
             if sk == NodeKind.NK_LOOP and pool.get_data1(stmt) == label:
                 return render_expr(pool, intern, (stmt) as NodeId, indent)
             if sk == NodeKind.NK_FOR:
@@ -608,6 +610,17 @@ fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
         if label != 0:
             out = out ++ "'" ++ intern.resolve(label) ++ " "
         return out ++ "while " ++ render_expr(pool, intern, (cond) as NodeId, 0) ++ ":\n" ++ render_expr(pool, intern, (body) as NodeId, indent + 2)
+
+    if kind == NodeKind.NK_DO_WHILE:
+        let body = pool.get_data0(node)
+        let cond = pool.get_data1(node)
+        let label = pool.get_data2(node)
+        var out = prefix
+        if label != 0:
+            out = out ++ "'" ++ intern.resolve(label) ++ " "
+        out = out ++ "do:\n" ++ render_expr(pool, intern, (body) as NodeId, indent + 2)
+        out = out ++ "\n" ++ prefix ++ "while " ++ render_expr(pool, intern, (cond) as NodeId, 0)
+        return out
 
     if kind == NodeKind.NK_ARRAY_LIT:
         let extra_start = pool.get_data0(node)
