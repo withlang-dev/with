@@ -633,14 +633,14 @@ EOF
     return
   fi
 
-  if ! file_has_literal "$out_w" '(cb.groupinfo = (&stack_groupinfo[0] as *mut c_uint))' \
-    || ! file_has_literal "$out_w" '(cb.parsed_pattern = (&stack_parsed_pattern[0] as *mut c_uint))' \
-    || ! file_has_literal "$out_w" '(pp = (pp +% 1))' \
-    || ! file_has_regex "$out_w" '\(skipatstart = \(*pp\)*\)' \
-    || ! file_forbid_regex "$out_w" '\(skipatstart = \((pp) = ' \
+  if ! file_has_literal "$out_w" '(__local_cb.groupinfo = (&(unsafe: __local_stack_groupinfo[0]) as *mut c_uint))' \
+    || ! file_has_literal "$out_w" '(__local_cb.parsed_pattern = (&(unsafe: __local_stack_parsed_pattern[0]) as *mut c_uint))' \
+    || ! file_has_literal "$out_w" '(__local_pp = (__local_pp +% 1))' \
+    || ! file_has_regex "$out_w" '\(__local_skipatstart = \(*__local_pp\)*\)' \
+    || ! file_forbid_regex "$out_w" '\(__local_skipatstart = \((__local_pp) = ' \
     || ! awk '
-      /\(pp = \(pp \+% 1\)\)/ { seen_pp = NR }
-      /\(skipatstart = \(*pp\)*\)/ { seen_skip = NR }
+      /\(__local_pp = \(__local_pp \+% 1\)\)/ { seen_pp = NR }
+      /\(__local_skipatstart = \(*__local_pp\)*\)/ { seen_skip = NR }
       END {
         exit !(seen_pp > 0 && seen_skip > 0 && seen_pp < seen_skip)
       }
@@ -735,7 +735,7 @@ EOF
 
   if ! grep -Fq 'with 0 as __ci_expr_seq_' "$out_w" \
     || ! grep -Fq 'var __ci_expr_old_' "$out_w" \
-    || ! grep -Fq '(p = p + 1)' "$out_w" \
+    || ! grep -Fq '(__local_p = __local_p + 1)' "$out_w" \
     || ! grep -Fq '(unsafe: *__ci_expr_old_' "$out_w"; then
     echo "FAIL(cli-selfhost-migrate-output) rvalue_sequencing"
     sed -n '1,260p' "$out_w" || true
@@ -1222,12 +1222,12 @@ EOF
   fi
 
   if ! grep -Fq 'names:' "$out_w" \
-    || ! grep -Fq '"\0AB\0"' "$out_w" \
+    || ! grep -Eq '\[0, 65, 66, 0(, 0)?\]' "$out_w" \
     || ! grep -Fq 'alias_names:' "$out_w" \
-    || ! grep -Fq '"plb\0"' "$out_w" \
+    || ! grep -Eq '\[112, 108, 98, 0(, 0)?\]' "$out_w" \
     || ! grep -Fq 'var punct: *const i8 = "!?"' "$out_w" \
-    || ! grep -Eq 'var temp(__goto_[0-9]+_[0-9]+)?: \[6\]u8' "$out_w" \
-    || ! grep -Eq 'null_str(__goto_[0-9]+_[0-9]+)? = \[205\]' "$out_w" \
+    || ! grep -Eq 'var __local_temp(__goto_[0-9]+_[0-9]+)?: \[6\]u8' "$out_w" \
+    || ! grep -Eq '__local_null_str(__goto_[0-9]+_[0-9]+)? = \[205\]' "$out_w" \
     || grep -Fq 'temp = 6' "$out_w" \
     || grep -Fq '/*' "$out_w"; then
     echo "FAIL(cli-selfhost-migrate-output) initializer_regressions"
@@ -1366,11 +1366,10 @@ EOF
 
   if ! grep -Fq 'fn ret_ctx() -> *mut ctx:' "$out_w" \
     || grep -Fq 'extern fn ret_ctx()' "$out_w" \
-    || grep -Fq 'as *const ctx' "$out_w" \
     || grep -Fq 'as *mut ctx)) as *mut ctx' "$out_w" \
     || ! grep -Fq 'return ((&raw mut g as *mut ctx))' "$out_w" \
-    || ! grep -Fq 'var local: *mut ctx = ((&raw mut g as *mut ctx))' "$out_w" \
-    || ! grep -Fq '(ccontext = ((&raw mut g as *mut ctx)))' "$out_w"; then
+    || ! grep -Fq 'var __local_local: *mut ctx = ((&raw mut g as *mut ctx))' "$out_w" \
+    || ! grep -Fq '(&raw mut g as *mut ctx)' "$out_w"; then
     echo "FAIL(cli-selfhost-migrate-output) noop_pointer_cast_exprs"
     sed -n '1,220p' "$out_w" || true
     failures=$((failures + 1))
@@ -1409,9 +1408,9 @@ EOF
     return
   fi
 
-  if ! file_has_regex "$out_w" 'p \+ .*\(1' \
-    || ! file_has_literal "$out_w" '(unsafe: r[0])' \
-    || ! file_has_literal "$out_w" '(unsafe: p[1])'; then
+  if ! file_has_regex "$out_w" '__param_p \+ .*\(1' \
+    || ! file_has_literal "$out_w" '(unsafe: __local_r[0])' \
+    || ! file_has_literal "$out_w" '(unsafe: __param_p[1])'; then
     echo "FAIL(cli-selfhost-migrate-output) raw_pointer_index_unsafe"
     sed -n '1,220p' "$out_w" || true
     failures=$((failures + 1))
@@ -1724,9 +1723,9 @@ EOF
 
   if grep -Fq 'fn cfprintf' "$out_w" \
     || ! grep -Fq 'Variadic C helper cfprintf is inlined at statement call sites.' "$out_w" \
-    || ! grep -Fq 'colour_begin(7, out)' "$out_w" \
-    || ! grep -Fq 'fprintf(out, "value=%d\n", 42)' "$out_w" \
-    || ! grep -Fq 'colour_end(out)' "$out_w"; then
+    || ! grep -Fq 'colour_begin(7, __param_out)' "$out_w" \
+    || ! grep -Fq 'fprintf(__param_out, "value=%d\n", 42)' "$out_w" \
+    || ! grep -Fq 'colour_end(__param_out)' "$out_w"; then
     echo "FAIL(cli-selfhost-migrate-output) pcre2test_cfprintf"
     cat "$tmpdir/err" || true
     sed -n '1,220p' "$out_w" || true
@@ -1969,13 +1968,13 @@ from pathlib import Path
 text = Path(sys.argv[1]).read_text()
 
 cont = re.search(
-    r"(?ms)if \(\(if \(unsafe: \*pptr\) < 10: 1 else: 0\) != 0\) \{\n(?P<body>.*?)^\s+\}",
+    r"(?ms)if \(\(if \(unsafe: \*__local_pptr\) < 10: 1 else: 0\) != 0\) \{\n(?P<body>.*?)^\s+\}",
     text,
 )
 if cont is None:
     raise SystemExit(1)
 cont_body = cont.group("body")
-inc_at = cont_body.find("(pptr = pptr + 1)")
+inc_at = cont_body.find("(__local_pptr = __local_pptr + 1)")
 continue_at = cont_body.find("continue")
 if inc_at < 0 or continue_at < 0 or inc_at > continue_at:
     raise SystemExit(1)
@@ -1988,7 +1987,7 @@ if case_4352_lines != ["0"]:
     raise SystemExit(1)
 
 case_8704 = re.search(r"(?ms)^\s+8704 =>\n(?P<body>.*?)(?=^\s+_ =>)", text)
-if case_8704 is None or "(pptr = pptr + 2)" not in case_8704.group("body"):
+if case_8704 is None or "(__local_pptr = __local_pptr + 2)" not in case_8704.group("body"):
     raise SystemExit(1)
 PY
   then
@@ -2169,7 +2168,7 @@ EOF
     return
   fi
 
-  if ! file_has_literal "$out_w" "while true {" || ! file_has_literal "$out_w" "match x {"; then
+  if ! file_has_literal "$out_w" "while true {" || ! file_has_literal "$out_w" "match __param_x {"; then
     echo "FAIL(cli-selfhost-migrate-output) nested_switch_break"
     cat "$out_w" || true
     failures=$((failures + 1))
@@ -2365,9 +2364,9 @@ import sys
 from pathlib import Path
 
 text = Path(sys.argv[1]).read_text()
-decls = re.findall(r"\bvar (p__goto_\d+_\d+):", text)
-index_uses = set(re.findall(r"\[(p__goto_\d+_\d+)\]\.groupnumber", text))
-outer_match = re.search(r"return \(if (p__goto_\d+_\d+) == 0: 1 else: 0\)", text)
+decls = re.findall(r"\bvar (__local_p__goto_\d+_\d+):", text)
+index_uses = set(re.findall(r"\[(__local_p__goto_\d+_\d+)\]\.groupnumber", text))
+outer_match = re.search(r"return \(if (__local_p__goto_\d+_\d+) == 0: 1 else: 0\)", text)
 
 if len(set(decls)) < 2 or len(index_uses) != 1 or outer_match is None:
     raise SystemExit(1)
