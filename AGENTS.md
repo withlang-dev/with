@@ -172,8 +172,9 @@ code generation is nondeterministic. Stop and fix.
 Resolution order: `WITH=<path>` → `with` on PATH → `src/main`
 
 `src/main` is not checked into git. It's a GitHub release asset.
-Run `make seed` to fetch. After a successful fixpoint, update
-the installed compiler: `make install-user`.
+Run `make seed` to fetch. After `make build`, `make fixpoint`,
+and `make test` all pass, update the installed user compiler:
+`make install-user`.
 
 If the seed, installed compiler, and release binaries are all
 broken, the compiler cannot be recovered.
@@ -206,6 +207,22 @@ doesn't exist. Never rely on memory.
 
 Don't batch unrelated changes. Small changes make debugging
 possible.
+
+### String formatting
+
+Use f-strings when they make code shorter and simpler. Use `++`
+concatenation when it makes code shorter and simpler. Do not
+mechanically prefer one form over the other.
+
+### Shell commands
+
+Compiler, migrator, runtime, and stdlib code must not assemble shell
+command strings to perform process or filesystem work. Prefer calling
+the internal functions directly; use fibers for concurrency inside the
+compiler instead of spawning compiler subprocesses. Shell command strings
+are acceptable only in Makefiles, scripts, and test harness glue where
+shell semantics such as redirection, globbing, or pipelines are the
+point.
 
 ### Rebuild and verify
 
@@ -320,6 +337,10 @@ make test       # no regressions
 ```
 
 If any step fails, continue debugging until it passes.
+
+After all three steps pass, deploy the verified compiler to
+`~/.local/bin/with` with `make install-user`. Do not deploy a
+compiler that has not passed the full checklist.
 
 ---
 

@@ -14,6 +14,7 @@ fn pcre2_general_context_copy_8(gcontext: *mut pcre2_real_general_context_8) -> 
 
 }
 
+@[c_export("pcre2_general_context_create_8")]
 fn pcre2_general_context_create_8(__param_private_malloc: *const fn(c_ulong, *mut c_void) -> *mut c_void, __param_private_free: *const fn(*mut c_void, *mut c_void) -> void, memory_data: *mut c_void) -> *mut pcre2_real_general_context_8 {
     var private_malloc = __param_private_malloc
     var private_free = __param_private_free
@@ -43,6 +44,7 @@ fn pcre2_general_context_create_8(__param_private_malloc: *const fn(c_ulong, *mu
 
 }
 
+@[c_export("pcre2_general_context_free_8")]
 fn pcre2_general_context_free_8(gcontext: *mut pcre2_real_general_context_8) {
     if ((if gcontext != null: 1 else: 0) != 0) {
         gcontext.memctl.free(gcontext, gcontext.memctl.memory_data)
@@ -63,6 +65,7 @@ fn pcre2_compile_context_copy_8(ccontext: *mut pcre2_real_compile_context_8) -> 
 
 }
 
+@[c_export("pcre2_compile_context_create_8")]
 fn pcre2_compile_context_create_8(gcontext: *mut pcre2_real_general_context_8) -> *mut pcre2_real_compile_context_8 {
     var ccontext: *mut pcre2_real_compile_context_8 = ((_pcre2_memctl_malloc_8(sizeof[pcre2_real_compile_context_8](), (gcontext as *mut pcre2_memctl)) as *mut pcre2_real_compile_context_8))
 
@@ -80,6 +83,7 @@ fn pcre2_compile_context_create_8(gcontext: *mut pcre2_real_general_context_8) -
 
 }
 
+@[c_export("pcre2_compile_context_free_8")]
 fn pcre2_compile_context_free_8(ccontext: *mut pcre2_real_compile_context_8) {
     if ((if ccontext != null: 1 else: 0) != 0) {
         ccontext.memctl.free(ccontext, ccontext.memctl.memory_data)
@@ -350,6 +354,7 @@ fn pcre2_match_context_copy_8(mcontext: *mut pcre2_real_match_context_8) -> *mut
 
 }
 
+@[c_export("pcre2_match_context_create_8")]
 fn pcre2_match_context_create_8(gcontext: *mut pcre2_real_general_context_8) -> *mut pcre2_real_match_context_8 {
     var mcontext: *mut pcre2_real_match_context_8 = ((_pcre2_memctl_malloc_8(sizeof[pcre2_real_match_context_8](), (gcontext as *mut pcre2_memctl)) as *mut pcre2_real_match_context_8))
 
@@ -367,6 +372,7 @@ fn pcre2_match_context_create_8(gcontext: *mut pcre2_real_general_context_8) -> 
 
 }
 
+@[c_export("pcre2_match_context_free_8")]
 fn pcre2_match_context_free_8(mcontext: *mut pcre2_real_match_context_8) {
     if ((if mcontext != null: 1 else: 0) != 0) {
         mcontext.memctl.free(mcontext, mcontext.memctl.memory_data)

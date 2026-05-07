@@ -1,4 +1,4 @@
-//! skip
+//! skip: non-executable spec sketch for Section 9.5 — By-Value Self Method Chaining (formerly 25.54); contains pseudo-code for unimplemented feature work
 // Spec test: Section 9.5 — By-Value Self Method Chaining (formerly 25.54)
 // These are pseudo-code test cases from the specification.
 // Remove the //! skip directive once the features are implemented.

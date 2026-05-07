@@ -1,6 +1,7 @@
 // Migrated from PCRE2
 use std.re.defs
 
+@[c_export("pcre2_get_error_message_8")]
 fn pcre2_get_error_message_8(enumber: c_int, buffer: *mut u8, size: c_ulong) -> c_int {
     var message: *const u8
 

@@ -1,4 +1,4 @@
-//! skip
+//! skip: non-executable spec sketch for Section 9.7 — Exhaustiveness (formerly 25.20); contains pseudo-code for unimplemented feature work
 // Spec test: Section 9.7 — Exhaustiveness (formerly 25.20)
 // These are pseudo-code test cases from the specification.
 // Remove the //! skip directive once the features are implemented.

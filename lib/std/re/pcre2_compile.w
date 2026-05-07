@@ -11,6 +11,7 @@ use std.re.pcre2_string_utils
 use std.re.pcre2_study
 use std.re.pcre2_valid_utf
 
+@[c_export("pcre2_compile_8")]
 fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_options: c_uint, errorptr: *mut c_int, erroroffset: *mut c_ulong, __param_ccontext: *mut pcre2_real_compile_context_8) -> *mut pcre2_real_code_8 {
     var pattern = __param_pattern
     var patlen = __param_patlen
@@ -2072,6 +2073,7 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
     }
 }
 
+@[c_export("pcre2_code_free_8")]
 fn pcre2_code_free_8(code: *mut pcre2_real_code_8) {
     var ref_count: *mut c_ulong
 
@@ -2096,6 +2098,7 @@ fn pcre2_code_free_8(code: *mut pcre2_real_code_8) {
 
 }
 
+@[c_export("pcre2_code_copy_8")]
 fn pcre2_code_copy_8(code: *const pcre2_real_code_8) -> *mut pcre2_real_code_8 {
     var ref_count: *mut c_ulong
 
@@ -15933,6 +15936,12 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                 __goto_pending = 1
                 continue
             },
+            30 => {  // __after_if (class body loop continuation)
+                (__goto_pending = 0)
+                __pc = 5
+                __goto_pending = 1
+                continue
+            },
             31 => {  // __if_else
                 (__goto_pending = 0)
                 var __ci_expr_logic_260: c_int
@@ -16219,7 +16228,9 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                             continue
                         }
                         if ((if class_depth_m1__goto_3132_9 < 0: 1 else: 0) != 0) {
-                            break
+                            __pc = 22
+                            __goto_pending = 1
+                            continue
                         }
                         if (__goto_pending != 0) {
                             continue
@@ -16331,6 +16342,8 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                     if (__goto_pending != 0) {
                         continue
                     }
+                    __pc = 29
+                    __goto_pending = 1
                     continue
                     if (__goto_pending != 0) {
                         continue
@@ -16486,7 +16499,9 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                         if (__goto_pending != 0) {
                             continue
                         }
-                        break
+                        __pc = 22
+                        __goto_pending = 1
+                        continue
                     }
                     if (__goto_pending != 0) {
                         continue
@@ -17544,7 +17559,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                         continue
                     }
                 } else {
-                    __pc = 49
+                    __pc = 4
                     __goto_pending = 1
                     continue
                 }
@@ -17554,7 +17569,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
                 __pc = 48
                 __goto_pending = 1
                 continue
-                __pc = 49
+                __pc = 4
                 __goto_pending = 1
                 continue
             },
@@ -22282,7 +22297,6 @@ fn compile_branch(optionsptr: *mut c_uint, xoptionsptr: *mut c_uint, codeptr: *m
                                 }
 
                             }
-
 
                             (pptr__goto_6084_11 = _pcre2_compile_class_not_nested_8(options__goto_6080_10, xoptions__goto_6081_10, (pptr__goto_6084_11 + ((1 as isize) as usize)), (&raw mut code__goto_6093_14 as *mut *mut u8), (if meta__goto_6085_10 == 2148401152: 1 else: 0), null, errorcodeptr, cb, lengthptr))
 

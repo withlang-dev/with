@@ -1,4 +1,4 @@
-//! skip
+//! skip: non-executable spec sketch for Section 14.3 — Async Calling Is Unrestricted (formerly 25.18); contains pseudo-code for unimplemented feature work
 // Spec test: Section 14.3 — Async Calling Is Unrestricted (formerly 25.18)
 // These are pseudo-code test cases from the specification.
 // Remove the //! skip directive once the features are implemented.

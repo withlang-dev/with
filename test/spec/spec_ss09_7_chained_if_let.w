@@ -1,4 +1,4 @@
-//! skip
+//! skip: non-executable spec sketch for Section 9.7 — Chained if let (formerly 25.94); contains pseudo-code for unimplemented feature work
 // Spec test: Section 9.7 — Chained if let (formerly 25.94)
 // These are pseudo-code test cases from the specification.
 // Remove the //! skip directive once the features are implemented.

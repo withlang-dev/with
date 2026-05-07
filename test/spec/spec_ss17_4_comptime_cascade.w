@@ -1,4 +1,4 @@
-//! skip
+//! skip: non-executable spec sketch for Section 17.4 — Comptime Cascade (formerly 25.95); contains pseudo-code for unimplemented feature work
 // Spec test: Section 17.4 — Comptime Cascade (formerly 25.95)
 // These are pseudo-code test cases from the specification.
 // Remove the //! skip directive once the features are implemented.

@@ -1,6 +1,7 @@
 // Migrated from PCRE2
 use std.re.defs
 
+@[c_export("pcre2_maketables_8")]
 fn pcre2_maketables_8(gcontext: *mut pcre2_real_general_context_8) -> *const u8 {
     var yield_: *mut u8 = with 0 as __ci_expr_seq_9 {
         var __ci_expr_ternary_0: *mut c_void = null

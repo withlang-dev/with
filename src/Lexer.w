@@ -33,6 +33,7 @@ enum CharCode: i32:
     Minus = 45
     Star = 42
     Percent = 37
+    Dollar = 36
     Eq = 61
     Bang = 33
     Question = 63
@@ -73,10 +74,11 @@ type Lexer {
     file_id: i32,
     token_start: i32,
     emit_comments: i32,
+    last_sig_tag: i32,
 }
 
 fn Lexer.init(source: str, file_id: i32) -> Lexer:
-    Lexer { source, pos: 0, file_id, token_start: 0, emit_comments: 0 }
+    Lexer { source, pos: 0, file_id, token_start: 0, emit_comments: 0, last_sig_tag: 0 - 1 }
 
 // Tokenize the entire source, returning a token list ending with EOF.
 fn Lexer.tokenize(mut self: Lexer) -> TokenList:
@@ -84,6 +86,8 @@ fn Lexer.tokenize(mut self: Lexer) -> TokenList:
     loop:
         let tag = self.next_token()
         tokens.append(tag, self.token_start, self.pos)
+        if lexer_token_is_significant(tag) != 0:
+            self.last_sig_tag = tag
         if tag == TokenKind.TK_EOF:
             break
     tokens
@@ -247,6 +251,9 @@ fn Lexer.next_token(mut self: Lexer) -> i32:
             if c2 == CharCode.Eq:  // ==
                 self.pos = self.pos + 1
                 return TokenKind.TK_EQ_EQ
+            if c2 == CharCode.Tilde:  // =~
+                self.pos = self.pos + 1
+                return TokenKind.TK_EQ_TILDE
             if c2 == CharCode.Gt:  // =>
                 self.pos = self.pos + 1
                 return TokenKind.TK_FAT_ARROW
@@ -258,6 +265,9 @@ fn Lexer.next_token(mut self: Lexer) -> i32:
         if self.pos < slen and src.byte_at((self.pos) as i64) == CharCode.Eq:  // !=
             self.pos = self.pos + 1
             return TokenKind.TK_BANG_EQ
+        if self.pos < slen and src.byte_at((self.pos) as i64) == CharCode.Tilde:  // !~
+            self.pos = self.pos + 1
+            return TokenKind.TK_BANG_TILDE
         return TokenKind.TK_BANG
 
     // ? compound
@@ -323,18 +333,21 @@ fn Lexer.next_token(mut self: Lexer) -> i32:
 
     // / and //
     if ch == CharCode.Slash:
-        self.pos = self.pos + 1
-        if self.pos < slen:
-            let c2 = src.byte_at((self.pos) as i64)
+        if self.pos + 1 < slen:
+            let c2 = src.byte_at((self.pos + 1) as i64)
             if c2 == CharCode.Slash:  // // comment
+                self.pos = self.pos + 2
                 while self.pos < slen and src.byte_at((self.pos) as i64) != CharCode.Newline:
                     self.pos = self.pos + 1
                 if self.emit_comments != 0:
                     return TokenKind.TK_COMMENT
                 return self.next_token()
             if c2 == CharCode.Eq:  // /=
-                self.pos = self.pos + 1
+                self.pos = self.pos + 2
                 return TokenKind.TK_SLASH_EQ
+        if lexer_slash_starts_regex(self.last_sig_tag) != 0:
+            return self.lex_regex()
+        self.pos = self.pos + 1
         return TokenKind.TK_SLASH
 
     // . compound
@@ -363,6 +376,9 @@ fn Lexer.next_token(mut self: Lexer) -> i32:
     // Number literal
     if ch >= CharCode.D0 and ch <= CharCode.D9:
         return self.lex_number()
+
+    if ch == CharCode.Dollar:
+        return self.lex_capture_ident()
 
     // Identifier or keyword
     if is_ident_start(ch):
@@ -665,6 +681,50 @@ fn Lexer.lex_ident(mut self: Lexer) -> i32:
         return kw
     TokenKind.TK_IDENT
 
+fn Lexer.lex_capture_ident(mut self: Lexer) -> i32:
+    let src = self.source
+    let slen = src.len() as i32
+    self.pos = self.pos + 1
+    if self.pos >= slen:
+        return TokenKind.TK_INVALID
+    let ch = src.byte_at(self.pos as i64)
+    if not (is_ident_start(ch) or lex_is_digit(ch)):
+        return TokenKind.TK_INVALID
+    self.pos = self.pos + 1
+    while self.pos < slen and is_ident_continue(src.byte_at(self.pos as i64)):
+        self.pos = self.pos + 1
+    TokenKind.TK_IDENT
+
+fn Lexer.lex_regex(mut self: Lexer) -> i32:
+    let src = self.source
+    let slen = src.len() as i32
+    self.pos = self.pos + 1  // skip opening /
+    var in_class = 0
+    while self.pos < slen:
+        let ch = src.byte_at(self.pos as i64)
+        if ch == CharCode.Backslash:
+            self.pos = self.pos + 1
+            if self.pos < slen:
+                self.pos = self.pos + 1
+            continue
+        if ch == CharCode.Lbracket:
+            in_class = 1
+            self.pos = self.pos + 1
+            continue
+        if ch == CharCode.Rbracket and in_class != 0:
+            in_class = 0
+            self.pos = self.pos + 1
+            continue
+        if ch == CharCode.Slash and in_class == 0:
+            self.pos = self.pos + 1
+            while self.pos < slen and is_ident_continue(src.byte_at(self.pos as i64)):
+                self.pos = self.pos + 1
+            return TokenKind.TK_REGEX_LIT
+        if ch == CharCode.Newline:
+            return TokenKind.TK_INVALID
+        self.pos = self.pos + 1
+    TokenKind.TK_INVALID
+
 fn Lexer.lex_dot_ident(mut self: Lexer) -> i32:
     let src = self.source
     let slen = src.len() as i32
@@ -726,6 +786,42 @@ fn lex_is_digit(ch: i32) -> bool:
 
 fn is_hex_digit(ch: i32) -> bool:
     (ch >= CharCode.D0 and ch <= CharCode.D9) or (ch >= CharCode.A and ch <= CharCode.F) or (ch >= CharCode.LowerA and ch <= CharCode.LowerF) or ch == CharCode.Underscore
+
+fn lexer_token_is_significant(tag: i32) -> i32:
+    if tag == TokenKind.TK_NEWLINE or tag == TokenKind.TK_COMMENT:
+        return 0
+    1
+
+fn lexer_slash_starts_regex(prev_tag: i32) -> i32:
+    if prev_tag < 0:
+        return 1
+    if prev_tag == TokenKind.TK_EQ or prev_tag == TokenKind.TK_EQ_EQ or prev_tag == TokenKind.TK_BANG_EQ or prev_tag == TokenKind.TK_BANG or prev_tag == TokenKind.TK_COLON:
+        return 1
+    if prev_tag == TokenKind.TK_COMMA or prev_tag == TokenKind.TK_SEMICOLON or prev_tag == TokenKind.TK_L_PAREN or prev_tag == TokenKind.TK_L_BRACKET or prev_tag == TokenKind.TK_L_BRACE:
+        return 1
+    if prev_tag == TokenKind.TK_ARROW or prev_tag == TokenKind.TK_FAT_ARROW or prev_tag == TokenKind.TK_PIPE_GT or prev_tag == TokenKind.TK_LT_PIPE:
+        return 1
+    if prev_tag == TokenKind.TK_PLUS or prev_tag == TokenKind.TK_MINUS or prev_tag == TokenKind.TK_STAR or prev_tag == TokenKind.TK_PERCENT:
+        return 1
+    if prev_tag == TokenKind.TK_PLUS_WRAP or prev_tag == TokenKind.TK_MINUS_WRAP or prev_tag == TokenKind.TK_STAR_WRAP:
+        return 1
+    if prev_tag == TokenKind.TK_PLUS_SAT or prev_tag == TokenKind.TK_MINUS_SAT or prev_tag == TokenKind.TK_STAR_SAT:
+        return 1
+    if prev_tag == TokenKind.TK_QUESTION or prev_tag == TokenKind.TK_QUESTION_DOT or prev_tag == TokenKind.TK_QUESTION_QUESTION:
+        return 1
+    if prev_tag == TokenKind.TK_LT or prev_tag == TokenKind.TK_GT or prev_tag == TokenKind.TK_LT_EQ or prev_tag == TokenKind.TK_GT_EQ:
+        return 1
+    if prev_tag == TokenKind.TK_AMPERSAND or prev_tag == TokenKind.TK_PIPE or prev_tag == TokenKind.TK_CARET:
+        return 1
+    if prev_tag == TokenKind.TK_KW_RETURN or prev_tag == TokenKind.TK_KW_IF or prev_tag == TokenKind.TK_KW_WHILE or prev_tag == TokenKind.TK_KW_FOR or prev_tag == TokenKind.TK_KW_MATCH:
+        return 1
+    if prev_tag == TokenKind.TK_KW_LET or prev_tag == TokenKind.TK_KW_VAR or prev_tag == TokenKind.TK_KW_WITH or prev_tag == TokenKind.TK_KW_IN:
+        return 1
+    if prev_tag == TokenKind.TK_KW_AND or prev_tag == TokenKind.TK_KW_OR or prev_tag == TokenKind.TK_KW_NOT:
+        return 1
+    if prev_tag == TokenKind.TK_EQ_TILDE or prev_tag == TokenKind.TK_BANG_TILDE:
+        return 1
+    0
 
 // Compute the 0-based column of a byte offset by scanning backward.
 fn column_of(source: str, pos: i32) -> i32:

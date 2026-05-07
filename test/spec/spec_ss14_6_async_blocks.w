@@ -1,4 +1,4 @@
-//! skip
+//! skip: non-executable spec sketch for Section 14.6 — Async Blocks (formerly 25.59); contains pseudo-code for unimplemented feature work
 // Spec test: Section 14.6 — Async Blocks (formerly 25.59)
 // These are pseudo-code test cases from the specification.
 // Remove the //! skip directive once the features are implemented.

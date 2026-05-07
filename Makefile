@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 
-.PHONY: all build stage1 stage2 stage3 runtime selfcheck smoke test test-pcre2 fixpoint install install-user update-seed clean seed print-version emit-c-test emit-c-fixpoint cross regex-migrate-raw regex-prepare regex-check regex-promote \
-	__build __stage1 __stage2 __stage3 __runtime __selfcheck __smoke __test __test-pcre2 __fixpoint __install __install-user __update-seed __clean __seed __regex-migrate-raw __regex-prepare __regex-check __regex-promote
+.PHONY: all build stage1 stage2 stage3 runtime selfcheck smoke test test-pcre2 fixpoint install install-user update-seed clean seed print-version emit-c-test emit-c-fixpoint cross regex-migrate regex-build regex-test regex-promote \
+	__build __stage1 __stage2 __stage3 __runtime __selfcheck __smoke __test __test-pcre2 __fixpoint __install __install-user __update-seed __clean __seed __regex-migrate __regex-build __regex-test __regex-promote
 
 ROOT_DIR := $(CURDIR)
 REPO_FULL_NAME ?= QuixiAI/with
@@ -31,12 +31,14 @@ GEN_BOOTSTRAP_ENTRY := $(OUT_GEN_DIR)/bootstrap_main.w
 GEN_EMIT_TEMP_ENTRY := $(OUT_GEN_DIR)/main_emit_temp.w
 GEN_VERSION_FILE := $(OUT_GEN_DIR)/version.txt
 GEN_STAMP := $(OUT_GEN_DIR)/.generated-stamp
-REGEX_RAW_STAMP := $(OUT_GEN_DIR)/.regex-raw-stamp
-REGEX_PREPARE_STAMP := $(OUT_GEN_DIR)/.regex-prepare-stamp
+REGEX_MIGRATE_STAMP := $(OUT_GEN_DIR)/.regex-migrate-stamp
+REGEX_BUILD_STAMP := $(OUT_GEN_DIR)/.regex-build-stamp
 
 REGEX_PCRE2_SRC := .reference/pcre2/src
-REGEX_RAW_DIR := $(OUT)/pcre2_migrate_raw
-REGEX_GENERATED_DIR := $(OUT)/pcre2_generated
+REGEX_MIGRATE_DIR := $(OUT)/pcre2_migrated
+REGEX_BUILD_DIR := $(OUT)/pcre2_build
+REGEX_BUILD_RE_DIR := $(REGEX_BUILD_DIR)/lib/std/re
+REGEX_PCRE2TEST_BIN := $(REGEX_BUILD_DIR)/bin/pcre2test
 REGEX_PROMOTE_DIR := lib/std/re
 REGEX_EXCLUDED_C_SOURCES := \
 	pcre2demo.c \
@@ -56,6 +58,7 @@ CIMPORT_STUBS_OBJ := $(OUT_LIB_DIR)/cimport_stubs.o
 LEGACY_HELPERS_OBJ := $(OUT_LIB_DIR)/helpers.o
 COMPAT_RUNTIME_OBJ := $(OUT_LIB_DIR)/compat_runtime.o
 PANIC_RUNTIME_OBJ := $(OUT_LIB_DIR)/panic_runtime.o
+REGEX_RUNTIME_OBJ := $(OUT_LIB_DIR)/regex_runtime.o
 FIBER_STUBS_OBJ := $(OUT_LIB_DIR)/fiber_stubs.o
 CHANNEL_RUNTIME_OBJ := $(OUT_LIB_DIR)/channel_runtime.o
 FIBER_RUNTIME_OBJ := $(OUT_LIB_DIR)/fiber_runtime.o
@@ -91,15 +94,11 @@ VERSION_PLACEHOLDER := WITH_VERSION_PLACEHOLDER
 SEED_PATH := src/main
 SEED_VERSION ?=
 
-# Seed compiler: WITH env var, local build outputs, `with` on PATH, or
-# src/main (downloaded). Preferring local stage outputs keeps smoke/fixpoint
-# on the freshly built compiler instead of a potentially stale installed one.
+# Seed compiler: WITH env var, `with` on PATH, or src/main (downloaded).
+# Do not resolve this through out/bin; build outputs are products of the
+# bootstrap chain, not the seed that starts it.
 WITH ?= $(shell \
-	if [ -x "$(CANONICAL_BIN)" ]; then \
-		printf '%s\n' "$(CANONICAL_BIN)"; \
-	elif [ -x "$(STAGE2_BIN)" ]; then \
-		printf '%s\n' "$(STAGE2_BIN)"; \
-	elif command -v with >/dev/null 2>&1; then \
+	if command -v with >/dev/null 2>&1; then \
 		command -v with; \
 	elif [ -x "$(SEED_PATH)" ]; then \
 		printf '%s\n' "$(SEED_PATH)"; \
@@ -129,6 +128,7 @@ RUNTIME_ARTIFACTS := \
 	$(CIMPORT_STUBS_OBJ) \
 	$(COMPAT_RUNTIME_OBJ) \
 	$(PANIC_RUNTIME_OBJ) \
+	$(REGEX_RUNTIME_OBJ) \
 	$(FIBER_STUBS_OBJ) \
 	$(CHANNEL_RUNTIME_OBJ) \
 	$(FIBER_RUNTIME_OBJ) \
@@ -261,14 +261,14 @@ print-version:
 seed: | $(OUT_TMP_DIR)
 	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __seed)
 
-regex-migrate-raw: | $(OUT_TMP_DIR)
-	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __regex-migrate-raw)
+regex-migrate: | $(OUT_TMP_DIR)
+	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __regex-migrate)
 
-regex-prepare: | $(OUT_TMP_DIR)
-	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __regex-prepare)
+regex-build: | $(OUT_TMP_DIR)
+	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __regex-build)
 
-regex-check: | $(OUT_TMP_DIR)
-	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __regex-check)
+regex-test: | $(OUT_TMP_DIR)
+	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __regex-test)
 
 regex-promote: | $(OUT_TMP_DIR)
 	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __regex-promote)
@@ -325,31 +325,22 @@ __seed:
 	chmod +x "$$dest"; \
 	echo "seed installed: $$dest"
 
-__regex-migrate-raw: $(REGEX_RAW_STAMP)
+__regex-migrate: $(REGEX_MIGRATE_STAMP)
 
-__regex-prepare: $(REGEX_PREPARE_STAMP)
+__regex-build: $(REGEX_BUILD_STAMP)
 
-__regex-check: $(REGEX_PREPARE_STAMP) scripts/pcre2_generated_workflow.sh
-	@bash "$(ROOT_DIR)/scripts/pcre2_generated_workflow.sh" check \
-		"$(ROOT_DIR)/$(CANONICAL_BIN)" \
-		"$(ROOT_DIR)/$(REGEX_RAW_DIR)" \
-		"$(ROOT_DIR)/$(REGEX_GENERATED_DIR)"
+__regex-test: $(REGEX_BUILD_STAMP) scripts/verify_pcre2_works.sh $(CANONICAL_BIN)
+	@WITH_BIN="$(ROOT_DIR)/$(CANONICAL_BIN)" bash "$(ROOT_DIR)/scripts/verify_pcre2_works.sh"
 
-__regex-promote: scripts/pcre2_generated_workflow.sh
+__regex-promote: $(REGEX_BUILD_STAMP) scripts/pcre2_generated_workflow.sh
 	@if [ ! -x "$(ROOT_DIR)/$(CANONICAL_BIN)" ]; then \
 		echo "error: missing compiler binary: $(ROOT_DIR)/$(CANONICAL_BIN)" >&2; \
 		echo "run make build before regex-promote" >&2; \
 		exit 1; \
 	fi
-	@if [ ! -d "$(ROOT_DIR)/$(REGEX_GENERATED_DIR)" ]; then \
-		echo "error: missing generated PCRE2 directory: $(ROOT_DIR)/$(REGEX_GENERATED_DIR)" >&2; \
-		echo "run make regex-prepare or make regex-check before regex-promote" >&2; \
-		exit 1; \
-	fi
 	@bash "$(ROOT_DIR)/scripts/pcre2_generated_workflow.sh" promote \
 		"$(ROOT_DIR)/$(CANONICAL_BIN)" \
-		"$(ROOT_DIR)/$(REGEX_RAW_DIR)" \
-		"$(ROOT_DIR)/$(REGEX_GENERATED_DIR)" \
+		"$(ROOT_DIR)/$(REGEX_BUILD_RE_DIR)" \
 		"$(ROOT_DIR)/$(REGEX_PROMOTE_DIR)"
 
 $(OUT_BIN_DIR) $(OUT_LIB_DIR) $(OUT_LOG_DIR) $(OUT_TMP_DIR) $(OUT_GEN_DIR):
@@ -366,24 +357,14 @@ GIT_PACKED_REFS_FILE := $(shell git -C "$(ROOT_DIR)" rev-parse --git-path packed
 GEN_VERSION_DEPS := $(wildcard $(GIT_HEAD_FILE) $(GIT_HEAD_REF_FILE) $(GIT_PACKED_REFS_FILE))
 STAGE_COMMON_DEPS := $(GEN_STAMP) $(COMPILER_BUILD_SOURCES) Makefile $(BOOTSTRAP_RUNTIME_STAMP)
 
-ifeq ($(origin WITH),command line)
 STAGE0_BIN := $(WITH)
-else ifeq ($(origin WITH),environment)
-STAGE0_BIN := $(WITH)
-else
-STAGE0_BIN := $(shell \
-	if command -v with >/dev/null 2>&1; then \
-		command -v with; \
-	elif [ -x "$(SEED_PATH)" ]; then \
-		printf '%s\n' "$(SEED_PATH)"; \
-	fi)
-endif
 
 BOOTSTRAP_RUNTIME_INPUTS := \
 	$(STAGE0_BIN) \
 	$(COMPAT_RUNTIME_SRC) \
 	rt/cimport_stubs.w \
 	rt/panic_runtime.w \
+	rt/regex_runtime.w \
 	rt/fiber_stubs.w \
 	rt/channel_runtime.w \
 	rt/fiber_runtime.w \
@@ -425,31 +406,49 @@ $(EMBEDDED_STDLIB_RUNTIME_SRC): scripts/generate_embedded_stdlib.py $(EMBED_STD_
 	done
 	@python3 "$(ROOT_DIR)/scripts/generate_embedded_stdlib.py" "$(ROOT_DIR)" "$@"
 
-$(REGEX_RAW_STAMP): $(CANONICAL_BIN) $(REGEX_REF_SOURCES) scripts/prepare_pcre2_reference.sh | $(OUT_GEN_DIR)
+$(REGEX_MIGRATE_STAMP): $(CANONICAL_BIN) $(REGEX_REF_SOURCES) scripts/prepare_pcre2_reference.sh | $(OUT_GEN_DIR) $(OUT_TMP_DIR)
 	@set -euo pipefail; \
 	src="$(ROOT_DIR)/$(REGEX_PCRE2_SRC)"; \
-	out="$(ROOT_DIR)/$(REGEX_RAW_DIR)"; \
+	out="$(ROOT_DIR)/$(REGEX_MIGRATE_DIR)"; \
+	tmp="$$out.tmp"; \
 	if [ ! -d "$$src" ]; then \
 		echo "error: missing PCRE2 source tree at $$src" >&2; \
 		exit 1; \
 	fi; \
 	bash "$(ROOT_DIR)/scripts/prepare_pcre2_reference.sh" "$$src"; \
-	rm -rf "$$out"; \
-	mkdir -p "$$out"; \
-	$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" migrate "$$src/" -o "$$out/" --no-c-export --prefer-brace --width-slice 8 --shared-defs std.re.defs $(foreach f,$(REGEX_EXCLUDED_C_SOURCES),--exclude $(f)) -I "$$src" -D PCRE2_CODE_UNIT_WIDTH=8 -D HAVE_CONFIG_H=1; \
-	count=$$(ls "$$out"/*.w 2>/dev/null | wc -l); \
+	rm -rf "$$tmp"; \
+	mkdir -p "$$tmp"; \
+	$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" migrate "$$src/" -o "$$tmp/" --no-c-export --prefer-brace --width-slice 8 --shared-defs std.re.defs $(foreach f,$(REGEX_EXCLUDED_C_SOURCES),--exclude $(f)) -I "$$src" -D PCRE2_CODE_UNIT_WIDTH=8 -D HAVE_CONFIG_H=1; \
+	count=$$(ls "$$tmp"/*.w 2>/dev/null | wc -l); \
 	if [ "$$count" -lt 30 ]; then \
 		echo "error: only $$count files migrated — expected at least 30" >&2; \
 		exit 1; \
 	fi; \
-	echo "raw migration: $$count .w files in $$out"; \
+	rm -rf "$$out" "$(ROOT_DIR)/out/pcre2_migrate_raw" "$(ROOT_DIR)/out/pcre2_generated"; \
+	mv "$$tmp" "$$out"; \
+	rm -f "$(REGEX_BUILD_STAMP)"; \
+	rm -rf "$(ROOT_DIR)/$(REGEX_BUILD_DIR)"; \
+	echo "migrated PCRE2: $$count .w files in $$out"; \
 	touch "$@"
 
-$(REGEX_PREPARE_STAMP): $(REGEX_RAW_STAMP) | $(OUT_GEN_DIR) $(OUT_TMP_DIR)
-	@rm -rf "$(ROOT_DIR)/$(REGEX_GENERATED_DIR)" && \
-	mkdir -p "$(ROOT_DIR)/$(REGEX_GENERATED_DIR)" && \
-	cp "$(ROOT_DIR)/$(REGEX_RAW_DIR)"/*.w "$(ROOT_DIR)/$(REGEX_GENERATED_DIR)/"
-	@touch "$@"
+$(REGEX_BUILD_STAMP): $(REGEX_MIGRATE_STAMP) scripts/pcre2_generated_workflow.sh | $(OUT_GEN_DIR) $(OUT_TMP_DIR)
+	@set -euo pipefail; \
+	src="$(ROOT_DIR)/$(REGEX_MIGRATE_DIR)"; \
+	out="$(ROOT_DIR)/$(REGEX_BUILD_DIR)"; \
+	tmp="$$out.tmp"; \
+	re_dir="$$tmp/lib/std/re"; \
+	bin_dir="$$tmp/bin"; \
+	[ -d "$$src" ] || { echo "error: missing migrated PCRE2 directory: $$src" >&2; exit 1; }; \
+	rm -rf "$$tmp"; \
+	mkdir -p "$$re_dir" "$$bin_dir"; \
+	cp "$$src"/*.w "$$re_dir/"; \
+	bash "$(ROOT_DIR)/scripts/pcre2_generated_workflow.sh" check "$(ROOT_DIR)/$(CANONICAL_BIN)" "$$re_dir"; \
+	$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" build "$$re_dir/pcre2test.w" -o "$$bin_dir/pcre2test"; \
+	[ -x "$$bin_dir/pcre2test" ] || { echo "error: PCRE2 build did not produce $$bin_dir/pcre2test" >&2; exit 1; }; \
+	rm -rf "$$out"; \
+	mv "$$tmp" "$$out"; \
+	echo "built migrated PCRE2: $(ROOT_DIR)/$(REGEX_PCRE2TEST_BIN)"; \
+	touch "$@"
 
 $(COMPAT_RUNTIME_SRC): rt/compat_runtime.w $(EMBEDDED_STDLIB_RUNTIME_SRC) | $(OUT_GEN_DIR)
 	@cat "$(ROOT_DIR)/rt/compat_runtime.w" "$(EMBEDDED_STDLIB_RUNTIME_SRC)" > "$@"
@@ -469,6 +468,17 @@ $(COMPAT_RUNTIME_OBJ): $(COMPAT_RUNTIME_SRC) $(STAGE0_BIN) | $(OUT_LIB_DIR)
 $(PANIC_RUNTIME_OBJ): rt/panic_runtime.w $(STAGE0_BIN) | $(OUT_LIB_DIR)
 	@if [ -z "$(STAGE0_BIN)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
 	$(WITH_BUILD_ENV) $(STAGE0_BIN) build $< --emit-obj --no-prelude -O0 -o $@
+
+$(REGEX_RUNTIME_OBJ): rt/regex_runtime.w $(STAGE0_BIN) | $(OUT_LIB_DIR) $(OUT_TMP_DIR)
+	@if [ -z "$(STAGE0_BIN)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
+	$(WITH_BUILD_ENV) $(STAGE0_BIN) ir $< --no-prelude > "$(OUT_TMP_DIR)/regex_runtime.ll"
+	@set -euo pipefail; \
+	sdk="$(SDK_PATH)"; \
+	if [ -n "$$sdk" ]; then \
+		$(HOST_CC) -isysroot "$$sdk" -c "$(OUT_TMP_DIR)/regex_runtime.ll" -o "$@"; \
+	else \
+		$(HOST_CC) -c "$(OUT_TMP_DIR)/regex_runtime.ll" -o "$@"; \
+	fi
 
 $(FIBER_STUBS_OBJ): rt/fiber_stubs.w $(STAGE0_BIN) | $(OUT_LIB_DIR)
 	@if [ -z "$(STAGE0_BIN)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
@@ -500,19 +510,27 @@ $(RT_DARWIN_AARCH64_OBJ): rt/darwin_aarch64.w $(STAGE0_BIN) | $(OUT_LIB_DIR)
 	@if [ -z "$(STAGE0_BIN)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
 	$(WITH_BUILD_ENV) $(STAGE0_BIN) build $< --emit-obj --no-prelude -O2 -o $@
 
-$(RT_WITH_REFRESH_STAMP): $(STAGE2_BIN) $(COMPAT_RUNTIME_SRC) rt/cimport_stubs.w rt/panic_runtime.w rt/fiber_stubs.w rt/channel_runtime.w rt/fiber_runtime.w $(FIBER_CORE_SRC) rt/rt_core.w rt/darwin_aarch64.w | $(OUT_LIB_DIR) $(OUT_GEN_DIR)
+$(RT_WITH_REFRESH_STAMP): $(STAGE2_BIN) $(COMPAT_RUNTIME_SRC) rt/cimport_stubs.w rt/panic_runtime.w rt/regex_runtime.w rt/fiber_stubs.w rt/channel_runtime.w rt/fiber_runtime.w $(FIBER_CORE_SRC) rt/rt_core.w rt/darwin_aarch64.w | $(OUT_LIB_DIR) $(OUT_GEN_DIR)
 	$(WITH_BUILD_ENV) $(STAGE2_BIN) build rt/rt_core.w --emit-obj --no-prelude -O2 -o $(RT_CORE_OBJ)
 	$(WITH_BUILD_ENV) $(STAGE2_BIN) build rt/darwin_aarch64.w --emit-obj --no-prelude -O2 -o $(RT_DARWIN_AARCH64_OBJ)
 	$(WITH_BUILD_ENV) $(STAGE2_BIN) build rt/cimport_stubs.w --emit-obj --no-prelude -O0 -o $(CIMPORT_STUBS_OBJ)
 	$(WITH_BUILD_ENV) $(STAGE2_BIN) build $(COMPAT_RUNTIME_SRC) --emit-obj --no-prelude -O0 -o $(COMPAT_RUNTIME_OBJ)
 	$(WITH_BUILD_ENV) $(STAGE2_BIN) build rt/panic_runtime.w --emit-obj --no-prelude -O0 -o $(PANIC_RUNTIME_OBJ)
+	$(WITH_BUILD_ENV) $(STAGE2_BIN) ir rt/regex_runtime.w --no-prelude > "$(OUT_TMP_DIR)/regex_runtime.ll"
+	@set -euo pipefail; \
+	sdk="$(SDK_PATH)"; \
+	if [ -n "$$sdk" ]; then \
+		$(HOST_CC) -isysroot "$$sdk" -c "$(OUT_TMP_DIR)/regex_runtime.ll" -o "$(REGEX_RUNTIME_OBJ)"; \
+	else \
+		$(HOST_CC) -c "$(OUT_TMP_DIR)/regex_runtime.ll" -o "$(REGEX_RUNTIME_OBJ)"; \
+	fi
 	$(WITH_BUILD_ENV) $(STAGE2_BIN) build rt/fiber_stubs.w --emit-obj --no-prelude -O0 -o $(FIBER_STUBS_OBJ)
 	$(WITH_BUILD_ENV) $(STAGE2_BIN) build rt/channel_runtime.w --emit-obj --no-prelude -O0 -o $(CHANNEL_RUNTIME_OBJ)
 	$(WITH_BUILD_ENV) $(STAGE2_BIN) build rt/fiber_runtime.w --emit-obj --no-prelude -O0 -o $(FIBER_RUNTIME_OBJ)
 	$(WITH_BUILD_ENV) $(STAGE2_BIN) build $(FIBER_CORE_SRC) --emit-obj --no-prelude -O0 -o $(FIBER_OBJ)
 	@touch "$@"
 
-$(EMBEDDED_OBJECTS_ASM): scripts/embed_runtime_objects.sh $(CIMPORT_STUBS_OBJ) $(COMPAT_RUNTIME_OBJ) $(PANIC_RUNTIME_OBJ) $(FIBER_STUBS_OBJ) $(CHANNEL_RUNTIME_OBJ) $(FIBER_RUNTIME_OBJ) $(FIBER_OBJ) $(FIBER_ASM_OBJ) $(RT_WITH_ARTIFACTS) | $(OUT_LIB_DIR)
+$(EMBEDDED_OBJECTS_ASM): scripts/embed_runtime_objects.sh $(CIMPORT_STUBS_OBJ) $(COMPAT_RUNTIME_OBJ) $(PANIC_RUNTIME_OBJ) $(REGEX_RUNTIME_OBJ) $(FIBER_STUBS_OBJ) $(CHANNEL_RUNTIME_OBJ) $(FIBER_RUNTIME_OBJ) $(FIBER_OBJ) $(FIBER_ASM_OBJ) $(RT_WITH_ARTIFACTS) | $(OUT_LIB_DIR)
 	@bash "$(ROOT_DIR)/scripts/embed_runtime_objects.sh" "$(OUT_LIB_DIR)" "$@"
 
 $(EMBEDDED_OBJECTS_OBJ): $(EMBEDDED_OBJECTS_ASM) | $(OUT_LIB_DIR)
@@ -692,12 +710,7 @@ __test: $(STAGE2_BIN)
 	./scripts/run_issue61_noop_local_regression.sh
 	./scripts/run_embedded_runtime_extract_regression.sh
 
-__test-pcre2: $(REGEX_PREPARE_STAMP) scripts/pcre2_generated_workflow.sh scripts/verify_pcre2_works.sh $(CANONICAL_BIN)
-	@bash "$(ROOT_DIR)/scripts/pcre2_generated_workflow.sh" check \
-		"$(ROOT_DIR)/$(CANONICAL_BIN)" \
-		"$(ROOT_DIR)/$(REGEX_RAW_DIR)" \
-		"$(ROOT_DIR)/$(REGEX_GENERATED_DIR)"
-	@WITH_BIN="$(ROOT_DIR)/$(CANONICAL_BIN)" bash "$(ROOT_DIR)/scripts/verify_pcre2_works.sh"
+__test-pcre2: __regex-test
 
 # Generate LLVM bridge stubs for C-only builds (no LLVM available).
 # Two files: wl_decls.h (declarations) and wl_stubs.c (stub implementations).

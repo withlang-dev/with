@@ -1,9 +1,10 @@
 #!/bin/bash
 # pcre2_generated_workflow.sh — check and promote migrated PCRE2 modules.
 #
-# The prepare step (raw → generated) is now a simple copy handled by the
-# Makefile. This script provides check (compilation error counting) and
-# promote (copy to lib/std/re after zero-error gate).
+# Make targets own the lifecycle:
+#   regex-migrate: with migrate -> out/pcre2_migrated
+#   regex-build: copy/check/build -> out/pcre2_build
+#   regex-promote: copy checked output -> lib/std/re
 
 set -euo pipefail
 
@@ -111,21 +112,19 @@ module_defines_main() {
 usage() {
     cat >&2 <<'EOF'
 usage:
-  pcre2_generated_workflow.sh check <with-bin> <raw-dir> <generated-dir>
-  pcre2_generated_workflow.sh promote <with-bin> <raw-dir> <generated-dir> <dest-dir>
+  pcre2_generated_workflow.sh check <with-bin> <generated-dir>
+  pcre2_generated_workflow.sh promote <with-bin> <generated-dir> <dest-dir>
 EOF
     exit 1
 }
 
 count_generated_errors() {
     local with_bin="$1"
-    local raw_dir="$2"
-    local generated_dir="$3"
+    local generated_dir="$2"
     local total=0
     local ok=0
 
     [ -x "$with_bin" ] || die "missing compiler binary: $with_bin"
-    [ -d "$raw_dir" ] || die "missing raw migration directory: $raw_dir"
     [ -d "$generated_dir" ] || die "missing generated directory: $generated_dir"
     ensure_generated_dependencies "$generated_dir"
 
@@ -142,11 +141,8 @@ count_generated_errors() {
         # check, strip module imports from the checked module body; otherwise
         # dependency imports pull std.re.defs back in and shadow the inlined
         # definitions. The promoted files keep their imports unchanged.
-        if [ -f "$generated_dir/defs.w" ]; then
-            cat "$generated_dir/defs.w" > "$tf"
-        else
-            head -48 "$raw_dir/pcre2_tables.w" > "$tf"
-        fi
+        [ -f "$generated_dir/defs.w" ] || die "missing generated defs.w in $generated_dir"
+        cat "$generated_dir/defs.w" > "$tf"
         awk 'NR <= 2 { next } /^use std\.re\./ { next } { print }' "$generated_dir/$mod.w" >> "$tf"
         if ! module_defines_main "$generated_dir/$mod.w"; then
             printf '\nfn main { print("ok") }\n' >> "$tf"
@@ -175,12 +171,11 @@ count_generated_errors() {
 
 promote_generated_tree() {
     local with_bin="$1"
-    local raw_dir="$2"
-    local generated_dir="$3"
-    local dest_dir="$4"
+    local generated_dir="$2"
+    local dest_dir="$3"
     local summary total
 
-    summary="$(count_generated_errors "$with_bin" "$raw_dir" "$generated_dir")"
+    summary="$(count_generated_errors "$with_bin" "$generated_dir")"
     printf '%s\n' "$summary"
     total="$(printf '%s\n' "$summary" | awk -F'TOTAL_ERRORS=' '/TOTAL_ERRORS=/{print $2}' | tail -1)"
     [ -n "$total" ] || die "failed to compute generated error count"
@@ -202,12 +197,12 @@ main() {
     local cmd="${1:-}"
     case "$cmd" in
         check)
-            [ "$#" -eq 4 ] || usage
-            count_generated_errors "$2" "$3" "$4"
+            [ "$#" -eq 3 ] || usage
+            count_generated_errors "$2" "$3"
             ;;
         promote)
-            [ "$#" -eq 5 ] || usage
-            promote_generated_tree "$2" "$3" "$4" "$5"
+            [ "$#" -eq 4 ] || usage
+            promote_generated_tree "$2" "$3" "$4"
             ;;
         *)
             usage

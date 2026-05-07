@@ -11,6 +11,8 @@ use CiIR
 use CiPrint
 use CImport
 
+extern fn with_arg_at(idx: i32) -> str
+
 // Width-slice mode: when > 0, skip declarations belonging to
 // non-target PCRE2 width families during migration.
 // Value is the target code-unit width (e.g. 8). Widths != target
@@ -55,6 +57,10 @@ fn ci_migrate_is_width_family_name(name: str) -> bool:
 var g_migrate_shared_defs_prefix: str = ""
 var g_migrate_shared_decl_buf: str = ""
 var g_migrate_shared_decl_keys: str = ""
+var g_migrate_shared_decl_records: str = ""
+var g_migrate_reinvoke_args: str = ""
+var g_migrate_directory_one_basename: str = ""
+var g_migrate_shared_fragment_path: str = ""
 
 type CiMigratePendingSharedExternVar {
     kind: str = "",
@@ -63,11 +69,20 @@ type CiMigratePendingSharedExternVar {
 }
 
 var g_migrate_shared_pending_extern_vars: Vec[CiMigratePendingSharedExternVar] = Vec.new()
-var g_migrate_shared_usage_text: str = ""
+var g_migrate_shared_usage_idents: str = ""
 var g_migrate_libc_symbols_used: str = ""
 
 pub fn migrate_set_shared_defs(prefix: str):
     g_migrate_shared_defs_prefix = prefix
+
+pub fn migrate_set_reinvoke_args(args: str):
+    g_migrate_reinvoke_args = args
+
+pub fn migrate_set_directory_one_basename(basename: str):
+    g_migrate_directory_one_basename = basename
+
+pub fn migrate_set_shared_fragment_path(path: str):
+    g_migrate_shared_fragment_path = path
 
 fn ci_migrate_shared_defs_active() -> bool:
     g_migrate_shared_defs_prefix.len() > 0
@@ -75,8 +90,9 @@ fn ci_migrate_shared_defs_active() -> bool:
 fn ci_migrate_shared_defs_reset:
     g_migrate_shared_decl_buf = ""
     g_migrate_shared_decl_keys = ""
+    g_migrate_shared_decl_records = ""
     g_migrate_shared_pending_extern_vars = Vec.new()
-    g_migrate_shared_usage_text = ""
+    g_migrate_shared_usage_idents = ""
 
 fn ci_migrate_shared_decl_key(kind: str, name: str) -> str:
     "|" ++ kind ++ ":" ++ name ++ "|"
@@ -97,6 +113,7 @@ fn ci_migrate_shared_decl_add(kind: str, name: str, rendered: str) -> bool:
         return true
     g_migrate_shared_decl_keys = g_migrate_shared_decl_keys ++ key
     g_migrate_shared_decl_buf = g_migrate_shared_decl_buf ++ rendered ++ "\n"
+    g_migrate_shared_decl_records = g_migrate_shared_decl_records ++ f"@@DECL|{kind}|{name}\n{rendered}\n@@END\n"
     true
 
 fn ci_migrate_shared_ownerless_extern_add(kind: str, name: str, rendered: str) -> bool:
@@ -106,7 +123,7 @@ fn ci_migrate_shared_ownerless_extern_add(kind: str, name: str, rendered: str) -
     if ci_find_str(g_migrate_shared_decl_keys, key) >= 0:
         return true
     g_migrate_shared_decl_keys = g_migrate_shared_decl_keys ++ key
-    g_migrate_shared_pending_extern_vars.push(CiMigratePendingSharedExternVar { kind: kind, name: name, rendered: rendered })
+    g_migrate_shared_pending_extern_vars.push(CiMigratePendingSharedExternVar { kind: ci_ir_owned_text(kind), name: ci_ir_owned_text(name), rendered: ci_ir_owned_text(rendered) })
     true
 
 fn ci_migrate_text_mentions_ident(text: str, name: str) -> bool:
@@ -128,10 +145,28 @@ fn ci_migrate_text_mentions_ident(text: str, name: str) -> bool:
         start = pos + 1
     false
 
+fn ci_migrate_shared_note_ident(name: str):
+    if name.len() == 0:
+        return
+    let key = "|" ++ name ++ "|"
+    if ci_find_str(g_migrate_shared_usage_idents, key) < 0:
+        g_migrate_shared_usage_idents = g_migrate_shared_usage_idents ++ key
+
 fn ci_migrate_shared_note_output_uses(output: str):
     if not ci_migrate_shared_defs_active():
         return
-    g_migrate_shared_usage_text = g_migrate_shared_usage_text ++ "\n" ++ output
+    var i = 0
+    let n = output.len() as i32
+    while i < n:
+        let ch = output.byte_at(i as i64)
+        if ci_is_ident_char(ch):
+            let start = i
+            i = i + 1
+            while i < n and ci_is_ident_char(output.byte_at(i as i64)):
+                i = i + 1
+            ci_migrate_shared_note_ident(output.slice(start as i64, i as i64))
+            continue
+        i = i + 1
 
 fn ci_migrate_libc_reset:
     g_migrate_libc_symbols_used = ""
@@ -251,7 +286,7 @@ fn ci_migrate_write_shared_defs(output_dir: str):
     var pending_i = 0
     while pending_i < g_migrate_shared_pending_extern_vars.len() as i32:
         let pending = g_migrate_shared_pending_extern_vars.get(pending_i as i64)
-        if ci_migrate_text_mentions_ident(g_migrate_shared_usage_text, pending.name):
+        if ci_find_str(g_migrate_shared_usage_idents, "|" ++ pending.name ++ "|") >= 0:
             defs = defs ++ pending.rendered ++ "\n"
         pending_i = pending_i + 1
     let defs_path = output_dir ++ "/defs.w"
@@ -260,6 +295,79 @@ fn ci_migrate_write_shared_defs(output_dir: str):
         eprint("migrate: failed to write shared defs: " ++ defs_path)
     else:
         eprint("migrate: wrote shared defs: " ++ defs_path)
+
+fn ci_migrate_write_shared_fragment(path: str):
+    var fragment = g_migrate_shared_decl_records
+    var pending_i = 0
+    while pending_i < g_migrate_shared_pending_extern_vars.len() as i32:
+        let pending = g_migrate_shared_pending_extern_vars.get(pending_i as i64)
+        fragment = fragment ++ f"@@PENDING|{pending.kind}|{pending.name}\n{pending.rendered}\n@@END\n"
+        pending_i = pending_i + 1
+    fragment = fragment ++ f"@@USES\n{g_migrate_shared_usage_idents}\n@@END\n"
+    if with_fs_write_file(path, fragment) != 0:
+        eprint(f"migrate: failed to write shared fragment: {path}")
+
+fn ci_migrate_merge_usage_keys(keys: str):
+    var i = 0
+    let n = keys.len() as i32
+    while i < n:
+        while i < n and keys.byte_at(i as i64) != 124:
+            i = i + 1
+        if i >= n:
+            return
+        let start = i + 1
+        i = start
+        while i < n and keys.byte_at(i as i64) != 124:
+            i = i + 1
+        if i > start:
+            ci_migrate_shared_note_ident(keys.slice(start as i64, i as i64))
+        i = i + 1
+
+fn ci_migrate_merge_shared_fragment_text(text: str):
+    var pos = 0
+    let n = text.len() as i32
+    while pos < n:
+        var line_end = pos
+        while line_end < n and text.byte_at(line_end as i64) != 10:
+            line_end = line_end + 1
+        let line = text.slice(pos as i64, line_end as i64)
+        let body_start = line_end + 1
+        let rest = text.slice(body_start as i64, text.len())
+        let rel_end = ci_find_str(rest, "\n@@END\n")
+        if rel_end < 0:
+            return
+        let body_end = body_start + rel_end
+        let body = text.slice(body_start as i64, body_end as i64)
+        if ci_starts_with(line, "@@DECL|"):
+            let marker = line.slice(7, line.len())
+            let sep = ci_find_str(marker, "|")
+            if sep > 0:
+                let kind = marker.slice(0, sep as i64)
+                let name = marker.slice((sep + 1) as i64, marker.len())
+                let _ = ci_migrate_shared_decl_add(kind, name, body)
+        else if ci_starts_with(line, "@@PENDING|"):
+            let marker = line.slice(10, line.len())
+            let sep = ci_find_str(marker, "|")
+            if sep > 0:
+                let kind = marker.slice(0, sep as i64)
+                let name = marker.slice((sep + 1) as i64, marker.len())
+                let _ = ci_migrate_shared_ownerless_extern_add(kind, name, body)
+        else if line == "@@USES":
+            ci_migrate_merge_usage_keys(body)
+        pos = body_end + 7
+
+fn ci_migrate_merge_shared_fragments(output_dir: str, fragments: Vec[str]):
+    ci_migrate_shared_defs_reset()
+    var i = 0
+    while i < fragments.len() as i32:
+        let path = fragments.get(i as i64)
+        let text = with_fs_read_file(path)
+        if text.len() == 0:
+            eprint(f"migrate: missing shared fragment: {path}")
+        else:
+            ci_migrate_merge_shared_fragment_text(text)
+        i = i + 1
+    ci_migrate_write_shared_defs(output_dir)
 
 // Generate the self-contained preamble that every migrated file needs.
 // In shared-defs mode this goes into defs.w; otherwise into each file.
@@ -730,6 +838,118 @@ fn ci_migrate_excludes_contains(excludes: str, basename: str) -> bool:
     let needle = "|" ++ basename ++ "|"
     ci_find_str(excludes, needle) >= 0
 
+fn ci_migrate_pcre2_order_rank(basename: str) -> i32:
+    if basename == "pcre2_chkdint.c": return 10
+    if basename == "pcre2_chartables.c": return 20
+    if basename == "pcre2_tables.c": return 30
+    if basename == "pcre2_ucd.c": return 40
+    if basename == "pcre2_config.c": return 50
+    if basename == "pcre2_context.c": return 60
+    if basename == "pcre2_error.c": return 70
+    if basename == "pcre2_newline.c": return 80
+    if basename == "pcre2_string_utils.c": return 90
+    if basename == "pcre2_ord2utf.c": return 100
+    if basename == "pcre2_extuni.c": return 110
+    if basename == "pcre2_valid_utf.c": return 120
+    if basename == "pcre2_xclass.c": return 130
+    if basename == "pcre2_find_bracket.c": return 140
+    if basename == "pcre2_convert.c": return 150
+    if basename == "pcre2_compile_cgroup.c": return 160
+    if basename == "pcre2_compile_class.c": return 170
+    if basename == "pcre2_auto_possess.c": return 180
+    if basename == "pcre2_compile.c": return 190
+    if basename == "pcre2_maketables.c": return 200
+    if basename == "pcre2_match_data.c": return 210
+    if basename == "pcre2_pattern_info.c": return 220
+    if basename == "pcre2_dfa_match.c": return 230
+    if basename == "pcre2_match_next.c": return 240
+    if basename == "pcre2_match.c": return 250
+    if basename == "pcre2_serialize.c": return 260
+    if basename == "pcre2_substring.c": return 270
+    if basename == "pcre2_substitute.c": return 280
+    if basename == "pcre2_study.c": return 290
+    if basename == "pcre2_script_run.c": return 300
+    if basename == "pcre2posix.c": return 310
+    if basename == "pcre2test.c": return 320
+    1000
+
+fn ci_migrate_file_before(a: str, b: str) -> bool:
+    let abase = ci_migrate_path_basename(a)
+    let bbase = ci_migrate_path_basename(b)
+    let arank = ci_migrate_pcre2_order_rank(abase)
+    let brank = ci_migrate_pcre2_order_rank(bbase)
+    if arank != brank:
+        return arank < brank
+    ci_str_compare(abase, bbase) < 0
+
+fn ci_migrate_sorted_files(files: Vec[str]) -> Vec[str]:
+    let sorted: Vec[str] = Vec.new()
+    var rank = 10
+    while rank <= 320:
+        var i = 0
+        while i < files.len() as i32:
+            let path = files.get(i as i64)
+            if ci_migrate_pcre2_order_rank(ci_migrate_path_basename(path)) == rank:
+                sorted.push(path)
+            i = i + 1
+        rank = rank + 10
+    var i = 0
+    while i < files.len() as i32:
+        let path = files.get(i as i64)
+        if ci_migrate_pcre2_order_rank(ci_migrate_path_basename(path)) == 1000:
+            sorted.push(path)
+        i = i + 1
+    sorted
+
+fn ci_migrate_shell_arg(s: str) -> str:
+    "'" ++ ci_shell_escape(s) ++ "'"
+
+fn ci_migrate_directory_output_path(input_dir: str, output_dir: str, file_path: str) -> str:
+    var out_path = ""
+    if ci_starts_with(file_path, input_dir):
+        let relative = file_path.slice(input_dir.len(), file_path.len())
+        if relative.len() > 2 and relative.slice(relative.len() - 2, relative.len()) == ".c":
+            out_path = f"{output_dir}{relative.slice(0, relative.len() - 2)}.w"
+        else:
+            out_path = f"{output_dir}{relative}.w"
+    else:
+        out_path = f"{output_dir}/{file_path}.w"
+    out_path
+
+fn ci_migrate_ensure_parent_dir(path: str):
+    var dir_end = path.len() as i32 - 1
+    while dir_end > 0 and path.byte_at(dir_end as i64) != 47:
+        dir_end = dir_end - 1
+    if dir_end > 0:
+        with_fs_mkdir_p(path.slice(0, dir_end as i64))
+
+fn ci_migrate_directory_filewise(input_dir: str, output_dir: str, files: Vec[str]) -> i32:
+    let fragments: Vec[str] = Vec.new()
+    let fragment_dir = f"{output_dir}/.shared_fragments"
+    with_fs_mkdir_p(output_dir)
+    with_fs_mkdir_p(fragment_dir)
+    let self_bin = with_arg_at(0)
+    var migrated = 0
+    var i = 0
+    while i < files.len() as i32:
+        let file_path = files.get(i as i64)
+        let base = ci_migrate_path_basename(file_path)
+        let out_path = ci_migrate_directory_output_path(input_dir, output_dir, file_path)
+        ci_migrate_ensure_parent_dir(out_path)
+        let fragment = f"{fragment_dir}/{base}.defs"
+        fragments.push(fragment)
+        let cmd = ci_migrate_shell_arg(self_bin) ++ " migrate " ++ ci_migrate_shell_arg(input_dir) ++ " -o " ++ ci_migrate_shell_arg(output_dir) ++ " " ++ g_migrate_reinvoke_args ++ " --migrate-one " ++ ci_migrate_shell_arg(base) ++ " --shared-fragment " ++ ci_migrate_shell_arg(fragment)
+        let rc = with_system(cmd)
+        if rc != 0:
+            eprint(f"migrate: failed while migrating {base}")
+            return rc
+        migrated = migrated + 1
+        i = i + 1
+    ci_migrate_merge_shared_fragments(output_dir, fragments)
+    let _cleanup = with_system("rm -rf " ++ ci_migrate_shell_arg(fragment_dir))
+    eprint(f"migrate: {migrated}/{files.len() as i32} files translated from {input_dir} -> {output_dir}")
+    if migrated == 0: 1 else: 0
+
 // Translate a directory of .c files to .w files.
 pub fn migrate_c_directory(input_dir: str, output_dir: str, exclude_basenames: str) -> i32:
     g_migrate_fn_translated_total = 0
@@ -740,7 +960,7 @@ pub fn migrate_c_directory(input_dir: str, output_dir: str, exclude_basenames: s
     with_fs_mkdir_p(output_dir)
 
     // Find all .c files using shell
-    let find_cmd = "find '" ++ ci_shell_escape(input_dir) ++ "' -name '*.c' -not -name '.*' -type f 2>/dev/null"
+    let find_cmd = "find '" ++ ci_shell_escape(input_dir) ++ "' -name '*.c' -not -name '.*' -type f 2>/dev/null | sort"
     let find_result = with_fs_read_file_cmd(find_cmd)
     if find_result.len() == 0:
         eprint("migrate: no .c files found in " ++ input_dir)
@@ -768,34 +988,28 @@ pub fn migrate_c_directory(input_dir: str, output_dir: str, exclude_basenames: s
                 files.push(file_path)
         pos = line_end + 1
 
+    let sorted_files = ci_migrate_sorted_files(files)
+
+    if ci_migrate_shared_defs_active() and g_migrate_directory_one_basename.len() == 0:
+        return ci_migrate_directory_filewise(input_dir, output_dir, sorted_files)
+
     var project = CiProject.new()
 
     var fi = 0
-    while fi < files.len() as i32:
-        if project.migrate_scan_file(files.get(fi as i64)) != 0:
+    while fi < sorted_files.len() as i32:
+        if project.migrate_scan_file(sorted_files.get(fi as i64)) != 0:
             return 1
         fi = fi + 1
 
     fi = 0
-    while fi < files.len() as i32:
-        let file_path = files.get(fi as i64)
+    while fi < sorted_files.len() as i32:
+        let file_path = sorted_files.get(fi as i64)
+        if g_migrate_directory_one_basename.len() > 0 and ci_migrate_path_basename(file_path) != g_migrate_directory_one_basename:
+            fi = fi + 1
+            continue
         // Compute output path: replace input_dir prefix with output_dir, .c → .w
-        var out_path = ""
-        if ci_starts_with(file_path, input_dir):
-            let relative = file_path.slice(input_dir.len(), file_path.len())
-            if relative.len() > 2 and relative.slice(relative.len() - 2, relative.len()) == ".c":
-                out_path = output_dir ++ relative.slice(0, relative.len() - 2) ++ ".w"
-            else:
-                out_path = output_dir ++ relative ++ ".w"
-        else:
-            out_path = output_dir ++ "/" ++ file_path ++ ".w"
-
-        // Create subdirectories if needed
-        var dir_end = out_path.len() as i32 - 1
-        while dir_end > 0 and out_path.byte_at(dir_end as i64) != 47:
-            dir_end = dir_end - 1
-        if dir_end > 0:
-            with_fs_mkdir_p(out_path.slice(0, dir_end as i64))
+        let out_path = ci_migrate_directory_output_path(input_dir, output_dir, file_path)
+        ci_migrate_ensure_parent_dir(out_path)
 
         let rc = ci_migrate_file_inner(file_path, out_path, true, &project)
         if rc == 0:
@@ -804,9 +1018,15 @@ pub fn migrate_c_directory(input_dir: str, output_dir: str, exclude_basenames: s
 
     // C3: emit shared defs module after all files are translated
     if ci_migrate_shared_defs_active():
-        ci_migrate_write_shared_defs(output_dir)
+        if g_migrate_shared_fragment_path.len() > 0:
+            ci_migrate_write_shared_fragment(g_migrate_shared_fragment_path)
+        else:
+            ci_migrate_write_shared_defs(output_dir)
 
-    let files_failed = files_scanned - files_migrated
+    var files_expected = files_scanned
+    if g_migrate_directory_one_basename.len() > 0:
+        files_expected = 1
+    let files_failed = files_expected - files_migrated
     ci_dump_raw_fallback_stats()
     let fn_total = g_migrate_fn_translated_total + g_migrate_fn_untranslatable_total
     if files_failed > 0:

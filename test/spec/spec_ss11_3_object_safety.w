@@ -1,4 +1,4 @@
-//! skip
+//! skip: non-executable spec sketch for Section 11.3 — Object Safety (formerly 25.83); contains pseudo-code for unimplemented feature work
 // Spec test: Section 11.3 — Object Safety (formerly 25.83)
 // These are pseudo-code test cases from the specification.
 // Remove the //! skip directive once the features are implemented.

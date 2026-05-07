@@ -118,6 +118,7 @@ type SemaBuiltinSymbols {
     hashmap: i32,
     hashset: i32,
     box: i32,
+    regex: i32,
     ok: i32,
     err: i32,
     some: i32,
@@ -648,6 +649,7 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         hashmap: 0,
         hashset: 0,
         box: 0,
+        regex: 0,
         ok: 0,
         err: 0,
         some: 0,
@@ -1186,6 +1188,7 @@ fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.syms.embed_file = self.pool_intern("embed_file")
     self.syms.copy_trait = self.pool_intern("Copy")
     self.syms.clone_trait = self.pool_intern("Clone")
+    self.syms.regex = self.pool_intern("Regex")
     self.syms.drop = self.pool_intern("Drop")
     self.syms.self_type = self.pool_intern("Self")
     self.syms.vec = self.pool_intern("Vec")

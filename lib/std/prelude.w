@@ -4,6 +4,7 @@ use std.string
 use std.math
 use std.builtins
 use std.collections
+use std.regex
 use std.option
 use std.result
 use std.traits

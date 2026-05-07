@@ -106,6 +106,8 @@ enum NodeKind: i32:
     // NK_MOVE_ARG: d0=inner(node), d1=0, d2=0  (explicit move at call site)
     NK_COPY_ARG = 118
     NK_MOVE_ARG = 119
+    // NK_REGEX_LIT: d0=pattern_sym, d1=flags_sym, d2=0
+    NK_REGEX_LIT = 120
     // Type expressions
     NK_TYPE_NAMED = 80
     NK_TYPE_GENERIC = 81
@@ -136,6 +138,7 @@ enum NodeKind: i32:
     NK_PAT_AT_BINDING = 112
     NK_PAT_SLICE = 113
     NK_PAT_TYPED_BIND = 114
+    NK_PAT_REGEX = 121
 
 // With-expression binding encoding in d2:
 // - positive value: immutable binding symbol id
@@ -1270,7 +1273,8 @@ fn ast_is_pattern_kind(kind: i32) -> bool:
     kind == NodeKind.NK_PAT_ENUM_SHORTHAND or
     kind == NodeKind.NK_PAT_AT_BINDING or
     kind == NodeKind.NK_PAT_SLICE or
-    kind == NodeKind.NK_PAT_TYPED_BIND
+    kind == NodeKind.NK_PAT_TYPED_BIND or
+    kind == NodeKind.NK_PAT_REGEX
 
 fn AstPool.is_pattern_node(self: AstPool, node: i32) -> bool:
     if node <= 0 or node >= self.node_count():
@@ -1402,4 +1406,5 @@ fn AstPool.for_binding_is_pattern(self: AstPool, node: NodeId) -> bool:
 // NodeKind.NK_PAT_SLICE:     d0=extra_start, d1=head_count, d2=rest(sym,0=none)
 //                   extra: [has_rest(0/1), head_syms..., tail_count, tail_syms...]
 // NodeKind.NK_PAT_TYPED_BIND:  d0=binding(sym), d1=type(sym), d2=0
+// NodeKind.NK_PAT_REGEX:    d0=pattern_sym, d1=flags_sym, d2=0
 // NodeKind.NK_PAT_ENUM_SHORTHAND: d0=name(sym), d1=extra_start, d2=binding_count

@@ -1,4 +1,4 @@
-//! skip
+//! skip: non-executable spec sketch for Section 14.13 — Await Inside Iterators (formerly 25.58); contains pseudo-code for unimplemented feature work
 // Spec test: Section 14.13 — Await Inside Iterators (formerly 25.58)
 // These are pseudo-code test cases from the specification.
 // Remove the //! skip directive once the features are implemented.

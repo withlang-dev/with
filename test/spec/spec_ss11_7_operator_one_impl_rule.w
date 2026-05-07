@@ -1,4 +1,4 @@
-//! skip
+//! skip: non-executable spec sketch for Section 11.7 — Operator One-Impl Rule (formerly 25.71); contains pseudo-code for unimplemented feature work
 // Spec test: Section 11.7 — Operator One-Impl Rule (formerly 25.71)
 // These are pseudo-code test cases from the specification.
 // Remove the //! skip directive once the features are implemented.

@@ -2614,6 +2614,11 @@ fn Parser.parse_precedence(self: Parser, min_prec: i32) -> NodeId:
 
         if op_code == 500:  // pipeline
             lhs = self.pool.add_node(NodeKind.NK_PIPELINE, self.pool.get_start(lhs), self.prev_end(), lhs, rhs, 0)
+        else if op_code == 506:  // =~
+            lhs = self.build_regex_match_call(lhs, rhs, self.pool.get_start(lhs), self.prev_end())
+        else if op_code == 507:  // !~
+            let call = self.build_regex_match_call(lhs, rhs, self.pool.get_start(lhs), self.prev_end())
+            lhs = self.pool.add_node(NodeKind.NK_UNARY, self.pool.get_start(lhs), self.prev_end(), UnaryOp.UOP_NOT, call, 0)
         else if op_code == 501:  // reverse pipeline
             lhs = self.pool.add_node(NodeKind.NK_PIPELINE, self.pool.get_start(lhs), self.prev_end(), rhs, lhs, 0)
         else if op_code == 504:  // backward compose <<
@@ -2672,6 +2677,8 @@ fn Parser.infix_op(self: Parser) -> i32:
     if t == TokenKind.TK_KW_AND: return 2 * 1000 + BinaryOp.OP_AND
     if t == TokenKind.TK_EQ_EQ: return 3 * 1000 + BinaryOp.OP_EQ
     if t == TokenKind.TK_BANG_EQ: return 3 * 1000 + BinaryOp.OP_NEQ
+    if t == TokenKind.TK_EQ_TILDE: return 3 * 1000 + 506
+    if t == TokenKind.TK_BANG_TILDE: return 3 * 1000 + 507
     if t == TokenKind.TK_KW_IN: return 3 * 1000 + BinaryOp.OP_IN
     if t == TokenKind.TK_KW_NOT:
         if self.pos + 1 < self.tokens.len() and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_KW_IN:
@@ -2717,6 +2724,7 @@ fn Parser.parse_primary(self: Parser) -> NodeId:
     if t == TokenKind.TK_INT_LIT: return self.parse_int_literal()
     if t == TokenKind.TK_FLOAT_LIT: return self.parse_float_literal()
     if t == TokenKind.TK_STRING_LIT: return self.parse_string_literal()
+    if t == TokenKind.TK_REGEX_LIT: return self.parse_regex_literal()
     if t == TokenKind.TK_C_STRING_LIT: return self.parse_c_string_literal()
     if t == TokenKind.TK_CHAR_LIT: return self.parse_char_literal()
     if t == TokenKind.TK_TRUE or t == TokenKind.TK_FALSE: return self.parse_bool_literal()
@@ -2987,6 +2995,64 @@ fn Parser.parse_string_literal(self: Parser) -> NodeId:
     self.advance()
     let node = self.pool.add_node(NodeKind.NK_STRING_LIT, start, end, sym, 0, 0)
     return self.parse_postfix(node)
+
+fn regex_literal_close_slash(text: str) -> i32:
+    let len = text.len() as i32
+    var i = 1
+    var in_class = 0
+    while i < len:
+        let ch = text.byte_at(i as i64)
+        if ch == 92:
+            i = i + 2
+            continue
+        if ch == 91:
+            in_class = 1
+            i = i + 1
+            continue
+        if ch == 93 and in_class != 0:
+            in_class = 0
+            i = i + 1
+            continue
+        if ch == 47 and in_class == 0:
+            return i
+        i = i + 1
+    0 - 1
+
+fn regex_literal_escape_runtime(text: str) -> str:
+    var out = ""
+    var i: i64 = 0
+    while i < text.len():
+        let ch = text.byte_at(i)
+        if ch == 92:
+            out = out ++ "\\\\"
+        else:
+            out = out ++ str_from_byte(ch)
+        i = i + 1
+    out
+
+fn Parser.parse_regex_literal(self: Parser) -> NodeId:
+    let start = self.current_start()
+    let end = self.current_end()
+    let text = self.source.slice(start as i64, end as i64)
+    let close_idx = regex_literal_close_slash(text)
+    var pattern = ""
+    var flags = ""
+    if close_idx > 0:
+        pattern = regex_literal_escape_runtime(text.slice(1, close_idx as i64))
+        if close_idx + 1 < text.len() as i32:
+            flags = text.slice((close_idx + 1) as i64, text.len() as i64)
+    let pat_sym = self.intern.intern(pattern)
+    let flag_sym = self.intern.intern(flags)
+    self.advance()
+    let node = self.pool.add_node(NodeKind.NK_REGEX_LIT, start, end, pat_sym, flag_sym, 0)
+    self.parse_postfix(node)
+
+fn Parser.build_regex_match_call(self: Parser, lhs: NodeId, rhs: NodeId, start: i32, end: i32) -> NodeId:
+    let method_sym = self.intern.intern("is_match")
+    let field = self.pool.add_node(NodeKind.NK_FIELD_ACCESS, start, end, rhs, method_sym, 0)
+    let arg_start = self.pool.extra_len()
+    self.pool.add_extra(lhs)
+    self.pool.add_node(NodeKind.NK_CALL, start, end, field, arg_start, 1)
 
 fn Parser.desugar_interpolated_string(self: Parser, content: str, start: i32, end: i32) -> NodeId:
     // Emit NodeKind.NK_FSTRING with segments in extra_data.
@@ -5046,7 +5112,7 @@ fn Parser.parse_inline_match_arms(self: Parser) -> i32:
     arm_count
 
 fn Parser.is_arm_token(self: Parser, t: i32) -> bool:
-    t == TokenKind.TK_IDENT or t == TokenKind.TK_INT_LIT or t == TokenKind.TK_DOT_IDENT or t == TokenKind.TK_TRUE or t == TokenKind.TK_FALSE or t == TokenKind.TK_STRING_LIT or t == TokenKind.TK_MINUS or t == TokenKind.TK_L_BRACKET or t == TokenKind.TK_L_PAREN or t == TokenKind.TK_L_BRACE or t == TokenKind.TK_KW_IN
+    t == TokenKind.TK_IDENT or t == TokenKind.TK_INT_LIT or t == TokenKind.TK_DOT_IDENT or t == TokenKind.TK_TRUE or t == TokenKind.TK_FALSE or t == TokenKind.TK_STRING_LIT or t == TokenKind.TK_REGEX_LIT or t == TokenKind.TK_MINUS or t == TokenKind.TK_L_BRACKET or t == TokenKind.TK_L_PAREN or t == TokenKind.TK_L_BRACE or t == TokenKind.TK_KW_IN
 
 // ── Pattern parsing ──────────────────────────────────────────────
 
@@ -5089,6 +5155,19 @@ fn Parser.parse_pattern(self: Parser) -> NodeId:
         let sym = self.intern.intern(raw)
         self.advance()
         return self.pool.add_node(NodeKind.NK_PAT_STRING, start, pat_end, sym, 0, 0)
+    if t == TokenKind.TK_REGEX_LIT:
+        let pat_end = self.current_end()
+        let text = self.source.slice(start as i64, pat_end as i64)
+        let close_idx = regex_literal_close_slash(text)
+        var pattern = ""
+        var flags = ""
+        if close_idx > 0:
+            pattern = regex_literal_escape_runtime(text.slice(1, close_idx as i64))
+            flags = text.slice((close_idx + 1) as i64, text.len())
+        let pat_sym = self.intern.intern(pattern)
+        let flag_sym = self.intern.intern(flags)
+        self.advance()
+        return self.pool.add_node(NodeKind.NK_PAT_REGEX, start, pat_end, pat_sym, flag_sym, 0)
     if t == TokenKind.TK_MINUS:
         self.advance()
         let ns = self.current_start()

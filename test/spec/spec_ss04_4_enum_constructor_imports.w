@@ -1,4 +1,4 @@
-//! skip
+//! skip: non-executable spec sketch for Section 4.4, 18.2 — Enum Constructor Imports (formerly 25.26); contains pseudo-code for unimplemented feature work
 // Spec test: Section 4.4, 18.2 — Enum Constructor Imports (formerly 25.26)
 // These are pseudo-code test cases from the specification.
 // Remove the //! skip directive once the features are implemented.

@@ -1,4 +1,4 @@
-//! skip
+//! skip: non-executable spec sketch for Section 2.4 — Partial Move from Drop Types (formerly 25.64); contains pseudo-code for unimplemented feature work
 // Spec test: Section 2.4 — Partial Move from Drop Types (formerly 25.64)
 // These are pseudo-code test cases from the specification.
 // Remove the //! skip directive once the features are implemented.

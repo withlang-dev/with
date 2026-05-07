@@ -31,6 +31,7 @@ fn pcre2_match_data_create_8(__param_oveccount: c_uint, gcontext: *mut pcre2_rea
 
 }
 
+@[c_export("pcre2_match_data_create_from_pattern_8")]
 fn pcre2_match_data_create_from_pattern_8(code: *const pcre2_real_code_8, __param_gcontext: *mut pcre2_real_general_context_8) -> *mut pcre2_real_match_data_8 {
     var gcontext = __param_gcontext
     if ((if code == null: 1 else: 0) != 0) {
@@ -45,6 +46,7 @@ fn pcre2_match_data_create_from_pattern_8(code: *const pcre2_real_code_8, __para
 
 }
 
+@[c_export("pcre2_match_data_free_8")]
 fn pcre2_match_data_free_8(match_data: *mut pcre2_real_match_data_8) {
     if ((if match_data != null: 1 else: 0) != 0) {
         if ((if match_data.heapframes != null: 1 else: 0) != 0) {
@@ -76,11 +78,13 @@ fn pcre2_get_match_data_heapframes_size_8(match_data: *mut pcre2_real_match_data
 
 }
 
+@[c_export("pcre2_get_ovector_count_8")]
 fn pcre2_get_ovector_count_8(match_data: *mut pcre2_real_match_data_8) -> c_uint {
     return match_data.oveccount
 
 }
 
+@[c_export("pcre2_get_ovector_pointer_8")]
 fn pcre2_get_ovector_pointer_8(match_data: *mut pcre2_real_match_data_8) -> *mut c_ulong {
     return (&match_data.ovector[0] as *mut c_ulong)
 
