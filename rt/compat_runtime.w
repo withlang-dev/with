@@ -136,6 +136,36 @@ fn run_shell_command(cmd: *const u8) -> i32:
     active_child_pgid = 0
     rc
 
+fn run_binary_direct(path: *const u8) -> i32:
+    var prev_mask: u32 = 0 as u32
+    let mask_rc = block_interrupt_signals(&raw mut prev_mask)
+    let pid = fork()
+    if pid == 0:
+        if mask_rc == 0:
+            restore_signal_mask(&prev_mask as *const u32)
+        let _ = setpgid(0, 0)
+        restore_default_signal_handler(SIGINT)
+        restore_default_signal_handler(SIGTERM)
+        restore_default_signal_handler(SIGHUP)
+        restore_default_signal_handler(SIGQUIT)
+        var argv: [2]*const u8 = [0 as *const u8; 2]
+        argv[0] = path
+        argv[1] = 0 as *const u8
+        let _ = execv(path, (&argv) as *const [2]*const u8 as *const *const u8)
+        _exit(127)
+    if pid < 0:
+        if mask_rc == 0:
+            restore_signal_mask(&prev_mask as *const u32)
+        return -1
+
+    active_child_pgid = pid
+    let _ = setpgid(pid, pid)
+    if mask_rc == 0:
+        restore_signal_mask(&prev_mask as *const u32)
+    let rc = wait_for_child_process(pid)
+    active_child_pgid = 0
+    rc
+
 fn interrupt_signal_handler(signo: i32):
     interrupt_flag = 1
     if active_child_pgid > 0:
@@ -197,6 +227,21 @@ pub fn system_str(cmd: str) -> i32:
             unsafe: *errp = EINTR
         return -1
     let rc = run_shell_command(buf as *const u8)
+    with_free(buf)
+    rc
+
+@[c_export("with_exec_binary")]
+pub fn exec_binary(path: str) -> i32:
+    let buf = str_to_c_buf(path)
+    if buf as i64 == 0:
+        return -1
+    if interrupt_flag != 0:
+        with_free(buf)
+        let errp = __error()
+        if errp as i64 != 0:
+            unsafe: *errp = EINTR
+        return -1
+    let rc = run_binary_direct(buf as *const u8)
     with_free(buf)
     rc
 

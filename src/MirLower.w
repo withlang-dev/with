@@ -4474,8 +4474,8 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
         if method_name == "find": return MirIntrinsic.MIR_INTRINSIC_STR_FIND
         if method_name == "split": return MirIntrinsic.MIR_INTRINSIC_STR_SPLIT
         if method_name == "trim": return MirIntrinsic.MIR_INTRINSIC_STR_TRIM
-        if method_name == "to_upper": return MirIntrinsic.MIR_INTRINSIC_STR_TO_UPPER
-        if method_name == "to_lower": return MirIntrinsic.MIR_INTRINSIC_STR_TO_LOWER
+        if method_name == "to_upper" or method_name == "upper": return MirIntrinsic.MIR_INTRINSIC_STR_TO_UPPER
+        if method_name == "to_lower" or method_name == "lower": return MirIntrinsic.MIR_INTRINSIC_STR_TO_LOWER
         if method_name == "replace": return MirIntrinsic.MIR_INTRINSIC_STR_REPLACE
         if method_name == "index_of": return MirIntrinsic.MIR_INTRINSIC_STR_INDEX_OF
         if method_name == "repeat": return MirIntrinsic.MIR_INTRINSIC_STR_REPEAT

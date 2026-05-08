@@ -152,6 +152,8 @@ type SemaBuiltinSymbols {
     trim: i32,
     to_lower: i32,
     to_upper: i32,
+    lower: i32,
+    upper: i32,
     replace: i32,
     slice: i32,
     fields: i32,
@@ -688,6 +690,8 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         trim: 0,
         to_lower: 0,
         to_upper: 0,
+        lower: 0,
+        upper: 0,
         replace: 0,
         slice: 0,
         fields: 0,
@@ -1250,6 +1254,8 @@ fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.syms.trim = self.pool_intern("trim")
     self.syms.to_lower = self.pool_intern("to_lower")
     self.syms.to_upper = self.pool_intern("to_upper")
+    self.syms.lower = self.pool_intern("lower")
+    self.syms.upper = self.pool_intern("upper")
     self.syms.replace = self.pool_intern("replace")
     self.syms.slice = self.pool_intern("slice")
     self.syms.fields = self.pool_intern("fields")
