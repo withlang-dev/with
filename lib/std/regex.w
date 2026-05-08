@@ -17,6 +17,7 @@ extern fn with_regex_match_spans_alloc_at(code: *const i8, text: str, start_offs
 extern fn with_regex_capture_name_count(code: *const i8) -> i32
 extern fn with_regex_capture_name_at(code: *const i8, index: i32) -> str
 extern fn with_regex_group_name_to_index(code: *const i8, name: str) -> i32
+extern fn with_regex_substitute(code: *const i8, text: str, repl: str, replace_all: i32) -> str
 extern fn with_free(ptr: *mut u8) -> void
 
 const REGEX_FLAG_GLOBAL: i32 = 1
@@ -54,6 +55,10 @@ pub type Captures {
     subject: str,
     spans: Vec[i32],
 }
+
+global var __regex_literal_cache_patterns: Vec[str] = Vec.new()
+global var __regex_literal_cache_flags: Vec[str] = Vec.new()
+global var __regex_literal_cache_values: Vec[Regex] = Vec.new()
 
 fn regex_make_flags(options: i32, flags: i32) -> RegexFlags:
     RegexFlags { options: options, flags: flags, }
@@ -137,8 +142,18 @@ pub fn Regex.compile_flags(pattern: str, flags: str) -> Result[Regex, RegexError
         Err(err) => Err(err)
 
 pub fn Regex.__compile_literal(pattern: str, flags: str, file: str, line: i32, col: i32) -> Regex:
+    var i: i32 = 0
+    while i < __regex_literal_cache_values.len() as i32:
+        if __regex_literal_cache_patterns.get(i as i64) == pattern and __regex_literal_cache_flags.get(i as i64) == flags:
+            return __regex_literal_cache_values.get(i as i64).clone()
+        i = i + 1
     match Regex.compile_flags(pattern, flags):
-        Ok(regex) => regex.clone()
+        Ok(regex) => {
+            __regex_literal_cache_patterns.push(pattern)
+            __regex_literal_cache_flags.push(flags)
+            __regex_literal_cache_values.push(regex.clone())
+            return regex.clone()
+        }
         Err(err) => {
             let msg = "invalid regex literal at column " ++ col.to_string() ++ ": " ++ err.message
             with_panic(msg, file, line)
@@ -338,10 +353,56 @@ fn Regex.replace_impl(self: &Self, text: str, repl: str, replace_all: bool) -> s
     out
 
 pub fn Regex.replace(self: &Self, text: str, repl: str) -> str:
-    self.replace_impl(text, repl, false)
+    with_regex_substitute(self.ptr, text, repl, if self.is_global(): 1 else: 0)
 
 pub fn Regex.replace_all(self: &Self, text: str, repl: str) -> str:
-    self.replace_impl(text, repl, true)
+    with_regex_substitute(self.ptr, text, repl, 1)
+
+pub fn Regex.replace_fn(self: &Self, text: str, replacement_callback: fn(&Captures) -> str) -> str:
+    var out = ""
+    var cursor: i32 = 0
+    while cursor <= text.len() as i32:
+        match self.captures_at(text, cursor):
+            Some(captures) => {
+                match captures.get(0):
+                    Some(found) => {
+                        out = out ++ with_str_slice(text, cursor as i64, found.start as i64) ++ replacement_callback(&captures)
+                        out = out ++ with_str_slice(text, found.end as i64, text.len())
+                        return out
+                    }
+                    None => break
+            }
+            None => break
+    text
+
+pub fn Regex.replace_all_fn(self: &Self, text: str, replacement_callback: fn(&Captures) -> str) -> str:
+    var out = ""
+    var cursor: i32 = 0
+    while cursor <= text.len() as i32:
+        match self.captures_at(text, cursor):
+            Some(captures) => {
+                match captures.get(0):
+                    Some(found) => {
+                        out = out ++ with_str_slice(text, cursor as i64, found.start as i64) ++ replacement_callback(&captures)
+                        if found.end == found.start:
+                            if found.end >= text.len() as i32:
+                                cursor = text.len() as i32 + 1
+                            else:
+                                out = out ++ with_str_slice(text, found.start as i64, found.start as i64 + 1)
+                                cursor = found.start + 1
+                        else:
+                            cursor = found.end
+                    }
+                    None => {
+                        out = out ++ with_str_slice(text, cursor as i64, text.len())
+                        return out
+                    }
+            }
+            None => {
+                out = out ++ with_str_slice(text, cursor as i64, text.len())
+                return out
+            }
+    out
 
 pub fn Regex.split(self: &Self, text: str) -> Vec[str]:
     self.splitn(text, 0)
@@ -397,3 +458,25 @@ pub fn Captures.by_name(self: &Self, name: str) -> Option[Match]:
 
 pub fn Captures.name(self: &Self, name: str) -> Option[Match]:
     self.by_name(name)
+
+pub fn Regex.capture_text(self: &Self, text: str, index: i32) -> str:
+    match self.captures(text):
+        Some(captures) => {
+            match captures.get(index):
+                Some(found) => found.text
+                None => ""
+        }
+        None => ""
+
+pub fn Regex.capture_name_text(self: &Self, text: str, name: str) -> str:
+    let lookup_name = if name.len() > 0 and name.byte_at(0) == 36:
+        with_str_slice(name, 1, name.len())
+    else:
+        name
+    match self.captures(text):
+        Some(captures) => {
+            match captures.name(lookup_name):
+                Some(found) => found.text
+                None => ""
+        }
+        None => ""

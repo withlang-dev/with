@@ -108,6 +108,10 @@ enum NodeKind: i32:
     NK_MOVE_ARG = 119
     // NK_REGEX_LIT: d0=pattern_sym, d1=flags_sym, d2=0
     NK_REGEX_LIT = 120
+    // NK_MATCH_OP: d0=lhs(str expr), d1=regex expr, d2=0
+    // NK_NEG_MATCH_OP: d0=lhs(str expr), d1=regex expr, d2=0
+    NK_MATCH_OP = 123
+    NK_NEG_MATCH_OP = 124
     // Type expressions
     NK_TYPE_NAMED = 80
     NK_TYPE_GENERIC = 81
@@ -1408,5 +1412,7 @@ fn AstPool.for_binding_is_pattern(self: AstPool, node: NodeId) -> bool:
 // NodeKind.NK_PAT_SLICE:     d0=extra_start, d1=head_count, d2=rest(sym,0=none)
 //                   extra: [has_rest(0/1), head_syms..., tail_count, tail_syms...]
 // NodeKind.NK_PAT_TYPED_BIND:  d0=binding(sym), d1=type(sym), d2=0
+// NodeKind.NK_MATCH_OP:     d0=lhs(str expr), d1=regex expr, d2=0
+// NodeKind.NK_NEG_MATCH_OP: d0=lhs(str expr), d1=regex expr, d2=0
 // NodeKind.NK_PAT_REGEX:    d0=pattern_sym, d1=flags_sym, d2=0
 // NodeKind.NK_PAT_ENUM_SHORTHAND: d0=name(sym), d1=extra_start, d2=binding_count

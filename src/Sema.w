@@ -391,6 +391,11 @@ type Sema {
     comp_resolved: HashMap[i32, i32],
     // Match value-pattern sidecar: pattern node → symbol compared by value.
     pattern_value_syms: HashMap[i32, i32],
+    // Regex literal metadata sidecars, keyed by NK_REGEX_LIT/NK_PAT_REGEX node.
+    regex_capture_counts: HashMap[i32, i32],
+    regex_capture_name_starts: HashMap[i32, i32],
+    regex_capture_name_counts: HashMap[i32, i32],
+    regex_capture_name_syms: Vec[i32],
 
     // Typed dump sidecar maps (keyed by span start byte offset)
     typed_expr_types: HashMap[i32, i32],
@@ -895,6 +900,10 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         implicit_binding_syms: Vec.new(),
         comp_resolved: sema_new_map_i32_i32(),
         pattern_value_syms: sema_new_map_i32_i32(),
+        regex_capture_counts: sema_new_map_i32_i32(),
+        regex_capture_name_starts: sema_new_map_i32_i32(),
+        regex_capture_name_counts: sema_new_map_i32_i32(),
+        regex_capture_name_syms: Vec.new(),
         typed_expr_types,
         typed_binding_types,
         typed_binding_names,

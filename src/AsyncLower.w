@@ -153,6 +153,11 @@ fn AsyncLower.walk_expr(self: AsyncLower, node: i32):
         self.walk_expr(async_ast_get_data2(self.ast, node))
         return
 
+    if kind == NodeKind.NK_MATCH_OP or kind == NodeKind.NK_NEG_MATCH_OP:
+        self.walk_expr(async_ast_get_data0(self.ast, node))
+        self.walk_expr(async_ast_get_data1(self.ast, node))
+        return
+
     if kind == NodeKind.NK_ASSIGN or kind == NodeKind.NK_PIPELINE or kind == NodeKind.NK_RANGE or kind == NodeKind.NK_INDEX:
         self.walk_expr(async_ast_get_data0(self.ast, node))
         self.walk_expr(async_ast_get_data1(self.ast, node))

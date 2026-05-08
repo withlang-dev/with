@@ -15,9 +15,40 @@ extern fn with_write(s: str) -> void
 extern fn with_eprint(s: str) -> void
 extern fn with_fs_file_exists(path: str) -> i32
 extern fn with_str_eq(a: str, b: str) -> i32
+extern fn with_regex_compile(pattern: str, options: i32, err_code: *mut i32, err_offset: *mut i32) -> *const i8
+extern fn with_regex_error_message(code: i32) -> str
+extern fn with_regex_code_free(code: *const i8) -> void
+extern fn with_regex_capture_count(code: *const i8) -> i32
+extern fn with_regex_capture_name_count(code: *const i8) -> i32
+extern fn with_regex_capture_name_at(code: *const i8, index: i32) -> str
 
 // docs/mut.md Rev 8 — P12 lockdown active. `&mut T` is rejected.
 const STRICT_NO_MUT_REF: i32 = 1
+
+fn sema_regex_compile_options(flags: str) -> i32:
+    var options = 0
+    var i: i64 = 0
+    while i < flags.len():
+        let ch = flags.byte_at(i)
+        if ch == 103:
+            // g is a With-level iteration/replacement flag, not a PCRE2 compile option.
+            options = options
+        else if ch == 105:
+            options = options | 8
+        else if ch == 109:
+            options = options | 1024
+        else if ch == 115:
+            options = options | 32
+        else if ch == 120:
+            options = options | 128
+        else if ch == 85:
+            options = options | 262144
+        else if ch == 117:
+            options = options | 524288 | 131072
+        else:
+            return -1
+        i = i + 1
+    options
 
 fn sema_dirname(path: str) -> str:
     var last_slash = -1
@@ -700,6 +731,11 @@ fn Sema.collect_function_labels(self: Sema, node: i32):
         self.collect_function_labels(self.ast.get_data2(node))
         return
 
+    if kind == NodeKind.NK_MATCH_OP or kind == NodeKind.NK_NEG_MATCH_OP:
+        self.collect_function_labels(self.ast.get_data0(node))
+        self.collect_function_labels(self.ast.get_data1(node))
+        return
+
     if kind == NodeKind.NK_UNARY:
         self.collect_function_labels(self.ast.get_data1(node))
         return
@@ -992,6 +1028,11 @@ fn Sema.check_expr_reachable_comptime_errors(self: Sema, node: i32):
     if kind == NodeKind.NK_BINARY:
         self.check_expr_reachable_comptime_errors(self.ast.get_data1(node))
         self.check_expr_reachable_comptime_errors(self.ast.get_data2(node))
+        return
+
+    if kind == NodeKind.NK_MATCH_OP or kind == NodeKind.NK_NEG_MATCH_OP:
+        self.check_expr_reachable_comptime_errors(self.ast.get_data0(node))
+        self.check_expr_reachable_comptime_errors(self.ast.get_data1(node))
         return
 
     if kind == NodeKind.NK_UNARY:
@@ -1492,6 +1533,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         if regex_ty == 0:
             self.emit_error("Regex type is not available; import std.regex", node)
             return 0 as TypeId
+        self.validate_regex_literal(node)
         return regex_ty as TypeId
 
     if kind == NodeKind.NK_FSTRING:
@@ -1510,6 +1552,19 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
 
     if kind == NodeKind.NK_IDENT:
         return self.check_ident(self.ast.get_data0(node), node) as TypeId
+
+    if kind == NodeKind.NK_MATCH_OP or kind == NodeKind.NK_NEG_MATCH_OP:
+        let lhs = self.ast.get_data0(node)
+        let rhs = self.ast.get_data1(node)
+        let lhs_ty = self.check_expr(lhs)
+        let rhs_ty = self.check_expr(rhs)
+        if lhs_ty != 0 and self.types_compatible(self.ty_str as i32, lhs_ty as i32) == 0:
+            self.emit_error("left side of regex match must be str-compatible", lhs)
+        let regex_ty = self.lookup_named_type_visible(self.syms.regex)
+        if regex_ty != 0 and rhs_ty != 0 and self.types_compatible(regex_ty, rhs_ty as i32) == 0:
+            self.emit_error("right side of regex match must be Regex", rhs)
+        self.typed_expr_types.insert(node, self.ty_bool as i32)
+        return self.ty_bool
 
     if kind == NodeKind.NK_BINARY:
         return self.check_binary(node) as TypeId
@@ -1983,6 +2038,65 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
     let suggestion = self.suggest_name(target_name, node)
     self.emit_error_with_suggestion("undefined variable", node, suggestion)
     0
+
+fn Sema.regex_literal_pattern(self: Sema, node: i32) -> str:
+    self.pool_resolve(self.ast.get_data0(node))
+
+fn Sema.regex_literal_flags(self: Sema, node: i32) -> str:
+    self.pool_resolve(self.ast.get_data1(node))
+
+fn Sema.validate_regex_literal(self: Sema, node: i32):
+    if self.regex_capture_counts.contains(node):
+        return
+    let pattern = self.regex_literal_pattern(node)
+    let flags = self.regex_literal_flags(node)
+    let options = sema_regex_compile_options(flags)
+    if options < 0:
+        self.emit_error("invalid regex flag", node)
+        self.regex_capture_counts.insert(node, 0)
+        return
+    var err_code: i32 = 0
+    var err_offset: i32 = 0
+    let code = with_regex_compile(pattern, options, &raw mut err_code, &raw mut err_offset)
+    if code as i64 == 0:
+        self.emit_error("invalid regex literal: " ++ with_regex_error_message(err_code), node)
+        self.regex_capture_counts.insert(node, 0)
+        return
+    let capture_count = with_regex_capture_count(code)
+    self.regex_capture_counts.insert(node, capture_count)
+    let name_start = self.regex_capture_name_syms.len() as i32
+    let name_count = with_regex_capture_name_count(code)
+    var ni = 0
+    while ni < name_count:
+        let name = with_regex_capture_name_at(code, ni)
+        self.regex_capture_name_syms.push(self.pool_lookup_symbol("$" ++ name))
+        ni = ni + 1
+    self.regex_capture_name_starts.insert(node, name_start)
+    self.regex_capture_name_counts.insert(node, name_count)
+    with_regex_code_free(code)
+
+fn Sema.regex_bind_capture_scope(self: Sema, regex_node: i32):
+    if regex_node == 0:
+        return
+    let kind = self.ast.kind(regex_node)
+    if kind != NodeKind.NK_REGEX_LIT and kind != NodeKind.NK_PAT_REGEX:
+        return
+    self.validate_regex_literal(regex_node)
+    let count = if self.regex_capture_counts.contains(regex_node): self.regex_capture_counts.get(regex_node).unwrap() else: 0
+    var i = 0
+    while i <= count:
+        let sym = self.pool_lookup_symbol("$" ++ i.to_string())
+        if sym != 0:
+            self.scope_put(sym, self.ty_str as i32, 0)
+        i = i + 1
+    let name_count = if self.regex_capture_name_counts.contains(regex_node): self.regex_capture_name_counts.get(regex_node).unwrap() else: 0
+    let name_start = if self.regex_capture_name_starts.contains(regex_node): self.regex_capture_name_starts.get(regex_node).unwrap() else: 0
+    var ni = 0
+    while ni < name_count:
+        let sym = self.regex_capture_name_syms.get((name_start + ni) as i64)
+        if sym != 0:
+            self.scope_put(sym, self.ty_str as i32, 0)
+        ni = ni + 1
 
 fn Sema.check_fstring(self: Sema, node: i32) -> i32:
     // Type-check each expression segment. Result type is always str.
@@ -2557,7 +2671,16 @@ fn Sema.check_if_expr(self: Sema, node: i32) -> i32:
     // Save scope states before then branch so early-return branches don't
     // permanently mark outer variables as MOVED when control continues past the if.
     let pre_then_states = self.save_scope_states()
+    var pushed_regex_capture_scope = 0
+    if self.ast.kind(cond) == NodeKind.NK_MATCH_OP:
+        let rhs = self.ast.get_data1(cond)
+        if self.ast.kind(rhs) == NodeKind.NK_REGEX_LIT:
+            self.push_scope()
+            pushed_regex_capture_scope = 1
+            self.regex_bind_capture_scope(rhs)
     let then_type = if outer_expected != 0: self.check_expr_with_expected(then_body, outer_expected) else: self.check_expr(then_body)
+    if pushed_regex_capture_scope != 0:
+        self.pop_scope()
     // If then branch always terminates, restore pre-then states for the continuation.
     if self.get_type_kind(self.resolve_alias(then_type as TypeId)) == TypeKind.TY_NEVER:
         self.restore_scope_states(pre_then_states)
@@ -3523,6 +3646,8 @@ fn Sema.check_match_expr(self: Sema, node: i32) -> i32:
 
         self.push_scope()
         self.check_pattern(pat, subject_type as i32)
+        if self.ast.kind(pat) == NodeKind.NK_PAT_REGEX:
+            self.regex_bind_capture_scope(pat)
         if guard != 0:
             self.check_expr(guard)
         let arm_expected: TypeId = if result_type != 0: result_type else: match_expected
@@ -3886,6 +4011,7 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
         let regex_ty = self.lookup_named_type_visible(self.syms.regex)
         if regex_ty != 0:
             let _ = self.ensure_exact_type(TypeKind.TY_REF, regex_ty, 0, 0)
+        self.validate_regex_literal(node)
         return
 
     if kind == NodeKind.NK_PAT_TYPED_BIND:
@@ -5178,6 +5304,10 @@ fn Sema.verify_tail_position(self: Sema, node: i32, fn_sym: i32, in_tail: i32):
     if kind == NodeKind.NK_BINARY:
         self.verify_tail_position(self.ast.get_data1(node), fn_sym, 0)
         self.verify_tail_position(self.ast.get_data2(node), fn_sym, 0)
+        return
+    if kind == NodeKind.NK_MATCH_OP or kind == NodeKind.NK_NEG_MATCH_OP:
+        self.verify_tail_position(self.ast.get_data0(node), fn_sym, 0)
+        self.verify_tail_position(self.ast.get_data1(node), fn_sym, 0)
         return
     if kind == NodeKind.NK_UNARY:
         self.verify_tail_position(self.ast.get_data1(node), fn_sym, 0)
@@ -7665,6 +7795,10 @@ fn Sema.expr_uses_symbol(self: Sema, node: i32, sym: i32) -> i32:
         if self.expr_uses_symbol(self.ast.get_data1(node), sym) != 0:
             return 1
         return self.expr_uses_symbol(self.ast.get_data2(node), sym)
+    if kind == NodeKind.NK_MATCH_OP or kind == NodeKind.NK_NEG_MATCH_OP:
+        if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
+            return 1
+        return self.expr_uses_symbol(self.ast.get_data1(node), sym)
     if kind == NodeKind.NK_UNARY:
         return self.expr_uses_symbol(self.ast.get_data1(node), sym)
     if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_COMPTIME:
@@ -7860,6 +7994,10 @@ fn Sema.expr_mutates_place(self: Sema, node: i32, sym: i32) -> i32:
         if self.expr_mutates_place(self.ast.get_data1(node), sym) != 0:
             return 1
         return self.expr_mutates_place(self.ast.get_data2(node), sym)
+    if kind == NodeKind.NK_MATCH_OP or kind == NodeKind.NK_NEG_MATCH_OP:
+        if self.expr_mutates_place(self.ast.get_data0(node), sym) != 0:
+            return 1
+        return self.expr_mutates_place(self.ast.get_data1(node), sym)
     if kind == NodeKind.NK_BLOCK:
         let extra_start = self.ast.get_data0(node)
         let stmt_count = self.ast.get_data1(node)
@@ -8005,6 +8143,10 @@ fn Sema.expr_has_nested_mutating_call_on(self: Sema, node: i32, recv_sym: i32) -
         if self.expr_has_nested_mutating_call_on(self.ast.get_data1(node), recv_sym) != 0:
             return 1
         return self.expr_has_nested_mutating_call_on(self.ast.get_data2(node), recv_sym)
+    if kind == NodeKind.NK_MATCH_OP or kind == NodeKind.NK_NEG_MATCH_OP:
+        if self.expr_has_nested_mutating_call_on(self.ast.get_data0(node), recv_sym) != 0:
+            return 1
+        return self.expr_has_nested_mutating_call_on(self.ast.get_data1(node), recv_sym)
     if kind == NodeKind.NK_UNARY:
         return self.expr_has_nested_mutating_call_on(self.ast.get_data1(node), recv_sym)
     if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_INDEX or kind == NodeKind.NK_GROUPED:
@@ -8245,6 +8387,10 @@ fn Sema.capture_is_field_only(self: Sema, node: i32, sym: i32) -> i32:
         if self.capture_is_field_only(self.ast.get_data1(node), sym) == 0:
             return 0
         return self.capture_is_field_only(self.ast.get_data2(node), sym)
+    if kind == NodeKind.NK_MATCH_OP or kind == NodeKind.NK_NEG_MATCH_OP:
+        if self.capture_is_field_only(self.ast.get_data0(node), sym) == 0:
+            return 0
+        return self.capture_is_field_only(self.ast.get_data1(node), sym)
     if kind == NodeKind.NK_UNARY:
         let operand = self.ast.get_data1(node)
         // &mut sym.field or &sym.field — check the operand
@@ -8379,6 +8525,10 @@ fn Sema.collect_capture_fields(self: Sema, node: i32, sym: i32):
     if kind == NodeKind.NK_BINARY:
         self.collect_capture_fields(self.ast.get_data1(node), sym)
         self.collect_capture_fields(self.ast.get_data2(node), sym)
+        return
+    if kind == NodeKind.NK_MATCH_OP or kind == NodeKind.NK_NEG_MATCH_OP:
+        self.collect_capture_fields(self.ast.get_data0(node), sym)
+        self.collect_capture_fields(self.ast.get_data1(node), sym)
         return
     if kind == NodeKind.NK_BLOCK:
         let ea = self.ast.get_data0(node)

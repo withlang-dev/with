@@ -1262,6 +1262,10 @@ pub fn str_from_cstr(s: *const u8) -> str:
     let len = cstr_len(s)
     make_str(s, len)
 
+@[c_export("with_str_from_bytes")]
+pub fn str_from_bytes(s: *const u8, len: i64) -> str:
+    alloc_str(s, len)
+
 @[c_export("with_str_hash")]
 pub fn str_hash(s: str) -> u64:
     fnv_hash(str_data(s), str_length(s))

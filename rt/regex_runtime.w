@@ -38,6 +38,7 @@ use std.re.pcre2_script_run
 extern fn with_panic(msg: str, file: str, line: i32) -> void
 extern fn with_str_clone(s: str) -> str
 extern fn with_str_from_cstr(s: *const u8) -> str
+extern fn with_str_from_bytes(s: *const u8, len: i64) -> str
 
 fn regex_runtime_malloc(size: c_ulong, data: *mut c_void) -> *mut c_void:
     let _ = data
@@ -244,3 +245,69 @@ pub fn regex_group_name_to_index_impl(code: *const i8, name: str) -> i32:
     if out < 0:
         return -1
     out
+
+@[c_export("with_regex_substitute")]
+pub fn regex_substitute_impl(code: *const i8, text: str, repl: str, replace_all: i32) -> str:
+    if code as i64 == 0:
+        return text
+    let gcontext = pcre2_general_context_create_8(regex_runtime_malloc, regex_runtime_free, null)
+    if gcontext as i64 == 0:
+        with_panic("with_regex_substitute(): general context creation failed", "", 0)
+        return ""
+    let match_data = pcre2_match_data_create_from_pattern_8(code as *const pcre2_real_code_8, gcontext)
+    if match_data as i64 == 0:
+        pcre2_general_context_free_8(gcontext)
+        with_panic("with_regex_substitute(): match data creation failed", "", 0)
+        return ""
+    let c_repl = regex_to_cstr(repl)
+    var options: c_uint = (PCRE2_SUBSTITUTE_UNSET_EMPTY | PCRE2_SUBSTITUTE_OVERFLOW_LENGTH) as c_uint
+    if replace_all != 0:
+        options = options | PCRE2_SUBSTITUTE_GLOBAL
+    var buffer_len: c_ulong = (text.len() + repl.len() + 64) as c_ulong
+    if buffer_len < 64:
+        buffer_len = 64
+    var buffer = with_alloc(buffer_len as i64 + 1) as *mut u8
+    var rc = pcre2_substitute_8(
+        code as *const pcre2_real_code_8,
+        text as *const u8,
+        text.len() as c_ulong,
+        0,
+        options,
+        match_data,
+        null,
+        c_repl,
+        repl.len() as c_ulong,
+        buffer,
+        &raw mut buffer_len
+    )
+    if rc == PCRE2_ERROR_NOMEMORY:
+        with_free(buffer as *mut u8)
+        buffer = with_alloc(buffer_len as i64 + 1) as *mut u8
+        rc = pcre2_substitute_8(
+            code as *const pcre2_real_code_8,
+            text as *const u8,
+            text.len() as c_ulong,
+            0,
+            options,
+            match_data,
+            null,
+            c_repl,
+            repl.len() as c_ulong,
+            buffer,
+            &raw mut buffer_len
+        )
+    if rc < 0:
+        let msg = "with_regex_substitute(): " ++ regex_error_message_impl(rc as i32)
+        with_free(c_repl as *i8)
+        with_free(buffer as *mut u8)
+        pcre2_match_data_free_8(match_data)
+        pcre2_general_context_free_8(gcontext)
+        with_panic(msg, "", 0)
+        return ""
+    unsafe: *((buffer as i64 + buffer_len as i64) as *mut u8) = 0
+    let result = with_str_from_bytes(buffer as *const u8, buffer_len as i64)
+    with_free(c_repl as *i8)
+    with_free(buffer as *mut u8)
+    pcre2_match_data_free_8(match_data)
+    pcre2_general_context_free_8(gcontext)
+    result

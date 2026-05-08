@@ -571,6 +571,11 @@ fn AstPool.ct_clone_tree_with_subst(self: AstPool, node: i32, subst_sym: i32, su
         let rhs = self.ct_clone_tree_with_subst(self.get_data2(node), subst_sym, subst_node, index_sym, index_node)
         return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), self.get_data0(node), lhs, rhs, self.literal_suffix(node))
 
+    if kind == NodeKind.NK_MATCH_OP or kind == NodeKind.NK_NEG_MATCH_OP:
+        let lhs = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
+        let rhs = self.ct_clone_tree_with_subst(self.get_data1(node), subst_sym, subst_node, index_sym, index_node)
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), lhs, rhs, self.get_data2(node), self.literal_suffix(node))
+
     if kind == NodeKind.NK_ASSIGN or kind == NodeKind.NK_PIPELINE:
         let lhs = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
         let rhs = self.ct_clone_tree_with_subst(self.get_data1(node), subst_sym, subst_node, index_sym, index_node)

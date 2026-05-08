@@ -76,29 +76,27 @@ Current status: **32/32 files, 287/287 functions, 0 stubs, 0 errors**
 make test-pcre2   # full pipeline: migrate -> prepare -> stage -> verify
 ```
 
-### Step 4: Build as object files -- PARTIAL
+### Step 4: Build as object files -- DONE
 
-Individual modules build successfully via `with build --emit-obj`
-(verified by selfhost tests: `pcre2_match_heapframe`,
-`pcre2_compile_builds`). Full static library linking not yet wired.
+The migrated modules are promoted under `lib/std/re/` and linked
+through the native With stdlib/runtime paths. Self-host tests cover
+module compilation and the regex runtime object is built as part of
+`make build`.
 
-### Step 5: Test with pcre2test -- PARTIAL
+### Step 5: Test with pcre2test -- DONE
 
-`scripts/verify_pcre2_works.sh` builds a test harness that runs
-the migrated PCRE2 against 20 pattern/subject test cases and
-diffs output byte-for-byte against system `/opt/homebrew/bin/pcre2test`.
-All 20 cases pass.
-
-Full PCRE2 test suite (`testdata/testinput1` etc.) not yet run.
-Requires building migrated `pcre2test` binary.
+`make regex-test` builds the migrated `pcre2test` binary and runs
+the full PCRE2 corpus (`testdata/testinput1` etc.). The older
+`scripts/verify_pcre2_works.sh` smoke harness remains useful for
+small byte-for-byte comparisons against system PCRE2.
 
 ---
 
-## Phase 2: With Wrapper API
+## Phase 2: With Wrapper API -- COMPLETE
 
-### Step 6: Create `lib/std/regex.w`
+### Step 6: Create `lib/std/regex.w` -- DONE
 
-~300 lines wrapping the migrated PCRE2 internals:
+`lib/std/regex.w` wraps the migrated PCRE2 internals:
 
 ```
 use std.re
@@ -131,43 +129,52 @@ pub fn Regex.compile(pattern: &str) -> Result[Regex, RegexError]:
     Ok(Regex { code, pattern: pattern.to_owned(), ... })
 ```
 
-### Step 7: Match and capture methods
+### Step 7: Match and capture methods -- DONE
 
 ```
 pub fn Regex.is_match(self: &Self, text: &str) -> bool
 pub fn Regex.find(self: &Self, text: &str) -> Option[Match]
 pub fn Regex.captures(self: &Self, text: &str) -> Option[Captures]
+pub fn Regex.captures_all(self: &Self, text: &str) -> Vec[Captures]
 ```
 
-### Step 8: Replace and split
+### Step 8: Replace and split -- DONE
 
 ```
+pub fn Regex.replace(self: &Self, text: &str, repl: &str) -> str
 pub fn Regex.replace_all(self: &Self, text: &str, repl: &str) -> str
+pub fn Regex.replace_fn(self: &Self, text: &str, f: fn(&Captures) -> str) -> str
+pub fn Regex.replace_all_fn(self: &Self, text: &str, f: fn(&Captures) -> str) -> str
 pub fn Regex.split(self: &Self, text: &str) -> Vec[str]
+pub fn Regex.splitn(self: &Self, text: &str, n: i32) -> Vec[str]
 ```
 
 ---
 
-## Phase 3: Language Integration
+## Phase 3: Language Integration -- COMPLETE
 
-### Step 9: Lexer — `TK_REGEX_LIT`
+### Step 9: Lexer — `TK_REGEX_LIT` -- DONE
 
 Add regex literal syntax `/pattern/flags` to the lexer.
 
-### Step 10: Parser — `=~` and capture bindings
+### Step 10: Parser — `=~` and capture bindings -- DONE
 
 `NK_REGEX_LIT`, `NK_MATCH_OP`, `NK_NEG_MATCH_OP` AST nodes.
 Capture binding injection (`$0`, `$1`, `$name`) in if/match bodies.
 
-### Step 11: Sema — type checking
+### Step 11: Sema — type checking -- DONE
 
 Regex as a builtin struct type. Regex literal validation at
 compile time.
 
-### Step 12: Codegen — lazy statics
+### Step 12: Codegen — lazy literal compilation -- DONE
 
-Each regex literal compiles to a module-level lazy-initialized
-`Regex`. `=~` desugars to `Regex.captures()` + Option check.
+Each regex literal lowers to `Regex.__compile_literal(pattern,
+flags, file, line, col)`. The stdlib keeps a process-wide lazy cache
+keyed by `(pattern, flags)`, so repeated literal use reuses compiled
+PCRE2 code. `=~` lowers to `Regex.is_match`; capture-bearing `if`
+conditions and regex match arms bind `$0`, `$1`, and `$name` in the
+body scope.
 
 ---
 
@@ -177,7 +184,7 @@ Each regex literal compiles to a module-level lazy-initialized
 
 Link PCRE2's sljit JIT compiler as a C object for hot patterns.
 
-### Step 14: Compile-time validation
+### Step 14: Compile-time validation -- DONE
 
 Run `pcre2_compile_8` at comptime for regex literals. Report
 invalid patterns as compile errors with source location.
@@ -191,18 +198,18 @@ Phase 1: Migrate + Build
   Step 1 (migrate)  DONE
   Step 2 (fix)      DONE
   Step 3 (prepare)  DONE
-  Step 4 (build)    PARTIAL — individual modules build, library not wired
-  Step 5 (test)     PARTIAL — 20/20 verify cases pass, full suite TODO
+  Step 4 (build)    DONE — promoted under lib/std/re and built by stdlib/runtime paths
+  Step 5 (test)     DONE — full pcre2test suite runs through make regex-test
 
 Phase 2: Wrapper API
-  Step 6 (Regex type) → Step 7 (match/capture) → Step 8 (replace/split)
+  Step 6 (Regex type) DONE → Step 7 (match/capture) DONE → Step 8 (replace/split) DONE
 
 Phase 3: Language Integration
-  Step 9 (lexer) → Step 10 (parser) → Step 11 (sema) → Step 12 (codegen)
+  Step 9 (lexer) DONE → Step 10 (parser) DONE → Step 11 (sema) DONE → Step 12 (codegen) DONE
 
 Phase 4: Optimization
   Step 13 (JIT) — independent
-  Step 14 (comptime) — depends on Phase 3
+  Step 14 (comptime) DONE
 ```
 
 ---
@@ -213,11 +220,11 @@ Phase 4: Optimization
 |---|---|---|
 | Migrated PCRE2 | ~160,000 | Done — auto-generated, 0 errors, 287/287 functions |
 | Fix-up patches | 0 | Not needed — all fixes in migrator |
-| Wrapper API | ~300 | TODO |
-| Lexer changes | ~80 | TODO |
-| Parser changes | ~150 | TODO |
-| Sema changes | ~80 | TODO |
-| Codegen changes | ~100 | TODO |
+| Wrapper API | ~500 | Done |
+| Lexer changes | ~80 | Done |
+| Parser changes | ~150 | Done |
+| Sema changes | ~200 | Done |
+| Codegen changes | ~250 | Done |
 | **Total new hand-written code** | **~700** | Plus ~160K auto-migrated |
 
 ---
