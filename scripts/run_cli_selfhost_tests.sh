@@ -3962,6 +3962,53 @@ expect_cli_one_liners() {
     return
   fi
 
+  if ! printf 'error 42\nok\nwarning 7\n' | "$SELFHOST_BIN" -n 'if line =~ /(?<kind>error|warning) (\d+)/: print(f"{nr}: {$kind.upper()} code={$2}")' >"$tmpdir/out" 2>"$tmpdir/err"; then
+    echo "FAIL(cli-selfhost-one-liner-regex-fstring-run) one_liners"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+  if [[ "$(cat "$tmpdir/out")" != $'1: ERROR code=42\n3: WARNING code=7' ]]; then
+    echo "FAIL(cli-selfhost-one-liner-regex-fstring-output) one_liners"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! printf '[INFO] boot\n[WARN] slow query\n[ERROR] db timeout\n' | "$SELFHOST_BIN" -n 'if line =~ /^\[(?<level>ERROR|WARN)\]\s+(?<msg>.*)$/: print(f"{nr}: {$level} {$msg}")' >"$tmpdir/out" 2>"$tmpdir/err"; then
+    echo "FAIL(cli-selfhost-one-liner-regex-escaped-named-run) one_liners"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+  if [[ "$(cat "$tmpdir/out")" != $'2: WARN slow query\n3: ERROR db timeout' ]]; then
+    echo "FAIL(cli-selfhost-one-liner-regex-escaped-named-output) one_liners"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  local implicit_src="$tmpdir/implicit_regex_fstring.w"
+  cat >"$implicit_src" <<'EOF'
+use std.io
+use std.regex
+for line in stdin.lines():
+    if line =~ /(?<kind>error|warning) (\d+)/:
+        print(f"{$kind.upper()} code={$2}")
+EOF
+  if ! printf 'error 42\nok\n' | "$SELFHOST_BIN" run "$implicit_src" >"$tmpdir/out" 2>"$tmpdir/err"; then
+    echo "FAIL(cli-selfhost-implicit-main-regex-fstring-run) one_liners"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+  if [[ "$(cat "$tmpdir/out")" != "ERROR code=42" ]]; then
+    echo "FAIL(cli-selfhost-implicit-main-regex-fstring-output) one_liners"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
   if run_cli "$tmpdir/out" "$tmpdir/err" -e 'print("x")' -n 'print(line)'; then
     echo "FAIL(cli-selfhost-one-liner-mutual-exclusion) one_liners"
     failures=$((failures + 1))
@@ -3993,6 +4040,30 @@ expect_cli_one_liners() {
   fi
   if ! file_has_literal "$tmpdir/err" "<cli -n #1>:1:23"; then
     echo "FAIL(cli-selfhost-one-liner-diag-n-location) one_liners"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if printf 'error 42\n' | "$SELFHOST_BIN" -n 'if line =~ /(?<kind>error|warning) (\d+)/: print(f"{kind}")' >"$tmpdir/out" 2>"$tmpdir/err"; then
+    echo "FAIL(cli-selfhost-one-liner-diag-fstring-capture-run) one_liners"
+    failures=$((failures + 1))
+    return
+  fi
+  if ! file_has_literal "$tmpdir/err" "<cli -n #1>:1:"; then
+    echo "FAIL(cli-selfhost-one-liner-diag-fstring-capture-location) one_liners"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+  if file_has_literal "$tmpdir/err" "use std."; then
+    echo "FAIL(cli-selfhost-one-liner-diag-fstring-capture-source) one_liners"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+  if file_has_literal "$tmpdir/err" "one-liner compilation failed"; then
+    echo "FAIL(cli-selfhost-one-liner-diag-wrapper-noise) one_liners"
     cat "$tmpdir/err" || true
     failures=$((failures + 1))
     return

@@ -2,6 +2,10 @@
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
+**Changelog v6.9:** CLI one-liners (`with -e`, `with -n`, `with -p`)
+are specified as normal compiled With entry sources with implicit-main
+semantics, stdin line bindings, `args`, semicolon splitting, and regex
+capture behavior (§18.5a).
 **Changelog v6.8:** Three universal body forms (§29.13) — inline colon,
 indented colon, and braced — now apply to every block-introducing construct
 including `defer`, `errdefer`, `comptime`, and `unsafe`. `if` additionally
@@ -5053,7 +5057,7 @@ The binding position is a full pattern, not just an identifier:
 
 ```
 for (key, value) in map:
-    println(f"{key} = {value}")
+    print(f"{key} = {value}")
 
 for { name, age, .. } in users:
     print(f"{name}: {age}")
@@ -8308,9 +8312,223 @@ with test
 with fmt
 with doc [--open]
 with repl
+with -e <code>
+with -n <code>
+with -p <code>
 ```
 
 Cross-compilation is a normal mode, not special.
+
+### 18.5a CLI One-Liners
+
+The `with` CLI supports small programs directly on the command line:
+
+```
+with -e 'print("hello")'
+cat log.txt | with -n 'if line =~ /error (\d+)/: print($1)'
+cat names.txt | with -p 'line = line.upper()'
+```
+
+One-liners are not interpreted and do not use a separate execution
+model. The CLI constructs a synthetic With entry source file, compiles
+it through the normal build/run pipeline, runs the resulting binary,
+and returns that binary's exit code. The generated source uses top-level
+executable statements and the normal implicit-main feature; the CLI
+does not generate an explicit `fn main` wrapper.
+
+Exactly one one-liner mode may be used in a single invocation:
+
+| Mode | Meaning |
+|------|---------|
+| `-e CODE` | Compile and run `CODE` as top-level executable statements |
+| `-n CODE` | Loop over stdin lines and run `CODE` for each line |
+| `-p CODE` | Like `-n`, then print the current `line` after `CODE` |
+
+Multiple flags of the same mode are allowed and concatenate as separate
+generated lines:
+
+```
+with -e 'var total = 0' -e 'total = total + 1' -e 'print(total)'
+```
+
+One-liner code cannot be combined with a source file argument.
+
+#### 18.5a.1 Generated Environment
+
+All one-liner modes implicitly import common modules, including I/O,
+string helpers, regex support, math, collections, and builtins. The
+exact generated helper names are implementation-defined; the following
+bindings are user-visible:
+
+| Binding | Modes | Type / Meaning |
+|---------|-------|----------------|
+| `args` | all | `Vec[str]` containing arguments after `--` |
+| `line` | `-n`, `-p` | current stdin line, without trailing newline or CRLF `\r` |
+| `nr` | `-n`, `-p` | 1-based line number, `i64` |
+
+Arguments after `--` are passed to `args` and are not parsed as With CLI
+options:
+
+```
+with -e 'for a in args: print(a)' -- foo bar
+```
+
+#### 18.5a.2 `-e`
+
+`-e CODE` emits `CODE` as top-level executable statements after the
+implicit imports and `args` binding:
+
+```
+with -e 'print("hello")'
+```
+
+is equivalent, modulo implementation-defined helper names, to an entry
+file containing:
+
+```
+use std.io
+use std.str
+use std.regex
+use std.math
+use std.collections
+use std.builtins
+
+let args: Vec[str] = ...
+print("hello")
+```
+
+#### 18.5a.3 `-n`
+
+`-n CODE` emits a top-level loop over `stdin.lines()`. For each input
+line, `line` is bound to the current line and `nr` is incremented before
+the user code runs:
+
+```
+cat access.log | with -n 'if line =~ /404/: print(f"{nr}: {line}")'
+```
+
+is equivalent to:
+
+```
+var nr: i64 = 0
+for line in stdin.lines():
+    nr = nr + 1
+    if line =~ /404/: print(f"{nr}: {line}")
+```
+
+`stdin.lines()` used by one-liners removes the trailing newline. For
+CRLF input, the trailing `\r` is also removed.
+
+#### 18.5a.4 `-p`
+
+`-p CODE` is like `-n`, but prints `line` after `CODE` runs. `line` is a
+mutable per-line binding in `-p`, so assignments affect the printed
+value:
+
+```
+cat names.txt | with -p 'line = line.upper()'
+```
+
+is equivalent to:
+
+```
+var nr: i64 = 0
+for __line in stdin.lines():
+    nr = nr + 1
+    var line = __line
+    line = line.upper()
+    print(line)
+```
+
+For filtering, use `-n`; `-p` always prints once per input line.
+
+#### 18.5a.5 Semicolons
+
+Shell one-liners often need multiple statements. Within `-e`, `-n`, and
+`-p` code strings, semicolons act as line separators:
+
+```
+with -e 'var x = 0; x = x + 1; print(x)'
+```
+
+The semicolon pass is lexical. It must not split semicolons inside
+string literals, regex literals, character literals, or balanced
+delimiter groups. Braced blocks may still contain ordinary semicolon
+separators:
+
+```
+with -e 'if true { print("yes"); print("also yes") }'
+```
+
+#### 18.5a.6 Regex One-Liners
+
+Regex one-liners use the normal With regex syntax:
+
+| Feature | Syntax |
+|---------|--------|
+| literal | `/pattern/flags` |
+| positive match | `text =~ /pattern/` |
+| negative match | `text !~ /pattern/` |
+| numbered captures | `$0`, `$1`, `$2`, ... |
+| named captures | `$name` |
+
+Capture bindings are created only for direct positive regex conditions
+whose right side is a regex literal:
+
+```
+cat log.txt | with -n 'if line =~ /status=(\d+)/: print($1)'
+cat log.txt | with -n 'if line =~ /^\[(?<level>ERROR|WARN)\]\s+(?<msg>.*)$/: print(f"{nr}: {$level} {$msg}")'
+```
+
+Named captures include the `$` prefix. A regex capture named `level`
+is referenced as `$level`, including inside f-string holes:
+
+```
+print(f"{$level}: {$msg}")
+```
+
+`!~` is valid for boolean matching but does not create capture
+bindings:
+
+```
+cat log.txt | with -n 'if line !~ /debug/: print(line)'
+```
+
+Compound boolean expressions do not create capture bindings for their
+subexpressions. To combine capture use with other conditions, nest the
+logic:
+
+```
+cat log.txt | with -n 'if line =~ /error (\d+)/ { if line.len() > 0: print($1) }'
+```
+
+Regex literals are ordinary `Regex` values in one-liners:
+
+```
+with -e 'let r = /hello/i; print(r.is_match("HELLO"))'
+```
+
+#### 18.5a.7 Diagnostics
+
+Compiler errors from one-liner user code must point at the user's CLI
+argument, not at generated imports, helper bindings, temporary files, or
+wrapper code. Diagnostic source names identify the originating argument:
+
+```
+with -e 'let x = '
+```
+
+reports against `<cli -e #1>`. Multiple same-mode code arguments use
+`#1`, `#2`, and so on. Failed one-liner compilation should emit the
+normal compiler diagnostic and exit non-zero; it must not add vague
+wrapper errors such as "one-liner compilation failed".
+
+#### 18.5a.8 Non-Goals
+
+One-liners do not add shell execution, `s///` substitution syntax, a
+REPL execution model, or a separate data-processing mini-language.
+Replacement, splitting, and more advanced regex operations use the
+normal `std.regex` API.
 
 ### 18.6 Standard Library Design
 
