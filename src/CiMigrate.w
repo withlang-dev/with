@@ -391,6 +391,19 @@ fn ci_migrate_preamble_text() -> str:
     p = p ++ "extern fn strcmp(a: *const i8, b: *const i8) -> i32\n"
     p = p ++ "extern fn strncmp(a: *const i8, b: *const i8, n: i64) -> i32\n"
     p = p ++ "extern fn memchr(s: *const c_void, c: i32, n: i64) -> *mut c_void\n"
+    p = p ++ "extern fn isalpha(c: i32) -> i32\n"
+    p = p ++ "extern fn isdigit(c: i32) -> i32\n"
+    p = p ++ "extern fn isalnum(c: i32) -> i32\n"
+    p = p ++ "extern fn isspace(c: i32) -> i32\n"
+    p = p ++ "extern fn isupper(c: i32) -> i32\n"
+    p = p ++ "extern fn islower(c: i32) -> i32\n"
+    p = p ++ "extern fn isxdigit(c: i32) -> i32\n"
+    p = p ++ "extern fn isprint(c: i32) -> i32\n"
+    p = p ++ "extern fn isgraph(c: i32) -> i32\n"
+    p = p ++ "extern fn ispunct(c: i32) -> i32\n"
+    p = p ++ "extern fn iscntrl(c: i32) -> i32\n"
+    p = p ++ "extern fn tolower(c: i32) -> i32\n"
+    p = p ++ "extern fn toupper(c: i32) -> i32\n"
     p = p ++ ci_migrate_render_preamble_fn("fn string_len(s: *const i8) -> i64", "strlen(s)", "strlen(s)")
     p = p ++ ci_migrate_render_preamble_fn("fn string_cmp(a: *const i8, b: *const i8) -> i32", "strcmp(a, b)", "strcmp(a, b)")
     p = p ++ ci_migrate_render_preamble_fn("fn string_find_char(s: *const i8, c: i32) -> *const i8", "(memchr((s as *const c_void), c, strlen(s)) as *const i8)", "(memchr((s as *const c_void), c, strlen(s)) as *const i8)")
@@ -775,13 +788,6 @@ fn ci_migrate_file_inner(input_path: str, output_path: str, project_active: bool
     g_macro_type_names = ""
     g_macro_type_aliases = ""
     g_migrate_file_error = ""
-
-    // C4: post-process output — unsigned -1 in assignment/binding context.
-    // ~(size_t)0 evaluates to -1 as a signed constant, but in unsigned context
-    // it represents ULONG_MAX. Replace "= (-1" and "else: (-1" with wrapping form.
-    if ci_migrate_shared_defs_active():
-        output = ci_replace_sparse(output, "= (-1", "= ((0 -% 1)")
-        output = ci_replace_sparse(output, "else: (-1", "else: ((0 -% 1)")
 
     output = ci_migrate_insert_libc_use(output)
 

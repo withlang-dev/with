@@ -2852,6 +2852,64 @@ pub unsafe fn ci_cursor_location(session: i64, cursor_idx: i32) -> str:
     clang_disposeString(presumed_file)
     session_make_str(s, &buf as *const [1024]u8 as *const u8)
 
+@[c_export("with_ci_cursor_expansion_location")]
+pub unsafe fn ci_cursor_expansion_location(session: i64, cursor_idx: i32) -> str:
+    let s = session as *mut CImportSession
+    if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return ""
+    let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
+    let loc = clang_getCursorLocation(cursor)
+    var file: *mut u8 = 0 as *mut u8
+    var line_val: u32 = 0
+    var col_val: u32 = 0
+    clang_getExpansionLocation(loc, &raw mut file, &raw mut line_val, &raw mut col_val, 0 as *mut u32)
+    if file as i64 == 0:
+        return ""
+    let fname = clang_getFileName(file)
+    let fname_str = clang_getCString(fname)
+    if fname_str as i64 == 0 or *fname_str == 0:
+        clang_disposeString(fname)
+        return ""
+    var buf: [1024]u8 = [0 as u8; 1024]
+    var pos: i64 = 0
+    buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, fname_str)
+    buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, ":\0" as *const u8)
+    buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, line_val as i64)
+    buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, ":\0" as *const u8)
+    buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, col_val as i64)
+    clang_disposeString(fname)
+    session_make_str(s, &buf as *const [1024]u8 as *const u8)
+
+@[c_export("with_ci_cursor_spelling_location")]
+pub unsafe fn ci_cursor_spelling_location(session: i64, cursor_idx: i32) -> str:
+    let s = session as *mut CImportSession
+    if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return ""
+    let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
+    let loc = clang_getCursorLocation(cursor)
+    var file: *mut u8 = 0 as *mut u8
+    var line_val: u32 = 0
+    var col_val: u32 = 0
+    clang_getSpellingLocation(loc, &raw mut file, &raw mut line_val, &raw mut col_val, 0 as *mut u32)
+    if file as i64 == 0:
+        var expansion_file: *mut u8 = 0 as *mut u8
+        clang_getExpansionLocation(loc, &raw mut expansion_file, 0 as *mut u32, 0 as *mut u32, 0 as *mut u32)
+        file = expansion_file
+    if file as i64 == 0:
+        return ""
+    let fname = clang_getFileName(file)
+    let fname_str = clang_getCString(fname)
+    if fname_str as i64 == 0 or *fname_str == 0:
+        clang_disposeString(fname)
+        return ""
+    var buf: [1024]u8 = [0 as u8; 1024]
+    var pos: i64 = 0
+    buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, fname_str)
+    buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, ":\0" as *const u8)
+    buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, line_val as i64)
+    buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, ":\0" as *const u8)
+    buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, col_val as i64)
+    clang_disposeString(fname)
+    session_make_str(s, &buf as *const [1024]u8 as *const u8)
+
 unsafe fn source_location_expansion_offset(loc: CXSourceLocation, file: *mut *mut u8, offset: *mut u32):
     clang_getExpansionLocation(loc, file, 0 as *mut u32, 0 as *mut u32, offset)
     if (*file as i64) == 0:
@@ -2949,6 +3007,44 @@ unsafe fn cursor_source_text_from_cursor(s: *mut CImportSession, cursor: CXCurso
     with_free(text)
     result
 
+unsafe fn cursor_expansion_text_from_cursor(s: *mut CImportSession, cursor: CXCursor) -> str:
+    let range = clang_getCursorExtent(cursor)
+    var file: *mut u8 = 0 as *mut u8
+    var start_off: u32 = 0
+    var end_off: u32 = 0
+    if source_range_expansion_offsets(range, &raw mut file, &raw mut start_off, &raw mut end_off) == 0:
+        return ""
+    if end_off <= start_off: return ""
+    var buf_size: u64 = 0
+    let contents = clang_getFileContents((*s).tu, file, &raw mut buf_size)
+    if contents as i64 == 0 or end_off as u64 > buf_size: return ""
+    let len = (end_off - start_off) as i64
+    let text = with_alloc(len + 1)
+    with_memcpy(text, (contents as i64 + start_off as i64) as *const u8, len)
+    *((text as i64 + len) as *mut u8) = 0
+    let result = session_make_str(s, text as *const u8)
+    with_free(text)
+    result
+
+unsafe fn cursor_spelling_text_from_cursor(s: *mut CImportSession, cursor: CXCursor) -> str:
+    let range = clang_getCursorExtent(cursor)
+    var file: *mut u8 = 0 as *mut u8
+    var start_off: u32 = 0
+    var end_off: u32 = 0
+    if source_range_spelling_offsets(range, &raw mut file, &raw mut start_off, &raw mut end_off) == 0:
+        return ""
+    if end_off <= start_off: return ""
+    var buf_size: u64 = 0
+    let contents = clang_getFileContents((*s).tu, file, &raw mut buf_size)
+    if contents as i64 == 0 or end_off as u64 > buf_size: return ""
+    let len = (end_off - start_off) as i64
+    let text = with_alloc(len + 1)
+    with_memcpy(text, (contents as i64 + start_off as i64) as *const u8, len)
+    *((text as i64 + len) as *mut u8) = 0
+    let result = session_make_str(s, text as *const u8)
+    with_free(text)
+    result
+
 unsafe fn cursor_token_text_from_cursor(s: *mut CImportSession, cursor: CXCursor) -> str:
     let tu = clang_Cursor_getTranslationUnit(cursor)
     if tu as i64 == 0:
@@ -3014,6 +3110,20 @@ pub unsafe fn ci_cursor_source_text(session: i64, cursor_idx: i32) -> str:
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return ""
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
     cursor_source_text_from_cursor(s, cursor)
+
+@[c_export("with_ci_cursor_expansion_text")]
+pub unsafe fn ci_cursor_expansion_text(session: i64, cursor_idx: i32) -> str:
+    let s = session as *mut CImportSession
+    if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return ""
+    let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
+    cursor_expansion_text_from_cursor(s, cursor)
+
+@[c_export("with_ci_cursor_spelling_text")]
+pub unsafe fn ci_cursor_spelling_text(session: i64, cursor_idx: i32) -> str:
+    let s = session as *mut CImportSession
+    if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return ""
+    let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
+    cursor_spelling_text_from_cursor(s, cursor)
 
 @[c_export("with_ci_cursor_token_text")]
 pub unsafe fn ci_cursor_token_text(session: i64, cursor_idx: i32) -> str:
