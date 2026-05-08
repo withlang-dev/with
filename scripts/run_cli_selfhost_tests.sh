@@ -635,11 +635,12 @@ EOF
 
   if ! file_has_literal "$out_w" '(__local_cb.groupinfo = (&(unsafe: __local_stack_groupinfo[0]) as *mut c_uint))' \
     || ! file_has_literal "$out_w" '(__local_cb.parsed_pattern = (&(unsafe: __local_stack_parsed_pattern[0]) as *mut c_uint))' \
-    || ! file_has_literal "$out_w" '(__local_pp = (__local_pp +% 1))' \
+    || { ! file_has_literal "$out_w" '(__local_pp = (__local_pp +% 1))' && ! file_has_literal "$out_w" '(__local_pp = ((__local_pp as c_uint) +% (1 as c_uint)))'; } \
     || ! file_has_regex "$out_w" '\(__local_skipatstart = \(*__local_pp\)*\)' \
     || ! file_forbid_regex "$out_w" '\(__local_skipatstart = \((__local_pp) = ' \
     || ! awk '
       /\(__local_pp = \(__local_pp \+% 1\)\)/ { seen_pp = NR }
+      /\(__local_pp = \(\(__local_pp as c_uint\) \+% \(1 as c_uint\)\)\)/ { seen_pp = NR }
       /\(__local_skipatstart = \(*__local_pp\)*\)/ { seen_skip = NR }
       END {
         exit !(seen_pp > 0 && seen_skip > 0 && seen_pp < seen_skip)
@@ -1251,10 +1252,24 @@ expect_migrate_initializer_regressions() {
 #define STR_QUESTION_MARK "?"
 #define STRING_AB0 STR_A STR_B "\0"
 #define STRING_plb0 STR_p STR_l STR_b "\0"
+#define STR_LP "("
+#define STR_RP ")"
+#define STR_STAR "*"
+#define STR_N "N"
+#define STR_U "U"
+#define STR_L "L"
+#define STR_STAR_NUL STR_LP STR_STAR STR_N STR_U STR_L STR_RP
 
 static const char names[] = "\0" /* comment between fragments */ STRING_AB0;
 static const char alias_names[] = STRING_plb0;
+static const unsigned char error_texts[8] = "a\0" "b";
+static const signed char signed_bytes[3] = "\377";
 static const char *punct = STR_EXCLAMATION_MARK STR_QUESTION_MARK;
+static const char *octal_backslash_string = "\134";
+static const char *concat_octal_string = "\133" "x" "\135";
+static const char *macro_star_nul = STR_STAR_NUL;
+
+extern int consume_string(const char *);
 
 int f(int x) {
 label:
@@ -1263,6 +1278,11 @@ label:
   if (x) goto label;
   return temp[0] + null_str[0];
 }
+
+int octal_backslash(void) { return '\134'; }
+int hex_backslash(void) { return '\x5c'; }
+int escaped_backslash(void) { return '\\'; }
+int call_macro_string(void) { return consume_string(STR_STAR_NUL); }
 EOF
 
   if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
@@ -1272,13 +1292,28 @@ EOF
     return
   fi
 
+  local char_backslash_count
+  char_backslash_count=$(grep -c 'return 92' "$out_w" || true)
+
   if ! grep -Fq 'names:' "$out_w" \
     || ! grep -Eq '\[0, 65, 66, 0(, 0)?\]' "$out_w" \
     || ! grep -Fq 'alias_names:' "$out_w" \
     || ! grep -Eq '\[112, 108, 98, 0(, 0)?\]' "$out_w" \
+    || ! grep -Fq 'error_texts:' "$out_w" \
+    || ! grep -Fq '[97, 0, 98, 0, 0, 0, 0, 0]' "$out_w" \
+    || ! grep -Fq 'signed_bytes:' "$out_w" \
+    || ! grep -Fq '[-1, 0, 0]' "$out_w" \
     || ! grep -Fq 'var punct: *const i8 = "!?"' "$out_w" \
+    || ! grep -Fq 'var octal_backslash_string: *const i8 = "\x5c"' "$out_w" \
+    || ! grep -Fq 'var concat_octal_string: *const i8 = "\x5bx\x5d"' "$out_w" \
+    || ! grep -Fq 'var macro_star_nul: *const i8 = "(*NUL)"' "$out_w" \
+    || ! grep -Fq 'consume_string("(*NUL)")' "$out_w" \
     || ! grep -Eq 'var __local_temp(__goto_[0-9]+_[0-9]+)?: \[6\]u8' "$out_w" \
     || ! grep -Eq '__local_null_str(__goto_[0-9]+_[0-9]+)? = \[205\]' "$out_w" \
+    || [ "$char_backslash_count" -lt 3 ] \
+    || grep -Fq 'return 134' "$out_w" \
+    || grep -Fq '"\134"' "$out_w" \
+    || grep -Eq ': \[[0-9]+\](u8|i8|c_char|c_schar|c_uchar) = "' "$out_w" \
     || grep -Fq 'temp = 6' "$out_w" \
     || grep -Fq '/*' "$out_w"; then
     echo "FAIL(cli-selfhost-migrate-output) initializer_regressions"
@@ -1295,6 +1330,116 @@ EOF
   fi
 
   echo "PASS(cli-selfhost-migrate) initializer_regressions"
+}
+
+expect_migrate_libc_ctype_calls_preserve_c_semantics() {
+  local case_dir="$tmpdir/migrate_libc_ctype_case"
+  local src="$case_dir/libc_ctype.c"
+  local out_w="$case_dir/libc_ctype.w"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+#include <ctype.h>
+
+int classify(int c) {
+  return isalpha(c) + isdigit(c) + isalnum(c) + isspace(c) +
+    isupper(c) + islower(c) + isxdigit(c) + isprint(c) +
+    isgraph(c) + ispunct(c) + iscntrl(c) + tolower(c) + toupper(c);
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) libc_ctype_calls"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! grep -Fq 'extern fn isalpha(c: i32) -> i32' "$out_w" \
+    || ! grep -Fq 'extern fn tolower(c: i32) -> i32' "$out_w" \
+    || ! grep -Fq 'isalpha(__param_c)' "$out_w" \
+    || ! grep -Fq 'isalnum(__param_c)' "$out_w" \
+    || ! grep -Fq 'isgraph(__param_c)' "$out_w" \
+    || ! grep -Fq 'tolower(__param_c)' "$out_w" \
+    || grep -Fq 'is_alpha(__param_c)' "$out_w" \
+    || grep -Fq 'is_alnum(__param_c)' "$out_w" \
+    || grep -Fq 'to_lower(__param_c)' "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate-output) libc_ctype_calls"
+    sed -n '1,220p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" check "$out_w"; then
+    echo "FAIL(cli-selfhost-check) libc_ctype_calls"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) libc_ctype_calls"
+}
+
+expect_migrate_macro_initializer_and_unsigned_minus() {
+  local case_dir="$tmpdir/migrate_macro_initializer_unsigned_minus_case"
+  local src="$case_dir/macro_initializer_unsigned_minus.c"
+  local out_w="$case_dir/macro_initializer_unsigned_minus.w"
+  mkdir -p "$case_dir"
+
+  cat >"$src" <<'EOF'
+typedef unsigned long size_t;
+
+#define MY_SIZE_MAX ((size_t)-1)
+#define COPY_ONE(dst_, src_, length_) do { \
+  size_t chkmc_length = length_; \
+  if (chkmc_length > 0) { \
+    (dst_)[0] = (src_)[0]; \
+  } \
+} while (0)
+
+int too_large(size_t current, size_t need) {
+  return current > (MY_SIZE_MAX - need) / 2;
+}
+
+int repeat_too_large(size_t replen, size_t need, int count) {
+  return count > 0 && replen > (MY_SIZE_MAX - need) / count;
+}
+
+int copy_after_goto(char *dst, const char *src, int flag) {
+  if (flag) goto copy;
+  return 0;
+copy:
+  COPY_ONE(dst, src, 3);
+  return (int)dst[0];
+}
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate) macro_initializer_unsigned_minus"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! grep -Eq '\(-1 as [^)]+\)|\(0 as [^)]+\) -% 1' "$out_w" \
+    || grep -Fq '((0 -% 1)' "$out_w" \
+    || ! grep -Eq '/ \(__param_count as [^)]+\)' "$out_w" \
+    || ! grep -Fq '__local_chkmc_length' "$out_w" \
+    || ! grep -Eq '\(__local_chkmc_length[^=]*= 3\)' "$out_w"; then
+    echo "FAIL(cli-selfhost-migrate-output) macro_initializer_unsigned_minus"
+    sed -n '1,220p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" check "$out_w"; then
+    echo "FAIL(cli-selfhost-check) macro_initializer_unsigned_minus"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) macro_initializer_unsigned_minus"
 }
 
 expect_migrate_tentative_global_owner() {
@@ -2097,7 +2242,10 @@ if case_4352_lines != ["0"]:
     raise SystemExit(1)
 
 case_8704 = re.search(r"(?ms)^\s+8704 =>\n(?P<body>.*?)(?=^\s+_ =>)", text)
-if case_8704 is None or "(__local_pptr = __local_pptr + 2)" not in case_8704.group("body"):
+if case_8704 is None:
+    raise SystemExit(1)
+case_8704_body = case_8704.group("body")
+if "(__local_pptr = __local_pptr + 2)" not in case_8704_body and "(__local_pptr = __local_pptr + ((2 as isize) as usize))" not in case_8704_body:
     raise SystemExit(1)
 PY
   then
@@ -3837,6 +3985,8 @@ expect_pcre2_prepare_shared_lets
 expect_pcre2_check_existing_main
 expect_std_re_shared_dependency_imports
 expect_migrate_initializer_regressions
+expect_migrate_libc_ctype_calls_preserve_c_semantics
+expect_migrate_macro_initializer_and_unsigned_minus
 expect_migrate_tentative_global_owner
 expect_migrate_cross_file_tentative_global_owner
 expect_migrate_noop_pointer_cast_exprs
