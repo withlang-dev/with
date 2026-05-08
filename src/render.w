@@ -325,6 +325,12 @@ fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
         let rhs = pool.get_data2(node)
         return prefix ++ "(" ++ render_expr(pool, intern, (lhs) as NodeId, 0) ++ " " ++ bin_op_str(op) ++ " " ++ render_expr(pool, intern, (rhs) as NodeId, 0) ++ ")"
 
+    if kind == NodeKind.NK_MATCH_OP or kind == NodeKind.NK_NEG_MATCH_OP:
+        let lhs = pool.get_data0(node)
+        let rhs = pool.get_data1(node)
+        let op = if kind == NodeKind.NK_MATCH_OP: " =~ " else: " !~ "
+        return prefix ++ "(" ++ render_expr(pool, intern, (lhs) as NodeId, 0) ++ op ++ render_expr(pool, intern, (rhs) as NodeId, 0) ++ ")"
+
     if kind == NodeKind.NK_UNARY:
         let op = pool.get_data0(node)
         let operand = pool.get_data1(node)

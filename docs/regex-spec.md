@@ -177,14 +177,14 @@ The parser injects the let bindings at scope entry.
 ### Codegen
 
 The regex literal compiles to a call to the runtime regex
-compiler at program startup (lazy, once). The compiled `Regex`
-object is stored in a module-level static. Subsequent uses
-reuse the compiled object.
+compiler through a lazy cache. The compiler emits the literal
+pattern/flags and source location; `Regex.__compile_literal`
+validates and compiles on first use, then reuses compiled PCRE2
+code for subsequent uses of the same `(pattern, flags)` pair.
 
 ```
 // What the compiler emits for: let pattern = /^\d+$/
-static __regex_0: Regex = Regex.__compile_unchecked("^\\d+$", "")
-let pattern = __regex_0
+let pattern = Regex.__compile_literal("^\\d+$", "", file, line, col)
 ```
 
 ---
@@ -439,36 +439,37 @@ Everything PCRE2 supports, which is everything Perl supports:
 | Run `with migrate` on PCRE2 source | DONE — 32/32 files, 287/287 functions, ~160K lines |
 | Fix compilation errors in migrated output | DONE — all errors fixed in migrator (978 + 893 + 3) |
 | Prepare and promote to `lib/std/re/` | DONE — 0 errors, 0 stubs |
-| Build migrated library as object files | PARTIAL — individual modules build, library not wired |
-| Verify against system pcre2test | PARTIAL — 20/20 test cases pass byte-for-byte |
-| Run full PCRE2 test suite | TODO — requires building migrated pcre2test binary |
+| Build migrated library as object files | DONE — wired into stdlib/runtime paths |
+| Verify against system pcre2test | DONE — full migrated `pcre2test` corpus runs through `make regex-test` |
+| Run full PCRE2 test suite | DONE — all tests run, no skipped corpus |
 
 ### Phase 2: With wrapper API (`lib/std/regex.w`)
 
 | Step | Status |
 |---|---|
-| `Regex` type with Drop | TODO |
-| `Regex.compile` | TODO |
-| `Regex.is_match`, `find`, `find_all` | TODO |
-| `Regex.captures` | TODO |
-| `Regex.replace`, `replace_all` | TODO |
-| `Regex.split` | TODO |
+| `Regex` type with Drop | DONE |
+| `Regex.compile` | DONE |
+| `Regex.is_match`, `find`, `find_all` | DONE |
+| `Regex.captures` | DONE |
+| `Regex.replace`, `replace_all` | DONE |
+| `Regex.replace_fn`, `replace_all_fn` | DONE |
+| `Regex.split` | DONE |
 
 ### Phase 3: Language integration
 
 | Step | Status |
 |---|---|
-| Lexer — `TK_REGEX_LIT`, `/` disambiguation | TODO |
-| Parser — `=~`/`!~`, capture bindings | TODO |
-| Sema — Regex type, compile-time validation | TODO |
-| Codegen — lazy statics, `=~` desugaring | TODO |
+| Lexer — `TK_REGEX_LIT`, `/` disambiguation | DONE |
+| Parser — `=~`/`!~`, capture bindings | DONE |
+| Sema — Regex type, compile-time validation | DONE |
+| Codegen — lazy literal cache, `=~` desugaring | DONE |
 
 ### Phase 4: Optimization (future)
 
 | Step | Status |
 |---|---|
 | JIT — link sljit compiler | TODO |
-| Compile-time regex validation | TODO |
+| Compile-time regex validation | DONE |
 
 ---
 

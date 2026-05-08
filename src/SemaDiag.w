@@ -128,6 +128,8 @@ fn typed_expr_kind_name(kind: i32) -> str:
     if kind == NodeKind.NK_BOOL_LIT: return "bool_literal"
     if kind == NodeKind.NK_IDENT: return "ident"
     if kind == NodeKind.NK_BINARY: return "binary"
+    if kind == NodeKind.NK_MATCH_OP: return "regex_match"
+    if kind == NodeKind.NK_NEG_MATCH_OP: return "regex_neg_match"
     if kind == NodeKind.NK_UNARY: return "unary"
     if kind == NodeKind.NK_CALL: return "call"
     if kind == NodeKind.NK_FIELD_ACCESS: return "field_access"
@@ -581,6 +583,11 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
     if kind == NodeKind.NK_BINARY:
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data2(node), indent + 1)
+        return out
+
+    if kind == NodeKind.NK_MATCH_OP or kind == NodeKind.NK_NEG_MATCH_OP:
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         return out
 
     if kind == NodeKind.NK_UNARY:

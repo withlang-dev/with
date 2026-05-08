@@ -2615,10 +2615,9 @@ fn Parser.parse_precedence(self: Parser, min_prec: i32) -> NodeId:
         if op_code == 500:  // pipeline
             lhs = self.pool.add_node(NodeKind.NK_PIPELINE, self.pool.get_start(lhs), self.prev_end(), lhs, rhs, 0)
         else if op_code == 506:  // =~
-            lhs = self.build_regex_match_call(lhs, rhs, self.pool.get_start(lhs), self.prev_end())
+            lhs = self.pool.add_node(NodeKind.NK_MATCH_OP, self.pool.get_start(lhs), self.prev_end(), lhs, rhs, 0)
         else if op_code == 507:  // !~
-            let call = self.build_regex_match_call(lhs, rhs, self.pool.get_start(lhs), self.prev_end())
-            lhs = self.pool.add_node(NodeKind.NK_UNARY, self.pool.get_start(lhs), self.prev_end(), UnaryOp.UOP_NOT, call, 0)
+            lhs = self.pool.add_node(NodeKind.NK_NEG_MATCH_OP, self.pool.get_start(lhs), self.prev_end(), lhs, rhs, 0)
         else if op_code == 501:  // reverse pipeline
             lhs = self.pool.add_node(NodeKind.NK_PIPELINE, self.pool.get_start(lhs), self.prev_end(), rhs, lhs, 0)
         else if op_code == 504:  // backward compose <<

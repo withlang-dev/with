@@ -1546,6 +1546,92 @@ fn MirBuilder.lower_regex_literal(self: MirBuilder, node: i32) -> i32:
         return self.body.new_operand(OperandKind.OK_COPY, result_place)
     self.body.new_operand(OperandKind.OK_MOVE, result_place)
 
+fn MirBuilder.regex_ref_operand(self: MirBuilder, regex_place: i32) -> i32:
+    let regex_ty = self.sema.lookup_named_type_visible(self.sema.syms.regex)
+    let regex_ref_ty = self.sema.ensure_exact_type(TypeKind.TY_REF, regex_ty, 0, 0) as i32
+    let regex_ref_tmp = self.new_temp(regex_ref_ty)
+    let regex_ref_place = self.place_for_local(regex_ref_tmp)
+    let regex_ref_rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, regex_place, 0)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, regex_ref_place, regex_ref_rv, self.ast.get_start(self.cur_node))
+    self.body.new_operand(OperandKind.OK_COPY, regex_ref_place)
+
+fn MirBuilder.lower_regex_method_bool(self: MirBuilder, regex_place: i32, text_place: i32, method_name: str) -> i32:
+    let method_sym = self.sema.pool_lookup_symbol(method_name)
+    let fn_sym = self.sema.lookup_method_fn(self.sema.syms.regex, method_sym)
+    let fn_op = self.lower_var(fn_sym, 0, 0)
+    let args: Vec[i32] = Vec.new()
+    args.push(self.regex_ref_operand(regex_place))
+    args.push(self.body.new_operand(OperandKind.OK_COPY, text_place))
+    let args_id = self.body.new_call_args(args)
+    let result_local = self.new_temp(self.sema.ty_bool)
+    let result_place = self.place_for_local(result_local)
+    let next_bb = self.new_block()
+    self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
+    self.switch_to(next_bb)
+    self.body.new_operand(OperandKind.OK_COPY, result_place)
+
+fn MirBuilder.lower_regex_is_match_places(self: MirBuilder, regex_place: i32, text_place: i32) -> i32:
+    self.lower_regex_method_bool(regex_place, text_place, "is_match")
+
+fn MirBuilder.lower_regex_match_expr(self: MirBuilder, node: i32) -> i32:
+    let lhs = self.ast.get_data0(node)
+    let rhs = self.ast.get_data1(node)
+    let text_op = self.lower_expr(lhs)
+    let text_place = self.materialize_operand(text_op, self.expr_type(lhs), self.ast.get_start(lhs))
+    let regex_op = self.lower_expr(rhs)
+    let regex_place = self.materialize_operand(regex_op, self.expr_type(rhs), self.ast.get_start(rhs))
+    self.lower_regex_is_match_places(regex_place, text_place)
+
+fn MirBuilder.lower_regex_capture_text_call(self: MirBuilder, regex_place: i32, text_place: i32, index: i32, name_sym: i32) -> i32:
+    let method_name = if name_sym != 0: "capture_name_text" else: "capture_text"
+    let method_sym = self.sema.pool_lookup_symbol(method_name)
+    let fn_sym = self.sema.lookup_method_fn(self.sema.syms.regex, method_sym)
+    let fn_op = self.lower_var(fn_sym, 0, 0)
+    let args: Vec[i32] = Vec.new()
+    args.push(self.regex_ref_operand(regex_place))
+    args.push(self.body.new_operand(OperandKind.OK_COPY, text_place))
+    if name_sym != 0:
+        args.push(self.lower_str_lit(name_sym))
+    else:
+        args.push(self.int_const_operand(index as i64, self.sema.ty_i32))
+    let args_id = self.body.new_call_args(args)
+    let result_local = self.new_temp(self.sema.ty_str)
+    let result_place = self.place_for_local(result_local)
+    let next_bb = self.new_block()
+    self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
+    self.switch_to(next_bb)
+    self.body.new_operand(OperandKind.OK_MOVE, result_place)
+
+fn MirBuilder.bind_regex_capture_local(self: MirBuilder, sym: i32, value_op: i32, span: i32):
+    if sym == 0:
+        return
+    let local_id = self.body.new_local(self.sema.ty_str as i32, 0, sym, 1)
+    self.bind_local(sym, local_id)
+    self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, span)
+    self.schedule_drop(local_id, DropKind.DK_VALUE)
+    self.assign_operand_to_place(self.place_for_local(local_id), value_op, span)
+
+fn MirBuilder.lower_regex_capture_bindings(self: MirBuilder, regex_node: i32, regex_place: i32, text_place: i32):
+    if regex_node == 0:
+        return
+    let capture_count = if self.sema.regex_capture_counts.contains(regex_node): self.sema.regex_capture_counts.get(regex_node).unwrap() else: 0
+    var i = 0
+    while i <= capture_count:
+        let sym = self.sema.pool_lookup_symbol("$" ++ i.to_string())
+        if sym != 0:
+            let value_op = self.lower_regex_capture_text_call(regex_place, text_place, i, 0)
+            self.bind_regex_capture_local(sym, value_op, self.ast.get_start(regex_node))
+        i = i + 1
+    let name_count = if self.sema.regex_capture_name_counts.contains(regex_node): self.sema.regex_capture_name_counts.get(regex_node).unwrap() else: 0
+    let name_start = if self.sema.regex_capture_name_starts.contains(regex_node): self.sema.regex_capture_name_starts.get(regex_node).unwrap() else: 0
+    var ni = 0
+    while ni < name_count:
+        let sym = self.sema.regex_capture_name_syms.get((name_start + ni) as i64)
+        if sym != 0:
+            let value_op = self.lower_regex_capture_text_call(regex_place, text_place, 0, sym)
+            self.bind_regex_capture_local(sym, value_op, self.ast.get_start(regex_node))
+        ni = ni + 1
+
 fn MirBuilder.lower_fmt_to_str(self: MirBuilder, operand: i32, node: i32) -> i32:
     // Emit MirIntrinsic.MIR_INTRINSIC_FMT_TO_STR call to format a non-str value to str.
     let fn_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("fmt_to_str"), self.sema.ty_str)
@@ -2647,7 +2733,22 @@ fn MirBuilder.lower_block(self: MirBuilder, node: i32) -> i32:
     result
 
 fn MirBuilder.lower_if(self: MirBuilder, cond_expr: i32, then_expr: i32, else_expr_opt: i32, node: i32) -> i32:
-    let cond_op = self.lower_expr(cond_expr)
+    var cond_op = 0
+    var regex_capture_node = 0
+    var regex_capture_place = 0
+    var regex_text_place = 0
+    if self.ast.kind(cond_expr) == NodeKind.NK_MATCH_OP:
+        let lhs = self.ast.get_data0(cond_expr)
+        let rhs = self.ast.get_data1(cond_expr)
+        let text_op = self.lower_expr(lhs)
+        regex_text_place = self.materialize_operand(text_op, self.expr_type(lhs), self.ast.get_start(lhs))
+        let regex_op = self.lower_expr(rhs)
+        regex_capture_place = self.materialize_operand(regex_op, self.expr_type(rhs), self.ast.get_start(rhs))
+        cond_op = self.lower_regex_is_match_places(regex_capture_place, regex_text_place)
+        if self.ast.kind(rhs) == NodeKind.NK_REGEX_LIT:
+            regex_capture_node = rhs
+    else:
+        cond_op = self.lower_expr(cond_expr)
 
     let then_bb = self.new_block()
     let else_bb = self.new_block()
@@ -2669,6 +2770,8 @@ fn MirBuilder.lower_if(self: MirBuilder, cond_expr: i32, then_expr: i32, else_ex
         self.expected_type = result_ty
 
     self.switch_to(then_bb)
+    if regex_capture_node != 0:
+        self.lower_regex_capture_bindings(regex_capture_node, regex_capture_place, regex_text_place)
     let then_op = self.lower_expr(then_expr)
     self.assign_operand_to_place(result_place, then_op, self.ast.get_start(then_expr))
     self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
@@ -3997,6 +4100,13 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
             return self.lower_pattern(self.ast.get_extra(p_start), scrutinee_place)
         return out
 
+    if pk == NodeKind.NK_PAT_REGEX:
+        let regex_val = self.lower_regex_literal(pat_node)
+        let regex_ty = self.sema.lookup_named_type_visible(self.sema.syms.regex)
+        let regex_place = self.materialize_operand(regex_val, regex_ty, self.ast.get_start(pat_node))
+        self.lower_regex_capture_bindings(pat_node, regex_place, scrutinee_place)
+        return out
+
     if pk == NodeKind.NK_PAT_TYPED_BIND:
         let tb_bind_sym = self.ast.get_data0(pat_node)
         let tb_type_sym = self.ast.get_data1(pat_node)
@@ -4961,6 +5071,18 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
 
     if kind == NodeKind.NK_REGEX_LIT:
         return self.lower_regex_literal(node)
+
+    if kind == NodeKind.NK_MATCH_OP:
+        return self.lower_regex_match_expr(node)
+
+    if kind == NodeKind.NK_NEG_MATCH_OP:
+        let match_op = self.lower_regex_match_expr(node)
+        let one = self.lower_bool_lit(1)
+        let rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_NEQ, match_op, one)
+        let tmp = self.new_temp(self.sema.ty_bool)
+        let place = self.place_for_local(tmp)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, self.ast.get_start(node))
+        return self.body.new_operand(OperandKind.OK_COPY, place)
 
     if kind == NodeKind.NK_STRING_LIT or kind == NodeKind.NK_C_STRING_LIT:
         return self.lower_str_lit(self.ast.get_data0(node))

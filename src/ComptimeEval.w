@@ -1509,6 +1509,8 @@ fn ComptimeEvaluator.eval_expr(self: ComptimeEvaluator, node: i32) -> ComptimeCo
         return self.eval_field_access(node)
     if kind == NodeKind.NK_UNARY:
         return self.eval_unary(node)
+    if kind == NodeKind.NK_MATCH_OP or kind == NodeKind.NK_NEG_MATCH_OP:
+        return self.unsupported(node)
     if kind == NodeKind.NK_BINARY:
         return self.eval_binary(node)
     if kind == NodeKind.NK_BLOCK:

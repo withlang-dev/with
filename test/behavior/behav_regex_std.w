@@ -35,14 +35,30 @@ fn test_captures:
     assert(re.capture_index("key").unwrap() == 1)
     assert(re.capture_index("value").unwrap() == 2)
 
+fn bracket_pair(caps: &Captures) -> str:
+    "[" ++ caps.name("key").unwrap().text ++ ":" ++ caps.get(2).unwrap().text ++ "]"
+
 fn test_replace_split:
     let digits = Regex.compile("\\d+").unwrap()
     assert(digits.replace("a1b22c", "#") == "a#b22c")
     assert(digits.replace_all("a1b22c", "#") == "a#b#c")
 
+    let global_digits = Regex.compile_flags("\\d+", "g").unwrap()
+    assert(global_digits.replace("a1b22c", "#") == "a#b#c")
+
     let pair = Regex.compile("(?<key>\\w+)=(\\w+)").unwrap()
     assert(pair.replace("x=one y=two", "${key}:$2") == "x:one y=two")
     assert(pair.replace_all("x=one y=two", "$1:$$:$2") == "x:$:one y:$:two")
+
+    let bracketed = pair.replace_fn("x=one y=two", bracket_pair)
+    assert(bracketed == "[x:one] y=two")
+
+    let all_bracketed = pair.replace_all_fn("x=one y=two", bracket_pair)
+    assert(all_bracketed == "[x:one] [y:two]")
+
+    let zero = Regex.compile("x").unwrap().replace("x", "\x00")
+    assert(zero.len() == 1)
+    assert(zero.byte_at(0) == 0)
 
     let parts = digits.split("a1b22c")
     assert(parts.len() == 3)
@@ -61,10 +77,23 @@ fn test_literals_and_operators:
     assert("abc123" =~ /\d+/)
     assert("abc" !~ /\d+/)
 
+    if "key=value" =~ /^(?<key>\w+)=(\w+)$/:
+        assert($0 == "key=value")
+        assert($key == "key")
+        assert($1 == "key")
+        assert($2 == "value")
+    else:
+        assert(false)
+
     let kind = match "abc123":
         /\d+$/ => "number suffix"
         _ => "other"
     assert(kind == "number suffix")
+
+    let parsed = match "answer=42":
+        /^(?<name>\w+)=(\d+)$/ => $name ++ ":" ++ $2
+        _ => "miss"
+    assert(parsed == "answer:42")
 
 fn main:
     test_compile_match_find()
