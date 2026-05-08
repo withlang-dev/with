@@ -518,7 +518,6 @@ fn run_one_liner_command(argc: i32, one: CliOneLiner, no_std: bool, alloc_mode: 
         )
     let built = comp.build_entry_binary_from_source_to_path(source_name, source, bin_path)
     if built == "":
-        with_eprint("error: one-liner compilation failed")
         return 1
     comp.print_warnings()
     let rc = with_exec_binary(built)

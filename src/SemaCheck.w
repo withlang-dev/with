@@ -2054,11 +2054,56 @@ fn Sema.regex_literal_pattern(self: Sema, node: i32) -> str:
 fn Sema.regex_literal_flags(self: Sema, node: i32) -> str:
     self.pool_resolve(self.ast.get_data1(node))
 
+fn sema_regex_hex_digit_value(ch: i32) -> i32:
+    if ch >= 48 and ch <= 57:
+        return ch - 48
+    if ch >= 97 and ch <= 102:
+        return ch - 87
+    if ch >= 65 and ch <= 70:
+        return ch - 55
+    -1
+
+fn sema_regex_decode_literal_escapes(text: str) -> str:
+    var out = ""
+    let len = text.len() as i32
+    var i = 0
+    while i < len:
+        let ch = text[i]
+        if ch == 92 and i + 1 < len:
+            i = i + 1
+            let esc = text[i]
+            if esc == 120 and i + 2 < len:
+                let hi = sema_regex_hex_digit_value(text[i + 1])
+                let lo = sema_regex_hex_digit_value(text[i + 2])
+                if hi >= 0 and lo >= 0:
+                    out = out ++ str_from_byte(hi * 16 + lo)
+                    i = i + 2
+                else:
+                    out = out ++ text.slice(i as i64, i as i64 + 1)
+            else if esc == 110:
+                out = out ++ "\n"
+            else if esc == 116:
+                out = out ++ "\t"
+            else if esc == 114:
+                out = out ++ "\r"
+            else if esc == 48:
+                out = out ++ str_from_byte(0)
+            else if esc == 92:
+                out = out ++ "\\"
+            else if esc == 34:
+                out = out ++ "\""
+            else:
+                out = out ++ text.slice(i as i64, i as i64 + 1)
+        else:
+            out = out ++ text.slice(i as i64, i as i64 + 1)
+        i = i + 1
+    out
+
 fn Sema.validate_regex_literal(self: Sema, node: i32):
     if self.regex_capture_counts.contains(node):
         return
-    let pattern = self.regex_literal_pattern(node)
-    let flags = self.regex_literal_flags(node)
+    let pattern = sema_regex_decode_literal_escapes(self.regex_literal_pattern(node))
+    let flags = sema_regex_decode_literal_escapes(self.regex_literal_flags(node))
     let options = sema_regex_compile_options(flags)
     if options < 0:
         self.emit_error("invalid regex flag", node)
