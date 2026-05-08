@@ -12,6 +12,8 @@ use CiPrint
 use CImport
 
 extern fn with_arg_at(idx: i32) -> str
+extern fn with_write_stdout(s: str) -> void
+extern fn with_flush_stdout() -> void
 
 // Width-slice mode: when > 0, skip declarations belonging to
 // non-target PCRE2 width families during migration.
@@ -677,6 +679,8 @@ fn ci_migrate_file_inner(input_path: str, output_path: str, project_active: bool
     // Pre-scan: collect demoted types and prepopulate names
     let demoted_types = ci_collect_demoted_types(session, count)
     let typedef_shadowed = ci_prepopulate_names(session, count)
+    g_macro_type_names = ci_collect_macro_type_names(session)
+    g_macro_type_aliases = ci_collect_macro_type_aliases(session)
 
     // Collect extern var names for macro reference detection
     var extern_vars = ""
@@ -759,14 +763,11 @@ fn ci_migrate_file_inner(input_path: str, output_path: str, project_active: bool
 
     // Member function detection
     output = output ++ ci_detect_member_functions(session, count, translated_structs)
-    g_macro_type_names = ci_collect_macro_type_names(session)
-    g_macro_type_aliases = ci_collect_macro_type_aliases(session)
-    with_cimport_dispose(session)
-
     // Macro translation via separate preprocessor pass
     if macro_session != 0:
-        output = output ++ ci_translate_macros(macro_session, extern_vars, macro_include)
+        output = output ++ ci_translate_macros(macro_session, session, extern_vars, macro_include)
         with_cimport_dispose_macros(macro_session)
+    with_cimport_dispose(session)
     g_migrate_macro_values = ""
     g_migrate_macro_session = 0
     g_migrate_preprocessed_source = ""
@@ -916,6 +917,14 @@ fn ci_migrate_directory_output_path(input_dir: str, output_dir: str, file_path: 
         out_path = f"{output_dir}/{file_path}.w"
     out_path
 
+fn ci_migrate_print_progress(file_path: str, current: i32, total: i32):
+    let base = ci_migrate_path_basename(file_path)
+    var percent = 0
+    if total > 0:
+        percent = (current * 100) / total
+    with_write_stdout(f"migrate: processing {base} - {current}/{total}, {percent}% completed\n")
+    with_flush_stdout()
+
 fn ci_migrate_ensure_parent_dir(path: str):
     var dir_end = path.len() as i32 - 1
     while dir_end > 0 and path.byte_at(dir_end as i64) != 47:
@@ -931,11 +940,13 @@ fn ci_migrate_directory_filewise(input_dir: str, output_dir: str, files: Vec[str
     let self_bin = with_arg_at(0)
     var migrated = 0
     var i = 0
+    let total = files.len() as i32
     while i < files.len() as i32:
         let file_path = files.get(i as i64)
         let base = ci_migrate_path_basename(file_path)
         let out_path = ci_migrate_directory_output_path(input_dir, output_dir, file_path)
         ci_migrate_ensure_parent_dir(out_path)
+        ci_migrate_print_progress(file_path, i + 1, total)
         let fragment = f"{fragment_dir}/{base}.defs"
         fragments.push(fragment)
         let cmd = ci_migrate_shell_arg(self_bin) ++ " migrate " ++ ci_migrate_shell_arg(input_dir) ++ " -o " ++ ci_migrate_shell_arg(output_dir) ++ " " ++ g_migrate_reinvoke_args ++ " --migrate-one " ++ ci_migrate_shell_arg(base) ++ " --shared-fragment " ++ ci_migrate_shell_arg(fragment)
@@ -1002,6 +1013,7 @@ pub fn migrate_c_directory(input_dir: str, output_dir: str, exclude_basenames: s
         fi = fi + 1
 
     fi = 0
+    let total_files = sorted_files.len() as i32
     while fi < sorted_files.len() as i32:
         let file_path = sorted_files.get(fi as i64)
         if g_migrate_directory_one_basename.len() > 0 and ci_migrate_path_basename(file_path) != g_migrate_directory_one_basename:
@@ -1011,6 +1023,8 @@ pub fn migrate_c_directory(input_dir: str, output_dir: str, exclude_basenames: s
         let out_path = ci_migrate_directory_output_path(input_dir, output_dir, file_path)
         ci_migrate_ensure_parent_dir(out_path)
 
+        if g_migrate_directory_one_basename.len() == 0:
+            ci_migrate_print_progress(file_path, fi + 1, total_files)
         let rc = ci_migrate_file_inner(file_path, out_path, true, &project)
         if rc == 0:
             files_migrated = files_migrated + 1

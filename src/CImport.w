@@ -68,6 +68,7 @@ extern fn with_cimport_struct_field_anon_field_name(session: i64, idx: i32, fiel
 extern fn with_cimport_struct_field_anon_field_type(session: i64, idx: i32, field: i32, sub_field: i32) -> str
 extern fn with_cimport_struct_is_packed(session: i64, idx: i32) -> i32
 extern fn with_cimport_struct_field_offset(session: i64, idx: i32, field: i32) -> i64
+extern fn with_cimport_record_field_offset_by_name(session: i64, type_name: str, field_name: str) -> i64
 extern fn with_cimport_struct_size(session: i64, idx: i32) -> i64
 extern fn with_cimport_struct_field_size(session: i64, idx: i32, field: i32) -> i64
 extern fn with_cimport_fn_storage_class(session: i64, idx: i32) -> i32
@@ -366,6 +367,8 @@ fn process_c_import(header_spec: str) -> str:
     // This prevents collisions in the common C pattern: typedef struct Foo { ... } Foo;
     var translated_structs = ""
     let typedef_shadowed = ci_prepopulate_names(session, count)
+    g_macro_type_names = ci_collect_macro_type_names(session)
+    g_macro_type_aliases = ci_collect_macro_type_aliases(session)
 
     var i = 0
     while i < count:
@@ -407,15 +410,12 @@ fn process_c_import(header_spec: str) -> str:
     // Member function detection (Zig-style): attach C functions whose first
     // parameter is *StructType as methods of that struct.
     output = output ++ ci_detect_member_functions(session, count, translated_structs)
-    g_macro_type_names = ci_collect_macro_type_names(session)
-    g_macro_type_aliases = ci_collect_macro_type_aliases(session)
-    with_cimport_dispose(session)
-
     // Extract macros using a separate preprocessor pass
     let macro_session = with_cimport_parse_macros(include_text)
     if macro_session != 0:
-        output = output ++ ci_translate_macros(macro_session, extern_vars, include_text)
+        output = output ++ ci_translate_macros(macro_session, session, extern_vars, include_text)
         with_cimport_dispose_macros(macro_session)
+    with_cimport_dispose(session)
     g_macro_type_names = ""
     g_macro_type_aliases = ""
 
@@ -1682,7 +1682,38 @@ fn ci_collect_object_macro_type_map(session: i64, macro_source: str) -> str:
         return ""
     with_cimport_collect_object_macro_types(macro_source, names)
 
-fn ci_translate_macros(session: i64, extern_vars: str, macro_source: str) -> str:
+fn ci_offsetof_record_type_name(raw_type: str) -> str:
+    let t = ci_trim(raw_type)
+    if ci_starts_with(t, "struct "):
+        return ci_trim(t.slice(7, t.len()))
+    if ci_starts_with(t, "union "):
+        return ci_trim(t.slice(6, t.len()))
+    t
+
+fn ci_try_translate_offsetof_expr(session: i64, expr: str) -> str:
+    let t = ci_trim(ci_strip_parens(expr))
+    var fn_name = ""
+    var args = ""
+    var call_paren = 0
+    while call_paren < t.len() as i32 and t.byte_at(call_paren as i64) != 40:
+        call_paren = call_paren + 1
+    if call_paren > 0 and call_paren < t.len() as i32:
+        fn_name = ci_trim(t.slice(0, call_paren as i64))
+        let close_paren = ci_find_matching_paren(t, call_paren)
+        if close_paren == t.len() as i32 - 1 and t.len() > call_paren as i64 + 1:
+            args = t.slice(call_paren as i64 + 1, t.len() - 1)
+    if fn_name != "offsetof" and fn_name != "__builtin_offsetof":
+        return ""
+    let type_arg = ci_offsetof_record_type_name(ci_extract_first_arg(args))
+    let field_arg = ci_trim(ci_after_first_arg(args))
+    if type_arg.len() == 0 or field_arg.len() == 0:
+        return ""
+    let offset = with_cimport_record_field_offset_by_name(session, type_arg, field_arg)
+    if offset < 0:
+        return ""
+    i64_to_string(offset)
+
+fn ci_translate_macros(session: i64, type_session: i64, extern_vars: str, macro_source: str) -> str:
     let count = with_cimport_macro_count(session)
     var output = ""
     var known_values = ""
@@ -1872,9 +1903,16 @@ fn ci_translate_macros(session: i64, extern_vars: str, macro_source: str) -> str
             if not ci_migrate_shared_decl_add("let", safe_name, let_line):
                 output = output ++ let_line ++ "\n"
         else:
-            let cast_expr_result = ci_translate_c_expr(stripped, "", known_values)
+            let offsetof_result = ci_try_translate_offsetof_expr(type_session, stripped)
+            let cast_expr_result = if offsetof_result.len() > 0: offsetof_result else: ci_translate_c_expr(stripped, "", known_values)
             let semantic_expr_ty = ci_lookup_known(name, object_macro_types)
-            let cast_expr_ty = if semantic_expr_ty.len() > 0: semantic_expr_ty else: ci_infer_cast_return_type(cast_expr_result)
+            var cast_expr_ty = ""
+            if offsetof_result.len() > 0:
+                cast_expr_ty = "c_int"
+            else if semantic_expr_ty.len() > 0:
+                cast_expr_ty = semantic_expr_ty
+            else:
+                cast_expr_ty = ci_infer_cast_return_type(cast_expr_result)
             if cast_expr_result.len() > 0 and cast_expr_ty.len() > 0:
                 let safe_name = ci_escape_reserved(name)
                 with_cimport_mark_name_emitted(name)
@@ -2752,9 +2790,9 @@ fn ci_has_stringify(body: str, params: str) -> bool:
 // Check if a string is a decimal integer > 2147483647 (i32 max)
 // Returns true if `ty_str` denotes a small integer type (u8/u16/i8/i16,
 // or the C-typedef forms c_uchar/c_schar/c_ushort/c_short). C integer
-// promotion rules promote these to `int` before arithmetic; without
-// the cast in shift operations, `u8 << 8` becomes `shl i8 %x, 8`
-// which is poison in LLVM IR.
+// promotion rules promote these to `int` before arithmetic and
+// bitwise operations; without the cast, `uint16_t * 128` can stay
+// as i16 and then sign-extend into a negative array index.
 fn ci_type_is_small_int(ty_str: str) -> bool:
     if ty_str == "u8" or ty_str == "i8": return true
     if ty_str == "u16" or ty_str == "i16": return true
@@ -2767,6 +2805,9 @@ fn ci_type_is_small_int(ty_str: str) -> bool:
 
 fn ci_shift_lhs_needs_integer_promotion(lhs_ty_str: str, lhs_peeled_ty: str, lhs_expr_ty_str: str) -> bool:
     ci_type_is_small_int(lhs_ty_str) or ci_type_is_small_int(lhs_peeled_ty) or ci_type_is_small_int(lhs_expr_ty_str)
+
+fn ci_binary_op_uses_c_integer_promotions(op: i32) -> bool:
+    op == BO_ADD or op == BO_SUB or op == BO_MUL or op == BO_DIV or op == BO_REM or op == BO_AND or op == BO_OR or op == BO_XOR
 
 fn ci_type_is_integer_shift_anchor(ty_str: str) -> bool:
     if ci_type_is_small_int(ty_str): return true
@@ -2847,6 +2888,26 @@ fn ci_expr_tree_contains_small_int(exprs: CiExprPool, types: CiTypePool, id: CiE
     if kind == CiExprKind.CIE_FIELD:
         return false
     false
+
+fn ci_operand_needs_c_int_promotion(session: i64, cursor: i32, peeled_cursor: i32, exprs: CiExprPool, types: CiTypePool, id: CiExprId) -> bool:
+    let ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, cursor))
+    if ci_type_is_small_int(ty_str):
+        return true
+    let peeled_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, peeled_cursor))
+    if ci_type_is_small_int(peeled_ty_str):
+        return true
+    let expr_ty = exprs.get_type(id)
+    if (expr_ty as i32) != 0 and ci_type_is_small_int(ci_print_type(types, expr_ty)):
+        return true
+    ci_index_expr_element_type_is_small_int(exprs, types, id) or ci_array_subscript_element_type_is_small_int(session, cursor) or ci_expr_tree_contains_small_int(exprs, types, id, 0)
+
+fn CiExprPool.promote_c_small_int_operand(self: CiExprPool, session: i64, cursor: i32, peeled_cursor: i32, value: CiExprId, types: CiTypePool) -> CiExprId:
+    if not ci_operand_needs_c_int_promotion(session, cursor, peeled_cursor, self.val(), types, value):
+        return value
+    let c_int_ty = types.named_type_from_text("c_int")
+    if (c_int_ty as i32) == 0:
+        return 0 as CiExprId
+    self.cast(c_int_ty, value)
 
 fn ci_is_large_decimal(s: str) -> bool:
     if s.len() == 0: return false
@@ -3110,7 +3171,14 @@ fn ci_map_sizeof_type(c_type: str) -> str:
         return "usize"
     // Struct/type name — pass through
     if ci_is_c_ident(t):
-        return t
+        let translated_typedef = ci_lookup_known(t, g_macro_type_aliases)
+        if translated_typedef.len() > 0:
+            return translated_typedef
+        let macro_value = ci_trim(ci_lookup_macro_value(0, t))
+        if macro_value.len() > 0 and ci_is_c_ident(macro_value) and ci_str_contains(g_macro_type_names, "|" ++ macro_value ++ "|"):
+            return ci_escape_reserved(macro_value)
+        if ci_str_contains(g_macro_type_names, "|" ++ t ++ "|"):
+            return ci_escape_reserved(t)
     ""
 
 fn ci_render_sizeof_type(c_type: str) -> str:
@@ -4502,6 +4570,25 @@ fn ci_cursor_is_simple_storage_ref(session: i64, cursor: i32) -> bool:
         return false
     true
 
+fn ci_cursor_is_function_ref(session: i64, cursor: i32) -> bool:
+    let kind = with_ci_cursor_kind(session, cursor)
+    let nc = with_ci_num_children(session, cursor)
+    if kind == CXK_UNEXPOSED_STMT:
+        let inner = ci_find_last_expr_child(session, cursor)
+        if inner >= 0:
+            return ci_cursor_is_function_ref(session, inner)
+        return false
+    if (kind == CXK_PAREN_EXPR or kind == 100 or kind == CXK_IMPLICIT_CAST) and nc == 1:
+        return ci_cursor_is_function_ref(session, with_ci_child(session, cursor, 0))
+    if kind != CXK_DECL_REF:
+        return false
+    let operand_ty = with_ci_type_translated(session, with_ci_cursor_type(session, cursor))
+    if ci_starts_with(operand_ty, "fn("):
+        return true
+    let cxtype = with_ci_cursor_type(session, cursor)
+    let canon_kind = with_ci_type_kind(session, cxtype)
+    canon_kind == CXT_FunctionProto or canon_kind == CXT_FunctionNoProto
+
 fn ci_literal_token_text(session: i64, cursor: i32) -> str:
     let token_text = with_ci_cursor_token_text(session, cursor)
     if token_text.len() > 0:
@@ -5051,11 +5138,11 @@ fn CiExprPool.lower_expr_ir(self: CiExprPool, session: i64, cursor: i32, types: 
     // to ci_lower_implicit_cast, falling back to plain peel-and-recurse
     // if the cast handler bails.
     if kind == 100:
-        if with_ci_eval_int_valid(session, cursor) != 0:
+        let nc = with_ci_num_children(session, cursor)
+        if with_ci_eval_int_valid(session, cursor) != 0 and not ci_expr_children_need_rvalue_lowering(session, cursor):
             let ival = with_ci_eval_int_value(session, cursor)
             let text_idx = self.add_string(i64_to_string(ival))
             return self.int_lit(text_idx, 0 as CiTypeId)
-        let nc = with_ci_num_children(session, cursor)
         if nc == 1:
             let cast_id = self.lower_implicit_cast(session, cursor, types, scope)
             if (cast_id as i32) != 0:
@@ -5178,6 +5265,16 @@ fn CiExprPool.lower_expr_ir(self: CiExprPool, session: i64, cursor: i32, types: 
     if kind == CXK_UNARY_EXPR:
         let src = with_ci_cursor_source_text(session, cursor)
         if ci_starts_with(src, "sizeof"):
+            let rest = ci_trim(src.slice(6, src.len()))
+            if rest.len() > 0 and rest.byte_at(0) == 40:
+                let close = ci_find_matching_paren(rest, 0)
+                if close > 0:
+                    let inner = ci_trim(rest.slice(1, close as i64))
+                    let mapped = ci_map_sizeof_type(inner)
+                    if mapped.len() > 0:
+                        let mapped_ty = types.named_type_from_text(mapped)
+                        if (mapped_ty as i32) != 0:
+                            return self.add(CiExprKind.CIE_SIZEOF_TYPE, mapped_ty as i32, 0, 0, 0 as CiTypeId)
             let nc = with_ci_num_children(session, cursor)
             if nc > 0:
                 ci_trace_port("STRUCTURAL[b11.4.sizeof_ue]")
@@ -5339,6 +5436,14 @@ fn CiExprPool.lower_binary_simple(self: CiExprPool, session: i64, cursor: i32, t
             if (c_uint_ty as i32) == 0:
                 return 0 as CiExprId
             rhs_value = self.cast(c_uint_ty, rhs_value)
+
+        if ci_binary_op_uses_c_integer_promotions(op):
+            lhs_value = self.promote_c_small_int_operand(session, lhs_cursor, ci_peel_transparent(session, lhs_cursor), lhs_value, types)
+            if (lhs_value as i32) == 0:
+                return 0 as CiExprId
+            rhs_value = self.promote_c_small_int_operand(session, rhs_cursor, ci_peel_transparent(session, rhs_cursor), rhs_value, types)
+            if (rhs_value as i32) == 0:
+                return 0 as CiExprId
 
     self.binary(ci_op, lhs_value, rhs_value, 0 as CiTypeId)
 
@@ -5879,6 +5984,24 @@ fn ci_call_callee_name(session: i64, cursor: i32) -> str:
         return with_ci_cursor_spelling(session, c)
     ""
 
+fn ci_note_unsupported_offsetof(session: i64, cursor: i32):
+    if g_ci_bail_message.len() == 0:
+        g_ci_bail_message = "unsupported __builtin_offsetof expression"
+        g_ci_bail_location = with_ci_cursor_location(session, cursor)
+        g_ci_bail_kind = with_ci_cursor_kind(session, cursor)
+
+fn CiExprPool.lower_offsetof_value_expr(self: CiExprPool, session: i64, cursor: i32) -> CiExprId:
+    if with_ci_eval_int_valid(session, cursor) != 0:
+        let text_idx = self.add_string(ci_eval_int_text(session, cursor))
+        return self.int_lit(text_idx, 0 as CiTypeId)
+    let src = with_ci_cursor_source_text(session, cursor)
+    let offset_text = ci_try_translate_offsetof_expr(session, src)
+    if offset_text.len() > 0:
+        let text_idx = self.add_string(offset_text)
+        return self.int_lit(text_idx, 0 as CiTypeId)
+    ci_note_unsupported_offsetof(session, cursor)
+    0 as CiExprId
+
 fn CiExprPool.lower_call_simple(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: str) -> CiExprId:
     self.lower_plain_value_expr_ir(session, cursor, types, scope)
 
@@ -6268,6 +6391,13 @@ fn CiExprPool.build_binary_value_expr_from_ids(self: CiExprPool, session: i64, c
             lhs_value = self.cast(c_uint_ty, lhs_value)
         if rhs_large:
             rhs_value = self.cast(c_uint_ty, rhs_value)
+    if ci_binary_op_uses_c_integer_promotions(op):
+        lhs_value = self.promote_c_small_int_operand(session, lhs_cursor, lhs_peeled, lhs_value, types)
+        if (lhs_value as i32) == 0:
+            return 0 as CiExprId
+        rhs_value = self.promote_c_small_int_operand(session, rhs_cursor, rhs_peeled, rhs_value, types)
+        if (rhs_value as i32) == 0:
+            return 0 as CiExprId
     if op == BO_SHL or op == BO_SHR:
         rhs_value = self.cast_shift_count_expr(types, rhs_value)
         if (rhs_value as i32) == 0:
@@ -6347,6 +6477,8 @@ fn CiExprPool.build_unary_value_expr_from_id(self: CiExprPool, session: i64, cur
     if op == UO_ADDR:
         let addr_cxtype = with_ci_cursor_type(session, cursor)
         let addr_ty_id = types.type_from_libclang(session, addr_cxtype)
+        if ci_cursor_is_function_ref(session, child_cursor):
+            return child_id
         if (addr_ty_id as i32) == 0:
             return self.add(CiExprKind.CIE_ADDR_OF, child_id as i32, 0, 0, 0 as CiTypeId)
         var is_mut_ptr = false
@@ -6579,6 +6711,8 @@ fn CiExprPool.build_libc_call_value_expr(self: CiExprPool, session: i64, cursor:
     if callee_text == "__builtin_object_size":
         let zero_idx = self.add_string("0")
         return self.int_lit(zero_idx, 0 as CiTypeId)
+    if callee_text == "__builtin_offsetof":
+        return self.lower_offsetof_value_expr(session, cursor)
     if ci_starts_with(callee_text, "__builtin"):
         let zero_idx = self.add_string("0")
         return self.int_lit(zero_idx, 0 as CiTypeId)
@@ -6660,7 +6794,7 @@ fn CiStmtPool.lower_value_expr_ir(self: CiStmtPool, session: i64, cursor: i32, e
         return ci_value_ir_invalid()
 
     if kind == 100:
-        if with_ci_eval_int_valid(session, cursor) != 0:
+        if with_ci_eval_int_valid(session, cursor) != 0 and not ci_expr_children_need_rvalue_lowering(session, cursor):
             let text_idx = exprs.add_string(ci_eval_int_text(session, cursor))
             return ci_value_ir_plain(exprs.int_lit(text_idx, 0 as CiTypeId))
         if nc == 1:
@@ -6734,8 +6868,11 @@ fn CiStmtPool.lower_value_expr_ir(self: CiStmtPool, session: i64, cursor: i32, e
             let lhs = self.lower_value_expr_ir(session, lhs_cursor, exprs, types, scope)
             let rhs = self.lower_value_expr_ir(session, rhs_cursor, exprs, types, scope)
             if ci_value_ir_valid(lhs) and ci_value_ir_valid(rhs):
+                var lhs_effect = lhs.setup_stmt
+                if (lhs_effect as i32) == 0:
+                    lhs_effect = self.lower_effect_expr_ir(session, lhs_cursor, exprs, types, scope)
                 return CiValueExprIR {
-                    setup_stmt: self.merge_ir( self.lower_effect_expr_ir(session, lhs_cursor, exprs, types, scope), rhs.setup_stmt),
+                    setup_stmt: self.merge_ir( lhs_effect, rhs.setup_stmt),
                     value_expr: rhs.value_expr,
                 }
             return ci_value_ir_invalid()
@@ -6939,6 +7076,14 @@ fn CiStmtPool.lower_value_expr_ir(self: CiStmtPool, session: i64, cursor: i32, e
             callee_text = ci_escape_reserved(callee_name)
             first_arg = 0
         if callee_text == "cfprintf":
+            return ci_value_ir_invalid()
+        if callee_text == "__builtin_offsetof" or callee_text == "offsetof":
+            let offset_id = exprs.lower_offsetof_value_expr(session, cursor)
+            if (offset_id as i32) != 0:
+                return CiValueExprIR {
+                    setup_stmt: setup,
+                    value_expr: offset_id,
+                }
             return ci_value_ir_invalid()
         var arg_ids: Vec[i32] = Vec.new()
         var ai = first_arg
@@ -11369,6 +11514,16 @@ fn ci_find_last_expr_child(session: i64, cursor: i32) -> i32:
             return child
         i = i - 1
     -1
+
+fn ci_expr_children_need_rvalue_lowering(session: i64, cursor: i32) -> bool:
+    let nc = with_ci_num_children(session, cursor)
+    var i = 0
+    while i < nc:
+        let child = with_ci_child(session, cursor, i)
+        if ci_cursor_kind_is_expr(with_ci_cursor_kind(session, child)) and ci_rvalue_needs_lowering(session, child):
+            return true
+        i = i + 1
+    false
 
 fn ci_decl_name_matches_type(decl_name: str, ty_name: str) -> bool:
     decl_name == ty_name or ci_escape_reserved(decl_name) == ty_name

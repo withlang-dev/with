@@ -76,6 +76,7 @@ extern fn clang_Cursor_getTranslationUnit(cursor: CXCursor) -> *mut u8
 
 // Cursor queries
 extern fn clang_getCursorKind(cursor: CXCursor) -> i32
+extern fn clang_Cursor_isNull(cursor: CXCursor) -> i32
 extern fn clang_getCursorSpelling(cursor: CXCursor) -> CXString
 extern fn clang_getCursorType(cursor: CXCursor) -> CXType
 extern fn clang_getCursorLocation(cursor: CXCursor) -> CXSourceLocation
@@ -1430,6 +1431,49 @@ pub unsafe fn cimport_struct_field_offset(session: i64, idx: i32, field: i32) ->
     let offset_bits = clang_Type_getOffsetOf(ty, (*fi).name as *const u8)
     if offset_bits < 0: return -1
     offset_bits / 8
+
+@[c_export("with_cimport_record_field_offset_by_name")]
+pub unsafe fn cimport_record_field_offset_by_name(session: i64, type_name: str, field_name: str) -> i64:
+    let s = session as *mut CImportSession
+    if s as i64 == 0: return -1
+    let type_cstr = str_to_cstr(type_name)
+    let field_cstr = str_to_cstr(field_name)
+    if type_cstr as i64 == 0 or field_cstr as i64 == 0:
+        if type_cstr as i64 != 0: with_free(type_cstr)
+        if field_cstr as i64 != 0: with_free(field_cstr)
+        return -1
+    var i = 0
+    while i < (*s).decl_count:
+        let cursor = *(((*s).decls as i64 + i as i64 * 32) as *const CXCursor)
+        if clang_Cursor_isNull(cursor) != 0:
+            i = i + 1
+            continue
+        let kind = clang_getCursorKind(cursor)
+        if kind != CXCursor_StructDecl and kind != CXCursor_UnionDecl and kind != CXCursor_TypedefDecl:
+            i = i + 1
+            continue
+        let spelling = clang_getCursorSpelling(cursor)
+        let spelling_cstr = clang_getCString(spelling)
+        var matches = false
+        if spelling_cstr as i64 != 0:
+            if c_strcmp(spelling_cstr, type_cstr as *const u8) == 0:
+                matches = true
+        if matches:
+            var ty = clang_getCursorType(cursor)
+            if kind == CXCursor_TypedefDecl:
+                ty = clang_getTypedefDeclUnderlyingType(cursor)
+            let offset_bits = clang_Type_getOffsetOf(ty, field_cstr as *const u8)
+            clang_disposeString(spelling)
+            if offset_bits >= 0:
+                with_free(type_cstr)
+                with_free(field_cstr)
+                return offset_bits / 8
+        else:
+            clang_disposeString(spelling)
+        i = i + 1
+    with_free(type_cstr)
+    with_free(field_cstr)
+    -1
 
 @[c_export("with_cimport_struct_size")]
 pub unsafe fn cimport_struct_size(session: i64, idx: i32) -> i64:

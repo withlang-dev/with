@@ -715,6 +715,21 @@ int macro_expr(int utf) {
   return c * 10 + (int)(p - buf);
 }
 
+static unsigned int issue120_ord2utf(unsigned int c, u8 *p) {
+  *p = (u8)c;
+  return 1;
+}
+
+#define ISSUE120_PUTCHAR(c, p) ((utf && c > 127u) ? issue120_ord2utf(c, p) : (*p = c, 1))
+
+int macro_ternary_comma_expr(int utf) {
+  u8 buf[1] = { 0 };
+  u8 *p = buf;
+  unsigned int c = 65u;
+  p += ISSUE120_PUTCHAR(c, p);
+  return ((int)buf[0]) * 10 + (int)(p - buf);
+}
+
 int main(void) {
   if (init_expr() != 651) return 1;
   if (assign_expr() != 651) return 2;
@@ -722,6 +737,7 @@ int main(void) {
   if (call_arg_expr() != 651) return 4;
   if (macro_expr(0) != 661) return 5;
   if (macro_expr(1) != 10661) return 6;
+  if (macro_ternary_comma_expr(0) != 651) return 7;
   return 0;
 }
 EOF
@@ -736,7 +752,8 @@ EOF
   if ! grep -Fq 'with 0 as __ci_expr_seq_' "$out_w" \
     || ! grep -Fq 'var __ci_expr_old_' "$out_w" \
     || ! grep -Fq '(__local_p = __local_p + 1)' "$out_w" \
-    || ! grep -Fq '(unsafe: *__ci_expr_old_' "$out_w"; then
+    || ! grep -Fq '(unsafe: *__ci_expr_old_' "$out_w" \
+    || ! grep -Fq '((unsafe: *__local_p) = __local_c)' "$out_w"; then
     echo "FAIL(cli-selfhost-migrate-output) rvalue_sequencing"
     sed -n '1,260p' "$out_w" || true
     failures=$((failures + 1))
@@ -759,6 +776,40 @@ EOF
   fi
 
   echo "PASS(cli-selfhost-migrate) rvalue_sequencing"
+}
+
+expect_migrate_directory_progress_stdout() {
+  local case_dir="$tmpdir/migrate_directory_progress_case"
+  local src_dir="$case_dir/src"
+  local out_dir="$case_dir/out"
+  mkdir -p "$src_dir"
+
+  cat >"$src_dir/a.c" <<'EOF'
+int a_value(void) { return 1; }
+EOF
+  cat >"$src_dir/b.c" <<'EOF'
+int b_value(void) { return 2; }
+EOF
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src_dir" --no-c-export -o "$out_dir"; then
+    echo "FAIL(cli-selfhost-migrate) directory_progress_stdout"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! grep -Fq 'migrate: processing a.c - 1/2, 50% completed' "$tmpdir/out" \
+    || ! grep -Fq 'migrate: processing b.c - 2/2, 100% completed' "$tmpdir/out"; then
+    echo "FAIL(cli-selfhost-migrate-output) directory_progress_stdout"
+    echo "--- stdout"
+    cat "$tmpdir/out" || true
+    echo "--- stderr"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-migrate) directory_progress_stdout"
 }
 
 expect_migrate_cross_file_global_owner_arrays() {
@@ -1355,6 +1406,16 @@ int f(ctx *ccontext) {
   ccontext = (ctx *)(&g);
   return local->x + ccontext->x;
 }
+
+static void callback(void *p) {
+  (void)p;
+}
+
+typedef void (*callback_fn)(void *);
+
+callback_fn ret_callback(void) {
+  return &callback;
+}
 EOF
 
   if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export -o "$out_w"; then
@@ -1369,7 +1430,9 @@ EOF
     || grep -Fq 'as *mut ctx)) as *mut ctx' "$out_w" \
     || ! grep -Fq 'return ((&raw mut g as *mut ctx))' "$out_w" \
     || ! grep -Fq 'var __local_local: *mut ctx = ((&raw mut g as *mut ctx))' "$out_w" \
-    || ! grep -Fq '(&raw mut g as *mut ctx)' "$out_w"; then
+    || ! grep -Fq '(&raw mut g as *mut ctx)' "$out_w" \
+    || ! grep -Fq 'return callback' "$out_w" \
+    || grep -Fq '&raw const callback' "$out_w"; then
     echo "FAIL(cli-selfhost-migrate-output) noop_pointer_cast_exprs"
     sed -n '1,220p' "$out_w" || true
     failures=$((failures + 1))
@@ -1437,6 +1500,7 @@ expect_migrate_small_int_shift_promotion() {
   cat >"$src" <<'EOF'
 typedef unsigned char uint8_t;
 typedef unsigned int uint32_t;
+typedef unsigned short uint16_t;
 
 uint32_t issue170_shift_promotion(uint8_t *p) {
   return (p[1] << 8) | p[2];
@@ -1444,6 +1508,10 @@ uint32_t issue170_shift_promotion(uint8_t *p) {
 
 uint32_t issue170_masked_shift_promotion(uint8_t *p) {
   return ((p[0] & 63) << 6) | (1 << (p[1] & 7));
+}
+
+uint32_t issue170_mul_index_promotion(uint16_t *stage1, uint16_t *stage2) {
+  return stage2[stage1[0] * 128];
 }
 EOF
 
@@ -1475,6 +1543,13 @@ EOF
     return
   fi
 
+  if ! file_has_regex "$out_w" 'stage1\[0\].*as c_int\).* \* 128'; then
+    echo "FAIL(cli-selfhost-migrate-output) small_int_mul_index_promotion"
+    sed -n '1,260p' "$out_w" || true
+    failures=$((failures + 1))
+    return
+  fi
+
   if ! run_cli "$tmpdir/out" "$tmpdir/err" check "$out_w"; then
     echo "FAIL(cli-selfhost-check) small_int_shift_promotion"
     cat "$tmpdir/err" || true
@@ -1492,6 +1567,13 @@ EOF
   if file_has_regex "$ir_out" 'shl i8'; then
     echo "FAIL(cli-selfhost-ir-output) small_int_shift_promotion"
     grep -En 'shl i8|shr i8' "$ir_out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if file_has_regex "$ir_out" 'mul i16'; then
+    echo "FAIL(cli-selfhost-ir-output) small_int_mul_index_promotion"
+    grep -En 'mul i16' "$ir_out" || true
     failures=$((failures + 1))
     return
   fi
@@ -1895,9 +1977,27 @@ expect_migrate_sizeof_pointer_type_syntax() {
 
   cat >"$src" <<'EOF'
 static const char *items[] = { "a", "b", "c" };
+typedef unsigned char PCRE2_UCHAR;
+#define real_context real_context_8
+typedef struct memctl_for_sizeof {
+  void *(*malloc)(unsigned long, void *);
+  void (*free)(void *, void *);
+  void *data;
+} memctl_for_sizeof;
+typedef struct real_context {
+  memctl_for_sizeof memctl;
+} real_context;
 
 int in_range(int i) {
   return i < sizeof(items) / sizeof(char *);
+}
+
+int typed_pointer_size(void) {
+  return sizeof(PCRE2_UCHAR *);
+}
+
+unsigned long macro_suffixed_record_size(void) {
+  return sizeof(real_context);
 }
 EOF
 
@@ -1908,7 +2008,11 @@ EOF
     return
   fi
 
-  if ! file_has_literal "$out_w" "sizeof[usize]()" || file_has_literal "$out_w" "sizeof[*mut " || file_has_literal "$out_w" "sizeof[*const "; then
+  if ! file_has_literal "$out_w" "sizeof[usize]()" \
+    || ! file_has_literal "$out_w" "sizeof[real_context_8]()" \
+    || file_has_literal "$out_w" "sizeof[real_context]()" \
+    || file_has_literal "$out_w" "sizeof[*mut " \
+    || file_has_literal "$out_w" "sizeof[*const "; then
     echo "FAIL(cli-selfhost-migrate-output) sizeof_pointer_type_syntax"
     cat "$out_w" || true
     failures=$((failures + 1))
@@ -3717,6 +3821,7 @@ expect_migrate_host_header_compat
 expect_migrate_pcre2_config_template
 expect_migrate_assignment_compat
 expect_migrate_rvalue_sequencing
+expect_migrate_directory_progress_stdout
 expect_migrate_cross_file_global_owner_arrays
 expect_migrate_shared_defs_prunes_unused_ownerless_externs
 expect_pcre2_defs_prune_ebcdic_tables
