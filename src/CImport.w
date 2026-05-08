@@ -1562,6 +1562,19 @@ fn ci_map_builtin_typedef(name: str) -> str:
     if name == "va_list": return "opaque"
     ""
 
+fn ci_normalize_translated_type_name(name: str) -> str:
+    let t = ci_trim(name)
+    let builtin = ci_map_builtin_typedef(t)
+    if builtin.len() > 0:
+        return builtin
+    let alias = ci_lookup_known(t, g_macro_type_aliases)
+    if alias.len() > 0 and alias != t:
+        let alias_builtin = ci_map_builtin_typedef(alias)
+        if alias_builtin.len() > 0:
+            return alias_builtin
+        return alias
+    t
+
 fn ci_translate_typedef(session: i64, idx: i32) -> str:
     let name = with_cimport_decl_name(session, idx)
     if name.len() == 0:
@@ -3173,10 +3186,14 @@ fn ci_map_sizeof_type(c_type: str) -> str:
     if ci_is_c_ident(t):
         let translated_typedef = ci_lookup_known(t, g_macro_type_aliases)
         if translated_typedef.len() > 0:
-            return translated_typedef
+            return ci_normalize_translated_type_name(translated_typedef)
         let macro_value = ci_trim(ci_lookup_macro_value(0, t))
-        if macro_value.len() > 0 and ci_is_c_ident(macro_value) and ci_str_contains(g_macro_type_names, "|" ++ macro_value ++ "|"):
-            return ci_escape_reserved(macro_value)
+        if macro_value.len() > 0 and ci_is_c_ident(macro_value):
+            let normalized_macro_value = ci_normalize_translated_type_name(macro_value)
+            if normalized_macro_value != macro_value:
+                return normalized_macro_value
+            if ci_str_contains(g_macro_type_names, "|" ++ macro_value ++ "|"):
+                return ci_escape_reserved(macro_value)
         if ci_str_contains(g_macro_type_names, "|" ++ t ++ "|"):
             return ci_escape_reserved(t)
     ""
@@ -3876,7 +3893,7 @@ fn ci_map_base_type(name: str) -> str:
     let builtin_typedef = ci_map_builtin_typedef(name)
     if builtin_typedef.len() > 0: return builtin_typedef
     let translated_typedef = ci_lookup_known(name, g_macro_type_aliases)
-    if translated_typedef.len() > 0: return translated_typedef
+    if translated_typedef.len() > 0: return ci_normalize_translated_type_name(translated_typedef)
     if name == "void": return "void"
     if name == "_Bool": return "bool"
     if name == "char": return "c_char"
@@ -4677,7 +4694,7 @@ fn CiTypePool.type_from_libclang(self: CiTypePool, session: i64, cxtype: i32) ->
 
     if ci_cxtype_kind_is_int(kind):
         ci_trace_port("STRUCTURAL[b11.3.ty_int]")
-        let name = with_ci_type_translated(session, cxtype)
+        let name = ci_normalize_translated_type_name(with_ci_type_translated(session, cxtype))
         if name.len() == 0:
             return 0 as CiTypeId
         let name_idx = self.add_string(name)
@@ -4685,7 +4702,7 @@ fn CiTypePool.type_from_libclang(self: CiTypePool, session: i64, cxtype: i32) ->
 
     if ci_cxtype_kind_is_float(kind):
         ci_trace_port("STRUCTURAL[b11.3.ty_float]")
-        let name = with_ci_type_translated(session, cxtype)
+        let name = ci_normalize_translated_type_name(with_ci_type_translated(session, cxtype))
         if name.len() == 0:
             return 0 as CiTypeId
         let name_idx = self.add_string(name)
@@ -4737,7 +4754,7 @@ fn CiTypePool.type_from_libclang(self: CiTypePool, session: i64, cxtype: i32) ->
 
     if kind == CXT_Record:
         ci_trace_port("STRUCTURAL[b11.3.ty_struct]")
-        let name = with_ci_type_translated(session, cxtype)
+        let name = ci_normalize_translated_type_name(with_ci_type_translated(session, cxtype))
         if name.len() == 0:
             return 0 as CiTypeId
         let name_idx = self.add_string(name)
@@ -4745,7 +4762,7 @@ fn CiTypePool.type_from_libclang(self: CiTypePool, session: i64, cxtype: i32) ->
 
     if kind == CXT_Enum:
         ci_trace_port("STRUCTURAL[b11.3.ty_enum]")
-        let name = with_ci_type_translated(session, cxtype)
+        let name = ci_normalize_translated_type_name(with_ci_type_translated(session, cxtype))
         if name.len() == 0:
             return 0 as CiTypeId
         let name_idx = self.add_string(name)
@@ -4773,11 +4790,11 @@ fn CiTypePool.type_from_libclang(self: CiTypePool, session: i64, cxtype: i32) ->
             i = i + 1
         return self.ty_fn_ptr(ret_ty, params_start, arg_count)
 
-    // Typedef, elaborated, atomic, and other named wrappers —
-    // use CT_NAMED with the translated name so the printer
-    // emits exactly what the legacy translator would.
+    // Typedef, elaborated, atomic, and other named wrappers.
+    // Normalize builtin typedef spellings so C names like size_t do
+    // not leak into generated With type positions.
     ci_trace_port("STRUCTURAL[b11.3.ty_named]")
-    let name = with_ci_type_translated(session, cxtype)
+    let name = ci_normalize_translated_type_name(with_ci_type_translated(session, cxtype))
     if name.len() == 0:
         return 0 as CiTypeId
     let name_idx = self.add_string(name)
@@ -6189,7 +6206,7 @@ fn ci_compound_to_base_op(op: i32) -> str:
 fn CiTypePool.named_type_from_text(self: CiTypePool, text: str) -> CiTypeId:
     if text.len() == 0:
         return 0 as CiTypeId
-    let idx = self.add_string(text)
+    let idx = self.add_string(ci_normalize_translated_type_name(text))
     self.ty_named(idx)
 
 fn CiExprPool.build_named_call_expr(self: CiExprPool, name: str, arg_ids: &Vec[i32]) -> CiExprId:
