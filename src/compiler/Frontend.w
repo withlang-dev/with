@@ -914,8 +914,7 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
     let root_local_decl_count = count_non_use_decls_frontend(pool)
 
     if self.diagnostics.has_errors():
-        let source = Source.from_string(name, text, file_id)
-        self.diagnostics.render_all(source)
+        self.render_all_diagnostics_frontend()
         self.set_resolve_snapshot(ResolveResult.init(), name)
         return AstPool.new()
 
@@ -933,8 +932,7 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
     self.capture_last_link_lib_names(self.pool, self.last_resolved)
 
     if self.diagnostics.has_errors():
-        let source = Source.from_string(name, text, file_id)
-        self.diagnostics.render_all(source)
+        self.render_all_diagnostics_frontend()
         self.set_typed_snapshot("", AstPool.new())
         return AstPool.new()
 

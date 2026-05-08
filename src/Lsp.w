@@ -880,7 +880,7 @@ fn lsp_dot_completion(id: i32, state: LspState, uri: str, text: str, offset: i32
 
     if type_name == "str":
         // str methods
-        let str_methods = "len,slice,starts_with,ends_with,contains,find,replace,to_upper,to_lower,trim,split,byte_at,repeat"
+        let str_methods = "len,slice,starts_with,ends_with,contains,find,replace,to_upper,to_lower,upper,lower,trim,split,byte_at,repeat"
         var sm_start = 0
         for smi in 0..str_methods.len() as i32:
             if str_methods.byte_at(smi as i64) == 44 or smi == str_methods.len() as i32 - 1:

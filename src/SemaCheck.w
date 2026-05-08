@@ -6367,7 +6367,7 @@ fn Sema.builtin_intrinsic_method_return_type(self: Sema, recv_type: i32, owner_s
             return self.ty_bool as i32
         if method_name == "find" or method_name == "index_of":
             return self.ty_i64 as i32
-        if field == self.syms.trim or field == self.syms.to_lower or field == self.syms.to_upper or field == self.syms.replace or field == self.syms.slice or method_name == "repeat":
+        if field == self.syms.trim or field == self.syms.to_lower or field == self.syms.to_upper or field == self.syms.lower or field == self.syms.upper or field == self.syms.replace or field == self.syms.slice or method_name == "repeat":
             return self.ty_str as i32
         if method_name == "split":
             return self.ensure_vec_str_type()

@@ -72,6 +72,10 @@ type Zcu {
     project_config: ProjectConfig,
     trace_c_import_cache: i32,
     prelude_mode: i32,
+    cli_diag_gen_starts: Vec[i32],
+    cli_diag_gen_ends: Vec[i32],
+    cli_diag_source_names: Vec[str],
+    cli_diag_source_texts: Vec[str],
 }
 
 fn Zcu.init -> Zcu:
@@ -114,6 +118,10 @@ fn Zcu.init -> Zcu:
         project_config: project_config_default(),
         trace_c_import_cache: 0,
         prelude_mode: PRELUDE_FULL(),
+        cli_diag_gen_starts: Vec.new(),
+        cli_diag_gen_ends: Vec.new(),
+        cli_diag_source_names: Vec.new(),
+        cli_diag_source_texts: Vec.new(),
     }
 
 fn Zcu.reset_import_state(self: Zcu):
@@ -185,6 +193,43 @@ fn Zcu.c_import_cache_store(self: Zcu, key: str, value: str):
 fn Zcu.set_prelude_mode(self: Zcu, mode: i32):
     self.prelude_mode = compilation_normalize_prelude_mode(mode)
 
+fn Zcu.clear_cli_diag_mappings(self: Zcu):
+    self.cli_diag_gen_starts = Vec.new()
+    self.cli_diag_gen_ends = Vec.new()
+    self.cli_diag_source_names = Vec.new()
+    self.cli_diag_source_texts = Vec.new()
+
+fn Zcu.add_cli_diag_mapping(self: Zcu, gen_start: i32, gen_end: i32, source_name: str, source_text: str):
+    self.cli_diag_gen_starts.push(gen_start)
+    self.cli_diag_gen_ends.push(gen_end)
+    self.cli_diag_source_names.push(source_name)
+    self.cli_diag_source_texts.push(source_text)
+
+fn Zcu.cli_diag_mapping_index(self: Zcu, offset: i32) -> i32:
+    for i in 0..self.cli_diag_gen_starts.len() as i32:
+        let start = self.cli_diag_gen_starts.get(i as i64)
+        let end = self.cli_diag_gen_ends.get(i as i64)
+        if offset >= start and offset <= end:
+            return i
+    -1
+
+fn Zcu.render_diag_frontend(self: Zcu, diag: Diagnostic):
+    let map_idx = self.cli_diag_mapping_index(diag.primary.start)
+    if map_idx >= 0:
+        let gen_start = self.cli_diag_gen_starts.get(map_idx as i64)
+        let source = Source.from_string(self.cli_diag_source_names.get(map_idx as i64), self.cli_diag_source_texts.get(map_idx as i64), 0)
+        var mapped = diag
+        mapped.primary.start = mapped.primary.start - gen_start
+        mapped.primary.end = mapped.primary.end - gen_start
+        if mapped.primary.start < 0:
+            mapped.primary.start = 0
+        if mapped.primary.end <= mapped.primary.start:
+            mapped.primary.end = mapped.primary.start + 1
+        mapped.render(source)
+        return
+    let source = self.source_for_file_id_frontend(diag.primary.file)
+    diag.render(source)
+
 fn Zcu.source_for_file_id_frontend(self: Zcu, file_id: i32) -> Source:
     if file_id == 0:
         return Source.from_string(self.current_source_path, self.current_source_text, 0)
@@ -200,8 +245,7 @@ fn Zcu.source_for_file_id_frontend(self: Zcu, file_id: i32) -> Source:
 fn Zcu.render_all_diagnostics_frontend(self: Zcu):
     for i in 0..self.diagnostics.items.len() as i32:
         let diag = self.diagnostics.items.get(i as i64)
-        let source = self.source_for_file_id_frontend(diag.primary.file)
-        diag.render(source)
+        self.render_diag_frontend(diag)
         if i + 1 < self.diagnostics.items.len() as i32:
             with_eprint("")
 
@@ -313,5 +357,4 @@ fn Zcu.set_diagnostics(self: Zcu, diags: DiagnosticList):
     self.diagnostics = diags
 
 fn Zcu.render_current_diagnostics(self: Zcu):
-    let source: Source = Source.from_string(self.current_source_path, self.current_source_text, 0)
-    self.diagnostics.render_all(source)
+    self.render_all_diagnostics_frontend()

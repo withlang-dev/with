@@ -31,7 +31,10 @@ extern fn with_str_slice(s: str, start: i64, end: i64) -> str
 extern fn with_eprint(s: str) -> void
 extern fn with_ewrite(s: str) -> void
 extern fn with_system(cmd: str) -> i32
+extern fn with_exec_binary(path: str) -> i32
 extern fn with_fs_read_file(path: str) -> str
+extern fn with_fs_remove_file(path: str) -> i32
+extern fn with_fs_remove_dir(path: str) -> i32
 extern fn with_getenv_str(name: str) -> str
 extern fn with_clock_nanos() -> i64
 extern fn with_getpid() -> i32
@@ -64,6 +67,30 @@ type CliOptions {
     deterministic_mode: bool,
     emit_c_mode: bool,
     prelude_mode: i32,
+}
+
+enum CliOneLinerMode: i32:
+    None = 0
+    Eval = 1
+    Lines = 2
+    Print = 3
+
+type CliOneLiner {
+    seen: bool,
+    ok: bool,
+    mode: i32,
+    error_msg: str,
+    code_parts: Vec[str],
+    args: Vec[str],
+    opt_level: i32,
+}
+
+type CliSyntheticSource {
+    source: str,
+    gen_starts: Vec[i32],
+    gen_ends: Vec[i32],
+    source_names: Vec[str],
+    source_texts: Vec[str],
 }
 
 type TestDiscovery {
@@ -237,6 +264,269 @@ fn tokenize_text(text: str) -> TokenList:
     var lexer = Lexer.init(text, 0)
     return lexer.tokenize()
 
+fn cli_one_liner_default(argc: i32) -> CliOneLiner:
+    CliOneLiner {
+        seen: false,
+        ok: true,
+        mode: CliOneLinerMode.None,
+        error_msg: "",
+        code_parts: Vec.new(),
+        args: Vec.new(),
+        opt_level: cli_default_opt_level(argc),
+    }
+
+fn cli_one_liner_mode_for_flag(arg: str) -> i32:
+    if arg == "-e":
+        return CliOneLinerMode.Eval
+    if arg == "-n":
+        return CliOneLinerMode.Lines
+    if arg == "-p":
+        return CliOneLinerMode.Print
+    CliOneLinerMode.None
+
+fn cli_one_liner_mode_name(mode: i32) -> str:
+    if mode == CliOneLinerMode.Eval:
+        return "-e"
+    if mode == CliOneLinerMode.Lines:
+        return "-n"
+    if mode == CliOneLinerMode.Print:
+        return "-p"
+    ""
+
+fn cli_one_liner_known_value_option(arg: str) -> bool:
+    arg == "-o" or arg == "--output"
+
+fn cli_one_liner_known_flag(arg: str) -> bool:
+    arg == "-O0" or arg == "-O1" or arg == "-O2" or arg == "-O3" or
+    arg == "--release" or arg == "--alloc" or arg == "--no-std" or
+    arg == "--freestanding" or arg == "--no-prelude" or
+    arg == "-g0" or arg == "-h" or arg == "--help"
+
+fn cli_one_liner_scan(argc: i32) -> CliOneLiner:
+    var result = cli_one_liner_default(argc)
+    var after_double_dash = false
+    var i = 1
+    while i < argc:
+        let arg = with_arg_at(i)
+        if after_double_dash:
+            result.args.push(arg)
+            i = i + 1
+            continue
+        if arg == "--":
+            after_double_dash = true
+            i = i + 1
+            continue
+        let mode = cli_one_liner_mode_for_flag(arg)
+        if mode != CliOneLinerMode.None:
+            result.seen = true
+            if result.mode != CliOneLinerMode.None and result.mode != mode:
+                result.ok = false
+                result.error_msg = "error: -e, -n, and -p are mutually exclusive"
+                return result
+            result.mode = mode
+            if i + 1 >= argc:
+                result.ok = false
+                result.error_msg = "error: " ++ arg ++ " requires a code argument"
+                return result
+            result.code_parts.push(with_arg_at(i + 1))
+            i = i + 2
+            continue
+        if arg == "-O0":
+            result.opt_level = 0
+            i = i + 1
+            continue
+        if arg == "-O1":
+            result.opt_level = 1
+            i = i + 1
+            continue
+        if arg == "-O2":
+            result.opt_level = 2
+            i = i + 1
+            continue
+        if arg == "-O3":
+            result.opt_level = 3
+            i = i + 1
+            continue
+        if arg == "--release":
+            if result.opt_level < 2:
+                result.opt_level = 2
+            i = i + 1
+            continue
+        if cli_one_liner_known_value_option(arg):
+            i = i + 2
+            continue
+        if has_output_prefix(arg) or cli_one_liner_known_flag(arg) or with_str_starts_with(arg, "--prelude=") != 0:
+            i = i + 1
+            continue
+        if with_str_len(arg) > 0 and with_str_byte_at(arg, 0) != 45:
+            if result.seen:
+                result.ok = false
+                result.error_msg = "error: cannot combine one-liner code with a source file"
+                return result
+        i = i + 1
+    result
+
+fn cli_escape_with_string(value: str) -> str:
+    var out = ""
+    for i in 0..value.len() as i32:
+        let ch = value.byte_at(i as i64)
+        if ch == 92:
+            out = out ++ "\\\\"
+        else if ch == 34:
+            out = out ++ "\\\""
+        else if ch == 10:
+            out = out ++ "\\n"
+        else if ch == 13:
+            out = out ++ "\\r"
+        else if ch == 9:
+            out = out ++ "\\t"
+        else:
+            out = out ++ value.slice(i as i64, (i + 1) as i64)
+    out
+
+fn cli_rewrite_semicolons(code: str) -> str:
+    var lexer = Lexer.init(code, 0)
+    let tokens = lexer.tokenize()
+    var out = ""
+    var cursor = 0
+    for i in 0..tokens.len():
+        let tag = tokens.get_tag(i)
+        if tag == TokenKind.TK_EOF:
+            break
+        if tag != TokenKind.TK_SEMICOLON:
+            continue
+        let start = tokens.get_start(i)
+        let end = tokens.get_end(i)
+        if start > cursor:
+            out = out ++ code.slice(cursor as i64, start as i64)
+        out = out ++ "\n"
+        cursor = end
+    if cursor < code.len() as i32:
+        out = out ++ code.slice(cursor as i64, code.len())
+    out
+
+fn cli_indent_code(code: str, indent: str) -> str:
+    var out = indent
+    for i in 0..code.len() as i32:
+        let ch = code.byte_at(i as i64)
+        out = out ++ code.slice(i as i64, (i + 1) as i64)
+        if ch == 10 and i + 1 < code.len() as i32:
+            out = out ++ indent
+    out
+
+fn cli_one_liner_source_name(mode: i32, count: i32) -> str:
+    let name = cli_one_liner_mode_name(mode)
+    if count == 1:
+        return "<cli " ++ name ++ " #1>"
+    "<cli " ++ name ++ ">"
+
+fn cli_build_args_binding(args: Vec[str]) -> str:
+    var out = "let args: Vec[str] = Vec.new()\n"
+    for i in 0..args.len() as i32:
+        let escaped = cli_escape_with_string(args.get(i as i64))
+        out = out ++ "args.push(\"" ++ escaped ++ "\")\n"
+    out
+
+fn cli_synthetic_source_new -> CliSyntheticSource:
+    CliSyntheticSource {
+        source: "",
+        gen_starts: Vec.new(),
+        gen_ends: Vec.new(),
+        source_names: Vec.new(),
+        source_texts: Vec.new(),
+    }
+
+fn cli_synthetic_add_mapping(mut syn: CliSyntheticSource, start: i32, text: str, source_name: str) -> CliSyntheticSource:
+    syn.gen_starts.push(start)
+    syn.gen_ends.push(start + text.len() as i32 + 1)
+    syn.source_names.push(source_name)
+    syn.source_texts.push(text)
+    syn
+
+fn cli_build_synthetic_source(one: CliOneLiner) -> CliSyntheticSource:
+    var syn = cli_synthetic_source_new()
+    var source = ""
+    source = source ++ "use std.io\n"
+    source = source ++ "use std.str\n"
+    source = source ++ "use std.regex\n"
+    source = source ++ "use std.math\n"
+    source = source ++ "use std.collections\n"
+    source = source ++ "use std.builtins\n\n"
+    source = source ++ cli_build_args_binding(one.args)
+    if one.mode == CliOneLinerMode.Eval:
+        for i in 0..one.code_parts.len() as i32:
+            let rewritten = cli_rewrite_semicolons(one.code_parts.get(i as i64))
+            let start = source.len() as i32
+            source = source ++ rewritten ++ "\n"
+            syn = cli_synthetic_add_mapping(syn, start, rewritten, "<cli -e #" ++ f"{i + 1}" ++ ">")
+        syn.source = source
+        return syn
+    source = source ++ "var nr: i64 = 0\n"
+    if one.mode == CliOneLinerMode.Lines:
+        source = source ++ "for line in stdin.lines():\n"
+        source = source ++ "    nr = nr + 1\n"
+        for i in 0..one.code_parts.len() as i32:
+            let rewritten = cli_rewrite_semicolons(one.code_parts.get(i as i64))
+            let indented = cli_indent_code(rewritten, "    ")
+            let start = source.len() as i32 + 4
+            source = source ++ indented ++ "\n"
+            syn = cli_synthetic_add_mapping(syn, start, rewritten, "<cli -n #" ++ f"{i + 1}" ++ ">")
+        syn.source = source
+        return syn
+    source = source ++ "for __line in stdin.lines():\n"
+    source = source ++ "    nr = nr + 1\n"
+    source = source ++ "    var line = __line\n"
+    for i in 0..one.code_parts.len() as i32:
+        let rewritten = cli_rewrite_semicolons(one.code_parts.get(i as i64))
+        let indented = cli_indent_code(rewritten, "    ")
+        let start = source.len() as i32 + 4
+        source = source ++ indented ++ "\n"
+        syn = cli_synthetic_add_mapping(syn, start, rewritten, "<cli -p #" ++ f"{i + 1}" ++ ">")
+    source = source ++ "    print(line)\n"
+    syn.source = source
+    syn
+
+fn cli_one_liner_bin_path -> str:
+    f"out/tmp/with-cli-one-liner-{with_getpid()}-{with_clock_nanos()}"
+
+fn run_one_liner_command(argc: i32, one: CliOneLiner, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> i32:
+    let _ = argc
+    let _ = debug_info
+    if not one.ok:
+        with_eprint(one.error_msg)
+        return 1
+    if one.code_parts.len() == 0:
+        with_eprint("error: one-liner mode requires at least one code argument")
+        return 1
+    if no_std:
+        with_eprint("error: one-liner mode requires the standard library")
+        return 1
+    let synthetic = cli_build_synthetic_source(one)
+    let source = synthetic.source
+    let source_name = cli_one_liner_source_name(one.mode, one.code_parts.len() as i32)
+    let bin_path = cli_one_liner_bin_path()
+    var comp = Compilation.init()
+    comp.configure(one.opt_level, no_std, alloc_mode)
+    comp.set_prelude_mode(prelude_mode)
+    comp.set_debug_info(false)
+    for mi in 0..synthetic.gen_starts.len() as i32:
+        comp.add_cli_diag_mapping(
+            synthetic.gen_starts.get(mi as i64),
+            synthetic.gen_ends.get(mi as i64),
+            synthetic.source_names.get(mi as i64),
+            synthetic.source_texts.get(mi as i64),
+        )
+    let built = comp.build_entry_binary_from_source_to_path(source_name, source, bin_path)
+    if built == "":
+        with_eprint("error: one-liner compilation failed")
+        return 1
+    comp.print_warnings()
+    let rc = with_exec_binary(built)
+    let _ = with_fs_remove_file(built)
+    let _ = with_fs_remove_file(built ++ ".o")
+    let _ = with_fs_remove_dir(built ++ ".dSYM")
+    rc
+
 fn run_cli(argc: i32) -> i32:
     let opt_level = cli_opt_level(argc)
     let no_std = cli_has_flag(argc, "--no-std") or cli_has_flag(argc, "--freestanding")
@@ -256,6 +546,10 @@ fn run_cli(argc: i32) -> i32:
     // Cache source and output paths — scanned once, used by all subcommands.
     let source = find_source_arg(argc)
     let output = find_output_arg(argc)
+
+    let one_liner = cli_one_liner_scan(argc)
+    if one_liner.seen:
+        return run_one_liner_command(argc, one_liner, no_std, alloc_mode, prelude_mode, debug_info)
 
     // `with hello.w` is shorthand for `with run hello.w`
     if cli_is_implicit_run(argc):
@@ -1294,6 +1588,10 @@ fn print_usage:
     with_write("\n")
     with_write("General Options:\n")
     with_write("\n")
+    with_write("  -e <code>        Compile and run code as top-level statements\n")
+    with_write("  -n <code>        Run code for each stdin line as line/nr\n")
+    with_write("  -p <code>        Like -n, then print line after each iteration\n")
+    with_write("  -- <args>        Pass remaining args to one-liner args\n")
     with_write("  -h, --help       Print this help and exit\n")
     with_write("  -O0|-O1|-O2|-O3  Set optimization level\n")
     with_write("  -o <path>        Write output to path\n")

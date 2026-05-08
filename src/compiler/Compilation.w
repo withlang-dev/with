@@ -117,6 +117,10 @@ fn compilation_mir_error_span(zcu: Zcu, pool: AstPool, fn_sym: i32, raw_span: i3
 type Compilation {
     zcu: Zcu,
     config: CompilationConfig,
+    cli_diag_gen_starts: Vec[i32],
+    cli_diag_gen_ends: Vec[i32],
+    cli_diag_source_names: Vec[str],
+    cli_diag_source_texts: Vec[str],
 }
 
 fn Compilation.init -> Compilation:
@@ -126,6 +130,10 @@ fn Compilation.init -> Compilation:
     Compilation {
         zcu: zcu,
         config: compilation_config_default(),
+        cli_diag_gen_starts: Vec.new(),
+        cli_diag_gen_ends: Vec.new(),
+        cli_diag_source_names: Vec.new(),
+        cli_diag_source_texts: Vec.new(),
     }
 
 fn Compilation.configure(self: Compilation, opt_level: i32, no_std: bool, alloc_mode: bool):
@@ -146,6 +154,23 @@ fn Compilation.set_debug_info(self: Compilation, enabled: bool):
     var cfg = self.config
     cfg.debug_info = enabled
     self.config = cfg
+
+fn Compilation.add_cli_diag_mapping(self: Compilation, gen_start: i32, gen_end: i32, source_name: str, source_text: str):
+    self.cli_diag_gen_starts.push(gen_start)
+    self.cli_diag_gen_ends.push(gen_end)
+    self.cli_diag_source_names.push(source_name)
+    self.cli_diag_source_texts.push(source_text)
+
+fn Compilation.apply_cli_diag_mappings(self: Compilation, zcu: Zcu) -> Zcu:
+    zcu.clear_cli_diag_mappings()
+    for i in 0..self.cli_diag_gen_starts.len() as i32:
+        zcu.add_cli_diag_mapping(
+            self.cli_diag_gen_starts.get(i as i64),
+            self.cli_diag_gen_ends.get(i as i64),
+            self.cli_diag_source_names.get(i as i64),
+            self.cli_diag_source_texts.get(i as i64),
+        )
+    zcu
 
 fn Compilation.compile_file(self: Compilation, path: str) -> AstPool:
     compilation_debug_init("Compilation.compile_file:start " ++ path)
@@ -203,6 +228,17 @@ fn Compilation.compile_source_text(self: Compilation, source_path: str, source_t
     zcu.project_config = project_config_load_for_source(source_path)
     zcu.set_current_source(source_dir, source_path, source_text)
     let pool = zcu.compile_source_frontend(source_text, source_path, 0)
+    self.zcu = zcu
+    pool
+
+fn Compilation.compile_entry_source_text(self: Compilation, source_path: str, source_text: str) -> AstPool:
+    var zcu = self.zcu
+    let source_dir = frontend_dirname(source_path)
+    zcu.reset_for_new_invocation(source_dir, source_path, "")
+    zcu.project_config = project_config_load_for_source(source_path)
+    zcu.set_current_source(source_dir, source_path, source_text)
+    zcu = self.apply_cli_diag_mappings(zcu)
+    let pool = zcu.compile_source_frontend_mode(source_text, source_path, 0, 1)
     self.zcu = zcu
     pool
 
@@ -282,6 +318,17 @@ fn Compilation.build_binary_from_source_to_path(self: Compilation, source_path: 
     let _ = ("rm -rf " ++ bin_path ++ ".dSYM") |> with_system
 
     let pool = self.compile_source_text(source_path, source_text)
+    self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
+
+fn Compilation.build_entry_binary_from_source_to_path(self: Compilation, source_path: str, source_text: str, bin_path: str) -> str:
+    if bin_path.len() == 0:
+        return self.build_binary_from_source(source_path, source_text)
+    let obj_path = bin_path ++ ".o"
+    let output_dir = link_stage_dirname(bin_path)
+    let _ = ("mkdir -p " ++ output_dir) |> with_system
+    let _ = ("rm -rf " ++ bin_path ++ ".dSYM") |> with_system
+
+    let pool = self.compile_entry_source_text(source_path, source_text)
     self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
 
 fn Compilation.emit_c(self: Compilation, source_path: str, output_path: str) -> str:

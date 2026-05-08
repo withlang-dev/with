@@ -241,5 +241,6 @@ uint64_t with_bswap64(uint64_t x);
 // ── System ─────────────────────────────────────────────────────────
 
 int32_t with_system(with_str cmd);
+int32_t with_exec_binary(with_str path);
 
 #endif // WITH_RUNTIME_H

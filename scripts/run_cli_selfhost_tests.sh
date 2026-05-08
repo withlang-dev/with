@@ -3819,6 +3819,13 @@ expect_top_level_help_lists_cli_commands() {
     return
   fi
 
+  if ! file_has_literal "$tmpdir/out" "  -e <code>        Compile and run code as top-level statements"; then
+    echo "FAIL(cli-selfhost-help-one-liners) top_level_help"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
   if file_has_literal "$tmpdir/out" "Language quick reference:" || file_has_literal "$tmpdir/out" "with help use"; then
     echo "FAIL(cli-selfhost-help-language-reference) top_level_help"
     cat "$tmpdir/out" || true
@@ -3834,6 +3841,164 @@ expect_top_level_help_lists_cli_commands() {
   fi
 
   echo "PASS(cli-selfhost-help) top_level_help"
+}
+
+expect_cli_one_liners() {
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" -e 'print("hello")'; then
+    echo "FAIL(cli-selfhost-one-liner-e-run) one_liners"
+    cat "$tmpdir/out" || true
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+  if [[ "$(cat "$tmpdir/out")" != "hello" ]]; then
+    echo "FAIL(cli-selfhost-one-liner-e-output) one_liners"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" -e 'var x = 0' -e 'x = x + 2' -e 'print(f"{x}")'; then
+    echo "FAIL(cli-selfhost-one-liner-repeat-e-run) one_liners"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+  if [[ "$(cat "$tmpdir/out")" != "2" ]]; then
+    echo "FAIL(cli-selfhost-one-liner-repeat-e-output) one_liners"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" -e 'var x = 0; x = x + 1; print(f"{x}")'; then
+    echo "FAIL(cli-selfhost-one-liner-semicolon-run) one_liners"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+  if [[ "$(cat "$tmpdir/out")" != "1" ]]; then
+    echo "FAIL(cli-selfhost-one-liner-semicolon-output) one_liners"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" -e 'print("a;b")'; then
+    echo "FAIL(cli-selfhost-one-liner-semicolon-string-run) one_liners"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+  if [[ "$(cat "$tmpdir/out")" != "a;b" ]]; then
+    echo "FAIL(cli-selfhost-one-liner-semicolon-string-output) one_liners"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli "$tmpdir/out" "$tmpdir/err" -e 'for a in args: print(a)' -- foo bar; then
+    echo "FAIL(cli-selfhost-one-liner-args-run) one_liners"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+  if [[ "$(cat "$tmpdir/out")" != $'foo\nbar' ]]; then
+    echo "FAIL(cli-selfhost-one-liner-args-output) one_liners"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! printf 'a\nb\n' | "$SELFHOST_BIN" -n 'print(f"{nr}: {line}")' >"$tmpdir/out" 2>"$tmpdir/err"; then
+    echo "FAIL(cli-selfhost-one-liner-n-run) one_liners"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+  if [[ "$(cat "$tmpdir/out")" != $'1: a\n2: b' ]]; then
+    echo "FAIL(cli-selfhost-one-liner-n-output) one_liners"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! printf 'a\r\nb\n' | "$SELFHOST_BIN" -p 'line = line.upper()' >"$tmpdir/out" 2>"$tmpdir/err"; then
+    echo "FAIL(cli-selfhost-one-liner-p-run) one_liners"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+  if [[ "$(cat "$tmpdir/out")" != $'A\nB' ]]; then
+    echo "FAIL(cli-selfhost-one-liner-p-output) one_liners"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! printf 'error 42\n' | "$SELFHOST_BIN" -n 'if line =~ /error (\d+)/: print($1)' >"$tmpdir/out" 2>"$tmpdir/err"; then
+    echo "FAIL(cli-selfhost-one-liner-regex-numbered-run) one_liners"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+  if [[ "$(cat "$tmpdir/out")" != "42" ]]; then
+    echo "FAIL(cli-selfhost-one-liner-regex-numbered-output) one_liners"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! printf 'email=a@b\n' | "$SELFHOST_BIN" -n 'if line =~ /email=(?<email>\S+)/: print($email)' >"$tmpdir/out" 2>"$tmpdir/err"; then
+    echo "FAIL(cli-selfhost-one-liner-regex-named-run) one_liners"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+  if [[ "$(cat "$tmpdir/out")" != "a@b" ]]; then
+    echo "FAIL(cli-selfhost-one-liner-regex-named-output) one_liners"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if run_cli "$tmpdir/out" "$tmpdir/err" -e 'print("x")' -n 'print(line)'; then
+    echo "FAIL(cli-selfhost-one-liner-mutual-exclusion) one_liners"
+    failures=$((failures + 1))
+    return
+  fi
+  if ! file_has_literal "$tmpdir/err" "mutually exclusive"; then
+    echo "FAIL(cli-selfhost-one-liner-mutual-exclusion-diag) one_liners"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if run_cli "$tmpdir/out" "$tmpdir/err" -e 'let x = '; then
+    echo "FAIL(cli-selfhost-one-liner-diag-e-run) one_liners"
+    failures=$((failures + 1))
+    return
+  fi
+  if ! file_has_literal "$tmpdir/err" "<cli -e #1>:1:9"; then
+    echo "FAIL(cli-selfhost-one-liner-diag-e-location) one_liners"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if printf 'x\n' | "$SELFHOST_BIN" -n 'if line =~ /x/: print($1)' >"$tmpdir/out" 2>"$tmpdir/err"; then
+    echo "FAIL(cli-selfhost-one-liner-diag-n-run) one_liners"
+    failures=$((failures + 1))
+    return
+  fi
+  if ! file_has_literal "$tmpdir/err" "<cli -n #1>:1:23"; then
+    echo "FAIL(cli-selfhost-one-liner-diag-n-location) one_liners"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-one-liners) one_liners"
 }
 
 expect_test_command_runtime_directives() {
@@ -3960,6 +4125,7 @@ expect_init_in_cwd
 expect_init_named_dir
 expect_pointer_index_is_rejected
 expect_top_level_help_lists_cli_commands
+expect_cli_one_liners
 expect_test_command_runtime_directives
 expect_test_command_parallel_same_source
 expect_prelude_output_functions_contract
