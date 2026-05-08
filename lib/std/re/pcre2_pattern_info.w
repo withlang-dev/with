@@ -2,11 +2,11 @@
 use std.re.defs
 
 @[c_export("pcre2_pattern_info_8")]
-fn pcre2_pattern_info_8(code: *const pcre2_real_code_8, what: c_uint, where_: *mut c_void) -> c_int {
-    var re: *const pcre2_real_code_8 = code
+fn pcre2_pattern_info_8(__param_code: *const pcre2_real_code_8, __param_what: c_uint, __param_where_: *mut c_void) -> c_int {
+    var __local_re: *const pcre2_real_code_8 = __param_code
 
-    if ((if where_ == null: 1 else: 0) != 0) {
-        match what {
+    if ((if __param_where_ == null: 1 else: 0) != 0) {
+        match __param_what {
             0 => {
                 return 4
             },
@@ -92,55 +92,55 @@ fn pcre2_pattern_info_8(code: *const pcre2_real_code_8, what: c_uint, where_: *m
 
     }
 
-    if ((if re == null: 1 else: 0) != 0) {
+    if ((if __local_re == null: 1 else: 0) != 0) {
         return -51
     }
 
-    if ((if re.magic_number != 1346589253: 1 else: 0) != 0) {
+    if ((if __local_re.magic_number != 1346589253: 1 else: 0) != 0) {
         return -31
     }
 
-    if ((if (re.flags & 1) == 0: 1 else: 0) != 0) {
+    if ((if ((__local_re.flags as c_uint) & (1 as c_uint)) == 0: 1 else: 0) != 0) {
         return -32
     }
 
     while true {
-        match what {
+        match __param_what {
             0 => {
-                ((unsafe: *(where_ as *mut c_uint)) = re.overall_options)
+                ((unsafe: *(__param_where_ as *mut c_uint)) = __local_re.overall_options)
             },
             1 => {
-                ((unsafe: *(where_ as *mut c_uint)) = re.compile_options)
+                ((unsafe: *(__param_where_ as *mut c_uint)) = __local_re.compile_options)
             },
             2 => {
-                ((unsafe: *(where_ as *mut c_uint)) = re.top_backref)
+                ((unsafe: *(__param_where_ as *mut c_uint)) = __local_re.top_backref)
             },
             3 => {
-                ((unsafe: *(where_ as *mut c_uint)) = re.bsr_convention)
+                ((unsafe: *(__param_where_ as *mut c_uint)) = __local_re.bsr_convention)
             },
             4 => {
-                ((unsafe: *(where_ as *mut c_uint)) = re.top_bracket)
+                ((unsafe: *(__param_where_ as *mut c_uint)) = __local_re.top_bracket)
             },
             21 => {
-                ((unsafe: *(where_ as *mut c_uint)) = re.limit_depth)
+                ((unsafe: *(__param_where_ as *mut c_uint)) = __local_re.limit_depth)
 
-                if ((if re.limit_depth == 4294967295: 1 else: 0) != 0) {
+                if ((if __local_re.limit_depth == 4294967295: 1 else: 0) != 0) {
                     return -55
                 }
 
             },
             26 => {
-                ((unsafe: *(where_ as *mut c_uint)) = re.extra_options)
+                ((unsafe: *(__param_where_ as *mut c_uint)) = __local_re.extra_options)
             },
             6 => {
                 var __ci_expr_ternary_1: c_int = 0
 
-                if ((if (re.flags & 16) != 0: 1 else: 0) != 0) {
+                if ((if ((__local_re.flags as c_uint) & (16 as c_uint)) != 0: 1 else: 0) != 0) {
                     (__ci_expr_ternary_1 = 1)
                 } else {
                     var __ci_expr_ternary_0: c_int = 0
 
-                    if ((if (re.flags & 512) != 0: 1 else: 0) != 0) {
+                    if ((if ((__local_re.flags as c_uint) & (512 as c_uint)) != 0: 1 else: 0) != 0) {
                         (__ci_expr_ternary_0 = 2)
                     } else {
                         (__ci_expr_ternary_0 = 0)
@@ -150,111 +150,111 @@ fn pcre2_pattern_info_8(code: *const pcre2_real_code_8, what: c_uint, where_: *m
 
                 }
 
-                ((unsafe: *(where_ as *mut c_uint)) = __ci_expr_ternary_1)
+                ((unsafe: *(__param_where_ as *mut c_uint)) = __ci_expr_ternary_1)
 
             },
             5 => {
                 var __ci_expr_ternary_2: c_uint = 0
 
-                if ((if (re.flags & 16) != 0: 1 else: 0) != 0) {
-                    (__ci_expr_ternary_2 = re.first_codeunit)
+                if ((if ((__local_re.flags as c_uint) & (16 as c_uint)) != 0: 1 else: 0) != 0) {
+                    (__ci_expr_ternary_2 = __local_re.first_codeunit)
                 } else {
                     (__ci_expr_ternary_2 = 0)
                 }
 
-                ((unsafe: *(where_ as *mut c_uint)) = __ci_expr_ternary_2)
+                ((unsafe: *(__param_where_ as *mut c_uint)) = __ci_expr_ternary_2)
 
             },
             7 => {
                 var __ci_expr_ternary_3: *const u8 = null
 
-                if ((if (re.flags & 64) != 0: 1 else: 0) != 0) {
-                    (__ci_expr_ternary_3 = ((&re.start_bitmap[0] as *const u8)))
+                if ((if ((__local_re.flags as c_uint) & (64 as c_uint)) != 0: 1 else: 0) != 0) {
+                    (__ci_expr_ternary_3 = ((&raw const (unsafe: *__local_re).start_bitmap[0] as *const u8)))
                 } else {
                     (__ci_expr_ternary_3 = ((null as *const u8)))
                 }
 
-                ((unsafe: *(where_ as *mut *const u8)) = __ci_expr_ternary_3)
+                ((unsafe: *(__param_where_ as *mut *const u8)) = __ci_expr_ternary_3)
 
             },
             24 => {
-                ((unsafe: *(where_ as *mut c_ulong)) = (120 +% ((re.top_bracket * 2) *% sizeof[c_ulong]())))
+                ((unsafe: *(__param_where_ as *mut c_ulong)) = ((120 as c_ulong) +% (((((__local_re.top_bracket as c_int) * 2) as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong)))
             },
             23 => {
-                ((unsafe: *(where_ as *mut c_uint)) = (if (re.flags & 4194304) != 0: 1 else: 0))
+                ((unsafe: *(__param_where_ as *mut c_uint)) = (if ((__local_re.flags as c_uint) & (4194304 as c_uint)) != 0: 1 else: 0))
             },
             8 => {
-                ((unsafe: *(where_ as *mut c_uint)) = (if (re.flags & 2048) != 0: 1 else: 0))
+                ((unsafe: *(__param_where_ as *mut c_uint)) = (if ((__local_re.flags as c_uint) & (2048 as c_uint)) != 0: 1 else: 0))
             },
             25 => {
-                ((unsafe: *(where_ as *mut c_uint)) = re.limit_heap)
+                ((unsafe: *(__param_where_ as *mut c_uint)) = __local_re.limit_heap)
 
-                if ((if re.limit_heap == 4294967295: 1 else: 0) != 0) {
+                if ((if __local_re.limit_heap == 4294967295: 1 else: 0) != 0) {
                     return -55
                 }
 
             },
             9 => {
-                ((unsafe: *(where_ as *mut c_uint)) = (if (re.flags & 1024) != 0: 1 else: 0))
+                ((unsafe: *(__param_where_ as *mut c_uint)) = (if ((__local_re.flags as c_uint) & (1024 as c_uint)) != 0: 1 else: 0))
             },
             10 => {
-                ((unsafe: *(where_ as *mut c_ulong)) = 0)
+                ((unsafe: *(__param_where_ as *mut c_ulong)) = 0)
             },
             12 => {
                 var __ci_expr_ternary_4: c_int = 0
 
-                if ((if (re.flags & 128) != 0: 1 else: 0) != 0) {
+                if ((if ((__local_re.flags as c_uint) & (128 as c_uint)) != 0: 1 else: 0) != 0) {
                     (__ci_expr_ternary_4 = 1)
                 } else {
                     (__ci_expr_ternary_4 = 0)
                 }
 
-                ((unsafe: *(where_ as *mut c_uint)) = __ci_expr_ternary_4)
+                ((unsafe: *(__param_where_ as *mut c_uint)) = __ci_expr_ternary_4)
 
             },
             11 => {
                 var __ci_expr_ternary_5: c_uint = 0
 
-                if ((if (re.flags & 128) != 0: 1 else: 0) != 0) {
-                    (__ci_expr_ternary_5 = re.last_codeunit)
+                if ((if ((__local_re.flags as c_uint) & (128 as c_uint)) != 0: 1 else: 0) != 0) {
+                    (__ci_expr_ternary_5 = __local_re.last_codeunit)
                 } else {
                     (__ci_expr_ternary_5 = 0)
                 }
 
-                ((unsafe: *(where_ as *mut c_uint)) = __ci_expr_ternary_5)
+                ((unsafe: *(__param_where_ as *mut c_uint)) = __ci_expr_ternary_5)
 
             },
             13 => {
-                ((unsafe: *(where_ as *mut c_uint)) = (if (re.flags & 8192) != 0: 1 else: 0))
+                ((unsafe: *(__param_where_ as *mut c_uint)) = (if ((__local_re.flags as c_uint) & (8192 as c_uint)) != 0: 1 else: 0))
             },
             14 => {
-                ((unsafe: *(where_ as *mut c_uint)) = re.limit_match)
+                ((unsafe: *(__param_where_ as *mut c_uint)) = __local_re.limit_match)
 
-                if ((if re.limit_match == 4294967295: 1 else: 0) != 0) {
+                if ((if __local_re.limit_match == 4294967295: 1 else: 0) != 0) {
                     return -55
                 }
 
             },
             15 => {
-                ((unsafe: *(where_ as *mut c_uint)) = re.max_lookbehind)
+                ((unsafe: *(__param_where_ as *mut c_uint)) = __local_re.max_lookbehind)
             },
             16 => {
-                ((unsafe: *(where_ as *mut c_uint)) = re.minlength)
+                ((unsafe: *(__param_where_ as *mut c_uint)) = __local_re.minlength)
             },
             18 => {
-                ((unsafe: *(where_ as *mut c_uint)) = re.name_entry_size)
+                ((unsafe: *(__param_where_ as *mut c_uint)) = __local_re.name_entry_size)
             },
             17 => {
-                ((unsafe: *(where_ as *mut c_uint)) = re.name_count)
+                ((unsafe: *(__param_where_ as *mut c_uint)) = __local_re.name_count)
             },
             19 => {
-                ((unsafe: *(where_ as *mut *const u8)) = ((((re as *const c_char) + sizeof[pcre2_real_code_8]()) as *const u8)))
+                ((unsafe: *(__param_where_ as *mut *const u8)) = ((((__local_re as *const c_char) + (sizeof[pcre2_real_code_8]() as usize)) as *const u8)))
             },
             20 => {
-                ((unsafe: *(where_ as *mut c_uint)) = re.newline_convention)
+                ((unsafe: *(__param_where_ as *mut c_uint)) = __local_re.newline_convention)
             },
             22 => {
-                ((unsafe: *(where_ as *mut c_ulong)) = re.blocksize)
+                ((unsafe: *(__param_where_ as *mut c_ulong)) = __local_re.blocksize)
             },
             _ => {
                 return -34
@@ -269,1169 +269,1170 @@ fn pcre2_pattern_info_8(code: *const pcre2_real_code_8, what: c_uint, where_: *m
 
 }
 
-fn pcre2_callout_enumerate_8(code: *const pcre2_real_code_8, callback: *const fn(*mut pcre2_callout_enumerate_block_8, *mut c_void) -> c_int, callout_data: *mut c_void) -> c_int {
-    var re: *const pcre2_real_code_8 = code
+@[c_export("pcre2_callout_enumerate_8")]
+fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, __param_callback: *const fn(*mut pcre2_callout_enumerate_block_8, *mut c_void) -> c_int, __param_callout_data: *mut c_void) -> c_int {
+    var __local_re: *const pcre2_real_code_8 = __param_code
 
-    var cb: pcre2_callout_enumerate_block_8
+    var __local_cb: pcre2_callout_enumerate_block_8
 
-    var cc: *const u8
+    var __local_cc: *const u8
 
-    var utf: c_int
+    var __local_utf: c_int
 
-    if ((if re == null: 1 else: 0) != 0) {
+    if ((if __local_re == null: 1 else: 0) != 0) {
         return -51
     }
 
-    (utf = (if (re.overall_options & 524288) != 0: 1 else: 0))
+    (__local_utf = (if ((__local_re.overall_options as c_uint) & (524288 as c_uint)) != 0: 1 else: 0))
 
-    if ((if re.magic_number != 1346589253: 1 else: 0) != 0) {
+    if ((if __local_re.magic_number != 1346589253: 1 else: 0) != 0) {
         return -31
     }
 
-    if ((if (re.flags & 1) == 0: 1 else: 0) != 0) {
+    if ((if ((__local_re.flags as c_uint) & (1 as c_uint)) == 0: 1 else: 0) != 0) {
         return -32
     }
 
-    (cb.version = 0)
+    (__local_cb.version = 0)
 
-    (cc = ((((re as *mut u8) + re.code_start) as *const u8)))
+    (__local_cc = ((((__local_re as *mut u8) + (__local_re.code_start as usize)) as *const u8)))
 
     while (1 != 0) {
-        var rc: c_int
+        var __local_rc: c_int
 
         while true {
-            match (unsafe: *cc) {
+            match (unsafe: *__local_cc) {
                 0 => {
                     return 0
                 },
                 29 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 30 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 31 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 32 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 33 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 34 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 35 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 36 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 37 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 38 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 39 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 40 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 41 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 42 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 43 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 44 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 45 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 46 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 47 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 48 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 49 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 50 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 51 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 52 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 53 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 54 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 55 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 56 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 57 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 58 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 59 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 60 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 61 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 62 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 63 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 64 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 65 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 66 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 67 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 68 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 69 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 70 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 71 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 72 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 73 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 74 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 75 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 76 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 77 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 78 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 79 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 80 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 81 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 82 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 83 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 84 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_0: c_int = 0
 
-                    if (utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (unsafe: cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_utf != 0) {
+                        (__ci_expr_logic_0 = (if (if (unsafe: __local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
-                        (cc = cc + _pcre2_utf8_table4[((unsafe: cc[-1]) & 63)])
+                        (__local_cc = __local_cc + ((_pcre2_utf8_table4[((((unsafe: __local_cc[-1]) as c_int) as c_uint) & (63 as c_uint))] as c_uint) as usize))
                     }
 
 
                 },
                 85 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_1: c_int
 
-                    if ((if (unsafe: cc[-1]) == OP_PROP: 1 else: 0) != 0) {
+                    if ((if (unsafe: __local_cc[-1]) == OP_PROP: 1 else: 0) != 0) {
                         (__ci_expr_logic_1 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_1 = (if (if (unsafe: cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_1 = (if (if (unsafe: __local_cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_1 != 0) {
-                        (cc = cc + 2)
+                        (__local_cc = __local_cc + ((2 as isize) as usize))
                     }
 
 
                 },
                 86 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_1: c_int
 
-                    if ((if (unsafe: cc[-1]) == OP_PROP: 1 else: 0) != 0) {
+                    if ((if (unsafe: __local_cc[-1]) == OP_PROP: 1 else: 0) != 0) {
                         (__ci_expr_logic_1 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_1 = (if (if (unsafe: cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_1 = (if (if (unsafe: __local_cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_1 != 0) {
-                        (cc = cc + 2)
+                        (__local_cc = __local_cc + ((2 as isize) as usize))
                     }
 
 
                 },
                 87 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_1: c_int
 
-                    if ((if (unsafe: cc[-1]) == OP_PROP: 1 else: 0) != 0) {
+                    if ((if (unsafe: __local_cc[-1]) == OP_PROP: 1 else: 0) != 0) {
                         (__ci_expr_logic_1 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_1 = (if (if (unsafe: cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_1 = (if (if (unsafe: __local_cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_1 != 0) {
-                        (cc = cc + 2)
+                        (__local_cc = __local_cc + ((2 as isize) as usize))
                     }
 
 
                 },
                 88 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_1: c_int
 
-                    if ((if (unsafe: cc[-1]) == OP_PROP: 1 else: 0) != 0) {
+                    if ((if (unsafe: __local_cc[-1]) == OP_PROP: 1 else: 0) != 0) {
                         (__ci_expr_logic_1 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_1 = (if (if (unsafe: cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_1 = (if (if (unsafe: __local_cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_1 != 0) {
-                        (cc = cc + 2)
+                        (__local_cc = __local_cc + ((2 as isize) as usize))
                     }
 
 
                 },
                 89 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_1: c_int
 
-                    if ((if (unsafe: cc[-1]) == OP_PROP: 1 else: 0) != 0) {
+                    if ((if (unsafe: __local_cc[-1]) == OP_PROP: 1 else: 0) != 0) {
                         (__ci_expr_logic_1 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_1 = (if (if (unsafe: cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_1 = (if (if (unsafe: __local_cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_1 != 0) {
-                        (cc = cc + 2)
+                        (__local_cc = __local_cc + ((2 as isize) as usize))
                     }
 
 
                 },
                 90 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_1: c_int
 
-                    if ((if (unsafe: cc[-1]) == OP_PROP: 1 else: 0) != 0) {
+                    if ((if (unsafe: __local_cc[-1]) == OP_PROP: 1 else: 0) != 0) {
                         (__ci_expr_logic_1 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_1 = (if (if (unsafe: cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_1 = (if (if (unsafe: __local_cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_1 != 0) {
-                        (cc = cc + 2)
+                        (__local_cc = __local_cc + ((2 as isize) as usize))
                     }
 
 
                 },
                 91 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_1: c_int
 
-                    if ((if (unsafe: cc[-1]) == OP_PROP: 1 else: 0) != 0) {
+                    if ((if (unsafe: __local_cc[-1]) == OP_PROP: 1 else: 0) != 0) {
                         (__ci_expr_logic_1 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_1 = (if (if (unsafe: cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_1 = (if (if (unsafe: __local_cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_1 != 0) {
-                        (cc = cc + 2)
+                        (__local_cc = __local_cc + ((2 as isize) as usize))
                     }
 
 
                 },
                 92 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_1: c_int
 
-                    if ((if (unsafe: cc[-1]) == OP_PROP: 1 else: 0) != 0) {
+                    if ((if (unsafe: __local_cc[-1]) == OP_PROP: 1 else: 0) != 0) {
                         (__ci_expr_logic_1 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_1 = (if (if (unsafe: cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_1 = (if (if (unsafe: __local_cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_1 != 0) {
-                        (cc = cc + 2)
+                        (__local_cc = __local_cc + ((2 as isize) as usize))
                     }
 
 
                 },
                 93 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_1: c_int
 
-                    if ((if (unsafe: cc[-1]) == OP_PROP: 1 else: 0) != 0) {
+                    if ((if (unsafe: __local_cc[-1]) == OP_PROP: 1 else: 0) != 0) {
                         (__ci_expr_logic_1 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_1 = (if (if (unsafe: cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_1 = (if (if (unsafe: __local_cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_1 != 0) {
-                        (cc = cc + 2)
+                        (__local_cc = __local_cc + ((2 as isize) as usize))
                     }
 
 
                 },
                 94 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_1: c_int
 
-                    if ((if (unsafe: cc[-1]) == OP_PROP: 1 else: 0) != 0) {
+                    if ((if (unsafe: __local_cc[-1]) == OP_PROP: 1 else: 0) != 0) {
                         (__ci_expr_logic_1 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_1 = (if (if (unsafe: cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_1 = (if (if (unsafe: __local_cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_1 != 0) {
-                        (cc = cc + 2)
+                        (__local_cc = __local_cc + ((2 as isize) as usize))
                     }
 
 
                 },
                 95 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_1: c_int
 
-                    if ((if (unsafe: cc[-1]) == OP_PROP: 1 else: 0) != 0) {
+                    if ((if (unsafe: __local_cc[-1]) == OP_PROP: 1 else: 0) != 0) {
                         (__ci_expr_logic_1 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_1 = (if (if (unsafe: cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_1 = (if (if (unsafe: __local_cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_1 != 0) {
-                        (cc = cc + 2)
+                        (__local_cc = __local_cc + ((2 as isize) as usize))
                     }
 
 
                 },
                 96 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_1: c_int
 
-                    if ((if (unsafe: cc[-1]) == OP_PROP: 1 else: 0) != 0) {
+                    if ((if (unsafe: __local_cc[-1]) == OP_PROP: 1 else: 0) != 0) {
                         (__ci_expr_logic_1 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_1 = (if (if (unsafe: cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_1 = (if (if (unsafe: __local_cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_1 != 0) {
-                        (cc = cc + 2)
+                        (__local_cc = __local_cc + ((2 as isize) as usize))
                     }
 
 
                 },
                 97 => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                     var __ci_expr_logic_1: c_int
 
-                    if ((if (unsafe: cc[-1]) == OP_PROP: 1 else: 0) != 0) {
+                    if ((if (unsafe: __local_cc[-1]) == OP_PROP: 1 else: 0) != 0) {
                         (__ci_expr_logic_1 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_1 = (if (if (unsafe: cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_1 = (if (if (unsafe: __local_cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_1 != 0) {
-                        (cc = cc + 2)
+                        (__local_cc = __local_cc + ((2 as isize) as usize))
                     }
 
 
                 },
                 112 => {
-                    (cc = cc + (((((unsafe: cc[1]) as c_int) << (8 as c_uint)) | (unsafe: cc[(1 + 1)])) as c_uint))
+                    (__local_cc = __local_cc + ((((((unsafe: __local_cc[1]) as c_int) << (8 as c_uint)) | ((unsafe: __local_cc[(1 + 1)]) as c_int)) as c_uint) as usize))
                 },
                 113 => {
-                    (cc = cc + (((((unsafe: cc[1]) as c_int) << (8 as c_uint)) | (unsafe: cc[(1 + 1)])) as c_uint))
+                    (__local_cc = __local_cc + ((((((unsafe: __local_cc[1]) as c_int) << (8 as c_uint)) | ((unsafe: __local_cc[(1 + 1)]) as c_int)) as c_uint) as usize))
                 },
                 156 => {
-                    (cc = cc + (_pcre2_OP_lengths_8[(unsafe: *cc)] + (unsafe: cc[1])))
+                    (__local_cc = __local_cc + ((((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_int) + ((unsafe: __local_cc[1]) as c_int)) as isize) as usize))
                 },
                 164 => {
-                    (cc = cc + (_pcre2_OP_lengths_8[(unsafe: *cc)] + (unsafe: cc[1])))
+                    (__local_cc = __local_cc + ((((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_int) + ((unsafe: __local_cc[1]) as c_int)) as isize) as usize))
                 },
                 158 => {
-                    (cc = cc + (_pcre2_OP_lengths_8[(unsafe: *cc)] + (unsafe: cc[1])))
+                    (__local_cc = __local_cc + ((((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_int) + ((unsafe: __local_cc[1]) as c_int)) as isize) as usize))
                 },
                 160 => {
-                    (cc = cc + (_pcre2_OP_lengths_8[(unsafe: *cc)] + (unsafe: cc[1])))
+                    (__local_cc = __local_cc + ((((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_int) + ((unsafe: __local_cc[1]) as c_int)) as isize) as usize))
                 },
                 162 => {
-                    (cc = cc + (_pcre2_OP_lengths_8[(unsafe: *cc)] + (unsafe: cc[1])))
+                    (__local_cc = __local_cc + ((((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_int) + ((unsafe: __local_cc[1]) as c_int)) as isize) as usize))
                 },
                 119 => {
-                    (cb.pattern_position = ((((((unsafe: cc[1]) as c_int) << (8 as c_uint)) | (unsafe: cc[(1 + 1)])) as c_uint)))
+                    (__local_cb.pattern_position = ((((((unsafe: __local_cc[1]) as c_int) << (8 as c_uint)) | ((unsafe: __local_cc[(1 + 1)]) as c_int)) as c_uint)))
 
-                    (cb.next_item_length = ((((((unsafe: cc[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: cc[((1 + 2) + 1)])) as c_uint)))
+                    (__local_cb.next_item_length = ((((((unsafe: __local_cc[(1 + 2)]) as c_int) << (8 as c_uint)) | ((unsafe: __local_cc[((1 + 2) + 1)]) as c_int)) as c_uint)))
 
-                    (cb.callout_number = (unsafe: cc[(1 + (2 * 2))]))
+                    (__local_cb.callout_number = (unsafe: __local_cc[(1 + (2 * 2))]))
 
-                    (cb.callout_string_offset = 0)
+                    (__local_cb.callout_string_offset = 0)
 
-                    (cb.callout_string_length = 0)
+                    (__local_cb.callout_string_length = 0)
 
-                    (cb.callout_string = null)
+                    (__local_cb.callout_string = null)
 
-                    (rc = callback((&raw mut cb as *mut pcre2_callout_enumerate_block_8), callout_data))
+                    (__local_rc = __param_callback((&raw mut __local_cb as *mut pcre2_callout_enumerate_block_8), __param_callout_data))
 
-                    if ((if rc != 0: 1 else: 0) != 0) {
-                        return rc
+                    if ((if __local_rc != 0: 1 else: 0) != 0) {
+                        return __local_rc
                     }
 
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
 
                 },
                 120 => {
-                    (cb.pattern_position = ((((((unsafe: cc[1]) as c_int) << (8 as c_uint)) | (unsafe: cc[(1 + 1)])) as c_uint)))
+                    (__local_cb.pattern_position = ((((((unsafe: __local_cc[1]) as c_int) << (8 as c_uint)) | ((unsafe: __local_cc[(1 + 1)]) as c_int)) as c_uint)))
 
-                    (cb.next_item_length = ((((((unsafe: cc[(1 + 2)]) as c_int) << (8 as c_uint)) | (unsafe: cc[((1 + 2) + 1)])) as c_uint)))
+                    (__local_cb.next_item_length = ((((((unsafe: __local_cc[(1 + 2)]) as c_int) << (8 as c_uint)) | ((unsafe: __local_cc[((1 + 2) + 1)]) as c_int)) as c_uint)))
 
-                    (cb.callout_number = 0)
+                    (__local_cb.callout_number = 0)
 
-                    (cb.callout_string_offset = ((((((unsafe: cc[(1 + (3 * 2))]) as c_int) << (8 as c_uint)) | (unsafe: cc[((1 + (3 * 2)) + 1)])) as c_uint)))
+                    (__local_cb.callout_string_offset = ((((((unsafe: __local_cc[(1 + (3 * 2))]) as c_int) << (8 as c_uint)) | ((unsafe: __local_cc[((1 + (3 * 2)) + 1)]) as c_int)) as c_uint)))
 
-                    (cb.callout_string_length = (((((((unsafe: cc[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) | (unsafe: cc[((1 + (2 * 2)) + 1)])) as c_uint) -% 9) -% 2))
+                    (__local_cb.callout_string_length = (((((((((unsafe: __local_cc[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) | ((unsafe: __local_cc[((1 + (2 * 2)) + 1)]) as c_int)) as c_uint) as c_uint) -% (9 as c_uint)) as c_uint) -% (2 as c_uint)))
 
-                    (cb.callout_string = (cc + (((1 + (4 * 2)) as isize) as usize)) + ((1 as isize) as usize))
+                    (__local_cb.callout_string = (__local_cc + (((1 + (4 * 2)) as isize) as usize)) + ((1 as isize) as usize))
 
-                    (rc = callback((&raw mut cb as *mut pcre2_callout_enumerate_block_8), callout_data))
+                    (__local_rc = __param_callback((&raw mut __local_cb as *mut pcre2_callout_enumerate_block_8), __param_callout_data))
 
-                    if ((if rc != 0: 1 else: 0) != 0) {
-                        return rc
+                    if ((if __local_rc != 0: 1 else: 0) != 0) {
+                        return __local_rc
                     }
 
-                    (cc = cc + (((((unsafe: cc[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) | (unsafe: cc[((1 + (2 * 2)) + 1)])) as c_uint))
+                    (__local_cc = __local_cc + ((((((unsafe: __local_cc[(1 + (2 * 2))]) as c_int) << (8 as c_uint)) | ((unsafe: __local_cc[((1 + (2 * 2)) + 1)]) as c_int)) as c_uint) as usize))
 
                 },
                 _ => {
-                    (cc = cc + _pcre2_OP_lengths_8[(unsafe: *cc)])
+                    (__local_cc = __local_cc + ((_pcre2_OP_lengths_8[(unsafe: *__local_cc)] as c_uint) as usize))
                 },
             }
 

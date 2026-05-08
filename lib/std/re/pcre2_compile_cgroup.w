@@ -1,55 +1,53 @@
 // Migrated from PCRE2
 use std.re.defs
 
-fn _pcre2_compile_get_hash_from_name8(name: *const u8, length: c_uint) -> c_ushort {
-    var hash: c_ushort
+@[c_export("_pcre2_compile_get_hash_from_name8")]
+fn _pcre2_compile_get_hash_from_name8(__param_name: *const u8, __param_length: c_uint) -> c_ushort {
+    var __local_hash: c_ushort
 
-    while true {
-        if (not (0 != 0)) {
-            break
-        }
-    }
+    do {
+        0
+    } while (0 != 0)
 
-    (hash = (((((unsafe: name[0]) & 127) | ((((unsafe: name[(length -% 1)]) & 255) as c_int) << (7 as c_uint))) as c_ushort)))
+    (__local_hash = ((((((unsafe: __param_name[0]) as c_int) & 127) | (((((unsafe: __param_name[((__param_length as c_uint) -% (1 as c_uint))]) as c_int) & 255) as c_int) << (7 as c_uint))) as c_ushort)))
 
-    while true {
-        if (not (0 != 0)) {
-            break
-        }
-    }
+    do {
+        0
+    } while (0 != 0)
 
-    return hash
+    return __local_hash
 
 }
 
-fn _pcre2_compile_find_named_group8(name: *const u8, length: c_uint, cb: *mut compile_block_8) -> *mut named_group_8 {
-    var hash: c_ushort = _pcre2_compile_get_hash_from_name8(name, length)
+@[c_export("_pcre2_compile_find_named_group8")]
+fn _pcre2_compile_find_named_group8(__param_name: *const u8, __param_length: c_uint, __param_cb: *mut compile_block_8) -> *mut named_group_8 {
+    var __local_hash: c_ushort = _pcre2_compile_get_hash_from_name8(__param_name, __param_length)
 
-    var ng: *mut named_group_8
+    var __local_ng: *mut named_group_8
 
-    var end: *mut named_group_8 = (cb.named_groups + ((cb.names_found as isize) as usize))
+    var __local_end: *mut named_group_8 = (__param_cb.named_groups + ((__param_cb.names_found as c_uint) as usize))
 
-    (ng = cb.named_groups)
+    (__local_ng = __param_cb.named_groups)
 
-    while ((if ng < end: 1 else: 0) != 0) {
+    while ((if __local_ng < __local_end: 1 else: 0) != 0) {
         var __ci_expr_logic_1: c_int = 0
 
         var __ci_expr_logic_0: c_int = 0
 
-        if ((if length == ng.length: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if hash == (ng.hash_dup & 32767): 1 else: 0) != 0: 1 else: 0))
+        if ((if __param_length == __local_ng.length: 1 else: 0) != 0) {
+            (__ci_expr_logic_0 = (if (if __local_hash == ((__local_ng.hash_dup as c_int) & (32767 as c_int)): 1 else: 0) != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_0 != 0) {
-            (__ci_expr_logic_1 = (if (if _pcre2_strncmp_8(name, ng.name, length) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_1 = (if (if _pcre2_strncmp_8(__param_name, __local_ng.name, __param_length) == 0: 1 else: 0) != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_1 != 0) {
-            return ng
+            return __local_ng
         }
 
 
-        (ng = ng + 1)
+        (__local_ng = __local_ng + 1)
 
     }
 
@@ -58,128 +56,128 @@ fn _pcre2_compile_find_named_group8(name: *const u8, length: c_uint, cb: *mut co
 
 }
 
-fn _pcre2_compile_add_name_to_table8(cb: *mut compile_block_8, __param_ng: *mut named_group_8, __param_tablecount: c_uint) -> c_uint {
-    var ng = __param_ng
-    var tablecount = __param_tablecount
-    var i: c_uint
+@[c_export("_pcre2_compile_add_name_to_table8")]
+fn _pcre2_compile_add_name_to_table8(__param_cb: *mut compile_block_8, __param_ng: *mut named_group_8, __param_tablecount: c_uint) -> c_uint {
+    var __local_ng = __param_ng
+    var __local_tablecount = __param_tablecount
+    var __local_i: c_uint
 
-    var name: *const u8 = ng.name
+    var __local_name: *const u8 = __local_ng.name
 
-    var length: c_int = ng.length
+    var __local_length: c_int = __local_ng.length
 
-    var duplicate_count: c_uint = 1
+    var __local_duplicate_count: c_uint = 1
 
-    var slot: *mut u8 = cb.name_table
+    var __local_slot: *mut u8 = __param_cb.name_table
 
-    while true {
-        if (not (0 != 0)) {
-            break
-        }
-    }
+    do {
+        0
+    } while (0 != 0)
 
-    if ((if (ng.hash_dup & 32768) != 0: 1 else: 0) != 0) {
-        var ng_it: *mut named_group_8
+    if ((if ((__local_ng.hash_dup as c_int) & (32768 as c_int)) != 0: 1 else: 0) != 0) {
+        var __local_ng_it: *mut named_group_8
 
-        var end: *mut named_group_8 = (cb.named_groups + ((cb.names_found as isize) as usize))
+        var __local_end: *mut named_group_8 = (__param_cb.named_groups + ((__param_cb.names_found as c_uint) as usize))
 
-        (ng_it = ng + ((1 as isize) as usize))
+        (__local_ng_it = __local_ng + ((1 as isize) as usize))
 
-        while ((if ng_it < end: 1 else: 0) != 0) {
-            if ((if ng_it.name == name: 1 else: 0) != 0) {
-                (duplicate_count = duplicate_count + 1)
+        while ((if __local_ng_it < __local_end: 1 else: 0) != 0) {
+            if ((if __local_ng_it.name == __local_name: 1 else: 0) != 0) {
+                (__local_duplicate_count = __local_duplicate_count + 1)
             }
 
-            (ng_it = ng_it + 1)
+            (__local_ng_it = __local_ng_it + 1)
 
         }
 
 
     }
 
-    (i = 0)
+    (__local_i = 0)
 
-    while ((if i < tablecount: 1 else: 0) != 0) {
-        var crc: c_int = with_memcmp((name as *i8), ((slot + ((2 as isize) as usize)) as *i8), ((length * (8 / 8)) as i64))
+    while ((if __local_i < __local_tablecount: 1 else: 0) != 0) {
+        var __local_crc: c_int = with_memcmp((__local_name as *i8), ((__local_slot + ((2 as isize) as usize)) as *i8), ((__local_length * (8 / 8)) as i64))
 
         var __ci_expr_logic_0: c_int = 0
 
-        if ((if crc == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if (unsafe: slot[(2 + length)]) != 0: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_crc == 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_0 = (if (if (unsafe: __local_slot[(2 + __local_length)]) != 0: 1 else: 0) != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_0 != 0) {
-            (crc = -1)
+            (__local_crc = -1)
         }
 
 
-        if ((if crc < 0: 1 else: 0) != 0) {
-            with_memmove(((slot + (cb.name_entry_size *% duplicate_count)) as *i8), (slot as *i8), ((((tablecount -% i) *% cb.name_entry_size) *% 1) as i64))
+        if ((if __local_crc < 0: 1 else: 0) != 0) {
+            with_memmove(((__local_slot + ((((__param_cb.name_entry_size as c_int) as c_uint) *% (__local_duplicate_count as c_uint)) as usize)) as *i8), (__local_slot as *i8), (((((((__local_tablecount as c_uint) -% (__local_i as c_uint)) as c_uint) *% ((__param_cb.name_entry_size as c_int) as c_uint)) as c_uint) *% (1 as c_uint)) as i64))
 
             break
 
         }
 
-        (slot = slot + cb.name_entry_size)
+        (__local_slot = __local_slot + ((__param_cb.name_entry_size as c_uint) as usize))
 
 
-        (i = i + 1)
+        (__local_i = __local_i + 1)
 
     }
 
 
-    (tablecount = tablecount + duplicate_count)
+    (__local_tablecount = __local_tablecount + __local_duplicate_count)
 
     while (1 != 0) {
-        ((unsafe: slot[0]) = (ng.number as c_uint) >> (8 as c_uint))
+        ((unsafe: __local_slot[0]) = (__local_ng.number as c_uint) >> (8 as c_uint))
 
-        ((unsafe: slot[(0 + 1)]) = ng.number & 255)
+        ((unsafe: __local_slot[(0 + 1)]) = (__local_ng.number as c_uint) & (255 as c_uint))
 
 
-        with_memcpy(((slot + ((2 as isize) as usize)) as *i8), (name as *i8), ((length * (8 / 8)) as i64))
+        with_memcpy(((__local_slot + ((2 as isize) as usize)) as *i8), (__local_name as *i8), ((__local_length * (8 / 8)) as i64))
 
-        with_memset((((slot + ((2 as isize) as usize)) + ((length as isize) as usize)) as *i8), 0, ((((cb.name_entry_size - length) - 2) * (8 / 8)) as i64))
+        with_memset((((__local_slot + ((2 as isize) as usize)) + ((__local_length as isize) as usize)) as *i8), 0, (((((__param_cb.name_entry_size as c_int) - __local_length) - 2) * (8 / 8)) as i64))
 
-        (duplicate_count = duplicate_count - 1)
+        (__local_duplicate_count = __local_duplicate_count - 1)
 
-        if ((if duplicate_count == 0: 1 else: 0) != 0) {
+        if ((if __local_duplicate_count == 0: 1 else: 0) != 0) {
             break
         }
 
 
         while (1 != 0) {
-            (ng = ng + 1)
+            (__local_ng = __local_ng + 1)
 
-            if ((if ng.name == name: 1 else: 0) != 0) {
+            if ((if __local_ng.name == __local_name: 1 else: 0) != 0) {
                 break
             }
 
         }
 
-        (slot = slot + cb.name_entry_size)
+        (__local_slot = __local_slot + ((__param_cb.name_entry_size as c_uint) as usize))
 
     }
 
-    return tablecount
+    return __local_tablecount
 
 }
 
-fn _pcre2_compile_find_dupname_details8(name: *const u8, length: c_uint, indexptr: *mut c_int, countptr: *mut c_int, errorcodeptr: *mut c_int, cb: *mut compile_block_8) -> c_int {
-    var i: c_uint
+@[c_export("_pcre2_compile_find_dupname_details8")]
+fn _pcre2_compile_find_dupname_details8(__param_name: *const u8, __param_length: c_uint, __param_indexptr: *mut c_int, __param_countptr: *mut c_int, __param_errorcodeptr: *mut c_int, __param_cb: *mut compile_block_8) -> c_int {
+    var __local_i: c_uint
 
-    var groupnumber: c_uint
+    var __local_groupnumber: c_uint
 
 
-    var count: c_int
+    var __local_count: c_int
 
-    var slot: *mut u8 = cb.name_table
+    var __local_slot: *mut u8 = __param_cb.name_table
 
-    (i = 0)
+    (__local_i = 0)
 
-    while ((if i < cb.names_found: 1 else: 0) != 0) {
+    while ((if __local_i < __param_cb.names_found: 1 else: 0) != 0) {
         var __ci_expr_logic_0: c_int = 0
 
-        if ((if _pcre2_strncmp_8(name, (slot + ((2 as isize) as usize)), length) == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if (unsafe: slot[(2 +% length)]) == 0: 1 else: 0) != 0: 1 else: 0))
+        if ((if _pcre2_strncmp_8(__param_name, (__local_slot + ((2 as isize) as usize)), __param_length) == 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_0 = (if (if (unsafe: __local_slot[((2 as c_uint) +% (__param_length as c_uint))]) == 0: 1 else: 0) != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_0 != 0) {
@@ -187,68 +185,66 @@ fn _pcre2_compile_find_dupname_details8(name: *const u8, length: c_uint, indexpt
         }
 
 
-        (slot = slot + cb.name_entry_size)
+        (__local_slot = __local_slot + ((__param_cb.name_entry_size as c_uint) as usize))
 
 
-        (i = i + 1)
+        (__local_i = __local_i + 1)
 
     }
 
 
-    if ((if i >= cb.names_found: 1 else: 0) != 0) {
-        while true {
-            if (not (0 != 0)) {
-                break
-            }
-        }
+    if ((if __local_i >= __param_cb.names_found: 1 else: 0) != 0) {
+        do {
+            0
+        } while (0 != 0)
 
-        ((unsafe: *errorcodeptr) = ERR53)
+        ((unsafe: *__param_errorcodeptr) = ERR53)
 
-        (cb.erroroffset = ((name as usize) -% (cb.start_pattern as usize)) / sizeof[u8]())
+        ((unsafe: *__param_cb).erroroffset = ((__param_name as usize) -% (__param_cb.start_pattern as usize)) / sizeof[u8]())
 
         return 0
 
     }
 
-    ((unsafe: *indexptr) = i)
+    ((unsafe: *__param_indexptr) = __local_i)
 
-    (count = 0)
+    (__local_count = 0)
 
     while true {
-        (count = count + 1)
+        (__local_count = __local_count + 1)
 
-        (groupnumber = ((((((unsafe: slot[0]) as c_int) << (8 as c_uint)) | (unsafe: slot[(0 + 1)])) as c_uint)))
+        (__local_groupnumber = ((((((unsafe: __local_slot[0]) as c_int) << (8 as c_uint)) | ((unsafe: __local_slot[(0 + 1)]) as c_int)) as c_uint)))
 
         var __ci_expr_ternary_1: c_uint = 0
 
-        if ((if groupnumber < 32: 1 else: 0) != 0) {
-            (__ci_expr_ternary_1 = (1 as c_uint) << (groupnumber as c_uint))
+        if ((if __local_groupnumber < 32: 1 else: 0) != 0) {
+            (__ci_expr_ternary_1 = (1 as c_uint) << (__local_groupnumber as c_uint))
         } else {
             (__ci_expr_ternary_1 = 1)
         }
 
-        (cb.backref_map = cb.backref_map | __ci_expr_ternary_1)
+        ((unsafe: *__param_cb).backref_map = __param_cb.backref_map | __ci_expr_ternary_1)
 
 
-        if ((if groupnumber > cb.top_backref: 1 else: 0) != 0) {
-            (cb.top_backref = groupnumber)
+        if ((if __local_groupnumber > __param_cb.top_backref: 1 else: 0) != 0) {
+            ((unsafe: *__param_cb).top_backref = __local_groupnumber)
         }
 
-        (i = i + 1)
+        (__local_i = __local_i + 1)
 
-        if ((if i >= cb.names_found: 1 else: 0) != 0) {
+        if ((if __local_i >= __param_cb.names_found: 1 else: 0) != 0) {
             break
         }
 
 
-        (slot = slot + cb.name_entry_size)
+        (__local_slot = __local_slot + ((__param_cb.name_entry_size as c_uint) as usize))
 
         var __ci_expr_logic_2: c_int
 
-        if ((if _pcre2_strncmp_8(name, (slot + ((2 as isize) as usize)), length) != 0: 1 else: 0) != 0) {
+        if ((if _pcre2_strncmp_8(__param_name, (__local_slot + ((2 as isize) as usize)), __param_length) != 0: 1 else: 0) != 0) {
             (__ci_expr_logic_2 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_2 = (if (if (unsafe: (slot + ((2 as isize) as usize))[length]) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_2 = (if (if (unsafe: (__local_slot + ((2 as isize) as usize))[__param_length]) != 0: 1 else: 0) != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_2 != 0) {
@@ -258,153 +254,155 @@ fn _pcre2_compile_find_dupname_details8(name: *const u8, length: c_uint, indexpt
 
     }
 
-    ((unsafe: *countptr) = count)
+    ((unsafe: *__param_countptr) = __local_count)
 
     return 1
 
 }
 
-fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, errorcodeptr: *mut c_int, cb: *mut compile_block_8, lengthptr: *mut c_ulong) -> *mut c_uint {
-    var pptr = __param_pptr
-    var captures: *mut u8
+@[c_export("_pcre2_compile_parse_scan_substr_args8")]
+fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, __param_errorcodeptr: *mut c_int, __param_cb: *mut compile_block_8, __param_lengthptr: *mut c_ulong) -> *mut c_uint {
+    var __local_pptr = __param_pptr
+    var __local_captures: *mut u8
 
-    var capture_ptr: *mut u8
+    var __local_capture_ptr: *mut u8
 
-    var bit: u8
+    var __local_bit: u8
 
-    var name: *const u8
+    var __local_name: *const u8
 
-    var ng: *mut named_group_8
+    var __local_ng: *mut named_group_8
 
-    var end: *mut named_group_8 = (cb.named_groups + ((cb.names_found as isize) as usize))
+    var __local_end: *mut named_group_8 = (__param_cb.named_groups + ((__param_cb.names_found as c_uint) as usize))
 
-    var all_found: c_int
+    var __local_all_found: c_int
 
-    var size: c_ulong
+    var __local_size: c_ulong
 
-    while true {
-        if (not (0 != 0)) {
-            break
-        }
-    }
+    do {
+        0
+    } while (0 != 0)
 
-    if ((if _pcre2_compile_process_capture_list((pptr - ((1 as isize) as usize)), 0, errorcodeptr, cb) == 0: 1 else: 0) != 0) {
+    if ((if _pcre2_compile_process_capture_list((__local_pptr - ((1 as isize) as usize)), 0, __param_errorcodeptr, __param_cb) == 0: 1 else: 0) != 0) {
         return null
     }
 
-    (size = (((cb.bracount +% 1) +% 7) as c_uint) >> (3 as c_uint))
+    (__local_size = (((((__param_cb.bracount as c_uint) +% (1 as c_uint)) as c_uint) +% (7 as c_uint)) as c_uint) >> (3 as c_uint))
 
-    (captures = ((cb.cx.memctl.malloc(size, cb.cx.memctl.memory_data) as *mut u8)))
+    (__local_captures = (((&raw const (unsafe: *__param_cb.cx).memctl as *const pcre2_memctl).malloc(__local_size, (&raw const (unsafe: *__param_cb.cx).memctl as *const pcre2_memctl).memory_data) as *mut u8)))
 
-    if ((if captures == null: 1 else: 0) != 0) {
-        ((unsafe: *errorcodeptr) = ERR21)
+    if ((if __local_captures == null: 1 else: 0) != 0) {
+        ((unsafe: *__param_errorcodeptr) = ERR21)
 
-        (cb.erroroffset = ((((unsafe: pptr[1]) as c_ulong) as c_ulong) << (32 as c_uint)) | ((unsafe: pptr[2]) as c_ulong))
+        ((unsafe: *__param_cb).erroroffset = (((((unsafe: __local_pptr[1]) as c_ulong) as c_ulong) << (32 as c_uint)) as c_ulong) | (((unsafe: __local_pptr[2]) as c_ulong) as c_ulong))
 
 
         return null
 
     }
 
-    with_memset((captures as *i8), 0, (size as i64))
+    with_memset((__local_captures as *i8), 0, (__local_size as i64))
 
     while (1 != 0) {
         var __ci_expr_switch_continue_0: i32 = 0
 
         while true {
-            match ((unsafe: *pptr) & (4294901760 as c_uint)) {
+            match (((unsafe: *__local_pptr) as c_uint) & ((4294901760 as c_uint) as c_uint)) {
                 2148925440 => {
-                    (pptr = pptr + 1)
+                    (__local_pptr = __local_pptr + 1)
 
-                    (pptr = pptr + 2)
+                    (__local_pptr = __local_pptr + ((2 as isize) as usize))
 
-                    continue
+                    (__ci_expr_switch_continue_0 = 1)
+
+                    break
+
 
                 },
                 2149056512 => {
-                    (ng = cb.named_groups + (unsafe: pptr[1]))
+                    (__local_ng = __param_cb.named_groups + ((unsafe: __local_pptr[1]) as usize))
 
-                    while true {
-                        if (not (0 != 0)) {
-                            break
-                        }
-                    }
+                    do {
+                        0
+                    } while (0 != 0)
 
-                    (pptr = pptr + 2)
+                    (__local_pptr = __local_pptr + ((2 as isize) as usize))
 
-                    (name = ng.name)
+                    (__local_name = __local_ng.name)
 
-                    (all_found = 1)
+                    (__local_all_found = 1)
 
-                    while true {
-                        if ((if ng.name != name: 1 else: 0) != 0) {
+                    do {
+                        if ((if __local_ng.name != __local_name: 1 else: 0) != 0) {
                             continue
                         }
 
-                        (capture_ptr = captures + ((ng.number as c_uint) >> (3 as c_uint)))
+                        (__local_capture_ptr = __local_captures + (((__local_ng.number as c_uint) >> (3 as c_uint)) as usize))
 
-                        while true {
-                            if (not (0 != 0)) {
-                                break
-                            }
-                        }
+                        do {
+                            0
+                        } while (0 != 0)
 
-                        (bit = ((((1 as c_int) << ((ng.number & 7) as c_uint)) as u8)))
+                        (__local_bit = ((((1 as c_int) << (((__local_ng.number as c_uint) & (7 as c_uint)) as c_uint)) as u8)))
 
-                        if ((if ((unsafe: *capture_ptr) & bit) == 0: 1 else: 0) != 0) {
-                            ((unsafe: *capture_ptr) = (unsafe: *capture_ptr) | bit)
+                        if ((if (((unsafe: *__local_capture_ptr) as c_int) & (__local_bit as c_int)) == 0: 1 else: 0) != 0) {
+                            ((unsafe: *__local_capture_ptr) = (unsafe: *__local_capture_ptr) | __local_bit)
 
-                            (all_found = 0)
+                            (__local_all_found = 0)
 
                         }
 
-                        (ng = ng + 1)
+                    } while { (__local_ng = __local_ng + 1); ((if __local_ng < __local_end: 1 else: 0) != 0) }
 
-                        if (not ((if ng < end: 1 else: 0) != 0)) {
-                            break
-                        }
+                    if ((if not (__local_all_found != 0): 1 else: 0) != 0) {
+                        ((unsafe: *__param_lengthptr) = (unsafe: *__param_lengthptr) + 5)
+
+                        (__ci_expr_switch_continue_0 = 1)
+
+                        break
+
 
                     }
 
-                    if ((if not (all_found != 0): 1 else: 0) != 0) {
-                        ((unsafe: *lengthptr) = (unsafe: *lengthptr) + 5)
+                    ((unsafe: __local_pptr[-2]) = 2149122048)
 
-                        continue
+                    ((unsafe: __local_pptr[-1]) = 0)
 
-                    }
+                    (__ci_expr_switch_continue_0 = 1)
 
-                    ((unsafe: pptr[-2]) = 2149122048)
+                    break
 
-                    ((unsafe: pptr[-1]) = 0)
-
-                    continue
 
                 },
                 2149122048 => {
-                    (pptr = pptr + 2)
+                    (__local_pptr = __local_pptr + ((2 as isize) as usize))
 
-                    (capture_ptr = captures + (((unsafe: pptr[-1]) as c_uint) >> (3 as c_uint)))
+                    (__local_capture_ptr = __local_captures + ((((unsafe: __local_pptr[-1]) as c_uint) >> (3 as c_uint)) as usize))
 
-                    while true {
-                        if (not (0 != 0)) {
-                            break
-                        }
+                    do {
+                        0
+                    } while (0 != 0)
+
+                    (__local_bit = ((((1 as c_int) << ((((unsafe: __local_pptr[-1]) as c_uint) & (7 as c_uint)) as c_uint)) as u8)))
+
+                    if ((if (((unsafe: *__local_capture_ptr) as c_int) & (__local_bit as c_int)) != 0: 1 else: 0) != 0) {
+                        ((unsafe: __local_pptr[-1]) = 0)
+
+                        (__ci_expr_switch_continue_0 = 1)
+
+                        break
+
+
                     }
 
-                    (bit = ((((1 as c_int) << (((unsafe: pptr[-1]) & 7) as c_uint)) as u8)))
+                    ((unsafe: *__local_capture_ptr) = (unsafe: *__local_capture_ptr) | __local_bit)
 
-                    if ((if ((unsafe: *capture_ptr) & bit) != 0: 1 else: 0) != 0) {
-                        ((unsafe: pptr[-1]) = 0)
+                    ((unsafe: *__param_lengthptr) = (unsafe: *__param_lengthptr) + 3)
 
-                        continue
+                    (__ci_expr_switch_continue_0 = 1)
 
-                    }
+                    break
 
-                    ((unsafe: *capture_ptr) = (unsafe: *capture_ptr) | bit)
-
-                    ((unsafe: *lengthptr) = (unsafe: *lengthptr) + 3)
-
-                    continue
 
                 },
                 _ => {
@@ -425,133 +423,141 @@ fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, errorcodept
 
     }
 
-    cb.cx.memctl.free(captures, cb.cx.memctl.memory_data)
+    (&raw const (unsafe: *__param_cb.cx).memctl as *const pcre2_memctl).free(__local_captures, (&raw const (unsafe: *__param_cb.cx).memctl as *const pcre2_memctl).memory_data)
 
-    return (pptr - ((1 as isize) as usize))
+    return (__local_pptr - ((1 as isize) as usize))
 
 }
 
-fn _pcre2_compile_parse_recurse_args8(pptr_start: *mut c_uint, offset: c_ulong, errorcodeptr: *mut c_int, cb: *mut compile_block_8) -> c_int {
-    var pptr: *mut c_uint = pptr_start
+@[c_export("_pcre2_compile_parse_recurse_args8")]
+fn _pcre2_compile_parse_recurse_args8(__param_pptr_start: *mut c_uint, __param_offset: c_ulong, __param_errorcodeptr: *mut c_int, __param_cb: *mut compile_block_8) -> c_int {
+    var __local_pptr: *mut c_uint = __param_pptr_start
 
-    var i: c_ulong
+    var __local_i: c_ulong
 
-    var size: c_ulong
+    var __local_size: c_ulong
 
 
-    var name: *const u8
+    var __local_name: *const u8
 
-    var ng: *mut named_group_8
+    var __local_ng: *mut named_group_8
 
-    var end: *mut named_group_8 = (cb.named_groups + ((cb.names_found as isize) as usize))
+    var __local_end: *mut named_group_8 = (__param_cb.named_groups + ((__param_cb.names_found as c_uint) as usize))
 
-    var args: *mut recurse_arguments
+    var __local_args: *mut recurse_arguments
 
-    var captures: *mut c_ushort
+    var __local_captures: *mut c_ushort
 
-    var current: *mut c_ushort
+    var __local_current: *mut c_ushort
 
-    var captures_end: *mut c_ushort
+    var __local_captures_end: *mut c_ushort
 
-    var tmp: c_ushort
+    var __local_tmp: c_ushort
 
-    (size = _pcre2_compile_process_capture_list(pptr, offset, errorcodeptr, cb))
+    (__local_size = _pcre2_compile_process_capture_list(__local_pptr, __param_offset, __param_errorcodeptr, __param_cb))
 
-    if ((if size == 0: 1 else: 0) != 0) {
+    if ((if __local_size == 0: 1 else: 0) != 0) {
         return 0
     }
 
-    (args = ((cb.cx.memctl.malloc((sizeof[recurse_arguments]() +% (size *% sizeof[c_ushort]())), cb.cx.memctl.memory_data) as *mut recurse_arguments)))
+    (__local_args = (((&raw const (unsafe: *__param_cb.cx).memctl as *const pcre2_memctl).malloc(((sizeof[recurse_arguments]() as c_ulong) +% (((__local_size as c_ulong) *% (sizeof[u16]() as c_ulong)) as c_ulong)), (&raw const (unsafe: *__param_cb.cx).memctl as *const pcre2_memctl).memory_data) as *mut recurse_arguments)))
 
-    if ((if args == null: 1 else: 0) != 0) {
-        ((unsafe: *errorcodeptr) = ERR21)
+    if ((if __local_args == null: 1 else: 0) != 0) {
+        ((unsafe: *__param_errorcodeptr) = ERR21)
 
-        (cb.erroroffset = offset)
+        ((unsafe: *__param_cb).erroroffset = __param_offset)
 
         return 0
 
     }
 
-    (args.header.next = ((null as *mut compile_data)))
+    ((unsafe: *__local_args).header.next = ((null as *mut compile_data)))
 
-    (args.size = size)
+    ((unsafe: *__local_args).size = __local_size)
 
-    if ((if cb.last_data != null: 1 else: 0) != 0) {
-        (cb.last_data.next = (((&args.header as *const compile_data) as *mut compile_data)))
+    if ((if __param_cb.last_data != null: 1 else: 0) != 0) {
+        ((unsafe: *__param_cb.last_data).next = (((&raw const (unsafe: *__local_args).header as *const compile_data) as *mut compile_data)))
     } else {
-        (cb.first_data = (((&args.header as *const compile_data) as *mut compile_data)))
+        ((unsafe: *__param_cb).first_data = (((&raw const (unsafe: *__local_args).header as *const compile_data) as *mut compile_data)))
     }
 
-    (cb.last_data = (((&args.header as *const compile_data) as *mut compile_data)))
+    ((unsafe: *__param_cb).last_data = (((&raw const (unsafe: *__local_args).header as *const compile_data) as *mut compile_data)))
 
-    (captures = (((args + ((1 as isize) as usize)) as *mut c_ushort)))
+    (__local_captures = (((__local_args + ((1 as isize) as usize)) as *mut c_ushort)))
 
     while (1 != 0) {
-        (pptr = pptr + 1)
+        (__local_pptr = __local_pptr + 1)
 
         var __ci_expr_switch_continue_3: i32 = 0
 
         while true {
-            match ((unsafe: *pptr) & (4294901760 as c_uint)) {
+            match (((unsafe: *__local_pptr) as c_uint) & ((4294901760 as c_uint) as c_uint)) {
                 2148925440 => {
-                    (pptr = pptr + 2)
+                    (__local_pptr = __local_pptr + ((2 as isize) as usize))
 
-                    continue
+                    (__ci_expr_switch_continue_3 = 1)
+
+                    break
+
 
                 },
                 2149056512 => {
-                    (pptr = pptr + 1)
+                    (__local_pptr = __local_pptr + 1)
 
-                    (ng = cb.named_groups + (unsafe: *pptr))
-
-
-                    while true {
-                        if (not (0 != 0)) {
-                            break
-                        }
-                    }
-
-                    var __ci_expr_old_0: *mut c_ushort = captures
-
-                    (captures = captures + 1)
-
-                    ((unsafe: *__ci_expr_old_0) = ((ng.number as c_ushort)))
+                    (__local_ng = __param_cb.named_groups + ((unsafe: *__local_pptr) as usize))
 
 
-                    (name = ng.name)
+                    do {
+                        0
+                    } while (0 != 0)
+
+                    var __ci_expr_old_0: *mut c_ushort = __local_captures
+
+                    (__local_captures = __local_captures + 1)
+
+                    ((unsafe: *__ci_expr_old_0) = ((__local_ng.number as c_ushort)))
+
+
+                    (__local_name = __local_ng.name)
 
                     while true {
-                        (ng = ng + 1)
+                        (__local_ng = __local_ng + 1)
 
-                        if (not ((if ng < end: 1 else: 0) != 0)) {
+                        if (not ((if __local_ng < __local_end: 1 else: 0) != 0)) {
                             break
                         }
 
-                        if ((if ng.name == name: 1 else: 0) != 0) {
-                            var __ci_expr_old_1: *mut c_ushort = captures
+                        if ((if __local_ng.name == __local_name: 1 else: 0) != 0) {
+                            var __ci_expr_old_1: *mut c_ushort = __local_captures
 
-                            (captures = captures + 1)
+                            (__local_captures = __local_captures + 1)
 
-                            ((unsafe: *__ci_expr_old_1) = ((ng.number as c_ushort)))
+                            ((unsafe: *__ci_expr_old_1) = ((__local_ng.number as c_ushort)))
 
                         }
 
                     }
 
-                    continue
+                    (__ci_expr_switch_continue_3 = 1)
+
+                    break
+
 
                 },
                 2149122048 => {
-                    var __ci_expr_old_2: *mut c_ushort = captures
+                    var __ci_expr_old_2: *mut c_ushort = __local_captures
 
-                    (captures = captures + 1)
+                    (__local_captures = __local_captures + 1)
 
-                    (pptr = pptr + 1)
+                    (__local_pptr = __local_pptr + 1)
 
-                    ((unsafe: *__ci_expr_old_2) = (unsafe: *pptr))
+                    ((unsafe: *__ci_expr_old_2) = (unsafe: *__local_pptr))
 
 
-                    continue
+                    (__ci_expr_switch_continue_3 = 1)
+
+                    break
+
 
                 },
                 _ => {
@@ -572,196 +578,206 @@ fn _pcre2_compile_parse_recurse_args8(pptr_start: *mut c_uint, offset: c_ulong, 
 
     }
 
-    while true {
-        if (not (0 != 0)) {
-            break
-        }
-    }
+    do {
+        0
+    } while (0 != 0)
 
-    (args.skip_size = (((((pptr as usize) -% (pptr_start as usize)) / sizeof[c_uint]()) as c_ulong) -% 1))
+    ((unsafe: *__local_args).skip_size = ((((((__local_pptr as usize) -% (__param_pptr_start as usize)) / sizeof[c_uint]()) as c_ulong) as c_ulong) -% (1 as c_ulong)))
 
-    if ((if size == 1: 1 else: 0) != 0) {
+    if ((if __local_size == 1: 1 else: 0) != 0) {
         return 1
     }
 
-    (captures = (((args + ((1 as isize) as usize)) as *mut c_ushort)))
+    (__local_captures = (((__local_args + ((1 as isize) as usize)) as *mut c_ushort)))
 
-    (i = (((size as c_ulong) >> (1 as c_uint)) -% 1))
+    (__local_i = ((((__local_size as c_ulong) >> (1 as c_uint)) as c_ulong) -% (1 as c_ulong)))
 
     while (1 != 0) {
-        do_heapify_u16(captures, size, i)
+        do_heapify_u16(__local_captures, __local_size, __local_i)
 
-        if ((if i == 0: 1 else: 0) != 0) {
+        if ((if __local_i == 0: 1 else: 0) != 0) {
             break
         }
 
-        (i = i - 1)
+        (__local_i = __local_i - 1)
 
     }
 
-    (i = (size -% 1))
+    (__local_i = ((__local_size as c_ulong) -% (1 as c_ulong)))
 
-    while ((if i > 0: 1 else: 0) != 0) {
-        (tmp = (unsafe: captures[0]))
+    while ((if __local_i > 0: 1 else: 0) != 0) {
+        (__local_tmp = (unsafe: __local_captures[0]))
 
-        ((unsafe: captures[0]) = (unsafe: captures[i]))
+        ((unsafe: __local_captures[0]) = (unsafe: __local_captures[__local_i]))
 
-        ((unsafe: captures[i]) = tmp)
+        ((unsafe: __local_captures[__local_i]) = __local_tmp)
 
-        do_heapify_u16(captures, i, 0)
+        do_heapify_u16(__local_captures, __local_i, 0)
 
 
-        (i = i - 1)
+        (__local_i = __local_i - 1)
 
     }
 
 
-    (captures_end = captures + size)
+    (__local_captures_end = __local_captures + (__local_size as usize))
 
-    var __ci_expr_old_4: *mut c_ushort = captures
+    var __ci_expr_old_4: *mut c_ushort = __local_captures
 
-    (captures = captures + 1)
+    (__local_captures = __local_captures + 1)
 
-    (tmp = (unsafe: *__ci_expr_old_4))
+    (__local_tmp = (unsafe: *__ci_expr_old_4))
 
 
-    (current = captures)
+    (__local_current = __local_captures)
 
-    while ((if current < captures_end: 1 else: 0) != 0) {
-        if ((if (unsafe: *current) != tmp: 1 else: 0) != 0) {
-            (tmp = (unsafe: *current))
+    while ((if __local_current < __local_captures_end: 1 else: 0) != 0) {
+        if ((if (unsafe: *__local_current) != __local_tmp: 1 else: 0) != 0) {
+            (__local_tmp = (unsafe: *__local_current))
 
-            var __ci_expr_old_5: *mut c_ushort = captures
+            var __ci_expr_old_5: *mut c_ushort = __local_captures
 
-            (captures = captures + 1)
+            (__local_captures = __local_captures + 1)
 
-            ((unsafe: *__ci_expr_old_5) = tmp)
+            ((unsafe: *__ci_expr_old_5) = __local_tmp)
 
 
         }
 
-        (current = current + 1)
+        (__local_current = __local_current + 1)
 
     }
 
-    (args.size = (((((captures as usize) -% (((args + ((1 as isize) as usize)) as *mut c_ushort) as usize)) / sizeof[c_ushort]()) as c_ulong)))
+    ((unsafe: *__local_args).size = (((((__local_captures as usize) -% (((__local_args + ((1 as isize) as usize)) as *mut c_ushort) as usize)) / sizeof[c_ushort]()) as c_ulong)))
 
     return 1
 
 }
 
-fn _pcre2_compile_process_capture_list(__param_pptr: *mut c_uint, __param_offset: c_ulong, errorcodeptr: *mut c_int, cb: *mut compile_block_8) -> c_ulong {
-    var pptr = __param_pptr
-    var offset = __param_offset
-    var i: c_ulong
+fn _pcre2_compile_process_capture_list(__param_pptr: *mut c_uint, __param_offset: c_ulong, __param_errorcodeptr: *mut c_int, __param_cb: *mut compile_block_8) -> c_ulong {
+    var __local_pptr = __param_pptr
+    var __local_offset = __param_offset
+    var __local_i: c_ulong
 
-    var size: c_ulong = 0
+    var __local_size: c_ulong = 0
 
 
-    var ng: *mut named_group_8
+    var __local_ng: *mut named_group_8
 
-    var name: *const u8
+    var __local_name: *const u8
 
-    var length: c_uint
+    var __local_length: c_uint
 
-    var end: *mut named_group_8 = (cb.named_groups + ((cb.names_found as isize) as usize))
+    var __local_end: *mut named_group_8 = (__param_cb.named_groups + ((__param_cb.names_found as c_uint) as usize))
 
     while (1 != 0) {
-        (pptr = pptr + 1)
+        (__local_pptr = __local_pptr + 1)
 
         var __ci_expr_switch_continue_0: i32 = 0
 
         while true {
-            match ((unsafe: *pptr) & (4294901760 as c_uint)) {
+            match (((unsafe: *__local_pptr) as c_uint) & ((4294901760 as c_uint) as c_uint)) {
                 2148925440 => {
-                    (offset = ((((unsafe: pptr[1]) as c_ulong) as c_ulong) << (32 as c_uint)) | ((unsafe: pptr[2]) as c_ulong))
+                    (__local_offset = (((((unsafe: __local_pptr[1]) as c_ulong) as c_ulong) << (32 as c_uint)) as c_ulong) | (((unsafe: __local_pptr[2]) as c_ulong) as c_ulong))
 
-                    (pptr = pptr + 2)
+                    (__local_pptr = __local_pptr + ((2 as isize) as usize))
 
 
-                    continue
+                    (__ci_expr_switch_continue_0 = 1)
+
+                    break
+
 
                 },
                 2149056512 => {
-                    (offset = offset + ((unsafe: *pptr) & 65535))
+                    (__local_offset = __local_offset + (((unsafe: *__local_pptr) as c_uint) & (65535 as c_uint)))
 
-                    (pptr = pptr + 1)
+                    (__local_pptr = __local_pptr + 1)
 
-                    (length = (unsafe: *pptr))
+                    (__local_length = (unsafe: *__local_pptr))
 
 
-                    (name = cb.start_pattern + offset)
+                    (__local_name = __param_cb.start_pattern + (__local_offset as usize))
 
-                    (ng = _pcre2_compile_find_named_group8(name, length, cb))
+                    (__local_ng = _pcre2_compile_find_named_group8(__local_name, __local_length, __param_cb))
 
-                    if ((if ng == null: 1 else: 0) != 0) {
-                        ((unsafe: *errorcodeptr) = ERR15)
+                    if ((if __local_ng == null: 1 else: 0) != 0) {
+                        ((unsafe: *__param_errorcodeptr) = ERR15)
 
-                        (cb.erroroffset = offset)
+                        ((unsafe: *__param_cb).erroroffset = __local_offset)
 
                         return 0
 
                     }
 
-                    if ((if (ng.hash_dup & 32768) == 0: 1 else: 0) != 0) {
-                        ((unsafe: pptr[-1]) = 2149122048)
+                    if ((if ((__local_ng.hash_dup as c_int) & (32768 as c_int)) == 0: 1 else: 0) != 0) {
+                        ((unsafe: __local_pptr[-1]) = 2149122048)
 
-                        ((unsafe: pptr[0]) = ng.number)
+                        ((unsafe: __local_pptr[0]) = __local_ng.number)
 
-                        (size = size + 1)
+                        (__local_size = __local_size + 1)
 
-                        continue
+                        (__ci_expr_switch_continue_0 = 1)
+
+                        break
+
 
                     }
 
-                    ((unsafe: pptr[-1]) = 2149056512)
+                    ((unsafe: __local_pptr[-1]) = 2149056512)
 
-                    ((unsafe: pptr[0]) = (((((ng as usize) -% (cb.named_groups as usize)) / sizeof[named_group_8]()) as c_uint)))
+                    ((unsafe: __local_pptr[0]) = (((((__local_ng as usize) -% (__param_cb.named_groups as usize)) / sizeof[named_group_8]()) as c_uint)))
 
-                    (size = size + 1)
+                    (__local_size = __local_size + 1)
 
-                    (name = ng.name)
+                    (__local_name = __local_ng.name)
 
                     while true {
-                        (ng = ng + 1)
+                        (__local_ng = __local_ng + 1)
 
-                        if (not ((if ng < end: 1 else: 0) != 0)) {
+                        if (not ((if __local_ng < __local_end: 1 else: 0) != 0)) {
                             break
                         }
 
-                        if ((if ng.name == name: 1 else: 0) != 0) {
-                            (size = size + 1)
+                        if ((if __local_ng.name == __local_name: 1 else: 0) != 0) {
+                            (__local_size = __local_size + 1)
                         }
 
                     }
 
-                    continue
+                    (__ci_expr_switch_continue_0 = 1)
+
+                    break
+
 
                 },
                 2149122048 => {
-                    (offset = offset + ((unsafe: *pptr) & 65535))
+                    (__local_offset = __local_offset + (((unsafe: *__local_pptr) as c_uint) & (65535 as c_uint)))
 
-                    (pptr = pptr + 1)
+                    (__local_pptr = __local_pptr + 1)
 
-                    (i = (unsafe: *pptr))
+                    (__local_i = (unsafe: *__local_pptr))
 
 
-                    if ((if i > cb.bracount: 1 else: 0) != 0) {
-                        ((unsafe: *errorcodeptr) = ERR15)
+                    if ((if __local_i > __param_cb.bracount: 1 else: 0) != 0) {
+                        ((unsafe: *__param_errorcodeptr) = ERR15)
 
-                        (cb.erroroffset = offset)
+                        ((unsafe: *__param_cb).erroroffset = __local_offset)
 
                         return 0
 
                     }
 
-                    if ((if i > cb.top_backref: 1 else: 0) != 0) {
-                        (cb.top_backref = ((i as c_ushort)))
+                    if ((if __local_i > __param_cb.top_backref: 1 else: 0) != 0) {
+                        ((unsafe: *__param_cb).top_backref = ((__local_i as c_ushort)))
                     }
 
-                    (size = size + 1)
+                    (__local_size = __local_size + 1)
 
-                    continue
+                    (__ci_expr_switch_continue_0 = 1)
+
+                    break
+
 
                 },
                 _ => {
@@ -778,68 +794,66 @@ fn _pcre2_compile_process_capture_list(__param_pptr: *mut c_uint, __param_offset
         }
 
 
-        while true {
-            if (not (0 != 0)) {
-                break
-            }
-        }
+        do {
+            0
+        } while (0 != 0)
 
-        return size
+        return __local_size
 
     }
 
 }
 
-fn do_heapify_u16(captures: *mut c_ushort, size: c_ulong, __param_i: c_ulong) {
-    var i = __param_i
-    var max: c_ulong
+fn do_heapify_u16(__param_captures: *mut c_ushort, __param_size: c_ulong, __param_i: c_ulong) {
+    var __local_i = __param_i
+    var __local_max: c_ulong
 
-    var left: c_ulong
+    var __local_left: c_ulong
 
-    var right: c_ulong
+    var __local_right: c_ulong
 
-    var tmp: c_ushort
+    var __local_tmp: c_ushort
 
     while (1 != 0) {
-        (max = i)
+        (__local_max = __local_i)
 
-        (left = (((i as c_ulong) << (1 as c_uint)) +% 1))
+        (__local_left = ((((__local_i as c_ulong) << (1 as c_uint)) as c_ulong) +% (1 as c_ulong)))
 
-        (right = (left +% 1))
+        (__local_right = ((__local_left as c_ulong) +% (1 as c_ulong)))
 
         var __ci_expr_logic_0: c_int = 0
 
-        if ((if left < size: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if (unsafe: captures[left]) > (unsafe: captures[max]): 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_left < __param_size: 1 else: 0) != 0) {
+            (__ci_expr_logic_0 = (if (if (unsafe: __param_captures[__local_left]) > (unsafe: __param_captures[__local_max]): 1 else: 0) != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_0 != 0) {
-            (max = left)
+            (__local_max = __local_left)
         }
 
 
         var __ci_expr_logic_1: c_int = 0
 
-        if ((if right < size: 1 else: 0) != 0) {
-            (__ci_expr_logic_1 = (if (if (unsafe: captures[right]) > (unsafe: captures[max]): 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_right < __param_size: 1 else: 0) != 0) {
+            (__ci_expr_logic_1 = (if (if (unsafe: __param_captures[__local_right]) > (unsafe: __param_captures[__local_max]): 1 else: 0) != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_1 != 0) {
-            (max = right)
+            (__local_max = __local_right)
         }
 
 
-        if ((if i == max: 1 else: 0) != 0) {
+        if ((if __local_i == __local_max: 1 else: 0) != 0) {
             return
         }
 
-        (tmp = (unsafe: captures[i]))
+        (__local_tmp = (unsafe: __param_captures[__local_i]))
 
-        ((unsafe: captures[i]) = (unsafe: captures[max]))
+        ((unsafe: __param_captures[__local_i]) = (unsafe: __param_captures[__local_max]))
 
-        ((unsafe: captures[max]) = tmp)
+        ((unsafe: __param_captures[__local_max]) = __local_tmp)
 
-        (i = max)
+        (__local_i = __local_max)
 
     }
 

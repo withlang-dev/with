@@ -417,7 +417,7 @@ $(REGEX_MIGRATE_STAMP): $(CANONICAL_BIN) $(REGEX_REF_SOURCES) scripts/prepare_pc
 	bash "$(ROOT_DIR)/scripts/prepare_pcre2_reference.sh" "$$src"; \
 	rm -rf "$$tmp"; \
 	mkdir -p "$$tmp"; \
-	$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" migrate "$$src/" -o "$$tmp/" --no-c-export --prefer-brace --width-slice 8 --shared-defs std.re.defs $(foreach f,$(REGEX_EXCLUDED_C_SOURCES),--exclude $(f)) -I "$$src" -D PCRE2_CODE_UNIT_WIDTH=8 -D HAVE_CONFIG_H=1; \
+	$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" migrate "$$src/" -o "$$tmp/" --no-c-export --c-export-functions --prefer-brace --width-slice 8 --shared-defs std.re.defs $(foreach f,$(REGEX_EXCLUDED_C_SOURCES),--exclude $(f)) -I "$$src" -D PCRE2_CODE_UNIT_WIDTH=8 -D HAVE_CONFIG_H=1; \
 	count=$$(ls "$$tmp"/*.w 2>/dev/null | wc -l); \
 	if [ "$$count" -lt 30 ]; then \
 		echo "error: only $$count files migrated — expected at least 30" >&2; \

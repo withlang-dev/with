@@ -1176,7 +1176,7 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
         return ci_migrate_render_stub(name, safe_name, "", "Never", g_migrate_current_input_path, fn_cursor, session, "", "unsupported type: " ++ unsupported_reason)
 
     // @[c_export] for non-static functions (preserves C ABI)
-    let export_prefix = if g_migrate_no_c_export != 0 or storage == CX_SC_STATIC: "" else: "@[c_export(\"" ++ name ++ "\")]\n"
+    let export_prefix = if (g_migrate_no_c_export != 0 and g_migrate_export_function_defs == 0) or storage == CX_SC_STATIC: "" else: "@[c_export(\"" ++ name ++ "\")]\n"
 
     // Try to translate the function body.
     let body = ci_try_translate_fn_body(session, idx)
@@ -1492,6 +1492,14 @@ var g_migrate_no_c_export: i32 = 0
 
 pub fn migrate_set_no_c_export(val: i32):
     g_migrate_no_c_export = val
+
+// Keep local-definition behavior for globals while preserving C ABI symbols
+// for translated function definitions. Used by promoted migrated libraries
+// that are compiled as std modules but still expose C-compatible entrypoints.
+var g_migrate_export_function_defs: i32 = 0
+
+pub fn migrate_set_export_function_defs(val: i32):
+    g_migrate_export_function_defs = val
 
 // Block style preference for migrated output.
 // 0 = colon-form (default), 2 = brace-form (--prefer-brace).

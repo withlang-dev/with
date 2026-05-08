@@ -1,127 +1,128 @@
 // Migrated from PCRE2
 use std.re.defs
 
-fn _pcre2_update_classbits_8(ptype: c_uint, pdata: c_uint, negated: c_int, __param_classbits: *mut u8) {
-    var classbits = __param_classbits
-    var c: c_int
+@[c_export("_pcre2_update_classbits_8")]
+fn _pcre2_update_classbits_8(__param_ptype: c_uint, __param_pdata: c_uint, __param_negated: c_int, __param_classbits: *mut u8) {
+    var __local_classbits = __param_classbits
+    var __local_c: c_int
 
-    var chartype: c_int
+    var __local_chartype: c_int
 
 
-    var prop: *const ucd_record
+    var __local_prop: *const ucd_record
 
-    var gentype: c_uint
+    var __local_gentype: c_uint
 
-    var set_bit: c_int
+    var __local_set_bit: c_int
 
-    if ((if ptype == 13: 1 else: 0) != 0) {
-        if ((if not (negated != 0): 1 else: 0) != 0) {
-            with_memset((classbits as *i8), 255, (32 as i64))
+    if ((if __param_ptype == 13: 1 else: 0) != 0) {
+        if ((if not (__param_negated != 0): 1 else: 0) != 0) {
+            with_memset((__local_classbits as *i8), 255, (32 as i64))
         }
 
         return
 
     }
 
-    (c = 0)
+    (__local_c = 0)
 
-    while ((if c < 256: 1 else: 0) != 0) {
-        (prop = (&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[(c / 128)] * 128) + (c % 128))] as isize) as usize))
+    while ((if __local_c < 256: 1 else: 0) != 0) {
+        (__local_prop = (&(unsafe: _pcre2_ucd_records_8[0]) as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[(__local_c / 128)] as c_int) * 128) + (__local_c % 128))] as c_uint) as usize))
 
-        (set_bit = 0)
+        (__local_set_bit = 0)
 
-        set_bit
+        __local_set_bit
 
         while true {
-            match ptype {
+            match __param_ptype {
                 0 => {
-                    (chartype = prop.chartype)
+                    (__local_chartype = __local_prop.chartype)
 
                     var __ci_expr_logic_1: c_int
 
                     var __ci_expr_logic_0: c_int
 
-                    if ((if chartype == ucp_Lu: 1 else: 0) != 0) {
+                    if ((if __local_chartype == ucp_Lu: 1 else: 0) != 0) {
                         (__ci_expr_logic_0 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_0 = (if (if chartype == ucp_Ll: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_0 = (if (if __local_chartype == ucp_Ll: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_0 != 0) {
                         (__ci_expr_logic_1 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_1 = (if (if chartype == ucp_Lt: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_1 = (if (if __local_chartype == ucp_Lt: 1 else: 0) != 0: 1 else: 0))
                     }
 
-                    (set_bit = __ci_expr_logic_1)
+                    (__local_set_bit = __ci_expr_logic_1)
 
 
                 },
                 1 => {
-                    (set_bit = (if _pcre2_ucp_gentype_8[prop.chartype] == pdata: 1 else: 0))
+                    (__local_set_bit = (if _pcre2_ucp_gentype_8[__local_prop.chartype] == __param_pdata: 1 else: 0))
                 },
                 2 => {
-                    (set_bit = (if prop.chartype == pdata: 1 else: 0))
+                    (__local_set_bit = (if __local_prop.chartype == __param_pdata: 1 else: 0))
                 },
                 3 => {
-                    (set_bit = (if prop.script == pdata: 1 else: 0))
+                    (__local_set_bit = (if __local_prop.script == __param_pdata: 1 else: 0))
                 },
                 4 => {
                     var __ci_expr_logic_2: c_int
 
-                    if ((if prop.script == pdata: 1 else: 0) != 0) {
+                    if ((if __local_prop.script == __param_pdata: 1 else: 0) != 0) {
                         (__ci_expr_logic_2 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_2 = (if (if ((unsafe: ((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + (((prop.scriptx_bidiclass & 1023) as isize) as usize))[(pdata / 32)]) & ((1 as c_uint) << ((pdata % 32) as c_uint))) != 0: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_2 = (if (if (((unsafe: ((&(unsafe: _pcre2_ucd_script_sets_8[0]) as *const c_uint) + ((((__local_prop.scriptx_bidiclass as c_int) & 1023) as isize) as usize))[((__param_pdata as c_uint) / (32 as c_uint))]) as c_uint) & (((1 as c_uint) << (((__param_pdata as c_uint) % (32 as c_uint)) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
                     }
 
-                    (set_bit = __ci_expr_logic_2)
+                    (__local_set_bit = __ci_expr_logic_2)
 
                 },
                 5 => {
-                    (gentype = _pcre2_ucp_gentype_8[prop.chartype])
+                    (__local_gentype = _pcre2_ucp_gentype_8[__local_prop.chartype])
 
                     var __ci_expr_logic_3: c_int
 
-                    if ((if gentype == 1: 1 else: 0) != 0) {
+                    if ((if __local_gentype == 1: 1 else: 0) != 0) {
                         (__ci_expr_logic_3 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_3 = (if (if gentype == 3: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_3 = (if (if __local_gentype == 3: 1 else: 0) != 0: 1 else: 0))
                     }
 
-                    (set_bit = __ci_expr_logic_3)
+                    (__local_set_bit = __ci_expr_logic_3)
 
 
                 },
                 6 => {
                     while true {
-                        match c {
+                        match __local_c {
                             9 => {
-                                (set_bit = 1)
+                                (__local_set_bit = 1)
                             },
                             32 => {
-                                (set_bit = 1)
+                                (__local_set_bit = 1)
                             },
                             160 => {
-                                (set_bit = 1)
+                                (__local_set_bit = 1)
                             },
                             10 => {
-                                (set_bit = 1)
+                                (__local_set_bit = 1)
                             },
                             11 => {
-                                (set_bit = 1)
+                                (__local_set_bit = 1)
                             },
                             12 => {
-                                (set_bit = 1)
+                                (__local_set_bit = 1)
                             },
                             13 => {
-                                (set_bit = 1)
+                                (__local_set_bit = 1)
                             },
                             133 => {
-                                (set_bit = 1)
+                                (__local_set_bit = 1)
                             },
                             _ => {
-                                (set_bit = (if _pcre2_ucp_gentype_8[prop.chartype] == 6: 1 else: 0))
+                                (__local_set_bit = (if _pcre2_ucp_gentype_8[__local_prop.chartype] == 6: 1 else: 0))
                             },
                         }
 
@@ -131,33 +132,33 @@ fn _pcre2_update_classbits_8(ptype: c_uint, pdata: c_uint, negated: c_int, __par
                 },
                 7 => {
                     while true {
-                        match c {
+                        match __local_c {
                             9 => {
-                                (set_bit = 1)
+                                (__local_set_bit = 1)
                             },
                             32 => {
-                                (set_bit = 1)
+                                (__local_set_bit = 1)
                             },
                             160 => {
-                                (set_bit = 1)
+                                (__local_set_bit = 1)
                             },
                             10 => {
-                                (set_bit = 1)
+                                (__local_set_bit = 1)
                             },
                             11 => {
-                                (set_bit = 1)
+                                (__local_set_bit = 1)
                             },
                             12 => {
-                                (set_bit = 1)
+                                (__local_set_bit = 1)
                             },
                             13 => {
-                                (set_bit = 1)
+                                (__local_set_bit = 1)
                             },
                             133 => {
-                                (set_bit = 1)
+                                (__local_set_bit = 1)
                             },
                             _ => {
-                                (set_bit = (if _pcre2_ucp_gentype_8[prop.chartype] == 6: 1 else: 0))
+                                (__local_set_bit = (if _pcre2_ucp_gentype_8[__local_prop.chartype] == 6: 1 else: 0))
                             },
                         }
 
@@ -166,9 +167,9 @@ fn _pcre2_update_classbits_8(ptype: c_uint, pdata: c_uint, negated: c_int, __par
                     }
                 },
                 8 => {
-                    (chartype = prop.chartype)
+                    (__local_chartype = __local_prop.chartype)
 
-                    (gentype = _pcre2_ucp_gentype_8[chartype])
+                    (__local_gentype = _pcre2_ucp_gentype_8[__local_chartype])
 
                     var __ci_expr_logic_7: c_int
 
@@ -176,25 +177,25 @@ fn _pcre2_update_classbits_8(ptype: c_uint, pdata: c_uint, negated: c_int, __par
 
                     var __ci_expr_logic_5: c_int
 
-                    if ((if gentype == 1: 1 else: 0) != 0) {
+                    if ((if __local_gentype == 1: 1 else: 0) != 0) {
                         (__ci_expr_logic_5 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_5 = (if (if gentype == 3: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_5 = (if (if __local_gentype == 3: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_5 != 0) {
                         (__ci_expr_logic_6 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_6 = (if (if chartype == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_6 = (if (if __local_chartype == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_6 != 0) {
                         (__ci_expr_logic_7 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_7 = (if (if chartype == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_7 = (if (if __local_chartype == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
                     }
 
-                    (set_bit = __ci_expr_logic_7)
+                    (__local_set_bit = __ci_expr_logic_7)
 
 
                 },
@@ -205,113 +206,111 @@ fn _pcre2_update_classbits_8(ptype: c_uint, pdata: c_uint, negated: c_int, __par
 
                     var __ci_expr_logic_8: c_int
 
-                    if ((if c == 36: 1 else: 0) != 0) {
+                    if ((if __local_c == 36: 1 else: 0) != 0) {
                         (__ci_expr_logic_8 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_8 = (if (if c == 64: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_8 = (if (if __local_c == 64: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_8 != 0) {
                         (__ci_expr_logic_9 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_9 = (if (if c == 96: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_9 = (if (if __local_c == 96: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_9 != 0) {
                         (__ci_expr_logic_10 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_10 = (if (if c >= 160: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_10 = (if (if __local_c >= 160: 1 else: 0) != 0: 1 else: 0))
                     }
 
-                    (set_bit = __ci_expr_logic_10)
+                    (__local_set_bit = __ci_expr_logic_10)
 
                 },
                 11 => {
-                    (set_bit = (if ((prop.scriptx_bidiclass as c_int) >> (11 as c_uint)) == pdata: 1 else: 0))
+                    (__local_set_bit = (if ((__local_prop.scriptx_bidiclass as c_int) >> (11 as c_uint)) == __param_pdata: 1 else: 0))
                 },
                 12 => {
-                    (set_bit = (if ((unsafe: ((&_pcre2_ucd_boolprop_sets_8[0] as *const c_uint) + (((prop.bprops & 4095) as isize) as usize))[(pdata / 32)]) & ((1 as c_uint) << ((pdata % 32) as c_uint))) != 0: 1 else: 0))
+                    (__local_set_bit = (if (((unsafe: ((&(unsafe: _pcre2_ucd_boolprop_sets_8[0]) as *const c_uint) + ((((__local_prop.bprops as c_int) & 4095) as isize) as usize))[((__param_pdata as c_uint) / (32 as c_uint))]) as c_uint) & (((1 as c_uint) << (((__param_pdata as c_uint) % (32 as c_uint)) as c_uint)) as c_uint)) != 0: 1 else: 0))
                 },
                 14 => {
-                    (chartype = prop.chartype)
+                    (__local_chartype = __local_prop.chartype)
 
-                    (gentype = _pcre2_ucp_gentype_8[chartype])
+                    (__local_gentype = _pcre2_ucp_gentype_8[__local_chartype])
 
                     var __ci_expr_logic_12: c_int = 0
 
-                    if ((if gentype != 6: 1 else: 0) != 0) {
+                    if ((if __local_gentype != 6: 1 else: 0) != 0) {
                         var __ci_expr_logic_11: c_int
 
-                        if ((if gentype != 0: 1 else: 0) != 0) {
+                        if ((if __local_gentype != 0: 1 else: 0) != 0) {
                             (__ci_expr_logic_11 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_11 = (if (if chartype == ucp_Cf: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_11 = (if (if __local_chartype == ucp_Cf: 1 else: 0) != 0: 1 else: 0))
                         }
 
                         (__ci_expr_logic_12 = (if __ci_expr_logic_11 != 0: 1 else: 0))
 
                     }
 
-                    (set_bit = __ci_expr_logic_12)
+                    (__local_set_bit = __ci_expr_logic_12)
 
 
                 },
                 15 => {
-                    (chartype = prop.chartype)
+                    (__local_chartype = __local_prop.chartype)
 
                     var __ci_expr_logic_15: c_int = 0
 
                     var __ci_expr_logic_13: c_int = 0
 
-                    if ((if chartype != ucp_Zl: 1 else: 0) != 0) {
-                        (__ci_expr_logic_13 = (if (if chartype != ucp_Zp: 1 else: 0) != 0: 1 else: 0))
+                    if ((if __local_chartype != ucp_Zl: 1 else: 0) != 0) {
+                        (__ci_expr_logic_13 = (if (if __local_chartype != ucp_Zp: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_13 != 0) {
                         var __ci_expr_logic_14: c_int
 
-                        if ((if _pcre2_ucp_gentype_8[chartype] != 0: 1 else: 0) != 0) {
+                        if ((if _pcre2_ucp_gentype_8[__local_chartype] != 0: 1 else: 0) != 0) {
                             (__ci_expr_logic_14 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_14 = (if (if chartype == ucp_Cf: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_14 = (if (if __local_chartype == ucp_Cf: 1 else: 0) != 0: 1 else: 0))
                         }
 
                         (__ci_expr_logic_15 = (if __ci_expr_logic_14 != 0: 1 else: 0))
 
                     }
 
-                    (set_bit = __ci_expr_logic_15)
+                    (__local_set_bit = __ci_expr_logic_15)
 
 
                 },
                 16 => {
-                    (gentype = _pcre2_ucp_gentype_8[prop.chartype])
+                    (__local_gentype = _pcre2_ucp_gentype_8[__local_prop.chartype])
 
                     var __ci_expr_logic_17: c_int
 
-                    if ((if gentype == 4: 1 else: 0) != 0) {
+                    if ((if __local_gentype == 4: 1 else: 0) != 0) {
                         (__ci_expr_logic_17 = (if true: 1 else: 0))
                     } else {
                         var __ci_expr_logic_16: c_int = 0
 
-                        if ((if c < 128: 1 else: 0) != 0) {
-                            (__ci_expr_logic_16 = (if (if gentype == 5: 1 else: 0) != 0: 1 else: 0))
+                        if ((if __local_c < 128: 1 else: 0) != 0) {
+                            (__ci_expr_logic_16 = (if (if __local_gentype == 5: 1 else: 0) != 0: 1 else: 0))
                         }
 
                         (__ci_expr_logic_17 = (if __ci_expr_logic_16 != 0: 1 else: 0))
 
                     }
 
-                    (set_bit = __ci_expr_logic_17)
+                    (__local_set_bit = __ci_expr_logic_17)
 
 
                 },
                 _ => {
-                    while true {
-                        if (not (0 != 0)) {
-                            break
-                        }
-                    }
+                    do {
+                        0
+                    } while (0 != 0)
 
                     var __ci_expr_logic_22: c_int
 
@@ -319,8 +318,8 @@ fn _pcre2_update_classbits_8(ptype: c_uint, pdata: c_uint, negated: c_int, __par
 
                     var __ci_expr_logic_18: c_int = 0
 
-                    if ((if c >= 48: 1 else: 0) != 0) {
-                        (__ci_expr_logic_18 = (if (if c <= 57: 1 else: 0) != 0: 1 else: 0))
+                    if ((if __local_c >= 48: 1 else: 0) != 0) {
+                        (__ci_expr_logic_18 = (if (if __local_c <= 57: 1 else: 0) != 0: 1 else: 0))
                     }
 
                     if (__ci_expr_logic_18 != 0) {
@@ -328,8 +327,8 @@ fn _pcre2_update_classbits_8(ptype: c_uint, pdata: c_uint, negated: c_int, __par
                     } else {
                         var __ci_expr_logic_19: c_int = 0
 
-                        if ((if c >= 65: 1 else: 0) != 0) {
-                            (__ci_expr_logic_19 = (if (if c <= 70: 1 else: 0) != 0: 1 else: 0))
+                        if ((if __local_c >= 65: 1 else: 0) != 0) {
+                            (__ci_expr_logic_19 = (if (if __local_c <= 70: 1 else: 0) != 0: 1 else: 0))
                         }
 
                         (__ci_expr_logic_20 = (if __ci_expr_logic_19 != 0: 1 else: 0))
@@ -341,15 +340,15 @@ fn _pcre2_update_classbits_8(ptype: c_uint, pdata: c_uint, negated: c_int, __par
                     } else {
                         var __ci_expr_logic_21: c_int = 0
 
-                        if ((if c >= 97: 1 else: 0) != 0) {
-                            (__ci_expr_logic_21 = (if (if c <= 102: 1 else: 0) != 0: 1 else: 0))
+                        if ((if __local_c >= 97: 1 else: 0) != 0) {
+                            (__ci_expr_logic_21 = (if (if __local_c <= 102: 1 else: 0) != 0: 1 else: 0))
                         }
 
                         (__ci_expr_logic_22 = (if __ci_expr_logic_21 != 0: 1 else: 0))
 
                     }
 
-                    (set_bit = __ci_expr_logic_22)
+                    (__local_set_bit = __ci_expr_logic_22)
 
 
                 },
@@ -359,1467 +358,2043 @@ fn _pcre2_update_classbits_8(ptype: c_uint, pdata: c_uint, negated: c_int, __par
 
         }
 
-        if (negated != 0) {
-            (set_bit = (if not (set_bit != 0): 1 else: 0))
+        if (__param_negated != 0) {
+            (__local_set_bit = (if not (__local_set_bit != 0): 1 else: 0))
         }
 
-        if (set_bit != 0) {
-            ((unsafe: *classbits) = (unsafe: *classbits) | (((1 as c_int) << ((c & 7) as c_uint)) as u8))
+        if (__local_set_bit != 0) {
+            ((unsafe: *__local_classbits) = (unsafe: *__local_classbits) | (((1 as c_int) << ((__local_c & 7) as c_uint)) as u8))
         }
 
-        if ((if (c & 7) == 7: 1 else: 0) != 0) {
-            (classbits = classbits + 1)
+        if ((if (__local_c & 7) == 7: 1 else: 0) != 0) {
+            (__local_classbits = __local_classbits + 1)
         }
 
 
-        (c = c + 1)
+        (__local_c = __local_c + 1)
 
     }
 
 
 }
 
-fn _pcre2_compile_class_not_nested_8(options: c_uint, xoptions: c_uint, start_ptr: *mut c_uint, pcode: *mut *mut u8, negate_class: c_int, has_bitmap: *mut c_int, errorcodeptr: *mut c_int, cb: *mut compile_block_8, lengthptr: *mut c_ulong) -> *mut c_uint {
-    var pptr__goto_1076_11: *mut c_uint = null
-    var code__goto_1077_14: *mut u8 = null
-    var should_flip_negation__goto_1078_6: c_int = 0
-    var cbits__goto_1079_16: *const u8 = null
-    var classbits__goto_1082_16: *mut u8 = null
-    var utf__goto_1085_6: c_int = 0
-    var xclass_props__goto_1093_10: c_uint = 0
-    var class_uchardata__goto_1094_14: *mut u8 = null
-    var cranges__goto_1095_15: *mut class_ranges = null
-    var ranges__goto_1149_21: *const c_uint = null
-    var meta__goto_1174_12: c_uint = 0
-    var local_negate__goto_1175_8: c_int = 0
-    var posix_class__goto_1176_7: c_int = 0
-    var taboffset__goto_1177_7: c_int = 0
-    var tabopt__goto_1177_18: c_int = 0
-    var pbits__goto_1178_22: class_bits_storage
-    var escape__goto_1179_12: c_uint = 0
-    var c__goto_1179_20: c_uint = 0
-    var ptype__goto_1211_16: c_uint = 0
-    var i__goto_1279_18: c_int = 0
-    var i__goto_1282_18: c_int = 0
-    var classwords__goto_1312_17: *mut c_uint = null
-    var i__goto_1315_18: c_int = 0
-    var i__goto_1318_18: c_int = 0
-    var i__goto_1340_16: c_int = 0
-    var i__goto_1345_16: c_int = 0
-    var i__goto_1350_16: c_int = 0
-    var i__goto_1355_16: c_int = 0
-    var i__goto_1367_16: c_int = 0
-    var i__goto_1372_16: c_int = 0
-    var ptype__goto_1437_18: c_uint = 0
-    var pdata__goto_1438_18: c_uint = 0
-    var d__goto_1497_14: c_uint = 0
-    var range__goto_1581_13: *mut c_uint = null
-    var end__goto_1582_13: *mut c_uint = null
-    var range_start__goto_1616_16: c_uint = 0
-    var range_end__goto_1617_16: c_uint = 0
-    var previous__goto_1707_16: *mut u8 = null
-    var classwords__goto_1723_17: *mut c_uint = null
-    var i__goto_1724_16: c_int = 0
-    var char_lists_size__goto_1748_12: c_ulong = 0
-    var data__goto_1777_16: *mut u8 = null
-    var classwords__goto_1840_13: *mut c_uint = null
-    var i__goto_1842_12: c_int = 0
-    var classwords__goto_1848_19: *const c_uint = null
-    var i__goto_1849_7: c_int = 0
-    var __pc: i32 = 0
-    var __goto_pending: i32 = 0
-    while true {
-        match __pc {
-            0 => {
-                (__goto_pending = 0)
-                (pptr__goto_1076_11 = start_ptr)
-                (code__goto_1077_14 = (unsafe: *pcode))
-                (cbits__goto_1079_16 = cb.cbits)
-                (classbits__goto_1082_16 = ((&cb.classbits.classbits[0] as *mut u8)))
-                (utf__goto_1085_6 = (if (options & 524288) != 0: 1 else: 0))
-                (should_flip_negation__goto_1078_6 = 0)
-                if (__goto_pending != 0) {
-                    continue
-                }
-                (xclass_props__goto_1093_10 = 0)
-                if (__goto_pending != 0) {
-                    continue
-                }
-                (cranges__goto_1095_15 = ((null as *mut class_ranges)))
-                if (__goto_pending != 0) {
-                    continue
-                }
-                if (utf__goto_1085_6 != 0) {
-                    if ((if lengthptr != null: 1 else: 0) != 0) {
-                        (cranges__goto_1095_15 = compile_optimize_class(pptr__goto_1076_11, options, xoptions, cb))
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-                        if ((if cranges__goto_1095_15 == null: 1 else: 0) != 0) {
-                            ((unsafe: *errorcodeptr) = ERR21)
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                            return null
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                        }
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-                        if ((if cb.last_data != null: 1 else: 0) != 0) {
-                            (cb.last_data.next = (((&cranges__goto_1095_15.header as *const compile_data) as *mut compile_data)))
-                        } else {
-                            (cb.first_data = (((&cranges__goto_1095_15.header as *const compile_data) as *mut compile_data)))
-                        }
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-                        (cb.last_data = (((&cranges__goto_1095_15.header as *const compile_data) as *mut compile_data)))
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-                    } else {
-                        (cranges__goto_1095_15 = ((cb.first_data as *mut class_ranges)))
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-                        (cb.first_data = cranges__goto_1095_15.header.next)
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-                    }
-                    if (__goto_pending != 0) {
-                        continue
-                    }
-                    if ((if cranges__goto_1095_15.range_list_size > 0: 1 else: 0) != 0) {
-                        (ranges__goto_1149_21 = (((cranges__goto_1095_15 + ((1 as isize) as usize)) as *const c_uint)))
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-                        if ((if (unsafe: ranges__goto_1149_21[0]) <= 255: 1 else: 0) != 0) {
-                            (xclass_props__goto_1093_10 = xclass_props__goto_1093_10 | 2)
-                        }
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-                        var __ci_expr_logic_1: c_int = 0
-                        var __ci_expr_ternary_0: c_uint = 0
-                        if (utf__goto_1085_6 != 0) {
-                            (__ci_expr_ternary_0 = 1114111)
-                        } else {
-                            (__ci_expr_ternary_0 = 255)
-                        }
-                        if ((if (unsafe: ranges__goto_1149_21[(cranges__goto_1095_15.range_list_size - 1)]) == __ci_expr_ternary_0: 1 else: 0) != 0) {
-                            (__ci_expr_logic_1 = (if (if (unsafe: ranges__goto_1149_21[(cranges__goto_1095_15.range_list_size - 2)]) <= 256: 1 else: 0) != 0: 1 else: 0))
-                        }
-                        if (__ci_expr_logic_1 != 0) {
-                            (xclass_props__goto_1093_10 = xclass_props__goto_1093_10 | 16)
-                        }
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-                    }
-                    if (__goto_pending != 0) {
-                        continue
-                    }
-                }
-                if (__goto_pending != 0) {
-                    continue
-                }
-                (class_uchardata__goto_1094_14 = (code__goto_1077_14 + ((2 as isize) as usize)) + ((2 as isize) as usize))
-                if (__goto_pending != 0) {
-                    continue
-                }
-                with_memset((classbits__goto_1082_16 as *i8), 0, (32 as i64))
-                if (__goto_pending != 0) {
-                    continue
-                }
-                while (1 != 0) {
-                    var __ci_expr_old_2: *mut c_uint = pptr__goto_1076_11
-                    (pptr__goto_1076_11 = pptr__goto_1076_11 + 1)
-                    (meta__goto_1174_12 = (unsafe: *__ci_expr_old_2))
-                    if (__goto_pending != 0) {
-                        break
-                    }
-                    var __ci_expr_switch_continue_21: i32 = 0
-                    while true {
-                        match (meta__goto_1174_12 & (4294901760 as c_uint)) {
-                            2149580800 => {
-                                (local_negate__goto_1175_8 = (if meta__goto_1174_12 == 2149646336: 1 else: 0))
-
-                                var __ci_expr_old_3: *mut c_uint = pptr__goto_1076_11
-
-                                (pptr__goto_1076_11 = pptr__goto_1076_11 + 1)
-
-                                (posix_class__goto_1176_7 = (unsafe: *__ci_expr_old_3))
-
-
-                                if (local_negate__goto_1175_8 != 0) {
-                                    (should_flip_negation__goto_1078_6 = 1)
-                                }
-
-                                var __ci_expr_logic_4: c_int = 0
-
-                                if ((if (options & 8) != 0: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_4 = (if (if posix_class__goto_1176_7 <= 2: 1 else: 0) != 0: 1 else: 0))
-                                }
-
-                                if (__ci_expr_logic_4 != 0) {
-                                    (posix_class__goto_1176_7 = 0)
-                                }
-
-
-                                var __ci_expr_logic_5: c_int = 0
-
-                                if ((if (options & 131072) != 0: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_5 = (if (if (xoptions & 2048) == 0: 1 else: 0) != 0: 1 else: 0))
-                                }
-
-                                if (__ci_expr_logic_5 != 0) {
-                                    var __ci_expr_switch_continue_12: i32 = 0
-
-                                    while true {
-                                        match posix_class__goto_1176_7 {
-                                            8 => {
-                                                var __ci_expr_ternary_7: c_int = 0
-
-                                                if ((if posix_class__goto_1176_7 == 8: 1 else: 0) != 0) {
-                                                    (__ci_expr_ternary_7 = 14)
-                                                } else {
-                                                    var __ci_expr_ternary_6: c_int = 0
+@[c_export("_pcre2_compile_class_not_nested_8")]
+fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: c_uint, __param_start_ptr: *mut c_uint, __param_pcode: *mut *mut u8, __param_negate_class: c_int, __param_has_bitmap: *mut c_int, __param_errorcodeptr: *mut c_int, __param_cb: *mut compile_block_8, __param_lengthptr: *mut c_ulong) -> *mut c_uint {
+    var __local_pptr__goto_1076_11: *mut c_uint = null
 
-                                                    if ((if posix_class__goto_1176_7 == 9: 1 else: 0) != 0) {
-                                                        (__ci_expr_ternary_6 = 15)
-                                                    } else {
-                                                        (__ci_expr_ternary_6 = 16)
-                                                    }
+    var __local_code__goto_1077_14: *mut u8 = null
 
-                                                    (__ci_expr_ternary_7 = __ci_expr_ternary_6)
+    var __local_should_flip_negation__goto_1078_6: c_int = 0
 
-                                                }
+    var __local_cbits__goto_1079_16: *const u8 = null
 
-                                                (ptype__goto_1211_16 = __ci_expr_ternary_7)
+    var __local_classbits__goto_1082_16: *mut u8 = null
 
+    var __local_utf__goto_1085_6: c_int = 0
 
-                                                _pcre2_update_classbits_8(ptype__goto_1211_16, 0, local_negate__goto_1175_8, classbits__goto_1082_16)
+    var __local_xclass_props__goto_1093_10: c_uint = 0
 
-                                                if ((if (xclass_props__goto_1093_10 & 16) == 0: 1 else: 0) != 0) {
-                                                    if ((if lengthptr != null: 1 else: 0) != 0) {
-                                                        ((unsafe: *lengthptr) = (unsafe: *lengthptr) + 3)
-                                                    } else {
-                                                        var __ci_expr_old_8: *mut u8 = class_uchardata__goto_1094_14
+    var __local_class_uchardata__goto_1094_14: *mut u8 = null
 
-                                                        (class_uchardata__goto_1094_14 = class_uchardata__goto_1094_14 + 1)
+    var __local_cranges__goto_1095_15: *mut class_ranges = null
 
-                                                        var __ci_expr_ternary_9: c_int = 0
+    var __local_ranges__goto_1149_21: *const c_uint = null
 
-                                                        if (local_negate__goto_1175_8 != 0) {
-                                                            (__ci_expr_ternary_9 = 4)
-                                                        } else {
-                                                            (__ci_expr_ternary_9 = 3)
-                                                        }
+    var __local_meta__goto_1174_12: c_uint = 0
 
-                                                        ((unsafe: *__ci_expr_old_8) = __ci_expr_ternary_9)
+    var __local_local_negate__goto_1175_8: c_int = 0
 
+    var __local_posix_class__goto_1176_7: c_int = 0
 
-                                                        if (__goto_pending != 0) {
-                                                            break
-                                                        }
+    var __local_taboffset__goto_1177_7: c_int = 0
 
-                                                        var __ci_expr_old_10: *mut u8 = class_uchardata__goto_1094_14
+    var __local_tabopt__goto_1177_18: c_int = 0
 
-                                                        (class_uchardata__goto_1094_14 = class_uchardata__goto_1094_14 + 1)
+    var __local_pbits__goto_1178_22: class_bits_storage
 
-                                                        ((unsafe: *__ci_expr_old_10) = ((ptype__goto_1211_16 as u8)))
+    var __local_escape__goto_1179_12: c_uint = 0
 
+    var __local_c__goto_1179_20: c_uint = 0
 
-                                                        if (__goto_pending != 0) {
-                                                            break
-                                                        }
+    var __local_ptype__goto_1211_16: c_uint = 0
 
-                                                        var __ci_expr_old_11: *mut u8 = class_uchardata__goto_1094_14
+    var __local_i__goto_1279_18: c_int = 0
 
-                                                        (class_uchardata__goto_1094_14 = class_uchardata__goto_1094_14 + 1)
+    var __local_i__goto_1282_18: c_int = 0
 
-                                                        ((unsafe: *__ci_expr_old_11) = 0)
+    var __local_classwords__goto_1312_17: *mut c_uint = null
 
+    var __local_i__goto_1315_18: c_int = 0
 
-                                                        if (__goto_pending != 0) {
-                                                            break
-                                                        }
+    var __local_i__goto_1318_18: c_int = 0
 
-                                                    }
+    var __local_i__goto_1340_16: c_int = 0
 
-                                                    if (__goto_pending != 0) {
-                                                        break
-                                                    }
+    var __local_i__goto_1345_16: c_int = 0
 
-                                                    (xclass_props__goto_1093_10 = xclass_props__goto_1093_10 | 5)
+    var __local_i__goto_1350_16: c_int = 0
 
-                                                    if (__goto_pending != 0) {
-                                                        break
-                                                    }
+    var __local_i__goto_1355_16: c_int = 0
 
-                                                }
+    var __local_i__goto_1367_16: c_int = 0
 
-                                                continue
+    var __local_i__goto_1372_16: c_int = 0
 
-                                            },
-                                        }
+    var __local_ptype__goto_1437_18: c_uint = 0
 
-                                        break
+    var __local_pdata__goto_1438_18: c_uint = 0
 
-                                    }
+    var __local_d__goto_1497_14: c_uint = 0
 
-                                    if (__ci_expr_switch_continue_12 != 0) {
-                                        continue
-                                    }
+    var __local_range__goto_1581_13: *mut c_uint = null
 
+    var __local_end__goto_1582_13: *mut c_uint = null
 
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
+    var __local_range_start__goto_1616_16: c_uint = 0
 
-                                }
+    var __local_range_end__goto_1617_16: c_uint = 0
 
+    var __local_previous__goto_1707_16: *mut u8 = null
 
-                                (posix_class__goto_1176_7 = posix_class__goto_1176_7 * 3)
+    var __local_classwords__goto_1723_17: *mut c_uint = null
 
-                                with_memcpy(((&pbits__goto_1178_22.classbits[0] as *mut u8) as *i8), ((cbits__goto_1079_16 + ((_pcre2_posix_class_maps8[posix_class__goto_1176_7] as isize) as usize)) as *i8), (32 as i64))
+    var __local_i__goto_1724_16: c_int = 0
 
-                                (taboffset__goto_1177_7 = _pcre2_posix_class_maps8[(posix_class__goto_1176_7 + 1)])
+    var __local_char_lists_size__goto_1748_12: c_ulong = 0
 
-                                (tabopt__goto_1177_18 = _pcre2_posix_class_maps8[(posix_class__goto_1176_7 + 2)])
+    var __local_data__goto_1777_16: *mut u8 = null
 
-                                if ((if taboffset__goto_1177_7 >= 0: 1 else: 0) != 0) {
-                                    if ((if tabopt__goto_1177_18 >= 0: 1 else: 0) != 0) {
-                                        (i__goto_1279_18 = 0)
+    var __local_classwords__goto_1840_13: *mut c_uint = null
 
-                                        while ((if i__goto_1279_18 < 32: 1 else: 0) != 0) {
-                                            (pbits__goto_1178_22.classbits[i__goto_1279_18] = pbits__goto_1178_22.classbits[i__goto_1279_18] | (unsafe: cbits__goto_1079_16[(i__goto_1279_18 + taboffset__goto_1177_7)]))
+    var __local_i__goto_1842_12: c_int = 0
 
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
+    var __local_classwords__goto_1848_19: *const c_uint = null
 
-                                            (i__goto_1279_18 = i__goto_1279_18 + 1)
+    var __local_i__goto_1849_7: c_int = 0
 
-                                        }
+    var __ci_expr_logic_1: c_int = 0
 
-                                    } else {
-                                        (i__goto_1282_18 = 0)
+    var __ci_expr_ternary_0: c_uint = 0
 
-                                        while ((if i__goto_1282_18 < 32: 1 else: 0) != 0) {
-                                            (pbits__goto_1178_22.classbits[i__goto_1282_18] = pbits__goto_1178_22.classbits[i__goto_1282_18] & ((~(unsafe: cbits__goto_1079_16[(i__goto_1282_18 + taboffset__goto_1177_7)])) as u8))
+    var __ci_expr_old_2: *mut c_uint = null
 
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
+    var __ci_expr_old_3: *mut c_uint = null
 
-                                            (i__goto_1282_18 = i__goto_1282_18 + 1)
+    var __ci_expr_logic_4: c_int = 0
 
-                                        }
+    var __ci_expr_logic_5: c_int = 0
 
-                                    }
+    var __ci_expr_ternary_7: c_int = 0
 
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
+    var __ci_expr_old_8: *mut u8 = null
 
-                                }
+    var __ci_expr_ternary_9: c_int = 0
 
-                                if ((if tabopt__goto_1177_18 < 0: 1 else: 0) != 0) {
-                                    (tabopt__goto_1177_18 = 0 - tabopt__goto_1177_18)
-                                }
+    var __ci_expr_old_10: *mut u8 = null
 
-                                if ((if tabopt__goto_1177_18 == 1: 1 else: 0) != 0) {
-                                    (pbits__goto_1178_22.classbits[1] = pbits__goto_1178_22.classbits[1] & (~60))
-                                } else {
-                                    if ((if tabopt__goto_1177_18 == 2: 1 else: 0) != 0) {
-                                        (pbits__goto_1178_22.classbits[11] = pbits__goto_1178_22.classbits[11] & 127)
-                                    }
-                                }
+    var __ci_expr_old_11: *mut u8 = null
 
-                                (classwords__goto_1312_17 = ((&cb.classbits.classwords[0] as *mut c_uint)))
+    var __ci_expr_old_12: *mut c_uint = null
 
-                                if (__goto_pending != 0) {
-                                    break
-                                }
+    var __ci_expr_old_13: *mut c_uint = null
 
-                                if (local_negate__goto_1175_8 != 0) {
-                                    (i__goto_1315_18 = 0)
+    var __ci_expr_logic_14: c_int = 0
 
-                                    while ((if i__goto_1315_18 < 8: 1 else: 0) != 0) {
-                                        ((unsafe: classwords__goto_1312_17[i__goto_1315_18]) = (unsafe: classwords__goto_1312_17[i__goto_1315_18]) | (~pbits__goto_1178_22.classwords[i__goto_1315_18]))
+    var __ci_expr_old_15: *mut u8 = null
 
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
+    var __ci_expr_ternary_16: c_int = 0
 
-                                        (i__goto_1315_18 = i__goto_1315_18 + 1)
+    var __ci_expr_old_17: *mut u8 = null
 
-                                    }
+    var __ci_expr_old_18: *mut u8 = null
 
-                                } else {
-                                    (i__goto_1318_18 = 0)
+    var __ci_expr_logic_19: c_int = 0
 
-                                    while ((if i__goto_1318_18 < 8: 1 else: 0) != 0) {
-                                        ((unsafe: classwords__goto_1312_17[i__goto_1318_18]) = (unsafe: classwords__goto_1312_17[i__goto_1318_18]) | pbits__goto_1178_22.classwords[i__goto_1318_18])
+    var __ci_expr_logic_20: c_int = 0
 
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
+    var __ci_expr_old_21: *mut c_uint = null
 
-                                        (i__goto_1318_18 = i__goto_1318_18 + 1)
+    var __ci_expr_old_22: *mut c_uint = null
 
-                                    }
+    var __ci_expr_logic_23: c_int = 0
 
-                                }
+    var __ci_expr_logic_24: c_int = 0
 
-                                if (__goto_pending != 0) {
-                                    break
-                                }
+    var __ci_expr_ternary_25: c_uint = 0
 
+    var __ci_expr_ternary_26: c_int = 0
 
-                                (xclass_props__goto_1093_10 = xclass_props__goto_1093_10 | 2)
+    var __ci_expr_old_27: *mut u8 = null
 
-                                continue
+    var __ci_expr_old_28: *mut u8 = null
 
-                            },
-                            2147811328 => {
-                                var __ci_expr_old_13: *mut c_uint = pptr__goto_1076_11
+    var __ci_expr_old_29: *mut u8 = null
 
-                                (pptr__goto_1076_11 = pptr__goto_1076_11 + 1)
+    var __ci_expr_old_30: *mut u8 = null
 
-                                (meta__goto_1174_12 = (unsafe: *__ci_expr_old_13))
+    var __ci_expr_ternary_31: c_int = 0
 
-                            },
-                            2149318656 => {
-                                (escape__goto_1179_12 = meta__goto_1174_12 & 65535)
+    var __ci_expr_logic_32: c_int = 0
 
-                                var __ci_expr_switch_continue_20: i32 = 0
+    var __ci_expr_old_33: *mut u8 = null
 
-                                while true {
-                                    match escape__goto_1179_12 {
-                                        7 => {
-                                            (i__goto_1340_16 = 0)
+    var __ci_expr_logic_34: c_int = 0
 
-                                            while ((if i__goto_1340_16 < 32: 1 else: 0) != 0) {
-                                                ((unsafe: classbits__goto_1082_16[i__goto_1340_16]) = (unsafe: classbits__goto_1082_16[i__goto_1340_16]) | (unsafe: cbits__goto_1079_16[(i__goto_1340_16 + 64)]))
+    var __ci_expr_ternary_35: c_int = 0
 
-                                                if (__goto_pending != 0) {
-                                                    break
-                                                }
+    var __ci_expr_logic_37: c_int = 0
 
-                                                (i__goto_1340_16 = i__goto_1340_16 + 1)
+    var __ci_expr_logic_36: c_int = 0
 
-                                            }
+    var __ci_expr_old_38: *mut u8 = null
 
-                                        },
-                                        6 => {
-                                            (should_flip_negation__goto_1078_6 = 1)
+    var __ci_expr_old_39: *mut u8 = null
 
-                                            (i__goto_1345_16 = 0)
+    var __ci_expr_ternary_40: c_int = 0
 
-                                            while ((if i__goto_1345_16 < 32: 1 else: 0) != 0) {
-                                                ((unsafe: classbits__goto_1082_16[i__goto_1345_16]) = (unsafe: classbits__goto_1082_16[i__goto_1345_16]) | ((~(unsafe: cbits__goto_1079_16[(i__goto_1345_16 + 64)])) as u8))
+    goto '__ci_bb_0
 
-                                                if (__goto_pending != 0) {
-                                                    break
-                                                }
-
-                                                (i__goto_1345_16 = i__goto_1345_16 + 1)
-
-                                            }
-
-
-                                        },
-                                        11 => {
-                                            (i__goto_1350_16 = 0)
-
-                                            while ((if i__goto_1350_16 < 32: 1 else: 0) != 0) {
-                                                ((unsafe: classbits__goto_1082_16[i__goto_1350_16]) = (unsafe: classbits__goto_1082_16[i__goto_1350_16]) | (unsafe: cbits__goto_1079_16[(i__goto_1350_16 + 160)]))
-
-                                                if (__goto_pending != 0) {
-                                                    break
-                                                }
-
-                                                (i__goto_1350_16 = i__goto_1350_16 + 1)
-
-                                            }
-
-                                        },
-                                        10 => {
-                                            (should_flip_negation__goto_1078_6 = 1)
-
-                                            (i__goto_1355_16 = 0)
-
-                                            while ((if i__goto_1355_16 < 32: 1 else: 0) != 0) {
-                                                ((unsafe: classbits__goto_1082_16[i__goto_1355_16]) = (unsafe: classbits__goto_1082_16[i__goto_1355_16]) | ((~(unsafe: cbits__goto_1079_16[(i__goto_1355_16 + 160)])) as u8))
-
-                                                if (__goto_pending != 0) {
-                                                    break
-                                                }
-
-                                                (i__goto_1355_16 = i__goto_1355_16 + 1)
-
-                                            }
-
-
-                                        },
-                                        9 => {
-                                            (i__goto_1367_16 = 0)
-
-                                            while ((if i__goto_1367_16 < 32: 1 else: 0) != 0) {
-                                                ((unsafe: classbits__goto_1082_16[i__goto_1367_16]) = (unsafe: classbits__goto_1082_16[i__goto_1367_16]) | (unsafe: cbits__goto_1079_16[(i__goto_1367_16 + 0)]))
-
-                                                if (__goto_pending != 0) {
-                                                    break
-                                                }
-
-                                                (i__goto_1367_16 = i__goto_1367_16 + 1)
-
-                                            }
-
-                                        },
-                                        8 => {
-                                            (should_flip_negation__goto_1078_6 = 1)
-
-                                            (i__goto_1372_16 = 0)
-
-                                            while ((if i__goto_1372_16 < 32: 1 else: 0) != 0) {
-                                                ((unsafe: classbits__goto_1082_16[i__goto_1372_16]) = (unsafe: classbits__goto_1082_16[i__goto_1372_16]) | ((~(unsafe: cbits__goto_1079_16[(i__goto_1372_16 + 0)])) as u8))
-
-                                                if (__goto_pending != 0) {
-                                                    break
-                                                }
-
-                                                (i__goto_1372_16 = i__goto_1372_16 + 1)
-
-                                            }
-
-
-                                        },
-                                        19 => {
-                                            if ((if cranges__goto_1095_15 != null: 1 else: 0) != 0) {
-                                                break
-                                            }
-
-                                            add_list_to_class((options & (~8)), xoptions, cb, (&_pcre2_hspace_list_8[0] as *mut c_uint))
-
-                                        },
-                                        18 => {
-                                            if ((if cranges__goto_1095_15 != null: 1 else: 0) != 0) {
-                                                break
-                                            }
-
-                                            add_not_list_to_class((options & (~8)), xoptions, cb, (&_pcre2_hspace_list_8[0] as *mut c_uint))
-
-                                        },
-                                        21 => {
-                                            if ((if cranges__goto_1095_15 != null: 1 else: 0) != 0) {
-                                                break
-                                            }
-
-                                            add_list_to_class((options & (~8)), xoptions, cb, (&_pcre2_vspace_list_8[0] as *mut c_uint))
-
-                                        },
-                                        20 => {
-                                            if ((if cranges__goto_1095_15 != null: 1 else: 0) != 0) {
-                                                break
-                                            }
-
-                                            add_not_list_to_class((options & (~8)), xoptions, cb, (&_pcre2_vspace_list_8[0] as *mut c_uint))
-
-                                        },
-                                        16 => {
-                                            (ptype__goto_1437_18 = ((unsafe: *pptr__goto_1076_11) as c_uint) >> (16 as c_uint))
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            var __ci_expr_old_14: *mut c_uint = pptr__goto_1076_11
-
-                                            (pptr__goto_1076_11 = pptr__goto_1076_11 + 1)
-
-                                            (pdata__goto_1438_18 = (unsafe: *__ci_expr_old_14) & 65535)
-
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            if ((if ptype__goto_1437_18 == 13: 1 else: 0) != 0) {
-                                                var __ci_expr_logic_15: c_int = 0
-
-                                                if ((if not (utf__goto_1085_6 != 0): 1 else: 0) != 0) {
-                                                    (__ci_expr_logic_15 = (if (if escape__goto_1179_12 == 16: 1 else: 0) != 0: 1 else: 0))
-                                                }
-
-                                                if (__ci_expr_logic_15 != 0) {
-                                                    with_memset((classbits__goto_1082_16 as *i8), 255, (32 as i64))
-                                                }
-
-
-                                                if (__goto_pending != 0) {
-                                                    break
-                                                }
-
-                                                continue
-
-                                                if (__goto_pending != 0) {
-                                                    break
-                                                }
-
-                                            }
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            _pcre2_update_classbits_8(ptype__goto_1437_18, pdata__goto_1438_18, (if escape__goto_1179_12 == 15: 1 else: 0), classbits__goto_1082_16)
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            if ((if (xclass_props__goto_1093_10 & 16) == 0: 1 else: 0) != 0) {
-                                                if ((if lengthptr != null: 1 else: 0) != 0) {
-                                                    ((unsafe: *lengthptr) = (unsafe: *lengthptr) + 3)
-                                                } else {
-                                                    var __ci_expr_old_16: *mut u8 = class_uchardata__goto_1094_14
-
-                                                    (class_uchardata__goto_1094_14 = class_uchardata__goto_1094_14 + 1)
-
-                                                    var __ci_expr_ternary_17: c_int = 0
-
-                                                    if ((if escape__goto_1179_12 == 16: 1 else: 0) != 0) {
-                                                        (__ci_expr_ternary_17 = 3)
-                                                    } else {
-                                                        (__ci_expr_ternary_17 = 4)
-                                                    }
-
-                                                    ((unsafe: *__ci_expr_old_16) = __ci_expr_ternary_17)
-
-
-                                                    if (__goto_pending != 0) {
-                                                        break
-                                                    }
-
-                                                    var __ci_expr_old_18: *mut u8 = class_uchardata__goto_1094_14
-
-                                                    (class_uchardata__goto_1094_14 = class_uchardata__goto_1094_14 + 1)
-
-                                                    ((unsafe: *__ci_expr_old_18) = ptype__goto_1437_18)
-
-
-                                                    if (__goto_pending != 0) {
-                                                        break
-                                                    }
-
-                                                    var __ci_expr_old_19: *mut u8 = class_uchardata__goto_1094_14
-
-                                                    (class_uchardata__goto_1094_14 = class_uchardata__goto_1094_14 + 1)
-
-                                                    ((unsafe: *__ci_expr_old_19) = pdata__goto_1438_18)
-
-
-                                                    if (__goto_pending != 0) {
-                                                        break
-                                                    }
-
-                                                }
-
-                                                if (__goto_pending != 0) {
-                                                    break
-                                                }
-
-                                                (xclass_props__goto_1093_10 = xclass_props__goto_1093_10 | 5)
-
-                                                if (__goto_pending != 0) {
-                                                    break
-                                                }
-
-                                            }
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-
-                                            continue
-
-                                        },
-                                    }
-
-                                    break
-
-                                }
-
-                                if (__ci_expr_switch_continue_20 != 0) {
-                                    continue
-                                }
-
-
-                                (xclass_props__goto_1093_10 = xclass_props__goto_1093_10 | 2)
-
-                                continue
-
-                            },
-                            _ => {
-                                if ((if meta__goto_1174_12 < 2147483648: 1 else: 0) != 0) {
-                                    break
-                                }
-
-                                __pc = 1
-                                __goto_pending = 1
-
-                            },
-                        }
-                        break
-                    }
-                    if (__ci_expr_switch_continue_21 != 0) {
-                        continue
-                    }
-                    if (__goto_pending != 0) {
-                        break
-                    }
-                    (c__goto_1179_20 = meta__goto_1174_12)
-                    if (__goto_pending != 0) {
-                        break
-                    }
-                    var __ci_expr_logic_22: c_int
-                    if ((if c__goto_1179_20 == 13: 1 else: 0) != 0) {
-                        (__ci_expr_logic_22 = (if true: 1 else: 0))
-                    } else {
-                        (__ci_expr_logic_22 = (if (if c__goto_1179_20 == 10: 1 else: 0) != 0: 1 else: 0))
-                    }
-                    if (__ci_expr_logic_22 != 0) {
-                        (cb.external_flags = cb.external_flags | 2048)
-                    }
-                    if (__goto_pending != 0) {
-                        break
-                    }
-                    var __ci_expr_logic_23: c_int
-                    if ((if (unsafe: *pptr__goto_1076_11) == 2149777408: 1 else: 0) != 0) {
-                        (__ci_expr_logic_23 = (if true: 1 else: 0))
-                    } else {
-                        (__ci_expr_logic_23 = (if (if (unsafe: *pptr__goto_1076_11) == 2149711872: 1 else: 0) != 0: 1 else: 0))
-                    }
-                    if (__ci_expr_logic_23 != 0) {
-                        (pptr__goto_1076_11 = pptr__goto_1076_11 + 1)
-                        if (__goto_pending != 0) {
-                            break
-                        }
-                        var __ci_expr_old_24: *mut c_uint = pptr__goto_1076_11
-                        (pptr__goto_1076_11 = pptr__goto_1076_11 + 1)
-                        (d__goto_1497_14 = (unsafe: *__ci_expr_old_24))
-                        if (__goto_pending != 0) {
-                            break
-                        }
-                        if ((if d__goto_1497_14 == 2147811328: 1 else: 0) != 0) {
-                            var __ci_expr_old_25: *mut c_uint = pptr__goto_1076_11
-                            (pptr__goto_1076_11 = pptr__goto_1076_11 + 1)
-                            (d__goto_1497_14 = (unsafe: *__ci_expr_old_25))
-                        }
-                        if (__goto_pending != 0) {
-                            break
-                        }
-                        var __ci_expr_logic_26: c_int
-                        if ((if d__goto_1497_14 == 13: 1 else: 0) != 0) {
-                            (__ci_expr_logic_26 = (if true: 1 else: 0))
-                        } else {
-                            (__ci_expr_logic_26 = (if (if d__goto_1497_14 == 10: 1 else: 0) != 0: 1 else: 0))
-                        }
-                        if (__ci_expr_logic_26 != 0) {
-                            (cb.external_flags = cb.external_flags | 2048)
-                        }
-                        if (__goto_pending != 0) {
-                            break
-                        }
-                        if ((if cranges__goto_1095_15 != null: 1 else: 0) != 0) {
-                            continue
-                        }
-                        if (__goto_pending != 0) {
-                            break
-                        }
-                        (xclass_props__goto_1093_10 = xclass_props__goto_1093_10 | 2)
-                        if (__goto_pending != 0) {
-                            break
-                        }
-                        add_to_class(options, xoptions, cb, c__goto_1179_20, d__goto_1497_14)
-                        if (__goto_pending != 0) {
-                            break
-                        }
-                        continue
-                        if (__goto_pending != 0) {
-                            break
-                        }
-                    }
-                    if (__goto_pending != 0) {
-                        break
-                    }
-                    if ((if cranges__goto_1095_15 != null: 1 else: 0) != 0) {
-                        continue
-                    }
-                    if (__goto_pending != 0) {
-                        break
-                    }
-                    (xclass_props__goto_1093_10 = xclass_props__goto_1093_10 | 2)
-                    if (__goto_pending != 0) {
-                        break
-                    }
-                    add_to_class(options, xoptions, cb, meta__goto_1174_12, meta__goto_1174_12)
-                    if (__goto_pending != 0) {
-                        break
-                    }
-                    if (__goto_pending != 0) {
-                        break
-                    }
-                }
-                if (__goto_pending != 0) {
-                    continue
-                }
-                __pc = 1
-                __goto_pending = 1
-                continue
-            },
-            1 => {  // END_PROCESSING
-                (__goto_pending = 0)
-                if (__goto_pending != 0) {
-                    continue
-                }
-                if ((if cranges__goto_1095_15 != null: 1 else: 0) != 0) {
-                    (range__goto_1581_13 = (((cranges__goto_1095_15 + ((1 as isize) as usize)) as *mut c_uint)))
-                    if (__goto_pending != 0) {
-                        continue
-                    }
-                    (end__goto_1582_13 = range__goto_1581_13 + ((cranges__goto_1095_15.range_list_size as isize) as usize))
-                    if (__goto_pending != 0) {
-                        continue
-                    }
-                    while true {
-                        var __ci_expr_logic_27: c_int = 0
-                        if ((if range__goto_1581_13 < end__goto_1582_13: 1 else: 0) != 0) {
-                            (__ci_expr_logic_27 = (if (if (unsafe: range__goto_1581_13[0]) < 256: 1 else: 0) != 0: 1 else: 0))
-                        }
-                        if (not (__ci_expr_logic_27 != 0)) {
-                            break
-                        }
-                        if (__goto_pending != 0) {
-                            break
-                        }
-                        var __ci_expr_ternary_28: c_uint = 0
-                        if ((if (options & (524288 | 131072)) != 0: 1 else: 0) != 0) {
-                            (__ci_expr_ternary_28 = options & (~8))
-                        } else {
-                            (__ci_expr_ternary_28 = options)
-                        }
-                        add_to_class(__ci_expr_ternary_28, xoptions, cb, (unsafe: range__goto_1581_13[0]), (unsafe: range__goto_1581_13[1]))
-                        if (__goto_pending != 0) {
-                            break
-                        }
-                        if ((if (unsafe: range__goto_1581_13[1]) > 255: 1 else: 0) != 0) {
-                            break
-                        }
-                        if (__goto_pending != 0) {
-                            break
-                        }
-                        (range__goto_1581_13 = range__goto_1581_13 + 2)
-                        if (__goto_pending != 0) {
-                            break
-                        }
-                        if (__goto_pending != 0) {
-                            break
-                        }
-                    }
-                    if (__goto_pending != 0) {
-                        continue
-                    }
-                    if ((if cranges__goto_1095_15.char_lists_size > 0: 1 else: 0) != 0) {
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-                        (xclass_props__goto_1093_10 = xclass_props__goto_1093_10 | 9)
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-                    } else {
-                        if ((if (xclass_props__goto_1093_10 & 16) != 0: 1 else: 0) != 0) {
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                            (should_flip_negation__goto_1078_6 = 1)
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                            (range__goto_1581_13 = end__goto_1582_13)
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                        }
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-                        while ((if range__goto_1581_13 < end__goto_1582_13: 1 else: 0) != 0) {
-                            (range_start__goto_1616_16 = (unsafe: range__goto_1581_13[0]))
-                            if (__goto_pending != 0) {
-                                break
-                            }
-                            (range_end__goto_1617_16 = (unsafe: range__goto_1581_13[1]))
-                            if (__goto_pending != 0) {
-                                break
-                            }
-                            (range__goto_1581_13 = range__goto_1581_13 + 2)
-                            if (__goto_pending != 0) {
-                                break
-                            }
-                            (xclass_props__goto_1093_10 = xclass_props__goto_1093_10 | 1)
-                            if (__goto_pending != 0) {
-                                break
-                            }
-                            if ((if range_start__goto_1616_16 < 256: 1 else: 0) != 0) {
-                                (range_start__goto_1616_16 = 256)
-                            }
-                            if (__goto_pending != 0) {
-                                break
-                            }
-                            if ((if lengthptr != null: 1 else: 0) != 0) {
-                                if (utf__goto_1085_6 != 0) {
-                                    ((unsafe: *lengthptr) = (unsafe: *lengthptr) + 1)
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-                                    if ((if range_start__goto_1616_16 < range_end__goto_1617_16: 1 else: 0) != 0) {
-                                        ((unsafe: *lengthptr) = (unsafe: *lengthptr) + _pcre2_ord2utf_8(range_start__goto_1616_16, class_uchardata__goto_1094_14))
-                                    }
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-                                    ((unsafe: *lengthptr) = (unsafe: *lengthptr) + _pcre2_ord2utf_8(range_end__goto_1617_16, class_uchardata__goto_1094_14))
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-                                    continue
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-                                }
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-                                var __ci_expr_ternary_29: c_int = 0
-                                if ((if range_start__goto_1616_16 < range_end__goto_1617_16: 1 else: 0) != 0) {
-                                    (__ci_expr_ternary_29 = 3)
-                                } else {
-                                    (__ci_expr_ternary_29 = 2)
-                                }
-                                ((unsafe: *lengthptr) = (unsafe: *lengthptr) + __ci_expr_ternary_29)
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-                                continue
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-                            }
-                            if (__goto_pending != 0) {
-                                break
-                            }
-                            if (utf__goto_1085_6 != 0) {
-                                if ((if range_start__goto_1616_16 < range_end__goto_1617_16: 1 else: 0) != 0) {
-                                    var __ci_expr_old_30: *mut u8 = class_uchardata__goto_1094_14
-                                    (class_uchardata__goto_1094_14 = class_uchardata__goto_1094_14 + 1)
-                                    ((unsafe: *__ci_expr_old_30) = 2)
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-                                    (class_uchardata__goto_1094_14 = class_uchardata__goto_1094_14 + _pcre2_ord2utf_8(range_start__goto_1616_16, class_uchardata__goto_1094_14))
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-                                } else {
-                                    var __ci_expr_old_31: *mut u8 = class_uchardata__goto_1094_14
-                                    (class_uchardata__goto_1094_14 = class_uchardata__goto_1094_14 + 1)
-                                    ((unsafe: *__ci_expr_old_31) = 1)
-                                }
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-                                (class_uchardata__goto_1094_14 = class_uchardata__goto_1094_14 + _pcre2_ord2utf_8(range_end__goto_1617_16, class_uchardata__goto_1094_14))
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-                                continue
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-                            }
-                            if (__goto_pending != 0) {
-                                break
-                            }
-                            if (__goto_pending != 0) {
-                                break
-                            }
-                        }
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-                        if ((if lengthptr == null: 1 else: 0) != 0) {
-                            cb.cx.memctl.free(cranges__goto_1095_15, cb.cx.memctl.memory_data)
-                        }
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-                    }
-                    if (__goto_pending != 0) {
-                        continue
-                    }
-                }
-                if (__goto_pending != 0) {
-                    continue
-                }
-                if ((if (xclass_props__goto_1093_10 & 1) != 0: 1 else: 0) != 0) {
-                    (previous__goto_1707_16 = code__goto_1077_14)
-                    if (__goto_pending != 0) {
-                        continue
-                    }
-                    if ((if (xclass_props__goto_1093_10 & 8) == 0: 1 else: 0) != 0) {
-                        var __ci_expr_old_32: *mut u8 = class_uchardata__goto_1094_14
-                        (class_uchardata__goto_1094_14 = class_uchardata__goto_1094_14 + 1)
-                        ((unsafe: *__ci_expr_old_32) = 0)
-                    }
-                    if (__goto_pending != 0) {
-                        continue
-                    }
-                    var __ci_expr_old_33: *mut u8 = code__goto_1077_14
-                    (code__goto_1077_14 = code__goto_1077_14 + 1)
-                    ((unsafe: *__ci_expr_old_33) = 112)
-                    if (__goto_pending != 0) {
-                        continue
-                    }
-                    (code__goto_1077_14 = code__goto_1077_14 + 2)
-                    if (__goto_pending != 0) {
-                        continue
-                    }
-                    var __ci_expr_ternary_34: c_int = 0
-                    if (negate_class != 0) {
-                        (__ci_expr_ternary_34 = 1)
-                    } else {
-                        (__ci_expr_ternary_34 = 0)
-                    }
-                    ((unsafe: *code__goto_1077_14) = __ci_expr_ternary_34)
-                    if (__goto_pending != 0) {
-                        continue
-                    }
-                    if ((if (xclass_props__goto_1093_10 & 4) != 0: 1 else: 0) != 0) {
-                        ((unsafe: *code__goto_1077_14) = (unsafe: *code__goto_1077_14) | 4)
-                    }
-                    if (__goto_pending != 0) {
-                        continue
-                    }
-                    var __ci_expr_logic_35: c_int
-                    if ((if (xclass_props__goto_1093_10 & 2) != 0: 1 else: 0) != 0) {
-                        (__ci_expr_logic_35 = (if true: 1 else: 0))
-                    } else {
-                        (__ci_expr_logic_35 = (if (if has_bitmap != null: 1 else: 0) != 0: 1 else: 0))
-                    }
-                    if (__ci_expr_logic_35 != 0) {
-                        if (negate_class != 0) {
-                            (classwords__goto_1723_17 = ((&cb.classbits.classwords[0] as *mut c_uint)))
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                            (i__goto_1724_16 = 0)
-                            while ((if i__goto_1724_16 < 8: 1 else: 0) != 0) {
-                                ((unsafe: classwords__goto_1723_17[i__goto_1724_16]) = (~(unsafe: classwords__goto_1723_17[i__goto_1724_16])))
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-                                (i__goto_1724_16 = i__goto_1724_16 + 1)
-                            }
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                        }
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-                        if ((if has_bitmap == null: 1 else: 0) != 0) {
-                            var __ci_expr_old_36: *mut u8 = code__goto_1077_14
-                            (code__goto_1077_14 = code__goto_1077_14 + 1)
-                            ((unsafe: *__ci_expr_old_36) = (unsafe: *__ci_expr_old_36) | 2)
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                            with_memmove(((code__goto_1077_14 + (32 / sizeof[u8]())) as *i8), (code__goto_1077_14 as *i8), (((((class_uchardata__goto_1094_14 as usize) -% (code__goto_1077_14 as usize)) / sizeof[u8]()) * 1) as i64))
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                            with_memcpy((code__goto_1077_14 as *i8), (classbits__goto_1082_16 as *i8), (32 as i64))
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                            (code__goto_1077_14 = class_uchardata__goto_1094_14 + (32 / sizeof[u8]()))
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                        } else {
-                            (code__goto_1077_14 = class_uchardata__goto_1094_14)
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                            if ((if (xclass_props__goto_1093_10 & 2) != 0: 1 else: 0) != 0) {
-                                ((unsafe: *has_bitmap) = 1)
-                            }
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                        }
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-                    } else {
-                        (code__goto_1077_14 = class_uchardata__goto_1094_14)
-                    }
-                    if (__goto_pending != 0) {
-                        continue
-                    }
-                    if ((if (xclass_props__goto_1093_10 & 8) != 0: 1 else: 0) != 0) {
-                        (char_lists_size__goto_1748_12 = cranges__goto_1095_15.char_lists_size)
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-                        if ((if lengthptr != null: 1 else: 0) != 0) {
-                            (char_lists_size__goto_1748_12 = (char_lists_size__goto_1748_12 +% (sizeof[c_uint]() -% 1)) & (~(sizeof[c_uint]() -% 1)))
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                            ((unsafe: *lengthptr) = (unsafe: *lengthptr) + 4)
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                            (cb.char_lists_size = cb.char_lists_size + char_lists_size__goto_1748_12)
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                            (char_lists_size__goto_1748_12 = char_lists_size__goto_1748_12 / sizeof[u8]())
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                            var __ci_expr_logic_37: c_int
-                            if ((if (unsafe: *lengthptr) > 65536: 1 else: 0) != 0) {
-                                (__ci_expr_logic_37 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_37 = (if (if (65536 -% (unsafe: *lengthptr)) < char_lists_size__goto_1748_12: 1 else: 0) != 0: 1 else: 0))
-                            }
-                            if (__ci_expr_logic_37 != 0) {
-                                ((unsafe: *errorcodeptr) = ERR20)
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-                                return null
-                                if (__goto_pending != 0) {
-                                    continue
-                                }
-                            }
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                        } else {
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                            var __ci_expr_ternary_38: c_int = 0
-                            if (1 != 0) {
-                                (__ci_expr_ternary_38 = 16)
-                            } else {
-                                (__ci_expr_ternary_38 = 4096)
-                            }
-                            ((unsafe: code__goto_1077_14[0]) = (((__ci_expr_ternary_38 | ((cranges__goto_1095_15.char_lists_types as c_int) >> (8 as c_uint))) as u8)))
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                            ((unsafe: code__goto_1077_14[1]) = ((cranges__goto_1095_15.char_lists_types as u8)))
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                            (code__goto_1077_14 = code__goto_1077_14 + 2)
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                            (cb.char_lists_size = cb.char_lists_size + char_lists_size__goto_1748_12)
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                            (data__goto_1777_16 = cb.start_code - cb.char_lists_size)
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                            with_memcpy((data__goto_1777_16 as *i8), ((((cranges__goto_1095_15 + ((1 as isize) as usize)) as *mut u8) + cranges__goto_1095_15.char_lists_start) as *i8), (char_lists_size__goto_1748_12 as i64))
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                            (char_lists_size__goto_1748_12 = cb.char_lists_size)
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                            ((unsafe: code__goto_1077_14[0]) = (((((((char_lists_size__goto_1748_12 as c_ulong) >> (1 as c_uint)) as c_uint) as c_uint) >> (8 as c_uint)) as u8)))
-                            ((unsafe: code__goto_1077_14[(0 + 1)]) = ((((((char_lists_size__goto_1748_12 as c_ulong) >> (1 as c_uint)) as c_uint) & 255) as u8)))
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                            (code__goto_1077_14 = code__goto_1077_14 + 2)
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                            if ((if (char_lists_size__goto_1748_12 & 2) != 0: 1 else: 0) != 0) {
-                                ((unsafe: (data__goto_1777_16 as *mut c_ushort)[-1]) = 57005)
-                            }
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                            (cb.char_lists_size = (char_lists_size__goto_1748_12 +% (sizeof[c_uint]() -% 1)) & (~(sizeof[c_uint]() -% 1)))
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                            cb.cx.memctl.free(cranges__goto_1095_15, cb.cx.memctl.memory_data)
-                            if (__goto_pending != 0) {
-                                continue
-                            }
-                        }
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-                    }
-                    if (__goto_pending != 0) {
-                        continue
-                    }
-                    ((unsafe: previous__goto_1707_16[1]) = ((((((((code__goto_1077_14 as usize) -% (previous__goto_1707_16 as usize)) / sizeof[u8]()) as c_int) as c_int) >> (8 as c_uint)) as u8)))
-                    ((unsafe: previous__goto_1707_16[(1 + 1)]) = (((((((code__goto_1077_14 as usize) -% (previous__goto_1707_16 as usize)) / sizeof[u8]()) as c_int) & 255) as u8)))
-                    if (__goto_pending != 0) {
-                        continue
-                    }
-                    __pc = 2
-                    __goto_pending = 1
-                    if (__goto_pending != 0) {
-                        continue
-                    }
-                }
-                if (__goto_pending != 0) {
-                    continue
-                }
-                if (negate_class != 0) {
-                    (classwords__goto_1840_13 = ((&cb.classbits.classwords[0] as *mut c_uint)))
-                    if (__goto_pending != 0) {
-                        continue
-                    }
-                    (i__goto_1842_12 = 0)
-                    while ((if i__goto_1842_12 < 8: 1 else: 0) != 0) {
-                        ((unsafe: classwords__goto_1840_13[i__goto_1842_12]) = (~(unsafe: classwords__goto_1840_13[i__goto_1842_12])))
-                        if (__goto_pending != 0) {
-                            break
-                        }
-                        (i__goto_1842_12 = i__goto_1842_12 + 1)
-                    }
-                    if (__goto_pending != 0) {
-                        continue
-                    }
-                }
-                if (__goto_pending != 0) {
-                    continue
-                }
-                var __ci_expr_logic_40: c_int = 0
-                var __ci_expr_logic_39: c_int
-                if ((if not (utf__goto_1085_6 != 0): 1 else: 0) != 0) {
-                    (__ci_expr_logic_39 = (if true: 1 else: 0))
-                } else {
-                    (__ci_expr_logic_39 = (if (if negate_class != should_flip_negation__goto_1078_6: 1 else: 0) != 0: 1 else: 0))
-                }
-                if (__ci_expr_logic_39 != 0) {
-                    (__ci_expr_logic_40 = (if (if cb.classbits.classwords[0] == (~(0 as c_uint)): 1 else: 0) != 0: 1 else: 0))
-                }
-                if (__ci_expr_logic_40 != 0) {
-                    (classwords__goto_1848_19 = ((&cb.classbits.classwords[0] as *const c_uint)))
-                    if (__goto_pending != 0) {
-                        continue
-                    }
-                    (i__goto_1849_7 = 0)
-                    while ((if i__goto_1849_7 < 8: 1 else: 0) != 0) {
-                        if ((if (unsafe: classwords__goto_1848_19[i__goto_1849_7]) != (~(0 as c_uint)): 1 else: 0) != 0) {
-                            break
-                        }
-                        if (__goto_pending != 0) {
-                            break
-                        }
-                        (i__goto_1849_7 = i__goto_1849_7 + 1)
-                    }
-                    if (__goto_pending != 0) {
-                        continue
-                    }
-                    if ((if i__goto_1849_7 == 8: 1 else: 0) != 0) {
-                        var __ci_expr_old_41: *mut u8 = code__goto_1077_14
-                        (code__goto_1077_14 = code__goto_1077_14 + 1)
-                        ((unsafe: *__ci_expr_old_41) = 13)
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-                        __pc = 2
-                        __goto_pending = 1
-                        if (__goto_pending != 0) {
-                            continue
-                        }
-                    }
-                    if (__goto_pending != 0) {
-                        continue
-                    }
-                }
-                if (__goto_pending != 0) {
-                    continue
-                }
-                var __ci_expr_old_42: *mut u8 = code__goto_1077_14
-                (code__goto_1077_14 = code__goto_1077_14 + 1)
-                var __ci_expr_ternary_43: c_int = 0
-                if ((if negate_class == should_flip_negation__goto_1078_6: 1 else: 0) != 0) {
-                    (__ci_expr_ternary_43 = OP_CLASS)
-                } else {
-                    (__ci_expr_ternary_43 = OP_NCLASS)
-                }
-                ((unsafe: *__ci_expr_old_42) = __ci_expr_ternary_43)
-                if (__goto_pending != 0) {
-                    continue
-                }
-                with_memcpy((code__goto_1077_14 as *i8), (classbits__goto_1082_16 as *i8), (32 as i64))
-                if (__goto_pending != 0) {
-                    continue
-                }
-                (code__goto_1077_14 = code__goto_1077_14 + (32 / sizeof[u8]()))
-                if (__goto_pending != 0) {
-                    continue
-                }
-                __pc = 2
-                __goto_pending = 1
-                continue
-            },
-            2 => {  // DONE
-                (__goto_pending = 0)
-                ((unsafe: *pcode) = code__goto_1077_14)
-                if (__goto_pending != 0) {
-                    continue
-                }
-                return (pptr__goto_1076_11 - ((1 as isize) as usize))
-                if (__goto_pending != 0) {
-                    continue
-                }
-            },
-            _ => {
-                break
-            },
+    '__ci_bb_0 {
+        (__local_pptr__goto_1076_11 = __param_start_ptr)
+        (__local_code__goto_1077_14 = (unsafe: *__param_pcode))
+        (__local_cbits__goto_1079_16 = __param_cb.cbits)
+        (__local_classbits__goto_1082_16 = ((&raw const (unsafe: *__param_cb).classbits.classbits[0] as *mut u8)))
+        (__local_utf__goto_1085_6 = (if ((__param_options as c_uint) & (524288 as c_uint)) != 0: 1 else: 0))
+        (__local_should_flip_negation__goto_1078_6 = 0)
+        (__local_xclass_props__goto_1093_10 = 0)
+        (__local_cranges__goto_1095_15 = ((null as *mut class_ranges)))
+        if (__local_utf__goto_1085_6 != 0) {
+            goto '__ci_bb_1
+        } else {
+            goto '__ci_bb_2
         }
     }
+
+    '__ci_bb_1 {
+        if ((if __param_lengthptr != null: 1 else: 0) != 0) {
+            goto '__ci_bb_3
+        } else {
+            goto '__ci_bb_4
+        }
+    }
+
+    '__ci_bb_2 {
+        (__local_class_uchardata__goto_1094_14 = (__local_code__goto_1077_14 + ((2 as isize) as usize)) + ((2 as isize) as usize))
+        with_memset((__local_classbits__goto_1082_16 as *i8), 0, (32 as i64))
+        goto '__ci_bb_20
+    }
+
+    '__ci_bb_3 {
+        (__local_cranges__goto_1095_15 = compile_optimize_class(__local_pptr__goto_1076_11, __param_options, __param_xoptions, __param_cb))
+        if ((if __local_cranges__goto_1095_15 == null: 1 else: 0) != 0) {
+            goto '__ci_bb_6
+        } else {
+            goto '__ci_bb_7
+        }
+    }
+
+    '__ci_bb_4 {
+        (__local_cranges__goto_1095_15 = ((__param_cb.first_data as *mut class_ranges)))
+        goto '__ci_bb_11
+    }
+
+    '__ci_bb_5 {
+        if ((if __local_cranges__goto_1095_15.range_list_size > 0: 1 else: 0) != 0) {
+            goto '__ci_bb_14
+        } else {
+            goto '__ci_bb_15
+        }
+    }
+
+    '__ci_bb_6 {
+        ((unsafe: *__param_errorcodeptr) = ERR21)
+        return null
+    }
+
+    '__ci_bb_7 {
+        if ((if __param_cb.last_data != null: 1 else: 0) != 0) {
+            goto '__ci_bb_8
+        } else {
+            goto '__ci_bb_9
+        }
+    }
+
+    '__ci_bb_8 {
+        ((unsafe: *__param_cb.last_data).next = (((&raw const (unsafe: *__local_cranges__goto_1095_15).header as *const compile_data) as *mut compile_data)))
+        goto '__ci_bb_10
+    }
+
+    '__ci_bb_9 {
+        ((unsafe: *__param_cb).first_data = (((&raw const (unsafe: *__local_cranges__goto_1095_15).header as *const compile_data) as *mut compile_data)))
+        goto '__ci_bb_10
+    }
+
+    '__ci_bb_10 {
+        ((unsafe: *__param_cb).last_data = (((&raw const (unsafe: *__local_cranges__goto_1095_15).header as *const compile_data) as *mut compile_data)))
+        goto '__ci_bb_5
+    }
+
+    '__ci_bb_11 {
+        goto '__ci_bb_12
+    }
+
+    '__ci_bb_12 {
+        if (0 != 0) {
+            goto '__ci_bb_11
+        } else {
+            goto '__ci_bb_13
+        }
+    }
+
+    '__ci_bb_13 {
+        ((unsafe: *__param_cb).first_data = (&raw const (unsafe: *__local_cranges__goto_1095_15).header as *const compile_data).next)
+        goto '__ci_bb_5
+    }
+
+    '__ci_bb_14 {
+        (__local_ranges__goto_1149_21 = (((__local_cranges__goto_1095_15 + ((1 as isize) as usize)) as *const c_uint)))
+        if ((if (unsafe: __local_ranges__goto_1149_21[0]) <= 255: 1 else: 0) != 0) {
+            goto '__ci_bb_16
+        } else {
+            goto '__ci_bb_17
+        }
+    }
+
+    '__ci_bb_15 {
+        goto '__ci_bb_2
+    }
+
+    '__ci_bb_16 {
+        (__local_xclass_props__goto_1093_10 = __local_xclass_props__goto_1093_10 | 2)
+        goto '__ci_bb_17
+    }
+
+    '__ci_bb_17 {
+        (__ci_expr_logic_1 = 0)
+        (__ci_expr_ternary_0 = 0)
+        if (__local_utf__goto_1085_6 != 0) {
+            (__ci_expr_ternary_0 = 1114111)
+        } else {
+            (__ci_expr_ternary_0 = 255)
+        }
+        if ((if (unsafe: __local_ranges__goto_1149_21[((__local_cranges__goto_1095_15.range_list_size as c_int) - 1)]) == __ci_expr_ternary_0: 1 else: 0) != 0) {
+            (__ci_expr_logic_1 = (if (if (unsafe: __local_ranges__goto_1149_21[((__local_cranges__goto_1095_15.range_list_size as c_int) - 2)]) <= 256: 1 else: 0) != 0: 1 else: 0))
+        }
+        if (__ci_expr_logic_1 != 0) {
+            goto '__ci_bb_18
+        } else {
+            goto '__ci_bb_19
+        }
+    }
+
+    '__ci_bb_18 {
+        (__local_xclass_props__goto_1093_10 = __local_xclass_props__goto_1093_10 | 16)
+        goto '__ci_bb_19
+    }
+
+    '__ci_bb_19 {
+        goto '__ci_bb_15
+    }
+
+    '__ci_bb_20 {
+        if (1 != 0) {
+            goto '__ci_bb_21
+        } else {
+            goto '__ci_bb_22
+        }
+    }
+
+    '__ci_bb_21 {
+        (__ci_expr_old_2 = __local_pptr__goto_1076_11)
+        (__local_pptr__goto_1076_11 = __local_pptr__goto_1076_11 + 1)
+        (__local_meta__goto_1174_12 = (unsafe: *__ci_expr_old_2))
+        goto '__ci_bb_23
+    }
+
+    '__ci_bb_22 {
+        goto '__ci_bb_144
+    }
+
+    '__ci_bb_23 {
+        if (((__local_meta__goto_1174_12 as c_uint) & ((4294901760 as c_uint) as c_uint)) == 2149580800) {
+            goto '__ci_bb_25
+        } else {
+            goto '__ci_bb_145
+        }
+    }
+
+    '__ci_bb_24 {
+        (__local_c__goto_1179_20 = __local_meta__goto_1174_12)
+        if ((if __local_c__goto_1179_20 == 13: 1 else: 0) != 0) {
+            (__ci_expr_logic_19 = (if true: 1 else: 0))
+        } else {
+            (__ci_expr_logic_19 = (if (if __local_c__goto_1179_20 == 10: 1 else: 0) != 0: 1 else: 0))
+        }
+        if (__ci_expr_logic_19 != 0) {
+            goto '__ci_bb_148
+        } else {
+            goto '__ci_bb_149
+        }
+    }
+
+    '__ci_bb_25 {
+        (__local_local_negate__goto_1175_8 = (if __local_meta__goto_1174_12 == 2149646336: 1 else: 0))
+        (__ci_expr_old_3 = __local_pptr__goto_1076_11)
+        (__local_pptr__goto_1076_11 = __local_pptr__goto_1076_11 + 1)
+        (__local_posix_class__goto_1176_7 = (unsafe: *__ci_expr_old_3))
+        if (__local_local_negate__goto_1175_8 != 0) {
+            goto '__ci_bb_26
+        } else {
+            goto '__ci_bb_27
+        }
+    }
+
+    '__ci_bb_26 {
+        (__local_should_flip_negation__goto_1078_6 = 1)
+        goto '__ci_bb_27
+    }
+
+    '__ci_bb_27 {
+        (__ci_expr_logic_4 = 0)
+        if ((if ((__param_options as c_uint) & (8 as c_uint)) != 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_4 = (if (if __local_posix_class__goto_1176_7 <= 2: 1 else: 0) != 0: 1 else: 0))
+        }
+        if (__ci_expr_logic_4 != 0) {
+            goto '__ci_bb_28
+        } else {
+            goto '__ci_bb_29
+        }
+    }
+
+    '__ci_bb_28 {
+        (__local_posix_class__goto_1176_7 = 0)
+        goto '__ci_bb_29
+    }
+
+    '__ci_bb_29 {
+        (__ci_expr_logic_5 = 0)
+        if ((if ((__param_options as c_uint) & (131072 as c_uint)) != 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_5 = (if (if ((__param_xoptions as c_uint) & (2048 as c_uint)) == 0: 1 else: 0) != 0: 1 else: 0))
+        }
+        if (__ci_expr_logic_5 != 0) {
+            goto '__ci_bb_30
+        } else {
+            goto '__ci_bb_31
+        }
+    }
+
+    '__ci_bb_30 {
+        goto '__ci_bb_32
+    }
+
+    '__ci_bb_31 {
+        (__local_posix_class__goto_1176_7 = __local_posix_class__goto_1176_7 * 3)
+        with_memcpy(((&(unsafe: (&raw const __local_pbits__goto_1178_22 as *const class_bits_storage).classbits[0]) as *mut u8) as *i8), ((__local_cbits__goto_1079_16 + ((_pcre2_posix_class_maps8[__local_posix_class__goto_1176_7] as isize) as usize)) as *i8), (32 as i64))
+        (__local_taboffset__goto_1177_7 = _pcre2_posix_class_maps8[(__local_posix_class__goto_1176_7 + 1)])
+        (__local_tabopt__goto_1177_18 = _pcre2_posix_class_maps8[(__local_posix_class__goto_1176_7 + 2)])
+        if ((if __local_taboffset__goto_1177_7 >= 0: 1 else: 0) != 0) {
+            goto '__ci_bb_43
+        } else {
+            goto '__ci_bb_44
+        }
+    }
+
+    '__ci_bb_32 {
+        if (__local_posix_class__goto_1176_7 == 8) {
+            goto '__ci_bb_34
+        } else {
+            goto '__ci_bb_41
+        }
+    }
+
+    '__ci_bb_33 {
+        goto '__ci_bb_31
+    }
+
+    '__ci_bb_34 {
+        (__ci_expr_ternary_7 = 0)
+        if ((if __local_posix_class__goto_1176_7 == 8: 1 else: 0) != 0) {
+            (__ci_expr_ternary_7 = 14)
+        } else {
+            var __ci_expr_ternary_6: c_int = 0
+
+            if ((if __local_posix_class__goto_1176_7 == 9: 1 else: 0) != 0) {
+                (__ci_expr_ternary_6 = 15)
+            } else {
+                (__ci_expr_ternary_6 = 16)
+            }
+
+            (__ci_expr_ternary_7 = __ci_expr_ternary_6)
+
+        }
+        (__local_ptype__goto_1211_16 = __ci_expr_ternary_7)
+        _pcre2_update_classbits_8(__local_ptype__goto_1211_16, 0, __local_local_negate__goto_1175_8, __local_classbits__goto_1082_16)
+        if ((if ((__local_xclass_props__goto_1093_10 as c_uint) & (16 as c_uint)) == 0: 1 else: 0) != 0) {
+            goto '__ci_bb_35
+        } else {
+            goto '__ci_bb_36
+        }
+    }
+
+    '__ci_bb_35 {
+        if ((if __param_lengthptr != null: 1 else: 0) != 0) {
+            goto '__ci_bb_37
+        } else {
+            goto '__ci_bb_38
+        }
+    }
+
+    '__ci_bb_36 {
+        goto '__ci_bb_20
+    }
+
+    '__ci_bb_37 {
+        ((unsafe: *__param_lengthptr) = (unsafe: *__param_lengthptr) + 3)
+        goto '__ci_bb_39
+    }
+
+    '__ci_bb_38 {
+        (__ci_expr_old_8 = __local_class_uchardata__goto_1094_14)
+        (__local_class_uchardata__goto_1094_14 = __local_class_uchardata__goto_1094_14 + 1)
+        (__ci_expr_ternary_9 = 0)
+        if (__local_local_negate__goto_1175_8 != 0) {
+            (__ci_expr_ternary_9 = 4)
+        } else {
+            (__ci_expr_ternary_9 = 3)
+        }
+        ((unsafe: *__ci_expr_old_8) = __ci_expr_ternary_9)
+        (__ci_expr_old_10 = __local_class_uchardata__goto_1094_14)
+        (__local_class_uchardata__goto_1094_14 = __local_class_uchardata__goto_1094_14 + 1)
+        ((unsafe: *__ci_expr_old_10) = ((__local_ptype__goto_1211_16 as u8)))
+        (__ci_expr_old_11 = __local_class_uchardata__goto_1094_14)
+        (__local_class_uchardata__goto_1094_14 = __local_class_uchardata__goto_1094_14 + 1)
+        ((unsafe: *__ci_expr_old_11) = 0)
+        goto '__ci_bb_39
+    }
+
+    '__ci_bb_39 {
+        (__local_xclass_props__goto_1093_10 = __local_xclass_props__goto_1093_10 | 5)
+        goto '__ci_bb_36
+    }
+
+    '__ci_bb_40 {
+        goto '__ci_bb_33
+    }
+
+    '__ci_bb_41 {
+        if (__local_posix_class__goto_1176_7 == 9) {
+            goto '__ci_bb_34
+        } else {
+            goto '__ci_bb_42
+        }
+    }
+
+    '__ci_bb_42 {
+        if (__local_posix_class__goto_1176_7 == 10) {
+            goto '__ci_bb_34
+        } else {
+            goto '__ci_bb_40
+        }
+    }
+
+    '__ci_bb_43 {
+        if ((if __local_tabopt__goto_1177_18 >= 0: 1 else: 0) != 0) {
+            goto '__ci_bb_45
+        } else {
+            goto '__ci_bb_46
+        }
+    }
+
+    '__ci_bb_44 {
+        if ((if __local_tabopt__goto_1177_18 < 0: 1 else: 0) != 0) {
+            goto '__ci_bb_56
+        } else {
+            goto '__ci_bb_57
+        }
+    }
+
+    '__ci_bb_45 {
+        (__local_i__goto_1279_18 = 0)
+        goto '__ci_bb_48
+    }
+
+    '__ci_bb_46 {
+        (__local_i__goto_1282_18 = 0)
+        goto '__ci_bb_52
+    }
+
+    '__ci_bb_47 {
+        goto '__ci_bb_44
+    }
+
+    '__ci_bb_48 {
+        if ((if __local_i__goto_1279_18 < 32: 1 else: 0) != 0) {
+            goto '__ci_bb_49
+        } else {
+            goto '__ci_bb_51
+        }
+    }
+
+    '__ci_bb_49 {
+        (__local_pbits__goto_1178_22.classbits[__local_i__goto_1279_18] = (&raw const __local_pbits__goto_1178_22 as *const class_bits_storage).classbits[__local_i__goto_1279_18] | (unsafe: __local_cbits__goto_1079_16[(__local_i__goto_1279_18 + __local_taboffset__goto_1177_7)]))
+        goto '__ci_bb_50
+    }
+
+    '__ci_bb_50 {
+        (__local_i__goto_1279_18 = __local_i__goto_1279_18 + 1)
+        goto '__ci_bb_48
+    }
+
+    '__ci_bb_51 {
+        goto '__ci_bb_47
+    }
+
+    '__ci_bb_52 {
+        if ((if __local_i__goto_1282_18 < 32: 1 else: 0) != 0) {
+            goto '__ci_bb_53
+        } else {
+            goto '__ci_bb_55
+        }
+    }
+
+    '__ci_bb_53 {
+        (__local_pbits__goto_1178_22.classbits[__local_i__goto_1282_18] = (&raw const __local_pbits__goto_1178_22 as *const class_bits_storage).classbits[__local_i__goto_1282_18] & ((~(unsafe: __local_cbits__goto_1079_16[(__local_i__goto_1282_18 + __local_taboffset__goto_1177_7)])) as u8))
+        goto '__ci_bb_54
+    }
+
+    '__ci_bb_54 {
+        (__local_i__goto_1282_18 = __local_i__goto_1282_18 + 1)
+        goto '__ci_bb_52
+    }
+
+    '__ci_bb_55 {
+        goto '__ci_bb_47
+    }
+
+    '__ci_bb_56 {
+        (__local_tabopt__goto_1177_18 = 0 - __local_tabopt__goto_1177_18)
+        goto '__ci_bb_57
+    }
+
+    '__ci_bb_57 {
+        if ((if __local_tabopt__goto_1177_18 == 1: 1 else: 0) != 0) {
+            goto '__ci_bb_58
+        } else {
+            goto '__ci_bb_59
+        }
+    }
+
+    '__ci_bb_58 {
+        (__local_pbits__goto_1178_22.classbits[1] = (&raw const __local_pbits__goto_1178_22 as *const class_bits_storage).classbits[1] & (~60))
+        goto '__ci_bb_60
+    }
+
+    '__ci_bb_59 {
+        if ((if __local_tabopt__goto_1177_18 == 2: 1 else: 0) != 0) {
+            goto '__ci_bb_61
+        } else {
+            goto '__ci_bb_62
+        }
+    }
+
+    '__ci_bb_60 {
+        (__local_classwords__goto_1312_17 = ((&raw const (unsafe: *__param_cb).classbits.classwords[0] as *mut c_uint)))
+        if (__local_local_negate__goto_1175_8 != 0) {
+            goto '__ci_bb_63
+        } else {
+            goto '__ci_bb_64
+        }
+    }
+
+    '__ci_bb_61 {
+        (__local_pbits__goto_1178_22.classbits[11] = (&raw const __local_pbits__goto_1178_22 as *const class_bits_storage).classbits[11] & 127)
+        goto '__ci_bb_62
+    }
+
+    '__ci_bb_62 {
+        goto '__ci_bb_60
+    }
+
+    '__ci_bb_63 {
+        (__local_i__goto_1315_18 = 0)
+        goto '__ci_bb_66
+    }
+
+    '__ci_bb_64 {
+        (__local_i__goto_1318_18 = 0)
+        goto '__ci_bb_70
+    }
+
+    '__ci_bb_65 {
+        (__local_xclass_props__goto_1093_10 = __local_xclass_props__goto_1093_10 | 2)
+        goto '__ci_bb_20
+    }
+
+    '__ci_bb_66 {
+        if ((if __local_i__goto_1315_18 < 8: 1 else: 0) != 0) {
+            goto '__ci_bb_67
+        } else {
+            goto '__ci_bb_69
+        }
+    }
+
+    '__ci_bb_67 {
+        ((unsafe: __local_classwords__goto_1312_17[__local_i__goto_1315_18]) = (unsafe: __local_classwords__goto_1312_17[__local_i__goto_1315_18]) | (~(&raw const __local_pbits__goto_1178_22 as *const class_bits_storage).classwords[__local_i__goto_1315_18]))
+        goto '__ci_bb_68
+    }
+
+    '__ci_bb_68 {
+        (__local_i__goto_1315_18 = __local_i__goto_1315_18 + 1)
+        goto '__ci_bb_66
+    }
+
+    '__ci_bb_69 {
+        goto '__ci_bb_65
+    }
+
+    '__ci_bb_70 {
+        if ((if __local_i__goto_1318_18 < 8: 1 else: 0) != 0) {
+            goto '__ci_bb_71
+        } else {
+            goto '__ci_bb_73
+        }
+    }
+
+    '__ci_bb_71 {
+        ((unsafe: __local_classwords__goto_1312_17[__local_i__goto_1318_18]) = (unsafe: __local_classwords__goto_1312_17[__local_i__goto_1318_18]) | (&raw const __local_pbits__goto_1178_22 as *const class_bits_storage).classwords[__local_i__goto_1318_18])
+        goto '__ci_bb_72
+    }
+
+    '__ci_bb_72 {
+        (__local_i__goto_1318_18 = __local_i__goto_1318_18 + 1)
+        goto '__ci_bb_70
+    }
+
+    '__ci_bb_73 {
+        goto '__ci_bb_65
+    }
+
+    '__ci_bb_74 {
+        (__ci_expr_old_12 = __local_pptr__goto_1076_11)
+        (__local_pptr__goto_1076_11 = __local_pptr__goto_1076_11 + 1)
+        (__local_meta__goto_1174_12 = (unsafe: *__ci_expr_old_12))
+        goto '__ci_bb_24
+    }
+
+    '__ci_bb_75 {
+        (__local_escape__goto_1179_12 = (__local_meta__goto_1174_12 as c_uint) & (65535 as c_uint))
+        goto '__ci_bb_76
+    }
+
+    '__ci_bb_76 {
+        if (__local_escape__goto_1179_12 == 7) {
+            goto '__ci_bb_78
+        } else {
+            goto '__ci_bb_130
+        }
+    }
+
+    '__ci_bb_77 {
+        (__local_xclass_props__goto_1093_10 = __local_xclass_props__goto_1093_10 | 2)
+        goto '__ci_bb_20
+    }
+
+    '__ci_bb_78 {
+        (__local_i__goto_1340_16 = 0)
+        goto '__ci_bb_79
+    }
+
+    '__ci_bb_79 {
+        if ((if __local_i__goto_1340_16 < 32: 1 else: 0) != 0) {
+            goto '__ci_bb_80
+        } else {
+            goto '__ci_bb_82
+        }
+    }
+
+    '__ci_bb_80 {
+        ((unsafe: __local_classbits__goto_1082_16[__local_i__goto_1340_16]) = (unsafe: __local_classbits__goto_1082_16[__local_i__goto_1340_16]) | (unsafe: __local_cbits__goto_1079_16[(__local_i__goto_1340_16 + 64)]))
+        goto '__ci_bb_81
+    }
+
+    '__ci_bb_81 {
+        (__local_i__goto_1340_16 = __local_i__goto_1340_16 + 1)
+        goto '__ci_bb_79
+    }
+
+    '__ci_bb_82 {
+        goto '__ci_bb_77
+    }
+
+    '__ci_bb_83 {
+        (__local_should_flip_negation__goto_1078_6 = 1)
+        (__local_i__goto_1345_16 = 0)
+        goto '__ci_bb_84
+    }
+
+    '__ci_bb_84 {
+        if ((if __local_i__goto_1345_16 < 32: 1 else: 0) != 0) {
+            goto '__ci_bb_85
+        } else {
+            goto '__ci_bb_87
+        }
+    }
+
+    '__ci_bb_85 {
+        ((unsafe: __local_classbits__goto_1082_16[__local_i__goto_1345_16]) = (unsafe: __local_classbits__goto_1082_16[__local_i__goto_1345_16]) | ((~(unsafe: __local_cbits__goto_1079_16[(__local_i__goto_1345_16 + 64)])) as u8))
+        goto '__ci_bb_86
+    }
+
+    '__ci_bb_86 {
+        (__local_i__goto_1345_16 = __local_i__goto_1345_16 + 1)
+        goto '__ci_bb_84
+    }
+
+    '__ci_bb_87 {
+        goto '__ci_bb_77
+    }
+
+    '__ci_bb_88 {
+        (__local_i__goto_1350_16 = 0)
+        goto '__ci_bb_89
+    }
+
+    '__ci_bb_89 {
+        if ((if __local_i__goto_1350_16 < 32: 1 else: 0) != 0) {
+            goto '__ci_bb_90
+        } else {
+            goto '__ci_bb_92
+        }
+    }
+
+    '__ci_bb_90 {
+        ((unsafe: __local_classbits__goto_1082_16[__local_i__goto_1350_16]) = (unsafe: __local_classbits__goto_1082_16[__local_i__goto_1350_16]) | (unsafe: __local_cbits__goto_1079_16[(__local_i__goto_1350_16 + 160)]))
+        goto '__ci_bb_91
+    }
+
+    '__ci_bb_91 {
+        (__local_i__goto_1350_16 = __local_i__goto_1350_16 + 1)
+        goto '__ci_bb_89
+    }
+
+    '__ci_bb_92 {
+        goto '__ci_bb_77
+    }
+
+    '__ci_bb_93 {
+        (__local_should_flip_negation__goto_1078_6 = 1)
+        (__local_i__goto_1355_16 = 0)
+        goto '__ci_bb_94
+    }
+
+    '__ci_bb_94 {
+        if ((if __local_i__goto_1355_16 < 32: 1 else: 0) != 0) {
+            goto '__ci_bb_95
+        } else {
+            goto '__ci_bb_97
+        }
+    }
+
+    '__ci_bb_95 {
+        ((unsafe: __local_classbits__goto_1082_16[__local_i__goto_1355_16]) = (unsafe: __local_classbits__goto_1082_16[__local_i__goto_1355_16]) | ((~(unsafe: __local_cbits__goto_1079_16[(__local_i__goto_1355_16 + 160)])) as u8))
+        goto '__ci_bb_96
+    }
+
+    '__ci_bb_96 {
+        (__local_i__goto_1355_16 = __local_i__goto_1355_16 + 1)
+        goto '__ci_bb_94
+    }
+
+    '__ci_bb_97 {
+        goto '__ci_bb_77
+    }
+
+    '__ci_bb_98 {
+        (__local_i__goto_1367_16 = 0)
+        goto '__ci_bb_99
+    }
+
+    '__ci_bb_99 {
+        if ((if __local_i__goto_1367_16 < 32: 1 else: 0) != 0) {
+            goto '__ci_bb_100
+        } else {
+            goto '__ci_bb_102
+        }
+    }
+
+    '__ci_bb_100 {
+        ((unsafe: __local_classbits__goto_1082_16[__local_i__goto_1367_16]) = (unsafe: __local_classbits__goto_1082_16[__local_i__goto_1367_16]) | (unsafe: __local_cbits__goto_1079_16[(__local_i__goto_1367_16 + 0)]))
+        goto '__ci_bb_101
+    }
+
+    '__ci_bb_101 {
+        (__local_i__goto_1367_16 = __local_i__goto_1367_16 + 1)
+        goto '__ci_bb_99
+    }
+
+    '__ci_bb_102 {
+        goto '__ci_bb_77
+    }
+
+    '__ci_bb_103 {
+        (__local_should_flip_negation__goto_1078_6 = 1)
+        (__local_i__goto_1372_16 = 0)
+        goto '__ci_bb_104
+    }
+
+    '__ci_bb_104 {
+        if ((if __local_i__goto_1372_16 < 32: 1 else: 0) != 0) {
+            goto '__ci_bb_105
+        } else {
+            goto '__ci_bb_107
+        }
+    }
+
+    '__ci_bb_105 {
+        ((unsafe: __local_classbits__goto_1082_16[__local_i__goto_1372_16]) = (unsafe: __local_classbits__goto_1082_16[__local_i__goto_1372_16]) | ((~(unsafe: __local_cbits__goto_1079_16[(__local_i__goto_1372_16 + 0)])) as u8))
+        goto '__ci_bb_106
+    }
+
+    '__ci_bb_106 {
+        (__local_i__goto_1372_16 = __local_i__goto_1372_16 + 1)
+        goto '__ci_bb_104
+    }
+
+    '__ci_bb_107 {
+        goto '__ci_bb_77
+    }
+
+    '__ci_bb_108 {
+        if ((if __local_cranges__goto_1095_15 != null: 1 else: 0) != 0) {
+            goto '__ci_bb_109
+        } else {
+            goto '__ci_bb_110
+        }
+    }
+
+    '__ci_bb_109 {
+        goto '__ci_bb_77
+    }
+
+    '__ci_bb_110 {
+        add_list_to_class(((__param_options as c_uint) & ((~8) as c_uint)), __param_xoptions, __param_cb, (&(unsafe: _pcre2_hspace_list_8[0]) as *mut c_uint))
+        goto '__ci_bb_77
+    }
+
+    '__ci_bb_111 {
+        if ((if __local_cranges__goto_1095_15 != null: 1 else: 0) != 0) {
+            goto '__ci_bb_112
+        } else {
+            goto '__ci_bb_113
+        }
+    }
+
+    '__ci_bb_112 {
+        goto '__ci_bb_77
+    }
+
+    '__ci_bb_113 {
+        add_not_list_to_class(((__param_options as c_uint) & ((~8) as c_uint)), __param_xoptions, __param_cb, (&(unsafe: _pcre2_hspace_list_8[0]) as *mut c_uint))
+        goto '__ci_bb_77
+    }
+
+    '__ci_bb_114 {
+        if ((if __local_cranges__goto_1095_15 != null: 1 else: 0) != 0) {
+            goto '__ci_bb_115
+        } else {
+            goto '__ci_bb_116
+        }
+    }
+
+    '__ci_bb_115 {
+        goto '__ci_bb_77
+    }
+
+    '__ci_bb_116 {
+        add_list_to_class(((__param_options as c_uint) & ((~8) as c_uint)), __param_xoptions, __param_cb, (&(unsafe: _pcre2_vspace_list_8[0]) as *mut c_uint))
+        goto '__ci_bb_77
+    }
+
+    '__ci_bb_117 {
+        if ((if __local_cranges__goto_1095_15 != null: 1 else: 0) != 0) {
+            goto '__ci_bb_118
+        } else {
+            goto '__ci_bb_119
+        }
+    }
+
+    '__ci_bb_118 {
+        goto '__ci_bb_77
+    }
+
+    '__ci_bb_119 {
+        add_not_list_to_class(((__param_options as c_uint) & ((~8) as c_uint)), __param_xoptions, __param_cb, (&(unsafe: _pcre2_vspace_list_8[0]) as *mut c_uint))
+        goto '__ci_bb_77
+    }
+
+    '__ci_bb_120 {
+        (__local_ptype__goto_1437_18 = ((unsafe: *__local_pptr__goto_1076_11) as c_uint) >> (16 as c_uint))
+        (__ci_expr_old_13 = __local_pptr__goto_1076_11)
+        (__local_pptr__goto_1076_11 = __local_pptr__goto_1076_11 + 1)
+        (__local_pdata__goto_1438_18 = ((unsafe: *__ci_expr_old_13) as c_uint) & (65535 as c_uint))
+        if ((if __local_ptype__goto_1437_18 == 13: 1 else: 0) != 0) {
+            goto '__ci_bb_121
+        } else {
+            goto '__ci_bb_122
+        }
+    }
+
+    '__ci_bb_121 {
+        (__ci_expr_logic_14 = 0)
+        if ((if not (__local_utf__goto_1085_6 != 0): 1 else: 0) != 0) {
+            (__ci_expr_logic_14 = (if (if __local_escape__goto_1179_12 == 16: 1 else: 0) != 0: 1 else: 0))
+        }
+        if (__ci_expr_logic_14 != 0) {
+            goto '__ci_bb_123
+        } else {
+            goto '__ci_bb_124
+        }
+    }
+
+    '__ci_bb_122 {
+        _pcre2_update_classbits_8(__local_ptype__goto_1437_18, __local_pdata__goto_1438_18, (if __local_escape__goto_1179_12 == 15: 1 else: 0), __local_classbits__goto_1082_16)
+        if ((if ((__local_xclass_props__goto_1093_10 as c_uint) & (16 as c_uint)) == 0: 1 else: 0) != 0) {
+            goto '__ci_bb_125
+        } else {
+            goto '__ci_bb_126
+        }
+    }
+
+    '__ci_bb_123 {
+        with_memset((__local_classbits__goto_1082_16 as *i8), 255, (32 as i64))
+        goto '__ci_bb_124
+    }
+
+    '__ci_bb_124 {
+        goto '__ci_bb_20
+    }
+
+    '__ci_bb_125 {
+        if ((if __param_lengthptr != null: 1 else: 0) != 0) {
+            goto '__ci_bb_127
+        } else {
+            goto '__ci_bb_128
+        }
+    }
+
+    '__ci_bb_126 {
+        goto '__ci_bb_20
+    }
+
+    '__ci_bb_127 {
+        ((unsafe: *__param_lengthptr) = (unsafe: *__param_lengthptr) + 3)
+        goto '__ci_bb_129
+    }
+
+    '__ci_bb_128 {
+        (__ci_expr_old_15 = __local_class_uchardata__goto_1094_14)
+        (__local_class_uchardata__goto_1094_14 = __local_class_uchardata__goto_1094_14 + 1)
+        (__ci_expr_ternary_16 = 0)
+        if ((if __local_escape__goto_1179_12 == 16: 1 else: 0) != 0) {
+            (__ci_expr_ternary_16 = 3)
+        } else {
+            (__ci_expr_ternary_16 = 4)
+        }
+        ((unsafe: *__ci_expr_old_15) = __ci_expr_ternary_16)
+        (__ci_expr_old_17 = __local_class_uchardata__goto_1094_14)
+        (__local_class_uchardata__goto_1094_14 = __local_class_uchardata__goto_1094_14 + 1)
+        ((unsafe: *__ci_expr_old_17) = __local_ptype__goto_1437_18)
+        (__ci_expr_old_18 = __local_class_uchardata__goto_1094_14)
+        (__local_class_uchardata__goto_1094_14 = __local_class_uchardata__goto_1094_14 + 1)
+        ((unsafe: *__ci_expr_old_18) = __local_pdata__goto_1438_18)
+        goto '__ci_bb_129
+    }
+
+    '__ci_bb_129 {
+        (__local_xclass_props__goto_1093_10 = __local_xclass_props__goto_1093_10 | 5)
+        goto '__ci_bb_126
+    }
+
+    '__ci_bb_130 {
+        if (__local_escape__goto_1179_12 == 6) {
+            goto '__ci_bb_83
+        } else {
+            goto '__ci_bb_131
+        }
+    }
+
+    '__ci_bb_131 {
+        if (__local_escape__goto_1179_12 == 11) {
+            goto '__ci_bb_88
+        } else {
+            goto '__ci_bb_132
+        }
+    }
+
+    '__ci_bb_132 {
+        if (__local_escape__goto_1179_12 == 10) {
+            goto '__ci_bb_93
+        } else {
+            goto '__ci_bb_133
+        }
+    }
+
+    '__ci_bb_133 {
+        if (__local_escape__goto_1179_12 == 9) {
+            goto '__ci_bb_98
+        } else {
+            goto '__ci_bb_134
+        }
+    }
+
+    '__ci_bb_134 {
+        if (__local_escape__goto_1179_12 == 8) {
+            goto '__ci_bb_103
+        } else {
+            goto '__ci_bb_135
+        }
+    }
+
+    '__ci_bb_135 {
+        if (__local_escape__goto_1179_12 == 19) {
+            goto '__ci_bb_108
+        } else {
+            goto '__ci_bb_136
+        }
+    }
+
+    '__ci_bb_136 {
+        if (__local_escape__goto_1179_12 == 18) {
+            goto '__ci_bb_111
+        } else {
+            goto '__ci_bb_137
+        }
+    }
+
+    '__ci_bb_137 {
+        if (__local_escape__goto_1179_12 == 21) {
+            goto '__ci_bb_114
+        } else {
+            goto '__ci_bb_138
+        }
+    }
+
+    '__ci_bb_138 {
+        if (__local_escape__goto_1179_12 == 20) {
+            goto '__ci_bb_117
+        } else {
+            goto '__ci_bb_139
+        }
+    }
+
+    '__ci_bb_139 {
+        if (__local_escape__goto_1179_12 == 16) {
+            goto '__ci_bb_120
+        } else {
+            goto '__ci_bb_140
+        }
+    }
+
+    '__ci_bb_140 {
+        if (__local_escape__goto_1179_12 == 15) {
+            goto '__ci_bb_120
+        } else {
+            goto '__ci_bb_77
+        }
+    }
+
+    '__ci_bb_141 {
+        if ((if __local_meta__goto_1174_12 < 2147483648: 1 else: 0) != 0) {
+            goto '__ci_bb_142
+        } else {
+            goto '__ci_bb_143
+        }
+    }
+
+    '__ci_bb_142 {
+        goto '__ci_bb_24
+    }
+
+    '__ci_bb_143 {
+        goto '__ci_bb_144
+    }
+
+    '__ci_bb_144 {
+        goto '__ci_bb_160
+    }
+
+    '__ci_bb_145 {
+        if (((__local_meta__goto_1174_12 as c_uint) & ((4294901760 as c_uint) as c_uint)) == 2149646336) {
+            goto '__ci_bb_25
+        } else {
+            goto '__ci_bb_146
+        }
+    }
+
+    '__ci_bb_146 {
+        if (((__local_meta__goto_1174_12 as c_uint) & ((4294901760 as c_uint) as c_uint)) == 2147811328) {
+            goto '__ci_bb_74
+        } else {
+            goto '__ci_bb_147
+        }
+    }
+
+    '__ci_bb_147 {
+        if (((__local_meta__goto_1174_12 as c_uint) & ((4294901760 as c_uint) as c_uint)) == 2149318656) {
+            goto '__ci_bb_75
+        } else {
+            goto '__ci_bb_141
+        }
+    }
+
+    '__ci_bb_148 {
+        ((unsafe: *__param_cb).external_flags = __param_cb.external_flags | 2048)
+        goto '__ci_bb_149
+    }
+
+    '__ci_bb_149 {
+        if ((if (unsafe: *__local_pptr__goto_1076_11) == 2149777408: 1 else: 0) != 0) {
+            (__ci_expr_logic_20 = (if true: 1 else: 0))
+        } else {
+            (__ci_expr_logic_20 = (if (if (unsafe: *__local_pptr__goto_1076_11) == 2149711872: 1 else: 0) != 0: 1 else: 0))
+        }
+        if (__ci_expr_logic_20 != 0) {
+            goto '__ci_bb_150
+        } else {
+            goto '__ci_bb_151
+        }
+    }
+
+    '__ci_bb_150 {
+        (__local_pptr__goto_1076_11 = __local_pptr__goto_1076_11 + 1)
+        (__ci_expr_old_21 = __local_pptr__goto_1076_11)
+        (__local_pptr__goto_1076_11 = __local_pptr__goto_1076_11 + 1)
+        (__local_d__goto_1497_14 = (unsafe: *__ci_expr_old_21))
+        if ((if __local_d__goto_1497_14 == 2147811328: 1 else: 0) != 0) {
+            goto '__ci_bb_152
+        } else {
+            goto '__ci_bb_153
+        }
+    }
+
+    '__ci_bb_151 {
+        if ((if __local_cranges__goto_1095_15 != null: 1 else: 0) != 0) {
+            goto '__ci_bb_158
+        } else {
+            goto '__ci_bb_159
+        }
+    }
+
+    '__ci_bb_152 {
+        (__ci_expr_old_22 = __local_pptr__goto_1076_11)
+        (__local_pptr__goto_1076_11 = __local_pptr__goto_1076_11 + 1)
+        (__local_d__goto_1497_14 = (unsafe: *__ci_expr_old_22))
+        goto '__ci_bb_153
+    }
+
+    '__ci_bb_153 {
+        if ((if __local_d__goto_1497_14 == 13: 1 else: 0) != 0) {
+            (__ci_expr_logic_23 = (if true: 1 else: 0))
+        } else {
+            (__ci_expr_logic_23 = (if (if __local_d__goto_1497_14 == 10: 1 else: 0) != 0: 1 else: 0))
+        }
+        if (__ci_expr_logic_23 != 0) {
+            goto '__ci_bb_154
+        } else {
+            goto '__ci_bb_155
+        }
+    }
+
+    '__ci_bb_154 {
+        ((unsafe: *__param_cb).external_flags = __param_cb.external_flags | 2048)
+        goto '__ci_bb_155
+    }
+
+    '__ci_bb_155 {
+        if ((if __local_cranges__goto_1095_15 != null: 1 else: 0) != 0) {
+            goto '__ci_bb_156
+        } else {
+            goto '__ci_bb_157
+        }
+    }
+
+    '__ci_bb_156 {
+        goto '__ci_bb_20
+    }
+
+    '__ci_bb_157 {
+        (__local_xclass_props__goto_1093_10 = __local_xclass_props__goto_1093_10 | 2)
+        add_to_class(__param_options, __param_xoptions, __param_cb, __local_c__goto_1179_20, __local_d__goto_1497_14)
+        goto '__ci_bb_20
+    }
+
+    '__ci_bb_158 {
+        goto '__ci_bb_20
+    }
+
+    '__ci_bb_159 {
+        (__local_xclass_props__goto_1093_10 = __local_xclass_props__goto_1093_10 | 2)
+        add_to_class(__param_options, __param_xoptions, __param_cb, __local_meta__goto_1174_12, __local_meta__goto_1174_12)
+        goto '__ci_bb_20
+    }
+
+    '__ci_bb_160 {
+        goto '__ci_bb_161
+    }
+
+    '__ci_bb_161 {
+        if (0 != 0) {
+            goto '__ci_bb_160
+        } else {
+            goto '__ci_bb_162
+        }
+    }
+
+    '__ci_bb_162 {
+        if ((if __local_cranges__goto_1095_15 != null: 1 else: 0) != 0) {
+            goto '__ci_bb_163
+        } else {
+            goto '__ci_bb_164
+        }
+    }
+
+    '__ci_bb_163 {
+        (__local_range__goto_1581_13 = (((__local_cranges__goto_1095_15 + ((1 as isize) as usize)) as *mut c_uint)))
+        (__local_end__goto_1582_13 = __local_range__goto_1581_13 + ((__local_cranges__goto_1095_15.range_list_size as c_uint) as usize))
+        goto '__ci_bb_165
+    }
+
+    '__ci_bb_164 {
+        if ((if ((__local_xclass_props__goto_1093_10 as c_uint) & (1 as c_uint)) != 0: 1 else: 0) != 0) {
+            goto '__ci_bb_202
+        } else {
+            goto '__ci_bb_203
+        }
+    }
+
+    '__ci_bb_165 {
+        (__ci_expr_logic_24 = 0)
+        if ((if __local_range__goto_1581_13 < __local_end__goto_1582_13: 1 else: 0) != 0) {
+            (__ci_expr_logic_24 = (if (if (unsafe: __local_range__goto_1581_13[0]) < 256: 1 else: 0) != 0: 1 else: 0))
+        }
+        if (__ci_expr_logic_24 != 0) {
+            goto '__ci_bb_166
+        } else {
+            goto '__ci_bb_167
+        }
+    }
+
+    '__ci_bb_166 {
+        goto '__ci_bb_168
+    }
+
+    '__ci_bb_167 {
+        if ((if __local_cranges__goto_1095_15.char_lists_size > 0: 1 else: 0) != 0) {
+            goto '__ci_bb_173
+        } else {
+            goto '__ci_bb_174
+        }
+    }
+
+    '__ci_bb_168 {
+        goto '__ci_bb_169
+    }
+
+    '__ci_bb_169 {
+        if (0 != 0) {
+            goto '__ci_bb_168
+        } else {
+            goto '__ci_bb_170
+        }
+    }
+
+    '__ci_bb_170 {
+        (__ci_expr_ternary_25 = 0)
+        if ((if ((__param_options as c_uint) & (((524288 as c_uint) | (131072 as c_uint)) as c_uint)) != 0: 1 else: 0) != 0) {
+            (__ci_expr_ternary_25 = (__param_options as c_uint) & ((~8) as c_uint))
+        } else {
+            (__ci_expr_ternary_25 = __param_options)
+        }
+        add_to_class(__ci_expr_ternary_25, __param_xoptions, __param_cb, (unsafe: __local_range__goto_1581_13[0]), (unsafe: __local_range__goto_1581_13[1]))
+        if ((if (unsafe: __local_range__goto_1581_13[1]) > 255: 1 else: 0) != 0) {
+            goto '__ci_bb_171
+        } else {
+            goto '__ci_bb_172
+        }
+    }
+
+    '__ci_bb_171 {
+        goto '__ci_bb_167
+    }
+
+    '__ci_bb_172 {
+        (__local_range__goto_1581_13 = __local_range__goto_1581_13 + ((2 as isize) as usize))
+        goto '__ci_bb_165
+    }
+
+    '__ci_bb_173 {
+        goto '__ci_bb_176
+    }
+
+    '__ci_bb_174 {
+        if ((if ((__local_xclass_props__goto_1093_10 as c_uint) & (16 as c_uint)) != 0: 1 else: 0) != 0) {
+            goto '__ci_bb_179
+        } else {
+            goto '__ci_bb_180
+        }
+    }
+
+    '__ci_bb_175 {
+        goto '__ci_bb_164
+    }
+
+    '__ci_bb_176 {
+        goto '__ci_bb_177
+    }
+
+    '__ci_bb_177 {
+        if (0 != 0) {
+            goto '__ci_bb_176
+        } else {
+            goto '__ci_bb_178
+        }
+    }
+
+    '__ci_bb_178 {
+        (__local_xclass_props__goto_1093_10 = __local_xclass_props__goto_1093_10 | 9)
+        goto '__ci_bb_175
+    }
+
+    '__ci_bb_179 {
+        goto '__ci_bb_181
+    }
+
+    '__ci_bb_180 {
+        goto '__ci_bb_184
+    }
+
+    '__ci_bb_181 {
+        goto '__ci_bb_182
+    }
+
+    '__ci_bb_182 {
+        if (0 != 0) {
+            goto '__ci_bb_181
+        } else {
+            goto '__ci_bb_183
+        }
+    }
+
+    '__ci_bb_183 {
+        (__local_should_flip_negation__goto_1078_6 = 1)
+        (__local_range__goto_1581_13 = __local_end__goto_1582_13)
+        goto '__ci_bb_180
+    }
+
+    '__ci_bb_184 {
+        if ((if __local_range__goto_1581_13 < __local_end__goto_1582_13: 1 else: 0) != 0) {
+            goto '__ci_bb_185
+        } else {
+            goto '__ci_bb_186
+        }
+    }
+
+    '__ci_bb_185 {
+        (__local_range_start__goto_1616_16 = (unsafe: __local_range__goto_1581_13[0]))
+        (__local_range_end__goto_1617_16 = (unsafe: __local_range__goto_1581_13[1]))
+        (__local_range__goto_1581_13 = __local_range__goto_1581_13 + ((2 as isize) as usize))
+        (__local_xclass_props__goto_1093_10 = __local_xclass_props__goto_1093_10 | 1)
+        if ((if __local_range_start__goto_1616_16 < 256: 1 else: 0) != 0) {
+            goto '__ci_bb_187
+        } else {
+            goto '__ci_bb_188
+        }
+    }
+
+    '__ci_bb_186 {
+        if ((if __param_lengthptr == null: 1 else: 0) != 0) {
+            goto '__ci_bb_200
+        } else {
+            goto '__ci_bb_201
+        }
+    }
+
+    '__ci_bb_187 {
+        (__local_range_start__goto_1616_16 = 256)
+        goto '__ci_bb_188
+    }
+
+    '__ci_bb_188 {
+        if ((if __param_lengthptr != null: 1 else: 0) != 0) {
+            goto '__ci_bb_189
+        } else {
+            goto '__ci_bb_190
+        }
+    }
+
+    '__ci_bb_189 {
+        if (__local_utf__goto_1085_6 != 0) {
+            goto '__ci_bb_191
+        } else {
+            goto '__ci_bb_192
+        }
+    }
+
+    '__ci_bb_190 {
+        if (__local_utf__goto_1085_6 != 0) {
+            goto '__ci_bb_195
+        } else {
+            goto '__ci_bb_196
+        }
+    }
+
+    '__ci_bb_191 {
+        ((unsafe: *__param_lengthptr) = (unsafe: *__param_lengthptr) + 1)
+        if ((if __local_range_start__goto_1616_16 < __local_range_end__goto_1617_16: 1 else: 0) != 0) {
+            goto '__ci_bb_193
+        } else {
+            goto '__ci_bb_194
+        }
+    }
+
+    '__ci_bb_192 {
+        (__ci_expr_ternary_26 = 0)
+        if ((if __local_range_start__goto_1616_16 < __local_range_end__goto_1617_16: 1 else: 0) != 0) {
+            (__ci_expr_ternary_26 = 3)
+        } else {
+            (__ci_expr_ternary_26 = 2)
+        }
+        ((unsafe: *__param_lengthptr) = (unsafe: *__param_lengthptr) + __ci_expr_ternary_26)
+        goto '__ci_bb_184
+    }
+
+    '__ci_bb_193 {
+        ((unsafe: *__param_lengthptr) = (unsafe: *__param_lengthptr) + _pcre2_ord2utf_8(__local_range_start__goto_1616_16, __local_class_uchardata__goto_1094_14))
+        goto '__ci_bb_194
+    }
+
+    '__ci_bb_194 {
+        ((unsafe: *__param_lengthptr) = (unsafe: *__param_lengthptr) + _pcre2_ord2utf_8(__local_range_end__goto_1617_16, __local_class_uchardata__goto_1094_14))
+        goto '__ci_bb_184
+    }
+
+    '__ci_bb_195 {
+        if ((if __local_range_start__goto_1616_16 < __local_range_end__goto_1617_16: 1 else: 0) != 0) {
+            goto '__ci_bb_197
+        } else {
+            goto '__ci_bb_198
+        }
+    }
+
+    '__ci_bb_196 {
+        goto '__ci_bb_184
+    }
+
+    '__ci_bb_197 {
+        (__ci_expr_old_27 = __local_class_uchardata__goto_1094_14)
+        (__local_class_uchardata__goto_1094_14 = __local_class_uchardata__goto_1094_14 + 1)
+        ((unsafe: *__ci_expr_old_27) = 2)
+        (__local_class_uchardata__goto_1094_14 = __local_class_uchardata__goto_1094_14 + (_pcre2_ord2utf_8(__local_range_start__goto_1616_16, __local_class_uchardata__goto_1094_14) as usize))
+        goto '__ci_bb_199
+    }
+
+    '__ci_bb_198 {
+        (__ci_expr_old_28 = __local_class_uchardata__goto_1094_14)
+        (__local_class_uchardata__goto_1094_14 = __local_class_uchardata__goto_1094_14 + 1)
+        ((unsafe: *__ci_expr_old_28) = 1)
+        goto '__ci_bb_199
+    }
+
+    '__ci_bb_199 {
+        (__local_class_uchardata__goto_1094_14 = __local_class_uchardata__goto_1094_14 + (_pcre2_ord2utf_8(__local_range_end__goto_1617_16, __local_class_uchardata__goto_1094_14) as usize))
+        goto '__ci_bb_184
+    }
+
+    '__ci_bb_200 {
+        (&raw const (unsafe: *__param_cb.cx).memctl as *const pcre2_memctl).free(__local_cranges__goto_1095_15, (&raw const (unsafe: *__param_cb.cx).memctl as *const pcre2_memctl).memory_data)
+        goto '__ci_bb_201
+    }
+
+    '__ci_bb_201 {
+        goto '__ci_bb_175
+    }
+
+    '__ci_bb_202 {
+        (__local_previous__goto_1707_16 = __local_code__goto_1077_14)
+        if ((if ((__local_xclass_props__goto_1093_10 as c_uint) & (8 as c_uint)) == 0: 1 else: 0) != 0) {
+            goto '__ci_bb_204
+        } else {
+            goto '__ci_bb_205
+        }
+    }
+
+    '__ci_bb_203 {
+        if (__param_negate_class != 0) {
+            goto '__ci_bb_238
+        } else {
+            goto '__ci_bb_239
+        }
+    }
+
+    '__ci_bb_204 {
+        (__ci_expr_old_29 = __local_class_uchardata__goto_1094_14)
+        (__local_class_uchardata__goto_1094_14 = __local_class_uchardata__goto_1094_14 + 1)
+        ((unsafe: *__ci_expr_old_29) = 0)
+        goto '__ci_bb_205
+    }
+
+    '__ci_bb_205 {
+        (__ci_expr_old_30 = __local_code__goto_1077_14)
+        (__local_code__goto_1077_14 = __local_code__goto_1077_14 + 1)
+        ((unsafe: *__ci_expr_old_30) = 112)
+        (__local_code__goto_1077_14 = __local_code__goto_1077_14 + ((2 as isize) as usize))
+        (__ci_expr_ternary_31 = 0)
+        if (__param_negate_class != 0) {
+            (__ci_expr_ternary_31 = 1)
+        } else {
+            (__ci_expr_ternary_31 = 0)
+        }
+        ((unsafe: *__local_code__goto_1077_14) = __ci_expr_ternary_31)
+        if ((if ((__local_xclass_props__goto_1093_10 as c_uint) & (4 as c_uint)) != 0: 1 else: 0) != 0) {
+            goto '__ci_bb_206
+        } else {
+            goto '__ci_bb_207
+        }
+    }
+
+    '__ci_bb_206 {
+        ((unsafe: *__local_code__goto_1077_14) = (unsafe: *__local_code__goto_1077_14) | 4)
+        goto '__ci_bb_207
+    }
+
+    '__ci_bb_207 {
+        if ((if ((__local_xclass_props__goto_1093_10 as c_uint) & (2 as c_uint)) != 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_32 = (if true: 1 else: 0))
+        } else {
+            (__ci_expr_logic_32 = (if (if __param_has_bitmap != null: 1 else: 0) != 0: 1 else: 0))
+        }
+        if (__ci_expr_logic_32 != 0) {
+            goto '__ci_bb_208
+        } else {
+            goto '__ci_bb_209
+        }
+    }
+
+    '__ci_bb_208 {
+        if (__param_negate_class != 0) {
+            goto '__ci_bb_211
+        } else {
+            goto '__ci_bb_212
+        }
+    }
+
+    '__ci_bb_209 {
+        (__local_code__goto_1077_14 = __local_class_uchardata__goto_1094_14)
+        goto '__ci_bb_210
+    }
+
+    '__ci_bb_210 {
+        if ((if ((__local_xclass_props__goto_1093_10 as c_uint) & (8 as c_uint)) != 0: 1 else: 0) != 0) {
+            goto '__ci_bb_222
+        } else {
+            goto '__ci_bb_223
+        }
+    }
+
+    '__ci_bb_211 {
+        (__local_classwords__goto_1723_17 = ((&raw const (unsafe: *__param_cb).classbits.classwords[0] as *mut c_uint)))
+        (__local_i__goto_1724_16 = 0)
+        goto '__ci_bb_213
+    }
+
+    '__ci_bb_212 {
+        if ((if __param_has_bitmap == null: 1 else: 0) != 0) {
+            goto '__ci_bb_217
+        } else {
+            goto '__ci_bb_218
+        }
+    }
+
+    '__ci_bb_213 {
+        if ((if __local_i__goto_1724_16 < 8: 1 else: 0) != 0) {
+            goto '__ci_bb_214
+        } else {
+            goto '__ci_bb_216
+        }
+    }
+
+    '__ci_bb_214 {
+        ((unsafe: __local_classwords__goto_1723_17[__local_i__goto_1724_16]) = (~(unsafe: __local_classwords__goto_1723_17[__local_i__goto_1724_16])))
+        goto '__ci_bb_215
+    }
+
+    '__ci_bb_215 {
+        (__local_i__goto_1724_16 = __local_i__goto_1724_16 + 1)
+        goto '__ci_bb_213
+    }
+
+    '__ci_bb_216 {
+        goto '__ci_bb_212
+    }
+
+    '__ci_bb_217 {
+        (__ci_expr_old_33 = __local_code__goto_1077_14)
+        (__local_code__goto_1077_14 = __local_code__goto_1077_14 + 1)
+        ((unsafe: *__ci_expr_old_33) = (unsafe: *__ci_expr_old_33) | 2)
+        with_memmove(((__local_code__goto_1077_14 + (((32 as c_ulong) / (sizeof[u8]() as c_ulong)) as usize)) as *i8), (__local_code__goto_1077_14 as *i8), (((((__local_class_uchardata__goto_1094_14 as usize) -% (__local_code__goto_1077_14 as usize)) / sizeof[u8]()) * 1) as i64))
+        with_memcpy((__local_code__goto_1077_14 as *i8), (__local_classbits__goto_1082_16 as *i8), (32 as i64))
+        (__local_code__goto_1077_14 = __local_class_uchardata__goto_1094_14 + (((32 as c_ulong) / (sizeof[u8]() as c_ulong)) as usize))
+        goto '__ci_bb_219
+    }
+
+    '__ci_bb_218 {
+        (__local_code__goto_1077_14 = __local_class_uchardata__goto_1094_14)
+        if ((if ((__local_xclass_props__goto_1093_10 as c_uint) & (2 as c_uint)) != 0: 1 else: 0) != 0) {
+            goto '__ci_bb_220
+        } else {
+            goto '__ci_bb_221
+        }
+    }
+
+    '__ci_bb_219 {
+        goto '__ci_bb_210
+    }
+
+    '__ci_bb_220 {
+        ((unsafe: *__param_has_bitmap) = 1)
+        goto '__ci_bb_221
+    }
+
+    '__ci_bb_221 {
+        goto '__ci_bb_219
+    }
+
+    '__ci_bb_222 {
+        (__local_char_lists_size__goto_1748_12 = __local_cranges__goto_1095_15.char_lists_size)
+        goto '__ci_bb_224
+    }
+
+    '__ci_bb_223 {
+        ((unsafe: __local_previous__goto_1707_16[1]) = ((((((((__local_code__goto_1077_14 as usize) -% (__local_previous__goto_1707_16 as usize)) / sizeof[u8]()) as c_int) as c_int) >> (8 as c_uint)) as u8)))
+        ((unsafe: __local_previous__goto_1707_16[(1 + 1)]) = (((((((__local_code__goto_1077_14 as usize) -% (__local_previous__goto_1707_16 as usize)) / sizeof[u8]()) as c_int) & 255) as u8)))
+        goto '__ci_bb_237
+    }
+
+    '__ci_bb_224 {
+        goto '__ci_bb_225
+    }
+
+    '__ci_bb_225 {
+        if (0 != 0) {
+            goto '__ci_bb_224
+        } else {
+            goto '__ci_bb_226
+        }
+    }
+
+    '__ci_bb_226 {
+        if ((if __param_lengthptr != null: 1 else: 0) != 0) {
+            goto '__ci_bb_227
+        } else {
+            goto '__ci_bb_228
+        }
+    }
+
+    '__ci_bb_227 {
+        (__local_char_lists_size__goto_1748_12 = (((__local_char_lists_size__goto_1748_12 as c_ulong) +% (((sizeof[u32]() as c_ulong) -% (1 as c_ulong)) as c_ulong)) as c_ulong) & ((~((sizeof[u32]() as c_ulong) -% (1 as c_ulong))) as c_ulong))
+        ((unsafe: *__param_lengthptr) = (unsafe: *__param_lengthptr) + 4)
+        ((unsafe: *__param_cb).char_lists_size = __param_cb.char_lists_size + __local_char_lists_size__goto_1748_12)
+        (__local_char_lists_size__goto_1748_12 = __local_char_lists_size__goto_1748_12 / sizeof[u8]())
+        if ((if (unsafe: *__param_lengthptr) > 65536: 1 else: 0) != 0) {
+            (__ci_expr_logic_34 = (if true: 1 else: 0))
+        } else {
+            (__ci_expr_logic_34 = (if (if ((65536 as c_ulong) -% ((unsafe: *__param_lengthptr) as c_ulong)) < __local_char_lists_size__goto_1748_12: 1 else: 0) != 0: 1 else: 0))
+        }
+        if (__ci_expr_logic_34 != 0) {
+            goto '__ci_bb_230
+        } else {
+            goto '__ci_bb_231
+        }
+    }
+
+    '__ci_bb_228 {
+        goto '__ci_bb_232
+    }
+
+    '__ci_bb_229 {
+        goto '__ci_bb_223
+    }
+
+    '__ci_bb_230 {
+        ((unsafe: *__param_errorcodeptr) = ERR20)
+        return null
+    }
+
+    '__ci_bb_231 {
+        goto '__ci_bb_229
+    }
+
+    '__ci_bb_232 {
+        goto '__ci_bb_233
+    }
+
+    '__ci_bb_233 {
+        if (0 != 0) {
+            goto '__ci_bb_232
+        } else {
+            goto '__ci_bb_234
+        }
+    }
+
+    '__ci_bb_234 {
+        (__ci_expr_ternary_35 = 0)
+        if (1 != 0) {
+            (__ci_expr_ternary_35 = 16)
+        } else {
+            (__ci_expr_ternary_35 = 4096)
+        }
+        ((unsafe: __local_code__goto_1077_14[0]) = (((__ci_expr_ternary_35 | ((__local_cranges__goto_1095_15.char_lists_types as c_int) >> (8 as c_uint))) as u8)))
+        ((unsafe: __local_code__goto_1077_14[1]) = ((__local_cranges__goto_1095_15.char_lists_types as u8)))
+        (__local_code__goto_1077_14 = __local_code__goto_1077_14 + ((2 as isize) as usize))
+        ((unsafe: *__param_cb).char_lists_size = __param_cb.char_lists_size + __local_char_lists_size__goto_1748_12)
+        (__local_data__goto_1777_16 = __param_cb.start_code - (__param_cb.char_lists_size as usize))
+        with_memcpy((__local_data__goto_1777_16 as *i8), ((((__local_cranges__goto_1095_15 + ((1 as isize) as usize)) as *mut u8) + (__local_cranges__goto_1095_15.char_lists_start as usize)) as *i8), (__local_char_lists_size__goto_1748_12 as i64))
+        (__local_char_lists_size__goto_1748_12 = __param_cb.char_lists_size)
+        ((unsafe: __local_code__goto_1077_14[0]) = (((((((__local_char_lists_size__goto_1748_12 as c_ulong) >> (1 as c_uint)) as c_uint) as c_uint) >> (8 as c_uint)) as u8)))
+        ((unsafe: __local_code__goto_1077_14[(0 + 1)]) = (((((((__local_char_lists_size__goto_1748_12 as c_ulong) >> (1 as c_uint)) as c_uint) as c_uint) & (255 as c_uint)) as u8)))
+        (__local_code__goto_1077_14 = __local_code__goto_1077_14 + ((2 as isize) as usize))
+        if ((if ((__local_char_lists_size__goto_1748_12 as c_ulong) & (2 as c_ulong)) != 0: 1 else: 0) != 0) {
+            goto '__ci_bb_235
+        } else {
+            goto '__ci_bb_236
+        }
+    }
+
+    '__ci_bb_235 {
+        ((unsafe: (__local_data__goto_1777_16 as *mut c_ushort)[-1]) = 57005)
+        goto '__ci_bb_236
+    }
+
+    '__ci_bb_236 {
+        ((unsafe: *__param_cb).char_lists_size = (((__local_char_lists_size__goto_1748_12 as c_ulong) +% (((sizeof[u32]() as c_ulong) -% (1 as c_ulong)) as c_ulong)) as c_ulong) & ((~((sizeof[u32]() as c_ulong) -% (1 as c_ulong))) as c_ulong))
+        (&raw const (unsafe: *__param_cb.cx).memctl as *const pcre2_memctl).free(__local_cranges__goto_1095_15, (&raw const (unsafe: *__param_cb.cx).memctl as *const pcre2_memctl).memory_data)
+        goto '__ci_bb_229
+    }
+
+    '__ci_bb_237 {
+        ((unsafe: *__param_pcode) = __local_code__goto_1077_14)
+        return (__local_pptr__goto_1076_11 - ((1 as isize) as usize))
+    }
+
+    '__ci_bb_238 {
+        (__local_classwords__goto_1840_13 = ((&raw const (unsafe: *__param_cb).classbits.classwords[0] as *mut c_uint)))
+        (__local_i__goto_1842_12 = 0)
+        goto '__ci_bb_240
+    }
+
+    '__ci_bb_239 {
+        (__ci_expr_logic_37 = 0)
+        if ((if not (__local_utf__goto_1085_6 != 0): 1 else: 0) != 0) {
+            (__ci_expr_logic_36 = (if true: 1 else: 0))
+        } else {
+            (__ci_expr_logic_36 = (if (if __param_negate_class != __local_should_flip_negation__goto_1078_6: 1 else: 0) != 0: 1 else: 0))
+        }
+        if (__ci_expr_logic_36 != 0) {
+            (__ci_expr_logic_37 = (if (if (&raw const (unsafe: *__param_cb).classbits as *const class_bits_storage).classwords[0] == (~(0 as c_uint)): 1 else: 0) != 0: 1 else: 0))
+        }
+        if (__ci_expr_logic_37 != 0) {
+            goto '__ci_bb_244
+        } else {
+            goto '__ci_bb_245
+        }
+    }
+
+    '__ci_bb_240 {
+        if ((if __local_i__goto_1842_12 < 8: 1 else: 0) != 0) {
+            goto '__ci_bb_241
+        } else {
+            goto '__ci_bb_243
+        }
+    }
+
+    '__ci_bb_241 {
+        ((unsafe: __local_classwords__goto_1840_13[__local_i__goto_1842_12]) = (~(unsafe: __local_classwords__goto_1840_13[__local_i__goto_1842_12])))
+        goto '__ci_bb_242
+    }
+
+    '__ci_bb_242 {
+        (__local_i__goto_1842_12 = __local_i__goto_1842_12 + 1)
+        goto '__ci_bb_240
+    }
+
+    '__ci_bb_243 {
+        goto '__ci_bb_239
+    }
+
+    '__ci_bb_244 {
+        (__local_classwords__goto_1848_19 = ((&raw const (unsafe: *__param_cb).classbits.classwords[0] as *const c_uint)))
+        (__local_i__goto_1849_7 = 0)
+        goto '__ci_bb_246
+    }
+
+    '__ci_bb_245 {
+        (__ci_expr_old_39 = __local_code__goto_1077_14)
+        (__local_code__goto_1077_14 = __local_code__goto_1077_14 + 1)
+        (__ci_expr_ternary_40 = 0)
+        if ((if __param_negate_class == __local_should_flip_negation__goto_1078_6: 1 else: 0) != 0) {
+            (__ci_expr_ternary_40 = OP_CLASS)
+        } else {
+            (__ci_expr_ternary_40 = OP_NCLASS)
+        }
+        ((unsafe: *__ci_expr_old_39) = __ci_expr_ternary_40)
+        with_memcpy((__local_code__goto_1077_14 as *i8), (__local_classbits__goto_1082_16 as *i8), (32 as i64))
+        (__local_code__goto_1077_14 = __local_code__goto_1077_14 + (((32 as c_ulong) / (sizeof[u8]() as c_ulong)) as usize))
+        goto '__ci_bb_237
+    }
+
+    '__ci_bb_246 {
+        if ((if __local_i__goto_1849_7 < 8: 1 else: 0) != 0) {
+            goto '__ci_bb_247
+        } else {
+            goto '__ci_bb_249
+        }
+    }
+
+    '__ci_bb_247 {
+        if ((if (unsafe: __local_classwords__goto_1848_19[__local_i__goto_1849_7]) != (~(0 as c_uint)): 1 else: 0) != 0) {
+            goto '__ci_bb_250
+        } else {
+            goto '__ci_bb_251
+        }
+    }
+
+    '__ci_bb_248 {
+        (__local_i__goto_1849_7 = __local_i__goto_1849_7 + 1)
+        goto '__ci_bb_246
+    }
+
+    '__ci_bb_249 {
+        if ((if __local_i__goto_1849_7 == 8: 1 else: 0) != 0) {
+            goto '__ci_bb_252
+        } else {
+            goto '__ci_bb_253
+        }
+    }
+
+    '__ci_bb_250 {
+        goto '__ci_bb_249
+    }
+
+    '__ci_bb_251 {
+        goto '__ci_bb_248
+    }
+
+    '__ci_bb_252 {
+        (__ci_expr_old_38 = __local_code__goto_1077_14)
+        (__local_code__goto_1077_14 = __local_code__goto_1077_14 + 1)
+        ((unsafe: *__ci_expr_old_38) = 13)
+        goto '__ci_bb_237
+    }
+
+    '__ci_bb_253 {
+        goto '__ci_bb_245
+    }
+
 }
 
-fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *mut c_uint, pcode: *mut *mut u8, errorcodeptr: *mut c_int, cb: *mut compile_block_8, lengthptr: *mut c_ulong) -> c_int {
-    var context: eclass_context
+@[c_export("_pcre2_compile_class_nested_8")]
+fn _pcre2_compile_class_nested_8(__param_options: c_uint, __param_xoptions: c_uint, __param_pptr: *mut *mut c_uint, __param_pcode: *mut *mut u8, __param_errorcodeptr: *mut c_int, __param_cb: *mut compile_block_8, __param_lengthptr: *mut c_ulong) -> c_int {
+    var __local_context: eclass_context
 
-    var op_info: eclass_op_info
+    var __local_op_info: eclass_op_info
 
-    var previous_length: c_ulong = with 0 as __ci_expr_seq_11 {
+    var __local_previous_length: c_ulong = with 0 as __ci_expr_seq_11 {
         var __ci_expr_ternary_0: c_ulong = 0
-        if ((if lengthptr != null: 1 else: 0) != 0) {
-            (__ci_expr_ternary_0 = (unsafe: *lengthptr))
+        if ((if __param_lengthptr != null: 1 else: 0) != 0) {
+            (__ci_expr_ternary_0 = (unsafe: *__param_lengthptr))
         } else {
             (__ci_expr_ternary_0 = 0)
         }
         __ci_expr_ternary_0
     }
 
-    var code: *mut u8 = (unsafe: *pcode)
+    var __local_code: *mut u8 = (unsafe: *__param_pcode)
 
-    var previous: *mut u8
+    var __local_previous: *mut u8
 
-    var allbitsone: c_int = 1
+    var __local_allbitsone: c_int = 1
 
-    (context.needs_bitmap = 0)
+    (__local_context.needs_bitmap = 0)
 
-    (context.options = options)
+    (__local_context.options = __param_options)
 
-    (context.xoptions = xoptions)
+    (__local_context.xoptions = __param_xoptions)
 
-    (context.errorcodeptr = errorcodeptr)
+    (__local_context.errorcodeptr = __param_errorcodeptr)
 
-    (context.cb = cb)
+    (__local_context.cb = __param_cb)
 
-    (previous = code)
+    (__local_previous = __local_code)
 
-    var __ci_expr_old_1: *mut u8 = code
+    var __ci_expr_old_1: *mut u8 = __local_code
 
-    (code = code + 1)
+    (__local_code = __local_code + 1)
 
     ((unsafe: *__ci_expr_old_1) = 113)
 
 
-    (code = code + 2)
+    (__local_code = __local_code + ((2 as isize) as usize))
 
-    var __ci_expr_old_2: *mut u8 = code
+    var __ci_expr_old_2: *mut u8 = __local_code
 
-    (code = code + 1)
+    (__local_code = __local_code + 1)
 
     ((unsafe: *__ci_expr_old_2) = 0)
 
 
-    if ((if not (compile_eclass_nested((&raw mut context as *mut eclass_context), 0, pptr, (&raw mut code as *mut *mut u8), (&raw mut op_info as *mut eclass_op_info), lengthptr) != 0): 1 else: 0) != 0) {
+    if ((if not (compile_eclass_nested((&raw mut __local_context as *mut eclass_context), 0, __param_pptr, (&raw mut __local_code as *mut *mut u8), (&raw mut __local_op_info as *mut eclass_op_info), __param_lengthptr) != 0): 1 else: 0) != 0) {
         return 0
     }
 
-    if ((if lengthptr != null: 1 else: 0) != 0) {
-        ((unsafe: *lengthptr) = (unsafe: *lengthptr) + (((code as usize) -% (previous as usize)) / sizeof[u8]()))
+    if ((if __param_lengthptr != null: 1 else: 0) != 0) {
+        ((unsafe: *__param_lengthptr) = (unsafe: *__param_lengthptr) + (((__local_code as usize) -% (__local_previous as usize)) / sizeof[u8]()))
 
-        (code = previous)
+        (__local_code = __local_previous)
 
     }
 
-    var i: c_int = 0
+    var __local_i: c_int = 0
 
-    while ((if i < 8: 1 else: 0) != 0) {
-        if ((if op_info.bits.classwords[i] != 4294967295: 1 else: 0) != 0) {
-            (allbitsone = 0)
+    while ((if __local_i < 8: 1 else: 0) != 0) {
+        if ((if (&raw const __local_op_info.bits as *const class_bits_storage).classwords[__local_i] != 4294967295: 1 else: 0) != 0) {
+            (__local_allbitsone = 0)
 
             break
 
         }
 
-        (i = i + 1)
+        (__local_i = __local_i + 1)
 
     }
 
 
-    if ((if op_info.op_single_type != 0: 1 else: 0) != 0) {
-        (code = previous)
+    if ((if (&raw const __local_op_info as *const eclass_op_info).op_single_type != 0: 1 else: 0) != 0) {
+        (__local_code = __local_previous)
 
         var __ci_expr_logic_3: c_int = 0
 
-        if ((if op_info.op_single_type == 6: 1 else: 0) != 0) {
-            (__ci_expr_logic_3 = (if allbitsone != 0: 1 else: 0))
+        if ((if (&raw const __local_op_info as *const eclass_op_info).op_single_type == 6: 1 else: 0) != 0) {
+            (__ci_expr_logic_3 = (if __local_allbitsone != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_3 != 0) {
-            if ((if lengthptr != null: 1 else: 0) != 0) {
-                ((unsafe: *lengthptr) = (unsafe: *lengthptr) - 1)
+            if ((if __param_lengthptr != null: 1 else: 0) != 0) {
+                ((unsafe: *__param_lengthptr) = (unsafe: *__param_lengthptr) - 1)
             }
 
-            var __ci_expr_old_4: *mut u8 = code
+            var __ci_expr_old_4: *mut u8 = __local_code
 
-            (code = code + 1)
+            (__local_code = __local_code + 1)
 
             ((unsafe: *__ci_expr_old_4) = 13)
 
@@ -1827,33 +2402,33 @@ fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *
         } else {
             var __ci_expr_logic_5: c_int
 
-            if ((if op_info.op_single_type == 6: 1 else: 0) != 0) {
+            if ((if (&raw const __local_op_info as *const eclass_op_info).op_single_type == 6: 1 else: 0) != 0) {
                 (__ci_expr_logic_5 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_5 = (if (if op_info.op_single_type == 7: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_5 = (if (if (&raw const __local_op_info as *const eclass_op_info).op_single_type == 7: 1 else: 0) != 0: 1 else: 0))
             }
 
             if (__ci_expr_logic_5 != 0) {
-                var required_len: c_ulong = (1 +% (32 / sizeof[u8]()))
+                var __local_required_len: c_ulong = ((1 as c_ulong) +% (((32 as c_ulong) / (sizeof[u8]() as c_ulong)) as c_ulong))
 
-                if ((if lengthptr != null: 1 else: 0) != 0) {
-                    if ((if required_len > ((unsafe: *lengthptr) -% previous_length): 1 else: 0) != 0) {
-                        ((unsafe: *lengthptr) = (previous_length +% required_len))
+                if ((if __param_lengthptr != null: 1 else: 0) != 0) {
+                    if ((if __local_required_len > (((unsafe: *__param_lengthptr) as c_ulong) -% (__local_previous_length as c_ulong)): 1 else: 0) != 0) {
+                        ((unsafe: *__param_lengthptr) = ((__local_previous_length as c_ulong) +% (__local_required_len as c_ulong)))
                     }
 
                 }
 
-                if ((if lengthptr != null: 1 else: 0) != 0) {
-                    ((unsafe: *lengthptr) = (unsafe: *lengthptr) - required_len)
+                if ((if __param_lengthptr != null: 1 else: 0) != 0) {
+                    ((unsafe: *__param_lengthptr) = (unsafe: *__param_lengthptr) - __local_required_len)
                 }
 
-                var __ci_expr_old_6: *mut u8 = code
+                var __ci_expr_old_6: *mut u8 = __local_code
 
-                (code = code + 1)
+                (__local_code = __local_code + 1)
 
                 var __ci_expr_ternary_7: c_int = 0
 
-                if ((if op_info.op_single_type == 6: 1 else: 0) != 0) {
+                if ((if (&raw const __local_op_info as *const eclass_op_info).op_single_type == 6: 1 else: 0) != 0) {
                     (__ci_expr_ternary_7 = OP_NCLASS)
                 } else {
                     (__ci_expr_ternary_7 = OP_CLASS)
@@ -1862,133 +2437,127 @@ fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *
                 ((unsafe: *__ci_expr_old_6) = __ci_expr_ternary_7)
 
 
-                with_memcpy((code as *i8), ((&op_info.bits.classbits[0] as *mut u8) as *i8), (32 as i64))
+                with_memcpy((__local_code as *i8), ((&(unsafe: (&raw const __local_op_info.bits as *const class_bits_storage).classbits[0]) as *mut u8) as *i8), (32 as i64))
 
-                (code = code + (32 / sizeof[u8]()))
+                (__local_code = __local_code + (((32 as c_ulong) / (sizeof[u8]() as c_ulong)) as usize))
 
             } else {
-                var need_map: c_int = context.needs_bitmap
+                var __local_need_map: c_int = (&raw const __local_context as *const eclass_context).needs_bitmap
 
-                var required_len_1: c_ulong
+                var __local_required_len_1: c_ulong
 
-                while true {
-                    if (not (0 != 0)) {
-                        break
-                    }
-                }
+                do {
+                    0
+                } while (0 != 0)
 
                 var __ci_expr_ternary_8: c_ulong = 0
 
-                if (need_map != 0) {
-                    (__ci_expr_ternary_8 = 32 / sizeof[u8]())
+                if (__local_need_map != 0) {
+                    (__ci_expr_ternary_8 = (32 as c_ulong) / (sizeof[u8]() as c_ulong))
                 } else {
                     (__ci_expr_ternary_8 = 0)
                 }
 
-                (required_len_1 = (op_info.length +% __ci_expr_ternary_8))
+                (__local_required_len_1 = (((&raw const __local_op_info as *const eclass_op_info).length as c_ulong) +% (__ci_expr_ternary_8 as c_ulong)))
 
 
-                if ((if lengthptr != null: 1 else: 0) != 0) {
-                    if ((if required_len_1 > ((unsafe: *lengthptr) -% previous_length): 1 else: 0) != 0) {
-                        ((unsafe: *lengthptr) = (previous_length +% required_len_1))
+                if ((if __param_lengthptr != null: 1 else: 0) != 0) {
+                    if ((if __local_required_len_1 > (((unsafe: *__param_lengthptr) as c_ulong) -% (__local_previous_length as c_ulong)): 1 else: 0) != 0) {
+                        ((unsafe: *__param_lengthptr) = ((__local_previous_length as c_ulong) +% (__local_required_len_1 as c_ulong)))
                     }
 
-                    ((unsafe: *lengthptr) = (unsafe: *lengthptr) - 4)
+                    ((unsafe: *__param_lengthptr) = (unsafe: *__param_lengthptr) - 4)
 
-                    var __ci_expr_old_9: *mut u8 = code
+                    var __ci_expr_old_9: *mut u8 = __local_code
 
-                    (code = code + 1)
+                    (__local_code = __local_code + 1)
 
                     ((unsafe: *__ci_expr_old_9) = 112)
 
 
-                    ((unsafe: code[0]) = ((((((1 + 2) + 1) as c_int) >> (8 as c_uint)) as u8)))
+                    ((unsafe: __local_code[0]) = ((((((1 + 2) + 1) as c_int) >> (8 as c_uint)) as u8)))
 
-                    ((unsafe: code[(0 + 1)]) = (((((1 + 2) + 1) & 255) as u8)))
+                    ((unsafe: __local_code[(0 + 1)]) = (((((1 + 2) + 1) & 255) as u8)))
 
 
-                    (code = code + 2)
+                    (__local_code = __local_code + ((2 as isize) as usize))
 
-                    var __ci_expr_old_10: *mut u8 = code
+                    var __ci_expr_old_10: *mut u8 = __local_code
 
-                    (code = code + 1)
+                    (__local_code = __local_code + 1)
 
                     ((unsafe: *__ci_expr_old_10) = 0)
 
 
                 } else {
-                    var rest: *mut u8
+                    var __local_rest: *mut u8
 
-                    var rest_len: c_ulong
+                    var __local_rest_len: c_ulong
 
-                    var flags: u8
+                    var __local_flags: u8
 
-                    while true {
-                        if (not (0 != 0)) {
-                            break
-                        }
-                    }
+                    do {
+                        0
+                    } while (0 != 0)
 
-                    (rest = ((op_info.code_start + ((1 as isize) as usize)) + ((2 as isize) as usize)) + ((1 as isize) as usize))
+                    (__local_rest = (((&raw const __local_op_info as *const eclass_op_info).code_start + ((1 as isize) as usize)) + ((2 as isize) as usize)) + ((1 as isize) as usize))
 
-                    (rest_len = (((op_info.code_start + op_info.length) as usize) -% (rest as usize)) / sizeof[u8]())
+                    (__local_rest_len = ((((&raw const __local_op_info as *const eclass_op_info).code_start + ((&raw const __local_op_info as *const eclass_op_info).length as usize)) as usize) -% (__local_rest as usize)) / sizeof[u8]())
 
-                    (flags = (unsafe: op_info.code_start[(1 + 2)]))
+                    (__local_flags = (unsafe: (&raw const __local_op_info as *const eclass_op_info).code_start[(1 + 2)]))
 
-                    while true {
-                        if (not (0 != 0)) {
-                            break
-                        }
-                    }
+                    do {
+                        0
+                    } while (0 != 0)
 
                     var __ci_expr_ternary_11: c_ulong = 0
 
-                    if (need_map != 0) {
-                        (__ci_expr_ternary_11 = 32 / sizeof[u8]())
+                    if (__local_need_map != 0) {
+                        (__ci_expr_ternary_11 = (32 as c_ulong) / (sizeof[u8]() as c_ulong))
                     } else {
                         (__ci_expr_ternary_11 = 0)
                     }
 
-                    with_memmove((((((code + ((1 as isize) as usize)) + ((2 as isize) as usize)) + ((1 as isize) as usize)) + __ci_expr_ternary_11) as *i8), (rest as *i8), ((rest_len *% 1) as i64))
+                    with_memmove((((((__local_code + ((1 as isize) as usize)) + ((2 as isize) as usize)) + ((1 as isize) as usize)) + (__ci_expr_ternary_11 as usize)) as *i8), (__local_rest as *i8), (((__local_rest_len as c_ulong) *% (1 as c_ulong)) as i64))
 
 
-                    var __ci_expr_old_12: *mut u8 = code
+                    var __ci_expr_old_12: *mut u8 = __local_code
 
-                    (code = code + 1)
+                    (__local_code = __local_code + 1)
 
                     ((unsafe: *__ci_expr_old_12) = 112)
 
 
-                    ((unsafe: code[0]) = (((((required_len_1 as c_int) as c_int) >> (8 as c_uint)) as u8)))
+                    ((unsafe: __local_code[0]) = (((((__local_required_len_1 as c_int) as c_int) >> (8 as c_uint)) as u8)))
 
-                    ((unsafe: code[(0 + 1)]) = ((((required_len_1 as c_int) & 255) as u8)))
+                    ((unsafe: __local_code[(0 + 1)]) = ((((__local_required_len_1 as c_int) & 255) as u8)))
 
 
-                    (code = code + 2)
+                    (__local_code = __local_code + ((2 as isize) as usize))
 
-                    var __ci_expr_old_13: *mut u8 = code
+                    var __ci_expr_old_13: *mut u8 = __local_code
 
-                    (code = code + 1)
+                    (__local_code = __local_code + 1)
 
                     var __ci_expr_ternary_14: c_int = 0
 
-                    if (need_map != 0) {
+                    if (__local_need_map != 0) {
                         (__ci_expr_ternary_14 = 2)
                     } else {
                         (__ci_expr_ternary_14 = 0)
                     }
 
-                    ((unsafe: *__ci_expr_old_13) = flags | __ci_expr_ternary_14)
+                    ((unsafe: *__ci_expr_old_13) = (__local_flags as c_int) | __ci_expr_ternary_14)
 
 
-                    if (need_map != 0) {
-                        with_memcpy((code as *i8), ((&op_info.bits.classbits[0] as *mut u8) as *i8), (32 as i64))
+                    if (__local_need_map != 0) {
+                        with_memcpy((__local_code as *i8), ((&(unsafe: (&raw const __local_op_info.bits as *const class_bits_storage).classbits[0]) as *mut u8) as *i8), (32 as i64))
 
-                        (code = code + (32 / sizeof[u8]()))
+                        (__local_code = __local_code + (((32 as c_ulong) / (sizeof[u8]() as c_ulong)) as usize))
 
                     }
 
-                    (code = code + rest_len)
+                    (__local_code = __local_code + (__local_rest_len as usize))
 
                 }
 
@@ -1998,166 +2567,166 @@ fn _pcre2_compile_class_nested_8(options: c_uint, xoptions: c_uint, pptr: *mut *
 
 
     } else {
-        var need_map_1: c_int = context.needs_bitmap
+        var __local_need_map_1: c_int = (&raw const __local_context as *const eclass_context).needs_bitmap
 
-        var required_len_2: c_ulong = with 0 as __ci_expr_seq_182 {
+        var __local_required_len_2: c_ulong = with 0 as __ci_expr_seq_176 {
             var __ci_expr_ternary_15: c_ulong = 0
-            if (need_map_1 != 0) {
-                (__ci_expr_ternary_15 = 32 / sizeof[u8]())
+            if (__local_need_map_1 != 0) {
+                (__ci_expr_ternary_15 = (32 as c_ulong) / (sizeof[u8]() as c_ulong))
             } else {
                 (__ci_expr_ternary_15 = 0)
             }
-            ((4 +% __ci_expr_ternary_15) +% op_info.length)
+            ((((4 as c_ulong) +% (__ci_expr_ternary_15 as c_ulong)) as c_ulong) +% ((&raw const __local_op_info as *const eclass_op_info).length as c_ulong))
         }
 
-        if ((if lengthptr != null: 1 else: 0) != 0) {
-            if ((if required_len_2 > ((unsafe: *lengthptr) -% previous_length): 1 else: 0) != 0) {
-                ((unsafe: *lengthptr) = (previous_length +% required_len_2))
+        if ((if __param_lengthptr != null: 1 else: 0) != 0) {
+            if ((if __local_required_len_2 > (((unsafe: *__param_lengthptr) as c_ulong) -% (__local_previous_length as c_ulong)): 1 else: 0) != 0) {
+                ((unsafe: *__param_lengthptr) = ((__local_previous_length as c_ulong) +% (__local_required_len_2 as c_ulong)))
             }
 
-            ((unsafe: *lengthptr) = (unsafe: *lengthptr) - 4)
+            ((unsafe: *__param_lengthptr) = (unsafe: *__param_lengthptr) - 4)
 
-            var __ci_expr_old_16: *mut u8 = code
+            var __ci_expr_old_16: *mut u8 = __local_code
 
-            (code = code + 1)
+            (__local_code = __local_code + 1)
 
             ((unsafe: *__ci_expr_old_16) = 113)
 
 
-            ((unsafe: code[0]) = ((((((1 + 2) + 1) as c_int) >> (8 as c_uint)) as u8)))
+            ((unsafe: __local_code[0]) = ((((((1 + 2) + 1) as c_int) >> (8 as c_uint)) as u8)))
 
-            ((unsafe: code[(0 + 1)]) = (((((1 + 2) + 1) & 255) as u8)))
+            ((unsafe: __local_code[(0 + 1)]) = (((((1 + 2) + 1) & 255) as u8)))
 
 
-            (code = code + 2)
+            (__local_code = __local_code + ((2 as isize) as usize))
 
-            var __ci_expr_old_17: *mut u8 = code
+            var __ci_expr_old_17: *mut u8 = __local_code
 
-            (code = code + 1)
+            (__local_code = __local_code + 1)
 
             ((unsafe: *__ci_expr_old_17) = 0)
 
 
         } else {
-            if (need_map_1 != 0) {
-                var map_start: *mut u8 = (((previous + ((1 as isize) as usize)) + ((2 as isize) as usize)) + ((1 as isize) as usize))
+            if (__local_need_map_1 != 0) {
+                var __local_map_start: *mut u8 = (((__local_previous + ((1 as isize) as usize)) + ((2 as isize) as usize)) + ((1 as isize) as usize))
 
-                ((unsafe: previous[(1 + 2)]) = (unsafe: previous[(1 + 2)]) | 1)
+                ((unsafe: __local_previous[(1 + 2)]) = (unsafe: __local_previous[(1 + 2)]) | 1)
 
-                with_memmove(((map_start + (32 / sizeof[u8]())) as *i8), (map_start as *i8), (((((code as usize) -% (map_start as usize)) / sizeof[u8]()) * 1) as i64))
+                with_memmove(((__local_map_start + (((32 as c_ulong) / (sizeof[u8]() as c_ulong)) as usize)) as *i8), (__local_map_start as *i8), (((((__local_code as usize) -% (__local_map_start as usize)) / sizeof[u8]()) * 1) as i64))
 
-                with_memcpy((map_start as *i8), ((&op_info.bits.classbits[0] as *mut u8) as *i8), (32 as i64))
+                with_memcpy((__local_map_start as *i8), ((&(unsafe: (&raw const __local_op_info.bits as *const class_bits_storage).classbits[0]) as *mut u8) as *i8), (32 as i64))
 
-                (code = code + (32 / sizeof[u8]()))
+                (__local_code = __local_code + (((32 as c_ulong) / (sizeof[u8]() as c_ulong)) as usize))
 
             }
 
-            ((unsafe: previous[1]) = ((((((((code as usize) -% (previous as usize)) / sizeof[u8]()) as c_int) as c_int) >> (8 as c_uint)) as u8)))
+            ((unsafe: __local_previous[1]) = ((((((((__local_code as usize) -% (__local_previous as usize)) / sizeof[u8]()) as c_int) as c_int) >> (8 as c_uint)) as u8)))
 
-            ((unsafe: previous[(1 + 1)]) = (((((((code as usize) -% (previous as usize)) / sizeof[u8]()) as c_int) & 255) as u8)))
+            ((unsafe: __local_previous[(1 + 1)]) = (((((((__local_code as usize) -% (__local_previous as usize)) / sizeof[u8]()) as c_int) & 255) as u8)))
 
 
         }
 
     }
 
-    ((unsafe: *pcode) = code)
+    ((unsafe: *__param_pcode) = __local_code)
 
     return 1
 
 }
 
-fn do_heapify(buffer: *mut c_uint, size: c_ulong, __param_i: c_ulong) {
-    var i = __param_i
-    var max: c_ulong
+fn do_heapify(__param_buffer: *mut c_uint, __param_size: c_ulong, __param_i: c_ulong) {
+    var __local_i = __param_i
+    var __local_max: c_ulong
 
-    var left: c_ulong
+    var __local_left: c_ulong
 
-    var right: c_ulong
+    var __local_right: c_ulong
 
-    var tmp1: c_uint
+    var __local_tmp1: c_uint
 
-    var tmp2: c_uint
+    var __local_tmp2: c_uint
 
 
     while (1 != 0) {
-        (max = i)
+        (__local_max = __local_i)
 
-        (left = (((i as c_ulong) << (1 as c_uint)) +% 2))
+        (__local_left = ((((__local_i as c_ulong) << (1 as c_uint)) as c_ulong) +% (2 as c_ulong)))
 
-        (right = (left +% 2))
+        (__local_right = ((__local_left as c_ulong) +% (2 as c_ulong)))
 
         var __ci_expr_logic_0: c_int = 0
 
-        if ((if left < size: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if (unsafe: buffer[left]) > (unsafe: buffer[max]): 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_left < __param_size: 1 else: 0) != 0) {
+            (__ci_expr_logic_0 = (if (if (unsafe: __param_buffer[__local_left]) > (unsafe: __param_buffer[__local_max]): 1 else: 0) != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_0 != 0) {
-            (max = left)
+            (__local_max = __local_left)
         }
 
 
         var __ci_expr_logic_1: c_int = 0
 
-        if ((if right < size: 1 else: 0) != 0) {
-            (__ci_expr_logic_1 = (if (if (unsafe: buffer[right]) > (unsafe: buffer[max]): 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_right < __param_size: 1 else: 0) != 0) {
+            (__ci_expr_logic_1 = (if (if (unsafe: __param_buffer[__local_right]) > (unsafe: __param_buffer[__local_max]): 1 else: 0) != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_1 != 0) {
-            (max = right)
+            (__local_max = __local_right)
         }
 
 
-        if ((if i == max: 1 else: 0) != 0) {
+        if ((if __local_i == __local_max: 1 else: 0) != 0) {
             return
         }
 
-        (tmp1 = (unsafe: buffer[i]))
+        (__local_tmp1 = (unsafe: __param_buffer[__local_i]))
 
-        (tmp2 = (unsafe: buffer[(i +% 1)]))
+        (__local_tmp2 = (unsafe: __param_buffer[((__local_i as c_ulong) +% (1 as c_ulong))]))
 
-        ((unsafe: buffer[i]) = (unsafe: buffer[max]))
+        ((unsafe: __param_buffer[__local_i]) = (unsafe: __param_buffer[__local_max]))
 
-        ((unsafe: buffer[(i +% 1)]) = (unsafe: buffer[(max +% 1)]))
+        ((unsafe: __param_buffer[((__local_i as c_ulong) +% (1 as c_ulong))]) = (unsafe: __param_buffer[((__local_max as c_ulong) +% (1 as c_ulong))]))
 
-        ((unsafe: buffer[max]) = tmp1)
+        ((unsafe: __param_buffer[__local_max]) = __local_tmp1)
 
-        ((unsafe: buffer[(max +% 1)]) = tmp2)
+        ((unsafe: __param_buffer[((__local_max as c_ulong) +% (1 as c_ulong))]) = __local_tmp2)
 
-        (i = max)
+        (__local_i = __local_max)
 
     }
 
 }
 
-fn get_nocase_range(c: c_uint) -> *const c_uint {
-    var left: c_uint = 0
+fn get_nocase_range(__param_c: c_uint) -> *const c_uint {
+    var __local_left: c_uint = 0
 
-    var right: c_uint = _pcre2_ucd_nocase_ranges_size_8
+    var __local_right: c_uint = _pcre2_ucd_nocase_ranges_size_8
 
-    var middle: c_uint
+    var __local_middle: c_uint
 
-    if ((if c > 1114111: 1 else: 0) != 0) {
-        return ((&_pcre2_ucd_nocase_ranges_8[0] as *const c_uint) + right)
+    if ((if __param_c > 1114111: 1 else: 0) != 0) {
+        return ((&(unsafe: _pcre2_ucd_nocase_ranges_8[0]) as *const c_uint) + (__local_right as usize))
     }
 
     while (1 != 0) {
-        (middle = (((left +% right) as c_uint) >> (1 as c_uint)) | 1)
+        (__local_middle = (((((__local_left as c_uint) +% (__local_right as c_uint)) as c_uint) >> (1 as c_uint)) as c_uint) | (1 as c_uint))
 
-        if ((if _pcre2_ucd_nocase_ranges_8[middle] <= c: 1 else: 0) != 0) {
-            (left = (middle +% 1))
+        if ((if _pcre2_ucd_nocase_ranges_8[__local_middle] <= __param_c: 1 else: 0) != 0) {
+            (__local_left = ((__local_middle as c_uint) +% (1 as c_uint)))
         } else {
             var __ci_expr_logic_0: c_int = 0
 
-            if ((if middle > 1: 1 else: 0) != 0) {
-                (__ci_expr_logic_0 = (if (if _pcre2_ucd_nocase_ranges_8[(middle -% 2)] > c: 1 else: 0) != 0: 1 else: 0))
+            if ((if __local_middle > 1: 1 else: 0) != 0) {
+                (__ci_expr_logic_0 = (if (if _pcre2_ucd_nocase_ranges_8[((__local_middle as c_uint) -% (2 as c_uint))] > __param_c: 1 else: 0) != 0: 1 else: 0))
             }
 
             if (__ci_expr_logic_0 != 0) {
-                (right = (middle -% 1))
+                (__local_right = ((__local_middle as c_uint) -% (1 as c_uint)))
             } else {
-                return ((&_pcre2_ucd_nocase_ranges_8[0] as *const c_uint) + (middle -% 1))
+                return ((&(unsafe: _pcre2_ucd_nocase_ranges_8[0]) as *const c_uint) + (((__local_middle as c_uint) -% (1 as c_uint)) as usize))
             }
 
         }
@@ -2166,39 +2735,37 @@ fn get_nocase_range(c: c_uint) -> *const c_uint {
 
 }
 
-fn utf_caseless_extend(start: c_uint, end: c_uint, options: c_uint, __param_buffer: *mut c_uint) -> c_ulong {
-    var buffer = __param_buffer
-    var new_start: c_uint = start
+fn utf_caseless_extend(__param_start: c_uint, __param_end: c_uint, __param_options: c_uint, __param_buffer: *mut c_uint) -> c_ulong {
+    var __local_buffer = __param_buffer
+    var __local_new_start: c_uint = __param_start
 
-    var new_end: c_uint = end
+    var __local_new_end: c_uint = __param_end
 
-    var c: c_uint = start
+    var __local_c: c_uint = __param_start
 
-    var list: *const c_uint
+    var __local_list: *const c_uint
 
-    var tmp: [3]c_uint
+    var __local_tmp: [3]c_uint
 
-    var result: c_ulong = 2
+    var __local_result: c_ulong = 2
 
-    var skip_range: *const c_uint = get_nocase_range(c)
+    var __local_skip_range: *const c_uint = get_nocase_range(__local_c)
 
-    var skip_start: c_uint = (unsafe: skip_range[0])
+    var __local_skip_start: c_uint = (unsafe: __local_skip_range[0])
 
-    while true {
-        if (not (0 != 0)) {
-            break
-        }
-    }
+    do {
+        0
+    } while (0 != 0)
 
-    while ((if c <= end: 1 else: 0) != 0) {
-        var co: c_uint
+    while ((if __local_c <= __param_end: 1 else: 0) != 0) {
+        var __local_co: c_uint
 
-        if ((if c > skip_start: 1 else: 0) != 0) {
-            (c = (unsafe: skip_range[1]))
+        if ((if __local_c > __local_skip_start: 1 else: 0) != 0) {
+            (__local_c = (unsafe: __local_skip_range[1]))
 
-            (skip_range = skip_range + 2)
+            (__local_skip_range = __local_skip_range + ((2 as isize) as usize))
 
-            (skip_start = (unsafe: skip_range[0]))
+            (__local_skip_start = (unsafe: __local_skip_range[0]))
 
             continue
 
@@ -2206,13 +2773,13 @@ fn utf_caseless_extend(start: c_uint, end: c_uint, options: c_uint, __param_buff
 
         var __ci_expr_logic_1: c_int = 0
 
-        if ((if (options & 12) == 8: 1 else: 0) != 0) {
+        if ((if ((__param_options as c_uint) & (12 as c_uint)) == 8: 1 else: 0) != 0) {
             var __ci_expr_logic_0: c_int
 
-            if ((if (c | 32) == 105: 1 else: 0) != 0) {
+            if ((if ((__local_c as c_uint) | (32 as c_uint)) == 105: 1 else: 0) != 0) {
                 (__ci_expr_logic_0 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_0 = (if (if (c | 1) == 305: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_0 = (if (if ((__local_c as c_uint) | (1 as c_uint)) == 305: 1 else: 0) != 0: 1 else: 0))
             }
 
             (__ci_expr_logic_1 = (if __ci_expr_logic_0 != 0: 1 else: 0))
@@ -2224,10 +2791,10 @@ fn utf_caseless_extend(start: c_uint, end: c_uint, options: c_uint, __param_buff
 
             var __ci_expr_logic_2: c_int
 
-            if ((if c == 105: 1 else: 0) != 0) {
+            if ((if __local_c == 105: 1 else: 0) != 0) {
                 (__ci_expr_logic_2 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_2 = (if (if c == 304: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_2 = (if (if __local_c == 304: 1 else: 0) != 0: 1 else: 0))
             }
 
             if (__ci_expr_logic_2 != 0) {
@@ -2236,7 +2803,7 @@ fn utf_caseless_extend(start: c_uint, end: c_uint, options: c_uint, __param_buff
                 (__ci_expr_ternary_3 = 3)
             }
 
-            (co = (_pcre2_ucd_turkish_dotted_i_caseset_8 +% __ci_expr_ternary_3))
+            (__local_co = ((_pcre2_ucd_turkish_dotted_i_caseset_8 as c_uint) +% (__ci_expr_ternary_3 as c_uint)))
 
 
         } else {
@@ -2244,59 +2811,59 @@ fn utf_caseless_extend(start: c_uint, end: c_uint, options: c_uint, __param_buff
 
             var __ci_expr_logic_4: c_int = 0
 
-            (co = ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((c as c_int) / 128)] * 128) + ((c as c_int) % 128))] as isize) as usize)).caseset)
+            (__local_co = ((&(unsafe: _pcre2_ucd_records_8[0]) as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_c as c_int) / 128)] as c_int) * 128) + ((__local_c as c_int) % 128))] as c_uint) as usize)).caseset)
 
-            if ((if co != 0: 1 else: 0) != 0) {
-                (__ci_expr_logic_4 = (if (if (options & 4) != 0: 1 else: 0) != 0: 1 else: 0))
+            if ((if __local_co != 0: 1 else: 0) != 0) {
+                (__ci_expr_logic_4 = (if (if ((__param_options as c_uint) & (4 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
             }
 
             if (__ci_expr_logic_4 != 0) {
-                (__ci_expr_logic_5 = (if (if _pcre2_ucd_caseless_sets_8[co] < 128: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_5 = (if (if _pcre2_ucd_caseless_sets_8[__local_co] < 128: 1 else: 0) != 0: 1 else: 0))
             }
 
             if (__ci_expr_logic_5 != 0) {
-                (co = 0)
+                (__local_co = 0)
 
             }
 
         }
 
 
-        if ((if co != 0: 1 else: 0) != 0) {
-            (list = (&_pcre2_ucd_caseless_sets_8[0] as *const c_uint) + co)
+        if ((if __local_co != 0: 1 else: 0) != 0) {
+            (__local_list = (&(unsafe: _pcre2_ucd_caseless_sets_8[0]) as *const c_uint) + (__local_co as usize))
         } else {
-            (co = ((((c as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((c as c_int) / 128)] * 128) + ((c as c_int) % 128))] as isize) as usize)).other_case) as c_uint)))
+            (__local_co = ((((__local_c as c_int) + ((&(unsafe: _pcre2_ucd_records_8[0]) as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_c as c_int) / 128)] as c_int) * 128) + ((__local_c as c_int) % 128))] as c_uint) as usize)).other_case) as c_uint)))
 
-            (list = (&tmp[0] as *const c_uint))
+            (__local_list = (&(unsafe: __local_tmp[0]) as *const c_uint))
 
-            (tmp[0] = c)
+            (__local_tmp[0] = __local_c)
 
-            (tmp[1] = 4294967295)
+            (__local_tmp[1] = 4294967295)
 
-            if ((if co != c: 1 else: 0) != 0) {
-                (tmp[1] = co)
+            if ((if __local_co != __local_c: 1 else: 0) != 0) {
+                (__local_tmp[1] = __local_co)
 
-                (tmp[2] = 4294967295)
+                (__local_tmp[2] = 4294967295)
 
             }
 
         }
 
-        (c = c + 1)
+        (__local_c = __local_c + 1)
 
-        while true {
-            if ((if (unsafe: *list) < new_start: 1 else: 0) != 0) {
-                if ((if ((unsafe: *list) +% 1) == new_start: 1 else: 0) != 0) {
-                    (new_start = new_start - 1)
+        do {
+            if ((if (unsafe: *__local_list) < __local_new_start: 1 else: 0) != 0) {
+                if ((if (((unsafe: *__local_list) as c_uint) +% (1 as c_uint)) == __local_new_start: 1 else: 0) != 0) {
+                    (__local_new_start = __local_new_start - 1)
 
                     continue
 
                 }
 
             } else {
-                if ((if (unsafe: *list) > new_end: 1 else: 0) != 0) {
-                    if ((if ((unsafe: *list) -% 1) == new_end: 1 else: 0) != 0) {
-                        (new_end = new_end + 1)
+                if ((if (unsafe: *__local_list) > __local_new_end: 1 else: 0) != 0) {
+                    if ((if (((unsafe: *__local_list) as c_uint) -% (1 as c_uint)) == __local_new_end: 1 else: 0) != 0) {
+                        (__local_new_end = __local_new_end + 1)
 
                         continue
 
@@ -2307,285 +2874,273 @@ fn utf_caseless_extend(start: c_uint, end: c_uint, options: c_uint, __param_buff
                 }
             }
 
-            (result = result + 2)
+            (__local_result = __local_result + 2)
 
-            if ((if buffer != null: 1 else: 0) != 0) {
-                ((unsafe: buffer[0]) = (unsafe: *list))
+            if ((if __local_buffer != null: 1 else: 0) != 0) {
+                ((unsafe: __local_buffer[0]) = (unsafe: *__local_list))
 
-                ((unsafe: buffer[1]) = (unsafe: *list))
+                ((unsafe: __local_buffer[1]) = (unsafe: *__local_list))
 
-                (buffer = buffer + 2)
+                (__local_buffer = __local_buffer + ((2 as isize) as usize))
 
             }
 
-            (list = list + 1)
-
-            if (not ((if (unsafe: *list) != 4294967295: 1 else: 0) != 0)) {
-                break
-            }
-
-        }
+        } while { (__local_list = __local_list + 1); ((if (unsafe: *__local_list) != 4294967295: 1 else: 0) != 0) }
 
     }
 
-    if ((if buffer != null: 1 else: 0) != 0) {
-        ((unsafe: buffer[0]) = new_start)
+    if ((if __local_buffer != null: 1 else: 0) != 0) {
+        ((unsafe: __local_buffer[0]) = __local_new_start)
 
-        ((unsafe: buffer[1]) = new_end)
+        ((unsafe: __local_buffer[1]) = __local_new_end)
 
-        (buffer = buffer + 2)
+        (__local_buffer = __local_buffer + ((2 as isize) as usize))
 
-        buffer
+        __local_buffer
 
     }
 
-    return result
+    return __local_result
 
 }
 
 fn append_char_list(__param_p: *const c_uint, __param_buffer: *mut c_uint) -> c_ulong {
-    var p = __param_p
-    var buffer = __param_buffer
-    var n: *const c_uint
+    var __local_p = __param_p
+    var __local_buffer = __param_buffer
+    var __local_n: *const c_uint
 
-    var result: c_ulong = 0
+    var __local_result: c_ulong = 0
 
-    while ((if (unsafe: *p) != 4294967295: 1 else: 0) != 0) {
-        (n = p)
+    while ((if (unsafe: *__local_p) != 4294967295: 1 else: 0) != 0) {
+        (__local_n = __local_p)
 
-        while ((if (unsafe: n[0]) == ((unsafe: n[1]) -% 1): 1 else: 0) != 0) {
-            (n = n + 1)
+        while ((if (unsafe: __local_n[0]) == (((unsafe: __local_n[1]) as c_uint) -% (1 as c_uint)): 1 else: 0) != 0) {
+            (__local_n = __local_n + 1)
         }
 
-        while true {
-            if (not (0 != 0)) {
-                break
-            }
-        }
+        do {
+            0
+        } while (0 != 0)
 
-        if ((if buffer != null: 1 else: 0) != 0) {
-            ((unsafe: buffer[0]) = (unsafe: *p))
+        if ((if __local_buffer != null: 1 else: 0) != 0) {
+            ((unsafe: __local_buffer[0]) = (unsafe: *__local_p))
 
-            ((unsafe: buffer[1]) = (unsafe: *n))
+            ((unsafe: __local_buffer[1]) = (unsafe: *__local_n))
 
-            (buffer = buffer + 2)
+            (__local_buffer = __local_buffer + ((2 as isize) as usize))
 
         }
 
-        (result = result + 2)
+        (__local_result = __local_result + 2)
 
-        (p = n + ((1 as isize) as usize))
+        (__local_p = __local_n + ((1 as isize) as usize))
 
     }
 
-    return result
+    return __local_result
 
 }
 
-fn get_highest_char(options: c_uint) -> c_uint {
-    options
+fn get_highest_char(__param_options: c_uint) -> c_uint {
+    __param_options
 
     return 1114111
 
 }
 
-fn append_negated_char_list(__param_p: *const c_uint, options: c_uint, __param_buffer: *mut c_uint) -> c_ulong {
-    var p = __param_p
-    var buffer = __param_buffer
-    var n: *const c_uint
+fn append_negated_char_list(__param_p: *const c_uint, __param_options: c_uint, __param_buffer: *mut c_uint) -> c_ulong {
+    var __local_p = __param_p
+    var __local_buffer = __param_buffer
+    var __local_n: *const c_uint
 
-    var start: c_uint = 0
+    var __local_start: c_uint = 0
 
-    var result: c_ulong = 2
+    var __local_result: c_ulong = 2
 
-    while true {
-        if (not (0 != 0)) {
-            break
-        }
-    }
+    do {
+        0
+    } while (0 != 0)
 
-    while ((if (unsafe: *p) != 4294967295: 1 else: 0) != 0) {
-        (n = p)
+    while ((if (unsafe: *__local_p) != 4294967295: 1 else: 0) != 0) {
+        (__local_n = __local_p)
 
-        while ((if (unsafe: n[0]) == ((unsafe: n[1]) -% 1): 1 else: 0) != 0) {
-            (n = n + 1)
+        while ((if (unsafe: __local_n[0]) == (((unsafe: __local_n[1]) as c_uint) -% (1 as c_uint)): 1 else: 0) != 0) {
+            (__local_n = __local_n + 1)
         }
 
-        while true {
-            if (not (0 != 0)) {
-                break
-            }
-        }
+        do {
+            0
+        } while (0 != 0)
 
-        if ((if buffer != null: 1 else: 0) != 0) {
-            ((unsafe: buffer[0]) = start)
+        if ((if __local_buffer != null: 1 else: 0) != 0) {
+            ((unsafe: __local_buffer[0]) = __local_start)
 
-            ((unsafe: buffer[1]) = ((unsafe: *p) -% 1))
+            ((unsafe: __local_buffer[1]) = (((unsafe: *__local_p) as c_uint) -% (1 as c_uint)))
 
-            (buffer = buffer + 2)
+            (__local_buffer = __local_buffer + ((2 as isize) as usize))
 
         }
 
-        (result = result + 2)
+        (__local_result = __local_result + 2)
 
-        (start = ((unsafe: *n) +% 1))
+        (__local_start = (((unsafe: *__local_n) as c_uint) +% (1 as c_uint)))
 
-        (p = n + ((1 as isize) as usize))
+        (__local_p = __local_n + ((1 as isize) as usize))
 
     }
 
-    if ((if buffer != null: 1 else: 0) != 0) {
-        ((unsafe: buffer[0]) = start)
+    if ((if __local_buffer != null: 1 else: 0) != 0) {
+        ((unsafe: __local_buffer[0]) = __local_start)
 
-        ((unsafe: buffer[1]) = get_highest_char(options))
+        ((unsafe: __local_buffer[1]) = get_highest_char(__param_options))
 
-        (buffer = buffer + 2)
+        (__local_buffer = __local_buffer + ((2 as isize) as usize))
 
-        buffer
+        __local_buffer
 
     }
 
-    return result
+    return __local_result
 
 }
 
-fn append_non_ascii_range(options: c_uint, buffer: *mut c_uint) -> *mut c_uint {
-    if ((if buffer == null: 1 else: 0) != 0) {
+fn append_non_ascii_range(__param_options: c_uint, __param_buffer: *mut c_uint) -> *mut c_uint {
+    if ((if __param_buffer == null: 1 else: 0) != 0) {
         return null
     }
 
-    ((unsafe: buffer[0]) = 256)
+    ((unsafe: __param_buffer[0]) = 256)
 
-    ((unsafe: buffer[1]) = get_highest_char(options))
+    ((unsafe: __param_buffer[1]) = get_highest_char(__param_options))
 
-    return (buffer + ((2 as isize) as usize))
+    return (__param_buffer + ((2 as isize) as usize))
 
 }
 
-fn parse_class(__param_ptr: *mut c_uint, options: c_uint, __param_buffer: *mut c_uint) -> c_ulong {
-    var ptr = __param_ptr
-    var buffer = __param_buffer
-    var total_size: c_ulong = 0
+fn parse_class(__param_ptr: *mut c_uint, __param_options: c_uint, __param_buffer: *mut c_uint) -> c_ulong {
+    var __local_ptr = __param_ptr
+    var __local_buffer = __param_buffer
+    var __local_total_size: c_ulong = 0
 
-    var size: c_ulong
+    var __local_size: c_ulong
 
-    var meta_arg: c_uint
+    var __local_meta_arg: c_uint
 
-    var start_char: c_uint
+    var __local_start_char: c_uint
 
     while (1 != 0) {
         var __ci_expr_switch_continue_2: i32 = 0
 
         while true {
-            match ((unsafe: *ptr) & (4294901760 as c_uint)) {
+            match (((unsafe: *__local_ptr) as c_uint) & ((4294901760 as c_uint) as c_uint)) {
                 2149318656 => {
-                    (meta_arg = (unsafe: *ptr) & 65535)
+                    (__local_meta_arg = ((unsafe: *__local_ptr) as c_uint) & (65535 as c_uint))
 
                     while true {
-                        match meta_arg {
+                        match __local_meta_arg {
                             6 => {
-                                (buffer = append_non_ascii_range(options, buffer))
+                                (__local_buffer = append_non_ascii_range(__param_options, __local_buffer))
 
-                                (total_size = total_size + 2)
+                                (__local_total_size = __local_total_size + 2)
 
                             },
                             10 => {
-                                (buffer = append_non_ascii_range(options, buffer))
+                                (__local_buffer = append_non_ascii_range(__param_options, __local_buffer))
 
-                                (total_size = total_size + 2)
+                                (__local_total_size = __local_total_size + 2)
 
                             },
                             8 => {
-                                (buffer = append_non_ascii_range(options, buffer))
+                                (__local_buffer = append_non_ascii_range(__param_options, __local_buffer))
 
-                                (total_size = total_size + 2)
+                                (__local_total_size = __local_total_size + 2)
 
                             },
                             19 => {
-                                (size = append_char_list((&_pcre2_hspace_list_8[0] as *mut c_uint), buffer))
+                                (__local_size = append_char_list((&(unsafe: _pcre2_hspace_list_8[0]) as *mut c_uint), __local_buffer))
 
-                                (total_size = total_size + size)
+                                (__local_total_size = __local_total_size + __local_size)
 
-                                if ((if buffer != null: 1 else: 0) != 0) {
-                                    (buffer = buffer + size)
+                                if ((if __local_buffer != null: 1 else: 0) != 0) {
+                                    (__local_buffer = __local_buffer + (__local_size as usize))
                                 }
 
                             },
                             18 => {
-                                (size = append_negated_char_list((&_pcre2_hspace_list_8[0] as *mut c_uint), options, buffer))
+                                (__local_size = append_negated_char_list((&(unsafe: _pcre2_hspace_list_8[0]) as *mut c_uint), __param_options, __local_buffer))
 
-                                (total_size = total_size + size)
+                                (__local_total_size = __local_total_size + __local_size)
 
-                                if ((if buffer != null: 1 else: 0) != 0) {
-                                    (buffer = buffer + size)
+                                if ((if __local_buffer != null: 1 else: 0) != 0) {
+                                    (__local_buffer = __local_buffer + (__local_size as usize))
                                 }
 
                             },
                             21 => {
-                                (size = append_char_list((&_pcre2_vspace_list_8[0] as *mut c_uint), buffer))
+                                (__local_size = append_char_list((&(unsafe: _pcre2_vspace_list_8[0]) as *mut c_uint), __local_buffer))
 
-                                (total_size = total_size + size)
+                                (__local_total_size = __local_total_size + __local_size)
 
-                                if ((if buffer != null: 1 else: 0) != 0) {
-                                    (buffer = buffer + size)
+                                if ((if __local_buffer != null: 1 else: 0) != 0) {
+                                    (__local_buffer = __local_buffer + (__local_size as usize))
                                 }
 
                             },
                             20 => {
-                                (size = append_negated_char_list((&_pcre2_vspace_list_8[0] as *mut c_uint), options, buffer))
+                                (__local_size = append_negated_char_list((&(unsafe: _pcre2_vspace_list_8[0]) as *mut c_uint), __param_options, __local_buffer))
 
-                                (total_size = total_size + size)
+                                (__local_total_size = __local_total_size + __local_size)
 
-                                if ((if buffer != null: 1 else: 0) != 0) {
-                                    (buffer = buffer + size)
+                                if ((if __local_buffer != null: 1 else: 0) != 0) {
+                                    (__local_buffer = __local_buffer + (__local_size as usize))
                                 }
 
                             },
                             16 => {
-                                (ptr = ptr + 1)
+                                (__local_ptr = __local_ptr + 1)
 
                                 var __ci_expr_logic_0: c_int = 0
 
-                                if ((if meta_arg == 16: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_0 = (if (if (((unsafe: *ptr) as c_uint) >> (16 as c_uint)) == 13: 1 else: 0) != 0: 1 else: 0))
+                                if ((if __local_meta_arg == 16: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_0 = (if (if (((unsafe: *__local_ptr) as c_uint) >> (16 as c_uint)) == 13: 1 else: 0) != 0: 1 else: 0))
                                 }
 
                                 if (__ci_expr_logic_0 != 0) {
-                                    if ((if buffer != null: 1 else: 0) != 0) {
-                                        ((unsafe: buffer[0]) = 0)
+                                    if ((if __local_buffer != null: 1 else: 0) != 0) {
+                                        ((unsafe: __local_buffer[0]) = 0)
 
-                                        ((unsafe: buffer[1]) = get_highest_char(options))
+                                        ((unsafe: __local_buffer[1]) = get_highest_char(__param_options))
 
-                                        (buffer = buffer + 2)
+                                        (__local_buffer = __local_buffer + ((2 as isize) as usize))
 
                                     }
 
-                                    (total_size = total_size + 2)
+                                    (__local_total_size = __local_total_size + 2)
 
                                 }
 
 
                             },
                             15 => {
-                                (ptr = ptr + 1)
+                                (__local_ptr = __local_ptr + 1)
 
                                 var __ci_expr_logic_0: c_int = 0
 
-                                if ((if meta_arg == 16: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_0 = (if (if (((unsafe: *ptr) as c_uint) >> (16 as c_uint)) == 13: 1 else: 0) != 0: 1 else: 0))
+                                if ((if __local_meta_arg == 16: 1 else: 0) != 0) {
+                                    (__ci_expr_logic_0 = (if (if (((unsafe: *__local_ptr) as c_uint) >> (16 as c_uint)) == 13: 1 else: 0) != 0: 1 else: 0))
                                 }
 
                                 if (__ci_expr_logic_0 != 0) {
-                                    if ((if buffer != null: 1 else: 0) != 0) {
-                                        ((unsafe: buffer[0]) = 0)
+                                    if ((if __local_buffer != null: 1 else: 0) != 0) {
+                                        ((unsafe: __local_buffer[0]) = 0)
 
-                                        ((unsafe: buffer[1]) = get_highest_char(options))
+                                        ((unsafe: __local_buffer[1]) = get_highest_char(__param_options))
 
-                                        (buffer = buffer + 2)
+                                        (__local_buffer = __local_buffer + ((2 as isize) as usize))
 
                                     }
 
-                                    (total_size = total_size + 2)
+                                    (__local_total_size = __local_total_size + 2)
 
                                 }
 
@@ -2597,33 +3152,42 @@ fn parse_class(__param_ptr: *mut c_uint, options: c_uint, __param_buffer: *mut c
 
                     }
 
-                    (ptr = ptr + 1)
+                    (__local_ptr = __local_ptr + 1)
 
-                    continue
+                    (__ci_expr_switch_continue_2 = 1)
+
+                    break
+
 
                 },
                 2149646336 => {
-                    (buffer = append_non_ascii_range(options, buffer))
+                    (__local_buffer = append_non_ascii_range(__param_options, __local_buffer))
 
-                    (total_size = total_size + 2)
+                    (__local_total_size = __local_total_size + 2)
 
-                    (ptr = ptr + 2)
+                    (__local_ptr = __local_ptr + ((2 as isize) as usize))
 
-                    continue
+                    (__ci_expr_switch_continue_2 = 1)
+
+                    break
+
 
                 },
                 2149580800 => {
-                    (ptr = ptr + 2)
+                    (__local_ptr = __local_ptr + ((2 as isize) as usize))
 
-                    continue
+                    (__ci_expr_switch_continue_2 = 1)
+
+                    break
+
 
                 },
                 2147811328 => {
-                    (ptr = ptr + 1)
+                    (__local_ptr = __local_ptr + 1)
                 },
                 _ => {
-                    if ((if (unsafe: *ptr) >= 2147483648: 1 else: 0) != 0) {
-                        return total_size
+                    if ((if (unsafe: *__local_ptr) >= 2147483648: 1 else: 0) != 0) {
+                        return __local_total_size
                     }
                 },
             }
@@ -2637,537 +3201,517 @@ fn parse_class(__param_ptr: *mut c_uint, options: c_uint, __param_buffer: *mut c
         }
 
 
-        (start_char = (unsafe: *ptr))
+        (__local_start_char = (unsafe: *__local_ptr))
 
         var __ci_expr_logic_3: c_int
 
-        if ((if (unsafe: ptr[1]) == 2149777408: 1 else: 0) != 0) {
+        if ((if (unsafe: __local_ptr[1]) == 2149777408: 1 else: 0) != 0) {
             (__ci_expr_logic_3 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_3 = (if (if (unsafe: ptr[1]) == 2149711872: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_3 = (if (if (unsafe: __local_ptr[1]) == 2149711872: 1 else: 0) != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_3 != 0) {
-            (ptr = ptr + 2)
+            (__local_ptr = __local_ptr + ((2 as isize) as usize))
 
-            while true {
-                if (not (0 != 0)) {
-                    break
-                }
-            }
+            do {
+                0
+            } while (0 != 0)
 
-            if ((if (unsafe: *ptr) == 2147811328: 1 else: 0) != 0) {
-                (ptr = ptr + 1)
+            if ((if (unsafe: *__local_ptr) == 2147811328: 1 else: 0) != 0) {
+                (__local_ptr = __local_ptr + 1)
             }
 
         }
 
 
-        if ((options & 2) != 0) {
-            var __ci_expr_old_4: *mut c_uint = ptr
+        if (((__param_options as c_uint) & (2 as c_uint)) != 0) {
+            var __ci_expr_old_4: *mut c_uint = __local_ptr
 
-            (ptr = ptr + 1)
+            (__local_ptr = __local_ptr + 1)
 
-            (size = utf_caseless_extend(start_char, (unsafe: *__ci_expr_old_4), options, buffer))
+            (__local_size = utf_caseless_extend(__local_start_char, (unsafe: *__ci_expr_old_4), __param_options, __local_buffer))
 
 
-            if ((if buffer != null: 1 else: 0) != 0) {
-                (buffer = buffer + size)
+            if ((if __local_buffer != null: 1 else: 0) != 0) {
+                (__local_buffer = __local_buffer + (__local_size as usize))
             }
 
-            (total_size = total_size + size)
+            (__local_total_size = __local_total_size + __local_size)
 
             continue
 
         }
 
-        if ((if buffer != null: 1 else: 0) != 0) {
-            ((unsafe: buffer[0]) = start_char)
+        if ((if __local_buffer != null: 1 else: 0) != 0) {
+            ((unsafe: __local_buffer[0]) = __local_start_char)
 
-            ((unsafe: buffer[1]) = (unsafe: *ptr))
+            ((unsafe: __local_buffer[1]) = (unsafe: *__local_ptr))
 
-            (buffer = buffer + 2)
+            (__local_buffer = __local_buffer + ((2 as isize) as usize))
 
         }
 
-        (ptr = ptr + 1)
+        (__local_ptr = __local_ptr + 1)
 
-        (total_size = total_size + 2)
+        (__local_total_size = __local_total_size + 2)
 
     }
 
-    return total_size
+    return __local_total_size
 
 }
 
-fn compile_optimize_class(start_ptr: *mut c_uint, options: c_uint, xoptions: c_uint, cb: *mut compile_block_8) -> *mut class_ranges {
-    var cranges: *mut class_ranges
+fn compile_optimize_class(__param_start_ptr: *mut c_uint, __param_options: c_uint, __param_xoptions: c_uint, __param_cb: *mut compile_block_8) -> *mut class_ranges {
+    var __local_cranges: *mut class_ranges
 
-    var ptr: *mut c_uint
+    var __local_ptr: *mut c_uint
 
-    var buffer: *mut c_uint
+    var __local_buffer: *mut c_uint
 
-    var dst: *mut c_uint
+    var __local_dst: *mut c_uint
 
-    var class_options: c_uint = 0
+    var __local_class_options: c_uint = 0
 
-    var range_list_size: c_ulong = 0
+    var __local_range_list_size: c_ulong = 0
 
-    var total_size: c_ulong
+    var __local_total_size: c_ulong
 
-    var i: c_ulong
-
-
-    var tmp1: c_uint
-
-    var tmp2: c_uint
+    var __local_i: c_ulong
 
 
-    var char_list_next: *const c_uint
+    var __local_tmp1: c_uint
 
-    var next_char: *mut c_ushort
-
-    var char_list_start: c_uint
-
-    var char_list_end: c_uint
+    var __local_tmp2: c_uint
 
 
-    var range_start: c_uint
+    var __local_char_list_next: *const c_uint
 
-    var range_end: c_uint
+    var __local_next_char: *mut c_ushort
+
+    var __local_char_list_start: c_uint
+
+    var __local_char_list_end: c_uint
 
 
-    if ((options & 524288) != 0) {
-        (class_options = class_options | 1)
+    var __local_range_start: c_uint
+
+    var __local_range_end: c_uint
+
+
+    if (((__param_options as c_uint) & (524288 as c_uint)) != 0) {
+        (__local_class_options = __local_class_options | 1)
     }
 
     var __ci_expr_logic_0: c_int = 0
 
-    if ((options & 8) != 0) {
-        (__ci_expr_logic_0 = (if (options & (524288 | 131072)) != 0: 1 else: 0))
+    if (((__param_options as c_uint) & (8 as c_uint)) != 0) {
+        (__ci_expr_logic_0 = (if ((__param_options as c_uint) & (((524288 as c_uint) | (131072 as c_uint)) as c_uint)) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_0 != 0) {
-        (class_options = class_options | 2)
+        (__local_class_options = __local_class_options | 2)
     }
 
 
-    if ((xoptions & 128) != 0) {
-        (class_options = class_options | 4)
+    if (((__param_xoptions as c_uint) & (128 as c_uint)) != 0) {
+        (__local_class_options = __local_class_options | 4)
     }
 
-    if ((xoptions & 65536) != 0) {
-        (class_options = class_options | 8)
+    if (((__param_xoptions as c_uint) & (65536 as c_uint)) != 0) {
+        (__local_class_options = __local_class_options | 8)
     }
 
-    (range_list_size = parse_class(start_ptr, class_options, null))
+    (__local_range_list_size = parse_class(__param_start_ptr, __local_class_options, null))
 
-    while true {
-        if (not (0 != 0)) {
-            break
-        }
-    }
+    do {
+        0
+    } while (0 != 0)
 
     var __ci_expr_ternary_1: c_int = 0
 
-    if ((if range_list_size >= 2: 1 else: 0) != 0) {
+    if ((if __local_range_list_size >= 2: 1 else: 0) != 0) {
         (__ci_expr_ternary_1 = 3)
     } else {
         (__ci_expr_ternary_1 = 0)
     }
 
-    (total_size = (range_list_size +% __ci_expr_ternary_1))
+    (__local_total_size = ((__local_range_list_size as c_ulong) +% (__ci_expr_ternary_1 as c_ulong)))
 
 
-    (cranges = ((cb.cx.memctl.malloc((sizeof[class_ranges]() +% (total_size *% sizeof[c_uint]())), cb.cx.memctl.memory_data) as *mut class_ranges)))
+    (__local_cranges = (((&raw const (unsafe: *__param_cb.cx).memctl as *const pcre2_memctl).malloc(((sizeof[class_ranges]() as c_ulong) +% (((__local_total_size as c_ulong) *% (sizeof[u32]() as c_ulong)) as c_ulong)), (&raw const (unsafe: *__param_cb.cx).memctl as *const pcre2_memctl).memory_data) as *mut class_ranges)))
 
-    if ((if cranges == null: 1 else: 0) != 0) {
+    if ((if __local_cranges == null: 1 else: 0) != 0) {
         return null
     }
 
-    (cranges.header.next = ((null as *mut compile_data)))
+    ((unsafe: *__local_cranges).header.next = ((null as *mut compile_data)))
 
-    (cranges.range_list_size = ((range_list_size as c_ushort)))
+    ((unsafe: *__local_cranges).range_list_size = ((__local_range_list_size as c_ushort)))
 
-    (cranges.char_lists_types = 0)
+    ((unsafe: *__local_cranges).char_lists_types = 0)
 
-    (cranges.char_lists_size = 0)
+    ((unsafe: *__local_cranges).char_lists_size = 0)
 
-    (cranges.char_lists_start = 0)
+    ((unsafe: *__local_cranges).char_lists_start = 0)
 
-    if ((if range_list_size == 0: 1 else: 0) != 0) {
-        return cranges
+    if ((if __local_range_list_size == 0: 1 else: 0) != 0) {
+        return __local_cranges
     }
 
-    (buffer = (((cranges + ((1 as isize) as usize)) as *mut c_uint)))
+    (__local_buffer = (((__local_cranges + ((1 as isize) as usize)) as *mut c_uint)))
 
-    parse_class(start_ptr, class_options, buffer)
+    parse_class(__param_start_ptr, __local_class_options, __local_buffer)
 
-    if ((if range_list_size <= 2: 1 else: 0) != 0) {
-        return cranges
+    if ((if __local_range_list_size <= 2: 1 else: 0) != 0) {
+        return __local_cranges
     }
 
-    (i = ((((range_list_size as c_ulong) >> (2 as c_uint)) -% 1) as c_ulong) << (1 as c_uint))
+    (__local_i = (((((__local_range_list_size as c_ulong) >> (2 as c_uint)) as c_ulong) -% (1 as c_ulong)) as c_ulong) << (1 as c_uint))
 
     while (1 != 0) {
-        do_heapify(buffer, range_list_size, i)
+        do_heapify(__local_buffer, __local_range_list_size, __local_i)
 
-        if ((if i == 0: 1 else: 0) != 0) {
+        if ((if __local_i == 0: 1 else: 0) != 0) {
             break
         }
 
-        (i = i - 2)
+        (__local_i = __local_i - 2)
 
     }
 
-    (i = (range_list_size -% 2))
+    (__local_i = ((__local_range_list_size as c_ulong) -% (2 as c_ulong)))
 
     while (1 != 0) {
-        (tmp1 = (unsafe: buffer[i]))
+        (__local_tmp1 = (unsafe: __local_buffer[__local_i]))
 
-        (tmp2 = (unsafe: buffer[(i +% 1)]))
+        (__local_tmp2 = (unsafe: __local_buffer[((__local_i as c_ulong) +% (1 as c_ulong))]))
 
-        ((unsafe: buffer[i]) = (unsafe: buffer[0]))
+        ((unsafe: __local_buffer[__local_i]) = (unsafe: __local_buffer[0]))
 
-        ((unsafe: buffer[(i +% 1)]) = (unsafe: buffer[1]))
+        ((unsafe: __local_buffer[((__local_i as c_ulong) +% (1 as c_ulong))]) = (unsafe: __local_buffer[1]))
 
-        ((unsafe: buffer[0]) = tmp1)
+        ((unsafe: __local_buffer[0]) = __local_tmp1)
 
-        ((unsafe: buffer[1]) = tmp2)
+        ((unsafe: __local_buffer[1]) = __local_tmp2)
 
-        do_heapify(buffer, i, 0)
+        do_heapify(__local_buffer, __local_i, 0)
 
-        if ((if i == 0: 1 else: 0) != 0) {
+        if ((if __local_i == 0: 1 else: 0) != 0) {
             break
         }
 
-        (i = i - 2)
+        (__local_i = __local_i - 2)
 
     }
 
-    (dst = buffer)
+    (__local_dst = __local_buffer)
 
-    (ptr = buffer + ((2 as isize) as usize))
+    (__local_ptr = __local_buffer + ((2 as isize) as usize))
 
-    (range_list_size = range_list_size - 2)
+    (__local_range_list_size = __local_range_list_size - 2)
 
     while true {
         var __ci_expr_logic_2: c_int = 0
 
-        if ((if range_list_size > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_2 = (if (if (unsafe: dst[1]) != (~(0 as c_uint)): 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_range_list_size > 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_2 = (if (if (unsafe: __local_dst[1]) != (~(0 as c_uint)): 1 else: 0) != 0: 1 else: 0))
         }
 
         if (not (__ci_expr_logic_2 != 0)) {
             break
         }
 
-        if ((if ((unsafe: dst[1]) +% 1) < (unsafe: ptr[0]): 1 else: 0) != 0) {
-            (dst = dst + 2)
+        if ((if (((unsafe: __local_dst[1]) as c_uint) +% (1 as c_uint)) < (unsafe: __local_ptr[0]): 1 else: 0) != 0) {
+            (__local_dst = __local_dst + ((2 as isize) as usize))
 
-            ((unsafe: dst[0]) = (unsafe: ptr[0]))
+            ((unsafe: __local_dst[0]) = (unsafe: __local_ptr[0]))
 
-            ((unsafe: dst[1]) = (unsafe: ptr[1]))
+            ((unsafe: __local_dst[1]) = (unsafe: __local_ptr[1]))
 
         } else {
-            if ((if (unsafe: dst[1]) < (unsafe: ptr[1]): 1 else: 0) != 0) {
-                ((unsafe: dst[1]) = (unsafe: ptr[1]))
+            if ((if (unsafe: __local_dst[1]) < (unsafe: __local_ptr[1]): 1 else: 0) != 0) {
+                ((unsafe: __local_dst[1]) = (unsafe: __local_ptr[1]))
             }
         }
 
-        (ptr = ptr + 2)
+        (__local_ptr = __local_ptr + ((2 as isize) as usize))
 
-        (range_list_size = range_list_size - 2)
+        (__local_range_list_size = __local_range_list_size - 2)
 
     }
 
-    while true {
-        if (not (0 != 0)) {
-            break
-        }
-    }
+    do {
+        0
+    } while (0 != 0)
 
-    (ptr = buffer)
+    (__local_ptr = __local_buffer)
 
     while true {
         var __ci_expr_logic_3: c_int = 0
 
-        if ((if ptr < dst: 1 else: 0) != 0) {
-            (__ci_expr_logic_3 = (if (if (unsafe: ptr[1]) < 256: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_ptr < __local_dst: 1 else: 0) != 0) {
+            (__ci_expr_logic_3 = (if (if (unsafe: __local_ptr[1]) < 256: 1 else: 0) != 0: 1 else: 0))
         }
 
         if (not (__ci_expr_logic_3 != 0)) {
             break
         }
 
-        (ptr = ptr + 2)
+        (__local_ptr = __local_ptr + ((2 as isize) as usize))
 
     }
 
-    if ((if (((dst as usize) -% (ptr as usize)) / sizeof[c_uint]()) < 10: 1 else: 0) != 0) {
-        (cranges.range_list_size = ((((((dst + ((2 as isize) as usize)) as usize) -% (buffer as usize)) / sizeof[c_uint]()) as c_ushort)))
+    if ((if (((__local_dst as usize) -% (__local_ptr as usize)) / sizeof[c_uint]()) < 10: 1 else: 0) != 0) {
+        ((unsafe: *__local_cranges).range_list_size = ((((((__local_dst + ((2 as isize) as usize)) as usize) -% (__local_buffer as usize)) / sizeof[c_uint]()) as c_ushort)))
 
-        return cranges
+        return __local_cranges
 
     }
 
-    (char_list_next = (&char_list_starts[0] as *const c_uint))
+    (__local_char_list_next = (&(unsafe: char_list_starts[0]) as *const c_uint))
 
-    var __ci_expr_old_4: *const c_uint = char_list_next
+    var __ci_expr_old_4: *const c_uint = __local_char_list_next
 
-    (char_list_next = char_list_next + 1)
+    (__local_char_list_next = __local_char_list_next + 1)
 
-    (char_list_start = (unsafe: *__ci_expr_old_4))
+    (__local_char_list_start = (unsafe: *__ci_expr_old_4))
 
 
-    (char_list_end = 2147483647)
+    (__local_char_list_end = 2147483647)
 
-    (next_char = (((buffer + total_size) as *mut c_ushort)))
+    (__local_next_char = (((__local_buffer + (__local_total_size as usize)) as *mut c_ushort)))
 
-    (tmp1 = 0)
+    (__local_tmp1 = 0)
 
-    (tmp2 = 6)
+    (__local_tmp2 = 6)
 
-    while true {
-        if (not (0 != 0)) {
-            break
-        }
-    }
+    do {
+        0
+    } while (0 != 0)
 
-    (range_start = (unsafe: dst[0]))
+    (__local_range_start = (unsafe: __local_dst[0]))
 
-    (range_end = (unsafe: dst[1]))
+    (__local_range_end = (unsafe: __local_dst[1]))
 
     while (1 != 0) {
-        if ((if range_start >= char_list_start: 1 else: 0) != 0) {
+        if ((if __local_range_start >= __local_char_list_start: 1 else: 0) != 0) {
             var __ci_expr_logic_5: c_int
 
-            if ((if range_start == range_end: 1 else: 0) != 0) {
+            if ((if __local_range_start == __local_range_end: 1 else: 0) != 0) {
                 (__ci_expr_logic_5 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_5 = (if (if range_end < char_list_end: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_5 = (if (if __local_range_end < __local_char_list_end: 1 else: 0) != 0: 1 else: 0))
             }
 
             if (__ci_expr_logic_5 != 0) {
-                (tmp1 = tmp1 + 1)
+                (__local_tmp1 = __local_tmp1 + 1)
 
-                (next_char = next_char - 1)
+                (__local_next_char = __local_next_char - 1)
 
-                if ((if char_list_start < 65536: 1 else: 0) != 0) {
-                    ((unsafe: *next_char) = (((((range_end as c_uint) << (1 as c_uint)) | 1) as c_ushort)))
+                if ((if __local_char_list_start < 65536: 1 else: 0) != 0) {
+                    ((unsafe: *__local_next_char) = ((((((__local_range_end as c_uint) << (1 as c_uint)) as c_uint) | (1 as c_uint)) as c_ushort)))
                 } else {
-                    (next_char = next_char - 1)
+                    (__local_next_char = __local_next_char - 1)
 
-                    ((unsafe: *(next_char as *mut c_uint)) = ((range_end as c_uint) << (1 as c_uint)) | 1)
+                    ((unsafe: *(__local_next_char as *mut c_uint)) = (((__local_range_end as c_uint) << (1 as c_uint)) as c_uint) | (1 as c_uint))
 
                 }
 
             }
 
 
-            if ((if range_start < range_end: 1 else: 0) != 0) {
-                if ((if range_start > char_list_start: 1 else: 0) != 0) {
-                    (tmp1 = tmp1 + 1)
+            if ((if __local_range_start < __local_range_end: 1 else: 0) != 0) {
+                if ((if __local_range_start > __local_char_list_start: 1 else: 0) != 0) {
+                    (__local_tmp1 = __local_tmp1 + 1)
 
-                    (next_char = next_char - 1)
+                    (__local_next_char = __local_next_char - 1)
 
-                    if ((if char_list_start < 65536: 1 else: 0) != 0) {
-                        ((unsafe: *next_char) = ((((range_start as c_uint) << (1 as c_uint)) as c_ushort)))
+                    if ((if __local_char_list_start < 65536: 1 else: 0) != 0) {
+                        ((unsafe: *__local_next_char) = ((((__local_range_start as c_uint) << (1 as c_uint)) as c_ushort)))
                     } else {
-                        (next_char = next_char - 1)
+                        (__local_next_char = __local_next_char - 1)
 
-                        ((unsafe: *(next_char as *mut c_uint)) = (range_start as c_uint) << (1 as c_uint))
+                        ((unsafe: *(__local_next_char as *mut c_uint)) = (__local_range_start as c_uint) << (1 as c_uint))
 
                     }
 
                 } else {
-                    (cranges.char_lists_types = cranges.char_lists_types | ((4 as c_int) << (tmp2 as c_uint)))
+                    ((unsafe: *__local_cranges).char_lists_types = __local_cranges.char_lists_types | ((4 as c_int) << (__local_tmp2 as c_uint)))
                 }
 
             }
 
-            while true {
-                if (not (0 != 0)) {
-                    break
-                }
-            }
+            do {
+                0
+            } while (0 != 0)
 
-            if ((if dst > buffer: 1 else: 0) != 0) {
-                (dst = dst - 2)
+            if ((if __local_dst > __local_buffer: 1 else: 0) != 0) {
+                (__local_dst = __local_dst - ((2 as isize) as usize))
 
-                (range_start = (unsafe: dst[0]))
+                (__local_range_start = (unsafe: __local_dst[0]))
 
-                (range_end = (unsafe: dst[1]))
+                (__local_range_end = (unsafe: __local_dst[1]))
 
                 continue
 
             }
 
-            (range_start = 0)
+            (__local_range_start = 0)
 
-            (range_end = 0)
+            (__local_range_end = 0)
 
         }
 
-        if ((if range_end >= char_list_start: 1 else: 0) != 0) {
-            while true {
-                if (not (0 != 0)) {
-                    break
-                }
-            }
+        if ((if __local_range_end >= __local_char_list_start: 1 else: 0) != 0) {
+            do {
+                0
+            } while (0 != 0)
 
-            if ((if range_end < char_list_end: 1 else: 0) != 0) {
-                (tmp1 = tmp1 + 1)
+            if ((if __local_range_end < __local_char_list_end: 1 else: 0) != 0) {
+                (__local_tmp1 = __local_tmp1 + 1)
 
-                (next_char = next_char - 1)
+                (__local_next_char = __local_next_char - 1)
 
-                if ((if char_list_start < 65536: 1 else: 0) != 0) {
-                    ((unsafe: *next_char) = (((((range_end as c_uint) << (1 as c_uint)) | 1) as c_ushort)))
+                if ((if __local_char_list_start < 65536: 1 else: 0) != 0) {
+                    ((unsafe: *__local_next_char) = ((((((__local_range_end as c_uint) << (1 as c_uint)) as c_uint) | (1 as c_uint)) as c_ushort)))
                 } else {
-                    (next_char = next_char - 1)
+                    (__local_next_char = __local_next_char - 1)
 
-                    ((unsafe: *(next_char as *mut c_uint)) = ((range_end as c_uint) << (1 as c_uint)) | 1)
+                    ((unsafe: *(__local_next_char as *mut c_uint)) = (((__local_range_end as c_uint) << (1 as c_uint)) as c_uint) | (1 as c_uint))
 
                 }
 
-                while true {
-                    if (not (0 != 0)) {
-                        break
-                    }
-                }
+                do {
+                    0
+                } while (0 != 0)
 
             }
 
-            (cranges.char_lists_types = cranges.char_lists_types | ((4 as c_int) << (tmp2 as c_uint)))
+            ((unsafe: *__local_cranges).char_lists_types = __local_cranges.char_lists_types | ((4 as c_int) << (__local_tmp2 as c_uint)))
 
         }
 
-        if ((if tmp1 >= 3: 1 else: 0) != 0) {
-            (cranges.char_lists_types = cranges.char_lists_types | ((3 as c_int) << (tmp2 as c_uint)))
+        if ((if __local_tmp1 >= 3: 1 else: 0) != 0) {
+            ((unsafe: *__local_cranges).char_lists_types = __local_cranges.char_lists_types | ((3 as c_int) << (__local_tmp2 as c_uint)))
 
-            (next_char = next_char - 1)
+            (__local_next_char = __local_next_char - 1)
 
-            if ((if char_list_start < 65536: 1 else: 0) != 0) {
-                ((unsafe: *next_char) = ((tmp1 as c_ushort)))
+            if ((if __local_char_list_start < 65536: 1 else: 0) != 0) {
+                ((unsafe: *__local_next_char) = ((__local_tmp1 as c_ushort)))
             } else {
-                (next_char = next_char - 1)
+                (__local_next_char = __local_next_char - 1)
 
-                ((unsafe: *(next_char as *mut c_uint)) = tmp1)
+                ((unsafe: *(__local_next_char as *mut c_uint)) = __local_tmp1)
 
             }
 
         } else {
-            (cranges.char_lists_types = cranges.char_lists_types | ((tmp1 as c_uint) << (tmp2 as c_uint)))
+            ((unsafe: *__local_cranges).char_lists_types = __local_cranges.char_lists_types | ((__local_tmp1 as c_uint) << (__local_tmp2 as c_uint)))
         }
 
         var __ci_expr_logic_6: c_int
 
-        if ((if range_end < 256: 1 else: 0) != 0) {
+        if ((if __local_range_end < 256: 1 else: 0) != 0) {
             (__ci_expr_logic_6 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_6 = (if (if tmp2 == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_6 = (if (if __local_tmp2 == 0: 1 else: 0) != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_6 != 0) {
-            while true {
-                if (not (0 != 0)) {
-                    break
-                }
-            }
+            do {
+                0
+            } while (0 != 0)
 
             break
 
         }
 
 
-        while true {
-            if (not (0 != 0)) {
-                break
-            }
-        }
+        do {
+            0
+        } while (0 != 0)
 
-        (char_list_end = (char_list_start -% 1))
+        (__local_char_list_end = ((__local_char_list_start as c_uint) -% (1 as c_uint)))
 
-        var __ci_expr_old_7: *const c_uint = char_list_next
+        var __ci_expr_old_7: *const c_uint = __local_char_list_next
 
-        (char_list_next = char_list_next + 1)
+        (__local_char_list_next = __local_char_list_next + 1)
 
-        (char_list_start = (unsafe: *__ci_expr_old_7))
+        (__local_char_list_start = (unsafe: *__ci_expr_old_7))
 
 
-        (tmp1 = 0)
+        (__local_tmp1 = 0)
 
-        (tmp2 = tmp2 - 3)
+        (__local_tmp2 = __local_tmp2 - 3)
 
     }
 
-    if ((if (unsafe: dst[0]) < 256: 1 else: 0) != 0) {
-        (dst = dst + 2)
+    if ((if (unsafe: __local_dst[0]) < 256: 1 else: 0) != 0) {
+        (__local_dst = __local_dst + ((2 as isize) as usize))
     }
 
-    while true {
-        if (not (0 != 0)) {
-            break
-        }
-    }
+    do {
+        0
+    } while (0 != 0)
 
-    (cranges.char_lists_size = (((((((buffer + total_size) as *mut u8) as usize) -% ((next_char as *mut u8) as usize)) / sizeof[u8]()) as c_ulong)))
+    ((unsafe: *__local_cranges).char_lists_size = (((((((__local_buffer + (__local_total_size as usize)) as *mut u8) as usize) -% ((__local_next_char as *mut u8) as usize)) / sizeof[u8]()) as c_ulong)))
 
-    (cranges.char_lists_start = ((((((next_char as *mut u8) as usize) -% ((buffer as *mut u8) as usize)) / sizeof[u8]()) as c_ulong)))
+    ((unsafe: *__local_cranges).char_lists_start = ((((((__local_next_char as *mut u8) as usize) -% ((__local_buffer as *mut u8) as usize)) / sizeof[u8]()) as c_ulong)))
 
-    (cranges.range_list_size = (((((dst as usize) -% (buffer as usize)) / sizeof[c_uint]()) as c_ushort)))
+    ((unsafe: *__local_cranges).range_list_size = (((((__local_dst as usize) -% (__local_buffer as usize)) / sizeof[c_uint]()) as c_ushort)))
 
-    return cranges
+    return __local_cranges
 
 }
 
-fn add_to_class(options: c_uint, xoptions: c_uint, cb: *mut compile_block_8, start: c_uint, end: c_uint) {
-    var classbits: *mut u8 = ((&cb.classbits.classbits[0] as *mut u8))
+fn add_to_class(__param_options: c_uint, __param_xoptions: c_uint, __param_cb: *mut compile_block_8, __param_start: c_uint, __param_end: c_uint) {
+    var __local_classbits: *mut u8 = ((&raw const (unsafe: *__param_cb).classbits.classbits[0] as *mut u8))
 
-    var c: c_uint
+    var __local_c: c_uint
 
-    var byte_start: c_uint
+    var __local_byte_start: c_uint
 
-    var byte_end: c_uint
+    var __local_byte_end: c_uint
 
 
-    var classbits_end: c_uint = with 0 as __ci_expr_seq_14 {
+    var __local_classbits_end: c_uint = with 0 as __ci_expr_seq_14 {
         var __ci_expr_ternary_0: c_uint = 0
-        if ((if end <= 255: 1 else: 0) != 0) {
-            (__ci_expr_ternary_0 = end)
+        if ((if __param_end <= 255: 1 else: 0) != 0) {
+            (__ci_expr_ternary_0 = __param_end)
         } else {
             (__ci_expr_ternary_0 = 255)
         }
         __ci_expr_ternary_0
     }
 
-    if ((if (options & 8) != 0: 1 else: 0) != 0) {
-        if ((if (options & (524288 | 131072)) != 0: 1 else: 0) != 0) {
-            var turkish_i: c_int = (if (xoptions & (65536 | 128)) == 65536: 1 else: 0)
+    if ((if ((__param_options as c_uint) & (8 as c_uint)) != 0: 1 else: 0) != 0) {
+        if ((if ((__param_options as c_uint) & (((524288 as c_uint) | (131072 as c_uint)) as c_uint)) != 0: 1 else: 0) != 0) {
+            var __local_turkish_i: c_int = (if ((__param_xoptions as c_uint) & (((65536 as c_uint) | (128 as c_uint)) as c_uint)) == 65536: 1 else: 0)
 
-            if ((if start < 128: 1 else: 0) != 0) {
-                var lo_end: c_uint = with 0 as __ci_expr_seq_24 {
+            if ((if __param_start < 128: 1 else: 0) != 0) {
+                var __local_lo_end: c_uint = with 0 as __ci_expr_seq_24 {
                     var __ci_expr_ternary_1: c_uint = 0
-                    if ((if classbits_end < 127: 1 else: 0) != 0) {
-                        (__ci_expr_ternary_1 = classbits_end)
+                    if ((if __local_classbits_end < 127: 1 else: 0) != 0) {
+                        (__ci_expr_ternary_1 = __local_classbits_end)
                     } else {
                         (__ci_expr_ternary_1 = 127)
                     }
                     __ci_expr_ternary_1
                 }
 
-                (c = start)
+                (__local_c = __param_start)
 
-                while ((if c <= lo_end: 1 else: 0) != 0) {
+                while ((if __local_c <= __local_lo_end: 1 else: 0) != 0) {
                     var __ci_expr_logic_3: c_int = 0
 
-                    if (turkish_i != 0) {
+                    if (__local_turkish_i != 0) {
                         var __ci_expr_logic_2: c_int
 
-                        if ((if (c | 32) == 105: 1 else: 0) != 0) {
+                        if ((if ((__local_c as c_uint) | (32 as c_uint)) == 105: 1 else: 0) != 0) {
                             (__ci_expr_logic_2 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_2 = (if (if (c | 1) == 305: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_2 = (if (if ((__local_c as c_uint) | (1 as c_uint)) == 305: 1 else: 0) != 0: 1 else: 0))
                         }
 
                         (__ci_expr_logic_3 = (if __ci_expr_logic_2 != 0: 1 else: 0))
@@ -3175,45 +3719,45 @@ fn add_to_class(options: c_uint, xoptions: c_uint, cb: *mut compile_block_8, sta
                     }
 
                     if (__ci_expr_logic_3 != 0) {
-                        (c = c + 1)
+                        (__local_c = __local_c + 1)
 
                         continue
 
                     }
 
 
-                    ((unsafe: classbits[(((unsafe: cb.fcc[c]) as c_int) >> (3 as c_uint))]) = (unsafe: classbits[(((unsafe: cb.fcc[c]) as c_int) >> (3 as c_uint))]) | (((1 as c_uint) << (((unsafe: cb.fcc[c]) & 7) as c_uint)) as u8))
+                    ((unsafe: __local_classbits[(((unsafe: __param_cb.fcc[__local_c]) as c_int) >> (3 as c_uint))]) = (unsafe: __local_classbits[(((unsafe: __param_cb.fcc[__local_c]) as c_int) >> (3 as c_uint))]) | (((1 as c_uint) << ((((unsafe: __param_cb.fcc[__local_c]) as c_int) & 7) as c_uint)) as u8))
 
 
-                    (c = c + 1)
+                    (__local_c = __local_c + 1)
 
                 }
 
 
             }
 
-            if ((if classbits_end >= 128: 1 else: 0) != 0) {
-                var hi_start: c_uint = with 0 as __ci_expr_seq_63 {
+            if ((if __local_classbits_end >= 128: 1 else: 0) != 0) {
+                var __local_hi_start: c_uint = with 0 as __ci_expr_seq_63 {
                     var __ci_expr_ternary_4: c_uint = 0
-                    if ((if start > 128: 1 else: 0) != 0) {
-                        (__ci_expr_ternary_4 = start)
+                    if ((if __param_start > 128: 1 else: 0) != 0) {
+                        (__ci_expr_ternary_4 = __param_start)
                     } else {
                         (__ci_expr_ternary_4 = 128)
                     }
                     __ci_expr_ternary_4
                 }
 
-                (c = hi_start)
+                (__local_c = __local_hi_start)
 
-                while ((if c <= classbits_end: 1 else: 0) != 0) {
-                    var co: c_uint = ((((c as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[((_pcre2_ucd_stage1_8[((c as c_int) / 128)] * 128) + ((c as c_int) % 128))] as isize) as usize)).other_case) as c_uint))
+                while ((if __local_c <= __local_classbits_end: 1 else: 0) != 0) {
+                    var __local_co: c_uint = ((((__local_c as c_int) + ((&(unsafe: _pcre2_ucd_records_8[0]) as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_c as c_int) / 128)] as c_int) * 128) + ((__local_c as c_int) % 128))] as c_uint) as usize)).other_case) as c_uint))
 
-                    if ((if co <= 255: 1 else: 0) != 0) {
-                        ((unsafe: classbits[((co as c_uint) >> (3 as c_uint))]) = (unsafe: classbits[((co as c_uint) >> (3 as c_uint))]) | (((1 as c_uint) << ((co & 7) as c_uint)) as u8))
+                    if ((if __local_co <= 255: 1 else: 0) != 0) {
+                        ((unsafe: __local_classbits[((__local_co as c_uint) >> (3 as c_uint))]) = (unsafe: __local_classbits[((__local_co as c_uint) >> (3 as c_uint))]) | (((1 as c_uint) << (((__local_co as c_uint) & (7 as c_uint)) as c_uint)) as u8))
                     }
 
 
-                    (c = c + 1)
+                    (__local_c = __local_c + 1)
 
                 }
 
@@ -3221,12 +3765,12 @@ fn add_to_class(options: c_uint, xoptions: c_uint, cb: *mut compile_block_8, sta
             }
 
         } else {
-            (c = start)
+            (__local_c = __param_start)
 
-            while ((if c <= classbits_end: 1 else: 0) != 0) {
-                ((unsafe: classbits[(((unsafe: cb.fcc[c]) as c_int) >> (3 as c_uint))]) = (unsafe: classbits[(((unsafe: cb.fcc[c]) as c_int) >> (3 as c_uint))]) | (((1 as c_uint) << (((unsafe: cb.fcc[c]) & 7) as c_uint)) as u8))
+            while ((if __local_c <= __local_classbits_end: 1 else: 0) != 0) {
+                ((unsafe: __local_classbits[(((unsafe: __param_cb.fcc[__local_c]) as c_int) >> (3 as c_uint))]) = (unsafe: __local_classbits[(((unsafe: __param_cb.fcc[__local_c]) as c_int) >> (3 as c_uint))]) | (((1 as c_uint) << ((((unsafe: __param_cb.fcc[__local_c]) as c_int) & 7) as c_uint)) as u8))
 
-                (c = c + 1)
+                (__local_c = __local_c + 1)
 
             }
 
@@ -3235,17 +3779,17 @@ fn add_to_class(options: c_uint, xoptions: c_uint, cb: *mut compile_block_8, sta
 
     }
 
-    (byte_start = ((start +% 7) as c_uint) >> (3 as c_uint))
+    (__local_byte_start = (((__param_start as c_uint) +% (7 as c_uint)) as c_uint) >> (3 as c_uint))
 
-    (byte_end = ((classbits_end +% 1) as c_uint) >> (3 as c_uint))
+    (__local_byte_end = (((__local_classbits_end as c_uint) +% (1 as c_uint)) as c_uint) >> (3 as c_uint))
 
-    if ((if byte_start >= byte_end: 1 else: 0) != 0) {
-        (c = start)
+    if ((if __local_byte_start >= __local_byte_end: 1 else: 0) != 0) {
+        (__local_c = __param_start)
 
-        while ((if c <= classbits_end: 1 else: 0) != 0) {
-            ((unsafe: classbits[((c as c_uint) >> (3 as c_uint))]) = (unsafe: classbits[((c as c_uint) >> (3 as c_uint))]) | (((1 as c_uint) << ((c & 7) as c_uint)) as u8))
+        while ((if __local_c <= __local_classbits_end: 1 else: 0) != 0) {
+            ((unsafe: __local_classbits[((__local_c as c_uint) >> (3 as c_uint))]) = (unsafe: __local_classbits[((__local_c as c_uint) >> (3 as c_uint))]) | (((1 as c_uint) << (((__local_c as c_uint) & (7 as c_uint)) as c_uint)) as u8))
 
-            (c = c + 1)
+            (__local_c = __local_c + 1)
 
         }
 
@@ -3254,144 +3798,142 @@ fn add_to_class(options: c_uint, xoptions: c_uint, cb: *mut compile_block_8, sta
 
     }
 
-    (c = byte_start)
+    (__local_c = __local_byte_start)
 
-    while ((if c < byte_end: 1 else: 0) != 0) {
-        ((unsafe: classbits[c]) = 255)
+    while ((if __local_c < __local_byte_end: 1 else: 0) != 0) {
+        ((unsafe: __local_classbits[__local_c]) = 255)
 
-        (c = c + 1)
-
-    }
-
-
-    (byte_start = byte_start << (3 as c_uint))
-
-    (byte_end = byte_end << (3 as c_uint))
-
-    (c = start)
-
-    while ((if c < byte_start: 1 else: 0) != 0) {
-        ((unsafe: classbits[((c as c_uint) >> (3 as c_uint))]) = (unsafe: classbits[((c as c_uint) >> (3 as c_uint))]) | (((1 as c_uint) << ((c & 7) as c_uint)) as u8))
-
-        (c = c + 1)
+        (__local_c = __local_c + 1)
 
     }
 
 
-    (c = byte_end)
+    (__local_byte_start = __local_byte_start << (3 as c_uint))
 
-    while ((if c <= classbits_end: 1 else: 0) != 0) {
-        ((unsafe: classbits[((c as c_uint) >> (3 as c_uint))]) = (unsafe: classbits[((c as c_uint) >> (3 as c_uint))]) | (((1 as c_uint) << ((c & 7) as c_uint)) as u8))
+    (__local_byte_end = __local_byte_end << (3 as c_uint))
 
-        (c = c + 1)
+    (__local_c = __param_start)
+
+    while ((if __local_c < __local_byte_start: 1 else: 0) != 0) {
+        ((unsafe: __local_classbits[((__local_c as c_uint) >> (3 as c_uint))]) = (unsafe: __local_classbits[((__local_c as c_uint) >> (3 as c_uint))]) | (((1 as c_uint) << (((__local_c as c_uint) & (7 as c_uint)) as c_uint)) as u8))
+
+        (__local_c = __local_c + 1)
+
+    }
+
+
+    (__local_c = __local_byte_end)
+
+    while ((if __local_c <= __local_classbits_end: 1 else: 0) != 0) {
+        ((unsafe: __local_classbits[((__local_c as c_uint) >> (3 as c_uint))]) = (unsafe: __local_classbits[((__local_c as c_uint) >> (3 as c_uint))]) | (((1 as c_uint) << (((__local_c as c_uint) & (7 as c_uint)) as c_uint)) as u8))
+
+        (__local_c = __local_c + 1)
 
     }
 
 
 }
 
-fn add_list_to_class(options: c_uint, xoptions: c_uint, cb: *mut compile_block_8, __param_p: *const c_uint) {
-    var p = __param_p
-    while ((if (unsafe: p[0]) < 256: 1 else: 0) != 0) {
-        var n: c_uint = 0
+fn add_list_to_class(__param_options: c_uint, __param_xoptions: c_uint, __param_cb: *mut compile_block_8, __param_p: *const c_uint) {
+    var __local_p = __param_p
+    while ((if (unsafe: __local_p[0]) < 256: 1 else: 0) != 0) {
+        var __local_n: c_uint = 0
 
-        while ((if (unsafe: p[(n +% 1)]) == (((unsafe: p[0]) +% n) +% 1): 1 else: 0) != 0) {
-            (n = n + 1)
+        while ((if (unsafe: __local_p[((__local_n as c_uint) +% (1 as c_uint))]) == (((((unsafe: __local_p[0]) as c_uint) +% (__local_n as c_uint)) as c_uint) +% (1 as c_uint)): 1 else: 0) != 0) {
+            (__local_n = __local_n + 1)
         }
 
-        add_to_class(options, xoptions, cb, (unsafe: p[0]), (unsafe: p[n]))
+        add_to_class(__param_options, __param_xoptions, __param_cb, (unsafe: __local_p[0]), (unsafe: __local_p[__local_n]))
 
-        (p = p + (n +% 1))
+        (__local_p = __local_p + (((__local_n as c_uint) +% (1 as c_uint)) as usize))
 
     }
 
 }
 
-fn add_not_list_to_class(options: c_uint, xoptions: c_uint, cb: *mut compile_block_8, __param_p: *const c_uint) {
-    var p = __param_p
-    if ((if (unsafe: p[0]) > 0: 1 else: 0) != 0) {
-        add_to_class(options, xoptions, cb, 0, ((unsafe: p[0]) -% 1))
+fn add_not_list_to_class(__param_options: c_uint, __param_xoptions: c_uint, __param_cb: *mut compile_block_8, __param_p: *const c_uint) {
+    var __local_p = __param_p
+    if ((if (unsafe: __local_p[0]) > 0: 1 else: 0) != 0) {
+        add_to_class(__param_options, __param_xoptions, __param_cb, 0, (((unsafe: __local_p[0]) as c_uint) -% (1 as c_uint)))
     }
 
-    while ((if (unsafe: p[0]) < 256: 1 else: 0) != 0) {
-        while ((if (unsafe: p[1]) == ((unsafe: p[0]) +% 1): 1 else: 0) != 0) {
-            (p = p + 1)
+    while ((if (unsafe: __local_p[0]) < 256: 1 else: 0) != 0) {
+        while ((if (unsafe: __local_p[1]) == (((unsafe: __local_p[0]) as c_uint) +% (1 as c_uint)): 1 else: 0) != 0) {
+            (__local_p = __local_p + 1)
         }
 
         var __ci_expr_ternary_0: c_uint = 0
 
-        if ((if (unsafe: p[1]) > 255: 1 else: 0) != 0) {
+        if ((if (unsafe: __local_p[1]) > 255: 1 else: 0) != 0) {
             (__ci_expr_ternary_0 = 255)
         } else {
-            (__ci_expr_ternary_0 = ((unsafe: p[1]) -% 1))
+            (__ci_expr_ternary_0 = (((unsafe: __local_p[1]) as c_uint) -% (1 as c_uint)))
         }
 
-        add_to_class(options, xoptions, cb, ((unsafe: p[0]) +% 1), __ci_expr_ternary_0)
+        add_to_class(__param_options, __param_xoptions, __param_cb, (((unsafe: __local_p[0]) as c_uint) +% (1 as c_uint)), __ci_expr_ternary_0)
 
 
-        (p = p + 1)
+        (__local_p = __local_p + 1)
 
     }
 
 }
 
-fn fold_negation(pop_info: *mut eclass_op_info, lengthptr: *mut c_ulong, preserve_classbits: c_int) {
-    if ((if pop_info.op_single_type == 0: 1 else: 0) != 0) {
-        if ((if lengthptr != null: 1 else: 0) != 0) {
-            ((unsafe: *lengthptr) = (unsafe: *lengthptr) + 1)
+fn fold_negation(__param_pop_info: *mut eclass_op_info, __param_lengthptr: *mut c_ulong, __param_preserve_classbits: c_int) {
+    if ((if __param_pop_info.op_single_type == 0: 1 else: 0) != 0) {
+        if ((if __param_lengthptr != null: 1 else: 0) != 0) {
+            ((unsafe: *__param_lengthptr) = (unsafe: *__param_lengthptr) + 1)
         } else {
-            ((unsafe: pop_info.code_start[pop_info.length]) = 4)
+            ((unsafe: (unsafe: *__param_pop_info).code_start[__param_pop_info.length]) = 4)
         }
 
-        (pop_info.length = pop_info.length + 1)
+        ((unsafe: *__param_pop_info).length = __param_pop_info.length + 1)
 
     } else {
         var __ci_expr_logic_0: c_int
 
-        if ((if pop_info.op_single_type == 6: 1 else: 0) != 0) {
+        if ((if __param_pop_info.op_single_type == 6: 1 else: 0) != 0) {
             (__ci_expr_logic_0 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_0 = (if (if pop_info.op_single_type == 7: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_0 = (if (if __param_pop_info.op_single_type == 7: 1 else: 0) != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_0 != 0) {
             var __ci_expr_ternary_1: c_int = 0
 
-            if ((if pop_info.op_single_type == 7: 1 else: 0) != 0) {
+            if ((if __param_pop_info.op_single_type == 7: 1 else: 0) != 0) {
                 (__ci_expr_ternary_1 = 6)
             } else {
                 (__ci_expr_ternary_1 = 7)
             }
 
-            (pop_info.op_single_type = __ci_expr_ternary_1)
+            ((unsafe: *__param_pop_info).op_single_type = __ci_expr_ternary_1)
 
 
-            if ((if lengthptr == null: 1 else: 0) != 0) {
-                ((unsafe: *pop_info.code_start) = pop_info.op_single_type)
+            if ((if __param_lengthptr == null: 1 else: 0) != 0) {
+                ((unsafe: *__param_pop_info.code_start) = __param_pop_info.op_single_type)
             }
 
         } else {
-            while true {
-                if (not (0 != 0)) {
-                    break
-                }
-            }
+            do {
+                0
+            } while (0 != 0)
 
-            if ((if lengthptr == null: 1 else: 0) != 0) {
-                ((unsafe: pop_info.code_start[(1 + 2)]) = (unsafe: pop_info.code_start[(1 + 2)]) ^ 1)
+            if ((if __param_lengthptr == null: 1 else: 0) != 0) {
+                ((unsafe: (unsafe: *__param_pop_info).code_start[(1 + 2)]) = (unsafe: __param_pop_info.code_start[(1 + 2)]) ^ 1)
             }
 
         }
 
     }
 
-    if ((if not (preserve_classbits != 0): 1 else: 0) != 0) {
-        var i: c_int = 0
+    if ((if not (__param_preserve_classbits != 0): 1 else: 0) != 0) {
+        var __local_i: c_int = 0
 
-        while ((if i < 8: 1 else: 0) != 0) {
-            (pop_info.bits.classwords[i] = (~pop_info.bits.classwords[i]))
+        while ((if __local_i < 8: 1 else: 0) != 0) {
+            ((unsafe: *__param_pop_info).bits.classwords[__local_i] = (~(&raw const (unsafe: *__param_pop_info).bits as *const class_bits_storage).classwords[__local_i]))
 
-            (i = i + 1)
+            (__local_i = __local_i + 1)
 
         }
 
@@ -3400,188 +3942,180 @@ fn fold_negation(pop_info: *mut eclass_op_info, lengthptr: *mut c_ulong, preserv
 
 }
 
-fn fold_binary(op: c_int, lhs_op_info: *mut eclass_op_info, rhs_op_info: *mut eclass_op_info, lengthptr: *mut c_ulong) {
+fn fold_binary(__param_op: c_int, __param_lhs_op_info: *mut eclass_op_info, __param_rhs_op_info: *mut eclass_op_info, __param_lengthptr: *mut c_ulong) {
     while true {
-        match op {
+        match __param_op {
             1 => {
-                if (not ((if rhs_op_info.op_single_type == 6: 1 else: 0) != 0)) {
-                    if ((if lhs_op_info.op_single_type == 6: 1 else: 0) != 0) {
-                        if ((if lengthptr == null: 1 else: 0) != 0) {
-                            with_memmove((lhs_op_info.code_start as *i8), (rhs_op_info.code_start as *i8), ((rhs_op_info.length *% 1) as i64))
+                if (not ((if __param_rhs_op_info.op_single_type == 6: 1 else: 0) != 0)) {
+                    if ((if __param_lhs_op_info.op_single_type == 6: 1 else: 0) != 0) {
+                        if ((if __param_lengthptr == null: 1 else: 0) != 0) {
+                            with_memmove((__param_lhs_op_info.code_start as *i8), (__param_rhs_op_info.code_start as *i8), (((__param_rhs_op_info.length as c_ulong) *% (1 as c_ulong)) as i64))
                         }
 
-                        (lhs_op_info.length = rhs_op_info.length)
+                        ((unsafe: *__param_lhs_op_info).length = __param_rhs_op_info.length)
 
-                        (lhs_op_info.op_single_type = rhs_op_info.op_single_type)
+                        ((unsafe: *__param_lhs_op_info).op_single_type = __param_rhs_op_info.op_single_type)
 
                     } else {
-                        if ((if rhs_op_info.op_single_type == 7: 1 else: 0) != 0) {
-                            if ((if lengthptr == null: 1 else: 0) != 0) {
-                                ((unsafe: lhs_op_info.code_start[0]) = 7)
+                        if ((if __param_rhs_op_info.op_single_type == 7: 1 else: 0) != 0) {
+                            if ((if __param_lengthptr == null: 1 else: 0) != 0) {
+                                ((unsafe: (unsafe: *__param_lhs_op_info).code_start[0]) = 7)
                             }
 
-                            (lhs_op_info.length = 1)
+                            ((unsafe: *__param_lhs_op_info).length = 1)
 
-                            (lhs_op_info.op_single_type = 7)
+                            ((unsafe: *__param_lhs_op_info).op_single_type = 7)
 
                         } else {
-                            if (not ((if lhs_op_info.op_single_type == 7: 1 else: 0) != 0)) {
-                                if ((if lengthptr != null: 1 else: 0) != 0) {
-                                    ((unsafe: *lengthptr) = (unsafe: *lengthptr) + 1)
+                            if (not ((if __param_lhs_op_info.op_single_type == 7: 1 else: 0) != 0)) {
+                                if ((if __param_lengthptr != null: 1 else: 0) != 0) {
+                                    ((unsafe: *__param_lengthptr) = (unsafe: *__param_lengthptr) + 1)
                                 } else {
-                                    while true {
-                                        if (not (0 != 0)) {
-                                            break
-                                        }
-                                    }
+                                    do {
+                                        0
+                                    } while (0 != 0)
 
-                                    ((unsafe: rhs_op_info.code_start[rhs_op_info.length]) = 1)
+                                    ((unsafe: (unsafe: *__param_rhs_op_info).code_start[__param_rhs_op_info.length]) = 1)
 
                                 }
 
-                                (lhs_op_info.length = lhs_op_info.length + (rhs_op_info.length +% 1))
+                                ((unsafe: *__param_lhs_op_info).length = __param_lhs_op_info.length + ((__param_rhs_op_info.length as c_ulong) +% (1 as c_ulong)))
 
-                                (lhs_op_info.op_single_type = 0)
+                                ((unsafe: *__param_lhs_op_info).op_single_type = 0)
 
                             }
                         }
                     }
                 }
 
-                var i: c_int = 0
+                var __local_i: c_int = 0
 
-                while ((if i < 8: 1 else: 0) != 0) {
-                    (lhs_op_info.bits.classwords[i] = lhs_op_info.bits.classwords[i] & rhs_op_info.bits.classwords[i])
+                while ((if __local_i < 8: 1 else: 0) != 0) {
+                    ((unsafe: *__param_lhs_op_info).bits.classwords[__local_i] = (&raw const (unsafe: *__param_lhs_op_info).bits as *const class_bits_storage).classwords[__local_i] & (&raw const (unsafe: *__param_rhs_op_info).bits as *const class_bits_storage).classwords[__local_i])
 
-                    (i = i + 1)
+                    (__local_i = __local_i + 1)
 
                 }
 
 
             },
             2 => {
-                if (not ((if rhs_op_info.op_single_type == 7: 1 else: 0) != 0)) {
-                    if ((if lhs_op_info.op_single_type == 7: 1 else: 0) != 0) {
-                        if ((if lengthptr == null: 1 else: 0) != 0) {
-                            with_memmove((lhs_op_info.code_start as *i8), (rhs_op_info.code_start as *i8), ((rhs_op_info.length *% 1) as i64))
+                if (not ((if __param_rhs_op_info.op_single_type == 7: 1 else: 0) != 0)) {
+                    if ((if __param_lhs_op_info.op_single_type == 7: 1 else: 0) != 0) {
+                        if ((if __param_lengthptr == null: 1 else: 0) != 0) {
+                            with_memmove((__param_lhs_op_info.code_start as *i8), (__param_rhs_op_info.code_start as *i8), (((__param_rhs_op_info.length as c_ulong) *% (1 as c_ulong)) as i64))
                         }
 
-                        (lhs_op_info.length = rhs_op_info.length)
+                        ((unsafe: *__param_lhs_op_info).length = __param_rhs_op_info.length)
 
-                        (lhs_op_info.op_single_type = rhs_op_info.op_single_type)
+                        ((unsafe: *__param_lhs_op_info).op_single_type = __param_rhs_op_info.op_single_type)
 
                     } else {
-                        if ((if rhs_op_info.op_single_type == 6: 1 else: 0) != 0) {
-                            if ((if lengthptr == null: 1 else: 0) != 0) {
-                                ((unsafe: lhs_op_info.code_start[0]) = 6)
+                        if ((if __param_rhs_op_info.op_single_type == 6: 1 else: 0) != 0) {
+                            if ((if __param_lengthptr == null: 1 else: 0) != 0) {
+                                ((unsafe: (unsafe: *__param_lhs_op_info).code_start[0]) = 6)
                             }
 
-                            (lhs_op_info.length = 1)
+                            ((unsafe: *__param_lhs_op_info).length = 1)
 
-                            (lhs_op_info.op_single_type = 6)
+                            ((unsafe: *__param_lhs_op_info).op_single_type = 6)
 
                         } else {
-                            if (not ((if lhs_op_info.op_single_type == 6: 1 else: 0) != 0)) {
-                                if ((if lengthptr != null: 1 else: 0) != 0) {
-                                    ((unsafe: *lengthptr) = (unsafe: *lengthptr) + 1)
+                            if (not ((if __param_lhs_op_info.op_single_type == 6: 1 else: 0) != 0)) {
+                                if ((if __param_lengthptr != null: 1 else: 0) != 0) {
+                                    ((unsafe: *__param_lengthptr) = (unsafe: *__param_lengthptr) + 1)
                                 } else {
-                                    while true {
-                                        if (not (0 != 0)) {
-                                            break
-                                        }
-                                    }
+                                    do {
+                                        0
+                                    } while (0 != 0)
 
-                                    ((unsafe: rhs_op_info.code_start[rhs_op_info.length]) = 2)
+                                    ((unsafe: (unsafe: *__param_rhs_op_info).code_start[__param_rhs_op_info.length]) = 2)
 
                                 }
 
-                                (lhs_op_info.length = lhs_op_info.length + (rhs_op_info.length +% 1))
+                                ((unsafe: *__param_lhs_op_info).length = __param_lhs_op_info.length + ((__param_rhs_op_info.length as c_ulong) +% (1 as c_ulong)))
 
-                                (lhs_op_info.op_single_type = 0)
+                                ((unsafe: *__param_lhs_op_info).op_single_type = 0)
 
                             }
                         }
                     }
                 }
 
-                var i_1: c_int = 0
+                var __local_i_1: c_int = 0
 
-                while ((if i_1 < 8: 1 else: 0) != 0) {
-                    (lhs_op_info.bits.classwords[i_1] = lhs_op_info.bits.classwords[i_1] | rhs_op_info.bits.classwords[i_1])
+                while ((if __local_i_1 < 8: 1 else: 0) != 0) {
+                    ((unsafe: *__param_lhs_op_info).bits.classwords[__local_i_1] = (&raw const (unsafe: *__param_lhs_op_info).bits as *const class_bits_storage).classwords[__local_i_1] | (&raw const (unsafe: *__param_rhs_op_info).bits as *const class_bits_storage).classwords[__local_i_1])
 
-                    (i_1 = i_1 + 1)
+                    (__local_i_1 = __local_i_1 + 1)
 
                 }
 
 
             },
             3 => {
-                if (not ((if rhs_op_info.op_single_type == 7: 1 else: 0) != 0)) {
-                    if ((if lhs_op_info.op_single_type == 7: 1 else: 0) != 0) {
-                        if ((if lengthptr == null: 1 else: 0) != 0) {
-                            with_memmove((lhs_op_info.code_start as *i8), (rhs_op_info.code_start as *i8), ((rhs_op_info.length *% 1) as i64))
+                if (not ((if __param_rhs_op_info.op_single_type == 7: 1 else: 0) != 0)) {
+                    if ((if __param_lhs_op_info.op_single_type == 7: 1 else: 0) != 0) {
+                        if ((if __param_lengthptr == null: 1 else: 0) != 0) {
+                            with_memmove((__param_lhs_op_info.code_start as *i8), (__param_rhs_op_info.code_start as *i8), (((__param_rhs_op_info.length as c_ulong) *% (1 as c_ulong)) as i64))
                         }
 
-                        (lhs_op_info.length = rhs_op_info.length)
+                        ((unsafe: *__param_lhs_op_info).length = __param_rhs_op_info.length)
 
-                        (lhs_op_info.op_single_type = rhs_op_info.op_single_type)
+                        ((unsafe: *__param_lhs_op_info).op_single_type = __param_rhs_op_info.op_single_type)
 
                     } else {
-                        if ((if rhs_op_info.op_single_type == 6: 1 else: 0) != 0) {
-                            fold_negation(lhs_op_info, lengthptr, 1)
+                        if ((if __param_rhs_op_info.op_single_type == 6: 1 else: 0) != 0) {
+                            fold_negation(__param_lhs_op_info, __param_lengthptr, 1)
 
                         } else {
-                            if ((if lhs_op_info.op_single_type == 6: 1 else: 0) != 0) {
-                                if ((if lengthptr == null: 1 else: 0) != 0) {
-                                    with_memmove((lhs_op_info.code_start as *i8), (rhs_op_info.code_start as *i8), ((rhs_op_info.length *% 1) as i64))
+                            if ((if __param_lhs_op_info.op_single_type == 6: 1 else: 0) != 0) {
+                                if ((if __param_lengthptr == null: 1 else: 0) != 0) {
+                                    with_memmove((__param_lhs_op_info.code_start as *i8), (__param_rhs_op_info.code_start as *i8), (((__param_rhs_op_info.length as c_ulong) *% (1 as c_ulong)) as i64))
                                 }
 
-                                (lhs_op_info.length = rhs_op_info.length)
+                                ((unsafe: *__param_lhs_op_info).length = __param_rhs_op_info.length)
 
-                                (lhs_op_info.op_single_type = rhs_op_info.op_single_type)
+                                ((unsafe: *__param_lhs_op_info).op_single_type = __param_rhs_op_info.op_single_type)
 
-                                fold_negation(lhs_op_info, lengthptr, 1)
+                                fold_negation(__param_lhs_op_info, __param_lengthptr, 1)
 
                             } else {
-                                if ((if lengthptr != null: 1 else: 0) != 0) {
-                                    ((unsafe: *lengthptr) = (unsafe: *lengthptr) + 1)
+                                if ((if __param_lengthptr != null: 1 else: 0) != 0) {
+                                    ((unsafe: *__param_lengthptr) = (unsafe: *__param_lengthptr) + 1)
                                 } else {
-                                    while true {
-                                        if (not (0 != 0)) {
-                                            break
-                                        }
-                                    }
+                                    do {
+                                        0
+                                    } while (0 != 0)
 
-                                    ((unsafe: rhs_op_info.code_start[rhs_op_info.length]) = 3)
+                                    ((unsafe: (unsafe: *__param_rhs_op_info).code_start[__param_rhs_op_info.length]) = 3)
 
                                 }
 
-                                (lhs_op_info.length = lhs_op_info.length + (rhs_op_info.length +% 1))
+                                ((unsafe: *__param_lhs_op_info).length = __param_lhs_op_info.length + ((__param_rhs_op_info.length as c_ulong) +% (1 as c_ulong)))
 
-                                (lhs_op_info.op_single_type = 0)
+                                ((unsafe: *__param_lhs_op_info).op_single_type = 0)
 
                             }
                         }
                     }
                 }
 
-                var i_2: c_int = 0
+                var __local_i_2: c_int = 0
 
-                while ((if i_2 < 8: 1 else: 0) != 0) {
-                    (lhs_op_info.bits.classwords[i_2] = lhs_op_info.bits.classwords[i_2] ^ rhs_op_info.bits.classwords[i_2])
+                while ((if __local_i_2 < 8: 1 else: 0) != 0) {
+                    ((unsafe: *__param_lhs_op_info).bits.classwords[__local_i_2] = (&raw const (unsafe: *__param_lhs_op_info).bits as *const class_bits_storage).classwords[__local_i_2] ^ (&raw const (unsafe: *__param_rhs_op_info).bits as *const class_bits_storage).classwords[__local_i_2])
 
-                    (i_2 = i_2 + 1)
+                    (__local_i_2 = __local_i_2 + 1)
 
                 }
 
 
             },
             _ => {
-                while true {
-                    if (not (0 != 0)) {
-                        break
-                    }
-                }
+                do {
+                    0
+                } while (0 != 0)
             },
         }
 
@@ -3591,998 +4125,564 @@ fn fold_binary(op: c_int, lhs_op_info: *mut eclass_op_info, rhs_op_info: *mut ec
 
 }
 
-fn compile_eclass_nested(context: *mut eclass_context, __param_negated: c_int, pptr: *mut *mut c_uint, pcode: *mut *mut u8, pop_info: *mut eclass_op_info, lengthptr: *mut c_ulong) -> c_int {
-    var negated = __param_negated
-    var ptr: *mut c_uint = (unsafe: *pptr)
+fn compile_eclass_nested(__param_context: *mut eclass_context, __param_negated: c_int, __param_pptr: *mut *mut c_uint, __param_pcode: *mut *mut u8, __param_pop_info: *mut eclass_op_info, __param_lengthptr: *mut c_ulong) -> c_int {
+    var __local_negated = __param_negated
+    var __local_ptr: *mut c_uint = (unsafe: *__param_pptr)
 
-    while true {
-        if (not (0 != 0)) {
-            break
-        }
+    do {
+        0
+    } while (0 != 0)
+
+    var __ci_expr_old_0: *mut c_uint = __local_ptr
+
+    (__local_ptr = __local_ptr + 1)
+
+    if ((if (unsafe: *__ci_expr_old_0) == (((2148401152 as c_uint) as c_uint) | (1 as c_uint)): 1 else: 0) != 0) {
+        (__local_negated = (if not (__local_negated != 0): 1 else: 0))
     }
 
-    var __ci_expr_old_0: *mut c_uint = ptr
 
-    (ptr = ptr + 1)
+    ((unsafe: *__param_pptr) = (unsafe: *__param_pptr) + 1)
 
-    if ((if (unsafe: *__ci_expr_old_0) == ((2148401152 as c_uint) | 1): 1 else: 0) != 0) {
-        (negated = (if not (negated != 0): 1 else: 0))
-    }
-
-
-    ((unsafe: *pptr) = (unsafe: *pptr) + 1)
-
-    if ((if not (compile_class_binary_loose(context, negated, pptr, pcode, pop_info, lengthptr) != 0): 1 else: 0) != 0) {
+    if ((if not (compile_class_binary_loose(__param_context, __local_negated, __param_pptr, __param_pcode, __param_pop_info, __param_lengthptr) != 0): 1 else: 0) != 0) {
         return 0
     }
 
-    while true {
-        if (not (0 != 0)) {
-            break
-        }
-    }
+    do {
+        0
+    } while (0 != 0)
 
-    while true {
-        if (not (0 != 0)) {
-            break
-        }
-    }
+    do {
+        0
+    } while (0 != 0)
 
     return 1
 
 }
 
-fn compile_class_operand(context: *mut eclass_context, negated: c_int, pptr: *mut *mut c_uint, pcode: *mut *mut u8, pop_info: *mut eclass_op_info, lengthptr: *mut c_ulong) -> c_int {
-    var ptr__goto_2135_11: *mut c_uint = null
-    var prev_ptr__goto_2136_11: *mut c_uint = null
-    var code__goto_2137_14: *mut u8 = null
-    var code_start__goto_2138_14: *mut u8 = null
-    var prev_length__goto_2139_12: c_ulong = 0
-    var extra_length__goto_2140_12: c_ulong = 0
-    var meta__goto_2141_10: c_uint = 0
-    var classwords__goto_2242_17: *mut c_uint = null
-    var i__goto_2244_16: c_int = 0
-    var __pc: i32 = 0
-    var __goto_pending: i32 = 0
-    while true {
-        match __pc {
-            0 => {
-                (__goto_pending = 0)
-                (ptr__goto_2135_11 = (unsafe: *pptr))
-                (code__goto_2137_14 = (unsafe: *pcode))
-                (code_start__goto_2138_14 = code__goto_2137_14)
-                var __ci_expr_ternary_0: c_ulong = 0
-                if ((if lengthptr != null: 1 else: 0) != 0) {
-                    (__ci_expr_ternary_0 = (unsafe: *lengthptr))
-                } else {
-                    (__ci_expr_ternary_0 = 0)
-                }
-                (prev_length__goto_2139_12 = __ci_expr_ternary_0)
-                (meta__goto_2141_10 = (unsafe: *ptr__goto_2135_11) & (4294901760 as c_uint))
-                while true {
-                    match meta__goto_2141_10 {
-                        2148270080 => {
-                            (ptr__goto_2135_11 = ptr__goto_2135_11 + 1)
+fn compile_class_operand(__param_context: *mut eclass_context, __param_negated: c_int, __param_pptr: *mut *mut c_uint, __param_pcode: *mut *mut u8, __param_pop_info: *mut eclass_op_info, __param_lengthptr: *mut c_ulong) -> c_int {
+    var __local_ptr__goto_2135_11: *mut c_uint = null
 
-                            (pop_info.length = 1)
+    var __local_prev_ptr__goto_2136_11: *mut c_uint = null
 
-                            if ((if (if meta__goto_2141_10 == 2148204544: 1 else: 0) == negated: 1 else: 0) != 0) {
-                                var __ci_expr_old_1: *mut u8 = code__goto_2137_14
+    var __local_code__goto_2137_14: *mut u8 = null
 
-                                (code__goto_2137_14 = code__goto_2137_14 + 1)
+    var __local_code_start__goto_2138_14: *mut u8 = null
 
-                                (pop_info.op_single_type = 6)
+    var __local_prev_length__goto_2139_12: c_ulong = 0
 
-                                ((unsafe: *__ci_expr_old_1) = pop_info.op_single_type)
+    var __local_extra_length__goto_2140_12: c_ulong = 0
 
+    var __local_meta__goto_2141_10: c_uint = 0
 
-                                if (__goto_pending != 0) {
-                                    break
-                                }
+    var __local_classwords__goto_2242_17: *mut c_uint = null
 
-                                with_memset(((&pop_info.bits.classbits[0] as *mut u8) as *i8), 255, (32 as i64))
+    var __local_i__goto_2244_16: c_int = 0
 
-                                if (__goto_pending != 0) {
-                                    break
-                                }
+    var __ci_expr_ternary_0: c_ulong = 0
 
-                            } else {
-                                var __ci_expr_old_2: *mut u8 = code__goto_2137_14
+    var __ci_expr_old_1: *mut u8 = null
 
-                                (code__goto_2137_14 = code__goto_2137_14 + 1)
+    var __ci_expr_old_2: *mut u8 = null
 
-                                (pop_info.op_single_type = 7)
+    var __ci_expr_logic_3: c_int = 0
 
-                                ((unsafe: *__ci_expr_old_2) = pop_info.op_single_type)
+    var __ci_expr_ternary_4: c_ulong = 0
 
+    var __ci_expr_logic_5: c_int = 0
 
-                                if (__goto_pending != 0) {
-                                    break
-                                }
+    var __ci_expr_ternary_6: c_int = 0
 
-                                with_memset(((&pop_info.bits.classbits[0] as *mut u8) as *i8), 0, (32 as i64))
+    var __ci_expr_logic_7: c_int = 0
 
-                                if (__goto_pending != 0) {
-                                    break
-                                }
+    var __ci_expr_ternary_8: *mut u8 = null
 
-                            }
+    goto '__ci_bb_0
 
-                        },
-                        2148204544 => {
-                            (ptr__goto_2135_11 = ptr__goto_2135_11 + 1)
+    '__ci_bb_0 {
+        (__local_ptr__goto_2135_11 = (unsafe: *__param_pptr))
+        (__local_code__goto_2137_14 = (unsafe: *__param_pcode))
+        (__local_code_start__goto_2138_14 = __local_code__goto_2137_14)
+        (__ci_expr_ternary_0 = 0)
+        if ((if __param_lengthptr != null: 1 else: 0) != 0) {
+            (__ci_expr_ternary_0 = (unsafe: *__param_lengthptr))
+        } else {
+            (__ci_expr_ternary_0 = 0)
+        }
+        (__local_prev_length__goto_2139_12 = __ci_expr_ternary_0)
+        (__local_meta__goto_2141_10 = ((unsafe: *__local_ptr__goto_2135_11) as c_uint) & ((4294901760 as c_uint) as c_uint))
+        goto '__ci_bb_1
+    }
 
-                            (pop_info.length = 1)
-
-                            if ((if (if meta__goto_2141_10 == 2148204544: 1 else: 0) == negated: 1 else: 0) != 0) {
-                                var __ci_expr_old_1: *mut u8 = code__goto_2137_14
-
-                                (code__goto_2137_14 = code__goto_2137_14 + 1)
-
-                                (pop_info.op_single_type = 6)
-
-                                ((unsafe: *__ci_expr_old_1) = pop_info.op_single_type)
-
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                with_memset(((&pop_info.bits.classbits[0] as *mut u8) as *i8), 255, (32 as i64))
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                            } else {
-                                var __ci_expr_old_2: *mut u8 = code__goto_2137_14
-
-                                (code__goto_2137_14 = code__goto_2137_14 + 1)
-
-                                (pop_info.op_single_type = 7)
-
-                                ((unsafe: *__ci_expr_old_2) = pop_info.op_single_type)
-
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                with_memset(((&pop_info.bits.classbits[0] as *mut u8) as *i8), 0, (32 as i64))
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                            }
-
-                        },
-                        2148139008 => {
-                            if ((if ((unsafe: *ptr__goto_2135_11) & 1) != 0: 1 else: 0) != 0) {
-                                if ((if not (compile_eclass_nested(context, negated, (&raw mut ptr__goto_2135_11 as *mut *mut c_uint), (&raw mut code__goto_2137_14 as *mut *mut u8), pop_info, lengthptr) != 0): 1 else: 0) != 0) {
-                                    return 0
-                                }
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                (ptr__goto_2135_11 = ptr__goto_2135_11 + 1)
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                __pc = 1
-                                __goto_pending = 1
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                            }
-
-                            (ptr__goto_2135_11 = ptr__goto_2135_11 + 1)
-
-                            (prev_ptr__goto_2136_11 = ptr__goto_2135_11)
-
-                            (ptr__goto_2135_11 = _pcre2_compile_class_not_nested_8(context.options, context.xoptions, ptr__goto_2135_11, (&raw mut code__goto_2137_14 as *mut *mut u8), (if (if meta__goto_2141_10 != 2148401152: 1 else: 0) == negated: 1 else: 0), ((&context.needs_bitmap as *const c_int) as *mut c_int), context.errorcodeptr, context.cb, lengthptr))
-
-                            if ((if ptr__goto_2135_11 == null: 1 else: 0) != 0) {
-                                return 0
-                            }
-
-                            if ((if ptr__goto_2135_11 <= prev_ptr__goto_2136_11: 1 else: 0) != 0) {
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                return 0
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                            }
-
-                            var __ci_expr_logic_3: c_int
-
-                            if ((if meta__goto_2141_10 == 2148139008: 1 else: 0) != 0) {
-                                (__ci_expr_logic_3 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_3 = (if (if meta__goto_2141_10 == 2148401152: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_3 != 0) {
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                (ptr__goto_2135_11 = ptr__goto_2135_11 + 1)
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                            }
-
-
-
-                            var __ci_expr_ternary_4: c_ulong = 0
-
-                            if ((if lengthptr != null: 1 else: 0) != 0) {
-                                (__ci_expr_ternary_4 = ((unsafe: *lengthptr) -% prev_length__goto_2139_12))
-                            } else {
-                                (__ci_expr_ternary_4 = 0)
-                            }
-
-                            (extra_length__goto_2140_12 = __ci_expr_ternary_4)
-
-
-                            if ((if (unsafe: *code_start__goto_2138_14) == OP_ALLANY: 1 else: 0) != 0) {
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                (pop_info.length = 1)
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                (pop_info.op_single_type = 6)
-
-                                ((unsafe: *code_start__goto_2138_14) = pop_info.op_single_type)
-
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                with_memset(((&pop_info.bits.classbits[0] as *mut u8) as *i8), 255, (32 as i64))
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                            } else {
-                                var __ci_expr_logic_5: c_int
-
-                                if ((if (unsafe: *code_start__goto_2138_14) == OP_CLASS: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_5 = (if true: 1 else: 0))
-                                } else {
-                                    (__ci_expr_logic_5 = (if (if (unsafe: *code_start__goto_2138_14) == OP_NCLASS: 1 else: 0) != 0: 1 else: 0))
-                                }
-
-                                if (__ci_expr_logic_5 != 0) {
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    (pop_info.length = 1)
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    var __ci_expr_ternary_6: c_int = 0
-
-                                    if ((if (unsafe: *code_start__goto_2138_14) == OP_CLASS: 1 else: 0) != 0) {
-                                        (__ci_expr_ternary_6 = 7)
-                                    } else {
-                                        (__ci_expr_ternary_6 = 6)
-                                    }
-
-                                    (pop_info.op_single_type = __ci_expr_ternary_6)
-
-                                    ((unsafe: *code_start__goto_2138_14) = pop_info.op_single_type)
-
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    with_memcpy(((&pop_info.bits.classbits[0] as *mut u8) as *i8), ((code_start__goto_2138_14 + ((1 as isize) as usize)) as *i8), (32 as i64))
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    if ((if lengthptr != null: 1 else: 0) != 0) {
-                                        ((unsafe: *lengthptr) = (unsafe: *lengthptr) + (((code__goto_2137_14 as usize) -% ((code_start__goto_2138_14 + ((1 as isize) as usize)) as usize)) / sizeof[u8]()))
-                                    }
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    (code__goto_2137_14 = code_start__goto_2138_14 + ((1 as isize) as usize))
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    var __ci_expr_logic_7: c_int = 0
-
-                                    if ((if not (context.needs_bitmap != 0): 1 else: 0) != 0) {
-                                        (__ci_expr_logic_7 = (if (if (unsafe: *code_start__goto_2138_14) == 7: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (__ci_expr_logic_7 != 0) {
-                                        (classwords__goto_2242_17 = ((&pop_info.bits.classwords[0] as *mut c_uint)))
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (i__goto_2244_16 = 0)
-
-                                        while ((if i__goto_2244_16 < 8: 1 else: 0) != 0) {
-                                            if ((if (unsafe: classwords__goto_2242_17[i__goto_2244_16]) != 0: 1 else: 0) != 0) {
-                                                (context.needs_bitmap = 1)
-
-                                                if (__goto_pending != 0) {
-                                                    break
-                                                }
-
-                                                break
-
-                                            }
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            (i__goto_2244_16 = i__goto_2244_16 + 1)
-
-                                        }
-
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                    } else {
-                                        (context.needs_bitmap = 1)
-                                    }
-
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                } else {
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    (pop_info.op_single_type = 5)
-
-                                    ((unsafe: *code_start__goto_2138_14) = pop_info.op_single_type)
-
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    with_memcpy(((&pop_info.bits.classbits[0] as *mut u8) as *i8), ((&context.cb.classbits.classbits[0] as *mut u8) as *i8), (32 as i64))
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    (pop_info.length = ((((code__goto_2137_14 as usize) -% (code_start__goto_2138_14 as usize)) / sizeof[u8]()) +% extra_length__goto_2140_12))
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                }
-
-                            }
-
-
-                        },
-                        2148401152 => {
-                            if ((if ((unsafe: *ptr__goto_2135_11) & 1) != 0: 1 else: 0) != 0) {
-                                if ((if not (compile_eclass_nested(context, negated, (&raw mut ptr__goto_2135_11 as *mut *mut c_uint), (&raw mut code__goto_2137_14 as *mut *mut u8), pop_info, lengthptr) != 0): 1 else: 0) != 0) {
-                                    return 0
-                                }
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                (ptr__goto_2135_11 = ptr__goto_2135_11 + 1)
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                __pc = 1
-                                __goto_pending = 1
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                            }
-
-                            (ptr__goto_2135_11 = ptr__goto_2135_11 + 1)
-
-                            (prev_ptr__goto_2136_11 = ptr__goto_2135_11)
-
-                            (ptr__goto_2135_11 = _pcre2_compile_class_not_nested_8(context.options, context.xoptions, ptr__goto_2135_11, (&raw mut code__goto_2137_14 as *mut *mut u8), (if (if meta__goto_2141_10 != 2148401152: 1 else: 0) == negated: 1 else: 0), ((&context.needs_bitmap as *const c_int) as *mut c_int), context.errorcodeptr, context.cb, lengthptr))
-
-                            if ((if ptr__goto_2135_11 == null: 1 else: 0) != 0) {
-                                return 0
-                            }
-
-                            if ((if ptr__goto_2135_11 <= prev_ptr__goto_2136_11: 1 else: 0) != 0) {
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                return 0
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                            }
-
-                            var __ci_expr_logic_3: c_int
-
-                            if ((if meta__goto_2141_10 == 2148139008: 1 else: 0) != 0) {
-                                (__ci_expr_logic_3 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_3 = (if (if meta__goto_2141_10 == 2148401152: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_3 != 0) {
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                (ptr__goto_2135_11 = ptr__goto_2135_11 + 1)
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                            }
-
-
-
-                            var __ci_expr_ternary_4: c_ulong = 0
-
-                            if ((if lengthptr != null: 1 else: 0) != 0) {
-                                (__ci_expr_ternary_4 = ((unsafe: *lengthptr) -% prev_length__goto_2139_12))
-                            } else {
-                                (__ci_expr_ternary_4 = 0)
-                            }
-
-                            (extra_length__goto_2140_12 = __ci_expr_ternary_4)
-
-
-                            if ((if (unsafe: *code_start__goto_2138_14) == OP_ALLANY: 1 else: 0) != 0) {
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                (pop_info.length = 1)
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                (pop_info.op_single_type = 6)
-
-                                ((unsafe: *code_start__goto_2138_14) = pop_info.op_single_type)
-
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                with_memset(((&pop_info.bits.classbits[0] as *mut u8) as *i8), 255, (32 as i64))
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                            } else {
-                                var __ci_expr_logic_5: c_int
-
-                                if ((if (unsafe: *code_start__goto_2138_14) == OP_CLASS: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_5 = (if true: 1 else: 0))
-                                } else {
-                                    (__ci_expr_logic_5 = (if (if (unsafe: *code_start__goto_2138_14) == OP_NCLASS: 1 else: 0) != 0: 1 else: 0))
-                                }
-
-                                if (__ci_expr_logic_5 != 0) {
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    (pop_info.length = 1)
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    var __ci_expr_ternary_6: c_int = 0
-
-                                    if ((if (unsafe: *code_start__goto_2138_14) == OP_CLASS: 1 else: 0) != 0) {
-                                        (__ci_expr_ternary_6 = 7)
-                                    } else {
-                                        (__ci_expr_ternary_6 = 6)
-                                    }
-
-                                    (pop_info.op_single_type = __ci_expr_ternary_6)
-
-                                    ((unsafe: *code_start__goto_2138_14) = pop_info.op_single_type)
-
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    with_memcpy(((&pop_info.bits.classbits[0] as *mut u8) as *i8), ((code_start__goto_2138_14 + ((1 as isize) as usize)) as *i8), (32 as i64))
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    if ((if lengthptr != null: 1 else: 0) != 0) {
-                                        ((unsafe: *lengthptr) = (unsafe: *lengthptr) + (((code__goto_2137_14 as usize) -% ((code_start__goto_2138_14 + ((1 as isize) as usize)) as usize)) / sizeof[u8]()))
-                                    }
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    (code__goto_2137_14 = code_start__goto_2138_14 + ((1 as isize) as usize))
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    var __ci_expr_logic_7: c_int = 0
-
-                                    if ((if not (context.needs_bitmap != 0): 1 else: 0) != 0) {
-                                        (__ci_expr_logic_7 = (if (if (unsafe: *code_start__goto_2138_14) == 7: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (__ci_expr_logic_7 != 0) {
-                                        (classwords__goto_2242_17 = ((&pop_info.bits.classwords[0] as *mut c_uint)))
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (i__goto_2244_16 = 0)
-
-                                        while ((if i__goto_2244_16 < 8: 1 else: 0) != 0) {
-                                            if ((if (unsafe: classwords__goto_2242_17[i__goto_2244_16]) != 0: 1 else: 0) != 0) {
-                                                (context.needs_bitmap = 1)
-
-                                                if (__goto_pending != 0) {
-                                                    break
-                                                }
-
-                                                break
-
-                                            }
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            (i__goto_2244_16 = i__goto_2244_16 + 1)
-
-                                        }
-
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                    } else {
-                                        (context.needs_bitmap = 1)
-                                    }
-
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                } else {
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    (pop_info.op_single_type = 5)
-
-                                    ((unsafe: *code_start__goto_2138_14) = pop_info.op_single_type)
-
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    with_memcpy(((&pop_info.bits.classbits[0] as *mut u8) as *i8), ((&context.cb.classbits.classbits[0] as *mut u8) as *i8), (32 as i64))
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    (pop_info.length = ((((code__goto_2137_14 as usize) -% (code_start__goto_2138_14 as usize)) / sizeof[u8]()) +% extra_length__goto_2140_12))
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                }
-
-                            }
-
-
-                        },
-                        _ => {
-                            (prev_ptr__goto_2136_11 = ptr__goto_2135_11)
-
-                            (ptr__goto_2135_11 = _pcre2_compile_class_not_nested_8(context.options, context.xoptions, ptr__goto_2135_11, (&raw mut code__goto_2137_14 as *mut *mut u8), (if (if meta__goto_2141_10 != 2148401152: 1 else: 0) == negated: 1 else: 0), ((&context.needs_bitmap as *const c_int) as *mut c_int), context.errorcodeptr, context.cb, lengthptr))
-
-                            if ((if ptr__goto_2135_11 == null: 1 else: 0) != 0) {
-                                return 0
-                            }
-
-                            if ((if ptr__goto_2135_11 <= prev_ptr__goto_2136_11: 1 else: 0) != 0) {
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                return 0
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                            }
-
-                            var __ci_expr_logic_3: c_int
-
-                            if ((if meta__goto_2141_10 == 2148139008: 1 else: 0) != 0) {
-                                (__ci_expr_logic_3 = (if true: 1 else: 0))
-                            } else {
-                                (__ci_expr_logic_3 = (if (if meta__goto_2141_10 == 2148401152: 1 else: 0) != 0: 1 else: 0))
-                            }
-
-                            if (__ci_expr_logic_3 != 0) {
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                (ptr__goto_2135_11 = ptr__goto_2135_11 + 1)
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                            }
-
-
-
-                            var __ci_expr_ternary_4: c_ulong = 0
-
-                            if ((if lengthptr != null: 1 else: 0) != 0) {
-                                (__ci_expr_ternary_4 = ((unsafe: *lengthptr) -% prev_length__goto_2139_12))
-                            } else {
-                                (__ci_expr_ternary_4 = 0)
-                            }
-
-                            (extra_length__goto_2140_12 = __ci_expr_ternary_4)
-
-
-                            if ((if (unsafe: *code_start__goto_2138_14) == OP_ALLANY: 1 else: 0) != 0) {
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                (pop_info.length = 1)
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                (pop_info.op_single_type = 6)
-
-                                ((unsafe: *code_start__goto_2138_14) = pop_info.op_single_type)
-
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                                with_memset(((&pop_info.bits.classbits[0] as *mut u8) as *i8), 255, (32 as i64))
-
-                                if (__goto_pending != 0) {
-                                    break
-                                }
-
-                            } else {
-                                var __ci_expr_logic_5: c_int
-
-                                if ((if (unsafe: *code_start__goto_2138_14) == OP_CLASS: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_5 = (if true: 1 else: 0))
-                                } else {
-                                    (__ci_expr_logic_5 = (if (if (unsafe: *code_start__goto_2138_14) == OP_NCLASS: 1 else: 0) != 0: 1 else: 0))
-                                }
-
-                                if (__ci_expr_logic_5 != 0) {
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    (pop_info.length = 1)
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    var __ci_expr_ternary_6: c_int = 0
-
-                                    if ((if (unsafe: *code_start__goto_2138_14) == OP_CLASS: 1 else: 0) != 0) {
-                                        (__ci_expr_ternary_6 = 7)
-                                    } else {
-                                        (__ci_expr_ternary_6 = 6)
-                                    }
-
-                                    (pop_info.op_single_type = __ci_expr_ternary_6)
-
-                                    ((unsafe: *code_start__goto_2138_14) = pop_info.op_single_type)
-
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    with_memcpy(((&pop_info.bits.classbits[0] as *mut u8) as *i8), ((code_start__goto_2138_14 + ((1 as isize) as usize)) as *i8), (32 as i64))
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    if ((if lengthptr != null: 1 else: 0) != 0) {
-                                        ((unsafe: *lengthptr) = (unsafe: *lengthptr) + (((code__goto_2137_14 as usize) -% ((code_start__goto_2138_14 + ((1 as isize) as usize)) as usize)) / sizeof[u8]()))
-                                    }
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    (code__goto_2137_14 = code_start__goto_2138_14 + ((1 as isize) as usize))
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    var __ci_expr_logic_7: c_int = 0
-
-                                    if ((if not (context.needs_bitmap != 0): 1 else: 0) != 0) {
-                                        (__ci_expr_logic_7 = (if (if (unsafe: *code_start__goto_2138_14) == 7: 1 else: 0) != 0: 1 else: 0))
-                                    }
-
-                                    if (__ci_expr_logic_7 != 0) {
-                                        (classwords__goto_2242_17 = ((&pop_info.bits.classwords[0] as *mut c_uint)))
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                        (i__goto_2244_16 = 0)
-
-                                        while ((if i__goto_2244_16 < 8: 1 else: 0) != 0) {
-                                            if ((if (unsafe: classwords__goto_2242_17[i__goto_2244_16]) != 0: 1 else: 0) != 0) {
-                                                (context.needs_bitmap = 1)
-
-                                                if (__goto_pending != 0) {
-                                                    break
-                                                }
-
-                                                break
-
-                                            }
-
-                                            if (__goto_pending != 0) {
-                                                break
-                                            }
-
-                                            (i__goto_2244_16 = i__goto_2244_16 + 1)
-
-                                        }
-
-
-                                        if (__goto_pending != 0) {
-                                            break
-                                        }
-
-                                    } else {
-                                        (context.needs_bitmap = 1)
-                                    }
-
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                } else {
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    (pop_info.op_single_type = 5)
-
-                                    ((unsafe: *code_start__goto_2138_14) = pop_info.op_single_type)
-
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    with_memcpy(((&pop_info.bits.classbits[0] as *mut u8) as *i8), ((&context.cb.classbits.classbits[0] as *mut u8) as *i8), (32 as i64))
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                    (pop_info.length = ((((code__goto_2137_14 as usize) -% (code_start__goto_2138_14 as usize)) / sizeof[u8]()) +% extra_length__goto_2140_12))
-
-                                    if (__goto_pending != 0) {
-                                        break
-                                    }
-
-                                }
-
-                            }
-
-                        },
-                    }
-                    break
-                }
-                if (__goto_pending != 0) {
-                    continue
-                }
-                var __ci_expr_ternary_9: *mut u8 = null
-                if ((if lengthptr == null: 1 else: 0) != 0) {
-                    (__ci_expr_ternary_9 = code_start__goto_2138_14)
-                } else {
-                    (__ci_expr_ternary_9 = ((null as *mut u8)))
-                }
-                (pop_info.code_start = __ci_expr_ternary_9)
-                if (__goto_pending != 0) {
-                    continue
-                }
-                if ((if lengthptr != null: 1 else: 0) != 0) {
-                    ((unsafe: *lengthptr) = (unsafe: *lengthptr) + (((code__goto_2137_14 as usize) -% (code_start__goto_2138_14 as usize)) / sizeof[u8]()))
-                    if (__goto_pending != 0) {
-                        continue
-                    }
-                    (code__goto_2137_14 = code_start__goto_2138_14)
-                    if (__goto_pending != 0) {
-                        continue
-                    }
-                }
-                if (__goto_pending != 0) {
-                    continue
-                }
-                __pc = 1
-                __goto_pending = 1
-                continue
-            },
-            1 => {  // DONE
-                (__goto_pending = 0)
-                if (__goto_pending != 0) {
-                    continue
-                }
-                ((unsafe: *pptr) = ptr__goto_2135_11)
-                if (__goto_pending != 0) {
-                    continue
-                }
-                ((unsafe: *pcode) = code__goto_2137_14)
-                if (__goto_pending != 0) {
-                    continue
-                }
-                return 1
-                if (__goto_pending != 0) {
-                    continue
-                }
-            },
-            _ => {
-                break
-            },
+    '__ci_bb_1 {
+        if (__local_meta__goto_2141_10 == 2148270080) {
+            goto '__ci_bb_3
+        } else {
+            goto '__ci_bb_61
         }
     }
+
+    '__ci_bb_2 {
+        (__ci_expr_ternary_8 = null)
+        if ((if __param_lengthptr == null: 1 else: 0) != 0) {
+            (__ci_expr_ternary_8 = __local_code_start__goto_2138_14)
+        } else {
+            (__ci_expr_ternary_8 = ((null as *mut u8)))
+        }
+        ((unsafe: *__param_pop_info).code_start = __ci_expr_ternary_8)
+        if ((if __param_lengthptr != null: 1 else: 0) != 0) {
+            goto '__ci_bb_64
+        } else {
+            goto '__ci_bb_65
+        }
+    }
+
+    '__ci_bb_3 {
+        (__local_ptr__goto_2135_11 = __local_ptr__goto_2135_11 + 1)
+        ((unsafe: *__param_pop_info).length = 1)
+        if ((if (if __local_meta__goto_2141_10 == 2148204544: 1 else: 0) == __param_negated: 1 else: 0) != 0) {
+            goto '__ci_bb_4
+        } else {
+            goto '__ci_bb_5
+        }
+    }
+
+    '__ci_bb_4 {
+        (__ci_expr_old_1 = __local_code__goto_2137_14)
+        (__local_code__goto_2137_14 = __local_code__goto_2137_14 + 1)
+        ((unsafe: *__param_pop_info).op_single_type = 6)
+        ((unsafe: *__ci_expr_old_1) = __param_pop_info.op_single_type)
+        with_memset(((&(unsafe: (&raw const (unsafe: *__param_pop_info).bits as *const class_bits_storage).classbits[0]) as *mut u8) as *i8), 255, (32 as i64))
+        goto '__ci_bb_6
+    }
+
+    '__ci_bb_5 {
+        (__ci_expr_old_2 = __local_code__goto_2137_14)
+        (__local_code__goto_2137_14 = __local_code__goto_2137_14 + 1)
+        ((unsafe: *__param_pop_info).op_single_type = 7)
+        ((unsafe: *__ci_expr_old_2) = __param_pop_info.op_single_type)
+        with_memset(((&(unsafe: (&raw const (unsafe: *__param_pop_info).bits as *const class_bits_storage).classbits[0]) as *mut u8) as *i8), 0, (32 as i64))
+        goto '__ci_bb_6
+    }
+
+    '__ci_bb_6 {
+        goto '__ci_bb_2
+    }
+
+    '__ci_bb_7 {
+        if ((if (((unsafe: *__local_ptr__goto_2135_11) as c_uint) & (1 as c_uint)) != 0: 1 else: 0) != 0) {
+            goto '__ci_bb_8
+        } else {
+            goto '__ci_bb_9
+        }
+    }
+
+    '__ci_bb_8 {
+        if ((if not (compile_eclass_nested(__param_context, __param_negated, (&raw mut __local_ptr__goto_2135_11 as *mut *mut c_uint), (&raw mut __local_code__goto_2137_14 as *mut *mut u8), __param_pop_info, __param_lengthptr) != 0): 1 else: 0) != 0) {
+            goto '__ci_bb_10
+        } else {
+            goto '__ci_bb_11
+        }
+    }
+
+    '__ci_bb_9 {
+        (__local_ptr__goto_2135_11 = __local_ptr__goto_2135_11 + 1)
+        goto '__ci_bb_16
+    }
+
+    '__ci_bb_10 {
+        return 0
+    }
+
+    '__ci_bb_11 {
+        goto '__ci_bb_12
+    }
+
+    '__ci_bb_12 {
+        goto '__ci_bb_13
+    }
+
+    '__ci_bb_13 {
+        if (0 != 0) {
+            goto '__ci_bb_12
+        } else {
+            goto '__ci_bb_14
+        }
+    }
+
+    '__ci_bb_14 {
+        (__local_ptr__goto_2135_11 = __local_ptr__goto_2135_11 + 1)
+        goto '__ci_bb_15
+    }
+
+    '__ci_bb_15 {
+        goto '__ci_bb_66
+    }
+
+    '__ci_bb_16 {
+        (__local_prev_ptr__goto_2136_11 = __local_ptr__goto_2135_11)
+        (__local_ptr__goto_2135_11 = _pcre2_compile_class_not_nested_8(__param_context.options, __param_context.xoptions, __local_ptr__goto_2135_11, (&raw mut __local_code__goto_2137_14 as *mut *mut u8), (if (if __local_meta__goto_2141_10 != 2148401152: 1 else: 0) == __param_negated: 1 else: 0), ((&raw const (unsafe: *__param_context).needs_bitmap as *const c_int) as *mut c_int), __param_context.errorcodeptr, __param_context.cb, __param_lengthptr))
+        if ((if __local_ptr__goto_2135_11 == null: 1 else: 0) != 0) {
+            goto '__ci_bb_17
+        } else {
+            goto '__ci_bb_18
+        }
+    }
+
+    '__ci_bb_17 {
+        return 0
+    }
+
+    '__ci_bb_18 {
+        if ((if __local_ptr__goto_2135_11 <= __local_prev_ptr__goto_2136_11: 1 else: 0) != 0) {
+            goto '__ci_bb_19
+        } else {
+            goto '__ci_bb_20
+        }
+    }
+
+    '__ci_bb_19 {
+        goto '__ci_bb_21
+    }
+
+    '__ci_bb_20 {
+        if ((if __local_meta__goto_2141_10 == 2148139008: 1 else: 0) != 0) {
+            (__ci_expr_logic_3 = (if true: 1 else: 0))
+        } else {
+            (__ci_expr_logic_3 = (if (if __local_meta__goto_2141_10 == 2148401152: 1 else: 0) != 0: 1 else: 0))
+        }
+        if (__ci_expr_logic_3 != 0) {
+            goto '__ci_bb_24
+        } else {
+            goto '__ci_bb_25
+        }
+    }
+
+    '__ci_bb_21 {
+        goto '__ci_bb_22
+    }
+
+    '__ci_bb_22 {
+        if (0 != 0) {
+            goto '__ci_bb_21
+        } else {
+            goto '__ci_bb_23
+        }
+    }
+
+    '__ci_bb_23 {
+        return 0
+    }
+
+    '__ci_bb_24 {
+        goto '__ci_bb_26
+    }
+
+    '__ci_bb_25 {
+        goto '__ci_bb_29
+    }
+
+    '__ci_bb_26 {
+        goto '__ci_bb_27
+    }
+
+    '__ci_bb_27 {
+        if (0 != 0) {
+            goto '__ci_bb_26
+        } else {
+            goto '__ci_bb_28
+        }
+    }
+
+    '__ci_bb_28 {
+        (__local_ptr__goto_2135_11 = __local_ptr__goto_2135_11 + 1)
+        goto '__ci_bb_25
+    }
+
+    '__ci_bb_29 {
+        goto '__ci_bb_30
+    }
+
+    '__ci_bb_30 {
+        if (0 != 0) {
+            goto '__ci_bb_29
+        } else {
+            goto '__ci_bb_31
+        }
+    }
+
+    '__ci_bb_31 {
+        (__ci_expr_ternary_4 = 0)
+        if ((if __param_lengthptr != null: 1 else: 0) != 0) {
+            (__ci_expr_ternary_4 = (((unsafe: *__param_lengthptr) as c_ulong) -% (__local_prev_length__goto_2139_12 as c_ulong)))
+        } else {
+            (__ci_expr_ternary_4 = 0)
+        }
+        (__local_extra_length__goto_2140_12 = __ci_expr_ternary_4)
+        if ((if (unsafe: *__local_code_start__goto_2138_14) == OP_ALLANY: 1 else: 0) != 0) {
+            goto '__ci_bb_32
+        } else {
+            goto '__ci_bb_33
+        }
+    }
+
+    '__ci_bb_32 {
+        goto '__ci_bb_35
+    }
+
+    '__ci_bb_33 {
+        if ((if (unsafe: *__local_code_start__goto_2138_14) == OP_CLASS: 1 else: 0) != 0) {
+            (__ci_expr_logic_5 = (if true: 1 else: 0))
+        } else {
+            (__ci_expr_logic_5 = (if (if (unsafe: *__local_code_start__goto_2138_14) == OP_NCLASS: 1 else: 0) != 0: 1 else: 0))
+        }
+        if (__ci_expr_logic_5 != 0) {
+            goto '__ci_bb_38
+        } else {
+            goto '__ci_bb_39
+        }
+    }
+
+    '__ci_bb_34 {
+        goto '__ci_bb_2
+    }
+
+    '__ci_bb_35 {
+        goto '__ci_bb_36
+    }
+
+    '__ci_bb_36 {
+        if (0 != 0) {
+            goto '__ci_bb_35
+        } else {
+            goto '__ci_bb_37
+        }
+    }
+
+    '__ci_bb_37 {
+        ((unsafe: *__param_pop_info).length = 1)
+        ((unsafe: *__param_pop_info).op_single_type = 6)
+        ((unsafe: *__local_code_start__goto_2138_14) = __param_pop_info.op_single_type)
+        with_memset(((&(unsafe: (&raw const (unsafe: *__param_pop_info).bits as *const class_bits_storage).classbits[0]) as *mut u8) as *i8), 255, (32 as i64))
+        goto '__ci_bb_34
+    }
+
+    '__ci_bb_38 {
+        goto '__ci_bb_41
+    }
+
+    '__ci_bb_39 {
+        goto '__ci_bb_55
+    }
+
+    '__ci_bb_40 {
+        goto '__ci_bb_34
+    }
+
+    '__ci_bb_41 {
+        goto '__ci_bb_42
+    }
+
+    '__ci_bb_42 {
+        if (0 != 0) {
+            goto '__ci_bb_41
+        } else {
+            goto '__ci_bb_43
+        }
+    }
+
+    '__ci_bb_43 {
+        ((unsafe: *__param_pop_info).length = 1)
+        (__ci_expr_ternary_6 = 0)
+        if ((if (unsafe: *__local_code_start__goto_2138_14) == OP_CLASS: 1 else: 0) != 0) {
+            (__ci_expr_ternary_6 = 7)
+        } else {
+            (__ci_expr_ternary_6 = 6)
+        }
+        ((unsafe: *__param_pop_info).op_single_type = __ci_expr_ternary_6)
+        ((unsafe: *__local_code_start__goto_2138_14) = __param_pop_info.op_single_type)
+        with_memcpy(((&(unsafe: (&raw const (unsafe: *__param_pop_info).bits as *const class_bits_storage).classbits[0]) as *mut u8) as *i8), ((__local_code_start__goto_2138_14 + ((1 as isize) as usize)) as *i8), (32 as i64))
+        if ((if __param_lengthptr != null: 1 else: 0) != 0) {
+            goto '__ci_bb_44
+        } else {
+            goto '__ci_bb_45
+        }
+    }
+
+    '__ci_bb_44 {
+        ((unsafe: *__param_lengthptr) = (unsafe: *__param_lengthptr) + (((__local_code__goto_2137_14 as usize) -% ((__local_code_start__goto_2138_14 + ((1 as isize) as usize)) as usize)) / sizeof[u8]()))
+        goto '__ci_bb_45
+    }
+
+    '__ci_bb_45 {
+        (__local_code__goto_2137_14 = __local_code_start__goto_2138_14 + ((1 as isize) as usize))
+        (__ci_expr_logic_7 = 0)
+        if ((if not (__param_context.needs_bitmap != 0): 1 else: 0) != 0) {
+            (__ci_expr_logic_7 = (if (if (unsafe: *__local_code_start__goto_2138_14) == 7: 1 else: 0) != 0: 1 else: 0))
+        }
+        if (__ci_expr_logic_7 != 0) {
+            goto '__ci_bb_46
+        } else {
+            goto '__ci_bb_47
+        }
+    }
+
+    '__ci_bb_46 {
+        (__local_classwords__goto_2242_17 = ((&raw const (unsafe: *__param_pop_info).bits.classwords[0] as *mut c_uint)))
+        (__local_i__goto_2244_16 = 0)
+        goto '__ci_bb_49
+    }
+
+    '__ci_bb_47 {
+        ((unsafe: *__param_context).needs_bitmap = 1)
+        goto '__ci_bb_48
+    }
+
+    '__ci_bb_48 {
+        goto '__ci_bb_40
+    }
+
+    '__ci_bb_49 {
+        if ((if __local_i__goto_2244_16 < 8: 1 else: 0) != 0) {
+            goto '__ci_bb_50
+        } else {
+            goto '__ci_bb_52
+        }
+    }
+
+    '__ci_bb_50 {
+        if ((if (unsafe: __local_classwords__goto_2242_17[__local_i__goto_2244_16]) != 0: 1 else: 0) != 0) {
+            goto '__ci_bb_53
+        } else {
+            goto '__ci_bb_54
+        }
+    }
+
+    '__ci_bb_51 {
+        (__local_i__goto_2244_16 = __local_i__goto_2244_16 + 1)
+        goto '__ci_bb_49
+    }
+
+    '__ci_bb_52 {
+        goto '__ci_bb_48
+    }
+
+    '__ci_bb_53 {
+        ((unsafe: *__param_context).needs_bitmap = 1)
+        goto '__ci_bb_52
+    }
+
+    '__ci_bb_54 {
+        goto '__ci_bb_51
+    }
+
+    '__ci_bb_55 {
+        goto '__ci_bb_56
+    }
+
+    '__ci_bb_56 {
+        if (0 != 0) {
+            goto '__ci_bb_55
+        } else {
+            goto '__ci_bb_57
+        }
+    }
+
+    '__ci_bb_57 {
+        ((unsafe: *__param_pop_info).op_single_type = 5)
+        ((unsafe: *__local_code_start__goto_2138_14) = __param_pop_info.op_single_type)
+        goto '__ci_bb_58
+    }
+
+    '__ci_bb_58 {
+        goto '__ci_bb_59
+    }
+
+    '__ci_bb_59 {
+        if (0 != 0) {
+            goto '__ci_bb_58
+        } else {
+            goto '__ci_bb_60
+        }
+    }
+
+    '__ci_bb_60 {
+        with_memcpy(((&(unsafe: (&raw const (unsafe: *__param_pop_info).bits as *const class_bits_storage).classbits[0]) as *mut u8) as *i8), ((&(unsafe: (&raw const (unsafe: *__param_context.cb).classbits as *const class_bits_storage).classbits[0]) as *mut u8) as *i8), (32 as i64))
+        ((unsafe: *__param_pop_info).length = (((((__local_code__goto_2137_14 as usize) -% (__local_code_start__goto_2138_14 as usize)) / sizeof[u8]()) as c_ulong) +% (__local_extra_length__goto_2140_12 as c_ulong)))
+        goto '__ci_bb_40
+    }
+
+    '__ci_bb_61 {
+        if (__local_meta__goto_2141_10 == 2148204544) {
+            goto '__ci_bb_3
+        } else {
+            goto '__ci_bb_62
+        }
+    }
+
+    '__ci_bb_62 {
+        if (__local_meta__goto_2141_10 == 2148139008) {
+            goto '__ci_bb_7
+        } else {
+            goto '__ci_bb_63
+        }
+    }
+
+    '__ci_bb_63 {
+        if (__local_meta__goto_2141_10 == 2148401152) {
+            goto '__ci_bb_7
+        } else {
+            goto '__ci_bb_16
+        }
+    }
+
+    '__ci_bb_64 {
+        ((unsafe: *__param_lengthptr) = (unsafe: *__param_lengthptr) + (((__local_code__goto_2137_14 as usize) -% (__local_code_start__goto_2138_14 as usize)) / sizeof[u8]()))
+        (__local_code__goto_2137_14 = __local_code_start__goto_2138_14)
+        goto '__ci_bb_65
+    }
+
+    '__ci_bb_65 {
+        goto '__ci_bb_15
+    }
+
+    '__ci_bb_66 {
+        goto '__ci_bb_67
+    }
+
+    '__ci_bb_67 {
+        if (0 != 0) {
+            goto '__ci_bb_66
+        } else {
+            goto '__ci_bb_68
+        }
+    }
+
+    '__ci_bb_68 {
+        ((unsafe: *__param_pptr) = __local_ptr__goto_2135_11)
+        ((unsafe: *__param_pcode) = __local_code__goto_2137_14)
+        return 1
+    }
+
 }
 
-fn compile_class_juxtaposition(context: *mut eclass_context, negated: c_int, pptr: *mut *mut c_uint, pcode: *mut *mut u8, pop_info: *mut eclass_op_info, lengthptr: *mut c_ulong) -> c_int {
-    var ptr: *mut c_uint = (unsafe: *pptr)
+fn compile_class_juxtaposition(__param_context: *mut eclass_context, __param_negated: c_int, __param_pptr: *mut *mut c_uint, __param_pcode: *mut *mut u8, __param_pop_info: *mut eclass_op_info, __param_lengthptr: *mut c_ulong) -> c_int {
+    var __local_ptr: *mut c_uint = (unsafe: *__param_pptr)
 
-    var code: *mut u8 = (unsafe: *pcode)
+    var __local_code: *mut u8 = (unsafe: *__param_pcode)
 
-    if ((if not (compile_class_operand(context, negated, (&raw mut ptr as *mut *mut c_uint), (&raw mut code as *mut *mut u8), pop_info, lengthptr) != 0): 1 else: 0) != 0) {
+    if ((if not (compile_class_operand(__param_context, __param_negated, (&raw mut __local_ptr as *mut *mut c_uint), (&raw mut __local_code as *mut *mut u8), __param_pop_info, __param_lengthptr) != 0): 1 else: 0) != 0) {
         return 0
     }
 
     while true {
         var __ci_expr_logic_1: c_int = 0
 
-        if ((if (unsafe: *ptr) != 2148335616: 1 else: 0) != 0) {
+        if ((if (unsafe: *__local_ptr) != 2148335616: 1 else: 0) != 0) {
             var __ci_expr_logic_0: c_int = 0
 
-            if ((if (unsafe: *ptr) >= 2151940096: 1 else: 0) != 0) {
-                (__ci_expr_logic_0 = (if (if (unsafe: *ptr) <= 2152202240: 1 else: 0) != 0: 1 else: 0))
+            if ((if (unsafe: *__local_ptr) >= 2151940096: 1 else: 0) != 0) {
+                (__ci_expr_logic_0 = (if (if (unsafe: *__local_ptr) <= 2152202240: 1 else: 0) != 0: 1 else: 0))
             }
 
             (__ci_expr_logic_1 = (if (if not (__ci_expr_logic_0 != 0): 1 else: 0) != 0: 1 else: 0))
@@ -4593,170 +4693,164 @@ fn compile_class_juxtaposition(context: *mut eclass_context, negated: c_int, ppt
             break
         }
 
-        var op: c_uint
+        var __local_op: c_uint
 
-        var rhs_negated: c_int
+        var __local_rhs_negated: c_int
 
-        var rhs_op_info: eclass_op_info
+        var __local_rhs_op_info: eclass_op_info
 
-        if (negated != 0) {
-            (op = 1)
+        if (__param_negated != 0) {
+            (__local_op = 1)
 
-            (rhs_negated = 1)
+            (__local_rhs_negated = 1)
 
         } else {
-            (op = 2)
+            (__local_op = 2)
 
-            (rhs_negated = 0)
+            (__local_rhs_negated = 0)
 
         }
 
-        if ((if not (compile_class_operand(context, rhs_negated, (&raw mut ptr as *mut *mut c_uint), (&raw mut code as *mut *mut u8), (&raw mut rhs_op_info as *mut eclass_op_info), lengthptr) != 0): 1 else: 0) != 0) {
+        if ((if not (compile_class_operand(__param_context, __local_rhs_negated, (&raw mut __local_ptr as *mut *mut c_uint), (&raw mut __local_code as *mut *mut u8), (&raw mut __local_rhs_op_info as *mut eclass_op_info), __param_lengthptr) != 0): 1 else: 0) != 0) {
             return 0
         }
 
-        fold_binary(op, pop_info, (&raw mut rhs_op_info as *mut eclass_op_info), lengthptr)
+        fold_binary(__local_op, __param_pop_info, (&raw mut __local_rhs_op_info as *mut eclass_op_info), __param_lengthptr)
 
-        if ((if lengthptr == null: 1 else: 0) != 0) {
-            (code = pop_info.code_start + pop_info.length)
+        if ((if __param_lengthptr == null: 1 else: 0) != 0) {
+            (__local_code = __param_pop_info.code_start + (__param_pop_info.length as usize))
         }
 
     }
 
-    while true {
-        if (not (0 != 0)) {
-            break
-        }
-    }
+    do {
+        0
+    } while (0 != 0)
 
-    ((unsafe: *pptr) = ptr)
+    ((unsafe: *__param_pptr) = __local_ptr)
 
-    ((unsafe: *pcode) = code)
+    ((unsafe: *__param_pcode) = __local_code)
 
     return 1
 
 }
 
-fn compile_class_unary(context: *mut eclass_context, __param_negated: c_int, pptr: *mut *mut c_uint, pcode: *mut *mut u8, pop_info: *mut eclass_op_info, lengthptr: *mut c_ulong) -> c_int {
-    var negated = __param_negated
-    var ptr: *mut c_uint = (unsafe: *pptr)
+fn compile_class_unary(__param_context: *mut eclass_context, __param_negated: c_int, __param_pptr: *mut *mut c_uint, __param_pcode: *mut *mut u8, __param_pop_info: *mut eclass_op_info, __param_lengthptr: *mut c_ulong) -> c_int {
+    var __local_negated = __param_negated
+    var __local_ptr: *mut c_uint = (unsafe: *__param_pptr)
 
-    while ((if (unsafe: *ptr) == 2152202240: 1 else: 0) != 0) {
-        (ptr = ptr + 1)
+    while ((if (unsafe: *__local_ptr) == 2152202240: 1 else: 0) != 0) {
+        (__local_ptr = __local_ptr + 1)
 
-        (negated = (if not (negated != 0): 1 else: 0))
+        (__local_negated = (if not (__local_negated != 0): 1 else: 0))
 
     }
 
-    ((unsafe: *pptr) = ptr)
+    ((unsafe: *__param_pptr) = __local_ptr)
 
-    if ((if not (compile_class_juxtaposition(context, negated, pptr, pcode, pop_info, lengthptr) != 0): 1 else: 0) != 0) {
+    if ((if not (compile_class_juxtaposition(__param_context, __local_negated, __param_pptr, __param_pcode, __param_pop_info, __param_lengthptr) != 0): 1 else: 0) != 0) {
         return 0
     }
 
-    while true {
-        if (not (0 != 0)) {
-            break
-        }
-    }
+    do {
+        0
+    } while (0 != 0)
 
     return 1
 
 }
 
-fn compile_class_binary_tight(context: *mut eclass_context, negated: c_int, pptr: *mut *mut c_uint, pcode: *mut *mut u8, pop_info: *mut eclass_op_info, lengthptr: *mut c_ulong) -> c_int {
-    var ptr: *mut c_uint = (unsafe: *pptr)
+fn compile_class_binary_tight(__param_context: *mut eclass_context, __param_negated: c_int, __param_pptr: *mut *mut c_uint, __param_pcode: *mut *mut u8, __param_pop_info: *mut eclass_op_info, __param_lengthptr: *mut c_ulong) -> c_int {
+    var __local_ptr: *mut c_uint = (unsafe: *__param_pptr)
 
-    var code: *mut u8 = (unsafe: *pcode)
+    var __local_code: *mut u8 = (unsafe: *__param_pcode)
 
-    if ((if not (compile_class_unary(context, negated, (&raw mut ptr as *mut *mut c_uint), (&raw mut code as *mut *mut u8), pop_info, lengthptr) != 0): 1 else: 0) != 0) {
+    if ((if not (compile_class_unary(__param_context, __param_negated, (&raw mut __local_ptr as *mut *mut c_uint), (&raw mut __local_code as *mut *mut u8), __param_pop_info, __param_lengthptr) != 0): 1 else: 0) != 0) {
         return 0
     }
 
-    while ((if (unsafe: *ptr) == 2151940096: 1 else: 0) != 0) {
-        var op: c_uint
+    while ((if (unsafe: *__local_ptr) == 2151940096: 1 else: 0) != 0) {
+        var __local_op: c_uint
 
-        var rhs_negated: c_int
+        var __local_rhs_negated: c_int
 
-        var rhs_op_info: eclass_op_info
+        var __local_rhs_op_info: eclass_op_info
 
-        if (negated != 0) {
-            (op = 2)
+        if (__param_negated != 0) {
+            (__local_op = 2)
 
-            (rhs_negated = 1)
+            (__local_rhs_negated = 1)
 
         } else {
-            (op = 1)
+            (__local_op = 1)
 
-            (rhs_negated = 0)
+            (__local_rhs_negated = 0)
 
         }
 
-        (ptr = ptr + 1)
+        (__local_ptr = __local_ptr + 1)
 
-        if ((if not (compile_class_unary(context, rhs_negated, (&raw mut ptr as *mut *mut c_uint), (&raw mut code as *mut *mut u8), (&raw mut rhs_op_info as *mut eclass_op_info), lengthptr) != 0): 1 else: 0) != 0) {
+        if ((if not (compile_class_unary(__param_context, __local_rhs_negated, (&raw mut __local_ptr as *mut *mut c_uint), (&raw mut __local_code as *mut *mut u8), (&raw mut __local_rhs_op_info as *mut eclass_op_info), __param_lengthptr) != 0): 1 else: 0) != 0) {
             return 0
         }
 
-        fold_binary(op, pop_info, (&raw mut rhs_op_info as *mut eclass_op_info), lengthptr)
+        fold_binary(__local_op, __param_pop_info, (&raw mut __local_rhs_op_info as *mut eclass_op_info), __param_lengthptr)
 
-        if ((if lengthptr == null: 1 else: 0) != 0) {
-            (code = pop_info.code_start + pop_info.length)
+        if ((if __param_lengthptr == null: 1 else: 0) != 0) {
+            (__local_code = __param_pop_info.code_start + (__param_pop_info.length as usize))
         }
 
     }
 
-    while true {
-        if (not (0 != 0)) {
-            break
-        }
-    }
+    do {
+        0
+    } while (0 != 0)
 
-    ((unsafe: *pptr) = ptr)
+    ((unsafe: *__param_pptr) = __local_ptr)
 
-    ((unsafe: *pcode) = code)
+    ((unsafe: *__param_pcode) = __local_code)
 
     return 1
 
 }
 
-fn compile_class_binary_loose(context: *mut eclass_context, negated: c_int, pptr: *mut *mut c_uint, pcode: *mut *mut u8, pop_info: *mut eclass_op_info, lengthptr: *mut c_ulong) -> c_int {
-    var ptr: *mut c_uint = (unsafe: *pptr)
+fn compile_class_binary_loose(__param_context: *mut eclass_context, __param_negated: c_int, __param_pptr: *mut *mut c_uint, __param_pcode: *mut *mut u8, __param_pop_info: *mut eclass_op_info, __param_lengthptr: *mut c_ulong) -> c_int {
+    var __local_ptr: *mut c_uint = (unsafe: *__param_pptr)
 
-    var code: *mut u8 = (unsafe: *pcode)
+    var __local_code: *mut u8 = (unsafe: *__param_pcode)
 
-    if ((if not (compile_class_binary_tight(context, negated, (&raw mut ptr as *mut *mut c_uint), (&raw mut code as *mut *mut u8), pop_info, lengthptr) != 0): 1 else: 0) != 0) {
+    if ((if not (compile_class_binary_tight(__param_context, __param_negated, (&raw mut __local_ptr as *mut *mut c_uint), (&raw mut __local_code as *mut *mut u8), __param_pop_info, __param_lengthptr) != 0): 1 else: 0) != 0) {
         return 0
     }
 
     while true {
         var __ci_expr_logic_0: c_int = 0
 
-        if ((if (unsafe: *ptr) >= 2152005632: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if (unsafe: *ptr) <= 2152136704: 1 else: 0) != 0: 1 else: 0))
+        if ((if (unsafe: *__local_ptr) >= 2152005632: 1 else: 0) != 0) {
+            (__ci_expr_logic_0 = (if (if (unsafe: *__local_ptr) <= 2152136704: 1 else: 0) != 0: 1 else: 0))
         }
 
         if (not (__ci_expr_logic_0 != 0)) {
             break
         }
 
-        var op: c_uint
+        var __local_op: c_uint
 
-        var op_neg: c_int
+        var __local_op_neg: c_int
 
-        var rhs_negated: c_int
+        var __local_rhs_negated: c_int
 
-        var rhs_op_info: eclass_op_info
+        var __local_rhs_op_info: eclass_op_info
 
-        if (negated != 0) {
+        if (__param_negated != 0) {
             var __ci_expr_ternary_2: c_int = 0
 
-            if ((if (unsafe: *ptr) == 2152005632: 1 else: 0) != 0) {
+            if ((if (unsafe: *__local_ptr) == 2152005632: 1 else: 0) != 0) {
                 (__ci_expr_ternary_2 = 1)
             } else {
                 var __ci_expr_ternary_1: c_int = 0
 
-                if ((if (unsafe: *ptr) == 2152071168: 1 else: 0) != 0) {
+                if ((if (unsafe: *__local_ptr) == 2152071168: 1 else: 0) != 0) {
                     (__ci_expr_ternary_1 = 2)
                 } else {
                     (__ci_expr_ternary_1 = 3)
@@ -4766,22 +4860,22 @@ fn compile_class_binary_loose(context: *mut eclass_context, negated: c_int, pptr
 
             }
 
-            (op = __ci_expr_ternary_2)
+            (__local_op = __ci_expr_ternary_2)
 
 
-            (op_neg = (if (unsafe: *ptr) == 2152136704: 1 else: 0))
+            (__local_op_neg = (if (unsafe: *__local_ptr) == 2152136704: 1 else: 0))
 
-            (rhs_negated = (if (unsafe: *ptr) != 2152071168: 1 else: 0))
+            (__local_rhs_negated = (if (unsafe: *__local_ptr) != 2152071168: 1 else: 0))
 
         } else {
             var __ci_expr_ternary_4: c_int = 0
 
-            if ((if (unsafe: *ptr) == 2152005632: 1 else: 0) != 0) {
+            if ((if (unsafe: *__local_ptr) == 2152005632: 1 else: 0) != 0) {
                 (__ci_expr_ternary_4 = 2)
             } else {
                 var __ci_expr_ternary_3: c_int = 0
 
-                if ((if (unsafe: *ptr) == 2152071168: 1 else: 0) != 0) {
+                if ((if (unsafe: *__local_ptr) == 2152071168: 1 else: 0) != 0) {
                     (__ci_expr_ternary_3 = 1)
                 } else {
                     (__ci_expr_ternary_3 = 3)
@@ -4791,42 +4885,40 @@ fn compile_class_binary_loose(context: *mut eclass_context, negated: c_int, pptr
 
             }
 
-            (op = __ci_expr_ternary_4)
+            (__local_op = __ci_expr_ternary_4)
 
 
-            (op_neg = 0)
+            (__local_op_neg = 0)
 
-            (rhs_negated = (if (unsafe: *ptr) == 2152071168: 1 else: 0))
+            (__local_rhs_negated = (if (unsafe: *__local_ptr) == 2152071168: 1 else: 0))
 
         }
 
-        (ptr = ptr + 1)
+        (__local_ptr = __local_ptr + 1)
 
-        if ((if not (compile_class_binary_tight(context, rhs_negated, (&raw mut ptr as *mut *mut c_uint), (&raw mut code as *mut *mut u8), (&raw mut rhs_op_info as *mut eclass_op_info), lengthptr) != 0): 1 else: 0) != 0) {
+        if ((if not (compile_class_binary_tight(__param_context, __local_rhs_negated, (&raw mut __local_ptr as *mut *mut c_uint), (&raw mut __local_code as *mut *mut u8), (&raw mut __local_rhs_op_info as *mut eclass_op_info), __param_lengthptr) != 0): 1 else: 0) != 0) {
             return 0
         }
 
-        fold_binary(op, pop_info, (&raw mut rhs_op_info as *mut eclass_op_info), lengthptr)
+        fold_binary(__local_op, __param_pop_info, (&raw mut __local_rhs_op_info as *mut eclass_op_info), __param_lengthptr)
 
-        if (op_neg != 0) {
-            fold_negation(pop_info, lengthptr, 0)
+        if (__local_op_neg != 0) {
+            fold_negation(__param_pop_info, __param_lengthptr, 0)
         }
 
-        if ((if lengthptr == null: 1 else: 0) != 0) {
-            (code = pop_info.code_start + pop_info.length)
+        if ((if __param_lengthptr == null: 1 else: 0) != 0) {
+            (__local_code = __param_pop_info.code_start + (__param_pop_info.length as usize))
         }
 
     }
 
-    while true {
-        if (not (0 != 0)) {
-            break
-        }
-    }
+    do {
+        0
+    } while (0 != 0)
 
-    ((unsafe: *pptr) = ptr)
+    ((unsafe: *__param_pptr) = __local_ptr)
 
-    ((unsafe: *pcode) = code)
+    ((unsafe: *__param_pcode) = __local_code)
 
     return 1
 

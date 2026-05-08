@@ -3,6 +3,8 @@
 // This module intentionally exposes concrete target ABI symbols. Migrated C
 // output is target-specific and should be regenerated for a different target.
 
+use std.builtins
+
 pub type rlimit {
     rlim_cur: u64,
     rlim_max: u64,
