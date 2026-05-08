@@ -1611,7 +1611,16 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         self.check_expr(cond)
         self.loop_depth = self.loop_depth + 1
         self.push_label_frame(label, LabelFrameKind.LFK_WHILE, node)
+        var pushed_regex_capture_scope = 0
+        if self.ast.kind(cond) == NodeKind.NK_MATCH_OP:
+            let rhs = self.ast.get_data1(cond)
+            if self.ast.kind(rhs) == NodeKind.NK_REGEX_LIT:
+                self.push_scope()
+                pushed_regex_capture_scope = 1
+                self.regex_bind_capture_scope(rhs)
         self.check_expr(body)
+        if pushed_regex_capture_scope != 0:
+            self.pop_scope()
         self.pop_label_frame()
         self.loop_depth = self.loop_depth - 1
         return self.ty_void

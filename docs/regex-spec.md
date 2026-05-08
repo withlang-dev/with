@@ -37,6 +37,7 @@ Flags appear after the closing `/`:
 | `s` | Single-line — `.` matches `\n` |
 | `x` | Extended — ignore whitespace and `#` comments |
 | `g` | Global — find all matches (affects `=~` and `replace`) |
+| `u` | Unicode/UTF mode — enables Unicode properties such as `\p{L}` |
 | `U` | Ungreedy — swap greedy/non-greedy defaults |
 
 ```
@@ -88,10 +89,10 @@ Sugar for `not (line =~ pattern)`. No capture bindings created.
 
 ```
 match line:
-    /^#(.*)/ -> handle_comment($1)
-    /^(\w+)=(.*)/ -> handle_assignment($1, $2)
-    /^\s*$/ -> skip()
-    _ -> handle_other(line)
+    /^#(.*)/ => handle_comment($1)
+    /^(\w+)=(.*)/ => handle_assignment($1, $2)
+    /^\s*$/ => skip()
+    _ => handle_other(line)
 ```
 
 Each arm's pattern is matched in order. Capture groups are
@@ -127,7 +128,11 @@ the lexer scans until the closing unescaped `/`, handling:
 - `[...]` character classes (where `/` is literal, not delimiter)
 - `\\` as escaped backslash
 
-After the closing `/`, consume flag characters `[igmsxU]*`.
+After the closing `/`, consume all contiguous ASCII flag
+characters. Sema validates the resulting flag string and reports
+unknown flags as source errors. This keeps bad flag diagnostics at
+the regex literal instead of making the lexer stop early and parse
+the remaining letters as unrelated tokens.
 
 The lexer stores the raw pattern string and flags in the token.
 
@@ -144,7 +149,7 @@ NK_NEG_MATCH_OP    d0=lhs          d1=regex     // !~ operator
 `=~` and `!~` are binary operators at the same precedence as
 `==` and `!=`.
 
-In `if` and `match` arms, the parser recognizes `=~` and makes
+In `if` and `match` arms, the compiler recognizes `=~` and makes
 capture group bindings (`$0`, `$1`, `$name`) available in the
 body scope. These are desugared to local let bindings:
 
@@ -163,7 +168,7 @@ if __match.is_some():
 ```
 
 The `$N` tokens are lexed as identifiers with a `$` prefix.
-The parser injects the let bindings at scope entry.
+The compiler injects the let bindings at scope entry.
 
 ### Sema
 
@@ -176,16 +181,25 @@ The parser injects the let bindings at scope entry.
 
 ### Codegen
 
-The regex literal compiles to a call to the runtime regex
-compiler through a lazy cache. The compiler emits the literal
-pattern/flags and source location; `Regex.__compile_literal`
-validates and compiles on first use, then reuses compiled PCRE2
-code for subsequent uses of the same `(pattern, flags)` pair.
+Each regex literal in source gets its own module-level static
+slot for the compiled PCRE2 code pointer. The compiler validates
+the pattern at compile time for diagnostics, then emits lazy
+runtime initialization for the literal's slot. Two identical
+literals at different source locations get different slots.
+
+Conceptually, for `/^\d+$/i`:
 
 ```
-// What the compiler emits for: let pattern = /^\d+$/
-let pattern = Regex.__compile_literal("^\\d+$", "", file, line, col)
+static __regex_lit_42: *const i8 = null
+
+if __regex_lit_42 as i64 == 0:
+    __regex_lit_42 = with_regex_compile("^\\d+$", "i")
+__regex_lit_42
 ```
+
+The compiled regex lives for the duration of the process. There is
+no global cache, no lookup by pattern string, no deduplication, and
+no reference counting for literal-owned compiled code.
 
 ---
 
@@ -337,8 +351,8 @@ type Regex = {
 let re = /pattern/flags
 
 // From string (runtime, can fail):
-fn Regex.compile(pattern: &str) -> Result[Regex, RegexError]
-fn Regex.compile_flags(pattern: &str, flags: &str) -> Result[Regex, RegexError]
+fn Regex.compile(pattern: str) -> Result[Regex, RegexError]
+fn Regex.compile_flags(pattern: str, flags: str) -> Result[Regex, RegexError]
 ```
 
 Internally calls `pcre2_compile_8`.
@@ -346,10 +360,10 @@ Internally calls `pcre2_compile_8`.
 ### Matching
 
 ```
-fn Regex.is_match(self: &Self, text: &str) -> bool
-fn Regex.find(self: &Self, text: &str) -> Option[Match]
-fn Regex.find_all(self: &Self, text: &str) -> Vec[Match]
-fn Regex.find_at(self: &Self, text: &str, start: i32) -> Option[Match]
+fn Regex.is_match(self: &Self, text: str) -> bool
+fn Regex.find(self: &Self, text: str) -> Option[Match]
+fn Regex.find_all(self: &Self, text: str) -> Vec[Match]
+fn Regex.find_at(self: &Self, text: str, start: i32) -> Option[Match]
 ```
 
 Internally calls `pcre2_match_8`.
@@ -357,8 +371,8 @@ Internally calls `pcre2_match_8`.
 ### Captures
 
 ```
-fn Regex.captures(self: &Self, text: &str) -> Option[Captures]
-fn Regex.captures_all(self: &Self, text: &str) -> Vec[Captures]
+fn Regex.captures(self: &Self, text: str) -> Option[Captures]
+fn Regex.captures_all(self: &Self, text: str) -> Vec[Captures]
 
 type Match = {
     start: i32,
@@ -371,18 +385,18 @@ type Captures = {
     named: HashMap[str, i32],
 }
 
-fn Captures.get(self: &Self, i: i32) -> Option[&Match]
-fn Captures.name(self: &Self, name: &str) -> Option[&Match]
+fn Captures.get(self: &Self, i: i32) -> Option[Match]
+fn Captures.name(self: &Self, name: str) -> Option[Match]
 fn Captures.len(self: &Self) -> i32
 ```
 
 ### Replacement
 
 ```
-fn Regex.replace(self: &Self, text: &str, replacement: &str) -> str
-fn Regex.replace_all(self: &Self, text: &str, replacement: &str) -> str
-fn Regex.replace_fn(self: &Self, text: &str, f: fn(&Captures) -> str) -> str
-fn Regex.replace_all_fn(self: &Self, text: &str, f: fn(&Captures) -> str) -> str
+fn Regex.replace(self: &Self, text: str, replacement: str) -> str
+fn Regex.replace_all(self: &Self, text: str, replacement: str) -> str
+fn Regex.replace_fn(self: &Self, text: str, f: fn(&Captures) -> str) -> str
+fn Regex.replace_all_fn(self: &Self, text: str, f: fn(&Captures) -> str) -> str
 ```
 
 Replacement strings support `$1`, `$2`, `$name`, `${name}`,
@@ -393,8 +407,8 @@ Internally calls `pcre2_substitute_8`.
 ### Splitting
 
 ```
-fn Regex.split(self: &Self, text: &str) -> Vec[str]
-fn Regex.splitn(self: &Self, text: &str, n: i32) -> Vec[str]
+fn Regex.split(self: &Self, text: str) -> Vec[str]
+fn Regex.splitn(self: &Self, text: str, n: i32) -> Vec[str]
 ```
 
 ### Introspection
@@ -403,7 +417,7 @@ fn Regex.splitn(self: &Self, text: &str, n: i32) -> Vec[str]
 fn Regex.pattern(self: &Self) -> str
 fn Regex.num_captures(self: &Self) -> i32
 fn Regex.capture_names(self: &Self) -> Vec[str]
-fn Regex.capture_index(self: &Self, name: &str) -> Option[i32]
+fn Regex.capture_index(self: &Self, name: str) -> Option[i32]
 ```
 
 ### Supported syntax
@@ -462,13 +476,13 @@ Everything PCRE2 supports, which is everything Perl supports:
 | Lexer — `TK_REGEX_LIT`, `/` disambiguation | DONE |
 | Parser — `=~`/`!~`, capture bindings | DONE |
 | Sema — Regex type, compile-time validation | DONE |
-| Codegen — lazy literal cache, `=~` desugaring | DONE |
+| Codegen — per-literal static slots, `=~` desugaring | DONE |
 
 ### Phase 4: Optimization (future)
 
 | Step | Status |
 |---|---|
-| JIT — link sljit compiler | TODO |
+| JIT — optional sljit integration | OPTIONAL |
 | Compile-time regex validation | DONE |
 
 ---
@@ -491,8 +505,9 @@ Everything PCRE2 supports, which is everything Perl supports:
 ## Part 7: What This Doesn't Cover
 
 - **Streaming match** — PCRE2 supports partial matching via
-  `PCRE2_PARTIAL_SOFT` / `PCRE2_PARTIAL_HARD`. Expose in a
-  later phase.
+  `PCRE2_PARTIAL_SOFT` / `PCRE2_PARTIAL_HARD`. This is a
+  separate API extension, not part of the initial `std.regex`
+  language integration.
 - **JIT compilation** — Available in PCRE2 via sljit. Link as
   C object when needed.
 - **Regex syntax highlighting** — Falls out naturally from the
@@ -506,7 +521,7 @@ Everything PCRE2 supports, which is everything Perl supports:
 
 | Approach | Lines of code | Time | Correctness | Features |
 |---|---|---|---|---|
-| **PCRE2 via `with migrate`** | ~160K (auto) + 300 (wrapper) | Days | 20/20 pcre2test cases verified byte-for-byte | Full Perl compat |
+| **PCRE2 via `with migrate`** | ~160K (auto) + 300 (wrapper) | Days | Full migrated `pcre2test` corpus runs through `make regex-test` | Full Perl compat |
 | Go RE2 manual port | ~4,400 (hand-written) | 4-6 weeks | Must port Go's test suite | No backrefs, no lookahead |
 | From scratch | ~3,000+ | Months | Extensive new testing needed | Whatever we implement |
 

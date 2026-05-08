@@ -80,6 +80,9 @@ type MirBuilder {
     cur_node: i32,
     expected_type: i32,
 
+    regex_capture_pat_nodes: Vec[i32],
+    regex_capture_opt_places: Vec[i32],
+
     sema: Sema,
     ast: AstPool,
     pool: InternPool,
@@ -121,6 +124,8 @@ fn MirBuilder.init(sema: Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> M
         next_temp: 0,
         cur_node: 0,
         expected_type: 0,
+        regex_capture_pat_nodes: Vec.new(),
+        regex_capture_opt_places: Vec.new(),
         sema,
         ast,
         pool,
@@ -1520,31 +1525,28 @@ fn MirBuilder.lower_str_lit(self: MirBuilder, sym: i32) -> i32:
     self.const_operand(ConstKind.CK_STR, sym, self.sema.ty_str)
 
 fn MirBuilder.lower_regex_literal(self: MirBuilder, node: i32) -> i32:
-    let compile_sym = self.sema.pool_lookup_symbol("__compile_literal")
-    let fn_sym = self.sema.lookup_method_fn(self.sema.syms.regex, compile_sym)
     let regex_ty = self.sema.lookup_named_type_visible(self.sema.syms.regex)
-    let fn_op = self.const_operand(ConstKind.CK_FN, fn_sym, regex_ty)
-    let pat_op = self.lower_str_lit(self.ast.get_data0(node))
-    let flags_op = self.lower_str_lit(self.ast.get_data1(node))
-    let file_op = self.lower_str_lit(self.pool.intern(""))
-    let line_op = self.int_const_operand(0, self.sema.ty_i32 as i32)
-    let col_op = self.int_const_operand(0, self.sema.ty_i32 as i32)
-    let call_args: Vec[i32] = Vec.new()
-    call_args.push(pat_op)
-    call_args.push(flags_op)
-    call_args.push(file_op)
-    call_args.push(line_op)
-    call_args.push(col_op)
-    let args_id = self.body.new_call_args(call_args)
     let result_ty = if self.expr_type(node) != 0: self.expr_type(node) else: regex_ty
-    let result_local = self.new_temp(result_ty)
-    let result_place = self.place_for_local(result_local)
-    let next_bb = self.new_block()
-    self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
-    self.switch_to(next_bb)
-    if self.sema.is_copy(result_ty) != 0:
-        return self.body.new_operand(OperandKind.OK_COPY, result_place)
-    self.body.new_operand(OperandKind.OK_MOVE, result_place)
+    let c = self.body.new_const(ConstKind.CK_REGEX_LIT, self.ast.get_data0(node), self.ast.get_data1(node), node, result_ty)
+    self.body.new_operand(OperandKind.OK_CONSTANT, c)
+
+fn MirBuilder.regex_captures_type(self: MirBuilder) -> i32:
+    let sym = self.sema.pool_lookup_symbol("Captures")
+    if sym != 0 and self.sema.named_types.contains(sym):
+        return self.sema.named_types.get(sym).unwrap()
+    self.sema.ty_void as i32
+
+fn MirBuilder.regex_captures_option_type(self: MirBuilder) -> i32:
+    let cap_ty = self.regex_captures_type()
+    let opt_sym = self.sema.pool_lookup_symbol("Option")
+    if opt_sym == 0 or cap_ty == 0:
+        return self.sema.ty_void as i32
+    let found = self.sema.find_generic_inst(opt_sym, cap_ty)
+    if found != 0:
+        return found
+    let args: Vec[i32] = Vec.new()
+    args.push(cap_ty)
+    self.sema.ensure_generic_inst_type(opt_sym, args, 1) as i32
 
 fn MirBuilder.regex_ref_operand(self: MirBuilder, regex_place: i32) -> i32:
     let regex_ty = self.sema.lookup_named_type_visible(self.sema.syms.regex)
@@ -1554,6 +1556,15 @@ fn MirBuilder.regex_ref_operand(self: MirBuilder, regex_place: i32) -> i32:
     let regex_ref_rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, regex_place, 0)
     self.body.push_stmt(self.cur_bb, StmtKind.Assign, regex_ref_place, regex_ref_rv, self.ast.get_start(self.cur_node))
     self.body.new_operand(OperandKind.OK_COPY, regex_ref_place)
+
+fn MirBuilder.captures_ref_operand(self: MirBuilder, captures_place: i32) -> i32:
+    let captures_ty = self.regex_captures_type()
+    let captures_ref_ty = self.sema.ensure_exact_type(TypeKind.TY_REF, captures_ty, 0, 0) as i32
+    let captures_ref_tmp = self.new_temp(captures_ref_ty)
+    let captures_ref_place = self.place_for_local(captures_ref_tmp)
+    let captures_ref_rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, captures_place, 0)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, captures_ref_place, captures_ref_rv, self.ast.get_start(self.cur_node))
+    self.body.new_operand(OperandKind.OK_COPY, captures_ref_place)
 
 fn MirBuilder.lower_regex_method_bool(self: MirBuilder, regex_place: i32, text_place: i32, method_name: str) -> i32:
     let method_sym = self.sema.pool_lookup_symbol(method_name)
@@ -1573,6 +1584,48 @@ fn MirBuilder.lower_regex_method_bool(self: MirBuilder, regex_place: i32, text_p
 fn MirBuilder.lower_regex_is_match_places(self: MirBuilder, regex_place: i32, text_place: i32) -> i32:
     self.lower_regex_method_bool(regex_place, text_place, "is_match")
 
+fn MirBuilder.lower_regex_captures_places(self: MirBuilder, regex_place: i32, text_place: i32) -> i32:
+    let method_sym = self.sema.pool_lookup_symbol("captures_match_op")
+    let fn_sym = self.sema.lookup_method_fn(self.sema.syms.regex, method_sym)
+    let fn_op = self.lower_var(fn_sym, 0, 0)
+    let args: Vec[i32] = Vec.new()
+    args.push(self.regex_ref_operand(regex_place))
+    args.push(self.body.new_operand(OperandKind.OK_COPY, text_place))
+    let args_id = self.body.new_call_args(args)
+    let result_ty = self.regex_captures_option_type()
+    let result_local = self.new_temp(result_ty)
+    let result_place = self.place_for_local(result_local)
+    let next_bb = self.new_block()
+    self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
+    self.switch_to(next_bb)
+    result_place
+
+fn MirBuilder.lower_option_is_some_place(self: MirBuilder, opt_place: i32, opt_ty: i32) -> i32:
+    let fn_op = self.const_operand(ConstKind.CK_FN, self.sema.pool_lookup_symbol("is_some"), self.sema.ty_void)
+    let args: Vec[i32] = Vec.new()
+    args.push(self.body.new_operand(OperandKind.OK_COPY, opt_place))
+    let args_id = self.body.new_call_args(args)
+    self.body.set_call_intrinsic(args_id, MirIntrinsic.MIR_INTRINSIC_OPT_IS_SOME)
+    let result_local = self.new_temp(self.sema.ty_bool)
+    let result_place = self.place_for_local(result_local)
+    let next_bb = self.new_block()
+    self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
+    self.switch_to(next_bb)
+    self.body.new_operand(OperandKind.OK_COPY, result_place)
+
+fn MirBuilder.lower_option_unwrap_place(self: MirBuilder, opt_place: i32, opt_ty: i32, result_ty: i32) -> i32:
+    let fn_op = self.const_operand(ConstKind.CK_FN, self.sema.pool_lookup_symbol("unwrap"), self.sema.ty_void)
+    let args: Vec[i32] = Vec.new()
+    args.push(self.body.new_operand(OperandKind.OK_COPY, opt_place))
+    let args_id = self.body.new_call_args(args)
+    self.body.set_call_intrinsic(args_id, MirIntrinsic.MIR_INTRINSIC_OPT_UNWRAP)
+    let result_local = self.new_temp(result_ty)
+    let result_place = self.place_for_local(result_local)
+    let next_bb = self.new_block()
+    self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
+    self.switch_to(next_bb)
+    result_place
+
 fn MirBuilder.lower_regex_match_expr(self: MirBuilder, node: i32) -> i32:
     let lhs = self.ast.get_data0(node)
     let rhs = self.ast.get_data1(node)
@@ -1580,16 +1633,17 @@ fn MirBuilder.lower_regex_match_expr(self: MirBuilder, node: i32) -> i32:
     let text_place = self.materialize_operand(text_op, self.expr_type(lhs), self.ast.get_start(lhs))
     let regex_op = self.lower_expr(rhs)
     let regex_place = self.materialize_operand(regex_op, self.expr_type(rhs), self.ast.get_start(rhs))
-    self.lower_regex_is_match_places(regex_place, text_place)
+    let captures_opt_place = self.lower_regex_captures_places(regex_place, text_place)
+    self.lower_option_is_some_place(captures_opt_place, self.regex_captures_option_type())
 
-fn MirBuilder.lower_regex_capture_text_call(self: MirBuilder, regex_place: i32, text_place: i32, index: i32, name_sym: i32) -> i32:
-    let method_name = if name_sym != 0: "capture_name_text" else: "capture_text"
+fn MirBuilder.lower_captures_text_call(self: MirBuilder, captures_place: i32, index: i32, name_sym: i32) -> i32:
+    let method_name = if name_sym != 0: "name_text" else: "text"
     let method_sym = self.sema.pool_lookup_symbol(method_name)
-    let fn_sym = self.sema.lookup_method_fn(self.sema.syms.regex, method_sym)
+    let captures_sym = self.sema.pool_lookup_symbol("Captures")
+    let fn_sym = self.sema.lookup_method_fn(captures_sym, method_sym)
     let fn_op = self.lower_var(fn_sym, 0, 0)
     let args: Vec[i32] = Vec.new()
-    args.push(self.regex_ref_operand(regex_place))
-    args.push(self.body.new_operand(OperandKind.OK_COPY, text_place))
+    args.push(self.captures_ref_operand(captures_place))
     if name_sym != 0:
         args.push(self.lower_str_lit(name_sym))
     else:
@@ -1611,7 +1665,7 @@ fn MirBuilder.bind_regex_capture_local(self: MirBuilder, sym: i32, value_op: i32
     self.schedule_drop(local_id, DropKind.DK_VALUE)
     self.assign_operand_to_place(self.place_for_local(local_id), value_op, span)
 
-fn MirBuilder.lower_regex_capture_bindings(self: MirBuilder, regex_node: i32, regex_place: i32, text_place: i32):
+fn MirBuilder.lower_regex_capture_bindings_from_captures(self: MirBuilder, regex_node: i32, captures_place: i32):
     if regex_node == 0:
         return
     let capture_count = if self.sema.regex_capture_counts.contains(regex_node): self.sema.regex_capture_counts.get(regex_node).unwrap() else: 0
@@ -1619,7 +1673,7 @@ fn MirBuilder.lower_regex_capture_bindings(self: MirBuilder, regex_node: i32, re
     while i <= capture_count:
         let sym = self.sema.pool_lookup_symbol("$" ++ i.to_string())
         if sym != 0:
-            let value_op = self.lower_regex_capture_text_call(regex_place, text_place, i, 0)
+            let value_op = self.lower_captures_text_call(captures_place, i, 0)
             self.bind_regex_capture_local(sym, value_op, self.ast.get_start(regex_node))
         i = i + 1
     let name_count = if self.sema.regex_capture_name_counts.contains(regex_node): self.sema.regex_capture_name_counts.get(regex_node).unwrap() else: 0
@@ -1628,9 +1682,29 @@ fn MirBuilder.lower_regex_capture_bindings(self: MirBuilder, regex_node: i32, re
     while ni < name_count:
         let sym = self.sema.regex_capture_name_syms.get((name_start + ni) as i64)
         if sym != 0:
-            let value_op = self.lower_regex_capture_text_call(regex_place, text_place, 0, sym)
+            let value_op = self.lower_captures_text_call(captures_place, 0, sym)
             self.bind_regex_capture_local(sym, value_op, self.ast.get_start(regex_node))
         ni = ni + 1
+
+fn MirBuilder.lower_regex_capture_bindings_from_option(self: MirBuilder, regex_node: i32, captures_opt_place: i32):
+    if regex_node == 0:
+        return
+    let captures_place = self.lower_option_unwrap_place(captures_opt_place, self.regex_captures_option_type(), self.regex_captures_type())
+    self.lower_regex_capture_bindings_from_captures(regex_node, captures_place)
+
+fn MirBuilder.remember_regex_pattern_captures(self: MirBuilder, pat_node: i32, captures_opt_place: i32):
+    for i in 0..self.regex_capture_pat_nodes.len() as i32:
+        if self.regex_capture_pat_nodes.get(i as i64) == pat_node:
+            self.regex_capture_opt_places.set_i32(i as i64, captures_opt_place)
+            return
+    self.regex_capture_pat_nodes.push(pat_node)
+    self.regex_capture_opt_places.push(captures_opt_place)
+
+fn MirBuilder.lookup_regex_pattern_captures(self: MirBuilder, pat_node: i32) -> i32:
+    for i in 0..self.regex_capture_pat_nodes.len() as i32:
+        if self.regex_capture_pat_nodes.get(i as i64) == pat_node:
+            return self.regex_capture_opt_places.get(i as i64)
+    -1
 
 fn MirBuilder.lower_fmt_to_str(self: MirBuilder, operand: i32, node: i32) -> i32:
     // Emit MirIntrinsic.MIR_INTRINSIC_FMT_TO_STR call to format a non-str value to str.
@@ -2735,16 +2809,16 @@ fn MirBuilder.lower_block(self: MirBuilder, node: i32) -> i32:
 fn MirBuilder.lower_if(self: MirBuilder, cond_expr: i32, then_expr: i32, else_expr_opt: i32, node: i32) -> i32:
     var cond_op = 0
     var regex_capture_node = 0
-    var regex_capture_place = 0
-    var regex_text_place = 0
+    var regex_captures_opt_place = -1
     if self.ast.kind(cond_expr) == NodeKind.NK_MATCH_OP:
         let lhs = self.ast.get_data0(cond_expr)
         let rhs = self.ast.get_data1(cond_expr)
         let text_op = self.lower_expr(lhs)
-        regex_text_place = self.materialize_operand(text_op, self.expr_type(lhs), self.ast.get_start(lhs))
+        let regex_text_place = self.materialize_operand(text_op, self.expr_type(lhs), self.ast.get_start(lhs))
         let regex_op = self.lower_expr(rhs)
-        regex_capture_place = self.materialize_operand(regex_op, self.expr_type(rhs), self.ast.get_start(rhs))
-        cond_op = self.lower_regex_is_match_places(regex_capture_place, regex_text_place)
+        let regex_capture_place = self.materialize_operand(regex_op, self.expr_type(rhs), self.ast.get_start(rhs))
+        regex_captures_opt_place = self.lower_regex_captures_places(regex_capture_place, regex_text_place)
+        cond_op = self.lower_option_is_some_place(regex_captures_opt_place, self.regex_captures_option_type())
         if self.ast.kind(rhs) == NodeKind.NK_REGEX_LIT:
             regex_capture_node = rhs
     else:
@@ -2771,7 +2845,7 @@ fn MirBuilder.lower_if(self: MirBuilder, cond_expr: i32, then_expr: i32, else_ex
 
     self.switch_to(then_bb)
     if regex_capture_node != 0:
-        self.lower_regex_capture_bindings(regex_capture_node, regex_capture_place, regex_text_place)
+        self.lower_regex_capture_bindings_from_option(regex_capture_node, regex_captures_opt_place)
     let then_op = self.lower_expr(then_expr)
     self.assign_operand_to_place(result_place, then_op, self.ast.get_start(then_expr))
     self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
@@ -2850,7 +2924,22 @@ fn MirBuilder.lower_while(self: MirBuilder, cond_expr: i32, body_expr: i32, node
     self.push_control_target(self.ast.get_data2(node), ControlTargetKind.CT_LOOP, cond_bb, exit_bb)
 
     self.switch_to(cond_bb)
-    let cond_op = self.lower_expr(cond_expr)
+    var cond_op = 0
+    var regex_capture_node = 0
+    var regex_captures_opt_place = -1
+    if self.ast.kind(cond_expr) == NodeKind.NK_MATCH_OP:
+        let lhs = self.ast.get_data0(cond_expr)
+        let rhs = self.ast.get_data1(cond_expr)
+        let text_op = self.lower_expr(lhs)
+        let text_place = self.materialize_operand(text_op, self.expr_type(lhs), self.ast.get_start(lhs))
+        let regex_op = self.lower_expr(rhs)
+        let regex_place = self.materialize_operand(regex_op, self.expr_type(rhs), self.ast.get_start(rhs))
+        regex_captures_opt_place = self.lower_regex_captures_places(regex_place, text_place)
+        cond_op = self.lower_option_is_some_place(regex_captures_opt_place, self.regex_captures_option_type())
+        if self.ast.kind(rhs) == NodeKind.NK_REGEX_LIT:
+            regex_capture_node = rhs
+    else:
+        cond_op = self.lower_expr(cond_expr)
     let vals: Vec[i32] = Vec.new()
     vals.push(1)
     let targets: Vec[i32] = Vec.new()
@@ -2859,6 +2948,8 @@ fn MirBuilder.lower_while(self: MirBuilder, cond_expr: i32, body_expr: i32, node
     self.terminate(TermKind.TK_SWITCH_INT, cond_op, table, exit_bb, 0)
 
     self.switch_to(body_bb)
+    if regex_capture_node != 0:
+        self.lower_regex_capture_bindings_from_option(regex_capture_node, regex_captures_opt_place)
     let _ = self.lower_expr(body_expr)
     self.terminate(TermKind.TK_GOTO, cond_bb, 0, 0, 0)
 
@@ -3706,26 +3797,9 @@ fn MirBuilder.lower_regex_pattern_match(self: MirBuilder, scrutinee_place: i32, 
     let regex_ty = self.sema.lookup_named_type_visible(self.sema.syms.regex)
     let regex_val = self.lower_regex_literal(pat_node)
     let regex_place = self.materialize_operand(regex_val, regex_ty, self.ast.get_start(pat_node))
-    let regex_ref_ty = self.sema.ensure_exact_type(TypeKind.TY_REF, regex_ty, 0, 0) as i32
-    let regex_ref_tmp = self.new_temp(regex_ref_ty)
-    let regex_ref_place = self.place_for_local(regex_ref_tmp)
-    let regex_ref_rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, regex_place, 0)
-    self.body.push_stmt(self.cur_bb, StmtKind.Assign, regex_ref_place, regex_ref_rv, self.ast.get_start(pat_node))
-
-    let is_match_sym = self.sema.pool_lookup_symbol("is_match")
-    let is_match_fn = self.sema.lookup_method_fn(self.sema.syms.regex, is_match_sym)
-    let is_match_fn_op = self.lower_var(is_match_fn, 0, 0)
-    let call_args: Vec[i32] = Vec.new()
-    call_args.push(self.body.new_operand(OperandKind.OK_COPY, regex_ref_place))
-    call_args.push(self.body.new_operand(OperandKind.OK_COPY, scrutinee_place))
-    let args_id = self.body.new_call_args(call_args)
-    let result_local = self.new_temp(self.sema.ty_bool)
-    let result_place = self.place_for_local(result_local)
-    let next_bb = self.new_block()
-    self.terminate(TermKind.TK_CALL, is_match_fn_op, args_id, result_place, next_bb)
-    self.switch_to(next_bb)
-
-    let result_op = self.body.new_operand(OperandKind.OK_COPY, result_place)
+    let captures_opt_place = self.lower_regex_captures_places(regex_place, scrutinee_place)
+    self.remember_regex_pattern_captures(pat_node, captures_opt_place)
+    let result_op = self.lower_option_is_some_place(captures_opt_place, self.regex_captures_option_type())
     let vals: Vec[i32] = Vec.new()
     vals.push(1)
     let targets: Vec[i32] = Vec.new()
@@ -4101,10 +4175,9 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
         return out
 
     if pk == NodeKind.NK_PAT_REGEX:
-        let regex_val = self.lower_regex_literal(pat_node)
-        let regex_ty = self.sema.lookup_named_type_visible(self.sema.syms.regex)
-        let regex_place = self.materialize_operand(regex_val, regex_ty, self.ast.get_start(pat_node))
-        self.lower_regex_capture_bindings(pat_node, regex_place, scrutinee_place)
+        let captures_opt_place = self.lookup_regex_pattern_captures(pat_node)
+        if captures_opt_place >= 0:
+            self.lower_regex_capture_bindings_from_option(pat_node, captures_opt_place)
         return out
 
     if pk == NodeKind.NK_PAT_TYPED_BIND:
