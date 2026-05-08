@@ -9,7 +9,7 @@ fn test_float_ops:
     let sum = 1.5 + 2.5
     assert(sum == 4.0)
     // Subtraction
-    let diff = 10.0 - 3.5
+    let diff = 10.-3.5
     assert(diff == 6.5)
     // Multiplication and division in expression
     let prod = 3.0 * 4.0

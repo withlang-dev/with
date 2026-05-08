@@ -2838,7 +2838,7 @@ fn numeric_literal_suffix_start(text: str, suffix: str) -> i32:
     let len = text.len() as i32
     let slen = suffix.len() as i32
     if len <= slen:
-        return 0 - 1
+        return -1
     let direct_start = len - slen
     if text.slice(direct_start as i64, len as i64) == suffix:
         return direct_start
@@ -2846,7 +2846,7 @@ fn numeric_literal_suffix_start(text: str, suffix: str) -> i32:
         let legacy_start = len - slen - 1
         if text.slice((legacy_start + 1) as i64, len as i64) == suffix:
             return legacy_start
-    0 - 1
+    -1
 
 fn numeric_literal_suffix_code(text: str) -> i32:
     if numeric_literal_suffix_start(text, "usize") >= 0: return LiteralSuffix.Usize
@@ -3017,7 +3017,7 @@ fn regex_literal_close_slash(text: str) -> i32:
         if ch == 47 and in_class == 0:
             return i
         i = i + 1
-    0 - 1
+    -1
 
 fn regex_literal_escape_runtime(text: str) -> str:
     var out = ""
@@ -3321,7 +3321,7 @@ fn Parser.parse_format_spec_text(self: Parser, spec_text: str, start: i32, end: 
         if ch == 100 or ch == 120 or ch == 88 or ch == 98 or ch == 111 or ch == 102 or ch == 101 or ch == 103 or ch == 115 or ch == 63:
             mode = ch
             pos = pos + 1
-    // Pack flags into d0: mode(0-7), fill(8-15), align(16-17), sign_plus(18), alternate(19), zero_pad(20)
+    // Pack flags into d0: mode(-7), fill(8-15), align(16-17), sign_plus(18), alternate(19), zero_pad(20)
     let flags = mode | ((fill & 255) << 8) | ((align & 3) << 16) | ((sign_plus & 1) << 18) | ((alternate & 1) << 19) | ((zero_pad & 1) << 20)
     self.pool.add_node(NodeKind.NK_FSTRING_SPEC, start, end, flags, width, precision)
 
@@ -3457,7 +3457,7 @@ fn is_raw_string_token_text(text: str) -> bool:
 
 fn dedent_multiline(text: str) -> str:
     let len = text.len() as i32
-    var min_indent = 0 - 1
+    var min_indent = -1
     var line_start = 0
     var i = 0
     while i <= len:
@@ -3505,7 +3505,7 @@ fn hex_digit_value(ch: i32) -> i32:
         return ch - 87
     if ch >= 65 and ch <= 70:
         return ch - 55
-    0 - 1
+    -1
 
 fn Parser.parse_ident_or_call(self: Parser) -> NodeId:
     let start = self.current_start()
@@ -6563,7 +6563,7 @@ fn Parser.parse_optional_where_clause(self: Parser):
 fn parse_int(text: str) -> i32:
     let value = parse_i64(text)
     if value < -2147483648:
-        return (0 - 2147483648) as i32
+        return (-2147483648) as i32
     if value > 2147483647:
         return 2147483647
     value as i32

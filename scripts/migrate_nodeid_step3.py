@@ -47,7 +47,7 @@ def fix_parser_returns():
             if re.match(r'^    0\s*$', stripped):
                 line = line.replace('    0', '    NodeId(0)')
 
-            # Fix "return 0 - 1" etc — these are NOT node IDs
+            # Fix "return -1" etc — these are NOT node IDs
             # (find_fn_meta returns -1 as error, but that returns i32 not NodeId)
             # Skip these.
 

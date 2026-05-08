@@ -9,7 +9,7 @@ fn test_int_format_locale:
     assert(s == "12345")
 
 fn test_negative_int_locale:
-    let s = f"{0 - 42}"
+    let s = f"{-42}"
     assert(s == "-42")
 
 fn test_bool_locale:

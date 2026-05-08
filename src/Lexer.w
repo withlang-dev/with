@@ -78,7 +78,7 @@ type Lexer {
 }
 
 fn Lexer.init(source: str, file_id: i32) -> Lexer:
-    Lexer { source, pos: 0, file_id, token_start: 0, emit_comments: 0, last_sig_tag: 0 - 1 }
+    Lexer { source, pos: 0, file_id, token_start: 0, emit_comments: 0, last_sig_tag: -1 }
 
 // Tokenize the entire source, returning a token list ending with EOF.
 fn Lexer.tokenize(mut self: Lexer) -> TokenList:

@@ -26,7 +26,7 @@ There are no remaining `regex-build` errors in this run.
 
 ## Runtime Correctness (regex-test)
 
-Running the upstream PCRE2 RunTest corpus (tests 0-29 + heap) against the migrated binary:
+Running the upstream PCRE2 RunTest corpus (tests -29 + heap) against the migrated binary:
 
 ### Fixed
 

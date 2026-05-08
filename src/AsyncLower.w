@@ -383,4 +383,4 @@ fn async_resume_bb_for_span(body: MirBody, span_start: i32) -> i32:
             let stmt_id = stmt_start + si
             if body.stmt_spans.get(stmt_id as i64) == span_start:
                 return bb
-    0 - 1
+    -1

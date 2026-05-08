@@ -65,7 +65,7 @@ pub fn string_cmp(a: str, b: str) -> i32:
 pub fn is_alpha(c: i32) -> bool:
     (c >= 65 and c <= 90) or (c >= 97 and c <= 122)
 
-/// Returns true if the character code is a decimal digit (0-9).
+/// Returns true if the character code is a decimal digit (-9).
 pub fn is_digit(c: i32) -> bool:
     c >= 48 and c <= 57
 
@@ -85,7 +85,7 @@ pub fn is_upper(c: i32) -> bool:
 pub fn is_lower(c: i32) -> bool:
     c >= 97 and c <= 122
 
-/// Returns true if the character code is a hex digit (0-9, a-f, A-F).
+/// Returns true if the character code is a hex digit (-9, a-f, A-F).
 pub fn is_xdigit(c: i32) -> bool:
     (c >= 48 and c <= 57) or (c >= 65 and c <= 70) or (c >= 97 and c <= 102)
 

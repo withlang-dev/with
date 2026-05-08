@@ -911,7 +911,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         current_fn_param_syms: Vec.new(),
         current_fn_param_effs: Vec.new(),
         current_fn_param_origins: Vec.new(),
-        current_fn_sig_idx: 0 - 1,
+        current_fn_sig_idx: -1,
         closure_capture_summary_starts: sema_new_map_i32_i32(),
         closure_capture_summary_counts: sema_new_map_i32_i32(),
         closure_capture_summary_data: Vec.new(),
@@ -2156,7 +2156,7 @@ fn Sema.scope_lookup(self: Sema, sym: i32) -> i32:
     let opt = self.scope_name_map.get(sym)
     if opt.is_some():
         return self.bind_types.get(opt.unwrap() as i64)
-    0 - 1
+    -1
 
 fn Sema.scope_update_type(self: Sema, sym: i32, tid: i32):
     let opt = self.scope_name_map.get(sym)
@@ -2459,7 +2459,7 @@ fn Sema.param_index_for_sym(self: Sema, sym: i32) -> i32:
     for pi in 0..self.current_fn_param_syms.len() as i32:
         if self.current_fn_param_syms.get(pi as i64) == sym:
             return pi
-    0 - 1
+    -1
 
 fn Sema.note_param_effect(self: Sema, sym: i32, eff: i32):
     if self.current_fn_sig_idx < 0 or sym == 0:
@@ -2489,7 +2489,7 @@ fn Sema.note_place_effect(self: Sema, expr_node: i32, eff: i32):
 fn Sema.get_sig(self: Sema, name: i32) -> i32:
     if self.sig_lookup.contains(name):
         return self.sig_lookup.get(name).unwrap()
-    0 - 1
+    -1
 
 fn Sema.sig_return_type(self: Sema, idx: i32) -> i32:
     self.sig_ret_types.get(idx as i64)

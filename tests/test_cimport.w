@@ -72,14 +72,14 @@ fn test_stdlib_functions():
     let r = realloc(q, 128)
     assert_true(r != 0 as *mut c_void, "realloc non-null")
     free(r)
-    assert_eq_i32(abs(0 - 42), 42, "abs(-42)")
+    assert_eq_i32(abs(-42), 42, "abs(-42)")
     with_eprintln("  OK: stdlib.h")
 
 // ── stdio.h ─────────────────────────────────────────────────
 fn test_stdio_functions():
     let _ = puts("  c_import: puts works" as *const i8)
     assert_true(BUFSIZ > 0, "BUFSIZ > 0")
-    assert_eq_i32(EOF, 0 - 1, "EOF")
+    assert_eq_i32(EOF, -1, "EOF")
     assert_eq_i32(SEEK_SET, 0, "SEEK_SET")
     with_eprintln("  OK: stdio.h")
 

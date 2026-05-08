@@ -1245,7 +1245,7 @@ fn ci_migrate_var_is_definition(session: i64, idx: i32) -> bool:
 
 fn ci_migrate_project_var_symbol(project_active: bool, project: &CiProject, name: str) -> i32:
     if not project_active or name.len() == 0:
-        return 0 - 1
+        return -1
     project.find_symbol(CiProjectSymbolKind.CIPS_VAR, name)
 
 fn ci_migrate_project_var_owner_path(project_active: bool, project: &CiProject, name: str) -> str:

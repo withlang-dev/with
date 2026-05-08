@@ -152,7 +152,7 @@ type StackifyContext {
 }
 
 fn stackify_invalid -> i32:
-    0 - 1
+    -1
 
 fn stackify_empty_block(desc: str) -> StackifyBlock:
     StackifyBlock {

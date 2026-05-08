@@ -893,7 +893,7 @@ Step  Feature                    Phase  Effort   Depends on
  10   Partial application        D      ~300 ln  —
  11   For-comprehensions         A      ~250 ln  —
  12   Verify: tuple returns      E      ~0 ln    F6
- 13   Verify: range values       E      ~0-50    —
+ 13   Verify: range values       E      ~-50    —
  14   Tail call (mutual)         D      ~400 ln  F10, defer
 ```
 

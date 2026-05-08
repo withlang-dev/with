@@ -334,7 +334,7 @@ fn alloc_align_size(size_arg: i64) -> i64:
     var size = size_arg
     if size <= 0:
         size = 1
-    (size + 15) & (0 - 16)
+    (size + 15) & (-16)
 
 fn size_class_block_size(idx: i32) -> i64:
     size_class_size(idx) + RT_ALLOC_HEADER_SIZE

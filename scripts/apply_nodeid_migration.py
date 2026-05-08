@@ -327,8 +327,8 @@ def fix_consumer_files():
     fix_file('src/CodegenDispatch.w', [
         ('fn Codegen.find_struct_decl_node(self: Codegen, type_sym: i32) -> i32:\n    for di in 0..self.pool.decl_count():\n        let decl = self.pool.get_decl(di)\n        if self.pool.kind(decl) != NodeKind.NK_TYPE_DECL:\n            continue\n        if self.pool.get_data0(decl) != type_sym:\n            continue\n        let sub_kind = type_decl_sub_kind(self.pool.get_data2(decl))\n        if sub_kind == TypeDeclKind.Struct:\n            return decl\n    0',
          'fn Codegen.find_struct_decl_node(self: Codegen, type_sym: i32) -> NodeId:\n    for di in 0..self.pool.decl_count():\n        let decl = self.pool.get_decl(di)\n        if self.pool.kind(decl) != NodeKind.NK_TYPE_DECL:\n            continue\n        if self.pool.get_data0(decl) != type_sym:\n            continue\n        let sub_kind = type_decl_sub_kind(self.pool.get_data2(decl))\n        if sub_kind == TypeDeclKind.Struct:\n            return decl\n    (0) as NodeId'),
-        ('    if decl == 0:\n        return 0 - 1',
-         '    if (decl as i32) == 0:\n        return 0 - 1'),
+        ('    if decl == 0:\n        return -1',
+         '    if (decl as i32) == 0:\n        return -1'),
         ('                generic_node = decl\n',
          '                generic_node = decl as i32\n'),
     ])

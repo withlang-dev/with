@@ -50,7 +50,7 @@ enum CiTypeKind: i32:
     CT_FN_PTR = 9    // d0 = ret_ty_id, d1 = params_extra_start, d2 = param_count
     CT_NAMED = 10    // d0 = name_sym_idx  (typedef reference)
 
-const CI_SIZE_INCOMPLETE: i32 = 0 - 1
+const CI_SIZE_INCOMPLETE: i32 = -1
 
 type CiTypePoolState {
     kinds: Vec[i32],
@@ -644,7 +644,7 @@ fn CiDeclPool.new -> CiDeclPool:
     st.data1.push(0)
     st.data2.push(0)
     st.flags.push(0)
-    st.owner_module.push(0 - 1)
+    st.owner_module.push(-1)
     CiDeclPool { state: ptr }
 
 fn CiDeclPool.add(self: CiDeclPool, kind: i32, d0: i32, d1: i32, d2: i32, flags: i32) -> CiDeclId:
@@ -657,7 +657,7 @@ fn CiDeclPool.add(self: CiDeclPool, kind: i32, d0: i32, d1: i32, d2: i32, flags:
     st.data1.push(d1)
     st.data2.push(d2)
     st.flags.push(flags)
-    st.owner_module.push(0 - 1)
+    st.owner_module.push(-1)
     id as CiDeclId
 
 fn CiDeclPool.add_extra(self: CiDeclPool, value: i32) -> i32:
@@ -784,11 +784,11 @@ fn CiProjectSymbol.new(name: str, kind: i32) -> CiProjectSymbol:
     CiProjectSymbol {
         name: ci_ir_owned_text(name),
         kind: kind,
-        owner_module: 0 - 1,
+        owner_module: -1,
         resolved_ty: 0 as CiTypeId,
         resolved_ty_text: "",
         consumers: "",
-        owner_rank: 0 - 1,
+        owner_rank: -1,
         owner_definition_kind: 0,
     }
 
@@ -862,7 +862,7 @@ fn CiProject.find_symbol(self: &CiProject, kind: i32, name: str) -> i32:
         if ci_project_symbol_key(symbol.kind, symbol.name) == key:
             return i
         i = i - 1
-    0 - 1
+    -1
 
 fn CiProject.ensure_symbol(mut self: CiProject, kind: i32, name: str) -> i32:
     let existing = self.find_symbol(kind, name)

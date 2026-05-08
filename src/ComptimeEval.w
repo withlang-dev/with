@@ -97,7 +97,7 @@ fn ComptimeEvaluator.init(sema: Sema, ast: AstPool, pool: InternPool, require_su
     }
 
 fn comptime_dirname(path: str) -> str:
-    var last_slash = 0 - 1
+    var last_slash = -1
     for i in 0..path.len() as i32:
         if path.byte_at(i as i64) == 47:
             last_slash = i
@@ -236,7 +236,7 @@ fn ComptimeEvaluator.lookup_slot_index(self: ComptimeEvaluator, sym: i32) -> i32
         if self.slot_syms.get(i as i64) == sym:
             return i
         i = i - 1
-    0 - 1
+    -1
 
 fn ComptimeEvaluator.lookup_value(self: ComptimeEvaluator, sym: i32, node: i32) -> ComptimeControl:
     let idx = self.lookup_slot_index(sym)
@@ -271,7 +271,7 @@ fn ComptimeEvaluator.find_decl_index(self: ComptimeEvaluator, decl_node: i32) ->
     for di in 0..self.ast.decl_count():
         if self.ast.get_decl(di) == decl_node:
             return di
-    0 - 1
+    -1
 
 fn ComptimeEvaluator.decl_file_id(self: ComptimeEvaluator, decl_node: i32) -> i32:
     let decl_idx = self.find_decl_index(decl_node)
@@ -427,7 +427,7 @@ fn ComptimeEvaluator.struct_field_index(self: ComptimeEvaluator, type_id: i32, f
     for fi in 0..field_count:
         if self.sema.type_reflection_field_name(type_id, fi) == field_sym:
             return fi
-    0 - 1
+    -1
 
 fn ComptimeEvaluator.variant_payload_name(self: ComptimeEvaluator, type_id: i32, variant_index: i32) -> str:
     let payload_count = self.sema.type_reflection_variant_payload_count(type_id, variant_index)
@@ -830,7 +830,7 @@ fn ComptimeEvaluator.eval_struct_lit(self: ComptimeEvaluator, node: i32) -> Comp
     let start = self.extra_values.len() as i32
     for fi in 0..field_total:
         let field_sym = self.sema.type_reflection_field_name(type_id, fi)
-        var found = 0 - 1
+        var found = -1
         for pi in 0..init_syms.len() as i32:
             if init_syms.get(pi as i64) == field_sym:
                 found = pi

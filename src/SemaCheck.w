@@ -20,7 +20,7 @@ extern fn with_str_eq(a: str, b: str) -> i32
 const STRICT_NO_MUT_REF: i32 = 1
 
 fn sema_dirname(path: str) -> str:
-    var last_slash = 0 - 1
+    var last_slash = -1
     for i in 0..path.len() as i32:
         if path.byte_at(i as i64) == 47:
             last_slash = i
@@ -440,7 +440,7 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
         let pin_param_sym = self.ast.state.fn_effect_pin_params.get(node).unwrap()
         let pin_bits = if self.ast.state.fn_effect_pin_bits.contains(node): self.ast.state.fn_effect_pin_bits.get(node).unwrap() else: 0
         // Find which param index this pin covers
-        var pin_pi = 0 - 1
+        var pin_pi = -1
         for pi in 0..self.current_fn_param_syms.len() as i32:
             if self.current_fn_param_syms.get(pi as i64) == pin_param_sym:
                 pin_pi = pi
@@ -559,7 +559,7 @@ fn Sema.find_function_label(self: Sema, sym: i32) -> i32:
     for i in 0..self.fn_label_syms.len() as i32:
         if self.fn_label_syms.get(i as i64) == sym:
             return i
-    0 - 1
+    -1
 
 fn Sema.mark_function_label_used(self: Sema, sym: i32):
     let idx = self.find_function_label(sym)
@@ -843,11 +843,11 @@ fn Sema.resolve_labeled_control(self: Sema, label: i32, node: i32) -> i32:
         if self.label_syms.get(i as i64) == label:
             if crossed_boundary != 0:
                 self.emit_error("label cannot cross function, closure, or async boundary", node)
-                return 0 - 1
+                return -1
             return i
         i = i - 1
     self.emit_error("no enclosing loop or block labeled " ++ self.label_name(label), node)
-    0 - 1
+    -1
 
 fn Sema.resolve_innermost_loop_control(self: Sema, node: i32, word: str) -> i32:
     var i = self.label_syms.len() as i32 - 1
@@ -859,7 +859,7 @@ fn Sema.resolve_innermost_loop_control(self: Sema, node: i32, word: str) -> i32:
             return i
         i = i - 1
     self.emit_error(word ++ " outside of loop", node)
-    0 - 1
+    -1
 
 // ── Reachable comptime_error validation ─────────────────────────
 
@@ -1197,7 +1197,7 @@ fn Sema.check_fn_body_concrete(self: Sema, fn_node: i32, tp_syms: Vec[i32], tp_s
     let body = self.ast.get_data1(fn_node)
     let meta = self.ast.find_fn_meta(fn_node)
     if meta < 0:
-        return 0 - 1
+        return -1
 
     let tp_count = tp_syms.len() as i32
 
@@ -1971,6 +1971,9 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
     // Check enum variants
     if self.variant_lookup.contains(sym) and self.is_ci_visible(sym) != 0:
         let variant_expected_tid = self.expected_variant_constructor_type(sym)
+        if variant_expected_tid != 0:
+            let resolved_variant_sym = self.qualified_enum_variant_sym(variant_expected_tid, sym)
+            self.comp_resolved.insert(node, resolved_variant_sym)
         let variant_tid = if variant_expected_tid != 0: variant_expected_tid else: self.variant_type_ids.get(sym).unwrap()
         self.typed_expr_types.insert(node, variant_tid)
         return variant_tid
@@ -3684,7 +3687,7 @@ fn Sema.generic_type_param_index(self: Sema, tp_start: i32, tp_count: i32, param
             return ti
         let bound_count = self.ast.get_extra(tp_pos + 1)
         tp_pos = tp_pos + 2 + bound_count
-    0 - 1
+    -1
 
 // Infer a concrete generic enum type for direct variant constructor calls like
 // Some(7) when the payload directly names the enum's type parameter.
@@ -3880,6 +3883,9 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
     if kind == NodeKind.NK_PAT_REGEX:
         if subject_type != 0 and self.types_compatible(self.ty_str as i32, subject_type) == 0:
             self.emit_error("regex pattern requires a str-compatible match subject", node)
+        let regex_ty = self.lookup_named_type_visible(self.syms.regex)
+        if regex_ty != 0:
+            let _ = self.ensure_exact_type(TypeKind.TY_REF, regex_ty, 0, 0)
         return
 
     if kind == NodeKind.NK_PAT_TYPED_BIND:
@@ -4122,7 +4128,7 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
     self.push_scope()
     let te_start = self.type_extra.len() as i32
     // Partial application: if body is NK_CALL, resolve callee param types for placeholders
-    var partial_sig = 0 - 1
+    var partial_sig = -1
     if self.ast.kind(body) == NodeKind.NK_CALL:
         let call_callee = self.ast.get_data0(body)
         if self.ast.kind(call_callee) == NodeKind.NK_IDENT:
@@ -4693,7 +4699,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
 
     // Direct call: callee should be ident
     var fn_sym = 0
-    var local_tid = 0 - 1
+    var local_tid = -1
     var callable_value_tid = 0
     var callable_closure_node = 0
     if self.ast.kind(callee) == NodeKind.NK_IDENT:
@@ -4727,8 +4733,8 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
             self.emit_error("named arguments are not supported for closures or function pointers", node)
 
     let param_offset = if self.in_pipeline_rhs != 0: 1 else: 0
-    let sig_idx_raw = if self.generic_fn_nodes.contains(fn_sym): 0 - 1 else: self.get_sig(fn_sym)
-    let sig_idx = if sig_idx_raw >= 0 and self.is_ci_visible(fn_sym) == 0: 0 - 1 else: sig_idx_raw
+    let sig_idx_raw = if self.generic_fn_nodes.contains(fn_sym): -1 else: self.get_sig(fn_sym)
+    let sig_idx = if sig_idx_raw >= 0 and self.is_ci_visible(fn_sym) == 0: -1 else: sig_idx_raw
     let variant_expected_ty = if self.variant_lookup.contains(fn_sym) and self.is_ci_visible(fn_sym) != 0: self.expected_variant_constructor_type(fn_sym) else: 0
     let variant_payload_tys = if variant_expected_ty != 0: self.enum_variant_payload_types(variant_expected_ty, fn_sym) else: Vec.new()
 
@@ -4758,7 +4764,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
                 let name_sym = self.ast.get_call_named_arg(node, ai)
                 if name_sym == 0:
                     continue
-                var matched = 0 - 1
+                var matched = -1
                 for pi in 0..param_count:
                     let pname = self.ast.fn_param_name(ps, pi)
                     if pname == name_sym:
@@ -7183,18 +7189,18 @@ fn Sema.type_reflection_variant_base(self: Sema, tid: i32) -> i32:
 fn Sema.type_reflection_variant_position(self: Sema, base_tid: i32, variant_index: i32) -> i32:
     let resolved = self.resolve_alias(base_tid)
     if self.get_type_kind(resolved) != TypeKind.TY_ENUM:
-        return 0 - 1
+        return -1
     let te_start = self.get_type_d1(resolved)
     let variant_count = self.get_type_d2(resolved)
     if variant_index < 0 or variant_index >= variant_count:
-        return 0 - 1
+        return -1
     var pos = te_start
     for vi in 0..variant_count:
         if vi == variant_index:
             return pos
         let payload_count = self.type_extra.get((pos + 1) as i64)
         pos = pos + 2 + payload_count
-    0 - 1
+    -1
 
 fn Sema.type_reflection_variant_count(self: Sema, tid: i32) -> i32:
     let base_tid = self.type_reflection_variant_base(tid)
@@ -7264,52 +7270,52 @@ fn Sema.check_static_type_method_call(self: Sema, obj_type: i32, field: i32, ext
     if field == self.syms.name:
         if arg_count != 0:
             self.emit_error("type.name() takes no arguments", node)
-            return 0 - 1
+            return -1
         self.typed_expr_types.insert(node, self.ty_str as i32)
         return self.ty_str as i32
 
     if field == self.syms.size or field == self.syms.align:
         if arg_count != 0:
             self.emit_error("type size/align methods take no arguments", node)
-            return 0 - 1
+            return -1
         self.typed_expr_types.insert(node, self.ty_usize as i32)
         return self.ty_usize as i32
 
     if field == self.syms.implements:
         if arg_count != 1:
             self.emit_error("type.implements() expects exactly one trait argument", node)
-            return 0 - 1
+            return -1
         let trait_node = self.ast.get_extra(extra_start)
         if trait_node == 0:
             self.emit_error("type.implements() requires a trait name", node)
-            return 0 - 1
+            return -1
         let trait_kind = self.ast.kind(trait_node)
         if trait_kind != NodeKind.NK_IDENT and trait_kind != NodeKind.NK_TYPE_NAMED:
             self.emit_error("type.implements() requires a trait name", trait_node)
-            return 0 - 1
+            return -1
         let trait_sym = self.ast.get_data0(trait_node)
         if not self.lang_trait_syms.contains(trait_sym) and not self.trait_lookup.contains(trait_sym):
             self.emit_error("unknown trait '" ++ self.pool_resolve(trait_sym) ++ "'", trait_node)
-            return 0 - 1
+            return -1
         self.typed_expr_types.insert(node, self.ty_bool as i32)
         return self.ty_bool as i32
 
     if field == self.syms.is_copy:
         if arg_count != 0:
             self.emit_error("type.is_copy() takes no arguments", node)
-            return 0 - 1
+            return -1
         self.typed_expr_types.insert(node, self.ty_bool as i32)
         return self.ty_bool as i32
 
     if field == self.syms.fields:
         if arg_count != 0:
             self.emit_error("type.fields() takes no arguments", node)
-            return 0 - 1
+            return -1
         let resolved = self.resolve_alias(obj_type)
         let tk = self.get_type_kind(resolved)
         if tk != TypeKind.TY_STRUCT and tk != TypeKind.TY_GENERIC_INST:
             self.emit_error("type.fields() requires a struct type", node)
-            return 0 - 1
+            return -1
         let field_count = self.type_reflection_field_count(obj_type)
         let result = self.ensure_exact_type(TypeKind.TY_ARRAY, self.ty_field_info as i32, field_count, 0)
         self.typed_expr_types.insert(node, result as i32)
@@ -7318,10 +7324,10 @@ fn Sema.check_static_type_method_call(self: Sema, obj_type: i32, field: i32, ext
     let base_tid = self.type_reflection_variant_base(obj_type)
     if arg_count != 0:
         self.emit_error("type.variants() takes no arguments", node)
-        return 0 - 1
+        return -1
     if base_tid == 0:
         self.emit_error("type.variants() requires an enum type", node)
-        return 0 - 1
+        return -1
     let variant_count = self.type_reflection_variant_count(obj_type)
     let result = self.ensure_exact_type(TypeKind.TY_ARRAY, self.ty_variant_info as i32, variant_count, 0)
     self.typed_expr_types.insert(node, result as i32)
@@ -7610,7 +7616,7 @@ fn Sema.check_borrow_create_direct(self: Sema, place: i32, kind: i32, field: i32
             continue
         if existing_kind == BorrowKind.EXCLUSIVE:
             self.emit_error("cannot borrow mutably: already mutably borrowed", err_node)
-        else if self.borrow_refs.get(i as i64) == 0 - 1:
+        else if self.borrow_refs.get(i as i64) == -1:
             let place_name = self.pool_resolve(place)
             self.emit_error("iterator over `" ++ place_name ++ "` retains access; cannot also mutably capture `" ++ place_name ++ "` (§15.8)", err_node)
         else:
@@ -8547,11 +8553,11 @@ fn Sema.mark_moved_if_consumed(self: Sema, node: i32):
 
 fn Sema.lookup_method_sig(self: Sema, type_sym: i32, method_sym: i32) -> i32:
     if type_sym <= 0 or method_sym <= 0:
-        return 0 - 1
+        return -1
     let key = sema_pair_key(type_sym, method_sym)
     if self.method_lookup.sig_lookup.contains(key):
         return self.method_lookup.sig_lookup.get(key).unwrap()
-    0 - 1
+    -1
 
 fn Sema.lookup_method_fn(self: Sema, type_sym: i32, method_sym: i32) -> i32:
     if type_sym <= 0 or method_sym <= 0:
@@ -8574,17 +8580,17 @@ fn Sema.lookup_method_fn(self: Sema, type_sym: i32, method_sym: i32) -> i32:
 // any sibling closures have been checked together).
 fn Sema.maybe_register_iter_of_self_borrow(self: Sema, arg_node: i32) -> i32:
     if arg_node <= 0:
-        return 0 - 1
+        return -1
     if self.ast.kind(arg_node) != NodeKind.NK_CALL:
-        return 0 - 1
+        return -1
     let arg_callee = self.ast.get_data0(arg_node)
     if self.ast.kind(arg_callee) != NodeKind.NK_FIELD_ACCESS:
-        return 0 - 1
+        return -1
     let recv = self.ast.get_data0(arg_callee)
     let method = self.ast.get_data1(arg_callee)
     let recv_root = self.place_root_sym(recv)
     if recv_root == 0:
-        return 0 - 1
+        return -1
     var recv_ty = 0
     let recv_ty_opt = self.typed_expr_types.get(recv)
     if recv_ty_opt.is_some():
@@ -8592,19 +8598,19 @@ fn Sema.maybe_register_iter_of_self_borrow(self: Sema, arg_node: i32) -> i32:
     else:
         recv_ty = self.check_expr(recv) as i32
     if recv_ty == 0:
-        return 0 - 1
+        return -1
     let owner_sym = self.method_owner_symbol_for_type(recv_ty)
     if owner_sym == 0:
-        return 0 - 1
+        return -1
     if self.method_is_iter_of_self_fn(owner_sym, method) == 0:
-        return 0 - 1
+        return -1
     let pre_count = self.borrow_kinds.len() as i32
     let path_start = self.borrow_path_data.len() as i32
     self.check_borrow_create_direct(recv_root, BorrowKind.SHARED, 0, path_start, 0, arg_node)
     if (self.borrow_kinds.len() as i32) > pre_count:
-        self.borrow_refs.set_i32(pre_count as i64, 0 - 1)
+        self.borrow_refs.set_i32(pre_count as i64, -1)
         return pre_count
-    0 - 1
+    -1
 
 // docs/mut.md Rev 8 §11.4 / §15.17 — returns 1 when the for-loop iterable
 // is a .iter() call (or any iter_of_self method), meaning the iterator

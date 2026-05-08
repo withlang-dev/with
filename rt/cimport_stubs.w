@@ -345,7 +345,7 @@ pub fn cimport_struct_field_offset(s: i64, i: i32, f: i32) -> i64:
     let _ = s
     let _ = i
     let _ = f
-    0 - 1
+    -1
 
 @[weak] @[c_export("with_cimport_struct_size")]
 pub fn cimport_struct_size(s: i64, i: i32) -> i64:

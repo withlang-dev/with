@@ -58,7 +58,7 @@ async fn slow_bidder(id: i32, tx: Sender[Bid]) -> i32:
 // ---------------------------------------------------------------------------
 
 async fn collect_bids(rx: Receiver[Bid], expected: i32) -> Bid:
-    var best = Bid { bidder_id: 0 - 1, amount: 0 }
+    var best = Bid { bidder_id: -1, amount: 0 }
     var count: i32 = 0
     while count < expected:
         let bid = rx.recv()
@@ -246,7 +246,7 @@ async fn run_auction() -> AuctionResult:
     // MIR_INTRINSIC_GENERIC_CALL sym=is_err". Spec says Result has .is_err().
     // Workaround: `not .is_ok()`.
     print("  calling bad path...")
-    let bad = process_winning_bid(0 - 1).await
+    let bad = process_winning_bid(-1).await
     print("  bad returned")
     assert(not bad.is_ok())
     print("  bad is not ok (correct)")

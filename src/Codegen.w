@@ -1007,7 +1007,7 @@ fn Codegen.debug_init_module(self: Codegen):
     self.di_builder = wl_di_create_builder(self.llmod)
 
     // Split source path into directory and filename
-    var last_slash = 0 - 1
+    var last_slash = -1
     for i in 0..self.source_file.len() as i32:
         if self.source_file.byte_at(i as i64) == 47:
             last_slash = i
@@ -1365,7 +1365,7 @@ fn Codegen.debug_fallback_enabled(self: Codegen) -> bool:
 fn Codegen.debug_type_layout_field(self: Codegen, owner_name: str, field_index: i32, field_name: i32, type_node: i32, resolved_ty: i64):
     if not self.debug_type_layout_enabled():
         return
-    let node_kind = if type_node != 0: self.pool.kind(type_node) else: 0 - 1
+    let node_kind = if type_node != 0: self.pool.kind(type_node) else: -1
     var msg = f"[type-layout] owner={owner_name} field={field_index} name={self.intern.resolve(field_name)} type_node={type_node} node_kind={node_kind}"
     if type_node != 0:
         let start = self.pool.get_start(type_node)
@@ -1439,7 +1439,7 @@ fn Codegen.debug_call_coerce_failure(self: Codegen, context: str, call_node: i32
     if self.current_function_name_sym != 0:
         msg = msg ++ " fn=" ++ self.function_symbol_name(self.current_function_name_sym)
     msg = msg ++ f" arg={arg_index}"
-    var line = 0 - 1
+    var line = -1
     if arg_node != 0:
         line = self.span_to_line(arg_node)
     else if call_node != 0:
@@ -1844,7 +1844,7 @@ fn Codegen.find_struct_index_by_type(self: Codegen, llvm_ty: i64) -> i32:
     for i in 0..self.struct_llvm_types.len() as i32:
         if self.struct_llvm_types.get(i as i64) == llvm_ty:
             return i
-    0 - 1
+    -1
 
 fn Codegen.is_union_struct_index(self: Codegen, struct_idx: i32) -> bool:
     if struct_idx < 0 or struct_idx >= self.struct_index_syms.len() as i32:
@@ -2701,7 +2701,7 @@ fn Codegen.type_decl_tp_meta_start(self: Codegen, type_node: i32) -> i32:
         return pos + 1
     if sub_kind == TypeDeclKind.Alias or sub_kind == TypeDeclKind.Distinct:
         return extra_start + 2
-    0 - 1
+    -1
 
 fn Codegen.type_decl_tp_start(self: Codegen, type_node: i32) -> i32:
     let meta_start = self.type_decl_tp_meta_start(type_node)
@@ -3155,7 +3155,7 @@ fn Codegen.method_text_from_field_access(self: Codegen, node: i32) -> str:
     let text = self.ident_text_from_node(node)
     if text.len() == 0:
         return ""
-    var dot = 0 - 1
+    var dot = -1
     for i in 0..text.len() as i32:
         if text.byte_at(i as i64) == 46:
             dot = i
@@ -3706,7 +3706,7 @@ fn Codegen.declare_extern_var(self: Codegen, node: i32):
 
 fn Codegen.canonical_extern_name(self: Codegen, name: str) -> str:
     // c_import may suffix C symbols as "name.<n>" — strip the suffix for linking.
-    var dot_pos = 0 - 1
+    var dot_pos = -1
     for i in 0..name.len() as i32:
         if name.byte_at(i as i64) == 46:
             dot_pos = i

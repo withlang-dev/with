@@ -648,7 +648,7 @@ Overhead:       Prologue check per function call (~1-2 instructions)
 Complexity:     Moderate (segment management, cross-segment references)
 ```
 
-This is what Go used initially (Go 1.0-1.3). Go later switched to
+This is what Go used initially (Go 1.-1.3). Go later switched to
 copyable stacks (possible because Go has a GC that can update
 pointers). Without a GC, segmented stacks remain viable but have
 a known "hot split" problem: a function near a segment boundary

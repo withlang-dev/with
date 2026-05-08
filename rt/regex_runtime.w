@@ -131,24 +131,28 @@ pub fn regex_capture_count_impl(code: *const i8) -> i32:
 
 @[c_export("with_regex_match_spans_alloc")]
 pub fn regex_match_spans_alloc_impl(code: *const i8, text: str, out_count: *mut i32) -> *const i32:
+    regex_match_spans_alloc_at_impl(code, text, 0, out_count)
+
+@[c_export("with_regex_match_spans_alloc_at")]
+pub fn regex_match_spans_alloc_at_impl(code: *const i8, text: str, start_offset: i32, out_count: *mut i32) -> *const i32:
     if out_count as i64 != 0:
         unsafe: *out_count = 0
-    if code as i64 == 0:
+    if code as i64 == 0 or start_offset < 0 or start_offset as i64 > text.len():
         return null
     let gcontext = pcre2_general_context_create_8(regex_runtime_malloc, regex_runtime_free, null)
     if gcontext as i64 == 0:
-        with_panic("with_regex_match_spans_alloc(): general context creation failed", "", 0)
+        with_panic("with_regex_match_spans_alloc_at(): general context creation failed", "", 0)
         return null
     let match_data = pcre2_match_data_create_from_pattern_8(code as *const pcre2_real_code_8, gcontext)
     if match_data as i64 == 0:
         pcre2_general_context_free_8(gcontext)
-        with_panic("with_regex_match_spans_alloc(): match data creation failed", "", 0)
+        with_panic("with_regex_match_spans_alloc_at(): match data creation failed", "", 0)
         return null
     let rc = pcre2_match_8(
         code as *const pcre2_real_code_8,
         text as *const u8,
         text.len() as c_ulong,
-        0,
+        start_offset as c_ulong,
         0,
         match_data,
         null
@@ -164,7 +168,7 @@ pub fn regex_match_spans_alloc_impl(code: *const i8, text: str, out_count: *mut 
     if out as i64 == 0:
         pcre2_match_data_free_8(match_data)
         pcre2_general_context_free_8(gcontext)
-        with_panic("with_regex_match_spans_alloc(): span allocation failed", "", 0)
+        with_panic("with_regex_match_spans_alloc_at(): span allocation failed", "", 0)
         return null
     var i: i32 = 0
     while i < count:
@@ -179,13 +183,64 @@ pub fn regex_match_spans_alloc_impl(code: *const i8, text: str, out_count: *mut 
         unsafe: *out_count = ints_count
     out as *const i32
 
+@[c_export("with_regex_capture_name_count")]
+pub fn regex_capture_name_count_impl(code: *const i8) -> i32:
+    if code as i64 == 0:
+        return 0
+    var name_count: c_uint = 0
+    let rc = pcre2_pattern_info_8(
+        code as *const pcre2_real_code_8,
+        PCRE2_INFO_NAMECOUNT as c_uint,
+        (&raw mut name_count) as *mut c_void
+    )
+    if rc < 0:
+        with_panic("with_regex_capture_name_count(): pattern info failed", "", 0)
+        return 0
+    name_count as i32
+
+@[c_export("with_regex_capture_name_at")]
+pub fn regex_capture_name_at_impl(code: *const i8, index: i32) -> str:
+    if code as i64 == 0 or index < 0:
+        return ""
+    var name_count: c_uint = 0
+    var entry_size: c_uint = 0
+    var table: *const u8 = null
+    var rc = pcre2_pattern_info_8(
+        code as *const pcre2_real_code_8,
+        PCRE2_INFO_NAMECOUNT as c_uint,
+        (&raw mut name_count) as *mut c_void
+    )
+    if rc < 0:
+        with_panic("with_regex_capture_name_at(): name count lookup failed", "", 0)
+        return ""
+    if index >= name_count as i32:
+        return ""
+    rc = pcre2_pattern_info_8(
+        code as *const pcre2_real_code_8,
+        PCRE2_INFO_NAMEENTRYSIZE as c_uint,
+        (&raw mut entry_size) as *mut c_void
+    )
+    if rc < 0:
+        with_panic("with_regex_capture_name_at(): entry size lookup failed", "", 0)
+        return ""
+    rc = pcre2_pattern_info_8(
+        code as *const pcre2_real_code_8,
+        PCRE2_INFO_NAMETABLE as c_uint,
+        (&raw mut table) as *mut c_void
+    )
+    if rc < 0:
+        with_panic("with_regex_capture_name_at(): name table lookup failed", "", 0)
+        return ""
+    let entry = (table as i64 + index as i64 * entry_size as i64 + 2) as *const u8
+    with_str_clone(with_str_from_cstr(entry))
+
 @[c_export("with_regex_group_name_to_index")]
 pub fn regex_group_name_to_index_impl(code: *const i8, name: str) -> i32:
     if code as i64 == 0:
-        return 0 - 1
+        return -1
     let cname = regex_to_cstr(name)
     let out = pcre2_substring_number_from_name_8(code as *const pcre2_real_code_8, cname)
     with_free(cname as *i8)
     if out < 0:
-        return 0 - 1
+        return -1
     out

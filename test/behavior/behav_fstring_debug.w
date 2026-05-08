@@ -7,7 +7,7 @@ fn test_debug_int:
     assert(f"{x:?}" == "42")
 
 fn test_debug_negative_int:
-    let x = 0 - 7
+    let x = -7
     assert(f"{x:?}" == "-7")
 
 fn test_debug_bool_true:

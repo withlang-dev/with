@@ -43,7 +43,7 @@ fn assert_eq_i64(a: i64, b: i64, msg: str):
 
 fn test_macro_literals:
     assert_eq(TC_INT_CONST, 42, "TC_INT_CONST")
-    assert_eq(TC_NEG_CONST, 0 - 7, "TC_NEG_CONST")
+    assert_eq(TC_NEG_CONST, -7, "TC_NEG_CONST")
     assert_eq(TC_HEX_CONST, 255, "TC_HEX_CONST")
     assert_eq(TC_CHAR_CONST, 65, "TC_CHAR_CONST")
     assert_eq(TC_BOOL_TRUE, 1, "TC_BOOL_TRUE")
@@ -54,9 +54,9 @@ fn test_macro_literals:
 fn test_macro_arithmetic:
     assert_eq(TC_ADD(3, 4), 7, "TC_ADD(3,4)")
     assert_eq(TC_ADD(0, 0), 0, "TC_ADD(0,0)")
-    assert_eq(TC_ADD(100, 0 - 50), 50, "TC_ADD(100,-50)")
+    assert_eq(TC_ADD(100, -50), 50, "TC_ADD(100,-50)")
     assert_eq(TC_MUL(6, 7), 42, "TC_MUL(6,7)")
-    assert_eq(TC_NEGATE(5), 0 - 5, "TC_NEGATE(5)")
+    assert_eq(TC_NEGATE(5), -5, "TC_NEGATE(5)")
     assert_eq(TC_SHIFT_LEFT(1, 3), 8, "TC_SHIFT_LEFT(1,3)")
     assert_eq(TC_SHIFT_RIGHT(16, 2), 4, "TC_SHIFT_RIGHT(16,2)")
     assert_eq(TC_BITAND(0xFF, 0x0F), 0x0F, "TC_BITAND")
@@ -89,11 +89,11 @@ fn test_macro_conditional:
     assert_eq(v5, 3, "TC_MIN(3,7)")
     let v6: i32 = TC_CLAMP(5, 0, 10)
     assert_eq(v6, 5, "TC_CLAMP mid")
-    let v7: i32 = TC_CLAMP(0 - 1, 0, 10)
+    let v7: i32 = TC_CLAMP(-1, 0, 10)
     assert_eq(v7, 0, "TC_CLAMP low")
     let v8: i32 = TC_CLAMP(15, 0, 10)
     assert_eq(v8, 10, "TC_CLAMP high")
-    let v9: i32 = TC_ABS(0 - 5)
+    let v9: i32 = TC_ABS(-5)
     assert_eq(v9, 5, "TC_ABS(-5)")
     let v10: i32 = TC_ABS(5)
     assert_eq(v10, 5, "TC_ABS(5)")
@@ -102,7 +102,7 @@ fn test_macro_conditional:
 
 fn test_macro_casts:
     assert_eq(TC_CAST_TO_INT(3.14), 3, "TC_CAST_TO_INT(3.14)")
-    assert_eq(TC_CAST_TO_INT(0 - 7), 0 - 7, "TC_CAST_TO_INT(-7)")
+    assert_eq(TC_CAST_TO_INT(-7), -7, "TC_CAST_TO_INT(-7)")
 
 // Macro define-referencing-define
 
@@ -132,8 +132,8 @@ fn test_enums:
     assert_eq(TC_ENUM_C, 2, "TC_ENUM_C")
     assert_eq(TC_ENUM_D, 100, "TC_ENUM_D")
     // Negative enum values
-    assert_eq(TC_NEG_ENUM_A, 0 - 1, "TC_NEG_ENUM_A")
-    assert_eq(TC_NEG_ENUM_B, 0 - 100, "TC_NEG_ENUM_B")
+    assert_eq(TC_NEG_ENUM_A, -1, "TC_NEG_ENUM_A")
+    assert_eq(TC_NEG_ENUM_B, -100, "TC_NEG_ENUM_B")
     assert_eq(TC_NEG_ENUM_C, 50, "TC_NEG_ENUM_C")
     // Anonymous enum
     assert_eq(TC_ANON_X, 10, "TC_ANON_X")
@@ -174,13 +174,13 @@ fn test_type_fields:
 fn test_functions:
     assert_eq(tc_add(3, 4), 7, "tc_add(3,4)")
     assert_eq(tc_mul(6, 7), 42, "tc_mul(6,7)")
-    assert_eq(tc_abs(0 - 5), 5, "tc_abs(-5)")
+    assert_eq(tc_abs(-5), 5, "tc_abs(-5)")
     assert_eq(tc_abs(5), 5, "tc_abs(5)")
 
 // Bool-to-int patterns
 
 fn test_bool_patterns:
-    assert_eq(tc_sign(0 - 5), 0 - 1, "tc_sign(-5)")
+    assert_eq(tc_sign(-5), -1, "tc_sign(-5)")
     assert_eq(tc_sign(5), 0, "tc_sign(5)")
     assert_eq(tc_sign(0), 0, "tc_sign(0)")
     assert_eq(tc_bool_to_int(42), 1, "tc_bool_to_int(42)")
@@ -269,7 +269,7 @@ fn test_inline_functions:
     // Test that inline function body translation works for non-trivial functions
     assert_eq(tc_add(100, 200), 300, "inline tc_add")
     assert_eq(tc_mul(11, 11), 121, "inline tc_mul")
-    assert_eq(tc_abs(0 - 42), 42, "inline tc_abs")
+    assert_eq(tc_abs(-42), 42, "inline tc_abs")
 
 // Hex float literals (Gap 4)
 

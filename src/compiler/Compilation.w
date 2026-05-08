@@ -96,7 +96,7 @@ fn compilation_find_fn_decl_index(pool: AstPool, fn_sym: i32) -> i32:
             continue
         if pool.get_data0(decl) == fn_sym:
             return di
-    0 - 1
+    -1
 
 fn compilation_mir_error_span(zcu: Zcu, pool: AstPool, fn_sym: i32, raw_span: i32) -> Span:
     let decl_index = compilation_find_fn_decl_index(pool, fn_sym)

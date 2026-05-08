@@ -2729,9 +2729,9 @@ PY
 fn main() -> i32 {
     if f(1) != 2 { return 1 }
     if f(2) != 7 { return 2 }
-    if f(3) != (0 - 1) { return 3 }
+    if f(3) != (-1) { return 3 }
     if g(1) != 3 { return 4 }
-    if g(2) != (0 - 1) { return 5 }
+    if g(2) != (-1) { return 5 }
     0
 }
 EOF
