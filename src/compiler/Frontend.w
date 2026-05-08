@@ -537,8 +537,8 @@ fn c_import_function_decl(stmt_raw: str) -> str:
     if stmt.len() == 0:
         return ""
 
-    var open = 0 - 1
-    var close = 0 - 1
+    var open = -1
+    var close = -1
     for i in 0..stmt.len() as i32:
         let ch = stmt.byte_at(i as i64)
         if ch == 40 and open < 0:

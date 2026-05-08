@@ -84,13 +84,13 @@ fn Codegen.find_trait_method_offset(self: Codegen, trait_idx: i32, method_sym: i
     for i in 0..count:
         if self.trait_method_names.get((start + i) as i64) == method_sym:
             return i
-    0 - 1
+    -1
 
 fn Codegen.find_decl_index(self: Codegen, node: i32) -> i32:
     for i in 0..self.pool.decl_count():
         if self.pool.get_decl(i) == node:
             return i
-    0 - 1
+    -1
 
 fn Codegen.lookup_impl_method_symbol_by_slot(self: Codegen, impl_node: i32, slot: i32) -> i32:
     if slot < 0:
@@ -709,7 +709,7 @@ fn Codegen.find_module_fn_decl_index(self: Codegen, sym: i32) -> i32:
             continue
         if self.pool.get_data0(decl) == sym:
             return di
-    0 - 1
+    -1
 
 fn Codegen.function_link_name_for_sym(self: Codegen, sym: i32) -> str:
     let name = self.function_symbol_name(sym)
@@ -747,10 +747,10 @@ fn Codegen.find_module_let_decl_index(self: Codegen, sym: i32) -> i32:
             continue
         if self.pool.get_data0(decl) == sym:
             return di
-    0 - 1
+    -1
 
 fn codegen_dirname(path: str) -> str:
-    var last_slash = 0 - 1
+    var last_slash = -1
     for di in 0..path.len() as i32:
         if path.byte_at(di as i64) == 47:
             last_slash = di

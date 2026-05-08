@@ -93,11 +93,14 @@ VERSION_PLACEHOLDER := WITH_VERSION_PLACEHOLDER
 SEED_PATH := src/main
 SEED_VERSION ?=
 
-# Seed compiler: WITH env var, `with` on PATH, or src/main (downloaded).
-# Do not resolve this through out/bin; build outputs are products of the
-# bootstrap chain, not the seed that starts it.
+# Seed compiler: WITH env var, out/bin/with, `with` on PATH, or src/main
+# (downloaded). Prefer the repo-local canonical compiler so runtime/stdlib
+# rebuilds use the compiler that belongs to this checkout rather than a stale
+# installed user compiler.
 WITH ?= $(shell \
-	if command -v with >/dev/null 2>&1; then \
+	if [ -x "$(CANONICAL_BIN)" ]; then \
+		printf '%s\n' "$(CANONICAL_BIN)"; \
+	elif command -v with >/dev/null 2>&1; then \
 		command -v with; \
 	elif [ -x "$(SEED_PATH)" ]; then \
 		printf '%s\n' "$(SEED_PATH)"; \
@@ -357,9 +360,10 @@ GEN_VERSION_DEPS := $(wildcard $(GIT_HEAD_FILE) $(GIT_HEAD_REF_FILE) $(GIT_PACKE
 STAGE_COMMON_DEPS := $(GEN_STAMP) $(COMPILER_BUILD_SOURCES) Makefile $(BOOTSTRAP_RUNTIME_STAMP)
 
 STAGE0_BIN := $(WITH)
+STAGE0_PREREQ := $(if $(filter $(CANONICAL_BIN) ./$(CANONICAL_BIN) $(ROOT_DIR)/$(CANONICAL_BIN),$(STAGE0_BIN)),,$(STAGE0_BIN))
 
 BOOTSTRAP_RUNTIME_INPUTS := \
-	$(STAGE0_BIN) \
+	$(STAGE0_PREREQ) \
 	$(COMPAT_RUNTIME_SRC) \
 	rt/cimport_stubs.w \
 	rt/panic_runtime.w \
@@ -456,19 +460,19 @@ $(RUNTIME_C_ALLOWLIST_STAMP): scripts/check_runtime_c_allowlist.sh $(RUNTIME_C_S
 	@bash "$(ROOT_DIR)/scripts/check_runtime_c_allowlist.sh" $(RUNTIME_C_ALLOWLIST)
 	@touch "$@"
 
-$(CIMPORT_STUBS_OBJ): rt/cimport_stubs.w $(STAGE0_BIN) | $(OUT_LIB_DIR)
+$(CIMPORT_STUBS_OBJ): rt/cimport_stubs.w $(STAGE0_PREREQ) | $(OUT_LIB_DIR)
 	@if [ -z "$(STAGE0_BIN)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
 	$(WITH_BUILD_ENV) $(STAGE0_BIN) build $< --emit-obj --no-prelude -O0 -o $@
 
-$(COMPAT_RUNTIME_OBJ): $(COMPAT_RUNTIME_SRC) $(STAGE0_BIN) | $(OUT_LIB_DIR)
+$(COMPAT_RUNTIME_OBJ): $(COMPAT_RUNTIME_SRC) $(STAGE0_PREREQ) | $(OUT_LIB_DIR)
 	@if [ -z "$(STAGE0_BIN)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
 	$(WITH_BUILD_ENV) $(STAGE0_BIN) build $< --emit-obj --no-prelude -O0 -o $@
 
-$(PANIC_RUNTIME_OBJ): rt/panic_runtime.w $(STAGE0_BIN) | $(OUT_LIB_DIR)
+$(PANIC_RUNTIME_OBJ): rt/panic_runtime.w $(STAGE0_PREREQ) | $(OUT_LIB_DIR)
 	@if [ -z "$(STAGE0_BIN)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
 	$(WITH_BUILD_ENV) $(STAGE0_BIN) build $< --emit-obj --no-prelude -O0 -o $@
 
-$(REGEX_RUNTIME_OBJ): rt/regex_runtime.w $(STAGE0_BIN) | $(OUT_LIB_DIR) $(OUT_TMP_DIR)
+$(REGEX_RUNTIME_OBJ): rt/regex_runtime.w $(STAGE0_PREREQ) | $(OUT_LIB_DIR) $(OUT_TMP_DIR)
 	@if [ -z "$(STAGE0_BIN)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
 	$(WITH_BUILD_ENV) $(STAGE0_BIN) ir $< --no-prelude > "$(OUT_TMP_DIR)/regex_runtime.ll"
 	@set -euo pipefail; \
@@ -479,19 +483,19 @@ $(REGEX_RUNTIME_OBJ): rt/regex_runtime.w $(STAGE0_BIN) | $(OUT_LIB_DIR) $(OUT_TM
 		$(HOST_CC) -c "$(OUT_TMP_DIR)/regex_runtime.ll" -o "$@"; \
 	fi
 
-$(FIBER_STUBS_OBJ): rt/fiber_stubs.w $(STAGE0_BIN) | $(OUT_LIB_DIR)
+$(FIBER_STUBS_OBJ): rt/fiber_stubs.w $(STAGE0_PREREQ) | $(OUT_LIB_DIR)
 	@if [ -z "$(STAGE0_BIN)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
 	$(WITH_BUILD_ENV) $(STAGE0_BIN) build $< --emit-obj --no-prelude -O0 -o $@
 
-$(CHANNEL_RUNTIME_OBJ): rt/channel_runtime.w $(STAGE0_BIN) | $(OUT_LIB_DIR)
+$(CHANNEL_RUNTIME_OBJ): rt/channel_runtime.w $(STAGE0_PREREQ) | $(OUT_LIB_DIR)
 	@if [ -z "$(STAGE0_BIN)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
 	$(WITH_BUILD_ENV) $(STAGE0_BIN) build $< --emit-obj --no-prelude -O0 -o $@
 
-$(FIBER_RUNTIME_OBJ): rt/fiber_runtime.w $(STAGE0_BIN) | $(OUT_LIB_DIR)
+$(FIBER_RUNTIME_OBJ): rt/fiber_runtime.w $(STAGE0_PREREQ) | $(OUT_LIB_DIR)
 	@if [ -z "$(STAGE0_BIN)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
 	$(WITH_BUILD_ENV) $(STAGE0_BIN) build $< --emit-obj --no-prelude -O0 -o $@
 
-$(FIBER_OBJ): $(FIBER_CORE_SRC) $(STAGE0_BIN) | $(OUT_LIB_DIR)
+$(FIBER_OBJ): $(FIBER_CORE_SRC) $(STAGE0_PREREQ) | $(OUT_LIB_DIR)
 	@if [ -z "$(FIBER_CORE_SRC)" ]; then echo "error: unsupported host platform $(UNAME_S)/$(UNAME_M) for fiber runtime" >&2; exit 1; fi
 	@if [ -z "$(STAGE0_BIN)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
 	$(WITH_BUILD_ENV) $(STAGE0_BIN) build $< --emit-obj --no-prelude -O0 -o $@
@@ -500,12 +504,12 @@ $(FIBER_ASM_OBJ): $(FIBER_ASM_SRC) | $(OUT_LIB_DIR)
 	@if [ -z "$(FIBER_ASM_SRC)" ]; then echo "error: unsupported host architecture $(UNAME_M) for fiber_asm.o" >&2; exit 1; fi
 	$(call HOST_COMPILE,)
 
-$(RT_CORE_OBJ): rt/rt_core.w $(STAGE0_BIN) | $(OUT_LIB_DIR)
+$(RT_CORE_OBJ): rt/rt_core.w $(STAGE0_PREREQ) | $(OUT_LIB_DIR)
 	@if [ -z "$(STAGE0_BIN)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
 	$(WITH_BUILD_ENV) $(STAGE0_BIN) build $< --emit-obj --no-prelude -O2 -o $@
 
 # Compile the With runtime backend to .o with the seed during bootstrap.
-$(RT_DARWIN_AARCH64_OBJ): rt/darwin_aarch64.w $(STAGE0_BIN) | $(OUT_LIB_DIR)
+$(RT_DARWIN_AARCH64_OBJ): rt/darwin_aarch64.w $(STAGE0_PREREQ) | $(OUT_LIB_DIR)
 	@if [ -z "$(STAGE0_BIN)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
 	$(WITH_BUILD_ENV) $(STAGE0_BIN) build $< --emit-obj --no-prelude -O2 -o $@
 
@@ -535,11 +539,11 @@ $(EMBEDDED_OBJECTS_ASM): scripts/embed_runtime_objects.sh $(CIMPORT_STUBS_OBJ) $
 $(EMBEDDED_OBJECTS_OBJ): $(EMBEDDED_OBJECTS_ASM) | $(OUT_LIB_DIR)
 	$(call HOST_COMPILE,)
 
-$(LLVM_BRIDGE_OBJ): rt/llvm_bridge.w $(STAGE0_BIN) | $(OUT_LIB_DIR)
+$(LLVM_BRIDGE_OBJ): rt/llvm_bridge.w $(STAGE0_PREREQ) | $(OUT_LIB_DIR)
 	@if [ -z "$(STAGE0_BIN)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
 	$(WITH_BUILD_ENV) $(STAGE0_BIN) build $< --emit-obj --no-prelude -O0 -o $@
 
-$(CLANG_BRIDGE_OBJ): rt/clang_bridge.w $(STAGE0_BIN) | $(OUT_LIB_DIR)
+$(CLANG_BRIDGE_OBJ): rt/clang_bridge.w $(STAGE0_PREREQ) | $(OUT_LIB_DIR)
 	@if [ -z "$(STAGE0_BIN)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
 	$(WITH_BUILD_ENV) $(STAGE0_BIN) build $< --emit-obj --no-prelude -O0 -o $@
 
@@ -666,7 +670,7 @@ define build_stage
 	echo "[$(2)] wrote $@"
 endef
 
-$(STAGE1_BIN): $(STAGE0_BIN) $(STAGE_COMMON_DEPS)
+$(STAGE1_BIN): $(STAGE0_PREREQ) $(STAGE_COMMON_DEPS)
 	@if [ -z "$(STAGE0_BIN)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
 	$(call build_stage,$(STAGE0_BIN),stage1,$(STAGE1_TMP),-O0)
 

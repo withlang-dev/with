@@ -484,7 +484,7 @@ assert view.shape.rank > 0, "view must have at least one dimension"
 
 ### L6. Type aliases
 **First needed:** Session 14 (Code clarity)
-**Difficulty:** 0-1 sessions (may already work)
+**Difficulty:** -1 sessions (may already work)
 
 ```with
 type Handle = i64
@@ -659,7 +659,7 @@ Sprint  Feature             Difficulty  Unblocks
   === Weld Sessions 28-32 can start ===
 
  15     L5. assert + message 1 sess     Better errors
- 16     L6. Type aliases     0-1 sess   Code clarity
+ 16     L6. Type aliases     -1 sess   Code clarity
  17     L7. Enum methods     1-2 sess   WeldError
  18     L8. pub visibility   1-2 sess   API surface
  19     L9. Module system    3-5 sess   use weld.nn

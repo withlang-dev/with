@@ -277,7 +277,7 @@ fn Sema.find_decl_index(self: Sema, node: i32) -> i32:
     for di in 0..self.ast.decl_count():
         if self.ast.get_decl(di) == node:
             return di
-    0 - 1
+    -1
 
 fn Sema.decls_share_source_file(self: Sema, a: i32, b: i32) -> i32:
     if a < 0 or b < 0:
@@ -301,7 +301,7 @@ fn Sema.build_ci_scoping(self: Sema):
         return
     var has_ci = 0
     var module_count = 0
-    var prev_path_sym = 0 - 1
+    var prev_path_sym = -1
     for di in 0..self.ast.decl_count():
         let decl = self.ast.get_decl(di)
         if self.ast.kind(decl) == NodeKind.NK_C_IMPORT and di < self.decl_source_paths.len() as i32:
@@ -521,10 +521,10 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
                     self.emit_error(f"duplicate discriminant value {disc_value}", node)
             // Check discriminant fits in repr type range
             if repr_type_tid == self.ty_i8:
-                if disc_value < (0 - 128) or disc_value > 127:
+                if disc_value < (-128) or disc_value > 127:
                     self.emit_error(f"discriminant value {disc_value} out of range for i8", node)
             if repr_type_tid == self.ty_i16:
-                if disc_value < (0 - 32768) or disc_value > 32767:
+                if disc_value < (-32768) or disc_value > 32767:
                     self.emit_error(f"discriminant value {disc_value} out of range for i16", node)
             disc_vals.push(disc_value)
             for pi in 0..payload_count:
@@ -1126,7 +1126,7 @@ fn sema_str_find_char(text: str, needle: i32) -> i32:
     for i in 0..text.len() as i32:
         if text[i] == needle:
             return i
-    return 0 - 1
+    return -1
 
 fn Sema.impl_owner_type_sym_for_decl(self: Sema, decl: i32) -> i32:
     let start = self.ast.get_start(decl)

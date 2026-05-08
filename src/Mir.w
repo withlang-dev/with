@@ -408,11 +408,11 @@ fn MirModule.body_count(self: &MirModule) -> i32:
 
 fn MirModule.find_body(self: &MirModule, fn_sym: i32) -> i32:
     if fn_sym == 0:
-        return 0 - 1
+        return -1
     let body_idx = self.body_index_by_fn_sym.get(fn_sym)
     if body_idx.is_some():
         return body_idx.unwrap()
-    0 - 1
+    -1
 
 // ── MirBody builders ─────────────────────────────────────────────
 
@@ -1595,7 +1595,7 @@ fn mir_validate_enum_payload_type(mir_mod: MirModule, enum_tid: i32, variant_idx
         // Option[T]: one generic arg, exactly one payload-bearing variant.
         if arg_count == 1 and field_idx == 0:
             var pos = te_start
-            var payload_variant = 0 - 1
+            var payload_variant = -1
             for vi in 0..variant_count:
                 let payload_count = mir_mod.mir_get_type_extra(pos + 1)
                 if payload_count == 1:
@@ -1704,7 +1704,7 @@ fn mir_validate_place_type(mir_mod: MirModule, body: MirBody, place_id: i32) -> 
     let proj_count = body.place_proj_counts.get(place_id as i64)
     if proj_count <= 0:
         return current_ty
-    var active_variant_idx = 0 - 1
+    var active_variant_idx = -1
 
     for pi in 0..proj_count:
         let proj_kind = body.proj_kinds.get((proj_start + pi) as i64)
@@ -1729,7 +1729,7 @@ fn mir_validate_place_type(mir_mod: MirModule, body: MirBody, place_id: i32) -> 
             if field_ty == 0:
                 return 0
             current_ty = field_ty
-            active_variant_idx = 0 - 1
+            active_variant_idx = -1
             continue
 
         if proj_kind == ProjKind.PK_INDEX:
@@ -1737,13 +1737,13 @@ fn mir_validate_place_type(mir_mod: MirModule, body: MirBody, place_id: i32) -> 
             if elem_ty == 0:
                 return 0
             current_ty = elem_ty
-            active_variant_idx = 0 - 1
+            active_variant_idx = -1
             continue
 
         if proj_kind == ProjKind.PK_DEREF:
             if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
                 current_ty = mir_mod.mir_get_type_d0(resolved)
-                active_variant_idx = 0 - 1
+                active_variant_idx = -1
                 continue
             return 0
 

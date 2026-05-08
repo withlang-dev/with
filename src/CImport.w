@@ -249,9 +249,9 @@ let CI_CAST_INT_WIDEN_SIGN: i32 = 29
 // Kinds the bridge does not emit — distinct negative sentinels
 // so `cast_kind == CI_CAST_*` comparisons never match anything
 // the bridge returns.
-let CI_CAST_UNKNOWN: i32 = 0 - 1
-let CI_CAST_LVALUE_TO_RVALUE: i32 = 0 - 2
-let CI_CAST_FUNCTION_TO_PTR: i32 = 0 - 3
+let CI_CAST_UNKNOWN: i32 = -1
+let CI_CAST_LVALUE_TO_RVALUE: i32 = -2
+let CI_CAST_FUNCTION_TO_PTR: i32 = -3
 let CI_CAST_FLOAT_WIDEN: i32 = CI_CAST_FLOAT_CAST
 let CI_CAST_FLOAT_TRUNC: i32 = CI_CAST_FLOAT_CAST
 
@@ -2091,7 +2091,7 @@ fn ci_parse_eq_expr(s: str, params: str, known: str) -> str:
 // Level 7: Relational  < > <= >=
 fn ci_parse_rel_expr(s: str, params: str, known: str) -> str:
     // Find rightmost relational op at depth 0 (to get left-to-right assoc)
-    var best_pos = 0 - 1
+    var best_pos = -1
     var best_len = 0
     var depth = 0
     var i = 0
@@ -2141,7 +2141,7 @@ fn ci_parse_shift_expr(s: str, params: str, known: str) -> str:
 // Level 9: Additive  + -
 fn ci_parse_add_expr(s: str, params: str, known: str) -> str:
     // Find rightmost + or - at depth 0, but not after another operator (unary)
-    var best_pos = 0 - 1
+    var best_pos = -1
     var depth = 0
     var i = 0
     while i < s.len() as i32:
@@ -2166,7 +2166,7 @@ fn ci_parse_add_expr(s: str, params: str, known: str) -> str:
 // Level 10: Multiplicative  * / %
 fn ci_parse_mul_expr(s: str, params: str, known: str) -> str:
     // Find rightmost * / % at depth 0
-    var best_pos = 0 - 1
+    var best_pos = -1
     var depth = 0
     var i = 0
     while i < s.len() as i32:
@@ -2357,7 +2357,7 @@ fn ci_ensure_bool(expr: str) -> str:
 // Helper: find a two-char operator at paren depth 0 (leftmost occurrence)
 fn ci_find_op_at_depth0(s: str, op: str) -> i32:
     if op.len() != 2:
-        return 0 - 1
+        return -1
     let c0 = op.byte_at(0)
     let c1 = op.byte_at(1)
     var depth = 0
@@ -2377,7 +2377,7 @@ fn ci_find_op_at_depth0(s: str, op: str) -> i32:
                 return i
             return i
         i = i + 1
-    0 - 1
+    -1
 
 // Helper: find single-char operator at depth 0, excluding doubled version
 fn ci_find_single_op_at_depth0(s: str, ch: i32, doubled: i32) -> i32:
@@ -2398,7 +2398,7 @@ fn ci_find_single_op_at_depth0(s: str, ch: i32, doubled: i32) -> i32:
                 continue
             return i
         i = i + 1
-    0 - 1
+    -1
 
 // Helper: find single char at depth 0
 fn ci_find_char_op_at_depth0(s: str, ch: i32) -> i32:
@@ -2411,7 +2411,7 @@ fn ci_find_char_op_at_depth0(s: str, ch: i32) -> i32:
         if depth == 0 and c == ch:
             return i
         i = i + 1
-    0 - 1
+    -1
 
 // Scan identifier length at start of string. Returns 0 if no ident.
 fn ci_scan_ident(s: str) -> i32:
@@ -2504,7 +2504,7 @@ fn ci_find_matching_bracket(s: str, start: i32) -> i32:
             if depth == 0:
                 return i
         i = i + 1
-    0 - 1
+    -1
 
 // Find the opening paren of a function call: ident(...)
 // Returns position of '(' or -1.
@@ -2713,8 +2713,8 @@ fn ci_translate_builtin_call(name: str, args: str, params: str, known: str) -> s
         return "NAN"
 
     if name == "__builtin_object_size":
-        // __builtin_object_size(ptr, type) → (0 - 1) as usize  (unknown size)
-        return "0 - 1"
+        // __builtin_object_size(ptr, type) → (-1) as usize  (unknown size)
+        return "-1"
 
     if name == "__builtin_mul_overflow":
         // __builtin_mul_overflow(a, b, result) — can't translate inline
@@ -3095,16 +3095,16 @@ fn ci_token_paste_suffix(suffix: str) -> str:
 
 fn ci_find_str(text: str, needle: str) -> i32:
     if needle.len() > text.len():
-        return 0 - 1
+        return -1
     let limit = text.len() - needle.len()
     for i in 0..limit as i32 + 1:
         if text.slice(i as i64, i as i64 + needle.len()) == needle:
             return i
-    0 - 1
+    -1
 
 fn ci_find_binary_op_ext(s: str) -> i32:
     // Like ci_find_binary_op but also handles comparison and logical ops
-    var best_pos = 0 - 1
+    var best_pos = -1
     var best_prec = 100
     var best_len = 0
     var paren_depth = 0
@@ -3128,7 +3128,7 @@ fn ci_find_binary_op_ext(s: str) -> i32:
         idx = idx + 1
     if best_pos > 0:
         return best_pos * 256 + best_len
-    0 - 1
+    -1
 
 fn ci_last_nonspace_char(s: str, idx: i32) -> i32:
     var i = idx - 1
@@ -3178,7 +3178,7 @@ fn ci_op_prec_ext(s: str, idx: i32, slen: i32) -> i32:
     if c == 42: return 9
     if c == 47: return 9
     if c == 37: return 9
-    0 - 1
+    -1
 
 fn ci_op_length_ext(s: str, idx: i32, slen: i32) -> i32:
     if idx + 1 < slen:
@@ -3353,7 +3353,7 @@ fn ci_find_matching_paren(s: str, start: i32) -> i32:
             if depth == 0:
                 return i
         i = i + 1
-    0 - 1
+    -1
 
 fn ci_find_matching_brace(s: str, start: i32) -> i32:
     var depth = 0
@@ -3379,7 +3379,7 @@ fn ci_find_matching_brace(s: str, start: i32) -> i32:
             if depth == 0:
                 return i
         i = i + 1
-    0 - 1
+    -1
 
 // Translate C designated initializer: .field = val, .field2 = val2
 fn ci_translate_designated_init(s: str, params: str, known: str) -> str:
@@ -3541,7 +3541,7 @@ fn ci_translate_comma_block(s: str, params: str, known: str) -> str:
 
 fn ci_find_last_comma_at_depth0(s: str) -> i32:
     var depth = 0
-    var last_comma = 0 - 1
+    var last_comma = -1
     var i = 0
     while i < s.len() as i32:
         let c = s.byte_at(i as i64)
@@ -3564,7 +3564,7 @@ fn ci_find_ternary(s: str) -> i32:
         else if c == 63 and depth == 0:
             return i
         i = i + 1
-    0 - 1
+    -1
 
 fn ci_find_ternary_colon(s: str) -> i32:
     var depth = 0
@@ -3578,7 +3578,7 @@ fn ci_find_ternary_colon(s: str) -> i32:
         else if c == 58 and depth == 0:
             return i
         i = i + 1
-    0 - 1
+    -1
 
 fn ci_is_c_ident(s: str) -> bool:
     if s.len() == 0:
@@ -3612,7 +3612,7 @@ fn ci_lookup_known(name: str, known: str) -> str:
     ""
 
 fn ci_find_binary_op(s: str) -> i32:
-    var best_pos = 0 - 1
+    var best_pos = -1
     var best_prec = 100
     var best_len = 0
     var paren_depth = 0
@@ -3633,7 +3633,7 @@ fn ci_find_binary_op(s: str) -> i32:
         idx = idx + 1
     if best_pos > 0:
         return best_pos * 256 + best_len
-    0 - 1
+    -1
 
 fn ci_op_prec(s: str, idx: i32, slen: i32) -> i32:
     let c = s.byte_at(idx as i64)
@@ -3650,7 +3650,7 @@ fn ci_op_prec(s: str, idx: i32, slen: i32) -> i32:
     if c == 42: return 5
     if c == 47: return 5
     if c == 37: return 5
-    0 - 1
+    -1
 
 fn ci_op_length(s: str, idx: i32, slen: i32) -> i32:
     if idx + 1 < slen:
@@ -5695,7 +5695,7 @@ fn ci_compound_to_ci_binop(op: i32) -> i32:
     if op == BO_XOR_ASSIGN: return CiBinOp.CIBO_BIT_XOR
     if op == BO_SHL_ASSIGN: return CiBinOp.CIBO_SHL
     if op == BO_SHR_ASSIGN: return CiBinOp.CIBO_SHR
-    0 - 1
+    -1
 
 fn CiExprPool.cast_shift_count_expr(self: CiExprPool, types: CiTypePool, rhs: CiExprId) -> CiExprId:
     let c_uint_ty = types.named_type_from_text("c_uint")
@@ -8486,7 +8486,7 @@ fn ci_find_char(s: str, c: i32) -> i32:
         if s.byte_at(i as i64) == c:
             return i
         i = i + 1
-    0 - 1
+    -1
 
 fn ci_find_last_char(s: str, c: i32) -> i32:
     var i = s.len() as i32 - 1
@@ -8494,7 +8494,7 @@ fn ci_find_last_char(s: str, c: i32) -> i32:
         if s.byte_at(i as i64) == c:
             return i
         i = i - 1
-    0 - 1
+    -1
 
 fn ci_goto_decl_suffix(session: i64, var_cursor: i32) -> str:
     let loc = with_ci_cursor_location(session, var_cursor)
@@ -8850,7 +8850,7 @@ fn ci_str_contains(text: str, needle: str) -> bool:
 // Replace field name `old_name` with `new_name` in last comma-separated field of a field_str
 fn ci_str_replace_last_field(field_str: str, old_name: str, new_name: str) -> str:
     // Find last comma at depth 0
-    var last_comma = 0 - 1
+    var last_comma = -1
     var i = 0
     while i < field_str.len() as i32:
         if field_str.byte_at(i as i64) == 44:
@@ -9244,7 +9244,7 @@ fn ci_find_string_literal_end(s: str, start: i32) -> i32:
         if (c == 76 or c == 85 or c == 117) and s.byte_at((i + 1) as i64) == 34:
             i = i + 1
     if i >= slen or s.byte_at(i as i64) != 34:
-        return 0 - 1
+        return -1
     i = i + 1
     while i < slen:
         let c = s.byte_at(i as i64)
@@ -9254,7 +9254,7 @@ fn ci_find_string_literal_end(s: str, start: i32) -> i32:
         if c == 34:
             return i + 1
         i = i + 1
-    0 - 1
+    -1
 
 fn ci_is_concatenated_string(s: str) -> bool:
     // Detect adjacent string literals: "foo" "bar"
@@ -9747,7 +9747,7 @@ fn ci_preprocessed_string_sequence_for_cursor(session: i64, cursor: i32, raw_src
     if preprocessed.len() == 0:
         return ""
     let first_token = ci_first_string_literal_token(raw_src)
-    var start = if first_token.len() > 0: ci_find_str(preprocessed, first_token) else: 0 - 1
+    var start = if first_token.len() > 0: ci_find_str(preprocessed, first_token) else: -1
     if start < 0:
         start = ci_find_str(preprocessed, "\"")
     if start < 0:
@@ -10295,7 +10295,7 @@ fn ci_preprocessed_var_initializer_by_name(var_name: str) -> str:
                 var paren_depth = 0
                 var bracket_depth = 0
                 var brace_depth = 0
-                var eq_pos = 0 - 1
+                var eq_pos = -1
                 while pos < slen:
                     let ch = s.byte_at(pos as i64)
                     if ch == 34 or ch == 39:
@@ -10763,12 +10763,12 @@ fn ci_temp_id_for_cursor(cursor: i32) -> i32:
 // (pcre2_match can trigger thousands of fallbacks per function).
 // When the flag is off, ci_record_raw_{expr,stmt}_kind is a no-op
 // and the aggregators at end of migration never fire.
-var g_ci_raw_stats_enabled_cache: i32 = 0 - 1
+var g_ci_raw_stats_enabled_cache: i32 = -1
 var g_ci_raw_expr_kinds: Vec[i32] = Vec.new()
 var g_ci_raw_stmt_kinds: Vec[i32] = Vec.new()
 
 fn ci_raw_stats_enabled() -> bool:
-    if g_ci_raw_stats_enabled_cache == 0 - 1:
+    if g_ci_raw_stats_enabled_cache == -1:
         let v = with_getenv_str("WITH_MIGRATE_RAW_STATS")
         if v == "1":
             g_ci_raw_stats_enabled_cache = 1
@@ -10785,10 +10785,10 @@ fn ci_raw_stats_enabled() -> bool:
 //     2>&1 | grep -E "^(STRUCTURAL|LEGACY)\[b11\." | sort | uniq -c
 // Every listed site for the commit must show STRUCTURAL[...] >= 1
 // and must not show any LEGACY[...] line.
-var g_ci_trace_port_cache: i32 = 0 - 1
+var g_ci_trace_port_cache: i32 = -1
 
 fn ci_trace_port_enabled() -> bool:
-    if g_ci_trace_port_cache == 0 - 1:
+    if g_ci_trace_port_cache == -1:
         let v = with_getenv_str("WITH_MIGRATE_TRACE_PORT")
         if v == "1":
             g_ci_trace_port_cache = 1

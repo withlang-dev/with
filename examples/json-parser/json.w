@@ -184,7 +184,7 @@ fn parse_number_str(text: str, start: usize) -> Result[f64, JsonError]:
 
     // handle sign
     if i < text.len() and text.byte_at(i as i64) == 45:   // '-'
-        sign = 0.0 - 1.0
+        sign = 0.-1.0
         i = i + 1
 
     // integer part

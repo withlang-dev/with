@@ -1266,7 +1266,7 @@ type PipelineParallel = {
 
 fn pipeline_parallel(model: &Transformer, world: *mut World,
                       splits: Vec[i32]) -> PipelineParallel:
-    // splits = [8, 16, 24, 32] → device 0 gets layers 0-7, etc.
+    // splits = [8, 16, 24, 32] → device 0 gets layers -7, etc.
     ...
 
 fn pp_forward(pp: &PipelineParallel, input: &Tensor) -> Tensor:

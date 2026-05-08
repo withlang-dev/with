@@ -337,7 +337,7 @@ fn MirBuilder.pop_control_target(self: MirBuilder):
 
 fn MirBuilder.find_control_target(self: MirBuilder, label: i32, want_continue: i32) -> LoopInfo:
     if self.loop_continue_bbs.len() as i32 == 0:
-        return LoopInfo { label: 0, target_kind: 0, continue_bb: 0 - 1, break_bb: 0 - 1, break_drop_depth: 0, break_defer_depth: 0, break_scope_depth: 0 }
+        return LoopInfo { label: 0, target_kind: 0, continue_bb: -1, break_bb: -1, break_drop_depth: 0, break_defer_depth: 0, break_scope_depth: 0 }
 
     var i = self.loop_continue_bbs.len() as i32 - 1
     while i >= 0:
@@ -351,7 +351,7 @@ fn MirBuilder.find_control_target(self: MirBuilder, label: i32, want_continue: i
             matches = 1
         if matches != 0:
             if want_continue != 0 and target_kind != ControlTargetKind.CT_LOOP:
-                return LoopInfo { label: target_label, target_kind, continue_bb: 0 - 1, break_bb: self.loop_break_bbs.get(i as i64), break_drop_depth: self.loop_break_drop_depths.get(i as i64), break_defer_depth: self.loop_break_defer_depths.get(i as i64), break_scope_depth: self.loop_break_scope_depths.get(i as i64) }
+                return LoopInfo { label: target_label, target_kind, continue_bb: -1, break_bb: self.loop_break_bbs.get(i as i64), break_drop_depth: self.loop_break_drop_depths.get(i as i64), break_defer_depth: self.loop_break_defer_depths.get(i as i64), break_scope_depth: self.loop_break_scope_depths.get(i as i64) }
             return LoopInfo {
                 label: target_label,
                 target_kind,
@@ -362,7 +362,7 @@ fn MirBuilder.find_control_target(self: MirBuilder, label: i32, want_continue: i
                 break_scope_depth: self.loop_break_scope_depths.get(i as i64),
             }
         i = i - 1
-    LoopInfo { label: 0, target_kind: 0, continue_bb: 0 - 1, break_bb: 0 - 1, break_drop_depth: 0, break_defer_depth: 0, break_scope_depth: 0 }
+    LoopInfo { label: 0, target_kind: 0, continue_bb: -1, break_bb: -1, break_drop_depth: 0, break_defer_depth: 0, break_scope_depth: 0 }
 
 fn MirBuilder.find_goto_label_index(self: MirBuilder, label: i32) -> i32:
     var i = 0
@@ -370,7 +370,7 @@ fn MirBuilder.find_goto_label_index(self: MirBuilder, label: i32) -> i32:
         if self.goto_label_syms.get(i as i64) == label:
             return i
         i = i + 1
-    0 - 1
+    -1
 
 fn MirBuilder.ensure_goto_label(self: MirBuilder, label: i32, scope_depth: i32) -> i32:
     let existing = self.find_goto_label_index(label)
@@ -518,13 +518,13 @@ fn MirBuilder.define_goto_label(self: MirBuilder, label: i32) -> i32:
     bb
 
 fn MirBuilder.goto_target_info(self: MirBuilder, label: i32) -> LoopInfo:
-    let idx = self.ensure_goto_label(label, 0 - 1)
+    let idx = self.ensure_goto_label(label, -1)
     let bb = self.goto_label_bbs.get(idx as i64)
     if self.goto_label_defined.get(idx as i64) != 0:
         return LoopInfo {
             label,
             target_kind: ControlTargetKind.CT_BLOCK,
-            continue_bb: 0 - 1,
+            continue_bb: -1,
             break_bb: bb,
             break_drop_depth: self.goto_label_drop_depths.get(idx as i64),
             break_defer_depth: self.goto_label_defer_depths.get(idx as i64),
@@ -542,7 +542,7 @@ fn MirBuilder.goto_target_info(self: MirBuilder, label: i32) -> LoopInfo:
     LoopInfo {
         label,
         target_kind: ControlTargetKind.CT_BLOCK,
-        continue_bb: 0 - 1,
+        continue_bb: -1,
         break_bb: bb,
         break_drop_depth: drop_depth,
         break_defer_depth: defer_depth,
@@ -564,7 +564,7 @@ fn MirBuilder.lookup_local(self: MirBuilder, sym: i32) -> i32:
         if self.bind_syms.get(i as i64) == sym:
             return self.bind_local_ids.get(i as i64)
         i = i - 1
-    0 - 1
+    -1
 
 fn MirBuilder.lookup_alias_place(self: MirBuilder, sym: i32) -> i32:
     var i = self.alias_syms.len() as i32 - 1
@@ -572,7 +572,7 @@ fn MirBuilder.lookup_alias_place(self: MirBuilder, sym: i32) -> i32:
         if self.alias_syms.get(i as i64) == sym:
             return self.alias_places.get(i as i64)
         i = i - 1
-    0 - 1
+    -1
 
 fn MirBuilder.lookup_alias_type(self: MirBuilder, sym: i32) -> i32:
     var i = self.alias_syms.len() as i32 - 1
@@ -1802,9 +1802,9 @@ fn MirBuilder.ensure_global_local(self: MirBuilder, sym: i32) -> i32:
         let local_id = self.body.new_local(gty, is_mut, sym, 1)
         self.bind_local(sym, local_id)
         return local_id
-    0 - 1
+    -1
 
-fn MirBuilder.lower_var(self: MirBuilder, sym: i32, type_id: i32) -> i32:
+fn MirBuilder.lower_var(self: MirBuilder, sym: i32, type_id: i32, node_id: i32) -> i32:
     let hinted_ty = if self.expected_type != 0: self.expected_type else: type_id
     if self.pool.resolve(sym) == "None" and hinted_ty != 0:
         let hinted_resolved = self.sema.resolve_alias(hinted_ty)
@@ -1863,8 +1863,9 @@ fn MirBuilder.lower_var(self: MirBuilder, sym: i32, type_id: i32) -> i32:
 
     // Check for enum variant without payload (None, etc.)
     if self.sema.variant_lookup.contains(sym):
-        let vl_variant_idx = self.sema.variant_lookup.get(sym).unwrap()
-        let vl_decl_ty = self.sema.variant_type_ids.get(sym).unwrap()
+        let vl_sym = if node_id != 0 and self.sema.comp_resolved.contains(node_id): self.sema.comp_resolved.get(node_id).unwrap() else: sym
+        let vl_variant_idx = self.sema.variant_lookup.get(vl_sym).unwrap()
+        let vl_decl_ty = self.sema.variant_type_ids.get(vl_sym).unwrap()
         var vl_result_ty = if self.expected_type != 0: self.expected_type else: type_id
         if vl_result_ty == 0:
             vl_result_ty = vl_decl_ty
@@ -2082,7 +2083,7 @@ fn mir_op_method_name(op: i32) -> str:
 
 fn MirBuilder.lower_method_bin_op(self: MirBuilder, lhs_expr: i32, rhs_expr: i32, method_sym: i32, node: i32) -> i32:
     // Lower as: method_sym(lhs, rhs)
-    let fn_op = self.lower_var(method_sym, 0)
+    let fn_op = self.lower_var(method_sym, 0, 0)
     let arg_nodes: Vec[i32] = Vec.new()
     arg_nodes.push(lhs_expr)
     arg_nodes.push(rhs_expr)
@@ -2090,20 +2091,20 @@ fn MirBuilder.lower_method_bin_op(self: MirBuilder, lhs_expr: i32, rhs_expr: i32
 
 fn MirBuilder.lower_fn_address(self: MirBuilder, expr: i32, type_id: i32) -> i32:
     if expr == 0:
-        return 0 - 1
+        return -1
     let kind = self.ast.kind(expr)
     if kind == NodeKind.NK_GROUPED:
         return self.lower_fn_address(self.ast.get_data0(expr), type_id)
     if kind != NodeKind.NK_IDENT:
-        return 0 - 1
+        return -1
     let sym = self.ast.get_data0(expr)
     if self.lookup_local(sym) >= 0:
-        return 0 - 1
+        return -1
     if self.lookup_alias_place(sym) >= 0:
-        return 0 - 1
+        return -1
     if self.sema.get_sig(sym) >= 0 or self.sema.generic_fn_nodes.contains(sym):
-        return self.lower_var(sym, type_id)
-    0 - 1
+        return self.lower_var(sym, type_id, expr)
+    -1
 
 fn MirBuilder.lower_un_op(self: MirBuilder, op: i32, expr: i32, node: i32) -> i32:
     if op == UnaryOp.UOP_REF or op == UnaryOp.UOP_RAW_REF_CONST or op == UnaryOp.UOP_RAW_REF_MUT:
@@ -2572,7 +2573,7 @@ fn MirBuilder.lower_block(self: MirBuilder, node: i32) -> i32:
     let labeled_after_bb = if block_label != 0: self.new_block() else: 0
 
     if block_label != 0:
-        self.push_control_target(block_label, ControlTargetKind.CT_BLOCK, 0 - 1, labeled_after_bb)
+        self.push_control_target(block_label, ControlTargetKind.CT_BLOCK, -1, labeled_after_bb)
     self.push_scope()
     let defer_start = self.defer_nodes.len() as i32
 
@@ -3602,7 +3603,7 @@ fn MirBuilder.lower_regex_pattern_match(self: MirBuilder, scrutinee_place: i32, 
     let regex_ty = self.sema.lookup_named_type_visible(self.sema.syms.regex)
     let regex_val = self.lower_regex_literal(pat_node)
     let regex_place = self.materialize_operand(regex_val, regex_ty, self.ast.get_start(pat_node))
-    let regex_ref_ty = self.sema.add_type(TypeKind.TY_REF, regex_ty, 0, 0)
+    let regex_ref_ty = self.sema.ensure_exact_type(TypeKind.TY_REF, regex_ty, 0, 0) as i32
     let regex_ref_tmp = self.new_temp(regex_ref_ty)
     let regex_ref_place = self.place_for_local(regex_ref_tmp)
     let regex_ref_rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, regex_place, 0)
@@ -3610,7 +3611,7 @@ fn MirBuilder.lower_regex_pattern_match(self: MirBuilder, scrutinee_place: i32, 
 
     let is_match_sym = self.sema.pool_lookup_symbol("is_match")
     let is_match_fn = self.sema.lookup_method_fn(self.sema.syms.regex, is_match_sym)
-    let is_match_fn_op = self.lower_var(is_match_fn, 0)
+    let is_match_fn_op = self.lower_var(is_match_fn, 0, 0)
     let call_args: Vec[i32] = Vec.new()
     call_args.push(self.body.new_operand(OperandKind.OK_COPY, regex_ref_place))
     call_args.push(self.body.new_operand(OperandKind.OK_COPY, scrutinee_place))
@@ -3668,7 +3669,7 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
             let scrutinee_ty = self.place_local_type(scrutinee_place)
             let saved_expected = self.expected_type
             self.expected_type = scrutinee_ty
-            let value_op = self.lower_var(value_sym, scrutinee_ty)
+            let value_op = self.lower_var(value_sym, scrutinee_ty, 0)
             self.expected_type = saved_expected
             self.lower_pattern_eq_operand(scrutinee_place, value_op, pat_node, arm_bb, fail_bb)
             return
@@ -3916,7 +3917,7 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
     if pk == NodeKind.NK_PAT_VARIANT or pk == NodeKind.NK_PAT_ENUM_SHORTHAND:
         if self.sema.pattern_value_syms.contains(pat_node):
             return out
-        let variant_sym = self.ast.get_data0(pat_node)
+        let variant_sym = self.resolve_variant_sym(pat_node)
         let bind_start = self.ast.get_data1(pat_node)
         let bind_count = self.ast.get_data2(pat_node)
         let variant_place = self.body.new_downcast_place(scrutinee_place, self.variant_index(variant_sym), 0)
@@ -4133,7 +4134,7 @@ fn MirBuilder.lower_call(self: MirBuilder, fn_expr: i32, arg_exprs_start: i32, a
             if arg_node < 0:
                 // Negative value = implicit parameter marker: 0 - bind_sym
                 let impl_sym = 0 - arg_node
-                args.push(self.lower_var(impl_sym, 0))
+                args.push(self.lower_var(impl_sym, 0, 0))
             else if arg_node != 0:
                 args.push(self.lower_call_arg(arg_node, sig_idx, callable_fn_tid, i))
             else:
@@ -4533,7 +4534,7 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
             self.switch_to(gc_next)
             return self.body.new_operand(OperandKind.OK_COPY, gc_place)
 
-    let fn_op = self.lower_var(callee_sym, 0)
+    let fn_op = self.lower_var(callee_sym, 0, 0)
     let arg_nodes: Vec[i32] = Vec.new()
     // For static method calls (receiver is a type name, not a value),
     // don't pass the receiver as an argument.
@@ -5014,7 +5015,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         return self.unit_operand()
 
     if kind == NodeKind.NK_IDENT:
-        return self.lower_var(self.ast.get_data0(node), self.expr_type(node))
+        return self.lower_var(self.ast.get_data0(node), self.expr_type(node), node)
 
     if kind == NodeKind.NK_BINARY:
         let op = self.ast.get_data0(node)
@@ -5553,7 +5554,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         if self.ast.state.copy_arg_needs_clone.contains(node):
             // Clone-only type: emit inner.clone()
             let clone_sym = self.pool.intern("clone")
-            return self.lower_method_call(inner, clone_sym, 0 - 1, 0, node)
+            return self.lower_method_call(inner, clone_sym, -1, 0, node)
         return self.lower_expr(inner)
 
     if kind == NodeKind.NK_OPTIONAL_CHAIN:

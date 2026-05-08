@@ -507,7 +507,7 @@ diff -ruN a/pcre2posix.w b/pcre2posix.w
          var i: c_ulong = 0 // init: untranslatable
          var ovector: *mut c_ulong = null // init: untranslatable
          while (if i < nmatch: 1 else: 0) != 0:
--(pmatch[i].rm_so = (pmatch[i].rm_eo = (0 - 1)))            (i = i + 1)
+-(pmatch[i].rm_so = (pmatch[i].rm_eo = (-1)))            (i = i + 1)
 +            pmatch[i].rm_eo = -1
 +            pmatch[i].rm_so = -1
 +            i = i + 1

@@ -463,7 +463,7 @@ fn cc_str_find_last_char(text: str, ch: i32) -> i32:
         if text.byte_at(i as i64) == ch:
             return i
         i = i - 1
-    0 - 1
+    -1
 
 fn cc_owner_prefix(sym_text: str) -> str:
     let dot = cc_str_find_last_char(sym_text, 46)
@@ -1320,8 +1320,8 @@ fn CCodegen.local_assigned_fn_sym_depth(self: CCodegen, body: MirBody, local_id:
                 if self.place_is_direct_local(body, od, src_local) == 0:
                     continue
                 cand = self.local_assigned_fn_sym_depth(body, src_local, depth + 1)
-                if cand == 0 - 2:
-                    return 0 - 2
+                if cand == -2:
+                    return -2
             else:
                 continue
             if cand <= 0:
@@ -1330,7 +1330,7 @@ fn CCodegen.local_assigned_fn_sym_depth(self: CCodegen, body: MirBody, local_id:
                 out = cand
                 continue
             if out != cand:
-                return 0 - 2
+                return -2
     out
 
 fn CCodegen.local_assigned_fn_sym(self: CCodegen, body: MirBody, local_id: i32) -> i32:
@@ -1367,13 +1367,13 @@ fn CCodegen.call_method_base_name(self: CCodegen, body: MirBody, callee_operand:
 
 fn CCodegen.call_first_arg_place_id(self: CCodegen, body: MirBody, args_id: i32) -> i32:
     if self.call_arg_count(body, args_id) <= 0:
-        return 0 - 1
+        return -1
     let first_arg = self.call_arg_operand(body, args_id, 0)
     if first_arg < 0 or first_arg >= body.operand_kinds.len() as i32:
-        return 0 - 1
+        return -1
     let ok = body.operand_kinds.get(first_arg as i64)
     if ok != OperandKind.OK_COPY and ok != OperandKind.OK_MOVE:
-        return 0 - 1
+        return -1
     body.operand_d0.get(first_arg as i64)
 
 fn CCodegen.place_same(self: CCodegen, body: MirBody, a: i32, b: i32) -> i32:
@@ -1404,7 +1404,7 @@ fn CCodegen.place_kind_cache_lookup(self: CCodegen, body_fn_sym: i32, place_id: 
         if self.place_kind_cache_place_ids.get(i as i64) != place_id:
             continue
         return self.place_kind_cache_vals.get(i as i64)
-    0 - 1234567
+    -1234567
 
 fn CCodegen.place_kind_cache_store(self: CCodegen, body_fn_sym: i32, place_id: i32, kind: i32):
     self.place_kind_cache_body_fns.push(body_fn_sym)
@@ -1416,7 +1416,7 @@ fn CCodegen.callee_hint_cache_lookup(self: CCodegen, fn_sym: i32) -> i32:
         let v = self.callee_hint_cache.get(fn_sym)
         if v.is_some():
             return v.unwrap()
-    0 - 1234567
+    -1234567
 
 fn CCodegen.callee_hint_cache_store(self: CCodegen, fn_sym: i32, kind: i32):
     self.callee_hint_cache.insert(fn_sym, kind)
@@ -1425,7 +1425,7 @@ fn CCodegen.callee_field_hint(self: CCodegen, fn_sym: i32) -> i32:
     if fn_sym == 0:
         return cc_callee_hint_none()
     let cache_hit = self.callee_hint_cache_lookup(fn_sym)
-    if cache_hit != 0 - 1234567:
+    if cache_hit != -1234567:
         return cache_hit
 
     let raw = cc_intern_resolve(self.intern, fn_sym)
@@ -1502,7 +1502,7 @@ fn CCodegen.infer_place_kind_impl(self: CCodegen, body: MirBody, place_id: i32) 
 
 fn CCodegen.infer_place_kind(self: CCodegen, body: MirBody, place_id: i32) -> i32:
     let cache_hit = self.place_kind_cache_lookup(body.fn_sym, place_id)
-    if cache_hit != 0 - 1234567:
+    if cache_hit != -1234567:
         return cache_hit
     let kind = self.infer_place_kind_impl(body, place_id)
     self.place_kind_cache_store(body.fn_sym, place_id, kind)
@@ -1649,7 +1649,7 @@ fn CCodegen.infer_named_call_sym_scan(self: CCodegen, body: MirBody, fn_sym: i32
     let arg_count = self.call_arg_count(body, args_id)
     let want_ret_tid = self.call_dest_expected_tid(body, dest_place)
     var match_sym = 0
-    var match_score = 0 - 1
+    var match_score = -1
     for si in 0..self.sema.sig_names.len() as i32:
         let sym = self.sema.sig_names.get(si as i64)
         if only_local_defs != 0 and self.has_body_for_sym(sym) == 0:
@@ -1698,7 +1698,7 @@ fn CCodegen.infer_body_method_sym(self: CCodegen, body: MirBody, fn_sym: i32, ar
     let want_ret_tid = self.call_dest_expected_tid(body, dest_place)
     let first_owner = self.type_owner_text(self.call_first_arg_resolved_tid(body, args_id))
     var match_sym = 0
-    var match_score = 0 - 1
+    var match_score = -1
     for i in 0..self.mir_mod.body_fn_syms.len() as i32:
         let cand = self.mir_mod.body_fn_syms.get(i as i64)
         let cand_text = cc_intern_resolve(self.intern, cand)
@@ -1742,7 +1742,7 @@ fn CCodegen.infer_direct_call_sym_scan(self: CCodegen, body: MirBody, args_id: i
     let arg_count = self.call_arg_count(body, args_id)
     let want_ret_tid = self.call_dest_expected_tid(body, dest_place)
     var match_sym = 0
-    var match_score = 0 - 1
+    var match_score = -1
     for si in 0..self.sema.sig_names.len() as i32:
         let sym = self.sema.sig_names.get(si as i64)
         if only_local_defs != 0 and self.has_body_for_sym(sym) == 0:
@@ -1937,7 +1937,7 @@ fn CCodegen.direct_cache_lookup(self: CCodegen, body_fn_sym: i32, args_id: i32, 
         if self.direct_cache_dests.get(i as i64) != dest_place:
             continue
         return self.direct_cache_values.get(i as i64)
-    0 - 1234567
+    -1234567
 
 fn CCodegen.direct_cache_store(self: CCodegen, body_fn_sym: i32, args_id: i32, dest_place: i32, value: i32):
     self.direct_cache_body_fns.push(body_fn_sym)
@@ -1956,7 +1956,7 @@ fn CCodegen.method_cache_lookup(self: CCodegen, body_fn_sym: i32, method_sym: i3
         if self.method_cache_dests.get(i as i64) != dest_place:
             continue
         return self.method_cache_values.get(i as i64)
-    0 - 1234567
+    -1234567
 
 fn CCodegen.method_cache_store(self: CCodegen, body_fn_sym: i32, method_sym: i32, args_id: i32, dest_place: i32, value: i32):
     self.method_cache_body_fns.push(body_fn_sym)
@@ -1972,7 +1972,7 @@ fn CCodegen.field_cache_lookup(self: CCodegen, struct_tid: i32, field_sym: i32) 
         if self.field_cache_syms.get(i as i64) != field_sym:
             continue
         return self.field_cache_tids.get(i as i64)
-    0 - 1234567
+    -1234567
 
 fn CCodegen.field_cache_store(self: CCodegen, struct_tid: i32, field_sym: i32, tid: i32):
     self.field_cache_struct_tids.push(struct_tid)
@@ -1982,7 +1982,7 @@ fn CCodegen.field_cache_store(self: CCodegen, struct_tid: i32, field_sym: i32, t
 fn CCodegen.field_cache_record(self: CCodegen, struct_tid: i32, field_sym: i32, tid: i32):
     if tid == 0 or self.is_void_tid(tid) != 0:
         return
-    if self.field_cache_lookup(struct_tid, field_sym) != 0 - 1234567:
+    if self.field_cache_lookup(struct_tid, field_sym) != -1234567:
         return
     self.field_cache_store(struct_tid, field_sym, self.sema.resolve_alias(tid))
 
@@ -1993,7 +1993,7 @@ fn CCodegen.local_infer_cache_lookup(self: CCodegen, body_fn_sym: i32, local_id:
         if self.local_infer_ids.get(i as i64) != local_id:
             continue
         return self.local_infer_vals.get(i as i64)
-    0 - 1234567
+    -1234567
 
 fn CCodegen.local_infer_cache_store(self: CCodegen, body_fn_sym: i32, local_id: i32, tid: i32):
     self.local_infer_body_fns.push(body_fn_sym)
@@ -2007,7 +2007,7 @@ fn CCodegen.local_usage_hint_cache_lookup(self: CCodegen, body_fn_sym: i32, loca
         if self.local_usage_hint_ids.get(i as i64) != local_id:
             continue
         return self.local_usage_hint_vals.get(i as i64)
-    0 - 1234567
+    -1234567
 
 fn CCodegen.local_usage_hint_cache_store(self: CCodegen, body_fn_sym: i32, local_id: i32, tid: i32):
     self.local_usage_hint_body_fns.push(body_fn_sym)
@@ -2018,7 +2018,7 @@ fn CCodegen.local_usage_hint_tid(self: CCodegen, body: MirBody, local_id: i32) -
     if local_id < 0:
         return 0
     let cache_hit = self.local_usage_hint_cache_lookup(body.fn_sym, local_id)
-    if cache_hit != 0 - 1234567:
+    if cache_hit != -1234567:
         return cache_hit
     var hint_tid = 0
 
@@ -2028,7 +2028,7 @@ fn CCodegen.local_usage_hint_tid(self: CCodegen, body: MirBody, local_id: i32) -
             continue
         let callee_operand = body.term_data0(bb)
         let args_id = body.term_data1(bb)
-        var sig_idx = 0 - 1
+        var sig_idx = -1
         let fn_sym = self.call_callee_fn_sym(body, callee_operand)
         if fn_sym != 0:
             sig_idx = self.sig_index_for_sym(fn_sym)
@@ -2097,7 +2097,7 @@ fn CCodegen.local_usage_hint_tid(self: CCodegen, body: MirBody, local_id: i32) -
 
 fn CCodegen.infer_direct_call_sym(self: CCodegen, body: MirBody, args_id: i32, dest_place: i32) -> i32:
     let cache_hit = self.direct_cache_lookup(body.fn_sym, args_id, dest_place)
-    if cache_hit != 0 - 1234567:
+    if cache_hit != -1234567:
         return cache_hit
     if self.direct_infer_active(args_id, dest_place) != 0:
         self.direct_cache_store(body.fn_sym, args_id, dest_place, 0)
@@ -2105,7 +2105,7 @@ fn CCodegen.infer_direct_call_sym(self: CCodegen, body: MirBody, args_id: i32, d
     self.direct_infer_push(args_id, dest_place)
     let local_scan = self.infer_direct_call_sym_scan(body, args_id, dest_place, 1)
     var result = 0
-    if local_scan == 0 - 2 or local_scan > 0:
+    if local_scan == -2 or local_scan > 0:
         result = local_scan
     else:
         result = self.infer_direct_call_sym_scan(body, args_id, dest_place, 0)
@@ -2241,7 +2241,7 @@ fn CCodegen.infer_qualified_method_sym_scan(self: CCodegen, body: MirBody, metho
         preferred_owner = self.type_owner_text(first_arg_tid)
 
     var match_sym = 0
-    var match_score = 0 - 1
+    var match_score = -1
     for si in 0..self.sema.sig_names.len() as i32:
         let sym = self.sema.sig_names.get(si as i64)
         if only_local_defs != 0 and self.has_body_for_sym(sym) == 0:
@@ -2284,7 +2284,7 @@ fn CCodegen.infer_qualified_method_sym(self: CCodegen, body: MirBody, method_sym
     if self.infer_local_depth > 0:
         return self.infer_qualified_method_sym_scan(body, method_sym, args_id, dest_place, 1)
     let cache_hit = self.method_cache_lookup(body.fn_sym, method_sym, args_id, dest_place)
-    if cache_hit != 0 - 1234567:
+    if cache_hit != -1234567:
         return cache_hit
     if self.method_infer_active(method_sym, args_id, dest_place) != 0:
         self.method_cache_store(body.fn_sym, method_sym, args_id, dest_place, 0)
@@ -2292,7 +2292,7 @@ fn CCodegen.infer_qualified_method_sym(self: CCodegen, body: MirBody, method_sym
     self.method_infer_push(method_sym, args_id, dest_place)
     let local_scan = self.infer_qualified_method_sym_scan(body, method_sym, args_id, dest_place, 1)
     var result = 0
-    if local_scan == 0 - 2 or local_scan > 0:
+    if local_scan == -2 or local_scan > 0:
         result = local_scan
     else:
         result = self.infer_qualified_method_sym_scan(body, method_sym, args_id, dest_place, 0)
@@ -2316,7 +2316,7 @@ fn CCodegen.infer_owner_method_sym_scan(self: CCodegen, body: MirBody, fn_sym: i
     let argc = self.call_arg_count(body, args_id)
     let want_ret_tid = self.call_dest_expected_tid(body, dest_place)
     var match_sym = 0
-    var match_score = 0 - 1
+    var match_score = -1
     for si in 0..self.sema.sig_names.len() as i32:
         let sym = self.sema.sig_names.get(si as i64)
         if only_local_defs != 0 and self.has_body_for_sym(sym) == 0:
@@ -2385,7 +2385,7 @@ fn CCodegen.sig_index_for_sym(self: CCodegen, fn_sym: i32) -> i32:
     if self.sig_idx_cache.contains(fn_sym):
         return self.sig_idx_cache.get(fn_sym).unwrap()
 
-    var out = 0 - 1
+    var out = -1
     let canon = self.canonical_body_sym(fn_sym)
     if canon != 0:
         let canon_sig = self.sema.get_sig(canon)
@@ -2402,7 +2402,7 @@ fn CCodegen.sig_index_for_sym(self: CCodegen, fn_sym: i32) -> i32:
                 out = si
                 break
         if out < 0 and cc_str_contains_dot(raw) != 0:
-            var match_idx = 0 - 1
+            var match_idx = -1
             for si in 0..self.sema.sig_names.len() as i32:
                 let sym_text = cc_intern_resolve(self.intern, self.sema.sig_names.get(si as i64))
                 if sym_text != raw:
@@ -2410,13 +2410,13 @@ fn CCodegen.sig_index_for_sym(self: CCodegen, fn_sym: i32) -> i32:
                 if match_idx < 0:
                     match_idx = si
                 else:
-                    match_idx = 0 - 2
+                    match_idx = -2
                     break
             if match_idx >= 0:
                 out = match_idx
         if out < 0 and cc_str_contains_dot(raw) == 0:
             let wanted = "." ++ raw
-            var match_idx = 0 - 1
+            var match_idx = -1
             for si in 0..self.sema.sig_names.len() as i32:
                 let sym_text = cc_intern_resolve(self.intern, self.sema.sig_names.get(si as i64))
                 if cc_str_ends_with(sym_text, wanted) == 0:
@@ -2424,7 +2424,7 @@ fn CCodegen.sig_index_for_sym(self: CCodegen, fn_sym: i32) -> i32:
                 if match_idx < 0:
                     match_idx = si
                 else:
-                    match_idx = 0 - 2
+                    match_idx = -2
                     break
             if match_idx >= 0:
                 out = match_idx
@@ -2772,7 +2772,7 @@ fn CCodegen.resolve_call_named_callee(self: CCodegen, body: MirBody, fn_sym: i32
             return self.fn_c_name(named_body_sym)
         return self.extern_call_name(inferred_named, body, args_id, dest_place)
     let inferred_method = self.infer_qualified_method_sym(body, fn_sym, args_id, dest_place)
-    if inferred_method == 0 - 2:
+    if inferred_method == -2:
         return "/*ambiguous_method*/"
     if inferred_method > 0:
         let method_body_sym = self.canonical_body_sym(inferred_method)
@@ -2847,7 +2847,7 @@ fn CCodegen.resolve_call_callee_text(self: CCodegen, body: MirBody, bb: i32, cal
         let local_id = self.place_local_id(body, od)
         if local_id >= 0 and self.place_is_direct_local(body, od, local_id) != 0:
             let local_fn_sym = self.local_assigned_fn_sym(body, local_id)
-            if local_fn_sym == 0 - 2:
+            if local_fn_sym == -2:
                 return "/*ambiguous_call*/"
             if local_fn_sym > 0:
                 return self.resolve_call_named_callee(body, local_fn_sym, args_id, dest_place)
@@ -2855,7 +2855,7 @@ fn CCodegen.resolve_call_callee_text(self: CCodegen, body: MirBody, bb: i32, cal
         if callee_tid != 0:
             return self.place_text(body, od)
         let inferred = self.infer_direct_call_sym(body, args_id, dest_place)
-        if inferred == 0 - 2:
+        if inferred == -2:
             return "/*ambiguous_call*/"
         if inferred > 0:
             let inferred_body_sym = self.canonical_body_sym(inferred)
@@ -2878,7 +2878,7 @@ fn CCodegen.resolve_call_callee_text(self: CCodegen, body: MirBody, bb: i32, cal
         // Current MIR lowering often uses a unit-const placeholder for direct
         // calls. Recover the callee from semantic signatures.
         let inferred = self.infer_direct_call_sym(body, args_id, dest_place)
-        if inferred == 0 - 2:
+        if inferred == -2:
             return "/*ambiguous_call*/"
         if inferred > 0:
             let inferred_body_sym = self.canonical_body_sym(inferred)
@@ -3048,7 +3048,7 @@ fn CCodegen.infer_local_tid(self: CCodegen, body: MirBody, local_id: i32) -> i32
     if local_id < 0 or local_id >= body.local_type_ids.len() as i32:
         return 0
     let cache_hit = self.local_infer_cache_lookup(body.fn_sym, local_id)
-    if cache_hit != 0 - 1234567:
+    if cache_hit != -1234567:
         return cache_hit
     let declared = self.local_declared_tid(body, local_id)
     let declared_resolved = self.sema.resolve_alias(declared)
@@ -3143,7 +3143,7 @@ fn CCodegen.call_args_text(self: CCodegen, body: MirBody, args_id: i32, callee_o
 
 fn CCodegen.callee_sig_from_operand(self: CCodegen, body: MirBody, callee_op: i32) -> i32:
     if callee_op < 0 or callee_op >= body.operand_kinds.len() as i32:
-        return 0 - 1
+        return -1
     let ok = body.operand_kinds.get(callee_op as i64)
     if ok == OperandKind.OK_CONSTANT:
         let cd = body.operand_d0.get(callee_op as i64)
@@ -3152,7 +3152,7 @@ fn CCodegen.callee_sig_from_operand(self: CCodegen, body: MirBody, callee_op: i3
             if ck == ConstKind.CK_FN:
                 let fn_sym = body.const_d0.get(cd as i64)
                 return self.body_sig_index(fn_sym)
-    0 - 1
+    -1
 
 fn cc_builtin_from_mir_intrinsic(intrinsic: i32) -> i32:
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_NEW: return cc_builtin_vec_new()
@@ -4269,12 +4269,12 @@ fn CCodegen.infer_struct_field_tid_from_usage(self: CCodegen, struct_tid: i32, f
     if self.sema.get_type_kind(resolved_struct) != TypeKind.TY_STRUCT:
         return 0
     let cached = self.field_cache_lookup(resolved_struct, field_sym)
-    if cached != 0 - 1234567:
+    if cached != -1234567:
         return cached
 
     self.build_field_cache_from_usage()
     let hinted = self.field_cache_lookup(resolved_struct, field_sym)
-    if hinted != 0 - 1234567:
+    if hinted != -1234567:
         return hinted
 
     var inferred = 0
@@ -4292,7 +4292,7 @@ fn CCodegen.infer_struct_field_tid_from_usage(self: CCodegen, struct_tid: i32, f
                 let args_id = body.term_data1(bb)
                 let dest_place = body.term_data2(bb)
 
-                var sig_idx = 0 - 1
+                var sig_idx = -1
                 if callee_operand >= 0 and callee_operand < body.operand_kinds.len() as i32:
                     if body.operand_kinds.get(callee_operand as i64) == OperandKind.OK_CONSTANT:
                         let const_id = body.operand_d0.get(callee_operand as i64)
@@ -4401,10 +4401,10 @@ fn CCodegen.effective_field_tid(self: CCodegen, struct_tid: i32, field_sym: i32,
     let owner_tid = self.sema.resolve_alias(struct_tid as TypeId) as i32
     if owner_tid != 0 and self.sema.get_type_kind(owner_tid as TypeId) == TypeKind.TY_STRUCT:
         var cached = self.field_cache_lookup(owner_tid, field_sym)
-        if cached == 0 - 1234567:
+        if cached == -1234567:
             self.build_field_cache_from_usage()
             cached = self.field_cache_lookup(owner_tid, field_sym)
-        if cached != 0 - 1234567 and cached != 0 and self.is_void_tid(cached) == 0:
+        if cached != -1234567 and cached != 0 and self.is_void_tid(cached) == 0:
             let cached_resolved = self.sema.resolve_alias(cached as TypeId) as i32
             if cached_resolved != 0 and self.sema.get_type_kind(cached_resolved as TypeId) != TypeKind.TY_ERR:
                 return cached_resolved

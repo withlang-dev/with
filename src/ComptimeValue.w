@@ -164,7 +164,7 @@ fn comptime_value_truthy(value: ComptimeValue) -> i32:
         if value.data0 != 0:
             return 1
         return 0
-    0 - 1
+    -1
 
 fn comptime_value_kind_name(kind: i32) -> str:
     if kind == ComptimeValueKind.CV_VOID: return "void"

@@ -1245,10 +1245,10 @@ Use diagnostics or `comptime_error`. Incomplete generated output must be visible
 
 Use `comptime`, derives, type introspection, and explicit generated source.
 
-### Do not write `0 - 1` when you mean `-1`
+### Do not write `-1` when you mean `-1`
 
 ```with
-let x = 0 - 1    // wrong: verbose and confusing
+let x = -1    // wrong: verbose and confusing
 let x = -1        // right
 ```
 

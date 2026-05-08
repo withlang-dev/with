@@ -50,7 +50,7 @@ pub fn range_i32(lo: i32, hi: i32) -> i32:
     let positive = if v < 0: 0 - v else: v
     lo + (positive % range)
 
-/// Return true with the given probability (0-100 percent).
+/// Return true with the given probability (-100 percent).
 pub fn chance(percent: i32) -> bool:
     if percent <= 0: return false
     if percent >= 100: return true

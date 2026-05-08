@@ -431,8 +431,8 @@ fn AstPool.new -> AstPool:
             int_literal_radices: Vec.new(),
             extra: Vec.new(),
             decls: Vec.new(),
-            local_decl_count: 0 - 1,
-            prelude_decl_count: 0 - 1,
+            local_decl_count: -1,
+            prelude_decl_count: -1,
             strings: Vec.new(),
             fn_meta: Vec.new(),
             type_meta: Vec.new(),
@@ -484,7 +484,7 @@ fn AstPool.new -> AstPool:
     st.data1.push(0)
     st.data2.push(0)
     st.literal_suffixes.push(LiteralSuffix.None)
-    st.int_literal_digit_idxs.push(0 - 1)
+    st.int_literal_digit_idxs.push(-1)
     st.int_literal_radices.push(0)
     AstPool { state: ptr }
 
@@ -504,7 +504,7 @@ fn AstPool.add_node(self: AstPool, kind: i32, start: i32, end: i32, d0: i32, d1:
     self.state.data1.push(d1)
     self.state.data2.push(d2)
     self.state.literal_suffixes.push(LiteralSuffix.None)
-    self.state.int_literal_digit_idxs.push(0 - 1)
+    self.state.int_literal_digit_idxs.push(-1)
     self.state.int_literal_radices.push(0)
     idx as NodeId
 
@@ -623,7 +623,7 @@ fn exact_int_expr_magnitude(expr: ExactIntExpr) -> ExactIntValue:
     ExactIntValue { ok: expr.ok, overflow: expr.overflow, lo: expr.lo, hi: expr.hi }
 
 fn exact_int_sign_bit() -> i64:
-    0 - 9223372036854775807 - 1
+    -9223372036854775807 - 1
 
 fn exact_int_uword_lt(lhs: i64, rhs: i64) -> bool:
     let sign_bit = exact_int_sign_bit()
@@ -637,7 +637,7 @@ fn exact_int_low_mask(bits: i32) -> i64:
     if bits <= 0:
         return 0
     if bits >= 64:
-        return 0 - 1
+        return -1
     if bits == 63:
         return 9223372036854775807
     ((1 as i64) << (bits as u32)) - 1
@@ -676,11 +676,11 @@ fn exact_int_is_zero(value: ExactIntValue) -> bool:
 
 fn exact_int_cmp(lhs: ExactIntValue, rhs: ExactIntValue) -> i32:
     if exact_int_uword_lt(lhs.hi, rhs.hi):
-        return 0 - 1
+        return -1
     if exact_int_uword_lt(rhs.hi, lhs.hi):
         return 1
     if exact_int_uword_lt(lhs.lo, rhs.lo):
-        return 0 - 1
+        return -1
     if exact_int_uword_lt(rhs.lo, lhs.lo):
         return 1
     0
@@ -765,7 +765,7 @@ fn exact_int_digit_value(ch: i32) -> i32:
         return ch - 87
     if ch >= 65 and ch <= 70:
         return ch - 55
-    0 - 1
+    -1
 
 fn exact_int_parse_digits(digits: str, radix: i32) -> ExactIntValue:
     if radix < 2 or radix > 16:
@@ -872,7 +872,7 @@ fn AstPool.int_literal_expr_i64(self: AstPool, node: i32) -> ExactIntI64:
     if not exact_int_fits_signed_negative_bits(mag, 64):
         return ExactIntI64 { ok: 0, value: 0 }
     if mag.hi == 0 and mag.lo == exact_int_sign_bit():
-        return ExactIntI64 { ok: 1, value: 0 - 9223372036854775807 - 1 }
+        return ExactIntI64 { ok: 1, value: -9223372036854775807 - 1 }
     ExactIntI64 { ok: 1, value: 0 - mag.lo }
 
 fn AstPool.int_literal_exact_expr(self: AstPool, node: i32) -> ExactIntExpr:
@@ -1013,7 +1013,7 @@ fn AstPool.find_fn_meta(self: AstPool, node: NodeId) -> i32:
     let opt = self.state.fn_meta_map.get(node as i32)
     if opt.is_some():
         return opt.unwrap()
-    0 - 1
+    -1
 
 fn AstPool.fn_meta_flags(self: AstPool, meta: i32) -> i32:
     self.state.fn_meta.get((meta + 1) as i64)
@@ -1075,7 +1075,7 @@ fn AstPool.find_type_meta(self: AstPool, node: NodeId) -> i32:
     let opt = self.state.type_meta_map.get(node as i32)
     if opt.is_some():
         return opt.unwrap()
-    0 - 1
+    -1
 
 fn AstPool.type_meta_derive_start(self: AstPool, meta: i32) -> i32:
     self.state.type_meta.get((meta + 1) as i64)
@@ -1154,7 +1154,7 @@ fn AstPool.find_where_meta(self: AstPool, fn_node: NodeId) -> i32:
     let opt = self.state.where_meta_map.get(fn_node as i32)
     if opt.is_some():
         return opt.unwrap()
-    0 - 1
+    -1
 
 fn AstPool.add_impl_type_params(self: AstPool, impl_node: NodeId, tp_start: i32, tp_count: i32):
     let idx = self.state.impl_type_params.len() as i32
@@ -1167,7 +1167,7 @@ fn AstPool.find_impl_type_params(self: AstPool, impl_node: NodeId) -> i32:
     let opt = self.state.impl_type_params_map.get(impl_node as i32)
     if opt.is_some():
         return opt.unwrap()
-    0 - 1
+    -1
 
 fn AstPool.add_impl_target_type_node(self: AstPool, impl_node: NodeId, type_node: NodeId):
     self.state.impl_target_type_nodes.push(impl_node as i32)
@@ -1196,7 +1196,7 @@ fn AstPool.find_impl_trait_type_args(self: AstPool, impl_node: NodeId) -> i32:
     let opt = self.state.impl_trait_type_args_map.get(impl_node as i32)
     if opt.is_some():
         return opt.unwrap()
-    0 - 1
+    -1
 
 fn AstPool.fn_param_patterns_len(self: AstPool) -> i32:
     self.state.fn_param_patterns.len() as i32
@@ -1218,7 +1218,7 @@ fn AstPool.find_fn_param_pattern_meta(self: AstPool, node: NodeId) -> i32:
     let opt = self.state.fn_param_pattern_meta_map.get(node as i32)
     if opt.is_some():
         return opt.unwrap()
-    0 - 1
+    -1
 
 fn AstPool.fn_param_pattern_meta_start(self: AstPool, meta: i32) -> i32:
     self.state.fn_param_pattern_meta.get((meta + 1) as i64)
@@ -1237,7 +1237,7 @@ fn AstPool.find_for_meta(self: AstPool, node: NodeId) -> i32:
     let opt = self.state.for_meta_map.get(node as i32)
     if opt.is_some():
         return opt.unwrap()
-    0 - 1
+    -1
 
 fn AstPool.for_meta_index_binding(self: AstPool, meta: i32) -> i32:
     self.state.for_meta.get((meta + 1) as i64)
@@ -1255,7 +1255,7 @@ fn AstPool.find_block_meta(self: AstPool, node: NodeId) -> i32:
     let opt = self.state.block_meta_map.get(node as i32)
     if opt.is_some():
         return opt.unwrap()
-    0 - 1
+    -1
 
 fn AstPool.block_meta_label(self: AstPool, meta: i32) -> i32:
     self.state.block_meta.get((meta + 1) as i64)

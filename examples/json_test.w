@@ -89,7 +89,7 @@ fn main():
     let r9 = json_parse(&mut p9 as *mut JsonParser, neg, tokens, 128)
     expect("neg int parse: 3 tokens", r9 == 3)
     let xi = json_find(neg, tokens, 0, "x")
-    expect("neg int val", json_int(neg, tokens, xi) == 0 - 42)
+    expect("neg int val", json_int(neg, tokens, xi) == -42)
 
     // ── Test 10: Boolean and null ──
     var p10 = JsonParser.new()

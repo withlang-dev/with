@@ -10,7 +10,7 @@ fn might_fail(x: i32) -> MyResult:
 
 fn test_errdefer_on_error() -> MyResult:
     errdefer: print("cleanup-on-error")
-    let val = might_fail(0 - 1)?
+    let val = might_fail(-1)?
     .Ok(val)
 
 fn test_errdefer_on_success() -> MyResult:

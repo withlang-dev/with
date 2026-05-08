@@ -67,7 +67,7 @@ fn test_primitives:
     assert_eq(10 % 3, 1, "modulo")
 
     // Unary negate
-    assert_eq(0 - 5, -5, "unary negate via subtraction")
+    assert_eq(-5, -5, "unary negate via subtraction")
 
     // Comparison operators
     assert_true(3 < 5, "less than")

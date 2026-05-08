@@ -442,12 +442,12 @@ fn Sema.ct_build_value_tree(self: Sema, pool: AstPool, intern: InternPool, value
 fn Sema.ct_eval_truthy(mut self: Sema, source_ast: AstPool, node: i32) -> i32:
     let value = comptime_force_eval_expr(self as *mut Sema, source_ast, self.pool, node)
     if comptime_value_is_valid(value) == 0:
-        return 0 - 1
+        return -1
     let truthy = comptime_value_truthy(value)
     if truthy >= 0:
         return truthy
     self.ct_emit_error(source_ast, node, "comptime condition must be bool or integer")
-    0 - 1
+    -1
 
 fn Sema.ct_transform_fstring(mut self: Sema, source_ast: AstPool, pool: AstPool, intern: InternPool, node: i32):
     let seg_count = pool.get_data0(node)
@@ -497,7 +497,7 @@ fn ct_iter_count(value: ComptimeValue) -> i32:
         if span <= 0:
             return 0
         return span as i32
-    0 - 1
+    -1
 
 fn Sema.ct_iter_item_node(self: Sema, pool: AstPool, intern: InternPool, iterable: ComptimeValue, index: i32, node: i32, extras: Vec[ComptimeValue]) -> i32:
     if iterable.kind == ComptimeValueKind.CV_RANGE:
