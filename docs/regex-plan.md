@@ -113,7 +113,7 @@ impl Drop for Regex:
         if self.code as i64 != 0:
             pcre2_code_free_8(self.code)
 
-pub fn Regex.compile(pattern: &str) -> Result[Regex, RegexError]:
+pub fn Regex.compile(pattern: str) -> Result[Regex, RegexError]:
     var error_code: c_int
     var error_offset: c_ulong
     let code = pcre2_compile_8(
@@ -132,21 +132,21 @@ pub fn Regex.compile(pattern: &str) -> Result[Regex, RegexError]:
 ### Step 7: Match and capture methods -- DONE
 
 ```
-pub fn Regex.is_match(self: &Self, text: &str) -> bool
-pub fn Regex.find(self: &Self, text: &str) -> Option[Match]
-pub fn Regex.captures(self: &Self, text: &str) -> Option[Captures]
-pub fn Regex.captures_all(self: &Self, text: &str) -> Vec[Captures]
+pub fn Regex.is_match(self: &Self, text: str) -> bool
+pub fn Regex.find(self: &Self, text: str) -> Option[Match]
+pub fn Regex.captures(self: &Self, text: str) -> Option[Captures]
+pub fn Regex.captures_all(self: &Self, text: str) -> Vec[Captures]
 ```
 
 ### Step 8: Replace and split -- DONE
 
 ```
-pub fn Regex.replace(self: &Self, text: &str, repl: &str) -> str
-pub fn Regex.replace_all(self: &Self, text: &str, repl: &str) -> str
-pub fn Regex.replace_fn(self: &Self, text: &str, f: fn(&Captures) -> str) -> str
-pub fn Regex.replace_all_fn(self: &Self, text: &str, f: fn(&Captures) -> str) -> str
-pub fn Regex.split(self: &Self, text: &str) -> Vec[str]
-pub fn Regex.splitn(self: &Self, text: &str, n: i32) -> Vec[str]
+pub fn Regex.replace(self: &Self, text: str, repl: str) -> str
+pub fn Regex.replace_all(self: &Self, text: str, repl: str) -> str
+pub fn Regex.replace_fn(self: &Self, text: str, f: fn(&Captures) -> str) -> str
+pub fn Regex.replace_all_fn(self: &Self, text: str, f: fn(&Captures) -> str) -> str
+pub fn Regex.split(self: &Self, text: str) -> Vec[str]
+pub fn Regex.splitn(self: &Self, text: str, n: i32) -> Vec[str]
 ```
 
 ---
@@ -167,22 +167,24 @@ Capture binding injection (`$0`, `$1`, `$name`) in if/match bodies.
 Regex as a builtin struct type. Regex literal validation at
 compile time.
 
-### Step 12: Codegen — lazy literal compilation -- DONE
+### Step 12: Codegen — per-literal static compilation -- DONE
 
-Each regex literal lowers to `Regex.__compile_literal(pattern,
-flags, file, line, col)`. The stdlib keeps a process-wide lazy cache
-keyed by `(pattern, flags)`, so repeated literal use reuses compiled
-PCRE2 code. `=~` lowers to `Regex.is_match`; capture-bearing `if`
-conditions and regex match arms bind `$0`, `$1`, and `$name` in the
-body scope.
+Each regex literal lowers to a module-level static slot that is
+unique to that source literal. The slot is initialized lazily on
+first use and reused directly after that; there is no pattern-string
+cache or deduplication across source locations. `=~` lowers to one
+capture-producing match operation when capture bindings are in scope,
+so `$0`, `$1`, and `$name` all come from the same successful match
+result.
 
 ---
 
 ## Phase 4: Optimization (future)
 
-### Step 13: JIT compilation
+### Step 13: Optional JIT compilation
 
-Link PCRE2's sljit JIT compiler as a C object for hot patterns.
+Link PCRE2's sljit JIT compiler as a C object only if future
+performance work needs it for hot patterns.
 
 ### Step 14: Compile-time validation -- DONE
 
@@ -208,7 +210,7 @@ Phase 3: Language Integration
   Step 9 (lexer) DONE → Step 10 (parser) DONE → Step 11 (sema) DONE → Step 12 (codegen) DONE
 
 Phase 4: Optimization
-  Step 13 (JIT) — independent
+  Step 13 (optional JIT) — independent
   Step 14 (comptime) DONE
 ```
 

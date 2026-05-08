@@ -509,21 +509,3 @@ system commands or managing processes.
 which are a general-purpose data query language backed by
 the migrated jq engine. But `-e` / `-n` / `-p` give you the
 full With language for everything else.
-
----
-
-## Design Decisions
-
-| Decision | Rationale |
-|---|---|
-| Implicit imports | One-liners shouldn't need boilerplate. The seven imports cover 99% of one-liner use cases. |
-| `-n` / `-p` as separate flags | Perl proved this is the right granularity. `-n` for filtering, `-p` for transforming. |
-| `-j` for JSON mode | jq is the most common one-liner tool for JSON. `-j` makes the common case trivial. |
-| `-jn` / `-jy` / `-jt` variants | JSONL, YAML, TOML are common enough to deserve single-flag access. |
-| `line` not `$_` | With doesn't have sigil variables. `line` is readable and obvious. |
-| `nr` not `$.` | Same — readable name instead of Perl sigil. |
-| `.` as stdin root in `-j` | Matches jq convention. `.` is the input document. |
-| Semicolons as line breaks | Shell quoting makes actual newlines painful. Semicolons are the universal workaround. |
-| `-O0` default | Compile speed matters more than runtime speed for one-liners. Sub-100ms startup. |
-| Full compilation, no interpreter | One binary, one execution model. No "interpreted mode" to maintain separately. |
-| `from` not string-based jq | Compile-time checked queries, variable capture, no injection. The whole point of With. |

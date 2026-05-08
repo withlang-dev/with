@@ -160,6 +160,114 @@ fn Codegen.mir_sema_type_to_llvm(self: Codegen, sema_ty: i32) -> i64:
         return wl_struct_type(self.context, vec_data_i64(&body_types), 2, 0)
     0
 
+fn codegen_regex_flag_options(flags: str) -> i32:
+    var options: i32 = 0
+    var i: i64 = 0
+    while i < flags.len():
+        let flag_byte = flags.byte_at(i)
+        if flag_byte == 105:
+            options = options | 8
+        else if flag_byte == 109:
+            options = options | 1024
+        else if flag_byte == 115:
+            options = options | 32
+        else if flag_byte == 120:
+            options = options | 128
+        else if flag_byte == 85:
+            options = options | 262144
+        else if flag_byte == 117:
+            options = options | 524288 | 131072
+        i = i + 1
+    options
+
+fn codegen_regex_state_flags(flags: str) -> i32:
+    var state_flags: i32 = 0
+    var i: i64 = 0
+    while i < flags.len():
+        if flags.byte_at(i) == 103:
+            state_flags = state_flags | 1
+        i = i + 1
+    state_flags
+
+fn Codegen.ensure_regex_runtime_fn(self: Codegen, name: str, ret_ty: i64, params: Vec[i64]) -> i64:
+    var fn_val = wl_get_named_function(self.llmod, name)
+    if fn_val != 0:
+        return fn_val
+    let fn_ty = wl_function_type(ret_ty, vec_data_i64(&params), params.len() as i32, 0)
+    wl_add_function(self.llmod, name, fn_ty)
+
+fn Codegen.regex_literal_code_fn(self: Codegen) -> i64:
+    let helper_sym = self.intern.intern("Regex.__literal_code")
+    let fn_opt = self.fn_values.get(helper_sym)
+    if fn_opt.is_some():
+        return fn_opt.unwrap() as i64
+    let helper_name = self.function_link_name_for_sym(helper_sym)
+    let found = wl_get_named_function(self.llmod, helper_name)
+    if found != 0:
+        return found
+    with_eprint("error: regex literal helper Regex.__literal_code was not generated")
+    self.had_error = 1
+    0
+
+fn Codegen.regex_literal_global(self: Codegen, name: str, ty: i64, init: i64) -> i64:
+    var gv = wl_get_named_global(self.llmod, name)
+    if gv != 0:
+        return gv
+    gv = wl_add_global(self.llmod, ty, name)
+    wl_set_linkage(gv, wl_private_linkage())
+    wl_set_initializer(gv, init)
+    gv
+
+fn Codegen.gen_regex_literal_value(self: Codegen, body: MirBody, const_id: i32, regex_ty: i64) -> i64:
+    let ptr_ty = wl_ptr_type(self.context)
+    let i32_ty = wl_i32_type(self.context)
+    let i64_ty = wl_i64_type(self.context)
+    let str_ty = self.resolve_named_type(self.intern.intern("str"))
+    let pat_sym = body.const_d0.get(const_id as i64)
+    let flags_sym = body.const_d1.get(const_id as i64)
+    let node = body.const_d2.get(const_id as i64)
+    let raw_pattern = if pat_sym != 0: self.intern.resolve(pat_sym) else: ""
+    let raw_flags = if flags_sym != 0: self.intern.resolve(flags_sym) else: ""
+    let pattern = self.decode_string_escapes(raw_pattern)
+    let flags = self.decode_string_escapes(raw_flags)
+    let options = codegen_regex_flag_options(flags)
+    let state_flags = codegen_regex_state_flags(flags)
+    let base_name = f"__regex_lit_{node}"
+    let code_global = self.regex_literal_global(base_name, ptr_ty, wl_const_null(ptr_ty))
+    let pos_global = self.regex_literal_global(base_name ++ "_pos", i32_ty, wl_const_int(i32_ty, 0, 0))
+    let subject_ptr_global = self.regex_literal_global(base_name ++ "_subject_ptr", i64_ty, wl_const_int(i64_ty, 0, 0))
+    let subject_len_global = self.regex_literal_global(base_name ++ "_subject_len", i64_ty, wl_const_int(i64_ty, -1, 1))
+
+    let literal_fn = self.regex_literal_code_fn()
+    if literal_fn == 0:
+        return self.build_default_value(regex_ty)
+    let literal_ft = wl_global_get_value_type(literal_fn)
+    let literal_args: Vec[i64] = Vec.new()
+    literal_args.push(code_global)
+    literal_args.push(self.gen_string_literal_raw(pattern))
+    literal_args.push(wl_const_int(i32_ty, options as i64, 0))
+    let code_ptr = wl_build_call(self.builder, literal_ft, literal_fn, vec_data_i64(&literal_args), 3)
+    let cap_params: Vec[i64] = Vec.new()
+    cap_params.push(ptr_ty)
+    let cap_fn = self.ensure_regex_runtime_fn("with_regex_capture_count", i32_ty, cap_params)
+    let cap_ft = wl_global_get_value_type(cap_fn)
+    let cap_args: Vec[i64] = Vec.new()
+    cap_args.push(code_ptr)
+    let capture_count = wl_build_call(self.builder, cap_ft, cap_fn, vec_data_i64(&cap_args), 1)
+
+    var result = self.build_default_value(regex_ty)
+    result = wl_build_insert_value(self.builder, result, code_ptr, 0)
+    result = wl_build_insert_value(self.builder, result, self.gen_string_literal_raw(pattern), 1)
+    result = wl_build_insert_value(self.builder, result, self.gen_string_literal_raw(flags), 2)
+    result = wl_build_insert_value(self.builder, result, wl_const_int(i32_ty, options as i64, 0), 3)
+    result = wl_build_insert_value(self.builder, result, wl_const_int(i32_ty, state_flags as i64, 0), 4)
+    result = wl_build_insert_value(self.builder, result, capture_count, 5)
+    result = wl_build_insert_value(self.builder, result, wl_const_int(i32_ty, 0, 0), 6)
+    result = wl_build_insert_value(self.builder, result, if state_flags != 0: pos_global else: wl_const_null(ptr_ty), 7)
+    result = wl_build_insert_value(self.builder, result, if state_flags != 0: subject_ptr_global else: wl_const_null(ptr_ty), 8)
+    result = wl_build_insert_value(self.builder, result, if state_flags != 0: subject_len_global else: wl_const_null(ptr_ty), 9)
+    result
+
 fn Codegen.mir_build_closure_fn_type(self: Codegen, sema_ty: i32) -> i64:
     var resolved = self.mir_input.mir_resolve_alias(sema_ty)
     var tk = self.mir_input.mir_get_type_kind(resolved)
@@ -792,6 +900,10 @@ fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected
         if materialize_ty != 0:
             return self.build_default_value(materialize_ty)
         return wl_const_int(wl_i32_type(self.context), 0, 0)
+
+    if ck == ConstKind.CK_REGEX_LIT:
+        let regex_ty = if materialize_ty != 0: materialize_ty else: self.resolve_named_type(self.intern.intern("Regex"))
+        return self.gen_regex_literal_value(body, const_id, regex_ty)
 
     if ck == ConstKind.CK_CLOSURE:
         // Populate local_allocas/local_types/local_sema_types from MIR locals

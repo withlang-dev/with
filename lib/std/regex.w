@@ -48,6 +48,10 @@ pub type Regex {
     options: i32,
     flags: i32,
     capture_count: i32,
+    owned: i32,
+    global_pos: *mut i32,
+    global_subject_ptr: *mut i64,
+    global_subject_len: *mut i64,
 }
 
 pub type Captures {
@@ -55,10 +59,6 @@ pub type Captures {
     subject: str,
     spans: Vec[i32],
 }
-
-global var __regex_literal_cache_patterns: Vec[str] = Vec.new()
-global var __regex_literal_cache_flags: Vec[str] = Vec.new()
-global var __regex_literal_cache_values: Vec[Regex] = Vec.new()
 
 fn regex_make_flags(options: i32, flags: i32) -> RegexFlags:
     RegexFlags { options: options, flags: flags, }
@@ -106,10 +106,14 @@ pub fn Regex.clone(self: &Self) -> Self:
         options: self.options,
         flags: self.flags,
         capture_count: self.capture_count,
+        owned: 1,
+        global_pos: null,
+        global_subject_ptr: null,
+        global_subject_len: null,
     }
 
 fn Regex.drop(move self: Self):
-    if self.ptr as i64 != 0:
+    if self.owned != 0 and self.ptr as i64 != 0:
         with_regex_code_free(self.ptr)
 
 pub fn Regex.is_global(self: &Self) -> bool:
@@ -137,28 +141,28 @@ pub fn Regex.compile_flags(pattern: str, flags: str) -> Result[Regex, RegexError
                 options: parsed_flags.options,
                 flags: parsed_flags.flags,
                 capture_count: with_regex_capture_count(compiled),
+                owned: 1,
+                global_pos: null,
+                global_subject_ptr: null,
+                global_subject_len: null,
             })
         }
         Err(err) => Err(err)
 
-pub fn Regex.__compile_literal(pattern: str, flags: str, file: str, line: i32, col: i32) -> Regex:
-    var i: i32 = 0
-    while i < __regex_literal_cache_values.len() as i32:
-        if __regex_literal_cache_patterns.get(i as i64) == pattern and __regex_literal_cache_flags.get(i as i64) == flags:
-            return __regex_literal_cache_values.get(i as i64).clone()
-        i = i + 1
-    match Regex.compile_flags(pattern, flags):
-        Ok(regex) => {
-            __regex_literal_cache_patterns.push(pattern)
-            __regex_literal_cache_flags.push(flags)
-            __regex_literal_cache_values.push(regex.clone())
-            return regex.clone()
-        }
-        Err(err) => {
-            let msg = "invalid regex literal at column " ++ col.to_string() ++ ": " ++ err.message
-            with_panic(msg, file, line)
-            Regex { ptr: null, pattern_text: pattern, flags_text: flags, options: 0, flags: 0, capture_count: 0, }
-        }
+pub fn Regex.__literal_code(slot: *mut *const i8, pattern: str, options: i32) -> *const i8:
+    if slot as i64 == 0:
+        return null
+    let existing = unsafe: *slot
+    if existing as i64 != 0:
+        return existing
+    var err_code: i32 = 0
+    var err_offset: i32 = 0
+    let compiled = with_regex_compile(pattern, options, &raw mut err_code, &raw mut err_offset)
+    if compiled as i64 == 0:
+        with_panic("invalid regex literal: " ++ regex_error_message(err_code), "", 0)
+        return null
+    unsafe: *slot = compiled
+    compiled
 
 pub fn Regex.pattern(self: &Self) -> str:
     self.pattern_text
@@ -205,6 +209,39 @@ pub fn Regex.captures_at(self: &Self, text: str, start_offset: i32) -> Option[Ca
 
 pub fn Regex.is_match(self: &Self, text: str) -> bool:
     self.captures(text).is_some()
+
+pub fn Regex.captures_match_op(self: &Self, text: str) -> Option[Captures]:
+    if not self.is_global() or self.global_pos as i64 == 0 or self.global_subject_ptr as i64 == 0 or self.global_subject_len as i64 == 0:
+        return self.captures(text)
+    let subject_ptr = unsafe: *(&text as *const *const u8) as i64
+    let subject_len = text.len()
+    if unsafe: *self.global_subject_ptr != subject_ptr or unsafe: *self.global_subject_len != subject_len:
+        unsafe: *self.global_subject_ptr = subject_ptr
+        unsafe: *self.global_subject_len = subject_len
+        unsafe: *self.global_pos = 0
+    let start_offset = unsafe: *self.global_pos
+    match self.captures_at(text, start_offset):
+        Some(captures) => {
+            match captures.get(0):
+                Some(found) => {
+                    if found.end == found.start:
+                        if found.end >= text.len() as i32:
+                            unsafe: *self.global_pos = text.len() as i32 + 1
+                        else:
+                            unsafe: *self.global_pos = found.end + 1
+                    else:
+                        unsafe: *self.global_pos = found.end
+                    Some(captures)
+                }
+                None => {
+                    unsafe: *self.global_pos = 0
+                    None
+                }
+        }
+        None => {
+            unsafe: *self.global_pos = 0
+            None
+        }
 
 pub fn Regex.find(self: &Self, text: str) -> Option[Match]:
     self.find_at(text, 0)
@@ -458,6 +495,20 @@ pub fn Captures.by_name(self: &Self, name: str) -> Option[Match]:
 
 pub fn Captures.name(self: &Self, name: str) -> Option[Match]:
     self.by_name(name)
+
+pub fn Captures.text(self: &Self, index: i32) -> str:
+    match self.get(index):
+        Some(found) => found.text
+        None => ""
+
+pub fn Captures.name_text(self: &Self, name: str) -> str:
+    let lookup_name = if name.len() > 0 and name.byte_at(0) == 36:
+        with_str_slice(name, 1, name.len())
+    else:
+        name
+    match self.name(lookup_name):
+        Some(found) => found.text
+        None => ""
 
 pub fn Regex.capture_text(self: &Self, text: str, index: i32) -> str:
     match self.captures(text):
