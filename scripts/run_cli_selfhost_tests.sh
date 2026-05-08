@@ -1978,6 +1978,7 @@ expect_migrate_sizeof_pointer_type_syntax() {
   cat >"$src" <<'EOF'
 static const char *items[] = { "a", "b", "c" };
 typedef unsigned char PCRE2_UCHAR;
+#define PCRE2_SIZE size_t
 #define real_context real_context_8
 typedef struct memctl_for_sizeof {
   void *(*malloc)(unsigned long, void *);
@@ -1999,6 +2000,10 @@ int typed_pointer_size(void) {
 unsigned long macro_suffixed_record_size(void) {
   return sizeof(real_context);
 }
+
+unsigned long macro_builtin_type_size(void) {
+  return sizeof(PCRE2_SIZE);
+}
 EOF
 
   if ! run_cli "$tmpdir/out" "$tmpdir/err" migrate "$src" --no-c-export --prefer-brace -o "$out_w"; then
@@ -2011,6 +2016,7 @@ EOF
   if ! file_has_literal "$out_w" "sizeof[usize]()" \
     || ! file_has_literal "$out_w" "sizeof[real_context_8]()" \
     || file_has_literal "$out_w" "sizeof[real_context]()" \
+    || file_has_literal "$out_w" "sizeof[size_t]()" \
     || file_has_literal "$out_w" "sizeof[*mut " \
     || file_has_literal "$out_w" "sizeof[*const "; then
     echo "FAIL(cli-selfhost-migrate-output) sizeof_pointer_type_syntax"
