@@ -11849,6 +11849,39 @@ fn ci_native_goto_collect_leaf_ids(cfg: CiGotoCfg, block: i32) -> Vec[i32]:
         i = i + 1
     out
 
+fn ci_goto_cfg_reachable_blocks(cfg: CiGotoCfg) -> Vec[i32]:
+    let reachable: Vec[i32] = Vec.new()
+    let worklist: Vec[i32] = Vec.new()
+    let block_count = cfg.graph.blocks.len() as i32
+    var i = 0
+    while i < block_count:
+        reachable.push(0)
+        i = i + 1
+
+    if cfg.graph.entry < 0 or cfg.graph.entry >= block_count:
+        return reachable
+
+    let entry_i = cfg.graph.entry as i64
+    with reachable.slot(entry_i) as mut entry_slot:
+        entry_slot.set(1)
+    worklist.push(cfg.graph.entry)
+
+    var wi: i64 = 0
+    while wi < worklist.len():
+        let current = worklist.get(wi)
+        let block = cfg.graph.blocks.get(current as i64)
+        var si = 0
+        while si < block.succs_count:
+            let succ = cfg.graph.succs.get((block.succs_start + si) as i64)
+            if succ >= 0 and succ < block_count and reachable.get(succ as i64) == 0:
+                let succ_i = succ as i64
+                with reachable.slot(succ_i) as mut succ_slot:
+                    succ_slot.set(1)
+                worklist.push(succ)
+            si = si + 1
+        wi = wi + 1
+    reachable
+
 fn CiStmtPool.native_goto_unreachable_stmt(self: CiStmtPool, exprs: CiExprPool) -> CiStmtId:
     let name = exprs.add_string("unreachable")
     let callee = exprs.ident(name, 0 as CiTypeId)
@@ -11926,6 +11959,7 @@ fn CiStmtPool.native_goto_emit_cfg(self: CiStmtPool, cfg: CiGotoCfg, hoisted_stm
     let labels = self.native_goto_label_syms(cfg)
     if cfg.graph.entry < 0 or cfg.graph.entry >= labels.len() as i32:
         return ci_native_goto_fail("native goto emitter: entry block out of range")
+    let reachable = ci_goto_cfg_reachable_blocks(cfg)
 
     let ids: Vec[i32] = Vec.new()
     var hi: i64 = 0
@@ -11960,6 +11994,9 @@ fn CiStmtPool.native_goto_emit_cfg(self: CiStmtPool, cfg: CiGotoCfg, hoisted_stm
 
     var block: i32 = 0
     while block < cfg.graph.blocks.len() as i32:
+        if reachable.get(block as i64) == 0:
+            block = block + 1
+            continue
         let block_ids: Vec[i32] = Vec.new()
         var li: i64 = 0
         while li < cfg.stmt_ids.len():

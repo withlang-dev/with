@@ -1120,6 +1120,11 @@ fn run_migrate_command(argc: i32) -> i32:
             reinvoke_args = f"{reinvoke_args} --no-c-export"
             ai = ai + 1
             continue
+        if arg == "--c-export-functions":
+            migrate_set_export_function_defs(1)
+            reinvoke_args = f"{reinvoke_args} --c-export-functions"
+            ai = ai + 1
+            continue
         if arg == "--convert-goto-to-structured":
             migrate_set_convert_goto_to_structured(1)
             reinvoke_args = f"{reinvoke_args} --convert-goto-to-structured"

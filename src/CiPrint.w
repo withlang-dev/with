@@ -426,7 +426,7 @@ fn ci_type_needs_memcpy_assignment(types: CiTypePool, ty: CiTypeId) -> bool:
 
 fn ci_print_memcpy_assignment(indent: str, exprs: CiExprPool, types: CiTypePool, lhs: CiExprId, rhs: CiExprId, ty: CiTypeId) -> str:
     let lhs_str = ci_print_expr(exprs, types, lhs, 0, 1)
-    let rhs_str = ci_print_expr(exprs, types, rhs, 0, 0)
+    let rhs_str = ci_print_expr(exprs, types, rhs, 0, 1)
     let ty_text = ci_print_sizeof_type_text(ci_print_type(types, ty))
     indent ++ "with_memcpy((&raw mut " ++ lhs_str ++ " as *i8), (&raw const " ++ rhs_str ++ " as *i8), sizeof[" ++ ty_text ++ "]())\n"
 
@@ -530,10 +530,14 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
     if kind == CiExprKind.CIE_FIELD:
         let base = (exprs.get_d0(id)) as CiExprId
         let field = exprs.get_string(exprs.get_d1(id))
-        let base_text = ci_print_expr(exprs, types, base, 0, wants_ptr)
         let base_ty = exprs.get_type(base)
+        if wants_ptr != 0 and (base_ty as i32) != 0 and types.kind(base_ty) == CiTypeKind.CT_POINTER:
+            let base_text = ci_print_expr(exprs, types, base, 0, 0)
+            return f"(unsafe: *{base_text}).{field}"
         if wants_ptr == 0 and ci_field_base_needs_borrow(types, base_ty):
+            let base_text = ci_print_expr(exprs, types, base, 0, 1)
             return f"(&raw const {base_text} as *const {ci_print_type(types, base_ty)}).{field}"
+        let base_text = ci_print_expr(exprs, types, base, 0, wants_ptr)
         return f"{base_text}.{field}"
     if kind == CiExprKind.CIE_INDEX:
         let base = (exprs.get_d0(id)) as CiExprId

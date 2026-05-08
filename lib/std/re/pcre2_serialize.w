@@ -1,27 +1,28 @@
 // Migrated from PCRE2
 use std.re.defs
 
-fn pcre2_serialize_encode_8(codes: *mut *const pcre2_real_code_8, number_of_codes: c_int, serialized_bytes: *mut *mut u8, serialized_size: *mut c_ulong, gcontext: *mut pcre2_real_general_context_8) -> c_int {
-    var bytes: *mut u8
+@[c_export("pcre2_serialize_encode_8")]
+fn pcre2_serialize_encode_8(__param_codes: *mut *const pcre2_real_code_8, __param_number_of_codes: c_int, __param_serialized_bytes: *mut *mut u8, __param_serialized_size: *mut c_ulong, __param_gcontext: *mut pcre2_real_general_context_8) -> c_int {
+    var __local_bytes: *mut u8
 
-    var dst_bytes: *mut u8
+    var __local_dst_bytes: *mut u8
 
-    var i: c_int
+    var __local_i: c_int
 
-    var total_size: c_ulong
+    var __local_total_size: c_ulong
 
-    var re: *const pcre2_real_code_8
+    var __local_re: *const pcre2_real_code_8
 
-    var tables: *const u8
+    var __local_tables: *const u8
 
-    var data: *mut pcre2_serialized_data
+    var __local_data: *mut pcre2_serialized_data
 
-    var memctl: *const pcre2_memctl = with 0 as __ci_expr_seq_16 {
+    var __local_memctl: *const pcre2_memctl = with 0 as __ci_expr_seq_16 {
         var __ci_expr_ternary_0: *mut pcre2_memctl = null
-        if ((if gcontext != null: 1 else: 0) != 0) {
-            (__ci_expr_ternary_0 = (((&gcontext.memctl as *const pcre2_memctl) as *mut pcre2_memctl)))
+        if ((if __param_gcontext != null: 1 else: 0) != 0) {
+            (__ci_expr_ternary_0 = (((&raw const (unsafe: *__param_gcontext).memctl as *const pcre2_memctl) as *mut pcre2_memctl)))
         } else {
-            (__ci_expr_ternary_0 = (((&_pcre2_default_compile_context_8.memctl as *const pcre2_memctl) as *mut pcre2_memctl)))
+            (__ci_expr_ternary_0 = (((&raw const (unsafe: *(&raw const _pcre2_default_compile_context_8 as *const pcre2_real_compile_context_8)).memctl as *const pcre2_memctl) as *mut pcre2_memctl)))
         }
         (__ci_expr_ternary_0 as *const pcre2_memctl)
     }
@@ -30,16 +31,16 @@ fn pcre2_serialize_encode_8(codes: *mut *const pcre2_real_code_8, number_of_code
 
     var __ci_expr_logic_1: c_int
 
-    if ((if codes == null: 1 else: 0) != 0) {
+    if ((if __param_codes == null: 1 else: 0) != 0) {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_1 = (if (if serialized_bytes == null: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_1 = (if (if __param_serialized_bytes == null: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_1 != 0) {
         (__ci_expr_logic_2 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_2 = (if (if serialized_size == null: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_2 = (if (if __param_serialized_size == null: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_2 != 0) {
@@ -47,376 +48,403 @@ fn pcre2_serialize_encode_8(codes: *mut *const pcre2_real_code_8, number_of_code
     }
 
 
-    if ((if number_of_codes <= 0: 1 else: 0) != 0) {
+    if ((if __param_number_of_codes <= 0: 1 else: 0) != 0) {
         return -29
     }
 
-    (total_size = (sizeof[pcre2_serialized_data]() +% 1088))
+    (__local_total_size = ((sizeof[pcre2_serialized_data]() as c_ulong) +% (1088 as c_ulong)))
 
-    (tables = ((null as *const u8)))
+    (__local_tables = ((null as *const u8)))
 
-    (i = 0)
+    (__local_i = 0)
 
-    while ((if i < number_of_codes: 1 else: 0) != 0) {
-        if ((if (unsafe: codes[i]) == null: 1 else: 0) != 0) {
+    while ((if __local_i < __param_number_of_codes: 1 else: 0) != 0) {
+        if ((if (unsafe: __param_codes[__local_i]) == null: 1 else: 0) != 0) {
             return -51
         }
 
-        (re = (unsafe: codes[i]))
+        (__local_re = (unsafe: __param_codes[__local_i]))
 
-        if ((if re.magic_number != 1346589253: 1 else: 0) != 0) {
+        if ((if __local_re.magic_number != 1346589253: 1 else: 0) != 0) {
             return -31
         }
 
-        if ((if tables == null: 1 else: 0) != 0) {
-            (tables = re.tables)
+        if ((if __local_tables == null: 1 else: 0) != 0) {
+            (__local_tables = __local_re.tables)
         } else {
-            if ((if tables != re.tables: 1 else: 0) != 0) {
+            if ((if __local_tables != __local_re.tables: 1 else: 0) != 0) {
                 return -30
             }
         }
 
-        (total_size = total_size + re.blocksize)
+        (__local_total_size = __local_total_size + __local_re.blocksize)
 
 
-        (i = i + 1)
+        (__local_i = __local_i + 1)
 
     }
 
 
-    (bytes = ((memctl.malloc((total_size +% sizeof[pcre2_memctl]()), memctl.memory_data) as *mut u8)))
+    (__local_bytes = ((__local_memctl.malloc(((__local_total_size as c_ulong) +% (sizeof[pcre2_memctl]() as c_ulong)), __local_memctl.memory_data) as *mut u8)))
 
-    if ((if bytes == null: 1 else: 0) != 0) {
+    if ((if __local_bytes == null: 1 else: 0) != 0) {
         return -48
     }
 
-    with_memcpy((bytes as *i8), (memctl as *i8), (sizeof[pcre2_memctl]() as i64))
+    with_memcpy((__local_bytes as *i8), (__local_memctl as *i8), (sizeof[pcre2_memctl]() as i64))
 
-    (bytes = bytes + sizeof[pcre2_memctl]())
+    (__local_bytes = __local_bytes + (sizeof[pcre2_memctl]() as usize))
 
-    (data = ((bytes as *mut pcre2_serialized_data)))
+    (__local_data = ((__local_bytes as *mut pcre2_serialized_data)))
 
-    (data.magic = 1347564115)
+    ((unsafe: *__local_data).magic = 1347564115)
 
-    (data.version = 3145738)
+    ((unsafe: *__local_data).version = 3145738)
 
-    (data.config = 526337)
+    ((unsafe: *__local_data).config = 526337)
 
-    (data.number_of_codes = number_of_codes)
+    ((unsafe: *__local_data).number_of_codes = __param_number_of_codes)
 
-    (dst_bytes = bytes + sizeof[pcre2_serialized_data]())
+    (__local_dst_bytes = __local_bytes + (sizeof[pcre2_serialized_data]() as usize))
 
-    with_memcpy((dst_bytes as *i8), (tables as *i8), (1088 as i64))
+    with_memcpy((__local_dst_bytes as *i8), (__local_tables as *i8), (1088 as i64))
 
-    (dst_bytes = dst_bytes + ((512 + 320) + 256))
+    (__local_dst_bytes = __local_dst_bytes + ((((512 + 320) + 256) as isize) as usize))
 
-    (i = 0)
+    (__local_i = 0)
 
-    while ((if i < number_of_codes: 1 else: 0) != 0) {
-        (re = (unsafe: codes[i]))
+    while ((if __local_i < __param_number_of_codes: 1 else: 0) != 0) {
+        (__local_re = (unsafe: __param_codes[__local_i]))
 
-        with_memcpy((dst_bytes as *i8), ((re as *const c_char) as *i8), (re.blocksize as i64))
+        with_memcpy((__local_dst_bytes as *i8), ((__local_re as *const c_char) as *i8), (__local_re.blocksize as i64))
 
-        with_memset(((dst_bytes + 0) as *i8), 0, (sizeof[pcre2_memctl]() as i64))
+        with_memset(((__local_dst_bytes + (0 as usize)) as *i8), 0, (sizeof[pcre2_memctl]() as i64))
 
-        with_memset(((dst_bytes + 24) as *i8), 0, (8 as i64))
+        with_memset(((__local_dst_bytes + (24 as usize)) as *i8), 0, (sizeof[usize]() as i64))
 
-        with_memset(((dst_bytes + 32) as *i8), 0, (8 as i64))
+        with_memset(((__local_dst_bytes + (32 as usize)) as *i8), 0, (sizeof[usize]() as i64))
 
-        (dst_bytes = dst_bytes + re.blocksize)
+        (__local_dst_bytes = __local_dst_bytes + (__local_re.blocksize as usize))
 
 
-        (i = i + 1)
+        (__local_i = __local_i + 1)
 
     }
 
 
-    ((unsafe: *serialized_bytes) = bytes)
+    ((unsafe: *__param_serialized_bytes) = __local_bytes)
 
-    ((unsafe: *serialized_size) = total_size)
+    ((unsafe: *__param_serialized_size) = __local_total_size)
 
-    return number_of_codes
+    return __param_number_of_codes
 
 }
 
-fn pcre2_serialize_decode_8(codes: *mut *mut pcre2_real_code_8, __param_number_of_codes: c_int, bytes: *const u8, gcontext: *mut pcre2_real_general_context_8) -> c_int {
-    var number_of_codes = __param_number_of_codes
-    var data__goto_164_30: *const pcre2_serialized_data = null
-    var memctl__goto_165_21: *const pcre2_memctl = null
-    var src_bytes__goto_168_16: *const u8 = null
-    var dst_re__goto_169_18: *mut pcre2_real_code_8 = null
-    var tables__goto_170_10: *mut u8 = null
-    var i__goto_171_9: c_int = 0
-    var j__goto_171_12: c_int = 0
-    var error___goto_172_9: c_int = 0
-    var blocksize__goto_206_23: c_ulong = 0
-    var __pc: i32 = 0
-    var __goto_pending: i32 = 0
-    while true {
-        match __pc {
-            0 => {
-                (__goto_pending = 0)
-                (data__goto_164_30 = ((bytes as *const pcre2_serialized_data)))
-                var __ci_expr_ternary_0: *mut pcre2_memctl = null
-                if ((if gcontext != null: 1 else: 0) != 0) {
-                    (__ci_expr_ternary_0 = (((&gcontext.memctl as *const pcre2_memctl) as *mut pcre2_memctl)))
-                } else {
-                    (__ci_expr_ternary_0 = (((&_pcre2_default_compile_context_8.memctl as *const pcre2_memctl) as *mut pcre2_memctl)))
-                }
-                (memctl__goto_165_21 = ((__ci_expr_ternary_0 as *const pcre2_memctl)))
-                (dst_re__goto_169_18 = ((null as *mut pcre2_real_code_8)))
-                var __ci_expr_logic_1: c_int
-                if ((if data__goto_164_30 == null: 1 else: 0) != 0) {
-                    (__ci_expr_logic_1 = (if true: 1 else: 0))
-                } else {
-                    (__ci_expr_logic_1 = (if (if codes == null: 1 else: 0) != 0: 1 else: 0))
-                }
-                if (__ci_expr_logic_1 != 0) {
-                    return -51
-                }
-                if (__goto_pending != 0) {
-                    continue
-                }
-                if ((if number_of_codes <= 0: 1 else: 0) != 0) {
-                    return -29
-                }
-                if (__goto_pending != 0) {
-                    continue
-                }
-                if ((if data__goto_164_30.number_of_codes <= 0: 1 else: 0) != 0) {
-                    return -62
-                }
-                if (__goto_pending != 0) {
-                    continue
-                }
-                if ((if data__goto_164_30.magic != 1347564115: 1 else: 0) != 0) {
-                    return -31
-                }
-                if (__goto_pending != 0) {
-                    continue
-                }
-                if ((if data__goto_164_30.version != 3145738: 1 else: 0) != 0) {
-                    return -32
-                }
-                if (__goto_pending != 0) {
-                    continue
-                }
-                if ((if data__goto_164_30.config != (2049 | 524288): 1 else: 0) != 0) {
-                    return -32
-                }
-                if (__goto_pending != 0) {
-                    continue
-                }
-                if ((if number_of_codes > data__goto_164_30.number_of_codes: 1 else: 0) != 0) {
-                    (number_of_codes = data__goto_164_30.number_of_codes)
-                }
-                if (__goto_pending != 0) {
-                    continue
-                }
-                (src_bytes__goto_168_16 = bytes + sizeof[pcre2_serialized_data]())
-                if (__goto_pending != 0) {
-                    continue
-                }
-                (tables__goto_170_10 = ((memctl__goto_165_21.malloc((1088 +% sizeof[c_ulong]()), memctl__goto_165_21.memory_data) as *mut u8)))
-                if (__goto_pending != 0) {
-                    continue
-                }
-                if ((if tables__goto_170_10 == null: 1 else: 0) != 0) {
-                    return -48
-                }
-                if (__goto_pending != 0) {
-                    continue
-                }
-                with_memcpy((tables__goto_170_10 as *i8), (src_bytes__goto_168_16 as *i8), (1088 as i64))
-                if (__goto_pending != 0) {
-                    continue
-                }
-                ((unsafe: *((tables__goto_170_10 + ((((512 + 320) + 256) as isize) as usize)) as *mut c_ulong)) = number_of_codes)
-                if (__goto_pending != 0) {
-                    continue
-                }
-                (src_bytes__goto_168_16 = src_bytes__goto_168_16 + ((512 + 320) + 256))
-                if (__goto_pending != 0) {
-                    continue
-                }
-                (i__goto_171_9 = 0)
-                while ((if i__goto_171_9 < number_of_codes: 1 else: 0) != 0) {
-                    with_memcpy(((&raw mut blocksize__goto_206_23 as *mut c_ulong) as *i8), ((src_bytes__goto_168_16 + 72) as *i8), (sizeof[c_ulong]() as i64))
-                    if (__goto_pending != 0) {
-                        break
-                    }
-                    if ((if blocksize__goto_206_23 <= sizeof[pcre2_real_code_8](): 1 else: 0) != 0) {
-                        (error___goto_172_9 = -62)
-                        if (__goto_pending != 0) {
-                            break
-                        }
-                        __pc = 1
-                        __goto_pending = 1
-                        if (__goto_pending != 0) {
-                            break
-                        }
-                    }
-                    if (__goto_pending != 0) {
-                        break
-                    }
-                    (dst_re__goto_169_18 = ((_pcre2_memctl_malloc_8(blocksize__goto_206_23, (gcontext as *mut pcre2_memctl)) as *mut pcre2_real_code_8)))
-                    if (__goto_pending != 0) {
-                        break
-                    }
-                    if ((if dst_re__goto_169_18 == null: 1 else: 0) != 0) {
-                        (error___goto_172_9 = -48)
-                        if (__goto_pending != 0) {
-                            break
-                        }
-                        __pc = 1
-                        __goto_pending = 1
-                        if (__goto_pending != 0) {
-                            break
-                        }
-                    }
-                    if (__goto_pending != 0) {
-                        break
-                    }
-                    with_memcpy((((dst_re__goto_169_18 as *mut u8) + sizeof[pcre2_memctl]()) as *i8), ((src_bytes__goto_168_16 + sizeof[pcre2_memctl]()) as *i8), ((blocksize__goto_206_23 -% sizeof[pcre2_memctl]()) as i64))
-                    if (__goto_pending != 0) {
-                        break
-                    }
-                    var __ci_expr_logic_3: c_int
-                    var __ci_expr_logic_2: c_int
-                    if ((if dst_re__goto_169_18.magic_number != 1346589253: 1 else: 0) != 0) {
-                        (__ci_expr_logic_2 = (if true: 1 else: 0))
-                    } else {
-                        (__ci_expr_logic_2 = (if (if dst_re__goto_169_18.name_entry_size > ((128 + 2) + 1): 1 else: 0) != 0: 1 else: 0))
-                    }
-                    if (__ci_expr_logic_2 != 0) {
-                        (__ci_expr_logic_3 = (if true: 1 else: 0))
-                    } else {
-                        (__ci_expr_logic_3 = (if (if dst_re__goto_169_18.name_count > 10000: 1 else: 0) != 0: 1 else: 0))
-                    }
-                    if (__ci_expr_logic_3 != 0) {
-                        (error___goto_172_9 = -62)
-                        if (__goto_pending != 0) {
-                            break
-                        }
-                        __pc = 1
-                        __goto_pending = 1
-                        if (__goto_pending != 0) {
-                            break
-                        }
-                    }
-                    if (__goto_pending != 0) {
-                        break
-                    }
-                    (dst_re__goto_169_18.tables = ((tables__goto_170_10 as *const u8)))
-                    if (__goto_pending != 0) {
-                        break
-                    }
-                    (dst_re__goto_169_18.executable_jit = null)
-                    if (__goto_pending != 0) {
-                        break
-                    }
-                    (dst_re__goto_169_18.flags = dst_re__goto_169_18.flags | 262144)
-                    if (__goto_pending != 0) {
-                        break
-                    }
-                    ((unsafe: codes[i__goto_171_9]) = dst_re__goto_169_18)
-                    if (__goto_pending != 0) {
-                        break
-                    }
-                    (dst_re__goto_169_18 = ((null as *mut pcre2_real_code_8)))
-                    if (__goto_pending != 0) {
-                        break
-                    }
-                    (src_bytes__goto_168_16 = src_bytes__goto_168_16 + blocksize__goto_206_23)
-                    if (__goto_pending != 0) {
-                        break
-                    }
-                    if (__goto_pending != 0) {
-                        break
-                    }
-                    (i__goto_171_9 = i__goto_171_9 + 1)
-                }
-                if (__goto_pending != 0) {
-                    continue
-                }
-                return number_of_codes
-                if (__goto_pending != 0) {
-                    continue
-                }
-                __pc = 1
-                __goto_pending = 1
-                continue
-            },
-            1 => {  // cleanup
-                (__goto_pending = 0)
-                if ((if dst_re__goto_169_18 != null: 1 else: 0) != 0) {
-                    memctl__goto_165_21.free(dst_re__goto_169_18, memctl__goto_165_21.memory_data)
-                }
-                if (__goto_pending != 0) {
-                    continue
-                }
-                memctl__goto_165_21.free(tables__goto_170_10, memctl__goto_165_21.memory_data)
-                if (__goto_pending != 0) {
-                    continue
-                }
-                (j__goto_171_12 = 0)
-                while ((if j__goto_171_12 < i__goto_171_9: 1 else: 0) != 0) {
-                    memctl__goto_165_21.free((unsafe: codes[j__goto_171_12]), memctl__goto_165_21.memory_data)
-                    if (__goto_pending != 0) {
-                        break
-                    }
-                    ((unsafe: codes[j__goto_171_12]) = ((null as *mut pcre2_real_code_8)))
-                    if (__goto_pending != 0) {
-                        break
-                    }
-                    if (__goto_pending != 0) {
-                        break
-                    }
-                    (j__goto_171_12 = j__goto_171_12 + 1)
-                }
-                if (__goto_pending != 0) {
-                    continue
-                }
-                return error___goto_172_9
-                if (__goto_pending != 0) {
-                    continue
-                }
-            },
-            _ => {
-                break
-            },
+@[c_export("pcre2_serialize_decode_8")]
+fn pcre2_serialize_decode_8(__param_codes: *mut *mut pcre2_real_code_8, __param_number_of_codes: c_int, __param_bytes: *const u8, __param_gcontext: *mut pcre2_real_general_context_8) -> c_int {
+    var __local_number_of_codes = __param_number_of_codes
+    var __local_data__goto_164_30: *const pcre2_serialized_data = null
+
+    var __local_memctl__goto_165_21: *const pcre2_memctl = null
+
+    var __local_src_bytes__goto_168_16: *const u8 = null
+
+    var __local_dst_re__goto_169_18: *mut pcre2_real_code_8 = null
+
+    var __local_tables__goto_170_10: *mut u8 = null
+
+    var __local_i__goto_171_9: c_int = 0
+
+    var __local_j__goto_171_12: c_int = 0
+
+    var __local_error___goto_172_9: c_int = 0
+
+    var __local_blocksize__goto_206_23: c_ulong = 0
+
+    var __ci_expr_ternary_0: *mut pcre2_memctl = null
+
+    var __ci_expr_logic_1: c_int = 0
+
+    var __ci_expr_logic_3: c_int = 0
+
+    var __ci_expr_logic_2: c_int = 0
+
+    goto '__ci_bb_0
+
+    '__ci_bb_0 {
+        (__local_data__goto_164_30 = ((__param_bytes as *const pcre2_serialized_data)))
+        (__ci_expr_ternary_0 = null)
+        if ((if __param_gcontext != null: 1 else: 0) != 0) {
+            (__ci_expr_ternary_0 = (((&raw const (unsafe: *__param_gcontext).memctl as *const pcre2_memctl) as *mut pcre2_memctl)))
+        } else {
+            (__ci_expr_ternary_0 = (((&raw const (unsafe: *(&raw const _pcre2_default_compile_context_8 as *const pcre2_real_compile_context_8)).memctl as *const pcre2_memctl) as *mut pcre2_memctl)))
+        }
+        (__local_memctl__goto_165_21 = ((__ci_expr_ternary_0 as *const pcre2_memctl)))
+        (__local_dst_re__goto_169_18 = ((null as *mut pcre2_real_code_8)))
+        if ((if __local_data__goto_164_30 == null: 1 else: 0) != 0) {
+            (__ci_expr_logic_1 = (if true: 1 else: 0))
+        } else {
+            (__ci_expr_logic_1 = (if (if __param_codes == null: 1 else: 0) != 0: 1 else: 0))
+        }
+        if (__ci_expr_logic_1 != 0) {
+            goto '__ci_bb_1
+        } else {
+            goto '__ci_bb_2
         }
     }
-}
 
-fn pcre2_serialize_get_number_of_codes_8(bytes: *const u8) -> c_int {
-    var data: *const pcre2_serialized_data = ((bytes as *const pcre2_serialized_data))
-
-    if ((if data == null: 1 else: 0) != 0) {
+    '__ci_bb_1 {
         return -51
     }
 
-    if ((if data.magic != 1347564115: 1 else: 0) != 0) {
+    '__ci_bb_2 {
+        if ((if __local_number_of_codes <= 0: 1 else: 0) != 0) {
+            goto '__ci_bb_3
+        } else {
+            goto '__ci_bb_4
+        }
+    }
+
+    '__ci_bb_3 {
+        return -29
+    }
+
+    '__ci_bb_4 {
+        if ((if __local_data__goto_164_30.number_of_codes <= 0: 1 else: 0) != 0) {
+            goto '__ci_bb_5
+        } else {
+            goto '__ci_bb_6
+        }
+    }
+
+    '__ci_bb_5 {
+        return -62
+    }
+
+    '__ci_bb_6 {
+        if ((if __local_data__goto_164_30.magic != 1347564115: 1 else: 0) != 0) {
+            goto '__ci_bb_7
+        } else {
+            goto '__ci_bb_8
+        }
+    }
+
+    '__ci_bb_7 {
         return -31
     }
 
-    if ((if data.version != 3145738: 1 else: 0) != 0) {
+    '__ci_bb_8 {
+        if ((if __local_data__goto_164_30.version != 3145738: 1 else: 0) != 0) {
+            goto '__ci_bb_9
+        } else {
+            goto '__ci_bb_10
+        }
+    }
+
+    '__ci_bb_9 {
         return -32
     }
 
-    if ((if data.config != (2049 | 524288): 1 else: 0) != 0) {
+    '__ci_bb_10 {
+        if ((if __local_data__goto_164_30.config != ((2049 as c_ulong) | (524288 as c_ulong)): 1 else: 0) != 0) {
+            goto '__ci_bb_11
+        } else {
+            goto '__ci_bb_12
+        }
+    }
+
+    '__ci_bb_11 {
         return -32
     }
 
-    return data.number_of_codes
+    '__ci_bb_12 {
+        if ((if __local_number_of_codes > __local_data__goto_164_30.number_of_codes: 1 else: 0) != 0) {
+            goto '__ci_bb_13
+        } else {
+            goto '__ci_bb_14
+        }
+    }
+
+    '__ci_bb_13 {
+        (__local_number_of_codes = __local_data__goto_164_30.number_of_codes)
+        goto '__ci_bb_14
+    }
+
+    '__ci_bb_14 {
+        (__local_src_bytes__goto_168_16 = __param_bytes + (sizeof[pcre2_serialized_data]() as usize))
+        (__local_tables__goto_170_10 = ((__local_memctl__goto_165_21.malloc(((1088 as c_ulong) +% (sizeof[usize]() as c_ulong)), __local_memctl__goto_165_21.memory_data) as *mut u8)))
+        if ((if __local_tables__goto_170_10 == null: 1 else: 0) != 0) {
+            goto '__ci_bb_15
+        } else {
+            goto '__ci_bb_16
+        }
+    }
+
+    '__ci_bb_15 {
+        return -48
+    }
+
+    '__ci_bb_16 {
+        with_memcpy((__local_tables__goto_170_10 as *i8), (__local_src_bytes__goto_168_16 as *i8), (1088 as i64))
+        ((unsafe: *((__local_tables__goto_170_10 + ((((512 + 320) + 256) as isize) as usize)) as *mut c_ulong)) = __local_number_of_codes)
+        (__local_src_bytes__goto_168_16 = __local_src_bytes__goto_168_16 + ((((512 + 320) + 256) as isize) as usize))
+        (__local_i__goto_171_9 = 0)
+        goto '__ci_bb_17
+    }
+
+    '__ci_bb_17 {
+        if ((if __local_i__goto_171_9 < __local_number_of_codes: 1 else: 0) != 0) {
+            goto '__ci_bb_18
+        } else {
+            goto '__ci_bb_20
+        }
+    }
+
+    '__ci_bb_18 {
+        with_memcpy(((&raw mut __local_blocksize__goto_206_23 as *mut c_ulong) as *i8), ((__local_src_bytes__goto_168_16 + (72 as usize)) as *i8), (sizeof[c_ulong]() as i64))
+        if ((if __local_blocksize__goto_206_23 <= sizeof[pcre2_real_code_8](): 1 else: 0) != 0) {
+            goto '__ci_bb_21
+        } else {
+            goto '__ci_bb_22
+        }
+    }
+
+    '__ci_bb_19 {
+        (__local_i__goto_171_9 = __local_i__goto_171_9 + 1)
+        goto '__ci_bb_17
+    }
+
+    '__ci_bb_20 {
+        return __local_number_of_codes
+    }
+
+    '__ci_bb_21 {
+        (__local_error___goto_172_9 = -62)
+        goto '__ci_bb_23
+    }
+
+    '__ci_bb_22 {
+        (__local_dst_re__goto_169_18 = ((_pcre2_memctl_malloc_8(__local_blocksize__goto_206_23, (__param_gcontext as *mut pcre2_memctl)) as *mut pcre2_real_code_8)))
+        if ((if __local_dst_re__goto_169_18 == null: 1 else: 0) != 0) {
+            goto '__ci_bb_24
+        } else {
+            goto '__ci_bb_25
+        }
+    }
+
+    '__ci_bb_23 {
+        if ((if __local_dst_re__goto_169_18 != null: 1 else: 0) != 0) {
+            goto '__ci_bb_28
+        } else {
+            goto '__ci_bb_29
+        }
+    }
+
+    '__ci_bb_24 {
+        (__local_error___goto_172_9 = -48)
+        goto '__ci_bb_23
+    }
+
+    '__ci_bb_25 {
+        with_memcpy((((__local_dst_re__goto_169_18 as *mut u8) + (sizeof[pcre2_memctl]() as usize)) as *i8), ((__local_src_bytes__goto_168_16 + (sizeof[pcre2_memctl]() as usize)) as *i8), (((__local_blocksize__goto_206_23 as c_ulong) -% (sizeof[pcre2_memctl]() as c_ulong)) as i64))
+        if ((if __local_dst_re__goto_169_18.magic_number != 1346589253: 1 else: 0) != 0) {
+            (__ci_expr_logic_2 = (if true: 1 else: 0))
+        } else {
+            (__ci_expr_logic_2 = (if (if __local_dst_re__goto_169_18.name_entry_size > ((128 + 2) + 1): 1 else: 0) != 0: 1 else: 0))
+        }
+        if (__ci_expr_logic_2 != 0) {
+            (__ci_expr_logic_3 = (if true: 1 else: 0))
+        } else {
+            (__ci_expr_logic_3 = (if (if __local_dst_re__goto_169_18.name_count > 10000: 1 else: 0) != 0: 1 else: 0))
+        }
+        if (__ci_expr_logic_3 != 0) {
+            goto '__ci_bb_26
+        } else {
+            goto '__ci_bb_27
+        }
+    }
+
+    '__ci_bb_26 {
+        (__local_error___goto_172_9 = -62)
+        goto '__ci_bb_23
+    }
+
+    '__ci_bb_27 {
+        ((unsafe: *__local_dst_re__goto_169_18).tables = ((__local_tables__goto_170_10 as *const u8)))
+        ((unsafe: *__local_dst_re__goto_169_18).executable_jit = null)
+        ((unsafe: *__local_dst_re__goto_169_18).flags = __local_dst_re__goto_169_18.flags | 262144)
+        ((unsafe: __param_codes[__local_i__goto_171_9]) = __local_dst_re__goto_169_18)
+        (__local_dst_re__goto_169_18 = ((null as *mut pcre2_real_code_8)))
+        (__local_src_bytes__goto_168_16 = __local_src_bytes__goto_168_16 + (__local_blocksize__goto_206_23 as usize))
+        goto '__ci_bb_19
+    }
+
+    '__ci_bb_28 {
+        __local_memctl__goto_165_21.free(__local_dst_re__goto_169_18, __local_memctl__goto_165_21.memory_data)
+        goto '__ci_bb_29
+    }
+
+    '__ci_bb_29 {
+        __local_memctl__goto_165_21.free(__local_tables__goto_170_10, __local_memctl__goto_165_21.memory_data)
+        (__local_j__goto_171_12 = 0)
+        goto '__ci_bb_30
+    }
+
+    '__ci_bb_30 {
+        if ((if __local_j__goto_171_12 < __local_i__goto_171_9: 1 else: 0) != 0) {
+            goto '__ci_bb_31
+        } else {
+            goto '__ci_bb_33
+        }
+    }
+
+    '__ci_bb_31 {
+        __local_memctl__goto_165_21.free((unsafe: __param_codes[__local_j__goto_171_12]), __local_memctl__goto_165_21.memory_data)
+        ((unsafe: __param_codes[__local_j__goto_171_12]) = ((null as *mut pcre2_real_code_8)))
+        goto '__ci_bb_32
+    }
+
+    '__ci_bb_32 {
+        (__local_j__goto_171_12 = __local_j__goto_171_12 + 1)
+        goto '__ci_bb_30
+    }
+
+    '__ci_bb_33 {
+        return __local_error___goto_172_9
+    }
 
 }
 
-fn pcre2_serialize_free_8(bytes: *mut u8) {
-    if ((if bytes != null: 1 else: 0) != 0) {
-        var memctl: *mut pcre2_memctl = (((bytes - sizeof[pcre2_memctl]()) as *mut pcre2_memctl))
+@[c_export("pcre2_serialize_get_number_of_codes_8")]
+fn pcre2_serialize_get_number_of_codes_8(__param_bytes: *const u8) -> c_int {
+    var __local_data: *const pcre2_serialized_data = ((__param_bytes as *const pcre2_serialized_data))
 
-        memctl.free(memctl, memctl.memory_data)
+    if ((if __local_data == null: 1 else: 0) != 0) {
+        return -51
+    }
+
+    if ((if __local_data.magic != 1347564115: 1 else: 0) != 0) {
+        return -31
+    }
+
+    if ((if __local_data.version != 3145738: 1 else: 0) != 0) {
+        return -32
+    }
+
+    if ((if __local_data.config != ((2049 as c_ulong) | (524288 as c_ulong)): 1 else: 0) != 0) {
+        return -32
+    }
+
+    return __local_data.number_of_codes
+
+}
+
+@[c_export("pcre2_serialize_free_8")]
+fn pcre2_serialize_free_8(__param_bytes: *mut u8) {
+    if ((if __param_bytes != null: 1 else: 0) != 0) {
+        var __local_memctl: *mut pcre2_memctl = (((__param_bytes - (sizeof[pcre2_memctl]() as usize)) as *mut pcre2_memctl))
+
+        __local_memctl.free(__local_memctl, __local_memctl.memory_data)
 
     }
 

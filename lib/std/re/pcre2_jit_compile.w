@@ -1,11 +1,12 @@
 // Migrated from PCRE2
 use std.re.defs
 
-fn pcre2_jit_compile_8(code: *mut pcre2_real_code_8, options: c_uint) -> c_int {
-    var re: *mut pcre2_real_code_8 = code
+@[c_export("pcre2_jit_compile_8")]
+fn pcre2_jit_compile_8(__param_code: *mut pcre2_real_code_8, __param_options: c_uint) -> c_int {
+    var __local_re: *mut pcre2_real_code_8 = __param_code
 
-    if ((options & 512) != 0) {
-        if ((if options != 512: 1 else: 0) != 0) {
+    if (((__param_options as c_uint) & (512 as c_uint)) != 0) {
+        if ((if __param_options != 512: 1 else: 0) != 0) {
             return -45
         }
 
@@ -13,17 +14,17 @@ fn pcre2_jit_compile_8(code: *mut pcre2_real_code_8, options: c_uint) -> c_int {
 
     }
 
-    if ((if code == null: 1 else: 0) != 0) {
+    if ((if __param_code == null: 1 else: 0) != 0) {
         return -51
     }
 
-    if ((if (options & (~(((1 | 2) | 4) | 256))) != 0: 1 else: 0) != 0) {
+    if ((if ((__param_options as c_uint) & ((~((((((1 as c_uint) | (2 as c_uint)) as c_uint) | (4 as c_uint)) as c_uint) | (256 as c_uint))) as c_uint)) != 0: 1 else: 0) != 0) {
         return -45
     }
 
-    if ((if (options & 256) != 0: 1 else: 0) != 0) {
-        if ((if (re.overall_options & 67108864) == 0: 1 else: 0) != 0) {
-            (re.overall_options = re.overall_options | 67108864)
+    if ((if ((__param_options as c_uint) & (256 as c_uint)) != 0: 1 else: 0) != 0) {
+        if ((if ((__local_re.overall_options as c_uint) & (67108864 as c_uint)) == 0: 1 else: 0) != 0) {
+            ((unsafe: *__local_re).overall_options = __local_re.overall_options | 67108864)
 
         }
 
@@ -33,78 +34,87 @@ fn pcre2_jit_compile_8(code: *mut pcre2_real_code_8, options: c_uint) -> c_int {
 
 }
 
-fn pcre2_jit_match_8(code: *const pcre2_real_code_8, subject: *const u8, length: c_ulong, start_offset: c_ulong, options: c_uint, match_data: *mut pcre2_real_match_data_8, mcontext: *mut pcre2_real_match_context_8) -> c_int {
-    code
+@[c_export("pcre2_jit_match_8")]
+fn pcre2_jit_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *const u8, __param_length: c_ulong, __param_start_offset: c_ulong, __param_options: c_uint, __param_match_data: *mut pcre2_real_match_data_8, __param_mcontext: *mut pcre2_real_match_context_8) -> c_int {
+    __param_code
 
-    subject
+    __param_subject
 
-    length
+    __param_length
 
-    start_offset
+    __param_start_offset
 
-    options
+    __param_options
 
-    mcontext
+    __param_mcontext
 
-    (match_data.rc = -45)
+    ((unsafe: *__param_match_data).rc = -45)
 
-    return match_data.rc
+    return __param_match_data.rc
 
-
-}
-
-fn pcre2_jit_free_unused_memory_8(gcontext: *mut pcre2_real_general_context_8) {
-    gcontext
 
 }
 
-fn pcre2_jit_stack_create_8(startsize: c_ulong, maxsize: c_ulong, gcontext: *mut pcre2_real_general_context_8) -> *mut pcre2_real_jit_stack_8 {
-    gcontext
+@[c_export("pcre2_jit_free_unused_memory_8")]
+fn pcre2_jit_free_unused_memory_8(__param_gcontext: *mut pcre2_real_general_context_8) {
+    __param_gcontext
 
-    startsize
+}
 
-    maxsize
+@[c_export("pcre2_jit_stack_create_8")]
+fn pcre2_jit_stack_create_8(__param_startsize: c_ulong, __param_maxsize: c_ulong, __param_gcontext: *mut pcre2_real_general_context_8) -> *mut pcre2_real_jit_stack_8 {
+    __param_gcontext
+
+    __param_startsize
+
+    __param_maxsize
 
     return null
 
 }
 
-fn pcre2_jit_stack_assign_8(mcontext: *mut pcre2_real_match_context_8, callback: *const fn(*mut c_void) -> *mut pcre2_real_jit_stack_8, callback_data: *mut c_void) {
-    mcontext
+@[c_export("pcre2_jit_stack_assign_8")]
+fn pcre2_jit_stack_assign_8(__param_mcontext: *mut pcre2_real_match_context_8, __param_callback: *const fn(*mut c_void) -> *mut pcre2_real_jit_stack_8, __param_callback_data: *mut c_void) {
+    __param_mcontext
 
-    callback
+    __param_callback
 
-    callback_data
-
-}
-
-fn pcre2_jit_stack_free_8(jit_stack: *mut pcre2_real_jit_stack_8) {
-    jit_stack
+    __param_callback_data
 
 }
 
-fn _pcre2_jit_free_rodata_8(current: *mut c_void, allocator_data: *mut c_void) {
-    current
-
-    allocator_data
-
-}
-
-fn _pcre2_jit_free_8(executable_jit: *mut c_void, memctl: *mut pcre2_memctl) {
-    executable_jit
-
-    memctl
+@[c_export("pcre2_jit_stack_free_8")]
+fn pcre2_jit_stack_free_8(__param_jit_stack: *mut pcre2_real_jit_stack_8) {
+    __param_jit_stack
 
 }
 
-fn _pcre2_jit_get_size_8(executable_jit: *mut c_void) -> c_ulong {
-    executable_jit
+@[c_export("_pcre2_jit_free_rodata_8")]
+fn _pcre2_jit_free_rodata_8(__param_current: *mut c_void, __param_allocator_data: *mut c_void) {
+    __param_current
+
+    __param_allocator_data
+
+}
+
+@[c_export("_pcre2_jit_free_8")]
+fn _pcre2_jit_free_8(__param_executable_jit: *mut c_void, __param_memctl: *mut pcre2_memctl) {
+    __param_executable_jit
+
+    __param_memctl
+
+}
+
+@[c_export("_pcre2_jit_get_size_8")]
+fn _pcre2_jit_get_size_8(__param_executable_jit: *mut c_void) -> c_ulong {
+    __param_executable_jit
 
     return 0
 
 }
 
+@[c_export("_pcre2_jit_get_target_8")]
 fn _pcre2_jit_get_target_8() -> *const i8 {
-    return (&"JIT is not supported"[0] as *mut c_char)
+    return (&(unsafe: "JIT is not supported"[0]) as *mut c_char)
 
 }
