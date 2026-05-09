@@ -28,18 +28,25 @@ mkdir -p "$repo_copy"
 cp -R "$ROOT_DIR/src" "$repo_copy/src"
 ln -s "$ROOT_DIR/lib" "$repo_copy/lib"
 
-python3 - "$repo_copy/src/SemaCheck.w" <<'PY'
-from pathlib import Path
-import sys
-
-path = Path(sys.argv[1])
-needle = "    // Check all arguments (with expected-type propagation for Atomic ordering params)\n"
-insert = needle + "    var mc_issue61_padding_local: i32 = 0\n"
-text = path.read_text()
-if needle not in text:
-    raise SystemExit(f"missing insertion point in {path}")
-path.write_text(text.replace(needle, insert, 1))
-PY
+semacheck_tmp="$tmpdir/SemaCheck.w"
+awk '
+  {
+    print
+    if (!inserted && $0 == "    // Check all arguments (with expected-type propagation for Atomic ordering params)") {
+      print "    var mc_issue61_padding_local: i32 = 0"
+      inserted = 1
+    }
+  }
+  END {
+    if (!inserted) {
+      exit 2
+    }
+  }
+' "$repo_copy/src/SemaCheck.w" > "$semacheck_tmp" || {
+  echo "error: missing insertion point in $repo_copy/src/SemaCheck.w" >&2
+  exit 1
+}
+mv "$semacheck_tmp" "$repo_copy/src/SemaCheck.w"
 
 if ! grep -q "mc_issue61_padding_local" "$repo_copy/src/SemaCheck.w"; then
   echo "error: failed to inject noop local into copied SemaCheck.w" >&2

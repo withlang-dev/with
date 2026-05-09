@@ -1,0 +1,67 @@
+# Toolchain Implementation Plan
+
+Source: `docs/toolchain.md`.
+
+## Completed In This Slice
+
+- Build doctrine basics:
+  - `with build` can infer `src/main.w` from a project `with.toml`.
+  - `[package].name` / `[project].name` choose the default output name.
+  - Imperative manifest entries such as `[build]` fail loudly and point users
+    to `build.w`.
+  - A project `build.w` is not silently ignored; until tool-mode execution is
+    implemented, `with build` fails loudly and direct-source builds remain
+    available.
+- `std.build` initial typed graph API:
+  - `Build`, `Target`, `Package`, `BuildKind`, `BuildTarget`,
+    `OptimizeMode`.
+  - Target builder methods for executable/library/test, target selection,
+    optimization mode, system libraries, include paths, and defines.
+- `std.context` initial scoped execution context:
+  - `Context` as an ephemeral stdlib type.
+  - `TraceId`, `CancellationToken`, `NoopLogger`, `default_context()`,
+    `Context.with_temp()`.
+- `std.alloc.TempArena`:
+  - `scratch_arena()`, `TempArena.alloc`, `TempArena.alloc_zeroed`,
+    `TempArena.reset`.
+- `@[specified]` discriminant enums:
+  - Parser flagging.
+  - Diagnostics for missing explicit backing type and missing explicit
+    discriminant values.
+  - Rendering support.
+- `c_import(..., allow_untranslated: ...)` parsing and rendering:
+  - AST packing for link-library count plus allow-list count.
+  - Resolve/frontend cache key includes the allow-list.
+- PCRE2 reference source location:
+  - `Makefile` fetches PCRE2 10.47 into `out/pcre2_reference/...` instead of
+    using `.reference` as mutable staging.
+- Embedded stdlib generator:
+  - Replaced `scripts/generate_embedded_stdlib.py` with
+    `src/tools/generate_embedded_stdlib.w`.
+  - Make builds and runs the With tool.
+- Script pruning/dependency cleanup:
+  - Only Make-touched scripts remain live.
+  - Make-touched scripts no longer shell out to Python or Perl.
+
+## Verified
+
+- `make build`
+- `make fixpoint`
+- Focused behavior and compile-error tests for `std.context`, `TempArena`, and
+  `@[specified]`.
+- `WITH=out/bin/with ./scripts/run_cli_selfhost_tests.sh`
+- `make test`
+- `make regex-migrate`
+- `make regex-build`
+- `make regex-test`
+
+## Remaining
+
+- Platform-independent build replacement for Make itself. The current work
+  removes Python from the build path but does not yet replace Make/shell as the
+  orchestration layer.
+- Full tool-mode execution of user-authored `build.w`; current `std.build` is
+  the typed API surface, default project inference, and an explicit loud
+  failure when `build.w` would otherwise be ignored.
+- Read-only `ProjectInfo`, compiler hooks, source emission, and blessed derives
+  remain future phases per `docs/toolchain.md`.

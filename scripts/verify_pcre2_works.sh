@@ -13,7 +13,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PCRE2_BUILD_DIR="$ROOT_DIR/out/pcre2_build"
 PCRE2TEST_BIN="$PCRE2_BUILD_DIR/bin/pcre2test"
-RUNTEST_DIR="$ROOT_DIR/.reference/pcre2"
+RUNTEST_DIR="${PCRE2_REF_DIR:-$ROOT_DIR/out/pcre2_reference/pcre2-10.47}"
 
 RUNTEST_WORKDIR=""
 

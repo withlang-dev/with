@@ -6,6 +6,9 @@ extern fn with_getenv_str(name: str) -> str
 type ProjectConfig {
     root_dir: str,
     manifest_path: str,
+    manifest_error: str,
+    package_name: str,
+    package_version: str,
     c_import_include_paths: Vec[str],
     link_search_paths: Vec[str],
     dep_link_libs: Vec[str],
@@ -15,6 +18,9 @@ fn project_config_default -> ProjectConfig:
     ProjectConfig {
         root_dir: "",
         manifest_path: "",
+        manifest_error: "",
+        package_name: "",
+        package_version: "",
         c_import_include_paths: Vec.new(),
         link_search_paths: Vec.new(),
         dep_link_libs: Vec.new(),
@@ -77,6 +83,9 @@ fn project_config_load_for_source(source_path_raw: str) -> ProjectConfig:
                     if eq > 0:
                         let key = project_config_trim(line.slice(0, eq as i64))
                         let value = project_config_trim(line.slice((eq + 1) as i64, line.len()))
+                        let forbidden = project_config_forbidden_entry(section, key)
+                        if forbidden.len() > 0 and cfg.manifest_error.len() == 0:
+                            cfg.manifest_error = forbidden
                         if project_config_wants_key(section, key):
                             if project_config_value_complete(value):
                                 cfg = project_config_apply_entry(cfg, section, key, value)
@@ -93,7 +102,11 @@ fn project_config_load_for_source(source_path_raw: str) -> ProjectConfig:
 
 fn project_config_apply_entry(cfg: ProjectConfig, section: str, key: str, value: str) -> ProjectConfig:
     var out = cfg
-    if section == "c_import" and key == "include_paths":
+    if (section == "project" or section == "package") and key == "name":
+        out.package_name = project_config_strip_quotes(value)
+    else if (section == "project" or section == "package") and key == "version":
+        out.package_version = project_config_strip_quotes(value)
+    else if section == "c_import" and key == "include_paths":
         out.c_import_include_paths = project_config_parse_path_array(value, out.root_dir)
     else if section == "link" and key == "search_paths":
         out.link_search_paths = project_config_parse_path_array(value, out.root_dir)
@@ -171,6 +184,8 @@ fn project_config_json_str_array(json: str, key: str) -> Vec[str]:
     result
 
 fn project_config_wants_key(section: str, key: str) -> bool:
+    if (section == "project" or section == "package") and (key == "name" or key == "version"):
+        return true
     if section == "c_import" and key == "include_paths":
         return true
     if section == "link" and key == "search_paths":
@@ -178,6 +193,21 @@ fn project_config_wants_key(section: str, key: str) -> bool:
     if section == "deps" and key.starts_with("c."):
         return true
     false
+
+fn project_config_forbidden_entry(section: str, key: str) -> str:
+    if section == "build" or section == "commands" or section == "scripts" or section == "targets" or section == "target":
+        return "imperative build configuration belongs in build.w, not with.toml: [" ++ section ++ "]"
+    if section == "assets" or section == "asset" or section == "shaders" or section == "shader":
+        return "asset and shader pipelines belong in build.w, not with.toml: [" ++ section ++ "]"
+    if key == "command" or key == "commands" or key == "script" or key == "scripts":
+        return "imperative build configuration belongs in build.w, not with.toml: " ++ key
+    if key == "prebuild" or key == "postbuild" or key == "build_command":
+        return "imperative build configuration belongs in build.w, not with.toml: " ++ key
+    if key == "target" or key == "targets" or key == "binary" or key == "binaries":
+        return "build targets belong in build.w, not with.toml: " ++ key
+    if key == "library" or key == "libraries" or key == "asset_pipeline" or key == "shader_compile":
+        return "build targets and pipelines belong in build.w, not with.toml: " ++ key
+    ""
 
 fn project_config_value_complete(value: str) -> bool:
     // Array values need closing bracket

@@ -715,15 +715,31 @@ fn test_unique_binary_path(source_file: str) -> str:
     f"{base}.test.{with_getpid()}.{with_clock_nanos()}"
 
 fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: bool, emit_c_mode: bool, emit_obj_mode: bool, output_path: str, prelude_mode: i32, debug_info: bool) -> i32:
-    if source_file == "":
-        with_eprint("error: 'build' requires a source file argument")
-        return 1
+    var actual_source = source_file
+    var actual_output = output_path
+    if actual_source == "":
+        let root = project_config_find_root(".")
+        if root.len() == 0:
+            with_eprint("error: 'build' requires a source file argument or a with.toml project")
+            return 1
+        let build_path = resolve_join(root, "build.w")
+        if project_config_file_exists(build_path):
+            with_eprint("error: build.w tool-mode execution is not implemented yet: " ++ build_path)
+            with_eprint("  pass an explicit source file to build directly")
+            return 1
+        let cfg = project_config_load_for_source(root ++ "/src/main.w")
+        if cfg.manifest_error.len() > 0:
+            with_eprint("error: invalid with.toml: " ++ cfg.manifest_error)
+            return 1
+        actual_source = root ++ "/src/main.w"
+        if actual_output == "" and cfg.package_name.len() > 0:
+            actual_output = "out/bin/" ++ cfg.package_name
     var comp = Compilation.init()
     comp.configure(opt_level, no_std, alloc_mode)
     comp.set_prelude_mode(prelude_mode)
     comp.set_debug_info(debug_info)
     if emit_c_mode:
-        let c_path = comp.emit_c(source_file, output_path)
+        let c_path = comp.emit_c(actual_source, actual_output)
         if c_path == "":
             with_eprint("error: build failed")
             return 1
@@ -733,16 +749,16 @@ fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode:
         comp.print_warnings()
         return 0
     if emit_obj_mode:
-        var obj_path = output_path
+        var obj_path = actual_output
         if obj_path == "":
-            obj_path = link_stage_output_path_for_source(source_file) ++ ".o"
-        let result = comp.emit_object_to_path(source_file, obj_path)
+            obj_path = link_stage_output_path_for_source(actual_source) ++ ".o"
+        let result = comp.emit_object_to_path(actual_source, obj_path)
         if result == "":
             with_eprint("error: build failed")
             return 1
         comp.print_warnings()
         return 0
-    let bin_path = comp.build_binary_to_path(source_file, output_path)
+    let bin_path = comp.build_binary_to_path(actual_source, actual_output)
     if bin_path == "":
         with_eprint("error: build failed")
         return 1
