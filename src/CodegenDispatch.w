@@ -1016,7 +1016,17 @@ fn Codegen.mir_eval_operand(self: Codegen, body: MirBody, operand_id: i32, expec
         if bp_proj.is_some():
             // Override ptr_ty to the backing integer type (the alloca type)
             ptr_ty = wl_get_allocated_type(ptr)
-        var loaded = wl_build_load(self.builder, ptr_ty, ptr)
+        var loaded: i64 = 0
+        if p_count == 0 and wl_get_type_kind(ptr_ty) == wl_pointer_type_kind():
+            let indirect_value_ty_opt = self.mir_indirect_value_local_types.get(local_id)
+            if indirect_value_ty_opt.is_some():
+                let indirect_value_ty = indirect_value_ty_opt.unwrap() as i64
+                if indirect_value_ty != 0 and wl_get_type_kind(indirect_value_ty) != wl_pointer_type_kind():
+                    let indirect_ptr = wl_build_load(self.builder, ptr_ty, ptr)
+                    loaded = wl_build_load(self.builder, indirect_value_ty, indirect_ptr)
+                    ptr_ty = indirect_value_ty
+        if loaded == 0:
+            loaded = wl_build_load(self.builder, ptr_ty, ptr)
         if bp_proj.is_some():
             let bp_info = bp_proj.unwrap() as i32
             let bp_bit_offset = bp_info / 65536
@@ -2569,11 +2579,49 @@ fn Codegen.mir_try_place_ptr_for_ref(self: Codegen, body: MirBody, operand_id: i
     let ok = body.operand_kinds.get(operand_id as i64)
     let od = body.operand_d0.get(operand_id as i64)
     if (ok == OperandKind.OK_COPY or ok == OperandKind.OK_MOVE) and od >= 0 and od < body.place_locals.len() as i32:
-        return self.mir_place_ptr(body, od, false, 0)
+        let ptr = self.mir_place_ptr(body, od, false, 0)
+        if ptr == 0:
+            return 0
+        let local_id = body.place_locals.get(od as i64)
+        let p_count = body.place_proj_counts.get(od as i64)
+        if p_count == 0:
+            let alloc_ty = wl_get_allocated_type(ptr)
+            if alloc_ty != 0 and wl_get_type_kind(alloc_ty) == wl_pointer_type_kind():
+                return wl_build_load(self.builder, alloc_ty, ptr)
+            let ptr_ty_opt = self.mir_local_types.get(local_id)
+            if ptr_ty_opt.is_some():
+                let ptr_ty = ptr_ty_opt.unwrap() as i64
+                if ptr_ty != 0 and wl_get_type_kind(ptr_ty) == wl_pointer_type_kind():
+                    return wl_build_load(self.builder, ptr_ty, ptr)
+        var is_indirect_value_local = self.mir_indirect_value_local_types.get(local_id).is_some()
+        if not is_indirect_value_local and p_count == 0 and local_id >= 0 and local_id < body.local_names.len() as i32:
+            let local_name = body.local_names.get(local_id as i64)
+            if local_name == self.sym_self:
+                is_indirect_value_local = true
+            else:
+                let local_text = self.sema_symbol_text(local_name)
+                if local_text == "self":
+                    is_indirect_value_local = true
+        if not is_indirect_value_local and p_count == 0 and local_id >= 0 and local_id < body.local_type_ids.len() as i32:
+            let local_sema_ty = body.local_type_ids.get(local_id as i64)
+            if local_sema_ty > 0:
+                let semantic_ty = self.mir_sema_type_to_llvm(local_sema_ty)
+                if semantic_ty != 0 and wl_get_type_kind(semantic_ty) != wl_pointer_type_kind():
+                    is_indirect_value_local = true
+        if p_count == 0 and is_indirect_value_local:
+            let ptr_ty_opt = self.mir_local_types.get(local_id)
+            if ptr_ty_opt.is_some():
+                let ptr_ty = ptr_ty_opt.unwrap() as i64
+                if ptr_ty != 0 and wl_get_type_kind(ptr_ty) == wl_pointer_type_kind():
+                    return wl_build_load(self.builder, ptr_ty, ptr)
+        return ptr
     0
 
 fn Codegen.mir_eval_call_operand(self: Codegen, body: MirBody, operand_id: i32, expected_ty: i64, call_context: str, arg_index: i32) -> i64:
-    let val = self.mir_eval_operand(body, operand_id, expected_ty)
+    var eval_expected_ty = expected_ty
+    if expected_ty != 0 and wl_get_type_kind(expected_ty) == wl_pointer_type_kind():
+        eval_expected_ty = 0
+    let val = self.mir_eval_operand(body, operand_id, eval_expected_ty)
     var out = val
     if out != 0 and expected_ty != 0:
         let expected_kind = wl_get_type_kind(expected_ty)
@@ -6352,6 +6400,11 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                         let gc_fb_args: Vec[i64] = Vec.new()
                         for gc_fb_i in 0..gc_fb_mir_count:
                             let gc_fb_op = body.call_arg_operands.get((gc_fb_mir_start + gc_fb_i) as i64)
+                            if gc_fb_i == 0 and gc_fb_is_ref:
+                                let gc_fb_ref_ptr = self.mir_try_place_ptr_for_ref(body, gc_fb_op)
+                                if gc_fb_ref_ptr != 0:
+                                    gc_fb_args.push(gc_fb_ref_ptr)
+                                    continue
                             let gc_fb_val = self.mir_eval_operand(body, gc_fb_op, 0)
                             if gc_fb_i == 0 and gc_fb_is_ref:
                                 if wl_get_type_kind(wl_type_of(gc_fb_val)) != wl_pointer_type_kind():
@@ -6902,10 +6955,12 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
 
     let fresh_mir_locals: HashMap[i32, i64] = HashMap.new()
     let fresh_mir_local_types: HashMap[i32, i64] = HashMap.new()
+    let fresh_mir_indirect_value_local_types: HashMap[i32, i64] = HashMap.new()
     let fresh_mir_bbs: Vec[i64] = Vec.new()
     let fresh_mir_default_unreachable_bbs: Vec[i64] = Vec.new()
     self.mir_local_ptrs = fresh_mir_locals
     self.mir_local_types = fresh_mir_local_types
+    self.mir_indirect_value_local_types = fresh_mir_indirect_value_local_types
     self.mir_bb_values = fresh_mir_bbs
     self.mir_default_unreachable_bbs = fresh_mir_default_unreachable_bbs
 
@@ -6986,6 +7041,12 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
 
         self.mir_local_ptrs.insert(pi + 1, alloca)
         self.mir_local_types.insert(pi + 1, param_type)
+        if wl_get_type_kind(param_type) == wl_pointer_type_kind() and pi + 1 < body.local_type_ids.len() as i32:
+            let local_sema_ty = body.local_type_ids.get((pi + 1) as i64)
+            if local_sema_ty > 0:
+                let semantic_ty = self.mir_sema_type_to_llvm(local_sema_ty)
+                if semantic_ty != 0 and wl_get_type_kind(semantic_ty) != wl_pointer_type_kind():
+                    self.mir_indirect_value_local_types.insert(pi + 1, semantic_ty)
 
         if p_type_node != 0:
             let pk = self.pool.kind(p_type_node)
@@ -7008,10 +7069,28 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
                 if method_owner_sym != 0 and (p_sym == self.sym_Self or p_sym == method_owner_sym):
                     if method_owner_sym != self.sym_str:
                         self.record_local_pointee_struct(p_name, method_owner_sym)
+                        var owner_ty: i64 = 0
+                        if pi + 1 < body.local_type_ids.len() as i32:
+                            let local_sema_ty = body.local_type_ids.get((pi + 1) as i64)
+                            if local_sema_ty > 0:
+                                owner_ty = self.mir_sema_type_to_llvm(local_sema_ty)
+                        if owner_ty == 0:
+                            owner_ty = self.resolve_named_type(method_owner_sym)
+                        if owner_ty != 0 and wl_get_type_kind(param_type) == wl_pointer_type_kind():
+                            self.mir_indirect_value_local_types.insert(pi + 1, owner_ty)
             if method_owner_sym != 0:
                 if p_name == self.sym_self:
                     if method_owner_sym != self.sym_str:
                         self.record_local_pointee_struct(p_name, method_owner_sym)
+                        var owner_ty: i64 = 0
+                        if pi + 1 < body.local_type_ids.len() as i32:
+                            let local_sema_ty = body.local_type_ids.get((pi + 1) as i64)
+                            if local_sema_ty > 0:
+                                owner_ty = self.mir_sema_type_to_llvm(local_sema_ty)
+                        if owner_ty == 0:
+                            owner_ty = self.resolve_named_type(method_owner_sym)
+                        if owner_ty != 0 and wl_get_type_kind(param_type) == wl_pointer_type_kind():
+                            self.mir_indirect_value_local_types.insert(pi + 1, owner_ty)
             let trait_sym = self.dyn_trait_from_type_node(p_type_node)
             if trait_sym != 0:
                 self.record_trait_local(p_name, trait_sym)
@@ -7198,14 +7277,17 @@ fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, bod
 
     let saved_mir_locals = self.mir_local_ptrs
     let saved_mir_local_types = self.mir_local_types
+    let saved_mir_indirect_value_local_types = self.mir_indirect_value_local_types
     let saved_mir_bbs = self.mir_bb_values
     let saved_mir_default_unreachable_bbs = self.mir_default_unreachable_bbs
     let fresh_mir_locals: HashMap[i32, i64] = HashMap.new()
     let fresh_mir_local_types: HashMap[i32, i64] = HashMap.new()
+    let fresh_mir_indirect_value_local_types: HashMap[i32, i64] = HashMap.new()
     let fresh_mir_bbs: Vec[i64] = Vec.new()
     let fresh_mir_default_unreachable_bbs: Vec[i64] = Vec.new()
     self.mir_local_ptrs = fresh_mir_locals
     self.mir_local_types = fresh_mir_local_types
+    self.mir_indirect_value_local_types = fresh_mir_indirect_value_local_types
     self.mir_bb_values = fresh_mir_bbs
     self.mir_default_unreachable_bbs = fresh_mir_default_unreachable_bbs
 
@@ -7279,6 +7361,12 @@ fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, bod
 
         self.mir_local_ptrs.insert(pi + 1, alloca)
         self.mir_local_types.insert(pi + 1, param_type)
+        if wl_get_type_kind(param_type) == wl_pointer_type_kind() and pi + 1 < body.local_type_ids.len() as i32:
+            let local_sema_ty = body.local_type_ids.get((pi + 1) as i64)
+            if local_sema_ty > 0:
+                let semantic_ty = self.mir_sema_type_to_llvm(local_sema_ty)
+                if semantic_ty != 0 and wl_get_type_kind(semantic_ty) != wl_pointer_type_kind():
+                    self.mir_indirect_value_local_types.insert(pi + 1, semantic_ty)
 
         if p_type_node != 0:
             let pk = self.pool.kind(p_type_node)
@@ -7300,10 +7388,28 @@ fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, bod
                 if method_owner_sym != 0 and (p_sym == self.sym_Self or p_sym == method_owner_sym):
                     if method_owner_sym != self.sym_str:
                         self.record_local_pointee_struct(p_name, method_owner_sym)
+                        var owner_ty: i64 = 0
+                        if pi + 1 < body.local_type_ids.len() as i32:
+                            let local_sema_ty = body.local_type_ids.get((pi + 1) as i64)
+                            if local_sema_ty > 0:
+                                owner_ty = self.mir_sema_type_to_llvm(local_sema_ty)
+                        if owner_ty == 0:
+                            owner_ty = self.resolve_named_type(method_owner_sym)
+                        if owner_ty != 0 and wl_get_type_kind(param_type) == wl_pointer_type_kind():
+                            self.mir_indirect_value_local_types.insert(pi + 1, owner_ty)
             if method_owner_sym != 0:
                 if p_name == self.sym_self:
                     if method_owner_sym != self.sym_str:
                         self.record_local_pointee_struct(p_name, method_owner_sym)
+                        var owner_ty: i64 = 0
+                        if pi + 1 < body.local_type_ids.len() as i32:
+                            let local_sema_ty = body.local_type_ids.get((pi + 1) as i64)
+                            if local_sema_ty > 0:
+                                owner_ty = self.mir_sema_type_to_llvm(local_sema_ty)
+                        if owner_ty == 0:
+                            owner_ty = self.resolve_named_type(method_owner_sym)
+                        if owner_ty != 0 and wl_get_type_kind(param_type) == wl_pointer_type_kind():
+                            self.mir_indirect_value_local_types.insert(pi + 1, owner_ty)
             let trait_sym = self.dyn_trait_from_type_node(p_type_node)
             if trait_sym != 0:
                 self.record_trait_local(p_name, trait_sym)
@@ -7382,6 +7488,7 @@ fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, bod
     self.restore_loop_state(saved_loops)
     self.mir_local_ptrs = saved_mir_locals
     self.mir_local_types = saved_mir_local_types
+    self.mir_indirect_value_local_types = saved_mir_indirect_value_local_types
     self.mir_bb_values = saved_mir_bbs
     self.mir_default_unreachable_bbs = saved_mir_default_unreachable_bbs
     if saved_bb != 0:
@@ -7974,8 +8081,7 @@ fn Codegen.get_mutable_receiver_ptr(self: Codegen, recv_node: i32, recv_val: i64
         if alloca != 0:
             let local_ty = self.lookup_local_type(sym)
             if local_ty != 0:
-                let pointee_sym = self.lookup_local_pointee_struct(sym)
-                if wl_get_type_kind(local_ty) == wl_pointer_type_kind() and pointee_sym != 0:
+                if wl_get_type_kind(local_ty) == wl_pointer_type_kind():
                     return wl_build_load(self.builder, local_ty, alloca)
             return alloca
     if wl_get_type_kind(recv_ty) == wl_pointer_type_kind():
@@ -8181,14 +8287,17 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
     // Save outer MIR state (gen_closure is called from within MIR codegen)
     let saved_mir_locals = self.mir_local_ptrs
     let saved_mir_local_types = self.mir_local_types
+    let saved_mir_indirect_value_local_types = self.mir_indirect_value_local_types
     let saved_mir_bbs = self.mir_bb_values
     let saved_mir_unreachable = self.mir_default_unreachable_bbs
     let fresh_cl_mir_locals: HashMap[i32, i64] = HashMap.new()
     let fresh_cl_mir_local_types: HashMap[i32, i64] = HashMap.new()
+    let fresh_cl_mir_indirect_value_local_types: HashMap[i32, i64] = HashMap.new()
     let fresh_cl_mir_bbs: Vec[i64] = Vec.new()
     let fresh_cl_mir_unreachable: Vec[i64] = Vec.new()
     self.mir_local_ptrs = fresh_cl_mir_locals
     self.mir_local_types = fresh_cl_mir_local_types
+    self.mir_indirect_value_local_types = fresh_cl_mir_indirect_value_local_types
     self.mir_bb_values = fresh_cl_mir_bbs
     self.mir_default_unreachable_bbs = fresh_cl_mir_unreachable
 
@@ -8313,6 +8422,7 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
     // Restore outer MIR state
     self.mir_local_ptrs = saved_mir_locals
     self.mir_local_types = saved_mir_local_types
+    self.mir_indirect_value_local_types = saved_mir_indirect_value_local_types
     self.mir_bb_values = saved_mir_bbs
     self.mir_default_unreachable_bbs = saved_mir_unreachable
     // Restore state
@@ -9160,6 +9270,7 @@ fn Codegen.gen_async_block(self: Codegen, node: i32) -> i64:
     let saved_loops = self.capture_loop_state()
     let saved_mir_locals = self.mir_local_ptrs
     let saved_mir_types = self.mir_local_types
+    let saved_mir_indirect_value_local_types = self.mir_indirect_value_local_types
     let saved_mir_bbs = self.mir_bb_values
 
     // 5. Fresh context for trampoline body
@@ -9231,6 +9342,7 @@ fn Codegen.gen_async_block(self: Codegen, node: i32) -> i64:
     let ret_alloca = wl_build_alloca(self.builder, ret_ty)
     self.mir_local_ptrs = HashMap.new()
     self.mir_local_types = HashMap.new()
+    self.mir_indirect_value_local_types = HashMap.new()
     // Map capture MIR locals
     for ci in 0..capture_count:
         let sym = captures.get(ci as i64)
@@ -9272,6 +9384,7 @@ fn Codegen.gen_async_block(self: Codegen, node: i32) -> i64:
     self.async_block_rbuf = 0
     self.mir_local_ptrs = saved_mir_locals
     self.mir_local_types = saved_mir_types
+    self.mir_indirect_value_local_types = saved_mir_indirect_value_local_types
     self.mir_bb_values = saved_mir_bbs
     self.current_function = saved_fn
     self.current_ret_type = saved_ret
