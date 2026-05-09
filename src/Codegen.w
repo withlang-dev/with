@@ -681,6 +681,7 @@ type Codegen {
     mir_input: MirModule,
     mir_local_ptrs: HashMap[i32, i64],
     mir_local_types: HashMap[i32, i64],
+    mir_indirect_value_local_types: HashMap[i32, i64],
     mir_bb_values: Vec[i64],
     mir_default_unreachable_bbs: Vec[i64],
 }
@@ -948,6 +949,7 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         mir_input: MirModule.init(),
         mir_local_ptrs: HashMap.new(),
         mir_local_types: HashMap.new(),
+        mir_indirect_value_local_types: HashMap.new(),
         mir_bb_values: Vec.new(),
         mir_default_unreachable_bbs: Vec.new(),
         debug_info: 1,
@@ -1583,6 +1585,9 @@ fn Codegen.arg_lvalue_ptr_for_autoref(self: Codegen, arg_node: i32, arg_ty: i64,
         let sym = self.pool.get_data0(arg_node)
         let alloca = self.lookup_local_alloca(sym)
         if alloca != 0:
+            let local_ty = self.lookup_local_type(sym)
+            if local_ty != 0 and wl_get_type_kind(local_ty) == wl_pointer_type_kind():
+                return wl_build_load(self.builder, local_ty, alloca)
             return alloca
 
     let tmp = self.create_entry_alloca(arg_ty)
