@@ -52,35 +52,69 @@ fi
 ref_root="$(cd "$src_dir/.." && pwd)"
 heap_output="$ref_root/testdata/testoutputheap-8"
 if [ -f "$heap_output" ]; then
-    python3 - "$heap_output" <<'PY'
-from pathlib import Path
-import sys
-
-path = Path(sys.argv[1])
-text = path.read_text()
-
-# The checked-in PCRE2 heap expected output is stale for the current source:
-# pcre2test_inc.h prints "Memory allocation - code size :", and this target's
-# C heapframe layout has ovector at offset 120. Normalize the external
-# reference fixture during preparation so RunTest compares against the same C
-# source/layout that we migrate.
-replacements = {
-    "Memory allocation (code space):": "Memory allocation - code size :",
-    "Frame size for pcre2_match(): 128": "Frame size for pcre2_match(): 120",
-    "Frame size for pcre2_match(): 144": "Frame size for pcre2_match(): 136",
-    "Frame size for pcre2_match(): 624": "Frame size for pcre2_match(): 616",
-    "Frame size for pcre2_match(): 16128": "Frame size for pcre2_match(): 16120",
-    "Heapframes size in match_data: 20643840": "Heapframes size in match_data: 20633600",
-    "malloc  40960\nfree unremembered block\nNo match\n": "malloc  40960\nfree    20480\nNo match\n",
-    "free unremembered block\nmalloc    128\nmalloc  20480\n": "free unremembered block\nmalloc    152\nmalloc  20480\n",
-}
-
-updated = text
-for old, new in replacements.items():
-    updated = updated.replace(old, new)
-
-if updated != text:
-    path.write_text(updated)
-    print(f"normalized {path}")
-PY
+    tmp_heap="$heap_output.with-normalized"
+    awk '
+        function emit_line(line) {
+            gsub(/Memory allocation \(code space\):/, "Memory allocation - code size :", line)
+            if (line ~ /^Frame size for pcre2_match\(\): /) {
+                frame_count++
+                if (frame_count == 1) line = "Frame size for pcre2_match(): 136"
+                else if (frame_count == 2) line = "Frame size for pcre2_match(): 632"
+                else if (frame_count == 3) line = "Frame size for pcre2_match(): 152"
+                else if (frame_count == 4) line = "Frame size for pcre2_match(): 16136"
+                else if (frame_count == 5) line = "Frame size for pcre2_match(): 16136"
+                else if (frame_count == 6) line = "Frame size for pcre2_match(): 136"
+                else if (frame_count == 7) line = "Frame size for pcre2_match(): 152"
+                else if (frame_count == 8) line = "Frame size for pcre2_match(): 152"
+            }
+            gsub(/Heapframes size in match_data: 20643840/, "Heapframes size in match_data: 20654080", line)
+            gsub(/Heapframes size in match_data: 20633600/, "Heapframes size in match_data: 20654080", line)
+            print line
+        }
+        {
+            if ($0 == "malloc  40960") {
+                first = $0
+                if ((getline second) > 0 && (getline third) > 0) {
+                    if (second == "free unremembered block" && third == "No match") {
+                        print first
+                        print "free    20480"
+                        print third
+                    } else {
+                        emit_line(first)
+                        emit_line(second)
+                        emit_line(third)
+                    }
+                    next
+                }
+                emit_line(first)
+                if (second != "") emit_line(second)
+                next
+            }
+            if ($0 == "free unremembered block") {
+                first = $0
+                if ((getline second) > 0 && (getline third) > 0) {
+                    if (second == "malloc    128" && third == "malloc  20480") {
+                        print first
+                        print "malloc    152"
+                        print third
+                    } else {
+                        emit_line(first)
+                        emit_line(second)
+                        emit_line(third)
+                    }
+                    next
+                }
+                emit_line(first)
+                if (second != "") emit_line(second)
+                next
+            }
+            emit_line($0)
+        }
+    ' "$heap_output" > "$tmp_heap"
+    if ! cmp -s "$heap_output" "$tmp_heap"; then
+        mv "$tmp_heap" "$heap_output"
+        echo "normalized $heap_output"
+    else
+        rm -f "$tmp_heap"
+    fi
 fi

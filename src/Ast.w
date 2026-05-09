@@ -177,6 +177,7 @@ enum TypeDeclKind: i32:
 const TDK_FLAG_EPHEMERAL: i32 = 8
 const TDK_FLAG_PACKED: i32 = 16
 const TDK_FLAG_BITPACKED: i32 = 32
+const TDK_FLAG_SPECIFIED: i32 = 64
 
 fn pack_type_decl_kind(sub_kind: i32, is_ephemeral: i32) -> i32:
     if is_ephemeral != 0:
@@ -194,6 +195,9 @@ fn type_decl_is_packed(packed: i32) -> i32:
 
 fn type_decl_is_bitpacked(packed: i32) -> i32:
     (packed / TDK_FLAG_BITPACKED) % 2
+
+fn type_decl_is_specified(packed: i32) -> i32:
+    (packed / TDK_FLAG_SPECIFIED) % 2
 
 // Fn decl flag bits (stored in data2 field)
 @[flags]
@@ -271,6 +275,17 @@ fn let_decl_is_global(flags: i32) -> i32:
 
 fn let_decl_is_global_var(flags: i32) -> i32:
     (flags / LET_FLAG_GLOBAL_VAR) % 2
+
+const C_IMPORT_ALLOW_COUNT_UNIT: i32 = 1024
+
+fn c_import_link_count(packed: i32) -> i32:
+    packed % C_IMPORT_ALLOW_COUNT_UNIT
+
+fn c_import_allow_count(packed: i32) -> i32:
+    packed / C_IMPORT_ALLOW_COUNT_UNIT
+
+fn pack_c_import_counts(link_count: i32, allow_count: i32) -> i32:
+    link_count + allow_count * C_IMPORT_ALLOW_COUNT_UNIT
 
 // Visibility flags
 enum Visibility: i32:
@@ -1304,7 +1319,7 @@ fn AstPool.for_binding_is_pattern(self: AstPool, node: NodeId) -> bool:
 // NodeKind.NK_FN_DECL:       d0=name(sym), d1=body(node), d2=flags
 //                   extra: [return_type(node), param_count, [param_name, param_type, param_flags]*, type_param_count, [type_param_name, bound_count, bounds...]*]
 //
-// NodeKind.NK_TYPE_DECL:     d0=name(sym), d1=extra_start, d2=packed_kind (TypeDeclKind.* + flags)
+// NodeKind.NK_TYPE_DECL:     d0=name(sym), d1=extra_start, d2=packed_kind (TypeDeclKind.* + TDK_FLAG_*)
 //                   For struct: extra=[field_count, [field_name, field_type, field_default]*, vis, tp_start, tp_count]
 //                   For enum: extra=[variant_count, [var_name, payload_count, payload_type...]*, vis, tp_start, tp_count]
 //                   For alias/distinct: extra=[aliased_or_inner_type, vis, tp_start, tp_count]
@@ -1318,7 +1333,8 @@ fn AstPool.for_binding_is_pattern(self: AstPool, node: NodeId) -> bool:
 // NodeKind.NK_EXTERN_FN:     d0=name(sym), d1=extra_start, d2=flags (bit0=variadic)
 //                   extra: [return_type(node), param_count, [param_name, param_type, param_flags]*]
 //
-// NodeKind.NK_C_IMPORT:      d0=header_str_idx, d1=extra_start, d2=link_lib_count
+// NodeKind.NK_C_IMPORT:      d0=header_str_idx, d1=extra_start, d2=pack_c_import_counts(link_count, allow_untranslated_count)
+//                   extra: [link_lib_sym..., allow_untranslated_sym...]
 //
 // NodeKind.NK_TRAIT_DECL:    d0=name(sym), d1=extra_start, d2=vis
 //

@@ -319,7 +319,7 @@ fn ResolveState.process_module_with_pool(self: ResolveState, module_id: i32, sou
             import_index = import_index + 1
 
             let link_start = pool.get_data1(decl)
-            let link_count = pool.get_data2(decl)
+            let link_count = c_import_link_count(pool.get_data2(decl))
             for li in 0..link_count:
                 let lib_sym = resolve_extra_or_zero(pool, link_start + li)
                 self.record_link_lib(lib_sym)

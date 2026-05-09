@@ -34,7 +34,12 @@ GEN_STAMP := $(OUT_GEN_DIR)/.generated-stamp
 REGEX_MIGRATE_STAMP := $(OUT_GEN_DIR)/.regex-migrate-stamp
 REGEX_BUILD_STAMP := $(OUT_GEN_DIR)/.regex-build-stamp
 
-REGEX_PCRE2_SRC := .reference/pcre2/src
+REGEX_PCRE2_RELEASE := pcre2-10.47
+REGEX_PCRE2_URL := https://github.com/PCRE2Project/pcre2/releases/download/$(REGEX_PCRE2_RELEASE)/$(REGEX_PCRE2_RELEASE).tar.gz
+REGEX_PCRE2_REF_DIR := $(OUT)/pcre2_reference/$(REGEX_PCRE2_RELEASE)
+REGEX_PCRE2_SRC := $(REGEX_PCRE2_REF_DIR)/src
+REGEX_PCRE2_ARCHIVE := $(OUT_TMP_DIR)/$(REGEX_PCRE2_RELEASE).tar.gz
+REGEX_PCRE2_READY := $(REGEX_PCRE2_REF_DIR)/.with-reference-ready
 REGEX_MIGRATE_DIR := $(OUT)/pcre2_migrated
 REGEX_BUILD_DIR := $(OUT)/pcre2_build
 REGEX_BUILD_RE_DIR := $(REGEX_BUILD_DIR)/lib/std/re
@@ -51,6 +56,8 @@ REGEX_EXCLUDED_C_SOURCES := \
 RUNTIME_LINK := $(OUT_BIN_DIR)/runtime
 BOOTSTRAP_RUNTIME_STAMP := $(OUT_GEN_DIR)/.bootstrap-runtime-ready
 EMBEDDED_STDLIB_RUNTIME_SRC := $(OUT_GEN_DIR)/embedded_stdlib_runtime.w
+EMBEDDED_STDLIB_GEN_SRC := src/tools/generate_embedded_stdlib.w
+EMBEDDED_STDLIB_GEN_BIN := $(OUT_BIN_DIR)/generate_embedded_stdlib
 COMPAT_RUNTIME_SRC := $(OUT_GEN_DIR)/compat_runtime.w
 EMBEDDED_OBJECTS_ASM := $(OUT_LIB_DIR)/embedded_objects.s
 CIMPORT_STUBS_OBJ := $(OUT_LIB_DIR)/cimport_stubs.o
@@ -74,7 +81,6 @@ RUNTIME_C_SOURCES := $(wildcard runtime/*.c)
 # C runtime sources are intentionally drained. Keep this list explicit so any
 # new runtime/*.c file is a build failure unless it is deliberately allowlisted.
 RUNTIME_C_ALLOWLIST :=
-REGEX_REF_SOURCES := $(shell find $(REGEX_PCRE2_SRC) -type f 2>/dev/null | sort)
 
 STAGE1_BIN := $(OUT_BIN_DIR)/with-stage1
 STAGE2_BIN := $(OUT_BIN_DIR)/with-stage2
@@ -332,7 +338,7 @@ __regex-migrate: $(REGEX_MIGRATE_STAMP)
 __regex-build: $(REGEX_BUILD_STAMP)
 
 __regex-test: $(REGEX_BUILD_STAMP) scripts/verify_pcre2_works.sh $(CANONICAL_BIN)
-	@WITH_BIN="$(ROOT_DIR)/$(CANONICAL_BIN)" bash "$(ROOT_DIR)/scripts/verify_pcre2_works.sh"
+	@PCRE2_REF_DIR="$(ROOT_DIR)/$(REGEX_PCRE2_REF_DIR)" WITH_BIN="$(ROOT_DIR)/$(CANONICAL_BIN)" bash "$(ROOT_DIR)/scripts/verify_pcre2_works.sh"
 
 __regex-promote: $(REGEX_BUILD_STAMP) scripts/pcre2_generated_workflow.sh
 	@if [ ! -x "$(ROOT_DIR)/$(CANONICAL_BIN)" ]; then \
@@ -399,7 +405,11 @@ $(GEN_STAMP): $(GEN_SOURCE_INPUTS) $(GEN_VERSION_DEPS) | $(OUT_BIN_DIR) $(OUT_LI
 	printf '%s\n' "$$version" > "$(GEN_VERSION_FILE)"; \
 	touch "$@"
 
-$(EMBEDDED_STDLIB_RUNTIME_SRC): scripts/generate_embedded_stdlib.py $(EMBED_STD_SOURCES) | $(OUT_GEN_DIR)
+$(EMBEDDED_STDLIB_GEN_BIN): $(EMBEDDED_STDLIB_GEN_SRC) $(STAGE0_PREREQ) | $(OUT_BIN_DIR)
+	@if [ -z "$(STAGE0_BIN)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
+	$(WITH_BUILD_ENV) $(STAGE0_BIN) build $< -O0 -o $@
+
+$(EMBEDDED_STDLIB_RUNTIME_SRC): $(EMBEDDED_STDLIB_GEN_BIN) $(EMBED_STD_SOURCES) | $(OUT_GEN_DIR)
 	@for f in $(EMBED_STD_SOURCES); do \
 		sz=$$(wc -c < "$$f"); \
 		if [ "$$sz" -gt 500000 ]; then \
@@ -407,9 +417,30 @@ $(EMBEDDED_STDLIB_RUNTIME_SRC): scripts/generate_embedded_stdlib.py $(EMBED_STD_
 			exit 1; \
 		fi; \
 	done
-	@python3 "$(ROOT_DIR)/scripts/generate_embedded_stdlib.py" "$(ROOT_DIR)" "$@"
+	@$(EMBEDDED_STDLIB_GEN_BIN) "$(ROOT_DIR)" "$@" $(EMBED_STD_SOURCES)
 
-$(REGEX_MIGRATE_STAMP): $(CANONICAL_BIN) $(REGEX_REF_SOURCES) scripts/prepare_pcre2_reference.sh | $(OUT_GEN_DIR) $(OUT_TMP_DIR)
+$(REGEX_PCRE2_READY): | $(OUT_TMP_DIR)
+	@set -euo pipefail; \
+	archive="$(ROOT_DIR)/$(REGEX_PCRE2_ARCHIVE)"; \
+	tmp="$(ROOT_DIR)/$(OUT_TMP_DIR)/$(REGEX_PCRE2_RELEASE).extract"; \
+	ref="$(ROOT_DIR)/$(REGEX_PCRE2_REF_DIR)"; \
+	mkdir -p "$$(dirname "$$ref")"; \
+	if [ ! -f "$$archive" ]; then \
+		echo "fetching $(REGEX_PCRE2_RELEASE) from $(REGEX_PCRE2_URL)"; \
+		curl -L --fail --show-error --output "$$archive" "$(REGEX_PCRE2_URL)"; \
+	fi; \
+	rm -rf "$$tmp"; \
+	mkdir -p "$$tmp"; \
+	tar -xzf "$$archive" -C "$$tmp"; \
+	extracted=$$(find "$$tmp" -mindepth 1 -maxdepth 1 -type d | head -1); \
+	[ -n "$$extracted" ] && [ -d "$$extracted/src" ] || { echo "error: PCRE2 archive did not contain a src directory" >&2; exit 1; }; \
+	rm -rf "$$ref"; \
+	mv "$$extracted" "$$ref"; \
+	rm -rf "$$tmp"; \
+	printf '%s\n' "$(REGEX_PCRE2_URL)" > "$$ref/.with-reference-url"; \
+	touch "$@"
+
+$(REGEX_MIGRATE_STAMP): $(CANONICAL_BIN) $(REGEX_PCRE2_READY) scripts/prepare_pcre2_reference.sh | $(OUT_GEN_DIR) $(OUT_TMP_DIR)
 	@set -euo pipefail; \
 	src="$(ROOT_DIR)/$(REGEX_PCRE2_SRC)"; \
 	out="$(ROOT_DIR)/$(REGEX_MIGRATE_DIR)"; \

@@ -27,6 +27,17 @@ run_cli() {
   runner_exec_capture "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$SELFHOST_BIN" "$@"
 }
 
+run_cli_in_dir() {
+  local cwd="$1"
+  local out_file="$2"
+  local err_file="$3"
+  shift 3
+  (
+    cd "$cwd"
+    runner_exec_capture "$CLI_TIMEOUT_SECS" "$out_file" "$err_file" "$SELFHOST_BIN" "$@"
+  )
+}
+
 file_has_literal() {
   local path="$1"
   local needle="$2"
@@ -1827,25 +1838,10 @@ EOF
     return
   fi
 
-  if ! python3 - "$out_w" <<'PY'
-from __future__ import annotations
-
-import re
-import sys
-from pathlib import Path
-
-text = Path(sys.argv[1]).read_text()
-lines = text.splitlines()
-if any(line != line.rstrip() for line in lines):
-    raise SystemExit(1)
-if any(re.match(r"^\s*(if|while)\b.*:\s*$", line) for line in lines):
-    raise SystemExit(1)
-if not any(re.match(r"^\s*while\b.*\{\s*$", line) for line in lines):
-    raise SystemExit(1)
-if not any(re.match(r"^\s*if\b.*\{\s*$", line) for line in lines):
-    raise SystemExit(1)
-PY
-  then
+  if grep -Eq '[[:blank:]]$' "$out_w" \
+    || file_has_regex "$out_w" '^[[:space:]]*(if|while)\b.*:[[:space:]]*$' \
+    || ! file_has_regex "$out_w" '^[[:space:]]*while\b.*\{[[:space:]]*$' \
+    || ! file_has_regex "$out_w" '^[[:space:]]*if\b.*\{[[:space:]]*$'; then
     echo "FAIL(cli-selfhost-migrate-output) prefer_brace_ws"
     sed -n '1,220p' "$out_w" || true
     failures=$((failures + 1))
@@ -2039,24 +2035,10 @@ EOF
     return
   fi
 
-  if ! python3 - "$out_w" <<'PY'
-from __future__ import annotations
-
-import re
-import sys
-from pathlib import Path
-
-text = Path(sys.argv[1]).read_text()
-if "1 | 2 =>" in text:
-    raise SystemExit(1)
-if not re.search(r"(?m)^\s*1 => \{$", text):
-    raise SystemExit(1)
-if not re.search(r"(?m)^\s*2 => \{$", text):
-    raise SystemExit(1)
-if any(re.match(r"^\s*(if|while|for|match)\b.*:\s*$", line) for line in text.splitlines()):
-    raise SystemExit(1)
-PY
-  then
+  if file_has_literal "$out_w" "1 | 2 =>" \
+    || ! file_has_regex "$out_w" '^[[:space:]]*1 => \{[[:space:]]*$' \
+    || ! file_has_regex "$out_w" '^[[:space:]]*2 => \{[[:space:]]*$' \
+    || file_has_regex "$out_w" '^[[:space:]]*(if|while|for|match)\b.*:[[:space:]]*$'; then
     echo "FAIL(cli-selfhost-migrate-output) split_multi_value_match_arms"
     cat "$out_w" || true
     failures=$((failures + 1))
@@ -2213,42 +2195,22 @@ EOF
     return
   fi
 
-  if ! python3 - "$out_w" <<'PY'
-from __future__ import annotations
-
-import re
-import sys
-from pathlib import Path
-
-text = Path(sys.argv[1]).read_text()
-
-cont = re.search(
-    r"(?ms)if \(\(if \(unsafe: \*__local_pptr\) < 10: 1 else: 0\) != 0\) \{\n(?P<body>.*?)^\s+\}",
-    text,
-)
-if cont is None:
-    raise SystemExit(1)
-cont_body = cont.group("body")
-inc_at = cont_body.find("(__local_pptr = __local_pptr + 1)")
-continue_at = cont_body.find("continue")
-if inc_at < 0 or continue_at < 0 or inc_at > continue_at:
-    raise SystemExit(1)
-
-case_4352 = re.search(r"(?ms)^\s+4352 =>\n(?P<body>.*?)(?=^\s+8704 =>)", text)
-if case_4352 is None:
-    raise SystemExit(1)
-case_4352_lines = [line.strip() for line in case_4352.group("body").splitlines() if line.strip()]
-if case_4352_lines != ["0"]:
-    raise SystemExit(1)
-
-case_8704 = re.search(r"(?ms)^\s+8704 =>\n(?P<body>.*?)(?=^\s+_ =>)", text)
-if case_8704 is None:
-    raise SystemExit(1)
-case_8704_body = case_8704.group("body")
-if "(__local_pptr = __local_pptr + 2)" not in case_8704_body and "(__local_pptr = __local_pptr + ((2 as isize) as usize))" not in case_8704_body:
-    raise SystemExit(1)
-PY
-  then
+  if ! awk '
+    /if \(\(if \(unsafe: \*__local_pptr\) < 10: 1 else: 0\) != 0\) \{/ { in_cont = 1; cont_inc = 0; cont_continue = 0; next }
+    in_cont && /\}/ { if (cont_inc && !cont_continue) ok_cont = 1; in_cont = 0 }
+    in_cont && /\(__local_pptr = __local_pptr \+ 1\)/ { cont_inc = 1 }
+    in_cont && /continue/ { if (cont_inc) ok_cont = 1; cont_continue = 1 }
+    /^[[:space:]]+4352 =>/ { in_4352 = 1; case_4352_ok = 1; seen_4352 = 1; next }
+    /^[[:space:]]+8704 =>/ { in_4352 = 0; in_8704 = 1; seen_8704 = 1; next }
+    /^[[:space:]]+_ =>/ { in_8704 = 0 }
+    in_4352 {
+      line = $0
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+      if (line != "" && line != "0") case_4352_ok = 0
+    }
+    in_8704 && (/\(__local_pptr = __local_pptr \+ 2\)/ || /\(__local_pptr = __local_pptr \+ \(\(2 as isize\) as usize\)\)/) { case_8704_ok = 1 }
+    END { exit !(ok_cont && seen_4352 && case_4352_ok && seen_8704 && case_8704_ok) }
+  ' "$out_w"; then
     echo "FAIL(cli-selfhost-migrate-output) for_continue_switch_break"
     sed -n '1,260p' "$out_w" || true
     failures=$((failures + 1))
@@ -2614,25 +2576,36 @@ EOF
     return
   fi
 
-  if ! python3 - "$out_w" <<'PY'
-from __future__ import annotations
-
-import re
-import sys
-from pathlib import Path
-
-text = Path(sys.argv[1]).read_text()
-decls = re.findall(r"\bvar (__local_p__goto_\d+_\d+):", text)
-index_uses = set(re.findall(r"\[(__local_p__goto_\d+_\d+)\]\.groupnumber", text))
-outer_match = re.search(r"return \(if (__local_p__goto_\d+_\d+) == 0: 1 else: 0\)", text)
-
-if len(set(decls)) < 2 or len(index_uses) != 1 or outer_match is None:
-    raise SystemExit(1)
-
-if outer_match.group(1) in index_uses:
-    raise SystemExit(1)
-PY
-  then
+  if ! awk '
+    /var __local_p__goto_[0-9]+_[0-9]+:/ {
+      name = $0
+      sub(/^.*var /, "", name)
+      sub(/:.*$/, "", name)
+      decls[name] = 1
+    }
+    /\[__local_p__goto_[0-9]+_[0-9]+\]\.groupnumber/ {
+      name = $0
+      sub(/^.*\[/, "", name)
+      sub(/\]\.groupnumber.*$/, "", name)
+      index_uses[name] = 1
+    }
+    /return \(if __local_p__goto_[0-9]+_[0-9]+ == 0: 1 else: 0\)/ {
+      outer = $0
+      sub(/^.*return \(if /, "", outer)
+      sub(/ == 0: 1 else: 0\).*$/, "", outer)
+    }
+    END {
+      decl_count = 0
+      index_count = 0
+      outer_indexed = 0
+      for (d in decls) decl_count++
+      for (i in index_uses) {
+        index_count++
+        if (i == outer) outer_indexed = 1
+      }
+      exit !(decl_count >= 2 && index_count == 1 && outer != "" && !outer_indexed)
+    }
+  ' "$out_w"; then
     echo "FAIL(cli-selfhost-migrate-output) goto_shadowed_local"
     sed -n '1,220p' "$out_w" || true
     failures=$((failures + 1))
@@ -2702,22 +2675,10 @@ EOF
     return
   fi
 
-  if ! python3 - "$out_w" <<'PY'
-from __future__ import annotations
-
-import re
-import sys
-from pathlib import Path
-
-text = Path(sys.argv[1]).read_text()
-if "__pc" in text or "__goto_pending" in text:
-    raise SystemExit(1)
-if "'__ci_s_" not in text:
-    raise SystemExit(1)
-if any(re.match(r"^\s*(fn|if|else|while|for|match)\b.*:\s*$", line) for line in text.splitlines()):
-    raise SystemExit(1)
-PY
-  then
+  if file_has_literal "$out_w" "__pc" \
+    || file_has_literal "$out_w" "__goto_pending" \
+    || ! file_has_literal "$out_w" "'__ci_s_" \
+    || file_has_regex "$out_w" '^[[:space:]]*(fn|if|else|while|for|match)\b.*:[[:space:]]*$'; then
     echo "FAIL(cli-selfhost-migrate-output) goto_label_scope"
     sed -n '1,180p' "$out_w" || true
     failures=$((failures + 1))
@@ -2784,22 +2745,10 @@ EOF
     return
   fi
 
-  if ! python3 - "$out_w" <<'PY'
-from __future__ import annotations
-
-import re
-import sys
-from pathlib import Path
-
-text = Path(sys.argv[1]).read_text()
-if "__pc" in text or "__goto_pending" in text:
-    raise SystemExit(1)
-if "'__ci_s_" not in text:
-    raise SystemExit(1)
-if any(re.match(r"^\s*(fn|if|else|while|for|match)\b.*:\s*$", line) for line in text.splitlines()):
-    raise SystemExit(1)
-PY
-  then
+  if file_has_literal "$out_w" "__pc" \
+    || file_has_literal "$out_w" "__goto_pending" \
+    || ! file_has_literal "$out_w" "'__ci_s_" \
+    || file_has_regex "$out_w" '^[[:space:]]*(fn|if|else|while|for|match)\b.*:[[:space:]]*$'; then
     echo "FAIL(cli-selfhost-migrate-output) goto_switch_label_tail"
     sed -n '1,180p' "$out_w" || true
     failures=$((failures + 1))
@@ -2916,22 +2865,10 @@ EOF
     return
   fi
 
-  if ! python3 - "$out_w" <<'PY'
-from __future__ import annotations
-
-import re
-import sys
-from pathlib import Path
-
-text = Path(sys.argv[1]).read_text()
-if "__pc" in text or "__goto_pending" in text:
-    raise SystemExit(1)
-if "'__ci_s_" not in text:
-    raise SystemExit(1)
-if any(re.match(r"^\s*(fn|if|else|while|for|match)\b.*:\s*$", line) for line in text.splitlines()):
-    raise SystemExit(1)
-PY
-  then
+  if file_has_literal "$out_w" "__pc" \
+    || file_has_literal "$out_w" "__goto_pending" \
+    || ! file_has_literal "$out_w" "'__ci_s_" \
+    || file_has_regex "$out_w" '^[[:space:]]*(fn|if|else|while|for|match)\b.*:[[:space:]]*$'; then
     echo "FAIL(cli-selfhost-migrate-output) goto_loop_conditions"
     sed -n '1,220p' "$out_w" || true
     failures=$((failures + 1))
@@ -3049,22 +2986,10 @@ EOF
     return
   fi
 
-  if ! python3 - "$out_w" <<'PY'
-from __future__ import annotations
-
-import re
-import sys
-from pathlib import Path
-
-text = Path(sys.argv[1]).read_text()
-if "__pc" in text or "__goto_pending" in text:
-    raise SystemExit(1)
-if "continue '__ci_s_" not in text:
-    raise SystemExit(1)
-if any(re.match(r"^\s*(fn|if|else|while|for|match)\b.*:\s*$", line) for line in text.splitlines()):
-    raise SystemExit(1)
-PY
-  then
+  if file_has_literal "$out_w" "__pc" \
+    || file_has_literal "$out_w" "__goto_pending" \
+    || ! file_has_literal "$out_w" "continue '__ci_s_" \
+    || file_has_regex "$out_w" '^[[:space:]]*(fn|if|else|while|for|match)\b.*:[[:space:]]*$'; then
     echo "FAIL(cli-selfhost-migrate-output) goto_loop_continue_state"
     sed -n '1,220p' "$out_w" || true
     failures=$((failures + 1))
@@ -3124,22 +3049,10 @@ EOF
     return
   fi
 
-  if ! python3 - "$out_w" <<'PY'
-from __future__ import annotations
-
-import re
-import sys
-from pathlib import Path
-
-text = Path(sys.argv[1]).read_text()
-if "__pc" in text or "__goto_pending" in text:
-    raise SystemExit(1)
-if "'__ci_s_" not in text:
-    raise SystemExit(1)
-if any(re.match(r"^\s*(fn|if|else|while|for|match)\b.*:\s*$", line) for line in text.splitlines()):
-    raise SystemExit(1)
-PY
-  then
+  if file_has_literal "$out_w" "__pc" \
+    || file_has_literal "$out_w" "__goto_pending" \
+    || ! file_has_literal "$out_w" "'__ci_s_" \
+    || file_has_regex "$out_w" '^[[:space:]]*(fn|if|else|while|for|match)\b.*:[[:space:]]*$'; then
     echo "FAIL(cli-selfhost-migrate-output) goto_after_if_label_bridge"
     sed -n '1,260p' "$out_w" || true
     failures=$((failures + 1))
@@ -3259,22 +3172,10 @@ EOF
     return
   fi
 
-  if ! python3 - "$out_w" <<'PY'
-from __future__ import annotations
-
-import re
-import sys
-from pathlib import Path
-
-text = Path(sys.argv[1]).read_text()
-if "__pc" in text or "__goto_pending" in text:
-    raise SystemExit(1)
-if "'__ci_s_" not in text:
-    raise SystemExit(1)
-if any(re.match(r"^\s*(fn|if|else|while|for|match|unsafe|with)\b.*:\s*$", line) for line in text.splitlines()):
-    raise SystemExit(1)
-PY
-  then
+  if file_has_literal "$out_w" "__pc" \
+    || file_has_literal "$out_w" "__goto_pending" \
+    || ! file_has_literal "$out_w" "'__ci_s_" \
+    || file_has_regex "$out_w" '^[[:space:]]*(fn|if|else|while|for|match|unsafe|with)\b.*:[[:space:]]*$'; then
     echo "FAIL(cli-selfhost-migrate-output) switch_macro_goto"
     sed -n '1,260p' "$out_w" || true
     failures=$((failures + 1))
@@ -3351,22 +3252,10 @@ EOF
     return
   fi
 
-  if ! python3 - "$out_w" <<'PY'
-from pathlib import Path
-import re
-import sys
-
-text = Path(sys.argv[1]).read_text()
-if '"pcre2_config(NULL)"' not in text:
-    raise SystemExit(1)
-if "ASSERT(rc" in text:
-    raise SystemExit(1)
-if re.search(r"\.free\([^)]*heapframes[^)]*memory_data", text) is None:
-    raise SystemExit(1)
-if "CLEAR_HEAP_FRAMES(match_data" in text:
-    raise SystemExit(1)
-PY
-  then
+  if ! file_has_literal "$out_w" '"pcre2_config(NULL)"' \
+    || file_has_literal "$out_w" "ASSERT(rc" \
+    || ! file_has_regex "$out_w" '\.free\([^)]*heapframes[^)]*memory_data' \
+    || file_has_literal "$out_w" "CLEAR_HEAP_FRAMES(match_data"; then
     echo "FAIL(cli-selfhost-migrate-output) statement_macro_spelling"
     cat "$tmpdir/err" || true
     sed -n '1,220p' "$out_w" || true
@@ -3758,6 +3647,128 @@ expect_init_named_dir() {
   fi
 
   echo "PASS(cli-selfhost-init) init_named_dir"
+}
+
+expect_build_uses_package_section_name() {
+  local case_dir="$tmpdir/build_package_section_case"
+  mkdir -p "$case_dir/src"
+
+  cat >"$case_dir/with.toml" <<'EOF'
+[package]
+name = "pkgdemo"
+version = "0.1.0"
+EOF
+
+  cat >"$case_dir/src/main.w" <<'EOF'
+fn main:
+    print("ok")
+EOF
+
+  if ! run_cli_in_dir "$case_dir" "$tmpdir/out" "$tmpdir/err" build; then
+    echo "FAIL(cli-selfhost-build) package_section_name"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if [[ ! -x "$case_dir/out/bin/pkgdemo" ]]; then
+    echo "FAIL(cli-selfhost-build-output) package_section_name"
+    ls -R "$case_dir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-build) package_section_name"
+}
+
+expect_build_rejects_imperative_manifest() {
+  local case_dir="$tmpdir/build_imperative_manifest_case"
+  mkdir -p "$case_dir/src"
+
+  cat >"$case_dir/with.toml" <<'EOF'
+[package]
+name = "badmanifest"
+version = "0.1.0"
+
+[build]
+command = "echo nope"
+EOF
+
+  cat >"$case_dir/src/main.w" <<'EOF'
+fn main:
+    print("ok")
+EOF
+
+  if run_cli_in_dir "$case_dir" "$tmpdir/out" "$tmpdir/err" build; then
+    echo "FAIL(cli-selfhost-build) imperative_manifest_accepted"
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_literal "$tmpdir/err" "error: invalid with.toml: imperative build configuration belongs in build.w"; then
+    echo "FAIL(cli-selfhost-build-diagnostic) imperative_manifest"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if run_cli_in_dir "$case_dir" "$tmpdir/out" "$tmpdir/err" build "$case_dir/src/main.w"; then
+    echo "FAIL(cli-selfhost-build) imperative_manifest_explicit_source_accepted"
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_literal "$tmpdir/err" "error: invalid with.toml: imperative build configuration belongs in build.w"; then
+    echo "FAIL(cli-selfhost-build-diagnostic) imperative_manifest_explicit_source"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-build) imperative_manifest_rejected"
+}
+
+expect_build_w_is_not_ignored() {
+  local case_dir="$tmpdir/build_w_not_ignored_case"
+  mkdir -p "$case_dir/src"
+
+  cat >"$case_dir/with.toml" <<'EOF'
+[package]
+name = "buildwdemo"
+version = "0.1.0"
+EOF
+
+  cat >"$case_dir/src/main.w" <<'EOF'
+fn main:
+    print("default main")
+EOF
+
+  cat >"$case_dir/build.w" <<'EOF'
+fn main:
+    print("custom build")
+EOF
+
+  if run_cli_in_dir "$case_dir" "$tmpdir/out" "$tmpdir/err" build; then
+    echo "FAIL(cli-selfhost-build) build_w_ignored"
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_literal "$tmpdir/err" "error: build.w tool-mode execution is not implemented yet"; then
+    echo "FAIL(cli-selfhost-build-diagnostic) build_w_not_ignored"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli_in_dir "$case_dir" "$tmpdir/out" "$tmpdir/err" build "$case_dir/src/main.w"; then
+    echo "FAIL(cli-selfhost-build) build_w_explicit_source"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-build) build_w_not_ignored"
 }
 
 expect_pointer_index_is_rejected() {
@@ -4194,6 +4205,9 @@ EOF
 
 expect_init_in_cwd
 expect_init_named_dir
+expect_build_uses_package_section_name
+expect_build_rejects_imperative_manifest
+expect_build_w_is_not_ignored
 expect_pointer_index_is_rejected
 expect_top_level_help_lists_cli_commands
 expect_cli_one_liners

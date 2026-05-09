@@ -110,7 +110,8 @@ test/
 
 scripts/
     run_tests.sh        unified test runner
-    rebuild_selfhost.sh compatibility wrapper for make stage targets
+    run_cli_selfhost_tests.sh
+                        self-hosted CLI and migrator regression tests
 ```
 
 ### Key Concepts

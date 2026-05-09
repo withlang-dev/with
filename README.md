@@ -291,5 +291,5 @@ bootstrap/           historical Zig bootstrap compiler (frozen, unused)
   The compiler statically links LLVM — no dynamic library needed at runtime.
 - Need only the staged compiler rebuild:
   use `make stage2` for stage2 only, or `make fixpoint` for stage2 plus stage3 verification.
-- Legacy scripts that say `./scripts/rebuild_selfhost.sh ...`:
-  that script is now only a compatibility wrapper around `make stage1|stage2|stage3`.
+- Need to rebuild compiler stages directly:
+  use `make stage1`, `make stage2`, or `make stage3`.

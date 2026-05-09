@@ -8,6 +8,10 @@ type Arena  {
     block_size: i32
 }
 
+type TempArena {
+    allocations: Vec[i64],
+}
+
 type Pool  {
     item_size: i32,
     capacity: i32
@@ -29,6 +33,25 @@ pub fn arena_free(arena: Arena, ptr: *i8) -> void:
 
 pub fn arena_reset(arena: Arena) -> void:
     free_mem(alloc(if arena.block_size > 0: arena.block_size else: 1))
+
+pub fn scratch_arena() -> TempArena:
+    TempArena { allocations: Vec.new() }
+
+pub fn TempArena.alloc(mut self: TempArena, size: i32) -> *i8:
+    let ptr = alloc(if size > 0: size else: 1)
+    self.allocations.push(ptr as i64)
+    ptr
+
+pub fn TempArena.alloc_zeroed(mut self: TempArena, count: i32, size: i32) -> *i8:
+    let ptr = alloc_zeroed(count, size)
+    self.allocations.push(ptr as i64)
+    ptr
+
+pub fn TempArena.reset(mut self: TempArena) -> void:
+    for raw in self.allocations:
+        if raw != 0:
+            free_mem(raw as *i8)
+    self.allocations = Vec.new()
 
 pub fn pool_new(item_size: i32, capacity: i32) -> Pool:
     Pool { item_size, capacity }

@@ -37,6 +37,7 @@ type Parser {
     pending_derive_count: i32,
     pending_sealed: i32,
     pending_flags: i32,
+    pending_specified: i32,
     pending_packed: i32,
     pending_bitpacked: i32,
     pending_weak: i32,
@@ -99,6 +100,7 @@ fn Parser.init_with_pool(tokens: TokenList, source: str, file_id: i32, intern: I
         pending_derive_count: 0,
         pending_sealed: 0,
         pending_flags: 0,
+        pending_specified: 0,
         pending_packed: 0,
         pending_bitpacked: 0,
         pending_weak: 0,
@@ -434,6 +436,7 @@ fn Parser.skip_attributes(self: Parser):
     self.pending_bench = 0
     self.pending_sealed = 0
     self.pending_flags = 0
+    self.pending_specified = 0
     self.pending_packed = 0
     self.pending_bitpacked = 0
     self.pending_weak = 0
@@ -461,6 +464,8 @@ fn Parser.skip_attributes(self: Parser):
                 self.pending_must_use = 1
             if attr_text == "flags":
                 self.pending_flags = 1
+            if attr_text == "specified":
+                self.pending_specified = 1
             if attr_text == "sealed":
                 self.pending_sealed = 1
             if attr_text == "packed":
@@ -526,6 +531,9 @@ fn Parser.skip_attributes(self: Parser):
             // Already handled by standalone check above
             self.advance()
         else if self.is_ident_named("flags"):
+            // Already handled by standalone check above
+            self.advance()
+        else if self.is_ident_named("specified"):
             // Already handled by standalone check above
             self.advance()
         else if self.is_ident_named("c_export"):
@@ -1120,7 +1128,10 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> NodeId:
         self.pool.add_extra(is_pub)
         self.pool.add_extra(tp_start)
         self.pool.add_extra(tp_count)
-        let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TypeDeclKind.DiscEnum, is_ephemeral))
+        var packed_kind = pack_type_decl_kind(TypeDeclKind.DiscEnum, is_ephemeral)
+        if self.pending_specified != 0:
+            packed_kind = packed_kind + TDK_FLAG_SPECIFIED
+        let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, packed_kind)
         return self.finish_type_decl(node)
 
     if self.peek() == TokenKind.TK_L_BRACE:
@@ -1288,6 +1299,8 @@ fn Parser.parse_enum_named_decl(self: Parser, start: i32, name: i32, is_pub: i32
         else:
             extra_start = self.parse_disc_enum_variants_braced(repr_type_node)
     else:
+        if self.pending_specified != 0:
+            self.emit_error("@[specified] requires a discriminant enum with an explicit backing type")
         if use_block_body != 0:
             extra_start = self.parse_enum_variants_block()
         else:
@@ -1296,7 +1309,10 @@ fn Parser.parse_enum_named_decl(self: Parser, start: i32, name: i32, is_pub: i32
     self.pool.add_extra(is_pub)
     self.pool.add_extra(tp_start)
     self.pool.add_extra(tp_count)
-    let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(sub_kind, is_ephemeral))
+    var packed_kind = pack_type_decl_kind(sub_kind, is_ephemeral)
+    if sub_kind == TypeDeclKind.DiscEnum and self.pending_specified != 0:
+        packed_kind = packed_kind + TDK_FLAG_SPECIFIED
+    let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, packed_kind)
     return self.finish_type_decl(node)
 
 fn Parser.finish_type_decl(self: Parser, node: NodeId) -> NodeId:
@@ -1675,7 +1691,9 @@ fn Parser.parse_disc_enum_variants(self: Parser, repr_type_node: i32) -> i32:
             self.expect(TokenKind.TK_R_PAREN)
 
         // Optional explicit discriminant: = value
+        var has_explicit_disc = 0
         if self.peek() == TokenKind.TK_EQ:
+            has_explicit_disc = 1
             self.advance()
             self.skip_newlines()
             var negate = 0
@@ -1692,6 +1710,8 @@ fn Parser.parse_disc_enum_variants(self: Parser, repr_type_node: i32) -> i32:
                 self.advance()
             else:
                 self.emit_error("expected integer literal for discriminant value")
+        if self.pending_specified != 0 and has_explicit_disc == 0:
+            self.emit_error("@[specified] requires explicit discriminant value")
 
         variants.push(vname)
         variants.push(current_disc)
@@ -1758,7 +1778,9 @@ fn Parser.parse_disc_enum_variants_braced(self: Parser, repr_type_node: i32) -> 
                     self.emit_error("expected ',' or ')' in enum payload")
                     self.advance()
             self.expect(TokenKind.TK_R_PAREN)
+        var has_explicit_disc = 0
         if self.peek() == TokenKind.TK_EQ:
+            has_explicit_disc = 1
             self.advance()
             self.skip_newlines()
             var negate = 0
@@ -1775,6 +1797,8 @@ fn Parser.parse_disc_enum_variants_braced(self: Parser, repr_type_node: i32) -> 
                 self.advance()
             else:
                 self.emit_error("expected integer literal for discriminant value")
+        if self.pending_specified != 0 and has_explicit_disc == 0:
+            self.emit_error("@[specified] requires explicit discriminant value")
         variants.push(vname)
         variants.push(current_disc)
         variants.push(payloads.len() as i32)
@@ -1837,7 +1861,9 @@ fn Parser.parse_disc_enum_variants_block(self: Parser, repr_type_node: i32) -> i
                     self.emit_error("expected ',' or ')' in enum payload")
                     self.advance()
             self.expect(TokenKind.TK_R_PAREN)
+        var has_explicit_disc = 0
         if self.peek() == TokenKind.TK_EQ:
+            has_explicit_disc = 1
             self.advance()
             self.skip_newlines()
             var negate = 0
@@ -1854,6 +1880,8 @@ fn Parser.parse_disc_enum_variants_block(self: Parser, repr_type_node: i32) -> i
                 self.advance()
             else:
                 self.emit_error("expected integer literal for discriminant value")
+        if self.pending_specified != 0 and has_explicit_disc == 0:
+            self.emit_error("@[specified] requires explicit discriminant value")
         variants.push(vname)
         variants.push(current_disc)
         variants.push(payloads.len() as i32)
@@ -1964,37 +1992,72 @@ fn Parser.parse_c_import(self: Parser, start: i32) -> NodeId:
     let header_sym = self.intern.intern(raw)
     self.advance()
 
-    let extra_start = self.pool.extra_len()
-    var link_count = 0
+    let links: Vec[i32] = Vec.new()
+    let allow_untranslated: Vec[i32] = Vec.new()
 
-    if self.peek() == TokenKind.TK_COMMA:
+    while self.peek() == TokenKind.TK_COMMA:
         self.advance()
         self.skip_newlines()
+        var key = ""
         if self.peek() == TokenKind.TK_IDENT:
-            self.advance()  // skip 'link'
+            key = self.source.slice(self.current_start() as i64, self.current_end() as i64)
+            self.advance()
         if self.expect(TokenKind.TK_COLON) == 0:
             return self.poisoned_expr()
         self.skip_newlines()
-        while self.peek() == TokenKind.TK_STRING_LIT:
-            let ls = self.current_start()
-            let le = self.current_end()
-            let lib = self.source.slice((ls + 1) as i64, (le - 1) as i64)
-            let lib_sym = self.intern.intern(lib)
-            self.pool.add_extra(lib_sym)
-            link_count = link_count + 1
-            self.advance()
-            self.skip_newlines()
-            if self.peek() == TokenKind.TK_COMMA:
-                let cp = self.pos
+        if key == "link":
+            while self.peek() == TokenKind.TK_STRING_LIT:
+                let ls = self.current_start()
+                let le = self.current_end()
+                let lib = self.source.slice((ls + 1) as i64, (le - 1) as i64)
+                links.push(self.intern.intern(lib))
                 self.advance()
                 self.skip_newlines()
-                if self.peek() == TokenKind.TK_STRING_LIT:
-                    continue
-                self.pos = cp
-            break
+                if self.peek() == TokenKind.TK_COMMA:
+                    let cp = self.pos
+                    self.advance()
+                    self.skip_newlines()
+                    if self.peek() == TokenKind.TK_STRING_LIT:
+                        continue
+                    self.pos = cp
+                break
+        else if key == "allow_untranslated":
+            if self.peek() == TokenKind.TK_L_BRACKET:
+                self.advance()
+                self.skip_newlines()
+                while self.peek() != TokenKind.TK_R_BRACKET and self.peek() != TokenKind.TK_EOF:
+                    if self.peek() == TokenKind.TK_STRING_LIT:
+                        let as_ = self.current_start()
+                        let ae = self.current_end()
+                        allow_untranslated.push(self.intern.intern(self.source.slice((as_ + 1) as i64, (ae - 1) as i64)))
+                        self.advance()
+                    else:
+                        self.emit_error("expected string literal in allow_untranslated")
+                        self.advance()
+                    self.skip_newlines()
+                    if self.peek() == TokenKind.TK_COMMA:
+                        self.advance()
+                        self.skip_newlines()
+                self.expect(TokenKind.TK_R_BRACKET)
+            else if self.peek() == TokenKind.TK_STRING_LIT:
+                let as_ = self.current_start()
+                let ae = self.current_end()
+                allow_untranslated.push(self.intern.intern(self.source.slice((as_ + 1) as i64, (ae - 1) as i64)))
+                self.advance()
+            else:
+                self.emit_error("expected string literal or string array for allow_untranslated")
+        else:
+            self.emit_error("unknown c_import option")
+            while self.peek() != TokenKind.TK_COMMA and self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
+                self.advance()
 
     self.expect(TokenKind.TK_R_PAREN)
-    self.pool.add_node(NodeKind.NK_C_IMPORT, start, self.prev_end(), header_sym, extra_start, link_count)
+    let extra_start = self.pool.extra_len()
+    for i in 0..links.len() as i32:
+        self.pool.add_extra(links.get(i as i64))
+    for i in 0..allow_untranslated.len() as i32:
+        self.pool.add_extra(allow_untranslated.get(i as i64))
+    self.pool.add_node(NodeKind.NK_C_IMPORT, start, self.prev_end(), header_sym, extra_start, pack_c_import_counts(links.len() as i32, allow_untranslated.len() as i32))
 
 // ── let decl ─────────────────────────────────────────────────────
 

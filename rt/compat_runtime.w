@@ -1,6 +1,6 @@
 // rt/compat_runtime.w -- compiler-only runtime functions.
 // These supplement rt_core.w for the compiler build (lld path).
-// The embedded stdlib functions are appended by generate_embedded_stdlib.py.
+// The embedded stdlib functions are appended by generate_embedded_stdlib.w.
 //
 // No libc dependency: uses with_alloc/with_free/with_memcpy/with_memset
 // from rt_core.w. All other extern fns are libSystem (stable Darwin ABI).

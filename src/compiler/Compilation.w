@@ -226,6 +226,10 @@ fn Compilation.compile_source_text(self: Compilation, source_path: str, source_t
     let source_dir = frontend_dirname(source_path)
     zcu.reset_for_new_invocation(source_dir, source_path, "")
     zcu.project_config = project_config_load_for_source(source_path)
+    if zcu.project_config.manifest_error.len() > 0:
+        with_eprint("error: invalid with.toml: " ++ zcu.project_config.manifest_error)
+        self.zcu = zcu
+        return AstPool.new()
     zcu.set_current_source(source_dir, source_path, source_text)
     let pool = zcu.compile_source_frontend(source_text, source_path, 0)
     self.zcu = zcu
@@ -236,6 +240,10 @@ fn Compilation.compile_entry_source_text(self: Compilation, source_path: str, so
     let source_dir = frontend_dirname(source_path)
     zcu.reset_for_new_invocation(source_dir, source_path, "")
     zcu.project_config = project_config_load_for_source(source_path)
+    if zcu.project_config.manifest_error.len() > 0:
+        with_eprint("error: invalid with.toml: " ++ zcu.project_config.manifest_error)
+        self.zcu = zcu
+        return AstPool.new()
     zcu.set_current_source(source_dir, source_path, source_text)
     zcu = self.apply_cli_diag_mappings(zcu)
     let pool = zcu.compile_source_frontend_mode(source_text, source_path, 0, 1)

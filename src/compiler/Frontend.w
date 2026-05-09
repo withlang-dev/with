@@ -309,10 +309,16 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
 fn Zcu.c_import_cache_key_frontend(self: Zcu, pool: AstPool, decl: i32, header_spec: str) -> str:
     var key = header_spec ++ "\n#format:cimport-v3\n#links:"
     let link_start = pool.get_data1(decl)
-    let link_count = pool.get_data2(decl)
+    let packed_counts = pool.get_data2(decl)
+    let link_count = c_import_link_count(packed_counts)
+    let allow_count = c_import_allow_count(packed_counts)
     for li in 0..link_count:
         let lib_sym = pool.get_extra(link_start + li)
         key = key ++ "|" ++ self.pool.resolve(lib_sym)
+    key = key ++ "\n#allow-untranslated:"
+    for ai in 0..allow_count:
+        let allow_sym = pool.get_extra(link_start + link_count + ai)
+        key = key ++ "|" ++ self.pool.resolve(allow_sym)
     key = key ++ frontend_cimport_compiler_fingerprint_line()
     let epoch = with_getenv_str("WITH_CIMPORT_CACHE_EPOCH")
     if epoch.len() > 0:
@@ -838,6 +844,10 @@ fn Zcu.compile_file_frontend(self: Zcu, path: str) -> AstPool:
     let source_dir = frontend_dirname(path)
     self.reset_for_new_invocation(source_dir, path, "")
     self.project_config = project_config_load_for_source(path)
+    if self.project_config.manifest_error.len() > 0:
+        with_eprint("error: invalid with.toml: " ++ self.project_config.manifest_error)
+        self.set_resolve_snapshot(ResolveResult.init(), path)
+        return AstPool.new()
 
     let t_read = with_clock_nanos()
     let text = with_fs_read_file(path)
@@ -864,6 +874,10 @@ fn Zcu.compile_file_frontend_entry(self: Zcu, path: str) -> AstPool:
     let source_dir = frontend_dirname(path)
     self.reset_for_new_invocation(source_dir, path, "")
     self.project_config = project_config_load_for_source(path)
+    if self.project_config.manifest_error.len() > 0:
+        with_eprint("error: invalid with.toml: " ++ self.project_config.manifest_error)
+        self.set_resolve_snapshot(ResolveResult.init(), path)
+        return AstPool.new()
 
     let t_read = with_clock_nanos()
     let text = with_fs_read_file(path)

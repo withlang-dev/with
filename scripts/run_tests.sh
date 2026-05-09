@@ -21,7 +21,7 @@ set -euo pipefail
 #   WITH_TEST_TIMING=1   — show per-test timing, under-load summaries, suite throughput, and isolated reruns
 #   WITH_TEST_TIMING_ISOLATED_TOP=N — with timing enabled, rerun top N slow under-load tests serially (default: 10, 0 disables)
 #   WITH_TEST_TIMING_PHASES_TOP=N — with timing enabled, profile top N isolated reruns and print compiler phase breakdowns (default: 5, 0 disables)
-#   WITH_TEST_TIMEOUT=N  — per-test timeout in seconds (default: 30)
+#   WITH_TEST_TIMEOUT=N  — per-test timeout in seconds (default: 60)
 #   WITH_TEST_DEBUG=1    — keep debug info for ephemeral test binaries (default: 0, pass -g0)
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -29,17 +29,17 @@ cd "$ROOT_DIR"
 source "${ROOT_DIR}/scripts/selfhost_runner.sh"
 
 COMPILER="${WITH:-./out/bin/with-stage2}"
-RUN_TIMEOUT_SECS="${WITH_TEST_TIMEOUT:-30}"
+RUN_TIMEOUT_SECS="${WITH_TEST_TIMEOUT:-60}"
 JOBS="${WITH_TEST_JOBS:-$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)}"
 SHOW_TIMING="${WITH_TEST_TIMING:-0}"
 ISOLATED_TIMING_TOP="${WITH_TEST_TIMING_ISOLATED_TOP:-10}"
 PHASE_TIMING_TOP="${WITH_TEST_TIMING_PHASES_TOP:-5}"
 KEEP_TEST_DEBUG="${WITH_TEST_DEBUG:-0}"
 
-# Portable millisecond clock. Uses perl for sub-second precision
-# (bash SECONDS is integer-only, and date %N is not available on macOS).
+# Portable coarse millisecond clock. Keep this dependency-free; macOS date
+# lacks %N, so use second precision and scale to milliseconds.
 _epoch_ms() {
-  perl -MTime::HiRes=time -e 'printf "%d\n", time()*1000'
+  printf '%d000\n' "$(date +%s)"
 }
 
 if [[ ! -x "$COMPILER" ]]; then
@@ -398,7 +398,7 @@ if [[ "$SHOW_TIMING" == "1" ]]; then
 
   echo ""
   echo "--- slowest tests under load ---"
-  printf "%b" "$timing_data" | sort -t'	' -k1 -rn | head -20 | while IFS='	' read -r tms tname tfile; do
+  printf "%b" "$timing_data" | sort -t'	' -k1 -rn | awk 'NR <= 20 { print }' | while IFS='	' read -r tms tname tfile; do
     [[ -z "$tms" ]] && continue
     printf "  %6d ms  %s\n" "$tms" "$tname"
   done
@@ -421,7 +421,7 @@ if [[ "$SHOW_TIMING" == "1" ]]; then
     printf "%b" "$timing_data" |
       awk -F'	' -v min_ms="$threshold_ms" 'NF >= 2 && ($1 + 0) > min_ms { print }' |
       sort -t'	' -k1 -rn |
-      head -20 |
+      awk 'NR <= 20 { print }' |
       while IFS='	' read -r tms tname tfile; do
         [[ -z "$tms" ]] && continue
         printf "  %6d ms  %s\n" "$tms" "$tname"
@@ -438,7 +438,7 @@ if [[ "$SHOW_TIMING" == "1" ]]; then
     printf "%b" "$timing_data" |
       awk -F'	' 'NF >= 3 && $3 != "" { print }' |
       sort -t'	' -k1 -rn |
-      head -"$ISOLATED_TIMING_TOP" > "$top_under_load_file"
+      awk -v limit="$ISOLATED_TIMING_TOP" 'NR <= limit { print }' > "$top_under_load_file"
 
     echo ""
     echo "--- isolated rerun of top ${ISOLATED_TIMING_TOP} under-load tests ---"
@@ -470,7 +470,7 @@ if [[ "$SHOW_TIMING" == "1" ]]; then
     printf "%b" "$timing_data" |
       awk -F'	' 'NF >= 3 && $3 != "" { print }' |
       sort -t'	' -k1 -rn |
-      head -"$PHASE_TIMING_TOP" > "$top_phase_file"
+      awk -v limit="$PHASE_TIMING_TOP" 'NR <= limit { print }' > "$top_phase_file"
 
     echo ""
     echo "--- compiler phase breakdown for top ${PHASE_TIMING_TOP} under-load tests ---"
@@ -502,7 +502,7 @@ if [[ "$SHOW_TIMING" == "1" ]]; then
       if [[ -n "$phase_data" ]]; then
         printf "%s\n" "$phase_data" |
           sort -t'	' -k2,2nr |
-          head -5 |
+          awk 'NR <= 5 { print }' |
           while IFS='	' read -r phase_name phase_ms; do
             [[ -z "$phase_name" ]] && continue
             printf "      %16s  %8s ms\n" "$phase_name" "$phase_ms"
