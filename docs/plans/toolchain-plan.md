@@ -72,6 +72,11 @@ Source: `docs/toolchain.md`.
     under the project root before target compilation. Invalid or escaping
     paths fail loudly.
   - Unsupported graph features fail loudly instead of being ignored.
+- Initial blessed derive support:
+  - `@[derive(Default)]` is implemented for non-generic structs.
+  - Generated defaults initialize each field through `FieldType.default()`,
+    so missing field support fails loudly through normal method resolution.
+  - Generic structs fail loudly until generic derive expansion is implemented.
 
 ## Verified
 
@@ -93,5 +98,5 @@ Source: `docs/toolchain.md`.
 - Complete `build.w` graph execution beyond executable, library, test, and
   generated-source targets: actual cross-target codegen/linking still needs
   driver support.
-- Read-only `ProjectInfo`, compiler hooks, source emission, and blessed derives
-  remain future phases per `docs/toolchain.md`.
+- Read-only `ProjectInfo`, compiler hooks, source emission, generic derives,
+  and additional blessed derives remain future phases per `docs/toolchain.md`.
