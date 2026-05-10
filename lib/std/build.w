@@ -36,9 +36,15 @@ pub type Target {
     defines: Vec[str],
 }
 
+pub type GeneratedSource {
+    path: str,
+    contents: str,
+}
+
 pub type Build {
     package: Package,
     targets: Vec[Target],
+    generated_sources: Vec[GeneratedSource],
 }
 
 fn build_graph_escape(value: str) -> str:
@@ -61,6 +67,7 @@ pub fn new_build(package: Package) -> Build:
     Build {
         package,
         targets: Vec.new(),
+        generated_sources: Vec.new(),
     }
 
 pub fn target_new(kind: BuildKind, name: str, entry: str) -> Target:
@@ -77,6 +84,10 @@ pub fn target_new(kind: BuildKind, name: str, entry: str) -> Target:
 
 pub fn Build.add_target(mut self: Build, target: Target) -> Build:
     self.targets.push(target)
+    self
+
+pub fn Build.generated_source(mut self: Build, path: str, contents: str) -> Build:
+    self.generated_sources.push(GeneratedSource { path, contents })
     self
 
 pub fn Build.executable(self: Build, name: str, entry: str) -> Build:
@@ -130,6 +141,9 @@ pub fn Target.define(mut self: Target, define: str) -> Target:
 pub fn Build.emit_graph(self: Build) -> str:
     var out = "WITH_BUILD_GRAPH\t1\n"
     out = out ++ "package\t" ++ build_graph_escape(self.package.name) ++ "\t" ++ build_graph_escape(self.package.version) ++ "\n"
+    for gi in 0..self.generated_sources.len() as i32:
+        let generated = self.generated_sources.get(gi as i64)
+        out = out ++ "generated_source\t" ++ build_graph_escape(generated.path) ++ "\t" ++ build_graph_escape(generated.contents) ++ "\n"
     for ti in 0..self.targets.len() as i32:
         let target = self.targets.get(ti as i64)
         out = out ++ "target\t"

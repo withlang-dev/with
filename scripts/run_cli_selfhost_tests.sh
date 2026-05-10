@@ -3968,6 +3968,95 @@ EOF
   echo "PASS(cli-selfhost-build) build_w_non_native_target"
 }
 
+expect_build_w_generated_source() {
+  local case_dir="$tmpdir/build_w_generated_source_case"
+  mkdir -p "$case_dir"
+
+  cat >"$case_dir/with.toml" <<'EOF'
+[package]
+name = "buildwgenerated"
+version = "0.1.0"
+EOF
+
+  cat >"$case_dir/build.w" <<'EOF'
+use std.build
+
+pub fn build(b: Build) -> Build:
+    let generated = b.generated_source("out/gen/generated_main.w", "fn main:\n    print(\"generated source\")\n")
+    generated.executable("generated-app", "out/gen/generated_main.w")
+EOF
+
+  if ! run_cli_in_dir "$case_dir" "$tmpdir/out" "$tmpdir/err" build; then
+    echo "FAIL(cli-selfhost-build) build_w_generated_source"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if [[ ! -f "$case_dir/out/gen/generated_main.w" || ! -x "$case_dir/out/bin/generated-app" ]]; then
+    echo "FAIL(cli-selfhost-build-output) build_w_generated_source"
+    ls -R "$case_dir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! "$case_dir/out/bin/generated-app" >"$tmpdir/out" 2>"$tmpdir/err"; then
+    echo "FAIL(cli-selfhost-build-run) build_w_generated_source"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_literal "$tmpdir/out" "generated source"; then
+    echo "FAIL(cli-selfhost-build-run-output) build_w_generated_source"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-build) build_w_generated_source"
+}
+
+expect_build_w_invalid_generated_source_path() {
+  local case_dir="$tmpdir/build_w_invalid_generated_source_case"
+  mkdir -p "$case_dir/src"
+
+  cat >"$case_dir/with.toml" <<'EOF'
+[package]
+name = "buildwinvalidgenerated"
+version = "0.1.0"
+EOF
+
+  cat >"$case_dir/src/main.w" <<'EOF'
+fn main:
+    print("should not build")
+EOF
+
+  cat >"$case_dir/build.w" <<'EOF'
+use std.build
+
+pub fn build(b: Build) -> Build:
+    let generated = b.generated_source("../outside.w", "fn main: print(\"bad\")\n")
+    generated.executable("invalid-generated", "src/main.w")
+EOF
+
+  if run_cli_in_dir "$case_dir" "$tmpdir/out" "$tmpdir/err" build; then
+    echo "FAIL(cli-selfhost-build) build_w_invalid_generated_source"
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_literal "$tmpdir/err" "invalid build.w generated source path"; then
+    echo "FAIL(cli-selfhost-build-output) build_w_invalid_generated_source"
+    cat "$tmpdir/out" || true
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-build) build_w_invalid_generated_source"
+}
+
 expect_pointer_index_is_rejected() {
   local case_dir="$tmpdir/pointer_index_rejected_case"
   local src="$case_dir/pointer_index_rejected.w"
@@ -4423,6 +4512,8 @@ expect_build_w_is_not_ignored
 expect_build_w_test_target
 expect_build_w_library_target
 expect_build_w_non_native_target_fails_loudly
+expect_build_w_generated_source
+expect_build_w_invalid_generated_source_path
 expect_pointer_index_is_rejected
 expect_top_level_help_lists_cli_commands
 expect_cli_one_liners

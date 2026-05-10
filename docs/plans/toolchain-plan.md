@@ -68,6 +68,9 @@ Source: `docs/toolchain.md`.
     `include_path`, `define`, and `link_system_lib` build settings.
   - Library targets emit static archives under `out/lib` and inherit
     `include_path`, `define`, and `link_system_lib` build settings.
+  - `Build.generated_source(path, contents)` writes generated source files
+    under the project root before target compilation. Invalid or escaping
+    paths fail loudly.
   - Unsupported graph features fail loudly instead of being ignored.
 
 ## Verified
@@ -87,8 +90,8 @@ Source: `docs/toolchain.md`.
 - Platform-independent build replacement for Make itself. The current work
   removes Python from the build path but does not yet replace Make/shell as the
   orchestration layer.
-- Complete `build.w` graph execution beyond executable, library, and test
-  targets: actual cross-target codegen/linking and custom source-generation
-  steps still need driver support.
+- Complete `build.w` graph execution beyond executable, library, test, and
+  generated-source targets: actual cross-target codegen/linking still needs
+  driver support.
 - Read-only `ProjectInfo`, compiler hooks, source emission, and blessed derives
   remain future phases per `docs/toolchain.md`.

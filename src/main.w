@@ -129,12 +129,18 @@ type BuildGraphTarget {
     defines: Vec[str],
 }
 
+type BuildGraphGeneratedSource {
+    path: str,
+    contents: str,
+}
+
 type BuildGraph {
     ok: bool,
     error_msg: str,
     package_name: str,
     package_version: str,
     targets: Vec[BuildGraphTarget],
+    generated_sources: Vec[BuildGraphGeneratedSource],
 }
 
 fn empty_test_discovery -> TestDiscovery:
@@ -740,7 +746,11 @@ fn empty_build_graph -> BuildGraph:
         package_name: "",
         package_version: "",
         targets: Vec.new(),
+        generated_sources: Vec.new(),
     }
+
+fn build_graph_generated_source_new(path: str, contents: str) -> BuildGraphGeneratedSource:
+    BuildGraphGeneratedSource { path, contents }
 
 fn build_graph_target_new(kind: i32, name: str, entry: str, target_kind: i32, optimize_mode: i32) -> BuildGraphTarget:
     BuildGraphTarget {
@@ -812,6 +822,11 @@ fn parse_build_graph(text: str) -> BuildGraph:
                 return graph
             graph.package_name = fields.get(1)
             graph.package_version = fields.get(2)
+        else if tag == "generated_source":
+            if fields.len() != 3:
+                graph.error_msg = "invalid generated_source line in build graph"
+                return graph
+            graph.generated_sources.push(build_graph_generated_source_new(fields.get(1), fields.get(2)))
         else if tag == "target":
             if fields.len() != 6:
                 graph.error_msg = "invalid target line in build graph"
@@ -917,19 +932,60 @@ fn build_graph_resolve_paths(root: str, paths: Vec[str]) -> Vec[str]:
         out.push(build_graph_resolve_project_path(root, paths.get(i as i64)))
     out
 
+fn build_graph_dirname(path: str) -> str:
+    var last_slash = -1
+    for i in 0..path.len() as i32:
+        if path.byte_at(i as i64) == 47:
+            last_slash = i
+    if last_slash < 0:
+        return "."
+    path.slice(0, last_slash as i64)
+
+fn build_graph_generated_path_valid(path: str) -> bool:
+    if path.len() == 0:
+        return false
+    if path.byte_at(0) == 47:
+        return false
+    if with_str_contains(path, "..") != 0:
+        return false
+    for i in 0..path.len() as i32:
+        let ch = path.byte_at(i as i64)
+        if ch == 10 or ch == 13 or ch == 9:
+            return false
+    true
+
 fn build_graph_define_valid(define: str) -> bool:
     if define.len() == 0:
         return false
     for i in 0..define.len() as i32:
         let ch = define.byte_at(i as i64)
         if ch == 10 or ch == 13:
-            return false
+                return false
     true
+
+fn run_build_graph_write_generated_sources(root: str, graph: BuildGraph) -> i32:
+    for gi in 0..graph.generated_sources.len() as i32:
+        let generated = graph.generated_sources.get(gi as i64)
+        if not build_graph_generated_path_valid(generated.path):
+            with_eprint("error: invalid build.w generated source path: " ++ generated.path)
+            return 1
+        let output_path = resolve_join(root, generated.path)
+        let output_dir = build_graph_dirname(output_path)
+        if with_fs_mkdir_p(output_dir) != 0:
+            with_eprint("error: could not create generated source directory: " ++ output_dir)
+            return 1
+        if with_fs_write_file(output_path, generated.contents) != 0:
+            with_eprint("error: could not write generated source: " ++ generated.path)
+            return 1
+    0
 
 fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, alloc_mode: bool, output_path: str, prelude_mode: i32, debug_info: bool) -> i32:
     if graph.targets.len() == 0:
         with_eprint("error: build.w did not declare any targets")
         return 1
+    let generated_rc = run_build_graph_write_generated_sources(root, graph)
+    if generated_rc != 0:
+        return generated_rc
     for ti in 0..graph.targets.len() as i32:
         let target = graph.targets.get(ti as i64)
         if target.kind != 0 and target.kind != 1 and target.kind != 2:

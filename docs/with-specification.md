@@ -8449,8 +8449,8 @@ The standard build graph API lives in `std.build`. It defines
 `Package`, `Build`, `Target`, `BuildKind`, `BuildTarget`, and
 `OptimizeMode`, plus target construction methods such as
 `Build.executable`, `Build.library`, `Build.test`,
-`Target.optimize`, `Target.link_system_lib`, `Target.include_path`,
-and `Target.define`.
+`Build.generated_source`, `Target.optimize`, `Target.link_system_lib`,
+`Target.include_path`, and `Target.define`.
 
 `build.w` runs in tool-mode compiler-driver context, not ordinary pure
 `comptime`. Tool-mode code may perform build effects through
@@ -8460,14 +8460,16 @@ The initial tool-mode driver executes `build.w`, calls
 `build(new_build(package))`, consumes the returned build graph, and
 builds executable, library, and test targets. Per-target
 `link_system_lib`, `include_path`, and `define` settings are honored by
-the corresponding compile/test path. `BuildTarget` can represent
-non-native targets, but until cross-target codegen/linking is
-implemented those selections must fail loudly instead of falling back
-to native output. Unsupported graph features, such as source-generation
-steps the driver cannot yet honor, must likewise fail loudly instead of
-being ignored. A compiler version that recognizes project `build.w`
-files but does not execute them must likewise fail loudly instead of
-silently building some other target.
+the corresponding compile/test path. `Build.generated_source(path,
+contents)` declares a generated source file to write before target
+compilation; generated paths are project-relative and escaping paths
+must fail loudly. `BuildTarget` can represent non-native targets, but
+until cross-target codegen/linking is implemented those selections must
+fail loudly instead of falling back to native output. Unsupported graph
+features must likewise fail loudly instead of being ignored. A compiler
+version that recognizes project `build.w` files but does not execute
+them must likewise fail loudly instead of silently building some other
+target.
 
 ### 18.5b CLI One-Liners
 
