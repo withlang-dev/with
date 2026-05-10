@@ -868,12 +868,15 @@ fn Zcu.compile_file_frontend(self: Zcu, path: str) -> AstPool:
     pool
 
 fn Zcu.compile_file_frontend_entry(self: Zcu, path: str) -> AstPool:
+    self.compile_file_frontend_entry_with_config(path, project_config_load_for_source(path))
+
+fn Zcu.compile_file_frontend_entry_with_config(self: Zcu, path: str, cfg: ProjectConfig) -> AstPool:
     let do_profile = with_getenv_str("WITH_PROFILE").len() > 0
     if zcu_debug_init_enabled() != 0:
         with_eprint("[frontend] compile_file_entry:start " ++ path)
     let source_dir = frontend_dirname(path)
     self.reset_for_new_invocation(source_dir, path, "")
-    self.project_config = project_config_load_for_source(path)
+    self.project_config = cfg
     if self.project_config.manifest_error.len() > 0:
         with_eprint("error: invalid with.toml: " ++ self.project_config.manifest_error)
         self.set_resolve_snapshot(ResolveResult.init(), path)

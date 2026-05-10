@@ -1891,6 +1891,19 @@ pub fn sb_build(sb: *mut u8) -> str:
 
 // ── File I/O ───────────────────────────────────────────────────────
 
+fn fs_path_is_dir_c(path: *const u8) -> bool:
+    var st: [24]u8 = [0 as u8; 24]
+    if rt_stat(path, &st as *mut u8) != 0:
+        return false
+    let base = &st as i64
+    unsafe: *((base + 8) as *const i32) != 0
+
+fn fs_mkdir_component(path: *const u8, mode: i32) -> i32:
+    let rc = rt_mkdir(path, mode)
+    if rc == -17 and fs_path_is_dir_c(path):
+        return 0
+    rc
+
 @[c_export("with_fs_read_file")]
 pub fn fs_read_file(path: str) -> str:
     let cpath = str_to_cstr(path)
@@ -1948,10 +1961,12 @@ pub fn fs_mkdir_p(path: str) -> i32:
     while i < slen:
         if unsafe: *((cpath as i64 + i) as *const u8) == 47:  // '/'
             unsafe: *((cpath as i64 + i) as *mut u8) = 0
-            let _ = rt_mkdir(cpath, 493)  // 0755
+            let rc = fs_mkdir_component(cpath, 493)  // 0755
             unsafe: *((cpath as i64 + i) as *mut u8) = 47
+            if rc != 0:
+                return rc
         i = i + 1
-    rt_mkdir(cpath, 493)
+    fs_mkdir_component(cpath, 493)
 
 @[c_export("with_fs_remove_file")]
 pub fn fs_remove_file(path: str) -> i32:

@@ -34,7 +34,7 @@ fn project_config_find_root(start_dir: str) -> str:
     while true:
         let manifest = resolve_join(cur, "with.toml")
         if project_config_file_exists(manifest):
-            return cur
+            return project_config_absolutize_path(cur)
         let parent = resolve_dirname(cur)
         if parent == cur:
             break
