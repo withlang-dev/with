@@ -243,6 +243,9 @@ fn link_stage_make_archive(obj_path: str) -> str:
     // Wrap a .o file in a .a archive so the linker treats it as a library
     // (only pulling in symbols that aren't already defined).
     let ar_path = obj_path ++ ".a"
+    link_stage_make_archive_to_path(obj_path, ar_path)
+
+fn link_stage_make_archive_to_path(obj_path: str, ar_path: str) -> str:
     let cmd = "if [ ! -f " ++ ar_path ++ " ] || [ " ++ obj_path ++ " -nt " ++ ar_path ++ " ]; then ar rcs " ++ ar_path ++ " " ++ obj_path ++ "; fi"
     let rc = with_system(cmd)
     if rc == 0:

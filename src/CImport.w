@@ -274,11 +274,28 @@ fn ci_set_include_paths(paths: Vec[str]):
     for i in 0..paths.len() as i32:
         with_cimport_add_include_path(paths.get(i as i64))
 
+fn ci_build_define_prefix(defines: Vec[str]) -> str:
+    var out = ""
+    for i in 0..defines.len() as i32:
+        let define = defines.get(i as i64)
+        if define.len() > 0:
+            var rendered = define
+            for di in 0..define.len() as i32:
+                if define.byte_at(di as i64) == 61:
+                    rendered = define.slice(0, di as i64) ++ " " ++ define.slice((di + 1) as i64, define.len())
+                    break
+            out = out ++ "#define " ++ rendered ++ "\n"
+    out
+
 fn process_c_import(header_spec: str) -> str:
+    let defines: Vec[str] = Vec.new()
+    process_c_import_with_defines(header_spec, defines)
+
+fn process_c_import_with_defines(header_spec: str, defines: Vec[str]) -> str:
     if with_cimport_available() == 0:
         return ""
 
-    let include_text = ci_build_include_text(header_spec)
+    let include_text = ci_build_define_prefix(defines) ++ ci_build_include_text(header_spec)
     let session = with_cimport_parse(include_text)
     if session == 0:
         return ""

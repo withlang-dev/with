@@ -259,7 +259,7 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
             else:
                 if self.trace_c_import_cache != 0:
                     with_eprint("c_import cache miss")
-                let libclang_result = process_c_import(resolved_header_spec)
+                let libclang_result = process_c_import_with_defines(resolved_header_spec, self.project_config.c_import_defines)
                 if self.trace_c_import_cache != 0 and libclang_result.len() > 0:
                     with_eprint("c_import generated:")
                     with_eprint(libclang_result)
@@ -319,6 +319,9 @@ fn Zcu.c_import_cache_key_frontend(self: Zcu, pool: AstPool, decl: i32, header_s
     for ai in 0..allow_count:
         let allow_sym = pool.get_extra(link_start + link_count + ai)
         key = key ++ "|" ++ self.pool.resolve(allow_sym)
+    key = key ++ "\n#defines:"
+    for di in 0..self.project_config.c_import_defines.len() as i32:
+        key = key ++ "|" ++ self.project_config.c_import_defines.get(di as i64)
     key = key ++ frontend_cimport_compiler_fingerprint_line()
     let epoch = with_getenv_str("WITH_CIMPORT_CACHE_EPOCH")
     if epoch.len() > 0:
@@ -838,12 +841,15 @@ fn Zcu.parse_with_prelude_first(self: Zcu, text: str, file_id: i32) -> AstPool:
     self.parse_with_prelude_first_mode(text, file_id, 0)
 
 fn Zcu.compile_file_frontend(self: Zcu, path: str) -> AstPool:
+    self.compile_file_frontend_with_config(path, project_config_load_for_source(path))
+
+fn Zcu.compile_file_frontend_with_config(self: Zcu, path: str, cfg: ProjectConfig) -> AstPool:
     let do_profile = with_getenv_str("WITH_PROFILE").len() > 0
     if zcu_debug_init_enabled() != 0:
         with_eprint("[frontend] compile_file:start " ++ path)
     let source_dir = frontend_dirname(path)
     self.reset_for_new_invocation(source_dir, path, "")
-    self.project_config = project_config_load_for_source(path)
+    self.project_config = cfg
     if self.project_config.manifest_error.len() > 0:
         with_eprint("error: invalid with.toml: " ++ self.project_config.manifest_error)
         self.set_resolve_snapshot(ResolveResult.init(), path)

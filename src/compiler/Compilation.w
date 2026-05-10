@@ -181,6 +181,14 @@ fn Compilation.compile_file(self: Compilation, path: str) -> AstPool:
     compilation_debug_init(f"Compilation.compile_file:done decls={pool.decl_count()}")
     pool
 
+fn Compilation.compile_file_with_config(self: Compilation, path: str, cfg: ProjectConfig) -> AstPool:
+    compilation_debug_init("Compilation.compile_file_with_config:start " ++ path)
+    var zcu = self.zcu
+    let pool = zcu.compile_file_frontend_with_config(path, cfg)
+    self.zcu = zcu
+    compilation_debug_init(f"Compilation.compile_file_with_config:done decls={pool.decl_count()}")
+    pool
+
 fn Compilation.compile_entry_file(self: Compilation, path: str) -> AstPool:
     compilation_debug_init("Compilation.compile_entry_file:start " ++ path)
     var zcu = self.zcu
@@ -235,6 +243,20 @@ fn Compilation.compile_source_text(self: Compilation, source_path: str, source_t
     let source_dir = frontend_dirname(source_path)
     zcu.reset_for_new_invocation(source_dir, source_path, "")
     zcu.project_config = project_config_load_for_source(source_path)
+    if zcu.project_config.manifest_error.len() > 0:
+        with_eprint("error: invalid with.toml: " ++ zcu.project_config.manifest_error)
+        self.zcu = zcu
+        return AstPool.new()
+    zcu.set_current_source(source_dir, source_path, source_text)
+    let pool = zcu.compile_source_frontend(source_text, source_path, 0)
+    self.zcu = zcu
+    pool
+
+fn Compilation.compile_source_text_with_config(self: Compilation, source_path: str, source_text: str, cfg: ProjectConfig) -> AstPool:
+    var zcu = self.zcu
+    let source_dir = frontend_dirname(source_path)
+    zcu.reset_for_new_invocation(source_dir, source_path, "")
+    zcu.project_config = cfg
     if zcu.project_config.manifest_error.len() > 0:
         with_eprint("error: invalid with.toml: " ++ zcu.project_config.manifest_error)
         self.zcu = zcu
@@ -315,6 +337,43 @@ fn Compilation.emit_object_to_path(self: Compilation, source_path: str, obj_path
         return ""
     obj_path
 
+fn Compilation.emit_object_to_path_with_build_settings(self: Compilation, source_path: str, obj_path: str, include_paths: Vec[str], defines: Vec[str], link_libs: Vec[str]) -> str:
+    let output_dir = link_stage_dirname(obj_path)
+    let _ = ("mkdir -p " ++ output_dir) |> with_system
+
+    var cfg = project_config_load_for_source(source_path)
+    for ii in 0..include_paths.len() as i32:
+        cfg.c_import_include_paths.push(include_paths.get(ii as i64))
+    for di in 0..defines.len() as i32:
+        cfg.c_import_defines.push(defines.get(di as i64))
+    for li in 0..link_libs.len() as i32:
+        cfg.dep_link_libs.push(link_libs.get(li as i64))
+    let pool = self.compile_file_with_config(source_path, cfg)
+    if pool.decl_count() == 0:
+        return ""
+    if not self.ensure_codegen_mir(pool):
+        return ""
+    let active_pool: AstPool = self.active_pool(pool)
+    let opt_level = self.config.opt_level
+    let backend_rc = self.zcu.compile_to_object_backend(active_pool, opt_level, obj_path, self.config.debug_info, true)
+    if backend_rc != 0:
+        let _ = ("rm -f " ++ obj_path) |> with_system
+        return ""
+    obj_path
+
+fn Compilation.emit_archive_to_path_with_build_settings(self: Compilation, source_path: str, ar_path: str, include_paths: Vec[str], defines: Vec[str], link_libs: Vec[str]) -> str:
+    if ar_path.len() == 0:
+        return ""
+    let output_dir = link_stage_dirname(ar_path)
+    let _ = ("mkdir -p " ++ output_dir) |> with_system
+    let obj_path = ar_path ++ ".o"
+    let obj = self.emit_object_to_path_with_build_settings(source_path, obj_path, include_paths, defines, link_libs)
+    if obj == "":
+        return ""
+    let ar = link_stage_make_archive_to_path(obj, ar_path)
+    let _ = ("rm -f " ++ obj) |> with_system
+    ar
+
 fn Compilation.build_binary_to_path(self: Compilation, source_path: str, bin_path: str) -> str:
     if bin_path.len() == 0:
         return self.build_binary(source_path)
@@ -326,7 +385,7 @@ fn Compilation.build_binary_to_path(self: Compilation, source_path: str, bin_pat
     let pool = self.compile_entry_file(source_path)
     self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
 
-fn Compilation.build_binary_to_path_with_build_settings(self: Compilation, source_path: str, bin_path: str, include_paths: Vec[str], link_libs: Vec[str]) -> str:
+fn Compilation.build_binary_to_path_with_build_settings(self: Compilation, source_path: str, bin_path: str, include_paths: Vec[str], defines: Vec[str], link_libs: Vec[str]) -> str:
     if bin_path.len() == 0:
         return self.build_binary_to_path(source_path, bin_path)
     let obj_path = bin_path ++ ".o"
@@ -337,6 +396,8 @@ fn Compilation.build_binary_to_path_with_build_settings(self: Compilation, sourc
     var cfg = project_config_load_for_source(source_path)
     for ii in 0..include_paths.len() as i32:
         cfg.c_import_include_paths.push(include_paths.get(ii as i64))
+    for di in 0..defines.len() as i32:
+        cfg.c_import_defines.push(defines.get(di as i64))
     for li in 0..link_libs.len() as i32:
         cfg.dep_link_libs.push(link_libs.get(li as i64))
     let pool = self.compile_entry_file_with_config(source_path, cfg)
@@ -344,7 +405,8 @@ fn Compilation.build_binary_to_path_with_build_settings(self: Compilation, sourc
 
 fn Compilation.build_binary_to_path_with_link_libs(self: Compilation, source_path: str, bin_path: str, link_libs: Vec[str]) -> str:
     let include_paths: Vec[str] = Vec.new()
-    self.build_binary_to_path_with_build_settings(source_path, bin_path, include_paths, link_libs)
+    let defines: Vec[str] = Vec.new()
+    self.build_binary_to_path_with_build_settings(source_path, bin_path, include_paths, defines, link_libs)
 
 fn Compilation.build_binary_from_source_to_path(self: Compilation, source_path: str, source_text: str, bin_path: str) -> str:
     if bin_path.len() == 0:
@@ -355,6 +417,24 @@ fn Compilation.build_binary_from_source_to_path(self: Compilation, source_path: 
     let _ = ("rm -rf " ++ bin_path ++ ".dSYM") |> with_system
 
     let pool = self.compile_source_text(source_path, source_text)
+    self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
+
+fn Compilation.build_binary_from_source_to_path_with_build_settings(self: Compilation, source_path: str, source_text: str, bin_path: str, include_paths: Vec[str], defines: Vec[str], link_libs: Vec[str]) -> str:
+    if bin_path.len() == 0:
+        return self.build_binary_from_source_to_path(source_path, source_text, bin_path)
+    let obj_path = bin_path ++ ".o"
+    let output_dir = link_stage_dirname(bin_path)
+    let _ = ("mkdir -p " ++ output_dir) |> with_system
+    let _ = ("rm -rf " ++ bin_path ++ ".dSYM") |> with_system
+
+    var cfg = project_config_load_for_source(source_path)
+    for ii in 0..include_paths.len() as i32:
+        cfg.c_import_include_paths.push(include_paths.get(ii as i64))
+    for di in 0..defines.len() as i32:
+        cfg.c_import_defines.push(defines.get(di as i64))
+    for li in 0..link_libs.len() as i32:
+        cfg.dep_link_libs.push(link_libs.get(li as i64))
+    let pool = self.compile_source_text_with_config(source_path, source_text, cfg)
     self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
 
 fn Compilation.build_entry_binary_from_source_to_path(self: Compilation, source_path: str, source_text: str, bin_path: str) -> str:

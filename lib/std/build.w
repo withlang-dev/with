@@ -10,6 +10,11 @@ pub enum BuildKind: i32:
 
 pub enum BuildTarget: i32:
     native = 0
+    linux_x86_64 = 1
+    linux_aarch64 = 2
+    darwin_x86_64 = 3
+    darwin_aarch64 = 4
+    windows_x86_64 = 5
 
 pub enum OptimizeMode: i32:
     debug = 0

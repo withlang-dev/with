@@ -17,6 +17,8 @@ Source: `docs/toolchain.md`.
     `OptimizeMode`.
   - Target builder methods for executable/library/test, target selection,
     optimization mode, system libraries, include paths, and defines.
+  - Non-native target selections are represented in the graph and fail loudly
+    until cross-target codegen/linking is implemented.
 - `std.context` initial scoped execution context:
   - `Context` as an ephemeral stdlib type.
   - `TraceId`, `CancellationToken`, `NoopLogger`, `default_context()`,
@@ -58,6 +60,14 @@ Source: `docs/toolchain.md`.
     `std.build` graph for the driver.
   - Executable targets are built from that graph, including
     `link_system_lib` entries.
+  - `include_path` entries are resolved relative to the project root and
+    passed through to `c_import`.
+  - `define` entries are passed through to `c_import` as C preprocessor
+    definitions, including `NAME=value` forms.
+  - Test targets run through the normal `with test` pipeline and inherit
+    `include_path`, `define`, and `link_system_lib` build settings.
+  - Library targets emit static archives under `out/lib` and inherit
+    `include_path`, `define`, and `link_system_lib` build settings.
   - Unsupported graph features fail loudly instead of being ignored.
 
 ## Verified
@@ -77,8 +87,8 @@ Source: `docs/toolchain.md`.
 - Platform-independent build replacement for Make itself. The current work
   removes Python from the build path but does not yet replace Make/shell as the
   orchestration layer.
-- Complete `build.w` graph execution beyond executable targets: libraries,
-  test targets, non-native target selection, include paths, defines, and
-  custom source-generation steps still need driver support.
+- Complete `build.w` graph execution beyond executable, library, and test
+  targets: actual cross-target codegen/linking and custom source-generation
+  steps still need driver support.
 - Read-only `ProjectInfo`, compiler hooks, source emission, and blessed derives
   remain future phases per `docs/toolchain.md`.
