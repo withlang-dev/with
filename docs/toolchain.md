@@ -131,12 +131,16 @@ A complex project:
 use std.build
 
 pub fn build(b: Build) -> Build:
-    with b as mut b:
-        b.executable("game", "src/main.w")
-            .target(BuildTarget.native)
-            .optimize(.debug)
-            .link_system_lib("SDL2")
-        b.test("unit", "tests/*.w")
+    var out = b.generated_source(
+        "out/gen/version.w",
+        "pub fn build_version -> str:\n    \"dev\"\n",
+    )
+    var game = target_new(.Executable, "game", "src/main.w")
+    game = game.target(BuildTarget.native)
+    game = game.optimize(.debug)
+    game = game.link_system_lib("SDL2")
+    out = out.add_target(game)
+    out.test("unit", "tests/*.w")
 ```
 
 ### `build.w` is not ordinary `comptime`
