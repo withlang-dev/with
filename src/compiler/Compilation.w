@@ -317,6 +317,21 @@ fn Compilation.build_binary_to_path(self: Compilation, source_path: str, bin_pat
     let pool = self.compile_entry_file(source_path)
     self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
 
+fn Compilation.build_binary_to_path_with_link_libs(self: Compilation, source_path: str, bin_path: str, link_libs: Vec[str]) -> str:
+    if bin_path.len() == 0:
+        return self.build_binary_to_path(source_path, bin_path)
+    let obj_path = bin_path ++ ".o"
+    let output_dir = link_stage_dirname(bin_path)
+    let _ = ("mkdir -p " ++ output_dir) |> with_system
+    let _ = ("rm -rf " ++ bin_path ++ ".dSYM") |> with_system
+
+    let pool = self.compile_entry_file(source_path)
+    var zcu = self.zcu
+    for li in 0..link_libs.len() as i32:
+        zcu.project_config.dep_link_libs.push(link_libs.get(li as i64))
+    self.zcu = zcu
+    self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
+
 fn Compilation.build_binary_from_source_to_path(self: Compilation, source_path: str, source_text: str, bin_path: str) -> str:
     if bin_path.len() == 0:
         return self.build_binary_from_source(source_path, source_text)

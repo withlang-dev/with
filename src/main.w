@@ -118,6 +118,25 @@ type BenchDiscovery {
     bench_names: Vec[str],
 }
 
+type BuildGraphTarget {
+    kind: i32,
+    name: str,
+    entry: str,
+    target_kind: i32,
+    optimize_mode: i32,
+    system_libs: Vec[str],
+    include_paths: Vec[str],
+    defines: Vec[str],
+}
+
+type BuildGraph {
+    ok: bool,
+    error_msg: str,
+    package_name: str,
+    package_version: str,
+    targets: Vec[BuildGraphTarget],
+}
+
 fn empty_test_discovery -> TestDiscovery:
     TestDiscovery { parse_ok: false, has_main: false, test_names: Vec.new() }
 
@@ -714,6 +733,209 @@ fn test_unique_binary_path(source_file: str) -> str:
     let base = link_stage_output_path_for_source(source_file)
     f"{base}.test.{with_getpid()}.{with_clock_nanos()}"
 
+fn empty_build_graph -> BuildGraph:
+    BuildGraph {
+        ok: false,
+        error_msg: "",
+        package_name: "",
+        package_version: "",
+        targets: Vec.new(),
+    }
+
+fn build_graph_target_new(kind: i32, name: str, entry: str, target_kind: i32, optimize_mode: i32) -> BuildGraphTarget:
+    BuildGraphTarget {
+        kind,
+        name,
+        entry,
+        target_kind,
+        optimize_mode,
+        system_libs: Vec.new(),
+        include_paths: Vec.new(),
+        defines: Vec.new(),
+    }
+
+fn build_graph_split_fields(line: str) -> Vec[str]:
+    let fields: Vec[str] = Vec.new()
+    var cur = ""
+    var escaped = false
+    for i in 0..line.len() as i32:
+        let ch = line.byte_at(i as i64)
+        if escaped:
+            if ch == 110:
+                cur = cur ++ "\n"
+            else if ch == 116:
+                cur = cur ++ "\t"
+            else if ch == 114:
+                cur = cur ++ "\r"
+            else:
+                cur = cur ++ line.slice(i as i64, (i + 1) as i64)
+            escaped = false
+        else if ch == 92:
+            escaped = true
+        else if ch == 9:
+            fields.push(cur)
+            cur = ""
+        else:
+            cur = cur ++ line.slice(i as i64, (i + 1) as i64)
+    fields.push(cur)
+    fields
+
+fn build_graph_parse_i32(text: str) -> i32:
+    test_parse_i32(text)
+
+fn parse_build_graph(text: str) -> BuildGraph:
+    var graph = empty_build_graph()
+    if text.len() == 0:
+        graph.error_msg = "build.w produced an empty build graph"
+        return graph
+    let lines = split_nonempty_lines(text)
+    if lines.len() == 0:
+        graph.error_msg = "build.w produced an empty build graph"
+        return graph
+    let header = build_graph_split_fields(lines.get(0))
+    if header.len() != 2 or header.get(0) != "WITH_BUILD_GRAPH" or header.get(1) != "1":
+        graph.error_msg = "build.w produced an invalid build graph header"
+        return graph
+
+    var has_current = false
+    var current = build_graph_target_new(0, "", "", 0, 0)
+    var i = 1
+    while i < lines.len() as i32:
+        let fields = build_graph_split_fields(lines.get(i as i64))
+        if fields.len() == 0:
+            i = i + 1
+            continue
+        let tag = fields.get(0)
+        if tag == "package":
+            if fields.len() != 3:
+                graph.error_msg = "invalid package line in build graph"
+                return graph
+            graph.package_name = fields.get(1)
+            graph.package_version = fields.get(2)
+        else if tag == "target":
+            if fields.len() != 6:
+                graph.error_msg = "invalid target line in build graph"
+                return graph
+            if has_current:
+                graph.targets.push(current)
+            current = build_graph_target_new(
+                build_graph_parse_i32(fields.get(1)),
+                fields.get(2),
+                fields.get(3),
+                build_graph_parse_i32(fields.get(4)),
+                build_graph_parse_i32(fields.get(5)),
+            )
+            has_current = true
+        else if tag == "system_lib":
+            if fields.len() != 3 or not has_current:
+                graph.error_msg = "invalid system_lib line in build graph"
+                return graph
+            current.system_libs.push(fields.get(2))
+        else if tag == "include_path":
+            if fields.len() != 3 or not has_current:
+                graph.error_msg = "invalid include_path line in build graph"
+                return graph
+            current.include_paths.push(fields.get(2))
+        else if tag == "define":
+            if fields.len() != 3 or not has_current:
+                graph.error_msg = "invalid define line in build graph"
+                return graph
+            current.defines.push(fields.get(2))
+        else:
+            graph.error_msg = "unknown build graph line: " ++ tag
+            return graph
+        i = i + 1
+    if has_current:
+        graph.targets.push(current)
+    graph.ok = true
+    graph
+
+fn build_tool_runner_source(package_name: str, package_version: str, graph_path: str) -> str:
+    "use std.build\n" ++
+    "use build\n\n" ++
+    "extern fn with_fs_write_file(path: str, data: str) -> i32\n\n" ++
+    "fn main:\n" ++
+    "    let pkg = Package { name: \"" ++ cli_escape_with_string(package_name) ++ "\", version: \"" ++ cli_escape_with_string(package_version) ++ "\" }\n" ++
+    "    let graph = build(new_build(pkg)).emit_graph()\n" ++
+    "    assert(with_fs_write_file(\"" ++ cli_escape_with_string(graph_path) ++ "\", graph) == 0)\n"
+
+fn load_build_graph_from_build_w(root: str, cfg: ProjectConfig, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> BuildGraph:
+    var graph = empty_build_graph()
+    let tmp_dir = resolve_join(root, "out/tmp")
+    if with_fs_mkdir_p(tmp_dir) != 0:
+        graph.error_msg = "could not create build graph temp directory: " ++ tmp_dir
+        return graph
+    let stamp = f"{with_getpid()}.{with_clock_nanos()}"
+    let runner_path = resolve_join(root, "__with_build_runner." ++ stamp ++ ".w")
+    let graph_path = resolve_join(tmp_dir, "build-graph." ++ stamp ++ ".txt")
+    let runner_bin = resolve_join(tmp_dir, "build-runner." ++ stamp)
+    let runner_source = build_tool_runner_source(cfg.package_name, cfg.package_version, graph_path)
+    if with_fs_write_file(runner_path, runner_source) != 0:
+        graph.error_msg = "could not write generated build.w runner"
+        return graph
+    var comp = Compilation.init()
+    comp.configure(opt_level, no_std, alloc_mode)
+    comp.set_prelude_mode(prelude_mode)
+    comp.set_debug_info(debug_info)
+    let built_runner = comp.build_binary_to_path(runner_path, runner_bin)
+    let _remove_runner_source = with_fs_remove_file(runner_path)
+    if built_runner == "":
+        graph.error_msg = "build.w runner compilation failed"
+        return graph
+    let rc = with_exec_binary(built_runner)
+    cleanup_binary_artifacts(built_runner)
+    if rc != 0:
+        let _remove_graph_on_error = with_fs_remove_file(graph_path)
+        graph.error_msg = f"build.w execution failed with exit code {rc}"
+        return graph
+    let graph_text = with_fs_read_file(graph_path)
+    let _remove_graph = with_fs_remove_file(graph_path)
+    parse_build_graph(graph_text)
+
+fn build_graph_output_path(root: str, target: BuildGraphTarget, output_path: str, target_count: i32) -> str:
+    if output_path.len() > 0:
+        if target_count != 1:
+            return ""
+        return output_path
+    resolve_join(resolve_join(root, "out/bin"), target.name)
+
+fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, alloc_mode: bool, output_path: str, prelude_mode: i32, debug_info: bool) -> i32:
+    if graph.targets.len() == 0:
+        with_eprint("error: build.w did not declare any targets")
+        return 1
+    for ti in 0..graph.targets.len() as i32:
+        let target = graph.targets.get(ti as i64)
+        if target.kind != 0:
+            with_eprint("error: build.w target kind is not implemented yet for '" ++ target.name ++ "'")
+            return 1
+        if target.target_kind != 0:
+            with_eprint("error: build.w target platform is not implemented yet for '" ++ target.name ++ "'")
+            return 1
+        if target.include_paths.len() > 0:
+            with_eprint("error: build.w include paths are not implemented yet for '" ++ target.name ++ "'")
+            return 1
+        if target.defines.len() > 0:
+            with_eprint("error: build.w defines are not implemented yet for '" ++ target.name ++ "'")
+            return 1
+        let source_path = resolve_join(root, target.entry)
+        let bin_path = build_graph_output_path(root, target, output_path, graph.targets.len() as i32)
+        if bin_path.len() == 0:
+            with_eprint("error: -o cannot be used when build.w declares multiple targets")
+            return 1
+        var target_opt = opt_level
+        if target.optimize_mode == 1 and target_opt < 2:
+            target_opt = 2
+        var comp = Compilation.init()
+        comp.configure(target_opt, no_std, alloc_mode)
+        comp.set_prelude_mode(prelude_mode)
+        comp.set_debug_info(debug_info)
+        let built = comp.build_binary_to_path_with_link_libs(source_path, bin_path, target.system_libs)
+        if built == "":
+            with_eprint("error: build.w target failed: " ++ target.name)
+            return 1
+        comp.print_warnings()
+    0
+
 fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: bool, emit_c_mode: bool, emit_obj_mode: bool, output_path: str, prelude_mode: i32, debug_info: bool) -> i32:
     var actual_source = source_file
     var actual_output = output_path
@@ -723,14 +945,19 @@ fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode:
             with_eprint("error: 'build' requires a source file argument or a with.toml project")
             return 1
         let build_path = resolve_join(root, "build.w")
-        if project_config_file_exists(build_path):
-            with_eprint("error: build.w tool-mode execution is not implemented yet: " ++ build_path)
-            with_eprint("  pass an explicit source file to build directly")
-            return 1
         let cfg = project_config_load_for_source(root ++ "/src/main.w")
         if cfg.manifest_error.len() > 0:
             with_eprint("error: invalid with.toml: " ++ cfg.manifest_error)
             return 1
+        if project_config_file_exists(build_path):
+            if emit_c_mode or emit_obj_mode:
+                with_eprint("error: build.w tool-mode only supports binary builds")
+                return 1
+            let graph = load_build_graph_from_build_w(root, cfg, opt_level, no_std, alloc_mode, prelude_mode, debug_info)
+            if not graph.ok:
+                with_eprint("error: " ++ graph.error_msg)
+                return 1
+            return run_build_graph(root, graph, opt_level, no_std, alloc_mode, actual_output, prelude_mode, debug_info)
         actual_source = root ++ "/src/main.w"
         if actual_output == "" and cfg.package_name.len() > 0:
             actual_output = "out/bin/" ++ cfg.package_name

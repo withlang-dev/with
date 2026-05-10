@@ -3743,20 +3743,51 @@ fn main:
     print("default main")
 EOF
 
-  cat >"$case_dir/build.w" <<'EOF'
+  cat >"$case_dir/src/custom.w" <<'EOF'
 fn main:
     print("custom build")
 EOF
 
-  if run_cli_in_dir "$case_dir" "$tmpdir/out" "$tmpdir/err" build; then
-    echo "FAIL(cli-selfhost-build) build_w_ignored"
+  cat >"$case_dir/build.w" <<'EOF'
+use std.build
+
+pub fn build(b: Build) -> Build:
+    var target = target_new(.Executable, "custom-build", "src/custom.w")
+    target = target.link_system_lib("m")
+    b.add_target(target)
+EOF
+
+  if ! run_cli_in_dir "$case_dir" "$tmpdir/out" "$tmpdir/err" build; then
+    echo "FAIL(cli-selfhost-build) build_w_execution"
+    cat "$tmpdir/err" || true
     failures=$((failures + 1))
     return
   fi
 
-  if ! file_has_literal "$tmpdir/err" "error: build.w tool-mode execution is not implemented yet"; then
-    echo "FAIL(cli-selfhost-build-diagnostic) build_w_not_ignored"
+  if [[ ! -x "$case_dir/out/bin/custom-build" ]]; then
+    echo "FAIL(cli-selfhost-build-output) build_w_execution"
+    ls -R "$case_dir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if [[ -x "$case_dir/out/bin/buildwdemo" ]]; then
+    echo "FAIL(cli-selfhost-build-default-output) build_w_ignored"
+    ls -R "$case_dir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! "$case_dir/out/bin/custom-build" >"$tmpdir/out" 2>"$tmpdir/err"; then
+    echo "FAIL(cli-selfhost-build-run) build_w_execution"
     cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_literal "$tmpdir/out" "custom build"; then
+    echo "FAIL(cli-selfhost-build-run-output) build_w_execution"
+    cat "$tmpdir/out" || true
     failures=$((failures + 1))
     return
   fi
