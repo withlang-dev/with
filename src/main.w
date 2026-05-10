@@ -899,6 +899,17 @@ fn build_graph_output_path(root: str, target: BuildGraphTarget, output_path: str
         return output_path
     resolve_join(resolve_join(root, "out/bin"), target.name)
 
+fn build_graph_resolve_project_path(root: str, path: str) -> str:
+    if path.len() > 0 and path.byte_at(0) == 47:
+        return path
+    resolve_join(root, path)
+
+fn build_graph_resolve_paths(root: str, paths: Vec[str]) -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    for i in 0..paths.len() as i32:
+        out.push(build_graph_resolve_project_path(root, paths.get(i as i64)))
+    out
+
 fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, alloc_mode: bool, output_path: str, prelude_mode: i32, debug_info: bool) -> i32:
     if graph.targets.len() == 0:
         with_eprint("error: build.w did not declare any targets")
@@ -910,9 +921,6 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
             return 1
         if target.target_kind != 0:
             with_eprint("error: build.w target platform is not implemented yet for '" ++ target.name ++ "'")
-            return 1
-        if target.include_paths.len() > 0:
-            with_eprint("error: build.w include paths are not implemented yet for '" ++ target.name ++ "'")
             return 1
         if target.defines.len() > 0:
             with_eprint("error: build.w defines are not implemented yet for '" ++ target.name ++ "'")
@@ -929,7 +937,8 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
         comp.configure(target_opt, no_std, alloc_mode)
         comp.set_prelude_mode(prelude_mode)
         comp.set_debug_info(debug_info)
-        let built = comp.build_binary_to_path_with_link_libs(source_path, bin_path, target.system_libs)
+        let include_paths = build_graph_resolve_paths(root, target.include_paths)
+        let built = comp.build_binary_to_path_with_build_settings(source_path, bin_path, include_paths, target.system_libs)
         if built == "":
             with_eprint("error: build.w target failed: " ++ target.name)
             return 1

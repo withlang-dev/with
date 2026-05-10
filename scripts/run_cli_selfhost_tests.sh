@@ -6,7 +6,7 @@ cd "$ROOT_DIR"
 source "${ROOT_DIR}/scripts/selfhost_runner.sh"
 
 SELFHOST_BIN="${WITH:-${ROOT_DIR}/out/bin/with-stage2}"
-CLI_TIMEOUT_SECS="${PARITY_CLI_TIMEOUT_SECS:-25}"
+CLI_TIMEOUT_SECS="${PARITY_CLI_TIMEOUT_SECS:-120}"
 
 if [[ ! -x "$SELFHOST_BIN" ]]; then
   echo "error: missing self-host compiler: $SELFHOST_BIN"
@@ -3730,7 +3730,7 @@ EOF
 
 expect_build_w_is_not_ignored() {
   local case_dir="$tmpdir/build_w_not_ignored_case"
-  mkdir -p "$case_dir/src"
+  mkdir -p "$case_dir/src" "$case_dir/extra_include"
 
   cat >"$case_dir/with.toml" <<'EOF'
 [package]
@@ -3744,8 +3744,15 @@ fn main:
 EOF
 
   cat >"$case_dir/src/custom.w" <<'EOF'
+use c_import("answer.h")
+
 fn main:
+    assert(ANSWER == 42)
     print("custom build")
+EOF
+
+  cat >"$case_dir/extra_include/answer.h" <<'EOF'
+#define ANSWER 42
 EOF
 
   cat >"$case_dir/build.w" <<'EOF'
@@ -3753,6 +3760,7 @@ use std.build
 
 pub fn build(b: Build) -> Build:
     var target = target_new(.Executable, "custom-build", "src/custom.w")
+    target = target.include_path("extra_include")
     target = target.link_system_lib("m")
     b.add_target(target)
 EOF

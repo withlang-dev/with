@@ -22,7 +22,7 @@ extern fn mmap(addr: *mut u8, len: u64, prot: i32, flags: i32, fd: i32, offset: 
 extern fn munmap(addr: *mut u8, len: u64) -> i32
 extern fn getenv(name: *const u8) -> *const u8
 extern fn sysconf(name: i32) -> i64
-extern fn lstat(path: *const u8, buf: *mut u8) -> i32
+extern fn stat(path: *const u8, buf: *mut u8) -> i32
 extern fn _exit(code: i32) -> void
 extern fn mach_absolute_time() -> u64
 extern fn __error() -> *mut i32
@@ -120,7 +120,7 @@ pub fn rt_seek_impl(fd: i32, offset: i64, whence: i32) -> i64:
 @[c_export("rt_stat")]
 pub fn rt_stat_impl(path: *const u8, out: *mut RtStatBuf) -> i32:
     var native_buf: [144]u8 = [0 as u8; 144]
-    let r = lstat(path, &native_buf as *mut u8)
+    let r = stat(path, &native_buf as *mut u8)
     if r < 0:
         return -get_errno()
     // Extract fields from native stat struct (darwin aarch64 layout):

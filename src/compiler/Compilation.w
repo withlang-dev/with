@@ -13,6 +13,7 @@ use compiler.Compilation.Config
 use compiler.Backend
 use compiler.Frontend
 use compiler.Link
+use compiler.ProjectConfig
 use compiler.Zcu
 
 extern fn with_eprint(s: str) -> void
@@ -188,6 +189,14 @@ fn Compilation.compile_entry_file(self: Compilation, path: str) -> AstPool:
     compilation_debug_init(f"Compilation.compile_entry_file:done decls={pool.decl_count()}")
     pool
 
+fn Compilation.compile_entry_file_with_config(self: Compilation, path: str, cfg: ProjectConfig) -> AstPool:
+    compilation_debug_init("Compilation.compile_entry_file_with_config:start " ++ path)
+    var zcu = self.zcu
+    let pool = zcu.compile_file_frontend_entry_with_config(path, cfg)
+    self.zcu = zcu
+    compilation_debug_init(f"Compilation.compile_entry_file_with_config:done decls={pool.decl_count()}")
+    pool
+
 fn Compilation.resolve_file(self: Compilation, path: str, emit_resolve_diags: bool) -> ResolveResult:
     let _ = emit_resolve_diags
     let _ = self.compile_file(path)
@@ -317,7 +326,7 @@ fn Compilation.build_binary_to_path(self: Compilation, source_path: str, bin_pat
     let pool = self.compile_entry_file(source_path)
     self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
 
-fn Compilation.build_binary_to_path_with_link_libs(self: Compilation, source_path: str, bin_path: str, link_libs: Vec[str]) -> str:
+fn Compilation.build_binary_to_path_with_build_settings(self: Compilation, source_path: str, bin_path: str, include_paths: Vec[str], link_libs: Vec[str]) -> str:
     if bin_path.len() == 0:
         return self.build_binary_to_path(source_path, bin_path)
     let obj_path = bin_path ++ ".o"
@@ -325,12 +334,17 @@ fn Compilation.build_binary_to_path_with_link_libs(self: Compilation, source_pat
     let _ = ("mkdir -p " ++ output_dir) |> with_system
     let _ = ("rm -rf " ++ bin_path ++ ".dSYM") |> with_system
 
-    let pool = self.compile_entry_file(source_path)
-    var zcu = self.zcu
+    var cfg = project_config_load_for_source(source_path)
+    for ii in 0..include_paths.len() as i32:
+        cfg.c_import_include_paths.push(include_paths.get(ii as i64))
     for li in 0..link_libs.len() as i32:
-        zcu.project_config.dep_link_libs.push(link_libs.get(li as i64))
-    self.zcu = zcu
+        cfg.dep_link_libs.push(link_libs.get(li as i64))
+    let pool = self.compile_entry_file_with_config(source_path, cfg)
     self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
+
+fn Compilation.build_binary_to_path_with_link_libs(self: Compilation, source_path: str, bin_path: str, link_libs: Vec[str]) -> str:
+    let include_paths: Vec[str] = Vec.new()
+    self.build_binary_to_path_with_build_settings(source_path, bin_path, include_paths, link_libs)
 
 fn Compilation.build_binary_from_source_to_path(self: Compilation, source_path: str, source_text: str, bin_path: str) -> str:
     if bin_path.len() == 0:
