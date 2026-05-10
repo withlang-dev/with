@@ -53,6 +53,9 @@ pub fn TempArena.reset(mut self: TempArena) -> void:
             free_mem(raw as *i8)
     self.allocations = Vec.new()
 
+pub fn TempArena.drop(mut self: TempArena) -> void:
+    self.reset()
+
 pub fn pool_new(item_size: i32, capacity: i32) -> Pool:
     Pool { item_size, capacity }
 
