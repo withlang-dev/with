@@ -1243,6 +1243,77 @@ fn ct_source_decl_is_local(ast: AstPool, decl_index: i32) -> i32:
         return 1
     0
 
+fn ct_type_decl_tp_count(ast: AstPool, node: i32) -> i32:
+    let extra_start = ast.get_data1(node)
+    let sub_kind = type_decl_sub_kind(ast.get_data2(node))
+    if sub_kind == TypeDeclKind.Struct:
+        let field_count = ast.get_extra(extra_start)
+        return ast.get_extra(extra_start + 1 + field_count * 4 + 2)
+    0
+
+fn Sema.ct_build_default_value_expr(self: Sema, pool: AstPool, intern: InternPool, type_id: i32, node: i32) -> i32:
+    let type_node = self.ct_build_type_expr(pool, intern, type_id, node)
+    if type_node == 0:
+        return 0
+    let default_sym = intern.intern("default")
+    let callee = pool.add_node(NodeKind.NK_FIELD_ACCESS, pool.get_start(node), pool.get_end(node), type_node, default_sym, 0)
+    let no_args: Vec[i32] = Vec.new()
+    pool.ct_build_call(node, callee as i32, no_args)
+
+fn Sema.ct_generate_default_derive(self: Sema, out: AstPool, intern: InternPool, decl: i32) -> Vec[i32]:
+    let generated: Vec[i32] = Vec.new()
+    if type_decl_sub_kind(out.get_data2(decl)) != TypeDeclKind.Struct:
+        return generated
+    if ct_type_decl_tp_count(out, decl) > 0:
+        self.ct_emit_error(out, decl, "derive Default for generic structs is not implemented yet")
+        return generated
+
+    let default_trait_sym = intern.intern("Default")
+    let default_method_sym = intern.intern("default")
+    let type_name_sym = out.get_data0(decl)
+    if self.lookup_method_sig(type_name_sym, default_method_sym) >= 0:
+        return generated
+    if self.select_trait_impl(type_name_sym, default_trait_sym) != 0:
+        return generated
+
+    let tid = self.lookup_named_type_visible(type_name_sym)
+    if tid == 0:
+        return generated
+    let resolved = self.resolve_alias(tid)
+    if self.get_type_kind(resolved) != TypeKind.TY_STRUCT:
+        return generated
+
+    let start = out.get_start(decl)
+    let end = out.get_end(decl)
+    let type_name = intern.resolve(type_name_sym)
+    let fn_sym = intern.intern(type_name ++ ".default")
+    let ret_type = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, type_name_sym, 0, 0)
+
+    let te_start = self.get_type_d1(resolved)
+    let field_count = self.get_type_d2(resolved)
+    let field_extra = out.extra_len()
+    for fi in 0..field_count:
+        let field_sym = self.type_extra.get((te_start + fi * 3) as i64)
+        let field_tid = self.type_extra.get((te_start + fi * 3 + 1) as i64)
+        let field_default = self.ct_build_default_value_expr(out, intern, field_tid, decl)
+        if field_default == 0:
+            self.ct_emit_error(out, decl, "could not generate Default field initializer")
+            return generated
+        out.add_extra(field_sym)
+        out.add_extra(field_default)
+    let body = out.add_node(NodeKind.NK_STRUCT_LIT, start, end, type_name_sym, field_extra, field_count)
+    let fn_node = out.add_node(NodeKind.NK_FN_DECL, start, end, fn_sym, body as i32, 0)
+    out.add_fn_meta(fn_node, 0, ret_type as i32, out.extra_len(), 0, 0, 0)
+
+    let impl_extra = out.extra_len()
+    out.add_extra(0)
+    out.add_extra(1)
+    let impl_node = out.add_node(NodeKind.NK_IMPL_DECL, start, end, type_name_sym, impl_extra, default_trait_sym)
+
+    generated.push(fn_node as i32)
+    generated.push(impl_node as i32)
+    generated
+
 fn Sema.ct_transform_decl(mut self: Sema, source_ast: AstPool, pool: AstPool, intern: InternPool, node: i32):
     let kind = pool.kind(node)
     if kind == NodeKind.NK_FN_DECL:
@@ -1267,6 +1338,7 @@ fn Sema.comptime_transform_module(mut self: Sema, source_ast: AstPool, intern: I
     var out = astpool_clone_deep(source_ast)
 
     let clone_trait_sym = intern.intern("Clone")
+    let default_trait_sym = intern.intern("Default")
     let clone_method_sym = intern.intern("clone")
     let self_sym = intern.intern("self")
     let self_type_sym = intern.intern("Self")
@@ -1291,6 +1363,15 @@ fn Sema.comptime_transform_module(mut self: Sema, source_ast: AstPool, intern: I
 
         if out.kind(decl) != NodeKind.NK_TYPE_DECL:
             continue
+        if self.type_decl_has_derive(decl as i32, default_trait_sym) != 0:
+            let generated_defaults = self.ct_generate_default_derive(out, intern, decl as i32)
+            for gi in 0..generated_defaults.len() as i32:
+                ordered.push(generated_defaults.get(gi as i64))
+                ordered_paths.push(decl_path)
+                ordered_file_ids.push(decl_file_id)
+                ordered_ci.push(decl_ci)
+            if ct_source_decl_is_local(source_ast, di) != 0:
+                generated_local_count = generated_local_count + generated_defaults.len() as i32
         if self.type_decl_has_derive(decl as i32, clone_trait_sym) == 0:
             continue
         if type_decl_sub_kind(out.get_data2(decl)) != TypeDeclKind.Struct:
