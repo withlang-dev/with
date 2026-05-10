@@ -36,6 +36,22 @@ pub type Build {
     targets: Vec[Target],
 }
 
+fn build_graph_escape(value: str) -> str:
+    var out = ""
+    for i in 0..value.len() as i32:
+        let ch = value.byte_at(i as i64)
+        if ch == 92:
+            out = out ++ "\\\\"
+        else if ch == 9:
+            out = out ++ "\\t"
+        else if ch == 10:
+            out = out ++ "\\n"
+        else if ch == 13:
+            out = out ++ "\\r"
+        else:
+            out = out ++ value.slice(i as i64, (i + 1) as i64)
+    out
+
 pub fn new_build(package: Package) -> Build:
     Build {
         package,
@@ -105,3 +121,22 @@ pub fn Target.include_path(mut self: Target, path: str) -> Target:
 pub fn Target.define(mut self: Target, define: str) -> Target:
     self.defines.push(define)
     self
+
+pub fn Build.emit_graph(self: Build) -> str:
+    var out = "WITH_BUILD_GRAPH\t1\n"
+    out = out ++ "package\t" ++ build_graph_escape(self.package.name) ++ "\t" ++ build_graph_escape(self.package.version) ++ "\n"
+    for ti in 0..self.targets.len() as i32:
+        let target = self.targets.get(ti as i64)
+        out = out ++ "target\t"
+        out = out ++ f"{target.kind as i32}\t"
+        out = out ++ build_graph_escape(target.name) ++ "\t"
+        out = out ++ build_graph_escape(target.entry) ++ "\t"
+        out = out ++ f"{target.target_kind as i32}\t"
+        out = out ++ f"{target.optimize_mode as i32}\n"
+        for li in 0..target.system_libs.len() as i32:
+            out = out ++ "system_lib\t" ++ f"{ti}\t" ++ build_graph_escape(target.system_libs.get(li as i64)) ++ "\n"
+        for ii in 0..target.include_paths.len() as i32:
+            out = out ++ "include_path\t" ++ f"{ti}\t" ++ build_graph_escape(target.include_paths.get(ii as i64)) ++ "\n"
+        for di in 0..target.defines.len() as i32:
+            out = out ++ "define\t" ++ f"{ti}\t" ++ build_graph_escape(target.defines.get(di as i64)) ++ "\n"
+    out

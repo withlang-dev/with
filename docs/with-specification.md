@@ -8454,10 +8454,15 @@ and `Target.define`.
 
 `build.w` runs in tool-mode compiler-driver context, not ordinary pure
 `comptime`. Tool-mode code may perform build effects through
-`std.build` APIs supplied by the driver. A compiler version that
-recognizes project `build.w` files but does not yet execute them must
-fail loudly instead of silently ignoring the file and building some
-other target.
+`std.build` APIs supplied by the driver.
+
+The initial tool-mode driver executes `build.w`, calls
+`build(new_build(package))`, consumes the returned build graph, and
+builds executable targets. Unsupported graph features, such as target
+kinds or per-target settings the driver cannot yet honor, must fail
+loudly instead of being ignored. A compiler version that recognizes
+project `build.w` files but does not execute them must likewise fail
+loudly instead of silently building some other target.
 
 ### 18.5b CLI One-Liners
 

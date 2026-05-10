@@ -51,6 +51,14 @@ Source: `docs/toolchain.md`.
   - Attribute-only test files now build only the synthesized test source,
     avoiding the previous no-`main` linker stderr leak before the real test
     binary was built.
+- Initial `build.w` tool-mode execution:
+  - `with build` compiles and runs a generated tool-mode runner for project
+    `build.w`.
+  - The runner calls `build(new_build(package))` and writes a stable
+    `std.build` graph for the driver.
+  - Executable targets are built from that graph, including
+    `link_system_lib` entries.
+  - Unsupported graph features fail loudly instead of being ignored.
 
 ## Verified
 
@@ -69,8 +77,8 @@ Source: `docs/toolchain.md`.
 - Platform-independent build replacement for Make itself. The current work
   removes Python from the build path but does not yet replace Make/shell as the
   orchestration layer.
-- Full tool-mode execution of user-authored `build.w`; current `std.build` is
-  the typed API surface, default project inference, and an explicit loud
-  failure when `build.w` would otherwise be ignored.
+- Complete `build.w` graph execution beyond executable targets: libraries,
+  test targets, non-native target selection, include paths, defines, and
+  custom source-generation steps still need driver support.
 - Read-only `ProjectInfo`, compiler hooks, source emission, and blessed derives
   remain future phases per `docs/toolchain.md`.
