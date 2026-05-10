@@ -24,6 +24,7 @@ Source: `docs/toolchain.md`.
 - `std.alloc.TempArena`:
   - `scratch_arena()`, `TempArena.alloc`, `TempArena.alloc_zeroed`,
     `TempArena.reset`.
+  - `TempArena.drop()` resets outstanding scratch allocations at scope exit.
 - `@[specified]` discriminant enums:
   - Parser flagging.
   - Diagnostics for missing explicit backing type and missing explicit
@@ -42,6 +43,14 @@ Source: `docs/toolchain.md`.
 - Script pruning/dependency cleanup:
   - Only Make-touched scripts remain live.
   - Make-touched scripts no longer shell out to Python or Perl.
+- Main specification updates:
+  - Documented `@[specified]`, `TempArena`, `allow_untranslated`,
+    `std.context`, `std.build`, and `build.w` doctrine in
+    `docs/with-specification.md`.
+- `with test` synthetic-main path:
+  - Attribute-only test files now build only the synthesized test source,
+    avoiding the previous no-`main` linker stderr leak before the real test
+    binary was built.
 
 ## Verified
 

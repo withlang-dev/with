@@ -4167,6 +4167,21 @@ fn attr_only:
     assert(1 == 1)
 EOF
 
+  if ! run_cli "$case_dir/single.out" "$case_dir/single.err" test "$src"; then
+    echo "FAIL(cli-selfhost-test-parallel-single) issue173_parallel_same_source"
+    cat "$case_dir/single.out" || true
+    cat "$case_dir/single.err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if [[ -s "$case_dir/single.err" ]]; then
+    echo "FAIL(cli-selfhost-test-parallel-single-stderr) issue173_parallel_same_source"
+    cat "$case_dir/single.err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
   for i in $(seq 1 "$jobs"); do
     (
       local rc=0

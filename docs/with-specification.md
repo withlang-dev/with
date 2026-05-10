@@ -5,7 +5,7 @@
 **Changelog v6.9:** CLI one-liners (`with -e`, `with -n`, `with -p`)
 are specified as normal compiled With entry sources with implicit-main
 semantics, stdin line bindings, `args`, semicolon splitting, and regex
-capture behavior (§18.5a).
+capture behavior (§18.5b).
 **Changelog v6.8:** Three universal body forms (§29.13) — inline colon,
 indented colon, and braced — now apply to every block-introducing construct
 including `defer`, `errdefer`, `comptime`, and `unsafe`. `if` additionally
@@ -1693,6 +1693,30 @@ enum Perms: i32:
 
 Bitwise operations work naturally since the enum **is** its integer value.
 
+**`@[specified]` attribute:** For boundary-facing discriminant enums,
+`@[specified]` requires every variant to provide an explicit value.
+It is intended for wire formats, file formats, FFI constants, protocol
+messages, and other values where auto-increment would make source
+ordering part of the external ABI.
+
+```
+@[specified]
+enum MessageType: u16:
+    Ping = 1
+    Pong = 2
+    Data = 3
+```
+
+`@[specified]` requires an explicit integer representation type and
+rejects any variant without `= value`:
+
+```
+@[specified]
+enum MessageType: u16:
+    Ping = 1
+    Pong       // ERROR: @[specified] requires explicit variant values
+```
+
 **Conversion:** `Type.from_int(n)` converts an integer to `Option[Type]`,
 returning `.None` for values that don't match any defined discriminant:
 
@@ -2378,6 +2402,22 @@ Additional rules:
 The identifier in `with name(expr):` is descriptive. Resolution is
 driven by type, not by the identifier text.
 
+`std.context` defines the standard context shape for common execution
+services. `Context` is ephemeral and currently carries a temporary
+arena, logger, cancellation token, and trace id. Library APIs that need
+these cross-cutting services should accept an `implicit Context`
+parameter instead of adding unrelated positional parameters.
+
+```
+use std.context
+
+fn trace_id(ctx: implicit Context) -> i64:
+    ctx.trace_id.value
+
+with active(default_context()):
+    let id = trace_id()
+```
+
 ### 7.4 Form 4: Record Update
 
 Functional immutable update of struct fields. Defined in §4.3 and
@@ -2678,6 +2718,38 @@ fn example(arena: &FrameArena):
 This is a deliberate consequence of the ephemeral system: borrowed
 resources create ephemeral containers, owned resources create
 storable ones. The compiler enforces this automatically.
+
+### 8.3a Temporary Arenas
+
+`std.alloc` provides `TempArena` for short-lived scratch allocation:
+
+```
+use std.alloc
+
+let scratch = scratch_arena()
+with scratch as mut arena:
+    let bytes = arena.alloc(1024)
+    use_scratch(bytes)
+```
+
+`scratch_arena()` returns a fresh `TempArena`. `TempArena.alloc(size)`
+and `TempArena.alloc_zeroed(count, size)` allocate raw memory and
+record it in the arena. `TempArena.reset()` frees all allocations made
+through that arena and clears the allocation list. `TempArena` also has
+a destructor that calls `reset()`, so a scoped arena created for a
+block releases its allocations when the arena value goes out of scope.
+
+`TempArena` is distinct from the longer-lived arena types:
+
+| Type | Reset authority | Primary use case |
+|------|-----------------|------------------|
+| `Arena` | User-controlled reset/drop | Long-lived region allocation |
+| `FrameArena` | External reset per frame/tick | Game loops, render passes |
+| `TempArena` | Lexical owner scope or explicit `reset()` | Scratch computation |
+
+References or containers that borrow arena-backed storage follow the
+normal ephemeral rules: they cannot be stored somewhere that outlives
+the arena scope.
 
 ### 8.4 Convenience Type
 
@@ -7398,6 +7470,24 @@ fn COMPLEX_MACRO():
     comptime_error("c_import: macro COMPLEX_MACRO not translatable")
 ```
 
+**Acknowledged omissions:** `allow_untranslated` names declarations,
+macros, or other imported C entities that the project explicitly
+accepts as unavailable. The compiler includes this allow-list in the
+`c_import` cache key so changing it cannot reuse stale generated
+bindings.
+
+```
+use c_import("complex_lib.h",
+    link: "complex",
+    allow_untranslated: ["WEIRD_MACRO", "PLATFORM_HACK"],
+)
+```
+
+This is not a silent fallback. Anything outside the allow-list that
+cannot be translated correctly must still produce a diagnostic or a
+loud `comptime_error` stub. A generated binding surface must never
+pretend an untranslatable construct works.
+
 **Constant expression evaluation:** `#define` macros with arithmetic
 expressions, bitwise operations, casts, and references to other macros
 are evaluated via the C compiler's constant evaluator:
@@ -8319,7 +8409,57 @@ with -p <code>
 
 Cross-compilation is a normal mode, not special.
 
-### 18.5a CLI One-Liners
+### 18.5a Project Builds
+
+`build.w` is executable build behavior written in With. `with.toml`
+is declarative package configuration. Imperative build concerns belong
+in `build.w`, not in `with.toml`.
+
+Allowed in `with.toml`:
+
+- Package identity such as name and version
+- Dependencies and version constraints
+- Target defaults and feature flags
+- C include paths, defines, link libraries, and link search paths
+- Publishing metadata and lint/runtime policy
+
+Not allowed in `with.toml`:
+
+- Conditionals or loops
+- Generated-file steps
+- Asset pipelines or shader compilation
+- Custom shell commands
+- Target graph construction
+- Platform-specific branching logic
+- Multi-binary or multi-library build behavior
+
+Those belong in `build.w`.
+
+For simple projects with no `build.w`, the compiler synthesizes the
+default recipe:
+
+```
+use std.build
+
+pub fn build(b: Build) -> Build:
+    b.executable(b.package.name, "src/main.w")
+```
+
+The standard build graph API lives in `std.build`. It defines
+`Package`, `Build`, `Target`, `BuildKind`, `BuildTarget`, and
+`OptimizeMode`, plus target construction methods such as
+`Build.executable`, `Build.library`, `Build.test`,
+`Target.optimize`, `Target.link_system_lib`, `Target.include_path`,
+and `Target.define`.
+
+`build.w` runs in tool-mode compiler-driver context, not ordinary pure
+`comptime`. Tool-mode code may perform build effects through
+`std.build` APIs supplied by the driver. A compiler version that
+recognizes project `build.w` files but does not yet execute them must
+fail loudly instead of silently ignoring the file and building some
+other target.
+
+### 18.5b CLI One-Liners
 
 The `with` CLI supports small programs directly on the command line:
 
@@ -8353,7 +8493,7 @@ with -e 'var total = 0' -e 'total = total + 1' -e 'print(total)'
 
 One-liner code cannot be combined with a source file argument.
 
-#### 18.5a.1 Generated Environment
+#### 18.5b.1 Generated Environment
 
 All one-liner modes implicitly import common modules, including I/O,
 string helpers, regex support, math, collections, and builtins. The
@@ -8373,7 +8513,7 @@ options:
 with -e 'for a in args: print(a)' -- foo bar
 ```
 
-#### 18.5a.2 `-e`
+#### 18.5b.2 `-e`
 
 `-e CODE` emits `CODE` as top-level executable statements after the
 implicit imports and `args` binding:
@@ -8397,7 +8537,7 @@ let args: Vec[str] = ...
 print("hello")
 ```
 
-#### 18.5a.3 `-n`
+#### 18.5b.3 `-n`
 
 `-n CODE` emits a top-level loop over `stdin.lines()`. For each input
 line, `line` is bound to the current line and `nr` is incremented before
@@ -8419,7 +8559,7 @@ for line in stdin.lines():
 `stdin.lines()` used by one-liners removes the trailing newline. For
 CRLF input, the trailing `\r` is also removed.
 
-#### 18.5a.4 `-p`
+#### 18.5b.4 `-p`
 
 `-p CODE` is like `-n`, but prints `line` after `CODE` runs. `line` is a
 mutable per-line binding in `-p`, so assignments affect the printed
@@ -8442,7 +8582,7 @@ for __line in stdin.lines():
 
 For filtering, use `-n`; `-p` always prints once per input line.
 
-#### 18.5a.5 Semicolons
+#### 18.5b.5 Semicolons
 
 Shell one-liners often need multiple statements. Within `-e`, `-n`, and
 `-p` code strings, semicolons act as line separators:
@@ -8460,7 +8600,7 @@ separators:
 with -e 'if true { print("yes"); print("also yes") }'
 ```
 
-#### 18.5a.6 Regex One-Liners
+#### 18.5b.6 Regex One-Liners
 
 Regex one-liners use the normal With regex syntax:
 
@@ -8508,7 +8648,7 @@ Regex literals are ordinary `Regex` values in one-liners:
 with -e 'let r = /hello/i; print(r.is_match("HELLO"))'
 ```
 
-#### 18.5a.7 Diagnostics
+#### 18.5b.7 Diagnostics
 
 Compiler errors from one-liner user code must point at the user's CLI
 argument, not at generated imports, helper bindings, temporary files, or
@@ -8523,7 +8663,7 @@ reports against `<cli -e #1>`. Multiple same-mode code arguments use
 normal compiler diagnostic and exit non-zero; it must not add vague
 wrapper errors such as "one-liner compilation failed".
 
-#### 18.5a.8 Non-Goals
+#### 18.5b.8 Non-Goals
 
 One-liners do not add shell execution, `s///` substitution syntax, a
 REPL execution model, or a separate data-processing mini-language.
@@ -8561,7 +8701,9 @@ what users import.
 | `std.sync` | Mutex, RwLock, Atomic, Condvar, Barrier, Once | `pthread.h`, `stdatomic.h` |
 | `std.process` | Process control, args, env, Command | `stdlib.h`, `unistd.h` |
 | `std.mem` | Low-level memory, Allocator trait, mmap | `stdlib.h`, `sys/mman.h` |
-| `std.alloc` | Arena, Pool | — |
+| `std.alloc` | Arena, TempArena, Pool | — |
+| `std.build` | Typed project build graph construction | Make/CMake project files |
+| `std.context` | Standard implicit execution context | ad hoc context parameters |
 | `std.signal` | Signal handling | `signal.h` |
 | `std.random` | Rng, seeded PRNG | `stdlib.h` |
 | `std.hash` | Hasher trait, DefaultHasher | — |

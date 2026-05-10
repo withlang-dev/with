@@ -1253,9 +1253,11 @@ fn run_test_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, pr
     comp.set_debug_info(debug_info)
     let synthetic_source = maybe_synthesize_test_source(target)
     let test_bin_path = test_unique_binary_path(target)
-    var bin_path = comp.build_binary_to_path(target, test_bin_path)
+    var bin_path = ""
     if synthetic_source.len() > 0:
         bin_path = comp.build_binary_from_source_to_path(target, synthetic_source, test_bin_path)
+    else:
+        bin_path = comp.build_binary_to_path(target, test_bin_path)
     if bin_path == "":
         emit_test_stage_error("test build failed", target, "build", "")
         return 1
