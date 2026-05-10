@@ -106,9 +106,9 @@ to a warning, add an exemption, or route around it.
 
 **"Pre-existing" without evidence.** A failure is only
 pre-existing if you've verified it existed on the previous
-commit. Otherwise it's your failure and you've just renamed
-it. `git stash && make test && git stash pop` answers this
-question in under a minute.
+commit. Otherwise it's your failure and you've just renamed it.
+Never use `git stash` to answer this question; use `git worktree`
+or a separate clone.
 
 **Silent fallbacks in generated output.** See "No Silent
 Fallbacks" above. Placeholder bodies, TODO comments in
@@ -323,6 +323,11 @@ flag on `NK_LET_DECL`.
   Use `grep`, `nm`, `lldb`, or `with check` for diagnosis.
 - **Iterating unordered maps** or using pointer-address ordering.
   These break fixpoint determinism.
+- **Never use `git stash`.** It has destroyed uncommitted work
+  multiple times. There is no valid use case in this repo.
+  If you need to test something against a clean state, use
+  `git worktree` or a separate clone. `git stash`, `git stash pop`,
+  and `git stash drop` are all forbidden.
 
 ---
 

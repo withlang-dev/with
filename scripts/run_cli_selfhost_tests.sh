@@ -3752,7 +3752,10 @@ fn main:
 EOF
 
   cat >"$case_dir/extra_include/answer.h" <<'EOF'
-#define ANSWER 42
+#ifndef WITH_BUILD_FEATURE
+#error "missing build.w target define"
+#endif
+enum { ANSWER = WITH_BUILD_VALUE };
 EOF
 
   cat >"$case_dir/build.w" <<'EOF'
@@ -3761,6 +3764,8 @@ use std.build
 pub fn build(b: Build) -> Build:
     var target = target_new(.Executable, "custom-build", "src/custom.w")
     target = target.include_path("extra_include")
+    target = target.define("WITH_BUILD_FEATURE")
+    target = target.define("WITH_BUILD_VALUE=42")
     target = target.link_system_lib("m")
     b.add_target(target)
 EOF
@@ -3808,6 +3813,159 @@ EOF
   fi
 
   echo "PASS(cli-selfhost-build) build_w_not_ignored"
+}
+
+expect_build_w_test_target() {
+  local case_dir="$tmpdir/build_w_test_target_case"
+  mkdir -p "$case_dir/src" "$case_dir/extra_include"
+
+  cat >"$case_dir/with.toml" <<'EOF'
+[package]
+name = "buildwtest"
+version = "0.1.0"
+EOF
+
+  cat >"$case_dir/src/build_test.w" <<'EOF'
+use c_import("answer.h")
+
+@[test]
+fn build_w_test_target_uses_settings:
+    assert(ANSWER == 42)
+EOF
+
+  cat >"$case_dir/extra_include/answer.h" <<'EOF'
+#ifndef WITH_BUILD_FEATURE
+#error "missing build.w test target define"
+#endif
+enum { ANSWER = WITH_BUILD_VALUE };
+EOF
+
+  cat >"$case_dir/build.w" <<'EOF'
+use std.build
+
+pub fn build(b: Build) -> Build:
+    var target = target_new(.Test, "configured-test", "src/build_test.w")
+    target = target.include_path("extra_include")
+    target = target.define("WITH_BUILD_FEATURE")
+    target = target.define("WITH_BUILD_VALUE=42")
+    b.add_target(target)
+EOF
+
+  if ! run_cli_in_dir "$case_dir" "$tmpdir/out" "$tmpdir/err" build; then
+    echo "FAIL(cli-selfhost-build) build_w_test_target"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_literal "$tmpdir/out" "ok: 1 test passed"; then
+    echo "FAIL(cli-selfhost-build-output) build_w_test_target"
+    cat "$tmpdir/out" || true
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-build) build_w_test_target"
+}
+
+expect_build_w_library_target() {
+  local case_dir="$tmpdir/build_w_library_target_case"
+  mkdir -p "$case_dir/src" "$case_dir/extra_include"
+
+  cat >"$case_dir/with.toml" <<'EOF'
+[package]
+name = "buildwlib"
+version = "0.1.0"
+EOF
+
+  cat >"$case_dir/src/lib.w" <<'EOF'
+use c_import("answer.h")
+
+pub fn answer_from_header -> i32:
+    ANSWER
+EOF
+
+  cat >"$case_dir/extra_include/answer.h" <<'EOF'
+#ifndef WITH_BUILD_FEATURE
+#error "missing build.w library target define"
+#endif
+enum { ANSWER = WITH_BUILD_VALUE };
+EOF
+
+  cat >"$case_dir/build.w" <<'EOF'
+use std.build
+
+pub fn build(b: Build) -> Build:
+    var target = target_new(.Library, "configured", "src/lib.w")
+    target = target.include_path("extra_include")
+    target = target.define("WITH_BUILD_FEATURE")
+    target = target.define("WITH_BUILD_VALUE=42")
+    b.add_target(target)
+EOF
+
+  if ! run_cli_in_dir "$case_dir" "$tmpdir/out" "$tmpdir/err" build; then
+    echo "FAIL(cli-selfhost-build) build_w_library_target"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if [[ ! -f "$case_dir/out/lib/libconfigured.a" ]]; then
+    echo "FAIL(cli-selfhost-build-output) build_w_library_target"
+    ls -R "$case_dir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! /usr/bin/nm "$case_dir/out/lib/libconfigured.a" >/dev/null; then
+    echo "FAIL(cli-selfhost-build-archive) build_w_library_target"
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-build) build_w_library_target"
+}
+
+expect_build_w_non_native_target_fails_loudly() {
+  local case_dir="$tmpdir/build_w_non_native_target_case"
+  mkdir -p "$case_dir/src"
+
+  cat >"$case_dir/with.toml" <<'EOF'
+[package]
+name = "buildwnonnative"
+version = "0.1.0"
+EOF
+
+  cat >"$case_dir/src/main.w" <<'EOF'
+fn main:
+    print("wrong target")
+EOF
+
+  cat >"$case_dir/build.w" <<'EOF'
+use std.build
+
+pub fn build(b: Build) -> Build:
+    var target = target_new(.Executable, "wrong-target", "src/main.w")
+    target = target.target(BuildTarget.linux_x86_64)
+    b.add_target(target)
+EOF
+
+  if run_cli_in_dir "$case_dir" "$tmpdir/out" "$tmpdir/err" build; then
+    echo "FAIL(cli-selfhost-build) build_w_non_native_target"
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_literal "$tmpdir/err" "build.w target platform is not implemented yet for 'wrong-target'"; then
+    echo "FAIL(cli-selfhost-build-output) build_w_non_native_target"
+    cat "$tmpdir/out" || true
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-build) build_w_non_native_target"
 }
 
 expect_pointer_index_is_rejected() {
@@ -4262,6 +4420,9 @@ expect_init_named_dir
 expect_build_uses_package_section_name
 expect_build_rejects_imperative_manifest
 expect_build_w_is_not_ignored
+expect_build_w_test_target
+expect_build_w_library_target
+expect_build_w_non_native_target_fails_loudly
 expect_pointer_index_is_rejected
 expect_top_level_help_lists_cli_commands
 expect_cli_one_liners

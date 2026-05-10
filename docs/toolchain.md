@@ -133,7 +133,7 @@ use std.build
 pub fn build(b: Build) -> Build:
     with b as mut b:
         b.executable("game", "src/main.w")
-            .target(.native)
+            .target(BuildTarget.native)
             .optimize(.debug)
             .link_system_lib("SDL2")
         b.test("unit", "tests/*.w")

@@ -899,6 +899,13 @@ fn build_graph_output_path(root: str, target: BuildGraphTarget, output_path: str
         return output_path
     resolve_join(resolve_join(root, "out/bin"), target.name)
 
+fn build_graph_library_output_path(root: str, target: BuildGraphTarget, output_path: str, target_count: i32) -> str:
+    if output_path.len() > 0:
+        if target_count != 1:
+            return ""
+        return output_path
+    resolve_join(resolve_join(root, "out/lib"), "lib" ++ target.name ++ ".a")
+
 fn build_graph_resolve_project_path(root: str, path: str) -> str:
     if path.len() > 0 and path.byte_at(0) == 47:
         return path
@@ -910,35 +917,70 @@ fn build_graph_resolve_paths(root: str, paths: Vec[str]) -> Vec[str]:
         out.push(build_graph_resolve_project_path(root, paths.get(i as i64)))
     out
 
+fn build_graph_define_valid(define: str) -> bool:
+    if define.len() == 0:
+        return false
+    for i in 0..define.len() as i32:
+        let ch = define.byte_at(i as i64)
+        if ch == 10 or ch == 13:
+            return false
+    true
+
 fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, alloc_mode: bool, output_path: str, prelude_mode: i32, debug_info: bool) -> i32:
     if graph.targets.len() == 0:
         with_eprint("error: build.w did not declare any targets")
         return 1
     for ti in 0..graph.targets.len() as i32:
         let target = graph.targets.get(ti as i64)
-        if target.kind != 0:
+        if target.kind != 0 and target.kind != 1 and target.kind != 2:
             with_eprint("error: build.w target kind is not implemented yet for '" ++ target.name ++ "'")
             return 1
         if target.target_kind != 0:
             with_eprint("error: build.w target platform is not implemented yet for '" ++ target.name ++ "'")
             return 1
-        if target.defines.len() > 0:
-            with_eprint("error: build.w defines are not implemented yet for '" ++ target.name ++ "'")
-            return 1
+        for di in 0..target.defines.len() as i32:
+            let define = target.defines.get(di as i64)
+            if not build_graph_define_valid(define):
+                with_eprint("error: invalid build.w define for '" ++ target.name ++ "': " ++ define)
+                return 1
         let source_path = resolve_join(root, target.entry)
+        var target_opt = opt_level
+        if target.optimize_mode == 1 and target_opt < 2:
+            target_opt = 2
+        let include_paths = build_graph_resolve_paths(root, target.include_paths)
+        if target.kind == 2:
+            if output_path.len() > 0:
+                with_eprint("error: -o cannot be used with build.w test target '" ++ target.name ++ "'")
+                return 1
+            let test_rc = run_test_file_with_build_settings(source_path, target_opt, no_std, alloc_mode, prelude_mode, debug_info, false, false, "", include_paths, target.defines, target.system_libs)
+            if test_rc != 0:
+                with_eprint("error: build.w test target failed: " ++ target.name)
+                return test_rc
+            continue
+        if target.kind == 1:
+            let ar_path = build_graph_library_output_path(root, target, output_path, graph.targets.len() as i32)
+            if ar_path.len() == 0:
+                with_eprint("error: -o cannot be used when build.w declares multiple targets")
+                return 1
+            var comp = Compilation.init()
+            comp.configure(target_opt, no_std, alloc_mode)
+            comp.set_prelude_mode(prelude_mode)
+            comp.set_debug_info(debug_info)
+            let built = comp.emit_archive_to_path_with_build_settings(source_path, ar_path, include_paths, target.defines, target.system_libs)
+            if built == "":
+                with_eprint("error: build.w library target failed: " ++ target.name)
+                return 1
+            comp.print_warnings()
+            continue
         let bin_path = build_graph_output_path(root, target, output_path, graph.targets.len() as i32)
         if bin_path.len() == 0:
             with_eprint("error: -o cannot be used when build.w declares multiple targets")
             return 1
-        var target_opt = opt_level
-        if target.optimize_mode == 1 and target_opt < 2:
-            target_opt = 2
         var comp = Compilation.init()
         comp.configure(target_opt, no_std, alloc_mode)
         comp.set_prelude_mode(prelude_mode)
         comp.set_debug_info(debug_info)
-        let include_paths = build_graph_resolve_paths(root, target.include_paths)
-        let built = comp.build_binary_to_path_with_build_settings(source_path, bin_path, include_paths, target.system_libs)
+        let built = comp.build_binary_to_path_with_build_settings(source_path, bin_path, include_paths, target.defines, target.system_libs)
         if built == "":
             with_eprint("error: build.w target failed: " ++ target.name)
             return 1
@@ -1480,7 +1522,7 @@ fn run_test_binary_checked(bin_path: str, target: str, test_name: str, quiet: bo
         return 0
     1
 
-fn run_test_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, filter: str) -> i32:
+fn run_test_file_with_build_settings(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, filter: str, include_paths: Vec[str], defines: Vec[str], link_libs: Vec[str]) -> i32:
     let discovery = discover_tests_for_target(target)
     let directives = parse_test_directives_for_target(target)
     var comp = Compilation.init()
@@ -1491,9 +1533,9 @@ fn run_test_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, pr
     let test_bin_path = test_unique_binary_path(target)
     var bin_path = ""
     if synthetic_source.len() > 0:
-        bin_path = comp.build_binary_from_source_to_path(target, synthetic_source, test_bin_path)
+        bin_path = comp.build_binary_from_source_to_path_with_build_settings(target, synthetic_source, test_bin_path, include_paths, defines, link_libs)
     else:
-        bin_path = comp.build_binary_to_path(target, test_bin_path)
+        bin_path = comp.build_binary_to_path_with_build_settings(target, test_bin_path, include_paths, defines, link_libs)
     if bin_path == "":
         emit_test_stage_error("test build failed", target, "build", "")
         return 1
@@ -1545,6 +1587,12 @@ fn run_test_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, pr
         return 0
     print_test_summary(target, 0, 1, run_quiet)
     run_rc
+
+fn run_test_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, filter: str) -> i32:
+    let include_paths: Vec[str] = Vec.new()
+    let defines: Vec[str] = Vec.new()
+    let link_libs: Vec[str] = Vec.new()
+    run_test_file_with_build_settings(target, opt_level, no_std, alloc_mode, prelude_mode, debug_info, verbose, quiet, filter, include_paths, defines, link_libs)
 
 fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> i32:
     let verbose = cli_test_verbose(argc)

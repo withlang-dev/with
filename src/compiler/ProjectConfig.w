@@ -10,6 +10,7 @@ type ProjectConfig {
     package_name: str,
     package_version: str,
     c_import_include_paths: Vec[str],
+    c_import_defines: Vec[str],
     link_search_paths: Vec[str],
     dep_link_libs: Vec[str],
 }
@@ -22,6 +23,7 @@ fn project_config_default -> ProjectConfig:
         package_name: "",
         package_version: "",
         c_import_include_paths: Vec.new(),
+        c_import_defines: Vec.new(),
         link_search_paths: Vec.new(),
         dep_link_libs: Vec.new(),
     }
