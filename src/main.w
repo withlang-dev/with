@@ -38,6 +38,8 @@ extern fn with_fs_remove_dir(path: str) -> i32
 extern fn with_getenv_str(name: str) -> str
 extern fn with_clock_nanos() -> i64
 extern fn with_getpid() -> i32
+extern fn with_sysinfo_os() -> str
+extern fn with_sysinfo_arch() -> str
 extern fn with_write(s: str) -> void
 extern fn exit(code: i32) -> void
 extern fn with_install_interrupt_handlers() -> void
@@ -963,6 +965,44 @@ fn build_graph_define_valid(define: str) -> bool:
                 return false
     true
 
+fn build_graph_target_name(kind: i32) -> str:
+    if kind == 0:
+        return "native"
+    if kind == 1:
+        return "linux_x86_64"
+    if kind == 2:
+        return "linux_aarch64"
+    if kind == 3:
+        return "darwin_x86_64"
+    if kind == 4:
+        return "darwin_aarch64"
+    if kind == 5:
+        return "windows_x86_64"
+    f"unknown({kind})"
+
+fn build_graph_host_target_kind() -> i32:
+    let os = with_sysinfo_os()
+    let arch = with_sysinfo_arch()
+    if os == "Macos":
+        if arch == "armv8" or arch == "aarch64":
+            return 4
+        if arch == "x86_64":
+            return 3
+    if os == "Linux":
+        if arch == "armv8" or arch == "aarch64":
+            return 2
+        if arch == "x86_64":
+            return 1
+    if os == "Windows":
+        if arch == "x86_64":
+            return 5
+    0
+
+fn build_graph_target_is_host(kind: i32) -> bool:
+    if kind == 0:
+        return true
+    kind == build_graph_host_target_kind()
+
 fn run_build_graph_write_generated_sources(root: str, graph: BuildGraph) -> i32:
     for gi in 0..graph.generated_sources.len() as i32:
         let generated = graph.generated_sources.get(gi as i64)
@@ -991,8 +1031,11 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
         if target.kind != 0 and target.kind != 1 and target.kind != 2:
             with_eprint("error: build.w target kind is not implemented yet for '" ++ target.name ++ "'")
             return 1
-        if target.target_kind != 0:
-            with_eprint("error: build.w target platform is not implemented yet for '" ++ target.name ++ "'")
+        if target.target_kind < 0 or target.target_kind > 5:
+            with_eprint("error: invalid build.w target platform " ++ build_graph_target_name(target.target_kind) ++ " for '" ++ target.name ++ "'")
+            return 1
+        if not build_graph_target_is_host(target.target_kind):
+            with_eprint("error: build.w cross-target platform " ++ build_graph_target_name(target.target_kind) ++ " is not implemented yet for '" ++ target.name ++ "'; host is " ++ build_graph_target_name(build_graph_host_target_kind()))
             return 1
         for di in 0..target.defines.len() as i32:
             let define = target.defines.get(di as i64)

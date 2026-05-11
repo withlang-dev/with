@@ -3927,6 +3927,76 @@ EOF
   echo "PASS(cli-selfhost-build) build_w_library_target"
 }
 
+expect_build_w_explicit_host_target() {
+  local case_dir="$tmpdir/build_w_explicit_host_target_case"
+  mkdir -p "$case_dir/src"
+
+  cat >"$case_dir/with.toml" <<'EOF'
+[package]
+name = "buildwhosttarget"
+version = "0.1.0"
+EOF
+
+  cat >"$case_dir/src/main.w" <<'EOF'
+fn main:
+    print("explicit host target")
+EOF
+
+  cat >"$case_dir/build.w" <<'EOF'
+use std.build
+use std.sysinfo
+
+pub fn build(b: Build) -> Build:
+    var host = BuildTarget.native
+    if os() == "Macos":
+        if arch() == "armv8" or arch() == "aarch64":
+            host = BuildTarget.darwin_aarch64
+        else if arch() == "x86_64":
+            host = BuildTarget.darwin_x86_64
+    else if os() == "Linux":
+        if arch() == "armv8" or arch() == "aarch64":
+            host = BuildTarget.linux_aarch64
+        else if arch() == "x86_64":
+            host = BuildTarget.linux_x86_64
+    else if os() == "Windows":
+        if arch() == "x86_64":
+            host = BuildTarget.windows_x86_64
+    var target = target_new(.Executable, "host-target", "src/main.w")
+    target = target.target(host)
+    b.add_target(target)
+EOF
+
+  if ! run_cli_in_dir "$case_dir" "$tmpdir/out" "$tmpdir/err" build; then
+    echo "FAIL(cli-selfhost-build) build_w_explicit_host_target"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if [[ ! -x "$case_dir/out/bin/host-target" ]]; then
+    echo "FAIL(cli-selfhost-build-output) build_w_explicit_host_target"
+    ls -R "$case_dir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! "$case_dir/out/bin/host-target" >"$tmpdir/out" 2>"$tmpdir/err"; then
+    echo "FAIL(cli-selfhost-build-run) build_w_explicit_host_target"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_literal "$tmpdir/out" "explicit host target"; then
+    echo "FAIL(cli-selfhost-build-run-output) build_w_explicit_host_target"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-build) build_w_explicit_host_target"
+}
+
 expect_build_w_non_native_target_fails_loudly() {
   local case_dir="$tmpdir/build_w_non_native_target_case"
   mkdir -p "$case_dir/src"
@@ -3944,10 +4014,14 @@ EOF
 
   cat >"$case_dir/build.w" <<'EOF'
 use std.build
+use std.sysinfo
 
 pub fn build(b: Build) -> Build:
+    var non_native = BuildTarget.linux_x86_64
+    if os() == "Linux" and arch() == "x86_64":
+        non_native = BuildTarget.darwin_aarch64
     var target = target_new(.Executable, "wrong-target", "src/main.w")
-    target = target.target(BuildTarget.linux_x86_64)
+    target = target.target(non_native)
     b.add_target(target)
 EOF
 
@@ -3957,7 +4031,7 @@ EOF
     return
   fi
 
-  if ! file_has_literal "$tmpdir/err" "build.w target platform is not implemented yet for 'wrong-target'"; then
+  if ! file_has_literal "$tmpdir/err" "build.w cross-target platform"; then
     echo "FAIL(cli-selfhost-build-output) build_w_non_native_target"
     cat "$tmpdir/out" || true
     cat "$tmpdir/err" || true
@@ -4511,6 +4585,7 @@ expect_build_rejects_imperative_manifest
 expect_build_w_is_not_ignored
 expect_build_w_test_target
 expect_build_w_library_target
+expect_build_w_explicit_host_target
 expect_build_w_non_native_target_fails_loudly
 expect_build_w_generated_source
 expect_build_w_invalid_generated_source_path
