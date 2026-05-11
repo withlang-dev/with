@@ -45,6 +45,7 @@ type Parser {
     pending_stack_size: i32,
     pending_effect_param: i32,    // param name sym (0 = no pin)
     pending_effect_bits: i32,     // EFF_* bitmask
+    pending_compiler_hook_phase: i32,
     pending_unsafe_fn: i32,
     pending_iter_of_self: i32,
     saw_implicit_it: i32,
@@ -108,6 +109,7 @@ fn Parser.init_with_pool(tokens: TokenList, source: str, file_id: i32, intern: I
         pending_stack_size: 0,
         pending_effect_param: 0,
         pending_effect_bits: 0,
+        pending_compiler_hook_phase: 0,
         pending_unsafe_fn: 0,
         pending_iter_of_self: 0,
         saw_implicit_it: 0,
@@ -445,6 +447,7 @@ fn Parser.skip_attributes(self: Parser):
     self.pending_effect_param = 0
     self.pending_effect_bits = 0
     self.pending_iter_of_self = 0
+    self.pending_compiler_hook_phase = 0
     var derive_syms: Vec[i32] = Vec.new()
 
     while self.peek() == TokenKind.TK_AT:
@@ -619,6 +622,24 @@ fn Parser.skip_attributes(self: Parser):
                             self.pending_effect_bits = eff_bits
                 if self.peek() == TokenKind.TK_R_PAREN:
                     self.advance()
+        else if self.is_ident_named("compiler_hook"):
+            self.advance()
+            if self.peek() != TokenKind.TK_L_PAREN:
+                self.emit_error("expected '(' after compiler_hook")
+            else:
+                self.advance()
+                if self.peek() == TokenKind.TK_IDENT:
+                    let phase_sym = self.intern_current()
+                    let phase_text = self.source.slice(self.current_start() as i64, self.current_end() as i64)
+                    if phase_text == "after_typecheck":
+                        self.pending_compiler_hook_phase = phase_sym
+                    else:
+                        self.emit_error("unknown compiler hook phase '" ++ phase_text ++ "'")
+                    self.advance()
+                else:
+                    self.emit_error("expected compiler hook phase")
+                if self.peek() == TokenKind.TK_R_PAREN:
+                    self.advance()
 
         // consume until matching ]
         var depth = 1
@@ -731,6 +752,12 @@ fn Parser.parse_decl(self: Parser) -> NodeId:
         self.pending_derive_count = 0
 
     let t = self.peek()
+    if self.pending_compiler_hook_phase != 0 and
+       t != TokenKind.TK_KW_FN and t != TokenKind.TK_KW_UNSAFE and
+       t != TokenKind.TK_KW_COMPTIME and t != TokenKind.TK_KW_ASYNC and
+       t != TokenKind.TK_KW_GEN:
+        self.emit_error("compiler_hook attribute can only be used on functions")
+        self.pending_compiler_hook_phase = 0
     if t == TokenKind.TK_KW_FN:
         return self.parse_fn_decl(is_pub, start, 0, 0, 0)
     if t == TokenKind.TK_KW_UNSAFE:
@@ -983,6 +1010,9 @@ fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is
         self.pool.state.fn_effect_pin_bits.insert(fn_node as i32, self.pending_effect_bits)
         self.pending_effect_param = 0
         self.pending_effect_bits = 0
+    if self.pending_compiler_hook_phase != 0:
+        self.pool.mark_compiler_hook_fn(fn_node, self.pending_compiler_hook_phase)
+        self.pending_compiler_hook_phase = 0
     fn_node
 
 // ── extern fn ────────────────────────────────────────────────────

@@ -399,6 +399,8 @@ type AstPoolState {
     comptime_decl_nodes: Vec[i32],
     move_closure_nodes: Vec[i32],
     non_escaping_closure_nodes: Vec[i32],
+    compiler_hook_fn_nodes: Vec[i32],
+    compiler_hook_phase_syms: Vec[i32],
     where_meta: Vec[i32],
     impl_type_params: Vec[i32],
     impl_target_type_nodes: Vec[i32],
@@ -420,6 +422,8 @@ type AstPoolState {
     comptime_decl_set: HashMap[i32, i32],
     move_closure_set: HashMap[i32, i32],
     non_escaping_closure_set: HashMap[i32, i32],
+    compiler_hook_fn_set: HashMap[i32, i32],
+    compiler_hook_phase_map: HashMap[i32, i32],
     call_named_args: HashMap[i32, i32],
     fn_stack_sizes: HashMap[i32, i32],
     fn_weak_flags: HashMap[i32, i32],
@@ -466,6 +470,8 @@ fn AstPool.new -> AstPool:
             comptime_decl_nodes: Vec.new(),
             move_closure_nodes: Vec.new(),
             non_escaping_closure_nodes: Vec.new(),
+            compiler_hook_fn_nodes: Vec.new(),
+            compiler_hook_phase_syms: Vec.new(),
             where_meta: Vec.new(),
             impl_type_params: Vec.new(),
             impl_target_type_nodes: Vec.new(),
@@ -487,6 +493,8 @@ fn AstPool.new -> AstPool:
             comptime_decl_set: HashMap.new(),
             move_closure_set: HashMap.new(),
             non_escaping_closure_set: HashMap.new(),
+            compiler_hook_fn_set: HashMap.new(),
+            compiler_hook_phase_map: HashMap.new(),
             call_named_args: HashMap.new(),
             fn_stack_sizes: HashMap.new(),
             fn_weak_flags: HashMap.new(),
@@ -958,6 +966,29 @@ fn AstPool.has_type_derives(self: AstPool) -> bool:
             return true
         meta = meta + 3
     false
+
+fn AstPool.mark_compiler_hook_fn(self: AstPool, node: NodeId, phase_sym: i32):
+    self.state.compiler_hook_fn_nodes.push(node as i32)
+    self.state.compiler_hook_phase_syms.push(phase_sym)
+    self.state.compiler_hook_fn_set.insert(node as i32, 1)
+    self.state.compiler_hook_phase_map.insert(node as i32, phase_sym)
+
+fn AstPool.is_compiler_hook_fn(self: AstPool, node: NodeId) -> i32:
+    if self.state.compiler_hook_fn_set.contains(node as i32): 1 else: 0
+
+fn AstPool.compiler_hook_phase(self: AstPool, node: NodeId) -> i32:
+    if self.state.compiler_hook_phase_map.contains(node as i32):
+        return self.state.compiler_hook_phase_map.get(node as i32).unwrap()
+    0
+
+fn AstPool.compiler_hook_count(self: AstPool) -> i32:
+    self.state.compiler_hook_fn_nodes.len() as i32
+
+fn AstPool.compiler_hook_node(self: AstPool, idx: i32) -> NodeId:
+    self.state.compiler_hook_fn_nodes.get(idx as i64) as NodeId
+
+fn AstPool.compiler_hook_phase_at(self: AstPool, idx: i32) -> i32:
+    self.state.compiler_hook_phase_syms.get(idx as i64)
 
 fn AstPool.get_extra(self: AstPool, idx: i32) -> i32:
     self.state.extra.get(idx as i64)

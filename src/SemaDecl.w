@@ -1796,6 +1796,13 @@ fn Sema.validate_copy_derives(self: Sema):
         if has_noncopy_field != 0:
             self.emit_error("cannot derive Copy for a type with non-Copy fields", decl)
 
+fn Sema.validate_compiler_hooks(self: Sema):
+    for hi in 0..self.ast.compiler_hook_count():
+        let hook_node = self.ast.compiler_hook_node(hi)
+        let phase_sym = self.ast.compiler_hook_phase_at(hi)
+        let phase_name = self.pool_resolve_symbol(phase_sym)
+        self.emit_error("compiler hooks are recognized but not implemented yet for phase '" ++ phase_name ++ "'", hook_node)
+
 fn Sema.validate_generic_type_decls(self: Sema):
     for di in 0..self.ast.decl_count():
         let decl = self.ast.get_decl(di)
