@@ -88,6 +88,17 @@ Source: `docs/toolchain.md`.
     structs. Generic derives add `Serialize` bounds to generated impl type
     parameters and emit normal field-by-field serializer calls, so fields
     without `Serialize` fail loudly through normal method resolution.
+  - `std.json` provides a `JsonDocument`, `JsonView`, and `Deserialize` trait
+    for JSON object parsing.
+  - `@[derive(Deserialize)]` is implemented for structs, including generic
+    structs. Generated code reads each field from the input `JsonView` once and
+    calls `FieldType.deserialize(...)`, so unsupported fields fail loudly
+    through normal method resolution.
+  - `std.component` provides a `ComponentId` trait for ECS component identity.
+  - `@[derive(ComponentId)]` is implemented for concrete structs and generates
+    a stable type-name hash through `Type.component_id() -> i64`. Generic
+    component templates fail loudly because they do not describe a single
+    concrete component identity.
 
 ## Verified
 
@@ -105,6 +116,10 @@ Source: `docs/toolchain.md`.
 - `scripts/run_tests.sh test/compile_errors/err_derive_soa_name_collision.w`
 - `out/bin/with run test/behavior/behav_derive_serialize.w`
 - `scripts/run_tests.sh test/compile_errors/err_derive_serialize_field_without_serialize.w`
+- `out/bin/with run test/behavior/behav_derive_deserialize.w`
+- `scripts/run_tests.sh test/compile_errors/err_derive_deserialize_field_without_deserialize.w`
+- `out/bin/with run test/behavior/behav_derive_component_id.w`
+- `scripts/run_tests.sh test/compile_errors/err_derive_component_id_requires_trait.w test/compile_errors/err_derive_component_id_generic.w`
 
 ## Remaining
 
@@ -114,6 +129,5 @@ Source: `docs/toolchain.md`.
 - Complete `build.w` graph execution beyond executable, library, test, and
   generated-source targets: actual cross-target codegen/linking still needs
   driver support.
-- Read-only `ProjectInfo`, compiler hooks, source emission, and additional
-  blessed derives (`Deserialize`, `ComponentId`) remain future phases per
-  `docs/toolchain.md`.
+- Read-only `ProjectInfo`, compiler hooks, and source emission remain future
+  phases per `docs/toolchain.md`.
