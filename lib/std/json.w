@@ -1,8 +1,96 @@
-// std.json — Minimal JSON tokenizer
+// std.json — Minimal JSON writer and tokenizer
 //
 // Port of jsmn (https://github.com/zserge/jsmn) by Serge Zaitsev.
 // Single-pass tokenizer. Tokens store byte offsets into the source string.
 // Always includes parent links. Non-strict mode.
+
+pub type JsonWriter {
+    text: str,
+    needs_comma: bool,
+    after_key: bool,
+}
+
+pub trait Serialize =
+    fn serialize(self: &Self, out: JsonWriter) -> JsonWriter
+
+pub fn JsonWriter.new() -> JsonWriter:
+    JsonWriter { text: "", needs_comma: false, after_key: false }
+
+pub fn JsonWriter.finish(self: &JsonWriter) -> str:
+    self.text
+
+fn json_escape_string(value: str) -> str:
+    var out = ""
+    var i = 0
+    while i < value.len() as i32:
+        let ch = value.byte_at(i as i64)
+        if ch == 34:
+            out = out ++ "\\\""
+        else if ch == 92:
+            out = out ++ "\\\\"
+        else if ch == 10:
+            out = out ++ "\\n"
+        else if ch == 13:
+            out = out ++ "\\r"
+        else if ch == 9:
+            out = out ++ "\\t"
+        else:
+            out = out ++ value.slice(i as i64, (i + 1) as i64)
+        i = i + 1
+    out
+
+fn json_quote(value: str) -> str:
+    "\"" ++ json_escape_string(value) ++ "\""
+
+fn JsonWriter.prefix_value(self: JsonWriter) -> JsonWriter:
+    if self.after_key:
+        return JsonWriter { text: self.text, needs_comma: self.needs_comma, after_key: false }
+    if self.needs_comma:
+        return JsonWriter { text: self.text ++ ",", needs_comma: self.needs_comma, after_key: self.after_key }
+    JsonWriter { text: self.text, needs_comma: self.needs_comma, after_key: self.after_key }
+
+pub fn JsonWriter.begin_object(self: JsonWriter) -> JsonWriter:
+    let prefixed = self.prefix_value()
+    JsonWriter { text: prefixed.text ++ "{", needs_comma: false, after_key: false }
+
+pub fn JsonWriter.end_object(self: JsonWriter) -> JsonWriter:
+    JsonWriter { text: self.text ++ "}", needs_comma: true, after_key: false }
+
+pub fn JsonWriter.key(self: JsonWriter, key: str) -> JsonWriter:
+    let prefix = if self.needs_comma: "," else: ""
+    JsonWriter { text: self.text ++ prefix ++ json_quote(key) ++ ":", needs_comma: false, after_key: true }
+
+pub fn JsonWriter.value_raw(self: JsonWriter, raw: str) -> JsonWriter:
+    let prefixed = self.prefix_value()
+    JsonWriter { text: prefixed.text ++ raw, needs_comma: true, after_key: false }
+
+pub fn JsonWriter.value_str(self: JsonWriter, value: str) -> JsonWriter:
+    self.value_raw(json_quote(value))
+
+pub fn JsonWriter.value_i32(self: JsonWriter, value: i32) -> JsonWriter:
+    self.value_raw(with_i32_to_str(value))
+
+pub fn JsonWriter.value_i64(self: JsonWriter, value: i64) -> JsonWriter:
+    self.value_raw(with_i64_to_str(value))
+
+pub fn JsonWriter.value_bool(self: JsonWriter, value: bool) -> JsonWriter:
+    self.value_raw(if value: "true" else: "false")
+
+impl Serialize for str =
+    fn serialize(self: &str, out: JsonWriter) -> JsonWriter:
+        out.value_str(*self)
+
+impl Serialize for i32 =
+    fn serialize(self: &i32, out: JsonWriter) -> JsonWriter:
+        out.value_i32(*self)
+
+impl Serialize for i64 =
+    fn serialize(self: &i64, out: JsonWriter) -> JsonWriter:
+        out.value_i64(*self)
+
+impl Serialize for bool =
+    fn serialize(self: &bool, out: JsonWriter) -> JsonWriter:
+        out.value_bool(*self)
 
 /// Token type: undefined/uninitialized.
 let JSON_UNDEFINED: i32 = 0

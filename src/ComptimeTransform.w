@@ -1276,6 +1276,9 @@ fn AstPool.ct_build_field_access(self: AstPool, node: i32, base: i32, field: i32
 fn AstPool.ct_build_int_lit(self: AstPool, node: i32, value: i64) -> i32:
     self.add_node(NodeKind.NK_INT_LIT, self.get_start(node), self.get_end(node), ast_int_part0(value), ast_int_part1(value), ast_int_part2(value)) as i32
 
+fn AstPool.ct_build_string_lit(self: AstPool, intern: InternPool, node: i32, value: str) -> i32:
+    self.add_node(NodeKind.NK_STRING_LIT, self.get_start(node), self.get_end(node), intern.intern(value), 0, 0) as i32
+
 fn AstPool.ct_build_block(self: AstPool, node: i32, stmts: Vec[i32], tail: i32) -> i32:
     let stmt_extra = self.extra_len()
     for si in 0..stmts.len() as i32:
@@ -1610,6 +1613,81 @@ fn Sema.ct_generate_default_derive(self: Sema, out: AstPool, intern: InternPool,
     generated.push(impl_node as i32)
     generated
 
+fn Sema.ct_generate_serialize_derive(self: Sema, out: AstPool, intern: InternPool, decl: i32) -> Vec[i32]:
+    let generated: Vec[i32] = Vec.new()
+    if type_decl_sub_kind(out.get_data2(decl)) != TypeDeclKind.Struct:
+        return generated
+
+    let serialize_trait_sym = intern.intern("Serialize")
+    let serialize_method_sym = intern.intern("serialize")
+    let type_name_sym = out.get_data0(decl)
+    if self.lookup_method_sig(type_name_sym, serialize_method_sym) >= 0:
+        return generated
+    if self.select_trait_impl(type_name_sym, serialize_trait_sym) != 0:
+        return generated
+
+    let type_name = intern.resolve(type_name_sym)
+    let start = out.get_start(decl)
+    let end = out.get_end(decl)
+    let self_sym = intern.intern("self")
+    let self_type_sym = intern.intern("Self")
+    let out_sym = intern.intern("out")
+    let json_writer_sym = intern.intern("JsonWriter")
+    let begin_object_sym = intern.intern("begin_object")
+    let end_object_sym = intern.intern("end_object")
+    let key_sym = intern.intern("key")
+
+    let tp_count = ct_type_decl_tp_count(out, decl)
+    let tp_start = ct_type_decl_tp_start(out, decl)
+    let self_type = ct_build_generic_self_type(out, decl, type_name_sym, tp_start, tp_count)
+    let self_ref_type = out.add_node(NodeKind.NK_TYPE_REF, start, end, self_type as i32, 0, 0)
+    let writer_type = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, json_writer_sym, 0, 0)
+
+    let out_ident = out.ct_build_ident(decl, out_sym)
+    let begin_callee = out.ct_build_field_access(decl, out_ident, begin_object_sym)
+    let no_args: Vec[i32] = Vec.new()
+    var writer_expr = out.ct_build_call(decl, begin_callee, no_args)
+
+    let type_extra_start = out.get_data1(decl)
+    let field_count = out.get_extra(type_extra_start)
+    for fi in 0..field_count:
+        let field_sym = out.get_extra(type_extra_start + 1 + fi * 3)
+        let key_callee = out.ct_build_field_access(decl, writer_expr, key_sym)
+        let key_args: Vec[i32] = Vec.new()
+        key_args.push(out.ct_build_string_lit(intern, decl, intern.resolve(field_sym)))
+        writer_expr = out.ct_build_call(decl, key_callee, key_args)
+
+        let self_ident = out.ct_build_ident(decl, self_sym)
+        let self_field = out.ct_build_field_access(decl, self_ident, field_sym)
+        let serialize_callee = out.ct_build_field_access(decl, self_field, serialize_method_sym)
+        let serialize_args: Vec[i32] = Vec.new()
+        serialize_args.push(writer_expr)
+        writer_expr = out.ct_build_call(decl, serialize_callee, serialize_args)
+
+    let end_callee = out.ct_build_field_access(decl, writer_expr, end_object_sym)
+    let body = out.ct_build_call(decl, end_callee, no_args)
+
+    let param_start = out.extra_len()
+    out.ct_add_fn_param(self_sym, self_ref_type as i32, FN_PARAM_FLAG_REF_SELF)
+    out.ct_add_fn_param(out_sym, writer_type as i32, 0)
+    let fn_sym = intern.intern(type_name ++ ".serialize")
+    let fn_node = out.add_node(NodeKind.NK_FN_DECL, start, end, fn_sym, body as i32, 0)
+    out.add_fn_meta(fn_node, 2 * FN_META_REQUIRED_UNIT, writer_type as i32, param_start, 2, 0, 0)
+
+    let impl_extra = out.extra_len()
+    out.add_extra(0)
+    out.add_extra(1)
+    let impl_node = out.add_node(NodeKind.NK_IMPL_DECL, start, end, type_name_sym, impl_extra, serialize_trait_sym)
+    if tp_count > 0:
+        let impl_tp_start = ct_copy_type_params_with_bound(out, tp_start, tp_count, serialize_trait_sym)
+        out.add_impl_type_params(impl_node, impl_tp_start, tp_count)
+        let target_type = ct_build_generic_self_type(out, decl, type_name_sym, impl_tp_start, tp_count)
+        out.add_impl_target_type_node(impl_node, target_type as NodeId)
+
+    generated.push(fn_node as i32)
+    generated.push(impl_node as i32)
+    generated
+
 fn Sema.ct_transform_decl(mut self: Sema, source_ast: AstPool, pool: AstPool, intern: InternPool, node: i32):
     let kind = pool.kind(node)
     if kind == NodeKind.NK_FN_DECL:
@@ -1636,6 +1714,7 @@ fn Sema.comptime_transform_module(mut self: Sema, source_ast: AstPool, intern: I
     let clone_trait_sym = intern.intern("Clone")
     let default_trait_sym = intern.intern("Default")
     let soa_trait_sym = intern.intern("SoA")
+    let serialize_trait_sym = intern.intern("Serialize")
     let clone_method_sym = intern.intern("clone")
     let self_sym = intern.intern("self")
     let self_type_sym = intern.intern("Self")
@@ -1678,6 +1757,15 @@ fn Sema.comptime_transform_module(mut self: Sema, source_ast: AstPool, intern: I
                 ordered_ci.push(decl_ci)
             if ct_source_decl_is_local(source_ast, di) != 0:
                 generated_local_count = generated_local_count + generated_soa.len() as i32
+        if self.type_decl_has_derive(decl as i32, serialize_trait_sym) != 0:
+            let generated_serialize = self.ct_generate_serialize_derive(out, intern, decl as i32)
+            for gi in 0..generated_serialize.len() as i32:
+                ordered.push(generated_serialize.get(gi as i64))
+                ordered_paths.push(decl_path)
+                ordered_file_ids.push(decl_file_id)
+                ordered_ci.push(decl_ci)
+            if ct_source_decl_is_local(source_ast, di) != 0:
+                generated_local_count = generated_local_count + generated_serialize.len() as i32
         if self.type_decl_has_derive(decl as i32, clone_trait_sym) == 0:
             continue
         if type_decl_sub_kind(out.get_data2(decl)) != TypeDeclKind.Struct:
