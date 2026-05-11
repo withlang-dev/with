@@ -4,6 +4,9 @@
 // Single-pass tokenizer. Tokens store byte offsets into the source string.
 // Always includes parent links. Non-strict mode.
 
+extern fn str_from_byte(b: i32) -> str
+extern fn with_alloc_zeroed(count: i64, size: i64) -> *i8
+
 pub type JsonWriter {
     text: str,
     needs_comma: bool,
@@ -12,6 +15,21 @@ pub type JsonWriter {
 
 pub trait Serialize =
     fn serialize(self: &Self, out: JsonWriter) -> JsonWriter
+
+pub type JsonView {
+    source: str,
+    tokens: *const JsonToken,
+    index: i32,
+}
+
+pub type JsonDocument {
+    source: str,
+    tokens: *mut JsonToken,
+    count: i32,
+}
+
+pub trait Deserialize =
+    fn deserialize(input: JsonView) -> Self
 
 pub fn JsonWriter.new() -> JsonWriter:
     JsonWriter { text: "", needs_comma: false, after_key: false }
@@ -114,7 +132,7 @@ let JSON_ERROR_PART: i32 = -3
 /// `tok_type` is one of JSON_OBJECT, JSON_ARRAY, JSON_STRING, JSON_PRIMITIVE.
 /// `size` is the number of direct children (keys for objects, elements for arrays).
 /// `parent` is the index of the parent token (-1 for root).
-type JsonToken {
+pub type JsonToken {
     tok_type: i32,
     start: i32,
     end: i32,
@@ -328,10 +346,48 @@ pub fn json_parse(parser: *mut JsonParser, js: str, tokens: *mut JsonToken, num_
     let len = js.len() as i32
     unsafe: json_parse_impl(parser, js, len, tokens, num_tokens)
 
+fn json_panic(msg: str) -> void:
+    with_panic(msg, "", 0)
+
+fn JsonToken.empty() -> JsonToken:
+    JsonToken { tok_type: JSON_UNDEFINED, start: -1, end: -1, size: 0, parent: -1 }
+
+/// Parse a JSON document into a fixed-size token buffer.
+pub fn JsonDocument.parse(js: str) -> JsonDocument:
+    let tokens = with_alloc_zeroed(256, sizeof[JsonToken]()) as *mut JsonToken
+    if tokens == null:
+        json_panic("could not allocate JSON token buffer")
+    var parser = JsonParser.new()
+    let count = json_parse(&raw mut parser as *mut JsonParser, js, tokens, 256)
+    if count < 0:
+        json_panic("invalid JSON")
+    JsonDocument { source: js, tokens, count }
+
+pub fn JsonDocument.root(self: &JsonDocument) -> JsonView:
+    if self.count <= 0:
+        json_panic("empty JSON document")
+    JsonView { source: self.source, tokens: self.tokens as *const JsonToken, index: 0 }
+
+fn JsonView.token_type(self: JsonView) -> i32:
+    if self.index < 0:
+        json_panic("missing JSON value")
+    unsafe: (*(self.tokens + self.index as u64)).tok_type
+
+pub fn JsonView.raw(self: JsonView) -> str:
+    json_str(self.source, self.tokens, self.index)
+
+pub fn JsonView.field(self: JsonView, key: str) -> JsonView:
+    if self.token_type() != JSON_OBJECT:
+        json_panic("expected JSON object")
+    let value_idx = json_find(self.source, self.tokens, self.index, key)
+    if value_idx < 0:
+        json_panic("missing JSON field: " ++ key)
+    JsonView { source: self.source, tokens: self.tokens, index: value_idx }
+
 // ── Lookup helpers ──────────────────────────────────────────────
 
 /// Extract the text of a token from the source JSON string.
-pub fn json_str(js: str, tokens: *mut JsonToken, idx: i32) -> str:
+pub fn json_str(js: str, tokens: *const JsonToken, idx: i32) -> str:
     var start: i32 = 0
     var end: i32 = 0
     unsafe:
@@ -341,7 +397,7 @@ pub fn json_str(js: str, tokens: *mut JsonToken, idx: i32) -> str:
 
 /// Find the value token for a key in a JSON object.
 /// Returns the token index of the value, or -1 if not found.
-pub fn json_find(js: str, tokens: *mut JsonToken, parent: i32, key: str) -> i32:
+pub fn json_find(js: str, tokens: *const JsonToken, parent: i32, key: str) -> i32:
     var tok_type: i32 = 0
     var size: i32 = 0
     unsafe:
@@ -362,7 +418,7 @@ pub fn json_find(js: str, tokens: *mut JsonToken, parent: i32, key: str) -> i32:
     -1
 
 /// Parse a primitive token as an integer. Returns 0 for non-numeric tokens.
-pub fn json_int(js: str, tokens: *mut JsonToken, idx: i32) -> i32:
+pub fn json_int(js: str, tokens: *const JsonToken, idx: i32) -> i32:
     var start: i32 = 0
     var end: i32 = 0
     unsafe:
@@ -384,8 +440,117 @@ pub fn json_int(js: str, tokens: *mut JsonToken, idx: i32) -> i32:
         pos = pos + 1
     if neg: 0 - val else: val
 
+/// Parse a primitive token as an i64. Returns 0 for non-numeric tokens.
+pub fn json_i64(js: str, tokens: *const JsonToken, idx: i32) -> i64:
+    var start: i32 = 0
+    var end: i32 = 0
+    unsafe:
+        start = (*(tokens + idx as u64)).start
+        end = (*(tokens + idx as u64)).end
+    var val: i64 = 0
+    var neg = false
+    var pos = start
+    if pos < end and js.byte_at(pos as i64) == 45:
+        neg = true
+        pos = pos + 1
+    while pos < end:
+        let d = js.byte_at(pos as i64) as i32
+        if d >= 48 and d <= 57:
+            val = val * 10 + (d - 48) as i64
+        else:
+            break
+        pos = pos + 1
+    if neg: 0i64 - val else: val
+
+fn json_hex_value(ch: i32) -> i32:
+    if ch >= 48 and ch <= 57:
+        return ch - 48
+    if ch >= 65 and ch <= 70:
+        return ch - 55
+    if ch >= 97 and ch <= 102:
+        return ch - 87
+    -1
+
+fn json_unescape_string(value: str) -> str:
+    var out = ""
+    var i = 0
+    while i < value.len() as i32:
+        let ch = value.byte_at(i as i64) as i32
+        if ch != 92:
+            out = out ++ value.slice(i as i64, (i + 1) as i64)
+        else:
+            i = i + 1
+            if i >= value.len() as i32:
+                json_panic("invalid JSON string escape")
+            let esc = value.byte_at(i as i64) as i32
+            if esc == 34:
+                out = out ++ "\""
+            else if esc == 92:
+                out = out ++ "\\"
+            else if esc == 47:
+                out = out ++ "/"
+            else if esc == 98:
+                out = out ++ str_from_byte(8)
+            else if esc == 102:
+                out = out ++ str_from_byte(12)
+            else if esc == 110:
+                out = out ++ "\n"
+            else if esc == 114:
+                out = out ++ "\r"
+            else if esc == 116:
+                out = out ++ "\t"
+            else if esc == 117:
+                if i + 4 >= value.len() as i32:
+                    json_panic("invalid JSON unicode escape")
+                let h0 = json_hex_value(value.byte_at((i + 1) as i64) as i32)
+                let h1 = json_hex_value(value.byte_at((i + 2) as i64) as i32)
+                let h2 = json_hex_value(value.byte_at((i + 3) as i64) as i32)
+                let h3 = json_hex_value(value.byte_at((i + 4) as i64) as i32)
+                if h0 < 0 or h1 < 0 or h2 < 0 or h3 < 0:
+                    json_panic("invalid JSON unicode escape")
+                let code = ((h0 * 4096) + (h1 * 256) + (h2 * 16) + h3)
+                if code < 128:
+                    out = out ++ str_from_byte(code)
+                else:
+                    json_panic("JSON unicode escapes above ASCII are not supported yet")
+                i = i + 4
+            else:
+                json_panic("invalid JSON string escape")
+        i = i + 1
+    out
+
+impl Deserialize for str =
+    fn deserialize(input: JsonView) -> str:
+        if input.token_type() != JSON_STRING:
+            json_panic("expected JSON string")
+        json_unescape_string(input.raw())
+
+impl Deserialize for i32 =
+    fn deserialize(input: JsonView) -> i32:
+        if input.token_type() != JSON_PRIMITIVE:
+            json_panic("expected JSON integer")
+        json_int(input.source, input.tokens, input.index)
+
+impl Deserialize for i64 =
+    fn deserialize(input: JsonView) -> i64:
+        if input.token_type() != JSON_PRIMITIVE:
+            json_panic("expected JSON integer")
+        json_i64(input.source, input.tokens, input.index)
+
+impl Deserialize for bool =
+    fn deserialize(input: JsonView) -> bool:
+        if input.token_type() != JSON_PRIMITIVE:
+            json_panic("expected JSON bool")
+        let raw = input.raw()
+        if raw == "true":
+            return true
+        if raw == "false":
+            return false
+        json_panic("expected JSON bool")
+        false
+
 // Skip over a token and all its nested children. Returns the next token index.
-fn json_skip(tokens: *mut JsonToken, idx: i32) -> i32:
+fn json_skip(tokens: *const JsonToken, idx: i32) -> i32:
     var tok_type: i32 = 0
     var size: i32 = 0
     unsafe:

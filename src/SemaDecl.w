@@ -129,6 +129,52 @@ fn Sema.resolve_deferred_non_generic_type_decls(self: Sema):
             continue
         self.resolve_deferred_non_generic_type_decl(decl)
 
+fn Sema.type_has_unresolved_parts(self: Sema, tid: i32) -> i32:
+    if tid <= 0:
+        return 1
+    let resolved = self.resolve_alias(tid as TypeId)
+    if (resolved as i32) <= 0:
+        return 1
+    let kind = self.get_type_kind(resolved)
+
+    if kind == TypeKind.TY_PTR or kind == TypeKind.TY_REF or kind == TypeKind.TY_ARRAY or kind == TypeKind.TY_SLICE:
+        return self.type_has_unresolved_parts(self.get_type_d0(resolved))
+
+    if kind == TypeKind.TY_TUPLE:
+        let extra_start = self.get_type_d0(resolved)
+        let elem_count = self.get_type_d1(resolved)
+        for ei in 0..elem_count:
+            if self.type_has_unresolved_parts(self.type_extra.get((extra_start + ei) as i64)) != 0:
+                return 1
+        return 0
+
+    if kind == TypeKind.TY_FN:
+        let extra_start = self.get_type_d0(resolved)
+        let param_count = self.get_type_d1(resolved)
+        for pi in 0..param_count:
+            if self.type_has_unresolved_parts(self.type_extra.get((extra_start + pi) as i64)) != 0:
+                return 1
+        return self.type_has_unresolved_parts(self.get_type_d2(resolved))
+
+    if kind == TypeKind.TY_GENERIC_INST:
+        let arg_count = self.get_type_d2(resolved)
+        for ai in 0..arg_count:
+            if self.type_has_unresolved_parts(self.get_generic_inst_arg(resolved as i32, ai)) != 0:
+                return 1
+        return 0
+
+    0
+
+fn Sema.resolve_deferred_value_type_slot(self: Sema, slot: i32, type_node: i32, opaque_message: str):
+    let current = self.type_extra.get(slot as i64)
+    if current != 0 and self.type_has_unresolved_parts(current) == 0:
+        return
+    let resolved = self.resolve_type_expr(type_node)
+    if resolved != 0:
+        if self.is_opaque_value_type(resolved) != 0:
+            self.emit_error(opaque_message, type_node)
+        self.type_extra.set_i32(slot as i64, resolved)
+
 fn Sema.resolve_deferred_non_generic_type_decl(self: Sema, decl: i32):
     let name = self.ast.get_data0(decl)
     let tid = if self.type_decl_tids.contains(decl): self.type_decl_tids.get(decl).unwrap() else: self.lookup_named_type_visible(name)
@@ -146,15 +192,9 @@ fn Sema.resolve_deferred_non_generic_type_decl(self: Sema, decl: i32):
         let field_count = self.ast.get_extra(extra_start)
         for fi in 0..field_count:
             let field_slot = te_start + fi * 3 + 1
-            if self.type_extra.get(field_slot as i64) != 0:
-                continue
             let field_base = extra_start + 1 + fi * 3
             let field_type_node = self.ast.get_extra(field_base + 1)
-            let field_tid = self.resolve_type_expr(field_type_node)
-            if field_tid != 0:
-                if self.is_opaque_value_type(field_tid) != 0:
-                    self.emit_error("opaque types cannot be stored in struct fields; use a pointer or reference", field_type_node)
-                self.type_extra.set_i32(field_slot as i64, field_tid)
+            self.resolve_deferred_value_type_slot(field_slot, field_type_node, "opaque types cannot be stored in struct fields; use a pointer or reference")
         // Validate bitpacked field types: must be integer, bool, or nested bitpacked
         let packed_kind = self.ast.get_data2(decl)
         if type_decl_is_bitpacked(packed_kind) != 0:
@@ -185,13 +225,8 @@ fn Sema.resolve_deferred_non_generic_type_decl(self: Sema, decl: i32):
             type_pos = type_pos + 2
             for pi in 0..payload_count:
                 let payload_slot = type_pos + pi
-                if self.type_extra.get(payload_slot as i64) == 0:
-                    let payload_type_node = self.ast.get_extra(ast_pos + pi)
-                    let payload_tid = self.resolve_type_expr(payload_type_node)
-                    if payload_tid != 0:
-                        if self.is_opaque_value_type(payload_tid) != 0:
-                            self.emit_error("opaque types cannot be stored in enum payloads by value; use a pointer or reference", payload_type_node)
-                        self.type_extra.set_i32(payload_slot as i64, payload_tid)
+                let payload_type_node = self.ast.get_extra(ast_pos + pi)
+                self.resolve_deferred_value_type_slot(payload_slot, payload_type_node, "opaque types cannot be stored in enum payloads by value; use a pointer or reference")
             ast_pos = ast_pos + payload_count
             type_pos = type_pos + payload_count
         return
@@ -216,19 +251,14 @@ fn Sema.resolve_deferred_non_generic_type_decl(self: Sema, decl: i32):
             type_pos = type_pos + 2
             for pi in 0..payload_count:
                 let payload_slot = type_pos + pi
-                if self.type_extra.get(payload_slot as i64) == 0:
-                    let payload_type_node = self.ast.get_extra(ast_pos + pi)
-                    let payload_tid = self.resolve_type_expr(payload_type_node)
-                    if payload_tid != 0:
-                        if self.is_opaque_value_type(payload_tid) != 0:
-                            self.emit_error("opaque types cannot be stored in enum payloads by value; use a pointer or reference", payload_type_node)
-                        self.type_extra.set_i32(payload_slot as i64, payload_tid)
+                let payload_type_node = self.ast.get_extra(ast_pos + pi)
+                self.resolve_deferred_value_type_slot(payload_slot, payload_type_node, "opaque types cannot be stored in enum payloads by value; use a pointer or reference")
             ast_pos = ast_pos + payload_count
             type_pos = type_pos + payload_count
         return
 
     if sub_kind == TypeDeclKind.Alias:
-        if self.get_type_d0(tid) != 0:
+        if self.get_type_d0(tid) != 0 and self.type_has_unresolved_parts(self.get_type_d0(tid)) == 0:
             return
         let aliased_node = self.ast.get_extra(extra_start)
         let target_tid = self.resolve_type_expr(aliased_node)
@@ -241,14 +271,8 @@ fn Sema.resolve_deferred_non_generic_type_decl(self: Sema, decl: i32):
             return
         let te_start = self.get_type_d1(resolved)
         let value_slot = te_start + 1
-        if self.type_extra.get(value_slot as i64) != 0:
-            return
         let inner_node = self.ast.get_extra(extra_start)
-        let inner_tid = self.resolve_type_expr(inner_node)
-        if inner_tid != 0:
-            if self.is_opaque_value_type(inner_tid) != 0:
-                self.emit_error("opaque types cannot be wrapped by value in distinct types; use a pointer or reference", inner_node)
-            self.type_extra.set_i32(value_slot as i64, inner_tid)
+        self.resolve_deferred_value_type_slot(value_slot, inner_node, "opaque types cannot be wrapped by value in distinct types; use a pointer or reference")
 
 fn Sema.is_local_decl(self: Sema, decl_index: i32) -> i32:
     let limit = self.ast.local_decl_count()
