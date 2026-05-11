@@ -593,6 +593,8 @@ fn MirBuilder.expr_type(self: MirBuilder, node: i32) -> i32:
     if self.sema.typed_expr_types.contains(node):
         let typed = self.sema.typed_expr_types.get(node).unwrap()
         if typed != 0:
+            if typed == self.sema.ty_void as i32 and self.ast.kind(node) == NodeKind.NK_FIELD_ACCESS:
+                return self.fallback_expr_type(node)
             return typed as i32
     self.fallback_expr_type(node)
 
@@ -971,7 +973,14 @@ fn MirBuilder.struct_field_type(self: MirBuilder, struct_tid: i32, field_sym: i3
     if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
         let inner = self.sema.get_type_d0(resolved)
         return self.struct_field_type(inner, field_sym)
-    self.sema.struct_field_type(resolved as i32, field_sym)
+    let direct = self.sema.struct_field_type(resolved as i32, field_sym)
+    if direct != 0:
+        return direct
+    let field_text = self.pool.resolve_symbol(field_sym)
+    let sema_field = if field_text.len() > 0: self.sema.pool_lookup_symbol(field_text) else: 0
+    if sema_field != 0 and sema_field != field_sym:
+        return self.sema.struct_field_type(resolved as i32, sema_field)
+    0
 
 fn MirBuilder.tuple_elem_type(self: MirBuilder, tuple_tid: i32, field_idx: i32) -> i32:
     let resolved = self.sema.resolve_alias(tuple_tid)
@@ -4767,7 +4776,15 @@ fn MirBuilder.lower_intrinsic_call(self: MirBuilder, intrinsic: i32, self_expr: 
     if is_static and self.expected_type > 0:
         let expected_resolved = self.sema.resolve_alias(self.expected_type)
         let et_tk = self.sema.get_type_kind(expected_resolved)
+        var expected_matches_receiver = false
         if et_tk == TypeKind.TY_GENERIC_INST:
+            let expected_base = self.sema.get_type_d0(expected_resolved)
+            let recv_base_ty = self.type_receiver_type(self_expr)
+            if recv_base_ty != 0:
+                let recv_resolved = self.sema.resolve_alias(recv_base_ty)
+                if self.sema.get_type_kind(recv_resolved) == TypeKind.TY_STRUCT:
+                    expected_matches_receiver = self.sema.get_type_d0(recv_resolved) == expected_base
+        if expected_matches_receiver:
             ret_type = expected_resolved as i32
     // If ret_type is still a base struct (not generic instance) for a static
     // constructor, try to resolve from the NodeKind.NK_INDEX receiver (Vec[i32]).

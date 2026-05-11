@@ -114,9 +114,26 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> TypeId:
         let prim = self.primitive_type_by_sym(sym)
         if prim != 0:
             return prim as TypeId
+        let subst = self.lookup_generic_subst(sym)
+        if subst != 0:
+            return subst as TypeId
         let named_tid = self.lookup_named_type_visible(sym)
         if named_tid != 0 and (self.collecting_types != 0 or self.is_ci_visible(sym) != 0):
             return named_tid as TypeId
+        let sym_text = self.pool_resolve_symbol(sym)
+        let canonical_sym = if sym_text.len() > 0: self.pool_lookup_symbol(sym_text) else: 0
+        if canonical_sym != 0 and canonical_sym != sym:
+            let canonical_prim = self.primitive_type_by_sym(canonical_sym)
+            if canonical_prim != 0:
+                return canonical_prim as TypeId
+            let canonical_subst = self.lookup_generic_subst(canonical_sym)
+            if canonical_subst != 0:
+                return canonical_subst as TypeId
+            let canonical_tid = self.lookup_named_type_visible(canonical_sym)
+            if canonical_tid != 0 and (self.collecting_types != 0 or self.is_ci_visible(canonical_sym) != 0):
+                return canonical_tid as TypeId
+            if canonical_sym == self.syms.self_type:
+                return 0 as TypeId
         // Self is resolved at codegen time
         if sym == self.syms.self_type:
             return 0 as TypeId
@@ -1242,6 +1259,13 @@ fn Sema.check_fn_body_concrete(self: Sema, fn_node: i32, tp_syms: Vec[i32], tp_s
 
     let tp_count = tp_syms.len() as i32
 
+    let saved_generic_subst_param_syms = self.generic_subst_param_syms
+    let saved_generic_subst_type_ids = self.generic_subst_type_ids
+    let saved_types_frozen = self.types_frozen
+    self.types_frozen = 0
+    self.generic_subst_param_syms = Vec.new()
+    self.generic_subst_type_ids = Vec.new()
+
     // Save named_types entries for type params and install concrete types
     let saved_named: Vec[i32] = Vec.new()
     let saved_had: Vec[i32] = Vec.new()
@@ -1255,6 +1279,11 @@ fn Sema.check_fn_body_concrete(self: Sema, fn_node: i32, tp_syms: Vec[i32], tp_s
             saved_named.push(0)
         let tp_sema_ty = tp_sema_tys.get(ti as i64)
         self.named_types.insert(tp_sym, tp_sema_ty)
+        self.put_generic_subst(tp_sym, tp_sema_ty, fn_node)
+        let tp_text = self.pool_resolve_symbol(tp_sym)
+        let canonical_tp_sym = if tp_text.len() > 0: self.pool_lookup_symbol(tp_text) else: 0
+        if canonical_tp_sym != 0 and canonical_tp_sym != tp_sym:
+            self.put_generic_subst(canonical_tp_sym, tp_sema_ty, fn_node)
 
     // Resolve param types with concrete substitutions
     let param_start = self.ast.fn_meta_param_start(meta)
@@ -1327,6 +1356,10 @@ fn Sema.check_fn_body_concrete(self: Sema, fn_node: i32, tp_syms: Vec[i32], tp_s
             self.named_types.insert(tp_sym, saved_named.get(ti as i64))
         else:
             self.named_types.remove(tp_sym)
+
+    self.generic_subst_param_syms = saved_generic_subst_param_syms
+    self.generic_subst_type_ids = saved_generic_subst_type_ids
+    self.types_frozen = saved_types_frozen
 
     sig_idx
 
