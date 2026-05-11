@@ -2555,6 +2555,7 @@ fn Sema.prepare_for_comptime_transform(self: Sema):
     self.build_ci_scoping()
     self.build_ci_destructor_map()
     self.validate_copy_derives()
+    self.validate_compiler_hooks()
     self.validate_generic_type_decls()
 
 // ── Utility functions ────────────────────────────────────────────

@@ -102,6 +102,15 @@ Source: `docs/toolchain.md`.
     a stable type-name hash through `Type.component_id() -> i64`. Generic
     component templates fail loudly because they do not describe a single
     concrete component identity.
+- Initial compiler-hook guardrail:
+  - `std.compiler` defines the read-only `ProjectInfo` value model for modules,
+    functions, types, and source locations.
+  - `@[compiler_hook(after_typecheck)]` is parsed and preserved on function
+    declarations.
+  - Until `ProjectInfo` execution is implemented, compiler hooks fail loudly
+    instead of being silently ignored.
+  - Unknown compiler-hook phases and hooks attached to non-functions are
+    diagnostics.
 
 ## Verified
 
@@ -123,6 +132,8 @@ Source: `docs/toolchain.md`.
 - `scripts/run_tests.sh test/compile_errors/err_derive_deserialize_field_without_deserialize.w`
 - `out/bin/with run test/behavior/behav_derive_component_id.w`
 - `scripts/run_tests.sh test/compile_errors/err_derive_component_id_requires_trait.w test/compile_errors/err_derive_component_id_generic.w`
+- `scripts/run_tests.sh test/compile_errors/err_compiler_hook_not_implemented.w test/compile_errors/err_compiler_hook_unknown_phase.w test/compile_errors/err_compiler_hook_function_only.w`
+- `out/bin/with run test/behavior/behav_std_compiler_project_info.w`
 
 ## Remaining
 
@@ -132,5 +143,6 @@ Source: `docs/toolchain.md`.
 - Complete `build.w` graph execution beyond executable, library, test,
   generated-source targets, and explicit host-target aliases: actual
   cross-target codegen/linking still needs driver support.
-- Read-only `ProjectInfo`, compiler hooks, and source emission remain future
-  phases per `docs/toolchain.md`.
+- Compiler construction of real `ProjectInfo` values, compiler-hook runner
+  integration, and source emission remain future phases per
+  `docs/toolchain.md`.
