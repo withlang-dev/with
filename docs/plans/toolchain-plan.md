@@ -79,9 +79,9 @@ Source: `docs/toolchain.md`.
     `T.default()` trait-bound dispatch path.
   - Generated defaults initialize each field through `FieldType.default()`,
     so missing field support fails loudly through normal method resolution.
-  - `@[derive(SoA)]` is implemented for non-generic structs, generating
-    `TypeSoA` plus `new`, `push`, `get`, and `len` methods.
-  - SoA target-name collisions and generic SoA derives fail loudly.
+  - `@[derive(SoA)]` is implemented for structs, including generic structs,
+    generating `TypeSoA` plus `new`, `push`, `get`, and `len` methods.
+  - SoA target-name collisions fail loudly.
 
 ## Verified
 
@@ -94,6 +94,9 @@ Source: `docs/toolchain.md`.
 - `make regex-migrate`
 - `make regex-build`
 - `make regex-test`
+- `out/bin/with run test/behavior/behav_derive_soa_generic.w`
+- `out/bin/with run test/behavior/behav_derive_soa.w`
+- `scripts/run_tests.sh test/compile_errors/err_derive_soa_name_collision.w`
 
 ## Remaining
 
@@ -103,6 +106,6 @@ Source: `docs/toolchain.md`.
 - Complete `build.w` graph execution beyond executable, library, test, and
   generated-source targets: actual cross-target codegen/linking still needs
   driver support.
-- Read-only `ProjectInfo`, compiler hooks, source emission, generic SoA
-  derives, and additional blessed derives (`Serialize`, `Deserialize`,
-  `ComponentId`) remain future phases per `docs/toolchain.md`.
+- Read-only `ProjectInfo`, compiler hooks, source emission, and additional
+  blessed derives (`Serialize`, `Deserialize`, `ComponentId`) remain future
+  phases per `docs/toolchain.md`.

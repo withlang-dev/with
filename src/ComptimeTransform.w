@@ -1306,6 +1306,19 @@ fn ct_copy_type_params_with_bound(pool: AstPool, src_tp_start: i32, tp_count: i3
         src = src + 2 + bound_count
     dst_tp_start
 
+fn ct_copy_type_params(pool: AstPool, src_tp_start: i32, tp_count: i32) -> i32:
+    let dst_tp_start = pool.extra_len()
+    var src = src_tp_start
+    for tpi in 0..tp_count:
+        let tp_name = pool.get_extra(src)
+        let bound_count = pool.get_extra(src + 1)
+        pool.add_extra(tp_name)
+        pool.add_extra(bound_count)
+        for bi in 0..bound_count:
+            pool.add_extra(pool.get_extra(src + 2 + bi))
+        src = src + 2 + bound_count
+    dst_tp_start
+
 fn ct_build_generic_self_type(pool: AstPool, node: i32, type_sym: i32, tp_start: i32, tp_count: i32) -> i32:
     if tp_count == 0:
         return pool.add_node(NodeKind.NK_TYPE_NAMED, pool.get_start(node), pool.get_end(node), type_sym, 0, 0) as i32
@@ -1348,8 +1361,13 @@ fn ct_type_param_sym_for_type_node(pool: AstPool, type_node: i32, tp_start: i32,
         pos = pos + 2 + bound_count
     0
 
-fn Sema.ct_build_vec_type_expr(self: Sema, pool: AstPool, intern: InternPool, elem_type_id: i32, node: i32) -> i32:
-    let elem_type = self.ct_build_type_expr(pool, intern, elem_type_id, node)
+fn Sema.ct_build_type_expr_with_hint(self: Sema, pool: AstPool, intern: InternPool, type_id: i32, type_node_hint: i32, node: i32) -> i32:
+    if type_node_hint != 0:
+        return pool.ct_clone_tree_with_subst(type_node_hint, 0, 0, 0, 0)
+    self.ct_build_type_expr(pool, intern, type_id, node)
+
+fn Sema.ct_build_vec_type_expr(self: Sema, pool: AstPool, intern: InternPool, elem_type_id: i32, type_node_hint: i32, node: i32) -> i32:
+    let elem_type = self.ct_build_type_expr_with_hint(pool, intern, elem_type_id, type_node_hint, node)
     if elem_type == 0:
         return 0
     let arg_start = pool.extra_len()
@@ -1359,9 +1377,6 @@ fn Sema.ct_build_vec_type_expr(self: Sema, pool: AstPool, intern: InternPool, el
 fn Sema.ct_generate_soa_derive(self: Sema, out: AstPool, intern: InternPool, decl: i32) -> Vec[i32]:
     let generated: Vec[i32] = Vec.new()
     if type_decl_sub_kind(out.get_data2(decl)) != TypeDeclKind.Struct:
-        return generated
-    if ct_type_decl_tp_count(out, decl) > 0:
-        self.ct_emit_error(out, decl, "derive SoA for generic structs is not implemented yet")
         return generated
 
     let type_name_sym = out.get_data0(decl)
@@ -1380,12 +1395,17 @@ fn Sema.ct_generate_soa_derive(self: Sema, out: AstPool, intern: InternPool, dec
 
     let start = out.get_start(decl)
     let end = out.get_end(decl)
+    let tp_count = ct_type_decl_tp_count(out, decl)
+    let tp_start = ct_type_decl_tp_start(out, decl)
+    let soa_tp_start = if tp_count > 0: ct_copy_type_params(out, tp_start, tp_count) else: 0
     let te_start = self.get_type_d1(resolved)
     let field_count = self.get_type_d2(resolved)
+    let type_extra_start = out.get_data1(decl)
     let soa_field_types: Vec[i32] = Vec.new()
     for fi in 0..field_count:
         let field_tid = self.type_extra.get((te_start + fi * 3 + 1) as i64)
-        let vec_type = self.ct_build_vec_type_expr(out, intern, field_tid, decl)
+        let field_type_node = out.get_extra(type_extra_start + 1 + fi * 3 + 1)
+        let vec_type = self.ct_build_vec_type_expr(out, intern, field_tid, field_type_node, decl)
         if vec_type == 0:
             self.ct_emit_error(out, decl, "could not generate SoA field type")
             return generated
@@ -1394,15 +1414,15 @@ fn Sema.ct_generate_soa_derive(self: Sema, out: AstPool, intern: InternPool, dec
     let soa_extra = out.extra_len()
     out.add_extra(field_count)
     for fi in 0..field_count:
-        let field_sym = self.type_extra.get((te_start + fi * 3) as i64)
+        let field_sym = out.get_extra(type_extra_start + 1 + fi * 3)
         out.add_extra(field_sym)
         out.add_extra(soa_field_types.get(fi as i64))
         out.add_extra(0)
     for fi in 0..field_count:
         out.add_extra(0)
     out.add_extra(ct_struct_type_decl_vis(out, decl))
-    out.add_extra(0)
-    out.add_extra(0)
+    out.add_extra(soa_tp_start)
+    out.add_extra(tp_count)
     let soa_type_node = out.add_node(NodeKind.NK_TYPE_DECL, start, end, soa_sym, soa_extra, pack_type_decl_kind(TypeDeclKind.Struct, 0))
     generated.push(soa_type_node as i32)
 
@@ -1416,8 +1436,9 @@ fn Sema.ct_generate_soa_derive(self: Sema, out: AstPool, intern: InternPool, dec
     let self_type_sym = intern.intern("Self")
     let i64_sym = intern.intern("i64")
     let self_type = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, self_type_sym, 0, 0)
-    let self_ref_type = out.add_node(NodeKind.NK_TYPE_REF, start, end, self_type as i32, 0, 0)
-    let source_type = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, type_name_sym, 0, 0)
+    let soa_self_type = ct_build_generic_self_type(out, decl, soa_sym, tp_start, tp_count)
+    let soa_self_ref_type = out.add_node(NodeKind.NK_TYPE_REF, start, end, soa_self_type as i32, 0, 0)
+    let source_type = ct_build_generic_self_type(out, decl, type_name_sym, tp_start, tp_count)
     let idx_type = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, i64_sym, 0, 0)
 
     let new_field_values: Vec[i32] = Vec.new()
@@ -1428,18 +1449,19 @@ fn Sema.ct_generate_soa_derive(self: Sema, out: AstPool, intern: InternPool, dec
         new_field_values.push(new_call)
     let new_field_extra = out.extra_len()
     for fi in 0..field_count:
-        let field_sym = self.type_extra.get((te_start + fi * 3) as i64)
+        let field_sym = out.get_extra(type_extra_start + 1 + fi * 3)
         out.add_extra(field_sym)
         out.add_extra(new_field_values.get(fi as i64))
-    let new_body = out.add_node(NodeKind.NK_STRUCT_LIT, start, end, soa_sym, new_field_extra, field_count)
+    let new_lit_type = if tp_count > 0: self_type_sym else: soa_sym
+    let new_body = out.add_node(NodeKind.NK_STRUCT_LIT, start, end, new_lit_type, new_field_extra, field_count)
     let new_fn_sym = intern.intern(soa_name ++ ".new")
     let new_fn = out.add_node(NodeKind.NK_FN_DECL, start, end, new_fn_sym, new_body as i32, 0)
-    out.add_fn_meta(new_fn, 0, self_type as i32, out.extra_len(), 0, 0, 0)
+    out.add_fn_meta(new_fn, 0, soa_self_type as i32, out.extra_len(), 0, 0, 0)
     generated.push(new_fn as i32)
 
     let push_stmts: Vec[i32] = Vec.new()
     for fi in 0..field_count:
-        let field_sym = self.type_extra.get((te_start + fi * 3) as i64)
+        let field_sym = out.get_extra(type_extra_start + 1 + fi * 3)
         let self_ident = out.ct_build_ident(decl, self_sym)
         let self_field = out.ct_build_field_access(decl, self_ident, field_sym)
         let push_callee = out.ct_build_field_access(decl, self_field, push_sym)
@@ -1451,16 +1473,16 @@ fn Sema.ct_generate_soa_derive(self: Sema, out: AstPool, intern: InternPool, dec
     let push_tail = out.ct_build_ident(decl, self_sym)
     let push_body = out.ct_build_block(decl, push_stmts, push_tail)
     let push_param_start = out.extra_len()
-    out.ct_add_fn_param(self_sym, self_type as i32, FN_PARAM_FLAG_MUT_SELF)
+    out.ct_add_fn_param(self_sym, soa_self_type as i32, FN_PARAM_FLAG_MUT_SELF)
     out.ct_add_fn_param(value_sym, source_type as i32, 0)
     let push_fn_sym = intern.intern(soa_name ++ ".push")
     let push_fn = out.add_node(NodeKind.NK_FN_DECL, start, end, push_fn_sym, push_body as i32, 0)
-    out.add_fn_meta(push_fn, 2 * FN_META_REQUIRED_UNIT, self_type as i32, push_param_start, 2, 0, 0)
+    out.add_fn_meta(push_fn, 2 * FN_META_REQUIRED_UNIT, soa_self_type as i32, push_param_start, 2, 0, 0)
     generated.push(push_fn as i32)
 
     let get_field_values: Vec[i32] = Vec.new()
     for fi in 0..field_count:
-        let field_sym = self.type_extra.get((te_start + fi * 3) as i64)
+        let field_sym = out.get_extra(type_extra_start + 1 + fi * 3)
         let self_ident = out.ct_build_ident(decl, self_sym)
         let self_field = out.ct_build_field_access(decl, self_ident, field_sym)
         let get_callee = out.ct_build_field_access(decl, self_field, get_sym)
@@ -1471,12 +1493,12 @@ fn Sema.ct_generate_soa_derive(self: Sema, out: AstPool, intern: InternPool, dec
         get_field_values.push(get_call)
     let get_field_extra = out.extra_len()
     for fi in 0..field_count:
-        let field_sym = self.type_extra.get((te_start + fi * 3) as i64)
+        let field_sym = out.get_extra(type_extra_start + 1 + fi * 3)
         out.add_extra(field_sym)
         out.add_extra(get_field_values.get(fi as i64))
     let get_body = out.add_node(NodeKind.NK_STRUCT_LIT, start, end, type_name_sym, get_field_extra, field_count)
     let get_param_start = out.extra_len()
-    out.ct_add_fn_param(self_sym, self_ref_type as i32, FN_PARAM_FLAG_REF_SELF)
+    out.ct_add_fn_param(self_sym, soa_self_ref_type as i32, FN_PARAM_FLAG_REF_SELF)
     out.ct_add_fn_param(idx_sym, idx_type as i32, 0)
     let get_fn_sym = intern.intern(soa_name ++ ".get")
     let get_fn = out.add_node(NodeKind.NK_FN_DECL, start, end, get_fn_sym, get_body as i32, 0)
@@ -1485,14 +1507,14 @@ fn Sema.ct_generate_soa_derive(self: Sema, out: AstPool, intern: InternPool, dec
 
     var len_body = out.ct_build_int_lit(decl, 0)
     if field_count > 0:
-        let first_field_sym = self.type_extra.get(te_start as i64)
+        let first_field_sym = out.get_extra(type_extra_start + 1)
         let self_ident = out.ct_build_ident(decl, self_sym)
         let self_field = out.ct_build_field_access(decl, self_ident, first_field_sym)
         let len_callee = out.ct_build_field_access(decl, self_field, len_sym)
         let len_args: Vec[i32] = Vec.new()
         len_body = out.ct_build_call(decl, len_callee, len_args)
     let len_param_start = out.extra_len()
-    out.ct_add_fn_param(self_sym, self_ref_type as i32, FN_PARAM_FLAG_REF_SELF)
+    out.ct_add_fn_param(self_sym, soa_self_ref_type as i32, FN_PARAM_FLAG_REF_SELF)
     let len_ret = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, i64_sym, 0, 0)
     let len_fn_sym = intern.intern(soa_name ++ ".len")
     let len_fn = out.add_node(NodeKind.NK_FN_DECL, start, end, len_fn_sym, len_body as i32, 0)
@@ -1503,6 +1525,11 @@ fn Sema.ct_generate_soa_derive(self: Sema, out: AstPool, intern: InternPool, dec
     out.add_extra(0)
     out.add_extra(4)
     let impl_node = out.add_node(NodeKind.NK_IMPL_DECL, start, end, soa_sym, impl_extra, 0)
+    if tp_count > 0:
+        let impl_tp_start = ct_copy_type_params(out, tp_start, tp_count)
+        out.add_impl_type_params(impl_node, impl_tp_start, tp_count)
+        let target_type = ct_build_generic_self_type(out, decl, soa_sym, impl_tp_start, tp_count)
+        out.add_impl_target_type_node(impl_node, target_type as NodeId)
     generated.push(impl_node as i32)
     generated
 

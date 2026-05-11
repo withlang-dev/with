@@ -1512,6 +1512,14 @@ fn Codegen.record_local(self: Codegen, sym: i32, local_ptr: i64, ty: i64, is_mut
         msg = msg ++ f" ty={self.llvm_type_mangle(ty)}"
         with_eprint(msg)
 
+fn Codegen.record_local_sema_type(self: Codegen, sym: i32, sema_ty: i32):
+    if sym == 0 or sema_ty == 0:
+        return
+    self.local_sema_types.insert(sym, sema_ty)
+    let canon = self.canonical_local_sym(sym)
+    if canon != 0 and canon != sym:
+        self.local_sema_types.insert(canon, sema_ty)
+
 fn Codegen.record_local_fn_sig(self: Codegen, sym: i32, fn_sig: i64):
     self.local_fn_sigs.insert(sym, fn_sig)
     let canon = self.canonical_local_sym(sym)
@@ -2384,10 +2392,6 @@ fn Codegen.sema_type_of_node(self: Codegen, node: i32) -> i32:
     if node == 0:
         return 0
     let nk = self.pool.kind(node)
-    if self.sema.typed_expr_types.contains(node):
-        let typed = self.sema.typed_expr_types.get(node).unwrap()
-        if typed > 0:
-            return typed
     if nk == NodeKind.NK_IDENT:
         let sym = self.pool.get_data0(node)
         let opt = self.local_sema_types.get(sym)
@@ -2398,6 +2402,10 @@ fn Codegen.sema_type_of_node(self: Codegen, node: i32) -> i32:
             let canon_opt = self.local_sema_types.get(canon)
             if canon_opt.is_some():
                 return canon_opt.unwrap()
+    if self.sema.typed_expr_types.contains(node):
+        let typed = self.sema.typed_expr_types.get(node).unwrap()
+        if typed > 0:
+            return typed
     // Literal types
     if nk == NodeKind.NK_STRING_LIT:
         return self.sema.ty_str as i32
@@ -2428,6 +2436,33 @@ fn Codegen.sema_generic_arg_llvm(self: Codegen, sema_tid: i32, arg_idx: i32) -> 
         return 0
     let inner_tid = self.sema.get_generic_inst_arg(sema_tid, arg_idx)
     self.sema_type_to_llvm(inner_tid)
+
+fn Codegen.mono_struct_sema_type(self: Codegen, mono_sym: i32) -> i32:
+    let mono_base_opt = self.mono_struct_base.get(mono_sym)
+    let tp_start_opt = self.mono_struct_tp_starts.get(mono_sym)
+    let tp_count_opt = self.mono_struct_tp_counts.get(mono_sym)
+    if not mono_base_opt.is_some() or not tp_start_opt.is_some() or not tp_count_opt.is_some():
+        return 0
+    let tp_flat_start = tp_start_opt.unwrap()
+    let tp_count = tp_count_opt.unwrap()
+    let sema_args: Vec[i32] = Vec.new()
+    for ti in 0..tp_count:
+        var arg_sema = 0
+        if tp_flat_start + ti < self.mono_struct_tp_flat_sema_types.len() as i32:
+            arg_sema = self.mono_struct_tp_flat_sema_types.get((tp_flat_start + ti) as i64)
+        if arg_sema == 0 and tp_flat_start + ti < self.mono_struct_tp_flat_types.len() as i32:
+            let arg_llvm = self.mono_struct_tp_flat_types.get((tp_flat_start + ti) as i64)
+            arg_sema = self.llvm_type_to_sema_type(arg_llvm)
+        if arg_sema == 0:
+            return 0
+        sema_args.push(arg_sema)
+    let base_sym = mono_base_opt.unwrap()
+    let base_text = self.intern.resolve(base_sym)
+    let sema_base_sym = if base_text.len() > 0: self.sema.pool_lookup_symbol(base_text) else: 0
+    let found = self.sema.find_generic_inst_type(if sema_base_sym != 0: sema_base_sym else: base_sym, sema_args, tp_count)
+    if found != 0:
+        return found as i32
+    0
 
 fn Codegen.sema_sym_to_codegen_sym(self: Codegen, sym: i32) -> i32:
     if sym <= 0:
@@ -4161,6 +4196,25 @@ fn Codegen.monomorphize_struct_method_core(self: Codegen, mono_type_sym: i32, me
             tp_sema = self.llvm_type_to_sema_type(tp_llvm)
         sm_tp_sema_tys.push(tp_sema)
 
+    let alias_base_sym = self.mono_struct_base.get(mono_type_sym).unwrap()
+    let alias_base_text = self.intern.resolve(alias_base_sym)
+    let alias_sema_base = if alias_base_text.len() > 0: self.sema.pool_lookup_symbol(alias_base_text) else: 0
+    var alias_named_had = 0
+    var alias_named_old = 0
+    var alias_decl_had = 0
+    var alias_decl_old = 0
+    if alias_sema_base != 0 and alias_sema_base != alias_base_sym:
+        if self.sema.named_types.contains(alias_base_sym):
+            alias_named_had = 1
+            alias_named_old = self.sema.named_types.get(alias_base_sym).unwrap()
+        if self.sema.type_decl_nodes.contains(alias_base_sym):
+            alias_decl_had = 1
+            alias_decl_old = self.sema.type_decl_nodes.get(alias_base_sym).unwrap()
+        if self.sema.named_types.contains(alias_sema_base):
+            self.sema.named_types.insert(alias_base_sym, self.sema.named_types.get(alias_sema_base).unwrap())
+        if self.sema.type_decl_nodes.contains(alias_sema_base):
+            self.sema.type_decl_nodes.insert(alias_base_sym, self.sema.type_decl_nodes.get(alias_sema_base).unwrap())
+
     // 1. Type-check body with concrete types
     let sig_idx = self.sema.check_fn_body_concrete(decl, sm_tp_syms, sm_tp_sema_tys, mono_sym)
 
@@ -4182,6 +4236,16 @@ fn Codegen.monomorphize_struct_method_core(self: Codegen, mono_type_sym: i32, me
 
     // 3. Codegen via MIR (saves/restores all codegen state internally)
     self.gen_function_mir_mono(mono_sym, decl, mir_body)
+
+    if alias_sema_base != 0 and alias_sema_base != alias_base_sym:
+        if alias_named_had != 0:
+            self.sema.named_types.insert(alias_base_sym, alias_named_old)
+        else:
+            self.sema.named_types.remove(alias_base_sym)
+        if alias_decl_had != 0:
+            self.sema.type_decl_nodes.insert(alias_base_sym, alias_decl_old)
+        else:
+            self.sema.type_decl_nodes.remove(alias_base_sym)
 
     for ti3 in 0..sm_tp_syms.len() as i32:
         let tp_sym3 = sm_tp_syms.get(ti3 as i64)
@@ -4268,7 +4332,9 @@ fn Codegen.monomorphize_struct_static_method_core(self: Codegen, mono_type_sym: 
     let sm_tp_sema_tys: Vec[i32] = Vec.new()
     for ti in 0..tp_count:
         let tp_sym = self.mono_struct_tp_flat_syms.get((tp_flat_start + ti) as i64)
-        sm_tp_syms.push(tp_sym)
+        let tp_text = self.intern.resolve(tp_sym)
+        let sema_tp_sym = if tp_text.len() > 0: self.sema.pool_lookup_symbol(tp_text) else: 0
+        sm_tp_syms.push(if sema_tp_sym != 0: sema_tp_sym else: tp_sym)
         var tp_sema = 0
         if tp_flat_start + ti < self.mono_struct_tp_flat_sema_types.len() as i32:
             tp_sema = self.mono_struct_tp_flat_sema_types.get((tp_flat_start + ti) as i64)

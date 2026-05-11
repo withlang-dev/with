@@ -423,25 +423,33 @@ fn Codegen.mir_resolve_field_index(self: Codegen, agg_ty: i64, field_token: i32)
     // MIR stores field *symbols* as projection data, not numeric indices.
     // Must do this before the raw range check, because a symbol value (e.g. 132 for "ast")
     // can accidentally pass field_token < elem_count on large structs.
+    var normalized_field = field_token
+    var field_text = self.intern.resolve(field_token)
+    if field_text.len() == 0:
+        field_text = self.sema_symbol_text(field_token)
+    if field_text.len() > 0:
+        normalized_field = self.intern.intern(field_text)
     let st_sym = self.find_struct_type_by_llvm(agg_ty)
     if st_sym != 0:
-        let fi = self.find_field_index(st_sym, field_token)
+        var fi = self.find_field_index(st_sym, field_token)
+        if fi < 0 and normalized_field != field_token:
+            fi = self.find_field_index(st_sym, normalized_field)
         if fi >= 0 and ((is_union and fi < source_field_count) or ((not is_union) and fi < elem_count)):
             return fi
 
     // Vec types are created dynamically and not registered in the struct field
     // registry. Resolve their field names by layout: {ptr, len, cap, elem_size}.
     if self.vec_is_vec.contains(agg_ty):
-        if field_token == self.sym_ptr: return 0
-        if field_token == self.sym_len: return 1
-        if field_token == self.sym_cap: return 2
-        if field_token == self.sym_elem_size: return 3
+        if normalized_field == self.sym_ptr: return 0
+        if normalized_field == self.sym_len: return 1
+        if normalized_field == self.sym_cap: return 2
+        if normalized_field == self.sym_elem_size: return 3
 
     // Fall back to direct numeric index (for tuple fields, match bindings)
     if field_token >= 0 and ((is_union and field_token < source_field_count) or ((not is_union) and field_token < elem_count)):
         return field_token
 
-    let field_name = self.intern.resolve(field_token)
+    let field_name = field_text
     if field_name.len() == 1:
         let ch = field_name.byte_at(0)
         if ch >= 48 and ch <= 57:
@@ -477,6 +485,12 @@ fn Codegen.mir_place_projected_type(self: Codegen, body: MirBody, place_id: i32)
         let pd = body.proj_d0.get((p_start + i) as i64)
         if pk == 0: // ProjKind.PK_FIELD
             if wl_get_type_kind(cur_ty) == wl_pointer_type_kind():
+                let pointee_sema = self.mir_unwrap_ref_like_sema_type(cur_sema_ty)
+                if pointee_sema > 0 and pointee_sema != cur_sema_ty:
+                    let pointee_ty = self.mir_sema_type_to_llvm(pointee_sema)
+                    if pointee_ty != 0:
+                        cur_sema_ty = pointee_sema
+                        cur_ty = pointee_ty
                 if base_local >= 0 and base_local < body.local_type_ids.len() as i32:
                     let sema_ty = body.local_type_ids.get(base_local as i64)
                     if sema_ty > 0:
@@ -522,10 +536,16 @@ fn Codegen.mir_place_projected_type(self: Codegen, body: MirBody, place_id: i32)
             // Resolve pointee type from base local's sema type (via MIR snapshot)
             var deref_ty: i64 = 0
             if cur_sema_ty > 0:
-                let deref_resolved = self.mir_input.mir_resolve_alias(cur_sema_ty)
-                let deref_tk = self.mir_input.mir_get_type_kind(deref_resolved)
+                var deref_resolved = self.mir_input.mir_resolve_alias(cur_sema_ty)
+                var deref_tk = self.mir_input.mir_get_type_kind(deref_resolved)
+                if deref_tk == 0 and deref_resolved >= self.mir_input.sema_type_kinds.len() as i32 and deref_resolved > 0:
+                    deref_resolved = self.sema.resolve_alias(deref_resolved as TypeId) as i32
+                    deref_tk = self.sema.get_type_kind(deref_resolved)
                 if deref_tk == TypeKind.TY_PTR or deref_tk == TypeKind.TY_REF:
-                    let pointee_sema = self.mir_input.mir_get_type_d0(deref_resolved)
+                    let pointee_sema = if deref_resolved >= self.mir_input.sema_type_kinds.len() as i32:
+                        self.sema.get_type_d0(deref_resolved)
+                    else:
+                        self.mir_input.mir_get_type_d0(deref_resolved)
                     if pointee_sema > 0:
                         cur_sema_ty = pointee_sema
                         deref_ty = self.mir_sema_type_to_llvm(pointee_sema)
@@ -636,6 +656,12 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
                     cur_ptr = wl_build_load(self.builder, wl_ptr_type(self.context), cur_ptr)
                 else:
                     cur_ptr = wl_build_load(self.builder, cur_ty, cur_ptr)
+                let pointee_sema = self.mir_unwrap_ref_like_sema_type(cur_sema_ty)
+                if pointee_sema > 0 and pointee_sema != cur_sema_ty:
+                    let pointee_ty = self.mir_sema_type_to_llvm(pointee_sema)
+                    if pointee_ty != 0:
+                        cur_sema_ty = pointee_sema
+                        cur_ty = pointee_ty
                 // Resolve the pointee struct type via sema snapshot
                 if base_local >= 0 and base_local < body.local_type_ids.len() as i32:
                     let sema_ty = body.local_type_ids.get(base_local as i64)
@@ -696,10 +722,16 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
             // Resolve pointee type from base local's sema type (via snapshot)
             var deref_ptr_ty: i64 = 0
             if cur_sema_ty > 0:
-                let deref_resolved = self.mir_input.mir_resolve_alias(cur_sema_ty)
-                let deref_tk = self.mir_input.mir_get_type_kind(deref_resolved)
+                var deref_resolved = self.mir_input.mir_resolve_alias(cur_sema_ty)
+                var deref_tk = self.mir_input.mir_get_type_kind(deref_resolved)
+                if deref_tk == 0 and deref_resolved >= self.mir_input.sema_type_kinds.len() as i32 and deref_resolved > 0:
+                    deref_resolved = self.sema.resolve_alias(deref_resolved as TypeId) as i32
+                    deref_tk = self.sema.get_type_kind(deref_resolved)
                 if deref_tk == TypeKind.TY_PTR or deref_tk == TypeKind.TY_REF:
-                    let pointee_sema = self.mir_input.mir_get_type_d0(deref_resolved)
+                    let pointee_sema = if deref_resolved >= self.mir_input.sema_type_kinds.len() as i32:
+                        self.sema.get_type_d0(deref_resolved)
+                    else:
+                        self.mir_input.mir_get_type_d0(deref_resolved)
                     if pointee_sema > 0:
                         cur_sema_ty = pointee_sema
                         deref_ptr_ty = self.mir_sema_type_to_llvm(pointee_sema)
@@ -2641,29 +2673,42 @@ fn Codegen.mir_unwrap_ref_like_sema_type(self: Codegen, sema_ty: i32) -> i32:
     for _ in 0..4:
         if current <= 0:
             return 0
-        let resolved = self.mir_input.mir_resolve_alias(current)
-        let tk = self.mir_input.mir_get_type_kind(resolved)
+        var resolved = self.mir_input.mir_resolve_alias(current)
+        var tk = self.mir_input.mir_get_type_kind(resolved)
+        if tk == 0 and resolved >= self.mir_input.sema_type_kinds.len() as i32 and resolved > 0:
+            resolved = self.sema.resolve_alias(resolved as TypeId) as i32
+            tk = self.sema.get_type_kind(resolved)
         if tk != TypeKind.TY_REF and tk != TypeKind.TY_PTR:
             return resolved
-        current = self.mir_input.mir_get_type_d0(resolved)
+        current = if resolved >= self.mir_input.sema_type_kinds.len() as i32:
+            self.sema.get_type_d0(resolved)
+        else:
+            self.mir_input.mir_get_type_d0(resolved)
     current
 
 fn Codegen.mir_intrinsic_recv_ptr(self: Codegen, body: MirBody, args_id: i32) -> i64:
     // Get a pointer to the receiver (arg 0) for instance method intrinsics.
     let arg_start = body.call_arg_starts.get(args_id as i64)
     let recv_op = body.call_arg_operands.get(arg_start as i64)
-    let recv_sema = self.mir_operand_sema_type(body, recv_op)
-    let recv_resolved = self.mir_unwrap_ref_like_sema_type(recv_sema)
-    if recv_sema > 0 and recv_resolved != recv_sema:
-        let recv_val = self.mir_eval_operand(body, recv_op, 0)
-        if wl_get_type_kind(wl_type_of(recv_val)) == wl_pointer_type_kind():
-            return recv_val
     let ok = body.operand_kinds.get(recv_op as i64)
     let od = body.operand_d0.get(recv_op as i64)
-    // If operand is a place (Copy/Move), try to get its pointer directly.
+    // If operand is a place (Copy/Move), get its address directly. This must
+    // happen before the reference shortcut below; field places like
+    // `self.xs` may have reference-like sema during projection, but Vec
+    // intrinsics need the field address, not an evaluated pointer-shaped value.
     if ok == OperandKind.OK_COPY or ok == OperandKind.OK_MOVE:
         let ptr = self.mir_place_ptr(body, od, false, 0)
         if ptr != 0:
+            let local_id0 = body.place_locals.get(od as i64)
+            let p_count0 = body.place_proj_counts.get(od as i64)
+            if p_count0 == 0 and local_id0 >= 0 and local_id0 < body.local_type_ids.len() as i32:
+                let local_sema0 = body.local_type_ids.get(local_id0 as i64)
+                let local_resolved0 = self.mir_input.mir_resolve_alias(local_sema0)
+                let local_kind0 = self.mir_input.mir_get_type_kind(local_resolved0)
+                if local_kind0 == TypeKind.TY_REF or local_kind0 == TypeKind.TY_PTR:
+                    let alloc_ty0 = wl_get_allocated_type(ptr)
+                    if alloc_ty0 != 0 and wl_get_type_kind(alloc_ty0) == wl_pointer_type_kind():
+                        return wl_build_load(self.builder, alloc_ty0, ptr)
             return ptr
         // Lazy-create alloca
         let local_id = body.place_locals.get(od as i64)
@@ -2675,6 +2720,12 @@ fn Codegen.mir_intrinsic_recv_ptr(self: Codegen, body: MirBody, args_id: i32) ->
                     let ptr2 = self.mir_place_ptr(body, od, true, llvm_ty)
                     if ptr2 != 0:
                         return ptr2
+    let recv_sema = self.mir_operand_sema_type(body, recv_op)
+    let recv_resolved = self.mir_unwrap_ref_like_sema_type(recv_sema)
+    if recv_sema > 0 and recv_resolved != recv_sema:
+        let recv_val = self.mir_eval_operand(body, recv_op, 0)
+        if wl_get_type_kind(wl_type_of(recv_val)) == wl_pointer_type_kind():
+            return recv_val
     // Fallback: evaluate, alloca, store
     let val = self.mir_eval_operand(body, recv_op, 0)
     let alloca = wl_build_alloca(self.builder, wl_type_of(val))
@@ -2687,6 +2738,14 @@ fn Codegen.mir_intrinsic_recv_vec_value(self: Codegen, body: MirBody, args_id: i
     let recv = self.mir_intrinsic_arg(body, args_id, 0)
     if wl_get_type_kind(wl_type_of(recv)) == wl_struct_type_kind():
         return recv
+    let ok = body.operand_kinds.get(recv_op as i64)
+    let od = body.operand_d0.get(recv_op as i64)
+    if ok == OperandKind.OK_COPY or ok == OperandKind.OK_MOVE:
+        let place_ty = self.mir_place_projected_type(body, od)
+        if place_ty != 0 and wl_get_type_kind(place_ty) == wl_struct_type_kind():
+            let recv_ptr = self.mir_place_ptr(body, od, false, 0)
+            if recv_ptr != 0 and wl_get_type_kind(wl_type_of(recv_ptr)) == wl_pointer_type_kind():
+                return wl_build_load(self.builder, place_ty, recv_ptr)
     let recv_sema = self.mir_operand_sema_type(body, recv_op)
     let recv_unwrapped = self.mir_unwrap_ref_like_sema_type(recv_sema)
     if recv_unwrapped > 0:
@@ -3126,11 +3185,35 @@ fn Codegen.mir_map_recv_base_sym(self: Codegen, body: MirBody, recv_op_id: i32) 
 fn Codegen.ast_static_type_expr(self: Codegen, node: i32) -> i32:
     if node == 0:
         return 0
+    let kind = self.pool.kind(node)
+    if kind == NodeKind.NK_IDENT:
+        let local_ty = self.sema_type_of_node(node)
+        if local_ty != 0:
+            return local_ty
+    if kind == NodeKind.NK_FIELD_ACCESS:
+        let base = self.pool.get_data0(node)
+        let field = self.pool.get_data1(node)
+        var base_ty = self.ast_static_type_expr(base)
+        if base_ty == 0:
+            base_ty = self.sema_type_of_node(base)
+        if base_ty == 0 and self.current_method_owner_sym != 0 and self.pool.kind(base) == NodeKind.NK_IDENT and self.pool.get_data0(base) == self.sym_self:
+            base_ty = self.mono_struct_sema_type(self.current_method_owner_sym)
+        if base_ty != 0:
+            var resolved = self.sema.resolve_alias(base_ty as TypeId) as i32
+            let tk = self.sema.get_type_kind(resolved as TypeId)
+            if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
+                resolved = self.sema.resolve_alias(self.sema.get_type_d0(resolved as TypeId) as TypeId) as i32
+            var field_text = self.intern.resolve(field)
+            if field_text.len() == 0:
+                field_text = self.sema_symbol_text(field)
+            let sema_field = if field_text.len() > 0: self.sema.pool_lookup_symbol(field_text) else: 0
+            var field_ty = self.sema.struct_field_type(resolved, if sema_field != 0: sema_field else: field)
+            if field_ty != 0:
+                return field_ty
     if self.sema.typed_expr_types.contains(node):
         let typed = self.sema.typed_expr_types.get(node).unwrap()
         if typed != 0:
             return typed
-    let kind = self.pool.kind(node)
     if kind == NodeKind.NK_IDENT or kind == NodeKind.NK_TYPE_NAMED:
         let sym = self.pool.get_data0(node)
         let prim = self.sema.primitive_type_by_sym(sym)
@@ -3282,6 +3365,24 @@ fn Codegen.classify_generic_call_intrinsic(self: Codegen, recv_type: i32, method
         return MirIntrinsic.MIR_INTRINSIC_NONE
     MirIntrinsic.MIR_INTRINSIC_NONE
 
+fn Codegen.classify_generic_call_intrinsic_by_llvm(self: Codegen, recv_ty: i64, method_sym: i32) -> i32:
+    if recv_ty == 0 or method_sym == 0:
+        return MirIntrinsic.MIR_INTRINSIC_NONE
+    let method_name = self.intern.resolve(method_sym)
+    if self.vec_is_vec.contains(recv_ty):
+        if method_name == "push": return MirIntrinsic.MIR_INTRINSIC_VEC_PUSH
+        if method_name == "get": return MirIntrinsic.MIR_INTRINSIC_VEC_GET
+        if method_name == "len": return MirIntrinsic.MIR_INTRINSIC_VEC_LEN
+        if method_name == "set_i32": return MirIntrinsic.MIR_INTRINSIC_VEC_SET
+        if method_name == "remove": return MirIntrinsic.MIR_INTRINSIC_VEC_REMOVE
+        if method_name == "clear": return MirIntrinsic.MIR_INTRINSIC_VEC_CLEAR
+        if method_name == "pop": return MirIntrinsic.MIR_INTRINSIC_VEC_POP
+        if method_name == "iter": return MirIntrinsic.MIR_INTRINSIC_VEC_ITER
+        if method_name == "iter_ref": return MirIntrinsic.MIR_INTRINSIC_VEC_ITER_REF
+        if method_name == "slot": return MirIntrinsic.MIR_INTRINSIC_VEC_SLOT
+        if method_name == "range": return MirIntrinsic.MIR_INTRINSIC_VEC_RANGE
+    MirIntrinsic.MIR_INTRINSIC_NONE
+
 fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
     let byte_ty = wl_i8_type(self.context)
     let i64_ty = wl_i64_type(self.context)
@@ -3396,8 +3497,12 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         result = wl_build_call(self.builder, gr_ty, gr_fn, vec_data_i64(&gr_args), 2)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_LEN:
-        let recv = self.mir_intrinsic_recv_vec_value(body, args_id)
-        result = wl_build_extract_value(self.builder, recv, 1)
+        let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let len_fn = self.ensure_vec_runtime_fn("with_vec_len", i64_ty, 1)
+        let len_ty = self.get_vec_fn_type("with_vec_len", i64_ty, 1)
+        let args: Vec[i64] = Vec.new()
+        args.push(recv_ptr)
+        result = wl_build_call(self.builder, len_ty, len_fn, vec_data_i64(&args), 1)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_SET:
         let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
@@ -6240,6 +6345,9 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                     let gc_recv_op = body.call_arg_operands.get(gc_mir_start as i64)
                     let gc_recv_val = self.mir_eval_operand(body, gc_recv_op, 0)
                     let gc_recv_ty = wl_type_of(gc_recv_val)
+                    let gc_llvm_intrinsic = self.classify_generic_call_intrinsic_by_llvm(gc_recv_ty, gc_method_sym)
+                    if gc_llvm_intrinsic != MirIntrinsic.MIR_INTRINSIC_NONE:
+                        return self.mir_emit_intrinsic_call(body, gc_llvm_intrinsic, args_id, dest_place, next_bb)
                     var gc_recv_type_sym = self.mir_struct_sym_from_sema_type(gc_recv_type_unwrapped)
                     if gc_recv_type_sym == 0:
                         gc_recv_type_sym = self.find_struct_type_by_llvm(gc_recv_ty)
@@ -6372,7 +6480,10 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                 let gc_fb_mir_count = body.call_arg_counts.get(args_id as i64)
                 // Try qualified name lookups: OwnerType.method, then TraitName.method
                 var gc_fb_fn_sym = 0
-                if self.current_method_owner_sym != 0:
+                let gc_fb_recv = self.pool.get_data0(gc_callee_field)
+                let gc_fb_is_direct_self =
+                    self.pool.kind(gc_fb_recv) == NodeKind.NK_IDENT and self.pool.get_data0(gc_fb_recv) == self.sym_self
+                if self.current_method_owner_sym != 0 and gc_fb_is_direct_self:
                     let gc_fb_owner = self.intern.resolve(self.current_method_owner_sym)
                     let gc_fb_q1 = gc_fb_owner ++ "." ++ gc_fb_method
                     gc_fb_fn_sym = self.intern.intern(gc_fb_q1)
@@ -6489,6 +6600,20 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                 if fatal_recv_ty == 0 and fatal_mir_count > 0:
                     let fatal_recv_op = body.call_arg_operands.get(fatal_mir_start as i64)
                     fatal_recv_ty = self.mir_operand_sema_type(body, fatal_recv_op)
+                if self.debug_method_dispatch_enabled() and fatal_recv != 0:
+                    let fatal_base =
+                        if self.pool.kind(fatal_recv) == NodeKind.NK_FIELD_ACCESS:
+                            self.pool.get_data0(fatal_recv)
+                        else:
+                            0
+                    let fatal_base_ty = if fatal_base != 0: self.ast_static_type_expr(fatal_base) else: 0
+                    let fatal_base_local_ty = if fatal_base != 0: self.sema_type_of_node(fatal_base) else: 0
+                    let fatal_field =
+                        if self.pool.kind(fatal_recv) == NodeKind.NK_FIELD_ACCESS:
+                            self.pool.get_data1(fatal_recv)
+                        else:
+                            0
+                    with_eprint(f"[generic-call-unhandled] recv_ast_ty={self.ast_static_type_expr(fatal_recv)} recv_mir_ty={fatal_recv_ty} base_ast_ty={fatal_base_ty} base_local_ty={fatal_base_local_ty} owner={self.function_symbol_name(self.current_method_owner_sym)} field_sym={fatal_field} field_text={if fatal_field != 0: self.intern.resolve(fatal_field) else: \"\"}")
                 with_eprint(f"FATAL: unhandled MirIntrinsic.MIR_INTRINSIC_GENERIC_CALL sym={gc_name} node_kind={self.pool.kind(gc_node)} recv_ty={fatal_recv_ty} recv_kind={if fatal_recv != 0: self.pool.kind(fatal_recv) else: -1} arg_count={fatal_mir_count}")
                 self.had_error = 1
             if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
@@ -6919,6 +7044,7 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
     let fresh_local_muts: HashMap[i32, i32] = HashMap.new()
     let fresh_local_fn_sigs: HashMap[i32, i64] = HashMap.new()
     let fresh_local_pointee_structs: HashMap[i32, i32] = HashMap.new()
+    let fresh_local_sema_types: HashMap[i32, i32] = HashMap.new()
     let fresh_task_locals: HashMap[i32, i32] = HashMap.new()
     let fresh_defer_stack: Vec[i32] = Vec.new()
     let fresh_errdefer_stack: Vec[i32] = Vec.new()
@@ -6930,6 +7056,7 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
     self.local_muts = fresh_local_muts
     self.local_fn_sigs = fresh_local_fn_sigs
     self.local_pointee_structs = fresh_local_pointee_structs
+    self.local_sema_types = fresh_local_sema_types
     self.task_locals = fresh_task_locals
     self.defer_stack = fresh_defer_stack
     self.errdefer_stack = fresh_errdefer_stack
@@ -7015,6 +7142,12 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
             let loaded = wl_build_load(self.builder, param_type, param_val)
             wl_build_store(self.builder, loaded, byval_alloca)
             self.record_local(p_name, byval_alloca, param_type, 1)
+            var p_sema_ty = if pi + 1 < body.local_type_ids.len() as i32: body.local_type_ids.get((pi + 1) as i64) else: 0
+            if p_type_node != 0:
+                let resolved_p_sema = self.sema.resolve_type_expr(p_type_node)
+                if resolved_p_sema != 0:
+                    p_sema_ty = resolved_p_sema as i32
+            self.record_local_sema_type(p_name, p_sema_ty)
             self.mir_local_ptrs.insert(pi + 1, byval_alloca)
             self.mir_local_types.insert(pi + 1, param_type)
             if p_type_node != 0:
@@ -7038,6 +7171,12 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
         wl_build_store(self.builder, param_val, alloca)
 
         self.record_local(p_name, alloca, param_type, 1)
+        var p_sema_ty2 = if pi + 1 < body.local_type_ids.len() as i32: body.local_type_ids.get((pi + 1) as i64) else: 0
+        if p_type_node != 0:
+            let resolved_p_sema2 = self.sema.resolve_type_expr(p_type_node)
+            if resolved_p_sema2 != 0:
+                p_sema_ty2 = resolved_p_sema2 as i32
+        self.record_local_sema_type(p_name, p_sema_ty2)
 
         self.mir_local_ptrs.insert(pi + 1, alloca)
         self.mir_local_types.insert(pi + 1, param_type)
@@ -7240,6 +7379,7 @@ fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, bod
     let fresh_local_muts: HashMap[i32, i32] = HashMap.new()
     let fresh_local_fn_sigs: HashMap[i32, i64] = HashMap.new()
     let fresh_local_pointee_structs: HashMap[i32, i32] = HashMap.new()
+    let fresh_local_sema_types: HashMap[i32, i32] = HashMap.new()
     let fresh_task_locals: HashMap[i32, i32] = HashMap.new()
     let fresh_defer_stack: Vec[i32] = Vec.new()
     let fresh_errdefer_stack: Vec[i32] = Vec.new()
@@ -7255,6 +7395,7 @@ fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, bod
     self.local_muts = fresh_local_muts
     self.local_fn_sigs = fresh_local_fn_sigs
     self.local_pointee_structs = fresh_local_pointee_structs
+    self.local_sema_types = fresh_local_sema_types
     self.task_locals = fresh_task_locals
     self.defer_stack = fresh_defer_stack
     self.errdefer_stack = fresh_errdefer_stack
@@ -7335,6 +7476,12 @@ fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, bod
             let loaded = wl_build_load(self.builder, param_type, param_val)
             wl_build_store(self.builder, loaded, byval_alloca)
             self.record_local(p_name, byval_alloca, param_type, 1)
+            var p_sema_ty = if pi + 1 < body.local_type_ids.len() as i32: body.local_type_ids.get((pi + 1) as i64) else: 0
+            if p_type_node != 0:
+                let resolved_p_sema = self.sema.resolve_type_expr(p_type_node)
+                if resolved_p_sema != 0:
+                    p_sema_ty = resolved_p_sema as i32
+            self.record_local_sema_type(p_name, p_sema_ty)
             self.mir_local_ptrs.insert(pi + 1, byval_alloca)
             self.mir_local_types.insert(pi + 1, param_type)
             if p_type_node != 0:
@@ -7358,6 +7505,12 @@ fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, bod
         wl_build_store(self.builder, param_val, alloca)
 
         self.record_local(p_name, alloca, param_type, 1)
+        var p_sema_ty2 = if pi + 1 < body.local_type_ids.len() as i32: body.local_type_ids.get((pi + 1) as i64) else: 0
+        if p_type_node != 0:
+            let resolved_p_sema2 = self.sema.resolve_type_expr(p_type_node)
+            if resolved_p_sema2 != 0:
+                p_sema_ty2 = resolved_p_sema2 as i32
+        self.record_local_sema_type(p_name, p_sema_ty2)
 
         self.mir_local_ptrs.insert(pi + 1, alloca)
         self.mir_local_types.insert(pi + 1, param_type)

@@ -1722,12 +1722,19 @@ fn Sema.preregister_mir_types(self: Sema):
 // Type args stored in type_extra[extra_start..extra_start+arg_count] as TypeIds.
 
 fn Sema.resolve_generic_type(self: Sema, node: i32) -> i32:
-    let gi_base_sym = self.ast.get_data0(node)
-    let gi_base_tid = self.lookup_named_type_visible(gi_base_sym)
+    var gi_base_sym = self.ast.get_data0(node)
+    var gi_base_tid = self.lookup_named_type_visible(gi_base_sym)
     if gi_base_tid == 0:
-        let gi_name = self.pool_resolve_symbol(gi_base_sym)
-        self.emit_error("unknown type: " ++ gi_name, node)
-        return 0
+        let gi_base_text = self.pool_resolve_symbol(gi_base_sym)
+        let canonical_base = if gi_base_text.len() > 0: self.pool_lookup_symbol(gi_base_text) else: 0
+        if canonical_base != 0 and canonical_base != gi_base_sym:
+            gi_base_sym = canonical_base
+            gi_base_tid = self.lookup_named_type_visible(gi_base_sym)
+    if gi_base_tid == 0:
+        if not self.type_decl_nodes.contains(gi_base_sym):
+            let gi_name = self.pool_resolve_symbol(gi_base_sym)
+            self.emit_error("unknown type: " ++ gi_name, node)
+            return 0
     let gi_arg_count = self.ast.get_data2(node)
     let gi_extra_start = self.ast.get_data1(node)
     let gi_args: Vec[i32] = Vec.new()
