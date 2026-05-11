@@ -1251,6 +1251,14 @@ fn ct_type_decl_tp_count(ast: AstPool, node: i32) -> i32:
         return ast.get_extra(extra_start + 1 + field_count * 4 + 2)
     0
 
+fn ct_type_decl_tp_start(ast: AstPool, node: i32) -> i32:
+    let extra_start = ast.get_data1(node)
+    let sub_kind = type_decl_sub_kind(ast.get_data2(node))
+    if sub_kind == TypeDeclKind.Struct:
+        let field_count = ast.get_extra(extra_start)
+        return ast.get_extra(extra_start + 1 + field_count * 4 + 1)
+    0
+
 fn ct_struct_type_decl_vis(ast: AstPool, node: i32) -> i32:
     let extra_start = ast.get_data1(node)
     let sub_kind = type_decl_sub_kind(ast.get_data2(node))
@@ -1278,6 +1286,67 @@ fn AstPool.ct_add_fn_param(self: AstPool, name: i32, type_node: i32, flags: i32)
     self.add_extra(name)
     self.add_extra(type_node)
     self.add_extra(flags)
+
+fn ct_copy_type_params_with_bound(pool: AstPool, src_tp_start: i32, tp_count: i32, bound_sym: i32) -> i32:
+    let dst_tp_start = pool.extra_len()
+    var src = src_tp_start
+    for tpi in 0..tp_count:
+        let tp_name = pool.get_extra(src)
+        let bound_count = pool.get_extra(src + 1)
+        var has_bound = 0
+        for bi in 0..bound_count:
+            if pool.get_extra(src + 2 + bi) == bound_sym:
+                has_bound = 1
+        pool.add_extra(tp_name)
+        pool.add_extra(bound_count + if has_bound != 0: 0 else: 1)
+        for bi2 in 0..bound_count:
+            pool.add_extra(pool.get_extra(src + 2 + bi2))
+        if has_bound == 0:
+            pool.add_extra(bound_sym)
+        src = src + 2 + bound_count
+    dst_tp_start
+
+fn ct_build_generic_self_type(pool: AstPool, node: i32, type_sym: i32, tp_start: i32, tp_count: i32) -> i32:
+    if tp_count == 0:
+        return pool.add_node(NodeKind.NK_TYPE_NAMED, pool.get_start(node), pool.get_end(node), type_sym, 0, 0) as i32
+    let arg_start = pool.extra_len()
+    var pos = tp_start
+    for tpi in 0..tp_count:
+        let tp_name = pool.get_extra(pos)
+        let arg_node = pool.add_node(NodeKind.NK_TYPE_NAMED, pool.get_start(node), pool.get_end(node), tp_name, 0, 0)
+        pool.add_extra(arg_node as i32)
+        let bound_count = pool.get_extra(pos + 1)
+        pos = pos + 2 + bound_count
+    pool.add_node(NodeKind.NK_TYPE_GENERIC, pool.get_start(node), pool.get_end(node), type_sym, arg_start, tp_count) as i32
+
+fn ct_type_param_sym_for_type_id(sema: Sema, pool: AstPool, intern: InternPool, type_id: i32, tp_start: i32, tp_count: i32) -> i32:
+    if tp_count <= 0:
+        return 0
+    let type_name = sema.type_name(type_id)
+    var pos = tp_start
+    for tpi in 0..tp_count:
+        let tp_sym = pool.get_extra(pos)
+        if intern.resolve(tp_sym) == type_name:
+            return tp_sym
+        let bound_count = pool.get_extra(pos + 1)
+        pos = pos + 2 + bound_count
+    0
+
+fn ct_type_param_sym_for_type_node(pool: AstPool, type_node: i32, tp_start: i32, tp_count: i32) -> i32:
+    if tp_count <= 0 or type_node == 0:
+        return 0
+    let kind = pool.kind(type_node)
+    if kind != NodeKind.NK_TYPE_NAMED and kind != NodeKind.NK_IDENT:
+        return 0
+    let type_sym = pool.get_data0(type_node)
+    var pos = tp_start
+    for tpi in 0..tp_count:
+        let tp_sym = pool.get_extra(pos)
+        if tp_sym == type_sym:
+            return tp_sym
+        let bound_count = pool.get_extra(pos + 1)
+        pos = pos + 2 + bound_count
+    0
 
 fn Sema.ct_build_vec_type_expr(self: Sema, pool: AstPool, intern: InternPool, elem_type_id: i32, node: i32) -> i32:
     let elem_type = self.ct_build_type_expr(pool, intern, elem_type_id, node)
@@ -1437,8 +1506,15 @@ fn Sema.ct_generate_soa_derive(self: Sema, out: AstPool, intern: InternPool, dec
     generated.push(impl_node as i32)
     generated
 
-fn Sema.ct_build_default_value_expr(self: Sema, pool: AstPool, intern: InternPool, type_id: i32, node: i32) -> i32:
-    let type_node = self.ct_build_type_expr(pool, intern, type_id, node)
+fn Sema.ct_build_default_value_expr(self: Sema, pool: AstPool, intern: InternPool, type_id: i32, type_node_hint: i32, node: i32, tp_start: i32, tp_count: i32) -> i32:
+    var tp_sym = ct_type_param_sym_for_type_node(pool, type_node_hint, tp_start, tp_count)
+    if tp_sym == 0:
+        tp_sym = ct_type_param_sym_for_type_id(self, pool, intern, type_id, tp_start, tp_count)
+    let type_node =
+        if tp_sym != 0:
+            pool.ct_build_ident(node, tp_sym)
+        else:
+            self.ct_build_type_expr(pool, intern, type_id, node)
     if type_node == 0:
         return 0
     let default_sym = intern.intern("default")
@@ -1449,9 +1525,6 @@ fn Sema.ct_build_default_value_expr(self: Sema, pool: AstPool, intern: InternPoo
 fn Sema.ct_generate_default_derive(self: Sema, out: AstPool, intern: InternPool, decl: i32) -> Vec[i32]:
     let generated: Vec[i32] = Vec.new()
     if type_decl_sub_kind(out.get_data2(decl)) != TypeDeclKind.Struct:
-        return generated
-    if ct_type_decl_tp_count(out, decl) > 0:
-        self.ct_emit_error(out, decl, "derive Default for generic structs is not implemented yet")
         return generated
 
     let default_trait_sym = intern.intern("Default")
@@ -1473,21 +1546,26 @@ fn Sema.ct_generate_default_derive(self: Sema, out: AstPool, intern: InternPool,
     let end = out.get_end(decl)
     let type_name = intern.resolve(type_name_sym)
     let fn_sym = intern.intern(type_name ++ ".default")
-    let ret_type = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, type_name_sym, 0, 0)
+    let tp_count = ct_type_decl_tp_count(out, decl)
+    let tp_start = ct_type_decl_tp_start(out, decl)
+    let ret_type = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, intern.intern("Self"), 0, 0)
+    let struct_lit_type = if tp_count > 0: intern.intern("Self") else: type_name_sym
 
     let te_start = self.get_type_d1(resolved)
     let field_count = self.get_type_d2(resolved)
+    let type_extra_start = out.get_data1(decl)
     let field_extra = out.extra_len()
     for fi in 0..field_count:
         let field_sym = self.type_extra.get((te_start + fi * 3) as i64)
         let field_tid = self.type_extra.get((te_start + fi * 3 + 1) as i64)
-        let field_default = self.ct_build_default_value_expr(out, intern, field_tid, decl)
+        let field_type_node = out.get_extra(type_extra_start + 1 + fi * 3 + 1)
+        let field_default = self.ct_build_default_value_expr(out, intern, field_tid, field_type_node, decl, tp_start, tp_count)
         if field_default == 0:
             self.ct_emit_error(out, decl, "could not generate Default field initializer")
             return generated
         out.add_extra(field_sym)
         out.add_extra(field_default)
-    let body = out.add_node(NodeKind.NK_STRUCT_LIT, start, end, type_name_sym, field_extra, field_count)
+    let body = out.add_node(NodeKind.NK_STRUCT_LIT, start, end, struct_lit_type, field_extra, field_count)
     let fn_node = out.add_node(NodeKind.NK_FN_DECL, start, end, fn_sym, body as i32, 0)
     out.add_fn_meta(fn_node, 0, ret_type as i32, out.extra_len(), 0, 0, 0)
 
@@ -1495,6 +1573,11 @@ fn Sema.ct_generate_default_derive(self: Sema, out: AstPool, intern: InternPool,
     out.add_extra(0)
     out.add_extra(1)
     let impl_node = out.add_node(NodeKind.NK_IMPL_DECL, start, end, type_name_sym, impl_extra, default_trait_sym)
+    if tp_count > 0:
+        let impl_tp_start = ct_copy_type_params_with_bound(out, tp_start, tp_count, default_trait_sym)
+        out.add_impl_type_params(impl_node, impl_tp_start, tp_count)
+        let target_type = ct_build_generic_self_type(out, decl, type_name_sym, impl_tp_start, tp_count)
+        out.add_impl_target_type_node(impl_node, target_type as NodeId)
 
     generated.push(fn_node as i32)
     generated.push(impl_node as i32)
