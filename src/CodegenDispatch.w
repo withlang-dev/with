@@ -8057,12 +8057,31 @@ fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i
     // 1. Type-check body with concrete types
     let sig_idx = self.sema.check_fn_body_concrete(generic_node, tp_syms, tp_sema_tys, mono_sym)
 
+    let saved_sema_named: Vec[i32] = Vec.new()
+    let saved_sema_had: Vec[i32] = Vec.new()
+    for ti2 in 0..tp_syms.len() as i32:
+        let tp_sym2 = tp_syms.get(ti2 as i64)
+        if self.sema.named_types.contains(tp_sym2):
+            saved_sema_had.push(1)
+            saved_sema_named.push(self.sema.named_types.get(tp_sym2).unwrap())
+        else:
+            saved_sema_had.push(0)
+            saved_sema_named.push(0)
+        self.sema.named_types.insert(tp_sym2, tp_sema_tys.get(ti2 as i64))
+
     // 2. Lower to MIR
     var mir_builder = MirBuilder.init(self.sema, self.pool, self.intern, mono_sym)
     let mir_body = lower_fn_with_sig(mir_builder, generic_node, sig_idx)
 
     // 3. Codegen via MIR (saves/restores all codegen state internally)
     self.gen_function_mir_mono(mono_sym, generic_node, mir_body)
+
+    for ti3 in 0..tp_syms.len() as i32:
+        let tp_sym3 = tp_syms.get(ti3 as i64)
+        if saved_sema_had.get(ti3 as i64) == 1:
+            self.sema.named_types.insert(tp_sym3, saved_sema_named.get(ti3 as i64))
+        else:
+            self.sema.named_types.remove(tp_sym3)
 
     self.type_binding_syms = saved_bind_syms
     self.type_binding_types = saved_bind_tys

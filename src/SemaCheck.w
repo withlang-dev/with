@@ -1325,7 +1325,8 @@ fn Sema.check_fn_body_concrete(self: Sema, fn_node: i32, tp_syms: Vec[i32], tp_s
         let tp_sym = tp_syms.get(ti as i64)
         if saved_had.get(ti as i64) == 1:
             self.named_types.insert(tp_sym, saved_named.get(ti as i64))
-        // Note: can't remove from HashMap, leave as-is if wasn't present before
+        else:
+            self.named_types.remove(tp_sym)
 
     sig_idx
 

@@ -73,10 +73,12 @@ Source: `docs/toolchain.md`.
     paths fail loudly.
   - Unsupported graph features fail loudly instead of being ignored.
 - Initial blessed derive support:
-  - `@[derive(Default)]` is implemented for non-generic structs.
+  - `@[derive(Default)]` is implemented for structs, including generic
+    structs. Generic derives add `Default` bounds to generated impl type
+    parameters and emit bare type-parameter defaults through the normal
+    `T.default()` trait-bound dispatch path.
   - Generated defaults initialize each field through `FieldType.default()`,
     so missing field support fails loudly through normal method resolution.
-  - Generic structs fail loudly until generic derive expansion is implemented.
   - `@[derive(SoA)]` is implemented for non-generic structs, generating
     `TypeSoA` plus `new`, `push`, `get`, and `len` methods.
   - SoA target-name collisions and generic SoA derives fail loudly.
@@ -101,6 +103,6 @@ Source: `docs/toolchain.md`.
 - Complete `build.w` graph execution beyond executable, library, test, and
   generated-source targets: actual cross-target codegen/linking still needs
   driver support.
-- Read-only `ProjectInfo`, compiler hooks, source emission, generic derives,
-  and additional blessed derives (`Serialize`, `Deserialize`, `ComponentId`)
-  remain future phases per `docs/toolchain.md`.
+- Read-only `ProjectInfo`, compiler hooks, source emission, generic SoA
+  derives, and additional blessed derives (`Serialize`, `Deserialize`,
+  `ComponentId`) remain future phases per `docs/toolchain.md`.
