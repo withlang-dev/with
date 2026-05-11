@@ -6253,6 +6253,44 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
 
             let gc_callee_field = self.pool.get_data0(gc_node)
 
+            // Static methods on a resolved type expression inside generic code:
+            // after monomorphization, `T.deserialize(x)` may have `T` resolved
+            // to a concrete type such as `i32`. Dispatch directly to the
+            // concrete method symbol (`i32.deserialize`) instead of treating it
+            // as an unresolved generic call.
+            if self.pool.kind(gc_callee_field) == NodeKind.NK_FIELD_ACCESS:
+                let gc_static_type_expr = self.pool.get_data0(gc_callee_field)
+                let gc_static_method_sym = self.pool.get_data1(gc_callee_field)
+                let gc_static_recv_type = self.ast_static_type_expr(gc_static_type_expr)
+                if gc_static_recv_type > 0:
+                    let gc_static_type_name = self.sema.type_name(gc_static_recv_type)
+                    let gc_static_method_name = self.intern.resolve(gc_static_method_sym)
+                    let gc_static_fn_sym = self.intern.intern(gc_static_type_name ++ "." ++ gc_static_method_name)
+                    let gc_static_fv = self.fn_values.get(gc_static_fn_sym)
+                    let gc_static_ft = self.fn_fn_types.get(gc_static_fn_sym)
+                    if gc_static_fv.is_some() and gc_static_ft.is_some():
+                        let gc_static_mir_start = body.call_arg_starts.get(args_id as i64)
+                        let gc_static_mir_count = body.call_arg_counts.get(args_id as i64)
+                        let gc_static_call_args_start = self.pool.get_data1(gc_node)
+                        let gc_static_args: Vec[i64] = Vec.new()
+                        for gc_static_ai in 0..gc_static_mir_count:
+                            let gc_static_op = body.call_arg_operands.get((gc_static_mir_start + gc_static_ai) as i64)
+                            gc_static_args.push(self.mir_eval_operand(body, gc_static_op, 0))
+                        let gc_static_coerced = self.coerce_call_args_for_fn_value(gc_static_fn_sym, gc_static_fv.unwrap() as i64, gc_static_call_args_start, 0, gc_static_args, gc_static_mir_count, "static method " ++ gc_static_type_name ++ "." ++ gc_static_method_name, gc_node)
+                        let gc_static_result = wl_build_call(self.builder, gc_static_ft.unwrap() as i64, gc_static_fv.unwrap() as i64, vec_data_i64(&gc_static_coerced), gc_static_mir_count)
+                        if dest_place >= 0 and gc_static_result != 0:
+                            let gc_static_ret_ty = wl_type_of(gc_static_result)
+                            if gc_static_ret_ty != wl_void_type(self.context):
+                                let gc_static_local = body.place_locals.get(dest_place as i64)
+                                let gc_static_alloca = self.create_entry_alloca(gc_static_ret_ty)
+                                wl_build_store(self.builder, gc_static_result, gc_static_alloca)
+                                self.mir_local_ptrs.insert(gc_static_local, gc_static_alloca)
+                                self.mir_local_types.insert(gc_static_local, gc_static_ret_ty)
+                        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                            let gc_static_next_val = self.mir_bb_values.get(next_bb as i64)
+                            wl_build_br(self.builder, gc_static_next_val)
+                        return true
+
             // Static generic struct methods: Cell.wrap(v) needs the concrete
             // owner instantiation before its signature can be lowered.
             if self.pool.kind(gc_callee_field) == NodeKind.NK_FIELD_ACCESS:
