@@ -82,6 +82,12 @@ Source: `docs/toolchain.md`.
   - `@[derive(SoA)]` is implemented for structs, including generic structs,
     generating `TypeSoA` plus `new`, `push`, `get`, and `len` methods.
   - SoA target-name collisions fail loudly.
+  - `std.json` provides a `JsonWriter` plus a `Serialize` trait for JSON
+    object emission.
+  - `@[derive(Serialize)]` is implemented for structs, including generic
+    structs. Generic derives add `Serialize` bounds to generated impl type
+    parameters and emit normal field-by-field serializer calls, so fields
+    without `Serialize` fail loudly through normal method resolution.
 
 ## Verified
 
@@ -97,6 +103,8 @@ Source: `docs/toolchain.md`.
 - `out/bin/with run test/behavior/behav_derive_soa_generic.w`
 - `out/bin/with run test/behavior/behav_derive_soa.w`
 - `scripts/run_tests.sh test/compile_errors/err_derive_soa_name_collision.w`
+- `out/bin/with run test/behavior/behav_derive_serialize.w`
+- `scripts/run_tests.sh test/compile_errors/err_derive_serialize_field_without_serialize.w`
 
 ## Remaining
 
@@ -107,5 +115,5 @@ Source: `docs/toolchain.md`.
   generated-source targets: actual cross-target codegen/linking still needs
   driver support.
 - Read-only `ProjectInfo`, compiler hooks, source emission, and additional
-  blessed derives (`Serialize`, `Deserialize`, `ComponentId`) remain future
-  phases per `docs/toolchain.md`.
+  blessed derives (`Deserialize`, `ComponentId`) remain future phases per
+  `docs/toolchain.md`.
