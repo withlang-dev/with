@@ -1322,6 +1322,16 @@ fn ct_copy_type_params(pool: AstPool, src_tp_start: i32, tp_count: i32) -> i32:
         src = src + 2 + bound_count
     dst_tp_start
 
+fn ct_component_id_value(name: str) -> i64:
+    var h: i64 = 5381
+    var i: i64 = 0
+    while i < name.len():
+        h = ((h * 33) + name[i]) % 2147483647
+        i = i + 1
+    if h == 0:
+        return 1
+    h
+
 fn ct_build_generic_self_type(pool: AstPool, node: i32, type_sym: i32, tp_start: i32, tp_count: i32) -> i32:
     if tp_count == 0:
         return pool.add_node(NodeKind.NK_TYPE_NAMED, pool.get_start(node), pool.get_end(node), type_sym, 0, 0) as i32
@@ -1777,6 +1787,43 @@ fn Sema.ct_generate_deserialize_derive(self: Sema, out: AstPool, intern: InternP
     generated.push(impl_node as i32)
     generated
 
+fn Sema.ct_generate_component_id_derive(self: Sema, out: AstPool, intern: InternPool, decl: i32) -> Vec[i32]:
+    let generated: Vec[i32] = Vec.new()
+    if type_decl_sub_kind(out.get_data2(decl)) != TypeDeclKind.Struct:
+        return generated
+
+    let component_trait_sym = intern.intern("ComponentId")
+    let component_method_sym = intern.intern("component_id")
+    let type_name_sym = out.get_data0(decl)
+    if self.lookup_method_sig(type_name_sym, component_method_sym) >= 0:
+        return generated
+    if self.select_trait_impl(type_name_sym, component_trait_sym) != 0:
+        return generated
+
+    let type_name = intern.resolve(type_name_sym)
+    let start = out.get_start(decl)
+    let end = out.get_end(decl)
+    let i64_sym = intern.intern("i64")
+    let tp_count = ct_type_decl_tp_count(out, decl)
+    if tp_count > 0:
+        self.ct_emit_error(out, decl, "derive ComponentId requires a concrete struct")
+        return generated
+
+    let body = out.ct_build_int_lit(decl, ct_component_id_value(type_name))
+    let ret_type = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, i64_sym, 0, 0)
+    let fn_sym = intern.intern(type_name ++ ".component_id")
+    let fn_node = out.add_node(NodeKind.NK_FN_DECL, start, end, fn_sym, body as i32, 0)
+    out.add_fn_meta(fn_node, 0, ret_type as i32, out.extra_len(), 0, 0, 0)
+
+    let impl_extra = out.extra_len()
+    out.add_extra(0)
+    out.add_extra(1)
+    let impl_node = out.add_node(NodeKind.NK_IMPL_DECL, start, end, type_name_sym, impl_extra, component_trait_sym)
+
+    generated.push(fn_node as i32)
+    generated.push(impl_node as i32)
+    generated
+
 fn Sema.ct_transform_decl(mut self: Sema, source_ast: AstPool, pool: AstPool, intern: InternPool, node: i32):
     let kind = pool.kind(node)
     if kind == NodeKind.NK_FN_DECL:
@@ -1805,6 +1852,7 @@ fn Sema.comptime_transform_module(mut self: Sema, source_ast: AstPool, intern: I
     let soa_trait_sym = intern.intern("SoA")
     let serialize_trait_sym = intern.intern("Serialize")
     let deserialize_trait_sym = intern.intern("Deserialize")
+    let component_id_trait_sym = intern.intern("ComponentId")
     let clone_method_sym = intern.intern("clone")
     let self_sym = intern.intern("self")
     let self_type_sym = intern.intern("Self")
@@ -1865,6 +1913,15 @@ fn Sema.comptime_transform_module(mut self: Sema, source_ast: AstPool, intern: I
                 ordered_ci.push(decl_ci)
             if ct_source_decl_is_local(source_ast, di) != 0:
                 generated_local_count = generated_local_count + generated_deserialize.len() as i32
+        if self.type_decl_has_derive(decl as i32, component_id_trait_sym) != 0:
+            let generated_component_id = self.ct_generate_component_id_derive(out, intern, decl as i32)
+            for gi in 0..generated_component_id.len() as i32:
+                ordered.push(generated_component_id.get(gi as i64))
+                ordered_paths.push(decl_path)
+                ordered_file_ids.push(decl_file_id)
+                ordered_ci.push(decl_ci)
+            if ct_source_decl_is_local(source_ast, di) != 0:
+                generated_local_count = generated_local_count + generated_component_id.len() as i32
         if self.type_decl_has_derive(decl as i32, clone_trait_sym) == 0:
             continue
         if type_decl_sub_kind(out.get_data2(decl)) != TypeDeclKind.Struct:
