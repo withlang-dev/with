@@ -30,6 +30,7 @@ pub enum BuildKind: i32:
     CliSelfhostSmokeTest = 23
     GenerateCompilerEntrypoints = 24
     WithCompilerBuild = 25
+    Pcre2RunTest = 26
 
 pub enum BuildTarget: i32:
     native = 0
@@ -224,6 +225,12 @@ pub fn Build.generate_compiler_entrypoints(self: Build, name: str, stamp: str) -
 pub fn Build.with_compiler_build(self: Build, name: str, compiler: str, source: str, output: str) -> Build:
     var target = target_new(.WithCompilerBuild, name, compiler).output(output)
     target = target.input(source)
+    self.add_target(target)
+
+pub fn Build.pcre2_run_test(self: Build, name: str, pcre2test: str, ref_dir: str) -> Build:
+    var target = target_new(.Pcre2RunTest, name, pcre2test)
+    target = target.input(ref_dir ++ "/RunTest")
+    target = target.arg(ref_dir)
     self.add_target(target)
 
 pub fn Target.target(self: Target, target: BuildTarget) -> Target:
