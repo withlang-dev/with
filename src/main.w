@@ -22,6 +22,7 @@ extern fn with_fs_write_file(path: str, data: str) -> i32
 extern fn with_fs_mkdir_p(path: str) -> i32
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_fs_file_exists(path: str) -> i32
+extern fn with_fs_is_dir(path: str) -> i32
 extern fn with_fs_chmod(path: str, mode: i32) -> i32
 extern fn with_read_bytes_stdin(count: i32) -> str
 extern fn with_str_eq(a: str, b: str) -> i32
@@ -109,8 +110,15 @@ type TestDiscovery {
 type TestDirectives {
     expect_stdout: Vec[str],
     expect_stderr: Vec[str],
+    expect_check_stdout: Vec[str],
+    expect_check_fail: str,
+    expect_build_fail: str,
     has_expect_exit: bool,
     expect_exit: i32,
+    check_only: bool,
+    skip: bool,
+    skip_reason: str,
+    extra_args: str,
 }
 
 type TestRunResult {
@@ -163,8 +171,15 @@ fn empty_test_directives -> TestDirectives:
     TestDirectives {
         expect_stdout: Vec.new(),
         expect_stderr: Vec.new(),
+        expect_check_stdout: Vec.new(),
+        expect_check_fail: "",
+        expect_build_fail: "",
         has_expect_exit: false,
         expect_exit: 0,
+        check_only: false,
+        skip: false,
+        skip_reason: "",
+        extra_args: "",
     }
 
 fn cli_options_default -> CliOptions:
@@ -1211,6 +1226,66 @@ fn build_graph_test_target_files(root: str, entry: str) -> Vec[str]:
             files.push(candidate)
     files
 
+fn build_graph_test_compiler_arg(arg: str) -> str:
+    let prefix = "compiler="
+    if with_str_starts_with(arg, prefix) != 0:
+        return arg.slice(prefix.len(), arg.len())
+    ""
+
+fn build_graph_test_compiler(root: str, target: BuildGraphTarget) -> str:
+    for ai in 0..target.args.len() as i32:
+        let value = build_graph_test_compiler_arg(target.args.get(ai as i64))
+        if value.len() > 0:
+            return build_graph_resolve_project_path(root, value)
+    ""
+
+fn build_graph_append_test_args(argv: str, target: BuildGraphTarget) -> str:
+    var out = argv
+    for ai in 0..target.args.len() as i32:
+        let arg = target.args.get(ai as i64)
+        if build_graph_test_compiler_arg(arg).len() == 0:
+            out = build_graph_argv_append(out, arg)
+    out
+
+fn build_graph_path_for_child_process(root: str, path: str) -> str:
+    var normalized_root = root
+    while normalized_root.len() > 1 and normalized_root.ends_with("/"):
+        normalized_root = normalized_root.slice(0, normalized_root.len() - 1)
+    if normalized_root.ends_with("/."):
+        normalized_root = normalized_root.slice(0, normalized_root.len() - 2)
+    let dot_prefix = normalized_root ++ "/./"
+    if with_str_starts_with(path, dot_prefix) != 0:
+        return path.slice(dot_prefix.len(), path.len())
+    let prefix = normalized_root ++ "/"
+    if with_str_starts_with(path, prefix) != 0:
+        return path.slice(prefix.len(), path.len())
+    path
+
+fn build_graph_run_external_test_file(root: str, target: BuildGraphTarget, compiler_path: str, test_path: str) -> i32:
+    let capture_dir = resolve_join(resolve_join(root, "out/test-graph"), target.name)
+    if with_fs_mkdir_p(capture_dir) != 0:
+        with_eprint("error: could not create test output directory for target '" ++ target.name ++ "': " ++ capture_dir)
+        return 1
+    let base = build_graph_path_basename(test_path)
+    let stdout_path = resolve_join(capture_dir, base ++ ".stdout")
+    let stderr_path = resolve_join(capture_dir, base ++ ".stderr")
+    var argv = ""
+    argv = build_graph_argv_append(argv, compiler_path)
+    argv = build_graph_argv_append(argv, "test")
+    argv = build_graph_append_test_args(argv, target)
+    argv = build_graph_argv_append(argv, "--quiet")
+    argv = build_graph_argv_append(argv, build_graph_path_for_child_process(root, test_path))
+    let rc = with_exec_argv_capture(argv, stdout_path, stderr_path, 300000)
+    if rc == 124:
+        with_eprint("error: build.w test target '" ++ target.name ++ "' timed out in '" ++ test_path ++ "'; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+        return 124
+    if rc != 0:
+        with_eprint("error: build.w test target '" ++ target.name ++ "' failed in '" ++ test_path ++ f"' with exit code {rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+        return if rc == 0: 1 else: rc
+    let _remove_stdout = with_fs_remove_file(stdout_path)
+    let _remove_stderr = with_fs_remove_file(stderr_path)
+    0
+
 fn build_graph_dirname(path: str) -> str:
     var last_slash = -1
     for i in 0..path.len() as i32:
@@ -1964,9 +2039,13 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
             if test_files.len() == 0:
                 with_eprint("error: build.w test target matched no files: " ++ target.entry)
                 return 1
+            let test_compiler = build_graph_test_compiler(root, target)
             for fi in 0..test_files.len() as i32:
                 let test_path = test_files.get(fi as i64)
-                let test_rc = run_test_file_with_build_settings(test_path, target_opt, no_std, alloc_mode, prelude_mode, debug_info, false, false, "", include_paths, target.defines, target.system_libs)
+                let test_rc = if test_compiler.len() > 0:
+                    build_graph_run_external_test_file(root, target, test_compiler, test_path)
+                else:
+                    run_test_file_with_build_settings(test_path, target_opt, no_std, alloc_mode, prelude_mode, debug_info, false, false, "", include_paths, target.defines, target.system_libs)
                 if test_rc != 0:
                     with_eprint("error: build.w test target failed: " ++ target.name)
                     return test_rc
@@ -2412,6 +2491,12 @@ fn parse_test_directives_for_target(target: str) -> TestDirectives:
     let expect_stdout_prefix = "//! expect-stdout: "
     let expect_stderr_prefix = "//! expect-stderr: "
     let expect_exit_prefix = "//! expect-exit: "
+    let expect_check_stdout_prefix = "//! expect-check-stdout: "
+    let expect_check_fail_prefix = "//! expect-check-fail: "
+    let expect_error_prefix = "//! expect-error: "
+    let expect_build_fail_prefix = "//! expect-build-fail: "
+    let args_prefix = "//! args: "
+    let skip_prefix = "//! skip: "
     var start = 0
     var i = 0
     while i <= text_len:
@@ -2429,6 +2514,26 @@ fn parse_test_directives_for_target(target: str) -> TestDirectives:
             else if with_str_starts_with(line, expect_exit_prefix) != 0:
                 result.has_expect_exit = true
                 result.expect_exit = test_parse_i32(line.slice(expect_exit_prefix.len(), line.len()))
+            else if with_str_starts_with(line, expect_check_stdout_prefix) != 0:
+                result.expect_check_stdout.push(line.slice(expect_check_stdout_prefix.len(), line.len()))
+            else if with_str_starts_with(line, expect_check_fail_prefix) != 0:
+                result.expect_check_fail = line.slice(expect_check_fail_prefix.len(), line.len())
+            else if with_str_starts_with(line, expect_error_prefix) != 0:
+                result.expect_check_fail = line.slice(expect_error_prefix.len(), line.len())
+            else if with_str_starts_with(line, expect_build_fail_prefix) != 0:
+                result.expect_build_fail = line.slice(expect_build_fail_prefix.len(), line.len())
+            else if with_str_starts_with(line, args_prefix) != 0:
+                result.extra_args = line.slice(args_prefix.len(), line.len())
+            else if with_str_starts_with(line, skip_prefix) != 0:
+                result.skip = true
+                result.skip_reason = line.slice(skip_prefix.len(), line.len())
+                return result
+            else if line == "//! skip":
+                result.skip = true
+                result.skip_reason = ""
+                return result
+            else if line == "//! check-only":
+                result.check_only = true
             else if with_str_starts_with(line, "//!") != 0:
                 let _ = 0
             else:
@@ -2439,6 +2544,126 @@ fn parse_test_directives_for_target(target: str) -> TestDirectives:
 
 fn test_directives_have_run_expectations(directives: TestDirectives) -> bool:
     directives.has_expect_exit or directives.expect_stdout.len() > 0 or directives.expect_stderr.len() > 0
+
+fn test_append_extra_args(argv: str, extra_args: str) -> str:
+    var out = argv
+    var start = 0
+    var i = 0
+    while i <= extra_args.len() as i32:
+        let at_end = i == extra_args.len() as i32
+        let ch = if at_end: 32 else: extra_args.byte_at(i as i64)
+        if ch == 32 or ch == 9:
+            if i > start:
+                out = build_graph_argv_append(out, extra_args.slice(start as i64, i as i64))
+            start = i + 1
+        i = i + 1
+    out
+
+fn test_capture_dir(target: str, suffix: str) -> str:
+    let base = build_graph_path_basename(target)
+    let stem = if base.ends_with(".w"): base.slice(0, base.len() - 2) else: base
+    "out/test-native/" ++ stem ++ "." ++ suffix ++ "." ++ f"{with_getpid()}.{with_clock_nanos()}"
+
+fn run_test_compiler_command(target: str, command_name: str, directives: TestDirectives) -> TestRunResult:
+    let capture_dir = test_capture_dir(target, command_name)
+    let _mkdir = with_fs_mkdir_p(capture_dir)
+    let stdout_path = capture_dir ++ "/stdout.txt"
+    let stderr_path = capture_dir ++ "/stderr.txt"
+    var argv = ""
+    argv = build_graph_argv_append(argv, with_arg_at(0))
+    argv = build_graph_argv_append(argv, command_name)
+    if command_name == "build":
+        argv = build_graph_argv_append(argv, "-g0")
+        argv = build_graph_argv_append(argv, "-o")
+        argv = build_graph_argv_append(argv, capture_dir ++ "/out")
+    argv = test_append_extra_args(argv, directives.extra_args)
+    argv = build_graph_argv_append(argv, target)
+    let rc = with_exec_argv_capture(argv, stdout_path, stderr_path, 60000)
+    let stdout = with_fs_read_file(stdout_path)
+    let stderr = with_fs_read_file(stderr_path)
+    let _remove_stdout = with_fs_remove_file(stdout_path)
+    let _remove_stderr = with_fs_remove_file(stderr_path)
+    let _remove_bin = with_fs_remove_file(capture_dir ++ "/out")
+    let _remove_obj = with_fs_remove_file(capture_dir ++ "/out.o")
+    let _remove_dsym = with_fs_remove_dir(capture_dir ++ "/out.dSYM")
+    let _remove_dir = with_fs_remove_dir(capture_dir)
+    TestRunResult { rc, stdout, stderr }
+
+fn test_output_contains_expected(actual: str, expected: str) -> bool:
+    expected.len() == 0 or with_str_contains(actual, expected) != 0
+
+fn run_test_directive_command(target: str, directives: TestDirectives, quiet: bool) -> i32:
+    if directives.skip:
+        if directives.skip_reason.len() == 0:
+            emit_test_stage_error("skip missing reason", target, "directives", "")
+            return 1
+        return 0
+    if directives.expect_check_fail.len() > 0:
+        let result = run_test_compiler_command(target, "check", directives)
+        if result.rc == 0:
+            emit_test_stage_error("expected check failure", target, "check", "")
+            return 1
+        if not test_output_contains_expected(result.stderr, directives.expect_check_fail):
+            emit_test_stage_error("missing expected check error: " ++ directives.expect_check_fail, target, "check", "")
+            return 1
+        return 0
+    if directives.expect_build_fail.len() > 0:
+        let result = run_test_compiler_command(target, "build", directives)
+        if result.rc == 0:
+            emit_test_stage_error("expected build failure", target, "build", "")
+            return 1
+        if not test_output_contains_expected(result.stderr, directives.expect_build_fail):
+            emit_test_stage_error("missing expected build error: " ++ directives.expect_build_fail, target, "build", "")
+            return 1
+        return 0
+    if directives.expect_check_stdout.len() > 0:
+        let result = run_test_compiler_command(target, "check", directives)
+        if result.rc != 0:
+            emit_test_stage_error(f"check failed with exit code {result.rc}", target, "check", "")
+            return 1
+        for i in 0..directives.expect_check_stdout.len() as i32:
+            let expected = directives.expect_check_stdout.get(i as i64)
+            if not test_output_contains_expected(result.stdout, expected):
+                emit_test_stage_error("missing expected check stdout: " ++ expected, target, "check", "")
+                return 1
+        return 0
+    if directives.check_only:
+        let result = run_test_compiler_command(target, "check", directives)
+        if result.rc == 0:
+            return 0
+        emit_test_stage_error(f"check failed with exit code {result.rc}", target, "check", "")
+        return 1
+    let _ = quiet
+    -1
+
+fn test_extra_arg_present(args: str, wanted: str) -> bool:
+    var start = 0
+    var i = 0
+    while i <= args.len() as i32:
+        let at_end = i == args.len() as i32
+        let ch = if at_end: 32 else: args.byte_at(i as i64)
+        if ch == 32 or ch == 9:
+            if i > start and args.slice(start as i64, i as i64) == wanted:
+                return true
+            start = i + 1
+        i = i + 1
+    false
+
+fn test_effective_opt_level(default_opt: i32, args: str) -> i32:
+    if test_extra_arg_present(args, "-O0"): return 0
+    if test_extra_arg_present(args, "-O1"): return 1
+    if test_extra_arg_present(args, "-O2"): return 2
+    if test_extra_arg_present(args, "-O3"): return 3
+    default_opt
+
+fn test_effective_prelude_mode(default_mode: i32, args: str) -> i32:
+    if test_extra_arg_present(args, "--no-prelude") or test_extra_arg_present(args, "--prelude=none"):
+        return PreludeMode.NoneMode as i32
+    if test_extra_arg_present(args, "--prelude=core"):
+        return PreludeMode.CoreMode as i32
+    if test_extra_arg_present(args, "--prelude=full"):
+        return PreludeMode.FullMode as i32
+    default_mode
 
 fn test_shell_quote(text: str) -> str:
     var out = "'"
@@ -2474,19 +2699,67 @@ fn split_nonempty_lines(text: str) -> Vec[str]:
     lines
 
 fn test_target_is_directory(target: str) -> bool:
-    with_system("[ -d " ++ test_shell_quote(target) ++ " ]") == 0
+    with_fs_is_dir(target) != 0
+
+fn test_str_compare(a: str, b: str) -> i32:
+    let min_len = if a.len() < b.len(): a.len() else: b.len()
+    var i = 0
+    while i < min_len as i32:
+        let ac = a.byte_at(i as i64)
+        let bc = b.byte_at(i as i64)
+        if ac != bc:
+            return ac - bc
+        i = i + 1
+    if a.len() == b.len():
+        return 0
+    if a.len() < b.len():
+        return -1
+    1
+
+fn test_sorted_paths(files: Vec[str]) -> Vec[str]:
+    var sorted: Vec[str] = Vec.new()
+    for i in 0..files.len() as i32:
+        let path = files.get(i as i64)
+        var inserted = false
+        var out: Vec[str] = Vec.new()
+        for j in 0..sorted.len() as i32:
+            let existing = sorted.get(j as i64)
+            if not inserted and test_str_compare(path, existing) < 0:
+                out.push(path)
+                inserted = true
+            out.push(existing)
+        if not inserted:
+            out.push(path)
+        sorted = out
+    sorted
 
 fn collect_test_files(target_dir: str) -> Vec[str]:
     let files: Vec[str] = Vec.new()
-    let _ = with_system("mkdir -p out/tmp")
-    let manifest_path = "out/tmp/test-files.txt"
-    let cmd = "find " ++ test_shell_quote(target_dir) ++ " -type f -name '*.w' | sort > " ++ test_shell_quote(manifest_path)
-    if with_system(cmd) != 0:
+    if with_fs_mkdir_p("out/tmp") != 0:
+        return files
+    let stamp = f"{with_getpid()}.{with_clock_nanos()}"
+    let manifest_path = "out/tmp/test-files." ++ stamp ++ ".txt"
+    let err_path = manifest_path ++ ".stderr"
+    var argv = ""
+    argv = build_graph_argv_append(argv, "/usr/bin/find")
+    argv = build_graph_argv_append(argv, target_dir)
+    argv = build_graph_argv_append(argv, "-maxdepth")
+    argv = build_graph_argv_append(argv, "1")
+    argv = build_graph_argv_append(argv, "-type")
+    argv = build_graph_argv_append(argv, "f")
+    argv = build_graph_argv_append(argv, "-name")
+    argv = build_graph_argv_append(argv, "*.w")
+    let rc = with_exec_argv_capture(argv, manifest_path, err_path, 60000)
+    if rc != 0:
+        let _remove_manifest_on_error = with_fs_remove_file(manifest_path)
+        let _remove_err_on_error = with_fs_remove_file(err_path)
         return files
     let listing = with_fs_read_file(manifest_path)
+    let _remove_manifest = with_fs_remove_file(manifest_path)
+    let _remove_err = with_fs_remove_file(err_path)
     if listing.len() == 0:
         return files
-    split_nonempty_lines(listing)
+    test_sorted_paths(split_nonempty_lines(listing))
 
 fn test_count_label(count: i32) -> str:
     if count == 1:
@@ -2563,11 +2836,17 @@ fn run_test_binary_checked(bin_path: str, target: str, test_name: str, quiet: bo
     1
 
 fn run_test_file_with_build_settings(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, filter: str, include_paths: Vec[str], defines: Vec[str], link_libs: Vec[str]) -> i32:
-    let discovery = discover_tests_for_target(target)
     let directives = parse_test_directives_for_target(target)
+    let directive_rc = run_test_directive_command(target, directives, quiet)
+    if directive_rc >= 0:
+        return directive_rc
+    let discovery = discover_tests_for_target(target)
+    let effective_opt_level = test_effective_opt_level(opt_level, directives.extra_args)
+    let effective_no_std = no_std or test_extra_arg_present(directives.extra_args, "--no-std") or test_extra_arg_present(directives.extra_args, "--freestanding")
+    let effective_prelude_mode = test_effective_prelude_mode(prelude_mode, directives.extra_args)
     var comp = Compilation.init()
-    comp.configure(opt_level, no_std, alloc_mode)
-    comp.set_prelude_mode(prelude_mode)
+    comp.configure(effective_opt_level, effective_no_std, alloc_mode)
+    comp.set_prelude_mode(effective_prelude_mode)
     comp.set_debug_info(debug_info)
     let synthetic_source = maybe_synthesize_test_source(target)
     let test_bin_path = test_unique_binary_path(target)

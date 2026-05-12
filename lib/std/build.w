@@ -272,6 +272,10 @@ pub fn Target.arg(mut self: Target, arg: str) -> Target:
     self.args.push(arg)
     self
 
+pub fn Target.compiler(mut self: Target, compiler: str) -> Target:
+    self.args.push("compiler=" ++ compiler)
+    self
+
 pub fn Build.emit_graph(self: Build) -> str:
     var out = "WITH_BUILD_GRAPH\t2\n"
     out = out ++ "package\t" ++ build_graph_escape(self.package.name) ++ "\t" ++ build_graph_escape(self.package.version) ++ "\n"

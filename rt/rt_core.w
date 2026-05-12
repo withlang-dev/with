@@ -1953,6 +1953,13 @@ pub fn fs_file_exists(path: str) -> i32:
     let _ = rt_close(fd)
     1
 
+@[c_export("with_fs_is_dir")]
+pub fn fs_is_dir(path: str) -> i32:
+    let cpath = str_to_cstr(path)
+    if fs_path_is_dir_c(cpath):
+        return 1
+    0
+
 @[c_export("with_fs_mkdir_p")]
 pub fn fs_mkdir_p(path: str) -> i32:
     let cpath = str_to_cstr(path)
