@@ -52,4 +52,10 @@ pub fn build(b: Build) -> Build:
     install_user = install_user.dep("verified-existing-stage")
     out = out.add_target(install_user)
 
+    var update_seed = target_new(.Install, "update-seed", "out/bin/with-stage2").output("src/main")
+    update_seed = update_seed.input("out/bin/with-stage2")
+    update_seed = update_seed.arg("0755")
+    update_seed = update_seed.dep("verified-existing-stage")
+    out = out.add_target(update_seed)
+
     out.default("verified-existing-stage")
