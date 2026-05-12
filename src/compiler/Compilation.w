@@ -279,6 +279,7 @@ type Compilation {
     cli_diag_gen_ends: Vec[i32],
     cli_diag_source_names: Vec[str],
     cli_diag_source_texts: Vec[str],
+    compiler_hook_emitted_source: str,
 }
 
 fn Compilation.init -> Compilation:
@@ -292,6 +293,7 @@ fn Compilation.init -> Compilation:
         cli_diag_gen_ends: Vec.new(),
         cli_diag_source_names: Vec.new(),
         cli_diag_source_texts: Vec.new(),
+        compiler_hook_emitted_source: "",
     }
 
 fn Compilation.configure(self: Compilation, opt_level: i32, no_std: bool, alloc_mode: bool):
@@ -458,7 +460,7 @@ fn Compilation.project_info_source(self: Compilation, pool: AstPool) -> str:
             out = out ++ "    project = project.add_type(TypeInfo.new(\"" ++ compilation_escape_with_string(module_name) ++ "\", \"" ++ compilation_escape_with_string(name) ++ "\", " ++ (if is_pub: "true" else: "false") ++ ", false, \"" ++ kind_name ++ "\", " ++ loc ++ "))\n"
     out ++ "    project\n"
 
-fn Compilation.compiler_hook_runner_source(self: Compilation, pool: AstPool, source_path: str, diag_path: str) -> str:
+fn Compilation.compiler_hook_runner_source(self: Compilation, pool: AstPool, source_path: str, diag_path: str, emitted_source_path: str) -> str:
     let zcu = self.zcu
     let root = if zcu.project_config.root_dir.len() > 0: zcu.project_config.root_dir else: frontend_dirname(source_path)
     let hook_count = pool.compiler_hook_count()
@@ -478,6 +480,7 @@ fn Compilation.compiler_hook_runner_source(self: Compilation, pool: AstPool, sou
     out = out ++ self.project_info_source(pool)
     out = out ++ "\nfn main:\n"
     out = out ++ "    compiler_set_diagnostic_output(\"" ++ compilation_escape_with_string(diag_path) ++ "\")\n"
+    out = out ++ "    compiler_set_emitted_source_output(\"" ++ compilation_escape_with_string(emitted_source_path) ++ "\")\n"
     out = out ++ "    let project = __with_compiler_hook_project_info()\n"
     for hi2 in 0..hook_count:
         let hook_node = pool.compiler_hook_node(hi2)
@@ -513,6 +516,7 @@ fn Compilation.emit_compiler_hook_diagnostics(self: Compilation, diag_text: str)
     emitted
 
 fn Compilation.run_after_typecheck_hooks(self: Compilation, pool: AstPool, source_path: str) -> bool:
+    self.compiler_hook_emitted_source = ""
     if pool.compiler_hook_count() == 0:
         return true
     if not self.config.compiler_hooks_enabled:
@@ -527,12 +531,18 @@ fn Compilation.run_after_typecheck_hooks(self: Compilation, pool: AstPool, sourc
     let runner_path = root ++ "/__with_compiler_hook_runner." ++ stamp ++ ".w"
     let runner_bin = tmp_dir ++ "/compiler-hook-runner." ++ stamp
     let diag_path = tmp_dir ++ "/compiler-hook-diags." ++ stamp ++ ".txt"
+    let emitted_source_path = tmp_dir ++ "/compiler-hook-source." ++ stamp ++ ".w"
     if with_fs_write_file(diag_path, "") != 0:
         with_eprint("error: could not initialize compiler hook diagnostics")
         return false
-    let runner_source = self.compiler_hook_runner_source(pool, source_path, diag_path)
+    if with_fs_write_file(emitted_source_path, "") != 0:
+        let _remove_diag_init = with_fs_remove_file(diag_path)
+        with_eprint("error: could not initialize compiler hook emitted source")
+        return false
+    let runner_source = self.compiler_hook_runner_source(pool, source_path, diag_path, emitted_source_path)
     if with_fs_write_file(runner_path, runner_source) != 0:
         let _ = with_fs_remove_file(diag_path)
+        let _remove_emitted_init = with_fs_remove_file(emitted_source_path)
         with_eprint("error: could not write compiler hook runner")
         return false
     var runner_comp = Compilation.init()
@@ -544,11 +554,14 @@ fn Compilation.run_after_typecheck_hooks(self: Compilation, pool: AstPool, sourc
     let _remove_runner_source = with_fs_remove_file(runner_path)
     if built_runner == "":
         let _remove_diag = with_fs_remove_file(diag_path)
+        let _remove_emitted = with_fs_remove_file(emitted_source_path)
         with_eprint("error: compiler hook runner compilation failed")
         return false
     let rc = with_exec_binary(built_runner)
     let diag_text = with_fs_read_file(diag_path)
+    let emitted_source = with_fs_read_file(emitted_source_path)
     let _remove_diag_after = with_fs_remove_file(diag_path)
+    let _remove_emitted_after = with_fs_remove_file(emitted_source_path)
     let _remove_runner_bin = with_fs_remove_file(built_runner)
     let _remove_runner_obj = with_fs_remove_file(built_runner ++ ".o")
     let _remove_runner_dsym = with_fs_remove_dir(built_runner ++ ".dSYM")
@@ -558,7 +571,21 @@ fn Compilation.run_after_typecheck_hooks(self: Compilation, pool: AstPool, sourc
     if rc != 0:
         with_eprint(f"error: compiler hook execution failed with exit code {rc}")
         return false
+    self.compiler_hook_emitted_source = emitted_source
     true
+
+fn Compilation.prepare_pool_after_typecheck_hooks(self: Compilation, pool: AstPool, source_path: str) -> AstPool:
+    if pool.decl_count() == 0:
+        return pool
+    if not self.run_after_typecheck_hooks(pool, source_path):
+        return AstPool.new()
+    if self.compiler_hook_emitted_source.len() == 0:
+        return pool
+    let base_source = if self.zcu.current_source_text.len() > 0: self.zcu.current_source_text else: with_fs_read_file(source_path)
+    let cfg = self.zcu.project_config
+    let combined = base_source ++ "\n\n// <with compiler hook emitted source>\n" ++ self.compiler_hook_emitted_source
+    self.compiler_hook_emitted_source = ""
+    self.compile_source_text_with_config(source_path, combined, cfg)
 
 fn Compilation.has_errors(self: Compilation) -> bool:
     self.zcu.diagnostics.has_errors()
@@ -567,9 +594,12 @@ fn Compilation.get_pool(self: Compilation) -> InternPool:
     self.zcu.pool
 
 fn Compilation.emit_ir(self: Compilation, pool: AstPool) -> bool:
-    if not self.ensure_codegen_mir(pool):
+    let prepared_pool = self.prepare_pool_after_typecheck_hooks(pool, self.zcu.current_source_path)
+    if prepared_pool.decl_count() == 0:
         return false
-    self.zcu.emit_ir_backend(self.active_pool(pool), self.config.opt_level)
+    if not self.ensure_codegen_mir(prepared_pool):
+        return false
+    self.zcu.emit_ir_backend(self.active_pool(prepared_pool), self.config.opt_level)
 
 fn compilation_cleanup_build_products(obj_path: str, bin_path: str):
     if obj_path.len() > 0:
@@ -635,14 +665,15 @@ fn Compilation.finish_binary_from_pool(self: Compilation, pool: AstPool, source_
     compilation_debug_init(f"build_binary_to_path:compiled {source_path} decls={pool.decl_count()}")
     if pool.decl_count() == 0:
         return ""
-    if not self.run_after_typecheck_hooks(pool, source_path):
+    let prepared_pool = self.prepare_pool_after_typecheck_hooks(pool, source_path)
+    if prepared_pool.decl_count() == 0:
         compilation_cleanup_build_products(obj_path, bin_path)
         return ""
-    if not self.ensure_codegen_mir(pool):
+    if not self.ensure_codegen_mir(prepared_pool):
         compilation_debug_init("build_binary_to_path:ensure_codegen_mir FAILED")
         compilation_cleanup_build_products(obj_path, bin_path)
         return ""
-    let active_pool: AstPool = self.active_pool(pool)
+    let active_pool: AstPool = self.active_pool(prepared_pool)
     let opt_level = self.config.opt_level
     let requires_async_runtime = self.zcu.last_async_mir_module.requires_async_runtime()
     compilation_debug_pool_flow("build_binary_to_path:after_codegen", self.zcu.pool, active_pool, self.zcu.last_sema)
@@ -680,9 +711,12 @@ fn Compilation.emit_object_to_path(self: Compilation, source_path: str, obj_path
     let pool = self.compile_file(source_path)
     if pool.decl_count() == 0:
         return ""
-    if not self.ensure_codegen_mir(pool):
+    let prepared_pool = self.prepare_pool_after_typecheck_hooks(pool, source_path)
+    if prepared_pool.decl_count() == 0:
         return ""
-    let active_pool: AstPool = self.active_pool(pool)
+    if not self.ensure_codegen_mir(prepared_pool):
+        return ""
+    let active_pool: AstPool = self.active_pool(prepared_pool)
     let opt_level = self.config.opt_level
     let backend_rc = self.zcu.compile_to_object_backend(active_pool, opt_level, obj_path, self.config.debug_info, true)
     if backend_rc != 0:
@@ -805,10 +839,13 @@ fn Compilation.emit_c(self: Compilation, source_path: str, output_path: str) -> 
     let pool = self.compile_file(source_path)
     if pool.decl_count() == 0:
         return ""
-    if not self.ensure_codegen_mir(pool):
+    let prepared_pool = self.prepare_pool_after_typecheck_hooks(pool, source_path)
+    if prepared_pool.decl_count() == 0:
+        return ""
+    if not self.ensure_codegen_mir(prepared_pool):
         with_eprint("error: C emission failed during MIR lowering")
         return ""
-    let typed_pool: AstPool = self.active_pool(pool)
+    let typed_pool: AstPool = self.active_pool(prepared_pool)
 
     var final_output = output_path
     if final_output.len() == 0:

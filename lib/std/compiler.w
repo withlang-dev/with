@@ -56,6 +56,7 @@ pub type CompilerApi {}
 pub global compiler = CompilerApi {}
 
 global var __compiler_diagnostic_output_path: str = ""
+global var __compiler_emitted_source_output_path: str = ""
 
 fn compiler_hook_escape(value: str) -> str:
     var out = ""
@@ -76,6 +77,9 @@ fn compiler_hook_escape(value: str) -> str:
 pub fn compiler_set_diagnostic_output(path: str):
     __compiler_diagnostic_output_path = path
 
+pub fn compiler_set_emitted_source_output(path: str):
+    __compiler_emitted_source_output_path = path
+
 pub fn CompilerApi.error(self: &Self, location: SourceLocation, message: str):
     let _ = self
     if __compiler_diagnostic_output_path.len() == 0:
@@ -90,6 +94,17 @@ pub fn CompilerApi.error(self: &Self, location: SourceLocation, message: str):
         compiler_hook_escape(message) ++ "\n"
     if with_fs_write_file(__compiler_diagnostic_output_path, old ++ line) != 0:
         with_eprint("error: failed to write compiler hook diagnostic")
+        exit(1)
+
+pub fn CompilerApi.emit_source(self: &Self, source: str):
+    let _ = self
+    if __compiler_emitted_source_output_path.len() == 0:
+        with_eprint("error: compiler.emit_source called outside compiler hook execution")
+        exit(1)
+        return
+    let old = with_fs_read_file(__compiler_emitted_source_output_path)
+    if with_fs_write_file(__compiler_emitted_source_output_path, old ++ "\n" ++ source ++ "\n") != 0:
+        with_eprint("error: failed to write compiler hook emitted source")
         exit(1)
 
 pub fn SourceLocation.new(file: str, start: i32, end: i32) -> SourceLocation:
