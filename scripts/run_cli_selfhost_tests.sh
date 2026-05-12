@@ -3869,6 +3869,67 @@ EOF
   echo "PASS(cli-selfhost-build) build_w_test_target"
 }
 
+expect_build_w_test_target_glob() {
+  local case_dir="$tmpdir/build_w_test_target_glob_case"
+  mkdir -p "$case_dir/tests" "$case_dir/extra_include"
+
+  cat >"$case_dir/with.toml" <<'EOF'
+[package]
+name = "buildwtestglob"
+version = "0.1.0"
+EOF
+
+  cat >"$case_dir/tests/first.w" <<'EOF'
+use c_import("answer.h")
+
+@[test]
+fn first_build_w_glob_test_uses_settings:
+    assert(ANSWER == 42)
+EOF
+
+  cat >"$case_dir/tests/second.w" <<'EOF'
+@[test]
+fn second_build_w_glob_test_runs:
+    assert(2 + 2 == 4)
+EOF
+
+  cat >"$case_dir/extra_include/answer.h" <<'EOF'
+#ifndef WITH_BUILD_FEATURE
+#error "missing build.w test glob target define"
+#endif
+enum { ANSWER = WITH_BUILD_VALUE };
+EOF
+
+  cat >"$case_dir/build.w" <<'EOF'
+use std.build
+
+pub fn build(b: Build) -> Build:
+    var target = target_new(.Test, "glob-tests", "tests/*.w")
+    target = target.include_path("extra_include")
+    target = target.define("WITH_BUILD_FEATURE")
+    target = target.define("WITH_BUILD_VALUE=42")
+    b.add_target(target)
+EOF
+
+  if ! run_cli_in_dir "$case_dir" "$tmpdir/out" "$tmpdir/err" build; then
+    echo "FAIL(cli-selfhost-build) build_w_test_target_glob"
+    cat "$tmpdir/out" || true
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_literal "$tmpdir/out" "ok: 2 files passed in build.w test target glob-tests"; then
+    echo "FAIL(cli-selfhost-build-output) build_w_test_target_glob"
+    cat "$tmpdir/out" || true
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-build) build_w_test_target_glob"
+}
+
 expect_build_w_library_target() {
   local case_dir="$tmpdir/build_w_library_target_case"
   mkdir -p "$case_dir/src" "$case_dir/extra_include"
@@ -4584,6 +4645,7 @@ expect_build_uses_package_section_name
 expect_build_rejects_imperative_manifest
 expect_build_w_is_not_ignored
 expect_build_w_test_target
+expect_build_w_test_target_glob
 expect_build_w_library_target
 expect_build_w_explicit_host_target
 expect_build_w_non_native_target_fails_loudly
