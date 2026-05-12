@@ -111,6 +111,8 @@ fn astpool_clone_deep(src: AstPool) -> AstPool:
         out.mark_sealed_trait((src.state.sealed_trait_nodes.get(si as i64)) as NodeId)
     for ci in 0..src.state.comptime_decl_nodes.len() as i32:
         out.mark_comptime_decl((src.state.comptime_decl_nodes.get(ci as i64)) as NodeId)
+    for hi in 0..src.compiler_hook_count():
+        out.mark_compiler_hook_fn(src.compiler_hook_node(hi), src.compiler_hook_phase_at(hi))
     for mi in 0..src.state.move_closure_nodes.len() as i32:
         out.mark_move_closure((src.state.move_closure_nodes.get(mi as i64)) as NodeId)
     for ni in 0..src.state.non_escaping_closure_nodes.len() as i32:

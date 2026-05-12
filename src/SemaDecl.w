@@ -1801,7 +1801,8 @@ fn Sema.validate_compiler_hooks(self: Sema):
         let hook_node = self.ast.compiler_hook_node(hi)
         let phase_sym = self.ast.compiler_hook_phase_at(hi)
         let phase_name = self.pool_resolve_symbol(phase_sym)
-        self.emit_error("compiler hooks are recognized but not implemented yet for phase '" ++ phase_name ++ "'", hook_node)
+        if phase_name != "after_typecheck":
+            self.emit_error("unknown compiler_hook phase '" ++ phase_name ++ "'", hook_node)
 
 fn Sema.validate_generic_type_decls(self: Sema):
     for di in 0..self.ast.decl_count():
