@@ -753,11 +753,8 @@ test: | $(OUT_TMP_DIR)
 test-pcre2: | $(OUT_TMP_DIR)
 	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __test-pcre2)
 
-__test: $(STAGE2_BIN)
-	./scripts/run_tests.sh
-	WITH=$(STAGE2_BIN) ./scripts/run_cli_selfhost_tests.sh
-	./scripts/run_issue61_noop_local_regression.sh
-	./scripts/run_embedded_runtime_extract_regression.sh
+__test: $(CANONICAL_BIN)
+	$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" build :test
 
 __test-pcre2: __regex-test
 

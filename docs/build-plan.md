@@ -67,6 +67,9 @@
   - `make regex-test` is now a compatibility shim over
     `with build :regex-test` after checking that existing migrated PCRE2
     sources, built `pcre2test`, and the reference tree are present.
+  - `make test` is now a compatibility shim over `with build :test`; Make no
+    longer invokes `scripts/run_tests.sh`, the issue61 regression script, or
+    the embedded-runtime regression script directly.
   - Initial repository `build.w`:
       - `with build`
       - `with build :selfcheck`
