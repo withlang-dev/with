@@ -17,11 +17,17 @@ extern fn kill(pid: i32, sig: i32) -> i32
 extern fn fork() -> i32
 extern fn setpgid(pid: i32, pgid: i32) -> i32
 extern fn execv(path: *const u8, argv: *const *const u8) -> i32
+extern fn execvp(file: *const u8, argv: *const *const u8) -> i32
 extern fn waitpid(pid: i32, status: *mut i32, options: i32) -> i32
+extern fn __open(path: *const u8, flags: i32, mode: i32) -> i32
+extern fn dup2(oldfd: i32, newfd: i32) -> i32
+extern fn close(fd: i32) -> i32
 extern fn getrlimit(resource: i32, lim: *mut u8) -> i32
 extern fn setrlimit(resource: i32, lim: *const u8) -> i32
 extern fn _exit(code: i32) -> void
 extern fn __error() -> *mut i32
+extern fn with_clock_nanos() -> i64
+extern fn with_usleep(usecs: i32) -> i32
 
 let SIGINT: i32 = 2
 let SIGQUIT: i32 = 3
@@ -37,6 +43,8 @@ let SIGACTION_OFF_HANDLER: i64 = 0
 let RLIMIT_SIZE: i64 = 16
 let RLIMIT_OFF_CUR: i64 = 0
 let RLIMIT_OFF_MAX: i64 = 8
+let WNOHANG: i32 = 1
+let CAPTURE_TIMEOUT_RC: i32 = 124
 
 var interrupt_flag: i32 = 0
 var active_child_pgid: i32 = 0
@@ -103,6 +111,34 @@ fn wait_for_child_process(pid: i32) -> i32:
                 continue
             return -1
 
+fn wait_for_child_process_timeout(pid: i32, timeout_ms: i32) -> i32:
+    var status: i32 = -1
+    let start_ns = with_clock_nanos()
+    let timeout_ns = timeout_ms as i64 * 1000000
+    while true:
+        let waited = waitpid(pid, &raw mut status, WNOHANG)
+        if waited == pid:
+            let termsig = status & 0x7f
+            if termsig == 0:
+                return (status >> 8) & 0xff
+            if termsig != 0x7f:
+                return 128 + termsig
+            return status
+        if waited < 0:
+            let errp = __error()
+            if errp as i64 != 0 and unsafe: *errp == EINTR:
+                continue
+            return -1
+        if timeout_ms > 0 and with_clock_nanos() - start_ns >= timeout_ns:
+            let _ = kill(0 - pid, SIGTERM)
+            let _sleep = with_usleep(10000)
+            let waited_after_term = waitpid(pid, &raw mut status, WNOHANG)
+            if waited_after_term != pid:
+                let _kill = kill(0 - pid, 9)
+                let _ = waitpid(pid, &raw mut status, 0)
+            return CAPTURE_TIMEOUT_RC
+        let _sleep_poll = with_usleep(10000)
+
 fn run_shell_command(cmd: *const u8) -> i32:
     var prev_mask: u32 = 0 as u32
     let mask_rc = block_interrupt_signals(&raw mut prev_mask)
@@ -163,6 +199,112 @@ fn run_binary_direct(path: *const u8) -> i32:
     if mask_rc == 0:
         restore_signal_mask(&prev_mask as *const u32)
     let rc = wait_for_child_process(pid)
+    active_child_pgid = 0
+    rc
+
+fn argv_blob_count(blob: *const u8, len: i64) -> i32:
+    if len <= 0:
+        return 0
+    var count = 0
+    var offset: i64 = 0
+    while offset < len:
+        count += 1
+        while offset < len and (unsafe: *((blob as i64 + offset) as *const u8)) != 0:
+            offset += 1
+        offset += 1
+    count
+
+fn run_argv_direct(blob: *const u8, len: i64) -> i32:
+    let argc = argv_blob_count(blob, len)
+    if argc <= 0 or argc >= 256:
+        return -1
+    var prev_mask: u32 = 0 as u32
+    let mask_rc = block_interrupt_signals(&raw mut prev_mask)
+    let pid = fork()
+    if pid == 0:
+        if mask_rc == 0:
+            restore_signal_mask(&prev_mask as *const u32)
+        let _ = setpgid(0, 0)
+        restore_default_signal_handler(SIGINT)
+        restore_default_signal_handler(SIGTERM)
+        restore_default_signal_handler(SIGHUP)
+        restore_default_signal_handler(SIGQUIT)
+        var argv: [256]*const u8 = [0 as *const u8; 256]
+        var argi = 0
+        var offset: i64 = 0
+        while offset < len and argi < 255:
+            argv[argi] = (blob as i64 + offset) as *const u8
+            argi += 1
+            while offset < len and (unsafe: *((blob as i64 + offset) as *const u8)) != 0:
+                offset += 1
+            offset += 1
+        argv[argi] = 0 as *const u8
+        let _ = execvp(argv[0], (&argv) as *const [256]*const u8 as *const *const u8)
+        _exit(127)
+    if pid < 0:
+        if mask_rc == 0:
+            restore_signal_mask(&prev_mask as *const u32)
+        return -1
+
+    active_child_pgid = pid
+    let _ = setpgid(pid, pid)
+    if mask_rc == 0:
+        restore_signal_mask(&prev_mask as *const u32)
+    let rc = wait_for_child_process(pid)
+    active_child_pgid = 0
+    rc
+
+fn redirect_fd_to_path(path: *const u8, fd: i32) -> i32:
+    let out_fd = __open(path, 1 | 0x200 | 0x400, 0o644)
+    if out_fd < 0:
+        return -1
+    if dup2(out_fd, fd) < 0:
+        let _ = close(out_fd)
+        return -1
+    let _ = close(out_fd)
+    0
+
+fn run_argv_capture(blob: *const u8, len: i64, stdout_path: *const u8, stderr_path: *const u8, timeout_ms: i32) -> i32:
+    let argc = argv_blob_count(blob, len)
+    if argc <= 0 or argc >= 256:
+        return -1
+    var prev_mask: u32 = 0 as u32
+    let mask_rc = block_interrupt_signals(&raw mut prev_mask)
+    let pid = fork()
+    if pid == 0:
+        if mask_rc == 0:
+            restore_signal_mask(&prev_mask as *const u32)
+        let _ = setpgid(0, 0)
+        restore_default_signal_handler(SIGINT)
+        restore_default_signal_handler(SIGTERM)
+        restore_default_signal_handler(SIGHUP)
+        restore_default_signal_handler(SIGQUIT)
+        if redirect_fd_to_path(stdout_path, 1) != 0:
+            _exit(127)
+        if redirect_fd_to_path(stderr_path, 2) != 0:
+            _exit(127)
+        var argv: [256]*const u8 = [0 as *const u8; 256]
+        var argi = 0
+        var offset: i64 = 0
+        while offset < len and argi < 255:
+            argv[argi] = (blob as i64 + offset) as *const u8
+            argi += 1
+            while offset < len and (unsafe: *((blob as i64 + offset) as *const u8)) != 0:
+                offset += 1
+            offset += 1
+        argv[argi] = 0 as *const u8
+        let _ = execvp(argv[0], (&argv) as *const [256]*const u8 as *const *const u8)
+        _exit(127)
+    if pid < 0:
+        if mask_rc == 0:
+            restore_signal_mask(&prev_mask as *const u32)
+        return -1
+
+    active_child_pgid = pid
+    let _ = setpgid(pid, pid)
+    if mask_rc == 0:
+        restore_signal_mask(&prev_mask as *const u32)
+    let rc = wait_for_child_process_timeout(pid, timeout_ms)
     active_child_pgid = 0
     rc
 
@@ -243,6 +385,49 @@ pub fn exec_binary(path: str) -> i32:
         return -1
     let rc = run_binary_direct(buf as *const u8)
     with_free(buf)
+    rc
+
+@[c_export("with_exec_argv")]
+pub fn exec_argv(args: str) -> i32:
+    let buf = str_to_c_buf(args)
+    if buf as i64 == 0:
+        return -1
+    if interrupt_flag != 0:
+        with_free(buf)
+        let errp = __error()
+        if errp as i64 != 0:
+            unsafe: *errp = EINTR
+        return -1
+    let rc = run_argv_direct(buf as *const u8, args.len())
+    with_free(buf)
+    rc
+
+@[c_export("with_exec_argv_capture")]
+pub fn exec_argv_capture(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32) -> i32:
+    let arg_buf = str_to_c_buf(args)
+    if arg_buf as i64 == 0:
+        return -1
+    let out_buf = str_to_c_buf(stdout_path)
+    if out_buf as i64 == 0:
+        with_free(arg_buf)
+        return -1
+    let err_buf = str_to_c_buf(stderr_path)
+    if err_buf as i64 == 0:
+        with_free(arg_buf)
+        with_free(out_buf)
+        return -1
+    if interrupt_flag != 0:
+        with_free(arg_buf)
+        with_free(out_buf)
+        with_free(err_buf)
+        let errp = __error()
+        if errp as i64 != 0:
+            unsafe: *errp = EINTR
+        return -1
+    let rc = run_argv_capture(arg_buf as *const u8, args.len(), out_buf as *const u8, err_buf as *const u8, timeout_ms)
+    with_free(arg_buf)
+    with_free(out_buf)
+    with_free(err_buf)
     rc
 
 @[c_export("with_extract_tgz")]

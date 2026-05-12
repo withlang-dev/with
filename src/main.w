@@ -21,6 +21,7 @@ extern fn with_arg_at(idx: i32) -> str
 extern fn with_fs_write_file(path: str, data: str) -> i32
 extern fn with_fs_mkdir_p(path: str) -> i32
 extern fn with_fs_read_file(path: str) -> str
+extern fn with_fs_file_exists(path: str) -> i32
 extern fn with_read_bytes_stdin(count: i32) -> str
 extern fn with_str_eq(a: str, b: str) -> i32
 extern fn with_str_len(s: str) -> i64
@@ -32,6 +33,8 @@ extern fn with_eprint(s: str) -> void
 extern fn with_ewrite(s: str) -> void
 extern fn with_system(cmd: str) -> i32
 extern fn with_exec_binary(path: str) -> i32
+extern fn with_exec_argv(args: str) -> i32
+extern fn with_exec_argv_capture(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32) -> i32
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_fs_remove_file(path: str) -> i32
 extern fn with_fs_remove_dir(path: str) -> i32
@@ -125,11 +128,15 @@ type BuildGraphTarget {
     kind: i32,
     name: str,
     entry: str,
+    output: str,
     target_kind: i32,
     optimize_mode: i32,
     system_libs: Vec[str],
     include_paths: Vec[str],
     defines: Vec[str],
+    inputs: Vec[str],
+    deps: Vec[str],
+    args: Vec[str],
 }
 
 type BuildGraphGeneratedSource {
@@ -140,8 +147,10 @@ type BuildGraphGeneratedSource {
 type BuildGraph {
     ok: bool,
     error_msg: str,
+    raw_text: str,
     package_name: str,
     package_version: str,
+    default_target: str,
     targets: Vec[BuildGraphTarget],
     generated_sources: Vec[BuildGraphGeneratedSource],
 }
@@ -234,6 +243,20 @@ fn cli_test_verbose(argc: i32) -> bool:
 
 fn cli_test_quiet(argc: i32) -> bool:
     cli_has_flag(argc, "-q") or cli_has_flag(argc, "--quiet")
+
+fn cli_is_build_target_selector(arg: str) -> bool:
+    arg.len() > 1 and arg.byte_at(0) == 58
+
+fn cli_build_target_arg(argc: i32) -> str:
+    if cli_command(argc) != "build":
+        return ""
+    var i = 2
+    while i < argc:
+        let arg = with_arg_at(i)
+        if cli_is_build_target_selector(arg):
+            return arg.slice(1, arg.len())
+        i = i + 1
+    ""
 
 fn cli_test_filter(argc: i32) -> str:
     var i = 2
@@ -586,7 +609,7 @@ fn run_cli(argc: i32) -> i32:
         return run_run_command(cli_command(argc), opt_level, no_std, alloc_mode, prelude_mode, debug_info)
 
     if cli_command(argc) == "build":
-        return run_build_command(source, opt_level, no_std, alloc_mode, emit_c_mode, emit_obj_mode, output, prelude_mode, debug_info)
+        return run_build_command(source, opt_level, no_std, alloc_mode, emit_c_mode, emit_obj_mode, output, prelude_mode, debug_info, cli_build_target_arg(argc), cli_has_flag(argc, "--graph"), cli_has_flag(argc, "--dry-run"))
     if cli_command(argc) == "run":
         if emit_c_mode:
             with_eprint("error: '--emit-c' is only supported with 'build'")
@@ -722,7 +745,7 @@ fn find_source_arg(argc: i32) -> str:
             skip = true
         if not skip:
             if with_str_len(arg) > 0:
-                if with_str_byte_at(arg, 0) != 45: // not '-'
+                if with_str_byte_at(arg, 0) != 45 and not cli_is_build_target_selector(arg): // not '-' or ':target'
                     return arg
         i = i + step
     ""
@@ -754,8 +777,10 @@ fn empty_build_graph -> BuildGraph:
     BuildGraph {
         ok: false,
         error_msg: "",
+        raw_text: "",
         package_name: "",
         package_version: "",
+        default_target: "",
         targets: Vec.new(),
         generated_sources: Vec.new(),
     }
@@ -763,16 +788,20 @@ fn empty_build_graph -> BuildGraph:
 fn build_graph_generated_source_new(path: str, contents: str) -> BuildGraphGeneratedSource:
     BuildGraphGeneratedSource { path, contents }
 
-fn build_graph_target_new(kind: i32, name: str, entry: str, target_kind: i32, optimize_mode: i32) -> BuildGraphTarget:
+fn build_graph_target_new(kind: i32, name: str, entry: str, target_kind: i32, optimize_mode: i32, output: str) -> BuildGraphTarget:
     BuildGraphTarget {
         kind,
         name,
         entry,
+        output,
         target_kind,
         optimize_mode,
         system_libs: Vec.new(),
         include_paths: Vec.new(),
         defines: Vec.new(),
+        inputs: Vec.new(),
+        deps: Vec.new(),
+        args: Vec.new(),
     }
 
 fn build_graph_split_fields(line: str) -> Vec[str]:
@@ -801,11 +830,59 @@ fn build_graph_split_fields(line: str) -> Vec[str]:
     fields.push(cur)
     fields
 
+fn build_graph_escape(value: str) -> str:
+    var out = ""
+    for i in 0..value.len() as i32:
+        let ch = value.byte_at(i as i64)
+        if ch == 92:
+            out = out ++ "\\\\"
+        else if ch == 9:
+            out = out ++ "\\t"
+        else if ch == 10:
+            out = out ++ "\\n"
+        else if ch == 13:
+            out = out ++ "\\r"
+        else:
+            out = out ++ value.slice(i as i64, (i + 1) as i64)
+    out
+
+fn build_graph_emit(graph: BuildGraph) -> str:
+    var out = "WITH_BUILD_GRAPH\t2\n"
+    out = out ++ "package\t" ++ build_graph_escape(graph.package_name) ++ "\t" ++ build_graph_escape(graph.package_version) ++ "\n"
+    if graph.default_target.len() > 0:
+        out = out ++ "default_target\t" ++ build_graph_escape(graph.default_target) ++ "\n"
+    for gi in 0..graph.generated_sources.len() as i32:
+        let generated = graph.generated_sources.get(gi as i64)
+        out = out ++ "generated_source\t" ++ build_graph_escape(generated.path) ++ "\t" ++ build_graph_escape(generated.contents) ++ "\n"
+    for ti in 0..graph.targets.len() as i32:
+        let target = graph.targets.get(ti as i64)
+        out = out ++ "target\t"
+        out = out ++ f"{target.kind}\t"
+        out = out ++ build_graph_escape(target.name) ++ "\t"
+        out = out ++ build_graph_escape(target.entry) ++ "\t"
+        out = out ++ f"{target.target_kind}\t"
+        out = out ++ f"{target.optimize_mode}\t"
+        out = out ++ build_graph_escape(target.output) ++ "\n"
+        for li in 0..target.system_libs.len() as i32:
+            out = out ++ "system_lib\t" ++ f"{ti}\t" ++ build_graph_escape(target.system_libs.get(li as i64)) ++ "\n"
+        for ii in 0..target.include_paths.len() as i32:
+            out = out ++ "include_path\t" ++ f"{ti}\t" ++ build_graph_escape(target.include_paths.get(ii as i64)) ++ "\n"
+        for di in 0..target.defines.len() as i32:
+            out = out ++ "define\t" ++ f"{ti}\t" ++ build_graph_escape(target.defines.get(di as i64)) ++ "\n"
+        for ini in 0..target.inputs.len() as i32:
+            out = out ++ "input\t" ++ f"{ti}\t" ++ build_graph_escape(target.inputs.get(ini as i64)) ++ "\n"
+        for depi in 0..target.deps.len() as i32:
+            out = out ++ "dep\t" ++ f"{ti}\t" ++ build_graph_escape(target.deps.get(depi as i64)) ++ "\n"
+        for ai in 0..target.args.len() as i32:
+            out = out ++ "arg\t" ++ f"{ti}\t" ++ build_graph_escape(target.args.get(ai as i64)) ++ "\n"
+    out
+
 fn build_graph_parse_i32(text: str) -> i32:
     test_parse_i32(text)
 
 fn parse_build_graph(text: str) -> BuildGraph:
     var graph = empty_build_graph()
+    graph.raw_text = text
     if text.len() == 0:
         graph.error_msg = "build.w produced an empty build graph"
         return graph
@@ -814,12 +891,13 @@ fn parse_build_graph(text: str) -> BuildGraph:
         graph.error_msg = "build.w produced an empty build graph"
         return graph
     let header = build_graph_split_fields(lines.get(0))
-    if header.len() != 2 or header.get(0) != "WITH_BUILD_GRAPH" or header.get(1) != "1":
+    if header.len() != 2 or header.get(0) != "WITH_BUILD_GRAPH" or (header.get(1) != "1" and header.get(1) != "2"):
         graph.error_msg = "build.w produced an invalid build graph header"
         return graph
+    let graph_version = build_graph_parse_i32(header.get(1))
 
     var has_current = false
-    var current = build_graph_target_new(0, "", "", 0, 0)
+    var current = build_graph_target_new(0, "", "", 0, 0, "")
     var i = 1
     while i < lines.len() as i32:
         let fields = build_graph_split_fields(lines.get(i as i64))
@@ -833,23 +911,30 @@ fn parse_build_graph(text: str) -> BuildGraph:
                 return graph
             graph.package_name = fields.get(1)
             graph.package_version = fields.get(2)
+        else if tag == "default_target":
+            if fields.len() != 2:
+                graph.error_msg = "invalid default_target line in build graph"
+                return graph
+            graph.default_target = fields.get(1)
         else if tag == "generated_source":
             if fields.len() != 3:
                 graph.error_msg = "invalid generated_source line in build graph"
                 return graph
             graph.generated_sources.push(build_graph_generated_source_new(fields.get(1), fields.get(2)))
         else if tag == "target":
-            if fields.len() != 6:
+            if (graph_version == 1 and fields.len() != 6) or (graph_version == 2 and fields.len() != 7):
                 graph.error_msg = "invalid target line in build graph"
                 return graph
             if has_current:
                 graph.targets.push(current)
+            let output = if graph_version == 2: fields.get(6) else: ""
             current = build_graph_target_new(
                 build_graph_parse_i32(fields.get(1)),
                 fields.get(2),
                 fields.get(3),
                 build_graph_parse_i32(fields.get(4)),
                 build_graph_parse_i32(fields.get(5)),
+                output,
             )
             has_current = true
         else if tag == "system_lib":
@@ -867,6 +952,21 @@ fn parse_build_graph(text: str) -> BuildGraph:
                 graph.error_msg = "invalid define line in build graph"
                 return graph
             current.defines.push(fields.get(2))
+        else if tag == "input":
+            if fields.len() != 3 or not has_current:
+                graph.error_msg = "invalid input line in build graph"
+                return graph
+            current.inputs.push(fields.get(2))
+        else if tag == "dep":
+            if fields.len() != 3 or not has_current:
+                graph.error_msg = "invalid dep line in build graph"
+                return graph
+            current.deps.push(fields.get(2))
+        else if tag == "arg":
+            if fields.len() != 3 or not has_current:
+                graph.error_msg = "invalid arg line in build graph"
+                return graph
+            current.args.push(fields.get(2))
         else:
             graph.error_msg = "unknown build graph line: " ++ tag
             return graph
@@ -918,11 +1018,129 @@ fn load_build_graph_from_build_w(root: str, cfg: ProjectConfig, opt_level: i32, 
     let _remove_graph = with_fs_remove_file(graph_path)
     parse_build_graph(graph_text)
 
+fn build_graph_filter_target(graph: &BuildGraph, target_name: str) -> BuildGraph:
+    var out = empty_build_graph()
+    out.ok = graph.ok
+    out.error_msg = graph.error_msg
+    out.raw_text = graph.raw_text
+    out.package_name = graph.package_name
+    out.package_version = graph.package_version
+    out.default_target = graph.default_target
+    for gi in 0..graph.generated_sources.len() as i32:
+        out.generated_sources.push(graph.generated_sources.get(gi as i64))
+    if target_name.len() == 0:
+        for ti_all in 0..graph.targets.len() as i32:
+            out.targets.push(graph.targets.get(ti_all as i64))
+        out.raw_text = build_graph_emit(out)
+        return out
+    let selected = build_graph_select_target_closure(graph, target_name)
+    if not selected.ok:
+        out.ok = false
+        out.error_msg = selected.error_msg
+    else:
+        for ti in 0..selected.targets.len() as i32:
+            out.targets.push(selected.targets.get(ti as i64))
+        out.raw_text = build_graph_emit(out)
+    out
+
+type BuildGraphSelectedTargets {
+    ok: bool,
+    error_msg: str,
+    targets: Vec[BuildGraphTarget],
+    selected_names: Vec[str],
+    visiting_names: Vec[str],
+}
+
+fn build_graph_selected_targets_new -> BuildGraphSelectedTargets:
+    BuildGraphSelectedTargets {
+        ok: true,
+        error_msg: "",
+        targets: Vec.new(),
+        selected_names: Vec.new(),
+        visiting_names: Vec.new(),
+    }
+
+fn build_graph_name_vec_contains(names: Vec[str], name: str) -> bool:
+    for i in 0..names.len() as i32:
+        if names.get(i as i64) == name:
+            return true
+    false
+
+fn build_graph_find_target_index(graph: &BuildGraph, name: str) -> i32:
+    for i in 0..graph.targets.len() as i32:
+        if graph.targets.get(i as i64).name == name:
+            return i
+    -1
+
+fn build_graph_find_output_producer_index(graph: &BuildGraph, path: str, consumer_name: str) -> i32:
+    if path.len() == 0:
+        return -1
+    for i in 0..graph.targets.len() as i32:
+        let target = graph.targets.get(i as i64)
+        if target.name != consumer_name and target.output.len() > 0 and target.output == path:
+            return i
+    -1
+
+fn build_graph_selected_targets_add(selected: BuildGraphSelectedTargets, graph: &BuildGraph, name: str) -> BuildGraphSelectedTargets:
+    var out = selected
+    if not out.ok:
+        return out
+    if build_graph_name_vec_contains(out.selected_names, name):
+        return out
+    if build_graph_name_vec_contains(out.visiting_names, name):
+        out.ok = false
+        out.error_msg = "build.w target dependency cycle includes '" ++ name ++ "'"
+        return out
+    let index = build_graph_find_target_index(graph, name)
+    if index < 0:
+        out.ok = false
+        out.error_msg = "build.w did not declare target '" ++ name ++ "'"
+        return out
+    let target = graph.targets.get(index as i64)
+    out.visiting_names.push(name)
+    for di in 0..target.deps.len() as i32:
+        out = build_graph_selected_targets_add(move out, graph, target.deps.get(di as i64))
+        if not out.ok:
+            return out
+    let entry_producer = build_graph_find_output_producer_index(graph, target.entry, target.name)
+    if entry_producer >= 0:
+        out = build_graph_selected_targets_add(move out, graph, graph.targets.get(entry_producer as i64).name)
+        if not out.ok:
+            return out
+    for ii in 0..target.inputs.len() as i32:
+        let input_producer = build_graph_find_output_producer_index(graph, target.inputs.get(ii as i64), target.name)
+        if input_producer >= 0:
+            out = build_graph_selected_targets_add(move out, graph, graph.targets.get(input_producer as i64).name)
+            if not out.ok:
+                return out
+    out.selected_names.push(name)
+    out.targets.push(target)
+    out
+
+fn build_graph_select_target_closure(graph: &BuildGraph, target_name: str) -> BuildGraphSelectedTargets:
+    var selected = build_graph_selected_targets_new()
+    build_graph_selected_targets_add(move selected, graph, target_name)
+
+fn build_graph_find_build_root(start_dir: str) -> str:
+    var cur = if start_dir.len() > 0: start_dir else: "."
+    while true:
+        let manifest = resolve_join(cur, "with.toml")
+        let build_file = resolve_join(cur, "build.w")
+        if project_config_file_exists(manifest) or project_config_file_exists(build_file):
+            return project_config_absolutize_path(cur)
+        let parent = resolve_dirname(cur)
+        if parent == cur:
+            break
+        cur = parent
+    ""
+
 fn build_graph_output_path(root: str, target: BuildGraphTarget, output_path: str, target_count: i32) -> str:
     if output_path.len() > 0:
         if target_count != 1:
             return ""
         return output_path
+    if target.output.len() > 0:
+        return build_graph_resolve_project_path(root, target.output)
     resolve_join(resolve_join(root, "out/bin"), target.name)
 
 fn build_graph_library_output_path(root: str, target: BuildGraphTarget, output_path: str, target_count: i32) -> str:
@@ -930,6 +1148,8 @@ fn build_graph_library_output_path(root: str, target: BuildGraphTarget, output_p
         if target_count != 1:
             return ""
         return output_path
+    if target.output.len() > 0:
+        return build_graph_resolve_project_path(root, target.output)
     resolve_join(resolve_join(root, "out/lib"), "lib" ++ target.name ++ ".a")
 
 fn build_graph_resolve_project_path(root: str, path: str) -> str:
@@ -1021,6 +1241,30 @@ fn build_graph_define_valid(define: str) -> bool:
                 return false
     true
 
+fn build_graph_kind_name(kind: i32) -> str:
+    if kind == 0: return "executable"
+    if kind == 1: return "library"
+    if kind == 2: return "test"
+    if kind == 3: return "object"
+    if kind == 4: return "archive"
+    if kind == 5: return "generated_source"
+    if kind == 6: return "generated_binary"
+    if kind == 7: return "command"
+    if kind == 8: return "install"
+    if kind == 9: return "group"
+    if kind == 10: return "binary_compare"
+    if kind == 11: return "fixpoint_compare"
+    if kind == 12: return "compile_c_object"
+    if kind == 13: return "compile_asm_object"
+    if kind == 14: return "compile_llvm_ir_object"
+    if kind == 15: return "create_static_archive"
+    if kind == 16: return "generate_response_file"
+    if kind == 17: return "embed_object_files"
+    if kind == 18: return "copy_runtime_tree"
+    if kind == 19: return "run_corpus_test"
+    if kind == 20: return "promote_tree_if_verified"
+    f"unknown({kind})"
+
 fn build_graph_target_name(kind: i32) -> str:
     if kind == 0:
         return "native"
@@ -1059,6 +1303,41 @@ fn build_graph_target_is_host(kind: i32) -> bool:
         return true
     kind == build_graph_host_target_kind()
 
+fn build_graph_output_seen(outputs: Vec[str], path: str) -> bool:
+    for i in 0..outputs.len() as i32:
+        if outputs.get(i as i64) == path:
+            return true
+    false
+
+fn build_graph_register_output(outputs: Vec[str], path: str) -> bool:
+    if path.len() == 0:
+        return true
+    if build_graph_output_seen(outputs, path):
+        return false
+    outputs.push(path)
+    true
+
+fn build_graph_validate_outputs(root: str, graph: BuildGraph, output_path: str) -> i32:
+    let outputs: Vec[str] = Vec.new()
+    for gi in 0..graph.generated_sources.len() as i32:
+        let generated = graph.generated_sources.get(gi as i64)
+        if not build_graph_register_output(outputs, resolve_join(root, generated.path)):
+            with_eprint("error: duplicate build.w output path: " ++ generated.path)
+            return 1
+    for ti in 0..graph.targets.len() as i32:
+        let target = graph.targets.get(ti as i64)
+        var path = ""
+        if target.kind == 0:
+            path = build_graph_output_path(root, target, output_path, graph.targets.len() as i32)
+        else if target.kind == 1:
+            path = build_graph_library_output_path(root, target, output_path, graph.targets.len() as i32)
+        else if target.output.len() > 0:
+            path = build_graph_resolve_project_path(root, target.output)
+        if not build_graph_register_output(outputs, path):
+            with_eprint("error: duplicate build.w output path for target '" ++ target.name ++ "': " ++ path)
+            return 1
+    0
+
 fn run_build_graph_write_generated_sources(root: str, graph: BuildGraph) -> i32:
     for gi in 0..graph.generated_sources.len() as i32:
         let generated = graph.generated_sources.get(gi as i64)
@@ -1075,17 +1354,401 @@ fn run_build_graph_write_generated_sources(root: str, graph: BuildGraph) -> i32:
             return 1
     0
 
+fn build_graph_target_input_path(root: str, target: BuildGraphTarget, index: i32) -> str:
+    if index == 0:
+        if target.entry.len() == 0:
+            return ""
+        return build_graph_resolve_project_path(root, target.entry)
+    let input_index = index - 1
+    if input_index < 0 or input_index >= target.inputs.len() as i32:
+        return ""
+    build_graph_resolve_project_path(root, target.inputs.get(input_index as i64))
+
+fn build_graph_compare_files(root: str, target: BuildGraphTarget, operation_name: str) -> i32:
+    let left_path = build_graph_target_input_path(root, target, 0)
+    let right_path = if target.args.len() > 0:
+        build_graph_resolve_project_path(root, target.args.get(0))
+    else:
+        build_graph_target_input_path(root, target, 1)
+    if left_path.len() == 0 or right_path.len() == 0:
+        with_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' requires two input paths")
+        return 1
+    if with_fs_file_exists(left_path) == 0:
+        with_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' missing left input: " ++ left_path)
+        return 1
+    if with_fs_file_exists(right_path) == 0:
+        with_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' missing right input: " ++ right_path)
+        return 1
+    let left = with_fs_read_file(left_path)
+    let right = with_fs_read_file(right_path)
+    let min_len = if left.len() < right.len(): left.len() else: right.len()
+    var diff_at = -1
+    var i = 0
+    while i < min_len:
+        if left.byte_at(i as i64) != right.byte_at(i as i64):
+            diff_at = i
+            break
+        i = i + 1
+    if diff_at < 0 and left.len() != right.len():
+        diff_at = min_len
+    if diff_at >= 0:
+        with_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' failed: " ++ left_path ++ " and " ++ right_path ++ f" differ at byte {diff_at}")
+        return 1
+    0
+
+fn build_graph_response_arg_valid(arg: str) -> bool:
+    for i in 0..arg.len() as i32:
+        let ch = arg.byte_at(i as i64)
+        if ch == 10 or ch == 13:
+            return false
+    true
+
+fn build_graph_quote_response_arg(arg: str) -> str:
+    var out = "\""
+    for i in 0..arg.len() as i32:
+        let ch = arg.byte_at(i as i64)
+        if ch == 92 or ch == 34:
+            out = out ++ "\\"
+        out = out ++ arg.slice(i as i64, (i + 1) as i64)
+    out ++ "\""
+
+fn build_graph_write_response_file(root: str, target: BuildGraphTarget) -> i32:
+    if target.output.len() == 0:
+        with_eprint("error: generate_response_file target '" ++ target.name ++ "' requires an output path")
+        return 1
+    let output_path = build_graph_resolve_project_path(root, target.output)
+    let output_dir = build_graph_dirname(output_path)
+    if with_fs_mkdir_p(output_dir) != 0:
+        with_eprint("error: could not create response file directory for target '" ++ target.name ++ "': " ++ output_dir)
+        return 1
+    var text = ""
+    for ai in 0..target.args.len() as i32:
+        let arg = target.args.get(ai as i64)
+        if not build_graph_response_arg_valid(arg):
+            with_eprint("error: generate_response_file target '" ++ target.name ++ "' contains an argument with a newline")
+            return 1
+        text = text ++ build_graph_quote_response_arg(arg) ++ "\n"
+    if with_fs_write_file(output_path, text) != 0:
+        with_eprint("error: could not write response file for target '" ++ target.name ++ "': " ++ output_path)
+        return 1
+    0
+
+fn build_graph_process_arg_valid(arg: str) -> bool:
+    for i in 0..arg.len() as i32:
+        if arg.byte_at(i as i64) == 0:
+            return false
+    true
+
+fn build_graph_argv_append(argv_blob: str, arg: str) -> str:
+    argv_blob ++ arg ++ "\0"
+
+fn build_graph_exec_argv(target: BuildGraphTarget, operation_name: str, argv_blob: str) -> i32:
+    let rc = with_exec_argv(argv_blob)
+    if rc != 0:
+        with_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ f"' failed with exit code {rc}")
+        return if rc == 0: 1 else: rc
+    0
+
+fn build_graph_tool_from_env(env_name: str, fallback: str) -> str:
+    let value = with_getenv_str(env_name)
+    if value.len() > 0:
+        return value
+    fallback
+
+fn build_graph_llvm_clang_tool() -> str:
+    let explicit = with_getenv_str("WITH_LLVM_CC")
+    if explicit.len() > 0:
+        return explicit
+    let legacy = with_getenv_str("LLVM_CC")
+    if legacy.len() > 0:
+        return legacy
+    let prefix = with_getenv_str("LLVM_PREFIX")
+    if prefix.len() > 0:
+        return prefix ++ "/bin/clang"
+    "clang"
+
+fn build_graph_append_common_compile_args(root: str, target: BuildGraphTarget, argv_blob: str) -> str:
+    var out = argv_blob
+    for ii in 0..target.include_paths.len() as i32:
+        out = build_graph_argv_append(out, "-I" ++ build_graph_resolve_project_path(root, target.include_paths.get(ii as i64)))
+    for di in 0..target.defines.len() as i32:
+        out = build_graph_argv_append(out, "-D" ++ target.defines.get(di as i64))
+    for ai in 0..target.args.len() as i32:
+        out = build_graph_argv_append(out, target.args.get(ai as i64))
+    out
+
+fn build_graph_validate_process_args(target: BuildGraphTarget) -> i32:
+    if not build_graph_process_arg_valid(target.entry):
+        with_eprint("error: build.w target '" ++ target.name ++ "' entry contains a NUL byte")
+        return 1
+    if not build_graph_process_arg_valid(target.output):
+        with_eprint("error: build.w target '" ++ target.name ++ "' output contains a NUL byte")
+        return 1
+    for ii in 0..target.inputs.len() as i32:
+        if not build_graph_process_arg_valid(target.inputs.get(ii as i64)):
+            with_eprint("error: build.w target '" ++ target.name ++ "' input contains a NUL byte")
+            return 1
+    for ai in 0..target.args.len() as i32:
+        if not build_graph_process_arg_valid(target.args.get(ai as i64)):
+            with_eprint("error: build.w target '" ++ target.name ++ "' arg contains a NUL byte")
+            return 1
+    0
+
+fn build_graph_compile_object(root: str, target: BuildGraphTarget, operation_name: str, compiler: str) -> i32:
+    if target.entry.len() == 0 or target.output.len() == 0:
+        with_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' requires source and output paths")
+        return 1
+    let arg_rc = build_graph_validate_process_args(target)
+    if arg_rc != 0:
+        return arg_rc
+    let source_path = build_graph_resolve_project_path(root, target.entry)
+    let output_path = build_graph_resolve_project_path(root, target.output)
+    if with_fs_file_exists(source_path) == 0:
+        with_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' missing source: " ++ source_path)
+        return 1
+    let output_dir = build_graph_dirname(output_path)
+    if with_fs_mkdir_p(output_dir) != 0:
+        with_eprint("error: could not create object output directory for target '" ++ target.name ++ "': " ++ output_dir)
+        return 1
+    var argv = ""
+    argv = build_graph_argv_append(argv, compiler)
+    argv = build_graph_append_common_compile_args(root, target, argv)
+    argv = build_graph_argv_append(argv, "-c")
+    argv = build_graph_argv_append(argv, source_path)
+    argv = build_graph_argv_append(argv, "-o")
+    argv = build_graph_argv_append(argv, output_path)
+    build_graph_exec_argv(target, operation_name, argv)
+
+fn build_graph_archive_member_seen(inputs: Vec[str], count: i32, basename: str) -> bool:
+    for i in 0..count:
+        if build_graph_path_basename(inputs.get(i as i64)) == basename:
+            return true
+    false
+
+fn build_graph_create_archive(root: str, target: BuildGraphTarget) -> i32:
+    if target.output.len() == 0:
+        with_eprint("error: create_static_archive target '" ++ target.name ++ "' requires an output path")
+        return 1
+    if target.inputs.len() == 0:
+        with_eprint("error: create_static_archive target '" ++ target.name ++ "' requires at least one input object")
+        return 1
+    let arg_rc = build_graph_validate_process_args(target)
+    if arg_rc != 0:
+        return arg_rc
+    let output_path = build_graph_resolve_project_path(root, target.output)
+    let output_dir = build_graph_dirname(output_path)
+    if with_fs_mkdir_p(output_dir) != 0:
+        with_eprint("error: could not create archive output directory for target '" ++ target.name ++ "': " ++ output_dir)
+        return 1
+    let resolved_inputs: Vec[str] = Vec.new()
+    for ii in 0..target.inputs.len() as i32:
+        let input_path = build_graph_resolve_project_path(root, target.inputs.get(ii as i64))
+        if with_fs_file_exists(input_path) == 0:
+            with_eprint("error: create_static_archive target '" ++ target.name ++ "' missing input: " ++ input_path)
+            return 1
+        let member = build_graph_path_basename(input_path)
+        if build_graph_archive_member_seen(resolved_inputs, resolved_inputs.len() as i32, member):
+            with_eprint("error: create_static_archive target '" ++ target.name ++ "' has duplicate archive member name: " ++ member)
+            return 1
+        resolved_inputs.push(input_path)
+    let _remove_old_archive = with_fs_remove_file(output_path)
+    var argv = ""
+    argv = build_graph_argv_append(argv, build_graph_tool_from_env("AR", "ar"))
+    argv = build_graph_argv_append(argv, "rcs")
+    argv = build_graph_argv_append(argv, output_path)
+    for ri in 0..resolved_inputs.len() as i32:
+        argv = build_graph_argv_append(argv, resolved_inputs.get(ri as i64))
+    build_graph_exec_argv(target, "create_static_archive", argv)
+
+fn build_graph_asm_quote_path(path: str) -> str:
+    var out = "\""
+    for i in 0..path.len() as i32:
+        let ch = path.byte_at(i as i64)
+        if ch == 92 or ch == 34:
+            out = out ++ "\\"
+        out = out ++ path.slice(i as i64, (i + 1) as i64)
+    out ++ "\""
+
+fn build_graph_symbol_char_ok(ch: i32) -> bool:
+    (ch >= 65 and ch <= 90) or (ch >= 97 and ch <= 122) or (ch >= 48 and ch <= 57) or ch == 95
+
+fn build_graph_symbol_name_valid(sym: str) -> bool:
+    if sym.len() == 0:
+        return false
+    let first = sym.byte_at(0)
+    if first >= 48 and first <= 57:
+        return false
+    for i in 0..sym.len() as i32:
+        if not build_graph_symbol_char_ok(sym.byte_at(i as i64)):
+            return false
+    true
+
+fn build_graph_emit_embedded_blob(sym: str, input_path: str) -> str:
+    ".globl _with_embedded_" ++ sym ++ "_start\n" ++
+    ".globl with_embedded_" ++ sym ++ "_start\n" ++
+    ".globl _with_embedded_" ++ sym ++ "_end\n" ++
+    ".globl with_embedded_" ++ sym ++ "_end\n" ++
+    ".p2align 4\n" ++
+    "_with_embedded_" ++ sym ++ "_start:\n" ++
+    "with_embedded_" ++ sym ++ "_start:\n" ++
+    "    .incbin " ++ build_graph_asm_quote_path(input_path) ++ "\n" ++
+    "_with_embedded_" ++ sym ++ "_end:\n" ++
+    "with_embedded_" ++ sym ++ "_end:\n\n"
+
+fn build_graph_embed_object_files(root: str, target: BuildGraphTarget) -> i32:
+    if target.output.len() == 0:
+        with_eprint("error: embed_object_files target '" ++ target.name ++ "' requires an output path")
+        return 1
+    if target.inputs.len() == 0:
+        with_eprint("error: embed_object_files target '" ++ target.name ++ "' requires at least one input object")
+        return 1
+    if target.args.len() != target.inputs.len():
+        with_eprint("error: embed_object_files target '" ++ target.name ++ "' requires one stable symbol name per input")
+        return 1
+    let arg_rc = build_graph_validate_process_args(target)
+    if arg_rc != 0:
+        return arg_rc
+    let output_path = build_graph_resolve_project_path(root, target.output)
+    let output_dir = build_graph_dirname(output_path)
+    if with_fs_mkdir_p(output_dir) != 0:
+        with_eprint("error: could not create embedded-object output directory for target '" ++ target.name ++ "': " ++ output_dir)
+        return 1
+    var asm_text = "// Auto-generated by with build embed_object_files - do not edit.\n\n"
+    if build_graph_host_target_kind() == 3 or build_graph_host_target_kind() == 4:
+        asm_text = asm_text ++ ".section __TEXT,__const\n.subsections_via_symbols\n\n"
+    else:
+        asm_text = asm_text ++ ".section .rodata\n\n"
+    for ii in 0..target.inputs.len() as i32:
+        let input_path = build_graph_resolve_project_path(root, target.inputs.get(ii as i64))
+        if with_fs_file_exists(input_path) == 0:
+            with_eprint("error: embed_object_files target '" ++ target.name ++ "' missing input: " ++ input_path)
+            return 1
+        let sym = target.args.get(ii as i64)
+        if not build_graph_symbol_name_valid(sym):
+            with_eprint("error: embed_object_files target '" ++ target.name ++ "' has invalid symbol name: " ++ sym)
+            return 1
+        asm_text = asm_text ++ build_graph_emit_embedded_blob(sym, input_path)
+    if with_fs_write_file(output_path, asm_text) != 0:
+        with_eprint("error: could not write embedded-object assembly for target '" ++ target.name ++ "': " ++ output_path)
+        return 1
+    0
+
+fn build_graph_manifest_relative_path_valid(path: str) -> bool:
+    if path.len() == 0:
+        return false
+    if path.byte_at(0) == 47:
+        return false
+    if with_str_contains(path, "..") != 0:
+        return false
+    for i in 0..path.len() as i32:
+        let ch = path.byte_at(i as i64)
+        if ch == 0 or ch == 10 or ch == 13 or ch == 9:
+            return false
+    true
+
+fn build_graph_copy_manifest_files(root: str, target: BuildGraphTarget, operation_name: str) -> i32:
+    if target.entry.len() == 0 or target.output.len() == 0:
+        with_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' requires source and output directories")
+        return 1
+    if target.inputs.len() == 0:
+        with_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' requires explicit relative input paths")
+        return 1
+    let source_dir = build_graph_resolve_project_path(root, target.entry)
+    let output_dir = build_graph_resolve_project_path(root, target.output)
+    for ii in 0..target.inputs.len() as i32:
+        let rel = target.inputs.get(ii as i64)
+        if not build_graph_manifest_relative_path_valid(rel):
+            with_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' has invalid relative input path: " ++ rel)
+            return 1
+        let source_path = resolve_join(source_dir, rel)
+        let dest_path = resolve_join(output_dir, rel)
+        if with_fs_file_exists(source_path) == 0:
+            with_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' missing input: " ++ source_path)
+            return 1
+        let dest_dir = build_graph_dirname(dest_path)
+        if with_fs_mkdir_p(dest_dir) != 0:
+            with_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' could not create destination directory: " ++ dest_dir)
+            return 1
+        let contents = with_fs_read_file(source_path)
+        if with_fs_write_file(dest_path, contents) != 0:
+            with_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' could not write destination: " ++ dest_path)
+            return 1
+    0
+
+fn build_graph_run_corpus_test(root: str, target: BuildGraphTarget) -> i32:
+    if target.entry.len() == 0:
+        with_eprint("error: run_corpus_test target '" ++ target.name ++ "' requires a runner")
+        return 1
+    let arg_rc = build_graph_validate_process_args(target)
+    if arg_rc != 0:
+        return arg_rc
+    for ii in 0..target.inputs.len() as i32:
+        let input_path = build_graph_resolve_project_path(root, target.inputs.get(ii as i64))
+        if with_fs_file_exists(input_path) == 0:
+            with_eprint("error: run_corpus_test target '" ++ target.name ++ "' missing declared input: " ++ input_path)
+            return 1
+    let output_dir = if target.output.len() > 0:
+        build_graph_resolve_project_path(root, target.output)
+    else:
+        resolve_join(resolve_join(root, "out/corpus"), target.name)
+    if with_fs_mkdir_p(output_dir) != 0:
+        with_eprint("error: could not create corpus output directory for target '" ++ target.name ++ "': " ++ output_dir)
+        return 1
+    let stdout_path = resolve_join(output_dir, "stdout.txt")
+    let stderr_path = resolve_join(output_dir, "stderr.txt")
+    var argv = ""
+    let runner_path = if target.entry.byte_at(0) == 47 or with_str_contains(target.entry, "/") != 0:
+        build_graph_resolve_project_path(root, target.entry)
+    else:
+        target.entry
+    argv = build_graph_argv_append(argv, runner_path)
+    for ai in 0..target.args.len() as i32:
+        argv = build_graph_argv_append(argv, target.args.get(ai as i64))
+    let timeout_ms = 300000
+    let rc = with_exec_argv_capture(argv, stdout_path, stderr_path, timeout_ms)
+    if rc == 124:
+        with_eprint("error: run_corpus_test target '" ++ target.name ++ f"' timed out after {timeout_ms}ms; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+        return 124
+    if rc != 0:
+        with_eprint("error: run_corpus_test target '" ++ target.name ++ f"' failed with exit code {rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+        return if rc == 0: 1 else: rc
+    0
+
+fn build_graph_target_completed(completed: Vec[str], name: str) -> bool:
+    for i in 0..completed.len() as i32:
+        if completed.get(i as i64) == name:
+            return true
+    false
+
+fn build_graph_verify_completed_deps(target: BuildGraphTarget, completed: Vec[str], operation_name: str, require_deps: bool) -> i32:
+    if require_deps and target.deps.len() == 0:
+        with_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' requires verification dependencies")
+        return 1
+    for di in 0..target.deps.len() as i32:
+        let dep = target.deps.get(di as i64)
+        if not build_graph_target_completed(completed, dep):
+            with_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' dependency has not completed: " ++ dep)
+            return 1
+    0
+
 fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, alloc_mode: bool, output_path: str, prelude_mode: i32, debug_info: bool) -> i32:
     if graph.targets.len() == 0:
         with_eprint("error: build.w did not declare any targets")
         return 1
+    let output_rc = build_graph_validate_outputs(root, graph, output_path)
+    if output_rc != 0:
+        return output_rc
     let generated_rc = run_build_graph_write_generated_sources(root, graph)
     if generated_rc != 0:
         return generated_rc
+    let completed_targets: Vec[str] = Vec.new()
     for ti in 0..graph.targets.len() as i32:
         let target = graph.targets.get(ti as i64)
-        if target.kind != 0 and target.kind != 1 and target.kind != 2:
-            with_eprint("error: build.w target kind is not implemented yet for '" ++ target.name ++ "'")
+        if target.kind < 0 or target.kind > 20:
+            with_eprint("error: invalid build.w target kind " ++ build_graph_kind_name(target.kind) ++ " for '" ++ target.name ++ "'")
+            return 1
+        if target.kind != 0 and target.kind != 1 and target.kind != 2 and target.kind != 9 and target.kind != 10 and target.kind != 11 and target.kind != 12 and target.kind != 13 and target.kind != 14 and target.kind != 15 and target.kind != 16 and target.kind != 17 and target.kind != 18 and target.kind != 19 and target.kind != 20:
+            with_eprint("error: build.w target kind '" ++ build_graph_kind_name(target.kind) ++ "' is not implemented yet for '" ++ target.name ++ "'")
             return 1
         if target.target_kind < 0 or target.target_kind > 5:
             with_eprint("error: invalid build.w target platform " ++ build_graph_target_name(target.target_kind) ++ " for '" ++ target.name ++ "'")
@@ -1098,6 +1761,81 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
             if not build_graph_define_valid(define):
                 with_eprint("error: invalid build.w define for '" ++ target.name ++ "': " ++ define)
                 return 1
+        if target.kind == 9:
+            let deps_rc = build_graph_verify_completed_deps(target, completed_targets, "group", false)
+            if deps_rc != 0:
+                return deps_rc
+            completed_targets.push(target.name)
+            continue
+        if target.kind == 10:
+            let compare_rc = build_graph_compare_files(root, target, "binary_compare")
+            if compare_rc != 0:
+                return compare_rc
+            completed_targets.push(target.name)
+            continue
+        if target.kind == 11:
+            let fixpoint_rc = build_graph_compare_files(root, target, "fixpoint_compare")
+            if fixpoint_rc != 0:
+                return fixpoint_rc
+            completed_targets.push(target.name)
+            continue
+        if target.kind == 16:
+            let response_rc = build_graph_write_response_file(root, target)
+            if response_rc != 0:
+                return response_rc
+            completed_targets.push(target.name)
+            continue
+        if target.kind == 12:
+            let c_rc = build_graph_compile_object(root, target, "compile_c_object", build_graph_tool_from_env("CC", "cc"))
+            if c_rc != 0:
+                return c_rc
+            completed_targets.push(target.name)
+            continue
+        if target.kind == 13:
+            let asm_rc = build_graph_compile_object(root, target, "compile_asm_object", build_graph_tool_from_env("CC", "cc"))
+            if asm_rc != 0:
+                return asm_rc
+            completed_targets.push(target.name)
+            continue
+        if target.kind == 14:
+            let ir_rc = build_graph_compile_object(root, target, "compile_llvm_ir_object", build_graph_llvm_clang_tool())
+            if ir_rc != 0:
+                return ir_rc
+            completed_targets.push(target.name)
+            continue
+        if target.kind == 15:
+            let archive_rc = build_graph_create_archive(root, target)
+            if archive_rc != 0:
+                return archive_rc
+            completed_targets.push(target.name)
+            continue
+        if target.kind == 17:
+            let embed_rc = build_graph_embed_object_files(root, target)
+            if embed_rc != 0:
+                return embed_rc
+            completed_targets.push(target.name)
+            continue
+        if target.kind == 18:
+            let copy_rc = build_graph_copy_manifest_files(root, target, "copy_runtime_tree")
+            if copy_rc != 0:
+                return copy_rc
+            completed_targets.push(target.name)
+            continue
+        if target.kind == 20:
+            let deps_rc = build_graph_verify_completed_deps(target, completed_targets, "promote_tree_if_verified", true)
+            if deps_rc != 0:
+                return deps_rc
+            let promote_rc = build_graph_copy_manifest_files(root, target, "promote_tree_if_verified")
+            if promote_rc != 0:
+                return promote_rc
+            completed_targets.push(target.name)
+            continue
+        if target.kind == 19:
+            let corpus_rc = build_graph_run_corpus_test(root, target)
+            if corpus_rc != 0:
+                return corpus_rc
+            completed_targets.push(target.name)
+            continue
         let source_path = resolve_join(root, target.entry)
         var target_opt = opt_level
         if target.optimize_mode == 1 and target_opt < 2:
@@ -1119,6 +1857,7 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
                     return test_rc
             if build_graph_path_has_glob(target.entry):
                 with_write(f"ok: {test_files.len()} files passed in build.w test target {target.name}\n")
+            completed_targets.push(target.name)
             continue
         if target.kind == 1:
             let ar_path = build_graph_library_output_path(root, target, output_path, graph.targets.len() as i32)
@@ -1134,6 +1873,7 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
                 with_eprint("error: build.w library target failed: " ++ target.name)
                 return 1
             comp.print_warnings()
+            completed_targets.push(target.name)
             continue
         let bin_path = build_graph_output_path(root, target, output_path, graph.targets.len() as i32)
         if bin_path.len() == 0:
@@ -1148,15 +1888,16 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
             with_eprint("error: build.w target failed: " ++ target.name)
             return 1
         comp.print_warnings()
+        completed_targets.push(target.name)
     0
 
-fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: bool, emit_c_mode: bool, emit_obj_mode: bool, output_path: str, prelude_mode: i32, debug_info: bool) -> i32:
+fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: bool, emit_c_mode: bool, emit_obj_mode: bool, output_path: str, prelude_mode: i32, debug_info: bool, build_target_name: str, graph_only: bool, dry_run: bool) -> i32:
     var actual_source = source_file
     var actual_output = output_path
     if actual_source == "":
-        let root = project_config_find_root(".")
+        let root = build_graph_find_build_root(".")
         if root.len() == 0:
-            with_eprint("error: 'build' requires a source file argument or a with.toml project")
+            with_eprint("error: 'build' requires a source file argument, build.w, or a with.toml project")
             return 1
         let build_path = resolve_join(root, "build.w")
         let cfg = project_config_load_for_source(root ++ "/src/main.w")
@@ -1171,7 +1912,17 @@ fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode:
             if not graph.ok:
                 with_eprint("error: " ++ graph.error_msg)
                 return 1
-            return run_build_graph(root, graph, opt_level, no_std, alloc_mode, actual_output, prelude_mode, debug_info)
+            var selected_target_name = build_target_name
+            if selected_target_name.len() == 0 and graph.default_target.len() > 0:
+                selected_target_name = graph.default_target
+            let selected_graph = build_graph_filter_target(&graph, selected_target_name)
+            if not selected_graph.ok:
+                with_eprint("error: " ++ selected_graph.error_msg)
+                return 1
+            if graph_only or dry_run:
+                with_write(selected_graph.raw_text)
+                return 0
+            return run_build_graph(root, selected_graph, opt_level, no_std, alloc_mode, actual_output, prelude_mode, debug_info)
         actual_source = root ++ "/src/main.w"
         if actual_output == "" and cfg.package_name.len() > 0:
             actual_output = "out/bin/" ++ cfg.package_name

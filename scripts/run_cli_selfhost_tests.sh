@@ -4192,6 +4192,263 @@ EOF
   echo "PASS(cli-selfhost-build) build_w_invalid_generated_source"
 }
 
+expect_build_w_graph_v2_and_target_selection() {
+  local case_dir="$tmpdir/build_w_graph_v2_case"
+  mkdir -p "$case_dir/src" "$case_dir/runtime"
+
+  cat >"$case_dir/with.toml" <<'EOF'
+[package]
+name = "buildwgraphv2"
+version = "0.1.0"
+EOF
+
+  cat >"$case_dir/src/one.w" <<'EOF'
+fn main:
+    print("one")
+EOF
+
+  cat >"$case_dir/src/two.w" <<'EOF'
+fn main:
+    print("two")
+EOF
+
+  cat >"$case_dir/runtime/helper.c" <<'EOF'
+int helper(void) {
+  return 42;
+}
+EOF
+
+  cat >"$case_dir/build.w" <<'EOF'
+use std.build
+
+pub fn build(b: Build) -> Build:
+    var out = b.executable("one", "src/one.w")
+    out = out.executable("two", "src/two.w")
+    out = out.generated_source("out/tmp/a.txt", "same")
+    out = out.generated_source("out/tmp/b.txt", "same")
+    out = out.binary_compare("bytes-same", "out/tmp/a.txt", "out/tmp/b.txt")
+    out = out.fixpoint_compare("fix-same", "out/tmp/a.txt", "out/tmp/b.txt")
+    var rsp = target_new(.GenerateResponseFile, "rsp", "").output("out/tmp/args.rsp")
+    rsp = rsp.arg("-L/some path")
+    rsp = rsp.arg("plain")
+    out = out.add_target(rsp)
+    out = out.compile_c_object("helper-o", "runtime/helper.c", "out/lib/helper.o")
+    var archive = target_new(.CreateStaticArchive, "helper-a", "").output("out/lib/libhelper.a")
+    archive = archive.input("out/lib/helper.o")
+    out = out.add_target(archive)
+    var embedded = target_new(.EmbedObjectFiles, "embed-helper", "").output("out/lib/embedded_helper.s")
+    embedded = embedded.input("out/lib/helper.o")
+    embedded = embedded.arg("helper_o")
+    out = out.add_target(embedded)
+    out = out.compile_asm_object("embedded-helper-o", "out/lib/embedded_helper.s", "out/lib/embedded_helper.o")
+    var copy_target = target_new(.CopyRuntimeTree, "runtime-copy", "runtime").output("out/runtime")
+    copy_target = copy_target.input("helper.c")
+    out = out.add_target(copy_target)
+    var promote = target_new(.PromoteTreeIfVerified, "promote-runtime", "out/runtime").output("promoted-runtime")
+    promote = promote.input("helper.c")
+    promote = promote.dep("runtime-copy")
+    out = out.add_target(promote)
+    var corpus = target_new(.RunCorpusTest, "corpus", "out/bin/two")
+    corpus = corpus.dep("two")
+    out = out.add_target(corpus)
+    var aggregate = target_new(.Group, "toolchain", "")
+    aggregate = aggregate.dep("bytes-same")
+    aggregate = aggregate.dep("fix-same")
+    aggregate = aggregate.dep("rsp")
+    aggregate = aggregate.dep("helper-a")
+    aggregate = aggregate.dep("embedded-helper-o")
+    aggregate = aggregate.dep("promote-runtime")
+    aggregate = aggregate.dep("corpus")
+    out = out.add_target(aggregate)
+    out.default("toolchain")
+EOF
+
+  if ! run_cli_in_dir "$case_dir" "$tmpdir/out" "$tmpdir/err" build --graph; then
+    echo "FAIL(cli-selfhost-build-graph) build_w_graph_v2"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_literal "$tmpdir/out" $'WITH_BUILD_GRAPH\t2'; then
+    echo "FAIL(cli-selfhost-build-graph-header) build_w_graph_v2"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_literal "$tmpdir/out" $'default_target\ttoolchain'; then
+    echo "FAIL(cli-selfhost-build-graph-default-target) build_w_graph_v2"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_literal "$tmpdir/out" $'target\t12\thelper-o\truntime/helper.c\t0\t0\tout/lib/helper.o'; then
+    echo "FAIL(cli-selfhost-build-graph-node) build_w_graph_v2"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_literal "$tmpdir/out" $'target\t15\thelper-a\t\t0\t0\tout/lib/libhelper.a'; then
+    echo "FAIL(cli-selfhost-build-graph-archive-node) build_w_graph_v2"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_literal "$tmpdir/out" $'target\t17\tembed-helper\t\t0\t0\tout/lib/embedded_helper.s'; then
+    echo "FAIL(cli-selfhost-build-graph-embed-node) build_w_graph_v2"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_literal "$tmpdir/out" $'target\t10\tbytes-same\tout/tmp/a.txt\t0\t0\t'; then
+    echo "FAIL(cli-selfhost-build-graph-binary-compare-node) build_w_graph_v2"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_literal "$tmpdir/out" $'target\t16\trsp\t\t0\t0\tout/tmp/args.rsp'; then
+    echo "FAIL(cli-selfhost-build-graph-response-node) build_w_graph_v2"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli_in_dir "$case_dir" "$tmpdir/out" "$tmpdir/err" build :two --graph; then
+    echo "FAIL(cli-selfhost-build-graph-selected) build_w_graph_v2"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if file_has_literal "$tmpdir/out" $'target\t12\thelper-o'; then
+    echo "FAIL(cli-selfhost-build-graph-selected-filter) build_w_graph_v2"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli_in_dir "$case_dir" "$tmpdir/out" "$tmpdir/err" build :toolchain --graph; then
+    echo "FAIL(cli-selfhost-build-graph-deps) build_w_graph_v2"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_literal "$tmpdir/out" $'target\t12\thelper-o' || ! file_has_literal "$tmpdir/out" $'target\t9\ttoolchain\t\t0\t0\t'; then
+    echo "FAIL(cli-selfhost-build-graph-dep-closure) build_w_graph_v2"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if file_has_literal "$tmpdir/out" $'target\t0\tone\t'; then
+    echo "FAIL(cli-selfhost-build-graph-dep-filter) build_w_graph_v2"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli_in_dir "$case_dir" "$tmpdir/out" "$tmpdir/err" build; then
+    echo "FAIL(cli-selfhost-build-full-graph) build_w_graph_v2"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if [[ ! -f "$case_dir/out/lib/helper.o" || ! -f "$case_dir/out/lib/libhelper.a" || ! -f "$case_dir/out/lib/embedded_helper.s" || ! -f "$case_dir/out/lib/embedded_helper.o" || ! -f "$case_dir/out/runtime/helper.c" || ! -f "$case_dir/promoted-runtime/helper.c" || ! -f "$case_dir/out/corpus/corpus/stdout.txt" ]]; then
+    echo "FAIL(cli-selfhost-build-object-archive-embed-before-unsupported) build_w_graph_v2"
+    ls -R "$case_dir/out" || true
+    ls -R "$case_dir/promoted-runtime" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_literal "$case_dir/out/corpus/corpus/stdout.txt" "two"; then
+    echo "FAIL(cli-selfhost-build-corpus-output) build_w_graph_v2"
+    cat "$case_dir/out/corpus/corpus/stdout.txt" || true
+    cat "$case_dir/out/corpus/corpus/stderr.txt" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_literal "$case_dir/out/lib/embedded_helper.s" "with_embedded_helper_o_start"; then
+    echo "FAIL(cli-selfhost-build-embed-contents) build_w_graph_v2"
+    cat "$case_dir/out/lib/embedded_helper.s" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  rm -rf "$case_dir/out"
+
+  if ! run_cli_in_dir "$case_dir" "$tmpdir/out" "$tmpdir/err" build :toolchain; then
+    echo "FAIL(cli-selfhost-build-group-deps) build_w_graph_v2"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if [[ ! -x "$case_dir/out/bin/two" || -x "$case_dir/out/bin/one" || ! -f "$case_dir/out/lib/libhelper.a" || ! -f "$case_dir/out/corpus/corpus/stdout.txt" ]]; then
+    echo "FAIL(cli-selfhost-build-group-deps-output) build_w_graph_v2"
+    ls -R "$case_dir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  rm -rf "$case_dir/out"
+
+  if ! run_cli_in_dir "$case_dir" "$tmpdir/out" "$tmpdir/err" build :bytes-same; then
+    echo "FAIL(cli-selfhost-build-binary-compare) build_w_graph_v2"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli_in_dir "$case_dir" "$tmpdir/out" "$tmpdir/err" build :fix-same; then
+    echo "FAIL(cli-selfhost-build-fixpoint-compare) build_w_graph_v2"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! run_cli_in_dir "$case_dir" "$tmpdir/out" "$tmpdir/err" build :rsp; then
+    echo "FAIL(cli-selfhost-build-response-file) build_w_graph_v2"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if [[ "$(cat "$case_dir/out/tmp/args.rsp")" != $'"-L/some path"\n"plain"' ]]; then
+    echo "FAIL(cli-selfhost-build-response-file-contents) build_w_graph_v2"
+    cat "$case_dir/out/tmp/args.rsp" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  rm -rf "$case_dir/out"
+
+  if ! run_cli_in_dir "$case_dir" "$tmpdir/out" "$tmpdir/err" build :two; then
+    echo "FAIL(cli-selfhost-build-target-select) build_w_graph_v2"
+    cat "$tmpdir/err" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if [[ ! -x "$case_dir/out/bin/two" || -x "$case_dir/out/bin/one" ]]; then
+    echo "FAIL(cli-selfhost-build-target-select-output) build_w_graph_v2"
+    ls -R "$case_dir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  echo "PASS(cli-selfhost-build) build_w_graph_v2"
+}
+
 expect_pointer_index_is_rejected() {
   local case_dir="$tmpdir/pointer_index_rejected_case"
   local src="$case_dir/pointer_index_rejected.w"
@@ -4651,6 +4908,7 @@ expect_build_w_explicit_host_target
 expect_build_w_non_native_target_fails_loudly
 expect_build_w_generated_source
 expect_build_w_invalid_generated_source_path
+expect_build_w_graph_v2_and_target_selection
 expect_pointer_index_is_rejected
 expect_top_level_help_lists_cli_commands
 expect_cli_one_liners
