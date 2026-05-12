@@ -64,6 +64,7 @@ type CliOptions {
     dump_ast_flag: bool,
     dump_resolved_flag: bool,
     dump_typed_flag: bool,
+    dump_project_info_flag: bool,
     dump_mir_flag: bool,
     dump_async_mir_flag: bool,
     deterministic_mode: bool,
@@ -168,6 +169,7 @@ fn cli_options_default -> CliOptions:
         dump_ast_flag: false,
         dump_resolved_flag: false,
         dump_typed_flag: false,
+        dump_project_info_flag: false,
         dump_mir_flag: false,
         dump_async_mir_flag: false,
         deterministic_mode: false,
@@ -280,6 +282,7 @@ fn parse_cli_options(argc: i32) -> CliOptions:
     opts.dump_ast_flag = cli_has_flag(argc, "--dump-ast")
     opts.dump_resolved_flag = cli_has_flag(argc, "--dump-resolved")
     opts.dump_typed_flag = cli_has_flag(argc, "--dump-typed")
+    opts.dump_project_info_flag = cli_has_flag(argc, "--dump-project-info")
     opts.dump_mir_flag = cli_has_flag(argc, "--dump-mir")
     opts.dump_async_mir_flag = cli_has_flag(argc, "--dump-async-mir")
     opts.deterministic_mode = cli_has_flag(argc, "--deterministic")
@@ -565,6 +568,7 @@ fn run_cli(argc: i32) -> i32:
     let dump_ast_flag = cli_has_flag(argc, "--dump-ast")
     let dump_resolved_flag = cli_has_flag(argc, "--dump-resolved")
     let dump_typed_flag = cli_has_flag(argc, "--dump-typed")
+    let dump_project_info_flag = cli_has_flag(argc, "--dump-project-info")
     let dump_mir_flag = cli_has_flag(argc, "--dump-mir")
     let dump_async_mir_flag = cli_has_flag(argc, "--dump-async-mir")
     let debug_info = not cli_has_flag(argc, "-g0") and not cli_has_flag(argc, "--release")
@@ -624,6 +628,8 @@ fn run_cli(argc: i32) -> i32:
             return dump_resolved_artifact(source, no_std, alloc_mode, prelude_mode)
         if dump_typed_flag:
             return dump_typed_artifact(source, no_std, alloc_mode, prelude_mode)
+        if dump_project_info_flag:
+            return dump_project_info_artifact(source, no_std, alloc_mode, prelude_mode)
         if dump_mir_flag:
             return dump_mir_artifact(source, no_std, alloc_mode, prelude_mode)
         if dump_async_mir_flag:
@@ -1263,6 +1269,17 @@ fn dump_typed_artifact(source_file: str, no_std: bool, alloc_mode: bool, prelude
     if not typed_ok:
         with_eprint("error: typed dump failed during compilation or semantic analysis")
         return 1
+    0
+
+fn dump_project_info_artifact(source_file: str, no_std: bool, alloc_mode: bool, prelude_mode: i32) -> i32:
+    var comp = Compilation.init()
+    comp.configure(0, no_std, alloc_mode)
+    comp.set_prelude_mode(prelude_mode)
+    let text = comp.dump_project_info_file(source_file)
+    if text.len() == 0:
+        with_eprint("error: project info dump failed")
+        return 1
+    with_write(text)
     0
 
 fn dump_mir_artifact(source_file: str, no_std: bool, alloc_mode: bool, prelude_mode: i32) -> i32:
@@ -1998,6 +2015,8 @@ fn print_usage:
     with_write("  --release        Enable release defaults\n")
     with_write("  --emit-c         Emit C instead of a binary\n")
     with_write("  --emit-obj       Emit an object file instead of a binary\n")
+    with_write("  --dump-project-info\n")
+    with_write("                   Print resolved project metadata from 'check'\n")
     with_write("  --no-std         Disable standard library support\n")
     with_write("  --no-prelude     Disable implicit prelude import\n")
     with_write("  --prelude=<mode> Select prelude mode: full, core, none\n")

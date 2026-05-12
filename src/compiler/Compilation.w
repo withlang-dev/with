@@ -9,6 +9,7 @@ use MirLower
 use AsyncMir
 use AsyncLower
 use CCodegen
+use render
 use compiler.Compilation.Config
 use compiler.Backend
 use compiler.Frontend
@@ -112,6 +113,50 @@ fn compilation_mir_error_span(zcu: Zcu, pool: AstPool, fn_sym: i32, raw_span: i3
     let start = if raw_span > 0: raw_span else: 0
     Span { file: 0, start: start, end: start + 1 }
 
+fn compilation_bool_digit(value: bool) -> str:
+    if value: "1" else: "0"
+
+fn compilation_type_decl_is_pub(pool: AstPool, extra_start: i32, sub_kind: i32) -> bool:
+    if sub_kind == TypeDeclKind.Struct or sub_kind == TypeDeclKind.Union:
+        let field_count = pool.get_extra(extra_start)
+        let vis_idx = extra_start + 1 + field_count * 4
+        return pool.get_extra(vis_idx) == Visibility.Public
+    if sub_kind == TypeDeclKind.Enum:
+        var ep = extra_start + 1
+        let variant_count = pool.get_extra(extra_start)
+        for _ in 0..variant_count:
+            ep = ep + 1
+            let payload_count = pool.get_extra(ep)
+            ep = ep + 1 + payload_count
+        return pool.get_extra(ep) == Visibility.Public
+    if sub_kind == TypeDeclKind.DiscEnum:
+        var ep = extra_start + 2
+        let variant_count = pool.get_extra(extra_start + 1)
+        for _ in 0..variant_count:
+            ep = ep + 1
+            ep = ep + 1
+            let payload_count = pool.get_extra(ep)
+            ep = ep + 1 + payload_count
+        return pool.get_extra(ep) == Visibility.Public
+    pool.get_extra(extra_start + 1) == Visibility.Public
+
+fn compilation_type_decl_kind_name(sub_kind: i32) -> str:
+    if sub_kind == TypeDeclKind.Struct:
+        return "struct"
+    if sub_kind == TypeDeclKind.Enum:
+        return "enum"
+    if sub_kind == TypeDeclKind.DiscEnum:
+        return "disc_enum"
+    if sub_kind == TypeDeclKind.Alias:
+        return "alias"
+    if sub_kind == TypeDeclKind.Distinct:
+        return "distinct"
+    if sub_kind == TypeDeclKind.Opaque:
+        return "opaque"
+    if sub_kind == TypeDeclKind.Union:
+        return "union"
+    "unknown"
+
 // Transitional orchestration root:
 // owns compiler-facing config/Zcu state while reusing Driver execution per call.
 // This removes long-lived Driver field ownership from Compilation.
@@ -209,6 +254,55 @@ fn Compilation.resolve_file(self: Compilation, path: str, emit_resolve_diags: bo
     let _ = emit_resolve_diags
     let _ = self.compile_file(path)
     self.zcu.last_resolved
+
+fn Compilation.dump_project_info_file(self: Compilation, source_path: str) -> str:
+    let pool = self.compile_file(source_path)
+    if pool.decl_count() == 0:
+        return ""
+    self.dump_project_info(pool)
+
+fn Compilation.dump_project_info(self: Compilation, pool: AstPool) -> str:
+    let zcu = self.zcu
+    var function_count = 0
+    var type_count = 0
+    for di in 0..pool.decl_count():
+        let decl = pool.get_decl(di)
+        let kind = pool.kind(decl)
+        if kind == NodeKind.NK_FN_DECL:
+            function_count = function_count + 1
+        else if kind == NodeKind.NK_TYPE_DECL:
+            type_count = type_count + 1
+
+    var out = f"project_info modules={zcu.last_resolved.modules.len() as i32} functions={function_count} types={type_count}\n"
+    for mi in 0..zcu.last_resolved.modules.len() as i32:
+        let mod = zcu.last_resolved.modules.get(mi as i64)
+        out = out ++ f"module path={mod.path} file={mod.file_id} decls={mod.decl_count}\n"
+
+    for di in 0..pool.decl_count():
+        let decl = pool.get_decl(di)
+        let kind = pool.kind(decl)
+        let path = zcu.decl_source_path_frontend(di)
+        if kind == NodeKind.NK_FN_DECL:
+            let name = zcu.pool.resolve(pool.get_data0(decl))
+            let flags = pool.get_data2(decl)
+            let is_pub = (flags / FnFlags.PUB) % 2 == 1
+            let meta = pool.find_fn_meta(decl)
+            var param_count = 0
+            var return_type = "void"
+            if meta >= 0:
+                param_count = pool.fn_meta_param_count(meta)
+                let ret_node = pool.fn_meta_ret(meta)
+                if ret_node != 0:
+                    return_type = render_type_expr(pool, zcu.pool, ret_node as NodeId)
+            out = out ++ f"function path={path} name={name} pub={compilation_bool_digit(is_pub)} params={param_count} return={return_type} span={pool.get_start(decl)}..{pool.get_end(decl)}\n"
+        else if kind == NodeKind.NK_TYPE_DECL:
+            let name = zcu.pool.resolve(pool.get_data0(decl))
+            let packed = pool.get_data2(decl)
+            let sub_kind = type_decl_sub_kind(packed)
+            let is_pub = compilation_type_decl_is_pub(pool, pool.get_data1(decl), sub_kind)
+            let kind_name = compilation_type_decl_kind_name(sub_kind)
+            out = out ++ f"type path={path} name={name} pub={compilation_bool_digit(is_pub)} kind={kind_name} span={pool.get_start(decl)}..{pool.get_end(decl)}\n"
+    out
 
 fn Compilation.has_errors(self: Compilation) -> bool:
     self.zcu.diagnostics.has_errors()

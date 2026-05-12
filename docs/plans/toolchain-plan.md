@@ -111,6 +111,13 @@ Source: `docs/toolchain.md`.
     instead of being silently ignored.
   - Unknown compiler-hook phases and hooks attached to non-functions are
     diagnostics.
+- Initial real `ProjectInfo` compiler data path:
+  - `with check --dump-project-info` now compiles through the normal frontend
+    and emits a stable textual summary from the resolved `Zcu` and typed AST.
+  - The dump reports modules plus function/type metadata including source path,
+    visibility, parameter counts, return type rendering, kind, and source span.
+  - This validates the compiler-side construction path before wiring
+    `ProjectInfo` values into tool-mode compiler-hook execution.
 
 ## Verified
 
@@ -134,6 +141,8 @@ Source: `docs/toolchain.md`.
 - `scripts/run_tests.sh test/compile_errors/err_derive_component_id_requires_trait.w test/compile_errors/err_derive_component_id_generic.w`
 - `scripts/run_tests.sh test/compile_errors/err_compiler_hook_not_implemented.w test/compile_errors/err_compiler_hook_unknown_phase.w test/compile_errors/err_compiler_hook_function_only.w`
 - `out/bin/with run test/behavior/behav_std_compiler_project_info.w`
+- `scripts/run_tests.sh test/behavior/behav_project_info_dump.w`
+- `out/bin/with check --no-std --no-prelude --dump-project-info test/behavior/behav_project_info_dump.w`
 
 ## Remaining
 
@@ -143,6 +152,6 @@ Source: `docs/toolchain.md`.
 - Complete `build.w` graph execution beyond executable, library, test,
   generated-source targets, and explicit host-target aliases: actual
   cross-target codegen/linking still needs driver support.
-- Compiler construction of real `ProjectInfo` values, compiler-hook runner
-  integration, and source emission remain future phases per
+- Compiler-hook runner integration, materializing the real `ProjectInfo` data
+  as stdlib values for hooks, and source emission remain future phases per
   `docs/toolchain.md`.
