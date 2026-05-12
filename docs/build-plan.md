@@ -30,6 +30,15 @@
       - install.
   - Runtime argv process execution with stdout/stderr capture and timeout.
   - Runtime chmod support for install nodes.
+  - Native test directory discovery now avoids shell command strings for
+    directory checks and sorted file collection.
+  - Native `with test` now handles the suite directives used by the script runner:
+    `expect-check-fail`, `expect-error`, `expect-build-fail`,
+    `expect-check-stdout`, `check-only`, `skip`, and `args`.
+  - Native `Test` graph targets are exposed for behavior, compile-error,
+    codegen, spec, and phase directories. Test graph nodes can select an
+    explicit compiler with `compiler=<path>`, so the behavior suite now runs
+    through `out/bin/with-stage2` without `scripts/run_tests.sh`.
   - Initial repository `build.w`:
       - `with build`
       - `with build :selfcheck`
@@ -38,14 +47,17 @@
       - `with build :install-user`
       - `with build :update-seed`
       - `with build :regex-test`
+      - `with build :regex-check-generated`
+      - `with build :regex-promote`
 
   Remaining:
 
-  - Replace temporary `with build :test` script invocations with native typed With test harness nodes.
+  - Replace remaining temporary `with build :test` script invocations with
+    native typed With test harness nodes for CLI selfhost and regression tests.
   - Port runtime object generation into `build.w`.
   - Port embedded runtime object generation out of shell.
   - Port stage1/stage2/stage3 compiler builds into `build.w`.
-  - Port PCRE2 download/migrate/build/promote into typed nodes; `regex-test` is currently exposed through the existing verifier script.
+  - Port PCRE2 download/migrate/build into typed nodes; `regex-test`, `regex-check-generated`, and `regex-promote` are currently exposed through existing scripts.
   - Port seed, clean, emit-c, and cross targets.
   - Make Makefile delegate to `with build :...` only after direct graph paths are equivalent.
   - Remove Make recipes and obsolete scripts last.
