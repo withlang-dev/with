@@ -61,12 +61,25 @@
   - `with build :regex-test` now runs the upstream PCRE2 `RunTest -8 0-29
     heap` corpus through a typed `pcre2_run_test` graph node instead of the
     repository wrapper script `scripts/verify_pcre2_works.sh`.
+  - `with build :regex-build` now consumes existing `out/pcre2_migrated`
+    sources, checks generated modules, and builds `out/pcre2_build/bin/pcre2test`
+    through a typed `pcre2_build` graph node. It does not trigger migration.
+  - `with build :regex-check-generated` now checks generated PCRE2 modules
+    through a typed `pcre2_generated_check` node instead of
+    `scripts/pcre2_generated_workflow.sh`.
+  - `with build :regex-promote` now refuses promotion unless generated PCRE2
+    modules type-check cleanly, then copies the verified tree through a typed
+    `pcre2_generated_promote` node.
   - PCRE2 migration is now treated as a manual refresh step in the legacy
     Make path too: `regex-test` no longer depends on `regex-build`, and
     `regex-build` no longer depends on `regex-migrate`.
   - `make regex-test` is now a compatibility shim over
     `with build :regex-test` after checking that existing migrated PCRE2
     sources, built `pcre2test`, and the reference tree are present.
+  - `make regex-build` is now a compatibility shim over
+    `with build :regex-build`.
+  - `make regex-promote` is now a compatibility shim over
+    `with build :regex-promote`.
   - `make test` is now a compatibility shim over `with build :test`; Make no
     longer invokes `scripts/run_tests.sh`, the issue61 regression script, or
     the embedded-runtime regression script directly.
@@ -93,11 +106,10 @@
   - Port the canonical `out/bin/with` compiler build into `build.w`; stage1,
     stage2, stage3, and fixpoint object generation now have direct graph
     targets, but canonical runtime refresh/embedding still lives in Make.
-  - Port PCRE2 download/migrate/build/check/promote into typed nodes;
-    `regex-test` is typed, while source preparation, generated-source checking,
-    and promotion still use existing scripts. Migration must remain manually
-    triggered; normal test/build targets should consume existing migrated
-    output and fail loudly if it is missing.
+  - Port PCRE2 download/migrate/source-preparation into typed nodes;
+    `regex-build`, `regex-test`, generated-source checking, and promotion are
+    typed. Migration must remain manually triggered; normal test/build targets
+    should consume existing migrated output and fail loudly if it is missing.
   - Port seed, clean, emit-c, and cross targets.
   - Make Makefile delegate to `with build :...` only after direct graph paths are equivalent.
   - Remove Make recipes and obsolete scripts last.

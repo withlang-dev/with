@@ -89,7 +89,7 @@ fn _pcre2_script_run_8(__param_ptr: *const u8, __param_endptr: *const u8, __para
 
         var __local_script: c_uint = __local_ucd.script
 
-        if ((if __local_script == 99: 1 else: 0) != 0) {
+        if ((if __local_script == 98: 1 else: 0) != 0) {
             return 0
         }
 
@@ -100,8 +100,8 @@ fn _pcre2_script_run_8(__param_ptr: *const u8, __param_endptr: *const u8, __para
         } else {
             var __ci_expr_logic_3: c_int = 0
 
-            if ((if __local_script != 107: 1 else: 0) != 0) {
-                (__ci_expr_logic_3 = (if (if __local_script != 100: 1 else: 0) != 0: 1 else: 0))
+            if ((if __local_script != 106: 1 else: 0) != 0) {
+                (__ci_expr_logic_3 = (if (if __local_script != 99: 1 else: 0) != 0: 1 else: 0))
             }
 
             (__ci_expr_logic_4 = (if __ci_expr_logic_3 != 0: 1 else: 0))
@@ -117,8 +117,8 @@ fn _pcre2_script_run_8(__param_ptr: *const u8, __param_endptr: *const u8, __para
 
             var __ci_expr_logic_5: c_int = 0
 
-            if ((if __local_script != 100: 1 else: 0) != 0) {
-                (__ci_expr_logic_5 = (if (if __local_script != 107: 1 else: 0) != 0: 1 else: 0))
+            if ((if __local_script != 99: 1 else: 0) != 0) {
+                (__ci_expr_logic_5 = (if (if __local_script != 106: 1 else: 0) != 0: 1 else: 0))
             }
 
             if (__ci_expr_logic_5 != 0) {

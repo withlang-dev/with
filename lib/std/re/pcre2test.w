@@ -184,7 +184,7 @@ fn get_ucpname_8(__param_ptype: c_uint, __param_pvalue: c_uint) -> *const i8 {
         __ci_expr_ternary_0
     }
 
-    var __local_i: c_long = 517
+    var __local_i: c_long = 509
 
     while ((if __local_i >= 0: 1 else: 0) != 0) {
         var __local_u: *const ucp_type_table = ((&(unsafe: utt[0]) as *const ucp_type_table) + ((__local_i as isize) as usize))
@@ -6119,18 +6119,35 @@ fn ptrunc_8(__param_clr: c_int, __param_p: *const u8, __param_p_len: c_ulong, __
 
 }
 
-fn config_str_8(__param_what: c_uint) -> *mut i8 {
+fn config_str_8(__param_what: c_uint, __param_where_: *mut i8) {
+    var __local_r1: c_int
+
     var __local_r2: c_int
 
-    var __local_buf: *mut u8
 
-    var __local_buf8: *mut c_char
+    var __local_buf: [64]u8
 
-    var __local_needed_len: c_int
+    (__local_r1 = pcre2_config_8(__param_what, null))
 
-    (__local_needed_len = pcre2_config_8(__param_what, null))
+    (__local_r2 = pcre2_config_8(__param_what, (&(unsafe: __local_buf[0]) as *mut u8)))
 
-    if ((if __local_needed_len <= 0: 1 else: 0) != 0) {
+    var __ci_expr_logic_1: c_int
+
+    var __ci_expr_logic_0: c_int
+
+    if ((if __local_r1 < 0: 1 else: 0) != 0) {
+        (__ci_expr_logic_0 = (if true: 1 else: 0))
+    } else {
+        (__ci_expr_logic_0 = (if (if __local_r1 != __local_r2: 1 else: 0) != 0: 1 else: 0))
+    }
+
+    if (__ci_expr_logic_0 != 0) {
+        (__ci_expr_logic_1 = (if true: 1 else: 0))
+    } else {
+        (__ci_expr_logic_1 = (if (if __local_r1 >= 64: 1 else: 0) != 0: 1 else: 0))
+    }
+
+    if (__ci_expr_logic_1 != 0) {
         colour_begin(31, __stderrp)
 
         fprintf(__stderrp, "pcre2test: Error in pcre2_config(%d)\n", __param_what)
@@ -6142,61 +6159,19 @@ fn config_str_8(__param_what: c_uint) -> *mut i8 {
 
     }
 
-    (__local_buf = ((with_alloc(((((__local_needed_len as c_uint) as c_ulong) *% (sizeof[u8]() as c_ulong)) as i64)) as *mut c_void)))
-
-    (__local_buf8 = ((with_alloc(((__local_needed_len as c_uint) as i64)) as *mut c_void)))
-
-    var __ci_expr_logic_0: c_int
-
-    if ((if __local_buf == null: 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if true: 1 else: 0))
-    } else {
-        (__ci_expr_logic_0 = (if (if __local_buf8 == null: 1 else: 0) != 0: 1 else: 0))
-    }
-
-    if (__ci_expr_logic_0 != 0) {
-        colour_begin(31, __stderrp)
-
-        fprintf(__stderrp, "pcre2test: malloc failed in config_str()\n")
-
-        colour_end(__stderrp)
-
-
-        exit(1)
-
-    }
-
-
-    (__local_r2 = pcre2_config_8(__param_what, __local_buf))
-
-    if ((if __local_r2 != __local_needed_len: 1 else: 0) != 0) {
-        colour_begin(31, __stderrp)
-
-        fprintf(__stderrp, "pcre2test: pcre2_config(%d) returned %d, expected %d\n", __param_what, __local_r2, __local_needed_len)
-
-        colour_end(__stderrp)
-
-
-        exit(1)
-
-    }
 
     while true {
-        var __ci_expr_old_1: c_int = __local_r2
+        var __ci_expr_old_2: c_int = __local_r1
 
-        (__local_r2 = __local_r2 - 1)
+        (__local_r1 = __local_r1 - 1)
 
-        if (not ((if __ci_expr_old_1 > 0: 1 else: 0) != 0)) {
+        if (not ((if __ci_expr_old_2 > 0: 1 else: 0) != 0)) {
             break
         }
 
-        ((unsafe: __local_buf8[__local_r2]) = (((unsafe: __local_buf[__local_r2]) as c_char)))
+        ((unsafe: __param_where_[__local_r1]) = ((__local_buf[__local_r1] as c_char)))
 
     }
-
-    with_free((__local_buf as *mut i8))
-
-    return __local_buf8
 
 }
 
@@ -6443,41 +6418,41 @@ fn check_modifier_8(__param_m: *mut modstruct, __param_ctx: c_int, __param_pctl:
 
 fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut patctl, __param_dctl: *mut datctl) -> c_int {
     var __local_p = __param_p
-    var __local_ep__goto_719_10: *mut u8 = null
+    var __local_ep__goto_696_10: *mut u8 = null
 
-    var __local_pp__goto_719_15: *mut u8 = null
+    var __local_pp__goto_696_15: *mut u8 = null
 
-    var __local_li__goto_720_6: c_long = 0
+    var __local_li__goto_697_6: c_long = 0
 
-    var __local_uli__goto_721_15: c_ulong = 0
+    var __local_uli__goto_698_15: c_ulong = 0
 
-    var __local_first__goto_722_6: c_int = 0
+    var __local_first__goto_699_6: c_int = 0
 
-    var __local_field__goto_726_9: *mut c_void = null
+    var __local_field__goto_703_9: *mut c_void = null
 
-    var __local_m__goto_727_14: *mut modstruct = null
+    var __local_m__goto_704_14: *mut modstruct = null
 
-    var __local_off__goto_728_8: c_int = 0
+    var __local_off__goto_705_8: c_int = 0
 
-    var __local_i__goto_729_16: c_uint = 0
+    var __local_i__goto_706_16: c_uint = 0
 
-    var __local_len__goto_730_10: c_ulong = 0
+    var __local_len__goto_707_10: c_ulong = 0
 
-    var __local_index__goto_731_7: c_int = 0
+    var __local_index__goto_708_7: c_int = 0
 
-    var __local_endptr__goto_732_9: *mut i8 = null
+    var __local_endptr__goto_709_9: *mut i8 = null
 
-    var __local_cc__goto_768_14: c_uint = 0
+    var __local_cc__goto_745_14: c_uint = 0
 
-    var __local_mp__goto_769_14: *mut u8 = null
+    var __local_mp__goto_746_14: *mut u8 = null
 
-    var __local_colon__goto_909_16: *mut u8 = null
+    var __local_colon__goto_886_16: *mut u8 = null
 
-    var __local_ct__goto_1005_11: c_int = 0
+    var __local_ct__goto_982_11: c_int = 0
 
-    var __local_value__goto_1006_15: c_int = 0
+    var __local_value__goto_983_15: c_int = 0
 
-    var __local_nn__goto_1030_13: *mut i8 = null
+    var __local_nn__goto_1007_13: *mut i8 = null
 
     var __ci_expr_logic_0: c_int = 0
 
@@ -6550,7 +6525,7 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     goto '__ci_bb_0
 
     '__ci_bb_0 {
-        (__local_first__goto_722_6 = 1)
+        (__local_first__goto_699_6 = 1)
         goto '__ci_bb_1
     }
 
@@ -6559,7 +6534,7 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_2 {
-        (__local_off__goto_728_8 = 0)
+        (__local_off__goto_705_8 = 0)
         goto '__ci_bb_5
     }
 
@@ -6602,14 +6577,14 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_9 {
-        (__local_ep__goto_719_10 = __local_p)
+        (__local_ep__goto_696_10 = __local_p)
         goto '__ci_bb_10
     }
 
     '__ci_bb_10 {
         (__ci_expr_logic_1 = 0)
-        if ((if (unsafe: *__local_ep__goto_719_10) != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_1 = (if (if (unsafe: *__local_ep__goto_719_10) != 44: 1 else: 0) != 0: 1 else: 0))
+        if ((if (unsafe: *__local_ep__goto_696_10) != 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_1 = (if (if (unsafe: *__local_ep__goto_696_10) != 44: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_1 != 0) {
             goto '__ci_bb_11
@@ -6623,12 +6598,12 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_12 {
-        (__local_ep__goto_719_10 = __local_ep__goto_719_10 + 1)
+        (__local_ep__goto_696_10 = __local_ep__goto_696_10 + 1)
         goto '__ci_bb_10
     }
 
     '__ci_bb_13 {
-        if ((if (unsafe: *__local_ep__goto_719_10) == 0: 1 else: 0) != 0) {
+        if ((if (unsafe: *__local_ep__goto_696_10) == 0: 1 else: 0) != 0) {
             goto '__ci_bb_14
         } else {
             goto '__ci_bb_15
@@ -6649,8 +6624,8 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
 
     '__ci_bb_16 {
         (__ci_expr_logic_2 = 0)
-        if ((if __local_ep__goto_719_10 > __local_p: 1 else: 0) != 0) {
-            (__ci_expr_logic_2 = (if isspace((unsafe: __local_ep__goto_719_10[-1])) != 0: 1 else: 0))
+        if ((if __local_ep__goto_696_10 > __local_p: 1 else: 0) != 0) {
+            (__ci_expr_logic_2 = (if isspace((unsafe: __local_ep__goto_696_10[-1])) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_2 != 0) {
             goto '__ci_bb_17
@@ -6660,30 +6635,30 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_17 {
-        (__local_ep__goto_719_10 = __local_ep__goto_719_10 - 1)
+        (__local_ep__goto_696_10 = __local_ep__goto_696_10 - 1)
         goto '__ci_bb_16
     }
 
     '__ci_bb_18 {
-        ((unsafe: *__local_ep__goto_719_10) = 0)
+        ((unsafe: *__local_ep__goto_696_10) = 0)
         goto '__ci_bb_15
     }
 
     '__ci_bb_19 {
-        (__local_off__goto_728_8 = 1)
+        (__local_off__goto_705_8 = 1)
         (__local_p = __local_p + 1)
         goto '__ci_bb_20
     }
 
     '__ci_bb_20 {
-        (__local_pp__goto_719_15 = __local_p)
+        (__local_pp__goto_696_15 = __local_p)
         goto '__ci_bb_21
     }
 
     '__ci_bb_21 {
         (__ci_expr_logic_3 = 0)
-        if ((if __local_pp__goto_719_15 < __local_ep__goto_719_10: 1 else: 0) != 0) {
-            (__ci_expr_logic_3 = (if (if (unsafe: *__local_pp__goto_719_15) != 61: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_pp__goto_696_15 < __local_ep__goto_696_10: 1 else: 0) != 0) {
+            (__ci_expr_logic_3 = (if (if (unsafe: *__local_pp__goto_696_15) != 61: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_3 != 0) {
             goto '__ci_bb_22
@@ -6693,13 +6668,13 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_22 {
-        (__local_pp__goto_719_15 = __local_pp__goto_719_15 + 1)
+        (__local_pp__goto_696_15 = __local_pp__goto_696_15 + 1)
         goto '__ci_bb_21
     }
 
     '__ci_bb_23 {
-        (__local_index__goto_731_7 = scan_modifiers(__local_p, (((__local_pp__goto_719_15 as usize) -% (__local_p as usize)) / sizeof[u8]())))
-        if ((if __local_index__goto_731_7 < 0: 1 else: 0) != 0) {
+        (__local_index__goto_708_7 = scan_modifiers(__local_p, (((__local_pp__goto_696_15 as usize) -% (__local_p as usize)) / sizeof[u8]())))
+        if ((if __local_index__goto_708_7 < 0: 1 else: 0) != 0) {
             goto '__ci_bb_24
         } else {
             goto '__ci_bb_25
@@ -6707,8 +6682,8 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_24 {
-        (__local_mp__goto_769_14 = __local_p)
-        if ((if not (__local_first__goto_722_6 != 0): 1 else: 0) != 0) {
+        (__local_mp__goto_746_14 = __local_p)
+        if ((if not (__local_first__goto_699_6 != 0): 1 else: 0) != 0) {
             goto '__ci_bb_26
         } else {
             goto '__ci_bb_27
@@ -6716,23 +6691,23 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_25 {
-        (__local_m__goto_727_14 = (&(unsafe: modlist[0]) as *mut modstruct) + ((__local_index__goto_731_7 as isize) as usize))
+        (__local_m__goto_704_14 = (&(unsafe: modlist[0]) as *mut modstruct) + ((__local_index__goto_708_7 as isize) as usize))
         (__ci_expr_logic_10 = 0)
         (__ci_expr_logic_8 = 0)
         (__ci_expr_logic_7 = 0)
-        if ((if __local_m__goto_727_14.type_ != MOD_CTL: 1 else: 0) != 0) {
-            (__ci_expr_logic_7 = (if (if __local_m__goto_727_14.type_ != MOD_OPT: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_m__goto_704_14.type_ != MOD_CTL: 1 else: 0) != 0) {
+            (__ci_expr_logic_7 = (if (if __local_m__goto_704_14.type_ != MOD_OPT: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_7 != 0) {
-            (__ci_expr_logic_8 = (if (if __local_m__goto_727_14.type_ != MOD_OPTMZ: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_8 = (if (if __local_m__goto_704_14.type_ != MOD_OPTMZ: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_8 != 0) {
             var __ci_expr_logic_9: c_int
 
-            if ((if __local_m__goto_727_14.type_ != MOD_IND: 1 else: 0) != 0) {
+            if ((if __local_m__goto_704_14.type_ != MOD_IND: 1 else: 0) != 0) {
                 (__ci_expr_logic_9 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_9 = (if (if (unsafe: *__local_pp__goto_719_15) == 61: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_9 = (if (if (unsafe: *__local_pp__goto_696_15) == 61: 1 else: 0) != 0: 1 else: 0))
             }
 
             (__ci_expr_logic_10 = (if __ci_expr_logic_9 != 0: 1 else: 0))
@@ -6747,9 +6722,9 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
 
     '__ci_bb_26 {
         colour_begin(31, outfile)
-        fprintf(outfile, "** Unrecognized modifier \"%.*s\"\n", ((((__local_ep__goto_719_10 as usize) -% (__local_p as usize)) / sizeof[u8]()) as c_int), __local_p)
+        fprintf(outfile, "** Unrecognized modifier \"%.*s\"\n", ((((__local_ep__goto_696_10 as usize) -% (__local_p as usize)) / sizeof[u8]()) as c_int), __local_p)
         colour_end(outfile)
-        if ((if (((__local_ep__goto_719_10 as usize) -% (__local_p as usize)) / sizeof[u8]()) == 1: 1 else: 0) != 0) {
+        if ((if (((__local_ep__goto_696_10 as usize) -% (__local_p as usize)) / sizeof[u8]()) == 1: 1 else: 0) != 0) {
             goto '__ci_bb_28
         } else {
             goto '__ci_bb_29
@@ -6757,8 +6732,8 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_27 {
-        (__local_first__goto_722_6 = 0)
-        (__local_cc__goto_768_14 = (unsafe: *__local_p))
+        (__local_first__goto_699_6 = 0)
+        (__local_cc__goto_745_14 = (unsafe: *__local_p))
         goto '__ci_bb_30
     }
 
@@ -6776,11 +6751,11 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     '__ci_bb_30 {
         (__ci_expr_logic_5 = 0)
         (__ci_expr_logic_4 = 0)
-        if ((if __local_cc__goto_768_14 != 44: 1 else: 0) != 0) {
-            (__ci_expr_logic_4 = (if (if __local_cc__goto_768_14 != 10: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_cc__goto_745_14 != 44: 1 else: 0) != 0) {
+            (__ci_expr_logic_4 = (if (if __local_cc__goto_745_14 != 10: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_4 != 0) {
-            (__ci_expr_logic_5 = (if (if __local_cc__goto_768_14 != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_5 = (if (if __local_cc__goto_745_14 != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_5 != 0) {
             goto '__ci_bb_31
@@ -6790,13 +6765,13 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_31 {
-        (__local_i__goto_729_16 = 0)
+        (__local_i__goto_706_16 = 0)
         goto '__ci_bb_34
     }
 
     '__ci_bb_32 {
         (__local_p = __local_p + 1)
-        (__local_cc__goto_768_14 = (unsafe: *__local_p))
+        (__local_cc__goto_745_14 = (unsafe: *__local_p))
         goto '__ci_bb_30
     }
 
@@ -6805,7 +6780,7 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_34 {
-        if ((if __local_i__goto_729_16 < 10: 1 else: 0) != 0) {
+        if ((if __local_i__goto_706_16 < 10: 1 else: 0) != 0) {
             goto '__ci_bb_35
         } else {
             goto '__ci_bb_37
@@ -6813,7 +6788,7 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_35 {
-        if ((if __local_cc__goto_768_14 == c1modlist[__local_i__goto_729_16].onechar: 1 else: 0) != 0) {
+        if ((if __local_cc__goto_745_14 == c1modlist[__local_i__goto_706_16].onechar: 1 else: 0) != 0) {
             goto '__ci_bb_38
         } else {
             goto '__ci_bb_39
@@ -6821,12 +6796,12 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_36 {
-        (__local_i__goto_729_16 = __local_i__goto_729_16 + 1)
+        (__local_i__goto_706_16 = __local_i__goto_706_16 + 1)
         goto '__ci_bb_34
     }
 
     '__ci_bb_37 {
-        if ((if __local_i__goto_729_16 >= 10: 1 else: 0) != 0) {
+        if ((if __local_i__goto_706_16 >= 10: 1 else: 0) != 0) {
             goto '__ci_bb_40
         } else {
             goto '__ci_bb_41
@@ -6843,13 +6818,13 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
 
     '__ci_bb_40 {
         colour_begin(31, outfile)
-        fprintf(outfile, "** Unrecognized modifier '%c' in modifier string \"%.*s\"\n", (unsafe: *__local_p), ((((__local_ep__goto_719_10 as usize) -% (__local_mp__goto_769_14 as usize)) / sizeof[u8]()) as c_int), __local_mp__goto_769_14)
+        fprintf(outfile, "** Unrecognized modifier '%c' in modifier string \"%.*s\"\n", (unsafe: *__local_p), ((((__local_ep__goto_696_10 as usize) -% (__local_mp__goto_746_14 as usize)) / sizeof[u8]()) as c_int), __local_mp__goto_746_14)
         colour_end(outfile)
         return 0
     }
 
     '__ci_bb_41 {
-        if ((if c1modlist[__local_i__goto_729_16].index >= 0: 1 else: 0) != 0) {
+        if ((if c1modlist[__local_i__goto_706_16].index >= 0: 1 else: 0) != 0) {
             goto '__ci_bb_42
         } else {
             goto '__ci_bb_43
@@ -6857,13 +6832,13 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_42 {
-        (__local_index__goto_731_7 = c1modlist[__local_i__goto_729_16].index)
+        (__local_index__goto_708_7 = c1modlist[__local_i__goto_706_16].index)
         goto '__ci_bb_44
     }
 
     '__ci_bb_43 {
-        (__local_index__goto_731_7 = scan_modifiers((c1modlist[__local_i__goto_729_16].fullname as *const u8), string_len(c1modlist[__local_i__goto_729_16].fullname)))
-        if ((if __local_index__goto_731_7 < 0: 1 else: 0) != 0) {
+        (__local_index__goto_708_7 = scan_modifiers((c1modlist[__local_i__goto_706_16].fullname as *const u8), string_len(c1modlist[__local_i__goto_706_16].fullname)))
+        if ((if __local_index__goto_708_7 < 0: 1 else: 0) != 0) {
             goto '__ci_bb_45
         } else {
             goto '__ci_bb_46
@@ -6871,8 +6846,8 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_44 {
-        (__local_field__goto_726_9 = check_modifier_8(((&(unsafe: modlist[0]) as *mut modstruct) + ((__local_index__goto_731_7 as isize) as usize)), __param_ctx, __param_pctl, __param_dctl, (unsafe: *__local_p)))
-        if ((if __local_field__goto_726_9 == null: 1 else: 0) != 0) {
+        (__local_field__goto_703_9 = check_modifier_8(((&(unsafe: modlist[0]) as *mut modstruct) + ((__local_index__goto_708_7 as isize) as usize)), __param_ctx, __param_pctl, __param_dctl, (unsafe: *__local_p)))
+        if ((if __local_field__goto_703_9 == null: 1 else: 0) != 0) {
             goto '__ci_bb_47
         } else {
             goto '__ci_bb_48
@@ -6881,13 +6856,13 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
 
     '__ci_bb_45 {
         colour_begin(31, outfile)
-        fprintf(outfile, "** Internal error: single-character equivalent modifier \"%s\" not found\n", c1modlist[__local_i__goto_729_16].fullname)
+        fprintf(outfile, "** Internal error: single-character equivalent modifier \"%s\" not found\n", c1modlist[__local_i__goto_706_16].fullname)
         colour_end(outfile)
         return 0
     }
 
     '__ci_bb_46 {
-        (c1modlist[__local_i__goto_729_16].index = __local_index__goto_731_7)
+        (c1modlist[__local_i__goto_706_16].index = __local_index__goto_708_7)
         goto '__ci_bb_44
     }
 
@@ -6897,8 +6872,8 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
 
     '__ci_bb_48 {
         (__ci_expr_logic_6 = 0)
-        if ((if __local_cc__goto_768_14 == 120: 1 else: 0) != 0) {
-            (__ci_expr_logic_6 = (if (if (((unsafe: *(__local_field__goto_726_9 as *mut c_uint)) as c_uint) & (128 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_cc__goto_745_14 == 120: 1 else: 0) != 0) {
+            (__ci_expr_logic_6 = (if (if (((unsafe: *(__local_field__goto_703_9 as *mut c_uint)) as c_uint) & (128 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_6 != 0) {
             goto '__ci_bb_49
@@ -6908,13 +6883,13 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_49 {
-        ((unsafe: *(__local_field__goto_726_9 as *mut c_uint)) = (unsafe: *(__local_field__goto_726_9 as *mut c_uint)) & (~128))
-        ((unsafe: *(__local_field__goto_726_9 as *mut c_uint)) = (unsafe: *(__local_field__goto_726_9 as *mut c_uint)) | 16777216)
+        ((unsafe: *(__local_field__goto_703_9 as *mut c_uint)) = (unsafe: *(__local_field__goto_703_9 as *mut c_uint)) & (~128))
+        ((unsafe: *(__local_field__goto_703_9 as *mut c_uint)) = (unsafe: *(__local_field__goto_703_9 as *mut c_uint)) | 16777216)
         goto '__ci_bb_51
     }
 
     '__ci_bb_50 {
-        ((unsafe: *(__local_field__goto_726_9 as *mut c_uint)) = (unsafe: *(__local_field__goto_726_9 as *mut c_uint)) | modlist[__local_index__goto_731_7].value)
+        ((unsafe: *(__local_field__goto_703_9 as *mut c_uint)) = (unsafe: *(__local_field__goto_703_9 as *mut c_uint)) | modlist[__local_index__goto_708_7].value)
         goto '__ci_bb_51
     }
 
@@ -6923,8 +6898,8 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_52 {
-        (__ci_expr_old_11 = __local_pp__goto_719_15)
-        (__local_pp__goto_719_15 = __local_pp__goto_719_15 + 1)
+        (__ci_expr_old_11 = __local_pp__goto_696_15)
+        (__local_pp__goto_696_15 = __local_pp__goto_696_15 + 1)
         if ((if (unsafe: *__ci_expr_old_11) != 61: 1 else: 0) != 0) {
             goto '__ci_bb_55
         } else {
@@ -6936,14 +6911,14 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
         (__ci_expr_logic_14 = 0)
         (__ci_expr_logic_13 = 0)
         (__ci_expr_logic_12 = 0)
-        if ((if (unsafe: *__local_pp__goto_719_15) != 44: 1 else: 0) != 0) {
-            (__ci_expr_logic_12 = (if (if (unsafe: *__local_pp__goto_719_15) != 10: 1 else: 0) != 0: 1 else: 0))
+        if ((if (unsafe: *__local_pp__goto_696_15) != 44: 1 else: 0) != 0) {
+            (__ci_expr_logic_12 = (if (if (unsafe: *__local_pp__goto_696_15) != 10: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_12 != 0) {
-            (__ci_expr_logic_13 = (if (if (unsafe: *__local_pp__goto_719_15) != 32: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_13 = (if (if (unsafe: *__local_pp__goto_696_15) != 32: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_13 != 0) {
-            (__ci_expr_logic_14 = (if (if (unsafe: *__local_pp__goto_719_15) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_14 = (if (if (unsafe: *__local_pp__goto_696_15) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_14 != 0) {
             goto '__ci_bb_59
@@ -6953,9 +6928,9 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_54 {
-        (__local_len__goto_730_10 = ((__local_ep__goto_719_10 as usize) -% (__local_pp__goto_719_15 as usize)) / sizeof[u8]())
-        (__local_field__goto_726_9 = check_modifier_8(__local_m__goto_727_14, __param_ctx, __param_pctl, __param_dctl, 0))
-        if ((if __local_field__goto_726_9 == null: 1 else: 0) != 0) {
+        (__local_len__goto_707_10 = ((__local_ep__goto_696_10 as usize) -% (__local_pp__goto_696_15 as usize)) / sizeof[u8]())
+        (__local_field__goto_703_9 = check_modifier_8(__local_m__goto_704_14, __param_ctx, __param_pctl, __param_dctl, 0))
+        if ((if __local_field__goto_703_9 == null: 1 else: 0) != 0) {
             goto '__ci_bb_61
         } else {
             goto '__ci_bb_62
@@ -6964,13 +6939,13 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
 
     '__ci_bb_55 {
         colour_begin(31, outfile)
-        fprintf(outfile, "** '=' expected after \"%s\"\n", __local_m__goto_727_14.name)
+        fprintf(outfile, "** '=' expected after \"%s\"\n", __local_m__goto_704_14.name)
         colour_end(outfile)
         return 0
     }
 
     '__ci_bb_56 {
-        if (__local_off__goto_728_8 != 0) {
+        if (__local_off__goto_705_8 != 0) {
             goto '__ci_bb_57
         } else {
             goto '__ci_bb_58
@@ -6979,7 +6954,7 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
 
     '__ci_bb_57 {
         colour_begin(31, outfile)
-        fprintf(outfile, "** '-' is not valid for \"%s\"\n", __local_m__goto_727_14.name)
+        fprintf(outfile, "** '-' is not valid for \"%s\"\n", __local_m__goto_704_14.name)
         colour_end(outfile)
         return 0
     }
@@ -6990,7 +6965,7 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
 
     '__ci_bb_59 {
         colour_begin(31, outfile)
-        fprintf(outfile, "** Unrecognized modifier '%.*s'\n", ((((__local_ep__goto_719_10 as usize) -% (__local_p as usize)) / sizeof[u8]()) as c_int), __local_p)
+        fprintf(outfile, "** Unrecognized modifier '%.*s'\n", ((((__local_ep__goto_696_10 as usize) -% (__local_p as usize)) / sizeof[u8]()) as c_int), __local_p)
         colour_end(outfile)
         return 0
     }
@@ -7008,10 +6983,10 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_63 {
-        if (__local_m__goto_727_14.type_ == 12) {
+        if (__local_m__goto_704_14.type_ == 12) {
             goto '__ci_bb_65
         } else {
-            goto '__ci_bb_181
+            goto '__ci_bb_179
         }
     }
 
@@ -7019,24 +6994,24 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
         (__ci_expr_logic_34 = 0)
         (__ci_expr_logic_33 = 0)
         (__ci_expr_logic_32 = 0)
-        if ((if (unsafe: *__local_pp__goto_719_15) != 44: 1 else: 0) != 0) {
-            (__ci_expr_logic_32 = (if (if (unsafe: *__local_pp__goto_719_15) != 10: 1 else: 0) != 0: 1 else: 0))
+        if ((if (unsafe: *__local_pp__goto_696_15) != 44: 1 else: 0) != 0) {
+            (__ci_expr_logic_32 = (if (if (unsafe: *__local_pp__goto_696_15) != 10: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_32 != 0) {
-            (__ci_expr_logic_33 = (if (if (unsafe: *__local_pp__goto_719_15) != 32: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_33 = (if (if (unsafe: *__local_pp__goto_696_15) != 32: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_33 != 0) {
-            (__ci_expr_logic_34 = (if (if (unsafe: *__local_pp__goto_719_15) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_34 = (if (if (unsafe: *__local_pp__goto_696_15) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_34 != 0) {
-            goto '__ci_bb_194
+            goto '__ci_bb_192
         } else {
-            goto '__ci_bb_195
+            goto '__ci_bb_193
         }
     }
 
     '__ci_bb_65 {
-        if (__local_off__goto_728_8 != 0) {
+        if (__local_off__goto_705_8 != 0) {
             goto '__ci_bb_66
         } else {
             goto '__ci_bb_67
@@ -7044,12 +7019,12 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_66 {
-        ((unsafe: *(__local_field__goto_726_9 as *mut c_uint)) = (unsafe: *(__local_field__goto_726_9 as *mut c_uint)) & (~__local_m__goto_727_14.value))
+        ((unsafe: *(__local_field__goto_703_9 as *mut c_uint)) = (unsafe: *(__local_field__goto_703_9 as *mut c_uint)) & (~__local_m__goto_704_14.value))
         goto '__ci_bb_68
     }
 
     '__ci_bb_67 {
-        ((unsafe: *(__local_field__goto_726_9 as *mut c_uint)) = (unsafe: *(__local_field__goto_726_9 as *mut c_uint)) | __local_m__goto_727_14.value)
+        ((unsafe: *(__local_field__goto_703_9 as *mut c_uint)) = (unsafe: *(__local_field__goto_703_9 as *mut c_uint)) | __local_m__goto_704_14.value)
         goto '__ci_bb_68
     }
 
@@ -7058,14 +7033,14 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_69 {
-        pcre2_set_optimize_8(__local_field__goto_726_9, __local_m__goto_727_14.value)
+        pcre2_set_optimize_8(__local_field__goto_703_9, __local_m__goto_704_14.value)
         goto '__ci_bb_64
     }
 
     '__ci_bb_70 {
         (__ci_expr_logic_15 = 0)
-        if ((if __local_len__goto_730_10 == 7: 1 else: 0) != 0) {
-            (__ci_expr_logic_15 = (if (if strncmpic(__local_pp__goto_719_15, ("default" as *const u8), 7) == 0: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_len__goto_707_10 == 7: 1 else: 0) != 0) {
+            (__ci_expr_logic_15 = (if (if strncmpic(__local_pp__goto_696_15, ("default" as *const u8), 7) == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_15 != 0) {
             goto '__ci_bb_71
@@ -7075,7 +7050,7 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_71 {
-        ((unsafe: *(__local_field__goto_726_9 as *mut c_ushort)) = 1)
+        ((unsafe: *(__local_field__goto_703_9 as *mut c_ushort)) = 1)
         if ((if __param_ctx == CTX_PAT: 1 else: 0) != 0) {
             (__ci_expr_logic_16 = (if true: 1 else: 0))
         } else {
@@ -7090,8 +7065,8 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
 
     '__ci_bb_72 {
         (__ci_expr_logic_17 = 0)
-        if ((if __local_len__goto_730_10 == 7: 1 else: 0) != 0) {
-            (__ci_expr_logic_17 = (if (if strncmpic(__local_pp__goto_719_15, ("anycrlf" as *const u8), 7) == 0: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_len__goto_707_10 == 7: 1 else: 0) != 0) {
+            (__ci_expr_logic_17 = (if (if strncmpic(__local_pp__goto_696_15, ("anycrlf" as *const u8), 7) == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_17 != 0) {
             goto '__ci_bb_77
@@ -7101,7 +7076,7 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_73 {
-        (__local_pp__goto_719_15 = __local_ep__goto_719_10)
+        (__local_pp__goto_696_15 = __local_ep__goto_696_10)
         goto '__ci_bb_64
     }
 
@@ -7120,14 +7095,14 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_77 {
-        ((unsafe: *(__local_field__goto_726_9 as *mut c_ushort)) = 2)
+        ((unsafe: *(__local_field__goto_703_9 as *mut c_ushort)) = 2)
         goto '__ci_bb_79
     }
 
     '__ci_bb_78 {
         (__ci_expr_logic_18 = 0)
-        if ((if __local_len__goto_730_10 == 7: 1 else: 0) != 0) {
-            (__ci_expr_logic_18 = (if (if strncmpic(__local_pp__goto_719_15, ("unicode" as *const u8), 7) == 0: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_len__goto_707_10 == 7: 1 else: 0) != 0) {
+            (__ci_expr_logic_18 = (if (if strncmpic(__local_pp__goto_696_15, ("unicode" as *const u8), 7) == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_18 != 0) {
             goto '__ci_bb_80
@@ -7150,7 +7125,7 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_80 {
-        ((unsafe: *(__local_field__goto_726_9 as *mut c_ushort)) = 1)
+        ((unsafe: *(__local_field__goto_703_9 as *mut c_ushort)) = 1)
         goto '__ci_bb_82
     }
 
@@ -7164,7 +7139,7 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
 
     '__ci_bb_83 {
         colour_begin(31, outfile)
-        fprintf(outfile, "** Invalid value in \"%.*s\"\n", ((((__local_ep__goto_719_10 as usize) -% (__local_p as usize)) / sizeof[u8]()) as c_int), __local_p)
+        fprintf(outfile, "** Invalid value in \"%.*s\"\n", ((((__local_ep__goto_696_10 as usize) -% (__local_p as usize)) / sizeof[u8]()) as c_int), __local_p)
         colour_end(outfile)
         return 0
     }
@@ -7184,9 +7159,9 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_87 {
-        (__ci_expr_old_20 = __local_pp__goto_719_15)
-        (__local_pp__goto_719_15 = __local_pp__goto_719_15 + 1)
-        ((unsafe: *(__local_field__goto_726_9 as *mut c_uint)) = (unsafe: *__ci_expr_old_20))
+        (__ci_expr_old_20 = __local_pp__goto_696_15)
+        (__local_pp__goto_696_15 = __local_pp__goto_696_15 + 1)
+        ((unsafe: *(__local_field__goto_703_9 as *mut c_uint)) = (unsafe: *__ci_expr_old_20))
         goto '__ci_bb_64
     }
 
@@ -7199,24 +7174,24 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_90 {
-        (__local_colon__goto_909_16 = ((string_find_char((__local_pp__goto_719_15 as *const c_char), 58) as *mut u8)))
+        (__local_colon__goto_886_16 = ((string_find_char((__local_pp__goto_696_15 as *const c_char), 58) as *mut u8)))
         (__ci_expr_ternary_22 = null)
         (__ci_expr_logic_21 = 0)
-        if ((if __local_colon__goto_909_16 != null: 1 else: 0) != 0) {
-            (__ci_expr_logic_21 = (if (if __local_colon__goto_909_16 < __local_ep__goto_719_10: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_colon__goto_886_16 != null: 1 else: 0) != 0) {
+            (__ci_expr_logic_21 = (if (if __local_colon__goto_886_16 < __local_ep__goto_696_10: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_21 != 0) {
-            (__ci_expr_ternary_22 = __local_colon__goto_909_16)
+            (__ci_expr_ternary_22 = __local_colon__goto_886_16)
         } else {
-            (__ci_expr_ternary_22 = __local_ep__goto_719_10)
+            (__ci_expr_ternary_22 = __local_ep__goto_696_10)
         }
-        (__local_len__goto_730_10 = ((__ci_expr_ternary_22 as usize) -% (__local_pp__goto_719_15 as usize)) / sizeof[u8]())
-        (__local_i__goto_729_16 = 0)
+        (__local_len__goto_707_10 = ((__ci_expr_ternary_22 as usize) -% (__local_pp__goto_696_15 as usize)) / sizeof[u8]())
+        (__local_i__goto_706_16 = 0)
         goto '__ci_bb_93
     }
 
     '__ci_bb_91 {
-        (__local_pp__goto_719_15 = __local_pp__goto_719_15 + 1)
+        (__local_pp__goto_696_15 = __local_pp__goto_696_15 + 1)
         goto '__ci_bb_89
     }
 
@@ -7225,7 +7200,7 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_93 {
-        if ((if __local_i__goto_729_16 < 6: 1 else: 0) != 0) {
+        if ((if __local_i__goto_706_16 < 6: 1 else: 0) != 0) {
             goto '__ci_bb_94
         } else {
             goto '__ci_bb_96
@@ -7233,7 +7208,7 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_94 {
-        if ((if strncmpic(__local_pp__goto_719_15, (convertlist[__local_i__goto_729_16].name as *const u8), __local_len__goto_730_10) == 0: 1 else: 0) != 0) {
+        if ((if strncmpic(__local_pp__goto_696_15, (convertlist[__local_i__goto_706_16].name as *const u8), __local_len__goto_707_10) == 0: 1 else: 0) != 0) {
             goto '__ci_bb_97
         } else {
             goto '__ci_bb_98
@@ -7241,12 +7216,12 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_95 {
-        (__local_i__goto_729_16 = __local_i__goto_729_16 + 1)
+        (__local_i__goto_706_16 = __local_i__goto_706_16 + 1)
         goto '__ci_bb_93
     }
 
     '__ci_bb_96 {
-        if ((if __local_i__goto_729_16 >= 6: 1 else: 0) != 0) {
+        if ((if __local_i__goto_706_16 >= 6: 1 else: 0) != 0) {
             goto '__ci_bb_102
         } else {
             goto '__ci_bb_103
@@ -7254,7 +7229,7 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_97 {
-        if ((if (unsafe: *(__local_field__goto_726_9 as *mut c_uint)) == 4294967295: 1 else: 0) != 0) {
+        if ((if (unsafe: *(__local_field__goto_703_9 as *mut c_uint)) == 4294967295: 1 else: 0) != 0) {
             goto '__ci_bb_99
         } else {
             goto '__ci_bb_100
@@ -7266,12 +7241,12 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_99 {
-        ((unsafe: *(__local_field__goto_726_9 as *mut c_uint)) = convertlist[__local_i__goto_729_16].option)
+        ((unsafe: *(__local_field__goto_703_9 as *mut c_uint)) = convertlist[__local_i__goto_706_16].option)
         goto '__ci_bb_101
     }
 
     '__ci_bb_100 {
-        ((unsafe: *(__local_field__goto_726_9 as *mut c_uint)) = (unsafe: *(__local_field__goto_726_9 as *mut c_uint)) | convertlist[__local_i__goto_729_16].option)
+        ((unsafe: *(__local_field__goto_703_9 as *mut c_uint)) = (unsafe: *(__local_field__goto_703_9 as *mut c_uint)) | convertlist[__local_i__goto_706_16].option)
         goto '__ci_bb_101
     }
 
@@ -7284,8 +7259,8 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_103 {
-        (__local_pp__goto_719_15 = __local_pp__goto_719_15 + (__local_len__goto_730_10 as usize))
-        if ((if (unsafe: *__local_pp__goto_719_15) != 58: 1 else: 0) != 0) {
+        (__local_pp__goto_696_15 = __local_pp__goto_696_15 + (__local_len__goto_707_10 as usize))
+        if ((if (unsafe: *__local_pp__goto_696_15) != 58: 1 else: 0) != 0) {
             goto '__ci_bb_104
         } else {
             goto '__ci_bb_105
@@ -7301,7 +7276,7 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_106 {
-        if ((if not (isdigit((unsafe: *__local_pp__goto_719_15)) != 0): 1 else: 0) != 0) {
+        if ((if not (isdigit((unsafe: *__local_pp__goto_696_15)) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_107
         } else {
             goto '__ci_bb_108
@@ -7313,8 +7288,8 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_108 {
-        (__local_uli__goto_721_15 = strtoul((__local_pp__goto_719_15 as *const c_char), (&raw mut __local_endptr__goto_732_9 as *mut *mut c_char), 10))
-        if ((if __local_uli__goto_721_15 > 4294967295: 1 else: 0) != 0) {
+        (__local_uli__goto_698_15 = strtoul((__local_pp__goto_696_15 as *const c_char), (&raw mut __local_endptr__goto_709_9 as *mut *mut c_char), 10))
+        if ((if __local_uli__goto_698_15 > 4294967295: 1 else: 0) != 0) {
             goto '__ci_bb_109
         } else {
             goto '__ci_bb_110
@@ -7326,8 +7301,8 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_110 {
-        ((unsafe: (__local_field__goto_726_9 as *mut c_uint)[0]) = ((__local_uli__goto_721_15 as c_uint)))
-        if ((if (unsafe: *__local_endptr__goto_732_9) == 58: 1 else: 0) != 0) {
+        ((unsafe: (__local_field__goto_703_9 as *mut c_uint)[0]) = ((__local_uli__goto_698_15 as c_uint)))
+        if ((if (unsafe: *__local_endptr__goto_709_9) == 58: 1 else: 0) != 0) {
             goto '__ci_bb_111
         } else {
             goto '__ci_bb_112
@@ -7335,8 +7310,8 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_111 {
-        (__local_uli__goto_721_15 = strtoul(((__local_endptr__goto_732_9 as *const c_char) + ((1 as isize) as usize)), (&raw mut __local_endptr__goto_732_9 as *mut *mut c_char), 10))
-        if ((if __local_uli__goto_721_15 > 4294967295: 1 else: 0) != 0) {
+        (__local_uli__goto_698_15 = strtoul(((__local_endptr__goto_709_9 as *const c_char) + ((1 as isize) as usize)), (&raw mut __local_endptr__goto_709_9 as *mut *mut c_char), 10))
+        if ((if __local_uli__goto_698_15 > 4294967295: 1 else: 0) != 0) {
             goto '__ci_bb_114
         } else {
             goto '__ci_bb_115
@@ -7344,12 +7319,12 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_112 {
-        ((unsafe: (__local_field__goto_726_9 as *mut c_uint)[1]) = 0)
+        ((unsafe: (__local_field__goto_703_9 as *mut c_uint)[1]) = 0)
         goto '__ci_bb_113
     }
 
     '__ci_bb_113 {
-        (__local_pp__goto_719_15 = ((__local_endptr__goto_732_9 as *mut u8)))
+        (__local_pp__goto_696_15 = ((__local_endptr__goto_709_9 as *mut u8)))
         goto '__ci_bb_64
     }
 
@@ -7358,12 +7333,12 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_115 {
-        ((unsafe: (__local_field__goto_726_9 as *mut c_uint)[1]) = ((__local_uli__goto_721_15 as c_uint)))
+        ((unsafe: (__local_field__goto_703_9 as *mut c_uint)[1]) = ((__local_uli__goto_698_15 as c_uint)))
         goto '__ci_bb_113
     }
 
     '__ci_bb_116 {
-        if ((if not (isdigit((unsafe: *__local_pp__goto_719_15)) != 0): 1 else: 0) != 0) {
+        if ((if not (isdigit((unsafe: *__local_pp__goto_696_15)) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_117
         } else {
             goto '__ci_bb_118
@@ -7375,8 +7350,8 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_118 {
-        (__local_uli__goto_721_15 = strtoul((__local_pp__goto_719_15 as *const c_char), (&raw mut __local_endptr__goto_732_9 as *mut *mut c_char), 10))
-        if ((if __local_uli__goto_721_15 == ((((0 as c_ulong) -% 2) as c_ulong) +% (1 as c_ulong)): 1 else: 0) != 0) {
+        (__local_uli__goto_698_15 = strtoul((__local_pp__goto_696_15 as *const c_char), (&raw mut __local_endptr__goto_709_9 as *mut *mut c_char), 10))
+        if ((if __local_uli__goto_698_15 == ((((0 as c_ulong) -% 2) as c_ulong) +% (1 as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_119
         } else {
             goto '__ci_bb_120
@@ -7388,13 +7363,13 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_120 {
-        ((unsafe: *(__local_field__goto_726_9 as *mut c_ulong)) = __local_uli__goto_721_15)
-        (__local_pp__goto_719_15 = ((__local_endptr__goto_732_9 as *mut u8)))
+        ((unsafe: *(__local_field__goto_703_9 as *mut c_ulong)) = __local_uli__goto_698_15)
+        (__local_pp__goto_696_15 = ((__local_endptr__goto_709_9 as *mut u8)))
         goto '__ci_bb_64
     }
 
     '__ci_bb_121 {
-        if ((if __local_len__goto_730_10 == 0: 1 else: 0) != 0) {
+        if ((if __local_len__goto_707_10 == 0: 1 else: 0) != 0) {
             goto '__ci_bb_122
         } else {
             goto '__ci_bb_123
@@ -7402,7 +7377,7 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_122 {
-        ((unsafe: *(__local_field__goto_726_9 as *mut c_uint)) = __local_m__goto_727_14.value)
+        ((unsafe: *(__local_field__goto_703_9 as *mut c_uint)) = __local_m__goto_704_14.value)
         goto '__ci_bb_64
     }
 
@@ -7411,7 +7386,7 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_124 {
-        if ((if not (isdigit((unsafe: *__local_pp__goto_719_15)) != 0): 1 else: 0) != 0) {
+        if ((if not (isdigit((unsafe: *__local_pp__goto_696_15)) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_125
         } else {
             goto '__ci_bb_126
@@ -7423,8 +7398,8 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_126 {
-        (__local_uli__goto_721_15 = strtoul((__local_pp__goto_719_15 as *const c_char), (&raw mut __local_endptr__goto_732_9 as *mut *mut c_char), 10))
-        if ((if __local_uli__goto_721_15 > 4294967295: 1 else: 0) != 0) {
+        (__local_uli__goto_698_15 = strtoul((__local_pp__goto_696_15 as *const c_char), (&raw mut __local_endptr__goto_709_9 as *mut *mut c_char), 10))
+        if ((if __local_uli__goto_698_15 > 4294967295: 1 else: 0) != 0) {
             goto '__ci_bb_127
         } else {
             goto '__ci_bb_128
@@ -7436,15 +7411,15 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_128 {
-        ((unsafe: *(__local_field__goto_726_9 as *mut c_uint)) = ((__local_uli__goto_721_15 as c_uint)))
-        (__local_pp__goto_719_15 = ((__local_endptr__goto_732_9 as *mut u8)))
+        ((unsafe: *(__local_field__goto_703_9 as *mut c_uint)) = ((__local_uli__goto_698_15 as c_uint)))
+        (__local_pp__goto_696_15 = ((__local_endptr__goto_709_9 as *mut u8)))
         goto '__ci_bb_64
     }
 
     '__ci_bb_129 {
         (__ci_expr_logic_23 = 0)
-        if ((if not (isdigit((unsafe: *__local_pp__goto_719_15)) != 0): 1 else: 0) != 0) {
-            (__ci_expr_logic_23 = (if (if (unsafe: *__local_pp__goto_719_15) != 45: 1 else: 0) != 0: 1 else: 0))
+        if ((if not (isdigit((unsafe: *__local_pp__goto_696_15)) != 0): 1 else: 0) != 0) {
+            (__ci_expr_logic_23 = (if (if (unsafe: *__local_pp__goto_696_15) != 45: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_23 != 0) {
             goto '__ci_bb_130
@@ -7458,11 +7433,11 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_131 {
-        (__local_li__goto_720_6 = strtol((__local_pp__goto_719_15 as *const c_char), (&raw mut __local_endptr__goto_732_9 as *mut *mut c_char), 10))
-        if ((if __local_li__goto_720_6 > 2147483647: 1 else: 0) != 0) {
+        (__local_li__goto_697_6 = strtol((__local_pp__goto_696_15 as *const c_char), (&raw mut __local_endptr__goto_709_9 as *mut *mut c_char), 10))
+        if ((if __local_li__goto_697_6 > 2147483647: 1 else: 0) != 0) {
             (__ci_expr_logic_24 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_24 = (if (if __local_li__goto_720_6 < -2147483648: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_24 = (if (if __local_li__goto_697_6 < -2147483648: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_24 != 0) {
             goto '__ci_bb_132
@@ -7476,18 +7451,18 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_133 {
-        ((unsafe: *(__local_field__goto_726_9 as *mut c_int)) = ((__local_li__goto_720_6 as c_int)))
-        (__local_pp__goto_719_15 = ((__local_endptr__goto_732_9 as *mut u8)))
+        ((unsafe: *(__local_field__goto_703_9 as *mut c_int)) = ((__local_li__goto_697_6 as c_int)))
+        (__local_pp__goto_696_15 = ((__local_endptr__goto_709_9 as *mut u8)))
         goto '__ci_bb_64
     }
 
     '__ci_bb_134 {
-        (__local_i__goto_729_16 = 0)
+        (__local_i__goto_706_16 = 0)
         goto '__ci_bb_135
     }
 
     '__ci_bb_135 {
-        if ((if __local_i__goto_729_16 < (((7 * sizeof[usize]()) as c_ulong) / (sizeof[usize]() as c_ulong)): 1 else: 0) != 0) {
+        if ((if __local_i__goto_706_16 < (((7 * sizeof[usize]()) as c_ulong) / (sizeof[usize]() as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_136
         } else {
             goto '__ci_bb_138
@@ -7496,8 +7471,8 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
 
     '__ci_bb_136 {
         (__ci_expr_logic_25 = 0)
-        if ((if __local_len__goto_730_10 == string_len(newlines[__local_i__goto_729_16]): 1 else: 0) != 0) {
-            (__ci_expr_logic_25 = (if (if strncmpic(__local_pp__goto_719_15, (newlines[__local_i__goto_729_16] as *const u8), __local_len__goto_730_10) == 0: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_len__goto_707_10 == string_len(newlines[__local_i__goto_706_16]): 1 else: 0) != 0) {
+            (__ci_expr_logic_25 = (if (if strncmpic(__local_pp__goto_696_15, (newlines[__local_i__goto_706_16] as *const u8), __local_len__goto_707_10) == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_25 != 0) {
             goto '__ci_bb_139
@@ -7507,12 +7482,12 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_137 {
-        (__local_i__goto_729_16 = __local_i__goto_729_16 + 1)
+        (__local_i__goto_706_16 = __local_i__goto_706_16 + 1)
         goto '__ci_bb_135
     }
 
     '__ci_bb_138 {
-        if ((if __local_i__goto_729_16 >= (((7 * sizeof[usize]()) as c_ulong) / (sizeof[usize]() as c_ulong)): 1 else: 0) != 0) {
+        if ((if __local_i__goto_706_16 >= (((7 * sizeof[usize]()) as c_ulong) / (sizeof[usize]() as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_141
         } else {
             goto '__ci_bb_142
@@ -7532,7 +7507,7 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_142 {
-        if ((if __local_i__goto_729_16 == 0: 1 else: 0) != 0) {
+        if ((if __local_i__goto_706_16 == 0: 1 else: 0) != 0) {
             goto '__ci_bb_143
         } else {
             goto '__ci_bb_144
@@ -7540,7 +7515,7 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_143 {
-        pcre2_set_newline_8(__local_field__goto_726_9, 2)
+        pcre2_set_newline_8(__local_field__goto_703_9, 2)
         if ((if __param_ctx == CTX_PAT: 1 else: 0) != 0) {
             (__ci_expr_logic_26 = (if true: 1 else: 0))
         } else {
@@ -7554,7 +7529,7 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_144 {
-        pcre2_set_newline_8(__local_field__goto_726_9, __local_i__goto_729_16)
+        pcre2_set_newline_8(__local_field__goto_703_9, __local_i__goto_706_16)
         if ((if __param_ctx == CTX_PAT: 1 else: 0) != 0) {
             (__ci_expr_logic_27 = (if true: 1 else: 0))
         } else {
@@ -7568,7 +7543,7 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_145 {
-        (__local_pp__goto_719_15 = __local_ep__goto_719_10)
+        (__local_pp__goto_696_15 = __local_ep__goto_696_10)
         goto '__ci_bb_64
     }
 
@@ -7601,10 +7576,10 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_152 {
-        if (isdigit((unsafe: *__local_pp__goto_719_15)) != 0) {
+        if (isdigit((unsafe: *__local_pp__goto_696_15)) != 0) {
             (__ci_expr_logic_28 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_28 = (if (if (unsafe: *__local_pp__goto_719_15) == 45: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_28 = (if (if (unsafe: *__local_pp__goto_696_15) == 45: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_28 != 0) {
             goto '__ci_bb_153
@@ -7614,12 +7589,12 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_153 {
-        (__local_ct__goto_1005_11 = 10 - 1)
-        (__local_li__goto_720_6 = strtol((__local_pp__goto_719_15 as *const c_char), (&raw mut __local_endptr__goto_732_9 as *mut *mut c_char), 10))
-        if ((if __local_li__goto_720_6 > 2147483647: 1 else: 0) != 0) {
+        (__local_ct__goto_982_11 = 10 - 1)
+        (__local_li__goto_697_6 = strtol((__local_pp__goto_696_15 as *const c_char), (&raw mut __local_endptr__goto_709_9 as *mut *mut c_char), 10))
+        if ((if __local_li__goto_697_6 > 2147483647: 1 else: 0) != 0) {
             (__ci_expr_logic_29 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_29 = (if (if __local_li__goto_720_6 < -2147483648: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_29 = (if (if __local_li__goto_697_6 < -2147483648: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_29 != 0) {
             goto '__ci_bb_156
@@ -7629,8 +7604,8 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_154 {
-        (__local_nn__goto_1030_13 = ((__local_field__goto_726_9 as *mut c_char)))
-        if ((if __local_len__goto_730_10 > 0: 1 else: 0) != 0) {
+        (__local_nn__goto_1007_13 = ((__local_field__goto_703_9 as *mut c_char)))
+        if ((if __local_len__goto_707_10 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_167
         } else {
             goto '__ci_bb_168
@@ -7646,9 +7621,9 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_157 {
-        (__local_value__goto_1006_15 = ((__local_li__goto_720_6 as c_int)))
-        (__local_field__goto_726_9 = (((((__local_field__goto_726_9 as *mut c_char) - (__local_m__goto_727_14.offset as usize)) + (__local_m__goto_727_14.value as usize)) as *mut c_void)))
-        if ((if __local_value__goto_1006_15 >= 0: 1 else: 0) != 0) {
+        (__local_value__goto_983_15 = ((__local_li__goto_697_6 as c_int)))
+        (__local_field__goto_703_9 = (((((__local_field__goto_703_9 as *mut c_char) - (__local_m__goto_704_14.offset as usize)) + (__local_m__goto_704_14.value as usize)) as *mut c_void)))
+        if ((if __local_value__goto_983_15 >= 0: 1 else: 0) != 0) {
             goto '__ci_bb_158
         } else {
             goto '__ci_bb_159
@@ -7660,8 +7635,8 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_159 {
-        ((unsafe: *(__local_field__goto_726_9 as *mut c_int)) = __local_value__goto_1006_15)
-        if ((if __local_ct__goto_1005_11 > 0: 1 else: 0) != 0) {
+        ((unsafe: *(__local_field__goto_703_9 as *mut c_int)) = __local_value__goto_983_15)
+        if ((if __local_ct__goto_982_11 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_165
         } else {
             goto '__ci_bb_166
@@ -7670,10 +7645,10 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
 
     '__ci_bb_160 {
         (__ci_expr_logic_31 = 0)
-        if ((if (unsafe: *(__local_field__goto_726_9 as *mut c_int)) >= 0: 1 else: 0) != 0) {
-            var __ci_expr_old_30: c_int = __local_ct__goto_1005_11
+        if ((if (unsafe: *(__local_field__goto_703_9 as *mut c_int)) >= 0: 1 else: 0) != 0) {
+            var __ci_expr_old_30: c_int = __local_ct__goto_982_11
 
-            (__local_ct__goto_1005_11 = __local_ct__goto_1005_11 - 1)
+            (__local_ct__goto_982_11 = __local_ct__goto_982_11 - 1)
 
             (__ci_expr_logic_31 = (if (if __ci_expr_old_30 > 0: 1 else: 0) != 0: 1 else: 0))
 
@@ -7686,12 +7661,12 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_161 {
-        (__local_field__goto_726_9 = ((((__local_field__goto_726_9 as *mut c_char) + (sizeof[i32]() as usize)) as *mut c_void)))
+        (__local_field__goto_703_9 = ((((__local_field__goto_703_9 as *mut c_char) + (sizeof[i32]() as usize)) as *mut c_void)))
         goto '__ci_bb_160
     }
 
     '__ci_bb_162 {
-        if ((if __local_ct__goto_1005_11 <= 0: 1 else: 0) != 0) {
+        if ((if __local_ct__goto_982_11 <= 0: 1 else: 0) != 0) {
             goto '__ci_bb_163
         } else {
             goto '__ci_bb_164
@@ -7700,7 +7675,7 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
 
     '__ci_bb_163 {
         colour_begin(31, outfile)
-        fprintf(outfile, "** Too many numeric \"%s\" modifiers\n", __local_m__goto_727_14.name)
+        fprintf(outfile, "** Too many numeric \"%s\" modifiers\n", __local_m__goto_704_14.name)
         colour_end(outfile)
         return 0
     }
@@ -7710,17 +7685,17 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_165 {
-        ((unsafe: (__local_field__goto_726_9 as *mut c_int)[1]) = -1)
+        ((unsafe: (__local_field__goto_703_9 as *mut c_int)[1]) = -1)
         goto '__ci_bb_166
     }
 
     '__ci_bb_166 {
-        (__local_pp__goto_719_15 = ((__local_endptr__goto_732_9 as *mut u8)))
+        (__local_pp__goto_696_15 = ((__local_endptr__goto_709_9 as *mut u8)))
         goto '__ci_bb_155
     }
 
     '__ci_bb_167 {
-        if ((if __local_len__goto_730_10 > 128: 1 else: 0) != 0) {
+        if ((if __local_len__goto_707_10 > 128: 1 else: 0) != 0) {
             goto '__ci_bb_169
         } else {
             goto '__ci_bb_170
@@ -7728,15 +7703,15 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_168 {
-        ((unsafe: __local_nn__goto_1030_13[__local_len__goto_730_10]) = 0)
-        ((unsafe: __local_nn__goto_1030_13[((__local_len__goto_730_10 as c_ulong) +% (1 as c_ulong))]) = 0)
-        (__local_pp__goto_719_15 = __local_ep__goto_719_10)
+        ((unsafe: __local_nn__goto_1007_13[__local_len__goto_707_10]) = 0)
+        ((unsafe: __local_nn__goto_1007_13[((__local_len__goto_707_10 as c_ulong) +% (1 as c_ulong))]) = 0)
+        (__local_pp__goto_696_15 = __local_ep__goto_696_10)
         goto '__ci_bb_155
     }
 
     '__ci_bb_169 {
         colour_begin(31, outfile)
-        fprintf(outfile, "** Group name in \"%s\" is too long\n", __local_m__goto_727_14.name)
+        fprintf(outfile, "** Group name in \"%s\" is too long\n", __local_m__goto_704_14.name)
         colour_end(outfile)
         return 0
     }
@@ -7746,7 +7721,7 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_171 {
-        if ((if (unsafe: *__local_nn__goto_1030_13) != 0: 1 else: 0) != 0) {
+        if ((if (unsafe: *__local_nn__goto_1007_13) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_172
         } else {
             goto '__ci_bb_173
@@ -7754,12 +7729,12 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_172 {
-        (__local_nn__goto_1030_13 = __local_nn__goto_1030_13 + (((string_len(__local_nn__goto_1030_13) as c_ulong) +% (1 as c_ulong)) as usize))
+        (__local_nn__goto_1007_13 = __local_nn__goto_1007_13 + (((string_len(__local_nn__goto_1007_13) as c_ulong) +% (1 as c_ulong)) as usize))
         goto '__ci_bb_171
     }
 
     '__ci_bb_173 {
-        if ((if (((((__local_nn__goto_1030_13 + (__local_len__goto_730_10 as usize)) + ((2 as isize) as usize)) as usize) -% ((__local_field__goto_726_9 as *mut c_char) as usize)) / sizeof[c_char]()) > 64: 1 else: 0) != 0) {
+        if ((if (((((__local_nn__goto_1007_13 + (__local_len__goto_707_10 as usize)) + ((2 as isize) as usize)) as usize) -% ((__local_field__goto_703_9 as *mut c_char) as usize)) / sizeof[c_char]()) > 64: 1 else: 0) != 0) {
             goto '__ci_bb_174
         } else {
             goto '__ci_bb_175
@@ -7768,18 +7743,18 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
 
     '__ci_bb_174 {
         colour_begin(31, outfile)
-        fprintf(outfile, "** Too many characters in named \"%s\" modifiers\n", __local_m__goto_727_14.name)
+        fprintf(outfile, "** Too many characters in named \"%s\" modifiers\n", __local_m__goto_704_14.name)
         colour_end(outfile)
         return 0
     }
 
     '__ci_bb_175 {
-        with_memcpy((__local_nn__goto_1030_13 as *i8), (__local_pp__goto_719_15 as *i8), (__local_len__goto_730_10 as i64))
+        with_memcpy((__local_nn__goto_1007_13 as *i8), (__local_pp__goto_696_15 as *i8), (__local_len__goto_707_10 as i64))
         goto '__ci_bb_168
     }
 
     '__ci_bb_176 {
-        if ((if __local_m__goto_727_14.value > (((255 as c_uint) as c_uint) +% (1 as c_uint)): 1 else: 0) != 0) {
+        if ((if ((__local_len__goto_707_10 as c_ulong) +% (1 as c_ulong)) > __local_m__goto_704_14.value: 1 else: 0) != 0) {
             goto '__ci_bb_177
         } else {
             goto '__ci_bb_178
@@ -7787,149 +7762,133 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
     }
 
     '__ci_bb_177 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, "pcre2test: mod %s size > 256 \n", __local_m__goto_727_14.name)
-        colour_end(__stderrp)
-        exit(1)
-        goto '__ci_bb_178
+        colour_begin(31, outfile)
+        fprintf(outfile, "** Overlong value for \"%s\" (max %d code units)\n", __local_m__goto_704_14.name, ((__local_m__goto_704_14.value as c_uint) -% (1 as c_uint)))
+        colour_end(outfile)
+        return 0
     }
 
     '__ci_bb_178 {
-        if ((if ((__local_len__goto_730_10 as c_ulong) +% (1 as c_ulong)) > __local_m__goto_727_14.value: 1 else: 0) != 0) {
-            goto '__ci_bb_179
+        ((unsafe: (__local_field__goto_703_9 as *mut u8)[0]) = __local_len__goto_707_10)
+        with_memcpy((((__local_field__goto_703_9 as *mut u8) + ((1 as isize) as usize)) as *i8), (__local_pp__goto_696_15 as *i8), (__local_len__goto_707_10 as i64))
+        ((unsafe: (__local_field__goto_703_9 as *mut u8)[((__local_len__goto_707_10 as c_ulong) +% (1 as c_ulong))]) = 0)
+        (__local_pp__goto_696_15 = __local_ep__goto_696_10)
+        goto '__ci_bb_64
+    }
+
+    '__ci_bb_179 {
+        if (__local_m__goto_704_14.type_ == 20) {
+            goto '__ci_bb_65
         } else {
             goto '__ci_bb_180
         }
     }
 
-    '__ci_bb_179 {
-        colour_begin(31, outfile)
-        fprintf(outfile, "** Overlong value for \"%s\" (max %d code units)\n", __local_m__goto_727_14.name, ((__local_m__goto_727_14.value as c_uint) -% (1 as c_uint)))
-        colour_end(outfile)
-        return 0
-    }
-
     '__ci_bb_180 {
-        ((unsafe: (__local_field__goto_726_9 as *mut u8)[0]) = ((__local_len__goto_730_10 as u8)))
-        with_memcpy((((__local_field__goto_726_9 as *mut u8) + ((1 as isize) as usize)) as *i8), (__local_pp__goto_719_15 as *i8), (__local_len__goto_730_10 as i64))
-        ((unsafe: (__local_field__goto_726_9 as *mut u8)[((__local_len__goto_730_10 as c_ulong) +% (1 as c_ulong))]) = 0)
-        (__local_pp__goto_719_15 = __local_ep__goto_719_10)
-        goto '__ci_bb_64
+        if (__local_m__goto_704_14.type_ == 21) {
+            goto '__ci_bb_69
+        } else {
+            goto '__ci_bb_181
+        }
     }
 
     '__ci_bb_181 {
-        if (__local_m__goto_727_14.type_ == 20) {
-            goto '__ci_bb_65
+        if (__local_m__goto_704_14.type_ == 13) {
+            goto '__ci_bb_70
         } else {
             goto '__ci_bb_182
         }
     }
 
     '__ci_bb_182 {
-        if (__local_m__goto_727_14.type_ == 21) {
-            goto '__ci_bb_69
+        if (__local_m__goto_704_14.type_ == 10) {
+            goto '__ci_bb_87
         } else {
             goto '__ci_bb_183
         }
     }
 
     '__ci_bb_183 {
-        if (__local_m__goto_727_14.type_ == 13) {
-            goto '__ci_bb_70
+        if (__local_m__goto_704_14.type_ == 11) {
+            goto '__ci_bb_88
         } else {
             goto '__ci_bb_184
         }
     }
 
     '__ci_bb_184 {
-        if (__local_m__goto_727_14.type_ == 10) {
-            goto '__ci_bb_87
+        if (__local_m__goto_704_14.type_ == 14) {
+            goto '__ci_bb_106
         } else {
             goto '__ci_bb_185
         }
     }
 
     '__ci_bb_185 {
-        if (__local_m__goto_727_14.type_ == 11) {
-            goto '__ci_bb_88
+        if (__local_m__goto_704_14.type_ == 22) {
+            goto '__ci_bb_116
         } else {
             goto '__ci_bb_186
         }
     }
 
     '__ci_bb_186 {
-        if (__local_m__goto_727_14.type_ == 14) {
-            goto '__ci_bb_106
+        if (__local_m__goto_704_14.type_ == 17) {
+            goto '__ci_bb_121
         } else {
             goto '__ci_bb_187
         }
     }
 
     '__ci_bb_187 {
-        if (__local_m__goto_727_14.type_ == 22) {
-            goto '__ci_bb_116
+        if (__local_m__goto_704_14.type_ == 16) {
+            goto '__ci_bb_124
         } else {
             goto '__ci_bb_188
         }
     }
 
     '__ci_bb_188 {
-        if (__local_m__goto_727_14.type_ == 17) {
-            goto '__ci_bb_121
+        if (__local_m__goto_704_14.type_ == 15) {
+            goto '__ci_bb_129
         } else {
             goto '__ci_bb_189
         }
     }
 
     '__ci_bb_189 {
-        if (__local_m__goto_727_14.type_ == 16) {
-            goto '__ci_bb_124
+        if (__local_m__goto_704_14.type_ == 18) {
+            goto '__ci_bb_134
         } else {
             goto '__ci_bb_190
         }
     }
 
     '__ci_bb_190 {
-        if (__local_m__goto_727_14.type_ == 15) {
-            goto '__ci_bb_129
+        if (__local_m__goto_704_14.type_ == 19) {
+            goto '__ci_bb_152
         } else {
             goto '__ci_bb_191
         }
     }
 
     '__ci_bb_191 {
-        if (__local_m__goto_727_14.type_ == 18) {
-            goto '__ci_bb_134
-        } else {
-            goto '__ci_bb_192
-        }
-    }
-
-    '__ci_bb_192 {
-        if (__local_m__goto_727_14.type_ == 19) {
-            goto '__ci_bb_152
-        } else {
-            goto '__ci_bb_193
-        }
-    }
-
-    '__ci_bb_193 {
-        if (__local_m__goto_727_14.type_ == 23) {
+        if (__local_m__goto_704_14.type_ == 23) {
             goto '__ci_bb_176
         } else {
             goto '__ci_bb_64
         }
     }
 
-    '__ci_bb_194 {
+    '__ci_bb_192 {
         colour_begin(31, outfile)
-        fprintf(outfile, "** Comma expected after modifier item \"%s\"\n", __local_m__goto_727_14.name)
+        fprintf(outfile, "** Comma expected after modifier item \"%s\"\n", __local_m__goto_704_14.name)
         colour_end(outfile)
         return 0
     }
 
-    '__ci_bb_195 {
-        (__local_p = __local_pp__goto_719_15)
+    '__ci_bb_193 {
+        (__local_p = __local_pp__goto_696_15)
         (__ci_expr_logic_38 = 0)
         if ((if __param_ctx == CTX_POPPAT: 1 else: 0) != 0) {
             var __ci_expr_logic_37: c_int
@@ -7960,20 +7919,20 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
 
         }
         if (__ci_expr_logic_38 != 0) {
-            goto '__ci_bb_196
+            goto '__ci_bb_194
         } else {
-            goto '__ci_bb_197
+            goto '__ci_bb_195
         }
     }
 
-    '__ci_bb_196 {
+    '__ci_bb_194 {
         colour_begin(31, outfile)
-        fprintf(outfile, "** \"%s\" is not valid here\n", __local_m__goto_727_14.name)
+        fprintf(outfile, "** \"%s\" is not valid here\n", __local_m__goto_704_14.name)
         colour_end(outfile)
         return 0
     }
 
-    '__ci_bb_197 {
+    '__ci_bb_195 {
         goto '__ci_bb_3
     }
 
@@ -9410,131 +9369,125 @@ fn process_command_8() -> c_int {
 }
 
 fn process_pattern_8() -> c_int {
-    var __local_utf__goto_2039_6: c_int = 0
+    var __local_utf__goto_2011_6: c_int = 0
 
-    var __local_k__goto_2040_10: c_uint = 0
+    var __local_k__goto_2012_10: c_uint = 0
 
-    var __local_p__goto_2041_10: *mut u8 = null
+    var __local_p__goto_2013_10: *mut u8 = null
 
-    var __local_delimiter__goto_2042_14: c_uint = 0
+    var __local_delimiter__goto_2014_14: c_uint = 0
 
-    var __local_rc__goto_2043_5: c_int = 0
+    var __local_rc__goto_2015_5: c_int = 0
 
-    var __local_errorcode__goto_2043_9: c_int = 0
+    var __local_errorcode__goto_2015_9: c_int = 0
 
-    var __local_use_pat_context__goto_2044_24: *mut pcre2_real_compile_context_8 = null
+    var __local_use_pat_context__goto_2016_24: *mut pcre2_real_compile_context_8 = null
 
-    var __local_use_pbuffer__goto_2045_12: *const u8 = null
+    var __local_use_pbuffer__goto_2017_12: *const u8 = null
 
-    var __local_use_forbid_utf__goto_2046_10: c_uint = 0
+    var __local_use_forbid_utf__goto_2018_10: c_uint = 0
 
-    var __local_patlen__goto_2047_12: c_ulong = 0
+    var __local_patlen__goto_2019_12: c_ulong = 0
 
-    var __local_full_patlen__goto_2047_20: c_ulong = 0
+    var __local_full_patlen__goto_2019_20: c_ulong = 0
 
-    var __local_valgrind_access_length__goto_2048_12: c_ulong = 0
+    var __local_valgrind_access_length__goto_2020_12: c_ulong = 0
 
-    var __local_erroroffset__goto_2049_12: c_ulong = 0
+    var __local_erroroffset__goto_2021_12: c_ulong = 0
 
-    var __local_serialize_rc__goto_2050_9: c_int = 0
+    var __local_c__goto_2107_12: c_uint = 0
 
-    var __local_serialized_bytes__goto_2051_10: *mut u8 = null
+    var __local_pp__goto_2130_12: *mut u8 = null
 
-    var __local_serialized_size__goto_2052_12: c_ulong = 0
+    var __local_pt__goto_2130_17: *mut u8 = null
 
-    var __local_c__goto_2138_12: c_uint = 0
+    var __local_c__goto_2131_12: c_uint = 0
 
-    var __local_pp__goto_2161_12: *mut u8 = null
+    var __local_d__goto_2131_15: c_uint = 0
 
-    var __local_pt__goto_2161_17: *mut u8 = null
+    var __local_pq__goto_2143_16: *mut u8 = null
 
-    var __local_c__goto_2162_12: c_uint = 0
+    var __local_pp__goto_2195_12: *mut u8 = null
 
-    var __local_d__goto_2162_15: c_uint = 0
+    var __local_pt__goto_2195_17: *mut u8 = null
 
-    var __local_pq__goto_2174_16: *mut u8 = null
+    var __local_pc__goto_2200_14: *mut u8 = null
 
-    var __local_pp__goto_2226_12: *mut u8 = null
+    var __local_count__goto_2201_14: c_uint = 0
 
-    var __local_pt__goto_2226_17: *mut u8 = null
+    var __local_length__goto_2202_12: c_ulong = 0
 
-    var __local_pc__goto_2231_14: *mut u8 = null
+    var __local_pe__goto_2209_16: *mut u8 = null
 
-    var __local_count__goto_2232_14: c_uint = 0
+    var __local_clen__goto_2214_18: c_ulong = 0
 
-    var __local_length__goto_2233_12: c_ulong = 0
+    var __local_i__goto_2215_20: c_uint = 0
 
-    var __local_pe__goto_2240_16: *mut u8 = null
+    var __local_uli__goto_2216_25: c_ulong = 0
 
-    var __local_clen__goto_2245_18: c_ulong = 0
+    var __local_endptr__goto_2217_17: *mut i8 = null
 
-    var __local_i__goto_2246_20: c_uint = 0
+    var __local_pc_offset__goto_2252_14: c_ulong = 0
 
-    var __local_uli__goto_2247_25: c_ulong = 0
+    var __local_pp_offset__goto_2253_14: c_ulong = 0
 
-    var __local_endptr__goto_2248_17: *mut i8 = null
+    var __local_pt_offset__goto_2254_14: c_ulong = 0
 
-    var __local_pc_offset__goto_2283_14: c_ulong = 0
+    var __local_cflags__goto_2350_7: c_int = 0
 
-    var __local_pp_offset__goto_2284_14: c_ulong = 0
+    var __local_msg__goto_2351_15: *const i8 = null
 
-    var __local_pt_offset__goto_2285_14: c_ulong = 0
+    var __local_regbuffer__goto_2436_11: *mut i8 = null
 
-    var __local_cflags__goto_2381_7: c_int = 0
+    var __local_bsize__goto_2437_12: c_ulong = 0
 
-    var __local_msg__goto_2382_15: *const i8 = null
+    var __local_usize__goto_2437_19: c_ulong = 0
 
-    var __local_regbuffer__goto_2467_11: *mut i8 = null
+    var __local_strsize__goto_2437_26: c_ulong = 0
 
-    var __local_bsize__goto_2468_12: c_ulong = 0
+    var __local_convert_return__goto_2563_7: c_int = 0
 
-    var __local_usize__goto_2468_19: c_ulong = 0
+    var __local_convert_options__goto_2564_12: c_uint = 0
 
-    var __local_strsize__goto_2468_26: c_ulong = 0
+    var __local_converted_pattern__goto_2565_16: *mut u8 = null
 
-    var __local_convert_return__goto_2594_7: c_int = 0
+    var __local_converted_length__goto_2566_14: c_ulong = 0
 
-    var __local_convert_options__goto_2595_12: c_uint = 0
+    var __local_zero_terminate__goto_2567_8: c_int = 0
 
-    var __local_converted_pattern__goto_2596_16: *mut u8 = null
+    var __local_escape__goto_2589_14: c_uint = 0
 
-    var __local_converted_length__goto_2597_14: c_ulong = 0
+    var __local_separator__goto_2603_14: c_uint = 0
 
-    var __local_zero_terminate__goto_2598_8: c_int = 0
+    var __local_i__goto_2723_7: c_int = 0
 
-    var __local_escape__goto_2620_14: c_uint = 0
+    var __local_time_taken__goto_2724_11: c_ulong = 0
 
-    var __local_separator__goto_2634_14: c_uint = 0
+    var __local_start_time__goto_2727_13: c_ulong = 0
 
-    var __local_i__goto_2754_7: c_int = 0
+    var __local_i__goto_2750_12: c_int = 0
 
-    var __local_time_taken__goto_2755_11: c_ulong = 0
+    var __local_target_mallocs__goto_2750_19: c_int = 0
 
-    var __local_start_time__goto_2758_13: c_ulong = 0
+    var __local_i__goto_2789_9: c_int = 0
 
-    var __local_i__goto_2781_12: c_int = 0
+    var __local_time_taken__goto_2790_13: c_ulong = 0
 
-    var __local_target_mallocs__goto_2781_19: c_int = 0
+    var __local_start_time__goto_2794_15: c_ulong = 0
 
-    var __local_i__goto_2820_9: c_int = 0
+    var __local_i__goto_2828_14: c_int = 0
 
-    var __local_time_taken__goto_2821_13: c_ulong = 0
+    var __local_target_mallocs__goto_2828_21: c_int = 0
 
-    var __local_start_time__goto_2825_15: c_ulong = 0
+    var __local_direction__goto_2868_7: c_int = 0
 
-    var __local_i__goto_2859_14: c_int = 0
+    var __local_cc__goto_2883_14: c_uint = 0
 
-    var __local_target_mallocs__goto_2859_21: c_int = 0
+    var __local_n__goto_2884_9: c_int = 0
 
-    var __local_direction__goto_2899_7: c_int = 0
+    var __local_q__goto_2885_23: *mut u8 = null
 
-    var __local_cc__goto_2914_14: c_uint = 0
-
-    var __local_n__goto_2915_9: c_int = 0
-
-    var __local_q__goto_2916_23: *mut u8 = null
-
-    var __local_q_end__goto_2916_37: *mut u8 = null
+    var __local_q_end__goto_2885_37: *mut u8 = null
 
     var __ci_expr_old_0: *mut u8 = null
 
@@ -9625,14 +9578,14 @@ fn process_pattern_8() -> c_int {
     goto '__ci_bb_0
 
     '__ci_bb_0 {
-        (__local_p__goto_2041_10 = buffer)
-        (__ci_expr_old_0 = __local_p__goto_2041_10)
-        (__local_p__goto_2041_10 = __local_p__goto_2041_10 + 1)
-        (__local_delimiter__goto_2042_14 = (unsafe: *__ci_expr_old_0))
-        (__local_use_forbid_utf__goto_2046_10 = forbid_utf)
+        (__local_p__goto_2013_10 = buffer)
+        (__ci_expr_old_0 = __local_p__goto_2013_10)
+        (__local_p__goto_2013_10 = __local_p__goto_2013_10 + 1)
+        (__local_delimiter__goto_2014_14 = (unsafe: *__ci_expr_old_0))
+        (__local_use_forbid_utf__goto_2018_10 = forbid_utf)
         (__ci_expr_logic_1 = 0)
         if (restrict_for_perl_test != 0) {
-            (__ci_expr_logic_1 = (if (if __local_delimiter__goto_2042_14 != 47: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_1 = (if (if __local_delimiter__goto_2014_14 != 47: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_1 != 0) {
             goto '__ci_bb_1
@@ -9667,7 +9620,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_6 {
-        if ((if (unsafe: __local_p__goto_2041_10[1]) == 92: 1 else: 0) != 0) {
+        if ((if (unsafe: __local_p__goto_2013_10[1]) == 92: 1 else: 0) != 0) {
             goto '__ci_bb_21
         } else {
             goto '__ci_bb_22
@@ -9675,7 +9628,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_7 {
-        if ((if (unsafe: *__local_p__goto_2041_10) != 0: 1 else: 0) != 0) {
+        if ((if (unsafe: *__local_p__goto_2013_10) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_8
         } else {
             goto '__ci_bb_9
@@ -9684,8 +9637,8 @@ fn process_pattern_8() -> c_int {
 
     '__ci_bb_8 {
         (__ci_expr_logic_2 = 0)
-        if ((if (unsafe: *__local_p__goto_2041_10) == 92: 1 else: 0) != 0) {
-            (__ci_expr_logic_2 = (if (if (unsafe: __local_p__goto_2041_10[1]) != 0: 1 else: 0) != 0: 1 else: 0))
+        if ((if (unsafe: *__local_p__goto_2013_10) == 92: 1 else: 0) != 0) {
+            (__ci_expr_logic_2 = (if (if (unsafe: __local_p__goto_2013_10[1]) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_2 != 0) {
             goto '__ci_bb_10
@@ -9695,7 +9648,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_9 {
-        if ((if (unsafe: *__local_p__goto_2041_10) != 0: 1 else: 0) != 0) {
+        if ((if (unsafe: *__local_p__goto_2013_10) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_15
         } else {
             goto '__ci_bb_16
@@ -9703,12 +9656,12 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_10 {
-        (__local_p__goto_2041_10 = __local_p__goto_2041_10 + 1)
+        (__local_p__goto_2013_10 = __local_p__goto_2013_10 + 1)
         goto '__ci_bb_12
     }
 
     '__ci_bb_11 {
-        if ((if (unsafe: *__local_p__goto_2041_10) == __local_delimiter__goto_2042_14: 1 else: 0) != 0) {
+        if ((if (unsafe: *__local_p__goto_2013_10) == __local_delimiter__goto_2014_14: 1 else: 0) != 0) {
             goto '__ci_bb_13
         } else {
             goto '__ci_bb_14
@@ -9716,7 +9669,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_12 {
-        (__local_p__goto_2041_10 = __local_p__goto_2041_10 + 1)
+        (__local_p__goto_2013_10 = __local_p__goto_2013_10 + 1)
         goto '__ci_bb_7
     }
 
@@ -9733,8 +9686,8 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_16 {
-        (__local_p__goto_2041_10 = extend_inputline(infile, __local_p__goto_2041_10, "    > "))
-        if ((if __local_p__goto_2041_10 == null: 1 else: 0) != 0) {
+        (__local_p__goto_2013_10 = extend_inputline(infile, __local_p__goto_2013_10, "    > "))
+        if ((if __local_p__goto_2013_10 == null: 1 else: 0) != 0) {
             goto '__ci_bb_17
         } else {
             goto '__ci_bb_18
@@ -9758,7 +9711,7 @@ fn process_pattern_8() -> c_int {
 
     '__ci_bb_19 {
         colour_begin(32, outfile)
-        fprintf(outfile, "%s", (__local_p__goto_2041_10 as *mut c_char))
+        fprintf(outfile, "%s", (__local_p__goto_2013_10 as *mut c_char))
         colour_end(outfile)
         goto '__ci_bb_20
     }
@@ -9768,18 +9721,18 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_21 {
-        (__ci_expr_old_3 = __local_p__goto_2041_10)
-        (__local_p__goto_2041_10 = __local_p__goto_2041_10 + 1)
+        (__ci_expr_old_3 = __local_p__goto_2013_10)
+        (__local_p__goto_2013_10 = __local_p__goto_2013_10 + 1)
         ((unsafe: *__ci_expr_old_3) = 92)
         goto '__ci_bb_22
     }
 
     '__ci_bb_22 {
-        (__ci_expr_old_4 = __local_p__goto_2041_10)
-        (__local_p__goto_2041_10 = __local_p__goto_2041_10 + 1)
+        (__ci_expr_old_4 = __local_p__goto_2013_10)
+        (__local_p__goto_2013_10 = __local_p__goto_2013_10 + 1)
         ((unsafe: *__ci_expr_old_4) = 0)
-        (__local_patlen__goto_2047_12 = (((__local_p__goto_2041_10 as usize) -% (buffer as usize)) / sizeof[u8]()) - 2)
-        if ((if not (decode_modifiers_8(__local_p__goto_2041_10, CTX_PAT, (&raw mut pat_patctl as *mut patctl), null) != 0): 1 else: 0) != 0) {
+        (__local_patlen__goto_2019_12 = (((__local_p__goto_2013_10 as usize) -% (buffer as usize)) / sizeof[u8]()) - 2)
+        if ((if not (decode_modifiers_8(__local_p__goto_2013_10, CTX_PAT, (&raw mut pat_patctl as *mut patctl), null) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_23
         } else {
             goto '__ci_bb_24
@@ -9791,7 +9744,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_24 {
-        (__local_utf__goto_2039_6 = (if (((&raw const pat_patctl as *const patctl).options as c_uint) & (((524288 as c_uint) | (67108864 as c_uint)) as c_uint)) != 0: 1 else: 0))
+        (__local_utf__goto_2011_6 = (if (((&raw const pat_patctl as *const patctl).options as c_uint) & (((524288 as c_uint) | (67108864 as c_uint)) as c_uint)) != 0: 1 else: 0))
         if ((if (((&raw const pat_patctl as *const patctl).control as c_uint) & (1073741824 as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_25
         } else {
@@ -9826,12 +9779,12 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_28 {
-        (__local_k__goto_2040_10 = 0)
+        (__local_k__goto_2012_10 = 0)
         goto '__ci_bb_29
     }
 
     '__ci_bb_29 {
-        if ((if __local_k__goto_2040_10 < (((7 * sizeof[c_uint]()) as c_ulong) / (sizeof[u32]() as c_ulong)): 1 else: 0) != 0) {
+        if ((if __local_k__goto_2012_10 < (((7 * sizeof[c_uint]()) as c_ulong) / (sizeof[u32]() as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_30
         } else {
             goto '__ci_bb_32
@@ -9839,10 +9792,10 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_30 {
-        (__local_c__goto_2138_12 = ((&raw const pat_patctl as *const patctl).control as c_uint) & (exclusive_pat_controls[__local_k__goto_2040_10] as c_uint))
+        (__local_c__goto_2107_12 = ((&raw const pat_patctl as *const patctl).control as c_uint) & (exclusive_pat_controls[__local_k__goto_2012_10] as c_uint))
         (__ci_expr_logic_6 = 0)
-        if ((if __local_c__goto_2138_12 != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_6 = (if (if __local_c__goto_2138_12 != ((__local_c__goto_2138_12 as c_uint) & ((((~__local_c__goto_2138_12) as c_uint) +% (1 as c_uint)) as c_uint)): 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_c__goto_2107_12 != 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_6 = (if (if __local_c__goto_2107_12 != ((__local_c__goto_2107_12 as c_uint) & ((((~__local_c__goto_2107_12) as c_uint) +% (1 as c_uint)) as c_uint)): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_6 != 0) {
             goto '__ci_bb_33
@@ -9852,7 +9805,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_31 {
-        (__local_k__goto_2040_10 = __local_k__goto_2040_10 + 1)
+        (__local_k__goto_2012_10 = __local_k__goto_2012_10 + 1)
         goto '__ci_bb_29
     }
 
@@ -9869,7 +9822,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_33 {
-        show_controls(31, __local_c__goto_2138_12, 0, "** Not allowed together:")
+        show_controls(31, __local_c__goto_2107_12, 0, "** Not allowed together:")
         fprintf(outfile, "\n")
         return PR_SKIP
     }
@@ -9892,8 +9845,8 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_37 {
-        (__local_pt__goto_2161_17 = pbuffer8)
-        (__local_pp__goto_2161_12 = buffer + ((1 as isize) as usize))
+        (__local_pt__goto_2130_17 = pbuffer8)
+        (__local_pp__goto_2130_12 = buffer + ((1 as isize) as usize))
         goto '__ci_bb_40
     }
 
@@ -9914,7 +9867,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_40 {
-        if ((if (unsafe: *__local_pp__goto_2161_12) != 0: 1 else: 0) != 0) {
+        if ((if (unsafe: *__local_pp__goto_2130_12) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_41
         } else {
             goto '__ci_bb_43
@@ -9922,7 +9875,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_41 {
-        if (isspace((unsafe: *__local_pp__goto_2161_12)) != 0) {
+        if (isspace((unsafe: *__local_pp__goto_2130_12)) != 0) {
             goto '__ci_bb_44
         } else {
             goto '__ci_bb_45
@@ -9930,13 +9883,13 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_42 {
-        (__local_pp__goto_2161_12 = __local_pp__goto_2161_12 + 1)
+        (__local_pp__goto_2130_12 = __local_pp__goto_2130_12 + 1)
         goto '__ci_bb_40
     }
 
     '__ci_bb_43 {
-        ((unsafe: *__local_pt__goto_2161_17) = 0)
-        (__local_patlen__goto_2047_12 = ((__local_pt__goto_2161_17 as usize) -% (pbuffer8 as usize)) / sizeof[u8]())
+        ((unsafe: *__local_pt__goto_2130_17) = 0)
+        (__local_patlen__goto_2019_12 = ((__local_pt__goto_2130_17 as usize) -% (pbuffer8 as usize)) / sizeof[u8]())
         goto '__ci_bb_39
     }
 
@@ -9945,13 +9898,13 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_45 {
-        (__ci_expr_old_8 = __local_pp__goto_2161_12)
-        (__local_pp__goto_2161_12 = __local_pp__goto_2161_12 + 1)
-        (__local_c__goto_2162_12 = (unsafe: *__ci_expr_old_8))
-        if ((if __local_c__goto_2162_12 == 39: 1 else: 0) != 0) {
+        (__ci_expr_old_8 = __local_pp__goto_2130_12)
+        (__local_pp__goto_2130_12 = __local_pp__goto_2130_12 + 1)
+        (__local_c__goto_2131_12 = (unsafe: *__ci_expr_old_8))
+        if ((if __local_c__goto_2131_12 == 39: 1 else: 0) != 0) {
             (__ci_expr_logic_9 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_9 = (if (if __local_c__goto_2162_12 == 34: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_9 = (if (if __local_c__goto_2131_12 == 34: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_9 != 0) {
             goto '__ci_bb_46
@@ -9961,12 +9914,12 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_46 {
-        (__local_pq__goto_2174_16 = __local_pp__goto_2161_12)
+        (__local_pq__goto_2143_16 = __local_pp__goto_2130_12)
         goto '__ci_bb_49
     }
 
     '__ci_bb_47 {
-        if ((if not (isxdigit(__local_c__goto_2162_12) != 0): 1 else: 0) != 0) {
+        if ((if not (isxdigit(__local_c__goto_2131_12) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_57
         } else {
             goto '__ci_bb_58
@@ -9982,8 +9935,8 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_50 {
-        (__local_d__goto_2162_15 = (unsafe: *__local_pp__goto_2161_12))
-        if ((if __local_d__goto_2162_15 == 0: 1 else: 0) != 0) {
+        (__local_d__goto_2131_15 = (unsafe: *__local_pp__goto_2130_12))
+        if ((if __local_d__goto_2131_15 == 0: 1 else: 0) != 0) {
             goto '__ci_bb_53
         } else {
             goto '__ci_bb_54
@@ -9991,7 +9944,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_51 {
-        (__local_pp__goto_2161_12 = __local_pp__goto_2161_12 + 1)
+        (__local_pp__goto_2130_12 = __local_pp__goto_2130_12 + 1)
         goto '__ci_bb_49
     }
 
@@ -10001,13 +9954,13 @@ fn process_pattern_8() -> c_int {
 
     '__ci_bb_53 {
         colour_begin(31, outfile)
-        fprintf(outfile, "** Missing closing quote in hex pattern: opening quote is at offset %.\n", ((((__local_pq__goto_2174_16 as usize) -% (buffer as usize)) / sizeof[u8]()) - 2))
+        fprintf(outfile, "** Missing closing quote in hex pattern: opening quote is at offset %.\n", ((((__local_pq__goto_2143_16 as usize) -% (buffer as usize)) / sizeof[u8]()) - 2))
         colour_end(outfile)
         return PR_SKIP
     }
 
     '__ci_bb_54 {
-        if ((if __local_d__goto_2162_15 == __local_c__goto_2162_12: 1 else: 0) != 0) {
+        if ((if __local_d__goto_2131_15 == __local_c__goto_2131_12: 1 else: 0) != 0) {
             goto '__ci_bb_55
         } else {
             goto '__ci_bb_56
@@ -10019,21 +9972,21 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_56 {
-        (__ci_expr_old_10 = __local_pt__goto_2161_17)
-        (__local_pt__goto_2161_17 = __local_pt__goto_2161_17 + 1)
-        ((unsafe: *__ci_expr_old_10) = __local_d__goto_2162_15)
+        (__ci_expr_old_10 = __local_pt__goto_2130_17)
+        (__local_pt__goto_2130_17 = __local_pt__goto_2130_17 + 1)
+        ((unsafe: *__ci_expr_old_10) = __local_d__goto_2131_15)
         goto '__ci_bb_51
     }
 
     '__ci_bb_57 {
         colour_begin(31, outfile)
-        fprintf(outfile, "** Unexpected non-hex-digit '%c' at offset %td in hex pattern: quote missing?\n", __local_c__goto_2162_12, ((((__local_pp__goto_2161_12 as usize) -% (buffer as usize)) / sizeof[u8]()) - 2))
+        fprintf(outfile, "** Unexpected non-hex-digit '%c' at offset %td in hex pattern: quote missing?\n", __local_c__goto_2131_12, ((((__local_pp__goto_2130_12 as usize) -% (buffer as usize)) / sizeof[u8]()) - 2))
         colour_end(outfile)
         return PR_SKIP
     }
 
     '__ci_bb_58 {
-        if ((if (unsafe: *__local_pp__goto_2161_12) == 0: 1 else: 0) != 0) {
+        if ((if (unsafe: *__local_pp__goto_2130_12) == 0: 1 else: 0) != 0) {
             goto '__ci_bb_59
         } else {
             goto '__ci_bb_60
@@ -10048,8 +10001,8 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_60 {
-        (__local_d__goto_2162_15 = (unsafe: *__local_pp__goto_2161_12))
-        if ((if not (isxdigit(__local_d__goto_2162_15) != 0): 1 else: 0) != 0) {
+        (__local_d__goto_2131_15 = (unsafe: *__local_pp__goto_2130_12))
+        if ((if not (isxdigit(__local_d__goto_2131_15) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_61
         } else {
             goto '__ci_bb_62
@@ -10058,42 +10011,42 @@ fn process_pattern_8() -> c_int {
 
     '__ci_bb_61 {
         colour_begin(31, outfile)
-        fprintf(outfile, "** Unexpected non-hex-digit '%c' at offset %td in hex pattern: quote missing?\n", __local_d__goto_2162_15, ((((__local_pp__goto_2161_12 as usize) -% (buffer as usize)) / sizeof[u8]()) - 1))
+        fprintf(outfile, "** Unexpected non-hex-digit '%c' at offset %td in hex pattern: quote missing?\n", __local_d__goto_2131_15, ((((__local_pp__goto_2130_12 as usize) -% (buffer as usize)) / sizeof[u8]()) - 1))
         colour_end(outfile)
         return PR_SKIP
     }
 
     '__ci_bb_62 {
-        (__local_c__goto_2162_12 = toupper(__local_c__goto_2162_12))
-        (__local_d__goto_2162_15 = toupper(__local_d__goto_2162_15))
+        (__local_c__goto_2131_12 = toupper(__local_c__goto_2131_12))
+        (__local_d__goto_2131_15 = toupper(__local_d__goto_2131_15))
         (__ci_expr_ternary_11 = 0)
-        if (isdigit(__local_c__goto_2162_12) != 0) {
-            (__ci_expr_ternary_11 = ((__local_c__goto_2162_12 as c_uint) -% (48 as c_uint)))
+        if (isdigit(__local_c__goto_2131_12) != 0) {
+            (__ci_expr_ternary_11 = ((__local_c__goto_2131_12 as c_uint) -% (48 as c_uint)))
         } else {
-            (__ci_expr_ternary_11 = ((((__local_c__goto_2162_12 as c_uint) -% (65 as c_uint)) as c_uint) +% (10 as c_uint)))
+            (__ci_expr_ternary_11 = ((((__local_c__goto_2131_12 as c_uint) -% (65 as c_uint)) as c_uint) +% (10 as c_uint)))
         }
-        (__local_c__goto_2162_12 = __ci_expr_ternary_11)
+        (__local_c__goto_2131_12 = __ci_expr_ternary_11)
         (__ci_expr_ternary_12 = 0)
-        if (isdigit(__local_d__goto_2162_15) != 0) {
-            (__ci_expr_ternary_12 = ((__local_d__goto_2162_15 as c_uint) -% (48 as c_uint)))
+        if (isdigit(__local_d__goto_2131_15) != 0) {
+            (__ci_expr_ternary_12 = ((__local_d__goto_2131_15 as c_uint) -% (48 as c_uint)))
         } else {
-            (__ci_expr_ternary_12 = ((((__local_d__goto_2162_15 as c_uint) -% (65 as c_uint)) as c_uint) +% (10 as c_uint)))
+            (__ci_expr_ternary_12 = ((((__local_d__goto_2131_15 as c_uint) -% (65 as c_uint)) as c_uint) +% (10 as c_uint)))
         }
-        (__local_d__goto_2162_15 = __ci_expr_ternary_12)
-        (__ci_expr_old_13 = __local_pt__goto_2161_17)
-        (__local_pt__goto_2161_17 = __local_pt__goto_2161_17 + 1)
-        ((unsafe: *__ci_expr_old_13) = ((((__local_c__goto_2162_12 as c_uint) << (4 as c_uint)) as c_uint) +% (__local_d__goto_2162_15 as c_uint)))
+        (__local_d__goto_2131_15 = __ci_expr_ternary_12)
+        (__ci_expr_old_13 = __local_pt__goto_2130_17)
+        (__local_pt__goto_2130_17 = __local_pt__goto_2130_17 + 1)
+        ((unsafe: *__ci_expr_old_13) = ((((__local_c__goto_2131_12 as c_uint) << (4 as c_uint)) as c_uint) +% (__local_d__goto_2131_15 as c_uint)))
         goto '__ci_bb_48
     }
 
     '__ci_bb_63 {
-        (__local_pt__goto_2226_17 = pbuffer8)
-        (__local_pp__goto_2226_12 = buffer + ((1 as isize) as usize))
+        (__local_pt__goto_2195_17 = pbuffer8)
+        (__local_pp__goto_2195_12 = buffer + ((1 as isize) as usize))
         goto '__ci_bb_66
     }
 
     '__ci_bb_64 {
-        strncpy((pbuffer8 as *mut c_char), ((buffer + ((1 as isize) as usize)) as *mut c_char), ((__local_patlen__goto_2047_12 as c_ulong) +% (1 as c_ulong)))
+        strncpy((pbuffer8 as *mut c_char), ((buffer + ((1 as isize) as usize)) as *mut c_char), ((__local_patlen__goto_2019_12 as c_ulong) +% (1 as c_ulong)))
         goto '__ci_bb_65
     }
 
@@ -10102,7 +10055,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_66 {
-        if ((if (unsafe: *__local_pp__goto_2226_12) != 0: 1 else: 0) != 0) {
+        if ((if (unsafe: *__local_pp__goto_2195_12) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_67
         } else {
             goto '__ci_bb_69
@@ -10110,12 +10063,12 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_67 {
-        (__local_pc__goto_2231_14 = __local_pp__goto_2226_12)
-        (__local_count__goto_2232_14 = 1)
-        (__local_length__goto_2233_12 = 1)
+        (__local_pc__goto_2200_14 = __local_pp__goto_2195_12)
+        (__local_count__goto_2201_14 = 1)
+        (__local_length__goto_2202_12 = 1)
         (__ci_expr_logic_14 = 0)
-        if ((if (unsafe: __local_pp__goto_2226_12[0]) == 92: 1 else: 0) != 0) {
-            (__ci_expr_logic_14 = (if (if (unsafe: __local_pp__goto_2226_12[1]) == 91: 1 else: 0) != 0: 1 else: 0))
+        if ((if (unsafe: __local_pp__goto_2195_12[0]) == 92: 1 else: 0) != 0) {
+            (__ci_expr_logic_14 = (if (if (unsafe: __local_pp__goto_2195_12[1]) == 91: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_14 != 0) {
             goto '__ci_bb_70
@@ -10125,13 +10078,13 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_68 {
-        (__local_pp__goto_2226_12 = __local_pp__goto_2226_12 + 1)
+        (__local_pp__goto_2195_12 = __local_pp__goto_2195_12 + 1)
         goto '__ci_bb_66
     }
 
     '__ci_bb_69 {
-        ((unsafe: *__local_pt__goto_2226_17) = 0)
-        (__local_patlen__goto_2047_12 = ((__local_pt__goto_2226_17 as usize) -% (pbuffer8 as usize)) / sizeof[u8]())
+        ((unsafe: *__local_pt__goto_2195_17) = 0)
+        (__local_patlen__goto_2019_12 = ((__local_pt__goto_2195_17 as usize) -% (pbuffer8 as usize)) / sizeof[u8]())
         if ((if (((&raw const pat_patctl as *const patctl).control as c_uint) & (131072 as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_91
         } else {
@@ -10140,7 +10093,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_70 {
-        (__local_pe__goto_2240_16 = __local_pp__goto_2226_12 + ((2 as isize) as usize))
+        (__local_pe__goto_2209_16 = __local_pp__goto_2195_12 + ((2 as isize) as usize))
         goto '__ci_bb_72
     }
 
@@ -10149,7 +10102,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_72 {
-        if ((if (unsafe: *__local_pe__goto_2240_16) != 0: 1 else: 0) != 0) {
+        if ((if (unsafe: *__local_pe__goto_2209_16) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_73
         } else {
             goto '__ci_bb_75
@@ -10158,8 +10111,8 @@ fn process_pattern_8() -> c_int {
 
     '__ci_bb_73 {
         (__ci_expr_logic_15 = 0)
-        if ((if (unsafe: __local_pe__goto_2240_16[0]) == 93: 1 else: 0) != 0) {
-            (__ci_expr_logic_15 = (if (if (unsafe: __local_pe__goto_2240_16[1]) == 123: 1 else: 0) != 0: 1 else: 0))
+        if ((if (unsafe: __local_pe__goto_2209_16[0]) == 93: 1 else: 0) != 0) {
+            (__ci_expr_logic_15 = (if (if (unsafe: __local_pe__goto_2209_16[1]) == 123: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_15 != 0) {
             goto '__ci_bb_76
@@ -10169,7 +10122,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_74 {
-        (__local_pe__goto_2240_16 = __local_pe__goto_2240_16 + 1)
+        (__local_pe__goto_2209_16 = __local_pe__goto_2209_16 + 1)
         goto '__ci_bb_72
     }
 
@@ -10178,11 +10131,11 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_76 {
-        (__local_clen__goto_2245_18 = (((__local_pe__goto_2240_16 as usize) -% (__local_pc__goto_2231_14 as usize)) / sizeof[u8]()) - 2)
-        (__local_i__goto_2246_20 = 0)
-        (__local_pe__goto_2240_16 = __local_pe__goto_2240_16 + ((2 as isize) as usize))
-        (__local_uli__goto_2247_25 = strtoul((__local_pe__goto_2240_16 as *const c_char), (&raw mut __local_endptr__goto_2248_17 as *mut *mut c_char), 10))
-        if ((if __local_uli__goto_2247_25 > 4294967295: 1 else: 0) != 0) {
+        (__local_clen__goto_2214_18 = (((__local_pe__goto_2209_16 as usize) -% (__local_pc__goto_2200_14 as usize)) / sizeof[u8]()) - 2)
+        (__local_i__goto_2215_20 = 0)
+        (__local_pe__goto_2209_16 = __local_pe__goto_2209_16 + ((2 as isize) as usize))
+        (__local_uli__goto_2216_25 = strtoul((__local_pe__goto_2209_16 as *const c_char), (&raw mut __local_endptr__goto_2217_17 as *mut *mut c_char), 10))
+        if ((if __local_uli__goto_2216_25 > 4294967295: 1 else: 0) != 0) {
             goto '__ci_bb_78
         } else {
             goto '__ci_bb_79
@@ -10201,9 +10154,9 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_79 {
-        (__local_i__goto_2246_20 = ((__local_uli__goto_2247_25 as c_uint)))
-        (__local_pe__goto_2240_16 = ((__local_endptr__goto_2248_17 as *mut u8)))
-        if ((if (unsafe: *__local_pe__goto_2240_16) == 125: 1 else: 0) != 0) {
+        (__local_i__goto_2215_20 = ((__local_uli__goto_2216_25 as c_uint)))
+        (__local_pe__goto_2209_16 = ((__local_endptr__goto_2217_17 as *mut u8)))
+        if ((if (unsafe: *__local_pe__goto_2209_16) == 125: 1 else: 0) != 0) {
             goto '__ci_bb_80
         } else {
             goto '__ci_bb_81
@@ -10211,7 +10164,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_80 {
-        if ((if __local_i__goto_2246_20 == 0: 1 else: 0) != 0) {
+        if ((if __local_i__goto_2215_20 == 0: 1 else: 0) != 0) {
             goto '__ci_bb_82
         } else {
             goto '__ci_bb_83
@@ -10230,15 +10183,15 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_83 {
-        (__local_pc__goto_2231_14 = __local_pc__goto_2231_14 + ((2 as isize) as usize))
-        (__local_count__goto_2232_14 = __local_i__goto_2246_20)
-        (__local_length__goto_2233_12 = __local_clen__goto_2245_18)
-        (__local_pp__goto_2226_12 = __local_pe__goto_2240_16)
+        (__local_pc__goto_2200_14 = __local_pc__goto_2200_14 + ((2 as isize) as usize))
+        (__local_count__goto_2201_14 = __local_i__goto_2215_20)
+        (__local_length__goto_2202_12 = __local_clen__goto_2214_18)
+        (__local_pp__goto_2195_12 = __local_pe__goto_2209_16)
         goto '__ci_bb_75
     }
 
     '__ci_bb_84 {
-        if ((if (__local_pt__goto_2226_17 + (((__local_count__goto_2232_14 as c_ulong) *% (__local_length__goto_2233_12 as c_ulong)) as usize)) > (pbuffer8 + (pbuffer8_size as usize)): 1 else: 0) != 0) {
+        if ((if (__local_pt__goto_2195_17 + (((__local_count__goto_2201_14 as c_ulong) *% (__local_length__goto_2202_12 as c_ulong)) as usize)) > (pbuffer8 + (pbuffer8_size as usize)): 1 else: 0) != 0) {
             goto '__ci_bb_85
         } else {
             goto '__ci_bb_86
@@ -10246,13 +10199,13 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_85 {
-        (__local_pc_offset__goto_2283_14 = ((__local_pc__goto_2231_14 as usize) -% (buffer as usize)) / sizeof[u8]())
-        (__local_pp_offset__goto_2284_14 = ((__local_pp__goto_2226_12 as usize) -% (buffer as usize)) / sizeof[u8]())
-        (__local_pt_offset__goto_2285_14 = ((__local_pt__goto_2226_17 as usize) -% (pbuffer8 as usize)) / sizeof[u8]())
+        (__local_pc_offset__goto_2252_14 = ((__local_pc__goto_2200_14 as usize) -% (buffer as usize)) / sizeof[u8]())
+        (__local_pp_offset__goto_2253_14 = ((__local_pp__goto_2195_12 as usize) -% (buffer as usize)) / sizeof[u8]())
+        (__local_pt_offset__goto_2254_14 = ((__local_pt__goto_2195_17 as usize) -% (pbuffer8 as usize)) / sizeof[u8]())
         expand_input_buffers()
-        (__local_pc__goto_2231_14 = buffer + (__local_pc_offset__goto_2283_14 as usize))
-        (__local_pp__goto_2226_12 = buffer + (__local_pp_offset__goto_2284_14 as usize))
-        (__local_pt__goto_2226_17 = pbuffer8 + (__local_pt_offset__goto_2285_14 as usize))
+        (__local_pc__goto_2200_14 = buffer + (__local_pc_offset__goto_2252_14 as usize))
+        (__local_pp__goto_2195_12 = buffer + (__local_pp_offset__goto_2253_14 as usize))
+        (__local_pt__goto_2195_17 = pbuffer8 + (__local_pt_offset__goto_2254_14 as usize))
         goto '__ci_bb_84
     }
 
@@ -10261,7 +10214,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_87 {
-        if ((if __local_count__goto_2232_14 > 0: 1 else: 0) != 0) {
+        if ((if __local_count__goto_2201_14 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_88
         } else {
             goto '__ci_bb_90
@@ -10269,13 +10222,13 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_88 {
-        with_memcpy((__local_pt__goto_2226_17 as *i8), (__local_pc__goto_2231_14 as *i8), (__local_length__goto_2233_12 as i64))
-        (__local_pt__goto_2226_17 = __local_pt__goto_2226_17 + (__local_length__goto_2233_12 as usize))
+        with_memcpy((__local_pt__goto_2195_17 as *i8), (__local_pc__goto_2200_14 as *i8), (__local_length__goto_2202_12 as i64))
+        (__local_pt__goto_2195_17 = __local_pt__goto_2195_17 + (__local_length__goto_2202_12 as usize))
         goto '__ci_bb_89
     }
 
     '__ci_bb_89 {
-        (__local_count__goto_2232_14 = __local_count__goto_2232_14 - 1)
+        (__local_count__goto_2201_14 = __local_count__goto_2201_14 - 1)
         goto '__ci_bb_87
     }
 
@@ -10460,8 +10413,8 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_118 {
-        (__local_cflags__goto_2381_7 = 0)
-        (__local_msg__goto_2382_15 = (("** Ignored with POSIX interface:" as *const c_char)))
+        (__local_cflags__goto_2350_7 = 0)
+        (__local_msg__goto_2351_15 = (("** Ignored with POSIX interface:" as *const c_char)))
         if ((if (&raw const pat_patctl as *const patctl).locale[0] != 255: 1 else: 0) != 0) {
             goto '__ci_bb_120
         } else {
@@ -10478,7 +10431,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_120 {
-        prmsg((&raw mut __local_msg__goto_2382_15 as *mut *const c_char), "locale")
+        prmsg((&raw mut __local_msg__goto_2351_15 as *mut *const c_char), "locale")
         goto '__ci_bb_121
     }
 
@@ -10491,7 +10444,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_122 {
-        prmsg((&raw mut __local_msg__goto_2382_15 as *mut *const c_char), "replace")
+        prmsg((&raw mut __local_msg__goto_2351_15 as *mut *const c_char), "replace")
         goto '__ci_bb_123
     }
 
@@ -10504,7 +10457,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_124 {
-        prmsg((&raw mut __local_msg__goto_2382_15 as *mut *const c_char), "tables")
+        prmsg((&raw mut __local_msg__goto_2351_15 as *mut *const c_char), "tables")
         goto '__ci_bb_125
     }
 
@@ -10517,7 +10470,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_126 {
-        prmsg((&raw mut __local_msg__goto_2382_15 as *mut *const c_char), "stackguard")
+        prmsg((&raw mut __local_msg__goto_2351_15 as *mut *const c_char), "stackguard")
         goto '__ci_bb_127
     }
 
@@ -10530,7 +10483,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_128 {
-        prmsg((&raw mut __local_msg__goto_2382_15 as *mut *const c_char), "timing")
+        prmsg((&raw mut __local_msg__goto_2351_15 as *mut *const c_char), "timing")
         goto '__ci_bb_129
     }
 
@@ -10543,7 +10496,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_130 {
-        prmsg((&raw mut __local_msg__goto_2382_15 as *mut *const c_char), "JIT")
+        prmsg((&raw mut __local_msg__goto_2351_15 as *mut *const c_char), "JIT")
         goto '__ci_bb_131
     }
 
@@ -10556,8 +10509,8 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_132 {
-        show_compile_options(31, (((&raw const pat_patctl as *const patctl).options as c_uint) & ((~((((((((((((8 as c_uint) | (32 as c_uint)) as c_uint) | (33554432 as c_uint)) as c_uint) | (1024 as c_uint)) as c_uint) | (131072 as c_uint)) as c_uint) | (524288 as c_uint)) as c_uint) | (262144 as c_uint))) as c_uint)), __local_msg__goto_2382_15, "")
-        (__local_msg__goto_2382_15 = (("" as *const c_char)))
+        show_compile_options(31, (((&raw const pat_patctl as *const patctl).options as c_uint) & ((~((((((((((((8 as c_uint) | (32 as c_uint)) as c_uint) | (33554432 as c_uint)) as c_uint) | (1024 as c_uint)) as c_uint) | (131072 as c_uint)) as c_uint) | (524288 as c_uint)) as c_uint) | (262144 as c_uint))) as c_uint)), __local_msg__goto_2351_15, "")
+        (__local_msg__goto_2351_15 = (("" as *const c_char)))
         goto '__ci_bb_133
     }
 
@@ -10570,8 +10523,8 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_134 {
-        show_compile_extra_options(31, ((pat_context_8.extra_options as c_uint) & (((~0) as c_uint) as c_uint)), __local_msg__goto_2382_15, "")
-        (__local_msg__goto_2382_15 = (("" as *const c_char)))
+        show_compile_extra_options(31, ((pat_context_8.extra_options as c_uint) & (((~0) as c_uint) as c_uint)), __local_msg__goto_2351_15, "")
+        (__local_msg__goto_2351_15 = (("" as *const c_char)))
         goto '__ci_bb_135
     }
 
@@ -10589,8 +10542,8 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_136 {
-        show_controls(31, (((&raw const pat_patctl as *const patctl).control as c_uint) & ((~((((((((((((1 as c_uint) | (2 as c_uint)) as c_uint) | (1024 as c_uint)) as c_uint) | (65536 as c_uint)) as c_uint) | (8388608 as c_uint)) as c_uint) | (16777216 as c_uint)) as c_uint) | (536870912 as c_uint))) as c_uint)), (((&raw const pat_patctl as *const patctl).control2 as c_uint) & (((~0) as c_uint) as c_uint)), __local_msg__goto_2382_15)
-        (__local_msg__goto_2382_15 = (("" as *const c_char)))
+        show_controls(31, (((&raw const pat_patctl as *const patctl).control as c_uint) & ((~((((((((((((1 as c_uint) | (2 as c_uint)) as c_uint) | (1024 as c_uint)) as c_uint) | (65536 as c_uint)) as c_uint) | (8388608 as c_uint)) as c_uint) | (16777216 as c_uint)) as c_uint) | (536870912 as c_uint))) as c_uint)), (((&raw const pat_patctl as *const patctl).control2 as c_uint) & (((~0) as c_uint) as c_uint)), __local_msg__goto_2351_15)
+        (__local_msg__goto_2351_15 = (("" as *const c_char)))
         (pat_patctl.control = (&raw const pat_patctl as *const patctl).control & ((((((((((((1 as c_uint) | (2 as c_uint)) as c_uint) | (1024 as c_uint)) as c_uint) | (65536 as c_uint)) as c_uint) | (8388608 as c_uint)) as c_uint) | (16777216 as c_uint)) as c_uint) | (536870912 as c_uint)))
         (pat_patctl.control2 = (&raw const pat_patctl as *const patctl).control2 & (0 as c_uint))
         goto '__ci_bb_137
@@ -10605,7 +10558,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_138 {
-        prmsg((&raw mut __local_msg__goto_2382_15 as *mut *const c_char), "#newline_default")
+        prmsg((&raw mut __local_msg__goto_2351_15 as *mut *const c_char), "#newline_default")
         goto '__ci_bb_139
     }
 
@@ -10618,7 +10571,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_140 {
-        prmsg((&raw mut __local_msg__goto_2382_15 as *mut *const c_char), "max_pattern_length")
+        prmsg((&raw mut __local_msg__goto_2351_15 as *mut *const c_char), "max_pattern_length")
         goto '__ci_bb_141
     }
 
@@ -10631,7 +10584,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_142 {
-        prmsg((&raw mut __local_msg__goto_2382_15 as *mut *const c_char), "max_pattern_compiled_length")
+        prmsg((&raw mut __local_msg__goto_2351_15 as *mut *const c_char), "max_pattern_compiled_length")
         goto '__ci_bb_143
     }
 
@@ -10644,12 +10597,12 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_144 {
-        prmsg((&raw mut __local_msg__goto_2382_15 as *mut *const c_char), "parens_nest_limit")
+        prmsg((&raw mut __local_msg__goto_2351_15 as *mut *const c_char), "parens_nest_limit")
         goto '__ci_bb_145
     }
 
     '__ci_bb_145 {
-        if ((if (unsafe: __local_msg__goto_2382_15[0]) == 0: 1 else: 0) != 0) {
+        if ((if (unsafe: __local_msg__goto_2351_15[0]) == 0: 1 else: 0) != 0) {
             goto '__ci_bb_146
         } else {
             goto '__ci_bb_147
@@ -10662,7 +10615,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_147 {
-        if (__local_utf__goto_2039_6 != 0) {
+        if (__local_utf__goto_2011_6 != 0) {
             goto '__ci_bb_148
         } else {
             goto '__ci_bb_149
@@ -10670,7 +10623,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_148 {
-        (__local_cflags__goto_2381_7 = __local_cflags__goto_2381_7 | 64)
+        (__local_cflags__goto_2350_7 = __local_cflags__goto_2350_7 | 64)
         goto '__ci_bb_149
     }
 
@@ -10683,7 +10636,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_150 {
-        (__local_cflags__goto_2381_7 = __local_cflags__goto_2381_7 | 32)
+        (__local_cflags__goto_2350_7 = __local_cflags__goto_2350_7 | 32)
         goto '__ci_bb_151
     }
 
@@ -10696,7 +10649,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_152 {
-        (__local_cflags__goto_2381_7 = __local_cflags__goto_2381_7 | 1024)
+        (__local_cflags__goto_2350_7 = __local_cflags__goto_2350_7 | 1024)
         goto '__ci_bb_153
     }
 
@@ -10709,7 +10662,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_154 {
-        (__local_cflags__goto_2381_7 = __local_cflags__goto_2381_7 | 1)
+        (__local_cflags__goto_2350_7 = __local_cflags__goto_2350_7 | 1)
         goto '__ci_bb_155
     }
 
@@ -10722,7 +10675,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_156 {
-        (__local_cflags__goto_2381_7 = __local_cflags__goto_2381_7 | 4096)
+        (__local_cflags__goto_2350_7 = __local_cflags__goto_2350_7 | 4096)
         goto '__ci_bb_157
     }
 
@@ -10735,7 +10688,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_158 {
-        (__local_cflags__goto_2381_7 = __local_cflags__goto_2381_7 | 2)
+        (__local_cflags__goto_2350_7 = __local_cflags__goto_2350_7 | 2)
         goto '__ci_bb_159
     }
 
@@ -10748,7 +10701,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_160 {
-        (__local_cflags__goto_2381_7 = __local_cflags__goto_2381_7 | 16)
+        (__local_cflags__goto_2350_7 = __local_cflags__goto_2350_7 | 16)
         goto '__ci_bb_161
     }
 
@@ -10761,7 +10714,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_162 {
-        (__local_cflags__goto_2381_7 = __local_cflags__goto_2381_7 | 512)
+        (__local_cflags__goto_2350_7 = __local_cflags__goto_2350_7 | 512)
         goto '__ci_bb_163
     }
 
@@ -10774,14 +10727,14 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_164 {
-        (preg.re_endp = ((((pbuffer8 as *mut c_char) + (__local_patlen__goto_2047_12 as usize)) as *const c_char)))
-        (__local_cflags__goto_2381_7 = __local_cflags__goto_2381_7 | 2048)
+        (preg.re_endp = ((((pbuffer8 as *mut c_char) + (__local_patlen__goto_2019_12 as usize)) as *const c_char)))
+        (__local_cflags__goto_2350_7 = __local_cflags__goto_2350_7 | 2048)
         goto '__ci_bb_165
     }
 
     '__ci_bb_165 {
-        (__local_rc__goto_2043_5 = pcre2_regcomp((&raw mut preg as *mut regex_t), (pbuffer8 as *mut c_char), __local_cflags__goto_2381_7))
-        if ((if __local_rc__goto_2043_5 != 0: 1 else: 0) != 0) {
+        (__local_rc__goto_2015_5 = pcre2_regcomp((&raw mut preg as *mut regex_t), (pbuffer8 as *mut c_char), __local_cflags__goto_2350_7))
+        if ((if __local_rc__goto_2015_5 != 0: 1 else: 0) != 0) {
             goto '__ci_bb_166
         } else {
             goto '__ci_bb_167
@@ -10801,20 +10754,20 @@ fn process_pattern_8() -> c_int {
         } else {
             (__ci_expr_ternary_18 = pbuffer8_size)
         }
-        (__local_bsize__goto_2468_12 = __ci_expr_ternary_18)
-        (__local_regbuffer__goto_2467_11 = ((((pbuffer8 as *mut c_char) + (((pbuffer8_size as c_ulong) -% (__local_bsize__goto_2468_12 as c_ulong)) as usize)) as *mut c_char)))
-        (__local_usize__goto_2468_19 = pcre2_regerror(__local_rc__goto_2043_5, (&raw mut preg as *mut regex_t), __local_regbuffer__goto_2467_11, __local_bsize__goto_2468_12))
+        (__local_bsize__goto_2437_12 = __ci_expr_ternary_18)
+        (__local_regbuffer__goto_2436_11 = ((((pbuffer8 as *mut c_char) + (((pbuffer8_size as c_ulong) -% (__local_bsize__goto_2437_12 as c_ulong)) as usize)) as *mut c_char)))
+        (__local_usize__goto_2437_19 = pcre2_regerror(__local_rc__goto_2015_5, (&raw mut preg as *mut regex_t), __local_regbuffer__goto_2436_11, __local_bsize__goto_2437_12))
         (__ci_expr_ternary_19 = 0)
-        if ((if __local_usize__goto_2468_19 > __local_bsize__goto_2468_12: 1 else: 0) != 0) {
-            (__ci_expr_ternary_19 = __local_bsize__goto_2468_12)
+        if ((if __local_usize__goto_2437_19 > __local_bsize__goto_2437_12: 1 else: 0) != 0) {
+            (__ci_expr_ternary_19 = __local_bsize__goto_2437_12)
         } else {
-            (__ci_expr_ternary_19 = __local_usize__goto_2468_19)
+            (__ci_expr_ternary_19 = __local_usize__goto_2437_19)
         }
-        (__local_strsize__goto_2468_26 = ((__ci_expr_ternary_19 as c_ulong) -% (1 as c_ulong)))
+        (__local_strsize__goto_2437_26 = ((__ci_expr_ternary_19 as c_ulong) -% (1 as c_ulong)))
         colour_begin(35, outfile)
-        fprintf(outfile, "Failed: POSIX code %d: ", __local_rc__goto_2043_5)
+        fprintf(outfile, "Failed: POSIX code %d: ", __local_rc__goto_2015_5)
         colour_end(outfile)
-        if ((if __local_bsize__goto_2468_12 > 0: 1 else: 0) != 0) {
+        if ((if __local_bsize__goto_2437_12 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_168
         } else {
             goto '__ci_bb_169
@@ -10840,7 +10793,7 @@ fn process_pattern_8() -> c_int {
         if (__ci_expr_logic_23 != 0) {
             (__ci_expr_logic_24 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_24 = (if (if (&raw const preg as *const regex_t).re_cflags != __local_cflags__goto_2381_7: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_24 = (if (if (&raw const preg as *const regex_t).re_cflags != __local_cflags__goto_2350_7: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_24 != 0) {
             goto '__ci_bb_174
@@ -10850,13 +10803,13 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_168 {
-        pchars_8(35, (__local_regbuffer__goto_2467_11 as *const u8), __local_strsize__goto_2468_26, __local_utf__goto_2039_6, outfile)
+        pchars_8(35, (__local_regbuffer__goto_2436_11 as *const u8), __local_strsize__goto_2437_26, __local_utf__goto_2011_6, outfile)
         goto '__ci_bb_169
     }
 
     '__ci_bb_169 {
         fputs("\n", outfile)
-        if ((if __local_usize__goto_2468_19 > __local_bsize__goto_2468_12: 1 else: 0) != 0) {
+        if ((if __local_usize__goto_2437_19 > __local_bsize__goto_2437_12: 1 else: 0) != 0) {
             goto '__ci_bb_170
         } else {
             goto '__ci_bb_171
@@ -10872,8 +10825,8 @@ fn process_pattern_8() -> c_int {
 
     '__ci_bb_171 {
         (__ci_expr_logic_20 = 0)
-        if ((if __local_bsize__goto_2468_12 > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_20 = (if (if string_len(__local_regbuffer__goto_2467_11) != __local_strsize__goto_2468_26: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_bsize__goto_2437_12 > 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_20 = (if (if string_len(__local_regbuffer__goto_2436_11) != __local_strsize__goto_2437_26: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_20 != 0) {
             goto '__ci_bb_172
@@ -10914,7 +10867,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_177 {
-        (__local_errorcode__goto_2043_9 = 0)
+        (__local_errorcode__goto_2015_9 = 0)
         if ((if (&raw const pat_patctl as *const patctl).convert_type != 4294967295: 1 else: 0) != 0) {
             goto '__ci_bb_184
         } else {
@@ -10972,9 +10925,9 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_184 {
-        (__local_convert_return__goto_2594_7 = PR_OK)
-        (__local_convert_options__goto_2595_12 = (&raw const pat_patctl as *const patctl).convert_type)
-        (__local_converted_length__goto_2597_14 = 3735928559)
+        (__local_convert_return__goto_2563_7 = PR_OK)
+        (__local_convert_options__goto_2564_12 = (&raw const pat_patctl as *const patctl).convert_type)
+        (__local_converted_length__goto_2566_14 = 3735928559)
         if ((if (&raw const pat_patctl as *const patctl).convert_length != 4294967295: 1 else: 0) != 0) {
             goto '__ci_bb_186
         } else {
@@ -10983,8 +10936,8 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_185 {
-        (__local_full_patlen__goto_2047_20 = __local_patlen__goto_2047_12)
-        (__local_valgrind_access_length__goto_2048_12 = __local_patlen__goto_2047_12)
+        (__local_full_patlen__goto_2019_20 = __local_patlen__goto_2019_12)
+        (__local_valgrind_access_length__goto_2020_12 = __local_patlen__goto_2019_12)
         if ((if (((&raw const pat_patctl as *const patctl).control as c_uint) & (((65536 as c_uint) | (536870912 as c_uint)) as c_uint)) == 0: 1 else: 0) != 0) {
             goto '__ci_bb_217
         } else {
@@ -10993,15 +10946,15 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_186 {
-        (__local_converted_length__goto_2597_14 = (&raw const pat_patctl as *const patctl).convert_length)
+        (__local_converted_length__goto_2566_14 = (&raw const pat_patctl as *const patctl).convert_length)
         (__ci_expr_ternary_27 = 0)
-        if (__local_converted_length__goto_2597_14 != 0) {
-            (__ci_expr_ternary_27 = ((__local_converted_length__goto_2597_14 as c_ulong) *% (1 as c_ulong)))
+        if (__local_converted_length__goto_2566_14 != 0) {
+            (__ci_expr_ternary_27 = ((__local_converted_length__goto_2566_14 as c_ulong) *% (1 as c_ulong)))
         } else {
             (__ci_expr_ternary_27 = 1)
         }
-        (__local_converted_pattern__goto_2596_16 = ((with_alloc((__ci_expr_ternary_27 as i64)) as *mut c_void)))
-        if ((if __local_converted_pattern__goto_2596_16 == null: 1 else: 0) != 0) {
+        (__local_converted_pattern__goto_2565_16 = ((with_alloc((__ci_expr_ternary_27 as i64)) as *mut c_void)))
+        if ((if __local_converted_pattern__goto_2565_16 == null: 1 else: 0) != 0) {
             goto '__ci_bb_189
         } else {
             goto '__ci_bb_190
@@ -11009,12 +10962,12 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_187 {
-        (__local_converted_pattern__goto_2596_16 = ((null as *mut u8)))
+        (__local_converted_pattern__goto_2565_16 = ((null as *mut u8)))
         goto '__ci_bb_188
     }
 
     '__ci_bb_188 {
-        if (__local_utf__goto_2039_6 != 0) {
+        if (__local_utf__goto_2011_6 != 0) {
             goto '__ci_bb_191
         } else {
             goto '__ci_bb_192
@@ -11033,7 +10986,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_191 {
-        (__local_convert_options__goto_2595_12 = __local_convert_options__goto_2595_12 | 1)
+        (__local_convert_options__goto_2564_12 = __local_convert_options__goto_2564_12 | 1)
         goto '__ci_bb_192
     }
 
@@ -11046,7 +10999,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_193 {
-        (__local_convert_options__goto_2595_12 = __local_convert_options__goto_2595_12 | 2)
+        (__local_convert_options__goto_2564_12 = __local_convert_options__goto_2564_12 | 2)
         goto '__ci_bb_194
     }
 
@@ -11066,9 +11019,9 @@ fn process_pattern_8() -> c_int {
         } else {
             (__ci_expr_ternary_28 = (&raw const pat_patctl as *const patctl).convert_glob_escape)
         }
-        (__local_escape__goto_2620_14 = __ci_expr_ternary_28)
-        (__local_rc__goto_2043_5 = pcre2_set_glob_escape_8(con_context_8, __local_escape__goto_2620_14))
-        if ((if __local_rc__goto_2043_5 != 0: 1 else: 0) != 0) {
+        (__local_escape__goto_2589_14 = __ci_expr_ternary_28)
+        (__local_rc__goto_2015_5 = pcre2_set_glob_escape_8(con_context_8, __local_escape__goto_2589_14))
+        if ((if __local_rc__goto_2015_5 != 0: 1 else: 0) != 0) {
             goto '__ci_bb_197
         } else {
             goto '__ci_bb_198
@@ -11087,7 +11040,7 @@ fn process_pattern_8() -> c_int {
         colour_begin(31, outfile)
         fprintf(outfile, "** Invalid glob escape '%c'\n", (&raw const pat_patctl as *const patctl).convert_glob_escape)
         colour_end(outfile)
-        (__local_convert_return__goto_2594_7 = PR_SKIP)
+        (__local_convert_return__goto_2563_7 = PR_SKIP)
         goto '__ci_bb_199
     }
 
@@ -11104,9 +11057,9 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_200 {
-        (__local_separator__goto_2634_14 = (&raw const pat_patctl as *const patctl).convert_glob_separator)
-        (__local_rc__goto_2043_5 = pcre2_set_glob_separator_8(con_context_8, __local_separator__goto_2634_14))
-        if ((if __local_rc__goto_2043_5 != 0: 1 else: 0) != 0) {
+        (__local_separator__goto_2603_14 = (&raw const pat_patctl as *const patctl).convert_glob_separator)
+        (__local_rc__goto_2015_5 = pcre2_set_glob_separator_8(con_context_8, __local_separator__goto_2603_14))
+        if ((if __local_rc__goto_2015_5 != 0: 1 else: 0) != 0) {
             goto '__ci_bb_202
         } else {
             goto '__ci_bb_203
@@ -11114,8 +11067,8 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_201 {
-        (__local_zero_terminate__goto_2598_8 = (if (((&raw const pat_patctl as *const patctl).control as c_uint) & (((65536 as c_uint) | (536870912 as c_uint)) as c_uint)) == 0: 1 else: 0))
-        if (__local_zero_terminate__goto_2598_8 != 0) {
+        (__local_zero_terminate__goto_2567_8 = (if (((&raw const pat_patctl as *const patctl).control as c_uint) & (((65536 as c_uint) | (536870912 as c_uint)) as c_uint)) == 0: 1 else: 0))
+        if (__local_zero_terminate__goto_2567_8 != 0) {
             goto '__ci_bb_204
         } else {
             goto '__ci_bb_205
@@ -11126,7 +11079,7 @@ fn process_pattern_8() -> c_int {
         colour_begin(31, outfile)
         fprintf(outfile, "** Invalid glob separator '%c'\n", (&raw const pat_patctl as *const patctl).convert_glob_separator)
         colour_end(outfile)
-        (__local_convert_return__goto_2594_7 = PR_SKIP)
+        (__local_convert_return__goto_2563_7 = PR_SKIP)
         goto '__ci_bb_199
     }
 
@@ -11135,7 +11088,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_204 {
-        (__local_patlen__goto_2047_12 = (~(0 as c_ulong)))
+        (__local_patlen__goto_2019_12 = (~(0 as c_ulong)))
         goto '__ci_bb_205
     }
 
@@ -11146,9 +11099,9 @@ fn process_pattern_8() -> c_int {
         } else {
             (__ci_expr_ternary_29 = ((null as *mut u8)))
         }
-        (__local_use_pbuffer__goto_2045_12 = __ci_expr_ternary_29)
-        (__local_rc__goto_2043_5 = pcre2_pattern_convert_8(__local_use_pbuffer__goto_2045_12, __local_patlen__goto_2047_12, __local_convert_options__goto_2595_12, (&raw mut __local_converted_pattern__goto_2596_16 as *mut *mut u8), (&raw mut __local_converted_length__goto_2597_14 as *mut c_ulong), con_context_8))
-        if ((if __local_rc__goto_2043_5 != 0: 1 else: 0) != 0) {
+        (__local_use_pbuffer__goto_2017_12 = __ci_expr_ternary_29)
+        (__local_rc__goto_2015_5 = pcre2_pattern_convert_8(__local_use_pbuffer__goto_2017_12, __local_patlen__goto_2019_12, __local_convert_options__goto_2564_12, (&raw mut __local_converted_pattern__goto_2565_16 as *mut *mut u8), (&raw mut __local_converted_length__goto_2566_14 as *mut c_ulong), con_context_8))
+        if ((if __local_rc__goto_2015_5 != 0: 1 else: 0) != 0) {
             goto '__ci_bb_206
         } else {
             goto '__ci_bb_207
@@ -11157,22 +11110,22 @@ fn process_pattern_8() -> c_int {
 
     '__ci_bb_206 {
         colour_begin(35, outfile)
-        fprintf(outfile, "** Pattern conversion error at offset %zu: ", __local_converted_length__goto_2597_14)
+        fprintf(outfile, "** Pattern conversion error at offset %zu: ", __local_converted_length__goto_2566_14)
         colour_end(outfile)
         (__ci_expr_ternary_30 = 0)
-        if (print_error_message_8(__local_rc__goto_2043_5, "", "\n") != 0) {
+        if (print_error_message_8(__local_rc__goto_2015_5, "", "\n") != 0) {
             (__ci_expr_ternary_30 = PR_SKIP)
         } else {
             (__ci_expr_ternary_30 = PR_ABEND)
         }
-        (__local_convert_return__goto_2594_7 = __ci_expr_ternary_30)
+        (__local_convert_return__goto_2563_7 = __ci_expr_ternary_30)
         goto '__ci_bb_208
     }
 
     '__ci_bb_207 {
-        pchars_8(-1, __local_converted_pattern__goto_2596_16, __local_converted_length__goto_2597_14, __local_utf__goto_2039_6, outfile)
+        pchars_8(-1, __local_converted_pattern__goto_2565_16, __local_converted_length__goto_2566_14, __local_utf__goto_2011_6, outfile)
         fprintf(outfile, "\n")
-        if ((if ((((__local_converted_length__goto_2597_14 as c_ulong) +% (1 as c_ulong)) as c_ulong) *% (1 as c_ulong)) > pbuffer8_size: 1 else: 0) != 0) {
+        if ((if ((((__local_converted_length__goto_2566_14 as c_ulong) +% (1 as c_ulong)) as c_ulong) *% (1 as c_ulong)) > pbuffer8_size: 1 else: 0) != 0) {
             goto '__ci_bb_209
         } else {
             goto '__ci_bb_210
@@ -11187,13 +11140,13 @@ fn process_pattern_8() -> c_int {
         colour_begin(31, outfile)
         fprintf(outfile, "** Pattern conversion is too long for the buffer\n")
         colour_end(outfile)
-        (__local_convert_return__goto_2594_7 = PR_SKIP)
+        (__local_convert_return__goto_2563_7 = PR_SKIP)
         goto '__ci_bb_211
     }
 
     '__ci_bb_210 {
-        with_memcpy((pbuffer8 as *i8), (__local_converted_pattern__goto_2596_16 as *i8), (((((__local_converted_length__goto_2597_14 as c_ulong) +% (1 as c_ulong)) as c_ulong) *% (1 as c_ulong)) as i64))
-        (__local_patlen__goto_2047_12 = __local_converted_length__goto_2597_14)
+        with_memcpy((pbuffer8 as *i8), (__local_converted_pattern__goto_2565_16 as *i8), (((((__local_converted_length__goto_2566_14 as c_ulong) +% (1 as c_ulong)) as c_ulong) *% (1 as c_ulong)) as i64))
+        (__local_patlen__goto_2019_12 = __local_converted_length__goto_2566_14)
         goto '__ci_bb_211
     }
 
@@ -11202,17 +11155,17 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_212 {
-        with_free((__local_converted_pattern__goto_2596_16 as *mut i8))
+        with_free((__local_converted_pattern__goto_2565_16 as *mut i8))
         goto '__ci_bb_214
     }
 
     '__ci_bb_213 {
-        pcre2_converted_pattern_free_8(__local_converted_pattern__goto_2596_16)
+        pcre2_converted_pattern_free_8(__local_converted_pattern__goto_2565_16)
         goto '__ci_bb_214
     }
 
     '__ci_bb_214 {
-        if ((if __local_convert_return__goto_2594_7 != PR_OK: 1 else: 0) != 0) {
+        if ((if __local_convert_return__goto_2563_7 != PR_OK: 1 else: 0) != 0) {
             goto '__ci_bb_215
         } else {
             goto '__ci_bb_216
@@ -11220,7 +11173,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_215 {
-        return __local_convert_return__goto_2594_7
+        return __local_convert_return__goto_2563_7
     }
 
     '__ci_bb_216 {
@@ -11228,13 +11181,13 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_217 {
-        (__local_patlen__goto_2047_12 = (~(0 as c_ulong)))
-        (__local_valgrind_access_length__goto_2048_12 = __local_valgrind_access_length__goto_2048_12 + 1)
+        (__local_patlen__goto_2019_12 = (~(0 as c_ulong)))
+        (__local_valgrind_access_length__goto_2020_12 = __local_valgrind_access_length__goto_2020_12 + 1)
         goto '__ci_bb_218
     }
 
     '__ci_bb_218 {
-        __local_valgrind_access_length__goto_2048_12
+        __local_valgrind_access_length__goto_2020_12
         (__ci_expr_logic_31 = 0)
         if ((if (((&raw const pat_patctl as *const patctl).control2 as c_uint) & (1073741824 as c_uint)) == 0: 1 else: 0) != 0) {
             (__ci_expr_logic_31 = (if (if local_newline_default != 0: 1 else: 0) != 0: 1 else: 0))
@@ -11258,7 +11211,7 @@ fn process_pattern_8() -> c_int {
         } else {
             (__ci_expr_ternary_32 = pat_context_8)
         }
-        (__local_use_pat_context__goto_2044_24 = __ci_expr_ternary_32)
+        (__local_use_pat_context__goto_2016_24 = __ci_expr_ternary_32)
         if ((if (((&raw const pat_patctl as *const patctl).options as c_uint) & (33554432 as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_221
         } else {
@@ -11267,7 +11220,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_221 {
-        (__local_use_forbid_utf__goto_2046_10 = 0)
+        (__local_use_forbid_utf__goto_2018_10 = 0)
         goto '__ci_bb_222
     }
 
@@ -11278,7 +11231,7 @@ fn process_pattern_8() -> c_int {
         } else {
             (__ci_expr_ternary_33 = ((null as *mut u8)))
         }
-        (__local_use_pbuffer__goto_2045_12 = __ci_expr_ternary_33)
+        (__local_use_pbuffer__goto_2017_12 = __ci_expr_ternary_33)
         if ((if timeit > 0: 1 else: 0) != 0) {
             goto '__ci_bb_223
         } else {
@@ -11287,14 +11240,14 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_223 {
-        (__local_time_taken__goto_2755_11 = 0)
-        (__local_i__goto_2754_7 = 0)
+        (__local_time_taken__goto_2724_11 = 0)
+        (__local_i__goto_2723_7 = 0)
         goto '__ci_bb_225
     }
 
     '__ci_bb_224 {
         (mallocs_called = 0)
-        (compiled_code_8 = pcre2_compile_8(__local_use_pbuffer__goto_2045_12, __local_patlen__goto_2047_12, (((&raw const pat_patctl as *const patctl).options as c_uint) | (__local_use_forbid_utf__goto_2046_10 as c_uint)), (&raw mut __local_errorcode__goto_2043_9 as *mut c_int), (&raw mut __local_erroroffset__goto_2049_12 as *mut c_ulong), __local_use_pat_context__goto_2044_24))
+        (compiled_code_8 = pcre2_compile_8(__local_use_pbuffer__goto_2017_12, __local_patlen__goto_2019_12, (((&raw const pat_patctl as *const patctl).options as c_uint) | (__local_use_forbid_utf__goto_2018_10 as c_uint)), (&raw mut __local_errorcode__goto_2015_9 as *mut c_int), (&raw mut __local_erroroffset__goto_2021_12 as *mut c_ulong), __local_use_pat_context__goto_2016_24))
         if (malloc_testing != 0) {
             goto '__ci_bb_231
         } else {
@@ -11303,7 +11256,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_225 {
-        if ((if __local_i__goto_2754_7 < timeit: 1 else: 0) != 0) {
+        if ((if __local_i__goto_2723_7 < timeit: 1 else: 0) != 0) {
             goto '__ci_bb_226
         } else {
             goto '__ci_bb_228
@@ -11311,9 +11264,9 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_226 {
-        (__local_start_time__goto_2758_13 = clock())
-        (compiled_code_8 = pcre2_compile_8(__local_use_pbuffer__goto_2045_12, __local_patlen__goto_2047_12, (((&raw const pat_patctl as *const patctl).options as c_uint) | (__local_use_forbid_utf__goto_2046_10 as c_uint)), (&raw mut __local_errorcode__goto_2043_9 as *mut c_int), (&raw mut __local_erroroffset__goto_2049_12 as *mut c_ulong), __local_use_pat_context__goto_2044_24))
-        (__local_time_taken__goto_2755_11 = __local_time_taken__goto_2755_11 + ((clock() as c_ulong) -% (__local_start_time__goto_2758_13 as c_ulong)))
+        (__local_start_time__goto_2727_13 = clock())
+        (compiled_code_8 = pcre2_compile_8(__local_use_pbuffer__goto_2017_12, __local_patlen__goto_2019_12, (((&raw const pat_patctl as *const patctl).options as c_uint) | (__local_use_forbid_utf__goto_2018_10 as c_uint)), (&raw mut __local_errorcode__goto_2015_9 as *mut c_int), (&raw mut __local_erroroffset__goto_2021_12 as *mut c_ulong), __local_use_pat_context__goto_2016_24))
+        (__local_time_taken__goto_2724_11 = __local_time_taken__goto_2724_11 + ((clock() as c_ulong) -% (__local_start_time__goto_2727_13 as c_ulong)))
         if ((if compiled_code_8 != null: 1 else: 0) != 0) {
             goto '__ci_bb_229
         } else {
@@ -11322,14 +11275,14 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_227 {
-        (__local_i__goto_2754_7 = __local_i__goto_2754_7 + 1)
+        (__local_i__goto_2723_7 = __local_i__goto_2723_7 + 1)
         goto '__ci_bb_225
     }
 
     '__ci_bb_228 {
-        (total_compile_time = total_compile_time + __local_time_taken__goto_2755_11)
+        (total_compile_time = total_compile_time + __local_time_taken__goto_2724_11)
         colour_begin(36, outfile)
-        fprintf(outfile, "Compile time %8.4f microseconds\n", ((((1000000 as c_ulong) / ((1000000 as c_ulong) as c_ulong)) * (__local_time_taken__goto_2755_11 as f64)) / timeit))
+        fprintf(outfile, "Compile time %8.4f microseconds\n", ((((1000000 as c_ulong) / ((1000000 as c_ulong) as c_ulong)) * (__local_time_taken__goto_2724_11 as f64)) / timeit))
         colour_end(outfile)
         goto '__ci_bb_224
     }
@@ -11344,8 +11297,8 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_231 {
-        (__local_i__goto_2781_12 = 0)
-        (__local_target_mallocs__goto_2781_19 = mallocs_called)
+        (__local_i__goto_2750_12 = 0)
+        (__local_target_mallocs__goto_2750_19 = mallocs_called)
         goto '__ci_bb_233
     }
 
@@ -11362,7 +11315,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_233 {
-        if ((if __local_i__goto_2781_12 <= __local_target_mallocs__goto_2781_19: 1 else: 0) != 0) {
+        if ((if __local_i__goto_2750_12 <= __local_target_mallocs__goto_2750_19: 1 else: 0) != 0) {
             goto '__ci_bb_234
         } else {
             goto '__ci_bb_236
@@ -11378,7 +11331,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_235 {
-        (__local_i__goto_2781_12 = __local_i__goto_2781_12 + 1)
+        (__local_i__goto_2750_12 = __local_i__goto_2750_12 + 1)
         goto '__ci_bb_233
     }
 
@@ -11392,17 +11345,17 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_238 {
-        (__local_errorcode__goto_2043_9 = 0)
-        (__local_erroroffset__goto_2049_12 = 0)
-        (mallocs_until_failure = __local_i__goto_2781_12)
-        (compiled_code_8 = pcre2_compile_8(__local_use_pbuffer__goto_2045_12, __local_patlen__goto_2047_12, (((&raw const pat_patctl as *const patctl).options as c_uint) | (__local_use_forbid_utf__goto_2046_10 as c_uint)), (&raw mut __local_errorcode__goto_2043_9 as *mut c_int), (&raw mut __local_erroroffset__goto_2049_12 as *mut c_ulong), __local_use_pat_context__goto_2044_24))
+        (__local_errorcode__goto_2015_9 = 0)
+        (__local_erroroffset__goto_2021_12 = 0)
+        (mallocs_until_failure = __local_i__goto_2750_12)
+        (compiled_code_8 = pcre2_compile_8(__local_use_pbuffer__goto_2017_12, __local_patlen__goto_2019_12, (((&raw const pat_patctl as *const patctl).options as c_uint) | (__local_use_forbid_utf__goto_2018_10 as c_uint)), (&raw mut __local_errorcode__goto_2015_9 as *mut c_int), (&raw mut __local_erroroffset__goto_2021_12 as *mut c_ulong), __local_use_pat_context__goto_2016_24))
         (mallocs_until_failure = 2147483647)
         (__ci_expr_logic_35 = 0)
-        if ((if __local_i__goto_2781_12 < __local_target_mallocs__goto_2781_19: 1 else: 0) != 0) {
+        if ((if __local_i__goto_2750_12 < __local_target_mallocs__goto_2750_19: 1 else: 0) != 0) {
             var __ci_expr_logic_34: c_int = 0
 
             if ((if compiled_code_8 == null: 1 else: 0) != 0) {
-                (__ci_expr_logic_34 = (if (if __local_errorcode__goto_2043_9 == 121: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_34 = (if (if __local_errorcode__goto_2015_9 == 121: 1 else: 0) != 0: 1 else: 0))
             }
 
             (__ci_expr_logic_35 = (if (if not (__ci_expr_logic_34 != 0): 1 else: 0) != 0: 1 else: 0))
@@ -11417,7 +11370,7 @@ fn process_pattern_8() -> c_int {
 
     '__ci_bb_239 {
         colour_begin(31, outfile)
-        fprintf(outfile, "** malloc() compile test did not fail as expected (%d)\n", __local_errorcode__goto_2043_9)
+        fprintf(outfile, "** malloc() compile test did not fail as expected (%d)\n", __local_errorcode__goto_2015_9)
         colour_end(outfile)
         return PR_ABEND
     }
@@ -11443,8 +11396,8 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_243 {
-        (__local_time_taken__goto_2821_13 = 0)
-        (__local_i__goto_2820_9 = 0)
+        (__local_time_taken__goto_2790_13 = 0)
+        (__local_i__goto_2789_9 = 0)
         goto '__ci_bb_245
     }
 
@@ -11459,7 +11412,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_245 {
-        if ((if __local_i__goto_2820_9 < timeit: 1 else: 0) != 0) {
+        if ((if __local_i__goto_2789_9 < timeit: 1 else: 0) != 0) {
             goto '__ci_bb_246
         } else {
             goto '__ci_bb_248
@@ -11467,11 +11420,11 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_246 {
-        (__local_start_time__goto_2825_15 = clock())
+        (__local_start_time__goto_2794_15 = clock())
         (jitrc = pcre2_jit_compile_8(compiled_code_8, (&raw const pat_patctl as *const patctl).jit))
-        (__local_time_taken__goto_2821_13 = __local_time_taken__goto_2821_13 + ((clock() as c_ulong) -% (__local_start_time__goto_2825_15 as c_ulong)))
+        (__local_time_taken__goto_2790_13 = __local_time_taken__goto_2790_13 + ((clock() as c_ulong) -% (__local_start_time__goto_2794_15 as c_ulong)))
         pcre2_code_free_8(compiled_code_8)
-        (compiled_code_8 = pcre2_compile_8(__local_use_pbuffer__goto_2045_12, __local_patlen__goto_2047_12, (((&raw const pat_patctl as *const patctl).options as c_uint) | (__local_use_forbid_utf__goto_2046_10 as c_uint)), (&raw mut __local_errorcode__goto_2043_9 as *mut c_int), (&raw mut __local_erroroffset__goto_2049_12 as *mut c_ulong), __local_use_pat_context__goto_2044_24))
+        (compiled_code_8 = pcre2_compile_8(__local_use_pbuffer__goto_2017_12, __local_patlen__goto_2019_12, (((&raw const pat_patctl as *const patctl).options as c_uint) | (__local_use_forbid_utf__goto_2018_10 as c_uint)), (&raw mut __local_errorcode__goto_2015_9 as *mut c_int), (&raw mut __local_erroroffset__goto_2021_12 as *mut c_ulong), __local_use_pat_context__goto_2016_24))
         if ((if compiled_code_8 == null: 1 else: 0) != 0) {
             goto '__ci_bb_249
         } else {
@@ -11480,12 +11433,12 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_247 {
-        (__local_i__goto_2820_9 = __local_i__goto_2820_9 + 1)
+        (__local_i__goto_2789_9 = __local_i__goto_2789_9 + 1)
         goto '__ci_bb_245
     }
 
     '__ci_bb_248 {
-        (total_jit_compile_time = total_jit_compile_time + __local_time_taken__goto_2821_13)
+        (total_jit_compile_time = total_jit_compile_time + __local_time_taken__goto_2790_13)
         if ((if jitrc == 0: 1 else: 0) != 0) {
             goto '__ci_bb_255
         } else {
@@ -11533,7 +11486,7 @@ fn process_pattern_8() -> c_int {
 
     '__ci_bb_255 {
         colour_begin(36, outfile)
-        fprintf(outfile, "JIT compile  %8.4f microseconds\n", ((((1000000 as c_ulong) / ((1000000 as c_ulong) as c_ulong)) * (__local_time_taken__goto_2821_13 as f64)) / timeit))
+        fprintf(outfile, "JIT compile  %8.4f microseconds\n", ((((1000000 as c_ulong) / ((1000000 as c_ulong) as c_ulong)) * (__local_time_taken__goto_2790_13 as f64)) / timeit))
         colour_end(outfile)
         goto '__ci_bb_256
     }
@@ -11543,8 +11496,8 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_257 {
-        (__local_i__goto_2859_14 = 0)
-        (__local_target_mallocs__goto_2859_21 = mallocs_called)
+        (__local_i__goto_2828_14 = 0)
+        (__local_target_mallocs__goto_2828_21 = mallocs_called)
         goto '__ci_bb_259
     }
 
@@ -11561,7 +11514,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_259 {
-        if ((if __local_i__goto_2859_14 <= __local_target_mallocs__goto_2859_21: 1 else: 0) != 0) {
+        if ((if __local_i__goto_2828_14 <= __local_target_mallocs__goto_2828_21: 1 else: 0) != 0) {
             goto '__ci_bb_260
         } else {
             goto '__ci_bb_262
@@ -11570,7 +11523,7 @@ fn process_pattern_8() -> c_int {
 
     '__ci_bb_260 {
         pcre2_code_free_8(compiled_code_8)
-        (compiled_code_8 = pcre2_compile_8(__local_use_pbuffer__goto_2045_12, __local_patlen__goto_2047_12, (((&raw const pat_patctl as *const patctl).options as c_uint) | (__local_use_forbid_utf__goto_2046_10 as c_uint)), (&raw mut __local_errorcode__goto_2043_9 as *mut c_int), (&raw mut __local_erroroffset__goto_2049_12 as *mut c_ulong), __local_use_pat_context__goto_2044_24))
+        (compiled_code_8 = pcre2_compile_8(__local_use_pbuffer__goto_2017_12, __local_patlen__goto_2019_12, (((&raw const pat_patctl as *const patctl).options as c_uint) | (__local_use_forbid_utf__goto_2018_10 as c_uint)), (&raw mut __local_errorcode__goto_2015_9 as *mut c_int), (&raw mut __local_erroroffset__goto_2021_12 as *mut c_ulong), __local_use_pat_context__goto_2016_24))
         if ((if compiled_code_8 == null: 1 else: 0) != 0) {
             goto '__ci_bb_263
         } else {
@@ -11579,7 +11532,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_261 {
-        (__local_i__goto_2859_14 = __local_i__goto_2859_14 + 1)
+        (__local_i__goto_2828_14 = __local_i__goto_2828_14 + 1)
         goto '__ci_bb_259
     }
 
@@ -11595,11 +11548,11 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_264 {
-        (mallocs_until_failure = __local_i__goto_2859_14)
+        (mallocs_until_failure = __local_i__goto_2828_14)
         (jitrc = pcre2_jit_compile_8(compiled_code_8, (&raw const pat_patctl as *const patctl).jit))
         (mallocs_until_failure = 2147483647)
         (__ci_expr_logic_37 = 0)
-        if ((if __local_i__goto_2859_14 < __local_target_mallocs__goto_2859_21: 1 else: 0) != 0) {
+        if ((if __local_i__goto_2828_14 < __local_target_mallocs__goto_2828_21: 1 else: 0) != 0) {
             (__ci_expr_logic_37 = (if (if jitrc != -48: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_37 != 0) {
@@ -11644,11 +11597,11 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_271 {
-        (__local_direction__goto_2899_7 = error_direction(__local_errorcode__goto_2043_9, __local_erroroffset__goto_2049_12))
+        (__local_direction__goto_2868_7 = error_direction(__local_errorcode__goto_2015_9, __local_erroroffset__goto_2021_12))
         colour_begin(35, outfile)
-        fprintf(outfile, "Failed: error %d at offset %d: ", __local_errorcode__goto_2043_9, (__local_erroroffset__goto_2049_12 as c_int))
+        fprintf(outfile, "Failed: error %d at offset %d: ", __local_errorcode__goto_2015_9, (__local_erroroffset__goto_2021_12 as c_int))
         colour_end(outfile)
-        if ((if not (print_error_message_8(__local_errorcode__goto_2043_9, "", "\n") != 0): 1 else: 0) != 0) {
+        if ((if not (print_error_message_8(__local_errorcode__goto_2015_9, "", "\n") != 0): 1 else: 0) != 0) {
             goto '__ci_bb_273
         } else {
             goto '__ci_bb_274
@@ -11668,7 +11621,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_274 {
-        if (__local_utf__goto_2039_6 != 0) {
+        if (__local_utf__goto_2011_6 != 0) {
             goto '__ci_bb_275
         } else {
             goto '__ci_bb_276
@@ -11676,14 +11629,14 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_275 {
-        (__local_n__goto_2915_9 = 1)
-        (__local_q__goto_2916_23 = pbuffer8)
-        (__local_q_end__goto_2916_37 = __local_q__goto_2916_23 + (__local_erroroffset__goto_2049_12 as usize))
+        (__local_n__goto_2884_9 = 1)
+        (__local_q__goto_2885_23 = pbuffer8)
+        (__local_q_end__goto_2885_37 = __local_q__goto_2885_23 + (__local_erroroffset__goto_2021_12 as usize))
         goto '__ci_bb_277
     }
 
     '__ci_bb_276 {
-        if ((if __local_direction__goto_2899_7 < 0: 1 else: 0) != 0) {
+        if ((if __local_direction__goto_2868_7 < 0: 1 else: 0) != 0) {
             goto '__ci_bb_283
         } else {
             goto '__ci_bb_284
@@ -11692,8 +11645,8 @@ fn process_pattern_8() -> c_int {
 
     '__ci_bb_277 {
         (__ci_expr_logic_39 = 0)
-        if ((if __local_q__goto_2916_23 < __local_q_end__goto_2916_37: 1 else: 0) != 0) {
-            (__ci_expr_logic_39 = (if (if __local_n__goto_2915_9 > 0: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_q__goto_2885_23 < __local_q_end__goto_2885_37: 1 else: 0) != 0) {
+            (__ci_expr_logic_39 = (if (if __local_n__goto_2884_9 > 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_39 != 0) {
             goto '__ci_bb_278
@@ -11703,17 +11656,17 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_278 {
-        (__local_n__goto_2915_9 = utf8_to_ord(__local_q__goto_2916_23, __local_q_end__goto_2916_37, (&raw mut __local_cc__goto_2914_14 as *mut c_uint)))
+        (__local_n__goto_2884_9 = utf8_to_ord(__local_q__goto_2885_23, __local_q_end__goto_2885_37, (&raw mut __local_cc__goto_2883_14 as *mut c_uint)))
         goto '__ci_bb_279
     }
 
     '__ci_bb_279 {
-        (__local_q__goto_2916_23 = __local_q__goto_2916_23 + ((__local_n__goto_2915_9 as isize) as usize))
+        (__local_q__goto_2885_23 = __local_q__goto_2885_23 + ((__local_n__goto_2884_9 as isize) as usize))
         goto '__ci_bb_277
     }
 
     '__ci_bb_280 {
-        if ((if __local_n__goto_2915_9 <= 0: 1 else: 0) != 0) {
+        if ((if __local_n__goto_2884_9 <= 0: 1 else: 0) != 0) {
             goto '__ci_bb_281
         } else {
             goto '__ci_bb_282
@@ -11722,7 +11675,7 @@ fn process_pattern_8() -> c_int {
 
     '__ci_bb_281 {
         colour_begin(31, outfile)
-        fprintf(outfile, "** Erroroffset %d splits a UTF character\n", (__local_erroroffset__goto_2049_12 as c_int))
+        fprintf(outfile, "** Erroroffset %d splits a UTF character\n", (__local_erroroffset__goto_2021_12 as c_int))
         colour_end(outfile)
         return PR_ABEND
     }
@@ -11733,7 +11686,7 @@ fn process_pattern_8() -> c_int {
 
     '__ci_bb_283 {
         colour_begin(31, outfile)
-        fprintf(outfile, "** Error code %d not implemented in error_direction().\n", __local_errorcode__goto_2043_9)
+        fprintf(outfile, "** Error code %d not implemented in error_direction().\n", __local_errorcode__goto_2015_9)
         colour_end(outfile)
         colour_begin(31, outfile)
         fprintf(outfile, "   error_direction() should usually return '1' for newly-added errors,\n")
@@ -11745,7 +11698,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_284 {
-        if ((if __local_direction__goto_2899_7 != 0: 1 else: 0) != 0) {
+        if ((if __local_direction__goto_2868_7 != 0: 1 else: 0) != 0) {
             goto '__ci_bb_286
         } else {
             goto '__ci_bb_287
@@ -11760,7 +11713,7 @@ fn process_pattern_8() -> c_int {
         colour_begin(35, outfile)
         fprintf(outfile, "        here: ")
         colour_end(outfile)
-        if ((if __local_erroroffset__goto_2049_12 > 0: 1 else: 0) != 0) {
+        if ((if __local_erroroffset__goto_2021_12 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_289
         } else {
             goto '__ci_bb_290
@@ -11768,7 +11721,7 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_287 {
-        if ((if __local_erroroffset__goto_2049_12 != 0: 1 else: 0) != 0) {
+        if ((if __local_erroroffset__goto_2021_12 != 0: 1 else: 0) != 0) {
             goto '__ci_bb_293
         } else {
             goto '__ci_bb_294
@@ -11780,19 +11733,19 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_289 {
-        ptrunc_8(32, pbuffer8, __local_full_patlen__goto_2047_20, __local_erroroffset__goto_2049_12, 1, __local_utf__goto_2039_6, outfile)
+        ptrunc_8(32, pbuffer8, __local_full_patlen__goto_2019_20, __local_erroroffset__goto_2021_12, 1, __local_utf__goto_2011_6, outfile)
         fprintf(outfile, " ")
         goto '__ci_bb_290
     }
 
     '__ci_bb_290 {
         (__ci_expr_ternary_41 = null)
-        if ((if __local_direction__goto_2899_7 == 1: 1 else: 0) != 0) {
+        if ((if __local_direction__goto_2868_7 == 1: 1 else: 0) != 0) {
             (__ci_expr_ternary_41 = (("|<--|" as *mut c_char)))
         } else {
             var __ci_expr_ternary_40: *mut c_char = null
 
-            if ((if __local_direction__goto_2899_7 == 2: 1 else: 0) != 0) {
+            if ((if __local_direction__goto_2868_7 == 2: 1 else: 0) != 0) {
                 (__ci_expr_ternary_40 = (("|-->|" as *mut c_char)))
             } else {
                 (__ci_expr_ternary_40 = (("|<-->|" as *mut c_char)))
@@ -11804,7 +11757,7 @@ fn process_pattern_8() -> c_int {
         colour_begin(35, outfile)
         fprintf(outfile, __ci_expr_ternary_41)
         colour_end(outfile)
-        if ((if __local_erroroffset__goto_2049_12 < __local_full_patlen__goto_2047_20: 1 else: 0) != 0) {
+        if ((if __local_erroroffset__goto_2021_12 < __local_full_patlen__goto_2019_20: 1 else: 0) != 0) {
             goto '__ci_bb_291
         } else {
             goto '__ci_bb_292
@@ -11813,7 +11766,7 @@ fn process_pattern_8() -> c_int {
 
     '__ci_bb_291 {
         fprintf(outfile, " ")
-        ptrunc_8(32, pbuffer8, __local_full_patlen__goto_2047_20, __local_erroroffset__goto_2049_12, 0, __local_utf__goto_2039_6, outfile)
+        ptrunc_8(32, pbuffer8, __local_full_patlen__goto_2019_20, __local_erroroffset__goto_2021_12, 0, __local_utf__goto_2011_6, outfile)
         goto '__ci_bb_292
     }
 
@@ -11824,7 +11777,7 @@ fn process_pattern_8() -> c_int {
 
     '__ci_bb_293 {
         colour_begin(31, outfile)
-        fprintf(outfile, "** Unexpected non-zero erroroffset %d for error code %d\n", (__local_erroroffset__goto_2049_12 as c_int), __local_errorcode__goto_2043_9)
+        fprintf(outfile, "** Unexpected non-zero erroroffset %d for error code %d\n", (__local_erroroffset__goto_2021_12 as c_int), __local_errorcode__goto_2015_9)
         colour_end(outfile)
         return PR_ABEND
     }
@@ -11890,8 +11843,8 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_304 {
-        (__local_rc__goto_2043_5 = show_pattern_info_8())
-        if ((if __local_rc__goto_2043_5 != PR_OK: 1 else: 0) != 0) {
+        (__local_rc__goto_2015_5 = show_pattern_info_8())
+        if ((if __local_rc__goto_2015_5 != PR_OK: 1 else: 0) != 0) {
             goto '__ci_bb_305
         } else {
             goto '__ci_bb_306
@@ -11899,12 +11852,11 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_305 {
-        return __local_rc__goto_2043_5
+        return __local_rc__goto_2015_5
     }
 
     '__ci_bb_306 {
-        (__local_serialize_rc__goto_2050_9 = pcre2_serialize_encode_8(((&raw mut compiled_code_8 as *mut *mut pcre2_real_code_8) as *mut *const pcre2_real_code_8), 1, (&raw mut __local_serialized_bytes__goto_2051_10 as *mut *mut u8), (&raw mut __local_serialized_size__goto_2052_12 as *mut c_ulong), general_context_8))
-        if ((if __local_serialize_rc__goto_2050_9 != 1: 1 else: 0) != 0) {
+        if ((if (((&raw const pat_patctl as *const patctl).control as c_uint) & (33554432 as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_307
         } else {
             goto '__ci_bb_308
@@ -11912,95 +11864,79 @@ fn process_pattern_8() -> c_int {
     }
 
     '__ci_bb_307 {
-        colour_begin(31, outfile)
-        fprintf(outfile, "** pcre2_serialize_encode() returned %d instead of 1\n", __local_serialize_rc__goto_2050_9)
-        colour_end(outfile)
-        return PR_ABEND
-    }
-
-    '__ci_bb_308 {
-        pcre2_serialize_free_8(__local_serialized_bytes__goto_2051_10)
-        if ((if (((&raw const pat_patctl as *const patctl).control as c_uint) & (33554432 as c_uint)) != 0: 1 else: 0) != 0) {
+        if ((if patstacknext_8 >= 20: 1 else: 0) != 0) {
             goto '__ci_bb_309
         } else {
             goto '__ci_bb_310
         }
     }
 
-    '__ci_bb_309 {
-        if ((if patstacknext_8 >= 20: 1 else: 0) != 0) {
+    '__ci_bb_308 {
+        if ((if (((&raw const pat_patctl as *const patctl).control as c_uint) & (((67108864 as c_uint) | (134217728 as c_uint)) as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_311
         } else {
             goto '__ci_bb_312
         }
     }
 
+    '__ci_bb_309 {
+        colour_begin(31, outfile)
+        fprintf(outfile, "** Too many pushed patterns (max %d)\n", 20)
+        colour_end(outfile)
+        return PR_ABEND
+    }
+
     '__ci_bb_310 {
-        if ((if (((&raw const pat_patctl as *const patctl).control as c_uint) & (((67108864 as c_uint) | (134217728 as c_uint)) as c_uint)) != 0: 1 else: 0) != 0) {
+        (__ci_expr_old_42 = patstacknext_8)
+        (patstacknext_8 = patstacknext_8 + 1)
+        (patstack_8[__ci_expr_old_42] = compiled_code_8)
+        (compiled_code_8 = ((null as *mut pcre2_real_code_8)))
+        goto '__ci_bb_308
+    }
+
+    '__ci_bb_311 {
+        if ((if patstacknext_8 >= 20: 1 else: 0) != 0) {
             goto '__ci_bb_313
         } else {
             goto '__ci_bb_314
         }
     }
 
-    '__ci_bb_311 {
+    '__ci_bb_312 {
+        return PR_OK
+    }
+
+    '__ci_bb_313 {
         colour_begin(31, outfile)
         fprintf(outfile, "** Too many pushed patterns (max %d)\n", 20)
         colour_end(outfile)
         return PR_ABEND
     }
 
-    '__ci_bb_312 {
-        (__ci_expr_old_42 = patstacknext_8)
-        (patstacknext_8 = patstacknext_8 + 1)
-        (patstack_8[__ci_expr_old_42] = compiled_code_8)
-        (compiled_code_8 = ((null as *mut pcre2_real_code_8)))
-        goto '__ci_bb_310
-    }
-
-    '__ci_bb_313 {
-        if ((if patstacknext_8 >= 20: 1 else: 0) != 0) {
+    '__ci_bb_314 {
+        if ((if (((&raw const pat_patctl as *const patctl).control as c_uint) & (67108864 as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_315
         } else {
             goto '__ci_bb_316
         }
     }
 
-    '__ci_bb_314 {
-        return PR_OK
-    }
-
     '__ci_bb_315 {
-        colour_begin(31, outfile)
-        fprintf(outfile, "** Too many pushed patterns (max %d)\n", 20)
-        colour_end(outfile)
-        return PR_ABEND
-    }
-
-    '__ci_bb_316 {
-        if ((if (((&raw const pat_patctl as *const patctl).control as c_uint) & (67108864 as c_uint)) != 0: 1 else: 0) != 0) {
-            goto '__ci_bb_317
-        } else {
-            goto '__ci_bb_318
-        }
-    }
-
-    '__ci_bb_317 {
         (__ci_expr_old_43 = patstacknext_8)
         (patstacknext_8 = patstacknext_8 + 1)
         (patstack_8[__ci_expr_old_43] = pcre2_code_copy_8(compiled_code_8))
-        goto '__ci_bb_319
+        goto '__ci_bb_317
     }
 
-    '__ci_bb_318 {
+    '__ci_bb_316 {
         (__ci_expr_old_44 = patstacknext_8)
         (patstacknext_8 = patstacknext_8 + 1)
         (patstack_8[__ci_expr_old_44] = pcre2_code_copy_with_tables_8(compiled_code_8))
-        goto '__ci_bb_319
+        goto '__ci_bb_317
     }
 
-    '__ci_bb_319 {
-        goto '__ci_bb_314
+    '__ci_bb_317 {
+        goto '__ci_bb_312
     }
 
 }
@@ -12180,15 +12116,15 @@ fn check_match_limit_8(__param_pp: *const u8, __param_ulen: c_ulong, __param_err
 }
 
 fn substitute_callout_function_8(__param_scb: *mut pcre2_substitute_callout_block_8, __param_data_ptr: *mut c_void) -> c_int {
-    var __local_yield___goto_3230_5: c_int = 0
+    var __local_yield___goto_3177_5: c_int = 0
 
-    var __local_utf__goto_3231_6: c_int = 0
+    var __local_utf__goto_3178_6: c_int = 0
 
     goto '__ci_bb_0
 
     '__ci_bb_0 {
-        (__local_yield___goto_3230_5 = 0)
-        (__local_utf__goto_3231_6 = (if ((compiled_code_8.overall_options as c_uint) & (524288 as c_uint)) != 0: 1 else: 0))
+        (__local_yield___goto_3177_5 = 0)
+        (__local_utf__goto_3178_6 = (if ((compiled_code_8.overall_options as c_uint) & (524288 as c_uint)) != 0: 1 else: 0))
         __param_data_ptr
         if ((if outfile == null: 1 else: 0) != 0) {
             goto '__ci_bb_1
@@ -12203,9 +12139,9 @@ fn substitute_callout_function_8(__param_scb: *mut pcre2_substitute_callout_bloc
 
     '__ci_bb_2 {
         fprintf(outfile, "%2d(%d) Old %zu %zu \"", __param_scb.subscount, __param_scb.oveccount, (unsafe: __param_scb.ovector[0]), (unsafe: __param_scb.ovector[1]))
-        pchars_8(-1, (__param_scb.input + ((unsafe: __param_scb.ovector[0]) as usize)), (((unsafe: __param_scb.ovector[1]) as c_ulong) -% ((unsafe: __param_scb.ovector[0]) as c_ulong)), __local_utf__goto_3231_6, outfile)
+        pchars_8(-1, (__param_scb.input + ((unsafe: __param_scb.ovector[0]) as usize)), (((unsafe: __param_scb.ovector[1]) as c_ulong) -% ((unsafe: __param_scb.ovector[0]) as c_ulong)), __local_utf__goto_3178_6, outfile)
         fprintf(outfile, "\" New %zu %zu \"", __param_scb.output_offsets[0], __param_scb.output_offsets[1])
-        pchars_8(-1, (__param_scb.output + (__param_scb.output_offsets[0] as usize)), ((__param_scb.output_offsets[1] as c_ulong) -% (__param_scb.output_offsets[0] as c_ulong)), __local_utf__goto_3231_6, outfile)
+        pchars_8(-1, (__param_scb.output + (__param_scb.output_offsets[0] as usize)), ((__param_scb.output_offsets[1] as c_ulong) -% (__param_scb.output_offsets[0] as c_ulong)), __local_utf__goto_3178_6, outfile)
         goto '__ci_bb_3
     }
 
@@ -12218,7 +12154,7 @@ fn substitute_callout_function_8(__param_scb: *mut pcre2_substitute_callout_bloc
     }
 
     '__ci_bb_4 {
-        (__local_yield___goto_3230_5 = -1)
+        (__local_yield___goto_3177_5 = -1)
         if ((if outfile != null: 1 else: 0) != 0) {
             goto '__ci_bb_7
         } else {
@@ -12252,7 +12188,7 @@ fn substitute_callout_function_8(__param_scb: *mut pcre2_substitute_callout_bloc
     }
 
     '__ci_bb_9 {
-        (__local_yield___goto_3230_5 = 1)
+        (__local_yield___goto_3177_5 = 1)
         if ((if outfile != null: 1 else: 0) != 0) {
             goto '__ci_bb_11
         } else {
@@ -12279,32 +12215,32 @@ fn substitute_callout_function_8(__param_scb: *mut pcre2_substitute_callout_bloc
     }
 
     '__ci_bb_14 {
-        return __local_yield___goto_3230_5
+        return __local_yield___goto_3177_5
     }
 
 }
 
 fn substitute_case_callout_function_8(__param_input: *const u8, __param_input_len: c_ulong, __param_output: *mut u8, __param_output_cap: c_ulong, __param_to_case: c_int, __param_data_ptr: *mut c_void) -> c_ulong {
     var __local_to_case = __param_to_case
-    var __local_buf__goto_3293_13: [16]u8
+    var __local_buf__goto_3240_13: [16]u8
 
-    var __local_input_copy__goto_3294_12: *const u8 = null
+    var __local_input_copy__goto_3241_12: *const u8 = null
 
-    var __local_written__goto_3295_12: c_ulong = 0
+    var __local_written__goto_3242_12: c_ulong = 0
 
-    var __local_input_buf__goto_3301_16: *mut u8 = null
+    var __local_input_buf__goto_3248_16: *mut u8 = null
 
-    var __local_i__goto_3312_17: c_ulong = 0
+    var __local_i__goto_3259_17: c_ulong = 0
 
-    var __local_num_in__goto_3314_7: c_int = 0
+    var __local_num_in__goto_3261_7: c_int = 0
 
-    var __local_c1__goto_3315_12: c_uint = 0
+    var __local_c1__goto_3262_12: c_uint = 0
 
-    var __local_c2__goto_3316_12: c_uint = 0
+    var __local_c2__goto_3263_12: c_uint = 0
 
-    var __local_num_read__goto_3317_7: c_int = 0
+    var __local_num_read__goto_3264_7: c_int = 0
 
-    var __local_num_write__goto_3318_7: c_int = 0
+    var __local_num_write__goto_3265_7: c_int = 0
 
     var __ci_expr_ternary_0: c_int = 0
 
@@ -12319,7 +12255,7 @@ fn substitute_case_callout_function_8(__param_input: *const u8, __param_input_le
     goto '__ci_bb_0
 
     '__ci_bb_0 {
-        (__local_written__goto_3295_12 = 0)
+        (__local_written__goto_3242_12 = 0)
         __param_data_ptr
         if ((if __param_input_len > (((16 * sizeof[u8]()) as c_ulong) / (sizeof[u8]() as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_1
@@ -12329,8 +12265,8 @@ fn substitute_case_callout_function_8(__param_input: *const u8, __param_input_le
     }
 
     '__ci_bb_1 {
-        (__local_input_buf__goto_3301_16 = (((with_alloc((((__param_input_len as c_ulong) *% (1 as c_ulong)) as i64)) as *mut c_void) as *mut u8)))
-        if ((if __local_input_buf__goto_3301_16 == null: 1 else: 0) != 0) {
+        (__local_input_buf__goto_3248_16 = (((with_alloc((((__param_input_len as c_ulong) *% (1 as c_ulong)) as i64)) as *mut c_void) as *mut u8)))
+        if ((if __local_input_buf__goto_3248_16 == null: 1 else: 0) != 0) {
             goto '__ci_bb_4
         } else {
             goto '__ci_bb_5
@@ -12338,13 +12274,13 @@ fn substitute_case_callout_function_8(__param_input: *const u8, __param_input_le
     }
 
     '__ci_bb_2 {
-        with_memcpy(((&(unsafe: __local_buf__goto_3293_13[0]) as *mut u8) as *i8), (__param_input as *i8), (((__param_input_len as c_ulong) *% (1 as c_ulong)) as i64))
-        (__local_input_copy__goto_3294_12 = (&(unsafe: __local_buf__goto_3293_13[0]) as *mut u8))
+        with_memcpy(((&(unsafe: __local_buf__goto_3240_13[0]) as *mut u8) as *i8), (__param_input as *i8), (((__param_input_len as c_ulong) *% (1 as c_ulong)) as i64))
+        (__local_input_copy__goto_3241_12 = (&(unsafe: __local_buf__goto_3240_13[0]) as *mut u8))
         goto '__ci_bb_3
     }
 
     '__ci_bb_3 {
-        (__local_i__goto_3312_17 = 0)
+        (__local_i__goto_3259_17 = 0)
         goto '__ci_bb_6
     }
 
@@ -12353,13 +12289,13 @@ fn substitute_case_callout_function_8(__param_input: *const u8, __param_input_le
     }
 
     '__ci_bb_5 {
-        with_memcpy((__local_input_buf__goto_3301_16 as *i8), (__param_input as *i8), (((__param_input_len as c_ulong) *% (1 as c_ulong)) as i64))
-        (__local_input_copy__goto_3294_12 = __local_input_buf__goto_3301_16)
+        with_memcpy((__local_input_buf__goto_3248_16 as *i8), (__param_input as *i8), (((__param_input_len as c_ulong) *% (1 as c_ulong)) as i64))
+        (__local_input_copy__goto_3241_12 = __local_input_buf__goto_3248_16)
         goto '__ci_bb_3
     }
 
     '__ci_bb_6 {
-        if ((if __local_i__goto_3312_17 < __param_input_len: 1 else: 0) != 0) {
+        if ((if __local_i__goto_3259_17 < __param_input_len: 1 else: 0) != 0) {
             goto '__ci_bb_7
         } else {
             goto '__ci_bb_9
@@ -12368,21 +12304,21 @@ fn substitute_case_callout_function_8(__param_input: *const u8, __param_input_le
 
     '__ci_bb_7 {
         (__ci_expr_ternary_0 = 0)
-        if ((if ((__local_i__goto_3312_17 as c_ulong) +% (1 as c_ulong)) < __param_input_len: 1 else: 0) != 0) {
+        if ((if ((__local_i__goto_3259_17 as c_ulong) +% (1 as c_ulong)) < __param_input_len: 1 else: 0) != 0) {
             (__ci_expr_ternary_0 = 2)
         } else {
             (__ci_expr_ternary_0 = 1)
         }
-        (__local_num_in__goto_3314_7 = __ci_expr_ternary_0)
-        (__local_c1__goto_3315_12 = (unsafe: __local_input_copy__goto_3294_12[__local_i__goto_3312_17]))
+        (__local_num_in__goto_3261_7 = __ci_expr_ternary_0)
+        (__local_c1__goto_3262_12 = (unsafe: __local_input_copy__goto_3241_12[__local_i__goto_3259_17]))
         (__ci_expr_ternary_1 = 0)
-        if ((if ((__local_i__goto_3312_17 as c_ulong) +% (1 as c_ulong)) < __param_input_len: 1 else: 0) != 0) {
-            (__ci_expr_ternary_1 = (unsafe: __local_input_copy__goto_3294_12[((__local_i__goto_3312_17 as c_ulong) +% (1 as c_ulong))]))
+        if ((if ((__local_i__goto_3259_17 as c_ulong) +% (1 as c_ulong)) < __param_input_len: 1 else: 0) != 0) {
+            (__ci_expr_ternary_1 = (unsafe: __local_input_copy__goto_3241_12[((__local_i__goto_3259_17 as c_ulong) +% (1 as c_ulong))]))
         } else {
             (__ci_expr_ternary_1 = 0)
         }
-        (__local_c2__goto_3316_12 = __ci_expr_ternary_1)
-        if ((if not (case_transform(__local_to_case, __local_num_in__goto_3314_7, (&raw mut __local_num_read__goto_3317_7 as *mut c_int), (&raw mut __local_num_write__goto_3318_7 as *mut c_int), (&raw mut __local_c1__goto_3315_12 as *mut c_uint), (&raw mut __local_c2__goto_3316_12 as *mut c_uint)) != 0): 1 else: 0) != 0) {
+        (__local_c2__goto_3263_12 = __ci_expr_ternary_1)
+        if ((if not (case_transform(__local_to_case, __local_num_in__goto_3261_7, (&raw mut __local_num_read__goto_3264_7 as *mut c_int), (&raw mut __local_num_write__goto_3265_7 as *mut c_int), (&raw mut __local_c1__goto_3262_12 as *mut c_uint), (&raw mut __local_c2__goto_3263_12 as *mut c_uint)) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_10
         } else {
             goto '__ci_bb_11
@@ -12398,12 +12334,12 @@ fn substitute_case_callout_function_8(__param_input: *const u8, __param_input_le
     }
 
     '__ci_bb_10 {
-        (__local_written__goto_3295_12 = (~(0 as c_ulong)))
+        (__local_written__goto_3242_12 = (~(0 as c_ulong)))
         goto '__ci_bb_12
     }
 
     '__ci_bb_11 {
-        (__local_i__goto_3312_17 = __local_i__goto_3312_17 + __local_num_read__goto_3317_7)
+        (__local_i__goto_3259_17 = __local_i__goto_3259_17 + __local_num_read__goto_3264_7)
         if ((if __local_to_case == 3: 1 else: 0) != 0) {
             goto '__ci_bb_13
         } else {
@@ -12412,7 +12348,7 @@ fn substitute_case_callout_function_8(__param_input: *const u8, __param_input_le
     }
 
     '__ci_bb_12 {
-        if ((if __local_input_copy__goto_3294_12 != (&(unsafe: __local_buf__goto_3293_13[0]) as *mut u8): 1 else: 0) != 0) {
+        if ((if __local_input_copy__goto_3241_12 != (&(unsafe: __local_buf__goto_3240_13[0]) as *mut u8): 1 else: 0) != 0) {
             goto '__ci_bb_22
         } else {
             goto '__ci_bb_23
@@ -12425,7 +12361,7 @@ fn substitute_case_callout_function_8(__param_input: *const u8, __param_input_le
     }
 
     '__ci_bb_14 {
-        if ((if ((__local_written__goto_3295_12 as c_ulong) +% (__local_num_write__goto_3318_7 as c_ulong)) > __param_output_cap: 1 else: 0) != 0) {
+        if ((if ((__local_written__goto_3242_12 as c_ulong) +% (__local_num_write__goto_3265_7 as c_ulong)) > __param_output_cap: 1 else: 0) != 0) {
             goto '__ci_bb_15
         } else {
             goto '__ci_bb_16
@@ -12433,12 +12369,12 @@ fn substitute_case_callout_function_8(__param_input: *const u8, __param_input_le
     }
 
     '__ci_bb_15 {
-        (__local_written__goto_3295_12 = __local_written__goto_3295_12 + __local_num_write__goto_3318_7)
+        (__local_written__goto_3242_12 = __local_written__goto_3242_12 + __local_num_write__goto_3265_7)
         goto '__ci_bb_17
     }
 
     '__ci_bb_16 {
-        if ((if __local_num_write__goto_3318_7 > 0: 1 else: 0) != 0) {
+        if ((if __local_num_write__goto_3265_7 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_18
         } else {
             goto '__ci_bb_19
@@ -12450,14 +12386,14 @@ fn substitute_case_callout_function_8(__param_input: *const u8, __param_input_le
     }
 
     '__ci_bb_18 {
-        (__ci_expr_old_2 = __local_written__goto_3295_12)
-        (__local_written__goto_3295_12 = __local_written__goto_3295_12 + 1)
-        ((unsafe: __param_output[__ci_expr_old_2]) = __local_c1__goto_3315_12)
+        (__ci_expr_old_2 = __local_written__goto_3242_12)
+        (__local_written__goto_3242_12 = __local_written__goto_3242_12 + 1)
+        ((unsafe: __param_output[__ci_expr_old_2]) = __local_c1__goto_3262_12)
         goto '__ci_bb_19
     }
 
     '__ci_bb_19 {
-        if ((if __local_num_write__goto_3318_7 > 1: 1 else: 0) != 0) {
+        if ((if __local_num_write__goto_3265_7 > 1: 1 else: 0) != 0) {
             goto '__ci_bb_20
         } else {
             goto '__ci_bb_21
@@ -12465,9 +12401,9 @@ fn substitute_case_callout_function_8(__param_input: *const u8, __param_input_le
     }
 
     '__ci_bb_20 {
-        (__ci_expr_old_3 = __local_written__goto_3295_12)
-        (__local_written__goto_3295_12 = __local_written__goto_3295_12 + 1)
-        ((unsafe: __param_output[__ci_expr_old_3]) = __local_c2__goto_3316_12)
+        (__ci_expr_old_3 = __local_written__goto_3242_12)
+        (__local_written__goto_3242_12 = __local_written__goto_3242_12 + 1)
+        ((unsafe: __param_output[__ci_expr_old_3]) = __local_c2__goto_3263_12)
         goto '__ci_bb_21
     }
 
@@ -12476,12 +12412,12 @@ fn substitute_case_callout_function_8(__param_input: *const u8, __param_input_le
     }
 
     '__ci_bb_22 {
-        with_free(((__local_input_copy__goto_3294_12 as *mut u8) as *mut i8))
+        with_free(((__local_input_copy__goto_3241_12 as *mut u8) as *mut i8))
         goto '__ci_bb_23
     }
 
     '__ci_bb_23 {
-        if ((if __local_written__goto_3295_12 > __param_output_cap: 1 else: 0) != 0) {
+        if ((if __local_written__goto_3242_12 > __param_output_cap: 1 else: 0) != 0) {
             goto '__ci_bb_24
         } else {
             goto '__ci_bb_25
@@ -12500,35 +12436,35 @@ fn substitute_case_callout_function_8(__param_input: *const u8, __param_input_le
     }
 
     '__ci_bb_25 {
-        return __local_written__goto_3295_12
+        return __local_written__goto_3242_12
     }
 
 }
 
 fn callout_function_8(__param_cb: *mut pcre2_callout_block_8, __param_callout_data_ptr: *mut c_void) -> c_int {
-    var __local_f__goto_3376_7: *mut c_void = null
+    var __local_f__goto_3323_7: *mut c_void = null
 
-    var __local_fdefault__goto_3376_11: *mut c_void = null
+    var __local_fdefault__goto_3323_11: *mut c_void = null
 
-    var __local_i__goto_3377_10: c_uint = 0
+    var __local_i__goto_3324_10: c_uint = 0
 
-    var __local_pre_start__goto_3377_13: c_uint = 0
+    var __local_pre_start__goto_3324_13: c_uint = 0
 
-    var __local_post_start__goto_3377_24: c_uint = 0
+    var __local_post_start__goto_3324_24: c_uint = 0
 
-    var __local_subject_length__goto_3377_36: c_uint = 0
+    var __local_subject_length__goto_3324_36: c_uint = 0
 
-    var __local_current_position__goto_3378_12: c_ulong = 0
+    var __local_current_position__goto_3325_12: c_ulong = 0
 
-    var __local_utf__goto_3379_6: c_int = 0
+    var __local_utf__goto_3326_6: c_int = 0
 
-    var __local_callout_capture__goto_3380_6: c_int = 0
+    var __local_callout_capture__goto_3327_6: c_int = 0
 
-    var __local_callout_where__goto_3381_6: c_int = 0
+    var __local_callout_where__goto_3328_6: c_int = 0
 
-    var __local_delimiter__goto_3421_12: c_uint = 0
+    var __local_delimiter__goto_3368_12: c_uint = 0
 
-    var __local_callout_data__goto_3557_7: c_int = 0
+    var __local_callout_data__goto_3504_7: c_int = 0
 
     var __ci_expr_ternary_2: *mut c_void = null
 
@@ -12547,9 +12483,9 @@ fn callout_function_8(__param_cb: *mut pcre2_callout_block_8, __param_callout_da
     goto '__ci_bb_0
 
     '__ci_bb_0 {
-        (__local_utf__goto_3379_6 = (if ((compiled_code_8.overall_options as c_uint) & (524288 as c_uint)) != 0: 1 else: 0))
-        (__local_callout_capture__goto_3380_6 = (if (((&raw const dat_datctl as *const datctl).control as c_uint) & (64 as c_uint)) != 0: 1 else: 0))
-        (__local_callout_where__goto_3381_6 = (if (((&raw const dat_datctl as *const datctl).control2 as c_uint) & (512 as c_uint)) == 0: 1 else: 0))
+        (__local_utf__goto_3326_6 = (if ((compiled_code_8.overall_options as c_uint) & (524288 as c_uint)) != 0: 1 else: 0))
+        (__local_callout_capture__goto_3327_6 = (if (((&raw const dat_datctl as *const datctl).control as c_uint) & (64 as c_uint)) != 0: 1 else: 0))
+        (__local_callout_where__goto_3328_6 = (if (((&raw const dat_datctl as *const datctl).control2 as c_uint) & (512 as c_uint)) == 0: 1 else: 0))
         if ((if outfile == null: 1 else: 0) != 0) {
             goto '__ci_bb_1
         } else {
@@ -12566,7 +12502,7 @@ fn callout_function_8(__param_cb: *mut pcre2_callout_block_8, __param_callout_da
         (__ci_expr_logic_1 = 0)
         (__ci_expr_logic_0 = 0)
         if ((if not (first_callout != 0): 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if not (__local_callout_capture__goto_3380_6 != 0): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_0 = (if (if not (__local_callout_capture__goto_3327_6 != 0): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_0 != 0) {
             (__ci_expr_logic_1 = (if (if __param_cb.callout_string == null: 1 else: 0) != 0: 1 else: 0))
@@ -12576,7 +12512,7 @@ fn callout_function_8(__param_cb: *mut pcre2_callout_block_8, __param_callout_da
         } else {
             (__ci_expr_ternary_2 = outfile)
         }
-        (__local_fdefault__goto_3376_11 = __ci_expr_ternary_2)
+        (__local_fdefault__goto_3323_11 = __ci_expr_ternary_2)
         if ((if (((&raw const dat_datctl as *const datctl).control2 as c_uint) & (1024 as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_4
         } else {
@@ -12596,12 +12532,12 @@ fn callout_function_8(__param_cb: *mut pcre2_callout_block_8, __param_callout_da
     }
 
     '__ci_bb_4 {
-        (__local_f__goto_3376_7 = outfile)
+        (__local_f__goto_3323_7 = outfile)
         goto '__ci_bb_7
     }
 
     '__ci_bb_5 {
-        (__local_f__goto_3376_7 = __local_fdefault__goto_3376_11)
+        (__local_f__goto_3323_7 = __local_fdefault__goto_3323_11)
         goto '__ci_bb_6
     }
 
@@ -12626,22 +12562,22 @@ fn callout_function_8(__param_cb: *mut pcre2_callout_block_8, __param_callout_da
     }
 
     '__ci_bb_9 {
-        fprintf(__local_f__goto_3376_7, "Backtrack\n")
+        fprintf(__local_f__goto_3323_7, "Backtrack\n")
         goto '__ci_bb_8
     }
 
     '__ci_bb_10 {
-        fprintf(__local_f__goto_3376_7, "Backtrack\nNo other matching paths\n")
+        fprintf(__local_f__goto_3323_7, "Backtrack\nNo other matching paths\n")
         goto '__ci_bb_11
     }
 
     '__ci_bb_11 {
-        fprintf(__local_f__goto_3376_7, "New match attempt\n")
+        fprintf(__local_f__goto_3323_7, "New match attempt\n")
         goto '__ci_bb_8
     }
 
     '__ci_bb_12 {
-        (__local_f__goto_3376_7 = __local_fdefault__goto_3376_11)
+        (__local_f__goto_3323_7 = __local_fdefault__goto_3323_11)
         goto '__ci_bb_8
     }
 
@@ -12662,15 +12598,15 @@ fn callout_function_8(__param_cb: *mut pcre2_callout_block_8, __param_callout_da
     }
 
     '__ci_bb_15 {
-        (__local_delimiter__goto_3421_12 = (unsafe: __param_cb.callout_string[-1]))
-        fprintf(outfile, "Callout (%zu): %c", __param_cb.callout_string_offset, __local_delimiter__goto_3421_12)
-        pchars_8(-1, __param_cb.callout_string, __param_cb.callout_string_length, __local_utf__goto_3379_6, outfile)
-        (__local_i__goto_3377_10 = 0)
+        (__local_delimiter__goto_3368_12 = (unsafe: __param_cb.callout_string[-1]))
+        fprintf(outfile, "Callout (%zu): %c", __param_cb.callout_string_offset, __local_delimiter__goto_3368_12)
+        pchars_8(-1, __param_cb.callout_string, __param_cb.callout_string_length, __local_utf__goto_3326_6, outfile)
+        (__local_i__goto_3324_10 = 0)
         goto '__ci_bb_17
     }
 
     '__ci_bb_16 {
-        if (__local_callout_capture__goto_3380_6 != 0) {
+        if (__local_callout_capture__goto_3327_6 != 0) {
             goto '__ci_bb_25
         } else {
             goto '__ci_bb_26
@@ -12678,7 +12614,7 @@ fn callout_function_8(__param_cb: *mut pcre2_callout_block_8, __param_callout_da
     }
 
     '__ci_bb_17 {
-        if ((if callout_start_delims[__local_i__goto_3377_10] != 0: 1 else: 0) != 0) {
+        if ((if callout_start_delims[__local_i__goto_3324_10] != 0: 1 else: 0) != 0) {
             goto '__ci_bb_18
         } else {
             goto '__ci_bb_20
@@ -12686,7 +12622,7 @@ fn callout_function_8(__param_cb: *mut pcre2_callout_block_8, __param_callout_da
     }
 
     '__ci_bb_18 {
-        if ((if __local_delimiter__goto_3421_12 == callout_start_delims[__local_i__goto_3377_10]: 1 else: 0) != 0) {
+        if ((if __local_delimiter__goto_3368_12 == callout_start_delims[__local_i__goto_3324_10]: 1 else: 0) != 0) {
             goto '__ci_bb_21
         } else {
             goto '__ci_bb_22
@@ -12694,13 +12630,13 @@ fn callout_function_8(__param_cb: *mut pcre2_callout_block_8, __param_callout_da
     }
 
     '__ci_bb_19 {
-        (__local_i__goto_3377_10 = __local_i__goto_3377_10 + 1)
+        (__local_i__goto_3324_10 = __local_i__goto_3324_10 + 1)
         goto '__ci_bb_17
     }
 
     '__ci_bb_20 {
-        fprintf(outfile, "%c", __local_delimiter__goto_3421_12)
-        if ((if not (__local_callout_capture__goto_3380_6 != 0): 1 else: 0) != 0) {
+        fprintf(outfile, "%c", __local_delimiter__goto_3368_12)
+        if ((if not (__local_callout_capture__goto_3327_6 != 0): 1 else: 0) != 0) {
             goto '__ci_bb_23
         } else {
             goto '__ci_bb_24
@@ -12708,7 +12644,7 @@ fn callout_function_8(__param_cb: *mut pcre2_callout_block_8, __param_callout_da
     }
 
     '__ci_bb_21 {
-        (__local_delimiter__goto_3421_12 = callout_end_delims[__local_i__goto_3377_10])
+        (__local_delimiter__goto_3368_12 = callout_end_delims[__local_i__goto_3324_10])
         goto '__ci_bb_20
     }
 
@@ -12734,7 +12670,7 @@ fn callout_function_8(__param_cb: *mut pcre2_callout_block_8, __param_callout_da
     }
 
     '__ci_bb_26 {
-        if (__local_callout_where__goto_3381_6 != 0) {
+        if (__local_callout_where__goto_3328_6 != 0) {
             goto '__ci_bb_36
         } else {
             goto '__ci_bb_37
@@ -12748,12 +12684,12 @@ fn callout_function_8(__param_cb: *mut pcre2_callout_block_8, __param_callout_da
 
     '__ci_bb_28 {
         fprintf(outfile, " last capture = %d\n", __param_cb.capture_last)
-        (__local_i__goto_3377_10 = 2)
+        (__local_i__goto_3324_10 = 2)
         goto '__ci_bb_29
     }
 
     '__ci_bb_29 {
-        if ((if __local_i__goto_3377_10 < ((__param_cb.capture_top as c_uint) *% (2 as c_uint)): 1 else: 0) != 0) {
+        if ((if __local_i__goto_3324_10 < ((__param_cb.capture_top as c_uint) *% (2 as c_uint)): 1 else: 0) != 0) {
             goto '__ci_bb_30
         } else {
             goto '__ci_bb_32
@@ -12761,8 +12697,8 @@ fn callout_function_8(__param_cb: *mut pcre2_callout_block_8, __param_callout_da
     }
 
     '__ci_bb_30 {
-        fprintf(outfile, "%2d: ", ((__local_i__goto_3377_10 as c_uint) / (2 as c_uint)))
-        if ((if (unsafe: __param_cb.offset_vector[__local_i__goto_3377_10]) == (~(0 as c_ulong)): 1 else: 0) != 0) {
+        fprintf(outfile, "%2d: ", ((__local_i__goto_3324_10 as c_uint) / (2 as c_uint)))
+        if ((if (unsafe: __param_cb.offset_vector[__local_i__goto_3324_10]) == (~(0 as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_33
         } else {
             goto '__ci_bb_34
@@ -12770,7 +12706,7 @@ fn callout_function_8(__param_cb: *mut pcre2_callout_block_8, __param_callout_da
     }
 
     '__ci_bb_31 {
-        (__local_i__goto_3377_10 = __local_i__goto_3377_10 + 2)
+        (__local_i__goto_3324_10 = __local_i__goto_3324_10 + 2)
         goto '__ci_bb_29
     }
 
@@ -12784,7 +12720,7 @@ fn callout_function_8(__param_cb: *mut pcre2_callout_block_8, __param_callout_da
     }
 
     '__ci_bb_34 {
-        pchars_8(-1, (__param_cb.subject + ((unsafe: __param_cb.offset_vector[__local_i__goto_3377_10]) as usize)), (((unsafe: __param_cb.offset_vector[((__local_i__goto_3377_10 as c_uint) +% (1 as c_uint))]) as c_ulong) -% ((unsafe: __param_cb.offset_vector[__local_i__goto_3377_10]) as c_ulong)), __local_utf__goto_3379_6, __local_f__goto_3376_7)
+        pchars_8(-1, (__param_cb.subject + ((unsafe: __param_cb.offset_vector[__local_i__goto_3324_10]) as usize)), (((unsafe: __param_cb.offset_vector[((__local_i__goto_3324_10 as c_uint) +% (1 as c_uint))]) as c_ulong) -% ((unsafe: __param_cb.offset_vector[__local_i__goto_3324_10]) as c_ulong)), __local_utf__goto_3326_6, __local_f__goto_3323_7)
         goto '__ci_bb_35
     }
 
@@ -12794,7 +12730,7 @@ fn callout_function_8(__param_cb: *mut pcre2_callout_block_8, __param_callout_da
     }
 
     '__ci_bb_36 {
-        if ((if __local_f__goto_3376_7 != null: 1 else: 0) != 0) {
+        if ((if __local_f__goto_3323_7 != null: 1 else: 0) != 0) {
             goto '__ci_bb_38
         } else {
             goto '__ci_bb_39
@@ -12810,23 +12746,23 @@ fn callout_function_8(__param_cb: *mut pcre2_callout_block_8, __param_callout_da
     }
 
     '__ci_bb_38 {
-        fprintf(__local_f__goto_3376_7, "--->")
+        fprintf(__local_f__goto_3323_7, "--->")
         goto '__ci_bb_39
     }
 
     '__ci_bb_39 {
-        (__local_pre_start__goto_3377_13 = pchars_8(-1, __param_cb.subject, __param_cb.start_match, __local_utf__goto_3379_6, __local_f__goto_3376_7))
+        (__local_pre_start__goto_3324_13 = pchars_8(-1, __param_cb.subject, __param_cb.start_match, __local_utf__goto_3326_6, __local_f__goto_3323_7))
         (__ci_expr_ternary_3 = 0)
         if ((if __param_cb.current_position >= __param_cb.start_match: 1 else: 0) != 0) {
             (__ci_expr_ternary_3 = __param_cb.current_position)
         } else {
             (__ci_expr_ternary_3 = __param_cb.start_match)
         }
-        (__local_current_position__goto_3378_12 = __ci_expr_ternary_3)
-        (__local_post_start__goto_3377_24 = pchars_8(-1, (__param_cb.subject + (__param_cb.start_match as usize)), ((__local_current_position__goto_3378_12 as c_ulong) -% (__param_cb.start_match as c_ulong)), __local_utf__goto_3379_6, __local_f__goto_3376_7))
-        pchars_8(-1, (__param_cb.subject + (__local_current_position__goto_3378_12 as usize)), ((__param_cb.subject_length as c_ulong) -% (__local_current_position__goto_3378_12 as c_ulong)), __local_utf__goto_3379_6, __local_f__goto_3376_7)
-        (__local_subject_length__goto_3377_36 = pchars_8(-1, __param_cb.subject, __param_cb.subject_length, __local_utf__goto_3379_6, null))
-        if ((if __local_f__goto_3376_7 != null: 1 else: 0) != 0) {
+        (__local_current_position__goto_3325_12 = __ci_expr_ternary_3)
+        (__local_post_start__goto_3324_24 = pchars_8(-1, (__param_cb.subject + (__param_cb.start_match as usize)), ((__local_current_position__goto_3325_12 as c_ulong) -% (__param_cb.start_match as c_ulong)), __local_utf__goto_3326_6, __local_f__goto_3323_7))
+        pchars_8(-1, (__param_cb.subject + (__local_current_position__goto_3325_12 as usize)), ((__param_cb.subject_length as c_ulong) -% (__local_current_position__goto_3325_12 as c_ulong)), __local_utf__goto_3326_6, __local_f__goto_3323_7)
+        (__local_subject_length__goto_3324_36 = pchars_8(-1, __param_cb.subject, __param_cb.subject_length, __local_utf__goto_3326_6, null))
+        if ((if __local_f__goto_3323_7 != null: 1 else: 0) != 0) {
             goto '__ci_bb_40
         } else {
             goto '__ci_bb_41
@@ -12834,7 +12770,7 @@ fn callout_function_8(__param_cb: *mut pcre2_callout_block_8, __param_callout_da
     }
 
     '__ci_bb_40 {
-        fprintf(__local_f__goto_3376_7, "\n")
+        fprintf(__local_f__goto_3323_7, "\n")
         goto '__ci_bb_41
     }
 
@@ -12856,7 +12792,7 @@ fn callout_function_8(__param_cb: *mut pcre2_callout_block_8, __param_callout_da
     }
 
     '__ci_bb_43 {
-        if (__local_callout_capture__goto_3380_6 != 0) {
+        if (__local_callout_capture__goto_3327_6 != 0) {
             (__ci_expr_logic_4 = (if true: 1 else: 0))
         } else {
             (__ci_expr_logic_4 = (if (if __param_cb.callout_string != null: 1 else: 0) != 0: 1 else: 0))
@@ -12869,7 +12805,7 @@ fn callout_function_8(__param_cb: *mut pcre2_callout_block_8, __param_callout_da
     }
 
     '__ci_bb_44 {
-        (__local_i__goto_3377_10 = 0)
+        (__local_i__goto_3324_10 = 0)
         goto '__ci_bb_50
     }
 
@@ -12897,7 +12833,7 @@ fn callout_function_8(__param_cb: *mut pcre2_callout_block_8, __param_callout_da
     }
 
     '__ci_bb_50 {
-        if ((if __local_i__goto_3377_10 < __local_pre_start__goto_3377_13: 1 else: 0) != 0) {
+        if ((if __local_i__goto_3324_10 < __local_pre_start__goto_3324_13: 1 else: 0) != 0) {
             goto '__ci_bb_51
         } else {
             goto '__ci_bb_53
@@ -12910,13 +12846,13 @@ fn callout_function_8(__param_cb: *mut pcre2_callout_block_8, __param_callout_da
     }
 
     '__ci_bb_52 {
-        (__local_i__goto_3377_10 = __local_i__goto_3377_10 + 1)
+        (__local_i__goto_3324_10 = __local_i__goto_3324_10 + 1)
         goto '__ci_bb_50
     }
 
     '__ci_bb_53 {
         fprintf(outfile, "^")
-        if ((if __local_post_start__goto_3377_24 > 0: 1 else: 0) != 0) {
+        if ((if __local_post_start__goto_3324_24 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_54
         } else {
             goto '__ci_bb_55
@@ -12924,17 +12860,17 @@ fn callout_function_8(__param_cb: *mut pcre2_callout_block_8, __param_callout_da
     }
 
     '__ci_bb_54 {
-        (__local_i__goto_3377_10 = 0)
+        (__local_i__goto_3324_10 = 0)
         goto '__ci_bb_56
     }
 
     '__ci_bb_55 {
-        (__local_i__goto_3377_10 = 0)
+        (__local_i__goto_3324_10 = 0)
         goto '__ci_bb_60
     }
 
     '__ci_bb_56 {
-        if ((if __local_i__goto_3377_10 < ((__local_post_start__goto_3377_24 as c_uint) -% (1 as c_uint)): 1 else: 0) != 0) {
+        if ((if __local_i__goto_3324_10 < ((__local_post_start__goto_3324_24 as c_uint) -% (1 as c_uint)): 1 else: 0) != 0) {
             goto '__ci_bb_57
         } else {
             goto '__ci_bb_59
@@ -12947,7 +12883,7 @@ fn callout_function_8(__param_cb: *mut pcre2_callout_block_8, __param_callout_da
     }
 
     '__ci_bb_58 {
-        (__local_i__goto_3377_10 = __local_i__goto_3377_10 + 1)
+        (__local_i__goto_3324_10 = __local_i__goto_3324_10 + 1)
         goto '__ci_bb_56
     }
 
@@ -12957,7 +12893,7 @@ fn callout_function_8(__param_cb: *mut pcre2_callout_block_8, __param_callout_da
     }
 
     '__ci_bb_60 {
-        if ((if __local_i__goto_3377_10 < ((((((__local_subject_length__goto_3377_36 as c_uint) -% (__local_pre_start__goto_3377_13 as c_uint)) as c_uint) -% (__local_post_start__goto_3377_24 as c_uint)) as c_uint) +% (4 as c_uint)): 1 else: 0) != 0) {
+        if ((if __local_i__goto_3324_10 < ((((((__local_subject_length__goto_3324_36 as c_uint) -% (__local_pre_start__goto_3324_13 as c_uint)) as c_uint) -% (__local_post_start__goto_3324_24 as c_uint)) as c_uint) +% (4 as c_uint)): 1 else: 0) != 0) {
             goto '__ci_bb_61
         } else {
             goto '__ci_bb_63
@@ -12970,7 +12906,7 @@ fn callout_function_8(__param_cb: *mut pcre2_callout_block_8, __param_callout_da
     }
 
     '__ci_bb_62 {
-        (__local_i__goto_3377_10 = __local_i__goto_3377_10 + 1)
+        (__local_i__goto_3324_10 = __local_i__goto_3324_10 + 1)
         goto '__ci_bb_60
     }
 
@@ -12983,7 +12919,7 @@ fn callout_function_8(__param_cb: *mut pcre2_callout_block_8, __param_callout_da
     }
 
     '__ci_bb_64 {
-        pchars_8(-1, (pbuffer8 + (__param_cb.pattern_position as usize)), __param_cb.next_item_length, __local_utf__goto_3379_6, outfile)
+        pchars_8(-1, (pbuffer8 + (__param_cb.pattern_position as usize)), __param_cb.next_item_length, __local_utf__goto_3326_6, outfile)
         goto '__ci_bb_66
     }
 
@@ -13016,7 +12952,7 @@ fn callout_function_8(__param_cb: *mut pcre2_callout_block_8, __param_callout_da
 
     '__ci_bb_70 {
         fprintf(outfile, "Latest Mark: ")
-        pchars_8(-1, (__param_cb.mark - ((1 as isize) as usize)), -1, __local_utf__goto_3379_6, outfile)
+        pchars_8(-1, (__param_cb.mark - ((1 as isize) as usize)), -1, __local_utf__goto_3326_6, outfile)
         putc(10, outfile)
         goto '__ci_bb_71
     }
@@ -13026,8 +12962,8 @@ fn callout_function_8(__param_cb: *mut pcre2_callout_block_8, __param_callout_da
     }
 
     '__ci_bb_72 {
-        (__local_callout_data__goto_3557_7 = (unsafe: *(__param_callout_data_ptr as *mut c_int)))
-        if ((if __local_callout_data__goto_3557_7 != 0: 1 else: 0) != 0) {
+        (__local_callout_data__goto_3504_7 = (unsafe: *(__param_callout_data_ptr as *mut c_int)))
+        if ((if __local_callout_data__goto_3504_7 != 0: 1 else: 0) != 0) {
             goto '__ci_bb_74
         } else {
             goto '__ci_bb_75
@@ -13059,12 +12995,12 @@ fn callout_function_8(__param_cb: *mut pcre2_callout_block_8, __param_callout_da
     }
 
     '__ci_bb_76 {
-        fprintf(outfile, "Callout data = %d\n", __local_callout_data__goto_3557_7)
+        fprintf(outfile, "Callout data = %d\n", __local_callout_data__goto_3504_7)
         goto '__ci_bb_77
     }
 
     '__ci_bb_77 {
-        return __local_callout_data__goto_3557_7
+        return __local_callout_data__goto_3504_7
     }
 
     '__ci_bb_78 {
@@ -13580,209 +13516,209 @@ fn copy_substitute_string_8(__param_utf: c_int, __param_input: *mut u8, __param_
 }
 
 fn process_data_8() -> c_int {
-    var __local_ulen__goto_3889_12: c_ulong = 0
+    var __local_ulen__goto_3836_12: c_ulong = 0
 
-    var __local_arg_ulen__goto_3889_18: c_ulong = 0
+    var __local_arg_ulen__goto_3836_18: c_ulong = 0
 
-    var __local_gmatched__goto_3890_10: c_uint = 0
+    var __local_gmatched__goto_3837_10: c_uint = 0
 
-    var __local_c__goto_3891_10: c_uint = 0
+    var __local_c__goto_3838_10: c_uint = 0
 
-    var __local_k__goto_3891_13: c_uint = 0
+    var __local_k__goto_3838_13: c_uint = 0
 
-    var __local_g_notempty__goto_3892_10: c_uint = 0
+    var __local_g_notempty__goto_3839_10: c_uint = 0
 
-    var __local_p__goto_3893_10: *mut u8 = null
+    var __local_p__goto_3840_10: *mut u8 = null
 
-    var __local_len__goto_3894_8: c_ulong = 0
+    var __local_len__goto_3841_8: c_ulong = 0
 
-    var __local_needlen__goto_3895_8: c_ulong = 0
+    var __local_needlen__goto_3842_8: c_ulong = 0
 
-    var __local_use_dat_context__goto_3896_22: *mut pcre2_real_match_context_8 = null
+    var __local_use_dat_context__goto_3843_22: *mut pcre2_real_match_context_8 = null
 
-    var __local_utf__goto_3897_6: c_int = 0
+    var __local_utf__goto_3844_6: c_int = 0
 
-    var __local_subject_literal__goto_3898_6: c_int = 0
+    var __local_subject_literal__goto_3845_6: c_int = 0
 
-    var __local_ovector__goto_3900_13: *mut c_ulong = null
+    var __local_ovector__goto_3847_13: *mut c_ulong = null
 
-    var __local_ovecsave__goto_3901_12: [2]*const u8
+    var __local_ovecsave__goto_3848_12: [2]*const u8
 
-    var __local_oveccount__goto_3902_10: c_uint = 0
+    var __local_oveccount__goto_3849_10: c_uint = 0
 
-    var __local_q__goto_3904_14: *mut u8 = null
+    var __local_q__goto_3851_14: *mut u8 = null
 
-    var __local_start_rep__goto_3905_14: *mut u8 = null
+    var __local_start_rep__goto_3852_14: *mut u8 = null
 
-    var __local_pp__goto_3906_14: *mut u8 = null
+    var __local_pp__goto_3853_14: *mut u8 = null
 
-    var __local_ptmp__goto_3957_12: *mut u8 = null
+    var __local_ptmp__goto_3904_12: *mut u8 = null
 
-    var __local_cc__goto_3958_12: c_uint = 0
+    var __local_cc__goto_3905_12: c_uint = 0
 
-    var __local_n__goto_3959_7: c_int = 0
+    var __local_n__goto_3906_7: c_int = 0
 
-    var __local_ptmp_end__goto_3960_12: *mut u8 = null
+    var __local_ptmp_end__goto_3907_12: *mut u8 = null
 
-    var __local_i__goto_4008_7: c_int = 0
+    var __local_i__goto_3955_7: c_int = 0
 
-    var __local_replen__goto_4009_10: c_ulong = 0
+    var __local_replen__goto_3956_10: c_ulong = 0
 
-    var __local_encoding__goto_4010_23: i32 = 0
+    var __local_encoding__goto_3957_23: i32 = 0
 
-    var __local_li__goto_4016_10: c_long = 0
+    var __local_li__goto_3963_10: c_long = 0
 
-    var __local_endptr__goto_4017_11: *mut i8 = null
+    var __local_endptr__goto_3964_11: *mut i8 = null
 
-    var __local_qoffset__goto_4056_14: c_ulong = 0
+    var __local_qoffset__goto_4003_14: c_ulong = 0
 
-    var __local_rep_offset__goto_4057_14: c_ulong = 0
+    var __local_rep_offset__goto_4004_14: c_ulong = 0
 
-    var __local_topbit__goto_4089_14: c_uint = 0
+    var __local_topbit__goto_4036_14: c_uint = 0
 
-    var __local_pt__goto_4140_16: *mut u8 = null
+    var __local_pt__goto_4087_16: *mut u8 = null
 
-    var __local_pt__goto_4165_16: *mut u8 = null
+    var __local_pt__goto_4112_16: *mut u8 = null
 
-    var __local_endptr__goto_4214_13: *mut i8 = null
+    var __local_endptr__goto_4161_13: *mut i8 = null
 
-    var __local_uli__goto_4215_21: c_ulong = 0
+    var __local_uli__goto_4162_21: c_ulong = 0
 
-    var __local_rc__goto_4445_7: c_int = 0
+    var __local_rc__goto_4392_7: c_int = 0
 
-    var __local_eflags__goto_4446_7: c_int = 0
+    var __local_eflags__goto_4393_7: c_int = 0
 
-    var __local_pmatch__goto_4447_15: *mut regmatch_t = null
+    var __local_pmatch__goto_4394_15: *mut regmatch_t = null
 
-    var __local_startend_buf__goto_4448_14: regmatch_t
+    var __local_startend_buf__goto_4395_14: regmatch_t
 
-    var __local_msg__goto_4449_15: *const i8 = null
+    var __local_msg__goto_4396_15: *const i8 = null
 
-    var __local_usize__goto_4506_12: c_ulong = 0
+    var __local_usize__goto_4453_12: c_ulong = 0
 
-    var __local_i__goto_4517_12: c_ulong = 0
+    var __local_i__goto_4464_12: c_ulong = 0
 
-    var __local_j__goto_4517_15: c_ulong = 0
+    var __local_j__goto_4464_15: c_ulong = 0
 
-    var __local_last_printed__goto_4518_12: c_ulong = 0
+    var __local_last_printed__goto_4465_12: c_ulong = 0
 
-    var __local_start__goto_4523_20: c_ulong = 0
+    var __local_start__goto_4470_20: c_ulong = 0
 
-    var __local_end__goto_4524_20: c_ulong = 0
+    var __local_end__goto_4471_20: c_ulong = 0
 
-    var __local_rc__goto_4699_7: c_int = 0
+    var __local_rc__goto_4646_7: c_int = 0
 
-    var __local_pr__goto_4700_12: *mut u8 = null
+    var __local_pr__goto_4647_12: *mut u8 = null
 
-    var __local_prend__goto_4700_17: *mut u8 = null
+    var __local_prend__goto_4647_17: *mut u8 = null
 
-    var __local_sbuffer__goto_4701_15: [100]u8
+    var __local_sbuffer__goto_4648_15: [100]u8
 
-    var __local_rbptr__goto_4702_16: *mut u8 = null
+    var __local_rbptr__goto_4649_16: *mut u8 = null
 
-    var __local_sbptr__goto_4703_16: *mut u8 = null
+    var __local_sbptr__goto_4650_16: *mut u8 = null
 
-    var __local_xoptions__goto_4704_12: c_uint = 0
+    var __local_xoptions__goto_4651_12: c_uint = 0
 
-    var __local_emoption__goto_4705_12: c_uint = 0
+    var __local_emoption__goto_4652_12: c_uint = 0
 
-    var __local_j__goto_4706_14: c_ulong = 0
+    var __local_j__goto_4653_14: c_ulong = 0
 
-    var __local_rlen__goto_4706_17: c_ulong = 0
+    var __local_rlen__goto_4653_17: c_ulong = 0
 
-    var __local_full_rlen__goto_4706_23: c_ulong = 0
+    var __local_full_rlen__goto_4653_23: c_ulong = 0
 
-    var __local_nsize__goto_4706_34: c_ulong = 0
+    var __local_nsize__goto_4653_34: c_ulong = 0
 
-    var __local_nsize_input__goto_4706_41: c_ulong = 0
+    var __local_nsize_input__goto_4653_41: c_ulong = 0
 
-    var __local_slen__goto_4706_54: c_ulong = 0
+    var __local_slen__goto_4653_54: c_ulong = 0
 
-    var __local_smatch_data__goto_4707_21: *mut pcre2_real_match_data_8 = null
+    var __local_smatch_data__goto_4654_21: *mut pcre2_real_match_data_8 = null
 
-    var __local_n__goto_4776_16: c_ulong = 0
+    var __local_n__goto_4723_16: c_ulong = 0
 
-    var __local_heapframes__goto_4884_23: *mut c_void = null
+    var __local_heapframes__goto_4831_23: *mut c_void = null
 
-    var __local_memory_data__goto_4884_23: *mut c_void = null
+    var __local_memory_data__goto_4831_23: *mut c_void = null
 
-    var __local_i__goto_4895_14: c_int = 0
+    var __local_i__goto_4842_14: c_int = 0
 
-    var __local_target_mallocs__goto_4895_21: c_int = 0
+    var __local_target_mallocs__goto_4842_21: c_int = 0
 
-    var __local_saved_outfile__goto_4897_13: *mut c_void = null
+    var __local_saved_outfile__goto_4844_13: *mut c_void = null
 
-    var __local_heapframes__goto_4898_7: *mut c_void = null
+    var __local_heapframes__goto_4845_7: *mut c_void = null
 
-    var __local_memory_data__goto_4898_7: *mut c_void = null
+    var __local_memory_data__goto_4845_7: *mut c_void = null
 
-    var __local_j__goto_4971_14: c_ulong = 0
+    var __local_j__goto_4918_14: c_ulong = 0
 
-    var __local_capcount__goto_4972_7: c_int = 0
+    var __local_capcount__goto_4919_7: c_int = 0
 
-    var __local_i__goto_4988_9: c_int = 0
+    var __local_i__goto_4935_9: c_int = 0
 
-    var __local_start_time__goto_4989_13: c_ulong = 0
+    var __local_start_time__goto_4936_13: c_ulong = 0
 
-    var __local_time_taken__goto_4989_25: c_ulong = 0
+    var __local_time_taken__goto_4936_25: c_ulong = 0
 
-    var __local_saved_outfile__goto_4990_11: *mut c_void = null
+    var __local_saved_outfile__goto_4937_11: *mut c_void = null
 
-    var __local_heapframes__goto_5078_25: *mut c_void = null
+    var __local_heapframes__goto_5025_25: *mut c_void = null
 
-    var __local_memory_data__goto_5078_25: *mut c_void = null
+    var __local_memory_data__goto_5025_25: *mut c_void = null
 
-    var __local_i__goto_5114_16: c_int = 0
+    var __local_i__goto_5061_16: c_int = 0
 
-    var __local_target_mallocs__goto_5114_23: c_int = 0
+    var __local_target_mallocs__goto_5061_23: c_int = 0
 
-    var __local_saved_outfile__goto_5116_15: *mut c_void = null
+    var __local_saved_outfile__goto_5063_15: *mut c_void = null
 
-    var __local_heapframes__goto_5118_9: *mut c_void = null
+    var __local_heapframes__goto_5065_9: *mut c_void = null
 
-    var __local_memory_data__goto_5118_9: *mut c_void = null
+    var __local_memory_data__goto_5065_9: *mut c_void = null
 
-    var __local_rc_nextmatch__goto_5162_12: c_int = 0
+    var __local_rc_nextmatch__goto_5109_12: c_int = 0
 
-    var __local_tmp_offset__goto_5163_18: c_ulong = 0
+    var __local_tmp_offset__goto_5110_18: c_ulong = 0
 
-    var __local_tmp_options__goto_5164_16: c_uint = 0
+    var __local_tmp_options__goto_5111_16: c_uint = 0
 
-    var __local_i__goto_5282_14: c_int = 0
+    var __local_i__goto_5229_14: c_int = 0
 
-    var __local_lleft__goto_5284_18: c_ulong = 0
+    var __local_lleft__goto_5231_18: c_ulong = 0
 
-    var __local_lmiddle__goto_5284_25: c_ulong = 0
+    var __local_lmiddle__goto_5231_25: c_ulong = 0
 
-    var __local_lright__goto_5284_34: c_ulong = 0
+    var __local_lright__goto_5231_34: c_ulong = 0
 
-    var __local_start__goto_5285_18: c_ulong = 0
+    var __local_start__goto_5232_18: c_ulong = 0
 
-    var __local_end__goto_5286_18: c_ulong = 0
+    var __local_end__goto_5233_18: c_ulong = 0
 
-    var __local_showallused__goto_5333_14: c_int = 0
+    var __local_showallused__goto_5280_14: c_int = 0
 
-    var __local_leftchar__goto_5334_20: c_ulong = 0
+    var __local_leftchar__goto_5281_20: c_ulong = 0
 
-    var __local_rightchar__goto_5334_30: c_ulong = 0
+    var __local_rightchar__goto_5281_30: c_ulong = 0
 
-    var __local_startchar__goto_5363_22: c_ulong = 0
+    var __local_startchar__goto_5310_22: c_ulong = 0
 
-    var __local_leftchar__goto_5430_16: c_ulong = 0
+    var __local_leftchar__goto_5377_16: c_ulong = 0
 
-    var __local_backlength__goto_5431_9: c_int = 0
+    var __local_backlength__goto_5378_9: c_int = 0
 
-    var __local_rubriclength__goto_5432_9: c_int = 0
+    var __local_rubriclength__goto_5379_9: c_int = 0
 
-    var __local_i__goto_5460_16: c_int = 0
+    var __local_i__goto_5407_16: c_int = 0
 
-    var __local_i__goto_5461_16: c_int = 0
+    var __local_i__goto_5408_16: c_int = 0
 
-    var __local_startchar__goto_5520_20: c_ulong = 0
+    var __local_startchar__goto_5467_20: c_ulong = 0
 
-    var __local_new_start_offset__goto_5541_16: c_ulong = 0
+    var __local_new_start_offset__goto_5488_16: c_ulong = 0
 
-    var __local_rc_nextmatch__goto_5542_10: c_int = 0
+    var __local_rc_nextmatch__goto_5489_10: c_int = 0
 
     var __ci_expr_ternary_0: c_uint = 0
 
@@ -14011,10 +13947,10 @@ fn process_data_8() -> c_int {
     goto '__ci_bb_0
 
     '__ci_bb_0 {
-        (__local_g_notempty__goto_3892_10 = 0)
-        (__local_ovecsave__goto_3901_12 = [((null) as *const u8), ((null) as *const u8)])
-        (__local_q__goto_3904_14 = ((null as *mut u8)))
-        (__local_subject_literal__goto_3898_6 = (if (((&raw const pat_patctl as *const patctl).control2 as c_uint) & (256 as c_uint)) != 0: 1 else: 0))
+        (__local_g_notempty__goto_3839_10 = 0)
+        (__local_ovecsave__goto_3848_12 = [((null) as *const u8), ((null) as *const u8)])
+        (__local_q__goto_3851_14 = ((null as *mut u8)))
+        (__local_subject_literal__goto_3845_6 = (if (((&raw const pat_patctl as *const patctl).control2 as c_uint) & (256 as c_uint)) != 0: 1 else: 0))
         with_memcpy((dat_context_8 as *i8), (default_dat_context_8 as *i8), (sizeof[pcre2_real_match_context_8]() as i64))
         with_memcpy(((&raw mut dat_datctl as *mut datctl) as *i8), ((&raw mut def_datctl as *mut datctl) as *i8), (sizeof[datctl]() as i64))
         (dat_datctl.control = (&raw const dat_datctl as *const datctl).control | (((&raw const pat_patctl as *const patctl).control as c_uint) & (((((((((((((((((1 as c_uint) | (2 as c_uint)) as c_uint) | (4 as c_uint)) as c_uint) | (8 as c_uint)) as c_uint) | (16 as c_uint)) as c_uint) | (32768 as c_uint)) as c_uint) | (1048576 as c_uint)) as c_uint) | (268435456 as c_uint)) as c_uint) | (1073741824 as c_uint)) as c_uint)))
@@ -14078,16 +14014,16 @@ fn process_data_8() -> c_int {
         } else {
             (__ci_expr_ternary_0 = compiled_code_8.overall_options)
         }
-        (__local_utf__goto_3897_6 = (if ((__ci_expr_ternary_0 as c_uint) & (524288 as c_uint)) != 0: 1 else: 0))
-        (__local_start_rep__goto_3905_14 = ((null as *mut u8)))
-        (__local_len__goto_3894_8 = string_len((buffer as *const c_char)))
+        (__local_utf__goto_3844_6 = (if ((__ci_expr_ternary_0 as c_uint) & (524288 as c_uint)) != 0: 1 else: 0))
+        (__local_start_rep__goto_3852_14 = ((null as *mut u8)))
+        (__local_len__goto_3841_8 = string_len((buffer as *const c_char)))
         goto '__ci_bb_9
     }
 
     '__ci_bb_9 {
         (__ci_expr_logic_1 = 0)
-        if ((if __local_len__goto_3894_8 > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_1 = (if isspace((unsafe: buffer[((__local_len__goto_3894_8 as c_ulong) -% (1 as c_ulong))])) != 0: 1 else: 0))
+        if ((if __local_len__goto_3841_8 > 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_1 = (if isspace((unsafe: buffer[((__local_len__goto_3841_8 as c_ulong) -% (1 as c_ulong))])) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_1 != 0) {
             goto '__ci_bb_10
@@ -14097,18 +14033,18 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_10 {
-        (__local_len__goto_3894_8 = __local_len__goto_3894_8 - 1)
+        (__local_len__goto_3841_8 = __local_len__goto_3841_8 - 1)
         goto '__ci_bb_9
     }
 
     '__ci_bb_11 {
-        ((unsafe: buffer[__local_len__goto_3894_8]) = 0)
-        (__local_p__goto_3893_10 = buffer)
+        ((unsafe: buffer[__local_len__goto_3841_8]) = 0)
+        (__local_p__goto_3840_10 = buffer)
         goto '__ci_bb_12
     }
 
     '__ci_bb_12 {
-        if (isspace((unsafe: *__local_p__goto_3893_10)) != 0) {
+        if (isspace((unsafe: *__local_p__goto_3840_10)) != 0) {
             goto '__ci_bb_13
         } else {
             goto '__ci_bb_14
@@ -14116,13 +14052,13 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_13 {
-        (__local_p__goto_3893_10 = __local_p__goto_3893_10 + 1)
-        (__local_len__goto_3894_8 = __local_len__goto_3894_8 - 1)
+        (__local_p__goto_3840_10 = __local_p__goto_3840_10 + 1)
+        (__local_len__goto_3841_8 = __local_len__goto_3841_8 - 1)
         goto '__ci_bb_12
     }
 
     '__ci_bb_14 {
-        if (__local_utf__goto_3897_6 != 0) {
+        if (__local_utf__goto_3844_6 != 0) {
             goto '__ci_bb_15
         } else {
             goto '__ci_bb_16
@@ -14130,18 +14066,18 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_15 {
-        (__local_n__goto_3959_7 = 1)
-        (__local_ptmp_end__goto_3960_12 = __local_p__goto_3893_10 + (__local_len__goto_3894_8 as usize))
-        (__local_ptmp__goto_3957_12 = __local_p__goto_3893_10)
+        (__local_n__goto_3906_7 = 1)
+        (__local_ptmp_end__goto_3907_12 = __local_p__goto_3840_10 + (__local_len__goto_3841_8 as usize))
+        (__local_ptmp__goto_3904_12 = __local_p__goto_3840_10)
         goto '__ci_bb_17
     }
 
     '__ci_bb_16 {
-        (__local_needlen__goto_3895_8 = ((((__local_len__goto_3894_8 as c_ulong) +% (1 as c_ulong)) as c_ulong) *% (1 as c_ulong)))
+        (__local_needlen__goto_3842_8 = ((((__local_len__goto_3841_8 as c_ulong) +% (1 as c_ulong)) as c_ulong) *% (1 as c_ulong)))
         if ((if dbuffer == null: 1 else: 0) != 0) {
             (__ci_expr_logic_3 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_3 = (if (if __local_needlen__goto_3895_8 >= dbuffer_size: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_3 = (if (if __local_needlen__goto_3842_8 >= dbuffer_size: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_3 != 0) {
             goto '__ci_bb_23
@@ -14152,8 +14088,8 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_17 {
         (__ci_expr_logic_2 = 0)
-        if ((if __local_n__goto_3959_7 > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_2 = (if (unsafe: *__local_ptmp__goto_3957_12) != 0: 1 else: 0))
+        if ((if __local_n__goto_3906_7 > 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_2 = (if (unsafe: *__local_ptmp__goto_3904_12) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_2 != 0) {
             goto '__ci_bb_18
@@ -14163,17 +14099,17 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_18 {
-        (__local_n__goto_3959_7 = utf8_to_ord(__local_ptmp__goto_3957_12, __local_ptmp_end__goto_3960_12, (&raw mut __local_cc__goto_3958_12 as *mut c_uint)))
+        (__local_n__goto_3906_7 = utf8_to_ord(__local_ptmp__goto_3904_12, __local_ptmp_end__goto_3907_12, (&raw mut __local_cc__goto_3905_12 as *mut c_uint)))
         goto '__ci_bb_19
     }
 
     '__ci_bb_19 {
-        (__local_ptmp__goto_3957_12 = __local_ptmp__goto_3957_12 + ((__local_n__goto_3959_7 as isize) as usize))
+        (__local_ptmp__goto_3904_12 = __local_ptmp__goto_3904_12 + ((__local_n__goto_3906_7 as isize) as usize))
         goto '__ci_bb_17
     }
 
     '__ci_bb_20 {
-        if ((if __local_n__goto_3959_7 <= 0: 1 else: 0) != 0) {
+        if ((if __local_n__goto_3906_7 <= 0: 1 else: 0) != 0) {
             goto '__ci_bb_21
         } else {
             goto '__ci_bb_22
@@ -14196,12 +14132,12 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_24 {
-        (__local_q__goto_3904_14 = dbuffer)
+        (__local_q__goto_3851_14 = dbuffer)
         goto '__ci_bb_33
     }
 
     '__ci_bb_25 {
-        if ((if __local_needlen__goto_3895_8 >= dbuffer_size: 1 else: 0) != 0) {
+        if ((if __local_needlen__goto_3842_8 >= dbuffer_size: 1 else: 0) != 0) {
             goto '__ci_bb_26
         } else {
             goto '__ci_bb_27
@@ -14231,7 +14167,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_29 {
-        (dbuffer_size = ((__local_needlen__goto_3895_8 as c_ulong) +% (1 as c_ulong)))
+        (dbuffer_size = ((__local_needlen__goto_3842_8 as c_ulong) +% (1 as c_ulong)))
         goto '__ci_bb_30
     }
 
@@ -14252,10 +14188,10 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_33 {
-        (__ci_expr_old_4 = __local_p__goto_3893_10)
-        (__local_p__goto_3893_10 = __local_p__goto_3893_10 + 1)
-        (__local_c__goto_3891_10 = (unsafe: *__ci_expr_old_4))
-        if ((if __local_c__goto_3891_10 != 0: 1 else: 0) != 0) {
+        (__ci_expr_old_4 = __local_p__goto_3840_10)
+        (__local_p__goto_3840_10 = __local_p__goto_3840_10 + 1)
+        (__local_c__goto_3838_10 = (unsafe: *__ci_expr_old_4))
+        if ((if __local_c__goto_3838_10 != 0: 1 else: 0) != 0) {
             goto '__ci_bb_34
         } else {
             goto '__ci_bb_35
@@ -14263,11 +14199,11 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_34 {
-        (__local_i__goto_4008_7 = 0)
-        (__local_encoding__goto_4010_23 = 0)
+        (__local_i__goto_3955_7 = 0)
+        (__local_encoding__goto_3957_23 = 0)
         (__ci_expr_logic_5 = 0)
-        if ((if __local_c__goto_3891_10 == 93: 1 else: 0) != 0) {
-            (__ci_expr_logic_5 = (if (if __local_start_rep__goto_3905_14 != null: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_c__goto_3838_10 == 93: 1 else: 0) != 0) {
+            (__ci_expr_logic_5 = (if (if __local_start_rep__goto_3852_14 != null: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_5 != 0) {
             goto '__ci_bb_36
@@ -14281,8 +14217,8 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_36 {
-        (__ci_expr_old_6 = __local_p__goto_3893_10)
-        (__local_p__goto_3893_10 = __local_p__goto_3893_10 + 1)
+        (__ci_expr_old_6 = __local_p__goto_3840_10)
+        (__local_p__goto_3840_10 = __local_p__goto_3840_10 + 1)
         if ((if (unsafe: *__ci_expr_old_6) != 123: 1 else: 0) != 0) {
             goto '__ci_bb_38
         } else {
@@ -14291,10 +14227,10 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_37 {
-        if ((if __local_c__goto_3891_10 != 92: 1 else: 0) != 0) {
+        if ((if __local_c__goto_3838_10 != 92: 1 else: 0) != 0) {
             (__ci_expr_logic_12 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_12 = (if __local_subject_literal__goto_3898_6 != 0: 1 else: 0))
+            (__ci_expr_logic_12 = (if __local_subject_literal__goto_3845_6 != 0: 1 else: 0))
         }
         if (__ci_expr_logic_12 != 0) {
             goto '__ci_bb_61
@@ -14311,11 +14247,11 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_39 {
-        (__local_li__goto_4016_10 = strtol((__local_p__goto_3893_10 as *const c_char), (&raw mut __local_endptr__goto_4017_11 as *mut *mut c_char), 10))
-        if ((if __local_li__goto_4016_10 > 2147483647: 1 else: 0) != 0) {
+        (__local_li__goto_3963_10 = strtol((__local_p__goto_3840_10 as *const c_char), (&raw mut __local_endptr__goto_3964_11 as *mut *mut c_char), 10))
+        if ((if __local_li__goto_3963_10 > 2147483647: 1 else: 0) != 0) {
             (__ci_expr_logic_7 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_7 = (if (if __local_li__goto_4016_10 < -2147483648: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_7 = (if (if __local_li__goto_3963_10 < -2147483648: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_7 != 0) {
             goto '__ci_bb_40
@@ -14332,10 +14268,10 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_41 {
-        (__local_i__goto_4008_7 = ((__local_li__goto_4016_10 as c_int)))
-        (__local_p__goto_3893_10 = ((__local_endptr__goto_4017_11 as *mut u8)))
-        (__ci_expr_old_8 = __local_p__goto_3893_10)
-        (__local_p__goto_3893_10 = __local_p__goto_3893_10 + 1)
+        (__local_i__goto_3955_7 = ((__local_li__goto_3963_10 as c_int)))
+        (__local_p__goto_3840_10 = ((__local_endptr__goto_3964_11 as *mut u8)))
+        (__ci_expr_old_8 = __local_p__goto_3840_10)
+        (__local_p__goto_3840_10 = __local_p__goto_3840_10 + 1)
         if ((if (unsafe: *__ci_expr_old_8) != 125: 1 else: 0) != 0) {
             goto '__ci_bb_42
         } else {
@@ -14351,8 +14287,8 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_43 {
-        (__ci_expr_old_9 = __local_i__goto_4008_7)
-        (__local_i__goto_4008_7 = __local_i__goto_4008_7 - 1)
+        (__ci_expr_old_9 = __local_i__goto_3955_7)
+        (__local_i__goto_3955_7 = __local_i__goto_3955_7 - 1)
         if ((if __ci_expr_old_9 <= 0: 1 else: 0) != 0) {
             goto '__ci_bb_44
         } else {
@@ -14368,10 +14304,10 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_45 {
-        (__local_replen__goto_4009_10 = ((__local_q__goto_3904_14 as usize) -% (__local_start_rep__goto_3905_14 as usize)) / sizeof[u8]())
+        (__local_replen__goto_3956_10 = ((__local_q__goto_3851_14 as usize) -% (__local_start_rep__goto_3852_14 as usize)) / sizeof[u8]())
         (__ci_expr_logic_10 = 0)
-        if ((if __local_i__goto_4008_7 > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_10 = (if (if __local_replen__goto_4009_10 > ((((((0 as c_ulong) -% 1) as c_ulong) -% (__local_needlen__goto_3895_8 as c_ulong)) as c_ulong) / (__local_i__goto_4008_7 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_i__goto_3955_7 > 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_10 = (if (if __local_replen__goto_3956_10 > ((((((0 as c_ulong) -% 1) as c_ulong) -% (__local_needlen__goto_3842_8 as c_ulong)) as c_ulong) / (__local_i__goto_3955_7 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_10 != 0) {
             goto '__ci_bb_46
@@ -14388,8 +14324,8 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_47 {
-        (__local_needlen__goto_3895_8 = __local_needlen__goto_3895_8 + ((__local_replen__goto_4009_10 as c_ulong) *% (__local_i__goto_4008_7 as c_ulong)))
-        if ((if __local_needlen__goto_3895_8 >= dbuffer_size: 1 else: 0) != 0) {
+        (__local_needlen__goto_3842_8 = __local_needlen__goto_3842_8 + ((__local_replen__goto_3956_10 as c_ulong) *% (__local_i__goto_3955_7 as c_ulong)))
+        if ((if __local_needlen__goto_3842_8 >= dbuffer_size: 1 else: 0) != 0) {
             goto '__ci_bb_48
         } else {
             goto '__ci_bb_49
@@ -14397,8 +14333,8 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_48 {
-        (__local_qoffset__goto_4056_14 = ((__local_q__goto_3904_14 as usize) -% (dbuffer as usize)) / sizeof[u8]())
-        (__local_rep_offset__goto_4057_14 = ((__local_start_rep__goto_3905_14 as usize) -% (dbuffer as usize)) / sizeof[u8]())
+        (__local_qoffset__goto_4003_14 = ((__local_q__goto_3851_14 as usize) -% (dbuffer as usize)) / sizeof[u8]())
+        (__local_rep_offset__goto_4004_14 = ((__local_start_rep__goto_3852_14 as usize) -% (dbuffer as usize)) / sizeof[u8]())
         goto '__ci_bb_50
     }
 
@@ -14407,7 +14343,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_50 {
-        if ((if __local_needlen__goto_3895_8 >= dbuffer_size: 1 else: 0) != 0) {
+        if ((if __local_needlen__goto_3842_8 >= dbuffer_size: 1 else: 0) != 0) {
             goto '__ci_bb_51
         } else {
             goto '__ci_bb_52
@@ -14437,7 +14373,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_54 {
-        (dbuffer_size = ((__local_needlen__goto_3895_8 as c_ulong) +% (1 as c_ulong)))
+        (dbuffer_size = ((__local_needlen__goto_3842_8 as c_ulong) +% (1 as c_ulong)))
         goto '__ci_bb_55
     }
 
@@ -14454,14 +14390,14 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_57 {
-        (__local_q__goto_3904_14 = dbuffer + (__local_qoffset__goto_4056_14 as usize))
-        (__local_start_rep__goto_3905_14 = dbuffer + (__local_rep_offset__goto_4057_14 as usize))
+        (__local_q__goto_3851_14 = dbuffer + (__local_qoffset__goto_4003_14 as usize))
+        (__local_start_rep__goto_3852_14 = dbuffer + (__local_rep_offset__goto_4004_14 as usize))
         goto '__ci_bb_49
     }
 
     '__ci_bb_58 {
-        (__ci_expr_old_11 = __local_i__goto_4008_7)
-        (__local_i__goto_4008_7 = __local_i__goto_4008_7 - 1)
+        (__ci_expr_old_11 = __local_i__goto_3955_7)
+        (__local_i__goto_3955_7 = __local_i__goto_3955_7 - 1)
         if ((if __ci_expr_old_11 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_59
         } else {
@@ -14470,26 +14406,26 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_59 {
-        with_memcpy((__local_q__goto_3904_14 as *i8), (__local_start_rep__goto_3905_14 as *i8), (__local_replen__goto_4009_10 as i64))
-        (__local_q__goto_3904_14 = __local_q__goto_3904_14 + (((__local_replen__goto_4009_10 as c_ulong) / (1 as c_ulong)) as usize))
+        with_memcpy((__local_q__goto_3851_14 as *i8), (__local_start_rep__goto_3852_14 as *i8), (__local_replen__goto_3956_10 as i64))
+        (__local_q__goto_3851_14 = __local_q__goto_3851_14 + (((__local_replen__goto_3956_10 as c_ulong) / (1 as c_ulong)) as usize))
         goto '__ci_bb_58
     }
 
     '__ci_bb_60 {
-        (__local_start_rep__goto_3905_14 = ((null as *mut u8)))
+        (__local_start_rep__goto_3852_14 = ((null as *mut u8)))
         goto '__ci_bb_33
     }
 
     '__ci_bb_61 {
-        (__local_topbit__goto_4089_14 = 0)
+        (__local_topbit__goto_4036_14 = 0)
         (__ci_expr_logic_14 = 0)
-        if (__local_utf__goto_3897_6 != 0) {
+        if (__local_utf__goto_3844_6 != 0) {
             (__ci_expr_logic_13 = (if true: 1 else: 0))
         } else {
             (__ci_expr_logic_13 = (if (if (((&raw const pat_patctl as *const patctl).control as c_uint) & (1073741824 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_13 != 0) {
-            (__ci_expr_logic_14 = (if (if __local_c__goto_3891_10 >= 192: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_14 = (if (if __local_c__goto_3838_10 >= 192: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_14 != 0) {
             goto '__ci_bb_64
@@ -14499,23 +14435,23 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_62 {
-        (__ci_expr_old_16 = __local_p__goto_3893_10)
-        (__local_p__goto_3893_10 = __local_p__goto_3893_10 + 1)
-        (__local_c__goto_3891_10 = (unsafe: *__ci_expr_old_16))
-        (__ci_expr_switch_17 = __local_c__goto_3891_10)
+        (__ci_expr_old_16 = __local_p__goto_3840_10)
+        (__local_p__goto_3840_10 = __local_p__goto_3840_10 + 1)
+        (__local_c__goto_3838_10 = (unsafe: *__ci_expr_old_16))
+        (__ci_expr_switch_17 = __local_c__goto_3838_10)
         goto '__ci_bb_78
     }
 
     '__ci_bb_63 {
-        if ((if __local_encoding__goto_4010_23 == 1: 1 else: 0) != 0) {
+        if ((if __local_encoding__goto_3957_23 == 1: 1 else: 0) != 0) {
             (__ci_expr_logic_35 = (if true: 1 else: 0))
         } else {
             var __ci_expr_logic_34: c_int
 
-            if (__local_utf__goto_3897_6 != 0) {
+            if (__local_utf__goto_3844_6 != 0) {
                 (__ci_expr_logic_34 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_34 = (if (if __local_encoding__goto_4010_23 == 2: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_34 = (if (if __local_encoding__goto_3957_23 == 2: 1 else: 0) != 0: 1 else: 0))
             }
 
             (__ci_expr_logic_35 = (if (if not (__ci_expr_logic_34 != 0): 1 else: 0) != 0: 1 else: 0))
@@ -14529,7 +14465,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_64 {
-        if ((if ((__local_c__goto_3891_10 as c_uint) & (32 as c_uint)) == 0: 1 else: 0) != 0) {
+        if ((if ((__local_c__goto_3838_10 as c_uint) & (32 as c_uint)) == 0: 1 else: 0) != 0) {
             goto '__ci_bb_66
         } else {
             goto '__ci_bb_67
@@ -14537,19 +14473,19 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_65 {
-        (__local_c__goto_3891_10 = __local_c__goto_3891_10 | __local_topbit__goto_4089_14)
+        (__local_c__goto_3838_10 = __local_c__goto_3838_10 | __local_topbit__goto_4036_14)
         goto '__ci_bb_63
     }
 
     '__ci_bb_66 {
-        (__ci_expr_old_15 = __local_p__goto_3893_10)
-        (__local_p__goto_3893_10 = __local_p__goto_3893_10 + 1)
-        (__local_c__goto_3891_10 = (((((__local_c__goto_3891_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((unsafe: *__ci_expr_old_15) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+        (__ci_expr_old_15 = __local_p__goto_3840_10)
+        (__local_p__goto_3840_10 = __local_p__goto_3840_10 + 1)
+        (__local_c__goto_3838_10 = (((((__local_c__goto_3838_10 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((unsafe: *__ci_expr_old_15) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
         goto '__ci_bb_68
     }
 
     '__ci_bb_67 {
-        if ((if ((__local_c__goto_3891_10 as c_uint) & (16 as c_uint)) == 0: 1 else: 0) != 0) {
+        if ((if ((__local_c__goto_3838_10 as c_uint) & (16 as c_uint)) == 0: 1 else: 0) != 0) {
             goto '__ci_bb_69
         } else {
             goto '__ci_bb_70
@@ -14561,13 +14497,13 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_69 {
-        (__local_c__goto_3891_10 = (((((((__local_c__goto_3891_10 as c_uint) & (15 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint) | (((((((unsafe: *__local_p__goto_3893_10) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_p__goto_3893_10[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
-        (__local_p__goto_3893_10 = __local_p__goto_3893_10 + ((2 as isize) as usize))
+        (__local_c__goto_3838_10 = (((((((__local_c__goto_3838_10 as c_uint) & (15 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint) | (((((((unsafe: *__local_p__goto_3840_10) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_p__goto_3840_10[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+        (__local_p__goto_3840_10 = __local_p__goto_3840_10 + ((2 as isize) as usize))
         goto '__ci_bb_71
     }
 
     '__ci_bb_70 {
-        if ((if ((__local_c__goto_3891_10 as c_uint) & (8 as c_uint)) == 0: 1 else: 0) != 0) {
+        if ((if ((__local_c__goto_3838_10 as c_uint) & (8 as c_uint)) == 0: 1 else: 0) != 0) {
             goto '__ci_bb_72
         } else {
             goto '__ci_bb_73
@@ -14579,13 +14515,13 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_72 {
-        (__local_c__goto_3891_10 = (((((((((__local_c__goto_3891_10 as c_uint) & (7 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint) | (((((((unsafe: *__local_p__goto_3893_10) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_p__goto_3893_10[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_p__goto_3893_10[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
-        (__local_p__goto_3893_10 = __local_p__goto_3893_10 + ((3 as isize) as usize))
+        (__local_c__goto_3838_10 = (((((((((__local_c__goto_3838_10 as c_uint) & (7 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint) | (((((((unsafe: *__local_p__goto_3840_10) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_p__goto_3840_10[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_p__goto_3840_10[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+        (__local_p__goto_3840_10 = __local_p__goto_3840_10 + ((3 as isize) as usize))
         goto '__ci_bb_74
     }
 
     '__ci_bb_73 {
-        if ((if ((__local_c__goto_3891_10 as c_uint) & (4 as c_uint)) == 0: 1 else: 0) != 0) {
+        if ((if ((__local_c__goto_3838_10 as c_uint) & (4 as c_uint)) == 0: 1 else: 0) != 0) {
             goto '__ci_bb_75
         } else {
             goto '__ci_bb_76
@@ -14597,14 +14533,14 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_75 {
-        (__local_c__goto_3891_10 = (((((((((((__local_c__goto_3891_10 as c_uint) & (3 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint) | (((((((unsafe: *__local_p__goto_3893_10) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_p__goto_3893_10[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_p__goto_3893_10[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_p__goto_3893_10[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
-        (__local_p__goto_3893_10 = __local_p__goto_3893_10 + ((4 as isize) as usize))
+        (__local_c__goto_3838_10 = (((((((((((__local_c__goto_3838_10 as c_uint) & (3 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint) | (((((((unsafe: *__local_p__goto_3840_10) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_p__goto_3840_10[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_p__goto_3840_10[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_p__goto_3840_10[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+        (__local_p__goto_3840_10 = __local_p__goto_3840_10 + ((4 as isize) as usize))
         goto '__ci_bb_77
     }
 
     '__ci_bb_76 {
-        (__local_c__goto_3891_10 = (((((((((((((__local_c__goto_3891_10 as c_uint) & (1 as c_uint)) as c_uint) << (30 as c_uint)) as c_uint) | (((((((unsafe: *__local_p__goto_3893_10) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_p__goto_3893_10[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_p__goto_3893_10[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_p__goto_3893_10[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_p__goto_3893_10[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
-        (__local_p__goto_3893_10 = __local_p__goto_3893_10 + ((5 as isize) as usize))
+        (__local_c__goto_3838_10 = (((((((((((((__local_c__goto_3838_10 as c_uint) & (1 as c_uint)) as c_uint) << (30 as c_uint)) as c_uint) | (((((((unsafe: *__local_p__goto_3840_10) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_p__goto_3840_10[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_p__goto_3840_10[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_p__goto_3840_10[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_p__goto_3840_10[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+        (__local_p__goto_3840_10 = __local_p__goto_3840_10 + ((5 as isize) as usize))
         goto '__ci_bb_77
     }
 
@@ -14629,60 +14565,60 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_81 {
-        (__local_c__goto_3891_10 = 7)
+        (__local_c__goto_3838_10 = 7)
         goto '__ci_bb_79
     }
 
     '__ci_bb_82 {
-        (__local_c__goto_3891_10 = 8)
+        (__local_c__goto_3838_10 = 8)
         goto '__ci_bb_79
     }
 
     '__ci_bb_83 {
-        (__local_c__goto_3891_10 = 27)
+        (__local_c__goto_3838_10 = 27)
         goto '__ci_bb_79
     }
 
     '__ci_bb_84 {
-        (__local_c__goto_3891_10 = 12)
+        (__local_c__goto_3838_10 = 12)
         goto '__ci_bb_79
     }
 
     '__ci_bb_85 {
-        (__local_c__goto_3891_10 = 10)
+        (__local_c__goto_3838_10 = 10)
         goto '__ci_bb_79
     }
 
     '__ci_bb_86 {
-        (__local_c__goto_3891_10 = 13)
+        (__local_c__goto_3838_10 = 13)
         goto '__ci_bb_79
     }
 
     '__ci_bb_87 {
-        (__local_c__goto_3891_10 = 9)
+        (__local_c__goto_3838_10 = 9)
         goto '__ci_bb_79
     }
 
     '__ci_bb_88 {
-        (__local_c__goto_3891_10 = 11)
+        (__local_c__goto_3838_10 = 11)
         goto '__ci_bb_79
     }
 
     '__ci_bb_89 {
-        (__local_c__goto_3891_10 = __local_c__goto_3891_10 - 48)
+        (__local_c__goto_3838_10 = __local_c__goto_3838_10 - 48)
         goto '__ci_bb_90
     }
 
     '__ci_bb_90 {
         (__ci_expr_logic_20 = 0)
         (__ci_expr_logic_19 = 0)
-        (__ci_expr_old_18 = __local_i__goto_4008_7)
-        (__local_i__goto_4008_7 = __local_i__goto_4008_7 + 1)
+        (__ci_expr_old_18 = __local_i__goto_3955_7)
+        (__local_i__goto_3955_7 = __local_i__goto_3955_7 + 1)
         if ((if __ci_expr_old_18 < 2: 1 else: 0) != 0) {
-            (__ci_expr_logic_19 = (if (if (unsafe: *__local_p__goto_3893_10) >= 48: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_19 = (if (if (unsafe: *__local_p__goto_3840_10) >= 48: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_19 != 0) {
-            (__ci_expr_logic_20 = (if (if (unsafe: *__local_p__goto_3893_10) < 56: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_20 = (if (if (unsafe: *__local_p__goto_3840_10) < 56: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_20 != 0) {
             goto '__ci_bb_91
@@ -14692,30 +14628,30 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_91 {
-        (__ci_expr_old_21 = __local_p__goto_3893_10)
-        (__local_p__goto_3893_10 = __local_p__goto_3893_10 + 1)
-        (__local_c__goto_3891_10 = ((((__local_c__goto_3891_10 as c_uint) *% (8 as c_uint)) as c_uint) +% ((((unsafe: *__ci_expr_old_21) as c_int) - 48) as c_uint)))
+        (__ci_expr_old_21 = __local_p__goto_3840_10)
+        (__local_p__goto_3840_10 = __local_p__goto_3840_10 + 1)
+        (__local_c__goto_3838_10 = ((((__local_c__goto_3838_10 as c_uint) *% (8 as c_uint)) as c_uint) +% ((((unsafe: *__ci_expr_old_21) as c_int) - 48) as c_uint)))
         goto '__ci_bb_90
     }
 
     '__ci_bb_92 {
-        (__local_c__goto_3891_10 = __local_c__goto_3891_10)
+        (__local_c__goto_3838_10 = __local_c__goto_3838_10)
         (__ci_expr_ternary_23 = 0)
         (__ci_expr_logic_22 = 0)
-        if (__local_utf__goto_3897_6 != 0) {
-            (__ci_expr_logic_22 = (if (if __local_c__goto_3891_10 > 255: 1 else: 0) != 0: 1 else: 0))
+        if (__local_utf__goto_3844_6 != 0) {
+            (__ci_expr_logic_22 = (if (if __local_c__goto_3838_10 > 255: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_22 != 0) {
             (__ci_expr_ternary_23 = FORCE_UTF)
         } else {
             (__ci_expr_ternary_23 = FORCE_RAW)
         }
-        (__local_encoding__goto_4010_23 = __ci_expr_ternary_23)
+        (__local_encoding__goto_3957_23 = __ci_expr_ternary_23)
         goto '__ci_bb_79
     }
 
     '__ci_bb_93 {
-        if ((if (unsafe: *__local_p__goto_3893_10) == 123: 1 else: 0) != 0) {
+        if ((if (unsafe: *__local_p__goto_3840_10) == 123: 1 else: 0) != 0) {
             goto '__ci_bb_94
         } else {
             goto '__ci_bb_95
@@ -14723,9 +14659,9 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_94 {
-        (__local_pt__goto_4140_16 = __local_p__goto_3893_10)
-        (__local_c__goto_3891_10 = 0)
-        (__local_pt__goto_4140_16 = __local_pt__goto_4140_16 + 1)
+        (__local_pt__goto_4087_16 = __local_p__goto_3840_10)
+        (__local_c__goto_3838_10 = 0)
+        (__local_pt__goto_4087_16 = __local_pt__goto_4087_16 + 1)
         goto '__ci_bb_96
     }
 
@@ -14735,8 +14671,8 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_96 {
         (__ci_expr_logic_24 = 0)
-        if (isdigit((unsafe: *__local_pt__goto_4140_16)) != 0) {
-            (__ci_expr_logic_24 = (if (if (unsafe: *__local_pt__goto_4140_16) < 56: 1 else: 0) != 0: 1 else: 0))
+        if (isdigit((unsafe: *__local_pt__goto_4087_16)) != 0) {
+            (__ci_expr_logic_24 = (if (if (unsafe: *__local_pt__goto_4087_16) < 56: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_24 != 0) {
             goto '__ci_bb_97
@@ -14746,7 +14682,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_97 {
-        if ((if __local_c__goto_3891_10 >= 536870912: 1 else: 0) != 0) {
+        if ((if __local_c__goto_3838_10 >= 536870912: 1 else: 0) != 0) {
             goto '__ci_bb_100
         } else {
             goto '__ci_bb_101
@@ -14754,17 +14690,17 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_98 {
-        (__local_i__goto_4008_7 = __local_i__goto_4008_7 + 1)
-        (__local_pt__goto_4140_16 = __local_pt__goto_4140_16 + 1)
+        (__local_i__goto_3955_7 = __local_i__goto_3955_7 + 1)
+        (__local_pt__goto_4087_16 = __local_pt__goto_4087_16 + 1)
         goto '__ci_bb_96
     }
 
     '__ci_bb_99 {
-        (__local_c__goto_3891_10 = __local_c__goto_3891_10)
-        if ((if __local_i__goto_4008_7 == 0: 1 else: 0) != 0) {
+        (__local_c__goto_3838_10 = __local_c__goto_3838_10)
+        if ((if __local_i__goto_3955_7 == 0: 1 else: 0) != 0) {
             (__ci_expr_logic_25 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_25 = (if (if (unsafe: *__local_pt__goto_4140_16) != 125: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_25 = (if (if (unsafe: *__local_pt__goto_4087_16) != 125: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_25 != 0) {
             goto '__ci_bb_103
@@ -14781,7 +14717,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_101 {
-        (__local_c__goto_3891_10 = ((((__local_c__goto_3891_10 as c_uint) *% (8 as c_uint)) as c_uint) +% ((((unsafe: *__local_pt__goto_4140_16) as c_int) - 48) as c_uint)))
+        (__local_c__goto_3838_10 = ((((__local_c__goto_3838_10 as c_uint) *% (8 as c_uint)) as c_uint) +% ((((unsafe: *__local_pt__goto_4087_16) as c_int) - 48) as c_uint)))
         goto '__ci_bb_102
     }
 
@@ -14797,7 +14733,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_104 {
-        (__local_p__goto_3893_10 = __local_pt__goto_4140_16 + ((1 as isize) as usize))
+        (__local_p__goto_3840_10 = __local_pt__goto_4087_16 + ((1 as isize) as usize))
         goto '__ci_bb_105
     }
 
@@ -14806,8 +14742,8 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_106 {
-        (__local_c__goto_3891_10 = 0)
-        if ((if (unsafe: *__local_p__goto_3893_10) == 123: 1 else: 0) != 0) {
+        (__local_c__goto_3838_10 = 0)
+        if ((if (unsafe: *__local_p__goto_3840_10) == 123: 1 else: 0) != 0) {
             goto '__ci_bb_107
         } else {
             goto '__ci_bb_108
@@ -14815,8 +14751,8 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_107 {
-        (__local_pt__goto_4165_16 = __local_p__goto_3893_10)
-        (__local_pt__goto_4165_16 = __local_pt__goto_4165_16 + 1)
+        (__local_pt__goto_4112_16 = __local_p__goto_3840_10)
+        (__local_pt__goto_4112_16 = __local_pt__goto_4112_16 + 1)
         goto '__ci_bb_110
     }
 
@@ -14829,7 +14765,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_110 {
-        if (isxdigit((unsafe: *__local_pt__goto_4165_16)) != 0) {
+        if (isxdigit((unsafe: *__local_pt__goto_4112_16)) != 0) {
             goto '__ci_bb_111
         } else {
             goto '__ci_bb_113
@@ -14837,8 +14773,8 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_111 {
-        (__local_i__goto_4008_7 = __local_i__goto_4008_7 + 1)
-        if ((if __local_i__goto_4008_7 == 9: 1 else: 0) != 0) {
+        (__local_i__goto_3955_7 = __local_i__goto_3955_7 + 1)
+        if ((if __local_i__goto_3955_7 == 9: 1 else: 0) != 0) {
             goto '__ci_bb_114
         } else {
             goto '__ci_bb_115
@@ -14846,16 +14782,16 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_112 {
-        (__local_pt__goto_4165_16 = __local_pt__goto_4165_16 + 1)
+        (__local_pt__goto_4112_16 = __local_pt__goto_4112_16 + 1)
         goto '__ci_bb_110
     }
 
     '__ci_bb_113 {
-        (__local_c__goto_3891_10 = __local_c__goto_3891_10)
-        if ((if __local_i__goto_4008_7 == 0: 1 else: 0) != 0) {
+        (__local_c__goto_3838_10 = __local_c__goto_3838_10)
+        if ((if __local_i__goto_3955_7 == 0: 1 else: 0) != 0) {
             (__ci_expr_logic_27 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_27 = (if (if (unsafe: *__local_pt__goto_4165_16) != 125: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_27 = (if (if (unsafe: *__local_pt__goto_4112_16) != 125: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_27 != 0) {
             goto '__ci_bb_120
@@ -14873,12 +14809,12 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_115 {
         (__ci_expr_ternary_26 = 0)
-        if (isdigit((unsafe: *__local_pt__goto_4165_16)) != 0) {
+        if (isdigit((unsafe: *__local_pt__goto_4112_16)) != 0) {
             (__ci_expr_ternary_26 = 48)
         } else {
             (__ci_expr_ternary_26 = 97 - 10)
         }
-        (__local_c__goto_3891_10 = ((((__local_c__goto_3891_10 as c_uint) *% (16 as c_uint)) as c_uint) +% ((tolower((unsafe: *__local_pt__goto_4165_16)) - __ci_expr_ternary_26) as c_uint)))
+        (__local_c__goto_3838_10 = ((((__local_c__goto_3838_10 as c_uint) *% (16 as c_uint)) as c_uint) +% ((tolower((unsafe: *__local_pt__goto_4112_16)) - __ci_expr_ternary_26) as c_uint)))
         goto '__ci_bb_116
     }
 
@@ -14887,7 +14823,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_117 {
-        if (isxdigit((unsafe: *__local_pt__goto_4165_16)) != 0) {
+        if (isxdigit((unsafe: *__local_pt__goto_4112_16)) != 0) {
             goto '__ci_bb_118
         } else {
             goto '__ci_bb_119
@@ -14895,7 +14831,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_118 {
-        (__local_pt__goto_4165_16 = __local_pt__goto_4165_16 + 1)
+        (__local_pt__goto_4112_16 = __local_pt__goto_4112_16 + 1)
         goto '__ci_bb_117
     }
 
@@ -14911,7 +14847,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_121 {
-        (__local_p__goto_3893_10 = __local_pt__goto_4165_16 + ((1 as isize) as usize))
+        (__local_p__goto_3840_10 = __local_pt__goto_4112_16 + ((1 as isize) as usize))
         goto '__ci_bb_122
     }
 
@@ -14921,10 +14857,10 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_123 {
         (__ci_expr_logic_29 = 0)
-        (__ci_expr_old_28 = __local_i__goto_4008_7)
-        (__local_i__goto_4008_7 = __local_i__goto_4008_7 + 1)
+        (__ci_expr_old_28 = __local_i__goto_3955_7)
+        (__local_i__goto_3955_7 = __local_i__goto_3955_7 + 1)
         if ((if __ci_expr_old_28 < 2: 1 else: 0) != 0) {
-            (__ci_expr_logic_29 = (if isxdigit((unsafe: *__local_p__goto_3893_10)) != 0: 1 else: 0))
+            (__ci_expr_logic_29 = (if isxdigit((unsafe: *__local_p__goto_3840_10)) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_29 != 0) {
             goto '__ci_bb_124
@@ -14935,19 +14871,19 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_124 {
         (__ci_expr_ternary_30 = 0)
-        if (isdigit((unsafe: *__local_p__goto_3893_10)) != 0) {
+        if (isdigit((unsafe: *__local_p__goto_3840_10)) != 0) {
             (__ci_expr_ternary_30 = 48)
         } else {
             (__ci_expr_ternary_30 = 97 - 10)
         }
-        (__local_c__goto_3891_10 = ((((__local_c__goto_3891_10 as c_uint) *% (16 as c_uint)) as c_uint) +% ((tolower((unsafe: *__local_p__goto_3893_10)) - __ci_expr_ternary_30) as c_uint)))
-        (__local_p__goto_3893_10 = __local_p__goto_3893_10 + 1)
+        (__local_c__goto_3838_10 = ((((__local_c__goto_3838_10 as c_uint) *% (16 as c_uint)) as c_uint) +% ((tolower((unsafe: *__local_p__goto_3840_10)) - __ci_expr_ternary_30) as c_uint)))
+        (__local_p__goto_3840_10 = __local_p__goto_3840_10 + 1)
         goto '__ci_bb_123
     }
 
     '__ci_bb_125 {
-        (__local_c__goto_3891_10 = __local_c__goto_3891_10)
-        if (__local_utf__goto_3897_6 != 0) {
+        (__local_c__goto_3838_10 = __local_c__goto_3838_10)
+        if (__local_utf__goto_3844_6 != 0) {
             goto '__ci_bb_126
         } else {
             goto '__ci_bb_127
@@ -14955,7 +14891,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_126 {
-        (__local_encoding__goto_4010_23 = 1)
+        (__local_encoding__goto_3957_23 = 1)
         goto '__ci_bb_127
     }
 
@@ -14965,8 +14901,8 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_128 {
         (__ci_expr_logic_31 = 0)
-        if ((if with_memcmp((__local_p__goto_3893_10 as *i8), ("{U+" as *i8), (3 as i64)) == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_31 = (if isxdigit((unsafe: __local_p__goto_3893_10[3])) != 0: 1 else: 0))
+        if ((if with_memcmp((__local_p__goto_3840_10 as *i8), ("{U+" as *i8), (3 as i64)) == 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_31 = (if isxdigit((unsafe: __local_p__goto_3840_10[3])) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_31 != 0) {
             goto '__ci_bb_129
@@ -14976,16 +14912,16 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_129 {
-        (__local_p__goto_3893_10 = __local_p__goto_3893_10 + ((3 as isize) as usize))
+        (__local_p__goto_3840_10 = __local_p__goto_3840_10 + ((3 as isize) as usize))
         ((unsafe: *__error()) = 0)
-        (__local_uli__goto_4215_21 = strtoul((__local_p__goto_3893_10 as *const c_char), (&raw mut __local_endptr__goto_4214_13 as *mut *mut c_char), 16))
+        (__local_uli__goto_4162_21 = strtoul((__local_p__goto_3840_10 as *const c_char), (&raw mut __local_endptr__goto_4161_13 as *mut *mut c_char), 16))
         (__ci_expr_logic_33 = 0)
         (__ci_expr_logic_32 = 0)
         if ((if (unsafe: *__error()) == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_32 = (if (if (unsafe: *__local_endptr__goto_4214_13) == 125: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_32 = (if (if (unsafe: *__local_endptr__goto_4161_13) == 125: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_32 != 0) {
-            (__ci_expr_logic_33 = (if (if __local_uli__goto_4215_21 <= 4294967295: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_33 = (if (if __local_uli__goto_4162_21 <= 4294967295: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_33 != 0) {
             goto '__ci_bb_131
@@ -15002,9 +14938,9 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_131 {
-        (__local_c__goto_3891_10 = ((__local_uli__goto_4215_21 as c_uint)))
-        (__local_p__goto_3893_10 = (__local_endptr__goto_4214_13 as *mut u8) + ((1 as isize) as usize))
-        (__local_encoding__goto_4010_23 = 2)
+        (__local_c__goto_3838_10 = ((__local_uli__goto_4162_21 as c_uint)))
+        (__local_p__goto_3840_10 = (__local_endptr__goto_4161_13 as *mut u8) + ((1 as isize) as usize))
+        (__local_encoding__goto_3957_23 = 2)
         goto '__ci_bb_79
     }
 
@@ -15013,7 +14949,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_133 {
-        (__local_p__goto_3893_10 = __local_p__goto_3893_10 - 1)
+        (__local_p__goto_3840_10 = __local_p__goto_3840_10 - 1)
         goto '__ci_bb_33
     }
 
@@ -15022,13 +14958,13 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_135 {
-        ((unsafe: *__local_q__goto_3904_14) = 0)
-        (__local_len__goto_3894_8 = ((__local_q__goto_3904_14 as usize) -% (dbuffer as usize)) / sizeof[u8]())
-        (__local_ulen__goto_3889_12 = (__local_len__goto_3894_8 as c_ulong) / (1 as c_ulong))
-        (__local_arg_ulen__goto_3889_18 = __local_ulen__goto_3889_12)
+        ((unsafe: *__local_q__goto_3851_14) = 0)
+        (__local_len__goto_3841_8 = ((__local_q__goto_3851_14 as usize) -% (dbuffer as usize)) / sizeof[u8]())
+        (__local_ulen__goto_3836_12 = (__local_len__goto_3841_8 as c_ulong) / (1 as c_ulong))
+        (__local_arg_ulen__goto_3836_18 = __local_ulen__goto_3836_12)
         (__ci_expr_logic_38 = 0)
-        if ((if (unsafe: __local_p__goto_3893_10[-1]) != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_38 = (if (if not (decode_modifiers_8(__local_p__goto_3893_10, CTX_DAT, null, (&raw mut dat_datctl as *mut datctl)) != 0): 1 else: 0) != 0: 1 else: 0))
+        if ((if (unsafe: __local_p__goto_3840_10[-1]) != 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_38 = (if (if not (decode_modifiers_8(__local_p__goto_3840_10, CTX_DAT, null, (&raw mut dat_datctl as *mut datctl)) != 0): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_38 != 0) {
             goto '__ci_bb_174
@@ -15038,7 +14974,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_136 {
-        if ((if __local_start_rep__goto_3905_14 != null: 1 else: 0) != 0) {
+        if ((if __local_start_rep__goto_3852_14 != null: 1 else: 0) != 0) {
             goto '__ci_bb_137
         } else {
             goto '__ci_bb_138
@@ -15053,12 +14989,12 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_138 {
-        (__local_start_rep__goto_3905_14 = __local_q__goto_3904_14)
+        (__local_start_rep__goto_3852_14 = __local_q__goto_3851_14)
         goto '__ci_bb_33
     }
 
     '__ci_bb_139 {
-        if (isalnum(__local_c__goto_3891_10) != 0) {
+        if (isalnum(__local_c__goto_3838_10) != 0) {
             goto '__ci_bb_140
         } else {
             goto '__ci_bb_141
@@ -15067,7 +15003,7 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_140 {
         colour_begin(31, outfile)
-        fprintf(outfile, "** Unrecognized escape sequence \"\\%c\"\n", __local_c__goto_3891_10)
+        fprintf(outfile, "** Unrecognized escape sequence \"\\%c\"\n", __local_c__goto_3838_10)
         colour_end(outfile)
         return PR_OK
     }
@@ -15253,7 +15189,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_164 {
-        if ((if __local_c__goto_3891_10 > 255: 1 else: 0) != 0) {
+        if ((if __local_c__goto_3838_10 > 255: 1 else: 0) != 0) {
             goto '__ci_bb_167
         } else {
             goto '__ci_bb_168
@@ -15261,7 +15197,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_165 {
-        if ((if __local_c__goto_3891_10 > 2147483647: 1 else: 0) != 0) {
+        if ((if __local_c__goto_3838_10 > 2147483647: 1 else: 0) != 0) {
             goto '__ci_bb_169
         } else {
             goto '__ci_bb_170
@@ -15274,7 +15210,7 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_167 {
         colour_begin(31, outfile)
-        fprintf(outfile, "** Character \\x{%x} is greater than 255 and UTF-8 mode is not enabled.\n", __local_c__goto_3891_10)
+        fprintf(outfile, "** Character \\x{%x} is greater than 255 and UTF-8 mode is not enabled.\n", __local_c__goto_3838_10)
         colour_end(outfile)
         colour_begin(31, outfile)
         fprintf(outfile, "** Truncation will probably give the wrong result.\n")
@@ -15283,23 +15219,23 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_168 {
-        (__ci_expr_old_36 = __local_q__goto_3904_14)
-        (__local_q__goto_3904_14 = __local_q__goto_3904_14 + 1)
-        ((unsafe: *__ci_expr_old_36) = ((__local_c__goto_3891_10 as u8)))
+        (__ci_expr_old_36 = __local_q__goto_3851_14)
+        (__local_q__goto_3851_14 = __local_q__goto_3851_14 + 1)
+        ((unsafe: *__ci_expr_old_36) = ((__local_c__goto_3838_10 as u8)))
         goto '__ci_bb_166
     }
 
     '__ci_bb_169 {
         colour_begin(31, outfile)
-        fprintf(outfile, "** Character \\N{U+%x} is greater than 0x7fffffff and therefore cannot be encoded as UTF-8\n", __local_c__goto_3891_10)
+        fprintf(outfile, "** Character \\N{U+%x} is greater than 0x7fffffff and therefore cannot be encoded as UTF-8\n", __local_c__goto_3838_10)
         colour_end(outfile)
         return PR_OK
     }
 
     '__ci_bb_170 {
         (__ci_expr_logic_37 = 0)
-        if ((if __local_encoding__goto_4010_23 == 2: 1 else: 0) != 0) {
-            (__ci_expr_logic_37 = (if (if __local_c__goto_3891_10 > 1114111: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_encoding__goto_3957_23 == 2: 1 else: 0) != 0) {
+            (__ci_expr_logic_37 = (if (if __local_c__goto_3838_10 > 1114111: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_37 != 0) {
             goto '__ci_bb_172
@@ -15309,13 +15245,13 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_171 {
-        (__local_q__goto_3904_14 = __local_q__goto_3904_14 + ((ord_to_utf8(__local_c__goto_3891_10, __local_q__goto_3904_14) as isize) as usize))
+        (__local_q__goto_3851_14 = __local_q__goto_3851_14 + ((ord_to_utf8(__local_c__goto_3838_10, __local_q__goto_3851_14) as isize) as usize))
         goto '__ci_bb_166
     }
 
     '__ci_bb_172 {
         colour_begin(31, outfile)
-        fprintf(outfile, "** Warning: character \\N{U+%x} is greater than 0x%x and should not be encoded as UTF-8\n", __local_c__goto_3891_10, 1114111)
+        fprintf(outfile, "** Warning: character \\N{U+%x} is greater than 0x%x and should not be encoded as UTF-8\n", __local_c__goto_3838_10, 1114111)
         colour_end(outfile)
         goto '__ci_bb_173
     }
@@ -15347,12 +15283,12 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_177 {
-        (__local_k__goto_3891_13 = 0)
+        (__local_k__goto_3838_13 = 0)
         goto '__ci_bb_178
     }
 
     '__ci_bb_178 {
-        if ((if __local_k__goto_3891_13 < (((3 * sizeof[c_uint]()) as c_ulong) / (sizeof[u32]() as c_ulong)): 1 else: 0) != 0) {
+        if ((if __local_k__goto_3838_13 < (((3 * sizeof[c_uint]()) as c_ulong) / (sizeof[u32]() as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_179
         } else {
             goto '__ci_bb_181
@@ -15360,10 +15296,10 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_179 {
-        (__local_c__goto_3891_10 = ((&raw const dat_datctl as *const datctl).control as c_uint) & (exclusive_dat_controls[__local_k__goto_3891_13] as c_uint))
+        (__local_c__goto_3838_10 = ((&raw const dat_datctl as *const datctl).control as c_uint) & (exclusive_dat_controls[__local_k__goto_3838_13] as c_uint))
         (__ci_expr_logic_40 = 0)
-        if ((if __local_c__goto_3891_10 != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_40 = (if (if __local_c__goto_3891_10 != ((__local_c__goto_3891_10 as c_uint) & ((((~__local_c__goto_3891_10) as c_uint) +% (1 as c_uint)) as c_uint)): 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_c__goto_3838_10 != 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_40 = (if (if __local_c__goto_3838_10 != ((__local_c__goto_3838_10 as c_uint) & ((((~__local_c__goto_3838_10) as c_uint) +% (1 as c_uint)) as c_uint)): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_40 != 0) {
             goto '__ci_bb_182
@@ -15373,7 +15309,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_180 {
-        (__local_k__goto_3891_13 = __local_k__goto_3891_13 + 1)
+        (__local_k__goto_3838_13 = __local_k__goto_3838_13 + 1)
         goto '__ci_bb_178
     }
 
@@ -15386,7 +15322,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_182 {
-        show_controls(31, __local_c__goto_3891_10, 0, "** Not allowed together:")
+        show_controls(31, __local_c__goto_3838_10, 0, "** Not allowed together:")
         fprintf(outfile, "\n")
         return PR_OK
     }
@@ -15518,8 +15454,8 @@ fn process_data_8() -> c_int {
         } else {
             (__ci_expr_ternary_45 = 0)
         }
-        (__local_c__goto_3891_10 = __ci_expr_ternary_45)
-        (__local_pp__goto_3906_14 = ((with_memmove((((dbuffer + (dbuffer_size as usize)) - (((__local_len__goto_3894_8 as c_ulong) +% (__local_c__goto_3891_10 as c_ulong)) as usize)) as *i8), (dbuffer as *i8), (((__local_len__goto_3894_8 as c_ulong) +% (__local_c__goto_3891_10 as c_ulong)) as i64)) as *mut u8)))
+        (__local_c__goto_3838_10 = __ci_expr_ternary_45)
+        (__local_pp__goto_3853_14 = ((with_memmove((((dbuffer + (dbuffer_size as usize)) - (((__local_len__goto_3841_8 as c_ulong) +% (__local_c__goto_3838_10 as c_ulong)) as usize)) as *i8), (dbuffer as *i8), (((__local_len__goto_3841_8 as c_ulong) +% (__local_c__goto_3838_10 as c_ulong)) as i64)) as *mut u8)))
         if ((if (((&raw const dat_datctl as *const datctl).control2 as c_uint) & (8192 as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_203
         } else {
@@ -15554,7 +15490,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_203 {
-        (__local_pp__goto_3906_14 = ((null as *mut u8)))
+        (__local_pp__goto_3853_14 = ((null as *mut u8)))
         goto '__ci_bb_204
     }
 
@@ -15567,9 +15503,9 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_205 {
-        (__local_eflags__goto_4446_7 = 0)
-        (__local_pmatch__goto_4447_15 = ((null as *mut regmatch_t)))
-        (__local_msg__goto_4449_15 = (("** Ignored with POSIX interface:" as *const c_char)))
+        (__local_eflags__goto_4393_7 = 0)
+        (__local_pmatch__goto_4394_15 = ((null as *mut regmatch_t)))
+        (__local_msg__goto_4396_15 = (("** Ignored with POSIX interface:" as *const c_char)))
         if ((if (&raw const dat_datctl as *const datctl).cerror[0] != 4294967295: 1 else: 0) != 0) {
             (__ci_expr_logic_46 = (if true: 1 else: 0))
         } else {
@@ -15591,7 +15527,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_207 {
-        prmsg((&raw mut __local_msg__goto_4449_15 as *mut *const c_char), "callout_error")
+        prmsg((&raw mut __local_msg__goto_4396_15 as *mut *const c_char), "callout_error")
         goto '__ci_bb_208
     }
 
@@ -15609,7 +15545,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_209 {
-        prmsg((&raw mut __local_msg__goto_4449_15 as *mut *const c_char), "callout_fail")
+        prmsg((&raw mut __local_msg__goto_4396_15 as *mut *const c_char), "callout_fail")
         goto '__ci_bb_210
     }
 
@@ -15627,7 +15563,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_211 {
-        prmsg((&raw mut __local_msg__goto_4449_15 as *mut *const c_char), "copy")
+        prmsg((&raw mut __local_msg__goto_4396_15 as *mut *const c_char), "copy")
         goto '__ci_bb_212
     }
 
@@ -15645,7 +15581,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_213 {
-        prmsg((&raw mut __local_msg__goto_4449_15 as *mut *const c_char), "get")
+        prmsg((&raw mut __local_msg__goto_4396_15 as *mut *const c_char), "get")
         goto '__ci_bb_214
     }
 
@@ -15658,7 +15594,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_215 {
-        prmsg((&raw mut __local_msg__goto_4449_15 as *mut *const c_char), "jitstack")
+        prmsg((&raw mut __local_msg__goto_4396_15 as *mut *const c_char), "jitstack")
         goto '__ci_bb_216
     }
 
@@ -15671,7 +15607,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_217 {
-        prmsg((&raw mut __local_msg__goto_4449_15 as *mut *const c_char), "offset")
+        prmsg((&raw mut __local_msg__goto_4396_15 as *mut *const c_char), "offset")
         goto '__ci_bb_218
     }
 
@@ -15685,10 +15621,10 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_219 {
         colour_begin(31, outfile)
-        fprintf(outfile, "%s", __local_msg__goto_4449_15)
+        fprintf(outfile, "%s", __local_msg__goto_4396_15)
         colour_end(outfile)
         show_match_options(31, (((&raw const dat_datctl as *const datctl).options as c_uint) & ((~((((1 as c_uint) | (4 as c_uint)) as c_uint) | (2 as c_uint))) as c_uint)))
-        (__local_msg__goto_4449_15 = (("" as *const c_char)))
+        (__local_msg__goto_4396_15 = (("" as *const c_char)))
         goto '__ci_bb_220
     }
 
@@ -15706,13 +15642,13 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_221 {
-        show_controls(31, (((&raw const dat_datctl as *const datctl).control as c_uint) & ((~((1 as c_uint) | (2 as c_uint))) as c_uint)), (((&raw const dat_datctl as *const datctl).control2 as c_uint) & ((~8192) as c_uint)), __local_msg__goto_4449_15)
-        (__local_msg__goto_4449_15 = (("" as *const c_char)))
+        show_controls(31, (((&raw const dat_datctl as *const datctl).control as c_uint) & ((~((1 as c_uint) | (2 as c_uint))) as c_uint)), (((&raw const dat_datctl as *const datctl).control2 as c_uint) & ((~8192) as c_uint)), __local_msg__goto_4396_15)
+        (__local_msg__goto_4396_15 = (("" as *const c_char)))
         goto '__ci_bb_222
     }
 
     '__ci_bb_222 {
-        if ((if (unsafe: __local_msg__goto_4449_15[0]) == 0: 1 else: 0) != 0) {
+        if ((if (unsafe: __local_msg__goto_4396_15[0]) == 0: 1 else: 0) != 0) {
             goto '__ci_bb_223
         } else {
             goto '__ci_bb_224
@@ -15733,8 +15669,8 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_225 {
-        (__local_pmatch__goto_4447_15 = (((with_alloc((((sizeof[regmatch_t]() as c_ulong) *% ((&raw const dat_datctl as *const datctl).oveccount as c_ulong)) as i64)) as *mut c_void) as *mut regmatch_t)))
-        if ((if __local_pmatch__goto_4447_15 == null: 1 else: 0) != 0) {
+        (__local_pmatch__goto_4394_15 = (((with_alloc((((sizeof[regmatch_t]() as c_ulong) *% ((&raw const dat_datctl as *const datctl).oveccount as c_ulong)) as i64)) as *mut c_void) as *mut regmatch_t)))
+        if ((if __local_pmatch__goto_4394_15 == null: 1 else: 0) != 0) {
             goto '__ci_bb_227
         } else {
             goto '__ci_bb_228
@@ -15761,7 +15697,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_229 {
-        if ((if __local_pmatch__goto_4447_15 == null: 1 else: 0) != 0) {
+        if ((if __local_pmatch__goto_4394_15 == null: 1 else: 0) != 0) {
             goto '__ci_bb_231
         } else {
             goto '__ci_bb_232
@@ -15777,25 +15713,25 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_231 {
-        (__local_pmatch__goto_4447_15 = ((&raw mut __local_startend_buf__goto_4448_14 as *mut regmatch_t)))
+        (__local_pmatch__goto_4394_15 = ((&raw mut __local_startend_buf__goto_4395_14 as *mut regmatch_t)))
         goto '__ci_bb_232
     }
 
     '__ci_bb_232 {
-        ((unsafe: __local_pmatch__goto_4447_15[0]).rm_so = (((&raw const dat_datctl as *const datctl).startend[0] as c_int)))
+        ((unsafe: __local_pmatch__goto_4394_15[0]).rm_so = (((&raw const dat_datctl as *const datctl).startend[0] as c_int)))
         (__ci_expr_ternary_51 = 0)
         if ((if (&raw const dat_datctl as *const datctl).startend[1] != 0: 1 else: 0) != 0) {
             (__ci_expr_ternary_51 = (((&raw const dat_datctl as *const datctl).startend[1] as c_int)))
         } else {
-            (__ci_expr_ternary_51 = ((__local_len__goto_3894_8 as c_int)))
+            (__ci_expr_ternary_51 = ((__local_len__goto_3841_8 as c_int)))
         }
-        ((unsafe: __local_pmatch__goto_4447_15[0]).rm_eo = __ci_expr_ternary_51)
-        (__local_eflags__goto_4446_7 = __local_eflags__goto_4446_7 | 128)
+        ((unsafe: __local_pmatch__goto_4394_15[0]).rm_eo = __ci_expr_ternary_51)
+        (__local_eflags__goto_4393_7 = __local_eflags__goto_4393_7 | 128)
         goto '__ci_bb_230
     }
 
     '__ci_bb_233 {
-        (__local_eflags__goto_4446_7 = __local_eflags__goto_4446_7 | 4)
+        (__local_eflags__goto_4393_7 = __local_eflags__goto_4393_7 | 4)
         goto '__ci_bb_234
     }
 
@@ -15808,7 +15744,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_235 {
-        (__local_eflags__goto_4446_7 = __local_eflags__goto_4446_7 | 8)
+        (__local_eflags__goto_4393_7 = __local_eflags__goto_4393_7 | 8)
         goto '__ci_bb_236
     }
 
@@ -15821,13 +15757,13 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_237 {
-        (__local_eflags__goto_4446_7 = __local_eflags__goto_4446_7 | 256)
+        (__local_eflags__goto_4393_7 = __local_eflags__goto_4393_7 | 256)
         goto '__ci_bb_238
     }
 
     '__ci_bb_238 {
-        (__local_rc__goto_4445_7 = pcre2_regexec((&raw mut preg as *mut regex_t), (__local_pp__goto_3906_14 as *const c_char), (&raw const dat_datctl as *const datctl).oveccount, __local_pmatch__goto_4447_15, __local_eflags__goto_4446_7))
-        if ((if __local_rc__goto_4445_7 != 0: 1 else: 0) != 0) {
+        (__local_rc__goto_4392_7 = pcre2_regexec((&raw mut preg as *mut regex_t), (__local_pp__goto_3853_14 as *const c_char), (&raw const dat_datctl as *const datctl).oveccount, __local_pmatch__goto_4394_15, __local_eflags__goto_4393_7))
+        if ((if __local_rc__goto_4392_7 != 0: 1 else: 0) != 0) {
             goto '__ci_bb_239
         } else {
             goto '__ci_bb_240
@@ -15835,11 +15771,11 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_239 {
-        (__local_usize__goto_4506_12 = pcre2_regerror(__local_rc__goto_4445_7, (&raw mut preg as *mut regex_t), (pbuffer8 as *mut c_char), pbuffer8_size))
+        (__local_usize__goto_4453_12 = pcre2_regerror(__local_rc__goto_4392_7, (&raw mut preg as *mut regex_t), (pbuffer8 as *mut c_char), pbuffer8_size))
         colour_begin(35, outfile)
-        fprintf(outfile, "No match: POSIX code %d: ", __local_rc__goto_4445_7)
+        fprintf(outfile, "No match: POSIX code %d: ", __local_rc__goto_4392_7)
         colour_end(outfile)
-        pchars_8(35, (pbuffer8 as *const u8), ((__local_usize__goto_4506_12 as c_ulong) -% (1 as c_ulong)), __local_utf__goto_3897_6, outfile)
+        pchars_8(35, (pbuffer8 as *const u8), ((__local_usize__goto_4453_12 as c_ulong) -% (1 as c_ulong)), __local_utf__goto_3844_6, outfile)
         fputs("\n", outfile)
         goto '__ci_bb_241
     }
@@ -15853,7 +15789,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_241 {
-        if ((if __local_pmatch__goto_4447_15 != ((&raw mut __local_startend_buf__goto_4448_14 as *mut regmatch_t)): 1 else: 0) != 0) {
+        if ((if __local_pmatch__goto_4394_15 != ((&raw mut __local_startend_buf__goto_4395_14 as *mut regmatch_t)): 1 else: 0) != 0) {
             goto '__ci_bb_262
         } else {
             goto '__ci_bb_263
@@ -15883,8 +15819,8 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_246 {
-        (__local_last_printed__goto_4518_12 = (((&raw const dat_datctl as *const datctl).oveccount as c_ulong)))
-        (__local_i__goto_4517_12 = 0)
+        (__local_last_printed__goto_4465_12 = (((&raw const dat_datctl as *const datctl).oveccount as c_ulong)))
+        (__local_i__goto_4464_12 = 0)
         goto '__ci_bb_248
     }
 
@@ -15893,7 +15829,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_248 {
-        if ((if __local_i__goto_4517_12 < (((&raw const dat_datctl as *const datctl).oveccount as c_ulong)): 1 else: 0) != 0) {
+        if ((if __local_i__goto_4464_12 < (((&raw const dat_datctl as *const datctl).oveccount as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_249
         } else {
             goto '__ci_bb_251
@@ -15901,7 +15837,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_249 {
-        if ((if (unsafe: __local_pmatch__goto_4447_15[__local_i__goto_4517_12]).rm_so >= 0: 1 else: 0) != 0) {
+        if ((if (unsafe: __local_pmatch__goto_4394_15[__local_i__goto_4464_12]).rm_so >= 0: 1 else: 0) != 0) {
             goto '__ci_bb_252
         } else {
             goto '__ci_bb_253
@@ -15909,7 +15845,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_250 {
-        (__local_i__goto_4517_12 = __local_i__goto_4517_12 + 1)
+        (__local_i__goto_4464_12 = __local_i__goto_4464_12 + 1)
         goto '__ci_bb_248
     }
 
@@ -15918,9 +15854,9 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_252 {
-        (__local_start__goto_4523_20 = (unsafe: __local_pmatch__goto_4447_15[__local_i__goto_4517_12]).rm_so)
-        (__local_end__goto_4524_20 = (unsafe: __local_pmatch__goto_4447_15[__local_i__goto_4517_12]).rm_eo)
-        (__local_j__goto_4517_15 = ((__local_last_printed__goto_4518_12 as c_ulong) +% (1 as c_ulong)))
+        (__local_start__goto_4470_20 = (unsafe: __local_pmatch__goto_4394_15[__local_i__goto_4464_12]).rm_so)
+        (__local_end__goto_4471_20 = (unsafe: __local_pmatch__goto_4394_15[__local_i__goto_4464_12]).rm_eo)
+        (__local_j__goto_4464_15 = ((__local_last_printed__goto_4465_12 as c_ulong) +% (1 as c_ulong)))
         goto '__ci_bb_254
     }
 
@@ -15929,7 +15865,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_254 {
-        if ((if __local_j__goto_4517_15 < __local_i__goto_4517_12: 1 else: 0) != 0) {
+        if ((if __local_j__goto_4464_15 < __local_i__goto_4464_12: 1 else: 0) != 0) {
             goto '__ci_bb_255
         } else {
             goto '__ci_bb_257
@@ -15937,18 +15873,18 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_255 {
-        fprintf(outfile, "%2d: <unset>\n", (__local_j__goto_4517_15 as c_int))
+        fprintf(outfile, "%2d: <unset>\n", (__local_j__goto_4464_15 as c_int))
         goto '__ci_bb_256
     }
 
     '__ci_bb_256 {
-        (__local_j__goto_4517_15 = __local_j__goto_4517_15 + 1)
+        (__local_j__goto_4464_15 = __local_j__goto_4464_15 + 1)
         goto '__ci_bb_254
     }
 
     '__ci_bb_257 {
-        (__local_last_printed__goto_4518_12 = __local_i__goto_4517_12)
-        if ((if __local_start__goto_4523_20 > __local_end__goto_4524_20: 1 else: 0) != 0) {
+        (__local_last_printed__goto_4465_12 = __local_i__goto_4464_12)
+        if ((if __local_start__goto_4470_20 > __local_end__goto_4471_20: 1 else: 0) != 0) {
             goto '__ci_bb_258
         } else {
             goto '__ci_bb_259
@@ -15956,8 +15892,8 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_258 {
-        (__local_start__goto_4523_20 = (unsafe: __local_pmatch__goto_4447_15[__local_i__goto_4517_12]).rm_eo)
-        (__local_end__goto_4524_20 = (unsafe: __local_pmatch__goto_4447_15[__local_i__goto_4517_12]).rm_so)
+        (__local_start__goto_4470_20 = (unsafe: __local_pmatch__goto_4394_15[__local_i__goto_4464_12]).rm_eo)
+        (__local_end__goto_4471_20 = (unsafe: __local_pmatch__goto_4394_15[__local_i__goto_4464_12]).rm_so)
         colour_begin(35, outfile)
         fprintf(outfile, "Start of matched string is beyond its end - displaying from end to start.\n")
         colour_end(outfile)
@@ -15965,11 +15901,11 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_259 {
-        fprintf(outfile, "%2d: ", (__local_i__goto_4517_12 as c_int))
-        pchars_8(-1, (__local_pp__goto_3906_14 + (__local_start__goto_4523_20 as usize)), ((__local_end__goto_4524_20 as c_ulong) -% (__local_start__goto_4523_20 as c_ulong)), __local_utf__goto_3897_6, outfile)
+        fprintf(outfile, "%2d: ", (__local_i__goto_4464_12 as c_int))
+        pchars_8(-1, (__local_pp__goto_3853_14 + (__local_start__goto_4470_20 as usize)), ((__local_end__goto_4471_20 as c_ulong) -% (__local_start__goto_4470_20 as c_ulong)), __local_utf__goto_3844_6, outfile)
         fprintf(outfile, "\n")
         (__ci_expr_logic_52 = 0)
-        if ((if __local_i__goto_4517_12 == 0: 1 else: 0) != 0) {
+        if ((if __local_i__goto_4464_12 == 0: 1 else: 0) != 0) {
             (__ci_expr_logic_52 = (if (if (((&raw const dat_datctl as *const datctl).control as c_uint) & (1 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_52 != 0) {
@@ -15985,8 +15921,8 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_260 {
-        fprintf(outfile, "%2d+ ", (__local_i__goto_4517_12 as c_int))
-        pchars_8(-1, (__local_pp__goto_3906_14 + (((unsafe: __local_pmatch__goto_4447_15[__local_i__goto_4517_12]).rm_eo as isize) as usize)), ((__local_len__goto_3894_8 as c_ulong) -% ((unsafe: __local_pmatch__goto_4447_15[__local_i__goto_4517_12]).rm_eo as c_ulong)), __local_utf__goto_3897_6, outfile)
+        fprintf(outfile, "%2d+ ", (__local_i__goto_4464_12 as c_int))
+        pchars_8(-1, (__local_pp__goto_3853_14 + (((unsafe: __local_pmatch__goto_4394_15[__local_i__goto_4464_12]).rm_eo as isize) as usize)), ((__local_len__goto_3841_8 as c_ulong) -% ((unsafe: __local_pmatch__goto_4394_15[__local_i__goto_4464_12]).rm_eo as c_ulong)), __local_utf__goto_3844_6, outfile)
         fprintf(outfile, "\n")
         goto '__ci_bb_261
     }
@@ -15996,7 +15932,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_262 {
-        with_free((__local_pmatch__goto_4447_15 as *mut i8))
+        with_free((__local_pmatch__goto_4394_15 as *mut i8))
         goto '__ci_bb_263
     }
 
@@ -16040,7 +15976,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_268 {
-        (__local_arg_ulen__goto_3889_18 = (~(0 as c_ulong)))
+        (__local_arg_ulen__goto_3836_18 = (~(0 as c_ulong)))
         goto '__ci_bb_269
     }
 
@@ -16051,7 +15987,7 @@ fn process_data_8() -> c_int {
         } else {
             (__ci_expr_ternary_55 = dat_context_8)
         }
-        (__local_use_dat_context__goto_3896_22 = __ci_expr_ternary_55)
+        (__local_use_dat_context__goto_3843_22 = __ci_expr_ternary_55)
         (show_memory = (if (((&raw const dat_datctl as *const datctl).control as c_uint) & (2097152 as c_uint)) != 0: 1 else: 0))
         (__ci_expr_logic_56 = 0)
         if (show_memory != 0) {
@@ -16210,8 +16146,8 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_291 {
-        (__local_ovector__goto_3900_13 = (&(unsafe: match_data_8.ovector[0]) as *mut c_ulong))
-        (__local_oveccount__goto_3902_10 = pcre2_get_ovector_count_8(match_data_8))
+        (__local_ovector__goto_3847_13 = (&(unsafe: match_data_8.ovector[0]) as *mut c_ulong))
+        (__local_oveccount__goto_3849_10 = pcre2_get_ovector_count_8(match_data_8))
         (__ci_expr_logic_59 = 0)
         (__ci_expr_logic_58 = 0)
         if ((if (&raw const dat_datctl as *const datctl).replacement[0] != 255: 1 else: 0) != 0) {
@@ -16244,17 +16180,17 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_294 {
-        (__local_j__goto_4706_14 = 0)
+        (__local_j__goto_4653_14 = 0)
         goto '__ci_bb_296
     }
 
     '__ci_bb_295 {
-        (__local_gmatched__goto_3890_10 = 0)
+        (__local_gmatched__goto_3837_10 = 0)
         goto '__ci_bb_377
     }
 
     '__ci_bb_296 {
-        if ((if __local_j__goto_4706_14 < ((2 as c_uint) *% (__local_oveccount__goto_3902_10 as c_uint)): 1 else: 0) != 0) {
+        if ((if __local_j__goto_4653_14 < ((2 as c_uint) *% (__local_oveccount__goto_3849_10 as c_uint)): 1 else: 0) != 0) {
             goto '__ci_bb_297
         } else {
             goto '__ci_bb_299
@@ -16262,12 +16198,12 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_297 {
-        ((unsafe: __local_ovector__goto_3900_13[__local_j__goto_4706_14]) = 3735928559)
+        ((unsafe: __local_ovector__goto_3847_13[__local_j__goto_4653_14]) = 3735928559)
         goto '__ci_bb_298
     }
 
     '__ci_bb_298 {
-        (__local_j__goto_4706_14 = __local_j__goto_4706_14 + 1)
+        (__local_j__goto_4653_14 = __local_j__goto_4653_14 + 1)
         goto '__ci_bb_296
     }
 
@@ -16308,8 +16244,8 @@ fn process_data_8() -> c_int {
         } else {
             (__ci_expr_ternary_60 = 65536)
         }
-        (__local_emoption__goto_4705_12 = __ci_expr_ternary_60)
-        if ((if __local_emoption__goto_4705_12 != 0: 1 else: 0) != 0) {
+        (__local_emoption__goto_4652_12 = __ci_expr_ternary_60)
+        if ((if __local_emoption__goto_4652_12 != 0: 1 else: 0) != 0) {
             goto '__ci_bb_304
         } else {
             goto '__ci_bb_305
@@ -16368,13 +16304,13 @@ fn process_data_8() -> c_int {
         } else {
             (__ci_expr_ternary_67 = 1024)
         }
-        (__local_xoptions__goto_4704_12 = (((((((((((((__local_emoption__goto_4705_12 as c_uint) | (__ci_expr_ternary_61 as c_uint)) as c_uint) | (__ci_expr_ternary_62 as c_uint)) as c_uint) | (__ci_expr_ternary_63 as c_uint)) as c_uint) | (__ci_expr_ternary_64 as c_uint)) as c_uint) | (__ci_expr_ternary_65 as c_uint)) as c_uint) | (__ci_expr_ternary_66 as c_uint)) as c_uint) | (__ci_expr_ternary_67 as c_uint))
-        (__local_pr__goto_4700_12 = (&(unsafe: (&raw const dat_datctl as *const datctl).replacement[0]) as *mut u8) + ((1 as isize) as usize))
-        (__local_prend__goto_4700_17 = __local_pr__goto_4700_12 + (((&raw const dat_datctl as *const datctl).replacement[0] as c_uint) as usize))
-        (__local_nsize__goto_4706_34 = rep_out_buffer_size_8)
+        (__local_xoptions__goto_4651_12 = (((((((((((((__local_emoption__goto_4652_12 as c_uint) | (__ci_expr_ternary_61 as c_uint)) as c_uint) | (__ci_expr_ternary_62 as c_uint)) as c_uint) | (__ci_expr_ternary_63 as c_uint)) as c_uint) | (__ci_expr_ternary_64 as c_uint)) as c_uint) | (__ci_expr_ternary_65 as c_uint)) as c_uint) | (__ci_expr_ternary_66 as c_uint)) as c_uint) | (__ci_expr_ternary_67 as c_uint))
+        (__local_pr__goto_4647_12 = (&(unsafe: (&raw const dat_datctl as *const datctl).replacement[0]) as *mut u8) + ((1 as isize) as usize))
+        (__local_prend__goto_4647_17 = __local_pr__goto_4647_12 + (((&raw const dat_datctl as *const datctl).replacement[0] as c_uint) as usize))
+        (__local_nsize__goto_4653_34 = rep_out_buffer_size_8)
         (__ci_expr_logic_68 = 0)
-        if ((if __local_pr__goto_4700_12 < __local_prend__goto_4700_17: 1 else: 0) != 0) {
-            (__ci_expr_logic_68 = (if (if (unsafe: *__local_pr__goto_4700_12) == 91: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_pr__goto_4647_12 < __local_prend__goto_4647_17: 1 else: 0) != 0) {
+            (__ci_expr_logic_68 = (if (if (unsafe: *__local_pr__goto_4647_12) == 91: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_68 != 0) {
             goto '__ci_bb_314
@@ -16410,17 +16346,17 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_310 {
         ((unsafe: dfa_workspace[0]) = -1)
-        pcre2_dfa_match_8(compiled_code_8, __local_pp__goto_3906_14, __local_arg_ulen__goto_3889_18, (&raw const dat_datctl as *const datctl).offset, (&raw const dat_datctl as *const datctl).options, match_data_8, __local_use_dat_context__goto_3896_22, dfa_workspace, 1000)
+        pcre2_dfa_match_8(compiled_code_8, __local_pp__goto_3853_14, __local_arg_ulen__goto_3836_18, (&raw const dat_datctl as *const datctl).offset, (&raw const dat_datctl as *const datctl).options, match_data_8, __local_use_dat_context__goto_3843_22, dfa_workspace, 1000)
         goto '__ci_bb_308
     }
 
     '__ci_bb_311 {
-        pcre2_jit_match_8(compiled_code_8, __local_pp__goto_3906_14, __local_arg_ulen__goto_3889_18, (&raw const dat_datctl as *const datctl).offset, (&raw const dat_datctl as *const datctl).options, match_data_8, __local_use_dat_context__goto_3896_22)
+        pcre2_jit_match_8(compiled_code_8, __local_pp__goto_3853_14, __local_arg_ulen__goto_3836_18, (&raw const dat_datctl as *const datctl).offset, (&raw const dat_datctl as *const datctl).options, match_data_8, __local_use_dat_context__goto_3843_22)
         goto '__ci_bb_313
     }
 
     '__ci_bb_312 {
-        pcre2_match_8(compiled_code_8, __local_pp__goto_3906_14, __local_arg_ulen__goto_3889_18, (&raw const dat_datctl as *const datctl).offset, (&raw const dat_datctl as *const datctl).options, match_data_8, __local_use_dat_context__goto_3896_22)
+        pcre2_match_8(compiled_code_8, __local_pp__goto_3853_14, __local_arg_ulen__goto_3836_18, (&raw const dat_datctl as *const datctl).offset, (&raw const dat_datctl as *const datctl).options, match_data_8, __local_use_dat_context__goto_3843_22)
         goto '__ci_bb_313
     }
 
@@ -16429,14 +16365,14 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_314 {
-        (__local_n__goto_4776_16 = 0)
-        (__local_pr__goto_4700_12 = __local_pr__goto_4700_12 + 1)
+        (__local_n__goto_4723_16 = 0)
+        (__local_pr__goto_4647_12 = __local_pr__goto_4647_12 + 1)
         goto '__ci_bb_316
     }
 
     '__ci_bb_315 {
-        copy_substitute_string_8(__local_utf__goto_3897_6, __local_pr__goto_4700_12, (((__local_prend__goto_4700_17 as usize) -% (__local_pr__goto_4700_12 as usize)) / sizeof[u8]()), rep_in_buffer_8, (&raw mut __local_rlen__goto_4706_17 as *mut c_ulong))
-        (__local_full_rlen__goto_4706_23 = __local_rlen__goto_4706_17)
+        copy_substitute_string_8(__local_utf__goto_3844_6, __local_pr__goto_4647_12, (((__local_prend__goto_4647_17 as usize) -% (__local_pr__goto_4647_12 as usize)) / sizeof[u8]()), rep_in_buffer_8, (&raw mut __local_rlen__goto_4653_17 as *mut c_ulong))
+        (__local_full_rlen__goto_4653_23 = __local_rlen__goto_4653_17)
         if ((if (((&raw const dat_datctl as *const datctl).control as c_uint) & ((2147483648 as c_uint) as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_324
         } else {
@@ -16447,14 +16383,14 @@ fn process_data_8() -> c_int {
     '__ci_bb_316 {
         (__ci_expr_logic_70 = 0)
         (__ci_expr_logic_69 = 0)
-        if ((if __local_pr__goto_4700_12 < __local_prend__goto_4700_17: 1 else: 0) != 0) {
-            (__local_c__goto_3891_10 = (unsafe: *__local_pr__goto_4700_12))
+        if ((if __local_pr__goto_4647_12 < __local_prend__goto_4647_17: 1 else: 0) != 0) {
+            (__local_c__goto_3838_10 = (unsafe: *__local_pr__goto_4647_12))
 
-            (__ci_expr_logic_69 = (if (if __local_c__goto_3891_10 >= 48: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_69 = (if (if __local_c__goto_3838_10 >= 48: 1 else: 0) != 0: 1 else: 0))
 
         }
         if (__ci_expr_logic_69 != 0) {
-            (__ci_expr_logic_70 = (if (if __local_c__goto_3891_10 <= 57: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_70 = (if (if __local_c__goto_3838_10 <= 57: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_70 != 0) {
             goto '__ci_bb_317
@@ -16464,20 +16400,20 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_317 {
-        (__local_n__goto_4776_16 = ((((__local_n__goto_4776_16 as c_ulong) *% (10 as c_ulong)) as c_ulong) +% (((__local_c__goto_3891_10 as c_uint) -% (48 as c_uint)) as c_ulong)))
+        (__local_n__goto_4723_16 = ((((__local_n__goto_4723_16 as c_ulong) *% (10 as c_ulong)) as c_ulong) +% (((__local_c__goto_3838_10 as c_uint) -% (48 as c_uint)) as c_ulong)))
         goto '__ci_bb_318
     }
 
     '__ci_bb_318 {
-        (__local_pr__goto_4700_12 = __local_pr__goto_4700_12 + 1)
+        (__local_pr__goto_4647_12 = __local_pr__goto_4647_12 + 1)
         goto '__ci_bb_316
     }
 
     '__ci_bb_319 {
-        if ((if __local_pr__goto_4700_12 >= __local_prend__goto_4700_17: 1 else: 0) != 0) {
+        if ((if __local_pr__goto_4647_12 >= __local_prend__goto_4647_17: 1 else: 0) != 0) {
             (__ci_expr_logic_71 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_71 = (if (if (unsafe: *__local_pr__goto_4700_12) != 93: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_71 = (if (if (unsafe: *__local_pr__goto_4647_12) != 93: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_71 != 0) {
             goto '__ci_bb_320
@@ -16494,8 +16430,8 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_321 {
-        (__local_pr__goto_4700_12 = __local_pr__goto_4700_12 + 1)
-        if ((if __local_n__goto_4776_16 > __local_nsize__goto_4706_34: 1 else: 0) != 0) {
+        (__local_pr__goto_4647_12 = __local_pr__goto_4647_12 + 1)
+        if ((if __local_n__goto_4723_16 > __local_nsize__goto_4653_34: 1 else: 0) != 0) {
             goto '__ci_bb_322
         } else {
             goto '__ci_bb_323
@@ -16504,18 +16440,18 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_322 {
         colour_begin(31, outfile)
-        fprintf(outfile, "** Replacement buffer setting (%zu) is too large (max %zu)\n", __local_n__goto_4776_16, __local_nsize__goto_4706_34)
+        fprintf(outfile, "** Replacement buffer setting (%zu) is too large (max %zu)\n", __local_n__goto_4723_16, __local_nsize__goto_4653_34)
         colour_end(outfile)
         return PR_OK
     }
 
     '__ci_bb_323 {
-        (__local_nsize__goto_4706_34 = __local_n__goto_4776_16)
+        (__local_nsize__goto_4653_34 = __local_n__goto_4723_16)
         goto '__ci_bb_315
     }
 
     '__ci_bb_324 {
-        (__local_rlen__goto_4706_17 = (~(0 as c_ulong)))
+        (__local_rlen__goto_4653_17 = (~(0 as c_ulong)))
         goto '__ci_bb_325
     }
 
@@ -16526,9 +16462,9 @@ fn process_data_8() -> c_int {
         } else {
             (__ci_expr_ternary_72 = ((null as *mut u8)))
         }
-        (__local_rbptr__goto_4702_16 = __ci_expr_ternary_72)
-        (__local_sbptr__goto_4703_16 = __local_pp__goto_3906_14)
-        (__local_slen__goto_4706_54 = __local_arg_ulen__goto_3889_18)
+        (__local_rbptr__goto_4649_16 = __ci_expr_ternary_72)
+        (__local_sbptr__goto_4650_16 = __local_pp__goto_3853_14)
+        (__local_slen__goto_4653_54 = __local_arg_ulen__goto_3836_18)
         if ((if (&raw const dat_datctl as *const datctl).substitute_subject[0] != 255: 1 else: 0) != 0) {
             goto '__ci_bb_326
         } else {
@@ -16537,8 +16473,8 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_326 {
-        copy_substitute_string_8(__local_utf__goto_3897_6, ((&(unsafe: (&raw const dat_datctl as *const datctl).substitute_subject[0]) as *mut u8) + ((1 as isize) as usize)), (&raw const dat_datctl as *const datctl).substitute_subject[0], (&(unsafe: __local_sbuffer__goto_4701_15[0]) as *mut u8), (&raw mut __local_slen__goto_4706_54 as *mut c_ulong))
-        if ((if __local_slen__goto_4706_54 > __local_ulen__goto_3889_12: 1 else: 0) != 0) {
+        copy_substitute_string_8(__local_utf__goto_3844_6, ((&(unsafe: (&raw const dat_datctl as *const datctl).substitute_subject[0]) as *mut u8) + ((1 as isize) as usize)), (&raw const dat_datctl as *const datctl).substitute_subject[0], (&(unsafe: __local_sbuffer__goto_4648_15[0]) as *mut u8), (&raw mut __local_slen__goto_4653_54 as *mut c_ulong))
+        if ((if __local_slen__goto_4653_54 > __local_ulen__goto_3836_12: 1 else: 0) != 0) {
             goto '__ci_bb_328
         } else {
             goto '__ci_bb_329
@@ -16552,7 +16488,7 @@ fn process_data_8() -> c_int {
         } else {
             (__ci_expr_ternary_73 = ((null as *mut pcre2_real_match_data_8)))
         }
-        (__local_smatch_data__goto_4707_21 = __ci_expr_ternary_73)
+        (__local_smatch_data__goto_4654_21 = __ci_expr_ternary_73)
         if ((if (((&raw const dat_datctl as *const datctl).control2 as c_uint) & (1 as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_336
         } else {
@@ -16568,7 +16504,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_329 {
-        if ((if __local_pp__goto_3906_14 != null: 1 else: 0) != 0) {
+        if ((if __local_pp__goto_3853_14 != null: 1 else: 0) != 0) {
             goto '__ci_bb_330
         } else {
             goto '__ci_bb_331
@@ -16576,8 +16512,8 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_330 {
-        with_memcpy((__local_pp__goto_3906_14 as *i8), ((&(unsafe: __local_sbuffer__goto_4701_15[0]) as *mut u8) as *i8), (((__local_slen__goto_4706_54 as c_ulong) *% (1 as c_ulong)) as i64))
-        if ((if __local_slen__goto_4706_54 < __local_ulen__goto_3889_12: 1 else: 0) != 0) {
+        with_memcpy((__local_pp__goto_3853_14 as *i8), ((&(unsafe: __local_sbuffer__goto_4648_15[0]) as *mut u8) as *i8), (((__local_slen__goto_4653_54 as c_ulong) *% (1 as c_ulong)) as i64))
+        if ((if __local_slen__goto_4653_54 < __local_ulen__goto_3836_12: 1 else: 0) != 0) {
             goto '__ci_bb_332
         } else {
             goto '__ci_bb_333
@@ -16593,7 +16529,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_332 {
-        ((unsafe: __local_pp__goto_3906_14[__local_slen__goto_4706_54]) = 0)
+        ((unsafe: __local_pp__goto_3853_14[__local_slen__goto_4653_54]) = 0)
         goto '__ci_bb_333
     }
 
@@ -16602,7 +16538,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_334 {
-        (__local_slen__goto_4706_54 = (~(0 as c_ulong)))
+        (__local_slen__goto_4653_54 = (~(0 as c_ulong)))
         goto '__ci_bb_335
     }
 
@@ -16652,8 +16588,8 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_343 {
         reset_callout_state()
-        (__local_nsize_input__goto_4706_41 = __local_nsize__goto_4706_34)
-        (__local_rc__goto_4699_7 = pcre2_substitute_8(compiled_code_8, __local_sbptr__goto_4703_16, __local_slen__goto_4706_54, (&raw const dat_datctl as *const datctl).offset, (((&raw const dat_datctl as *const datctl).options as c_uint) | (__local_xoptions__goto_4704_12 as c_uint)), __local_smatch_data__goto_4707_21, __local_use_dat_context__goto_3896_22, __local_rbptr__goto_4702_16, __local_rlen__goto_4706_17, rep_out_buffer_8, (&raw mut __local_nsize__goto_4706_34 as *mut c_ulong)))
+        (__local_nsize_input__goto_4653_41 = __local_nsize__goto_4653_34)
+        (__local_rc__goto_4646_7 = pcre2_substitute_8(compiled_code_8, __local_sbptr__goto_4650_16, __local_slen__goto_4653_54, (&raw const dat_datctl as *const datctl).offset, (((&raw const dat_datctl as *const datctl).options as c_uint) | (__local_xoptions__goto_4651_12 as c_uint)), __local_smatch_data__goto_4654_21, __local_use_dat_context__goto_3843_22, __local_rbptr__goto_4649_16, __local_rlen__goto_4653_17, rep_out_buffer_8, (&raw mut __local_nsize__goto_4653_34 as *mut c_ulong)))
         (__ci_expr_logic_74 = 0)
         if (malloc_testing != 0) {
             (__ci_expr_logic_74 = (if (if (((&raw const dat_datctl as *const datctl).control2 as c_uint) & (1 as c_uint)) == 0: 1 else: 0) != 0: 1 else: 0))
@@ -16666,9 +16602,9 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_344 {
-        (__local_heapframes__goto_4884_23 = ((match_data_8.heapframes as *mut c_void)))
-        (__local_memory_data__goto_4884_23 = (&raw const (unsafe: *match_data_8).memctl as *const pcre2_memctl).memory_data)
-        (&raw const (unsafe: *match_data_8).memctl as *const pcre2_memctl).free(__local_heapframes__goto_4884_23, __local_memory_data__goto_4884_23)
+        (__local_heapframes__goto_4831_23 = ((match_data_8.heapframes as *mut c_void)))
+        (__local_memory_data__goto_4831_23 = (&raw const (unsafe: *match_data_8).memctl as *const pcre2_memctl).memory_data)
+        (&raw const (unsafe: *match_data_8).memctl as *const pcre2_memctl).free(__local_heapframes__goto_4831_23, __local_memory_data__goto_4831_23)
         ((unsafe: *match_data_8).heapframes = ((null as *mut heapframe)))
         ((unsafe: *match_data_8).heapframes_size = 0)
         goto '__ci_bb_345
@@ -16687,13 +16623,13 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_347 {
-        (__local_i__goto_4895_14 = 0)
-        (__local_target_mallocs__goto_4895_21 = mallocs_called)
+        (__local_i__goto_4842_14 = 0)
+        (__local_target_mallocs__goto_4842_21 = mallocs_called)
         goto '__ci_bb_349
     }
 
     '__ci_bb_348 {
-        if ((if __local_rc__goto_4699_7 < 0: 1 else: 0) != 0) {
+        if ((if __local_rc__goto_4646_7 < 0: 1 else: 0) != 0) {
             goto '__ci_bb_358
         } else {
             goto '__ci_bb_359
@@ -16701,7 +16637,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_349 {
-        if ((if __local_i__goto_4895_14 <= __local_target_mallocs__goto_4895_21: 1 else: 0) != 0) {
+        if ((if __local_i__goto_4842_14 <= __local_target_mallocs__goto_4842_21: 1 else: 0) != 0) {
             goto '__ci_bb_350
         } else {
             goto '__ci_bb_352
@@ -16709,12 +16645,12 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_350 {
-        (__local_saved_outfile__goto_4897_13 = outfile)
+        (__local_saved_outfile__goto_4844_13 = outfile)
         goto '__ci_bb_353
     }
 
     '__ci_bb_351 {
-        (__local_i__goto_4895_14 = __local_i__goto_4895_14 + 1)
+        (__local_i__goto_4842_14 = __local_i__goto_4842_14 + 1)
         goto '__ci_bb_349
     }
 
@@ -16723,9 +16659,9 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_353 {
-        (__local_heapframes__goto_4898_7 = ((match_data_8.heapframes as *mut c_void)))
-        (__local_memory_data__goto_4898_7 = (&raw const (unsafe: *match_data_8).memctl as *const pcre2_memctl).memory_data)
-        (&raw const (unsafe: *match_data_8).memctl as *const pcre2_memctl).free(__local_heapframes__goto_4898_7, __local_memory_data__goto_4898_7)
+        (__local_heapframes__goto_4845_7 = ((match_data_8.heapframes as *mut c_void)))
+        (__local_memory_data__goto_4845_7 = (&raw const (unsafe: *match_data_8).memctl as *const pcre2_memctl).memory_data)
+        (&raw const (unsafe: *match_data_8).memctl as *const pcre2_memctl).free(__local_heapframes__goto_4845_7, __local_memory_data__goto_4845_7)
         ((unsafe: *match_data_8).heapframes = ((null as *mut heapframe)))
         ((unsafe: *match_data_8).heapframes_size = 0)
         goto '__ci_bb_354
@@ -16741,15 +16677,15 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_355 {
         reset_callout_state()
-        (mallocs_until_failure = __local_i__goto_4895_14)
+        (mallocs_until_failure = __local_i__goto_4842_14)
         (outfile = null)
-        (__local_nsize__goto_4706_34 = __local_nsize_input__goto_4706_41)
-        (__local_rc__goto_4699_7 = pcre2_substitute_8(compiled_code_8, __local_sbptr__goto_4703_16, __local_slen__goto_4706_54, (&raw const dat_datctl as *const datctl).offset, (((&raw const dat_datctl as *const datctl).options as c_uint) | (__local_xoptions__goto_4704_12 as c_uint)), __local_smatch_data__goto_4707_21, __local_use_dat_context__goto_3896_22, __local_rbptr__goto_4702_16, __local_rlen__goto_4706_17, rep_out_buffer_8, (&raw mut __local_nsize__goto_4706_34 as *mut c_ulong)))
+        (__local_nsize__goto_4653_34 = __local_nsize_input__goto_4653_41)
+        (__local_rc__goto_4646_7 = pcre2_substitute_8(compiled_code_8, __local_sbptr__goto_4650_16, __local_slen__goto_4653_54, (&raw const dat_datctl as *const datctl).offset, (((&raw const dat_datctl as *const datctl).options as c_uint) | (__local_xoptions__goto_4651_12 as c_uint)), __local_smatch_data__goto_4654_21, __local_use_dat_context__goto_3843_22, __local_rbptr__goto_4649_16, __local_rlen__goto_4653_17, rep_out_buffer_8, (&raw mut __local_nsize__goto_4653_34 as *mut c_ulong)))
         (mallocs_until_failure = 2147483647)
-        (outfile = __local_saved_outfile__goto_4897_13)
+        (outfile = __local_saved_outfile__goto_4844_13)
         (__ci_expr_logic_75 = 0)
-        if ((if __local_i__goto_4895_14 < __local_target_mallocs__goto_4895_21: 1 else: 0) != 0) {
-            (__ci_expr_logic_75 = (if (if __local_rc__goto_4699_7 != -48: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_i__goto_4842_14 < __local_target_mallocs__goto_4842_21: 1 else: 0) != 0) {
+            (__ci_expr_logic_75 = (if (if __local_rc__goto_4646_7 != -48: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_75 != 0) {
             goto '__ci_bb_356
@@ -16760,7 +16696,7 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_356 {
         colour_begin(31, outfile)
-        fprintf(outfile, "** malloc() Substitution test did not fail as expected (%d)\n", __local_rc__goto_4699_7)
+        fprintf(outfile, "** malloc() Substitution test did not fail as expected (%d)\n", __local_rc__goto_4646_7)
         colour_end(outfile)
         return PR_ABEND
     }
@@ -16771,11 +16707,11 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_358 {
         colour_begin(35, outfile)
-        fprintf(outfile, "Failed: error %d", __local_rc__goto_4699_7)
+        fprintf(outfile, "Failed: error %d", __local_rc__goto_4646_7)
         colour_end(outfile)
         (__ci_expr_logic_76 = 0)
-        if ((if __local_rc__goto_4699_7 != -48: 1 else: 0) != 0) {
-            (__ci_expr_logic_76 = (if (if __local_nsize__goto_4706_34 != (~(0 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_rc__goto_4646_7 != -48: 1 else: 0) != 0) {
+            (__ci_expr_logic_76 = (if (if __local_nsize__goto_4653_34 != (~(0 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_76 != 0) {
             goto '__ci_bb_361
@@ -16786,9 +16722,9 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_359 {
         colour_begin(35, outfile)
-        fprintf(outfile, "%2d: ", __local_rc__goto_4699_7)
+        fprintf(outfile, "%2d: ", __local_rc__goto_4646_7)
         colour_end(outfile)
-        pchars_8(35, rep_out_buffer_8, __local_nsize__goto_4706_34, __local_utf__goto_3897_6, outfile)
+        pchars_8(35, rep_out_buffer_8, __local_nsize__goto_4653_34, __local_utf__goto_3844_6, outfile)
         goto '__ci_bb_360
     }
 
@@ -16804,7 +16740,7 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_361 {
         colour_begin(35, outfile)
-        fprintf(outfile, " at offset %ld in replacement", (__local_nsize__goto_4706_34 as c_long))
+        fprintf(outfile, " at offset %ld in replacement", (__local_nsize__goto_4653_34 as c_long))
         colour_end(outfile)
         goto '__ci_bb_362
     }
@@ -16813,7 +16749,7 @@ fn process_data_8() -> c_int {
         colour_begin(35, outfile)
         fprintf(outfile, ": ")
         colour_end(outfile)
-        if ((if not (print_error_message_8(__local_rc__goto_4699_7, "", "") != 0): 1 else: 0) != 0) {
+        if ((if not (print_error_message_8(__local_rc__goto_4646_7, "", "") != 0): 1 else: 0) != 0) {
             goto '__ci_bb_363
         } else {
             goto '__ci_bb_364
@@ -16826,8 +16762,8 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_364 {
         (__ci_expr_logic_77 = 0)
-        if ((if __local_rc__goto_4699_7 == -48: 1 else: 0) != 0) {
-            (__ci_expr_logic_77 = (if (if ((__local_xoptions__goto_4704_12 as c_uint) & (4096 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_rc__goto_4646_7 == -48: 1 else: 0) != 0) {
+            (__ci_expr_logic_77 = (if (if ((__local_xoptions__goto_4651_12 as c_uint) & (4096 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_77 != 0) {
             goto '__ci_bb_365
@@ -16838,15 +16774,15 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_365 {
         colour_begin(35, outfile)
-        fprintf(outfile, ": %ld code units are needed", (__local_nsize__goto_4706_34 as c_long))
+        fprintf(outfile, ": %ld code units are needed", (__local_nsize__goto_4653_34 as c_long))
         colour_end(outfile)
         goto '__ci_bb_366
     }
 
     '__ci_bb_366 {
         (__ci_expr_logic_78 = 0)
-        if ((if __local_rc__goto_4699_7 != -48: 1 else: 0) != 0) {
-            (__ci_expr_logic_78 = (if (if __local_nsize__goto_4706_34 != (~(0 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_rc__goto_4646_7 != -48: 1 else: 0) != 0) {
+            (__ci_expr_logic_78 = (if (if __local_nsize__goto_4653_34 != (~(0 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_78 != 0) {
             goto '__ci_bb_367
@@ -16859,7 +16795,7 @@ fn process_data_8() -> c_int {
         colour_begin(35, outfile)
         fprintf(outfile, "\n        here: ")
         colour_end(outfile)
-        if ((if __local_nsize__goto_4706_34 > 0: 1 else: 0) != 0) {
+        if ((if __local_nsize__goto_4653_34 > 0: 1 else: 0) != 0) {
             goto '__ci_bb_369
         } else {
             goto '__ci_bb_370
@@ -16871,7 +16807,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_369 {
-        ptrunc_8(32, __local_rbptr__goto_4702_16, __local_full_rlen__goto_4706_23, __local_nsize__goto_4706_34, 1, __local_utf__goto_3897_6, outfile)
+        ptrunc_8(32, __local_rbptr__goto_4649_16, __local_full_rlen__goto_4653_23, __local_nsize__goto_4653_34, 1, __local_utf__goto_3844_6, outfile)
         fprintf(outfile, " ")
         goto '__ci_bb_370
     }
@@ -16880,7 +16816,7 @@ fn process_data_8() -> c_int {
         colour_begin(35, outfile)
         fprintf(outfile, "|<--|")
         colour_end(outfile)
-        if ((if __local_nsize__goto_4706_34 < __local_full_rlen__goto_4706_23: 1 else: 0) != 0) {
+        if ((if __local_nsize__goto_4653_34 < __local_full_rlen__goto_4653_23: 1 else: 0) != 0) {
             goto '__ci_bb_371
         } else {
             goto '__ci_bb_372
@@ -16889,7 +16825,7 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_371 {
         fprintf(outfile, " ")
-        ptrunc_8(32, __local_rbptr__goto_4702_16, __local_full_rlen__goto_4706_23, __local_nsize__goto_4706_34, 0, __local_utf__goto_3897_6, outfile)
+        ptrunc_8(32, __local_rbptr__goto_4649_16, __local_full_rlen__goto_4653_23, __local_nsize__goto_4653_34, 0, __local_utf__goto_3844_6, outfile)
         goto '__ci_bb_372
     }
 
@@ -16898,7 +16834,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_373 {
-        show_ovector(__local_ovector__goto_3900_13, __local_oveccount__goto_3902_10)
+        show_ovector(__local_ovector__goto_3847_13, __local_oveccount__goto_3849_10)
         goto '__ci_bb_374
     }
 
@@ -16928,12 +16864,12 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_378 {
-        (__local_j__goto_4971_14 = 0)
+        (__local_j__goto_4918_14 = 0)
         goto '__ci_bb_381
     }
 
     '__ci_bb_379 {
-        (__local_gmatched__goto_3890_10 = __local_gmatched__goto_3890_10 + 1)
+        (__local_gmatched__goto_3837_10 = __local_gmatched__goto_3837_10 + 1)
         goto '__ci_bb_377
     }
 
@@ -16950,7 +16886,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_381 {
-        if ((if __local_j__goto_4971_14 < ((2 as c_uint) *% (__local_oveccount__goto_3902_10 as c_uint)): 1 else: 0) != 0) {
+        if ((if __local_j__goto_4918_14 < ((2 as c_uint) *% (__local_oveccount__goto_3849_10 as c_uint)): 1 else: 0) != 0) {
             goto '__ci_bb_382
         } else {
             goto '__ci_bb_384
@@ -16958,12 +16894,12 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_382 {
-        ((unsafe: __local_ovector__goto_3900_13[__local_j__goto_4971_14]) = 3735928559)
+        ((unsafe: __local_ovector__goto_3847_13[__local_j__goto_4918_14]) = 3735928559)
         goto '__ci_bb_383
     }
 
     '__ci_bb_383 {
-        (__local_j__goto_4971_14 = __local_j__goto_4971_14 + 1)
+        (__local_j__goto_4918_14 = __local_j__goto_4918_14 + 1)
         goto '__ci_bb_381
     }
 
@@ -16977,7 +16913,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_385 {
-        (__local_saved_outfile__goto_4990_11 = outfile)
+        (__local_saved_outfile__goto_4937_11 = outfile)
         (outfile = null)
         if ((if (((&raw const dat_datctl as *const datctl).control as c_uint) & (512 as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_387
@@ -17011,17 +16947,17 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_389 {
-        (__local_time_taken__goto_4989_25 = ((clock() as c_ulong) -% (__local_start_time__goto_4989_13 as c_ulong)))
-        (total_match_time = total_match_time + __local_time_taken__goto_4989_25)
-        (outfile = __local_saved_outfile__goto_4990_11)
+        (__local_time_taken__goto_4936_25 = ((clock() as c_ulong) -% (__local_start_time__goto_4936_13 as c_ulong)))
+        (total_match_time = total_match_time + __local_time_taken__goto_4936_25)
+        (outfile = __local_saved_outfile__goto_4937_11)
         colour_begin(36, outfile)
-        fprintf(outfile, "Match time %7.4f microseconds\n", ((((1000000 as c_ulong) / ((1000000 as c_ulong) as c_ulong)) * (__local_time_taken__goto_4989_25 as f64)) / timeitm))
+        fprintf(outfile, "Match time %7.4f microseconds\n", ((((1000000 as c_ulong) / ((1000000 as c_ulong) as c_ulong)) * (__local_time_taken__goto_4936_25 as f64)) / timeitm))
         colour_end(outfile)
         goto '__ci_bb_386
     }
 
     '__ci_bb_390 {
-        (outfile = __local_saved_outfile__goto_4990_11)
+        (outfile = __local_saved_outfile__goto_4937_11)
         colour_begin(31, outfile)
         fprintf(outfile, "** Timing DFA restarts is not supported\n")
         colour_end(outfile)
@@ -17042,13 +16978,13 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_393 {
-        (__local_start_time__goto_4989_13 = clock())
-        (__local_i__goto_4988_9 = 0)
+        (__local_start_time__goto_4936_13 = clock())
+        (__local_i__goto_4935_9 = 0)
         goto '__ci_bb_394
     }
 
     '__ci_bb_394 {
-        if ((if __local_i__goto_4988_9 < timeitm: 1 else: 0) != 0) {
+        if ((if __local_i__goto_4935_9 < timeitm: 1 else: 0) != 0) {
             goto '__ci_bb_395
         } else {
             goto '__ci_bb_397
@@ -17056,12 +16992,12 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_395 {
-        pcre2_dfa_match_8(compiled_code_8, __local_pp__goto_3906_14, __local_arg_ulen__goto_3889_18, (&raw const dat_datctl as *const datctl).offset, (((&raw const dat_datctl as *const datctl).options as c_uint) | (__local_g_notempty__goto_3892_10 as c_uint)), match_data_8, __local_use_dat_context__goto_3896_22, dfa_workspace, 1000)
+        pcre2_dfa_match_8(compiled_code_8, __local_pp__goto_3853_14, __local_arg_ulen__goto_3836_18, (&raw const dat_datctl as *const datctl).offset, (((&raw const dat_datctl as *const datctl).options as c_uint) | (__local_g_notempty__goto_3839_10 as c_uint)), match_data_8, __local_use_dat_context__goto_3843_22, dfa_workspace, 1000)
         goto '__ci_bb_396
     }
 
     '__ci_bb_396 {
-        (__local_i__goto_4988_9 = __local_i__goto_4988_9 + 1)
+        (__local_i__goto_4935_9 = __local_i__goto_4935_9 + 1)
         goto '__ci_bb_394
     }
 
@@ -17070,14 +17006,14 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_398 {
-        (__local_start_time__goto_4989_13 = clock())
-        (__local_i__goto_4988_9 = 0)
+        (__local_start_time__goto_4936_13 = clock())
+        (__local_i__goto_4935_9 = 0)
         goto '__ci_bb_401
     }
 
     '__ci_bb_399 {
-        (__local_start_time__goto_4989_13 = clock())
-        (__local_i__goto_4988_9 = 0)
+        (__local_start_time__goto_4936_13 = clock())
+        (__local_i__goto_4935_9 = 0)
         goto '__ci_bb_405
     }
 
@@ -17086,7 +17022,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_401 {
-        if ((if __local_i__goto_4988_9 < timeitm: 1 else: 0) != 0) {
+        if ((if __local_i__goto_4935_9 < timeitm: 1 else: 0) != 0) {
             goto '__ci_bb_402
         } else {
             goto '__ci_bb_404
@@ -17094,12 +17030,12 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_402 {
-        pcre2_jit_match_8(compiled_code_8, __local_pp__goto_3906_14, __local_arg_ulen__goto_3889_18, (&raw const dat_datctl as *const datctl).offset, (((&raw const dat_datctl as *const datctl).options as c_uint) | (__local_g_notempty__goto_3892_10 as c_uint)), match_data_8, __local_use_dat_context__goto_3896_22)
+        pcre2_jit_match_8(compiled_code_8, __local_pp__goto_3853_14, __local_arg_ulen__goto_3836_18, (&raw const dat_datctl as *const datctl).offset, (((&raw const dat_datctl as *const datctl).options as c_uint) | (__local_g_notempty__goto_3839_10 as c_uint)), match_data_8, __local_use_dat_context__goto_3843_22)
         goto '__ci_bb_403
     }
 
     '__ci_bb_403 {
-        (__local_i__goto_4988_9 = __local_i__goto_4988_9 + 1)
+        (__local_i__goto_4935_9 = __local_i__goto_4935_9 + 1)
         goto '__ci_bb_401
     }
 
@@ -17108,7 +17044,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_405 {
-        if ((if __local_i__goto_4988_9 < timeitm: 1 else: 0) != 0) {
+        if ((if __local_i__goto_4935_9 < timeitm: 1 else: 0) != 0) {
             goto '__ci_bb_406
         } else {
             goto '__ci_bb_408
@@ -17116,12 +17052,12 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_406 {
-        pcre2_match_8(compiled_code_8, __local_pp__goto_3906_14, __local_arg_ulen__goto_3889_18, (&raw const dat_datctl as *const datctl).offset, (((&raw const dat_datctl as *const datctl).options as c_uint) | (__local_g_notempty__goto_3892_10 as c_uint)), match_data_8, __local_use_dat_context__goto_3896_22)
+        pcre2_match_8(compiled_code_8, __local_pp__goto_3853_14, __local_arg_ulen__goto_3836_18, (&raw const dat_datctl as *const datctl).offset, (((&raw const dat_datctl as *const datctl).options as c_uint) | (__local_g_notempty__goto_3839_10 as c_uint)), match_data_8, __local_use_dat_context__goto_3843_22)
         goto '__ci_bb_407
     }
 
     '__ci_bb_407 {
-        (__local_i__goto_4988_9 = __local_i__goto_4988_9 + 1)
+        (__local_i__goto_4935_9 = __local_i__goto_4935_9 + 1)
         goto '__ci_bb_405
     }
 
@@ -17160,7 +17096,7 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_411 {
         (__ci_expr_logic_88 = 0)
-        if ((if __local_capcount__goto_4972_7 < 0: 1 else: 0) != 0) {
+        if ((if __local_capcount__goto_4919_7 < 0: 1 else: 0) != 0) {
             (__ci_expr_logic_88 = (if (if (((&raw const dat_datctl as *const datctl).control as c_uint) & (((16 as c_uint) | (32768 as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_88 != 0) {
@@ -17171,12 +17107,12 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_412 {
-        check_match_limit_8(__local_pp__goto_3906_14, __local_arg_ulen__goto_3889_18, -63, "heap")
+        check_match_limit_8(__local_pp__goto_3853_14, __local_arg_ulen__goto_3836_18, -63, "heap")
         goto '__ci_bb_413
     }
 
     '__ci_bb_413 {
-        (__local_capcount__goto_4972_7 = check_match_limit_8(__local_pp__goto_3906_14, __local_arg_ulen__goto_3889_18, -47, "match"))
+        (__local_capcount__goto_4919_7 = check_match_limit_8(__local_pp__goto_3853_14, __local_arg_ulen__goto_3836_18, -47, "match"))
         if ((if compiled_code_8.executable_jit == null: 1 else: 0) != 0) {
             (__ci_expr_logic_82 = (if true: 1 else: 0))
         } else {
@@ -17195,12 +17131,12 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_414 {
-        (__local_capcount__goto_4972_7 = check_match_limit_8(__local_pp__goto_3906_14, __local_arg_ulen__goto_3889_18, -53, "depth"))
+        (__local_capcount__goto_4919_7 = check_match_limit_8(__local_pp__goto_3853_14, __local_arg_ulen__goto_3836_18, -53, "depth"))
         goto '__ci_bb_415
     }
 
     '__ci_bb_415 {
-        if ((if __local_capcount__goto_4972_7 == 0: 1 else: 0) != 0) {
+        if ((if __local_capcount__goto_4919_7 == 0: 1 else: 0) != 0) {
             goto '__ci_bb_416
         } else {
             goto '__ci_bb_417
@@ -17211,7 +17147,7 @@ fn process_data_8() -> c_int {
         colour_begin(35, outfile)
         fprintf(outfile, "Matched, but offsets vector is too small to show all matches\n")
         colour_end(outfile)
-        (__local_capcount__goto_4972_7 = (&raw const dat_datctl as *const datctl).oveccount)
+        (__local_capcount__goto_4919_7 = (&raw const dat_datctl as *const datctl).oveccount)
         goto '__ci_bb_417
     }
 
@@ -17233,9 +17169,9 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_420 {
-        (__local_heapframes__goto_5078_25 = ((match_data_8.heapframes as *mut c_void)))
-        (__local_memory_data__goto_5078_25 = (&raw const (unsafe: *match_data_8).memctl as *const pcre2_memctl).memory_data)
-        (&raw const (unsafe: *match_data_8).memctl as *const pcre2_memctl).free(__local_heapframes__goto_5078_25, __local_memory_data__goto_5078_25)
+        (__local_heapframes__goto_5025_25 = ((match_data_8.heapframes as *mut c_void)))
+        (__local_memory_data__goto_5025_25 = (&raw const (unsafe: *match_data_8).memctl as *const pcre2_memctl).memory_data)
+        (&raw const (unsafe: *match_data_8).memctl as *const pcre2_memctl).free(__local_heapframes__goto_5025_25, __local_memory_data__goto_5025_25)
         ((unsafe: *match_data_8).heapframes = ((null as *mut heapframe)))
         ((unsafe: *match_data_8).heapframes_size = 0)
         goto '__ci_bb_421
@@ -17302,8 +17238,8 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_429 {
-        (__local_capcount__goto_4972_7 = pcre2_dfa_match_8(compiled_code_8, __local_pp__goto_3906_14, __local_arg_ulen__goto_3889_18, (&raw const dat_datctl as *const datctl).offset, (((&raw const dat_datctl as *const datctl).options as c_uint) | (__local_g_notempty__goto_3892_10 as c_uint)), match_data_8, __local_use_dat_context__goto_3896_22, dfa_workspace, 1000))
-        if ((if __local_capcount__goto_4972_7 == 0: 1 else: 0) != 0) {
+        (__local_capcount__goto_4919_7 = pcre2_dfa_match_8(compiled_code_8, __local_pp__goto_3853_14, __local_arg_ulen__goto_3836_18, (&raw const dat_datctl as *const datctl).offset, (((&raw const dat_datctl as *const datctl).options as c_uint) | (__local_g_notempty__goto_3839_10 as c_uint)), match_data_8, __local_use_dat_context__goto_3843_22, dfa_workspace, 1000))
+        if ((if __local_capcount__goto_4919_7 == 0: 1 else: 0) != 0) {
             goto '__ci_bb_430
         } else {
             goto '__ci_bb_431
@@ -17314,7 +17250,7 @@ fn process_data_8() -> c_int {
         colour_begin(35, outfile)
         fprintf(outfile, "Matched, but offsets vector is too small to show all matches\n")
         colour_end(outfile)
-        (__local_capcount__goto_4972_7 = (&raw const dat_datctl as *const datctl).oveccount)
+        (__local_capcount__goto_4919_7 = (&raw const dat_datctl as *const datctl).oveccount)
         goto '__ci_bb_431
     }
 
@@ -17323,17 +17259,17 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_432 {
-        (__local_capcount__goto_4972_7 = pcre2_jit_match_8(compiled_code_8, __local_pp__goto_3906_14, __local_arg_ulen__goto_3889_18, (&raw const dat_datctl as *const datctl).offset, (((&raw const dat_datctl as *const datctl).options as c_uint) | (__local_g_notempty__goto_3892_10 as c_uint)), match_data_8, __local_use_dat_context__goto_3896_22))
+        (__local_capcount__goto_4919_7 = pcre2_jit_match_8(compiled_code_8, __local_pp__goto_3853_14, __local_arg_ulen__goto_3836_18, (&raw const dat_datctl as *const datctl).offset, (((&raw const dat_datctl as *const datctl).options as c_uint) | (__local_g_notempty__goto_3839_10 as c_uint)), match_data_8, __local_use_dat_context__goto_3843_22))
         goto '__ci_bb_434
     }
 
     '__ci_bb_433 {
-        (__local_capcount__goto_4972_7 = pcre2_match_8(compiled_code_8, __local_pp__goto_3906_14, __local_arg_ulen__goto_3889_18, (&raw const dat_datctl as *const datctl).offset, (((&raw const dat_datctl as *const datctl).options as c_uint) | (__local_g_notempty__goto_3892_10 as c_uint)), match_data_8, __local_use_dat_context__goto_3896_22))
+        (__local_capcount__goto_4919_7 = pcre2_match_8(compiled_code_8, __local_pp__goto_3853_14, __local_arg_ulen__goto_3836_18, (&raw const dat_datctl as *const datctl).offset, (((&raw const dat_datctl as *const datctl).options as c_uint) | (__local_g_notempty__goto_3839_10 as c_uint)), match_data_8, __local_use_dat_context__goto_3843_22))
         goto '__ci_bb_434
     }
 
     '__ci_bb_434 {
-        if ((if __local_capcount__goto_4972_7 == 0: 1 else: 0) != 0) {
+        if ((if __local_capcount__goto_4919_7 == 0: 1 else: 0) != 0) {
             goto '__ci_bb_435
         } else {
             goto '__ci_bb_436
@@ -17344,7 +17280,7 @@ fn process_data_8() -> c_int {
         colour_begin(35, outfile)
         fprintf(outfile, "Matched, but too many substrings\n")
         colour_end(outfile)
-        (__local_capcount__goto_4972_7 = (&raw const dat_datctl as *const datctl).oveccount)
+        (__local_capcount__goto_4919_7 = (&raw const dat_datctl as *const datctl).oveccount)
         goto '__ci_bb_436
     }
 
@@ -17353,8 +17289,8 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_437 {
-        (__local_i__goto_5114_16 = 0)
-        (__local_target_mallocs__goto_5114_23 = mallocs_called)
+        (__local_i__goto_5061_16 = 0)
+        (__local_target_mallocs__goto_5061_23 = mallocs_called)
         goto '__ci_bb_439
     }
 
@@ -17363,7 +17299,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_439 {
-        if ((if __local_i__goto_5114_16 <= __local_target_mallocs__goto_5114_23: 1 else: 0) != 0) {
+        if ((if __local_i__goto_5061_16 <= __local_target_mallocs__goto_5061_23: 1 else: 0) != 0) {
             goto '__ci_bb_440
         } else {
             goto '__ci_bb_442
@@ -17371,12 +17307,12 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_440 {
-        (__local_saved_outfile__goto_5116_15 = outfile)
+        (__local_saved_outfile__goto_5063_15 = outfile)
         goto '__ci_bb_443
     }
 
     '__ci_bb_441 {
-        (__local_i__goto_5114_16 = __local_i__goto_5114_16 + 1)
+        (__local_i__goto_5061_16 = __local_i__goto_5061_16 + 1)
         goto '__ci_bb_439
     }
 
@@ -17385,9 +17321,9 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_443 {
-        (__local_heapframes__goto_5118_9 = ((match_data_8.heapframes as *mut c_void)))
-        (__local_memory_data__goto_5118_9 = (&raw const (unsafe: *match_data_8).memctl as *const pcre2_memctl).memory_data)
-        (&raw const (unsafe: *match_data_8).memctl as *const pcre2_memctl).free(__local_heapframes__goto_5118_9, __local_memory_data__goto_5118_9)
+        (__local_heapframes__goto_5065_9 = ((match_data_8.heapframes as *mut c_void)))
+        (__local_memory_data__goto_5065_9 = (&raw const (unsafe: *match_data_8).memctl as *const pcre2_memctl).memory_data)
+        (&raw const (unsafe: *match_data_8).memctl as *const pcre2_memctl).free(__local_heapframes__goto_5065_9, __local_memory_data__goto_5065_9)
         ((unsafe: *match_data_8).heapframes = ((null as *mut heapframe)))
         ((unsafe: *match_data_8).heapframes_size = 0)
         goto '__ci_bb_444
@@ -17403,7 +17339,7 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_445 {
         reset_callout_state()
-        (mallocs_until_failure = __local_i__goto_5114_16)
+        (mallocs_until_failure = __local_i__goto_5061_16)
         (outfile = null)
         if ((if (((&raw const dat_datctl as *const datctl).control as c_uint) & (512 as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_446
@@ -17432,8 +17368,8 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_448 {
         (mallocs_until_failure = 2147483647)
-        (outfile = __local_saved_outfile__goto_5116_15)
-        if ((if __local_capcount__goto_4972_7 == 0: 1 else: 0) != 0) {
+        (outfile = __local_saved_outfile__goto_5063_15)
+        if ((if __local_capcount__goto_4919_7 == 0: 1 else: 0) != 0) {
             goto '__ci_bb_454
         } else {
             goto '__ci_bb_455
@@ -17446,17 +17382,17 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_450 {
-        (__local_capcount__goto_4972_7 = pcre2_dfa_match_8(compiled_code_8, __local_pp__goto_3906_14, __local_arg_ulen__goto_3889_18, (&raw const dat_datctl as *const datctl).offset, (((&raw const dat_datctl as *const datctl).options as c_uint) | (__local_g_notempty__goto_3892_10 as c_uint)), match_data_8, __local_use_dat_context__goto_3896_22, dfa_workspace, 1000))
+        (__local_capcount__goto_4919_7 = pcre2_dfa_match_8(compiled_code_8, __local_pp__goto_3853_14, __local_arg_ulen__goto_3836_18, (&raw const dat_datctl as *const datctl).offset, (((&raw const dat_datctl as *const datctl).options as c_uint) | (__local_g_notempty__goto_3839_10 as c_uint)), match_data_8, __local_use_dat_context__goto_3843_22, dfa_workspace, 1000))
         goto '__ci_bb_448
     }
 
     '__ci_bb_451 {
-        (__local_capcount__goto_4972_7 = pcre2_jit_match_8(compiled_code_8, __local_pp__goto_3906_14, __local_arg_ulen__goto_3889_18, (&raw const dat_datctl as *const datctl).offset, (((&raw const dat_datctl as *const datctl).options as c_uint) | (__local_g_notempty__goto_3892_10 as c_uint)), match_data_8, __local_use_dat_context__goto_3896_22))
+        (__local_capcount__goto_4919_7 = pcre2_jit_match_8(compiled_code_8, __local_pp__goto_3853_14, __local_arg_ulen__goto_3836_18, (&raw const dat_datctl as *const datctl).offset, (((&raw const dat_datctl as *const datctl).options as c_uint) | (__local_g_notempty__goto_3839_10 as c_uint)), match_data_8, __local_use_dat_context__goto_3843_22))
         goto '__ci_bb_453
     }
 
     '__ci_bb_452 {
-        (__local_capcount__goto_4972_7 = pcre2_match_8(compiled_code_8, __local_pp__goto_3906_14, __local_arg_ulen__goto_3889_18, (&raw const dat_datctl as *const datctl).offset, (((&raw const dat_datctl as *const datctl).options as c_uint) | (__local_g_notempty__goto_3892_10 as c_uint)), match_data_8, __local_use_dat_context__goto_3896_22))
+        (__local_capcount__goto_4919_7 = pcre2_match_8(compiled_code_8, __local_pp__goto_3853_14, __local_arg_ulen__goto_3836_18, (&raw const dat_datctl as *const datctl).offset, (((&raw const dat_datctl as *const datctl).options as c_uint) | (__local_g_notempty__goto_3839_10 as c_uint)), match_data_8, __local_use_dat_context__goto_3843_22))
         goto '__ci_bb_453
     }
 
@@ -17465,14 +17401,14 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_454 {
-        (__local_capcount__goto_4972_7 = (&raw const dat_datctl as *const datctl).oveccount)
+        (__local_capcount__goto_4919_7 = (&raw const dat_datctl as *const datctl).oveccount)
         goto '__ci_bb_455
     }
 
     '__ci_bb_455 {
         (__ci_expr_logic_87 = 0)
-        if ((if __local_i__goto_5114_16 < __local_target_mallocs__goto_5114_23: 1 else: 0) != 0) {
-            (__ci_expr_logic_87 = (if (if __local_capcount__goto_4972_7 != -48: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_i__goto_5061_16 < __local_target_mallocs__goto_5061_23: 1 else: 0) != 0) {
+            (__ci_expr_logic_87 = (if (if __local_capcount__goto_4919_7 != -48: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_87 != 0) {
             goto '__ci_bb_456
@@ -17483,7 +17419,7 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_456 {
         colour_begin(31, outfile)
-        fprintf(outfile, "** malloc() match test did not fail as expected (%d)\n", __local_capcount__goto_4972_7)
+        fprintf(outfile, "** malloc() match test did not fail as expected (%d)\n", __local_capcount__goto_4919_7)
         colour_end(outfile)
         return PR_ABEND
     }
@@ -17493,18 +17429,18 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_458 {
-        (__local_tmp_offset__goto_5163_18 = 205)
-        (__local_tmp_options__goto_5164_16 = 205)
-        (__local_rc_nextmatch__goto_5162_12 = pcre2_next_match_8(match_data_8, (&raw mut __local_tmp_offset__goto_5163_18 as *mut c_ulong), (&raw mut __local_tmp_options__goto_5164_16 as *mut c_uint)))
-        if (__local_rc_nextmatch__goto_5162_12 != 0) {
+        (__local_tmp_offset__goto_5110_18 = 205)
+        (__local_tmp_options__goto_5111_16 = 205)
+        (__local_rc_nextmatch__goto_5109_12 = pcre2_next_match_8(match_data_8, (&raw mut __local_tmp_offset__goto_5110_18 as *mut c_ulong), (&raw mut __local_tmp_options__goto_5111_16 as *mut c_uint)))
+        if (__local_rc_nextmatch__goto_5109_12 != 0) {
             (__ci_expr_logic_89 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_89 = (if (if __local_tmp_offset__goto_5163_18 != 205: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_89 = (if (if __local_tmp_offset__goto_5110_18 != 205: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_89 != 0) {
             (__ci_expr_logic_90 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_90 = (if (if __local_tmp_options__goto_5164_16 != 205: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_90 = (if (if __local_tmp_options__goto_5111_16 != 205: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_90 != 0) {
             goto '__ci_bb_460
@@ -17514,7 +17450,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_459 {
-        if ((if __local_capcount__goto_4972_7 >= 0: 1 else: 0) != 0) {
+        if ((if __local_capcount__goto_4919_7 >= 0: 1 else: 0) != 0) {
             goto '__ci_bb_462
         } else {
             goto '__ci_bb_463
@@ -17533,7 +17469,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_462 {
-        if ((if __local_pp__goto_3906_14 == null: 1 else: 0) != 0) {
+        if ((if __local_pp__goto_3853_14 == null: 1 else: 0) != 0) {
             goto '__ci_bb_465
         } else {
             goto '__ci_bb_466
@@ -17541,7 +17477,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_463 {
-        if ((if __local_capcount__goto_4972_7 == -2: 1 else: 0) != 0) {
+        if ((if __local_capcount__goto_4919_7 == -2: 1 else: 0) != 0) {
             goto '__ci_bb_543
         } else {
             goto '__ci_bb_544
@@ -17553,13 +17489,13 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_465 {
-        (__local_pp__goto_3906_14 = dbuffer)
-        ((unsafe: *__local_pp__goto_3906_14) = 0)
+        (__local_pp__goto_3853_14 = dbuffer)
+        ((unsafe: *__local_pp__goto_3853_14) = 0)
         goto '__ci_bb_466
     }
 
     '__ci_bb_466 {
-        if ((if ((__local_capcount__goto_4972_7 as c_uint)) > __local_oveccount__goto_3902_10: 1 else: 0) != 0) {
+        if ((if ((__local_capcount__goto_4919_7 as c_uint)) > __local_oveccount__goto_3849_10: 1 else: 0) != 0) {
             goto '__ci_bb_467
         } else {
             goto '__ci_bb_468
@@ -17568,7 +17504,7 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_467 {
         colour_begin(31, outfile)
-        fprintf(outfile, "** PCRE2 error: returned count %d is too big for ovector count %d\n", __local_capcount__goto_4972_7, __local_oveccount__goto_3902_10)
+        fprintf(outfile, "** PCRE2 error: returned count %d is too big for ovector count %d\n", __local_capcount__goto_4919_7, __local_oveccount__goto_3849_10)
         colour_end(outfile)
         return PR_ABEND
     }
@@ -17597,21 +17533,21 @@ fn process_data_8() -> c_int {
         (__ci_expr_logic_95 = 0)
         (__ci_expr_logic_94 = 0)
         (__ci_expr_logic_93 = 0)
-        if ((if __local_gmatched__goto_3890_10 > 0: 1 else: 0) != 0) {
+        if ((if __local_gmatched__goto_3837_10 > 0: 1 else: 0) != 0) {
             var __ci_expr_logic_92: c_int = 0
 
-            if ((if (&raw const dat_datctl as *const datctl).offset <= (unsafe: __local_ovector__goto_3900_13[0]): 1 else: 0) != 0) {
-                (__ci_expr_logic_92 = (if (if (unsafe: __local_ovector__goto_3900_13[0]) <= (unsafe: __local_ovector__goto_3900_13[1]): 1 else: 0) != 0: 1 else: 0))
+            if ((if (&raw const dat_datctl as *const datctl).offset <= (unsafe: __local_ovector__goto_3847_13[0]): 1 else: 0) != 0) {
+                (__ci_expr_logic_92 = (if (if (unsafe: __local_ovector__goto_3847_13[0]) <= (unsafe: __local_ovector__goto_3847_13[1]): 1 else: 0) != 0: 1 else: 0))
             }
 
             (__ci_expr_logic_93 = (if (if not (__ci_expr_logic_92 != 0): 1 else: 0) != 0: 1 else: 0))
 
         }
         if (__ci_expr_logic_93 != 0) {
-            (__ci_expr_logic_94 = (if (if (__local_pp__goto_3906_14 + ((unsafe: __local_ovector__goto_3900_13[0]) as usize)) == __local_ovecsave__goto_3901_12[0]: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_94 = (if (if (__local_pp__goto_3853_14 + ((unsafe: __local_ovector__goto_3847_13[0]) as usize)) == __local_ovecsave__goto_3848_12[0]: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_94 != 0) {
-            (__ci_expr_logic_95 = (if (if (__local_pp__goto_3906_14 + ((unsafe: __local_ovector__goto_3900_13[1]) as usize)) == __local_ovecsave__goto_3901_12[1]: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_95 = (if (if (__local_pp__goto_3853_14 + ((unsafe: __local_ovector__goto_3847_13[1]) as usize)) == __local_ovecsave__goto_3848_12[1]: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_95 != 0) {
             goto '__ci_bb_477
@@ -17628,7 +17564,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_472 {
-        if ((if match_data_8.subject == __local_pp__goto_3906_14: 1 else: 0) != 0) {
+        if ((if match_data_8.subject == __local_pp__goto_3853_14: 1 else: 0) != 0) {
             goto '__ci_bb_473
         } else {
             goto '__ci_bb_474
@@ -17643,7 +17579,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_474 {
-        if ((if with_memcmp((match_data_8.subject as *i8), (__local_pp__goto_3906_14 as *i8), (__local_ulen__goto_3889_12 as i64)) != 0: 1 else: 0) != 0) {
+        if ((if with_memcmp((match_data_8.subject as *i8), (__local_pp__goto_3853_14 as *i8), (__local_ulen__goto_3836_12 as i64)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_475
         } else {
             goto '__ci_bb_476
@@ -17671,11 +17607,11 @@ fn process_data_8() -> c_int {
     '__ci_bb_478 {
         (__ci_expr_logic_101 = 0)
         (__ci_expr_logic_97 = 0)
-        if ((if __local_gmatched__goto_3890_10 > 0: 1 else: 0) != 0) {
+        if ((if __local_gmatched__goto_3837_10 > 0: 1 else: 0) != 0) {
             var __ci_expr_logic_96: c_int = 0
 
-            if ((if (&raw const dat_datctl as *const datctl).offset <= (unsafe: __local_ovector__goto_3900_13[0]): 1 else: 0) != 0) {
-                (__ci_expr_logic_96 = (if (if (unsafe: __local_ovector__goto_3900_13[0]) <= (unsafe: __local_ovector__goto_3900_13[1]): 1 else: 0) != 0: 1 else: 0))
+            if ((if (&raw const dat_datctl as *const datctl).offset <= (unsafe: __local_ovector__goto_3847_13[0]): 1 else: 0) != 0) {
+                (__ci_expr_logic_96 = (if (if (unsafe: __local_ovector__goto_3847_13[0]) <= (unsafe: __local_ovector__goto_3847_13[1]): 1 else: 0) != 0: 1 else: 0))
             }
 
             (__ci_expr_logic_97 = (if __ci_expr_logic_96 != 0: 1 else: 0))
@@ -17684,19 +17620,19 @@ fn process_data_8() -> c_int {
         if (__ci_expr_logic_97 != 0) {
             var __ci_expr_logic_100: c_int
 
-            if ((if (__local_pp__goto_3906_14 + ((unsafe: __local_ovector__goto_3900_13[1]) as usize)) > __local_ovecsave__goto_3901_12[1]: 1 else: 0) != 0) {
+            if ((if (__local_pp__goto_3853_14 + ((unsafe: __local_ovector__goto_3847_13[1]) as usize)) > __local_ovecsave__goto_3848_12[1]: 1 else: 0) != 0) {
                 (__ci_expr_logic_100 = (if true: 1 else: 0))
             } else {
                 var __ci_expr_logic_99: c_int = 0
 
                 var __ci_expr_logic_98: c_int = 0
 
-                if ((if (unsafe: __local_ovector__goto_3900_13[1]) == (unsafe: __local_ovector__goto_3900_13[0]): 1 else: 0) != 0) {
-                    (__ci_expr_logic_98 = (if (if __local_ovecsave__goto_3901_12[1] != __local_ovecsave__goto_3901_12[0]: 1 else: 0) != 0: 1 else: 0))
+                if ((if (unsafe: __local_ovector__goto_3847_13[1]) == (unsafe: __local_ovector__goto_3847_13[0]): 1 else: 0) != 0) {
+                    (__ci_expr_logic_98 = (if (if __local_ovecsave__goto_3848_12[1] != __local_ovecsave__goto_3848_12[0]: 1 else: 0) != 0: 1 else: 0))
                 }
 
                 if (__ci_expr_logic_98 != 0) {
-                    (__ci_expr_logic_99 = (if (if (__local_pp__goto_3906_14 + ((unsafe: __local_ovector__goto_3900_13[1]) as usize)) == __local_ovecsave__goto_3901_12[1]: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_99 = (if (if (__local_pp__goto_3853_14 + ((unsafe: __local_ovector__goto_3847_13[1]) as usize)) == __local_ovecsave__goto_3848_12[1]: 1 else: 0) != 0: 1 else: 0))
                 }
 
                 (__ci_expr_logic_100 = (if __ci_expr_logic_99 != 0: 1 else: 0))
@@ -17729,8 +17665,8 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_481 {
-        (__local_ovecsave__goto_3901_12[0] = __local_pp__goto_3906_14 + ((unsafe: __local_ovector__goto_3900_13[0]) as usize))
-        (__local_ovecsave__goto_3901_12[1] = __local_pp__goto_3906_14 + ((unsafe: __local_ovector__goto_3900_13[1]) as usize))
+        (__local_ovecsave__goto_3848_12[0] = __local_pp__goto_3853_14 + ((unsafe: __local_ovector__goto_3847_13[0]) as usize))
+        (__local_ovecsave__goto_3848_12[1] = __local_pp__goto_3853_14 + ((unsafe: __local_ovector__goto_3847_13[1]) as usize))
         if ((if (((&raw const dat_datctl as *const datctl).control as c_uint) & (((4 as c_uint) | (512 as c_uint)) as c_uint)) == 4: 1 else: 0) != 0) {
             goto '__ci_bb_482
         } else {
@@ -17739,8 +17675,8 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_482 {
-        (__local_capcount__goto_4972_7 = ((maxcapcount as c_uint) +% (1 as c_uint)))
-        if ((if ((__local_capcount__goto_4972_7 as c_uint)) > __local_oveccount__goto_3902_10: 1 else: 0) != 0) {
+        (__local_capcount__goto_4919_7 = ((maxcapcount as c_uint) +% (1 as c_uint)))
+        if ((if ((__local_capcount__goto_4919_7 as c_uint)) > __local_oveccount__goto_3849_10: 1 else: 0) != 0) {
             goto '__ci_bb_484
         } else {
             goto '__ci_bb_485
@@ -17756,7 +17692,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_484 {
-        (__local_capcount__goto_4972_7 = __local_oveccount__goto_3902_10)
+        (__local_capcount__goto_4919_7 = __local_oveccount__goto_3849_10)
         goto '__ci_bb_485
     }
 
@@ -17765,17 +17701,17 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_486 {
-        (__local_capcount__goto_4972_7 = __local_oveccount__goto_3902_10)
+        (__local_capcount__goto_4919_7 = __local_oveccount__goto_3849_10)
         goto '__ci_bb_487
     }
 
     '__ci_bb_487 {
-        (__local_i__goto_5282_14 = 0)
+        (__local_i__goto_5229_14 = 0)
         goto '__ci_bb_488
     }
 
     '__ci_bb_488 {
-        if ((if __local_i__goto_5282_14 < (2 * __local_capcount__goto_4972_7): 1 else: 0) != 0) {
+        if ((if __local_i__goto_5229_14 < (2 * __local_capcount__goto_4919_7): 1 else: 0) != 0) {
             goto '__ci_bb_489
         } else {
             goto '__ci_bb_491
@@ -17783,9 +17719,9 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_489 {
-        (__local_start__goto_5285_18 = (unsafe: __local_ovector__goto_3900_13[__local_i__goto_5282_14]))
-        (__local_end__goto_5286_18 = (unsafe: __local_ovector__goto_3900_13[(__local_i__goto_5282_14 + 1)]))
-        if ((if __local_start__goto_5285_18 > __local_end__goto_5286_18: 1 else: 0) != 0) {
+        (__local_start__goto_5232_18 = (unsafe: __local_ovector__goto_3847_13[__local_i__goto_5229_14]))
+        (__local_end__goto_5233_18 = (unsafe: __local_ovector__goto_3847_13[(__local_i__goto_5229_14 + 1)]))
+        if ((if __local_start__goto_5232_18 > __local_end__goto_5233_18: 1 else: 0) != 0) {
             goto '__ci_bb_492
         } else {
             goto '__ci_bb_493
@@ -17793,7 +17729,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_490 {
-        (__local_i__goto_5282_14 = __local_i__goto_5282_14 + 2)
+        (__local_i__goto_5229_14 = __local_i__goto_5229_14 + 2)
         goto '__ci_bb_488
     }
 
@@ -17810,8 +17746,8 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_492 {
-        (__local_start__goto_5285_18 = (unsafe: __local_ovector__goto_3900_13[(__local_i__goto_5282_14 + 1)]))
-        (__local_end__goto_5286_18 = (unsafe: __local_ovector__goto_3900_13[__local_i__goto_5282_14]))
+        (__local_start__goto_5232_18 = (unsafe: __local_ovector__goto_3847_13[(__local_i__goto_5229_14 + 1)]))
+        (__local_end__goto_5233_18 = (unsafe: __local_ovector__goto_3847_13[__local_i__goto_5229_14]))
         colour_begin(35, outfile)
         fprintf(outfile, "Start of matched string is beyond its end - displaying from end to start.\n")
         colour_end(outfile)
@@ -17819,10 +17755,10 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_493 {
-        fprintf(outfile, "%2d: ", (__local_i__goto_5282_14 / 2))
+        fprintf(outfile, "%2d: ", (__local_i__goto_5229_14 / 2))
         (__ci_expr_logic_102 = 0)
-        if ((if __local_start__goto_5285_18 == (~(0 as c_ulong)): 1 else: 0) != 0) {
-            (__ci_expr_logic_102 = (if (if __local_end__goto_5286_18 == (~(0 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_start__goto_5232_18 == (~(0 as c_ulong)): 1 else: 0) != 0) {
+            (__ci_expr_logic_102 = (if (if __local_end__goto_5233_18 == (~(0 as c_ulong)): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_102 != 0) {
             goto '__ci_bb_494
@@ -17837,10 +17773,10 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_495 {
-        if ((if __local_start__goto_5285_18 > __local_ulen__goto_3889_12: 1 else: 0) != 0) {
+        if ((if __local_start__goto_5232_18 > __local_ulen__goto_3836_12: 1 else: 0) != 0) {
             (__ci_expr_logic_103 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_103 = (if (if __local_end__goto_5286_18 > __local_ulen__goto_3889_12: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_103 = (if (if __local_end__goto_5233_18 > __local_ulen__goto_3836_12: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_103 != 0) {
             goto '__ci_bb_496
@@ -17855,13 +17791,13 @@ fn process_data_8() -> c_int {
         if ((if (((&raw const dat_datctl as *const datctl).control as c_uint) & (512 as c_uint)) != 0: 1 else: 0) != 0) {
             (__ci_expr_logic_104 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_104 = (if (if __local_i__goto_5282_14 >= ((((((2 as c_uint) *% (maxcapcount as c_uint)) as c_uint) +% (2 as c_uint)) as c_int)): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_104 = (if (if __local_i__goto_5229_14 >= ((((((2 as c_uint) *% (maxcapcount as c_uint)) as c_uint) +% (2 as c_uint)) as c_int)): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_104 != 0) {
-            (__ci_expr_logic_105 = (if (if __local_start__goto_5285_18 == 3735928559: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_105 = (if (if __local_start__goto_5232_18 == 3735928559: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_105 != 0) {
-            (__ci_expr_logic_106 = (if (if __local_end__goto_5286_18 == 3735928559: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_106 = (if (if __local_end__goto_5233_18 == 3735928559: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_106 != 0) {
             goto '__ci_bb_498
@@ -17871,7 +17807,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_497 {
-        if ((if __local_i__goto_5282_14 == 0: 1 else: 0) != 0) {
+        if ((if __local_i__goto_5229_14 == 0: 1 else: 0) != 0) {
             goto '__ci_bb_501
         } else {
             goto '__ci_bb_502
@@ -17885,7 +17821,7 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_499 {
         colour_begin(31, outfile)
-        fprintf(outfile, "** ERROR: bad value(s) for offset(s): 0x%lx 0x%lx\n", __local_start__goto_5285_18, __local_end__goto_5286_18)
+        fprintf(outfile, "** ERROR: bad value(s) for offset(s): 0x%lx 0x%lx\n", __local_start__goto_5232_18, __local_end__goto_5233_18)
         colour_end(outfile)
         goto '__ci_bb_500
     }
@@ -17903,7 +17839,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_502 {
-        pchars_8(-1, (__local_pp__goto_3906_14 + (__local_start__goto_5285_18 as usize)), ((__local_end__goto_5286_18 as c_ulong) -% (__local_start__goto_5285_18 as c_ulong)), __local_utf__goto_3897_6, outfile)
+        pchars_8(-1, (__local_pp__goto_3853_14 + (__local_start__goto_5232_18 as usize)), ((__local_end__goto_5233_18 as c_ulong) -% (__local_start__goto_5232_18 as c_ulong)), __local_utf__goto_3844_6, outfile)
         goto '__ci_bb_503
     }
 
@@ -17914,7 +17850,7 @@ fn process_data_8() -> c_int {
         } else {
             var __ci_expr_logic_112: c_int = 0
 
-            if ((if __local_i__goto_5282_14 == 0: 1 else: 0) != 0) {
+            if ((if __local_i__goto_5229_14 == 0: 1 else: 0) != 0) {
                 (__ci_expr_logic_112 = (if (if (((&raw const dat_datctl as *const datctl).control as c_uint) & (1 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
             }
 
@@ -17929,32 +17865,32 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_504 {
-        (__local_leftchar__goto_5334_20 = match_data_8.leftchar)
-        (__local_rightchar__goto_5334_30 = match_data_8.rightchar)
+        (__local_leftchar__goto_5281_20 = match_data_8.leftchar)
+        (__local_rightchar__goto_5281_30 = match_data_8.rightchar)
         (__ci_expr_logic_108 = 0)
-        if ((if __local_i__goto_5282_14 == 0: 1 else: 0) != 0) {
+        if ((if __local_i__goto_5229_14 == 0: 1 else: 0) != 0) {
             var __ci_expr_logic_107: c_int
 
-            if ((if __local_leftchar__goto_5334_20 < __local_start__goto_5285_18: 1 else: 0) != 0) {
+            if ((if __local_leftchar__goto_5281_20 < __local_start__goto_5232_18: 1 else: 0) != 0) {
                 (__ci_expr_logic_107 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_107 = (if (if __local_rightchar__goto_5334_30 > __local_end__goto_5286_18: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_107 = (if (if __local_rightchar__goto_5281_30 > __local_end__goto_5233_18: 1 else: 0) != 0: 1 else: 0))
             }
 
             (__ci_expr_logic_108 = (if __ci_expr_logic_107 != 0: 1 else: 0))
 
         }
-        (__local_showallused__goto_5333_14 = __ci_expr_logic_108)
+        (__local_showallused__goto_5280_14 = __ci_expr_logic_108)
         goto '__ci_bb_506
     }
 
     '__ci_bb_505 {
-        (__local_showallused__goto_5333_14 = 0)
+        (__local_showallused__goto_5280_14 = 0)
         goto '__ci_bb_506
     }
 
     '__ci_bb_506 {
-        if (__local_showallused__goto_5333_14 != 0) {
+        if (__local_showallused__goto_5280_14 != 0) {
             goto '__ci_bb_507
         } else {
             goto '__ci_bb_508
@@ -17962,9 +17898,9 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_507 {
-        (__local_lleft__goto_5284_18 = pchars_8(-1, (__local_pp__goto_3906_14 + (__local_leftchar__goto_5334_20 as usize)), ((__local_start__goto_5285_18 as c_ulong) -% (__local_leftchar__goto_5334_20 as c_ulong)), __local_utf__goto_3897_6, outfile))
-        (__local_lmiddle__goto_5284_25 = pchars_8(-1, (__local_pp__goto_3906_14 + (__local_start__goto_5285_18 as usize)), ((__local_end__goto_5286_18 as c_ulong) -% (__local_start__goto_5285_18 as c_ulong)), __local_utf__goto_3897_6, outfile))
-        (__local_lright__goto_5284_34 = pchars_8(-1, (__local_pp__goto_3906_14 + (__local_end__goto_5286_18 as usize)), ((__local_rightchar__goto_5334_30 as c_ulong) -% (__local_end__goto_5286_18 as c_ulong)), __local_utf__goto_3897_6, outfile))
+        (__local_lleft__goto_5231_18 = pchars_8(-1, (__local_pp__goto_3853_14 + (__local_leftchar__goto_5281_20 as usize)), ((__local_start__goto_5232_18 as c_ulong) -% (__local_leftchar__goto_5281_20 as c_ulong)), __local_utf__goto_3844_6, outfile))
+        (__local_lmiddle__goto_5231_25 = pchars_8(-1, (__local_pp__goto_3853_14 + (__local_start__goto_5232_18 as usize)), ((__local_end__goto_5233_18 as c_ulong) -% (__local_start__goto_5232_18 as c_ulong)), __local_utf__goto_3844_6, outfile))
+        (__local_lright__goto_5231_34 = pchars_8(-1, (__local_pp__goto_3853_14 + (__local_end__goto_5233_18 as usize)), ((__local_rightchar__goto_5281_30 as c_ulong) -% (__local_end__goto_5233_18 as c_ulong)), __local_utf__goto_3844_6, outfile))
         (__ci_expr_logic_109 = 0)
         if ((if (((&raw const pat_patctl as *const patctl).control as c_uint) & (524288 as c_uint)) != 0: 1 else: 0) != 0) {
             (__ci_expr_logic_109 = (if jit_was_used != 0: 1 else: 0))
@@ -17995,12 +17931,12 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_511 {
         fprintf(outfile, "\n    ")
-        (__local_j__goto_4971_14 = 0)
+        (__local_j__goto_4918_14 = 0)
         goto '__ci_bb_512
     }
 
     '__ci_bb_512 {
-        if ((if __local_j__goto_4971_14 < __local_lleft__goto_5284_18: 1 else: 0) != 0) {
+        if ((if __local_j__goto_4918_14 < __local_lleft__goto_5231_18: 1 else: 0) != 0) {
             goto '__ci_bb_513
         } else {
             goto '__ci_bb_515
@@ -18013,17 +17949,17 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_514 {
-        (__local_j__goto_4971_14 = __local_j__goto_4971_14 + 1)
+        (__local_j__goto_4918_14 = __local_j__goto_4918_14 + 1)
         goto '__ci_bb_512
     }
 
     '__ci_bb_515 {
-        (__local_j__goto_4971_14 = 0)
+        (__local_j__goto_4918_14 = 0)
         goto '__ci_bb_516
     }
 
     '__ci_bb_516 {
-        if ((if __local_j__goto_4971_14 < __local_lmiddle__goto_5284_25: 1 else: 0) != 0) {
+        if ((if __local_j__goto_4918_14 < __local_lmiddle__goto_5231_25: 1 else: 0) != 0) {
             goto '__ci_bb_517
         } else {
             goto '__ci_bb_519
@@ -18036,17 +17972,17 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_518 {
-        (__local_j__goto_4971_14 = __local_j__goto_4971_14 + 1)
+        (__local_j__goto_4918_14 = __local_j__goto_4918_14 + 1)
         goto '__ci_bb_516
     }
 
     '__ci_bb_519 {
-        (__local_j__goto_4971_14 = 0)
+        (__local_j__goto_4918_14 = 0)
         goto '__ci_bb_520
     }
 
     '__ci_bb_520 {
-        if ((if __local_j__goto_4971_14 < __local_lright__goto_5284_34: 1 else: 0) != 0) {
+        if ((if __local_j__goto_4918_14 < __local_lright__goto_5231_34: 1 else: 0) != 0) {
             goto '__ci_bb_521
         } else {
             goto '__ci_bb_523
@@ -18059,7 +17995,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_522 {
-        (__local_j__goto_4971_14 = __local_j__goto_4971_14 + 1)
+        (__local_j__goto_4918_14 = __local_j__goto_4918_14 + 1)
         goto '__ci_bb_520
     }
 
@@ -18068,9 +18004,9 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_524 {
-        (__local_startchar__goto_5363_22 = pcre2_get_startchar_8(match_data_8))
-        (__local_lleft__goto_5284_18 = pchars_8(-1, (__local_pp__goto_3906_14 + (__local_startchar__goto_5363_22 as usize)), ((__local_start__goto_5285_18 as c_ulong) -% (__local_startchar__goto_5363_22 as c_ulong)), __local_utf__goto_3897_6, outfile))
-        pchars_8(-1, (__local_pp__goto_3906_14 + (__local_start__goto_5285_18 as usize)), ((__local_end__goto_5286_18 as c_ulong) -% (__local_start__goto_5285_18 as c_ulong)), __local_utf__goto_3897_6, outfile)
+        (__local_startchar__goto_5310_22 = pcre2_get_startchar_8(match_data_8))
+        (__local_lleft__goto_5231_18 = pchars_8(-1, (__local_pp__goto_3853_14 + (__local_startchar__goto_5310_22 as usize)), ((__local_start__goto_5232_18 as c_ulong) -% (__local_startchar__goto_5310_22 as c_ulong)), __local_utf__goto_3844_6, outfile))
+        pchars_8(-1, (__local_pp__goto_3853_14 + (__local_start__goto_5232_18 as usize)), ((__local_end__goto_5233_18 as c_ulong) -% (__local_start__goto_5232_18 as c_ulong)), __local_utf__goto_3844_6, outfile)
         (__ci_expr_logic_110 = 0)
         if ((if (((&raw const pat_patctl as *const patctl).control as c_uint) & (524288 as c_uint)) != 0: 1 else: 0) != 0) {
             (__ci_expr_logic_110 = (if jit_was_used != 0: 1 else: 0))
@@ -18083,7 +18019,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_525 {
-        pchars_8(-1, (__local_pp__goto_3906_14 + (__local_start__goto_5285_18 as usize)), ((__local_end__goto_5286_18 as c_ulong) -% (__local_start__goto_5285_18 as c_ulong)), __local_utf__goto_3897_6, outfile)
+        pchars_8(-1, (__local_pp__goto_3853_14 + (__local_start__goto_5232_18 as usize)), ((__local_end__goto_5233_18 as c_ulong) -% (__local_start__goto_5232_18 as c_ulong)), __local_utf__goto_3844_6, outfile)
         (__ci_expr_logic_111 = 0)
         if ((if (((&raw const pat_patctl as *const patctl).control as c_uint) & (524288 as c_uint)) != 0: 1 else: 0) != 0) {
             (__ci_expr_logic_111 = (if jit_was_used != 0: 1 else: 0))
@@ -18105,7 +18041,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_528 {
-        if ((if __local_startchar__goto_5363_22 != __local_start__goto_5285_18: 1 else: 0) != 0) {
+        if ((if __local_startchar__goto_5310_22 != __local_start__goto_5232_18: 1 else: 0) != 0) {
             goto '__ci_bb_529
         } else {
             goto '__ci_bb_530
@@ -18114,7 +18050,7 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_529 {
         fprintf(outfile, "\n    ")
-        (__local_j__goto_4971_14 = 0)
+        (__local_j__goto_4918_14 = 0)
         goto '__ci_bb_531
     }
 
@@ -18123,7 +18059,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_531 {
-        if ((if __local_j__goto_4971_14 < __local_lleft__goto_5284_18: 1 else: 0) != 0) {
+        if ((if __local_j__goto_4918_14 < __local_lleft__goto_5231_18: 1 else: 0) != 0) {
             goto '__ci_bb_532
         } else {
             goto '__ci_bb_534
@@ -18136,7 +18072,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_533 {
-        (__local_j__goto_4971_14 = __local_j__goto_4971_14 + 1)
+        (__local_j__goto_4918_14 = __local_j__goto_4918_14 + 1)
         goto '__ci_bb_531
     }
 
@@ -18154,8 +18090,8 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_537 {
-        fprintf(outfile, "%2d+ ", (__local_i__goto_5282_14 / 2))
-        pchars_8(-1, (__local_pp__goto_3906_14 + ((unsafe: __local_ovector__goto_3900_13[(__local_i__goto_5282_14 + 1)]) as usize)), ((__local_ulen__goto_3889_12 as c_ulong) -% ((unsafe: __local_ovector__goto_3900_13[(__local_i__goto_5282_14 + 1)]) as c_ulong)), __local_utf__goto_3897_6, outfile)
+        fprintf(outfile, "%2d+ ", (__local_i__goto_5229_14 / 2))
+        pchars_8(-1, (__local_pp__goto_3853_14 + ((unsafe: __local_ovector__goto_3847_13[(__local_i__goto_5229_14 + 1)]) as usize)), ((__local_ulen__goto_3836_12 as c_ulong) -% ((unsafe: __local_ovector__goto_3847_13[(__local_i__goto_5229_14 + 1)]) as c_ulong)), __local_utf__goto_3844_6, outfile)
         fprintf(outfile, "\n")
         goto '__ci_bb_538
     }
@@ -18166,13 +18102,13 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_539 {
         fprintf(outfile, "MK: ")
-        pchars_8(-1, (match_data_8.mark - ((1 as isize) as usize)), -1, __local_utf__goto_3897_6, outfile)
+        pchars_8(-1, (match_data_8.mark - ((1 as isize) as usize)), -1, __local_utf__goto_3844_6, outfile)
         fprintf(outfile, "\n")
         goto '__ci_bb_540
     }
 
     '__ci_bb_540 {
-        if ((if not (copy_and_get_8(__local_utf__goto_3897_6, __local_capcount__goto_4972_7) != 0): 1 else: 0) != 0) {
+        if ((if not (copy_and_get_8(__local_utf__goto_3844_6, __local_capcount__goto_4919_7) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_541
         } else {
             goto '__ci_bb_542
@@ -18188,7 +18124,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_543 {
-        (__local_rubriclength__goto_5432_9 = 0)
+        (__local_rubriclength__goto_5379_9 = 0)
         if ((if (((&raw const dat_datctl as *const datctl).control as c_uint) & (8 as c_uint)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_546
         } else {
@@ -18201,12 +18137,12 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_546 {
-        (__local_leftchar__goto_5430_16 = match_data_8.leftchar)
+        (__local_leftchar__goto_5377_16 = match_data_8.leftchar)
         goto '__ci_bb_548
     }
 
     '__ci_bb_547 {
-        (__local_leftchar__goto_5430_16 = (unsafe: __local_ovector__goto_3900_13[0]))
+        (__local_leftchar__goto_5377_16 = (unsafe: __local_ovector__goto_3847_13[0]))
         goto '__ci_bb_548
     }
 
@@ -18227,16 +18163,16 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_549 {
         fprintf(outfile, ", mark=")
-        (__local_rubriclength__goto_5432_9 = pchars_8(-1, (match_data_8.mark - ((1 as isize) as usize)), -1, __local_utf__goto_3897_6, outfile))
-        (__local_rubriclength__goto_5432_9 = __local_rubriclength__goto_5432_9 + 7)
+        (__local_rubriclength__goto_5379_9 = pchars_8(-1, (match_data_8.mark - ((1 as isize) as usize)), -1, __local_utf__goto_3844_6, outfile))
+        (__local_rubriclength__goto_5379_9 = __local_rubriclength__goto_5379_9 + 7)
         goto '__ci_bb_550
     }
 
     '__ci_bb_550 {
         fprintf(outfile, ": ")
-        (__local_rubriclength__goto_5432_9 = __local_rubriclength__goto_5432_9 + 15)
-        (__local_backlength__goto_5431_9 = pchars_8(32, (__local_pp__goto_3906_14 + (__local_leftchar__goto_5430_16 as usize)), (((unsafe: __local_ovector__goto_3900_13[0]) as c_ulong) -% (__local_leftchar__goto_5430_16 as c_ulong)), __local_utf__goto_3897_6, outfile))
-        pchars_8(32, (__local_pp__goto_3906_14 + ((unsafe: __local_ovector__goto_3900_13[0]) as usize)), (((unsafe: __local_ovector__goto_3900_13[1]) as c_ulong) -% ((unsafe: __local_ovector__goto_3900_13[0]) as c_ulong)), __local_utf__goto_3897_6, outfile)
+        (__local_rubriclength__goto_5379_9 = __local_rubriclength__goto_5379_9 + 15)
+        (__local_backlength__goto_5378_9 = pchars_8(32, (__local_pp__goto_3853_14 + (__local_leftchar__goto_5377_16 as usize)), (((unsafe: __local_ovector__goto_3847_13[0]) as c_ulong) -% (__local_leftchar__goto_5377_16 as c_ulong)), __local_utf__goto_3844_6, outfile))
+        pchars_8(32, (__local_pp__goto_3853_14 + ((unsafe: __local_ovector__goto_3847_13[0]) as usize)), (((unsafe: __local_ovector__goto_3847_13[1]) as c_ulong) -% ((unsafe: __local_ovector__goto_3847_13[0]) as c_ulong)), __local_utf__goto_3844_6, outfile)
         (__ci_expr_logic_116 = 0)
         if ((if (((&raw const pat_patctl as *const patctl).control as c_uint) & (524288 as c_uint)) != 0: 1 else: 0) != 0) {
             (__ci_expr_logic_116 = (if jit_was_used != 0: 1 else: 0))
@@ -18255,7 +18191,7 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_552 {
         fprintf(outfile, "\n")
-        if ((if __local_backlength__goto_5431_9 != 0: 1 else: 0) != 0) {
+        if ((if __local_backlength__goto_5378_9 != 0: 1 else: 0) != 0) {
             goto '__ci_bb_553
         } else {
             goto '__ci_bb_554
@@ -18263,12 +18199,12 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_553 {
-        (__local_i__goto_5460_16 = 0)
+        (__local_i__goto_5407_16 = 0)
         goto '__ci_bb_555
     }
 
     '__ci_bb_554 {
-        if ((if __local_ulen__goto_3889_12 != (unsafe: __local_ovector__goto_3900_13[1]): 1 else: 0) != 0) {
+        if ((if __local_ulen__goto_3836_12 != (unsafe: __local_ovector__goto_3847_13[1]): 1 else: 0) != 0) {
             goto '__ci_bb_563
         } else {
             goto '__ci_bb_564
@@ -18276,7 +18212,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_555 {
-        if ((if __local_i__goto_5460_16 < __local_rubriclength__goto_5432_9: 1 else: 0) != 0) {
+        if ((if __local_i__goto_5407_16 < __local_rubriclength__goto_5379_9: 1 else: 0) != 0) {
             goto '__ci_bb_556
         } else {
             goto '__ci_bb_558
@@ -18289,17 +18225,17 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_557 {
-        (__local_i__goto_5460_16 = __local_i__goto_5460_16 + 1)
+        (__local_i__goto_5407_16 = __local_i__goto_5407_16 + 1)
         goto '__ci_bb_555
     }
 
     '__ci_bb_558 {
-        (__local_i__goto_5461_16 = 0)
+        (__local_i__goto_5408_16 = 0)
         goto '__ci_bb_559
     }
 
     '__ci_bb_559 {
-        if ((if __local_i__goto_5461_16 < __local_backlength__goto_5431_9: 1 else: 0) != 0) {
+        if ((if __local_i__goto_5408_16 < __local_backlength__goto_5378_9: 1 else: 0) != 0) {
             goto '__ci_bb_560
         } else {
             goto '__ci_bb_562
@@ -18312,7 +18248,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_561 {
-        (__local_i__goto_5461_16 = __local_i__goto_5461_16 + 1)
+        (__local_i__goto_5408_16 = __local_i__goto_5408_16 + 1)
         goto '__ci_bb_559
     }
 
@@ -18323,13 +18259,13 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_563 {
         colour_begin(31, outfile)
-        fprintf(outfile, "** ovector[1] is not equal to the subject length: %ld != %ld\n", (unsafe: __local_ovector__goto_3900_13[1]), __local_ulen__goto_3889_12)
+        fprintf(outfile, "** ovector[1] is not equal to the subject length: %ld != %ld\n", (unsafe: __local_ovector__goto_3847_13[1]), __local_ulen__goto_3836_12)
         colour_end(outfile)
         goto '__ci_bb_564
     }
 
     '__ci_bb_564 {
-        if ((if not (copy_and_get_8(__local_utf__goto_3897_6, 1) != 0): 1 else: 0) != 0) {
+        if ((if not (copy_and_get_8(__local_utf__goto_3844_6, 1) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_565
         } else {
             goto '__ci_bb_566
@@ -18349,7 +18285,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_567 {
-        show_ovector(__local_ovector__goto_3900_13, __local_oveccount__goto_3902_10)
+        show_ovector(__local_ovector__goto_3847_13, __local_oveccount__goto_3849_10)
         goto '__ci_bb_568
     }
 
@@ -18358,7 +18294,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_569 {
-        if (__local_capcount__goto_4972_7 == -1) {
+        if (__local_capcount__goto_4919_7 == -1) {
             goto '__ci_bb_571
         } else {
             goto '__ci_bb_586
@@ -18370,7 +18306,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_571 {
-        if ((if __local_gmatched__goto_3890_10 == 0: 1 else: 0) != 0) {
+        if ((if __local_gmatched__goto_3837_10 == 0: 1 else: 0) != 0) {
             goto '__ci_bb_572
         } else {
             goto '__ci_bb_573
@@ -18398,7 +18334,7 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_574 {
         fprintf(outfile, ", mark = ")
-        pchars_8(-1, (match_data_8.mark - ((1 as isize) as usize)), -1, __local_utf__goto_3897_6, outfile)
+        pchars_8(-1, (match_data_8.mark - ((1 as isize) as usize)), -1, __local_utf__goto_3844_6, outfile)
         goto '__ci_bb_575
     }
 
@@ -18429,7 +18365,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_578 {
-        show_ovector(__local_ovector__goto_3900_13, __local_oveccount__goto_3902_10)
+        show_ovector(__local_ovector__goto_3847_13, __local_oveccount__goto_3849_10)
         goto '__ci_bb_579
     }
 
@@ -18439,16 +18375,16 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_580 {
         colour_begin(35, outfile)
-        fprintf(outfile, "Error %d (bad UTF-8 offset)\n", __local_capcount__goto_4972_7)
+        fprintf(outfile, "Error %d (bad UTF-8 offset)\n", __local_capcount__goto_4919_7)
         colour_end(outfile)
         goto '__ci_bb_570
     }
 
     '__ci_bb_581 {
         colour_begin(35, outfile)
-        fprintf(outfile, "Failed: error %d: ", __local_capcount__goto_4972_7)
+        fprintf(outfile, "Failed: error %d: ", __local_capcount__goto_4919_7)
         colour_end(outfile)
-        if ((if not (print_error_message_8(__local_capcount__goto_4972_7, "", "") != 0): 1 else: 0) != 0) {
+        if ((if not (print_error_message_8(__local_capcount__goto_4919_7, "", "") != 0): 1 else: 0) != 0) {
             goto '__ci_bb_582
         } else {
             goto '__ci_bb_583
@@ -18461,8 +18397,8 @@ fn process_data_8() -> c_int {
 
     '__ci_bb_583 {
         (__ci_expr_logic_119 = 0)
-        if ((if __local_capcount__goto_4972_7 <= -3: 1 else: 0) != 0) {
-            (__ci_expr_logic_119 = (if (if __local_capcount__goto_4972_7 >= -28: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_capcount__goto_4919_7 <= -3: 1 else: 0) != 0) {
+            (__ci_expr_logic_119 = (if (if __local_capcount__goto_4919_7 >= -28: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_119 != 0) {
             goto '__ci_bb_584
@@ -18472,9 +18408,9 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_584 {
-        (__local_startchar__goto_5520_20 = pcre2_get_startchar_8(match_data_8))
+        (__local_startchar__goto_5467_20 = pcre2_get_startchar_8(match_data_8))
         colour_begin(35, outfile)
-        fprintf(outfile, " at offset %zu", __local_startchar__goto_5520_20)
+        fprintf(outfile, " at offset %zu", __local_startchar__goto_5467_20)
         colour_end(outfile)
         goto '__ci_bb_585
     }
@@ -18485,7 +18421,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_586 {
-        if (__local_capcount__goto_4972_7 == -36) {
+        if (__local_capcount__goto_4919_7 == -36) {
             goto '__ci_bb_580
         } else {
             goto '__ci_bb_581
@@ -18497,9 +18433,9 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_588 {
-        (__local_new_start_offset__goto_5541_16 = ((-1 as c_ulong)))
-        (__local_rc_nextmatch__goto_5542_10 = pcre2_next_match_8(match_data_8, (&raw mut __local_new_start_offset__goto_5541_16 as *mut c_ulong), (&raw mut __local_g_notempty__goto_3892_10 as *mut c_uint)))
-        if ((if not (__local_rc_nextmatch__goto_5542_10 != 0): 1 else: 0) != 0) {
+        (__local_new_start_offset__goto_5488_16 = ((-1 as c_ulong)))
+        (__local_rc_nextmatch__goto_5489_10 = pcre2_next_match_8(match_data_8, (&raw mut __local_new_start_offset__goto_5488_16 as *mut c_ulong), (&raw mut __local_g_notempty__goto_3839_10 as *mut c_uint)))
+        if ((if not (__local_rc_nextmatch__goto_5489_10 != 0): 1 else: 0) != 0) {
             goto '__ci_bb_590
         } else {
             goto '__ci_bb_591
@@ -18523,15 +18459,15 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_592 {
-        (dat_datctl.offset = __local_new_start_offset__goto_5541_16)
+        (dat_datctl.offset = __local_new_start_offset__goto_5488_16)
         goto '__ci_bb_594
     }
 
     '__ci_bb_593 {
-        (__local_pp__goto_3906_14 = __local_pp__goto_3906_14 + (__local_new_start_offset__goto_5541_16 as usize))
-        (__local_len__goto_3894_8 = __local_len__goto_3894_8 - ((__local_new_start_offset__goto_5541_16 as c_ulong) *% (1 as c_ulong)))
-        (__local_ulen__goto_3889_12 = __local_ulen__goto_3889_12 - __local_new_start_offset__goto_5541_16)
-        if ((if __local_arg_ulen__goto_3889_18 != (~(0 as c_ulong)): 1 else: 0) != 0) {
+        (__local_pp__goto_3853_14 = __local_pp__goto_3853_14 + (__local_new_start_offset__goto_5488_16 as usize))
+        (__local_len__goto_3841_8 = __local_len__goto_3841_8 - ((__local_new_start_offset__goto_5488_16 as c_ulong) *% (1 as c_ulong)))
+        (__local_ulen__goto_3836_12 = __local_ulen__goto_3836_12 - __local_new_start_offset__goto_5488_16)
+        if ((if __local_arg_ulen__goto_3836_18 != (~(0 as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_595
         } else {
             goto '__ci_bb_596
@@ -18543,7 +18479,7 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_595 {
-        (__local_arg_ulen__goto_3889_18 = __local_arg_ulen__goto_3889_18 - __local_new_start_offset__goto_5541_16)
+        (__local_arg_ulen__goto_3836_18 = __local_arg_ulen__goto_3836_18 - __local_new_start_offset__goto_5488_16)
         goto '__ci_bb_596
     }
 
@@ -18642,107 +18578,73 @@ fn free_globals_8() {
 }
 
 fn unittest_8() {
-    var __local_rc__goto_5681_5: c_int = 0
+    var __local_rc__goto_5628_5: c_int = 0
 
-    var __local_uval__goto_5682_10: c_uint = 0
+    var __local_uval__goto_5629_10: c_uint = 0
 
-    var __local_sizeval__goto_5683_12: c_ulong = 0
+    var __local_sizeval__goto_5630_12: c_ulong = 0
 
-    var __local_sptrval__goto_5684_14: *mut u8 = null
+    var __local_sptrval__goto_5631_14: *mut u8 = null
 
-    var __local_failure__goto_5685_13: *const i8 = null
+    var __local_failure__goto_5632_13: *const i8 = null
 
-    var __local_test_gen_context__goto_5686_24: *mut pcre2_real_general_context_8 = null
+    var __local_test_gen_context__goto_5633_24: *mut pcre2_real_general_context_8 = null
 
-    var __local_test_gen_context_copy__goto_5686_50: *mut pcre2_real_general_context_8 = null
+    var __local_test_gen_context_copy__goto_5633_50: *mut pcre2_real_general_context_8 = null
 
-    var __local_test_pat_context__goto_5687_24: *mut pcre2_real_compile_context_8 = null
+    var __local_test_pat_context__goto_5634_24: *mut pcre2_real_compile_context_8 = null
 
-    var __local_test_pat_context_copy__goto_5687_50: *mut pcre2_real_compile_context_8 = null
+    var __local_test_pat_context_copy__goto_5634_50: *mut pcre2_real_compile_context_8 = null
 
-    var __local_test_dat_context__goto_5688_22: *mut pcre2_real_match_context_8 = null
+    var __local_test_dat_context__goto_5635_22: *mut pcre2_real_match_context_8 = null
 
-    var __local_test_dat_context_copy__goto_5688_48: *mut pcre2_real_match_context_8 = null
+    var __local_test_dat_context_copy__goto_5635_48: *mut pcre2_real_match_context_8 = null
 
-    var __local_test_con_context__goto_5689_24: *mut pcre2_real_convert_context_8 = null
+    var __local_test_con_context__goto_5636_24: *mut pcre2_real_convert_context_8 = null
 
-    var __local_test_con_context_copy__goto_5689_50: *mut pcre2_real_convert_context_8 = null
+    var __local_test_con_context_copy__goto_5636_50: *mut pcre2_real_convert_context_8 = null
 
-    var __local_test_match_data__goto_5690_19: *mut pcre2_real_match_data_8 = null
+    var __local_test_match_data__goto_5637_19: *mut pcre2_real_match_data_8 = null
 
-    var __local_test_compiled_code__goto_5691_13: *mut pcre2_real_code_8 = null
+    var __local_test_compiled_code__goto_5638_13: *mut pcre2_real_code_8 = null
 
-    var __local_pattern__goto_5692_13: [4]u8
+    var __local_pattern__goto_5639_13: [4]u8
 
-    var __local_callout_int_pattern__goto_5693_13: [5]u8
+    var __local_callout_int_pattern__goto_5640_13: [5]u8
 
-    var __local_callout_str_pattern__goto_5695_13: [8]u8
+    var __local_callout_str_pattern__goto_5642_13: [8]u8
 
-    var __local_capture_pattern__goto_5698_13: [11]u8
+    var __local_capture_pattern__goto_5645_13: [11]u8
 
-    var __local_subject_abcz__goto_5702_13: [5]u8
+    var __local_subject_abcz__goto_5649_13: [5]u8
 
-    var __local_substitute_subject__goto_5704_13: [6]u8
+    var __local_substitute_subject__goto_5651_13: [6]u8
 
-    var __local_name_n__goto_5705_13: [2]u8
+    var __local_name_n__goto_5652_13: [2]u8
 
-    var __local_errorcode__goto_5710_5: c_int = 0
+    var __local_errorcode__goto_5657_5: c_int = 0
 
-    var __local_erroroffset__goto_5711_12: c_ulong = 0
+    var __local_erroroffset__goto_5658_12: c_ulong = 0
 
-    var __local_errorbuffer__goto_5712_13: [256]u8
+    var __local_errorbuffer__goto_5659_13: [256]u8
 
-    var __local_errorbuffer8__goto_5714_6: [256]c_char
+    var __local_errorbuffer8__goto_5661_6: [256]c_char
 
-    var __local_test_preg__goto_5715_9: regex_t
+    var __local_test_preg__goto_5662_9: regex_t
 
-    var __local_invalid_code__goto_5717_7: *mut c_void = null
+    var __local_invalid_code__goto_5664_7: *mut c_void = null
 
-    var __local_test_tables__goto_5718_16: *const u8 = null
+    var __local_test_tables__goto_5665_16: *const u8 = null
 
-    var __local_copy_buf__goto_5719_13: [64]u8
+    var __local_copy_buf__goto_5666_13: [64]u8
 
-    var __local_stringlist__goto_5720_15: *mut *mut u8 = null
+    var __local_stringlist__goto_5667_15: *mut *mut u8 = null
 
-    var __local_lengthslist__goto_5721_13: *mut c_ulong = null
+    var __local_lengthslist__goto_5668_13: *mut c_ulong = null
 
-    var __local_replace_buf__goto_5722_13: [64]u8
+    var __local_replace_buf__goto_5669_13: [64]u8
 
-    var __local_subs_other_code__goto_5723_13: *mut pcre2_real_code_8 = null
-
-    var __local_serialize_code__goto_6303_15: *mut pcre2_real_code_8 = null
-
-    var __local_serialized_bytes__goto_6305_12: *mut u8 = null
-
-    var __local_serialized_size__goto_6306_14: c_ulong = 0
-
-    var __local_decode_codes__goto_6307_15: [1]*mut pcre2_real_code_8
-
-    var __local_blocksize_offset__goto_6317_12: c_ulong = 0
-
-    var __local_saved_blocksize__goto_6319_13: [8]u8
-
-    var __local_serialize_test_context__goto_6335_28: *mut pcre2_real_general_context_8 = null
-
-    var __local_off__goto_6348_12: c_ulong = 0
-
-    var __local_saved__goto_6350_13: [4]u8
-
-    var __local_multi_codes__goto_6363_17: [2]*mut pcre2_real_code_8
-
-    var __local_multi_decode_codes__goto_6364_17: [2]*mut pcre2_real_code_8
-
-    var __local_multi_serialized_bytes__goto_6365_14: *mut u8 = null
-
-    var __local_multi_serialized_size__goto_6366_16: c_ulong = 0
-
-    var __local_first_blocksize__goto_6367_25: c_ulong = 0
-
-    var __local_first_blocksize_offset__goto_6368_12: c_ulong = 0
-
-    var __local_second_blocksize_offset__goto_6370_12: c_ulong = 0
-
-    var __local_saved_second_blocksize__goto_6371_13: [8]u8
+    var __local_subs_other_code__goto_5670_13: *mut pcre2_real_code_8 = null
 
     var __ci_expr_logic_0: c_int = 0
 
@@ -18798,52 +18700,36 @@ fn unittest_8() {
 
     var __ci_expr_logic_26: c_int = 0
 
-    var __ci_expr_logic_27: c_int = 0
-
-    var __ci_expr_logic_28: c_int = 0
-
-    var __ci_expr_logic_29: c_int = 0
-
-    var __ci_expr_logic_30: c_int = 0
-
-    var __ci_expr_logic_31: c_int = 0
-
-    var __ci_expr_logic_32: c_int = 0
-
-    var __ci_expr_logic_34: c_int = 0
-
-    var __ci_expr_logic_33: c_int = 0
-
     goto '__ci_bb_0
 
     '__ci_bb_0 {
-        (__local_failure__goto_5685_13 = ((null as *const c_char)))
-        (__local_test_gen_context__goto_5686_24 = ((null as *mut pcre2_real_general_context_8)))
-        (__local_test_gen_context_copy__goto_5686_50 = ((null as *mut pcre2_real_general_context_8)))
-        (__local_test_pat_context__goto_5687_24 = ((null as *mut pcre2_real_compile_context_8)))
-        (__local_test_pat_context_copy__goto_5687_50 = ((null as *mut pcre2_real_compile_context_8)))
-        (__local_test_dat_context__goto_5688_22 = ((null as *mut pcre2_real_match_context_8)))
-        (__local_test_dat_context_copy__goto_5688_48 = ((null as *mut pcre2_real_match_context_8)))
-        (__local_test_con_context__goto_5689_24 = ((null as *mut pcre2_real_convert_context_8)))
-        (__local_test_con_context_copy__goto_5689_50 = ((null as *mut pcre2_real_convert_context_8)))
-        (__local_test_match_data__goto_5690_19 = ((null as *mut pcre2_real_match_data_8)))
-        (__local_test_compiled_code__goto_5691_13 = ((null as *mut pcre2_real_code_8)))
-        (__local_pattern__goto_5692_13 = [65, 66, 67, 0])
-        (__local_callout_int_pattern__goto_5693_13 = [40, 63, 67, 41, 0])
-        (__local_callout_str_pattern__goto_5695_13 = [40, 63, 67, 34, 90, 34, 41, 0])
-        (__local_capture_pattern__goto_5698_13 = [65, 40, 63, 60, 78, 62, 46, 42, 41, 90, 0])
-        (__local_subject_abcz__goto_5702_13 = [65, 66, 67, 90, 0])
-        (__local_name_n__goto_5705_13 = [78, 0])
-        (__local_invalid_code__goto_5717_7 = null)
-        (__local_test_tables__goto_5718_16 = ((null as *const u8)))
-        (__local_subs_other_code__goto_5723_13 = ((null as *mut pcre2_real_code_8)))
-        with_memset(((&raw mut __local_test_preg__goto_5715_9 as *mut regex_t) as *i8), 0, (sizeof[regex_t]() as i64))
-        (__local_rc__goto_5681_5 = pcre2_config_8(0, null))
+        (__local_failure__goto_5632_13 = ((null as *const c_char)))
+        (__local_test_gen_context__goto_5633_24 = ((null as *mut pcre2_real_general_context_8)))
+        (__local_test_gen_context_copy__goto_5633_50 = ((null as *mut pcre2_real_general_context_8)))
+        (__local_test_pat_context__goto_5634_24 = ((null as *mut pcre2_real_compile_context_8)))
+        (__local_test_pat_context_copy__goto_5634_50 = ((null as *mut pcre2_real_compile_context_8)))
+        (__local_test_dat_context__goto_5635_22 = ((null as *mut pcre2_real_match_context_8)))
+        (__local_test_dat_context_copy__goto_5635_48 = ((null as *mut pcre2_real_match_context_8)))
+        (__local_test_con_context__goto_5636_24 = ((null as *mut pcre2_real_convert_context_8)))
+        (__local_test_con_context_copy__goto_5636_50 = ((null as *mut pcre2_real_convert_context_8)))
+        (__local_test_match_data__goto_5637_19 = ((null as *mut pcre2_real_match_data_8)))
+        (__local_test_compiled_code__goto_5638_13 = ((null as *mut pcre2_real_code_8)))
+        (__local_pattern__goto_5639_13 = [65, 66, 67, 0])
+        (__local_callout_int_pattern__goto_5640_13 = [40, 63, 67, 41, 0])
+        (__local_callout_str_pattern__goto_5642_13 = [40, 63, 67, 34, 90, 34, 41, 0])
+        (__local_capture_pattern__goto_5645_13 = [65, 40, 63, 60, 78, 62, 46, 42, 41, 90, 0])
+        (__local_subject_abcz__goto_5649_13 = [65, 66, 67, 90, 0])
+        (__local_name_n__goto_5652_13 = [78, 0])
+        (__local_invalid_code__goto_5664_7 = null)
+        (__local_test_tables__goto_5665_16 = ((null as *const u8)))
+        (__local_subs_other_code__goto_5670_13 = ((null as *mut pcre2_real_code_8)))
+        with_memset(((&raw mut __local_test_preg__goto_5662_9 as *mut regex_t) as *i8), 0, (sizeof[regex_t]() as i64))
+        (__local_rc__goto_5628_5 = pcre2_config_8(0, null))
         goto '__ci_bb_1
     }
 
     '__ci_bb_1 {
-        if ((if not ((if __local_rc__goto_5681_5 == ((sizeof[u32]() as c_int)): 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == ((sizeof[u32]() as c_int)): 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_4
         } else {
             goto '__ci_bb_5
@@ -18859,12 +18745,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_3 {
-        (__local_rc__goto_5681_5 = pcre2_config_8(14, null))
+        (__local_rc__goto_5628_5 = pcre2_config_8(14, null))
         goto '__ci_bb_7
     }
 
     '__ci_bb_4 {
-        (__local_failure__goto_5685_13 = (("pcre2_config(NULL)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_config(NULL)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -18874,16 +18760,16 @@ fn unittest_8() {
 
     '__ci_bb_6 {
         (mallocs_until_failure = 2147483647)
-        pcre2_regfree((&raw mut __local_test_preg__goto_5715_9 as *mut regex_t))
-        if ((if __local_test_compiled_code__goto_5691_13 != null: 1 else: 0) != 0) {
-            goto '__ci_bb_697
+        pcre2_regfree((&raw mut __local_test_preg__goto_5662_9 as *mut regex_t))
+        if ((if __local_test_compiled_code__goto_5638_13 != null: 1 else: 0) != 0) {
+            goto '__ci_bb_652
         } else {
-            goto '__ci_bb_698
+            goto '__ci_bb_653
         }
     }
 
     '__ci_bb_7 {
-        if ((if not ((if __local_rc__goto_5681_5 == ((sizeof[u32]() as c_int)): 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == ((sizeof[u32]() as c_int)): 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_10
         } else {
             goto '__ci_bb_11
@@ -18899,12 +18785,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_9 {
-        (__local_rc__goto_5681_5 = pcre2_config_8(7, null))
+        (__local_rc__goto_5628_5 = pcre2_config_8(7, null))
         goto '__ci_bb_12
     }
 
     '__ci_bb_10 {
-        (__local_failure__goto_5685_13 = (("pcre2_config(NULL)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_config(NULL)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -18913,7 +18799,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_12 {
-        if ((if not ((if __local_rc__goto_5681_5 == ((sizeof[u32]() as c_int)): 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == ((sizeof[u32]() as c_int)): 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_15
         } else {
             goto '__ci_bb_16
@@ -18929,12 +18815,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_14 {
-        (__local_rc__goto_5681_5 = pcre2_config_8(16, null))
+        (__local_rc__goto_5628_5 = pcre2_config_8(16, null))
         goto '__ci_bb_17
     }
 
     '__ci_bb_15 {
-        (__local_failure__goto_5685_13 = (("pcre2_config(NULL)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_config(NULL)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -18943,7 +18829,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_17 {
-        if ((if not ((if __local_rc__goto_5681_5 == ((sizeof[u32]() as c_int)): 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == ((sizeof[u32]() as c_int)): 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_20
         } else {
             goto '__ci_bb_21
@@ -18959,12 +18845,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_19 {
-        (__local_rc__goto_5681_5 = pcre2_config_8(12, null))
+        (__local_rc__goto_5628_5 = pcre2_config_8(12, null))
         goto '__ci_bb_22
     }
 
     '__ci_bb_20 {
-        (__local_failure__goto_5685_13 = (("pcre2_config(NULL)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_config(NULL)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -18973,7 +18859,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_22 {
-        if ((if not ((if __local_rc__goto_5681_5 == ((sizeof[u32]() as c_int)): 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == ((sizeof[u32]() as c_int)): 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_25
         } else {
             goto '__ci_bb_26
@@ -18989,12 +18875,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_24 {
-        (__local_rc__goto_5681_5 = pcre2_config_8(1, null))
+        (__local_rc__goto_5628_5 = pcre2_config_8(1, null))
         goto '__ci_bb_27
     }
 
     '__ci_bb_25 {
-        (__local_failure__goto_5685_13 = (("pcre2_config(NULL)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_config(NULL)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19003,7 +18889,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_27 {
-        if ((if not ((if __local_rc__goto_5681_5 == ((sizeof[u32]() as c_int)): 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == ((sizeof[u32]() as c_int)): 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_30
         } else {
             goto '__ci_bb_31
@@ -19019,12 +18905,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_29 {
-        (__local_rc__goto_5681_5 = pcre2_config_8(3, null))
+        (__local_rc__goto_5628_5 = pcre2_config_8(3, null))
         goto '__ci_bb_32
     }
 
     '__ci_bb_30 {
-        (__local_failure__goto_5685_13 = (("pcre2_config(NULL)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_config(NULL)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19033,7 +18919,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_32 {
-        if ((if not ((if __local_rc__goto_5681_5 == ((sizeof[u32]() as c_int)): 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == ((sizeof[u32]() as c_int)): 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_35
         } else {
             goto '__ci_bb_36
@@ -19049,12 +18935,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_34 {
-        (__local_rc__goto_5681_5 = pcre2_config_8(4, null))
+        (__local_rc__goto_5628_5 = pcre2_config_8(4, null))
         goto '__ci_bb_37
     }
 
     '__ci_bb_35 {
-        (__local_failure__goto_5685_13 = (("pcre2_config(NULL)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_config(NULL)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19063,7 +18949,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_37 {
-        if ((if not ((if __local_rc__goto_5681_5 == ((sizeof[u32]() as c_int)): 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == ((sizeof[u32]() as c_int)): 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_40
         } else {
             goto '__ci_bb_41
@@ -19079,12 +18965,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_39 {
-        (__local_rc__goto_5681_5 = pcre2_config_8(13, null))
+        (__local_rc__goto_5628_5 = pcre2_config_8(13, null))
         goto '__ci_bb_42
     }
 
     '__ci_bb_40 {
-        (__local_failure__goto_5685_13 = (("pcre2_config(NULL)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_config(NULL)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19093,7 +18979,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_42 {
-        if ((if not ((if __local_rc__goto_5681_5 == ((sizeof[u32]() as c_int)): 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == ((sizeof[u32]() as c_int)): 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_45
         } else {
             goto '__ci_bb_46
@@ -19109,12 +18995,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_44 {
-        (__local_rc__goto_5681_5 = pcre2_config_8(5, null))
+        (__local_rc__goto_5628_5 = pcre2_config_8(5, null))
         goto '__ci_bb_47
     }
 
     '__ci_bb_45 {
-        (__local_failure__goto_5685_13 = (("pcre2_config(NULL)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_config(NULL)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19123,7 +19009,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_47 {
-        if ((if not ((if __local_rc__goto_5681_5 == ((sizeof[u32]() as c_int)): 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == ((sizeof[u32]() as c_int)): 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_50
         } else {
             goto '__ci_bb_51
@@ -19139,12 +19025,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_49 {
-        (__local_rc__goto_5681_5 = pcre2_config_8(6, null))
+        (__local_rc__goto_5628_5 = pcre2_config_8(6, null))
         goto '__ci_bb_52
     }
 
     '__ci_bb_50 {
-        (__local_failure__goto_5685_13 = (("pcre2_config(NULL)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_config(NULL)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19153,7 +19039,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_52 {
-        if ((if not ((if __local_rc__goto_5681_5 == ((sizeof[u32]() as c_int)): 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == ((sizeof[u32]() as c_int)): 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_55
         } else {
             goto '__ci_bb_56
@@ -19169,12 +19055,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_54 {
-        (__local_rc__goto_5681_5 = pcre2_config_8(8, null))
+        (__local_rc__goto_5628_5 = pcre2_config_8(8, null))
         goto '__ci_bb_57
     }
 
     '__ci_bb_55 {
-        (__local_failure__goto_5685_13 = (("pcre2_config(NULL)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_config(NULL)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19183,7 +19069,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_57 {
-        if ((if not ((if __local_rc__goto_5681_5 == ((sizeof[u32]() as c_int)): 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == ((sizeof[u32]() as c_int)): 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_60
         } else {
             goto '__ci_bb_61
@@ -19199,12 +19085,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_59 {
-        (__local_rc__goto_5681_5 = pcre2_config_8(15, null))
+        (__local_rc__goto_5628_5 = pcre2_config_8(15, null))
         goto '__ci_bb_62
     }
 
     '__ci_bb_60 {
-        (__local_failure__goto_5685_13 = (("pcre2_config(NULL)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_config(NULL)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19213,7 +19099,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_62 {
-        if ((if not ((if __local_rc__goto_5681_5 == ((sizeof[u32]() as c_int)): 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == ((sizeof[u32]() as c_int)): 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_65
         } else {
             goto '__ci_bb_66
@@ -19229,12 +19115,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_64 {
-        (__local_rc__goto_5681_5 = pcre2_config_8(9, null))
+        (__local_rc__goto_5628_5 = pcre2_config_8(9, null))
         goto '__ci_bb_67
     }
 
     '__ci_bb_65 {
-        (__local_failure__goto_5685_13 = (("pcre2_config(NULL)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_config(NULL)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19243,7 +19129,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_67 {
-        if ((if not ((if __local_rc__goto_5681_5 == ((sizeof[u32]() as c_int)): 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == ((sizeof[u32]() as c_int)): 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_70
         } else {
             goto '__ci_bb_71
@@ -19259,12 +19145,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_69 {
-        (__local_rc__goto_5681_5 = pcre2_config_8(10, null))
+        (__local_rc__goto_5628_5 = pcre2_config_8(10, null))
         goto '__ci_bb_72
     }
 
     '__ci_bb_70 {
-        (__local_failure__goto_5685_13 = (("pcre2_config(NULL)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_config(NULL)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19273,7 +19159,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_72 {
-        if ((if not ((if __local_rc__goto_5681_5 > 4: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 > 4: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_75
         } else {
             goto '__ci_bb_76
@@ -19289,12 +19175,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_74 {
-        (__local_rc__goto_5681_5 = pcre2_config_8(11, null))
+        (__local_rc__goto_5628_5 = pcre2_config_8(11, null))
         goto '__ci_bb_77
     }
 
     '__ci_bb_75 {
-        (__local_failure__goto_5685_13 = (("pcre2_config(NULL)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_config(NULL)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19303,7 +19189,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_77 {
-        if ((if not ((if __local_rc__goto_5681_5 > 4: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 > 4: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_80
         } else {
             goto '__ci_bb_81
@@ -19319,12 +19205,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_79 {
-        (__local_rc__goto_5681_5 = pcre2_config_8(4, (&raw mut __local_uval__goto_5682_10 as *mut c_uint)))
+        (__local_rc__goto_5628_5 = pcre2_config_8(4, (&raw mut __local_uval__goto_5629_10 as *mut c_uint)))
         goto '__ci_bb_82
     }
 
     '__ci_bb_80 {
-        (__local_failure__goto_5685_13 = (("pcre2_config(NULL)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_config(NULL)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19333,7 +19219,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_82 {
-        if ((if not ((if __local_rc__goto_5681_5 == 0: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == 0: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_85
         } else {
             goto '__ci_bb_86
@@ -19349,12 +19235,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_84 {
-        (__local_rc__goto_5681_5 = pcre2_config_8(999, null))
+        (__local_rc__goto_5628_5 = pcre2_config_8(999, null))
         goto '__ci_bb_87
     }
 
     '__ci_bb_85 {
-        (__local_failure__goto_5685_13 = (("pcre2_config(PCRE2_CONFIG_MATCHLIMIT)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_config(PCRE2_CONFIG_MATCHLIMIT)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19363,7 +19249,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_87 {
-        if ((if not ((if __local_rc__goto_5681_5 == -34: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == -34: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_90
         } else {
             goto '__ci_bb_91
@@ -19379,12 +19265,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_89 {
-        (__local_rc__goto_5681_5 = pcre2_config_8(999, (&raw mut __local_uval__goto_5682_10 as *mut c_uint)))
+        (__local_rc__goto_5628_5 = pcre2_config_8(999, (&raw mut __local_uval__goto_5629_10 as *mut c_uint)))
         goto '__ci_bb_92
     }
 
     '__ci_bb_90 {
-        (__local_failure__goto_5685_13 = (("pcre2_config(bad option)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_config(bad option)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19393,7 +19279,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_92 {
-        if ((if not ((if __local_rc__goto_5681_5 == -34: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == -34: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_95
         } else {
             goto '__ci_bb_96
@@ -19409,12 +19295,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_94 {
-        (__local_rc__goto_5681_5 = pcre2_config_8(8, (&raw mut __local_uval__goto_5682_10 as *mut c_uint)))
+        (__local_rc__goto_5628_5 = pcre2_config_8(8, (&raw mut __local_uval__goto_5629_10 as *mut c_uint)))
         goto '__ci_bb_97
     }
 
     '__ci_bb_95 {
-        (__local_failure__goto_5685_13 = (("pcre2_config(bad option)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_config(bad option)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19423,7 +19309,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_97 {
-        if ((if not ((if __local_rc__goto_5681_5 == 0: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == 0: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_100
         } else {
             goto '__ci_bb_101
@@ -19439,12 +19325,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_99 {
-        (__local_rc__goto_5681_5 = pcre2_config_8(3, (&raw mut __local_uval__goto_5682_10 as *mut c_uint)))
+        (__local_rc__goto_5628_5 = pcre2_config_8(3, (&raw mut __local_uval__goto_5629_10 as *mut c_uint)))
         goto '__ci_bb_102
     }
 
     '__ci_bb_100 {
-        (__local_failure__goto_5685_13 = (("pcre2_config(PCRE2_CONFIG_STACKRECURSE)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_config(PCRE2_CONFIG_STACKRECURSE)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19453,7 +19339,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_102 {
-        if ((if not ((if __local_rc__goto_5681_5 == 0: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == 0: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_105
         } else {
             goto '__ci_bb_106
@@ -19469,12 +19355,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_104 {
-        (__local_test_gen_context__goto_5686_24 = pcre2_general_context_create_8(null, null, null))
+        (__local_test_gen_context__goto_5633_24 = pcre2_general_context_create_8(null, null, null))
         goto '__ci_bb_107
     }
 
     '__ci_bb_105 {
-        (__local_failure__goto_5685_13 = (("pcre2_config(PCRE2_CONFIG_LINKSIZE)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_config(PCRE2_CONFIG_LINKSIZE)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19483,7 +19369,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_107 {
-        if ((if not ((if __local_test_gen_context__goto_5686_24 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_gen_context__goto_5633_24 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_110
         } else {
             goto '__ci_bb_111
@@ -19499,14 +19385,14 @@ fn unittest_8() {
     }
 
     '__ci_bb_109 {
-        pcre2_general_context_free_8(__local_test_gen_context__goto_5686_24)
+        pcre2_general_context_free_8(__local_test_gen_context__goto_5633_24)
         (mallocs_until_failure = 0)
-        (__local_test_gen_context__goto_5686_24 = pcre2_general_context_create_8(my_malloc, my_free, null))
+        (__local_test_gen_context__goto_5633_24 = pcre2_general_context_create_8(my_malloc, my_free, null))
         goto '__ci_bb_112
     }
 
     '__ci_bb_110 {
-        (__local_failure__goto_5685_13 = (("pcre2_general_context_create(null)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_general_context_create(null)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19515,7 +19401,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_112 {
-        if ((if not ((if __local_test_gen_context__goto_5686_24 == null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_gen_context__goto_5633_24 == null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_115
         } else {
             goto '__ci_bb_116
@@ -19532,12 +19418,12 @@ fn unittest_8() {
 
     '__ci_bb_114 {
         (mallocs_until_failure = 1)
-        (__local_test_gen_context__goto_5686_24 = pcre2_general_context_create_8(my_malloc, my_free, null))
+        (__local_test_gen_context__goto_5633_24 = pcre2_general_context_create_8(my_malloc, my_free, null))
         goto '__ci_bb_117
     }
 
     '__ci_bb_115 {
-        (__local_failure__goto_5685_13 = (("pcre2_general_context_create(malloc)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_general_context_create(malloc)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19546,7 +19432,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_117 {
-        if ((if not ((if __local_test_gen_context__goto_5686_24 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_gen_context__goto_5633_24 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_120
         } else {
             goto '__ci_bb_121
@@ -19562,12 +19448,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_119 {
-        (__local_test_pat_context__goto_5687_24 = pcre2_compile_context_create_8(__local_test_gen_context__goto_5686_24))
+        (__local_test_pat_context__goto_5634_24 = pcre2_compile_context_create_8(__local_test_gen_context__goto_5633_24))
         goto '__ci_bb_122
     }
 
     '__ci_bb_120 {
-        (__local_failure__goto_5685_13 = (("pcre2_general_context_create(malloc)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_general_context_create(malloc)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19576,7 +19462,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_122 {
-        if ((if not ((if __local_test_pat_context__goto_5687_24 == null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_pat_context__goto_5634_24 == null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_125
         } else {
             goto '__ci_bb_126
@@ -19592,12 +19478,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_124 {
-        (__local_test_dat_context__goto_5688_22 = pcre2_match_context_create_8(__local_test_gen_context__goto_5686_24))
+        (__local_test_dat_context__goto_5635_22 = pcre2_match_context_create_8(__local_test_gen_context__goto_5633_24))
         goto '__ci_bb_127
     }
 
     '__ci_bb_125 {
-        (__local_failure__goto_5685_13 = (("pcre2_compile_context_create()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_compile_context_create()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19606,7 +19492,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_127 {
-        if ((if not ((if __local_test_dat_context__goto_5688_22 == null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_dat_context__goto_5635_22 == null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_130
         } else {
             goto '__ci_bb_131
@@ -19622,12 +19508,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_129 {
-        (__local_test_con_context__goto_5689_24 = pcre2_convert_context_create_8(__local_test_gen_context__goto_5686_24))
+        (__local_test_con_context__goto_5636_24 = pcre2_convert_context_create_8(__local_test_gen_context__goto_5633_24))
         goto '__ci_bb_132
     }
 
     '__ci_bb_130 {
-        (__local_failure__goto_5685_13 = (("pcre2_match_context_create()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_match_context_create()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19636,7 +19522,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_132 {
-        if ((if not ((if __local_test_con_context__goto_5689_24 == null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_con_context__goto_5636_24 == null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_135
         } else {
             goto '__ci_bb_136
@@ -19652,12 +19538,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_134 {
-        (__local_test_pat_context__goto_5687_24 = pcre2_compile_context_create_8(null))
+        (__local_test_pat_context__goto_5634_24 = pcre2_compile_context_create_8(null))
         goto '__ci_bb_137
     }
 
     '__ci_bb_135 {
-        (__local_failure__goto_5685_13 = (("pcre2_convert_context_create()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_convert_context_create()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19666,7 +19552,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_137 {
-        if ((if not ((if __local_test_pat_context__goto_5687_24 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_pat_context__goto_5634_24 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_140
         } else {
             goto '__ci_bb_141
@@ -19682,13 +19568,13 @@ fn unittest_8() {
     }
 
     '__ci_bb_139 {
-        pcre2_compile_context_free_8(__local_test_pat_context__goto_5687_24)
-        (__local_test_dat_context__goto_5688_22 = pcre2_match_context_create_8(null))
+        pcre2_compile_context_free_8(__local_test_pat_context__goto_5634_24)
+        (__local_test_dat_context__goto_5635_22 = pcre2_match_context_create_8(null))
         goto '__ci_bb_142
     }
 
     '__ci_bb_140 {
-        (__local_failure__goto_5685_13 = (("pcre2_compile_context_create(null)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_compile_context_create(null)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19697,7 +19583,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_142 {
-        if ((if not ((if __local_test_dat_context__goto_5688_22 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_dat_context__goto_5635_22 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_145
         } else {
             goto '__ci_bb_146
@@ -19713,13 +19599,13 @@ fn unittest_8() {
     }
 
     '__ci_bb_144 {
-        pcre2_match_context_free_8(__local_test_dat_context__goto_5688_22)
-        (__local_test_con_context__goto_5689_24 = pcre2_convert_context_create_8(null))
+        pcre2_match_context_free_8(__local_test_dat_context__goto_5635_22)
+        (__local_test_con_context__goto_5636_24 = pcre2_convert_context_create_8(null))
         goto '__ci_bb_147
     }
 
     '__ci_bb_145 {
-        (__local_failure__goto_5685_13 = (("pcre2_match_context_create(null)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_match_context_create(null)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19728,7 +19614,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_147 {
-        if ((if not ((if __local_test_con_context__goto_5689_24 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_con_context__goto_5636_24 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_150
         } else {
             goto '__ci_bb_151
@@ -19744,14 +19630,14 @@ fn unittest_8() {
     }
 
     '__ci_bb_149 {
-        pcre2_convert_context_free_8(__local_test_con_context__goto_5689_24)
+        pcre2_convert_context_free_8(__local_test_con_context__goto_5636_24)
         (mallocs_until_failure = 2147483647)
-        (__local_test_pat_context__goto_5687_24 = pcre2_compile_context_create_8(__local_test_gen_context__goto_5686_24))
+        (__local_test_pat_context__goto_5634_24 = pcre2_compile_context_create_8(__local_test_gen_context__goto_5633_24))
         goto '__ci_bb_152
     }
 
     '__ci_bb_150 {
-        (__local_failure__goto_5685_13 = (("pcre2_convert_context_create(null)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_convert_context_create(null)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19760,7 +19646,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_152 {
-        if ((if not ((if __local_test_pat_context__goto_5687_24 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_pat_context__goto_5634_24 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_155
         } else {
             goto '__ci_bb_156
@@ -19776,12 +19662,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_154 {
-        (__local_test_dat_context__goto_5688_22 = pcre2_match_context_create_8(__local_test_gen_context__goto_5686_24))
+        (__local_test_dat_context__goto_5635_22 = pcre2_match_context_create_8(__local_test_gen_context__goto_5633_24))
         goto '__ci_bb_157
     }
 
     '__ci_bb_155 {
-        (__local_failure__goto_5685_13 = (("pcre2_compile_context_create()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_compile_context_create()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19790,7 +19676,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_157 {
-        if ((if not ((if __local_test_dat_context__goto_5688_22 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_dat_context__goto_5635_22 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_160
         } else {
             goto '__ci_bb_161
@@ -19806,12 +19692,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_159 {
-        (__local_test_con_context__goto_5689_24 = pcre2_convert_context_create_8(__local_test_gen_context__goto_5686_24))
+        (__local_test_con_context__goto_5636_24 = pcre2_convert_context_create_8(__local_test_gen_context__goto_5633_24))
         goto '__ci_bb_162
     }
 
     '__ci_bb_160 {
-        (__local_failure__goto_5685_13 = (("pcre2_match_context_create()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_match_context_create()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19820,7 +19706,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_162 {
-        if ((if not ((if __local_test_con_context__goto_5689_24 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_con_context__goto_5636_24 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_165
         } else {
             goto '__ci_bb_166
@@ -19837,12 +19723,12 @@ fn unittest_8() {
 
     '__ci_bb_164 {
         (mallocs_until_failure = 0)
-        (__local_test_gen_context_copy__goto_5686_50 = pcre2_general_context_copy_8(__local_test_gen_context__goto_5686_24))
+        (__local_test_gen_context_copy__goto_5633_50 = pcre2_general_context_copy_8(__local_test_gen_context__goto_5633_24))
         goto '__ci_bb_167
     }
 
     '__ci_bb_165 {
-        (__local_failure__goto_5685_13 = (("pcre2_convert_context_create()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_convert_context_create()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19851,7 +19737,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_167 {
-        if ((if not ((if __local_test_gen_context_copy__goto_5686_50 == null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_gen_context_copy__goto_5633_50 == null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_170
         } else {
             goto '__ci_bb_171
@@ -19867,12 +19753,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_169 {
-        (__local_test_pat_context_copy__goto_5687_50 = pcre2_compile_context_copy_8(__local_test_pat_context__goto_5687_24))
+        (__local_test_pat_context_copy__goto_5634_50 = pcre2_compile_context_copy_8(__local_test_pat_context__goto_5634_24))
         goto '__ci_bb_172
     }
 
     '__ci_bb_170 {
-        (__local_failure__goto_5685_13 = (("pcre2_general_context_copy()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_general_context_copy()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19881,7 +19767,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_172 {
-        if ((if not ((if __local_test_pat_context_copy__goto_5687_50 == null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_pat_context_copy__goto_5634_50 == null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_175
         } else {
             goto '__ci_bb_176
@@ -19897,12 +19783,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_174 {
-        (__local_test_dat_context_copy__goto_5688_48 = pcre2_match_context_copy_8(__local_test_dat_context__goto_5688_22))
+        (__local_test_dat_context_copy__goto_5635_48 = pcre2_match_context_copy_8(__local_test_dat_context__goto_5635_22))
         goto '__ci_bb_177
     }
 
     '__ci_bb_175 {
-        (__local_failure__goto_5685_13 = (("pcre2_compile_context_copy()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_compile_context_copy()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19911,7 +19797,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_177 {
-        if ((if not ((if __local_test_dat_context_copy__goto_5688_48 == null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_dat_context_copy__goto_5635_48 == null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_180
         } else {
             goto '__ci_bb_181
@@ -19927,12 +19813,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_179 {
-        (__local_test_con_context_copy__goto_5689_50 = pcre2_convert_context_copy_8(__local_test_con_context__goto_5689_24))
+        (__local_test_con_context_copy__goto_5636_50 = pcre2_convert_context_copy_8(__local_test_con_context__goto_5636_24))
         goto '__ci_bb_182
     }
 
     '__ci_bb_180 {
-        (__local_failure__goto_5685_13 = (("pcre2_match_context_copy()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_match_context_copy()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19941,7 +19827,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_182 {
-        if ((if not ((if __local_test_con_context_copy__goto_5689_50 == null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_con_context_copy__goto_5636_50 == null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_185
         } else {
             goto '__ci_bb_186
@@ -19958,12 +19844,12 @@ fn unittest_8() {
 
     '__ci_bb_184 {
         (mallocs_until_failure = 2147483647)
-        (__local_test_gen_context_copy__goto_5686_50 = pcre2_general_context_copy_8(__local_test_gen_context__goto_5686_24))
+        (__local_test_gen_context_copy__goto_5633_50 = pcre2_general_context_copy_8(__local_test_gen_context__goto_5633_24))
         goto '__ci_bb_187
     }
 
     '__ci_bb_185 {
-        (__local_failure__goto_5685_13 = (("pcre2_convert_context_copy()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_convert_context_copy()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -19972,7 +19858,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_187 {
-        if ((if not ((if __local_test_gen_context_copy__goto_5686_50 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_gen_context_copy__goto_5633_50 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_190
         } else {
             goto '__ci_bb_191
@@ -19988,12 +19874,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_189 {
-        (__local_test_pat_context_copy__goto_5687_50 = pcre2_compile_context_copy_8(__local_test_pat_context__goto_5687_24))
+        (__local_test_pat_context_copy__goto_5634_50 = pcre2_compile_context_copy_8(__local_test_pat_context__goto_5634_24))
         goto '__ci_bb_192
     }
 
     '__ci_bb_190 {
-        (__local_failure__goto_5685_13 = (("pcre2_general_context_copy()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_general_context_copy()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20002,7 +19888,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_192 {
-        if ((if not ((if __local_test_pat_context_copy__goto_5687_50 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_pat_context_copy__goto_5634_50 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_195
         } else {
             goto '__ci_bb_196
@@ -20018,12 +19904,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_194 {
-        (__local_test_dat_context_copy__goto_5688_48 = pcre2_match_context_copy_8(__local_test_dat_context__goto_5688_22))
+        (__local_test_dat_context_copy__goto_5635_48 = pcre2_match_context_copy_8(__local_test_dat_context__goto_5635_22))
         goto '__ci_bb_197
     }
 
     '__ci_bb_195 {
-        (__local_failure__goto_5685_13 = (("pcre2_compile_context_copy()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_compile_context_copy()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20032,7 +19918,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_197 {
-        if ((if not ((if __local_test_dat_context_copy__goto_5688_48 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_dat_context_copy__goto_5635_48 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_200
         } else {
             goto '__ci_bb_201
@@ -20048,12 +19934,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_199 {
-        (__local_test_con_context_copy__goto_5689_50 = pcre2_convert_context_copy_8(__local_test_con_context__goto_5689_24))
+        (__local_test_con_context_copy__goto_5636_50 = pcre2_convert_context_copy_8(__local_test_con_context__goto_5636_24))
         goto '__ci_bb_202
     }
 
     '__ci_bb_200 {
-        (__local_failure__goto_5685_13 = (("pcre2_match_context_copy()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_match_context_copy()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20062,7 +19948,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_202 {
-        if ((if not ((if __local_test_con_context_copy__goto_5689_50 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_con_context_copy__goto_5636_50 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_205
         } else {
             goto '__ci_bb_206
@@ -20078,12 +19964,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_204 {
-        (__local_rc__goto_5681_5 = pcre2_set_compile_extra_options_8(__local_test_pat_context__goto_5687_24, 0))
+        (__local_rc__goto_5628_5 = pcre2_set_compile_extra_options_8(__local_test_pat_context__goto_5634_24, 0))
         goto '__ci_bb_207
     }
 
     '__ci_bb_205 {
-        (__local_failure__goto_5685_13 = (("pcre2_convert_context_copy()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_convert_context_copy()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20092,7 +19978,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_207 {
-        if ((if not ((if __local_rc__goto_5681_5 == 0: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == 0: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_210
         } else {
             goto '__ci_bb_211
@@ -20108,12 +19994,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_209 {
-        (__local_rc__goto_5681_5 = pcre2_set_max_pattern_length_8(__local_test_pat_context__goto_5687_24, 10))
+        (__local_rc__goto_5628_5 = pcre2_set_max_pattern_length_8(__local_test_pat_context__goto_5634_24, 10))
         goto '__ci_bb_212
     }
 
     '__ci_bb_210 {
-        (__local_failure__goto_5685_13 = (("pcre2_set_compile_extra_options()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_set_compile_extra_options()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20122,7 +20008,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_212 {
-        if ((if not ((if __local_rc__goto_5681_5 == 0: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == 0: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_215
         } else {
             goto '__ci_bb_216
@@ -20138,12 +20024,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_214 {
-        (__local_rc__goto_5681_5 = pcre2_set_max_pattern_compiled_length_8(__local_test_pat_context__goto_5687_24, 256))
+        (__local_rc__goto_5628_5 = pcre2_set_max_pattern_compiled_length_8(__local_test_pat_context__goto_5634_24, 256))
         goto '__ci_bb_217
     }
 
     '__ci_bb_215 {
-        (__local_failure__goto_5685_13 = (("pcre2_set_max_pattern_length()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_set_max_pattern_length()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20152,7 +20038,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_217 {
-        if ((if not ((if __local_rc__goto_5681_5 == 0: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == 0: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_220
         } else {
             goto '__ci_bb_221
@@ -20168,12 +20054,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_219 {
-        (__local_rc__goto_5681_5 = pcre2_set_max_varlookbehind_8(__local_test_pat_context__goto_5687_24, 0))
+        (__local_rc__goto_5628_5 = pcre2_set_max_varlookbehind_8(__local_test_pat_context__goto_5634_24, 0))
         goto '__ci_bb_222
     }
 
     '__ci_bb_220 {
-        (__local_failure__goto_5685_13 = (("pcre2_set_max_pattern_compiled_length()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_set_max_pattern_compiled_length()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20182,7 +20068,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_222 {
-        if ((if not ((if __local_rc__goto_5681_5 == 0: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == 0: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_225
         } else {
             goto '__ci_bb_226
@@ -20198,12 +20084,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_224 {
-        (__local_rc__goto_5681_5 = pcre2_set_offset_limit_8(__local_test_dat_context__goto_5688_22, 0))
+        (__local_rc__goto_5628_5 = pcre2_set_offset_limit_8(__local_test_dat_context__goto_5635_22, 0))
         goto '__ci_bb_227
     }
 
     '__ci_bb_225 {
-        (__local_failure__goto_5685_13 = (("pcre2_set_max_varlookbehind()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_set_max_varlookbehind()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20212,7 +20098,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_227 {
-        if ((if not ((if __local_rc__goto_5681_5 == 0: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == 0: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_230
         } else {
             goto '__ci_bb_231
@@ -20228,12 +20114,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_229 {
-        (__local_rc__goto_5681_5 = pcre2_set_bsr_8(__local_test_pat_context__goto_5687_24, 999))
+        (__local_rc__goto_5628_5 = pcre2_set_bsr_8(__local_test_pat_context__goto_5634_24, 999))
         goto '__ci_bb_232
     }
 
     '__ci_bb_230 {
-        (__local_failure__goto_5685_13 = (("pcre2_set_offset_limit()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_set_offset_limit()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20242,7 +20128,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_232 {
-        if ((if not ((if __local_rc__goto_5681_5 == -29: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == -29: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_235
         } else {
             goto '__ci_bb_236
@@ -20258,12 +20144,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_234 {
-        (__local_rc__goto_5681_5 = pcre2_set_newline_8(__local_test_pat_context__goto_5687_24, 999))
+        (__local_rc__goto_5628_5 = pcre2_set_newline_8(__local_test_pat_context__goto_5634_24, 999))
         goto '__ci_bb_237
     }
 
     '__ci_bb_235 {
-        (__local_failure__goto_5685_13 = (("pcre2_set_bsr()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_set_bsr()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20272,7 +20158,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_237 {
-        if ((if not ((if __local_rc__goto_5681_5 == -29: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == -29: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_240
         } else {
             goto '__ci_bb_241
@@ -20288,12 +20174,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_239 {
-        (__local_rc__goto_5681_5 = pcre2_set_recursion_limit_8(__local_test_dat_context__goto_5688_22, 10))
+        (__local_rc__goto_5628_5 = pcre2_set_recursion_limit_8(__local_test_dat_context__goto_5635_22, 10))
         goto '__ci_bb_242
     }
 
     '__ci_bb_240 {
-        (__local_failure__goto_5685_13 = (("pcre2_set_newline()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_set_newline()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20302,7 +20188,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_242 {
-        if ((if not ((if __local_rc__goto_5681_5 == 0: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == 0: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_245
         } else {
             goto '__ci_bb_246
@@ -20318,12 +20204,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_244 {
-        (__local_rc__goto_5681_5 = pcre2_set_recursion_memory_management_8(__local_test_dat_context__goto_5688_22, null, null, null))
+        (__local_rc__goto_5628_5 = pcre2_set_recursion_memory_management_8(__local_test_dat_context__goto_5635_22, null, null, null))
         goto '__ci_bb_247
     }
 
     '__ci_bb_245 {
-        (__local_failure__goto_5685_13 = (("pcre2_set_recursion_limit()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_set_recursion_limit()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20332,7 +20218,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_247 {
-        if ((if not ((if __local_rc__goto_5681_5 == 0: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == 0: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_250
         } else {
             goto '__ci_bb_251
@@ -20348,12 +20234,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_249 {
-        (__local_rc__goto_5681_5 = pcre2_set_optimize_8(null, 0))
+        (__local_rc__goto_5628_5 = pcre2_set_optimize_8(null, 0))
         goto '__ci_bb_252
     }
 
     '__ci_bb_250 {
-        (__local_failure__goto_5685_13 = (("pcre2_set_recursion_memory_management()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_set_recursion_memory_management()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20362,7 +20248,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_252 {
-        if ((if not ((if __local_rc__goto_5681_5 == -51: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == -51: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_255
         } else {
             goto '__ci_bb_256
@@ -20378,12 +20264,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_254 {
-        (__local_rc__goto_5681_5 = pcre2_set_optimize_8(__local_test_pat_context__goto_5687_24, 63))
+        (__local_rc__goto_5628_5 = pcre2_set_optimize_8(__local_test_pat_context__goto_5634_24, 63))
         goto '__ci_bb_257
     }
 
     '__ci_bb_255 {
-        (__local_failure__goto_5685_13 = (("pcre2_set_optimize(null)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_set_optimize(null)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20392,7 +20278,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_257 {
-        if ((if not ((if __local_rc__goto_5681_5 == -34: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == -34: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_260
         } else {
             goto '__ci_bb_261
@@ -20408,12 +20294,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_259 {
-        (__local_rc__goto_5681_5 = pcre2_set_optimize_8(__local_test_pat_context__goto_5687_24, 70))
+        (__local_rc__goto_5628_5 = pcre2_set_optimize_8(__local_test_pat_context__goto_5634_24, 70))
         goto '__ci_bb_262
     }
 
     '__ci_bb_260 {
-        (__local_failure__goto_5685_13 = (("pcre2_set_optimize(bad option)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_set_optimize(bad option)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20422,7 +20308,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_262 {
-        if ((if not ((if __local_rc__goto_5681_5 == -34: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == -34: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_265
         } else {
             goto '__ci_bb_266
@@ -20438,12 +20324,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_264 {
-        (__local_rc__goto_5681_5 = pcre2_set_glob_escape_8(__local_test_con_context__goto_5689_24, 0))
+        (__local_rc__goto_5628_5 = pcre2_set_glob_escape_8(__local_test_con_context__goto_5636_24, 0))
         goto '__ci_bb_267
     }
 
     '__ci_bb_265 {
-        (__local_failure__goto_5685_13 = (("pcre2_set_optimize(bad option)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_set_optimize(bad option)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20452,7 +20338,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_267 {
-        if ((if not ((if __local_rc__goto_5681_5 == 0: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == 0: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_270
         } else {
             goto '__ci_bb_271
@@ -20468,12 +20354,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_269 {
-        (__local_rc__goto_5681_5 = pcre2_set_glob_escape_8(__local_test_con_context__goto_5689_24, 1))
+        (__local_rc__goto_5628_5 = pcre2_set_glob_escape_8(__local_test_con_context__goto_5636_24, 1))
         goto '__ci_bb_272
     }
 
     '__ci_bb_270 {
-        (__local_failure__goto_5685_13 = (("pcre2_set_glob_escape(0)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_set_glob_escape(0)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20482,7 +20368,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_272 {
-        if ((if not ((if __local_rc__goto_5681_5 == -29: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == -29: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_275
         } else {
             goto '__ci_bb_276
@@ -20498,12 +20384,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_274 {
-        (__local_rc__goto_5681_5 = pcre2_set_glob_escape_8(__local_test_con_context__goto_5689_24, 256))
+        (__local_rc__goto_5628_5 = pcre2_set_glob_escape_8(__local_test_con_context__goto_5636_24, 256))
         goto '__ci_bb_277
     }
 
     '__ci_bb_275 {
-        (__local_failure__goto_5685_13 = (("pcre2_set_glob_escape(1)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_set_glob_escape(1)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20512,7 +20398,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_277 {
-        if ((if not ((if __local_rc__goto_5681_5 == -29: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == -29: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_280
         } else {
             goto '__ci_bb_281
@@ -20528,12 +20414,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_279 {
-        (__local_test_compiled_code__goto_5691_13 = pcre2_compile_8((&(unsafe: __local_pattern__goto_5692_13[0]) as *mut u8), (~(0 as c_ulong)), 0, null, (&raw mut __local_erroroffset__goto_5711_12 as *mut c_ulong), __local_test_pat_context__goto_5687_24))
+        (__local_test_compiled_code__goto_5638_13 = pcre2_compile_8((&(unsafe: __local_pattern__goto_5639_13[0]) as *mut u8), (~(0 as c_ulong)), 0, null, (&raw mut __local_erroroffset__goto_5658_12 as *mut c_ulong), __local_test_pat_context__goto_5634_24))
         goto '__ci_bb_282
     }
 
     '__ci_bb_280 {
-        (__local_failure__goto_5685_13 = (("pcre2_set_glob_escape(256)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_set_glob_escape(256)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20542,7 +20428,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_282 {
-        if ((if not ((if __local_test_compiled_code__goto_5691_13 == null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_compiled_code__goto_5638_13 == null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_285
         } else {
             goto '__ci_bb_286
@@ -20558,12 +20444,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_284 {
-        (__local_test_compiled_code__goto_5691_13 = pcre2_compile_8((&(unsafe: __local_pattern__goto_5692_13[0]) as *mut u8), (~(0 as c_ulong)), 0, (&raw mut __local_errorcode__goto_5710_5 as *mut c_int), null, __local_test_pat_context__goto_5687_24))
+        (__local_test_compiled_code__goto_5638_13 = pcre2_compile_8((&(unsafe: __local_pattern__goto_5639_13[0]) as *mut u8), (~(0 as c_ulong)), 0, (&raw mut __local_errorcode__goto_5657_5 as *mut c_int), null, __local_test_pat_context__goto_5634_24))
         goto '__ci_bb_287
     }
 
     '__ci_bb_285 {
-        (__local_failure__goto_5685_13 = (("test pattern compilation" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("test pattern compilation" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20573,8 +20459,8 @@ fn unittest_8() {
 
     '__ci_bb_287 {
         (__ci_expr_logic_0 = 0)
-        if ((if __local_test_compiled_code__goto_5691_13 == null: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if __local_errorcode__goto_5710_5 == 220: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_test_compiled_code__goto_5638_13 == null: 1 else: 0) != 0) {
+            (__ci_expr_logic_0 = (if (if __local_errorcode__goto_5657_5 == 220: 1 else: 0) != 0: 1 else: 0))
         }
         if ((if not (__ci_expr_logic_0 != 0): 1 else: 0) != 0) {
             goto '__ci_bb_290
@@ -20592,12 +20478,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_289 {
-        (__local_test_compiled_code__goto_5691_13 = pcre2_compile_8((&(unsafe: __local_pattern__goto_5692_13[0]) as *mut u8), (~(0 as c_ulong)), 0, (&raw mut __local_errorcode__goto_5710_5 as *mut c_int), (&raw mut __local_erroroffset__goto_5711_12 as *mut c_ulong), __local_test_pat_context__goto_5687_24))
+        (__local_test_compiled_code__goto_5638_13 = pcre2_compile_8((&(unsafe: __local_pattern__goto_5639_13[0]) as *mut u8), (~(0 as c_ulong)), 0, (&raw mut __local_errorcode__goto_5657_5 as *mut c_int), (&raw mut __local_erroroffset__goto_5658_12 as *mut c_ulong), __local_test_pat_context__goto_5634_24))
         goto '__ci_bb_292
     }
 
     '__ci_bb_290 {
-        (__local_failure__goto_5685_13 = (("test pattern compilation" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("test pattern compilation" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20608,11 +20494,11 @@ fn unittest_8() {
     '__ci_bb_292 {
         (__ci_expr_logic_2 = 0)
         (__ci_expr_logic_1 = 0)
-        if ((if __local_test_compiled_code__goto_5691_13 != null: 1 else: 0) != 0) {
-            (__ci_expr_logic_1 = (if (if __local_errorcode__goto_5710_5 == 100: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_test_compiled_code__goto_5638_13 != null: 1 else: 0) != 0) {
+            (__ci_expr_logic_1 = (if (if __local_errorcode__goto_5657_5 == 100: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_1 != 0) {
-            (__ci_expr_logic_2 = (if (if __local_erroroffset__goto_5711_12 == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_2 = (if (if __local_erroroffset__goto_5658_12 == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if ((if not (__ci_expr_logic_2 != 0): 1 else: 0) != 0) {
             goto '__ci_bb_295
@@ -20631,12 +20517,12 @@ fn unittest_8() {
 
     '__ci_bb_294 {
         (mallocs_until_failure = 0)
-        (__local_test_match_data__goto_5690_19 = pcre2_match_data_create_8(10, __local_test_gen_context__goto_5686_24))
+        (__local_test_match_data__goto_5637_19 = pcre2_match_data_create_8(10, __local_test_gen_context__goto_5633_24))
         goto '__ci_bb_297
     }
 
     '__ci_bb_295 {
-        (__local_failure__goto_5685_13 = (("test pattern compilation" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("test pattern compilation" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20645,7 +20531,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_297 {
-        if ((if not ((if __local_test_match_data__goto_5690_19 == null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_match_data__goto_5637_19 == null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_300
         } else {
             goto '__ci_bb_301
@@ -20661,12 +20547,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_299 {
-        (__local_test_match_data__goto_5690_19 = pcre2_match_data_create_8(10, null))
+        (__local_test_match_data__goto_5637_19 = pcre2_match_data_create_8(10, null))
         goto '__ci_bb_302
     }
 
     '__ci_bb_300 {
-        (__local_failure__goto_5685_13 = (("pcre2_match_data_create()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_match_data_create()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20675,7 +20561,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_302 {
-        if ((if not ((if __local_test_match_data__goto_5690_19 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_match_data__goto_5637_19 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_305
         } else {
             goto '__ci_bb_306
@@ -20695,7 +20581,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_305 {
-        (__local_failure__goto_5685_13 = (("pcre2_match_data_create()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_match_data_create()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20704,7 +20590,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_307 {
-        if ((if not ((if pcre2_get_ovector_count_8(__local_test_match_data__goto_5690_19) == 10: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if pcre2_get_ovector_count_8(__local_test_match_data__goto_5637_19) == 10: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_310
         } else {
             goto '__ci_bb_311
@@ -20720,12 +20606,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_309 {
-        (__local_sizeval__goto_5683_12 = pcre2_get_match_data_size_8(__local_test_match_data__goto_5690_19))
+        (__local_sizeval__goto_5630_12 = pcre2_get_match_data_size_8(__local_test_match_data__goto_5637_19))
         goto '__ci_bb_312
     }
 
     '__ci_bb_310 {
-        (__local_failure__goto_5685_13 = (("pcre2_get_ovector_count()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_get_ovector_count()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20734,7 +20620,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_312 {
-        if ((if not ((if __local_sizeval__goto_5683_12 >= 2: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_sizeval__goto_5630_12 >= 2: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_315
         } else {
             goto '__ci_bb_316
@@ -20751,13 +20637,13 @@ fn unittest_8() {
 
     '__ci_bb_314 {
         (mallocs_until_failure = 2147483647)
-        pcre2_match_data_free_8(__local_test_match_data__goto_5690_19)
-        (__local_test_match_data__goto_5690_19 = pcre2_match_data_create_8(0, __local_test_gen_context__goto_5686_24))
+        pcre2_match_data_free_8(__local_test_match_data__goto_5637_19)
+        (__local_test_match_data__goto_5637_19 = pcre2_match_data_create_8(0, __local_test_gen_context__goto_5633_24))
         goto '__ci_bb_317
     }
 
     '__ci_bb_315 {
-        (__local_failure__goto_5685_13 = (("pcre2_get_match_data_size()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_get_match_data_size()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20766,7 +20652,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_317 {
-        if ((if not ((if __local_test_match_data__goto_5690_19 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_match_data__goto_5637_19 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_320
         } else {
             goto '__ci_bb_321
@@ -20786,7 +20672,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_320 {
-        (__local_failure__goto_5685_13 = (("pcre2_match_data_create()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_match_data_create()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20795,7 +20681,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_322 {
-        if ((if not ((if pcre2_get_ovector_count_8(__local_test_match_data__goto_5690_19) == 1: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if pcre2_get_ovector_count_8(__local_test_match_data__goto_5637_19) == 1: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_325
         } else {
             goto '__ci_bb_326
@@ -20811,13 +20697,13 @@ fn unittest_8() {
     }
 
     '__ci_bb_324 {
-        pcre2_match_data_free_8(__local_test_match_data__goto_5690_19)
-        (__local_test_match_data__goto_5690_19 = pcre2_match_data_create_from_pattern_8(null, null))
+        pcre2_match_data_free_8(__local_test_match_data__goto_5637_19)
+        (__local_test_match_data__goto_5637_19 = pcre2_match_data_create_from_pattern_8(null, null))
         goto '__ci_bb_327
     }
 
     '__ci_bb_325 {
-        (__local_failure__goto_5685_13 = (("pcre2_get_ovector_count()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_get_ovector_count()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20826,7 +20712,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_327 {
-        if ((if not ((if __local_test_match_data__goto_5690_19 == null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_match_data__goto_5637_19 == null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_330
         } else {
             goto '__ci_bb_331
@@ -20842,12 +20728,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_329 {
-        (__local_test_match_data__goto_5690_19 = pcre2_match_data_create_from_pattern_8(__local_test_compiled_code__goto_5691_13, null))
+        (__local_test_match_data__goto_5637_19 = pcre2_match_data_create_from_pattern_8(__local_test_compiled_code__goto_5638_13, null))
         goto '__ci_bb_332
     }
 
     '__ci_bb_330 {
-        (__local_failure__goto_5685_13 = (("pcre2_match_data_create_from_pattern(null)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_match_data_create_from_pattern(null)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20856,7 +20742,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_332 {
-        if ((if not ((if __local_test_match_data__goto_5690_19 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_match_data__goto_5637_19 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_335
         } else {
             goto '__ci_bb_336
@@ -20876,7 +20762,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_335 {
-        (__local_failure__goto_5685_13 = (("pcre2_match_data_create_from_pattern()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_match_data_create_from_pattern()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20885,7 +20771,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_337 {
-        if ((if not ((if pcre2_get_ovector_count_8(__local_test_match_data__goto_5690_19) == 1: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if pcre2_get_ovector_count_8(__local_test_match_data__goto_5637_19) == 1: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_340
         } else {
             goto '__ci_bb_341
@@ -20902,13 +20788,13 @@ fn unittest_8() {
 
     '__ci_bb_339 {
         (mallocs_until_failure = 0)
-        pcre2_match_data_free_8(__local_test_match_data__goto_5690_19)
-        (__local_test_match_data__goto_5690_19 = pcre2_match_data_create_from_pattern_8(__local_test_compiled_code__goto_5691_13, __local_test_gen_context__goto_5686_24))
+        pcre2_match_data_free_8(__local_test_match_data__goto_5637_19)
+        (__local_test_match_data__goto_5637_19 = pcre2_match_data_create_from_pattern_8(__local_test_compiled_code__goto_5638_13, __local_test_gen_context__goto_5633_24))
         goto '__ci_bb_342
     }
 
     '__ci_bb_340 {
-        (__local_failure__goto_5685_13 = (("pcre2_get_ovector_count()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_get_ovector_count()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20917,7 +20803,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_342 {
-        if ((if not ((if __local_test_match_data__goto_5690_19 == null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_match_data__goto_5637_19 == null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_345
         } else {
             goto '__ci_bb_346
@@ -20934,13 +20820,13 @@ fn unittest_8() {
 
     '__ci_bb_344 {
         (mallocs_until_failure = 2147483647)
-        pcre2_match_data_free_8(__local_test_match_data__goto_5690_19)
-        (__local_test_match_data__goto_5690_19 = pcre2_match_data_create_from_pattern_8(__local_test_compiled_code__goto_5691_13, __local_test_gen_context__goto_5686_24))
+        pcre2_match_data_free_8(__local_test_match_data__goto_5637_19)
+        (__local_test_match_data__goto_5637_19 = pcre2_match_data_create_from_pattern_8(__local_test_compiled_code__goto_5638_13, __local_test_gen_context__goto_5633_24))
         goto '__ci_bb_347
     }
 
     '__ci_bb_345 {
-        (__local_failure__goto_5685_13 = (("pcre2_match_data_create_from_pattern()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_match_data_create_from_pattern()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20949,7 +20835,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_347 {
-        if ((if not ((if __local_test_match_data__goto_5690_19 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_match_data__goto_5637_19 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_350
         } else {
             goto '__ci_bb_351
@@ -20965,12 +20851,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_349 {
-        (__local_rc__goto_5681_5 = pcre2_match_8(__local_test_compiled_code__goto_5691_13, (&(unsafe: __local_pattern__goto_5692_13[0]) as *mut u8), (~(0 as c_ulong)), 0, 16384, __local_test_match_data__goto_5690_19, null))
+        (__local_rc__goto_5628_5 = pcre2_match_8(__local_test_compiled_code__goto_5638_13, (&(unsafe: __local_pattern__goto_5639_13[0]) as *mut u8), (~(0 as c_ulong)), 0, 16384, __local_test_match_data__goto_5637_19, null))
         goto '__ci_bb_352
     }
 
     '__ci_bb_350 {
-        (__local_failure__goto_5685_13 = (("pcre2_match_data_create_from_pattern()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_match_data_create_from_pattern()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -20979,7 +20865,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_352 {
-        if ((if not ((if __local_rc__goto_5681_5 == 1: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == 1: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_355
         } else {
             goto '__ci_bb_356
@@ -20995,14 +20881,14 @@ fn unittest_8() {
     }
 
     '__ci_bb_354 {
-        pcre2_match_data_free_8(__local_test_match_data__goto_5690_19)
-        (__local_test_match_data__goto_5690_19 = ((null as *mut pcre2_real_match_data_8)))
-        (__local_rc__goto_5681_5 = pcre2_pattern_info_8(null, 20, (&raw mut __local_uval__goto_5682_10 as *mut c_uint)))
+        pcre2_match_data_free_8(__local_test_match_data__goto_5637_19)
+        (__local_test_match_data__goto_5637_19 = ((null as *mut pcre2_real_match_data_8)))
+        (__local_rc__goto_5628_5 = pcre2_pattern_info_8(null, 20, (&raw mut __local_uval__goto_5629_10 as *mut c_uint)))
         goto '__ci_bb_357
     }
 
     '__ci_bb_355 {
-        (__local_failure__goto_5685_13 = (("pcre2_match()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_match()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -21011,7 +20897,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_357 {
-        if ((if not ((if __local_rc__goto_5681_5 == -51: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == -51: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_360
         } else {
             goto '__ci_bb_361
@@ -21027,12 +20913,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_359 {
-        (__local_rc__goto_5681_5 = pcre2_pattern_info_8(__local_test_compiled_code__goto_5691_13, 999, null))
+        (__local_rc__goto_5628_5 = pcre2_pattern_info_8(__local_test_compiled_code__goto_5638_13, 999, null))
         goto '__ci_bb_362
     }
 
     '__ci_bb_360 {
-        (__local_failure__goto_5685_13 = (("pcre2_pattern_info(null)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_pattern_info(null)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -21041,7 +20927,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_362 {
-        if ((if not ((if __local_rc__goto_5681_5 == -34: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == -34: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_365
         } else {
             goto '__ci_bb_366
@@ -21057,12 +20943,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_364 {
-        (__local_rc__goto_5681_5 = pcre2_pattern_info_8(__local_test_compiled_code__goto_5691_13, 999, (&raw mut __local_uval__goto_5682_10 as *mut c_uint)))
+        (__local_rc__goto_5628_5 = pcre2_pattern_info_8(__local_test_compiled_code__goto_5638_13, 999, (&raw mut __local_uval__goto_5629_10 as *mut c_uint)))
         goto '__ci_bb_367
     }
 
     '__ci_bb_365 {
-        (__local_failure__goto_5685_13 = (("pcre2_pattern_info(bad option)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_pattern_info(bad option)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -21071,7 +20957,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_367 {
-        if ((if not ((if __local_rc__goto_5681_5 == -34: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == -34: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_370
         } else {
             goto '__ci_bb_371
@@ -21087,12 +20973,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_369 {
-        (__local_invalid_code__goto_5717_7 = ((with_alloc((1024 as i64)) as *mut c_void)))
+        (__local_invalid_code__goto_5664_7 = ((with_alloc((1024 as i64)) as *mut c_void)))
         goto '__ci_bb_372
     }
 
     '__ci_bb_370 {
-        (__local_failure__goto_5685_13 = (("pcre2_pattern_info(bad option)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_pattern_info(bad option)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -21101,7 +20987,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_372 {
-        if ((if not ((if __local_invalid_code__goto_5717_7 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_invalid_code__goto_5664_7 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_375
         } else {
             goto '__ci_bb_376
@@ -21117,13 +21003,13 @@ fn unittest_8() {
     }
 
     '__ci_bb_374 {
-        with_memset((__local_invalid_code__goto_5717_7 as *i8), 0, (1024 as i64))
-        (__local_rc__goto_5681_5 = pcre2_pattern_info_8(__local_invalid_code__goto_5717_7, 20, (&raw mut __local_uval__goto_5682_10 as *mut c_uint)))
+        with_memset((__local_invalid_code__goto_5664_7 as *i8), 0, (1024 as i64))
+        (__local_rc__goto_5628_5 = pcre2_pattern_info_8(__local_invalid_code__goto_5664_7, 20, (&raw mut __local_uval__goto_5629_10 as *mut c_uint)))
         goto '__ci_bb_377
     }
 
     '__ci_bb_375 {
-        (__local_failure__goto_5685_13 = (("malloc()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("malloc()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -21132,7 +21018,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_377 {
-        if ((if not ((if __local_rc__goto_5681_5 == -31: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == -31: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_380
         } else {
             goto '__ci_bb_381
@@ -21148,12 +21034,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_379 {
-        (__local_rc__goto_5681_5 = pcre2_regcomp((&raw mut __local_test_preg__goto_5715_9 as *mut regex_t), "abc", 0))
+        (__local_rc__goto_5628_5 = pcre2_regcomp((&raw mut __local_test_preg__goto_5662_9 as *mut regex_t), "abc", 0))
         goto '__ci_bb_382
     }
 
     '__ci_bb_380 {
-        (__local_failure__goto_5685_13 = (("pcre2_pattern_info(bad magic)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_pattern_info(bad magic)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -21162,7 +21048,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_382 {
-        if ((if not ((if __local_rc__goto_5681_5 == 0: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == 0: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_385
         } else {
             goto '__ci_bb_386
@@ -21178,12 +21064,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_384 {
-        (__local_rc__goto_5681_5 = pcre2_regexec((&raw mut __local_test_preg__goto_5715_9 as *mut regex_t), "zabcz", 0, null, 0))
+        (__local_rc__goto_5628_5 = pcre2_regexec((&raw mut __local_test_preg__goto_5662_9 as *mut regex_t), "zabcz", 0, null, 0))
         goto '__ci_bb_387
     }
 
     '__ci_bb_385 {
-        (__local_failure__goto_5685_13 = (("pcre2_regcomp()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_regcomp()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -21192,7 +21078,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_387 {
-        if ((if not ((if __local_rc__goto_5681_5 == 0: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == 0: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_390
         } else {
             goto '__ci_bb_391
@@ -21208,12 +21094,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_389 {
-        (__local_rc__goto_5681_5 = pcre2_regexec((&raw mut __local_test_preg__goto_5715_9 as *mut regex_t), "zabcz", 0, null, 128))
+        (__local_rc__goto_5628_5 = pcre2_regexec((&raw mut __local_test_preg__goto_5662_9 as *mut regex_t), "zabcz", 0, null, 128))
         goto '__ci_bb_392
     }
 
     '__ci_bb_390 {
-        (__local_failure__goto_5685_13 = (("pcre2_regexec(0)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_regexec(0)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -21222,7 +21108,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_392 {
-        if ((if not ((if __local_rc__goto_5681_5 == REG_INVARG: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == REG_INVARG: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_395
         } else {
             goto '__ci_bb_396
@@ -21238,13 +21124,13 @@ fn unittest_8() {
     }
 
     '__ci_bb_394 {
-        with_memset(((&(unsafe: __local_errorbuffer8__goto_5714_6[0]) as *mut c_char) as *i8), 0, ((256 * sizeof[c_char]()) as i64))
-        (__local_rc__goto_5681_5 = pcre2_regerror(REG_ASSERT, null, (&(unsafe: __local_errorbuffer8__goto_5714_6[0]) as *mut c_char), (256 * sizeof[c_char]())))
+        with_memset(((&(unsafe: __local_errorbuffer8__goto_5661_6[0]) as *mut c_char) as *i8), 0, ((256 * sizeof[c_char]()) as i64))
+        (__local_rc__goto_5628_5 = pcre2_regerror(REG_ASSERT, null, (&(unsafe: __local_errorbuffer8__goto_5661_6[0]) as *mut c_char), (256 * sizeof[c_char]())))
         goto '__ci_bb_397
     }
 
     '__ci_bb_395 {
-        (__local_failure__goto_5685_13 = (("pcre2_regexec(REG_STARTEND)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_regexec(REG_STARTEND)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -21255,11 +21141,11 @@ fn unittest_8() {
     '__ci_bb_397 {
         (__ci_expr_logic_4 = 0)
         (__ci_expr_logic_3 = 0)
-        if ((if __local_rc__goto_5681_5 > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_3 = (if (if __local_rc__goto_5681_5 <= (((256 * sizeof[c_char]()) as c_int)): 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_rc__goto_5628_5 > 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_3 = (if (if __local_rc__goto_5628_5 <= (((256 * sizeof[c_char]()) as c_int)): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_3 != 0) {
-            (__ci_expr_logic_4 = (if (if __local_rc__goto_5681_5 == ((string_len((&(unsafe: __local_errorbuffer8__goto_5714_6[0]) as *mut c_char)) as c_int) + 1): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_4 = (if (if __local_rc__goto_5628_5 == ((string_len((&(unsafe: __local_errorbuffer8__goto_5661_6[0]) as *mut c_char)) as c_int) + 1): 1 else: 0) != 0: 1 else: 0))
         }
         if ((if not (__ci_expr_logic_4 != 0): 1 else: 0) != 0) {
             goto '__ci_bb_400
@@ -21277,12 +21163,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_399 {
-        (__local_rc__goto_5681_5 = pcre2_regerror(REG_NOMATCH, null, (&(unsafe: __local_errorbuffer8__goto_5714_6[0]) as *mut c_char), (256 * sizeof[c_char]())))
+        (__local_rc__goto_5628_5 = pcre2_regerror(REG_NOMATCH, null, (&(unsafe: __local_errorbuffer8__goto_5661_6[0]) as *mut c_char), (256 * sizeof[c_char]())))
         goto '__ci_bb_402
     }
 
     '__ci_bb_400 {
-        (__local_failure__goto_5685_13 = (("regerror()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("regerror()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -21293,11 +21179,11 @@ fn unittest_8() {
     '__ci_bb_402 {
         (__ci_expr_logic_6 = 0)
         (__ci_expr_logic_5 = 0)
-        if ((if __local_rc__goto_5681_5 > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_5 = (if (if __local_rc__goto_5681_5 <= (((256 * sizeof[c_char]()) as c_int)): 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_rc__goto_5628_5 > 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_5 = (if (if __local_rc__goto_5628_5 <= (((256 * sizeof[c_char]()) as c_int)): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_5 != 0) {
-            (__ci_expr_logic_6 = (if (if __local_rc__goto_5681_5 == ((string_len((&(unsafe: __local_errorbuffer8__goto_5714_6[0]) as *mut c_char)) as c_int) + 1): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_6 = (if (if __local_rc__goto_5628_5 == ((string_len((&(unsafe: __local_errorbuffer8__goto_5661_6[0]) as *mut c_char)) as c_int) + 1): 1 else: 0) != 0: 1 else: 0))
         }
         if ((if not (__ci_expr_logic_6 != 0): 1 else: 0) != 0) {
             goto '__ci_bb_405
@@ -21315,12 +21201,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_404 {
-        (__local_rc__goto_5681_5 = pcre2_regerror((REG_ASSERT - 1), null, (&(unsafe: __local_errorbuffer8__goto_5714_6[0]) as *mut c_char), (256 * sizeof[c_char]())))
+        (__local_rc__goto_5628_5 = pcre2_regerror((REG_ASSERT - 1), null, (&(unsafe: __local_errorbuffer8__goto_5661_6[0]) as *mut c_char), (256 * sizeof[c_char]())))
         goto '__ci_bb_407
     }
 
     '__ci_bb_405 {
-        (__local_failure__goto_5685_13 = (("regerror()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("regerror()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -21330,8 +21216,8 @@ fn unittest_8() {
 
     '__ci_bb_407 {
         (__ci_expr_logic_7 = 0)
-        if ((if __local_rc__goto_5681_5 == ((string_len("unknown error code") as c_int) + 1): 1 else: 0) != 0) {
-            (__ci_expr_logic_7 = (if (if string_cmp((&(unsafe: __local_errorbuffer8__goto_5714_6[0]) as *mut c_char), "unknown error code") == 0: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_rc__goto_5628_5 == ((string_len("unknown error code") as c_int) + 1): 1 else: 0) != 0) {
+            (__ci_expr_logic_7 = (if (if string_cmp((&(unsafe: __local_errorbuffer8__goto_5661_6[0]) as *mut c_char), "unknown error code") == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if ((if not (__ci_expr_logic_7 != 0): 1 else: 0) != 0) {
             goto '__ci_bb_410
@@ -21349,12 +21235,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_409 {
-        (__local_rc__goto_5681_5 = pcre2_regerror((REG_NOMATCH + 1), null, (&(unsafe: __local_errorbuffer8__goto_5714_6[0]) as *mut c_char), (256 * sizeof[c_char]())))
+        (__local_rc__goto_5628_5 = pcre2_regerror((REG_NOMATCH + 1), null, (&(unsafe: __local_errorbuffer8__goto_5661_6[0]) as *mut c_char), (256 * sizeof[c_char]())))
         goto '__ci_bb_412
     }
 
     '__ci_bb_410 {
-        (__local_failure__goto_5685_13 = (("regerror(bad error code)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("regerror(bad error code)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -21364,8 +21250,8 @@ fn unittest_8() {
 
     '__ci_bb_412 {
         (__ci_expr_logic_8 = 0)
-        if ((if __local_rc__goto_5681_5 == ((string_len("unknown error code") as c_int) + 1): 1 else: 0) != 0) {
-            (__ci_expr_logic_8 = (if (if string_cmp((&(unsafe: __local_errorbuffer8__goto_5714_6[0]) as *mut c_char), "unknown error code") == 0: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_rc__goto_5628_5 == ((string_len("unknown error code") as c_int) + 1): 1 else: 0) != 0) {
+            (__ci_expr_logic_8 = (if (if string_cmp((&(unsafe: __local_errorbuffer8__goto_5661_6[0]) as *mut c_char), "unknown error code") == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if ((if not (__ci_expr_logic_8 != 0): 1 else: 0) != 0) {
             goto '__ci_bb_415
@@ -21383,12 +21269,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_414 {
-        (__local_rc__goto_5681_5 = pcre2_get_error_message_8(-29, null, 0))
+        (__local_rc__goto_5628_5 = pcre2_get_error_message_8(-29, null, 0))
         goto '__ci_bb_417
     }
 
     '__ci_bb_415 {
-        (__local_failure__goto_5685_13 = (("regerror(bad error code)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("regerror(bad error code)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -21397,7 +21283,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_417 {
-        if ((if not ((if __local_rc__goto_5681_5 == -48: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == -48: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_420
         } else {
             goto '__ci_bb_421
@@ -21413,13 +21299,13 @@ fn unittest_8() {
     }
 
     '__ci_bb_419 {
-        with_memset(((&(unsafe: __local_errorbuffer__goto_5712_13[0]) as *mut u8) as *i8), 0, ((256 * sizeof[u8]()) as i64))
-        (__local_rc__goto_5681_5 = pcre2_get_error_message_8(-29, (&(unsafe: __local_errorbuffer__goto_5712_13[0]) as *mut u8), 0))
+        with_memset(((&(unsafe: __local_errorbuffer__goto_5659_13[0]) as *mut u8) as *i8), 0, ((256 * sizeof[u8]()) as i64))
+        (__local_rc__goto_5628_5 = pcre2_get_error_message_8(-29, (&(unsafe: __local_errorbuffer__goto_5659_13[0]) as *mut u8), 0))
         goto '__ci_bb_422
     }
 
     '__ci_bb_420 {
-        (__local_failure__goto_5685_13 = (("pcre2_get_error_message(null)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_get_error_message(null)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -21428,7 +21314,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_422 {
-        if ((if not ((if __local_rc__goto_5681_5 == -48: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == -48: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_425
         } else {
             goto '__ci_bb_426
@@ -21444,12 +21330,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_424 {
-        (__local_rc__goto_5681_5 = pcre2_get_error_message_8(-29, (&(unsafe: __local_errorbuffer__goto_5712_13[0]) as *mut u8), 4))
+        (__local_rc__goto_5628_5 = pcre2_get_error_message_8(-29, (&(unsafe: __local_errorbuffer__goto_5659_13[0]) as *mut u8), 4))
         goto '__ci_bb_427
     }
 
     '__ci_bb_425 {
-        (__local_failure__goto_5685_13 = (("pcre2_get_error_message(null)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_get_error_message(null)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -21459,8 +21345,8 @@ fn unittest_8() {
 
     '__ci_bb_427 {
         (__ci_expr_logic_9 = 0)
-        if ((if __local_rc__goto_5681_5 == -48: 1 else: 0) != 0) {
-            (__ci_expr_logic_9 = (if (if pcre2_strcmp_c8_8((&(unsafe: __local_errorbuffer__goto_5712_13[0]) as *mut u8), "bad") == 0: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_rc__goto_5628_5 == -48: 1 else: 0) != 0) {
+            (__ci_expr_logic_9 = (if (if pcre2_strcmp_c8_8((&(unsafe: __local_errorbuffer__goto_5659_13[0]) as *mut u8), "bad") == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if ((if not (__ci_expr_logic_9 != 0): 1 else: 0) != 0) {
             goto '__ci_bb_430
@@ -21478,12 +21364,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_429 {
-        (__local_rc__goto_5681_5 = pcre2_get_error_message_8(-29, (&(unsafe: __local_errorbuffer__goto_5712_13[0]) as *mut u8), 14))
+        (__local_rc__goto_5628_5 = pcre2_get_error_message_8(-29, (&(unsafe: __local_errorbuffer__goto_5659_13[0]) as *mut u8), 14))
         goto '__ci_bb_432
     }
 
     '__ci_bb_430 {
-        (__local_failure__goto_5685_13 = (("pcre2_get_error_message(null)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_get_error_message(null)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -21493,8 +21379,8 @@ fn unittest_8() {
 
     '__ci_bb_432 {
         (__ci_expr_logic_10 = 0)
-        if ((if __local_rc__goto_5681_5 == -48: 1 else: 0) != 0) {
-            (__ci_expr_logic_10 = (if (if pcre2_strcmp_c8_8((&(unsafe: __local_errorbuffer__goto_5712_13[0]) as *mut u8), "bad data valu") == 0: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_rc__goto_5628_5 == -48: 1 else: 0) != 0) {
+            (__ci_expr_logic_10 = (if (if pcre2_strcmp_c8_8((&(unsafe: __local_errorbuffer__goto_5659_13[0]) as *mut u8), "bad data valu") == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if ((if not (__ci_expr_logic_10 != 0): 1 else: 0) != 0) {
             goto '__ci_bb_435
@@ -21512,12 +21398,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_434 {
-        (__local_rc__goto_5681_5 = pcre2_get_error_message_8(-29, (&(unsafe: __local_errorbuffer__goto_5712_13[0]) as *mut u8), 15))
+        (__local_rc__goto_5628_5 = pcre2_get_error_message_8(-29, (&(unsafe: __local_errorbuffer__goto_5659_13[0]) as *mut u8), 15))
         goto '__ci_bb_437
     }
 
     '__ci_bb_435 {
-        (__local_failure__goto_5685_13 = (("pcre2_get_error_message(null)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_get_error_message(null)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -21527,8 +21413,8 @@ fn unittest_8() {
 
     '__ci_bb_437 {
         (__ci_expr_logic_11 = 0)
-        if ((if __local_rc__goto_5681_5 == 14: 1 else: 0) != 0) {
-            (__ci_expr_logic_11 = (if (if pcre2_strcmp_c8_8((&(unsafe: __local_errorbuffer__goto_5712_13[0]) as *mut u8), "bad data value") == 0: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_rc__goto_5628_5 == 14: 1 else: 0) != 0) {
+            (__ci_expr_logic_11 = (if (if pcre2_strcmp_c8_8((&(unsafe: __local_errorbuffer__goto_5659_13[0]) as *mut u8), "bad data value") == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if ((if not (__ci_expr_logic_11 != 0): 1 else: 0) != 0) {
             goto '__ci_bb_440
@@ -21546,12 +21432,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_439 {
-        (__local_test_tables__goto_5718_16 = pcre2_maketables_8(null))
+        (__local_test_tables__goto_5665_16 = pcre2_maketables_8(null))
         goto '__ci_bb_442
     }
 
     '__ci_bb_440 {
-        (__local_failure__goto_5685_13 = (("pcre2_get_error_message(null)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_get_error_message(null)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -21560,7 +21446,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_442 {
-        if ((if not ((if __local_test_tables__goto_5718_16 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_tables__goto_5665_16 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_445
         } else {
             goto '__ci_bb_446
@@ -21576,13 +21462,13 @@ fn unittest_8() {
     }
 
     '__ci_bb_444 {
-        pcre2_maketables_free_8(null, __local_test_tables__goto_5718_16)
-        (__local_test_tables__goto_5718_16 = pcre2_maketables_8(__local_test_gen_context__goto_5686_24))
+        pcre2_maketables_free_8(null, __local_test_tables__goto_5665_16)
+        (__local_test_tables__goto_5665_16 = pcre2_maketables_8(__local_test_gen_context__goto_5633_24))
         goto '__ci_bb_447
     }
 
     '__ci_bb_445 {
-        (__local_failure__goto_5685_13 = (("pcre2_maketables(null)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_maketables(null)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -21591,7 +21477,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_447 {
-        if ((if not ((if __local_test_tables__goto_5718_16 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_tables__goto_5665_16 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_450
         } else {
             goto '__ci_bb_451
@@ -21607,14 +21493,14 @@ fn unittest_8() {
     }
 
     '__ci_bb_449 {
-        pcre2_maketables_free_8(__local_test_gen_context__goto_5686_24, __local_test_tables__goto_5718_16)
+        pcre2_maketables_free_8(__local_test_gen_context__goto_5633_24, __local_test_tables__goto_5665_16)
         (mallocs_until_failure = 0)
-        (__local_test_tables__goto_5718_16 = pcre2_maketables_8(__local_test_gen_context__goto_5686_24))
+        (__local_test_tables__goto_5665_16 = pcre2_maketables_8(__local_test_gen_context__goto_5633_24))
         goto '__ci_bb_452
     }
 
     '__ci_bb_450 {
-        (__local_failure__goto_5685_13 = (("pcre2_maketables()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_maketables()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -21623,7 +21509,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_452 {
-        if ((if not ((if __local_test_tables__goto_5718_16 == null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_tables__goto_5665_16 == null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_455
         } else {
             goto '__ci_bb_456
@@ -21640,12 +21526,12 @@ fn unittest_8() {
 
     '__ci_bb_454 {
         (mallocs_until_failure = 2147483647)
-        (__local_rc__goto_5681_5 = pcre2_callout_enumerate_8(null, callout_enumerate_function_void_8, null))
+        (__local_rc__goto_5628_5 = pcre2_callout_enumerate_8(null, callout_enumerate_function_void_8, null))
         goto '__ci_bb_457
     }
 
     '__ci_bb_455 {
-        (__local_failure__goto_5685_13 = (("pcre2_maketables()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_maketables()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -21654,7 +21540,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_457 {
-        if ((if not ((if __local_rc__goto_5681_5 == -51: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == -51: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_460
         } else {
             goto '__ci_bb_461
@@ -21670,12 +21556,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_459 {
-        (__local_rc__goto_5681_5 = pcre2_callout_enumerate_8(__local_invalid_code__goto_5717_7, callout_enumerate_function_void_8, null))
+        (__local_rc__goto_5628_5 = pcre2_callout_enumerate_8(__local_invalid_code__goto_5664_7, callout_enumerate_function_void_8, null))
         goto '__ci_bb_462
     }
 
     '__ci_bb_460 {
-        (__local_failure__goto_5685_13 = (("pcre2_callout_enumerate(null)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_callout_enumerate(null)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -21684,7 +21570,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_462 {
-        if ((if not ((if __local_rc__goto_5681_5 == -31: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == -31: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_465
         } else {
             goto '__ci_bb_466
@@ -21700,13 +21586,13 @@ fn unittest_8() {
     }
 
     '__ci_bb_464 {
-        pcre2_code_free_8(__local_test_compiled_code__goto_5691_13)
-        (__local_test_compiled_code__goto_5691_13 = pcre2_compile_8((&(unsafe: __local_callout_int_pattern__goto_5693_13[0]) as *mut u8), (~(0 as c_ulong)), 0, (&raw mut __local_errorcode__goto_5710_5 as *mut c_int), (&raw mut __local_erroroffset__goto_5711_12 as *mut c_ulong), null))
+        pcre2_code_free_8(__local_test_compiled_code__goto_5638_13)
+        (__local_test_compiled_code__goto_5638_13 = pcre2_compile_8((&(unsafe: __local_callout_int_pattern__goto_5640_13[0]) as *mut u8), (~(0 as c_ulong)), 0, (&raw mut __local_errorcode__goto_5657_5 as *mut c_int), (&raw mut __local_erroroffset__goto_5658_12 as *mut c_ulong), null))
         goto '__ci_bb_467
     }
 
     '__ci_bb_465 {
-        (__local_failure__goto_5685_13 = (("pcre2_callout_enumerate(invalid)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_callout_enumerate(invalid)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -21715,7 +21601,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_467 {
-        if ((if not ((if __local_test_compiled_code__goto_5691_13 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_compiled_code__goto_5638_13 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_470
         } else {
             goto '__ci_bb_471
@@ -21731,12 +21617,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_469 {
-        (__local_rc__goto_5681_5 = pcre2_callout_enumerate_8(__local_test_compiled_code__goto_5691_13, callout_enumerate_function_void_8, (&raw mut __local_errorcode__goto_5710_5 as *mut c_int)))
+        (__local_rc__goto_5628_5 = pcre2_callout_enumerate_8(__local_test_compiled_code__goto_5638_13, callout_enumerate_function_void_8, (&raw mut __local_errorcode__goto_5657_5 as *mut c_int)))
         goto '__ci_bb_472
     }
 
     '__ci_bb_470 {
-        (__local_failure__goto_5685_13 = (("test pattern compilation" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("test pattern compilation" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -21745,7 +21631,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_472 {
-        if ((if not ((if __local_rc__goto_5681_5 == 0: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == 0: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_475
         } else {
             goto '__ci_bb_476
@@ -21761,13 +21647,13 @@ fn unittest_8() {
     }
 
     '__ci_bb_474 {
-        (__local_errorcode__goto_5710_5 = -12)
-        (__local_rc__goto_5681_5 = pcre2_callout_enumerate_8(__local_test_compiled_code__goto_5691_13, callout_enumerate_function_fail_8, (&raw mut __local_errorcode__goto_5710_5 as *mut c_int)))
+        (__local_errorcode__goto_5657_5 = -12)
+        (__local_rc__goto_5628_5 = pcre2_callout_enumerate_8(__local_test_compiled_code__goto_5638_13, callout_enumerate_function_fail_8, (&raw mut __local_errorcode__goto_5657_5 as *mut c_int)))
         goto '__ci_bb_477
     }
 
     '__ci_bb_475 {
-        (__local_failure__goto_5685_13 = (("pcre2_callout_enumerate(void)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_callout_enumerate(void)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -21776,7 +21662,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_477 {
-        if ((if not ((if __local_rc__goto_5681_5 == -12: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == -12: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_480
         } else {
             goto '__ci_bb_481
@@ -21792,13 +21678,13 @@ fn unittest_8() {
     }
 
     '__ci_bb_479 {
-        pcre2_code_free_8(__local_test_compiled_code__goto_5691_13)
-        (__local_test_compiled_code__goto_5691_13 = pcre2_compile_8((&(unsafe: __local_callout_str_pattern__goto_5695_13[0]) as *mut u8), (~(0 as c_ulong)), 0, (&raw mut __local_errorcode__goto_5710_5 as *mut c_int), (&raw mut __local_erroroffset__goto_5711_12 as *mut c_ulong), null))
+        pcre2_code_free_8(__local_test_compiled_code__goto_5638_13)
+        (__local_test_compiled_code__goto_5638_13 = pcre2_compile_8((&(unsafe: __local_callout_str_pattern__goto_5642_13[0]) as *mut u8), (~(0 as c_ulong)), 0, (&raw mut __local_errorcode__goto_5657_5 as *mut c_int), (&raw mut __local_erroroffset__goto_5658_12 as *mut c_ulong), null))
         goto '__ci_bb_482
     }
 
     '__ci_bb_480 {
-        (__local_failure__goto_5685_13 = (("pcre2_callout_enumerate(fail)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_callout_enumerate(fail)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -21807,7 +21693,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_482 {
-        if ((if not ((if __local_test_compiled_code__goto_5691_13 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_compiled_code__goto_5638_13 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_485
         } else {
             goto '__ci_bb_486
@@ -21823,13 +21709,13 @@ fn unittest_8() {
     }
 
     '__ci_bb_484 {
-        (__local_errorcode__goto_5710_5 = -123)
-        (__local_rc__goto_5681_5 = pcre2_callout_enumerate_8(__local_test_compiled_code__goto_5691_13, callout_enumerate_function_fail_8, (&raw mut __local_errorcode__goto_5710_5 as *mut c_int)))
+        (__local_errorcode__goto_5657_5 = -123)
+        (__local_rc__goto_5628_5 = pcre2_callout_enumerate_8(__local_test_compiled_code__goto_5638_13, callout_enumerate_function_fail_8, (&raw mut __local_errorcode__goto_5657_5 as *mut c_int)))
         goto '__ci_bb_487
     }
 
     '__ci_bb_485 {
-        (__local_failure__goto_5685_13 = (("test pattern compilation" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("test pattern compilation" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -21838,7 +21724,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_487 {
-        if ((if not ((if __local_rc__goto_5681_5 == -123: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == -123: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_490
         } else {
             goto '__ci_bb_491
@@ -21856,13 +21742,13 @@ fn unittest_8() {
     '__ci_bb_489 {
         pcre2_substring_free_8(null)
         pcre2_substring_list_free_8(null)
-        pcre2_code_free_8(__local_test_compiled_code__goto_5691_13)
-        (__local_test_compiled_code__goto_5691_13 = pcre2_compile_8((&(unsafe: __local_capture_pattern__goto_5698_13[0]) as *mut u8), (~(0 as c_ulong)), 0, (&raw mut __local_errorcode__goto_5710_5 as *mut c_int), (&raw mut __local_erroroffset__goto_5711_12 as *mut c_ulong), null))
+        pcre2_code_free_8(__local_test_compiled_code__goto_5638_13)
+        (__local_test_compiled_code__goto_5638_13 = pcre2_compile_8((&(unsafe: __local_capture_pattern__goto_5645_13[0]) as *mut u8), (~(0 as c_ulong)), 0, (&raw mut __local_errorcode__goto_5657_5 as *mut c_int), (&raw mut __local_erroroffset__goto_5658_12 as *mut c_ulong), null))
         goto '__ci_bb_492
     }
 
     '__ci_bb_490 {
-        (__local_failure__goto_5685_13 = (("pcre2_callout_enumerate(fail)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_callout_enumerate(fail)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -21871,7 +21757,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_492 {
-        if ((if not ((if __local_test_compiled_code__goto_5691_13 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_compiled_code__goto_5638_13 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_495
         } else {
             goto '__ci_bb_496
@@ -21887,13 +21773,13 @@ fn unittest_8() {
     }
 
     '__ci_bb_494 {
-        pcre2_match_data_free_8(__local_test_match_data__goto_5690_19)
-        (__local_test_match_data__goto_5690_19 = pcre2_match_data_create_from_pattern_8(__local_test_compiled_code__goto_5691_13, __local_test_gen_context__goto_5686_24))
+        pcre2_match_data_free_8(__local_test_match_data__goto_5637_19)
+        (__local_test_match_data__goto_5637_19 = pcre2_match_data_create_from_pattern_8(__local_test_compiled_code__goto_5638_13, __local_test_gen_context__goto_5633_24))
         goto '__ci_bb_497
     }
 
     '__ci_bb_495 {
-        (__local_failure__goto_5685_13 = (("test pattern compilation" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("test pattern compilation" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -21902,7 +21788,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_497 {
-        if ((if not ((if __local_test_match_data__goto_5690_19 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_match_data__goto_5637_19 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_500
         } else {
             goto '__ci_bb_501
@@ -21918,12 +21804,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_499 {
-        (__local_rc__goto_5681_5 = pcre2_match_8(__local_test_compiled_code__goto_5691_13, (&(unsafe: __local_subject_abcz__goto_5702_13[0]) as *mut u8), (~(0 as c_ulong)), 0, 0, __local_test_match_data__goto_5690_19, null))
+        (__local_rc__goto_5628_5 = pcre2_match_8(__local_test_compiled_code__goto_5638_13, (&(unsafe: __local_subject_abcz__goto_5649_13[0]) as *mut u8), (~(0 as c_ulong)), 0, 0, __local_test_match_data__goto_5637_19, null))
         goto '__ci_bb_502
     }
 
     '__ci_bb_500 {
-        (__local_failure__goto_5685_13 = (("pcre2_match_data_create()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_match_data_create()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -21932,7 +21818,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_502 {
-        if ((if not ((if __local_rc__goto_5681_5 == 2: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == 2: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_505
         } else {
             goto '__ci_bb_506
@@ -21948,13 +21834,13 @@ fn unittest_8() {
     }
 
     '__ci_bb_504 {
-        (__local_sizeval__goto_5683_12 = 2)
-        (__local_rc__goto_5681_5 = pcre2_substring_copy_byname_8(__local_test_match_data__goto_5690_19, (&(unsafe: __local_name_n__goto_5705_13[0]) as *mut u8), (&(unsafe: __local_copy_buf__goto_5719_13[0]) as *mut u8), (&raw mut __local_sizeval__goto_5683_12 as *mut c_ulong)))
+        (__local_sizeval__goto_5630_12 = 2)
+        (__local_rc__goto_5628_5 = pcre2_substring_copy_byname_8(__local_test_match_data__goto_5637_19, (&(unsafe: __local_name_n__goto_5652_13[0]) as *mut u8), (&(unsafe: __local_copy_buf__goto_5666_13[0]) as *mut u8), (&raw mut __local_sizeval__goto_5630_12 as *mut c_ulong)))
         goto '__ci_bb_507
     }
 
     '__ci_bb_505 {
-        (__local_failure__goto_5685_13 = (("pcre2_match()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_match()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -21964,8 +21850,8 @@ fn unittest_8() {
 
     '__ci_bb_507 {
         (__ci_expr_logic_12 = 0)
-        if ((if __local_rc__goto_5681_5 == -48: 1 else: 0) != 0) {
-            (__ci_expr_logic_12 = (if (if __local_sizeval__goto_5683_12 == 2: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_rc__goto_5628_5 == -48: 1 else: 0) != 0) {
+            (__ci_expr_logic_12 = (if (if __local_sizeval__goto_5630_12 == 2: 1 else: 0) != 0: 1 else: 0))
         }
         if ((if not (__ci_expr_logic_12 != 0): 1 else: 0) != 0) {
             goto '__ci_bb_510
@@ -21983,13 +21869,13 @@ fn unittest_8() {
     }
 
     '__ci_bb_509 {
-        (__local_sizeval__goto_5683_12 = 3)
-        (__local_rc__goto_5681_5 = pcre2_substring_copy_byname_8(__local_test_match_data__goto_5690_19, (&(unsafe: __local_name_n__goto_5705_13[0]) as *mut u8), (&(unsafe: __local_copy_buf__goto_5719_13[0]) as *mut u8), (&raw mut __local_sizeval__goto_5683_12 as *mut c_ulong)))
+        (__local_sizeval__goto_5630_12 = 3)
+        (__local_rc__goto_5628_5 = pcre2_substring_copy_byname_8(__local_test_match_data__goto_5637_19, (&(unsafe: __local_name_n__goto_5652_13[0]) as *mut u8), (&(unsafe: __local_copy_buf__goto_5666_13[0]) as *mut u8), (&raw mut __local_sizeval__goto_5630_12 as *mut c_ulong)))
         goto '__ci_bb_512
     }
 
     '__ci_bb_510 {
-        (__local_failure__goto_5685_13 = (("pcre2_substring_copy_byname(small buffer)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_substring_copy_byname(small buffer)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -21999,8 +21885,8 @@ fn unittest_8() {
 
     '__ci_bb_512 {
         (__ci_expr_logic_13 = 0)
-        if ((if __local_rc__goto_5681_5 == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_13 = (if (if __local_sizeval__goto_5683_12 == 2: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_rc__goto_5628_5 == 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_13 = (if (if __local_sizeval__goto_5630_12 == 2: 1 else: 0) != 0: 1 else: 0))
         }
         if ((if not (__ci_expr_logic_13 != 0): 1 else: 0) != 0) {
             goto '__ci_bb_515
@@ -22018,13 +21904,13 @@ fn unittest_8() {
     }
 
     '__ci_bb_514 {
-        (__local_sizeval__goto_5683_12 = 4)
-        (__local_rc__goto_5681_5 = pcre2_substring_copy_byname_8(__local_test_match_data__goto_5690_19, (&(unsafe: __local_name_n__goto_5705_13[0]) as *mut u8), (&(unsafe: __local_copy_buf__goto_5719_13[0]) as *mut u8), (&raw mut __local_sizeval__goto_5683_12 as *mut c_ulong)))
+        (__local_sizeval__goto_5630_12 = 4)
+        (__local_rc__goto_5628_5 = pcre2_substring_copy_byname_8(__local_test_match_data__goto_5637_19, (&(unsafe: __local_name_n__goto_5652_13[0]) as *mut u8), (&(unsafe: __local_copy_buf__goto_5666_13[0]) as *mut u8), (&raw mut __local_sizeval__goto_5630_12 as *mut c_ulong)))
         goto '__ci_bb_517
     }
 
     '__ci_bb_515 {
-        (__local_failure__goto_5685_13 = (("pcre2_substring_copy_byname(small buffer)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_substring_copy_byname(small buffer)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -22034,8 +21920,8 @@ fn unittest_8() {
 
     '__ci_bb_517 {
         (__ci_expr_logic_14 = 0)
-        if ((if __local_rc__goto_5681_5 == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_14 = (if (if __local_sizeval__goto_5683_12 == 2: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_rc__goto_5628_5 == 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_14 = (if (if __local_sizeval__goto_5630_12 == 2: 1 else: 0) != 0: 1 else: 0))
         }
         if ((if not (__ci_expr_logic_14 != 0): 1 else: 0) != 0) {
             goto '__ci_bb_520
@@ -22053,13 +21939,13 @@ fn unittest_8() {
     }
 
     '__ci_bb_519 {
-        (__local_sizeval__goto_5683_12 = 2)
-        (__local_rc__goto_5681_5 = pcre2_substring_copy_bynumber_8(__local_test_match_data__goto_5690_19, 1, (&(unsafe: __local_copy_buf__goto_5719_13[0]) as *mut u8), (&raw mut __local_sizeval__goto_5683_12 as *mut c_ulong)))
+        (__local_sizeval__goto_5630_12 = 2)
+        (__local_rc__goto_5628_5 = pcre2_substring_copy_bynumber_8(__local_test_match_data__goto_5637_19, 1, (&(unsafe: __local_copy_buf__goto_5666_13[0]) as *mut u8), (&raw mut __local_sizeval__goto_5630_12 as *mut c_ulong)))
         goto '__ci_bb_522
     }
 
     '__ci_bb_520 {
-        (__local_failure__goto_5685_13 = (("pcre2_substring_copy_byname(small buffer)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_substring_copy_byname(small buffer)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -22069,8 +21955,8 @@ fn unittest_8() {
 
     '__ci_bb_522 {
         (__ci_expr_logic_15 = 0)
-        if ((if __local_rc__goto_5681_5 == -48: 1 else: 0) != 0) {
-            (__ci_expr_logic_15 = (if (if __local_sizeval__goto_5683_12 == 2: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_rc__goto_5628_5 == -48: 1 else: 0) != 0) {
+            (__ci_expr_logic_15 = (if (if __local_sizeval__goto_5630_12 == 2: 1 else: 0) != 0: 1 else: 0))
         }
         if ((if not (__ci_expr_logic_15 != 0): 1 else: 0) != 0) {
             goto '__ci_bb_525
@@ -22088,13 +21974,13 @@ fn unittest_8() {
     }
 
     '__ci_bb_524 {
-        (__local_sizeval__goto_5683_12 = 3)
-        (__local_rc__goto_5681_5 = pcre2_substring_copy_bynumber_8(__local_test_match_data__goto_5690_19, 1, (&(unsafe: __local_copy_buf__goto_5719_13[0]) as *mut u8), (&raw mut __local_sizeval__goto_5683_12 as *mut c_ulong)))
+        (__local_sizeval__goto_5630_12 = 3)
+        (__local_rc__goto_5628_5 = pcre2_substring_copy_bynumber_8(__local_test_match_data__goto_5637_19, 1, (&(unsafe: __local_copy_buf__goto_5666_13[0]) as *mut u8), (&raw mut __local_sizeval__goto_5630_12 as *mut c_ulong)))
         goto '__ci_bb_527
     }
 
     '__ci_bb_525 {
-        (__local_failure__goto_5685_13 = (("pcre2_substring_copy_bynumber(small buffer)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_substring_copy_bynumber(small buffer)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -22104,8 +21990,8 @@ fn unittest_8() {
 
     '__ci_bb_527 {
         (__ci_expr_logic_16 = 0)
-        if ((if __local_rc__goto_5681_5 == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_16 = (if (if __local_sizeval__goto_5683_12 == 2: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_rc__goto_5628_5 == 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_16 = (if (if __local_sizeval__goto_5630_12 == 2: 1 else: 0) != 0: 1 else: 0))
         }
         if ((if not (__ci_expr_logic_16 != 0): 1 else: 0) != 0) {
             goto '__ci_bb_530
@@ -22124,14 +22010,14 @@ fn unittest_8() {
 
     '__ci_bb_529 {
         (mallocs_until_failure = 0)
-        (__local_sizeval__goto_5683_12 = 0)
-        (__local_sptrval__goto_5684_14 = ((null as *mut u8)))
-        (__local_rc__goto_5681_5 = pcre2_substring_get_byname_8(__local_test_match_data__goto_5690_19, (&(unsafe: __local_name_n__goto_5705_13[0]) as *mut u8), (&raw mut __local_sptrval__goto_5684_14 as *mut *mut u8), (&raw mut __local_sizeval__goto_5683_12 as *mut c_ulong)))
+        (__local_sizeval__goto_5630_12 = 0)
+        (__local_sptrval__goto_5631_14 = ((null as *mut u8)))
+        (__local_rc__goto_5628_5 = pcre2_substring_get_byname_8(__local_test_match_data__goto_5637_19, (&(unsafe: __local_name_n__goto_5652_13[0]) as *mut u8), (&raw mut __local_sptrval__goto_5631_14 as *mut *mut u8), (&raw mut __local_sizeval__goto_5630_12 as *mut c_ulong)))
         goto '__ci_bb_532
     }
 
     '__ci_bb_530 {
-        (__local_failure__goto_5685_13 = (("pcre2_substring_copy_bynumber(small buffer)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_substring_copy_bynumber(small buffer)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -22141,8 +22027,8 @@ fn unittest_8() {
 
     '__ci_bb_532 {
         (__ci_expr_logic_17 = 0)
-        if ((if __local_rc__goto_5681_5 == -48: 1 else: 0) != 0) {
-            (__ci_expr_logic_17 = (if (if __local_sptrval__goto_5684_14 == null: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_rc__goto_5628_5 == -48: 1 else: 0) != 0) {
+            (__ci_expr_logic_17 = (if (if __local_sptrval__goto_5631_14 == null: 1 else: 0) != 0: 1 else: 0))
         }
         if ((if not (__ci_expr_logic_17 != 0): 1 else: 0) != 0) {
             goto '__ci_bb_535
@@ -22160,13 +22046,13 @@ fn unittest_8() {
     }
 
     '__ci_bb_534 {
-        (__local_sizeval__goto_5683_12 = 0)
-        (__local_rc__goto_5681_5 = pcre2_substring_get_bynumber_8(__local_test_match_data__goto_5690_19, 1, (&raw mut __local_sptrval__goto_5684_14 as *mut *mut u8), (&raw mut __local_sizeval__goto_5683_12 as *mut c_ulong)))
+        (__local_sizeval__goto_5630_12 = 0)
+        (__local_rc__goto_5628_5 = pcre2_substring_get_bynumber_8(__local_test_match_data__goto_5637_19, 1, (&raw mut __local_sptrval__goto_5631_14 as *mut *mut u8), (&raw mut __local_sizeval__goto_5630_12 as *mut c_ulong)))
         goto '__ci_bb_537
     }
 
     '__ci_bb_535 {
-        (__local_failure__goto_5685_13 = (("pcre2_substring_get_byname(small buffer)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_substring_get_byname(small buffer)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -22176,8 +22062,8 @@ fn unittest_8() {
 
     '__ci_bb_537 {
         (__ci_expr_logic_18 = 0)
-        if ((if __local_rc__goto_5681_5 == -48: 1 else: 0) != 0) {
-            (__ci_expr_logic_18 = (if (if __local_sptrval__goto_5684_14 == null: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_rc__goto_5628_5 == -48: 1 else: 0) != 0) {
+            (__ci_expr_logic_18 = (if (if __local_sptrval__goto_5631_14 == null: 1 else: 0) != 0: 1 else: 0))
         }
         if ((if not (__ci_expr_logic_18 != 0): 1 else: 0) != 0) {
             goto '__ci_bb_540
@@ -22196,13 +22082,13 @@ fn unittest_8() {
 
     '__ci_bb_539 {
         (mallocs_until_failure = 2147483647)
-        (__local_sizeval__goto_5683_12 = 0)
-        (__local_rc__goto_5681_5 = pcre2_substring_length_bynumber_8(__local_test_match_data__goto_5690_19, 1, (&raw mut __local_sizeval__goto_5683_12 as *mut c_ulong)))
+        (__local_sizeval__goto_5630_12 = 0)
+        (__local_rc__goto_5628_5 = pcre2_substring_length_bynumber_8(__local_test_match_data__goto_5637_19, 1, (&raw mut __local_sizeval__goto_5630_12 as *mut c_ulong)))
         goto '__ci_bb_542
     }
 
     '__ci_bb_540 {
-        (__local_failure__goto_5685_13 = (("pcre2_substring_get_bynumber(small buffer)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_substring_get_bynumber(small buffer)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -22212,8 +22098,8 @@ fn unittest_8() {
 
     '__ci_bb_542 {
         (__ci_expr_logic_19 = 0)
-        if ((if __local_rc__goto_5681_5 == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_19 = (if (if __local_sizeval__goto_5683_12 == 2: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_rc__goto_5628_5 == 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_19 = (if (if __local_sizeval__goto_5630_12 == 2: 1 else: 0) != 0: 1 else: 0))
         }
         if ((if not (__ci_expr_logic_19 != 0): 1 else: 0) != 0) {
             goto '__ci_bb_545
@@ -22231,12 +22117,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_544 {
-        (__local_rc__goto_5681_5 = pcre2_substring_length_bynumber_8(__local_test_match_data__goto_5690_19, 1, null))
+        (__local_rc__goto_5628_5 = pcre2_substring_length_bynumber_8(__local_test_match_data__goto_5637_19, 1, null))
         goto '__ci_bb_547
     }
 
     '__ci_bb_545 {
-        (__local_failure__goto_5685_13 = (("pcre2_substring_length_bynumber()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_substring_length_bynumber()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -22245,7 +22131,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_547 {
-        if ((if not ((if __local_rc__goto_5681_5 == 0: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == 0: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_550
         } else {
             goto '__ci_bb_551
@@ -22261,13 +22147,13 @@ fn unittest_8() {
     }
 
     '__ci_bb_549 {
-        (__local_sizeval__goto_5683_12 = 0)
-        (__local_rc__goto_5681_5 = pcre2_substring_length_byname_8(__local_test_match_data__goto_5690_19, (&(unsafe: __local_name_n__goto_5705_13[0]) as *mut u8), (&raw mut __local_sizeval__goto_5683_12 as *mut c_ulong)))
+        (__local_sizeval__goto_5630_12 = 0)
+        (__local_rc__goto_5628_5 = pcre2_substring_length_byname_8(__local_test_match_data__goto_5637_19, (&(unsafe: __local_name_n__goto_5652_13[0]) as *mut u8), (&raw mut __local_sizeval__goto_5630_12 as *mut c_ulong)))
         goto '__ci_bb_552
     }
 
     '__ci_bb_550 {
-        (__local_failure__goto_5685_13 = (("pcre2_substring_length_bynumber()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_substring_length_bynumber()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -22277,8 +22163,8 @@ fn unittest_8() {
 
     '__ci_bb_552 {
         (__ci_expr_logic_20 = 0)
-        if ((if __local_rc__goto_5681_5 == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_20 = (if (if __local_sizeval__goto_5683_12 == 2: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_rc__goto_5628_5 == 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_20 = (if (if __local_sizeval__goto_5630_12 == 2: 1 else: 0) != 0: 1 else: 0))
         }
         if ((if not (__ci_expr_logic_20 != 0): 1 else: 0) != 0) {
             goto '__ci_bb_555
@@ -22296,12 +22182,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_554 {
-        (__local_rc__goto_5681_5 = pcre2_substring_length_byname_8(__local_test_match_data__goto_5690_19, (&(unsafe: __local_name_n__goto_5705_13[0]) as *mut u8), null))
+        (__local_rc__goto_5628_5 = pcre2_substring_length_byname_8(__local_test_match_data__goto_5637_19, (&(unsafe: __local_name_n__goto_5652_13[0]) as *mut u8), null))
         goto '__ci_bb_557
     }
 
     '__ci_bb_555 {
-        (__local_failure__goto_5685_13 = (("pcre2_substring_length_byname()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_substring_length_byname()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -22310,7 +22196,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_557 {
-        if ((if not ((if __local_rc__goto_5681_5 == 0: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == 0: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_560
         } else {
             goto '__ci_bb_561
@@ -22326,12 +22212,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_559 {
-        (__local_rc__goto_5681_5 = pcre2_substring_list_get_8(__local_test_match_data__goto_5690_19, (&raw mut __local_stringlist__goto_5720_15 as *mut *mut *mut u8), (&raw mut __local_lengthslist__goto_5721_13 as *mut *mut c_ulong)))
+        (__local_rc__goto_5628_5 = pcre2_substring_list_get_8(__local_test_match_data__goto_5637_19, (&raw mut __local_stringlist__goto_5667_15 as *mut *mut *mut u8), (&raw mut __local_lengthslist__goto_5668_13 as *mut *mut c_ulong)))
         goto '__ci_bb_562
     }
 
     '__ci_bb_560 {
-        (__local_failure__goto_5685_13 = (("pcre2_substring_length_byname()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_substring_length_byname()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -22342,11 +22228,11 @@ fn unittest_8() {
     '__ci_bb_562 {
         (__ci_expr_logic_22 = 0)
         (__ci_expr_logic_21 = 0)
-        if ((if __local_rc__goto_5681_5 == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_21 = (if (if __local_stringlist__goto_5720_15 != null: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_rc__goto_5628_5 == 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_21 = (if (if __local_stringlist__goto_5667_15 != null: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_21 != 0) {
-            (__ci_expr_logic_22 = (if (if __local_lengthslist__goto_5721_13 != null: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_22 = (if (if __local_lengthslist__goto_5668_13 != null: 1 else: 0) != 0: 1 else: 0))
         }
         if ((if not (__ci_expr_logic_22 != 0): 1 else: 0) != 0) {
             goto '__ci_bb_565
@@ -22364,14 +22250,14 @@ fn unittest_8() {
     }
 
     '__ci_bb_564 {
-        pcre2_substring_list_free_8(__local_stringlist__goto_5720_15)
-        (__local_stringlist__goto_5720_15 = ((null as *mut *mut u8)))
-        (__local_rc__goto_5681_5 = pcre2_substring_list_get_8(__local_test_match_data__goto_5690_19, (&raw mut __local_stringlist__goto_5720_15 as *mut *mut *mut u8), null))
+        pcre2_substring_list_free_8(__local_stringlist__goto_5667_15)
+        (__local_stringlist__goto_5667_15 = ((null as *mut *mut u8)))
+        (__local_rc__goto_5628_5 = pcre2_substring_list_get_8(__local_test_match_data__goto_5637_19, (&raw mut __local_stringlist__goto_5667_15 as *mut *mut *mut u8), null))
         goto '__ci_bb_567
     }
 
     '__ci_bb_565 {
-        (__local_failure__goto_5685_13 = (("pcre2_substring_list_get()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_substring_list_get()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -22381,8 +22267,8 @@ fn unittest_8() {
 
     '__ci_bb_567 {
         (__ci_expr_logic_23 = 0)
-        if ((if __local_rc__goto_5681_5 == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_23 = (if (if __local_stringlist__goto_5720_15 != null: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_rc__goto_5628_5 == 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_23 = (if (if __local_stringlist__goto_5667_15 != null: 1 else: 0) != 0: 1 else: 0))
         }
         if ((if not (__ci_expr_logic_23 != 0): 1 else: 0) != 0) {
             goto '__ci_bb_570
@@ -22400,15 +22286,15 @@ fn unittest_8() {
     }
 
     '__ci_bb_569 {
-        pcre2_substring_list_free_8(__local_stringlist__goto_5720_15)
+        pcre2_substring_list_free_8(__local_stringlist__goto_5667_15)
         (mallocs_until_failure = 0)
-        (__local_stringlist__goto_5720_15 = ((null as *mut *mut u8)))
-        (__local_rc__goto_5681_5 = pcre2_substring_list_get_8(__local_test_match_data__goto_5690_19, (&raw mut __local_stringlist__goto_5720_15 as *mut *mut *mut u8), (&raw mut __local_lengthslist__goto_5721_13 as *mut *mut c_ulong)))
+        (__local_stringlist__goto_5667_15 = ((null as *mut *mut u8)))
+        (__local_rc__goto_5628_5 = pcre2_substring_list_get_8(__local_test_match_data__goto_5637_19, (&raw mut __local_stringlist__goto_5667_15 as *mut *mut *mut u8), (&raw mut __local_lengthslist__goto_5668_13 as *mut *mut c_ulong)))
         goto '__ci_bb_572
     }
 
     '__ci_bb_570 {
-        (__local_failure__goto_5685_13 = (("pcre2_substring_list_get()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_substring_list_get()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -22418,8 +22304,8 @@ fn unittest_8() {
 
     '__ci_bb_572 {
         (__ci_expr_logic_24 = 0)
-        if ((if __local_rc__goto_5681_5 == -48: 1 else: 0) != 0) {
-            (__ci_expr_logic_24 = (if (if __local_stringlist__goto_5720_15 == null: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_rc__goto_5628_5 == -48: 1 else: 0) != 0) {
+            (__ci_expr_logic_24 = (if (if __local_stringlist__goto_5667_15 == null: 1 else: 0) != 0: 1 else: 0))
         }
         if ((if not (__ci_expr_logic_24 != 0): 1 else: 0) != 0) {
             goto '__ci_bb_575
@@ -22438,12 +22324,12 @@ fn unittest_8() {
 
     '__ci_bb_574 {
         (mallocs_until_failure = 2147483647)
-        (__local_rc__goto_5681_5 = pcre2_match_8(__local_test_compiled_code__goto_5691_13, (&(unsafe: __local_subject_abcz__goto_5702_13[0]) as *mut u8), (~(0 as c_ulong)), 2, 0, __local_test_match_data__goto_5690_19, null))
+        (__local_rc__goto_5628_5 = pcre2_match_8(__local_test_compiled_code__goto_5638_13, (&(unsafe: __local_subject_abcz__goto_5649_13[0]) as *mut u8), (~(0 as c_ulong)), 2, 0, __local_test_match_data__goto_5637_19, null))
         goto '__ci_bb_577
     }
 
     '__ci_bb_575 {
-        (__local_failure__goto_5685_13 = (("pcre2_substring_list_get()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_substring_list_get()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -22452,7 +22338,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_577 {
-        if ((if not ((if __local_rc__goto_5681_5 == -1: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == -1: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_580
         } else {
             goto '__ci_bb_581
@@ -22468,13 +22354,13 @@ fn unittest_8() {
     }
 
     '__ci_bb_579 {
-        (__local_sizeval__goto_5683_12 = 4)
-        (__local_rc__goto_5681_5 = pcre2_substring_copy_byname_8(__local_test_match_data__goto_5690_19, (&(unsafe: __local_name_n__goto_5705_13[0]) as *mut u8), (&(unsafe: __local_copy_buf__goto_5719_13[0]) as *mut u8), (&raw mut __local_sizeval__goto_5683_12 as *mut c_ulong)))
+        (__local_sizeval__goto_5630_12 = 4)
+        (__local_rc__goto_5628_5 = pcre2_substring_copy_byname_8(__local_test_match_data__goto_5637_19, (&(unsafe: __local_name_n__goto_5652_13[0]) as *mut u8), (&(unsafe: __local_copy_buf__goto_5666_13[0]) as *mut u8), (&raw mut __local_sizeval__goto_5630_12 as *mut c_ulong)))
         goto '__ci_bb_582
     }
 
     '__ci_bb_580 {
-        (__local_failure__goto_5685_13 = (("pcre2_match()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_match()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -22483,7 +22369,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_582 {
-        if ((if not ((if __local_rc__goto_5681_5 == -1: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == -1: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_585
         } else {
             goto '__ci_bb_586
@@ -22499,12 +22385,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_584 {
-        (__local_rc__goto_5681_5 = pcre2_substring_copy_bynumber_8(__local_test_match_data__goto_5690_19, 1, (&(unsafe: __local_copy_buf__goto_5719_13[0]) as *mut u8), (&raw mut __local_sizeval__goto_5683_12 as *mut c_ulong)))
+        (__local_rc__goto_5628_5 = pcre2_substring_copy_bynumber_8(__local_test_match_data__goto_5637_19, 1, (&(unsafe: __local_copy_buf__goto_5666_13[0]) as *mut u8), (&raw mut __local_sizeval__goto_5630_12 as *mut c_ulong)))
         goto '__ci_bb_587
     }
 
     '__ci_bb_585 {
-        (__local_failure__goto_5685_13 = (("pcre2_substring_copy_byname(no match)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_substring_copy_byname(no match)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -22513,7 +22399,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_587 {
-        if ((if not ((if __local_rc__goto_5681_5 == -1: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == -1: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_590
         } else {
             goto '__ci_bb_591
@@ -22529,12 +22415,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_589 {
-        (__local_rc__goto_5681_5 = pcre2_substring_get_byname_8(__local_test_match_data__goto_5690_19, (&(unsafe: __local_name_n__goto_5705_13[0]) as *mut u8), (&raw mut __local_sptrval__goto_5684_14 as *mut *mut u8), (&raw mut __local_sizeval__goto_5683_12 as *mut c_ulong)))
+        (__local_rc__goto_5628_5 = pcre2_substring_get_byname_8(__local_test_match_data__goto_5637_19, (&(unsafe: __local_name_n__goto_5652_13[0]) as *mut u8), (&raw mut __local_sptrval__goto_5631_14 as *mut *mut u8), (&raw mut __local_sizeval__goto_5630_12 as *mut c_ulong)))
         goto '__ci_bb_592
     }
 
     '__ci_bb_590 {
-        (__local_failure__goto_5685_13 = (("pcre2_substring_copy_bynumber(no match)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_substring_copy_bynumber(no match)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -22544,8 +22430,8 @@ fn unittest_8() {
 
     '__ci_bb_592 {
         (__ci_expr_logic_25 = 0)
-        if ((if __local_rc__goto_5681_5 == -1: 1 else: 0) != 0) {
-            (__ci_expr_logic_25 = (if (if __local_sptrval__goto_5684_14 == null: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_rc__goto_5628_5 == -1: 1 else: 0) != 0) {
+            (__ci_expr_logic_25 = (if (if __local_sptrval__goto_5631_14 == null: 1 else: 0) != 0: 1 else: 0))
         }
         if ((if not (__ci_expr_logic_25 != 0): 1 else: 0) != 0) {
             goto '__ci_bb_595
@@ -22563,12 +22449,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_594 {
-        (__local_rc__goto_5681_5 = pcre2_substring_get_bynumber_8(__local_test_match_data__goto_5690_19, 1, (&raw mut __local_sptrval__goto_5684_14 as *mut *mut u8), (&raw mut __local_sizeval__goto_5683_12 as *mut c_ulong)))
+        (__local_rc__goto_5628_5 = pcre2_substring_get_bynumber_8(__local_test_match_data__goto_5637_19, 1, (&raw mut __local_sptrval__goto_5631_14 as *mut *mut u8), (&raw mut __local_sizeval__goto_5630_12 as *mut c_ulong)))
         goto '__ci_bb_597
     }
 
     '__ci_bb_595 {
-        (__local_failure__goto_5685_13 = (("pcre2_substring_get_byname(no match)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_substring_get_byname(no match)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -22578,8 +22464,8 @@ fn unittest_8() {
 
     '__ci_bb_597 {
         (__ci_expr_logic_26 = 0)
-        if ((if __local_rc__goto_5681_5 == -1: 1 else: 0) != 0) {
-            (__ci_expr_logic_26 = (if (if __local_sptrval__goto_5684_14 == null: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_rc__goto_5628_5 == -1: 1 else: 0) != 0) {
+            (__ci_expr_logic_26 = (if (if __local_sptrval__goto_5631_14 == null: 1 else: 0) != 0: 1 else: 0))
         }
         if ((if not (__ci_expr_logic_26 != 0): 1 else: 0) != 0) {
             goto '__ci_bb_600
@@ -22597,13 +22483,13 @@ fn unittest_8() {
     }
 
     '__ci_bb_599 {
-        pcre2_code_free_8(__local_test_compiled_code__goto_5691_13)
-        (__local_test_compiled_code__goto_5691_13 = pcre2_compile_8((&(unsafe: __local_pattern__goto_5692_13[0]) as *mut u8), (~(0 as c_ulong)), 0, (&raw mut __local_errorcode__goto_5710_5 as *mut c_int), (&raw mut __local_erroroffset__goto_5711_12 as *mut c_ulong), null))
+        pcre2_code_free_8(__local_test_compiled_code__goto_5638_13)
+        (__local_test_compiled_code__goto_5638_13 = pcre2_compile_8((&(unsafe: __local_pattern__goto_5639_13[0]) as *mut u8), (~(0 as c_ulong)), 0, (&raw mut __local_errorcode__goto_5657_5 as *mut c_int), (&raw mut __local_erroroffset__goto_5658_12 as *mut c_ulong), null))
         goto '__ci_bb_602
     }
 
     '__ci_bb_600 {
-        (__local_failure__goto_5685_13 = (("pcre2_substring_get_bynumber(no match)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_substring_get_bynumber(no match)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -22612,7 +22498,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_602 {
-        if ((if not ((if __local_test_compiled_code__goto_5691_13 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_compiled_code__goto_5638_13 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_605
         } else {
             goto '__ci_bb_606
@@ -22628,12 +22514,12 @@ fn unittest_8() {
     }
 
     '__ci_bb_604 {
-        (__local_subs_other_code__goto_5723_13 = pcre2_compile_8((&(unsafe: __local_pattern__goto_5692_13[0]) as *mut u8), (~(0 as c_ulong)), 0, (&raw mut __local_errorcode__goto_5710_5 as *mut c_int), (&raw mut __local_erroroffset__goto_5711_12 as *mut c_ulong), null))
+        (__local_subs_other_code__goto_5670_13 = pcre2_compile_8((&(unsafe: __local_pattern__goto_5639_13[0]) as *mut u8), (~(0 as c_ulong)), 0, (&raw mut __local_errorcode__goto_5657_5 as *mut c_int), (&raw mut __local_erroroffset__goto_5658_12 as *mut c_ulong), null))
         goto '__ci_bb_607
     }
 
     '__ci_bb_605 {
-        (__local_failure__goto_5685_13 = (("test pattern compilation" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("test pattern compilation" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -22642,7 +22528,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_607 {
-        if ((if not ((if __local_subs_other_code__goto_5723_13 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_subs_other_code__goto_5670_13 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_610
         } else {
             goto '__ci_bb_611
@@ -22658,13 +22544,13 @@ fn unittest_8() {
     }
 
     '__ci_bb_609 {
-        pcre2_match_data_free_8(__local_test_match_data__goto_5690_19)
-        (__local_test_match_data__goto_5690_19 = pcre2_match_data_create_from_pattern_8(__local_test_compiled_code__goto_5691_13, null))
+        pcre2_match_data_free_8(__local_test_match_data__goto_5637_19)
+        (__local_test_match_data__goto_5637_19 = pcre2_match_data_create_from_pattern_8(__local_test_compiled_code__goto_5638_13, null))
         goto '__ci_bb_612
     }
 
     '__ci_bb_610 {
-        (__local_failure__goto_5685_13 = (("test pattern compilation" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("test pattern compilation" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -22673,7 +22559,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_612 {
-        if ((if not ((if __local_test_match_data__goto_5690_19 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_test_match_data__goto_5637_19 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_615
         } else {
             goto '__ci_bb_616
@@ -22689,13 +22575,13 @@ fn unittest_8() {
     }
 
     '__ci_bb_614 {
-        with_memcpy(((&(unsafe: __local_substitute_subject__goto_5704_13[0]) as *mut u8) as *i8), ((&(unsafe: __local_subject_abcz__goto_5702_13[0]) as *mut u8) as *i8), ((5 * sizeof[u8]()) as i64))
-        (__local_rc__goto_5681_5 = pcre2_match_8(__local_test_compiled_code__goto_5691_13, (&(unsafe: __local_substitute_subject__goto_5704_13[0]) as *mut u8), (~(0 as c_ulong)), 0, 0, __local_test_match_data__goto_5690_19, null))
+        with_memcpy(((&(unsafe: __local_substitute_subject__goto_5651_13[0]) as *mut u8) as *i8), ((&(unsafe: __local_subject_abcz__goto_5649_13[0]) as *mut u8) as *i8), ((5 * sizeof[u8]()) as i64))
+        (__local_rc__goto_5628_5 = pcre2_match_8(__local_test_compiled_code__goto_5638_13, (&(unsafe: __local_substitute_subject__goto_5651_13[0]) as *mut u8), (~(0 as c_ulong)), 0, 0, __local_test_match_data__goto_5637_19, null))
         goto '__ci_bb_617
     }
 
     '__ci_bb_615 {
-        (__local_failure__goto_5685_13 = (("pcre2_match_data_create()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_match_data_create()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -22704,7 +22590,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_617 {
-        if ((if not ((if __local_rc__goto_5681_5 == 1: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == 1: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_620
         } else {
             goto '__ci_bb_621
@@ -22720,14 +22606,14 @@ fn unittest_8() {
     }
 
     '__ci_bb_619 {
-        with_memcpy(((&(unsafe: __local_substitute_subject__goto_5704_13[0]) as *mut u8) as *i8), ((&(unsafe: __local_subject_abcz__goto_5702_13[0]) as *mut u8) as *i8), ((5 * sizeof[u8]()) as i64))
-        (__local_sizeval__goto_5683_12 = ((64 * sizeof[u8]()) as c_ulong) / (sizeof[u8]() as c_ulong))
-        (__local_rc__goto_5681_5 = pcre2_substitute_8(__local_test_compiled_code__goto_5691_13, (&(unsafe: __local_substitute_subject__goto_5704_13[0]) as *mut u8), (~(0 as c_ulong)), 0, 65536, __local_test_match_data__goto_5690_19, null, null, 0, (&(unsafe: __local_replace_buf__goto_5722_13[0]) as *mut u8), (&raw mut __local_sizeval__goto_5683_12 as *mut c_ulong)))
+        with_memcpy(((&(unsafe: __local_substitute_subject__goto_5651_13[0]) as *mut u8) as *i8), ((&(unsafe: __local_subject_abcz__goto_5649_13[0]) as *mut u8) as *i8), ((5 * sizeof[u8]()) as i64))
+        (__local_sizeval__goto_5630_12 = ((64 * sizeof[u8]()) as c_ulong) / (sizeof[u8]() as c_ulong))
+        (__local_rc__goto_5628_5 = pcre2_substitute_8(__local_test_compiled_code__goto_5638_13, (&(unsafe: __local_substitute_subject__goto_5651_13[0]) as *mut u8), (~(0 as c_ulong)), 0, 65536, __local_test_match_data__goto_5637_19, null, null, 0, (&(unsafe: __local_replace_buf__goto_5669_13[0]) as *mut u8), (&raw mut __local_sizeval__goto_5630_12 as *mut c_ulong)))
         goto '__ci_bb_622
     }
 
     '__ci_bb_620 {
-        (__local_failure__goto_5685_13 = (("pcre2_match()" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_match()" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -22736,7 +22622,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_622 {
-        if ((if not ((if __local_rc__goto_5681_5 == 1: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == 1: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_625
         } else {
             goto '__ci_bb_626
@@ -22752,14 +22638,14 @@ fn unittest_8() {
     }
 
     '__ci_bb_624 {
-        with_memcpy((((&(unsafe: __local_substitute_subject__goto_5704_13[0]) as *mut u8) + ((1 as isize) as usize)) as *i8), ((&(unsafe: __local_subject_abcz__goto_5702_13[0]) as *mut u8) as *i8), ((5 * sizeof[u8]()) as i64))
-        (__local_sizeval__goto_5683_12 = ((64 * sizeof[u8]()) as c_ulong) / (sizeof[u8]() as c_ulong))
-        (__local_rc__goto_5681_5 = pcre2_substitute_8(__local_test_compiled_code__goto_5691_13, ((&(unsafe: __local_substitute_subject__goto_5704_13[0]) as *mut u8) + ((1 as isize) as usize)), (~(0 as c_ulong)), 0, 65536, __local_test_match_data__goto_5690_19, null, null, 0, (&(unsafe: __local_replace_buf__goto_5722_13[0]) as *mut u8), (&raw mut __local_sizeval__goto_5683_12 as *mut c_ulong)))
+        with_memcpy((((&(unsafe: __local_substitute_subject__goto_5651_13[0]) as *mut u8) + ((1 as isize) as usize)) as *i8), ((&(unsafe: __local_subject_abcz__goto_5649_13[0]) as *mut u8) as *i8), ((5 * sizeof[u8]()) as i64))
+        (__local_sizeval__goto_5630_12 = ((64 * sizeof[u8]()) as c_ulong) / (sizeof[u8]() as c_ulong))
+        (__local_rc__goto_5628_5 = pcre2_substitute_8(__local_test_compiled_code__goto_5638_13, ((&(unsafe: __local_substitute_subject__goto_5651_13[0]) as *mut u8) + ((1 as isize) as usize)), (~(0 as c_ulong)), 0, 65536, __local_test_match_data__goto_5637_19, null, null, 0, (&(unsafe: __local_replace_buf__goto_5669_13[0]) as *mut u8), (&raw mut __local_sizeval__goto_5630_12 as *mut c_ulong)))
         goto '__ci_bb_627
     }
 
     '__ci_bb_625 {
-        (__local_failure__goto_5685_13 = (("pcre2_substitute(baseline)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_substitute(baseline)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -22768,7 +22654,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_627 {
-        if ((if not ((if __local_rc__goto_5681_5 == -72: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == -72: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_630
         } else {
             goto '__ci_bb_631
@@ -22784,16 +22670,16 @@ fn unittest_8() {
     }
 
     '__ci_bb_629 {
-        with_memcpy(((&(unsafe: __local_substitute_subject__goto_5704_13[0]) as *mut u8) as *i8), ((&(unsafe: __local_subject_abcz__goto_5702_13[0]) as *mut u8) as *i8), ((5 * sizeof[u8]()) as i64))
-        (__local_substitute_subject__goto_5704_13[4] = 89)
-        (__local_substitute_subject__goto_5704_13[5] = 0)
-        (__local_sizeval__goto_5683_12 = ((64 * sizeof[u8]()) as c_ulong) / (sizeof[u8]() as c_ulong))
-        (__local_rc__goto_5681_5 = pcre2_substitute_8(__local_test_compiled_code__goto_5691_13, (&(unsafe: __local_substitute_subject__goto_5704_13[0]) as *mut u8), (~(0 as c_ulong)), 0, 65536, __local_test_match_data__goto_5690_19, null, null, 0, (&(unsafe: __local_replace_buf__goto_5722_13[0]) as *mut u8), (&raw mut __local_sizeval__goto_5683_12 as *mut c_ulong)))
+        with_memcpy(((&(unsafe: __local_substitute_subject__goto_5651_13[0]) as *mut u8) as *i8), ((&(unsafe: __local_subject_abcz__goto_5649_13[0]) as *mut u8) as *i8), ((5 * sizeof[u8]()) as i64))
+        (__local_substitute_subject__goto_5651_13[4] = 89)
+        (__local_substitute_subject__goto_5651_13[5] = 0)
+        (__local_sizeval__goto_5630_12 = ((64 * sizeof[u8]()) as c_ulong) / (sizeof[u8]() as c_ulong))
+        (__local_rc__goto_5628_5 = pcre2_substitute_8(__local_test_compiled_code__goto_5638_13, (&(unsafe: __local_substitute_subject__goto_5651_13[0]) as *mut u8), (~(0 as c_ulong)), 0, 65536, __local_test_match_data__goto_5637_19, null, null, 0, (&(unsafe: __local_replace_buf__goto_5669_13[0]) as *mut u8), (&raw mut __local_sizeval__goto_5630_12 as *mut c_ulong)))
         goto '__ci_bb_632
     }
 
     '__ci_bb_630 {
-        (__local_failure__goto_5685_13 = (("pcre2_substitute(moved)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_substitute(moved)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -22802,7 +22688,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_632 {
-        if ((if not ((if __local_rc__goto_5681_5 == -72: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == -72: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_635
         } else {
             goto '__ci_bb_636
@@ -22818,14 +22704,14 @@ fn unittest_8() {
     }
 
     '__ci_bb_634 {
-        with_memcpy(((&(unsafe: __local_substitute_subject__goto_5704_13[0]) as *mut u8) as *i8), ((&(unsafe: __local_subject_abcz__goto_5702_13[0]) as *mut u8) as *i8), ((5 * sizeof[u8]()) as i64))
-        (__local_sizeval__goto_5683_12 = ((64 * sizeof[u8]()) as c_ulong) / (sizeof[u8]() as c_ulong))
-        (__local_rc__goto_5681_5 = pcre2_substitute_8(__local_test_compiled_code__goto_5691_13, (&(unsafe: __local_substitute_subject__goto_5704_13[0]) as *mut u8), (~(0 as c_ulong)), 1, 65536, __local_test_match_data__goto_5690_19, null, null, 0, (&(unsafe: __local_replace_buf__goto_5722_13[0]) as *mut u8), (&raw mut __local_sizeval__goto_5683_12 as *mut c_ulong)))
+        with_memcpy(((&(unsafe: __local_substitute_subject__goto_5651_13[0]) as *mut u8) as *i8), ((&(unsafe: __local_subject_abcz__goto_5649_13[0]) as *mut u8) as *i8), ((5 * sizeof[u8]()) as i64))
+        (__local_sizeval__goto_5630_12 = ((64 * sizeof[u8]()) as c_ulong) / (sizeof[u8]() as c_ulong))
+        (__local_rc__goto_5628_5 = pcre2_substitute_8(__local_test_compiled_code__goto_5638_13, (&(unsafe: __local_substitute_subject__goto_5651_13[0]) as *mut u8), (~(0 as c_ulong)), 1, 65536, __local_test_match_data__goto_5637_19, null, null, 0, (&(unsafe: __local_replace_buf__goto_5669_13[0]) as *mut u8), (&raw mut __local_sizeval__goto_5630_12 as *mut c_ulong)))
         goto '__ci_bb_637
     }
 
     '__ci_bb_635 {
-        (__local_failure__goto_5685_13 = (("pcre2_substitute(extended)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_substitute(extended)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -22834,7 +22720,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_637 {
-        if ((if not ((if __local_rc__goto_5681_5 == -73: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == -73: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_640
         } else {
             goto '__ci_bb_641
@@ -22850,14 +22736,14 @@ fn unittest_8() {
     }
 
     '__ci_bb_639 {
-        with_memcpy(((&(unsafe: __local_substitute_subject__goto_5704_13[0]) as *mut u8) as *i8), ((&(unsafe: __local_subject_abcz__goto_5702_13[0]) as *mut u8) as *i8), ((5 * sizeof[u8]()) as i64))
-        (__local_sizeval__goto_5683_12 = ((64 * sizeof[u8]()) as c_ulong) / (sizeof[u8]() as c_ulong))
-        (__local_rc__goto_5681_5 = pcre2_substitute_8(__local_test_compiled_code__goto_5691_13, (&(unsafe: __local_substitute_subject__goto_5704_13[0]) as *mut u8), (~(0 as c_ulong)), 0, ((65536 as c_uint) | (4 as c_uint)), __local_test_match_data__goto_5690_19, null, null, 0, (&(unsafe: __local_replace_buf__goto_5722_13[0]) as *mut u8), (&raw mut __local_sizeval__goto_5683_12 as *mut c_ulong)))
+        with_memcpy(((&(unsafe: __local_substitute_subject__goto_5651_13[0]) as *mut u8) as *i8), ((&(unsafe: __local_subject_abcz__goto_5649_13[0]) as *mut u8) as *i8), ((5 * sizeof[u8]()) as i64))
+        (__local_sizeval__goto_5630_12 = ((64 * sizeof[u8]()) as c_ulong) / (sizeof[u8]() as c_ulong))
+        (__local_rc__goto_5628_5 = pcre2_substitute_8(__local_test_compiled_code__goto_5638_13, (&(unsafe: __local_substitute_subject__goto_5651_13[0]) as *mut u8), (~(0 as c_ulong)), 0, ((65536 as c_uint) | (4 as c_uint)), __local_test_match_data__goto_5637_19, null, null, 0, (&(unsafe: __local_replace_buf__goto_5669_13[0]) as *mut u8), (&raw mut __local_sizeval__goto_5630_12 as *mut c_ulong)))
         goto '__ci_bb_642
     }
 
     '__ci_bb_640 {
-        (__local_failure__goto_5685_13 = (("pcre2_substitute(offset)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_substitute(offset)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -22866,7 +22752,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_642 {
-        if ((if not ((if __local_rc__goto_5681_5 == -74: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == -74: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_645
         } else {
             goto '__ci_bb_646
@@ -22882,14 +22768,14 @@ fn unittest_8() {
     }
 
     '__ci_bb_644 {
-        with_memcpy(((&(unsafe: __local_substitute_subject__goto_5704_13[0]) as *mut u8) as *i8), ((&(unsafe: __local_subject_abcz__goto_5702_13[0]) as *mut u8) as *i8), ((5 * sizeof[u8]()) as i64))
-        (__local_sizeval__goto_5683_12 = ((64 * sizeof[u8]()) as c_ulong) / (sizeof[u8]() as c_ulong))
-        (__local_rc__goto_5681_5 = pcre2_substitute_8(__local_subs_other_code__goto_5723_13, (&(unsafe: __local_substitute_subject__goto_5704_13[0]) as *mut u8), (~(0 as c_ulong)), 0, 65536, __local_test_match_data__goto_5690_19, null, null, 0, (&(unsafe: __local_replace_buf__goto_5722_13[0]) as *mut u8), (&raw mut __local_sizeval__goto_5683_12 as *mut c_ulong)))
+        with_memcpy(((&(unsafe: __local_substitute_subject__goto_5651_13[0]) as *mut u8) as *i8), ((&(unsafe: __local_subject_abcz__goto_5649_13[0]) as *mut u8) as *i8), ((5 * sizeof[u8]()) as i64))
+        (__local_sizeval__goto_5630_12 = ((64 * sizeof[u8]()) as c_ulong) / (sizeof[u8]() as c_ulong))
+        (__local_rc__goto_5628_5 = pcre2_substitute_8(__local_subs_other_code__goto_5670_13, (&(unsafe: __local_substitute_subject__goto_5651_13[0]) as *mut u8), (~(0 as c_ulong)), 0, 65536, __local_test_match_data__goto_5637_19, null, null, 0, (&(unsafe: __local_replace_buf__goto_5669_13[0]) as *mut u8), (&raw mut __local_sizeval__goto_5630_12 as *mut c_ulong)))
         goto '__ci_bb_647
     }
 
     '__ci_bb_645 {
-        (__local_failure__goto_5685_13 = (("pcre2_substitute(options)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_substitute(options)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -22898,7 +22784,7 @@ fn unittest_8() {
     }
 
     '__ci_bb_647 {
-        if ((if not ((if __local_rc__goto_5681_5 == -71: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if __local_rc__goto_5628_5 == -71: 1 else: 0) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_650
         } else {
             goto '__ci_bb_651
@@ -22914,15 +22800,11 @@ fn unittest_8() {
     }
 
     '__ci_bb_649 {
-        (__local_serialize_code__goto_6303_15 = pcre2_compile_8((&(unsafe: __local_pattern__goto_5692_13[0]) as *mut u8), (~(0 as c_ulong)), 0, (&raw mut __local_errorcode__goto_5710_5 as *mut c_int), (&raw mut __local_erroroffset__goto_5711_12 as *mut c_ulong), null))
-        (__local_serialized_bytes__goto_6305_12 = ((null as *mut u8)))
-        (__local_serialized_size__goto_6306_14 = 0)
-        (__local_decode_codes__goto_6307_15 = [((null) as *mut pcre2_real_code_8)])
-        goto '__ci_bb_652
+        goto '__ci_bb_6
     }
 
     '__ci_bb_650 {
-        (__local_failure__goto_5685_13 = (("pcre2_substitute(pattern)" as *const c_char)))
+        (__local_failure__goto_5632_13 = (("pcre2_substitute(pattern)" as *const c_char)))
         goto '__ci_bb_6
     }
 
@@ -22931,486 +22813,158 @@ fn unittest_8() {
     }
 
     '__ci_bb_652 {
-        if ((if not ((if __local_serialize_code__goto_6303_15 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
-            goto '__ci_bb_655
-        } else {
-            goto '__ci_bb_656
-        }
+        pcre2_code_free_8(__local_test_compiled_code__goto_5638_13)
+        goto '__ci_bb_653
     }
 
     '__ci_bb_653 {
-        if (0 != 0) {
-            goto '__ci_bb_652
-        } else {
+        if ((if __local_subs_other_code__goto_5670_13 != null: 1 else: 0) != 0) {
             goto '__ci_bb_654
+        } else {
+            goto '__ci_bb_655
         }
     }
 
     '__ci_bb_654 {
-        (__local_rc__goto_5681_5 = pcre2_serialize_encode_8(((&raw mut __local_serialize_code__goto_6303_15 as *mut *mut pcre2_real_code_8) as *mut *const pcre2_real_code_8), 1, (&raw mut __local_serialized_bytes__goto_6305_12 as *mut *mut u8), (&raw mut __local_serialized_size__goto_6306_14 as *mut c_ulong), null))
-        pcre2_code_free_8(__local_serialize_code__goto_6303_15)
-        goto '__ci_bb_657
+        pcre2_code_free_8(__local_subs_other_code__goto_5670_13)
+        goto '__ci_bb_655
     }
 
     '__ci_bb_655 {
-        (__local_failure__goto_5685_13 = (("serialize setup" as *const c_char)))
-        goto '__ci_bb_6
+        if ((if __local_test_match_data__goto_5637_19 != null: 1 else: 0) != 0) {
+            goto '__ci_bb_656
+        } else {
+            goto '__ci_bb_657
+        }
     }
 
     '__ci_bb_656 {
-        goto '__ci_bb_653
+        pcre2_match_data_free_8(__local_test_match_data__goto_5637_19)
+        goto '__ci_bb_657
     }
 
     '__ci_bb_657 {
-        (__ci_expr_logic_27 = 0)
-        if ((if __local_rc__goto_5681_5 == 1: 1 else: 0) != 0) {
-            (__ci_expr_logic_27 = (if (if __local_serialized_bytes__goto_6305_12 != null: 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_test_con_context_copy__goto_5636_50 != null: 1 else: 0) != 0) {
+            goto '__ci_bb_658
+        } else {
+            goto '__ci_bb_659
         }
-        if ((if not (__ci_expr_logic_27 != 0): 1 else: 0) != 0) {
+    }
+
+    '__ci_bb_658 {
+        pcre2_convert_context_free_8(__local_test_con_context_copy__goto_5636_50)
+        goto '__ci_bb_659
+    }
+
+    '__ci_bb_659 {
+        if ((if __local_test_dat_context_copy__goto_5635_48 != null: 1 else: 0) != 0) {
             goto '__ci_bb_660
         } else {
             goto '__ci_bb_661
         }
     }
 
-    '__ci_bb_658 {
-        if (0 != 0) {
-            goto '__ci_bb_657
-        } else {
-            goto '__ci_bb_659
-        }
-    }
-
-    '__ci_bb_659 {
-        (__local_blocksize_offset__goto_6317_12 = ((((sizeof[pcre2_serialized_data]() as c_ulong) +% (1088 as c_ulong)) as c_ulong) +% (72 as c_ulong)))
-        with_memcpy(((&(unsafe: __local_saved_blocksize__goto_6319_13[0]) as *mut u8) as *i8), ((__local_serialized_bytes__goto_6305_12 + (__local_blocksize_offset__goto_6317_12 as usize)) as *i8), ((8 * sizeof[u8]()) as i64))
-        with_memset(((__local_serialized_bytes__goto_6305_12 + (__local_blocksize_offset__goto_6317_12 as usize)) as *i8), 0, (sizeof[usize]() as i64))
-        (__local_rc__goto_5681_5 = pcre2_serialize_decode_8((&(unsafe: __local_decode_codes__goto_6307_15[0]) as *mut *mut pcre2_real_code_8), 1, __local_serialized_bytes__goto_6305_12, null))
-        goto '__ci_bb_662
-    }
-
     '__ci_bb_660 {
-        (__local_failure__goto_5685_13 = (("serialize setup" as *const c_char)))
-        goto '__ci_bb_6
+        pcre2_match_context_free_8(__local_test_dat_context_copy__goto_5635_48)
+        goto '__ci_bb_661
     }
 
     '__ci_bb_661 {
-        goto '__ci_bb_658
+        if ((if __local_test_pat_context_copy__goto_5634_50 != null: 1 else: 0) != 0) {
+            goto '__ci_bb_662
+        } else {
+            goto '__ci_bb_663
+        }
     }
 
     '__ci_bb_662 {
-        (__ci_expr_logic_28 = 0)
-        if ((if __local_rc__goto_5681_5 == -62: 1 else: 0) != 0) {
-            (__ci_expr_logic_28 = (if (if __local_decode_codes__goto_6307_15[0] == null: 1 else: 0) != 0: 1 else: 0))
-        }
-        if ((if not (__ci_expr_logic_28 != 0): 1 else: 0) != 0) {
-            goto '__ci_bb_665
-        } else {
-            goto '__ci_bb_666
-        }
+        pcre2_compile_context_free_8(__local_test_pat_context_copy__goto_5634_50)
+        goto '__ci_bb_663
     }
 
     '__ci_bb_663 {
-        if (0 != 0) {
-            goto '__ci_bb_662
-        } else {
+        if ((if __local_test_gen_context_copy__goto_5633_50 != null: 1 else: 0) != 0) {
             goto '__ci_bb_664
+        } else {
+            goto '__ci_bb_665
         }
     }
 
     '__ci_bb_664 {
-        with_memcpy(((__local_serialized_bytes__goto_6305_12 + (__local_blocksize_offset__goto_6317_12 as usize)) as *i8), ((&(unsafe: __local_saved_blocksize__goto_6319_13[0]) as *mut u8) as *i8), ((8 * sizeof[u8]()) as i64))
-        (mallocs_until_failure = 2)
-        (__local_serialize_test_context__goto_6335_28 = pcre2_general_context_create_8(my_malloc, my_free, null))
-        goto '__ci_bb_667
+        pcre2_general_context_free_8(__local_test_gen_context_copy__goto_5633_50)
+        goto '__ci_bb_665
     }
 
     '__ci_bb_665 {
-        (__local_failure__goto_5685_13 = (("pcre2_serialize_decode(bad blocksize)" as *const c_char)))
-        goto '__ci_bb_6
+        if ((if __local_test_con_context__goto_5636_24 != null: 1 else: 0) != 0) {
+            goto '__ci_bb_666
+        } else {
+            goto '__ci_bb_667
+        }
     }
 
     '__ci_bb_666 {
-        goto '__ci_bb_663
+        pcre2_convert_context_free_8(__local_test_con_context__goto_5636_24)
+        goto '__ci_bb_667
     }
 
     '__ci_bb_667 {
-        if ((if not ((if __local_serialize_test_context__goto_6335_28 != null: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if __local_test_dat_context__goto_5635_22 != null: 1 else: 0) != 0) {
+            goto '__ci_bb_668
+        } else {
+            goto '__ci_bb_669
+        }
+    }
+
+    '__ci_bb_668 {
+        pcre2_match_context_free_8(__local_test_dat_context__goto_5635_22)
+        goto '__ci_bb_669
+    }
+
+    '__ci_bb_669 {
+        if ((if __local_test_pat_context__goto_5634_24 != null: 1 else: 0) != 0) {
             goto '__ci_bb_670
         } else {
             goto '__ci_bb_671
         }
     }
 
-    '__ci_bb_668 {
-        if (0 != 0) {
-            goto '__ci_bb_667
-        } else {
-            goto '__ci_bb_669
-        }
-    }
-
-    '__ci_bb_669 {
-        (__local_rc__goto_5681_5 = pcre2_serialize_decode_8((&(unsafe: __local_decode_codes__goto_6307_15[0]) as *mut *mut pcre2_real_code_8), 1, __local_serialized_bytes__goto_6305_12, __local_serialize_test_context__goto_6335_28))
-        goto '__ci_bb_672
-    }
-
     '__ci_bb_670 {
-        (__local_failure__goto_5685_13 = (("general_context for serialize test" as *const c_char)))
-        goto '__ci_bb_6
+        pcre2_compile_context_free_8(__local_test_pat_context__goto_5634_24)
+        goto '__ci_bb_671
     }
 
     '__ci_bb_671 {
-        goto '__ci_bb_668
+        if ((if __local_test_gen_context__goto_5633_24 != null: 1 else: 0) != 0) {
+            goto '__ci_bb_672
+        } else {
+            goto '__ci_bb_673
+        }
     }
 
     '__ci_bb_672 {
-        (__ci_expr_logic_29 = 0)
-        if ((if __local_rc__goto_5681_5 == -48: 1 else: 0) != 0) {
-            (__ci_expr_logic_29 = (if (if __local_decode_codes__goto_6307_15[0] == null: 1 else: 0) != 0: 1 else: 0))
-        }
-        if ((if not (__ci_expr_logic_29 != 0): 1 else: 0) != 0) {
-            goto '__ci_bb_675
-        } else {
-            goto '__ci_bb_676
-        }
+        pcre2_general_context_free_8(__local_test_gen_context__goto_5633_24)
+        goto '__ci_bb_673
     }
 
     '__ci_bb_673 {
-        if (0 != 0) {
-            goto '__ci_bb_672
-        } else {
+        with_free((__local_invalid_code__goto_5664_7 as *mut i8))
+        if ((if __local_failure__goto_5632_13 != null: 1 else: 0) != 0) {
             goto '__ci_bb_674
+        } else {
+            goto '__ci_bb_675
         }
     }
 
     '__ci_bb_674 {
-        (mallocs_until_failure = 2147483647)
-        pcre2_general_context_free_8(__local_serialize_test_context__goto_6335_28)
-        (__local_off__goto_6348_12 = ((((sizeof[pcre2_serialized_data]() as c_ulong) +% (1088 as c_ulong)) as c_ulong) +% (88 as c_ulong)))
-        with_memcpy(((&(unsafe: __local_saved__goto_6350_13[0]) as *mut u8) as *i8), ((__local_serialized_bytes__goto_6305_12 + (__local_off__goto_6348_12 as usize)) as *i8), (4 as i64))
-        with_memset(((__local_serialized_bytes__goto_6305_12 + (__local_off__goto_6348_12 as usize)) as *i8), 0, (4 as i64))
-        (__local_decode_codes__goto_6307_15[0] = ((null as *mut pcre2_real_code_8)))
-        (__local_rc__goto_5681_5 = pcre2_serialize_decode_8((&(unsafe: __local_decode_codes__goto_6307_15[0]) as *mut *mut pcre2_real_code_8), 1, __local_serialized_bytes__goto_6305_12, null))
-        with_memcpy(((__local_serialized_bytes__goto_6305_12 + (__local_off__goto_6348_12 as usize)) as *i8), ((&(unsafe: __local_saved__goto_6350_13[0]) as *mut u8) as *i8), (4 as i64))
-        goto '__ci_bb_677
+        colour_begin(31, __stderrp)
+        fprintf(__stderrp, "pcre2test: Unit test error in %s\n", __local_failure__goto_5632_13)
+        colour_end(__stderrp)
+        exit(1)
+        goto '__ci_bb_675
     }
 
     '__ci_bb_675 {
-        (__local_failure__goto_5685_13 = (("pcre2_serialize_decode(malloc failure)" as *const c_char)))
-        goto '__ci_bb_6
-    }
-
-    '__ci_bb_676 {
-        goto '__ci_bb_673
-    }
-
-    '__ci_bb_677 {
-        (__ci_expr_logic_30 = 0)
-        if ((if __local_rc__goto_5681_5 == -62: 1 else: 0) != 0) {
-            (__ci_expr_logic_30 = (if (if __local_decode_codes__goto_6307_15[0] == null: 1 else: 0) != 0: 1 else: 0))
-        }
-        if ((if not (__ci_expr_logic_30 != 0): 1 else: 0) != 0) {
-            goto '__ci_bb_680
-        } else {
-            goto '__ci_bb_681
-        }
-    }
-
-    '__ci_bb_678 {
-        if (0 != 0) {
-            goto '__ci_bb_677
-        } else {
-            goto '__ci_bb_679
-        }
-    }
-
-    '__ci_bb_679 {
-        (__local_multi_decode_codes__goto_6364_17 = [((null) as *mut pcre2_real_code_8), ((null) as *mut pcre2_real_code_8)])
-        (__local_multi_serialized_bytes__goto_6365_14 = ((null as *mut u8)))
-        (__local_multi_serialized_size__goto_6366_16 = 0)
-        (__local_first_blocksize_offset__goto_6368_12 = ((((sizeof[pcre2_serialized_data]() as c_ulong) +% (1088 as c_ulong)) as c_ulong) +% (72 as c_ulong)))
-        (__local_multi_codes__goto_6363_17[0] = pcre2_compile_8((&(unsafe: __local_pattern__goto_5692_13[0]) as *mut u8), (~(0 as c_ulong)), 0, (&raw mut __local_errorcode__goto_5710_5 as *mut c_int), (&raw mut __local_erroroffset__goto_5711_12 as *mut c_ulong), null))
-        (__local_multi_codes__goto_6363_17[1] = pcre2_compile_8((&(unsafe: __local_pattern__goto_5692_13[0]) as *mut u8), (~(0 as c_ulong)), 0, (&raw mut __local_errorcode__goto_5710_5 as *mut c_int), (&raw mut __local_erroroffset__goto_5711_12 as *mut c_ulong), null))
-        goto '__ci_bb_682
-    }
-
-    '__ci_bb_680 {
-        (__local_failure__goto_5685_13 = (("pcre2_serialize_decode(goto 3)" as *const c_char)))
-        goto '__ci_bb_6
-    }
-
-    '__ci_bb_681 {
-        goto '__ci_bb_678
-    }
-
-    '__ci_bb_682 {
-        (__ci_expr_logic_31 = 0)
-        if ((if __local_multi_codes__goto_6363_17[0] != null: 1 else: 0) != 0) {
-            (__ci_expr_logic_31 = (if (if __local_multi_codes__goto_6363_17[1] != null: 1 else: 0) != 0: 1 else: 0))
-        }
-        if ((if not (__ci_expr_logic_31 != 0): 1 else: 0) != 0) {
-            goto '__ci_bb_685
-        } else {
-            goto '__ci_bb_686
-        }
-    }
-
-    '__ci_bb_683 {
-        if (0 != 0) {
-            goto '__ci_bb_682
-        } else {
-            goto '__ci_bb_684
-        }
-    }
-
-    '__ci_bb_684 {
-        (__local_rc__goto_5681_5 = pcre2_serialize_encode_8((&(unsafe: __local_multi_codes__goto_6363_17[0]) as *mut *const pcre2_real_code_8), 2, (&raw mut __local_multi_serialized_bytes__goto_6365_14 as *mut *mut u8), (&raw mut __local_multi_serialized_size__goto_6366_16 as *mut c_ulong), null))
-        pcre2_code_free_8(__local_multi_codes__goto_6363_17[0])
-        pcre2_code_free_8(__local_multi_codes__goto_6363_17[1])
-        goto '__ci_bb_687
-    }
-
-    '__ci_bb_685 {
-        (__local_failure__goto_5685_13 = (("serialize setup (multi-code compile)" as *const c_char)))
-        goto '__ci_bb_6
-    }
-
-    '__ci_bb_686 {
-        goto '__ci_bb_683
-    }
-
-    '__ci_bb_687 {
-        (__ci_expr_logic_32 = 0)
-        if ((if __local_rc__goto_5681_5 == 2: 1 else: 0) != 0) {
-            (__ci_expr_logic_32 = (if (if __local_multi_serialized_bytes__goto_6365_14 != null: 1 else: 0) != 0: 1 else: 0))
-        }
-        if ((if not (__ci_expr_logic_32 != 0): 1 else: 0) != 0) {
-            goto '__ci_bb_690
-        } else {
-            goto '__ci_bb_691
-        }
-    }
-
-    '__ci_bb_688 {
-        if (0 != 0) {
-            goto '__ci_bb_687
-        } else {
-            goto '__ci_bb_689
-        }
-    }
-
-    '__ci_bb_689 {
-        with_memcpy(((&raw mut __local_first_blocksize__goto_6367_25 as *mut c_ulong) as *i8), ((__local_multi_serialized_bytes__goto_6365_14 + (__local_first_blocksize_offset__goto_6368_12 as usize)) as *i8), (sizeof[c_ulong]() as i64))
-        (__local_second_blocksize_offset__goto_6370_12 = ((((((sizeof[pcre2_serialized_data]() as c_ulong) +% (1088 as c_ulong)) as c_ulong) +% (__local_first_blocksize__goto_6367_25 as c_ulong)) as c_ulong) +% (72 as c_ulong)))
-        with_memcpy(((&(unsafe: __local_saved_second_blocksize__goto_6371_13[0]) as *mut u8) as *i8), ((__local_multi_serialized_bytes__goto_6365_14 + (__local_second_blocksize_offset__goto_6370_12 as usize)) as *i8), ((8 * sizeof[u8]()) as i64))
-        with_memset(((__local_multi_serialized_bytes__goto_6365_14 + (__local_second_blocksize_offset__goto_6370_12 as usize)) as *i8), 0, ((8 * sizeof[u8]()) as i64))
-        (__local_rc__goto_5681_5 = pcre2_serialize_decode_8((&(unsafe: __local_multi_decode_codes__goto_6364_17[0]) as *mut *mut pcre2_real_code_8), 2, __local_multi_serialized_bytes__goto_6365_14, null))
-        with_memcpy(((__local_multi_serialized_bytes__goto_6365_14 + (__local_second_blocksize_offset__goto_6370_12 as usize)) as *i8), ((&(unsafe: __local_saved_second_blocksize__goto_6371_13[0]) as *mut u8) as *i8), ((8 * sizeof[u8]()) as i64))
-        goto '__ci_bb_692
-    }
-
-    '__ci_bb_690 {
-        (__local_failure__goto_5685_13 = (("serialize setup (multi-code encode)" as *const c_char)))
-        goto '__ci_bb_6
-    }
-
-    '__ci_bb_691 {
-        goto '__ci_bb_688
-    }
-
-    '__ci_bb_692 {
-        (__ci_expr_logic_34 = 0)
-        (__ci_expr_logic_33 = 0)
-        if ((if __local_rc__goto_5681_5 == -62: 1 else: 0) != 0) {
-            (__ci_expr_logic_33 = (if (if __local_multi_decode_codes__goto_6364_17[0] == null: 1 else: 0) != 0: 1 else: 0))
-        }
-        if (__ci_expr_logic_33 != 0) {
-            (__ci_expr_logic_34 = (if (if __local_multi_decode_codes__goto_6364_17[1] == null: 1 else: 0) != 0: 1 else: 0))
-        }
-        if ((if not (__ci_expr_logic_34 != 0): 1 else: 0) != 0) {
-            goto '__ci_bb_695
-        } else {
-            goto '__ci_bb_696
-        }
-    }
-
-    '__ci_bb_693 {
-        if (0 != 0) {
-            goto '__ci_bb_692
-        } else {
-            goto '__ci_bb_694
-        }
-    }
-
-    '__ci_bb_694 {
-        pcre2_serialize_free_8(__local_multi_serialized_bytes__goto_6365_14)
-        pcre2_serialize_free_8(__local_serialized_bytes__goto_6305_12)
-        goto '__ci_bb_6
-    }
-
-    '__ci_bb_695 {
-        (__local_failure__goto_5685_13 = (("pcre2_serialize_decode(regression stale dst_re)" as *const c_char)))
-        goto '__ci_bb_6
-    }
-
-    '__ci_bb_696 {
-        goto '__ci_bb_693
-    }
-
-    '__ci_bb_697 {
-        pcre2_code_free_8(__local_test_compiled_code__goto_5691_13)
-        goto '__ci_bb_698
-    }
-
-    '__ci_bb_698 {
-        if ((if __local_subs_other_code__goto_5723_13 != null: 1 else: 0) != 0) {
-            goto '__ci_bb_699
-        } else {
-            goto '__ci_bb_700
-        }
-    }
-
-    '__ci_bb_699 {
-        pcre2_code_free_8(__local_subs_other_code__goto_5723_13)
-        goto '__ci_bb_700
-    }
-
-    '__ci_bb_700 {
-        if ((if __local_test_match_data__goto_5690_19 != null: 1 else: 0) != 0) {
-            goto '__ci_bb_701
-        } else {
-            goto '__ci_bb_702
-        }
-    }
-
-    '__ci_bb_701 {
-        pcre2_match_data_free_8(__local_test_match_data__goto_5690_19)
-        goto '__ci_bb_702
-    }
-
-    '__ci_bb_702 {
-        if ((if __local_test_con_context_copy__goto_5689_50 != null: 1 else: 0) != 0) {
-            goto '__ci_bb_703
-        } else {
-            goto '__ci_bb_704
-        }
-    }
-
-    '__ci_bb_703 {
-        pcre2_convert_context_free_8(__local_test_con_context_copy__goto_5689_50)
-        goto '__ci_bb_704
-    }
-
-    '__ci_bb_704 {
-        if ((if __local_test_dat_context_copy__goto_5688_48 != null: 1 else: 0) != 0) {
-            goto '__ci_bb_705
-        } else {
-            goto '__ci_bb_706
-        }
-    }
-
-    '__ci_bb_705 {
-        pcre2_match_context_free_8(__local_test_dat_context_copy__goto_5688_48)
-        goto '__ci_bb_706
-    }
-
-    '__ci_bb_706 {
-        if ((if __local_test_pat_context_copy__goto_5687_50 != null: 1 else: 0) != 0) {
-            goto '__ci_bb_707
-        } else {
-            goto '__ci_bb_708
-        }
-    }
-
-    '__ci_bb_707 {
-        pcre2_compile_context_free_8(__local_test_pat_context_copy__goto_5687_50)
-        goto '__ci_bb_708
-    }
-
-    '__ci_bb_708 {
-        if ((if __local_test_gen_context_copy__goto_5686_50 != null: 1 else: 0) != 0) {
-            goto '__ci_bb_709
-        } else {
-            goto '__ci_bb_710
-        }
-    }
-
-    '__ci_bb_709 {
-        pcre2_general_context_free_8(__local_test_gen_context_copy__goto_5686_50)
-        goto '__ci_bb_710
-    }
-
-    '__ci_bb_710 {
-        if ((if __local_test_con_context__goto_5689_24 != null: 1 else: 0) != 0) {
-            goto '__ci_bb_711
-        } else {
-            goto '__ci_bb_712
-        }
-    }
-
-    '__ci_bb_711 {
-        pcre2_convert_context_free_8(__local_test_con_context__goto_5689_24)
-        goto '__ci_bb_712
-    }
-
-    '__ci_bb_712 {
-        if ((if __local_test_dat_context__goto_5688_22 != null: 1 else: 0) != 0) {
-            goto '__ci_bb_713
-        } else {
-            goto '__ci_bb_714
-        }
-    }
-
-    '__ci_bb_713 {
-        pcre2_match_context_free_8(__local_test_dat_context__goto_5688_22)
-        goto '__ci_bb_714
-    }
-
-    '__ci_bb_714 {
-        if ((if __local_test_pat_context__goto_5687_24 != null: 1 else: 0) != 0) {
-            goto '__ci_bb_715
-        } else {
-            goto '__ci_bb_716
-        }
-    }
-
-    '__ci_bb_715 {
-        pcre2_compile_context_free_8(__local_test_pat_context__goto_5687_24)
-        goto '__ci_bb_716
-    }
-
-    '__ci_bb_716 {
-        if ((if __local_test_gen_context__goto_5686_24 != null: 1 else: 0) != 0) {
-            goto '__ci_bb_717
-        } else {
-            goto '__ci_bb_718
-        }
-    }
-
-    '__ci_bb_717 {
-        pcre2_general_context_free_8(__local_test_gen_context__goto_5686_24)
-        goto '__ci_bb_718
-    }
-
-    '__ci_bb_718 {
-        with_free((__local_invalid_code__goto_5717_7 as *mut i8))
-        if ((if __local_failure__goto_5685_13 != null: 1 else: 0) != 0) {
-            goto '__ci_bb_719
-        } else {
-            goto '__ci_bb_720
-        }
-    }
-
-    '__ci_bb_719 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, "pcre2test: Unit test error in %s\n", __local_failure__goto_5685_13)
-        colour_end(__stderrp)
-        exit(1)
-        goto '__ci_bb_720
-    }
-
-    '__ci_bb_720 {
         return
     }
 
@@ -23426,8 +22980,8 @@ fn pcre2_config_(__param_what: c_uint, __param_where_: *mut c_void) -> c_int {
 
 }
 
-fn config_str(__param_what: c_uint) -> *mut i8 {
-    return config_str_8(__param_what)
+fn config_str(__param_what: c_uint, __param_where_: *mut i8) {
+    config_str_8(__param_what, __param_where_)
 
 }
 
@@ -23482,9 +23036,11 @@ fn unittest() {
 }
 
 fn print_version(__param_f: *mut c_void, __param_include_mode: c_int) {
-    var __local_buf: *mut c_char = ((config_str(11) as *mut c_char))
+    var __local_buf: [64]c_char
 
-    fprintf(__param_f, "PCRE2 version %s", __local_buf)
+    config_str(11, (&(unsafe: __local_buf[0]) as *mut c_char))
+
+    fprintf(__param_f, "PCRE2 version %s", (&(unsafe: __local_buf[0]) as *mut c_char))
 
     if (__param_include_mode != 0) {
         fprintf(__param_f, " (%d-bit)", test_mode)
@@ -23493,25 +23049,23 @@ fn print_version(__param_f: *mut c_void, __param_include_mode: c_int) {
 
     fprintf(__param_f, "\n")
 
-    with_free((__local_buf as *mut i8))
-
 }
 
 fn print_unicode_version(__param_f: *mut c_void) {
-    var __local_buf: *mut c_char = ((config_str(10) as *mut c_char))
+    var __local_buf: [64]c_char
 
-    fprintf(__param_f, "Unicode version %s", __local_buf)
+    config_str(10, (&(unsafe: __local_buf[0]) as *mut c_char))
 
-    with_free((__local_buf as *mut i8))
+    fprintf(__param_f, "Unicode version %s", (&(unsafe: __local_buf[0]) as *mut c_char))
 
 }
 
 fn print_jit_target(__param_f: *mut c_void) {
-    var __local_buf: *mut c_char = ((config_str(2) as *mut c_char))
+    var __local_buf: [64]c_char
 
-    fputs(__local_buf, __param_f)
+    config_str(2, (&(unsafe: __local_buf[0]) as *mut c_char))
 
-    with_free((__local_buf as *mut i8))
+    fputs((&(unsafe: __local_buf[0]) as *mut c_char), __param_f)
 
 }
 
@@ -24006,7 +23560,7 @@ fn display_properties(__param_wantscripts: c_int) {
 
     var __local_i: c_ulong = 0
 
-    while ((if __local_i < 518: 1 else: 0) != 0) {
+    while ((if __local_i < 510: 1 else: 0) != 0) {
         var __local_k: c_int
 
         var __local_m: c_int = 0
@@ -24094,7 +23648,7 @@ fn display_properties(__param_wantscripts: c_int) {
 
         var __local_j: c_ulong = ((__local_i as c_ulong) +% (1 as c_ulong))
 
-        while ((if __local_j < 518: 1 else: 0) != 0) {
+        while ((if __local_j < 510: 1 else: 0) != 0) {
             var __local_tt: *const ucp_type_table = ((&(unsafe: utt[0]) as *const ucp_type_table) + (__local_j as usize))
 
             var __ci_expr_logic_6: c_int
@@ -24400,63 +23954,63 @@ fn display_modifiers() {
 @[c_export("main")]
 fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     var __local_argc = __param_argc
-    var __local_yield___goto_3643_10: c_uint = 0
+    var __local_yield___goto_3644_10: c_uint = 0
 
-    var __local_op__goto_3644_10: c_uint = 0
+    var __local_op__goto_3645_10: c_uint = 0
 
-    var __local_notdone__goto_3645_6: c_int = 0
+    var __local_notdone__goto_3646_6: c_int = 0
 
-    var __local_quiet__goto_3646_6: c_int = 0
+    var __local_quiet__goto_3647_6: c_int = 0
 
-    var __local_showtotaltimes__goto_3647_6: c_int = 0
+    var __local_showtotaltimes__goto_3648_6: c_int = 0
 
-    var __local_skipping__goto_3648_6: c_int = 0
+    var __local_skipping__goto_3649_6: c_int = 0
 
-    var __local_skipping_endif__goto_3649_6: c_int = 0
+    var __local_skipping_endif__goto_3650_6: c_int = 0
 
-    var __local_arg_subject__goto_3650_7: *mut i8 = null
+    var __local_arg_subject__goto_3651_7: *mut i8 = null
 
-    var __local_arg_pattern__goto_3651_7: *mut i8 = null
+    var __local_arg_pattern__goto_3652_7: *mut i8 = null
 
-    var __local_arg_error__goto_3652_7: *mut i8 = null
+    var __local_arg_error__goto_3653_7: *mut i8 = null
 
-    var __local_endptr__goto_3681_9: *mut i8 = null
+    var __local_endptr__goto_3682_9: *mut i8 = null
 
-    var __local_arg__goto_3682_9: *mut i8 = null
+    var __local_arg__goto_3683_9: *mut i8 = null
 
-    var __local_uli__goto_3683_17: c_ulong = 0
+    var __local_uli__goto_3684_17: c_ulong = 0
 
-    var __local_rc__goto_3779_9: c_int = 0
+    var __local_rc__goto_3780_9: c_int = 0
 
-    var __local_stack_size__goto_3780_14: c_uint = 0
+    var __local_stack_size__goto_3781_14: c_uint = 0
 
-    var __local_rlim__goto_3781_19: rlimit
+    var __local_rlim__goto_3782_19: rlimit
 
-    var __local_rlim_old__goto_3781_25: rlimit
+    var __local_rlim_old__goto_3782_25: rlimit
 
-    var __local_both__goto_3847_9: c_int = 0
+    var __local_both__goto_3848_9: c_int = 0
 
-    var __local_val__goto_3930_11: *mut i8 = null
+    var __local_val__goto_3931_11: *mut i8 = null
 
-    var __local_errcode__goto_3961_7: c_int = 0
+    var __local_errcode__goto_3962_7: c_int = 0
 
-    var __local_endptr__goto_3962_9: *mut i8 = null
+    var __local_endptr__goto_3963_9: *mut i8 = null
 
-    var __local_li__goto_3963_8: c_long = 0
+    var __local_li__goto_3964_8: c_long = 0
 
-    var __local_p__goto_4051_18: *const u8 = null
+    var __local_p__goto_4052_18: *const u8 = null
 
-    var __local_p_notsp__goto_4052_18: *const u8 = null
+    var __local_p_notsp__goto_4053_18: *const u8 = null
 
-    var __local_rc__goto_4053_7: c_int = 0
+    var __local_rc__goto_4054_7: c_int = 0
 
-    var __local_expectdata__goto_4054_8: c_int = 0
+    var __local_expectdata__goto_4055_8: c_int = 0
 
-    var __local_is_pattern_comment__goto_4055_8: c_int = 0
+    var __local_is_pattern_comment__goto_4056_8: c_int = 0
 
-    var __local_is_data_comment__goto_4056_8: c_int = 0
+    var __local_is_data_comment__goto_4057_8: c_int = 0
 
-    var __local_pad__goto_4172_15: *const i8 = null
+    var __local_pad__goto_4173_15: *const i8 = null
 
     var __ci_expr_logic_1: c_int = 0
 
@@ -24533,16 +24087,16 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     goto '__ci_bb_0
 
     '__ci_bb_0 {
-        (__local_yield___goto_3643_10 = 0)
-        (__local_op__goto_3644_10 = 1)
-        (__local_notdone__goto_3645_6 = 1)
-        (__local_quiet__goto_3646_6 = 0)
-        (__local_showtotaltimes__goto_3647_6 = 0)
-        (__local_skipping__goto_3648_6 = 0)
-        (__local_skipping_endif__goto_3649_6 = 0)
-        (__local_arg_subject__goto_3650_7 = ((null as *mut c_char)))
-        (__local_arg_pattern__goto_3651_7 = ((null as *mut c_char)))
-        (__local_arg_error__goto_3652_7 = ((null as *mut c_char)))
+        (__local_yield___goto_3644_10 = 0)
+        (__local_op__goto_3645_10 = 1)
+        (__local_notdone__goto_3646_6 = 1)
+        (__local_quiet__goto_3647_6 = 0)
+        (__local_showtotaltimes__goto_3648_6 = 0)
+        (__local_skipping__goto_3649_6 = 0)
+        (__local_skipping_endif__goto_3650_6 = 0)
+        (__local_arg_subject__goto_3651_7 = ((null as *mut c_char)))
+        (__local_arg_pattern__goto_3652_7 = ((null as *mut c_char)))
+        (__local_arg_error__goto_3653_7 = ((null as *mut c_char)))
         (buffer = (((with_alloc((pbuffer8_size as i64)) as *mut c_void) as *mut u8)))
         (pbuffer8 = (((with_alloc((pbuffer8_size as i64)) as *mut c_void) as *mut u8)))
         (locale_name[0] = 0)
@@ -24555,10 +24109,10 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
         (__ci_expr_logic_1 = 0)
         (__ci_expr_logic_0 = 0)
         if ((if __local_argc > 1: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if (unsafe: (unsafe: __param_argv[__local_op__goto_3644_10])[0]) == 45: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_0 = (if (if (unsafe: (unsafe: __param_argv[__local_op__goto_3645_10])[0]) == 45: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_0 != 0) {
-            (__ci_expr_logic_1 = (if (if (unsafe: (unsafe: __param_argv[__local_op__goto_3644_10])[1]) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_1 = (if (if (unsafe: (unsafe: __param_argv[__local_op__goto_3645_10])[1]) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_1 != 0) {
             goto '__ci_bb_2
@@ -24568,8 +24122,8 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_2 {
-        (__local_arg__goto_3682_9 = (((unsafe: __param_argv[__local_op__goto_3644_10]) as *mut c_char)))
-        if ((if string_cmp(__local_arg__goto_3682_9, "-LM") == 0: 1 else: 0) != 0) {
+        (__local_arg__goto_3683_9 = (((unsafe: __param_argv[__local_op__goto_3645_10]) as *mut c_char)))
+        if ((if string_cmp(__local_arg__goto_3683_9, "-LM") == 0: 1 else: 0) != 0) {
             goto '__ci_bb_4
         } else {
             goto '__ci_bb_5
@@ -24577,7 +24131,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_3 {
-        if ((if __local_arg_error__goto_3652_7 != null: 1 else: 0) != 0) {
+        if ((if __local_arg_error__goto_3653_7 != null: 1 else: 0) != 0) {
             goto '__ci_bb_121
         } else {
             goto '__ci_bb_122
@@ -24590,7 +24144,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_5 {
-        if ((if string_cmp(__local_arg__goto_3682_9, "-LP") == 0: 1 else: 0) != 0) {
+        if ((if string_cmp(__local_arg__goto_3683_9, "-LP") == 0: 1 else: 0) != 0) {
             goto '__ci_bb_7
         } else {
             goto '__ci_bb_8
@@ -24615,7 +24169,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_8 {
-        if ((if string_cmp(__local_arg__goto_3682_9, "-LS") == 0: 1 else: 0) != 0) {
+        if ((if string_cmp(__local_arg__goto_3683_9, "-LS") == 0: 1 else: 0) != 0) {
             goto '__ci_bb_9
         } else {
             goto '__ci_bb_10
@@ -24628,7 +24182,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_10 {
-        if ((if string_cmp(__local_arg__goto_3682_9, "-unittest") == 0: 1 else: 0) != 0) {
+        if ((if string_cmp(__local_arg__goto_3683_9, "-unittest") == 0: 1 else: 0) != 0) {
             goto '__ci_bb_11
         } else {
             goto '__ci_bb_12
@@ -24641,7 +24195,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_12 {
-        if ((if string_cmp(__local_arg__goto_3682_9, "-C") == 0: 1 else: 0) != 0) {
+        if ((if string_cmp(__local_arg__goto_3683_9, "-C") == 0: 1 else: 0) != 0) {
             goto '__ci_bb_13
         } else {
             goto '__ci_bb_14
@@ -24649,12 +24203,12 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_13 {
-        (__local_yield___goto_3643_10 = c_option((unsafe: __param_argv[((__local_op__goto_3644_10 as c_uint) +% (1 as c_uint))])))
+        (__local_yield___goto_3644_10 = c_option((unsafe: __param_argv[((__local_op__goto_3645_10 as c_uint) +% (1 as c_uint))])))
         goto '__ci_bb_6
     }
 
     '__ci_bb_14 {
-        if ((if string_cmp(__local_arg__goto_3682_9, "-8") == 0: 1 else: 0) != 0) {
+        if ((if string_cmp(__local_arg__goto_3683_9, "-8") == 0: 1 else: 0) != 0) {
             goto '__ci_bb_15
         } else {
             goto '__ci_bb_16
@@ -24667,7 +24221,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_16 {
-        if ((if string_cmp(__local_arg__goto_3682_9, "-16") == 0: 1 else: 0) != 0) {
+        if ((if string_cmp(__local_arg__goto_3683_9, "-16") == 0: 1 else: 0) != 0) {
             goto '__ci_bb_18
         } else {
             goto '__ci_bb_19
@@ -24675,7 +24229,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_17 {
-        (__local_op__goto_3644_10 = __local_op__goto_3644_10 + 1)
+        (__local_op__goto_3645_10 = __local_op__goto_3645_10 + 1)
         (__local_argc = __local_argc - 1)
         goto '__ci_bb_1
     }
@@ -24689,7 +24243,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_19 {
-        if ((if string_cmp(__local_arg__goto_3682_9, "-32") == 0: 1 else: 0) != 0) {
+        if ((if string_cmp(__local_arg__goto_3683_9, "-32") == 0: 1 else: 0) != 0) {
             goto '__ci_bb_21
         } else {
             goto '__ci_bb_22
@@ -24709,7 +24263,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_22 {
-        if ((if string_cmp(__local_arg__goto_3682_9, "-E") == 0: 1 else: 0) != 0) {
+        if ((if string_cmp(__local_arg__goto_3683_9, "-E") == 0: 1 else: 0) != 0) {
             goto '__ci_bb_24
         } else {
             goto '__ci_bb_25
@@ -24726,7 +24280,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_25 {
-        if ((if string_cmp(__local_arg__goto_3682_9, "-q") == 0: 1 else: 0) != 0) {
+        if ((if string_cmp(__local_arg__goto_3683_9, "-q") == 0: 1 else: 0) != 0) {
             goto '__ci_bb_27
         } else {
             goto '__ci_bb_28
@@ -24738,20 +24292,20 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_27 {
-        (__local_quiet__goto_3646_6 = 1)
+        (__local_quiet__goto_3647_6 = 1)
         goto '__ci_bb_29
     }
 
     '__ci_bb_28 {
         (__ci_expr_logic_3 = 0)
         (__ci_expr_logic_2 = 0)
-        if ((if string_cmp(__local_arg__goto_3682_9, "-S") == 0: 1 else: 0) != 0) {
+        if ((if string_cmp(__local_arg__goto_3683_9, "-S") == 0: 1 else: 0) != 0) {
             (__ci_expr_logic_2 = (if (if __local_argc > 2: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_2 != 0) {
-            (__local_uli__goto_3683_17 = strtoul((unsafe: __param_argv[((__local_op__goto_3644_10 as c_uint) +% (1 as c_uint))]), (&raw mut __local_endptr__goto_3681_9 as *mut *mut c_char), 10))
+            (__local_uli__goto_3684_17 = strtoul((unsafe: __param_argv[((__local_op__goto_3645_10 as c_uint) +% (1 as c_uint))]), (&raw mut __local_endptr__goto_3682_9 as *mut *mut c_char), 10))
 
-            (__ci_expr_logic_3 = (if (if (unsafe: *__local_endptr__goto_3681_9) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_3 = (if (if (unsafe: *__local_endptr__goto_3682_9) == 0: 1 else: 0) != 0: 1 else: 0))
 
         }
         if (__ci_expr_logic_3 != 0) {
@@ -24766,8 +24320,8 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_30 {
-        (__local_rc__goto_3779_9 = 0)
-        if ((if __local_uli__goto_3683_17 > 2047: 1 else: 0) != 0) {
+        (__local_rc__goto_3780_9 = 0)
+        if ((if __local_uli__goto_3684_17 > 2047: 1 else: 0) != 0) {
             goto '__ci_bb_33
         } else {
             goto '__ci_bb_34
@@ -24775,7 +24329,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_31 {
-        if ((if string_cmp(__local_arg__goto_3682_9, "-AC") == 0: 1 else: 0) != 0) {
+        if ((if string_cmp(__local_arg__goto_3683_9, "-AC") == 0: 1 else: 0) != 0) {
             goto '__ci_bb_47
         } else {
             goto '__ci_bb_48
@@ -24795,13 +24349,13 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_34 {
-        (__local_stack_size__goto_3780_14 = ((__local_uli__goto_3683_17 as c_uint)))
-        getrlimit(3, (&raw mut __local_rlim_old__goto_3781_25 as *mut rlimit))
-        with_memcpy((&raw mut __local_rlim__goto_3781_19 as *i8), (&raw const __local_rlim_old__goto_3781_25 as *i8), sizeof[rlimit]())
-        (__local_rlim__goto_3781_19.rlim_cur = ((((__local_stack_size__goto_3780_14 as c_uint) *% (1024 as c_uint)) as c_uint) *% (1024 as c_uint)))
+        (__local_stack_size__goto_3781_14 = ((__local_uli__goto_3684_17 as c_uint)))
+        getrlimit(3, (&raw mut __local_rlim_old__goto_3782_25 as *mut rlimit))
+        with_memcpy((&raw mut __local_rlim__goto_3782_19 as *i8), (&raw const __local_rlim_old__goto_3782_25 as *i8), sizeof[rlimit]())
+        (__local_rlim__goto_3782_19.rlim_cur = ((((__local_stack_size__goto_3781_14 as c_uint) *% (1024 as c_uint)) as c_uint) *% (1024 as c_uint)))
         (__ci_expr_logic_4 = 0)
-        if ((if (&raw const __local_rlim__goto_3781_19 as *const rlimit).rlim_max != (((((1 as c_ulonglong) as c_ulonglong) << (63 as c_uint)) as c_ulonglong) -% (1 as c_ulonglong)): 1 else: 0) != 0) {
-            (__ci_expr_logic_4 = (if (if (&raw const __local_rlim__goto_3781_19 as *const rlimit).rlim_cur > (&raw const __local_rlim__goto_3781_19 as *const rlimit).rlim_max: 1 else: 0) != 0: 1 else: 0))
+        if ((if (&raw const __local_rlim__goto_3782_19 as *const rlimit).rlim_max != (((((1 as c_ulonglong) as c_ulonglong) << (63 as c_uint)) as c_ulonglong) -% (1 as c_ulonglong)): 1 else: 0) != 0) {
+            (__ci_expr_logic_4 = (if (if (&raw const __local_rlim__goto_3782_19 as *const rlimit).rlim_cur > (&raw const __local_rlim__goto_3782_19 as *const rlimit).rlim_max: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_4 != 0) {
             goto '__ci_bb_35
@@ -24812,9 +24366,9 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
 
     '__ci_bb_35 {
         colour_begin(31, __stderrp)
-        fprintf(__stderrp, "pcre2test: requested stack size %luMiB is greater than hard limit ", (__local_stack_size__goto_3780_14 as c_ulong))
+        fprintf(__stderrp, "pcre2test: requested stack size %luMiB is greater than hard limit ", (__local_stack_size__goto_3781_14 as c_ulong))
         colour_end(__stderrp)
-        if ((if (((&raw const __local_rlim__goto_3781_19 as *const rlimit).rlim_max as c_ulonglong) % (1048576 as c_ulonglong)) == 0: 1 else: 0) != 0) {
+        if ((if (((&raw const __local_rlim__goto_3782_19 as *const rlimit).rlim_max as c_ulonglong) % (1048576 as c_ulonglong)) == 0: 1 else: 0) != 0) {
             goto '__ci_bb_37
         } else {
             goto '__ci_bb_38
@@ -24824,11 +24378,11 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     '__ci_bb_36 {
         (__ci_expr_logic_6 = 0)
         (__ci_expr_logic_5 = 0)
-        if ((if (&raw const __local_rlim_old__goto_3781_25 as *const rlimit).rlim_cur != (((((1 as c_ulonglong) as c_ulonglong) << (63 as c_uint)) as c_ulonglong) -% (1 as c_ulonglong)): 1 else: 0) != 0) {
-            (__ci_expr_logic_5 = (if (if (&raw const __local_rlim_old__goto_3781_25 as *const rlimit).rlim_cur <= 2147483647: 1 else: 0) != 0: 1 else: 0))
+        if ((if (&raw const __local_rlim_old__goto_3782_25 as *const rlimit).rlim_cur != (((((1 as c_ulonglong) as c_ulonglong) << (63 as c_uint)) as c_ulonglong) -% (1 as c_ulonglong)): 1 else: 0) != 0) {
+            (__ci_expr_logic_5 = (if (if (&raw const __local_rlim_old__goto_3782_25 as *const rlimit).rlim_cur <= 2147483647: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_5 != 0) {
-            (__ci_expr_logic_6 = (if (if (&raw const __local_rlim__goto_3781_19 as *const rlimit).rlim_cur > (&raw const __local_rlim_old__goto_3781_25 as *const rlimit).rlim_cur: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_6 = (if (if (&raw const __local_rlim__goto_3782_19 as *const rlimit).rlim_cur > (&raw const __local_rlim_old__goto_3782_25 as *const rlimit).rlim_cur: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_6 != 0) {
             goto '__ci_bb_43
@@ -24839,13 +24393,13 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
 
     '__ci_bb_37 {
         colour_begin(31, __stderrp)
-        fprintf(__stderrp, "%luMiB\n", ((((&raw const __local_rlim__goto_3781_19 as *const rlimit).rlim_max as c_ulonglong) / (1048576 as c_ulonglong)) as c_ulong))
+        fprintf(__stderrp, "%luMiB\n", ((((&raw const __local_rlim__goto_3782_19 as *const rlimit).rlim_max as c_ulonglong) / (1048576 as c_ulonglong)) as c_ulong))
         colour_end(__stderrp)
         goto '__ci_bb_39
     }
 
     '__ci_bb_38 {
-        if ((if (((&raw const __local_rlim__goto_3781_19 as *const rlimit).rlim_max as c_ulonglong) % (1024 as c_ulonglong)) == 0: 1 else: 0) != 0) {
+        if ((if (((&raw const __local_rlim__goto_3782_19 as *const rlimit).rlim_max as c_ulonglong) % (1024 as c_ulonglong)) == 0: 1 else: 0) != 0) {
             goto '__ci_bb_40
         } else {
             goto '__ci_bb_41
@@ -24859,14 +24413,14 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
 
     '__ci_bb_40 {
         colour_begin(31, __stderrp)
-        fprintf(__stderrp, "%luKiB\n", ((((&raw const __local_rlim__goto_3781_19 as *const rlimit).rlim_max as c_ulonglong) / (1024 as c_ulonglong)) as c_ulong))
+        fprintf(__stderrp, "%luKiB\n", ((((&raw const __local_rlim__goto_3782_19 as *const rlimit).rlim_max as c_ulonglong) / (1024 as c_ulonglong)) as c_ulong))
         colour_end(__stderrp)
         goto '__ci_bb_42
     }
 
     '__ci_bb_41 {
         colour_begin(31, __stderrp)
-        fprintf(__stderrp, "%lu bytes\n", ((&raw const __local_rlim__goto_3781_19 as *const rlimit).rlim_max as c_ulong))
+        fprintf(__stderrp, "%lu bytes\n", ((&raw const __local_rlim__goto_3782_19 as *const rlimit).rlim_max as c_ulong))
         colour_end(__stderrp)
         goto '__ci_bb_42
     }
@@ -24876,12 +24430,12 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_43 {
-        (__local_rc__goto_3779_9 = setrlimit(3, (&raw mut __local_rlim__goto_3781_19 as *mut rlimit)))
+        (__local_rc__goto_3780_9 = setrlimit(3, (&raw mut __local_rlim__goto_3782_19 as *mut rlimit)))
         goto '__ci_bb_44
     }
 
     '__ci_bb_44 {
-        if ((if __local_rc__goto_3779_9 != 0: 1 else: 0) != 0) {
+        if ((if __local_rc__goto_3780_9 != 0: 1 else: 0) != 0) {
             goto '__ci_bb_45
         } else {
             goto '__ci_bb_46
@@ -24890,14 +24444,14 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
 
     '__ci_bb_45 {
         colour_begin(31, __stderrp)
-        fprintf(__stderrp, "pcre2test: setting stack size %luMiB failed: %s\n", (__local_stack_size__goto_3780_14 as c_ulong), strerror((unsafe: *__error())))
+        fprintf(__stderrp, "pcre2test: setting stack size %luMiB failed: %s\n", (__local_stack_size__goto_3781_14 as c_ulong), strerror((unsafe: *__error())))
         colour_end(__stderrp)
         exit(1)
         goto '__ci_bb_46
     }
 
     '__ci_bb_46 {
-        (__local_op__goto_3644_10 = __local_op__goto_3644_10 + 1)
+        (__local_op__goto_3645_10 = __local_op__goto_3645_10 + 1)
         (__local_argc = __local_argc - 1)
         goto '__ci_bb_32
     }
@@ -24909,7 +24463,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_48 {
-        if ((if string_cmp(__local_arg__goto_3682_9, "-ac") == 0: 1 else: 0) != 0) {
+        if ((if string_cmp(__local_arg__goto_3683_9, "-ac") == 0: 1 else: 0) != 0) {
             goto '__ci_bb_50
         } else {
             goto '__ci_bb_51
@@ -24926,7 +24480,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_51 {
-        if ((if string_cmp(__local_arg__goto_3682_9, "-b") == 0: 1 else: 0) != 0) {
+        if ((if string_cmp(__local_arg__goto_3683_9, "-b") == 0: 1 else: 0) != 0) {
             goto '__ci_bb_53
         } else {
             goto '__ci_bb_54
@@ -24943,7 +24497,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_54 {
-        if ((if string_cmp(__local_arg__goto_3682_9, "-d") == 0: 1 else: 0) != 0) {
+        if ((if string_cmp(__local_arg__goto_3683_9, "-d") == 0: 1 else: 0) != 0) {
             goto '__ci_bb_56
         } else {
             goto '__ci_bb_57
@@ -24960,7 +24514,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_57 {
-        if ((if string_cmp(__local_arg__goto_3682_9, "-dfa") == 0: 1 else: 0) != 0) {
+        if ((if string_cmp(__local_arg__goto_3683_9, "-dfa") == 0: 1 else: 0) != 0) {
             goto '__ci_bb_59
         } else {
             goto '__ci_bb_60
@@ -24977,7 +24531,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_60 {
-        if ((if string_cmp(__local_arg__goto_3682_9, "-i") == 0: 1 else: 0) != 0) {
+        if ((if string_cmp(__local_arg__goto_3683_9, "-i") == 0: 1 else: 0) != 0) {
             goto '__ci_bb_62
         } else {
             goto '__ci_bb_63
@@ -24994,15 +24548,15 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_63 {
-        if ((if string_cmp(__local_arg__goto_3682_9, "-jit") == 0: 1 else: 0) != 0) {
+        if ((if string_cmp(__local_arg__goto_3683_9, "-jit") == 0: 1 else: 0) != 0) {
             (__ci_expr_logic_7 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_7 = (if (if string_cmp(__local_arg__goto_3682_9, "-jitverify") == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_7 = (if (if string_cmp(__local_arg__goto_3683_9, "-jitverify") == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_7 != 0) {
             (__ci_expr_logic_8 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_8 = (if (if string_cmp(__local_arg__goto_3682_9, "-jitfast") == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_8 = (if (if string_cmp(__local_arg__goto_3683_9, "-jitfast") == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_8 != 0) {
             goto '__ci_bb_65
@@ -25016,7 +24570,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_65 {
-        if ((if (unsafe: __local_arg__goto_3682_9[4]) == 118: 1 else: 0) != 0) {
+        if ((if (unsafe: __local_arg__goto_3683_9[4]) == 118: 1 else: 0) != 0) {
             goto '__ci_bb_68
         } else {
             goto '__ci_bb_69
@@ -25024,20 +24578,20 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_66 {
-        if ((if string_cmp(__local_arg__goto_3682_9, "-t") == 0: 1 else: 0) != 0) {
+        if ((if string_cmp(__local_arg__goto_3683_9, "-t") == 0: 1 else: 0) != 0) {
             (__ci_expr_logic_9 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_9 = (if (if string_cmp(__local_arg__goto_3682_9, "-tm") == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_9 = (if (if string_cmp(__local_arg__goto_3683_9, "-tm") == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_9 != 0) {
             (__ci_expr_logic_10 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_10 = (if (if string_cmp(__local_arg__goto_3682_9, "-T") == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_10 = (if (if string_cmp(__local_arg__goto_3683_9, "-T") == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_10 != 0) {
             (__ci_expr_logic_11 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_11 = (if (if string_cmp(__local_arg__goto_3682_9, "-TM") == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_11 = (if (if string_cmp(__local_arg__goto_3683_9, "-TM") == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_11 != 0) {
             goto '__ci_bb_73
@@ -25056,7 +24610,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_69 {
-        if ((if (unsafe: __local_arg__goto_3682_9[4]) == 102: 1 else: 0) != 0) {
+        if ((if (unsafe: __local_arg__goto_3683_9[4]) == 102: 1 else: 0) != 0) {
             goto '__ci_bb_71
         } else {
             goto '__ci_bb_72
@@ -25081,13 +24635,13 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_73 {
-        (__local_both__goto_3847_9 = (if (unsafe: __local_arg__goto_3682_9[2]) == 0: 1 else: 0))
-        (__local_showtotaltimes__goto_3647_6 = (if (unsafe: __local_arg__goto_3682_9[1]) == 84: 1 else: 0))
+        (__local_both__goto_3848_9 = (if (unsafe: __local_arg__goto_3683_9[2]) == 0: 1 else: 0))
+        (__local_showtotaltimes__goto_3648_6 = (if (unsafe: __local_arg__goto_3683_9[1]) == 84: 1 else: 0))
         (__ci_expr_logic_12 = 0)
         if ((if __local_argc > 2: 1 else: 0) != 0) {
-            (__local_uli__goto_3683_17 = strtoul((unsafe: __param_argv[((__local_op__goto_3644_10 as c_uint) +% (1 as c_uint))]), (&raw mut __local_endptr__goto_3681_9 as *mut *mut c_char), 10))
+            (__local_uli__goto_3684_17 = strtoul((unsafe: __param_argv[((__local_op__goto_3645_10 as c_uint) +% (1 as c_uint))]), (&raw mut __local_endptr__goto_3682_9 as *mut *mut c_char), 10))
 
-            (__ci_expr_logic_12 = (if (if (unsafe: *__local_endptr__goto_3681_9) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_12 = (if (if (unsafe: *__local_endptr__goto_3682_9) == 0: 1 else: 0) != 0: 1 else: 0))
 
         }
         if (__ci_expr_logic_12 != 0) {
@@ -25098,7 +24652,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_74 {
-        if ((if string_cmp(__local_arg__goto_3682_9, "-malloc") == 0: 1 else: 0) != 0) {
+        if ((if string_cmp(__local_arg__goto_3683_9, "-malloc") == 0: 1 else: 0) != 0) {
             goto '__ci_bb_85
         } else {
             goto '__ci_bb_86
@@ -25110,7 +24664,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_76 {
-        if ((if __local_uli__goto_3683_17 == 0: 1 else: 0) != 0) {
+        if ((if __local_uli__goto_3684_17 == 0: 1 else: 0) != 0) {
             goto '__ci_bb_79
         } else {
             goto '__ci_bb_80
@@ -25123,7 +24677,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_78 {
-        if (__local_both__goto_3847_9 != 0) {
+        if (__local_both__goto_3848_9 != 0) {
             goto '__ci_bb_83
         } else {
             goto '__ci_bb_84
@@ -25132,14 +24686,14 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
 
     '__ci_bb_79 {
         colour_begin(31, __stderrp)
-        fprintf(__stderrp, "pcre2test: Argument for %s must not be zero\n", __local_arg__goto_3682_9)
+        fprintf(__stderrp, "pcre2test: Argument for %s must not be zero\n", __local_arg__goto_3683_9)
         colour_end(__stderrp)
         exit(1)
         goto '__ci_bb_80
     }
 
     '__ci_bb_80 {
-        if ((if __local_uli__goto_3683_17 > 4294967295: 1 else: 0) != 0) {
+        if ((if __local_uli__goto_3684_17 > 4294967295: 1 else: 0) != 0) {
             goto '__ci_bb_81
         } else {
             goto '__ci_bb_82
@@ -25148,15 +24702,15 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
 
     '__ci_bb_81 {
         colour_begin(31, __stderrp)
-        fprintf(__stderrp, "pcre2test: Argument for %s is too big\n", __local_arg__goto_3682_9)
+        fprintf(__stderrp, "pcre2test: Argument for %s is too big\n", __local_arg__goto_3683_9)
         colour_end(__stderrp)
         exit(1)
         goto '__ci_bb_82
     }
 
     '__ci_bb_82 {
-        (timeitm = ((__local_uli__goto_3683_17 as c_int)))
-        (__local_op__goto_3644_10 = __local_op__goto_3644_10 + 1)
+        (timeitm = ((__local_uli__goto_3684_17 as c_int)))
+        (__local_op__goto_3645_10 = __local_op__goto_3645_10 + 1)
         (__local_argc = __local_argc - 1)
         goto '__ci_bb_78
     }
@@ -25176,10 +24730,10 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_86 {
-        if ((if string_cmp(__local_arg__goto_3682_9, "-help") == 0: 1 else: 0) != 0) {
+        if ((if string_cmp(__local_arg__goto_3683_9, "-help") == 0: 1 else: 0) != 0) {
             (__ci_expr_logic_13 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_13 = (if (if string_cmp(__local_arg__goto_3682_9, "--help") == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_13 = (if (if string_cmp(__local_arg__goto_3683_9, "--help") == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_13 != 0) {
             goto '__ci_bb_88
@@ -25198,10 +24752,10 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_89 {
-        if ((if with_memcmp((__local_arg__goto_3682_9 as *i8), ("-v" as *i8), (2 as i64)) == 0: 1 else: 0) != 0) {
+        if ((if with_memcmp((__local_arg__goto_3683_9 as *i8), ("-v" as *i8), (2 as i64)) == 0: 1 else: 0) != 0) {
             (__ci_expr_logic_14 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_14 = (if (if string_cmp(__local_arg__goto_3682_9, "--version") == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_14 = (if (if string_cmp(__local_arg__goto_3683_9, "--version") == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_14 != 0) {
             goto '__ci_bb_91
@@ -25220,7 +24774,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_92 {
-        if ((if string_cmp(__local_arg__goto_3682_9, "-error") == 0: 1 else: 0) != 0) {
+        if ((if string_cmp(__local_arg__goto_3683_9, "-error") == 0: 1 else: 0) != 0) {
             goto '__ci_bb_94
         } else {
             goto '__ci_bb_95
@@ -25232,12 +24786,12 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_94 {
-        (__local_arg_error__goto_3652_7 = (((unsafe: __param_argv[((__local_op__goto_3644_10 as c_uint) +% (1 as c_uint))]) as *mut c_char)))
+        (__local_arg_error__goto_3653_7 = (((unsafe: __param_argv[((__local_op__goto_3645_10 as c_uint) +% (1 as c_uint))]) as *mut c_char)))
         goto '__ci_bb_97
     }
 
     '__ci_bb_95 {
-        if ((if string_cmp(__local_arg__goto_3682_9, "-subject") == 0: 1 else: 0) != 0) {
+        if ((if string_cmp(__local_arg__goto_3683_9, "-subject") == 0: 1 else: 0) != 0) {
             goto '__ci_bb_98
         } else {
             goto '__ci_bb_99
@@ -25257,12 +24811,12 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_98 {
-        (__local_arg_subject__goto_3650_7 = (((unsafe: __param_argv[((__local_op__goto_3644_10 as c_uint) +% (1 as c_uint))]) as *mut c_char)))
+        (__local_arg_subject__goto_3651_7 = (((unsafe: __param_argv[((__local_op__goto_3645_10 as c_uint) +% (1 as c_uint))]) as *mut c_char)))
         goto '__ci_bb_97
     }
 
     '__ci_bb_99 {
-        if ((if string_cmp(__local_arg__goto_3682_9, "-pattern") == 0: 1 else: 0) != 0) {
+        if ((if string_cmp(__local_arg__goto_3683_9, "-pattern") == 0: 1 else: 0) != 0) {
             goto '__ci_bb_101
         } else {
             goto '__ci_bb_102
@@ -25274,15 +24828,15 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_101 {
-        (__local_arg_pattern__goto_3651_7 = (((unsafe: __param_argv[((__local_op__goto_3644_10 as c_uint) +% (1 as c_uint))]) as *mut c_char)))
+        (__local_arg_pattern__goto_3652_7 = (((unsafe: __param_argv[((__local_op__goto_3645_10 as c_uint) +% (1 as c_uint))]) as *mut c_char)))
         goto '__ci_bb_97
     }
 
     '__ci_bb_102 {
-        if ((if string_cmp(__local_arg__goto_3682_9, "--color") == 0: 1 else: 0) != 0) {
+        if ((if string_cmp(__local_arg__goto_3683_9, "--color") == 0: 1 else: 0) != 0) {
             (__ci_expr_logic_15 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_15 = (if (if string_cmp(__local_arg__goto_3682_9, "--colour") == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_15 = (if (if string_cmp(__local_arg__goto_3683_9, "--colour") == 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_15 != 0) {
             goto '__ci_bb_106
@@ -25297,14 +24851,14 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
 
     '__ci_bb_104 {
         colour_begin(31, __stderrp)
-        fprintf(__stderrp, "pcre2test: Missing value for %s\n", __local_arg__goto_3682_9)
+        fprintf(__stderrp, "pcre2test: Missing value for %s\n", __local_arg__goto_3683_9)
         colour_end(__stderrp)
-        (__local_yield___goto_3643_10 = 1)
+        (__local_yield___goto_3644_10 = 1)
         goto '__ci_bb_6
     }
 
     '__ci_bb_105 {
-        (__local_op__goto_3644_10 = __local_op__goto_3644_10 + 1)
+        (__local_op__goto_3645_10 = __local_op__goto_3645_10 + 1)
         (__local_argc = __local_argc - 1)
         goto '__ci_bb_103
     }
@@ -25315,10 +24869,10 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_107 {
-        if ((if strstr(__local_arg__goto_3682_9, "--color=") == __local_arg__goto_3682_9: 1 else: 0) != 0) {
+        if ((if strstr(__local_arg__goto_3683_9, "--color=") == __local_arg__goto_3683_9: 1 else: 0) != 0) {
             (__ci_expr_logic_16 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_16 = (if (if strstr(__local_arg__goto_3682_9, "--colour=") == __local_arg__goto_3682_9: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_16 = (if (if strstr(__local_arg__goto_3683_9, "--colour=") == __local_arg__goto_3683_9: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_16 != 0) {
             goto '__ci_bb_109
@@ -25332,8 +24886,8 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_109 {
-        (__local_val__goto_3930_11 = (((string_find_char(__local_arg__goto_3682_9, 61) + ((1 as isize) as usize)) as *mut c_char)))
-        if ((if string_cmp(__local_val__goto_3930_11, "always") == 0: 1 else: 0) != 0) {
+        (__local_val__goto_3931_11 = (((string_find_char(__local_arg__goto_3683_9, 61) + ((1 as isize) as usize)) as *mut c_char)))
+        if ((if string_cmp(__local_val__goto_3931_11, "always") == 0: 1 else: 0) != 0) {
             goto '__ci_bb_112
         } else {
             goto '__ci_bb_113
@@ -25342,10 +24896,10 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
 
     '__ci_bb_110 {
         colour_begin(31, __stderrp)
-        fprintf(__stderrp, "pcre2test: Unknown or malformed option \"%s\"\n", __local_arg__goto_3682_9)
+        fprintf(__stderrp, "pcre2test: Unknown or malformed option \"%s\"\n", __local_arg__goto_3683_9)
         colour_end(__stderrp)
         usage()
-        (__local_yield___goto_3643_10 = 1)
+        (__local_yield___goto_3644_10 = 1)
         goto '__ci_bb_6
     }
 
@@ -25359,7 +24913,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_113 {
-        if ((if string_cmp(__local_val__goto_3930_11, "never") == 0: 1 else: 0) != 0) {
+        if ((if string_cmp(__local_val__goto_3931_11, "never") == 0: 1 else: 0) != 0) {
             goto '__ci_bb_115
         } else {
             goto '__ci_bb_116
@@ -25376,7 +24930,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_116 {
-        if ((if string_cmp(__local_val__goto_3930_11, "auto") == 0: 1 else: 0) != 0) {
+        if ((if string_cmp(__local_val__goto_3931_11, "auto") == 0: 1 else: 0) != 0) {
             goto '__ci_bb_118
         } else {
             goto '__ci_bb_119
@@ -25394,9 +24948,9 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
 
     '__ci_bb_119 {
         colour_begin(31, __stderrp)
-        fprintf(__stderrp, "pcre2test: Invalid value for \"%.*s\"\n", (((((__local_val__goto_3930_11 - ((1 as isize) as usize)) as usize) -% (__local_arg__goto_3682_9 as usize)) / sizeof[c_char]()) as c_int), __local_arg__goto_3682_9)
+        fprintf(__stderrp, "pcre2test: Invalid value for \"%.*s\"\n", (((((__local_val__goto_3931_11 - ((1 as isize) as usize)) as usize) -% (__local_arg__goto_3683_9 as usize)) / sizeof[c_char]()) as c_int), __local_arg__goto_3683_9)
         colour_end(__stderrp)
-        (__local_yield___goto_3643_10 = 1)
+        (__local_yield___goto_3644_10 = 1)
         goto '__ci_bb_6
     }
 
@@ -25413,16 +24967,16 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
         init_globals()
         (outfile = __stderrp)
         (__ci_expr_logic_20 = 0)
-        if ((if __local_arg_pattern__goto_3651_7 != null: 1 else: 0) != 0) {
-            (__ci_expr_logic_20 = (if (if not (decode_modifiers((__local_arg_pattern__goto_3651_7 as *mut u8), CTX_DEFPAT, (&raw mut def_patctl as *mut patctl), null) != 0): 1 else: 0) != 0: 1 else: 0))
+        if ((if __local_arg_pattern__goto_3652_7 != null: 1 else: 0) != 0) {
+            (__ci_expr_logic_20 = (if (if not (decode_modifiers((__local_arg_pattern__goto_3652_7 as *mut u8), CTX_DEFPAT, (&raw mut def_patctl as *mut patctl), null) != 0): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_20 != 0) {
             (__ci_expr_logic_22 = (if true: 1 else: 0))
         } else {
             var __ci_expr_logic_21: c_int = 0
 
-            if ((if __local_arg_subject__goto_3650_7 != null: 1 else: 0) != 0) {
-                (__ci_expr_logic_21 = (if (if not (decode_modifiers((__local_arg_subject__goto_3650_7 as *mut u8), CTX_DEFDAT, null, (&raw mut def_datctl as *mut datctl)) != 0): 1 else: 0) != 0: 1 else: 0))
+            if ((if __local_arg_subject__goto_3651_7 != null: 1 else: 0) != 0) {
+                (__ci_expr_logic_21 = (if (if not (decode_modifiers((__local_arg_subject__goto_3651_7 as *mut u8), CTX_DEFDAT, null, (&raw mut def_datctl as *mut datctl)) != 0): 1 else: 0) != 0: 1 else: 0))
             }
 
             (__ci_expr_logic_22 = (if __ci_expr_logic_21 != 0: 1 else: 0))
@@ -25440,19 +24994,19 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_124 {
-        (__local_li__goto_3963_8 = strtol(__local_arg_error__goto_3652_7, (&raw mut __local_endptr__goto_3962_9 as *mut *mut c_char), 10))
-        if ((if __local_li__goto_3963_8 > 2147483647: 1 else: 0) != 0) {
+        (__local_li__goto_3964_8 = strtol(__local_arg_error__goto_3653_7, (&raw mut __local_endptr__goto_3963_9 as *mut *mut c_char), 10))
+        if ((if __local_li__goto_3964_8 > 2147483647: 1 else: 0) != 0) {
             (__ci_expr_logic_17 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_17 = (if (if __local_li__goto_3963_8 < -2147483648: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_17 = (if (if __local_li__goto_3964_8 < -2147483648: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_17 != 0) {
             (__ci_expr_logic_19 = (if true: 1 else: 0))
         } else {
             var __ci_expr_logic_18: c_int = 0
 
-            if ((if (unsafe: *__local_endptr__goto_3962_9) != 0: 1 else: 0) != 0) {
-                (__ci_expr_logic_18 = (if (if (unsafe: *__local_endptr__goto_3962_9) != 44: 1 else: 0) != 0: 1 else: 0))
+            if ((if (unsafe: *__local_endptr__goto_3963_9) != 0: 1 else: 0) != 0) {
+                (__ci_expr_logic_18 = (if (if (unsafe: *__local_endptr__goto_3963_9) != 44: 1 else: 0) != 0: 1 else: 0))
             }
 
             (__ci_expr_logic_19 = (if __ci_expr_logic_18 != 0: 1 else: 0))
@@ -25471,17 +25025,17 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
 
     '__ci_bb_127 {
         colour_begin(31, __stderrp)
-        fprintf(__stderrp, "pcre2test: \"%s\" is not a valid error number list\n", __local_arg_error__goto_3652_7)
+        fprintf(__stderrp, "pcre2test: \"%s\" is not a valid error number list\n", __local_arg_error__goto_3653_7)
         colour_end(__stderrp)
-        (__local_yield___goto_3643_10 = 1)
+        (__local_yield___goto_3644_10 = 1)
         goto '__ci_bb_6
     }
 
     '__ci_bb_128 {
-        (__local_errcode__goto_3961_7 = ((__local_li__goto_3963_8 as c_int)))
-        printf("Error %d: ", __local_errcode__goto_3961_7)
-        print_error_message_file(__stdoutp, __local_errcode__goto_3961_7, "", "\n", 1)
-        if ((if (unsafe: *__local_endptr__goto_3962_9) == 0: 1 else: 0) != 0) {
+        (__local_errcode__goto_3962_7 = ((__local_li__goto_3964_8 as c_int)))
+        printf("Error %d: ", __local_errcode__goto_3962_7)
+        print_error_message_file(__stdoutp, __local_errcode__goto_3962_7, "", "\n", 1)
+        if ((if (unsafe: *__local_endptr__goto_3963_9) == 0: 1 else: 0) != 0) {
             goto '__ci_bb_129
         } else {
             goto '__ci_bb_130
@@ -25493,12 +25047,12 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_130 {
-        (__local_arg_error__goto_3652_7 = (((__local_endptr__goto_3962_9 + ((1 as isize) as usize)) as *mut c_char)))
+        (__local_arg_error__goto_3653_7 = (((__local_endptr__goto_3963_9 + ((1 as isize) as usize)) as *mut c_char)))
         goto '__ci_bb_125
     }
 
     '__ci_bb_131 {
-        (__local_yield___goto_3643_10 = 1)
+        (__local_yield___goto_3644_10 = 1)
         goto '__ci_bb_6
     }
 
@@ -25507,7 +25061,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
         (outfile = __stdoutp)
         (__ci_expr_logic_23 = 0)
         if ((if __local_argc > 1: 1 else: 0) != 0) {
-            (__ci_expr_logic_23 = (if (if string_cmp((unsafe: __param_argv[__local_op__goto_3644_10]), "-") != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_23 = (if (if string_cmp((unsafe: __param_argv[__local_op__goto_3645_10]), "-") != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_23 != 0) {
             goto '__ci_bb_133
@@ -25517,7 +25071,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_133 {
-        (infile = fopen((unsafe: __param_argv[__local_op__goto_3644_10]), "rb"))
+        (infile = fopen((unsafe: __param_argv[__local_op__goto_3645_10]), "rb"))
         if ((if infile == null: 1 else: 0) != 0) {
             goto '__ci_bb_135
         } else {
@@ -25535,9 +25089,9 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
 
     '__ci_bb_135 {
         colour_begin(31, __stderrp)
-        fprintf(__stderrp, "pcre2test: Failed to open \"%s\": %s\n", (unsafe: __param_argv[__local_op__goto_3644_10]), strerror((unsafe: *__error())))
+        fprintf(__stderrp, "pcre2test: Failed to open \"%s\": %s\n", (unsafe: __param_argv[__local_op__goto_3645_10]), strerror((unsafe: *__error())))
         colour_end(__stderrp)
-        (__local_yield___goto_3643_10 = 1)
+        (__local_yield___goto_3644_10 = 1)
         goto '__ci_bb_6
     }
 
@@ -25546,7 +25100,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_137 {
-        (outfile = fopen((unsafe: __param_argv[((__local_op__goto_3644_10 as c_uint) +% (1 as c_uint))]), "wb"))
+        (outfile = fopen((unsafe: __param_argv[((__local_op__goto_3645_10 as c_uint) +% (1 as c_uint))]), "wb"))
         if ((if outfile == null: 1 else: 0) != 0) {
             goto '__ci_bb_139
         } else {
@@ -25555,7 +25109,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_138 {
-        if ((if not (__local_quiet__goto_3646_6 != 0): 1 else: 0) != 0) {
+        if ((if not (__local_quiet__goto_3647_6 != 0): 1 else: 0) != 0) {
             goto '__ci_bb_141
         } else {
             goto '__ci_bb_142
@@ -25564,9 +25118,9 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
 
     '__ci_bb_139 {
         colour_begin(31, __stderrp)
-        fprintf(__stderrp, "pcre2test: Failed to open \"%s\": %s\n", (unsafe: __param_argv[((__local_op__goto_3644_10 as c_uint) +% (1 as c_uint))]), strerror((unsafe: *__error())))
+        fprintf(__stderrp, "pcre2test: Failed to open \"%s\": %s\n", (unsafe: __param_argv[((__local_op__goto_3645_10 as c_uint) +% (1 as c_uint))]), strerror((unsafe: *__error())))
         colour_end(__stderrp)
-        (__local_yield___goto_3643_10 = 1)
+        (__local_yield___goto_3644_10 = 1)
         goto '__ci_bb_6
     }
 
@@ -25586,7 +25140,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_143 {
-        if (__local_notdone__goto_3645_6 != 0) {
+        if (__local_notdone__goto_3646_6 != 0) {
             goto '__ci_bb_144
         } else {
             goto '__ci_bb_145
@@ -25594,11 +25148,11 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_144 {
-        (__local_rc__goto_4053_7 = PR_OK)
-        (__local_expectdata__goto_4054_8 = have_active_pattern())
-        (__local_expectdata__goto_4054_8 = __local_expectdata__goto_4054_8 | (if (&raw const preg as *const regex_t).re_pcre2_code != null: 1 else: 0))
+        (__local_rc__goto_4054_7 = PR_OK)
+        (__local_expectdata__goto_4055_8 = have_active_pattern())
+        (__local_expectdata__goto_4055_8 = __local_expectdata__goto_4055_8 | (if (&raw const preg as *const regex_t).re_pcre2_code != null: 1 else: 0))
         (__ci_expr_ternary_24 = null)
-        if (__local_expectdata__goto_4054_8 != 0) {
+        if (__local_expectdata__goto_4055_8 != 0) {
             (__ci_expr_ternary_24 = (("data> " as *mut c_char)))
         } else {
             (__ci_expr_ternary_24 = (("  re> " as *mut c_char)))
@@ -25611,7 +25165,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_145 {
-        if (__local_skipping_endif__goto_3649_6 != 0) {
+        if (__local_skipping_endif__goto_3650_6 != 0) {
             goto '__ci_bb_187
         } else {
             goto '__ci_bb_188
@@ -25623,7 +25177,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_147 {
-        if (__local_skipping_endif__goto_3649_6 != 0) {
+        if (__local_skipping_endif__goto_3650_6 != 0) {
             goto '__ci_bb_148
         } else {
             goto '__ci_bb_149
@@ -25653,8 +25207,8 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_149 {
-        (__local_p_notsp__goto_4052_18 = ((buffer as *const u8)))
-        (__local_p__goto_4051_18 = __local_p_notsp__goto_4052_18)
+        (__local_p_notsp__goto_4053_18 = ((buffer as *const u8)))
+        (__local_p__goto_4052_18 = __local_p_notsp__goto_4053_18)
         goto '__ci_bb_152
     }
 
@@ -25663,12 +25217,12 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_151 {
-        (__local_skipping_endif__goto_3649_6 = 0)
+        (__local_skipping_endif__goto_3650_6 = 0)
         goto '__ci_bb_149
     }
 
     '__ci_bb_152 {
-        if (isspace((unsafe: *__local_p_notsp__goto_4052_18)) != 0) {
+        if (isspace((unsafe: *__local_p_notsp__goto_4053_18)) != 0) {
             goto '__ci_bb_153
         } else {
             goto '__ci_bb_154
@@ -25676,55 +25230,55 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_153 {
-        (__local_p_notsp__goto_4052_18 = __local_p_notsp__goto_4052_18 + 1)
+        (__local_p_notsp__goto_4053_18 = __local_p_notsp__goto_4053_18 + 1)
         goto '__ci_bb_152
     }
 
     '__ci_bb_154 {
         (__ci_expr_logic_29 = 0)
-        if ((if (unsafe: __local_p__goto_4051_18[0]) == 35: 1 else: 0) != 0) {
+        if ((if (unsafe: __local_p__goto_4052_18[0]) == 35: 1 else: 0) != 0) {
             var __ci_expr_logic_28: c_int
 
             var __ci_expr_logic_27: c_int
 
-            if (isspace((unsafe: __local_p__goto_4051_18[1])) != 0) {
+            if (isspace((unsafe: __local_p__goto_4052_18[1])) != 0) {
                 (__ci_expr_logic_27 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_27 = (if (if (unsafe: __local_p__goto_4051_18[1]) == 33: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_27 = (if (if (unsafe: __local_p__goto_4052_18[1]) == 33: 1 else: 0) != 0: 1 else: 0))
             }
 
             if (__ci_expr_logic_27 != 0) {
                 (__ci_expr_logic_28 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_28 = (if (if (unsafe: __local_p__goto_4051_18[1]) == 0: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_28 = (if (if (unsafe: __local_p__goto_4052_18[1]) == 0: 1 else: 0) != 0: 1 else: 0))
             }
 
             (__ci_expr_logic_29 = (if __ci_expr_logic_28 != 0: 1 else: 0))
 
         }
-        (__local_is_pattern_comment__goto_4055_8 = __ci_expr_logic_29)
+        (__local_is_pattern_comment__goto_4056_8 = __ci_expr_logic_29)
         (__ci_expr_logic_33 = 0)
         (__ci_expr_logic_31 = 0)
         (__ci_expr_logic_30 = 0)
-        if (__local_expectdata__goto_4054_8 != 0) {
-            (__ci_expr_logic_30 = (if (if (unsafe: __local_p_notsp__goto_4052_18[0]) == 92: 1 else: 0) != 0: 1 else: 0))
+        if (__local_expectdata__goto_4055_8 != 0) {
+            (__ci_expr_logic_30 = (if (if (unsafe: __local_p_notsp__goto_4053_18[0]) == 92: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_30 != 0) {
-            (__ci_expr_logic_31 = (if (if (unsafe: __local_p_notsp__goto_4052_18[1]) == 61: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_31 = (if (if (unsafe: __local_p_notsp__goto_4053_18[1]) == 61: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_31 != 0) {
             var __ci_expr_logic_32: c_int
 
-            if (isspace((unsafe: __local_p_notsp__goto_4052_18[2])) != 0) {
+            if (isspace((unsafe: __local_p_notsp__goto_4053_18[2])) != 0) {
                 (__ci_expr_logic_32 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_32 = (if (if (unsafe: __local_p_notsp__goto_4052_18[2]) == 0: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_32 = (if (if (unsafe: __local_p_notsp__goto_4053_18[2]) == 0: 1 else: 0) != 0: 1 else: 0))
             }
 
             (__ci_expr_logic_33 = (if __ci_expr_logic_32 != 0: 1 else: 0))
 
         }
-        (__local_is_data_comment__goto_4056_8 = __ci_expr_logic_33)
+        (__local_is_data_comment__goto_4057_8 = __ci_expr_logic_33)
         if ((if not (isatty(fileno(infile)) != 0): 1 else: 0) != 0) {
             goto '__ci_bb_155
         } else {
@@ -25734,10 +25288,10 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
 
     '__ci_bb_155 {
         (__ci_expr_ternary_35 = 0)
-        if (__local_is_pattern_comment__goto_4055_8 != 0) {
+        if (__local_is_pattern_comment__goto_4056_8 != 0) {
             (__ci_expr_logic_34 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_34 = (if __local_is_data_comment__goto_4056_8 != 0: 1 else: 0))
+            (__ci_expr_logic_34 = (if __local_is_data_comment__goto_4057_8 != 0: 1 else: 0))
         }
         if (__ci_expr_logic_34 != 0) {
             (__ci_expr_ternary_35 = 37)
@@ -25754,7 +25308,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
         fflush(outfile)
         (__ci_expr_logic_36 = 0)
         if (preprocess_only != 0) {
-            (__ci_expr_logic_36 = (if (if (unsafe: *__local_p__goto_4051_18) != 35: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_36 = (if (if (unsafe: *__local_p__goto_4052_18) != 35: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_36 != 0) {
             goto '__ci_bb_157
@@ -25768,10 +25322,10 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_158 {
-        if (__local_expectdata__goto_4054_8 != 0) {
+        if (__local_expectdata__goto_4055_8 != 0) {
             (__ci_expr_logic_37 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_37 = (if __local_skipping__goto_3648_6 != 0: 1 else: 0))
+            (__ci_expr_logic_37 = (if __local_skipping__goto_3649_6 != 0: 1 else: 0))
         }
         if (__ci_expr_logic_37 != 0) {
             goto '__ci_bb_159
@@ -25781,7 +25335,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_159 {
-        if ((if (unsafe: *__local_p_notsp__goto_4052_18) == 0: 1 else: 0) != 0) {
+        if ((if (unsafe: *__local_p_notsp__goto_4053_18) == 0: 1 else: 0) != 0) {
             goto '__ci_bb_162
         } else {
             goto '__ci_bb_163
@@ -25789,7 +25343,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_160 {
-        if ((if (unsafe: *__local_p__goto_4051_18) == 35: 1 else: 0) != 0) {
+        if ((if (unsafe: *__local_p__goto_4052_18) == 35: 1 else: 0) != 0) {
             goto '__ci_bb_169
         } else {
             goto '__ci_bb_170
@@ -25798,7 +25352,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
 
     '__ci_bb_161 {
         (__ci_expr_logic_39 = 0)
-        if ((if __local_rc__goto_4053_7 == PR_SKIP: 1 else: 0) != 0) {
+        if ((if __local_rc__goto_4054_7 == PR_SKIP: 1 else: 0) != 0) {
             (__ci_expr_logic_39 = (if (if not (isatty(fileno(infile)) != 0): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_39 != 0) {
@@ -25818,8 +25372,8 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
 
     '__ci_bb_163 {
         (__ci_expr_logic_38 = 0)
-        if ((if not (__local_skipping__goto_3648_6 != 0): 1 else: 0) != 0) {
-            (__ci_expr_logic_38 = (if (if not (__local_is_data_comment__goto_4056_8 != 0): 1 else: 0) != 0: 1 else: 0))
+        if ((if not (__local_skipping__goto_3649_6 != 0): 1 else: 0) != 0) {
+            (__ci_expr_logic_38 = (if (if not (__local_is_data_comment__goto_4057_8 != 0): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_38 != 0) {
             goto '__ci_bb_167
@@ -25841,13 +25395,13 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
 
     '__ci_bb_166 {
         free_active_pattern()
-        (__local_skipping__goto_3648_6 = 0)
+        (__local_skipping__goto_3649_6 = 0)
         setlocale(2, "C")
         goto '__ci_bb_164
     }
 
     '__ci_bb_167 {
-        (__local_rc__goto_4053_7 = process_data())
+        (__local_rc__goto_4054_7 = process_data())
         goto '__ci_bb_168
     }
 
@@ -25856,7 +25410,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_169 {
-        if (__local_is_pattern_comment__goto_4055_8 != 0) {
+        if (__local_is_pattern_comment__goto_4056_8 != 0) {
             goto '__ci_bb_172
         } else {
             goto '__ci_bb_173
@@ -25864,7 +25418,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_170 {
-        if ((if string_find_char("/!\"'`%&-=_:;,@~", (unsafe: *__local_p__goto_4051_18)) != null: 1 else: 0) != 0) {
+        if ((if string_find_char("/!\"'`%&-=_:;,@~", (unsafe: *__local_p__goto_4052_18)) != null: 1 else: 0) != 0) {
             goto '__ci_bb_174
         } else {
             goto '__ci_bb_175
@@ -25880,18 +25434,18 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_173 {
-        (__local_rc__goto_4053_7 = process_command())
+        (__local_rc__goto_4054_7 = process_command())
         goto '__ci_bb_171
     }
 
     '__ci_bb_174 {
-        (__local_rc__goto_4053_7 = process_pattern())
+        (__local_rc__goto_4054_7 = process_pattern())
         (dfa_matched = 0)
         goto '__ci_bb_176
     }
 
     '__ci_bb_175 {
-        if ((if (unsafe: *__local_p_notsp__goto_4052_18) != 0: 1 else: 0) != 0) {
+        if ((if (unsafe: *__local_p_notsp__goto_4053_18) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_177
         } else {
             goto '__ci_bb_178
@@ -25906,7 +25460,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
         colour_begin(31, outfile)
         fprintf(outfile, "** Invalid pattern delimiter '%c' (x%x).\n", (unsafe: *buffer), (unsafe: *buffer))
         colour_end(outfile)
-        (__local_rc__goto_4053_7 = PR_SKIP)
+        (__local_rc__goto_4054_7 = PR_SKIP)
         goto '__ci_bb_178
     }
 
@@ -25915,12 +25469,12 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_179 {
-        (__local_skipping__goto_3648_6 = 1)
+        (__local_skipping__goto_3649_6 = 1)
         goto '__ci_bb_181
     }
 
     '__ci_bb_180 {
-        if ((if __local_rc__goto_4053_7 == PR_ENDIF: 1 else: 0) != 0) {
+        if ((if __local_rc__goto_4054_7 == PR_ENDIF: 1 else: 0) != 0) {
             goto '__ci_bb_182
         } else {
             goto '__ci_bb_183
@@ -25932,12 +25486,12 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_182 {
-        (__local_skipping_endif__goto_3649_6 = 1)
+        (__local_skipping_endif__goto_3650_6 = 1)
         goto '__ci_bb_184
     }
 
     '__ci_bb_183 {
-        if ((if __local_rc__goto_4053_7 == PR_ABEND: 1 else: 0) != 0) {
+        if ((if __local_rc__goto_4054_7 == PR_ABEND: 1 else: 0) != 0) {
             goto '__ci_bb_185
         } else {
             goto '__ci_bb_186
@@ -25952,7 +25506,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
         colour_begin(31, outfile)
         fprintf(outfile, "** pcre2test run abandoned\n")
         colour_end(outfile)
-        (__local_yield___goto_3643_10 = 1)
+        (__local_yield___goto_3644_10 = 1)
         goto '__ci_bb_6
     }
 
@@ -25964,7 +25518,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
         colour_begin(31, outfile)
         fprintf(outfile, "** Expected #endif\n")
         colour_end(outfile)
-        (__local_yield___goto_3643_10 = 1)
+        (__local_yield___goto_3644_10 = 1)
         goto '__ci_bb_6
     }
 
@@ -25982,7 +25536,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_190 {
-        if (__local_showtotaltimes__goto_3647_6 != 0) {
+        if (__local_showtotaltimes__goto_3648_6 != 0) {
             goto '__ci_bb_191
         } else {
             goto '__ci_bb_192
@@ -25990,7 +25544,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_191 {
-        (__local_pad__goto_4172_15 = (("" as *const c_char)))
+        (__local_pad__goto_4173_15 = (("" as *const c_char)))
         colour_begin(36, outfile)
         fprintf(outfile, "--------------------------------------\n")
         colour_end(outfile)
@@ -26018,7 +25572,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
 
     '__ci_bb_194 {
         colour_begin(36, outfile)
-        fprintf(outfile, "Total match time %s%8.2f microseconds\n", __local_pad__goto_4172_15, ((((1000000 as c_ulong) / ((1000000 as c_ulong) as c_ulong)) * (total_match_time as f64)) / timeitm))
+        fprintf(outfile, "Total match time %s%8.2f microseconds\n", __local_pad__goto_4173_15, ((((1000000 as c_ulong) / ((1000000 as c_ulong) as c_ulong)) * (total_match_time as f64)) / timeitm))
         colour_end(outfile)
         goto '__ci_bb_192
     }
@@ -26031,7 +25585,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_196 {
-        (__local_pad__goto_4172_15 = (("  " as *const c_char)))
+        (__local_pad__goto_4173_15 = (("  " as *const c_char)))
         goto '__ci_bb_194
     }
 
@@ -26077,7 +25631,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
         with_free((dfa_workspace as *mut i8))
         with_free((tables3 as *mut i8))
         free_globals()
-        return __local_yield___goto_3643_10
+        return __local_yield___goto_3644_10
     }
 
 }

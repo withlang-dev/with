@@ -133,10 +133,10 @@ fn pcre2_config_8(__param_what: c_uint, __param_where_: *mut c_void) -> c_int {
             11 => {
                 var __local_v_1: *const c_char = with 0 as __ci_expr_seq_43 {
                     var __ci_expr_ternary_2: *mut c_char = null
-                    if ((if 32 == 0: 1 else: 0) != 0) {
-                        (__ci_expr_ternary_2 = (("10.48 2025-10-21" as *mut c_char)))
+                    if ((if 0 == 0: 1 else: 0) != 0) {
+                        (__ci_expr_ternary_2 = (("10.47 2025-10-21" as *mut c_char)))
                     } else {
-                        (__ci_expr_ternary_2 = (("10.48-DEV 2025-10-21" as *mut c_char)))
+                        (__ci_expr_ternary_2 = (("10.472025-10-21" as *mut c_char)))
                     }
                     (__ci_expr_ternary_2 as *const c_char)
                 }
