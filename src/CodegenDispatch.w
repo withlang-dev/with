@@ -6445,6 +6445,43 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                                 wl_build_br(self.builder, gc_next_val)
                             return true
 
+                    if gc_recv_type_sym != 0:
+                        let gc_direct_owner_name = self.intern.resolve(gc_recv_type_sym)
+                        let gc_direct_qualified = gc_direct_owner_name ++ "." ++ gc_method_name
+                        let gc_direct_fn_sym = self.intern.intern(gc_direct_qualified)
+                        let gc_direct_fv2 = self.fn_values.get(gc_direct_fn_sym)
+                        let gc_direct_ft2 = self.fn_fn_types.get(gc_direct_fn_sym)
+                        if gc_direct_fv2.is_some() and gc_direct_ft2.is_some():
+                            let gc_direct_call_args_start = self.pool.get_data1(gc_node)
+                            let gc_direct_method_arg_count = gc_mir_count - 1
+                            let gc_direct_args: Vec[i64] = Vec.new()
+                            let gc_direct_is_ref = self.fn_ref_param_starts.get(gc_direct_fn_sym).is_some()
+                            if gc_direct_is_ref:
+                                let gc_direct_ref_ptr = self.mir_try_place_ptr_for_ref(body, gc_recv_op)
+                                if gc_direct_ref_ptr != 0:
+                                    gc_direct_args.push(gc_direct_ref_ptr)
+                                else:
+                                    gc_direct_args.push(self.get_mutable_receiver_ptr(gc_self_expr_node, gc_recv_val, gc_recv_ty))
+                            else:
+                                gc_direct_args.push(gc_recv_val)
+                            for gc_direct_ai in 0..gc_direct_method_arg_count:
+                                let gc_direct_arg_op = body.call_arg_operands.get((gc_mir_start + 1 + gc_direct_ai) as i64)
+                                gc_direct_args.push(self.mir_eval_operand(body, gc_direct_arg_op, 0))
+                            let gc_direct_coerced = self.coerce_call_args_for_fn_value(gc_direct_fn_sym, gc_direct_fv2.unwrap() as i64, gc_direct_call_args_start, 1, gc_direct_args, gc_direct_method_arg_count + 1, "method " ++ gc_direct_qualified, gc_node)
+                            let gc_direct_result = wl_build_call(self.builder, gc_direct_ft2.unwrap() as i64, gc_direct_fv2.unwrap() as i64, vec_data_i64(&gc_direct_coerced), gc_direct_method_arg_count + 1)
+                            if dest_place >= 0 and gc_direct_result != 0:
+                                let gc_direct_ret_ty = wl_type_of(gc_direct_result)
+                                if gc_direct_ret_ty != wl_void_type(self.context):
+                                    let gc_direct_local = body.place_locals.get(dest_place as i64)
+                                    let gc_direct_alloca = self.create_entry_alloca(gc_direct_ret_ty)
+                                    wl_build_store(self.builder, gc_direct_result, gc_direct_alloca)
+                                    self.mir_local_ptrs.insert(gc_direct_local, gc_direct_alloca)
+                                    self.mir_local_types.insert(gc_direct_local, gc_direct_ret_ty)
+                            if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                                let gc_direct_next_val = self.mir_bb_values.get(next_bb as i64)
+                                wl_build_br(self.builder, gc_direct_next_val)
+                            return true
+
             // Disc enum static methods: Direction.from_int(n)
             if self.pool.kind(gc_callee_field) == NodeKind.NK_FIELD_ACCESS:
                 let gc_de_self = self.pool.get_data0(gc_callee_field)

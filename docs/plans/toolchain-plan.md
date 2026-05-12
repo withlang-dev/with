@@ -107,8 +107,6 @@ Source: `docs/toolchain.md`.
     functions, types, and source locations.
   - `@[compiler_hook(after_typecheck)]` is parsed and preserved on function
     declarations.
-  - Until `ProjectInfo` execution is implemented, compiler hooks fail loudly
-    instead of being silently ignored.
   - Unknown compiler-hook phases and hooks attached to non-functions are
     diagnostics.
 - Initial real `ProjectInfo` compiler data path:
@@ -118,6 +116,18 @@ Source: `docs/toolchain.md`.
     visibility, parameter counts, return type rendering, kind, and source span.
   - This validates the compiler-side construction path before wiring
     `ProjectInfo` values into tool-mode compiler-hook execution.
+- Initial compiler-hook execution:
+  - `after_typecheck` hooks now run in a generated tool-mode runner after
+    frontend type checking.
+  - The runner receives a real `std.compiler.ProjectInfo` value reconstructed
+    from the resolved module graph and typed AST metadata.
+  - `compiler.error(location, message)` records hook diagnostics through a
+    compiler-owned channel and renders them as normal compiler errors.
+  - Hook execution is disabled while compiling the generated hook runner, so
+    hooks do not recursively execute themselves.
+  - Module-level struct globals without explicit type annotations now receive
+    storage and runtime initialization, which lets generated hook runners call
+    methods on `std.compiler.compiler`.
 
 ## Verified
 
@@ -139,10 +149,15 @@ Source: `docs/toolchain.md`.
 - `scripts/run_tests.sh test/compile_errors/err_derive_deserialize_field_without_deserialize.w`
 - `out/bin/with run test/behavior/behav_derive_component_id.w`
 - `scripts/run_tests.sh test/compile_errors/err_derive_component_id_requires_trait.w test/compile_errors/err_derive_component_id_generic.w`
-- `scripts/run_tests.sh test/compile_errors/err_compiler_hook_not_implemented.w test/compile_errors/err_compiler_hook_unknown_phase.w test/compile_errors/err_compiler_hook_function_only.w`
+- `scripts/run_tests.sh test/compile_errors/err_compiler_hook_error_diagnostic.w test/compile_errors/err_compiler_hook_unknown_phase.w test/compile_errors/err_compiler_hook_function_only.w`
 - `out/bin/with run test/behavior/behav_std_compiler_project_info.w`
 - `scripts/run_tests.sh test/behavior/behav_project_info_dump.w`
 - `out/bin/with check --no-std --no-prelude --dump-project-info test/behavior/behav_project_info_dump.w`
+- `scripts/run_tests.sh test/behavior/behav_compiler_hook_project_info.w`
+- `scripts/run_tests.sh test/behavior/behav_global_method_receiver.w`
+- `scripts/run_tests.sh test/behavior/behav_global_method_receiver.w test/behavior/behav_compiler_hook_project_info.w test/compile_errors/err_compiler_hook_error_diagnostic.w test/compile_errors/err_compiler_hook_unknown_phase.w test/compile_errors/err_compiler_hook_function_only.w`
+- failing-hook probe: an `after_typecheck` hook with `assert(false)` exits
+  nonzero and reports `compiler hook execution failed`
 
 ## Remaining
 
@@ -152,6 +167,4 @@ Source: `docs/toolchain.md`.
 - Complete `build.w` graph execution beyond executable, library, test,
   generated-source targets, and explicit host-target aliases: actual
   cross-target codegen/linking still needs driver support.
-- Compiler-hook runner integration, materializing the real `ProjectInfo` data
-  as stdlib values for hooks, and source emission remain future phases per
-  `docs/toolchain.md`.
+- Compiler-hook source emission remains a future phase per `docs/toolchain.md`.

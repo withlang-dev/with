@@ -3,6 +3,11 @@
 // Compiler hooks receive ProjectInfo values once hook execution is wired into
 // the driver. This module defines the stable data shape and query methods.
 
+extern fn with_fs_read_file(path: str) -> str
+extern fn with_fs_write_file(path: str, data: str) -> i32
+extern fn with_eprint(s: str) -> void
+extern fn exit(code: i32) -> void
+
 pub enum CompilerHookPhase: i32:
     after_typecheck = 0
 
@@ -45,6 +50,47 @@ pub type ProjectInfo {
     function_items: Vec[FunctionInfo],
     type_items: Vec[TypeInfo],
 }
+
+pub type CompilerApi {}
+
+pub global compiler = CompilerApi {}
+
+global var __compiler_diagnostic_output_path: str = ""
+
+fn compiler_hook_escape(value: str) -> str:
+    var out = ""
+    for i in 0..value.len() as i32:
+        let ch = value.byte_at(i as i64)
+        if ch == 92:
+            out = out ++ "\\\\"
+        else if ch == 9:
+            out = out ++ "\\t"
+        else if ch == 10:
+            out = out ++ "\\n"
+        else if ch == 13:
+            out = out ++ "\\r"
+        else:
+            out = out ++ value.slice(i as i64, (i + 1) as i64)
+    out
+
+pub fn compiler_set_diagnostic_output(path: str):
+    __compiler_diagnostic_output_path = path
+
+pub fn CompilerApi.error(self: &Self, location: SourceLocation, message: str):
+    let _ = self
+    if __compiler_diagnostic_output_path.len() == 0:
+        with_eprint("error: compiler.error called outside compiler hook execution")
+        exit(1)
+        return
+    let old = with_fs_read_file(__compiler_diagnostic_output_path)
+    let line = "error\t" ++
+        compiler_hook_escape(location.file) ++ "\t" ++
+        f"{location.start}" ++ "\t" ++
+        f"{location.end}" ++ "\t" ++
+        compiler_hook_escape(message) ++ "\n"
+    if with_fs_write_file(__compiler_diagnostic_output_path, old ++ line) != 0:
+        with_eprint("error: failed to write compiler hook diagnostic")
+        exit(1)
 
 pub fn SourceLocation.new(file: str, start: i32, end: i32) -> SourceLocation:
     SourceLocation { file, start, end }

@@ -1655,6 +1655,19 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
         if ct_inner != 0:
             value_node = ct_inner
 
+    let inferred_value_ty =
+        if self.sema.typed_expr_types.contains(value_node):
+            self.sema.resolve_alias(self.sema.typed_expr_types.get(value_node).unwrap() as TypeId)
+        else:
+            0
+    var const_binding_ty = if resolved_binding_ty != 0: resolved_binding_ty else: inferred_value_ty
+    if const_binding_ty == 0 and self.pool.kind(value_node) == NodeKind.NK_STRUCT_LIT:
+        let lit_sym = self.pool.get_data0(value_node)
+        let lit_name = if lit_sym != 0: self.intern.resolve(lit_sym) else: ""
+        let sema_lit_sym = if lit_name.len() > 0: self.sema.pool_lookup_symbol(lit_name) else: 0
+        if sema_lit_sym != 0 and self.sema.named_types.contains(sema_lit_sym):
+            const_binding_ty = self.sema.resolve_alias(self.sema.named_types.get(sema_lit_sym).unwrap() as TypeId)
+
     if self.pool.kind(value_node) == NodeKind.NK_NULL_LIT:
         var null_ty = resolved_binding_ty
         if null_ty == 0 and self.sema.typed_expr_types.contains(value_node):
@@ -1692,12 +1705,12 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
         let _ = self.record_module_binding_global(name_sym, global_ty, wl_const_int(global_ty, val, 1), is_mut)
         return
 
-    if resolved_binding_ty != 0:
-        let binding_kind = self.sema.get_type_kind(resolved_binding_ty)
+    if const_binding_ty != 0:
+        let binding_kind = self.sema.get_type_kind(const_binding_ty)
         if binding_kind == TypeKind.TY_INT or binding_kind == TypeKind.TY_BOOL or binding_kind == TypeKind.TY_FLOAT or binding_kind == TypeKind.TY_STRUCT or binding_kind == TypeKind.TY_ARRAY or binding_kind == TypeKind.TY_PTR or binding_kind == TypeKind.TY_REF:
-            let init = self.try_eval_const_llvm(value_node, resolved_binding_ty as i32)
+            let init = self.try_eval_const_llvm(value_node, const_binding_ty as i32)
             if init != 0:
-                let global_ty = self.sema_type_to_llvm(resolved_binding_ty)
+                let global_ty = self.sema_type_to_llvm(const_binding_ty)
                 if global_ty != 0:
                     let _ = self.record_module_binding_global(name_sym, global_ty, init, is_mut)
                     return
@@ -1734,10 +1747,8 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
             return
 
     let array_tid =
-        if resolved_binding_ty != 0:
-            resolved_binding_ty as i32
-        else if self.sema.typed_expr_types.contains(value_node):
-            self.sema.resolve_alias(self.sema.typed_expr_types.get(value_node).unwrap() as TypeId) as i32
+        if const_binding_ty != 0:
+            const_binding_ty as i32
         else:
             0
     if array_tid > 0:
@@ -1771,6 +1782,8 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
     let runtime_tid =
         if binding_ty != 0:
             binding_ty as i32
+        else if const_binding_ty != 0:
+            const_binding_ty as i32
         else if self.sema.typed_expr_types.contains(value_node):
             self.sema.typed_expr_types.get(value_node).unwrap()
         else:
@@ -1779,5 +1792,5 @@ fn Codegen.gen_module_constant(self: Codegen, let_node: i32):
         let resolved_runtime = self.sema.resolve_alias(runtime_tid as TypeId)
         let runtime_kind = self.sema.get_type_kind(resolved_runtime)
         if runtime_kind != TypeKind.TY_INT and runtime_kind != TypeKind.TY_FLOAT and runtime_kind != TypeKind.TY_STR:
-            if self.module_const_contains_runtime_collection(value_node) and self.queue_module_runtime_init(name_sym, value_node, runtime_tid, is_mut):
+            if self.queue_module_runtime_init(name_sym, value_node, runtime_tid, is_mut):
                 return

@@ -18,10 +18,16 @@ use compiler.ProjectConfig
 use compiler.Zcu
 
 extern fn with_eprint(s: str) -> void
+extern fn with_exec_binary(path: str) -> i32
 extern fn with_fs_write_file(path: str, data: str) -> i32
+extern fn with_fs_read_file(path: str) -> str
+extern fn with_fs_remove_file(path: str) -> i32
+extern fn with_fs_remove_dir(path: str) -> i32
+extern fn with_fs_mkdir_p(path: str) -> i32
 extern fn with_getenv_str(name: str) -> str
 extern fn with_system(cmd: str) -> i32
 extern fn with_clock_nanos() -> i64
+extern fn with_getpid() -> i32
 
 fn profile_enabled() -> bool:
     with_getenv_str("WITH_PROFILE").len() > 0
@@ -116,6 +122,112 @@ fn compilation_mir_error_span(zcu: Zcu, pool: AstPool, fn_sym: i32, raw_span: i3
 fn compilation_bool_digit(value: bool) -> str:
     if value: "1" else: "0"
 
+fn compilation_escape_with_string(value: str) -> str:
+    var out = ""
+    for i in 0..value.len() as i32:
+        let ch = value.byte_at(i as i64)
+        if ch == 92:
+            out = out ++ "\\\\"
+        else if ch == 34:
+            out = out ++ "\\\""
+        else if ch == 10:
+            out = out ++ "\\n"
+        else if ch == 13:
+            out = out ++ "\\r"
+        else if ch == 9:
+            out = out ++ "\\t"
+        else:
+            out = out ++ value.slice(i as i64, (i + 1) as i64)
+    out
+
+fn compilation_split_escaped_fields(line: str) -> Vec[str]:
+    let fields: Vec[str] = Vec.new()
+    var cur = ""
+    var escaped = false
+    for i in 0..line.len() as i32:
+        let ch = line.byte_at(i as i64)
+        if escaped:
+            if ch == 110:
+                cur = cur ++ "\n"
+            else if ch == 116:
+                cur = cur ++ "\t"
+            else if ch == 114:
+                cur = cur ++ "\r"
+            else:
+                cur = cur ++ line.slice(i as i64, (i + 1) as i64)
+            escaped = false
+        else if ch == 92:
+            escaped = true
+        else if ch == 9:
+            fields.push(cur)
+            cur = ""
+        else:
+            cur = cur ++ line.slice(i as i64, (i + 1) as i64)
+    fields.push(cur)
+    fields
+
+fn compilation_split_nonempty_lines(text: str) -> Vec[str]:
+    let lines: Vec[str] = Vec.new()
+    var start = 0
+    for i in 0..text.len() as i32:
+        if text.byte_at(i as i64) == 10:
+            if i > start:
+                lines.push(text.slice(start as i64, i as i64))
+            start = i + 1
+    if start < text.len() as i32:
+        lines.push(text.slice(start as i64, text.len()))
+    lines
+
+fn compilation_parse_i32(text: str) -> i32:
+    var sign = 1
+    var i = 0
+    if text.len() > 0 and text.byte_at(0) == 45:
+        sign = -1
+        i = 1
+    var value = 0
+    while i < text.len() as i32:
+        let ch = text.byte_at(i as i64)
+        if ch < 48 or ch > 57:
+            break
+        value = value * 10 + (ch - 48)
+        i = i + 1
+    value * sign
+
+fn compilation_decl_index_for_node(pool: AstPool, node: NodeId) -> i32:
+    for di in 0..pool.decl_count():
+        if pool.get_decl(di) == node:
+            return di
+    -1
+
+fn compilation_relative_source_path(root: str, path: str) -> str:
+    if root.len() == 0:
+        return path
+    let prefix = if root.ends_with("/"): root else: root ++ "/"
+    if path.starts_with(prefix):
+        return path.slice(prefix.len(), path.len())
+    path
+
+fn compilation_module_import_name(root: str, path: str) -> str:
+    var rel = compilation_relative_source_path(root, path)
+    if rel.ends_with(".w"):
+        rel = rel.slice(0, rel.len() - 2)
+    var out = ""
+    for i in 0..rel.len() as i32:
+        let ch = rel.byte_at(i as i64)
+        if ch == 47:
+            out = out ++ "."
+        else:
+            out = out ++ rel.slice(i as i64, (i + 1) as i64)
+    out
+
+fn compilation_span_file_id_for_path(zcu: Zcu, path: str) -> i32:
+    if path == zcu.current_source_path:
+        return 0
+    for di in 0..zcu.last_sema.ast.decl_count():
+        if zcu.decl_source_path_frontend(di) == path:
+            return zcu.decl_source_file_id_frontend(di)
+    0
+
 fn compilation_type_decl_is_pub(pool: AstPool, extra_start: i32, sub_kind: i32) -> bool:
     if sub_kind == TypeDeclKind.Struct or sub_kind == TypeDeclKind.Union:
         let field_count = pool.get_extra(extra_start)
@@ -199,6 +311,11 @@ fn Compilation.set_prelude_mode(self: Compilation, mode: i32):
 fn Compilation.set_debug_info(self: Compilation, enabled: bool):
     var cfg = self.config
     cfg.debug_info = enabled
+    self.config = cfg
+
+fn Compilation.set_compiler_hooks_enabled(self: Compilation, enabled: bool):
+    var cfg = self.config
+    cfg.compiler_hooks_enabled = enabled
     self.config = cfg
 
 fn Compilation.add_cli_diag_mapping(self: Compilation, gen_start: i32, gen_end: i32, source_name: str, source_text: str):
@@ -304,6 +421,145 @@ fn Compilation.dump_project_info(self: Compilation, pool: AstPool) -> str:
             out = out ++ f"type path={path} name={name} pub={compilation_bool_digit(is_pub)} kind={kind_name} span={pool.get_start(decl)}..{pool.get_end(decl)}\n"
     out
 
+fn Compilation.project_info_source(self: Compilation, pool: AstPool) -> str:
+    let zcu = self.zcu
+    var out = "fn __with_compiler_hook_project_info() -> ProjectInfo:\n"
+    out = out ++ "    var project = ProjectInfo.new()\n"
+    for mi in 0..zcu.last_resolved.modules.len() as i32:
+        let mod = zcu.last_resolved.modules.get(mi as i64)
+        let module_name = compilation_module_import_name(zcu.project_config.root_dir, mod.path)
+        out = out ++ "    project = project.add_module(ModuleInfo.new(\"" ++ compilation_escape_with_string(module_name) ++ "\", \"" ++ compilation_escape_with_string(mod.path) ++ "\"))\n"
+
+    for di in 0..pool.decl_count():
+        let decl = pool.get_decl(di)
+        let kind = pool.kind(decl)
+        let path = zcu.decl_source_path_frontend(di)
+        let module_name = compilation_module_import_name(zcu.project_config.root_dir, path)
+        let loc = "SourceLocation.new(\"" ++ compilation_escape_with_string(path) ++ "\", " ++ f"{pool.get_start(decl)}" ++ ", " ++ f"{pool.get_end(decl)}" ++ ")"
+        if kind == NodeKind.NK_FN_DECL:
+            let name = zcu.pool.resolve(pool.get_data0(decl))
+            let flags = pool.get_data2(decl)
+            let is_pub = (flags / FnFlags.PUB) % 2 == 1
+            let meta = pool.find_fn_meta(decl)
+            var param_count = 0
+            var return_type = "void"
+            if meta >= 0:
+                param_count = pool.fn_meta_param_count(meta)
+                let ret_node = pool.fn_meta_ret(meta)
+                if ret_node != 0:
+                    return_type = render_type_expr(pool, zcu.pool, ret_node as NodeId)
+            out = out ++ "    project = project.add_function(FunctionInfo.new(\"" ++ compilation_escape_with_string(module_name) ++ "\", \"" ++ compilation_escape_with_string(name) ++ "\", " ++ (if is_pub: "true" else: "false") ++ ", false, " ++ f"{param_count}" ++ ", \"" ++ compilation_escape_with_string(return_type) ++ "\", " ++ loc ++ "))\n"
+        else if kind == NodeKind.NK_TYPE_DECL:
+            let name = zcu.pool.resolve(pool.get_data0(decl))
+            let packed = pool.get_data2(decl)
+            let sub_kind = type_decl_sub_kind(packed)
+            let is_pub = compilation_type_decl_is_pub(pool, pool.get_data1(decl), sub_kind)
+            let kind_name = compilation_type_decl_kind_name(sub_kind)
+            out = out ++ "    project = project.add_type(TypeInfo.new(\"" ++ compilation_escape_with_string(module_name) ++ "\", \"" ++ compilation_escape_with_string(name) ++ "\", " ++ (if is_pub: "true" else: "false") ++ ", false, \"" ++ kind_name ++ "\", " ++ loc ++ "))\n"
+    out ++ "    project\n"
+
+fn Compilation.compiler_hook_runner_source(self: Compilation, pool: AstPool, source_path: str, diag_path: str) -> str:
+    let zcu = self.zcu
+    let root = if zcu.project_config.root_dir.len() > 0: zcu.project_config.root_dir else: frontend_dirname(source_path)
+    let hook_count = pool.compiler_hook_count()
+    var out = "use std.compiler\n"
+    let imported: HashMap[str, i32] = HashMap.new()
+    for hi in 0..hook_count:
+        let hook_node = pool.compiler_hook_node(hi)
+        let di = compilation_decl_index_for_node(pool, hook_node)
+        if di < 0:
+            continue
+        let path = zcu.decl_source_path_frontend(di)
+        let import_name = compilation_module_import_name(root, path)
+        if import_name.len() > 0 and not imported.contains(import_name):
+            imported.insert(import_name, 1)
+            out = out ++ "use " ++ import_name ++ ".*\n"
+    out = out ++ "\n"
+    out = out ++ self.project_info_source(pool)
+    out = out ++ "\nfn main:\n"
+    out = out ++ "    compiler_set_diagnostic_output(\"" ++ compilation_escape_with_string(diag_path) ++ "\")\n"
+    out = out ++ "    let project = __with_compiler_hook_project_info()\n"
+    for hi2 in 0..hook_count:
+        let hook_node = pool.compiler_hook_node(hi2)
+        let phase_name = zcu.pool.resolve(pool.compiler_hook_phase_at(hi2))
+        if phase_name != "after_typecheck":
+            continue
+        let hook_name = zcu.pool.resolve(pool.get_data0(hook_node))
+        out = out ++ "    " ++ hook_name ++ "(project)\n"
+    out
+
+fn Compilation.emit_compiler_hook_diagnostics(self: Compilation, diag_text: str) -> i32:
+    if diag_text.len() == 0:
+        return 0
+    var emitted = 0
+    var zcu = self.zcu
+    let lines = compilation_split_nonempty_lines(diag_text)
+    for li in 0..lines.len() as i32:
+        let fields = compilation_split_escaped_fields(lines.get(li as i64))
+        if fields.len() != 5:
+            continue
+        if fields.get(0) != "error":
+            continue
+        let path = fields.get(1)
+        let start = compilation_parse_i32(fields.get(2))
+        let end = compilation_parse_i32(fields.get(3))
+        let message = fields.get(4)
+        let file_id = compilation_span_file_id_for_path(zcu, path)
+        zcu.diagnostics.emit(Diagnostic.err(message, Span { file: file_id, start, end }))
+        emitted = emitted + 1
+    self.zcu = zcu
+    if emitted > 0:
+        self.zcu.render_all_diagnostics_frontend()
+    emitted
+
+fn Compilation.run_after_typecheck_hooks(self: Compilation, pool: AstPool, source_path: str) -> bool:
+    if pool.compiler_hook_count() == 0:
+        return true
+    if not self.config.compiler_hooks_enabled:
+        return true
+    let zcu = self.zcu
+    let root = if zcu.project_config.root_dir.len() > 0: zcu.project_config.root_dir else: frontend_dirname(source_path)
+    let tmp_dir = root ++ "/out/tmp"
+    if with_fs_mkdir_p(tmp_dir) != 0:
+        with_eprint("error: could not create compiler hook temp directory: " ++ tmp_dir)
+        return false
+    let stamp = f"{with_getpid()}.{with_clock_nanos()}"
+    let runner_path = root ++ "/__with_compiler_hook_runner." ++ stamp ++ ".w"
+    let runner_bin = tmp_dir ++ "/compiler-hook-runner." ++ stamp
+    let diag_path = tmp_dir ++ "/compiler-hook-diags." ++ stamp ++ ".txt"
+    if with_fs_write_file(diag_path, "") != 0:
+        with_eprint("error: could not initialize compiler hook diagnostics")
+        return false
+    let runner_source = self.compiler_hook_runner_source(pool, source_path, diag_path)
+    if with_fs_write_file(runner_path, runner_source) != 0:
+        let _ = with_fs_remove_file(diag_path)
+        with_eprint("error: could not write compiler hook runner")
+        return false
+    var runner_comp = Compilation.init()
+    runner_comp.configure(self.config.opt_level, self.config.no_std, self.config.alloc_mode)
+    runner_comp.set_prelude_mode(self.config.prelude_mode)
+    runner_comp.set_debug_info(self.config.debug_info)
+    runner_comp.set_compiler_hooks_enabled(false)
+    let built_runner = runner_comp.build_binary_to_path(runner_path, runner_bin)
+    let _remove_runner_source = with_fs_remove_file(runner_path)
+    if built_runner == "":
+        let _remove_diag = with_fs_remove_file(diag_path)
+        with_eprint("error: compiler hook runner compilation failed")
+        return false
+    let rc = with_exec_binary(built_runner)
+    let diag_text = with_fs_read_file(diag_path)
+    let _remove_diag_after = with_fs_remove_file(diag_path)
+    let _remove_runner_bin = with_fs_remove_file(built_runner)
+    let _remove_runner_obj = with_fs_remove_file(built_runner ++ ".o")
+    let _remove_runner_dsym = with_fs_remove_dir(built_runner ++ ".dSYM")
+    let emitted = self.emit_compiler_hook_diagnostics(diag_text)
+    if emitted > 0:
+        return false
+    if rc != 0:
+        with_eprint(f"error: compiler hook execution failed with exit code {rc}")
+        return false
+    true
+
 fn Compilation.has_errors(self: Compilation) -> bool:
     self.zcu.diagnostics.has_errors()
 
@@ -378,6 +634,9 @@ fn Compilation.compile_entry_source_text(self: Compilation, source_path: str, so
 fn Compilation.finish_binary_from_pool(self: Compilation, pool: AstPool, source_path: str, obj_path: str, bin_path: str) -> str:
     compilation_debug_init(f"build_binary_to_path:compiled {source_path} decls={pool.decl_count()}")
     if pool.decl_count() == 0:
+        return ""
+    if not self.run_after_typecheck_hooks(pool, source_path):
+        compilation_cleanup_build_products(obj_path, bin_path)
         return ""
     if not self.ensure_codegen_mir(pool):
         compilation_debug_init("build_binary_to_path:ensure_codegen_mir FAILED")

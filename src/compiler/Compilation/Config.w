@@ -10,6 +10,7 @@ type CompilationConfig {
     is_test: bool,
     prelude_mode: i32,
     debug_info: bool,
+    compiler_hooks_enabled: bool,
 }
 impl Copy for CompilationConfig
 
@@ -34,6 +35,7 @@ fn compilation_config_default -> CompilationConfig:
         is_test: false,
         prelude_mode: PRELUDE_FULL(),
         debug_info: true,
+        compiler_hooks_enabled: true,
     }
 
 fn compilation_config_from_cli(opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32) -> CompilationConfig:

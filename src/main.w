@@ -641,6 +641,8 @@ fn run_cli(argc: i32) -> i32:
         if pool.decl_count() == 0:
             with_eprint("error: check failed during compilation")
             return 1
+        if not comp.run_after_typecheck_hooks(pool, source):
+            return 1
         with_write("ok\n")
         comp.print_warnings()
         return 0
