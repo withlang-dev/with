@@ -46,4 +46,10 @@ pub fn build(b: Build) -> Build:
     tests = tests.dep("embedded-runtime-regression")
     out = out.add_target(tests)
 
+    var install_user = target_new(.Install, "install-user", "out/bin/with").output("$HOME/.local/bin/with")
+    install_user = install_user.input("out/bin/with")
+    install_user = install_user.arg("0755")
+    install_user = install_user.dep("verified-existing-stage")
+    out = out.add_target(install_user)
+
     out.default("verified-existing-stage")
