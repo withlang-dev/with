@@ -28,6 +28,8 @@ pub enum BuildKind: i32:
     EmbeddedRuntimeExtractTest = 21
     SelfhostNoopLocalRegression = 22
     CliSelfhostSmokeTest = 23
+    GenerateCompilerEntrypoints = 24
+    WithCompilerBuild = 25
 
 pub enum BuildTarget: i32:
     native = 0
@@ -213,6 +215,15 @@ pub fn Build.selfhost_noop_local_regression(self: Build, name: str, compiler: st
 
 pub fn Build.cli_selfhost_smoke_test(self: Build, name: str, compiler: str) -> Build:
     let target = target_new(.CliSelfhostSmokeTest, name, compiler)
+    self.add_target(target)
+
+pub fn Build.generate_compiler_entrypoints(self: Build, name: str, stamp: str) -> Build:
+    let target = target_new(.GenerateCompilerEntrypoints, name, "").output(stamp)
+    self.add_target(target)
+
+pub fn Build.with_compiler_build(self: Build, name: str, compiler: str, source: str, output: str) -> Build:
+    var target = target_new(.WithCompilerBuild, name, compiler).output(output)
+    target = target.input(source)
     self.add_target(target)
 
 pub fn Target.target(self: Target, target: BuildTarget) -> Target:
