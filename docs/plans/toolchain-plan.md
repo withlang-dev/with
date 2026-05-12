@@ -128,6 +128,13 @@ Source: `docs/toolchain.md`.
   - Module-level struct globals without explicit type annotations now receive
     storage and runtime initialization, which lets generated hook runners call
     methods on `std.compiler.compiler`.
+- Initial compiler-hook source emission:
+  - `compiler.emit_source(source)` records generated With source through a
+    compiler-owned channel.
+  - The driver appends emitted source to the compilation unit, re-runs the
+    frontend, and feeds the resulting typed pool into MIR/codegen.
+  - Invalid emitted source produces normal parser/sema diagnostics and exits
+    nonzero.
 
 ## Verified
 
@@ -158,6 +165,9 @@ Source: `docs/toolchain.md`.
 - `scripts/run_tests.sh test/behavior/behav_global_method_receiver.w test/behavior/behav_compiler_hook_project_info.w test/compile_errors/err_compiler_hook_error_diagnostic.w test/compile_errors/err_compiler_hook_unknown_phase.w test/compile_errors/err_compiler_hook_function_only.w`
 - failing-hook probe: an `after_typecheck` hook with `assert(false)` exits
   nonzero and reports `compiler hook execution failed`
+- `scripts/run_tests.sh test/behavior/behav_compiler_hook_emit_source.w test/compile_errors/err_compiler_hook_emit_source_type_error.w test/behavior/behav_compiler_hook_project_info.w test/compile_errors/err_compiler_hook_error_diagnostic.w`
+- `out/bin/with ir test/behavior/behav_compiler_hook_emit_source.w -O0`
+  contains `define internal i32 @generated_from_hook`
 
 ## Remaining
 
@@ -167,4 +177,3 @@ Source: `docs/toolchain.md`.
 - Complete `build.w` graph execution beyond executable, library, test,
   generated-source targets, and explicit host-target aliases: actual
   cross-target codegen/linking still needs driver support.
-- Compiler-hook source emission remains a future phase per `docs/toolchain.md`.
