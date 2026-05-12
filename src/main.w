@@ -3499,8 +3499,7 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, p
     // Find test file/dir argument
     let target = find_source_arg(argc)
     if target == "":
-        with_eprint("error: 'test' requires a source file or directory argument")
-        return 1
+        return run_build_command("", opt_level, no_std, alloc_mode, false, false, "", prelude_mode, debug_info, "test", false, false)
     if test_target_is_directory(target):
         let test_files = collect_test_files(target)
         if test_files.len() == 0:

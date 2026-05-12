@@ -56,6 +56,8 @@
         stdout/stderr on failure.
       - `fixpoint_compare` depends on regenerated stage2/stage3 fixpoint
         objects and prints `FIXPOINT` on success.
+  - `with test` with no explicit source path now dispatches to the project
+    graph target `with build :test`.
   - Initial repository `build.w`:
       - `with build`
       - `with build :selfcheck`
