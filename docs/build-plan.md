@@ -39,6 +39,12 @@
     codegen, spec, and phase directories. Test graph nodes can select an
     explicit compiler with `compiler=<path>`, so the behavior suite now runs
     through `out/bin/with-stage2` without `scripts/run_tests.sh`.
+  - The embedded runtime extraction regression now runs as a typed
+    `embedded_runtime_extract_test` graph node instead of
+    `scripts/run_embedded_runtime_extract_regression.sh`.
+  - The issue61 noop-local selfhost regression now runs as a typed
+    `selfhost_noop_local_regression` graph node instead of
+    `scripts/run_issue61_noop_local_regression.sh`.
   - Initial repository `build.w`:
       - `with build`
       - `with build :selfcheck`
@@ -52,8 +58,8 @@
 
   Remaining:
 
-  - Replace remaining temporary `with build :test` script invocations with
-    native typed With test harness nodes for CLI selfhost and regression tests.
+  - Replace the remaining temporary `with build :test` script invocation with
+    native typed With test harness nodes for CLI selfhost tests.
   - Port runtime object generation into `build.w`.
   - Port embedded runtime object generation out of shell.
   - Port stage1/stage2/stage3 compiler builds into `build.w`.

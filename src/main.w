@@ -37,10 +37,12 @@ extern fn with_system(cmd: str) -> i32
 extern fn with_exec_binary(path: str) -> i32
 extern fn with_exec_argv(args: str) -> i32
 extern fn with_exec_argv_capture(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32) -> i32
+extern fn with_exec_argv_capture_cwd(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str) -> i32
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_fs_remove_file(path: str) -> i32
 extern fn with_fs_remove_dir(path: str) -> i32
 extern fn with_getenv_str(name: str) -> str
+extern fn with_setenv_str(name: str, value: str) -> i32
 extern fn with_clock_nanos() -> i64
 extern fn with_getpid() -> i32
 extern fn with_sysinfo_os() -> str
@@ -1339,6 +1341,8 @@ fn build_graph_kind_name(kind: i32) -> str:
     if kind == 18: return "copy_runtime_tree"
     if kind == 19: return "run_corpus_test"
     if kind == 20: return "promote_tree_if_verified"
+    if kind == 21: return "embedded_runtime_extract_test"
+    if kind == 22: return "selfhost_noop_local_regression"
     f"unknown({kind})"
 
 fn build_graph_target_name(kind: i32) -> str:
@@ -1839,6 +1843,208 @@ fn build_graph_run_command(root: str, target: BuildGraphTarget) -> i32:
             return 1
     0
 
+fn build_graph_copy_file_to_path(source_path: str, dest_path: str, mode: i32) -> i32:
+    if with_fs_file_exists(source_path) == 0:
+        with_eprint("error: missing file to copy: " ++ source_path)
+        return 1
+    let dest_dir = build_graph_dirname(dest_path)
+    if with_fs_mkdir_p(dest_dir) != 0:
+        with_eprint("error: could not create copy destination directory: " ++ dest_dir)
+        return 1
+    let contents = with_fs_read_file(source_path)
+    if contents.len() == 0:
+        with_eprint("error: could not read file to copy: " ++ source_path)
+        return 1
+    if with_fs_write_file(dest_path, contents) != 0:
+        with_eprint("error: could not write copied file: " ++ dest_path)
+        return 1
+    if mode >= 0 and with_fs_chmod(dest_path, mode) != 0:
+        with_eprint("error: could not chmod copied file: " ++ dest_path)
+        return 1
+    0
+
+fn build_graph_restore_env(name: str, old_value: str) -> i32:
+    with_setenv_str(name, old_value)
+
+fn build_graph_trim_trailing_line_endings(text: str) -> str:
+    var end = text.len() as i32
+    while end > 0:
+        let ch = text.byte_at((end - 1) as i64)
+        if ch != 10 and ch != 13:
+            break
+        end = end - 1
+    text.slice(0, end as i64)
+
+fn build_graph_find_substr(text: str, needle: str) -> i32:
+    if needle.len() == 0:
+        return 0
+    if text.len() < needle.len():
+        return -1
+    let last = text.len() as i32 - needle.len() as i32
+    for i in 0..(last + 1):
+        var matched = true
+        for j in 0..needle.len() as i32:
+            if text.byte_at((i + j) as i64) != needle.byte_at(j as i64):
+                matched = false
+                break
+        if matched:
+            return i
+    -1
+
+fn build_graph_replace_once(text: str, needle: str, replacement: str) -> str:
+    let at = build_graph_find_substr(text, needle)
+    if at < 0:
+        return ""
+    text.slice(0, at as i64) ++ replacement ++ text.slice((at + needle.len() as i32) as i64, text.len())
+
+fn build_graph_run_tool_capture(root: str, target: BuildGraphTarget, tool_name: str, argv: str, timeout_ms: i32) -> i32:
+    let capture_dir = resolve_join(resolve_join(root, "out/test-graph"), target.name)
+    if with_fs_mkdir_p(capture_dir) != 0:
+        with_eprint("error: could not create tool capture directory for target '" ++ target.name ++ "': " ++ capture_dir)
+        return 1
+    let stamp = f"{with_getpid()}.{with_clock_nanos()}"
+    let stdout_path = resolve_join(capture_dir, tool_name ++ "." ++ stamp ++ ".stdout")
+    let stderr_path = resolve_join(capture_dir, tool_name ++ "." ++ stamp ++ ".stderr")
+    let rc = with_exec_argv_capture(argv, stdout_path, stderr_path, timeout_ms)
+    if rc == 124:
+        with_eprint("error: " ++ tool_name ++ " for target '" ++ target.name ++ f"' timed out after {timeout_ms}ms; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+        return 124
+    if rc != 0:
+        with_eprint("error: " ++ tool_name ++ " for target '" ++ target.name ++ f"' failed with exit code {rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+        return if rc == 0: 1 else: rc
+    let _remove_stdout = with_fs_remove_file(stdout_path)
+    let _remove_stderr = with_fs_remove_file(stderr_path)
+    0
+
+fn build_graph_run_embedded_runtime_extract_test(root: str, target: BuildGraphTarget) -> i32:
+    if target.entry.len() == 0:
+        with_eprint("error: embedded_runtime_extract_test target '" ++ target.name ++ "' requires a compiler path")
+        return 1
+    let arg_rc = build_graph_validate_process_args(target)
+    if arg_rc != 0:
+        return arg_rc
+    let compiler_path = build_graph_resolve_project_path(root, target.entry)
+    let stamp = f"{with_getpid()}.{with_clock_nanos()}"
+    let test_dir = resolve_join(resolve_join(resolve_join(root, "out/test-graph"), target.name), stamp)
+    if with_fs_mkdir_p(test_dir) != 0:
+        with_eprint("error: could not create embedded runtime test directory: " ++ test_dir)
+        return 1
+    let copied_compiler = resolve_join(test_dir, "with")
+    let copy_rc = build_graph_copy_file_to_path(compiler_path, copied_compiler, 0o755)
+    if copy_rc != 0:
+        return copy_rc
+    let source_path = resolve_join(test_dir, "hello.w")
+    if with_fs_write_file(source_path, "fn main:\n    print(\"hello\")\n") != 0:
+        with_eprint("error: could not write embedded runtime test source: " ++ source_path)
+        return 1
+    let bin_path = resolve_join(test_dir, "hello")
+    let stdout_path = resolve_join(test_dir, "build.stdout")
+    let stderr_path = resolve_join(test_dir, "build.stderr")
+    let old_out_dir = with_getenv_str("WITH_OUT_DIR")
+    let set_rc = with_setenv_str("WITH_OUT_DIR", resolve_join(test_dir, "no-out"))
+    if set_rc != 0:
+        with_eprint("error: could not set WITH_OUT_DIR for embedded runtime test")
+        return 1
+    var build_argv = ""
+    build_argv = build_graph_argv_append(build_argv, copied_compiler)
+    build_argv = build_graph_argv_append(build_argv, "build")
+    build_argv = build_graph_argv_append(build_argv, source_path)
+    build_argv = build_graph_argv_append(build_argv, "-o")
+    build_argv = build_graph_argv_append(build_argv, bin_path)
+    let build_rc = with_exec_argv_capture(build_argv, stdout_path, stderr_path, 300000)
+    let _restore_after_build = build_graph_restore_env("WITH_OUT_DIR", old_out_dir)
+    if build_rc == 124:
+        with_eprint("error: embedded_runtime_extract_test target '" ++ target.name ++ "' timed out while building; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+        return 124
+    if build_rc != 0:
+        with_eprint("error: embedded_runtime_extract_test target '" ++ target.name ++ f"' failed while building with exit code {build_rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+        return if build_rc == 0: 1 else: build_rc
+    let run_stdout_path = resolve_join(test_dir, "run.stdout")
+    let run_stderr_path = resolve_join(test_dir, "run.stderr")
+    var run_argv = ""
+    run_argv = build_graph_argv_append(run_argv, bin_path)
+    let run_rc = with_exec_argv_capture(run_argv, run_stdout_path, run_stderr_path, 60000)
+    if run_rc == 124:
+        with_eprint("error: embedded_runtime_extract_test target '" ++ target.name ++ "' timed out while running; stdout=" ++ run_stdout_path ++ " stderr=" ++ run_stderr_path)
+        return 124
+    if run_rc != 0:
+        with_eprint("error: embedded_runtime_extract_test target '" ++ target.name ++ f"' failed while running with exit code {run_rc}; stdout=" ++ run_stdout_path ++ " stderr=" ++ run_stderr_path)
+        return if run_rc == 0: 1 else: run_rc
+    let output = build_graph_trim_trailing_line_endings(with_fs_read_file(run_stdout_path))
+    if output != "hello":
+        with_eprint("error: embedded_runtime_extract_test target '" ++ target.name ++ "' produced unexpected output: " ++ output)
+        return 1
+    0
+
+fn build_graph_run_selfhost_noop_local_regression(root: str, target: BuildGraphTarget) -> i32:
+    if target.entry.len() == 0:
+        with_eprint("error: selfhost_noop_local_regression target '" ++ target.name ++ "' requires a compiler path")
+        return 1
+    let arg_rc = build_graph_validate_process_args(target)
+    if arg_rc != 0:
+        return arg_rc
+    let compiler_path = build_graph_resolve_project_path(root, target.entry)
+    if with_fs_file_exists(compiler_path) == 0:
+        with_eprint("error: selfhost_noop_local_regression target '" ++ target.name ++ "' missing compiler: " ++ compiler_path)
+        return 1
+    let stamp = f"{with_getpid()}.{with_clock_nanos()}"
+    let test_dir = resolve_join(resolve_join(resolve_join(root, "out/test-graph"), target.name), stamp)
+    if with_fs_mkdir_p(test_dir) != 0:
+        with_eprint("error: could not create issue61 regression directory: " ++ test_dir)
+        return 1
+    let repo_copy = resolve_join(test_dir, "repo")
+    if with_fs_mkdir_p(repo_copy) != 0:
+        with_eprint("error: could not create issue61 repo copy directory: " ++ repo_copy)
+        return 1
+    var cp_argv = ""
+    cp_argv = build_graph_argv_append(cp_argv, "/bin/cp")
+    cp_argv = build_graph_argv_append(cp_argv, "-R")
+    cp_argv = build_graph_argv_append(cp_argv, resolve_join(root, "src"))
+    cp_argv = build_graph_argv_append(cp_argv, resolve_join(repo_copy, "src"))
+    let cp_rc = build_graph_run_tool_capture(root, target, "cp-src", cp_argv, 60000)
+    if cp_rc != 0:
+        return cp_rc
+    var ln_argv = ""
+    ln_argv = build_graph_argv_append(ln_argv, "/bin/ln")
+    ln_argv = build_graph_argv_append(ln_argv, "-s")
+    ln_argv = build_graph_argv_append(ln_argv, resolve_join(root, "lib"))
+    ln_argv = build_graph_argv_append(ln_argv, resolve_join(repo_copy, "lib"))
+    let ln_rc = build_graph_run_tool_capture(root, target, "ln-lib", ln_argv, 60000)
+    if ln_rc != 0:
+        return ln_rc
+    let sema_path = resolve_join(resolve_join(repo_copy, "src"), "SemaCheck.w")
+    let sema_text = with_fs_read_file(sema_path)
+    let marker = "    // Check all arguments (with expected-type propagation for Atomic ordering params)"
+    let replacement = marker ++ "\n    var mc_issue61_padding_local: i32 = 0"
+    let patched = build_graph_replace_once(sema_text, marker, replacement)
+    if patched.len() == 0:
+        with_eprint("error: selfhost_noop_local_regression target '" ++ target.name ++ "' missing insertion point in " ++ sema_path)
+        return 1
+    if with_fs_write_file(sema_path, patched) != 0:
+        with_eprint("error: selfhost_noop_local_regression target '" ++ target.name ++ "' could not patch " ++ sema_path)
+        return 1
+    if with_str_contains(with_fs_read_file(sema_path), "mc_issue61_padding_local") == 0:
+        with_eprint("error: selfhost_noop_local_regression target '" ++ target.name ++ "' failed to inject noop local")
+        return 1
+    let stdout_path = resolve_join(test_dir, "check.stdout")
+    let stderr_path = resolve_join(test_dir, "check.stderr")
+    var check_argv = ""
+    check_argv = build_graph_argv_append(check_argv, compiler_path)
+    check_argv = build_graph_argv_append(check_argv, "check")
+    check_argv = build_graph_argv_append(check_argv, "src/main.w")
+    let check_rc = with_exec_argv_capture_cwd(check_argv, stdout_path, stderr_path, 60000, repo_copy)
+    if check_rc == 124:
+        with_eprint("error: selfhost_noop_local_regression target '" ++ target.name ++ "' timed out; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+        return 124
+    if check_rc != 0:
+        with_eprint("error: selfhost_noop_local_regression target '" ++ target.name ++ f"' failed with exit code {check_rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+        return if check_rc == 0: 1 else: check_rc
+    let output = build_graph_trim_trailing_line_endings(with_fs_read_file(stdout_path))
+    if output != "ok":
+        with_eprint("error: selfhost_noop_local_regression target '" ++ target.name ++ "' produced unexpected output: " ++ output)
+        return 1
+    0
+
 fn build_graph_expand_install_path(root: str, path: str) -> str:
     if with_str_starts_with(path, "$HOME/") != 0:
         let home = with_getenv_str("HOME")
@@ -1922,10 +2128,10 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
     let completed_targets: Vec[str] = Vec.new()
     for ti in 0..graph.targets.len() as i32:
         let target = graph.targets.get(ti as i64)
-        if target.kind < 0 or target.kind > 20:
+        if target.kind < 0 or target.kind > 22:
             with_eprint("error: invalid build.w target kind " ++ build_graph_kind_name(target.kind) ++ " for '" ++ target.name ++ "'")
             return 1
-        if target.kind != 0 and target.kind != 1 and target.kind != 2 and target.kind != 7 and target.kind != 8 and target.kind != 9 and target.kind != 10 and target.kind != 11 and target.kind != 12 and target.kind != 13 and target.kind != 14 and target.kind != 15 and target.kind != 16 and target.kind != 17 and target.kind != 18 and target.kind != 19 and target.kind != 20:
+        if target.kind != 0 and target.kind != 1 and target.kind != 2 and target.kind != 7 and target.kind != 8 and target.kind != 9 and target.kind != 10 and target.kind != 11 and target.kind != 12 and target.kind != 13 and target.kind != 14 and target.kind != 15 and target.kind != 16 and target.kind != 17 and target.kind != 18 and target.kind != 19 and target.kind != 20 and target.kind != 21 and target.kind != 22:
             with_eprint("error: build.w target kind '" ++ build_graph_kind_name(target.kind) ++ "' is not implemented yet for '" ++ target.name ++ "'")
             return 1
         if target.target_kind < 0 or target.target_kind > 5:
@@ -2012,6 +2218,18 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
             let corpus_rc = build_graph_run_corpus_test(root, target)
             if corpus_rc != 0:
                 return corpus_rc
+            completed_targets.push(target.name)
+            continue
+        if target.kind == 21:
+            let embedded_rc = build_graph_run_embedded_runtime_extract_test(root, target)
+            if embedded_rc != 0:
+                return embedded_rc
+            completed_targets.push(target.name)
+            continue
+        if target.kind == 22:
+            let issue61_rc = build_graph_run_selfhost_noop_local_regression(root, target)
+            if issue61_rc != 0:
+                return issue61_rc
             completed_targets.push(target.name)
             continue
         if target.kind == 7:

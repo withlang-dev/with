@@ -19,6 +19,7 @@ extern fn setpgid(pid: i32, pgid: i32) -> i32
 extern fn execv(path: *const u8, argv: *const *const u8) -> i32
 extern fn execvp(file: *const u8, argv: *const *const u8) -> i32
 extern fn waitpid(pid: i32, status: *mut i32, options: i32) -> i32
+extern fn chdir(path: *const u8) -> i32
 extern fn __open(path: *const u8, flags: i32, mode: i32) -> i32
 extern fn dup2(oldfd: i32, newfd: i32) -> i32
 extern fn close(fd: i32) -> i32
@@ -265,6 +266,9 @@ fn redirect_fd_to_path(path: *const u8, fd: i32) -> i32:
     0
 
 fn run_argv_capture(blob: *const u8, len: i64, stdout_path: *const u8, stderr_path: *const u8, timeout_ms: i32) -> i32:
+    run_argv_capture_cwd(blob, len, stdout_path, stderr_path, timeout_ms, 0 as *const u8)
+
+fn run_argv_capture_cwd(blob: *const u8, len: i64, stdout_path: *const u8, stderr_path: *const u8, timeout_ms: i32, cwd: *const u8) -> i32:
     let argc = argv_blob_count(blob, len)
     if argc <= 0 or argc >= 256:
         return -1
@@ -283,6 +287,10 @@ fn run_argv_capture(blob: *const u8, len: i64, stdout_path: *const u8, stderr_pa
             _exit(127)
         if redirect_fd_to_path(stderr_path, 2) != 0:
             _exit(127)
+        if cwd as i64 != 0:
+            if chdir(cwd) != 0:
+                _exit(127)
+            let _ = setenv("PWD" as *const u8, cwd, 1)
         var argv: [256]*const u8 = [0 as *const u8; 256]
         var argi = 0
         var offset: i64 = 0
@@ -428,6 +436,42 @@ pub fn exec_argv_capture(args: str, stdout_path: str, stderr_path: str, timeout_
     with_free(arg_buf)
     with_free(out_buf)
     with_free(err_buf)
+    rc
+
+@[c_export("with_exec_argv_capture_cwd")]
+pub fn exec_argv_capture_cwd(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str) -> i32:
+    let arg_buf = str_to_c_buf(args)
+    if arg_buf as i64 == 0:
+        return -1
+    let out_buf = str_to_c_buf(stdout_path)
+    if out_buf as i64 == 0:
+        with_free(arg_buf)
+        return -1
+    let err_buf = str_to_c_buf(stderr_path)
+    if err_buf as i64 == 0:
+        with_free(arg_buf)
+        with_free(out_buf)
+        return -1
+    let cwd_buf = str_to_c_buf(cwd)
+    if cwd_buf as i64 == 0:
+        with_free(arg_buf)
+        with_free(out_buf)
+        with_free(err_buf)
+        return -1
+    if interrupt_flag != 0:
+        with_free(arg_buf)
+        with_free(out_buf)
+        with_free(err_buf)
+        with_free(cwd_buf)
+        let errp = __error()
+        if errp as i64 != 0:
+            unsafe: *errp = EINTR
+        return -1
+    let rc = run_argv_capture_cwd(arg_buf as *const u8, args.len(), out_buf as *const u8, err_buf as *const u8, timeout_ms, cwd_buf as *const u8)
+    with_free(arg_buf)
+    with_free(out_buf)
+    with_free(err_buf)
+    with_free(cwd_buf)
     rc
 
 @[c_export("with_extract_tgz")]

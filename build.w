@@ -45,13 +45,13 @@ pub fn build(b: Build) -> Build:
     cli_selfhost_tests = cli_selfhost_tests.dep("selfcheck")
     out = out.add_target(cli_selfhost_tests)
 
-    var issue61_regression = target_new(.Command, "issue61-regression", "scripts/run_issue61_noop_local_regression.sh")
-    issue61_regression = issue61_regression.input("scripts/run_issue61_noop_local_regression.sh")
+    var issue61_regression = target_new(.SelfhostNoopLocalRegression, "issue61-regression", "out/bin/with-stage2")
+    issue61_regression = issue61_regression.input("out/bin/with-stage2")
     issue61_regression = issue61_regression.dep("selfcheck")
     out = out.add_target(issue61_regression)
 
-    var embedded_runtime_regression = target_new(.Command, "embedded-runtime-regression", "scripts/run_embedded_runtime_extract_regression.sh")
-    embedded_runtime_regression = embedded_runtime_regression.input("scripts/run_embedded_runtime_extract_regression.sh")
+    var embedded_runtime_regression = target_new(.EmbeddedRuntimeExtractTest, "embedded-runtime-regression", "out/bin/with")
+    embedded_runtime_regression = embedded_runtime_regression.input("out/bin/with")
     embedded_runtime_regression = embedded_runtime_regression.dep("selfcheck")
     out = out.add_target(embedded_runtime_regression)
 
