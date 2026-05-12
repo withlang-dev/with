@@ -699,7 +699,7 @@ fn run_cli(argc: i32) -> i32:
     if cli_command(argc) == "bench":
         return run_bench_command(argc, opt_level, no_std, alloc_mode, prelude_mode, debug_info)
     if cli_command(argc) == "version" or cli_command(argc) == "--version":
-        with_write("with WITH_VERSION_PLACEHOLDER\n")
+        with_write("with " ++ "WITH_VERSION" ++ "_PLACEHOLDER\n")
         return 0
     if cli_command(argc) == "help" or cli_command(argc) == "--help" or cli_command(argc) == "-h":
         return run_help_command(argc)
@@ -2322,7 +2322,8 @@ fn build_graph_write_versioned_source(root: str, source_rel: str, output_rel: st
     if with_fs_mkdir_p(output_dir) != 0:
         with_eprint("error: generate_compiler_entrypoints could not create output directory: " ++ output_dir)
         return 1
-    let replaced = build_graph_replace_all(text, "WITH_VERSION_PLACEHOLDER", version)
+    let placeholder = "WITH_VERSION" ++ "_PLACEHOLDER"
+    let replaced = build_graph_replace_all(text, placeholder, version)
     if with_fs_write_file(output_path, replaced) != 0:
         with_eprint("error: generate_compiler_entrypoints could not write: " ++ output_path)
         return 1
