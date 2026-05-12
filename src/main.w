@@ -41,6 +41,7 @@ extern fn with_exec_argv_capture_cwd(args: str, stdout_path: str, stderr_path: s
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_fs_remove_file(path: str) -> i32
 extern fn with_fs_remove_dir(path: str) -> i32
+extern fn with_fs_rename_file(old_path: str, new_path: str) -> i32
 extern fn with_getenv_str(name: str) -> str
 extern fn with_setenv_str(name: str, value: str) -> i32
 extern fn with_clock_nanos() -> i64
@@ -1344,6 +1345,8 @@ fn build_graph_kind_name(kind: i32) -> str:
     if kind == 21: return "embedded_runtime_extract_test"
     if kind == 22: return "selfhost_noop_local_regression"
     if kind == 23: return "cli_selfhost_smoke_test"
+    if kind == 24: return "generate_compiler_entrypoints"
+    if kind == 25: return "with_compiler_build"
     f"unknown({kind})"
 
 fn build_graph_target_name(kind: i32) -> str:
@@ -2154,6 +2157,234 @@ fn build_graph_run_cli_selfhost_smoke_test(root: str, target: BuildGraphTarget) 
     let test_dir = resolve_join(resolve_join(resolve_join(root, "out/test-graph"), target.name), stamp)
     build_graph_run_cli_selfhost_test_directives(root, target, compiler_path, test_dir)
 
+fn build_graph_trim_space_and_newlines(text: str) -> str:
+    var start = 0
+    var end = text.len() as i32
+    while start < end:
+        let ch = text.byte_at(start as i64)
+        if ch != 32 and ch != 9 and ch != 10 and ch != 13:
+            break
+        start = start + 1
+    while end > start:
+        let ch = text.byte_at((end - 1) as i64)
+        if ch != 32 and ch != 9 and ch != 10 and ch != 13:
+            break
+        end = end - 1
+    text.slice(start as i64, end as i64)
+
+fn build_graph_first_trimmed_line(text: str) -> str:
+    var end = text.len() as i32
+    for i in 0..text.len() as i32:
+        let ch = text.byte_at(i as i64)
+        if ch == 10 or ch == 13:
+            end = i
+            break
+    build_graph_trim_space_and_newlines(text.slice(0, end as i64))
+
+fn build_graph_replace_all(text: str, needle: str, replacement: str) -> str:
+    if needle.len() == 0:
+        return text
+    var out = ""
+    var start = 0
+    while start < text.len() as i32:
+        var matched_at = -1
+        let remaining = text.len() as i32 - start
+        if remaining >= needle.len() as i32:
+            let last = text.len() as i32 - needle.len() as i32
+            for i in start..(last + 1):
+                var matched = true
+                for j in 0..needle.len() as i32:
+                    if text.byte_at((i + j) as i64) != needle.byte_at(j as i64):
+                        matched = false
+                        break
+                if matched:
+                    matched_at = i
+                    break
+        if matched_at < 0:
+            out = out ++ text.slice(start as i64, text.len())
+            return out
+        out = out ++ text.slice(start as i64, matched_at as i64) ++ replacement
+        start = matched_at + needle.len() as i32
+    out
+
+fn build_graph_run_capture_text(root: str, label: str, argv: str, timeout_ms: i32) -> str:
+    let capture_dir = resolve_join(root, "out/tmp")
+    let _mkdir = with_fs_mkdir_p(capture_dir)
+    let stamp = f"{with_getpid()}.{with_clock_nanos()}"
+    let stdout_path = resolve_join(capture_dir, label ++ "." ++ stamp ++ ".stdout")
+    let stderr_path = resolve_join(capture_dir, label ++ "." ++ stamp ++ ".stderr")
+    let rc = with_exec_argv_capture(argv, stdout_path, stderr_path, timeout_ms)
+    if rc != 0:
+        let _remove_stdout = with_fs_remove_file(stdout_path)
+        let _remove_stderr = with_fs_remove_file(stderr_path)
+        return ""
+    let stdout = build_graph_trim_space_and_newlines(with_fs_read_file(stdout_path))
+    let _remove_stdout = with_fs_remove_file(stdout_path)
+    let _remove_stderr = with_fs_remove_file(stderr_path)
+    stdout
+
+fn build_graph_resolve_compiler_version(root: str) -> str:
+    let version_path = resolve_join(root, "src/version")
+    let base = build_graph_first_trimmed_line(with_fs_read_file(version_path))
+    if base.len() == 0:
+        return ""
+    let override_version = with_getenv_str("WITH_VERSION")
+    if override_version.len() > 0:
+        return override_version
+    var hash_argv = ""
+    hash_argv = build_graph_argv_append(hash_argv, "git")
+    hash_argv = build_graph_argv_append(hash_argv, "-C")
+    hash_argv = build_graph_argv_append(hash_argv, root)
+    hash_argv = build_graph_argv_append(hash_argv, "rev-parse")
+    hash_argv = build_graph_argv_append(hash_argv, "--short=9")
+    hash_argv = build_graph_argv_append(hash_argv, "HEAD")
+    let short_hash = build_graph_run_capture_text(root, "git-hash", hash_argv, 30000)
+    var count_argv = ""
+    count_argv = build_graph_argv_append(count_argv, "git")
+    count_argv = build_graph_argv_append(count_argv, "-C")
+    count_argv = build_graph_argv_append(count_argv, root)
+    count_argv = build_graph_argv_append(count_argv, "rev-list")
+    count_argv = build_graph_argv_append(count_argv, "--count")
+    count_argv = build_graph_argv_append(count_argv, "HEAD")
+    let commit_count = build_graph_run_capture_text(root, "git-count", count_argv, 30000)
+    if short_hash.len() > 0 and commit_count.len() > 0:
+        return base ++ "-" ++ commit_count ++ "-g" ++ short_hash
+    base
+
+fn build_graph_write_versioned_source(root: str, source_rel: str, output_rel: str, version: str) -> i32:
+    let source_path = resolve_join(root, source_rel)
+    let output_path = resolve_join(root, output_rel)
+    let text = with_fs_read_file(source_path)
+    if text.len() == 0:
+        with_eprint("error: generate_compiler_entrypoints could not read source: " ++ source_path)
+        return 1
+    let output_dir = build_graph_dirname(output_path)
+    if with_fs_mkdir_p(output_dir) != 0:
+        with_eprint("error: generate_compiler_entrypoints could not create output directory: " ++ output_dir)
+        return 1
+    let replaced = build_graph_replace_all(text, "WITH_VERSION_PLACEHOLDER", version)
+    if with_fs_write_file(output_path, replaced) != 0:
+        with_eprint("error: generate_compiler_entrypoints could not write: " ++ output_path)
+        return 1
+    0
+
+fn build_graph_generate_compiler_entrypoints(root: str, target: BuildGraphTarget) -> i32:
+    if target.output.len() == 0:
+        with_eprint("error: generate_compiler_entrypoints target '" ++ target.name ++ "' requires a stamp output")
+        return 1
+    let version = build_graph_resolve_compiler_version(root)
+    if version.len() == 0:
+        with_eprint("error: generate_compiler_entrypoints target '" ++ target.name ++ "' could not resolve compiler version from src/version")
+        return 1
+    let main_rc = build_graph_write_versioned_source(root, "src/main.w", "out/gen/main.w", version)
+    if main_rc != 0:
+        return main_rc
+    let bootstrap_rc = build_graph_write_versioned_source(root, "src/bootstrap_main.w", "out/gen/bootstrap_main.w", version)
+    if bootstrap_rc != 0:
+        return bootstrap_rc
+    let emit_temp_rc = build_graph_write_versioned_source(root, "src/main_emit_temp.w", "out/gen/main_emit_temp.w", version)
+    if emit_temp_rc != 0:
+        return emit_temp_rc
+    let version_file = resolve_join(root, "out/gen/version.txt")
+    if with_fs_write_file(version_file, version ++ "\n") != 0:
+        with_eprint("error: generate_compiler_entrypoints could not write: " ++ version_file)
+        return 1
+    let stamp_path = build_graph_resolve_project_path(root, target.output)
+    if with_fs_write_file(stamp_path, version ++ "\n") != 0:
+        with_eprint("error: generate_compiler_entrypoints could not write stamp: " ++ stamp_path)
+        return 1
+    0
+
+fn build_graph_resolve_seed_compiler(root: str) -> str:
+    let explicit = with_getenv_str("WITH")
+    if explicit.len() > 0:
+        return explicit
+    let canonical = resolve_join(root, "out/bin/with")
+    if with_fs_file_exists(canonical) != 0:
+        return canonical
+    var path_probe = ""
+    path_probe = build_graph_argv_append(path_probe, "with")
+    path_probe = build_graph_argv_append(path_probe, "--version")
+    let installed_version = build_graph_run_capture_text(root, "with-version", path_probe, 30000)
+    if installed_version.len() > 0:
+        return "with"
+    let installed = "with"
+    let seed = resolve_join(root, "src/main")
+    if with_fs_file_exists(seed) != 0:
+        return seed
+    installed
+
+fn build_graph_run_with_compiler_build(root: str, target: BuildGraphTarget) -> i32:
+    if target.entry.len() == 0:
+        with_eprint("error: with_compiler_build target '" ++ target.name ++ "' requires a compiler path or 'seed'")
+        return 1
+    if target.inputs.len() == 0:
+        with_eprint("error: with_compiler_build target '" ++ target.name ++ "' requires a source input")
+        return 1
+    if target.output.len() == 0:
+        with_eprint("error: with_compiler_build target '" ++ target.name ++ "' requires an output path")
+        return 1
+    let arg_rc = build_graph_validate_process_args(target)
+    if arg_rc != 0:
+        return arg_rc
+    let compiler_path = if target.entry == "seed":
+        build_graph_resolve_seed_compiler(root)
+    else:
+        build_graph_resolve_project_path(root, target.entry)
+    let source_path = build_graph_resolve_project_path(root, target.inputs.get(0))
+    let output_path = build_graph_resolve_project_path(root, target.output)
+    if with_fs_file_exists(source_path) == 0:
+        with_eprint("error: with_compiler_build target '" ++ target.name ++ "' missing source: " ++ source_path)
+        return 1
+    if compiler_path != "with" and with_fs_file_exists(compiler_path) == 0:
+        with_eprint("error: with_compiler_build target '" ++ target.name ++ "' missing compiler: " ++ compiler_path)
+        return 1
+    let output_dir = build_graph_dirname(output_path)
+    if with_fs_mkdir_p(output_dir) != 0:
+        with_eprint("error: with_compiler_build target '" ++ target.name ++ "' could not create output directory: " ++ output_dir)
+        return 1
+    let tmp_output = output_path ++ ".tmp." ++ f"{with_getpid()}.{with_clock_nanos()}"
+    let _remove_tmp = with_fs_remove_file(tmp_output)
+    let _remove_tmp_dsym = with_fs_remove_dir(tmp_output ++ ".dSYM")
+    var argv = ""
+    argv = build_graph_argv_append(argv, compiler_path)
+    argv = build_graph_argv_append(argv, "build")
+    argv = build_graph_argv_append(argv, source_path)
+    for ai in 0..target.args.len() as i32:
+        argv = build_graph_argv_append(argv, target.args.get(ai as i64))
+    argv = build_graph_argv_append(argv, "-o")
+    argv = build_graph_argv_append(argv, tmp_output)
+    let capture_dir = resolve_join(resolve_join(root, "out/command"), target.name)
+    if with_fs_mkdir_p(capture_dir) != 0:
+        with_eprint("error: with_compiler_build target '" ++ target.name ++ "' could not create capture directory: " ++ capture_dir)
+        return 1
+    let stdout_path = resolve_join(capture_dir, "stdout.txt")
+    let stderr_path = resolve_join(capture_dir, "stderr.txt")
+    let old_out_dir = with_getenv_str("WITH_OUT_DIR")
+    let _set_out_dir = with_setenv_str("WITH_OUT_DIR", resolve_join(root, "out"))
+    let rc = with_exec_argv_capture(argv, stdout_path, stderr_path, 600000)
+    let _restore_out_dir = with_setenv_str("WITH_OUT_DIR", old_out_dir)
+    if rc == 124:
+        with_eprint("error: with_compiler_build target '" ++ target.name ++ "' timed out; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+        return 124
+    if rc != 0:
+        with_eprint("error: with_compiler_build target '" ++ target.name ++ f"' failed with exit code {rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+        return if rc == 0: 1 else: rc
+    if with_fs_file_exists(tmp_output) == 0:
+        with_eprint("error: with_compiler_build target '" ++ target.name ++ "' did not produce output: " ++ tmp_output)
+        return 1
+    let _remove_old = with_fs_remove_file(output_path)
+    let _remove_old_dsym = with_fs_remove_dir(output_path ++ ".dSYM")
+    if with_fs_rename_file(tmp_output, output_path) != 0:
+        with_eprint("error: with_compiler_build target '" ++ target.name ++ "' could not move output to: " ++ output_path)
+        return 1
+    let _move_dsym = with_fs_rename_file(tmp_output ++ ".dSYM", output_path ++ ".dSYM")
+    if with_str_contains(target.output, ".o") == 0:
+        with_write("[" ++ target.name ++ "] wrote " ++ target.output ++ "\n")
+    let _remove_stdout = with_fs_remove_file(stdout_path)
+    let _remove_stderr = with_fs_remove_file(stderr_path)
+    0
+
 fn build_graph_expand_install_path(root: str, path: str) -> str:
     if with_str_starts_with(path, "$HOME/") != 0:
         let home = with_getenv_str("HOME")
@@ -2237,10 +2468,10 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
     let completed_targets: Vec[str] = Vec.new()
     for ti in 0..graph.targets.len() as i32:
         let target = graph.targets.get(ti as i64)
-        if target.kind < 0 or target.kind > 23:
+        if target.kind < 0 or target.kind > 25:
             with_eprint("error: invalid build.w target kind " ++ build_graph_kind_name(target.kind) ++ " for '" ++ target.name ++ "'")
             return 1
-        if target.kind != 0 and target.kind != 1 and target.kind != 2 and target.kind != 7 and target.kind != 8 and target.kind != 9 and target.kind != 10 and target.kind != 11 and target.kind != 12 and target.kind != 13 and target.kind != 14 and target.kind != 15 and target.kind != 16 and target.kind != 17 and target.kind != 18 and target.kind != 19 and target.kind != 20 and target.kind != 21 and target.kind != 22 and target.kind != 23:
+        if target.kind != 0 and target.kind != 1 and target.kind != 2 and target.kind != 7 and target.kind != 8 and target.kind != 9 and target.kind != 10 and target.kind != 11 and target.kind != 12 and target.kind != 13 and target.kind != 14 and target.kind != 15 and target.kind != 16 and target.kind != 17 and target.kind != 18 and target.kind != 19 and target.kind != 20 and target.kind != 21 and target.kind != 22 and target.kind != 23 and target.kind != 24 and target.kind != 25:
             with_eprint("error: build.w target kind '" ++ build_graph_kind_name(target.kind) ++ "' is not implemented yet for '" ++ target.name ++ "'")
             return 1
         if target.target_kind < 0 or target.target_kind > 5:
@@ -2346,6 +2577,18 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
             let smoke_rc = build_graph_run_cli_selfhost_smoke_test(root, target)
             if smoke_rc != 0:
                 return smoke_rc
+            completed_targets.push(target.name)
+            continue
+        if target.kind == 24:
+            let gen_rc = build_graph_generate_compiler_entrypoints(root, target)
+            if gen_rc != 0:
+                return gen_rc
+            completed_targets.push(target.name)
+            continue
+        if target.kind == 25:
+            let with_build_rc = build_graph_run_with_compiler_build(root, target)
+            if with_build_rc != 0:
+                return with_build_rc
             completed_targets.push(target.name)
             continue
         if target.kind == 7:

@@ -3,13 +3,57 @@ use std.build
 pub fn build(b: Build) -> Build:
     var out = b
 
+    var compiler_sources = target_new(.GenerateCompilerEntrypoints, "compiler-sources", "").output("out/gen/.generated-stamp")
+    compiler_sources = compiler_sources.input("src/main.w")
+    compiler_sources = compiler_sources.input("src/bootstrap_main.w")
+    compiler_sources = compiler_sources.input("src/main_emit_temp.w")
+    compiler_sources = compiler_sources.input("src/version")
+    out = out.add_target(compiler_sources)
+
+    var stage1 = target_new(.WithCompilerBuild, "stage1", "seed").output("out/bin/with-stage1")
+    stage1 = stage1.input("out/gen/main.w")
+    stage1 = stage1.arg("-O0")
+    stage1 = stage1.dep("compiler-sources")
+    out = out.add_target(stage1)
+
+    var stage2 = target_new(.WithCompilerBuild, "stage2", "out/bin/with-stage1").output("out/bin/with-stage2")
+    stage2 = stage2.input("out/gen/main.w")
+    stage2 = stage2.arg("-O0")
+    stage2 = stage2.dep("stage1")
+    out = out.add_target(stage2)
+
+    var stage3 = target_new(.WithCompilerBuild, "stage3", "out/bin/with-stage2").output("out/bin/with-stage3")
+    stage3 = stage3.input("out/gen/main.w")
+    stage3 = stage3.arg("-O0")
+    stage3 = stage3.dep("stage2")
+    out = out.add_target(stage3)
+
+    var stage2_fixpoint = target_new(.WithCompilerBuild, "stage2-fixpoint-object", "out/bin/with-stage1").output("out/bin/with-stage2-fixpoint.o")
+    stage2_fixpoint = stage2_fixpoint.input("out/gen/main.w")
+    stage2_fixpoint = stage2_fixpoint.arg("--emit-obj")
+    stage2_fixpoint = stage2_fixpoint.arg("-O0")
+    stage2_fixpoint = stage2_fixpoint.dep("stage1")
+    out = out.add_target(stage2_fixpoint)
+
+    var stage3_fixpoint = target_new(.WithCompilerBuild, "stage3-fixpoint-object", "out/bin/with-stage2").output("out/bin/with-stage3-fixpoint.o")
+    stage3_fixpoint = stage3_fixpoint.input("out/gen/main.w")
+    stage3_fixpoint = stage3_fixpoint.arg("--emit-obj")
+    stage3_fixpoint = stage3_fixpoint.arg("-O0")
+    stage3_fixpoint = stage3_fixpoint.dep("stage2")
+    out = out.add_target(stage3_fixpoint)
+
     var selfcheck = target_new(.RunCorpusTest, "selfcheck", "out/bin/with-stage2")
     selfcheck = selfcheck.output("out/corpus/selfcheck")
     selfcheck = selfcheck.arg("check")
     selfcheck = selfcheck.arg("src/main.w")
+    selfcheck = selfcheck.dep("stage2")
     out = out.add_target(selfcheck)
 
-    out = out.fixpoint_compare("fixpoint", "out/bin/with-stage2-fixpoint.o", "out/bin/with-stage3-fixpoint.o")
+    var fixpoint = target_new(.FixpointCompare, "fixpoint", "out/bin/with-stage2-fixpoint.o")
+    fixpoint = fixpoint.arg("out/bin/with-stage3-fixpoint.o")
+    fixpoint = fixpoint.dep("stage2-fixpoint-object")
+    fixpoint = fixpoint.dep("stage3-fixpoint-object")
+    out = out.add_target(fixpoint)
 
     var verified = target_new(.Group, "verified-existing-stage", "")
     verified = verified.dep("selfcheck")
