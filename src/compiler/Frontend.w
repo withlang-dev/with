@@ -266,7 +266,7 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
                 if libclang_result.len() > 0:
                     synthetic = libclang_result
                 else:
-                    synthetic = self.c_import_expand_header_spec_frontend(header_spec, decl)
+                    synthetic = self.c_import_expand_header_spec_frontend(header_spec, out, decl)
                     if self.diagnostics.has_errors():
                         continue
                 self.c_import_cache_store(cache_key, synthetic)
@@ -307,7 +307,7 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     out
 
 fn Zcu.c_import_cache_key_frontend(self: Zcu, pool: AstPool, decl: i32, header_spec: str) -> str:
-    var key = header_spec ++ "\n#format:cimport-v3\n#links:"
+    var key = header_spec ++ "\n#format:cimport-v4\n#links:"
     let link_start = pool.get_data1(decl)
     let packed_counts = pool.get_data2(decl)
     let link_count = c_import_link_count(packed_counts)
@@ -371,7 +371,29 @@ fn Zcu.c_import_emit_header_error_frontend(self: Zcu, decl: i32, header_spec: st
         "failed to compile C header snippet"
     self.diagnostics.emit(Diagnostic.err(msg, span))
 
-fn Zcu.c_import_expand_header_spec_frontend(self: Zcu, header_spec_raw: str, decl: i32) -> str:
+fn Zcu.c_import_emit_untranslated_error_frontend(self: Zcu, pool: AstPool, decl: i32, kind: str, name: str):
+    let display_name = if name.len() > 0: name else: "<unknown>"
+    let span = Span {
+        file: 0,
+        start: pool.get_start(decl),
+        end: pool.get_end(decl),
+    }
+    self.diagnostics.emit(Diagnostic.err("c_import: untranslated " ++ kind ++ " '" ++ display_name ++ "'; add it to allow_untranslated to acknowledge omission", span))
+
+fn Zcu.c_import_decl_allows_untranslated_frontend(self: Zcu, pool: AstPool, decl: i32, name: str) -> bool:
+    if name.len() == 0:
+        return false
+    let link_start = pool.get_data1(decl)
+    let packed_counts = pool.get_data2(decl)
+    let link_count = c_import_link_count(packed_counts)
+    let allow_count = c_import_allow_count(packed_counts)
+    for ai in 0..allow_count:
+        let allow_sym = pool.get_extra(link_start + link_count + ai)
+        if self.pool.resolve(allow_sym) == name:
+            return true
+    false
+
+fn Zcu.c_import_expand_header_spec_frontend(self: Zcu, header_spec_raw: str, pool: AstPool, decl: i32) -> str:
     let decoded = c_import_decode_escapes(header_spec_raw)
     let rendered = c_import_render_header_spec(decoded)
     let header = c_import_trim(rendered)
@@ -396,7 +418,14 @@ fn Zcu.c_import_expand_header_spec_frontend(self: Zcu, header_spec_raw: str, dec
                         return ""
                     generated = generated ++ inc
                 else if c_import_starts_with(line, "#define"):
-                    generated = generated ++ c_import_macro_decl(line)
+                    let macro_decl = c_import_macro_decl(line)
+                    if macro_decl.len() > 0:
+                        generated = generated ++ macro_decl
+                    else:
+                        let macro_name = c_import_define_name(line)
+                        if not self.c_import_decl_allows_untranslated_frontend(pool, decl, macro_name):
+                            self.c_import_emit_untranslated_error_frontend(pool, decl, "macro", macro_name)
+                            return ""
                 else:
                     body = body ++ line ++ "\n"
             line_start = i + 1
@@ -411,9 +440,12 @@ fn Zcu.c_import_expand_header_spec_frontend(self: Zcu, header_spec_raw: str, dec
             if stmt.len() > 0:
                 let fn_decl = c_import_function_decl(stmt)
                 if fn_decl.len() == 0:
-                    self.c_import_emit_header_error_frontend(decl, header_spec_raw)
-                    return ""
-                generated = generated ++ fn_decl
+                    let decl_name = c_import_statement_name(stmt)
+                    if not self.c_import_decl_allows_untranslated_frontend(pool, decl, decl_name):
+                        self.c_import_emit_untranslated_error_frontend(pool, decl, "declaration", decl_name)
+                        return ""
+                else:
+                    generated = generated ++ fn_decl
             stmt_start = si + 1
         si = si + 1
 
@@ -540,6 +572,50 @@ fn c_import_macro_decl(line: str) -> str:
         return "let " ++ name ++ " = \"" ++ escaped ++ "\"\n"
 
     ""
+
+fn c_import_define_name(line: str) -> str:
+    var rest = line
+    if c_import_starts_with(rest, "#define"):
+        rest = c_import_trim(rest.slice(7, rest.len()))
+    else:
+        return ""
+    var i = 0
+    while i < rest.len() as i32 and c_import_is_ident_char(rest.byte_at(i as i64)):
+        i = i + 1
+    if i <= 0:
+        return ""
+    rest.slice(0, i as i64)
+
+fn c_import_statement_name(stmt_raw: str) -> str:
+    let stmt = c_import_trim(stmt_raw)
+    if stmt.len() == 0:
+        return ""
+
+    var open = -1
+    for i in 0..stmt.len() as i32:
+        if stmt.byte_at(i as i64) == 40:
+            open = i
+            break
+    if open > 0:
+        var ne = open - 1
+        while ne >= 0 and c_import_is_space(stmt.byte_at(ne as i64)):
+            ne = ne - 1
+        var ns = ne
+        while ns >= 0 and c_import_is_ident_char(stmt.byte_at(ns as i64)):
+            ns = ns - 1
+        ns = ns + 1
+        if ns <= ne:
+            return stmt.slice(ns as i64, (ne + 1) as i64)
+
+    var end = stmt.len() as i32 - 1
+    while end >= 0 and not c_import_is_ident_char(stmt.byte_at(end as i64)):
+        end = end - 1
+    if end < 0:
+        return ""
+    var start = end
+    while start >= 0 and c_import_is_ident_char(stmt.byte_at(start as i64)):
+        start = start - 1
+    stmt.slice((start + 1) as i64, (end + 1) as i64)
 
 fn c_import_function_decl(stmt_raw: str) -> str:
     let stmt = c_import_trim(stmt_raw)
