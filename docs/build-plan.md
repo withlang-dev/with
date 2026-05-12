@@ -36,6 +36,7 @@
       - `with build :fixpoint`
       - `with build :test`
       - `with build :install-user`
+      - `with build :update-seed`
 
   Remaining:
 
@@ -44,7 +45,7 @@
   - Port embedded runtime object generation out of shell.
   - Port stage1/stage2/stage3 compiler builds into `build.w`.
   - Port PCRE2 download/migrate/build/test/promote into typed nodes.
-  - Port update-seed, seed, clean, emit-c, and cross targets.
+  - Port seed, clean, emit-c, and cross targets.
   - Make Makefile delegate to `with build :...` only after direct graph paths are equivalent.
   - Remove Make recipes and obsolete scripts last.
 
