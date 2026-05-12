@@ -25,6 +25,8 @@ pub enum BuildKind: i32:
     CopyRuntimeTree = 18
     RunCorpusTest = 19
     PromoteTreeIfVerified = 20
+    EmbeddedRuntimeExtractTest = 21
+    SelfhostNoopLocalRegression = 22
 
 pub enum BuildTarget: i32:
     native = 0
@@ -198,6 +200,14 @@ pub fn Build.run_corpus_test(self: Build, name: str, runner: str) -> Build:
 
 pub fn Build.promote_tree_if_verified(self: Build, name: str, source_dir: str, output_dir: str) -> Build:
     let target = target_new(.PromoteTreeIfVerified, name, source_dir).output(output_dir)
+    self.add_target(target)
+
+pub fn Build.embedded_runtime_extract_test(self: Build, name: str, compiler: str) -> Build:
+    let target = target_new(.EmbeddedRuntimeExtractTest, name, compiler)
+    self.add_target(target)
+
+pub fn Build.selfhost_noop_local_regression(self: Build, name: str, compiler: str) -> Build:
+    let target = target_new(.SelfhostNoopLocalRegression, name, compiler)
     self.add_target(target)
 
 pub fn Target.target(self: Target, target: BuildTarget) -> Target:
