@@ -45,6 +45,11 @@ pub fn build(b: Build) -> Build:
     cli_selfhost_tests = cli_selfhost_tests.dep("selfcheck")
     out = out.add_target(cli_selfhost_tests)
 
+    var cli_selfhost_smoke_tests = target_new(.CliSelfhostSmokeTest, "cli-selfhost-smoke-tests", "out/bin/with-stage2")
+    cli_selfhost_smoke_tests = cli_selfhost_smoke_tests.input("out/bin/with-stage2")
+    cli_selfhost_smoke_tests = cli_selfhost_smoke_tests.dep("selfcheck")
+    out = out.add_target(cli_selfhost_smoke_tests)
+
     var issue61_regression = target_new(.SelfhostNoopLocalRegression, "issue61-regression", "out/bin/with-stage2")
     issue61_regression = issue61_regression.input("out/bin/with-stage2")
     issue61_regression = issue61_regression.dep("selfcheck")
@@ -61,6 +66,7 @@ pub fn build(b: Build) -> Build:
     tests = tests.dep("native-codegen-tests")
     tests = tests.dep("native-spec-tests")
     tests = tests.dep("native-phase-tests")
+    tests = tests.dep("cli-selfhost-smoke-tests")
     tests = tests.dep("cli-selfhost-tests")
     tests = tests.dep("issue61-regression")
     tests = tests.dep("embedded-runtime-regression")

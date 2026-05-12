@@ -45,6 +45,8 @@
   - The issue61 noop-local selfhost regression now runs as a typed
     `selfhost_noop_local_regression` graph node instead of
     `scripts/run_issue61_noop_local_regression.sh`.
+  - CLI selfhost top-level help and `with test` runtime-directive checks now
+    run as a typed `cli_selfhost_smoke_test` graph node.
   - Initial repository `build.w`:
       - `with build`
       - `with build :selfcheck`
@@ -59,7 +61,10 @@
   Remaining:
 
   - Replace the remaining temporary `with build :test` script invocation with
-    native typed With test harness nodes for CLI selfhost tests.
+    native typed With test harness nodes for the rest of the CLI selfhost
+    categories: object-symbol checks, one-liners, package/build.w cases,
+    migration fixtures, regex preparation checks, and parallel same-source
+    testing.
   - Port runtime object generation into `build.w`.
   - Port embedded runtime object generation out of shell.
   - Port stage1/stage2/stage3 compiler builds into `build.w`.

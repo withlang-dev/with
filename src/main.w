@@ -1343,6 +1343,7 @@ fn build_graph_kind_name(kind: i32) -> str:
     if kind == 20: return "promote_tree_if_verified"
     if kind == 21: return "embedded_runtime_extract_test"
     if kind == 22: return "selfhost_noop_local_regression"
+    if kind == 23: return "cli_selfhost_smoke_test"
     f"unknown({kind})"
 
 fn build_graph_target_name(kind: i32) -> str:
@@ -2045,6 +2046,114 @@ fn build_graph_run_selfhost_noop_local_regression(root: str, target: BuildGraphT
         return 1
     0
 
+fn build_graph_assert_contains(text: str, needle: str, target: BuildGraphTarget, label: str) -> i32:
+    if with_str_contains(text, needle) != 0:
+        return 0
+    with_eprint("error: " ++ build_graph_kind_name(target.kind) ++ " target '" ++ target.name ++ "' missing expected output for " ++ label ++ ": " ++ needle)
+    1
+
+fn build_graph_assert_not_contains(text: str, needle: str, target: BuildGraphTarget, label: str) -> i32:
+    if with_str_contains(text, needle) == 0:
+        return 0
+    with_eprint("error: " ++ build_graph_kind_name(target.kind) ++ " target '" ++ target.name ++ "' found forbidden output for " ++ label ++ ": " ++ needle)
+    1
+
+fn build_graph_run_cli_capture(root: str, target: BuildGraphTarget, compiler_path: str, label: str, argv_tail: str, timeout_ms: i32) -> TestRunResult:
+    let capture_dir = resolve_join(resolve_join(root, "out/test-graph"), target.name)
+    let _mkdir = with_fs_mkdir_p(capture_dir)
+    let stamp = f"{with_getpid()}.{with_clock_nanos()}"
+    let stdout_path = resolve_join(capture_dir, label ++ "." ++ stamp ++ ".stdout")
+    let stderr_path = resolve_join(capture_dir, label ++ "." ++ stamp ++ ".stderr")
+    var argv = ""
+    argv = build_graph_argv_append(argv, compiler_path)
+    argv = argv ++ argv_tail
+    let rc = with_exec_argv_capture(argv, stdout_path, stderr_path, timeout_ms)
+    let stdout = with_fs_read_file(stdout_path)
+    let stderr = with_fs_read_file(stderr_path)
+    let _ = label
+    if rc == 0:
+        let _remove_stdout = with_fs_remove_file(stdout_path)
+        let _remove_stderr = with_fs_remove_file(stderr_path)
+    TestRunResult { rc, stdout, stderr }
+
+fn build_graph_run_cli_expect_success(root: str, target: BuildGraphTarget, compiler_path: str, label: str, argv_tail: str) -> TestRunResult:
+    let result = build_graph_run_cli_capture(root, target, compiler_path, label, argv_tail, 120000)
+    if result.rc != 0:
+        with_eprint("error: cli selfhost command '" ++ label ++ f"' failed with exit code {result.rc}")
+    result
+
+fn build_graph_run_cli_selfhost_help(root: str, target: BuildGraphTarget, compiler_path: str) -> i32:
+    let result = build_graph_run_cli_expect_success(root, target, compiler_path, "help", build_graph_argv_append("", "--help"))
+    if result.rc != 0:
+        return if result.rc == 0: 1 else: result.rc
+    let checks: Vec[str] = Vec.new()
+    checks.push("Usage: with [command] [options]")
+    checks.push("  lsp              Start the language server")
+    checks.push("  -e <code>        Compile and run code as top-level statements")
+    for i in 0..checks.len() as i32:
+        let rc = build_graph_assert_contains(result.stdout, checks.get(i as i64), target, "top_level_help")
+        if rc != 0:
+            return rc
+    let forbid1 = build_graph_assert_not_contains(result.stdout, "Language quick reference:", target, "top_level_help")
+    if forbid1 != 0:
+        return forbid1
+    let forbid2 = build_graph_assert_not_contains(result.stdout, "with help use", target, "top_level_help")
+    if forbid2 != 0:
+        return forbid2
+    build_graph_assert_not_contains(result.stdout, "--prefer-curly", target, "top_level_help")
+
+fn build_graph_run_cli_selfhost_test_directives(root: str, target: BuildGraphTarget, compiler_path: str, test_dir: str) -> i32:
+    if with_fs_mkdir_p(test_dir) != 0:
+        with_eprint("error: could not create cli selfhost smoke test directory: " ++ test_dir)
+        return 1
+    let good_src = resolve_join(test_dir, "test_directives_good.w")
+    if with_fs_write_file(good_src, "//! expect-exit: 134\n//! expect-stderr: panic: expected boom\n\nfn main:\n    assert(false, \"expected boom\")\n") != 0:
+        with_eprint("error: could not write " ++ good_src)
+        return 1
+    let good_result = build_graph_run_cli_expect_success(root, target, compiler_path, "test-directives-good", build_graph_argv_append(build_graph_argv_append("", "test"), good_src))
+    if good_result.rc != 0:
+        return if good_result.rc == 0: 1 else: good_result.rc
+
+    let bad_stdout_src = resolve_join(test_dir, "test_directives_bad_stdout.w")
+    if with_fs_write_file(bad_stdout_src, "//! expect-stdout: missing\n\nfn main:\n    print(\"ok\")\n") != 0:
+        with_eprint("error: could not write " ++ bad_stdout_src)
+        return 1
+    let bad_stdout_result = build_graph_run_cli_capture(root, target, compiler_path, "test-directives-bad-stdout", build_graph_argv_append(build_graph_argv_append("", "test"), bad_stdout_src), 120000)
+    if bad_stdout_result.rc == 0:
+        with_eprint("error: cli_selfhost_smoke_test target '" ++ target.name ++ "' expected stdout directive failure")
+        return 1
+    let stdout_diag = build_graph_assert_contains(bad_stdout_result.stderr, "stdout mismatch; missing expected output: missing", target, "test_runtime_directives")
+    if stdout_diag != 0:
+        return stdout_diag
+
+    let bad_exit_src = resolve_join(test_dir, "test_directives_bad_exit.w")
+    if with_fs_write_file(bad_exit_src, "//! expect-exit: 7\n\nfn main:\n    print(\"ok\")\n") != 0:
+        with_eprint("error: could not write " ++ bad_exit_src)
+        return 1
+    let bad_exit_result = build_graph_run_cli_capture(root, target, compiler_path, "test-directives-bad-exit", build_graph_argv_append(build_graph_argv_append("", "test"), bad_exit_src), 120000)
+    if bad_exit_result.rc == 0:
+        with_eprint("error: cli_selfhost_smoke_test target '" ++ target.name ++ "' expected exit directive failure")
+        return 1
+    build_graph_assert_contains(bad_exit_result.stderr, "exit code 0, expected 7", target, "test_runtime_directives")
+
+fn build_graph_run_cli_selfhost_smoke_test(root: str, target: BuildGraphTarget) -> i32:
+    if target.entry.len() == 0:
+        with_eprint("error: cli_selfhost_smoke_test target '" ++ target.name ++ "' requires a compiler path")
+        return 1
+    let arg_rc = build_graph_validate_process_args(target)
+    if arg_rc != 0:
+        return arg_rc
+    let compiler_path = build_graph_resolve_project_path(root, target.entry)
+    if with_fs_file_exists(compiler_path) == 0:
+        with_eprint("error: cli_selfhost_smoke_test target '" ++ target.name ++ "' missing compiler: " ++ compiler_path)
+        return 1
+    let help_rc = build_graph_run_cli_selfhost_help(root, target, compiler_path)
+    if help_rc != 0:
+        return help_rc
+    let stamp = f"{with_getpid()}.{with_clock_nanos()}"
+    let test_dir = resolve_join(resolve_join(resolve_join(root, "out/test-graph"), target.name), stamp)
+    build_graph_run_cli_selfhost_test_directives(root, target, compiler_path, test_dir)
+
 fn build_graph_expand_install_path(root: str, path: str) -> str:
     if with_str_starts_with(path, "$HOME/") != 0:
         let home = with_getenv_str("HOME")
@@ -2128,10 +2237,10 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
     let completed_targets: Vec[str] = Vec.new()
     for ti in 0..graph.targets.len() as i32:
         let target = graph.targets.get(ti as i64)
-        if target.kind < 0 or target.kind > 22:
+        if target.kind < 0 or target.kind > 23:
             with_eprint("error: invalid build.w target kind " ++ build_graph_kind_name(target.kind) ++ " for '" ++ target.name ++ "'")
             return 1
-        if target.kind != 0 and target.kind != 1 and target.kind != 2 and target.kind != 7 and target.kind != 8 and target.kind != 9 and target.kind != 10 and target.kind != 11 and target.kind != 12 and target.kind != 13 and target.kind != 14 and target.kind != 15 and target.kind != 16 and target.kind != 17 and target.kind != 18 and target.kind != 19 and target.kind != 20 and target.kind != 21 and target.kind != 22:
+        if target.kind != 0 and target.kind != 1 and target.kind != 2 and target.kind != 7 and target.kind != 8 and target.kind != 9 and target.kind != 10 and target.kind != 11 and target.kind != 12 and target.kind != 13 and target.kind != 14 and target.kind != 15 and target.kind != 16 and target.kind != 17 and target.kind != 18 and target.kind != 19 and target.kind != 20 and target.kind != 21 and target.kind != 22 and target.kind != 23:
             with_eprint("error: build.w target kind '" ++ build_graph_kind_name(target.kind) ++ "' is not implemented yet for '" ++ target.name ++ "'")
             return 1
         if target.target_kind < 0 or target.target_kind > 5:
@@ -2161,6 +2270,7 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
             let fixpoint_rc = build_graph_compare_files(root, target, "fixpoint_compare")
             if fixpoint_rc != 0:
                 return fixpoint_rc
+            with_write("FIXPOINT\n")
             completed_targets.push(target.name)
             continue
         if target.kind == 16:
@@ -2230,6 +2340,12 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
             let issue61_rc = build_graph_run_selfhost_noop_local_regression(root, target)
             if issue61_rc != 0:
                 return issue61_rc
+            completed_targets.push(target.name)
+            continue
+        if target.kind == 23:
+            let smoke_rc = build_graph_run_cli_selfhost_smoke_test(root, target)
+            if smoke_rc != 0:
+                return smoke_rc
             completed_targets.push(target.name)
             continue
         if target.kind == 7:
