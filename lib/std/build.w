@@ -27,6 +27,7 @@ pub enum BuildKind: i32:
     PromoteTreeIfVerified = 20
     EmbeddedRuntimeExtractTest = 21
     SelfhostNoopLocalRegression = 22
+    CliSelfhostSmokeTest = 23
 
 pub enum BuildTarget: i32:
     native = 0
@@ -208,6 +209,10 @@ pub fn Build.embedded_runtime_extract_test(self: Build, name: str, compiler: str
 
 pub fn Build.selfhost_noop_local_regression(self: Build, name: str, compiler: str) -> Build:
     let target = target_new(.SelfhostNoopLocalRegression, name, compiler)
+    self.add_target(target)
+
+pub fn Build.cli_selfhost_smoke_test(self: Build, name: str, compiler: str) -> Build:
+    let target = target_new(.CliSelfhostSmokeTest, name, compiler)
     self.add_target(target)
 
 pub fn Target.target(self: Target, target: BuildTarget) -> Target:
