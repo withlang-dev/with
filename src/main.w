@@ -943,6 +943,53 @@ fn build_graph_resolve_paths(root: str, paths: Vec[str]) -> Vec[str]:
         out.push(build_graph_resolve_project_path(root, paths.get(i as i64)))
     out
 
+fn build_graph_path_basename(path: str) -> str:
+    let dir = build_graph_dirname(path)
+    if dir == ".":
+        return path
+    path.slice((dir.len() + 1) as i64, path.len())
+
+fn build_graph_path_has_glob(path: str) -> bool:
+    with_str_contains(path, "*") != 0
+
+fn build_graph_single_star_pattern_matches(pattern: str, name: str) -> bool:
+    var star = -1
+    for i in 0..pattern.len() as i32:
+        if pattern.byte_at(i as i64) == 42:
+            if star >= 0:
+                return false
+            star = i
+    if star < 0:
+        return pattern == name
+    let prefix = pattern.slice(0, star as i64)
+    let suffix = pattern.slice((star + 1) as i64, pattern.len())
+    if name.len() < prefix.len() + suffix.len():
+        return false
+    if prefix.len() > 0 and name.slice(0, prefix.len()) != prefix:
+        return false
+    if suffix.len() > 0:
+        let suffix_start = name.len() - suffix.len()
+        if name.slice(suffix_start, name.len()) != suffix:
+            return false
+    true
+
+fn build_graph_test_target_files(root: str, entry: str) -> Vec[str]:
+    let files: Vec[str] = Vec.new()
+    if not build_graph_path_has_glob(entry):
+        files.push(resolve_join(root, entry))
+        return files
+
+    let entry_dir = build_graph_dirname(entry)
+    let pattern = build_graph_path_basename(entry)
+    let search_dir = if entry_dir == ".": root else: build_graph_resolve_project_path(root, entry_dir)
+    let candidates = collect_test_files(search_dir)
+    for ci in 0..candidates.len() as i32:
+        let candidate = candidates.get(ci as i64)
+        let base = build_graph_path_basename(candidate)
+        if build_graph_single_star_pattern_matches(pattern, base):
+            files.push(candidate)
+    files
+
 fn build_graph_dirname(path: str) -> str:
     var last_slash = -1
     for i in 0..path.len() as i32:
@@ -1060,10 +1107,18 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
             if output_path.len() > 0:
                 with_eprint("error: -o cannot be used with build.w test target '" ++ target.name ++ "'")
                 return 1
-            let test_rc = run_test_file_with_build_settings(source_path, target_opt, no_std, alloc_mode, prelude_mode, debug_info, false, false, "", include_paths, target.defines, target.system_libs)
-            if test_rc != 0:
-                with_eprint("error: build.w test target failed: " ++ target.name)
-                return test_rc
+            let test_files = build_graph_test_target_files(root, target.entry)
+            if test_files.len() == 0:
+                with_eprint("error: build.w test target matched no files: " ++ target.entry)
+                return 1
+            for fi in 0..test_files.len() as i32:
+                let test_path = test_files.get(fi as i64)
+                let test_rc = run_test_file_with_build_settings(test_path, target_opt, no_std, alloc_mode, prelude_mode, debug_info, false, false, "", include_paths, target.defines, target.system_libs)
+                if test_rc != 0:
+                    with_eprint("error: build.w test target failed: " ++ target.name)
+                    return test_rc
+            if build_graph_path_has_glob(target.entry):
+                with_write(f"ok: {test_files.len()} files passed in build.w test target {target.name}\n")
             continue
         if target.kind == 1:
             let ar_path = build_graph_library_output_path(root, target, output_path, graph.targets.len() as i32)

@@ -71,6 +71,9 @@ Source: `docs/toolchain.md`.
     definitions, including `NAME=value` forms.
   - Test targets run through the normal `with test` pipeline and inherit
     `include_path`, `define`, and `link_system_lib` build settings.
+  - Test targets accept simple `*` file globs such as `tests/*.w` and run each
+    matched test file with the target's build settings. Empty matches fail
+    loudly.
   - Library targets emit static archives under `out/lib` and inherit
     `include_path`, `define`, and `link_system_lib` build settings.
   - Explicit build graph targets matching the current host are accepted as
@@ -175,6 +178,7 @@ Source: `docs/toolchain.md`.
   contains `define internal i32 @generated_from_hook`
 - `WITH=out/bin/with ./scripts/run_tests.sh test/behavior/behav_c_import_allow_untranslated.w test/compile_errors/err_c_import_untranslated_macro_requires_allow.w`
 - `make build`
+- `WITH=out/bin/with ./scripts/run_cli_selfhost_tests.sh`
 - `make fixpoint`
 - `make test`
 
@@ -184,5 +188,5 @@ Source: `docs/toolchain.md`.
   removes Python from the build path but does not yet replace Make/shell as the
   orchestration layer.
 - Complete `build.w` graph execution beyond executable, library, test,
-  generated-source targets, and explicit host-target aliases: actual
-  cross-target codegen/linking still needs driver support.
+  test-glob, generated-source targets, and explicit host-target aliases:
+  actual cross-target codegen/linking still needs driver support.
