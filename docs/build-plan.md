@@ -37,6 +37,7 @@
       - `with build :test`
       - `with build :install-user`
       - `with build :update-seed`
+      - `with build :regex-test`
 
   Remaining:
 
@@ -44,7 +45,7 @@
   - Port runtime object generation into `build.w`.
   - Port embedded runtime object generation out of shell.
   - Port stage1/stage2/stage3 compiler builds into `build.w`.
-  - Port PCRE2 download/migrate/build/test/promote into typed nodes.
+  - Port PCRE2 download/migrate/build/promote into typed nodes; `regex-test` is currently exposed through the existing verifier script.
   - Port seed, clean, emit-c, and cross targets.
   - Make Makefile delegate to `with build :...` only after direct graph paths are equivalent.
   - Remove Make recipes and obsolete scripts last.

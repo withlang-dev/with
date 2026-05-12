@@ -58,4 +58,12 @@ pub fn build(b: Build) -> Build:
     update_seed = update_seed.dep("verified-existing-stage")
     out = out.add_target(update_seed)
 
+    var regex_test = target_new(.Command, "regex-test", "scripts/verify_pcre2_works.sh")
+    regex_test = regex_test.input("scripts/verify_pcre2_works.sh")
+    regex_test = regex_test.input("out/bin/with")
+    regex_test = regex_test.input("out/pcre2_build/bin/pcre2test")
+    regex_test = regex_test.input("out/pcre2_reference/pcre2-10.47/RunTest")
+    regex_test = regex_test.dep("verified-existing-stage")
+    out = out.add_target(regex_test)
+
     out.default("verified-existing-stage")
