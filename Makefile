@@ -355,16 +355,13 @@ __regex-test:
 	fi
 	@$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" build :regex-test
 
-__regex-promote: $(REGEX_BUILD_STAMP) scripts/pcre2_generated_workflow.sh
+__regex-promote: $(REGEX_BUILD_STAMP)
 	@if [ ! -x "$(ROOT_DIR)/$(CANONICAL_BIN)" ]; then \
 		echo "error: missing compiler binary: $(ROOT_DIR)/$(CANONICAL_BIN)" >&2; \
 		echo "run make build before regex-promote" >&2; \
 		exit 1; \
 	fi
-	@bash "$(ROOT_DIR)/scripts/pcre2_generated_workflow.sh" promote \
-		"$(ROOT_DIR)/$(CANONICAL_BIN)" \
-		"$(ROOT_DIR)/$(REGEX_BUILD_RE_DIR)" \
-		"$(ROOT_DIR)/$(REGEX_PROMOTE_DIR)"
+	@$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" build :regex-promote
 
 $(OUT_BIN_DIR) $(OUT_LIB_DIR) $(OUT_LOG_DIR) $(OUT_TMP_DIR) $(OUT_GEN_DIR):
 	@mkdir -p "$@"
@@ -480,24 +477,9 @@ $(REGEX_MIGRATE_STAMP): $(CANONICAL_BIN) $(REGEX_PCRE2_READY) scripts/prepare_pc
 	echo "migrated PCRE2: $$count .w files in $$out"; \
 	touch "$@"
 
-$(REGEX_BUILD_STAMP): scripts/pcre2_generated_workflow.sh | $(OUT_GEN_DIR) $(OUT_TMP_DIR)
-	@set -euo pipefail; \
-	src="$(ROOT_DIR)/$(REGEX_MIGRATE_DIR)"; \
-	out="$(ROOT_DIR)/$(REGEX_BUILD_DIR)"; \
-	tmp="$$out.tmp"; \
-	re_dir="$$tmp/lib/std/re"; \
-	bin_dir="$$tmp/bin"; \
-	[ -d "$$src" ] || { echo "error: missing migrated PCRE2 directory: $$src — run make regex-migrate deliberately" >&2; exit 1; }; \
-	rm -rf "$$tmp"; \
-	mkdir -p "$$re_dir" "$$bin_dir"; \
-	cp "$$src"/*.w "$$re_dir/"; \
-	bash "$(ROOT_DIR)/scripts/pcre2_generated_workflow.sh" check "$(ROOT_DIR)/$(CANONICAL_BIN)" "$$re_dir"; \
-	$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" build "$$re_dir/pcre2test.w" -o "$$bin_dir/pcre2test"; \
-	[ -x "$$bin_dir/pcre2test" ] || { echo "error: PCRE2 build did not produce $$bin_dir/pcre2test" >&2; exit 1; }; \
-	rm -rf "$$out"; \
-	mv "$$tmp" "$$out"; \
-	echo "built migrated PCRE2: $(ROOT_DIR)/$(REGEX_PCRE2TEST_BIN)"; \
-	touch "$@"
+$(REGEX_BUILD_STAMP): | $(OUT_GEN_DIR) $(OUT_TMP_DIR)
+	@$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" build :regex-build
+	@touch "$@"
 
 $(COMPAT_RUNTIME_SRC): rt/compat_runtime.w $(EMBEDDED_STDLIB_RUNTIME_SRC) | $(OUT_GEN_DIR)
 	@cat "$(ROOT_DIR)/rt/compat_runtime.w" "$(EMBEDDED_STDLIB_RUNTIME_SRC)" > "$@"

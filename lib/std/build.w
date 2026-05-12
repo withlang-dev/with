@@ -31,6 +31,9 @@ pub enum BuildKind: i32:
     GenerateCompilerEntrypoints = 24
     WithCompilerBuild = 25
     Pcre2RunTest = 26
+    Pcre2GeneratedCheck = 27
+    Pcre2GeneratedPromote = 28
+    Pcre2Build = 29
 
 pub enum BuildTarget: i32:
     native = 0
@@ -231,6 +234,21 @@ pub fn Build.pcre2_run_test(self: Build, name: str, pcre2test: str, ref_dir: str
     var target = target_new(.Pcre2RunTest, name, pcre2test)
     target = target.input(ref_dir ++ "/RunTest")
     target = target.arg(ref_dir)
+    self.add_target(target)
+
+pub fn Build.pcre2_generated_check(self: Build, name: str, compiler: str, generated_dir: str) -> Build:
+    var target = target_new(.Pcre2GeneratedCheck, name, compiler)
+    target = target.input(generated_dir)
+    self.add_target(target)
+
+pub fn Build.pcre2_generated_promote(self: Build, name: str, compiler: str, generated_dir: str, dest_dir: str) -> Build:
+    var target = target_new(.Pcre2GeneratedPromote, name, compiler).output(dest_dir)
+    target = target.input(generated_dir)
+    self.add_target(target)
+
+pub fn Build.pcre2_build(self: Build, name: str, compiler: str, migrated_dir: str, output_dir: str) -> Build:
+    var target = target_new(.Pcre2Build, name, compiler).output(output_dir)
+    target = target.input(migrated_dir)
     self.add_target(target)
 
 pub fn Target.target(self: Target, target: BuildTarget) -> Target:

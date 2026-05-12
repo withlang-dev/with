@@ -178,7 +178,7 @@ fn pcre2_pattern_info_8(__param_code: *const pcre2_real_code_8, __param_what: c_
 
             },
             24 => {
-                ((unsafe: *(__param_where_ as *mut c_ulong)) = ((120 as c_ulong) +% (((((__local_re.top_bracket as c_int) * 2) as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong)))
+                ((unsafe: *(__param_where_ as *mut c_ulong)) = ((136 as c_ulong) +% (((((__local_re.top_bracket as c_int) * 2) as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong)))
             },
             23 => {
                 ((unsafe: *(__param_where_ as *mut c_uint)) = (if ((__local_re.flags as c_uint) & (4194304 as c_uint)) != 0: 1 else: 0))
