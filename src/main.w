@@ -22,6 +22,7 @@ extern fn with_fs_write_file(path: str, data: str) -> i32
 extern fn with_fs_mkdir_p(path: str) -> i32
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_fs_file_exists(path: str) -> i32
+extern fn with_fs_chmod(path: str, mode: i32) -> i32
 extern fn with_read_bytes_stdin(count: i32) -> str
 extern fn with_str_eq(a: str, b: str) -> i32
 extern fn with_str_len(s: str) -> i64
@@ -1331,6 +1332,8 @@ fn build_graph_validate_outputs(root: str, graph: BuildGraph, output_path: str) 
             path = build_graph_output_path(root, target, output_path, graph.targets.len() as i32)
         else if target.kind == 1:
             path = build_graph_library_output_path(root, target, output_path, graph.targets.len() as i32)
+        else if target.kind == 8:
+            path = build_graph_expand_install_path(root, target.output)
         else if target.output.len() > 0:
             path = build_graph_resolve_project_path(root, target.output)
         if not build_graph_register_output(outputs, path):
@@ -1761,6 +1764,59 @@ fn build_graph_run_command(root: str, target: BuildGraphTarget) -> i32:
             return 1
     0
 
+fn build_graph_expand_install_path(root: str, path: str) -> str:
+    if with_str_starts_with(path, "$HOME/") != 0:
+        let home = with_getenv_str("HOME")
+        if home.len() > 0:
+            return resolve_join(home, path.slice(6, path.len()))
+    build_graph_resolve_project_path(root, path)
+
+fn build_graph_parse_octal_mode(text: str) -> i32:
+    if text.len() == 0:
+        return -1
+    var mode = 0
+    for i in 0..text.len() as i32:
+        let ch = text.byte_at(i as i64)
+        if ch < 48 or ch > 55:
+            return -1
+        mode = mode * 8 + (ch - 48)
+    mode
+
+fn build_graph_install_file(root: str, target: BuildGraphTarget) -> i32:
+    if target.entry.len() == 0 or target.output.len() == 0:
+        with_eprint("error: install target '" ++ target.name ++ "' requires source and destination paths")
+        return 1
+    if target.args.len() > 1:
+        with_eprint("error: install target '" ++ target.name ++ "' accepts at most one mode argument")
+        return 1
+    let arg_rc = build_graph_validate_process_args(target)
+    if arg_rc != 0:
+        return arg_rc
+    let source_path = build_graph_resolve_project_path(root, target.entry)
+    if with_fs_file_exists(source_path) == 0:
+        with_eprint("error: install target '" ++ target.name ++ "' missing source: " ++ source_path)
+        return 1
+    let dest_path = build_graph_expand_install_path(root, target.output)
+    if dest_path.len() == 0 or dest_path == target.output and with_str_starts_with(dest_path, "$HOME/") != 0:
+        with_eprint("error: install target '" ++ target.name ++ "' could not resolve destination: " ++ target.output)
+        return 1
+    let dest_dir = build_graph_dirname(dest_path)
+    if with_fs_mkdir_p(dest_dir) != 0:
+        with_eprint("error: install target '" ++ target.name ++ "' could not create destination directory: " ++ dest_dir)
+        return 1
+    let contents = with_fs_read_file(source_path)
+    if with_fs_write_file(dest_path, contents) != 0:
+        with_eprint("error: install target '" ++ target.name ++ "' could not write destination: " ++ dest_path)
+        return 1
+    let mode = if target.args.len() == 0: 0o644 else: build_graph_parse_octal_mode(target.args.get(0))
+    if mode < 0:
+        with_eprint("error: install target '" ++ target.name ++ "' has invalid octal mode: " ++ target.args.get(0))
+        return 1
+    if with_fs_chmod(dest_path, mode) != 0:
+        with_eprint("error: install target '" ++ target.name ++ "' could not chmod destination: " ++ dest_path)
+        return 1
+    0
+
 fn build_graph_target_completed(completed: Vec[str], name: str) -> bool:
     for i in 0..completed.len() as i32:
         if completed.get(i as i64) == name:
@@ -1794,7 +1850,7 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
         if target.kind < 0 or target.kind > 20:
             with_eprint("error: invalid build.w target kind " ++ build_graph_kind_name(target.kind) ++ " for '" ++ target.name ++ "'")
             return 1
-        if target.kind != 0 and target.kind != 1 and target.kind != 2 and target.kind != 7 and target.kind != 9 and target.kind != 10 and target.kind != 11 and target.kind != 12 and target.kind != 13 and target.kind != 14 and target.kind != 15 and target.kind != 16 and target.kind != 17 and target.kind != 18 and target.kind != 19 and target.kind != 20:
+        if target.kind != 0 and target.kind != 1 and target.kind != 2 and target.kind != 7 and target.kind != 8 and target.kind != 9 and target.kind != 10 and target.kind != 11 and target.kind != 12 and target.kind != 13 and target.kind != 14 and target.kind != 15 and target.kind != 16 and target.kind != 17 and target.kind != 18 and target.kind != 19 and target.kind != 20:
             with_eprint("error: build.w target kind '" ++ build_graph_kind_name(target.kind) ++ "' is not implemented yet for '" ++ target.name ++ "'")
             return 1
         if target.target_kind < 0 or target.target_kind > 5:
@@ -1887,6 +1943,12 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
             let command_rc = build_graph_run_command(root, target)
             if command_rc != 0:
                 return command_rc
+            completed_targets.push(target.name)
+            continue
+        if target.kind == 8:
+            let install_rc = build_graph_install_file(root, target)
+            if install_rc != 0:
+                return install_rc
             completed_targets.push(target.name)
             continue
         let source_path = resolve_join(root, target.entry)

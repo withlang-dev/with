@@ -146,6 +146,10 @@ pub fn Build.command(self: Build, name: str, runner: str) -> Build:
     let target = target_new(.Command, name, runner)
     self.add_target(target)
 
+pub fn Build.install(self: Build, name: str, source: str, dest: str) -> Build:
+    let target = target_new(.Install, name, source).output(dest)
+    self.add_target(target)
+
 pub fn Build.group(self: Build, name: str) -> Build:
     let target = target_new(.Group, name, "")
     self.add_target(target)
