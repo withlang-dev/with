@@ -142,6 +142,10 @@ pub fn Build.archive(self: Build, name: str, entry: str) -> Build:
     let target = target_new(.Archive, name, entry)
     self.add_target(target)
 
+pub fn Build.command(self: Build, name: str, runner: str) -> Build:
+    let target = target_new(.Command, name, runner)
+    self.add_target(target)
+
 pub fn Build.group(self: Build, name: str) -> Build:
     let target = target_new(.Group, name, "")
     self.add_target(target)

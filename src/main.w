@@ -1714,6 +1714,53 @@ fn build_graph_run_corpus_test(root: str, target: BuildGraphTarget) -> i32:
         return if rc == 0: 1 else: rc
     0
 
+fn build_graph_run_command(root: str, target: BuildGraphTarget) -> i32:
+    if target.entry.len() == 0:
+        with_eprint("error: command target '" ++ target.name ++ "' requires an executable")
+        return 1
+    let arg_rc = build_graph_validate_process_args(target)
+    if arg_rc != 0:
+        return arg_rc
+    for ii in 0..target.inputs.len() as i32:
+        let input_path = build_graph_resolve_project_path(root, target.inputs.get(ii as i64))
+        if with_fs_file_exists(input_path) == 0:
+            with_eprint("error: command target '" ++ target.name ++ "' missing declared input: " ++ input_path)
+            return 1
+    if target.output.len() > 0:
+        let output_path = build_graph_resolve_project_path(root, target.output)
+        let output_dir = build_graph_dirname(output_path)
+        if with_fs_mkdir_p(output_dir) != 0:
+            with_eprint("error: command target '" ++ target.name ++ "' could not create output directory: " ++ output_dir)
+            return 1
+    let capture_dir = resolve_join(resolve_join(root, "out/command"), target.name)
+    if with_fs_mkdir_p(capture_dir) != 0:
+        with_eprint("error: could not create command output directory for target '" ++ target.name ++ "': " ++ capture_dir)
+        return 1
+    let stdout_path = resolve_join(capture_dir, "stdout.txt")
+    let stderr_path = resolve_join(capture_dir, "stderr.txt")
+    var argv = ""
+    let runner_path = if target.entry.byte_at(0) == 47 or with_str_contains(target.entry, "/") != 0:
+        build_graph_resolve_project_path(root, target.entry)
+    else:
+        target.entry
+    argv = build_graph_argv_append(argv, runner_path)
+    for ai in 0..target.args.len() as i32:
+        argv = build_graph_argv_append(argv, target.args.get(ai as i64))
+    let timeout_ms = 300000
+    let rc = with_exec_argv_capture(argv, stdout_path, stderr_path, timeout_ms)
+    if rc == 124:
+        with_eprint("error: command target '" ++ target.name ++ f"' timed out after {timeout_ms}ms; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+        return 124
+    if rc != 0:
+        with_eprint("error: command target '" ++ target.name ++ f"' failed with exit code {rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+        return if rc == 0: 1 else: rc
+    if target.output.len() > 0:
+        let output_path = build_graph_resolve_project_path(root, target.output)
+        if with_fs_file_exists(output_path) == 0:
+            with_eprint("error: command target '" ++ target.name ++ "' did not produce declared output: " ++ output_path)
+            return 1
+    0
+
 fn build_graph_target_completed(completed: Vec[str], name: str) -> bool:
     for i in 0..completed.len() as i32:
         if completed.get(i as i64) == name:
@@ -1747,7 +1794,7 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
         if target.kind < 0 or target.kind > 20:
             with_eprint("error: invalid build.w target kind " ++ build_graph_kind_name(target.kind) ++ " for '" ++ target.name ++ "'")
             return 1
-        if target.kind != 0 and target.kind != 1 and target.kind != 2 and target.kind != 9 and target.kind != 10 and target.kind != 11 and target.kind != 12 and target.kind != 13 and target.kind != 14 and target.kind != 15 and target.kind != 16 and target.kind != 17 and target.kind != 18 and target.kind != 19 and target.kind != 20:
+        if target.kind != 0 and target.kind != 1 and target.kind != 2 and target.kind != 7 and target.kind != 9 and target.kind != 10 and target.kind != 11 and target.kind != 12 and target.kind != 13 and target.kind != 14 and target.kind != 15 and target.kind != 16 and target.kind != 17 and target.kind != 18 and target.kind != 19 and target.kind != 20:
             with_eprint("error: build.w target kind '" ++ build_graph_kind_name(target.kind) ++ "' is not implemented yet for '" ++ target.name ++ "'")
             return 1
         if target.target_kind < 0 or target.target_kind > 5:
@@ -1834,6 +1881,12 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
             let corpus_rc = build_graph_run_corpus_test(root, target)
             if corpus_rc != 0:
                 return corpus_rc
+            completed_targets.push(target.name)
+            continue
+        if target.kind == 7:
+            let command_rc = build_graph_run_command(root, target)
+            if command_rc != 0:
+                return command_rc
             completed_targets.push(target.name)
             continue
         let source_path = resolve_join(root, target.entry)

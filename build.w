@@ -16,4 +16,34 @@ pub fn build(b: Build) -> Build:
     verified = verified.dep("fixpoint")
     out = out.add_target(verified)
 
+    var behavior_tests = target_new(.Command, "behavior-tests", "scripts/run_tests.sh")
+    behavior_tests = behavior_tests.input("scripts/run_tests.sh")
+    behavior_tests = behavior_tests.dep("selfcheck")
+    out = out.add_target(behavior_tests)
+
+    var cli_selfhost_tests = target_new(.Command, "cli-selfhost-tests", "/usr/bin/env")
+    cli_selfhost_tests = cli_selfhost_tests.input("scripts/run_cli_selfhost_tests.sh")
+    cli_selfhost_tests = cli_selfhost_tests.input("out/bin/with-stage2")
+    cli_selfhost_tests = cli_selfhost_tests.arg("WITH=out/bin/with-stage2")
+    cli_selfhost_tests = cli_selfhost_tests.arg("scripts/run_cli_selfhost_tests.sh")
+    cli_selfhost_tests = cli_selfhost_tests.dep("selfcheck")
+    out = out.add_target(cli_selfhost_tests)
+
+    var issue61_regression = target_new(.Command, "issue61-regression", "scripts/run_issue61_noop_local_regression.sh")
+    issue61_regression = issue61_regression.input("scripts/run_issue61_noop_local_regression.sh")
+    issue61_regression = issue61_regression.dep("selfcheck")
+    out = out.add_target(issue61_regression)
+
+    var embedded_runtime_regression = target_new(.Command, "embedded-runtime-regression", "scripts/run_embedded_runtime_extract_regression.sh")
+    embedded_runtime_regression = embedded_runtime_regression.input("scripts/run_embedded_runtime_extract_regression.sh")
+    embedded_runtime_regression = embedded_runtime_regression.dep("selfcheck")
+    out = out.add_target(embedded_runtime_regression)
+
+    var tests = target_new(.Group, "test", "")
+    tests = tests.dep("behavior-tests")
+    tests = tests.dep("cli-selfhost-tests")
+    tests = tests.dep("issue61-regression")
+    tests = tests.dep("embedded-runtime-regression")
+    out = out.add_target(tests)
+
     out.default("verified-existing-stage")
