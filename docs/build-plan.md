@@ -64,6 +64,9 @@
   - PCRE2 migration is now treated as a manual refresh step in the legacy
     Make path too: `regex-test` no longer depends on `regex-build`, and
     `regex-build` no longer depends on `regex-migrate`.
+  - `make regex-test` is now a compatibility shim over
+    `with build :regex-test` after checking that existing migrated PCRE2
+    sources, built `pcre2test`, and the reference tree are present.
   - Initial repository `build.w`:
       - `with build`
       - `with build :selfcheck`

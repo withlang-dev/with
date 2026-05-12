@@ -337,7 +337,7 @@ __regex-migrate: $(REGEX_MIGRATE_STAMP)
 
 __regex-build: $(REGEX_BUILD_STAMP)
 
-__regex-test: scripts/verify_pcre2_works.sh
+__regex-test:
 	@if [ ! -d "$(ROOT_DIR)/$(REGEX_MIGRATE_DIR)" ]; then \
 		echo "error: missing migrated PCRE2 sources: $(ROOT_DIR)/$(REGEX_MIGRATE_DIR)" >&2; \
 		echo "run make regex-migrate deliberately to refresh migrated PCRE2 sources" >&2; \
@@ -353,7 +353,7 @@ __regex-test: scripts/verify_pcre2_works.sh
 		echo "run make regex-migrate to fetch and prepare the PCRE2 release" >&2; \
 		exit 1; \
 	fi
-	@PCRE2_REF_DIR="$(ROOT_DIR)/$(REGEX_PCRE2_REF_DIR)" WITH_BIN="$(ROOT_DIR)/$(CANONICAL_BIN)" bash "$(ROOT_DIR)/scripts/verify_pcre2_works.sh"
+	@$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" build :regex-test
 
 __regex-promote: $(REGEX_BUILD_STAMP) scripts/pcre2_generated_workflow.sh
 	@if [ ! -x "$(ROOT_DIR)/$(CANONICAL_BIN)" ]; then \
