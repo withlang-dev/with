@@ -32,9 +32,14 @@ Source: `docs/toolchain.md`.
   - Diagnostics for missing explicit backing type and missing explicit
     discriminant values.
   - Rendering support.
-- `c_import(..., allow_untranslated: ...)` parsing and rendering:
+- `c_import(..., allow_untranslated: ...)`:
   - AST packing for link-library count plus allow-list count.
   - Resolve/frontend cache key includes the allow-list.
+  - Frontend fallback import now fails loudly for untranslatable macros and
+    declarations unless their names are explicitly present in
+    `allow_untranslated`.
+  - Explicitly allowed omissions are skipped by name; unallowed omissions are
+    diagnostics instead of silent drops.
 - PCRE2 reference source location:
   - `Makefile` fetches PCRE2 10.47 into `out/pcre2_reference/...` instead of
     using `.reference` as mutable staging.
@@ -168,6 +173,10 @@ Source: `docs/toolchain.md`.
 - `scripts/run_tests.sh test/behavior/behav_compiler_hook_emit_source.w test/compile_errors/err_compiler_hook_emit_source_type_error.w test/behavior/behav_compiler_hook_project_info.w test/compile_errors/err_compiler_hook_error_diagnostic.w`
 - `out/bin/with ir test/behavior/behav_compiler_hook_emit_source.w -O0`
   contains `define internal i32 @generated_from_hook`
+- `WITH=out/bin/with ./scripts/run_tests.sh test/behavior/behav_c_import_allow_untranslated.w test/compile_errors/err_c_import_untranslated_macro_requires_allow.w`
+- `make build`
+- `make fixpoint`
+- `make test`
 
 ## Remaining
 
