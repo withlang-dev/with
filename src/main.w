@@ -1347,6 +1347,7 @@ fn build_graph_kind_name(kind: i32) -> str:
     if kind == 23: return "cli_selfhost_smoke_test"
     if kind == 24: return "generate_compiler_entrypoints"
     if kind == 25: return "with_compiler_build"
+    if kind == 26: return "pcre2_run_test"
     f"unknown({kind})"
 
 fn build_graph_target_name(kind: i32) -> str:
@@ -1798,6 +1799,65 @@ fn build_graph_run_corpus_test(root: str, target: BuildGraphTarget) -> i32:
     if rc != 0:
         with_eprint("error: run_corpus_test target '" ++ target.name ++ f"' failed with exit code {rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
         return if rc == 0: 1 else: rc
+    0
+
+fn build_graph_run_pcre2_test(root: str, target: BuildGraphTarget) -> i32:
+    if target.entry.len() == 0:
+        with_eprint("error: pcre2_run_test target '" ++ target.name ++ "' requires a pcre2test binary")
+        return 1
+    if target.args.len() == 0:
+        with_eprint("error: pcre2_run_test target '" ++ target.name ++ "' requires a PCRE2 reference directory argument")
+        return 1
+    let arg_rc = build_graph_validate_process_args(target)
+    if arg_rc != 0:
+        return arg_rc
+    let pcre2test_path = build_graph_resolve_project_path(root, target.entry)
+    let ref_dir = build_graph_resolve_project_path(root, target.args.get(0))
+    let run_test_path = resolve_join(ref_dir, "RunTest")
+    for ii in 0..target.inputs.len() as i32:
+        let input_path = build_graph_resolve_project_path(root, target.inputs.get(ii as i64))
+        if with_fs_file_exists(input_path) == 0 and with_fs_is_dir(input_path) == 0:
+            with_eprint("error: pcre2_run_test target '" ++ target.name ++ "' missing declared input: " ++ input_path)
+            return 1
+    if with_fs_file_exists(pcre2test_path) == 0:
+        with_eprint("error: pcre2_run_test target '" ++ target.name ++ "' missing pcre2test binary: " ++ pcre2test_path)
+        return 1
+    if with_fs_file_exists(run_test_path) == 0:
+        with_eprint("error: pcre2_run_test target '" ++ target.name ++ "' missing upstream RunTest: " ++ run_test_path)
+        return 1
+    if with_fs_is_dir(ref_dir) == 0:
+        with_eprint("error: pcre2_run_test target '" ++ target.name ++ "' reference path is not a directory: " ++ ref_dir)
+        return 1
+    let stamp = f"{with_getpid()}.{with_clock_nanos()}"
+    let output_dir = if target.output.len() > 0:
+        build_graph_resolve_project_path(root, target.output)
+    else:
+        resolve_join(resolve_join(resolve_join(root, "out/corpus"), target.name), stamp)
+    if with_fs_mkdir_p(output_dir) != 0:
+        with_eprint("error: pcre2_run_test target '" ++ target.name ++ "' could not create output directory: " ++ output_dir)
+        return 1
+    let stdout_path = resolve_join(output_dir, "stdout.txt")
+    let stderr_path = resolve_join(output_dir, "stderr.txt")
+    var argv = ""
+    argv = build_graph_argv_append(argv, "/bin/bash")
+    argv = build_graph_argv_append(argv, run_test_path)
+    argv = build_graph_argv_append(argv, "-8")
+    argv = build_graph_argv_append(argv, "0-29")
+    argv = build_graph_argv_append(argv, "heap")
+    let old_srcdir = with_getenv_str("srcdir")
+    let old_pcre2test = with_getenv_str("pcre2test")
+    let _set_srcdir = with_setenv_str("srcdir", ref_dir)
+    let _set_pcre2test = with_setenv_str("pcre2test", pcre2test_path)
+    let rc = with_exec_argv_capture_cwd(argv, stdout_path, stderr_path, 900000, output_dir)
+    let _restore_srcdir = with_setenv_str("srcdir", old_srcdir)
+    let _restore_pcre2test = with_setenv_str("pcre2test", old_pcre2test)
+    if rc == 124:
+        with_eprint("error: pcre2_run_test target '" ++ target.name ++ "' timed out; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+        return 124
+    if rc != 0:
+        with_eprint("error: pcre2_run_test target '" ++ target.name ++ f"' failed with exit code {rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+        return if rc == 0: 1 else: rc
+    with_write("VERIFIED: migrated pcre2test passes upstream RunTest for the 8-bit corpus\n")
     0
 
 fn build_graph_run_command(root: str, target: BuildGraphTarget) -> i32:
@@ -2468,10 +2528,10 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
     let completed_targets: Vec[str] = Vec.new()
     for ti in 0..graph.targets.len() as i32:
         let target = graph.targets.get(ti as i64)
-        if target.kind < 0 or target.kind > 25:
+        if target.kind < 0 or target.kind > 26:
             with_eprint("error: invalid build.w target kind " ++ build_graph_kind_name(target.kind) ++ " for '" ++ target.name ++ "'")
             return 1
-        if target.kind != 0 and target.kind != 1 and target.kind != 2 and target.kind != 7 and target.kind != 8 and target.kind != 9 and target.kind != 10 and target.kind != 11 and target.kind != 12 and target.kind != 13 and target.kind != 14 and target.kind != 15 and target.kind != 16 and target.kind != 17 and target.kind != 18 and target.kind != 19 and target.kind != 20 and target.kind != 21 and target.kind != 22 and target.kind != 23 and target.kind != 24 and target.kind != 25:
+        if target.kind != 0 and target.kind != 1 and target.kind != 2 and target.kind != 7 and target.kind != 8 and target.kind != 9 and target.kind != 10 and target.kind != 11 and target.kind != 12 and target.kind != 13 and target.kind != 14 and target.kind != 15 and target.kind != 16 and target.kind != 17 and target.kind != 18 and target.kind != 19 and target.kind != 20 and target.kind != 21 and target.kind != 22 and target.kind != 23 and target.kind != 24 and target.kind != 25 and target.kind != 26:
             with_eprint("error: build.w target kind '" ++ build_graph_kind_name(target.kind) ++ "' is not implemented yet for '" ++ target.name ++ "'")
             return 1
         if target.target_kind < 0 or target.target_kind > 5:
@@ -2589,6 +2649,12 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
             let with_build_rc = build_graph_run_with_compiler_build(root, target)
             if with_build_rc != 0:
                 return with_build_rc
+            completed_targets.push(target.name)
+            continue
+        if target.kind == 26:
+            let pcre2_rc = build_graph_run_pcre2_test(root, target)
+            if pcre2_rc != 0:
+                return pcre2_rc
             completed_targets.push(target.name)
             continue
         if target.kind == 7:

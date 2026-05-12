@@ -337,7 +337,22 @@ __regex-migrate: $(REGEX_MIGRATE_STAMP)
 
 __regex-build: $(REGEX_BUILD_STAMP)
 
-__regex-test: $(REGEX_BUILD_STAMP) scripts/verify_pcre2_works.sh $(CANONICAL_BIN)
+__regex-test: scripts/verify_pcre2_works.sh
+	@if [ ! -d "$(ROOT_DIR)/$(REGEX_MIGRATE_DIR)" ]; then \
+		echo "error: missing migrated PCRE2 sources: $(ROOT_DIR)/$(REGEX_MIGRATE_DIR)" >&2; \
+		echo "run make regex-migrate deliberately to refresh migrated PCRE2 sources" >&2; \
+		exit 1; \
+	fi
+	@if [ ! -x "$(ROOT_DIR)/$(REGEX_PCRE2TEST_BIN)" ]; then \
+		echo "error: missing migrated PCRE2 test binary: $(ROOT_DIR)/$(REGEX_PCRE2TEST_BIN)" >&2; \
+		echo "run make regex-build after a deliberate make regex-migrate" >&2; \
+		exit 1; \
+	fi
+	@if [ ! -d "$(ROOT_DIR)/$(REGEX_PCRE2_REF_DIR)" ]; then \
+		echo "error: missing PCRE2 reference tree: $(ROOT_DIR)/$(REGEX_PCRE2_REF_DIR)" >&2; \
+		echo "run make regex-migrate to fetch and prepare the PCRE2 release" >&2; \
+		exit 1; \
+	fi
 	@PCRE2_REF_DIR="$(ROOT_DIR)/$(REGEX_PCRE2_REF_DIR)" WITH_BIN="$(ROOT_DIR)/$(CANONICAL_BIN)" bash "$(ROOT_DIR)/scripts/verify_pcre2_works.sh"
 
 __regex-promote: $(REGEX_BUILD_STAMP) scripts/pcre2_generated_workflow.sh
@@ -465,14 +480,14 @@ $(REGEX_MIGRATE_STAMP): $(CANONICAL_BIN) $(REGEX_PCRE2_READY) scripts/prepare_pc
 	echo "migrated PCRE2: $$count .w files in $$out"; \
 	touch "$@"
 
-$(REGEX_BUILD_STAMP): $(REGEX_MIGRATE_STAMP) scripts/pcre2_generated_workflow.sh | $(OUT_GEN_DIR) $(OUT_TMP_DIR)
+$(REGEX_BUILD_STAMP): scripts/pcre2_generated_workflow.sh | $(OUT_GEN_DIR) $(OUT_TMP_DIR)
 	@set -euo pipefail; \
 	src="$(ROOT_DIR)/$(REGEX_MIGRATE_DIR)"; \
 	out="$(ROOT_DIR)/$(REGEX_BUILD_DIR)"; \
 	tmp="$$out.tmp"; \
 	re_dir="$$tmp/lib/std/re"; \
 	bin_dir="$$tmp/bin"; \
-	[ -d "$$src" ] || { echo "error: missing migrated PCRE2 directory: $$src" >&2; exit 1; }; \
+	[ -d "$$src" ] || { echo "error: missing migrated PCRE2 directory: $$src — run make regex-migrate deliberately" >&2; exit 1; }; \
 	rm -rf "$$tmp"; \
 	mkdir -p "$$re_dir" "$$bin_dir"; \
 	cp "$$src"/*.w "$$re_dir/"; \

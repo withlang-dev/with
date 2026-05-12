@@ -58,6 +58,12 @@
         objects and prints `FIXPOINT` on success.
   - `with test` with no explicit source path now dispatches to the project
     graph target `with build :test`.
+  - `with build :regex-test` now runs the upstream PCRE2 `RunTest -8 0-29
+    heap` corpus through a typed `pcre2_run_test` graph node instead of the
+    repository wrapper script `scripts/verify_pcre2_works.sh`.
+  - PCRE2 migration is now treated as a manual refresh step in the legacy
+    Make path too: `regex-test` no longer depends on `regex-build`, and
+    `regex-build` no longer depends on `regex-migrate`.
   - Initial repository `build.w`:
       - `with build`
       - `with build :selfcheck`
@@ -81,7 +87,11 @@
   - Port the canonical `out/bin/with` compiler build into `build.w`; stage1,
     stage2, stage3, and fixpoint object generation now have direct graph
     targets, but canonical runtime refresh/embedding still lives in Make.
-  - Port PCRE2 download/migrate/build into typed nodes; `regex-test`, `regex-check-generated`, and `regex-promote` are currently exposed through existing scripts.
+  - Port PCRE2 download/migrate/build/check/promote into typed nodes;
+    `regex-test` is typed, while source preparation, generated-source checking,
+    and promotion still use existing scripts. Migration must remain manually
+    triggered; normal test/build targets should consume existing migrated
+    output and fail loudly if it is missing.
   - Port seed, clean, emit-c, and cross targets.
   - Make Makefile delegate to `with build :...` only after direct graph paths are equivalent.
   - Remove Make recipes and obsolete scripts last.
