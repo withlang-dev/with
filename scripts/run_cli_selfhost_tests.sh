@@ -4251,6 +4251,9 @@ pub fn build(b: Build) -> Build:
     var corpus = target_new(.RunCorpusTest, "corpus", "out/bin/two")
     corpus = corpus.dep("two")
     out = out.add_target(corpus)
+    var command = target_new(.Command, "run-two", "out/bin/two")
+    command = command.dep("two")
+    out = out.add_target(command)
     var aggregate = target_new(.Group, "toolchain", "")
     aggregate = aggregate.dep("bytes-same")
     aggregate = aggregate.dep("fix-same")
@@ -4259,6 +4262,7 @@ pub fn build(b: Build) -> Build:
     aggregate = aggregate.dep("embedded-helper-o")
     aggregate = aggregate.dep("promote-runtime")
     aggregate = aggregate.dep("corpus")
+    aggregate = aggregate.dep("run-two")
     out = out.add_target(aggregate)
     out.default("toolchain")
 EOF
@@ -4319,6 +4323,13 @@ EOF
     return
   fi
 
+  if ! file_has_literal "$tmpdir/out" $'target\t7\trun-two\tout/bin/two\t0\t0\t'; then
+    echo "FAIL(cli-selfhost-build-graph-command-node) build_w_graph_v2"
+    cat "$tmpdir/out" || true
+    failures=$((failures + 1))
+    return
+  fi
+
   if ! run_cli_in_dir "$case_dir" "$tmpdir/out" "$tmpdir/err" build :two --graph; then
     echo "FAIL(cli-selfhost-build-graph-selected) build_w_graph_v2"
     cat "$tmpdir/err" || true
@@ -4361,7 +4372,7 @@ EOF
     return
   fi
 
-  if [[ ! -f "$case_dir/out/lib/helper.o" || ! -f "$case_dir/out/lib/libhelper.a" || ! -f "$case_dir/out/lib/embedded_helper.s" || ! -f "$case_dir/out/lib/embedded_helper.o" || ! -f "$case_dir/out/runtime/helper.c" || ! -f "$case_dir/promoted-runtime/helper.c" || ! -f "$case_dir/out/corpus/corpus/stdout.txt" ]]; then
+  if [[ ! -f "$case_dir/out/lib/helper.o" || ! -f "$case_dir/out/lib/libhelper.a" || ! -f "$case_dir/out/lib/embedded_helper.s" || ! -f "$case_dir/out/lib/embedded_helper.o" || ! -f "$case_dir/out/runtime/helper.c" || ! -f "$case_dir/promoted-runtime/helper.c" || ! -f "$case_dir/out/corpus/corpus/stdout.txt" || ! -f "$case_dir/out/command/run-two/stdout.txt" ]]; then
     echo "FAIL(cli-selfhost-build-object-archive-embed-before-unsupported) build_w_graph_v2"
     ls -R "$case_dir/out" || true
     ls -R "$case_dir/promoted-runtime" || true
@@ -4373,6 +4384,14 @@ EOF
     echo "FAIL(cli-selfhost-build-corpus-output) build_w_graph_v2"
     cat "$case_dir/out/corpus/corpus/stdout.txt" || true
     cat "$case_dir/out/corpus/corpus/stderr.txt" || true
+    failures=$((failures + 1))
+    return
+  fi
+
+  if ! file_has_literal "$case_dir/out/command/run-two/stdout.txt" "two"; then
+    echo "FAIL(cli-selfhost-build-command-output) build_w_graph_v2"
+    cat "$case_dir/out/command/run-two/stdout.txt" || true
+    cat "$case_dir/out/command/run-two/stderr.txt" || true
     failures=$((failures + 1))
     return
   fi
@@ -4393,7 +4412,7 @@ EOF
     return
   fi
 
-  if [[ ! -x "$case_dir/out/bin/two" || -x "$case_dir/out/bin/one" || ! -f "$case_dir/out/lib/libhelper.a" || ! -f "$case_dir/out/corpus/corpus/stdout.txt" ]]; then
+  if [[ ! -x "$case_dir/out/bin/two" || -x "$case_dir/out/bin/one" || ! -f "$case_dir/out/lib/libhelper.a" || ! -f "$case_dir/out/corpus/corpus/stdout.txt" || ! -f "$case_dir/out/command/run-two/stdout.txt" ]]; then
     echo "FAIL(cli-selfhost-build-group-deps-output) build_w_graph_v2"
     ls -R "$case_dir/out" || true
     failures=$((failures + 1))

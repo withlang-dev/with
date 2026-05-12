@@ -9,6 +9,42 @@
   Make remains only as a temporary compatibility shim during migration. The final state is that the compiler repository can build, test,
   migrate PCRE2, promote regex sources, install the user compiler, and clean using with build :... targets directly.
 
+  ## Current Progress
+
+  Completed:
+
+  - Graph v2 parsing/serialization with target outputs, inputs, deps, args, and default target selection.
+  - Dependency-closure target selection, including explicit `dep(...)` edges and producer edges inferred from inputs/entries.
+  - Implemented executable graph nodes for:
+      - executable/library/test targets;
+      - group targets;
+      - binary_compare / fixpoint_compare;
+      - compile_c_object / compile_asm_object / compile_llvm_ir_object;
+      - create_static_archive;
+      - generate_response_file;
+      - embed_object_files;
+      - copy_runtime_tree;
+      - run_corpus_test;
+      - promote_tree_if_verified;
+      - command (argv-only, no shell command strings).
+  - Runtime argv process execution with stdout/stderr capture and timeout.
+  - Initial repository `build.w`:
+      - `with build`
+      - `with build :selfcheck`
+      - `with build :fixpoint`
+      - `with build :test`
+
+  Remaining:
+
+  - Replace temporary `with build :test` script invocations with native typed With test harness nodes.
+  - Port runtime object generation into `build.w`.
+  - Port embedded runtime object generation out of shell.
+  - Port stage1/stage2/stage3 compiler builds into `build.w`.
+  - Port PCRE2 download/migrate/build/test/promote into typed nodes.
+  - Port install-user, update-seed, seed, clean, emit-c, and cross targets.
+  - Make Makefile delegate to `with build :...` only after direct graph paths are equivalent.
+  - Remove Make recipes and obsolete scripts last.
+
   ## Key Changes
 
   - Extend std.build from the current simple target list into graph v2:
