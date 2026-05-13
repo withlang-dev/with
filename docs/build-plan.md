@@ -95,6 +95,9 @@
     resolvers for cc, ar, nm, LLVM clang, opt, curl, tar, and dsymutil.
   - Build graph data structures, v1/v2 parsing, serialization, and dependency
     closure selection now live in `BuildGraphModel` instead of `src/main.w`.
+  - Build graph path normalization, output path helpers, argv blob assembly,
+    and process-argument validation now live in `BuildGraphSupport` instead of
+    `src/main.w`.
   - `with build :stage1`, `:stage2`, `:stage3`, and `:fixpoint` now build
     through typed graph nodes instead of comparing stale stage artifacts:
       - `generate_compiler_entrypoints` emits the version-substituted
