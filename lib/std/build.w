@@ -44,6 +44,7 @@ pub enum BuildKind: i32:
     CliSelfhostRegexPrepTest = 37
     CliSelfhostMigrateBasicTest = 38
     CliSelfhostMigrateCoreTest = 39
+    SelfhostSuiteTest = 40
 
 pub enum BuildTarget: i32:
     native = 0
@@ -262,6 +263,13 @@ pub fn Build.cli_selfhost_migrate_basic_test(self: Build, name: str, compiler: s
 pub fn Build.cli_selfhost_migrate_core_test(self: Build, name: str, compiler: str) -> Build:
     let target = target_new(.CliSelfhostMigrateCoreTest, name, compiler)
     self.add_target(target)
+
+pub fn selfhost_suite_target(name: str, compiler: str, suite: str) -> Target:
+    var target = target_new(.SelfhostSuiteTest, name, compiler)
+    target.arg(suite)
+
+pub fn Build.selfhost_suite_test(self: Build, name: str, compiler: str, suite: str) -> Build:
+    self.add_target(selfhost_suite_target(name, compiler, suite))
 
 pub fn Build.generate_compiler_entrypoints(self: Build, name: str, stamp: str) -> Build:
     let target = target_new(.GenerateCompilerEntrypoints, name, "").output(stamp)
