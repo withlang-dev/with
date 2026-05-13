@@ -105,6 +105,10 @@
     binary/fixpoint comparisons, response files, C/asm/LLVM object compilation,
     static archives, embedded object assembly, manifest copy, corpus/command
     execution, file copy, and install nodes.
+  - PCRE2-specific graph operations now live in `BuildGraphPcre2`, keeping the
+    generated-source checks, promotion, pcre2test build, and upstream corpus run
+    out of `src/main.w` while using the centralized `BuildGraphRuntime`
+    boundary for process, environment, and filesystem effects.
   - `with build :stage1`, `:stage2`, `:stage3`, and `:fixpoint` now build
     through typed graph nodes instead of comparing stale stage artifacts:
       - `generate_compiler_entrypoints` emits the version-substituted
