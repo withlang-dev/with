@@ -109,6 +109,9 @@
     generated-source checks, promotion, pcre2test build, and upstream corpus run
     out of `src/main.w` while using the centralized `BuildGraphRuntime`
     boundary for process, environment, and filesystem effects.
+  - Native `Test` graph execution now lives in `BuildGraphTests`, so test-file
+    glob expansion, `compiler=` selection, and per-file process capture are no
+    longer embedded in `src/main.w`.
   - `with build :stage1`, `:stage2`, `:stage3`, and `:fixpoint` now build
     through typed graph nodes instead of comparing stale stage artifacts:
       - `generate_compiler_entrypoints` emits the version-substituted
