@@ -245,6 +245,16 @@ pub fn build(b: Build) -> Build:
     cli_selfhost_edge_tests = cli_selfhost_edge_tests.dep("selfcheck")
     out = out.add_target(cli_selfhost_edge_tests)
 
+    var cli_selfhost_regex_prep_tests = target_new(37 as BuildKind, "cli-selfhost-regex-prep-tests", "out/bin/with-stage2")
+    cli_selfhost_regex_prep_tests = cli_selfhost_regex_prep_tests.input("out/bin/with-stage2")
+    cli_selfhost_regex_prep_tests = cli_selfhost_regex_prep_tests.dep("selfcheck")
+    out = out.add_target(cli_selfhost_regex_prep_tests)
+
+    var cli_selfhost_migrate_basic_tests = target_new(38 as BuildKind, "cli-selfhost-migrate-basic-tests", "out/bin/with-stage2")
+    cli_selfhost_migrate_basic_tests = cli_selfhost_migrate_basic_tests.input("out/bin/with-stage2")
+    cli_selfhost_migrate_basic_tests = cli_selfhost_migrate_basic_tests.dep("selfcheck")
+    out = out.add_target(cli_selfhost_migrate_basic_tests)
+
     var issue61_regression = target_new(.SelfhostNoopLocalRegression, "issue61-regression", "out/bin/with-stage2")
     issue61_regression = issue61_regression.input("out/bin/with-stage2")
     issue61_regression = issue61_regression.dep("selfcheck")
@@ -267,6 +277,8 @@ pub fn build(b: Build) -> Build:
     tests = tests.dep("cli-selfhost-build-w-tests")
     tests = tests.dep("cli-selfhost-project-tests")
     tests = tests.dep("cli-selfhost-edge-tests")
+    tests = tests.dep("cli-selfhost-regex-prep-tests")
+    tests = tests.dep("cli-selfhost-migrate-basic-tests")
     tests = tests.dep("cli-selfhost-tests")
     tests = tests.dep("issue61-regression")
     tests = tests.dep("embedded-runtime-regression")

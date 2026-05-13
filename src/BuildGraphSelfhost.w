@@ -342,6 +342,513 @@ pub fn run_cli_selfhost_edge_test(root: str, target_name: str, compiler_path: st
     if rc != 0: return rc
     bgs_check_imported_module_dependency_order(root, target_name, compiler_path, bgs_resolve_join(base_dir, "imported_module_dependency_order_case"))
 
+fn bgs_regex_assert_contains(text: str, needle: str, target_name: str, label: str) -> i32:
+    if with_str_contains(text, needle) != 0:
+        return 0
+    with_eprint("error: cli_selfhost_regex_prep_test target '" ++ target_name ++ "' missing expected output for " ++ label ++ ": " ++ needle)
+    1
+
+fn bgs_regex_assert_not_contains(text: str, needle: str, target_name: str, label: str) -> i32:
+    if with_str_contains(text, needle) == 0:
+        return 0
+    with_eprint("error: cli_selfhost_regex_prep_test target '" ++ target_name ++ "' found forbidden output for " ++ label ++ ": " ++ needle)
+    1
+
+fn bgs_regex_file_contains(path: str, needle: str, target_name: str, label: str) -> i32:
+    if with_fs_file_exists(path) == 0:
+        with_eprint("error: cli_selfhost_regex_prep_test target '" ++ target_name ++ "' missing file for " ++ label ++ ": " ++ path)
+        return 1
+    bgs_regex_assert_contains(with_fs_read_file(path), needle, target_name, label)
+
+fn bgs_regex_file_forbids(path: str, needle: str, target_name: str, label: str) -> i32:
+    if with_fs_file_exists(path) == 0:
+        with_eprint("error: cli_selfhost_regex_prep_test target '" ++ target_name ++ "' missing file for " ++ label ++ ": " ++ path)
+        return 1
+    bgs_regex_assert_not_contains(with_fs_read_file(path), needle, target_name, label)
+
+fn bgs_copy_fixture_file(src: str, dst: str, target_name: str, label: str) -> i32:
+    if with_fs_file_exists(src) == 0:
+        with_eprint("error: cli_selfhost_regex_prep_test target '" ++ target_name ++ "' missing source file for " ++ label ++ ": " ++ src)
+        return 1
+    bgs_write_fixture(dst, with_fs_read_file(src), target_name, label)
+
+fn bgs_drop_first_lines(text: str, count: i32) -> str:
+    var line_start = 0
+    var line_no = 1
+    for i in 0..text.len() as i32:
+        if text.byte_at(i as i64) == 10:
+            if line_no == count:
+                return text.slice((i + 1) as i64, text.len())
+            line_no = line_no + 1
+            line_start = i + 1
+    if line_no > count:
+        return text.slice(line_start as i64, text.len())
+    ""
+
+fn bgs_regex_expect_success(root: str, target_name: str, compiler_path: str, case_dir: str, label: str, argv_tail: str) -> BuildSelfhostRunResult:
+    let result = bgs_run_cli_capture_cwd(root, target_name, compiler_path, label, argv_tail, 180000, case_dir)
+    if result.rc != 0:
+        with_eprint("error: regex prep selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
+    result
+
+fn bgs_check_pcre2_defs_prune_ebcdic_tables(root: str, target_name: str) -> i32:
+    let defs = bgs_resolve_join(root, "lib/std/re/defs.w")
+    var rc = bgs_regex_file_forbids(defs, "_pcre2_ebcdic_1047_to_ascii_8", target_name, "ebcdic table externs")
+    if rc != 0: return rc
+    bgs_regex_file_forbids(defs, "_pcre2_ascii_to_ebcdic_1047_8", target_name, "ebcdic table externs")
+
+fn bgs_check_pcre2_prepare_shared_externs(root: str, target_name: str, base_dir: str) -> i32:
+    let raw_dir = bgs_resolve_join(base_dir, "raw")
+    let generated_dir = bgs_resolve_join(base_dir, "generated")
+    var rc = bgs_write_fixture(bgs_resolve_join(raw_dir, "defs.w"), "// std.re.defs - shared definitions\nextern fn preamble_helper() -> void\n", target_name, "shared externs defs")
+    if rc != 0: return rc
+    rc = bgs_write_fixture(bgs_resolve_join(raw_dir, "pcre2_tables.w"), "// Migrated from PCRE2\nuse std.re.defs\n\ntype BOOL = c_int\nvar _pcre2_utf8_table1: *c_int\nvar _pcre2_OP_lengths_8: *u8\n", target_name, "shared externs tables")
+    if rc != 0: return rc
+    rc = bgs_write_fixture(bgs_resolve_join(raw_dir, "pcre2_compile.w"), "// Migrated from PCRE2\nuse std.re.defs\n\ntype BOOL = c_int\nextern var _pcre2_utf8_table1: *c_int\nvar _pcre2_posix_class_maps8: *c_int\n", target_name, "shared externs compile")
+    if rc != 0: return rc
+    rc = bgs_write_fixture(bgs_resolve_join(raw_dir, "pcre2_compile_class.w"), "// Migrated from PCRE2\nuse std.re.defs\n\ntype BOOL = c_int\nextern var _pcre2_utf8_table1: *c_int\nextern var _pcre2_posix_class_maps8: *c_int\n", target_name, "shared externs compile class")
+    if rc != 0: return rc
+    let files: Vec[str] = Vec.new()
+    files.push("defs.w")
+    files.push("pcre2_tables.w")
+    files.push("pcre2_compile.w")
+    files.push("pcre2_compile_class.w")
+    for i in 0..files.len() as i32:
+        let file = files.get(i as i64)
+        rc = bgs_copy_fixture_file(bgs_resolve_join(raw_dir, file), bgs_resolve_join(generated_dir, file), target_name, "shared externs copy")
+        if rc != 0: return rc
+    rc = bgs_regex_file_contains(bgs_resolve_join(generated_dir, "pcre2_tables.w"), "var _pcre2_utf8_table1: *c_int", target_name, "shared externs tables")
+    if rc != 0: return rc
+    rc = bgs_regex_file_contains(bgs_resolve_join(generated_dir, "pcre2_tables.w"), "var _pcre2_OP_lengths_8: *u8", target_name, "shared externs tables")
+    if rc != 0: return rc
+    rc = bgs_regex_file_contains(bgs_resolve_join(generated_dir, "pcre2_compile.w"), "extern var _pcre2_utf8_table1: *c_int", target_name, "shared externs compile")
+    if rc != 0: return rc
+    rc = bgs_regex_file_contains(bgs_resolve_join(generated_dir, "pcre2_compile.w"), "var _pcre2_posix_class_maps8: *c_int", target_name, "shared externs compile")
+    if rc != 0: return rc
+    rc = bgs_regex_file_contains(bgs_resolve_join(generated_dir, "pcre2_compile_class.w"), "extern var _pcre2_utf8_table1: *c_int", target_name, "shared externs class")
+    if rc != 0: return rc
+    bgs_regex_file_contains(bgs_resolve_join(generated_dir, "pcre2_compile_class.w"), "extern var _pcre2_posix_class_maps8: *c_int", target_name, "shared externs class")
+
+fn bgs_check_pcre2_prepare_width_prunes(root: str, target_name: str, compiler_path: str, base_dir: str) -> i32:
+    let raw_dir = bgs_resolve_join(base_dir, "raw")
+    let generated_dir = bgs_resolve_join(base_dir, "generated")
+    let compile_text = "// Migrated from PCRE2\nuse std.re.defs\n\ntype BOOL = c_int\nextern fn _pcre2_keep_8(ch: c_uint) -> c_uint\nfn keep_body(flag: c_int) -> c_int {\n    var c__goto_6350_16: c_uint = 0\n    if flag != 0 {\n        (c__goto_6350_16 = _pcre2_keep_8(c__goto_6350_16))\n    } else {\n        (c__goto_6350_16 = 1)\n    }\n    (c__goto_6350_16 as c_int)\n}\n"
+    var rc = bgs_write_fixture(bgs_resolve_join(raw_dir, "defs.w"), "// std.re.defs - shared definitions\ntype c_void = opaque\ntype c_int = i32\ntype c_uint = u32\ntype c_ushort = u16\nextern fn strlen(s: *const i8) -> i64\nextern fn memchr(s: *const c_void, c: i32, n: i64) -> *mut c_void\n", target_name, "width prune defs")
+    if rc != 0: return rc
+    rc = bgs_write_fixture(bgs_resolve_join(raw_dir, "pcre2_compile.w"), compile_text, target_name, "width prune compile")
+    if rc != 0: return rc
+    rc = bgs_copy_fixture_file(bgs_resolve_join(raw_dir, "defs.w"), bgs_resolve_join(generated_dir, "defs.w"), target_name, "width prune defs copy")
+    if rc != 0: return rc
+    rc = bgs_copy_fixture_file(bgs_resolve_join(raw_dir, "pcre2_compile.w"), bgs_resolve_join(generated_dir, "pcre2_compile.w"), target_name, "width prune compile copy")
+    if rc != 0: return rc
+    rc = bgs_regex_file_contains(bgs_resolve_join(generated_dir, "pcre2_compile.w"), "(c__goto_6350_16 = _pcre2_keep_8(c__goto_6350_16))", target_name, "width prune local")
+    if rc != 0: return rc
+    rc = bgs_regex_file_contains(bgs_resolve_join(generated_dir, "pcre2_compile.w"), "} else {", target_name, "width prune else")
+    if rc != 0: return rc
+    let wrapper = bgs_resolve_join(base_dir, "wrapper.w")
+    let wrapper_text = with_fs_read_file(bgs_resolve_join(generated_dir, "defs.w")) ++ bgs_drop_first_lines(with_fs_read_file(bgs_resolve_join(generated_dir, "pcre2_compile.w")), 2) ++ "\nfn main { print(\"ok\") }\n"
+    rc = bgs_write_fixture(wrapper, wrapper_text, target_name, "width prune wrapper")
+    if rc != 0: return rc
+    let result = bgs_regex_expect_success(root, target_name, compiler_path, base_dir, "width-prunes-whole-decls", bgs_argv_append(bgs_argv_append("", "check"), wrapper))
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    0
+
+fn bgs_check_pcre2_prepare_shared_lets(root: str, target_name: str, base_dir: str) -> i32:
+    let raw_dir = bgs_resolve_join(base_dir, "raw")
+    let generated_dir = bgs_resolve_join(base_dir, "generated")
+    var rc = bgs_write_fixture(bgs_resolve_join(raw_dir, "defs.w"), "// std.re.defs - shared definitions\nlet ucp_C: c_uint = 0\nlet ucp_L: c_uint = 1\n", target_name, "shared lets defs")
+    if rc != 0: return rc
+    rc = bgs_write_fixture(bgs_resolve_join(raw_dir, "pcre2_tables.w"), "// Migrated from PCRE2\nuse std.re.defs\n\ntype BOOL = c_int\nlet LOCAL_TABLE_ONLY: c_uint = 99\n", target_name, "shared lets tables")
+    if rc != 0: return rc
+    rc = bgs_write_fixture(bgs_resolve_join(raw_dir, "pcre2_compile.w"), "// Migrated from PCRE2\nuse std.re.defs\n\ntype BOOL = c_int\nlet COMPILE_ONLY: c_uint = 7\n", target_name, "shared lets compile")
+    if rc != 0: return rc
+    rc = bgs_write_fixture(bgs_resolve_join(raw_dir, "pcre2_match.w"), "// Migrated from PCRE2\nuse std.re.defs\n\ntype BOOL = c_int\nlet MATCH_ONLY: c_uint = 8\n", target_name, "shared lets match")
+    if rc != 0: return rc
+    let files: Vec[str] = Vec.new()
+    files.push("defs.w")
+    files.push("pcre2_tables.w")
+    files.push("pcre2_compile.w")
+    files.push("pcre2_match.w")
+    for i in 0..files.len() as i32:
+        let file = files.get(i as i64)
+        rc = bgs_copy_fixture_file(bgs_resolve_join(raw_dir, file), bgs_resolve_join(generated_dir, file), target_name, "shared lets copy")
+        if rc != 0: return rc
+    rc = bgs_regex_file_contains(bgs_resolve_join(generated_dir, "defs.w"), "let ucp_C: c_uint = 0", target_name, "shared lets defs")
+    if rc != 0: return rc
+    rc = bgs_regex_file_contains(bgs_resolve_join(generated_dir, "defs.w"), "let ucp_L: c_uint = 1", target_name, "shared lets defs")
+    if rc != 0: return rc
+    rc = bgs_regex_file_forbids(bgs_resolve_join(generated_dir, "pcre2_tables.w"), "let ucp_C: c_uint = 0", target_name, "shared lets tables")
+    if rc != 0: return rc
+    rc = bgs_regex_file_forbids(bgs_resolve_join(generated_dir, "pcre2_compile.w"), "let ucp_C: c_uint = 0", target_name, "shared lets compile")
+    if rc != 0: return rc
+    rc = bgs_regex_file_forbids(bgs_resolve_join(generated_dir, "pcre2_match.w"), "let ucp_C: c_uint = 0", target_name, "shared lets match")
+    if rc != 0: return rc
+    rc = bgs_regex_file_contains(bgs_resolve_join(generated_dir, "pcre2_tables.w"), "let LOCAL_TABLE_ONLY: c_uint = 99", target_name, "shared lets tables")
+    if rc != 0: return rc
+    rc = bgs_regex_file_contains(bgs_resolve_join(generated_dir, "pcre2_compile.w"), "let COMPILE_ONLY: c_uint = 7", target_name, "shared lets compile")
+    if rc != 0: return rc
+    bgs_regex_file_contains(bgs_resolve_join(generated_dir, "pcre2_match.w"), "let MATCH_ONLY: c_uint = 8", target_name, "shared lets match")
+
+fn bgs_check_std_re_shared_dependency_imports(root: str, target_name: str, compiler_path: str, base_dir: str) -> i32:
+    let src = bgs_resolve_join(base_dir, "main.w")
+    var rc = bgs_write_fixture(src, "use std.re.defs\nuse std.re.pcre2_compile\nuse std.re.pcre2_match\n\nfn main:\n    print(\"ok\")\n", target_name, "std re dependency imports")
+    if rc != 0: return rc
+    let result = bgs_regex_expect_success(root, target_name, compiler_path, base_dir, "std-re-shared-dependency-imports", bgs_argv_append(bgs_argv_append("", "check"), src))
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    0
+
+fn bgs_check_opaque_field_access_rejected(root: str, target_name: str, compiler_path: str, base_dir: str) -> i32:
+    let src = bgs_resolve_join(base_dir, "opaque_field_access.w")
+    var rc = bgs_write_fixture(src, "type T = opaque\n\nfn f(p: *mut T):\n    (p.x = 1)\n\nfn main:\n    let _ = 0\n", target_name, "opaque field access")
+    if rc != 0: return rc
+    let result = bgs_run_cli_capture_cwd(root, target_name, compiler_path, "opaque-field-access", bgs_argv_append(bgs_argv_append("", "check"), src), 120000, base_dir)
+    if result.rc == 0:
+        with_eprint("error: cli_selfhost_regex_prep_test target '" ++ target_name ++ "' accepted opaque field access")
+        return 1
+    bgs_regex_assert_contains(result.stderr, "field access requires a concrete struct or union type; this type is opaque", target_name, "opaque_field_access")
+
+fn bgs_check_pcre2_match_heapframe(root: str, target_name: str, compiler_path: str, base_dir: str) -> i32:
+    let match_path = bgs_resolve_join(root, "lib/std/re/pcre2_match.w")
+    let match_text = with_fs_read_file(match_path)
+    var rc = bgs_regex_assert_not_contains(match_text, "type heapframe = opaque", target_name, "pcre2 match heapframe")
+    if rc != 0: return rc
+    rc = bgs_regex_assert_not_contains(match_text, "type heapframe_align = opaque", target_name, "pcre2 match heapframe")
+    if rc != 0: return rc
+    let obj = bgs_resolve_join(base_dir, "pcre2_match_issue111.o")
+    var argv = ""
+    argv = bgs_argv_append(argv, "build")
+    argv = bgs_argv_append(argv, match_path)
+    argv = bgs_argv_append(argv, "--emit-obj")
+    argv = bgs_argv_append(argv, "--no-prelude")
+    argv = bgs_argv_append(argv, "-O0")
+    argv = bgs_argv_append(argv, "-o")
+    argv = bgs_argv_append(argv, obj)
+    let result = bgs_regex_expect_success(root, target_name, compiler_path, root, "pcre2-match-heapframe", argv)
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    0
+
+fn bgs_check_pcre2_compile_builds(root: str, target_name: str, compiler_path: str, base_dir: str) -> i32:
+    let src = bgs_resolve_join(base_dir, "pcre2_compile_builds.w")
+    let bin = bgs_resolve_join(base_dir, "pcre2_compile_builds")
+    var rc = bgs_write_fixture(src, "use std.re.defs\nuse std.re.pcre2_compile\n\nfn main:\n    let _ = pcre2_compile_8((null as *const u8), 0, 0, (null as *mut c_int), (null as *mut c_ulong), (null as *mut pcre2_real_compile_context_8))\n    print(\"ok\")\n", target_name, "pcre2 compile builds")
+    if rc != 0: return rc
+    let result = bgs_regex_expect_success(root, target_name, compiler_path, base_dir, "pcre2-compile-builds", bgs_argv_append(bgs_argv_append(bgs_argv_append(bgs_argv_append("", "build"), src), "-o"), bin))
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    rc = bgs_regex_assert_not_contains(result.stderr, "MIR lowering failed", target_name, "pcre2 compile builds")
+    if rc != 0: return rc
+    rc = bgs_regex_assert_not_contains(result.stderr, "AST codegen was removed", target_name, "pcre2 compile builds")
+    if rc != 0: return rc
+    if with_fs_file_exists(bin) == 0:
+        with_eprint("error: cli_selfhost_regex_prep_test target '" ++ target_name ++ "' missing pcre2_compile_builds output: " ++ bin)
+        return 1
+    0
+
+fn bgs_check_pcre2_jit_no_support(root: str, target_name: str, compiler_path: str, base_dir: str) -> i32:
+    let src = bgs_resolve_join(base_dir, "pcre2_jit_no_support.w")
+    let text = "use std.re.defs\nuse std.re.pcre2_jit_compile\n\nfn main() -> i32:\n    let rc_null = pcre2_jit_compile_8((null as *mut pcre2_real_code_8), 0)\n    if rc_null != PCRE2_ERROR_NULL: return 1\n\n    let rc_test_alloc = pcre2_jit_compile_8((null as *mut pcre2_real_code_8), PCRE2_JIT_TEST_ALLOC)\n    if rc_test_alloc != PCRE2_ERROR_JIT_UNSUPPORTED: return 2\n\n    let stack = pcre2_jit_stack_create_8(1, 1024, (null as *mut pcre2_real_general_context_8))\n    if stack != null: return 3\n\n    pcre2_jit_stack_assign_8((null as *mut pcre2_real_match_context_8), (null as *const fn(*mut c_void) -> *mut pcre2_real_jit_stack_8), (null as *mut c_void))\n    pcre2_jit_stack_free_8(stack)\n    pcre2_jit_free_unused_memory_8((null as *mut pcre2_real_general_context_8))\n    _pcre2_jit_free_rodata_8((null as *mut c_void), (null as *mut c_void))\n    _pcre2_jit_free_8((null as *mut c_void), (null as *mut pcre2_memctl))\n\n    if _pcre2_jit_get_size_8((null as *mut c_void)) != 0: return 4\n    if _pcre2_jit_get_target_8() == null: return 5\n    return 0\n"
+    var rc = bgs_write_fixture(src, text, target_name, "pcre2 jit no support")
+    if rc != 0: return rc
+    let result = bgs_regex_expect_success(root, target_name, compiler_path, base_dir, "pcre2-jit-no-support", bgs_argv_append(bgs_argv_append("", "run"), src))
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    0
+
+pub fn run_cli_selfhost_regex_prep_test(root: str, target_name: str, compiler_path: str) -> i32:
+    let stamp = f"{with_getpid()}.{with_clock_nanos()}"
+    let base_dir = bgs_resolve_join(bgs_resolve_join(bgs_resolve_join(root, "out/test-graph"), target_name), stamp)
+    var rc = bgs_check_pcre2_defs_prune_ebcdic_tables(root, target_name)
+    if rc != 0: return rc
+    rc = bgs_check_pcre2_prepare_shared_externs(root, target_name, bgs_resolve_join(base_dir, "pcre2_prepare_case"))
+    if rc != 0: return rc
+    rc = bgs_check_pcre2_prepare_width_prunes(root, target_name, compiler_path, bgs_resolve_join(base_dir, "pcre2_prepare_width_prune_case"))
+    if rc != 0: return rc
+    rc = bgs_check_pcre2_prepare_shared_lets(root, target_name, bgs_resolve_join(base_dir, "pcre2_prepare_shared_lets_case"))
+    if rc != 0: return rc
+    rc = bgs_check_std_re_shared_dependency_imports(root, target_name, compiler_path, bgs_resolve_join(base_dir, "std_re_shared_dependency_case"))
+    if rc != 0: return rc
+    rc = bgs_check_opaque_field_access_rejected(root, target_name, compiler_path, bgs_resolve_join(base_dir, "opaque_field_access_case"))
+    if rc != 0: return rc
+    rc = bgs_check_pcre2_match_heapframe(root, target_name, compiler_path, bgs_resolve_join(base_dir, "pcre2_match_heapframe_case"))
+    if rc != 0: return rc
+    rc = bgs_check_pcre2_compile_builds(root, target_name, compiler_path, bgs_resolve_join(base_dir, "pcre2_compile_builds_case"))
+    if rc != 0: return rc
+    bgs_check_pcre2_jit_no_support(root, target_name, compiler_path, bgs_resolve_join(base_dir, "pcre2_jit_no_support_case"))
+
+fn bgs_migrate_error(target_name: str, message: str) -> void:
+    with_eprint("error: cli_selfhost_migrate_basic_test target '" ++ target_name ++ "' " ++ message)
+
+fn bgs_migrate_assert_contains(text: str, needle: str, target_name: str, label: str) -> i32:
+    if with_str_contains(text, needle) != 0:
+        return 0
+    bgs_migrate_error(target_name, "missing expected output for " ++ label ++ ": " ++ needle)
+    1
+
+fn bgs_migrate_assert_not_contains(text: str, needle: str, target_name: str, label: str) -> i32:
+    if with_str_contains(text, needle) == 0:
+        return 0
+    bgs_migrate_error(target_name, "found forbidden output for " ++ label ++ ": " ++ needle)
+    1
+
+fn bgs_migrate_file_contains(path: str, needle: str, target_name: str, label: str) -> i32:
+    if with_fs_file_exists(path) == 0:
+        bgs_migrate_error(target_name, "missing file for " ++ label ++ ": " ++ path)
+        return 1
+    bgs_migrate_assert_contains(with_fs_read_file(path), needle, target_name, label)
+
+fn bgs_migrate_file_forbids(path: str, needle: str, target_name: str, label: str) -> i32:
+    if with_fs_file_exists(path) == 0:
+        bgs_migrate_error(target_name, "missing file for " ++ label ++ ": " ++ path)
+        return 1
+    bgs_migrate_assert_not_contains(with_fs_read_file(path), needle, target_name, label)
+
+fn bgs_index_of(text: str, needle: str) -> i32:
+    if needle.len() == 0:
+        return 0
+    if needle.len() > text.len():
+        return -1
+    let max_start = (text.len() - needle.len()) as i32
+    for i in 0..(max_start + 1):
+        var matched = true
+        for j in 0..needle.len() as i32:
+            if text.byte_at((i + j) as i64) != needle.byte_at(j as i64):
+                matched = false
+                break
+        if matched:
+            return i
+    -1
+
+fn bgs_count_occurrences(text: str, needle: str) -> i32:
+    if needle.len() == 0:
+        return 0
+    var count = 0
+    var offset = 0
+    while offset < text.len() as i32:
+        let found = bgs_index_of(text.slice(offset as i64, text.len()), needle)
+        if found < 0:
+            break
+        count = count + 1
+        offset = offset + found + needle.len() as i32
+    count
+
+fn bgs_migrate_expect_success(root: str, target_name: str, compiler_path: str, case_dir: str, label: str, argv_tail: str) -> BuildSelfhostRunResult:
+    let result = bgs_run_cli_capture_cwd(root, target_name, compiler_path, label, argv_tail, 180000, case_dir)
+    if result.rc != 0:
+        bgs_migrate_error(target_name, "case '" ++ label ++ f"' failed with exit code {result.rc}")
+    result
+
+fn bgs_check_migrate_global_init_list(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
+    let src = bgs_resolve_join(case_dir, "initlist.c")
+    let out_w = bgs_resolve_join(case_dir, "initlist.w")
+    var rc = bgs_write_fixture(src, "typedef int (*callback_t)(int);\ntypedef struct inner { callback_t cb; void *data; } inner;\ntypedef struct outer { inner in; int limit; } outer;\nint add1(int x) { return x + 1; }\nouter g = { { add1, 0 }, 7 };\n", target_name, "migrate global init list")
+    if rc != 0: return rc
+    var argv = ""
+    argv = bgs_argv_append(argv, "migrate")
+    argv = bgs_argv_append(argv, src)
+    argv = bgs_argv_append(argv, "--no-c-export")
+    argv = bgs_argv_append(argv, "--prefer-brace")
+    argv = bgs_argv_append(argv, "-o")
+    argv = bgs_argv_append(argv, out_w)
+    let result = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "migrate-global-init-list", argv)
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    bgs_migrate_file_contains(out_w, "var g: outer = outer { in_: inner { cb: add1, data: null }, limit: 7 }", target_name, "global_init_list")
+
+fn bgs_check_migrate_host_header_compat(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
+    let src = bgs_resolve_join(case_dir, "uses_isatty.c")
+    let out_w = bgs_resolve_join(case_dir, "uses_isatty.w")
+    var rc = bgs_write_fixture(bgs_resolve_join(case_dir, "config.h"), "/* Simulate an unconfigured config.h template. */\n", target_name, "migrate host header config")
+    if rc != 0: return rc
+    let c_text = "#if defined HAVE_CONFIG_H\n#include \"config.h\"\n#endif\n\n#ifndef HAVE_UNISTD_H\n#error \"missing HAVE_UNISTD_H\"\n#endif\n\n#ifdef HAVE_UNISTD_H\n#include <unistd.h>\n#endif\n\n#include <stdio.h>\n\nint tty_status(FILE *f) { return isatty(fileno(f)); }\n"
+    rc = bgs_write_fixture(src, c_text, target_name, "migrate host header source")
+    if rc != 0: return rc
+    var argv = ""
+    argv = bgs_argv_append(argv, "migrate")
+    argv = bgs_argv_append(argv, src)
+    argv = bgs_argv_append(argv, "-I")
+    argv = bgs_argv_append(argv, case_dir)
+    argv = bgs_argv_append(argv, "-D")
+    argv = bgs_argv_append(argv, "HAVE_CONFIG_H=1")
+    argv = bgs_argv_append(argv, "-o")
+    argv = bgs_argv_append(argv, out_w)
+    let result = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "migrate-host-header-compat", argv)
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    bgs_migrate_file_contains(out_w, "tty_status", target_name, "host_header_compat")
+
+fn bgs_check_migrate_assignment_compat(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
+    let src = bgs_resolve_join(case_dir, "assignments.c")
+    let out_w = bgs_resolve_join(case_dir, "assignments.w")
+    let c_text = "typedef unsigned int c_uint;\ntypedef struct {\n  c_uint *groupinfo;\n  c_uint *parsed_pattern;\n} compile_block;\n\nvoid f(void) {\n  compile_block cb;\n  c_uint stack_groupinfo[32];\n  c_uint stack_parsed_pattern[64];\n  c_uint pp = 0;\n  c_uint skipatstart = 0;\n  cb.groupinfo = stack_groupinfo;\n  cb.parsed_pattern = stack_parsed_pattern;\n  skipatstart = (pp = pp + 1);\n}\n"
+    var rc = bgs_write_fixture(src, c_text, target_name, "migrate assignment compat")
+    if rc != 0: return rc
+    var argv = ""
+    argv = bgs_argv_append(argv, "migrate")
+    argv = bgs_argv_append(argv, src)
+    argv = bgs_argv_append(argv, "--no-c-export")
+    argv = bgs_argv_append(argv, "--prefer-brace")
+    argv = bgs_argv_append(argv, "-o")
+    argv = bgs_argv_append(argv, out_w)
+    let result = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "migrate-assignment-compat", argv)
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    let out_text = with_fs_read_file(out_w)
+    rc = bgs_migrate_assert_contains(out_text, "(__local_cb.groupinfo = (&(unsafe: __local_stack_groupinfo[0]) as *mut c_uint))", target_name, "assignment_compat")
+    if rc != 0: return rc
+    rc = bgs_migrate_assert_contains(out_text, "(__local_cb.parsed_pattern = (&(unsafe: __local_stack_parsed_pattern[0]) as *mut c_uint))", target_name, "assignment_compat")
+    if rc != 0: return rc
+    let pp_simple = "(__local_pp = (__local_pp +% 1))"
+    let pp_casted = "(__local_pp = ((__local_pp as c_uint) +% (1 as c_uint)))"
+    let pp_index = if bgs_index_of(out_text, pp_simple) >= 0: bgs_index_of(out_text, pp_simple) else: bgs_index_of(out_text, pp_casted)
+    let skip_index = bgs_index_of(out_text, "(__local_skipatstart = __local_pp)")
+    if pp_index < 0 or skip_index < 0 or pp_index >= skip_index:
+        bgs_migrate_error(target_name, "assignment_compat did not preserve assignment sequencing")
+        return 1
+    rc = bgs_migrate_assert_not_contains(out_text, "(__local_skipatstart = ((__local_pp) =", target_name, "assignment_compat")
+    if rc != 0: return rc
+    let check_result = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "check-assignment-compat", bgs_argv_append(bgs_argv_append("", "check"), out_w))
+    if check_result.rc != 0: return if check_result.rc == 0: 1 else: check_result.rc
+    0
+
+fn bgs_check_migrate_rvalue_sequencing(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
+    let src = bgs_resolve_join(case_dir, "rvalue_sequencing.c")
+    let out_w = bgs_resolve_join(case_dir, "rvalue_sequencing.w")
+    let c_text = "typedef unsigned char u8;\n\nstatic int issue120_id(int x) { return x; }\n\nint init_expr(void) {\n  const u8 *buf = (const u8 *)\"AB\";\n  const u8 *p = buf;\n  int c = *p++;\n  return c * 10 + (int)(p - buf);\n}\n\nint assign_expr(void) {\n  const u8 *buf = (const u8 *)\"AB\";\n  const u8 *p = buf;\n  int c = 0;\n  c = *p++;\n  return c * 10 + (int)(p - buf);\n}\n\nint binary_expr(void) {\n  const u8 *buf = (const u8 *)\"AB\";\n  const u8 *p = buf;\n  int c = (*p++) + 0;\n  return c * 10 + (int)(p - buf);\n}\n\nint call_arg_expr(void) {\n  const u8 *buf = (const u8 *)\"AB\";\n  const u8 *p = buf;\n  int c = issue120_id(*p++);\n  return c * 10 + (int)(p - buf);\n}\n\n#define ISSUE120_GETCHARINCTEST(ch, ptr) ch = *ptr++; if (utf && ch >= 66u) ch += 1000\n\nint macro_expr(int utf) {\n  const u8 *buf = (const u8 *)\"BA\";\n  const u8 *p = buf;\n  int c = 0;\n  ISSUE120_GETCHARINCTEST(c, p);\n  return c * 10 + (int)(p - buf);\n}\n\nstatic unsigned int issue120_ord2utf(unsigned int c, u8 *p) {\n  *p = (u8)c;\n  return 1;\n}\n\n#define ISSUE120_PUTCHAR(c, p) ((utf && c > 127u) ? issue120_ord2utf(c, p) : (*p = c, 1))\n\nint macro_ternary_comma_expr(int utf) {\n  u8 buf[1] = { 0 };\n  u8 *p = buf;\n  unsigned int c = 65u;\n  p += ISSUE120_PUTCHAR(c, p);\n  return ((int)buf[0]) * 10 + (int)(p - buf);\n}\n\nint main(void) {\n  if (init_expr() != 651) return 1;\n  if (assign_expr() != 651) return 2;\n  if (binary_expr() != 651) return 3;\n  if (call_arg_expr() != 651) return 4;\n  if (macro_expr(0) != 661) return 5;\n  if (macro_expr(1) != 10661) return 6;\n  if (macro_ternary_comma_expr(0) != 651) return 7;\n  return 0;\n}\n"
+    var rc = bgs_write_fixture(src, c_text, target_name, "migrate rvalue sequencing")
+    if rc != 0: return rc
+    var argv = ""
+    argv = bgs_argv_append(argv, "migrate")
+    argv = bgs_argv_append(argv, src)
+    argv = bgs_argv_append(argv, "--no-c-export")
+    argv = bgs_argv_append(argv, "-o")
+    argv = bgs_argv_append(argv, out_w)
+    let result = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "migrate-rvalue-sequencing", argv)
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    let out_text = with_fs_read_file(out_w)
+    rc = bgs_migrate_assert_contains(out_text, "with 0 as __ci_expr_seq_", target_name, "rvalue_sequencing")
+    if rc != 0: return rc
+    rc = bgs_migrate_assert_contains(out_text, "var __ci_expr_old_", target_name, "rvalue_sequencing")
+    if rc != 0: return rc
+    rc = bgs_migrate_assert_contains(out_text, "(__local_p = __local_p + 1)", target_name, "rvalue_sequencing")
+    if rc != 0: return rc
+    rc = bgs_migrate_assert_contains(out_text, "(unsafe: *__ci_expr_old_", target_name, "rvalue_sequencing")
+    if rc != 0: return rc
+    rc = bgs_migrate_assert_contains(out_text, "((unsafe: *__local_p) = __local_c)", target_name, "rvalue_sequencing")
+    if rc != 0: return rc
+    let check_result = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "check-rvalue-sequencing", bgs_argv_append(bgs_argv_append("", "check"), out_w))
+    if check_result.rc != 0: return if check_result.rc == 0: 1 else: check_result.rc
+    let run_result = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "run-rvalue-sequencing", bgs_argv_append(bgs_argv_append("", "run"), out_w))
+    if run_result.rc != 0: return if run_result.rc == 0: 1 else: run_result.rc
+    0
+
+fn bgs_check_migrate_directory_progress(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
+    let src_dir = bgs_resolve_join(case_dir, "src")
+    let out_dir = bgs_resolve_join(case_dir, "out")
+    var rc = bgs_write_fixture(bgs_resolve_join(src_dir, "a.c"), "int a_value(void) { return 1; }\n", target_name, "directory progress a")
+    if rc != 0: return rc
+    rc = bgs_write_fixture(bgs_resolve_join(src_dir, "b.c"), "int b_value(void) { return 2; }\n", target_name, "directory progress b")
+    if rc != 0: return rc
+    var argv = ""
+    argv = bgs_argv_append(argv, "migrate")
+    argv = bgs_argv_append(argv, src_dir)
+    argv = bgs_argv_append(argv, "--no-c-export")
+    argv = bgs_argv_append(argv, "-o")
+    argv = bgs_argv_append(argv, out_dir)
+    let result = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "migrate-directory-progress", argv)
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    rc = bgs_migrate_assert_contains(result.stdout, "migrate: processing a.c - 1/2, 50% completed", target_name, "directory_progress_stdout")
+    if rc != 0: return rc
+    bgs_migrate_assert_contains(result.stdout, "migrate: processing b.c - 2/2, 100% completed", target_name, "directory_progress_stdout")
+
+fn bgs_check_migrate_cross_file_global_owner_arrays(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
+    let generated_dir = bgs_resolve_join(case_dir, "generated")
+    var rc = bgs_write_fixture(bgs_resolve_join(case_dir, "tables.h"), "extern const unsigned char issue121_table[];\nint issue121_value(int idx);\nint issue121_sum(void);\n", target_name, "cross file table header")
+    if rc != 0: return rc
+    rc = bgs_write_fixture(bgs_resolve_join(case_dir, "owner.c"), "#include \"tables.h\"\n\nconst unsigned char issue121_table[] = {7, 9, 11};\n\nint issue121_value(int idx) {\n  return issue121_table[idx];\n}\n", target_name, "cross file owner")
+    if rc != 0: return rc
+    rc = bgs_write_fixture(bgs_resolve_join(case_dir, "user.c"), "#include \"tables.h\"\n\nint issue121_sum(void) {\n  return issue121_table[2] + issue121_value(1);\n}\n", target_name, "cross file user")
+    if rc != 0: return rc
+    var argv = ""
+    argv = bgs_argv_append(argv, "migrate")
+    argv = bgs_argv_append(argv, case_dir)
+    argv = bgs_argv_append(argv, "--no-c-export")
+    argv = bgs_argv_append(argv, "-o")
+    argv = bgs_argv_append(argv, generated_dir)
+    let result = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "migrate-cross-file-global-owner-arrays", argv)
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    let owner_w = bgs_resolve_join(generated_dir, "owner.w")
+    let user_w = bgs_resolve_join(generated_dir, "user.w")
+    rc = bgs_migrate_file_contains(owner_w, "let issue121_table: [3]u8", target_name, "cross_file_global_owner_arrays owner")
+    if rc != 0: return rc
+    rc = bgs_migrate_file_contains(user_w, "extern let issue121_table: [3]u8", target_name, "cross_file_global_owner_arrays user")
+    if rc != 0: return rc
+    rc = bgs_migrate_file_forbids(owner_w, "issue121_table: *", target_name, "cross_file_global_owner_arrays owner")
+    if rc != 0: return rc
+    rc = bgs_migrate_file_forbids(user_w, "issue121_table: *", target_name, "cross_file_global_owner_arrays user")
+    if rc != 0: return rc
+    let owner_check = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "check-cross-file-owner", bgs_argv_append(bgs_argv_append("", "check"), owner_w))
+    if owner_check.rc != 0: return if owner_check.rc == 0: 1 else: owner_check.rc
+    let user_check = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "check-cross-file-user", bgs_argv_append(bgs_argv_append("", "check"), user_w))
+    if user_check.rc != 0: return if user_check.rc == 0: 1 else: user_check.rc
+    var owner_build_argv = ""
+    owner_build_argv = bgs_argv_append(owner_build_argv, "build")
+    owner_build_argv = bgs_argv_append(owner_build_argv, owner_w)
+    owner_build_argv = bgs_argv_append(owner_build_argv, "--emit-obj")
+    owner_build_argv = bgs_argv_append(owner_build_argv, "-o")
+    owner_build_argv = bgs_argv_append(owner_build_argv, bgs_resolve_join(generated_dir, "owner.o"))
+    let owner_build = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "build-cross-file-owner", owner_build_argv)
+    if owner_build.rc != 0: return if owner_build.rc == 0: 1 else: owner_build.rc
+    var user_build_argv = ""
+    user_build_argv = bgs_argv_append(user_build_argv, "build")
+    user_build_argv = bgs_argv_append(user_build_argv, user_w)
+    user_build_argv = bgs_argv_append(user_build_argv, "--emit-obj")
+    user_build_argv = bgs_argv_append(user_build_argv, "-o")
+    user_build_argv = bgs_argv_append(user_build_argv, bgs_resolve_join(generated_dir, "user.o"))
+    let user_build = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "build-cross-file-user", user_build_argv)
+    if user_build.rc != 0: return if user_build.rc == 0: 1 else: user_build.rc
+    0
+
+fn bgs_check_migrate_shared_defs_ownerless_extern(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
+    let generated_dir = bgs_resolve_join(case_dir, "generated")
+    var rc = bgs_write_fixture(bgs_resolve_join(case_dir, "tables.h"), "extern const unsigned char issue140_unused_external[];\nextern const unsigned char issue140_owned_table[];\nint issue140_read_owned(void);\n", target_name, "shared defs table header")
+    if rc != 0: return rc
+    rc = bgs_write_fixture(bgs_resolve_join(case_dir, "owner.c"), "#include \"tables.h\"\n\nconst unsigned char issue140_owned_table[] = {3, 5, 8};\n\nint issue140_read_owned(void) {\n  return issue140_owned_table[1];\n}\n", target_name, "shared defs owner")
+    if rc != 0: return rc
+    var argv = ""
+    argv = bgs_argv_append(argv, "migrate")
+    argv = bgs_argv_append(argv, case_dir)
+    argv = bgs_argv_append(argv, "--no-c-export")
+    argv = bgs_argv_append(argv, "--shared-defs")
+    argv = bgs_argv_append(argv, "defs")
+    argv = bgs_argv_append(argv, "-I")
+    argv = bgs_argv_append(argv, case_dir)
+    argv = bgs_argv_append(argv, "-o")
+    argv = bgs_argv_append(argv, generated_dir)
+    let result = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "migrate-shared-defs-ownerless-extern", argv)
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    let defs_w = bgs_resolve_join(generated_dir, "defs.w")
+    let defs_text = with_fs_read_file(defs_w)
+    rc = bgs_migrate_assert_contains(defs_text, "let issue140_owned_table:", target_name, "shared_defs_ownerless_extern")
+    if rc != 0: return rc
+    rc = bgs_migrate_assert_not_contains(defs_text, "issue140_unused_external", target_name, "shared_defs_ownerless_extern")
+    if rc != 0: return rc
+    if bgs_count_occurrences(defs_text, "fn string_find_char(") != 1:
+        bgs_migrate_error(target_name, "shared_defs_ownerless_extern emitted duplicate or missing string_find_char helper")
+        return 1
+    0
+
+pub fn run_cli_selfhost_migrate_basic_test(root: str, target_name: str, compiler_path: str) -> i32:
+    let stamp = f"{with_getpid()}.{with_clock_nanos()}"
+    let base_dir = bgs_resolve_join(bgs_resolve_join(bgs_resolve_join(root, "out/test-graph"), target_name), stamp)
+    var rc = bgs_check_migrate_global_init_list(root, target_name, compiler_path, bgs_resolve_join(base_dir, "global_init_list"))
+    if rc != 0: return rc
+    rc = bgs_check_migrate_host_header_compat(root, target_name, compiler_path, bgs_resolve_join(base_dir, "host_header_compat"))
+    if rc != 0: return rc
+    rc = bgs_check_migrate_assignment_compat(root, target_name, compiler_path, bgs_resolve_join(base_dir, "assignment_compat"))
+    if rc != 0: return rc
+    rc = bgs_check_migrate_rvalue_sequencing(root, target_name, compiler_path, bgs_resolve_join(base_dir, "rvalue_sequencing"))
+    if rc != 0: return rc
+    rc = bgs_check_migrate_directory_progress(root, target_name, compiler_path, bgs_resolve_join(base_dir, "directory_progress"))
+    if rc != 0: return rc
+    rc = bgs_check_migrate_cross_file_global_owner_arrays(root, target_name, compiler_path, bgs_resolve_join(base_dir, "cross_file_global_owner_arrays"))
+    if rc != 0: return rc
+    bgs_check_migrate_shared_defs_ownerless_extern(root, target_name, compiler_path, bgs_resolve_join(base_dir, "shared_defs_ownerless_extern"))
+
 fn bgs_tool_from_env(env_name: str, fallback: str) -> str:
     let value = with_getenv_str(env_name)
     if value.len() > 0:
