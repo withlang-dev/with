@@ -98,6 +98,10 @@
   - Build graph path normalization, output path helpers, argv blob assembly,
     and process-argument validation now live in `BuildGraphSupport` instead of
     `src/main.w`.
+  - Generic executable graph operations now live in `BuildGraphOps`, including
+    binary/fixpoint comparisons, response files, C/asm/LLVM object compilation,
+    static archives, embedded object assembly, manifest copy, corpus/command
+    execution, file copy, and install nodes.
   - `with build :stage1`, `:stage2`, `:stage3`, and `:fixpoint` now build
     through typed graph nodes instead of comparing stale stage artifacts:
       - `generate_compiler_entrypoints` emits the version-substituted
