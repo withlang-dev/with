@@ -136,6 +136,9 @@
       - directory progress stdout
       - cross-file global owner arrays
       - shared defs pruning of unused ownerless externs
+  - `with build :test` now checks the generated-PCRE2 existing-`main`
+    workflow through the typed `pcre2_generated_check` node instead of
+    `scripts/pcre2_generated_workflow.sh`.
   - Initial repository `build.w`:
       - `with build`
       - `with build :selfcheck`
@@ -151,8 +154,8 @@
 
   - Replace the remaining temporary `with build :test` script invocation with
     native typed With test harness nodes for the rest of the CLI selfhost
-    categories: remaining migration fixtures, generated PCRE2 workflow checks,
-    and parallel same-source testing.
+    categories: remaining migration fixtures, remaining generated PCRE2
+    workflow checks, and parallel same-source testing.
   - Port clean-bootstrap runtime/link preparation into the graph path. Direct
     `with build :build` works after a normal repository build, but Make still
     owns bootstrap-time runtime/link metadata setup from a cold checkout.

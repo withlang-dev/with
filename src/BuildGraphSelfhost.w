@@ -61,6 +61,24 @@ fn bgs_trim_trailing_line_endings(text: str) -> str:
         end = end - 1
     text.slice(0, end as i64)
 
+fn bgs_with_string_literal(value: str) -> str:
+    var out = "\""
+    for i in 0..value.len() as i32:
+        let ch = value.byte_at(i as i64)
+        if ch == 34:
+            out = out ++ "\\\""
+        else if ch == 92:
+            out = out ++ "\\\\"
+        else if ch == 9:
+            out = out ++ "\\t"
+        else if ch == 10:
+            out = out ++ "\\n"
+        else if ch == 13:
+            out = out ++ "\\r"
+        else:
+            out = out ++ value.slice(i as i64, (i + 1) as i64)
+    out ++ "\""
+
 fn bgs_assert_contains(text: str, needle: str, target_name: str, label: str) -> i32:
     if with_str_contains(text, needle) != 0:
         return 0
@@ -552,6 +570,29 @@ fn bgs_check_pcre2_jit_no_support(root: str, target_name: str, compiler_path: st
     if result.rc != 0: return if result.rc == 0: 1 else: result.rc
     0
 
+fn bgs_check_pcre2_generated_existing_main(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
+    let generated_dir = bgs_resolve_join(case_dir, "generated")
+    var rc = bgs_write_project_manifest(case_dir, "pcre2generatedcheck", target_name)
+    if rc != 0: return rc
+    rc = bgs_write_fixture(bgs_resolve_join(generated_dir, "defs.w"), "// std.re.defs\ntype c_int = i32\n", target_name, "pcre2 generated defs")
+    if rc != 0: return rc
+    rc = bgs_write_fixture(bgs_resolve_join(generated_dir, "pcre2_helper.w"), "// Migrated from PCRE2\nuse std.re.defs\n\nfn helper_value() -> c_int:\n    7\n", target_name, "pcre2 generated helper")
+    if rc != 0: return rc
+    rc = bgs_write_fixture(bgs_resolve_join(generated_dir, "pcre2test.w"), "// Migrated from PCRE2\nuse std.re.defs\n\nfn main() -> i32:\n    0\n", target_name, "pcre2 generated existing main")
+    if rc != 0: return rc
+    let build_text =
+        "use std.build\n\n" ++
+        "pub fn build(b: Build) -> Build:\n" ++
+        "    var target = target_new(.Pcre2GeneratedCheck, \"pcre2-check-existing-main\", " ++ bgs_with_string_literal(compiler_path) ++ ")\n" ++
+        "    target = target.input(\"generated\")\n" ++
+        "    var out = b.add_target(target)\n" ++
+        "    out.default(\"pcre2-check-existing-main\")\n"
+    rc = bgs_write_fixture(bgs_resolve_join(case_dir, "build.w"), build_text, target_name, "pcre2 generated check build.w")
+    if rc != 0: return rc
+    let result = bgs_regex_expect_success(root, target_name, compiler_path, case_dir, "pcre2-generated-existing-main", bgs_argv_append(bgs_argv_append("", "build"), ":pcre2-check-existing-main"))
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    bgs_regex_assert_contains(result.stdout, "OK=2 TOTAL_ERRORS=0", target_name, "pcre2_check_existing_main")
+
 pub fn run_cli_selfhost_regex_prep_test(root: str, target_name: str, compiler_path: str) -> i32:
     let stamp = f"{with_getpid()}.{with_clock_nanos()}"
     let base_dir = bgs_resolve_join(bgs_resolve_join(bgs_resolve_join(root, "out/test-graph"), target_name), stamp)
@@ -571,7 +612,11 @@ pub fn run_cli_selfhost_regex_prep_test(root: str, target_name: str, compiler_pa
     if rc != 0: return rc
     rc = bgs_check_pcre2_compile_builds(root, target_name, compiler_path, bgs_resolve_join(base_dir, "pcre2_compile_builds_case"))
     if rc != 0: return rc
-    bgs_check_pcre2_jit_no_support(root, target_name, compiler_path, bgs_resolve_join(base_dir, "pcre2_jit_no_support_case"))
+    rc = bgs_check_pcre2_jit_no_support(root, target_name, compiler_path, bgs_resolve_join(base_dir, "pcre2_jit_no_support_case"))
+    if rc != 0: return rc
+    rc = bgs_check_pcre2_generated_existing_main(root, target_name, compiler_path, bgs_resolve_join(base_dir, "pcre2_generated_existing_main_case"))
+    if rc != 0: return rc
+    0
 
 fn bgs_migrate_error(target_name: str, message: str) -> void:
     with_eprint("error: cli_selfhost_migrate_basic_test target '" ++ target_name ++ "' " ++ message)
