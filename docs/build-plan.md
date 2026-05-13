@@ -136,6 +136,15 @@
       - directory progress stdout
       - cross-file global owner arrays
       - shared defs pruning of unused ownerless externs
+  - `with build :test` now runs the core migrator fixture batch through a
+    typed `cli_selfhost_migrate_core_test` node:
+      - libc ctype calls preserve C return-value semantics
+      - macro initializer lists and typed unsigned minus constants
+      - tentative global owner selection across one or more source files
+      - no-op pointer cast cleanup
+      - raw pointer indexing diagnostics and unsafe indexing output
+      - brace-preferred migration output formatting
+      - typed casts inside macro-expanded expressions
   - `with build :test` now checks the generated-PCRE2 existing-`main`
     workflow through the typed `pcre2_generated_check` node instead of
     `scripts/pcre2_generated_workflow.sh`.
@@ -154,8 +163,7 @@
 
   - Replace the remaining temporary `with build :test` script invocation with
     native typed With test harness nodes for the rest of the CLI selfhost
-    categories: remaining migration fixtures, remaining generated PCRE2
-    workflow checks, and parallel same-source testing.
+    categories: remaining migration fixtures and parallel same-source testing.
   - Port clean-bootstrap runtime/link preparation into the graph path. Direct
     `with build :build` works after a normal repository build, but Make still
     owns bootstrap-time runtime/link metadata setup from a cold checkout.

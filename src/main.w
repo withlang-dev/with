@@ -1363,12 +1363,13 @@ fn build_graph_kind_name(kind: i32) -> str:
     if kind == 36: return "cli_selfhost_edge_test"
     if kind == 37: return "cli_selfhost_regex_prep_test"
     if kind == 38: return "cli_selfhost_migrate_basic_test"
+    if kind == 39: return "cli_selfhost_migrate_core_test"
     f"unknown({kind})"
 
 fn build_graph_kind_implemented(kind: i32) -> bool:
     if kind >= 0 and kind <= 2:
         return true
-    if kind >= 7 and kind <= 38:
+    if kind >= 7 and kind <= 39:
         return true
     false
 
@@ -3363,7 +3364,7 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
     let completed_targets: Vec[str] = Vec.new()
     for ti in 0..graph.targets.len() as i32:
         let target = graph.targets.get(ti as i64)
-        if target.kind < 0 or target.kind > 38:
+        if target.kind < 0 or target.kind > 39:
             with_eprint("error: invalid build.w target kind " ++ build_graph_kind_name(target.kind) ++ " for '" ++ target.name ++ "'")
             return 1
         if not build_graph_kind_implemented(target.kind):
@@ -3612,6 +3613,22 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
             let migrate_rc = run_cli_selfhost_migrate_basic_test(root, target.name, compiler_path)
             if migrate_rc != 0:
                 return migrate_rc
+            completed_targets.push(target.name)
+            continue
+        if target.kind == 39:
+            if target.entry.len() == 0:
+                with_eprint("error: cli_selfhost_migrate_core_test target '" ++ target.name ++ "' requires a compiler path")
+                return 1
+            let arg_rc = build_graph_validate_process_args(target)
+            if arg_rc != 0:
+                return arg_rc
+            let compiler_path = build_graph_resolve_project_path(root, target.entry)
+            if with_fs_file_exists(compiler_path) == 0:
+                with_eprint("error: cli_selfhost_migrate_core_test target '" ++ target.name ++ "' missing compiler: " ++ compiler_path)
+                return 1
+            let migrate_core_rc = run_cli_selfhost_migrate_core_test(root, target.name, compiler_path)
+            if migrate_core_rc != 0:
+                return migrate_core_rc
             completed_targets.push(target.name)
             continue
         if target.kind == 7:
