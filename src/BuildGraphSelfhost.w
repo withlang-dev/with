@@ -13,7 +13,6 @@ extern fn with_fs_remove_file(path: str) -> i32
 extern fn with_fs_write_file(path: str, data: str) -> i32
 extern fn with_getenv_str(name: str) -> str
 extern fn with_str_contains(s: str, needle: str) -> i32
-extern fn with_str_starts_with(s: str, prefix: str) -> i32
 extern fn with_eprint(s: str) -> void
 
 fn bgs_check_init_in_cwd(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
@@ -514,58 +513,6 @@ fn bgs_count_occurrences(text: str, needle: str) -> i32:
         offset = offset + found + needle.len() as i32
     count
 
-fn bgs_has_trailing_blank(text: str) -> bool:
-    var line_start = 0
-    for i in 0..text.len() as i32:
-        if text.byte_at(i as i64) == 10:
-            if i > line_start:
-                let prev = text.byte_at((i - 1) as i64)
-                if prev == 32 or prev == 9:
-                    return true
-            line_start = i + 1
-    if line_start < text.len() as i32:
-        let last = text.byte_at((text.len() - 1) as i64)
-        if last == 32 or last == 9:
-            return true
-    false
-
-fn bgs_line_with_prefix_contains(text: str, prefix: str, needle: str) -> bool:
-    var line_start = 0
-    for i in 0..text.len() as i32:
-        if text.byte_at(i as i64) == 10:
-            let line = text.slice(line_start as i64, i as i64)
-            if with_str_starts_with(line, prefix) != 0 and with_str_contains(line, needle) != 0:
-                return true
-            line_start = i + 1
-    if line_start < text.len() as i32:
-        let line = text.slice(line_start as i64, text.len())
-        if with_str_starts_with(line, prefix) != 0 and with_str_contains(line, needle) != 0:
-            return true
-    false
-
-fn bgs_trim_right_spaces(text: str) -> str:
-    var end = text.len() as i32
-    while end > 0:
-        let ch = text.byte_at((end - 1) as i64)
-        if ch != 32 and ch != 9:
-            break
-        end = end - 1
-    text.slice(0, end as i64)
-
-fn bgs_line_with_prefix_ends_with(text: str, prefix: str, suffix: str) -> bool:
-    var line_start = 0
-    for i in 0..text.len() as i32:
-        if text.byte_at(i as i64) == 10:
-            let line = bgs_trim_right_spaces(text.slice(line_start as i64, i as i64))
-            if with_str_starts_with(line, prefix) != 0 and line.ends_with(suffix):
-                return true
-            line_start = i + 1
-    if line_start < text.len() as i32:
-        let line = bgs_trim_right_spaces(text.slice(line_start as i64, text.len()))
-        if with_str_starts_with(line, prefix) != 0 and line.ends_with(suffix):
-            return true
-    false
-
 fn bgs_migrate_expect_success(root: str, target_name: str, compiler_path: str, case_dir: str, label: str, argv_tail: str) -> BuildSelfhostRunResult:
     let result = bgs_run_cli_capture_cwd(root, target_name, compiler_path, label, argv_tail, 180000, case_dir)
     if result.rc != 0:
@@ -976,15 +923,14 @@ fn bgs_check_migrate_prefer_brace_ws(root: str, target_name: str, compiler_path:
     let result = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "migrate-prefer-brace-ws", argv)
     if result.rc != 0: return if result.rc == 0: 1 else: result.rc
     let out_text = with_fs_read_file(out_w)
-    if bgs_has_trailing_blank(out_text):
-        bgs_migrate_error(target_name, "prefer_brace_ws emitted trailing whitespace")
-        return 1
-    if not bgs_line_with_prefix_contains(out_text, "    while", "{") or not bgs_line_with_prefix_contains(out_text, "        if", "{"):
-        bgs_migrate_error(target_name, "prefer_brace_ws did not emit brace-style while/if")
-        return 1
-    if bgs_line_with_prefix_ends_with(out_text, "    while", ":") or bgs_line_with_prefix_ends_with(out_text, "        if", ":"):
-        bgs_migrate_error(target_name, "prefer_brace_ws emitted colon-style while/if")
-        return 1
+    rc = bgs_assert_not_matches(out_text, "(?m)[\\t ]$", target_name, "prefer_brace_ws trailing whitespace")
+    if rc != 0: return rc
+    rc = bgs_assert_matches(out_text, "(?m)^[\\t ]*while\\b[^\\n]*\\{[\\t ]*$", target_name, "prefer_brace_ws while brace")
+    if rc != 0: return rc
+    rc = bgs_assert_matches(out_text, "(?m)^[\\t ]*if\\b[^\\n]*\\{[\\t ]*$", target_name, "prefer_brace_ws if brace")
+    if rc != 0: return rc
+    rc = bgs_assert_not_matches(out_text, "(?m)^[\\t ]*(if|while)\\b[^\\n]*:[\\t ]*$", target_name, "prefer_brace_ws colon style")
+    if rc != 0: return rc
     let check = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "check-prefer-brace-ws", bgs_argv_append(bgs_argv_append("", "check"), out_w))
     if check.rc != 0: return if check.rc == 0: 1 else: check.rc
     0

@@ -85,6 +85,9 @@
   - Reusable selfhost fixture/process/assertion helpers now live in
     `BuildGraphSelfhostHarness`, reducing the fixture warehouse pressure in
     `BuildGraphSelfhost.w`.
+  - The selfhost harness now has PCRE2-backed regex assertions, and migrated
+    brace-format checks use structural regex patterns instead of hand-written
+    line scanning.
   - Repository selfhost suites now use a generic `selfhost_suite_test` graph
     kind keyed by suite name, so new selfhost batches no longer require a new
     BuildKind and top-level dispatch branch.
