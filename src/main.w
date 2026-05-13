@@ -2904,6 +2904,42 @@ fn build_graph_run_cli_selfhost_object_symbol_test(root: str, target: BuildGraph
         return 1
     build_graph_check_object_symbols(root, target, compiler_path, case_dir)
 
+fn build_graph_run_cli_selfhost_suite_test(root: str, target: BuildGraphTarget) -> i32:
+    if target.entry.len() == 0:
+        with_eprint("error: selfhost_suite_test target '" ++ target.name ++ "' requires a compiler path")
+        return 1
+    if target.args.len() == 0:
+        with_eprint("error: selfhost_suite_test target '" ++ target.name ++ "' requires a suite name argument")
+        return 1
+    let arg_rc = build_graph_validate_process_args(target)
+    if arg_rc != 0:
+        return arg_rc
+    let suite = target.args.get(0)
+    let compiler_path = build_graph_resolve_project_path(root, target.entry)
+    if with_fs_file_exists(compiler_path) == 0:
+        with_eprint("error: selfhost_suite_test target '" ++ target.name ++ "' missing compiler: " ++ compiler_path)
+        return 1
+    if suite == "smoke":
+        return build_graph_run_cli_selfhost_smoke_test(root, target)
+    if suite == "one-liner":
+        return build_graph_run_cli_selfhost_one_liner_test(root, target)
+    if suite == "object-symbol":
+        return build_graph_run_cli_selfhost_object_symbol_test(root, target)
+    if suite == "build-w":
+        return run_cli_selfhost_build_w_test(root, target.name, compiler_path)
+    if suite == "project":
+        return run_cli_selfhost_project_test(root, target.name, compiler_path)
+    if suite == "edge":
+        return run_cli_selfhost_edge_test(root, target.name, compiler_path)
+    if suite == "regex-prep":
+        return run_cli_selfhost_regex_prep_test(root, target.name, compiler_path)
+    if suite == "migrate-basic":
+        return run_cli_selfhost_migrate_basic_test(root, target.name, compiler_path)
+    if suite == "migrate-core":
+        return run_cli_selfhost_migrate_core_test(root, target.name, compiler_path)
+    with_eprint("error: selfhost_suite_test target '" ++ target.name ++ "' has unknown suite: " ++ suite)
+    1
+
 fn build_graph_trim_space_and_newlines(text: str) -> str:
     var start = 0
     var end = text.len() as i32
@@ -3540,6 +3576,12 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
             let migrate_core_rc = run_cli_selfhost_migrate_core_test(root, target.name, compiler_path)
             if migrate_core_rc != 0:
                 return migrate_core_rc
+            completed_targets.push(target.name)
+            continue
+        if target.kind == 40:
+            let suite_rc = build_graph_run_cli_selfhost_suite_test(root, target)
+            if suite_rc != 0:
+                return suite_rc
             completed_targets.push(target.name)
             continue
         if target.kind == 7:

@@ -4,7 +4,7 @@ extern fn with_sysinfo_os() -> str
 extern fn with_sysinfo_arch() -> str
 
 const BUILD_GRAPH_KIND_MIN: i32 = 0
-const BUILD_GRAPH_KIND_MAX: i32 = 39
+const BUILD_GRAPH_KIND_MAX: i32 = 40
 const BUILD_GRAPH_TARGET_MIN: i32 = 0
 const BUILD_GRAPH_TARGET_MAX: i32 = 5
 
@@ -52,6 +52,7 @@ pub fn build_graph_kind_name(kind: i32) -> str:
     if kind == 37: return "cli_selfhost_regex_prep_test"
     if kind == 38: return "cli_selfhost_migrate_basic_test"
     if kind == 39: return "cli_selfhost_migrate_core_test"
+    if kind == 40: return "selfhost_suite_test"
     f"unknown({kind})"
 
 pub fn build_graph_kind_implemented(kind: i32) -> bool:
