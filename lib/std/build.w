@@ -36,6 +36,7 @@ pub enum BuildKind: i32:
     Pcre2Build = 29
     CliSelfhostOneLinerTest = 30
     CliSelfhostObjectSymbolTest = 31
+    CliSelfhostBuildWTest = 32
 
 pub enum BuildTarget: i32:
     native = 0
@@ -229,6 +230,10 @@ pub fn Build.cli_selfhost_one_liner_test(self: Build, name: str, compiler: str) 
 
 pub fn Build.cli_selfhost_object_symbol_test(self: Build, name: str, compiler: str) -> Build:
     let target = target_new(.CliSelfhostObjectSymbolTest, name, compiler)
+    self.add_target(target)
+
+pub fn Build.cli_selfhost_build_w_test(self: Build, name: str, compiler: str) -> Build:
+    let target = target_new(.CliSelfhostBuildWTest, name, compiler)
     self.add_target(target)
 
 pub fn Build.generate_compiler_entrypoints(self: Build, name: str, stamp: str) -> Build:

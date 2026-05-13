@@ -56,6 +56,12 @@
     `cli_selfhost_object_symbol_test` graph node, covering emitted globals,
     imported module symbol ownership, imported-vs-extern redeclarations, and
     PCRE2 C ABI symbol preservation without shell `nm | awk` pipelines.
+  - CLI selfhost package/build.w coverage now runs as a typed
+    `cli_selfhost_build_w_test` graph node, covering project `build.w`
+    execution, test/library targets, explicit host and rejected non-host
+    targets, generated source validation, graph v2 serialization, target
+    selection, dependency closure, response files, archives, embedded objects,
+    copy/promote nodes, command nodes, install nodes, and corpus nodes.
   - The compiler runtime process API now supports argv execution with supplied
     stdin plus captured stdout/stderr, so graph tests no longer need shell
     pipelines to exercise stdin-driven compiler behavior.
@@ -110,8 +116,8 @@
 
   - Replace the remaining temporary `with build :test` script invocation with
     native typed With test harness nodes for the rest of the CLI selfhost
-    categories: package/build.w cases, migration fixtures, regex preparation
-    checks, and parallel same-source testing.
+    categories: migration fixtures, regex preparation checks, and parallel
+    same-source testing.
   - Port runtime object generation into `build.w`.
   - Port embedded runtime object generation out of shell.
   - Port the canonical `out/bin/with` compiler build into `build.w`; stage1,
