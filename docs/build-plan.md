@@ -62,6 +62,11 @@
     targets, generated source validation, graph v2 serialization, target
     selection, dependency closure, response files, archives, embedded objects,
     copy/promote nodes, command nodes, install nodes, and corpus nodes.
+  - CLI selfhost project/init coverage now runs as a typed
+    `cli_selfhost_project_test` graph node, covering `with init` in the
+    current directory, `with init <dir>`, default package-name build output,
+    and rejection of imperative `[build]` manifest configuration for both
+    implicit and explicit-source builds.
   - The compiler runtime process API now supports argv execution with supplied
     stdin plus captured stdout/stderr, so graph tests no longer need shell
     pipelines to exercise stdin-driven compiler behavior.
@@ -127,8 +132,8 @@
 
   - Replace the remaining temporary `with build :test` script invocation with
     native typed With test harness nodes for the rest of the CLI selfhost
-    categories: migration fixtures, regex preparation checks, and parallel
-    same-source testing.
+    categories: CLI pointer/prelude/import edge cases, migration fixtures,
+    regex preparation checks, and parallel same-source testing.
   - Port clean-bootstrap runtime/link preparation into the graph path. Direct
     `with build :build` works after a normal repository build, but Make still
     owns bootstrap-time runtime/link metadata setup from a cold checkout.

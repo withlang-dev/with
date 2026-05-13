@@ -4927,10 +4927,6 @@ EOF
   echo "PASS(cli-selfhost-test) issue173_parallel_same_source"
 }
 
-expect_init_in_cwd
-expect_init_named_dir
-expect_build_uses_package_section_name
-expect_build_rejects_imperative_manifest
 expect_pointer_index_is_rejected
 expect_test_command_parallel_same_source
 expect_prelude_output_functions_contract

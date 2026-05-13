@@ -214,6 +214,16 @@ Use f-strings when they make code shorter and simpler. Use `++`
 concatenation when it makes code shorter and simpler. Do not
 mechanically prefer one form over the other.
 
+### Write nice With code
+
+With source should be pleasant to read and worth keeping as an example
+of the language. Passing tests is not enough. Do not mechanically extend
+bad shapes such as giant condition chains, fixture dumps in unrelated
+modules, copy-pasted validation blocks, or awkward APIs that make the next
+change harder. If surrounding code is ugly, improve the shape locally as
+part of the change instead of preserving the ugliness. Prefer small named
+helpers, clear predicates, typed data, and readable control flow.
+
 ### Shell commands
 
 Compiler, migrator, runtime, and stdlib code must not assemble shell
