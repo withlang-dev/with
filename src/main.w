@@ -15,6 +15,7 @@ use Fmt
 use Lsp
 use CiPrint
 use CiMigrate
+use BuildGraphSelfhost
 
 extern fn with_arg_count() -> i32
 extern fn with_arg_at(idx: i32) -> str
@@ -1354,6 +1355,7 @@ fn build_graph_kind_name(kind: i32) -> str:
     if kind == 29: return "pcre2_build"
     if kind == 30: return "cli_selfhost_one_liner_test"
     if kind == 31: return "cli_selfhost_object_symbol_test"
+    if kind == 32: return "cli_selfhost_build_w_test"
     f"unknown({kind})"
 
 fn build_graph_target_name(kind: i32) -> str:
@@ -3288,10 +3290,10 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
     let completed_targets: Vec[str] = Vec.new()
     for ti in 0..graph.targets.len() as i32:
         let target = graph.targets.get(ti as i64)
-        if target.kind < 0 or target.kind > 31:
+        if target.kind < 0 or target.kind > 32:
             with_eprint("error: invalid build.w target kind " ++ build_graph_kind_name(target.kind) ++ " for '" ++ target.name ++ "'")
             return 1
-        if target.kind != 0 and target.kind != 1 and target.kind != 2 and target.kind != 7 and target.kind != 8 and target.kind != 9 and target.kind != 10 and target.kind != 11 and target.kind != 12 and target.kind != 13 and target.kind != 14 and target.kind != 15 and target.kind != 16 and target.kind != 17 and target.kind != 18 and target.kind != 19 and target.kind != 20 and target.kind != 21 and target.kind != 22 and target.kind != 23 and target.kind != 24 and target.kind != 25 and target.kind != 26 and target.kind != 27 and target.kind != 28 and target.kind != 29 and target.kind != 30 and target.kind != 31:
+        if target.kind != 0 and target.kind != 1 and target.kind != 2 and target.kind != 7 and target.kind != 8 and target.kind != 9 and target.kind != 10 and target.kind != 11 and target.kind != 12 and target.kind != 13 and target.kind != 14 and target.kind != 15 and target.kind != 16 and target.kind != 17 and target.kind != 18 and target.kind != 19 and target.kind != 20 and target.kind != 21 and target.kind != 22 and target.kind != 23 and target.kind != 24 and target.kind != 25 and target.kind != 26 and target.kind != 27 and target.kind != 28 and target.kind != 29 and target.kind != 30 and target.kind != 31 and target.kind != 32:
             with_eprint("error: build.w target kind '" ++ build_graph_kind_name(target.kind) ++ "' is not implemented yet for '" ++ target.name ++ "'")
             return 1
         if target.target_kind < 0 or target.target_kind > 5:
@@ -3445,6 +3447,22 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
             let object_symbol_rc = build_graph_run_cli_selfhost_object_symbol_test(root, target)
             if object_symbol_rc != 0:
                 return object_symbol_rc
+            completed_targets.push(target.name)
+            continue
+        if target.kind == 32:
+            if target.entry.len() == 0:
+                with_eprint("error: cli_selfhost_build_w_test target '" ++ target.name ++ "' requires a compiler path")
+                return 1
+            let arg_rc = build_graph_validate_process_args(target)
+            if arg_rc != 0:
+                return arg_rc
+            let compiler_path = build_graph_resolve_project_path(root, target.entry)
+            if with_fs_file_exists(compiler_path) == 0:
+                with_eprint("error: cli_selfhost_build_w_test target '" ++ target.name ++ "' missing compiler: " ++ compiler_path)
+                return 1
+            let build_w_rc = run_cli_selfhost_build_w_test(root, target.name, compiler_path)
+            if build_w_rc != 0:
+                return build_w_rc
             completed_targets.push(target.name)
             continue
         if target.kind == 7:
