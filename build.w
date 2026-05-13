@@ -240,6 +240,11 @@ pub fn build(b: Build) -> Build:
     cli_selfhost_project_tests = cli_selfhost_project_tests.dep("selfcheck")
     out = out.add_target(cli_selfhost_project_tests)
 
+    var cli_selfhost_edge_tests = target_new(36 as BuildKind, "cli-selfhost-edge-tests", "out/bin/with-stage2")
+    cli_selfhost_edge_tests = cli_selfhost_edge_tests.input("out/bin/with-stage2")
+    cli_selfhost_edge_tests = cli_selfhost_edge_tests.dep("selfcheck")
+    out = out.add_target(cli_selfhost_edge_tests)
+
     var issue61_regression = target_new(.SelfhostNoopLocalRegression, "issue61-regression", "out/bin/with-stage2")
     issue61_regression = issue61_regression.input("out/bin/with-stage2")
     issue61_regression = issue61_regression.dep("selfcheck")
@@ -261,6 +266,7 @@ pub fn build(b: Build) -> Build:
     tests = tests.dep("cli-selfhost-object-symbol-tests")
     tests = tests.dep("cli-selfhost-build-w-tests")
     tests = tests.dep("cli-selfhost-project-tests")
+    tests = tests.dep("cli-selfhost-edge-tests")
     tests = tests.dep("cli-selfhost-tests")
     tests = tests.dep("issue61-regression")
     tests = tests.dep("embedded-runtime-regression")
