@@ -34,6 +34,7 @@ pub enum BuildKind: i32:
     Pcre2GeneratedCheck = 27
     Pcre2GeneratedPromote = 28
     Pcre2Build = 29
+    CliSelfhostOneLinerTest = 30
 
 pub enum BuildTarget: i32:
     native = 0
@@ -219,6 +220,10 @@ pub fn Build.selfhost_noop_local_regression(self: Build, name: str, compiler: st
 
 pub fn Build.cli_selfhost_smoke_test(self: Build, name: str, compiler: str) -> Build:
     let target = target_new(.CliSelfhostSmokeTest, name, compiler)
+    self.add_target(target)
+
+pub fn Build.cli_selfhost_one_liner_test(self: Build, name: str, compiler: str) -> Build:
+    let target = target_new(.CliSelfhostOneLinerTest, name, compiler)
     self.add_target(target)
 
 pub fn Build.generate_compiler_entrypoints(self: Build, name: str, stamp: str) -> Build:
