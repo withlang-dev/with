@@ -12,6 +12,11 @@ extern fn with_clock_nanos() -> i64
 extern fn with_getpid() -> i32
 extern fn with_str_contains(s: str, needle: str) -> i32
 extern fn with_eprint(s: str) -> void
+extern fn with_regex_error_message(code: i32) -> str
+extern fn with_regex_compile(pattern: str, options: i32, err_code: *mut i32, err_offset: *mut i32) -> *const i8
+extern fn with_regex_code_free(code: *const i8) -> void
+extern fn with_regex_match_spans_alloc(code: *const i8, text: str, out_count: *mut i32) -> *const i32
+extern fn with_free(ptr: *mut u8) -> void
 
 pub type BuildSelfhostRunResult {
     rc: i32,
@@ -84,6 +89,34 @@ pub fn bgs_assert_not_contains(text: str, needle: str, target_name: str, label: 
     if with_str_contains(text, needle) == 0:
         return 0
     with_eprint("error: cli_selfhost_build_w_test target '" ++ target_name ++ "' found forbidden output for " ++ label ++ ": " ++ needle)
+    1
+
+pub fn bgs_regex_matches(text: str, pattern: str, target_name: str, label: str) -> bool:
+    var err_code: i32 = 0
+    var err_offset: i32 = 0
+    let code = with_regex_compile(pattern, 0, &raw mut err_code, &raw mut err_offset)
+    if code as i64 == 0:
+        with_eprint("error: selfhost regex assertion for " ++ label ++ " has invalid pattern at offset " ++ f"{err_offset}: " ++ with_regex_error_message(err_code))
+        return false
+    var span_count: i32 = 0
+    let spans = with_regex_match_spans_alloc(code, text, &raw mut span_count)
+    let matched = spans as i64 != 0 and span_count > 0
+    if spans as i64 != 0:
+        with_free(spans as *mut u8)
+    with_regex_code_free(code)
+    let _ = target_name
+    matched
+
+pub fn bgs_assert_matches(text: str, pattern: str, target_name: str, label: str) -> i32:
+    if bgs_regex_matches(text, pattern, target_name, label):
+        return 0
+    with_eprint("error: selfhost test target '" ++ target_name ++ "' missing regex match for " ++ label ++ ": " ++ pattern)
+    1
+
+pub fn bgs_assert_not_matches(text: str, pattern: str, target_name: str, label: str) -> i32:
+    if not bgs_regex_matches(text, pattern, target_name, label):
+        return 0
+    with_eprint("error: selfhost test target '" ++ target_name ++ "' found forbidden regex match for " ++ label ++ ": " ++ pattern)
     1
 
 pub fn bgs_project_assert_contains(text: str, needle: str, target_name: str, label: str) -> i32:
