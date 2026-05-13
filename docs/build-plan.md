@@ -80,6 +80,11 @@
   - The compiler runtime process API now supports argv execution with supplied
     stdin plus captured stdout/stderr, so graph tests no longer need shell
     pipelines to exercise stdin-driven compiler behavior.
+  - Build graph target/platform metadata now lives in a dedicated
+    `BuildGraphKinds` module instead of `src/main.w`.
+  - Reusable selfhost fixture/process/assertion helpers now live in
+    `BuildGraphSelfhostHarness`, reducing the fixture warehouse pressure in
+    `BuildGraphSelfhost.w`.
   - `with build :stage1`, `:stage2`, `:stage3`, and `:fixpoint` now build
     through typed graph nodes instead of comparing stale stage artifacts:
       - `generate_compiler_entrypoints` emits the version-substituted
