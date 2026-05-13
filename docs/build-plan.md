@@ -98,6 +98,9 @@
   - Build graph path normalization, output path helpers, argv blob assembly,
     and process-argument validation now live in `BuildGraphSupport` instead of
     `src/main.w`.
+  - Sorted `.w` file discovery now lives in `BuildGraphSupport`, giving
+    selfhost tests and PCRE2 graph operations a shared fixture/file listing
+    primitive instead of keeping the finder inside `src/main.w`.
   - Generic executable graph operations now live in `BuildGraphOps`, including
     binary/fixpoint comparisons, response files, C/asm/LLVM object compilation,
     static archives, embedded object assembly, manifest copy, corpus/command

@@ -3354,66 +3354,6 @@ fn split_nonempty_lines(text: str) -> Vec[str]:
 fn test_target_is_directory(target: str) -> bool:
     with_fs_is_dir(target) != 0
 
-fn test_str_compare(a: str, b: str) -> i32:
-    let min_len = if a.len() < b.len(): a.len() else: b.len()
-    var i = 0
-    while i < min_len as i32:
-        let ac = a.byte_at(i as i64)
-        let bc = b.byte_at(i as i64)
-        if ac != bc:
-            return ac - bc
-        i = i + 1
-    if a.len() == b.len():
-        return 0
-    if a.len() < b.len():
-        return -1
-    1
-
-fn test_sorted_paths(files: Vec[str]) -> Vec[str]:
-    var sorted: Vec[str] = Vec.new()
-    for i in 0..files.len() as i32:
-        let path = files.get(i as i64)
-        var inserted = false
-        var out: Vec[str] = Vec.new()
-        for j in 0..sorted.len() as i32:
-            let existing = sorted.get(j as i64)
-            if not inserted and test_str_compare(path, existing) < 0:
-                out.push(path)
-                inserted = true
-            out.push(existing)
-        if not inserted:
-            out.push(path)
-        sorted = out
-    sorted
-
-fn collect_test_files(target_dir: str) -> Vec[str]:
-    let files: Vec[str] = Vec.new()
-    if with_fs_mkdir_p("out/tmp") != 0:
-        return files
-    let stamp = f"{with_getpid()}.{with_clock_nanos()}"
-    let manifest_path = "out/tmp/test-files." ++ stamp ++ ".txt"
-    let err_path = manifest_path ++ ".stderr"
-    var argv = ""
-    argv = build_graph_argv_append(argv, "/usr/bin/find")
-    argv = build_graph_argv_append(argv, target_dir)
-    argv = build_graph_argv_append(argv, "-maxdepth")
-    argv = build_graph_argv_append(argv, "1")
-    argv = build_graph_argv_append(argv, "-type")
-    argv = build_graph_argv_append(argv, "f")
-    argv = build_graph_argv_append(argv, "-name")
-    argv = build_graph_argv_append(argv, "*.w")
-    let rc = with_exec_argv_capture(argv, manifest_path, err_path, 60000)
-    if rc != 0:
-        let _remove_manifest_on_error = with_fs_remove_file(manifest_path)
-        let _remove_err_on_error = with_fs_remove_file(err_path)
-        return files
-    let listing = with_fs_read_file(manifest_path)
-    let _remove_manifest = with_fs_remove_file(manifest_path)
-    let _remove_err = with_fs_remove_file(err_path)
-    if listing.len() == 0:
-        return files
-    test_sorted_paths(split_nonempty_lines(listing))
-
 fn test_count_label(count: i32) -> str:
     if count == 1:
         return "test"
