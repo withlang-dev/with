@@ -67,6 +67,10 @@
     current directory, `with init <dir>`, default package-name build output,
     and rejection of imperative `[build]` manifest configuration for both
     implicit and explicit-source builds.
+  - CLI selfhost edge coverage now runs as a typed `cli_selfhost_edge_test`
+    graph node, covering pointer-index diagnostics, prelude stdout/stderr
+    output contracts, whole-program extern var redeclaration, and imported
+    module dependency ordering.
   - The compiler runtime process API now supports argv execution with supplied
     stdin plus captured stdout/stderr, so graph tests no longer need shell
     pipelines to exercise stdin-driven compiler behavior.
@@ -132,8 +136,8 @@
 
   - Replace the remaining temporary `with build :test` script invocation with
     native typed With test harness nodes for the rest of the CLI selfhost
-    categories: CLI pointer/prelude/import edge cases, migration fixtures,
-    regex preparation checks, and parallel same-source testing.
+    categories: migration fixtures, regex preparation checks, and parallel
+    same-source testing.
   - Port clean-bootstrap runtime/link preparation into the graph path. Direct
     `with build :build` works after a normal repository build, but Make still
     owns bootstrap-time runtime/link metadata setup from a cold checkout.

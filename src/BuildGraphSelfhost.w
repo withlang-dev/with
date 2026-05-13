@@ -238,6 +238,110 @@ pub fn run_cli_selfhost_project_test(root: str, target_name: str, compiler_path:
     if rc != 0: return rc
     bgs_check_build_rejects_imperative_manifest(root, target_name, compiler_path, bgs_resolve_join(base_dir, "build_imperative_manifest_case"))
 
+fn bgs_edge_assert_exact(actual: str, expected: str, target_name: str, label: str, stream_name: str) -> i32:
+    if actual == expected:
+        return 0
+    let prefix = "error: cli_selfhost_edge_test target '" ++ target_name ++ "' "
+    with_eprint(prefix ++ stream_name ++ " mismatch for " ++ label)
+    with_eprint("expected: '" ++ expected ++ "'")
+    with_eprint("actual: '" ++ actual ++ "'")
+    1
+
+fn bgs_edge_assert_contains(text: str, needle: str, target_name: str, label: str) -> i32:
+    if with_str_contains(text, needle) != 0:
+        return 0
+    with_eprint("error: cli_selfhost_edge_test target '" ++ target_name ++ "' missing expected output for " ++ label ++ ": " ++ needle)
+    1
+
+fn bgs_edge_assert_not_contains(text: str, needle: str, target_name: str, label: str) -> i32:
+    if with_str_contains(text, needle) == 0:
+        return 0
+    with_eprint("error: cli_selfhost_edge_test target '" ++ target_name ++ "' found forbidden output for " ++ label ++ ": " ++ needle)
+    1
+
+fn bgs_edge_expect_success(root: str, target_name: str, compiler_path: str, case_dir: str, label: str, argv_tail: str) -> BuildSelfhostRunResult:
+    let result = bgs_run_cli_capture_cwd(root, target_name, compiler_path, label, argv_tail, 120000, case_dir)
+    if result.rc != 0:
+        with_eprint("error: edge selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
+    result
+
+fn bgs_check_pointer_index_rejected(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
+    let src = bgs_resolve_join(case_dir, "pointer_index_rejected.w")
+    let obj = bgs_resolve_join(case_dir, "pointer_index_rejected.o")
+    var rc = bgs_write_fixture(src, "fn main:\n    var arr: [4]i32 = [0 as i32; 4]\n    var p: *const i32 = null\n    let value = arr[p]\n    value\n", target_name, "pointer index source")
+    if rc != 0: return rc
+    var argv = ""
+    argv = bgs_argv_append(argv, "build")
+    argv = bgs_argv_append(argv, src)
+    argv = bgs_argv_append(argv, "--emit-obj")
+    argv = bgs_argv_append(argv, "-O0")
+    argv = bgs_argv_append(argv, "-o")
+    argv = bgs_argv_append(argv, obj)
+    let result = bgs_run_cli_capture_cwd(root, target_name, compiler_path, "pointer-index-rejected", argv, 120000, case_dir)
+    if result.rc == 0:
+        with_eprint("error: cli_selfhost_edge_test target '" ++ target_name ++ "' accepted pointer index expression")
+        return 1
+    rc = bgs_edge_assert_contains(result.stderr, "index expression must be an integer", target_name, "pointer_index_rejected")
+    if rc != 0: return rc
+    bgs_edge_assert_not_contains(result.stderr, "LLVM verify error", target_name, "pointer_index_rejected")
+
+fn bgs_check_prelude_output_functions(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
+    let src = bgs_resolve_join(case_dir, "prelude_output_functions.w")
+    var rc = bgs_write_fixture(src, "fn main:\n    write(\"A\")\n    print(\"B\")\n    write(\"C\")\n    ewrite(\"D\")\n    eprint(\"E\")\n    ewrite(\"F\")\n", target_name, "prelude output source")
+    if rc != 0: return rc
+    let result = bgs_edge_expect_success(root, target_name, compiler_path, case_dir, "prelude-output-functions", bgs_argv_append(bgs_argv_append("", "run"), src))
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    rc = bgs_edge_assert_exact(result.stdout, "AB\nC", target_name, "prelude_output_functions", "stdout")
+    if rc != 0: return rc
+    bgs_edge_assert_exact(result.stderr, "DE\nF", target_name, "prelude_output_functions", "stderr")
+
+fn bgs_check_whole_program_extern_var_redecl(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
+    let defs_src = bgs_resolve_join(case_dir, "defs.w")
+    let user_src = bgs_resolve_join(case_dir, "user.w")
+    let main_src = bgs_resolve_join(case_dir, "main.w")
+    let bin = bgs_resolve_join(case_dir, "whole_program_extern_var_redecl")
+    var rc = bgs_write_fixture(defs_src, "var shared_counter: i32 = 41\n", target_name, "extern redecl defs")
+    if rc != 0: return rc
+    rc = bgs_write_fixture(user_src, "extern var shared_counter: i32\nfn read_counter() -> i32: shared_counter + 1\n", target_name, "extern redecl user")
+    if rc != 0: return rc
+    rc = bgs_write_fixture(main_src, "use user\nuse defs\n\nfn main:\n    if read_counter() == 42:\n        print(\"ok\")\n    else:\n        print(\"bad\")\n", target_name, "extern redecl main")
+    if rc != 0: return rc
+    var argv = ""
+    argv = bgs_argv_append(argv, "build")
+    argv = bgs_argv_append(argv, main_src)
+    argv = bgs_argv_append(argv, "-o")
+    argv = bgs_argv_append(argv, bin)
+    let build_result = bgs_edge_expect_success(root, target_name, compiler_path, case_dir, "whole-program-extern-var-redecl", argv)
+    if build_result.rc != 0: return if build_result.rc == 0: 1 else: build_result.rc
+    let run_result = bgs_run_binary_capture(root, target_name, "whole-program-extern-var-redecl-run", bin, 120000)
+    if run_result.rc != 0: return if run_result.rc == 0: 1 else: run_result.rc
+    bgs_edge_assert_exact(bgs_trim_trailing_line_endings(run_result.stdout), "ok", target_name, "whole_program_extern_var_redecl", "stdout")
+
+fn bgs_check_imported_module_dependency_order(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
+    let defs_src = bgs_resolve_join(case_dir, "defs.w")
+    let module_src = bgs_resolve_join(case_dir, "m.w")
+    let user_src = bgs_resolve_join(case_dir, "user.w")
+    var rc = bgs_write_fixture(defs_src, "type T = opaque\n", target_name, "dependency order defs")
+    if rc != 0: return rc
+    rc = bgs_write_fixture(module_src, "use defs\nextern var gv: T\ntype T { x: i32 = 0 }\n", target_name, "dependency order module")
+    if rc != 0: return rc
+    rc = bgs_write_fixture(user_src, "use m\nfn main: let _ = 0\n", target_name, "dependency order user")
+    if rc != 0: return rc
+    let result = bgs_edge_expect_success(root, target_name, compiler_path, case_dir, "imported-module-dependency-order", bgs_argv_append(bgs_argv_append("", "check"), user_src))
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    0
+
+pub fn run_cli_selfhost_edge_test(root: str, target_name: str, compiler_path: str) -> i32:
+    let stamp = f"{with_getpid()}.{with_clock_nanos()}"
+    let base_dir = bgs_resolve_join(bgs_resolve_join(bgs_resolve_join(root, "out/test-graph"), target_name), stamp)
+    var rc = bgs_check_pointer_index_rejected(root, target_name, compiler_path, bgs_resolve_join(base_dir, "pointer_index_rejected_case"))
+    if rc != 0: return rc
+    rc = bgs_check_prelude_output_functions(root, target_name, compiler_path, bgs_resolve_join(base_dir, "prelude_output_functions_case"))
+    if rc != 0: return rc
+    rc = bgs_check_whole_program_extern_var_redecl(root, target_name, compiler_path, bgs_resolve_join(base_dir, "whole_program_extern_var_redecl_case"))
+    if rc != 0: return rc
+    bgs_check_imported_module_dependency_order(root, target_name, compiler_path, bgs_resolve_join(base_dir, "imported_module_dependency_order_case"))
+
 fn bgs_tool_from_env(env_name: str, fallback: str) -> str:
     let value = with_getenv_str(env_name)
     if value.len() > 0:
