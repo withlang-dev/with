@@ -16,6 +16,7 @@ use Lsp
 use CiPrint
 use CiMigrate
 use BuildGraphKinds
+use BuildGraphTools
 use BuildGraphSelfhost
 use BuildGraphRuntime
 
@@ -1470,24 +1471,6 @@ fn build_graph_exec_argv(target: BuildGraphTarget, operation_name: str, argv_blo
         return if rc == 0: 1 else: rc
     0
 
-fn build_graph_tool_from_env(env_name: str, fallback: str) -> str:
-    let value = with_getenv_str(env_name)
-    if value.len() > 0:
-        return value
-    fallback
-
-fn build_graph_llvm_clang_tool() -> str:
-    let explicit = with_getenv_str("WITH_LLVM_CC")
-    if explicit.len() > 0:
-        return explicit
-    let legacy = with_getenv_str("LLVM_CC")
-    if legacy.len() > 0:
-        return legacy
-    let prefix = with_getenv_str("LLVM_PREFIX")
-    if prefix.len() > 0:
-        return prefix ++ "/bin/clang"
-    "clang"
-
 fn build_graph_append_common_compile_args(root: str, target: BuildGraphTarget, argv_blob: str) -> str:
     var out = argv_blob
     for ii in 0..target.include_paths.len() as i32:
@@ -1574,7 +1557,7 @@ fn build_graph_create_archive(root: str, target: BuildGraphTarget) -> i32:
         resolved_inputs.push(input_path)
     let _remove_old_archive = with_fs_remove_file(output_path)
     var argv = ""
-    argv = build_graph_argv_append(argv, build_graph_tool_from_env("AR", "ar"))
+    argv = build_graph_argv_append(argv, build_graph_ar_tool().executable)
     argv = build_graph_argv_append(argv, "rcs")
     argv = build_graph_argv_append(argv, output_path)
     for ri in 0..resolved_inputs.len() as i32:
@@ -2718,7 +2701,7 @@ fn build_graph_nm_output(root: str, target: BuildGraphTarget, obj_path: str, lab
     let stdout_path = resolve_join(capture_dir, label ++ "." ++ stamp ++ ".nm.stdout")
     let stderr_path = resolve_join(capture_dir, label ++ "." ++ stamp ++ ".nm.stderr")
     var argv = ""
-    argv = build_graph_argv_append(argv, build_graph_tool_from_env("NM", "nm"))
+    argv = build_graph_argv_append(argv, build_graph_nm_tool().executable)
     argv = build_graph_argv_append(argv, obj_path)
     let rc = with_exec_argv_capture(argv, stdout_path, stderr_path, 120000)
     let stdout = with_fs_read_file(stdout_path)
@@ -3354,19 +3337,19 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
             completed_targets.push(target.name)
             continue
         if target.kind == 12:
-            let c_rc = build_graph_compile_object(root, target, "compile_c_object", build_graph_tool_from_env("CC", "cc"))
+            let c_rc = build_graph_compile_object(root, target, "compile_c_object", build_graph_cc_tool().executable)
             if c_rc != 0:
                 return c_rc
             completed_targets.push(target.name)
             continue
         if target.kind == 13:
-            let asm_rc = build_graph_compile_object(root, target, "compile_asm_object", build_graph_tool_from_env("CC", "cc"))
+            let asm_rc = build_graph_compile_object(root, target, "compile_asm_object", build_graph_cc_tool().executable)
             if asm_rc != 0:
                 return asm_rc
             completed_targets.push(target.name)
             continue
         if target.kind == 14:
-            let ir_rc = build_graph_compile_object(root, target, "compile_llvm_ir_object", build_graph_llvm_clang_tool())
+            let ir_rc = build_graph_compile_object(root, target, "compile_llvm_ir_object", build_graph_llvm_clang_tool().executable)
             if ir_rc != 0:
                 return ir_rc
             completed_targets.push(target.name)

@@ -91,6 +91,8 @@
   - Repository selfhost suites now use a generic `selfhost_suite_test` graph
     kind keyed by suite name, so new selfhost batches no longer require a new
     BuildKind and top-level dispatch branch.
+  - Host tool lookup now lives in a typed `BuildGraphTools` module with named
+    resolvers for cc, ar, nm, LLVM clang, opt, curl, tar, and dsymutil.
   - `with build :stage1`, `:stage2`, `:stage3`, and `:fixpoint` now build
     through typed graph nodes instead of comparing stale stage artifacts:
       - `generate_compiler_entrypoints` emits the version-substituted
