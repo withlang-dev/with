@@ -52,6 +52,10 @@
     semicolon splitting, argument forwarding, `-n`, `-p`, regex captures,
     named captures, f-string capture interpolation, implicit-main stdin
     programs, and diagnostic source-location checks.
+  - CLI selfhost object-symbol coverage now runs as a typed
+    `cli_selfhost_object_symbol_test` graph node, covering emitted globals,
+    imported module symbol ownership, imported-vs-extern redeclarations, and
+    PCRE2 C ABI symbol preservation without shell `nm | awk` pipelines.
   - The compiler runtime process API now supports argv execution with supplied
     stdin plus captured stdout/stderr, so graph tests no longer need shell
     pipelines to exercise stdin-driven compiler behavior.
@@ -106,8 +110,8 @@
 
   - Replace the remaining temporary `with build :test` script invocation with
     native typed With test harness nodes for the rest of the CLI selfhost
-    categories: object-symbol checks, package/build.w cases, migration
-    fixtures, regex preparation checks, and parallel same-source testing.
+    categories: package/build.w cases, migration fixtures, regex preparation
+    checks, and parallel same-source testing.
   - Port runtime object generation into `build.w`.
   - Port embedded runtime object generation out of shell.
   - Port the canonical `out/bin/with` compiler build into `build.w`; stage1,
