@@ -1359,7 +1359,15 @@ fn build_graph_kind_name(kind: i32) -> str:
     if kind == 32: return "cli_selfhost_build_w_test"
     if kind == 33: return "generate_compat_runtime"
     if kind == 34: return "with_compiler_ir"
+    if kind == 35: return "cli_selfhost_project_test"
     f"unknown({kind})"
+
+fn build_graph_kind_implemented(kind: i32) -> bool:
+    if kind >= 0 and kind <= 2:
+        return true
+    if kind >= 7 and kind <= 35:
+        return true
+    false
 
 fn build_graph_target_name(kind: i32) -> str:
     if kind == 0:
@@ -3352,10 +3360,10 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
     let completed_targets: Vec[str] = Vec.new()
     for ti in 0..graph.targets.len() as i32:
         let target = graph.targets.get(ti as i64)
-        if target.kind < 0 or target.kind > 34:
+        if target.kind < 0 or target.kind > 35:
             with_eprint("error: invalid build.w target kind " ++ build_graph_kind_name(target.kind) ++ " for '" ++ target.name ++ "'")
             return 1
-        if target.kind != 0 and target.kind != 1 and target.kind != 2 and target.kind != 7 and target.kind != 8 and target.kind != 9 and target.kind != 10 and target.kind != 11 and target.kind != 12 and target.kind != 13 and target.kind != 14 and target.kind != 15 and target.kind != 16 and target.kind != 17 and target.kind != 18 and target.kind != 19 and target.kind != 20 and target.kind != 21 and target.kind != 22 and target.kind != 23 and target.kind != 24 and target.kind != 25 and target.kind != 26 and target.kind != 27 and target.kind != 28 and target.kind != 29 and target.kind != 30 and target.kind != 31 and target.kind != 32 and target.kind != 33 and target.kind != 34:
+        if not build_graph_kind_implemented(target.kind):
             with_eprint("error: build.w target kind '" ++ build_graph_kind_name(target.kind) ++ "' is not implemented yet for '" ++ target.name ++ "'")
             return 1
         if target.target_kind < 0 or target.target_kind > 5:
@@ -3537,6 +3545,22 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
             let build_w_rc = run_cli_selfhost_build_w_test(root, target.name, compiler_path)
             if build_w_rc != 0:
                 return build_w_rc
+            completed_targets.push(target.name)
+            continue
+        if target.kind == 35:
+            if target.entry.len() == 0:
+                with_eprint("error: cli_selfhost_project_test target '" ++ target.name ++ "' requires a compiler path")
+                return 1
+            let arg_rc = build_graph_validate_process_args(target)
+            if arg_rc != 0:
+                return arg_rc
+            let compiler_path = build_graph_resolve_project_path(root, target.entry)
+            if with_fs_file_exists(compiler_path) == 0:
+                with_eprint("error: cli_selfhost_project_test target '" ++ target.name ++ "' missing compiler: " ++ compiler_path)
+                return 1
+            let project_rc = run_cli_selfhost_project_test(root, target.name, compiler_path)
+            if project_rc != 0:
+                return project_rc
             completed_targets.push(target.name)
             continue
         if target.kind == 7:

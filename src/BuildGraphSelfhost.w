@@ -45,6 +45,13 @@ fn bgs_dirname(path: str) -> str:
         return "."
     path.slice(0, last as i64)
 
+fn bgs_basename(path: str) -> str:
+    var last = -1
+    for i in 0..path.len() as i32:
+        if path.byte_at(i as i64) == 47:
+            last = i
+    path.slice((last + 1) as i64, path.len())
+
 fn bgs_trim_trailing_line_endings(text: str) -> str:
     var end = text.len() as i32
     while end > 0:
@@ -64,6 +71,24 @@ fn bgs_assert_not_contains(text: str, needle: str, target_name: str, label: str)
     if with_str_contains(text, needle) == 0:
         return 0
     with_eprint("error: cli_selfhost_build_w_test target '" ++ target_name ++ "' found forbidden output for " ++ label ++ ": " ++ needle)
+    1
+
+fn bgs_project_assert_contains(text: str, needle: str, target_name: str, label: str) -> i32:
+    if with_str_contains(text, needle) != 0:
+        return 0
+    with_eprint("error: cli_selfhost_project_test target '" ++ target_name ++ "' missing expected output for " ++ label ++ ": " ++ needle)
+    1
+
+fn bgs_project_expect_file(path: str, target_name: str, label: str) -> i32:
+    if with_fs_file_exists(path) != 0:
+        return 0
+    with_eprint("error: cli_selfhost_project_test target '" ++ target_name ++ "' missing file for " ++ label ++ ": " ++ path)
+    1
+
+fn bgs_project_expect_absent(path: str, target_name: str, label: str) -> i32:
+    if with_fs_file_exists(path) == 0:
+        return 0
+    with_eprint("error: cli_selfhost_project_test target '" ++ target_name ++ "' found unexpected file for " ++ label ++ ": " ++ path)
     1
 
 fn bgs_write_fixture(path: str, contents: str, target_name: str, label: str) -> i32:
@@ -126,6 +151,92 @@ fn bgs_build_expect_success(root: str, target_name: str, compiler_path: str, cas
     if result.rc != 0:
         with_eprint("error: build.w selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
     result
+
+fn bgs_project_expect_success(root: str, target_name: str, compiler_path: str, case_dir: str, label: str, argv_tail: str) -> BuildSelfhostRunResult:
+    let result = bgs_run_cli_capture_cwd(root, target_name, compiler_path, label, argv_tail, 120000, case_dir)
+    if result.rc != 0:
+        with_eprint("error: project selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
+    result
+
+fn bgs_check_init_in_cwd(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
+    if with_fs_mkdir_p(case_dir) != 0:
+        with_eprint("error: cli_selfhost_project_test target '" ++ target_name ++ "' could not create init cwd case directory: " ++ case_dir)
+        return 1
+    let expected_name = bgs_basename(case_dir)
+    let result = bgs_project_expect_success(root, target_name, compiler_path, case_dir, "init-in-cwd", bgs_argv_append("", "init"))
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    var rc = bgs_project_expect_file(bgs_resolve_join(case_dir, "with.toml"), target_name, "init_in_cwd manifest")
+    if rc != 0: return rc
+    rc = bgs_project_expect_file(bgs_resolve_join(case_dir, "src/main.w"), target_name, "init_in_cwd main")
+    if rc != 0: return rc
+    rc = bgs_project_expect_absent(bgs_resolve_join(bgs_resolve_join(case_dir, expected_name), "with.toml"), target_name, "init_in_cwd nested manifest")
+    if rc != 0: return rc
+    rc = bgs_project_expect_absent(bgs_resolve_join(bgs_resolve_join(bgs_resolve_join(case_dir, expected_name), "src"), "main.w"), target_name, "init_in_cwd nested main")
+    if rc != 0: return rc
+    rc = bgs_expect_file_contains(bgs_resolve_join(case_dir, "with.toml"), "name = \"" ++ expected_name ++ "\"", target_name, "init_in_cwd manifest name")
+    if rc != 0: return rc
+    bgs_project_assert_contains(result.stderr, "created " ++ expected_name, target_name, "init_in_cwd stderr")
+
+fn bgs_check_init_named_dir(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
+    if with_fs_mkdir_p(case_dir) != 0:
+        with_eprint("error: cli_selfhost_project_test target '" ++ target_name ++ "' could not create init named case directory: " ++ case_dir)
+        return 1
+    let project_name = "sqlite"
+    let result = bgs_project_expect_success(root, target_name, compiler_path, case_dir, "init-named-dir", bgs_argv_append(bgs_argv_append("", "init"), project_name))
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    let project_dir = bgs_resolve_join(case_dir, project_name)
+    var rc = bgs_project_expect_file(bgs_resolve_join(project_dir, "with.toml"), target_name, "init_named_dir manifest")
+    if rc != 0: return rc
+    rc = bgs_project_expect_file(bgs_resolve_join(project_dir, "src/main.w"), target_name, "init_named_dir main")
+    if rc != 0: return rc
+    rc = bgs_project_expect_absent(bgs_resolve_join(case_dir, "with.toml"), target_name, "init_named_dir root manifest")
+    if rc != 0: return rc
+    rc = bgs_project_expect_absent(bgs_resolve_join(case_dir, "src/main.w"), target_name, "init_named_dir root main")
+    if rc != 0: return rc
+    rc = bgs_expect_file_contains(bgs_resolve_join(project_dir, "with.toml"), "name = \"" ++ project_name ++ "\"", target_name, "init_named_dir manifest name")
+    if rc != 0: return rc
+    rc = bgs_project_assert_contains(result.stderr, "created " ++ project_name, target_name, "init_named_dir stderr")
+    if rc != 0: return rc
+    rc = bgs_project_assert_contains(result.stderr, "  " ++ project_name ++ "/with.toml", target_name, "init_named_dir manifest path")
+    if rc != 0: return rc
+    bgs_project_assert_contains(result.stderr, "  " ++ project_name ++ "/src/main.w", target_name, "init_named_dir main path")
+
+fn bgs_check_build_uses_package_section_name(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
+    var rc = bgs_write_project_manifest(case_dir, "pkgdemo", target_name)
+    if rc != 0: return rc
+    rc = bgs_write_fixture(bgs_resolve_join(case_dir, "src/main.w"), "fn main:\n    print(\"ok\")\n", target_name, "package_section_name main")
+    if rc != 0: return rc
+    let result = bgs_project_expect_success(root, target_name, compiler_path, case_dir, "package-section-name", bgs_argv_append("", "build"))
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    bgs_project_expect_file(bgs_resolve_join(case_dir, "out/bin/pkgdemo"), target_name, "package_section_name output")
+
+fn bgs_check_build_rejects_imperative_manifest(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
+    var rc = bgs_write_fixture(bgs_resolve_join(case_dir, "with.toml"), "[package]\nname = \"badmanifest\"\nversion = \"0.1.0\"\n\n[build]\ncommand = \"echo nope\"\n", target_name, "imperative manifest")
+    if rc != 0: return rc
+    rc = bgs_write_fixture(bgs_resolve_join(case_dir, "src/main.w"), "fn main:\n    print(\"ok\")\n", target_name, "imperative main")
+    if rc != 0: return rc
+    let implicit = bgs_run_cli_capture_cwd(root, target_name, compiler_path, "imperative-manifest", bgs_argv_append("", "build"), 120000, case_dir)
+    if implicit.rc == 0:
+        with_eprint("error: cli_selfhost_project_test target '" ++ target_name ++ "' accepted imperative manifest")
+        return 1
+    rc = bgs_project_assert_contains(implicit.stderr, "error: invalid with.toml: imperative build configuration belongs in build.w", target_name, "imperative manifest diagnostic")
+    if rc != 0: return rc
+    let explicit = bgs_run_cli_capture_cwd(root, target_name, compiler_path, "imperative-manifest-explicit-source", bgs_argv_append(bgs_argv_append("", "build"), bgs_resolve_join(case_dir, "src/main.w")), 120000, case_dir)
+    if explicit.rc == 0:
+        with_eprint("error: cli_selfhost_project_test target '" ++ target_name ++ "' accepted imperative manifest with explicit source")
+        return 1
+    bgs_project_assert_contains(explicit.stderr, "error: invalid with.toml: imperative build configuration belongs in build.w", target_name, "imperative manifest explicit source diagnostic")
+
+pub fn run_cli_selfhost_project_test(root: str, target_name: str, compiler_path: str) -> i32:
+    let stamp = f"{with_getpid()}.{with_clock_nanos()}"
+    let base_dir = bgs_resolve_join(bgs_resolve_join(bgs_resolve_join(root, "out/test-graph"), target_name), stamp)
+    var rc = bgs_check_init_in_cwd(root, target_name, compiler_path, bgs_resolve_join(base_dir, "init_in_cwd_case"))
+    if rc != 0: return rc
+    rc = bgs_check_init_named_dir(root, target_name, compiler_path, bgs_resolve_join(base_dir, "init_named_dir_case"))
+    if rc != 0: return rc
+    rc = bgs_check_build_uses_package_section_name(root, target_name, compiler_path, bgs_resolve_join(base_dir, "build_package_section_case"))
+    if rc != 0: return rc
+    bgs_check_build_rejects_imperative_manifest(root, target_name, compiler_path, bgs_resolve_join(base_dir, "build_imperative_manifest_case"))
 
 fn bgs_tool_from_env(env_name: str, fallback: str) -> str:
     let value = with_getenv_str(env_name)

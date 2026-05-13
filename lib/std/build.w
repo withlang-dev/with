@@ -39,6 +39,7 @@ pub enum BuildKind: i32:
     CliSelfhostBuildWTest = 32
     GenerateCompatRuntime = 33
     WithCompilerIr = 34
+    CliSelfhostProjectTest = 35
 
 pub enum BuildTarget: i32:
     native = 0
@@ -236,6 +237,10 @@ pub fn Build.cli_selfhost_object_symbol_test(self: Build, name: str, compiler: s
 
 pub fn Build.cli_selfhost_build_w_test(self: Build, name: str, compiler: str) -> Build:
     let target = target_new(.CliSelfhostBuildWTest, name, compiler)
+    self.add_target(target)
+
+pub fn Build.cli_selfhost_project_test(self: Build, name: str, compiler: str) -> Build:
+    let target = target_new(.CliSelfhostProjectTest, name, compiler)
     self.add_target(target)
 
 pub fn Build.generate_compiler_entrypoints(self: Build, name: str, stamp: str) -> Build:
