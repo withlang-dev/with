@@ -131,11 +131,11 @@ fn wait_for_child_process_timeout(pid: i32, timeout_ms: i32) -> i32:
                 continue
             return -1
         if timeout_ms > 0 and with_clock_nanos() - start_ns >= timeout_ns:
-            let _ = kill(0 - pid, SIGTERM)
+            let _ = kill(-pid, SIGTERM)
             let _sleep = with_usleep(10000)
             let waited_after_term = waitpid(pid, &raw mut status, WNOHANG)
             if waited_after_term != pid:
-                let _kill = kill(0 - pid, 9)
+                let _kill = kill(-pid, 9)
                 let _ = waitpid(pid, &raw mut status, 0)
             return CAPTURE_TIMEOUT_RC
         let _sleep_poll = with_usleep(10000)
@@ -265,8 +265,64 @@ fn redirect_fd_to_path(path: *const u8, fd: i32) -> i32:
     let _ = close(out_fd)
     0
 
+fn redirect_fd_from_path(path: *const u8, fd: i32) -> i32:
+    let in_fd = __open(path, 0, 0)
+    if in_fd < 0:
+        return -1
+    if dup2(in_fd, fd) < 0:
+        let _ = close(in_fd)
+        return -1
+    let _ = close(in_fd)
+    0
+
 fn run_argv_capture(blob: *const u8, len: i64, stdout_path: *const u8, stderr_path: *const u8, timeout_ms: i32) -> i32:
     run_argv_capture_cwd(blob, len, stdout_path, stderr_path, timeout_ms, 0 as *const u8)
+
+fn run_argv_capture_input(blob: *const u8, len: i64, stdout_path: *const u8, stderr_path: *const u8, timeout_ms: i32, stdin_path: *const u8) -> i32:
+    let argc = argv_blob_count(blob, len)
+    if argc <= 0 or argc >= 256:
+        return -1
+    var prev_mask: u32 = 0 as u32
+    let mask_rc = block_interrupt_signals(&raw mut prev_mask)
+    let pid = fork()
+    if pid == 0:
+        if mask_rc == 0:
+            restore_signal_mask(&prev_mask as *const u32)
+        let _ = setpgid(0, 0)
+        restore_default_signal_handler(SIGINT)
+        restore_default_signal_handler(SIGTERM)
+        restore_default_signal_handler(SIGHUP)
+        restore_default_signal_handler(SIGQUIT)
+        if redirect_fd_from_path(stdin_path, 0) != 0:
+            _exit(127)
+        if redirect_fd_to_path(stdout_path, 1) != 0:
+            _exit(127)
+        if redirect_fd_to_path(stderr_path, 2) != 0:
+            _exit(127)
+        var argv: [256]*const u8 = [0 as *const u8; 256]
+        var argi = 0
+        var offset: i64 = 0
+        while offset < len and argi < 255:
+            argv[argi] = (blob as i64 + offset) as *const u8
+            argi += 1
+            while offset < len and (unsafe: *((blob as i64 + offset) as *const u8)) != 0:
+                offset += 1
+            offset += 1
+        argv[argi] = 0 as *const u8
+        let _ = execvp(argv[0], (&argv) as *const [256]*const u8 as *const *const u8)
+        _exit(127)
+    if pid < 0:
+        if mask_rc == 0:
+            restore_signal_mask(&prev_mask as *const u32)
+        return -1
+
+    active_child_pgid = pid
+    let _ = setpgid(pid, pid)
+    if mask_rc == 0:
+        restore_signal_mask(&prev_mask as *const u32)
+    let rc = wait_for_child_process_timeout(pid, timeout_ms)
+    active_child_pgid = 0
+    rc
 
 fn run_argv_capture_cwd(blob: *const u8, len: i64, stdout_path: *const u8, stderr_path: *const u8, timeout_ms: i32, cwd: *const u8) -> i32:
     let argc = argv_blob_count(blob, len)
@@ -319,7 +375,7 @@ fn run_argv_capture_cwd(blob: *const u8, len: i64, stdout_path: *const u8, stder
 fn interrupt_signal_handler(signo: i32):
     interrupt_flag = 1
     if active_child_pgid > 0:
-        let _ = kill(0 - active_child_pgid, signo)
+        let _ = kill(-active_child_pgid, signo)
     _exit(128 + signo)
 
 @[c_export("with_setenv_str")]
@@ -436,6 +492,42 @@ pub fn exec_argv_capture(args: str, stdout_path: str, stderr_path: str, timeout_
     with_free(arg_buf)
     with_free(out_buf)
     with_free(err_buf)
+    rc
+
+@[c_export("with_exec_argv_capture_input")]
+pub fn exec_argv_capture_input(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, stdin_path: str) -> i32:
+    let arg_buf = str_to_c_buf(args)
+    if arg_buf as i64 == 0:
+        return -1
+    let out_buf = str_to_c_buf(stdout_path)
+    if out_buf as i64 == 0:
+        with_free(arg_buf)
+        return -1
+    let err_buf = str_to_c_buf(stderr_path)
+    if err_buf as i64 == 0:
+        with_free(arg_buf)
+        with_free(out_buf)
+        return -1
+    let in_buf = str_to_c_buf(stdin_path)
+    if in_buf as i64 == 0:
+        with_free(arg_buf)
+        with_free(out_buf)
+        with_free(err_buf)
+        return -1
+    if interrupt_flag != 0:
+        with_free(arg_buf)
+        with_free(out_buf)
+        with_free(err_buf)
+        with_free(in_buf)
+        let errp = __error()
+        if errp as i64 != 0:
+            unsafe: *errp = EINTR
+        return -1
+    let rc = run_argv_capture_input(arg_buf as *const u8, args.len(), out_buf as *const u8, err_buf as *const u8, timeout_ms, in_buf as *const u8)
+    with_free(arg_buf)
+    with_free(out_buf)
+    with_free(err_buf)
+    with_free(in_buf)
     rc
 
 @[c_export("with_exec_argv_capture_cwd")]
