@@ -71,6 +71,12 @@
     graph node, covering pointer-index diagnostics, prelude stdout/stderr
     output contracts, whole-program extern var redeclaration, and imported
     module dependency ordering.
+  - CLI selfhost regex/PCRE2 preparation coverage now runs as a typed
+    `cli_selfhost_regex_prep_test` graph node, covering EBCDIC table pruning,
+    raw-to-generated preservation of shared extern/let ownership, width-suffix
+    local preservation, std.re shared dependency imports, opaque field
+    diagnostics, concrete PCRE2 heapframe structs, clean pcre2_compile builds,
+    and JIT no-support fallback behavior.
   - The compiler runtime process API now supports argv execution with supplied
     stdin plus captured stdout/stderr, so graph tests no longer need shell
     pipelines to exercise stdin-driven compiler behavior.
@@ -121,6 +127,15 @@
   - `make test` is now a compatibility shim over `with build :test`; Make no
     longer invokes `scripts/run_tests.sh`, the issue61 regression script, or
     the embedded-runtime regression script directly.
+  - `with build :test` now runs the first migrator fixture batch through a
+    typed `cli_selfhost_migrate_basic_test` node:
+      - global initializer lists
+      - host header compatibility
+      - assignment sequencing compatibility
+      - rvalue sequencing
+      - directory progress stdout
+      - cross-file global owner arrays
+      - shared defs pruning of unused ownerless externs
   - Initial repository `build.w`:
       - `with build`
       - `with build :selfcheck`
@@ -136,8 +151,8 @@
 
   - Replace the remaining temporary `with build :test` script invocation with
     native typed With test harness nodes for the rest of the CLI selfhost
-    categories: migration fixtures, regex preparation checks, and parallel
-    same-source testing.
+    categories: remaining migration fixtures, generated PCRE2 workflow checks,
+    and parallel same-source testing.
   - Port clean-bootstrap runtime/link preparation into the graph path. Direct
     `with build :build` works after a normal repository build, but Make still
     owns bootstrap-time runtime/link metadata setup from a cold checkout.
