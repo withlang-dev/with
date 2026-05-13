@@ -619,7 +619,7 @@ pub fn run_cli_selfhost_regex_prep_test(root: str, target_name: str, compiler_pa
     0
 
 fn bgs_migrate_error(target_name: str, message: str) -> void:
-    with_eprint("error: cli_selfhost_migrate_basic_test target '" ++ target_name ++ "' " ++ message)
+    with_eprint("error: cli selfhost migrator test target '" ++ target_name ++ "' " ++ message)
 
 fn bgs_migrate_assert_contains(text: str, needle: str, target_name: str, label: str) -> i32:
     if with_str_contains(text, needle) != 0:
@@ -673,6 +673,58 @@ fn bgs_count_occurrences(text: str, needle: str) -> i32:
         count = count + 1
         offset = offset + found + needle.len() as i32
     count
+
+fn bgs_has_trailing_blank(text: str) -> bool:
+    var line_start = 0
+    for i in 0..text.len() as i32:
+        if text.byte_at(i as i64) == 10:
+            if i > line_start:
+                let prev = text.byte_at((i - 1) as i64)
+                if prev == 32 or prev == 9:
+                    return true
+            line_start = i + 1
+    if line_start < text.len() as i32:
+        let last = text.byte_at((text.len() - 1) as i64)
+        if last == 32 or last == 9:
+            return true
+    false
+
+fn bgs_line_with_prefix_contains(text: str, prefix: str, needle: str) -> bool:
+    var line_start = 0
+    for i in 0..text.len() as i32:
+        if text.byte_at(i as i64) == 10:
+            let line = text.slice(line_start as i64, i as i64)
+            if with_str_starts_with(line, prefix) != 0 and with_str_contains(line, needle) != 0:
+                return true
+            line_start = i + 1
+    if line_start < text.len() as i32:
+        let line = text.slice(line_start as i64, text.len())
+        if with_str_starts_with(line, prefix) != 0 and with_str_contains(line, needle) != 0:
+            return true
+    false
+
+fn bgs_trim_right_spaces(text: str) -> str:
+    var end = text.len() as i32
+    while end > 0:
+        let ch = text.byte_at((end - 1) as i64)
+        if ch != 32 and ch != 9:
+            break
+        end = end - 1
+    text.slice(0, end as i64)
+
+fn bgs_line_with_prefix_ends_with(text: str, prefix: str, suffix: str) -> bool:
+    var line_start = 0
+    for i in 0..text.len() as i32:
+        if text.byte_at(i as i64) == 10:
+            let line = bgs_trim_right_spaces(text.slice(line_start as i64, i as i64))
+            if with_str_starts_with(line, prefix) != 0 and line.ends_with(suffix):
+                return true
+            line_start = i + 1
+    if line_start < text.len() as i32:
+        let line = bgs_trim_right_spaces(text.slice(line_start as i64, text.len()))
+        if with_str_starts_with(line, prefix) != 0 and line.ends_with(suffix):
+            return true
+    false
 
 fn bgs_migrate_expect_success(root: str, target_name: str, compiler_path: str, case_dir: str, label: str, argv_tail: str) -> BuildSelfhostRunResult:
     let result = bgs_run_cli_capture_cwd(root, target_name, compiler_path, label, argv_tail, 180000, case_dir)
@@ -893,6 +945,251 @@ pub fn run_cli_selfhost_migrate_basic_test(root: str, target_name: str, compiler
     rc = bgs_check_migrate_cross_file_global_owner_arrays(root, target_name, compiler_path, bgs_resolve_join(base_dir, "cross_file_global_owner_arrays"))
     if rc != 0: return rc
     bgs_check_migrate_shared_defs_ownerless_extern(root, target_name, compiler_path, bgs_resolve_join(base_dir, "shared_defs_ownerless_extern"))
+
+fn bgs_check_migrate_libc_ctype(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
+    let src = bgs_resolve_join(case_dir, "libc_ctype.c")
+    let out_w = bgs_resolve_join(case_dir, "libc_ctype.w")
+    let c_text = "#include <ctype.h>\n\nint classify(int c) {\n  return isalpha(c) + isdigit(c) + isalnum(c) + isspace(c) +\n    isupper(c) + islower(c) + isxdigit(c) + isprint(c) +\n    isgraph(c) + ispunct(c) + iscntrl(c) + tolower(c) + toupper(c);\n}\n"
+    var rc = bgs_write_fixture(src, c_text, target_name, "libc ctype source")
+    if rc != 0: return rc
+    var argv = ""
+    argv = bgs_argv_append(argv, "migrate")
+    argv = bgs_argv_append(argv, src)
+    argv = bgs_argv_append(argv, "--no-c-export")
+    argv = bgs_argv_append(argv, "--prefer-brace")
+    argv = bgs_argv_append(argv, "-o")
+    argv = bgs_argv_append(argv, out_w)
+    let result = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "migrate-libc-ctype", argv)
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    let out_text = with_fs_read_file(out_w)
+    let required: Vec[str] = Vec.new()
+    required.push("extern fn isalpha(c: i32) -> i32")
+    required.push("extern fn tolower(c: i32) -> i32")
+    required.push("isalpha(__param_c)")
+    required.push("isalnum(__param_c)")
+    required.push("isgraph(__param_c)")
+    required.push("tolower(__param_c)")
+    for i in 0..required.len() as i32:
+        rc = bgs_migrate_assert_contains(out_text, required.get(i as i64), target_name, "libc_ctype_calls")
+        if rc != 0: return rc
+    let forbidden: Vec[str] = Vec.new()
+    forbidden.push("is_alpha(__param_c)")
+    forbidden.push("is_alnum(__param_c)")
+    forbidden.push("to_lower(__param_c)")
+    for i in 0..forbidden.len() as i32:
+        rc = bgs_migrate_assert_not_contains(out_text, forbidden.get(i as i64), target_name, "libc_ctype_calls")
+        if rc != 0: return rc
+    let check = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "check-libc-ctype", bgs_argv_append(bgs_argv_append("", "check"), out_w))
+    if check.rc != 0: return if check.rc == 0: 1 else: check.rc
+    0
+
+fn bgs_check_migrate_macro_unsigned_minus(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
+    let src = bgs_resolve_join(case_dir, "macro_initializer_unsigned_minus.c")
+    let out_w = bgs_resolve_join(case_dir, "macro_initializer_unsigned_minus.w")
+    let c_text = "typedef unsigned long size_t;\n\n#define MY_SIZE_MAX ((size_t)-1)\n#define COPY_ONE(dst_, src_, length_) do { size_t chkmc_length = length_; if (chkmc_length > 0) { (dst_)[0] = (src_)[0]; } } while (0)\n\nint too_large(size_t current, size_t need) {\n  return current > (MY_SIZE_MAX - need) / 2;\n}\n\nint repeat_too_large(size_t replen, size_t need, int count) {\n  return count > 0 && replen > (MY_SIZE_MAX - need) / count;\n}\n\nint copy_after_goto(char *dst, const char *src, int flag) {\n  if (flag) goto copy;\n  return 0;\ncopy:\n  COPY_ONE(dst, src, 3);\n  return (int)dst[0];\n}\n"
+    var rc = bgs_write_fixture(src, c_text, target_name, "macro unsigned source")
+    if rc != 0: return rc
+    var argv = ""
+    argv = bgs_argv_append(argv, "migrate")
+    argv = bgs_argv_append(argv, src)
+    argv = bgs_argv_append(argv, "--no-c-export")
+    argv = bgs_argv_append(argv, "--prefer-brace")
+    argv = bgs_argv_append(argv, "-o")
+    argv = bgs_argv_append(argv, out_w)
+    let result = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "migrate-macro-unsigned-minus", argv)
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    let out_text = with_fs_read_file(out_w)
+    if with_str_contains(out_text, "(-1 as ") == 0 and with_str_contains(out_text, "(0 as ") == 0:
+        bgs_migrate_error(target_name, "macro_initializer_unsigned_minus missing typed unsigned -1")
+        return 1
+    rc = bgs_migrate_assert_not_contains(out_text, "((0 -% 1)", target_name, "macro_initializer_unsigned_minus")
+    if rc != 0: return rc
+    rc = bgs_migrate_assert_contains(out_text, "/ (__param_count as ", target_name, "macro_initializer_unsigned_minus")
+    if rc != 0: return rc
+    rc = bgs_migrate_assert_contains(out_text, "__local_chkmc_length", target_name, "macro_initializer_unsigned_minus")
+    if rc != 0: return rc
+    rc = bgs_migrate_assert_contains(out_text, "= 3)", target_name, "macro_initializer_unsigned_minus")
+    if rc != 0: return rc
+    let check = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "check-macro-unsigned-minus", bgs_argv_append(bgs_argv_append("", "check"), out_w))
+    if check.rc != 0: return if check.rc == 0: 1 else: check.rc
+    0
+
+fn bgs_check_migrate_tentative_global_owner(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
+    let src = bgs_resolve_join(case_dir, "tentative_global_owner.c")
+    let out_w = bgs_resolve_join(case_dir, "tentative_global_owner.w")
+    var rc = bgs_write_fixture(src, "typedef struct ctx { int x; } ctx;\nctx g;\nint issue127_read(void) { return g.x; }\n", target_name, "tentative global owner")
+    if rc != 0: return rc
+    var argv = ""
+    argv = bgs_argv_append(argv, "migrate")
+    argv = bgs_argv_append(argv, src)
+    argv = bgs_argv_append(argv, "--no-c-export")
+    argv = bgs_argv_append(argv, "-o")
+    argv = bgs_argv_append(argv, out_w)
+    let result = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "migrate-tentative-global-owner", argv)
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    rc = bgs_migrate_file_contains(out_w, "var g: ctx", target_name, "tentative_global_owner")
+    if rc != 0: return rc
+    rc = bgs_migrate_file_forbids(out_w, "extern var g: ctx", target_name, "tentative_global_owner")
+    if rc != 0: return rc
+    let check = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "check-tentative-global-owner", bgs_argv_append(bgs_argv_append("", "check"), out_w))
+    if check.rc != 0: return if check.rc == 0: 1 else: check.rc
+    0
+
+fn bgs_check_migrate_cross_file_tentative_global_owner(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
+    let generated_dir = bgs_resolve_join(case_dir, "generated")
+    var rc = bgs_write_fixture(bgs_resolve_join(case_dir, "a.c"), "int issue127_counter;\nint issue127_get(void) { return issue127_counter; }\n", target_name, "cross tentative a")
+    if rc != 0: return rc
+    rc = bgs_write_fixture(bgs_resolve_join(case_dir, "b.c"), "int issue127_counter;\nint issue127_bump(void) {\n  issue127_counter = issue127_counter + 1;\n  return issue127_counter;\n}\n", target_name, "cross tentative b")
+    if rc != 0: return rc
+    var argv = ""
+    argv = bgs_argv_append(argv, "migrate")
+    argv = bgs_argv_append(argv, case_dir)
+    argv = bgs_argv_append(argv, "--no-c-export")
+    argv = bgs_argv_append(argv, "-o")
+    argv = bgs_argv_append(argv, generated_dir)
+    let result = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "migrate-cross-file-tentative", argv)
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    let a_w = bgs_resolve_join(generated_dir, "a.w")
+    let b_w = bgs_resolve_join(generated_dir, "b.w")
+    rc = bgs_migrate_file_contains(a_w, "var issue127_counter: c_int", target_name, "cross_file_tentative_global_owner")
+    if rc != 0: return rc
+    rc = bgs_migrate_file_contains(b_w, "extern var issue127_counter: c_int", target_name, "cross_file_tentative_global_owner")
+    if rc != 0: return rc
+    let check_a = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "check-cross-file-tentative-a", bgs_argv_append(bgs_argv_append("", "check"), a_w))
+    if check_a.rc != 0: return if check_a.rc == 0: 1 else: check_a.rc
+    let check_b = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "check-cross-file-tentative-b", bgs_argv_append(bgs_argv_append("", "check"), b_w))
+    if check_b.rc != 0: return if check_b.rc == 0: 1 else: check_b.rc
+    0
+
+fn bgs_check_migrate_noop_pointer_casts(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
+    let src = bgs_resolve_join(case_dir, "noop_pointer_cast_exprs.c")
+    let out_w = bgs_resolve_join(case_dir, "noop_pointer_cast_exprs.w")
+    let c_text = "typedef struct ctx { int x; } ctx;\nctx g;\n\nctx *ret_ctx(void) { return (ctx *)(&g); }\n\nint f(ctx *ccontext) {\n  ctx *local = (ctx *)(&g);\n  ccontext = (ctx *)(&g);\n  return local->x + ccontext->x;\n}\n\nstatic void callback(void *p) { (void)p; }\n\ntypedef void (*callback_fn)(void *);\n\ncallback_fn ret_callback(void) { return &callback; }\n"
+    var rc = bgs_write_fixture(src, c_text, target_name, "noop pointer casts")
+    if rc != 0: return rc
+    var argv = ""
+    argv = bgs_argv_append(argv, "migrate")
+    argv = bgs_argv_append(argv, src)
+    argv = bgs_argv_append(argv, "--no-c-export")
+    argv = bgs_argv_append(argv, "-o")
+    argv = bgs_argv_append(argv, out_w)
+    let result = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "migrate-noop-pointer-casts", argv)
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    let out_text = with_fs_read_file(out_w)
+    let required: Vec[str] = Vec.new()
+    required.push("fn ret_ctx() -> *mut ctx:")
+    required.push("return ((&raw mut g as *mut ctx))")
+    required.push("var __local_local: *mut ctx = ((&raw mut g as *mut ctx))")
+    required.push("(&raw mut g as *mut ctx)")
+    required.push("return callback")
+    for i in 0..required.len() as i32:
+        rc = bgs_migrate_assert_contains(out_text, required.get(i as i64), target_name, "noop_pointer_cast_exprs")
+        if rc != 0: return rc
+    let forbidden: Vec[str] = Vec.new()
+    forbidden.push("extern fn ret_ctx()")
+    forbidden.push("as *mut ctx)) as *mut ctx")
+    forbidden.push("&raw const callback")
+    for i in 0..forbidden.len() as i32:
+        rc = bgs_migrate_assert_not_contains(out_text, forbidden.get(i as i64), target_name, "noop_pointer_cast_exprs")
+        if rc != 0: return rc
+    let check = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "check-noop-pointer-casts", bgs_argv_append(bgs_argv_append("", "check"), out_w))
+    if check.rc != 0: return if check.rc == 0: 1 else: check.rc
+    0
+
+fn bgs_check_migrate_raw_pointer_index(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
+    let src = bgs_resolve_join(case_dir, "raw_pointer_index_unsafe.c")
+    let out_w = bgs_resolve_join(case_dir, "raw_pointer_index_unsafe.w")
+    var rc = bgs_write_fixture(src, "int issue146_ptr_ops(int *p, int *q) {\n  int *r = p + 1;\n  int d = (int)(q - p);\n  r[0] = r[0] + d;\n  return p[1];\n}\n", target_name, "raw pointer index")
+    if rc != 0: return rc
+    var argv = ""
+    argv = bgs_argv_append(argv, "migrate")
+    argv = bgs_argv_append(argv, src)
+    argv = bgs_argv_append(argv, "--no-c-export")
+    argv = bgs_argv_append(argv, "-o")
+    argv = bgs_argv_append(argv, out_w)
+    let result = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "migrate-raw-pointer-index", argv)
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    let out_text = with_fs_read_file(out_w)
+    rc = bgs_migrate_assert_contains(out_text, "__param_p +", target_name, "raw_pointer_index_unsafe")
+    if rc != 0: return rc
+    rc = bgs_migrate_assert_contains(out_text, "(unsafe: __local_r[0])", target_name, "raw_pointer_index_unsafe")
+    if rc != 0: return rc
+    rc = bgs_migrate_assert_contains(out_text, "(unsafe: __param_p[1])", target_name, "raw_pointer_index_unsafe")
+    if rc != 0: return rc
+    let check = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "check-raw-pointer-index", bgs_argv_append(bgs_argv_append("", "check"), out_w))
+    if check.rc != 0: return if check.rc == 0: 1 else: check.rc
+    0
+
+fn bgs_check_migrate_prefer_brace_ws(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
+    let src = bgs_resolve_join(case_dir, "prefer_brace_ws.c")
+    let out_w = bgs_resolve_join(case_dir, "prefer_brace_ws.w")
+    let c_text = "int prefer_brace_ws(int *p) {\n  while (*p != 0) {\n    if (*p < 3) {\n      p++;\n      continue;\n    }\n    p++;\n  }\n  return 0;\n}\n"
+    var rc = bgs_write_fixture(src, c_text, target_name, "prefer brace source")
+    if rc != 0: return rc
+    var argv = ""
+    argv = bgs_argv_append(argv, "migrate")
+    argv = bgs_argv_append(argv, src)
+    argv = bgs_argv_append(argv, "--no-c-export")
+    argv = bgs_argv_append(argv, "--prefer-brace")
+    argv = bgs_argv_append(argv, "-o")
+    argv = bgs_argv_append(argv, out_w)
+    let result = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "migrate-prefer-brace-ws", argv)
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    let out_text = with_fs_read_file(out_w)
+    if bgs_has_trailing_blank(out_text):
+        bgs_migrate_error(target_name, "prefer_brace_ws emitted trailing whitespace")
+        return 1
+    if not bgs_line_with_prefix_contains(out_text, "    while", "{") or not bgs_line_with_prefix_contains(out_text, "        if", "{"):
+        bgs_migrate_error(target_name, "prefer_brace_ws did not emit brace-style while/if")
+        return 1
+    if bgs_line_with_prefix_ends_with(out_text, "    while", ":") or bgs_line_with_prefix_ends_with(out_text, "        if", ":"):
+        bgs_migrate_error(target_name, "prefer_brace_ws emitted colon-style while/if")
+        return 1
+    let check = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "check-prefer-brace-ws", bgs_argv_append(bgs_argv_append("", "check"), out_w))
+    if check.rc != 0: return if check.rc == 0: 1 else: check.rc
+    0
+
+fn bgs_check_migrate_typed_cast_macros(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
+    let src = bgs_resolve_join(case_dir, "typed_cast_macros.c")
+    let out_w = bgs_resolve_join(case_dir, "typed_cast_macros.w")
+    let c_text = "typedef unsigned long usize;\n#define ZERO_TERM ((usize)-1)\n\nint f(usize patlen) {\n  int zero_terminated = 0;\n  if ((zero_terminated = (patlen == ZERO_TERM)))\n    patlen = 7;\n  return zero_terminated + (int)patlen;\n}\n"
+    var rc = bgs_write_fixture(src, c_text, target_name, "typed cast macros")
+    if rc != 0: return rc
+    var argv = ""
+    argv = bgs_argv_append(argv, "migrate")
+    argv = bgs_argv_append(argv, src)
+    argv = bgs_argv_append(argv, "--no-c-export")
+    argv = bgs_argv_append(argv, "-o")
+    argv = bgs_argv_append(argv, out_w)
+    let result = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "migrate-typed-cast-macros", argv)
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    let out_text = with_fs_read_file(out_w)
+    rc = bgs_migrate_assert_contains(out_text, "let ZERO_TERM: c_ulong = (-1 as c_ulong)", target_name, "typed_cast_macros")
+    if rc != 0: return rc
+    rc = bgs_migrate_assert_contains(out_text, "patlen == ((-1 as c_ulong))", target_name, "typed_cast_macros")
+    if rc != 0: return rc
+    let check = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "check-typed-cast-macros", bgs_argv_append(bgs_argv_append("", "check"), out_w))
+    if check.rc != 0: return if check.rc == 0: 1 else: check.rc
+    0
+
+pub fn run_cli_selfhost_migrate_core_test(root: str, target_name: str, compiler_path: str) -> i32:
+    let stamp = f"{with_getpid()}.{with_clock_nanos()}"
+    let base_dir = bgs_resolve_join(bgs_resolve_join(bgs_resolve_join(root, "out/test-graph"), target_name), stamp)
+    var rc = bgs_check_migrate_libc_ctype(root, target_name, compiler_path, bgs_resolve_join(base_dir, "libc_ctype"))
+    if rc != 0: return rc
+    rc = bgs_check_migrate_macro_unsigned_minus(root, target_name, compiler_path, bgs_resolve_join(base_dir, "macro_unsigned_minus"))
+    if rc != 0: return rc
+    rc = bgs_check_migrate_tentative_global_owner(root, target_name, compiler_path, bgs_resolve_join(base_dir, "tentative_global_owner"))
+    if rc != 0: return rc
+    rc = bgs_check_migrate_cross_file_tentative_global_owner(root, target_name, compiler_path, bgs_resolve_join(base_dir, "cross_file_tentative_global_owner"))
+    if rc != 0: return rc
+    rc = bgs_check_migrate_noop_pointer_casts(root, target_name, compiler_path, bgs_resolve_join(base_dir, "noop_pointer_casts"))
+    if rc != 0: return rc
+    rc = bgs_check_migrate_raw_pointer_index(root, target_name, compiler_path, bgs_resolve_join(base_dir, "raw_pointer_index"))
+    if rc != 0: return rc
+    rc = bgs_check_migrate_prefer_brace_ws(root, target_name, compiler_path, bgs_resolve_join(base_dir, "prefer_brace_ws"))
+    if rc != 0: return rc
+    bgs_check_migrate_typed_cast_macros(root, target_name, compiler_path, bgs_resolve_join(base_dir, "typed_cast_macros"))
 
 fn bgs_tool_from_env(env_name: str, fallback: str) -> str:
     let value = with_getenv_str(env_name)
