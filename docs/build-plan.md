@@ -76,6 +76,17 @@
         objects and prints `FIXPOINT` on success.
   - `with test` with no explicit source path now dispatches to the project
     graph target `with build :test`.
+  - `with build :runtime` now refreshes the compiler runtime object set
+    through typed graph nodes:
+      - `generate_compat_runtime` generates `out/gen/embedded_stdlib_runtime.w`
+        and `out/gen/compat_runtime.w` without the old generator binary.
+      - `with_compiler_build` compiles With runtime objects with stage2.
+      - `with_compiler_ir` preserves the existing `regex_runtime.w` IR-to-object
+        path so imported PCRE2 modules are included correctly.
+      - `embed_object_files` and `compile_asm_object` generate and compile
+        `out/lib/embedded_objects.{s,o}` without the shell embedding script.
+  - `with build :build` now produces the canonical `out/bin/with` through the
+    graph path by depending on refreshed runtime objects and embedded objects.
   - `with build :regex-test` now runs the upstream PCRE2 `RunTest -8 0-29
     heap` corpus through a typed `pcre2_run_test` graph node instead of the
     repository wrapper script `scripts/verify_pcre2_works.sh`.
@@ -118,11 +129,11 @@
     native typed With test harness nodes for the rest of the CLI selfhost
     categories: migration fixtures, regex preparation checks, and parallel
     same-source testing.
-  - Port runtime object generation into `build.w`.
-  - Port embedded runtime object generation out of shell.
-  - Port the canonical `out/bin/with` compiler build into `build.w`; stage1,
-    stage2, stage3, and fixpoint object generation now have direct graph
-    targets, but canonical runtime refresh/embedding still lives in Make.
+  - Port clean-bootstrap runtime/link preparation into the graph path. Direct
+    `with build :build` works after a normal repository build, but Make still
+    owns bootstrap-time runtime/link metadata setup from a cold checkout.
+  - Port LLVM bridge/link response generation into typed nodes instead of
+    relying on existing `out/lib/llvm_link.rsp` and `out/lib/llvm_cc`.
   - Port PCRE2 download/migrate/source-preparation into typed nodes;
     `regex-build`, `regex-test`, generated-source checking, and promotion are
     typed. Migration must remain manually triggered; normal test/build targets

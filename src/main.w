@@ -16,6 +16,7 @@ use Lsp
 use CiPrint
 use CiMigrate
 use BuildGraphSelfhost
+use BuildGraphRuntime
 
 extern fn with_arg_count() -> i32
 extern fn with_arg_at(idx: i32) -> str
@@ -1356,6 +1357,8 @@ fn build_graph_kind_name(kind: i32) -> str:
     if kind == 30: return "cli_selfhost_one_liner_test"
     if kind == 31: return "cli_selfhost_object_symbol_test"
     if kind == 32: return "cli_selfhost_build_w_test"
+    if kind == 33: return "generate_compat_runtime"
+    if kind == 34: return "with_compiler_ir"
     f"unknown({kind})"
 
 fn build_graph_target_name(kind: i32) -> str:
@@ -3207,6 +3210,65 @@ fn build_graph_run_with_compiler_build(root: str, target: BuildGraphTarget) -> i
     let _remove_stderr = with_fs_remove_file(stderr_path)
     0
 
+fn build_graph_run_with_compiler_ir(root: str, target: BuildGraphTarget) -> i32:
+    if target.entry.len() == 0:
+        with_eprint("error: with_compiler_ir target '" ++ target.name ++ "' requires a compiler path")
+        return 1
+    if target.inputs.len() == 0:
+        with_eprint("error: with_compiler_ir target '" ++ target.name ++ "' requires a source input")
+        return 1
+    if target.output.len() == 0:
+        with_eprint("error: with_compiler_ir target '" ++ target.name ++ "' requires an output path")
+        return 1
+    let arg_rc = build_graph_validate_process_args(target)
+    if arg_rc != 0:
+        return arg_rc
+    let compiler_path = if target.entry == "seed":
+        build_graph_resolve_seed_compiler(root)
+    else:
+        build_graph_resolve_project_path(root, target.entry)
+    let source_path = build_graph_resolve_project_path(root, target.inputs.get(0))
+    let output_path = build_graph_resolve_project_path(root, target.output)
+    if with_fs_file_exists(source_path) == 0:
+        with_eprint("error: with_compiler_ir target '" ++ target.name ++ "' missing source: " ++ source_path)
+        return 1
+    if compiler_path != "with" and with_fs_file_exists(compiler_path) == 0:
+        with_eprint("error: with_compiler_ir target '" ++ target.name ++ "' missing compiler: " ++ compiler_path)
+        return 1
+    let output_dir = build_graph_dirname(output_path)
+    if with_fs_mkdir_p(output_dir) != 0:
+        with_eprint("error: with_compiler_ir target '" ++ target.name ++ "' could not create output directory: " ++ output_dir)
+        return 1
+    let tmp_output = output_path ++ ".tmp." ++ f"{with_getpid()}.{with_clock_nanos()}"
+    let stderr_path = tmp_output ++ ".stderr"
+    let _remove_tmp = with_fs_remove_file(tmp_output)
+    let _remove_stderr = with_fs_remove_file(stderr_path)
+    var argv = ""
+    argv = build_graph_argv_append(argv, compiler_path)
+    argv = build_graph_argv_append(argv, "ir")
+    argv = build_graph_argv_append(argv, source_path)
+    for ai in 0..target.args.len() as i32:
+        argv = build_graph_argv_append(argv, target.args.get(ai as i64))
+    let old_out_dir = with_getenv_str("WITH_OUT_DIR")
+    let _set_out_dir = with_setenv_str("WITH_OUT_DIR", resolve_join(root, "out"))
+    let rc = with_exec_argv_capture(argv, tmp_output, stderr_path, 600000)
+    let _restore_out_dir = with_setenv_str("WITH_OUT_DIR", old_out_dir)
+    if rc == 124:
+        with_eprint("error: with_compiler_ir target '" ++ target.name ++ "' timed out; output=" ++ tmp_output ++ " stderr=" ++ stderr_path)
+        return 124
+    if rc != 0:
+        with_eprint("error: with_compiler_ir target '" ++ target.name ++ f"' failed with exit code {rc}; output=" ++ tmp_output ++ " stderr=" ++ stderr_path)
+        return if rc == 0: 1 else: rc
+    if with_fs_file_exists(tmp_output) == 0:
+        with_eprint("error: with_compiler_ir target '" ++ target.name ++ "' did not produce output: " ++ tmp_output)
+        return 1
+    let _remove_old = with_fs_remove_file(output_path)
+    if with_fs_rename_file(tmp_output, output_path) != 0:
+        with_eprint("error: with_compiler_ir target '" ++ target.name ++ "' could not move output to: " ++ output_path)
+        return 1
+    let _remove_stderr_done = with_fs_remove_file(stderr_path)
+    0
+
 fn build_graph_expand_install_path(root: str, path: str) -> str:
     if with_str_starts_with(path, "$HOME/") != 0:
         let home = with_getenv_str("HOME")
@@ -3290,10 +3352,10 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
     let completed_targets: Vec[str] = Vec.new()
     for ti in 0..graph.targets.len() as i32:
         let target = graph.targets.get(ti as i64)
-        if target.kind < 0 or target.kind > 32:
+        if target.kind < 0 or target.kind > 34:
             with_eprint("error: invalid build.w target kind " ++ build_graph_kind_name(target.kind) ++ " for '" ++ target.name ++ "'")
             return 1
-        if target.kind != 0 and target.kind != 1 and target.kind != 2 and target.kind != 7 and target.kind != 8 and target.kind != 9 and target.kind != 10 and target.kind != 11 and target.kind != 12 and target.kind != 13 and target.kind != 14 and target.kind != 15 and target.kind != 16 and target.kind != 17 and target.kind != 18 and target.kind != 19 and target.kind != 20 and target.kind != 21 and target.kind != 22 and target.kind != 23 and target.kind != 24 and target.kind != 25 and target.kind != 26 and target.kind != 27 and target.kind != 28 and target.kind != 29 and target.kind != 30 and target.kind != 31 and target.kind != 32:
+        if target.kind != 0 and target.kind != 1 and target.kind != 2 and target.kind != 7 and target.kind != 8 and target.kind != 9 and target.kind != 10 and target.kind != 11 and target.kind != 12 and target.kind != 13 and target.kind != 14 and target.kind != 15 and target.kind != 16 and target.kind != 17 and target.kind != 18 and target.kind != 19 and target.kind != 20 and target.kind != 21 and target.kind != 22 and target.kind != 23 and target.kind != 24 and target.kind != 25 and target.kind != 26 and target.kind != 27 and target.kind != 28 and target.kind != 29 and target.kind != 30 and target.kind != 31 and target.kind != 32 and target.kind != 33 and target.kind != 34:
             with_eprint("error: build.w target kind '" ++ build_graph_kind_name(target.kind) ++ "' is not implemented yet for '" ++ target.name ++ "'")
             return 1
         if target.target_kind < 0 or target.target_kind > 5:
@@ -3407,10 +3469,22 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
                 return gen_rc
             completed_targets.push(target.name)
             continue
+        if target.kind == 33:
+            let compat_rc = run_generate_compat_runtime(root, target.name, target.entry, target.output)
+            if compat_rc != 0:
+                return compat_rc
+            completed_targets.push(target.name)
+            continue
         if target.kind == 25:
             let with_build_rc = build_graph_run_with_compiler_build(root, target)
             if with_build_rc != 0:
                 return with_build_rc
+            completed_targets.push(target.name)
+            continue
+        if target.kind == 34:
+            let ir_rc = build_graph_run_with_compiler_ir(root, target)
+            if ir_rc != 0:
+                return ir_rc
             completed_targets.push(target.name)
             continue
         if target.kind == 26:

@@ -37,6 +37,8 @@ pub enum BuildKind: i32:
     CliSelfhostOneLinerTest = 30
     CliSelfhostObjectSymbolTest = 31
     CliSelfhostBuildWTest = 32
+    GenerateCompatRuntime = 33
+    WithCompilerIr = 34
 
 pub enum BuildTarget: i32:
     native = 0
@@ -240,8 +242,17 @@ pub fn Build.generate_compiler_entrypoints(self: Build, name: str, stamp: str) -
     let target = target_new(.GenerateCompilerEntrypoints, name, "").output(stamp)
     self.add_target(target)
 
+pub fn Build.generate_compat_runtime(self: Build, name: str, compat_source: str, output: str) -> Build:
+    let target = target_new(.GenerateCompatRuntime, name, compat_source).output(output)
+    self.add_target(target)
+
 pub fn Build.with_compiler_build(self: Build, name: str, compiler: str, source: str, output: str) -> Build:
     var target = target_new(.WithCompilerBuild, name, compiler).output(output)
+    target = target.input(source)
+    self.add_target(target)
+
+pub fn Build.with_compiler_ir(self: Build, name: str, compiler: str, source: str, output: str) -> Build:
+    var target = target_new(.WithCompilerIr, name, compiler).output(output)
     target = target.input(source)
     self.add_target(target)
 
