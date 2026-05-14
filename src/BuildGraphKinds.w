@@ -4,7 +4,7 @@ extern fn with_sysinfo_os() -> str
 extern fn with_sysinfo_arch() -> str
 
 const BUILD_GRAPH_KIND_MIN: i32 = 0
-const BUILD_GRAPH_KIND_MAX: i32 = 42
+const BUILD_GRAPH_KIND_MAX: i32 = 43
 const BUILD_GRAPH_TARGET_MIN: i32 = 0
 const BUILD_GRAPH_TARGET_MAX: i32 = 5
 
@@ -55,6 +55,7 @@ pub fn build_graph_kind_name(kind: i32) -> str:
     if kind == 40: return "selfhost_suite_test"
     if kind == 41: return "generate_llvm_link_metadata"
     if kind == 42: return "pcre2_reference_prepare"
+    if kind == 43: return "pcre2_migrate"
     f"unknown({kind})"
 
 pub fn build_graph_kind_implemented(kind: i32) -> bool:

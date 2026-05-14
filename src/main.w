@@ -2241,6 +2241,12 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
                 return pcre2_ref_rc
             completed_targets.push(target.name)
             continue
+        if target.kind == 43:
+            let pcre2_migrate_rc = build_graph_run_pcre2_migrate(root, target)
+            if pcre2_migrate_rc != 0:
+                return pcre2_migrate_rc
+            completed_targets.push(target.name)
+            continue
         if target.kind == 7:
             let command_rc = build_graph_run_command(root, target)
             if command_rc != 0:

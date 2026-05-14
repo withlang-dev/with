@@ -209,6 +209,170 @@ pub fn build_graph_run_pcre2_reference_prepare(root: str, target: BuildGraphTarg
         return 1
     0
 
+fn pcre2_remove_dir_if_exists(path: str, target_name: str) -> i32:
+    if build_graph_rt_is_dir(path) == 0:
+        return 0
+    if build_graph_rt_remove_dir(path) != 0:
+        build_graph_rt_eprint("error: pcre2 target '" ++ target_name ++ "' could not remove directory: " ++ path)
+        return 1
+    0
+
+fn pcre2_remove_file_if_exists(path: str, target_name: str) -> i32:
+    if build_graph_rt_file_exists(path) == 0:
+        return 0
+    if build_graph_rt_remove_file(path) != 0:
+        build_graph_rt_eprint("error: pcre2 target '" ++ target_name ++ "' could not remove file: " ++ path)
+        return 1
+    0
+
+fn pcre2_remove_w_file_dir(path: str, target_name: str) -> i32:
+    if build_graph_rt_is_dir(path) == 0:
+        return 0
+    let files = collect_test_files(path)
+    for fi in 0..files.len() as i32:
+        let file_path = files.get(fi as i64)
+        if build_graph_rt_remove_file(file_path) != 0:
+            build_graph_rt_eprint("error: pcre2 target '" ++ target_name ++ "' could not remove file: " ++ file_path)
+            return 1
+    pcre2_remove_dir_if_exists(path, target_name)
+
+fn pcre2_remove_known_build_tree(output_dir: str, target_name: str) -> i32:
+    if build_graph_rt_is_dir(output_dir) == 0:
+        return 0
+    let re_dir = resolve_join(resolve_join(resolve_join(output_dir, "lib"), "std"), "re")
+    let bin_dir = resolve_join(output_dir, "bin")
+    let dsym_dir = resolve_join(bin_dir, "pcre2test.dSYM")
+    let dsym_contents = resolve_join(dsym_dir, "Contents")
+    let dsym_resources = resolve_join(dsym_contents, "Resources")
+    let dsym_dwarf = resolve_join(dsym_resources, "DWARF")
+    let dsym_relocations = resolve_join(dsym_resources, "Relocations")
+    let dsym_relocations_arch = resolve_join(dsym_relocations, "aarch64")
+
+    var rc = pcre2_remove_w_file_dir(re_dir, target_name)
+    if rc != 0: return rc
+    rc = pcre2_remove_dir_if_exists(resolve_join(resolve_join(output_dir, "lib"), "std"), target_name)
+    if rc != 0: return rc
+    rc = pcre2_remove_dir_if_exists(resolve_join(output_dir, "lib"), target_name)
+    if rc != 0: return rc
+
+    rc = pcre2_remove_file_if_exists(resolve_join(bin_dir, "pcre2test"), target_name)
+    if rc != 0: return rc
+    rc = pcre2_remove_file_if_exists(resolve_join(dsym_contents, "Info.plist"), target_name)
+    if rc != 0: return rc
+    rc = pcre2_remove_file_if_exists(resolve_join(dsym_dwarf, "pcre2test"), target_name)
+    if rc != 0: return rc
+    rc = pcre2_remove_file_if_exists(resolve_join(dsym_relocations_arch, "pcre2test.yml"), target_name)
+    if rc != 0: return rc
+    rc = pcre2_remove_dir_if_exists(dsym_dwarf, target_name)
+    if rc != 0: return rc
+    rc = pcre2_remove_dir_if_exists(dsym_relocations_arch, target_name)
+    if rc != 0: return rc
+    rc = pcre2_remove_dir_if_exists(dsym_relocations, target_name)
+    if rc != 0: return rc
+    rc = pcre2_remove_dir_if_exists(dsym_resources, target_name)
+    if rc != 0: return rc
+    rc = pcre2_remove_dir_if_exists(dsym_contents, target_name)
+    if rc != 0: return rc
+    rc = pcre2_remove_dir_if_exists(dsym_dir, target_name)
+    if rc != 0: return rc
+    rc = pcre2_remove_dir_if_exists(bin_dir, target_name)
+    if rc != 0: return rc
+
+    rc = pcre2_remove_file_if_exists(resolve_join(output_dir, "build.stdout"), target_name)
+    if rc != 0: return rc
+    rc = pcre2_remove_file_if_exists(resolve_join(output_dir, "build.stderr"), target_name)
+    if rc != 0: return rc
+    pcre2_remove_dir_if_exists(output_dir, target_name)
+
+pub fn build_graph_run_pcre2_migrate(root: str, target: BuildGraphTarget) -> i32:
+    if target.entry.len() == 0 or target.inputs.len() == 0 or target.args.len() == 0 or target.output.len() == 0:
+        build_graph_rt_eprint("error: pcre2_migrate target '" ++ target.name ++ "' requires compiler entry, source-dir input, generated-dir arg, and stamp output")
+        return 1
+    let arg_rc = build_graph_validate_process_args(target)
+    if arg_rc != 0:
+        return arg_rc
+    let compiler_path = build_graph_resolve_project_path(root, target.entry)
+    let source_dir = build_graph_resolve_project_path(root, target.inputs.get(0))
+    let generated_dir = build_graph_resolve_project_path(root, target.args.get(0))
+    let stamp_path = build_graph_resolve_project_path(root, target.output)
+    if build_graph_rt_file_exists(compiler_path) == 0:
+        build_graph_rt_eprint("error: pcre2_migrate target '" ++ target.name ++ "' missing compiler: " ++ compiler_path)
+        return 1
+    if build_graph_rt_is_dir(source_dir) == 0:
+        build_graph_rt_eprint("error: pcre2_migrate target '" ++ target.name ++ "' missing PCRE2 source directory: " ++ source_dir)
+        return 1
+    if build_graph_rt_mkdir_p(build_graph_dirname(stamp_path)) != 0:
+        build_graph_rt_eprint("error: pcre2_migrate target '" ++ target.name ++ "' could not create stamp directory: " ++ build_graph_dirname(stamp_path))
+        return 1
+    if build_graph_rt_mkdir_p(build_graph_dirname(generated_dir)) != 0:
+        build_graph_rt_eprint("error: pcre2_migrate target '" ++ target.name ++ "' could not create generated parent: " ++ build_graph_dirname(generated_dir))
+        return 1
+
+    let tmp_dir = generated_dir ++ ".tmp." ++ f"{build_graph_rt_getpid()}.{build_graph_rt_clock_nanos()}"
+    if build_graph_rt_mkdir_p(tmp_dir) != 0:
+        build_graph_rt_eprint("error: pcre2_migrate target '" ++ target.name ++ "' could not create temp migration directory: " ++ tmp_dir)
+        return 1
+
+    var argv = ""
+    argv = build_graph_argv_append(argv, compiler_path)
+    argv = build_graph_argv_append(argv, "migrate")
+    argv = build_graph_argv_append(argv, source_dir ++ "/")
+    argv = build_graph_argv_append(argv, "-o")
+    argv = build_graph_argv_append(argv, tmp_dir ++ "/")
+    argv = build_graph_argv_append(argv, "--no-c-export")
+    argv = build_graph_argv_append(argv, "--prefer-brace")
+    argv = build_graph_argv_append(argv, "--width-slice")
+    argv = build_graph_argv_append(argv, "8")
+    argv = build_graph_argv_append(argv, "--shared-defs")
+    argv = build_graph_argv_append(argv, "std.re.defs")
+    var exclude_i = 1
+    while exclude_i < target.args.len() as i32:
+        argv = build_graph_argv_append(argv, "--exclude")
+        argv = build_graph_argv_append(argv, target.args.get(exclude_i as i64))
+        exclude_i = exclude_i + 1
+    argv = build_graph_argv_append(argv, "-I")
+    argv = build_graph_argv_append(argv, source_dir)
+    argv = build_graph_argv_append(argv, "-D")
+    argv = build_graph_argv_append(argv, "PCRE2_CODE_UNIT_WIDTH=8")
+    argv = build_graph_argv_append(argv, "-D")
+    argv = build_graph_argv_append(argv, "HAVE_CONFIG_H=1")
+    let migrate_rc = build_graph_rt_exec_argv(argv)
+    if migrate_rc != 0:
+        build_graph_rt_eprint("error: pcre2_migrate target '" ++ target.name ++ f"' migrate failed with exit code {migrate_rc}")
+        return if migrate_rc == 0: 1 else: migrate_rc
+
+    let files = collect_test_files(tmp_dir)
+    if files.len() < 30:
+        build_graph_rt_eprint("error: pcre2_migrate target '" ++ target.name ++ f"' only generated {files.len()} .w files; expected at least 30")
+        return 1
+    let c_export_errors = build_graph_pcre2_reject_c_exports(target, tmp_dir)
+    if c_export_errors != 0:
+        return 1
+
+    var remove_rc = pcre2_remove_w_file_dir(generated_dir, target.name)
+    if remove_rc != 0:
+        return remove_rc
+    if build_graph_rt_rename_file(tmp_dir, generated_dir) != 0:
+        build_graph_rt_eprint("error: pcre2_migrate target '" ++ target.name ++ "' could not publish generated directory: " ++ generated_dir)
+        return 1
+
+    remove_rc = pcre2_remove_w_file_dir(resolve_join(root, "out/pcre2_migrate_raw"), target.name)
+    if remove_rc != 0: return remove_rc
+    remove_rc = pcre2_remove_w_file_dir(resolve_join(root, "out/pcre2_generated"), target.name)
+    if remove_rc != 0: return remove_rc
+    let remove_build_stamp_rc = pcre2_remove_file_if_exists(resolve_join(root, "out/gen/.regex-build-stamp"), target.name)
+    if remove_build_stamp_rc != 0:
+        return remove_build_stamp_rc
+    let build_remove_rc = pcre2_remove_known_build_tree(resolve_join(root, "out/pcre2_build"), target.name)
+    if build_remove_rc != 0:
+        return build_remove_rc
+
+    if build_graph_rt_write_file(stamp_path, "ok\n") != 0:
+        build_graph_rt_eprint("error: pcre2_migrate target '" ++ target.name ++ "' could not write stamp: " ++ stamp_path)
+        return 1
+    build_graph_rt_write(f"migrated PCRE2: {files.len()} .w files in {generated_dir}\n")
+    0
+
 pub fn build_graph_run_pcre2_test(root: str, target: BuildGraphTarget) -> i32:
     if target.entry.len() == 0:
         build_graph_rt_eprint("error: pcre2_run_test target '" ++ target.name ++ "' requires a pcre2test binary")
@@ -602,12 +766,10 @@ pub fn build_graph_run_pcre2_build(root: str, target: BuildGraphTarget) -> i32:
     if build_graph_rt_file_exists(pcre2test_bin) == 0:
         build_graph_rt_eprint("error: pcre2_build target '" ++ target.name ++ "' did not produce pcre2test binary: " ++ pcre2test_bin)
         return 1
-    let _remove_old = build_graph_rt_remove_dir(output_dir)
-    var mv_argv = ""
-    mv_argv = build_graph_argv_append(mv_argv, "/bin/mv")
-    mv_argv = build_graph_argv_append(mv_argv, tmp_dir)
-    mv_argv = build_graph_argv_append(mv_argv, output_dir)
-    if build_graph_rt_exec_argv(mv_argv) != 0:
+    let remove_old_rc = pcre2_remove_known_build_tree(output_dir, target.name)
+    if remove_old_rc != 0:
+        return remove_old_rc
+    if build_graph_rt_rename_file(tmp_dir, output_dir) != 0:
         build_graph_rt_eprint("error: pcre2_build target '" ++ target.name ++ "' could not move temp tree to " ++ output_dir)
         return 1
     build_graph_rt_write("built migrated PCRE2: " ++ resolve_join(output_dir, "bin/pcre2test") ++ "\n")
