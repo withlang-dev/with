@@ -1,7 +1,6 @@
 // Migrated from PCRE2
 use std.re.defs
 
-@[c_export("pcre2_pattern_convert_8")]
 fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plength: c_ulong, __param_options: c_uint, __param_buffptr: *mut *mut u8, __param_bufflenptr: *mut c_ulong, __param_ccontext: *mut pcre2_real_convert_context_8) -> c_int {
     var __local_pattern = __param_pattern
     var __local_plength = __param_plength
@@ -210,7 +209,6 @@ fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plength: c_ulong,
 
 }
 
-@[c_export("pcre2_converted_pattern_free_8")]
 fn pcre2_converted_pattern_free_8(__param_converted: *mut u8) {
     if ((if __param_converted != null: 1 else: 0) != 0) {
         var __local_memctl: *mut pcre2_memctl = ((((__param_converted as *mut c_char) - (sizeof[pcre2_memctl]() as usize)) as *mut pcre2_memctl))

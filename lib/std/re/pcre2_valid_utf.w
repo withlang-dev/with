@@ -1,7 +1,6 @@
 // Migrated from PCRE2
 use std.re.defs
 
-@[c_export("_pcre2_valid_utf_8")]
 fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: c_ulong, __param_erroroffset: *mut c_ulong) -> c_int {
     var __local_length = __param_length
     var __local_p: *const u8

@@ -1,7 +1,6 @@
 // Migrated from PCRE2
 use std.re.defs
 
-@[c_export("_pcre2_xclass_8")]
 fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, __param_char_lists_end: *const u8, __param_utf: c_int) -> c_int {
     var __local_c = __param_c
     var __local_data = __param_data
@@ -1132,7 +1131,6 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, __param_char_list
 
 }
 
-@[c_export("_pcre2_eclass_8")]
 fn _pcre2_eclass_8(__param_c: c_uint, __param_data_start: *const u8, __param_data_end: *const u8, __param_char_lists_end: *const u8, __param_utf: c_int) -> c_int {
     var __local_ptr: *const u8 = __param_data_start
 

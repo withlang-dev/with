@@ -1,7 +1,6 @@
 // Migrated from PCRE2
 use std.re.defs
 
-@[c_export("_pcre2_find_bracket_8")]
 fn _pcre2_find_bracket_8(__param_code: *const u8, __param_utf: c_int, __param_number: c_int) -> *const u8 {
     var __local_code = __param_code
     while true {

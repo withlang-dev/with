@@ -11,7 +11,6 @@ use std.re.pcre2_string_utils
 use std.re.pcre2_study
 use std.re.pcre2_valid_utf
 
-@[c_export("pcre2_compile_8")]
 fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_options: c_uint, __param_errorptr: *mut c_int, __param_erroroffset: *mut c_ulong, __param_ccontext: *mut pcre2_real_compile_context_8) -> *mut pcre2_real_code_8 {
     var __local_pattern = __param_pattern
     var __local_patlen = __param_patlen
@@ -2325,7 +2324,6 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
 
 }
 
-@[c_export("pcre2_code_free_8")]
 fn pcre2_code_free_8(__param_code: *mut pcre2_real_code_8) {
     var __local_ref_count: *mut c_ulong
 
@@ -2350,7 +2348,6 @@ fn pcre2_code_free_8(__param_code: *mut pcre2_real_code_8) {
 
 }
 
-@[c_export("pcre2_code_copy_8")]
 fn pcre2_code_copy_8(__param_code: *const pcre2_real_code_8) -> *mut pcre2_real_code_8 {
     var __local_ref_count: *mut c_ulong
 
@@ -2381,7 +2378,6 @@ fn pcre2_code_copy_8(__param_code: *const pcre2_real_code_8) -> *mut pcre2_real_
 
 }
 
-@[c_export("pcre2_code_copy_with_tables_8")]
 fn pcre2_code_copy_with_tables_8(__param_code: *const pcre2_real_code_8) -> *mut pcre2_real_code_8 {
     var __local_ref_count: *mut c_ulong
 
@@ -2426,7 +2422,6 @@ fn pcre2_code_copy_with_tables_8(__param_code: *const pcre2_real_code_8) -> *mut
 
 }
 
-@[c_export("_pcre2_check_escape_8")]
 fn _pcre2_check_escape_8(__param_ptrptr: *mut *const u8, __param_ptrend: *const u8, __param_chptr: *mut c_uint, __param_errorcodeptr: *mut c_int, __param_options: c_uint, __param_xoptions: c_uint, __param_bracount: c_uint, __param_isclass: c_int, __param_cb: *mut compile_block_8) -> c_int {
     var __local_utf__goto_1494_6: c_int = 0
 

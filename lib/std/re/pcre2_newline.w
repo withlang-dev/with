@@ -1,7 +1,6 @@
 // Migrated from PCRE2
 use std.re.defs
 
-@[c_export("_pcre2_is_newline_8")]
 fn _pcre2_is_newline_8(__param_ptr: *const u8, __param_type_: c_uint, __param_endptr: *const u8, __param_lenptr: *mut c_uint, __param_utf: c_int) -> c_int {
     var __local_c: c_uint
 
@@ -142,7 +141,6 @@ fn _pcre2_is_newline_8(__param_ptr: *const u8, __param_type_: c_uint, __param_en
 
 }
 
-@[c_export("_pcre2_was_newline_8")]
 fn _pcre2_was_newline_8(__param_ptr: *const u8, __param_type_: c_uint, __param_startptr: *const u8, __param_lenptr: *mut c_uint, __param_utf: c_int) -> c_int {
     var __local_ptr = __param_ptr
     var __local_c: c_uint

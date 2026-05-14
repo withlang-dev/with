@@ -1,7 +1,6 @@
 // Migrated from PCRE2
 use std.re.defs
 
-@[c_export("_pcre2_update_classbits_8")]
 fn _pcre2_update_classbits_8(__param_ptype: c_uint, __param_pdata: c_uint, __param_negated: c_int, __param_classbits: *mut u8) {
     var __local_classbits = __param_classbits
     var __local_c: c_int
@@ -378,7 +377,6 @@ fn _pcre2_update_classbits_8(__param_ptype: c_uint, __param_pdata: c_uint, __par
 
 }
 
-@[c_export("_pcre2_compile_class_not_nested_8")]
 fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: c_uint, __param_start_ptr: *mut c_uint, __param_pcode: *mut *mut u8, __param_negate_class: c_int, __param_has_bitmap: *mut c_int, __param_errorcodeptr: *mut c_int, __param_cb: *mut compile_block_8, __param_lengthptr: *mut c_ulong) -> *mut c_uint {
     var __local_pptr__goto_1072_11: *mut c_uint = null
 
@@ -2289,7 +2287,6 @@ fn _pcre2_compile_class_not_nested_8(__param_options: c_uint, __param_xoptions: 
 
 }
 
-@[c_export("_pcre2_compile_class_nested_8")]
 fn _pcre2_compile_class_nested_8(__param_options: c_uint, __param_xoptions: c_uint, __param_pptr: *mut *mut c_uint, __param_pcode: *mut *mut u8, __param_errorcodeptr: *mut c_int, __param_cb: *mut compile_block_8, __param_lengthptr: *mut c_ulong) -> c_int {
     var __local_context: eclass_context
 

@@ -1,7 +1,6 @@
 // Migrated from PCRE2
 use std.re.defs
 
-@[c_export("pcre2_jit_compile_8")]
 fn pcre2_jit_compile_8(__param_code: *mut pcre2_real_code_8, __param_options: c_uint) -> c_int {
     var __local_re: *mut pcre2_real_code_8 = __param_code
 
@@ -34,7 +33,6 @@ fn pcre2_jit_compile_8(__param_code: *mut pcre2_real_code_8, __param_options: c_
 
 }
 
-@[c_export("pcre2_jit_match_8")]
 fn pcre2_jit_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *const u8, __param_length: c_ulong, __param_start_offset: c_ulong, __param_options: c_uint, __param_match_data: *mut pcre2_real_match_data_8, __param_mcontext: *mut pcre2_real_match_context_8) -> c_int {
     __param_code
 
@@ -55,13 +53,11 @@ fn pcre2_jit_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
 
 }
 
-@[c_export("pcre2_jit_free_unused_memory_8")]
 fn pcre2_jit_free_unused_memory_8(__param_gcontext: *mut pcre2_real_general_context_8) {
     __param_gcontext
 
 }
 
-@[c_export("pcre2_jit_stack_create_8")]
 fn pcre2_jit_stack_create_8(__param_startsize: c_ulong, __param_maxsize: c_ulong, __param_gcontext: *mut pcre2_real_general_context_8) -> *mut pcre2_real_jit_stack_8 {
     __param_gcontext
 
@@ -73,7 +69,6 @@ fn pcre2_jit_stack_create_8(__param_startsize: c_ulong, __param_maxsize: c_ulong
 
 }
 
-@[c_export("pcre2_jit_stack_assign_8")]
 fn pcre2_jit_stack_assign_8(__param_mcontext: *mut pcre2_real_match_context_8, __param_callback: *const fn(*mut c_void) -> *mut pcre2_real_jit_stack_8, __param_callback_data: *mut c_void) {
     __param_mcontext
 
@@ -83,13 +78,11 @@ fn pcre2_jit_stack_assign_8(__param_mcontext: *mut pcre2_real_match_context_8, _
 
 }
 
-@[c_export("pcre2_jit_stack_free_8")]
 fn pcre2_jit_stack_free_8(__param_jit_stack: *mut pcre2_real_jit_stack_8) {
     __param_jit_stack
 
 }
 
-@[c_export("_pcre2_jit_free_rodata_8")]
 fn _pcre2_jit_free_rodata_8(__param_current: *mut c_void, __param_allocator_data: *mut c_void) {
     __param_current
 
@@ -97,7 +90,6 @@ fn _pcre2_jit_free_rodata_8(__param_current: *mut c_void, __param_allocator_data
 
 }
 
-@[c_export("_pcre2_jit_free_8")]
 fn _pcre2_jit_free_8(__param_executable_jit: *mut c_void, __param_memctl: *mut pcre2_memctl) {
     __param_executable_jit
 
@@ -105,7 +97,6 @@ fn _pcre2_jit_free_8(__param_executable_jit: *mut c_void, __param_memctl: *mut p
 
 }
 
-@[c_export("_pcre2_jit_get_size_8")]
 fn _pcre2_jit_get_size_8(__param_executable_jit: *mut c_void) -> c_ulong {
     __param_executable_jit
 
@@ -113,7 +104,6 @@ fn _pcre2_jit_get_size_8(__param_executable_jit: *mut c_void) -> c_ulong {
 
 }
 
-@[c_export("_pcre2_jit_get_target_8")]
 fn _pcre2_jit_get_target_8() -> *const i8 {
     return (&(unsafe: "JIT is not supported"[0]) as *mut c_char)
 

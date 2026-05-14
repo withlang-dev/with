@@ -1,7 +1,6 @@
 // Migrated from PCRE2
 use std.re.defs
 
-@[c_export("pcre2_next_match_8")]
 fn pcre2_next_match_8(__param_match_data: *mut pcre2_real_match_data_8, __param_pstart_offset: *mut c_ulong, __param_poptions: *mut c_uint) -> c_int {
     var __local_rc: c_int = __param_match_data.rc
 

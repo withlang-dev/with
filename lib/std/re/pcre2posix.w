@@ -2,7 +2,6 @@
 use std.re.defs
 use std.libc
 
-@[c_export("pcre2_regcomp")]
 fn pcre2_regcomp(__param_preg: *mut regex_t, __param_pattern: *const i8, __param_cflags: c_int) -> c_int {
     var __local_erroffset: c_ulong
 
@@ -113,7 +112,6 @@ fn pcre2_regcomp(__param_preg: *mut regex_t, __param_pattern: *const i8, __param
 
 }
 
-@[c_export("pcre2_regexec")]
 fn pcre2_regexec(__param_preg: *const regex_t, __param_string: *const i8, __param_nmatch: c_ulong, __param_pmatch: *mut regmatch_t, __param_eflags: c_int) -> c_int {
     var __local_nmatch = __param_nmatch
     var __local_rc: c_int
@@ -274,7 +272,6 @@ fn pcre2_regexec(__param_preg: *const regex_t, __param_string: *const i8, __para
 
 }
 
-@[c_export("pcre2_regerror")]
 fn pcre2_regerror(__param_errcode: c_int, __param_preg: *const regex_t, __param_errbuf: *mut i8, __param_errbuf_size: c_ulong) -> c_ulong {
     var __local_message: *const c_char
 
@@ -387,7 +384,6 @@ fn pcre2_regerror(__param_errcode: c_int, __param_preg: *const regex_t, __param_
 
 }
 
-@[c_export("pcre2_regfree")]
 fn pcre2_regfree(__param_preg: *mut regex_t) {
     pcre2_match_data_free_8(__param_preg.re_match_data)
 

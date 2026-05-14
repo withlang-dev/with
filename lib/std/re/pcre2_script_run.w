@@ -1,7 +1,6 @@
 // Migrated from PCRE2
 use std.re.defs
 
-@[c_export("_pcre2_script_run_8")]
 fn _pcre2_script_run_8(__param_ptr: *const u8, __param_endptr: *const u8, __param_utf: c_int) -> c_int {
     var __local_ptr = __param_ptr
     var __local_require_state: c_uint = 0

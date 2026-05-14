@@ -255,6 +255,17 @@ fn build_graph_pcre2_count_generated_errors(root: str, target: BuildGraphTarget,
         build_graph_rt_write(f"OK={ok} TOTAL_ERRORS={total_errors}\n")
     total_errors
 
+fn build_graph_pcre2_reject_c_exports(target: BuildGraphTarget, generated_dir: str) -> i32:
+    let files = collect_test_files(generated_dir)
+    var errors = 0
+    for fi in 0..files.len() as i32:
+        let path = files.get(fi as i64)
+        let text = build_graph_rt_read_file(path)
+        if text.contains("@[c_export("):
+            build_graph_rt_eprint("error: pcre2 generated source contains forbidden c_export attribute in " ++ path)
+            errors = errors + 1
+    errors
+
 pub fn build_graph_run_pcre2_generated_check(root: str, target: BuildGraphTarget) -> i32:
     if target.entry.len() == 0 or target.inputs.len() == 0:
         build_graph_rt_eprint("error: pcre2_generated_check target '" ++ target.name ++ "' requires compiler entry and generated-dir input")
@@ -264,6 +275,9 @@ pub fn build_graph_run_pcre2_generated_check(root: str, target: BuildGraphTarget
         return arg_rc
     let compiler_path = build_graph_resolve_project_path(root, target.entry)
     let generated_dir = build_graph_resolve_project_path(root, target.inputs.get(0))
+    let c_export_errors = build_graph_pcre2_reject_c_exports(target, generated_dir)
+    if c_export_errors != 0:
+        return 1
     let errors = build_graph_pcre2_count_generated_errors(root, target, compiler_path, generated_dir, true)
     if errors < 0:
         return 1
@@ -281,6 +295,9 @@ pub fn build_graph_run_pcre2_generated_promote(root: str, target: BuildGraphTarg
     let compiler_path = build_graph_resolve_project_path(root, target.entry)
     let generated_dir = build_graph_resolve_project_path(root, target.inputs.get(0))
     let dest_dir = build_graph_resolve_project_path(root, target.output)
+    let c_export_errors = build_graph_pcre2_reject_c_exports(target, generated_dir)
+    if c_export_errors != 0:
+        return 1
     let errors = build_graph_pcre2_count_generated_errors(root, target, compiler_path, generated_dir, true)
     if errors < 0:
         return 1

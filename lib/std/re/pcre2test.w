@@ -2827,7 +2827,6 @@ fn pcre2_printint_8(__param_re: *mut pcre2_real_code_8, __param_f: *mut c_void, 
 
 }
 
-@[c_export("valid_utf")]
 fn valid_utf(__param_string: *const u8, __param_length: c_ulong, __param_erroroffset: *mut c_ulong) -> c_int {
     var __local_length = __param_length
     var __local_p: *const u8
@@ -23951,7 +23950,6 @@ fn display_modifiers() {
 
 }
 
-@[c_export("main")]
 fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     var __local_argc = __param_argc
     var __local_yield___goto_3644_10: c_uint = 0

@@ -1,7 +1,6 @@
 // Migrated from PCRE2
 use std.re.defs
 
-@[c_export("pcre2_match_data_create_8")]
 fn pcre2_match_data_create_8(__param_oveccount: c_uint, __param_gcontext: *mut pcre2_real_general_context_8) -> *mut pcre2_real_match_data_8 {
     var __local_oveccount = __param_oveccount
     var __local_yield_: *mut pcre2_real_match_data_8
@@ -32,7 +31,6 @@ fn pcre2_match_data_create_8(__param_oveccount: c_uint, __param_gcontext: *mut p
 
 }
 
-@[c_export("pcre2_match_data_create_from_pattern_8")]
 fn pcre2_match_data_create_from_pattern_8(__param_code: *const pcre2_real_code_8, __param_gcontext: *mut pcre2_real_general_context_8) -> *mut pcre2_real_match_data_8 {
     var __local_gcontext = __param_gcontext
     if ((if __param_code == null: 1 else: 0) != 0) {
@@ -47,7 +45,6 @@ fn pcre2_match_data_create_from_pattern_8(__param_code: *const pcre2_real_code_8
 
 }
 
-@[c_export("pcre2_match_data_free_8")]
 fn pcre2_match_data_free_8(__param_match_data: *mut pcre2_real_match_data_8) {
     if ((if __param_match_data != null: 1 else: 0) != 0) {
         if ((if __param_match_data.heapframes != null: 1 else: 0) != 0) {
@@ -64,37 +61,31 @@ fn pcre2_match_data_free_8(__param_match_data: *mut pcre2_real_match_data_8) {
 
 }
 
-@[c_export("pcre2_get_mark_8")]
 fn pcre2_get_mark_8(__param_match_data: *mut pcre2_real_match_data_8) -> *const u8 {
     return __param_match_data.mark
 
 }
 
-@[c_export("pcre2_get_match_data_size_8")]
 fn pcre2_get_match_data_size_8(__param_match_data: *mut pcre2_real_match_data_8) -> c_ulong {
     return ((120 as c_ulong) +% ((((2 * (__param_match_data.oveccount as c_int)) as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong))
 
 }
 
-@[c_export("pcre2_get_match_data_heapframes_size_8")]
 fn pcre2_get_match_data_heapframes_size_8(__param_match_data: *mut pcre2_real_match_data_8) -> c_ulong {
     return __param_match_data.heapframes_size
 
 }
 
-@[c_export("pcre2_get_ovector_count_8")]
 fn pcre2_get_ovector_count_8(__param_match_data: *mut pcre2_real_match_data_8) -> c_uint {
     return __param_match_data.oveccount
 
 }
 
-@[c_export("pcre2_get_ovector_pointer_8")]
 fn pcre2_get_ovector_pointer_8(__param_match_data: *mut pcre2_real_match_data_8) -> *mut c_ulong {
     return (&(unsafe: __param_match_data.ovector[0]) as *mut c_ulong)
 
 }
 
-@[c_export("pcre2_get_startchar_8")]
 fn pcre2_get_startchar_8(__param_match_data: *mut pcre2_real_match_data_8) -> c_ulong {
     return __param_match_data.startchar
 
