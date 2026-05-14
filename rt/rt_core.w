@@ -34,6 +34,7 @@ extern fn rt_mkdir(path: *const u8, mode: i32) -> i32
 extern fn rt_unlink(path: *const u8) -> i32
 extern fn rt_rmdir(path: *const u8) -> i32
 extern fn rt_rename(old_path: *const u8, new_path: *const u8) -> i32
+extern fn rt_remove_tree(path: *const u8) -> i32
 extern fn rt_access(path: *const u8, mode: i32) -> i32
 extern fn rt_chmod(path: *const u8, mode: i32) -> i32
 // stat is in the core 13 but declared with a different name to avoid confusion
@@ -2001,6 +2002,11 @@ pub fn fs_create_dir(path: str) -> i32:
 pub fn fs_remove_dir(path: str) -> i32:
     let cpath = str_to_cstr(path)
     rt_rmdir(cpath)
+
+@[c_export("with_fs_remove_tree")]
+pub fn fs_remove_tree(path: str) -> i32:
+    let cpath = str_to_cstr(path)
+    rt_remove_tree(cpath)
 
 // ── stdin I/O ──────────────────────────────────────────────────────
 

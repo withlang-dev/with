@@ -239,6 +239,70 @@ extern fn unlink(path: *const u8) -> i32
 extern fn rmdir(path: *const u8) -> i32
 extern fn rename(old_path: *const u8, new_path: *const u8) -> i32
 extern fn access(path: *const u8, mode: i32) -> i32
+extern fn lstat(path: *const u8, st: *mut u8) -> i32
+extern fn opendir(path: *const u8) -> *mut u8
+extern fn readdir(dirp: *mut u8) -> *mut u8
+extern fn closedir(dirp: *mut u8) -> i32
+
+let S_IFMT: i32 = 61440
+let S_IFDIR: i32 = 16384
+let DARWIN_STAT_SIZE: i64 = 144
+let DARWIN_STAT_MODE_OFFSET: i64 = 4
+let DARWIN_DIRENT_NAME_OFFSET: i64 = 21
+let RT_PATH_MAX: i64 = 4096
+
+fn rt_cstr_len(s: *const u8) -> i64:
+    if s as i64 == 0:
+        return 0
+    var len: i64 = 0
+    while unsafe: *((s as i64 + len) as *const u8) != 0:
+        len = len + 1
+    len
+
+fn rt_dirent_name(ent: *mut u8) -> *const u8:
+    (ent as i64 + DARWIN_DIRENT_NAME_OFFSET) as *const u8
+
+fn rt_dirent_is_dot_or_dotdot(name: *const u8) -> bool:
+    let first = unsafe: *name
+    if first != 46:
+        return false
+    let second = unsafe: *((name as i64 + 1) as *const u8)
+    if second == 0:
+        return true
+    if second != 46:
+        return false
+    (unsafe: *((name as i64 + 2) as *const u8)) == 0
+
+fn rt_path_join(parent: *const u8, name: *const u8, out: *mut u8, cap: i64) -> i32:
+    let parent_len = rt_cstr_len(parent)
+    let name_len = rt_cstr_len(name)
+    var need_slash = true
+    if parent_len > 0 and unsafe: *((parent as i64 + parent_len - 1) as *const u8) == 47:
+        need_slash = false
+    let slash_len: i64 = if need_slash: 1 else: 0
+    if parent_len + slash_len + name_len + 1 > cap:
+        return -36
+    var i: i64 = 0
+    while i < parent_len:
+        unsafe: *((out as i64 + i) as *mut u8) = unsafe: *((parent as i64 + i) as *const u8)
+        i = i + 1
+    if need_slash:
+        unsafe: *((out as i64 + i) as *mut u8) = 47
+        i = i + 1
+    var j: i64 = 0
+    while j < name_len:
+        unsafe: *((out as i64 + i + j) as *mut u8) = unsafe: *((name as i64 + j) as *const u8)
+        j = j + 1
+    unsafe: *((out as i64 + i + j) as *mut u8) = 0
+    0
+
+fn rt_lstat_mode(path: *const u8, mode_out: *mut i32) -> i32:
+    var st: [144]u8 = [0 as u8; 144]
+    let r = lstat(path, &st as *mut [144]u8 as *mut u8)
+    if r < 0:
+        return -get_errno()
+    unsafe: *mode_out = (unsafe: *((&st as i64 + DARWIN_STAT_MODE_OFFSET) as *const u16)) as i32
+    0
 
 @[c_export("rt_mkdir")]
 pub fn rt_mkdir_impl(path: *const u8, mode: i32) -> i32:
@@ -271,6 +335,39 @@ pub fn rt_rename_impl(old_path: *const u8, new_path: *const u8) -> i32:
     if r < 0:
         return -get_errno()
     0
+
+@[c_export("rt_remove_tree")]
+pub fn rt_remove_tree_impl(path: *const u8) -> i32:
+    var mode: i32 = 0
+    let stat_rc = rt_lstat_mode(path, &mode as *mut i32)
+    if stat_rc != 0:
+        return stat_rc
+    if (mode & S_IFMT) != S_IFDIR:
+        return rt_unlink_impl(path)
+
+    let dir = opendir(path)
+    if dir as i64 == 0:
+        return -get_errno()
+    while true:
+        let ent = readdir(dir)
+        if ent as i64 == 0:
+            break
+        let name = rt_dirent_name(ent)
+        if rt_dirent_is_dot_or_dotdot(name):
+            continue
+        var child: [4096]u8 = [0 as u8; 4096]
+        let join_rc = rt_path_join(path, name, &child as *mut [4096]u8 as *mut u8, RT_PATH_MAX)
+        if join_rc != 0:
+            let _close_on_join = closedir(dir)
+            return join_rc
+        let child_rc = rt_remove_tree_impl(&child as *const [4096]u8 as *const u8)
+        if child_rc != 0:
+            let _close_on_child = closedir(dir)
+            return child_rc
+    let close_rc = closedir(dir)
+    if close_rc < 0:
+        return -get_errno()
+    rt_rmdir_impl(path)
 
 @[c_export("rt_access")]
 pub fn rt_access_impl(path: *const u8, mode: i32) -> i32:
