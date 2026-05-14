@@ -1,7 +1,6 @@
 // Migrated from PCRE2
 use std.re.defs
 
-@[c_export("_pcre2_compile_get_hash_from_name8")]
 fn _pcre2_compile_get_hash_from_name8(__param_name: *const u8, __param_length: c_uint) -> c_ushort {
     var __local_hash: c_ushort
 
@@ -19,7 +18,6 @@ fn _pcre2_compile_get_hash_from_name8(__param_name: *const u8, __param_length: c
 
 }
 
-@[c_export("_pcre2_compile_find_named_group8")]
 fn _pcre2_compile_find_named_group8(__param_name: *const u8, __param_length: c_uint, __param_cb: *mut compile_block_8) -> *mut named_group_8 {
     var __local_hash: c_ushort = _pcre2_compile_get_hash_from_name8(__param_name, __param_length)
 
@@ -56,7 +54,6 @@ fn _pcre2_compile_find_named_group8(__param_name: *const u8, __param_length: c_u
 
 }
 
-@[c_export("_pcre2_compile_add_name_to_table8")]
 fn _pcre2_compile_add_name_to_table8(__param_cb: *mut compile_block_8, __param_ng: *mut named_group_8, __param_tablecount: c_uint) -> c_uint {
     var __local_ng = __param_ng
     var __local_tablecount = __param_tablecount
@@ -160,7 +157,6 @@ fn _pcre2_compile_add_name_to_table8(__param_cb: *mut compile_block_8, __param_n
 
 }
 
-@[c_export("_pcre2_compile_find_dupname_details8")]
 fn _pcre2_compile_find_dupname_details8(__param_name: *const u8, __param_length: c_uint, __param_indexptr: *mut c_int, __param_countptr: *mut c_int, __param_errorcodeptr: *mut c_int, __param_cb: *mut compile_block_8) -> c_int {
     var __local_i: c_uint
 
@@ -260,7 +256,6 @@ fn _pcre2_compile_find_dupname_details8(__param_name: *const u8, __param_length:
 
 }
 
-@[c_export("_pcre2_compile_parse_scan_substr_args8")]
 fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, __param_errorcodeptr: *mut c_int, __param_cb: *mut compile_block_8, __param_lengthptr: *mut c_ulong) -> *mut c_uint {
     var __local_pptr = __param_pptr
     var __local_captures: *mut u8
@@ -429,7 +424,6 @@ fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut c_uint, __param_err
 
 }
 
-@[c_export("_pcre2_compile_parse_recurse_args8")]
 fn _pcre2_compile_parse_recurse_args8(__param_pptr_start: *mut c_uint, __param_offset: c_ulong, __param_errorcodeptr: *mut c_int, __param_cb: *mut compile_block_8) -> c_int {
     var __local_pptr: *mut c_uint = __param_pptr_start
 

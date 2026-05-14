@@ -1,7 +1,6 @@
 // Migrated from PCRE2
 use std.re.defs
 
-@[c_export("_pcre2_ckd_smul_8")]
 fn _pcre2_ckd_smul_8(__param_r: *mut c_ulong, __param_a: c_int, __param_b: c_int) -> c_int {
     var __local_m: c_longlong
 

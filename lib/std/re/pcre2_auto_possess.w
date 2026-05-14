@@ -2,7 +2,6 @@
 use std.re.defs
 use std.re.pcre2_xclass
 
-@[c_export("_pcre2_auto_possessify_8")]
 fn _pcre2_auto_possessify_8(__param_code: *mut u8, __param_cb: *const compile_block_8) -> c_int {
     var __local_code = __param_code
     var __local_c: u8

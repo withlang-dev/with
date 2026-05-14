@@ -1,7 +1,6 @@
 // Migrated from PCRE2
 use std.re.defs
 
-@[c_export("_pcre2_strcmp_8")]
 fn _pcre2_strcmp_8(__param_str1: *const u8, __param_str2: *const u8) -> c_int {
     var __local_str1 = __param_str1
     var __local_str2 = __param_str2
@@ -45,7 +44,6 @@ fn _pcre2_strcmp_8(__param_str1: *const u8, __param_str2: *const u8) -> c_int {
 
 }
 
-@[c_export("_pcre2_strcmp_c8_8")]
 fn _pcre2_strcmp_c8_8(__param_str1: *const u8, __param_str2: *const i8) -> c_int {
     var __local_str1 = __param_str1
     var __local_str2 = __param_str2
@@ -89,7 +87,6 @@ fn _pcre2_strcmp_c8_8(__param_str1: *const u8, __param_str2: *const i8) -> c_int
 
 }
 
-@[c_export("_pcre2_strcpy_c8_8")]
 fn _pcre2_strcpy_c8_8(__param_str1: *mut u8, __param_str2: *const i8) -> c_ulong {
     var __local_str2 = __param_str2
     var __local_t: *mut u8 = __param_str1
@@ -113,7 +110,6 @@ fn _pcre2_strcpy_c8_8(__param_str1: *mut u8, __param_str2: *const i8) -> c_ulong
 
 }
 
-@[c_export("_pcre2_strlen_8")]
 fn _pcre2_strlen_8(__param_str: *const u8) -> c_ulong {
     var __local_str = __param_str
     var __local_c: c_ulong = 0
@@ -135,7 +131,6 @@ fn _pcre2_strlen_8(__param_str: *const u8) -> c_ulong {
 
 }
 
-@[c_export("_pcre2_strncmp_8")]
 fn _pcre2_strncmp_8(__param_str1: *const u8, __param_str2: *const u8, __param_len: c_ulong) -> c_int {
     var __local_str1 = __param_str1
     var __local_str2 = __param_str2
@@ -173,7 +168,6 @@ fn _pcre2_strncmp_8(__param_str1: *const u8, __param_str2: *const u8, __param_le
 
 }
 
-@[c_export("_pcre2_strncmp_c8_8")]
 fn _pcre2_strncmp_c8_8(__param_str1: *const u8, __param_str2: *const i8, __param_len: c_ulong) -> c_int {
     var __local_str1 = __param_str1
     var __local_str2 = __param_str2

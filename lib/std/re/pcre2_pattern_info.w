@@ -1,7 +1,6 @@
 // Migrated from PCRE2
 use std.re.defs
 
-@[c_export("pcre2_pattern_info_8")]
 fn pcre2_pattern_info_8(__param_code: *const pcre2_real_code_8, __param_what: c_uint, __param_where_: *mut c_void) -> c_int {
     var __local_re: *const pcre2_real_code_8 = __param_code
 
@@ -269,7 +268,6 @@ fn pcre2_pattern_info_8(__param_code: *const pcre2_real_code_8, __param_what: c_
 
 }
 
-@[c_export("pcre2_callout_enumerate_8")]
 fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, __param_callback: *const fn(*mut pcre2_callout_enumerate_block_8, *mut c_void) -> c_int, __param_callout_data: *mut c_void) -> c_int {
     var __local_re: *const pcre2_real_code_8 = __param_code
 

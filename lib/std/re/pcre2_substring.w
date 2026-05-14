@@ -1,7 +1,6 @@
 // Migrated from PCRE2
 use std.re.defs
 
-@[c_export("pcre2_substring_copy_byname_8")]
 fn pcre2_substring_copy_byname_8(__param_match_data: *mut pcre2_real_match_data_8, __param_stringname: *const u8, __param_buffer: *mut u8, __param_sizeptr: *mut c_ulong) -> c_int {
     var __local_first: *const u8
 
@@ -51,7 +50,6 @@ fn pcre2_substring_copy_byname_8(__param_match_data: *mut pcre2_real_match_data_
 
 }
 
-@[c_export("pcre2_substring_copy_bynumber_8")]
 fn pcre2_substring_copy_bynumber_8(__param_match_data: *mut pcre2_real_match_data_8, __param_stringnumber: c_uint, __param_buffer: *mut u8, __param_sizeptr: *mut c_ulong) -> c_int {
     var __local_rc: c_int
 
@@ -79,7 +77,6 @@ fn pcre2_substring_copy_bynumber_8(__param_match_data: *mut pcre2_real_match_dat
 
 }
 
-@[c_export("pcre2_substring_free_8")]
 fn pcre2_substring_free_8(__param_string: *mut u8) {
     if ((if __param_string != null: 1 else: 0) != 0) {
         var __local_memctl: *mut pcre2_memctl = ((((__param_string as *mut c_char) - (sizeof[pcre2_memctl]() as usize)) as *mut pcre2_memctl))
@@ -90,7 +87,6 @@ fn pcre2_substring_free_8(__param_string: *mut u8) {
 
 }
 
-@[c_export("pcre2_substring_get_byname_8")]
 fn pcre2_substring_get_byname_8(__param_match_data: *mut pcre2_real_match_data_8, __param_stringname: *const u8, __param_stringptr: *mut *mut u8, __param_sizeptr: *mut c_ulong) -> c_int {
     var __local_first: *const u8
 
@@ -140,7 +136,6 @@ fn pcre2_substring_get_byname_8(__param_match_data: *mut pcre2_real_match_data_8
 
 }
 
-@[c_export("pcre2_substring_get_bynumber_8")]
 fn pcre2_substring_get_bynumber_8(__param_match_data: *mut pcre2_real_match_data_8, __param_stringnumber: c_uint, __param_stringptr: *mut *mut u8, __param_sizeptr: *mut c_ulong) -> c_int {
     var __local_rc: c_int
 
@@ -176,7 +171,6 @@ fn pcre2_substring_get_bynumber_8(__param_match_data: *mut pcre2_real_match_data
 
 }
 
-@[c_export("pcre2_substring_length_byname_8")]
 fn pcre2_substring_length_byname_8(__param_match_data: *mut pcre2_real_match_data_8, __param_stringname: *const u8, __param_sizeptr: *mut c_ulong) -> c_int {
     var __local_first: *const u8
 
@@ -226,7 +220,6 @@ fn pcre2_substring_length_byname_8(__param_match_data: *mut pcre2_real_match_dat
 
 }
 
-@[c_export("pcre2_substring_length_bynumber_8")]
 fn pcre2_substring_length_bynumber_8(__param_match_data: *mut pcre2_real_match_data_8, __param_stringnumber: c_uint, __param_sizeptr: *mut c_ulong) -> c_int {
     var __local_left: c_ulong
 
@@ -318,7 +311,6 @@ fn pcre2_substring_length_bynumber_8(__param_match_data: *mut pcre2_real_match_d
 
 }
 
-@[c_export("pcre2_substring_nametable_scan_8")]
 fn pcre2_substring_nametable_scan_8(__param_code: *const pcre2_real_code_8, __param_stringname: *const u8, __param_firstptr: *mut *const u8, __param_lastptr: *mut *const u8) -> c_int {
     var __local_bot: c_ushort = 0
 
@@ -400,13 +392,11 @@ fn pcre2_substring_nametable_scan_8(__param_code: *const pcre2_real_code_8, __pa
 
 }
 
-@[c_export("pcre2_substring_number_from_name_8")]
 fn pcre2_substring_number_from_name_8(__param_code: *const pcre2_real_code_8, __param_stringname: *const u8) -> c_int {
     return pcre2_substring_nametable_scan_8(__param_code, __param_stringname, null, null)
 
 }
 
-@[c_export("pcre2_substring_list_free_8")]
 fn pcre2_substring_list_free_8(__param_list: *mut *mut u8) {
     if ((if __param_list != null: 1 else: 0) != 0) {
         var __local_memctl: *mut pcre2_memctl = ((((__param_list as *mut c_char) - (sizeof[pcre2_memctl]() as usize)) as *mut pcre2_memctl))
@@ -417,7 +407,6 @@ fn pcre2_substring_list_free_8(__param_list: *mut *mut u8) {
 
 }
 
-@[c_export("pcre2_substring_list_get_8")]
 fn pcre2_substring_list_get_8(__param_match_data: *mut pcre2_real_match_data_8, __param_listptr: *mut *mut *mut u8, __param_lengthsptr: *mut *mut c_ulong) -> c_int {
     var __local_i: c_int
 

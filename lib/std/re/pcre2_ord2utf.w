@@ -1,7 +1,6 @@
 // Migrated from PCRE2
 use std.re.defs
 
-@[c_export("_pcre2_ord2utf_8")]
 fn _pcre2_ord2utf_8(__param_cvalue: c_uint, __param_buffer: *mut u8) -> c_uint {
     var __local_cvalue = __param_cvalue
     var __local_buffer = __param_buffer

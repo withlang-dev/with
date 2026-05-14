@@ -1,7 +1,6 @@
 // Migrated from PCRE2
 use std.re.defs
 
-@[c_export("pcre2_serialize_encode_8")]
 fn pcre2_serialize_encode_8(__param_codes: *mut *const pcre2_real_code_8, __param_number_of_codes: c_int, __param_serialized_bytes: *mut *mut u8, __param_serialized_size: *mut c_ulong, __param_gcontext: *mut pcre2_real_general_context_8) -> c_int {
     var __local_bytes: *mut u8
 
@@ -140,7 +139,6 @@ fn pcre2_serialize_encode_8(__param_codes: *mut *const pcre2_real_code_8, __para
 
 }
 
-@[c_export("pcre2_serialize_decode_8")]
 fn pcre2_serialize_decode_8(__param_codes: *mut *mut pcre2_real_code_8, __param_number_of_codes: c_int, __param_bytes: *const u8, __param_gcontext: *mut pcre2_real_general_context_8) -> c_int {
     var __local_number_of_codes = __param_number_of_codes
     var __local_data: *const pcre2_serialized_data = ((__param_bytes as *const pcre2_serialized_data))
@@ -296,7 +294,6 @@ fn pcre2_serialize_decode_8(__param_codes: *mut *mut pcre2_real_code_8, __param_
 
 }
 
-@[c_export("pcre2_serialize_get_number_of_codes_8")]
 fn pcre2_serialize_get_number_of_codes_8(__param_bytes: *const u8) -> c_int {
     var __local_data: *const pcre2_serialized_data = ((__param_bytes as *const pcre2_serialized_data))
 
@@ -320,7 +317,6 @@ fn pcre2_serialize_get_number_of_codes_8(__param_bytes: *const u8) -> c_int {
 
 }
 
-@[c_export("pcre2_serialize_free_8")]
 fn pcre2_serialize_free_8(__param_bytes: *mut u8) {
     if ((if __param_bytes != null: 1 else: 0) != 0) {
         var __local_memctl: *mut pcre2_memctl = (((__param_bytes - (sizeof[pcre2_memctl]() as usize)) as *mut pcre2_memctl))

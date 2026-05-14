@@ -1568,9 +1568,9 @@ fn build_graph_check_object_symbols(root: str, target: BuildGraphTarget, compile
         if pcre_nm.rc != 0: return if pcre_nm.rc == 0: 1 else: pcre_nm.rc
         rc = build_graph_expect_nm_symbol(pcre_nm.stdout, target, label ++ " call_compile", "call_compile", "", "", "", "U")
         if rc != 0: return rc
-        rc = build_graph_expect_nm_symbol(pcre_nm.stdout, target, label ++ " pcre2_compile_8", "pcre2_compile_8", "", "", "U", "")
+        rc = build_graph_expect_nm_symbol(pcre_nm.stdout, target, label ++ " module pcre2_compile_8", "", "__pcre2_compile_8", "__with_mod_", "U", "")
         if rc != 0: return rc
-        rc = build_graph_expect_nm_forbid(pcre_nm.stdout, target, label ++ " module pcre2_compile_8", "", "__pcre2_compile_8", "__with_mod_")
+        rc = build_graph_expect_nm_forbid(pcre_nm.stdout, target, label ++ " raw pcre2_compile_8", "pcre2_compile_8", "", "")
         if rc != 0: return rc
     0
 

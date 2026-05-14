@@ -1,7 +1,6 @@
 // Migrated from PCRE2
 use std.re.defs
 
-@[c_export("pcre2_config_8")]
 fn pcre2_config_8(__param_what: c_uint, __param_where_: *mut c_void) -> c_int {
     if ((if __param_where_ == null: 1 else: 0) != 0) {
         while true {

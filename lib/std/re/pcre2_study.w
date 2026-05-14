@@ -1,7 +1,6 @@
 // Migrated from PCRE2
 use std.re.defs
 
-@[c_export("_pcre2_study_8")]
 fn _pcre2_study_8(__param_re: *mut pcre2_real_code_8) -> c_int {
     var __local_count__goto_1917_5: c_int = 0
 

@@ -1,7 +1,6 @@
 // Migrated from PCRE2
 use std.re.defs
 
-@[c_export("_pcre2_extuni_8")]
 fn _pcre2_extuni_8(__param_c: c_uint, __param_eptr: *const u8, __param_start_subject: *const u8, __param_end_subject: *const u8, __param_utf: c_int, __param_xcount: *mut c_int) -> *const u8 {
     var __local_c = __param_c
     var __local_eptr = __param_eptr
