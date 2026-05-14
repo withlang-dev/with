@@ -11,6 +11,7 @@ extern fn with_fs_remove_file(path: str) -> i32
 extern fn with_fs_rename_file(old_path: str, new_path: str) -> i32
 extern fn with_fs_create_dir(path: str) -> i32
 extern fn with_fs_remove_dir(path: str) -> i32
+extern fn with_fs_remove_tree(path: str) -> i32
 extern fn with_fs_mkdir_p(path: str) -> i32
 
 /// Check if a file exists at the given path.
@@ -32,6 +33,10 @@ pub fn create_dir(path: str) -> i32:
 /// Remove an empty directory. Returns 0 on success.
 pub fn remove_dir(path: str) -> i32:
     with_fs_remove_dir(path)
+
+/// Remove a file or directory tree recursively. Returns 0 on success.
+pub fn remove_tree(path: str) -> i32:
+    with_fs_remove_tree(path)
 
 /// Write a string to a file, replacing its contents. Returns 0 on success.
 pub fn write_file(path: str, data: str) -> i32:
