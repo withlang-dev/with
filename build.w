@@ -339,6 +339,10 @@ pub fn build(b: Build) -> Build:
     update_seed = update_seed.dep("verified-existing-stage")
     out = out.add_target(update_seed)
 
+    var pcre2_reference = target_new(42 as BuildKind, "pcre2-reference", "pcre2-10.47").output("out/pcre2_reference/pcre2-10.47/.with-reference-ready")
+    pcre2_reference = pcre2_reference.arg("https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.47/pcre2-10.47.tar.gz")
+    out = out.add_target(pcre2_reference)
+
     var pcre2_build = target_new(29 as BuildKind, "pcre2-build", "out/bin/with").output("out/pcre2_build")
     pcre2_build = pcre2_build.input("out/pcre2_migrated")
     pcre2_build = pcre2_build.dep("build")

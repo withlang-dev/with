@@ -213,16 +213,23 @@
     `out/lib/.llvm-link-ready` through a typed metadata node. `stage1` now
     depends on this graph node, so direct graph builds no longer rely on stale
     Make-generated LLVM bridge metadata.
+  - `with build :pcre2-reference` now fetches/extracts the pinned PCRE2
+    release when needed, prepares `pcre2.h`, `config.h`, and
+    `pcre2_chartables.c`, and normalizes the heap corpus expectation through a
+    typed graph node instead of `scripts/prepare_pcre2_reference.sh`. The
+    manual Make `pcre2-migrate` path delegates reference preparation to this
+    graph target.
 
   Remaining:
 
   - Port clean-bootstrap runtime/link preparation into the graph path. Direct
     `with build :build` works after a normal repository build, but Make still
     owns bootstrap-time runtime/link metadata setup from a cold checkout.
-  - Port PCRE2 download/migrate/source-preparation into typed nodes;
-    `pcre2-build`, `pcre2-test`, generated-source checking, and promotion are
-    typed. Migration must remain manually triggered; normal test/build targets
-    should consume existing migrated output and fail loudly if it is missing.
+  - Port PCRE2 migration itself into a typed manual `pcre2-migrate` node;
+    download/source preparation, `pcre2-build`, `pcre2-test`,
+    generated-source checking, and promotion are typed. Migration must remain
+    manually triggered; normal test/build targets should consume existing
+    migrated output and fail loudly if it is missing.
   - Port seed, clean, emit-c, and cross targets.
   - Make Makefile delegate to `with build :...` only after direct graph paths are equivalent.
   - Remove Make recipes and obsolete scripts last.

@@ -46,6 +46,7 @@ pub enum BuildKind: i32:
     CliSelfhostMigrateCoreTest = 39
     SelfhostSuiteTest = 40
     GenerateLlvmLinkMetadata = 41
+    Pcre2ReferencePrepare = 42
 
 pub enum BuildTarget: i32:
     native = 0
@@ -313,6 +314,11 @@ pub fn Build.pcre2_generated_promote(self: Build, name: str, compiler: str, gene
 pub fn Build.pcre2_build(self: Build, name: str, compiler: str, migrated_dir: str, output_dir: str) -> Build:
     var target = target_new(.Pcre2Build, name, compiler).output(output_dir)
     target = target.input(migrated_dir)
+    self.add_target(target)
+
+pub fn Build.pcre2_reference_prepare(self: Build, name: str, release: str, url: str, stamp: str) -> Build:
+    var target = target_new(.Pcre2ReferencePrepare, name, release).output(stamp)
+    target = target.arg(url)
     self.add_target(target)
 
 pub fn Target.target(self: Target, target: BuildTarget) -> Target:
