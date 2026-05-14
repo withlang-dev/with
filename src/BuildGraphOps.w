@@ -565,7 +565,29 @@ pub fn build_graph_expand_install_path(root: str, path: str) -> str:
         let home = build_graph_rt_getenv("HOME")
         if home.len() > 0:
             return resolve_join(home, path.slice(6, path.len()))
+    if path.starts_with("$INSTALL_BINDIR/"):
+        let install_bindir = build_graph_install_bindir()
+        if install_bindir.len() > 0:
+            return build_graph_resolve_project_path(root, resolve_join(install_bindir, path.slice(16, path.len())))
+    if path.starts_with("$INSTALL_LIBDIR/"):
+        let install_libdir = build_graph_install_libdir()
+        if install_libdir.len() > 0:
+            return build_graph_resolve_project_path(root, resolve_join(install_libdir, path.slice(16, path.len())))
     build_graph_resolve_project_path(root, path)
+
+fn build_graph_env_or_default(name: str, default_value: str) -> str:
+    let value = build_graph_rt_getenv(name)
+    if value.len() > 0:
+        return value
+    default_value
+
+fn build_graph_install_bindir() -> str:
+    let prefix = build_graph_env_or_default("PREFIX", "/usr/local")
+    let bindir = build_graph_env_or_default("BINDIR", resolve_join(prefix, "bin"))
+    build_graph_rt_getenv("DESTDIR") ++ bindir
+
+fn build_graph_install_libdir() -> str:
+    resolve_join(build_graph_install_bindir(), "runtime")
 
 pub fn build_graph_parse_octal_mode(text: str) -> i32:
     if text.len() == 0:

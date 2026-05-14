@@ -808,11 +808,8 @@ __fixpoint:
 install: | $(OUT_TMP_DIR)
 	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __install)
 
-__install: $(STAGE2_BIN)
-	install -d "$(INSTALL_BINDIR)"
-	install -d "$(INSTALL_LIBDIR)"
-	install -m 0755 "$(STAGE2_BIN)" "$(INSTALL_BINDIR)/with"
-	cp -R "$(OUT_LIB_DIR)/." "$(INSTALL_LIBDIR)/"
+__install:
+	$(call RUN_GRAPH_TARGET,install)
 
 install-user: | $(OUT_TMP_DIR)
 	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __install-user)
