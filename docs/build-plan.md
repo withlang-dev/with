@@ -224,6 +224,10 @@
     the migrated tree only after the file-count check passes, and invalidates
     stale `pcre2-build` output. The manual Make `pcre2-migrate` path delegates
     to this graph target.
+  - `with build :clean` now removes `out/`, legacy `.with/`, and the stray
+    root/source build artifacts through a typed graph node backed by the
+    runtime `remove_tree` primitive. `with clean` no longer assembles a shell
+    command string.
 
   Remaining:
 

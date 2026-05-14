@@ -48,6 +48,7 @@ pub enum BuildKind: i32:
     GenerateLlvmLinkMetadata = 41
     Pcre2ReferencePrepare = 42
     Pcre2Migrate = 43
+    Clean = 44
 
 pub enum BuildTarget: i32:
     native = 0
@@ -327,6 +328,9 @@ pub fn Build.pcre2_migrate(self: Build, name: str, compiler: str, source_dir: st
     target = target.input(source_dir)
     target = target.arg(generated_dir)
     self.add_target(target)
+
+pub fn Build.clean(self: Build, name: str) -> Build:
+    self.add_target(target_new(.Clean, name, ""))
 
 pub fn Target.target(self: Target, target: BuildTarget) -> Target:
     Target {

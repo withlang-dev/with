@@ -833,5 +833,4 @@ clean: | $(OUT_TMP_DIR)
 	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __clean)
 
 __clean:
-	rm -rf "$(OUT)/"
-	rm -f $(STRAY_BUILD_ARTIFACTS)
+	@$(WITH_BUILD_ENV) "$(WITH)" build :clean
