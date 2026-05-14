@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: all build stage1 stage2 stage3 runtime selfcheck smoke test test-pcre2 fixpoint install install-user update-seed clean seed print-version emit-c-test emit-c-fixpoint cross regex-migrate regex-build regex-test regex-promote \
+.PHONY: all build stage1 stage2 stage3 runtime selfcheck smoke test test-pcre2 fixpoint install install-user update-seed clean seed print-version emit-c-test emit-c-fixpoint cross pcre2-migrate pcre2-build pcre2-test pcre2-promote regex-migrate regex-build regex-test regex-promote \
 	__build __stage1 __stage2 __stage3 __runtime __selfcheck __smoke __test __test-pcre2 __fixpoint __install __install-user __update-seed __clean __seed __regex-migrate __regex-build __regex-test __regex-promote
 
 ROOT_DIR := $(CURDIR)
@@ -269,17 +269,25 @@ print-version:
 seed: | $(OUT_TMP_DIR)
 	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __seed)
 
-regex-migrate: | $(OUT_TMP_DIR)
+pcre2-migrate: | $(OUT_TMP_DIR)
 	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __regex-migrate)
 
-regex-build: | $(OUT_TMP_DIR)
+regex-migrate: pcre2-migrate
+
+pcre2-build: | $(OUT_TMP_DIR)
 	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __regex-build)
 
-regex-test: | $(OUT_TMP_DIR)
+regex-build: pcre2-build
+
+pcre2-test: | $(OUT_TMP_DIR)
 	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __regex-test)
 
-regex-promote: | $(OUT_TMP_DIR)
+regex-test: pcre2-test
+
+pcre2-promote: | $(OUT_TMP_DIR)
 	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __regex-promote)
+
+regex-promote: pcre2-promote
 
 __build: $(CANONICAL_BIN)
 
@@ -340,28 +348,28 @@ __regex-build: $(REGEX_BUILD_STAMP)
 __regex-test:
 	@if [ ! -d "$(ROOT_DIR)/$(REGEX_MIGRATE_DIR)" ]; then \
 		echo "error: missing migrated PCRE2 sources: $(ROOT_DIR)/$(REGEX_MIGRATE_DIR)" >&2; \
-		echo "run make regex-migrate deliberately to refresh migrated PCRE2 sources" >&2; \
+		echo "run make pcre2-migrate deliberately to refresh migrated PCRE2 sources" >&2; \
 		exit 1; \
 	fi
 	@if [ ! -x "$(ROOT_DIR)/$(REGEX_PCRE2TEST_BIN)" ]; then \
 		echo "error: missing migrated PCRE2 test binary: $(ROOT_DIR)/$(REGEX_PCRE2TEST_BIN)" >&2; \
-		echo "run make regex-build after a deliberate make regex-migrate" >&2; \
+		echo "run make pcre2-build after a deliberate make pcre2-migrate" >&2; \
 		exit 1; \
 	fi
 	@if [ ! -d "$(ROOT_DIR)/$(REGEX_PCRE2_REF_DIR)" ]; then \
 		echo "error: missing PCRE2 reference tree: $(ROOT_DIR)/$(REGEX_PCRE2_REF_DIR)" >&2; \
-		echo "run make regex-migrate to fetch and prepare the PCRE2 release" >&2; \
+		echo "run make pcre2-migrate to fetch and prepare the PCRE2 release" >&2; \
 		exit 1; \
 	fi
-	@$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" build :regex-test
+	@$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" build :pcre2-test
 
 __regex-promote: $(REGEX_BUILD_STAMP)
 	@if [ ! -x "$(ROOT_DIR)/$(CANONICAL_BIN)" ]; then \
 		echo "error: missing compiler binary: $(ROOT_DIR)/$(CANONICAL_BIN)" >&2; \
-		echo "run make build before regex-promote" >&2; \
+		echo "run make build before pcre2-promote" >&2; \
 		exit 1; \
 	fi
-	@$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" build :regex-promote
+	@$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" build :pcre2-promote
 
 $(OUT_BIN_DIR) $(OUT_LIB_DIR) $(OUT_LOG_DIR) $(OUT_TMP_DIR) $(OUT_GEN_DIR):
 	@mkdir -p "$@"
@@ -478,7 +486,7 @@ $(REGEX_MIGRATE_STAMP): $(CANONICAL_BIN) $(REGEX_PCRE2_READY) scripts/prepare_pc
 	touch "$@"
 
 $(REGEX_BUILD_STAMP): | $(OUT_GEN_DIR) $(OUT_TMP_DIR)
-	@$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" build :regex-build
+	@$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" build :pcre2-build
 	@touch "$@"
 
 $(COMPAT_RUNTIME_SRC): rt/compat_runtime.w $(EMBEDDED_STDLIB_RUNTIME_SRC) | $(OUT_GEN_DIR)

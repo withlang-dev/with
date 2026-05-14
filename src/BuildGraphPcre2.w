@@ -337,7 +337,7 @@ pub fn build_graph_run_pcre2_build(root: str, target: BuildGraphTarget) -> i32:
         build_graph_rt_eprint("error: pcre2_build target '" ++ target.name ++ "' missing compiler: " ++ compiler_path)
         return 1
     if build_graph_rt_is_dir(migrated_dir) == 0:
-        build_graph_rt_eprint("error: pcre2_build target '" ++ target.name ++ "' missing migrated PCRE2 directory: " ++ migrated_dir ++ " - run regex-migrate deliberately")
+        build_graph_rt_eprint("error: pcre2_build target '" ++ target.name ++ "' missing migrated PCRE2 directory: " ++ migrated_dir ++ " - run pcre2-migrate deliberately")
         return 1
     let tmp_dir = output_dir ++ ".tmp." ++ f"{build_graph_rt_getpid()}.{build_graph_rt_clock_nanos()}"
     let re_dir = resolve_join(resolve_join(resolve_join(tmp_dir, "lib"), "std"), "re")

@@ -49,7 +49,7 @@ pub fn build_graph_kind_name(kind: i32) -> str:
     if kind == 34: return "with_compiler_ir"
     if kind == 35: return "cli_selfhost_project_test"
     if kind == 36: return "cli_selfhost_edge_test"
-    if kind == 37: return "cli_selfhost_regex_prep_test"
+    if kind == 37: return "cli_selfhost_pcre2_prep_test"
     if kind == 38: return "cli_selfhost_migrate_basic_test"
     if kind == 39: return "cli_selfhost_migrate_core_test"
     if kind == 40: return "selfhost_suite_test"

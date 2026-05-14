@@ -1619,8 +1619,8 @@ fn build_graph_run_cli_selfhost_suite_test(root: str, target: BuildGraphTarget) 
         return run_cli_selfhost_project_test(root, target.name, compiler_path)
     if suite == "edge":
         return run_cli_selfhost_edge_test(root, target.name, compiler_path)
-    if suite == "regex-prep":
-        return run_cli_selfhost_regex_prep_test(root, target.name, compiler_path)
+    if suite == "pcre2-prep":
+        return run_cli_selfhost_pcre2_prep_test(root, target.name, compiler_path)
     if suite == "migrate-basic":
         return run_cli_selfhost_migrate_basic_test(root, target.name, compiler_path)
     if suite == "migrate-core":
@@ -2167,18 +2167,18 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
             continue
         if target.kind == 37:
             if target.entry.len() == 0:
-                with_eprint("error: cli_selfhost_regex_prep_test target '" ++ target.name ++ "' requires a compiler path")
+                with_eprint("error: cli_selfhost_pcre2_prep_test target '" ++ target.name ++ "' requires a compiler path")
                 return 1
             let arg_rc = build_graph_validate_process_args(target)
             if arg_rc != 0:
                 return arg_rc
             let compiler_path = build_graph_resolve_project_path(root, target.entry)
             if with_fs_file_exists(compiler_path) == 0:
-                with_eprint("error: cli_selfhost_regex_prep_test target '" ++ target.name ++ "' missing compiler: " ++ compiler_path)
+                with_eprint("error: cli_selfhost_pcre2_prep_test target '" ++ target.name ++ "' missing compiler: " ++ compiler_path)
                 return 1
-            let regex_prep_rc = run_cli_selfhost_regex_prep_test(root, target.name, compiler_path)
-            if regex_prep_rc != 0:
-                return regex_prep_rc
+            let pcre2_prep_rc = run_cli_selfhost_pcre2_prep_test(root, target.name, compiler_path)
+            if pcre2_prep_rc != 0:
+                return pcre2_prep_rc
             completed_targets.push(target.name)
             continue
         if target.kind == 38:
