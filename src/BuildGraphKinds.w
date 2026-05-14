@@ -4,7 +4,7 @@ extern fn with_sysinfo_os() -> str
 extern fn with_sysinfo_arch() -> str
 
 const BUILD_GRAPH_KIND_MIN: i32 = 0
-const BUILD_GRAPH_KIND_MAX: i32 = 44
+const BUILD_GRAPH_KIND_MAX: i32 = 45
 const BUILD_GRAPH_TARGET_MIN: i32 = 0
 const BUILD_GRAPH_TARGET_MAX: i32 = 5
 
@@ -57,6 +57,7 @@ pub fn build_graph_kind_name(kind: i32) -> str:
     if kind == 42: return "pcre2_reference_prepare"
     if kind == 43: return "pcre2_migrate"
     if kind == 44: return "clean"
+    if kind == 45: return "seed_download"
     f"unknown({kind})"
 
 pub fn build_graph_kind_implemented(kind: i32) -> bool:

@@ -469,6 +469,10 @@ pub fn build(b: Build) -> Build:
     install = install.dep("install-llvm-cc")
     out = out.add_target(install)
 
+    var seed = target_new(45 as BuildKind, "seed", "withlang-dev/with").output("src/main")
+    seed = seed.arg("main")
+    out = out.add_target(seed)
+
     var update_seed = target_new(.Install, "update-seed", "out/bin/with-stage2").output("src/main")
     update_seed = update_seed.input("out/bin/with-stage2")
     update_seed = update_seed.arg("0755")

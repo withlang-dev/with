@@ -244,12 +244,18 @@
     object set through typed install nodes. It preserves Make-style `DESTDIR`,
     `BINDIR`, and `PREFIX` path selection via `$INSTALL_BINDIR` and
     `$INSTALL_LIBDIR`, and `make install` delegates to this graph target.
+  - `with build :seed` now downloads the `main` seed binary from GitHub
+    releases through a typed `seed_download` graph node. It honors
+    `SEED_VERSION` for a specific release and otherwise queries recent
+    releases for the first non-missing `main` asset. `make seed` delegates to
+    this graph target whenever an existing With compiler is available, keeping
+    the shell fallback only for true no-compiler bootstrap.
 
   Remaining:
 
-  - Port seed, emit-c, and cross targets.
-  - Finish delegating remaining Make compatibility targets after seed, emit-c,
-    and cross graph paths are equivalent.
+  - Port emit-c and cross targets.
+  - Finish delegating remaining Make compatibility targets after emit-c and
+    cross graph paths are equivalent.
   - Remove Make recipes and obsolete scripts last.
 
   ## Key Changes

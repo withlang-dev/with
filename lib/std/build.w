@@ -49,6 +49,7 @@ pub enum BuildKind: i32:
     Pcre2ReferencePrepare = 42
     Pcre2Migrate = 43
     Clean = 44
+    SeedDownload = 45
 
 pub enum BuildTarget: i32:
     native = 0

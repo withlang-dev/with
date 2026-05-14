@@ -317,6 +317,10 @@ __smoke:
 
 __seed:
 	@set -euo pipefail; \
+	if [ -n "$(STAGE0_BIN)" ]; then \
+		$(WITH_BUILD_ENV) $(STAGE0_BIN) build :seed; \
+		exit $$?; \
+	fi; \
 	dest="$(SEED_PATH)"; \
 	repo="$(REPO_FULL_NAME)"; \
 	if [ -x "$$dest" ]; then \
