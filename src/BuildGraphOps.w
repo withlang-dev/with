@@ -86,6 +86,173 @@ pub fn build_graph_write_response_file(root: str, target: BuildGraphTarget) -> i
         return 1
     0
 
+fn build_graph_trim_space(text: str) -> str:
+    var start = 0
+    var end = text.len() as i32
+    while start < end:
+        let ch = text.byte_at(start as i64)
+        if ch != 9 and ch != 10 and ch != 13 and ch != 32:
+            break
+        start = start + 1
+    while end > start:
+        let ch = text.byte_at((end - 1) as i64)
+        if ch != 9 and ch != 10 and ch != 13 and ch != 32:
+            break
+        end = end - 1
+    text.slice(start as i64, end as i64)
+
+fn build_graph_split_whitespace(text: str) -> Vec[str]:
+    let parts: Vec[str] = Vec.new()
+    var start = -1
+    for i in 0..text.len() as i32:
+        let ch = text.byte_at(i as i64)
+        let is_space = ch == 9 or ch == 10 or ch == 13 or ch == 32
+        if is_space:
+            if start >= 0:
+                parts.push(text.slice(start as i64, i as i64))
+                start = -1
+        else if start < 0:
+            start = i
+    if start >= 0:
+        parts.push(text.slice(start as i64, text.len()))
+    parts
+
+fn build_graph_capture_stdout(root: str, target_name: str, label: str, argv: str, timeout_ms: i32) -> str:
+    let capture_dir = resolve_join(resolve_join(root, "out/command"), target_name)
+    if build_graph_rt_mkdir_p(capture_dir) != 0:
+        return ""
+    let stamp = f"{build_graph_rt_getpid()}.{build_graph_rt_clock_nanos()}"
+    let stdout_path = resolve_join(capture_dir, label ++ "." ++ stamp ++ ".stdout")
+    let stderr_path = resolve_join(capture_dir, label ++ "." ++ stamp ++ ".stderr")
+    let rc = build_graph_rt_exec_argv_capture(argv, stdout_path, stderr_path, timeout_ms)
+    if rc != 0:
+        let stderr = build_graph_rt_read_file(stderr_path)
+        if stderr.len() > 0:
+            build_graph_rt_eprint(stderr)
+        let _remove_stdout_err = build_graph_rt_remove_file(stdout_path)
+        let _remove_stderr_err = build_graph_rt_remove_file(stderr_path)
+        return ""
+    let stdout = build_graph_trim_space(build_graph_rt_read_file(stdout_path))
+    let _remove_stdout = build_graph_rt_remove_file(stdout_path)
+    let _remove_stderr = build_graph_rt_remove_file(stderr_path)
+    stdout
+
+fn build_graph_libclang_path() -> str:
+    let explicit = build_graph_rt_getenv("WITH_LIBCLANG")
+    if explicit.len() > 0:
+        return explicit
+    let legacy = build_graph_rt_getenv("LIBCLANG_FILE")
+    if legacy.len() > 0:
+        return legacy
+    let lib_dir = build_graph_llvm_prefix() ++ "/lib"
+    let dylib = lib_dir ++ "/libclang.dylib"
+    if build_graph_rt_file_exists(dylib) != 0:
+        return dylib
+    let so = lib_dir ++ "/libclang.so"
+    if build_graph_rt_file_exists(so) != 0:
+        return so
+    let dll = lib_dir ++ "/libclang.dll"
+    if build_graph_rt_file_exists(dll) != 0:
+        return dll
+    ""
+
+fn build_graph_host_sdk_path(root: str, target_name: str) -> str:
+    let sdkroot = build_graph_rt_getenv("SDKROOT")
+    if sdkroot.len() > 0:
+        return sdkroot
+    let host = build_graph_host_target_kind()
+    if host != 3 and host != 4:
+        return ""
+    let xcrun = "/usr/bin/xcrun"
+    if build_graph_rt_file_exists(xcrun) == 0:
+        return ""
+    var argv = ""
+    argv = build_graph_argv_append(argv, xcrun)
+    argv = build_graph_argv_append(argv, "--show-sdk-path")
+    build_graph_capture_stdout(root, target_name, "xcrun-sdk-path", argv, 30000)
+
+pub fn build_graph_generate_llvm_link_metadata(root: str, target: BuildGraphTarget) -> i32:
+    if target.output.len() == 0:
+        build_graph_rt_eprint("error: generate_llvm_link_metadata target '" ++ target.name ++ "' requires a stamp output path")
+        return 1
+    let output_path = build_graph_resolve_project_path(root, target.output)
+    let output_dir = build_graph_dirname(output_path)
+    if build_graph_rt_mkdir_p(output_dir) != 0:
+        build_graph_rt_eprint("error: generate_llvm_link_metadata target '" ++ target.name ++ "' could not create output directory: " ++ output_dir)
+        return 1
+    for ii in 0..target.inputs.len() as i32:
+        let input_path = build_graph_resolve_project_path(root, target.inputs.get(ii as i64))
+        if build_graph_rt_file_exists(input_path) == 0:
+            build_graph_rt_eprint("error: generate_llvm_link_metadata target '" ++ target.name ++ "' missing input: " ++ input_path)
+            return 1
+    let llvm_config = build_graph_llvm_config_tool().executable
+    if build_graph_rt_file_exists(llvm_config) == 0:
+        build_graph_rt_eprint("error: generate_llvm_link_metadata target '" ++ target.name ++ "' missing llvm-config: " ++ llvm_config)
+        return 1
+    let llvm_clang = build_graph_llvm_clang_tool().executable
+    if build_graph_rt_file_exists(llvm_clang) == 0:
+        build_graph_rt_eprint("error: generate_llvm_link_metadata target '" ++ target.name ++ "' missing LLVM clang: " ++ llvm_clang)
+        return 1
+    let libclang = build_graph_libclang_path()
+    if libclang.len() == 0 or build_graph_rt_file_exists(libclang) == 0:
+        build_graph_rt_eprint("error: generate_llvm_link_metadata target '" ++ target.name ++ "' missing libclang under " ++ build_graph_llvm_prefix() ++ "/lib")
+        return 1
+    var argv = ""
+    argv = build_graph_argv_append(argv, llvm_config)
+    argv = build_graph_argv_append(argv, "--link-static")
+    argv = build_graph_argv_append(argv, "--libfiles")
+    let components: [58]str = [
+        "core", "support", "analysis", "passes",
+        "aarch64codegen", "aarch64asmparser", "aarch64desc", "aarch64info", "aarch64utils",
+        "codegen", "mc", "mcparser", "target", "targetparser", "bitwriter",
+        "objcarcopts", "linker", "selectiondag", "asmprinter", "globalisel",
+        "scalaropts", "instcombine", "ipo", "transformutils", "vectorize",
+        "instrumentation", "cfguard", "aggressiveinstcombine",
+        "irprinter", "hipstdpar", "coroutines", "sandboxir",
+        "frontendopenmp", "frontenddirective", "frontendatomic", "frontendoffloading",
+        "objectyaml", "cgdata", "codegentypes", "bitreader", "irreader", "asmparser",
+        "profiledata", "symbolize", "debuginfobtf", "debuginfopdb", "debuginfomsf",
+        "debuginfocodeview", "debuginfogsym", "debuginfodwarf", "debuginfodwarflowlevel",
+        "object", "textapi", "remarks", "bitstreamreader", "binaryformat",
+        "frontendhlsl", "demangle",
+    ]
+    for ci in 0..58:
+        argv = build_graph_argv_append(argv, components[ci])
+    let libs_text = build_graph_capture_stdout(root, target.name, "llvm-config-libfiles", argv, 120000)
+    if libs_text.len() == 0:
+        build_graph_rt_eprint("error: generate_llvm_link_metadata target '" ++ target.name ++ "' could not query llvm-config")
+        return 1
+    var rsp = ""
+    let libs = build_graph_split_whitespace(libs_text)
+    for li in 0..libs.len() as i32:
+        rsp = rsp ++ libs.get(li as i64) ++ "\n"
+    let sdk_path = build_graph_host_sdk_path(root, target.name)
+    if sdk_path.len() > 0:
+        rsp = rsp ++ "-isysroot\n" ++ sdk_path ++ "\n"
+    rsp = rsp ++ "-lm\n"
+    rsp = rsp ++ "-lz\n"
+    let zstd_archive = "/opt/homebrew/lib/libzstd.a"
+    if build_graph_rt_file_exists(zstd_archive) != 0:
+        rsp = rsp ++ zstd_archive ++ "\n"
+    else:
+        rsp = rsp ++ "-lzstd\n"
+    rsp = rsp ++ "-lxml2\n"
+    rsp = rsp ++ "-lc++\n"
+    rsp = rsp ++ libclang ++ "\n"
+    rsp = rsp ++ "-Wl,-rpath," ++ build_graph_dirname(libclang) ++ "/\n"
+    let rsp_path = resolve_join(output_dir, "llvm_link.rsp")
+    let cc_path = resolve_join(output_dir, "llvm_cc")
+    if build_graph_rt_write_file(rsp_path, rsp) != 0:
+        build_graph_rt_eprint("error: generate_llvm_link_metadata target '" ++ target.name ++ "' could not write: " ++ rsp_path)
+        return 1
+    if build_graph_rt_write_file(cc_path, llvm_clang ++ "\n") != 0:
+        build_graph_rt_eprint("error: generate_llvm_link_metadata target '" ++ target.name ++ "' could not write: " ++ cc_path)
+        return 1
+    if build_graph_rt_write_file(output_path, "ok\n") != 0:
+        build_graph_rt_eprint("error: generate_llvm_link_metadata target '" ++ target.name ++ "' could not write stamp: " ++ output_path)
+        return 1
+    0
+
 fn build_graph_append_common_compile_args(root: str, target: BuildGraphTarget, argv_blob: str) -> str:
     var out = argv_blob
     for ii in 0..target.include_paths.len() as i32:

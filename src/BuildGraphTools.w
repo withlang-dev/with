@@ -2,6 +2,8 @@
 
 extern fn with_getenv_str(name: str) -> str
 
+const BUILD_GRAPH_DEFAULT_LLVM_PREFIX: str = "/usr/local/llvm"
+
 pub type BuildTool {
     name: str,
     executable: str,
@@ -42,6 +44,21 @@ pub fn build_graph_tar_tool() -> BuildTool:
 pub fn build_graph_dsymutil_tool() -> BuildTool:
     build_graph_tool("dsymutil", "DSYMUTIL", "dsymutil")
 
+pub fn build_graph_llvm_prefix() -> str:
+    let prefix = with_getenv_str("LLVM_PREFIX")
+    if prefix.len() > 0:
+        return prefix
+    BUILD_GRAPH_DEFAULT_LLVM_PREFIX
+
+pub fn build_graph_llvm_config_tool() -> BuildTool:
+    let explicit = with_getenv_str("WITH_LLVM_CONFIG")
+    if explicit.len() > 0:
+        return BuildTool { name: "llvm-config", executable: explicit, env_name: "WITH_LLVM_CONFIG" }
+    let legacy = with_getenv_str("LLVM_CONFIG")
+    if legacy.len() > 0:
+        return BuildTool { name: "llvm-config", executable: legacy, env_name: "LLVM_CONFIG" }
+    BuildTool { name: "llvm-config", executable: build_graph_llvm_prefix() ++ "/bin/llvm-config", env_name: "LLVM_PREFIX" }
+
 pub fn build_graph_llvm_clang_tool() -> BuildTool:
     let explicit = with_getenv_str("WITH_LLVM_CC")
     if explicit.len() > 0:
@@ -52,4 +69,4 @@ pub fn build_graph_llvm_clang_tool() -> BuildTool:
     let prefix = with_getenv_str("LLVM_PREFIX")
     if prefix.len() > 0:
         return BuildTool { name: "llvm-clang", executable: prefix ++ "/bin/clang", env_name: "LLVM_PREFIX" }
-    BuildTool { name: "llvm-clang", executable: "clang", env_name: "" }
+    BuildTool { name: "llvm-clang", executable: build_graph_llvm_prefix() ++ "/bin/clang", env_name: "LLVM_PREFIX" }

@@ -13,11 +13,33 @@ pub fn build(b: Build) -> Build:
     var compat_runtime = target_new(33 as BuildKind, "compat-runtime-source", "rt/compat_runtime.w").output("out/gen/compat_runtime.w")
     out = out.add_target(compat_runtime)
 
+    var llvm_bridge = target_new(.WithCompilerBuild, "llvm-bridge-object", "seed").output("out/lib/llvm_bridge.o")
+    llvm_bridge = llvm_bridge.input("rt/llvm_bridge.w")
+    llvm_bridge = llvm_bridge.arg("--emit-obj")
+    llvm_bridge = llvm_bridge.arg("--no-prelude")
+    llvm_bridge = llvm_bridge.arg("-O0")
+    out = out.add_target(llvm_bridge)
+
+    var clang_bridge = target_new(.WithCompilerBuild, "clang-bridge-object", "seed").output("out/lib/clang_bridge.o")
+    clang_bridge = clang_bridge.input("rt/clang_bridge.w")
+    clang_bridge = clang_bridge.arg("--emit-obj")
+    clang_bridge = clang_bridge.arg("--no-prelude")
+    clang_bridge = clang_bridge.arg("-O0")
+    out = out.add_target(clang_bridge)
+
+    var llvm_link_metadata = target_new(41 as BuildKind, "llvm-link-metadata", "").output("out/lib/.llvm-link-ready")
+    llvm_link_metadata = llvm_link_metadata.input("out/lib/llvm_bridge.o")
+    llvm_link_metadata = llvm_link_metadata.input("out/lib/clang_bridge.o")
+    llvm_link_metadata = llvm_link_metadata.dep("llvm-bridge-object")
+    llvm_link_metadata = llvm_link_metadata.dep("clang-bridge-object")
+    out = out.add_target(llvm_link_metadata)
+
     var stage1 = target_new(.WithCompilerBuild, "stage1", "seed").output("out/bin/with-stage1")
     stage1 = stage1.input("out/gen/main.w")
     stage1 = stage1.arg("-O0")
     stage1 = stage1.dep("compiler-sources")
     stage1 = stage1.dep("compat-runtime-source")
+    stage1 = stage1.dep("llvm-link-metadata")
     out = out.add_target(stage1)
 
     var stage2 = target_new(.WithCompilerBuild, "stage2", "out/bin/with-stage1").output("out/bin/with-stage2")

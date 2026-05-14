@@ -45,6 +45,7 @@ pub enum BuildKind: i32:
     CliSelfhostMigrateBasicTest = 38
     CliSelfhostMigrateCoreTest = 39
     SelfhostSuiteTest = 40
+    GenerateLlvmLinkMetadata = 41
 
 pub enum BuildTarget: i32:
     native = 0
@@ -277,6 +278,10 @@ pub fn Build.generate_compiler_entrypoints(self: Build, name: str, stamp: str) -
 
 pub fn Build.generate_compat_runtime(self: Build, name: str, compat_source: str, output: str) -> Build:
     let target = target_new(.GenerateCompatRuntime, name, compat_source).output(output)
+    self.add_target(target)
+
+pub fn Build.generate_llvm_link_metadata(self: Build, name: str, stamp: str) -> Build:
+    let target = target_new(.GenerateLlvmLinkMetadata, name, "").output(stamp)
     self.add_target(target)
 
 pub fn Build.with_compiler_build(self: Build, name: str, compiler: str, source: str, output: str) -> Build:

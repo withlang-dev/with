@@ -203,17 +203,22 @@
     suites, including literal parsing, flags, `=~`/`!~`, match-arm captures,
     f-string capture interpolation, global `/g` progression, invalid literals,
     invalid flags, and capture-scope diagnostics.
+  - CLI selfhost parallel same-source coverage now runs as a typed
+    `selfhost_suite_test` graph target named `cli-selfhost-parallel-tests`.
+    It verifies one serial `with test` run and 32 concurrent same-source runs
+    without invoking the legacy shell test script.
+  - `with build :llvm-link-metadata` now compiles `rt/llvm_bridge.w` and
+    `rt/clang_bridge.w` through graph nodes and regenerates
+    `out/lib/llvm_link.rsp`, `out/lib/llvm_cc`, and
+    `out/lib/.llvm-link-ready` through a typed metadata node. `stage1` now
+    depends on this graph node, so direct graph builds no longer rely on stale
+    Make-generated LLVM bridge metadata.
 
   Remaining:
 
-  - Replace the remaining temporary `with build :test` script invocation with
-    native typed With test harness nodes for the rest of the CLI selfhost
-    categories: remaining migration fixtures and parallel same-source testing.
   - Port clean-bootstrap runtime/link preparation into the graph path. Direct
     `with build :build` works after a normal repository build, but Make still
     owns bootstrap-time runtime/link metadata setup from a cold checkout.
-  - Port LLVM bridge/link response generation into typed nodes instead of
-    relying on existing `out/lib/llvm_link.rsp` and `out/lib/llvm_cc`.
   - Port PCRE2 download/migrate/source-preparation into typed nodes;
     `pcre2-build`, `pcre2-test`, generated-source checking, and promotion are
     typed. Migration must remain manually triggered; normal test/build targets
