@@ -440,28 +440,10 @@ $(EMBEDDED_STDLIB_RUNTIME_SRC): $(EMBEDDED_STDLIB_GEN_BIN) $(EMBED_STD_SOURCES) 
 	done
 	@$(EMBEDDED_STDLIB_GEN_BIN) "$(ROOT_DIR)" "$@" $(EMBED_STD_SOURCES)
 
-$(REGEX_PCRE2_READY): | $(OUT_TMP_DIR)
-	@set -euo pipefail; \
-	archive="$(ROOT_DIR)/$(REGEX_PCRE2_ARCHIVE)"; \
-	tmp="$(ROOT_DIR)/$(OUT_TMP_DIR)/$(REGEX_PCRE2_RELEASE).extract"; \
-	ref="$(ROOT_DIR)/$(REGEX_PCRE2_REF_DIR)"; \
-	mkdir -p "$$(dirname "$$ref")"; \
-	if [ ! -f "$$archive" ]; then \
-		echo "fetching $(REGEX_PCRE2_RELEASE) from $(REGEX_PCRE2_URL)"; \
-		curl -L --fail --show-error --output "$$archive" "$(REGEX_PCRE2_URL)"; \
-	fi; \
-	rm -rf "$$tmp"; \
-	mkdir -p "$$tmp"; \
-	tar -xzf "$$archive" -C "$$tmp"; \
-	extracted=$$(find "$$tmp" -mindepth 1 -maxdepth 1 -type d | head -1); \
-	[ -n "$$extracted" ] && [ -d "$$extracted/src" ] || { echo "error: PCRE2 archive did not contain a src directory" >&2; exit 1; }; \
-	rm -rf "$$ref"; \
-	mv "$$extracted" "$$ref"; \
-	rm -rf "$$tmp"; \
-	printf '%s\n' "$(REGEX_PCRE2_URL)" > "$$ref/.with-reference-url"; \
-	touch "$@"
+$(REGEX_PCRE2_READY): $(CANONICAL_BIN) | $(OUT_TMP_DIR)
+	@$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" build :pcre2-reference
 
-$(REGEX_MIGRATE_STAMP): $(CANONICAL_BIN) $(REGEX_PCRE2_READY) scripts/prepare_pcre2_reference.sh | $(OUT_GEN_DIR) $(OUT_TMP_DIR)
+$(REGEX_MIGRATE_STAMP): $(CANONICAL_BIN) $(REGEX_PCRE2_READY) | $(OUT_GEN_DIR) $(OUT_TMP_DIR)
 	@set -euo pipefail; \
 	src="$(ROOT_DIR)/$(REGEX_PCRE2_SRC)"; \
 	out="$(ROOT_DIR)/$(REGEX_MIGRATE_DIR)"; \
@@ -470,7 +452,6 @@ $(REGEX_MIGRATE_STAMP): $(CANONICAL_BIN) $(REGEX_PCRE2_READY) scripts/prepare_pc
 		echo "error: missing PCRE2 source tree at $$src" >&2; \
 		exit 1; \
 	fi; \
-	bash "$(ROOT_DIR)/scripts/prepare_pcre2_reference.sh" "$$src"; \
 	rm -rf "$$tmp"; \
 	mkdir -p "$$tmp"; \
 	$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" migrate "$$src/" -o "$$tmp/" --no-c-export --prefer-brace --width-slice 8 --shared-defs std.re.defs $(foreach f,$(REGEX_EXCLUDED_C_SOURCES),--exclude $(f)) -I "$$src" -D PCRE2_CODE_UNIT_WIDTH=8 -D HAVE_CONFIG_H=1; \
