@@ -18,6 +18,14 @@ fn with_ir_target(name: str, compiler: str, source: str, output: str, dep: str) 
         target = target.dep(dep)
     target
 
+fn install_file_target(name: str, source: str, dest: str, mode: str, dep: str) -> Target:
+    var target = target_new(.Install, name, source).output(dest)
+    target = target.input(source)
+    target = target.arg(mode)
+    if dep.len() > 0:
+        target = target.dep(dep)
+    target
+
 pub fn build(b: Build) -> Build:
     var out = b
 
@@ -421,6 +429,45 @@ pub fn build(b: Build) -> Build:
     install_user = install_user.arg("0755")
     install_user = install_user.dep("build")
     out = out.add_target(install_user)
+
+    out = out.add_target(install_file_target("install-compiler", "out/bin/with-stage2", "$INSTALL_BINDIR/with", "0755", "stage2"))
+    out = out.add_target(install_file_target("install-rt-core", "out/lib/rt_core.o", "$INSTALL_LIBDIR/rt_core.o", "0644", "runtime"))
+    out = out.add_target(install_file_target("install-rt-darwin-aarch64", "out/lib/rt_darwin_aarch64.o", "$INSTALL_LIBDIR/rt_darwin_aarch64.o", "0644", "runtime"))
+    out = out.add_target(install_file_target("install-cimport-stubs", "out/lib/cimport_stubs.o", "$INSTALL_LIBDIR/cimport_stubs.o", "0644", "runtime"))
+    out = out.add_target(install_file_target("install-compat-runtime", "out/lib/compat_runtime.o", "$INSTALL_LIBDIR/compat_runtime.o", "0644", "runtime"))
+    out = out.add_target(install_file_target("install-panic-runtime", "out/lib/panic_runtime.o", "$INSTALL_LIBDIR/panic_runtime.o", "0644", "runtime"))
+    out = out.add_target(install_file_target("install-regex-runtime", "out/lib/regex_runtime.o", "$INSTALL_LIBDIR/regex_runtime.o", "0644", "runtime"))
+    out = out.add_target(install_file_target("install-fiber-stubs", "out/lib/fiber_stubs.o", "$INSTALL_LIBDIR/fiber_stubs.o", "0644", "runtime"))
+    out = out.add_target(install_file_target("install-channel-runtime", "out/lib/channel_runtime.o", "$INSTALL_LIBDIR/channel_runtime.o", "0644", "runtime"))
+    out = out.add_target(install_file_target("install-fiber-runtime", "out/lib/fiber_runtime.o", "$INSTALL_LIBDIR/fiber_runtime.o", "0644", "runtime"))
+    out = out.add_target(install_file_target("install-fiber-core", "out/lib/fiber.o", "$INSTALL_LIBDIR/fiber.o", "0644", "runtime"))
+    out = out.add_target(install_file_target("install-fiber-asm", "out/lib/fiber_asm.o", "$INSTALL_LIBDIR/fiber_asm.o", "0644", "runtime"))
+    out = out.add_target(install_file_target("install-embedded-objects", "out/lib/embedded_objects.o", "$INSTALL_LIBDIR/embedded_objects.o", "0644", "runtime"))
+    out = out.add_target(install_file_target("install-embedded-objects-asm", "out/lib/embedded_objects.s", "$INSTALL_LIBDIR/embedded_objects.s", "0644", "runtime"))
+    out = out.add_target(install_file_target("install-llvm-bridge", "out/lib/llvm_bridge.o", "$INSTALL_LIBDIR/llvm_bridge.o", "0644", "llvm-link-metadata"))
+    out = out.add_target(install_file_target("install-clang-bridge", "out/lib/clang_bridge.o", "$INSTALL_LIBDIR/clang_bridge.o", "0644", "llvm-link-metadata"))
+    out = out.add_target(install_file_target("install-llvm-link-rsp", "out/lib/llvm_link.rsp", "$INSTALL_LIBDIR/llvm_link.rsp", "0644", "llvm-link-metadata"))
+    out = out.add_target(install_file_target("install-llvm-cc", "out/lib/llvm_cc", "$INSTALL_LIBDIR/llvm_cc", "0644", "llvm-link-metadata"))
+    var install = target_new(.Group, "install", "")
+    install = install.dep("install-compiler")
+    install = install.dep("install-rt-core")
+    install = install.dep("install-rt-darwin-aarch64")
+    install = install.dep("install-cimport-stubs")
+    install = install.dep("install-compat-runtime")
+    install = install.dep("install-panic-runtime")
+    install = install.dep("install-regex-runtime")
+    install = install.dep("install-fiber-stubs")
+    install = install.dep("install-channel-runtime")
+    install = install.dep("install-fiber-runtime")
+    install = install.dep("install-fiber-core")
+    install = install.dep("install-fiber-asm")
+    install = install.dep("install-embedded-objects")
+    install = install.dep("install-embedded-objects-asm")
+    install = install.dep("install-llvm-bridge")
+    install = install.dep("install-clang-bridge")
+    install = install.dep("install-llvm-link-rsp")
+    install = install.dep("install-llvm-cc")
+    out = out.add_target(install)
 
     var update_seed = target_new(.Install, "update-seed", "out/bin/with-stage2").output("src/main")
     update_seed = update_seed.input("out/bin/with-stage2")

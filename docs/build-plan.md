@@ -240,12 +240,16 @@
     equivalent `with build :...` graph targets instead of exercising the old
     Make stage/runtime/fixpoint recipes. `make test` now builds through the
     graph path before running `with build :test`.
+  - `with build :install` now installs the stage2 compiler and runtime/link
+    object set through typed install nodes. It preserves Make-style `DESTDIR`,
+    `BINDIR`, and `PREFIX` path selection via `$INSTALL_BINDIR` and
+    `$INSTALL_LIBDIR`, and `make install` delegates to this graph target.
 
   Remaining:
 
   - Port seed, emit-c, and cross targets.
-  - Finish delegating remaining Make compatibility targets after seed,
-    install, emit-c, and cross graph paths are equivalent.
+  - Finish delegating remaining Make compatibility targets after seed, emit-c,
+    and cross graph paths are equivalent.
   - Remove Make recipes and obsolete scripts last.
 
   ## Key Changes
