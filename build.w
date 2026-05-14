@@ -343,6 +343,18 @@ pub fn build(b: Build) -> Build:
     pcre2_reference = pcre2_reference.arg("https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.47/pcre2-10.47.tar.gz")
     out = out.add_target(pcre2_reference)
 
+    var pcre2_migrate = target_new(43 as BuildKind, "pcre2-migrate", "out/bin/with").output("out/gen/.regex-migrate-stamp")
+    pcre2_migrate = pcre2_migrate.input("out/pcre2_reference/pcre2-10.47/src")
+    pcre2_migrate = pcre2_migrate.arg("out/pcre2_migrated")
+    pcre2_migrate = pcre2_migrate.arg("pcre2demo.c")
+    pcre2_migrate = pcre2_migrate.arg("pcre2grep.c")
+    pcre2_migrate = pcre2_migrate.arg("pcre2posix_test.c")
+    pcre2_migrate = pcre2_migrate.arg("pcre2_jit_test.c")
+    pcre2_migrate = pcre2_migrate.arg("pcre2_dftables.c")
+    pcre2_migrate = pcre2_migrate.arg("pcre2_fuzzsupport.c")
+    pcre2_migrate = pcre2_migrate.dep("pcre2-reference")
+    out = out.add_target(pcre2_migrate)
+
     var pcre2_build = target_new(29 as BuildKind, "pcre2-build", "out/bin/with").output("out/pcre2_build")
     pcre2_build = pcre2_build.input("out/pcre2_migrated")
     pcre2_build = pcre2_build.dep("build")

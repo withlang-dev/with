@@ -219,17 +219,17 @@
     typed graph node instead of `scripts/prepare_pcre2_reference.sh`. The
     manual Make `pcre2-migrate` path delegates reference preparation to this
     graph target.
+  - `with build :pcre2-migrate` now runs the pinned PCRE2 migration through a
+    typed manual graph node, rejects generated `c_export` attributes, publishes
+    the migrated tree only after the file-count check passes, and invalidates
+    stale `pcre2-build` output. The manual Make `pcre2-migrate` path delegates
+    to this graph target.
 
   Remaining:
 
   - Port clean-bootstrap runtime/link preparation into the graph path. Direct
     `with build :build` works after a normal repository build, but Make still
     owns bootstrap-time runtime/link metadata setup from a cold checkout.
-  - Port PCRE2 migration itself into a typed manual `pcre2-migrate` node;
-    download/source preparation, `pcre2-build`, `pcre2-test`,
-    generated-source checking, and promotion are typed. Migration must remain
-    manually triggered; normal test/build targets should consume existing
-    migrated output and fail loudly if it is missing.
   - Port seed, clean, emit-c, and cross targets.
   - Make Makefile delegate to `with build :...` only after direct graph paths are equivalent.
   - Remove Make recipes and obsolete scripts last.

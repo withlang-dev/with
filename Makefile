@@ -444,28 +444,7 @@ $(REGEX_PCRE2_READY): $(CANONICAL_BIN) | $(OUT_TMP_DIR)
 	@$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" build :pcre2-reference
 
 $(REGEX_MIGRATE_STAMP): $(CANONICAL_BIN) $(REGEX_PCRE2_READY) | $(OUT_GEN_DIR) $(OUT_TMP_DIR)
-	@set -euo pipefail; \
-	src="$(ROOT_DIR)/$(REGEX_PCRE2_SRC)"; \
-	out="$(ROOT_DIR)/$(REGEX_MIGRATE_DIR)"; \
-	tmp="$$out.tmp"; \
-	if [ ! -d "$$src" ]; then \
-		echo "error: missing PCRE2 source tree at $$src" >&2; \
-		exit 1; \
-	fi; \
-	rm -rf "$$tmp"; \
-	mkdir -p "$$tmp"; \
-	$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" migrate "$$src/" -o "$$tmp/" --no-c-export --prefer-brace --width-slice 8 --shared-defs std.re.defs $(foreach f,$(REGEX_EXCLUDED_C_SOURCES),--exclude $(f)) -I "$$src" -D PCRE2_CODE_UNIT_WIDTH=8 -D HAVE_CONFIG_H=1; \
-	count=$$(ls "$$tmp"/*.w 2>/dev/null | wc -l); \
-	if [ "$$count" -lt 30 ]; then \
-		echo "error: only $$count files migrated — expected at least 30" >&2; \
-		exit 1; \
-	fi; \
-	rm -rf "$$out" "$(ROOT_DIR)/out/pcre2_migrate_raw" "$(ROOT_DIR)/out/pcre2_generated"; \
-	mv "$$tmp" "$$out"; \
-	rm -f "$(REGEX_BUILD_STAMP)"; \
-	rm -rf "$(ROOT_DIR)/$(REGEX_BUILD_DIR)"; \
-	echo "migrated PCRE2: $$count .w files in $$out"; \
-	touch "$@"
+	@$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" build :pcre2-migrate
 
 $(REGEX_BUILD_STAMP): | $(OUT_GEN_DIR) $(OUT_TMP_DIR)
 	@$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" build :pcre2-build
