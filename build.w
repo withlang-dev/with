@@ -212,14 +212,6 @@ pub fn build(b: Build) -> Build:
     native_phase_tests = native_phase_tests.dep("selfcheck")
     out = out.add_target(native_phase_tests)
 
-    var legacy_cli_selfhost_tests = target_new(.Command, "legacy-cli-selfhost-tests", "/usr/bin/env")
-    legacy_cli_selfhost_tests = legacy_cli_selfhost_tests.input("scripts/run_cli_selfhost_tests.sh")
-    legacy_cli_selfhost_tests = legacy_cli_selfhost_tests.input("out/bin/with-stage2")
-    legacy_cli_selfhost_tests = legacy_cli_selfhost_tests.arg("WITH=out/bin/with-stage2")
-    legacy_cli_selfhost_tests = legacy_cli_selfhost_tests.arg("scripts/run_cli_selfhost_tests.sh")
-    legacy_cli_selfhost_tests = legacy_cli_selfhost_tests.dep("selfcheck")
-    out = out.add_target(legacy_cli_selfhost_tests)
-
     var cli_selfhost_smoke_tests = target_new(40 as BuildKind, "cli-selfhost-smoke-tests", "out/bin/with-stage2")
     cli_selfhost_smoke_tests = cli_selfhost_smoke_tests.arg("smoke")
     cli_selfhost_smoke_tests = cli_selfhost_smoke_tests.input("out/bin/with-stage2")
@@ -255,6 +247,12 @@ pub fn build(b: Build) -> Build:
     cli_selfhost_edge_tests = cli_selfhost_edge_tests.input("out/bin/with-stage2")
     cli_selfhost_edge_tests = cli_selfhost_edge_tests.dep("selfcheck")
     out = out.add_target(cli_selfhost_edge_tests)
+
+    var cli_selfhost_parallel_tests = target_new(40 as BuildKind, "cli-selfhost-parallel-tests", "out/bin/with-stage2")
+    cli_selfhost_parallel_tests = cli_selfhost_parallel_tests.arg("test-parallel")
+    cli_selfhost_parallel_tests = cli_selfhost_parallel_tests.input("out/bin/with-stage2")
+    cli_selfhost_parallel_tests = cli_selfhost_parallel_tests.dep("selfcheck")
+    out = out.add_target(cli_selfhost_parallel_tests)
 
     var c_migrator_pcre2_prep_tests = target_new(40 as BuildKind, "c-migrator-pcre2-prep-tests", "out/bin/with-stage2")
     c_migrator_pcre2_prep_tests = c_migrator_pcre2_prep_tests.arg("pcre2-prep")
@@ -302,6 +300,7 @@ pub fn build(b: Build) -> Build:
     tests = tests.dep("cli-selfhost-build-w-tests")
     tests = tests.dep("cli-selfhost-project-tests")
     tests = tests.dep("cli-selfhost-edge-tests")
+    tests = tests.dep("cli-selfhost-parallel-tests")
     tests = tests.dep("issue61-regression")
     tests = tests.dep("embedded-runtime-regression")
     out = out.add_target(tests)

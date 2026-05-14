@@ -2,6 +2,8 @@
 
 extern fn with_exec_argv_capture(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32) -> i32
 extern fn with_exec_argv_capture_cwd(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str) -> i32
+extern fn with_exec_argv_capture_spawn(args: str, stdout_path: str, stderr_path: str) -> i32
+extern fn with_exec_wait(pid: i32, timeout_ms: i32) -> i32
 extern fn with_exec_argv(args: str) -> i32
 extern fn with_getenv_str(name: str) -> str
 extern fn with_setenv_str(name: str, value: str) -> i32
@@ -26,6 +28,12 @@ pub fn build_graph_rt_exec_argv_capture(args: str, stdout_path: str, stderr_path
 
 pub fn build_graph_rt_exec_argv_capture_cwd(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str) -> i32:
     with_exec_argv_capture_cwd(args, stdout_path, stderr_path, timeout_ms, cwd)
+
+pub fn build_graph_rt_exec_argv_capture_spawn(args: str, stdout_path: str, stderr_path: str) -> i32:
+    with_exec_argv_capture_spawn(args, stdout_path, stderr_path)
+
+pub fn build_graph_rt_exec_wait(pid: i32, timeout_ms: i32) -> i32:
+    with_exec_wait(pid, timeout_ms)
 
 pub fn build_graph_rt_getenv(name: str) -> str:
     with_getenv_str(name)
