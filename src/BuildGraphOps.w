@@ -575,6 +575,123 @@ pub fn build_graph_expand_install_path(root: str, path: str) -> str:
             return build_graph_resolve_project_path(root, resolve_join(install_libdir, path.slice(16, path.len())))
     build_graph_resolve_project_path(root, path)
 
+fn build_graph_json_line_value(line: str, key: str) -> str:
+    let marker = "\"" ++ key ++ "\":"
+    var pos = -1
+    var i = 0
+    while i <= line.len() as i32 - marker.len() as i32:
+        if line.slice(i as i64, (i + marker.len() as i32) as i64) == marker:
+            pos = i + marker.len() as i32
+            break
+        i = i + 1
+    if pos < 0:
+        return ""
+    while pos < line.len() as i32:
+        let ch = line.byte_at(pos as i64)
+        if ch != 32 and ch != 9:
+            break
+        pos = pos + 1
+    if pos >= line.len() as i32 or line.byte_at(pos as i64) != 34:
+        return ""
+    let start = pos + 1
+    var end = start
+    var escaped = false
+    while end < line.len() as i32:
+        let ch = line.byte_at(end as i64)
+        if escaped:
+            escaped = false
+        else if ch == 92:
+            escaped = true
+        else if ch == 34:
+            return line.slice(start as i64, end as i64)
+        end = end + 1
+    ""
+
+fn build_graph_seed_release_from_api(root: str, target_name: str, repo: str, asset_name: str) -> str:
+    let tmp_dir = resolve_join(root, "out/tmp")
+    if build_graph_rt_mkdir_p(tmp_dir) != 0:
+        return ""
+    let stamp = f"{build_graph_rt_getpid()}.{build_graph_rt_clock_nanos()}"
+    let body_path = resolve_join(tmp_dir, "seed-releases." ++ stamp ++ ".json")
+    let stdout_path = resolve_join(tmp_dir, "seed-releases." ++ stamp ++ ".stdout")
+    let err_path = body_path ++ ".stderr"
+    var argv = ""
+    argv = build_graph_argv_append(argv, build_graph_curl_tool().executable)
+    argv = build_graph_argv_append(argv, "-L")
+    argv = build_graph_argv_append(argv, "--fail")
+    argv = build_graph_argv_append(argv, "--show-error")
+    argv = build_graph_argv_append(argv, "--output")
+    argv = build_graph_argv_append(argv, body_path)
+    argv = build_graph_argv_append(argv, "https://api.github.com/repos/" ++ repo ++ "/releases?per_page=10")
+    let rc = build_graph_rt_exec_argv_capture(argv, stdout_path, err_path, 120000)
+    if rc != 0:
+        build_graph_rt_eprint("error: seed_download target '" ++ target_name ++ f"' could not query releases for {repo}; curl exit code {rc}; stderr=" ++ err_path)
+        return ""
+    let body = build_graph_rt_read_file(body_path)
+    let _remove_body = build_graph_rt_remove_file(body_path)
+    let _remove_stdout = build_graph_rt_remove_file(stdout_path)
+    let _remove_err = build_graph_rt_remove_file(err_path)
+    let lines = build_graph_split_nonempty_lines(body)
+    var current_tag = ""
+    for li in 0..lines.len() as i32:
+        let line = lines.get(li as i64)
+        let tag = build_graph_json_line_value(line, "tag_name")
+        if tag.len() > 0:
+            current_tag = tag
+        let name = build_graph_json_line_value(line, "name")
+        if current_tag.len() > 0 and name == asset_name:
+            return current_tag
+    ""
+
+pub fn build_graph_run_seed_download(root: str, target: BuildGraphTarget) -> i32:
+    if target.entry.len() == 0 or target.output.len() == 0:
+        build_graph_rt_eprint("error: seed_download target '" ++ target.name ++ "' requires repo entry and output path")
+        return 1
+    let arg_rc = build_graph_validate_process_args(target)
+    if arg_rc != 0:
+        return arg_rc
+    let asset_name = if target.args.len() > 0: target.args.get(0) else: "main"
+    let output_path = build_graph_resolve_project_path(root, target.output)
+    if build_graph_rt_file_exists(output_path) != 0:
+        build_graph_rt_write("seed binary already exists: " ++ target.output ++ "\n")
+        build_graph_rt_write("remove it first if you want to re-download\n")
+        return 0
+    var tag = build_graph_rt_getenv("SEED_VERSION")
+    if tag.len() == 0:
+        tag = build_graph_seed_release_from_api(root, target.name, target.entry, asset_name)
+        if tag.len() == 0:
+            build_graph_rt_eprint("error: seed_download target '" ++ target.name ++ "' could not find a release containing asset '" ++ asset_name ++ "'")
+            build_graph_rt_eprint("set SEED_VERSION to a release tag to download a specific seed")
+            return 1
+        build_graph_rt_write("latest seed release: " ++ tag ++ "\n")
+    let url = "https://github.com/" ++ target.entry ++ "/releases/download/" ++ tag ++ "/" ++ asset_name
+    if build_graph_rt_mkdir_p(build_graph_dirname(output_path)) != 0:
+        build_graph_rt_eprint("error: seed_download target '" ++ target.name ++ "' could not create output directory: " ++ build_graph_dirname(output_path))
+        return 1
+    let tmp_path = output_path ++ ".tmp." ++ f"{build_graph_rt_getpid()}.{build_graph_rt_clock_nanos()}"
+    let _remove_tmp = build_graph_rt_remove_file(tmp_path)
+    build_graph_rt_write("downloading seed from: " ++ url ++ "\n")
+    var curl_argv = ""
+    curl_argv = build_graph_argv_append(curl_argv, build_graph_curl_tool().executable)
+    curl_argv = build_graph_argv_append(curl_argv, "-L")
+    curl_argv = build_graph_argv_append(curl_argv, "--fail")
+    curl_argv = build_graph_argv_append(curl_argv, "--show-error")
+    curl_argv = build_graph_argv_append(curl_argv, "--output")
+    curl_argv = build_graph_argv_append(curl_argv, tmp_path)
+    curl_argv = build_graph_argv_append(curl_argv, url)
+    let curl_rc = build_graph_rt_exec_argv(curl_argv)
+    if curl_rc != 0:
+        build_graph_rt_eprint("error: seed_download target '" ++ target.name ++ f"' curl failed with exit code {curl_rc}")
+        return if curl_rc == 0: 1 else: curl_rc
+    if build_graph_rt_rename_file(tmp_path, output_path) != 0:
+        build_graph_rt_eprint("error: seed_download target '" ++ target.name ++ "' could not publish seed: " ++ output_path)
+        return 1
+    if build_graph_rt_chmod(output_path, 0o755) != 0:
+        build_graph_rt_eprint("error: seed_download target '" ++ target.name ++ "' could not chmod seed: " ++ output_path)
+        return 1
+    build_graph_rt_write("seed installed: " ++ target.output ++ "\n")
+    0
+
 fn build_graph_env_or_default(name: str, default_value: str) -> str:
     let value = build_graph_rt_getenv(name)
     if value.len() > 0:

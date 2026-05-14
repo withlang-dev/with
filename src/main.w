@@ -2254,6 +2254,12 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
                 return clean_rc
             completed_targets.push(target.name)
             continue
+        if target.kind == 45:
+            let seed_rc = build_graph_run_seed_download(root, target)
+            if seed_rc != 0:
+                return seed_rc
+            completed_targets.push(target.name)
+            continue
         if target.kind == 7:
             let command_rc = build_graph_run_command(root, target)
             if command_rc != 0:
