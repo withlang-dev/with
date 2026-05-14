@@ -2,6 +2,7 @@ extern fn with_system(cmd: str) -> i32
 extern fn with_arg_at(idx: i32) -> str
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_fs_write_file(path: str, data: str) -> i32
+extern fn with_fs_mkdir_p(path: str) -> i32
 extern fn with_eprint(s: str) -> void
 extern fn with_getenv_str(name: str) -> str
 
@@ -189,13 +190,16 @@ fn link_stage_resolve_runtime_root() -> str:
     // the active tree instead of whatever stdlib/runtime payload the seed
     // binary happens to carry.
     candidates.push(link_stage_artifact_root() ++ "/lib")
+    // Seed-built bootstrap runtime for cold direct `with build` invocations.
+    // The canonical stage2-refreshed runtime overwrites out/lib later.
+    candidates.push(link_stage_artifact_root() ++ "/bootstrap-lib")
     // <compiler_dir>/runtime/ (symlink to ../lib in out/bin/)
     candidates.push(compiler_dir ++ "/runtime")
     // <compiler_dir>/../lib/ (direct FHS-style path)
     candidates.push(compiler_dir ++ "/../lib")
     for i in 0..candidates.len() as i32:
         let dir = candidates.get(i as i64)
-        let probe = dir ++ "/helpers.o"
+        let probe = dir ++ "/cimport_stubs.o"
         if with_fs_read_file(probe).len() > 0:
             return dir
     // Fall back to compiler-relative runtime dir.
@@ -233,7 +237,8 @@ fn link_stage_find_runtime_object_path(name: str) -> str:
         return p
     // Fall back to embedded runtime objects (self-contained binary)
     let tmp_dir = link_stage_artifact_root() ++ "/tmp/with_runtime"
-    let _ = ("mkdir -p " ++ tmp_dir) |> with_system
+    if with_fs_mkdir_p(tmp_dir) != 0:
+        return ""
     let tmp_path = tmp_dir ++ "/" ++ name
     if link_stage_extract_runtime_obj(name, tmp_path) == 0:
         return tmp_path
@@ -255,7 +260,7 @@ fn link_stage_make_archive_to_path(obj_path: str, ar_path: str) -> str:
 fn link_stage_should_use_rt_core_from_undef(undef: str) -> bool:
     // Use the libc-free runtime for user programs that don't need LLVM bridge
     // or c_import. The compiler itself (which needs wl_* symbols) always uses
-    // the libc-backed helpers.o runtime.
+    // the libc-backed cimport_stubs.o runtime.
     if undef == "<probe-failed>":
         return false
     // If it needs LLVM bridge, it's the compiler — use libc runtime
@@ -403,7 +408,7 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
         else if needs_llvm:
             // Compiler build (lld path) — rt_core.o provides the runtime,
             // compat_runtime.o has libc-dependent functions (system, signals),
-            // helpers.o has c_import/fiber weak stubs.
+            // cimport_stubs.o has c_import/fiber weak stubs.
             let rt_core_path = link_stage_find_runtime_object_path("rt_core.o")
             if rt_core_path.len() == 0:
                 with_eprint("error: missing rt_core.o")
@@ -438,13 +443,13 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
                 extras.push(fiber_stubs_path)
             let helpers_path = link_stage_find_runtime_object_path("cimport_stubs.o")
             if helpers_path.len() == 0:
-                with_eprint("error: missing runtime/helpers.o")
+                with_eprint("error: missing runtime/cimport_stubs.o")
                 return false
             extras.push(helpers_path)
         else:
             // User program with c_import (cc/Apple ld64 path) — rt_core.o first,
-            // then helpers as archive. Apple's ld64 resolves archives correctly:
-            // rt_core.o definitions win, helpers.a fills in C-only symbols.
+            // then cimport_stubs as archive. Apple's ld64 resolves archives correctly:
+            // rt_core.o definitions win, cimport_stubs.a fills in C-only symbols.
             let rt_core_path = link_stage_find_runtime_object_path("rt_core.o")
             if rt_core_path.len() == 0:
                 with_eprint("error: missing rt_core.o")
@@ -477,7 +482,7 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
                 extras.push(if fiber_stubs_ar.len() > 0: fiber_stubs_ar else: fiber_stubs_path)
             let helpers_path = link_stage_find_runtime_object_path("cimport_stubs.o")
             if helpers_path.len() == 0:
-                with_eprint("error: missing runtime/helpers.o")
+                with_eprint("error: missing runtime/cimport_stubs.o")
                 return false
             let helpers_ar = link_stage_make_archive(helpers_path)
             extras.push(if helpers_ar.len() > 0: helpers_ar else: helpers_path)

@@ -210,9 +210,16 @@
   - `with build :llvm-link-metadata` now compiles `rt/llvm_bridge.w` and
     `rt/clang_bridge.w` through graph nodes and regenerates
     `out/lib/llvm_link.rsp`, `out/lib/llvm_cc`, and
-    `out/lib/.llvm-link-ready` through a typed metadata node. `stage1` now
-    depends on this graph node, so direct graph builds no longer rely on stale
-    Make-generated LLVM bridge metadata.
+    `out/lib/.llvm-link-ready` through a typed metadata node.
+  - `with build :stage1` now depends on a seed-built bootstrap runtime root in
+    `out/bootstrap-lib`, including runtime objects, LLVM bridge metadata, and
+    embedded runtime objects. A cold direct graph build no longer relies on
+    Make's `helpers.o` compatibility symlink, `out/bin/runtime` symlink, or
+    stale `out/lib` runtime artifacts.
+  - `with build :build` explicitly depends on normal `out/lib` LLVM link
+    metadata before producing the canonical compiler, so the graph path has a
+    complete runtime/link root for both bootstrap stages and the final
+    stage2-built compiler.
   - `with build :pcre2-reference` now fetches/extracts the pinned PCRE2
     release when needed, prepares `pcre2.h`, `config.h`, and
     `pcre2_chartables.c`, and normalizes the heap corpus expectation through a
@@ -231,10 +238,7 @@
 
   Remaining:
 
-  - Port clean-bootstrap runtime/link preparation into the graph path. Direct
-    `with build :build` works after a normal repository build, but Make still
-    owns bootstrap-time runtime/link metadata setup from a cold checkout.
-  - Port seed, clean, emit-c, and cross targets.
+  - Port seed, emit-c, and cross targets.
   - Make Makefile delegate to `with build :...` only after direct graph paths are equivalent.
   - Remove Make recipes and obsolete scripts last.
 

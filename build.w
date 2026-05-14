@@ -1,5 +1,23 @@
 use std.build
 
+fn with_object_target(name: str, compiler: str, source: str, output: str, opt: str, dep: str) -> Target:
+    var target = target_new(.WithCompilerBuild, name, compiler).output(output)
+    target = target.input(source)
+    target = target.arg("--emit-obj")
+    target = target.arg("--no-prelude")
+    target = target.arg(opt)
+    if dep.len() > 0:
+        target = target.dep(dep)
+    target
+
+fn with_ir_target(name: str, compiler: str, source: str, output: str, dep: str) -> Target:
+    var target = target_new(.WithCompilerIr, name, compiler).output(output)
+    target = target.input(source)
+    target = target.arg("--no-prelude")
+    if dep.len() > 0:
+        target = target.dep(dep)
+    target
+
 pub fn build(b: Build) -> Build:
     var out = b
 
@@ -12,6 +30,76 @@ pub fn build(b: Build) -> Build:
 
     var compat_runtime = target_new(33 as BuildKind, "compat-runtime-source", "rt/compat_runtime.w").output("out/gen/compat_runtime.w")
     out = out.add_target(compat_runtime)
+
+    out = out.add_target(with_object_target("bootstrap-llvm-bridge-object", "seed", "rt/llvm_bridge.w", "out/bootstrap-lib/llvm_bridge.o", "-O0", ""))
+    out = out.add_target(with_object_target("bootstrap-clang-bridge-object", "seed", "rt/clang_bridge.w", "out/bootstrap-lib/clang_bridge.o", "-O0", ""))
+
+    var bootstrap_llvm_link_metadata = target_new(41 as BuildKind, "bootstrap-llvm-link-metadata", "").output("out/bootstrap-lib/.llvm-link-ready")
+    bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.input("out/bootstrap-lib/llvm_bridge.o")
+    bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.input("out/bootstrap-lib/clang_bridge.o")
+    bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.dep("bootstrap-llvm-bridge-object")
+    bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.dep("bootstrap-clang-bridge-object")
+    out = out.add_target(bootstrap_llvm_link_metadata)
+
+    out = out.add_target(with_object_target("bootstrap-rt-core-object", "seed", "rt/rt_core.w", "out/bootstrap-lib/rt_core.o", "-O2", ""))
+    out = out.add_target(with_object_target("bootstrap-rt-darwin-aarch64-object", "seed", "rt/darwin_aarch64.w", "out/bootstrap-lib/rt_darwin_aarch64.o", "-O2", ""))
+    out = out.add_target(with_object_target("bootstrap-cimport-stubs-object", "seed", "rt/cimport_stubs.w", "out/bootstrap-lib/cimport_stubs.o", "-O0", ""))
+    out = out.add_target(with_object_target("bootstrap-compat-runtime-object", "seed", "out/gen/compat_runtime.w", "out/bootstrap-lib/compat_runtime.o", "-O0", "compat-runtime-source"))
+    out = out.add_target(with_object_target("bootstrap-panic-runtime-object", "seed", "rt/panic_runtime.w", "out/bootstrap-lib/panic_runtime.o", "-O0", ""))
+    out = out.add_target(with_ir_target("bootstrap-regex-runtime-ir", "seed", "rt/regex_runtime.w", "out/bootstrap-tmp/regex_runtime.ll", ""))
+    var bootstrap_regex_runtime = target_new(.CompileLlvmIrObject, "bootstrap-regex-runtime-object", "out/bootstrap-tmp/regex_runtime.ll").output("out/bootstrap-lib/regex_runtime.o")
+    bootstrap_regex_runtime = bootstrap_regex_runtime.dep("bootstrap-regex-runtime-ir")
+    out = out.add_target(bootstrap_regex_runtime)
+    out = out.add_target(with_object_target("bootstrap-fiber-stubs-object", "seed", "rt/fiber_stubs.w", "out/bootstrap-lib/fiber_stubs.o", "-O0", ""))
+    out = out.add_target(with_object_target("bootstrap-channel-runtime-object", "seed", "rt/channel_runtime.w", "out/bootstrap-lib/channel_runtime.o", "-O0", ""))
+    out = out.add_target(with_object_target("bootstrap-fiber-runtime-object", "seed", "rt/fiber_runtime.w", "out/bootstrap-lib/fiber_runtime.o", "-O0", ""))
+    out = out.add_target(with_object_target("bootstrap-fiber-core-object", "seed", "rt/fiber_core_darwin.w", "out/bootstrap-lib/fiber.o", "-O0", ""))
+    var bootstrap_fiber_asm = target_new(.CompileAsmObject, "bootstrap-fiber-asm-object", "runtime/fiber_asm_aarch64.s").output("out/bootstrap-lib/fiber_asm.o")
+    out = out.add_target(bootstrap_fiber_asm)
+
+    var bootstrap_embedded_objects = target_new(.EmbedObjectFiles, "bootstrap-embedded-objects-asm", "").output("out/bootstrap-lib/embedded_objects.s")
+    bootstrap_embedded_objects = bootstrap_embedded_objects.input("out/bootstrap-lib/cimport_stubs.o")
+    bootstrap_embedded_objects = bootstrap_embedded_objects.arg("cimport_stubs_o")
+    bootstrap_embedded_objects = bootstrap_embedded_objects.input("out/bootstrap-lib/compat_runtime.o")
+    bootstrap_embedded_objects = bootstrap_embedded_objects.arg("compat_runtime_o")
+    bootstrap_embedded_objects = bootstrap_embedded_objects.input("out/bootstrap-lib/panic_runtime.o")
+    bootstrap_embedded_objects = bootstrap_embedded_objects.arg("panic_runtime_o")
+    bootstrap_embedded_objects = bootstrap_embedded_objects.input("out/bootstrap-lib/regex_runtime.o")
+    bootstrap_embedded_objects = bootstrap_embedded_objects.arg("regex_runtime_o")
+    bootstrap_embedded_objects = bootstrap_embedded_objects.input("out/bootstrap-lib/fiber_stubs.o")
+    bootstrap_embedded_objects = bootstrap_embedded_objects.arg("fiber_stubs_o")
+    bootstrap_embedded_objects = bootstrap_embedded_objects.input("out/bootstrap-lib/channel_runtime.o")
+    bootstrap_embedded_objects = bootstrap_embedded_objects.arg("channel_runtime_o")
+    bootstrap_embedded_objects = bootstrap_embedded_objects.input("out/bootstrap-lib/fiber_runtime.o")
+    bootstrap_embedded_objects = bootstrap_embedded_objects.arg("fiber_runtime_o")
+    bootstrap_embedded_objects = bootstrap_embedded_objects.input("out/bootstrap-lib/fiber.o")
+    bootstrap_embedded_objects = bootstrap_embedded_objects.arg("fiber_o")
+    bootstrap_embedded_objects = bootstrap_embedded_objects.input("out/bootstrap-lib/fiber_asm.o")
+    bootstrap_embedded_objects = bootstrap_embedded_objects.arg("fiber_asm_o")
+    bootstrap_embedded_objects = bootstrap_embedded_objects.input("out/bootstrap-lib/rt_core.o")
+    bootstrap_embedded_objects = bootstrap_embedded_objects.arg("rt_core_o")
+    bootstrap_embedded_objects = bootstrap_embedded_objects.input("out/bootstrap-lib/rt_darwin_aarch64.o")
+    bootstrap_embedded_objects = bootstrap_embedded_objects.arg("rt_darwin_aarch64_o")
+    out = out.add_target(bootstrap_embedded_objects)
+    var bootstrap_embedded_objects_obj = target_new(.CompileAsmObject, "bootstrap-embedded-objects-object", "out/bootstrap-lib/embedded_objects.s").output("out/bootstrap-lib/embedded_objects.o")
+    bootstrap_embedded_objects_obj = bootstrap_embedded_objects_obj.dep("bootstrap-embedded-objects-asm")
+    out = out.add_target(bootstrap_embedded_objects_obj)
+
+    var bootstrap_runtime = target_new(.Group, "bootstrap-runtime", "")
+    bootstrap_runtime = bootstrap_runtime.dep("bootstrap-llvm-link-metadata")
+    bootstrap_runtime = bootstrap_runtime.dep("bootstrap-rt-core-object")
+    bootstrap_runtime = bootstrap_runtime.dep("bootstrap-rt-darwin-aarch64-object")
+    bootstrap_runtime = bootstrap_runtime.dep("bootstrap-cimport-stubs-object")
+    bootstrap_runtime = bootstrap_runtime.dep("bootstrap-compat-runtime-object")
+    bootstrap_runtime = bootstrap_runtime.dep("bootstrap-panic-runtime-object")
+    bootstrap_runtime = bootstrap_runtime.dep("bootstrap-regex-runtime-object")
+    bootstrap_runtime = bootstrap_runtime.dep("bootstrap-fiber-stubs-object")
+    bootstrap_runtime = bootstrap_runtime.dep("bootstrap-channel-runtime-object")
+    bootstrap_runtime = bootstrap_runtime.dep("bootstrap-fiber-runtime-object")
+    bootstrap_runtime = bootstrap_runtime.dep("bootstrap-fiber-core-object")
+    bootstrap_runtime = bootstrap_runtime.dep("bootstrap-fiber-asm-object")
+    bootstrap_runtime = bootstrap_runtime.dep("bootstrap-embedded-objects-object")
+    out = out.add_target(bootstrap_runtime)
 
     var llvm_bridge = target_new(.WithCompilerBuild, "llvm-bridge-object", "seed").output("out/lib/llvm_bridge.o")
     llvm_bridge = llvm_bridge.input("rt/llvm_bridge.w")
@@ -39,7 +127,7 @@ pub fn build(b: Build) -> Build:
     stage1 = stage1.arg("-O0")
     stage1 = stage1.dep("compiler-sources")
     stage1 = stage1.dep("compat-runtime-source")
-    stage1 = stage1.dep("llvm-link-metadata")
+    stage1 = stage1.dep("bootstrap-runtime")
     out = out.add_target(stage1)
 
     var stage2 = target_new(.WithCompilerBuild, "stage2", "out/bin/with-stage1").output("out/bin/with-stage2")
@@ -210,6 +298,7 @@ pub fn build(b: Build) -> Build:
     var compiler = target_new(.WithCompilerBuild, "build", "out/bin/with-stage2").output("out/bin/with")
     compiler = compiler.input("out/gen/main.w")
     compiler = compiler.arg("-O0")
+    compiler = compiler.dep("llvm-link-metadata")
     compiler = compiler.dep("embedded-objects-object")
     out = out.add_target(compiler)
 
