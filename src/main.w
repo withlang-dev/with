@@ -1026,6 +1026,14 @@ fn build_graph_run_selfhost_noop_local_regression(root: str, target: BuildGraphT
     let ln_rc = build_graph_run_tool_capture(root, target, "ln-lib", ln_argv, 60000)
     if ln_rc != 0:
         return ln_rc
+    let embedded_src = resolve_join(root, "out/gen/compiler/EmbeddedStdlibData.w")
+    let embedded_dst = resolve_join(repo_copy, "out/gen/compiler/EmbeddedStdlibData.w")
+    if with_fs_mkdir_p(build_graph_dirname(embedded_dst)) != 0:
+        with_eprint("error: selfhost_noop_local_regression target '" ++ target.name ++ "' could not create embedded stdlib data directory")
+        return 1
+    if with_fs_write_file(embedded_dst, with_fs_read_file(embedded_src)) != 0:
+        with_eprint("error: selfhost_noop_local_regression target '" ++ target.name ++ "' could not copy embedded stdlib data module")
+        return 1
     let sema_path = resolve_join(resolve_join(repo_copy, "src"), "SemaCheck.w")
     let sema_text = with_fs_read_file(sema_path)
     let marker = "    // Check all arguments (with expected-type propagation for Atomic ordering params)"

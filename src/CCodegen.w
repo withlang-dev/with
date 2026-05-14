@@ -5057,9 +5057,7 @@ fn CCodegen.emit_module(self: CCodegen) -> str:
     out = out ++ "extern with_str with_sysinfo_os(void);\n"
     out = out ++ "extern with_str with_sysinfo_arch(void);\n"
     out = out ++ "extern with_str with_str_trim(with_str);\n"
-    out = out ++ "extern with_str with_str_clone(with_str);\n"
-    out = out ++ "extern with_str with_embedded_std_source(with_str);\n"
-    out = out ++ "extern with_str with_embedded_std_list_modules(void);\n\n"
+    out = out ++ "extern with_str with_str_clone(with_str);\n\n"
 
     out = out ++ self.emit_struct_type_defs()
     if self.had_error != 0:

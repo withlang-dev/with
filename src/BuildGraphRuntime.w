@@ -217,8 +217,7 @@ fn bgr_generate_embedded_stdlib(root: str, target_name: str, files: Vec[str]) ->
             listing = listing ++ "\n"
         listing = listing ++ rel
     out = out ++ "let EMBEDDED_STD_MODULE_LIST: str = " ++ bgr_raw_string_literal(listing) ++ "\n\n"
-    out = out ++ "@[c_export(\"with_embedded_std_source\")]\n"
-    out = out ++ "pub fn embedded_std_source(path: str) -> str:\n"
+    out = out ++ "pub fn embedded_std_source_data(path: str) -> str:\n"
     for i in 0..files.len() as i32:
         let path = files.get(i as i64)
         let rel = bgr_embedded_rel_path(root, path)
@@ -226,8 +225,7 @@ fn bgr_generate_embedded_stdlib(root: str, target_name: str, files: Vec[str]) ->
         out = out ++ "    if path == " ++ bgr_raw_string_literal(rel) ++ ":\n"
         out = out ++ "        return " ++ sym ++ "\n"
     out = out ++ "    return \"\"\n\n"
-    out = out ++ "@[c_export(\"with_embedded_std_list_modules\")]\n"
-    out = out ++ "pub fn embedded_std_list_modules() -> str:\n"
+    out = out ++ "pub fn embedded_std_list_modules_data() -> str:\n"
     out = out ++ "    return EMBEDDED_STD_MODULE_LIST\n"
     out
 
@@ -255,11 +253,15 @@ pub fn run_generate_compat_runtime(root: str, target_name: str, compat_source_re
     if compat_text.len() == 0:
         with_eprint("error: generate_compat_runtime target '" ++ target_name ++ "' could not read source: " ++ compat_source)
         return 1
-    let embedded_path = bgr_resolve_join(root, "out/gen/embedded_stdlib_runtime.w")
+    let embedded_path = bgr_resolve_join(root, "out/gen/compiler/EmbeddedStdlibData.w")
+    let embedded_dir = bgr_dirname(embedded_path)
+    if with_fs_mkdir_p(embedded_dir) != 0:
+        with_eprint("error: generate_compat_runtime target '" ++ target_name ++ "' could not create output directory: " ++ embedded_dir)
+        return 1
     if with_fs_write_file(embedded_path, embedded) != 0:
         with_eprint("error: generate_compat_runtime target '" ++ target_name ++ "' could not write: " ++ embedded_path)
         return 1
-    if with_fs_write_file(output_path, compat_text ++ embedded) != 0:
+    if with_fs_write_file(output_path, compat_text) != 0:
         with_eprint("error: generate_compat_runtime target '" ++ target_name ++ "' could not write: " ++ output_path)
         return 1
     0
