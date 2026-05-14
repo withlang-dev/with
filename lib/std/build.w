@@ -41,7 +41,7 @@ pub enum BuildKind: i32:
     WithCompilerIr = 34
     CliSelfhostProjectTest = 35
     CliSelfhostEdgeTest = 36
-    CliSelfhostRegexPrepTest = 37
+    CliSelfhostPcre2PrepTest = 37
     CliSelfhostMigrateBasicTest = 38
     CliSelfhostMigrateCoreTest = 39
     SelfhostSuiteTest = 40
@@ -252,8 +252,8 @@ pub fn Build.cli_selfhost_edge_test(self: Build, name: str, compiler: str) -> Bu
     let target = target_new(.CliSelfhostEdgeTest, name, compiler)
     self.add_target(target)
 
-pub fn Build.cli_selfhost_regex_prep_test(self: Build, name: str, compiler: str) -> Build:
-    let target = target_new(.CliSelfhostRegexPrepTest, name, compiler)
+pub fn Build.cli_selfhost_pcre2_prep_test(self: Build, name: str, compiler: str) -> Build:
+    let target = target_new(.CliSelfhostPcre2PrepTest, name, compiler)
     self.add_target(target)
 
 pub fn Build.cli_selfhost_migrate_basic_test(self: Build, name: str, compiler: str) -> Build:

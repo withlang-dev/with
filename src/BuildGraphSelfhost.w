@@ -202,30 +202,30 @@ pub fn run_cli_selfhost_edge_test(root: str, target_name: str, compiler_path: st
 fn bgs_regex_assert_contains(text: str, needle: str, target_name: str, label: str) -> i32:
     if with_str_contains(text, needle) != 0:
         return 0
-    with_eprint("error: cli_selfhost_regex_prep_test target '" ++ target_name ++ "' missing expected output for " ++ label ++ ": " ++ needle)
+    with_eprint("error: cli_selfhost_pcre2_prep_test target '" ++ target_name ++ "' missing expected output for " ++ label ++ ": " ++ needle)
     1
 
 fn bgs_regex_assert_not_contains(text: str, needle: str, target_name: str, label: str) -> i32:
     if with_str_contains(text, needle) == 0:
         return 0
-    with_eprint("error: cli_selfhost_regex_prep_test target '" ++ target_name ++ "' found forbidden output for " ++ label ++ ": " ++ needle)
+    with_eprint("error: cli_selfhost_pcre2_prep_test target '" ++ target_name ++ "' found forbidden output for " ++ label ++ ": " ++ needle)
     1
 
 fn bgs_regex_file_contains(path: str, needle: str, target_name: str, label: str) -> i32:
     if with_fs_file_exists(path) == 0:
-        with_eprint("error: cli_selfhost_regex_prep_test target '" ++ target_name ++ "' missing file for " ++ label ++ ": " ++ path)
+        with_eprint("error: cli_selfhost_pcre2_prep_test target '" ++ target_name ++ "' missing file for " ++ label ++ ": " ++ path)
         return 1
     bgs_regex_assert_contains(with_fs_read_file(path), needle, target_name, label)
 
 fn bgs_regex_file_forbids(path: str, needle: str, target_name: str, label: str) -> i32:
     if with_fs_file_exists(path) == 0:
-        with_eprint("error: cli_selfhost_regex_prep_test target '" ++ target_name ++ "' missing file for " ++ label ++ ": " ++ path)
+        with_eprint("error: cli_selfhost_pcre2_prep_test target '" ++ target_name ++ "' missing file for " ++ label ++ ": " ++ path)
         return 1
     bgs_regex_assert_not_contains(with_fs_read_file(path), needle, target_name, label)
 
 fn bgs_copy_fixture_file(src: str, dst: str, target_name: str, label: str) -> i32:
     if with_fs_file_exists(src) == 0:
-        with_eprint("error: cli_selfhost_regex_prep_test target '" ++ target_name ++ "' missing source file for " ++ label ++ ": " ++ src)
+        with_eprint("error: cli_selfhost_pcre2_prep_test target '" ++ target_name ++ "' missing source file for " ++ label ++ ": " ++ src)
         return 1
     bgs_write_fixture(dst, with_fs_read_file(src), target_name, label)
 
@@ -245,7 +245,7 @@ fn bgs_drop_first_lines(text: str, count: i32) -> str:
 fn bgs_regex_expect_success(root: str, target_name: str, compiler_path: str, case_dir: str, label: str, argv_tail: str) -> BuildSelfhostRunResult:
     let result = bgs_run_cli_capture_cwd(root, target_name, compiler_path, label, argv_tail, 180000, case_dir)
     if result.rc != 0:
-        with_eprint("error: regex prep selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
+        with_eprint("error: pcre2 prep selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
     result
 
 fn bgs_check_pcre2_defs_prune_ebcdic_tables(root: str, target_name: str) -> i32:
@@ -360,7 +360,7 @@ fn bgs_check_opaque_field_access_rejected(root: str, target_name: str, compiler_
     if rc != 0: return rc
     let result = bgs_run_cli_capture_cwd(root, target_name, compiler_path, "opaque-field-access", bgs_argv_append(bgs_argv_append("", "check"), src), 120000, base_dir)
     if result.rc == 0:
-        with_eprint("error: cli_selfhost_regex_prep_test target '" ++ target_name ++ "' accepted opaque field access")
+        with_eprint("error: cli_selfhost_pcre2_prep_test target '" ++ target_name ++ "' accepted opaque field access")
         return 1
     bgs_regex_assert_contains(result.stderr, "field access requires a concrete struct or union type; this type is opaque", target_name, "opaque_field_access")
 
@@ -396,7 +396,7 @@ fn bgs_check_pcre2_compile_builds(root: str, target_name: str, compiler_path: st
     rc = bgs_regex_assert_not_contains(result.stderr, "AST codegen was removed", target_name, "pcre2 compile builds")
     if rc != 0: return rc
     if with_fs_file_exists(bin) == 0:
-        with_eprint("error: cli_selfhost_regex_prep_test target '" ++ target_name ++ "' missing pcre2_compile_builds output: " ++ bin)
+        with_eprint("error: cli_selfhost_pcre2_prep_test target '" ++ target_name ++ "' missing pcre2_compile_builds output: " ++ bin)
         return 1
     0
 
@@ -432,7 +432,7 @@ fn bgs_check_pcre2_generated_existing_main(root: str, target_name: str, compiler
     if result.rc != 0: return if result.rc == 0: 1 else: result.rc
     bgs_regex_assert_contains(result.stdout, "OK=2 TOTAL_ERRORS=0", target_name, "pcre2_check_existing_main")
 
-pub fn run_cli_selfhost_regex_prep_test(root: str, target_name: str, compiler_path: str) -> i32:
+pub fn run_cli_selfhost_pcre2_prep_test(root: str, target_name: str, compiler_path: str) -> i32:
     let stamp = f"{with_getpid()}.{with_clock_nanos()}"
     let base_dir = bgs_resolve_join(bgs_resolve_join(bgs_resolve_join(root, "out/test-graph"), target_name), stamp)
     var rc = bgs_check_pcre2_defs_prune_ebcdic_tables(root, target_name)

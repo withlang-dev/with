@@ -72,7 +72,7 @@
     output contracts, whole-program extern var redeclaration, and imported
     module dependency ordering.
   - CLI selfhost regex/PCRE2 preparation coverage now runs as a typed
-    `cli_selfhost_regex_prep_test` graph node, covering EBCDIC table pruning,
+    `cli_selfhost_pcre2_prep_test` graph node, covering EBCDIC table pruning,
     raw-to-generated preservation of shared extern/let ownership, width-suffix
     local preservation, std.re shared dependency imports, opaque field
     diagnostics, concrete PCRE2 heapframe structs, clean pcre2_compile builds,
@@ -134,28 +134,28 @@
         `out/lib/embedded_objects.{s,o}` without the shell embedding script.
   - `with build :build` now produces the canonical `out/bin/with` through the
     graph path by depending on refreshed runtime objects and embedded objects.
-  - `with build :regex-test` now runs the upstream PCRE2 `RunTest -8 0-29
+  - `with build :pcre2-test` now runs the upstream PCRE2 `RunTest -8 0-29
     heap` corpus through a typed `pcre2_run_test` graph node instead of the
     repository wrapper script `scripts/verify_pcre2_works.sh`.
-  - `with build :regex-build` now consumes existing `out/pcre2_migrated`
+  - `with build :pcre2-build` now consumes existing `out/pcre2_migrated`
     sources, checks generated modules, and builds `out/pcre2_build/bin/pcre2test`
     through a typed `pcre2_build` graph node. It does not trigger migration.
-  - `with build :regex-check-generated` now checks generated PCRE2 modules
+  - `with build :pcre2-check-generated` now checks generated PCRE2 modules
     through a typed `pcre2_generated_check` node instead of
     `scripts/pcre2_generated_workflow.sh`.
-  - `with build :regex-promote` now refuses promotion unless generated PCRE2
+  - `with build :pcre2-promote` now refuses promotion unless generated PCRE2
     modules type-check cleanly, then copies the verified tree through a typed
     `pcre2_generated_promote` node.
   - PCRE2 migration is now treated as a manual refresh step in the legacy
-    Make path too: `regex-test` no longer depends on `regex-build`, and
-    `regex-build` no longer depends on `regex-migrate`.
-  - `make regex-test` is now a compatibility shim over
-    `with build :regex-test` after checking that existing migrated PCRE2
+    Make path too: `pcre2-test` no longer depends on `pcre2-build`, and
+    `pcre2-build` no longer depends on `pcre2-migrate`.
+  - `make pcre2-test` is now a compatibility shim over
+    `with build :pcre2-test` after checking that existing migrated PCRE2
     sources, built `pcre2test`, and the reference tree are present.
-  - `make regex-build` is now a compatibility shim over
-    `with build :regex-build`.
-  - `make regex-promote` is now a compatibility shim over
-    `with build :regex-promote`.
+  - `make pcre2-build` is now a compatibility shim over
+    `with build :pcre2-build`.
+  - `make pcre2-promote` is now a compatibility shim over
+    `with build :pcre2-promote`.
   - `make test` is now a compatibility shim over `with build :test`; Make no
     longer invokes `scripts/run_tests.sh`, the issue61 regression script, or
     the embedded-runtime regression script directly.
@@ -187,9 +187,22 @@
       - `with build :test`
       - `with build :install-user`
       - `with build :update-seed`
-      - `with build :regex-test`
-      - `with build :regex-check-generated`
-      - `with build :regex-promote`
+      - `with build :c-migrator-tests`
+      - `with build :pcre2-build`
+      - `with build :pcre2-test`
+      - `with build :pcre2-check-generated`
+      - `with build :pcre2-promote`
+  - Default `with build :test` no longer runs PCRE2/migrator-prep suites.
+    C migrator correctness checks are grouped under the explicit
+    `with build :c-migrator-tests` target, while migrated-library operations
+    use the per-library command family (`pcre2-migrate`, `pcre2-build`,
+    `pcre2-test`, `pcre2-promote`) so normal tests do not validate a rare
+    library refresh path by accident.
+  - Default `with build :test` still exercises With regex syntax and the
+    standard-library regex shim through the normal behavior/compile-error
+    suites, including literal parsing, flags, `=~`/`!~`, match-arm captures,
+    f-string capture interpolation, global `/g` progression, invalid literals,
+    invalid flags, and capture-scope diagnostics.
 
   Remaining:
 
@@ -202,7 +215,7 @@
   - Port LLVM bridge/link response generation into typed nodes instead of
     relying on existing `out/lib/llvm_link.rsp` and `out/lib/llvm_cc`.
   - Port PCRE2 download/migrate/source-preparation into typed nodes;
-    `regex-build`, `regex-test`, generated-source checking, and promotion are
+    `pcre2-build`, `pcre2-test`, generated-source checking, and promotion are
     typed. Migration must remain manually triggered; normal test/build targets
     should consume existing migrated output and fail loudly if it is missing.
   - Port seed, clean, emit-c, and cross targets.
@@ -278,18 +291,18 @@
       - with build :stage3
       - with build :fixpoint
       - with build :runtime
-      - with build :regex-build
-      - with build :regex-test
-      - with build :regex-promote --dry-run
+      - with build :pcre2-build
+      - with build :pcre2-test
+      - with build :pcre2-promote --dry-run
       - with build :emit-c-test
       - with build :install-user --dry-run
   - Final acceptance:
       - with build :compiler
       - with build :fixpoint
       - with build :test
-      - with build :regex-migrate
-      - with build :regex-build
-      - with build :regex-test
+      - with build :pcre2-migrate
+      - with build :pcre2-build
+      - with build :pcre2-test
       - with build :install-user
       - No Makefile or repository shell script is required for those commands.
       - make build, if still present during shim phase, delegates to with build :compiler.
