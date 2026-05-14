@@ -72,8 +72,7 @@ fn main -> void:
         index += 1
 
     out = out ++ "let EMBEDDED_STD_MODULE_LIST: str = " ++ raw_string_literal(listing) ++ "\n\n"
-    out = out ++ "@[c_export(\"with_embedded_std_source\")]\n"
-    out = out ++ "pub fn embedded_std_source(path: str) -> str:\n"
+    out = out ++ "pub fn embedded_std_source_data(path: str) -> str:\n"
 
     i = 3
     index = 0
@@ -87,8 +86,7 @@ fn main -> void:
         index += 1
 
     out = out ++ "    return \"\"\n\n"
-    out = out ++ "@[c_export(\"with_embedded_std_list_modules\")]\n"
-    out = out ++ "pub fn embedded_std_list_modules() -> str:\n"
+    out = out ++ "pub fn embedded_std_list_modules_data() -> str:\n"
     out = out ++ "    return EMBEDDED_STD_MODULE_LIST\n"
 
     if with_fs_write_file(out_path, out) != 0:

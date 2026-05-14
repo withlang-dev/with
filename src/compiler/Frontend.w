@@ -1582,6 +1582,12 @@ fn frontend_resolve_module_rel(module_dir: str, rel_path: str) -> str:
     if rooted.len() > 0:
         return rooted
 
+    // Generated With modules live under out/gen but still participate in
+    // normal module resolution. They are source modules, not runtime exports.
+    let gen_cand = resolve_join("out/gen", rel_path)
+    if resolve_file_exists(gen_cand):
+        return gen_cand
+
     let cand5 = resolve_join("src", rel_path)
     if resolve_file_exists(cand5):
         return cand5

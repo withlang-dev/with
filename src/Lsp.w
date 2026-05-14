@@ -14,6 +14,7 @@ use Compilation
 use Fmt
 use compiler.Frontend
 use compiler.Zcu
+use compiler.EmbeddedStdlib
 
 extern fn malloc(size: i64) -> *mut u8
 extern fn free(ptr: *mut u8) -> void
@@ -24,7 +25,6 @@ extern fn with_read_bytes_stdin(count: i32) -> str
 extern fn with_write_stdout(s: str) -> void
 extern fn with_flush_stdout() -> void
 extern fn with_fs_read_file(path: str) -> str
-extern fn with_embedded_std_list_modules() -> str
 
 // ── JSON-RPC framing ─────────────────────────────────────────
 
@@ -1507,7 +1507,7 @@ fn lsp_list_embedded_modules(prefix: str) -> Vec[str]:
     // Query the embedded stdlib listing and filter by prefix.
     // Returns module names without prefix or .w extension.
     // e.g. prefix="std/" returns ["collections", "fmt", "fs", ...]
-    let listing = with_embedded_std_list_modules()
+    let listing = embedded_std_list_modules()
     let result: Vec[str] = Vec.new()
     if listing.len() == 0:
         return result

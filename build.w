@@ -10,22 +10,28 @@ pub fn build(b: Build) -> Build:
     compiler_sources = compiler_sources.input("src/version")
     out = out.add_target(compiler_sources)
 
+    var compat_runtime = target_new(33 as BuildKind, "compat-runtime-source", "rt/compat_runtime.w").output("out/gen/compat_runtime.w")
+    out = out.add_target(compat_runtime)
+
     var stage1 = target_new(.WithCompilerBuild, "stage1", "seed").output("out/bin/with-stage1")
     stage1 = stage1.input("out/gen/main.w")
     stage1 = stage1.arg("-O0")
     stage1 = stage1.dep("compiler-sources")
+    stage1 = stage1.dep("compat-runtime-source")
     out = out.add_target(stage1)
 
     var stage2 = target_new(.WithCompilerBuild, "stage2", "out/bin/with-stage1").output("out/bin/with-stage2")
     stage2 = stage2.input("out/gen/main.w")
     stage2 = stage2.arg("-O0")
     stage2 = stage2.dep("stage1")
+    stage2 = stage2.dep("compat-runtime-source")
     out = out.add_target(stage2)
 
     var stage3 = target_new(.WithCompilerBuild, "stage3", "out/bin/with-stage2").output("out/bin/with-stage3")
     stage3 = stage3.input("out/gen/main.w")
     stage3 = stage3.arg("-O0")
     stage3 = stage3.dep("stage2")
+    stage3 = stage3.dep("compat-runtime-source")
     out = out.add_target(stage3)
 
     var stage2_fixpoint = target_new(.WithCompilerBuild, "stage2-fixpoint-object", "out/bin/with-stage1").output("out/bin/with-stage2-fixpoint.o")
@@ -33,6 +39,7 @@ pub fn build(b: Build) -> Build:
     stage2_fixpoint = stage2_fixpoint.arg("--emit-obj")
     stage2_fixpoint = stage2_fixpoint.arg("-O0")
     stage2_fixpoint = stage2_fixpoint.dep("stage1")
+    stage2_fixpoint = stage2_fixpoint.dep("compat-runtime-source")
     out = out.add_target(stage2_fixpoint)
 
     var stage3_fixpoint = target_new(.WithCompilerBuild, "stage3-fixpoint-object", "out/bin/with-stage2").output("out/bin/with-stage3-fixpoint.o")
@@ -40,6 +47,7 @@ pub fn build(b: Build) -> Build:
     stage3_fixpoint = stage3_fixpoint.arg("--emit-obj")
     stage3_fixpoint = stage3_fixpoint.arg("-O0")
     stage3_fixpoint = stage3_fixpoint.dep("stage2")
+    stage3_fixpoint = stage3_fixpoint.dep("compat-runtime-source")
     out = out.add_target(stage3_fixpoint)
 
     var selfcheck = target_new(.RunCorpusTest, "selfcheck", "out/bin/with-stage2")
@@ -59,9 +67,6 @@ pub fn build(b: Build) -> Build:
     verified = verified.dep("selfcheck")
     verified = verified.dep("fixpoint")
     out = out.add_target(verified)
-
-    var compat_runtime = target_new(33 as BuildKind, "compat-runtime-source", "rt/compat_runtime.w").output("out/gen/compat_runtime.w")
-    out = out.add_target(compat_runtime)
 
     var rt_core = target_new(.WithCompilerBuild, "rt-core-object", "out/bin/with-stage2").output("out/lib/rt_core.o")
     rt_core = rt_core.input("rt/rt_core.w")

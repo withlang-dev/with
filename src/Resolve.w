@@ -975,6 +975,12 @@ fn ResolveState.resolve_module_rel(self: ResolveState, module_dir: str, rel_path
     if rooted.len() > 0:
         return rooted
 
+    // Generated With modules live under out/gen but still participate in
+    // normal module resolution. They are source modules, not runtime exports.
+    let gen_cand = resolve_join("out/gen", rel_path)
+    if resolve_file_exists(gen_cand):
+        return gen_cand
+
     // Strategy 5: src/<rel_path> from cwd.
     let cand5 = resolve_join("src", rel_path)
     if resolve_file_exists(cand5):

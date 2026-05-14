@@ -55,7 +55,7 @@ REGEX_EXCLUDED_C_SOURCES := \
 
 RUNTIME_LINK := $(OUT_BIN_DIR)/runtime
 BOOTSTRAP_RUNTIME_STAMP := $(OUT_GEN_DIR)/.bootstrap-runtime-ready
-EMBEDDED_STDLIB_RUNTIME_SRC := $(OUT_GEN_DIR)/embedded_stdlib_runtime.w
+EMBEDDED_STDLIB_RUNTIME_SRC := $(OUT_GEN_DIR)/compiler/EmbeddedStdlibData.w
 EMBEDDED_STDLIB_GEN_SRC := src/tools/generate_embedded_stdlib.w
 EMBEDDED_STDLIB_GEN_BIN := $(OUT_BIN_DIR)/generate_embedded_stdlib
 COMPAT_RUNTIME_SRC := $(OUT_GEN_DIR)/compat_runtime.w
@@ -430,6 +430,7 @@ $(EMBEDDED_STDLIB_GEN_BIN): $(EMBEDDED_STDLIB_GEN_SRC) $(STAGE0_PREREQ) | $(OUT_
 	$(WITH_BUILD_ENV) $(STAGE0_BIN) build $< -O0 -o $@
 
 $(EMBEDDED_STDLIB_RUNTIME_SRC): $(EMBEDDED_STDLIB_GEN_BIN) $(EMBED_STD_SOURCES) | $(OUT_GEN_DIR)
+	@mkdir -p "$(dir $@)"
 	@for f in $(EMBED_STD_SOURCES); do \
 		sz=$$(wc -c < "$$f"); \
 		if [ "$$sz" -gt 500000 ]; then \
@@ -490,7 +491,7 @@ $(REGEX_BUILD_STAMP): | $(OUT_GEN_DIR) $(OUT_TMP_DIR)
 	@touch "$@"
 
 $(COMPAT_RUNTIME_SRC): rt/compat_runtime.w $(EMBEDDED_STDLIB_RUNTIME_SRC) | $(OUT_GEN_DIR)
-	@cat "$(ROOT_DIR)/rt/compat_runtime.w" "$(EMBEDDED_STDLIB_RUNTIME_SRC)" > "$@"
+	@cp "$(ROOT_DIR)/rt/compat_runtime.w" "$@"
 
 $(RUNTIME_C_ALLOWLIST_STAMP): scripts/check_runtime_c_allowlist.sh $(RUNTIME_C_SOURCES) | $(OUT_GEN_DIR)
 	@bash "$(ROOT_DIR)/scripts/check_runtime_c_allowlist.sh" $(RUNTIME_C_ALLOWLIST)
