@@ -278,6 +278,46 @@ fn redirect_fd_from_path(path: *const u8, fd: i32) -> i32:
 fn run_argv_capture(blob: *const u8, len: i64, stdout_path: *const u8, stderr_path: *const u8, timeout_ms: i32) -> i32:
     run_argv_capture_cwd(blob, len, stdout_path, stderr_path, timeout_ms, 0 as *const u8)
 
+fn spawn_argv_capture(blob: *const u8, len: i64, stdout_path: *const u8, stderr_path: *const u8) -> i32:
+    let argc = argv_blob_count(blob, len)
+    if argc <= 0 or argc >= 256:
+        return -1
+    var prev_mask: u32 = 0 as u32
+    let mask_rc = block_interrupt_signals(&raw mut prev_mask)
+    let pid = fork()
+    if pid == 0:
+        if mask_rc == 0:
+            restore_signal_mask(&prev_mask as *const u32)
+        let _ = setpgid(0, 0)
+        restore_default_signal_handler(SIGINT)
+        restore_default_signal_handler(SIGTERM)
+        restore_default_signal_handler(SIGHUP)
+        restore_default_signal_handler(SIGQUIT)
+        if redirect_fd_to_path(stdout_path, 1) != 0:
+            _exit(127)
+        if redirect_fd_to_path(stderr_path, 2) != 0:
+            _exit(127)
+        var argv: [256]*const u8 = [0 as *const u8; 256]
+        var argi = 0
+        var offset: i64 = 0
+        while offset < len and argi < 255:
+            argv[argi] = (blob as i64 + offset) as *const u8
+            argi += 1
+            while offset < len and (unsafe: *((blob as i64 + offset) as *const u8)) != 0:
+                offset += 1
+            offset += 1
+        argv[argi] = 0 as *const u8
+        let _ = execvp(argv[0], (&argv) as *const [256]*const u8 as *const *const u8)
+        _exit(127)
+    if pid < 0:
+        if mask_rc == 0:
+            restore_signal_mask(&prev_mask as *const u32)
+        return -1
+    let _ = setpgid(pid, pid)
+    if mask_rc == 0:
+        restore_signal_mask(&prev_mask as *const u32)
+    pid
+
 fn run_argv_capture_input(blob: *const u8, len: i64, stdout_path: *const u8, stderr_path: *const u8, timeout_ms: i32, stdin_path: *const u8) -> i32:
     let argc = argv_blob_count(blob, len)
     if argc <= 0 or argc >= 256:
@@ -564,6 +604,43 @@ pub fn exec_argv_capture_cwd(args: str, stdout_path: str, stderr_path: str, time
     with_free(out_buf)
     with_free(err_buf)
     with_free(cwd_buf)
+    rc
+
+@[c_export("with_exec_argv_capture_spawn")]
+pub fn exec_argv_capture_spawn(args: str, stdout_path: str, stderr_path: str) -> i32:
+    let arg_buf = str_to_c_buf(args)
+    if arg_buf as i64 == 0:
+        return -1
+    let out_buf = str_to_c_buf(stdout_path)
+    if out_buf as i64 == 0:
+        with_free(arg_buf)
+        return -1
+    let err_buf = str_to_c_buf(stderr_path)
+    if err_buf as i64 == 0:
+        with_free(arg_buf)
+        with_free(out_buf)
+        return -1
+    if interrupt_flag != 0:
+        with_free(arg_buf)
+        with_free(out_buf)
+        with_free(err_buf)
+        let errp = __error()
+        if errp as i64 != 0:
+            unsafe: *errp = EINTR
+        return -1
+    let pid = spawn_argv_capture(arg_buf as *const u8, args.len(), out_buf as *const u8, err_buf as *const u8)
+    with_free(arg_buf)
+    with_free(out_buf)
+    with_free(err_buf)
+    pid
+
+@[c_export("with_exec_wait")]
+pub fn exec_wait(pid: i32, timeout_ms: i32) -> i32:
+    if pid <= 0:
+        return -1
+    active_child_pgid = pid
+    let rc = wait_for_child_process_timeout(pid, timeout_ms)
+    active_child_pgid = 0
     rc
 
 @[c_export("with_extract_tgz")]
