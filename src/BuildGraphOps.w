@@ -49,6 +49,29 @@ pub fn build_graph_compare_files(root: str, target: BuildGraphTarget, operation_
         return 1
     0
 
+pub fn build_graph_run_clean(root: str, target: BuildGraphTarget) -> i32:
+    var removed = 0
+    for ai in 0..target.args.len() as i32:
+        let rel = target.args.get(ai as i64)
+        if rel.len() == 0 or rel.byte_at(0) == 47 or rel.contains(".."):
+            build_graph_rt_eprint("error: clean target '" ++ target.name ++ "' has unsafe path: " ++ rel)
+            return 1
+        let path = build_graph_resolve_project_path(root, rel)
+        if build_graph_rt_is_dir(path) != 0:
+            let rc = build_graph_rt_remove_tree(path)
+            if rc != 0:
+                build_graph_rt_eprint("error: clean target '" ++ target.name ++ "' could not remove directory tree: " ++ path)
+                return 1
+            removed = removed + 1
+        else if build_graph_rt_file_exists(path) != 0:
+            let rc = build_graph_rt_remove_file(path)
+            if rc != 0:
+                build_graph_rt_eprint("error: clean target '" ++ target.name ++ "' could not remove file: " ++ path)
+                return 1
+            removed = removed + 1
+    build_graph_rt_write(f"cleaned {removed} build artifact paths\n")
+    0
+
 fn build_graph_response_arg_valid(arg: str) -> bool:
     for i in 0..arg.len() as i32:
         let ch = arg.byte_at(i as i64)

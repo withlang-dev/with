@@ -51,6 +51,7 @@ extern fn with_exec_argv_capture_cwd(args: str, stdout_path: str, stderr_path: s
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_fs_remove_file(path: str) -> i32
 extern fn with_fs_remove_dir(path: str) -> i32
+extern fn with_fs_remove_tree(path: str) -> i32
 extern fn with_fs_rename_file(old_path: str, new_path: str) -> i32
 extern fn with_getenv_str(name: str) -> str
 extern fn with_setenv_str(name: str, value: str) -> i32
@@ -2247,6 +2248,12 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
                 return pcre2_migrate_rc
             completed_targets.push(target.name)
             continue
+        if target.kind == 44:
+            let clean_rc = build_graph_run_clean(root, target)
+            if clean_rc != 0:
+                return clean_rc
+            completed_targets.push(target.name)
+            continue
         if target.kind == 7:
             let command_rc = build_graph_run_command(root, target)
             if command_rc != 0:
@@ -3344,9 +3351,13 @@ fn run_fmt_command(argc: i32) -> i32:
     0
 
 fn run_clean_command -> i32:
-    let result = with_system("rm -rf out .with")
-    if result != 0:
-        with_eprint("error: clean failed")
+    let out_rc = with_fs_remove_tree("out")
+    if out_rc != 0 and with_fs_file_exists("out") != 0:
+        with_eprint("error: clean failed removing out/")
+        return 1
+    let legacy_rc = with_fs_remove_tree(".with")
+    if legacy_rc != 0 and with_fs_file_exists(".with") != 0:
+        with_eprint("error: clean failed removing legacy .with/")
         return 1
     with_write("cleaned out/ and legacy .with/\n")
     0
