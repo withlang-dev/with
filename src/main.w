@@ -1627,6 +1627,8 @@ fn build_graph_run_cli_selfhost_suite_test(root: str, target: BuildGraphTarget) 
         return run_cli_selfhost_project_test(root, target.name, compiler_path)
     if suite == "edge":
         return run_cli_selfhost_edge_test(root, target.name, compiler_path)
+    if suite == "test-parallel":
+        return run_cli_selfhost_parallel_test(root, target.name, compiler_path)
     if suite == "pcre2-prep":
         return run_cli_selfhost_pcre2_prep_test(root, target.name, compiler_path)
     if suite == "migrate-basic":
