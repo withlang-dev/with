@@ -235,11 +235,17 @@
     root/source build artifacts through a typed graph node backed by the
     runtime `remove_tree` primitive. `with clean` no longer assembles a shell
     command string.
+  - Make's `build`, `stage1`, `stage2`, `stage3`, `runtime`, `selfcheck`,
+    `smoke`, and `fixpoint` compatibility targets now delegate to the
+    equivalent `with build :...` graph targets instead of exercising the old
+    Make stage/runtime/fixpoint recipes. `make test` now builds through the
+    graph path before running `with build :test`.
 
   Remaining:
 
   - Port seed, emit-c, and cross targets.
-  - Make Makefile delegate to `with build :...` only after direct graph paths are equivalent.
+  - Finish delegating remaining Make compatibility targets after seed,
+    install, emit-c, and cross graph paths are equivalent.
   - Remove Make recipes and obsolete scripts last.
 
   ## Key Changes

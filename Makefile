@@ -289,21 +289,31 @@ pcre2-promote: | $(OUT_TMP_DIR)
 
 regex-promote: pcre2-promote
 
-__build: $(CANONICAL_BIN)
+define RUN_GRAPH_TARGET
+	@if [ -z "$(STAGE0_BIN)" ]; then echo "error: no seed compiler — set WITH, add with to PATH, or run: make seed" >&2; exit 1; fi
+	$(WITH_BUILD_ENV) $(STAGE0_BIN) build :$(1)
+endef
 
-__stage1: $(STAGE1_BIN)
+__build:
+	$(call RUN_GRAPH_TARGET,build)
 
-__stage2: $(STAGE2_BIN)
+__stage1:
+	$(call RUN_GRAPH_TARGET,stage1)
 
-__stage3: $(STAGE3_BIN)
+__stage2:
+	$(call RUN_GRAPH_TARGET,stage2)
 
-__runtime: $(BOOTSTRAP_RUNTIME_STAMP)
+__stage3:
+	$(call RUN_GRAPH_TARGET,stage3)
 
-__selfcheck: $(STAGE2_BIN)
-	./out/bin/with-stage2 check src/main.w
+__runtime:
+	$(call RUN_GRAPH_TARGET,runtime)
 
-__smoke: $(STAGE2_BIN)
-	./out/bin/with-stage2 check src/main.w
+__selfcheck:
+	$(call RUN_GRAPH_TARGET,selfcheck)
+
+__smoke:
+	$(call RUN_GRAPH_TARGET,selfcheck)
 
 __seed:
 	@set -euo pipefail; \
@@ -704,7 +714,7 @@ test: | $(OUT_TMP_DIR)
 test-pcre2: | $(OUT_TMP_DIR)
 	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __test-pcre2)
 
-__test: $(CANONICAL_BIN)
+__test: __build
 	$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" build :test
 
 __test-pcre2: __regex-test
@@ -792,8 +802,8 @@ cross: build
 fixpoint: | $(OUT_TMP_DIR)
 	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __fixpoint)
 
-__fixpoint: $(STAGE2_FIXPOINT_OBJ) $(STAGE3_FIXPOINT_OBJ)
-	@diff "$(STAGE2_FIXPOINT_OBJ)" "$(STAGE3_FIXPOINT_OBJ)" && echo "FIXPOINT"
+__fixpoint:
+	$(call RUN_GRAPH_TARGET,fixpoint)
 
 install: | $(OUT_TMP_DIR)
 	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __install)
