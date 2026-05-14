@@ -2229,6 +2229,12 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
                 return suite_rc
             completed_targets.push(target.name)
             continue
+        if target.kind == 41:
+            let llvm_metadata_rc = build_graph_generate_llvm_link_metadata(root, target)
+            if llvm_metadata_rc != 0:
+                return llvm_metadata_rc
+            completed_targets.push(target.name)
+            continue
         if target.kind == 7:
             let command_rc = build_graph_run_command(root, target)
             if command_rc != 0:
