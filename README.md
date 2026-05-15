@@ -1,110 +1,78 @@
-# With
+# The With Programming Language
 
-With is a systems language with a self-hosted compiler.
+A systems programming language that compiles to native code via LLVM.
+Fast, safe, and designed to feel less hostile than existing native languages.
 
-The compiler is written in With and compiles itself. The repository includes a
-frozen Zig bootstrap compiler (`bootstrap/`) as a historical artifact — it is
-no longer used in the build pipeline.
+[Specification](docs/with-specification.md) | [Contributing](CONTRIBUTING.md) | [Editor Support](docs/editor-support.md) | [Devlog](https://github.com/withlang-dev/with/discussions/185)
 
-## Requirements
+## Why With?
 
-- LLVM toolchain (default: `/usr/local/llvm`, override with `LLVM_PREFIX`)
-- clang available on PATH (for linking user programs)
-- Zig (optional, for cross-compilation)
+- **Performance:** Compiles to native machine code via LLVM. No runtime interpreter, no GC pauses. Suitable for games, AI infrastructure, embedded systems, and web services.
 
-## Build
+- **Safety:** Ownership-based memory model with no use-after-free, no double-free, and no data races — without lifetime annotations. Ownership is persistent, borrowing is ephemeral, long-lived relationships use handles.
 
-The Makefile is the primary build interface. Normal development should go
-through `make`, not through ad hoc shell scripts.
+- **Ergonomics:** Indentation-based scoping, type inference, f-string interpolation, first-class regex, `let ... else` for early returns, `with` blocks for scoped mutation, and seamless C interop via `c_import`. The common case should not require ceremony.
 
-The self-host chain is:
+## What It Looks Like
 
-```text
-seed → stage1 → stage2 → stage3
+```
+var nr = 0
+for line in file.read_lines("server.log"):
+    nr += 1
+    if line =~ /error (\d+)/:
+        print(f"{nr}: {line}")
 ```
 
-Common targets:
-
-```sh
-make stage1        # build stage1 only
-make stage2        # build stage2 only
-make build         # alias for stage2, also refreshes out/bin/with
-make stage3        # build stage3 only
-make fixpoint      # verify stage2 == stage3
-make test          # run selfhost suite and CLI regressions with stage2
-make smoke         # quick compiler smoke check
+```
+fn handle(req: Request) -> Response:
+    let user = db.find_user(req.params.id) else:
+        return Response.not_found()
+    Response.json(user)
 ```
 
-The seed compiler is resolved from `WITH` env var, `with` on PATH, or
-a downloaded seed binary:
-
-```sh
-make build                           # uses `with` on PATH
-make seed && make build              # downloads seed from GitHub releases
-WITH=~/other/with make build         # uses explicit binary
+```
+let config = with Config.default() as mut c:
+    c.timeout = 30
+    c.retries = 3
 ```
 
-`src/main` is a local downloaded seed binary. It is gitignored and must never
-be committed or pushed.
+## Quick Start
 
-`out/bin/with-stage2` is the canonical built compiler in the workspace, and
-`out/bin/with` is a copy of it for convenience. `make fixpoint` builds stage3
-from stage2 and verifies they are byte-identical.
-
-## Install
+Download a [pre-built binary](https://github.com/withlang-dev/with/releases)
+and add it to your PATH, or build from source (see below).
 
 ```sh
-make install-user                    # installs to ~/.local/bin/with
-make install PREFIX=$HOME/.local     # explicit local prefix install
-sudo make install                    # installs to /usr/local/bin/with
-```
-
-`make build` does not install to your PATH. Installing is a separate step.
-
-For fish shell:
-
-```sh
-fish_add_path -g ~/.local/bin
-```
-
-## Use
-
-Basic commands:
-
-```sh
-with check examples/hello.w
-with build examples/hello.w
-./examples/hello
 with run examples/hello.w
 ```
 
-Debug/dump commands:
+## Building from Source
+
+Requirements:
+
+ * LLVM toolchain (default `/usr/local/llvm`, override with `LLVM_PREFIX`)
+ * clang on PATH
+
+The compiler is self-hosting. The build chain is `seed -> stage1 -> stage2`:
 
 ```sh
-with check --dump-tokens examples/hello.w
-with check --dump-ast examples/hello.w
-with check --dump-resolved examples/hello.w
-with check --dump-typed examples/hello.w
-with check --dump-mir examples/hello.w
-with check --dump-async-mir examples/hello.w
+git clone https://github.com/withlang-dev/with.git
+cd with
+make seed       # download seed compiler (if `with` is not on PATH)
+make build      # build stage2
+make test       # run test suite
 ```
 
-C emission path:
+Install to your PATH:
 
 ```sh
-with build --emit-c examples/hello.w -o hello.c
-cc -I runtime hello.c runtime/with_runtime.c runtime/helpers.c runtime/fiber.c runtime/fiber_asm_aarch64.s -o hello
+make install-user       # installs to ~/.local/bin/with
 ```
 
-## Test
+### Fixpoint Verification
 
-Selfhost test suite and CLI regressions:
-
-```sh
-make test
-```
-
-Fixpoint verification (stage2 == stage3):
+The compiler compiles itself. `make fixpoint` builds stage3 from stage2 and
+verifies they are byte-identical. If fixpoint breaks, the compiler has a
+nondeterminism bug.
 
 ```sh
 make fixpoint
@@ -112,184 +80,15 @@ make fixpoint
 
 ## Editor Support
 
-The compiler includes a built-in language server: `with lsp`. It provides
-diagnostics, go-to-definition, hover, and format-on-save.
+The compiler includes a built-in language server (`with lsp`) with diagnostics,
+go-to-definition, hover, and format-on-save. Setup instructions for VSCode,
+Neovim, Vim, Emacs, Zed, and Helix are in [docs/editor-support.md](docs/editor-support.md).
 
-### VSCode
+## Contributing
 
-Install the extension from `with-vscode/`:
+See [CONTRIBUTING.md](CONTRIBUTING.md) for build setup, architecture overview,
+testing, and debugging instructions.
 
-```sh
-cd with-vscode
-npm install
-npx tsc -p ./
-```
+## License
 
-Then open VSCode, run **Extensions: Install from VSIX** (or press F1), or
-symlink the extension directory:
-
-```sh
-ln -s "$(pwd)/with-vscode" ~/.vscode/extensions/with-lang
-```
-
-Restart VSCode. Files with `.w` extension get syntax highlighting and LSP
-features automatically. Configure the compiler path in settings if `with`
-is not on your PATH:
-
-```json
-{ "with.lsp.path": "/path/to/with" }
-```
-
-### Neovim
-
-Using the built-in LSP client (requires Neovim 0.5+):
-
-```lua
--- ~/.config/nvim/init.lua (or ftplugin/with.lua)
-vim.api.nvim_create_autocmd('FileType', {
-  pattern = 'with',
-  callback = function()
-    vim.lsp.start({
-      name = 'with-lsp',
-      cmd = { 'with', 'lsp' },
-      root_dir = vim.fs.dirname(vim.fs.find({ 'with.toml' }, { upward = true })[1]),
-    })
-  end,
-})
-
-vim.filetype.add({ extension = { w = 'with' } })
-```
-
-### Vim
-
-Using [vim-lsp](https://github.com/prabirshrestha/vim-lsp):
-
-```vim
-" ~/.vimrc
-au User lsp_setup call lsp#register_server({
-    \ 'name': 'with-lsp',
-    \ 'cmd': ['with', 'lsp'],
-    \ 'allowlist': ['with'],
-    \ })
-
-au BufRead,BufNewFile *.w set filetype=with
-```
-
-Using [coc.nvim](https://github.com/neoclide/coc.nvim), add to
-`coc-settings.json`:
-
-```json
-{
-  "languageserver": {
-    "with": {
-      "command": "with",
-      "args": ["lsp"],
-      "filetypes": ["with"]
-    }
-  }
-}
-```
-
-### Emacs
-
-Using [lsp-mode](https://github.com/emacs-lsp/lsp-mode):
-
-```elisp
-;; ~/.emacs.d/init.el or ~/.emacs
-(define-derived-mode with-mode prog-mode "With"
-  "Major mode for the With language."
-  (setq-local comment-start "// "))
-
-(add-to-list 'auto-mode-alist '("\\.w\\'" . with-mode))
-
-(with-eval-after-load 'lsp-mode
-  (add-to-list 'lsp-language-id-configuration '(with-mode . "with"))
-  (lsp-register-client
-   (make-lsp-client
-    :new-connection (lsp-stdio-connection '("with" "lsp"))
-    :activation-fn (lsp-activate-on "with")
-    :server-id 'with-lsp)))
-
-(add-hook 'with-mode-hook #'lsp)
-```
-
-Using [eglot](https://github.com/joaotavora/eglot) (built into Emacs 29+):
-
-```elisp
-(define-derived-mode with-mode prog-mode "With"
-  (setq-local comment-start "// "))
-
-(add-to-list 'auto-mode-alist '("\\.w\\'" . with-mode))
-
-(with-eval-after-load 'eglot
-  (add-to-list 'eglot-server-programs '(with-mode . ("with" "lsp"))))
-
-(add-hook 'with-mode-hook #'eglot-ensure)
-```
-
-### Zed
-
-Add to your Zed settings (`~/.config/zed/settings.json`):
-
-```json
-{
-  "lsp": {
-    "with-lsp": {
-      "binary": { "path": "with", "arguments": ["lsp"] }
-    }
-  },
-  "languages": {
-    "With": {
-      "language_servers": ["with-lsp"]
-    }
-  },
-  "file_types": {
-    "With": ["w"]
-  }
-}
-```
-
-### Helix
-
-Add to `~/.config/helix/languages.toml`:
-
-```toml
-[[language]]
-name = "with"
-scope = "source.with"
-file-types = ["w"]
-comment-token = "//"
-indent = { tab-width = 4, unit = "    " }
-language-servers = ["with-lsp"]
-
-[language-server.with-lsp]
-command = "with"
-args = ["lsp"]
-```
-
-## Repo Layout
-
-```text
-src/                 self-hosted compiler (.w)
-src/main             local seed binary (gitignored; download via `make seed`)
-src/compiler/        Compilation-first architecture port layer
-runtime/             C runtime source (.c, .h, .s)
-lib/std/             standard library (.w)
-test/cases/          behavior tests
-out/                 all build output (gitignored)
-  bin/               compiler binaries
-  lib/               compiled runtime objects (.o), LLVM link config
-  log/               build logs
-bootstrap/           historical Zig bootstrap compiler (frozen, unused)
-```
-
-## Troubleshooting
-
-- `install: ... Operation not permitted` under `/usr/local`:
-  use `make install-user`, `PREFIX=$HOME/.local`, or run `sudo make install`.
-- `no LLVM bridge available`: install LLVM at `/usr/local/llvm` or set `LLVM_PREFIX`.
-  The compiler statically links LLVM — no dynamic library needed at runtime.
-- Need only the staged compiler rebuild:
-  use `make stage2` for stage2 only, or `make fixpoint` for stage2 plus stage3 verification.
-- Need to rebuild compiler stages directly:
-  use `make stage1`, `make stage2`, or `make stage3`.
+With is distributed under the [MIT License](LICENSE).
