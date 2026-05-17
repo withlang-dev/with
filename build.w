@@ -77,17 +77,6 @@ fn issue61_fail(ctx: ActionCtx, message: str) -> i32:
     ctx.diagnostics().error("issue61-regression: " ++ message)
     1
 
-fn issue61_run(ctx: ActionCtx, label: str, args: Vec[str], timeout_ms: i32) -> i32:
-    let output_dir = ctx.output()
-    let stdout_path = build_project_join(output_dir, label ++ ".stdout")
-    let stderr_path = build_project_join(output_dir, label ++ ".stderr")
-    let result = ctx.process_runner().run_capture(args, stdout_path, stderr_path, timeout_ms)
-    if result.rc == 124:
-        return issue61_fail(ctx, label ++ " timed out; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
-    if result.rc != 0:
-        return issue61_fail(ctx, label ++ f" failed with exit code {result.rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
-    0
-
 fn issue61_regression_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
     if inputs.len() == 0:
@@ -103,34 +92,15 @@ fn issue61_regression_action(ctx: ActionCtx) -> i32:
         return issue61_fail(ctx, "missing compiler: " ++ inputs.get(0))
 
     let repo_copy = build_project_join(output_dir, "repo")
-    if fs.exists(repo_copy):
-        var rm_args: Vec[str] = Vec.new()
-        rm_args |> push("/bin/rm")
-        rm_args |> push("-rf")
-        rm_args |> push(build_project_abs(root, repo_copy))
-        let rm_rc = issue61_run(ctx, "rm-repo", rm_args, 60000)
-        if rm_rc != 0:
-            return rm_rc
+    if fs.exists(repo_copy) and fs.remove_tree(repo_copy) != 0:
+        return issue61_fail(ctx, "could not remove existing repo copy: " ++ repo_copy)
     if fs.mkdir_all(repo_copy) != 0:
         return issue61_fail(ctx, "could not create repo copy directory: " ++ repo_copy)
 
-    var cp_args: Vec[str] = Vec.new()
-    cp_args |> push("/bin/cp")
-    cp_args |> push("-R")
-    cp_args |> push(build_project_abs(root, "src"))
-    cp_args |> push(build_project_abs(root, build_project_join(repo_copy, "src")))
-    let cp_rc = issue61_run(ctx, "cp-src", cp_args, 60000)
-    if cp_rc != 0:
-        return cp_rc
-
-    var ln_args: Vec[str] = Vec.new()
-    ln_args |> push("/bin/ln")
-    ln_args |> push("-s")
-    ln_args |> push(build_project_abs(root, "lib"))
-    ln_args |> push(build_project_abs(root, build_project_join(repo_copy, "lib")))
-    let ln_rc = issue61_run(ctx, "ln-lib", ln_args, 60000)
-    if ln_rc != 0:
-        return ln_rc
+    if fs.copy_tree("src", build_project_join(repo_copy, "src")) != 0:
+        return issue61_fail(ctx, "could not copy src into repo fixture")
+    if fs.symlink("lib", build_project_join(repo_copy, "lib")) != 0:
+        return issue61_fail(ctx, "could not link lib into repo fixture")
 
     let embedded_src = "out/gen/compiler/EmbeddedStdlibData.w"
     let embedded_dst = build_project_join(repo_copy, "out/gen/compiler/EmbeddedStdlibData.w")
