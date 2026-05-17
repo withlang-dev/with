@@ -1624,6 +1624,9 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
     let completed_targets: Vec[str] = Vec.new()
     for ti in 0..graph.targets.len() as i32:
         let target = graph.targets.get(ti as i64)
+        if build_graph_kind_removed(target.kind):
+            with_eprint("error: build.w target kind " ++ build_graph_kind_name(target.kind) ++ f" ({target.kind}) was removed; regenerate your build graph")
+            return 1
         if not build_graph_kind_valid(target.kind):
             with_eprint("error: invalid build.w target kind " ++ build_graph_kind_name(target.kind) ++ " for '" ++ target.name ++ "'")
             return 1
@@ -1908,6 +1911,38 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
             let built = comp.emit_archive_to_path_with_build_settings(source_path, ar_path, include_paths, target.defines, target.system_libs)
             if built == "":
                 with_eprint("error: build.w library target failed: " ++ target.name)
+                return 1
+            comp.print_warnings()
+            completed_targets.push(target.name)
+            continue
+        if target.kind == 3:
+            let obj_path = build_graph_object_output_path(root, target, output_path, graph.targets.len() as i32)
+            if obj_path.len() == 0:
+                with_eprint("error: -o cannot be used when build.w declares multiple targets")
+                return 1
+            var comp = Compilation.init()
+            comp.configure(target_opt, no_std, alloc_mode)
+            comp.set_prelude_mode(prelude_mode)
+            comp.set_debug_info(debug_info)
+            let built = comp.emit_object_to_path_with_build_settings(source_path, obj_path, include_paths, target.defines, target.system_libs)
+            if built == "":
+                with_eprint("error: build.w object target failed: " ++ target.name)
+                return 1
+            comp.print_warnings()
+            completed_targets.push(target.name)
+            continue
+        if target.kind == 4:
+            let ar_path = build_graph_library_output_path(root, target, output_path, graph.targets.len() as i32)
+            if ar_path.len() == 0:
+                with_eprint("error: -o cannot be used when build.w declares multiple targets")
+                return 1
+            var comp = Compilation.init()
+            comp.configure(target_opt, no_std, alloc_mode)
+            comp.set_prelude_mode(prelude_mode)
+            comp.set_debug_info(debug_info)
+            let built = comp.emit_archive_to_path_with_build_settings(source_path, ar_path, include_paths, target.defines, target.system_libs)
+            if built == "":
+                with_eprint("error: build.w archive target failed: " ++ target.name)
                 return 1
             comp.print_warnings()
             completed_targets.push(target.name)

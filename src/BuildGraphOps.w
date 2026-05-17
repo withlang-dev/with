@@ -549,9 +549,6 @@ pub fn build_graph_copy_file_to_path(source_path: str, dest_path: str, mode: i32
         build_graph_rt_eprint("error: could not create copy destination directory: " ++ dest_dir)
         return 1
     let contents = build_graph_rt_read_file(source_path)
-    if contents.len() == 0:
-        build_graph_rt_eprint("error: could not read file to copy: " ++ source_path)
-        return 1
     if build_graph_rt_write_file(dest_path, contents) != 0:
         build_graph_rt_eprint("error: could not write copied file: " ++ dest_path)
         return 1
@@ -559,6 +556,24 @@ pub fn build_graph_copy_file_to_path(source_path: str, dest_path: str, mode: i32
         build_graph_rt_eprint("error: could not chmod copied file: " ++ dest_path)
         return 1
     0
+
+pub fn build_graph_copy_file(root: str, target: BuildGraphTarget) -> i32:
+    if target.entry.len() == 0 or target.output.len() == 0:
+        build_graph_rt_eprint("error: copy_file target '" ++ target.name ++ "' requires source and destination paths")
+        return 1
+    if target.args.len() > 1:
+        build_graph_rt_eprint("error: copy_file target '" ++ target.name ++ "' accepts at most one mode argument")
+        return 1
+    let arg_rc = build_graph_validate_process_args(target)
+    if arg_rc != 0:
+        return arg_rc
+    let mode = if target.args.len() == 0: -1 else: build_graph_parse_octal_mode(target.args.get(0))
+    if target.args.len() > 0 and mode < 0:
+        build_graph_rt_eprint("error: copy_file target '" ++ target.name ++ "' has invalid octal mode: " ++ target.args.get(0))
+        return 1
+    let source_path = build_graph_resolve_project_path(root, target.entry)
+    let dest_path = build_graph_resolve_project_path(root, target.output)
+    build_graph_copy_file_to_path(source_path, dest_path, mode)
 
 pub fn build_graph_expand_install_path(root: str, path: str) -> str:
     if path.starts_with("$HOME/"):

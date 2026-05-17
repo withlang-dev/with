@@ -21,8 +21,9 @@ pub enum BuildKind: i32:
     Test = 2
     Object = 3
     Archive = 4
-    GeneratedSource = 5
-    GeneratedBinary = 6
+    // Values 5 and 6 were removed with the old GeneratedSource and
+    // GeneratedBinary target kinds. Generated sources are graph entries, not
+    // targets. Do not reuse these values; old graphs should fail loudly.
     Command = 7
     Install = 8
     Group = 9
@@ -38,6 +39,7 @@ pub enum BuildKind: i32:
     RunCorpusTest = 19
     PromoteTreeIfVerified = 20
     Clean = 21
+    CopyFile = 22
 
 pub enum BuildTarget: i32:
     native = 0
@@ -376,6 +378,10 @@ pub fn Build.embed_object_files(self: Build, name: str, output: str) -> Build:
 
 pub fn Build.copy_tree(self: Build, name: str, source_dir: str, output_dir: str) -> Build:
     let target = target_new(.CopyTree, name, source_dir).output(output_dir)
+    self.add_target(target)
+
+pub fn Build.copy_file(self: Build, name: str, source: str, dest: str) -> Build:
+    let target = target_new(.CopyFile, name, source).output(dest)
     self.add_target(target)
 
 pub fn Build.clean(self: Build, name: str) -> Build:

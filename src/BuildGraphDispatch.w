@@ -43,6 +43,10 @@ pub fn build_graph_validate_outputs(root: str, graph: BuildGraph, output_path: s
             path = build_graph_output_path(root, target, output_path, graph.targets.len() as i32)
         else if target.kind == 1:
             path = build_graph_library_output_path(root, target, output_path, graph.targets.len() as i32)
+        else if target.kind == 3:
+            path = build_graph_object_output_path(root, target, output_path, graph.targets.len() as i32)
+        else if target.kind == 4:
+            path = build_graph_library_output_path(root, target, output_path, graph.targets.len() as i32)
         else if target.kind == 8:
             path = build_graph_expand_install_path(root, target.output)
         else if target.output.len() > 0:
@@ -123,4 +127,6 @@ pub fn build_graph_dispatch_standard_target(root: str, target: BuildGraphTarget,
         return build_graph_dispatch_result(true, build_graph_copy_manifest_files(root, target, "promote_tree_if_verified"))
     if target.kind == 21:
         return build_graph_dispatch_result(true, build_graph_run_clean(root, target))
+    if target.kind == 22:
+        return build_graph_dispatch_result(true, build_graph_copy_file(root, target))
     build_graph_dispatch_result(false, 0)

@@ -1263,7 +1263,76 @@ fn bgs_check_build_w_generated_source(root: str, target_name: str, compiler_path
     bgs_assert_contains(toolfs_escape.stderr, "ToolFs path escapes project root", target_name, "build_w_toolfs_escape")
 
 fn bgs_graph_build_file() -> str:
-    "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    var out = ctx.new_build().executable(\"one\", \"src/one.w\")\n    out = out.executable(\"two\", \"src/two.w\")\n    out = out.generated_source(\"out/tmp/a.txt\", \"same\")\n    out = out.generated_source(\"out/tmp/b.txt\", \"same\")\n    out = out.binary_compare(\"bytes-same\", \"out/tmp/a.txt\", \"out/tmp/b.txt\")\n    out = out.fixpoint_compare(\"fix-same\", \"out/tmp/a.txt\", \"out/tmp/b.txt\")\n    var rsp = target_new(.GenerateResponseFile, \"rsp\", \"\").output(\"out/tmp/args.rsp\")\n    rsp = rsp.arg(\"-L/some path\")\n    rsp = rsp.arg(\"plain\")\n    out = out.add_target(rsp)\n    out = out.compile_c_object(\"helper-o\", \"runtime/helper.c\", \"out/lib/helper.o\")\n    var archive = target_new(.CreateStaticArchive, \"helper-a\", \"\").output(\"out/lib/libhelper.a\")\n    archive = archive.input(\"out/lib/helper.o\")\n    out = out.add_target(archive)\n    var embedded = target_new(.EmbedObjectFiles, \"embed-helper\", \"\").output(\"out/lib/embedded_helper.s\")\n    embedded = embedded.input(\"out/lib/helper.o\")\n    embedded = embedded.arg(\"helper_o\")\n    out = out.add_target(embedded)\n    out = out.compile_asm_object(\"embedded-helper-o\", \"out/lib/embedded_helper.s\", \"out/lib/embedded_helper.o\")\n    var copy_target = target_new(.CopyTree, \"runtime-copy\", \"runtime\").output(\"out/runtime\")\n    copy_target = copy_target.input(\"helper.c\")\n    out = out.add_target(copy_target)\n    var promote = target_new(.PromoteTreeIfVerified, \"promote-runtime\", \"out/runtime\").output(\"promoted-runtime\")\n    promote = promote.input(\"helper.c\")\n    promote = promote.dep(\"runtime-copy\")\n    out = out.add_target(promote)\n    var corpus = target_new(.RunCorpusTest, \"corpus\", \"out/bin/two\")\n    corpus = corpus.dep(\"two\")\n    out = out.add_target(corpus)\n    var command = target_new(.Command, \"run-two\", \"out/bin/two\")\n    command = command.dep(\"two\")\n    out = out.add_target(command)\n    var install = target_new(.Install, \"install-two\", \"out/bin/two\").output(\"out/install/two\")\n    install = install.dep(\"two\")\n    install = install.arg(\"0755\")\n    out = out.add_target(install)\n    var aggregate = target_new(.Group, \"toolchain\", \"\")\n    aggregate = aggregate.dep(\"bytes-same\")\n    aggregate = aggregate.dep(\"fix-same\")\n    aggregate = aggregate.dep(\"rsp\")\n    aggregate = aggregate.dep(\"helper-a\")\n    aggregate = aggregate.dep(\"embedded-helper-o\")\n    aggregate = aggregate.dep(\"promote-runtime\")\n    aggregate = aggregate.dep(\"corpus\")\n    aggregate = aggregate.dep(\"run-two\")\n    aggregate = aggregate.dep(\"install-two\")\n    out = out.add_target(aggregate)\n    out.default(\"toolchain\")\n"
+    "use std.build\n\n" ++
+    "pub fn build(ctx: BuildCtx) -> Build:\n" ++
+    "    var out = ctx.new_build().executable(\"one\", \"src/one.w\")\n" ++
+    "    out = out.executable(\"two\", \"src/two.w\")\n" ++
+    "    out = out.object(\"one-o\", \"src/one.w\")\n" ++
+    "    out = out.archive(\"one-a\", \"src/one.w\")\n" ++
+    "    out = out.generated_source(\"out/tmp/a.txt\", \"same\")\n" ++
+    "    out = out.generated_source(\"out/tmp/b.txt\", \"same\")\n" ++
+    "    out = out.binary_compare(\"bytes-same\", \"out/tmp/a.txt\", \"out/tmp/b.txt\")\n" ++
+    "    out = out.fixpoint_compare(\"fix-same\", \"out/tmp/a.txt\", \"out/tmp/b.txt\")\n" ++
+    "    var rsp = target_new(.GenerateResponseFile, \"rsp\", \"\").output(\"out/tmp/args.rsp\")\n" ++
+    "    rsp = rsp.arg(\"-L/some path\")\n" ++
+    "    rsp = rsp.arg(\"plain\")\n" ++
+    "    out = out.add_target(rsp)\n" ++
+    "    out = out.compile_c_object(\"helper-o\", \"runtime/helper.c\", \"out/lib/helper.o\")\n" ++
+    "    var archive = target_new(.CreateStaticArchive, \"helper-a\", \"\").output(\"out/lib/libhelper.a\")\n" ++
+    "    archive = archive.input(\"out/lib/helper.o\")\n" ++
+    "    out = out.add_target(archive)\n" ++
+    "    var embedded = target_new(.EmbedObjectFiles, \"embed-helper\", \"\").output(\"out/lib/embedded_helper.s\")\n" ++
+    "    embedded = embedded.input(\"out/lib/helper.o\")\n" ++
+    "    embedded = embedded.arg(\"helper_o\")\n" ++
+    "    out = out.add_target(embedded)\n" ++
+    "    out = out.compile_asm_object(\"embedded-helper-o\", \"out/lib/embedded_helper.s\", \"out/lib/embedded_helper.o\")\n" ++
+    "    out = out.copy_file(\"helper-copy\", \"runtime/helper.c\", \"out/copied/helper.c\")\n" ++
+    "    var copy_target = target_new(.CopyTree, \"runtime-copy\", \"runtime\").output(\"out/runtime\")\n" ++
+    "    copy_target = copy_target.input(\"helper.c\")\n" ++
+    "    out = out.add_target(copy_target)\n" ++
+    "    var promote = target_new(.PromoteTreeIfVerified, \"promote-runtime\", \"out/runtime\").output(\"promoted-runtime\")\n" ++
+    "    promote = promote.input(\"helper.c\")\n" ++
+    "    promote = promote.dep(\"runtime-copy\")\n" ++
+    "    out = out.add_target(promote)\n" ++
+    "    var corpus = target_new(.RunCorpusTest, \"corpus\", \"out/bin/two\")\n" ++
+    "    corpus = corpus.dep(\"two\")\n" ++
+    "    out = out.add_target(corpus)\n" ++
+    "    var command = target_new(.Command, \"run-two\", \"out/bin/two\")\n" ++
+    "    command = command.dep(\"two\")\n" ++
+    "    out = out.add_target(command)\n" ++
+    "    var install = target_new(.Install, \"install-two\", \"out/bin/two\").output(\"out/install/two\")\n" ++
+    "    install = install.dep(\"two\")\n" ++
+    "    install = install.arg(\"0755\")\n" ++
+    "    out = out.add_target(install)\n" ++
+    "    var aggregate = target_new(.Group, \"toolchain\", \"\")\n" ++
+    "    aggregate = aggregate.dep(\"bytes-same\")\n" ++
+    "    aggregate = aggregate.dep(\"fix-same\")\n" ++
+    "    aggregate = aggregate.dep(\"rsp\")\n" ++
+    "    aggregate = aggregate.dep(\"one-o\")\n" ++
+    "    aggregate = aggregate.dep(\"one-a\")\n" ++
+    "    aggregate = aggregate.dep(\"helper-a\")\n" ++
+    "    aggregate = aggregate.dep(\"embedded-helper-o\")\n" ++
+    "    aggregate = aggregate.dep(\"helper-copy\")\n" ++
+    "    aggregate = aggregate.dep(\"promote-runtime\")\n" ++
+    "    aggregate = aggregate.dep(\"corpus\")\n" ++
+    "    aggregate = aggregate.dep(\"run-two\")\n" ++
+    "    aggregate = aggregate.dep(\"install-two\")\n" ++
+    "    out = out.add_target(aggregate)\n" ++
+    "    out.default(\"toolchain\")\n"
+
+fn bgs_require_case_file(case_dir: str, rel_path: str, target_name: str, label: str) -> i32:
+    let path = bgs_resolve_join(case_dir, rel_path)
+    if with_fs_file_exists(path) != 0:
+        return 0
+    with_eprint("error: " ++ target_name ++ " " ++ label ++ " missing expected output: " ++ rel_path)
+    1
+
+fn bgs_forbid_case_file(case_dir: str, rel_path: str, target_name: str, label: str) -> i32:
+    let path = bgs_resolve_join(case_dir, rel_path)
+    if with_fs_file_exists(path) == 0:
+        return 0
+    with_eprint("error: " ++ target_name ++ " " ++ label ++ " produced unexpected output: " ++ rel_path)
+    1
 
 fn bgs_check_build_w_graph_v2(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
     var rc = bgs_write_project_manifest(case_dir, "buildwgraphv2", target_name)
@@ -1282,6 +1351,10 @@ fn bgs_check_build_w_graph_v2(root: str, target_name: str, compiler_path: str, c
     if rc != 0: return rc
     rc = bgs_assert_contains(graph_result.stdout, "default_target\ttoolchain", target_name, "build_w_graph_v2")
     if rc != 0: return rc
+    rc = bgs_assert_contains(graph_result.stdout, "target\t3\tone-o\tsrc/one.w\t0\t0\t", target_name, "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bgs_assert_contains(graph_result.stdout, "target\t4\tone-a\tsrc/one.w\t0\t0\t", target_name, "build_w_graph_v2")
+    if rc != 0: return rc
     rc = bgs_assert_contains(graph_result.stdout, "target\t12\thelper-o\truntime/helper.c\t0\t0\tout/lib/helper.o", target_name, "build_w_graph_v2")
     if rc != 0: return rc
     rc = bgs_assert_contains(graph_result.stdout, "target\t15\thelper-a\t\t0\t0\tout/lib/libhelper.a", target_name, "build_w_graph_v2")
@@ -1295,6 +1368,8 @@ fn bgs_check_build_w_graph_v2(root: str, target_name: str, compiler_path: str, c
     rc = bgs_assert_contains(graph_result.stdout, "target\t7\trun-two\tout/bin/two\t0\t0\t", target_name, "build_w_graph_v2")
     if rc != 0: return rc
     rc = bgs_assert_contains(graph_result.stdout, "target\t8\tinstall-two\tout/bin/two\t0\t0\tout/install/two", target_name, "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bgs_assert_contains(graph_result.stdout, "target\t22\thelper-copy\truntime/helper.c\t0\t0\tout/copied/helper.c", target_name, "build_w_graph_v2")
     if rc != 0: return rc
     let selected = bgs_build_expect_success(root, target_name, compiler_path, case_dir, "build-w-graph-selected", bgs_argv_append(bgs_argv_append(bgs_argv_append("", "build"), ":two"), "--graph"))
     if selected.rc != 0: return if selected.rc == 0: 1 else: selected.rc
@@ -1310,9 +1385,30 @@ fn bgs_check_build_w_graph_v2(root: str, target_name: str, compiler_path: str, c
     if rc != 0: return rc
     let full = bgs_build_expect_success(root, target_name, compiler_path, case_dir, "build-w-full-graph", bgs_argv_append("", "build"))
     if full.rc != 0: return if full.rc == 0: 1 else: full.rc
-    if with_fs_file_exists(bgs_resolve_join(case_dir, "out/lib/helper.o")) == 0 or with_fs_file_exists(bgs_resolve_join(case_dir, "out/lib/libhelper.a")) == 0 or with_fs_file_exists(bgs_resolve_join(case_dir, "out/lib/embedded_helper.s")) == 0 or with_fs_file_exists(bgs_resolve_join(case_dir, "out/lib/embedded_helper.o")) == 0 or with_fs_file_exists(bgs_resolve_join(case_dir, "out/runtime/helper.c")) == 0 or with_fs_file_exists(bgs_resolve_join(case_dir, "promoted-runtime/helper.c")) == 0 or with_fs_file_exists(bgs_resolve_join(case_dir, "out/corpus/corpus/stdout.txt")) == 0 or with_fs_file_exists(bgs_resolve_join(case_dir, "out/command/run-two/stdout.txt")) == 0 or with_fs_file_exists(bgs_resolve_join(case_dir, "out/install/two")) == 0:
-        with_eprint("error: build_w_graph_v2 missing one or more expected outputs")
-        return 1
+    rc = bgs_require_case_file(case_dir, "out/obj/one-o.o", target_name, "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bgs_require_case_file(case_dir, "out/lib/libone-a.a", target_name, "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bgs_require_case_file(case_dir, "out/lib/helper.o", target_name, "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bgs_require_case_file(case_dir, "out/lib/libhelper.a", target_name, "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bgs_require_case_file(case_dir, "out/lib/embedded_helper.s", target_name, "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bgs_require_case_file(case_dir, "out/lib/embedded_helper.o", target_name, "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bgs_require_case_file(case_dir, "out/copied/helper.c", target_name, "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bgs_require_case_file(case_dir, "out/runtime/helper.c", target_name, "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bgs_require_case_file(case_dir, "promoted-runtime/helper.c", target_name, "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bgs_require_case_file(case_dir, "out/corpus/corpus/stdout.txt", target_name, "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bgs_require_case_file(case_dir, "out/command/run-two/stdout.txt", target_name, "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bgs_require_case_file(case_dir, "out/install/two", target_name, "build_w_graph_v2")
+    if rc != 0: return rc
     rc = bgs_expect_file_contains(bgs_resolve_join(case_dir, "out/corpus/corpus/stdout.txt"), "two", target_name, "build_w_graph_corpus")
     if rc != 0: return rc
     rc = bgs_expect_file_contains(bgs_resolve_join(case_dir, "out/command/run-two/stdout.txt"), "two", target_name, "build_w_graph_command")
@@ -1322,9 +1418,24 @@ fn bgs_check_build_w_graph_v2(root: str, target_name: str, compiler_path: str, c
     let _remove_out1 = with_fs_remove_dir(bgs_resolve_join(case_dir, "out"))
     let group = bgs_build_expect_success(root, target_name, compiler_path, case_dir, "build-w-group-deps", bgs_argv_append(bgs_argv_append("", "build"), ":toolchain"))
     if group.rc != 0: return if group.rc == 0: 1 else: group.rc
-    if with_fs_file_exists(bgs_resolve_join(case_dir, "out/bin/two")) == 0 or with_fs_file_exists(bgs_resolve_join(case_dir, "out/bin/one")) != 0 or with_fs_file_exists(bgs_resolve_join(case_dir, "out/lib/libhelper.a")) == 0 or with_fs_file_exists(bgs_resolve_join(case_dir, "out/corpus/corpus/stdout.txt")) == 0 or with_fs_file_exists(bgs_resolve_join(case_dir, "out/command/run-two/stdout.txt")) == 0 or with_fs_file_exists(bgs_resolve_join(case_dir, "out/install/two")) == 0:
-        with_eprint("error: build_w_graph_v2 group dependency outputs were wrong")
-        return 1
+    rc = bgs_require_case_file(case_dir, "out/bin/two", target_name, "build_w_graph_group")
+    if rc != 0: return rc
+    rc = bgs_forbid_case_file(case_dir, "out/bin/one", target_name, "build_w_graph_group")
+    if rc != 0: return rc
+    rc = bgs_require_case_file(case_dir, "out/obj/one-o.o", target_name, "build_w_graph_group")
+    if rc != 0: return rc
+    rc = bgs_require_case_file(case_dir, "out/lib/libone-a.a", target_name, "build_w_graph_group")
+    if rc != 0: return rc
+    rc = bgs_require_case_file(case_dir, "out/lib/libhelper.a", target_name, "build_w_graph_group")
+    if rc != 0: return rc
+    rc = bgs_require_case_file(case_dir, "out/copied/helper.c", target_name, "build_w_graph_group")
+    if rc != 0: return rc
+    rc = bgs_require_case_file(case_dir, "out/corpus/corpus/stdout.txt", target_name, "build_w_graph_group")
+    if rc != 0: return rc
+    rc = bgs_require_case_file(case_dir, "out/command/run-two/stdout.txt", target_name, "build_w_graph_group")
+    if rc != 0: return rc
+    rc = bgs_require_case_file(case_dir, "out/install/two", target_name, "build_w_graph_group")
+    if rc != 0: return rc
     let _remove_out2 = with_fs_remove_dir(bgs_resolve_join(case_dir, "out"))
     let bytes = bgs_build_expect_success(root, target_name, compiler_path, case_dir, "build-w-binary-compare", bgs_argv_append(bgs_argv_append("", "build"), ":bytes-same"))
     if bytes.rc != 0: return if bytes.rc == 0: 1 else: bytes.rc
@@ -1344,6 +1455,28 @@ fn bgs_check_build_w_graph_v2(root: str, target_name: str, compiler_path: str, c
         return 1
     0
 
+fn bgs_check_removed_build_kind_diagnostic(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
+    var rc = bgs_write_project_manifest(case_dir, "removedkind", target_name)
+    if rc != 0: return rc
+    rc = bgs_write_fixture(bgs_resolve_join(case_dir, "src/main.w"), "fn main:\n    print(\"unused\")\n", target_name, "removed kind source")
+    if rc != 0: return rc
+    let build_text =
+        "use std.build\n\n" ++
+        "fn removed_kind() -> BuildKind: 5 as BuildKind\n\n" ++
+        "pub fn build(ctx: BuildCtx) -> Build:\n" ++
+        "    var out = ctx.new_build()\n" ++
+        "    out = out.add_target(target_new(removed_kind(), \"old-generated-source\", \"\"))\n" ++
+        "    out.default(\"old-generated-source\")\n"
+    rc = bgs_write_fixture(bgs_resolve_join(case_dir, "build.w"), build_text, target_name, "removed kind build.w")
+    if rc != 0: return rc
+    let result = bgs_run_cli_capture_cwd(root, target_name, compiler_path, "build-w-removed-kind", bgs_argv_append("", "build"), 120000, case_dir)
+    if result.rc == 0:
+        with_eprint("error: build_w_removed_kind unexpectedly succeeded")
+        return 1
+    rc = bgs_assert_contains(result.stderr, "removed_generated_source", target_name, "build_w_removed_kind")
+    if rc != 0: return rc
+    bgs_assert_contains(result.stderr, "regenerate your build graph", target_name, "build_w_removed_kind")
+
 pub fn run_cli_selfhost_build_w_test(root: str, target_name: str, compiler_path: str) -> i32:
     let stamp = f"{with_getpid()}.{with_clock_nanos()}"
     let base_dir = bgs_resolve_join(bgs_resolve_join(bgs_resolve_join(root, "out/test-graph"), target_name), stamp)
@@ -1355,4 +1488,6 @@ pub fn run_cli_selfhost_build_w_test(root: str, target_name: str, compiler_path:
     if rc != 0: return rc
     rc = bgs_check_build_w_generated_source(root, target_name, compiler_path, base_dir)
     if rc != 0: return rc
-    bgs_check_build_w_graph_v2(root, target_name, compiler_path, bgs_resolve_join(base_dir, "graph_v2"))
+    rc = bgs_check_build_w_graph_v2(root, target_name, compiler_path, bgs_resolve_join(base_dir, "graph_v2"))
+    if rc != 0: return rc
+    bgs_check_removed_build_kind_diagnostic(root, target_name, compiler_path, bgs_resolve_join(base_dir, "removed_kind"))
