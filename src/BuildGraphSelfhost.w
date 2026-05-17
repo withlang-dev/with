@@ -1563,6 +1563,56 @@ fn bgs_check_build_w_action_failures(root: str, target_name: str, compiler_path:
     rc = bgs_assert_contains(failure.stderr, "failed with exit code 7", target_name, "build_w_action_failure")
     if rc != 0: return rc
 
+    let undeclared_dir = bgs_resolve_join(base_dir, "undeclared_output")
+    rc = bgs_write_project_manifest(undeclared_dir, "actionundeclared", target_name)
+    if rc != 0: return rc
+    rc = bgs_write_fixture(bgs_resolve_join(undeclared_dir, "src/main.w"), "fn main:\n    print(\"unused\")\n", target_name, "action undeclared source")
+    if rc != 0: return rc
+    let undeclared_build =
+        "use std.build\n\n" ++
+        "fn bad_write(ctx: ActionCtx) -> i32:\n" ++
+        "    assert(ctx.fs().write_text(\"out/action/other.txt\", \"bad\") == 0)\n" ++
+        "    0\n\n" ++
+        "pub fn build(ctx: BuildCtx) -> Build:\n" ++
+        "    var out = ctx.new_build()\n" ++
+        "    var target = target_new(.Action, \"bad-write\", \"\").output(\"out/action/value.txt\")\n" ++
+        "    target.action = bad_write\n" ++
+        "    out = out.add_target(target)\n" ++
+        "    out.default(\"bad-write\")\n"
+    rc = bgs_write_fixture(bgs_resolve_join(undeclared_dir, "build.w"), undeclared_build, target_name, "action undeclared build.w")
+    if rc != 0: return rc
+    let undeclared = bgs_run_cli_capture_cwd(root, target_name, compiler_path, "build-w-action-undeclared-output", bgs_argv_append("", "build"), 120000, undeclared_dir)
+    if undeclared.rc == 0:
+        with_eprint("error: build_w_action_undeclared_output unexpectedly succeeded")
+        return 1
+    rc = bgs_assert_contains(undeclared.stderr, "not a declared action output", target_name, "build_w_action_undeclared_output")
+    if rc != 0: return rc
+
+    let escape_dir = bgs_resolve_join(base_dir, "escape_output")
+    rc = bgs_write_project_manifest(escape_dir, "actionescape", target_name)
+    if rc != 0: return rc
+    rc = bgs_write_fixture(bgs_resolve_join(escape_dir, "src/main.w"), "fn main:\n    print(\"unused\")\n", target_name, "action escape source")
+    if rc != 0: return rc
+    let escape_build =
+        "use std.build\n\n" ++
+        "fn bad_escape(ctx: ActionCtx) -> i32:\n" ++
+        "    assert(ctx.fs().write_text(\"../outside.txt\", \"bad\") == 0)\n" ++
+        "    0\n\n" ++
+        "pub fn build(ctx: BuildCtx) -> Build:\n" ++
+        "    var out = ctx.new_build()\n" ++
+        "    var target = target_new(.Action, \"bad-escape\", \"\").output(\"out/action/value.txt\")\n" ++
+        "    target.action = bad_escape\n" ++
+        "    out = out.add_target(target)\n" ++
+        "    out.default(\"bad-escape\")\n"
+    rc = bgs_write_fixture(bgs_resolve_join(escape_dir, "build.w"), escape_build, target_name, "action escape build.w")
+    if rc != 0: return rc
+    let escape = bgs_run_cli_capture_cwd(root, target_name, compiler_path, "build-w-action-escape-output", bgs_argv_append("", "build"), 120000, escape_dir)
+    if escape.rc == 0:
+        with_eprint("error: build_w_action_escape_output unexpectedly succeeded")
+        return 1
+    rc = bgs_assert_contains(escape.stderr, "ToolFs path escapes project root", target_name, "build_w_action_escape_output")
+    if rc != 0: return rc
+
     0
 
 pub fn run_cli_selfhost_build_w_test(root: str, target_name: str, compiler_path: str) -> i32:

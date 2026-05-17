@@ -197,21 +197,31 @@ Commit after this phase.
 Goal: action targets receive only the filesystem/process/install privileges
 they explicitly declare.
 
-Remaining action hardening:
+Status: scoped action filesystem writes are implemented and verified in the
+`Harden action ToolFs write scope` slice. Remaining action process/install
+policy declarations stay tracked below.
+
+Completed action hardening:
 
 - scoped `ToolFs` writes for declared outputs;
 - undeclared output rejection;
 - action path escape diagnostics;
+
+Remaining action hardening:
+
 - action timeout support;
 - action cwd/env support;
 - network-access declaration;
 - install-path access declaration.
 
-Required tests:
+Implemented tests:
 
 - undeclared action output is rejected;
 - `..` and absolute write paths are rejected;
 - declared output directories may be created;
+
+Required remaining tests:
+
 - timeout terminates the action and reports the target name;
 - cwd/env are available only when declared;
 - install-path writes require explicit install capability.

@@ -409,10 +409,10 @@ pub fn build(ctx: BuildCtx) -> Build:
 
 Action functions receive `ActionCtx`, which exposes the target name, project
 metadata, diagnostics, process runner, declared inputs, declared outputs, and a
-project filesystem capability. Declared inputs and outputs are part of the
-graph contract: missing declared inputs fail before the action runs, and the
-driver verifies that the declared primary output exists after a successful
-action.
+scoped project filesystem capability. Declared inputs and outputs are part of
+the graph contract: missing declared inputs fail before the action runs, action
+filesystem writes are restricted to declared outputs, and the driver verifies
+that the declared primary output exists after a successful action.
 
 Selecting a target that depends on an action runs the action first:
 
