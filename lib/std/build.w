@@ -124,6 +124,7 @@ pub type Target {
     include_paths: Vec[str],
     defines: Vec[str],
     inputs: Vec[str],
+    extra_outputs: Vec[str],
     deps: Vec[str],
     args: Vec[str],
     action: fn(ActionCtx) -> i32,
@@ -398,6 +399,7 @@ pub fn target_new(kind: BuildKind, name: str, entry: str) -> Target:
         include_paths: Vec.new(),
         defines: Vec.new(),
         inputs: Vec.new(),
+        extra_outputs: Vec.new(),
         deps: Vec.new(),
         args: Vec.new(),
         action: build_noop_action,
@@ -518,6 +520,7 @@ pub fn Target.target(self: Target, target: BuildTarget) -> Target:
         include_paths: self.include_paths,
         defines: self.defines,
         inputs: self.inputs,
+        extra_outputs: self.extra_outputs,
         deps: self.deps,
         args: self.args,
         action: self.action,
@@ -535,6 +538,7 @@ pub fn Target.optimize(self: Target, mode: OptimizeMode) -> Target:
         include_paths: self.include_paths,
         defines: self.defines,
         inputs: self.inputs,
+        extra_outputs: self.extra_outputs,
         deps: self.deps,
         args: self.args,
         action: self.action,
@@ -564,6 +568,7 @@ pub fn Target.output(self: Target, output: str) -> Target:
         include_paths: self.include_paths,
         defines: self.defines,
         inputs: self.inputs,
+        extra_outputs: self.extra_outputs,
         deps: self.deps,
         args: self.args,
         action: self.action,
@@ -571,6 +576,10 @@ pub fn Target.output(self: Target, output: str) -> Target:
 
 pub fn Target.input(mut self: Target, input: str) -> Target:
     self.inputs.push(input)
+    self
+
+pub fn Target.extra_output(mut self: Target, path: str) -> Target:
+    self.extra_outputs.push(path)
     self
 
 pub fn Target.dep(mut self: Target, dep: str) -> Target:
@@ -589,6 +598,8 @@ fn build_action_outputs(target: Target) -> Vec[str]:
     let outputs: Vec[str] = Vec.new()
     if target.output.len() > 0:
         outputs.push(target.output)
+    for i in 0..target.extra_outputs.len() as i32:
+        outputs.push(target.extra_outputs.get(i as i64))
     outputs
 
 fn build_action_ctx(ctx: BuildCtx, target: Target) -> ActionCtx:
@@ -649,6 +660,8 @@ pub fn Build.emit_graph(self: Build) -> str:
             out = out ++ "define\t" ++ f"{ti}\t" ++ build_graph_escape(target.defines.get(di as i64)) ++ "\n"
         for ini in 0..target.inputs.len() as i32:
             out = out ++ "input\t" ++ f"{ti}\t" ++ build_graph_escape(target.inputs.get(ini as i64)) ++ "\n"
+        for outi in 0..target.extra_outputs.len() as i32:
+            out = out ++ "extra_output\t" ++ f"{ti}\t" ++ build_graph_escape(target.extra_outputs.get(outi as i64)) ++ "\n"
         for depi in 0..target.deps.len() as i32:
             out = out ++ "dep\t" ++ f"{ti}\t" ++ build_graph_escape(target.deps.get(depi as i64)) ++ "\n"
         for ai in 0..target.args.len() as i32:

@@ -199,13 +199,15 @@ Commit after this phase.
 Goal: action targets receive only the filesystem/process/install privileges
 they explicitly declare.
 
-Status: scoped action filesystem writes are implemented and verified in the
-`Harden action ToolFs write scope` slice. Remaining action process/install
-policy declarations stay tracked below.
+Status: scoped action filesystem writes are implemented and verified. The
+`Declare extra action outputs` slice added graph-level extra outputs so actions
+can declare every file or directory they are allowed to create. Remaining action
+process/install policy declarations stay tracked below.
 
 Completed action hardening:
 
 - scoped `ToolFs` writes for declared outputs;
+- extra declared action outputs;
 - undeclared output rejection;
 - action path escape diagnostics;
 
@@ -219,6 +221,7 @@ Remaining action hardening:
 Implemented tests:
 
 - undeclared action output is rejected;
+- extra declared action output is writable and verified;
 - `..` and absolute write paths are rejected;
 - declared output directories may be created;
 

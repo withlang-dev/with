@@ -1494,10 +1494,12 @@ fn bgs_check_build_w_action_target(root: str, target_name: str, compiler_path: s
         "    assert(ctx.fs().read_text(ctx.inputs().get(0)) == \"input\")\n" ++
         "    assert(ctx.fs().mkdir_all(\"out/action\") == 0)\n" ++
         "    assert(ctx.fs().write_text(ctx.output(), \"action:\" ++ ctx.args().get(0)) == 0)\n" ++
+        "    assert(ctx.fs().write_text(ctx.outputs().get(1), \"extra:\" ++ ctx.args().get(0)) == 0)\n" ++
         "    0\n\n" ++
         "pub fn build(ctx: BuildCtx) -> Build:\n" ++
         "    var out = ctx.new_build()\n" ++
         "    var generate_target = target_new(.Action, \"generate\", \"\").output(\"out/action/value.txt\")\n" ++
+        "    generate_target = generate_target.extra_output(\"out/action/extra.txt\")\n" ++
         "    generate_target = generate_target.input(\"src/input.txt\")\n" ++
         "    generate_target = generate_target.arg(\"hello\")\n" ++
         "    generate_target.action = generate\n" ++
@@ -1510,7 +1512,9 @@ fn bgs_check_build_w_action_target(root: str, target_name: str, compiler_path: s
     if rc != 0: return rc
     let result = bgs_build_expect_success(root, target_name, compiler_path, case_dir, "build-w-action-target", bgs_argv_append("", "build"))
     if result.rc != 0: return if result.rc == 0: 1 else: result.rc
-    bgs_expect_file_contains(bgs_resolve_join(case_dir, "out/action/value.txt"), "action:hello", target_name, "build_w_action_target")
+    rc = bgs_expect_file_contains(bgs_resolve_join(case_dir, "out/action/value.txt"), "action:hello", target_name, "build_w_action_target")
+    if rc != 0: return rc
+    bgs_expect_file_contains(bgs_resolve_join(case_dir, "out/action/extra.txt"), "extra:hello", target_name, "build_w_action_extra_output")
 
 fn bgs_check_build_w_action_failures(root: str, target_name: str, compiler_path: str, base_dir: str) -> i32:
     let missing_dir = bgs_resolve_join(base_dir, "missing_input")
