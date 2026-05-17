@@ -477,6 +477,7 @@ fn rt_list_files_append_line(out: str, path: *const u8) -> str:
     with_str_concat(with_str_concat(out, with_str_from_cstr(path)), rt_newline_str())
 
 fn rt_list_files_walk(path: *const u8, out: str) -> str:
+    // TODO: partial-result on directory enumeration errors; propagate failures when callers need completeness guarantees.
     var mode: i32 = 0
     let stat_rc = rt_lstat_mode(path, &mode as *mut i32)
     if stat_rc != 0:
