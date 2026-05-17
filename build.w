@@ -1,7 +1,6 @@
 use std.build
 
 fn project_kind_embedded_runtime_extract_test() -> BuildKind: 1000 as BuildKind
-fn project_kind_selfhost_noop_local_regression() -> BuildKind: 1001 as BuildKind
 fn project_kind_generate_compiler_entrypoints() -> BuildKind: 1003 as BuildKind
 fn project_kind_with_compiler_build() -> BuildKind: 1004 as BuildKind
 fn project_kind_pcre2_run_test() -> BuildKind: 1005 as BuildKind
@@ -44,6 +43,133 @@ fn install_file_target(name: str, source: str, dest: str, mode: str, dep: str) -
     if dep.len() > 0:
         target = target.dep(dep)
     target
+
+fn build_project_join(left: str, right: str) -> str:
+    if left.len() == 0:
+        return right
+    if right.len() == 0:
+        return left
+    if left.ends_with("/"):
+        return left ++ right
+    left ++ "/" ++ right
+
+fn build_project_abs(root: str, path: str) -> str:
+    if path.len() > 0 and path.byte_at(0) == 47:
+        return path
+    build_project_join(root, path)
+
+fn build_trim_trailing_line_endings(text: str) -> str:
+    var end = text.len()
+    while end > 0:
+        let ch = text.byte_at(end - 1)
+        if ch != 10 and ch != 13:
+            break
+        end = end - 1
+    text.slice(0, end)
+
+fn build_replace_once(text: str, needle: str, replacement: str) -> str:
+    let idx = text.find(needle)
+    if idx < 0:
+        return ""
+    text.slice(0, idx) ++ replacement ++ text.slice(idx + needle.len(), text.len())
+
+fn build_action_argv_append(mut args: Vec[str], arg: str) -> Vec[str]:
+    args.push(arg)
+    args
+
+fn issue61_fail(ctx: ActionCtx, message: str) -> i32:
+    ctx.diagnostics().error("issue61-regression: " ++ message)
+    1
+
+fn issue61_run(ctx: ActionCtx, label: str, args: Vec[str], timeout_ms: i32) -> i32:
+    let output_dir = ctx.output()
+    let stdout_path = build_project_join(output_dir, label ++ ".stdout")
+    let stderr_path = build_project_join(output_dir, label ++ ".stderr")
+    let result = ctx.process_runner().run_capture(args, stdout_path, stderr_path, timeout_ms)
+    if result.rc == 124:
+        return issue61_fail(ctx, label ++ " timed out; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+    if result.rc != 0:
+        return issue61_fail(ctx, label ++ f" failed with exit code {result.rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+    0
+
+fn issue61_regression_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    if inputs.len() == 0:
+        return issue61_fail(ctx, "missing compiler input")
+    let fs = ctx.fs()
+    let output_dir = ctx.output()
+    if fs.mkdir_all(output_dir) != 0:
+        return issue61_fail(ctx, "could not create output directory: " ++ output_dir)
+
+    let root = ctx.project_info().project_root()
+    let compiler_path = build_project_abs(root, inputs.get(0))
+    if not fs.exists(inputs.get(0)):
+        return issue61_fail(ctx, "missing compiler: " ++ inputs.get(0))
+
+    let repo_copy = build_project_join(output_dir, "repo")
+    if fs.exists(repo_copy):
+        var rm_args: Vec[str] = Vec.new()
+        rm_args = build_action_argv_append(rm_args, "/bin/rm")
+        rm_args = build_action_argv_append(rm_args, "-rf")
+        rm_args = build_action_argv_append(rm_args, build_project_abs(root, repo_copy))
+        let rm_rc = issue61_run(ctx, "rm-repo", rm_args, 60000)
+        if rm_rc != 0:
+            return rm_rc
+    if fs.mkdir_all(repo_copy) != 0:
+        return issue61_fail(ctx, "could not create repo copy directory: " ++ repo_copy)
+
+    var cp_args: Vec[str] = Vec.new()
+    cp_args = build_action_argv_append(cp_args, "/bin/cp")
+    cp_args = build_action_argv_append(cp_args, "-R")
+    cp_args = build_action_argv_append(cp_args, build_project_abs(root, "src"))
+    cp_args = build_action_argv_append(cp_args, build_project_abs(root, build_project_join(repo_copy, "src")))
+    let cp_rc = issue61_run(ctx, "cp-src", cp_args, 60000)
+    if cp_rc != 0:
+        return cp_rc
+
+    var ln_args: Vec[str] = Vec.new()
+    ln_args = build_action_argv_append(ln_args, "/bin/ln")
+    ln_args = build_action_argv_append(ln_args, "-s")
+    ln_args = build_action_argv_append(ln_args, build_project_abs(root, "lib"))
+    ln_args = build_action_argv_append(ln_args, build_project_abs(root, build_project_join(repo_copy, "lib")))
+    let ln_rc = issue61_run(ctx, "ln-lib", ln_args, 60000)
+    if ln_rc != 0:
+        return ln_rc
+
+    let embedded_src = "out/gen/compiler/EmbeddedStdlibData.w"
+    let embedded_dst = build_project_join(repo_copy, "out/gen/compiler/EmbeddedStdlibData.w")
+    if fs.mkdir_all(build_project_join(repo_copy, "out/gen/compiler")) != 0:
+        return issue61_fail(ctx, "could not create embedded stdlib data directory")
+    if fs.write_text(embedded_dst, fs.read_text(embedded_src)) != 0:
+        return issue61_fail(ctx, "could not copy embedded stdlib data module")
+
+    let sema_path = build_project_join(repo_copy, "src/SemaCheck.w")
+    let sema_text = fs.read_text(sema_path)
+    let marker = "    // Check all arguments (with expected-type propagation for Atomic ordering params)"
+    let replacement = marker ++ "\n    var mc_issue61_padding_local: i32 = 0"
+    let patched = build_replace_once(sema_text, marker, replacement)
+    if patched.len() == 0:
+        return issue61_fail(ctx, "missing insertion point in " ++ sema_path)
+    if fs.write_text(sema_path, patched) != 0:
+        return issue61_fail(ctx, "could not patch " ++ sema_path)
+    if not fs.read_text(sema_path).contains("mc_issue61_padding_local"):
+        return issue61_fail(ctx, "failed to inject noop local")
+
+    let stdout_path = build_project_abs(root, build_project_join(output_dir, "check.stdout"))
+    let stderr_path = build_project_abs(root, build_project_join(output_dir, "check.stderr"))
+    var check_args: Vec[str] = Vec.new()
+    check_args = build_action_argv_append(check_args, compiler_path)
+    check_args = build_action_argv_append(check_args, "check")
+    check_args = build_action_argv_append(check_args, "src/main.w")
+    let check = ctx.process_runner().run_capture_cwd(check_args, stdout_path, stderr_path, 60000, build_project_abs(root, repo_copy))
+    if check.rc == 124:
+        return issue61_fail(ctx, "check timed out; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+    if check.rc != 0:
+        return issue61_fail(ctx, f"check failed with exit code {check.rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+    let output = build_trim_trailing_line_endings(check.stdout)
+    if output != "ok":
+        return issue61_fail(ctx, "check produced unexpected output: " ++ output)
+    0
 
 pub fn build(ctx: BuildCtx) -> Build:
     var out = ctx.new_build()
@@ -432,7 +558,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     c_migrator_tests = c_migrator_tests.dep("c-migrator-pcre2-prep-tests")
     out = out.add_target(c_migrator_tests)
 
-    var issue61_regression = target_new(project_kind_selfhost_noop_local_regression(), "issue61-regression", "out/bin/with-stage2")
+    var issue61_regression = target_new(.Action, "issue61-regression", "").output("out/test-graph/issue61-regression")
+    issue61_regression.action = issue61_regression_action
     issue61_regression = issue61_regression.input("out/bin/with-stage2")
     issue61_regression = issue61_regression.dep("selfcheck")
     out = out.add_target(issue61_regression)

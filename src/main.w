@@ -1010,83 +1010,6 @@ fn build_graph_run_embedded_runtime_extract_test(root: str, target: BuildGraphTa
         return 1
     0
 
-fn build_graph_run_selfhost_noop_local_regression(root: str, target: BuildGraphTarget) -> i32:
-    if target.entry.len() == 0:
-        with_eprint("error: selfhost_noop_local_regression target '" ++ target.name ++ "' requires a compiler path")
-        return 1
-    let arg_rc = build_graph_validate_process_args(target)
-    if arg_rc != 0:
-        return arg_rc
-    let compiler_path = build_graph_resolve_project_path(root, target.entry)
-    if with_fs_file_exists(compiler_path) == 0:
-        with_eprint("error: selfhost_noop_local_regression target '" ++ target.name ++ "' missing compiler: " ++ compiler_path)
-        return 1
-    let stamp = f"{with_getpid()}.{with_clock_nanos()}"
-    let test_dir = resolve_join(resolve_join(resolve_join(root, "out/test-graph"), target.name), stamp)
-    if with_fs_mkdir_p(test_dir) != 0:
-        with_eprint("error: could not create issue61 regression directory: " ++ test_dir)
-        return 1
-    let repo_copy = resolve_join(test_dir, "repo")
-    if with_fs_mkdir_p(repo_copy) != 0:
-        with_eprint("error: could not create issue61 repo copy directory: " ++ repo_copy)
-        return 1
-    var cp_argv = ""
-    cp_argv = build_graph_argv_append(cp_argv, "/bin/cp")
-    cp_argv = build_graph_argv_append(cp_argv, "-R")
-    cp_argv = build_graph_argv_append(cp_argv, resolve_join(root, "src"))
-    cp_argv = build_graph_argv_append(cp_argv, resolve_join(repo_copy, "src"))
-    let cp_rc = build_graph_run_tool_capture(root, target, "cp-src", cp_argv, 60000)
-    if cp_rc != 0:
-        return cp_rc
-    var ln_argv = ""
-    ln_argv = build_graph_argv_append(ln_argv, "/bin/ln")
-    ln_argv = build_graph_argv_append(ln_argv, "-s")
-    ln_argv = build_graph_argv_append(ln_argv, resolve_join(root, "lib"))
-    ln_argv = build_graph_argv_append(ln_argv, resolve_join(repo_copy, "lib"))
-    let ln_rc = build_graph_run_tool_capture(root, target, "ln-lib", ln_argv, 60000)
-    if ln_rc != 0:
-        return ln_rc
-    let embedded_src = resolve_join(root, "out/gen/compiler/EmbeddedStdlibData.w")
-    let embedded_dst = resolve_join(repo_copy, "out/gen/compiler/EmbeddedStdlibData.w")
-    if with_fs_mkdir_p(build_graph_dirname(embedded_dst)) != 0:
-        with_eprint("error: selfhost_noop_local_regression target '" ++ target.name ++ "' could not create embedded stdlib data directory")
-        return 1
-    if with_fs_write_file(embedded_dst, with_fs_read_file(embedded_src)) != 0:
-        with_eprint("error: selfhost_noop_local_regression target '" ++ target.name ++ "' could not copy embedded stdlib data module")
-        return 1
-    let sema_path = resolve_join(resolve_join(repo_copy, "src"), "SemaCheck.w")
-    let sema_text = with_fs_read_file(sema_path)
-    let marker = "    // Check all arguments (with expected-type propagation for Atomic ordering params)"
-    let replacement = marker ++ "\n    var mc_issue61_padding_local: i32 = 0"
-    let patched = build_graph_replace_once(sema_text, marker, replacement)
-    if patched.len() == 0:
-        with_eprint("error: selfhost_noop_local_regression target '" ++ target.name ++ "' missing insertion point in " ++ sema_path)
-        return 1
-    if with_fs_write_file(sema_path, patched) != 0:
-        with_eprint("error: selfhost_noop_local_regression target '" ++ target.name ++ "' could not patch " ++ sema_path)
-        return 1
-    if with_str_contains(with_fs_read_file(sema_path), "mc_issue61_padding_local") == 0:
-        with_eprint("error: selfhost_noop_local_regression target '" ++ target.name ++ "' failed to inject noop local")
-        return 1
-    let stdout_path = resolve_join(test_dir, "check.stdout")
-    let stderr_path = resolve_join(test_dir, "check.stderr")
-    var check_argv = ""
-    check_argv = build_graph_argv_append(check_argv, compiler_path)
-    check_argv = build_graph_argv_append(check_argv, "check")
-    check_argv = build_graph_argv_append(check_argv, "src/main.w")
-    let check_rc = with_exec_argv_capture_cwd(check_argv, stdout_path, stderr_path, 60000, repo_copy)
-    if check_rc == 124:
-        with_eprint("error: selfhost_noop_local_regression target '" ++ target.name ++ "' timed out; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
-        return 124
-    if check_rc != 0:
-        with_eprint("error: selfhost_noop_local_regression target '" ++ target.name ++ f"' failed with exit code {check_rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
-        return if check_rc == 0: 1 else: check_rc
-    let output = build_graph_trim_trailing_line_endings(with_fs_read_file(stdout_path))
-    if output != "ok":
-        with_eprint("error: selfhost_noop_local_regression target '" ++ target.name ++ "' produced unexpected output: " ++ output)
-        return 1
-    0
-
 fn build_graph_assert_contains(text: str, needle: str, target: BuildGraphTarget, label: str) -> i32:
     if with_str_contains(text, needle) != 0:
         return 0
@@ -1722,12 +1645,6 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, opt_level: 
             let embedded_rc = build_graph_run_embedded_runtime_extract_test(root, target)
             if embedded_rc != 0:
                 return embedded_rc
-            completed_targets.push(target.name)
-            continue
-        if target.kind == build_graph_kind_selfhost_noop_local_regression():
-            let issue61_rc = build_graph_run_selfhost_noop_local_regression(root, target)
-            if issue61_rc != 0:
-                return issue61_rc
             completed_targets.push(target.name)
             continue
         if target.kind == build_graph_kind_cli_selfhost_smoke_test():
