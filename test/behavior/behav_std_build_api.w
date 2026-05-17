@@ -2,6 +2,9 @@
 
 use std.build
 
+fn sample_action(ctx: ActionCtx) -> i32:
+    0
+
 fn main:
     let pkg = Package { name: "demo", version: "0.1.0" }
     var b = new_build(pkg)
@@ -66,9 +69,17 @@ fn main:
     assert((copy_file.kind as i32) == 22)
     assert(copy_file.entry == "README.md")
     assert(copy_file.output == "out/README.md")
-    b = b.clean("clean")
+    var action = target_new(.Action, "generate", "").output("out/generated.txt")
+    action = action.arg("hello")
+    action.action = sample_action
+    b = b.add_target(action)
     assert(b.targets.len() == 11)
-    let clean = b.targets.get(10)
+    let action_target = b.targets.get(10)
+    assert((action_target.kind as i32) == 23)
+    assert(action_target.output == "out/generated.txt")
+    b = b.clean("clean")
+    assert(b.targets.len() == 12)
+    let clean = b.targets.get(11)
     assert((clean.kind as i32) == 21)
     assert(clean.name == "clean")
     var archive = target_new(.CreateStaticArchive, "liball", "")
@@ -78,7 +89,7 @@ fn main:
     archive = archive.dep("helper-o")
     b = b.add_target(archive)
     b = b.default("liball")
-    assert(b.targets.len() == 12)
+    assert(b.targets.len() == 13)
     assert(b.default_target == "liball")
     let graph = b.emit_graph()
     assert(graph.starts_with("WITH_BUILD_GRAPH\t2\n"))
@@ -91,7 +102,8 @@ fn main:
     assert(graph.contains("target\t8\tinstall-demo\tout/bin/demo\t0\t0\tout/install/demo"))
     assert(graph.contains("target\t18\tcopy-assets\tassets\t0\t0\tout/assets"))
     assert(graph.contains("target\t22\tcopy-readme\tREADME.md\t0\t0\tout/README.md"))
+    assert(graph.contains("target\t23\tgenerate\t\t0\t0\tout/generated.txt"))
     assert(graph.contains("target\t21\tclean\t\t0\t0\t"))
-    assert(graph.contains("input\t11\tout/lib/a.o"))
-    assert(graph.contains("dep\t11\thelper-o"))
+    assert(graph.contains("input\t12\tout/lib/a.o"))
+    assert(graph.contains("dep\t12\thelper-o"))
     print("ok")

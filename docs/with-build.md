@@ -382,6 +382,48 @@ Command  argv-based external command target
 `Command` is an escape hatch for external tools. It is still argv-based, not a
 raw shell recipe.
 
+### Project-Local Actions
+
+```text
+Action  run a project-local With function as a graph target
+```
+
+Use `Action` when a build step is specific to the project and should not become
+a compiler-driver target kind.
+
+```with
+use std.build
+
+fn generate(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    assert(fs.mkdir_all("out/gen") == 0)
+    fs.write_text(ctx.output(), "pub let generated = true\n")
+
+pub fn build(ctx: BuildCtx) -> Build:
+    var out = ctx.new_build()
+    var gen = target_new(.Action, "generate", "").output("out/gen/generated.w")
+    gen.action = generate
+    out = out.add_target(gen)
+    out.executable("app", "src/main.w").default("app")
+```
+
+Action functions receive `ActionCtx`, which exposes the target name, project
+metadata, diagnostics, process runner, declared inputs, declared outputs, and a
+project filesystem capability. Declared inputs and outputs are part of the
+graph contract: missing declared inputs fail before the action runs, and the
+driver verifies that the declared primary output exists after a successful
+action.
+
+Selecting a target that depends on an action runs the action first:
+
+```with
+var gen = target_new(.Action, "generate", "").output("out/gen/generated.w")
+gen.action = generate
+
+var app = target_new(.Executable, "app", "src/main.w")
+app = app.dep("generate")
+```
+
 ## Build Targets
 
 Cross-platform target values exist in the API:

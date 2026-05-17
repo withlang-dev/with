@@ -40,6 +40,7 @@ pub enum BuildKind: i32:
     PromoteTreeIfVerified = 20
     Clean = 21
     CopyFile = 22
+    Action = 23
 
 pub enum BuildTarget: i32:
     native = 0
@@ -95,6 +96,21 @@ pub type BuildCtx {
     process_runner: ProcessRunner,
 }
 
+pub type ActionCtx {
+    token: str,
+    target_name_value: str,
+    project: ProjectInfo,
+    diagnostics_value: Diagnostics,
+    fs_value: ToolFs,
+    process_runner_value: ProcessRunner,
+    inputs_value: Vec[str],
+    outputs_value: Vec[str],
+    args_value: Vec[str],
+}
+
+fn build_noop_action(ctx: ActionCtx) -> i32:
+    0
+
 pub type Target {
     kind: BuildKind,
     name: str,
@@ -108,6 +124,7 @@ pub type Target {
     inputs: Vec[str],
     deps: Vec[str],
     args: Vec[str],
+    action: fn(ActionCtx) -> i32,
 }
 
 pub type GeneratedSource {
@@ -254,6 +271,44 @@ pub fn ProcessRunner.run_capture_cwd(self: &Self, args: Vec[str], stdout_path: s
         stderr: with_fs_read_file(stderr_path),
     }
 
+pub fn ActionCtx.target_name(self: &Self) -> str:
+    tool_capability_require(self.token, "ActionCtx")
+    self.target_name_value
+
+pub fn ActionCtx.project_info(self: &Self) -> ProjectInfo:
+    tool_capability_require(self.token, "ActionCtx")
+    self.project
+
+pub fn ActionCtx.diagnostics(self: &Self) -> Diagnostics:
+    tool_capability_require(self.token, "ActionCtx")
+    self.diagnostics_value
+
+pub fn ActionCtx.fs(self: &Self) -> ToolFs:
+    tool_capability_require(self.token, "ActionCtx")
+    self.fs_value
+
+pub fn ActionCtx.process_runner(self: &Self) -> ProcessRunner:
+    tool_capability_require(self.token, "ActionCtx")
+    self.process_runner_value
+
+pub fn ActionCtx.inputs(self: &Self) -> Vec[str]:
+    tool_capability_require(self.token, "ActionCtx")
+    self.inputs_value
+
+pub fn ActionCtx.outputs(self: &Self) -> Vec[str]:
+    tool_capability_require(self.token, "ActionCtx")
+    self.outputs_value
+
+pub fn ActionCtx.args(self: &Self) -> Vec[str]:
+    tool_capability_require(self.token, "ActionCtx")
+    self.args_value
+
+pub fn ActionCtx.output(self: &Self) -> str:
+    tool_capability_require(self.token, "ActionCtx")
+    if self.outputs_value.len() == 0:
+        return ""
+    self.outputs_value.get(0)
+
 fn build_graph_escape(value: str) -> str:
     var out = ""
     for i in 0..value.len() as i32:
@@ -296,6 +351,7 @@ pub fn target_new(kind: BuildKind, name: str, entry: str) -> Target:
         inputs: Vec.new(),
         deps: Vec.new(),
         args: Vec.new(),
+        action: build_noop_action,
     }
 
 pub fn Build.add_target(mut self: Build, target: Target) -> Build:
@@ -328,6 +384,11 @@ pub fn Build.object(self: Build, name: str, entry: str) -> Build:
 
 pub fn Build.archive(self: Build, name: str, entry: str) -> Build:
     let target = target_new(.Archive, name, entry)
+    self.add_target(target)
+
+pub fn Build.action(self: Build, name: str, action: fn(ActionCtx) -> i32) -> Build:
+    var target = target_new(.Action, name, "")
+    target.action = action
     self.add_target(target)
 
 pub fn Build.command(self: Build, name: str, runner: str) -> Build:
@@ -410,6 +471,7 @@ pub fn Target.target(self: Target, target: BuildTarget) -> Target:
         inputs: self.inputs,
         deps: self.deps,
         args: self.args,
+        action: self.action,
     }
 
 pub fn Target.optimize(self: Target, mode: OptimizeMode) -> Target:
@@ -426,6 +488,7 @@ pub fn Target.optimize(self: Target, mode: OptimizeMode) -> Target:
         inputs: self.inputs,
         deps: self.deps,
         args: self.args,
+        action: self.action,
     }
 
 pub fn Target.link_system_lib(mut self: Target, lib: str) -> Target:
@@ -454,6 +517,7 @@ pub fn Target.output(self: Target, output: str) -> Target:
         inputs: self.inputs,
         deps: self.deps,
         args: self.args,
+        action: self.action,
     }
 
 pub fn Target.input(mut self: Target, input: str) -> Target:
@@ -471,6 +535,44 @@ pub fn Target.arg(mut self: Target, arg: str) -> Target:
 pub fn Target.compiler(mut self: Target, compiler: str) -> Target:
     self.args.push("compiler=" ++ compiler)
     self
+
+fn build_action_outputs(target: Target) -> Vec[str]:
+    let outputs: Vec[str] = Vec.new()
+    if target.output.len() > 0:
+        outputs.push(target.output)
+    outputs
+
+fn build_action_ctx(ctx: BuildCtx, target: Target) -> ActionCtx:
+    let ctx_outputs = build_action_outputs(target)
+    ActionCtx {
+        token: ctx.token,
+        target_name_value: target.name,
+        project: ctx.project,
+        diagnostics_value: ctx.diagnostics,
+        fs_value: ctx.fs,
+        process_runner_value: ctx.process_runner,
+        inputs_value: target.inputs,
+        outputs_value: ctx_outputs,
+        args_value: target.args,
+    }
+
+pub fn Build.__driver_run_action(self: Build, ctx: BuildCtx, action_name: str) -> i32:
+    tool_capability_require(ctx.token, "ActionCtx")
+    for i in 0..self.targets.len() as i32:
+        let target = self.targets.get(i as i64)
+        if target.name == action_name:
+            if target.kind != .Action:
+                with_eprint("error: build action target '" ++ action_name ++ "' is not an Action target\n")
+                return 1
+            return target.action(build_action_ctx(ctx, target))
+    with_eprint("error: build action target not found: " ++ action_name ++ "\n")
+    1
+
+pub fn __driver_action_name() -> str:
+    with_getenv_str("WITH_BUILD_ACTION_NAME")
+
+pub fn __driver_exit(code: i32):
+    exit(code)
 
 pub fn Build.emit_graph(self: Build) -> str:
     var out = "WITH_BUILD_GRAPH\t2\n"

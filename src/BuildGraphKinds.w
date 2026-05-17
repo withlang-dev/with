@@ -4,7 +4,7 @@ extern fn with_sysinfo_os() -> str
 extern fn with_sysinfo_arch() -> str
 
 const BUILD_GRAPH_STANDARD_KIND_MIN: i32 = 0
-const BUILD_GRAPH_STANDARD_KIND_MAX: i32 = 22
+const BUILD_GRAPH_STANDARD_KIND_MAX: i32 = 23
 const BUILD_GRAPH_PROJECT_KIND_MIN: i32 = 1000
 const BUILD_GRAPH_PROJECT_KIND_MAX: i32 = 1027
 const BUILD_GRAPH_TARGET_MIN: i32 = 0
@@ -76,6 +76,7 @@ pub fn build_graph_kind_name(kind: i32) -> str:
     if kind == 20: return "promote_tree_if_verified"
     if kind == 21: return "clean"
     if kind == 22: return "copy_file"
+    if kind == 23: return "action"
     if kind == 1000: return "embedded_runtime_extract_test"
     if kind == 1001: return "selfhost_noop_local_regression"
     if kind == 1002: return "cli_selfhost_smoke_test"

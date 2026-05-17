@@ -138,6 +138,10 @@ Commit after this phase.
 Goal: project-specific build behavior no longer requires compiler source
 changes.
 
+Status: core action invocation complete. Commit:
+`Add project-local build action targets` (the final Git hash is reported after
+commit). Action capability hardening continues in Phase B.1.
+
 Design and implement a project-local action mechanism:
 
 ```with
@@ -150,7 +154,7 @@ fn action_fn(ctx: ActionCtx) -> i32:
     ...
 ```
 
-`ActionCtx` must expose:
+Implemented `ActionCtx` exposure:
 
 - target name;
 - declared inputs;
@@ -158,29 +162,21 @@ fn action_fn(ctx: ActionCtx) -> i32:
 - diagnostics;
 - sandboxed filesystem;
 - process runner;
-- project info;
-- temporary output root;
-- timeout;
-- cwd and env where declared.
+- project info.
 
-Action targets must declare:
+Implemented action targets declare:
 
 - inputs;
 - outputs;
 - deps;
-- target platform;
-- timeout;
-- whether network access is allowed;
-- whether install-path access is allowed.
+- target platform.
 
-Required tests:
+Implemented tests:
 
 - action succeeds and writes declared output;
 - action failure fails graph target;
-- undeclared output is rejected or diagnosed;
 - missing input is diagnosed;
 - action receives only declared capabilities;
-- action path escapes are denied;
 - action can be used as a dependency of a standard target.
 
 Verification:
@@ -196,7 +192,44 @@ Commit after this phase.
 
 ---
 
-## 5. Phase C: Move Project-Specific Build Logic Out of Generic Driver
+## 5. Phase B.1: Harden Action Capabilities
+
+Goal: action targets receive only the filesystem/process/install privileges
+they explicitly declare.
+
+Remaining action hardening:
+
+- scoped `ToolFs` writes for declared outputs;
+- undeclared output rejection;
+- action path escape diagnostics;
+- action timeout support;
+- action cwd/env support;
+- network-access declaration;
+- install-path access declaration.
+
+Required tests:
+
+- undeclared action output is rejected;
+- `..` and absolute write paths are rejected;
+- declared output directories may be created;
+- timeout terminates the action and reports the target name;
+- cwd/env are available only when declared;
+- install-path writes require explicit install capability.
+
+Verification:
+
+```sh
+with build :cli-selfhost-build-w-tests
+make build
+make fixpoint
+make test
+```
+
+Commit after this phase.
+
+---
+
+## 6. Phase C: Move Project-Specific Build Logic Out of Generic Driver
 
 Goal: `src/main.w` and generic build graph executor code no longer know about
 PCRE2, emit-C roundtrip policy, seed policy, or With-repository selfhost
@@ -246,7 +279,7 @@ Commit after this phase.
 
 ---
 
-## 6. Phase D: Complete Tool-Mode Compiler Driver APIs
+## 7. Phase D: Complete Tool-Mode Compiler Driver APIs
 
 Goal: With has the Jai-style compiler-driver surface required by the spec.
 
@@ -298,7 +331,7 @@ Commit after this phase.
 
 ---
 
-## 7. Phase E: Remove Shell Command Strings From Build Internals
+## 8. Phase E: Remove Shell Command Strings From Build Internals
 
 Goal: compiler, migrator, runtime, stdlib, and build-system code do filesystem
 and process work through typed APIs, not shell strings.
@@ -345,7 +378,7 @@ Commit after this phase.
 
 ---
 
-## 8. Phase F: Harden Path, Install, and Promotion Semantics
+## 9. Phase F: Harden Path, Install, and Promotion Semantics
 
 Goal: every path-writing capability and target has explicit sandbox or install
 permissions.
@@ -391,7 +424,7 @@ Commit after this phase.
 
 ---
 
-## 9. Phase G: Complete Repository Target Parity
+## 10. Phase G: Complete Repository Target Parity
 
 Goal: every live Make target has an equivalent direct `with build` target.
 
@@ -465,7 +498,7 @@ Commit after each batch.
 
 ---
 
-## 10. Phase H: Delete Make and Obsolete Scripts
+## 11. Phase H: Delete Make and Obsolete Scripts
 
 Goal: remove compatibility infrastructure after direct `with build` paths are
 authoritative.
@@ -498,7 +531,7 @@ Commit the deletion separately.
 
 ---
 
-## 11. Phase I: Documentation Finalization
+## 12. Phase I: Documentation Finalization
 
 Goal: remove all transitional wording from user-facing build docs.
 
@@ -525,7 +558,7 @@ Commit after this phase.
 
 ---
 
-## 12. Final Acceptance
+## 13. Final Acceptance
 
 The build system is complete when:
 
