@@ -73,10 +73,6 @@ fn build_replace_once(text: str, needle: str, replacement: str) -> str:
         return ""
     text.slice(0, idx) ++ replacement ++ text.slice(idx + needle.len(), text.len())
 
-fn build_action_argv_append(mut args: Vec[str], arg: str) -> Vec[str]:
-    args.push(arg)
-    args
-
 fn issue61_fail(ctx: ActionCtx, message: str) -> i32:
     ctx.diagnostics().error("issue61-regression: " ++ message)
     1
@@ -109,9 +105,9 @@ fn issue61_regression_action(ctx: ActionCtx) -> i32:
     let repo_copy = build_project_join(output_dir, "repo")
     if fs.exists(repo_copy):
         var rm_args: Vec[str] = Vec.new()
-        rm_args = build_action_argv_append(rm_args, "/bin/rm")
-        rm_args = build_action_argv_append(rm_args, "-rf")
-        rm_args = build_action_argv_append(rm_args, build_project_abs(root, repo_copy))
+        rm_args |> push("/bin/rm")
+        rm_args |> push("-rf")
+        rm_args |> push(build_project_abs(root, repo_copy))
         let rm_rc = issue61_run(ctx, "rm-repo", rm_args, 60000)
         if rm_rc != 0:
             return rm_rc
@@ -119,19 +115,19 @@ fn issue61_regression_action(ctx: ActionCtx) -> i32:
         return issue61_fail(ctx, "could not create repo copy directory: " ++ repo_copy)
 
     var cp_args: Vec[str] = Vec.new()
-    cp_args = build_action_argv_append(cp_args, "/bin/cp")
-    cp_args = build_action_argv_append(cp_args, "-R")
-    cp_args = build_action_argv_append(cp_args, build_project_abs(root, "src"))
-    cp_args = build_action_argv_append(cp_args, build_project_abs(root, build_project_join(repo_copy, "src")))
+    cp_args |> push("/bin/cp")
+    cp_args |> push("-R")
+    cp_args |> push(build_project_abs(root, "src"))
+    cp_args |> push(build_project_abs(root, build_project_join(repo_copy, "src")))
     let cp_rc = issue61_run(ctx, "cp-src", cp_args, 60000)
     if cp_rc != 0:
         return cp_rc
 
     var ln_args: Vec[str] = Vec.new()
-    ln_args = build_action_argv_append(ln_args, "/bin/ln")
-    ln_args = build_action_argv_append(ln_args, "-s")
-    ln_args = build_action_argv_append(ln_args, build_project_abs(root, "lib"))
-    ln_args = build_action_argv_append(ln_args, build_project_abs(root, build_project_join(repo_copy, "lib")))
+    ln_args |> push("/bin/ln")
+    ln_args |> push("-s")
+    ln_args |> push(build_project_abs(root, "lib"))
+    ln_args |> push(build_project_abs(root, build_project_join(repo_copy, "lib")))
     let ln_rc = issue61_run(ctx, "ln-lib", ln_args, 60000)
     if ln_rc != 0:
         return ln_rc
@@ -158,9 +154,9 @@ fn issue61_regression_action(ctx: ActionCtx) -> i32:
     let stdout_path = build_project_abs(root, build_project_join(output_dir, "check.stdout"))
     let stderr_path = build_project_abs(root, build_project_join(output_dir, "check.stderr"))
     var check_args: Vec[str] = Vec.new()
-    check_args = build_action_argv_append(check_args, compiler_path)
-    check_args = build_action_argv_append(check_args, "check")
-    check_args = build_action_argv_append(check_args, "src/main.w")
+    check_args |> push(compiler_path)
+    check_args |> push("check")
+    check_args |> push("src/main.w")
     let check = ctx.process_runner().run_capture_cwd(check_args, stdout_path, stderr_path, 60000, build_project_abs(root, repo_copy))
     if check.rc == 124:
         return issue61_fail(ctx, "check timed out; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
