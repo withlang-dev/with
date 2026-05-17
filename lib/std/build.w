@@ -75,6 +75,8 @@ pub type SourceEmitter {
 pub type ToolFs {
     token: str,
     root: str,
+    write_scope: Vec[str],
+    write_scoped: bool,
 }
 
 pub type ProcessRunner {
@@ -155,7 +157,7 @@ pub fn BuildCtx.__driver_new(package: Package, root: str, token: str) -> BuildCt
         project: ProjectInfo { package, root },
         diagnostics: Diagnostics { token },
         source_emitter: SourceEmitter { token },
-        fs: ToolFs { token, root },
+        fs: ToolFs { token, root, write_scope: Vec.new(), write_scoped: false },
         process_runner: ProcessRunner { token },
     }
 
@@ -214,16 +216,60 @@ fn tool_path_is_project_relative(path: str) -> bool:
             return false
     true
 
-fn ToolFs.resolve_path(self: &Self, path: str) -> str:
-    tool_capability_require(self.token, "ToolFs")
+fn tool_path_require_project_relative(path: str):
     if not tool_path_is_project_relative(path):
         with_eprint("error: ToolFs path escapes project root: " ++ path ++ "\n")
         exit(1)
+
+fn ToolFs.resolve_path(self: &Self, path: str) -> str:
+    tool_capability_require(self.token, "ToolFs")
+    tool_path_require_project_relative(path)
     if self.root.len() == 0 or self.root == ".":
         return path
     if self.root.ends_with("/"):
         return self.root ++ path
     self.root ++ "/" ++ path
+
+fn tool_path_is_same_or_child(path: str, root: str) -> bool:
+    if path == root:
+        return true
+    if path.len() <= root.len():
+        return false
+    path.starts_with(root) and path.byte_at(root.len() as i64) == 47
+
+fn tool_path_is_parent_of(parent: str, child: str) -> bool:
+    if parent.len() >= child.len():
+        return false
+    child.starts_with(parent) and child.byte_at(parent.len() as i64) == 47
+
+fn ToolFs.write_file_allowed(self: &Self, path: str) -> bool:
+    if not self.write_scoped:
+        return true
+    for i in 0..self.write_scope.len() as i32:
+        if tool_path_is_same_or_child(path, self.write_scope.get(i as i64)):
+            return true
+    false
+
+fn ToolFs.mkdir_allowed(self: &Self, path: str) -> bool:
+    if not self.write_scoped:
+        return true
+    for i in 0..self.write_scope.len() as i32:
+        let allowed = self.write_scope.get(i as i64)
+        if tool_path_is_same_or_child(path, allowed) or tool_path_is_parent_of(path, allowed):
+            return true
+    false
+
+fn ToolFs.require_write_file_allowed(self: &Self, path: str):
+    tool_path_require_project_relative(path)
+    if not self.write_file_allowed(path):
+        with_eprint("error: ToolFs write path is not a declared action output: " ++ path ++ "\n")
+        exit(1)
+
+fn ToolFs.require_mkdir_allowed(self: &Self, path: str):
+    tool_path_require_project_relative(path)
+    if not self.mkdir_allowed(path):
+        with_eprint("error: ToolFs mkdir path is not a declared action output: " ++ path ++ "\n")
+        exit(1)
 
 pub fn ToolFs.exists(self: &Self, path: str) -> bool:
     with_fs_file_exists(self.resolve_path(path)) != 0
@@ -232,15 +278,18 @@ pub fn ToolFs.is_dir(self: &Self, path: str) -> bool:
     with_fs_is_dir(self.resolve_path(path)) != 0
 
 pub fn ToolFs.mkdir_all(self: &Self, path: str) -> i32:
+    self.require_mkdir_allowed(path)
     with_fs_mkdir_p(self.resolve_path(path))
 
 pub fn ToolFs.read_text(self: &Self, path: str) -> str:
     with_fs_read_file(self.resolve_path(path))
 
 pub fn ToolFs.write_text(self: &Self, path: str, contents: str) -> i32:
+    self.require_write_file_allowed(path)
     with_fs_write_file(self.resolve_path(path), contents)
 
 pub fn ToolFs.remove_file(self: &Self, path: str) -> i32:
+    self.require_write_file_allowed(path)
     with_fs_remove_file(self.resolve_path(path))
 
 pub fn SourceEmitter.generated_source(self: &Self, path: str, contents: str) -> GeneratedSource:
@@ -543,13 +592,14 @@ fn build_action_outputs(target: Target) -> Vec[str]:
     outputs
 
 fn build_action_ctx(ctx: BuildCtx, target: Target) -> ActionCtx:
+    let fs_outputs = build_action_outputs(target)
     let ctx_outputs = build_action_outputs(target)
     ActionCtx {
         token: ctx.token,
         target_name_value: target.name,
         project: ctx.project,
         diagnostics_value: ctx.diagnostics,
-        fs_value: ctx.fs,
+        fs_value: ToolFs { token: ctx.token, root: ctx.fs.root, write_scope: fs_outputs, write_scoped: true },
         process_runner_value: ctx.process_runner,
         inputs_value: target.inputs,
         outputs_value: ctx_outputs,
