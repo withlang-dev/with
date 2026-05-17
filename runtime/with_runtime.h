@@ -167,6 +167,7 @@ int32_t with_fs_remove_dir(with_str path);
 int32_t with_fs_remove_tree(with_str path);
 int32_t with_fs_copy_tree(with_str src, with_str dst);
 int32_t with_fs_symlink(with_str target, with_str link_path);
+with_str with_fs_list_files(with_str path);
 int64_t with_str_hash(with_str s);
 void with_lines_out(with_vec *out, with_str s);
 with_str with_getenv_str(with_str name);

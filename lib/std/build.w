@@ -11,6 +11,7 @@ extern fn with_fs_is_dir(path: str) -> i32
 extern fn with_fs_mkdir_p(path: str) -> i32
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_fs_copy_tree(src: str, dst: str) -> i32
+extern fn with_fs_list_files(path: str) -> str
 extern fn with_fs_remove_file(path: str) -> i32
 extern fn with_fs_remove_tree(path: str) -> i32
 extern fn with_fs_symlink(target: str, link_path: str) -> i32
@@ -275,6 +276,26 @@ fn ToolFs.require_mkdir_allowed(self: &Self, path: str):
         with_eprint("error: ToolFs mkdir path is not a declared action output: " ++ path ++ "\n")
         exit(1)
 
+fn tool_split_nonempty_lines(text: str) -> Vec[str]:
+    let lines: Vec[str] = Vec.new()
+    var start = 0
+    for i in 0..text.len() as i32:
+        if text.byte_at(i as i64) == 10:
+            if i > start:
+                lines.push(text.slice(start as i64, i as i64))
+            start = i + 1
+    if start < text.len() as i32:
+        lines.push(text.slice(start as i64, text.len()))
+    lines
+
+fn ToolFs.project_relative_path(self: &Self, path: str) -> str:
+    if self.root.len() == 0 or self.root == ".":
+        return path
+    let prefix = if self.root.ends_with("/"): self.root else: self.root ++ "/"
+    if path.starts_with(prefix):
+        return path.slice(prefix.len(), path.len())
+    path
+
 pub fn ToolFs.exists(self: &Self, path: str) -> bool:
     with_fs_file_exists(self.resolve_path(path)) != 0
 
@@ -287,6 +308,14 @@ pub fn ToolFs.mkdir_all(self: &Self, path: str) -> i32:
 
 pub fn ToolFs.read_text(self: &Self, path: str) -> str:
     with_fs_read_file(self.resolve_path(path))
+
+pub fn ToolFs.list_files(self: &Self, path: str) -> Vec[str]:
+    let resolved = self.resolve_path(path)
+    let raw_files = tool_split_nonempty_lines(with_fs_list_files(resolved))
+    let files: Vec[str] = Vec.new()
+    for i in 0..raw_files.len() as i32:
+        files.push(self.project_relative_path(raw_files.get(i as i64)))
+    files
 
 pub fn ToolFs.write_text(self: &Self, path: str, contents: str) -> i32:
     self.require_write_file_allowed(path)

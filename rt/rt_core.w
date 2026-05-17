@@ -37,6 +37,7 @@ extern fn rt_rename(old_path: *const u8, new_path: *const u8) -> i32
 extern fn rt_remove_tree(path: *const u8) -> i32
 extern fn rt_copy_tree(src: *const u8, dst: *const u8) -> i32
 extern fn rt_symlink(target: *const u8, link_path: *const u8) -> i32
+extern fn rt_list_files(path: *const u8) -> str
 extern fn rt_access(path: *const u8, mode: i32) -> i32
 extern fn rt_chmod(path: *const u8, mode: i32) -> i32
 // stat is in the core 13 but declared with a different name to avoid confusion
@@ -2021,6 +2022,11 @@ pub fn fs_symlink(target: str, link_path: str) -> i32:
     let ctarget = str_to_cstr(target)
     let clink = str_to_cstr(link_path)
     rt_symlink(ctarget, clink)
+
+@[c_export("with_fs_list_files")]
+pub fn fs_list_files(path: str) -> str:
+    let cpath = str_to_cstr(path)
+    rt_list_files(cpath)
 
 // ── stdin I/O ──────────────────────────────────────────────────────
 
