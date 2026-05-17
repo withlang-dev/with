@@ -476,10 +476,10 @@ the project rather than one type at a time.
 
 ```
 @[compiler_hook(after_typecheck)]
-fn lint_project(project: ProjectInfo):
+fn lint_project(project: ProjectInfo, diagnostics: Diagnostics):
     for f in project.functions():
         if f.is_pub() and not f.has_docs():
-            compiler.error(f.location, "public function missing docs")
+            diagnostics.error(f.location, "public function missing docs")
 ```
 
 This is significant new infrastructure. It requires the compiler to
@@ -500,11 +500,11 @@ Only after Phase 1 is stable:
 
 ```
 @[compiler_hook(after_typecheck)]
-fn gen_rpc_stubs(project: ProjectInfo):
+fn gen_rpc_stubs(project: ProjectInfo, source: SourceEmitter):
     for s in project.structs():
         if s.has_attr("rpc_service"):
-            compiler.emit_source(generate_client(s))
-            compiler.emit_source(generate_server(s))
+            source.emit_source(generate_client(s))
+            source.emit_source(generate_server(s))
 ```
 
 Emitted source must be parsed, typechecked, and visible in
@@ -662,8 +662,9 @@ compiler.
 
 ### Phase 4: Advanced metaprogramming
 
-- **`compiler.emit_source()`**: Explicit code generation from
-  compiler hooks. Only after read-only introspection is proven.
+- **`SourceEmitter.emit_source()`**: Explicit code generation from
+  compiler-hook capability parameters. Only after read-only
+  introspection is proven.
 
 - **Build/introspection integration**: Compiler hooks that
   participate in the build graph.
@@ -754,7 +755,7 @@ lifetime annotations, `with` scoping instead of global context,
 6.  Add @[specified] enums.
 7.  Formalize allow_untranslated in c_import.
 8.  Add read-only ProjectInfo compiler introspection (later).
-9.  Add compiler.emit_source() (later still).
+9.  Add SourceEmitter.emit_source() for compiler hooks.
 10. Add blessed derives: SoA, Serialize, Deserialize, ComponentId.
 11. Reject raw-pointer defaults, caller-scope macros, runtime
     reflection by default, weak error conventions, and async
@@ -779,7 +780,7 @@ added or amended:
 | §16.2b (new) | `allow_untranslated` — `c_import` parameter for explicit omission acknowledgment |
 | §18.5a (new) | `build.w` and `std.build` doctrine — tool-mode execution, default recipe synthesis, `with.toml` boundary |
 | §7.3a (amend) | Add `std.context.Context` as the standard implicit context type |
-| §17 (amend) | Add future-work note for `ProjectInfo`, `compiler_hook`, and `compiler.emit_source()` |
+| §17 (amend) | Add future-work note for `ProjectInfo`, `compiler_hook`, and `SourceEmitter.emit_source()` |
 | stdlib module map | Add `std.context`, `std.build`, `std.alloc.TempArena` |
 
 These edits are ordered by implementation phase. §4.4b and §16.2b
