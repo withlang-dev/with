@@ -54,6 +54,11 @@ pub fn build_graph_validate_outputs(root: str, graph: BuildGraph, output_path: s
         if not build_graph_register_output(outputs, path):
             build_graph_rt_eprint("error: duplicate build.w output path for target '" ++ target.name ++ "': " ++ path)
             return 1
+        for oi in 0..target.extra_outputs.len() as i32:
+            let extra_path = build_graph_resolve_project_path(root, target.extra_outputs.get(oi as i64))
+            if not build_graph_register_output(outputs, extra_path):
+                build_graph_rt_eprint("error: duplicate build.w output path for target '" ++ target.name ++ "': " ++ extra_path)
+                return 1
     0
 
 pub fn build_graph_write_generated_sources(root: str, graph: BuildGraph) -> i32:

@@ -843,6 +843,11 @@ fn run_build_action_from_build_w(root: str, cfg: ProjectConfig, target: BuildGra
     if with_fs_file_exists(output_path) == 0:
         with_eprint("error: action target '" ++ target.name ++ "' did not produce declared output: " ++ output_path)
         return 1
+    for oi in 0..target.extra_outputs.len() as i32:
+        let extra_output = build_graph_resolve_project_path(root, target.extra_outputs.get(oi as i64))
+        if with_fs_file_exists(extra_output) == 0:
+            with_eprint("error: action target '" ++ target.name ++ "' did not produce declared output: " ++ extra_output)
+            return 1
     0
 
 fn load_build_graph_from_build_w(root: str, cfg: ProjectConfig, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> BuildGraph:

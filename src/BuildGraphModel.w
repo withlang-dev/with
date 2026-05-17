@@ -11,6 +11,7 @@ pub type BuildGraphTarget {
     include_paths: Vec[str],
     defines: Vec[str],
     inputs: Vec[str],
+    extra_outputs: Vec[str],
     deps: Vec[str],
     args: Vec[str],
 }
@@ -66,6 +67,7 @@ fn build_graph_target_new(kind: i32, name: str, entry: str, target_kind: i32, op
         include_paths: Vec.new(),
         defines: Vec.new(),
         inputs: Vec.new(),
+        extra_outputs: Vec.new(),
         deps: Vec.new(),
         args: Vec.new(),
     }
@@ -156,6 +158,8 @@ pub fn build_graph_emit(graph: BuildGraph) -> str:
             out = out ++ "define\t" ++ f"{ti}\t" ++ build_graph_escape(target.defines.get(di as i64)) ++ "\n"
         for ini in 0..target.inputs.len() as i32:
             out = out ++ "input\t" ++ f"{ti}\t" ++ build_graph_escape(target.inputs.get(ini as i64)) ++ "\n"
+        for outi in 0..target.extra_outputs.len() as i32:
+            out = out ++ "extra_output\t" ++ f"{ti}\t" ++ build_graph_escape(target.extra_outputs.get(outi as i64)) ++ "\n"
         for depi in 0..target.deps.len() as i32:
             out = out ++ "dep\t" ++ f"{ti}\t" ++ build_graph_escape(target.deps.get(depi as i64)) ++ "\n"
         for ai in 0..target.args.len() as i32:
@@ -254,6 +258,11 @@ pub fn parse_build_graph(text: str) -> BuildGraph:
                 graph.error_msg = "invalid input line in build graph"
                 return graph
             current.inputs.push(fields.get(2))
+        else if tag == "extra_output":
+            if fields.len() != 3 or not has_current:
+                graph.error_msg = "invalid extra_output line in build graph"
+                return graph
+            current.extra_outputs.push(fields.get(2))
         else if tag == "dep":
             if fields.len() != 3 or not has_current:
                 graph.error_msg = "invalid dep line in build graph"
