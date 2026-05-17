@@ -71,6 +71,7 @@ pub type SourceEmitter {
 
 pub type ToolFs {
     token: str,
+    root: str,
 }
 
 pub type ProcessRunner {
@@ -135,7 +136,7 @@ pub fn BuildCtx.__driver_new(package: Package, root: str, token: str) -> BuildCt
         project: ProjectInfo { package, root },
         diagnostics: Diagnostics { token },
         source_emitter: SourceEmitter { token },
-        fs: ToolFs { token },
+        fs: ToolFs { token, root },
         process_runner: ProcessRunner { token },
     }
 
@@ -181,29 +182,47 @@ pub fn Diagnostics.error(self: &Self, message: str):
     with_eprint("error: " ++ message ++ "\n")
     exit(1)
 
-pub fn ToolFs.exists(self: &Self, path: str) -> bool:
+fn tool_path_is_project_relative(path: str) -> bool:
+    if path.len() == 0:
+        return false
+    if path.byte_at(0) == 47:
+        return false
+    if path.contains(".."):
+        return false
+    for i in 0..path.len() as i32:
+        let ch = path.byte_at(i as i64)
+        if ch == 0 or ch == 9 or ch == 10 or ch == 13:
+            return false
+    true
+
+fn ToolFs.resolve_path(self: &Self, path: str) -> str:
     tool_capability_require(self.token, "ToolFs")
-    with_fs_file_exists(path) != 0
+    if not tool_path_is_project_relative(path):
+        with_eprint("error: ToolFs path escapes project root: " ++ path ++ "\n")
+        exit(1)
+    if self.root.len() == 0 or self.root == ".":
+        return path
+    if self.root.ends_with("/"):
+        return self.root ++ path
+    self.root ++ "/" ++ path
+
+pub fn ToolFs.exists(self: &Self, path: str) -> bool:
+    with_fs_file_exists(self.resolve_path(path)) != 0
 
 pub fn ToolFs.is_dir(self: &Self, path: str) -> bool:
-    tool_capability_require(self.token, "ToolFs")
-    with_fs_is_dir(path) != 0
+    with_fs_is_dir(self.resolve_path(path)) != 0
 
 pub fn ToolFs.mkdir_all(self: &Self, path: str) -> i32:
-    tool_capability_require(self.token, "ToolFs")
-    with_fs_mkdir_p(path)
+    with_fs_mkdir_p(self.resolve_path(path))
 
 pub fn ToolFs.read_text(self: &Self, path: str) -> str:
-    tool_capability_require(self.token, "ToolFs")
-    with_fs_read_file(path)
+    with_fs_read_file(self.resolve_path(path))
 
 pub fn ToolFs.write_text(self: &Self, path: str, contents: str) -> i32:
-    tool_capability_require(self.token, "ToolFs")
-    with_fs_write_file(path, contents)
+    with_fs_write_file(self.resolve_path(path), contents)
 
 pub fn ToolFs.remove_file(self: &Self, path: str) -> i32:
-    tool_capability_require(self.token, "ToolFs")
-    with_fs_remove_file(path)
+    with_fs_remove_file(self.resolve_path(path))
 
 pub fn SourceEmitter.generated_source(self: &Self, path: str, contents: str) -> GeneratedSource:
     tool_capability_require(self.token, "SourceEmitter")
