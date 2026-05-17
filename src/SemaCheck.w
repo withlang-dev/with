@@ -4374,17 +4374,19 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
             self.current_fn_param_origins.push(0)
     self.current_fn_sig_idx = if closure_capture_syms.len() > 0: 0 else: saved_capture_sig_idx
 
+    var expected_fn_tid = 0
+    if self.has_expected_type != 0 and self.expected_expr_type != 0:
+        expected_fn_tid = self.callable_fn_type(self.expected_expr_type)
+
     // `it` arity validation: if this is an implicit `it` closure (param_count==1,
     // param name is "__it") and the expected type is a fn with != 1 params, error.
-    if param_count == 1 and self.has_expected_type != 0:
+    if param_count == 1 and expected_fn_tid != 0:
         let p_sym = self.ast.get_extra(extra_start)
         let p_name = self.pool_resolve(p_sym)
         if p_name == "__it":
-            let expected = self.resolve_alias(self.expected_expr_type)
-            if self.get_type_kind(expected) == TypeKind.TY_FN:
-                let expected_params = self.get_type_d1(expected)
-                if expected_params != 1:
-                    self.emit_error(f"`it` used in context expecting {expected_params} parameter(s)", node)
+            let expected_params = self.get_type_d1(expected_fn_tid)
+            if expected_params != 1:
+                self.emit_error(f"`it` used in context expecting {expected_params} parameter(s)", node)
 
     // Save borrow state — closure body borrows are local to the closure.
     let saved_borrow_len = self.borrow_kinds.len() as i32
@@ -4400,9 +4402,18 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
             partial_sig = self.get_sig(callee_sym)
     for pi in 0..param_count:
         let p_sym = self.ast.get_extra(extra_start + pi * 2)
+        let p_type_node = self.ast.get_extra(extra_start + pi * 2 + 1)
         var p_ty = self.ty_i32 as i32
-        // For partial app, find which call arg position this placeholder occupies
-        if partial_sig >= 0 and self.ast.kind(body) == NodeKind.NK_CALL:
+        if p_type_node > 0:
+            let explicit_ty = self.resolve_type_expr(p_type_node)
+            if explicit_ty != 0:
+                p_ty = explicit_ty as i32
+        else if expected_fn_tid != 0 and pi < self.get_type_d1(expected_fn_tid):
+            let expected_param_ty = self.callable_fn_param_type(expected_fn_tid as TypeId, pi)
+            if expected_param_ty != 0:
+                p_ty = expected_param_ty
+        // For partial app, find which call arg position this placeholder occupies.
+        if p_type_node == 0 and expected_fn_tid == 0 and partial_sig >= 0 and self.ast.kind(body) == NodeKind.NK_CALL:
             let call_extra = self.ast.get_data1(body)
             let call_argc = self.ast.get_data2(body)
             for ai in 0..call_argc:
@@ -4419,7 +4430,10 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
     self.collect_function_labels(body)
     self.validate_function_gotos()
     self.push_label_boundary()
-    let body_ty = self.check_expr(body)
+    var expected_ret_ty = 0
+    if expected_fn_tid != 0:
+        expected_ret_ty = self.get_type_d2(expected_fn_tid)
+    let body_ty = if expected_ret_ty != 0: self.check_expr_with_expected(body, expected_ret_ty as TypeId) else: self.check_expr(body)
     self.pop_label_frame()
     self.emit_unused_label_warnings()
     self.restore_label_registry(saved_label_registry)
@@ -4507,6 +4521,13 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
     // Mark captured non-Copy variables as moved so subsequent uses error.
     let is_escaping = not is_non_escaping
     if is_escaping:
+        var emitted_capability_escape = 0
+        for cci in 0..closure_capture_syms.len() as i32:
+            let cap_sym2 = closure_capture_syms.get(cci as i64)
+            let cap_ty2 = self.scope_lookup(cap_sym2)
+            if emitted_capability_escape == 0 and self.is_std_build_capability_type(cap_ty2):
+                self.emit_error("capability-bearing closure cannot escape into runtime code", node)
+                emitted_capability_escape = 1
         // docs/mut.md Rev 8 §9.4 / §15.9 — a mutating closure may not
         // escape the scope containing the captured place. If the closure
         // is in escape position (e.g., returned, stored in a long-lived
@@ -4525,10 +4546,14 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
             ci = ci + 1
 
     // Use callee return type for partial application closures
-    var closure_ret_ty = self.ty_i32 as i32
+    var closure_ret_ty = if body_ty != 0: body_ty as i32 else: self.ty_i32 as i32
     if partial_sig >= 0:
         closure_ret_ty = self.sig_return_type(partial_sig)
-    self.add_type(TypeKind.TY_FN, te_start, param_count, closure_ret_ty) as i32
+    else if expected_ret_ty != 0:
+        closure_ret_ty = expected_ret_ty
+    let closure_ty = self.add_type(TypeKind.TY_FN, te_start, param_count, closure_ret_ty) as i32
+    self.typed_expr_types.insert(node, closure_ty)
+    closure_ty
 
 fn Sema.check_pipeline(self: Sema, node: i32) -> i32:
     let lhs = self.ast.get_data0(node)

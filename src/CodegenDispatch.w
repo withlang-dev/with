@@ -2499,6 +2499,13 @@ fn Codegen.mir_emit_stmt(self: Codegen, body: MirBody, stmt_id: i32) -> bool:
         let has_projections = body.place_proj_counts.get(d0 as i64) > 0
         let dst_sema_ty = self.mir_place_sema_type(body, d0)
         var dst_ty = self.mir_dest_llvm_type(body, d0)
+        if not has_projections:
+            let indirect_dst_ptr = self.mir_indirect_value_local_ptr(dst_local, dst_ptr)
+            if indirect_dst_ptr != 0:
+                dst_ptr = indirect_dst_ptr
+                let indirect_dst_ty = self.mir_indirect_value_local_types.get(dst_local)
+                if indirect_dst_ty.is_some():
+                    dst_ty = indirect_dst_ty.unwrap() as i64
         if dst_ty == 0:
             let dst_ty_opt = self.mir_local_types.get(dst_local)
             if dst_ptr != 0 and dst_ty_opt.is_some():
@@ -2641,13 +2648,24 @@ fn Codegen.mir_try_place_ptr_for_ref(self: Codegen, body: MirBody, operand_id: i
                 if semantic_ty != 0 and wl_get_type_kind(semantic_ty) != wl_pointer_type_kind():
                     is_indirect_value_local = true
         if p_count == 0 and is_indirect_value_local:
-            let ptr_ty_opt = self.mir_local_types.get(local_id)
-            if ptr_ty_opt.is_some():
-                let ptr_ty = ptr_ty_opt.unwrap() as i64
-                if ptr_ty != 0 and wl_get_type_kind(ptr_ty) == wl_pointer_type_kind():
-                    return wl_build_load(self.builder, ptr_ty, ptr)
+            let indirect_ptr = self.mir_indirect_value_local_ptr(local_id, ptr)
+            if indirect_ptr != 0:
+                return indirect_ptr
         return ptr
     0
+
+fn Codegen.mir_indirect_value_local_ptr(self: Codegen, local_id: i32, storage_ptr: i64) -> i64:
+    if storage_ptr == 0:
+        return 0
+    if self.mir_indirect_value_local_types.get(local_id).is_none():
+        return 0
+    let ptr_ty_opt = self.mir_local_types.get(local_id)
+    if ptr_ty_opt.is_none():
+        return 0
+    let ptr_ty = ptr_ty_opt.unwrap() as i64
+    if ptr_ty == 0 or wl_get_type_kind(ptr_ty) != wl_pointer_type_kind():
+        return 0
+    wl_build_load(self.builder, ptr_ty, storage_ptr)
 
 fn Codegen.mir_eval_call_operand(self: Codegen, body: MirBody, operand_id: i32, expected_ty: i64, call_context: str, arg_index: i32) -> i64:
     var eval_expected_ty = expected_ty
@@ -2702,6 +2720,9 @@ fn Codegen.mir_intrinsic_recv_ptr(self: Codegen, body: MirBody, args_id: i32) ->
             let local_id0 = body.place_locals.get(od as i64)
             let p_count0 = body.place_proj_counts.get(od as i64)
             if p_count0 == 0 and local_id0 >= 0 and local_id0 < body.local_type_ids.len() as i32:
+                let indirect_ptr = self.mir_indirect_value_local_ptr(local_id0, ptr)
+                if indirect_ptr != 0:
+                    return indirect_ptr
                 let local_sema0 = body.local_type_ids.get(local_id0 as i64)
                 let local_resolved0 = self.mir_input.mir_resolve_alias(local_sema0)
                 let local_kind0 = self.mir_input.mir_get_type_kind(local_resolved0)
@@ -5802,12 +5823,23 @@ fn Codegen.mir_emit_vec_filter(self: Codegen, body: MirBody, args_id: i32) -> i6
         ctx_ptr = wl_build_extract_value(self.builder, fn_val, 1)
         is_fat = 1
     var elem_ty = i32_ty
+    var pred_ret_ty = i32_ty
+    let arg_start_for_pred = body.call_arg_starts.get(args_id as i64)
+    let pred_op = body.call_arg_operands.get((arg_start_for_pred + 1) as i64)
+    let pred_sema_ty = self.mir_operand_sema_type(body, pred_op)
+    if pred_sema_ty > 0:
+        let pred_resolved = self.mir_input.mir_resolve_alias(pred_sema_ty)
+        if self.mir_input.mir_get_type_kind(pred_resolved) == TypeKind.TY_FN:
+            let pred_ret_sema = self.mir_input.mir_get_type_d2(pred_resolved)
+            let pred_ret_llvm = self.mir_sema_type_to_llvm(pred_ret_sema)
+            if pred_ret_llvm != 0 and pred_ret_llvm != wl_void_type(self.context):
+                pred_ret_ty = pred_ret_llvm
     var fn_ty: i64 = 0
     if is_fat != 0:
         let fp: Vec[i64] = Vec.new()
         fp.push(ptr_ty)
         fp.push(elem_ty)
-        fn_ty = wl_function_type(i32_ty, vec_data_i64(&fp), 2, 0)
+        fn_ty = wl_function_type(pred_ret_ty, vec_data_i64(&fp), 2, 0)
     else:
         fn_ty = wl_global_get_value_type(fn_ptr)
     let len = wl_build_extract_value(self.builder, recv, 1)
@@ -8413,6 +8445,18 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
     let param_count = self.pool.get_data2(node)
     let ptr_ty = wl_ptr_type(self.context)
     let i32_ty = wl_i32_type(self.context)
+    var closure_fn_tid = 0
+    var closure_fn_param_start = 0
+    var closure_fn_param_count = 0
+    var closure_fn_ret_tid = 0
+    let closure_node_ty = self.sema_type_of_node(node)
+    if closure_node_ty != 0:
+        let resolved_closure_ty = self.sema.resolve_alias(closure_node_ty)
+        if self.sema.get_type_kind(resolved_closure_ty) == TypeKind.TY_FN:
+            closure_fn_tid = resolved_closure_ty as i32
+            closure_fn_param_start = self.sema.get_type_d0(resolved_closure_ty)
+            closure_fn_param_count = self.sema.get_type_d1(resolved_closure_ty)
+            closure_fn_ret_tid = self.sema.get_type_d2(resolved_closure_ty)
 
     // Collect captured variables from enclosing scope
     // First, temporarily mark closure params so collect_captures skips them
@@ -8470,10 +8514,18 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
         let p_type = self.pool.get_extra(extra_start + i * 2 + 1)
         if p_type != 0:
             param_types.push(self.resolve_type(p_type))
+        else if closure_fn_tid != 0 and i < closure_fn_param_count:
+            let p_sema_ty = self.sema.type_extra.get((closure_fn_param_start + i) as i64)
+            let p_llvm_ty = self.sema_type_to_llvm(p_sema_ty)
+            param_types.push(if p_llvm_ty != 0: p_llvm_ty else: i32_ty)
         else:
             param_types.push(i32_ty)
     // Determine return type (infer from context or use i32)
-    let ret_ty = i32_ty
+    var ret_ty = i32_ty
+    if closure_fn_ret_tid != 0:
+        let expected_ret_ty = self.sema_type_to_llvm(closure_fn_ret_tid)
+        if expected_ret_ty != 0:
+            ret_ty = expected_ret_ty
     let fn_ty = wl_function_type(ret_ty, vec_data_i64(&param_types), param_count + 1, 0)
     let closure_fn = wl_add_function(self.llmod, "__closure", fn_ty)
     // Save current state
@@ -8510,11 +8562,13 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
             if is_ref_capture:
                 // Reference capture: load the pointer to outer alloca, use directly
                 let outer_ptr = wl_build_load(self.builder, ptr_ty, gep)
+                let outer_ptr_slot = self.create_entry_alloca(ptr_ty)
+                wl_build_store(self.builder, outer_ptr, outer_ptr_slot)
                 let orig_ty = cap_orig_types.get(ci as i64)
                 // Look up outer mutability
                 let outer_mut_opt = saved_muts.get(sym)
                 let outer_mut = if outer_mut_opt.is_some(): outer_mut_opt.unwrap() else: 0
-                self.record_local(sym, outer_ptr, orig_ty, outer_mut)
+                self.record_local(sym, outer_ptr_slot, ptr_ty, outer_mut)
             else:
                 // Value capture: load value, create fresh alloca
                 let loaded = wl_build_load(self.builder, cap_ty, gep)
@@ -8552,7 +8606,9 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
     var closure_builder = MirBuilder.init(self.sema, self.pool, self.intern, 0)
     // Set return type (try sema inference, default to i32)
     let ret_sema_ty = self.sema_type_of_node(body_node)
-    if ret_sema_ty != 0 and ret_sema_ty != self.sema.ty_void:
+    if closure_fn_ret_tid != 0 and closure_fn_ret_tid != self.sema.ty_void:
+        closure_builder.body.local_type_ids.set_i32(0, closure_fn_ret_tid)
+    else if ret_sema_ty != 0 and ret_sema_ty != self.sema.ty_void:
         closure_builder.body.local_type_ids.set_i32(0, ret_sema_ty)
     else:
         closure_builder.body.local_type_ids.set_i32(0, self.sema.ty_i32)
@@ -8588,6 +8644,10 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
                         cl_p_sema_ty = cl_prim as i32
                     else if self.sema.named_types.contains(cl_type_sym):
                         cl_p_sema_ty = self.sema.named_types.get(cl_type_sym).unwrap()
+        else if closure_fn_tid != 0 and cl_pi < closure_fn_param_count:
+            let cl_expected_ty = self.sema.type_extra.get((closure_fn_param_start + cl_pi) as i64)
+            if cl_expected_ty != 0:
+                cl_p_sema_ty = cl_expected_ty
         let cl_p_local = closure_builder.body.new_local(cl_p_sema_ty, 1, cl_p_name, 1)
         closure_builder.bind_local(cl_p_name, cl_p_local)
 
@@ -8602,9 +8662,10 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
     let closure_body = closure_builder.body
 
     // Set up return alloca (MIR local 0)
-    let cl_ret_alloca = self.create_entry_alloca(ret_ty)
+    let cl_ret_storage_ty = if ret_ty != wl_void_type(self.context): ret_ty else: i32_ty
+    let cl_ret_alloca = self.create_entry_alloca(cl_ret_storage_ty)
     self.mir_local_ptrs.insert(0, cl_ret_alloca)
-    self.mir_local_types.insert(0, ret_ty)
+    self.mir_local_types.insert(0, cl_ret_storage_ty)
 
     // Map capture MIR locals to existing LLVM allocas
     for cl_mi in 0..capture_count:
@@ -8616,6 +8677,10 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
             let cl_m_ty_opt = self.local_types.get(cl_m_sym)
             if cl_m_ty_opt.is_some():
                 self.mir_local_types.insert(cl_m_local_id, cl_m_ty_opt.unwrap())
+                if is_ref_capture:
+                    let cl_orig_ty = cap_orig_types.get(cl_mi as i64)
+                    if cl_orig_ty != 0:
+                        self.mir_indirect_value_local_types.insert(cl_m_local_id, cl_orig_ty)
 
     // Map param MIR locals to existing LLVM allocas
     for cl_pmi in 0..param_count:
