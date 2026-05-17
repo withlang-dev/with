@@ -218,6 +218,13 @@ Remaining action hardening:
 - network-access declaration;
 - install-path access declaration.
 
+Related stdlib/language blockers tracked for later design:
+
+- `Vec.push` currently returns `void`, so `Vec.new() |> push("a") |> push("b")`
+  cannot be a fluent builder chain until the Vec mutation API is redesigned.
+- Type context does not yet propagate through pipelines into `Vec.new()`, so
+  `Vec.new() |> push("a")` cannot infer the element type from the later method.
+
 Implemented tests:
 
 - undeclared action output is rejected;
