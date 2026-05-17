@@ -1206,7 +1206,9 @@ fn bgs_check_build_w_generated_source(root: str, target_name: str, compiler_path
     let gen_dir = bgs_resolve_join(base_dir, "generated")
     var rc = bgs_write_project_manifest(gen_dir, "buildwgenerated", target_name)
     if rc != 0: return rc
-    rc = bgs_write_fixture(bgs_resolve_join(gen_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    var generated = ctx.new_build()\n    generated = generated.generated_source(\"out/gen/generated_main.w\", \"fn main:\\n    print(\\\"generated source\\\")\\n\")\n    generated.executable(\"generated-app\", \"out/gen/generated_main.w\")\n", target_name, "generated build.w")
+    rc = bgs_write_fixture(bgs_resolve_join(gen_dir, "templates/generated_main.w"), "fn main:\n    print(\"generated source\")\n", target_name, "generated template")
+    if rc != 0: return rc
+    rc = bgs_write_fixture(bgs_resolve_join(gen_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    let fs = ctx.fs()\n    let emitter = ctx.source_emitter()\n    let source = emitter.generated_source(\"out/gen/generated_main.w\", fs.read_text(\"templates/generated_main.w\"))\n    var generated = ctx.new_build()\n    generated = generated.add_generated_source(source)\n    generated.executable(\"generated-app\", \"out/gen/generated_main.w\")\n", target_name, "generated build.w")
     if rc != 0: return rc
     let gen_result = bgs_build_expect_success(root, target_name, compiler_path, gen_dir, "build-w-generated-source", bgs_argv_append("", "build"))
     if gen_result.rc != 0: return if gen_result.rc == 0: 1 else: gen_result.rc
