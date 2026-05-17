@@ -3,8 +3,7 @@
 use std.compiler
 
 @[compiler_hook(after_typecheck)]
-fn generate_bad_source(project: ProjectInfo, source: SourceEmitter):
-    let _ = project
+fn generate(source: SourceEmitter):
     source.emit_source("fn generated_bad -> i32:\n    \"bad\"\n")
 
 fn main:

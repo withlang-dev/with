@@ -1,8 +1,6 @@
-// std.compiler — read-only compiler introspection value model.
-//
-// Compiler hooks receive ProjectInfo values once hook execution is wired into
-// the driver. This module defines the stable data shape and query methods.
+// std.compiler — compiler-hook introspection and tool capabilities.
 
+extern fn with_getenv_str(name: str) -> str
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_fs_write_file(path: str, data: str) -> i32
 extern fn with_eprint(s: str) -> void
@@ -51,12 +49,15 @@ pub type ProjectInfo {
     type_items: Vec[TypeInfo],
 }
 
-pub type CompilerApi {}
+pub type Diagnostics {
+    token: str,
+    output_path: str,
+}
 
-pub global compiler = CompilerApi {}
-
-global var __compiler_diagnostic_output_path: str = ""
-global var __compiler_emitted_source_output_path: str = ""
+pub type SourceEmitter {
+    token: str,
+    output_path: str,
+}
 
 fn compiler_hook_escape(value: str) -> str:
     var out = ""
@@ -74,36 +75,47 @@ fn compiler_hook_escape(value: str) -> str:
             out = out ++ value.slice(i as i64, (i + 1) as i64)
     out
 
-pub fn compiler_set_diagnostic_output(path: str):
-    __compiler_diagnostic_output_path = path
+fn compiler_capability_valid(token: str) -> bool:
+    let expected = with_getenv_str("WITH_TOOL_CAPABILITY_TOKEN")
+    expected.len() > 0 and token == expected
 
-pub fn compiler_set_emitted_source_output(path: str):
-    __compiler_emitted_source_output_path = path
+fn compiler_capability_require(token: str, name: str):
+    if not compiler_capability_valid(token):
+        with_eprint("error: invalid compiler hook capability: " ++ name)
+        exit(1)
 
-pub fn CompilerApi.error(self: &Self, location: SourceLocation, message: str):
-    let _ = self
-    if __compiler_diagnostic_output_path.len() == 0:
-        with_eprint("error: compiler.error called outside compiler hook execution")
+pub fn Diagnostics.__driver_new(token: str, output_path: str) -> Diagnostics:
+    compiler_capability_require(token, "Diagnostics")
+    Diagnostics { token, output_path }
+
+pub fn SourceEmitter.__driver_new(token: str, output_path: str) -> SourceEmitter:
+    compiler_capability_require(token, "SourceEmitter")
+    SourceEmitter { token, output_path }
+
+pub fn Diagnostics.error(self: &Self, location: SourceLocation, message: str):
+    compiler_capability_require(self.token, "Diagnostics")
+    if self.output_path.len() == 0:
+        with_eprint("error: Diagnostics.error called without a driver diagnostic output")
         exit(1)
         return
-    let old = with_fs_read_file(__compiler_diagnostic_output_path)
+    let old = with_fs_read_file(self.output_path)
     let line = "error\t" ++
         compiler_hook_escape(location.file) ++ "\t" ++
         f"{location.start}" ++ "\t" ++
         f"{location.end}" ++ "\t" ++
         compiler_hook_escape(message) ++ "\n"
-    if with_fs_write_file(__compiler_diagnostic_output_path, old ++ line) != 0:
+    if with_fs_write_file(self.output_path, old ++ line) != 0:
         with_eprint("error: failed to write compiler hook diagnostic")
         exit(1)
 
-pub fn CompilerApi.emit_source(self: &Self, source: str):
-    let _ = self
-    if __compiler_emitted_source_output_path.len() == 0:
-        with_eprint("error: compiler.emit_source called outside compiler hook execution")
+pub fn SourceEmitter.emit_source(self: &Self, source: str):
+    compiler_capability_require(self.token, "SourceEmitter")
+    if self.output_path.len() == 0:
+        with_eprint("error: SourceEmitter.emit_source called without a driver emitted-source output")
         exit(1)
         return
-    let old = with_fs_read_file(__compiler_emitted_source_output_path)
-    if with_fs_write_file(__compiler_emitted_source_output_path, old ++ "\n" ++ source ++ "\n") != 0:
+    let old = with_fs_read_file(self.output_path)
+    if with_fs_write_file(self.output_path, old ++ "\n" ++ source ++ "\n") != 0:
         with_eprint("error: failed to write compiler hook emitted source")
         exit(1)
 

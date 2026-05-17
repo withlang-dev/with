@@ -70,7 +70,10 @@ fn sema_resolve_embed_file_path(source_path: str, raw_path: str) -> str:
 fn sema_is_std_build_path(path: str) -> bool:
     path == "<embedded-std>/std/build.w" or path == "lib/std/build.w" or path.ends_with("/lib/std/build.w")
 
-fn sema_is_tool_capability_name(name: str) -> bool:
+fn sema_is_std_compiler_path(path: str) -> bool:
+    path == "<embedded-std>/std/compiler.w" or path == "lib/std/compiler.w" or path.ends_with("/lib/std/compiler.w")
+
+fn sema_is_std_build_capability_name(name: str) -> bool:
     name == "BuildCtx" or
         name == "ProjectInfo" or
         name == "Diagnostics" or
@@ -78,8 +81,11 @@ fn sema_is_tool_capability_name(name: str) -> bool:
         name == "ToolFs" or
         name == "ProcessRunner"
 
+fn sema_is_std_compiler_capability_name(name: str) -> bool:
+    name == "Diagnostics" or name == "SourceEmitter"
+
 fn Sema.can_access_tool_capability_internals(self: Sema) -> bool:
-    if sema_is_std_build_path(self.current_module_path):
+    if sema_is_std_build_path(self.current_module_path) or sema_is_std_compiler_path(self.current_module_path):
         return true
     self.tool_mode_entry_path.len() > 0 and self.current_module_path == self.tool_mode_entry_path
 
@@ -91,7 +97,7 @@ fn Sema.named_type_path_for(self: Sema, sym: i32, tid: i32) -> str:
         i = i - 1
     ""
 
-fn Sema.is_std_build_capability_type(self: Sema, tid: i32) -> bool:
+fn Sema.is_tool_capability_type(self: Sema, tid: i32) -> bool:
     if tid == 0:
         return false
     let resolved = self.resolve_alias(tid as TypeId)
@@ -99,12 +105,16 @@ fn Sema.is_std_build_capability_type(self: Sema, tid: i32) -> bool:
     if tk != TypeKind.TY_STRUCT:
         return false
     let type_sym = self.get_type_d0(resolved)
-    if not sema_is_tool_capability_name(self.pool_resolve(type_sym)):
-        return false
-    sema_is_std_build_path(self.named_type_path_for(type_sym, resolved))
+    let type_name = self.pool_resolve(type_sym)
+    let type_path = self.named_type_path_for(type_sym, resolved)
+    if sema_is_std_build_path(type_path):
+        return sema_is_std_build_capability_name(type_name)
+    if sema_is_std_compiler_path(type_path):
+        return sema_is_std_compiler_capability_name(type_name)
+    false
 
 fn Sema.reject_tool_capability_construction_if_needed(self: Sema, type_sym: i32, tid: i32, node: i32) -> bool:
-    if not self.is_std_build_capability_type(tid):
+    if not self.is_tool_capability_type(tid):
         return false
     if self.can_access_tool_capability_internals():
         return false
@@ -3379,7 +3389,7 @@ fn Sema.check_field_access(self: Sema, node: i32) -> i32:
     if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
         field_base = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
 
-    if self.is_std_build_capability_type(field_base as i32) and not self.can_access_tool_capability_internals():
+    if self.is_tool_capability_type(field_base as i32) and not self.can_access_tool_capability_internals():
         self.emit_error("tool capability fields are private; use capability methods instead", node)
         return 0
 
@@ -4525,7 +4535,7 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
         for cci in 0..closure_capture_syms.len() as i32:
             let cap_sym2 = closure_capture_syms.get(cci as i64)
             let cap_ty2 = self.scope_lookup(cap_sym2)
-            if emitted_capability_escape == 0 and self.is_std_build_capability_type(cap_ty2):
+            if emitted_capability_escape == 0 and self.is_tool_capability_type(cap_ty2):
                 self.emit_error("capability-bearing closure cannot escape into runtime code", node)
                 emitted_capability_escape = 1
         // docs/mut.md Rev 8 §9.4 / §15.9 — a mutating closure may not
@@ -6752,7 +6762,7 @@ fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: 
                 obj_type = static_named as TypeId
 
     if obj_type != 0 and static_type_sym != 0 and self.static_receiver_type_is_known(expr) != 0:
-        if self.is_std_build_capability_type(obj_type as i32) and self.pool_resolve(field) == "__driver_new" and not self.can_access_tool_capability_internals():
+        if self.is_tool_capability_type(obj_type as i32) and self.pool_resolve(field) == "__driver_new" and not self.can_access_tool_capability_internals():
             self.emit_error("tool capability constructor '" ++ self.pool_resolve(static_type_sym) ++ ".__driver_new' can only be called by the compiler driver", node)
             return 0
         let static_type_result = self.check_static_type_method_call(obj_type as i32, field, extra_start, arg_count, node)
