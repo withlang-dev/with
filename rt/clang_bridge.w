@@ -91,13 +91,14 @@ extern fn clang_Cursor_hasAttrs(cursor: CXCursor) -> i32
 extern fn clang_Cursor_getBinaryOpcode(cursor: CXCursor) -> i32
 extern fn clang_getCursorUnaryOperatorKind(cursor: CXCursor) -> i32
 extern fn clang_getCursorDefinition(cursor: CXCursor) -> CXCursor
+extern fn clang_getCursorReferenced(cursor: CXCursor) -> CXCursor
 extern fn clang_getCursorExtent(cursor: CXCursor) -> CXSourceRange
 extern fn clang_isCursorDefinition(cursor: CXCursor) -> i32
 extern fn clang_getCursorKindSpelling(kind: i32) -> CXString
 extern fn clang_getCursorTLSKind(cursor: CXCursor) -> i32
 extern fn clang_Cursor_Evaluate(cursor: CXCursor) -> *mut u8
 extern fn clang_Cursor_isEqual(a: CXCursor, b: CXCursor) -> i32
-extern fn clang_Cursor_getSemanticParent(cursor: CXCursor) -> CXCursor
+extern fn clang_getCursorSemanticParent(cursor: CXCursor) -> CXCursor
 
 // Type queries
 extern fn clang_getCanonicalType(ty: CXType) -> CXType
@@ -2358,14 +2359,16 @@ unsafe fn ensure_children_cached(s: *mut CImportSession, cursor_idx: i32):
     // Store results
     let flat_start = (*s).child_indices_count
     if cc.count > 0:
-        // Grow child_indices
-        while (*s).child_indices_count + cc.count > (*s).child_indices_cap:
-            (*s).child_indices_cap = if (*s).child_indices_cap > 0: (*s).child_indices_cap * 2 else: 256
-        let new_ci = with_alloc((*s).child_indices_cap as i64 * 4)
-        if (*s).child_indices as i64 != 0 and (*s).child_indices_count > 0:
-            with_memcpy(new_ci, (*s).child_indices as *const u8, (*s).child_indices_count as i64 * 4)
-        if (*s).child_indices as i64 != 0: with_free((*s).child_indices as *mut u8)
-        (*s).child_indices = new_ci as *mut i32
+        // Grow child_indices only when needed. Reallocating on every
+        // cursor cache fill makes large translation units quadratic.
+        if (*s).child_indices_count + cc.count > (*s).child_indices_cap:
+            while (*s).child_indices_count + cc.count > (*s).child_indices_cap:
+                (*s).child_indices_cap = if (*s).child_indices_cap > 0: (*s).child_indices_cap * 2 else: 256
+            let new_ci = with_alloc((*s).child_indices_cap as i64 * 4)
+            if (*s).child_indices as i64 != 0 and (*s).child_indices_count > 0:
+                with_memcpy(new_ci, (*s).child_indices as *const u8, (*s).child_indices_count as i64 * 4)
+            if (*s).child_indices as i64 != 0: with_free((*s).child_indices as *mut u8)
+            (*s).child_indices = new_ci as *mut i32
         // Copy indices
         with_memcpy(((*s).child_indices as i64 + flat_start as i64 * 4) as *mut u8, cc.indices as *const u8, cc.count as i64 * 4)
         (*s).child_indices_count = (*s).child_indices_count + cc.count
@@ -2605,7 +2608,7 @@ pub unsafe fn ci_field_offset_bits(session: i64, cursor_idx: i32) -> i64:
     let s = session as *mut CImportSession
     if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return -1
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
-    let parent = clang_Cursor_getSemanticParent(cursor)
+    let parent = clang_getCursorSemanticParent(cursor)
     let parent_type = clang_getCursorType(parent)
     let name_cxs = clang_getCursorSpelling(cursor)
     let name_cstr = clang_getCString(name_cxs)
@@ -2849,6 +2852,34 @@ pub unsafe fn ci_cursor_location(session: i64, cursor_idx: i32) -> str:
     if fallback_active:
         let fallback_file = *(&raw mut fallback_bits as *mut [2]i64 as *mut CXString)
         clang_disposeString(fallback_file)
+    clang_disposeString(presumed_file)
+    session_make_str(s, &buf as *const [1024]u8 as *const u8)
+
+@[c_export("with_ci_cursor_referenced_location")]
+pub unsafe fn ci_cursor_referenced_location(session: i64, cursor_idx: i32) -> str:
+    let s = session as *mut CImportSession
+    if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return ""
+    let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
+    let referenced = clang_getCursorReferenced(cursor)
+    if clang_Cursor_isNull(referenced) != 0:
+        return ""
+    let loc = clang_getCursorLocation(referenced)
+    var presumed_bits: [2]i64 = [0 as i64; 2]
+    var line_val: u32 = 0
+    var col_val: u32 = 0
+    clang_getPresumedLocation(loc, &raw mut presumed_bits as *mut [2]i64 as *mut CXString, &raw mut line_val, &raw mut col_val)
+    let presumed_file = *(&raw mut presumed_bits as *mut [2]i64 as *mut CXString)
+    let fname_str = clang_getCString(presumed_file)
+    if fname_str as i64 == 0 or *fname_str == 0:
+        clang_disposeString(presumed_file)
+        return ""
+    var buf: [1024]u8 = [0 as u8; 1024]
+    var pos: i64 = 0
+    buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, fname_str)
+    buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, ":\0" as *const u8)
+    buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, line_val as i64)
+    buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, ":\0" as *const u8)
+    buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, col_val as i64)
     clang_disposeString(presumed_file)
     session_make_str(s, &buf as *const [1024]u8 as *const u8)
 

@@ -68,6 +68,9 @@ extern fn with_cimport_struct_field_anon_field_name(session: i64, idx: i32, fiel
 extern fn with_cimport_struct_field_anon_field_type(session: i64, idx: i32, field: i32, sub_field: i32) -> str
 extern fn with_cimport_struct_is_packed(session: i64, idx: i32) -> i32
 extern fn with_cimport_struct_field_offset(session: i64, idx: i32, field: i32) -> i64
+
+var g_ci_realpath_cache_paths: Vec[str] = Vec.new()
+var g_ci_realpath_cache_values: Vec[str] = Vec.new()
 extern fn with_cimport_record_field_offset_by_name(session: i64, type_name: str, field_name: str) -> i64
 extern fn with_cimport_struct_size(session: i64, idx: i32) -> i64
 extern fn with_cimport_struct_field_size(session: i64, idx: i32, field: i32) -> i64
@@ -102,6 +105,7 @@ extern fn with_ci_type_arg(session: i64, ty: i32, idx: i32) -> i32
 extern fn with_ci_cursor_is_definition(session: i64, cursor: i32) -> i32
 extern fn with_ci_cursor_in_file(session: i64, cursor: i32, path: str) -> i32
 extern fn with_ci_cursor_location(session: i64, cursor: i32) -> str
+extern fn with_ci_cursor_referenced_location(session: i64, cursor: i32) -> str
 extern fn with_ci_cursor_source_text(session: i64, cursor: i32) -> str
 extern fn with_ci_cursor_expansion_text(session: i64, cursor: i32) -> str
 extern fn with_ci_cursor_spelling_text(session: i64, cursor: i32) -> str
@@ -185,7 +189,7 @@ let CXK_CALL_EXPR: i32 = 103
 let CXK_ARRAY_SUBSCRIPT: i32 = 113
 let CXK_INIT_LIST: i32 = 119
 let CXK_UNARY_EXPR: i32 = 136
-let CXK_COMPOUND_LITERAL: i32 = 121
+let CXK_COMPOUND_LITERAL: i32 = 118
 let CXK_VAR_DECL: i32 = 9
 let CXK_UNEXPOSED_STMT: i32 = 200
 
@@ -382,6 +386,7 @@ fn process_c_import_with_defines(header_spec: str, defines: Vec[str]) -> str:
     let macro_session = with_cimport_parse_macros(include_text)
     if macro_session != 0:
         g_migrate_macro_values = ci_collect_object_macro_values(macro_session)
+        g_migrate_macro_miss_names = Vec.new()
 
     // Pre-scan: collect all opaque-demoted types (bitfield, forward decl, unsupported)
     // then cascade through field references until fixpoint
@@ -444,6 +449,7 @@ fn process_c_import_with_defines(header_spec: str, defines: Vec[str]) -> str:
     g_macro_type_names = ""
     g_macro_type_aliases = ""
     g_migrate_macro_values = ""
+    g_migrate_macro_miss_names = Vec.new()
 
     output
 
@@ -595,6 +601,16 @@ fn ci_find_decl_cursor_for_idx(session: i64, idx: i32) -> i32:
     if kind != CK_STRUCT and kind != CK_UNION:
         return -1
     with_cimport_decl_cursor(session, idx)
+
+fn ci_find_child_of_kind(session: i64, cursor: i32, kind: i32) -> i32:
+    let nc = with_ci_num_children(session, cursor)
+    var i = 0
+    while i < nc:
+        let child = with_ci_child(session, cursor, i)
+        if with_ci_cursor_kind(session, child) == kind:
+            return child
+        i = i + 1
+    -1
 
 fn ci_decl_field_cursor(session: i64, decl_cursor: i32, field_idx: i32) -> i32:
     if decl_cursor < 0 or field_idx < 0:
@@ -3010,7 +3026,7 @@ fn ci_is_large_decimal(s: str) -> bool:
 
 fn ci_binary_op_allows_uint_literal_cast(op: i32, operand_unsigned: bool) -> bool:
     op == BO_SHL or op == BO_SHR or op == BO_AND or op == BO_OR or op == BO_XOR or
-    (operand_unsigned and (op == BO_ADD or op == BO_SUB))
+    (operand_unsigned and (op == BO_ADD or op == BO_SUB or op == BO_MUL))
 
 fn ci_non_literal_operand_is_unsigned(session: i64, lhs_cursor: i32, rhs_cursor: i32, lhs_large: bool, rhs_large: bool) -> bool:
     if lhs_large and rhs_large: return true
@@ -3115,7 +3131,7 @@ fn ci_find_str(text: str, needle: str) -> i32:
         return -1
     let limit = text.len() - needle.len()
     for i in 0..limit as i32 + 1:
-        if text.slice(i as i64, i as i64 + needle.len()) == needle:
+        if ci_str_matches_at(text, i, needle):
             return i
     -1
 
@@ -4046,14 +4062,66 @@ type CiValueExprIR {
     value_expr: CiExprId = 0 as CiExprId,
 }
 
+type CiScope {
+    ptr: *mut CiScopeState,
+}
+impl Copy for CiScope
+
+type CiScopeState {
+    names: HashMap[str, str],
+    types: HashMap[str, str],
+    name_log_keys: Vec[str],
+    name_log_values: Vec[str],
+    name_log_had: Vec[i32],
+    type_log_keys: Vec[str],
+    type_log_values: Vec[str],
+    type_log_had: Vec[i32],
+    return_type: str,
+}
+
+type CiScopeMark {
+    name_log_len: i64,
+    type_log_len: i64,
+}
+impl Copy for CiScopeMark
+
+fn CiScope.new(return_type: str) -> CiScope:
+    let ptr = with_alloc(sizeof[CiScopeState]()) as *mut CiScopeState
+    unsafe:
+        *ptr = CiScopeState {
+            names: HashMap.new(),
+            types: HashMap.new(),
+            name_log_keys: Vec.new(),
+            name_log_values: Vec.new(),
+            name_log_had: Vec.new(),
+            type_log_keys: Vec.new(),
+            type_log_values: Vec.new(),
+            type_log_had: Vec.new(),
+            return_type,
+        }
+    CiScope { ptr }
+
+fn CiScopeState.empty() -> CiScopeState:
+    CiScopeState {
+        names: HashMap.new(),
+        types: HashMap.new(),
+        name_log_keys: Vec.new(),
+        name_log_values: Vec.new(),
+        name_log_had: Vec.new(),
+        type_log_keys: Vec.new(),
+        type_log_values: Vec.new(),
+        type_log_had: Vec.new(),
+        return_type: "",
+    }
+
 // Produced by
 // ci_lower_decl_stmt_structural; consumed by ci_lower_stmt_ir
 // compound-stmt, ci_lower_for_stmt_ir, and the goto-body
 // structural handler. `stmt_id` is the CiStmtId to emit (may
 // be 0 if the decl lowered to nothing), `updated_scope` is the
-// scope string after registering the decl's name(s).
+// scope after registering the decl's name(s).
 type CiDeclLoweringIR {
-    updated_scope: str = "",
+    updated_scope: CiScope,
     stmt_id: CiStmtId = 0 as CiStmtId,
 }
 
@@ -4485,7 +4553,7 @@ fn ci_effect_expr_needs_terminal_stmt(session: i64, cursor: i32) -> bool:
 
     true
 
-fn CiStmtPool.lower_cfprintf_effect_ir(self: CiStmtPool, session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, scope: str) -> CiStmtId:
+fn CiStmtPool.lower_cfprintf_effect_ir(self: CiStmtPool, session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, scope: CiScope) -> CiStmtId:
     if with_ci_cursor_kind(session, cursor) != CXK_CALL_EXPR:
         return 0 as CiStmtId
     let callee_name = ci_call_name_from_source_text(with_ci_cursor_source_text(session, cursor))
@@ -4532,7 +4600,7 @@ fn CiStmtPool.lower_cfprintf_effect_ir(self: CiStmtPool, session: i64, cursor: i
     let end_stmt = self.expr_stmt(end_call)
     self.merge_ir( setup, self.merge3_ir( begin_stmt, fprintf_stmt, end_stmt))
 
-fn CiStmtPool.lower_effect_expr_ir(self: CiStmtPool, session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, scope: str) -> CiStmtId:
+fn CiStmtPool.lower_effect_expr_ir(self: CiStmtPool, session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, scope: CiScope) -> CiStmtId:
     let kind = with_ci_cursor_kind(session, cursor)
     let nc = with_ci_num_children(session, cursor)
 
@@ -4588,7 +4656,7 @@ fn CiStmtPool.lower_effect_expr_ir(self: CiStmtPool, session: i64, cursor: i32, 
         tail_stmt = self.expr_stmt(lowered.value_expr)
     self.merge_ir( lowered.setup_stmt, tail_stmt)
 
-fn CiStmtPool.prepare_stmt_subject_ir(self: CiStmtPool, session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, scope: str, tag: str) -> CiValueExprIR:
+fn CiStmtPool.prepare_stmt_subject_ir(self: CiStmtPool, session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, scope: CiScope, tag: str) -> CiValueExprIR:
     let lowered = self.lower_value_expr_ir(session, cursor, exprs, types, scope)
     if not ci_value_ir_valid(lowered):
         return ci_value_ir_invalid()
@@ -4606,7 +4674,7 @@ fn CiStmtPool.prepare_stmt_subject_ir(self: CiStmtPool, session: i64, cursor: i3
         value_expr: exprs.ident(temp_expr_name, temp_ty),
     }
 
-fn CiStmtPool.prepare_stmt_condition_ir(self: CiStmtPool, session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, scope: str) -> CiValueExprIR:
+fn CiStmtPool.prepare_stmt_condition_ir(self: CiStmtPool, session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, scope: CiScope) -> CiValueExprIR:
     let lowered = self.lower_value_expr_ir(session, cursor, exprs, types, scope)
     if not ci_value_ir_valid(lowered):
         return ci_value_ir_invalid()
@@ -5104,7 +5172,7 @@ fn ci_init_list_record_field_cxtype(session: i64, ty_text: str, ty: i32, field_i
         return -1
     ci_record_type_field_cxtype(session, ty, field_idx)
 
-fn CiExprPool.lower_init_list_ir(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: str) -> CiExprId:
+fn CiExprPool.lower_init_list_ir(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
     let nc = with_ci_num_children(session, cursor)
     let init_ty = with_ci_cursor_type(session, cursor)
     let init_ty_id = types.type_from_libclang(session, init_ty)
@@ -5205,7 +5273,7 @@ fn CiExprPool.lower_init_list_ir(self: CiExprPool, session: i64, cursor: i32, ty
         ij = ij + 1
     self.init_list(items_start, item_ids.len() as i32, init_ty_id)
 
-fn CiExprPool.lower_expr_ir(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: str) -> CiExprId:
+fn CiExprPool.lower_expr_ir(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
     let kind = with_ci_cursor_kind(session, cursor)
 
     if kind == CXK_UNEXPOSED_STMT:
@@ -5225,11 +5293,12 @@ fn CiExprPool.lower_expr_ir(self: CiExprPool, session: i64, cursor: i32, types: 
             let ival = with_ci_eval_int_value(session, cursor)
             let text_idx = self.add_string(i64_to_string(ival))
             return self.int_lit(text_idx, 0 as CiTypeId)
+        let inner_cursor = ci_find_last_expr_child(session, cursor)
         if nc == 1:
             let cast_id = self.lower_implicit_cast(session, cursor, types, scope)
             if (cast_id as i32) != 0:
                 return cast_id
-            let inner_cursor = with_ci_child(session, cursor, 0)
+        if inner_cursor >= 0:
             return self.lower_expr_ir(session, inner_cursor, types, scope)
 
     // Literal + DeclRef leaves (B2).
@@ -5336,10 +5405,9 @@ fn CiExprPool.lower_expr_ir(self: CiExprPool, session: i64, cursor: i32, types: 
 
     // Compound literal.
     if kind == CXK_COMPOUND_LITERAL:
-        let nc = with_ci_num_children(session, cursor)
-        if nc > 0:
-            let child_cursor = with_ci_child(session, cursor, 0)
-            return self.lower_expr_ir(session, child_cursor, types, scope)
+        let init_cursor = ci_find_child_of_kind(session, cursor, CXK_INIT_LIST)
+        if init_cursor >= 0:
+            return self.lower_init_list_ir(session, init_cursor, types, scope)
         return 0 as CiExprId
 
     // sizeof expression. Structurally builds CIE_SIZEOF_TYPE on
@@ -5415,7 +5483,7 @@ fn CiExprPool.lower_expr_ir(self: CiExprPool, session: i64, cursor: i32, types: 
     ci_record_raw_expr_kind(kind)
     0 as CiExprId
 
-fn CiExprPool.lower_binary_simple(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: str) -> CiExprId:
+fn CiExprPool.lower_binary_simple(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
     let nc = with_ci_num_children(session, cursor)
     if nc < 2:
         return 0 as CiExprId
@@ -5507,14 +5575,12 @@ fn CiExprPool.lower_binary_simple(self: CiExprPool, session: i64, cursor: i32, t
         let lhs_large = ci_is_large_decimal(lhs_str)
         let rhs_large = ci_is_large_decimal(rhs_str)
         let operand_unsigned = ci_non_literal_operand_is_unsigned(session, lhs_cursor, rhs_cursor, lhs_large, rhs_large)
-        if (lhs_large or rhs_large) and not ci_binary_op_allows_uint_literal_cast(op, operand_unsigned):
-            return 0 as CiExprId
         let c_uint_ty = types.named_type_from_text("c_uint")
-        if lhs_large:
+        if lhs_large and ci_binary_op_allows_uint_literal_cast(op, operand_unsigned):
             if (c_uint_ty as i32) == 0:
                 return 0 as CiExprId
             lhs_value = self.cast(c_uint_ty, lhs_value)
-        if rhs_large:
+        if rhs_large and ci_binary_op_allows_uint_literal_cast(op, operand_unsigned):
             if (c_uint_ty as i32) == 0:
                 return 0 as CiExprId
             rhs_value = self.cast(c_uint_ty, rhs_value)
@@ -5593,10 +5659,10 @@ fn ci_peel_transparent(session: i64, cursor: i32) -> i32:
         depth = depth + 1
     c
 
-fn CiExprPool.lower_binary_pointer(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: str) -> CiExprId:
+fn CiExprPool.lower_binary_pointer(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
     self.lower_plain_value_expr_ir(session, cursor, types, scope)
 
-fn CiExprPool.lower_binary_ptr_assign(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: str) -> CiExprId:
+fn CiExprPool.lower_binary_ptr_assign(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
     let nc = with_ci_num_children(session, cursor)
     if nc < 2 or with_ci_binary_op(session, cursor) != BO_ASSIGN:
         return 0 as CiExprId
@@ -5617,10 +5683,10 @@ fn CiExprPool.lower_binary_ptr_assign(self: CiExprPool, session: i64, cursor: i3
     let assign_id = self.add(CiExprKind.CIE_ASSIGN, lhs_id as i32, rhs_cast as i32, 0, 0 as CiTypeId)
     self.add(CiExprKind.CIE_PAREN, assign_id as i32, 0, 0, 0 as CiTypeId)
 
-fn CiExprPool.lower_binary_shift(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: str) -> CiExprId:
+fn CiExprPool.lower_binary_shift(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
     self.lower_plain_value_expr_ir(session, cursor, types, scope)
 
-fn CiExprPool.lower_binary_comparison(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: str) -> CiExprId:
+fn CiExprPool.lower_binary_comparison(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
     let nc = with_ci_num_children(session, cursor)
     if nc < 2:
         return 0 as CiExprId
@@ -5674,7 +5740,7 @@ fn CiExprPool.lower_binary_comparison(self: CiExprPool, session: i64, cursor: i3
     let zero = self.int_lit(zero_s, 0 as CiTypeId)
     self.add(CiExprKind.CIE_TERNARY, cond_id as i32, one as i32, zero as i32, 0 as CiTypeId)
 
-fn CiExprPool.lower_binary_logical(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: str) -> CiExprId:
+fn CiExprPool.lower_binary_logical(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
     let nc = with_ci_num_children(session, cursor)
     if nc < 2:
         return 0 as CiExprId
@@ -5720,7 +5786,7 @@ fn CiExprPool.cast_shift_count_expr(self: CiExprPool, types: CiTypePool, rhs: Ci
         return 0 as CiExprId
     self.cast(c_uint_ty, rhs)
 
-fn CiExprPool.lower_compound_assign(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: str) -> CiExprId:
+fn CiExprPool.lower_compound_assign(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
     let nc = with_ci_num_children(session, cursor)
     if nc < 2:
         return 0 as CiExprId
@@ -5749,7 +5815,7 @@ fn CiExprPool.lower_compound_assign(self: CiExprPool, session: i64, cursor: i32,
             return 0 as CiExprId
     self.add(CiExprKind.CIE_COMPOUND_ASSIGN, base_op, lhs_id as i32, rhs_value as i32, 0 as CiTypeId)
 
-fn CiExprPool.lower_unary_simple(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: str) -> CiExprId:
+fn CiExprPool.lower_unary_simple(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
     let nc = with_ci_num_children(session, cursor)
     if nc < 1:
         return 0 as CiExprId
@@ -5849,7 +5915,7 @@ fn ci_classify_implicit_cast_safe(session: i64, cursor: i32, inner_cursor: i32) 
     // the CIE_CAST output is the same either way.
     CI_CAST_INT_WIDEN
 
-fn CiExprPool.lower_implicit_cast(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: str) -> CiExprId:
+fn CiExprPool.lower_implicit_cast(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
     let nc = with_ci_num_children(session, cursor)
     if nc < 1:
         return 0 as CiExprId
@@ -6096,10 +6162,10 @@ fn CiExprPool.lower_offsetof_value_expr(self: CiExprPool, session: i64, cursor: 
     ci_note_unsupported_offsetof(session, cursor)
     0 as CiExprId
 
-fn CiExprPool.lower_call_simple(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: str) -> CiExprId:
+fn CiExprPool.lower_call_simple(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
     self.lower_plain_value_expr_ir(session, cursor, types, scope)
 
-fn CiExprPool.lower_literal_or_ref(self: CiExprPool, session: i64, cursor: i32, kind: i32, types: CiTypePool, scope: str) -> CiExprId:
+fn CiExprPool.lower_literal_or_ref(self: CiExprPool, session: i64, cursor: i32, kind: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
     if kind == CXK_INT_LITERAL:
         var text: str = ""
         if with_ci_eval_int_valid(session, cursor) != 0:
@@ -6119,26 +6185,32 @@ fn CiExprPool.lower_literal_or_ref(self: CiExprPool, session: i64, cursor: i32, 
         return self.add(CiExprKind.CIE_FLOAT_LIT, s, 0, 0, 0 as CiTypeId)
 
     if kind == CXK_STRING_LITERAL:
-        let expansion_src = with_ci_cursor_expansion_text(session, cursor)
-        let expansion_expanded = ci_expand_string_macro_sequence(session, expansion_src)
-        let expansion_arg = ci_string_macro_arg_from_expansion(session, cursor)
-        let expansion_arg_expanded = ci_expand_string_macro_sequence(session, expansion_arg)
-        let spelling_src = with_ci_cursor_spelling_text(session, cursor)
-        let spelling_expanded = ci_expand_string_macro_sequence(session, spelling_src)
-        let source_src = with_ci_cursor_source_text(session, cursor)
-        let source_expanded = ci_expand_string_macro_sequence(session, source_src)
         let literal_src = ci_literal_token_text(session, cursor)
-        let preprocessed_raw_src = if expansion_src.len() > 0: expansion_src else if source_src.len() > 0: source_src else: literal_src
-        let preprocessed_src = ci_preprocessed_string_sequence_for_cursor(session, cursor, preprocessed_raw_src)
-        let preprocessed_expanded = ci_expand_string_macro_sequence(session, preprocessed_src)
+        if ci_is_concatenated_string(literal_src):
+            let s = self.add_string(ci_concat_strings(literal_src))
+            return self.add(CiExprKind.CIE_STRING_LIT, s, 0, 0, 0 as CiTypeId)
+        if ci_is_string_literal(literal_src):
+            let s = self.add_string(literal_src)
+            return self.add(CiExprKind.CIE_STRING_LIT, s, 0, 0, 0 as CiTypeId)
+
+        let expansion_src = with_ci_cursor_expansion_text(session, cursor)
+        let expansion_arg = ci_string_macro_arg_from_expansion(session, cursor)
+        let spelling_src = with_ci_cursor_spelling_text(session, cursor)
+        let source_src = with_ci_cursor_source_text(session, cursor)
         let eval_src = with_ci_eval_as_str(session, cursor)
         let eval_text = ci_quote_evaluated_c_string(eval_src)
         let eval_is_safe = eval_src.len() > 0 and not ci_string_text_mentions_null_escape(expansion_src) and not ci_string_text_mentions_null_escape(spelling_src) and not ci_string_text_mentions_null_escape(source_src) and not ci_string_text_mentions_null_escape(literal_src)
-        let should_use_eval = eval_is_safe and (ci_string_text_has_stringify_call(session, expansion_src) or ci_string_text_has_stringify_call(session, spelling_src) or ci_string_text_has_stringify_call(session, source_src) or ci_string_text_has_stringify_call(session, literal_src))
+        if eval_is_safe:
+            let s = self.add_string(eval_text)
+            return self.add(CiExprKind.CIE_STRING_LIT, s, 0, 0, 0 as CiTypeId)
+
+        let expansion_expanded = ci_expand_string_macro_sequence(session, expansion_src)
+        let expansion_arg_expanded = ci_expand_string_macro_sequence(session, expansion_arg)
+        let spelling_expanded = ci_expand_string_macro_sequence(session, spelling_src)
+        let source_expanded = ci_expand_string_macro_sequence(session, source_src)
+        var preprocessed_expanded = ""
         var text = literal_src
-        if should_use_eval:
-            text = eval_text
-        else if expansion_expanded.len() > 0:
+        if expansion_expanded.len() > 0:
             text = expansion_expanded
         else if expansion_arg_expanded.len() > 0:
             text = expansion_arg_expanded
@@ -6146,8 +6218,6 @@ fn CiExprPool.lower_literal_or_ref(self: CiExprPool, session: i64, cursor: i32, 
             text = spelling_expanded
         else if source_expanded.len() > 0:
             text = source_expanded
-        else if preprocessed_expanded.len() > 0:
-            text = preprocessed_expanded
         else if literal_src.len() > 0 and literal_src.byte_at(0) == 34:
             text = ci_concat_strings(literal_src)
         else if literal_src.len() > 0:
@@ -6155,9 +6225,17 @@ fn CiExprPool.lower_literal_or_ref(self: CiExprPool, session: i64, cursor: i32, 
             if stringify_val.len() > 0:
                 text = stringify_val
             else:
-                return 0 as CiExprId
+                let preprocessed_raw_src = if expansion_src.len() > 0: expansion_src else if source_src.len() > 0: source_src else: literal_src
+                preprocessed_expanded = ci_expand_string_macro_sequence(session, ci_preprocessed_string_sequence_for_cursor(session, cursor, preprocessed_raw_src))
+                if preprocessed_expanded.len() > 0:
+                    text = preprocessed_expanded
+                else:
+                    return 0 as CiExprId
         else:
             return 0 as CiExprId
+        if preprocessed_expanded.len() == 0 and ci_string_text_contains_macro_like_ident(text):
+            let preprocessed_raw_src = if expansion_src.len() > 0: expansion_src else if source_src.len() > 0: source_src else: literal_src
+            preprocessed_expanded = ci_expand_string_macro_sequence(session, ci_preprocessed_string_sequence_for_cursor(session, cursor, preprocessed_raw_src))
         if text != preprocessed_expanded and preprocessed_expanded.len() > 0 and ci_string_text_contains_macro_like_ident(text):
             text = preprocessed_expanded
         if eval_is_safe and text != eval_text and ci_string_text_contains_macro_like_ident(text):
@@ -6186,10 +6264,10 @@ fn CiExprPool.lower_literal_or_ref(self: CiExprPool, session: i64, cursor: i32, 
         let mangled = ci_scope_lookup(scope, escaped)
         if mangled.len() == 0 and not ci_has_value_libc_call_mapping(name):
             if ci_libc_symbol_allowed_as(name, CI_LIBC_KIND_FN):
-                if not ci_note_filtered_system_symbol_ref(session, name, CI_LIBC_KIND_FN):
+                if not ci_note_filtered_system_symbol_ref_at(session, cursor, name, CI_LIBC_KIND_FN):
                     return 0 as CiExprId
             else:
-                if not ci_note_filtered_system_symbol_ref(session, name, CI_LIBC_KIND_VAR):
+                if not ci_note_filtered_system_symbol_ref_at(session, cursor, name, CI_LIBC_KIND_VAR):
                     return 0 as CiExprId
         var text = ""
         if mangled.len() > 0:
@@ -6207,14 +6285,21 @@ fn CiExprPool.lower_literal_or_ref(self: CiExprPool, session: i64, cursor: i32, 
 
     0 as CiExprId
 
-fn ci_trans_expr_via_ir(session: i64, cursor: i32, scope: str) -> str:
+fn ci_trans_expr_via_ir(session: i64, cursor: i32, scope: CiScope) -> str:
     var types = CiTypePool.new()
     var exprs = CiExprPool.new()
     var stmts = CiStmtPool.new()
     let lowered = stmts.lower_value_expr_ir(session, cursor, exprs, types, scope)
     if not ci_value_ir_valid(lowered):
+        stmts.deinit()
+        exprs.deinit()
+        types.deinit()
         return ""
-    stmts.render_value_expr_ir(session, cursor, exprs, types, lowered)
+    let rendered = stmts.render_value_expr_ir(session, cursor, exprs, types, lowered)
+    stmts.deinit()
+    exprs.deinit()
+    types.deinit()
+    rendered
 
 fn ci_rvalue_needs_lowering(session: i64, cursor: i32) -> bool:
     let kind = with_ci_cursor_kind(session, cursor)
@@ -6497,9 +6582,6 @@ fn CiExprPool.build_binary_value_expr_from_ids(self: CiExprPool, session: i64, c
     let lhs_large = ci_is_large_decimal(lhs_text)
     let rhs_large = ci_is_large_decimal(rhs_text)
     let operand_unsigned = ci_non_literal_operand_is_unsigned(session, lhs_cursor, rhs_cursor, lhs_large, rhs_large)
-    if (lhs_large or rhs_large) and not ci_binary_op_allows_uint_literal_cast(op, operand_unsigned):
-        return 0 as CiExprId
-
     var lhs_value = lhs_id
     var rhs_value = rhs_id
     if op == BO_SHL or op == BO_SHR:
@@ -6652,16 +6734,20 @@ fn CiExprPool.build_unary_value_expr_from_id(self: CiExprPool, session: i64, cur
 
     0 as CiExprId
 
-fn CiExprPool.lower_plain_value_expr_ir(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: str) -> CiExprId:
+fn CiExprPool.lower_plain_value_expr_ir(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
     var stmts = CiStmtPool.new()
     let lowered = stmts.lower_value_expr_ir(session, cursor, self.val(), types, scope)
     if not ci_value_ir_valid(lowered):
+        stmts.deinit()
         return 0 as CiExprId
     if (lowered.setup_stmt as i32) != 0:
+        stmts.deinit()
         return 0 as CiExprId
-    lowered.value_expr
+    let value_expr = lowered.value_expr
+    stmts.deinit()
+    value_expr
 
-fn CiExprPool.apply_implicit_cast_to_value_id(self: CiExprPool, session: i64, cursor: i32, inner_cursor: i32, inner_id: CiExprId, types: CiTypePool, scope: str) -> CiExprId:
+fn CiExprPool.apply_implicit_cast_to_value_id(self: CiExprPool, session: i64, cursor: i32, inner_cursor: i32, inner_id: CiExprId, types: CiTypePool, scope: CiScope) -> CiExprId:
     let cast_kind = ci_classify_implicit_cast_safe(session, cursor, inner_cursor)
 
     if cast_kind == CI_CAST_NULL_TO_PTR:
@@ -6721,6 +6807,8 @@ fn CiExprPool.build_libc_call_value_expr(self: CiExprPool, session: i64, cursor:
     let renamed = ci_libc_simple_rename(callee_text)
     if renamed.len() > 0:
         return self.build_named_call_expr(renamed, arg_ids)
+    if ci_is_libm_fn(callee_text):
+        return self.build_named_call_expr(callee_text, arg_ids)
     if callee_text == "malloc":
         if arg_ids.len() != 1:
             return 0 as CiExprId
@@ -6872,7 +6960,7 @@ fn CiExprPool.build_libc_call_value_expr(self: CiExprPool, session: i64, cursor:
         return self.int_lit(zero_idx, 0 as CiTypeId)
     0 as CiExprId
 
-fn CiStmtPool.lower_lvalue_expr_ir(self: CiStmtPool, session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, scope: str) -> CiValueExprIR:
+fn CiStmtPool.lower_lvalue_expr_ir(self: CiStmtPool, session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, scope: CiScope) -> CiValueExprIR:
     let kind = with_ci_cursor_kind(session, cursor)
     let nc = with_ci_num_children(session, cursor)
 
@@ -6937,7 +7025,7 @@ fn CiStmtPool.lower_lvalue_expr_ir(self: CiStmtPool, session: i64, cursor: i32, 
         return ci_value_ir_plain(expr_id)
     ci_value_ir_invalid()
 
-fn CiStmtPool.lower_value_expr_ir(self: CiStmtPool, session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, scope: str) -> CiValueExprIR:
+fn CiStmtPool.lower_value_expr_ir(self: CiStmtPool, session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, scope: CiScope) -> CiValueExprIR:
     let kind = with_ci_cursor_kind(session, cursor)
     let nc = with_ci_num_children(session, cursor)
 
@@ -6951,10 +7039,9 @@ fn CiStmtPool.lower_value_expr_ir(self: CiStmtPool, session: i64, cursor: i32, e
         if with_ci_eval_int_valid(session, cursor) != 0 and not ci_expr_children_need_rvalue_lowering(session, cursor):
             let text_idx = exprs.add_string(ci_eval_int_text(session, cursor))
             return ci_value_ir_plain(exprs.int_lit(text_idx, 0 as CiTypeId))
-        if nc == 1:
-            return self.lower_value_expr_ir(session, with_ci_child(session, cursor, 0), exprs, types, scope)
-        if nc > 0:
-            return self.lower_value_expr_ir(session, with_ci_child(session, cursor, 0), exprs, types, scope)
+        let inner_cursor = ci_find_last_expr_child(session, cursor)
+        if inner_cursor >= 0:
+            return self.lower_value_expr_ir(session, inner_cursor, exprs, types, scope)
 
     if kind == CXK_PAREN_EXPR:
         if nc == 1:
@@ -6989,6 +7076,16 @@ fn CiStmtPool.lower_value_expr_ir(self: CiStmtPool, session: i64, cursor: i32, e
         if op == BO_ASSIGN:
             let lhs = self.lower_lvalue_expr_ir(session, lhs_cursor, exprs, types, scope)
             let rhs = self.lower_value_expr_ir(session, rhs_cursor, exprs, types, scope)
+            if not ci_value_ir_valid(lhs):
+                g_ci_bail_location = with_ci_cursor_location(session, lhs_cursor)
+                g_ci_bail_kind = with_ci_cursor_kind(session, lhs_cursor)
+                g_ci_bail_message = f"unsupported assignment lhs in goto CFG (kind={g_ci_bail_kind})"
+                return ci_value_ir_invalid()
+            if not ci_value_ir_valid(rhs):
+                g_ci_bail_location = with_ci_cursor_location(session, rhs_cursor)
+                g_ci_bail_kind = with_ci_cursor_kind(session, rhs_cursor)
+                g_ci_bail_message = f"unsupported assignment rhs in goto CFG (kind={g_ci_bail_kind})"
+                return ci_value_ir_invalid()
             if ci_value_ir_valid(lhs) and ci_value_ir_valid(rhs):
                 var rhs_value = rhs.value_expr
                 let lhs_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, lhs_cursor))
@@ -7280,7 +7377,8 @@ fn CiStmtPool.lower_value_expr_ir(self: CiStmtPool, session: i64, cursor: i32, e
         if has_mapped_call:
             return ci_value_ir_invalid()
         if callee_text.len() > 0 and ci_is_c_ident(callee_text) and not ci_scope_contains(scope, callee_text):
-            if not ci_note_filtered_system_symbol_ref(session, callee_text, CI_LIBC_KIND_FN):
+            let callee_cursor = if nc > 0: with_ci_child(session, cursor, 0) else: cursor
+            if not ci_note_filtered_system_symbol_ref_at(session, callee_cursor, callee_text, CI_LIBC_KIND_FN):
                 return ci_value_ir_invalid()
         let args_start = exprs.extra_len()
         var j: i64 = 0
@@ -7318,7 +7416,16 @@ fn CiStmtPool.lower_value_expr_ir(self: CiStmtPool, session: i64, cursor: i32, e
         return ci_value_ir_invalid()
 
     if kind == CXK_COMPOUND_LITERAL and nc > 0:
-        return self.lower_value_expr_ir(session, with_ci_child(session, cursor, 0), exprs, types, scope)
+        let init_cursor = ci_find_child_of_kind(session, cursor, CXK_INIT_LIST)
+        if init_cursor >= 0:
+            let init_id = exprs.lower_init_list_ir(session, init_cursor, types, scope)
+            if (init_id as i32) == 0:
+                return ci_value_ir_invalid()
+            let literal_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
+            if (literal_ty as i32) != 0 and exprs.get_type(init_id) != literal_ty:
+                return ci_value_ir_plain(exprs.cast(literal_ty, init_id))
+            return ci_value_ir_plain(init_id)
+        return ci_value_ir_invalid()
 
     if kind == CXK_INIT_LIST:
         let init_id = exprs.lower_init_list_ir(session, cursor, types, scope)
@@ -7384,7 +7491,7 @@ fn ci_condition_unwrap_cursor(session: i64, cursor: i32) -> i32:
 //
 // Returns 0 as CiExprId only when the inner expression itself can't
 // be structurally lowered (ci_lower_expr_ir returns 0).
-fn CiExprPool.lower_bool_expr(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: str) -> CiExprId:
+fn CiExprPool.lower_bool_expr(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
     let kind = with_ci_cursor_kind(session, cursor)
 
     if kind == CXK_UNEXPOSED_STMT:
@@ -7574,8 +7681,9 @@ fn ci_extract_for_parts(session: i64, cursor: i32) -> CiForParts:
 // where init becomes a leading statement in an enclosing CIS_BLOCK,
 // cond becomes a structural boolean CiExpr, and inc becomes the
 // last structural statement in the while body.
-fn CiStmtPool.lower_for_stmt_ir(self: CiStmtPool, session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, scope: str) -> CiStmtId:
+fn CiStmtPool.lower_for_stmt_ir(self: CiStmtPool, session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, scope: CiScope) -> CiStmtId:
     let parts = ci_extract_for_parts(session, cursor)
+    let scope_mark = ci_scope_mark(scope)
     if parts.body_cursor < 0:
         if g_ci_bail_location.len() == 0:
             g_ci_bail_location = with_ci_cursor_location(session, cursor)
@@ -7592,6 +7700,7 @@ fn CiStmtPool.lower_for_stmt_ir(self: CiStmtPool, session: i64, cursor: i32, exp
                 if g_ci_bail_location.len() == 0:
                     g_ci_bail_location = with_ci_cursor_location(session, parts.init_cursor)
                     g_ci_bail_kind = CXK_DECL_STMT
+                let _ = ci_scope_restore(inner_scope, scope_mark)
                 return 0 as CiStmtId
             inner_scope = decl_ir.updated_scope
             init_id = decl_ir.stmt_id
@@ -7601,6 +7710,7 @@ fn CiStmtPool.lower_for_stmt_ir(self: CiStmtPool, session: i64, cursor: i32, exp
                 if g_ci_bail_location.len() == 0:
                     g_ci_bail_location = with_ci_cursor_location(session, parts.init_cursor)
                     g_ci_bail_kind = with_ci_cursor_kind(session, parts.init_cursor)
+                let _ = ci_scope_restore(inner_scope, scope_mark)
                 return 0 as CiStmtId
 
     var cond_setup_id: CiStmtId = 0 as CiStmtId
@@ -7611,6 +7721,7 @@ fn CiStmtPool.lower_for_stmt_ir(self: CiStmtPool, session: i64, cursor: i32, exp
             if g_ci_bail_location.len() == 0:
                 g_ci_bail_location = with_ci_cursor_location(session, parts.cond_cursor)
                 g_ci_bail_kind = with_ci_cursor_kind(session, parts.cond_cursor)
+            let _ = ci_scope_restore(inner_scope, scope_mark)
             return 0 as CiStmtId
         ci_trace_port("STRUCTURAL[b11.1.for_stmt_cond]")
         cond_setup_id = prepared_cond.setup_stmt
@@ -7623,6 +7734,7 @@ fn CiStmtPool.lower_for_stmt_ir(self: CiStmtPool, session: i64, cursor: i32, exp
         if g_ci_bail_location.len() == 0:
             g_ci_bail_location = with_ci_cursor_location(session, parts.body_cursor)
             g_ci_bail_kind = with_ci_cursor_kind(session, parts.body_cursor)
+        let _ = ci_scope_restore(inner_scope, scope_mark)
         return 0 as CiStmtId
 
     var inc_stmt_id: CiStmtId = 0 as CiStmtId
@@ -7632,6 +7744,7 @@ fn CiStmtPool.lower_for_stmt_ir(self: CiStmtPool, session: i64, cursor: i32, exp
             if g_ci_bail_location.len() == 0:
                 g_ci_bail_location = with_ci_cursor_location(session, parts.inc_cursor)
                 g_ci_bail_kind = with_ci_cursor_kind(session, parts.inc_cursor)
+            let _ = ci_scope_restore(inner_scope, scope_mark)
             return 0 as CiStmtId
         body_id = self.for_continue_runs_inc_ir( body_id, inc_stmt_id)
 
@@ -7657,7 +7770,10 @@ fn CiStmtPool.lower_for_stmt_ir(self: CiStmtPool, session: i64, cursor: i32, exp
         let wstart = self.extra_len()
         let _ = self.add_extra(init_id as i32)
         let _ = self.add_extra(while_id as i32)
-        return self.block(wstart, 2)
+        let result = self.block(wstart, 2)
+        let _ = ci_scope_restore(inner_scope, scope_mark)
+        return result
+    let _ = ci_scope_restore(inner_scope, scope_mark)
     while_id
 
 // Structural lowering for expression cursors when the value is
@@ -7665,7 +7781,7 @@ fn CiStmtPool.lower_for_stmt_ir(self: CiStmtPool, session: i64, cursor: i32, exp
 // the same value-position lowering as ci_lower_value_expr_ir, then
 // decides whether the terminal expression itself must still be
 // evaluated for effect.
-fn CiStmtPool.lower_stmt_expr_ir(self: CiStmtPool, session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, scope: str) -> CiStmtId:
+fn CiStmtPool.lower_stmt_expr_ir(self: CiStmtPool, session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, scope: CiScope) -> CiStmtId:
     self.lower_effect_expr_ir(session, cursor, exprs, types, scope)
 
 // Strip trailing CIS_BREAK children from a structural CIS_BLOCK,
@@ -7700,7 +7816,7 @@ fn CiStmtPool.strip_trailing_break_ir(self: CiStmtPool, stmt_id: CiStmtId) -> Ci
         i = i + 1
     self.block(new_start, new_count)
 
-fn CiStmtPool.lower_switch_prong_forward_ir(self: CiStmtPool, session: i64, body_cursor: i32, start_idx: i32, total: i32, exprs: CiExprPool, types: CiTypePool, scope: str) -> CiStmtId:
+fn CiStmtPool.lower_switch_prong_forward_ir(self: CiStmtPool, session: i64, body_cursor: i32, start_idx: i32, total: i32, exprs: CiExprPool, types: CiTypePool, scope: CiScope) -> CiStmtId:
     var part_ids: Vec[i32] = Vec.new()
     let start_child = with_ci_child(session, body_cursor, start_idx)
     let start_kind = with_ci_cursor_kind(session, start_child)
@@ -7747,7 +7863,7 @@ fn CiStmtPool.lower_switch_prong_forward_ir(self: CiStmtPool, session: i64, body
 //
 // Returns 0 when something in the switch body doesn't map cleanly
 // so the enclosing structural lowering attempt can bail.
-fn CiStmtPool.lower_switch_stmt_ir(self: CiStmtPool, session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, scope: str) -> CiStmtId:
+fn CiStmtPool.lower_switch_stmt_ir(self: CiStmtPool, session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, scope: CiScope) -> CiStmtId:
     let nc = with_ci_num_children(session, cursor)
     if nc < 2:
         return 0 as CiStmtId
@@ -7761,7 +7877,7 @@ fn CiStmtPool.lower_switch_stmt_ir(self: CiStmtPool, session: i64, cursor: i32, 
 // and ci_strip_trailing_break_ir to remove the terminating break
 // from each case body. Bails (returns 0) on unsupported switch
 // shapes so the enclosing structural lowering attempt can abort.
-fn CiStmtPool.lower_switch_stmt_ir_structural(self: CiStmtPool, session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, scope: str) -> CiStmtId:
+fn CiStmtPool.lower_switch_stmt_ir_structural(self: CiStmtPool, session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, scope: CiScope) -> CiStmtId:
     let nc = with_ci_num_children(session, cursor)
     if nc < 2:
         return 0 as CiStmtId
@@ -7918,7 +8034,7 @@ fn CiStmtPool.lower_switch_stmt_ir_structural(self: CiStmtPool, session: i64, cu
         return 0 as CiStmtId
     self.merge_ir( prepared_subject.setup_stmt, switch_id)
 
-fn CiExprPool.lower_case_value_ir(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: str) -> CiExprId:
+fn CiExprPool.lower_case_value_ir(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
     if with_ci_eval_int_valid(session, cursor) != 0:
         let text_idx = self.add_string(ci_eval_int_text(session, cursor))
         return self.int_lit(text_idx, 0 as CiTypeId)
@@ -7928,7 +8044,7 @@ fn CiExprPool.lower_case_value_ir(self: CiExprPool, session: i64, cursor: i32, t
 // cursor. Specific handlers build real CIS_* nodes for kinds we
 // own structurally; everything else: returns 0 so callers can bail
 // transactionally. Returns 0 for the empty case (CXK_NULL_STMT).
-fn CiStmtPool.lower_stmt_ir(self: CiStmtPool, session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, indent: i32, scope: str) -> CiStmtId:
+fn CiStmtPool.lower_stmt_ir(self: CiStmtPool, session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, indent: i32, scope: CiScope) -> CiStmtId:
     let kind = with_ci_cursor_kind(session, cursor)
 
     if kind == CXK_UNEXPOSED_STMT:
@@ -8054,6 +8170,7 @@ fn CiStmtPool.lower_stmt_ir(self: CiStmtPool, session: i64, cursor: i32, exprs: 
         let ccn = with_ci_num_children(session, cursor)
         var child_ids: Vec[i32] = Vec.new()
         var block_scope = scope
+        let block_mark = ci_scope_mark(block_scope)
         var bailed = false
         var ci = 0
         while ci < ccn and not bailed:
@@ -8081,6 +8198,7 @@ fn CiStmtPool.lower_stmt_ir(self: CiStmtPool, session: i64, cursor: i32, exprs: 
             ci = ci + 1
 
         if bailed:
+            let _ = ci_scope_restore(block_scope, block_mark)
             return 0 as CiStmtId
 
         let extra_start = self.extra_len()
@@ -8089,7 +8207,9 @@ fn CiStmtPool.lower_stmt_ir(self: CiStmtPool, session: i64, cursor: i32, exprs: 
         while cj < child_ids.len():
             let _ = self.add_extra(child_ids.get(cj))
             cj = cj + 1
-        return self.block(extra_start, count)
+        let block_id = self.block(extra_start, count)
+        let _ = ci_scope_restore(block_scope, block_mark)
+        return block_id
 
     // Expression-as-statement: same structural lowering as
     // ci_lower_expr_ir, plus statement-position-only handling for
@@ -8129,7 +8249,7 @@ fn ci_cursor_kind_is_expression(kind: i32) -> bool:
     if kind == 100: return true
     false
 
-fn ci_trans_stmt_via_ir(session: i64, cursor: i32, kind: i32, indent: i32, scope: str) -> str:
+fn ci_trans_stmt_via_ir(session: i64, cursor: i32, kind: i32, indent: i32, scope: CiScope) -> str:
     let saved_fn_var_names = g_ci_fn_var_names
     let saved_temp_cursor_len = g_ci_temp_cursors.len() as i32
     let saved_temp_id_len = g_ci_temp_ids.len() as i32
@@ -8146,6 +8266,9 @@ fn ci_trans_stmt_via_ir(session: i64, cursor: i32, kind: i32, indent: i32, scope
         while (g_ci_temp_ids.len() as i32) > saved_temp_id_len:
             let _ = g_ci_temp_ids.pop()
         g_ci_temp_next = saved_temp_next
+        stmts.deinit()
+        exprs.deinit()
+        types.deinit()
         // CXK_NULL_STMT and empty-bypass map to empty string.
         return ""
 
@@ -8157,10 +8280,16 @@ fn ci_trans_stmt_via_ir(session: i64, cursor: i32, kind: i32, indent: i32, scope
     // everything else, we print at the target depth so the
     // content lands at the caller's level.
     let sk = stmts.kind(id)
+    var rendered = ""
     if sk == CiStmtKind.CIS_BREAK or sk == CiStmtKind.CIS_CONTINUE or sk == CiStmtKind.CIS_RETURN:
-        return ci_strip_trailing_newline(ci_print_stmt(stmts, exprs, types, id, 0))
-    let target_depth = indent * 4
-    ci_print_stmt(stmts, exprs, types, id, target_depth)
+        rendered = ci_strip_trailing_newline(ci_print_stmt(stmts, exprs, types, id, 0))
+    else:
+        let target_depth = indent * 4
+        rendered = ci_print_stmt(stmts, exprs, types, id, target_depth)
+    stmts.deinit()
+    exprs.deinit()
+    types.deinit()
+    rendered
 
 fn ci_location_path(loc: str) -> str:
     if loc.len() == 0:
@@ -8245,7 +8374,7 @@ fn ci_try_eval_var_init_for_type(session: i64, idx: i32, target_type: str) -> st
                     let from_decl_source = ci_var_init_expr_from_decl_source_for_type(session, var_cursor, init_type)
                     if from_decl_source.len() > 0:
                         return from_decl_source
-                let from_ast = ci_var_init_expr_for_type(session, var_cursor, "", init_type)
+                let from_ast = ci_var_init_expr_for_type(session, var_cursor, CiScope.new(""), init_type)
                 if from_ast.len() > 0:
                     return from_ast
                 let from_decl_source = ci_var_init_expr_from_decl_source_for_type(session, var_cursor, init_type)
@@ -8253,7 +8382,7 @@ fn ci_try_eval_var_init_for_type(session: i64, idx: i32, target_type: str) -> st
                     return from_decl_source
             if with_ci_eval_int_valid(session, init_cursor) != 0:
                 return ci_eval_int_text(session, init_cursor)
-        let expr = ci_var_init_expr_for_type(session, var_cursor, "", init_type)
+        let expr = ci_var_init_expr_for_type(session, var_cursor, CiScope.new(""), init_type)
         if expr.len() > 0:
             return expr
     ""
@@ -8421,37 +8550,29 @@ fn ci_switch_case_is_terminated(session: i64, body_cursor: i32, case_index: i32)
     false
 
 // ── Scope helpers ───────────────────────────────────────────
-// Scope is a pipe-delimited string: "|name|" or "|name=mangled|"
 
-fn ci_scope_get_return_type(scope: str) -> str:
-    if ci_starts_with(scope, "RET:"):
-        let end = ci_find_char(scope, 124)  // '|'
-        if end > 4:
-            return scope.slice(4, end as i64)
+fn ci_scope_get_return_type(scope: CiScope) -> str:
+    unsafe:
+        if scope.ptr as i64 == 0:
+            return ""
+        (*scope.ptr).return_type
+
+fn ci_scope_contains(scope: CiScope, name: str) -> bool:
+    unsafe:
+        if scope.ptr as i64 == 0:
+            return false
+        (*scope.ptr).names.get(name).is_some()
+
+fn ci_scope_lookup(scope: CiScope, name: str) -> str:
+    unsafe:
+        if scope.ptr as i64 == 0:
+            return ""
+        let value = (*scope.ptr).names.get(name)
+        if value.is_some():
+            return value.unwrap()
     ""
 
-fn ci_scope_contains(scope: str, name: str) -> bool:
-    ci_str_contains(scope, "|" ++ name ++ "|") or ci_str_contains(scope, "|" ++ name ++ "=")
-
-fn ci_scope_lookup(scope: str, name: str) -> str:
-    // Look for the innermost "|name=mangled|" mapping.
-    // Later scope entries shadow earlier ones.
-    let needle = "|" ++ name ++ "="
-    let slen = scope.len() as i32
-    let nlen = needle.len() as i32
-    var pos = slen - nlen
-    while pos >= 0:
-        if scope.slice(pos as i64, (pos + nlen) as i64) == needle:
-            let start = pos + nlen
-            var end = start
-            while end < slen and scope.byte_at(end as i64) != 124:
-                end = end + 1
-            return scope.slice(start as i64, end as i64)
-        pos = pos - 1
-    // If just "|name|" exists, return the name unchanged
-    ""
-
-fn ci_scope_mangle(scope: str, name: str) -> str:
+fn ci_scope_mangle(scope: CiScope, name: str) -> str:
     if not ci_scope_contains(scope, name):
         return name
     var suffix = 1
@@ -8462,35 +8583,117 @@ fn ci_scope_mangle(scope: str, name: str) -> str:
         suffix = suffix + 1
     name ++ "_99"
 
-fn ci_scope_add(scope: str, name: str) -> str:
-    scope ++ "|" ++ name ++ "|"
+fn ci_scope_mark(scope: CiScope) -> CiScopeMark:
+    unsafe:
+        if scope.ptr as i64 == 0:
+            return CiScopeMark { name_log_len: 0, type_log_len: 0 }
+        CiScopeMark {
+            name_log_len: (*scope.ptr).name_log_keys.len(),
+            type_log_len: (*scope.ptr).type_log_keys.len(),
+        }
 
-fn ci_scope_add_mangled(scope: str, original: str, mangled: str) -> str:
-    scope ++ "|" ++ original ++ "=" ++ mangled ++ "|" ++ mangled ++ "|"
+fn ci_scope_note_name(scope: CiScope, key: str) -> CiScope:
+    unsafe:
+        if scope.ptr as i64 == 0:
+            return scope
+        let old = (*scope.ptr).names.get(key)
+        (*scope.ptr).name_log_keys.push(key)
+        if old.is_some():
+            (*scope.ptr).name_log_values.push(old.unwrap())
+            (*scope.ptr).name_log_had.push(1)
+        else:
+            (*scope.ptr).name_log_values.push("")
+            (*scope.ptr).name_log_had.push(0)
+    scope
 
-fn ci_scope_add_type(scope: str, name: str, ty: str) -> str:
+fn ci_scope_note_type(scope: CiScope, key: str) -> CiScope:
+    unsafe:
+        if scope.ptr as i64 == 0:
+            return scope
+        let old = (*scope.ptr).types.get(key)
+        (*scope.ptr).type_log_keys.push(key)
+        if old.is_some():
+            (*scope.ptr).type_log_values.push(old.unwrap())
+            (*scope.ptr).type_log_had.push(1)
+        else:
+            (*scope.ptr).type_log_values.push("")
+            (*scope.ptr).type_log_had.push(0)
+    scope
+
+fn ci_scope_restore(scope: CiScope, mark: CiScopeMark) -> CiScope:
+    unsafe:
+        if scope.ptr as i64 == 0:
+            return scope
+        while (*scope.ptr).name_log_keys.len() > mark.name_log_len:
+            let idx = (*scope.ptr).name_log_keys.len() - 1
+            let key = (*scope.ptr).name_log_keys.get(idx)
+            let value = (*scope.ptr).name_log_values.get(idx)
+            let had = (*scope.ptr).name_log_had.get(idx)
+            let _ = (*scope.ptr).name_log_keys.pop()
+            let _ = (*scope.ptr).name_log_values.pop()
+            let _ = (*scope.ptr).name_log_had.pop()
+            if had != 0:
+                (*scope.ptr).names.insert(key, value)
+            else:
+                let _ = (*scope.ptr).names.remove(key)
+        while (*scope.ptr).type_log_keys.len() > mark.type_log_len:
+            let idx = (*scope.ptr).type_log_keys.len() - 1
+            let key = (*scope.ptr).type_log_keys.get(idx)
+            let value = (*scope.ptr).type_log_values.get(idx)
+            let had = (*scope.ptr).type_log_had.get(idx)
+            let _ = (*scope.ptr).type_log_keys.pop()
+            let _ = (*scope.ptr).type_log_values.pop()
+            let _ = (*scope.ptr).type_log_had.pop()
+            if had != 0:
+                (*scope.ptr).types.insert(key, value)
+            else:
+                let _ = (*scope.ptr).types.remove(key)
+    scope
+
+fn ci_scope_add(scope: CiScope, name: str) -> CiScope:
+    if name.len() > 0:
+        let _ = ci_scope_note_name(scope, name)
+        unsafe:
+            (*scope.ptr).names.insert(name, "")
+    scope
+
+fn ci_scope_add_mangled(scope: CiScope, original: str, mangled: str) -> CiScope:
+    if original.len() == 0:
+        return scope
+    if original == mangled:
+        let _ = ci_scope_note_name(scope, original)
+        unsafe:
+            (*scope.ptr).names.insert(original, "")
+    else:
+        let _ = ci_scope_note_name(scope, original)
+        unsafe:
+            (*scope.ptr).names.insert(original, mangled)
+        if mangled.len() > 0:
+            let _ = ci_scope_note_name(scope, mangled)
+            unsafe:
+                (*scope.ptr).names.insert(mangled, "")
+    scope
+
+fn ci_scope_add_type(scope: CiScope, name: str, ty: str) -> CiScope:
     if name.len() == 0 or ty.len() == 0:
         return scope
-    f"{scope}|#ty:{name}={ty}|"
+    let _ = ci_scope_note_type(scope, name)
+    unsafe:
+        (*scope.ptr).types.insert(name, ty)
+    scope
 
-fn ci_scope_lookup_type(scope: str, name: str) -> str:
+fn ci_scope_lookup_type(scope: CiScope, name: str) -> str:
     if name.len() == 0:
         return ""
-    let needle = f"|#ty:{name}="
-    let slen = scope.len() as i32
-    let nlen = needle.len() as i32
-    var pos = slen - nlen
-    while pos >= 0:
-        if scope.slice(pos as i64, (pos + nlen) as i64) == needle:
-            let start = pos + nlen
-            var end = start
-            while end < slen and scope.byte_at(end as i64) != 124:
-                end = end + 1
-            return scope.slice(start as i64, end as i64)
-        pos = pos - 1
+    unsafe:
+        if scope.ptr as i64 == 0:
+            return ""
+        let value = (*scope.ptr).types.get(name)
+        if value.is_some():
+            return value.unwrap()
     ""
 
-fn ci_scope_type_for_cursor(session: i64, cursor: i32, scope: str) -> str:
+fn ci_scope_type_for_cursor(session: i64, cursor: i32, scope: CiScope) -> str:
     let peeled = ci_peel_transparent(session, cursor)
     if with_ci_cursor_kind(session, peeled) != CXK_DECL_REF:
         return ""
@@ -8513,8 +8716,23 @@ fn ci_find_last_char(s: str, c: i32) -> i32:
         i = i - 1
     -1
 
+fn ci_realpath_cached(path: str) -> str:
+    if path.len() == 0:
+        return ""
+    var i: i64 = 0
+    while i < g_ci_realpath_cache_paths.len():
+        if g_ci_realpath_cache_paths.get(i) == path:
+            return g_ci_realpath_cache_values.get(i)
+        i = i + 1
+    let resolved = with_cimport_realpath(path)
+    g_ci_realpath_cache_paths.push(path)
+    g_ci_realpath_cache_values.push(resolved)
+    resolved
+
 fn ci_goto_decl_suffix(session: i64, var_cursor: i32) -> str:
-    let loc = with_ci_cursor_location(session, var_cursor)
+    ci_goto_decl_suffix_from_location(with_ci_cursor_location(session, var_cursor), var_cursor)
+
+fn ci_goto_decl_suffix_from_location(loc: str, fallback_id: i32) -> str:
     let last_colon = ci_find_last_char(loc, 58)
     if last_colon > 0:
         let prefix = loc.slice(0, last_colon as i64)
@@ -8524,12 +8742,12 @@ fn ci_goto_decl_suffix(session: i64, var_cursor: i32) -> str:
             let col = loc.slice((last_colon + 1) as i64, loc.len())
             if line.len() > 0 and col.len() > 0:
                 return "__goto_" ++ line ++ "_" ++ col
-    "__goto_" ++ i64_to_string(var_cursor as i64)
+    "__goto_" ++ i64_to_string(fallback_id as i64)
 
 fn ci_goto_hoisted_var_name(session: i64, var_cursor: i32) -> str:
     ci_local_storage_name(ci_escape_reserved(with_ci_cursor_spelling(session, var_cursor)), var_cursor) ++ ci_goto_decl_suffix(session, var_cursor)
 
-fn ci_goto_scope_add_decl_mappings(session: i64, cursor: i32, scope: str) -> str:
+fn ci_goto_scope_add_decl_mappings(session: i64, cursor: i32, scope: CiScope) -> CiScope:
     if with_ci_cursor_kind(session, cursor) != CXK_DECL_STMT:
         return scope
     let nc = with_ci_num_children(session, cursor)
@@ -8545,7 +8763,7 @@ fn ci_goto_scope_add_decl_mappings(session: i64, cursor: i32, scope: str) -> str
         i = i + 1
     new_scope
 
-fn ci_goto_scope_after_label_stmt(session: i64, cursor: i32, scope: str) -> str:
+fn ci_goto_scope_after_label_stmt(session: i64, cursor: i32, scope: CiScope) -> CiScope:
     let kind = with_ci_cursor_kind(session, cursor)
     if kind == CXK_UNEXPOSED_STMT and with_ci_num_children(session, cursor) == 1:
         return ci_goto_scope_after_label_stmt(session, with_ci_child(session, cursor, 0), scope)
@@ -8562,7 +8780,7 @@ fn ci_goto_scope_after_label_stmt(session: i64, cursor: i32, scope: str) -> str:
         return ci_goto_scope_add_decl_mappings(session, child, scope)
     scope
 
-fn ci_goto_switch_scope_after_case(session: i64, cursor: i32, scope: str) -> str:
+fn ci_goto_switch_scope_after_case(session: i64, cursor: i32, scope: CiScope) -> CiScope:
     let kind = with_ci_cursor_kind(session, cursor)
     let nc = with_ci_num_children(session, cursor)
     var next_scope = scope
@@ -8604,7 +8822,7 @@ fn ci_goto_switch_scope_after_case(session: i64, cursor: i32, scope: str) -> str
 // Init expressions are lowered structurally via
 // ci_lower_expr_ir and ci_lower_value_expr_ir. Type is built via
 // ci_type_from_libclang.
-fn CiStmtPool.lower_decl_stmt_structural(self: CiStmtPool, session: i64, cursor: i32, scope: str, hoisted: bool, exprs: CiExprPool, types: CiTypePool) -> CiDeclLoweringIR:
+fn CiStmtPool.lower_decl_stmt_structural(self: CiStmtPool, session: i64, cursor: i32, scope: CiScope, hoisted: bool, exprs: CiExprPool, types: CiTypePool) -> CiDeclLoweringIR:
     let nc = with_ci_num_children(session, cursor)
     var new_scope = scope
     var child_stmt_ids: Vec[i32] = Vec.new()
@@ -8632,15 +8850,20 @@ fn CiStmtPool.lower_decl_stmt_structural(self: CiStmtPool, session: i64, cursor:
             var init_id: CiExprId = 0 as CiExprId
             var init_setup_id: CiStmtId = 0 as CiStmtId
             if init_cursor >= 0:
-                let source_init_expr = ci_var_init_expr_from_preprocessed_cursor_for_type(session, child, with_ci_type_translated(session, vty))
+                let init_src = ci_var_initializer_text_from_cursor(session, child)
+                let init_has_macro = init_src.len() > 0 and ci_initializer_text_has_macro_reference(session, init_src)
+                var source_init_expr = init_src
+                if init_has_macro:
+                    let preprocessed_init = ci_var_init_expr_from_preprocessed_cursor_for_type(session, child, with_ci_type_translated(session, vty))
+                    if preprocessed_init.len() > 0:
+                        source_init_expr = preprocessed_init
                 if ci_is_concatenated_string(source_init_expr):
                     let str_idx = exprs.add_string(ci_concat_strings(source_init_expr))
                     init_id = exprs.add(CiExprKind.CIE_STRING_LIT, str_idx, 0, 0, 0 as CiTypeId)
                 else if ci_is_string_literal(source_init_expr):
                     let str_idx = exprs.add_string(source_init_expr)
                     init_id = exprs.add(CiExprKind.CIE_STRING_LIT, str_idx, 0, 0, 0 as CiTypeId)
-                let init_src = ci_var_initializer_text_from_cursor(session, child)
-                if (init_id as i32) == 0 and init_src.len() > 0 and ci_initializer_text_has_macro_reference(session, init_src):
+                if (init_id as i32) == 0 and init_has_macro:
                     let expanded_init = ci_expand_string_macro_sequence(session, init_src)
                     if expanded_init.len() > 0:
                         let str_idx = exprs.add_string(expanded_init)
@@ -8798,7 +9021,7 @@ fn ci_try_translate_fn_body(session: i64, decl_idx: i32) -> str:
     // Build initial scope from parameter names + return type.
     // Use cursor API for param names (old API returns "" for many functions).
     let ret_type = with_cimport_fn_return_type_translated(session, decl_idx)
-    var init_scope = "RET:" ++ ret_type ++ "|"
+    var init_scope = CiScope.new(ret_type)
 
     // Get param names from cursor API (more reliable) and map each
     // original C parameter name to generated storage. Generated
@@ -8849,9 +9072,21 @@ fn ci_is_space(c: i32) -> bool:
     c == 32 or c == 9 or c == 10 or c == 13
 
 fn ci_starts_with(s: str, prefix: str) -> bool:
-    if prefix.len() > s.len():
+    ci_str_matches_at(s, 0, prefix)
+
+fn ci_str_matches_at(text: str, pos: i32, needle: str) -> bool:
+    if pos < 0:
         return false
-    s.slice(0, prefix.len()) == prefix
+    let start = pos as i64
+    let nlen = needle.len()
+    if start + nlen > text.len():
+        return false
+    var i: i64 = 0
+    while i < nlen:
+        if text.byte_at(start + i) != needle.byte_at(i):
+            return false
+        i = i + 1
+    true
 
 fn ci_str_contains(text: str, needle: str) -> bool:
     if needle.len() == 0:
@@ -8860,7 +9095,7 @@ fn ci_str_contains(text: str, needle: str) -> bool:
         return false
     let limit = text.len() - needle.len()
     for i in 0..limit as i32 + 1:
-        if text.slice(i as i64, i as i64 + needle.len()) == needle:
+        if ci_str_matches_at(text, i, needle):
             return true
     false
 
@@ -9529,6 +9764,8 @@ fn ci_concat_strings(s: str) -> str:
     result ++ "\""
 
 fn ci_lookup_macro_value(session: i64, name: str) -> str:
+    if name.len() == 0:
+        return ""
     let needle = "|" ++ name ++ "="
     let pos = ci_find_str(g_migrate_macro_values, needle)
     if pos >= 0:
@@ -9537,15 +9774,29 @@ fn ci_lookup_macro_value(session: i64, name: str) -> str:
         while end < g_migrate_macro_values.len() as i32 and g_migrate_macro_values.byte_at(end as i64) != 124:
             end = end + 1
         return g_migrate_macro_values.slice(start as i64, end as i64)
+    if ci_macro_miss_contains(name):
+        return ""
     let macro_session = if g_migrate_macro_session != 0: g_migrate_macro_session else: session
     let count = with_cimport_macro_count(macro_session)
     var i = 0
     while i < count:
         if with_cimport_macro_is_fn_like(macro_session, i) == 0:
             if with_cimport_macro_name(macro_session, i) == name:
-                return with_cimport_macro_value(macro_session, i)
+                let value = with_cimport_macro_value(macro_session, i)
+                if value.len() > 0 and value != name and not ci_str_contains(value, "|"):
+                    g_migrate_macro_values = g_migrate_macro_values ++ needle ++ value
+                return value
         i = i + 1
+    g_migrate_macro_miss_names.push(ci_ir_owned_text(name))
     ""
+
+fn ci_macro_miss_contains(name: str) -> bool:
+    var i: i64 = 0
+    while i < g_migrate_macro_miss_names.len():
+        if g_migrate_macro_miss_names.get(i) == name:
+            return true
+        i = i + 1
+    false
 
 // Check if a fn-like macro is a stringify macro (has # in body) or
 // calls another fn-like macro that stringifies (e.g. XSTRING -> STRING -> #a).
@@ -9713,7 +9964,7 @@ fn ci_preprocessed_text_at_location(loc: str, raw_src: str) -> str:
     if second_colon < 0:
         return ""
     let target_file_raw = path_and_line.slice(0, second_colon as i64)
-    let target_file_real = with_cimport_realpath(target_file_raw)
+    let target_file_real = ci_realpath_cached(target_file_raw)
     let target_file = if target_file_real.len() > 0: target_file_real else: target_file_raw
     let start_line = ci_parse_i64(path_and_line.slice((second_colon + 1) as i64, path_and_line.len())) as i32
     if start_line <= 0:
@@ -9738,7 +9989,7 @@ fn ci_preprocessed_text_at_location(loc: str, raw_src: str) -> str:
             if marker_line > 0 and marker_file.len() > 0:
                 current_line = marker_line
                 current_file = marker_file
-                let marker_real = with_cimport_realpath(marker_file)
+                let marker_real = ci_realpath_cached(marker_file)
                 current_file_real = if marker_real.len() > 0: marker_real else: marker_file
         else:
             if (current_file == target_file or current_file_real == target_file) and current_line >= start_line and current_line <= target_end_line:
@@ -10242,7 +10493,7 @@ fn ci_preprocess_initializer_text(session: i64, var_cursor: i32, raw_decl_src: s
     if second_colon < 0:
         return ""
     let target_file_raw = path_and_line.slice(0, second_colon as i64)
-    let target_file_real = with_cimport_realpath(target_file_raw)
+    let target_file_real = ci_realpath_cached(target_file_raw)
     let target_file = if target_file_real.len() > 0: target_file_real else: target_file_raw
     let start_line = ci_parse_i64(path_and_line.slice((second_colon + 1) as i64, path_and_line.len())) as i32
     if start_line <= 0:
@@ -10267,7 +10518,7 @@ fn ci_preprocess_initializer_text(session: i64, var_cursor: i32, raw_decl_src: s
             if marker_line > 0 and marker_file.len() > 0:
                 current_line = marker_line
                 current_file = marker_file
-                let marker_real = with_cimport_realpath(marker_file)
+                let marker_real = ci_realpath_cached(marker_file)
                 current_file_real = if marker_real.len() > 0: marker_real else: marker_file
         else:
             if (current_file == target_file or current_file_real == target_file) and current_line >= start_line and current_line <= target_end_line:
@@ -10377,7 +10628,7 @@ fn ci_source_line_at(path: str, line_no: i32) -> str:
         return ""
     var text = with_fs_read_file(path)
     if text.len() == 0:
-        let real = with_cimport_realpath(path)
+        let real = ci_realpath_cached(path)
         if real.len() > 0:
             text = with_fs_read_file(real)
     if text.len() == 0:
@@ -10628,10 +10879,10 @@ fn ci_var_init_translation_is_valid(vty_str: str, init_expr: str) -> bool:
             return false
     true
 
-fn ci_var_init_expr(session: i64, var_cursor: i32, scope: str) -> str:
+fn ci_var_init_expr(session: i64, var_cursor: i32, scope: CiScope) -> str:
     ci_var_init_expr_for_type(session, var_cursor, scope, "")
 
-fn ci_var_init_expr_for_type(session: i64, var_cursor: i32, scope: str, target_type: str) -> str:
+fn ci_var_init_expr_for_type(session: i64, var_cursor: i32, scope: CiScope, target_type: str) -> str:
     let init_cursor = ci_find_var_init_cursor(session, var_cursor)
     if init_cursor >= 0:
         var types = CiTypePool.new()
@@ -10641,6 +10892,9 @@ fn ci_var_init_expr_for_type(session: i64, var_cursor: i32, scope: str, target_t
         var init_expr = ""
         if ci_value_ir_valid(lowered):
             init_expr = stmts.render_value_expr_ir(session, init_cursor, exprs, types, lowered)
+        stmts.deinit()
+        exprs.deinit()
+        types.deinit()
         let cursor_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, var_cursor))
         let vty_str = if target_type.len() > 0: target_type else: cursor_ty_str
         // Array-to-pointer decay in initializer context: when the
@@ -10677,7 +10931,7 @@ fn ci_var_init_expr_for_type(session: i64, var_cursor: i32, scope: str, target_t
             init_expr = ci_coerce_init_value_for_type(init_expr, vty_str)
         if ci_var_init_translation_is_valid(vty_str, init_expr):
             return init_expr
-    if scope.len() == 0:
+    if ci_scope_get_return_type(scope).len() == 0:
         return ci_var_init_expr_from_decl_source_for_type(session, var_cursor, target_type)
     ""
 
@@ -10688,6 +10942,7 @@ fn ci_var_init_expr_for_type(session: i64, var_cursor: i32, scope: str, target_t
 //  here, along with the macro type globals that aren't migrate-specific.)
 
 var g_migrate_macro_values: str = ""
+var g_migrate_macro_miss_names: Vec[str] = Vec.new()
 var g_migrate_macro_session: i64 = 0
 var g_migrate_preprocessed_source: str = ""
 var g_migrate_current_input_path: str = ""
@@ -11205,7 +11460,7 @@ fn ci_goto_cfg_top_target(stack: &Vec[i32]) -> i32:
         return -1
     stack.get(stack.len() - 1)
 
-fn CiGotoCfgContext.append_lowered_leaf(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: str):
+fn CiGotoCfgContext.append_lowered_leaf(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope):
     if not self.ok or self.current < 0:
         return
     let stmt_id = stmts.lower_stmt_ir(session, cursor, exprs, types, 0, scope)
@@ -11213,9 +11468,12 @@ fn CiGotoCfgContext.append_lowered_leaf(mut self: CiGotoCfgContext, session: i64
         self.append_stmt(stmts, stmt_id)
         return
     if not ci_is_null_like_stmt(session, cursor):
-        self.fail("unsupported statement in goto CFG", with_ci_cursor_location(session, cursor))
+        if g_ci_bail_message.len() > 0:
+            self.fail(g_ci_bail_message, g_ci_bail_location)
+        else:
+            self.fail("unsupported statement in goto CFG", with_ci_cursor_location(session, cursor))
 
-fn CiGotoCfgContext.lower_return(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: str):
+fn CiGotoCfgContext.lower_return(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope):
     if not self.ok or self.current < 0:
         return
     let nc = with_ci_num_children(session, cursor)
@@ -11242,9 +11500,10 @@ fn CiGotoCfgContext.lower_return(mut self: CiGotoCfgContext, session: i64, curso
     values.push(ret_value as i32)
     self.return_current(values)
 
-fn CiGotoCfgContext.lower_compound(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: str):
+fn CiGotoCfgContext.lower_compound(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope):
     let nc = with_ci_num_children(session, cursor)
     var block_scope = scope
+    let block_mark = ci_scope_mark(block_scope)
     var i = 0
     while i < nc and self.ok:
         let child = with_ci_child(session, cursor, i)
@@ -11267,8 +11526,9 @@ fn CiGotoCfgContext.lower_compound(mut self: CiGotoCfgContext, session: i64, cur
             if ck == CXK_LABEL_STMT:
                 block_scope = ci_goto_scope_after_label_stmt(session, child, block_scope)
         i = i + 1
+    let _ = ci_scope_restore(block_scope, block_mark)
 
-fn CiGotoCfgContext.lower_if(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: str):
+fn CiGotoCfgContext.lower_if(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope):
     let nc = with_ci_num_children(session, cursor)
     if nc < 2:
         self.fail("malformed if statement in goto CFG", with_ci_cursor_location(session, cursor))
@@ -11311,7 +11571,7 @@ fn CiGotoCfgContext.lower_if(mut self: CiGotoCfgContext, session: i64, cursor: i
         if not self.block_has_pred(after_block):
             self.unreachable_current()
 
-fn CiGotoCfgContext.lower_while(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: str):
+fn CiGotoCfgContext.lower_while(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope):
     let nc = with_ci_num_children(session, cursor)
     if nc < 2:
         self.fail("malformed while statement in goto CFG", with_ci_cursor_location(session, cursor))
@@ -11342,7 +11602,7 @@ fn CiGotoCfgContext.lower_while(mut self: CiGotoCfgContext, session: i64, cursor
     if not self.block_has_pred(after_block):
         self.unreachable_current()
 
-fn CiGotoCfgContext.lower_do(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: str):
+fn CiGotoCfgContext.lower_do(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope):
     let nc = with_ci_num_children(session, cursor)
     if nc < 2:
         self.fail("malformed do statement in goto CFG", with_ci_cursor_location(session, cursor))
@@ -11372,8 +11632,9 @@ fn CiGotoCfgContext.lower_do(mut self: CiGotoCfgContext, session: i64, cursor: i
     if not self.block_has_pred(after_block):
         self.unreachable_current()
 
-fn CiGotoCfgContext.lower_for(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: str):
+fn CiGotoCfgContext.lower_for(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope):
     let parts = ci_extract_for_parts(session, cursor)
+    let scope_mark = ci_scope_mark(scope)
     if parts.body_cursor < 0:
         self.fail("malformed for statement in goto CFG", with_ci_cursor_location(session, cursor))
         return
@@ -11387,6 +11648,7 @@ fn CiGotoCfgContext.lower_for(mut self: CiGotoCfgContext, session: i64, cursor: 
             let init_id = stmts.lower_stmt_expr_ir(session, parts.init_cursor, exprs, types, loop_scope)
             if (init_id as i32) == 0:
                 self.fail("unsupported for initializer in goto CFG", with_ci_cursor_location(session, parts.init_cursor))
+                let _ = ci_scope_restore(loop_scope, scope_mark)
                 return
             self.append_stmt(stmts, init_id)
 
@@ -11401,6 +11663,7 @@ fn CiGotoCfgContext.lower_for(mut self: CiGotoCfgContext, session: i64, cursor: 
         let prepared_cond = stmts.prepare_stmt_condition_ir(session, parts.cond_cursor, exprs, types, loop_scope)
         if not ci_value_ir_valid(prepared_cond):
             self.fail("unsupported for condition in goto CFG", with_ci_cursor_location(session, parts.cond_cursor))
+            let _ = ci_scope_restore(loop_scope, scope_mark)
             return
         self.append_stmt(stmts, prepared_cond.setup_stmt)
         self.cond_current(prepared_cond.value_expr, body_block, after_block, with_ci_cursor_location(session, cursor))
@@ -11421,12 +11684,14 @@ fn CiGotoCfgContext.lower_for(mut self: CiGotoCfgContext, session: i64, cursor: 
         let inc_id = stmts.lower_stmt_expr_ir(session, parts.inc_cursor, exprs, types, loop_scope)
         if (inc_id as i32) == 0:
             self.fail("unsupported for increment in goto CFG", with_ci_cursor_location(session, parts.inc_cursor))
+            let _ = ci_scope_restore(loop_scope, scope_mark)
             return
         self.append_stmt(stmts, inc_id)
     self.branch_current(cond_block, with_ci_cursor_location(session, cursor))
     self.set_current(after_block)
     if not self.block_has_pred(after_block):
         self.unreachable_current()
+    let _ = ci_scope_restore(loop_scope, scope_mark)
 
 fn ci_goto_switch_case_new() -> CiGotoSwitchCase:
     let ptr = with_alloc(sizeof[CiGotoSwitchCaseState]()) as *mut CiGotoSwitchCaseState
@@ -11443,7 +11708,7 @@ fn CiGotoSwitchCase.record_case(self: CiGotoSwitchCase, value: CiExprId, block: 
     self.state.values.push(value as i32)
     self.state.blocks.push(block)
 
-fn CiGotoCfgContext.lower_case_children(mut self: CiGotoCfgContext, session: i64, cursor: i32, first_child: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: str, cases: CiGotoSwitchCase):
+fn CiGotoCfgContext.lower_case_children(mut self: CiGotoCfgContext, session: i64, cursor: i32, first_child: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope, cases: CiGotoSwitchCase):
     let saved_cases = self.switch_cases
     self.switch_cases = cases
     var case_scope = scope
@@ -11472,7 +11737,7 @@ fn CiGotoCfgContext.lower_case_children(mut self: CiGotoCfgContext, session: i64
         i = i + 1
     self.switch_cases = saved_cases
 
-fn CiGotoCfgContext.lower_case_node(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: str, cases: CiGotoSwitchCase):
+fn CiGotoCfgContext.lower_case_node(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope, cases: CiGotoSwitchCase):
     if not self.ok:
         return
     let kind = with_ci_cursor_kind(session, cursor)
@@ -11497,7 +11762,7 @@ fn CiGotoCfgContext.lower_case_node(mut self: CiGotoCfgContext, session: i64, cu
         return
     self.fail("expected switch case/default in goto CFG", with_ci_cursor_location(session, cursor))
 
-fn CiGotoCfgContext.lower_switch_body(mut self: CiGotoCfgContext, session: i64, body_cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: str, cases: CiGotoSwitchCase):
+fn CiGotoCfgContext.lower_switch_body(mut self: CiGotoCfgContext, session: i64, body_cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope, cases: CiGotoSwitchCase):
     let saved_cases = self.switch_cases
     self.switch_cases = cases
     let nc = with_ci_num_children(session, body_cursor)
@@ -11560,7 +11825,7 @@ fn CiGotoCfgContext.emit_switch_dispatch(mut self: CiGotoCfgContext, exprs: CiEx
         chain_block = false_block
         i = i + 1
 
-fn CiGotoCfgContext.lower_switch(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: str):
+fn CiGotoCfgContext.lower_switch(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope):
     let nc = with_ci_num_children(session, cursor)
     if nc < 2:
         self.fail("malformed switch statement in goto CFG", with_ci_cursor_location(session, cursor))
@@ -11594,7 +11859,7 @@ fn CiGotoCfgContext.lower_switch(mut self: CiGotoCfgContext, session: i64, curso
     if not self.block_has_pred(after_block):
         self.unreachable_current()
 
-fn CiGotoCfgContext.lower_stmt(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: str):
+fn CiGotoCfgContext.lower_stmt(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope):
     if not self.ok:
         return
     let kind = with_ci_cursor_kind(session, cursor)
@@ -11945,7 +12210,7 @@ fn CiStmtPool.native_goto_emit_terminator(self: CiStmtPool, cfg: CiGotoCfg, bloc
     if b.term_kind == StackifyTermKind.Select:
         return ci_native_goto_fail("native goto emitter: select terminator is not supported")
 
-    ci_native_goto_fail("native goto emitter: block has no terminator")
+    ci_native_goto_fail("native goto emitter: block has no terminator: " ++ i64_to_string(block as i64) ++ " " ++ b.desc)
 
 fn CiExprPool.default_for_ci_type(self: CiExprPool, ty_id: CiTypeId, types: CiTypePool) -> CiExprId:
     let tk = types.kind(ty_id)
@@ -12046,7 +12311,7 @@ fn CiGotoCfgContext.verify_labels(mut self: CiGotoCfgContext):
             self.fail("unresolved goto label '" ++ self.label_names.get(i as i64) ++ "'", "")
         i = i + 1
 
-fn CiStmtPool.lower_goto_body_stackify(self: CiStmtPool, session: i64, body_cursor: i32, scope: str, exprs: CiExprPool, types: CiTypePool) -> CiStmtId:
+fn CiStmtPool.lower_goto_body_stackify(self: CiStmtPool, session: i64, body_cursor: i32, scope: CiScope, exprs: CiExprPool, types: CiTypePool) -> CiStmtId:
     var hoisted_decls: Vec[CiHoistedVarDecl] = Vec.new()
     hoisted_decls = ci_collect_var_decls(session, body_cursor, hoisted_decls)
 
@@ -12070,12 +12335,16 @@ fn CiStmtPool.lower_goto_body_stackify(self: CiStmtPool, session: i64, body_curs
     var ctx = ci_goto_cfg_new("entry")
     ctx.lower_compound(session, body_cursor, self.val(), exprs, types, scope)
     if ctx.ok and ctx.current >= 0:
-        let ret_ty = ci_scope_get_return_type(scope)
-        if ret_ty == "void" or ret_ty.len() == 0:
-            let values: Vec[i32] = Vec.new()
-            ctx.return_current(values)
+        let reachable = ci_goto_cfg_reachable_blocks(ctx.cfg)
+        if ctx.current < reachable.len() as i32 and reachable.get(ctx.current as i64) == 0:
+            ctx.unreachable_current()
         else:
-            ctx.fail("goto CFG function can fall through without returning", with_ci_cursor_location(session, body_cursor))
+            let ret_ty = ci_scope_get_return_type(scope)
+            if ret_ty == "void" or ret_ty.len() == 0:
+                let values: Vec[i32] = Vec.new()
+                ctx.return_current(values)
+            else:
+                ctx.fail("goto CFG function can fall through without returning", with_ci_cursor_location(session, body_cursor))
     ctx.verify_labels()
     if not ctx.ok:
         return 0 as CiStmtId
@@ -12398,6 +12667,15 @@ fn ci_libc_symbol_platforms(name: str) -> i32:
     if name == "__error": return CI_LIBC_PLATFORM_DARWIN
     CI_LIBC_PLATFORM_DARWIN
 
+fn ci_is_libm_fn(name: str) -> bool:
+    if name == "sqrt" or name == "pow": return true
+    if name == "floor" or name == "ceil" or name == "round": return true
+    if name == "sin" or name == "cos" or name == "tan": return true
+    if name == "log" or name == "log10" or name == "exp": return true
+    if name == "fabs" or name == "fmod": return true
+    if name == "asin" or name == "acos" or name == "atan" or name == "atan2": return true
+    false
+
 fn ci_libc_symbol_kind_mask(name: str) -> i32:
     if name == "rlimit": return CI_LIBC_KIND_TYPE
     if name == "__stdinp" or name == "__stdoutp" or name == "__stderrp": return CI_LIBC_KIND_VAR
@@ -12411,6 +12689,7 @@ fn ci_libc_symbol_kind_mask(name: str) -> i32:
     if name == "isupper" or name == "islower" or name == "isxdigit" or name == "isprint": return CI_LIBC_KIND_FN
     if name == "isgraph" or name == "ispunct" or name == "iscntrl": return CI_LIBC_KIND_FN
     if name == "tolower" or name == "toupper": return CI_LIBC_KIND_FN
+    if ci_is_libm_fn(name): return CI_LIBC_KIND_FN
     if name == "exit" or name == "clock" or name == "time" or name == "isatty": return CI_LIBC_KIND_FN
     if name == "getrlimit" or name == "setrlimit" or name == "__error": return CI_LIBC_KIND_FN
     0
@@ -12427,12 +12706,26 @@ fn ci_libc_kind_name(kind: i32) -> str:
 fn ci_note_filtered_system_symbol_ref(session: i64, name: str, kind: i32) -> bool:
     if name.len() == 0:
         return true
+    if ci_libc_symbol_allowed_as(name, kind):
+        ci_migrate_note_libc_symbol(name)
+        return true
     let loc = ci_get_decl_location(session, name)
     let filtered = ci_is_system_decl(name) or (loc.len() > 0 and ci_is_system_path(loc))
     if not filtered:
         return true
+    let loc_suffix = if loc.len() > 0: " from " ++ loc else: ""
+    ci_migrate_set_error("migrate: unsupported filtered system " ++ ci_libc_kind_name(kind) ++ " '" ++ name ++ "'" ++ loc_suffix ++ "; add an explicit binding or extend std.libc")
+    false
+
+fn ci_note_filtered_system_symbol_ref_at(session: i64, cursor: i32, name: str, kind: i32) -> bool:
+    if name.len() == 0:
+        return true
     if ci_libc_symbol_allowed_as(name, kind):
         ci_migrate_note_libc_symbol(name)
+        return true
+    let loc = with_ci_cursor_referenced_location(session, cursor)
+    let filtered = ci_is_system_decl(name) or (loc.len() > 0 and ci_is_system_path(loc))
+    if not filtered:
         return true
     let loc_suffix = if loc.len() > 0: " from " ++ loc else: ""
     ci_migrate_set_error("migrate: unsupported filtered system " ++ ci_libc_kind_name(kind) ++ " '" ++ name ++ "'" ++ loc_suffix ++ "; add an explicit binding or extend std.libc")
@@ -12442,6 +12735,10 @@ fn ci_note_filtered_system_symbol_ref(session: i64, name: str, kind: i32) -> boo
 // This filters out the noise from stdlib.h, string.h, ctype.h, etc.
 fn ci_is_system_decl(name: str) -> bool:
     if name.len() == 0: return true
+    // Symbols emitted by With's C backend intentionally use reserved C
+    // spelling to avoid collisions with user identifiers. They are still
+    // source symbols owned by the translation unit, not system declarations.
+    if ci_starts_with(name, "__with_"): return false
     // Skip system internal names (__ prefix or _[A-Z]) but keep _pcre2_* etc.
     if name.len() >= 2 and name.byte_at(0) == 95:
         let second = name.byte_at(1)
@@ -12456,6 +12753,7 @@ fn ci_is_system_decl(name: str) -> bool:
     if name == "div_t" or name == "ldiv_t" or name == "lldiv_t": return true
     // Known system functions (libc)
     if ci_is_mapped_libc_fn(name): return true
+    if ci_is_libm_fn(name): return true
     // Common system functions not in the mapped list
     if name == "alloca" or name == "reallocf" or name == "valloc": return true
     if name == "imaxabs" or name == "imaxdiv" or name == "strtoimax" or name == "strtoumax": return true
@@ -12524,6 +12822,8 @@ fn ci_libc_simple_rename(callee: str) -> str:
 fn ci_has_value_libc_call_mapping(callee: str) -> bool:
     if ci_libc_simple_rename(callee).len() > 0:
         return true
+    if ci_is_libm_fn(callee):
+        return true
     if callee == "malloc" or callee == "free" or callee == "calloc" or callee == "realloc":
         return true
     if callee == "memcpy" or callee == "memmove" or callee == "memset" or callee == "memcmp" or callee == "memchr":
@@ -12538,10 +12838,21 @@ fn ci_has_value_libc_call_mapping(callee: str) -> bool:
 // result *mut c_void cast. Returns 0 for callees that still need
 // dedicated structural support (isgraph, ispunct, memcpy arg
 // rewrites).
-fn CiExprPool.lower_libc_call_structural(self: CiExprPool, session: i64, cursor: i32, callee_text: str, types: CiTypePool, scope: str) -> CiExprId:
+fn CiExprPool.lower_libc_call_structural(self: CiExprPool, session: i64, cursor: i32, callee_text: str, types: CiTypePool, scope: CiScope) -> CiExprId:
     let nc = with_ci_num_children(session, cursor)
     let arg_count = nc - 1
     let renamed = ci_libc_simple_rename(callee_text)
+    if ci_is_libm_fn(callee_text):
+        ci_trace_port("STRUCTURAL[b11.9.libm_call]")
+        var math_args: Vec[i32] = Vec.new()
+        var mai: i32 = 1
+        while mai < nc:
+            let arg_id = self.lower_expr_ir(session, with_ci_child(session, cursor, mai), types, scope)
+            if (arg_id as i32) == 0:
+                return 0 as CiExprId
+            math_args.push(arg_id as i32)
+            mai = mai + 1
+        return self.build_named_call_expr(callee_text, &math_args)
     if renamed.len() > 0:
         ci_trace_port("STRUCTURAL[b11.9.libc_call]")
         // Lower each argument structurally.

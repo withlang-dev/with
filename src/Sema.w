@@ -1626,7 +1626,13 @@ fn sema_generic_inst_hash(base_sym: i32, args: Vec[i32], arg_count: i32) -> i64:
 fn Sema.find_generic_inst_type(self: Sema, base_sym: i32, args: Vec[i32], arg_count: i32) -> TypeId:
     let key = sema_generic_inst_hash(base_sym, args, arg_count)
     if self.generic_inst_cache.contains(key):
-        return self.generic_inst_cache.get(key).unwrap() as TypeId
+        let cached = self.generic_inst_cache.get(key).unwrap()
+        if cached >= 0 and cached < self.type_kinds.len() as i32:
+            if self.type_kinds.get(cached as i64) == TypeKind.TY_GENERIC_INST:
+                if self.type_d0.get(cached as i64) == base_sym and self.type_d2.get(cached as i64) == arg_count:
+                    let cached_start = self.type_d1.get(cached as i64)
+                    if self.type_extra_matches(cached_start, args, arg_count) != 0:
+                        return cached as TypeId
     let type_count = self.type_kinds.len() as i32
     for ti in 0..type_count:
         if self.type_kinds.get(ti as i64) != TypeKind.TY_GENERIC_INST:
@@ -1679,8 +1685,12 @@ fn Sema.find_range_type(self: Sema, elem_tid: TypeId, inclusive: i32) -> TypeId:
 fn Sema.preregister_mir_types(self: Sema):
     let vec_sym = self.syms.vec
     let vi_sym = self.syms.veciter
+    let hashmap_sym = self.syms.hashmap
+    let option_sym = self.syms.option
 
     // For every Vec[T] type registered, also register VecIter[T].
+    // For every HashMap[K, V], register Option[V] so MIR/codegen can
+    // materialize aggregate map-get results after type freezing.
     let type_count = self.type_kinds.len() as i32
     for ti in 0..type_count:
         if self.type_kinds.get(ti as i64) == TypeKind.TY_GENERIC_INST:
@@ -1697,6 +1707,19 @@ fn Sema.preregister_mir_types(self: Sema):
                         self.type_extra.push(elem_ty)
                         let tid = self.add_type(TypeKind.TY_GENERIC_INST, vi_sym, te_start, 1)
                         self.generic_inst_cache.insert(vi_key, tid as i32)
+            if self.type_d0.get(ti as i64) == hashmap_sym:
+                let extra_start = self.type_d1.get(ti as i64)
+                let arg_count = self.type_d2.get(ti as i64)
+                if arg_count >= 2:
+                    let value_ty = self.type_extra.get((extra_start + 1) as i64)
+                    let opt_args: Vec[i32] = Vec.new()
+                    opt_args.push(value_ty)
+                    let opt_key = sema_generic_inst_hash(option_sym, opt_args, 1)
+                    if not self.generic_inst_cache.contains(opt_key):
+                        let opt_start = self.type_extra.len() as i32
+                        self.type_extra.push(value_ty)
+                        let tid = self.add_type(TypeKind.TY_GENERIC_INST, option_sym, opt_start, 1)
+                        self.generic_inst_cache.insert(opt_key, tid as i32)
 
     // Register Vec[str] for str.split() return type.
     let vec_str_args: Vec[i32] = Vec.new()

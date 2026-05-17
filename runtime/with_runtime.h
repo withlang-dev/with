@@ -31,6 +31,7 @@ int32_t with_str_starts_with(with_str s, with_str prefix);
 int32_t with_str_ends_with(with_str s, with_str suffix);
 int32_t with_str_contains(with_str haystack, with_str needle);
 int64_t with_str_index_of(with_str haystack, with_str needle);
+with_str with_str_replace(with_str s, with_str old, with_str new_s);
 with_str with_i32_to_str(int32_t n);
 with_str with_i64_to_str(int64_t n);
 with_str with_bool_to_str(bool b);
@@ -67,6 +68,7 @@ bool with_vec_get_bool(with_vec *v, int64_t index);
 void with_vec_set_i32(with_vec *v, int64_t index, int32_t val);
 void with_vec_set_i64(with_vec *v, int64_t index, int64_t val);
 void with_vec_remove(with_vec *v, int64_t index);
+with_str with_vec_str_join(with_vec *v, with_str sep);
 void with_codegen_loop_set_break(int32_t idx, int64_t bb);
 void with_codegen_loop_set_continue(int32_t idx, int64_t bb);
 void with_codegen_loop_set_result(int32_t idx, int64_t value);
@@ -156,10 +158,27 @@ with_str with_fs_read_file(with_str path);
 int32_t with_fs_file_exists(with_str path);
 int32_t with_fs_write_file(with_str path, with_str data);
 int32_t with_fs_mkdir_p(with_str path);
+int32_t with_fs_is_dir(with_str path);
+int32_t with_fs_remove_file(with_str path);
+int32_t with_fs_chmod(with_str path, int32_t mode);
+int32_t with_fs_rename_file(with_str old_path, with_str new_path);
+int32_t with_fs_create_dir(with_str path);
+int32_t with_fs_remove_dir(with_str path);
+int32_t with_fs_remove_tree(with_str path);
 int64_t with_str_hash(with_str s);
 void with_lines_out(with_vec *out, with_str s);
 with_str with_getenv_str(with_str name);
 int32_t with_setenv_str(with_str name, with_str value);
+int32_t with_getpid(void);
+void with_fill_random(uint8_t *buf, int64_t len);
+
+int32_t with_net_tcp_listen(int32_t port, int32_t backlog);
+int32_t with_net_tcp_accept(int32_t listen_fd);
+int32_t with_net_tcp_connect(with_str host, int32_t port);
+int64_t with_net_send(int32_t fd, with_str data);
+with_str with_net_recv(int32_t fd, int64_t max_len);
+int32_t with_net_close(int32_t fd);
+int32_t with_net_udp_bind(int32_t port);
 
 // Extract a .tgz archive to dest directory. Returns 0 on success.
 int32_t with_extract_tgz(with_str archive, with_str dest);
@@ -242,5 +261,11 @@ uint64_t with_bswap64(uint64_t x);
 
 int32_t with_system(with_str cmd);
 int32_t with_exec_binary(with_str path);
+int32_t with_exec_argv(with_str args);
+int32_t with_exec_argv_capture(with_str args, with_str stdout_path, with_str stderr_path, int32_t timeout_ms);
+int32_t with_exec_argv_capture_input(with_str args, with_str stdout_path, with_str stderr_path, int32_t timeout_ms, with_str stdin_path);
+int32_t with_exec_argv_capture_cwd(with_str args, with_str stdout_path, with_str stderr_path, int32_t timeout_ms, with_str cwd);
+int32_t with_exec_argv_capture_spawn(with_str args, with_str stdout_path, with_str stderr_path);
+int32_t with_exec_wait(int32_t pid, int32_t timeout_ms);
 
 #endif // WITH_RUNTIME_H

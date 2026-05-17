@@ -27,11 +27,20 @@
 extern fn with_eprint(s: str) -> void
 extern fn with_str_clone(s: str) -> str
 extern fn with_alloc(size: i64) -> *mut u8
+extern fn with_free(ptr: *mut u8) -> void
 
 fn ci_ir_owned_text(text: str) -> str:
     if text.len() == 0:
         return ""
     with_str_clone(text)
+
+fn ci_ir_free_vec_i32(v: Vec[i32]):
+    if v.cap > 0 and v.ptr as i64 != 0:
+        with_free(v.ptr as *mut u8)
+
+fn ci_ir_free_vec_str(v: Vec[str]):
+    if v.cap > 0 and v.ptr as i64 != 0:
+        with_free(v.ptr as *mut u8)
 
 // ── CiType ────────────────────────────────────────────────────
 
@@ -82,6 +91,18 @@ fn CiTypePool.new -> CiTypePool:
     ptr.data1.push(0)
     ptr.data2.push(0)
     CiTypePool { state: ptr }
+
+fn CiTypePool.deinit(self: CiTypePool):
+    if self.state as i64 == 0:
+        return
+    let st = self.state
+    ci_ir_free_vec_i32(st.kinds)
+    ci_ir_free_vec_i32(st.data0)
+    ci_ir_free_vec_i32(st.data1)
+    ci_ir_free_vec_i32(st.data2)
+    ci_ir_free_vec_i32(st.extra)
+    ci_ir_free_vec_str(st.strings)
+    with_free(st as *mut u8)
 
 fn CiTypePool.add(self: CiTypePool, kind: i32, d0: i32, d1: i32, d2: i32) -> CiTypeId:
     let st = self.state
@@ -289,6 +310,19 @@ fn CiExprPool.new -> CiExprPool:
     ptr.types.push(0)
     CiExprPool { state: ptr }
 
+fn CiExprPool.deinit(self: CiExprPool):
+    if self.state as i64 == 0:
+        return
+    let st = self.state
+    ci_ir_free_vec_i32(st.kinds)
+    ci_ir_free_vec_i32(st.data0)
+    ci_ir_free_vec_i32(st.data1)
+    ci_ir_free_vec_i32(st.data2)
+    ci_ir_free_vec_i32(st.types)
+    ci_ir_free_vec_i32(st.extra)
+    ci_ir_free_vec_str(st.strings)
+    with_free(st as *mut u8)
+
 fn CiExprPool.add(self: CiExprPool, kind: i32, d0: i32, d1: i32, d2: i32, ty: CiTypeId) -> CiExprId:
     let st = self.state
     if st.frozen != 0:
@@ -452,6 +486,19 @@ fn CiStmtPool.new -> CiStmtPool:
     st.flags.push(0)
     st.strings.push("")
     CiStmtPool { state: ptr }
+
+fn CiStmtPool.deinit(self: CiStmtPool):
+    if self.state as i64 == 0:
+        return
+    let st = self.state
+    ci_ir_free_vec_i32(st.kinds)
+    ci_ir_free_vec_i32(st.data0)
+    ci_ir_free_vec_i32(st.data1)
+    ci_ir_free_vec_i32(st.data2)
+    ci_ir_free_vec_i32(st.extra)
+    ci_ir_free_vec_str(st.strings)
+    ci_ir_free_vec_i32(st.flags)
+    with_free(st as *mut u8)
 
 fn CiStmtPool.add(self: CiStmtPool, kind: i32, d0: i32, d1: i32, d2: i32, flags: i32) -> CiStmtId:
     let st = self.state

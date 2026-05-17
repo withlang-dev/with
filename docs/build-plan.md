@@ -23,7 +23,7 @@
       - create_static_archive;
       - generate_response_file;
       - embed_object_files;
-      - copy_runtime_tree;
+      - copy_tree;
       - run_corpus_test;
       - promote_tree_if_verified;
       - command (argv-only, no shell command strings);
@@ -286,7 +286,7 @@
       - create_static_archive
       - generate_response_file
       - embed_object_files
-      - copy_runtime_tree
+      - copy_tree
       - run_corpus_test
       - promote_tree_if_verified
   - Add repository build.w targets:
