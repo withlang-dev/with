@@ -25,6 +25,7 @@ extern fn with_fs_remove_file(path: str) -> i32
 extern fn with_fs_remove_dir(path: str) -> i32
 extern fn with_fs_mkdir_p(path: str) -> i32
 extern fn with_getenv_str(name: str) -> str
+extern fn with_setenv_str(name: str, value: str) -> i32
 extern fn with_system(cmd: str) -> i32
 extern fn with_clock_nanos() -> i64
 extern fn with_getpid() -> i32
@@ -468,7 +469,34 @@ fn Compilation.project_info_source(self: Compilation, pool: AstPool) -> str:
             out = out ++ "    project = project.add_type(TypeInfo.new(\"" ++ compilation_escape_with_string(module_name) ++ "\", \"" ++ compilation_escape_with_string(name) ++ "\", " ++ (if is_pub: "true" else: "false") ++ ", false, \"" ++ kind_name ++ "\", " ++ loc ++ "))\n"
     out ++ "    project\n"
 
-fn Compilation.compiler_hook_runner_source(self: Compilation, pool: AstPool, source_path: str, diag_path: str, emitted_source_path: str) -> str:
+fn compilation_compiler_hook_arg_for_type(pool: AstPool, intern: InternPool, type_node: i32) -> str:
+    let rendered = render_type_expr(pool, intern, type_node as NodeId)
+    if rendered == "ProjectInfo":
+        return "project"
+    if rendered == "Diagnostics":
+        return "diagnostics"
+    if rendered == "SourceEmitter":
+        return "source_emitter"
+    ""
+
+fn compilation_compiler_hook_call_args(pool: AstPool, intern: InternPool, hook_node: NodeId) -> str:
+    let meta = pool.find_fn_meta(hook_node)
+    if meta < 0:
+        return ""
+    let param_start = pool.fn_meta_param_start(meta)
+    let param_count = pool.fn_meta_param_count(meta)
+    var out = ""
+    for pi in 0..param_count:
+        if pi > 0:
+            out = out ++ ", "
+        let type_node = pool.fn_param_type(param_start, pi)
+        let arg_name = compilation_compiler_hook_arg_for_type(pool, intern, type_node)
+        if arg_name.len() == 0:
+            return ""
+        out = out ++ arg_name
+    out
+
+fn Compilation.compiler_hook_runner_source(self: Compilation, pool: AstPool, source_path: str, diag_path: str, emitted_source_path: str, token: str) -> str:
     let zcu = self.zcu
     let root = if zcu.project_config.root_dir.len() > 0: zcu.project_config.root_dir else: frontend_dirname(source_path)
     let hook_count = pool.compiler_hook_count()
@@ -487,16 +515,17 @@ fn Compilation.compiler_hook_runner_source(self: Compilation, pool: AstPool, sou
     out = out ++ "\n"
     out = out ++ self.project_info_source(pool)
     out = out ++ "\nfn main:\n"
-    out = out ++ "    compiler_set_diagnostic_output(\"" ++ compilation_escape_with_string(diag_path) ++ "\")\n"
-    out = out ++ "    compiler_set_emitted_source_output(\"" ++ compilation_escape_with_string(emitted_source_path) ++ "\")\n"
     out = out ++ "    let project = __with_compiler_hook_project_info()\n"
+    out = out ++ "    let diagnostics = Diagnostics.__driver_new(\"" ++ compilation_escape_with_string(token) ++ "\", \"" ++ compilation_escape_with_string(diag_path) ++ "\")\n"
+    out = out ++ "    let source_emitter = SourceEmitter.__driver_new(\"" ++ compilation_escape_with_string(token) ++ "\", \"" ++ compilation_escape_with_string(emitted_source_path) ++ "\")\n"
     for hi2 in 0..hook_count:
         let hook_node = pool.compiler_hook_node(hi2)
         let phase_name = zcu.pool.resolve(pool.compiler_hook_phase_at(hi2))
         if phase_name != "after_typecheck":
             continue
         let hook_name = zcu.pool.resolve(pool.get_data0(hook_node))
-        out = out ++ "    " ++ hook_name ++ "(project)\n"
+        let call_args = compilation_compiler_hook_call_args(pool, zcu.pool, hook_node)
+        out = out ++ "    " ++ hook_name ++ "(" ++ call_args ++ ")\n"
     out
 
 fn Compilation.emit_compiler_hook_diagnostics(self: Compilation, diag_text: str) -> i32:
@@ -540,6 +569,7 @@ fn Compilation.run_after_typecheck_hooks(self: Compilation, pool: AstPool, sourc
     let runner_bin = tmp_dir ++ "/compiler-hook-runner." ++ stamp
     let diag_path = tmp_dir ++ "/compiler-hook-diags." ++ stamp ++ ".txt"
     let emitted_source_path = tmp_dir ++ "/compiler-hook-source." ++ stamp ++ ".w"
+    let capability_token = "with-compiler-hook:" ++ stamp
     if with_fs_write_file(diag_path, "") != 0:
         with_eprint("error: could not initialize compiler hook diagnostics")
         return false
@@ -547,7 +577,7 @@ fn Compilation.run_after_typecheck_hooks(self: Compilation, pool: AstPool, sourc
         let _remove_diag_init = with_fs_remove_file(diag_path)
         with_eprint("error: could not initialize compiler hook emitted source")
         return false
-    let runner_source = self.compiler_hook_runner_source(pool, source_path, diag_path, emitted_source_path)
+    let runner_source = self.compiler_hook_runner_source(pool, source_path, diag_path, emitted_source_path, capability_token)
     if with_fs_write_file(runner_path, runner_source) != 0:
         let _ = with_fs_remove_file(diag_path)
         let _remove_emitted_init = with_fs_remove_file(emitted_source_path)
@@ -558,6 +588,7 @@ fn Compilation.run_after_typecheck_hooks(self: Compilation, pool: AstPool, sourc
     runner_comp.set_prelude_mode(self.config.prelude_mode)
     runner_comp.set_debug_info(self.config.debug_info)
     runner_comp.set_compiler_hooks_enabled(false)
+    runner_comp.set_tool_mode_entry_path(runner_path)
     let built_runner = runner_comp.build_binary_to_path(runner_path, runner_bin)
     let _remove_runner_source = with_fs_remove_file(runner_path)
     if built_runner == "":
@@ -565,7 +596,10 @@ fn Compilation.run_after_typecheck_hooks(self: Compilation, pool: AstPool, sourc
         let _remove_emitted = with_fs_remove_file(emitted_source_path)
         with_eprint("error: compiler hook runner compilation failed")
         return false
+    let old_capability_token = with_getenv_str("WITH_TOOL_CAPABILITY_TOKEN")
+    let _set_capability_token = with_setenv_str("WITH_TOOL_CAPABILITY_TOKEN", capability_token)
     let rc = with_exec_binary(built_runner)
+    let _restore_capability_token = with_setenv_str("WITH_TOOL_CAPABILITY_TOKEN", old_capability_token)
     let diag_text = with_fs_read_file(diag_path)
     let emitted_source = with_fs_read_file(emitted_source_path)
     let _remove_diag_after = with_fs_remove_file(diag_path)

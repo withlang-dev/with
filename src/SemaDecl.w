@@ -1803,6 +1803,33 @@ fn Sema.validate_compiler_hooks(self: Sema):
         let phase_name = self.pool_resolve_symbol(phase_sym)
         if phase_name != "after_typecheck":
             self.emit_error("unknown compiler_hook phase '" ++ phase_name ++ "'", hook_node)
+        let meta = self.ast.find_fn_meta(hook_node)
+        if meta < 0:
+            continue
+        let param_start = self.ast.fn_meta_param_start(meta)
+        let param_count = self.ast.fn_meta_param_count(meta)
+        for pi in 0..param_count:
+            let param_type = self.ast.fn_param_type(param_start, pi)
+            if self.compiler_hook_param_is_supported(param_type) == 0:
+                self.emit_error("compiler_hook parameter must be ProjectInfo, Diagnostics, or SourceEmitter from std.compiler", hook_node)
+
+fn Sema.compiler_hook_param_is_supported(self: Sema, type_node: i32) -> i32:
+    if type_node == 0:
+        return 0
+    let tid = self.resolve_type_expr(type_node)
+    if tid == 0:
+        return 0
+    let resolved = self.resolve_alias(tid)
+    if self.get_type_kind(resolved) != TypeKind.TY_STRUCT:
+        return 0
+    let type_sym = self.get_type_d0(resolved)
+    let type_name = self.pool_resolve(type_sym)
+    let type_path = self.named_type_path_for(type_sym, resolved)
+    if not sema_is_std_compiler_path(type_path):
+        return 0
+    if type_name == "ProjectInfo" or type_name == "Diagnostics" or type_name == "SourceEmitter":
+        return 1
+    0
 
 fn Sema.validate_generic_type_decls(self: Sema):
     for di in 0..self.ast.decl_count():
