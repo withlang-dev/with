@@ -16,6 +16,10 @@ Fast, safe, and designed to feel less hostile than existing native languages.
 ## What It Looks Like
 
 ```
+print("Hello, World!")
+```
+
+```
 var nr = 0
 for line in file.read_lines("server.log"):
     nr += 1
