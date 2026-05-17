@@ -833,59 +833,6 @@ fn build_graph_find_build_root(start_dir: str) -> str:
         cur = parent
     ""
 
-fn build_graph_output_seen(outputs: Vec[str], path: str) -> bool:
-    for i in 0..outputs.len() as i32:
-        if outputs.get(i as i64) == path:
-            return true
-    false
-
-fn build_graph_register_output(outputs: Vec[str], path: str) -> bool:
-    if path.len() == 0:
-        return true
-    if build_graph_output_seen(outputs, path):
-        return false
-    outputs.push(path)
-    true
-
-fn build_graph_validate_outputs(root: str, graph: BuildGraph, output_path: str) -> i32:
-    let outputs: Vec[str] = Vec.new()
-    for gi in 0..graph.generated_sources.len() as i32:
-        let generated = graph.generated_sources.get(gi as i64)
-        if not build_graph_register_output(outputs, resolve_join(root, generated.path)):
-            with_eprint("error: duplicate build.w output path: " ++ generated.path)
-            return 1
-    for ti in 0..graph.targets.len() as i32:
-        let target = graph.targets.get(ti as i64)
-        var path = ""
-        if target.kind == 0:
-            path = build_graph_output_path(root, target, output_path, graph.targets.len() as i32)
-        else if target.kind == 1:
-            path = build_graph_library_output_path(root, target, output_path, graph.targets.len() as i32)
-        else if target.kind == 8:
-            path = build_graph_expand_install_path(root, target.output)
-        else if target.output.len() > 0:
-            path = build_graph_resolve_project_path(root, target.output)
-        if not build_graph_register_output(outputs, path):
-            with_eprint("error: duplicate build.w output path for target '" ++ target.name ++ "': " ++ path)
-            return 1
-    0
-
-fn run_build_graph_write_generated_sources(root: str, graph: BuildGraph) -> i32:
-    for gi in 0..graph.generated_sources.len() as i32:
-        let generated = graph.generated_sources.get(gi as i64)
-        if not build_graph_generated_path_valid(generated.path):
-            with_eprint("error: invalid build.w generated source path: " ++ generated.path)
-            return 1
-        let output_path = resolve_join(root, generated.path)
-        let output_dir = build_graph_dirname(output_path)
-        if with_fs_mkdir_p(output_dir) != 0:
-            with_eprint("error: could not create generated source directory: " ++ output_dir)
-            return 1
-        if with_fs_write_file(output_path, generated.contents) != 0:
-            with_eprint("error: could not write generated source: " ++ generated.path)
-            return 1
-    0
-
 fn build_graph_restore_env(name: str, old_value: str) -> i32:
     with_setenv_str(name, old_value)
 
@@ -1942,7 +1889,7 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
     let output_rc = build_graph_validate_outputs(root, graph, output_path)
     if output_rc != 0:
         return output_rc
-    let generated_rc = run_build_graph_write_generated_sources(root, graph)
+    let generated_rc = build_graph_write_generated_sources(root, graph)
     if generated_rc != 0:
         return generated_rc
     let completed_targets: Vec[str] = Vec.new()
