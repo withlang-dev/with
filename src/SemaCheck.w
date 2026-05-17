@@ -4600,6 +4600,11 @@ fn Sema.check_pipeline(self: Sema, node: i32) -> i32:
     rhs_ty as i32
 
 fn Sema.pipeline_generic_builtin_method_exists(self: Sema, owner_sym: i32, field: i32) -> i32:
+    // Temporary bridge: builtin generic collection methods do not all flow
+    // through lookup_method_sig on concrete generic instances yet, so pipeline
+    // method resolution needs this explicit allowlist. Long term, generic
+    // instance method lookup should use the same method table path as ordinary
+    // methods and this stdlib-specific list should disappear.
     if owner_sym == self.syms.vec:
         if field == self.syms.push or field == self.syms.set_i32 or field == self.syms.clear:
             return 1
