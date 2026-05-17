@@ -4,17 +4,22 @@ extern fn with_sysinfo_os() -> str
 extern fn with_sysinfo_arch() -> str
 
 const BUILD_GRAPH_STANDARD_KIND_MIN: i32 = 0
-const BUILD_GRAPH_STANDARD_KIND_MAX: i32 = 21
+const BUILD_GRAPH_STANDARD_KIND_MAX: i32 = 22
 const BUILD_GRAPH_PROJECT_KIND_MIN: i32 = 1000
 const BUILD_GRAPH_PROJECT_KIND_MAX: i32 = 1027
 const BUILD_GRAPH_TARGET_MIN: i32 = 0
 const BUILD_GRAPH_TARGET_MAX: i32 = 5
 
 fn build_graph_kind_is_standard(kind: i32) -> bool:
-    kind >= BUILD_GRAPH_STANDARD_KIND_MIN and kind <= BUILD_GRAPH_STANDARD_KIND_MAX
+    if kind >= BUILD_GRAPH_STANDARD_KIND_MIN and kind <= 4:
+        return true
+    kind >= 7 and kind <= BUILD_GRAPH_STANDARD_KIND_MAX
 
 fn build_graph_kind_is_project(kind: i32) -> bool:
     kind >= BUILD_GRAPH_PROJECT_KIND_MIN and kind <= BUILD_GRAPH_PROJECT_KIND_MAX
+
+pub fn build_graph_kind_removed(kind: i32) -> bool:
+    kind == 5 or kind == 6
 
 pub fn build_graph_kind_embedded_runtime_extract_test() -> i32: 1000
 pub fn build_graph_kind_selfhost_noop_local_regression() -> i32: 1001
@@ -53,8 +58,8 @@ pub fn build_graph_kind_name(kind: i32) -> str:
     if kind == 2: return "test"
     if kind == 3: return "object"
     if kind == 4: return "archive"
-    if kind == 5: return "generated_source"
-    if kind == 6: return "generated_binary"
+    if kind == 5: return "removed_generated_source"
+    if kind == 6: return "removed_generated_binary"
     if kind == 7: return "command"
     if kind == 8: return "install"
     if kind == 9: return "group"
@@ -70,6 +75,7 @@ pub fn build_graph_kind_name(kind: i32) -> str:
     if kind == 19: return "run_corpus_test"
     if kind == 20: return "promote_tree_if_verified"
     if kind == 21: return "clean"
+    if kind == 22: return "copy_file"
     if kind == 1000: return "embedded_runtime_extract_test"
     if kind == 1001: return "selfhost_noop_local_regression"
     if kind == 1002: return "cli_selfhost_smoke_test"
@@ -100,9 +106,7 @@ pub fn build_graph_kind_name(kind: i32) -> str:
     f"unknown({kind})"
 
 pub fn build_graph_kind_implemented(kind: i32) -> bool:
-    if kind >= 0 and kind <= 2:
-        return true
-    if kind >= 7 and kind <= BUILD_GRAPH_STANDARD_KIND_MAX:
+    if build_graph_kind_is_standard(kind):
         return true
     if build_graph_kind_is_project(kind):
         return true

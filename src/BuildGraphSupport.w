@@ -22,6 +22,15 @@ pub fn build_graph_library_output_path(root: str, target: BuildGraphTarget, outp
         return build_graph_resolve_project_path(root, target.output)
     resolve_join(resolve_join(root, "out/lib"), "lib" ++ target.name ++ ".a")
 
+pub fn build_graph_object_output_path(root: str, target: BuildGraphTarget, output_path: str, target_count: i32) -> str:
+    if output_path.len() > 0:
+        if target_count != 1:
+            return ""
+        return output_path
+    if target.output.len() > 0:
+        return build_graph_resolve_project_path(root, target.output)
+    resolve_join(resolve_join(root, "out/obj"), target.name ++ ".o")
+
 pub fn build_graph_resolve_project_path(root: str, path: str) -> str:
     if path.len() > 0 and path.byte_at(0) == 47:
         return path

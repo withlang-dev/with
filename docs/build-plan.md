@@ -1,353 +1,556 @@
-# Implement docs/build-spec.md
+# Build System Completion Plan
 
-  ## Summary
+Status: implementation plan.
 
-  Implement the integrated With build system as a graph-first tool-mode build driver. build.w will declare typed build nodes; the
-  compiler driver will execute them without Make or repository shell scripts. Current-host execution is required first, but platform/
-  target data stays explicit and non-host paths fail loudly.
+This plan describes the remaining work needed to make
+[build-spec.md](build-spec.md) describe reality. The end state is a With-native
+build system with no authoritative Makefile, no required repository shell
+scripts, and no project-specific build dispatch hardcoded into the generic
+compiler driver.
 
-  Make remains only as a temporary compatibility shim during migration. The final state is that the compiler repository can build, test,
-  migrate PCRE2, promote regex sources, install the user compiler, and clean using with build :... targets directly.
+---
 
-  ## Current Progress
+## 1. Current State
 
-  Completed:
+Already implemented:
 
-  - Graph v2 parsing/serialization with target outputs, inputs, deps, args, and default target selection.
-  - Dependency-closure target selection, including explicit `dep(...)` edges and producer edges inferred from inputs/entries.
-  - Implemented executable graph nodes for:
-      - executable/library/test targets;
-      - group targets;
-      - binary_compare / fixpoint_compare;
-      - compile_c_object / compile_asm_object / compile_llvm_ir_object;
-      - create_static_archive;
-      - generate_response_file;
-      - embed_object_files;
-      - copy_tree;
-      - run_corpus_test;
-      - promote_tree_if_verified;
-      - command (argv-only, no shell command strings);
-      - install.
-  - Runtime argv process execution with stdout/stderr capture and timeout.
-  - Runtime chmod support for install nodes.
-  - Native test directory discovery now avoids shell command strings for
-    directory checks and sorted file collection.
-  - Native `with test` now handles the suite directives used by the script runner:
-    `expect-check-fail`, `expect-error`, `expect-build-fail`,
-    `expect-check-stdout`, `check-only`, `skip`, and `args`.
-  - Native `Test` graph targets are exposed for behavior, compile-error,
-    codegen, spec, and phase directories. Test graph nodes can select an
-    explicit compiler with `compiler=<path>`, so the behavior suite now runs
-    through `out/bin/with-stage2` without `scripts/run_tests.sh`.
-  - The embedded runtime extraction regression now runs as a typed
-    `embedded_runtime_extract_test` graph node instead of
-    `scripts/run_embedded_runtime_extract_regression.sh`.
-  - The issue61 noop-local selfhost regression now runs as a typed
-    `selfhost_noop_local_regression` graph node instead of
-    `scripts/run_issue61_noop_local_regression.sh`.
-  - CLI selfhost top-level help and `with test` runtime-directive checks now
-    run as a typed `cli_selfhost_smoke_test` graph node.
-  - CLI one-liner coverage now runs as a typed
-    `cli_selfhost_one_liner_test` graph node, including `-e`, repeated `-e`,
-    semicolon splitting, argument forwarding, `-n`, `-p`, regex captures,
-    named captures, f-string capture interpolation, implicit-main stdin
-    programs, and diagnostic source-location checks.
-  - CLI selfhost object-symbol coverage now runs as a typed
-    `cli_selfhost_object_symbol_test` graph node, covering emitted globals,
-    imported module symbol ownership, imported-vs-extern redeclarations, and
-    PCRE2 C ABI symbol preservation without shell `nm | awk` pipelines.
-  - CLI selfhost package/build.w coverage now runs as a typed
-    `cli_selfhost_build_w_test` graph node, covering project `build.w`
-    execution, test/library targets, explicit host and rejected non-host
-    targets, generated source validation, graph v2 serialization, target
-    selection, dependency closure, response files, archives, embedded objects,
-    copy/promote nodes, command nodes, install nodes, and corpus nodes.
-  - CLI selfhost project/init coverage now runs as a typed
-    `cli_selfhost_project_test` graph node, covering `with init` in the
-    current directory, `with init <dir>`, default package-name build output,
-    and rejection of imperative `[build]` manifest configuration for both
-    implicit and explicit-source builds.
-  - CLI selfhost edge coverage now runs as a typed `cli_selfhost_edge_test`
-    graph node, covering pointer-index diagnostics, prelude stdout/stderr
-    output contracts, whole-program extern var redeclaration, and imported
-    module dependency ordering.
-  - CLI selfhost regex/PCRE2 preparation coverage now runs as a typed
-    `cli_selfhost_pcre2_prep_test` graph node, covering EBCDIC table pruning,
-    raw-to-generated preservation of shared extern/let ownership, width-suffix
-    local preservation, std.re shared dependency imports, opaque field
-    diagnostics, concrete PCRE2 heapframe structs, clean pcre2_compile builds,
-    and JIT no-support fallback behavior.
-  - The compiler runtime process API now supports argv execution with supplied
-    stdin plus captured stdout/stderr, so graph tests no longer need shell
-    pipelines to exercise stdin-driven compiler behavior.
-  - Build graph target/platform metadata now lives in a dedicated
-    `BuildGraphKinds` module instead of `src/main.w`.
-  - Reusable selfhost fixture/process/assertion helpers now live in
-    `BuildGraphSelfhostHarness`, reducing the fixture warehouse pressure in
-    `BuildGraphSelfhost.w`.
-  - The selfhost harness now has PCRE2-backed regex assertions, and migrated
-    brace-format checks use structural regex patterns instead of hand-written
-    line scanning.
-  - Repository selfhost suites now use a generic `selfhost_suite_test` graph
-    kind keyed by suite name, so new selfhost batches no longer require a new
-    BuildKind and top-level dispatch branch.
-  - Host tool lookup now lives in a typed `BuildGraphTools` module with named
-    resolvers for cc, ar, nm, LLVM clang, opt, curl, tar, and dsymutil.
-  - Build graph data structures, v1/v2 parsing, serialization, and dependency
-    closure selection now live in `BuildGraphModel` instead of `src/main.w`.
-  - Build graph path normalization, output path helpers, argv blob assembly,
-    and process-argument validation now live in `BuildGraphSupport` instead of
-    `src/main.w`.
-  - Sorted `.w` file discovery now lives in `BuildGraphSupport`, giving
-    selfhost tests and PCRE2 graph operations a shared fixture/file listing
-    primitive instead of keeping the finder inside `src/main.w`.
-  - Generic executable graph operations now live in `BuildGraphOps`, including
-    binary/fixpoint comparisons, response files, C/asm/LLVM object compilation,
-    static archives, embedded object assembly, manifest copy, corpus/command
-    execution, file copy, and install nodes.
-  - PCRE2-specific graph operations now live in `BuildGraphPcre2`, keeping the
-    generated-source checks, promotion, pcre2test build, and upstream corpus run
-    out of `src/main.w` while using the centralized `BuildGraphRuntime`
-    boundary for process, environment, and filesystem effects.
-  - Native `Test` graph execution now lives in `BuildGraphTests`, so test-file
-    glob expansion, `compiler=` selection, and per-file process capture are no
-    longer embedded in `src/main.w`.
-  - `with build :stage1`, `:stage2`, `:stage3`, and `:fixpoint` now build
-    through typed graph nodes instead of comparing stale stage artifacts:
-      - `generate_compiler_entrypoints` emits the version-substituted
-        `out/gen/*.w` entry files and `out/gen/version.txt`.
-      - `with_compiler_build` invokes the selected compiler through argv,
-        writes stage binaries or fixpoint objects, and reports captured
-        stdout/stderr on failure.
-      - `fixpoint_compare` depends on regenerated stage2/stage3 fixpoint
-        objects and prints `FIXPOINT` on success.
-  - `with test` with no explicit source path now dispatches to the project
-    graph target `with build :test`.
-  - `with build :runtime` now refreshes the compiler runtime object set
-    through typed graph nodes:
-      - `generate_compat_runtime` generates `out/gen/embedded_stdlib_runtime.w`
-        and `out/gen/compat_runtime.w` without the old generator binary.
-      - `with_compiler_build` compiles With runtime objects with stage2.
-      - `with_compiler_ir` preserves the existing `regex_runtime.w` IR-to-object
-        path so imported PCRE2 modules are included correctly.
-      - `embed_object_files` and `compile_asm_object` generate and compile
-        `out/lib/embedded_objects.{s,o}` without the shell embedding script.
-  - `with build :build` now produces the canonical `out/bin/with` through the
-    graph path by depending on refreshed runtime objects and embedded objects.
-  - `with build :pcre2-test` now runs the upstream PCRE2 `RunTest -8 0-29
-    heap` corpus through a typed `pcre2_run_test` graph node instead of the
-    repository wrapper script `scripts/verify_pcre2_works.sh`.
-  - `with build :pcre2-build` now consumes existing `out/pcre2_migrated`
-    sources, checks generated modules, and builds `out/pcre2_build/bin/pcre2test`
-    through a typed `pcre2_build` graph node. It does not trigger migration.
-  - `with build :pcre2-check-generated` now checks generated PCRE2 modules
-    through a typed `pcre2_generated_check` node instead of
-    `scripts/pcre2_generated_workflow.sh`.
-  - `with build :pcre2-promote` now refuses promotion unless generated PCRE2
-    modules type-check cleanly, then copies the verified tree through a typed
-    `pcre2_generated_promote` node.
-  - PCRE2 migration is now treated as a manual refresh step in the legacy
-    Make path too: `pcre2-test` no longer depends on `pcre2-build`, and
-    `pcre2-build` no longer depends on `pcre2-migrate`.
-  - `make pcre2-test` is now a compatibility shim over
-    `with build :pcre2-test` after checking that existing migrated PCRE2
-    sources, built `pcre2test`, and the reference tree are present.
-  - `make pcre2-build` is now a compatibility shim over
-    `with build :pcre2-build`.
-  - `make pcre2-promote` is now a compatibility shim over
-    `with build :pcre2-promote`.
-  - `make test` is now a compatibility shim over `with build :test`; Make no
-    longer invokes `scripts/run_tests.sh`, the issue61 regression script, or
-    the embedded-runtime regression script directly.
-  - `with build :test` now runs the first migrator fixture batch through a
-    typed `cli_selfhost_migrate_basic_test` node:
-      - global initializer lists
-      - host header compatibility
-      - assignment sequencing compatibility
-      - rvalue sequencing
-      - directory progress stdout
-      - cross-file global owner arrays
-      - shared defs pruning of unused ownerless externs
-  - `with build :test` now runs the core migrator fixture batch through a
-    typed `cli_selfhost_migrate_core_test` node:
-      - libc ctype calls preserve C return-value semantics
-      - macro initializer lists and typed unsigned minus constants
-      - tentative global owner selection across one or more source files
-      - no-op pointer cast cleanup
-      - raw pointer indexing diagnostics and unsafe indexing output
-      - brace-preferred migration output formatting
-      - typed casts inside macro-expanded expressions
-  - `with build :test` now checks the generated-PCRE2 existing-`main`
-    workflow through the typed `pcre2_generated_check` node instead of
-    `scripts/pcre2_generated_workflow.sh`.
-  - Initial repository `build.w`:
-      - `with build`
-      - `with build :selfcheck`
-      - `with build :fixpoint`
-      - `with build :test`
-      - `with build :install-user`
-      - `with build :update-seed`
-      - `with build :c-migrator-tests`
-      - `with build :pcre2-build`
-      - `with build :pcre2-test`
-      - `with build :pcre2-check-generated`
-      - `with build :pcre2-promote`
-  - Default `with build :test` no longer runs PCRE2/migrator-prep suites.
-    C migrator correctness checks are grouped under the explicit
-    `with build :c-migrator-tests` target, while migrated-library operations
-    use the per-library command family (`pcre2-migrate`, `pcre2-build`,
-    `pcre2-test`, `pcre2-promote`) so normal tests do not validate a rare
-    library refresh path by accident.
-  - Default `with build :test` still exercises With regex syntax and the
-    standard-library regex shim through the normal behavior/compile-error
-    suites, including literal parsing, flags, `=~`/`!~`, match-arm captures,
-    f-string capture interpolation, global `/g` progression, invalid literals,
-    invalid flags, and capture-scope diagnostics.
-  - CLI selfhost parallel same-source coverage now runs as a typed
-    `selfhost_suite_test` graph target named `cli-selfhost-parallel-tests`.
-    It verifies one serial `with test` run and 32 concurrent same-source runs
-    without invoking the legacy shell test script.
-  - `with build :llvm-link-metadata` now compiles `rt/llvm_bridge.w` and
-    `rt/clang_bridge.w` through graph nodes and regenerates
-    `out/lib/llvm_link.rsp`, `out/lib/llvm_cc`, and
-    `out/lib/.llvm-link-ready` through a typed metadata node.
-  - `with build :stage1` now depends on a seed-built bootstrap runtime root in
-    `out/bootstrap-lib`, including runtime objects, LLVM bridge metadata, and
-    embedded runtime objects. A cold direct graph build no longer relies on
-    Make's `helpers.o` compatibility symlink, `out/bin/runtime` symlink, or
-    stale `out/lib` runtime artifacts.
-  - `with build :build` explicitly depends on normal `out/lib` LLVM link
-    metadata before producing the canonical compiler, so the graph path has a
-    complete runtime/link root for both bootstrap stages and the final
-    stage2-built compiler.
-  - `with build :pcre2-reference` now fetches/extracts the pinned PCRE2
-    release when needed, prepares `pcre2.h`, `config.h`, and
-    `pcre2_chartables.c`, and normalizes the heap corpus expectation through a
-    typed graph node instead of `scripts/prepare_pcre2_reference.sh`. The
-    manual Make `pcre2-migrate` path delegates reference preparation to this
-    graph target.
-  - `with build :pcre2-migrate` now runs the pinned PCRE2 migration through a
-    typed manual graph node, rejects generated `c_export` attributes, publishes
-    the migrated tree only after the file-count check passes, and invalidates
-    stale `pcre2-build` output. The manual Make `pcre2-migrate` path delegates
-    to this graph target.
-  - `with build :clean` now removes `out/`, legacy `.with/`, and the stray
-    root/source build artifacts through a typed graph node backed by the
-    runtime `remove_tree` primitive. `with clean` no longer assembles a shell
-    command string.
-  - Make's `build`, `stage1`, `stage2`, `stage3`, `runtime`, `selfcheck`,
-    `smoke`, and `fixpoint` compatibility targets now delegate to the
-    equivalent `with build :...` graph targets instead of exercising the old
-    Make stage/runtime/fixpoint recipes. `make test` now builds through the
-    graph path before running `with build :test`.
-  - `with build :install` now installs the stage2 compiler and runtime/link
-    object set through typed install nodes. It preserves Make-style `DESTDIR`,
-    `BINDIR`, and `PREFIX` path selection via `$INSTALL_BINDIR` and
-    `$INSTALL_LIBDIR`, and `make install` delegates to this graph target.
-  - `with build :seed` now downloads the `main` seed binary from GitHub
-    releases through a typed `seed_download` graph node. It honors
-    `SEED_VERSION` for a specific release and otherwise queries recent
-    releases for the first non-missing `main` asset. `make seed` delegates to
-    this graph target whenever an existing With compiler is available, keeping
-    the shell fallback only for true no-compiler bootstrap.
+- `build.w` discovery and tool-mode execution.
+- Driver-minted `BuildCtx` and narrower tool capabilities.
+- Sandboxed project-relative `ToolFs`.
+- Graph v2 serialization/parsing.
+- Target selection by `with build :target`.
+- Dependency-closure selection using explicit deps and producer edges.
+- `--graph` and `--dry-run` graph printing.
+- Default `with test` dispatch through `with build :test`.
+- Standard graph nodes for:
+  - `Executable`
+  - `Library`
+  - `Test`
+  - `Object`
+  - `Archive`
+  - `Group`
+  - `Command`
+  - `BinaryCompare`
+  - `FixpointCompare`
+  - `CompileCObject`
+  - `CompileAsmObject`
+  - `CompileLlvmIrObject`
+  - `CreateStaticArchive`
+  - `GenerateResponseFile`
+  - `EmbedObjectFiles`
+  - `CopyTree`
+  - `CopyFile`
+  - `RunCorpusTest`
+  - `PromoteTreeIfVerified`
+  - `Install`
+  - `Clean`
+- Repository graph targets for:
+  - stage chain and fixpoint
+  - runtime object generation
+  - canonical compiler build
+  - default test suite
+  - install/install-user
+  - seed download
+  - PCRE2 reference/migrate/build/test/promote
+  - several emit-C targets
+- Make compatibility targets delegate many paths to `with build :...`.
+- Default `with build :test` no longer runs the full PCRE2 upstream corpus.
 
-  Remaining:
+Still not acceptable as final state:
 
-  - Port emit-c and cross targets.
-  - Finish delegating remaining Make compatibility targets after emit-c and
-    cross graph paths are equivalent.
-  - Remove Make recipes and obsolete scripts last.
+- Project-specific build behavior still leaks into compiler source modules.
+- There is no general project-local tool action mechanism.
+- Full Jai-style workspace/build-options/message-loop APIs are incomplete.
+- Make remains as a compatibility layer.
+- Some repository scripts still exist because old workflows or tests reference
+  them.
+- Some compiler/build paths still assemble shell command strings internally.
+- Cross-platform target plumbing exists, but only current-host paths are
+  routinely exercised.
 
-  ## Key Changes
+---
 
-  - Extend std.build from the current simple target list into graph v2:
-      - Add typed nodes for executable, test, library/archive, object, generated source/binary, group, clean, install, download/extract,
-        process, corpus test, promote, and all current Make parity operations.
-      - Every node records stable name, inputs, outputs, deps, target, options, and source location where available.
-      - Emit WITH_BUILD_GRAPH\t2; keep v1 parser only long enough for existing tests, then update tests to v2.
-  - Add build-driver execution infrastructure:
-      - Move ad hoc graph parsing/execution out of src/main.w into a dedicated build-driver module.
-      - Support with build, with build :target, with test, with clean, and with install-user.
-      - Add --graph, --dry-run, --explain, --verbose, --target, --debug, --release, and --out.
-      - Enforce duplicate-output detection, dependency order, current-host target validation, repo locking, and loud unsupported-node
-        diagnostics.
-  - Add typed tool-mode capabilities instead of shell recipes:
-      - Filesystem: read/write text and binary, mkdir, remove tree, copy file/tree, rename, symlink, chmod, glob, normalize/join paths.
-      - Process: argv-based execution with cwd/env, stdout/stderr capture, exit code, timeout, and process-tree cleanup. No shell
-        command strings.
-      - Host tools: typed adapters for cc, assembler, LLVM IR compilation, ar, dsymutil, git, curl, and tar where still required;
-        missing tools fail with explicit diagnostics.
-      - Replace build-path uses of with_system("...") with these typed APIs.
-  - Implement current Make parity nodes:
-      - binary_compare / fixpoint_compare
-      - compile_c_object
-      - compile_asm_object
-      - compile_llvm_ir_object
-      - create_static_archive
-      - generate_response_file
-      - embed_object_files
-      - copy_tree
-      - run_corpus_test
-      - promote_tree_if_verified
-  - Add repository build.w targets:
-      - build, stage1, stage2, stage3, runtime, fixpoint, test, regex_migrate, regex_build, regex_test, regex_promote, install_user,
-        update_seed, seed, clean, emit_c_test, emit_c_fixpoint, and cross.
-      - Preserve bootstrap order: seed → stage1 → stage2 → stage3; compare stage2/stage3 fixpoint objects before install/update-seed.
-      - Generate versioned compiler entry files under out/gen.
-      - Build embedded stdlib, runtime objects, LLVM/Clang bridge objects, embedded object payloads, canonical compiler, and runtime
-        tree through graph nodes.
-  - Port each live script into typed build functionality:
-      - embed_runtime_objects.sh becomes embed_object_files.
-      - pcre2_generated_workflow.sh becomes generated-PCRE2 dependency check/promote nodes.
-      - prepare_pcre2_reference.sh becomes a PCRE2 source preparation node.
-      - verify_pcre2_works.sh becomes run_corpus_test for upstream RunTest -8 0-29 heap.
-      - run_tests.sh, selfhost_runner.sh, CLI selfhost tests, and regression scripts become With test-suite nodes with directive
-        parsing, temp-project support, timeouts, and output assertions.
-      - generate_wl_stubs.sh becomes a typed emit-C support node.
-  - Migration sequence:
-      - First add APIs and graph executor while Make still works.
-      - Then add repository build.w targets and compare them against Make outputs.
-      - Then make Make call with build :... as a shim.
-      - Finally remove Make recipes and shell scripts once direct with build paths pass.
+## 2. Rule for the Rest of the Work
 
-  ## Test Plan
+Every remaining item is completed one slice at a time:
 
-  - Focused tests:
-      - Graph v2 serialization/parsing, unknown node, duplicate output, dependency order, empty glob, invalid path escape, unsupported
-        target.
-      - Named build entrypoints: with build :target, missing target, wrong signature.
-      - Process API: argv handling, cwd/env, stdout/stderr capture, nonzero exit, timeout.
-      - Filesystem API: binary read/write, copy tree, remove tree, symlink, chmod, glob ordering.
-      - Make parity nodes: object compilation, assembly compilation, LLVM IR compilation, archive determinism, response file
-        determinism, binary compare failure offsets, embedded object symbol output.
-      - Install/promote guardrails: refused stale verification, reported changed paths, no partial silent success.
-  - Repository parity tests:
-      - with build :stage1
-      - with build :stage2
-      - with build :stage3
-      - with build :fixpoint
-      - with build :runtime
-      - with build :pcre2-build
-      - with build :pcre2-test
-      - with build :pcre2-promote --dry-run
-      - with build :emit-c-test
-      - with build :install-user --dry-run
-  - Final acceptance:
-      - with build :compiler
-      - with build :fixpoint
-      - with build :test
-      - with build :pcre2-migrate
-      - with build :pcre2-build
-      - with build :pcre2-test
-      - with build :install-user
-      - No Makefile or repository shell script is required for those commands.
-      - make build, if still present during shim phase, delegates to with build :compiler.
+1. Implement one logical capability or target group.
+2. Run focused verification for that slice.
+3. Run `make build`.
+4. Run `make fixpoint`.
+5. Run relevant `with build :...` parity checks.
+6. Run `make test` when code behavior changed.
+7. Commit and push.
 
-  ## Assumptions
+Do not replace Make until every target it protects has a proven `with build`
+path.
 
-  - Build execution is graph-first: build.w declares typed nodes; the driver performs effects after graph construction.
-  - The current exercised host is macOS, but public APIs must not encode a Mac preference.
-  - Typed process adapters may invoke host tools such as cc, LLVM tools, git, curl, tar, and dsymutil; they must not invoke shell
-    command strings.
-  - Make is replaced last to protect bootstrap safety.
-  - docs/build-spec.md should be cleaned up during implementation to remove the remaining “macOS-first” wording in favor of “current-host.”
+---
+
+## 3. Phase A: Finish the Standard Target Vocabulary
+
+Goal: every target kind exported by `std.build` is either fully executable or
+removed from the standard vocabulary.
+
+Status: complete. Commit: `Complete Phase A build target vocabulary` (the
+final Git hash is reported after commit because a commit cannot embed its own
+hash).
+
+Tasks:
+
+1. Audit every `BuildKind` in `lib/std/build.w`. Done.
+2. For each kind, record:
+   - validation rules;
+   - graph parser support;
+   - executor support;
+   - docs;
+   - tests. Done.
+3. Fully implement or remove:
+   - `Object`: implemented as With source to object file;
+   - `Archive`: implemented as With source to static archive;
+   - `GeneratedSource`: removed as a target kind; generated sources are graph
+     entries;
+   - `GeneratedBinary`: removed until a binary-content graph entry exists.
+4. Add the missing standard target:
+   - `CopyFile`: implemented as a file-copy target with optional octal mode.
+5. Ensure standard nodes have:
+   - duplicate-output detection;
+   - declared input validation;
+   - clear failure diagnostics;
+   - deterministic output.
+
+Verification:
+
+```sh
+with build :cli-selfhost-build-w-tests
+with build --graph
+make build
+make fixpoint
+make test
+```
+
+Commit after this phase.
+
+---
+
+## 4. Phase B: Project-Local Tool Actions
+
+Goal: project-specific build behavior no longer requires compiler source
+changes.
+
+Design and implement a project-local action mechanism:
+
+```with
+pub fn build(ctx: BuildCtx) -> Build:
+    var out = ctx.new_build()
+    out = out.action("name", action_fn)
+    out
+
+fn action_fn(ctx: ActionCtx) -> i32:
+    ...
+```
+
+`ActionCtx` must expose:
+
+- target name;
+- declared inputs;
+- declared outputs;
+- diagnostics;
+- sandboxed filesystem;
+- process runner;
+- project info;
+- temporary output root;
+- timeout;
+- cwd and env where declared.
+
+Action targets must declare:
+
+- inputs;
+- outputs;
+- deps;
+- target platform;
+- timeout;
+- whether network access is allowed;
+- whether install-path access is allowed.
+
+Required tests:
+
+- action succeeds and writes declared output;
+- action failure fails graph target;
+- undeclared output is rejected or diagnosed;
+- missing input is diagnosed;
+- action receives only declared capabilities;
+- action path escapes are denied;
+- action can be used as a dependency of a standard target.
+
+Verification:
+
+```sh
+with build :cli-selfhost-build-w-tests
+make build
+make fixpoint
+make test
+```
+
+Commit after this phase.
+
+---
+
+## 5. Phase C: Move Project-Specific Build Logic Out of Generic Driver
+
+Goal: `src/main.w` and generic build graph executor code no longer know about
+PCRE2, emit-C roundtrip policy, seed policy, or With-repository selfhost
+fixtures.
+
+Move these into repository-local build modules backed by standard nodes or
+project-local actions:
+
+- PCRE2 reference preparation.
+- PCRE2 migration.
+- PCRE2 build.
+- PCRE2 corpus test.
+- PCRE2 promotion.
+- emit-C test.
+- emit-C fixpoint.
+- emit-C roundtrip.
+- seed download/update policy.
+- compiler stage policy that is not a generic graph operation.
+- selfhost fixture suites.
+
+Generic compiler-driver code may retain only:
+
+- graph parsing and validation;
+- standard target execution;
+- project-local action invocation;
+- capability minting;
+- workspace/compiler APIs.
+
+Verification:
+
+```sh
+with build :pcre2-reference
+with build :pcre2-migrate
+with build :pcre2-build
+with build :pcre2-test
+with build :pcre2-promote
+with build :emit-c-test
+with build :emit-c-fixpoint
+with build :emit-c-roundtrip
+with build :test
+make build
+make fixpoint
+make test
+```
+
+Commit after this phase.
+
+---
+
+## 6. Phase D: Complete Tool-Mode Compiler Driver APIs
+
+Goal: With has the Jai-style compiler-driver surface required by the spec.
+
+Implement:
+
+1. `Workspace` capability.
+2. `BuildOptions` typed API.
+3. Source injection:
+   - add source file;
+   - add source string;
+   - add generated source.
+4. Workspace compilation:
+   - executable;
+   - static library;
+   - dynamic library;
+   - object;
+   - C source emission.
+5. Compiler message loop:
+   - begin intercept;
+   - wait for message;
+   - end intercept.
+6. Build result model:
+   - diagnostics;
+   - artifacts;
+   - workspace name;
+   - timing;
+   - exit code.
+
+Tests:
+
+- build file creates two independent workspaces;
+- generated source in one workspace does not leak into another;
+- build options affect only the intended workspace;
+- message loop sees phases in order;
+- typechecked introspection can generate source;
+- hook execution does not recursively invoke hook runners.
+
+Verification:
+
+```sh
+with build :cli-selfhost-build-w-tests
+with build :test
+make build
+make fixpoint
+make test
+```
+
+Commit after this phase.
+
+---
+
+## 7. Phase E: Remove Shell Command Strings From Build Internals
+
+Goal: compiler, migrator, runtime, stdlib, and build-system code do filesystem
+and process work through typed APIs, not shell strings.
+
+Audit and replace shell-string use in:
+
+- `src/main.w`
+- `src/compiler/*`
+- `src/BuildGraph*`
+- migrator code
+- stdlib build/process/fs modules
+- runtime-facing build helpers
+
+Allowed shell use:
+
+- Makefile while it still exists;
+- test fixtures whose purpose is shell-facing CLI behavior;
+- comments or docs.
+
+Required replacements:
+
+- remove file/tree;
+- mkdir;
+- copy;
+- chmod;
+- command execution;
+- stdout/stderr redirection;
+- pipelines such as `nm | awk`.
+
+Verification:
+
+```sh
+rg -n "with_system|\\|>|<| rm |mkdir -p|\\| awk|\\| grep" src lib rt build.w
+with build :test
+make build
+make fixpoint
+make test
+```
+
+Every remaining hit must be either a false positive, a test fixture, or an
+explicitly documented exception.
+
+Commit after this phase.
+
+---
+
+## 8. Phase F: Harden Path, Install, and Promotion Semantics
+
+Goal: every path-writing capability and target has explicit sandbox or install
+permissions.
+
+Tasks:
+
+1. Apply project-root validation to:
+   - generated source;
+   - response files;
+   - copy targets;
+   - command capture paths;
+   - corpus outputs;
+   - clean targets.
+2. Add explicit install capability for:
+   - install;
+   - install-user;
+   - seed/update-seed;
+   - promotion into source-controlled trees.
+3. Add stale-verification checks for `PromoteTreeIfVerified`.
+4. Add path diagnostics that name the target, field, and rejected path.
+
+Tests:
+
+- absolute path rejection without install capability;
+- `..` rejection;
+- generated-source escape rejection;
+- copy/install/promote escape rejection;
+- clean cannot remove outside declared roots;
+- install-user requires the verified dependency chain.
+
+Verification:
+
+```sh
+with build :cli-selfhost-build-w-tests
+with build :install-user --dry-run
+with build :pcre2-promote --dry-run
+make build
+make fixpoint
+make test
+```
+
+Commit after this phase.
+
+---
+
+## 9. Phase G: Complete Repository Target Parity
+
+Goal: every live Make target has an equivalent direct `with build` target.
+
+Required direct targets:
+
+```sh
+with build
+with build :stage1
+with build :stage2
+with build :stage3
+with build :runtime
+with build :build
+with build :selfcheck
+with build :fixpoint
+with build :test
+with build :install
+with build :install-user
+with build :seed
+with build :update-seed
+with build :clean
+with build :pcre2-reference
+with build :pcre2-migrate
+with build :pcre2-build
+with build :pcre2-test
+with build :pcre2-promote
+with build :emit-c-test
+with build :emit-c-fixpoint
+with build :emit-c-roundtrip
+```
+
+For each target:
+
+1. Run the old Make target if still available.
+2. Run the `with build :...` target.
+3. Compare output artifacts byte-for-byte where applicable.
+4. Explain any intentional difference.
+5. Make Make delegate to the `with build` target.
+
+Batch order:
+
+1. Infrastructure:
+   - clean;
+   - seed;
+   - update-seed.
+2. Compiler builds:
+   - stage1;
+   - stage2;
+   - stage3;
+   - runtime;
+   - build.
+3. Verification:
+   - selfcheck;
+   - smoke;
+   - fixpoint;
+   - test.
+4. Install:
+   - install;
+   - install-user.
+5. PCRE2:
+   - pcre2-reference;
+   - pcre2-migrate;
+   - pcre2-build;
+   - pcre2-test;
+   - pcre2-promote.
+6. emit-C:
+   - emit-c-test;
+   - emit-c-fixpoint;
+   - emit-c-roundtrip.
+
+Commit after each batch.
+
+---
+
+## 10. Phase H: Delete Make and Obsolete Scripts
+
+Goal: remove compatibility infrastructure after direct `with build` paths are
+authoritative.
+
+Deletion sequence:
+
+1. Replace Make target bodies with one-line delegations to `with build :...`.
+2. Verify every delegated target.
+3. Delete shell scripts no longer referenced by:
+   - `build.w`;
+   - tests;
+   - docs;
+   - release automation.
+4. Turn the Makefile into a temporary one-line diagnostic shim that says to use
+   `with build`.
+5. Update CI/docs to use `with build` directly.
+6. Delete the Makefile.
+
+Before deleting the Makefile, these must pass without invoking Make:
+
+```sh
+with build :build
+with build :fixpoint
+with build :test
+with build :pcre2-test
+with build :emit-c-roundtrip
+```
+
+Commit the deletion separately.
+
+---
+
+## 11. Phase I: Documentation Finalization
+
+Goal: remove all transitional wording from user-facing build docs.
+
+Update:
+
+- `docs/with-build.md`
+- `docs/build-spec.md`
+- `docs/toolchain.md`
+- bootstrap instructions;
+- release instructions;
+- AI-facing repository docs.
+
+Remove or archive implementation-plan docs that are no longer active.
+
+Final docs must not describe:
+
+- Make as a required path;
+- shell scripts as required build tools;
+- standard targets as reserved/unimplemented;
+- project-specific build logic in compiler source;
+- current-host limitations as design constraints.
+
+Commit after this phase.
+
+---
+
+## 12. Final Acceptance
+
+The build system is complete when:
+
+```sh
+with build :build
+with build :fixpoint
+with build :test
+with build :pcre2-reference
+with build :pcre2-migrate
+with build :pcre2-build
+with build :pcre2-test
+with build :pcre2-promote
+with build :emit-c-test
+with build :emit-c-fixpoint
+with build :emit-c-roundtrip
+with build :install-user
+```
+
+all pass without Make or required repository shell scripts, and:
+
+- the produced compiler passes fixpoint;
+- the full default test suite passes;
+- migrated-library corpora are explicit per-library targets;
+- project-specific build behavior lives in project-local build modules;
+- every `std.build` target kind is implemented or removed;
+- no compiler/build-system internal path relies on shell command strings;
+- generated/promoted code is verified before promotion;
+- the Makefile is gone.
