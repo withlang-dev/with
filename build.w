@@ -1,23 +1,23 @@
 use std.build
 
-fn project_kind_embedded_runtime_extract_test() -> BuildKind: 21 as BuildKind
-fn project_kind_selfhost_noop_local_regression() -> BuildKind: 22 as BuildKind
-fn project_kind_generate_compiler_entrypoints() -> BuildKind: 24 as BuildKind
-fn project_kind_with_compiler_build() -> BuildKind: 25 as BuildKind
-fn project_kind_pcre2_run_test() -> BuildKind: 26 as BuildKind
-fn project_kind_pcre2_generated_check() -> BuildKind: 27 as BuildKind
-fn project_kind_pcre2_generated_promote() -> BuildKind: 28 as BuildKind
-fn project_kind_pcre2_build() -> BuildKind: 29 as BuildKind
-fn project_kind_generate_compat_runtime() -> BuildKind: 33 as BuildKind
-fn project_kind_with_compiler_ir() -> BuildKind: 34 as BuildKind
-fn project_kind_selfhost_suite_test() -> BuildKind: 40 as BuildKind
-fn project_kind_generate_llvm_link_metadata() -> BuildKind: 41 as BuildKind
-fn project_kind_pcre2_reference_prepare() -> BuildKind: 42 as BuildKind
-fn project_kind_pcre2_migrate() -> BuildKind: 43 as BuildKind
-fn project_kind_seed_download() -> BuildKind: 45 as BuildKind
-fn project_kind_emit_c_test() -> BuildKind: 46 as BuildKind
-fn project_kind_emit_c_fixpoint() -> BuildKind: 47 as BuildKind
-fn project_kind_emit_c_roundtrip() -> BuildKind: 48 as BuildKind
+fn project_kind_embedded_runtime_extract_test() -> BuildKind: 1000 as BuildKind
+fn project_kind_selfhost_noop_local_regression() -> BuildKind: 1001 as BuildKind
+fn project_kind_generate_compiler_entrypoints() -> BuildKind: 1003 as BuildKind
+fn project_kind_with_compiler_build() -> BuildKind: 1004 as BuildKind
+fn project_kind_pcre2_run_test() -> BuildKind: 1005 as BuildKind
+fn project_kind_pcre2_generated_check() -> BuildKind: 1006 as BuildKind
+fn project_kind_pcre2_generated_promote() -> BuildKind: 1007 as BuildKind
+fn project_kind_pcre2_build() -> BuildKind: 1008 as BuildKind
+fn project_kind_generate_compat_runtime() -> BuildKind: 1012 as BuildKind
+fn project_kind_with_compiler_ir() -> BuildKind: 1013 as BuildKind
+fn project_kind_selfhost_suite_test() -> BuildKind: 1019 as BuildKind
+fn project_kind_generate_llvm_link_metadata() -> BuildKind: 1020 as BuildKind
+fn project_kind_pcre2_reference_prepare() -> BuildKind: 1021 as BuildKind
+fn project_kind_pcre2_migrate() -> BuildKind: 1022 as BuildKind
+fn project_kind_seed_download() -> BuildKind: 1024 as BuildKind
+fn project_kind_emit_c_test() -> BuildKind: 1025 as BuildKind
+fn project_kind_emit_c_fixpoint() -> BuildKind: 1026 as BuildKind
+fn project_kind_emit_c_roundtrip() -> BuildKind: 1027 as BuildKind
 
 fn with_object_target(name: str, compiler: str, source: str, output: str, opt: str, dep: str) -> Target:
     var target = target_new(project_kind_with_compiler_build(), name, compiler).output(output)

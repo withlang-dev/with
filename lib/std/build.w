@@ -37,7 +37,7 @@ pub enum BuildKind: i32:
     CopyTree = 18
     RunCorpusTest = 19
     PromoteTreeIfVerified = 20
-    Clean = 44
+    Clean = 21
 
 pub enum BuildTarget: i32:
     native = 0

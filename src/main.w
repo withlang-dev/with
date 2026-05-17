@@ -2057,85 +2057,85 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
                 return corpus_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == 21:
+        if target.kind == 1000:
             let embedded_rc = build_graph_run_embedded_runtime_extract_test(root, target)
             if embedded_rc != 0:
                 return embedded_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == 22:
+        if target.kind == 1001:
             let issue61_rc = build_graph_run_selfhost_noop_local_regression(root, target)
             if issue61_rc != 0:
                 return issue61_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == 23:
+        if target.kind == 1002:
             let smoke_rc = build_graph_run_cli_selfhost_smoke_test(root, target)
             if smoke_rc != 0:
                 return smoke_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == 24:
+        if target.kind == 1003:
             let gen_rc = build_graph_generate_compiler_entrypoints(root, target)
             if gen_rc != 0:
                 return gen_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == 33:
+        if target.kind == 1012:
             let compat_rc = run_generate_compat_runtime(root, target.name, target.entry, target.output)
             if compat_rc != 0:
                 return compat_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == 25:
+        if target.kind == 1004:
             let with_build_rc = build_graph_run_with_compiler_build(root, target)
             if with_build_rc != 0:
                 return with_build_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == 34:
+        if target.kind == 1013:
             let ir_rc = build_graph_run_with_compiler_ir(root, target)
             if ir_rc != 0:
                 return ir_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == 26:
+        if target.kind == 1005:
             let pcre2_rc = build_graph_run_pcre2_test(root, target)
             if pcre2_rc != 0:
                 return pcre2_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == 27:
+        if target.kind == 1006:
             let pcre2_generated_check_rc = build_graph_run_pcre2_generated_check(root, target)
             if pcre2_generated_check_rc != 0:
                 return pcre2_generated_check_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == 28:
+        if target.kind == 1007:
             let pcre2_generated_promote_rc = build_graph_run_pcre2_generated_promote(root, target)
             if pcre2_generated_promote_rc != 0:
                 return pcre2_generated_promote_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == 29:
+        if target.kind == 1008:
             let pcre2_build_rc = build_graph_run_pcre2_build(root, target)
             if pcre2_build_rc != 0:
                 return pcre2_build_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == 30:
+        if target.kind == 1009:
             let one_liner_rc = build_graph_run_cli_selfhost_one_liner_test(root, target)
             if one_liner_rc != 0:
                 return one_liner_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == 31:
+        if target.kind == 1010:
             let object_symbol_rc = build_graph_run_cli_selfhost_object_symbol_test(root, target)
             if object_symbol_rc != 0:
                 return object_symbol_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == 32:
+        if target.kind == 1011:
             if target.entry.len() == 0:
                 with_eprint("error: cli_selfhost_build_w_test target '" ++ target.name ++ "' requires a compiler path")
                 return 1
@@ -2151,7 +2151,7 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
                 return build_w_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == 35:
+        if target.kind == 1014:
             if target.entry.len() == 0:
                 with_eprint("error: cli_selfhost_project_test target '" ++ target.name ++ "' requires a compiler path")
                 return 1
@@ -2167,7 +2167,7 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
                 return project_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == 36:
+        if target.kind == 1015:
             if target.entry.len() == 0:
                 with_eprint("error: cli_selfhost_edge_test target '" ++ target.name ++ "' requires a compiler path")
                 return 1
@@ -2183,7 +2183,7 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
                 return edge_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == 37:
+        if target.kind == 1016:
             if target.entry.len() == 0:
                 with_eprint("error: cli_selfhost_pcre2_prep_test target '" ++ target.name ++ "' requires a compiler path")
                 return 1
@@ -2199,7 +2199,7 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
                 return pcre2_prep_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == 38:
+        if target.kind == 1017:
             if target.entry.len() == 0:
                 with_eprint("error: cli_selfhost_migrate_basic_test target '" ++ target.name ++ "' requires a compiler path")
                 return 1
@@ -2215,7 +2215,7 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
                 return migrate_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == 39:
+        if target.kind == 1018:
             if target.entry.len() == 0:
                 with_eprint("error: cli_selfhost_migrate_core_test target '" ++ target.name ++ "' requires a compiler path")
                 return 1
@@ -2231,55 +2231,55 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
                 return migrate_core_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == 40:
+        if target.kind == 1019:
             let suite_rc = build_graph_run_cli_selfhost_suite_test(root, target)
             if suite_rc != 0:
                 return suite_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == 41:
+        if target.kind == 1020:
             let llvm_metadata_rc = build_graph_generate_llvm_link_metadata(root, target)
             if llvm_metadata_rc != 0:
                 return llvm_metadata_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == 42:
+        if target.kind == 1021:
             let pcre2_ref_rc = build_graph_run_pcre2_reference_prepare(root, target)
             if pcre2_ref_rc != 0:
                 return pcre2_ref_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == 43:
+        if target.kind == 1022:
             let pcre2_migrate_rc = build_graph_run_pcre2_migrate(root, target)
             if pcre2_migrate_rc != 0:
                 return pcre2_migrate_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == 44:
+        if target.kind == 21:
             let clean_rc = build_graph_run_clean(root, target)
             if clean_rc != 0:
                 return clean_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == 45:
+        if target.kind == 1024:
             let seed_rc = build_graph_run_seed_download(root, target)
             if seed_rc != 0:
                 return seed_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == 46:
+        if target.kind == 1025:
             let emit_c_rc = build_graph_run_emit_c_test(root, target)
             if emit_c_rc != 0:
                 return emit_c_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == 47:
+        if target.kind == 1026:
             let emit_c_fixpoint_rc = build_graph_run_emit_c_fixpoint(root, target)
             if emit_c_fixpoint_rc != 0:
                 return emit_c_fixpoint_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == 48:
+        if target.kind == 1027:
             let emit_c_roundtrip_rc = build_graph_run_emit_c_roundtrip(root, target)
             if emit_c_roundtrip_rc != 0:
                 return emit_c_roundtrip_rc

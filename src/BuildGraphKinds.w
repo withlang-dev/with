@@ -3,13 +3,21 @@
 extern fn with_sysinfo_os() -> str
 extern fn with_sysinfo_arch() -> str
 
-const BUILD_GRAPH_KIND_MIN: i32 = 0
-const BUILD_GRAPH_KIND_MAX: i32 = 48
+const BUILD_GRAPH_STANDARD_KIND_MIN: i32 = 0
+const BUILD_GRAPH_STANDARD_KIND_MAX: i32 = 21
+const BUILD_GRAPH_PROJECT_KIND_MIN: i32 = 1000
+const BUILD_GRAPH_PROJECT_KIND_MAX: i32 = 1027
 const BUILD_GRAPH_TARGET_MIN: i32 = 0
 const BUILD_GRAPH_TARGET_MAX: i32 = 5
 
+fn build_graph_kind_is_standard(kind: i32) -> bool:
+    kind >= BUILD_GRAPH_STANDARD_KIND_MIN and kind <= BUILD_GRAPH_STANDARD_KIND_MAX
+
+fn build_graph_kind_is_project(kind: i32) -> bool:
+    kind >= BUILD_GRAPH_PROJECT_KIND_MIN and kind <= BUILD_GRAPH_PROJECT_KIND_MAX
+
 pub fn build_graph_kind_valid(kind: i32) -> bool:
-    kind >= BUILD_GRAPH_KIND_MIN and kind <= BUILD_GRAPH_KIND_MAX
+    build_graph_kind_is_standard(kind) or build_graph_kind_is_project(kind)
 
 pub fn build_graph_kind_name(kind: i32) -> str:
     if kind == 0: return "executable"
@@ -33,40 +41,42 @@ pub fn build_graph_kind_name(kind: i32) -> str:
     if kind == 18: return "copy_tree"
     if kind == 19: return "run_corpus_test"
     if kind == 20: return "promote_tree_if_verified"
-    if kind == 21: return "embedded_runtime_extract_test"
-    if kind == 22: return "selfhost_noop_local_regression"
-    if kind == 23: return "cli_selfhost_smoke_test"
-    if kind == 24: return "generate_compiler_entrypoints"
-    if kind == 25: return "with_compiler_build"
-    if kind == 26: return "pcre2_run_test"
-    if kind == 27: return "pcre2_generated_check"
-    if kind == 28: return "pcre2_generated_promote"
-    if kind == 29: return "pcre2_build"
-    if kind == 30: return "cli_selfhost_one_liner_test"
-    if kind == 31: return "cli_selfhost_object_symbol_test"
-    if kind == 32: return "cli_selfhost_build_w_test"
-    if kind == 33: return "generate_compat_runtime"
-    if kind == 34: return "with_compiler_ir"
-    if kind == 35: return "cli_selfhost_project_test"
-    if kind == 36: return "cli_selfhost_edge_test"
-    if kind == 37: return "cli_selfhost_pcre2_prep_test"
-    if kind == 38: return "cli_selfhost_migrate_basic_test"
-    if kind == 39: return "cli_selfhost_migrate_core_test"
-    if kind == 40: return "selfhost_suite_test"
-    if kind == 41: return "generate_llvm_link_metadata"
-    if kind == 42: return "pcre2_reference_prepare"
-    if kind == 43: return "pcre2_migrate"
-    if kind == 44: return "clean"
-    if kind == 45: return "seed_download"
-    if kind == 46: return "emit_c_test"
-    if kind == 47: return "emit_c_fixpoint"
-    if kind == 48: return "emit_c_roundtrip"
+    if kind == 21: return "clean"
+    if kind == 1000: return "embedded_runtime_extract_test"
+    if kind == 1001: return "selfhost_noop_local_regression"
+    if kind == 1002: return "cli_selfhost_smoke_test"
+    if kind == 1003: return "generate_compiler_entrypoints"
+    if kind == 1004: return "with_compiler_build"
+    if kind == 1005: return "pcre2_run_test"
+    if kind == 1006: return "pcre2_generated_check"
+    if kind == 1007: return "pcre2_generated_promote"
+    if kind == 1008: return "pcre2_build"
+    if kind == 1009: return "cli_selfhost_one_liner_test"
+    if kind == 1010: return "cli_selfhost_object_symbol_test"
+    if kind == 1011: return "cli_selfhost_build_w_test"
+    if kind == 1012: return "generate_compat_runtime"
+    if kind == 1013: return "with_compiler_ir"
+    if kind == 1014: return "cli_selfhost_project_test"
+    if kind == 1015: return "cli_selfhost_edge_test"
+    if kind == 1016: return "cli_selfhost_pcre2_prep_test"
+    if kind == 1017: return "cli_selfhost_migrate_basic_test"
+    if kind == 1018: return "cli_selfhost_migrate_core_test"
+    if kind == 1019: return "selfhost_suite_test"
+    if kind == 1020: return "generate_llvm_link_metadata"
+    if kind == 1021: return "pcre2_reference_prepare"
+    if kind == 1022: return "pcre2_migrate"
+    if kind == 1024: return "seed_download"
+    if kind == 1025: return "emit_c_test"
+    if kind == 1026: return "emit_c_fixpoint"
+    if kind == 1027: return "emit_c_roundtrip"
     f"unknown({kind})"
 
 pub fn build_graph_kind_implemented(kind: i32) -> bool:
     if kind >= 0 and kind <= 2:
         return true
-    if kind >= 7 and kind <= BUILD_GRAPH_KIND_MAX:
+    if kind >= 7 and kind <= BUILD_GRAPH_STANDARD_KIND_MAX:
+        return true
+    if build_graph_kind_is_project(kind):
         return true
     false
 
