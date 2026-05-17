@@ -5095,6 +5095,9 @@ fn MirBuilder.lower_implicit_default_return(self: MirBuilder, type_id: i32) -> i
     self.lower_int_lit(0, type_id)
 
 fn MirBuilder.lower_pipeline(self: MirBuilder, lhs_expr: i32, fn_expr: i32, args_start: i32, args_count: i32, node: i32) -> i32:
+    if self.sema.pipeline_method_calls.contains(node):
+        let method_sym = self.sema.pipeline_method_calls.get(node).unwrap()
+        return self.lower_method_call(lhs_expr, method_sym, args_start, args_count, node)
     let fn_op = self.lower_expr(fn_expr)
     let callee_sym =
         if fn_expr != 0 and self.ast.kind(fn_expr) == NodeKind.NK_IDENT:
