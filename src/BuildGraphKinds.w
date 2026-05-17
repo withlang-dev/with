@@ -16,6 +16,34 @@ fn build_graph_kind_is_standard(kind: i32) -> bool:
 fn build_graph_kind_is_project(kind: i32) -> bool:
     kind >= BUILD_GRAPH_PROJECT_KIND_MIN and kind <= BUILD_GRAPH_PROJECT_KIND_MAX
 
+pub fn build_graph_kind_embedded_runtime_extract_test() -> i32: 1000
+pub fn build_graph_kind_selfhost_noop_local_regression() -> i32: 1001
+pub fn build_graph_kind_cli_selfhost_smoke_test() -> i32: 1002
+pub fn build_graph_kind_generate_compiler_entrypoints() -> i32: 1003
+pub fn build_graph_kind_with_compiler_build() -> i32: 1004
+pub fn build_graph_kind_pcre2_run_test() -> i32: 1005
+pub fn build_graph_kind_pcre2_generated_check() -> i32: 1006
+pub fn build_graph_kind_pcre2_generated_promote() -> i32: 1007
+pub fn build_graph_kind_pcre2_build() -> i32: 1008
+pub fn build_graph_kind_cli_selfhost_one_liner_test() -> i32: 1009
+pub fn build_graph_kind_cli_selfhost_object_symbol_test() -> i32: 1010
+pub fn build_graph_kind_cli_selfhost_build_w_test() -> i32: 1011
+pub fn build_graph_kind_generate_compat_runtime() -> i32: 1012
+pub fn build_graph_kind_with_compiler_ir() -> i32: 1013
+pub fn build_graph_kind_cli_selfhost_project_test() -> i32: 1014
+pub fn build_graph_kind_cli_selfhost_edge_test() -> i32: 1015
+pub fn build_graph_kind_cli_selfhost_pcre2_prep_test() -> i32: 1016
+pub fn build_graph_kind_cli_selfhost_migrate_basic_test() -> i32: 1017
+pub fn build_graph_kind_cli_selfhost_migrate_core_test() -> i32: 1018
+pub fn build_graph_kind_selfhost_suite_test() -> i32: 1019
+pub fn build_graph_kind_generate_llvm_link_metadata() -> i32: 1020
+pub fn build_graph_kind_pcre2_reference_prepare() -> i32: 1021
+pub fn build_graph_kind_pcre2_migrate() -> i32: 1022
+pub fn build_graph_kind_seed_download() -> i32: 1024
+pub fn build_graph_kind_emit_c_test() -> i32: 1025
+pub fn build_graph_kind_emit_c_fixpoint() -> i32: 1026
+pub fn build_graph_kind_emit_c_roundtrip() -> i32: 1027
+
 pub fn build_graph_kind_valid(kind: i32) -> bool:
     build_graph_kind_is_standard(kind) or build_graph_kind_is_project(kind)
 
