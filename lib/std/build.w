@@ -6,6 +6,14 @@
 extern fn with_eprint(s: str) -> void
 extern fn exit(code: i32) -> void
 extern fn with_getenv_str(name: str) -> str
+extern fn with_fs_file_exists(path: str) -> i32
+extern fn with_fs_is_dir(path: str) -> i32
+extern fn with_fs_mkdir_p(path: str) -> i32
+extern fn with_fs_read_file(path: str) -> str
+extern fn with_fs_remove_file(path: str) -> i32
+extern fn with_fs_write_file(path: str, data: str) -> i32
+extern fn with_exec_argv_capture(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32) -> i32
+extern fn with_exec_argv_capture_cwd(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str) -> i32
 
 pub enum BuildKind: i32:
     Executable = 0
@@ -67,6 +75,12 @@ pub type ToolFs {
 
 pub type ProcessRunner {
     token: str,
+}
+
+pub type ToolProcessResult {
+    rc: i32,
+    stdout: str,
+    stderr: str,
 }
 
 pub type BuildCtx {
@@ -158,6 +172,67 @@ pub fn ProjectInfo.package_version(self: &Self) -> str:
 pub fn ProjectInfo.project_root(self: &Self) -> str:
     self.root
 
+pub fn Diagnostics.warn(self: &Self, message: str):
+    tool_capability_require(self.token, "Diagnostics")
+    with_eprint("warning: " ++ message ++ "\n")
+
+pub fn Diagnostics.error(self: &Self, message: str):
+    tool_capability_require(self.token, "Diagnostics")
+    with_eprint("error: " ++ message ++ "\n")
+    exit(1)
+
+pub fn ToolFs.exists(self: &Self, path: str) -> bool:
+    tool_capability_require(self.token, "ToolFs")
+    with_fs_file_exists(path) != 0
+
+pub fn ToolFs.is_dir(self: &Self, path: str) -> bool:
+    tool_capability_require(self.token, "ToolFs")
+    with_fs_is_dir(path) != 0
+
+pub fn ToolFs.mkdir_all(self: &Self, path: str) -> i32:
+    tool_capability_require(self.token, "ToolFs")
+    with_fs_mkdir_p(path)
+
+pub fn ToolFs.read_text(self: &Self, path: str) -> str:
+    tool_capability_require(self.token, "ToolFs")
+    with_fs_read_file(path)
+
+pub fn ToolFs.write_text(self: &Self, path: str, contents: str) -> i32:
+    tool_capability_require(self.token, "ToolFs")
+    with_fs_write_file(path, contents)
+
+pub fn ToolFs.remove_file(self: &Self, path: str) -> i32:
+    tool_capability_require(self.token, "ToolFs")
+    with_fs_remove_file(path)
+
+pub fn SourceEmitter.generated_source(self: &Self, path: str, contents: str) -> GeneratedSource:
+    tool_capability_require(self.token, "SourceEmitter")
+    GeneratedSource { path, contents }
+
+fn tool_process_argv(args: Vec[str]) -> str:
+    var out = ""
+    for i in 0..args.len() as i32:
+        out = out ++ args.get(i as i64) ++ "\0"
+    out
+
+pub fn ProcessRunner.run_capture(self: &Self, args: Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32) -> ToolProcessResult:
+    tool_capability_require(self.token, "ProcessRunner")
+    let rc = with_exec_argv_capture(tool_process_argv(args), stdout_path, stderr_path, timeout_ms)
+    ToolProcessResult {
+        rc,
+        stdout: with_fs_read_file(stdout_path),
+        stderr: with_fs_read_file(stderr_path),
+    }
+
+pub fn ProcessRunner.run_capture_cwd(self: &Self, args: Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str) -> ToolProcessResult:
+    tool_capability_require(self.token, "ProcessRunner")
+    let rc = with_exec_argv_capture_cwd(tool_process_argv(args), stdout_path, stderr_path, timeout_ms, cwd)
+    ToolProcessResult {
+        rc,
+        stdout: with_fs_read_file(stdout_path),
+        stderr: with_fs_read_file(stderr_path),
+    }
+
 fn build_graph_escape(value: str) -> str:
     var out = ""
     for i in 0..value.len() as i32:
@@ -208,6 +283,10 @@ pub fn Build.add_target(mut self: Build, target: Target) -> Build:
 
 pub fn Build.generated_source(mut self: Build, path: str, contents: str) -> Build:
     self.generated_sources.push(GeneratedSource { path, contents })
+    self
+
+pub fn Build.add_generated_source(mut self: Build, source: GeneratedSource) -> Build:
+    self.generated_sources.push(source)
     self
 
 pub fn Build.executable(self: Build, name: str, entry: str) -> Build:
