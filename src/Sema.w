@@ -500,6 +500,7 @@ type Sema {
     decl_source_file_ids: Vec[i32],  // one file id per decl index (from Frontend)
     decl_is_c_import: Vec[i32],      // 1 if decl came from c_import, 0 otherwise
     current_module_path: str,        // module path being checked right now
+    tool_mode_entry_path: str,        // compiler-generated tool runner allowed to mint capabilities
     module_paths: Vec[str],          // resolved module graph paths
     module_import_starts: Vec[i32],  // per-module start into module_import_targets
     module_import_counts: Vec[i32],  // per-module import edge count
@@ -970,6 +971,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         decl_source_file_ids: Vec.new(),
         decl_is_c_import: Vec.new(),
         current_module_path: "",
+        tool_mode_entry_path: "",
         module_paths: Vec.new(),
         module_import_starts: Vec.new(),
         module_import_counts: Vec.new(),
