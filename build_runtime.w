@@ -70,26 +70,10 @@ fn br_sorted_paths(files: Vec[str]) -> Vec[str]:
 
 fn br_collect_stdlib_files(ctx: ActionCtx) -> Vec[str]:
     let files: Vec[str] = Vec.new()
-    var args: Vec[str] = Vec.new()
-    args.push("/usr/bin/find")
-    args.push("lib/std")
-    args.push("-type")
-    args.push("f")
-    args.push("-name")
-    args.push("*.w")
-
-    let manifest = "out/tmp/compat-runtime-stdlib-files.txt"
-    let stderr = "out/tmp/compat-runtime-stdlib-files.stderr"
-    let root = ctx.project_info().project_root()
-    let result = ctx.process_runner().run_capture_cwd(args, manifest, stderr, 60000, root)
-    if result.rc != 0:
-        ctx.diagnostics().error("compat-runtime-source: could not list stdlib files; stderr=" ++ stderr)
-        return files
-
-    let all_files = br_sorted_paths(br_split_nonempty_lines(result.stdout))
+    let all_files = br_sorted_paths(ctx.fs().list_files("lib/std"))
     for i in 0..all_files.len() as i32:
         let path = all_files.get(i as i64)
-        if not path.starts_with("lib/std/re/"):
+        if path.ends_with(".w") and not path.starts_with("lib/std/re/"):
             files.push(path)
     files
 

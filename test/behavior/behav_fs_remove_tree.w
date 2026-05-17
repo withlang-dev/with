@@ -1,5 +1,10 @@
 use std.fs
 
+fn contains_line(text: str, line: str) -> bool:
+    if text == line:
+        return true
+    text.contains(line ++ "\n") or text.contains("\n" ++ line)
+
 fn main:
     let root = "out/tmp/behav_fs_remove_tree"
     let copied = "out/tmp/behav_fs_remove_tree_copy"
@@ -19,6 +24,9 @@ fn main:
     assert(copy_tree(root, copied) == 0)
     assert(read_file(copied ++ "/root.txt") == "root")
     assert(read_file(copied ++ "/a/b/leaf.txt") == "leaf")
+    let listed = list_files_text(copied)
+    assert(contains_line(listed, copied ++ "/root.txt"))
+    assert(contains_line(listed, copied ++ "/a/b/leaf.txt"))
 
     assert(symlink("root.txt", link) == 0)
     assert(read_file(link) == "root")

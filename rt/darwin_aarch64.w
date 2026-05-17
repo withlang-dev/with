@@ -244,6 +244,8 @@ extern fn lstat(path: *const u8, st: *mut u8) -> i32
 extern fn opendir(path: *const u8) -> *mut u8
 extern fn readdir(dirp: *mut u8) -> *mut u8
 extern fn closedir(dirp: *mut u8) -> i32
+extern fn with_str_from_cstr(s: *const u8) -> str
+extern fn with_str_concat(a: str, b: str) -> str
 
 let S_IFMT: i32 = 61440
 let S_IFDIR: i32 = 16384
@@ -461,6 +463,48 @@ pub fn rt_symlink_impl(target: *const u8, link_path: *const u8) -> i32:
     if r < 0:
         return -get_errno()
     0
+
+fn rt_empty_str() -> str:
+    var empty: [1]u8 = [0 as u8; 1]
+    with_str_from_cstr(&empty as *const [1]u8 as *const u8)
+
+fn rt_newline_str() -> str:
+    var newline: [2]u8 = [10 as u8, 0 as u8]
+    with_str_from_cstr(&newline as *const [2]u8 as *const u8)
+
+fn rt_list_files_append_line(out: str, path: *const u8) -> str:
+    with_str_concat(with_str_concat(out, with_str_from_cstr(path)), rt_newline_str())
+
+fn rt_list_files_walk(path: *const u8, out: str) -> str:
+    var mode: i32 = 0
+    let stat_rc = rt_lstat_mode(path, &mode as *mut i32)
+    if stat_rc != 0:
+        return out
+    if (mode & S_IFMT) != S_IFDIR:
+        return rt_list_files_append_line(out, path)
+
+    let dir = opendir(path)
+    if dir as i64 == 0:
+        return out
+    var result = out
+    while true:
+        let ent = readdir(dir)
+        if ent as i64 == 0:
+            break
+        let name = rt_dirent_name(ent)
+        if rt_dirent_is_dot_or_dotdot(name):
+            continue
+        var child: [4096]u8 = [0 as u8; 4096]
+        let join_rc = rt_path_join(path, name, &child as *mut [4096]u8 as *mut u8, RT_PATH_MAX)
+        if join_rc != 0:
+            continue
+        result = rt_list_files_walk(&child as *const [4096]u8 as *const u8, result)
+    let _close = closedir(dir)
+    result
+
+@[c_export("rt_list_files")]
+pub fn rt_list_files_impl(path: *const u8) -> str:
+    rt_list_files_walk(path, rt_empty_str())
 
 @[c_export("rt_access")]
 pub fn rt_access_impl(path: *const u8, mode: i32) -> i32:
