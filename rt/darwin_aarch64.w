@@ -238,6 +238,7 @@ extern fn mkdir(path: *const u8, mode: u16) -> i32
 extern fn unlink(path: *const u8) -> i32
 extern fn rmdir(path: *const u8) -> i32
 extern fn rename(old_path: *const u8, new_path: *const u8) -> i32
+extern fn symlink(target: *const u8, link_path: *const u8) -> i32
 extern fn access(path: *const u8, mode: i32) -> i32
 extern fn lstat(path: *const u8, st: *mut u8) -> i32
 extern fn opendir(path: *const u8) -> *mut u8
@@ -304,6 +305,12 @@ fn rt_lstat_mode(path: *const u8, mode_out: *mut i32) -> i32:
     unsafe: *mode_out = (unsafe: *((&st as i64 + DARWIN_STAT_MODE_OFFSET) as *const u16)) as i32
     0
 
+fn rt_lstat_is_dir(path: *const u8) -> bool:
+    var mode: i32 = 0
+    if rt_lstat_mode(path, &mode as *mut i32) != 0:
+        return false
+    (mode & S_IFMT) == S_IFDIR
+
 @[c_export("rt_mkdir")]
 pub fn rt_mkdir_impl(path: *const u8, mode: i32) -> i32:
     var r: i32 = 0
@@ -368,6 +375,92 @@ pub fn rt_remove_tree_impl(path: *const u8) -> i32:
     if close_rc < 0:
         return -get_errno()
     rt_rmdir_impl(path)
+
+fn rt_copy_file_impl(src: *const u8, dst: *const u8, mode: i32) -> i32:
+    let in_fd = rt_open_impl(src, 0, 0)
+    if in_fd < 0:
+        return in_fd
+    let out_fd = rt_open_impl(dst, 1 | 0x200 | 0x400, mode & 0o777)
+    if out_fd < 0:
+        let _close_in_on_open = rt_close_impl(in_fd)
+        return out_fd
+    var buf: [65536]u8 = [0 as u8; 65536]
+    while true:
+        let read_count = rt_read_impl(in_fd, &buf as *mut [65536]u8 as *mut u8, 65536)
+        if read_count < 0:
+            let _close_in_on_read = rt_close_impl(in_fd)
+            let _close_out_on_read = rt_close_impl(out_fd)
+            return read_count as i32
+        if read_count == 0:
+            break
+        var written: i64 = 0
+        while written < read_count:
+            let write_count = rt_write_impl(out_fd, (&buf as i64 + written) as *const u8, read_count - written)
+            if write_count < 0:
+                let _close_in_on_write = rt_close_impl(in_fd)
+                let _close_out_on_write = rt_close_impl(out_fd)
+                return write_count as i32
+            if write_count == 0:
+                let _close_in_on_zero = rt_close_impl(in_fd)
+                let _close_out_on_zero = rt_close_impl(out_fd)
+                return -5
+            written = written + write_count
+    let close_in = rt_close_impl(in_fd)
+    let close_out = rt_close_impl(out_fd)
+    if close_in != 0:
+        return close_in
+    if close_out != 0:
+        return close_out
+    rt_chmod_impl(dst, mode & 0o777)
+
+@[c_export("rt_copy_tree")]
+pub fn rt_copy_tree_impl(src: *const u8, dst: *const u8) -> i32:
+    var mode: i32 = 0
+    let stat_rc = rt_lstat_mode(src, &mode as *mut i32)
+    if stat_rc != 0:
+        return stat_rc
+    if (mode & S_IFMT) != S_IFDIR:
+        return rt_copy_file_impl(src, dst, mode)
+
+    let mkdir_rc = rt_mkdir_impl(dst, mode & 0o777)
+    if mkdir_rc != 0 and not rt_lstat_is_dir(dst):
+        return mkdir_rc
+
+    let dir = opendir(src)
+    if dir as i64 == 0:
+        return -get_errno()
+    while true:
+        let ent = readdir(dir)
+        if ent as i64 == 0:
+            break
+        let name = rt_dirent_name(ent)
+        if rt_dirent_is_dot_or_dotdot(name):
+            continue
+        var child_src: [4096]u8 = [0 as u8; 4096]
+        let src_join_rc = rt_path_join(src, name, &child_src as *mut [4096]u8 as *mut u8, RT_PATH_MAX)
+        if src_join_rc != 0:
+            let _close_on_src_join = closedir(dir)
+            return src_join_rc
+        var child_dst: [4096]u8 = [0 as u8; 4096]
+        let dst_join_rc = rt_path_join(dst, name, &child_dst as *mut [4096]u8 as *mut u8, RT_PATH_MAX)
+        if dst_join_rc != 0:
+            let _close_on_dst_join = closedir(dir)
+            return dst_join_rc
+        let child_rc = rt_copy_tree_impl(&child_src as *const [4096]u8 as *const u8, &child_dst as *const [4096]u8 as *const u8)
+        if child_rc != 0:
+            let _close_on_child = closedir(dir)
+            return child_rc
+    let close_rc = closedir(dir)
+    if close_rc < 0:
+        return -get_errno()
+    rt_chmod_impl(dst, mode & 0o777)
+
+@[c_export("rt_symlink")]
+pub fn rt_symlink_impl(target: *const u8, link_path: *const u8) -> i32:
+    let r = symlink(target, link_path)
+    if r < 0:
+        return -get_errno()
+    0
 
 @[c_export("rt_access")]
 pub fn rt_access_impl(path: *const u8, mode: i32) -> i32:
