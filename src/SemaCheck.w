@@ -79,7 +79,8 @@ fn sema_is_std_build_capability_name(name: str) -> bool:
         name == "Diagnostics" or
         name == "SourceEmitter" or
         name == "ToolFs" or
-        name == "ProcessRunner"
+        name == "ProcessRunner" or
+        name == "ActionCtx"
 
 fn sema_is_std_compiler_capability_name(name: str) -> bool:
     name == "Diagnostics" or name == "SourceEmitter"

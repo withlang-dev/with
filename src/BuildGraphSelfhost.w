@@ -1477,6 +1477,94 @@ fn bgs_check_removed_build_kind_diagnostic(root: str, target_name: str, compiler
     if rc != 0: return rc
     bgs_assert_contains(result.stderr, "regenerate your build graph", target_name, "build_w_removed_kind")
 
+fn bgs_check_build_w_action_target(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
+    var rc = bgs_write_project_manifest(case_dir, "buildwaction", target_name)
+    if rc != 0: return rc
+    rc = bgs_write_fixture(bgs_resolve_join(case_dir, "src/main.w"), "fn main:\n    print(\"unused\")\n", target_name, "action source")
+    if rc != 0: return rc
+    rc = bgs_write_fixture(bgs_resolve_join(case_dir, "src/input.txt"), "input", target_name, "action input")
+    if rc != 0: return rc
+    let build_text =
+        "use std.build\n\n" ++
+        "fn generate(ctx: ActionCtx) -> i32:\n" ++
+        "    assert(ctx.target_name() == \"generate\")\n" ++
+        "    assert(ctx.project_info().package_name() == \"buildwaction\")\n" ++
+        "    assert(ctx.inputs().get(0) == \"src/input.txt\")\n" ++
+        "    assert(ctx.args().get(0) == \"hello\")\n" ++
+        "    assert(ctx.fs().read_text(ctx.inputs().get(0)) == \"input\")\n" ++
+        "    assert(ctx.fs().mkdir_all(\"out/action\") == 0)\n" ++
+        "    assert(ctx.fs().write_text(ctx.output(), \"action:\" ++ ctx.args().get(0)) == 0)\n" ++
+        "    0\n\n" ++
+        "pub fn build(ctx: BuildCtx) -> Build:\n" ++
+        "    var out = ctx.new_build()\n" ++
+        "    var generate_target = target_new(.Action, \"generate\", \"\").output(\"out/action/value.txt\")\n" ++
+        "    generate_target = generate_target.input(\"src/input.txt\")\n" ++
+        "    generate_target = generate_target.arg(\"hello\")\n" ++
+        "    generate_target.action = generate\n" ++
+        "    out = out.add_target(generate_target)\n" ++
+        "    var all = target_new(.Group, \"all\", \"\")\n" ++
+        "    all = all.dep(\"generate\")\n" ++
+        "    out = out.add_target(all)\n" ++
+        "    out.default(\"all\")\n"
+    rc = bgs_write_fixture(bgs_resolve_join(case_dir, "build.w"), build_text, target_name, "action build.w")
+    if rc != 0: return rc
+    let result = bgs_build_expect_success(root, target_name, compiler_path, case_dir, "build-w-action-target", bgs_argv_append("", "build"))
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    bgs_expect_file_contains(bgs_resolve_join(case_dir, "out/action/value.txt"), "action:hello", target_name, "build_w_action_target")
+
+fn bgs_check_build_w_action_failures(root: str, target_name: str, compiler_path: str, base_dir: str) -> i32:
+    let missing_dir = bgs_resolve_join(base_dir, "missing_input")
+    var rc = bgs_write_project_manifest(missing_dir, "actionmissing", target_name)
+    if rc != 0: return rc
+    rc = bgs_write_fixture(bgs_resolve_join(missing_dir, "src/main.w"), "fn main:\n    print(\"unused\")\n", target_name, "action missing source")
+    if rc != 0: return rc
+    let missing_build =
+        "use std.build\n\n" ++
+        "fn generate(ctx: ActionCtx) -> i32:\n" ++
+        "    assert(ctx.fs().write_text(ctx.output(), \"should not run\") == 0)\n" ++
+        "    0\n\n" ++
+        "pub fn build(ctx: BuildCtx) -> Build:\n" ++
+        "    var out = ctx.new_build()\n" ++
+        "    var target = target_new(.Action, \"generate\", \"\").output(\"out/action/value.txt\")\n" ++
+        "    target = target.input(\"src/missing.txt\")\n" ++
+        "    target.action = generate\n" ++
+        "    out = out.add_target(target)\n" ++
+        "    out.default(\"generate\")\n"
+    rc = bgs_write_fixture(bgs_resolve_join(missing_dir, "build.w"), missing_build, target_name, "action missing build.w")
+    if rc != 0: return rc
+    let missing = bgs_run_cli_capture_cwd(root, target_name, compiler_path, "build-w-action-missing-input", bgs_argv_append("", "build"), 120000, missing_dir)
+    if missing.rc == 0:
+        with_eprint("error: build_w_action_missing_input unexpectedly succeeded")
+        return 1
+    rc = bgs_assert_contains(missing.stderr, "missing declared input", target_name, "build_w_action_missing_input")
+    if rc != 0: return rc
+
+    let failure_dir = bgs_resolve_join(base_dir, "failure")
+    rc = bgs_write_project_manifest(failure_dir, "actionfailure", target_name)
+    if rc != 0: return rc
+    rc = bgs_write_fixture(bgs_resolve_join(failure_dir, "src/main.w"), "fn main:\n    print(\"unused\")\n", target_name, "action failure source")
+    if rc != 0: return rc
+    let failure_build =
+        "use std.build\n\n" ++
+        "fn fail_action(ctx: ActionCtx) -> i32:\n" ++
+        "    7\n\n" ++
+        "pub fn build(ctx: BuildCtx) -> Build:\n" ++
+        "    var out = ctx.new_build()\n" ++
+        "    var target = target_new(.Action, \"fail\", \"\").output(\"out/action/value.txt\")\n" ++
+        "    target.action = fail_action\n" ++
+        "    out = out.add_target(target)\n" ++
+        "    out.default(\"fail\")\n"
+    rc = bgs_write_fixture(bgs_resolve_join(failure_dir, "build.w"), failure_build, target_name, "action failure build.w")
+    if rc != 0: return rc
+    let failure = bgs_run_cli_capture_cwd(root, target_name, compiler_path, "build-w-action-failure", bgs_argv_append("", "build"), 120000, failure_dir)
+    if failure.rc == 0:
+        with_eprint("error: build_w_action_failure unexpectedly succeeded")
+        return 1
+    rc = bgs_assert_contains(failure.stderr, "failed with exit code 7", target_name, "build_w_action_failure")
+    if rc != 0: return rc
+
+    0
+
 pub fn run_cli_selfhost_build_w_test(root: str, target_name: str, compiler_path: str) -> i32:
     let stamp = f"{with_getpid()}.{with_clock_nanos()}"
     let base_dir = bgs_resolve_join(bgs_resolve_join(bgs_resolve_join(root, "out/test-graph"), target_name), stamp)
@@ -1490,4 +1578,8 @@ pub fn run_cli_selfhost_build_w_test(root: str, target_name: str, compiler_path:
     if rc != 0: return rc
     rc = bgs_check_build_w_graph_v2(root, target_name, compiler_path, bgs_resolve_join(base_dir, "graph_v2"))
     if rc != 0: return rc
-    bgs_check_removed_build_kind_diagnostic(root, target_name, compiler_path, bgs_resolve_join(base_dir, "removed_kind"))
+    rc = bgs_check_removed_build_kind_diagnostic(root, target_name, compiler_path, bgs_resolve_join(base_dir, "removed_kind"))
+    if rc != 0: return rc
+    rc = bgs_check_build_w_action_target(root, target_name, compiler_path, bgs_resolve_join(base_dir, "action"))
+    if rc != 0: return rc
+    bgs_check_build_w_action_failures(root, target_name, compiler_path, bgs_resolve_join(base_dir, "action_failures"))
