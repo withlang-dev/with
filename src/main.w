@@ -803,6 +803,7 @@ fn load_build_graph_from_build_w(root: str, cfg: ProjectConfig, opt_level: i32, 
     comp.configure(opt_level, no_std, alloc_mode)
     comp.set_prelude_mode(prelude_mode)
     comp.set_debug_info(debug_info)
+    comp.set_tool_mode_entry_path(runner_path)
     let built_runner = comp.build_binary_to_path(runner_path, runner_bin)
     let _remove_runner_source = with_fs_remove_file(runner_path)
     if built_runner == "":

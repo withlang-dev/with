@@ -11,6 +11,7 @@ type CompilationConfig {
     prelude_mode: i32,
     debug_info: bool,
     compiler_hooks_enabled: bool,
+    tool_mode_entry_path: str,
 }
 impl Copy for CompilationConfig
 
@@ -36,6 +37,7 @@ fn compilation_config_default -> CompilationConfig:
         prelude_mode: PRELUDE_FULL(),
         debug_info: true,
         compiler_hooks_enabled: true,
+        tool_mode_entry_path: "",
     }
 
 fn compilation_config_from_cli(opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32) -> CompilationConfig:

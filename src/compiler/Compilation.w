@@ -320,6 +320,14 @@ fn Compilation.set_compiler_hooks_enabled(self: Compilation, enabled: bool):
     cfg.compiler_hooks_enabled = enabled
     self.config = cfg
 
+fn Compilation.set_tool_mode_entry_path(self: Compilation, path: str):
+    var cfg = self.config
+    cfg.tool_mode_entry_path = path
+    self.config = cfg
+    var zcu = self.zcu
+    zcu.tool_mode_entry_path = path
+    self.zcu = zcu
+
 fn Compilation.add_cli_diag_mapping(self: Compilation, gen_start: i32, gen_end: i32, source_name: str, source_text: str):
     self.cli_diag_gen_starts.push(gen_start)
     self.cli_diag_gen_ends.push(gen_end)
@@ -877,6 +885,7 @@ fn Compilation.emit_typed(self: Compilation, pool: AstPool) -> bool:
 
     var sema = Sema.init(zcu.pool, zcu.diagnostics, typed_pool)
     sema.source_text = zcu.current_source_text
+    sema.tool_mode_entry_path = zcu.tool_mode_entry_path
     if self.config.no_std:
         sema.no_std = 1
     if self.config.alloc_mode:
@@ -950,6 +959,7 @@ fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
     sema.decl_source_paths = zcu.decl_source_paths
     sema.decl_source_file_ids = zcu.decl_source_file_ids
     sema.decl_is_c_import = zcu.decl_is_c_import
+    sema.tool_mode_entry_path = zcu.tool_mode_entry_path
     sema.init_module_graph(&zcu.last_resolved)
     if self.config.no_std:
         sema.no_std = 1
