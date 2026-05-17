@@ -473,6 +473,7 @@ fn rt_newline_str() -> str:
     with_str_from_cstr(&newline as *const [2]u8 as *const u8)
 
 fn rt_list_files_append_line(out: str, path: *const u8) -> str:
+    // TODO: O(n^2) string accumulation; replace with a builder when listed trees grow.
     with_str_concat(with_str_concat(out, with_str_from_cstr(path)), rt_newline_str())
 
 fn rt_list_files_walk(path: *const u8, out: str) -> str:
