@@ -4569,7 +4569,26 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
 fn Sema.check_pipeline(self: Sema, node: i32) -> i32:
     let lhs = self.ast.get_data0(node)
     let rhs = self.ast.get_data1(node)
-    self.check_expr(lhs)
+    let lhs_ty = self.check_expr(lhs)
+    if rhs != 0:
+        if self.ast.kind(rhs) == NodeKind.NK_CALL:
+            let rhs_callee = self.ast.get_data0(rhs)
+            if self.ast.kind(rhs_callee) == NodeKind.NK_IDENT:
+                let method = self.ast.get_data0(rhs_callee)
+                if self.pipeline_method_exists(lhs_ty as i32, method) != 0:
+                    let ret = self.check_method_call_parts(lhs, method, self.ast.get_data1(rhs), self.ast.get_data2(rhs), node)
+                    if ret != 0:
+                        self.pipeline_method_calls.insert(node, method)
+                        self.typed_expr_types.insert(node, ret)
+                    return ret
+        else if self.ast.kind(rhs) == NodeKind.NK_IDENT:
+            let method = self.ast.get_data0(rhs)
+            if self.pipeline_method_exists(lhs_ty as i32, method) != 0:
+                let ret2 = self.check_method_call_parts(lhs, method, -1, 0, node)
+                if ret2 != 0:
+                    self.pipeline_method_calls.insert(node, method)
+                    self.typed_expr_types.insert(node, ret2)
+                return ret2
     let saved = self.in_pipeline_rhs
     self.in_pipeline_rhs = 1
     let rhs_ty = self.check_expr(rhs)
@@ -4579,6 +4598,73 @@ fn Sema.check_pipeline(self: Sema, node: i32) -> i32:
         if self.get_type_kind(resolved) == TypeKind.TY_FN:
             return self.get_type_d2(resolved)
     rhs_ty as i32
+
+fn Sema.pipeline_generic_builtin_method_exists(self: Sema, owner_sym: i32, field: i32) -> i32:
+    if owner_sym == self.syms.vec:
+        if field == self.syms.push or field == self.syms.set_i32 or field == self.syms.clear:
+            return 1
+        if field == self.syms.get or field == self.syms.pop or field == self.syms.remove:
+            return 1
+        if field == self.syms.len or field == self.syms.contains or field == self.syms.join:
+            return 1
+        if field == self.syms.iter or field == self.syms.slot or field == self.syms.get_disjoint:
+            return 1
+        if field == self.syms.range_method or field == self.syms.iter_ref or field == self.syms.iter_place:
+            return 1
+        if field == self.syms.filter or field == self.syms.map or field == self.syms.fold:
+            return 1
+    if owner_sym == self.syms.hashmap:
+        if field == self.syms.insert or field == self.syms.clear:
+            return 1
+        if field == self.syms.get or field == self.syms.contains or field == self.syms.remove:
+            return 1
+        if field == self.syms.len or field == self.syms.keys or field == self.syms.entry:
+            return 1
+        if self.pool_resolve(field) == "increment":
+            return 1
+    if owner_sym == self.syms.hashmapentry:
+        if field == self.syms.or_insert or field == self.syms.get:
+            return 1
+        if self.pool_resolve(field) == "set":
+            return 1
+    if owner_sym == self.syms.hashset:
+        if field == self.syms.insert or field == self.syms.clear:
+            return 1
+        if field == self.syms.contains or field == self.syms.remove or field == self.syms.len:
+            return 1
+    if owner_sym == self.syms.option:
+        if field == self.syms.unwrap or field == self.syms.is_some or field == self.syms.is_none or field == self.syms.filter:
+            return 1
+    if owner_sym == self.syms.result:
+        if field == self.syms.unwrap or field == self.syms.is_ok or field == self.syms.is_err:
+            return 1
+    if owner_sym == self.syms.vecslot or owner_sym == self.syms.vecrange:
+        if field == self.syms.get or self.pool_resolve(field) == "set" or self.pool_resolve(field) == "len":
+            return 1
+    if owner_sym == self.syms.veciter or owner_sym == self.syms.veciterref or owner_sym == self.syms.veciterplace:
+        if field == self.syms.next:
+            return 1
+    0
+
+fn Sema.pipeline_method_exists(self: Sema, recv_type: i32, method: i32) -> i32:
+    if recv_type == 0 or method == 0:
+        return 0
+    var resolved = self.resolve_alias(recv_type as TypeId)
+    let tk0 = self.get_type_kind(resolved)
+    if tk0 == TypeKind.TY_PTR or tk0 == TypeKind.TY_REF:
+        resolved = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
+    let owner = self.method_owner_symbol_for_type(resolved as i32)
+    if owner == 0:
+        return 0
+    if self.lookup_generic_method_fn(owner, method) != 0:
+        return 1
+    if self.lookup_method_sig(owner, method) >= 0:
+        return 1
+    if self.builtin_intrinsic_method_return_type(resolved as i32, owner, method) != 0:
+        return 1
+    if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
+        return self.pipeline_generic_builtin_method_exists(owner, method)
+    0
 
 fn Sema.check_tuple(self: Sema, node: i32) -> i32:
     let extra_start = self.ast.get_data0(node)
@@ -6750,6 +6836,9 @@ fn Sema.emit_builtin_mutable_receiver_error(self: Sema, type_name_sym: i32, fiel
 fn Sema.check_method_call(self: Sema, callee: i32, extra_start: i32, arg_count: i32, node: i32) -> i32:
     let expr = self.ast.get_data0(callee)
     let field = self.ast.get_data1(callee)
+    self.check_method_call_parts(expr, field, extra_start, arg_count, node)
+
+fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: i32, arg_count: i32, node: i32) -> i32:
     var obj_type = self.check_expr(expr)
     let static_type_sym = self.static_receiver_base_sym(expr)
     let static_expr_kind = self.ast.kind(expr)
