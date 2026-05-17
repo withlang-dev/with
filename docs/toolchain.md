@@ -110,28 +110,22 @@ A project with no `build.w` behaves as though this existed:
 ```
 use std.build
 
-pub fn build(b: Build) -> Build:
-    with b as mut build:
-        build.executable(package.name, "src/main.w")
+pub fn build(ctx: BuildCtx) -> Build:
+    let info = ctx.project_info()
+    ctx.new_build().executable(info.package_name(), "src/main.w")
 ```
 
-The `with ... as mut` block returns `build` (the root `Build` value)
-as the function result. This avoids a type issue: `executable()`
-likely returns a target builder (e.g., `Executable`), not `Build`,
-so chaining it directly as the return value would be ill-typed. The
-scoped mutation pattern is idiomatic With — it uses the language's
-own `with` construct to express staged build graph construction.
-
-There is no `&mut Build`. Mutation uses `mut self: Self` receivers
-or `with ... as mut` scoped access.
+`BuildCtx` is a driver-created tool-mode capability. It exposes project
+metadata and creates the initial `Build` graph value.
 
 A complex project:
 
 ```
 use std.build
 
-pub fn build(b: Build) -> Build:
-    var out = b.generated_source(
+pub fn build(ctx: BuildCtx) -> Build:
+    var out = ctx.new_build()
+    out = out.generated_source(
         "out/gen/version.w",
         "pub fn build_version -> str:\n    \"dev\"\n",
     )

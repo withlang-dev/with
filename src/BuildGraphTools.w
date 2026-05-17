@@ -44,6 +44,9 @@ pub fn build_graph_tar_tool() -> BuildTool:
 pub fn build_graph_dsymutil_tool() -> BuildTool:
     build_graph_tool("dsymutil", "DSYMUTIL", "dsymutil")
 
+pub fn build_graph_zig_tool() -> BuildTool:
+    build_graph_tool("zig", "ZIG", "zig")
+
 pub fn build_graph_llvm_prefix() -> str:
     let prefix = with_getenv_str("LLVM_PREFIX")
     if prefix.len() > 0:

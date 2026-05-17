@@ -61,7 +61,7 @@ Source: `docs/toolchain.md`.
 - Initial `build.w` tool-mode execution:
   - `with build` compiles and runs a generated tool-mode runner for project
     `build.w`.
-  - The runner calls `build(new_build(package))` and writes a stable
+  - The runner calls `build(ctx)` with a driver-created `BuildCtx` and writes a stable
     `std.build` graph for the driver.
   - Executable targets are built from that graph, including
     `link_system_lib` entries.

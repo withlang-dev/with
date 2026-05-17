@@ -4,7 +4,7 @@ extern fn with_sysinfo_os() -> str
 extern fn with_sysinfo_arch() -> str
 
 const BUILD_GRAPH_KIND_MIN: i32 = 0
-const BUILD_GRAPH_KIND_MAX: i32 = 45
+const BUILD_GRAPH_KIND_MAX: i32 = 48
 const BUILD_GRAPH_TARGET_MIN: i32 = 0
 const BUILD_GRAPH_TARGET_MAX: i32 = 5
 
@@ -30,7 +30,7 @@ pub fn build_graph_kind_name(kind: i32) -> str:
     if kind == 15: return "create_static_archive"
     if kind == 16: return "generate_response_file"
     if kind == 17: return "embed_object_files"
-    if kind == 18: return "copy_runtime_tree"
+    if kind == 18: return "copy_tree"
     if kind == 19: return "run_corpus_test"
     if kind == 20: return "promote_tree_if_verified"
     if kind == 21: return "embedded_runtime_extract_test"
@@ -58,6 +58,9 @@ pub fn build_graph_kind_name(kind: i32) -> str:
     if kind == 43: return "pcre2_migrate"
     if kind == 44: return "clean"
     if kind == 45: return "seed_download"
+    if kind == 46: return "emit_c_test"
+    if kind == 47: return "emit_c_fixpoint"
+    if kind == 48: return "emit_c_roundtrip"
     f"unknown({kind})"
 
 pub fn build_graph_kind_implemented(kind: i32) -> bool:

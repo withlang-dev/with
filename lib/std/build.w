@@ -3,6 +3,10 @@
 // The compiler driver is responsible for executing build.w in tool mode and
 // turning this graph into concrete compiler/linker actions.
 
+extern fn with_eprint(s: str) -> void
+extern fn exit(code: i32) -> void
+extern fn with_getenv_str(name: str) -> str
+
 pub enum BuildKind: i32:
     Executable = 0
     Library = 1
@@ -22,34 +26,10 @@ pub enum BuildKind: i32:
     CreateStaticArchive = 15
     GenerateResponseFile = 16
     EmbedObjectFiles = 17
-    CopyRuntimeTree = 18
+    CopyTree = 18
     RunCorpusTest = 19
     PromoteTreeIfVerified = 20
-    EmbeddedRuntimeExtractTest = 21
-    SelfhostNoopLocalRegression = 22
-    CliSelfhostSmokeTest = 23
-    GenerateCompilerEntrypoints = 24
-    WithCompilerBuild = 25
-    Pcre2RunTest = 26
-    Pcre2GeneratedCheck = 27
-    Pcre2GeneratedPromote = 28
-    Pcre2Build = 29
-    CliSelfhostOneLinerTest = 30
-    CliSelfhostObjectSymbolTest = 31
-    CliSelfhostBuildWTest = 32
-    GenerateCompatRuntime = 33
-    WithCompilerIr = 34
-    CliSelfhostProjectTest = 35
-    CliSelfhostEdgeTest = 36
-    CliSelfhostPcre2PrepTest = 37
-    CliSelfhostMigrateBasicTest = 38
-    CliSelfhostMigrateCoreTest = 39
-    SelfhostSuiteTest = 40
-    GenerateLlvmLinkMetadata = 41
-    Pcre2ReferencePrepare = 42
-    Pcre2Migrate = 43
     Clean = 44
-    SeedDownload = 45
 
 pub enum BuildTarget: i32:
     native = 0
@@ -66,6 +46,36 @@ pub enum OptimizeMode: i32:
 pub type Package {
     name: str,
     version: str,
+}
+
+pub type ProjectInfo {
+    package: Package,
+    root: str,
+}
+
+pub type Diagnostics {
+    token: str,
+}
+
+pub type SourceEmitter {
+    token: str,
+}
+
+pub type ToolFs {
+    token: str,
+}
+
+pub type ProcessRunner {
+    token: str,
+}
+
+pub type BuildCtx {
+    token: str,
+    project: ProjectInfo,
+    diagnostics: Diagnostics,
+    source_emitter: SourceEmitter,
+    fs: ToolFs,
+    process_runner: ProcessRunner,
 }
 
 pub type Target {
@@ -94,6 +104,59 @@ pub type Build {
     targets: Vec[Target],
     generated_sources: Vec[GeneratedSource],
 }
+
+fn tool_capability_valid(token: str) -> bool:
+    let expected = with_getenv_str("WITH_TOOL_CAPABILITY_TOKEN")
+    expected.len() > 0 and token == expected
+
+fn tool_capability_require(token: str, name: str):
+    if not tool_capability_valid(token):
+        with_eprint("error: invalid tool capability: " ++ name)
+        exit(1)
+
+pub fn BuildCtx.__driver_new(package: Package, root: str, token: str) -> BuildCtx:
+    tool_capability_require(token, "BuildCtx")
+    BuildCtx {
+        token,
+        project: ProjectInfo { package, root },
+        diagnostics: Diagnostics { token },
+        source_emitter: SourceEmitter { token },
+        fs: ToolFs { token },
+        process_runner: ProcessRunner { token },
+    }
+
+pub fn BuildCtx.project_info(self: &Self) -> ProjectInfo:
+    tool_capability_require(self.token, "BuildCtx")
+    self.project
+
+pub fn BuildCtx.new_build(self: &Self) -> Build:
+    tool_capability_require(self.token, "BuildCtx")
+    new_build(self.project.package)
+
+pub fn BuildCtx.diagnostics(self: &Self) -> Diagnostics:
+    tool_capability_require(self.token, "Diagnostics")
+    self.diagnostics
+
+pub fn BuildCtx.source_emitter(self: &Self) -> SourceEmitter:
+    tool_capability_require(self.token, "SourceEmitter")
+    self.source_emitter
+
+pub fn BuildCtx.fs(self: &Self) -> ToolFs:
+    tool_capability_require(self.token, "ToolFs")
+    self.fs
+
+pub fn BuildCtx.process_runner(self: &Self) -> ProcessRunner:
+    tool_capability_require(self.token, "ProcessRunner")
+    self.process_runner
+
+pub fn ProjectInfo.package_name(self: &Self) -> str:
+    self.package.name
+
+pub fn ProjectInfo.package_version(self: &Self) -> str:
+    self.package.version
+
+pub fn ProjectInfo.project_root(self: &Self) -> str:
+    self.root
 
 fn build_graph_escape(value: str) -> str:
     var out = ""
@@ -213,8 +276,12 @@ pub fn Build.embed_object_files(self: Build, name: str, output: str) -> Build:
     let target = target_new(.EmbedObjectFiles, name, "").output(output)
     self.add_target(target)
 
-pub fn Build.copy_runtime_tree(self: Build, name: str, source_dir: str, output_dir: str) -> Build:
-    let target = target_new(.CopyRuntimeTree, name, source_dir).output(output_dir)
+pub fn Build.copy_tree(self: Build, name: str, source_dir: str, output_dir: str) -> Build:
+    let target = target_new(.CopyTree, name, source_dir).output(output_dir)
+    self.add_target(target)
+
+pub fn Build.clean(self: Build, name: str) -> Build:
+    let target = target_new(.Clean, name, "")
     self.add_target(target)
 
 pub fn Build.run_corpus_test(self: Build, name: str, runner: str) -> Build:
@@ -224,114 +291,6 @@ pub fn Build.run_corpus_test(self: Build, name: str, runner: str) -> Build:
 pub fn Build.promote_tree_if_verified(self: Build, name: str, source_dir: str, output_dir: str) -> Build:
     let target = target_new(.PromoteTreeIfVerified, name, source_dir).output(output_dir)
     self.add_target(target)
-
-pub fn Build.embedded_runtime_extract_test(self: Build, name: str, compiler: str) -> Build:
-    let target = target_new(.EmbeddedRuntimeExtractTest, name, compiler)
-    self.add_target(target)
-
-pub fn Build.selfhost_noop_local_regression(self: Build, name: str, compiler: str) -> Build:
-    let target = target_new(.SelfhostNoopLocalRegression, name, compiler)
-    self.add_target(target)
-
-pub fn Build.cli_selfhost_smoke_test(self: Build, name: str, compiler: str) -> Build:
-    let target = target_new(.CliSelfhostSmokeTest, name, compiler)
-    self.add_target(target)
-
-pub fn Build.cli_selfhost_one_liner_test(self: Build, name: str, compiler: str) -> Build:
-    let target = target_new(.CliSelfhostOneLinerTest, name, compiler)
-    self.add_target(target)
-
-pub fn Build.cli_selfhost_object_symbol_test(self: Build, name: str, compiler: str) -> Build:
-    let target = target_new(.CliSelfhostObjectSymbolTest, name, compiler)
-    self.add_target(target)
-
-pub fn Build.cli_selfhost_build_w_test(self: Build, name: str, compiler: str) -> Build:
-    let target = target_new(.CliSelfhostBuildWTest, name, compiler)
-    self.add_target(target)
-
-pub fn Build.cli_selfhost_project_test(self: Build, name: str, compiler: str) -> Build:
-    let target = target_new(.CliSelfhostProjectTest, name, compiler)
-    self.add_target(target)
-
-pub fn Build.cli_selfhost_edge_test(self: Build, name: str, compiler: str) -> Build:
-    let target = target_new(.CliSelfhostEdgeTest, name, compiler)
-    self.add_target(target)
-
-pub fn Build.cli_selfhost_pcre2_prep_test(self: Build, name: str, compiler: str) -> Build:
-    let target = target_new(.CliSelfhostPcre2PrepTest, name, compiler)
-    self.add_target(target)
-
-pub fn Build.cli_selfhost_migrate_basic_test(self: Build, name: str, compiler: str) -> Build:
-    let target = target_new(.CliSelfhostMigrateBasicTest, name, compiler)
-    self.add_target(target)
-
-pub fn Build.cli_selfhost_migrate_core_test(self: Build, name: str, compiler: str) -> Build:
-    let target = target_new(.CliSelfhostMigrateCoreTest, name, compiler)
-    self.add_target(target)
-
-pub fn selfhost_suite_target(name: str, compiler: str, suite: str) -> Target:
-    var target = target_new(.SelfhostSuiteTest, name, compiler)
-    target.arg(suite)
-
-pub fn Build.selfhost_suite_test(self: Build, name: str, compiler: str, suite: str) -> Build:
-    self.add_target(selfhost_suite_target(name, compiler, suite))
-
-pub fn Build.generate_compiler_entrypoints(self: Build, name: str, stamp: str) -> Build:
-    let target = target_new(.GenerateCompilerEntrypoints, name, "").output(stamp)
-    self.add_target(target)
-
-pub fn Build.generate_compat_runtime(self: Build, name: str, compat_source: str, output: str) -> Build:
-    let target = target_new(.GenerateCompatRuntime, name, compat_source).output(output)
-    self.add_target(target)
-
-pub fn Build.generate_llvm_link_metadata(self: Build, name: str, stamp: str) -> Build:
-    let target = target_new(.GenerateLlvmLinkMetadata, name, "").output(stamp)
-    self.add_target(target)
-
-pub fn Build.with_compiler_build(self: Build, name: str, compiler: str, source: str, output: str) -> Build:
-    var target = target_new(.WithCompilerBuild, name, compiler).output(output)
-    target = target.input(source)
-    self.add_target(target)
-
-pub fn Build.with_compiler_ir(self: Build, name: str, compiler: str, source: str, output: str) -> Build:
-    var target = target_new(.WithCompilerIr, name, compiler).output(output)
-    target = target.input(source)
-    self.add_target(target)
-
-pub fn Build.pcre2_run_test(self: Build, name: str, pcre2test: str, ref_dir: str) -> Build:
-    var target = target_new(.Pcre2RunTest, name, pcre2test)
-    target = target.input(ref_dir ++ "/RunTest")
-    target = target.arg(ref_dir)
-    self.add_target(target)
-
-pub fn Build.pcre2_generated_check(self: Build, name: str, compiler: str, generated_dir: str) -> Build:
-    var target = target_new(.Pcre2GeneratedCheck, name, compiler)
-    target = target.input(generated_dir)
-    self.add_target(target)
-
-pub fn Build.pcre2_generated_promote(self: Build, name: str, compiler: str, generated_dir: str, dest_dir: str) -> Build:
-    var target = target_new(.Pcre2GeneratedPromote, name, compiler).output(dest_dir)
-    target = target.input(generated_dir)
-    self.add_target(target)
-
-pub fn Build.pcre2_build(self: Build, name: str, compiler: str, migrated_dir: str, output_dir: str) -> Build:
-    var target = target_new(.Pcre2Build, name, compiler).output(output_dir)
-    target = target.input(migrated_dir)
-    self.add_target(target)
-
-pub fn Build.pcre2_reference_prepare(self: Build, name: str, release: str, url: str, stamp: str) -> Build:
-    var target = target_new(.Pcre2ReferencePrepare, name, release).output(stamp)
-    target = target.arg(url)
-    self.add_target(target)
-
-pub fn Build.pcre2_migrate(self: Build, name: str, compiler: str, source_dir: str, generated_dir: str, stamp: str) -> Build:
-    var target = target_new(.Pcre2Migrate, name, compiler).output(stamp)
-    target = target.input(source_dir)
-    target = target.arg(generated_dir)
-    self.add_target(target)
-
-pub fn Build.clean(self: Build, name: str) -> Build:
-    self.add_target(target_new(.Clean, name, ""))
 
 pub fn Target.target(self: Target, target: BuildTarget) -> Target:
     Target {

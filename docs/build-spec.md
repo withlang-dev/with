@@ -104,8 +104,9 @@ Default recipe:
 ```with
 use std.build
 
-pub fn build(b: Build) -> Build:
-    b.executable(b.package.name, "src/main.w")
+pub fn build(ctx: BuildCtx) -> Build:
+    let info = ctx.project_info()
+    ctx.new_build().executable(info.package_name(), "src/main.w")
 ```
 
 The default recipe is intentionally small. It builds one executable from
@@ -142,33 +143,23 @@ shell-facing CLI behavior.
 
 ## 6. Build Entry Points
 
-A project build file must expose one of these forms:
+A project build file must expose this form:
 
 ```with
-pub fn build(b: Build) -> Build:
+pub fn build(ctx: BuildCtx) -> Build:
     ...
 ```
 
-or:
-
-```with
-pub fn build(ctx: BuildContext, b: Build) -> Build:
-    ...
-```
-
-The one-argument form is sugar for the two-argument form with the default
-context.
-
-The driver constructs the initial `Build` from package metadata and invokes
-`build`. The returned value is the complete build graph.
+The driver constructs a `BuildCtx` capability from package metadata and
+invokes `build`. The returned value is the complete build graph.
 
 `build.w` may define additional named build entry points:
 
 ```with
-pub fn compiler(b: Build) -> Build:
-    ...
+pub fn compiler(ctx: BuildCtx) -> Build:
+    ctx.new_build()
 
-pub fn regex_migrate(ctx: BuildContext, b: Build) -> Build:
+pub fn regex_migrate(ctx: BuildCtx) -> Build:
     ...
 ```
 
@@ -206,8 +197,8 @@ Required API model:
 ```with
 pub type Workspace
 
-pub fn BuildContext.create_workspace(self: &Self, name: str) -> Workspace
-pub fn BuildContext.current_workspace(self: &Self) -> Workspace
+pub fn BuildCtx.create_workspace(self: &Self, name: str) -> Workspace
+pub fn BuildCtx.current_workspace(self: &Self) -> Workspace
 ```
 
 The exact storage representation of `Workspace` is compiler-private.
@@ -323,8 +314,8 @@ Source inputs may be:
 Example:
 
 ```with
-pub fn build(b: Build) -> Build:
-    var out = b
+pub fn build(ctx: BuildCtx) -> Build:
+    var out = ctx.new_build()
     out = out.generated_source(
         "out/gen/version.w",
         "pub fn build_version -> str:\n    \"dev\"\n",
@@ -347,17 +338,17 @@ Tool-mode build code needs typed compiler operations.
 Minimum required operations:
 
 ```with
-pub fn BuildContext.compile(
+pub fn BuildCtx.compile(
     self: &Self,
     workspace: Workspace,
     options: BuildOptions,
     sources: Vec[SourceInput],
 ) -> BuildResult
 
-pub fn BuildContext.compile_object(...)
-pub fn BuildContext.link_executable(...)
-pub fn BuildContext.link_static_library(...)
-pub fn BuildContext.run_tests(...)
+pub fn BuildCtx.compile_object(...)
+pub fn BuildCtx.link_executable(...)
+pub fn BuildCtx.link_static_library(...)
+pub fn BuildCtx.run_tests(...)
 ```
 
 `BuildResult` includes:
@@ -405,9 +396,9 @@ pub enum CompilerPhase: i32:
 Required operations:
 
 ```with
-pub fn BuildContext.begin_intercept(self: &Self, workspace: Workspace)
-pub fn BuildContext.wait_for_message(self: &Self, workspace: Workspace) -> CompilerMessage
-pub fn BuildContext.end_intercept(self: &Self, workspace: Workspace)
+pub fn BuildCtx.begin_intercept(self: &Self, workspace: Workspace)
+pub fn BuildCtx.wait_for_message(self: &Self, workspace: Workspace) -> CompilerMessage
+pub fn BuildCtx.end_intercept(self: &Self, workspace: Workspace)
 ```
 
 This supports build-time tools that inspect project code, generate source after
@@ -446,8 +437,8 @@ Supported forms:
 
 ```with
 pub fn Build.generated_source(self: Build, path: str, contents: str) -> Build
-pub fn BuildContext.add_source_string(self: &Self, workspace: Workspace, name: str, source: str)
-pub fn BuildContext.add_source_file(self: &Self, workspace: Workspace, path: str)
+pub fn BuildCtx.add_source_string(self: &Self, workspace: Workspace, name: str, source: str)
+pub fn BuildCtx.add_source_file(self: &Self, workspace: Workspace, path: str)
 ```
 
 Generated source must be visible in diagnostics using the declared path/name.
@@ -480,7 +471,7 @@ pub type ProcessSpec {
     capture_stderr: bool,
 }
 
-pub fn BuildContext.run_process(self: &Self, spec: ProcessSpec) -> ProcessResult
+pub fn BuildCtx.run_process(self: &Self, spec: ProcessSpec) -> ProcessResult
 ```
 
 No API should accept a shell command string as the primary interface. If shell
@@ -494,17 +485,17 @@ and forbidden for compiler repository build logic.
 Tool mode needs typed filesystem operations:
 
 ```with
-pub fn BuildContext.read_text(path: str) -> Result[str, FsError]
-pub fn BuildContext.read_binary(path: str) -> Result[Vec[u8], FsError]
-pub fn BuildContext.write_text(path: str, contents: str) -> Result[void, FsError]
-pub fn BuildContext.write_binary(path: str, bytes: Vec[u8]) -> Result[void, FsError]
-pub fn BuildContext.mkdir_all(path: str) -> Result[void, FsError]
-pub fn BuildContext.remove_tree(path: str) -> Result[void, FsError]
-pub fn BuildContext.copy_file(src: str, dst: str) -> Result[void, FsError]
-pub fn BuildContext.copy_tree(src: str, dst: str) -> Result[void, FsError]
-pub fn BuildContext.rename(src: str, dst: str) -> Result[void, FsError]
-pub fn BuildContext.symlink(src: str, dst: str) -> Result[void, FsError]
-pub fn BuildContext.glob(pattern: str) -> Result[Vec[str], FsError]
+pub fn BuildCtx.read_text(path: str) -> Result[str, FsError]
+pub fn BuildCtx.read_binary(path: str) -> Result[Vec[u8], FsError]
+pub fn BuildCtx.write_text(path: str, contents: str) -> Result[void, FsError]
+pub fn BuildCtx.write_binary(path: str, bytes: Vec[u8]) -> Result[void, FsError]
+pub fn BuildCtx.mkdir_all(path: str) -> Result[void, FsError]
+pub fn BuildCtx.remove_tree(path: str) -> Result[void, FsError]
+pub fn BuildCtx.copy_file(src: str, dst: str) -> Result[void, FsError]
+pub fn BuildCtx.copy_tree(src: str, dst: str) -> Result[void, FsError]
+pub fn BuildCtx.rename(src: str, dst: str) -> Result[void, FsError]
+pub fn BuildCtx.symlink(src: str, dst: str) -> Result[void, FsError]
+pub fn BuildCtx.glob(pattern: str) -> Result[Vec[str], FsError]
 ```
 
 All write operations must normalize paths. Operations that would escape the
@@ -638,19 +629,19 @@ accidentally.
 The compiler repository's `build.w` should eventually define at least:
 
 ```with
-pub fn build(b: Build) -> Build              // canonical compiler build
-pub fn stage1(b: Build) -> Build
-pub fn stage2(b: Build) -> Build
-pub fn stage3(b: Build) -> Build
-pub fn runtime(b: Build) -> Build
-pub fn fixpoint(b: Build) -> Build
-pub fn test(b: Build) -> Build
-pub fn regex_migrate(b: Build) -> Build
-pub fn regex_build(b: Build) -> Build
-pub fn regex_test(b: Build) -> Build
-pub fn regex_promote(b: Build) -> Build
-pub fn install_user(b: Build) -> Build
-pub fn clean(b: Build) -> Build
+pub fn build(ctx: BuildCtx) -> Build              // canonical compiler build
+pub fn stage1(ctx: BuildCtx) -> Build
+pub fn stage2(ctx: BuildCtx) -> Build
+pub fn stage3(ctx: BuildCtx) -> Build
+pub fn runtime(ctx: BuildCtx) -> Build
+pub fn fixpoint(ctx: BuildCtx) -> Build
+pub fn test(ctx: BuildCtx) -> Build
+pub fn regex_migrate(ctx: BuildCtx) -> Build
+pub fn regex_build(ctx: BuildCtx) -> Build
+pub fn regex_test(ctx: BuildCtx) -> Build
+pub fn regex_promote(ctx: BuildCtx) -> Build
+pub fn install_user(ctx: BuildCtx) -> Build
+pub fn clean(ctx: BuildCtx) -> Build
 ```
 
 The graph must preserve bootstrap ordering:
@@ -972,10 +963,9 @@ Required for:
 Inputs must be explicit object paths with stable logical names. Output must be
 deterministic across runs.
 
-### `copy_runtime_tree`
+### `copy_tree`
 
-Copy the runtime artifact tree from build output into an install/runtime
-destination.
+Copy a declared file tree from one build location to another.
 
 Required for:
 
@@ -1023,8 +1013,8 @@ It must report every source-controlled path it changes.
 ```with
 use std.build
 
-pub fn build(b: Build) -> Build:
-    b.executable("hello", "src/main.w")
+pub fn build(ctx: BuildCtx) -> Build:
+    ctx.new_build().executable("hello", "src/main.w")
 ```
 
 Run:
@@ -1040,8 +1030,9 @@ with build
 ```with
 use std.build
 
-pub fn build(b: Build) -> Build:
-    var out = b.generated_source(
+pub fn build(ctx: BuildCtx) -> Build:
+    var out = ctx.new_build()
+    out = out.generated_source(
         "out/gen/version.w",
         "pub fn version -> str:\n    \"dev\"\n",
     )
@@ -1055,8 +1046,8 @@ pub fn build(b: Build) -> Build:
 ```with
 use std.build
 
-pub fn build(b: Build) -> Build:
-    var out = b
+pub fn build(ctx: BuildCtx) -> Build:
+    var out = ctx.new_build()
     out = out.executable("server", "src/server.w")
     out = out.executable("tool", "src/tool.w")
     out = out.test("unit", "tests/*.w")
@@ -1072,8 +1063,8 @@ This is illustrative; exact API names may change as the implementation lands.
 ```with
 use std.build
 
-pub fn compiler(b: Build) -> Build:
-    var out = b
+pub fn compiler(ctx: BuildCtx) -> Build:
+    var out = ctx.new_build()
     let generated = generate_versioned_entry("out/gen/main.w", "src/main.w")
     out = out.generated_source(generated.path, generated.contents)
     out = out.tool("stage1", compiler: .seed, entry: generated.path)

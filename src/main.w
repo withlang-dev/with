@@ -19,9 +19,11 @@ use BuildGraphKinds
 use BuildGraphModel
 use BuildGraphOps
 use BuildGraphPcre2
+use BuildGraphEmitC
 use BuildGraphSupport
 use BuildGraphTools
 use BuildGraphTests
+use InitTemplates
 use BuildGraphSelfhost
 use BuildGraphRuntime
 
@@ -770,13 +772,14 @@ fn test_unique_binary_path(source_file: str) -> str:
     let base = link_stage_output_path_for_source(source_file)
     f"{base}.test.{with_getpid()}.{with_clock_nanos()}"
 
-fn build_tool_runner_source(package_name: str, package_version: str, graph_path: str) -> str:
+fn build_tool_runner_source(package_name: str, package_version: str, root: str, graph_path: str, token: str) -> str:
     "use std.build\n" ++
     "use build\n\n" ++
     "extern fn with_fs_write_file(path: str, data: str) -> i32\n\n" ++
     "fn main:\n" ++
     "    let pkg = Package { name: \"" ++ cli_escape_with_string(package_name) ++ "\", version: \"" ++ cli_escape_with_string(package_version) ++ "\" }\n" ++
-    "    let graph = build(new_build(pkg)).emit_graph()\n" ++
+    "    let ctx = BuildCtx.__driver_new(pkg, \"" ++ cli_escape_with_string(root) ++ "\", \"" ++ cli_escape_with_string(token) ++ "\")\n" ++
+    "    let graph = build(ctx).emit_graph()\n" ++
     "    assert(with_fs_write_file(\"" ++ cli_escape_with_string(graph_path) ++ "\", graph) == 0)\n"
 
 fn load_build_graph_from_build_w(root: str, cfg: ProjectConfig, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> BuildGraph:
@@ -789,7 +792,8 @@ fn load_build_graph_from_build_w(root: str, cfg: ProjectConfig, opt_level: i32, 
     let runner_path = resolve_join(root, "__with_build_runner." ++ stamp ++ ".w")
     let graph_path = resolve_join(tmp_dir, "build-graph." ++ stamp ++ ".txt")
     let runner_bin = resolve_join(tmp_dir, "build-runner." ++ stamp)
-    let runner_source = build_tool_runner_source(cfg.package_name, cfg.package_version, graph_path)
+    let capability_token = "with-tool:" ++ stamp
+    let runner_source = build_tool_runner_source(cfg.package_name, cfg.package_version, root, graph_path, capability_token)
     if with_fs_write_file(runner_path, runner_source) != 0:
         graph.error_msg = "could not write generated build.w runner"
         return graph
@@ -802,7 +806,10 @@ fn load_build_graph_from_build_w(root: str, cfg: ProjectConfig, opt_level: i32, 
     if built_runner == "":
         graph.error_msg = "build.w runner compilation failed"
         return graph
+    let old_capability_token = with_getenv_str("WITH_TOOL_CAPABILITY_TOKEN")
+    let _set_capability_token = with_setenv_str("WITH_TOOL_CAPABILITY_TOKEN", capability_token)
     let rc = with_exec_binary(built_runner)
+    let _restore_capability_token = with_setenv_str("WITH_TOOL_CAPABILITY_TOKEN", old_capability_token)
     cleanup_binary_artifacts(built_runner)
     if rc != 0:
         let _remove_graph_on_error = with_fs_remove_file(graph_path)
@@ -2030,7 +2037,7 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
             completed_targets.push(target.name)
             continue
         if target.kind == 18:
-            let copy_rc = build_graph_copy_manifest_files(root, target, "copy_runtime_tree")
+            let copy_rc = build_graph_copy_manifest_files(root, target, "copy_tree")
             if copy_rc != 0:
                 return copy_rc
             completed_targets.push(target.name)
@@ -2258,6 +2265,24 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
             let seed_rc = build_graph_run_seed_download(root, target)
             if seed_rc != 0:
                 return seed_rc
+            completed_targets.push(target.name)
+            continue
+        if target.kind == 46:
+            let emit_c_rc = build_graph_run_emit_c_test(root, target)
+            if emit_c_rc != 0:
+                return emit_c_rc
+            completed_targets.push(target.name)
+            continue
+        if target.kind == 47:
+            let emit_c_fixpoint_rc = build_graph_run_emit_c_fixpoint(root, target)
+            if emit_c_fixpoint_rc != 0:
+                return emit_c_fixpoint_rc
+            completed_targets.push(target.name)
+            continue
+        if target.kind == 48:
+            let emit_c_roundtrip_rc = build_graph_run_emit_c_roundtrip(root, target)
+            if emit_c_roundtrip_rc != 0:
+                return emit_c_roundtrip_rc
             completed_targets.push(target.name)
             continue
         if target.kind == 7:
@@ -3181,7 +3206,7 @@ fn run_bench_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, 
 
 fn run_migrate_command(argc: i32) -> i32:
     if argc < 3:
-        eprint("usage: with migrate <file.c|dir/> [-o output] [-I include_dir] [--exclude basename]")
+        eprint("usage: with migrate <file.c|dir/> [-o output] [-I include_dir] [-include header] [--exclude basename]")
         return 1
 
     // Hidden developer mode: run the CiIR/CiPrint roundtrip harness
@@ -3202,8 +3227,13 @@ fn run_migrate_command(argc: i32) -> i32:
             ai = ai + 2
             continue
         if arg == "-I" and ai + 1 < argc:
-            with_cimport_add_include_path(with_arg_at(ai + 1))
+            migrate_add_include_path(with_arg_at(ai + 1))
             reinvoke_args = f"{reinvoke_args} -I {test_shell_quote(with_arg_at(ai + 1))}"
+            ai = ai + 2
+            continue
+        if arg == "-include" and ai + 1 < argc:
+            migrate_add_forced_include(with_arg_at(ai + 1))
+            reinvoke_args = f"{reinvoke_args} -include {test_shell_quote(with_arg_at(ai + 1))}"
             ai = ai + 2
             continue
         if arg == "-D" and ai + 1 < argc:
@@ -3618,6 +3648,76 @@ fn cli_init_default_name(target_dir: str) -> str:
         return fallback
     "project"
 
+fn cli_init_write_new_file(path: str, contents: str) -> i32:
+    if with_fs_file_exists(path) != 0:
+        with_eprint("error: file already exists: " ++ path)
+        return 1
+    if with_fs_write_file(path, contents) != 0:
+        with_eprint("error: failed to write " ++ path)
+        return 1
+    0
+
+fn cli_init_manifest_template(name: str) -> str:
+    "[package]\n" ++
+    "name = \"" ++ name ++ "\"\n" ++
+    "version = \"0.1.0\"\n"
+
+fn cli_init_build_template(name: str, is_lib: bool) -> str:
+    let product_kind = if is_lib: "library" else: "executable"
+    let entry = if is_lib: "src/lib.w" else: "src/main.w"
+    "use std.build\n\n" ++
+    "pub fn build(ctx: BuildCtx) -> Build:\n" ++
+    "    var out = ctx.new_build()." ++ product_kind ++ "(\"" ++ name ++ "\", \"" ++ entry ++ "\")\n" ++
+    "    var tests = target_new(.Test, \"test\", \"tests/*.w\")\n" ++
+    "    out = out.add_target(tests)\n" ++
+    "    out.default(\"" ++ name ++ "\")\n"
+
+fn cli_init_readme_template(name: str, is_lib: bool) -> str:
+    let run_line = if is_lib: "with build" else: "with run src/main.w"
+    "# " ++ name ++ "\n\n" ++
+    "Generated by `with init`.\n\n" ++
+    "## Build\n\n" ++
+    "```sh\n" ++
+    "with build\n" ++
+    "```\n\n" ++
+    "## Test\n\n" ++
+    "```sh\n" ++
+    "with build :test\n" ++
+    "```\n\n" ++
+    "## Run\n\n" ++
+    "```sh\n" ++
+    run_line ++ "\n" ++
+    "```\n"
+
+fn cli_init_gitignore_template() -> str:
+    ".with/\n" ++
+    "out/\n" ++
+    "*.o\n" ++
+    "*.dSYM/\n"
+
+fn cli_init_main_template() -> str:
+    "fn main:\n" ++
+    "    print(\"Hello, With!\")\n"
+
+fn cli_init_lib_template(name: str) -> str:
+    "// " ++ name ++ " library\n\n" ++
+    "pub fn hello -> str:\n" ++
+    "    \"Hello from " ++ name ++ "!\"\n"
+
+fn cli_init_test_template() -> str:
+    "//! expect-stdout: ok\n\n" ++
+    "fn main:\n" ++
+    "    print(\"ok\")\n"
+
+fn cli_init_file_must_not_exist(path: str) -> i32:
+    if with_fs_file_exists(path) != 0:
+        with_eprint("error: file already exists: " ++ path)
+        return 1
+    0
+
+fn cli_init_report_path(path: str):
+    with_eprint("  " ++ path)
+
 fn run_init_command(argc: i32) -> i32:
     let target_dir = cli_init_target_dir(argc)
     var name = cli_flag_value(argc, "--name")
@@ -3625,48 +3725,86 @@ fn run_init_command(argc: i32) -> i32:
         name = cli_init_default_name(target_dir)
     let is_lib = cli_has_flag(argc, "--lib")
     let manifest_path = resolve_join(target_dir, "with.toml")
+    let build_path = resolve_join(target_dir, "build.w")
+    let readme_path = resolve_join(target_dir, "README.md")
+    let gitignore_path = resolve_join(target_dir, ".gitignore")
+    let agents_path = resolve_join(target_dir, "AGENTS.md")
+    let claude_path = resolve_join(target_dir, "CLAUDE.md")
     let src_dir = resolve_join(target_dir, "src")
+    let tests_dir = resolve_join(target_dir, "tests")
     let lib_path = resolve_join(src_dir, "lib.w")
     let main_path = resolve_join(src_dir, "main.w")
+    let smoke_test_path = resolve_join(tests_dir, "smoke.w")
     var created_path = target_dir
     if target_dir == ".":
         created_path = name
 
-    // Check if with.toml already exists
-    let existing = with_fs_read_file(manifest_path)
-    if existing.len() > 0:
-        with_eprint("error: with.toml already exists in " ++ target_dir)
+    let ai_guide = init_ai_guide_template()
+
+    if cli_init_file_must_not_exist(manifest_path) != 0:
+        return 1
+    if cli_init_file_must_not_exist(build_path) != 0:
+        return 1
+    if cli_init_file_must_not_exist(readme_path) != 0:
+        return 1
+    if cli_init_file_must_not_exist(gitignore_path) != 0:
+        return 1
+    if cli_init_file_must_not_exist(agents_path) != 0:
+        return 1
+    if cli_init_file_must_not_exist(claude_path) != 0:
+        return 1
+    if is_lib:
+        if cli_init_file_must_not_exist(lib_path) != 0:
+            return 1
+    else:
+        if cli_init_file_must_not_exist(main_path) != 0:
+            return 1
+    if cli_init_file_must_not_exist(smoke_test_path) != 0:
         return 1
 
-    // Create target directory tree first so named projects can be scaffolded.
     if with_fs_mkdir_p(src_dir) != 0:
         with_eprint("error: failed to create " ++ src_dir ++ " directory")
         return 1
-
-    let toml = "[project]\nname = \"" ++ name ++ "\"\nversion = \"0.1.0\"\n"
-    if with_fs_write_file(manifest_path, toml) != 0:
-        with_eprint("error: failed to write " ++ manifest_path)
+    if with_fs_mkdir_p(tests_dir) != 0:
+        with_eprint("error: failed to create " ++ tests_dir ++ " directory")
         return 1
 
-    // Create source file
+    if cli_init_write_new_file(manifest_path, cli_init_manifest_template(name)) != 0:
+        return 1
+    if cli_init_write_new_file(build_path, cli_init_build_template(name, is_lib)) != 0:
+        return 1
+    if cli_init_write_new_file(readme_path, cli_init_readme_template(name, is_lib)) != 0:
+        return 1
+    if cli_init_write_new_file(gitignore_path, cli_init_gitignore_template()) != 0:
+        return 1
+    if cli_init_write_new_file(agents_path, ai_guide) != 0:
+        return 1
+    if cli_init_write_new_file(claude_path, ai_guide) != 0:
+        return 1
     if is_lib:
-        let lib_src = "// " ++ name ++ " library\n\npub fn hello -> str:\n    \"Hello from " ++ name ++ "!\"\n"
-        if with_fs_write_file(lib_path, lib_src) != 0:
-            with_eprint("error: failed to write " ++ lib_path)
+        if cli_init_write_new_file(lib_path, cli_init_lib_template(name)) != 0:
             return 1
+    else:
+        if cli_init_write_new_file(main_path, cli_init_main_template()) != 0:
+            return 1
+    if cli_init_write_new_file(smoke_test_path, cli_init_test_template()) != 0:
+        return 1
+
+    if is_lib:
         with_eprint("created " ++ created_path ++ " (library)")
     else:
-        let main_src = "fn main:\n    print(\"Hello, World!\")\n"
-        if with_fs_write_file(main_path, main_src) != 0:
-            with_eprint("error: failed to write " ++ main_path)
-            return 1
         with_eprint("created " ++ created_path)
-
-    with_eprint("  " ++ manifest_path)
+    cli_init_report_path(manifest_path)
+    cli_init_report_path(build_path)
+    cli_init_report_path(readme_path)
+    cli_init_report_path(gitignore_path)
+    cli_init_report_path(agents_path)
+    cli_init_report_path(claude_path)
     if is_lib:
-        with_eprint("  " ++ lib_path)
+        cli_init_report_path(lib_path)
     else:
-        with_eprint("  " ++ main_path)
+        cli_init_report_path(main_path)
+    cli_init_report_path(smoke_test_path)
     0
 
 fn run_get_command(argc: i32) -> i32:

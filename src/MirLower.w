@@ -2733,7 +2733,25 @@ fn MirBuilder.lower_let_else(self: MirBuilder, node: i32):
 
     self.switch_to(cont_bb)
 
+fn MirBuilder.lower_expr_discard(self: MirBuilder, node: i32) -> i32:
+    if node == 0:
+        return self.unit_operand()
+    let saved_expected = self.expected_type
+    self.expected_type = self.sema.ty_void as i32
+    let kind = self.ast.kind(node)
+    let result = if kind == NodeKind.NK_BLOCK:
+        self.lower_block_mode(node, 0)
+    else if kind == NodeKind.NK_IF_EXPR:
+        self.lower_if(self.ast.get_data0(node), self.ast.get_data1(node), self.ast.get_data2(node), node, 0)
+    else:
+        self.lower_expr(node)
+    self.expected_type = saved_expected
+    result
+
 fn MirBuilder.lower_block(self: MirBuilder, node: i32) -> i32:
+    self.lower_block_mode(node, 1)
+
+fn MirBuilder.lower_block_mode(self: MirBuilder, node: i32, want_result: i32) -> i32:
     let stmt_start = self.ast.get_data0(node)
     let stmt_count = self.ast.get_data1(node)
     let tail_expr = self.ast.get_data2(node)
@@ -2787,9 +2805,12 @@ fn MirBuilder.lower_block(self: MirBuilder, node: i32) -> i32:
         if sk == NodeKind.NK_TUPLE_DESTRUCTURE:
             self.lower_tuple_destructure(stmt)
             continue
-        let _ = self.lower_expr(stmt)
+        let _ = self.lower_expr_discard(stmt)
 
-    let result = if tail_expr != 0: self.lower_expr(tail_expr) else: self.unit_operand()
+    let result = if tail_expr != 0:
+        if want_result != 0: self.lower_expr(tail_expr) else: self.lower_expr_discard(tail_expr)
+    else:
+        self.unit_operand()
 
     // Emit defers added in this block scope (LIFO order), before popping scope
     let defer_end = self.defer_nodes.len() as i32
@@ -2813,9 +2834,9 @@ fn MirBuilder.lower_block(self: MirBuilder, node: i32) -> i32:
         self.pop_control_target()
         self.switch_to(labeled_after_bb)
         return self.unit_operand()
-    result
+    if want_result != 0: result else: self.unit_operand()
 
-fn MirBuilder.lower_if(self: MirBuilder, cond_expr: i32, then_expr: i32, else_expr_opt: i32, node: i32) -> i32:
+fn MirBuilder.lower_if(self: MirBuilder, cond_expr: i32, then_expr: i32, else_expr_opt: i32, node: i32, want_result: i32) -> i32:
     var cond_op = 0
     var regex_capture_node = 0
     var regex_captures_opt_place = -1
@@ -2844,29 +2865,35 @@ fn MirBuilder.lower_if(self: MirBuilder, cond_expr: i32, then_expr: i32, else_ex
     let table = self.body.new_switch_table(vals, targets)
     self.terminate(TermKind.TK_SWITCH_INT, cond_op, table, else_bb, 0)
 
-    let result_ty = self.expr_type(node)
-    let result_local = self.new_temp(result_ty)
-    let result_place = self.place_for_local(result_local)
+    let result_ty = if want_result != 0: self.expr_type(node) else: self.sema.ty_void as i32
+    let result_local = if want_result != 0: self.new_temp(result_ty) else: -1
+    let result_place = if want_result != 0: self.place_for_local(result_local) else: -1
 
     let saved_expected = self.expected_type
-    if result_ty != 0:
+    if want_result != 0 and result_ty != 0:
         self.expected_type = result_ty
+    else if want_result == 0:
+        self.expected_type = self.sema.ty_void as i32
 
     self.switch_to(then_bb)
     if regex_capture_node != 0:
         self.lower_regex_capture_bindings_from_option(regex_capture_node, regex_captures_opt_place)
     let then_op = self.lower_expr(then_expr)
-    self.assign_operand_to_place(result_place, then_op, self.ast.get_start(then_expr))
+    if want_result != 0:
+        self.assign_operand_to_place(result_place, then_op, self.ast.get_start(then_expr))
     self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
     self.switch_to(else_bb)
     let else_op = if else_expr_opt != 0: self.lower_expr(else_expr_opt) else: self.unit_operand()
-    self.assign_operand_to_place(result_place, else_op, self.ast.get_start(node))
+    if want_result != 0:
+        self.assign_operand_to_place(result_place, else_op, self.ast.get_start(node))
     self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
     self.expected_type = saved_expected
 
     self.switch_to(join_bb)
+    if want_result == 0:
+        return self.unit_operand()
     if self.sema.is_copy(result_ty) != 0:
         return self.body.new_operand(OperandKind.OK_COPY, result_place)
     self.body.new_operand(OperandKind.OK_MOVE, result_place)
@@ -2915,7 +2942,7 @@ fn MirBuilder.lower_loop(self: MirBuilder, body_expr: i32, node: i32) -> i32:
     self.push_control_target(self.ast.get_data1(node), ControlTargetKind.CT_LOOP, header_bb, break_bb)
 
     self.switch_to(body_bb)
-    let _ = self.lower_expr(body_expr)
+    let _ = self.lower_expr_discard(body_expr)
     // Back-edge when body does not diverge.
     self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
 
@@ -2959,7 +2986,7 @@ fn MirBuilder.lower_while(self: MirBuilder, cond_expr: i32, body_expr: i32, node
     self.switch_to(body_bb)
     if regex_capture_node != 0:
         self.lower_regex_capture_bindings_from_option(regex_capture_node, regex_captures_opt_place)
-    let _ = self.lower_expr(body_expr)
+    let _ = self.lower_expr_discard(body_expr)
     self.terminate(TermKind.TK_GOTO, cond_bb, 0, 0, 0)
 
     self.pop_control_target()
@@ -2976,7 +3003,7 @@ fn MirBuilder.lower_do_while(self: MirBuilder, body_expr: i32, cond_expr: i32, n
     self.push_control_target(self.ast.get_data2(node), ControlTargetKind.CT_LOOP, cond_bb, exit_bb)
 
     self.switch_to(body_bb)
-    let _ = self.lower_expr(body_expr)
+    let _ = self.lower_expr_discard(body_expr)
     self.terminate(TermKind.TK_GOTO, cond_bb, 0, 0, 0)
 
     self.switch_to(cond_bb)
@@ -3123,7 +3150,7 @@ fn MirBuilder.lower_for(self: MirBuilder, for_node: i32) -> i32:
 
     self.bind_for_element(for_node, pat_or_sym, item_place, elem_ty, body_expr)
 
-    let _ = self.lower_expr(body_expr)
+    let _ = self.lower_expr_discard(body_expr)
     self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
 
     self.pop_control_target()
@@ -3215,7 +3242,7 @@ fn MirBuilder.lower_for_range_var(self: MirBuilder, for_node: i32, pat_or_sym: i
     // Body
     self.switch_to(body_bb)
     self.bind_for_element(for_node, pat_or_sym, counter_place, elem_ty, body_expr)
-    let _ = self.lower_expr(body_expr)
+    let _ = self.lower_expr_discard(body_expr)
     self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
 
     // Increment
@@ -3282,7 +3309,7 @@ fn MirBuilder.lower_for_range(self: MirBuilder, for_node: i32, pat_or_sym: i32, 
     self.switch_to(body_bb)
     self.bind_for_element(for_node, pat_or_sym, counter_place, elem_ty, body_expr)
 
-    let _ = self.lower_expr(body_expr)
+    let _ = self.lower_expr_discard(body_expr)
     self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
 
     // Increment: counter = counter + 1, goto header
@@ -3354,7 +3381,7 @@ fn MirBuilder.lower_for_slice(self: MirBuilder, for_node: i32, pat_or_sym: i32, 
     self.assign_operand_to_place(elem_place, elem_op, self.ast.get_start(body_expr))
     self.bind_for_element(for_node, pat_or_sym, elem_place, elem_ty, body_expr)
 
-    let _ = self.lower_expr(body_expr)
+    let _ = self.lower_expr_discard(body_expr)
     self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
 
     // Increment: counter += 1
@@ -3436,7 +3463,7 @@ fn MirBuilder.lower_for_vec(self: MirBuilder, for_node: i32, pat_or_sym: i32, it
     // Bind loop variable
     self.bind_for_element(for_node, pat_or_sym, elem_place, elem_ty, body_expr)
 
-    let _ = self.lower_expr(body_expr)
+    let _ = self.lower_expr_discard(body_expr)
     self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
 
     // Increment: counter += 1
@@ -3502,7 +3529,7 @@ fn MirBuilder.lower_for_iter_place(self: MirBuilder, for_node: i32, pat_or_sym: 
     self.terminate(TermKind.TK_CALL, self.unit_operand(), slot_args_id, slot_place, slot_after_bb)
     self.switch_to(slot_after_bb)
     self.bind_for_element(for_node, pat_or_sym, slot_place, slot_ty, body_expr)
-    let _ = self.lower_expr(body_expr)
+    let _ = self.lower_expr_discard(body_expr)
     self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
     self.switch_to(inc_bb)
     let cur_op2 = self.body.new_operand(OperandKind.OK_COPY, counter_place)
@@ -3571,7 +3598,7 @@ fn MirBuilder.lower_for_iter_ref(self: MirBuilder, for_node: i32, pat_or_sym: i3
     self.terminate(TermKind.TK_CALL, self.unit_operand(), ref_args_id, ref_place, ref_after_bb)
     self.switch_to(ref_after_bb)
     self.bind_for_element(for_node, pat_or_sym, ref_place, ref_elem_ty, body_expr)
-    let _ = self.lower_expr(body_expr)
+    let _ = self.lower_expr_discard(body_expr)
     self.terminate(TermKind.TK_GOTO, inc_bb, 0, 0, 0)
     self.switch_to(inc_bb)
     let cur_op2 = self.body.new_operand(OperandKind.OK_COPY, counter_place)
@@ -5405,7 +5432,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         return rhs_op
 
     if kind == NodeKind.NK_IF_EXPR:
-        return self.lower_if(self.ast.get_data0(node), self.ast.get_data1(node), self.ast.get_data2(node), node)
+        return self.lower_if(self.ast.get_data0(node), self.ast.get_data1(node), self.ast.get_data2(node), node, 1)
 
     if kind == NodeKind.NK_WHILE:
         return self.lower_while(self.ast.get_data0(node), self.ast.get_data1(node), node)

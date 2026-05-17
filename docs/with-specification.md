@@ -8441,8 +8441,9 @@ default recipe:
 ```
 use std.build
 
-pub fn build(b: Build) -> Build:
-    b.executable(b.package.name, "src/main.w")
+pub fn build(ctx: BuildCtx) -> Build:
+    let info = ctx.project_info()
+    ctx.new_build().executable(info.package_name(), "src/main.w")
 ```
 
 The standard build graph API lives in `std.build`. It defines
@@ -8456,9 +8457,9 @@ The standard build graph API lives in `std.build`. It defines
 `comptime`. Tool-mode code may perform build effects through
 `std.build` APIs supplied by the driver.
 
-The initial tool-mode driver executes `build.w`, calls
-`build(new_build(package))`, consumes the returned build graph, and
-builds executable, library, and test targets. Per-target
+The initial tool-mode driver executes `build.w`, passes a `BuildCtx`
+capability to `build(ctx)`, consumes the returned build graph, and builds
+executable, library, and test targets. Per-target
 `link_system_lib`, `include_path`, and `define` settings are honored by
 the corresponding compile/test path. `Build.generated_source(path,
 contents)` declares a generated source file to write before target

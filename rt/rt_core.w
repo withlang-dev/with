@@ -2391,8 +2391,9 @@ pub fn codegen_loop_get_result(idx: i32) -> i64:
 // ── Network stubs ──────────────────────────────────────────────────
 
 @[c_export("with_net_tcp_listen")]
-pub fn net_tcp_listen(port: i32) -> i32:
+pub fn net_tcp_listen(port: i32, backlog: i32) -> i32:
     let _ = port
+    let _ = backlog
     -1
 
 @[c_export("with_net_tcp_accept")]
@@ -2413,14 +2414,15 @@ pub fn net_send(sock: i32, data: str) -> i64:
     -1
 
 @[c_export("with_net_recv")]
-pub fn net_recv(sock: i32, max: i32) -> str:
+pub fn net_recv(sock: i32, max_len: i64) -> str:
     let _ = sock
-    let _ = max
+    let _ = max_len
     make_str("" as *const u8, 0)
 
 @[c_export("with_net_close")]
-pub fn net_close(sock: i32):
+pub fn net_close(sock: i32) -> i32:
     let _ = sock
+    -1
 
 @[c_export("with_net_udp_bind")]
 pub fn net_udp_bind(port: i32) -> i32:

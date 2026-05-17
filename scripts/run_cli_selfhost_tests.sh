@@ -2208,13 +2208,14 @@ EOF
   cat >"$case_dir/build.w" <<'EOF'
 use std.build
 
-pub fn build(b: Build) -> Build:
+pub fn build(ctx: BuildCtx) -> Build:
     var target = target_new(.Executable, "custom-build", "src/custom.w")
     target = target.include_path("extra_include")
     target = target.define("WITH_BUILD_FEATURE")
     target = target.define("WITH_BUILD_VALUE=42")
     target = target.link_system_lib("m")
-    b.add_target(target)
+    var out = ctx.new_build()
+    out.add_target(target)
 EOF
 
   if ! run_cli_in_dir "$case_dir" "$tmpdir/out" "$tmpdir/err" build; then
@@ -2290,12 +2291,13 @@ EOF
   cat >"$case_dir/build.w" <<'EOF'
 use std.build
 
-pub fn build(b: Build) -> Build:
+pub fn build(ctx: BuildCtx) -> Build:
     var target = target_new(.Test, "configured-test", "src/build_test.w")
     target = target.include_path("extra_include")
     target = target.define("WITH_BUILD_FEATURE")
     target = target.define("WITH_BUILD_VALUE=42")
-    b.add_target(target)
+    var out = ctx.new_build()
+    out.add_target(target)
 EOF
 
   if ! run_cli_in_dir "$case_dir" "$tmpdir/out" "$tmpdir/err" build; then
@@ -2350,12 +2352,13 @@ EOF
   cat >"$case_dir/build.w" <<'EOF'
 use std.build
 
-pub fn build(b: Build) -> Build:
+pub fn build(ctx: BuildCtx) -> Build:
     var target = target_new(.Test, "glob-tests", "tests/*.w")
     target = target.include_path("extra_include")
     target = target.define("WITH_BUILD_FEATURE")
     target = target.define("WITH_BUILD_VALUE=42")
-    b.add_target(target)
+    var out = ctx.new_build()
+    out.add_target(target)
 EOF
 
   if ! run_cli_in_dir "$case_dir" "$tmpdir/out" "$tmpdir/err" build; then
@@ -2404,12 +2407,13 @@ EOF
   cat >"$case_dir/build.w" <<'EOF'
 use std.build
 
-pub fn build(b: Build) -> Build:
+pub fn build(ctx: BuildCtx) -> Build:
     var target = target_new(.Library, "configured", "src/lib.w")
     target = target.include_path("extra_include")
     target = target.define("WITH_BUILD_FEATURE")
     target = target.define("WITH_BUILD_VALUE=42")
-    b.add_target(target)
+    var out = ctx.new_build()
+    out.add_target(target)
 EOF
 
   if ! run_cli_in_dir "$case_dir" "$tmpdir/out" "$tmpdir/err" build; then
@@ -2454,7 +2458,7 @@ EOF
 use std.build
 use std.sysinfo
 
-pub fn build(b: Build) -> Build:
+pub fn build(ctx: BuildCtx) -> Build:
     var host = BuildTarget.native
     if os() == "Macos":
         if arch() == "armv8" or arch() == "aarch64":
@@ -2471,7 +2475,8 @@ pub fn build(b: Build) -> Build:
             host = BuildTarget.windows_x86_64
     var target = target_new(.Executable, "host-target", "src/main.w")
     target = target.target(host)
-    b.add_target(target)
+    var out = ctx.new_build()
+    out.add_target(target)
 EOF
 
   if ! run_cli_in_dir "$case_dir" "$tmpdir/out" "$tmpdir/err" build; then
@@ -2524,13 +2529,14 @@ EOF
 use std.build
 use std.sysinfo
 
-pub fn build(b: Build) -> Build:
+pub fn build(ctx: BuildCtx) -> Build:
     var non_native = BuildTarget.linux_x86_64
     if os() == "Linux" and arch() == "x86_64":
         non_native = BuildTarget.darwin_aarch64
     var target = target_new(.Executable, "wrong-target", "src/main.w")
     target = target.target(non_native)
-    b.add_target(target)
+    var out = ctx.new_build()
+    out.add_target(target)
 EOF
 
   if run_cli_in_dir "$case_dir" "$tmpdir/out" "$tmpdir/err" build; then
@@ -2563,8 +2569,9 @@ EOF
   cat >"$case_dir/build.w" <<'EOF'
 use std.build
 
-pub fn build(b: Build) -> Build:
-    let generated = b.generated_source("out/gen/generated_main.w", "fn main:\n    print(\"generated source\")\n")
+pub fn build(ctx: BuildCtx) -> Build:
+    var generated = ctx.new_build()
+    generated = generated.generated_source("out/gen/generated_main.w", "fn main:\n    print(\"generated source\")\n")
     generated.executable("generated-app", "out/gen/generated_main.w")
 EOF
 
@@ -2617,8 +2624,9 @@ EOF
   cat >"$case_dir/build.w" <<'EOF'
 use std.build
 
-pub fn build(b: Build) -> Build:
-    let generated = b.generated_source("../outside.w", "fn main: print(\"bad\")\n")
+pub fn build(ctx: BuildCtx) -> Build:
+    var generated = ctx.new_build()
+    generated = generated.generated_source("../outside.w", "fn main: print(\"bad\")\n")
     generated.executable("invalid-generated", "src/main.w")
 EOF
 
@@ -2668,8 +2676,8 @@ EOF
   cat >"$case_dir/build.w" <<'EOF'
 use std.build
 
-pub fn build(b: Build) -> Build:
-    var out = b.executable("one", "src/one.w")
+pub fn build(ctx: BuildCtx) -> Build:
+    var out = ctx.new_build().executable("one", "src/one.w")
     out = out.executable("two", "src/two.w")
     out = out.generated_source("out/tmp/a.txt", "same")
     out = out.generated_source("out/tmp/b.txt", "same")
@@ -2688,7 +2696,7 @@ pub fn build(b: Build) -> Build:
     embedded = embedded.arg("helper_o")
     out = out.add_target(embedded)
     out = out.compile_asm_object("embedded-helper-o", "out/lib/embedded_helper.s", "out/lib/embedded_helper.o")
-    var copy_target = target_new(.CopyRuntimeTree, "runtime-copy", "runtime").output("out/runtime")
+    var copy_target = target_new(.CopyTree, "runtime-copy", "runtime").output("out/runtime")
     copy_target = copy_target.input("helper.c")
     out = out.add_target(copy_target)
     var promote = target_new(.PromoteTreeIfVerified, "promote-runtime", "out/runtime").output("promoted-runtime")

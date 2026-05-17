@@ -67,6 +67,44 @@ pub fn run_cli_selfhost_parallel_test(root: str, target_name: str, compiler_path
         return 1
     0
 
+fn bgs_check_init_ai_docs(root: str, project_dir: str, target_name: str, label: str) -> i32:
+    let expected = with_fs_read_file(bgs_resolve_join(root, "docs/with_for_ai.md"))
+    if expected.len() == 0:
+        with_eprint("error: cli_selfhost_project_test target '" ++ target_name ++ "' could not read docs/with_for_ai.md")
+        return 1
+    let agents = with_fs_read_file(bgs_resolve_join(project_dir, "AGENTS.md"))
+    if agents != expected:
+        with_eprint("error: cli_selfhost_project_test target '" ++ target_name ++ "' AGENTS.md did not match docs/with_for_ai.md for " ++ label)
+        return 1
+    let claude = with_fs_read_file(bgs_resolve_join(project_dir, "CLAUDE.md"))
+    if claude != expected:
+        with_eprint("error: cli_selfhost_project_test target '" ++ target_name ++ "' CLAUDE.md did not match docs/with_for_ai.md for " ++ label)
+        return 1
+    0
+
+fn bgs_check_init_common_files(root: str, project_dir: str, package_name: str, target_name: str, label: str) -> i32:
+    var rc = bgs_project_expect_file(bgs_resolve_join(project_dir, "build.w"), target_name, label ++ " build")
+    if rc != 0: return rc
+    rc = bgs_project_expect_file(bgs_resolve_join(project_dir, "README.md"), target_name, label ++ " readme")
+    if rc != 0: return rc
+    rc = bgs_project_expect_file(bgs_resolve_join(project_dir, ".gitignore"), target_name, label ++ " gitignore")
+    if rc != 0: return rc
+    rc = bgs_project_expect_file(bgs_resolve_join(project_dir, "AGENTS.md"), target_name, label ++ " agents")
+    if rc != 0: return rc
+    rc = bgs_project_expect_file(bgs_resolve_join(project_dir, "CLAUDE.md"), target_name, label ++ " claude")
+    if rc != 0: return rc
+    rc = bgs_project_expect_file(bgs_resolve_join(project_dir, "tests/smoke.w"), target_name, label ++ " smoke test")
+    if rc != 0: return rc
+    rc = bgs_expect_file_contains(bgs_resolve_join(project_dir, "with.toml"), "[package]", target_name, label ++ " manifest package section")
+    if rc != 0: return rc
+    rc = bgs_expect_file_contains(bgs_resolve_join(project_dir, "build.w"), "out.default(\"" ++ package_name ++ "\")", target_name, label ++ " build default")
+    if rc != 0: return rc
+    rc = bgs_expect_file_contains(bgs_resolve_join(project_dir, "README.md"), "# " ++ package_name, target_name, label ++ " readme title")
+    if rc != 0: return rc
+    rc = bgs_expect_file_contains(bgs_resolve_join(project_dir, ".gitignore"), ".with/", target_name, label ++ " gitignore with cache")
+    if rc != 0: return rc
+    bgs_check_init_ai_docs(root, project_dir, target_name, label)
+
 fn bgs_check_init_in_cwd(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
     if with_fs_mkdir_p(case_dir) != 0:
         with_eprint("error: cli_selfhost_project_test target '" ++ target_name ++ "' could not create init cwd case directory: " ++ case_dir)
@@ -77,6 +115,8 @@ fn bgs_check_init_in_cwd(root: str, target_name: str, compiler_path: str, case_d
     var rc = bgs_project_expect_file(bgs_resolve_join(case_dir, "with.toml"), target_name, "init_in_cwd manifest")
     if rc != 0: return rc
     rc = bgs_project_expect_file(bgs_resolve_join(case_dir, "src/main.w"), target_name, "init_in_cwd main")
+    if rc != 0: return rc
+    rc = bgs_check_init_common_files(root, case_dir, expected_name, target_name, "init_in_cwd")
     if rc != 0: return rc
     rc = bgs_project_expect_absent(bgs_resolve_join(bgs_resolve_join(case_dir, expected_name), "with.toml"), target_name, "init_in_cwd nested manifest")
     if rc != 0: return rc
@@ -97,6 +137,8 @@ fn bgs_check_init_named_dir(root: str, target_name: str, compiler_path: str, cas
     var rc = bgs_project_expect_file(bgs_resolve_join(project_dir, "with.toml"), target_name, "init_named_dir manifest")
     if rc != 0: return rc
     rc = bgs_project_expect_file(bgs_resolve_join(project_dir, "src/main.w"), target_name, "init_named_dir main")
+    if rc != 0: return rc
+    rc = bgs_check_init_common_files(root, project_dir, project_name, target_name, "init_named_dir")
     if rc != 0: return rc
     rc = bgs_project_expect_absent(bgs_resolve_join(case_dir, "with.toml"), target_name, "init_named_dir root manifest")
     if rc != 0: return rc
@@ -473,10 +515,10 @@ fn bgs_check_pcre2_generated_existing_main(root: str, target_name: str, compiler
     if rc != 0: return rc
     let build_text =
         "use std.build\n\n" ++
-        "pub fn build(b: Build) -> Build:\n" ++
+        "pub fn build(ctx: BuildCtx) -> Build:\n" ++
         "    var target = target_new(.Pcre2GeneratedCheck, \"pcre2-check-existing-main\", " ++ bgs_with_string_literal(compiler_path) ++ ")\n" ++
         "    target = target.input(\"generated\")\n" ++
-        "    var out = b.add_target(target)\n" ++
+        "    var out = ctx.new_build()\n    out = out.add_target(target)\n" ++
         "    out.default(\"pcre2-check-existing-main\")\n"
     rc = bgs_write_fixture(bgs_resolve_join(case_dir, "build.w"), build_text, target_name, "pcre2 generated check build.w")
     if rc != 0: return rc
@@ -1061,7 +1103,7 @@ fn bgs_check_build_w_not_ignored(root: str, target_name: str, compiler_path: str
     if rc != 0: return rc
     rc = bgs_write_fixture(bgs_resolve_join(case_dir, "extra_include/answer.h"), "#ifndef WITH_BUILD_FEATURE\n#error \"missing build.w target define\"\n#endif\nenum { ANSWER = WITH_BUILD_VALUE };\n", target_name, "answer.h")
     if rc != 0: return rc
-    rc = bgs_write_fixture(bgs_resolve_join(case_dir, "build.w"), "use std.build\n\npub fn build(b: Build) -> Build:\n    var target = target_new(.Executable, \"custom-build\", \"src/custom.w\")\n    target = target.include_path(\"extra_include\")\n    target = target.define(\"WITH_BUILD_FEATURE\")\n    target = target.define(\"WITH_BUILD_VALUE=42\")\n    target = target.link_system_lib(\"m\")\n    b.add_target(target)\n", target_name, "build.w")
+    rc = bgs_write_fixture(bgs_resolve_join(case_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    var target = target_new(.Executable, \"custom-build\", \"src/custom.w\")\n    target = target.include_path(\"extra_include\")\n    target = target.define(\"WITH_BUILD_FEATURE\")\n    target = target.define(\"WITH_BUILD_VALUE=42\")\n    target = target.link_system_lib(\"m\")\n    var out = ctx.new_build()\n    out.add_target(target)\n", target_name, "build.w")
     if rc != 0: return rc
     let result = bgs_build_expect_success(root, target_name, compiler_path, case_dir, "build-w-not-ignored", bgs_argv_append("", "build"))
     if result.rc != 0: return if result.rc == 0: 1 else: result.rc
@@ -1088,7 +1130,7 @@ fn bgs_check_build_w_test_targets(root: str, target_name: str, compiler_path: st
     if rc != 0: return rc
     rc = bgs_write_fixture(bgs_resolve_join(single_dir, "extra_include/answer.h"), "#ifndef WITH_BUILD_FEATURE\n#error \"missing build.w test target define\"\n#endif\nenum { ANSWER = WITH_BUILD_VALUE };\n", target_name, "test header")
     if rc != 0: return rc
-    rc = bgs_write_fixture(bgs_resolve_join(single_dir, "build.w"), "use std.build\n\npub fn build(b: Build) -> Build:\n    var target = target_new(.Test, \"configured-test\", \"src/build_test.w\")\n    target = target.include_path(\"extra_include\")\n    target = target.define(\"WITH_BUILD_FEATURE\")\n    target = target.define(\"WITH_BUILD_VALUE=42\")\n    b.add_target(target)\n", target_name, "test build.w")
+    rc = bgs_write_fixture(bgs_resolve_join(single_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    var target = target_new(.Test, \"configured-test\", \"src/build_test.w\")\n    target = target.include_path(\"extra_include\")\n    target = target.define(\"WITH_BUILD_FEATURE\")\n    target = target.define(\"WITH_BUILD_VALUE=42\")\n    var out = ctx.new_build()\n    out.add_target(target)\n", target_name, "test build.w")
     if rc != 0: return rc
     let single_result = bgs_build_expect_success(root, target_name, compiler_path, single_dir, "build-w-test-target", bgs_argv_append("", "build"))
     if single_result.rc != 0: return if single_result.rc == 0: 1 else: single_result.rc
@@ -1104,7 +1146,7 @@ fn bgs_check_build_w_test_targets(root: str, target_name: str, compiler_path: st
     if rc != 0: return rc
     rc = bgs_write_fixture(bgs_resolve_join(glob_dir, "extra_include/answer.h"), "#ifndef WITH_BUILD_FEATURE\n#error \"missing build.w test glob target define\"\n#endif\nenum { ANSWER = WITH_BUILD_VALUE };\n", target_name, "glob header")
     if rc != 0: return rc
-    rc = bgs_write_fixture(bgs_resolve_join(glob_dir, "build.w"), "use std.build\n\npub fn build(b: Build) -> Build:\n    var target = target_new(.Test, \"glob-tests\", \"tests/*.w\")\n    target = target.include_path(\"extra_include\")\n    target = target.define(\"WITH_BUILD_FEATURE\")\n    target = target.define(\"WITH_BUILD_VALUE=42\")\n    b.add_target(target)\n", target_name, "glob build.w")
+    rc = bgs_write_fixture(bgs_resolve_join(glob_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    var target = target_new(.Test, \"glob-tests\", \"tests/*.w\")\n    target = target.include_path(\"extra_include\")\n    target = target.define(\"WITH_BUILD_FEATURE\")\n    target = target.define(\"WITH_BUILD_VALUE=42\")\n    var out = ctx.new_build()\n    out.add_target(target)\n", target_name, "glob build.w")
     if rc != 0: return rc
     let glob_result = bgs_build_expect_success(root, target_name, compiler_path, glob_dir, "build-w-test-target-glob", bgs_argv_append("", "build"))
     if glob_result.rc != 0: return if glob_result.rc == 0: 1 else: glob_result.rc
@@ -1118,7 +1160,7 @@ fn bgs_check_build_w_library_and_targets(root: str, target_name: str, compiler_p
     if rc != 0: return rc
     rc = bgs_write_fixture(bgs_resolve_join(lib_dir, "extra_include/answer.h"), "#ifndef WITH_BUILD_FEATURE\n#error \"missing build.w library target define\"\n#endif\nenum { ANSWER = WITH_BUILD_VALUE };\n", target_name, "library header")
     if rc != 0: return rc
-    rc = bgs_write_fixture(bgs_resolve_join(lib_dir, "build.w"), "use std.build\n\npub fn build(b: Build) -> Build:\n    var target = target_new(.Library, \"configured\", \"src/lib.w\")\n    target = target.include_path(\"extra_include\")\n    target = target.define(\"WITH_BUILD_FEATURE\")\n    target = target.define(\"WITH_BUILD_VALUE=42\")\n    b.add_target(target)\n", target_name, "library build.w")
+    rc = bgs_write_fixture(bgs_resolve_join(lib_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    var target = target_new(.Library, \"configured\", \"src/lib.w\")\n    target = target.include_path(\"extra_include\")\n    target = target.define(\"WITH_BUILD_FEATURE\")\n    target = target.define(\"WITH_BUILD_VALUE=42\")\n    var out = ctx.new_build()\n    out.add_target(target)\n", target_name, "library build.w")
     if rc != 0: return rc
     let lib_result = bgs_build_expect_success(root, target_name, compiler_path, lib_dir, "build-w-library-target", bgs_argv_append("", "build"))
     if lib_result.rc != 0: return if lib_result.rc == 0: 1 else: lib_result.rc
@@ -1134,7 +1176,7 @@ fn bgs_check_build_w_library_and_targets(root: str, target_name: str, compiler_p
     if rc != 0: return rc
     rc = bgs_write_fixture(bgs_resolve_join(host_dir, "src/main.w"), "fn main:\n    print(\"explicit host target\")\n", target_name, "host source")
     if rc != 0: return rc
-    rc = bgs_write_fixture(bgs_resolve_join(host_dir, "build.w"), "use std.build\nuse std.sysinfo\n\npub fn build(b: Build) -> Build:\n    var host = BuildTarget.native\n    if os() == \"Macos\":\n        if arch() == \"armv8\" or arch() == \"aarch64\":\n            host = BuildTarget.darwin_aarch64\n        else if arch() == \"x86_64\":\n            host = BuildTarget.darwin_x86_64\n    else if os() == \"Linux\":\n        if arch() == \"armv8\" or arch() == \"aarch64\":\n            host = BuildTarget.linux_aarch64\n        else if arch() == \"x86_64\":\n            host = BuildTarget.linux_x86_64\n    else if os() == \"Windows\":\n        if arch() == \"x86_64\":\n            host = BuildTarget.windows_x86_64\n    var target = target_new(.Executable, \"host-target\", \"src/main.w\")\n    target = target.target(host)\n    b.add_target(target)\n", target_name, "host build.w")
+    rc = bgs_write_fixture(bgs_resolve_join(host_dir, "build.w"), "use std.build\nuse std.sysinfo\n\npub fn build(ctx: BuildCtx) -> Build:\n    var host = BuildTarget.native\n    if os() == \"Macos\":\n        if arch() == \"armv8\" or arch() == \"aarch64\":\n            host = BuildTarget.darwin_aarch64\n        else if arch() == \"x86_64\":\n            host = BuildTarget.darwin_x86_64\n    else if os() == \"Linux\":\n        if arch() == \"armv8\" or arch() == \"aarch64\":\n            host = BuildTarget.linux_aarch64\n        else if arch() == \"x86_64\":\n            host = BuildTarget.linux_x86_64\n    else if os() == \"Windows\":\n        if arch() == \"x86_64\":\n            host = BuildTarget.windows_x86_64\n    var target = target_new(.Executable, \"host-target\", \"src/main.w\")\n    target = target.target(host)\n    var out = ctx.new_build()\n    out.add_target(target)\n", target_name, "host build.w")
     if rc != 0: return rc
     let host_result = bgs_build_expect_success(root, target_name, compiler_path, host_dir, "build-w-explicit-host-target", bgs_argv_append("", "build"))
     if host_result.rc != 0: return if host_result.rc == 0: 1 else: host_result.rc
@@ -1152,7 +1194,7 @@ fn bgs_check_build_w_library_and_targets(root: str, target_name: str, compiler_p
     if rc != 0: return rc
     rc = bgs_write_fixture(bgs_resolve_join(non_native_dir, "src/main.w"), "fn main:\n    print(\"wrong target\")\n", target_name, "non-native source")
     if rc != 0: return rc
-    rc = bgs_write_fixture(bgs_resolve_join(non_native_dir, "build.w"), "use std.build\nuse std.sysinfo\n\npub fn build(b: Build) -> Build:\n    var non_native = BuildTarget.linux_x86_64\n    if os() == \"Linux\" and arch() == \"x86_64\":\n        non_native = BuildTarget.darwin_aarch64\n    var target = target_new(.Executable, \"wrong-target\", \"src/main.w\")\n    target = target.target(non_native)\n    b.add_target(target)\n", target_name, "non-native build.w")
+    rc = bgs_write_fixture(bgs_resolve_join(non_native_dir, "build.w"), "use std.build\nuse std.sysinfo\n\npub fn build(ctx: BuildCtx) -> Build:\n    var non_native = BuildTarget.linux_x86_64\n    if os() == \"Linux\" and arch() == \"x86_64\":\n        non_native = BuildTarget.darwin_aarch64\n    var target = target_new(.Executable, \"wrong-target\", \"src/main.w\")\n    target = target.target(non_native)\n    var out = ctx.new_build()\n    out.add_target(target)\n", target_name, "non-native build.w")
     if rc != 0: return rc
     let non_native_result = bgs_run_cli_capture_cwd(root, target_name, compiler_path, "build-w-non-native-target", bgs_argv_append("", "build"), 120000, non_native_dir)
     if non_native_result.rc == 0:
@@ -1164,7 +1206,7 @@ fn bgs_check_build_w_generated_source(root: str, target_name: str, compiler_path
     let gen_dir = bgs_resolve_join(base_dir, "generated")
     var rc = bgs_write_project_manifest(gen_dir, "buildwgenerated", target_name)
     if rc != 0: return rc
-    rc = bgs_write_fixture(bgs_resolve_join(gen_dir, "build.w"), "use std.build\n\npub fn build(b: Build) -> Build:\n    let generated = b.generated_source(\"out/gen/generated_main.w\", \"fn main:\\n    print(\\\"generated source\\\")\\n\")\n    generated.executable(\"generated-app\", \"out/gen/generated_main.w\")\n", target_name, "generated build.w")
+    rc = bgs_write_fixture(bgs_resolve_join(gen_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    var generated = ctx.new_build()\n    generated = generated.generated_source(\"out/gen/generated_main.w\", \"fn main:\\n    print(\\\"generated source\\\")\\n\")\n    generated.executable(\"generated-app\", \"out/gen/generated_main.w\")\n", target_name, "generated build.w")
     if rc != 0: return rc
     let gen_result = bgs_build_expect_success(root, target_name, compiler_path, gen_dir, "build-w-generated-source", bgs_argv_append("", "build"))
     if gen_result.rc != 0: return if gen_result.rc == 0: 1 else: gen_result.rc
@@ -1183,7 +1225,7 @@ fn bgs_check_build_w_generated_source(root: str, target_name: str, compiler_path
     if rc != 0: return rc
     rc = bgs_write_fixture(bgs_resolve_join(invalid_dir, "src/main.w"), "fn main:\n    print(\"should not build\")\n", target_name, "invalid generated source")
     if rc != 0: return rc
-    rc = bgs_write_fixture(bgs_resolve_join(invalid_dir, "build.w"), "use std.build\n\npub fn build(b: Build) -> Build:\n    let generated = b.generated_source(\"../outside.w\", \"fn main: print(\\\"bad\\\")\\n\")\n    generated.executable(\"invalid-generated\", \"src/main.w\")\n", target_name, "invalid generated build.w")
+    rc = bgs_write_fixture(bgs_resolve_join(invalid_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    var generated = ctx.new_build()\n    generated = generated.generated_source(\"../outside.w\", \"fn main: print(\\\"bad\\\")\\n\")\n    generated.executable(\"invalid-generated\", \"src/main.w\")\n", target_name, "invalid generated build.w")
     if rc != 0: return rc
     let invalid_result = bgs_run_cli_capture_cwd(root, target_name, compiler_path, "build-w-invalid-generated-source", bgs_argv_append("", "build"), 120000, invalid_dir)
     if invalid_result.rc == 0:
@@ -1192,7 +1234,7 @@ fn bgs_check_build_w_generated_source(root: str, target_name: str, compiler_path
     bgs_assert_contains(invalid_result.stderr, "invalid build.w generated source path", target_name, "build_w_invalid_generated_source")
 
 fn bgs_graph_build_file() -> str:
-    "use std.build\n\npub fn build(b: Build) -> Build:\n    var out = b.executable(\"one\", \"src/one.w\")\n    out = out.executable(\"two\", \"src/two.w\")\n    out = out.generated_source(\"out/tmp/a.txt\", \"same\")\n    out = out.generated_source(\"out/tmp/b.txt\", \"same\")\n    out = out.binary_compare(\"bytes-same\", \"out/tmp/a.txt\", \"out/tmp/b.txt\")\n    out = out.fixpoint_compare(\"fix-same\", \"out/tmp/a.txt\", \"out/tmp/b.txt\")\n    var rsp = target_new(.GenerateResponseFile, \"rsp\", \"\").output(\"out/tmp/args.rsp\")\n    rsp = rsp.arg(\"-L/some path\")\n    rsp = rsp.arg(\"plain\")\n    out = out.add_target(rsp)\n    out = out.compile_c_object(\"helper-o\", \"runtime/helper.c\", \"out/lib/helper.o\")\n    var archive = target_new(.CreateStaticArchive, \"helper-a\", \"\").output(\"out/lib/libhelper.a\")\n    archive = archive.input(\"out/lib/helper.o\")\n    out = out.add_target(archive)\n    var embedded = target_new(.EmbedObjectFiles, \"embed-helper\", \"\").output(\"out/lib/embedded_helper.s\")\n    embedded = embedded.input(\"out/lib/helper.o\")\n    embedded = embedded.arg(\"helper_o\")\n    out = out.add_target(embedded)\n    out = out.compile_asm_object(\"embedded-helper-o\", \"out/lib/embedded_helper.s\", \"out/lib/embedded_helper.o\")\n    var copy_target = target_new(.CopyRuntimeTree, \"runtime-copy\", \"runtime\").output(\"out/runtime\")\n    copy_target = copy_target.input(\"helper.c\")\n    out = out.add_target(copy_target)\n    var promote = target_new(.PromoteTreeIfVerified, \"promote-runtime\", \"out/runtime\").output(\"promoted-runtime\")\n    promote = promote.input(\"helper.c\")\n    promote = promote.dep(\"runtime-copy\")\n    out = out.add_target(promote)\n    var corpus = target_new(.RunCorpusTest, \"corpus\", \"out/bin/two\")\n    corpus = corpus.dep(\"two\")\n    out = out.add_target(corpus)\n    var command = target_new(.Command, \"run-two\", \"out/bin/two\")\n    command = command.dep(\"two\")\n    out = out.add_target(command)\n    var install = target_new(.Install, \"install-two\", \"out/bin/two\").output(\"out/install/two\")\n    install = install.dep(\"two\")\n    install = install.arg(\"0755\")\n    out = out.add_target(install)\n    var aggregate = target_new(.Group, \"toolchain\", \"\")\n    aggregate = aggregate.dep(\"bytes-same\")\n    aggregate = aggregate.dep(\"fix-same\")\n    aggregate = aggregate.dep(\"rsp\")\n    aggregate = aggregate.dep(\"helper-a\")\n    aggregate = aggregate.dep(\"embedded-helper-o\")\n    aggregate = aggregate.dep(\"promote-runtime\")\n    aggregate = aggregate.dep(\"corpus\")\n    aggregate = aggregate.dep(\"run-two\")\n    aggregate = aggregate.dep(\"install-two\")\n    out = out.add_target(aggregate)\n    out.default(\"toolchain\")\n"
+    "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    var out = ctx.new_build().executable(\"one\", \"src/one.w\")\n    out = out.executable(\"two\", \"src/two.w\")\n    out = out.generated_source(\"out/tmp/a.txt\", \"same\")\n    out = out.generated_source(\"out/tmp/b.txt\", \"same\")\n    out = out.binary_compare(\"bytes-same\", \"out/tmp/a.txt\", \"out/tmp/b.txt\")\n    out = out.fixpoint_compare(\"fix-same\", \"out/tmp/a.txt\", \"out/tmp/b.txt\")\n    var rsp = target_new(.GenerateResponseFile, \"rsp\", \"\").output(\"out/tmp/args.rsp\")\n    rsp = rsp.arg(\"-L/some path\")\n    rsp = rsp.arg(\"plain\")\n    out = out.add_target(rsp)\n    out = out.compile_c_object(\"helper-o\", \"runtime/helper.c\", \"out/lib/helper.o\")\n    var archive = target_new(.CreateStaticArchive, \"helper-a\", \"\").output(\"out/lib/libhelper.a\")\n    archive = archive.input(\"out/lib/helper.o\")\n    out = out.add_target(archive)\n    var embedded = target_new(.EmbedObjectFiles, \"embed-helper\", \"\").output(\"out/lib/embedded_helper.s\")\n    embedded = embedded.input(\"out/lib/helper.o\")\n    embedded = embedded.arg(\"helper_o\")\n    out = out.add_target(embedded)\n    out = out.compile_asm_object(\"embedded-helper-o\", \"out/lib/embedded_helper.s\", \"out/lib/embedded_helper.o\")\n    var copy_target = target_new(.CopyTree, \"runtime-copy\", \"runtime\").output(\"out/runtime\")\n    copy_target = copy_target.input(\"helper.c\")\n    out = out.add_target(copy_target)\n    var promote = target_new(.PromoteTreeIfVerified, \"promote-runtime\", \"out/runtime\").output(\"promoted-runtime\")\n    promote = promote.input(\"helper.c\")\n    promote = promote.dep(\"runtime-copy\")\n    out = out.add_target(promote)\n    var corpus = target_new(.RunCorpusTest, \"corpus\", \"out/bin/two\")\n    corpus = corpus.dep(\"two\")\n    out = out.add_target(corpus)\n    var command = target_new(.Command, \"run-two\", \"out/bin/two\")\n    command = command.dep(\"two\")\n    out = out.add_target(command)\n    var install = target_new(.Install, \"install-two\", \"out/bin/two\").output(\"out/install/two\")\n    install = install.dep(\"two\")\n    install = install.arg(\"0755\")\n    out = out.add_target(install)\n    var aggregate = target_new(.Group, \"toolchain\", \"\")\n    aggregate = aggregate.dep(\"bytes-same\")\n    aggregate = aggregate.dep(\"fix-same\")\n    aggregate = aggregate.dep(\"rsp\")\n    aggregate = aggregate.dep(\"helper-a\")\n    aggregate = aggregate.dep(\"embedded-helper-o\")\n    aggregate = aggregate.dep(\"promote-runtime\")\n    aggregate = aggregate.dep(\"corpus\")\n    aggregate = aggregate.dep(\"run-two\")\n    aggregate = aggregate.dep(\"install-two\")\n    out = out.add_target(aggregate)\n    out.default(\"toolchain\")\n"
 
 fn bgs_check_build_w_graph_v2(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
     var rc = bgs_write_project_manifest(case_dir, "buildwgraphv2", target_name)
