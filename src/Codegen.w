@@ -2618,6 +2618,12 @@ fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
         return wl_array_type(elem_ty, arr_len as i64)
     if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
         return wl_ptr_type(self.context)
+    if tk == TypeKind.TY_FN:
+        let ptr_ty = wl_ptr_type(self.context)
+        let fat_types: Vec[i64] = Vec.new()
+        fat_types.push(ptr_ty)
+        fat_types.push(ptr_ty)
+        return wl_struct_type(self.context, vec_data_i64(&fat_types), 2, 0)
     0
 
 // Reverse map: LLVM type → sema TypeId (for primitives and str)
