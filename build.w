@@ -1,4 +1,5 @@
 use std.build
+use build_runtime
 
 fn project_kind_embedded_runtime_extract_test() -> BuildKind: 1000 as BuildKind
 fn project_kind_generate_compiler_entrypoints() -> BuildKind: 1003 as BuildKind
@@ -7,7 +8,6 @@ fn project_kind_pcre2_run_test() -> BuildKind: 1005 as BuildKind
 fn project_kind_pcre2_generated_check() -> BuildKind: 1006 as BuildKind
 fn project_kind_pcre2_generated_promote() -> BuildKind: 1007 as BuildKind
 fn project_kind_pcre2_build() -> BuildKind: 1008 as BuildKind
-fn project_kind_generate_compat_runtime() -> BuildKind: 1012 as BuildKind
 fn project_kind_with_compiler_ir() -> BuildKind: 1013 as BuildKind
 fn project_kind_selfhost_suite_test() -> BuildKind: 1019 as BuildKind
 fn project_kind_generate_llvm_link_metadata() -> BuildKind: 1020 as BuildKind
@@ -181,7 +181,10 @@ pub fn build(ctx: BuildCtx) -> Build:
     compiler_sources = compiler_sources.input("src/version")
     out = out.add_target(compiler_sources)
 
-    var compat_runtime = target_new(project_kind_generate_compat_runtime(), "compat-runtime-source", "rt/compat_runtime.w").output("out/gen/compat_runtime.w")
+    var compat_runtime = target_new(.Action, "compat-runtime-source", "").output("out/gen/compat_runtime.w")
+    compat_runtime = compat_runtime.extra_output("out/gen/compiler/EmbeddedStdlibData.w")
+    compat_runtime = compat_runtime.input("rt/compat_runtime.w")
+    compat_runtime.action = generate_compat_runtime_action
     out = out.add_target(compat_runtime)
 
     out = out.add_target(with_object_target("bootstrap-llvm-bridge-object", "seed", "rt/llvm_bridge.w", "out/bootstrap-lib/llvm_bridge.o", "-O0", ""))

@@ -265,9 +265,15 @@ project-local actions:
 - compiler stage policy that is not a generic graph operation.
 - selfhost fixture suites.
 
-Status: in progress. The first slice moved `issue61-regression` from a
-compiler-hardcoded project kind to a `build.w` Action target and removed the
-old compiler dispatch path for that target.
+Status: in progress. Completed slices:
+
+- Moved `issue61-regression` from a compiler-hardcoded project kind to a
+  `build.w` Action target and removed the old compiler dispatch path for that
+  target.
+- Moved `compat-runtime-source` generation from a compiler-hardcoded project
+  kind to the repository-local `build_runtime.w` module. The target is now an
+  `Action` with declared primary and extra outputs, and project kind 1012 is
+  reserved as removed legacy graph data.
 
 Generic compiler-driver code may retain only:
 

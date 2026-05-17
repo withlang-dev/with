@@ -407,6 +407,11 @@ pub fn build(ctx: BuildCtx) -> Build:
     out.executable("app", "src/main.w").default("app")
 ```
 
+Action functions can live in `build.w` or in repository-local modules imported
+by `build.w`. Keep reusable build-system abstractions in `std.build`; keep
+project policy, file lists, generated-source rules, and migration commands in
+the project build files.
+
 Action functions receive `ActionCtx`, which exposes the target name, project
 metadata, diagnostics, process runner, declared inputs, declared outputs, and a
 scoped project filesystem capability. Declared inputs and outputs are part of
