@@ -1,6 +1,6 @@
 # Tool-Mode Design
 
-Status: canonical design. Implementation pending.
+Status: canonical design. Core implementation complete for `build.w` and compiler hooks.
 
 This document defines how privileged "tool-mode" operations are exposed in With. It supersedes prior design sketches; earlier options are retained at the end of the file as historical context.
 
@@ -118,6 +118,59 @@ These are the questions the design deliberately leaves open. They must be answer
 4. **Mock capability provisioning.** How does the test driver construct mock capabilities given the unforgeability requirement? Likely: test builds compile with a `test` privilege that the production driver does not have; or mock types are a separate set of capability types accepted by all the same APIs.
 
 5. **Cross-implementation capability transport.** If a same-process implementation later moves to separate-binary or RPC, what does the migration look like? The user model is stable by design; the open question is what serialization format or handle protocol is used.
+
+### Current Implementation
+
+The current implementation uses driver-minted, token-validated capability
+values. The compiler generates short-lived tool runner source files for
+`build.w` and `@[compiler_hook(after_typecheck)]`, marks those generated
+files as privileged tool-mode entry paths during sema, and sets a
+per-run `WITH_TOOL_CAPABILITY_TOKEN` while executing the compiled runner.
+
+The sema boundary rejects ordinary user construction of tool capability
+struct literals, direct calls to `.__driver_new`, and direct field access
+on tool capability values. Capability fields are implementation details;
+user code must call capability methods.
+
+`build.w` receives `BuildCtx`. From it, user code may request narrower
+capabilities such as `ProjectInfo`, `Diagnostics`, `SourceEmitter`,
+`ToolFs`, and `ProcessRunner`.
+
+Compiler hooks are discovered by annotation, but the annotation only
+schedules the hook. Privileged operations are available only through
+declared parameters:
+
+```with
+@[compiler_hook(after_typecheck)]
+fn lint(project: ProjectInfo, diagnostics: Diagnostics):
+    ...
+
+@[compiler_hook(after_typecheck)]
+fn generate(source: SourceEmitter):
+    ...
+```
+
+The generated compiler-hook runner constructs `Diagnostics` and
+`SourceEmitter` capabilities and passes them according to each hook
+function's parameter types. Unsupported hook parameter types are rejected
+by sema.
+
+Capability values may be passed through ordinary helper functions and
+generic functions. Closures may capture capabilities while they remain
+non-escaping. Sema rejects escaping capability-bearing closures so tool
+power cannot be stored into runtime artifacts.
+
+The current transport is boundary-safe: capabilities are token-backed
+handles and output paths, not raw pointers or shared process-memory
+references. A future same-process-to-RPC migration can preserve the user
+model by changing only the driver-side handle validation and method
+backing.
+
+Dedicated in-memory mock capability provisioning is not implemented yet.
+Current tests exercise driver-minted capabilities through generated
+tool runners. A future test-driver extension should add first-class
+mock or sandboxed capabilities without changing the production
+capability API.
 
 ### Historical Context
 
