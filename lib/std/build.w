@@ -10,7 +10,10 @@ extern fn with_fs_file_exists(path: str) -> i32
 extern fn with_fs_is_dir(path: str) -> i32
 extern fn with_fs_mkdir_p(path: str) -> i32
 extern fn with_fs_read_file(path: str) -> str
+extern fn with_fs_copy_tree(src: str, dst: str) -> i32
 extern fn with_fs_remove_file(path: str) -> i32
+extern fn with_fs_remove_tree(path: str) -> i32
+extern fn with_fs_symlink(target: str, link_path: str) -> i32
 extern fn with_fs_write_file(path: str, data: str) -> i32
 extern fn with_exec_argv_capture(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32) -> i32
 extern fn with_exec_argv_capture_cwd(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str) -> i32
@@ -292,6 +295,20 @@ pub fn ToolFs.write_text(self: &Self, path: str, contents: str) -> i32:
 pub fn ToolFs.remove_file(self: &Self, path: str) -> i32:
     self.require_write_file_allowed(path)
     with_fs_remove_file(self.resolve_path(path))
+
+pub fn ToolFs.remove_tree(self: &Self, path: str) -> i32:
+    self.require_write_file_allowed(path)
+    with_fs_remove_tree(self.resolve_path(path))
+
+pub fn ToolFs.copy_tree(self: &Self, src: str, dst: str) -> i32:
+    tool_path_require_project_relative(src)
+    self.require_write_file_allowed(dst)
+    with_fs_copy_tree(self.resolve_path(src), self.resolve_path(dst))
+
+pub fn ToolFs.symlink(self: &Self, target: str, link_path: str) -> i32:
+    tool_path_require_project_relative(target)
+    self.require_write_file_allowed(link_path)
+    with_fs_symlink(self.resolve_path(target), self.resolve_path(link_path))
 
 pub fn SourceEmitter.generated_source(self: &Self, path: str, contents: str) -> GeneratedSource:
     tool_capability_require(self.token, "SourceEmitter")
