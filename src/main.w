@@ -791,10 +791,11 @@ fn load_build_graph_from_build_w(root: str, cfg: ProjectConfig, opt_level: i32, 
         return graph
     let stamp = f"{with_getpid()}.{with_clock_nanos()}"
     let runner_path = resolve_join(root, "__with_build_runner." ++ stamp ++ ".w")
-    let graph_path = resolve_join(tmp_dir, "build-graph." ++ stamp ++ ".txt")
+    let graph_rel_path = "out/tmp/build-graph." ++ stamp ++ ".txt"
+    let graph_path = resolve_join(root, graph_rel_path)
     let runner_bin = resolve_join(tmp_dir, "build-runner." ++ stamp)
     let capability_token = "with-tool:" ++ stamp
-    let runner_source = build_tool_runner_source(cfg.package_name, cfg.package_version, root, graph_path, capability_token)
+    let runner_source = build_tool_runner_source(cfg.package_name, cfg.package_version, root, graph_rel_path, capability_token)
     if with_fs_write_file(runner_path, runner_source) != 0:
         graph.error_msg = "could not write generated build.w runner"
         return graph

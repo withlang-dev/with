@@ -1,6 +1,6 @@
 # Tool-Mode Design
 
-Status: canonical design. Core implementation complete for `build.w` and compiler hooks.
+Status: canonical design. Core implementation complete for `build.w`, compiler hooks, and sandboxed test capabilities.
 
 This document defines how privileged "tool-mode" operations are exposed in With. It supersedes prior design sketches; earlier options are retained at the end of the file as historical context.
 
@@ -166,11 +166,14 @@ references. A future same-process-to-RPC migration can preserve the user
 model by changing only the driver-side handle validation and method
 backing.
 
-Dedicated in-memory mock capability provisioning is not implemented yet.
-Current tests exercise driver-minted capabilities through generated
-tool runners. A future test-driver extension should add first-class
-mock or sandboxed capabilities without changing the production
-capability API.
+The build driver provisions sandboxed capabilities for build graph
+selfhost tests through the same generated tool runner path used by real
+`build.w` execution. `ToolFs` carries the driver-minted project root and
+accepts only project-relative paths; absolute paths, parent-directory
+escapes, and control characters fail loudly before any runtime filesystem
+operation is attempted. This gives tests a sandboxed implementation
+without changing the production capability API or allowing user code to
+forge capability values.
 
 ### Historical Context
 
