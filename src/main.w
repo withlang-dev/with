@@ -1664,12 +1664,6 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, opt_level: 
                 return gen_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == build_graph_kind_generate_compat_runtime():
-            let compat_rc = run_generate_compat_runtime(root, target.name, target.entry, target.output)
-            if compat_rc != 0:
-                return compat_rc
-            completed_targets.push(target.name)
-            continue
         if target.kind == build_graph_kind_with_compiler_build():
             let with_build_rc = build_graph_run_with_compiler_build(root, target)
             if with_build_rc != 0:
