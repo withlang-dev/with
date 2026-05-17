@@ -777,12 +777,11 @@ fn test_unique_binary_path(source_file: str) -> str:
 fn build_tool_runner_source(package_name: str, package_version: str, root: str, graph_path: str, token: str) -> str:
     "use std.build\n" ++
     "use build\n\n" ++
-    "extern fn with_fs_write_file(path: str, data: str) -> i32\n\n" ++
     "fn main:\n" ++
     "    let pkg = Package { name: \"" ++ cli_escape_with_string(package_name) ++ "\", version: \"" ++ cli_escape_with_string(package_version) ++ "\" }\n" ++
     "    let ctx = BuildCtx.__driver_new(pkg, \"" ++ cli_escape_with_string(root) ++ "\", \"" ++ cli_escape_with_string(token) ++ "\")\n" ++
     "    let graph = build(ctx).emit_graph()\n" ++
-    "    assert(with_fs_write_file(\"" ++ cli_escape_with_string(graph_path) ++ "\", graph) == 0)\n"
+    "    assert(ctx.fs().write_text(\"" ++ cli_escape_with_string(graph_path) ++ "\", graph) == 0)\n"
 
 fn load_build_graph_from_build_w(root: str, cfg: ProjectConfig, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> BuildGraph:
     var graph = empty_build_graph()
