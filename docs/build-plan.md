@@ -21,6 +21,8 @@ Already implemented:
 - Target selection by `with build :target`.
 - Dependency-closure selection using explicit deps and producer edges.
 - `--graph` and `--dry-run` graph printing.
+- Project-local `Action` targets.
+- Scoped action filesystem writes for declared outputs.
 - Default `with test` dispatch through `with build :test`.
 - Standard graph nodes for:
   - `Executable`
@@ -59,7 +61,7 @@ Already implemented:
 Still not acceptable as final state:
 
 - Project-specific build behavior still leaks into compiler source modules.
-- There is no general project-local tool action mechanism.
+- Action target process/install policy declarations are still incomplete.
 - Full Jai-style workspace/build-options/message-loop APIs are incomplete.
 - Make remains as a compatibility layer.
 - Some repository scripts still exist because old workflows or tests reference
@@ -259,6 +261,10 @@ project-local actions:
 - seed download/update policy.
 - compiler stage policy that is not a generic graph operation.
 - selfhost fixture suites.
+
+Status: in progress. The first slice moved `issue61-regression` from a
+compiler-hardcoded project kind to a `build.w` Action target and removed the
+old compiler dispatch path for that target.
 
 Generic compiler-driver code may retain only:
 

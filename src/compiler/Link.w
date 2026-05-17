@@ -175,6 +175,19 @@ fn link_stage_undefined_symbols_need_regex_runtime(undef: str) -> i32:
         return 1
     0
 
+fn link_stage_undefined_symbols_need_compat_runtime(undef: str) -> i32:
+    if undef == "<probe-failed>":
+        return 1
+    if undef.len() == 0:
+        return 0
+    if link_stage_str_contains(undef, "_with_exec_"):
+        return 1
+    if link_stage_str_contains(undef, "_with_system"):
+        return 1
+    if link_stage_str_contains(undef, "_with_setenv_str"):
+        return 1
+    0
+
 fn link_stage_compiler_runtime_dir() -> str:
     let argv0 = with_arg_at(0)
     if argv0.len() == 0:
@@ -345,6 +358,7 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
     let undef = link_stage_undefined_symbols_for_object(obj_path)
     let needs_fiber_runtime = if needs_async_runtime: 1 else: link_stage_undefined_symbols_need_fiber_runtime(undef)
     let needs_regex_runtime = link_stage_undefined_symbols_need_regex_runtime(undef)
+    let needs_compat_runtime = link_stage_undefined_symbols_need_compat_runtime(undef)
     if needs_fiber_runtime != 0:
         let channel_runtime_path = link_stage_find_runtime_object_path("channel_runtime.o")
         if channel_runtime_path.len() == 0:
@@ -398,6 +412,13 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
                     return false
                 let regex_runtime_ar = link_stage_make_archive(regex_runtime_path)
                 extras.push(if regex_runtime_ar.len() > 0: regex_runtime_ar else: regex_runtime_path)
+            if needs_compat_runtime != 0:
+                let compat_runtime_path = link_stage_find_runtime_object_path("compat_runtime.o")
+                if compat_runtime_path.len() == 0:
+                    with_eprint("error: missing runtime/compat_runtime.o")
+                    return false
+                let compat_runtime_ar = link_stage_make_archive(compat_runtime_path)
+                extras.push(if compat_runtime_ar.len() > 0: compat_runtime_ar else: compat_runtime_path)
             if needs_fiber_runtime == 0:
                 let fiber_stubs_path = link_stage_find_runtime_object_path("fiber_stubs.o")
                 if fiber_stubs_path.len() == 0:
@@ -473,6 +494,13 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
                     return false
                 let regex_runtime_ar = link_stage_make_archive(regex_runtime_path)
                 extras.push(if regex_runtime_ar.len() > 0: regex_runtime_ar else: regex_runtime_path)
+            if needs_compat_runtime != 0:
+                let compat_runtime_path = link_stage_find_runtime_object_path("compat_runtime.o")
+                if compat_runtime_path.len() == 0:
+                    with_eprint("error: missing runtime/compat_runtime.o")
+                    return false
+                let compat_runtime_ar = link_stage_make_archive(compat_runtime_path)
+                extras.push(if compat_runtime_ar.len() > 0: compat_runtime_ar else: compat_runtime_path)
             if needs_fiber_runtime == 0:
                 let fiber_stubs_path = link_stage_find_runtime_object_path("fiber_stubs.o")
                 if fiber_stubs_path.len() == 0:

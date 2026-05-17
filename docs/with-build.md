@@ -552,8 +552,10 @@ pub fn build(ctx: BuildCtx) -> Build:
 ## The With Compiler Repository
 
 The With compiler itself uses `build.w` heavily. Repository-specific target
-kinds live in the repository `build.w` and compiler build graph modules, not in
-`std.build`.
+kinds and actions live in the repository `build.w` and temporary compiler build
+graph modules, not in `std.build`. The repository is actively moving those
+project-specific paths to `Action` targets so the generic compiler driver only
+executes standard graph nodes and action invocations.
 
 Common repository targets include:
 
