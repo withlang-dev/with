@@ -17,6 +17,7 @@ use CiPrint
 use CiMigrate
 use BuildGraphKinds
 use BuildGraphModel
+use BuildGraphDispatch
 use BuildGraphOps
 use BuildGraphPcre2
 use BuildGraphEmitC
@@ -1934,23 +1935,6 @@ fn build_graph_run_with_compiler_ir(root: str, target: BuildGraphTarget) -> i32:
     let _remove_stderr_done = with_fs_remove_file(stderr_path)
     0
 
-fn build_graph_target_completed(completed: Vec[str], name: str) -> bool:
-    for i in 0..completed.len() as i32:
-        if completed.get(i as i64) == name:
-            return true
-    false
-
-fn build_graph_verify_completed_deps(target: BuildGraphTarget, completed: Vec[str], operation_name: str, require_deps: bool) -> i32:
-    if require_deps and target.deps.len() == 0:
-        with_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' requires verification dependencies")
-        return 1
-    for di in 0..target.deps.len() as i32:
-        let dep = target.deps.get(di as i64)
-        if not build_graph_target_completed(completed, dep):
-            with_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' dependency has not completed: " ++ dep)
-            return 1
-    0
-
 fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, alloc_mode: bool, output_path: str, prelude_mode: i32, debug_info: bool) -> i32:
     if graph.targets.len() == 0:
         with_eprint("error: build.w did not declare any targets")
@@ -1981,80 +1965,10 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
             if not build_graph_define_valid(define):
                 with_eprint("error: invalid build.w define for '" ++ target.name ++ "': " ++ define)
                 return 1
-        if target.kind == 9:
-            let deps_rc = build_graph_verify_completed_deps(target, completed_targets, "group", false)
-            if deps_rc != 0:
-                return deps_rc
-            completed_targets.push(target.name)
-            continue
-        if target.kind == 10:
-            let compare_rc = build_graph_compare_files(root, target, "binary_compare")
-            if compare_rc != 0:
-                return compare_rc
-            completed_targets.push(target.name)
-            continue
-        if target.kind == 11:
-            let fixpoint_rc = build_graph_compare_files(root, target, "fixpoint_compare")
-            if fixpoint_rc != 0:
-                return fixpoint_rc
-            with_write("FIXPOINT\n")
-            completed_targets.push(target.name)
-            continue
-        if target.kind == 16:
-            let response_rc = build_graph_write_response_file(root, target)
-            if response_rc != 0:
-                return response_rc
-            completed_targets.push(target.name)
-            continue
-        if target.kind == 12:
-            let c_rc = build_graph_compile_object(root, target, "compile_c_object", build_graph_cc_tool().executable)
-            if c_rc != 0:
-                return c_rc
-            completed_targets.push(target.name)
-            continue
-        if target.kind == 13:
-            let asm_rc = build_graph_compile_object(root, target, "compile_asm_object", build_graph_cc_tool().executable)
-            if asm_rc != 0:
-                return asm_rc
-            completed_targets.push(target.name)
-            continue
-        if target.kind == 14:
-            let ir_rc = build_graph_compile_object(root, target, "compile_llvm_ir_object", build_graph_llvm_clang_tool().executable)
-            if ir_rc != 0:
-                return ir_rc
-            completed_targets.push(target.name)
-            continue
-        if target.kind == 15:
-            let archive_rc = build_graph_create_archive(root, target)
-            if archive_rc != 0:
-                return archive_rc
-            completed_targets.push(target.name)
-            continue
-        if target.kind == 17:
-            let embed_rc = build_graph_embed_object_files(root, target)
-            if embed_rc != 0:
-                return embed_rc
-            completed_targets.push(target.name)
-            continue
-        if target.kind == 18:
-            let copy_rc = build_graph_copy_manifest_files(root, target, "copy_tree")
-            if copy_rc != 0:
-                return copy_rc
-            completed_targets.push(target.name)
-            continue
-        if target.kind == 20:
-            let deps_rc = build_graph_verify_completed_deps(target, completed_targets, "promote_tree_if_verified", true)
-            if deps_rc != 0:
-                return deps_rc
-            let promote_rc = build_graph_copy_manifest_files(root, target, "promote_tree_if_verified")
-            if promote_rc != 0:
-                return promote_rc
-            completed_targets.push(target.name)
-            continue
-        if target.kind == 19:
-            let corpus_rc = build_graph_run_corpus_test(root, target)
-            if corpus_rc != 0:
-                return corpus_rc
+        let standard_result = build_graph_dispatch_standard_target(root, target, completed_targets)
+        if standard_result.handled:
+            if standard_result.rc != 0:
+                return standard_result.rc
             completed_targets.push(target.name)
             continue
         if target.kind == 1000:
@@ -2255,12 +2169,6 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
                 return pcre2_migrate_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == 21:
-            let clean_rc = build_graph_run_clean(root, target)
-            if clean_rc != 0:
-                return clean_rc
-            completed_targets.push(target.name)
-            continue
         if target.kind == 1024:
             let seed_rc = build_graph_run_seed_download(root, target)
             if seed_rc != 0:
@@ -2283,18 +2191,6 @@ fn run_build_graph(root: str, graph: BuildGraph, opt_level: i32, no_std: bool, a
             let emit_c_roundtrip_rc = build_graph_run_emit_c_roundtrip(root, target)
             if emit_c_roundtrip_rc != 0:
                 return emit_c_roundtrip_rc
-            completed_targets.push(target.name)
-            continue
-        if target.kind == 7:
-            let command_rc = build_graph_run_command(root, target)
-            if command_rc != 0:
-                return command_rc
-            completed_targets.push(target.name)
-            continue
-        if target.kind == 8:
-            let install_rc = build_graph_install_file(root, target)
-            if install_rc != 0:
-                return install_rc
             completed_targets.push(target.name)
             continue
         let source_path = resolve_join(root, target.entry)

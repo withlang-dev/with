@@ -1,0 +1,72 @@
+// BuildGraphDispatch -- standard build graph target execution.
+
+use BuildGraphKinds
+use BuildGraphModel
+use BuildGraphOps
+use BuildGraphRuntime
+use BuildGraphTools
+
+pub type BuildGraphDispatchResult {
+    handled: bool,
+    rc: i32,
+}
+
+fn build_graph_dispatch_result(handled: bool, rc: i32) -> BuildGraphDispatchResult:
+    BuildGraphDispatchResult { handled, rc }
+
+fn build_graph_target_completed(completed: Vec[str], name: str) -> bool:
+    for i in 0..completed.len() as i32:
+        if completed.get(i as i64) == name:
+            return true
+    false
+
+fn build_graph_verify_completed_deps(target: BuildGraphTarget, completed: Vec[str], operation_name: str, require_deps: bool) -> i32:
+    if require_deps and target.deps.len() == 0:
+        build_graph_rt_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' requires verification dependencies")
+        return 1
+    for di in 0..target.deps.len() as i32:
+        let dep = target.deps.get(di as i64)
+        if not build_graph_target_completed(completed, dep):
+            build_graph_rt_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' dependency has not completed: " ++ dep)
+            return 1
+    0
+
+pub fn build_graph_dispatch_standard_target(root: str, target: BuildGraphTarget, completed_targets: Vec[str]) -> BuildGraphDispatchResult:
+    if target.kind == 7:
+        return build_graph_dispatch_result(true, build_graph_run_command(root, target))
+    if target.kind == 8:
+        return build_graph_dispatch_result(true, build_graph_install_file(root, target))
+    if target.kind == 9:
+        let deps_rc = build_graph_verify_completed_deps(target, completed_targets, "group", false)
+        return build_graph_dispatch_result(true, deps_rc)
+    if target.kind == 10:
+        return build_graph_dispatch_result(true, build_graph_compare_files(root, target, "binary_compare"))
+    if target.kind == 11:
+        let fixpoint_rc = build_graph_compare_files(root, target, "fixpoint_compare")
+        if fixpoint_rc == 0:
+            build_graph_rt_write("FIXPOINT\n")
+        return build_graph_dispatch_result(true, fixpoint_rc)
+    if target.kind == 12:
+        return build_graph_dispatch_result(true, build_graph_compile_object(root, target, "compile_c_object", build_graph_cc_tool().executable))
+    if target.kind == 13:
+        return build_graph_dispatch_result(true, build_graph_compile_object(root, target, "compile_asm_object", build_graph_cc_tool().executable))
+    if target.kind == 14:
+        return build_graph_dispatch_result(true, build_graph_compile_object(root, target, "compile_llvm_ir_object", build_graph_llvm_clang_tool().executable))
+    if target.kind == 15:
+        return build_graph_dispatch_result(true, build_graph_create_archive(root, target))
+    if target.kind == 16:
+        return build_graph_dispatch_result(true, build_graph_write_response_file(root, target))
+    if target.kind == 17:
+        return build_graph_dispatch_result(true, build_graph_embed_object_files(root, target))
+    if target.kind == 18:
+        return build_graph_dispatch_result(true, build_graph_copy_manifest_files(root, target, "copy_tree"))
+    if target.kind == 19:
+        return build_graph_dispatch_result(true, build_graph_run_corpus_test(root, target))
+    if target.kind == 20:
+        let deps_rc = build_graph_verify_completed_deps(target, completed_targets, "promote_tree_if_verified", true)
+        if deps_rc != 0:
+            return build_graph_dispatch_result(true, deps_rc)
+        return build_graph_dispatch_result(true, build_graph_copy_manifest_files(root, target, "promote_tree_if_verified"))
+    if target.kind == 21:
+        return build_graph_dispatch_result(true, build_graph_run_clean(root, target))
+    build_graph_dispatch_result(false, 0)
