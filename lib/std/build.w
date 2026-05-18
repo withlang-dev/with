@@ -11,6 +11,7 @@ extern fn with_fs_file_exists(path: str) -> i32
 extern fn with_fs_is_dir(path: str) -> i32
 extern fn with_fs_mkdir_p(path: str) -> i32
 extern fn with_fs_read_file(path: str) -> str
+extern fn with_fs_chmod(path: str, mode: i32) -> i32
 extern fn with_fs_copy_tree(src: str, dst: str) -> i32
 extern fn with_fs_list_files(path: str) -> str
 extern fn with_fs_remove_file(path: str) -> i32
@@ -230,6 +231,17 @@ fn tool_path_require_project_relative(path: str):
         with_eprint("error: ToolFs path escapes project root: " ++ path ++ "\n")
         exit(1)
 
+fn tool_path_dirname(path: str) -> str:
+    var last_slash = -1
+    for i in 0..path.len() as i32:
+        if path.byte_at(i as i64) == 47:
+            last_slash = i
+    if last_slash < 0:
+        return "."
+    if last_slash == 0:
+        return "/"
+    path.slice(0, last_slash as i64)
+
 fn ToolFs.resolve_path(self: &Self, path: str) -> str:
     tool_capability_require(self.token, "ToolFs")
     tool_path_require_project_relative(path)
@@ -324,6 +336,22 @@ pub fn ToolFs.list_files(self: &Self, path: str) -> Vec[str]:
 pub fn ToolFs.write_text(self: &Self, path: str, contents: str) -> i32:
     self.require_write_file_allowed(path)
     with_fs_write_file(self.resolve_path(path), contents)
+
+pub fn ToolFs.copy_file(self: &Self, src: str, dst: str) -> i32:
+    tool_path_require_project_relative(src)
+    self.require_write_file_allowed(dst)
+    let dst_dir = tool_path_dirname(dst)
+    if dst_dir != ".":
+        self.require_mkdir_allowed(dst_dir)
+        let mkdir_rc = with_fs_mkdir_p(self.resolve_path(dst_dir))
+        if mkdir_rc != 0:
+            return mkdir_rc
+    let contents = with_fs_read_file(self.resolve_path(src))
+    with_fs_write_file(self.resolve_path(dst), contents)
+
+pub fn ToolFs.chmod(self: &Self, path: str, mode: i32) -> i32:
+    self.require_write_file_allowed(path)
+    with_fs_chmod(self.resolve_path(path), mode)
 
 pub fn ToolFs.remove_file(self: &Self, path: str) -> i32:
     self.require_write_file_allowed(path)

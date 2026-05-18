@@ -1516,7 +1516,7 @@ fn bs_check_build_w_generated_source(ctx: ActionCtx, compiler_path: str, base_di
     if rc != 0: return rc
     rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_ok_dir, "fixtures/tree/a.txt"), "tree", ctx.target_name(), "toolfs ok tree fixture")
     if rc != 0: return rc
-    rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_ok_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    let fs = ctx.fs()\n    assert(fs.mkdir_all(\"out/toolfs\") == 0)\n    assert(fs.write_text(\"out/toolfs/value.txt\", \"inside\") == 0)\n    assert(fs.read_text(\"out/toolfs/value.txt\") == \"inside\")\n    let files = fs.list_files(\"fixtures/tree\")\n    assert(files.len() == 1)\n    assert(files.get(0) == \"fixtures/tree/a.txt\")\n    assert(fs.copy_tree(\"fixtures/tree\", \"out/toolfs/tree-copy\") == 0)\n    assert(fs.read_text(\"out/toolfs/tree-copy/a.txt\") == \"tree\")\n    assert(fs.symlink(\"fixtures/tree/a.txt\", \"out/toolfs/link-a.txt\") == 0)\n    assert(fs.read_text(\"out/toolfs/link-a.txt\") == \"tree\")\n    assert(fs.remove_tree(\"out/toolfs/tree-copy\") == 0)\n    assert(not fs.exists(\"out/toolfs/tree-copy/a.txt\"))\n    ctx.new_build().executable(\"toolfs-ok\", \"src/main.w\")\n", ctx.target_name(), "toolfs ok build.w")
+    rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_ok_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    let fs = ctx.fs()\n    assert(fs.mkdir_all(\"out/toolfs\") == 0)\n    assert(fs.write_text(\"out/toolfs/value.txt\", \"inside\") == 0)\n    assert(fs.read_text(\"out/toolfs/value.txt\") == \"inside\")\n    let files = fs.list_files(\"fixtures/tree\")\n    assert(files.len() == 1)\n    assert(files.get(0) == \"fixtures/tree/a.txt\")\n    assert(fs.copy_file(\"fixtures/tree/a.txt\", \"out/toolfs/copied-file.txt\") == 0)\n    assert(fs.read_text(\"out/toolfs/copied-file.txt\") == \"tree\")\n    assert(fs.chmod(\"out/toolfs/copied-file.txt\", 0o644) == 0)\n    assert(fs.copy_tree(\"fixtures/tree\", \"out/toolfs/tree-copy\") == 0)\n    assert(fs.read_text(\"out/toolfs/tree-copy/a.txt\") == \"tree\")\n    assert(fs.symlink(\"fixtures/tree/a.txt\", \"out/toolfs/link-a.txt\") == 0)\n    assert(fs.read_text(\"out/toolfs/link-a.txt\") == \"tree\")\n    assert(fs.remove_tree(\"out/toolfs/tree-copy\") == 0)\n    assert(not fs.exists(\"out/toolfs/tree-copy/a.txt\"))\n    ctx.new_build().executable(\"toolfs-ok\", \"src/main.w\")\n", ctx.target_name(), "toolfs ok build.w")
     if rc != 0: return rc
     let toolfs_ok = bs_build_w_expect_success(ctx, compiler_path, toolfs_ok_dir, "build-w-toolfs-ok", bs_blob_to_args(bs_argv_append("", "build")))
     if toolfs_ok.rc != 0: return toolfs_ok.rc
@@ -1536,6 +1536,20 @@ fn bs_check_build_w_generated_source(ctx: ActionCtx, compiler_path: str, base_di
         ctx.diagnostics().error("error: build_w_toolfs_escape unexpectedly succeeded")
         return 1
     rc = bs_assert_contains(ctx, toolfs_escape.stderr, "ToolFs path escapes project root", "build_w_toolfs_escape")
+    if rc != 0: return rc
+
+    let toolfs_file_escape_dir = bs_join(base_dir, "toolfs_file_escape")
+    rc = bs_write_project_manifest(ctx, toolfs_file_escape_dir, "buildwtoolfsfileescape")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_file_escape_dir, "src/main.w"), "fn main:\n    print(\"should not build\")\n", ctx.target_name(), "toolfs file escape source")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_file_escape_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    let _ = ctx.fs().copy_file(\"../outside.txt\", \"out/bad.txt\")\n    ctx.new_build().executable(\"toolfs-file-escape\", \"src/main.w\")\n", ctx.target_name(), "toolfs file escape build.w")
+    if rc != 0: return rc
+    let toolfs_file_escape = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-toolfs-file-escape", bs_blob_to_args(bs_argv_append("", "build")), 120000, toolfs_file_escape_dir)
+    if toolfs_file_escape.rc == 0:
+        ctx.diagnostics().error("error: build_w_toolfs_file_escape unexpectedly succeeded")
+        return 1
+    rc = bs_assert_contains(ctx, toolfs_file_escape.stderr, "ToolFs path escapes project root", "build_w_toolfs_file_escape")
     if rc != 0: return rc
 
     let toolfs_tree_escape_dir = bs_join(base_dir, "toolfs_tree_escape")
