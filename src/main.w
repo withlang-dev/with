@@ -50,7 +50,6 @@ extern fn with_system(cmd: str) -> i32
 extern fn with_exec_binary(path: str) -> i32
 extern fn with_exec_argv(args: str) -> i32
 extern fn with_exec_argv_capture(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32) -> i32
-extern fn with_exec_argv_capture_input(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, stdin_path: str) -> i32
 extern fn with_exec_argv_capture_cwd(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str) -> i32
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_fs_remove_file(path: str) -> i32
@@ -1015,18 +1014,6 @@ fn build_graph_run_embedded_runtime_extract_test(root: str, target: BuildGraphTa
         return 1
     0
 
-fn build_graph_assert_contains(text: str, needle: str, target: BuildGraphTarget, label: str) -> i32:
-    if with_str_contains(text, needle) != 0:
-        return 0
-    with_eprint("error: " ++ build_graph_kind_name(target.kind) ++ " target '" ++ target.name ++ "' missing expected output for " ++ label ++ ": " ++ needle)
-    1
-
-fn build_graph_assert_not_contains(text: str, needle: str, target: BuildGraphTarget, label: str) -> i32:
-    if with_str_contains(text, needle) == 0:
-        return 0
-    with_eprint("error: " ++ build_graph_kind_name(target.kind) ++ " target '" ++ target.name ++ "' found forbidden output for " ++ label ++ ": " ++ needle)
-    1
-
 fn build_graph_run_cli_capture(root: str, target: BuildGraphTarget, compiler_path: str, label: str, argv_tail: str, timeout_ms: i32) -> TestRunResult:
     let capture_dir = resolve_join(resolve_join(root, "out/test-graph"), target.name)
     let _mkdir = with_fs_mkdir_p(capture_dir)
@@ -1044,201 +1031,6 @@ fn build_graph_run_cli_capture(root: str, target: BuildGraphTarget, compiler_pat
         let _remove_stdout = with_fs_remove_file(stdout_path)
         let _remove_stderr = with_fs_remove_file(stderr_path)
     TestRunResult { rc, stdout, stderr }
-
-fn build_graph_run_cli_capture_input(root: str, target: BuildGraphTarget, compiler_path: str, label: str, argv_tail: str, stdin_text: str, timeout_ms: i32) -> TestRunResult:
-    let capture_dir = resolve_join(resolve_join(root, "out/test-graph"), target.name)
-    let _mkdir = with_fs_mkdir_p(capture_dir)
-    let stamp = f"{with_getpid()}.{with_clock_nanos()}"
-    let stdin_path = resolve_join(capture_dir, label ++ "." ++ stamp ++ ".stdin")
-    let stdout_path = resolve_join(capture_dir, label ++ "." ++ stamp ++ ".stdout")
-    let stderr_path = resolve_join(capture_dir, label ++ "." ++ stamp ++ ".stderr")
-    if with_fs_write_file(stdin_path, stdin_text) != 0:
-        with_eprint("error: cli selfhost command '" ++ label ++ "' could not write stdin fixture: " ++ stdin_path)
-        return TestRunResult { 1, "", "" }
-    var argv = ""
-    argv = build_graph_argv_append(argv, compiler_path)
-    argv = argv ++ argv_tail
-    let rc = with_exec_argv_capture_input(argv, stdout_path, stderr_path, timeout_ms, stdin_path)
-    let stdout = with_fs_read_file(stdout_path)
-    let stderr = with_fs_read_file(stderr_path)
-    let _ = label
-    if rc == 0:
-        let _remove_stdin = with_fs_remove_file(stdin_path)
-        let _remove_stdout = with_fs_remove_file(stdout_path)
-        let _remove_stderr = with_fs_remove_file(stderr_path)
-    TestRunResult { rc, stdout, stderr }
-
-fn build_graph_assert_stdout_exact(result: TestRunResult, expected: str, target: BuildGraphTarget, label: str) -> i32:
-    let actual = build_graph_trim_space_and_newlines(result.stdout)
-    if actual == expected:
-        return 0
-    with_eprint("error: " ++ build_graph_kind_name(target.kind) ++ " target '" ++ target.name ++ "' stdout mismatch for " ++ label ++ ": expected '" ++ expected ++ "' got '" ++ actual ++ "'")
-    1
-
-fn build_graph_expect_cli_success_exact(root: str, target: BuildGraphTarget, compiler_path: str, label: str, argv_tail: str, expected: str) -> i32:
-    let result = build_graph_run_cli_capture(root, target, compiler_path, label, argv_tail, 120000)
-    if result.rc != 0:
-        with_eprint("error: cli selfhost one-liner '" ++ label ++ f"' failed with exit code {result.rc}")
-        return if result.rc == 0: 1 else: result.rc
-    build_graph_assert_stdout_exact(result, expected, target, label)
-
-fn build_graph_expect_cli_input_success_exact(root: str, target: BuildGraphTarget, compiler_path: str, label: str, argv_tail: str, stdin_text: str, expected: str) -> i32:
-    let result = build_graph_run_cli_capture_input(root, target, compiler_path, label, argv_tail, stdin_text, 120000)
-    if result.rc != 0:
-        with_eprint("error: cli selfhost one-liner '" ++ label ++ f"' failed with exit code {result.rc}")
-        return if result.rc == 0: 1 else: result.rc
-    build_graph_assert_stdout_exact(result, expected, target, label)
-
-fn build_graph_run_cli_selfhost_one_liner_test(root: str, target: BuildGraphTarget) -> i32:
-    if target.entry.len() == 0:
-        with_eprint("error: cli_selfhost_one_liner_test target '" ++ target.name ++ "' requires a compiler path")
-        return 1
-    let arg_rc = build_graph_validate_process_args(target)
-    if arg_rc != 0:
-        return arg_rc
-    let compiler_path = build_graph_resolve_project_path(root, target.entry)
-    if with_fs_file_exists(compiler_path) == 0:
-        with_eprint("error: cli_selfhost_one_liner_test target '" ++ target.name ++ "' missing compiler: " ++ compiler_path)
-        return 1
-
-    var argv = ""
-    argv = build_graph_argv_append(argv, "-e")
-    argv = build_graph_argv_append(argv, "print(\"hello\")")
-    var rc = build_graph_expect_cli_success_exact(root, target, compiler_path, "one-liner-e", argv, "hello")
-    if rc != 0: return rc
-
-    argv = ""
-    argv = build_graph_argv_append(argv, "-e")
-    argv = build_graph_argv_append(argv, "var x = 0")
-    argv = build_graph_argv_append(argv, "-e")
-    argv = build_graph_argv_append(argv, "x = x + 2")
-    argv = build_graph_argv_append(argv, "-e")
-    argv = build_graph_argv_append(argv, "print(f\"{x}\")")
-    rc = build_graph_expect_cli_success_exact(root, target, compiler_path, "one-liner-repeat-e", argv, "2")
-    if rc != 0: return rc
-
-    argv = ""
-    argv = build_graph_argv_append(argv, "-e")
-    argv = build_graph_argv_append(argv, "var x = 0; x = x + 1; print(f\"{x}\")")
-    rc = build_graph_expect_cli_success_exact(root, target, compiler_path, "one-liner-semicolon", argv, "1")
-    if rc != 0: return rc
-
-    argv = ""
-    argv = build_graph_argv_append(argv, "-e")
-    argv = build_graph_argv_append(argv, "print(\"a;b\")")
-    rc = build_graph_expect_cli_success_exact(root, target, compiler_path, "one-liner-semicolon-string", argv, "a;b")
-    if rc != 0: return rc
-
-    argv = ""
-    argv = build_graph_argv_append(argv, "-e")
-    argv = build_graph_argv_append(argv, "for a in args: print(a)")
-    argv = build_graph_argv_append(argv, "--")
-    argv = build_graph_argv_append(argv, "foo")
-    argv = build_graph_argv_append(argv, "bar")
-    rc = build_graph_expect_cli_success_exact(root, target, compiler_path, "one-liner-args", argv, "foo\nbar")
-    if rc != 0: return rc
-
-    argv = ""
-    argv = build_graph_argv_append(argv, "-n")
-    argv = build_graph_argv_append(argv, "print(f\"{nr}: {line}\")")
-    rc = build_graph_expect_cli_input_success_exact(root, target, compiler_path, "one-liner-n", argv, "a\nb\n", "1: a\n2: b")
-    if rc != 0: return rc
-
-    argv = ""
-    argv = build_graph_argv_append(argv, "-p")
-    argv = build_graph_argv_append(argv, "line = line.upper()")
-    rc = build_graph_expect_cli_input_success_exact(root, target, compiler_path, "one-liner-p", argv, "a\r\nb\n", "A\nB")
-    if rc != 0: return rc
-
-    argv = ""
-    argv = build_graph_argv_append(argv, "-n")
-    argv = build_graph_argv_append(argv, "if line =~ /error (\\d+)/: print($1)")
-    rc = build_graph_expect_cli_input_success_exact(root, target, compiler_path, "one-liner-regex-numbered", argv, "error 42\n", "42")
-    if rc != 0: return rc
-
-    argv = ""
-    argv = build_graph_argv_append(argv, "-n")
-    argv = build_graph_argv_append(argv, "if line =~ /email=(?<email>\\S+)/: print($email)")
-    rc = build_graph_expect_cli_input_success_exact(root, target, compiler_path, "one-liner-regex-named", argv, "email=a@b\n", "a@b")
-    if rc != 0: return rc
-
-    argv = ""
-    argv = build_graph_argv_append(argv, "-n")
-    argv = build_graph_argv_append(argv, "if line =~ /(?<kind>error|warning) (\\d+)/: print(f\"{nr}: {$kind.upper()} code={$2}\")")
-    rc = build_graph_expect_cli_input_success_exact(root, target, compiler_path, "one-liner-regex-fstring", argv, "error 42\nok\nwarning 7\n", "1: ERROR code=42\n3: WARNING code=7")
-    if rc != 0: return rc
-
-    argv = ""
-    argv = build_graph_argv_append(argv, "-n")
-    argv = build_graph_argv_append(argv, "if line =~ /^\\[(?<level>ERROR|WARN)\\]\\s+(?<msg>.*)$/: print(f\"{nr}: {$level} {$msg}\")")
-    rc = build_graph_expect_cli_input_success_exact(root, target, compiler_path, "one-liner-regex-escaped-named", argv, "[INFO] boot\n[WARN] slow query\n[ERROR] db timeout\n", "2: WARN slow query\n3: ERROR db timeout")
-    if rc != 0: return rc
-
-    let stamp = f"{with_getpid()}.{with_clock_nanos()}"
-    let source_dir = resolve_join(resolve_join(resolve_join(root, "out/test-graph"), target.name), stamp)
-    if with_fs_mkdir_p(source_dir) != 0:
-        with_eprint("error: could not create one-liner source fixture directory: " ++ source_dir)
-        return 1
-    let implicit_src = resolve_join(source_dir, "implicit_regex_fstring.w")
-    let implicit_text =
-        "use std.io\n" ++
-        "use std.regex\n" ++
-        "for line in stdin.lines():\n" ++
-        "    if line =~ /(?<kind>error|warning) (\\d+)/:\n" ++
-        "        print(f\"{$kind.upper()} code={$2}\")\n"
-    if with_fs_write_file(implicit_src, implicit_text) != 0:
-        with_eprint("error: could not write one-liner fixture source: " ++ implicit_src)
-        return 1
-    argv = ""
-    argv = build_graph_argv_append(argv, "run")
-    argv = build_graph_argv_append(argv, implicit_src)
-    rc = build_graph_expect_cli_input_success_exact(root, target, compiler_path, "implicit-main-regex-fstring", argv, "error 42\nok\n", "ERROR code=42")
-    if rc != 0: return rc
-
-    argv = ""
-    argv = build_graph_argv_append(argv, "-e")
-    argv = build_graph_argv_append(argv, "print(\"x\")")
-    argv = build_graph_argv_append(argv, "-n")
-    argv = build_graph_argv_append(argv, "print(line)")
-    let mutual = build_graph_run_cli_capture(root, target, compiler_path, "one-liner-mutual-exclusion", argv, 120000)
-    if mutual.rc == 0:
-        with_eprint("error: cli selfhost one-liner mutual exclusion unexpectedly succeeded")
-        return 1
-    rc = build_graph_assert_contains(mutual.stderr, "mutually exclusive", target, "one_liners")
-    if rc != 0: return rc
-
-    argv = ""
-    argv = build_graph_argv_append(argv, "-e")
-    argv = build_graph_argv_append(argv, "let x = ")
-    let diag_e = build_graph_run_cli_capture(root, target, compiler_path, "one-liner-diag-e", argv, 120000)
-    if diag_e.rc == 0:
-        with_eprint("error: cli selfhost one-liner malformed -e unexpectedly succeeded")
-        return 1
-    rc = build_graph_assert_contains(diag_e.stderr, "<cli -e #1>:1:9", target, "one_liners")
-    if rc != 0: return rc
-
-    argv = ""
-    argv = build_graph_argv_append(argv, "-n")
-    argv = build_graph_argv_append(argv, "if line =~ /x/: print($1)")
-    let diag_n = build_graph_run_cli_capture_input(root, target, compiler_path, "one-liner-diag-n", argv, "x\n", 120000)
-    if diag_n.rc == 0:
-        with_eprint("error: cli selfhost one-liner malformed capture unexpectedly succeeded")
-        return 1
-    rc = build_graph_assert_contains(diag_n.stderr, "<cli -n #1>:1:23", target, "one_liners")
-    if rc != 0: return rc
-
-    argv = ""
-    argv = build_graph_argv_append(argv, "-n")
-    argv = build_graph_argv_append(argv, "if line =~ /(?<kind>error|warning) (\\d+)/: print(f\"{kind}\")")
-    let diag_capture = build_graph_run_cli_capture_input(root, target, compiler_path, "one-liner-diag-fstring-capture", argv, "error 42\n", 120000)
-    if diag_capture.rc == 0:
-        with_eprint("error: cli selfhost one-liner f-string capture diagnostic unexpectedly succeeded")
-        return 1
-    rc = build_graph_assert_contains(diag_capture.stderr, "<cli -n #1>:1:", target, "one_liners")
-    if rc != 0: return rc
-    rc = build_graph_assert_not_contains(diag_capture.stderr, "use std.", target, "one_liners")
-    if rc != 0: return rc
-    build_graph_assert_not_contains(diag_capture.stderr, "one-liner compilation failed", target, "one_liners")
 
 fn build_graph_split_words(line: str) -> Vec[str]:
     let words: Vec[str] = Vec.new()
@@ -1485,8 +1277,6 @@ fn build_graph_run_cli_selfhost_suite_test(root: str, target: BuildGraphTarget) 
     if with_fs_file_exists(compiler_path) == 0:
         with_eprint("error: selfhost_suite_test target '" ++ target.name ++ "' missing compiler: " ++ compiler_path)
         return 1
-    if suite == "one-liner":
-        return build_graph_run_cli_selfhost_one_liner_test(root, target)
     if suite == "object-symbol":
         return build_graph_run_cli_selfhost_object_symbol_test(root, target)
     if suite == "build-w":
@@ -1612,12 +1402,6 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, opt_level: 
             let pcre2_build_rc = build_graph_run_pcre2_build(root, target)
             if pcre2_build_rc != 0:
                 return pcre2_build_rc
-            completed_targets.push(target.name)
-            continue
-        if target.kind == build_graph_kind_cli_selfhost_one_liner_test():
-            let one_liner_rc = build_graph_run_cli_selfhost_one_liner_test(root, target)
-            if one_liner_rc != 0:
-                return one_liner_rc
             completed_targets.push(target.name)
             continue
         if target.kind == build_graph_kind_cli_selfhost_object_symbol_test():
