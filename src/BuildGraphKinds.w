@@ -24,12 +24,12 @@ fn build_graph_kind_is_project(kind: i32) -> bool:
         return true
     if kind == 1013:
         return true
-    if kind >= 1015 and kind <= 1022:
+    if kind >= 1016 and kind <= 1022:
         return true
     kind >= 1024 and kind <= BUILD_GRAPH_PROJECT_KIND_MAX
 
 pub fn build_graph_kind_removed(kind: i32) -> bool:
-    kind == 5 or kind == 6 or kind == 1001 or kind == 1002 or kind == 1009 or kind == 1010 or kind == 1012 or kind == 1014
+    kind == 5 or kind == 6 or kind == 1001 or kind == 1002 or kind == 1009 or kind == 1010 or kind == 1012 or kind == 1014 or kind == 1015
 
 pub fn build_graph_kind_embedded_runtime_extract_test() -> i32: 1000
 pub fn build_graph_kind_generate_compiler_entrypoints() -> i32: 1003
@@ -40,7 +40,6 @@ pub fn build_graph_kind_pcre2_generated_promote() -> i32: 1007
 pub fn build_graph_kind_pcre2_build() -> i32: 1008
 pub fn build_graph_kind_cli_selfhost_build_w_test() -> i32: 1011
 pub fn build_graph_kind_with_compiler_ir() -> i32: 1013
-pub fn build_graph_kind_cli_selfhost_edge_test() -> i32: 1015
 pub fn build_graph_kind_cli_selfhost_pcre2_prep_test() -> i32: 1016
 pub fn build_graph_kind_cli_selfhost_migrate_basic_test() -> i32: 1017
 pub fn build_graph_kind_cli_selfhost_migrate_core_test() -> i32: 1018
@@ -96,7 +95,7 @@ pub fn build_graph_kind_name(kind: i32) -> str:
     if kind == 1012: return "removed_generate_compat_runtime"
     if kind == 1013: return "with_compiler_ir"
     if kind == 1014: return "removed_cli_selfhost_project_test"
-    if kind == 1015: return "cli_selfhost_edge_test"
+    if kind == 1015: return "removed_cli_selfhost_edge_test"
     if kind == 1016: return "cli_selfhost_pcre2_prep_test"
     if kind == 1017: return "cli_selfhost_migrate_basic_test"
     if kind == 1018: return "cli_selfhost_migrate_core_test"
