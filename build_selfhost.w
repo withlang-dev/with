@@ -21,6 +21,17 @@ fn bs_join(left: str, right: str) -> str:
         return left ++ right
     left ++ "/" ++ right
 
+fn bs_dirname(path: str) -> str:
+    var last_slash = -1
+    for i in 0..path.len() as i32:
+        if path.byte_at(i as i64) == 47:
+            last_slash = i
+    if last_slash < 0:
+        return "."
+    if last_slash == 0:
+        return "/"
+    path.slice(0, last_slash as i64)
+
 fn bs_abs(root: str, path: str) -> str:
     if path.len() > 0 and path.byte_at(0) == 47:
         return path
@@ -307,3 +318,242 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
     rc = bs_assert_not_contains(ctx, diag_capture.stderr, "use std.", "one_liners")
     if rc != 0: return rc
     bs_assert_not_contains(ctx, diag_capture.stderr, "one-liner compilation failed", "one_liners")
+
+fn bs_split_words(line: str) -> Vec[str]:
+    let words: Vec[str] = Vec.new()
+    var start = 0
+    var in_word = false
+    var i = 0
+    while i <= line.len() as i32:
+        let at_end = i == line.len() as i32
+        let ch = if at_end: 32 else: line.byte_at(i as i64)
+        let is_space = ch == 32 or ch == 9
+        if at_end or is_space:
+            if in_word:
+                words.push(line.slice(start as i64, i as i64))
+                in_word = false
+            start = i + 1
+        else if not in_word:
+            start = i
+            in_word = true
+        i = i + 1
+    words
+
+fn bs_split_nonempty_lines(text: str) -> Vec[str]:
+    let lines: Vec[str] = Vec.new()
+    var start = 0
+    var i = 0
+    while i <= text.len() as i32:
+        let at_end = i == text.len() as i32
+        if at_end or text.byte_at(i as i64) == 10:
+            var end = i
+            if end > start and text.byte_at((end - 1) as i64) == 13:
+                end = end - 1
+            if end > start:
+                lines.push(text.slice(start as i64, end as i64))
+            start = i + 1
+        i = i + 1
+    lines
+
+fn bs_strip_mach_o_underscore(name: str) -> str:
+    if name.len() > 0 and name.byte_at(0) == 95:
+        return name.slice(1, name.len())
+    name
+
+fn bs_nm_symbol_name(line: str) -> str:
+    let words = bs_split_words(line)
+    if words.len() == 0:
+        return ""
+    bs_strip_mach_o_underscore(words.get(words.len() - 1))
+
+fn bs_nm_symbol_type(line: str) -> str:
+    let words = bs_split_words(line)
+    if words.len() < 2:
+        return ""
+    words.get(words.len() - 2)
+
+fn bs_nm_output(ctx: ActionCtx, nm_tool: str, obj_path: str, label: str) -> SelfhostRunResult:
+    let root = ctx.project_info().project_root()
+    let output_dir = ctx.output()
+    let stdout_rel = bs_join(output_dir, label ++ ".nm.stdout")
+    let stderr_rel = bs_join(output_dir, label ++ ".nm.stderr")
+    var argv: Vec[str] = Vec.new()
+    argv |> push(nm_tool)
+    argv |> push(bs_abs(root, obj_path))
+    let result = ctx.process_runner().run_capture(argv, bs_abs(root, stdout_rel), bs_abs(root, stderr_rel), 120000)
+    if result.rc == 0:
+        let _remove_stdout = ctx.fs().remove_file(stdout_rel)
+        let _remove_stderr = ctx.fs().remove_file(stderr_rel)
+    SelfhostRunResult { result.rc, result.stdout, result.stderr }
+
+fn bs_nm_has_symbol(nm_text: str, exact: str, suffix: str, prefix: str, type_required: str, type_forbidden: str) -> bool:
+    let lines = bs_split_nonempty_lines(nm_text)
+    for i in 0..lines.len() as i32:
+        let line = lines.get(i as i64)
+        let name = bs_nm_symbol_name(line)
+        if name.len() == 0:
+            continue
+        var matched = true
+        if exact.len() > 0 and name != exact:
+            matched = false
+        if suffix.len() > 0 and not name.ends_with(suffix):
+            matched = false
+        if prefix.len() > 0 and not name.starts_with(prefix):
+            matched = false
+        if matched:
+            let ty = bs_nm_symbol_type(line)
+            if type_required.len() > 0 and ty != type_required:
+                continue
+            if type_forbidden.len() > 0 and ty == type_forbidden:
+                continue
+            return true
+    false
+
+fn bs_expect_nm_symbol(ctx: ActionCtx, nm_text: str, label: str, exact: str, suffix: str, prefix: str, required_type: str, forbidden_type: str) -> i32:
+    if bs_nm_has_symbol(nm_text, exact, suffix, prefix, required_type, forbidden_type):
+        return 0
+    let want = if exact.len() > 0: exact else: prefix ++ "*" ++ suffix
+    bs_fail(ctx, "missing expected symbol for " ++ label ++ ": " ++ want)
+
+fn bs_expect_nm_forbid(ctx: ActionCtx, nm_text: str, label: str, exact: str, suffix: str, prefix: str) -> i32:
+    if not bs_nm_has_symbol(nm_text, exact, suffix, prefix, "", ""):
+        return 0
+    let want = if exact.len() > 0: exact else: prefix ++ "*" ++ suffix
+    bs_fail(ctx, "found forbidden symbol for " ++ label ++ ": " ++ want)
+
+fn bs_write_fixture(ctx: ActionCtx, path: str, contents: str, label: str) -> i32:
+    let dir = bs_dirname(path)
+    if ctx.fs().mkdir_all(dir) != 0:
+        return bs_fail(ctx, "could not create fixture directory for " ++ label ++ ": " ++ dir)
+    if ctx.fs().write_text(path, contents) != 0:
+        return bs_fail(ctx, "could not write fixture for " ++ label ++ ": " ++ path)
+    0
+
+fn bs_build_emit_obj(ctx: ActionCtx, compiler_path: str, label: str, src_path: str, obj_path: str) -> i32:
+    var args: Vec[str] = Vec.new()
+    args |> push("build")
+    args |> push(src_path)
+    args |> push("--emit-obj")
+    args |> push("-O0")
+    args |> push("-o")
+    args |> push(obj_path)
+    let result = bs_run_cli_capture(ctx, compiler_path, label, args, 120000)
+    if result.rc != 0:
+        return bs_fail(ctx, f"failed to build object for {label} with exit code {result.rc}")
+    0
+
+fn bs_check_object_symbols(ctx: ActionCtx, compiler_path: str, nm_tool: str, case_dir: str) -> i32:
+    let globals_src = bs_join(case_dir, "emit_obj_globals.w")
+    let globals_obj = bs_join(case_dir, "emit_obj_globals.o")
+    var rc = bs_write_fixture(ctx, globals_src, "var explicit_global: i32 = 42\nvar zero_global: i32\n", "emit_obj_globals")
+    if rc != 0: return rc
+    rc = bs_build_emit_obj(ctx, compiler_path, "emit-obj-globals-build", globals_src, globals_obj)
+    if rc != 0: return rc
+    let globals_nm = bs_nm_output(ctx, nm_tool, globals_obj, "emit-obj-globals")
+    if globals_nm.rc != 0:
+        return bs_fail(ctx, "nm failed for emit_obj_globals")
+    rc = bs_expect_nm_symbol(ctx, globals_nm.stdout, "emit_obj_globals explicit_global", "", "explicit_global", "", "", "U")
+    if rc != 0: return rc
+    rc = bs_expect_nm_symbol(ctx, globals_nm.stdout, "emit_obj_globals zero_global", "", "zero_global", "", "", "U")
+    if rc != 0: return rc
+
+    let shared_src = bs_join(case_dir, "shared.w")
+    let user_src = bs_join(case_dir, "user.w")
+    let shared_obj = bs_join(case_dir, "shared.o")
+    let user_obj = bs_join(case_dir, "user.o")
+    rc = bs_write_fixture(ctx, shared_src, "var shared_var: i32 = 42\nlet shared_let: i32 = 7\nfn shared_fn() -> i32: shared_var + shared_let\n", "emit_obj_import_owner")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, user_src, "use shared\n@[c_export(\"use_shared\")]\nfn use_shared() -> i32: shared_fn()\n@[c_export(\"shared_let_addr\")]\nfn shared_let_addr() -> *const i32: &shared_let\n@[c_export(\"shared_var_addr\")]\nfn shared_var_addr() -> *const i32: &shared_var\n", "emit_obj_import_user")
+    if rc != 0: return rc
+    rc = bs_build_emit_obj(ctx, compiler_path, "emit-obj-import-owner-build", shared_src, shared_obj)
+    if rc != 0: return rc
+    rc = bs_build_emit_obj(ctx, compiler_path, "emit-obj-import-user-build", user_src, user_obj)
+    if rc != 0: return rc
+    let shared_nm = bs_nm_output(ctx, nm_tool, shared_obj, "emit-obj-import-owner")
+    if shared_nm.rc != 0: return if shared_nm.rc == 0: 1 else: shared_nm.rc
+    rc = bs_expect_nm_symbol(ctx, shared_nm.stdout, "emit_obj_import_owner shared_var", "", "shared_var", "", "", "U")
+    if rc != 0: return rc
+    rc = bs_expect_nm_symbol(ctx, shared_nm.stdout, "emit_obj_import_owner shared_let", "", "shared_let", "", "", "U")
+    if rc != 0: return rc
+    rc = bs_expect_nm_symbol(ctx, shared_nm.stdout, "emit_obj_import_owner shared_fn", "", "shared_fn", "", "", "U")
+    if rc != 0: return rc
+    let user_nm = bs_nm_output(ctx, nm_tool, user_obj, "emit-obj-import-user")
+    if user_nm.rc != 0: return if user_nm.rc == 0: 1 else: user_nm.rc
+    rc = bs_expect_nm_symbol(ctx, user_nm.stdout, "emit_obj_import_user use_shared", "use_shared", "", "", "", "U")
+    if rc != 0: return rc
+    rc = bs_expect_nm_symbol(ctx, user_nm.stdout, "emit_obj_import_user shared_let_addr", "shared_let_addr", "", "", "", "U")
+    if rc != 0: return rc
+    rc = bs_expect_nm_symbol(ctx, user_nm.stdout, "emit_obj_import_user shared_var_addr", "shared_var_addr", "", "", "", "U")
+    if rc != 0: return rc
+    rc = bs_expect_nm_symbol(ctx, user_nm.stdout, "emit_obj_import_user shared_var", "", "shared_var", "", "U", "")
+    if rc != 0: return rc
+    rc = bs_expect_nm_symbol(ctx, user_nm.stdout, "emit_obj_import_user shared_let", "", "shared_let", "", "U", "")
+    if rc != 0: return rc
+    rc = bs_expect_nm_symbol(ctx, user_nm.stdout, "emit_obj_import_user shared_fn", "", "shared_fn", "", "U", "")
+    if rc != 0: return rc
+
+    let wrapper_src = bs_join(case_dir, "wrapper.w")
+    let redecl_user_src = bs_join(case_dir, "redecl_user.w")
+    let redecl_obj = bs_join(case_dir, "redecl_user.o")
+    rc = bs_write_fixture(ctx, shared_src, "fn shared_fn() -> i32: 1\n", "imported_fn_owner")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, wrapper_src, "extern fn shared_fn() -> i32\n", "imported_fn_wrapper")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, redecl_user_src, "use shared\nuse wrapper\n@[c_export(\"call_shared\")]\nfn call_shared() -> i32: shared_fn()\n", "imported_fn_user")
+    if rc != 0: return rc
+    rc = bs_build_emit_obj(ctx, compiler_path, "imported-fn-beats-extern-build", redecl_user_src, redecl_obj)
+    if rc != 0: return rc
+    let redecl_nm = bs_nm_output(ctx, nm_tool, redecl_obj, "imported-fn-beats-extern")
+    if redecl_nm.rc != 0: return if redecl_nm.rc == 0: 1 else: redecl_nm.rc
+    rc = bs_expect_nm_symbol(ctx, redecl_nm.stdout, "imported_fn_beats_extern call_shared", "call_shared", "", "", "", "U")
+    if rc != 0: return rc
+    rc = bs_expect_nm_symbol(ctx, redecl_nm.stdout, "imported_fn_beats_extern shared_fn", "", "__shared_fn", "__with_mod_", "U", "")
+    if rc != 0: return rc
+    rc = bs_expect_nm_forbid(ctx, redecl_nm.stdout, "imported_fn_beats_extern raw shared_fn", "shared_fn", "", "")
+    if rc != 0: return rc
+
+    for pi in 0..2:
+        let label = if pi == 0: "imported_pcre2_symbol" else: "imported_pcre2_symbol_multi_import"
+        let pcre_src = bs_join(case_dir, label ++ ".w")
+        let pcre_obj = bs_join(case_dir, label ++ ".o")
+        let imports = if pi == 0:
+            "use std.re.pcre2_compile\n"
+        else:
+            "use std.re.defs\nuse std.re.pcre2_compile\nuse std.re.pcre2_match\n"
+        let pcre_text = imports ++ "\n@[c_export(\"call_compile\")]\nfn call_compile() -> *mut pcre2_real_code_8:\n    pcre2_compile_8((null as *const u8), 0, 0, (null as *mut c_int), (null as *mut c_ulong), (null as *mut pcre2_real_compile_context_8))\n"
+        rc = bs_write_fixture(ctx, pcre_src, pcre_text, label)
+        if rc != 0: return rc
+        rc = bs_build_emit_obj(ctx, compiler_path, label ++ "-build", pcre_src, pcre_obj)
+        if rc != 0: return rc
+        let pcre_nm = bs_nm_output(ctx, nm_tool, pcre_obj, label)
+        if pcre_nm.rc != 0: return if pcre_nm.rc == 0: 1 else: pcre_nm.rc
+        rc = bs_expect_nm_symbol(ctx, pcre_nm.stdout, label ++ " call_compile", "call_compile", "", "", "", "U")
+        if rc != 0: return rc
+        rc = bs_expect_nm_symbol(ctx, pcre_nm.stdout, label ++ " module pcre2_compile_8", "", "__pcre2_compile_8", "__with_mod_", "U", "")
+        if rc != 0: return rc
+        rc = bs_expect_nm_forbid(ctx, pcre_nm.stdout, label ++ " raw pcre2_compile_8", "pcre2_compile_8", "", "")
+        if rc != 0: return rc
+    0
+
+pub fn run_cli_selfhost_object_symbol_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    if inputs.len() == 0:
+        return bs_fail(ctx, "missing compiler input")
+
+    let fs = ctx.fs()
+    let output_dir = ctx.output()
+    if output_dir.len() == 0:
+        return bs_fail(ctx, "missing output directory")
+    if fs.exists(output_dir) and fs.remove_tree(output_dir) != 0:
+        return bs_fail(ctx, "could not remove previous output directory: " ++ output_dir)
+    if fs.mkdir_all(output_dir) != 0:
+        return bs_fail(ctx, "could not create output directory: " ++ output_dir)
+
+    let compiler_input = inputs.get(0)
+    if not fs.exists(compiler_input):
+        return bs_fail(ctx, "missing compiler: " ++ compiler_input)
+    let compiler_path = bs_abs(ctx.project_info().project_root(), compiler_input)
+
+    let args = ctx.args()
+    let nm_tool = if args.len() > 0: args.get(0) else: "nm"
+    bs_check_object_symbols(ctx, compiler_path, nm_tool, bs_join(output_dir, "cases"))
