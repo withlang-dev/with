@@ -25,8 +25,7 @@ fn pcre2_dirname(path: str) -> str:
 fn pcre2_abs(root: str, path: str) -> str:
     if path.len() > 0 and path.byte_at(0) == 47:
         return path
-    let clean_root = if root.ends_with("/."): root.slice(0, root.len() - 2) else: root
-    pcre2_join(clean_root, path)
+    pcre2_join(root, path)
 
 fn pcre2_split_lines(text: str) -> Vec[str]:
     let lines: Vec[str] = Vec.new()
