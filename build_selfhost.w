@@ -1001,6 +1001,326 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     bs_check_migrate_shared_defs_ownerless_extern(ctx, compiler_path, bs_join(output_dir, "shared_defs_ownerless_extern"))
 
+fn bs_check_migrate_libc_ctype(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "libc_ctype.c")
+    let out_w = bs_join(case_dir, "libc_ctype.w")
+    let c_text = "#include <ctype.h>\n\nint classify(int c) {\n  return isalpha(c) + isdigit(c) + isalnum(c) + isspace(c) +\n    isupper(c) + islower(c) + isxdigit(c) + isprint(c) +\n    isgraph(c) + ispunct(c) + iscntrl(c) + tolower(c) + toupper(c);\n}\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "libc ctype source")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("--prefer-brace")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-libc-ctype", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    let required: Vec[str] = Vec.new()
+    required |> push("extern fn isalpha(c: i32) -> i32")
+    required |> push("extern fn tolower(c: i32) -> i32")
+    required |> push("isalpha(__param_c)")
+    required |> push("isalnum(__param_c)")
+    required |> push("isgraph(__param_c)")
+    required |> push("tolower(__param_c)")
+    for i in 0..required.len() as i32:
+        rc = bs_assert_contains(ctx, out_text, required.get(i as i64), "libc_ctype_calls")
+        if rc != 0: return rc
+    let forbidden: Vec[str] = Vec.new()
+    forbidden |> push("is_alpha(__param_c)")
+    forbidden |> push("is_alnum(__param_c)")
+    forbidden |> push("to_lower(__param_c)")
+    for i in 0..forbidden.len() as i32:
+        rc = bs_assert_not_contains(ctx, out_text, forbidden.get(i as i64), "libc_ctype_calls")
+        if rc != 0: return rc
+    var check_args: Vec[str] = Vec.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-libc-ctype", check_args)
+    if check.rc != 0: return check.rc
+    0
+
+fn bs_check_migrate_macro_unsigned_minus(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "macro_initializer_unsigned_minus.c")
+    let out_w = bs_join(case_dir, "macro_initializer_unsigned_minus.w")
+    let c_text = "typedef unsigned long size_t;\n\n#define MY_SIZE_MAX ((size_t)-1)\n#define COPY_ONE(dst_, src_, length_) do { size_t chkmc_length = length_; if (chkmc_length > 0) { (dst_)[0] = (src_)[0]; } } while (0)\n\nint too_large(size_t current, size_t need) {\n  return current > (MY_SIZE_MAX - need) / 2;\n}\n\nint repeat_too_large(size_t replen, size_t need, int count) {\n  return count > 0 && replen > (MY_SIZE_MAX - need) / count;\n}\n\nint copy_after_goto(char *dst, const char *src, int flag) {\n  if (flag) goto copy;\n  return 0;\ncopy:\n  COPY_ONE(dst, src, 3);\n  return (int)dst[0];\n}\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "macro unsigned source")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("--prefer-brace")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-macro-unsigned-minus", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    if not out_text.contains("(-1 as ") and not out_text.contains("(0 as "):
+        return bs_fail(ctx, "macro_initializer_unsigned_minus missing typed unsigned -1")
+    rc = bs_assert_not_contains(ctx, out_text, "((0 -% 1)", "macro_initializer_unsigned_minus")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "/ (__param_count as ", "macro_initializer_unsigned_minus")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "__local_chkmc_length", "macro_initializer_unsigned_minus")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "= 3)", "macro_initializer_unsigned_minus")
+    if rc != 0: return rc
+    var check_args: Vec[str] = Vec.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-macro-unsigned-minus", check_args)
+    if check.rc != 0: return check.rc
+    0
+
+fn bs_check_migrate_tentative_global_owner(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "tentative_global_owner.c")
+    let out_w = bs_join(case_dir, "tentative_global_owner.w")
+    var rc = bs_write_fixture(ctx, src, "typedef struct ctx { int x; } ctx;\nctx g;\nint issue127_read(void) { return g.x; }\n", "tentative global owner")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-tentative-global-owner", args)
+    if result.rc != 0: return result.rc
+    rc = bs_file_contains(ctx, out_w, "var g: ctx", "tentative_global_owner")
+    if rc != 0: return rc
+    rc = bs_file_forbids(ctx, out_w, "extern var g: ctx", "tentative_global_owner")
+    if rc != 0: return rc
+    var check_args: Vec[str] = Vec.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-tentative-global-owner", check_args)
+    if check.rc != 0: return check.rc
+    0
+
+fn bs_check_migrate_cross_file_tentative_global_owner(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let generated_dir = bs_join(case_dir, "generated")
+    var rc = bs_write_fixture(ctx, bs_join(case_dir, "a.c"), "int issue127_counter;\nint issue127_get(void) { return issue127_counter; }\n", "cross tentative a")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "b.c"), "int issue127_counter;\nint issue127_bump(void) {\n  issue127_counter = issue127_counter + 1;\n  return issue127_counter;\n}\n", "cross tentative b")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, case_dir))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, generated_dir))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-cross-file-tentative", args)
+    if result.rc != 0: return result.rc
+    let a_w = bs_join(generated_dir, "a.w")
+    let b_w = bs_join(generated_dir, "b.w")
+    rc = bs_file_contains(ctx, a_w, "var issue127_counter: c_int", "cross_file_tentative_global_owner")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, b_w, "extern var issue127_counter: c_int", "cross_file_tentative_global_owner")
+    if rc != 0: return rc
+    var check_a_args: Vec[str] = Vec.new()
+    check_a_args |> push("check")
+    check_a_args |> push(bs_abs(root, a_w))
+    let check_a = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-cross-file-tentative-a", check_a_args)
+    if check_a.rc != 0: return check_a.rc
+    var check_b_args: Vec[str] = Vec.new()
+    check_b_args |> push("check")
+    check_b_args |> push(bs_abs(root, b_w))
+    let check_b = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-cross-file-tentative-b", check_b_args)
+    if check_b.rc != 0: return check_b.rc
+    0
+
+fn bs_check_migrate_noop_pointer_casts(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "noop_pointer_cast_exprs.c")
+    let out_w = bs_join(case_dir, "noop_pointer_cast_exprs.w")
+    let c_text = "typedef struct ctx { int x; } ctx;\nctx g;\n\nctx *ret_ctx(void) { return (ctx *)(&g); }\n\nint f(ctx *ccontext) {\n  ctx *local = (ctx *)(&g);\n  ccontext = (ctx *)(&g);\n  return local->x + ccontext->x;\n}\n\nstatic void callback(void *p) { (void)p; }\n\ntypedef void (*callback_fn)(void *);\n\ncallback_fn ret_callback(void) { return &callback; }\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "noop pointer casts")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-noop-pointer-casts", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    let required: Vec[str] = Vec.new()
+    required |> push("fn ret_ctx() -> *mut ctx:")
+    required |> push("return ((&raw mut g as *mut ctx))")
+    required |> push("var __local_local: *mut ctx = ((&raw mut g as *mut ctx))")
+    required |> push("(&raw mut g as *mut ctx)")
+    required |> push("return callback")
+    for i in 0..required.len() as i32:
+        rc = bs_assert_contains(ctx, out_text, required.get(i as i64), "noop_pointer_cast_exprs")
+        if rc != 0: return rc
+    let forbidden: Vec[str] = Vec.new()
+    forbidden |> push("extern fn ret_ctx()")
+    forbidden |> push("as *mut ctx)) as *mut ctx")
+    forbidden |> push("&raw const callback")
+    for i in 0..forbidden.len() as i32:
+        rc = bs_assert_not_contains(ctx, out_text, forbidden.get(i as i64), "noop_pointer_cast_exprs")
+        if rc != 0: return rc
+    var check_args: Vec[str] = Vec.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-noop-pointer-casts", check_args)
+    if check.rc != 0: return check.rc
+    0
+
+fn bs_check_migrate_raw_pointer_index(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "raw_pointer_index_unsafe.c")
+    let out_w = bs_join(case_dir, "raw_pointer_index_unsafe.w")
+    var rc = bs_write_fixture(ctx, src, "int issue146_ptr_ops(int *p, int *q) {\n  int *r = p + 1;\n  int d = (int)(q - p);\n  r[0] = r[0] + d;\n  return p[1];\n}\n", "raw pointer index")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-raw-pointer-index", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_contains(ctx, out_text, "__param_p +", "raw_pointer_index_unsafe")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "(unsafe: __local_r[0])", "raw_pointer_index_unsafe")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "(unsafe: __param_p[1])", "raw_pointer_index_unsafe")
+    if rc != 0: return rc
+    var check_args: Vec[str] = Vec.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-raw-pointer-index", check_args)
+    if check.rc != 0: return check.rc
+    0
+
+fn bs_check_migrate_prefer_brace_ws(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "prefer_brace_ws.c")
+    let out_w = bs_join(case_dir, "prefer_brace_ws.w")
+    let c_text = "int prefer_brace_ws(int *p) {\n  while (*p != 0) {\n    if (*p < 3) {\n      p++;\n      continue;\n    }\n    p++;\n  }\n  return 0;\n}\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "prefer brace source")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("--prefer-brace")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-prefer-brace-ws", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+
+    var saw_while_brace = false
+    var saw_if_brace = false
+    var line_start = 0
+    while line_start < out_text.len() as i32:
+        var line_end = line_start
+        while line_end < out_text.len() as i32 and out_text.byte_at(line_end as i64) != 10:
+            line_end = line_end + 1
+        if line_end > line_start:
+            let last = out_text.byte_at((line_end - 1) as i64)
+            if last == 32 or last == 9:
+                return bs_fail(ctx, "prefer_brace_ws emitted trailing whitespace")
+        var trimmed_start = line_start
+        while trimmed_start < line_end:
+            let ch = out_text.byte_at(trimmed_start as i64)
+            if ch != 32 and ch != 9:
+                break
+            trimmed_start = trimmed_start + 1
+        let line = out_text.slice(trimmed_start as i64, line_end as i64)
+        if line.starts_with("while"):
+            if line.ends_with("{"):
+                saw_while_brace = true
+            if line.ends_with(":"):
+                return bs_fail(ctx, "prefer_brace_ws emitted colon-style while")
+        if line.starts_with("if"):
+            if line.ends_with("{"):
+                saw_if_brace = true
+            if line.ends_with(":"):
+                return bs_fail(ctx, "prefer_brace_ws emitted colon-style if")
+        line_start = line_end + 1
+    if not saw_while_brace:
+        return bs_fail(ctx, "prefer_brace_ws missing brace-style while")
+    if not saw_if_brace:
+        return bs_fail(ctx, "prefer_brace_ws missing brace-style if")
+    var check_args: Vec[str] = Vec.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-prefer-brace-ws", check_args)
+    if check.rc != 0: return check.rc
+    0
+
+fn bs_check_migrate_typed_cast_macros(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "typed_cast_macros.c")
+    let out_w = bs_join(case_dir, "typed_cast_macros.w")
+    let c_text = "typedef unsigned long usize;\n#define ZERO_TERM ((usize)-1)\n\nint f(usize patlen) {\n  int zero_terminated = 0;\n  if ((zero_terminated = (patlen == ZERO_TERM)))\n    patlen = 7;\n  return zero_terminated + (int)patlen;\n}\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "typed cast macros")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-typed-cast-macros", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_contains(ctx, out_text, "let ZERO_TERM: c_ulong = (-1 as c_ulong)", "typed_cast_macros")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "patlen == ((-1 as c_ulong))", "typed_cast_macros")
+    if rc != 0: return rc
+    var check_args: Vec[str] = Vec.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-typed-cast-macros", check_args)
+    if check.rc != 0: return check.rc
+    0
+
+pub fn run_cli_selfhost_migrate_core_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    if inputs.len() == 0:
+        return bs_fail(ctx, "missing compiler input")
+
+    let fs = ctx.fs()
+    let output_dir = ctx.output()
+    if output_dir.len() == 0:
+        return bs_fail(ctx, "missing output directory")
+    if fs.exists(output_dir) and fs.remove_tree(output_dir) != 0:
+        return bs_fail(ctx, "could not remove previous output directory: " ++ output_dir)
+    if fs.mkdir_all(output_dir) != 0:
+        return bs_fail(ctx, "could not create output directory: " ++ output_dir)
+
+    let compiler_input = inputs.get(0)
+    if not fs.exists(compiler_input):
+        return bs_fail(ctx, "missing compiler: " ++ compiler_input)
+    let compiler_path = bs_abs(ctx.project_info().project_root(), compiler_input)
+
+    var rc = bs_check_migrate_libc_ctype(ctx, compiler_path, bs_join(output_dir, "libc_ctype"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_macro_unsigned_minus(ctx, compiler_path, bs_join(output_dir, "macro_unsigned_minus"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_tentative_global_owner(ctx, compiler_path, bs_join(output_dir, "tentative_global_owner"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_cross_file_tentative_global_owner(ctx, compiler_path, bs_join(output_dir, "cross_file_tentative_global_owner"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_noop_pointer_casts(ctx, compiler_path, bs_join(output_dir, "noop_pointer_casts"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_raw_pointer_index(ctx, compiler_path, bs_join(output_dir, "raw_pointer_index"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_prefer_brace_ws(ctx, compiler_path, bs_join(output_dir, "prefer_brace_ws"))
+    if rc != 0: return rc
+    bs_check_migrate_typed_cast_macros(ctx, compiler_path, bs_join(output_dir, "typed_cast_macros"))
+
 fn bs_copy_fixture_file(ctx: ActionCtx, src: str, dst: str, label: str) -> i32:
     if not ctx.fs().exists(src):
         return bs_fail(ctx, "missing source file for " ++ label ++ ": " ++ src)
