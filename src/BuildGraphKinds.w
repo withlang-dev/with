@@ -29,7 +29,7 @@ fn build_graph_kind_is_project(kind: i32) -> bool:
     kind >= 1024 and kind <= BUILD_GRAPH_PROJECT_KIND_MAX
 
 pub fn build_graph_kind_removed(kind: i32) -> bool:
-    kind == 5 or kind == 6 or kind == 1001 or kind == 1002 or kind == 1009 or kind == 1010 or kind == 1012 or kind == 1014 or kind == 1015 or kind == 1016 or kind == 1017
+    kind == 5 or kind == 6 or kind == 1001 or kind == 1002 or kind == 1009 or kind == 1010 or kind == 1012 or kind == 1014 or kind == 1015 or kind == 1016 or kind == 1017 or kind == 1023
 
 pub fn build_graph_kind_embedded_runtime_extract_test() -> i32: 1000
 pub fn build_graph_kind_generate_compiler_entrypoints() -> i32: 1003
@@ -101,6 +101,8 @@ pub fn build_graph_kind_name(kind: i32) -> str:
     if kind == 1020: return "generate_llvm_link_metadata"
     if kind == 1021: return "pcre2_reference_prepare"
     if kind == 1022: return "pcre2_migrate"
+    // 1023 was skipped when project kinds were first named; keep it reserved.
+    if kind == 1023: return "removed_unused_1023"
     if kind == 1024: return "seed_download"
     if kind == 1025: return "emit_c_test"
     if kind == 1026: return "emit_c_fixpoint"

@@ -83,16 +83,14 @@ Removed project kinds:
 | 1015 | `removed_cli_selfhost_edge_test` |
 | 1016 | `removed_cli_selfhost_pcre2_prep_test` |
 | 1017 | `removed_cli_selfhost_migrate_basic_test` |
-
-Unassigned project gap:
-
-| Kind | Status |
-| --- | --- |
-| 1023 | unassigned; no current or historical source reference found |
+| 1023 | `removed_unused_1023` |
 
 `build_graph_kind_is_project` accepts every live project kind and excludes
 every removed project kind. `build_graph_kind_removed` reserves every removed
-project kind. Kind `1023` is neither live nor removed because it is an unused
-gap, not a retired serialized kind.
+project kind.
+
+Kind `1023` was never a live serialized target. It was skipped when project
+kinds were named in `3fd6f81`; it is now explicitly reserved as
+`removed_unused_1023` so the gap is intentional and diagnosable.
 
 No source corrections were required by this audit.
