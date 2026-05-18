@@ -493,8 +493,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     cli_selfhost_project_tests = cli_selfhost_project_tests.dep("selfcheck")
     out = out.add_target(cli_selfhost_project_tests)
 
-    var cli_selfhost_edge_tests = target_new(project_kind_selfhost_suite_test(), "cli-selfhost-edge-tests", "out/bin/with-stage2")
-    cli_selfhost_edge_tests = cli_selfhost_edge_tests.arg("edge")
+    var cli_selfhost_edge_tests = target_new(.Action, "cli-selfhost-edge-tests", "").output("out/test-graph/cli-selfhost-edge-tests")
+    cli_selfhost_edge_tests.action = run_cli_selfhost_edge_action
     cli_selfhost_edge_tests = cli_selfhost_edge_tests.input("out/bin/with-stage2")
     cli_selfhost_edge_tests = cli_selfhost_edge_tests.dep("selfcheck")
     out = out.add_target(cli_selfhost_edge_tests)

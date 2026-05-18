@@ -97,6 +97,19 @@ fn bs_run_cli_capture_cwd(ctx: ActionCtx, compiler_path: str, label: str, args: 
         let _remove_stderr = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stderr"))
     SelfhostRunResult { result.rc, result.stdout, result.stderr }
 
+fn bs_run_binary_capture(ctx: ActionCtx, exe_path: str, label: str, timeout_ms: i32) -> SelfhostRunResult:
+    let root = ctx.project_info().project_root()
+    let output_dir = ctx.output()
+    let stdout_path = bs_capture_path(root, output_dir, label, "stdout")
+    let stderr_path = bs_capture_path(root, output_dir, label, "stderr")
+    var argv: Vec[str] = Vec.new()
+    argv |> push(bs_abs(root, exe_path))
+    let result = ctx.process_runner().run_capture(argv, stdout_path, stderr_path, timeout_ms)
+    if result.rc == 0:
+        let _remove_stdout = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stdout"))
+        let _remove_stderr = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stderr"))
+    SelfhostRunResult { result.rc, result.stdout, result.stderr }
+
 fn bs_run_cli_expect_success(ctx: ActionCtx, compiler_path: str, label: str, args: Vec[str]) -> SelfhostRunResult:
     let result = bs_run_cli_capture(ctx, compiler_path, label, args, 120000)
     if result.rc != 0:
@@ -489,6 +502,125 @@ pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
     rc = bs_check_build_uses_package_section_name(ctx, compiler_path, bs_join(output_dir, "build_package_section_case"))
     if rc != 0: return rc
     bs_check_build_rejects_imperative_manifest(ctx, compiler_path, bs_join(output_dir, "build_imperative_manifest_case"))
+
+fn bs_edge_assert_exact(ctx: ActionCtx, actual: str, expected: str, label: str, stream_name: str) -> i32:
+    if actual == expected:
+        return 0
+    ctx.diagnostics().error(ctx.target_name() ++ ": " ++ stream_name ++ " mismatch for " ++ label)
+    ctx.diagnostics().error("expected: '" ++ expected ++ "'")
+    ctx.diagnostics().error("actual: '" ++ actual ++ "'")
+    1
+
+fn bs_edge_expect_success(ctx: ActionCtx, compiler_path: str, case_dir: str, label: str, args: Vec[str]) -> SelfhostRunResult:
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, label, args, 120000, case_dir)
+    if result.rc != 0:
+        ctx.diagnostics().error(ctx.target_name() ++ ": edge selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
+    result
+
+fn bs_edge_build_obj_args(src: str, obj: str) -> Vec[str]:
+    let args: Vec[str] = Vec.new()
+    args |> push("build")
+    args |> push(src)
+    args |> push("--emit-obj")
+    args |> push("-O0")
+    args |> push("-o")
+    args |> push(obj)
+    args
+
+fn bs_check_pointer_index_rejected(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "pointer_index_rejected.w")
+    let obj = bs_join(case_dir, "pointer_index_rejected.o")
+    var rc = bs_write_fixture(ctx, src, "fn main:\n    var arr: [4]i32 = [0 as i32; 4]\n    var p: *const i32 = null\n    let value = arr[p]\n    value\n", "pointer index source")
+    if rc != 0: return rc
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "pointer-index-rejected", bs_edge_build_obj_args(bs_abs(root, src), bs_abs(root, obj)), 120000, case_dir)
+    if result.rc == 0:
+        return bs_fail(ctx, "accepted pointer index expression")
+    rc = bs_assert_contains(ctx, result.stderr, "index expression must be an integer", "pointer_index_rejected")
+    if rc != 0: return rc
+    bs_assert_not_contains(ctx, result.stderr, "LLVM verify error", "pointer_index_rejected")
+
+fn bs_check_prelude_output_functions(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "prelude_output_functions.w")
+    var rc = bs_write_fixture(ctx, src, "fn main:\n    write(\"A\")\n    print(\"B\")\n    write(\"C\")\n    ewrite(\"D\")\n    eprint(\"E\")\n    ewrite(\"F\")\n", "prelude output source")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("run")
+    args |> push(bs_abs(root, src))
+    let result = bs_edge_expect_success(ctx, compiler_path, case_dir, "prelude-output-functions", args)
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    rc = bs_edge_assert_exact(ctx, result.stdout, "AB\nC", "prelude_output_functions", "stdout")
+    if rc != 0: return rc
+    bs_edge_assert_exact(ctx, result.stderr, "DE\nF", "prelude_output_functions", "stderr")
+
+fn bs_check_whole_program_extern_var_redecl(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let defs_src = bs_join(case_dir, "defs.w")
+    let user_src = bs_join(case_dir, "user.w")
+    let main_src = bs_join(case_dir, "main.w")
+    let bin = bs_join(case_dir, "whole_program_extern_var_redecl")
+    var rc = bs_write_fixture(ctx, defs_src, "var shared_counter: i32 = 41\n", "extern redecl defs")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, user_src, "extern var shared_counter: i32\nfn read_counter() -> i32: shared_counter + 1\n", "extern redecl user")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, main_src, "use user\nuse defs\n\nfn main:\n    if read_counter() == 42:\n        print(\"ok\")\n    else:\n        print(\"bad\")\n", "extern redecl main")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("build")
+    args |> push(bs_abs(root, main_src))
+    args |> push("-o")
+    args |> push(bs_abs(root, bin))
+    let build_result = bs_edge_expect_success(ctx, compiler_path, case_dir, "whole-program-extern-var-redecl", args)
+    if build_result.rc != 0: return if build_result.rc == 0: 1 else: build_result.rc
+    let run_result = bs_run_binary_capture(ctx, bin, "whole-program-extern-var-redecl-run", 120000)
+    if run_result.rc != 0: return if run_result.rc == 0: 1 else: run_result.rc
+    bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(run_result.stdout), "ok", "whole_program_extern_var_redecl", "stdout")
+
+fn bs_check_imported_module_dependency_order(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let defs_src = bs_join(case_dir, "defs.w")
+    let module_src = bs_join(case_dir, "m.w")
+    let user_src = bs_join(case_dir, "user.w")
+    var rc = bs_write_fixture(ctx, defs_src, "type T = opaque\n", "dependency order defs")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, module_src, "use defs\nextern var gv: T\ntype T { x: i32 = 0 }\n", "dependency order module")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, user_src, "use m\nfn main: let _ = 0\n", "dependency order user")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("check")
+    args |> push(bs_abs(root, user_src))
+    let result = bs_edge_expect_success(ctx, compiler_path, case_dir, "imported-module-dependency-order", args)
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    0
+
+pub fn run_cli_selfhost_edge_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    if inputs.len() == 0:
+        return bs_fail(ctx, "missing compiler input")
+
+    let fs = ctx.fs()
+    let output_dir = ctx.output()
+    if output_dir.len() == 0:
+        return bs_fail(ctx, "missing output directory")
+    if fs.exists(output_dir) and fs.remove_tree(output_dir) != 0:
+        return bs_fail(ctx, "could not remove previous output directory: " ++ output_dir)
+    if fs.mkdir_all(output_dir) != 0:
+        return bs_fail(ctx, "could not create output directory: " ++ output_dir)
+
+    let compiler_input = inputs.get(0)
+    if not fs.exists(compiler_input):
+        return bs_fail(ctx, "missing compiler: " ++ compiler_input)
+    let compiler_path = bs_abs(ctx.project_info().project_root(), compiler_input)
+
+    var rc = bs_check_pointer_index_rejected(ctx, compiler_path, bs_join(output_dir, "pointer_index_rejected_case"))
+    if rc != 0: return rc
+    rc = bs_check_prelude_output_functions(ctx, compiler_path, bs_join(output_dir, "prelude_output_functions_case"))
+    if rc != 0: return rc
+    rc = bs_check_whole_program_extern_var_redecl(ctx, compiler_path, bs_join(output_dir, "whole_program_extern_var_redecl_case"))
+    if rc != 0: return rc
+    bs_check_imported_module_dependency_order(ctx, compiler_path, bs_join(output_dir, "imported_module_dependency_order_case"))
 
 fn bs_split_words(line: str) -> Vec[str]:
     let words: Vec[str] = Vec.new()
