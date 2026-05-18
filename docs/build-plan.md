@@ -284,6 +284,10 @@ Status: in progress. Completed slices:
 - Moved `cli-selfhost-smoke-tests` from hardcoded `cli_selfhost_smoke_test`
   dispatch to the repository-local `build_selfhost.w` module. The target is now
   an `Action`, and project kind 1002 is reserved as removed legacy graph data.
+- Moved `cli-selfhost-one-liner-tests` from hardcoded
+  `cli_selfhost_one_liner_test` dispatch to the repository-local
+  `build_selfhost.w` module. The target is now an `Action`, and project kind
+  1009 is reserved as removed legacy graph data.
 
 Generic compiler-driver code may retain only:
 

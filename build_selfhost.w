@@ -44,11 +44,58 @@ fn bs_run_cli_capture(ctx: ActionCtx, compiler_path: str, label: str, args: Vec[
         let _remove_stderr = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stderr"))
     SelfhostRunResult { result.rc, result.stdout, result.stderr }
 
+fn bs_run_cli_capture_input(ctx: ActionCtx, compiler_path: str, label: str, args: Vec[str], stdin_text: str, timeout_ms: i32) -> SelfhostRunResult:
+    let root = ctx.project_info().project_root()
+    let output_dir = ctx.output()
+    let stdin_rel = bs_join(output_dir, label ++ ".stdin")
+    let stdout_path = bs_capture_path(root, output_dir, label, "stdout")
+    let stderr_path = bs_capture_path(root, output_dir, label, "stderr")
+    let stdin_path = bs_abs(root, stdin_rel)
+    if ctx.fs().write_text(stdin_rel, stdin_text) != 0:
+        return SelfhostRunResult { 1, "", "could not write stdin fixture: " ++ stdin_rel }
+    var argv: Vec[str] = Vec.new()
+    argv |> push(compiler_path)
+    for i in 0..args.len() as i32:
+        argv |> push(args.get(i as i64))
+    let result = ctx.process_runner().run_capture_input(argv, stdout_path, stderr_path, timeout_ms, stdin_path)
+    if result.rc == 0:
+        let _remove_stdin = ctx.fs().remove_file(stdin_rel)
+        let _remove_stdout = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stdout"))
+        let _remove_stderr = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stderr"))
+    SelfhostRunResult { result.rc, result.stdout, result.stderr }
+
 fn bs_run_cli_expect_success(ctx: ActionCtx, compiler_path: str, label: str, args: Vec[str]) -> SelfhostRunResult:
     let result = bs_run_cli_capture(ctx, compiler_path, label, args, 120000)
     if result.rc != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": cli selfhost command '" ++ label ++ f"' failed with exit code {result.rc}")
     result
+
+fn bs_trim_trailing_line_endings(text: str) -> str:
+    var end = text.len()
+    while end > 0:
+        let ch = text.byte_at(end - 1)
+        if ch != 10 and ch != 13:
+            break
+        end = end - 1
+    text.slice(0, end)
+
+fn bs_assert_stdout_exact(ctx: ActionCtx, result: SelfhostRunResult, expected: str, label: str) -> i32:
+    let actual = bs_trim_trailing_line_endings(result.stdout)
+    if actual == expected:
+        return 0
+    bs_fail(ctx, "stdout mismatch for " ++ label ++ ": expected '" ++ expected ++ "' got '" ++ actual ++ "'")
+
+fn bs_expect_cli_success_exact(ctx: ActionCtx, compiler_path: str, label: str, args: Vec[str], expected: str) -> i32:
+    let result = bs_run_cli_capture(ctx, compiler_path, label, args, 120000)
+    if result.rc != 0:
+        return bs_fail(ctx, "one-liner '" ++ label ++ f"' failed with exit code {result.rc}")
+    bs_assert_stdout_exact(ctx, result, expected, label)
+
+fn bs_expect_cli_input_success_exact(ctx: ActionCtx, compiler_path: str, label: str, args: Vec[str], stdin_text: str, expected: str) -> i32:
+    let result = bs_run_cli_capture_input(ctx, compiler_path, label, args, stdin_text, 120000)
+    if result.rc != 0:
+        return bs_fail(ctx, "one-liner '" ++ label ++ f"' failed with exit code {result.rc}")
+    bs_assert_stdout_exact(ctx, result, expected, label)
 
 fn bs_assert_contains(ctx: ActionCtx, text: str, needle: str, label: str) -> i32:
     if text.contains(needle):
@@ -145,3 +192,118 @@ pub fn run_cli_selfhost_smoke_action(ctx: ActionCtx) -> i32:
 
     let test_dir = bs_join(output_dir, "test-directives")
     bs_check_test_directives(ctx, compiler_path, test_dir)
+
+fn bs_one_liner_args(first: str, second: str) -> Vec[str]:
+    let args: Vec[str] = Vec.new()
+    args |> push(first)
+    args |> push(second)
+    args
+
+pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    if inputs.len() == 0:
+        return bs_fail(ctx, "missing compiler input")
+
+    let fs = ctx.fs()
+    let output_dir = ctx.output()
+    if output_dir.len() == 0:
+        return bs_fail(ctx, "missing output directory")
+    if fs.exists(output_dir) and fs.remove_tree(output_dir) != 0:
+        return bs_fail(ctx, "could not remove previous output directory: " ++ output_dir)
+    if fs.mkdir_all(output_dir) != 0:
+        return bs_fail(ctx, "could not create output directory: " ++ output_dir)
+
+    let compiler_input = inputs.get(0)
+    if not fs.exists(compiler_input):
+        return bs_fail(ctx, "missing compiler: " ++ compiler_input)
+    let compiler_path = bs_abs(ctx.project_info().project_root(), compiler_input)
+
+    var rc = bs_expect_cli_success_exact(ctx, compiler_path, "one-liner-e", bs_one_liner_args("-e", "print(\"hello\")"), "hello")
+    if rc != 0: return rc
+
+    var args: Vec[str] = Vec.new()
+    args |> push("-e")
+    args |> push("var x = 0")
+    args |> push("-e")
+    args |> push("x = x + 2")
+    args |> push("-e")
+    args |> push("print(f\"{x}\")")
+    rc = bs_expect_cli_success_exact(ctx, compiler_path, "one-liner-repeat-e", args, "2")
+    if rc != 0: return rc
+
+    rc = bs_expect_cli_success_exact(ctx, compiler_path, "one-liner-semicolon", bs_one_liner_args("-e", "var x = 0; x = x + 1; print(f\"{x}\")"), "1")
+    if rc != 0: return rc
+
+    rc = bs_expect_cli_success_exact(ctx, compiler_path, "one-liner-semicolon-string", bs_one_liner_args("-e", "print(\"a;b\")"), "a;b")
+    if rc != 0: return rc
+
+    args = Vec.new()
+    args |> push("-e")
+    args |> push("for a in args: print(a)")
+    args |> push("--")
+    args |> push("foo")
+    args |> push("bar")
+    rc = bs_expect_cli_success_exact(ctx, compiler_path, "one-liner-args", args, "foo\nbar")
+    if rc != 0: return rc
+
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-n", bs_one_liner_args("-n", "print(f\"{nr}: {line}\")"), "a\nb\n", "1: a\n2: b")
+    if rc != 0: return rc
+
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-p", bs_one_liner_args("-p", "line = line.upper()"), "a\r\nb\n", "A\nB")
+    if rc != 0: return rc
+
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-regex-numbered", bs_one_liner_args("-n", "if line =~ /error (\\d+)/: print($1)"), "error 42\n", "42")
+    if rc != 0: return rc
+
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-regex-named", bs_one_liner_args("-n", "if line =~ /email=(?<email>\\S+)/: print($email)"), "email=a@b\n", "a@b")
+    if rc != 0: return rc
+
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-regex-fstring", bs_one_liner_args("-n", "if line =~ /(?<kind>error|warning) (\\d+)/: print(f\"{nr}: {$kind.upper()} code={$2}\")"), "error 42\nok\nwarning 7\n", "1: ERROR code=42\n3: WARNING code=7")
+    if rc != 0: return rc
+
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-regex-escaped-named", bs_one_liner_args("-n", "if line =~ /^\\[(?<level>ERROR|WARN)\\]\\s+(?<msg>.*)$/: print(f\"{nr}: {$level} {$msg}\")"), "[INFO] boot\n[WARN] slow query\n[ERROR] db timeout\n", "2: WARN slow query\n3: ERROR db timeout")
+    if rc != 0: return rc
+
+    let implicit_src = bs_join(output_dir, "implicit_regex_fstring.w")
+    let implicit_text =
+        "use std.io\n" ++
+        "use std.regex\n" ++
+        "for line in stdin.lines():\n" ++
+        "    if line =~ /(?<kind>error|warning) (\\d+)/:\n" ++
+        "        print(f\"{$kind.upper()} code={$2}\")\n"
+    if fs.write_text(implicit_src, implicit_text) != 0:
+        return bs_fail(ctx, "could not write one-liner fixture source: " ++ implicit_src)
+    rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "implicit-main-regex-fstring", bs_one_liner_args("run", implicit_src), "error 42\nok\n", "ERROR code=42")
+    if rc != 0: return rc
+
+    args = Vec.new()
+    args |> push("-e")
+    args |> push("print(\"x\")")
+    args |> push("-n")
+    args |> push("print(line)")
+    let mutual = bs_run_cli_capture(ctx, compiler_path, "one-liner-mutual-exclusion", args, 120000)
+    if mutual.rc == 0:
+        return bs_fail(ctx, "one-liner mutual exclusion unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, mutual.stderr, "mutually exclusive", "one_liners")
+    if rc != 0: return rc
+
+    let diag_e = bs_run_cli_capture(ctx, compiler_path, "one-liner-diag-e", bs_one_liner_args("-e", "let x = "), 120000)
+    if diag_e.rc == 0:
+        return bs_fail(ctx, "one-liner malformed -e unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, diag_e.stderr, "<cli -e #1>:1:9", "one_liners")
+    if rc != 0: return rc
+
+    let diag_n = bs_run_cli_capture_input(ctx, compiler_path, "one-liner-diag-n", bs_one_liner_args("-n", "if line =~ /x/: print($1)"), "x\n", 120000)
+    if diag_n.rc == 0:
+        return bs_fail(ctx, "one-liner malformed capture unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, diag_n.stderr, "<cli -n #1>:1:23", "one_liners")
+    if rc != 0: return rc
+
+    let diag_capture = bs_run_cli_capture_input(ctx, compiler_path, "one-liner-diag-fstring-capture", bs_one_liner_args("-n", "if line =~ /(?<kind>error|warning) (\\d+)/: print(f\"{kind}\")"), "error 42\n", 120000)
+    if diag_capture.rc == 0:
+        return bs_fail(ctx, "one-liner f-string capture diagnostic unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, diag_capture.stderr, "<cli -n #1>:1:", "one_liners")
+    if rc != 0: return rc
+    rc = bs_assert_not_contains(ctx, diag_capture.stderr, "use std.", "one_liners")
+    if rc != 0: return rc
+    bs_assert_not_contains(ctx, diag_capture.stderr, "one-liner compilation failed", "one_liners")
