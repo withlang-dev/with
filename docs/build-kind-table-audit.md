@@ -1,9 +1,10 @@
 # Build Graph Kind Table Audit
 
-Status: current as of `54f35c9`.
+Status: current as of `60d64e0`.
 
 This audit covers `src/BuildGraphKinds.w` after the Phase C selfhost smoke,
-one-liner, object-symbol, project, edge, and PCRE2-prep extractions.
+one-liner, object-symbol, project, edge, PCRE2-prep, and migrate-basic
+extractions.
 
 ## Standard Kinds
 
@@ -59,7 +60,6 @@ Live project kinds:
 | 1008 | `pcre2_build` |
 | 1011 | `cli_selfhost_build_w_test` |
 | 1013 | `with_compiler_ir` |
-| 1017 | `cli_selfhost_migrate_basic_test` |
 | 1018 | `cli_selfhost_migrate_core_test` |
 | 1019 | `selfhost_suite_test` |
 | 1020 | `generate_llvm_link_metadata` |
@@ -82,6 +82,7 @@ Removed project kinds:
 | 1014 | `removed_cli_selfhost_project_test` |
 | 1015 | `removed_cli_selfhost_edge_test` |
 | 1016 | `removed_cli_selfhost_pcre2_prep_test` |
+| 1017 | `removed_cli_selfhost_migrate_basic_test` |
 
 Unassigned project gap:
 
