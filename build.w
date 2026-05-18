@@ -474,8 +474,9 @@ pub fn build(ctx: BuildCtx) -> Build:
     cli_selfhost_one_liner_tests = cli_selfhost_one_liner_tests.dep("selfcheck")
     out = out.add_target(cli_selfhost_one_liner_tests)
 
-    var cli_selfhost_object_symbol_tests = target_new(project_kind_selfhost_suite_test(), "cli-selfhost-object-symbol-tests", "out/bin/with-stage2")
-    cli_selfhost_object_symbol_tests = cli_selfhost_object_symbol_tests.arg("object-symbol")
+    var cli_selfhost_object_symbol_tests = target_new(.Action, "cli-selfhost-object-symbol-tests", "").output("out/test-graph/cli-selfhost-object-symbol-tests")
+    cli_selfhost_object_symbol_tests.action = run_cli_selfhost_object_symbol_action
+    cli_selfhost_object_symbol_tests = cli_selfhost_object_symbol_tests.arg("nm")
     cli_selfhost_object_symbol_tests = cli_selfhost_object_symbol_tests.input("out/bin/with-stage2")
     cli_selfhost_object_symbol_tests = cli_selfhost_object_symbol_tests.dep("selfcheck")
     out = out.add_target(cli_selfhost_object_symbol_tests)
