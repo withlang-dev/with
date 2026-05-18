@@ -631,7 +631,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var pcre2_reference = target_new(.Action, "pcre2-reference", "").output("out/pcre2_reference/pcre2-10.47")
     pcre2_reference.action = run_pcre2_reference_action
     pcre2_reference = pcre2_reference.extra_output("out/pcre2_reference/pcre2-10.47/.with-reference-ready")
-    pcre2_reference = pcre2_reference.extra_output("out/tmp")
+    pcre2_reference = pcre2_reference.extra_output("out/pcre2_tmp")
     pcre2_reference = pcre2_reference.arg("pcre2-10.47")
     pcre2_reference = pcre2_reference.arg("https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.47/pcre2-10.47.tar.gz")
     out = out.add_target(pcre2_reference)
