@@ -40,8 +40,6 @@ pub fn build_graph_kind_pcre2_generated_promote() -> i32: 1007
 pub fn build_graph_kind_pcre2_build() -> i32: 1008
 pub fn build_graph_kind_cli_selfhost_build_w_test() -> i32: 1011
 pub fn build_graph_kind_with_compiler_ir() -> i32: 1013
-pub fn build_graph_kind_removed_cli_selfhost_pcre2_prep_test() -> i32: 1016
-pub fn build_graph_kind_removed_cli_selfhost_migrate_basic_test() -> i32: 1017
 pub fn build_graph_kind_cli_selfhost_migrate_core_test() -> i32: 1018
 pub fn build_graph_kind_selfhost_suite_test() -> i32: 1019
 pub fn build_graph_kind_generate_llvm_link_metadata() -> i32: 1020
