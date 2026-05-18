@@ -321,15 +321,27 @@ fn project_config_resolve_path(root_dir: str, path: str) -> str:
 fn project_config_is_absolute_path(path: str) -> bool:
     path.len() > 0 and path.byte_at(0) == 47
 
+fn project_config_normalize_absolute_path(path: str) -> str:
+    var out = path
+    while out.len() > 1 and out.ends_with("/"):
+        out = out.slice(0, out.len() - 1)
+    while out == "/." or out.ends_with("/."):
+        if out == "/.":
+            return "/"
+        out = out.slice(0, out.len() - 2)
+        while out.len() > 1 and out.ends_with("/"):
+            out = out.slice(0, out.len() - 1)
+    out
+
 fn project_config_absolutize_path(path: str) -> str:
     if path.len() == 0:
         return path
     if project_config_is_absolute_path(path):
-        return path
+        return project_config_normalize_absolute_path(path)
     let cwd = with_getenv_str("PWD")
     if cwd.len() == 0:
         return path
-    resolve_join(cwd, path)
+    project_config_normalize_absolute_path(resolve_join(cwd, path))
 
 fn project_config_find_char(text: str, ch: i32) -> i32:
     var i = 0
