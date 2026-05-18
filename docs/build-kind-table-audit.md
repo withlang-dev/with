@@ -1,11 +1,11 @@
 # Build Graph Kind Table Audit
 
-Status: current as of `ac7dfc3`.
+Status: current as of `ccdebef`.
 
 This audit covers `src/BuildGraphKinds.w` after the Phase C selfhost smoke,
 one-liner, object-symbol, project, edge, PCRE2-prep, migrate-basic, and
 migrate-core, and build-w extractions. The old selfhost suite dispatcher is
-also removed.
+also removed. The embedded-runtime regression target is now an action target.
 
 ## Standard Kinds
 
@@ -52,7 +52,6 @@ Live project kinds:
 
 | Kind | Name |
 | --- | --- |
-| 1000 | `embedded_runtime_extract_test` |
 | 1003 | `generate_compiler_entrypoints` |
 | 1004 | `with_compiler_build` |
 | 1005 | `pcre2_run_test` |
@@ -72,6 +71,7 @@ Removed project kinds:
 
 | Kind | Name |
 | --- | --- |
+| 1000 | `removed_embedded_runtime_extract_test` |
 | 1001 | `removed_selfhost_noop_local_regression` |
 | 1002 | `removed_cli_selfhost_smoke_test` |
 | 1009 | `removed_cli_selfhost_one_liner_test` |
