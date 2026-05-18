@@ -226,7 +226,20 @@ define WITH_REPO_LOCK
 	@set -euo pipefail; \
 	lock="$(REPO_SERIAL_LOCK)"; \
 	owner_file="$$lock/owner"; \
+	acquired=0; \
 	if mkdir "$$lock" 2>/dev/null; then \
+		acquired=1; \
+	elif [ -f "$$owner_file" ]; then \
+		owner="$$(cat "$$owner_file")"; \
+		owner_pid="$$(printf '%s\n' "$$owner" | sed -n 's/.*pid=\([0-9][0-9]*\).*/\1/p')"; \
+		if [ -n "$$owner_pid" ] && ! kill -0 "$$owner_pid" 2>/dev/null; then \
+			rm -rf "$$lock"; \
+			if mkdir "$$lock" 2>/dev/null; then \
+				acquired=1; \
+			fi; \
+		fi; \
+	fi; \
+	if [ "$$acquired" -eq 1 ]; then \
 		trap 'rm -rf "$$lock"' EXIT INT TERM HUP; \
 		printf 'target=%s pid=%s started=%s\n' "$@" "$$$$" "$$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$$owner_file"; \
 		$(1); \
