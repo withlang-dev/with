@@ -18,6 +18,7 @@ extern fn with_fs_symlink(target: str, link_path: str) -> i32
 extern fn with_fs_write_file(path: str, data: str) -> i32
 extern fn with_exec_argv_capture(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32) -> i32
 extern fn with_exec_argv_capture_cwd(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str) -> i32
+extern fn with_exec_argv_capture_input(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, stdin_path: str) -> i32
 
 pub enum BuildKind: i32:
     Executable = 0
@@ -361,6 +362,15 @@ pub fn ProcessRunner.run_capture(self: &Self, args: Vec[str], stdout_path: str, 
 pub fn ProcessRunner.run_capture_cwd(self: &Self, args: Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str) -> ToolProcessResult:
     tool_capability_require(self.token, "ProcessRunner")
     let rc = with_exec_argv_capture_cwd(tool_process_argv(args), stdout_path, stderr_path, timeout_ms, cwd)
+    ToolProcessResult {
+        rc,
+        stdout: with_fs_read_file(stdout_path),
+        stderr: with_fs_read_file(stderr_path),
+    }
+
+pub fn ProcessRunner.run_capture_input(self: &Self, args: Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32, stdin_path: str) -> ToolProcessResult:
+    tool_capability_require(self.token, "ProcessRunner")
+    let rc = with_exec_argv_capture_input(tool_process_argv(args), stdout_path, stderr_path, timeout_ms, stdin_path)
     ToolProcessResult {
         rc,
         stdout: with_fs_read_file(stdout_path),
