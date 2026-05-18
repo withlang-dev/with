@@ -1049,8 +1049,6 @@ fn build_graph_run_cli_selfhost_suite_test(root: str, target: BuildGraphTarget) 
         return 1
     if suite == "build-w":
         return run_cli_selfhost_build_w_test(root, target.name, compiler_path)
-    if suite == "pcre2-prep":
-        return run_cli_selfhost_pcre2_prep_test(root, target.name, compiler_path)
     if suite == "migrate-basic":
         return run_cli_selfhost_migrate_basic_test(root, target.name, compiler_path)
     if suite == "migrate-core":
@@ -1180,22 +1178,6 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, opt_level: 
             let build_w_rc = run_cli_selfhost_build_w_test(root, target.name, compiler_path)
             if build_w_rc != 0:
                 return build_w_rc
-            completed_targets.push(target.name)
-            continue
-        if target.kind == build_graph_kind_cli_selfhost_pcre2_prep_test():
-            if target.entry.len() == 0:
-                with_eprint("error: cli_selfhost_pcre2_prep_test target '" ++ target.name ++ "' requires a compiler path")
-                return 1
-            let arg_rc = build_graph_validate_process_args(target)
-            if arg_rc != 0:
-                return arg_rc
-            let compiler_path = build_graph_resolve_project_path(root, target.entry)
-            if with_fs_file_exists(compiler_path) == 0:
-                with_eprint("error: cli_selfhost_pcre2_prep_test target '" ++ target.name ++ "' missing compiler: " ++ compiler_path)
-                return 1
-            let pcre2_prep_rc = run_cli_selfhost_pcre2_prep_test(root, target.name, compiler_path)
-            if pcre2_prep_rc != 0:
-                return pcre2_prep_rc
             completed_targets.push(target.name)
             continue
         if target.kind == build_graph_kind_cli_selfhost_migrate_basic_test():
