@@ -11,6 +11,9 @@ fn pcre2_join(left: str, right: str) -> str:
         return left ++ right
     left ++ "/" ++ right
 
+fn pcre2_scratch_dir() -> str:
+    "out/pcre2_tmp"
+
 fn pcre2_dirname(path: str) -> str:
     var last_slash = -1
     for i in 0..path.len() as i32:
@@ -178,7 +181,8 @@ pub fn run_pcre2_reference_action(ctx: ActionCtx) -> i32:
         return pcre2_fail(ctx, "requires reference tree output")
     let fs = ctx.fs()
     let root = ctx.project_info().project_root()
-    let archive_path = pcre2_join("out/tmp", release ++ ".tar.gz")
+    let scratch_dir = pcre2_scratch_dir()
+    let archive_path = pcre2_join(scratch_dir, release ++ ".tar.gz")
     if fs.mkdir_all(pcre2_dirname(archive_path)) != 0:
         return pcre2_fail(ctx, "could not create archive directory")
     if not fs.exists(archive_path):
@@ -191,11 +195,11 @@ pub fn run_pcre2_reference_action(ctx: ActionCtx) -> i32:
         curl_args |> push("--output")
         curl_args |> push(pcre2_abs(root, archive_path))
         curl_args |> push(url)
-        let curl_result = ctx.process_runner().run_capture(curl_args, pcre2_abs(root, pcre2_join("out/tmp", release ++ ".curl.stdout")), pcre2_abs(root, pcre2_join("out/tmp", release ++ ".curl.stderr")), 300000)
+        let curl_result = ctx.process_runner().run_capture(curl_args, pcre2_abs(root, pcre2_join(scratch_dir, release ++ ".curl.stdout")), pcre2_abs(root, pcre2_join(scratch_dir, release ++ ".curl.stderr")), 300000)
         if curl_result.rc != 0:
             return pcre2_fail(ctx, f"curl failed with exit code {curl_result.rc}: " ++ curl_result.stderr)
     if not fs.is_dir(ref_dir):
-        let tmp_dir = pcre2_join("out/tmp", release ++ ".extract")
+        let tmp_dir = pcre2_join(scratch_dir, release ++ ".extract")
         let extracted_dir = pcre2_join(tmp_dir, release)
         if fs.exists(tmp_dir) and fs.remove_tree(tmp_dir) != 0:
             return pcre2_fail(ctx, "could not remove old extract directory: " ++ tmp_dir)
@@ -207,7 +211,7 @@ pub fn run_pcre2_reference_action(ctx: ActionCtx) -> i32:
         tar_args |> push(pcre2_abs(root, archive_path))
         tar_args |> push("-C")
         tar_args |> push(pcre2_abs(root, tmp_dir))
-        let tar_result = ctx.process_runner().run_capture(tar_args, pcre2_abs(root, pcre2_join("out/tmp", release ++ ".tar.stdout")), pcre2_abs(root, pcre2_join("out/tmp", release ++ ".tar.stderr")), 300000)
+        let tar_result = ctx.process_runner().run_capture(tar_args, pcre2_abs(root, pcre2_join(scratch_dir, release ++ ".tar.stdout")), pcre2_abs(root, pcre2_join(scratch_dir, release ++ ".tar.stderr")), 300000)
         if tar_result.rc != 0:
             return pcre2_fail(ctx, f"tar failed with exit code {tar_result.rc}: " ++ tar_result.stderr)
         if not fs.is_dir(pcre2_join(extracted_dir, "src")):
