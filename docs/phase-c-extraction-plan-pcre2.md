@@ -186,3 +186,27 @@ For the PCRE2 extraction:
 10. Update `docs/build-kind-table-audit.md` in a separate docs-only commit.
 
 Do not combine a stdlib/runtime capability fix with a PCRE2 target extraction.
+
+## 9. Extraction Order
+
+Extraction 1: `pcre2-reference`
+
+Status: done in commit `bacd75c`.
+
+Extraction 2: `pcre2-migrate`
+
+Move the manual migration target after the reference-preparation action has
+settled. This target remains manual and must not be triggered by ordinary test
+targets.
+
+Extraction 3: `pcre2-build` + `pcre2-test`
+
+These are coupled because `pcre2-test` consumes the migrated library build
+artifacts and corpus runner setup. Extract them together once the migration
+target is project-local.
+
+Extraction 4: `pcre2-check-generated` + `pcre2-promote`
+
+These are coupled because promotion is only valid after the generated tree has
+been verified. Extract them last so the project-local PCRE2 flow has already
+proved reference, migrate, build, and test behavior.
