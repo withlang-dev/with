@@ -16,6 +16,7 @@ extern fn with_fs_copy_tree(src: str, dst: str) -> i32
 extern fn with_fs_list_files(path: str) -> str
 extern fn with_fs_remove_file(path: str) -> i32
 extern fn with_fs_remove_tree(path: str) -> i32
+extern fn with_fs_rename_file(old_path: str, new_path: str) -> i32
 extern fn with_fs_symlink(target: str, link_path: str) -> i32
 extern fn with_fs_write_file(path: str, data: str) -> i32
 extern fn with_exec_argv_capture(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32) -> i32
@@ -90,6 +91,15 @@ pub type ToolFs {
 
 pub type ProcessRunner {
     token: str,
+}
+
+pub type ProcessEnvVar {
+    name: str,
+    value: str,
+}
+
+pub type ProcessEnv {
+    vars: Vec[ProcessEnvVar],
 }
 
 pub type ToolProcessResult {
@@ -194,6 +204,13 @@ pub fn BuildCtx.fs(self: &Self) -> ToolFs:
 pub fn BuildCtx.process_runner(self: &Self) -> ProcessRunner:
     tool_capability_require(self.token, "ProcessRunner")
     self.process_runner
+
+pub fn process_env() -> ProcessEnv:
+    ProcessEnv { vars: Vec.new() }
+
+pub fn ProcessEnv.set(mut self: ProcessEnv, name: str, value: str) -> ProcessEnv:
+    self.vars.push(ProcessEnvVar { name, value })
+    self
 
 pub fn ProjectInfo.package_name(self: &Self) -> str:
     self.package.name
@@ -353,6 +370,11 @@ pub fn ToolFs.chmod(self: &Self, path: str, mode: i32) -> i32:
     self.require_write_file_allowed(path)
     with_fs_chmod(self.resolve_path(path), mode)
 
+pub fn ToolFs.rename(self: &Self, old_path: str, new_path: str) -> i32:
+    self.require_write_file_allowed(old_path)
+    self.require_write_file_allowed(new_path)
+    with_fs_rename_file(self.resolve_path(old_path), self.resolve_path(new_path))
+
 pub fn ToolFs.remove_file(self: &Self, path: str) -> i32:
     self.require_write_file_allowed(path)
     with_fs_remove_file(self.resolve_path(path))
@@ -386,6 +408,12 @@ type ToolProcessEnv {
     action_name: str,
 }
 
+type SavedProcessEnv {
+    driver: ToolProcessEnv,
+    names: Vec[str],
+    values: Vec[str],
+}
+
 fn tool_process_clear_driver_env() -> ToolProcessEnv:
     let tool_token = with_getenv_str("WITH_TOOL_CAPABILITY_TOKEN") ++ ""
     let action_name = with_getenv_str("WITH_BUILD_ACTION_NAME") ++ ""
@@ -401,6 +429,22 @@ fn tool_process_restore_driver_env(env: ToolProcessEnv):
     let _restore_action_name = with_setenv_str("WITH_BUILD_ACTION_NAME", env.action_name)
     let _restore_tool_token = with_setenv_str("WITH_TOOL_CAPABILITY_TOKEN", env.tool_token)
 
+fn tool_process_apply_env(env: ProcessEnv) -> SavedProcessEnv:
+    let driver = tool_process_clear_driver_env()
+    let names: Vec[str] = Vec.new()
+    let values: Vec[str] = Vec.new()
+    for i in 0..env.vars.len() as i32:
+        let item = env.vars.get(i as i64)
+        names.push(item.name)
+        values.push(with_getenv_str(item.name) ++ "")
+        let _set = with_setenv_str(item.name, item.value)
+    SavedProcessEnv { driver, names, values }
+
+fn tool_process_restore_env(saved: SavedProcessEnv):
+    for i in 0..saved.names.len() as i32:
+        let _restore = with_setenv_str(saved.names.get(i as i64), saved.values.get(i as i64))
+    tool_process_restore_driver_env(saved.driver)
+
 pub fn ProcessRunner.run_capture(self: &Self, args: Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32) -> ToolProcessResult:
     tool_capability_require(self.token, "ProcessRunner")
     let env = tool_process_clear_driver_env()
@@ -412,11 +456,33 @@ pub fn ProcessRunner.run_capture(self: &Self, args: Vec[str], stdout_path: str, 
         stderr: with_fs_read_file(stderr_path),
     }
 
+pub fn ProcessRunner.run_capture_with_env(self: &Self, args: Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32, process_env: ProcessEnv) -> ToolProcessResult:
+    tool_capability_require(self.token, "ProcessRunner")
+    let env = tool_process_apply_env(process_env)
+    let rc = with_exec_argv_capture(tool_process_argv(args), stdout_path, stderr_path, timeout_ms)
+    tool_process_restore_env(env)
+    ToolProcessResult {
+        rc,
+        stdout: with_fs_read_file(stdout_path),
+        stderr: with_fs_read_file(stderr_path),
+    }
+
 pub fn ProcessRunner.run_capture_cwd(self: &Self, args: Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str) -> ToolProcessResult:
     tool_capability_require(self.token, "ProcessRunner")
     let env = tool_process_clear_driver_env()
     let rc = with_exec_argv_capture_cwd(tool_process_argv(args), stdout_path, stderr_path, timeout_ms, cwd)
     tool_process_restore_driver_env(env)
+    ToolProcessResult {
+        rc,
+        stdout: with_fs_read_file(stdout_path),
+        stderr: with_fs_read_file(stderr_path),
+    }
+
+pub fn ProcessRunner.run_capture_cwd_with_env(self: &Self, args: Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str, process_env: ProcessEnv) -> ToolProcessResult:
+    tool_capability_require(self.token, "ProcessRunner")
+    let env = tool_process_apply_env(process_env)
+    let rc = with_exec_argv_capture_cwd(tool_process_argv(args), stdout_path, stderr_path, timeout_ms, cwd)
+    tool_process_restore_env(env)
     ToolProcessResult {
         rc,
         stdout: with_fs_read_file(stdout_path),
