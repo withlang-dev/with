@@ -18,17 +18,16 @@ fn build_graph_kind_is_standard(kind: i32) -> bool:
 fn build_graph_kind_is_project(kind: i32) -> bool:
     if kind == 1000:
         return true
-    if kind >= 1002 and kind <= 1011:
+    if kind >= 1003 and kind <= 1011:
         return true
     if kind >= 1013 and kind <= 1022:
         return true
     kind >= 1024 and kind <= BUILD_GRAPH_PROJECT_KIND_MAX
 
 pub fn build_graph_kind_removed(kind: i32) -> bool:
-    kind == 5 or kind == 6 or kind == 1001 or kind == 1012
+    kind == 5 or kind == 6 or kind == 1001 or kind == 1002 or kind == 1012
 
 pub fn build_graph_kind_embedded_runtime_extract_test() -> i32: 1000
-pub fn build_graph_kind_cli_selfhost_smoke_test() -> i32: 1002
 pub fn build_graph_kind_generate_compiler_entrypoints() -> i32: 1003
 pub fn build_graph_kind_with_compiler_build() -> i32: 1004
 pub fn build_graph_kind_pcre2_run_test() -> i32: 1005
@@ -83,7 +82,7 @@ pub fn build_graph_kind_name(kind: i32) -> str:
     if kind == 23: return "action"
     if kind == 1000: return "embedded_runtime_extract_test"
     if kind == 1001: return "removed_selfhost_noop_local_regression"
-    if kind == 1002: return "cli_selfhost_smoke_test"
+    if kind == 1002: return "removed_cli_selfhost_smoke_test"
     if kind == 1003: return "generate_compiler_entrypoints"
     if kind == 1004: return "with_compiler_build"
     if kind == 1005: return "pcre2_run_test"

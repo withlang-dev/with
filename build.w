@@ -1,5 +1,6 @@
 use std.build
 use build_runtime
+use build_selfhost
 
 fn project_kind_embedded_runtime_extract_test() -> BuildKind: 1000 as BuildKind
 fn project_kind_generate_compiler_entrypoints() -> BuildKind: 1003 as BuildKind
@@ -461,8 +462,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     native_phase_tests = native_phase_tests.dep("selfcheck")
     out = out.add_target(native_phase_tests)
 
-    var cli_selfhost_smoke_tests = target_new(project_kind_selfhost_suite_test(), "cli-selfhost-smoke-tests", "out/bin/with-stage2")
-    cli_selfhost_smoke_tests = cli_selfhost_smoke_tests.arg("smoke")
+    var cli_selfhost_smoke_tests = target_new(.Action, "cli-selfhost-smoke-tests", "").output("out/test-graph/cli-selfhost-smoke-tests")
+    cli_selfhost_smoke_tests.action = run_cli_selfhost_smoke_action
     cli_selfhost_smoke_tests = cli_selfhost_smoke_tests.input("out/bin/with-stage2")
     cli_selfhost_smoke_tests = cli_selfhost_smoke_tests.dep("selfcheck")
     out = out.add_target(cli_selfhost_smoke_tests)
