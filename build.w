@@ -487,8 +487,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     cli_selfhost_build_w_tests = cli_selfhost_build_w_tests.dep("selfcheck")
     out = out.add_target(cli_selfhost_build_w_tests)
 
-    var cli_selfhost_project_tests = target_new(project_kind_selfhost_suite_test(), "cli-selfhost-project-tests", "out/bin/with-stage2")
-    cli_selfhost_project_tests = cli_selfhost_project_tests.arg("project")
+    var cli_selfhost_project_tests = target_new(.Action, "cli-selfhost-project-tests", "").output("out/test-graph/cli-selfhost-project-tests")
+    cli_selfhost_project_tests.action = run_cli_selfhost_project_action
     cli_selfhost_project_tests = cli_selfhost_project_tests.input("out/bin/with-stage2")
     cli_selfhost_project_tests = cli_selfhost_project_tests.dep("selfcheck")
     out = out.add_target(cli_selfhost_project_tests)

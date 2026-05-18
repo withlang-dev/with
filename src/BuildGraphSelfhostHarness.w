@@ -119,24 +119,6 @@ pub fn bgs_assert_not_matches(text: str, pattern: str, target_name: str, label: 
     with_eprint("error: selfhost test target '" ++ target_name ++ "' found forbidden regex match for " ++ label ++ ": " ++ pattern)
     1
 
-pub fn bgs_project_assert_contains(text: str, needle: str, target_name: str, label: str) -> i32:
-    if with_str_contains(text, needle) != 0:
-        return 0
-    with_eprint("error: cli_selfhost_project_test target '" ++ target_name ++ "' missing expected output for " ++ label ++ ": " ++ needle)
-    1
-
-pub fn bgs_project_expect_file(path: str, target_name: str, label: str) -> i32:
-    if with_fs_file_exists(path) != 0:
-        return 0
-    with_eprint("error: cli_selfhost_project_test target '" ++ target_name ++ "' missing file for " ++ label ++ ": " ++ path)
-    1
-
-pub fn bgs_project_expect_absent(path: str, target_name: str, label: str) -> i32:
-    if with_fs_file_exists(path) == 0:
-        return 0
-    with_eprint("error: cli_selfhost_project_test target '" ++ target_name ++ "' found unexpected file for " ++ label ++ ": " ++ path)
-    1
-
 pub fn bgs_write_fixture(path: str, contents: str, target_name: str, label: str) -> i32:
     let dir = bgs_dirname(path)
     if with_fs_mkdir_p(dir) != 0:
@@ -196,10 +178,4 @@ pub fn bgs_build_expect_success(root: str, target_name: str, compiler_path: str,
     let result = bgs_run_cli_capture_cwd(root, target_name, compiler_path, label, argv_tail, 120000, case_dir)
     if result.rc != 0:
         with_eprint("error: build.w selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
-    result
-
-pub fn bgs_project_expect_success(root: str, target_name: str, compiler_path: str, case_dir: str, label: str, argv_tail: str) -> BuildSelfhostRunResult:
-    let result = bgs_run_cli_capture_cwd(root, target_name, compiler_path, label, argv_tail, 120000, case_dir)
-    if result.rc != 0:
-        with_eprint("error: project selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
     result

@@ -292,6 +292,10 @@ Status: in progress. Completed slices:
   `cli_selfhost_object_symbol_test` dispatch to the repository-local
   `build_selfhost.w` module. The target is now an `Action`, and project kind
   1010 is reserved as removed legacy graph data.
+- Moved `cli-selfhost-project-tests` from hardcoded
+  `cli_selfhost_project_test` dispatch to the repository-local
+  `build_selfhost.w` module. The target is now an `Action`, and project kind
+  1014 is reserved as removed legacy graph data.
 
 Generic compiler-driver code may retain only:
 
