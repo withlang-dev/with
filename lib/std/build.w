@@ -19,6 +19,8 @@ extern fn with_fs_write_file(path: str, data: str) -> i32
 extern fn with_exec_argv_capture(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32) -> i32
 extern fn with_exec_argv_capture_cwd(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str) -> i32
 extern fn with_exec_argv_capture_input(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, stdin_path: str) -> i32
+extern fn with_exec_argv_capture_spawn(args: str, stdout_path: str, stderr_path: str) -> i32
+extern fn with_exec_wait(pid: i32, timeout_ms: i32) -> i32
 
 pub enum BuildKind: i32:
     Executable = 0
@@ -376,6 +378,14 @@ pub fn ProcessRunner.run_capture_input(self: &Self, args: Vec[str], stdout_path:
         stdout: with_fs_read_file(stdout_path),
         stderr: with_fs_read_file(stderr_path),
     }
+
+pub fn ProcessRunner.spawn_capture(self: &Self, args: Vec[str], stdout_path: str, stderr_path: str) -> i32:
+    tool_capability_require(self.token, "ProcessRunner")
+    with_exec_argv_capture_spawn(tool_process_argv(args), stdout_path, stderr_path)
+
+pub fn ProcessRunner.wait(self: &Self, pid: i32, timeout_ms: i32) -> i32:
+    tool_capability_require(self.token, "ProcessRunner")
+    with_exec_wait(pid, timeout_ms)
 
 pub fn ActionCtx.target_name(self: &Self) -> str:
     tool_capability_require(self.token, "ActionCtx")
