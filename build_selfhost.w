@@ -32,6 +32,13 @@ fn bs_dirname(path: str) -> str:
         return "/"
     path.slice(0, last_slash as i64)
 
+fn bs_basename(path: str) -> str:
+    var last_slash = -1
+    for i in 0..path.len() as i32:
+        if path.byte_at(i as i64) == 47:
+            last_slash = i
+    path.slice((last_slash + 1) as i64, path.len())
+
 fn bs_abs(root: str, path: str) -> str:
     if path.len() > 0 and path.byte_at(0) == 47:
         return path
@@ -71,6 +78,21 @@ fn bs_run_cli_capture_input(ctx: ActionCtx, compiler_path: str, label: str, args
     let result = ctx.process_runner().run_capture_input(argv, stdout_path, stderr_path, timeout_ms, stdin_path)
     if result.rc == 0:
         let _remove_stdin = ctx.fs().remove_file(stdin_rel)
+        let _remove_stdout = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stdout"))
+        let _remove_stderr = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stderr"))
+    SelfhostRunResult { result.rc, result.stdout, result.stderr }
+
+fn bs_run_cli_capture_cwd(ctx: ActionCtx, compiler_path: str, label: str, args: Vec[str], timeout_ms: i32, cwd: str) -> SelfhostRunResult:
+    let root = ctx.project_info().project_root()
+    let output_dir = ctx.output()
+    let stdout_path = bs_capture_path(root, output_dir, label, "stdout")
+    let stderr_path = bs_capture_path(root, output_dir, label, "stderr")
+    var argv: Vec[str] = Vec.new()
+    argv |> push(compiler_path)
+    for i in 0..args.len() as i32:
+        argv |> push(args.get(i as i64))
+    let result = ctx.process_runner().run_capture_cwd(argv, stdout_path, stderr_path, timeout_ms, bs_abs(root, cwd))
+    if result.rc == 0:
         let _remove_stdout = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stdout"))
         let _remove_stderr = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stderr"))
     SelfhostRunResult { result.rc, result.stdout, result.stderr }
@@ -319,6 +341,155 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     bs_assert_not_contains(ctx, diag_capture.stderr, "one-liner compilation failed", "one_liners")
 
+fn bs_project_args(command: str) -> Vec[str]:
+    let args: Vec[str] = Vec.new()
+    args |> push(command)
+    args
+
+fn bs_project_expect_success(ctx: ActionCtx, compiler_path: str, case_dir: str, label: str, args: Vec[str]) -> SelfhostRunResult:
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, label, args, 120000, case_dir)
+    if result.rc != 0:
+        ctx.diagnostics().error(ctx.target_name() ++ ": project selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
+    result
+
+fn bs_check_init_ai_docs(ctx: ActionCtx, project_dir: str, label: str) -> i32:
+    let expected = ctx.fs().read_text("docs/with_for_ai.md")
+    if expected.len() == 0:
+        return bs_fail(ctx, "could not read docs/with_for_ai.md")
+    let agents = ctx.fs().read_text(bs_join(project_dir, "AGENTS.md"))
+    if agents != expected:
+        return bs_fail(ctx, "AGENTS.md did not match docs/with_for_ai.md for " ++ label)
+    let claude = ctx.fs().read_text(bs_join(project_dir, "CLAUDE.md"))
+    if claude != expected:
+        return bs_fail(ctx, "CLAUDE.md did not match docs/with_for_ai.md for " ++ label)
+    0
+
+fn bs_check_init_common_files(ctx: ActionCtx, project_dir: str, package_name: str, label: str) -> i32:
+    var rc = bs_expect_file(ctx, bs_join(project_dir, "build.w"), label ++ " build")
+    if rc != 0: return rc
+    rc = bs_expect_file(ctx, bs_join(project_dir, "README.md"), label ++ " readme")
+    if rc != 0: return rc
+    rc = bs_expect_file(ctx, bs_join(project_dir, ".gitignore"), label ++ " gitignore")
+    if rc != 0: return rc
+    rc = bs_expect_file(ctx, bs_join(project_dir, "AGENTS.md"), label ++ " agents")
+    if rc != 0: return rc
+    rc = bs_expect_file(ctx, bs_join(project_dir, "CLAUDE.md"), label ++ " claude")
+    if rc != 0: return rc
+    rc = bs_expect_file(ctx, bs_join(project_dir, "tests/smoke.w"), label ++ " smoke test")
+    if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, bs_join(project_dir, "with.toml"), "[package]", label ++ " manifest package section")
+    if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, bs_join(project_dir, "build.w"), "out.default(\"" ++ package_name ++ "\")", label ++ " build default")
+    if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, bs_join(project_dir, "README.md"), "# " ++ package_name, label ++ " readme title")
+    if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, bs_join(project_dir, ".gitignore"), ".with/", label ++ " gitignore with cache")
+    if rc != 0: return rc
+    bs_check_init_ai_docs(ctx, project_dir, label)
+
+fn bs_check_init_in_cwd(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    if ctx.fs().mkdir_all(case_dir) != 0:
+        return bs_fail(ctx, "could not create init case directory: " ++ case_dir)
+    let expected_name = bs_basename(case_dir)
+    let result = bs_project_expect_success(ctx, compiler_path, case_dir, "init-in-cwd", bs_project_args("init"))
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    var rc = bs_expect_file(ctx, bs_join(case_dir, "with.toml"), "init_in_cwd manifest")
+    if rc != 0: return rc
+    rc = bs_expect_file(ctx, bs_join(case_dir, "src/main.w"), "init_in_cwd main")
+    if rc != 0: return rc
+    rc = bs_check_init_common_files(ctx, case_dir, expected_name, "init_in_cwd")
+    if rc != 0: return rc
+    rc = bs_expect_absent(ctx, bs_join(bs_join(case_dir, expected_name), "with.toml"), "init_in_cwd nested manifest")
+    if rc != 0: return rc
+    rc = bs_expect_absent(ctx, bs_join(bs_join(bs_join(case_dir, expected_name), "src"), "main.w"), "init_in_cwd nested main")
+    if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, bs_join(case_dir, "with.toml"), "name = \"" ++ expected_name ++ "\"", "init_in_cwd manifest name")
+    if rc != 0: return rc
+    bs_assert_contains(ctx, result.stderr, "created " ++ expected_name, "init_in_cwd stderr")
+
+fn bs_check_init_named_dir(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    if ctx.fs().mkdir_all(case_dir) != 0:
+        return bs_fail(ctx, "could not create init named case directory: " ++ case_dir)
+    let project_name = "sqlite"
+    var args: Vec[str] = Vec.new()
+    args |> push("init")
+    args |> push(project_name)
+    let result = bs_project_expect_success(ctx, compiler_path, case_dir, "init-named-dir", args)
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    let project_dir = bs_join(case_dir, project_name)
+    var rc = bs_expect_file(ctx, bs_join(project_dir, "with.toml"), "init_named_dir manifest")
+    if rc != 0: return rc
+    rc = bs_expect_file(ctx, bs_join(project_dir, "src/main.w"), "init_named_dir main")
+    if rc != 0: return rc
+    rc = bs_check_init_common_files(ctx, project_dir, project_name, "init_named_dir")
+    if rc != 0: return rc
+    rc = bs_expect_absent(ctx, bs_join(case_dir, "with.toml"), "init_named_dir root manifest")
+    if rc != 0: return rc
+    rc = bs_expect_absent(ctx, bs_join(case_dir, "src/main.w"), "init_named_dir root main")
+    if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, bs_join(project_dir, "with.toml"), "name = \"" ++ project_name ++ "\"", "init_named_dir manifest name")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, result.stderr, "created " ++ project_name, "init_named_dir stderr")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, result.stderr, "  " ++ project_name ++ "/with.toml", "init_named_dir manifest path")
+    if rc != 0: return rc
+    bs_assert_contains(ctx, result.stderr, "  " ++ project_name ++ "/src/main.w", "init_named_dir main path")
+
+fn bs_check_build_uses_package_section_name(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    var rc = bs_write_project_manifest(ctx, case_dir, "pkgdemo")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "src/main.w"), "fn main:\n    print(\"ok\")\n", "package_section_name main")
+    if rc != 0: return rc
+    let result = bs_project_expect_success(ctx, compiler_path, case_dir, "package-section-name", bs_project_args("build"))
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    bs_expect_file(ctx, bs_join(case_dir, "out/bin/pkgdemo"), "package_section_name output")
+
+fn bs_check_build_rejects_imperative_manifest(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    var rc = bs_write_fixture(ctx, bs_join(case_dir, "with.toml"), "[package]\nname = \"badmanifest\"\nversion = \"0.1.0\"\n\n[build]\ncommand = \"echo nope\"\n", "imperative manifest")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "src/main.w"), "fn main:\n    print(\"ok\")\n", "imperative main")
+    if rc != 0: return rc
+    let implicit = bs_run_cli_capture_cwd(ctx, compiler_path, "imperative-manifest", bs_project_args("build"), 120000, case_dir)
+    if implicit.rc == 0:
+        return bs_fail(ctx, "imperative manifest unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, implicit.stderr, "error: invalid with.toml: imperative build configuration belongs in build.w", "imperative manifest diagnostic")
+    if rc != 0: return rc
+
+    var explicit_args: Vec[str] = Vec.new()
+    explicit_args |> push("build")
+    explicit_args |> push(bs_abs(ctx.project_info().project_root(), bs_join(case_dir, "src/main.w")))
+    let explicit = bs_run_cli_capture_cwd(ctx, compiler_path, "imperative-manifest-explicit-source", explicit_args, 120000, case_dir)
+    if explicit.rc == 0:
+        return bs_fail(ctx, "imperative manifest explicit source unexpectedly succeeded")
+    bs_assert_contains(ctx, explicit.stderr, "error: invalid with.toml: imperative build configuration belongs in build.w", "imperative manifest explicit source diagnostic")
+
+pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    if inputs.len() == 0:
+        return bs_fail(ctx, "missing compiler input")
+
+    let fs = ctx.fs()
+    let output_dir = ctx.output()
+    if output_dir.len() == 0:
+        return bs_fail(ctx, "missing output directory")
+    if fs.exists(output_dir) and fs.remove_tree(output_dir) != 0:
+        return bs_fail(ctx, "could not remove previous output directory: " ++ output_dir)
+    if fs.mkdir_all(output_dir) != 0:
+        return bs_fail(ctx, "could not create output directory: " ++ output_dir)
+
+    let compiler_input = inputs.get(0)
+    if not fs.exists(compiler_input):
+        return bs_fail(ctx, "missing compiler: " ++ compiler_input)
+    let compiler_path = bs_abs(ctx.project_info().project_root(), compiler_input)
+
+    var rc = bs_check_init_in_cwd(ctx, compiler_path, bs_join(output_dir, "init_in_cwd_case"))
+    if rc != 0: return rc
+    rc = bs_check_init_named_dir(ctx, compiler_path, bs_join(output_dir, "init_named_dir_case"))
+    if rc != 0: return rc
+    rc = bs_check_build_uses_package_section_name(ctx, compiler_path, bs_join(output_dir, "build_package_section_case"))
+    if rc != 0: return rc
+    bs_check_build_rejects_imperative_manifest(ctx, compiler_path, bs_join(output_dir, "build_imperative_manifest_case"))
+
 fn bs_split_words(line: str) -> Vec[str]:
     let words: Vec[str] = Vec.new()
     var start = 0
@@ -428,6 +599,26 @@ fn bs_write_fixture(ctx: ActionCtx, path: str, contents: str, label: str) -> i32
     if ctx.fs().write_text(path, contents) != 0:
         return bs_fail(ctx, "could not write fixture for " ++ label ++ ": " ++ path)
     0
+
+fn bs_write_project_manifest(ctx: ActionCtx, case_dir: str, package_name: str) -> i32:
+    bs_write_fixture(ctx, bs_join(case_dir, "with.toml"), "[package]\nname = \"" ++ package_name ++ "\"\nversion = \"0.1.0\"\n", package_name ++ " manifest")
+
+fn bs_expect_file(ctx: ActionCtx, path: str, label: str) -> i32:
+    if ctx.fs().exists(path):
+        return 0
+    bs_fail(ctx, "missing file for " ++ label ++ ": " ++ path)
+
+fn bs_expect_absent(ctx: ActionCtx, path: str, label: str) -> i32:
+    if not ctx.fs().exists(path):
+        return 0
+    bs_fail(ctx, "found unexpected file for " ++ label ++ ": " ++ path)
+
+fn bs_expect_file_contains(ctx: ActionCtx, path: str, needle: str, label: str) -> i32:
+    if not ctx.fs().exists(path):
+        return bs_fail(ctx, "missing file for " ++ label ++ ": " ++ path)
+    if ctx.fs().read_text(path).contains(needle):
+        return 0
+    bs_fail(ctx, "file mismatch for " ++ label ++ ": missing '" ++ needle ++ "' in " ++ path)
 
 fn bs_build_emit_obj(ctx: ActionCtx, compiler_path: str, label: str, src_path: str, obj_path: str) -> i32:
     var args: Vec[str] = Vec.new()
