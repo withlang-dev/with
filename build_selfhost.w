@@ -622,6 +622,74 @@ pub fn run_cli_selfhost_edge_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     bs_check_imported_module_dependency_order(ctx, compiler_path, bs_join(output_dir, "imported_module_dependency_order_case"))
 
+pub fn run_cli_selfhost_parallel_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    if inputs.len() == 0:
+        return bs_fail(ctx, "missing compiler input")
+
+    let fs = ctx.fs()
+    let output_dir = ctx.output()
+    if output_dir.len() == 0:
+        return bs_fail(ctx, "missing output directory")
+    if fs.exists(output_dir) and fs.remove_tree(output_dir) != 0:
+        return bs_fail(ctx, "could not remove previous output directory: " ++ output_dir)
+    if fs.mkdir_all(output_dir) != 0:
+        return bs_fail(ctx, "could not create output directory: " ++ output_dir)
+
+    let compiler_input = inputs.get(0)
+    if not fs.exists(compiler_input):
+        return bs_fail(ctx, "missing compiler: " ++ compiler_input)
+    let root = ctx.project_info().project_root()
+    let compiler_path = bs_abs(root, compiler_input)
+    let src = bs_join(output_dir, "attr_only.w")
+    if bs_write_fixture(ctx, src, "@[test]\nfn attr_only:\n    assert(1 == 1)\n", "parallel same-source test") != 0:
+        return 1
+
+    var args: Vec[str] = Vec.new()
+    args |> push("test")
+    args |> push(bs_abs(root, src))
+    let single = bs_run_cli_capture_cwd(ctx, compiler_path, "parallel-same-source-single", args, 120000, root)
+    if single.rc != 0:
+        return if single.rc == 0: 1 else: single.rc
+    if single.stderr.len() != 0:
+        ctx.diagnostics().error(ctx.target_name() ++ ": single run produced stderr")
+        ctx.diagnostics().error(single.stderr)
+        return 1
+
+    var argv: Vec[str] = Vec.new()
+    argv |> push(compiler_path)
+    argv |> push("test")
+    argv |> push(bs_abs(root, src))
+
+    let jobs = 32
+    let pids: Vec[i32] = Vec.new()
+    for i in 0..jobs:
+        let stdout_rel = bs_join(output_dir, f"job-{i}.stdout")
+        let stderr_rel = bs_join(output_dir, f"job-{i}.stderr")
+        let pid = ctx.process_runner().spawn_capture(argv, bs_abs(root, stdout_rel), bs_abs(root, stderr_rel))
+        if pid <= 0:
+            return bs_fail(ctx, f"could not spawn job {i}")
+        pids.push(pid)
+
+    var failed = false
+    for i in 0..jobs:
+        let pid = pids.get(i as i64)
+        let job_rc = ctx.process_runner().wait(pid, 120000)
+        if job_rc != 0:
+            let stdout_rel = bs_join(output_dir, f"job-{i}.stdout")
+            let stderr_rel = bs_join(output_dir, f"job-{i}.stderr")
+            ctx.diagnostics().error(ctx.target_name() ++ f": job {i} failed with exit code {job_rc}")
+            let stdout_text = fs.read_text(stdout_rel)
+            if stdout_text.len() > 0:
+                ctx.diagnostics().error(stdout_text)
+            let stderr_text = fs.read_text(stderr_rel)
+            if stderr_text.len() > 0:
+                ctx.diagnostics().error(stderr_text)
+            failed = true
+    if failed:
+        return 1
+    0
+
 fn bs_split_words(line: str) -> Vec[str]:
     let words: Vec[str] = Vec.new()
     var start = 0

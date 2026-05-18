@@ -3,8 +3,6 @@
 // dispatcher instead of a fixture warehouse.
 
 use BuildGraphSelfhostHarness
-use BuildGraphRuntime
-
 extern fn with_fs_chmod(path: str, mode: i32) -> i32
 extern fn with_fs_file_exists(path: str) -> i32
 extern fn with_fs_mkdir_p(path: str) -> i32
@@ -15,57 +13,6 @@ extern fn with_fs_write_file(path: str, data: str) -> i32
 extern fn with_getenv_str(name: str) -> str
 extern fn with_str_contains(s: str, needle: str) -> i32
 extern fn with_eprint(s: str) -> void
-
-pub fn run_cli_selfhost_parallel_test(root: str, target_name: str, compiler_path: str) -> i32:
-    let stamp = f"{with_getpid()}.{with_clock_nanos()}"
-    let case_dir = bgs_resolve_join(bgs_resolve_join(bgs_resolve_join(root, "out/test-graph"), target_name), stamp)
-    let src = bgs_resolve_join(case_dir, "attr_only.w")
-    var rc = bgs_write_fixture(src, "@[test]\nfn attr_only:\n    assert(1 == 1)\n", target_name, "parallel same-source test")
-    if rc != 0:
-        return rc
-
-    let single = bgs_run_cli_capture_cwd(root, target_name, compiler_path, "parallel-same-source-single", bgs_argv_append(bgs_argv_append("", "test"), src), 120000, root)
-    if single.rc != 0:
-        return if single.rc == 0: 1 else: single.rc
-    if single.stderr.len() != 0:
-        with_eprint("error: cli selfhost parallel test target '" ++ target_name ++ "' single run produced stderr")
-        with_eprint(single.stderr)
-        return 1
-
-    var argv = ""
-    argv = bgs_argv_append(argv, compiler_path)
-    argv = bgs_argv_append(argv, "test")
-    argv = bgs_argv_append(argv, src)
-
-    let jobs = 32
-    let pids: Vec[i32] = Vec.new()
-    for i in 0..jobs:
-        let stdout_path = bgs_resolve_join(case_dir, f"job-{i}.stdout")
-        let stderr_path = bgs_resolve_join(case_dir, f"job-{i}.stderr")
-        let pid = build_graph_rt_exec_argv_capture_spawn(argv, stdout_path, stderr_path)
-        if pid <= 0:
-            with_eprint("error: cli selfhost parallel test target '" ++ target_name ++ f"' could not spawn job {i}")
-            return 1
-        pids.push(pid)
-
-    var failed = false
-    for i in 0..jobs:
-        let pid = pids.get(i as i64)
-        let job_rc = build_graph_rt_exec_wait(pid, 120000)
-        if job_rc != 0:
-            let stdout_path = bgs_resolve_join(case_dir, f"job-{i}.stdout")
-            let stderr_path = bgs_resolve_join(case_dir, f"job-{i}.stderr")
-            with_eprint("error: cli selfhost parallel test target '" ++ target_name ++ f"' job {i} failed with exit code {job_rc}")
-            let stdout_text = with_fs_read_file(stdout_path)
-            if stdout_text.len() > 0:
-                with_eprint(stdout_text)
-            let stderr_text = with_fs_read_file(stderr_path)
-            if stderr_text.len() > 0:
-                with_eprint(stderr_text)
-            failed = true
-    if failed:
-        return 1
-    0
 
 fn bgs_regex_assert_contains(text: str, needle: str, target_name: str, label: str) -> i32:
     if with_str_contains(text, needle) != 0:

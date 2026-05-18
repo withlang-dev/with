@@ -499,8 +499,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     cli_selfhost_edge_tests = cli_selfhost_edge_tests.dep("selfcheck")
     out = out.add_target(cli_selfhost_edge_tests)
 
-    var cli_selfhost_parallel_tests = target_new(project_kind_selfhost_suite_test(), "cli-selfhost-parallel-tests", "out/bin/with-stage2")
-    cli_selfhost_parallel_tests = cli_selfhost_parallel_tests.arg("test-parallel")
+    var cli_selfhost_parallel_tests = target_new(.Action, "cli-selfhost-parallel-tests", "").output("out/test-graph/cli-selfhost-parallel-tests")
+    cli_selfhost_parallel_tests.action = run_cli_selfhost_parallel_action
     cli_selfhost_parallel_tests = cli_selfhost_parallel_tests.input("out/bin/with-stage2")
     cli_selfhost_parallel_tests = cli_selfhost_parallel_tests.dep("selfcheck")
     out = out.add_target(cli_selfhost_parallel_tests)
