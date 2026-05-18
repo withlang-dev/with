@@ -44,6 +44,22 @@ fn bs_abs(root: str, path: str) -> str:
         return path
     bs_join(root, path)
 
+fn bs_with_string_literal(value: str) -> str:
+    var out = "\""
+    for i in 0..value.len() as i32:
+        let ch = value.byte_at(i as i64)
+        if ch == 34:
+            out = out ++ "\\\""
+        else if ch == 92:
+            out = out ++ "\\\\"
+        else if ch == 10:
+            out = out ++ "\\n"
+        else if ch == 9:
+            out = out ++ "\\t"
+        else:
+            out = out ++ value.slice(i as i64, (i + 1) as i64)
+    out ++ "\""
+
 fn bs_capture_path(root: str, output_dir: str, label: str, suffix: str) -> str:
     bs_abs(root, bs_join(output_dir, label ++ "." ++ suffix))
 
@@ -689,6 +705,293 @@ pub fn run_cli_selfhost_parallel_action(ctx: ActionCtx) -> i32:
     if failed:
         return 1
     0
+
+fn bs_file_contains(ctx: ActionCtx, path: str, needle: str, label: str) -> i32:
+    if not ctx.fs().exists(path):
+        return bs_fail(ctx, "missing file for " ++ label ++ ": " ++ path)
+    bs_assert_contains(ctx, ctx.fs().read_text(path), needle, label)
+
+fn bs_file_forbids(ctx: ActionCtx, path: str, needle: str, label: str) -> i32:
+    if not ctx.fs().exists(path):
+        return bs_fail(ctx, "missing file for " ++ label ++ ": " ++ path)
+    bs_assert_not_contains(ctx, ctx.fs().read_text(path), needle, label)
+
+fn bs_copy_fixture_file(ctx: ActionCtx, src: str, dst: str, label: str) -> i32:
+    if not ctx.fs().exists(src):
+        return bs_fail(ctx, "missing source file for " ++ label ++ ": " ++ src)
+    bs_write_fixture(ctx, dst, ctx.fs().read_text(src), label)
+
+fn bs_drop_first_lines(text: str, count: i32) -> str:
+    var line_start = 0
+    var line_no = 1
+    for i in 0..text.len() as i32:
+        if text.byte_at(i as i64) == 10:
+            if line_no == count:
+                return text.slice((i + 1) as i64, text.len())
+            line_no = line_no + 1
+            line_start = i + 1
+    if line_no > count:
+        return text.slice(line_start as i64, text.len())
+    ""
+
+fn bs_pcre2_expect_success(ctx: ActionCtx, compiler_path: str, case_dir: str, label: str, args: Vec[str]) -> SelfhostRunResult:
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, label, args, 180000, case_dir)
+    if result.rc != 0:
+        ctx.diagnostics().error(ctx.target_name() ++ ": pcre2 prep selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
+    result
+
+fn bs_check_pcre2_defs_prune_ebcdic_tables(ctx: ActionCtx) -> i32:
+    let defs = "lib/std/re/defs.w"
+    var rc = bs_file_forbids(ctx, defs, "_pcre2_ebcdic_1047_to_ascii_8", "ebcdic table externs")
+    if rc != 0: return rc
+    bs_file_forbids(ctx, defs, "_pcre2_ascii_to_ebcdic_1047_8", "ebcdic table externs")
+
+fn bs_check_pcre2_prepare_shared_externs(ctx: ActionCtx, base_dir: str) -> i32:
+    let raw_dir = bs_join(base_dir, "raw")
+    let generated_dir = bs_join(base_dir, "generated")
+    var rc = bs_write_fixture(ctx, bs_join(raw_dir, "defs.w"), "// std.re.defs - shared definitions\nextern fn preamble_helper() -> void\n", "shared externs defs")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(raw_dir, "pcre2_tables.w"), "// Migrated from PCRE2\nuse std.re.defs\n\ntype BOOL = c_int\nvar _pcre2_utf8_table1: *c_int\nvar _pcre2_OP_lengths_8: *u8\n", "shared externs tables")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(raw_dir, "pcre2_compile.w"), "// Migrated from PCRE2\nuse std.re.defs\n\ntype BOOL = c_int\nextern var _pcre2_utf8_table1: *c_int\nvar _pcre2_posix_class_maps8: *c_int\n", "shared externs compile")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(raw_dir, "pcre2_compile_class.w"), "// Migrated from PCRE2\nuse std.re.defs\n\ntype BOOL = c_int\nextern var _pcre2_utf8_table1: *c_int\nextern var _pcre2_posix_class_maps8: *c_int\n", "shared externs compile class")
+    if rc != 0: return rc
+
+    let files: Vec[str] = Vec.new()
+    files |> push("defs.w")
+    files |> push("pcre2_tables.w")
+    files |> push("pcre2_compile.w")
+    files |> push("pcre2_compile_class.w")
+    for i in 0..files.len() as i32:
+        let file = files.get(i as i64)
+        rc = bs_copy_fixture_file(ctx, bs_join(raw_dir, file), bs_join(generated_dir, file), "shared externs copy")
+        if rc != 0: return rc
+
+    rc = bs_file_contains(ctx, bs_join(generated_dir, "pcre2_tables.w"), "var _pcre2_utf8_table1: *c_int", "shared externs tables")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, bs_join(generated_dir, "pcre2_tables.w"), "var _pcre2_OP_lengths_8: *u8", "shared externs tables")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, bs_join(generated_dir, "pcre2_compile.w"), "extern var _pcre2_utf8_table1: *c_int", "shared externs compile")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, bs_join(generated_dir, "pcre2_compile.w"), "var _pcre2_posix_class_maps8: *c_int", "shared externs compile")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, bs_join(generated_dir, "pcre2_compile_class.w"), "extern var _pcre2_utf8_table1: *c_int", "shared externs class")
+    if rc != 0: return rc
+    bs_file_contains(ctx, bs_join(generated_dir, "pcre2_compile_class.w"), "extern var _pcre2_posix_class_maps8: *c_int", "shared externs class")
+
+fn bs_check_pcre2_prepare_width_prunes(ctx: ActionCtx, compiler_path: str, base_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let raw_dir = bs_join(base_dir, "raw")
+    let generated_dir = bs_join(base_dir, "generated")
+    let compile_text = "// Migrated from PCRE2\nuse std.re.defs\n\ntype BOOL = c_int\nextern fn _pcre2_keep_8(ch: c_uint) -> c_uint\nfn keep_body(flag: c_int) -> c_int {\n    var c__goto_6350_16: c_uint = 0\n    if flag != 0 {\n        (c__goto_6350_16 = _pcre2_keep_8(c__goto_6350_16))\n    } else {\n        (c__goto_6350_16 = 1)\n    }\n    (c__goto_6350_16 as c_int)\n}\n"
+    var rc = bs_write_fixture(ctx, bs_join(raw_dir, "defs.w"), "// std.re.defs - shared definitions\ntype c_void = opaque\ntype c_int = i32\ntype c_uint = u32\ntype c_ushort = u16\nextern fn strlen(s: *const i8) -> i64\nextern fn memchr(s: *const c_void, c: i32, n: i64) -> *mut c_void\n", "width prune defs")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(raw_dir, "pcre2_compile.w"), compile_text, "width prune compile")
+    if rc != 0: return rc
+    rc = bs_copy_fixture_file(ctx, bs_join(raw_dir, "defs.w"), bs_join(generated_dir, "defs.w"), "width prune defs copy")
+    if rc != 0: return rc
+    rc = bs_copy_fixture_file(ctx, bs_join(raw_dir, "pcre2_compile.w"), bs_join(generated_dir, "pcre2_compile.w"), "width prune compile copy")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, bs_join(generated_dir, "pcre2_compile.w"), "(c__goto_6350_16 = _pcre2_keep_8(c__goto_6350_16))", "width prune local")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, bs_join(generated_dir, "pcre2_compile.w"), "} else {", "width prune else")
+    if rc != 0: return rc
+
+    let wrapper = bs_join(base_dir, "wrapper.w")
+    let wrapper_text = ctx.fs().read_text(bs_join(generated_dir, "defs.w")) ++ bs_drop_first_lines(ctx.fs().read_text(bs_join(generated_dir, "pcre2_compile.w")), 2) ++ "\nfn main { print(\"ok\") }\n"
+    rc = bs_write_fixture(ctx, wrapper, wrapper_text, "width prune wrapper")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("check")
+    args |> push(bs_abs(root, wrapper))
+    let result = bs_pcre2_expect_success(ctx, compiler_path, base_dir, "width-prunes-whole-decls", args)
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    0
+
+fn bs_check_pcre2_prepare_shared_lets(ctx: ActionCtx, base_dir: str) -> i32:
+    let raw_dir = bs_join(base_dir, "raw")
+    let generated_dir = bs_join(base_dir, "generated")
+    var rc = bs_write_fixture(ctx, bs_join(raw_dir, "defs.w"), "// std.re.defs - shared definitions\nlet ucp_C: c_uint = 0\nlet ucp_L: c_uint = 1\n", "shared lets defs")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(raw_dir, "pcre2_tables.w"), "// Migrated from PCRE2\nuse std.re.defs\n\ntype BOOL = c_int\nlet LOCAL_TABLE_ONLY: c_uint = 99\n", "shared lets tables")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(raw_dir, "pcre2_compile.w"), "// Migrated from PCRE2\nuse std.re.defs\n\ntype BOOL = c_int\nlet COMPILE_ONLY: c_uint = 7\n", "shared lets compile")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(raw_dir, "pcre2_match.w"), "// Migrated from PCRE2\nuse std.re.defs\n\ntype BOOL = c_int\nlet MATCH_ONLY: c_uint = 8\n", "shared lets match")
+    if rc != 0: return rc
+
+    let files: Vec[str] = Vec.new()
+    files |> push("defs.w")
+    files |> push("pcre2_tables.w")
+    files |> push("pcre2_compile.w")
+    files |> push("pcre2_match.w")
+    for i in 0..files.len() as i32:
+        let file = files.get(i as i64)
+        rc = bs_copy_fixture_file(ctx, bs_join(raw_dir, file), bs_join(generated_dir, file), "shared lets copy")
+        if rc != 0: return rc
+
+    rc = bs_file_contains(ctx, bs_join(generated_dir, "defs.w"), "let ucp_C: c_uint = 0", "shared lets defs")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, bs_join(generated_dir, "defs.w"), "let ucp_L: c_uint = 1", "shared lets defs")
+    if rc != 0: return rc
+    rc = bs_file_forbids(ctx, bs_join(generated_dir, "pcre2_tables.w"), "let ucp_C: c_uint = 0", "shared lets tables")
+    if rc != 0: return rc
+    rc = bs_file_forbids(ctx, bs_join(generated_dir, "pcre2_compile.w"), "let ucp_C: c_uint = 0", "shared lets compile")
+    if rc != 0: return rc
+    rc = bs_file_forbids(ctx, bs_join(generated_dir, "pcre2_match.w"), "let ucp_C: c_uint = 0", "shared lets match")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, bs_join(generated_dir, "pcre2_tables.w"), "let LOCAL_TABLE_ONLY: c_uint = 99", "shared lets tables")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, bs_join(generated_dir, "pcre2_compile.w"), "let COMPILE_ONLY: c_uint = 7", "shared lets compile")
+    if rc != 0: return rc
+    bs_file_contains(ctx, bs_join(generated_dir, "pcre2_match.w"), "let MATCH_ONLY: c_uint = 8", "shared lets match")
+
+fn bs_check_std_re_shared_dependency_imports(ctx: ActionCtx, compiler_path: str, base_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(base_dir, "main.w")
+    var rc = bs_write_fixture(ctx, src, "use std.re.defs\nuse std.re.pcre2_compile\nuse std.re.pcre2_match\n\nfn main:\n    print(\"ok\")\n", "std re dependency imports")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("check")
+    args |> push(bs_abs(root, src))
+    let result = bs_pcre2_expect_success(ctx, compiler_path, base_dir, "std-re-shared-dependency-imports", args)
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    0
+
+fn bs_check_opaque_field_access_rejected(ctx: ActionCtx, compiler_path: str, base_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(base_dir, "opaque_field_access.w")
+    var rc = bs_write_fixture(ctx, src, "type T = opaque\n\nfn f(p: *mut T):\n    (p.x = 1)\n\nfn main:\n    let _ = 0\n", "opaque field access")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("check")
+    args |> push(bs_abs(root, src))
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "opaque-field-access", args, 120000, base_dir)
+    if result.rc == 0:
+        return bs_fail(ctx, "accepted opaque field access")
+    bs_assert_contains(ctx, result.stderr, "field access requires a concrete struct or union type; this type is opaque", "opaque_field_access")
+
+fn bs_check_pcre2_match_heapframe(ctx: ActionCtx, compiler_path: str, base_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let match_path = "lib/std/re/pcre2_match.w"
+    let match_text = ctx.fs().read_text(match_path)
+    var rc = bs_assert_not_contains(ctx, match_text, "type heapframe = opaque", "pcre2 match heapframe")
+    if rc != 0: return rc
+    rc = bs_assert_not_contains(ctx, match_text, "type heapframe_align = opaque", "pcre2 match heapframe")
+    if rc != 0: return rc
+    let obj = bs_join(base_dir, "pcre2_match_issue111.o")
+    var args: Vec[str] = Vec.new()
+    args |> push("build")
+    args |> push(bs_abs(root, match_path))
+    args |> push("--emit-obj")
+    args |> push("--no-prelude")
+    args |> push("-O0")
+    args |> push("-o")
+    args |> push(bs_abs(root, obj))
+    let result = bs_pcre2_expect_success(ctx, compiler_path, root, "pcre2-match-heapframe", args)
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    0
+
+fn bs_check_pcre2_compile_builds(ctx: ActionCtx, compiler_path: str, base_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(base_dir, "pcre2_compile_builds.w")
+    let bin = bs_join(base_dir, "pcre2_compile_builds")
+    var rc = bs_write_fixture(ctx, src, "use std.re.defs\nuse std.re.pcre2_compile\n\nfn main:\n    let _ = pcre2_compile_8((null as *const u8), 0, 0, (null as *mut c_int), (null as *mut c_ulong), (null as *mut pcre2_real_compile_context_8))\n    print(\"ok\")\n", "pcre2 compile builds")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("build")
+    args |> push(bs_abs(root, src))
+    args |> push("-o")
+    args |> push(bs_abs(root, bin))
+    let result = bs_pcre2_expect_success(ctx, compiler_path, base_dir, "pcre2-compile-builds", args)
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    rc = bs_assert_not_contains(ctx, result.stderr, "MIR lowering failed", "pcre2 compile builds")
+    if rc != 0: return rc
+    rc = bs_assert_not_contains(ctx, result.stderr, "AST codegen was removed", "pcre2 compile builds")
+    if rc != 0: return rc
+    if not ctx.fs().exists(bin):
+        return bs_fail(ctx, "missing pcre2_compile_builds output: " ++ bin)
+    0
+
+fn bs_check_pcre2_jit_no_support(ctx: ActionCtx, compiler_path: str, base_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(base_dir, "pcre2_jit_no_support.w")
+    let text = "use std.re.defs\nuse std.re.pcre2_jit_compile\n\nfn main() -> i32:\n    let rc_null = pcre2_jit_compile_8((null as *mut pcre2_real_code_8), 0)\n    if rc_null != PCRE2_ERROR_NULL: return 1\n\n    let rc_test_alloc = pcre2_jit_compile_8((null as *mut pcre2_real_code_8), PCRE2_JIT_TEST_ALLOC)\n    if rc_test_alloc != PCRE2_ERROR_JIT_UNSUPPORTED: return 2\n\n    let stack = pcre2_jit_stack_create_8(1, 1024, (null as *mut pcre2_real_general_context_8))\n    if stack != null: return 3\n\n    pcre2_jit_stack_assign_8((null as *mut pcre2_real_match_context_8), (null as *const fn(*mut c_void) -> *mut pcre2_real_jit_stack_8), (null as *mut c_void))\n    pcre2_jit_stack_free_8(stack)\n    pcre2_jit_free_unused_memory_8((null as *mut pcre2_real_general_context_8))\n    _pcre2_jit_free_rodata_8((null as *mut c_void), (null as *mut c_void))\n    _pcre2_jit_free_8((null as *mut c_void), (null as *mut pcre2_memctl))\n\n    if _pcre2_jit_get_size_8((null as *mut c_void)) != 0: return 4\n    if _pcre2_jit_get_target_8() == null: return 5\n    return 0\n"
+    var rc = bs_write_fixture(ctx, src, text, "pcre2 jit no support")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("run")
+    args |> push(bs_abs(root, src))
+    let result = bs_pcre2_expect_success(ctx, compiler_path, base_dir, "pcre2-jit-no-support", args)
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    0
+
+fn bs_check_pcre2_generated_existing_main(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let generated_dir = bs_join(case_dir, "generated")
+    var rc = bs_write_project_manifest(ctx, case_dir, "pcre2generatedcheck")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(generated_dir, "defs.w"), "// std.re.defs\ntype c_int = i32\n", "pcre2 generated defs")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(generated_dir, "pcre2_helper.w"), "// Migrated from PCRE2\nuse std.re.defs\n\nfn helper_value() -> c_int:\n    7\n", "pcre2 generated helper")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(generated_dir, "pcre2test.w"), "// Migrated from PCRE2\nuse std.re.defs\n\nfn main() -> i32:\n    0\n", "pcre2 generated existing main")
+    if rc != 0: return rc
+    let build_text =
+        "use std.build\n\n" ++
+        "fn pcre2_generated_check_kind() -> BuildKind: 1006 as BuildKind\n\n" ++
+        "pub fn build(ctx: BuildCtx) -> Build:\n" ++
+        "    var target = target_new(pcre2_generated_check_kind(), \"pcre2-check-existing-main\", " ++ bs_with_string_literal(compiler_path) ++ ")\n" ++
+        "    target = target.input(\"generated\")\n" ++
+        "    var out = ctx.new_build()\n    out = out.add_target(target)\n" ++
+        "    out.default(\"pcre2-check-existing-main\")\n"
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), build_text, "pcre2 generated check build.w")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("build")
+    args |> push(":pcre2-check-existing-main")
+    let result = bs_pcre2_expect_success(ctx, compiler_path, case_dir, "pcre2-generated-existing-main", args)
+    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    bs_assert_contains(ctx, result.stdout, "OK=2 TOTAL_ERRORS=0", "pcre2_check_existing_main")
+
+pub fn run_cli_selfhost_pcre2_prep_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    if inputs.len() == 0:
+        return bs_fail(ctx, "missing compiler input")
+
+    let fs = ctx.fs()
+    let output_dir = ctx.output()
+    if output_dir.len() == 0:
+        return bs_fail(ctx, "missing output directory")
+    if fs.exists(output_dir) and fs.remove_tree(output_dir) != 0:
+        return bs_fail(ctx, "could not remove previous output directory: " ++ output_dir)
+    if fs.mkdir_all(output_dir) != 0:
+        return bs_fail(ctx, "could not create output directory: " ++ output_dir)
+
+    let compiler_input = inputs.get(0)
+    if not fs.exists(compiler_input):
+        return bs_fail(ctx, "missing compiler: " ++ compiler_input)
+    let compiler_path = bs_abs(ctx.project_info().project_root(), compiler_input)
+
+    var rc = bs_check_pcre2_defs_prune_ebcdic_tables(ctx)
+    if rc != 0: return rc
+    rc = bs_check_pcre2_prepare_shared_externs(ctx, bs_join(output_dir, "pcre2_prepare_case"))
+    if rc != 0: return rc
+    rc = bs_check_pcre2_prepare_width_prunes(ctx, compiler_path, bs_join(output_dir, "pcre2_prepare_width_prune_case"))
+    if rc != 0: return rc
+    rc = bs_check_pcre2_prepare_shared_lets(ctx, bs_join(output_dir, "pcre2_prepare_shared_lets_case"))
+    if rc != 0: return rc
+    rc = bs_check_std_re_shared_dependency_imports(ctx, compiler_path, bs_join(output_dir, "std_re_shared_dependency_case"))
+    if rc != 0: return rc
+    rc = bs_check_opaque_field_access_rejected(ctx, compiler_path, bs_join(output_dir, "opaque_field_access_case"))
+    if rc != 0: return rc
+    rc = bs_check_pcre2_match_heapframe(ctx, compiler_path, bs_join(output_dir, "pcre2_match_heapframe_case"))
+    if rc != 0: return rc
+    rc = bs_check_pcre2_compile_builds(ctx, compiler_path, bs_join(output_dir, "pcre2_compile_builds_case"))
+    if rc != 0: return rc
+    rc = bs_check_pcre2_jit_no_support(ctx, compiler_path, bs_join(output_dir, "pcre2_jit_no_support_case"))
+    if rc != 0: return rc
+    bs_check_pcre2_generated_existing_main(ctx, compiler_path, bs_join(output_dir, "pcre2_generated_existing_main_case"))
 
 fn bs_split_words(line: str) -> Vec[str]:
     let words: Vec[str] = Vec.new()

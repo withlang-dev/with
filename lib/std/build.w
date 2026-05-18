@@ -6,6 +6,7 @@
 extern fn with_eprint(s: str) -> void
 extern fn exit(code: i32) -> void
 extern fn with_getenv_str(name: str) -> str
+extern fn with_setenv_str(name: str, value: str) -> i32
 extern fn with_fs_file_exists(path: str) -> i32
 extern fn with_fs_is_dir(path: str) -> i32
 extern fn with_fs_mkdir_p(path: str) -> i32
@@ -352,9 +353,31 @@ fn tool_process_argv(args: Vec[str]) -> str:
         out = out ++ args.get(i as i64) ++ "\0"
     out
 
+type ToolProcessEnv {
+    tool_token: str,
+    action_name: str,
+}
+
+fn tool_process_clear_driver_env() -> ToolProcessEnv:
+    let tool_token = with_getenv_str("WITH_TOOL_CAPABILITY_TOKEN") ++ ""
+    let action_name = with_getenv_str("WITH_BUILD_ACTION_NAME") ++ ""
+    let env = ToolProcessEnv {
+        tool_token,
+        action_name,
+    }
+    let _clear_tool_token = with_setenv_str("WITH_TOOL_CAPABILITY_TOKEN", "")
+    let _clear_action_name = with_setenv_str("WITH_BUILD_ACTION_NAME", "")
+    env
+
+fn tool_process_restore_driver_env(env: ToolProcessEnv):
+    let _restore_action_name = with_setenv_str("WITH_BUILD_ACTION_NAME", env.action_name)
+    let _restore_tool_token = with_setenv_str("WITH_TOOL_CAPABILITY_TOKEN", env.tool_token)
+
 pub fn ProcessRunner.run_capture(self: &Self, args: Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32) -> ToolProcessResult:
     tool_capability_require(self.token, "ProcessRunner")
+    let env = tool_process_clear_driver_env()
     let rc = with_exec_argv_capture(tool_process_argv(args), stdout_path, stderr_path, timeout_ms)
+    tool_process_restore_driver_env(env)
     ToolProcessResult {
         rc,
         stdout: with_fs_read_file(stdout_path),
@@ -363,7 +386,9 @@ pub fn ProcessRunner.run_capture(self: &Self, args: Vec[str], stdout_path: str, 
 
 pub fn ProcessRunner.run_capture_cwd(self: &Self, args: Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str) -> ToolProcessResult:
     tool_capability_require(self.token, "ProcessRunner")
+    let env = tool_process_clear_driver_env()
     let rc = with_exec_argv_capture_cwd(tool_process_argv(args), stdout_path, stderr_path, timeout_ms, cwd)
+    tool_process_restore_driver_env(env)
     ToolProcessResult {
         rc,
         stdout: with_fs_read_file(stdout_path),
@@ -372,7 +397,9 @@ pub fn ProcessRunner.run_capture_cwd(self: &Self, args: Vec[str], stdout_path: s
 
 pub fn ProcessRunner.run_capture_input(self: &Self, args: Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32, stdin_path: str) -> ToolProcessResult:
     tool_capability_require(self.token, "ProcessRunner")
+    let env = tool_process_clear_driver_env()
     let rc = with_exec_argv_capture_input(tool_process_argv(args), stdout_path, stderr_path, timeout_ms, stdin_path)
+    tool_process_restore_driver_env(env)
     ToolProcessResult {
         rc,
         stdout: with_fs_read_file(stdout_path),
@@ -381,7 +408,10 @@ pub fn ProcessRunner.run_capture_input(self: &Self, args: Vec[str], stdout_path:
 
 pub fn ProcessRunner.spawn_capture(self: &Self, args: Vec[str], stdout_path: str, stderr_path: str) -> i32:
     tool_capability_require(self.token, "ProcessRunner")
-    with_exec_argv_capture_spawn(tool_process_argv(args), stdout_path, stderr_path)
+    let env = tool_process_clear_driver_env()
+    let pid = with_exec_argv_capture_spawn(tool_process_argv(args), stdout_path, stderr_path)
+    tool_process_restore_driver_env(env)
+    pid
 
 pub fn ProcessRunner.wait(self: &Self, pid: i32, timeout_ms: i32) -> i32:
     tool_capability_require(self.token, "ProcessRunner")

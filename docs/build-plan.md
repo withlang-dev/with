@@ -303,6 +303,11 @@ Status: in progress. Completed slices:
 - Moved `cli-selfhost-parallel-tests` from the generic `selfhost_suite_test`
   dispatcher to the repository-local `build_selfhost.w` module. The target is
   now an `Action` using `ProcessRunner.spawn_capture` and `ProcessRunner.wait`.
+- Moved `c-migrator-pcre2-prep-tests` from the generic `selfhost_suite_test`
+  dispatcher to the repository-local `build_selfhost.w` module. The target is
+  now an `Action`, project kind 1016 is reserved as removed legacy graph data,
+  and `ProcessRunner` clears driver-private action capability environment while
+  launching child processes so nested `with build` invocations are isolated.
 
 Generic compiler-driver code may retain only:
 

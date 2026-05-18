@@ -505,8 +505,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     cli_selfhost_parallel_tests = cli_selfhost_parallel_tests.dep("selfcheck")
     out = out.add_target(cli_selfhost_parallel_tests)
 
-    var c_migrator_pcre2_prep_tests = target_new(project_kind_selfhost_suite_test(), "c-migrator-pcre2-prep-tests", "out/bin/with-stage2")
-    c_migrator_pcre2_prep_tests = c_migrator_pcre2_prep_tests.arg("pcre2-prep")
+    var c_migrator_pcre2_prep_tests = target_new(.Action, "c-migrator-pcre2-prep-tests", "").output("out/test-graph/c-migrator-pcre2-prep-tests")
+    c_migrator_pcre2_prep_tests.action = run_cli_selfhost_pcre2_prep_action
     c_migrator_pcre2_prep_tests = c_migrator_pcre2_prep_tests.input("out/bin/with-stage2")
     c_migrator_pcre2_prep_tests = c_migrator_pcre2_prep_tests.dep("selfcheck")
     out = out.add_target(c_migrator_pcre2_prep_tests)
