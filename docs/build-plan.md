@@ -300,6 +300,9 @@ Status: in progress. Completed slices:
   `cli_selfhost_edge_test` dispatch to the repository-local
   `build_selfhost.w` module. The target is now an `Action`, and project kind
   1015 is reserved as removed legacy graph data.
+- Moved `cli-selfhost-parallel-tests` from the generic `selfhost_suite_test`
+  dispatcher to the repository-local `build_selfhost.w` module. The target is
+  now an `Action` using `ProcessRunner.spawn_capture` and `ProcessRunner.wait`.
 
 Generic compiler-driver code may retain only:
 
