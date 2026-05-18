@@ -127,6 +127,67 @@ fn bs_run_binary_capture(ctx: ActionCtx, exe_path: str, label: str, timeout_ms: 
         let _remove_stderr = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stderr"))
     SelfhostRunResult { result.rc, result.stdout, result.stderr }
 
+pub fn run_embedded_runtime_regression_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    if inputs.len() == 0:
+        return bs_fail(ctx, "missing compiler input")
+    let fs = ctx.fs()
+    let output_dir = ctx.output()
+    if output_dir.len() == 0:
+        return bs_fail(ctx, "missing output directory")
+    if fs.exists(output_dir) and fs.remove_tree(output_dir) != 0:
+        return bs_fail(ctx, "could not remove previous output directory: " ++ output_dir)
+    if fs.mkdir_all(output_dir) != 0:
+        return bs_fail(ctx, "could not create output directory: " ++ output_dir)
+    let compiler_input = inputs.get(0)
+    if not fs.exists(compiler_input):
+        return bs_fail(ctx, "missing compiler: " ++ compiler_input)
+
+    let copied_compiler = bs_join(output_dir, "with")
+    if fs.copy_file(compiler_input, copied_compiler) != 0:
+        return bs_fail(ctx, "could not copy compiler to embedded runtime fixture")
+    if fs.chmod(copied_compiler, 0o755) != 0:
+        return bs_fail(ctx, "could not make copied compiler executable")
+
+    let source_path = bs_join(output_dir, "hello.w")
+    if fs.write_text(source_path, "fn main:\n    print(\"hello\")\n") != 0:
+        return bs_fail(ctx, "could not write embedded runtime fixture source")
+
+    let root = ctx.project_info().project_root()
+    let bin_path = bs_join(output_dir, "hello")
+    let build_stdout = bs_join(output_dir, "build.stdout")
+    let build_stderr = bs_join(output_dir, "build.stderr")
+    var build_args: Vec[str] = Vec.new()
+    build_args |> push(bs_abs(root, copied_compiler))
+    build_args |> push("build")
+    build_args |> push(bs_abs(root, source_path))
+    build_args |> push("-o")
+    build_args |> push(bs_abs(root, bin_path))
+
+    let old_out_dir = env("WITH_OUT_DIR") ++ ""
+    if set_env("WITH_OUT_DIR", bs_abs(root, bs_join(output_dir, "no-out"))) != 0:
+        return bs_fail(ctx, "could not set WITH_OUT_DIR for embedded runtime test")
+    let build_result = ctx.process_runner().run_capture(build_args, bs_abs(root, build_stdout), bs_abs(root, build_stderr), 300000)
+    let _restore_out_dir = set_env("WITH_OUT_DIR", old_out_dir)
+    if build_result.rc == 124:
+        return bs_fail(ctx, "embedded runtime build timed out; stdout=" ++ build_stdout ++ " stderr=" ++ build_stderr)
+    if build_result.rc != 0:
+        return bs_fail(ctx, f"embedded runtime build failed with exit code {build_result.rc}; stdout=" ++ build_stdout ++ " stderr=" ++ build_stderr)
+
+    let run_stdout = bs_join(output_dir, "run.stdout")
+    let run_stderr = bs_join(output_dir, "run.stderr")
+    var run_args: Vec[str] = Vec.new()
+    run_args |> push(bs_abs(root, bin_path))
+    let run_result = ctx.process_runner().run_capture(run_args, bs_abs(root, run_stdout), bs_abs(root, run_stderr), 60000)
+    if run_result.rc == 124:
+        return bs_fail(ctx, "embedded runtime output run timed out; stdout=" ++ run_stdout ++ " stderr=" ++ run_stderr)
+    if run_result.rc != 0:
+        return bs_fail(ctx, f"embedded runtime output run failed with exit code {run_result.rc}; stdout=" ++ run_stdout ++ " stderr=" ++ run_stderr)
+    let output = bs_trim_trailing_line_endings(run_result.stdout)
+    if output != "hello":
+        return bs_fail(ctx, "embedded runtime output produced unexpected stdout: " ++ output)
+    0
+
 fn bs_run_cli_expect_success(ctx: ActionCtx, compiler_path: str, label: str, args: Vec[str]) -> SelfhostRunResult:
     let result = bs_run_cli_capture(ctx, compiler_path, label, args, 120000)
     if result.rc != 0:

@@ -953,66 +953,6 @@ fn build_graph_run_tool_capture(root: str, target: BuildGraphTarget, tool_name: 
     let _remove_stderr = with_fs_remove_file(stderr_path)
     0
 
-fn build_graph_run_embedded_runtime_extract_test(root: str, target: BuildGraphTarget) -> i32:
-    if target.entry.len() == 0:
-        with_eprint("error: embedded_runtime_extract_test target '" ++ target.name ++ "' requires a compiler path")
-        return 1
-    let arg_rc = build_graph_validate_process_args(target)
-    if arg_rc != 0:
-        return arg_rc
-    let compiler_path = build_graph_resolve_project_path(root, target.entry)
-    let stamp = f"{with_getpid()}.{with_clock_nanos()}"
-    let test_dir = resolve_join(resolve_join(resolve_join(root, "out/test-graph"), target.name), stamp)
-    if with_fs_mkdir_p(test_dir) != 0:
-        with_eprint("error: could not create embedded runtime test directory: " ++ test_dir)
-        return 1
-    let copied_compiler = resolve_join(test_dir, "with")
-    let copy_rc = build_graph_copy_file_to_path(compiler_path, copied_compiler, 0o755)
-    if copy_rc != 0:
-        return copy_rc
-    let source_path = resolve_join(test_dir, "hello.w")
-    if with_fs_write_file(source_path, "fn main:\n    print(\"hello\")\n") != 0:
-        with_eprint("error: could not write embedded runtime test source: " ++ source_path)
-        return 1
-    let bin_path = resolve_join(test_dir, "hello")
-    let stdout_path = resolve_join(test_dir, "build.stdout")
-    let stderr_path = resolve_join(test_dir, "build.stderr")
-    let old_out_dir = with_getenv_str("WITH_OUT_DIR")
-    let set_rc = with_setenv_str("WITH_OUT_DIR", resolve_join(test_dir, "no-out"))
-    if set_rc != 0:
-        with_eprint("error: could not set WITH_OUT_DIR for embedded runtime test")
-        return 1
-    var build_argv = ""
-    build_argv = build_graph_argv_append(build_argv, copied_compiler)
-    build_argv = build_graph_argv_append(build_argv, "build")
-    build_argv = build_graph_argv_append(build_argv, source_path)
-    build_argv = build_graph_argv_append(build_argv, "-o")
-    build_argv = build_graph_argv_append(build_argv, bin_path)
-    let build_rc = with_exec_argv_capture(build_argv, stdout_path, stderr_path, 300000)
-    let _restore_after_build = build_graph_restore_env("WITH_OUT_DIR", old_out_dir)
-    if build_rc == 124:
-        with_eprint("error: embedded_runtime_extract_test target '" ++ target.name ++ "' timed out while building; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
-        return 124
-    if build_rc != 0:
-        with_eprint("error: embedded_runtime_extract_test target '" ++ target.name ++ f"' failed while building with exit code {build_rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
-        return if build_rc == 0: 1 else: build_rc
-    let run_stdout_path = resolve_join(test_dir, "run.stdout")
-    let run_stderr_path = resolve_join(test_dir, "run.stderr")
-    var run_argv = ""
-    run_argv = build_graph_argv_append(run_argv, bin_path)
-    let run_rc = with_exec_argv_capture(run_argv, run_stdout_path, run_stderr_path, 60000)
-    if run_rc == 124:
-        with_eprint("error: embedded_runtime_extract_test target '" ++ target.name ++ "' timed out while running; stdout=" ++ run_stdout_path ++ " stderr=" ++ run_stderr_path)
-        return 124
-    if run_rc != 0:
-        with_eprint("error: embedded_runtime_extract_test target '" ++ target.name ++ f"' failed while running with exit code {run_rc}; stdout=" ++ run_stdout_path ++ " stderr=" ++ run_stderr_path)
-        return if run_rc == 0: 1 else: run_rc
-    let output = build_graph_trim_trailing_line_endings(with_fs_read_file(run_stdout_path))
-    if output != "hello":
-        with_eprint("error: embedded_runtime_extract_test target '" ++ target.name ++ "' produced unexpected output: " ++ output)
-        return 1
-    0
-
 fn build_graph_run_cli_capture(root: str, target: BuildGraphTarget, compiler_path: str, label: str, argv_tail: str, timeout_ms: i32) -> TestRunResult:
     let capture_dir = resolve_join(resolve_join(root, "out/test-graph"), target.name)
     let _mkdir = with_fs_mkdir_p(capture_dir)
@@ -1089,12 +1029,6 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, opt_level: 
             let action_rc = run_build_action_from_build_w(root, cfg, target, opt_level, no_std, alloc_mode, prelude_mode, debug_info)
             if action_rc != 0:
                 return action_rc
-            completed_targets.push(target.name)
-            continue
-        if target.kind == build_graph_kind_embedded_runtime_extract_test():
-            let embedded_rc = build_graph_run_embedded_runtime_extract_test(root, target)
-            if embedded_rc != 0:
-                return embedded_rc
             completed_targets.push(target.name)
             continue
         if target.kind == build_graph_kind_generate_compiler_entrypoints():
