@@ -26,7 +26,6 @@ use BuildGraphSupport
 use BuildGraphTools
 use BuildGraphTests
 use InitTemplates
-use BuildGraphSelfhost
 use BuildGraphRuntime
 
 extern fn with_arg_count() -> i32
@@ -1032,26 +1031,6 @@ fn build_graph_run_cli_capture(root: str, target: BuildGraphTarget, compiler_pat
         let _remove_stderr = with_fs_remove_file(stderr_path)
     TestRunResult { rc, stdout, stderr }
 
-fn build_graph_run_cli_selfhost_suite_test(root: str, target: BuildGraphTarget) -> i32:
-    if target.entry.len() == 0:
-        with_eprint("error: selfhost_suite_test target '" ++ target.name ++ "' requires a compiler path")
-        return 1
-    if target.args.len() == 0:
-        with_eprint("error: selfhost_suite_test target '" ++ target.name ++ "' requires a suite name argument")
-        return 1
-    let arg_rc = build_graph_validate_process_args(target)
-    if arg_rc != 0:
-        return arg_rc
-    let suite = target.args.get(0)
-    let compiler_path = build_graph_resolve_project_path(root, target.entry)
-    if with_fs_file_exists(compiler_path) == 0:
-        with_eprint("error: selfhost_suite_test target '" ++ target.name ++ "' missing compiler: " ++ compiler_path)
-        return 1
-    if suite == "build-w":
-        return run_cli_selfhost_build_w_test(root, target.name, compiler_path)
-    with_eprint("error: selfhost_suite_test target '" ++ target.name ++ "' has unknown suite: " ++ suite)
-    1
-
 fn build_graph_trim_space_and_newlines(text: str) -> str:
     var start = 0
     var end = text.len() as i32
@@ -1158,28 +1137,6 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, opt_level: 
             let pcre2_build_rc = build_graph_run_pcre2_build(root, target)
             if pcre2_build_rc != 0:
                 return pcre2_build_rc
-            completed_targets.push(target.name)
-            continue
-        if target.kind == build_graph_kind_cli_selfhost_build_w_test():
-            if target.entry.len() == 0:
-                with_eprint("error: cli_selfhost_build_w_test target '" ++ target.name ++ "' requires a compiler path")
-                return 1
-            let arg_rc = build_graph_validate_process_args(target)
-            if arg_rc != 0:
-                return arg_rc
-            let compiler_path = build_graph_resolve_project_path(root, target.entry)
-            if with_fs_file_exists(compiler_path) == 0:
-                with_eprint("error: cli_selfhost_build_w_test target '" ++ target.name ++ "' missing compiler: " ++ compiler_path)
-                return 1
-            let build_w_rc = run_cli_selfhost_build_w_test(root, target.name, compiler_path)
-            if build_w_rc != 0:
-                return build_w_rc
-            completed_targets.push(target.name)
-            continue
-        if target.kind == build_graph_kind_selfhost_suite_test():
-            let suite_rc = build_graph_run_cli_selfhost_suite_test(root, target)
-            if suite_rc != 0:
-                return suite_rc
             completed_targets.push(target.name)
             continue
         if target.kind == build_graph_kind_generate_llvm_link_metadata():
