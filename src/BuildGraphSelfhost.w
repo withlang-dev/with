@@ -90,7 +90,7 @@ fn bgs_check_migrate_libc_ctype(root: str, target_name: str, compiler_path: str,
     argv = bgs_argv_append(argv, "-o")
     argv = bgs_argv_append(argv, out_w)
     let result = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "migrate-libc-ctype", argv)
-    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    if result.rc != 0: return result.rc
     let out_text = with_fs_read_file(out_w)
     let required: Vec[str] = Vec.new()
     required.push("extern fn isalpha(c: i32) -> i32")
@@ -110,7 +110,7 @@ fn bgs_check_migrate_libc_ctype(root: str, target_name: str, compiler_path: str,
         rc = bgs_migrate_assert_not_contains(out_text, forbidden.get(i as i64), target_name, "libc_ctype_calls")
         if rc != 0: return rc
     let check = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "check-libc-ctype", bgs_argv_append(bgs_argv_append("", "check"), out_w))
-    if check.rc != 0: return if check.rc == 0: 1 else: check.rc
+    if check.rc != 0: return check.rc
     0
 
 fn bgs_check_migrate_macro_unsigned_minus(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
@@ -127,7 +127,7 @@ fn bgs_check_migrate_macro_unsigned_minus(root: str, target_name: str, compiler_
     argv = bgs_argv_append(argv, "-o")
     argv = bgs_argv_append(argv, out_w)
     let result = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "migrate-macro-unsigned-minus", argv)
-    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    if result.rc != 0: return result.rc
     let out_text = with_fs_read_file(out_w)
     if with_str_contains(out_text, "(-1 as ") == 0 and with_str_contains(out_text, "(0 as ") == 0:
         bgs_migrate_error(target_name, "macro_initializer_unsigned_minus missing typed unsigned -1")
@@ -141,7 +141,7 @@ fn bgs_check_migrate_macro_unsigned_minus(root: str, target_name: str, compiler_
     rc = bgs_migrate_assert_contains(out_text, "= 3)", target_name, "macro_initializer_unsigned_minus")
     if rc != 0: return rc
     let check = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "check-macro-unsigned-minus", bgs_argv_append(bgs_argv_append("", "check"), out_w))
-    if check.rc != 0: return if check.rc == 0: 1 else: check.rc
+    if check.rc != 0: return check.rc
     0
 
 fn bgs_check_migrate_tentative_global_owner(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
@@ -156,13 +156,13 @@ fn bgs_check_migrate_tentative_global_owner(root: str, target_name: str, compile
     argv = bgs_argv_append(argv, "-o")
     argv = bgs_argv_append(argv, out_w)
     let result = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "migrate-tentative-global-owner", argv)
-    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    if result.rc != 0: return result.rc
     rc = bgs_migrate_file_contains(out_w, "var g: ctx", target_name, "tentative_global_owner")
     if rc != 0: return rc
     rc = bgs_migrate_file_forbids(out_w, "extern var g: ctx", target_name, "tentative_global_owner")
     if rc != 0: return rc
     let check = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "check-tentative-global-owner", bgs_argv_append(bgs_argv_append("", "check"), out_w))
-    if check.rc != 0: return if check.rc == 0: 1 else: check.rc
+    if check.rc != 0: return check.rc
     0
 
 fn bgs_check_migrate_cross_file_tentative_global_owner(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
@@ -178,7 +178,7 @@ fn bgs_check_migrate_cross_file_tentative_global_owner(root: str, target_name: s
     argv = bgs_argv_append(argv, "-o")
     argv = bgs_argv_append(argv, generated_dir)
     let result = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "migrate-cross-file-tentative", argv)
-    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    if result.rc != 0: return result.rc
     let a_w = bgs_resolve_join(generated_dir, "a.w")
     let b_w = bgs_resolve_join(generated_dir, "b.w")
     rc = bgs_migrate_file_contains(a_w, "var issue127_counter: c_int", target_name, "cross_file_tentative_global_owner")
@@ -186,9 +186,9 @@ fn bgs_check_migrate_cross_file_tentative_global_owner(root: str, target_name: s
     rc = bgs_migrate_file_contains(b_w, "extern var issue127_counter: c_int", target_name, "cross_file_tentative_global_owner")
     if rc != 0: return rc
     let check_a = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "check-cross-file-tentative-a", bgs_argv_append(bgs_argv_append("", "check"), a_w))
-    if check_a.rc != 0: return if check_a.rc == 0: 1 else: check_a.rc
+    if check_a.rc != 0: return check_a.rc
     let check_b = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "check-cross-file-tentative-b", bgs_argv_append(bgs_argv_append("", "check"), b_w))
-    if check_b.rc != 0: return if check_b.rc == 0: 1 else: check_b.rc
+    if check_b.rc != 0: return check_b.rc
     0
 
 fn bgs_check_migrate_noop_pointer_casts(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
@@ -204,7 +204,7 @@ fn bgs_check_migrate_noop_pointer_casts(root: str, target_name: str, compiler_pa
     argv = bgs_argv_append(argv, "-o")
     argv = bgs_argv_append(argv, out_w)
     let result = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "migrate-noop-pointer-casts", argv)
-    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    if result.rc != 0: return result.rc
     let out_text = with_fs_read_file(out_w)
     let required: Vec[str] = Vec.new()
     required.push("fn ret_ctx() -> *mut ctx:")
@@ -223,7 +223,7 @@ fn bgs_check_migrate_noop_pointer_casts(root: str, target_name: str, compiler_pa
         rc = bgs_migrate_assert_not_contains(out_text, forbidden.get(i as i64), target_name, "noop_pointer_cast_exprs")
         if rc != 0: return rc
     let check = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "check-noop-pointer-casts", bgs_argv_append(bgs_argv_append("", "check"), out_w))
-    if check.rc != 0: return if check.rc == 0: 1 else: check.rc
+    if check.rc != 0: return check.rc
     0
 
 fn bgs_check_migrate_raw_pointer_index(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
@@ -238,7 +238,7 @@ fn bgs_check_migrate_raw_pointer_index(root: str, target_name: str, compiler_pat
     argv = bgs_argv_append(argv, "-o")
     argv = bgs_argv_append(argv, out_w)
     let result = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "migrate-raw-pointer-index", argv)
-    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    if result.rc != 0: return result.rc
     let out_text = with_fs_read_file(out_w)
     rc = bgs_migrate_assert_contains(out_text, "__param_p +", target_name, "raw_pointer_index_unsafe")
     if rc != 0: return rc
@@ -247,7 +247,7 @@ fn bgs_check_migrate_raw_pointer_index(root: str, target_name: str, compiler_pat
     rc = bgs_migrate_assert_contains(out_text, "(unsafe: __param_p[1])", target_name, "raw_pointer_index_unsafe")
     if rc != 0: return rc
     let check = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "check-raw-pointer-index", bgs_argv_append(bgs_argv_append("", "check"), out_w))
-    if check.rc != 0: return if check.rc == 0: 1 else: check.rc
+    if check.rc != 0: return check.rc
     0
 
 fn bgs_check_migrate_prefer_brace_ws(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
@@ -264,7 +264,7 @@ fn bgs_check_migrate_prefer_brace_ws(root: str, target_name: str, compiler_path:
     argv = bgs_argv_append(argv, "-o")
     argv = bgs_argv_append(argv, out_w)
     let result = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "migrate-prefer-brace-ws", argv)
-    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    if result.rc != 0: return result.rc
     let out_text = with_fs_read_file(out_w)
     rc = bgs_assert_not_matches(out_text, "(?m)[\\t ]$", target_name, "prefer_brace_ws trailing whitespace")
     if rc != 0: return rc
@@ -275,7 +275,7 @@ fn bgs_check_migrate_prefer_brace_ws(root: str, target_name: str, compiler_path:
     rc = bgs_assert_not_matches(out_text, "(?m)^[\\t ]*(if|while)\\b[^\\n]*:[\\t ]*$", target_name, "prefer_brace_ws colon style")
     if rc != 0: return rc
     let check = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "check-prefer-brace-ws", bgs_argv_append(bgs_argv_append("", "check"), out_w))
-    if check.rc != 0: return if check.rc == 0: 1 else: check.rc
+    if check.rc != 0: return check.rc
     0
 
 fn bgs_check_migrate_typed_cast_macros(root: str, target_name: str, compiler_path: str, case_dir: str) -> i32:
@@ -291,14 +291,14 @@ fn bgs_check_migrate_typed_cast_macros(root: str, target_name: str, compiler_pat
     argv = bgs_argv_append(argv, "-o")
     argv = bgs_argv_append(argv, out_w)
     let result = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "migrate-typed-cast-macros", argv)
-    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    if result.rc != 0: return result.rc
     let out_text = with_fs_read_file(out_w)
     rc = bgs_migrate_assert_contains(out_text, "let ZERO_TERM: c_ulong = (-1 as c_ulong)", target_name, "typed_cast_macros")
     if rc != 0: return rc
     rc = bgs_migrate_assert_contains(out_text, "patlen == ((-1 as c_ulong))", target_name, "typed_cast_macros")
     if rc != 0: return rc
     let check = bgs_migrate_expect_success(root, target_name, compiler_path, case_dir, "check-typed-cast-macros", bgs_argv_append(bgs_argv_append("", "check"), out_w))
-    if check.rc != 0: return if check.rc == 0: 1 else: check.rc
+    if check.rc != 0: return check.rc
     0
 
 pub fn run_cli_selfhost_migrate_core_test(root: str, target_name: str, compiler_path: str) -> i32:
@@ -355,7 +355,7 @@ fn bgs_check_build_w_not_ignored(root: str, target_name: str, compiler_path: str
     rc = bgs_write_fixture(bgs_resolve_join(case_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    var target = target_new(.Executable, \"custom-build\", \"src/custom.w\")\n    target = target.include_path(\"extra_include\")\n    target = target.define(\"WITH_BUILD_FEATURE\")\n    target = target.define(\"WITH_BUILD_VALUE=42\")\n    target = target.link_system_lib(\"m\")\n    var out = ctx.new_build()\n    out.add_target(target)\n", target_name, "build.w")
     if rc != 0: return rc
     let result = bgs_build_expect_success(root, target_name, compiler_path, case_dir, "build-w-not-ignored", bgs_argv_append("", "build"))
-    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    if result.rc != 0: return result.rc
     let custom_bin = bgs_resolve_join(case_dir, "out/bin/custom-build")
     if with_fs_file_exists(custom_bin) == 0:
         with_eprint("error: build_w_not_ignored missing custom-build output")
@@ -364,11 +364,11 @@ fn bgs_check_build_w_not_ignored(root: str, target_name: str, compiler_path: str
         with_eprint("error: build_w_not_ignored unexpectedly produced default package output")
         return 1
     let run_result = bgs_run_binary_capture(root, target_name, "build-w-not-ignored-run", custom_bin, 120000)
-    if run_result.rc != 0: return if run_result.rc == 0: 1 else: run_result.rc
+    if run_result.rc != 0: return run_result.rc
     rc = bgs_assert_contains(run_result.stdout, "custom build", target_name, "build_w_not_ignored")
     if rc != 0: return rc
     let explicit = bgs_build_expect_success(root, target_name, compiler_path, case_dir, "build-w-explicit-source", bgs_argv_append(bgs_argv_append("", "build"), bgs_resolve_join(case_dir, "src/main.w")))
-    if explicit.rc != 0: return if explicit.rc == 0: 1 else: explicit.rc
+    if explicit.rc != 0: return explicit.rc
     0
 
 fn bgs_check_build_w_test_targets(root: str, target_name: str, compiler_path: str, base_dir: str) -> i32:
@@ -382,7 +382,7 @@ fn bgs_check_build_w_test_targets(root: str, target_name: str, compiler_path: st
     rc = bgs_write_fixture(bgs_resolve_join(single_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    var target = target_new(.Test, \"configured-test\", \"src/build_test.w\")\n    target = target.include_path(\"extra_include\")\n    target = target.define(\"WITH_BUILD_FEATURE\")\n    target = target.define(\"WITH_BUILD_VALUE=42\")\n    var out = ctx.new_build()\n    out.add_target(target)\n", target_name, "test build.w")
     if rc != 0: return rc
     let single_result = bgs_build_expect_success(root, target_name, compiler_path, single_dir, "build-w-test-target", bgs_argv_append("", "build"))
-    if single_result.rc != 0: return if single_result.rc == 0: 1 else: single_result.rc
+    if single_result.rc != 0: return single_result.rc
     rc = bgs_assert_contains(single_result.stdout, "ok: 1 test passed", target_name, "build_w_test_target")
     if rc != 0: return rc
 
@@ -398,7 +398,7 @@ fn bgs_check_build_w_test_targets(root: str, target_name: str, compiler_path: st
     rc = bgs_write_fixture(bgs_resolve_join(glob_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    var target = target_new(.Test, \"glob-tests\", \"tests/*.w\")\n    target = target.include_path(\"extra_include\")\n    target = target.define(\"WITH_BUILD_FEATURE\")\n    target = target.define(\"WITH_BUILD_VALUE=42\")\n    var out = ctx.new_build()\n    out.add_target(target)\n", target_name, "glob build.w")
     if rc != 0: return rc
     let glob_result = bgs_build_expect_success(root, target_name, compiler_path, glob_dir, "build-w-test-target-glob", bgs_argv_append("", "build"))
-    if glob_result.rc != 0: return if glob_result.rc == 0: 1 else: glob_result.rc
+    if glob_result.rc != 0: return glob_result.rc
     bgs_assert_contains(glob_result.stdout, "ok: 2 files passed in build.w test target glob-tests", target_name, "build_w_test_target_glob")
 
 fn bgs_check_build_w_library_and_targets(root: str, target_name: str, compiler_path: str, base_dir: str) -> i32:
@@ -412,7 +412,7 @@ fn bgs_check_build_w_library_and_targets(root: str, target_name: str, compiler_p
     rc = bgs_write_fixture(bgs_resolve_join(lib_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    var target = target_new(.Library, \"configured\", \"src/lib.w\")\n    target = target.include_path(\"extra_include\")\n    target = target.define(\"WITH_BUILD_FEATURE\")\n    target = target.define(\"WITH_BUILD_VALUE=42\")\n    var out = ctx.new_build()\n    out.add_target(target)\n", target_name, "library build.w")
     if rc != 0: return rc
     let lib_result = bgs_build_expect_success(root, target_name, compiler_path, lib_dir, "build-w-library-target", bgs_argv_append("", "build"))
-    if lib_result.rc != 0: return if lib_result.rc == 0: 1 else: lib_result.rc
+    if lib_result.rc != 0: return lib_result.rc
     let archive = bgs_resolve_join(lib_dir, "out/lib/libconfigured.a")
     if with_fs_file_exists(archive) == 0:
         with_eprint("error: build_w_library_target missing archive: " ++ archive)
@@ -428,13 +428,13 @@ fn bgs_check_build_w_library_and_targets(root: str, target_name: str, compiler_p
     rc = bgs_write_fixture(bgs_resolve_join(host_dir, "build.w"), "use std.build\nuse std.sysinfo\n\npub fn build(ctx: BuildCtx) -> Build:\n    var host = BuildTarget.native\n    if os() == \"Macos\":\n        if arch() == \"armv8\" or arch() == \"aarch64\":\n            host = BuildTarget.darwin_aarch64\n        else if arch() == \"x86_64\":\n            host = BuildTarget.darwin_x86_64\n    else if os() == \"Linux\":\n        if arch() == \"armv8\" or arch() == \"aarch64\":\n            host = BuildTarget.linux_aarch64\n        else if arch() == \"x86_64\":\n            host = BuildTarget.linux_x86_64\n    else if os() == \"Windows\":\n        if arch() == \"x86_64\":\n            host = BuildTarget.windows_x86_64\n    var target = target_new(.Executable, \"host-target\", \"src/main.w\")\n    target = target.target(host)\n    var out = ctx.new_build()\n    out.add_target(target)\n", target_name, "host build.w")
     if rc != 0: return rc
     let host_result = bgs_build_expect_success(root, target_name, compiler_path, host_dir, "build-w-explicit-host-target", bgs_argv_append("", "build"))
-    if host_result.rc != 0: return if host_result.rc == 0: 1 else: host_result.rc
+    if host_result.rc != 0: return host_result.rc
     let host_bin = bgs_resolve_join(host_dir, "out/bin/host-target")
     if with_fs_file_exists(host_bin) == 0:
         with_eprint("error: build_w_explicit_host_target missing binary: " ++ host_bin)
         return 1
     let host_run = bgs_run_binary_capture(root, target_name, "build-w-explicit-host-run", host_bin, 120000)
-    if host_run.rc != 0: return if host_run.rc == 0: 1 else: host_run.rc
+    if host_run.rc != 0: return host_run.rc
     rc = bgs_assert_contains(host_run.stdout, "explicit host target", target_name, "build_w_explicit_host_target")
     if rc != 0: return rc
 
@@ -460,14 +460,14 @@ fn bgs_check_build_w_generated_source(root: str, target_name: str, compiler_path
     rc = bgs_write_fixture(bgs_resolve_join(gen_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    let fs = ctx.fs()\n    let emitter = ctx.source_emitter()\n    let source = emitter.generated_source(\"out/gen/generated_main.w\", fs.read_text(\"templates/generated_main.w\"))\n    var generated = ctx.new_build()\n    generated = generated.add_generated_source(source)\n    generated.executable(\"generated-app\", \"out/gen/generated_main.w\")\n", target_name, "generated build.w")
     if rc != 0: return rc
     let gen_result = bgs_build_expect_success(root, target_name, compiler_path, gen_dir, "build-w-generated-source", bgs_argv_append("", "build"))
-    if gen_result.rc != 0: return if gen_result.rc == 0: 1 else: gen_result.rc
+    if gen_result.rc != 0: return gen_result.rc
     let generated_source = bgs_resolve_join(gen_dir, "out/gen/generated_main.w")
     let generated_bin = bgs_resolve_join(gen_dir, "out/bin/generated-app")
     if with_fs_file_exists(generated_source) == 0 or with_fs_file_exists(generated_bin) == 0:
         with_eprint("error: build_w_generated_source missing generated source or binary")
         return 1
     let run_result = bgs_run_binary_capture(root, target_name, "build-w-generated-source-run", generated_bin, 120000)
-    if run_result.rc != 0: return if run_result.rc == 0: 1 else: run_result.rc
+    if run_result.rc != 0: return run_result.rc
     rc = bgs_assert_contains(run_result.stdout, "generated source", target_name, "build_w_generated_source")
     if rc != 0: return rc
 
@@ -495,7 +495,7 @@ fn bgs_check_build_w_generated_source(root: str, target_name: str, compiler_path
     rc = bgs_write_fixture(bgs_resolve_join(toolfs_ok_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    let fs = ctx.fs()\n    assert(fs.mkdir_all(\"out/toolfs\") == 0)\n    assert(fs.write_text(\"out/toolfs/value.txt\", \"inside\") == 0)\n    assert(fs.read_text(\"out/toolfs/value.txt\") == \"inside\")\n    let files = fs.list_files(\"fixtures/tree\")\n    assert(files.len() == 1)\n    assert(files.get(0) == \"fixtures/tree/a.txt\")\n    assert(fs.copy_tree(\"fixtures/tree\", \"out/toolfs/tree-copy\") == 0)\n    assert(fs.read_text(\"out/toolfs/tree-copy/a.txt\") == \"tree\")\n    assert(fs.symlink(\"fixtures/tree/a.txt\", \"out/toolfs/link-a.txt\") == 0)\n    assert(fs.read_text(\"out/toolfs/link-a.txt\") == \"tree\")\n    assert(fs.remove_tree(\"out/toolfs/tree-copy\") == 0)\n    assert(not fs.exists(\"out/toolfs/tree-copy/a.txt\"))\n    ctx.new_build().executable(\"toolfs-ok\", \"src/main.w\")\n", target_name, "toolfs ok build.w")
     if rc != 0: return rc
     let toolfs_ok = bgs_build_expect_success(root, target_name, compiler_path, toolfs_ok_dir, "build-w-toolfs-ok", bgs_argv_append("", "build"))
-    if toolfs_ok.rc != 0: return if toolfs_ok.rc == 0: 1 else: toolfs_ok.rc
+    if toolfs_ok.rc != 0: return toolfs_ok.rc
     if with_fs_file_exists(bgs_resolve_join(toolfs_ok_dir, "out/toolfs/value.txt")) == 0:
         with_eprint("error: build_w_toolfs_ok missing sandboxed ToolFs output")
         return 1
@@ -611,7 +611,7 @@ fn bgs_check_build_w_graph_v2(root: str, target_name: str, compiler_path: str, c
     rc = bgs_write_fixture(bgs_resolve_join(case_dir, "build.w"), bgs_graph_build_file(), target_name, "graph build.w")
     if rc != 0: return rc
     let graph_result = bgs_build_expect_success(root, target_name, compiler_path, case_dir, "build-w-graph-v2", bgs_argv_append(bgs_argv_append("", "build"), "--graph"))
-    if graph_result.rc != 0: return if graph_result.rc == 0: 1 else: graph_result.rc
+    if graph_result.rc != 0: return graph_result.rc
     rc = bgs_assert_contains(graph_result.stdout, "WITH_BUILD_GRAPH\t2", target_name, "build_w_graph_v2")
     if rc != 0: return rc
     rc = bgs_assert_contains(graph_result.stdout, "default_target\ttoolchain", target_name, "build_w_graph_v2")
@@ -637,11 +637,11 @@ fn bgs_check_build_w_graph_v2(root: str, target_name: str, compiler_path: str, c
     rc = bgs_assert_contains(graph_result.stdout, "target\t22\thelper-copy\truntime/helper.c\t0\t0\tout/copied/helper.c", target_name, "build_w_graph_v2")
     if rc != 0: return rc
     let selected = bgs_build_expect_success(root, target_name, compiler_path, case_dir, "build-w-graph-selected", bgs_argv_append(bgs_argv_append(bgs_argv_append("", "build"), ":two"), "--graph"))
-    if selected.rc != 0: return if selected.rc == 0: 1 else: selected.rc
+    if selected.rc != 0: return selected.rc
     rc = bgs_assert_not_contains(selected.stdout, "target\t12\thelper-o", target_name, "build_w_graph_selected")
     if rc != 0: return rc
     let deps = bgs_build_expect_success(root, target_name, compiler_path, case_dir, "build-w-graph-deps", bgs_argv_append(bgs_argv_append(bgs_argv_append("", "build"), ":toolchain"), "--graph"))
-    if deps.rc != 0: return if deps.rc == 0: 1 else: deps.rc
+    if deps.rc != 0: return deps.rc
     rc = bgs_assert_contains(deps.stdout, "target\t12\thelper-o", target_name, "build_w_graph_deps")
     if rc != 0: return rc
     rc = bgs_assert_contains(deps.stdout, "target\t9\ttoolchain\t\t0\t0\t", target_name, "build_w_graph_deps")
@@ -649,7 +649,7 @@ fn bgs_check_build_w_graph_v2(root: str, target_name: str, compiler_path: str, c
     rc = bgs_assert_not_contains(deps.stdout, "target\t0\tone\t", target_name, "build_w_graph_deps")
     if rc != 0: return rc
     let full = bgs_build_expect_success(root, target_name, compiler_path, case_dir, "build-w-full-graph", bgs_argv_append("", "build"))
-    if full.rc != 0: return if full.rc == 0: 1 else: full.rc
+    if full.rc != 0: return full.rc
     rc = bgs_require_case_file(case_dir, "out/obj/one-o.o", target_name, "build_w_graph_v2")
     if rc != 0: return rc
     rc = bgs_require_case_file(case_dir, "out/lib/libone-a.a", target_name, "build_w_graph_v2")
@@ -682,7 +682,7 @@ fn bgs_check_build_w_graph_v2(root: str, target_name: str, compiler_path: str, c
     if rc != 0: return rc
     let _remove_out1 = with_fs_remove_dir(bgs_resolve_join(case_dir, "out"))
     let group = bgs_build_expect_success(root, target_name, compiler_path, case_dir, "build-w-group-deps", bgs_argv_append(bgs_argv_append("", "build"), ":toolchain"))
-    if group.rc != 0: return if group.rc == 0: 1 else: group.rc
+    if group.rc != 0: return group.rc
     rc = bgs_require_case_file(case_dir, "out/bin/two", target_name, "build_w_graph_group")
     if rc != 0: return rc
     rc = bgs_forbid_case_file(case_dir, "out/bin/one", target_name, "build_w_graph_group")
@@ -703,18 +703,18 @@ fn bgs_check_build_w_graph_v2(root: str, target_name: str, compiler_path: str, c
     if rc != 0: return rc
     let _remove_out2 = with_fs_remove_dir(bgs_resolve_join(case_dir, "out"))
     let bytes = bgs_build_expect_success(root, target_name, compiler_path, case_dir, "build-w-binary-compare", bgs_argv_append(bgs_argv_append("", "build"), ":bytes-same"))
-    if bytes.rc != 0: return if bytes.rc == 0: 1 else: bytes.rc
+    if bytes.rc != 0: return bytes.rc
     let fix = bgs_build_expect_success(root, target_name, compiler_path, case_dir, "build-w-fixpoint-compare", bgs_argv_append(bgs_argv_append("", "build"), ":fix-same"))
-    if fix.rc != 0: return if fix.rc == 0: 1 else: fix.rc
+    if fix.rc != 0: return fix.rc
     let rsp = bgs_build_expect_success(root, target_name, compiler_path, case_dir, "build-w-response-file", bgs_argv_append(bgs_argv_append("", "build"), ":rsp"))
-    if rsp.rc != 0: return if rsp.rc == 0: 1 else: rsp.rc
+    if rsp.rc != 0: return rsp.rc
     let rsp_text = bgs_trim_trailing_line_endings(with_fs_read_file(bgs_resolve_join(case_dir, "out/tmp/args.rsp")))
     if rsp_text != "\"-L/some path\"\n\"plain\"":
         with_eprint("error: build_w_graph_v2 response file contents mismatch: " ++ rsp_text)
         return 1
     let _remove_out3 = with_fs_remove_dir(bgs_resolve_join(case_dir, "out"))
     let two = bgs_build_expect_success(root, target_name, compiler_path, case_dir, "build-w-target-select", bgs_argv_append(bgs_argv_append("", "build"), ":two"))
-    if two.rc != 0: return if two.rc == 0: 1 else: two.rc
+    if two.rc != 0: return two.rc
     if with_fs_file_exists(bgs_resolve_join(case_dir, "out/bin/two")) == 0 or with_fs_file_exists(bgs_resolve_join(case_dir, "out/bin/one")) != 0:
         with_eprint("error: build_w_graph_v2 target selection outputs were wrong")
         return 1
@@ -776,7 +776,7 @@ fn bgs_check_build_w_action_target(root: str, target_name: str, compiler_path: s
     rc = bgs_write_fixture(bgs_resolve_join(case_dir, "build.w"), build_text, target_name, "action build.w")
     if rc != 0: return rc
     let result = bgs_build_expect_success(root, target_name, compiler_path, case_dir, "build-w-action-target", bgs_argv_append("", "build"))
-    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    if result.rc != 0: return result.rc
     rc = bgs_expect_file_contains(bgs_resolve_join(case_dir, "out/action/value.txt"), "action:hello", target_name, "build_w_action_target")
     if rc != 0: return rc
     bgs_expect_file_contains(bgs_resolve_join(case_dir, "out/action/extra.txt"), "extra:hello", target_name, "build_w_action_extra_output")
