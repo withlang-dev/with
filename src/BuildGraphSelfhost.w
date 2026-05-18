@@ -236,8 +236,9 @@ fn bgs_check_pcre2_generated_existing_main(root: str, target_name: str, compiler
     if rc != 0: return rc
     let build_text =
         "use std.build\n\n" ++
+        "fn pcre2_generated_check_kind() -> BuildKind: 1006 as BuildKind\n\n" ++
         "pub fn build(ctx: BuildCtx) -> Build:\n" ++
-        "    var target = target_new(.Pcre2GeneratedCheck, \"pcre2-check-existing-main\", " ++ bgs_with_string_literal(compiler_path) ++ ")\n" ++
+        "    var target = target_new(pcre2_generated_check_kind(), \"pcre2-check-existing-main\", " ++ bgs_with_string_literal(compiler_path) ++ ")\n" ++
         "    target = target.input(\"generated\")\n" ++
         "    var out = ctx.new_build()\n    out = out.add_target(target)\n" ++
         "    out.default(\"pcre2-check-existing-main\")\n"
