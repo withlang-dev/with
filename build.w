@@ -511,8 +511,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     c_migrator_pcre2_prep_tests = c_migrator_pcre2_prep_tests.dep("selfcheck")
     out = out.add_target(c_migrator_pcre2_prep_tests)
 
-    var c_migrator_basic_tests = target_new(project_kind_selfhost_suite_test(), "c-migrator-basic-tests", "out/bin/with-stage2")
-    c_migrator_basic_tests = c_migrator_basic_tests.arg("migrate-basic")
+    var c_migrator_basic_tests = target_new(.Action, "c-migrator-basic-tests", "").output("out/test-graph/c-migrator-basic-tests")
+    c_migrator_basic_tests.action = run_cli_selfhost_migrate_basic_action
     c_migrator_basic_tests = c_migrator_basic_tests.input("out/bin/with-stage2")
     c_migrator_basic_tests = c_migrator_basic_tests.dep("selfcheck")
     out = out.add_target(c_migrator_basic_tests)

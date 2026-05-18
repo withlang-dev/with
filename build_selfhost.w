@@ -716,6 +716,291 @@ fn bs_file_forbids(ctx: ActionCtx, path: str, needle: str, label: str) -> i32:
         return bs_fail(ctx, "missing file for " ++ label ++ ": " ++ path)
     bs_assert_not_contains(ctx, ctx.fs().read_text(path), needle, label)
 
+fn bs_index_of(text: str, needle: str) -> i32:
+    if needle.len() == 0:
+        return 0
+    if needle.len() > text.len():
+        return -1
+    let max_start = (text.len() - needle.len()) as i32
+    for i in 0..(max_start + 1):
+        var matched = true
+        for j in 0..needle.len() as i32:
+            if text.byte_at((i + j) as i64) != needle.byte_at(j as i64):
+                matched = false
+                break
+        if matched:
+            return i
+    -1
+
+fn bs_count_occurrences(text: str, needle: str) -> i32:
+    if needle.len() == 0:
+        return 0
+    var count = 0
+    var offset = 0
+    while offset < text.len() as i32:
+        let found = bs_index_of(text.slice(offset as i64, text.len()), needle)
+        if found < 0:
+            break
+        count = count + 1
+        offset = offset + found + needle.len() as i32
+    count
+
+fn bs_migrate_expect_success(ctx: ActionCtx, compiler_path: str, case_dir: str, label: str, args: Vec[str]) -> SelfhostRunResult:
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, label, args, 180000, case_dir)
+    if result.rc != 0:
+        ctx.diagnostics().error(ctx.target_name() ++ ": migrator selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
+    result
+
+fn bs_check_migrate_global_init_list(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "initlist.c")
+    let out_w = bs_join(case_dir, "initlist.w")
+    var rc = bs_write_fixture(ctx, src, "typedef int (*callback_t)(int);\ntypedef struct inner { callback_t cb; void *data; } inner;\ntypedef struct outer { inner in; int limit; } outer;\nint add1(int x) { return x + 1; }\nouter g = { { add1, 0 }, 7 };\n", "migrate global init list")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("--prefer-brace")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-global-init-list", args)
+    if result.rc != 0: return result.rc
+    bs_file_contains(ctx, out_w, "var g: outer = outer { in_: inner { cb: add1, data: null }, limit: 7 }", "global_init_list")
+
+fn bs_check_migrate_host_header_compat(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "uses_isatty.c")
+    let out_w = bs_join(case_dir, "uses_isatty.w")
+    var rc = bs_write_fixture(ctx, bs_join(case_dir, "config.h"), "/* Simulate an unconfigured config.h template. */\n", "migrate host header config")
+    if rc != 0: return rc
+    let c_text = "#if defined HAVE_CONFIG_H\n#include \"config.h\"\n#endif\n\n#ifndef HAVE_UNISTD_H\n#error \"missing HAVE_UNISTD_H\"\n#endif\n\n#ifdef HAVE_UNISTD_H\n#include <unistd.h>\n#endif\n\n#include <stdio.h>\n\nint tty_status(FILE *f) { return isatty(fileno(f)); }\n"
+    rc = bs_write_fixture(ctx, src, c_text, "migrate host header source")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("-I")
+    args |> push(bs_abs(root, case_dir))
+    args |> push("-D")
+    args |> push("HAVE_CONFIG_H=1")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-host-header-compat", args)
+    if result.rc != 0: return result.rc
+    bs_file_contains(ctx, out_w, "tty_status", "host_header_compat")
+
+fn bs_check_migrate_assignment_compat(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "assignments.c")
+    let out_w = bs_join(case_dir, "assignments.w")
+    let c_text = "typedef unsigned int c_uint;\ntypedef struct {\n  c_uint *groupinfo;\n  c_uint *parsed_pattern;\n} compile_block;\n\nvoid f(void) {\n  compile_block cb;\n  c_uint stack_groupinfo[32];\n  c_uint stack_parsed_pattern[64];\n  c_uint pp = 0;\n  c_uint skipatstart = 0;\n  cb.groupinfo = stack_groupinfo;\n  cb.parsed_pattern = stack_parsed_pattern;\n  skipatstart = (pp = pp + 1);\n}\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "migrate assignment compat")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("--prefer-brace")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-assignment-compat", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_contains(ctx, out_text, "(__local_cb.groupinfo = (&(unsafe: __local_stack_groupinfo[0]) as *mut c_uint))", "assignment_compat")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "(__local_cb.parsed_pattern = (&(unsafe: __local_stack_parsed_pattern[0]) as *mut c_uint))", "assignment_compat")
+    if rc != 0: return rc
+    let pp_simple = "(__local_pp = (__local_pp +% 1))"
+    let pp_casted = "(__local_pp = ((__local_pp as c_uint) +% (1 as c_uint)))"
+    let pp_index = if bs_index_of(out_text, pp_simple) >= 0: bs_index_of(out_text, pp_simple) else: bs_index_of(out_text, pp_casted)
+    let skip_index = bs_index_of(out_text, "(__local_skipatstart = __local_pp)")
+    if pp_index < 0 or skip_index < 0 or pp_index >= skip_index:
+        return bs_fail(ctx, "assignment_compat did not preserve assignment sequencing")
+    rc = bs_assert_not_contains(ctx, out_text, "(__local_skipatstart = ((__local_pp) =", "assignment_compat")
+    if rc != 0: return rc
+    var check_args: Vec[str] = Vec.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let check_result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-assignment-compat", check_args)
+    if check_result.rc != 0: return check_result.rc
+    0
+
+fn bs_check_migrate_rvalue_sequencing(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "rvalue_sequencing.c")
+    let out_w = bs_join(case_dir, "rvalue_sequencing.w")
+    let c_text = "typedef unsigned char u8;\n\nstatic int issue120_id(int x) { return x; }\n\nint init_expr(void) {\n  const u8 *buf = (const u8 *)\"AB\";\n  const u8 *p = buf;\n  int c = *p++;\n  return c * 10 + (int)(p - buf);\n}\n\nint assign_expr(void) {\n  const u8 *buf = (const u8 *)\"AB\";\n  const u8 *p = buf;\n  int c = 0;\n  c = *p++;\n  return c * 10 + (int)(p - buf);\n}\n\nint binary_expr(void) {\n  const u8 *buf = (const u8 *)\"AB\";\n  const u8 *p = buf;\n  int c = (*p++) + 0;\n  return c * 10 + (int)(p - buf);\n}\n\nint call_arg_expr(void) {\n  const u8 *buf = (const u8 *)\"AB\";\n  const u8 *p = buf;\n  int c = issue120_id(*p++);\n  return c * 10 + (int)(p - buf);\n}\n\n#define ISSUE120_GETCHARINCTEST(ch, ptr) ch = *ptr++; if (utf && ch >= 66u) ch += 1000\n\nint macro_expr(int utf) {\n  const u8 *buf = (const u8 *)\"BA\";\n  const u8 *p = buf;\n  int c = 0;\n  ISSUE120_GETCHARINCTEST(c, p);\n  return c * 10 + (int)(p - buf);\n}\n\nstatic unsigned int issue120_ord2utf(unsigned int c, u8 *p) {\n  *p = (u8)c;\n  return 1;\n}\n\n#define ISSUE120_PUTCHAR(c, p) ((utf && c > 127u) ? issue120_ord2utf(c, p) : (*p = c, 1))\n\nint macro_ternary_comma_expr(int utf) {\n  u8 buf[1] = { 0 };\n  u8 *p = buf;\n  unsigned int c = 65u;\n  p += ISSUE120_PUTCHAR(c, p);\n  return ((int)buf[0]) * 10 + (int)(p - buf);\n}\n\nint main(void) {\n  if (init_expr() != 651) return 1;\n  if (assign_expr() != 651) return 2;\n  if (binary_expr() != 651) return 3;\n  if (call_arg_expr() != 651) return 4;\n  if (macro_expr(0) != 661) return 5;\n  if (macro_expr(1) != 10661) return 6;\n  if (macro_ternary_comma_expr(0) != 651) return 7;\n  return 0;\n}\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "migrate rvalue sequencing")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-rvalue-sequencing", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_contains(ctx, out_text, "with 0 as __ci_expr_seq_", "rvalue_sequencing")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "var __ci_expr_old_", "rvalue_sequencing")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "(__local_p = __local_p + 1)", "rvalue_sequencing")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "(unsafe: *__ci_expr_old_", "rvalue_sequencing")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "((unsafe: *__local_p) = __local_c)", "rvalue_sequencing")
+    if rc != 0: return rc
+    var check_args: Vec[str] = Vec.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let check_result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-rvalue-sequencing", check_args)
+    if check_result.rc != 0: return check_result.rc
+    var run_args: Vec[str] = Vec.new()
+    run_args |> push("run")
+    run_args |> push(bs_abs(root, out_w))
+    let run_result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-rvalue-sequencing", run_args)
+    if run_result.rc != 0: return run_result.rc
+    0
+
+fn bs_check_migrate_directory_progress(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src_dir = bs_join(case_dir, "src")
+    let out_dir = bs_join(case_dir, "out")
+    var rc = bs_write_fixture(ctx, bs_join(src_dir, "a.c"), "int a_value(void) { return 1; }\n", "directory progress a")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(src_dir, "b.c"), "int b_value(void) { return 2; }\n", "directory progress b")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src_dir))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_dir))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-directory-progress", args)
+    if result.rc != 0: return result.rc
+    rc = bs_assert_contains(ctx, result.stdout, "migrate: processing a.c - 1/2, 50% completed", "directory_progress_stdout")
+    if rc != 0: return rc
+    bs_assert_contains(ctx, result.stdout, "migrate: processing b.c - 2/2, 100% completed", "directory_progress_stdout")
+
+fn bs_check_migrate_cross_file_global_owner_arrays(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let generated_dir = bs_join(case_dir, "generated")
+    var rc = bs_write_fixture(ctx, bs_join(case_dir, "tables.h"), "extern const unsigned char issue121_table[];\nint issue121_value(int idx);\nint issue121_sum(void);\n", "cross file table header")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "owner.c"), "#include \"tables.h\"\n\nconst unsigned char issue121_table[] = {7, 9, 11};\n\nint issue121_value(int idx) {\n  return issue121_table[idx];\n}\n", "cross file owner")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "user.c"), "#include \"tables.h\"\n\nint issue121_sum(void) {\n  return issue121_table[2] + issue121_value(1);\n}\n", "cross file user")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, case_dir))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, generated_dir))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-cross-file-global-owner-arrays", args)
+    if result.rc != 0: return result.rc
+    let owner_w = bs_join(generated_dir, "owner.w")
+    let user_w = bs_join(generated_dir, "user.w")
+    rc = bs_file_contains(ctx, owner_w, "let issue121_table: [3]u8", "cross_file_global_owner_arrays owner")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, user_w, "extern let issue121_table: [3]u8", "cross_file_global_owner_arrays user")
+    if rc != 0: return rc
+    rc = bs_file_forbids(ctx, owner_w, "issue121_table: *", "cross_file_global_owner_arrays owner")
+    if rc != 0: return rc
+    rc = bs_file_forbids(ctx, user_w, "issue121_table: *", "cross_file_global_owner_arrays user")
+    if rc != 0: return rc
+    var owner_check_args: Vec[str] = Vec.new()
+    owner_check_args |> push("check")
+    owner_check_args |> push(bs_abs(root, owner_w))
+    let owner_check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-cross-file-owner", owner_check_args)
+    if owner_check.rc != 0: return owner_check.rc
+    var user_check_args: Vec[str] = Vec.new()
+    user_check_args |> push("check")
+    user_check_args |> push(bs_abs(root, user_w))
+    let user_check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-cross-file-user", user_check_args)
+    if user_check.rc != 0: return user_check.rc
+    var owner_build_args: Vec[str] = Vec.new()
+    owner_build_args |> push("build")
+    owner_build_args |> push(bs_abs(root, owner_w))
+    owner_build_args |> push("--emit-obj")
+    owner_build_args |> push("-o")
+    owner_build_args |> push(bs_abs(root, bs_join(generated_dir, "owner.o")))
+    let owner_build = bs_migrate_expect_success(ctx, compiler_path, case_dir, "build-cross-file-owner", owner_build_args)
+    if owner_build.rc != 0: return owner_build.rc
+    var user_build_args: Vec[str] = Vec.new()
+    user_build_args |> push("build")
+    user_build_args |> push(bs_abs(root, user_w))
+    user_build_args |> push("--emit-obj")
+    user_build_args |> push("-o")
+    user_build_args |> push(bs_abs(root, bs_join(generated_dir, "user.o")))
+    let user_build = bs_migrate_expect_success(ctx, compiler_path, case_dir, "build-cross-file-user", user_build_args)
+    if user_build.rc != 0: return user_build.rc
+    0
+
+fn bs_check_migrate_shared_defs_ownerless_extern(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let generated_dir = bs_join(case_dir, "generated")
+    var rc = bs_write_fixture(ctx, bs_join(case_dir, "tables.h"), "extern const unsigned char issue140_unused_external[];\nextern const unsigned char issue140_owned_table[];\nint issue140_read_owned(void);\n", "shared defs table header")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "owner.c"), "#include \"tables.h\"\n\nconst unsigned char issue140_owned_table[] = {3, 5, 8};\n\nint issue140_read_owned(void) {\n  return issue140_owned_table[1];\n}\n", "shared defs owner")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, case_dir))
+    args |> push("--no-c-export")
+    args |> push("--shared-defs")
+    args |> push("defs")
+    args |> push("-I")
+    args |> push(bs_abs(root, case_dir))
+    args |> push("-o")
+    args |> push(bs_abs(root, generated_dir))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-shared-defs-ownerless-extern", args)
+    if result.rc != 0: return result.rc
+    let defs_w = bs_join(generated_dir, "defs.w")
+    let defs_text = ctx.fs().read_text(defs_w)
+    rc = bs_assert_contains(ctx, defs_text, "let issue140_owned_table:", "shared_defs_ownerless_extern")
+    if rc != 0: return rc
+    rc = bs_assert_not_contains(ctx, defs_text, "issue140_unused_external", "shared_defs_ownerless_extern")
+    if rc != 0: return rc
+    if bs_count_occurrences(defs_text, "fn string_find_char(") != 1:
+        return bs_fail(ctx, "shared_defs_ownerless_extern emitted duplicate or missing string_find_char helper")
+    0
+
+pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    if inputs.len() == 0:
+        return bs_fail(ctx, "missing compiler input")
+
+    let fs = ctx.fs()
+    let output_dir = ctx.output()
+    if output_dir.len() == 0:
+        return bs_fail(ctx, "missing output directory")
+    if fs.exists(output_dir) and fs.remove_tree(output_dir) != 0:
+        return bs_fail(ctx, "could not remove previous output directory: " ++ output_dir)
+    if fs.mkdir_all(output_dir) != 0:
+        return bs_fail(ctx, "could not create output directory: " ++ output_dir)
+
+    let compiler_input = inputs.get(0)
+    if not fs.exists(compiler_input):
+        return bs_fail(ctx, "missing compiler: " ++ compiler_input)
+    let compiler_path = bs_abs(ctx.project_info().project_root(), compiler_input)
+
+    var rc = bs_check_migrate_global_init_list(ctx, compiler_path, bs_join(output_dir, "global_init_list"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_host_header_compat(ctx, compiler_path, bs_join(output_dir, "host_header_compat"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_assignment_compat(ctx, compiler_path, bs_join(output_dir, "assignment_compat"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_rvalue_sequencing(ctx, compiler_path, bs_join(output_dir, "rvalue_sequencing"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_directory_progress(ctx, compiler_path, bs_join(output_dir, "directory_progress"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_cross_file_global_owner_arrays(ctx, compiler_path, bs_join(output_dir, "cross_file_global_owner_arrays"))
+    if rc != 0: return rc
+    bs_check_migrate_shared_defs_ownerless_extern(ctx, compiler_path, bs_join(output_dir, "shared_defs_ownerless_extern"))
+
 fn bs_copy_fixture_file(ctx: ActionCtx, src: str, dst: str, label: str) -> i32:
     if not ctx.fs().exists(src):
         return bs_fail(ctx, "missing source file for " ++ label ++ ": " ++ src)
