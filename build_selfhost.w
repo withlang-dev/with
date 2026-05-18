@@ -1866,6 +1866,10 @@ fn bs_check_build_w_action_target(ctx: ActionCtx, compiler_path: str, case_dir: 
         "    let env_result = ctx.process_runner().run_capture_with_env(env_args, \"out/action/env.txt\", \"out/action/env.err\", 120000, child_env)\n" ++
         "    assert(env_result.rc == 0)\n" ++
         "    assert(env_result.stdout.contains(\"WITH_ACTION_TEST_ENV=present\"))\n" ++
+        "    var direct_args: Vec[str] = Vec.new()\n" ++
+        "    direct_args |> push(\"/bin/echo\")\n" ++
+        "    direct_args |> push(\"streamed-process-run\")\n" ++
+        "    assert(ctx.process_runner().run(direct_args) == 0)\n" ++
         "    0\n\n" ++
         "pub fn build(ctx: BuildCtx) -> Build:\n" ++
         "    var out = ctx.new_build()\n" ++
@@ -1883,6 +1887,8 @@ fn bs_check_build_w_action_target(ctx: ActionCtx, compiler_path: str, case_dir: 
     if rc != 0: return rc
     let result = bs_build_w_expect_success(ctx, compiler_path, case_dir, "build-w-action-target", bs_blob_to_args(bs_argv_append("", "build")))
     if result.rc != 0: return result.rc
+    rc = bs_assert_contains(ctx, result.stdout, "streamed-process-run", "build_w_action_process_run")
+    if rc != 0: return rc
     rc = bs_expect_file_contains(ctx, bs_join(case_dir, "out/action/value.txt"), "action:hello", "build_w_action_target")
     if rc != 0: return rc
     bs_expect_file_contains(ctx, bs_join(case_dir, "out/action/extra.txt"), "extra:hello", "build_w_action_extra_output")

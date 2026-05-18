@@ -19,6 +19,7 @@ extern fn with_fs_remove_tree(path: str) -> i32
 extern fn with_fs_rename_file(old_path: str, new_path: str) -> i32
 extern fn with_fs_symlink(target: str, link_path: str) -> i32
 extern fn with_fs_write_file(path: str, data: str) -> i32
+extern fn with_exec_argv(args: str) -> i32
 extern fn with_exec_argv_capture(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32) -> i32
 extern fn with_exec_argv_capture_cwd(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str) -> i32
 extern fn with_exec_argv_capture_input(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, stdin_path: str) -> i32
@@ -455,6 +456,13 @@ pub fn ProcessRunner.run_capture(self: &Self, args: Vec[str], stdout_path: str, 
         stdout: with_fs_read_file(stdout_path),
         stderr: with_fs_read_file(stderr_path),
     }
+
+pub fn ProcessRunner.run(self: &Self, args: Vec[str]) -> i32:
+    tool_capability_require(self.token, "ProcessRunner")
+    let env = tool_process_clear_driver_env()
+    let rc = with_exec_argv(tool_process_argv(args))
+    tool_process_restore_driver_env(env)
+    rc
 
 pub fn ProcessRunner.run_capture_with_env(self: &Self, args: Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32, process_env: ProcessEnv) -> ToolProcessResult:
     tool_capability_require(self.token, "ProcessRunner")
