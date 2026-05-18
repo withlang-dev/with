@@ -2,7 +2,6 @@ use std.build
 use build_runtime
 use build_selfhost
 
-fn project_kind_embedded_runtime_extract_test() -> BuildKind: 1000 as BuildKind
 fn project_kind_generate_compiler_entrypoints() -> BuildKind: 1003 as BuildKind
 fn project_kind_with_compiler_build() -> BuildKind: 1004 as BuildKind
 fn project_kind_pcre2_run_test() -> BuildKind: 1005 as BuildKind
@@ -534,7 +533,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     issue61_regression = issue61_regression.dep("selfcheck")
     out = out.add_target(issue61_regression)
 
-    var embedded_runtime_regression = target_new(project_kind_embedded_runtime_extract_test(), "embedded-runtime-regression", "out/bin/with")
+    var embedded_runtime_regression = target_new(.Action, "embedded-runtime-regression", "").output("out/test-graph/embedded-runtime-regression")
+    embedded_runtime_regression.action = run_embedded_runtime_regression_action
     embedded_runtime_regression = embedded_runtime_regression.input("out/bin/with")
     embedded_runtime_regression = embedded_runtime_regression.dep("build")
     out = out.add_target(embedded_runtime_regression)
