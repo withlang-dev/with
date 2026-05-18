@@ -28,6 +28,33 @@ seed before any newly built stage exists. Project-local action code can build
 the compiler, but it cannot require compiler features that are absent from the
 seed until the seed has been updated through the normal fixpoint path.
 
+## The Seed
+
+For Phase C planning, "the seed" means the compiler binary that evaluates this
+repository's `build.w` before stage1 exists. In the normal local workflow, that
+is the checked build product `out/bin/with`. This is the canonical planning
+case for Phase C extraction slices: a capability can be used by `build.w` only
+after it has landed in the compiler, reached fixpoint, and produced a new
+`out/bin/with`.
+
+There is a second, narrower use of the word in current target execution:
+compiler-build graph targets whose entry is `"seed"` resolve a compiler through
+`bgc_resolve_seed_compiler`. That resolution order is:
+
+1. `$WITH`, if explicitly set;
+2. `out/bin/with`, if present;
+3. `with` on `$PATH`, if it responds to `--version`;
+4. `src/main`, if present;
+5. `with` as a final command fallback.
+
+Those fallbacks are recovery and compatibility paths, not permission to use
+arbitrary new `build.w` APIs. If a developer or CI job invokes an older
+`$WITH`, `$PATH` compiler, or downloaded `src/main`, then `build.w` must stay
+within that compiler's embedded stdlib and driver capability set. Phase C
+planning therefore treats `out/bin/with` as the canonical local seed, while
+release/download/PATH seeds are compatibility boundaries that cannot rely on
+new capabilities until they have been explicitly updated.
+
 ## Seed Sufficiency
 
 The seed is sufficient to evaluate `build.w` if the build file uses only:
@@ -41,6 +68,17 @@ That means extraction must be staged around seed capabilities. If a compiler
 self-build action needs a new capability, the capability lands first, reaches
 fixpoint, and is installed into the seed before the project build starts relying
 on it.
+
+## Installing New Capabilities Into The Seed
+
+For the canonical local Phase C workflow, installing a new capability into the
+seed means: implement it, run the full build/fixpoint/test verification, and
+produce a new `out/bin/with`. The next extraction slice may then rely on that
+capability when it is run by `out/bin/with`. If the intended seed is a
+downloaded release or a `$PATH` compiler, the same capability is unavailable
+until that binary is updated by the release or installation process; such users
+must either use the compatible build path or update their seed before running
+the new project-local build logic.
 
 ## Chicken-And-Egg Risks
 
