@@ -174,7 +174,7 @@ fn bs_check_help(ctx: ActionCtx, compiler_path: str) -> i32:
     args |> push("--help")
     let result = bs_run_cli_expect_success(ctx, compiler_path, "help", args)
     if result.rc != 0:
-        return if result.rc == 0: 1 else: result.rc
+        return result.rc
 
     let checks: Vec[str] = Vec.new()
     checks |> push("Usage: with [command] [options]")
@@ -209,7 +209,7 @@ fn bs_check_test_directives(ctx: ActionCtx, compiler_path: str, test_dir: str) -
         return bs_fail(ctx, "could not write " ++ good_src)
     let good_result = bs_run_cli_expect_success(ctx, compiler_path, "test-directives-good", bs_test_args(good_src))
     if good_result.rc != 0:
-        return if good_result.rc == 0: 1 else: good_result.rc
+        return good_result.rc
 
     let bad_stdout_src = bs_join(test_dir, "test_directives_bad_stdout.w")
     if fs.write_text(bad_stdout_src, "//! expect-stdout: missing\n\nfn main:\n    print(\"ok\")\n") != 0:
@@ -421,7 +421,7 @@ fn bs_check_init_in_cwd(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i3
         return bs_fail(ctx, "could not create init case directory: " ++ case_dir)
     let expected_name = bs_basename(case_dir)
     let result = bs_project_expect_success(ctx, compiler_path, case_dir, "init-in-cwd", bs_project_args("init"))
-    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    if result.rc != 0: return result.rc
     var rc = bs_expect_file(ctx, bs_join(case_dir, "with.toml"), "init_in_cwd manifest")
     if rc != 0: return rc
     rc = bs_expect_file(ctx, bs_join(case_dir, "src/main.w"), "init_in_cwd main")
@@ -444,7 +444,7 @@ fn bs_check_init_named_dir(ctx: ActionCtx, compiler_path: str, case_dir: str) ->
     args |> push("init")
     args |> push(project_name)
     let result = bs_project_expect_success(ctx, compiler_path, case_dir, "init-named-dir", args)
-    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    if result.rc != 0: return result.rc
     let project_dir = bs_join(case_dir, project_name)
     var rc = bs_expect_file(ctx, bs_join(project_dir, "with.toml"), "init_named_dir manifest")
     if rc != 0: return rc
@@ -470,7 +470,7 @@ fn bs_check_build_uses_package_section_name(ctx: ActionCtx, compiler_path: str, 
     rc = bs_write_fixture(ctx, bs_join(case_dir, "src/main.w"), "fn main:\n    print(\"ok\")\n", "package_section_name main")
     if rc != 0: return rc
     let result = bs_project_expect_success(ctx, compiler_path, case_dir, "package-section-name", bs_project_args("build"))
-    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    if result.rc != 0: return result.rc
     bs_expect_file(ctx, bs_join(case_dir, "out/bin/pkgdemo"), "package_section_name output")
 
 fn bs_check_build_rejects_imperative_manifest(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
@@ -565,7 +565,7 @@ fn bs_check_prelude_output_functions(ctx: ActionCtx, compiler_path: str, case_di
     args |> push("run")
     args |> push(bs_abs(root, src))
     let result = bs_edge_expect_success(ctx, compiler_path, case_dir, "prelude-output-functions", args)
-    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    if result.rc != 0: return result.rc
     rc = bs_edge_assert_exact(ctx, result.stdout, "AB\nC", "prelude_output_functions", "stdout")
     if rc != 0: return rc
     bs_edge_assert_exact(ctx, result.stderr, "DE\nF", "prelude_output_functions", "stderr")
@@ -588,9 +588,9 @@ fn bs_check_whole_program_extern_var_redecl(ctx: ActionCtx, compiler_path: str, 
     args |> push("-o")
     args |> push(bs_abs(root, bin))
     let build_result = bs_edge_expect_success(ctx, compiler_path, case_dir, "whole-program-extern-var-redecl", args)
-    if build_result.rc != 0: return if build_result.rc == 0: 1 else: build_result.rc
+    if build_result.rc != 0: return build_result.rc
     let run_result = bs_run_binary_capture(ctx, bin, "whole-program-extern-var-redecl-run", 120000)
-    if run_result.rc != 0: return if run_result.rc == 0: 1 else: run_result.rc
+    if run_result.rc != 0: return run_result.rc
     bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(run_result.stdout), "ok", "whole_program_extern_var_redecl", "stdout")
 
 fn bs_check_imported_module_dependency_order(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
@@ -608,7 +608,7 @@ fn bs_check_imported_module_dependency_order(ctx: ActionCtx, compiler_path: str,
     args |> push("check")
     args |> push(bs_abs(root, user_src))
     let result = bs_edge_expect_success(ctx, compiler_path, case_dir, "imported-module-dependency-order", args)
-    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    if result.rc != 0: return result.rc
     0
 
 pub fn run_cli_selfhost_edge_action(ctx: ActionCtx) -> i32:
@@ -666,7 +666,7 @@ pub fn run_cli_selfhost_parallel_action(ctx: ActionCtx) -> i32:
     args |> push(bs_abs(root, src))
     let single = bs_run_cli_capture_cwd(ctx, compiler_path, "parallel-same-source-single", args, 120000, root)
     if single.rc != 0:
-        return if single.rc == 0: 1 else: single.rc
+        return single.rc
     if single.stderr.len() != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": single run produced stderr")
         ctx.diagnostics().error(single.stderr)
@@ -1091,7 +1091,7 @@ fn bs_check_pcre2_prepare_width_prunes(ctx: ActionCtx, compiler_path: str, base_
     args |> push("check")
     args |> push(bs_abs(root, wrapper))
     let result = bs_pcre2_expect_success(ctx, compiler_path, base_dir, "width-prunes-whole-decls", args)
-    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    if result.rc != 0: return result.rc
     0
 
 fn bs_check_pcre2_prepare_shared_lets(ctx: ActionCtx, base_dir: str) -> i32:
@@ -1141,7 +1141,7 @@ fn bs_check_std_re_shared_dependency_imports(ctx: ActionCtx, compiler_path: str,
     args |> push("check")
     args |> push(bs_abs(root, src))
     let result = bs_pcre2_expect_success(ctx, compiler_path, base_dir, "std-re-shared-dependency-imports", args)
-    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    if result.rc != 0: return result.rc
     0
 
 fn bs_check_opaque_field_access_rejected(ctx: ActionCtx, compiler_path: str, base_dir: str) -> i32:
@@ -1175,7 +1175,7 @@ fn bs_check_pcre2_match_heapframe(ctx: ActionCtx, compiler_path: str, base_dir: 
     args |> push("-o")
     args |> push(bs_abs(root, obj))
     let result = bs_pcre2_expect_success(ctx, compiler_path, root, "pcre2-match-heapframe", args)
-    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    if result.rc != 0: return result.rc
     0
 
 fn bs_check_pcre2_compile_builds(ctx: ActionCtx, compiler_path: str, base_dir: str) -> i32:
@@ -1190,7 +1190,7 @@ fn bs_check_pcre2_compile_builds(ctx: ActionCtx, compiler_path: str, base_dir: s
     args |> push("-o")
     args |> push(bs_abs(root, bin))
     let result = bs_pcre2_expect_success(ctx, compiler_path, base_dir, "pcre2-compile-builds", args)
-    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    if result.rc != 0: return result.rc
     rc = bs_assert_not_contains(ctx, result.stderr, "MIR lowering failed", "pcre2 compile builds")
     if rc != 0: return rc
     rc = bs_assert_not_contains(ctx, result.stderr, "AST codegen was removed", "pcre2 compile builds")
@@ -1209,7 +1209,7 @@ fn bs_check_pcre2_jit_no_support(ctx: ActionCtx, compiler_path: str, base_dir: s
     args |> push("run")
     args |> push(bs_abs(root, src))
     let result = bs_pcre2_expect_success(ctx, compiler_path, base_dir, "pcre2-jit-no-support", args)
-    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    if result.rc != 0: return result.rc
     0
 
 fn bs_check_pcre2_generated_existing_main(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
@@ -1236,7 +1236,7 @@ fn bs_check_pcre2_generated_existing_main(ctx: ActionCtx, compiler_path: str, ca
     args |> push("build")
     args |> push(":pcre2-check-existing-main")
     let result = bs_pcre2_expect_success(ctx, compiler_path, case_dir, "pcre2-generated-existing-main", args)
-    if result.rc != 0: return if result.rc == 0: 1 else: result.rc
+    if result.rc != 0: return result.rc
     bs_assert_contains(ctx, result.stdout, "OK=2 TOTAL_ERRORS=0", "pcre2_check_existing_main")
 
 pub fn run_cli_selfhost_pcre2_prep_action(ctx: ActionCtx) -> i32:
@@ -1449,7 +1449,7 @@ fn bs_check_object_symbols(ctx: ActionCtx, compiler_path: str, nm_tool: str, cas
     rc = bs_build_emit_obj(ctx, compiler_path, "emit-obj-import-user-build", user_src, user_obj)
     if rc != 0: return rc
     let shared_nm = bs_nm_output(ctx, nm_tool, shared_obj, "emit-obj-import-owner")
-    if shared_nm.rc != 0: return if shared_nm.rc == 0: 1 else: shared_nm.rc
+    if shared_nm.rc != 0: return shared_nm.rc
     rc = bs_expect_nm_symbol(ctx, shared_nm.stdout, "emit_obj_import_owner shared_var", "", "shared_var", "", "", "U")
     if rc != 0: return rc
     rc = bs_expect_nm_symbol(ctx, shared_nm.stdout, "emit_obj_import_owner shared_let", "", "shared_let", "", "", "U")
@@ -1457,7 +1457,7 @@ fn bs_check_object_symbols(ctx: ActionCtx, compiler_path: str, nm_tool: str, cas
     rc = bs_expect_nm_symbol(ctx, shared_nm.stdout, "emit_obj_import_owner shared_fn", "", "shared_fn", "", "", "U")
     if rc != 0: return rc
     let user_nm = bs_nm_output(ctx, nm_tool, user_obj, "emit-obj-import-user")
-    if user_nm.rc != 0: return if user_nm.rc == 0: 1 else: user_nm.rc
+    if user_nm.rc != 0: return user_nm.rc
     rc = bs_expect_nm_symbol(ctx, user_nm.stdout, "emit_obj_import_user use_shared", "use_shared", "", "", "", "U")
     if rc != 0: return rc
     rc = bs_expect_nm_symbol(ctx, user_nm.stdout, "emit_obj_import_user shared_let_addr", "shared_let_addr", "", "", "", "U")
@@ -1483,7 +1483,7 @@ fn bs_check_object_symbols(ctx: ActionCtx, compiler_path: str, nm_tool: str, cas
     rc = bs_build_emit_obj(ctx, compiler_path, "imported-fn-beats-extern-build", redecl_user_src, redecl_obj)
     if rc != 0: return rc
     let redecl_nm = bs_nm_output(ctx, nm_tool, redecl_obj, "imported-fn-beats-extern")
-    if redecl_nm.rc != 0: return if redecl_nm.rc == 0: 1 else: redecl_nm.rc
+    if redecl_nm.rc != 0: return redecl_nm.rc
     rc = bs_expect_nm_symbol(ctx, redecl_nm.stdout, "imported_fn_beats_extern call_shared", "call_shared", "", "", "", "U")
     if rc != 0: return rc
     rc = bs_expect_nm_symbol(ctx, redecl_nm.stdout, "imported_fn_beats_extern shared_fn", "", "__shared_fn", "__with_mod_", "U", "")
@@ -1505,7 +1505,7 @@ fn bs_check_object_symbols(ctx: ActionCtx, compiler_path: str, nm_tool: str, cas
         rc = bs_build_emit_obj(ctx, compiler_path, label ++ "-build", pcre_src, pcre_obj)
         if rc != 0: return rc
         let pcre_nm = bs_nm_output(ctx, nm_tool, pcre_obj, label)
-        if pcre_nm.rc != 0: return if pcre_nm.rc == 0: 1 else: pcre_nm.rc
+        if pcre_nm.rc != 0: return pcre_nm.rc
         rc = bs_expect_nm_symbol(ctx, pcre_nm.stdout, label ++ " call_compile", "call_compile", "", "", "", "U")
         if rc != 0: return rc
         rc = bs_expect_nm_symbol(ctx, pcre_nm.stdout, label ++ " module pcre2_compile_8", "", "__pcre2_compile_8", "__with_mod_", "U", "")
