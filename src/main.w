@@ -1079,12 +1079,6 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, opt_level: 
                 return llvm_metadata_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == build_graph_kind_pcre2_reference_prepare():
-            let pcre2_ref_rc = build_graph_run_pcre2_reference_prepare(root, target)
-            if pcre2_ref_rc != 0:
-                return pcre2_ref_rc
-            completed_targets.push(target.name)
-            continue
         if target.kind == build_graph_kind_pcre2_migrate():
             let pcre2_migrate_rc = build_graph_run_pcre2_migrate(root, target)
             if pcre2_migrate_rc != 0:

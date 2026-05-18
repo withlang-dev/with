@@ -1,6 +1,7 @@
 use std.build
 use build_runtime
 use build_selfhost
+use build_pcre2
 
 fn project_kind_generate_compiler_entrypoints() -> BuildKind: 1003 as BuildKind
 fn project_kind_with_compiler_build() -> BuildKind: 1004 as BuildKind
@@ -10,7 +11,6 @@ fn project_kind_pcre2_generated_promote() -> BuildKind: 1007 as BuildKind
 fn project_kind_pcre2_build() -> BuildKind: 1008 as BuildKind
 fn project_kind_with_compiler_ir() -> BuildKind: 1013 as BuildKind
 fn project_kind_generate_llvm_link_metadata() -> BuildKind: 1020 as BuildKind
-fn project_kind_pcre2_reference_prepare() -> BuildKind: 1021 as BuildKind
 fn project_kind_pcre2_migrate() -> BuildKind: 1022 as BuildKind
 fn project_kind_seed_download() -> BuildKind: 1024 as BuildKind
 fn project_kind_emit_c_test() -> BuildKind: 1025 as BuildKind
@@ -628,7 +628,11 @@ pub fn build(ctx: BuildCtx) -> Build:
     clean = clean.arg("main_emit_temp.o")
     out = out.add_target(clean)
 
-    var pcre2_reference = target_new(project_kind_pcre2_reference_prepare(), "pcre2-reference", "pcre2-10.47").output("out/pcre2_reference/pcre2-10.47/.with-reference-ready")
+    var pcre2_reference = target_new(.Action, "pcre2-reference", "").output("out/pcre2_reference/pcre2-10.47")
+    pcre2_reference.action = run_pcre2_reference_action
+    pcre2_reference = pcre2_reference.extra_output("out/pcre2_reference/pcre2-10.47/.with-reference-ready")
+    pcre2_reference = pcre2_reference.extra_output("out/tmp")
+    pcre2_reference = pcre2_reference.arg("pcre2-10.47")
     pcre2_reference = pcre2_reference.arg("https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.47/pcre2-10.47.tar.gz")
     out = out.add_target(pcre2_reference)
 
