@@ -10,7 +10,6 @@ fn project_kind_pcre2_generated_check() -> BuildKind: 1006 as BuildKind
 fn project_kind_pcre2_generated_promote() -> BuildKind: 1007 as BuildKind
 fn project_kind_pcre2_build() -> BuildKind: 1008 as BuildKind
 fn project_kind_with_compiler_ir() -> BuildKind: 1013 as BuildKind
-fn project_kind_selfhost_suite_test() -> BuildKind: 1019 as BuildKind
 fn project_kind_generate_llvm_link_metadata() -> BuildKind: 1020 as BuildKind
 fn project_kind_pcre2_reference_prepare() -> BuildKind: 1021 as BuildKind
 fn project_kind_pcre2_migrate() -> BuildKind: 1022 as BuildKind
@@ -481,8 +480,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     cli_selfhost_object_symbol_tests = cli_selfhost_object_symbol_tests.dep("selfcheck")
     out = out.add_target(cli_selfhost_object_symbol_tests)
 
-    var cli_selfhost_build_w_tests = target_new(project_kind_selfhost_suite_test(), "cli-selfhost-build-w-tests", "out/bin/with-stage2")
-    cli_selfhost_build_w_tests = cli_selfhost_build_w_tests.arg("build-w")
+    var cli_selfhost_build_w_tests = target_new(.Action, "cli-selfhost-build-w-tests", "").output("out/test-graph/cli-selfhost-build-w-tests")
+    cli_selfhost_build_w_tests.action = run_cli_selfhost_build_w_action
     cli_selfhost_build_w_tests = cli_selfhost_build_w_tests.input("out/bin/with-stage2")
     cli_selfhost_build_w_tests = cli_selfhost_build_w_tests.dep("selfcheck")
     out = out.add_target(cli_selfhost_build_w_tests)

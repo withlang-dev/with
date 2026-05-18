@@ -1,6 +1,7 @@
 module build_selfhost
 
 use std.build
+use std.process
 
 type SelfhostRunResult {
     rc: i32,
@@ -1320,6 +1321,626 @@ pub fn run_cli_selfhost_migrate_core_action(ctx: ActionCtx) -> i32:
     rc = bs_check_migrate_prefer_brace_ws(ctx, compiler_path, bs_join(output_dir, "prefer_brace_ws"))
     if rc != 0: return rc
     bs_check_migrate_typed_cast_macros(ctx, compiler_path, bs_join(output_dir, "typed_cast_macros"))
+
+
+fn bs_build_w_write_fixture(ctx: ActionCtx, path: str, contents: str, _target_name: str, label: str) -> i32:
+    let _ = _target_name
+    bs_write_fixture(ctx, path, contents, label)
+
+fn bs_argv_append(argv_blob: str, arg: str) -> str:
+    argv_blob ++ arg ++ "\0"
+
+fn bs_blob_to_args(blob: str) -> Vec[str]:
+    let args: Vec[str] = Vec.new()
+    var start = 0
+    for i in 0..blob.len() as i32:
+        if blob.byte_at(i as i64) == 0:
+            if i > start:
+                args.push(blob.slice(start as i64, i as i64))
+            start = i + 1
+    args
+
+fn bs_build_w_expect_success(ctx: ActionCtx, compiler_path: str, case_dir: str, label: str, args: Vec[str]) -> SelfhostRunResult:
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, label, args, 120000, case_dir)
+    if result.rc != 0:
+        ctx.diagnostics().error(ctx.target_name() ++ ": build.w selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
+    result
+
+fn bs_build_w_tool_from_env(env_name: str, fallback: str) -> str:
+    let value = env(env_name)
+    if value.len() > 0:
+        return value
+    fallback
+
+fn bs_build_w_nm_smoke(ctx: ActionCtx, obj_path: str, label: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let output_dir = ctx.output()
+    let stdout_rel = bs_join(output_dir, label ++ ".nm.stdout")
+    let stderr_rel = bs_join(output_dir, label ++ ".nm.stderr")
+    var args: Vec[str] = Vec.new()
+    args |> push(bs_build_w_tool_from_env("NM", "nm"))
+    args |> push(bs_abs(root, obj_path))
+    let result = ctx.process_runner().run_capture(args, bs_abs(root, stdout_rel), bs_abs(root, stderr_rel), 120000)
+    if result.rc != 0:
+        return bs_fail(ctx, "nm failed for " ++ label)
+    let _remove_stdout = ctx.fs().remove_file(stdout_rel)
+    let _remove_stderr = ctx.fs().remove_file(stderr_rel)
+    0
+
+fn bs_check_build_w_not_ignored(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    var rc = bs_write_project_manifest(ctx, case_dir, "buildwdemo")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "src/main.w"), "fn main:\n    print(\"default main\")\n", ctx.target_name(), "default main")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "src/custom.w"), "use c_import(\"answer.h\")\n\nfn main:\n    assert(ANSWER == 42)\n    print(\"custom build\")\n", ctx.target_name(), "custom main")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "extra_include/answer.h"), "#ifndef WITH_BUILD_FEATURE\n#error \"missing build.w target define\"\n#endif\nenum { ANSWER = WITH_BUILD_VALUE };\n", ctx.target_name(), "answer.h")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    var target = target_new(.Executable, \"custom-build\", \"src/custom.w\")\n    target = target.include_path(\"extra_include\")\n    target = target.define(\"WITH_BUILD_FEATURE\")\n    target = target.define(\"WITH_BUILD_VALUE=42\")\n    target = target.link_system_lib(\"m\")\n    var out = ctx.new_build()\n    out.add_target(target)\n", ctx.target_name(), "build.w")
+    if rc != 0: return rc
+    let result = bs_build_w_expect_success(ctx, compiler_path, case_dir, "build-w-not-ignored", bs_blob_to_args(bs_argv_append("", "build")))
+    if result.rc != 0: return result.rc
+    let custom_bin = bs_join(case_dir, "out/bin/custom-build")
+    if not ctx.fs().exists(custom_bin):
+        ctx.diagnostics().error("error: build_w_not_ignored missing custom-build output")
+        return 1
+    if ctx.fs().exists(bs_join(case_dir, "out/bin/buildwdemo")):
+        ctx.diagnostics().error("error: build_w_not_ignored unexpectedly produced default package output")
+        return 1
+    let run_result = bs_run_binary_capture(ctx, custom_bin, "build-w-not-ignored-run", 120000)
+    if run_result.rc != 0: return run_result.rc
+    rc = bs_assert_contains(ctx, run_result.stdout, "custom build", "build_w_not_ignored")
+    if rc != 0: return rc
+    let explicit = bs_build_w_expect_success(ctx, compiler_path, case_dir, "build-w-explicit-source", bs_blob_to_args(bs_argv_append(bs_argv_append("", "build"), bs_abs(ctx.project_info().project_root(), bs_join(case_dir, "src/main.w")))))
+    if explicit.rc != 0: return explicit.rc
+    0
+
+fn bs_check_build_w_test_targets(ctx: ActionCtx, compiler_path: str, base_dir: str) -> i32:
+    let single_dir = bs_join(base_dir, "single")
+    var rc = bs_write_project_manifest(ctx, single_dir, "buildwtest")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(single_dir, "src/build_test.w"), "use c_import(\"answer.h\")\n\n@[test]\nfn build_w_test_target_uses_settings:\n    assert(ANSWER == 42)\n", ctx.target_name(), "test source")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(single_dir, "extra_include/answer.h"), "#ifndef WITH_BUILD_FEATURE\n#error \"missing build.w test target define\"\n#endif\nenum { ANSWER = WITH_BUILD_VALUE };\n", ctx.target_name(), "test header")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(single_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    var target = target_new(.Test, \"configured-test\", \"src/build_test.w\")\n    target = target.include_path(\"extra_include\")\n    target = target.define(\"WITH_BUILD_FEATURE\")\n    target = target.define(\"WITH_BUILD_VALUE=42\")\n    var out = ctx.new_build()\n    out.add_target(target)\n", ctx.target_name(), "test build.w")
+    if rc != 0: return rc
+    let single_result = bs_build_w_expect_success(ctx, compiler_path, single_dir, "build-w-test-target", bs_blob_to_args(bs_argv_append("", "build")))
+    if single_result.rc != 0: return single_result.rc
+    rc = bs_assert_contains(ctx, single_result.stdout, "ok: 1 test passed", "build_w_test_target")
+    if rc != 0: return rc
+
+    let glob_dir = bs_join(base_dir, "glob")
+    rc = bs_write_project_manifest(ctx, glob_dir, "buildwtestglob")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(glob_dir, "tests/first.w"), "use c_import(\"answer.h\")\n\n@[test]\nfn first_build_w_glob_test_uses_settings:\n    assert(ANSWER == 42)\n", ctx.target_name(), "glob first")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(glob_dir, "tests/second.w"), "@[test]\nfn second_build_w_glob_test_runs:\n    assert(2 + 2 == 4)\n", ctx.target_name(), "glob second")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(glob_dir, "extra_include/answer.h"), "#ifndef WITH_BUILD_FEATURE\n#error \"missing build.w test glob target define\"\n#endif\nenum { ANSWER = WITH_BUILD_VALUE };\n", ctx.target_name(), "glob header")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(glob_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    var target = target_new(.Test, \"glob-tests\", \"tests/*.w\")\n    target = target.include_path(\"extra_include\")\n    target = target.define(\"WITH_BUILD_FEATURE\")\n    target = target.define(\"WITH_BUILD_VALUE=42\")\n    var out = ctx.new_build()\n    out.add_target(target)\n", ctx.target_name(), "glob build.w")
+    if rc != 0: return rc
+    let glob_result = bs_build_w_expect_success(ctx, compiler_path, glob_dir, "build-w-test-target-glob", bs_blob_to_args(bs_argv_append("", "build")))
+    if glob_result.rc != 0: return glob_result.rc
+    bs_assert_contains(ctx, glob_result.stdout, "ok: 2 files passed in build.w test target glob-tests", "build_w_test_target_glob")
+
+fn bs_check_build_w_library_and_targets(ctx: ActionCtx, compiler_path: str, base_dir: str) -> i32:
+    let lib_dir = bs_join(base_dir, "library")
+    var rc = bs_write_project_manifest(ctx, lib_dir, "buildwlib")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(lib_dir, "src/lib.w"), "use c_import(\"answer.h\")\n\npub fn answer_from_header -> i32:\n    ANSWER\n", ctx.target_name(), "library source")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(lib_dir, "extra_include/answer.h"), "#ifndef WITH_BUILD_FEATURE\n#error \"missing build.w library target define\"\n#endif\nenum { ANSWER = WITH_BUILD_VALUE };\n", ctx.target_name(), "library header")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(lib_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    var target = target_new(.Library, \"configured\", \"src/lib.w\")\n    target = target.include_path(\"extra_include\")\n    target = target.define(\"WITH_BUILD_FEATURE\")\n    target = target.define(\"WITH_BUILD_VALUE=42\")\n    var out = ctx.new_build()\n    out.add_target(target)\n", ctx.target_name(), "library build.w")
+    if rc != 0: return rc
+    let lib_result = bs_build_w_expect_success(ctx, compiler_path, lib_dir, "build-w-library-target", bs_blob_to_args(bs_argv_append("", "build")))
+    if lib_result.rc != 0: return lib_result.rc
+    let archive = bs_join(lib_dir, "out/lib/libconfigured.a")
+    if not ctx.fs().exists(archive):
+        ctx.diagnostics().error("error: build_w_library_target missing archive: " ++ archive)
+        return 1
+    rc = bs_build_w_nm_smoke(ctx, archive, "build-w-library-nm")
+    if rc != 0: return rc
+
+    let host_dir = bs_join(base_dir, "host")
+    rc = bs_write_project_manifest(ctx, host_dir, "buildwhosttarget")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(host_dir, "src/main.w"), "fn main:\n    print(\"explicit host target\")\n", ctx.target_name(), "host source")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(host_dir, "build.w"), "use std.build\nuse std.sysinfo\n\npub fn build(ctx: BuildCtx) -> Build:\n    var host = BuildTarget.native\n    if os() == \"Macos\":\n        if arch() == \"armv8\" or arch() == \"aarch64\":\n            host = BuildTarget.darwin_aarch64\n        else if arch() == \"x86_64\":\n            host = BuildTarget.darwin_x86_64\n    else if os() == \"Linux\":\n        if arch() == \"armv8\" or arch() == \"aarch64\":\n            host = BuildTarget.linux_aarch64\n        else if arch() == \"x86_64\":\n            host = BuildTarget.linux_x86_64\n    else if os() == \"Windows\":\n        if arch() == \"x86_64\":\n            host = BuildTarget.windows_x86_64\n    var target = target_new(.Executable, \"host-target\", \"src/main.w\")\n    target = target.target(host)\n    var out = ctx.new_build()\n    out.add_target(target)\n", ctx.target_name(), "host build.w")
+    if rc != 0: return rc
+    let host_result = bs_build_w_expect_success(ctx, compiler_path, host_dir, "build-w-explicit-host-target", bs_blob_to_args(bs_argv_append("", "build")))
+    if host_result.rc != 0: return host_result.rc
+    let host_bin = bs_join(host_dir, "out/bin/host-target")
+    if not ctx.fs().exists(host_bin):
+        ctx.diagnostics().error("error: build_w_explicit_host_target missing binary: " ++ host_bin)
+        return 1
+    let host_run = bs_run_binary_capture(ctx, host_bin, "build-w-explicit-host-run", 120000)
+    if host_run.rc != 0: return host_run.rc
+    rc = bs_assert_contains(ctx, host_run.stdout, "explicit host target", "build_w_explicit_host_target")
+    if rc != 0: return rc
+
+    let non_native_dir = bs_join(base_dir, "non_native")
+    rc = bs_write_project_manifest(ctx, non_native_dir, "buildwnonnative")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(non_native_dir, "src/main.w"), "fn main:\n    print(\"wrong target\")\n", ctx.target_name(), "non-native source")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(non_native_dir, "build.w"), "use std.build\nuse std.sysinfo\n\npub fn build(ctx: BuildCtx) -> Build:\n    var non_native = BuildTarget.linux_x86_64\n    if os() == \"Linux\" and arch() == \"x86_64\":\n        non_native = BuildTarget.darwin_aarch64\n    var target = target_new(.Executable, \"wrong-target\", \"src/main.w\")\n    target = target.target(non_native)\n    var out = ctx.new_build()\n    out.add_target(target)\n", ctx.target_name(), "non-native build.w")
+    if rc != 0: return rc
+    let non_native_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-non-native-target", bs_blob_to_args(bs_argv_append("", "build")), 120000, non_native_dir)
+    if non_native_result.rc == 0:
+        ctx.diagnostics().error("error: build_w_non_native_target unexpectedly succeeded")
+        return 1
+    bs_assert_contains(ctx, non_native_result.stderr, "build.w cross-target platform", "build_w_non_native_target")
+
+fn bs_check_build_w_generated_source(ctx: ActionCtx, compiler_path: str, base_dir: str) -> i32:
+    let gen_dir = bs_join(base_dir, "generated")
+    var rc = bs_write_project_manifest(ctx, gen_dir, "buildwgenerated")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(gen_dir, "templates/generated_main.w"), "fn main:\n    print(\"generated source\")\n", ctx.target_name(), "generated template")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(gen_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    let fs = ctx.fs()\n    let emitter = ctx.source_emitter()\n    let source = emitter.generated_source(\"out/gen/generated_main.w\", fs.read_text(\"templates/generated_main.w\"))\n    var generated = ctx.new_build()\n    generated = generated.add_generated_source(source)\n    generated.executable(\"generated-app\", \"out/gen/generated_main.w\")\n", ctx.target_name(), "generated build.w")
+    if rc != 0: return rc
+    let gen_result = bs_build_w_expect_success(ctx, compiler_path, gen_dir, "build-w-generated-source", bs_blob_to_args(bs_argv_append("", "build")))
+    if gen_result.rc != 0: return gen_result.rc
+    let generated_source = bs_join(gen_dir, "out/gen/generated_main.w")
+    let generated_bin = bs_join(gen_dir, "out/bin/generated-app")
+    if not ctx.fs().exists(generated_source) or not ctx.fs().exists(generated_bin):
+        ctx.diagnostics().error("error: build_w_generated_source missing generated source or binary")
+        return 1
+    let run_result = bs_run_binary_capture(ctx, generated_bin, "build-w-generated-source-run", 120000)
+    if run_result.rc != 0: return run_result.rc
+    rc = bs_assert_contains(ctx, run_result.stdout, "generated source", "build_w_generated_source")
+    if rc != 0: return rc
+
+    let invalid_dir = bs_join(base_dir, "invalid_generated")
+    rc = bs_write_project_manifest(ctx, invalid_dir, "buildwinvalidgenerated")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(invalid_dir, "src/main.w"), "fn main:\n    print(\"should not build\")\n", ctx.target_name(), "invalid generated source")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(invalid_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    var generated = ctx.new_build()\n    generated = generated.generated_source(\"../outside.w\", \"fn main: print(\\\"bad\\\")\n\")\n    generated.executable(\"invalid-generated\", \"src/main.w\")\n", ctx.target_name(), "invalid generated build.w")
+    if rc != 0: return rc
+    let invalid_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-invalid-generated-source", bs_blob_to_args(bs_argv_append("", "build")), 120000, invalid_dir)
+    if invalid_result.rc == 0:
+        ctx.diagnostics().error("error: build_w_invalid_generated_source unexpectedly succeeded")
+        return 1
+    rc = bs_assert_contains(ctx, invalid_result.stderr, "invalid build.w generated source path", "build_w_invalid_generated_source")
+    if rc != 0: return rc
+
+    let toolfs_ok_dir = bs_join(base_dir, "toolfs_ok")
+    rc = bs_write_project_manifest(ctx, toolfs_ok_dir, "buildwtoolfsok")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_ok_dir, "src/main.w"), "fn main:\n    print(\"toolfs ok\")\n", ctx.target_name(), "toolfs ok source")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_ok_dir, "fixtures/tree/a.txt"), "tree", ctx.target_name(), "toolfs ok tree fixture")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_ok_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    let fs = ctx.fs()\n    assert(fs.mkdir_all(\"out/toolfs\") == 0)\n    assert(fs.write_text(\"out/toolfs/value.txt\", \"inside\") == 0)\n    assert(fs.read_text(\"out/toolfs/value.txt\") == \"inside\")\n    let files = fs.list_files(\"fixtures/tree\")\n    assert(files.len() == 1)\n    assert(files.get(0) == \"fixtures/tree/a.txt\")\n    assert(fs.copy_tree(\"fixtures/tree\", \"out/toolfs/tree-copy\") == 0)\n    assert(fs.read_text(\"out/toolfs/tree-copy/a.txt\") == \"tree\")\n    assert(fs.symlink(\"fixtures/tree/a.txt\", \"out/toolfs/link-a.txt\") == 0)\n    assert(fs.read_text(\"out/toolfs/link-a.txt\") == \"tree\")\n    assert(fs.remove_tree(\"out/toolfs/tree-copy\") == 0)\n    assert(not fs.exists(\"out/toolfs/tree-copy/a.txt\"))\n    ctx.new_build().executable(\"toolfs-ok\", \"src/main.w\")\n", ctx.target_name(), "toolfs ok build.w")
+    if rc != 0: return rc
+    let toolfs_ok = bs_build_w_expect_success(ctx, compiler_path, toolfs_ok_dir, "build-w-toolfs-ok", bs_blob_to_args(bs_argv_append("", "build")))
+    if toolfs_ok.rc != 0: return toolfs_ok.rc
+    if not ctx.fs().exists(bs_join(toolfs_ok_dir, "out/toolfs/value.txt")):
+        ctx.diagnostics().error("error: build_w_toolfs_ok missing sandboxed ToolFs output")
+        return 1
+
+    let toolfs_escape_dir = bs_join(base_dir, "toolfs_escape")
+    rc = bs_write_project_manifest(ctx, toolfs_escape_dir, "buildwtoolfsescape")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_escape_dir, "src/main.w"), "fn main:\n    print(\"should not build\")\n", ctx.target_name(), "toolfs escape source")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_escape_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    let _ = ctx.fs().read_text(\"../outside.txt\")\n    ctx.new_build().executable(\"toolfs-escape\", \"src/main.w\")\n", ctx.target_name(), "toolfs escape build.w")
+    if rc != 0: return rc
+    let toolfs_escape = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-toolfs-escape", bs_blob_to_args(bs_argv_append("", "build")), 120000, toolfs_escape_dir)
+    if toolfs_escape.rc == 0:
+        ctx.diagnostics().error("error: build_w_toolfs_escape unexpectedly succeeded")
+        return 1
+    rc = bs_assert_contains(ctx, toolfs_escape.stderr, "ToolFs path escapes project root", "build_w_toolfs_escape")
+    if rc != 0: return rc
+
+    let toolfs_tree_escape_dir = bs_join(base_dir, "toolfs_tree_escape")
+    rc = bs_write_project_manifest(ctx, toolfs_tree_escape_dir, "buildwtoolfstreeescape")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_tree_escape_dir, "src/main.w"), "fn main:\n    print(\"should not build\")\n", ctx.target_name(), "toolfs tree escape source")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_tree_escape_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    let _ = ctx.fs().copy_tree(\"../outside\", \"out/bad\")\n    ctx.new_build().executable(\"toolfs-tree-escape\", \"src/main.w\")\n", ctx.target_name(), "toolfs tree escape build.w")
+    if rc != 0: return rc
+    let toolfs_tree_escape = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-toolfs-tree-escape", bs_blob_to_args(bs_argv_append("", "build")), 120000, toolfs_tree_escape_dir)
+    if toolfs_tree_escape.rc == 0:
+        ctx.diagnostics().error("error: build_w_toolfs_tree_escape unexpectedly succeeded")
+        return 1
+    bs_assert_contains(ctx, toolfs_tree_escape.stderr, "ToolFs path escapes project root", "build_w_toolfs_tree_escape")
+
+fn bs_graph_build_file() -> str:
+    "use std.build\n\n" ++
+    "pub fn build(ctx: BuildCtx) -> Build:\n" ++
+    "    var out = ctx.new_build().executable(\"one\", \"src/one.w\")\n" ++
+    "    out = out.executable(\"two\", \"src/two.w\")\n" ++
+    "    out = out.object(\"one-o\", \"src/one.w\")\n" ++
+    "    out = out.archive(\"one-a\", \"src/one.w\")\n" ++
+    "    out = out.generated_source(\"out/tmp/a.txt\", \"same\")\n" ++
+    "    out = out.generated_source(\"out/tmp/b.txt\", \"same\")\n" ++
+    "    out = out.binary_compare(\"bytes-same\", \"out/tmp/a.txt\", \"out/tmp/b.txt\")\n" ++
+    "    out = out.fixpoint_compare(\"fix-same\", \"out/tmp/a.txt\", \"out/tmp/b.txt\")\n" ++
+    "    var rsp = target_new(.GenerateResponseFile, \"rsp\", \"\").output(\"out/tmp/args.rsp\")\n" ++
+    "    rsp = rsp.arg(\"-L/some path\")\n" ++
+    "    rsp = rsp.arg(\"plain\")\n" ++
+    "    out = out.add_target(rsp)\n" ++
+    "    out = out.compile_c_object(\"helper-o\", \"runtime/helper.c\", \"out/lib/helper.o\")\n" ++
+    "    var archive = target_new(.CreateStaticArchive, \"helper-a\", \"\").output(\"out/lib/libhelper.a\")\n" ++
+    "    archive = archive.input(\"out/lib/helper.o\")\n" ++
+    "    out = out.add_target(archive)\n" ++
+    "    var embedded = target_new(.EmbedObjectFiles, \"embed-helper\", \"\").output(\"out/lib/embedded_helper.s\")\n" ++
+    "    embedded = embedded.input(\"out/lib/helper.o\")\n" ++
+    "    embedded = embedded.arg(\"helper_o\")\n" ++
+    "    out = out.add_target(embedded)\n" ++
+    "    out = out.compile_asm_object(\"embedded-helper-o\", \"out/lib/embedded_helper.s\", \"out/lib/embedded_helper.o\")\n" ++
+    "    out = out.copy_file(\"helper-copy\", \"runtime/helper.c\", \"out/copied/helper.c\")\n" ++
+    "    var copy_target = target_new(.CopyTree, \"runtime-copy\", \"runtime\").output(\"out/runtime\")\n" ++
+    "    copy_target = copy_target.input(\"helper.c\")\n" ++
+    "    out = out.add_target(copy_target)\n" ++
+    "    var promote = target_new(.PromoteTreeIfVerified, \"promote-runtime\", \"out/runtime\").output(\"promoted-runtime\")\n" ++
+    "    promote = promote.input(\"helper.c\")\n" ++
+    "    promote = promote.dep(\"runtime-copy\")\n" ++
+    "    out = out.add_target(promote)\n" ++
+    "    var corpus = target_new(.RunCorpusTest, \"corpus\", \"out/bin/two\")\n" ++
+    "    corpus = corpus.dep(\"two\")\n" ++
+    "    out = out.add_target(corpus)\n" ++
+    "    var command = target_new(.Command, \"run-two\", \"out/bin/two\")\n" ++
+    "    command = command.dep(\"two\")\n" ++
+    "    out = out.add_target(command)\n" ++
+    "    var install = target_new(.Install, \"install-two\", \"out/bin/two\").output(\"out/install/two\")\n" ++
+    "    install = install.dep(\"two\")\n" ++
+    "    install = install.arg(\"0755\")\n" ++
+    "    out = out.add_target(install)\n" ++
+    "    var aggregate = target_new(.Group, \"toolchain\", \"\")\n" ++
+    "    aggregate = aggregate.dep(\"bytes-same\")\n" ++
+    "    aggregate = aggregate.dep(\"fix-same\")\n" ++
+    "    aggregate = aggregate.dep(\"rsp\")\n" ++
+    "    aggregate = aggregate.dep(\"one-o\")\n" ++
+    "    aggregate = aggregate.dep(\"one-a\")\n" ++
+    "    aggregate = aggregate.dep(\"helper-a\")\n" ++
+    "    aggregate = aggregate.dep(\"embedded-helper-o\")\n" ++
+    "    aggregate = aggregate.dep(\"helper-copy\")\n" ++
+    "    aggregate = aggregate.dep(\"promote-runtime\")\n" ++
+    "    aggregate = aggregate.dep(\"corpus\")\n" ++
+    "    aggregate = aggregate.dep(\"run-two\")\n" ++
+    "    aggregate = aggregate.dep(\"install-two\")\n" ++
+    "    out = out.add_target(aggregate)\n" ++
+    "    out.default(\"toolchain\")\n"
+
+fn bs_require_case_file(ctx: ActionCtx, case_dir: str, rel_path: str, label: str) -> i32:
+    let path = bs_join(case_dir, rel_path)
+    if ctx.fs().exists(path):
+        return 0
+    ctx.diagnostics().error("error: " ++ ctx.target_name() ++ " " ++ label ++ " missing expected output: " ++ rel_path)
+    1
+
+fn bs_forbid_case_file(ctx: ActionCtx, case_dir: str, rel_path: str, label: str) -> i32:
+    let path = bs_join(case_dir, rel_path)
+    if not ctx.fs().exists(path):
+        return 0
+    ctx.diagnostics().error("error: " ++ ctx.target_name() ++ " " ++ label ++ " produced unexpected output: " ++ rel_path)
+    1
+
+fn bs_check_build_w_graph_v2(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    var rc = bs_write_project_manifest(ctx, case_dir, "buildwgraphv2")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "src/one.w"), "fn main:\n    print(\"one\")\n", ctx.target_name(), "graph one")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "src/two.w"), "fn main:\n    print(\"two\")\n", ctx.target_name(), "graph two")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "runtime/helper.c"), "int helper(void) {\n  return 42;\n}\n", ctx.target_name(), "graph helper")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "build.w"), bs_graph_build_file(), ctx.target_name(), "graph build.w")
+    if rc != 0: return rc
+    let graph_result = bs_build_w_expect_success(ctx, compiler_path, case_dir, "build-w-graph-v2", bs_blob_to_args(bs_argv_append(bs_argv_append("", "build"), "--graph")))
+    if graph_result.rc != 0: return graph_result.rc
+    rc = bs_assert_contains(ctx, graph_result.stdout, "WITH_BUILD_GRAPH\t2", "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, graph_result.stdout, "default_target\ttoolchain", "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, graph_result.stdout, "target\t3\tone-o\tsrc/one.w\t0\t0\t", "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, graph_result.stdout, "target\t4\tone-a\tsrc/one.w\t0\t0\t", "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, graph_result.stdout, "target\t12\thelper-o\truntime/helper.c\t0\t0\tout/lib/helper.o", "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, graph_result.stdout, "target\t15\thelper-a\t\t0\t0\tout/lib/libhelper.a", "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, graph_result.stdout, "target\t17\tembed-helper\t\t0\t0\tout/lib/embedded_helper.s", "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, graph_result.stdout, "target\t10\tbytes-same\tout/tmp/a.txt\t0\t0\t", "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, graph_result.stdout, "target\t16\trsp\t\t0\t0\tout/tmp/args.rsp", "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, graph_result.stdout, "target\t7\trun-two\tout/bin/two\t0\t0\t", "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, graph_result.stdout, "target\t8\tinstall-two\tout/bin/two\t0\t0\tout/install/two", "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, graph_result.stdout, "target\t22\thelper-copy\truntime/helper.c\t0\t0\tout/copied/helper.c", "build_w_graph_v2")
+    if rc != 0: return rc
+    let selected = bs_build_w_expect_success(ctx, compiler_path, case_dir, "build-w-graph-selected", bs_blob_to_args(bs_argv_append(bs_argv_append(bs_argv_append("", "build"), ":two"), "--graph")))
+    if selected.rc != 0: return selected.rc
+    rc = bs_assert_not_contains(ctx, selected.stdout, "target\t12\thelper-o", "build_w_graph_selected")
+    if rc != 0: return rc
+    let deps = bs_build_w_expect_success(ctx, compiler_path, case_dir, "build-w-graph-deps", bs_blob_to_args(bs_argv_append(bs_argv_append(bs_argv_append("", "build"), ":toolchain"), "--graph")))
+    if deps.rc != 0: return deps.rc
+    rc = bs_assert_contains(ctx, deps.stdout, "target\t12\thelper-o", "build_w_graph_deps")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, deps.stdout, "target\t9\ttoolchain\t\t0\t0\t", "build_w_graph_deps")
+    if rc != 0: return rc
+    rc = bs_assert_not_contains(ctx, deps.stdout, "target\t0\tone\t", "build_w_graph_deps")
+    if rc != 0: return rc
+    let full = bs_build_w_expect_success(ctx, compiler_path, case_dir, "build-w-full-graph", bs_blob_to_args(bs_argv_append("", "build")))
+    if full.rc != 0: return full.rc
+    rc = bs_require_case_file(ctx, case_dir, "out/obj/one-o.o", "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bs_require_case_file(ctx, case_dir, "out/lib/libone-a.a", "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bs_require_case_file(ctx, case_dir, "out/lib/helper.o", "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bs_require_case_file(ctx, case_dir, "out/lib/libhelper.a", "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bs_require_case_file(ctx, case_dir, "out/lib/embedded_helper.s", "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bs_require_case_file(ctx, case_dir, "out/lib/embedded_helper.o", "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bs_require_case_file(ctx, case_dir, "out/copied/helper.c", "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bs_require_case_file(ctx, case_dir, "out/runtime/helper.c", "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bs_require_case_file(ctx, case_dir, "promoted-runtime/helper.c", "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bs_require_case_file(ctx, case_dir, "out/corpus/corpus/stdout.txt", "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bs_require_case_file(ctx, case_dir, "out/command/run-two/stdout.txt", "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bs_require_case_file(ctx, case_dir, "out/install/two", "build_w_graph_v2")
+    if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, bs_join(case_dir, "out/corpus/corpus/stdout.txt"), "two", "build_w_graph_corpus")
+    if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, bs_join(case_dir, "out/command/run-two/stdout.txt"), "two", "build_w_graph_command")
+    if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, bs_join(case_dir, "out/lib/embedded_helper.s"), "with_embedded_helper_o_start", "build_w_graph_embed")
+    if rc != 0: return rc
+    let _remove_out1 = ctx.fs().remove_tree(bs_join(case_dir, "out"))
+    let group = bs_build_w_expect_success(ctx, compiler_path, case_dir, "build-w-group-deps", bs_blob_to_args(bs_argv_append(bs_argv_append("", "build"), ":toolchain")))
+    if group.rc != 0: return group.rc
+    rc = bs_require_case_file(ctx, case_dir, "out/bin/two", "build_w_graph_group")
+    if rc != 0: return rc
+    rc = bs_forbid_case_file(ctx, case_dir, "out/bin/one", "build_w_graph_group")
+    if rc != 0: return rc
+    rc = bs_require_case_file(ctx, case_dir, "out/obj/one-o.o", "build_w_graph_group")
+    if rc != 0: return rc
+    rc = bs_require_case_file(ctx, case_dir, "out/lib/libone-a.a", "build_w_graph_group")
+    if rc != 0: return rc
+    rc = bs_require_case_file(ctx, case_dir, "out/lib/libhelper.a", "build_w_graph_group")
+    if rc != 0: return rc
+    rc = bs_require_case_file(ctx, case_dir, "out/copied/helper.c", "build_w_graph_group")
+    if rc != 0: return rc
+    rc = bs_require_case_file(ctx, case_dir, "out/corpus/corpus/stdout.txt", "build_w_graph_group")
+    if rc != 0: return rc
+    rc = bs_require_case_file(ctx, case_dir, "out/command/run-two/stdout.txt", "build_w_graph_group")
+    if rc != 0: return rc
+    rc = bs_require_case_file(ctx, case_dir, "out/install/two", "build_w_graph_group")
+    if rc != 0: return rc
+    let _remove_out2 = ctx.fs().remove_tree(bs_join(case_dir, "out"))
+    let bytes = bs_build_w_expect_success(ctx, compiler_path, case_dir, "build-w-binary-compare", bs_blob_to_args(bs_argv_append(bs_argv_append("", "build"), ":bytes-same")))
+    if bytes.rc != 0: return bytes.rc
+    let fix = bs_build_w_expect_success(ctx, compiler_path, case_dir, "build-w-fixpoint-compare", bs_blob_to_args(bs_argv_append(bs_argv_append("", "build"), ":fix-same")))
+    if fix.rc != 0: return fix.rc
+    let rsp = bs_build_w_expect_success(ctx, compiler_path, case_dir, "build-w-response-file", bs_blob_to_args(bs_argv_append(bs_argv_append("", "build"), ":rsp")))
+    if rsp.rc != 0: return rsp.rc
+    let rsp_text = bs_trim_trailing_line_endings(ctx.fs().read_text(bs_join(case_dir, "out/tmp/args.rsp")))
+    if rsp_text != "\"-L/some path\"\n\"plain\"":
+        ctx.diagnostics().error("error: build_w_graph_v2 response file contents mismatch: " ++ rsp_text)
+        return 1
+    let _remove_out3 = ctx.fs().remove_tree(bs_join(case_dir, "out"))
+    let two = bs_build_w_expect_success(ctx, compiler_path, case_dir, "build-w-target-select", bs_blob_to_args(bs_argv_append(bs_argv_append("", "build"), ":two")))
+    if two.rc != 0: return two.rc
+    if not ctx.fs().exists(bs_join(case_dir, "out/bin/two")) or ctx.fs().exists(bs_join(case_dir, "out/bin/one")):
+        ctx.diagnostics().error("error: build_w_graph_v2 target selection outputs were wrong")
+        return 1
+    0
+
+fn bs_check_removed_build_kind_diagnostic(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    var rc = bs_write_project_manifest(ctx, case_dir, "removedkind")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "src/main.w"), "fn main:\n    print(\"unused\")\n", ctx.target_name(), "removed kind source")
+    if rc != 0: return rc
+    let build_text =
+        "use std.build\n\n" ++
+        "fn removed_kind() -> BuildKind: 5 as BuildKind\n\n" ++
+        "pub fn build(ctx: BuildCtx) -> Build:\n" ++
+        "    var out = ctx.new_build()\n" ++
+        "    out = out.add_target(target_new(removed_kind(), \"old-generated-source\", \"\"))\n" ++
+        "    out.default(\"old-generated-source\")\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "build.w"), build_text, ctx.target_name(), "removed kind build.w")
+    if rc != 0: return rc
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-removed-kind", bs_blob_to_args(bs_argv_append("", "build")), 120000, case_dir)
+    if result.rc == 0:
+        ctx.diagnostics().error("error: build_w_removed_kind unexpectedly succeeded")
+        return 1
+    rc = bs_assert_contains(ctx, result.stderr, "removed_generated_source", "build_w_removed_kind")
+    if rc != 0: return rc
+    bs_assert_contains(ctx, result.stderr, "regenerate your build graph", "build_w_removed_kind")
+
+fn bs_check_build_w_action_target(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    var rc = bs_write_project_manifest(ctx, case_dir, "buildwaction")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "src/main.w"), "fn main:\n    print(\"unused\")\n", ctx.target_name(), "action source")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "src/input.txt"), "input", ctx.target_name(), "action input")
+    if rc != 0: return rc
+    let build_text =
+        "use std.build\n\n" ++
+        "fn generate(ctx: ActionCtx) -> i32:\n" ++
+        "    assert(ctx.target_name() == \"generate\")\n" ++
+        "    assert(ctx.project_info().package_name() == \"buildwaction\")\n" ++
+        "    assert(ctx.inputs().get(0) == \"src/input.txt\")\n" ++
+        "    assert(ctx.args().get(0) == \"hello\")\n" ++
+        "    assert(ctx.fs().read_text(ctx.inputs().get(0)) == \"input\")\n" ++
+        "    assert(ctx.fs().mkdir_all(\"out/action\") == 0)\n" ++
+        "    assert(ctx.fs().write_text(ctx.output(), \"action:\" ++ ctx.args().get(0)) == 0)\n" ++
+        "    assert(ctx.fs().write_text(ctx.outputs().get(1), \"extra:\" ++ ctx.args().get(0)) == 0)\n" ++
+        "    0\n\n" ++
+        "pub fn build(ctx: BuildCtx) -> Build:\n" ++
+        "    var out = ctx.new_build()\n" ++
+        "    var generate_target = target_new(.Action, \"generate\", \"\").output(\"out/action/value.txt\")\n" ++
+        "    generate_target = generate_target.extra_output(\"out/action/extra.txt\")\n" ++
+        "    generate_target = generate_target.input(\"src/input.txt\")\n" ++
+        "    generate_target = generate_target.arg(\"hello\")\n" ++
+        "    generate_target.action = generate\n" ++
+        "    out = out.add_target(generate_target)\n" ++
+        "    var all = target_new(.Group, \"all\", \"\")\n" ++
+        "    all = all.dep(\"generate\")\n" ++
+        "    out = out.add_target(all)\n" ++
+        "    out.default(\"all\")\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "build.w"), build_text, ctx.target_name(), "action build.w")
+    if rc != 0: return rc
+    let result = bs_build_w_expect_success(ctx, compiler_path, case_dir, "build-w-action-target", bs_blob_to_args(bs_argv_append("", "build")))
+    if result.rc != 0: return result.rc
+    rc = bs_expect_file_contains(ctx, bs_join(case_dir, "out/action/value.txt"), "action:hello", "build_w_action_target")
+    if rc != 0: return rc
+    bs_expect_file_contains(ctx, bs_join(case_dir, "out/action/extra.txt"), "extra:hello", "build_w_action_extra_output")
+
+fn bs_check_build_w_action_failures(ctx: ActionCtx, compiler_path: str, base_dir: str) -> i32:
+    let missing_dir = bs_join(base_dir, "missing_input")
+    var rc = bs_write_project_manifest(ctx, missing_dir, "actionmissing")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(missing_dir, "src/main.w"), "fn main:\n    print(\"unused\")\n", ctx.target_name(), "action missing source")
+    if rc != 0: return rc
+    let missing_build =
+        "use std.build\n\n" ++
+        "fn generate(ctx: ActionCtx) -> i32:\n" ++
+        "    assert(ctx.fs().write_text(ctx.output(), \"should not run\") == 0)\n" ++
+        "    0\n\n" ++
+        "pub fn build(ctx: BuildCtx) -> Build:\n" ++
+        "    var out = ctx.new_build()\n" ++
+        "    var target = target_new(.Action, \"generate\", \"\").output(\"out/action/value.txt\")\n" ++
+        "    target = target.input(\"src/missing.txt\")\n" ++
+        "    target.action = generate\n" ++
+        "    out = out.add_target(target)\n" ++
+        "    out.default(\"generate\")\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(missing_dir, "build.w"), missing_build, ctx.target_name(), "action missing build.w")
+    if rc != 0: return rc
+    let missing = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-action-missing-input", bs_blob_to_args(bs_argv_append("", "build")), 120000, missing_dir)
+    if missing.rc == 0:
+        ctx.diagnostics().error("error: build_w_action_missing_input unexpectedly succeeded")
+        return 1
+    rc = bs_assert_contains(ctx, missing.stderr, "missing declared input", "build_w_action_missing_input")
+    if rc != 0: return rc
+
+    let failure_dir = bs_join(base_dir, "failure")
+    rc = bs_write_project_manifest(ctx, failure_dir, "actionfailure")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(failure_dir, "src/main.w"), "fn main:\n    print(\"unused\")\n", ctx.target_name(), "action failure source")
+    if rc != 0: return rc
+    let failure_build =
+        "use std.build\n\n" ++
+        "fn fail_action(ctx: ActionCtx) -> i32:\n" ++
+        "    7\n\n" ++
+        "pub fn build(ctx: BuildCtx) -> Build:\n" ++
+        "    var out = ctx.new_build()\n" ++
+        "    var target = target_new(.Action, \"fail\", \"\").output(\"out/action/value.txt\")\n" ++
+        "    target.action = fail_action\n" ++
+        "    out = out.add_target(target)\n" ++
+        "    out.default(\"fail\")\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(failure_dir, "build.w"), failure_build, ctx.target_name(), "action failure build.w")
+    if rc != 0: return rc
+    let failure = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-action-failure", bs_blob_to_args(bs_argv_append("", "build")), 120000, failure_dir)
+    if failure.rc == 0:
+        ctx.diagnostics().error("error: build_w_action_failure unexpectedly succeeded")
+        return 1
+    rc = bs_assert_contains(ctx, failure.stderr, "failed with exit code 7", "build_w_action_failure")
+    if rc != 0: return rc
+
+    let undeclared_dir = bs_join(base_dir, "undeclared_output")
+    rc = bs_write_project_manifest(ctx, undeclared_dir, "actionundeclared")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(undeclared_dir, "src/main.w"), "fn main:\n    print(\"unused\")\n", ctx.target_name(), "action undeclared source")
+    if rc != 0: return rc
+    let undeclared_build =
+        "use std.build\n\n" ++
+        "fn bad_write(ctx: ActionCtx) -> i32:\n" ++
+        "    assert(ctx.fs().write_text(\"out/action/other.txt\", \"bad\") == 0)\n" ++
+        "    0\n\n" ++
+        "pub fn build(ctx: BuildCtx) -> Build:\n" ++
+        "    var out = ctx.new_build()\n" ++
+        "    var target = target_new(.Action, \"bad-write\", \"\").output(\"out/action/value.txt\")\n" ++
+        "    target.action = bad_write\n" ++
+        "    out = out.add_target(target)\n" ++
+        "    out.default(\"bad-write\")\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(undeclared_dir, "build.w"), undeclared_build, ctx.target_name(), "action undeclared build.w")
+    if rc != 0: return rc
+    let undeclared = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-action-undeclared-output", bs_blob_to_args(bs_argv_append("", "build")), 120000, undeclared_dir)
+    if undeclared.rc == 0:
+        ctx.diagnostics().error("error: build_w_action_undeclared_output unexpectedly succeeded")
+        return 1
+    rc = bs_assert_contains(ctx, undeclared.stderr, "not a declared action output", "build_w_action_undeclared_output")
+    if rc != 0: return rc
+
+    let escape_dir = bs_join(base_dir, "escape_output")
+    rc = bs_write_project_manifest(ctx, escape_dir, "actionescape")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(escape_dir, "src/main.w"), "fn main:\n    print(\"unused\")\n", ctx.target_name(), "action escape source")
+    if rc != 0: return rc
+    let escape_build =
+        "use std.build\n\n" ++
+        "fn bad_escape(ctx: ActionCtx) -> i32:\n" ++
+        "    assert(ctx.fs().write_text(\"../outside.txt\", \"bad\") == 0)\n" ++
+        "    0\n\n" ++
+        "pub fn build(ctx: BuildCtx) -> Build:\n" ++
+        "    var out = ctx.new_build()\n" ++
+        "    var target = target_new(.Action, \"bad-escape\", \"\").output(\"out/action/value.txt\")\n" ++
+        "    target.action = bad_escape\n" ++
+        "    out = out.add_target(target)\n" ++
+        "    out.default(\"bad-escape\")\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(escape_dir, "build.w"), escape_build, ctx.target_name(), "action escape build.w")
+    if rc != 0: return rc
+    let escape = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-action-escape-output", bs_blob_to_args(bs_argv_append("", "build")), 120000, escape_dir)
+    if escape.rc == 0:
+        ctx.diagnostics().error("error: build_w_action_escape_output unexpectedly succeeded")
+        return 1
+    rc = bs_assert_contains(ctx, escape.stderr, "ToolFs path escapes project root", "build_w_action_escape_output")
+    if rc != 0: return rc
+
+    0
+
+pub fn run_cli_selfhost_build_w_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    if inputs.len() == 0:
+        return bs_fail(ctx, "missing compiler input")
+    let fs = ctx.fs()
+    let output_dir = ctx.output()
+    if output_dir.len() == 0:
+        return bs_fail(ctx, "missing output directory")
+    if fs.exists(output_dir) and fs.remove_tree(output_dir) != 0:
+        return bs_fail(ctx, "could not remove previous output directory: " ++ output_dir)
+    if fs.mkdir_all(output_dir) != 0:
+        return bs_fail(ctx, "could not create output directory: " ++ output_dir)
+    let compiler_input = inputs.get(0)
+    if not fs.exists(compiler_input):
+        return bs_fail(ctx, "missing compiler: " ++ compiler_input)
+    let compiler_path = bs_abs(ctx.project_info().project_root(), compiler_input)
+    let base_dir = output_dir
+    var rc = bs_check_build_w_not_ignored(ctx, compiler_path, bs_join(base_dir, "not_ignored"))
+    if rc != 0: return rc
+    rc = bs_check_build_w_test_targets(ctx, compiler_path, base_dir)
+    if rc != 0: return rc
+    rc = bs_check_build_w_library_and_targets(ctx, compiler_path, base_dir)
+    if rc != 0: return rc
+    rc = bs_check_build_w_generated_source(ctx, compiler_path, base_dir)
+    if rc != 0: return rc
+    rc = bs_check_build_w_graph_v2(ctx, compiler_path, bs_join(base_dir, "graph_v2"))
+    if rc != 0: return rc
+    rc = bs_check_removed_build_kind_diagnostic(ctx, compiler_path, bs_join(base_dir, "removed_kind"))
+    if rc != 0: return rc
+    rc = bs_check_build_w_action_target(ctx, compiler_path, bs_join(base_dir, "action"))
+    if rc != 0: return rc
+    bs_check_build_w_action_failures(ctx, compiler_path, bs_join(base_dir, "action_failures"))
+
 
 fn bs_copy_fixture_file(ctx: ActionCtx, src: str, dst: str, label: str) -> i32:
     if not ctx.fs().exists(src):
