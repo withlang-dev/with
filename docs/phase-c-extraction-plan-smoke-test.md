@@ -1,181 +1,82 @@
 # Phase C Extraction Plan: CLI Selfhost Smoke Test
 
-Status: implementation pending.
+Status: retroactive template for completed extraction.
 
-This is the first Phase C extraction slice. The goal is to remove the
-`cli_selfhost_smoke_test` project-specific target from generic compiler-driver
-dispatch and re-express it as a repository-local `Build.action` target.
+This document records the intended extraction shape for
+`cli-selfhost-smoke-tests`. Future Phase C extractions should use this level of
+planning before code moves.
 
-## What's Moving
+## Placement
 
-Current project-specific kind:
+The target belongs in the repository-local `build_selfhost.w` module, imported
+by root `build.w`. The smoke fixtures test this compiler's CLI behavior; they
+are not generic build-system APIs and do not belong in `lib/std`.
 
-- `BuildKind 1002`, named `cli_selfhost_smoke_test`
-  - current declaration: `src/BuildGraphKinds.w`
-  - current dispatch: `src/main.w`, in `run_build_graph`
+## What Moves
 
-Current implementation functions:
+Move the project-specific selfhost smoke implementation out of generic
+compiler-driver dispatch:
 
+- `BuildKind 1002`, previously `cli_selfhost_smoke_test`
 - `build_graph_run_cli_capture`
-  - file: `src/main.w`
-  - role: run compiler CLI with captured stdout/stderr.
 - `build_graph_run_cli_expect_success`
-  - file: `src/main.w`
-  - role: wrapper around captured CLI execution with success diagnostic.
 - `build_graph_run_cli_selfhost_help`
-  - file: `src/main.w`
-  - role: checks top-level `with --help` output.
 - `build_graph_run_cli_selfhost_test_directives`
-  - file: `src/main.w`
-  - role: writes small test directive fixtures and checks success/failure behavior.
 - `build_graph_run_cli_selfhost_smoke_test`
-  - file: `src/main.w`
-  - role: validates compiler path and runs the help and test-directive checks.
 
-Nearby assertion helpers currently used by this path:
+Shared assertion helpers can stay only if they still serve other generic graph
+paths. Smoke-only helper code moves with the action.
 
-- `build_graph_assert_contains`
-- `build_graph_assert_not_contains`
+## Target Shape
 
-Current repository target shape:
+The root build graph should declare a standard `.Action` target named
+`cli-selfhost-smoke-tests`, set its action to the project-local smoke runner,
+depend on `selfcheck`, and pass `out/bin/with-stage2` as an input. Fixture and
+capture files must be written under a declared output directory such as
+`out/test-graph/cli-selfhost-smoke-tests`.
 
-- `build.w` does not directly create kind `1002`.
-- `build.w` creates `cli-selfhost-smoke-tests` as kind `1019`
-  (`selfhost_suite_test`) with arg `"smoke"`.
-- `build_graph_run_cli_selfhost_suite_test` dispatches `"smoke"` to
-  `build_graph_run_cli_selfhost_smoke_test`.
+## Capabilities
 
-The extraction therefore removes both the direct `1002` dispatch path and the
-`"smoke"` branch inside the hardcoded selfhost suite dispatcher for this target.
+The action requires only capabilities already exposed by `ActionCtx`:
 
-## Where It's Moving
+- `Diagnostics` for target-specific failure messages
+- `ToolFs` for fixture directories, fixture files, capture reads, and cleanup
+- `ProcessRunner` for invoking the compiler CLI with argv and timeout
+- `ProjectInfo` for resolving project-relative paths
+- declared inputs and outputs through `ctx.inputs()` / `ctx.outputs()`
 
-Create a repository-local module at:
+No filesystem shell commands are part of the action shape.
 
-```text
-build_selfhost.w
-```
+## Reserved Kind
 
-Justification:
+Kind `1002` remains reserved after extraction. `build_graph_kind_removed(1002)`
+must return true, `build_graph_kind_is_project(1002)` must return false, and
+`build_graph_kind_name(1002)` should return `removed_cli_selfhost_smoke_test`.
+Old serialized graphs should fail with the standard removed-kind diagnostic:
+`this kind was removed; regenerate your build graph`.
 
-- The selfhost fixtures are tests for this repository's compiler CLI.
-- They are not standard build-system APIs and do not belong in `lib/std`.
-- They are small enough to start as one root-level project build module,
-  matching the existing `build_runtime.w` pattern.
-- Larger fixture groups can later split into narrower project-local modules if
-  needed, but the first extraction should keep import and bootstrap surface
-  minimal.
+## Dispatch Removal
 
-`build.w` will import `build_selfhost` and use its action function when
-declaring `cli-selfhost-smoke-tests`.
-
-## New Target Shape
-
-Before:
-
-```with
-var cli_selfhost_smoke_tests = target_new(project_kind_selfhost_suite_test(), "cli-selfhost-smoke-tests", "out/bin/with-stage2")
-cli_selfhost_smoke_tests = cli_selfhost_smoke_tests.arg("smoke")
-cli_selfhost_smoke_tests = cli_selfhost_smoke_tests.input("out/bin/with-stage2")
-cli_selfhost_smoke_tests = cli_selfhost_smoke_tests.dep("selfcheck")
-out = out.add_target(cli_selfhost_smoke_tests)
-```
-
-After:
-
-```with
-var cli_selfhost_smoke_tests = target_new(.Action, "cli-selfhost-smoke-tests", "").output("out/test-graph/cli-selfhost-smoke-tests")
-cli_selfhost_smoke_tests.action = run_cli_selfhost_smoke_action
-cli_selfhost_smoke_tests = cli_selfhost_smoke_tests.input("out/bin/with-stage2")
-cli_selfhost_smoke_tests = cli_selfhost_smoke_tests.dep("selfcheck")
-out = out.add_target(cli_selfhost_smoke_tests)
-```
-
-The action reads the compiler path from `ctx.inputs().get(0)`. The target output
-is a declared action output directory under `out/test-graph/` so fixture writes
-remain inside the action write scope.
-
-## Required Capabilities
-
-The action needs:
-
-- `Diagnostics`
-  - available through `ActionCtx.diagnostics()`;
-  - used for clear target-specific failure messages.
-- `ToolFs`
-  - available through `ActionCtx.fs()`;
-  - used to create fixture directories, write fixture source files, read
-    captured output, and remove successful capture files.
-- `ProcessRunner`
-  - available through `ActionCtx.process_runner()`;
-  - used to invoke the compiler CLI with argv and timeout.
-- `ProjectInfo`
-  - available through `ActionCtx.project_info()`;
-  - used to resolve project-relative paths to absolute process/capture paths.
-- Declared inputs and outputs
-  - available through `ActionCtx.inputs()`, `ActionCtx.outputs()`, and
-    `ActionCtx.output()`.
-
-All required capabilities already exist on `ActionCtx`.
-
-## Reserved-Kind Diagnostic
-
-Old kind `1002` must not disappear silently.
-
-Implementation requirements:
-
-- remove `build_graph_kind_cli_selfhost_smoke_test()`;
-- mark `1002` as removed in `build_graph_kind_removed`;
-- update `build_graph_kind_is_project` so `1002` is no longer valid;
-- keep `build_graph_kind_name(1002)` returning a removed-name string such as
-  `removed_cli_selfhost_smoke_test`;
-- rely on the existing removed-kind diagnostic:
-  `"this kind was removed; regenerate your build graph"`.
-
-This matches the existing reserved-kind pattern for `1001` and `1012`.
-
-## Dispatch Code Removed
-
-Remove from `src/main.w`:
-
-- the `run_build_graph` case that checks
-  `target.kind == build_graph_kind_cli_selfhost_smoke_test()`;
-- the `"smoke"` branch in `build_graph_run_cli_selfhost_suite_test`;
-- the smoke implementation helpers listed in "What's Moving" once they are
-  available in `build_selfhost.w`.
-
-Confirm by inspection after the extraction:
+After extraction, `src/main.w` must not dispatch kind `1002` or branch on the
+`"smoke"` suite argument. Verify with:
 
 ```sh
 rg -n "cli_selfhost_smoke_test|build_graph_run_cli_selfhost_smoke|build_graph_run_cli_selfhost_help|build_graph_run_cli_selfhost_test_directives" src/main.w src/BuildGraphKinds.w
 ```
 
-Expected remaining hits should be only the removed-kind name/diagnostic for
-`1002`, if any.
+Expected remaining hits are limited to the removed-kind name/diagnostic.
 
-## Verification Plan
+## Parity Standard
 
-Baseline before implementation:
-
-```sh
-out/bin/with build :cli-selfhost-smoke-tests > /tmp/with-smoke-before.out 2> /tmp/with-smoke-before.err
-echo $? > /tmp/with-smoke-before.rc
-```
-
-After implementation:
+Before and after the extraction, run:
 
 ```sh
-out/bin/with build :cli-selfhost-smoke-tests > /tmp/with-smoke-after.out 2> /tmp/with-smoke-after.err
-echo $? > /tmp/with-smoke-after.rc
-cmp /tmp/with-smoke-before.rc /tmp/with-smoke-after.rc
-cmp /tmp/with-smoke-before.out /tmp/with-smoke-after.out
-cmp /tmp/with-smoke-before.err /tmp/with-smoke-after.err
+out/bin/with build :cli-selfhost-smoke-tests > /tmp/with-smoke.out 2> /tmp/with-smoke.err
+echo $? > /tmp/with-smoke.rc
 ```
 
-This proves the public build target keeps the same command behavior across the
-extraction.
-
-Full slice verification:
+The extraction is correct only if the target's exit code and observable output
+remain equivalent, and the full slice verification also passes:
 
 ```sh
 out/bin/with check build_selfhost.w
@@ -185,6 +86,3 @@ make build
 make fixpoint
 make test
 ```
-
-After verification, commit and push the implementation slice separately from
-this plan.
