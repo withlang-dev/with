@@ -1054,12 +1054,6 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, opt_level: 
                 return llvm_metadata_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == build_graph_kind_seed_download():
-            let seed_rc = build_graph_run_seed_download(root, target)
-            if seed_rc != 0:
-                return seed_rc
-            completed_targets.push(target.name)
-            continue
         if target.kind == build_graph_kind_emit_c_test():
             let emit_c_rc = build_graph_run_emit_c_test(root, target)
             if emit_c_rc != 0:

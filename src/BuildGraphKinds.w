@@ -22,16 +22,15 @@ fn build_graph_kind_is_project(kind: i32) -> bool:
         return true
     if kind == 1020:
         return true
-    kind >= 1024 and kind <= BUILD_GRAPH_PROJECT_KIND_MAX
+    kind >= 1025 and kind <= BUILD_GRAPH_PROJECT_KIND_MAX
 
 pub fn build_graph_kind_removed(kind: i32) -> bool:
-    kind == 5 or kind == 6 or kind == 1000 or kind == 1001 or kind == 1002 or kind == 1005 or kind == 1006 or kind == 1007 or kind == 1008 or kind == 1009 or kind == 1010 or kind == 1011 or kind == 1012 or kind == 1014 or kind == 1015 or kind == 1016 or kind == 1017 or kind == 1018 or kind == 1019 or kind == 1021 or kind == 1022 or kind == 1023
+    kind == 5 or kind == 6 or kind == 1000 or kind == 1001 or kind == 1002 or kind == 1005 or kind == 1006 or kind == 1007 or kind == 1008 or kind == 1009 or kind == 1010 or kind == 1011 or kind == 1012 or kind == 1014 or kind == 1015 or kind == 1016 or kind == 1017 or kind == 1018 or kind == 1019 or kind == 1021 or kind == 1022 or kind == 1023 or kind == 1024
 
 pub fn build_graph_kind_generate_compiler_entrypoints() -> i32: 1003
 pub fn build_graph_kind_with_compiler_build() -> i32: 1004
 pub fn build_graph_kind_with_compiler_ir() -> i32: 1013
 pub fn build_graph_kind_generate_llvm_link_metadata() -> i32: 1020
-pub fn build_graph_kind_seed_download() -> i32: 1024
 pub fn build_graph_kind_emit_c_test() -> i32: 1025
 pub fn build_graph_kind_emit_c_fixpoint() -> i32: 1026
 pub fn build_graph_kind_emit_c_roundtrip() -> i32: 1027
@@ -89,7 +88,7 @@ pub fn build_graph_kind_name(kind: i32) -> str:
     if kind == 1022: return "removed_pcre2_migrate"
     // 1023 was skipped when project kinds were first named; keep it reserved.
     if kind == 1023: return "removed_unused_1023"
-    if kind == 1024: return "seed_download"
+    if kind == 1024: return "removed_seed_download"
     if kind == 1025: return "emit_c_test"
     if kind == 1026: return "emit_c_fixpoint"
     if kind == 1027: return "emit_c_roundtrip"

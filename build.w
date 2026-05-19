@@ -2,12 +2,12 @@ use std.build
 use build_runtime
 use build_selfhost
 use build_pcre2
+use build_seed
 
 fn project_kind_generate_compiler_entrypoints() -> BuildKind: 1003 as BuildKind
 fn project_kind_with_compiler_build() -> BuildKind: 1004 as BuildKind
 fn project_kind_with_compiler_ir() -> BuildKind: 1013 as BuildKind
 fn project_kind_generate_llvm_link_metadata() -> BuildKind: 1020 as BuildKind
-fn project_kind_seed_download() -> BuildKind: 1024 as BuildKind
 fn project_kind_emit_c_test() -> BuildKind: 1025 as BuildKind
 fn project_kind_emit_c_fixpoint() -> BuildKind: 1026 as BuildKind
 fn project_kind_emit_c_roundtrip() -> BuildKind: 1027 as BuildKind
@@ -596,7 +596,10 @@ pub fn build(ctx: BuildCtx) -> Build:
     install = install.dep("install-llvm-cc")
     out = out.add_target(install)
 
-    var seed = target_new(project_kind_seed_download(), "seed", "withlang-dev/with").output("src/main")
+    var seed = target_new(.Action, "seed", "").output("src/main")
+    seed.action = run_seed_download_action
+    seed = seed.write_scope("out/tmp")
+    seed = seed.arg("withlang-dev/with")
     seed = seed.arg("main")
     out = out.add_target(seed)
 
