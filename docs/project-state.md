@@ -11,12 +11,15 @@ conversation context after compaction.
 
 ## Current Focus
 
-Quality-of-life hardening before returning to Phase C extraction work:
+Quality-of-life hardening is complete. The next major build-system direction is
+to return to Phase C extraction work unless a new bug interrupts it.
 
-1. Persistent project-state doc.
-2. Helper scripts for common command/debug patterns.
-3. `--no-deps` support for action iteration.
-4. Parallel execution for the default test target.
+Completed quality-of-life slices:
+
+1. `855594b` Add persistent project state checkpoint.
+2. `9186a59` Add build debugging helper scripts.
+3. `f078129` Add action `--no-deps` build flag.
+4. `5f81dca` Run external build tests in parallel batches.
 
 ## Verification Baseline
 
@@ -31,6 +34,10 @@ make install-user
 
 Recent relevant commits:
 
+- `5f81dca` Run external build tests in parallel batches.
+- `f078129` Add action `--no-deps` build flag.
+- `9186a59` Add build debugging helper scripts.
+- `855594b` Add persistent project state checkpoint.
 - `54ecd97` Consolidate emit-C call inference caches.
 - `7c40e67` Add emit-C smoke to default tests.
 - `c47ee60` Decode string escapes in emitted C.
@@ -54,6 +61,8 @@ Completed at a high level:
 - Scoped `ToolFs` writes and declared extra outputs exist.
 - Default `with build :test` no longer runs the full PCRE2 upstream corpus.
 - Fast smoke coverage exists for PCRE2 migration, PCRE2 tests, and emit-C.
+- Action targets support `--no-deps` for focused iteration.
+- External-compiler build graph test targets run in parallel batches.
 - Several repository-specific build targets have moved to project-local action
   modules.
 
@@ -101,10 +110,8 @@ solely on this checkpoint for exact line ownership.
 
 ## Open Blockers And Follow-Ups
 
-- Implement `--no-deps` for action iteration without weakening dependency
-  validation in normal builds.
-- Add parallel execution for the default test path while preserving
-  deterministic diagnostics and fixpoint safety.
+- Decide whether in-process build graph test targets should also move to
+  external parallel execution, or remain serial for diagnostic fidelity.
 - Keep manual-only heavy targets covered by fast smokes in `make test`.
 - Continue removing project-specific build dispatch from generic compiler
   source one target group at a time.
