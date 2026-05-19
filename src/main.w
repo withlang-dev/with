@@ -609,7 +609,7 @@ fn run_cli(argc: i32) -> i32:
         return run_run_command(cli_command(argc), opt_level, no_std, alloc_mode, prelude_mode, debug_info)
 
     if cli_command(argc) == "build":
-        return run_build_command(source, opt_level, no_std, alloc_mode, emit_c_mode, emit_obj_mode, output, prelude_mode, debug_info, cli_build_target_arg(argc), cli_has_flag(argc, "--graph"), cli_has_flag(argc, "--dry-run"))
+        return run_build_command(source, opt_level, no_std, alloc_mode, emit_c_mode, emit_obj_mode, output, prelude_mode, debug_info, cli_build_target_arg(argc), cli_has_flag(argc, "--graph"), cli_has_flag(argc, "--dry-run"), cli_has_flag(argc, "--no-deps"))
     if cli_command(argc) == "run":
         if emit_c_mode:
             with_eprint("error: '--emit-c' is only supported with 'build'")
@@ -1165,7 +1165,7 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, opt_level: 
         completed_targets.push(target.name)
     0
 
-fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: bool, emit_c_mode: bool, emit_obj_mode: bool, output_path: str, prelude_mode: i32, debug_info: bool, build_target_name: str, graph_only: bool, dry_run: bool) -> i32:
+fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: bool, emit_c_mode: bool, emit_obj_mode: bool, output_path: str, prelude_mode: i32, debug_info: bool, build_target_name: str, graph_only: bool, dry_run: bool, no_deps: bool) -> i32:
     var actual_source = source_file
     var actual_output = output_path
     if actual_source == "":
@@ -1189,10 +1189,14 @@ fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode:
             var selected_target_name = build_target_name
             if selected_target_name.len() == 0 and graph.default_target.len() > 0:
                 selected_target_name = graph.default_target
-            let selected_graph = build_graph_filter_target(&graph, selected_target_name)
+            let selected_graph = if no_deps: build_graph_filter_single_target(&graph, selected_target_name) else: build_graph_filter_target(&graph, selected_target_name)
             if not selected_graph.ok:
                 with_eprint("error: " ++ selected_graph.error_msg)
                 return 1
+            if no_deps:
+                if selected_graph.targets.len() == 0 or selected_graph.targets.get(0).kind != 23:
+                    with_eprint("error: --no-deps is only supported for build.w action targets")
+                    return 1
             if graph_only or dry_run:
                 with_write(selected_graph.raw_text)
                 return 0
@@ -1200,6 +1204,9 @@ fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode:
         actual_source = root ++ "/src/main.w"
         if actual_output == "" and cfg.package_name.len() > 0:
             actual_output = "out/bin/" ++ cfg.package_name
+    if no_deps:
+        with_eprint("error: --no-deps is only supported for build.w action targets")
+        return 1
     var comp = Compilation.init()
     comp.configure(opt_level, no_std, alloc_mode)
     comp.set_prelude_mode(prelude_mode)
@@ -1942,7 +1949,7 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, p
     // Find test file/dir argument
     let target = find_source_arg(argc)
     if target == "":
-        return run_build_command("", opt_level, no_std, alloc_mode, false, false, "", prelude_mode, debug_info, "test", false, false)
+        return run_build_command("", opt_level, no_std, alloc_mode, false, false, "", prelude_mode, debug_info, "test", false, false, false)
     if test_target_is_directory(target):
         let test_files = collect_test_files(target)
         if test_files.len() == 0:
