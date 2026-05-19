@@ -489,6 +489,55 @@ fn cc_escape_c_string(text: str) -> str:
         out = out ++ "\\" ++ f"{d2}" ++ f"{d1}" ++ f"{d0}"
     out
 
+fn cc_hex_digit_value(ch: i32) -> i32:
+    if ch >= 48 and ch <= 57:
+        return ch - 48
+    if ch >= 97 and ch <= 102:
+        return ch - 87
+    if ch >= 65 and ch <= 70:
+        return ch - 55
+    -1
+
+fn cc_decode_with_string_escapes(text: str) -> str:
+    var out = ""
+    var i = 0
+    while i < text.len() as i32:
+        let ch = text.byte_at(i as i64)
+        if ch == 92 and i + 1 < text.len() as i32:
+            i = i + 1
+            let esc = text.byte_at(i as i64)
+            if esc == 120 and i + 2 < text.len() as i32:
+                let hi = cc_hex_digit_value(text.byte_at((i + 1) as i64))
+                let lo = cc_hex_digit_value(text.byte_at((i + 2) as i64))
+                if hi >= 0 and lo >= 0:
+                    out = out ++ str_from_byte(hi * 16 + lo)
+                    i = i + 2
+                else:
+                    out = out ++ text.slice(i as i64, (i + 1) as i64)
+            else if esc == 110:
+                out = out ++ "\n"
+            else if esc == 116:
+                out = out ++ "\t"
+            else if esc == 114:
+                out = out ++ "\r"
+            else if esc == 48:
+                out = out ++ str_from_byte(0)
+            else if esc == 92:
+                out = out ++ "\\"
+            else if esc == 34:
+                out = out ++ "\""
+            else:
+                out = out ++ text.slice(i as i64, (i + 1) as i64)
+        else:
+            out = out ++ text.slice(i as i64, (i + 1) as i64)
+        i = i + 1
+    out
+
+fn cc_string_literal_payload(raw: str) -> str:
+    if raw.len() >= 5 and raw.byte_at(0) == 1 and raw.byte_at(1) == 114 and raw.byte_at(2) == 97 and raw.byte_at(3) == 119 and raw.byte_at(4) == 1:
+        return raw.slice(5, raw.len())
+    cc_decode_with_string_escapes(raw)
+
 fn cc_sanitize_ident(raw: str) -> str:
     if raw.len() == 0:
         return "sym"
@@ -1816,10 +1865,10 @@ fn CCodegen.global_init_text(self: CCodegen, node: i32, tid: i32) -> str:
             return self.ast.get_string(str_idx)
         return "0.0"
     if kind == NodeKind.NK_STRING_LIT:
-        let text = cc_intern_resolve(self.intern, self.ast.get_data0(expr))
+        let text = cc_string_literal_payload(cc_intern_resolve(self.intern, self.ast.get_data0(expr)))
         return "WITH_STR_LIT(\"" ++ cc_escape_c_string(text) ++ "\")"
     if kind == NodeKind.NK_C_STRING_LIT:
-        let text = cc_intern_resolve(self.intern, self.ast.get_data0(expr))
+        let text = cc_string_literal_payload(cc_intern_resolve(self.intern, self.ast.get_data0(expr)))
         return "(\"" ++ cc_escape_c_string(text) ++ "\")"
     if kind == NodeKind.NK_NULL_LIT:
         return "NULL"
@@ -1841,7 +1890,7 @@ fn CCodegen.const_text(self: CCodegen, body: MirBody, const_id: i32) -> str:
     if ck == ConstKind.CK_BOOL:
         return if cd != 0: "true" else: "false"
     if ck == ConstKind.CK_STR:
-        let text = if cd != 0: cc_intern_resolve(self.intern, cd) else: ""
+        let text = if cd != 0: cc_string_literal_payload(cc_intern_resolve(self.intern, cd)) else: ""
         return "WITH_STR_LIT(\"" ++ cc_escape_c_string(text) ++ "\")"
     if ck == ConstKind.CK_UNIT:
         let unit_tid = body.const_types.get(const_id as i64)
