@@ -126,6 +126,44 @@ fn pcre2_fail(ctx: ActionCtx, message: str) -> i32:
     ctx.diagnostics().error(ctx.target_name() ++ ": " ++ message)
     1
 
+fn pcre2_remove_tree_if_exists(ctx: ActionCtx, path: str) -> i32:
+    let fs = ctx.fs()
+    if not fs.exists(path):
+        return 0
+    if fs.remove_tree(path) != 0:
+        return pcre2_fail(ctx, "could not remove directory: " ++ path)
+    0
+
+fn pcre2_remove_file_if_exists(ctx: ActionCtx, path: str) -> i32:
+    let fs = ctx.fs()
+    if not fs.exists(path):
+        return 0
+    if fs.remove_file(path) != 0:
+        return pcre2_fail(ctx, "could not remove file: " ++ path)
+    0
+
+fn pcre2_count_w_files(ctx: ActionCtx, dir: str) -> i32:
+    let files = ctx.fs().list_files(dir)
+    var count = 0
+    for i in 0..files.len() as i32:
+        if files.get(i as i64).ends_with(".w"):
+            count = count + 1
+    count
+
+fn pcre2_reject_c_exports(ctx: ActionCtx, generated_dir: str) -> i32:
+    let fs = ctx.fs()
+    let files = fs.list_files(generated_dir)
+    var errors = 0
+    for i in 0..files.len() as i32:
+        let path = files.get(i as i64)
+        if path.ends_with(".w") and fs.read_text(path).contains("@[c_export("):
+            ctx.diagnostics().error("pcre2 generated source contains forbidden c_export attribute in " ++ path)
+            errors = errors + 1
+    errors
+
+fn pcre2_migrate_tmp_dir(ctx: ActionCtx) -> str:
+    pcre2_join(pcre2_scratch_dir(), "migrate-" ++ f"{ctx.target_name()}")
+
 fn pcre2_prepare_reference_tree(ctx: ActionCtx, ref_dir: str) -> i32:
     let fs = ctx.fs()
     let src_dir = pcre2_join(ref_dir, "src")
@@ -229,4 +267,86 @@ pub fn run_pcre2_reference_action(ctx: ActionCtx) -> i32:
     let ready_stamp = if ctx.outputs().len() > 1: ctx.outputs().get(1) else: pcre2_join(ref_dir, ".with-reference-ready")
     if fs.write_text(ready_stamp, "ok\n") != 0:
         return pcre2_fail(ctx, "could not write ready stamp: " ++ ready_stamp)
+    0
+
+pub fn run_pcre2_migrate_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let inputs = ctx.inputs()
+    let args = ctx.args()
+    let root = ctx.project_info().project_root()
+    let stamp_path = ctx.output()
+    if inputs.len() == 0 or args.len() == 0 or stamp_path.len() == 0:
+        return pcre2_fail(ctx, "requires source-dir input, generated-dir arg, and stamp output")
+
+    let compiler_path = "out/bin/with"
+    let source_dir = inputs.get(0)
+    let generated_dir = args.get(0)
+    if not fs.exists(compiler_path):
+        return pcre2_fail(ctx, "missing compiler: " ++ compiler_path)
+    if not fs.is_dir(source_dir):
+        return pcre2_fail(ctx, "missing PCRE2 source directory: " ++ source_dir)
+    if fs.mkdir_all(pcre2_dirname(stamp_path)) != 0:
+        return pcre2_fail(ctx, "could not create stamp directory: " ++ pcre2_dirname(stamp_path))
+    if fs.mkdir_all(pcre2_dirname(generated_dir)) != 0:
+        return pcre2_fail(ctx, "could not create generated parent: " ++ pcre2_dirname(generated_dir))
+    if fs.mkdir_all(pcre2_scratch_dir()) != 0:
+        return pcre2_fail(ctx, "could not create scratch directory: " ++ pcre2_scratch_dir())
+
+    let tmp_dir = pcre2_migrate_tmp_dir(ctx)
+    let remove_tmp_rc = pcre2_remove_tree_if_exists(ctx, tmp_dir)
+    if remove_tmp_rc != 0: return remove_tmp_rc
+    if fs.mkdir_all(tmp_dir) != 0:
+        return pcre2_fail(ctx, "could not create temp migration directory: " ++ tmp_dir)
+
+    var migrate_args: Vec[str] = Vec.new()
+    migrate_args |> push(pcre2_abs(root, compiler_path))
+    migrate_args |> push("migrate")
+    migrate_args |> push(pcre2_abs(root, source_dir) ++ "/")
+    migrate_args |> push("-o")
+    migrate_args |> push(pcre2_abs(root, tmp_dir) ++ "/")
+    migrate_args |> push("--no-c-export")
+    migrate_args |> push("--prefer-brace")
+    migrate_args |> push("--width-slice")
+    migrate_args |> push("8")
+    migrate_args |> push("--shared-defs")
+    migrate_args |> push("std.re.defs")
+    var exclude_i = 1
+    while exclude_i < args.len() as i32:
+        migrate_args |> push("--exclude")
+        migrate_args |> push(args.get(exclude_i as i64))
+        exclude_i = exclude_i + 1
+    migrate_args |> push("-I")
+    migrate_args |> push(pcre2_abs(root, source_dir))
+    migrate_args |> push("-D")
+    migrate_args |> push("PCRE2_CODE_UNIT_WIDTH=8")
+    migrate_args |> push("-D")
+    migrate_args |> push("HAVE_CONFIG_H=1")
+
+    let migrate_rc = ctx.process_runner().run(migrate_args)
+    if migrate_rc != 0:
+        return pcre2_fail(ctx, f"migrate failed with exit code {migrate_rc}")
+
+    let generated_count = pcre2_count_w_files(ctx, tmp_dir)
+    if generated_count < 30:
+        return pcre2_fail(ctx, f"only generated {generated_count} .w files; expected at least 30")
+    if pcre2_reject_c_exports(ctx, tmp_dir) != 0:
+        return 1
+
+    var rc = pcre2_remove_tree_if_exists(ctx, generated_dir)
+    if rc != 0: return rc
+    if fs.rename(tmp_dir, generated_dir) != 0:
+        return pcre2_fail(ctx, "could not publish generated directory: " ++ generated_dir)
+
+    rc = pcre2_remove_tree_if_exists(ctx, "out/pcre2_migrate_raw")
+    if rc != 0: return rc
+    rc = pcre2_remove_tree_if_exists(ctx, "out/pcre2_generated")
+    if rc != 0: return rc
+    rc = pcre2_remove_file_if_exists(ctx, "out/gen/.regex-build-stamp")
+    if rc != 0: return rc
+    rc = pcre2_remove_tree_if_exists(ctx, "out/pcre2_build")
+    if rc != 0: return rc
+
+    if fs.write_text(stamp_path, "ok\n") != 0:
+        return pcre2_fail(ctx, "could not write stamp: " ++ stamp_path)
+    print(f"migrated PCRE2: {generated_count} .w files in " ++ pcre2_abs(root, generated_dir))
     0

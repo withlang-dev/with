@@ -11,7 +11,6 @@ fn project_kind_pcre2_generated_promote() -> BuildKind: 1007 as BuildKind
 fn project_kind_pcre2_build() -> BuildKind: 1008 as BuildKind
 fn project_kind_with_compiler_ir() -> BuildKind: 1013 as BuildKind
 fn project_kind_generate_llvm_link_metadata() -> BuildKind: 1020 as BuildKind
-fn project_kind_pcre2_migrate() -> BuildKind: 1022 as BuildKind
 fn project_kind_seed_download() -> BuildKind: 1024 as BuildKind
 fn project_kind_emit_c_test() -> BuildKind: 1025 as BuildKind
 fn project_kind_emit_c_fixpoint() -> BuildKind: 1026 as BuildKind
@@ -636,7 +635,14 @@ pub fn build(ctx: BuildCtx) -> Build:
     pcre2_reference = pcre2_reference.arg("https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.47/pcre2-10.47.tar.gz")
     out = out.add_target(pcre2_reference)
 
-    var pcre2_migrate = target_new(project_kind_pcre2_migrate(), "pcre2-migrate", "out/bin/with").output("out/gen/.regex-migrate-stamp")
+    var pcre2_migrate = target_new(.Action, "pcre2-migrate", "").output("out/gen/.regex-migrate-stamp")
+    pcre2_migrate.action = run_pcre2_migrate_action
+    pcre2_migrate = pcre2_migrate.extra_output("out/pcre2_migrated")
+    pcre2_migrate = pcre2_migrate.write_scope("out/pcre2_tmp")
+    pcre2_migrate = pcre2_migrate.write_scope("out/pcre2_migrate_raw")
+    pcre2_migrate = pcre2_migrate.write_scope("out/pcre2_generated")
+    pcre2_migrate = pcre2_migrate.write_scope("out/pcre2_build")
+    pcre2_migrate = pcre2_migrate.write_scope("out/gen/.regex-build-stamp")
     pcre2_migrate = pcre2_migrate.input("out/pcre2_reference/pcre2-10.47/src")
     pcre2_migrate = pcre2_migrate.arg("out/pcre2_migrated")
     pcre2_migrate = pcre2_migrate.arg("pcre2demo.c")
