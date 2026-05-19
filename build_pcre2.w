@@ -72,12 +72,15 @@ fn pcre2_append_normalized_heap_line(out: str, line: str, frame_count: i32) -> s
 
 fn pcre2_normalize_heap_output(text: str) -> str:
     let lines = pcre2_split_lines(text)
+    var line_count = lines.len() as i32
+    while line_count > 0 and lines.get((line_count - 1) as i64).len() == 0:
+        line_count = line_count - 1
     var out = ""
     var frame_count = 0
     var i = 0
-    while i < lines.len() as i32:
+    while i < line_count:
         let line = lines.get(i as i64)
-        if line == "malloc  40960" and i + 2 < lines.len() as i32:
+        if line == "malloc  40960" and i + 2 < line_count:
             let second = lines.get((i + 1) as i64)
             let third = lines.get((i + 2) as i64)
             if second == "free unremembered block" and third == "No match":
@@ -91,7 +94,7 @@ fn pcre2_normalize_heap_output(text: str) -> str:
                 if third.starts_with("Frame size for pcre2_match(): "): frame_count = frame_count + 1
             i = i + 3
             continue
-        if line == "free unremembered block" and i + 2 < lines.len() as i32:
+        if line == "free unremembered block" and i + 2 < line_count:
             let second = lines.get((i + 1) as i64)
             let third = lines.get((i + 2) as i64)
             if second == "malloc    128" and third == "malloc  20480":
