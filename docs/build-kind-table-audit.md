@@ -1,12 +1,12 @@
 # Build Graph Kind Table Audit
 
-Status: current as of `bacd75c`.
+Status: current as of `f7b68f0`.
 
 This audit covers `src/BuildGraphKinds.w` after the Phase C selfhost smoke,
 one-liner, object-symbol, project, edge, PCRE2-prep, migrate-basic, and
 migrate-core, and build-w extractions. The old selfhost suite dispatcher is
-also removed. The embedded-runtime regression and PCRE2 reference targets are
-now action targets.
+also removed. The embedded-runtime regression, PCRE2 reference, PCRE2 migrate,
+PCRE2 build, and PCRE2 test targets are now action targets.
 
 ## Standard Kinds
 
@@ -55,10 +55,8 @@ Live project kinds:
 | --- | --- |
 | 1003 | `generate_compiler_entrypoints` |
 | 1004 | `with_compiler_build` |
-| 1005 | `pcre2_run_test` |
 | 1006 | `pcre2_generated_check` |
 | 1007 | `pcre2_generated_promote` |
-| 1008 | `pcre2_build` |
 | 1013 | `with_compiler_ir` |
 | 1020 | `generate_llvm_link_metadata` |
 | 1024 | `seed_download` |
@@ -73,6 +71,8 @@ Removed project kinds:
 | 1000 | `removed_embedded_runtime_extract_test` |
 | 1001 | `removed_selfhost_noop_local_regression` |
 | 1002 | `removed_cli_selfhost_smoke_test` |
+| 1005 | `removed_pcre2_run_test` |
+| 1008 | `removed_pcre2_build` |
 | 1009 | `removed_cli_selfhost_one_liner_test` |
 | 1010 | `removed_cli_selfhost_object_symbol_test` |
 | 1011 | `removed_cli_selfhost_build_w_test` |
