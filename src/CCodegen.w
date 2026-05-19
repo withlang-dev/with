@@ -331,10 +331,8 @@ type CCodegen {
     body_fn_name_map: HashMap[str, i32],
     canonical_body_cache: HashMap[i32, i32],
     // Receiver ABI decisions happen at every call, declaration, and place
-    // reference. Keep declaration and parameter-shape lookups cached; the
-    // fallback path scans the AST and becomes pathological on the full
-    // compiler emit-C translation.
-    fn_decl_node_cache: HashMap[i32, i32],
+    // reference. Keep parameter-shape lookups cached; the uncached path
+    // resolves through Sema signatures at every generated call site.
     fn_pointer_param_cache: HashMap[i64, i32],
     sig_idx_cache: HashMap[i32, i32],
     infer_local_depth: i32,
@@ -385,7 +383,6 @@ fn c_emit_module(mir_mod: MirModule, ast: AstPool, intern: InternPool, sema: Sem
         body_fn_map: HashMap.new(),
         body_fn_name_map: HashMap.new(),
         canonical_body_cache: HashMap.new(),
-        fn_decl_node_cache: HashMap.new(),
         fn_pointer_param_cache: HashMap.new(),
         sig_idx_cache: HashMap.new(),
         infer_local_depth: 0,
@@ -701,82 +698,13 @@ fn CCodegen.body_sig_index(self: CCodegen, fn_sym: i32) -> i32:
         return direct
     self.sig_index_for_sym(fn_sym)
 
-fn CCodegen.fn_decl_node_for_sym(self: CCodegen, fn_sym: i32) -> i32:
-    if fn_sym == 0:
-        return 0
-    let cached = self.fn_decl_node_cache.get(fn_sym)
-    if cached.is_some():
-        return cached.unwrap()
-    let direct = self.sema.fn_decl_nodes.get(fn_sym)
-    if direct.is_some():
-        let out = direct.unwrap()
-        self.fn_decl_node_cache.insert(fn_sym, out)
-        return out
-    let raw = cc_intern_resolve(self.intern, fn_sym)
-    if raw.len() == 0:
-        self.fn_decl_node_cache.insert(fn_sym, 0)
-        return 0
-    let sema_sym = self.sema.pool_lookup_symbol(raw)
-    if sema_sym != 0:
-        let sema_decl = self.sema.fn_decl_nodes.get(sema_sym)
-        if sema_decl.is_some():
-            let out = sema_decl.unwrap()
-            self.fn_decl_node_cache.insert(fn_sym, out)
-            return out
-    for di in 0..self.ast.decl_count():
-        let decl = self.ast.get_decl(di)
-        if self.ast.kind(decl) != NodeKind.NK_FN_DECL:
-            continue
-        let name_sym = self.ast.get_data0(decl)
-        if cc_intern_resolve(self.intern, name_sym) == raw:
-            let out = decl as i32
-            self.fn_decl_node_cache.insert(fn_sym, out)
-            return out
-    self.fn_decl_node_cache.insert(fn_sym, 0)
-    0
-
 fn CCodegen.fn_param_is_c_pointer(self: CCodegen, fn_sym: i32, param_idx: i32) -> i32:
     let cache_key = cc_body_local_cache_key(fn_sym, param_idx)
     let cached = self.fn_pointer_param_cache.get(cache_key)
     if cached.is_some():
         return cached.unwrap()
-    let decl = self.fn_decl_node_for_sym(fn_sym)
-    if decl == 0:
-        self.fn_pointer_param_cache.insert(cache_key, 0)
-        return 0
-    let meta = self.ast.find_fn_meta(decl)
-    if meta < 0:
-        self.fn_pointer_param_cache.insert(cache_key, 0)
-        return 0
-    let param_count = self.ast.fn_meta_param_count(meta)
-    if param_idx < 0 or param_idx >= param_count:
-        self.fn_pointer_param_cache.insert(cache_key, 0)
-        return 0
-    let param_start = self.ast.fn_meta_param_start(meta)
-    let flags = self.ast.fn_param_flags(param_start, param_idx)
-    if fn_param_is_mut_self(flags) != 0:
-        self.fn_pointer_param_cache.insert(cache_key, 1)
-        return 1
-
-    var out = 0
-    if param_idx == 0:
-        let param_name = self.ast.fn_param_name(param_start, param_idx)
-        let raw = cc_intern_resolve(self.intern, fn_sym)
-        var dot = -1
-        for i in 0..raw.len() as i32:
-            if raw.byte_at(i as i64) == 46:
-                dot = i
-                break
-        if dot > 0:
-            let owner = raw.slice(0, dot as i64)
-            if owner != "str" and cc_intern_resolve(self.intern, param_name) == "self":
-                let sig_idx = self.body_sig_index(fn_sym)
-                if sig_idx >= 0:
-                    let p_tid = self.sema.sig_param_type(sig_idx, param_idx)
-                    let resolved = self.sema.resolve_alias(p_tid)
-                    let tk = self.sema.get_type_kind(resolved)
-                    if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_GENERIC_INST or self.type_is_payload_enum(resolved as i32) != 0:
-                        out = 1
+    let sig_idx = self.sig_index_for_sym(fn_sym)
+    let out = if sig_idx >= 0: self.sema.sig_param_uses_value_ref_abi(sig_idx, param_idx) else: 0
     self.fn_pointer_param_cache.insert(cache_key, out)
     out
 

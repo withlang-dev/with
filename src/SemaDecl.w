@@ -888,6 +888,26 @@ fn Sema.emit_type_cycle_error(self: Sema, cycle_start: i32, cycle_end: i32, clos
     diag.add_help("break the cycle by using a pointer (`*" ++ self.pool_resolve_symbol(fwd_syms.get(0)) ++ "`) or reference (`&" ++ self.pool_resolve_symbol(fwd_syms.get(0)) ++ "`) for one field")
     self.diags.emit(diag)
 
+fn Sema.fn_param_uses_value_ref_abi(self: Sema, param_start: i32, param_idx: i32, method_owner_sym: i32, self_type_id: i32) -> i32:
+    if method_owner_sym == 0 or self_type_id == 0:
+        return 0
+    if self.pool_resolve(method_owner_sym) == "str":
+        return 0
+    let owner_resolved = self.resolve_alias(self_type_id as TypeId)
+    let owner_kind = self.get_type_kind(owner_resolved)
+    if owner_kind != TypeKind.TY_STRUCT and owner_kind != TypeKind.TY_GENERIC_INST and owner_kind != TypeKind.TY_ENUM:
+        return 0
+
+    let p_type_node = self.ast.fn_param_type(param_start, param_idx)
+    if p_type_node == 0 or self.ast.kind(p_type_node) != NodeKind.NK_TYPE_NAMED:
+        return 0
+    let p_sym = self.ast.get_data0(p_type_node)
+    if p_sym == self.syms.self_type:
+        return 1
+    if p_sym == method_owner_sym:
+        return 1
+    0
+
 fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
     let fn_name = self.ast.get_data0(node)
     if is_local != 0:
@@ -934,12 +954,13 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
     // Bind Self to method owner type for dot-name methods
     let self_sym = self.syms.self_type
     var self_type_id = 0
+    var method_owner_sym = 0
     let fn_name_str = self.pool_resolve(fn_name)
     for ci in 0..fn_name_str.len() as i32:
         if fn_name_str.byte_at(ci as i64) == 46:
             let owner_name = fn_name_str.slice(0, ci as i64)
-            let owner_sym = self.pool_intern(owner_name)
-            self_type_id = self.lookup_named_type_visible(owner_sym)
+            method_owner_sym = self.pool_intern(owner_name)
+            self_type_id = self.lookup_named_type_visible(method_owner_sym)
             if self_type_id != 0:
                 self.named_types.insert(self_sym, self_type_id)
             break
@@ -1040,6 +1061,10 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
 
     self.add_sig(fn_name, fn_tid, sig_ret_type, sig_param_start, param_count, 0)
     let fn_sig_idx = self.get_sig(fn_name)
+    if fn_sig_idx >= 0:
+        for pi in 0..param_count:
+            if self.fn_param_uses_value_ref_abi(param_start, pi, method_owner_sym, self_type_id) != 0:
+                self.set_sig_param_value_ref_abi(fn_sig_idx, pi, 1)
     self.register_method_sig_alias(node, fn_name, fn_sig_idx)
 
     // Track must_use
