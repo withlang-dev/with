@@ -673,6 +673,65 @@ fn bs_check_imported_module_dependency_order(ctx: ActionCtx, compiler_path: str,
     if result.rc != 0: return result.rc
     0
 
+fn bs_check_emit_c_receiver_abi(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "receiver_abi.w")
+    let c_path = bs_join(case_dir, "receiver_abi.c")
+    let bin = bs_join(case_dir, "receiver_abi")
+    let source = "extern fn with_print_str(s: str) -> void\n\n" ++
+        "type Counter {\n" ++
+        "    value: i32,\n" ++
+        "}\n\n" ++
+        "fn Counter.bump(mut self: Counter, amount: i32) -> Counter:\n" ++
+        "    self.value = self.value + amount\n" ++
+        "    self\n\n" ++
+        "fn main() -> i32:\n" ++
+        "    var c = Counter { value: 0 }\n" ++
+        "    c = c.bump(2)\n" ++
+        "    c = c.bump(5)\n" ++
+        "    if c.value != 7:\n" ++
+        "        return c.value\n" ++
+        "    with_print_str(\"ok\")\n" ++
+        "    0\n"
+    var rc = bs_write_fixture(ctx, src, source, "emit-c receiver ABI source")
+    if rc != 0: return rc
+    var emit_args: Vec[str] = Vec.new()
+    emit_args |> push("build")
+    emit_args |> push(bs_abs(root, src))
+    emit_args |> push("--emit-c")
+    emit_args |> push("--no-prelude")
+    emit_args |> push("-o")
+    emit_args |> push(bs_abs(root, c_path))
+    let emit_result = bs_edge_expect_success(ctx, compiler_path, case_dir, "emit-c-receiver-abi", emit_args)
+    if emit_result.rc != 0: return emit_result.rc
+
+    let stdout_path = bs_capture_path(root, case_dir, "compile-receiver-abi", "stdout")
+    let stderr_path = bs_capture_path(root, case_dir, "compile-receiver-abi", "stderr")
+    var cc_args: Vec[str] = Vec.new()
+    cc_args |> push("zig")
+    cc_args |> push("cc")
+    cc_args |> push("-O2")
+    cc_args |> push("-o")
+    cc_args |> push(bs_abs(root, bin))
+    cc_args |> push(bs_abs(root, c_path))
+    cc_args |> push(bs_abs(root, "out/lib/rt_core.o"))
+    cc_args |> push(bs_abs(root, "out/lib/rt_darwin_aarch64.o"))
+    cc_args |> push(bs_abs(root, "out/lib/compat_runtime.o"))
+    cc_args |> push(bs_abs(root, "out/lib/panic_runtime.o"))
+    cc_args |> push(bs_abs(root, "out/lib/fiber_stubs.o"))
+    cc_args |> push(bs_abs(root, "out/lib/cimport_stubs.o"))
+    cc_args |> push(bs_abs(root, "out/lib/embedded_objects.o"))
+    cc_args |> push("-I")
+    cc_args |> push(bs_abs(root, "runtime"))
+    let cc_result = ctx.process_runner().run_capture(cc_args, stdout_path, stderr_path, 120000)
+    if cc_result.rc != 0:
+        ctx.diagnostics().error(ctx.target_name() ++ f": emit-c receiver ABI C compile failed with exit code {cc_result.rc}")
+        ctx.diagnostics().error(cc_result.stderr)
+        return cc_result.rc
+    let run_result = bs_run_binary_capture(ctx, bin, "emit-c-receiver-abi-run", 120000)
+    if run_result.rc != 0: return run_result.rc
+    bs_edge_assert_exact(ctx, run_result.stdout, "ok", "emit_c_receiver_abi", "stdout")
+
 pub fn run_cli_selfhost_edge_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
     if inputs.len() == 0:
@@ -698,7 +757,9 @@ pub fn run_cli_selfhost_edge_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     rc = bs_check_whole_program_extern_var_redecl(ctx, compiler_path, bs_join(output_dir, "whole_program_extern_var_redecl_case"))
     if rc != 0: return rc
-    bs_check_imported_module_dependency_order(ctx, compiler_path, bs_join(output_dir, "imported_module_dependency_order_case"))
+    rc = bs_check_imported_module_dependency_order(ctx, compiler_path, bs_join(output_dir, "imported_module_dependency_order_case"))
+    if rc != 0: return rc
+    bs_check_emit_c_receiver_abi(ctx, compiler_path, bs_join(output_dir, "emit_c_receiver_abi_case"))
 
 pub fn run_cli_selfhost_parallel_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
@@ -1376,6 +1437,60 @@ fn bs_check_migrate_typed_cast_macros(ctx: ActionCtx, compiler_path: str, case_d
     if check.rc != 0: return check.rc
     0
 
+fn bs_check_migrate_switch_case_scope(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "switch_case_scope.c")
+    let out_w = bs_join(case_dir, "switch_case_scope.w")
+    var cases = ""
+    for i in 0..48:
+        cases = cases ++ "    case " ++ f"{i}" ++ ": {\n"
+        cases = cases ++ f"      int local_{i} = {i + 1};\n"
+        cases = cases ++ f"      acc += local_{i};\n"
+        cases = cases ++ "      goto done;\n"
+        cases = cases ++ "    }\n"
+    let c_text = "int switch_scope(int x) {\n" ++
+        "  int acc = 0;\n" ++
+        "  switch (x) {\n" ++
+        cases ++
+        "    default: {\n" ++
+        "      int fallback = 99;\n" ++
+        "      acc += fallback;\n" ++
+        "      goto done;\n" ++
+        "    }\n" ++
+        "  }\n" ++
+        "done:\n" ++
+        "  return acc;\n" ++
+        "}\n\n" ++
+        "int main(void) {\n" ++
+        "  if (switch_scope(0) != 1) return 1;\n" ++
+        "  if (switch_scope(17) != 18) return 2;\n" ++
+        "  if (switch_scope(47) != 48) return 3;\n" ++
+        "  if (switch_scope(99) != 99) return 4;\n" ++
+        "  return 0;\n" ++
+        "}\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "migrate switch case scope")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("--prefer-brace")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-switch-case-scope", args)
+    if result.rc != 0: return result.rc
+    var check_args: Vec[str] = Vec.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-switch-case-scope", check_args)
+    if check.rc != 0: return check.rc
+    var run_args: Vec[str] = Vec.new()
+    run_args |> push("run")
+    run_args |> push(bs_abs(root, out_w))
+    let run = bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-switch-case-scope", run_args)
+    if run.rc != 0: return run.rc
+    0
+
 pub fn run_cli_selfhost_migrate_core_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
     if inputs.len() == 0:
@@ -1411,7 +1526,9 @@ pub fn run_cli_selfhost_migrate_core_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     rc = bs_check_migrate_prefer_brace_ws(ctx, compiler_path, bs_join(output_dir, "prefer_brace_ws"))
     if rc != 0: return rc
-    bs_check_migrate_typed_cast_macros(ctx, compiler_path, bs_join(output_dir, "typed_cast_macros"))
+    rc = bs_check_migrate_typed_cast_macros(ctx, compiler_path, bs_join(output_dir, "typed_cast_macros"))
+    if rc != 0: return rc
+    bs_check_migrate_switch_case_scope(ctx, compiler_path, bs_join(output_dir, "switch_case_scope"))
 
 
 fn bs_build_w_write_fixture(ctx: ActionCtx, path: str, contents: str, _target_name: str, label: str) -> i32:
