@@ -535,6 +535,14 @@ pub fn build(ctx: BuildCtx) -> Build:
     embedded_runtime_regression = embedded_runtime_regression.dep("build")
     out = out.add_target(embedded_runtime_regression)
 
+    var emit_c_smoke = target_new(.Action, "emit-c-smoke", "").output("out/test-graph/emit-c-smoke")
+    emit_c_smoke.action = run_emit_c_smoke_action
+    emit_c_smoke = emit_c_smoke.input("out/bin/with-stage2")
+    emit_c_smoke = emit_c_smoke.input("test/hello.w")
+    emit_c_smoke = emit_c_smoke.dep("selfcheck")
+    emit_c_smoke = emit_c_smoke.dep("runtime")
+    out = out.add_target(emit_c_smoke)
+
     var tests = target_new(.Group, "test", "")
     tests = tests.dep("behavior-tests")
     tests = tests.dep("native-compile-error-tests")
@@ -553,6 +561,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("pcre2-test-smoke")
     tests = tests.dep("issue61-regression")
     tests = tests.dep("embedded-runtime-regression")
+    tests = tests.dep("emit-c-smoke")
     out = out.add_target(tests)
 
     var install_user = target_new(.Install, "install-user", "out/bin/with").output("$HOME/.local/bin/with")

@@ -733,6 +733,77 @@ fn bs_check_emit_c_receiver_abi(ctx: ActionCtx, compiler_path: str, case_dir: st
     if run_result.rc != 0: return run_result.rc
     bs_edge_assert_exact(ctx, run_result.stdout, "ok", "emit_c_receiver_abi", "stdout")
 
+pub fn run_emit_c_smoke_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    if inputs.len() < 2:
+        return bs_fail(ctx, "missing compiler and source inputs")
+    let fs = ctx.fs()
+    let output_dir = ctx.output()
+    if output_dir.len() == 0:
+        return bs_fail(ctx, "missing output directory")
+    if fs.exists(output_dir) and fs.remove_tree(output_dir) != 0:
+        return bs_fail(ctx, "could not remove previous output directory: " ++ output_dir)
+    if fs.mkdir_all(output_dir) != 0:
+        return bs_fail(ctx, "could not create output directory: " ++ output_dir)
+
+    let root = ctx.project_info().project_root()
+    let compiler_input = inputs.get(0)
+    let source_input = inputs.get(1)
+    if not fs.exists(compiler_input):
+        return bs_fail(ctx, "missing compiler: " ++ compiler_input)
+    if not fs.exists(source_input):
+        return bs_fail(ctx, "missing source: " ++ source_input)
+    let compiler_path = bs_abs(root, compiler_input)
+    let source_path = bs_abs(root, source_input)
+    let c_path = bs_join(output_dir, "hello.c")
+    let bin_path = bs_join(output_dir, "hello")
+
+    var emit_args: Vec[str] = Vec.new()
+    emit_args |> push("build")
+    emit_args |> push(source_path)
+    emit_args |> push("--emit-c")
+    emit_args |> push("--no-prelude")
+    emit_args |> push("-o")
+    emit_args |> push(bs_abs(root, c_path))
+    let emit_result = bs_run_cli_capture(ctx, compiler_path, "emit-c-smoke-emit", emit_args, 120000)
+    if emit_result.rc != 0:
+        return bs_fail(ctx, f"emit-c failed with exit code {emit_result.rc}: " ++ emit_result.stderr)
+    if not fs.exists(c_path):
+        return bs_fail(ctx, "emit-c did not produce " ++ c_path)
+
+    let compile_stdout = bs_capture_path(root, output_dir, "emit-c-smoke-compile", "stdout")
+    let compile_stderr = bs_capture_path(root, output_dir, "emit-c-smoke-compile", "stderr")
+    var cc_args: Vec[str] = Vec.new()
+    cc_args |> push("zig")
+    cc_args |> push("cc")
+    cc_args |> push("-O2")
+    cc_args |> push("-o")
+    cc_args |> push(bs_abs(root, bin_path))
+    cc_args |> push(bs_abs(root, c_path))
+    cc_args |> push(bs_abs(root, "out/lib/rt_core.o"))
+    cc_args |> push(bs_abs(root, "out/lib/rt_darwin_aarch64.o"))
+    cc_args |> push(bs_abs(root, "out/lib/compat_runtime.o"))
+    cc_args |> push(bs_abs(root, "out/lib/panic_runtime.o"))
+    cc_args |> push(bs_abs(root, "out/lib/fiber_stubs.o"))
+    cc_args |> push(bs_abs(root, "out/lib/cimport_stubs.o"))
+    cc_args |> push(bs_abs(root, "out/lib/embedded_objects.o"))
+    cc_args |> push("-I")
+    cc_args |> push(bs_abs(root, "runtime"))
+    let compile_result = ctx.process_runner().run_capture(cc_args, compile_stdout, compile_stderr, 120000)
+    if compile_result.rc != 0:
+        return bs_fail(ctx, f"zig cc failed with exit code {compile_result.rc}; stdout=" ++ compile_stdout ++ " stderr=" ++ compile_stderr)
+    if not fs.exists(bin_path):
+        return bs_fail(ctx, "zig cc did not produce " ++ bin_path)
+
+    let run_result = bs_run_binary_capture(ctx, bin_path, "emit-c-smoke-run", 120000)
+    if run_result.rc != 0:
+        return bs_fail(ctx, f"emitted C binary failed with exit code {run_result.rc}: " ++ run_result.stderr)
+    let output = bs_trim_trailing_line_endings(run_result.stdout)
+    if output != "hello":
+        return bs_fail(ctx, "emitted C binary output mismatch: " ++ output)
+    print("EMIT-C SMOKE OK")
+    0
+
 pub fn run_cli_selfhost_edge_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
     if inputs.len() == 0:
