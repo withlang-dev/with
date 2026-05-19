@@ -330,6 +330,12 @@ type CCodegen {
     body_fn_map: HashMap[i32, i32],
     body_fn_name_map: HashMap[str, i32],
     canonical_body_cache: HashMap[i32, i32],
+    // Receiver ABI decisions happen at every call, declaration, and place
+    // reference. Keep declaration and parameter-shape lookups cached; the
+    // fallback path scans the AST and becomes pathological on the full
+    // compiler emit-C translation.
+    fn_decl_node_cache: HashMap[i32, i32],
+    fn_pointer_param_cache: HashMap[i64, i32],
     sig_idx_cache: HashMap[i32, i32],
     infer_local_depth: i32,
     active_local_body_fns: Vec[i32],
@@ -379,6 +385,8 @@ fn c_emit_module(mir_mod: MirModule, ast: AstPool, intern: InternPool, sema: Sem
         body_fn_map: HashMap.new(),
         body_fn_name_map: HashMap.new(),
         canonical_body_cache: HashMap.new(),
+        fn_decl_node_cache: HashMap.new(),
+        fn_pointer_param_cache: HashMap.new(),
         sig_idx_cache: HashMap.new(),
         infer_local_depth: 0,
         active_local_body_fns: Vec.new(),
@@ -692,6 +700,98 @@ fn CCodegen.body_sig_index(self: CCodegen, fn_sym: i32) -> i32:
     if direct >= 0:
         return direct
     self.sig_index_for_sym(fn_sym)
+
+fn CCodegen.fn_decl_node_for_sym(self: CCodegen, fn_sym: i32) -> i32:
+    if fn_sym == 0:
+        return 0
+    let cached = self.fn_decl_node_cache.get(fn_sym)
+    if cached.is_some():
+        return cached.unwrap()
+    let direct = self.sema.fn_decl_nodes.get(fn_sym)
+    if direct.is_some():
+        let out = direct.unwrap()
+        self.fn_decl_node_cache.insert(fn_sym, out)
+        return out
+    let raw = cc_intern_resolve(self.intern, fn_sym)
+    if raw.len() == 0:
+        self.fn_decl_node_cache.insert(fn_sym, 0)
+        return 0
+    let sema_sym = self.sema.pool_lookup_symbol(raw)
+    if sema_sym != 0:
+        let sema_decl = self.sema.fn_decl_nodes.get(sema_sym)
+        if sema_decl.is_some():
+            let out = sema_decl.unwrap()
+            self.fn_decl_node_cache.insert(fn_sym, out)
+            return out
+    for di in 0..self.ast.decl_count():
+        let decl = self.ast.get_decl(di)
+        if self.ast.kind(decl) != NodeKind.NK_FN_DECL:
+            continue
+        let name_sym = self.ast.get_data0(decl)
+        if cc_intern_resolve(self.intern, name_sym) == raw:
+            let out = decl as i32
+            self.fn_decl_node_cache.insert(fn_sym, out)
+            return out
+    self.fn_decl_node_cache.insert(fn_sym, 0)
+    0
+
+fn CCodegen.fn_param_is_c_pointer(self: CCodegen, fn_sym: i32, param_idx: i32) -> i32:
+    let cache_key = cc_body_local_cache_key(fn_sym, param_idx)
+    let cached = self.fn_pointer_param_cache.get(cache_key)
+    if cached.is_some():
+        return cached.unwrap()
+    let decl = self.fn_decl_node_for_sym(fn_sym)
+    if decl == 0:
+        self.fn_pointer_param_cache.insert(cache_key, 0)
+        return 0
+    let meta = self.ast.find_fn_meta(decl)
+    if meta < 0:
+        self.fn_pointer_param_cache.insert(cache_key, 0)
+        return 0
+    let param_count = self.ast.fn_meta_param_count(meta)
+    if param_idx < 0 or param_idx >= param_count:
+        self.fn_pointer_param_cache.insert(cache_key, 0)
+        return 0
+    let param_start = self.ast.fn_meta_param_start(meta)
+    let flags = self.ast.fn_param_flags(param_start, param_idx)
+    if fn_param_is_mut_self(flags) != 0:
+        self.fn_pointer_param_cache.insert(cache_key, 1)
+        return 1
+
+    var out = 0
+    if param_idx == 0:
+        let param_name = self.ast.fn_param_name(param_start, param_idx)
+        let raw = cc_intern_resolve(self.intern, fn_sym)
+        var dot = -1
+        for i in 0..raw.len() as i32:
+            if raw.byte_at(i as i64) == 46:
+                dot = i
+                break
+        if dot > 0:
+            let owner = raw.slice(0, dot as i64)
+            if owner != "str" and cc_intern_resolve(self.intern, param_name) == "self":
+                let sig_idx = self.body_sig_index(fn_sym)
+                if sig_idx >= 0:
+                    let p_tid = self.sema.sig_param_type(sig_idx, param_idx)
+                    let resolved = self.sema.resolve_alias(p_tid)
+                    let tk = self.sema.get_type_kind(resolved)
+                    if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_GENERIC_INST or self.type_is_payload_enum(resolved as i32) != 0:
+                        out = 1
+    self.fn_pointer_param_cache.insert(cache_key, out)
+    out
+
+fn CCodegen.local_is_c_pointer_param(self: CCodegen, body: MirBody, local_id: i32) -> i32:
+    if local_id <= 0:
+        return 0
+    let sig_idx = self.body_sig_index(body.fn_sym)
+    let param_count = if sig_idx >= 0: self.sema.sig_get_param_count(sig_idx) else: body.n_params
+    if local_id > param_count:
+        return 0
+    self.fn_param_is_c_pointer(body.fn_sym, local_id - 1)
+
+fn CCodegen.call_param_expects_c_pointer(self: CCodegen, body: MirBody, callee_operand: i32, param_idx: i32) -> i32:
+    let fn_sym = self.call_callee_fn_sym(body, callee_operand)
+    self.fn_param_is_c_pointer(fn_sym, param_idx)
 
 fn CCodegen.is_void_tid(self: CCodegen, tid: i32) -> i32:
     if tid == 0:
@@ -1074,6 +1174,20 @@ fn CCodegen.vec_element_tid(self: CCodegen, tid: i32) -> i32:
     if self.sema.get_generic_inst_arg_count(resolved as i32) <= 0:
         return 0
     self.sema.get_generic_inst_arg(resolved as i32, 0)
+
+fn CCodegen.vec_new_elem_size_text(self: CCodegen, body: MirBody, dest_place: i32) -> str:
+    var vec_tid = self.place_tid_no_infer(body, dest_place)
+    var elem_tid = self.vec_element_tid(vec_tid)
+    if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
+        vec_tid = self.call_dest_expected_tid(body, dest_place)
+        elem_tid = self.vec_element_tid(vec_tid)
+    if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
+        let dst_local = self.place_local_id(body, dest_place)
+        elem_tid = self.vec_local_element_tid(body, dst_local)
+    if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
+        "0"
+    else:
+        "sizeof(" ++ self.c_type(elem_tid, 0) ++ ")"
 
 fn CCodegen.generic_inst_base_name(self: CCodegen, tid: i32) -> str:
     let resolved = self.sema.resolve_alias(tid)
@@ -1596,7 +1710,12 @@ fn CCodegen.place_text(self: CCodegen, body: MirBody, place_id: i32) -> str:
         return "_0"
     let base_local = body.place_locals.get(place_id as i64)
     let global_sym = self.local_global_sym(body, base_local)
-    var out = if global_sym != 0: self.global_c_name(global_sym) else: f"_{base_local}"
+    var out = if global_sym != 0:
+        self.global_c_name(global_sym)
+    else if self.local_is_c_pointer_param(body, base_local) != 0:
+        f"(*_{base_local})"
+    else:
+        f"_{base_local}"
     var current_tid = self.local_effective_tid(body, base_local)
     if self.is_void_tid(current_tid) != 0:
         current_tid = self.place_local_tid(body, place_id)
@@ -3953,6 +4072,9 @@ fn CCodegen.call_args_text(self: CCodegen, body: MirBody, args_id: i32, callee_o
             out = out ++ ", "
         let op_id = body.call_arg_operands.get((start + i) as i64)
         let arg_text = self.operand_text(body, op_id)
+        if self.call_param_expects_c_pointer(body, callee_operand, i) != 0:
+            out = out ++ "&(" ++ arg_text ++ ")"
+            continue
         // If the argument is a struct value but the callee expects a pointer, emit &
         if i < callee_param_count:
             let p_tid = if callee_sig >= 0: self.sema.sig_param_type(callee_sig, i) else: self.sema.callable_fn_param_type(callee_fn_tid as TypeId, i)
@@ -4083,7 +4205,8 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
     if kind == cc_builtin_vec_new():
         var out = ""
         if has_ret != 0:
-            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = (with_vec)" ++ cc_lbrace() ++ "0" ++ cc_rbrace() ++ ";\n"
+            let elem_size = self.vec_new_elem_size_text(body, dest_place)
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = (with_vec)" ++ cc_lbrace() ++ " .ptr = NULL, .len = 0, .cap = 0, .elem_size = " ++ elem_size ++ " " ++ cc_rbrace() ++ ";\n"
         else:
             out = out ++ "    (void)0;\n"
         out = out ++ f"    goto bb{next_bb};"
@@ -6112,7 +6235,10 @@ fn CCodegen.emit_fn_decl(self: CCodegen, body: MirBody) -> str:
         if i > 0:
             out = out ++ ", "
         let p_tid = self.sema.sig_param_type(sig_idx, i)
-        out = out ++ self.c_type(p_tid, 0) ++ f" _{i + 1}"
+        if self.fn_param_is_c_pointer(fn_sym, i) != 0:
+            out = out ++ self.c_type(p_tid, 0) ++ f"* _{i + 1}"
+        else:
+            out = out ++ self.c_type(p_tid, 0) ++ f" _{i + 1}"
     out = out ++ ")"
     out
 
