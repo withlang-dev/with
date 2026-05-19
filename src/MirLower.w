@@ -2878,13 +2878,16 @@ fn MirBuilder.lower_if(self: MirBuilder, cond_expr: i32, then_expr: i32, else_ex
     self.switch_to(then_bb)
     if regex_capture_node != 0:
         self.lower_regex_capture_bindings_from_option(regex_capture_node, regex_captures_opt_place)
-    let then_op = self.lower_expr(then_expr)
+    let then_op = if want_result != 0: self.lower_expr(then_expr) else: self.lower_expr_discard(then_expr)
     if want_result != 0:
         self.assign_operand_to_place(result_place, then_op, self.ast.get_start(then_expr))
     self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
     self.switch_to(else_bb)
-    let else_op = if else_expr_opt != 0: self.lower_expr(else_expr_opt) else: self.unit_operand()
+    let else_op = if else_expr_opt != 0:
+        if want_result != 0: self.lower_expr(else_expr_opt) else: self.lower_expr_discard(else_expr_opt)
+    else:
+        self.unit_operand()
     if want_result != 0:
         self.assign_operand_to_place(result_place, else_op, self.ast.get_start(node))
     self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
