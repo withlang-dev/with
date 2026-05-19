@@ -490,7 +490,7 @@ pub fn build_graph_run_corpus_test(root: str, target: BuildGraphTarget) -> i32:
         return 124
     if rc != 0:
         build_graph_rt_eprint("error: run_corpus_test target '" ++ target.name ++ f"' failed with exit code {rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
-        return if rc == 0: 1 else: rc
+        return rc
     0
 
 pub fn build_graph_run_command(root: str, target: BuildGraphTarget) -> i32:
@@ -532,7 +532,7 @@ pub fn build_graph_run_command(root: str, target: BuildGraphTarget) -> i32:
         return 124
     if rc != 0:
         build_graph_rt_eprint("error: command target '" ++ target.name ++ f"' failed with exit code {rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
-        return if rc == 0: 1 else: rc
+        return rc
     if target.output.len() > 0:
         let output_path = build_graph_resolve_project_path(root, target.output)
         if build_graph_rt_file_exists(output_path) == 0:

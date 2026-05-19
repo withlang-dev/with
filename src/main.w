@@ -56,6 +56,8 @@ extern fn with_fs_remove_tree(path: str) -> i32
 extern fn with_fs_rename_file(old_path: str, new_path: str) -> i32
 extern fn with_getenv_str(name: str) -> str
 extern fn with_setenv_str(name: str, value: str) -> i32
+// Used for unique temp paths in one-liners, build.w runner binaries,
+// graph-tool captures, and native test captures.
 extern fn with_clock_nanos() -> i64
 extern fn with_getpid() -> i32
 extern fn with_write(s: str) -> void
@@ -836,7 +838,7 @@ fn run_build_action_from_build_w(root: str, cfg: ProjectConfig, target: BuildGra
     cleanup_binary_artifacts(built_runner)
     if rc != 0:
         with_eprint("error: action target '" ++ target.name ++ f"' failed with exit code {rc}")
-        return if rc == 0: 1 else: rc
+        return rc
     if with_fs_file_exists(output_path) == 0:
         with_eprint("error: action target '" ++ target.name ++ "' did not produce declared output: " ++ output_path)
         return 1
@@ -947,7 +949,7 @@ fn build_graph_run_tool_capture(root: str, target: BuildGraphTarget, tool_name: 
         return 124
     if rc != 0:
         with_eprint("error: " ++ tool_name ++ " for target '" ++ target.name ++ f"' failed with exit code {rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
-        return if rc == 0: 1 else: rc
+        return rc
     let _remove_stdout = with_fs_remove_file(stdout_path)
     let _remove_stderr = with_fs_remove_file(stderr_path)
     0
