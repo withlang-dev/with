@@ -550,6 +550,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("cli-selfhost-parallel-tests")
     tests = tests.dep("c-migrator-tests")
     tests = tests.dep("pcre2-migrate-smoke")
+    tests = tests.dep("pcre2-test-smoke")
     tests = tests.dep("issue61-regression")
     tests = tests.dep("embedded-runtime-regression")
     out = out.add_target(tests)
@@ -662,6 +663,16 @@ pub fn build(ctx: BuildCtx) -> Build:
     pcre2_migrate_smoke = pcre2_migrate_smoke.input("out/pcre2_reference/pcre2-10.47/src")
     pcre2_migrate_smoke = pcre2_migrate_smoke.dep("pcre2-reference")
     out = out.add_target(pcre2_migrate_smoke)
+
+    var pcre2_test_smoke = target_new(.Action, "pcre2-test-smoke", "").output("out/test-graph/pcre2-test-smoke")
+    pcre2_test_smoke.action = run_pcre2_test_smoke_action
+    pcre2_test_smoke = pcre2_test_smoke.input("out/bin/with-stage2")
+    pcre2_test_smoke = pcre2_test_smoke.input("lib/std/re/pcre2test.w")
+    pcre2_test_smoke = pcre2_test_smoke.input("out/pcre2_reference/pcre2-10.47/RunTest")
+    pcre2_test_smoke = pcre2_test_smoke.arg("out/pcre2_reference/pcre2-10.47")
+    pcre2_test_smoke = pcre2_test_smoke.dep("pcre2-reference")
+    pcre2_test_smoke = pcre2_test_smoke.dep("selfcheck")
+    out = out.add_target(pcre2_test_smoke)
 
     var pcre2_build = target_new(.Action, "pcre2-build", "").output("out/pcre2_build")
     pcre2_build.action = run_pcre2_build_action
