@@ -672,3 +672,58 @@ pub fn run_pcre2_test_action(ctx: ActionCtx) -> i32:
         return pcre2_fail(ctx, f"failed with exit code {result.rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
     print("VERIFIED: migrated pcre2test passes upstream RunTest for the 8-bit corpus")
     0
+
+pub fn run_pcre2_check_generated_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    let output = ctx.output()
+    if inputs.len() == 0 or output.len() == 0:
+        return pcre2_fail(ctx, "requires generated-dir input and stamp output")
+    let generated_dir = inputs.get(0)
+    let compiler_path = "out/bin/with"
+    let c_export_errors = pcre2_reject_c_exports(ctx, generated_dir)
+    if c_export_errors != 0:
+        return 1
+    let errors = pcre2_count_generated_errors(ctx, compiler_path, generated_dir, true)
+    if errors < 0:
+        return 1
+    if errors != 0:
+        return 1
+    if ctx.fs().write_text(output, "ok\n") != 0:
+        return pcre2_fail(ctx, "could not write generated-check stamp: " ++ output)
+    0
+
+pub fn run_pcre2_promote_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let inputs = ctx.inputs()
+    let dest_dir = ctx.output()
+    let root = ctx.project_info().project_root()
+    if inputs.len() == 0 or dest_dir.len() == 0:
+        return pcre2_fail(ctx, "requires generated-dir input and destination output")
+    let generated_dir = inputs.get(0)
+    let compiler_path = "out/bin/with"
+    let c_export_errors = pcre2_reject_c_exports(ctx, generated_dir)
+    if c_export_errors != 0:
+        return 1
+    let errors = pcre2_count_generated_errors(ctx, compiler_path, generated_dir, true)
+    if errors < 0:
+        return 1
+    if errors != 0:
+        return pcre2_fail(ctx, f"refusing to promote generated PCRE2 with {errors} remaining errors")
+    if fs.mkdir_all(dest_dir) != 0:
+        return pcre2_fail(ctx, "could not create destination: " ++ dest_dir)
+    let existing = fs.list_files(dest_dir)
+    for ei in 0..existing.len() as i32:
+        let path = existing.get(ei as i64)
+        if path.ends_with(".w") and fs.remove_file(path) != 0:
+            return pcre2_fail(ctx, "could not remove old generated file: " ++ path)
+    let files = fs.list_files(generated_dir)
+    var copied = 0
+    for fi in 0..files.len() as i32:
+        let source_path = files.get(fi as i64)
+        if source_path.ends_with(".w"):
+            let dest_path = pcre2_join(dest_dir, pcre2_basename(source_path))
+            if fs.copy_file(source_path, dest_path) != 0:
+                return pcre2_fail(ctx, "could not copy " ++ source_path ++ " to " ++ dest_path)
+            copied = copied + 1
+    print(f"promoted {copied} generated modules into " ++ pcre2_abs(root, dest_dir))
+    0
