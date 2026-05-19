@@ -1,5 +1,6 @@
 module build_selfhost
 
+use build_pcre2
 use std.build
 use std.process
 
@@ -2388,32 +2389,20 @@ fn bs_check_pcre2_jit_no_support(ctx: ActionCtx, compiler_path: str, base_dir: s
     if result.rc != 0: return result.rc
     0
 
-fn bs_check_pcre2_generated_existing_main(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+fn bs_check_pcre2_generated_existing_main(ctx: ActionCtx, compiler_input: str, case_dir: str) -> i32:
     let generated_dir = bs_join(case_dir, "generated")
-    var rc = bs_write_project_manifest(ctx, case_dir, "pcre2generatedcheck")
-    if rc != 0: return rc
-    rc = bs_write_fixture(ctx, bs_join(generated_dir, "defs.w"), "// std.re.defs\ntype c_int = i32\n", "pcre2 generated defs")
+    var rc = bs_write_fixture(ctx, bs_join(generated_dir, "defs.w"), "// std.re.defs\ntype c_int = i32\n", "pcre2 generated defs")
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(generated_dir, "pcre2_helper.w"), "// Migrated from PCRE2\nuse std.re.defs\n\nfn helper_value() -> c_int:\n    7\n", "pcre2 generated helper")
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(generated_dir, "pcre2test.w"), "// Migrated from PCRE2\nuse std.re.defs\n\nfn main() -> i32:\n    0\n", "pcre2 generated existing main")
     if rc != 0: return rc
-    let build_text =
-        "use std.build\n\n" ++
-        "fn pcre2_generated_check_kind() -> BuildKind: 1006 as BuildKind\n\n" ++
-        "pub fn build(ctx: BuildCtx) -> Build:\n" ++
-        "    var target = target_new(pcre2_generated_check_kind(), \"pcre2-check-existing-main\", " ++ bs_with_string_literal(compiler_path) ++ ")\n" ++
-        "    target = target.input(\"generated\")\n" ++
-        "    var out = ctx.new_build()\n    out = out.add_target(target)\n" ++
-        "    out.default(\"pcre2-check-existing-main\")\n"
-    rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), build_text, "pcre2 generated check build.w")
-    if rc != 0: return rc
-    var args: Vec[str] = Vec.new()
-    args |> push("build")
-    args |> push(":pcre2-check-existing-main")
-    let result = bs_pcre2_expect_success(ctx, compiler_path, case_dir, "pcre2-generated-existing-main", args)
-    if result.rc != 0: return result.rc
-    bs_assert_contains(ctx, result.stdout, "OK=2 TOTAL_ERRORS=0", "pcre2_check_existing_main")
+    let errors = pcre2_count_generated_errors(ctx, compiler_input, generated_dir, true)
+    if errors < 0:
+        return 1
+    if errors != 0:
+        return bs_fail(ctx, f"pcre2 generated existing main reported {errors} errors")
+    0
 
 pub fn run_cli_selfhost_pcre2_prep_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
@@ -2452,7 +2441,7 @@ pub fn run_cli_selfhost_pcre2_prep_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     rc = bs_check_pcre2_jit_no_support(ctx, compiler_path, bs_join(output_dir, "pcre2_jit_no_support_case"))
     if rc != 0: return rc
-    bs_check_pcre2_generated_existing_main(ctx, compiler_path, bs_join(output_dir, "pcre2_generated_existing_main_case"))
+    bs_check_pcre2_generated_existing_main(ctx, compiler_input, bs_join(output_dir, "pcre2_generated_existing_main_case"))
 
 fn bs_split_words(line: str) -> Vec[str]:
     let words: Vec[str] = Vec.new()

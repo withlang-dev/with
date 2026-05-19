@@ -304,7 +304,7 @@ fn pcre2_ensure_generated_dependencies(ctx: ActionCtx, generated_dir: str) -> i3
             return pcre2_fail(ctx, "could not update imports in " ++ pcre2test_path)
     0
 
-fn pcre2_count_generated_errors(ctx: ActionCtx, compiler_path: str, generated_dir: str, print_summary: bool) -> i32:
+pub fn pcre2_count_generated_errors(ctx: ActionCtx, compiler_path: str, generated_dir: str, print_summary: bool) -> i32:
     let fs = ctx.fs()
     let root = ctx.project_info().project_root()
     if not fs.exists(compiler_path):
