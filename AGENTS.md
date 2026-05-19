@@ -203,6 +203,10 @@ conventions. When you can't find something, grep `examples/`,
 `src/`, and `docs/with-specification.md` before assuming it
 doesn't exist. Never rely on memory.
 
+Read `docs/project-state.md` immediately after this file if it
+exists. Keep it current when phase status, blockers, or the next
+work queue changes.
+
 ### One logical change at a time
 
 Don't batch unrelated changes. Small changes make debugging
