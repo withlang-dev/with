@@ -224,6 +224,11 @@ type Sema {
     // view may originate from when this parameter participates in escape_view.
     sig_param_view_origins: Vec[i32],
     sig_param_eff_starts: Vec[i32],
+    // Parallel signature metadata for value parameters lowered through pointer ABI.
+    // This is distinct from semantic reference types: `self: &Self` is already a
+    // pointer value, while `mut self: Self` / value owner params are With values
+    // whose native ABI passes an address.
+    sig_value_ref_abi_params: Vec[i32],
 
     // Extern fn names
     extern_fn_names: HashMap[i32, i32],
@@ -787,6 +792,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         sig_param_effects: Vec.new(),
         sig_param_view_origins: Vec.new(),
         sig_param_eff_starts: Vec.new(),
+        sig_value_ref_abi_params: Vec.new(),
         extern_fn_names,
         fn_decl_nodes,
         generic_fn_nodes,
@@ -2467,7 +2473,26 @@ fn Sema.add_sig(self: Sema, name: i32, fn_tid: i32, ret: i32, param_start: i32, 
     for pi in 0..param_count:
         self.sig_param_effects.push(0)
         self.sig_param_view_origins.push(0)
+        self.sig_value_ref_abi_params.push(0)
     self.sig_lookup.insert(name, idx)
+
+fn Sema.sig_param_uses_value_ref_abi(self: Sema, si: i32, pi: i32) -> i32:
+    if si < 0 or si >= self.sig_param_eff_starts.len() as i32:
+        return 0
+    let start = self.sig_param_eff_starts.get(si as i64)
+    let count = self.sig_param_counts.get(si as i64)
+    if pi < 0 or pi >= count:
+        return 0
+    self.sig_value_ref_abi_params.get((start + pi) as i64)
+
+fn Sema.set_sig_param_value_ref_abi(self: Sema, si: i32, pi: i32, value: i32):
+    if si < 0 or si >= self.sig_param_eff_starts.len() as i32:
+        return
+    let start = self.sig_param_eff_starts.get(si as i64)
+    let count = self.sig_param_counts.get(si as i64)
+    if pi < 0 or pi >= count:
+        return
+    self.sig_value_ref_abi_params.set_i32((start + pi) as i64, value)
 
 fn Sema.sig_param_effect(self: Sema, si: i32, pi: i32) -> i32:
     if si < 0 or si >= self.sig_param_eff_starts.len() as i32:
