@@ -145,6 +145,7 @@ pub type Target {
     defines: Vec[str],
     inputs: Vec[str],
     extra_outputs: Vec[str],
+    write_scopes: Vec[str],
     deps: Vec[str],
     args: Vec[str],
     action: fn(ActionCtx) -> i32,
@@ -598,6 +599,7 @@ pub fn target_new(kind: BuildKind, name: str, entry: str) -> Target:
         defines: Vec.new(),
         inputs: Vec.new(),
         extra_outputs: Vec.new(),
+        write_scopes: Vec.new(),
         deps: Vec.new(),
         args: Vec.new(),
         action: build_noop_action,
@@ -719,6 +721,7 @@ pub fn Target.target(self: Target, target: BuildTarget) -> Target:
         defines: self.defines,
         inputs: self.inputs,
         extra_outputs: self.extra_outputs,
+        write_scopes: self.write_scopes,
         deps: self.deps,
         args: self.args,
         action: self.action,
@@ -737,6 +740,7 @@ pub fn Target.optimize(self: Target, mode: OptimizeMode) -> Target:
         defines: self.defines,
         inputs: self.inputs,
         extra_outputs: self.extra_outputs,
+        write_scopes: self.write_scopes,
         deps: self.deps,
         args: self.args,
         action: self.action,
@@ -767,6 +771,7 @@ pub fn Target.output(self: Target, output: str) -> Target:
         defines: self.defines,
         inputs: self.inputs,
         extra_outputs: self.extra_outputs,
+        write_scopes: self.write_scopes,
         deps: self.deps,
         args: self.args,
         action: self.action,
@@ -778,6 +783,10 @@ pub fn Target.input(mut self: Target, input: str) -> Target:
 
 pub fn Target.extra_output(mut self: Target, path: str) -> Target:
     self.extra_outputs.push(path)
+    self
+
+pub fn Target.write_scope(mut self: Target, path: str) -> Target:
+    self.write_scopes.push(path)
     self
 
 pub fn Target.dep(mut self: Target, dep: str) -> Target:
@@ -800,8 +809,14 @@ fn build_action_outputs(target: Target) -> Vec[str]:
         outputs.push(target.extra_outputs.get(i as i64))
     outputs
 
+fn build_action_write_scope(target: Target) -> Vec[str]:
+    let scopes = build_action_outputs(target)
+    for i in 0..target.write_scopes.len() as i32:
+        scopes.push(target.write_scopes.get(i as i64))
+    scopes
+
 fn build_action_ctx(ctx: BuildCtx, target: Target) -> ActionCtx:
-    let fs_outputs = build_action_outputs(target)
+    let fs_outputs = build_action_write_scope(target)
     let ctx_outputs = build_action_outputs(target)
     ActionCtx {
         token: ctx.token,
