@@ -74,7 +74,7 @@ fn CfgGraph.add_node(self: CfgGraph, kind: i32, span_start: i32, span_end: i32) 
     self.nodes.push(CfgNode { kind, span_start, span_end })
     id
 
-fn CfgGraph.add_edge(self: CfgGraph, from: i32, to: i32):
+fn CfgGraph.add_edge(self: CfgGraph, from: i32, to: i32) -> void:
     self.edges.push(CfgEdge { from, to })
 
 fn CfgGraph.out_degree(self: CfgGraph, node_id: i32) -> i32:

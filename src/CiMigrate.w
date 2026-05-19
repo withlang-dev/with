@@ -88,10 +88,10 @@ pub fn migrate_set_directory_one_basename(basename: str):
 pub fn migrate_set_shared_fragment_path(path: str):
     g_migrate_shared_fragment_path = path
 
-pub fn migrate_add_include_path(path: str):
+pub fn migrate_add_include_path(path: str) -> void:
     g_migrate_include_paths.push(path)
 
-pub fn migrate_add_forced_include(path: str):
+pub fn migrate_add_forced_include(path: str) -> void:
     g_migrate_forced_includes.push(path)
 
 fn ci_migrate_shared_defs_active() -> bool:

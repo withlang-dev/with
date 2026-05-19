@@ -212,7 +212,7 @@ fn ComptimeEvaluator.step(self: ComptimeEvaluator, node: i32) -> i32:
         return 0
     1
 
-fn ComptimeEvaluator.push_scope(self: ComptimeEvaluator):
+fn ComptimeEvaluator.push_scope(self: ComptimeEvaluator) -> void:
     self.scope_starts.push(self.slot_syms.len() as i32)
 
 fn ComptimeEvaluator.pop_scope(self: ComptimeEvaluator):
@@ -225,7 +225,7 @@ fn ComptimeEvaluator.pop_scope(self: ComptimeEvaluator):
         self.slot_muts.pop()
     self.scope_starts.pop()
 
-fn ComptimeEvaluator.bind_value(self: ComptimeEvaluator, sym: i32, value: ComptimeValue, is_mut: i32):
+fn ComptimeEvaluator.bind_value(self: ComptimeEvaluator, sym: i32, value: ComptimeValue, is_mut: i32) -> void:
     self.slot_syms.push(sym)
     self.slot_values.push(value)
     self.slot_muts.push(is_mut)
@@ -302,7 +302,7 @@ fn ComptimeEvaluator.current_source_text(self: ComptimeEvaluator) -> str:
             return text
     self.sema.source_text
 
-fn ComptimeEvaluator.push_extra_value(self: ComptimeEvaluator, value: ComptimeValue):
+fn ComptimeEvaluator.push_extra_value(self: ComptimeEvaluator, value: ComptimeValue) -> void:
     self.extra_values.push(value)
 
 fn ComptimeEvaluator.binding_sym(self: ComptimeEvaluator, node: i32) -> i32:

@@ -797,7 +797,7 @@ fn CiModule.new(name: str, source_path: str) -> CiModule:
         imports: Vec.new(),
     }
 
-fn CiModule.add_decl(mut self: CiModule, decl: CiDeclId):
+fn CiModule.add_decl(mut self: CiModule, decl: CiDeclId) -> void:
     self.top_level_decls.push(decl as i32)
 
 fn CiModule.add_import(mut self: CiModule, path: str):

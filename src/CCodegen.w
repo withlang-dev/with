@@ -2700,7 +2700,7 @@ fn CCodegen.method_infer_active(self: CCodegen, method_sym: i32, args_id: i32, d
         return 1
     0
 
-fn CCodegen.method_infer_push(self: CCodegen, method_sym: i32, args_id: i32, dest_place: i32):
+fn CCodegen.method_infer_push(self: CCodegen, method_sym: i32, args_id: i32, dest_place: i32) -> void:
     self.active_method_syms.push(method_sym)
     self.active_method_args.push(args_id)
     self.active_method_dests.push(dest_place)
@@ -2721,7 +2721,7 @@ fn CCodegen.direct_infer_active(self: CCodegen, args_id: i32, dest_place: i32) -
         return 1
     0
 
-fn CCodegen.direct_infer_push(self: CCodegen, args_id: i32, dest_place: i32):
+fn CCodegen.direct_infer_push(self: CCodegen, args_id: i32, dest_place: i32) -> void:
     self.active_direct_args.push(args_id)
     self.active_direct_dests.push(dest_place)
 
@@ -2742,7 +2742,7 @@ fn CCodegen.direct_cache_lookup(self: CCodegen, body_fn_sym: i32, args_id: i32, 
         return self.direct_cache_values.get(i as i64)
     -1234567
 
-fn CCodegen.direct_cache_store(self: CCodegen, body_fn_sym: i32, args_id: i32, dest_place: i32, value: i32):
+fn CCodegen.direct_cache_store(self: CCodegen, body_fn_sym: i32, args_id: i32, dest_place: i32, value: i32) -> void:
     self.direct_cache_body_fns.push(body_fn_sym)
     self.direct_cache_args.push(args_id)
     self.direct_cache_dests.push(dest_place)
@@ -2761,7 +2761,7 @@ fn CCodegen.method_cache_lookup(self: CCodegen, body_fn_sym: i32, method_sym: i3
         return self.method_cache_values.get(i as i64)
     -1234567
 
-fn CCodegen.method_cache_store(self: CCodegen, body_fn_sym: i32, method_sym: i32, args_id: i32, dest_place: i32, value: i32):
+fn CCodegen.method_cache_store(self: CCodegen, body_fn_sym: i32, method_sym: i32, args_id: i32, dest_place: i32, value: i32) -> void:
     self.method_cache_body_fns.push(body_fn_sym)
     self.method_cache_syms.push(method_sym)
     self.method_cache_args.push(args_id)
@@ -2777,7 +2777,7 @@ fn CCodegen.field_cache_lookup(self: CCodegen, struct_tid: i32, field_sym: i32) 
         return self.field_cache_tids.get(i as i64)
     -1234567
 
-fn CCodegen.field_cache_store(self: CCodegen, struct_tid: i32, field_sym: i32, tid: i32):
+fn CCodegen.field_cache_store(self: CCodegen, struct_tid: i32, field_sym: i32, tid: i32) -> void:
     self.field_cache_struct_tids.push(struct_tid)
     self.field_cache_syms.push(field_sym)
     self.field_cache_tids.push(tid)
@@ -3437,7 +3437,17 @@ fn CCodegen.call_builtin_ret_tid(self: CCodegen, body: MirBody, callee_operand: 
         if dst != 0 and self.is_void_tid(dst) == 0:
             return dst
         return self.sema.ty_i64 as i32
-    if kind == cc_builtin_vec_push() or kind == cc_builtin_vec_set_i32() or kind == cc_builtin_vec_remove() or kind == cc_builtin_vec_clear():
+    if kind == cc_builtin_vec_push():
+        let dst = self.place_local_tid(body, dest_place)
+        if dst != 0 and self.is_void_tid(dst) != 0:
+            return self.sema.ty_void as i32
+        let hinted = self.call_dest_expected_tid(body, dest_place)
+        if hinted != 0 and self.is_void_tid(hinted) == 0:
+            return hinted
+        if dst != 0 and self.is_void_tid(dst) == 0:
+            return dst
+        return self.operand_tid(body, self.call_arg_operand(body, args_id, 0))
+    if kind == cc_builtin_vec_set_i32() or kind == cc_builtin_vec_remove() or kind == cc_builtin_vec_clear():
         return self.sema.ty_void as i32
     if kind == cc_builtin_vecslot_set():
         return self.sema.ty_void as i32
@@ -4204,6 +4214,8 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
             elem_tid = self.sema.ty_i64 as i32
         let elem_ty = self.c_type(elem_tid, 0)
         var out = "    " ++ cc_lbrace() ++ " " ++ elem_ty ++ " __with_tmp = " ++ elem_text ++ "; with_vec_push(" ++ recv_ptr ++ ", &__with_tmp); " ++ cc_rbrace() ++ "\n"
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = *(" ++ recv_ptr ++ ");\n"
         out = out ++ f"    goto bb{next_bb};"
         return out
 

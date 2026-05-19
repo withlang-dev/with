@@ -1370,7 +1370,7 @@ fn Sema.check_blanket_overlap(self: Sema, trait_sym: i32, bound_start: i32, boun
             let tn = self.pool_resolve(trait_sym)
             self.emit_error("overlapping implementations of '" ++ tn ++ "'", node)
 
-fn Sema.collect_impl_decl(self: Sema, node: i32, is_local_impl: i32):
+fn Sema.collect_impl_decl(self: Sema, node: i32, is_local_impl: i32) -> void:
     let type_name = self.ast.get_data0(node)
     let trait_sym = self.ast.get_data2(node)
     if trait_sym == 0:

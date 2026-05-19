@@ -56,7 +56,7 @@ fn AsyncMirBody.init(fn_sym: i32, flavor: i32) -> AsyncMirBody:
         suspend_drop_counts: Vec.new(),
     }
 
-fn AsyncMirBody.add_suspend(self: AsyncMirBody, kind: i32, span_start: i32, span_end: i32, resume_bb: i32, live_locals: i32, storage_dead: i32, drop_count: i32):
+fn AsyncMirBody.add_suspend(self: AsyncMirBody, kind: i32, span_start: i32, span_end: i32, resume_bb: i32, live_locals: i32, storage_dead: i32, drop_count: i32) -> void:
     let idx = self.suspend_kinds.len() as i32
     self.suspend_kinds.push(kind)
     self.suspend_span_starts.push(span_start)
@@ -90,7 +90,7 @@ fn AsyncMirModule.init -> AsyncMirModule:
 fn AsyncMirModule.deinit(self: AsyncMirModule):
     return
 
-fn AsyncMirModule.add_body(self: AsyncMirModule, body: AsyncMirBody):
+fn AsyncMirModule.add_body(self: AsyncMirModule, body: AsyncMirBody) -> void:
     self.bodies.push(body)
     self.body_fn_syms.push(body.fn_sym)
 

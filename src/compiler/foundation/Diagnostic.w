@@ -51,13 +51,13 @@ fn diagnostic_warning(message: str, primary: Span) -> Diagnostic:
 fn Diagnostic.set_code(self: Diagnostic, code: str):
     self.code = code
 
-fn Diagnostic.add_label(self: Diagnostic, span: Span, message: str):
+fn Diagnostic.add_label(self: Diagnostic, span: Span, message: str) -> void:
     self.labels.push(DiagnosticLabel { span, message })
 
-fn Diagnostic.add_note(self: Diagnostic, message: str):
+fn Diagnostic.add_note(self: Diagnostic, message: str) -> void:
     self.notes.push(message)
 
-fn Diagnostic.add_help(self: Diagnostic, message: str):
+fn Diagnostic.add_help(self: Diagnostic, message: str) -> void:
     self.helps.push(message)
 
 fn DiagnosticStore.init -> DiagnosticStore:
@@ -65,7 +65,7 @@ fn DiagnosticStore.init -> DiagnosticStore:
         items: Vec.new(),
     }
 
-fn DiagnosticStore.emit(self: DiagnosticStore, diag: Diagnostic):
+fn DiagnosticStore.emit(self: DiagnosticStore, diag: Diagnostic) -> void:
     self.items.push(diag)
 
 fn DiagnosticStore.count(self: DiagnosticStore) -> i32:

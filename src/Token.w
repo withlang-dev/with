@@ -375,7 +375,7 @@ fn TokenList.new -> TokenList:
 fn TokenList.deinit(self: TokenList):
     return
 
-fn TokenList.append(mut self: TokenList, tag: i32, start: i32, end: i32):
+fn TokenList.append(mut self: TokenList, tag: i32, start: i32, end: i32) -> void:
     self.tags.push(tag)
     self.starts.push(start)
     self.ends.push(end)

@@ -1143,7 +1143,7 @@ fn Codegen.emit_module_runtime_init_fn(self: Codegen, name_sym: i32, value_node:
 
     function
 
-fn Codegen.emit_module_runtime_init_helpers(self: Codegen):
+fn Codegen.emit_module_runtime_init_helpers(self: Codegen) -> void:
     for i in 0..self.module_runtime_init_syms.len() as i32:
         let name_sym = self.module_runtime_init_syms.get(i as i64)
         let value_node = self.module_runtime_init_nodes.get(i as i64)
