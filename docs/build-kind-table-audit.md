@@ -61,7 +61,6 @@ Live project kinds:
 | 1008 | `pcre2_build` |
 | 1013 | `with_compiler_ir` |
 | 1020 | `generate_llvm_link_metadata` |
-| 1022 | `pcre2_migrate` |
 | 1024 | `seed_download` |
 | 1025 | `emit_c_test` |
 | 1026 | `emit_c_fixpoint` |
@@ -85,6 +84,7 @@ Removed project kinds:
 | 1018 | `removed_cli_selfhost_migrate_core_test` |
 | 1019 | `removed_selfhost_suite_test` |
 | 1021 | `removed_pcre2_reference_prepare` |
+| 1022 | `removed_pcre2_migrate` |
 | 1023 | `removed_unused_1023` |
 
 `build_graph_kind_is_project` accepts every live project kind and excludes
