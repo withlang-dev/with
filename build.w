@@ -501,6 +501,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var c_migrator_pcre2_prep_tests = target_new(.Action, "c-migrator-pcre2-prep-tests", "").output("out/test-graph/c-migrator-pcre2-prep-tests")
     c_migrator_pcre2_prep_tests.action = run_cli_selfhost_pcre2_prep_action
     c_migrator_pcre2_prep_tests = c_migrator_pcre2_prep_tests.input("out/bin/with-stage2")
+    c_migrator_pcre2_prep_tests = c_migrator_pcre2_prep_tests.write_scope("out/pcre2_tmp")
     c_migrator_pcre2_prep_tests = c_migrator_pcre2_prep_tests.dep("selfcheck")
     out = out.add_target(c_migrator_pcre2_prep_tests)
 
@@ -547,6 +548,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("cli-selfhost-project-tests")
     tests = tests.dep("cli-selfhost-edge-tests")
     tests = tests.dep("cli-selfhost-parallel-tests")
+    tests = tests.dep("c-migrator-tests")
     tests = tests.dep("issue61-regression")
     tests = tests.dep("embedded-runtime-regression")
     out = out.add_target(tests)
