@@ -1138,6 +1138,34 @@ fn bs_check_migrate_macro_unsigned_minus(ctx: ActionCtx, compiler_path: str, cas
     if check.rc != 0: return check.rc
     0
 
+fn bs_check_migrate_ulong_max_width(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "ulong_max_width.c")
+    let out_w = bs_join(case_dir, "ulong_max_width.w")
+    let c_text = "#include <limits.h>\n#include <stdlib.h>\n\nint cmp_ulong_max(unsigned long x) {\n  return x == ULONG_MAX;\n}\n\nint parse_overflow(char *s) {\n  char *end;\n  unsigned long value = strtoul(s, &end, 10);\n  return value == ULONG_MAX;\n}\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "ulong max width source")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("--prefer-brace")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-ulong-max-width", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_contains(ctx, out_text, "9223372036854775807 as c_ulong", "ulong_max_width")
+    if rc != 0: return rc
+    rc = bs_assert_not_contains(ctx, out_text, "9223372036854775807 as c_uint", "ulong_max_width")
+    if rc != 0: return rc
+    var check_args: Vec[str] = Vec.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-ulong-max-width", check_args)
+    if check.rc != 0: return check.rc
+    0
+
 fn bs_check_migrate_tentative_global_owner(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "tentative_global_owner.c")
@@ -1370,6 +1398,8 @@ pub fn run_cli_selfhost_migrate_core_action(ctx: ActionCtx) -> i32:
     var rc = bs_check_migrate_libc_ctype(ctx, compiler_path, bs_join(output_dir, "libc_ctype"))
     if rc != 0: return rc
     rc = bs_check_migrate_macro_unsigned_minus(ctx, compiler_path, bs_join(output_dir, "macro_unsigned_minus"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_ulong_max_width(ctx, compiler_path, bs_join(output_dir, "ulong_max_width"))
     if rc != 0: return rc
     rc = bs_check_migrate_tentative_global_owner(ctx, compiler_path, bs_join(output_dir, "tentative_global_owner"))
     if rc != 0: return rc

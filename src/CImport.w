@@ -3028,6 +3028,16 @@ fn ci_binary_op_allows_uint_literal_cast(op: i32, operand_unsigned: bool) -> boo
     op == BO_SHL or op == BO_SHR or op == BO_AND or op == BO_OR or op == BO_XOR or
     (operand_unsigned and (op == BO_ADD or op == BO_SUB or op == BO_MUL))
 
+fn ci_binary_large_decimal_cast_type(session: i64, cursor: i32, op: i32, is_rhs: bool, types: CiTypePool) -> CiTypeId:
+    let c_uint_ty = types.named_type_from_text("c_uint")
+    if (op == BO_SHL or op == BO_SHR) and is_rhs:
+        return c_uint_ty
+    if with_ci_type_is_unsigned(session, cursor) != 0:
+        let result_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
+        if (result_ty as i32) != 0:
+            return result_ty
+    c_uint_ty
+
 fn ci_non_literal_operand_is_unsigned(session: i64, lhs_cursor: i32, rhs_cursor: i32, lhs_large: bool, rhs_large: bool) -> bool:
     if lhs_large and rhs_large: return true
     if rhs_large: return with_ci_type_is_unsigned(session, lhs_cursor) != 0
@@ -5575,15 +5585,16 @@ fn CiExprPool.lower_binary_simple(self: CiExprPool, session: i64, cursor: i32, t
         let lhs_large = ci_is_large_decimal(lhs_str)
         let rhs_large = ci_is_large_decimal(rhs_str)
         let operand_unsigned = ci_non_literal_operand_is_unsigned(session, lhs_cursor, rhs_cursor, lhs_large, rhs_large)
-        let c_uint_ty = types.named_type_from_text("c_uint")
         if lhs_large and ci_binary_op_allows_uint_literal_cast(op, operand_unsigned):
-            if (c_uint_ty as i32) == 0:
+            let cast_ty = ci_binary_large_decimal_cast_type(session, cursor, op, false, types)
+            if (cast_ty as i32) == 0:
                 return 0 as CiExprId
-            lhs_value = self.cast(c_uint_ty, lhs_value)
+            lhs_value = self.cast(cast_ty, lhs_value)
         if rhs_large and ci_binary_op_allows_uint_literal_cast(op, operand_unsigned):
-            if (c_uint_ty as i32) == 0:
+            let cast_ty = ci_binary_large_decimal_cast_type(session, cursor, op, true, types)
+            if (cast_ty as i32) == 0:
                 return 0 as CiExprId
-            rhs_value = self.cast(c_uint_ty, rhs_value)
+            rhs_value = self.cast(cast_ty, rhs_value)
 
         if ci_binary_op_uses_c_integer_promotions(op):
             lhs_value = self.promote_c_small_int_operand(session, lhs_cursor, ci_peel_transparent(session, lhs_cursor), lhs_value, types)
@@ -6609,13 +6620,16 @@ fn CiExprPool.build_binary_value_expr_from_ids(self: CiExprPool, session: i64, c
             return 0 as CiExprId
         lhs_value = self.cast(c_int_ty, lhs_value)
     if (lhs_large or rhs_large) and ci_binary_op_allows_uint_literal_cast(op, operand_unsigned):
-        let c_uint_ty = types.named_type_from_text("c_uint")
-        if (c_uint_ty as i32) == 0:
-            return 0 as CiExprId
         if lhs_large:
-            lhs_value = self.cast(c_uint_ty, lhs_value)
+            let cast_ty = ci_binary_large_decimal_cast_type(session, cursor, op, false, types)
+            if (cast_ty as i32) == 0:
+                return 0 as CiExprId
+            lhs_value = self.cast(cast_ty, lhs_value)
         if rhs_large:
-            rhs_value = self.cast(c_uint_ty, rhs_value)
+            let cast_ty = ci_binary_large_decimal_cast_type(session, cursor, op, true, types)
+            if (cast_ty as i32) == 0:
+                return 0 as CiExprId
+            rhs_value = self.cast(cast_ty, rhs_value)
     if ci_binary_op_uses_c_integer_promotions(op):
         lhs_value = self.promote_c_small_int_operand(session, lhs_cursor, lhs_peeled, lhs_value, types)
         if (lhs_value as i32) == 0:
