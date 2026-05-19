@@ -343,15 +343,7 @@ type CCodegen {
     active_method_dests: Vec[i32],
     active_direct_args: Vec[i32],
     active_direct_dests: Vec[i32],
-    direct_cache_body_fns: Vec[i32],
-    direct_cache_args: Vec[i32],
-    direct_cache_dests: Vec[i32],
-    direct_cache_values: Vec[i32],
-    method_cache_body_fns: Vec[i32],
-    method_cache_syms: Vec[i32],
-    method_cache_args: Vec[i32],
-    method_cache_dests: Vec[i32],
-    method_cache_values: Vec[i32],
+    call_infer_cache: HashMap[str, i32],
     field_cache_struct_tids: Vec[i32],
     field_cache_syms: Vec[i32],
     field_cache_tids: Vec[i32],
@@ -393,15 +385,7 @@ fn c_emit_module(mir_mod: MirModule, ast: AstPool, intern: InternPool, sema: Sem
         active_method_dests: Vec.new(),
         active_direct_args: Vec.new(),
         active_direct_dests: Vec.new(),
-        direct_cache_body_fns: Vec.new(),
-        direct_cache_args: Vec.new(),
-        direct_cache_dests: Vec.new(),
-        direct_cache_values: Vec.new(),
-        method_cache_body_fns: Vec.new(),
-        method_cache_syms: Vec.new(),
-        method_cache_args: Vec.new(),
-        method_cache_dests: Vec.new(),
-        method_cache_values: Vec.new(),
+        call_infer_cache: HashMap.new(),
         field_cache_struct_tids: Vec.new(),
         field_cache_syms: Vec.new(),
         field_cache_tids: Vec.new(),
@@ -2539,11 +2523,24 @@ fn CCodegen.infer_named_call_sym_scan(self: CCodegen, body: MirBody, fn_sym: i32
     match_sym
 
 fn CCodegen.infer_named_call_sym(self: CCodegen, body: MirBody, fn_sym: i32, args_id: i32, dest_place: i32) -> i32:
-    self.infer_named_call_sym_scan(body, fn_sym, args_id, dest_place, 1)
+    if self.infer_local_depth > 0:
+        return self.infer_named_call_sym_scan(body, fn_sym, args_id, dest_place, 1)
+    let cached = self.call_infer_cache_lookup("named", body.fn_sym, fn_sym, args_id, dest_place)
+    if cached != -1234567:
+        return cached
+    let result = self.infer_named_call_sym_scan(body, fn_sym, args_id, dest_place, 1)
+    self.call_infer_cache_store("named", body.fn_sym, fn_sym, args_id, dest_place, result)
+    result
 
 fn CCodegen.infer_body_method_sym(self: CCodegen, body: MirBody, fn_sym: i32, args_id: i32, dest_place: i32) -> i32:
+    if self.infer_local_depth == 0:
+        let cached = self.call_infer_cache_lookup("body-method", body.fn_sym, fn_sym, args_id, dest_place)
+        if cached != -1234567:
+            return cached
     let raw = cc_intern_resolve(self.intern, fn_sym)
     if raw.len() == 0:
+        if self.infer_local_depth == 0:
+            self.call_infer_cache_store("body-method", body.fn_sym, fn_sym, args_id, dest_place, 0)
         return 0
     let base_name = cc_base_name(raw)
     let argc = self.call_arg_count(body, args_id)
@@ -2588,6 +2585,8 @@ fn CCodegen.infer_body_method_sym(self: CCodegen, body: MirBody, fn_sym: i32, ar
         if score > match_score:
             match_score = score
             match_sym = cand
+    if self.infer_local_depth == 0:
+        self.call_infer_cache_store("body-method", body.fn_sym, fn_sym, args_id, dest_place, match_sym)
     match_sym
 
 fn CCodegen.infer_direct_call_sym_scan(self: CCodegen, body: MirBody, args_id: i32, dest_place: i32, only_local_defs: i32) -> i32:
@@ -2780,42 +2779,17 @@ fn CCodegen.direct_infer_pop(self: CCodegen):
     self.active_direct_args.pop()
     self.active_direct_dests.pop()
 
-fn CCodegen.direct_cache_lookup(self: CCodegen, body_fn_sym: i32, args_id: i32, dest_place: i32) -> i32:
-    for i in 0..self.direct_cache_body_fns.len() as i32:
-        if self.direct_cache_body_fns.get(i as i64) != body_fn_sym:
-            continue
-        if self.direct_cache_args.get(i as i64) != args_id:
-            continue
-        if self.direct_cache_dests.get(i as i64) != dest_place:
-            continue
-        return self.direct_cache_values.get(i as i64)
+fn cc_call_infer_cache_key(kind: str, body_fn_sym: i32, callee_sym: i32, args_id: i32, dest_place: i32) -> str:
+    kind ++ ":" ++ f"{body_fn_sym}" ++ ":" ++ f"{callee_sym}" ++ ":" ++ f"{args_id}" ++ ":" ++ f"{dest_place}"
+
+fn CCodegen.call_infer_cache_lookup(self: CCodegen, kind: str, body_fn_sym: i32, callee_sym: i32, args_id: i32, dest_place: i32) -> i32:
+    let cached = self.call_infer_cache.get(cc_call_infer_cache_key(kind, body_fn_sym, callee_sym, args_id, dest_place))
+    if cached.is_some():
+        return cached.unwrap()
     -1234567
 
-fn CCodegen.direct_cache_store(self: CCodegen, body_fn_sym: i32, args_id: i32, dest_place: i32, value: i32) -> void:
-    self.direct_cache_body_fns.push(body_fn_sym)
-    self.direct_cache_args.push(args_id)
-    self.direct_cache_dests.push(dest_place)
-    self.direct_cache_values.push(value)
-
-fn CCodegen.method_cache_lookup(self: CCodegen, body_fn_sym: i32, method_sym: i32, args_id: i32, dest_place: i32) -> i32:
-    for i in 0..self.method_cache_body_fns.len() as i32:
-        if self.method_cache_body_fns.get(i as i64) != body_fn_sym:
-            continue
-        if self.method_cache_syms.get(i as i64) != method_sym:
-            continue
-        if self.method_cache_args.get(i as i64) != args_id:
-            continue
-        if self.method_cache_dests.get(i as i64) != dest_place:
-            continue
-        return self.method_cache_values.get(i as i64)
-    -1234567
-
-fn CCodegen.method_cache_store(self: CCodegen, body_fn_sym: i32, method_sym: i32, args_id: i32, dest_place: i32, value: i32) -> void:
-    self.method_cache_body_fns.push(body_fn_sym)
-    self.method_cache_syms.push(method_sym)
-    self.method_cache_args.push(args_id)
-    self.method_cache_dests.push(dest_place)
-    self.method_cache_values.push(value)
+fn CCodegen.call_infer_cache_store(self: CCodegen, kind: str, body_fn_sym: i32, callee_sym: i32, args_id: i32, dest_place: i32, value: i32) -> void:
+    self.call_infer_cache.insert(cc_call_infer_cache_key(kind, body_fn_sym, callee_sym, args_id, dest_place), value)
 
 fn CCodegen.field_cache_lookup(self: CCodegen, struct_tid: i32, field_sym: i32) -> i32:
     for i in 0..self.field_cache_struct_tids.len() as i32:
@@ -2941,11 +2915,11 @@ fn CCodegen.local_usage_hint_tid(self: CCodegen, body: MirBody, local_id: i32) -
     hint_tid
 
 fn CCodegen.infer_direct_call_sym(self: CCodegen, body: MirBody, args_id: i32, dest_place: i32) -> i32:
-    let cache_hit = self.direct_cache_lookup(body.fn_sym, args_id, dest_place)
+    let cache_hit = self.call_infer_cache_lookup("direct", body.fn_sym, 0, args_id, dest_place)
     if cache_hit != -1234567:
         return cache_hit
     if self.direct_infer_active(args_id, dest_place) != 0:
-        self.direct_cache_store(body.fn_sym, args_id, dest_place, 0)
+        self.call_infer_cache_store("direct", body.fn_sym, 0, args_id, dest_place, 0)
         return 0
     self.direct_infer_push(args_id, dest_place)
     let local_scan = self.infer_direct_call_sym_scan(body, args_id, dest_place, 1)
@@ -2955,7 +2929,7 @@ fn CCodegen.infer_direct_call_sym(self: CCodegen, body: MirBody, args_id: i32, d
     else:
         result = self.infer_direct_call_sym_scan(body, args_id, dest_place, 0)
     self.direct_infer_pop()
-    self.direct_cache_store(body.fn_sym, args_id, dest_place, result)
+    self.call_infer_cache_store("direct", body.fn_sym, 0, args_id, dest_place, result)
     result
 
 fn CCodegen.unique_method_owner_from_name(self: CCodegen, body: MirBody, fn_sym: i32, args_id: i32) -> str:
@@ -3128,11 +3102,11 @@ fn CCodegen.infer_qualified_method_sym_scan(self: CCodegen, body: MirBody, metho
 fn CCodegen.infer_qualified_method_sym(self: CCodegen, body: MirBody, method_sym: i32, args_id: i32, dest_place: i32) -> i32:
     if self.infer_local_depth > 0:
         return self.infer_qualified_method_sym_scan(body, method_sym, args_id, dest_place, 1)
-    let cache_hit = self.method_cache_lookup(body.fn_sym, method_sym, args_id, dest_place)
+    let cache_hit = self.call_infer_cache_lookup("qualified-method", body.fn_sym, method_sym, args_id, dest_place)
     if cache_hit != -1234567:
         return cache_hit
     if self.method_infer_active(method_sym, args_id, dest_place) != 0:
-        self.method_cache_store(body.fn_sym, method_sym, args_id, dest_place, 0)
+        self.call_infer_cache_store("qualified-method", body.fn_sym, method_sym, args_id, dest_place, 0)
         return 0
     self.method_infer_push(method_sym, args_id, dest_place)
     let local_scan = self.infer_qualified_method_sym_scan(body, method_sym, args_id, dest_place, 1)
@@ -3142,7 +3116,7 @@ fn CCodegen.infer_qualified_method_sym(self: CCodegen, body: MirBody, method_sym
     else:
         result = self.infer_qualified_method_sym_scan(body, method_sym, args_id, dest_place, 0)
     self.method_infer_pop()
-    self.method_cache_store(body.fn_sym, method_sym, args_id, dest_place, result)
+    self.call_infer_cache_store("qualified-method", body.fn_sym, method_sym, args_id, dest_place, result)
     result
 
 fn CCodegen.infer_owner_method_sym_scan(self: CCodegen, body: MirBody, fn_sym: i32, args_id: i32, dest_place: i32, only_local_defs: i32) -> i32:
@@ -3200,10 +3174,18 @@ fn CCodegen.infer_owner_method_sym_scan(self: CCodegen, body: MirBody, fn_sym: i
     match_sym
 
 fn CCodegen.infer_owner_method_sym(self: CCodegen, body: MirBody, fn_sym: i32, args_id: i32, dest_place: i32) -> i32:
+    if self.infer_local_depth > 0:
+        return self.infer_owner_method_sym_scan(body, fn_sym, args_id, dest_place, 1)
+    let cached = self.call_infer_cache_lookup("owner-method", body.fn_sym, fn_sym, args_id, dest_place)
+    if cached != -1234567:
+        return cached
     let local = self.infer_owner_method_sym_scan(body, fn_sym, args_id, dest_place, 1)
     if local > 0:
+        self.call_infer_cache_store("owner-method", body.fn_sym, fn_sym, args_id, dest_place, local)
         return local
-    self.infer_owner_method_sym_scan(body, fn_sym, args_id, dest_place, 0)
+    let result = self.infer_owner_method_sym_scan(body, fn_sym, args_id, dest_place, 0)
+    self.call_infer_cache_store("owner-method", body.fn_sym, fn_sym, args_id, dest_place, result)
+    result
 
 fn CCodegen.infer_builtin_call_name(self: CCodegen, body: MirBody, args_id: i32, dest_place: i32) -> str:
     let _ = self
