@@ -227,7 +227,7 @@ pub fn build_graph_run_with_compiler_build(root: str, target: BuildGraphTarget) 
         return 124
     if rc != 0:
         build_graph_rt_eprint("error: with_compiler_build target '" ++ target.name ++ f"' failed with exit code {rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
-        return if rc == 0: 1 else: rc
+        return rc
     if build_graph_rt_file_exists(tmp_output) == 0:
         build_graph_rt_eprint("error: with_compiler_build target '" ++ target.name ++ "' did not produce output: " ++ tmp_output)
         return 1
@@ -288,7 +288,7 @@ pub fn build_graph_run_with_compiler_ir(root: str, target: BuildGraphTarget) -> 
         return 124
     if rc != 0:
         build_graph_rt_eprint("error: with_compiler_ir target '" ++ target.name ++ f"' failed with exit code {rc}; output=" ++ tmp_output ++ " stderr=" ++ stderr_path)
-        return if rc == 0: 1 else: rc
+        return rc
     if build_graph_rt_file_exists(tmp_output) == 0:
         build_graph_rt_eprint("error: with_compiler_ir target '" ++ target.name ++ "' did not produce output: " ++ tmp_output)
         return 1

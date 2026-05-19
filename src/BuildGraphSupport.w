@@ -143,7 +143,7 @@ pub fn build_graph_exec_argv(target: BuildGraphTarget, operation_name: str, argv
     let rc = build_graph_rt_exec_argv(argv_blob)
     if rc != 0:
         build_graph_rt_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ f"' failed with exit code {rc}")
-        return if rc == 0: 1 else: rc
+        return rc
     0
 
 pub fn build_graph_validate_process_args(target: BuildGraphTarget) -> i32:

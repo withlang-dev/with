@@ -63,7 +63,7 @@ pub fn build_graph_run_external_test_file(root: str, target: BuildGraphTarget, c
         return 124
     if rc != 0:
         build_graph_rt_eprint("error: build.w test target '" ++ target.name ++ "' failed in '" ++ test_path ++ f"' with exit code {rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
-        return if rc == 0: 1 else: rc
+        return rc
     let _remove_stdout = build_graph_rt_remove_file(stdout_path)
     let _remove_stderr = build_graph_rt_remove_file(stderr_path)
     0
