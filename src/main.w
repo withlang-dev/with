@@ -1049,12 +1049,6 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, opt_level: 
                 return ir_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == build_graph_kind_pcre2_run_test():
-            let pcre2_rc = build_graph_run_pcre2_test(root, target)
-            if pcre2_rc != 0:
-                return pcre2_rc
-            completed_targets.push(target.name)
-            continue
         if target.kind == build_graph_kind_pcre2_generated_check():
             let pcre2_generated_check_rc = build_graph_run_pcre2_generated_check(root, target)
             if pcre2_generated_check_rc != 0:
@@ -1065,12 +1059,6 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, opt_level: 
             let pcre2_generated_promote_rc = build_graph_run_pcre2_generated_promote(root, target)
             if pcre2_generated_promote_rc != 0:
                 return pcre2_generated_promote_rc
-            completed_targets.push(target.name)
-            continue
-        if target.kind == build_graph_kind_pcre2_build():
-            let pcre2_build_rc = build_graph_run_pcre2_build(root, target)
-            if pcre2_build_rc != 0:
-                return pcre2_build_rc
             completed_targets.push(target.name)
             continue
         if target.kind == build_graph_kind_generate_llvm_link_metadata():

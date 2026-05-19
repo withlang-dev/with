@@ -16,7 +16,7 @@ fn build_graph_kind_is_standard(kind: i32) -> bool:
     kind >= 7 and kind <= BUILD_GRAPH_STANDARD_KIND_MAX
 
 fn build_graph_kind_is_project(kind: i32) -> bool:
-    if kind >= 1003 and kind <= 1008:
+    if kind == 1003 or kind == 1004 or kind == 1006 or kind == 1007:
         return true
     if kind == 1013:
         return true
@@ -25,14 +25,12 @@ fn build_graph_kind_is_project(kind: i32) -> bool:
     kind >= 1024 and kind <= BUILD_GRAPH_PROJECT_KIND_MAX
 
 pub fn build_graph_kind_removed(kind: i32) -> bool:
-    kind == 5 or kind == 6 or kind == 1000 or kind == 1001 or kind == 1002 or kind == 1009 or kind == 1010 or kind == 1011 or kind == 1012 or kind == 1014 or kind == 1015 or kind == 1016 or kind == 1017 or kind == 1018 or kind == 1019 or kind == 1021 or kind == 1022 or kind == 1023
+    kind == 5 or kind == 6 or kind == 1000 or kind == 1001 or kind == 1002 or kind == 1005 or kind == 1008 or kind == 1009 or kind == 1010 or kind == 1011 or kind == 1012 or kind == 1014 or kind == 1015 or kind == 1016 or kind == 1017 or kind == 1018 or kind == 1019 or kind == 1021 or kind == 1022 or kind == 1023
 
 pub fn build_graph_kind_generate_compiler_entrypoints() -> i32: 1003
 pub fn build_graph_kind_with_compiler_build() -> i32: 1004
-pub fn build_graph_kind_pcre2_run_test() -> i32: 1005
 pub fn build_graph_kind_pcre2_generated_check() -> i32: 1006
 pub fn build_graph_kind_pcre2_generated_promote() -> i32: 1007
-pub fn build_graph_kind_pcre2_build() -> i32: 1008
 pub fn build_graph_kind_with_compiler_ir() -> i32: 1013
 pub fn build_graph_kind_generate_llvm_link_metadata() -> i32: 1020
 pub fn build_graph_kind_seed_download() -> i32: 1024
@@ -73,10 +71,10 @@ pub fn build_graph_kind_name(kind: i32) -> str:
     if kind == 1002: return "removed_cli_selfhost_smoke_test"
     if kind == 1003: return "generate_compiler_entrypoints"
     if kind == 1004: return "with_compiler_build"
-    if kind == 1005: return "pcre2_run_test"
+    if kind == 1005: return "removed_pcre2_run_test"
     if kind == 1006: return "pcre2_generated_check"
     if kind == 1007: return "pcre2_generated_promote"
-    if kind == 1008: return "pcre2_build"
+    if kind == 1008: return "removed_pcre2_build"
     if kind == 1009: return "removed_cli_selfhost_one_liner_test"
     if kind == 1010: return "removed_cli_selfhost_object_symbol_test"
     if kind == 1011: return "removed_cli_selfhost_build_w_test"

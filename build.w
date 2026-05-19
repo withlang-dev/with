@@ -5,10 +5,8 @@ use build_pcre2
 
 fn project_kind_generate_compiler_entrypoints() -> BuildKind: 1003 as BuildKind
 fn project_kind_with_compiler_build() -> BuildKind: 1004 as BuildKind
-fn project_kind_pcre2_run_test() -> BuildKind: 1005 as BuildKind
 fn project_kind_pcre2_generated_check() -> BuildKind: 1006 as BuildKind
 fn project_kind_pcre2_generated_promote() -> BuildKind: 1007 as BuildKind
-fn project_kind_pcre2_build() -> BuildKind: 1008 as BuildKind
 fn project_kind_with_compiler_ir() -> BuildKind: 1013 as BuildKind
 fn project_kind_generate_llvm_link_metadata() -> BuildKind: 1020 as BuildKind
 fn project_kind_seed_download() -> BuildKind: 1024 as BuildKind
@@ -654,12 +652,15 @@ pub fn build(ctx: BuildCtx) -> Build:
     pcre2_migrate = pcre2_migrate.dep("pcre2-reference")
     out = out.add_target(pcre2_migrate)
 
-    var pcre2_build = target_new(project_kind_pcre2_build(), "pcre2-build", "out/bin/with").output("out/pcre2_build")
+    var pcre2_build = target_new(.Action, "pcre2-build", "").output("out/pcre2_build")
+    pcre2_build.action = run_pcre2_build_action
+    pcre2_build = pcre2_build.write_scope("out/pcre2_tmp")
     pcre2_build = pcre2_build.input("out/pcre2_migrated")
     pcre2_build = pcre2_build.dep("build")
     out = out.add_target(pcre2_build)
 
-    var pcre2_test = target_new(project_kind_pcre2_run_test(), "pcre2-test", "out/pcre2_build/bin/pcre2test")
+    var pcre2_test = target_new(.Action, "pcre2-test", "").output("out/corpus/pcre2-test")
+    pcre2_test.action = run_pcre2_test_action
     pcre2_test = pcre2_test.input("out/pcre2_migrated")
     pcre2_test = pcre2_test.input("out/pcre2_build/bin/pcre2test")
     pcre2_test = pcre2_test.input("out/pcre2_reference/pcre2-10.47/RunTest")
