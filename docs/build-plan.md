@@ -220,10 +220,11 @@ Remaining action hardening:
 
 Related stdlib/language blockers tracked for later design:
 
-- `Vec.push` currently returns `void`, so `Vec.new() |> push("a") |> push("b")`
-  cannot be a fluent builder chain until the Vec mutation API is redesigned.
-- Type context does not yet propagate through pipelines into `Vec.new()`, so
-  `Vec.new() |> push("a")` cannot infer the element type from the later method.
+- `Vec.push` now returns the receiver, so annotated fluent chains such as
+  `let v: Vec[str] = Vec.new() |> push("a") |> push("b")` work.
+- Type context still does not propagate through pipelines into an unannotated
+  `Vec.new()`, so `let v = Vec.new() |> push("a")` cannot infer the element
+  type from the later method.
 
 Implemented tests:
 

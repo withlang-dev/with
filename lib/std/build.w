@@ -210,9 +210,10 @@ pub fn BuildCtx.process_runner(self: &Self) -> ProcessRunner:
 pub fn process_env() -> ProcessEnv:
     ProcessEnv { vars: Vec.new() }
 
-pub fn ProcessEnv.set(mut self: ProcessEnv, name: str, value: str) -> ProcessEnv:
-    self.vars.push(ProcessEnvVar { name, value })
-    self
+pub fn ProcessEnv.set(self: ProcessEnv, name: str, value: str) -> ProcessEnv:
+    var vars = self.vars
+    vars.push(ProcessEnvVar { name, value })
+    ProcessEnv { vars }
 
 pub fn ProjectInfo.package_name(self: &Self) -> str:
     self.package.name
