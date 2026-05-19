@@ -47,6 +47,23 @@ extern fn ispunct(c: i32) -> i32
 extern fn iscntrl(c: i32) -> i32
 extern fn tolower(c: i32) -> i32
 extern fn toupper(c: i32) -> i32
+extern fn sqrt(x: f64) -> f64
+extern fn pow(base: f64, exp: f64) -> f64
+extern fn floor(x: f64) -> f64
+extern fn ceil(x: f64) -> f64
+extern fn round(x: f64) -> f64
+extern fn sin(x: f64) -> f64
+extern fn cos(x: f64) -> f64
+extern fn tan(x: f64) -> f64
+extern fn log(x: f64) -> f64
+extern fn log10(x: f64) -> f64
+extern fn exp(x: f64) -> f64
+extern fn fabs(x: f64) -> f64
+extern fn fmod(x: f64, y: f64) -> f64
+extern fn asin(x: f64) -> f64
+extern fn acos(x: f64) -> f64
+extern fn atan(x: f64) -> f64
+extern fn atan2(y: f64, x: f64) -> f64
 fn string_len(s: *const i8) -> i64 {
     strlen(s)
 }

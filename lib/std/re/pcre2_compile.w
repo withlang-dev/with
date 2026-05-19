@@ -662,7 +662,7 @@ fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulong, __param_
     }
 
     '__ci_bb_56 {
-        if ((if __local_c__goto_10503_18 > ((429496729 as c_uint) -% (1 as c_uint)): 1 else: 0) != 0) {
+        if ((if __local_c__goto_10503_18 > ((((4294967295 as c_uint) / (10 as c_uint)) as c_uint) -% (1 as c_uint)): 1 else: 0) != 0) {
             goto '__ci_bb_58
         } else {
             goto '__ci_bb_59
@@ -9448,7 +9448,7 @@ fn parse_capture_list(__param_ptrptr: *mut *const u8, __param_ptrend: *const u8,
         ((unsafe: *__ci_expr_old_3) = ((((__local_next_offset__goto_2736_12 as c_ulong) >> (32 as c_uint)) as c_uint)))
         (__ci_expr_old_4 = __local_parsed_pattern)
         (__local_parsed_pattern = __local_parsed_pattern + 1)
-        ((unsafe: *__ci_expr_old_4) = ((((__local_next_offset__goto_2736_12 as c_ulong) & ((4294967295 as c_uint) as c_ulong)) as c_uint)))
+        ((unsafe: *__ci_expr_old_4) = ((((__local_next_offset__goto_2736_12 as c_ulong) & ((4294967295 as c_ulong) as c_ulong)) as c_uint)))
         (__local_offset = __local_next_offset__goto_2736_12)
         goto '__ci_bb_33
     }
@@ -12010,7 +12010,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
         ((unsafe: *__ci_expr_old_68) = ((((__local_offset__goto_3236_14 as c_ulong) >> (32 as c_uint)) as c_uint)))
         (__ci_expr_old_69 = __local_parsed_pattern__goto_3125_11)
         (__local_parsed_pattern__goto_3125_11 = __local_parsed_pattern__goto_3125_11 + 1)
-        ((unsafe: *__ci_expr_old_69) = ((((__local_offset__goto_3236_14 as c_ulong) & ((4294967295 as c_uint) as c_ulong)) as c_uint)))
+        ((unsafe: *__ci_expr_old_69) = ((((__local_offset__goto_3236_14 as c_ulong) & ((4294967295 as c_ulong) as c_ulong)) as c_uint)))
         goto '__ci_bb_194
     }
 
@@ -12294,7 +12294,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
         ((unsafe: *__ci_expr_old_90) = ((((__local_offset__goto_3236_14 as c_ulong) >> (32 as c_uint)) as c_uint)))
         (__ci_expr_old_91 = __local_parsed_pattern__goto_3125_11)
         (__local_parsed_pattern__goto_3125_11 = __local_parsed_pattern__goto_3125_11 + 1)
-        ((unsafe: *__ci_expr_old_91) = ((((__local_offset__goto_3236_14 as c_ulong) & ((4294967295 as c_uint) as c_ulong)) as c_uint)))
+        ((unsafe: *__ci_expr_old_91) = ((((__local_offset__goto_3236_14 as c_ulong) & ((4294967295 as c_ulong) as c_ulong)) as c_uint)))
         (__local_okquantifier__goto_3146_6 = 1)
         goto '__ci_bb_198
     }
@@ -12671,7 +12671,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
         ((unsafe: *__ci_expr_old_104) = (((((0 as c_ulong) as c_ulong) >> (32 as c_uint)) as c_uint)))
         (__ci_expr_old_105 = __local_parsed_pattern__goto_3125_11)
         (__local_parsed_pattern__goto_3125_11 = __local_parsed_pattern__goto_3125_11 + 1)
-        ((unsafe: *__ci_expr_old_105) = (((((0 as c_ulong) as c_ulong) & ((4294967295 as c_uint) as c_ulong)) as c_uint)))
+        ((unsafe: *__ci_expr_old_105) = (((((0 as c_ulong) as c_ulong) & ((4294967295 as c_ulong) as c_ulong)) as c_uint)))
         goto '__ci_bb_270
     }
 
@@ -15584,7 +15584,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
         ((unsafe: *__ci_expr_old_339) = ((((__local_offset__goto_3236_14 as c_ulong) >> (32 as c_uint)) as c_uint)))
         (__ci_expr_old_340 = __local_parsed_pattern__goto_3125_11)
         (__local_parsed_pattern__goto_3125_11 = __local_parsed_pattern__goto_3125_11 + 1)
-        ((unsafe: *__ci_expr_old_340) = ((((__local_offset__goto_3236_14 as c_ulong) & ((4294967295 as c_uint) as c_ulong)) as c_uint)))
+        ((unsafe: *__ci_expr_old_340) = ((((__local_offset__goto_3236_14 as c_ulong) & ((4294967295 as c_ulong) as c_ulong)) as c_uint)))
         (__local_ptr = __local_ptr + ((2 as isize) as usize))
         goto '__ci_bb_636
     }
@@ -16535,7 +16535,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
         ((unsafe: *__ci_expr_old_270) = ((((__local_offset__goto_3236_14 as c_ulong) >> (32 as c_uint)) as c_uint)))
         (__ci_expr_old_271 = __local_parsed_pattern__goto_3125_11)
         (__local_parsed_pattern__goto_3125_11 = __local_parsed_pattern__goto_3125_11 + 1)
-        ((unsafe: *__ci_expr_old_271) = ((((__local_offset__goto_3236_14 as c_ulong) & ((4294967295 as c_uint) as c_ulong)) as c_uint)))
+        ((unsafe: *__ci_expr_old_271) = ((((__local_offset__goto_3236_14 as c_ulong) & ((4294967295 as c_ulong) as c_ulong)) as c_uint)))
         (__local_okquantifier__goto_3146_6 = 1)
         goto '__ci_bb_681
     }
@@ -16642,7 +16642,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
         ((unsafe: *__ci_expr_old_280) = ((((__local_offset__goto_3236_14 as c_ulong) >> (32 as c_uint)) as c_uint)))
         (__ci_expr_old_281 = __local_parsed_pattern__goto_3125_11)
         (__local_parsed_pattern__goto_3125_11 = __local_parsed_pattern__goto_3125_11 + 1)
-        ((unsafe: *__ci_expr_old_281) = ((((__local_offset__goto_3236_14 as c_ulong) & ((4294967295 as c_uint) as c_ulong)) as c_uint)))
+        ((unsafe: *__ci_expr_old_281) = ((((__local_offset__goto_3236_14 as c_ulong) & ((4294967295 as c_ulong) as c_ulong)) as c_uint)))
         (__local_okquantifier__goto_3146_6 = 1)
         if ((if __local_terminator__goto_3232_12 != 0: 1 else: 0) != 0) {
             goto '__ci_bb_780
@@ -16953,7 +16953,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
         ((unsafe: *__ci_expr_old_292) = ((((__local_offset__goto_3236_14 as c_ulong) >> (32 as c_uint)) as c_uint)))
         (__ci_expr_old_293 = __local_parsed_pattern__goto_3125_11)
         (__local_parsed_pattern__goto_3125_11 = __local_parsed_pattern__goto_3125_11 + 1)
-        ((unsafe: *__ci_expr_old_293) = ((((__local_offset__goto_3236_14 as c_ulong) & ((4294967295 as c_uint) as c_ulong)) as c_uint)))
+        ((unsafe: *__ci_expr_old_293) = ((((__local_offset__goto_3236_14 as c_ulong) & ((4294967295 as c_ulong) as c_ulong)) as c_uint)))
         goto '__ci_bb_797
     }
 
@@ -17119,7 +17119,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
         ((unsafe: *__ci_expr_old_302) = ((((__local_offset__goto_3236_14 as c_ulong) >> (32 as c_uint)) as c_uint)))
         (__ci_expr_old_303 = __local_parsed_pattern__goto_3125_11)
         (__local_parsed_pattern__goto_3125_11 = __local_parsed_pattern__goto_3125_11 + 1)
-        ((unsafe: *__ci_expr_old_303) = ((((__local_offset__goto_3236_14 as c_ulong) & ((4294967295 as c_uint) as c_ulong)) as c_uint)))
+        ((unsafe: *__ci_expr_old_303) = ((((__local_offset__goto_3236_14 as c_ulong) & ((4294967295 as c_ulong) as c_ulong)) as c_uint)))
         (__ci_expr_old_304 = __local_parsed_pattern__goto_3125_11)
         (__local_parsed_pattern__goto_3125_11 = __local_parsed_pattern__goto_3125_11 + 1)
         ((unsafe: *__ci_expr_old_304) = __local_i__goto_3139_5)
@@ -17542,7 +17542,7 @@ fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_xoptions
         ((unsafe: *__ci_expr_old_326) = ((((__local_offset__goto_3236_14 as c_ulong) >> (32 as c_uint)) as c_uint)))
         (__ci_expr_old_327 = __local_parsed_pattern__goto_3125_11)
         (__local_parsed_pattern__goto_3125_11 = __local_parsed_pattern__goto_3125_11 + 1)
-        ((unsafe: *__ci_expr_old_327) = ((((__local_offset__goto_3236_14 as c_ulong) & ((4294967295 as c_uint) as c_ulong)) as c_uint)))
+        ((unsafe: *__ci_expr_old_327) = ((((__local_offset__goto_3236_14 as c_ulong) & ((4294967295 as c_ulong) as c_ulong)) as c_uint)))
         goto '__ci_bb_841
     }
 
