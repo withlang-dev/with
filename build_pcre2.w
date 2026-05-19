@@ -571,6 +571,57 @@ pub fn run_pcre2_migrate_action(ctx: ActionCtx) -> i32:
     print(f"migrated PCRE2: {generated_count} .w files in " ++ pcre2_abs(root, generated_dir))
     0
 
+pub fn run_pcre2_migrate_smoke_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let inputs = ctx.inputs()
+    let root = ctx.project_info().project_root()
+    let output_dir = ctx.output()
+    if inputs.len() < 2 or output_dir.len() == 0:
+        return pcre2_fail(ctx, "requires pcre2_compile.c input, source-dir input, and output directory")
+    let compile_c = inputs.get(0)
+    let source_dir = inputs.get(1)
+    if not fs.exists(compile_c):
+        return pcre2_fail(ctx, "missing pcre2_compile.c: " ++ compile_c)
+    if not fs.is_dir(source_dir):
+        return pcre2_fail(ctx, "missing PCRE2 source directory: " ++ source_dir)
+    if fs.exists(output_dir) and fs.remove_tree(output_dir) != 0:
+        return pcre2_fail(ctx, "could not remove previous smoke output: " ++ output_dir)
+    if fs.mkdir_all(output_dir) != 0:
+        return pcre2_fail(ctx, "could not create smoke output directory: " ++ output_dir)
+
+    let out_w = pcre2_join(output_dir, "pcre2_compile.w")
+    let stdout_path = pcre2_abs(root, pcre2_join(output_dir, "migrate.stdout"))
+    let stderr_path = pcre2_abs(root, pcre2_join(output_dir, "migrate.stderr"))
+    var migrate_args: Vec[str] = Vec.new()
+    migrate_args |> push(pcre2_abs(root, "out/bin/with-stage2"))
+    migrate_args |> push("migrate")
+    migrate_args |> push(pcre2_abs(root, compile_c))
+    migrate_args |> push("-o")
+    migrate_args |> push(pcre2_abs(root, out_w))
+    migrate_args |> push("--no-c-export")
+    migrate_args |> push("--prefer-brace")
+    migrate_args |> push("--width-slice")
+    migrate_args |> push("8")
+    migrate_args |> push("--shared-defs")
+    migrate_args |> push("std.re.defs")
+    migrate_args |> push("-I")
+    migrate_args |> push(pcre2_abs(root, source_dir))
+    migrate_args |> push("-D")
+    migrate_args |> push("PCRE2_CODE_UNIT_WIDTH=8")
+    migrate_args |> push("-D")
+    migrate_args |> push("HAVE_CONFIG_H=1")
+    let result = ctx.process_runner().run_capture(migrate_args, stdout_path, stderr_path, 300000)
+    if result.rc == 124:
+        return pcre2_fail(ctx, "pcre2_compile.c migration smoke timed out; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+    if result.rc != 0:
+        return pcre2_fail(ctx, f"pcre2_compile.c migration smoke failed with exit code {result.rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+    if not fs.exists(out_w):
+        return pcre2_fail(ctx, "pcre2_compile.c migration smoke did not produce " ++ out_w)
+    if fs.read_text(out_w).contains("@[c_export("):
+        return pcre2_fail(ctx, "pcre2_compile.c migration smoke emitted forbidden c_export attribute")
+    print("PCRE2 MIGRATE SMOKE OK")
+    0
+
 pub fn run_pcre2_build_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let inputs = ctx.inputs()
