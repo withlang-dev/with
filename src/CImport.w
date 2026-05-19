@@ -8780,7 +8780,7 @@ fn ci_goto_scope_after_label_stmt(session: i64, cursor: i32, scope: CiScope) -> 
         return ci_goto_scope_add_decl_mappings(session, child, scope)
     scope
 
-fn ci_goto_switch_scope_after_case(session: i64, cursor: i32, scope: CiScope) -> CiScope:
+fn ci_goto_switch_scope_after_case(session: i64, cursor: i32, scope: CiScope):
     let kind = with_ci_cursor_kind(session, cursor)
     let nc = with_ci_num_children(session, cursor)
     var next_scope = scope
@@ -8790,27 +8790,26 @@ fn ci_goto_switch_scope_after_case(session: i64, cursor: i32, scope: CiScope) ->
             let case_body = with_ci_child(session, cursor, i)
             let cbk = with_ci_cursor_kind(session, case_body)
             if cbk == CXK_CASE_STMT or cbk == CXK_DEFAULT_STMT:
-                next_scope = ci_goto_switch_scope_after_case(session, case_body, next_scope)
+                ci_goto_switch_scope_after_case(session, case_body, next_scope)
             else if cbk == CXK_DECL_STMT:
                 next_scope = ci_goto_scope_add_decl_mappings(session, case_body, next_scope)
             else if cbk == CXK_LABEL_STMT:
                 next_scope = ci_goto_scope_after_label_stmt(session, case_body, next_scope)
             i = i + 1
-        return next_scope
+        return
     if kind == CXK_DEFAULT_STMT:
         var i = 0
         while i < nc:
             let default_body = with_ci_child(session, cursor, i)
             let dbk = with_ci_cursor_kind(session, default_body)
             if dbk == CXK_CASE_STMT or dbk == CXK_DEFAULT_STMT:
-                next_scope = ci_goto_switch_scope_after_case(session, default_body, next_scope)
+                ci_goto_switch_scope_after_case(session, default_body, next_scope)
             else if dbk == CXK_DECL_STMT:
                 next_scope = ci_goto_scope_add_decl_mappings(session, default_body, next_scope)
             else if dbk == CXK_LABEL_STMT:
                 next_scope = ci_goto_scope_after_label_stmt(session, default_body, next_scope)
             i = i + 1
-        return next_scope
-    next_scope
+        return
 
 // Structural counterpart of ci_lower_decl_stmt. Builds a
 // CIS_VAR_DECL for each VAR_DECL child, combining multiple
@@ -11711,6 +11710,7 @@ fn CiGotoSwitchCase.record_case(self: CiGotoSwitchCase, value: CiExprId, block: 
 fn CiGotoCfgContext.lower_case_children(mut self: CiGotoCfgContext, session: i64, cursor: i32, first_child: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope, cases: CiGotoSwitchCase):
     let saved_cases = self.switch_cases
     self.switch_cases = cases
+    let case_mark = ci_scope_mark(scope)
     var case_scope = scope
     let nc = with_ci_num_children(session, cursor)
     var i = first_child
@@ -11719,7 +11719,7 @@ fn CiGotoCfgContext.lower_case_children(mut self: CiGotoCfgContext, session: i64
         let ck = with_ci_cursor_kind(session, child)
         if ck == CXK_CASE_STMT or ck == CXK_DEFAULT_STMT:
             self.lower_case_node(session, child, stmts, exprs, types, case_scope, cases)
-            case_scope = ci_goto_switch_scope_after_case(session, child, case_scope)
+            ci_goto_switch_scope_after_case(session, child, case_scope)
             i = i + 1
             continue
         if ck == CXK_DECL_STMT:
@@ -11735,6 +11735,7 @@ fn CiGotoCfgContext.lower_case_children(mut self: CiGotoCfgContext, session: i64
         if ck == CXK_LABEL_STMT:
             case_scope = ci_goto_scope_after_label_stmt(session, child, case_scope)
         i = i + 1
+    let _ = ci_scope_restore(scope, case_mark)
     self.switch_cases = saved_cases
 
 fn CiGotoCfgContext.lower_case_node(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope, cases: CiGotoSwitchCase):
@@ -11766,6 +11767,7 @@ fn CiGotoCfgContext.lower_switch_body(mut self: CiGotoCfgContext, session: i64, 
     let saved_cases = self.switch_cases
     self.switch_cases = cases
     let nc = with_ci_num_children(session, body_cursor)
+    let switch_mark = ci_scope_mark(scope)
     var switch_scope = scope
     var i = 0
     while i < nc and self.ok:
@@ -11777,7 +11779,7 @@ fn CiGotoCfgContext.lower_switch_body(mut self: CiGotoCfgContext, session: i64, 
                 self.branch_current(case_block, with_ci_cursor_location(session, child))
             self.set_current(case_block)
             self.lower_case_node(session, child, stmts, exprs, types, switch_scope, cases)
-            switch_scope = ci_goto_switch_scope_after_case(session, child, switch_scope)
+            ci_goto_switch_scope_after_case(session, child, switch_scope)
             i = i + 1
             continue
         if self.current < 0:
@@ -11799,6 +11801,7 @@ fn CiGotoCfgContext.lower_switch_body(mut self: CiGotoCfgContext, session: i64, 
         if ck == CXK_LABEL_STMT:
             switch_scope = ci_goto_scope_after_label_stmt(session, child, switch_scope)
         i = i + 1
+    let _ = ci_scope_restore(scope, switch_mark)
     self.switch_cases = saved_cases
 
 fn CiGotoCfgContext.emit_switch_dispatch(mut self: CiGotoCfgContext, exprs: CiExprPool, subject_id: CiExprId, dispatch_block: i32, after_block: i32, cases: CiGotoSwitchCase, loc: str):
