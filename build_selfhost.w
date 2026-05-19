@@ -1958,6 +1958,16 @@ fn bs_check_build_w_graph_v2(ctx: ActionCtx, compiler_path: str, case_dir: str) 
     if selected.rc != 0: return selected.rc
     rc = bs_assert_not_contains(ctx, selected.stdout, "target\t12\thelper-o", "build_w_graph_selected")
     if rc != 0: return rc
+    var no_deps_args: Vec[str] = Vec.new()
+    no_deps_args |> push("build")
+    no_deps_args |> push(":two")
+    no_deps_args |> push("--no-deps")
+    let non_action = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-no-deps-non-action", no_deps_args, 120000, case_dir)
+    if non_action.rc == 0:
+        ctx.diagnostics().error("error: build_w_no_deps_non_action unexpectedly succeeded")
+        return 1
+    rc = bs_assert_contains(ctx, non_action.stderr, "--no-deps is only supported for build.w action targets", "build_w_no_deps_non_action")
+    if rc != 0: return rc
     let deps = bs_build_w_expect_success(ctx, compiler_path, case_dir, "build-w-graph-deps", bs_blob_to_args(bs_argv_append(bs_argv_append(bs_argv_append("", "build"), ":toolchain"), "--graph")))
     if deps.rc != 0: return deps.rc
     rc = bs_assert_contains(ctx, deps.stdout, "target\t12\thelper-o", "build_w_graph_deps")
@@ -2112,6 +2122,55 @@ fn bs_check_build_w_action_target(ctx: ActionCtx, compiler_path: str, case_dir: 
     if rc != 0: return rc
     bs_expect_file_contains(ctx, bs_join(case_dir, "out/action/extra.txt"), "extra:hello", "build_w_action_extra_output")
 
+fn bs_check_build_w_action_no_deps(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    var rc = bs_write_project_manifest(ctx, case_dir, "actionnodeps")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "src/main.w"), "fn main:\n    print(\"unused\")\n", ctx.target_name(), "action no-deps source")
+    if rc != 0: return rc
+    let build_text =
+        "use std.build\n\n" ++
+        "fn prepare(ctx: ActionCtx) -> i32:\n" ++
+        "    let _ = ctx\n" ++
+        "    17\n\n" ++
+        "fn leaf(ctx: ActionCtx) -> i32:\n" ++
+        "    assert(ctx.fs().write_text(ctx.output(), \"leaf\") == 0)\n" ++
+        "    0\n\n" ++
+        "pub fn build(ctx: BuildCtx) -> Build:\n" ++
+        "    var out = ctx.new_build()\n" ++
+        "    var prepare_target = target_new(.Action, \"prepare\", \"\").output(\"out/action/prepare.txt\")\n" ++
+        "    prepare_target.action = prepare\n" ++
+        "    out = out.add_target(prepare_target)\n" ++
+        "    var leaf_target = target_new(.Action, \"leaf\", \"\").output(\"out/action/leaf.txt\")\n" ++
+        "    leaf_target = leaf_target.dep(\"prepare\")\n" ++
+        "    leaf_target.action = leaf\n" ++
+        "    out = out.add_target(leaf_target)\n" ++
+        "    out.default(\"leaf\")\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "build.w"), build_text, ctx.target_name(), "action no-deps build.w")
+    if rc != 0: return rc
+
+    var args: Vec[str] = Vec.new()
+    args |> push("build")
+    args |> push(":leaf")
+    args |> push("--no-deps")
+    let no_deps = bs_build_w_expect_success(ctx, compiler_path, case_dir, "build-w-action-no-deps", args)
+    if no_deps.rc != 0: return no_deps.rc
+    rc = bs_expect_file_contains(ctx, bs_join(case_dir, "out/action/leaf.txt"), "leaf", "build_w_action_no_deps")
+    if rc != 0: return rc
+    if ctx.fs().exists(bs_join(case_dir, "out/action/prepare.txt")):
+        ctx.diagnostics().error("error: build_w_action_no_deps unexpectedly ran dependency action")
+        return 1
+
+    var dep_args: Vec[str] = Vec.new()
+    dep_args |> push("build")
+    dep_args |> push(":leaf")
+    let with_deps = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-action-with-deps-fails", dep_args, 120000, case_dir)
+    if with_deps.rc == 0:
+        ctx.diagnostics().error("error: build_w_action_no_deps normal dependency build unexpectedly succeeded")
+        return 1
+    rc = bs_assert_contains(ctx, with_deps.stderr, "prepare", "build_w_action_no_deps_failure")
+    if rc != 0: return rc
+    bs_assert_contains(ctx, with_deps.stderr, "failed with exit code 17", "build_w_action_no_deps_failure")
+
 fn bs_check_build_w_action_failures(ctx: ActionCtx, compiler_path: str, base_dir: str) -> i32:
     let missing_dir = bs_join(base_dir, "missing_input")
     var rc = bs_write_project_manifest(ctx, missing_dir, "actionmissing")
@@ -2245,6 +2304,8 @@ pub fn run_cli_selfhost_build_w_action(ctx: ActionCtx) -> i32:
     rc = bs_check_removed_build_kind_diagnostic(ctx, compiler_path, bs_join(base_dir, "removed_kind"))
     if rc != 0: return rc
     rc = bs_check_build_w_action_target(ctx, compiler_path, bs_join(base_dir, "action"))
+    if rc != 0: return rc
+    rc = bs_check_build_w_action_no_deps(ctx, compiler_path, bs_join(base_dir, "action_no_deps"))
     if rc != 0: return rc
     bs_check_build_w_action_failures(ctx, compiler_path, bs_join(base_dir, "action_failures"))
 

@@ -307,6 +307,29 @@ pub fn build_graph_filter_target(graph: &BuildGraph, target_name: str) -> BuildG
         out.raw_text = build_graph_emit(out)
     out
 
+pub fn build_graph_filter_single_target(graph: &BuildGraph, target_name: str) -> BuildGraph:
+    var out = empty_build_graph()
+    out.ok = graph.ok
+    out.error_msg = graph.error_msg
+    out.raw_text = graph.raw_text
+    out.package_name = graph.package_name
+    out.package_version = graph.package_version
+    out.default_target = graph.default_target
+    for gi in 0..graph.generated_sources.len() as i32:
+        out.generated_sources.push(graph.generated_sources.get(gi as i64))
+    if target_name.len() == 0:
+        out.ok = false
+        out.error_msg = "--no-deps requires an explicit build.w target"
+        return out
+    let index = build_graph_find_target_index(graph, target_name)
+    if index < 0:
+        out.ok = false
+        out.error_msg = "build.w did not declare target '" ++ target_name ++ "'"
+        return out
+    out.targets.push(graph.targets.get(index as i64))
+    out.raw_text = build_graph_emit(out)
+    out
+
 fn build_graph_selected_targets_new -> BuildGraphSelectedTargets:
     BuildGraphSelectedTargets {
         ok: true,

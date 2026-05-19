@@ -77,6 +77,7 @@ with build
 with build :target
 with build --graph
 with build --dry-run
+with build :action --no-deps
 ```
 
 `with build` searches upward from the current directory for `build.w` or
@@ -89,6 +90,17 @@ using the package name from `with.toml`.
 `--graph` prints the stable graph format emitted by `Build.emit_graph()`.
 
 `--dry-run` currently prints the selected graph without executing it.
+
+`--no-deps` is an action-iteration flag. It may be used only with an explicit
+`Action` target, and runs that action target without expanding declared
+dependencies or producer edges:
+
+```sh
+with build :pcre2-migrate --no-deps
+```
+
+Normal builds should not use this flag. It assumes required inputs already
+exist and is intended for debugging or iterating on one action body.
 
 ### Direct Source Builds
 
