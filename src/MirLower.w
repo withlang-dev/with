@@ -144,14 +144,14 @@ fn MirBuilder.terminate(self: MirBuilder, kind: i32, d0: i32, d1: i32, d2: i32, 
 fn MirBuilder.terminate_with_span(self: MirBuilder, kind: i32, d0: i32, d1: i32, d2: i32, d3: i32, span: i32):
     self.body.set_terminator(self.cur_bb, kind, d0, d1, d2, d3, span)
 
-fn MirBuilder.push_scope(self: MirBuilder):
+fn MirBuilder.push_scope(self: MirBuilder) -> void:
     self.drop_scope_starts.push(self.drop_local_ids.len() as i32)
     self.bind_scope_starts.push(self.bind_syms.len() as i32)
     self.alias_scope_starts.push(self.alias_syms.len() as i32)
     self.defer_scope_starts.push(self.defer_nodes.len() as i32)
     self.errdefer_scope_starts.push(self.errdefer_nodes.len() as i32)
 
-fn MirBuilder.schedule_drop(self: MirBuilder, local_id: i32, drop_kind: i32):
+fn MirBuilder.schedule_drop(self: MirBuilder, local_id: i32, drop_kind: i32) -> void:
     self.drop_local_ids.push(local_id)
     self.drop_kinds.push(drop_kind)
 
@@ -320,7 +320,7 @@ fn MirBuilder.emit_auto_defers_for_bind_range(self: MirBuilder, start: i32, end:
                 self.switch_to(next_bb)
         bi = bi + 1
 
-fn MirBuilder.push_control_target(self: MirBuilder, label: i32, target_kind: i32, continue_bb: i32, break_bb: i32):
+fn MirBuilder.push_control_target(self: MirBuilder, label: i32, target_kind: i32, continue_bb: i32, break_bb: i32) -> void:
     self.loop_continue_bbs.push(continue_bb)
     self.loop_break_bbs.push(break_bb)
     self.loop_break_drop_depths.push(self.drop_local_ids.len() as i32)
@@ -554,11 +554,11 @@ fn MirBuilder.goto_target_info(self: MirBuilder, label: i32) -> LoopInfo:
         break_scope_depth: scope_depth,
     }
 
-fn MirBuilder.bind_local(self: MirBuilder, sym: i32, local_id: i32):
+fn MirBuilder.bind_local(self: MirBuilder, sym: i32, local_id: i32) -> void:
     self.bind_syms.push(sym)
     self.bind_local_ids.push(local_id)
 
-fn MirBuilder.bind_alias_place(self: MirBuilder, sym: i32, place: i32, ty: i32):
+fn MirBuilder.bind_alias_place(self: MirBuilder, sym: i32, place: i32, ty: i32) -> void:
     self.alias_syms.push(sym)
     self.alias_places.push(place)
     self.alias_types.push(ty)
@@ -782,7 +782,8 @@ fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_nam
         if type_name == "Vec":
             if method_name == "len": return self.sema.ty_i64 as i32
             if method_name == "new": return recv_type
-            if method_name == "push" or method_name == "set_i32" or method_name == "remove" or method_name == "clear":
+            if method_name == "push": return recv_type
+            if method_name == "set_i32" or method_name == "remove" or method_name == "clear":
                 return self.sema.ty_void as i32
             if method_name == "get" or method_name == "pop":
                 if tk == TypeKind.TY_GENERIC_INST:
@@ -1701,7 +1702,7 @@ fn MirBuilder.lower_regex_capture_bindings_from_option(self: MirBuilder, regex_n
     let captures_place = self.lower_option_unwrap_place(captures_opt_place, self.regex_captures_option_type(), self.regex_captures_type())
     self.lower_regex_capture_bindings_from_captures(regex_node, captures_place)
 
-fn MirBuilder.remember_regex_pattern_captures(self: MirBuilder, pat_node: i32, captures_opt_place: i32):
+fn MirBuilder.remember_regex_pattern_captures(self: MirBuilder, pat_node: i32, captures_opt_place: i32) -> void:
     for i in 0..self.regex_capture_pat_nodes.len() as i32:
         if self.regex_capture_pat_nodes.get(i as i64) == pat_node:
             self.regex_capture_opt_places.set_i32(i as i64, captures_opt_place)
@@ -4798,6 +4799,8 @@ fn MirBuilder.lower_intrinsic_call(self: MirBuilder, intrinsic: i32, self_expr: 
 
     let args_id = self.body.new_call_args(call_args)
     var ret_type = self.expr_type(node)
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_PUSH and self.expected_type == self.sema.ty_void as i32:
+        ret_type = self.sema.ty_void as i32
     // For static constructors (Vec.new, HashMap.new), expr_type often returns
     // the bare struct type (TypeKind.TY_STRUCT) instead of the generic instance
     // (TypeKind.TY_GENERIC_INST). Use the expected type from the let binding if available.
@@ -6349,7 +6352,7 @@ fn mir_vec_contains_i32(v: &Vec[i32], value: i32) -> bool:
             return true
     false
 
-fn mir_push_unique_i32(v: Vec[i32], value: i32):
+fn mir_push_unique_i32(v: Vec[i32], value: i32) -> void:
     if not mir_vec_contains_i32(&v, value):
         v.push(value)
 

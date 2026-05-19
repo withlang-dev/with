@@ -5118,7 +5118,7 @@ fn ci_record_count_cache_lookup(key: str) -> i32:
         i = i + 1
     -1
 
-fn ci_record_count_cache_store(key: str, value: i32):
+fn ci_record_count_cache_store(key: str, value: i32) -> void:
     g_ci_record_count_cache_keys.push(key)
     g_ci_record_count_cache_values.push(value)
 
@@ -5130,7 +5130,7 @@ fn ci_record_field_cache_lookup_index(key: str) -> i32:
         i = i + 1
     -1
 
-fn ci_record_field_cache_store(key: str, name: str, ty: str):
+fn ci_record_field_cache_store(key: str, name: str, ty: str) -> void:
     g_ci_record_field_cache_keys.push(key)
     g_ci_record_field_name_cache_values.push(name)
     g_ci_record_field_type_cache_values.push(ty)
@@ -11085,11 +11085,11 @@ fn ci_trace_port(tag: str):
     if ci_trace_port_enabled():
         with_eprint(tag)
 
-fn ci_record_raw_expr_kind(kind: i32):
+fn ci_record_raw_expr_kind(kind: i32) -> void:
     if ci_raw_stats_enabled():
         g_ci_raw_expr_kinds.push(kind)
 
-fn ci_record_raw_stmt_kind(kind: i32):
+fn ci_record_raw_stmt_kind(kind: i32) -> void:
     if ci_raw_stats_enabled():
         g_ci_raw_stmt_kinds.push(kind)
 
@@ -11366,7 +11366,7 @@ fn CiGotoCfgContext.set_current(mut self: CiGotoCfgContext, block: i32):
         return
     self.current = block
 
-fn CiGotoCfgContext.append_stmt(mut self: CiGotoCfgContext, stmts: CiStmtPool, stmt_id: CiStmtId):
+fn CiGotoCfgContext.append_stmt(mut self: CiGotoCfgContext, stmts: CiStmtPool, stmt_id: CiStmtId) -> void:
     if not self.ok or self.current < 0 or (stmt_id as i32) == 0:
         return
     let kind = stmts.kind(stmt_id)
@@ -11454,14 +11454,14 @@ fn ci_goto_cfg_target_label_from_goto(session: i64, cursor: i32) -> str:
             return child_name
     with_ci_cursor_spelling(session, cursor)
 
-fn CiGotoCfgContext.push_break_target(self: CiGotoCfgContext, target: i32):
+fn CiGotoCfgContext.push_break_target(self: CiGotoCfgContext, target: i32) -> void:
     self.break_targets.push(target)
 
 fn CiGotoCfgContext.pop_break_target(self: CiGotoCfgContext):
     if self.break_targets.len() > 0:
         let _ = self.break_targets.pop()
 
-fn CiGotoCfgContext.push_continue_target(self: CiGotoCfgContext, target: i32):
+fn CiGotoCfgContext.push_continue_target(self: CiGotoCfgContext, target: i32) -> void:
     self.continue_targets.push(target)
 
 fn CiGotoCfgContext.pop_continue_target(self: CiGotoCfgContext):
@@ -11717,7 +11717,7 @@ fn ci_goto_switch_case_new() -> CiGotoSwitchCase:
         }
     CiGotoSwitchCase { state: ptr }
 
-fn CiGotoSwitchCase.record_case(self: CiGotoSwitchCase, value: CiExprId, block: i32):
+fn CiGotoSwitchCase.record_case(self: CiGotoSwitchCase, value: CiExprId, block: i32) -> void:
     self.state.values.push(value as i32)
     self.state.blocks.push(block)
 

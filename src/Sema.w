@@ -1076,7 +1076,7 @@ fn Sema.register_prim(mut self: Sema, name: str, tid: i32):
     let sym = self.pool_intern(name)
     self.record_named_type(sym, tid)
 
-fn Sema.record_named_type(mut self: Sema, sym: i32, tid: i32):
+fn Sema.record_named_type(mut self: Sema, sym: i32, tid: i32) -> void:
     self.named_types.insert(sym, tid)
     self.named_type_candidate_syms.push(sym)
     self.named_type_candidate_tids.push(tid)
@@ -2071,7 +2071,7 @@ fn Sema.is_c_void_like_type(self: Sema, tid: i32) -> i32:
 
 // ── Scope management ─────────────────────────────────────────────
 
-fn Sema.push_scope(self: Sema):
+fn Sema.push_scope(self: Sema) -> void:
     self.scope_starts.push(self.bind_names.len() as i32)
 
 fn Sema.emit_pending_generic_binding_error(self: Sema, sym: i32):

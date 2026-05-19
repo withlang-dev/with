@@ -149,7 +149,7 @@ fn frontend_dump_type_decl_names(stage: str, pool: AstPool, intern: InternPool):
         let msg = f"[type-names] {stage} decl={di} node={decl as i32} kind={kind_name} name_sym={name_sym} name={name}"
         with_eprint(msg)
 
-fn Sema.init_module_graph(mut self: Sema, resolved: &ResolveResult):
+fn Sema.init_module_graph(mut self: Sema, resolved: &ResolveResult) -> void:
     self.module_paths = Vec.new()
     self.module_import_starts = Vec.new()
     self.module_import_counts = Vec.new()
@@ -1506,7 +1506,7 @@ type ReorderedTier {
     file_ids: Vec[i32],
 }
 
-fn Zcu.collect_module_dependency_order_frontend(self: Zcu, path: str, wanted_paths: HashMap[str, i32], seen_paths: HashMap[str, i32], accum: DepOrderAccum):
+fn Zcu.collect_module_dependency_order_frontend(self: Zcu, path: str, wanted_paths: HashMap[str, i32], seen_paths: HashMap[str, i32], accum: DepOrderAccum) -> void:
     if path.len() == 0:
         return
     if seen_paths.contains(path):

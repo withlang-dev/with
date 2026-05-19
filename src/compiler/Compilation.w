@@ -329,7 +329,7 @@ fn Compilation.set_tool_mode_entry_path(self: Compilation, path: str):
     zcu.tool_mode_entry_path = path
     self.zcu = zcu
 
-fn Compilation.add_cli_diag_mapping(self: Compilation, gen_start: i32, gen_end: i32, source_name: str, source_text: str):
+fn Compilation.add_cli_diag_mapping(self: Compilation, gen_start: i32, gen_end: i32, source_name: str, source_text: str) -> void:
     self.cli_diag_gen_starts.push(gen_start)
     self.cli_diag_gen_ends.push(gen_end)
     self.cli_diag_source_names.push(source_name)

@@ -3486,7 +3486,13 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let args: Vec[i64] = Vec.new()
         args.push(recv_ptr)
         args.push(elem_alloca)
-        result = wl_build_call(self.builder, push_ty, push_fn, vec_data_i64(&args), 2)
+        let _ = wl_build_call(self.builder, push_ty, push_fn, vec_data_i64(&args), 2)
+        let push_dest_sema = self.mir_intrinsic_dest_sema_type(body, dest_place)
+        if push_dest_sema > 0 and push_dest_sema != self.sema.ty_void as i32:
+            var push_vec_ty = self.mir_dest_llvm_type(body, dest_place)
+            if push_vec_ty == 0:
+                push_vec_ty = self.get_or_create_vec_type(0, push_elem_ty)
+            result = wl_build_load(self.builder, push_vec_ty, recv_ptr)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_GET:
         let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
