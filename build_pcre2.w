@@ -622,6 +622,68 @@ pub fn run_pcre2_migrate_smoke_action(ctx: ActionCtx) -> i32:
     print("PCRE2 MIGRATE SMOKE OK")
     0
 
+pub fn run_pcre2_test_smoke_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let inputs = ctx.inputs()
+    let args = ctx.args()
+    let root = ctx.project_info().project_root()
+    let output_dir = ctx.output()
+    if inputs.len() < 3 or args.len() == 0 or output_dir.len() == 0:
+        return pcre2_fail(ctx, "requires compiler, pcre2test source, RunTest input, reference arg, and output directory")
+    let compiler_path = inputs.get(0)
+    let pcre2test_src = inputs.get(1)
+    let run_test_path = inputs.get(2)
+    let ref_dir = args.get(0)
+    if not fs.exists(compiler_path):
+        return pcre2_fail(ctx, "missing compiler: " ++ compiler_path)
+    if not fs.exists(pcre2test_src):
+        return pcre2_fail(ctx, "missing pcre2test source: " ++ pcre2test_src)
+    if not fs.exists(run_test_path):
+        return pcre2_fail(ctx, "missing upstream RunTest: " ++ run_test_path)
+    if not fs.is_dir(ref_dir):
+        return pcre2_fail(ctx, "reference path is not a directory: " ++ ref_dir)
+    if fs.exists(output_dir) and fs.remove_tree(output_dir) != 0:
+        return pcre2_fail(ctx, "could not remove previous pcre2-test smoke output: " ++ output_dir)
+    if fs.mkdir_all(output_dir) != 0:
+        return pcre2_fail(ctx, "could not create pcre2-test smoke output: " ++ output_dir)
+
+    let pcre2test_bin = pcre2_join(output_dir, "pcre2test")
+    let build_stdout = pcre2_abs(root, pcre2_join(output_dir, "build.stdout"))
+    let build_stderr = pcre2_abs(root, pcre2_join(output_dir, "build.stderr"))
+    var build_args: Vec[str] = Vec.new()
+    build_args |> push(pcre2_abs(root, compiler_path))
+    build_args |> push("build")
+    build_args |> push(pcre2_abs(root, pcre2test_src))
+    build_args |> push("-o")
+    build_args |> push(pcre2_abs(root, pcre2test_bin))
+    var build_env = process_env()
+    build_env = build_env.set("WITH_OUT_DIR", pcre2_abs(root, "out"))
+    let build_result = ctx.process_runner().run_capture_with_env(build_args, build_stdout, build_stderr, 300000, build_env)
+    if build_result.rc == 124:
+        return pcre2_fail(ctx, "timed out building pcre2test smoke binary; stdout=" ++ build_stdout ++ " stderr=" ++ build_stderr)
+    if build_result.rc != 0:
+        return pcre2_fail(ctx, f"failed building pcre2test smoke binary with exit code {build_result.rc}; stdout=" ++ build_stdout ++ " stderr=" ++ build_stderr)
+    if not fs.exists(pcre2test_bin):
+        return pcre2_fail(ctx, "did not produce pcre2test smoke binary: " ++ pcre2test_bin)
+
+    let run_stdout = pcre2_abs(root, pcre2_join(output_dir, "run.stdout"))
+    let run_stderr = pcre2_abs(root, pcre2_join(output_dir, "run.stderr"))
+    var run_args: Vec[str] = Vec.new()
+    run_args |> push("/bin/bash")
+    run_args |> push(pcre2_abs(root, run_test_path))
+    run_args |> push("-8")
+    run_args |> push("0-5")
+    var run_env = process_env()
+    run_env = run_env.set("srcdir", pcre2_abs(root, ref_dir))
+    run_env = run_env.set("pcre2test", pcre2_abs(root, pcre2test_bin))
+    let run_result = ctx.process_runner().run_capture_cwd_with_env(run_args, run_stdout, run_stderr, 120000, pcre2_abs(root, output_dir), run_env)
+    if run_result.rc == 124:
+        return pcre2_fail(ctx, "timed out running pcre2test smoke; stdout=" ++ run_stdout ++ " stderr=" ++ run_stderr)
+    if run_result.rc != 0:
+        return pcre2_fail(ctx, f"pcre2test smoke failed with exit code {run_result.rc}; stdout=" ++ run_stdout ++ " stderr=" ++ run_stderr)
+    print("PCRE2 TEST SMOKE OK")
+    0
+
 pub fn run_pcre2_build_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let inputs = ctx.inputs()
