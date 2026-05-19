@@ -102,6 +102,10 @@ with build :pcre2-migrate --no-deps
 Normal builds should not use this flag. It assumes required inputs already
 exist and is intended for debugging or iterating on one action body.
 
+Build graph `Test` targets that run through an external compiler execute test
+files in parallel batches. Set `WITH_BUILD_TEST_JOBS=N` to control the batch
+size; the default is 4 and the maximum is 32.
+
 ### Direct Source Builds
 
 The build command still supports direct source files:
