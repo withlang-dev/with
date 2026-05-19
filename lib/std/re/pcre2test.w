@@ -1,37 +1,37 @@
 // Migrated from PCRE2
 use std.re.defs
-use std.re.pcre2_auto_possess
-use std.re.pcre2_chartables
+use std.re.pcre2_script_run
+use std.re.pcre2_xclass
 use std.re.pcre2_chkdint
+use std.re.pcre2_convert
+use std.re.pcre2_substring
+use std.re.pcre2_match
+use std.re.pcre2_chartables
+use std.re.pcre2_extuni
+use std.re.pcre2_string_utils
+use std.re.pcre2_pattern_info
+use std.re.pcre2_match_next
+use std.re.pcre2_dfa_match
+use std.re.pcre2_maketables
+use std.re.pcre2_tables
 use std.re.pcre2_compile
+use std.re.pcre2_jit_compile
+use std.re.pcre2_ord2utf
 use std.re.pcre2_compile_cgroup
 use std.re.pcre2_compile_class
-use std.re.pcre2_config
-use std.re.pcre2_context
-use std.re.pcre2_convert
-use std.re.pcre2_dfa_match
-use std.re.pcre2_error
-use std.re.pcre2_extuni
-use std.re.pcre2_find_bracket
-use std.re.pcre2_jit_compile
-use std.re.pcre2_maketables
-use std.re.pcre2_match
-use std.re.pcre2_match_data
-use std.re.pcre2_match_next
-use std.re.pcre2_newline
-use std.re.pcre2_ord2utf
-use std.re.pcre2_pattern_info
-use std.re.pcre2_script_run
-use std.re.pcre2_serialize
-use std.re.pcre2_string_utils
-use std.re.pcre2_study
 use std.re.pcre2_substitute
-use std.re.pcre2_substring
-use std.re.pcre2_tables
+use std.re.pcre2_find_bracket
 use std.re.pcre2_ucd
 use std.re.pcre2_valid_utf
-use std.re.pcre2_xclass
+use std.re.pcre2_study
+use std.re.pcre2_context
+use std.re.pcre2_newline
 use std.re.pcre2posix
+use std.re.pcre2_config
+use std.re.pcre2_error
+use std.re.pcre2_match_data
+use std.re.pcre2_serialize
+use std.re.pcre2_auto_possess
 use std.libc
 
 fn print_char_8(__param_f: *mut c_void, __param_ptr: *const u8, __param_utf: c_int) -> c_uint {
@@ -7350,7 +7350,7 @@ fn decode_modifiers_8(__param_p: *mut u8, __param_ctx: c_int, __param_pctl: *mut
 
     '__ci_bb_118 {
         (__local_uli__goto_698_15 = strtoul((__local_pp__goto_696_15 as *const c_char), (&raw mut __local_endptr__goto_709_9 as *mut *mut c_char), 10))
-        if ((if __local_uli__goto_698_15 == ((((0 as c_ulong) -% 2) as c_ulong) +% (1 as c_ulong)): 1 else: 0) != 0) {
+        if ((if __local_uli__goto_698_15 == (((((9223372036854775807 as c_ulong) as c_ulong) *% (2 as c_ulong)) as c_ulong) +% (1 as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_119
         } else {
             goto '__ci_bb_120

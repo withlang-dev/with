@@ -2186,8 +2186,8 @@ fn more_workspace(__param_rwsptr: *mut *mut RWS_anchor, __param_ovecsize: c_uint
     } else {
         var __local_newsize: c_uint = with 0 as __ci_expr_seq_13 {
             var __ci_expr_ternary_0: c_ulong = 0
-            if ((if __local_rws.size >= 536870911: 1 else: 0) != 0) {
-                (__ci_expr_ternary_0 = 1073741823)
+            if ((if __local_rws.size >= ((4294967295 as c_ulong) / (((sizeof[c_int]() as c_ulong) *% (2 as c_ulong)) as c_ulong)): 1 else: 0) != 0) {
+                (__ci_expr_ternary_0 = (4294967295 as c_ulong) / (sizeof[c_int]() as c_ulong))
             } else {
                 (__ci_expr_ternary_0 = ((__local_rws.size as c_uint) *% (2 as c_uint)))
             }
