@@ -20,7 +20,6 @@ use BuildGraphModel
 use BuildGraphDispatch
 use BuildGraphCompiler
 use BuildGraphOps
-use BuildGraphPcre2
 use BuildGraphEmitC
 use BuildGraphSupport
 use BuildGraphTools
@@ -1047,18 +1046,6 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, opt_level: 
             let ir_rc = build_graph_run_with_compiler_ir(root, target)
             if ir_rc != 0:
                 return ir_rc
-            completed_targets.push(target.name)
-            continue
-        if target.kind == build_graph_kind_pcre2_generated_check():
-            let pcre2_generated_check_rc = build_graph_run_pcre2_generated_check(root, target)
-            if pcre2_generated_check_rc != 0:
-                return pcre2_generated_check_rc
-            completed_targets.push(target.name)
-            continue
-        if target.kind == build_graph_kind_pcre2_generated_promote():
-            let pcre2_generated_promote_rc = build_graph_run_pcre2_generated_promote(root, target)
-            if pcre2_generated_promote_rc != 0:
-                return pcre2_generated_promote_rc
             completed_targets.push(target.name)
             continue
         if target.kind == build_graph_kind_generate_llvm_link_metadata():

@@ -5,8 +5,6 @@ use build_pcre2
 
 fn project_kind_generate_compiler_entrypoints() -> BuildKind: 1003 as BuildKind
 fn project_kind_with_compiler_build() -> BuildKind: 1004 as BuildKind
-fn project_kind_pcre2_generated_check() -> BuildKind: 1006 as BuildKind
-fn project_kind_pcre2_generated_promote() -> BuildKind: 1007 as BuildKind
 fn project_kind_with_compiler_ir() -> BuildKind: 1013 as BuildKind
 fn project_kind_generate_llvm_link_metadata() -> BuildKind: 1020 as BuildKind
 fn project_kind_seed_download() -> BuildKind: 1024 as BuildKind
@@ -668,12 +666,16 @@ pub fn build(ctx: BuildCtx) -> Build:
     pcre2_test = pcre2_test.dep("verified-existing-stage")
     out = out.add_target(pcre2_test)
 
-    var pcre2_check_generated = target_new(project_kind_pcre2_generated_check(), "pcre2-check-generated", "out/bin/with")
+    var pcre2_check_generated = target_new(.Action, "pcre2-check-generated", "").output("out/gen/.pcre2-check-generated-stamp")
+    pcre2_check_generated.action = run_pcre2_check_generated_action
+    pcre2_check_generated = pcre2_check_generated.write_scope("out/pcre2_tmp")
     pcre2_check_generated = pcre2_check_generated.input("out/pcre2_build/lib/std/re")
     pcre2_check_generated = pcre2_check_generated.dep("build")
     out = out.add_target(pcre2_check_generated)
 
-    var pcre2_promote = target_new(project_kind_pcre2_generated_promote(), "pcre2-promote", "out/bin/with").output("lib/std/re")
+    var pcre2_promote = target_new(.Action, "pcre2-promote", "").output("lib/std/re")
+    pcre2_promote.action = run_pcre2_promote_action
+    pcre2_promote = pcre2_promote.write_scope("out/pcre2_tmp")
     pcre2_promote = pcre2_promote.input("out/pcre2_build/lib/std/re")
     pcre2_promote = pcre2_promote.dep("pcre2-test")
     out = out.add_target(pcre2_promote)
