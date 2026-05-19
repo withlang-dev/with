@@ -1088,15 +1088,18 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, opt_level: 
                 with_eprint("error: build.w test target matched no files: " ++ target.entry)
                 return 1
             let test_compiler = build_graph_test_compiler(root, target)
-            for fi in 0..test_files.len() as i32:
-                let test_path = test_files.get(fi as i64)
-                let test_rc = if test_compiler.len() > 0:
-                    build_graph_run_external_test_file(root, target, test_compiler, test_path)
-                else:
-                    run_test_file_with_build_settings(test_path, target_opt, no_std, alloc_mode, prelude_mode, debug_info, false, false, "", include_paths, target.defines, target.system_libs)
+            if test_compiler.len() > 0:
+                let test_rc = build_graph_run_external_test_files(root, target, test_compiler, test_files)
                 if test_rc != 0:
                     with_eprint("error: build.w test target failed: " ++ target.name)
                     return test_rc
+            else:
+                for fi in 0..test_files.len() as i32:
+                    let test_path = test_files.get(fi as i64)
+                    let test_rc = run_test_file_with_build_settings(test_path, target_opt, no_std, alloc_mode, prelude_mode, debug_info, false, false, "", include_paths, target.defines, target.system_libs)
+                    if test_rc != 0:
+                        with_eprint("error: build.w test target failed: " ++ target.name)
+                        return test_rc
             if build_graph_path_has_glob(target.entry):
                 with_write(f"ok: {test_files.len()} files passed in build.w test target {target.name}\n")
             completed_targets.push(target.name)
