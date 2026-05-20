@@ -167,6 +167,86 @@ fn comp_host_sdk_path(ctx: ActionCtx) -> str:
     argv |> push("--show-sdk-path")
     comp_capture_stdout(ctx, "xcrun-sdk-path", argv, 30000)
 
+fn comp_arg_value(args: Vec[str], prefix: str) -> str:
+    for i in 0..args.len() as i32:
+        let arg = args.get(i as i64)
+        if arg.starts_with(prefix):
+            return arg.slice(prefix.len(), arg.len())
+    ""
+
+fn comp_arg_allowed_for_compiler(arg: str) -> bool:
+    not arg.starts_with("compiler=")
+
+fn comp_resolve_seed_compiler(ctx: ActionCtx) -> str:
+    let explicit = env("WITH")
+    if explicit.len() > 0:
+        return explicit
+    let fs = ctx.fs()
+    if fs.exists("out/bin/with"):
+        return "out/bin/with"
+    var path_probe: Vec[str] = Vec.new()
+    path_probe |> push("with")
+    path_probe |> push("--version")
+    let installed_version = comp_capture_stdout(ctx, "with-version", path_probe, 30000)
+    if installed_version.len() > 0:
+        return "with"
+    if fs.exists("src/main"):
+        return "src/main"
+    "with"
+
+fn comp_compiler_path(ctx: ActionCtx, compiler: str) -> str:
+    if compiler == "seed":
+        return comp_resolve_seed_compiler(ctx)
+    compiler
+
+fn comp_path_exists(ctx: ActionCtx, path: str) -> bool:
+    if path == "with":
+        return true
+    if path.len() > 0 and path.byte_at(0) == 47:
+        return ctx.fs().host_exists(path)
+    ctx.fs().exists(path)
+
+fn comp_path_for_process(root: str, path: str) -> str:
+    if path == "with":
+        return path
+    comp_abs(root, path)
+
+fn comp_run_compiler_capture(ctx: ActionCtx, label: str, argv: Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32) -> i32:
+    let root = ctx.project_info().project_root()
+    var process_env = process_env()
+    process_env = process_env.set("WITH_OUT_DIR", comp_abs(root, "out"))
+    let result = ctx.process_runner().run_capture_with_env(argv, comp_abs(root, stdout_path), comp_abs(root, stderr_path), timeout_ms, process_env)
+    if result.rc == 124:
+        return comp_fail(ctx, "step '" ++ label ++ "' timed out; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+    if result.rc != 0:
+        if result.stderr.len() > 0:
+            ctx.diagnostics().error(result.stderr)
+        return comp_fail(ctx, "step '" ++ label ++ f"' failed with exit code {result.rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+    0
+
+fn comp_compile_args(ctx: ActionCtx, command: str, compiler_path: str, source_path: str) -> Vec[str]:
+    let root = ctx.project_info().project_root()
+    let args = ctx.args()
+    var argv: Vec[str] = Vec.new()
+    argv |> push(comp_path_for_process(root, compiler_path))
+    argv |> push(command)
+    argv |> push(comp_abs(root, source_path))
+    for ai in 0..args.len() as i32:
+        let arg = args.get(ai as i64)
+        if comp_arg_allowed_for_compiler(arg):
+            argv |> push(arg)
+    argv
+
+fn comp_remove_file_if_exists(fs: ToolFs, path: str) -> i32:
+    if not fs.exists(path):
+        return 0
+    fs.remove_file(path)
+
+fn comp_remove_tree_if_exists(fs: ToolFs, path: str) -> i32:
+    if not fs.exists(path):
+        return 0
+    fs.remove_tree(path)
+
 fn comp_resolve_compiler_version(ctx: ActionCtx) -> str:
     let fs = ctx.fs()
     let root = ctx.project_info().project_root()
@@ -302,4 +382,88 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
         return comp_fail(ctx, "could not write: " ++ cc_path)
     if fs.write_text(output_path, "ok\n") != 0:
         return comp_fail(ctx, "could not write stamp: " ++ output_path)
+    0
+
+pub fn run_with_compiler_build_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    let output_path = ctx.output()
+    if inputs.len() == 0:
+        return comp_fail(ctx, "requires a source input")
+    if output_path.len() == 0:
+        return comp_fail(ctx, "requires an output path")
+    let compiler_arg = comp_arg_value(ctx.args(), "compiler=")
+    if compiler_arg.len() == 0:
+        return comp_fail(ctx, "requires compiler= argument")
+    let source_path = inputs.get(0)
+    let compiler_path = comp_compiler_path(ctx, compiler_arg)
+    let fs = ctx.fs()
+    if not fs.exists(source_path):
+        return comp_fail(ctx, "missing source: " ++ source_path)
+    if not comp_path_exists(ctx, compiler_path):
+        return comp_fail(ctx, "missing compiler: " ++ compiler_path)
+    let output_dir = comp_dirname(output_path)
+    if fs.mkdir_all(output_dir) != 0:
+        return comp_fail(ctx, "could not create output directory: " ++ output_dir)
+    let tmp_output = output_path ++ ".tmp"
+    let _remove_tmp = comp_remove_file_if_exists(fs, tmp_output)
+    let _remove_tmp_dsym = comp_remove_tree_if_exists(fs, tmp_output ++ ".dSYM")
+    var argv = comp_compile_args(ctx, "build", compiler_path, source_path)
+    argv |> push("-o")
+    argv |> push(comp_abs(ctx.project_info().project_root(), tmp_output))
+    let capture_dir = comp_join("out/command", ctx.target_name())
+    if fs.mkdir_all(capture_dir) != 0:
+        return comp_fail(ctx, "could not create capture directory: " ++ capture_dir)
+    let stdout_path = comp_join(capture_dir, "stdout.txt")
+    let stderr_path = comp_join(capture_dir, "stderr.txt")
+    let rc = comp_run_compiler_capture(ctx, "build", argv, stdout_path, stderr_path, 600000)
+    if rc != 0:
+        return rc
+    if not fs.exists(tmp_output):
+        return comp_fail(ctx, "did not produce output: " ++ tmp_output)
+    let _remove_old = comp_remove_file_if_exists(fs, output_path)
+    let _remove_old_dsym = comp_remove_tree_if_exists(fs, output_path ++ ".dSYM")
+    if fs.rename(tmp_output, output_path) != 0:
+        return comp_fail(ctx, "could not move output to: " ++ output_path)
+    if fs.exists(tmp_output ++ ".dSYM"):
+        let _move_dsym = fs.rename(tmp_output ++ ".dSYM", output_path ++ ".dSYM")
+    if not output_path.contains(".o"):
+        print("[" ++ ctx.target_name() ++ "] wrote " ++ output_path)
+    let _remove_stdout = fs.remove_file(stdout_path)
+    let _remove_stderr = fs.remove_file(stderr_path)
+    0
+
+pub fn run_with_compiler_ir_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    let output_path = ctx.output()
+    if inputs.len() == 0:
+        return comp_fail(ctx, "requires a source input")
+    if output_path.len() == 0:
+        return comp_fail(ctx, "requires an output path")
+    let compiler_arg = comp_arg_value(ctx.args(), "compiler=")
+    if compiler_arg.len() == 0:
+        return comp_fail(ctx, "requires compiler= argument")
+    let source_path = inputs.get(0)
+    let compiler_path = comp_compiler_path(ctx, compiler_arg)
+    let fs = ctx.fs()
+    if not fs.exists(source_path):
+        return comp_fail(ctx, "missing source: " ++ source_path)
+    if not comp_path_exists(ctx, compiler_path):
+        return comp_fail(ctx, "missing compiler: " ++ compiler_path)
+    let output_dir = comp_dirname(output_path)
+    if fs.mkdir_all(output_dir) != 0:
+        return comp_fail(ctx, "could not create output directory: " ++ output_dir)
+    let tmp_output = output_path ++ ".tmp"
+    let stderr_path = output_path ++ ".stderr"
+    let _remove_tmp = comp_remove_file_if_exists(fs, tmp_output)
+    let _remove_stderr = comp_remove_file_if_exists(fs, stderr_path)
+    let argv = comp_compile_args(ctx, "ir", compiler_path, source_path)
+    let rc = comp_run_compiler_capture(ctx, "ir", argv, tmp_output, stderr_path, 600000)
+    if rc != 0:
+        return rc
+    if not fs.exists(tmp_output):
+        return comp_fail(ctx, "did not produce output: " ++ tmp_output)
+    let _remove_old = comp_remove_file_if_exists(fs, output_path)
+    if fs.rename(tmp_output, output_path) != 0:
+        return comp_fail(ctx, "could not move output to: " ++ output_path)
+    let _remove_stderr_done = comp_remove_file_if_exists(fs, stderr_path)
     0
