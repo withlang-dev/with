@@ -1,12 +1,13 @@
 # Build Graph Kind Table Audit
 
-Status: current as of `0a38d52`.
+Status: current as of `765c0d0`.
 
 This audit covers `src/BuildGraphKinds.w` after the Phase C selfhost smoke,
 one-liner, object-symbol, project, edge, PCRE2-prep, migrate-basic, and
 migrate-core, and build-w extractions. The old selfhost suite dispatcher is
 also removed. The embedded-runtime regression, all PCRE2 project targets, seed
-download, and the selfhost suites extracted so far are now action targets.
+download, emit-C targets, and the selfhost suites extracted so far are now
+action targets.
 
 ## Standard Kinds
 
@@ -57,9 +58,6 @@ Live project kinds:
 | 1004 | `with_compiler_build` |
 | 1013 | `with_compiler_ir` |
 | 1020 | `generate_llvm_link_metadata` |
-| 1025 | `emit_c_test` |
-| 1026 | `emit_c_fixpoint` |
-| 1027 | `emit_c_roundtrip` |
 
 Removed project kinds:
 
@@ -86,6 +84,9 @@ Removed project kinds:
 | 1022 | `removed_pcre2_migrate` |
 | 1023 | `removed_unused_1023` |
 | 1024 | `removed_seed_download` |
+| 1025 | `removed_emit_c_test` |
+| 1026 | `removed_emit_c_fixpoint` |
+| 1027 | `removed_emit_c_roundtrip` |
 
 `build_graph_kind_is_project` accepts every live project kind and excludes
 every removed project kind. `build_graph_kind_removed` reserves every removed

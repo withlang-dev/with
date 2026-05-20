@@ -40,9 +40,6 @@ File: `src/BuildGraphKinds.w`
 | 1021 | `pcre2_reference_prepare` | PCRE2 reference source preparation target. |
 | 1022 | `pcre2_migrate` | PCRE2 migration target. |
 | 1024 | `seed_download` | Seed compiler download target. |
-| 1025 | `emit_c_test` | Emit-C smoke/parity test target. |
-| 1026 | `emit_c_fixpoint` | Emit-C fixpoint target. |
-| 1027 | `emit_c_roundtrip` | Emit-C roundtrip target. |
 
 Removed project kinds retained for diagnostics:
 
@@ -228,43 +225,10 @@ File: `src/BuildGraphPcre2.w`
 
 ## Emit-C Build Targets
 
-File: `src/BuildGraphEmitC.w`
-
-| Item | Lines | Description |
-| --- | ---: | --- |
-| `EmitCParam` | ~5 | Temporary parsed C parameter description used by emit-C bridge generation. |
-| `EmitCFunction` | ~7 | Temporary parsed C function description used by emit-C bridge generation. |
-| `emitc_index_of` | ~19 | Substring index helper for emit-C target code. |
-| `emitc_trim` | ~15 | Trims text for emit-C parsing. |
-| `emitc_split_lines` | ~15 | Splits emit-C output text into lines. |
-| `emitc_c_export_symbol` | ~13 | Extracts a C export symbol from a generated line. |
-| `emitc_find_matching_paren` | ~14 | Finds a matching parenthesis in generated C text. |
-| `emitc_c_type` | ~18 | Maps With type spelling to generated C type spelling. |
-| `emitc_stub_return` | ~9 | Produces a C stub return expression for bridge generation. |
-| `emitc_parse_param` | ~14 | Parses one generated C parameter. |
-| `emitc_parse_params` | ~14 | Parses generated C parameter lists. |
-| `emitc_parse_export_function` | ~39 | Parses one exported generated C function signature. |
-| `emitc_collect_exports_from_text` | ~27 | Collects exported functions from generated C text. |
-| `emitc_collect_bridge_exports` | ~16 | Collects bridge exports needed by emit-C tests. |
-| `emitc_function_proto` | ~12 | Renders a C function prototype. |
-| `emitc_generate_stub_files` | ~36 | Generates temporary C bridge stub files. |
-| `emitc_run_capture` | ~23 | Runs an emit-C-produced tool and captures output. |
-| `emitc_compile_runtime_args` | ~11 | Produces runtime compile arguments for emit-C builds. |
-| `emitc_build_compiler_c` | ~10 | Emits the compiler to C. |
-| `emitc_compile_c_compiler` | ~19 | Compiles emitted compiler C. |
-| `emitc_compile_c_compiler_with_bridges` | ~24 | Compiles emitted compiler C with bridge stubs. |
-| `emitc_migrate_compiler_c` | ~14 | Migrates emitted compiler C back to With. |
-| `emitc_build_with_compiler` | ~10 | Builds the migrated/emitted compiler with With. |
-| `emitc_run_single_test` | ~8 | Runs one compiler test through an emit-C compiler path. |
-| `emitc_run_test_group` | ~13 | Runs a group of compiler tests through an emit-C compiler path. |
-| `emitc_run_compiler_test_suite` | ~14 | Runs the compiler behavior test subset for emit-C validation. |
-| `emitc_build_hello_c` | ~11 | Emits a hello fixture to C. |
-| `emitc_compile_hello` | ~15 | Compiles a hello C fixture. |
-| `emitc_run_hello` | ~23 | Runs and checks a hello fixture. |
-| `emitc_compare_files` | ~18 | Compares emitted/fixpoint files byte-for-byte. |
-| `build_graph_run_emit_c_test` | ~54 | Build graph target runner for emit-C smoke tests. |
-| `build_graph_run_emit_c_fixpoint` | ~33 | Build graph target runner for emit-C fixpoint comparison. |
-| `build_graph_run_emit_c_roundtrip` | ~70 | Build graph target runner for emit-C roundtrip validation. |
+No emit-C build target implementation remains under `src/`. The old
+`src/BuildGraphEmitC.w` target runners and kind dispatch were moved to the
+project-local `build_emit_c.w` action module in `765c0d0`, and kinds
+`1025..1027` are now reserved as removed graph kinds.
 
 ## Seed And Compiler-Project Targets
 
