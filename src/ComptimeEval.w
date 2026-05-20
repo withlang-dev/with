@@ -260,6 +260,33 @@ fn ComptimeEvaluator.assign_value(self: ComptimeEvaluator, sym: i32, value: Comp
     self.bind_value(sym, value, self.slot_muts.get(idx as i64))
     comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
 
+fn ComptimeEvaluator.assign_struct_field_value(self: ComptimeEvaluator, target: i32, value: ComptimeValue, node: i32) -> ComptimeControl:
+    let base_node = self.ast.get_data0(target)
+    let field_sym = self.ast.get_data1(target)
+    let base_sym = self.binding_sym(base_node)
+    if base_sym == 0:
+        return self.fail(node, "comptime field assignment requires a local identifier receiver")
+    let idx = self.lookup_slot_index(base_sym)
+    if idx < 0:
+        return self.fail(node, "comptime field assignment target is not available")
+    if self.slot_muts.get(idx as i64) == 0:
+        return self.fail(node, "cannot assign to field of immutable value")
+    let base_value = self.slot_values.get(idx as i64)
+    if base_value.kind != ComptimeValueKind.CV_STRUCT:
+        return self.fail(node, "comptime field assignment requires a struct value")
+    let field_index = self.struct_field_index(base_value.type_id, field_sym)
+    if field_index < 0:
+        return self.fail(node, "unknown comptime struct field")
+    let new_start = self.extra_values.len() as i32
+    for fi in 0..base_value.extra_count:
+        if fi == field_index:
+            self.extra_values.push(value)
+        else:
+            self.extra_values.push(self.extra_values.get((base_value.extra_start + fi) as i64))
+    let updated = comptime_value_struct(base_value.type_id, new_start, base_value.extra_count)
+    self.bind_value(base_sym, updated, self.slot_muts.get(idx as i64))
+    comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
+
 fn ComptimeEvaluator.find_module_let_decl(self: ComptimeEvaluator, sym: i32) -> i32:
     var di = self.ast.decl_count() as i32 - 1
     while di >= 0:
@@ -1145,11 +1172,13 @@ fn ComptimeEvaluator.eval_let_binding(self: ComptimeEvaluator, node: i32) -> Com
 
 fn ComptimeEvaluator.eval_assign(self: ComptimeEvaluator, node: i32) -> ComptimeControl:
     let target = self.ast.get_data0(node)
-    if self.ast.kind(target) != NodeKind.NK_IDENT:
-        return self.fail(node, "comptime assignment only supports local identifiers")
     let value_signal = self.eval_expr(self.ast.get_data1(node))
     if value_signal.kind != ComptimeControlKind.CTL_VALUE:
         return value_signal
+    if self.ast.kind(target) == NodeKind.NK_FIELD_ACCESS:
+        return self.assign_struct_field_value(target, value_signal.value, node)
+    if self.ast.kind(target) != NodeKind.NK_IDENT:
+        return self.fail(node, "comptime assignment only supports local identifiers and struct fields")
     self.assign_value(self.ast.get_data0(target), value_signal.value, node)
 
 fn ComptimeEvaluator.eval_if(self: ComptimeEvaluator, node: i32) -> ComptimeControl:
