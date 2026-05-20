@@ -3,14 +3,12 @@ use build_runtime
 use build_selfhost
 use build_pcre2
 use build_seed
+use build_emit_c
 
 fn project_kind_generate_compiler_entrypoints() -> BuildKind: 1003 as BuildKind
 fn project_kind_with_compiler_build() -> BuildKind: 1004 as BuildKind
 fn project_kind_with_compiler_ir() -> BuildKind: 1013 as BuildKind
 fn project_kind_generate_llvm_link_metadata() -> BuildKind: 1020 as BuildKind
-fn project_kind_emit_c_test() -> BuildKind: 1025 as BuildKind
-fn project_kind_emit_c_fixpoint() -> BuildKind: 1026 as BuildKind
-fn project_kind_emit_c_roundtrip() -> BuildKind: 1027 as BuildKind
 
 fn with_object_target(name: str, compiler: str, source: str, output: str, opt: str, dep: str) -> Target:
     var target = target_new(project_kind_with_compiler_build(), name, compiler).output(output)
@@ -418,19 +416,32 @@ pub fn build(ctx: BuildCtx) -> Build:
     compiler = compiler.dep("embedded-objects-object")
     out = out.add_target(compiler)
 
-    var emit_c_test = target_new(project_kind_emit_c_test(), "emit-c-test", "out/bin/with").output("out/gen/.emit-c-test-stamp")
+    var emit_c_test = target_new(.Action, "emit-c-test", "").output("out/gen/.emit-c-test-stamp")
+    emit_c_test.action = run_emit_c_test_action
     emit_c_test = emit_c_test.input("out/bin/with")
+    emit_c_test = emit_c_test.extra_output("out/emit-c-test")
+    emit_c_test = emit_c_test.extra_output("out/gen/wl_decls.h")
+    emit_c_test = emit_c_test.extra_output("out/gen/wl_stubs.c")
+    emit_c_test = emit_c_test.extra_output("out/command/emit-c-test")
     emit_c_test = emit_c_test.dep("build")
     out = out.add_target(emit_c_test)
 
-    var emit_c_fixpoint = target_new(project_kind_emit_c_fixpoint(), "emit-c-fixpoint", "out/emit-c-test/with-from-c").output("out/gen/.emit-c-fixpoint-stamp")
+    var emit_c_fixpoint = target_new(.Action, "emit-c-fixpoint", "").output("out/gen/.emit-c-fixpoint-stamp")
+    emit_c_fixpoint.action = run_emit_c_fixpoint_action
     emit_c_fixpoint = emit_c_fixpoint.input("out/emit-c-test/main.c")
     emit_c_fixpoint = emit_c_fixpoint.input("out/emit-c-test/with-from-c")
+    emit_c_fixpoint = emit_c_fixpoint.extra_output("out/emit-c-test/main2.c")
+    emit_c_fixpoint = emit_c_fixpoint.extra_output("out/command/emit-c-fixpoint")
     emit_c_fixpoint = emit_c_fixpoint.dep("emit-c-test")
     out = out.add_target(emit_c_fixpoint)
 
-    var emit_c_roundtrip = target_new(project_kind_emit_c_roundtrip(), "emit-c-roundtrip", "out/bin/with").output("out/gen/.emit-c-roundtrip-stamp")
+    var emit_c_roundtrip = target_new(.Action, "emit-c-roundtrip", "").output("out/gen/.emit-c-roundtrip-stamp")
+    emit_c_roundtrip.action = run_emit_c_roundtrip_action
     emit_c_roundtrip = emit_c_roundtrip.input("out/bin/with")
+    emit_c_roundtrip = emit_c_roundtrip.extra_output("out/emit-c-roundtrip")
+    emit_c_roundtrip = emit_c_roundtrip.extra_output("out/gen/wl_decls.h")
+    emit_c_roundtrip = emit_c_roundtrip.extra_output("out/gen/wl_stubs.c")
+    emit_c_roundtrip = emit_c_roundtrip.extra_output("out/command/emit-c-roundtrip")
     emit_c_roundtrip = emit_c_roundtrip.dep("build")
     out = out.add_target(emit_c_roundtrip)
 
