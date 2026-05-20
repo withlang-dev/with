@@ -28,9 +28,12 @@ is in progress. Completed D1 sub-slices:
    capabilities: diagnostics, source emitter, ToolFs, and ProcessRunner.
 6. A typed `ComptimeValue(Build)` to `BuildGraph` materializer substrate,
    including a driver-only action function reference on `BuildGraphTarget`.
+7. Build-time evaluator handlers for `Diagnostics.warn/error`,
+   `SourceEmitter.generated_source`, and `ToolFs` filesystem operations used
+   during direct `build(ctx)` evaluation.
 
-Remaining D1 work is the rest of the capability method handlers, wiring direct
-`build.w` evaluation into the CLI path through the typed materializer, and
+Remaining D1 work is wiring direct `build.w` evaluation into the CLI path
+through the typed materializer, completing action-time capability handlers, and
 replacing generated build/action runner binaries on the normal path.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
