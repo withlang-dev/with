@@ -785,6 +785,21 @@ fn build_tool_runner_source(package_name: str, package_version: str, root: str, 
     "    let graph = build_graph.emit_graph()\n" ++
     "    assert(ctx.fs().write_text(\"" ++ cli_escape_with_string(graph_path) ++ "\", graph) == 0)\n"
 
+fn replay_action_capture(stdout_path: str, stderr_path: str, stdout_to_stderr: bool) -> void:
+    let action_stderr = with_fs_read_file(stderr_path)
+    if action_stderr.len() > 0:
+        with_ewrite(action_stderr)
+    let action_stdout = with_fs_read_file(stdout_path)
+    if action_stdout.len() > 0:
+        if stdout_to_stderr:
+            with_ewrite(action_stdout)
+        else:
+            with_write(action_stdout)
+
+fn remove_action_capture(stdout_path: str, stderr_path: str) -> void:
+    let _remove_action_stdout = with_fs_remove_file(stdout_path)
+    let _remove_action_stderr = with_fs_remove_file(stderr_path)
+
 fn run_build_action_from_build_w(root: str, cfg: ProjectConfig, target: BuildGraphTarget, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> i32:
     if target.output.len() == 0:
         with_eprint("error: action target '" ++ target.name ++ "' requires a declared output")
@@ -831,13 +846,21 @@ fn run_build_action_from_build_w(root: str, cfg: ProjectConfig, target: BuildGra
     let old_action_name = with_getenv_str("WITH_BUILD_ACTION_NAME")
     let _set_capability_token = with_setenv_str("WITH_TOOL_CAPABILITY_TOKEN", capability_token)
     let _set_action_name = with_setenv_str("WITH_BUILD_ACTION_NAME", target.name)
-    let rc = with_exec_binary(built_runner)
+    let action_stdout_path = resolve_join(tmp_dir, "build-action-runner." ++ stamp ++ ".stdout")
+    let action_stderr_path = resolve_join(tmp_dir, "build-action-runner." ++ stamp ++ ".stderr")
+    var action_argv = ""
+    action_argv = build_graph_argv_append(action_argv, built_runner)
+    let rc = with_exec_argv_capture(action_argv, action_stdout_path, action_stderr_path, 3600000)
     let _restore_action_name = with_setenv_str("WITH_BUILD_ACTION_NAME", old_action_name)
     let _restore_capability_token = with_setenv_str("WITH_TOOL_CAPABILITY_TOKEN", old_capability_token)
     cleanup_binary_artifacts(built_runner)
     if rc != 0:
+        replay_action_capture(action_stdout_path, action_stderr_path, true)
+        remove_action_capture(action_stdout_path, action_stderr_path)
         with_eprint("error: action target '" ++ target.name ++ f"' failed with exit code {rc}")
         return rc
+    replay_action_capture(action_stdout_path, action_stderr_path, false)
+    remove_action_capture(action_stdout_path, action_stderr_path)
     if with_fs_file_exists(output_path) == 0:
         with_eprint("error: action target '" ++ target.name ++ "' did not produce declared output: " ++ output_path)
         return 1
