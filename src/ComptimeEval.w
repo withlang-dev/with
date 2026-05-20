@@ -7,8 +7,19 @@ use InternPool
 use TypeLayout
 use CapabilityRegistry
 
+extern fn with_eprint(s: str) -> void
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_fs_file_exists(path: str) -> i32
+extern fn with_fs_is_dir(path: str) -> i32
+extern fn with_fs_mkdir_p(path: str) -> i32
+extern fn with_fs_chmod(path: str, mode: i32) -> i32
+extern fn with_fs_copy_tree(src: str, dst: str) -> i32
+extern fn with_fs_list_files(path: str) -> str
+extern fn with_fs_remove_file(path: str) -> i32
+extern fn with_fs_remove_tree(path: str) -> i32
+extern fn with_fs_rename_file(old_path: str, new_path: str) -> i32
+extern fn with_fs_symlink(target: str, link_path: str) -> i32
+extern fn with_fs_write_file(path: str, data: str) -> i32
 
 const COMPTIME_RECURSION_LIMIT: i32 = 256
 const COMPTIME_STEP_LIMIT: i32 = 50000
@@ -158,6 +169,61 @@ fn comptime_type_name_has_base(type_name: str, base_name: str) -> i32:
         return 1
     0
 
+fn comptime_tool_path_is_project_relative(path: str) -> bool:
+    if path.len() == 0:
+        return false
+    if path.byte_at(0) == 47:
+        return false
+    if path.contains(".."):
+        return false
+    for i in 0..path.len() as i32:
+        let ch = path.byte_at(i as i64)
+        if ch == 0 or ch == 9 or ch == 10 or ch == 13:
+            return false
+    true
+
+fn comptime_tool_path_dirname(path: str) -> str:
+    var last_slash = -1
+    for i in 0..path.len() as i32:
+        if path.byte_at(i as i64) == 47:
+            last_slash = i
+    if last_slash < 0:
+        return "."
+    if last_slash == 0:
+        return "/"
+    path.slice(0, last_slash as i64)
+
+fn comptime_tool_join(root: str, path: str) -> str:
+    if root.len() == 0 or root == ".":
+        return path
+    if root.ends_with("/"):
+        return root ++ path
+    root ++ "/" ++ path
+
+fn comptime_tool_path_is_same_or_child(path: str, root: str) -> bool:
+    if path == root:
+        return true
+    if path.len() <= root.len():
+        return false
+    path.starts_with(root) and path.byte_at(root.len() as i64) == 47
+
+fn comptime_tool_path_is_parent_of(parent: str, child: str) -> bool:
+    if parent.len() >= child.len():
+        return false
+    child.starts_with(parent) and child.byte_at(parent.len() as i64) == 47
+
+fn comptime_tool_split_nonempty_lines(text: str) -> Vec[str]:
+    let lines: Vec[str] = Vec.new()
+    var start = 0
+    for i in 0..text.len() as i32:
+        if text.byte_at(i as i64) == 10:
+            if i > start:
+                lines.push(text.slice(start as i64, i as i64))
+            start = i + 1
+    if start < text.len() as i32:
+        lines.push(text.slice(start as i64, text.len()))
+    lines
+
 fn comptime_eval_result_invalid() -> ComptimeEvalResult:
     ComptimeEvalResult {
         value: comptime_value_invalid(),
@@ -211,6 +277,33 @@ fn comptime_try_eval_expr(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, n
 
 fn comptime_force_eval_expr(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeValue:
     comptime_force_eval_expr_result(sema_ptr, ast, pool, node).value
+
+fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, fn_sym: i32, package_name: str, package_version: str, project_root: str) -> ComptimeEvalResult:
+    var sema = unsafe: *sema_ptr
+    sema.ast = ast
+    var evaluator = ComptimeEvaluator.init(sema, ast, pool, 1)
+    evaluator.allow_runtime_calls = 1
+    let call_node = if ast.decl_count() > 0: ast.get_decl(0) else: 0
+    let ctx_type = evaluator.capability_type_id(CapabilityKind.CK_BUILD_CTX, call_node)
+    if ctx_type == 0:
+        return ComptimeEvalResult { value: comptime_value_invalid(), extras: evaluator.extra_values, error_msg: evaluator.last_error_msg }
+    let ctx_record = comptime_capability_record(CapabilityKind.CK_BUILD_CTX, package_name, package_version, project_root)
+    let ctx_value = evaluator.mint_capability(ctx_type, ctx_record)
+    let args: Vec[ComptimeValue] = Vec.new()
+    args.push(ctx_value)
+    let signal = evaluator.eval_fn_symbol_call_values(fn_sym, args, call_node)
+    if evaluator.has_pending_diag != 0:
+        sema_ptr.diags.emit(evaluator.pending_diag)
+    let value =
+        if signal.kind == ComptimeControlKind.CTL_VALUE or signal.kind == ComptimeControlKind.CTL_RETURN:
+            signal.value
+        else:
+            comptime_value_invalid()
+    ComptimeEvalResult {
+        value,
+        extras: evaluator.extra_values,
+        error_msg: evaluator.last_error_msg,
+    }
 
 fn ComptimeEvaluator.eval_root(self: ComptimeEvaluator, node: i32) -> ComptimeValue:
     let signal = self.eval_expr(node)
@@ -916,6 +1009,78 @@ fn ComptimeEvaluator.capability_expect_arg_count(self: ComptimeEvaluator, arg_co
     let _ = self.fail(node, "wrong argument count for capability method " ++ method)
     false
 
+fn ComptimeEvaluator.capability_args(self: ComptimeEvaluator, extra_start: i32, arg_count: i32) -> ComptimeControl:
+    let start = self.extra_values.len() as i32
+    for i in 0..arg_count:
+        let arg_signal = self.eval_expr(self.ast.get_extra(extra_start + i))
+        if arg_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return arg_signal
+        self.extra_values.push(arg_signal.value)
+    comptime_control_value(comptime_value_tuple(0, start, arg_count))
+
+fn ComptimeEvaluator.capability_arg_str(self: ComptimeEvaluator, args: ComptimeValue, index: i32, method: str, node: i32) -> str:
+    let value = self.extra_values.get((args.extra_start + index) as i64)
+    if value.kind != ComptimeValueKind.CV_STR:
+        let _ = self.fail(node, "capability method " ++ method ++ " expects a string argument")
+        return ""
+    value.text
+
+fn ComptimeEvaluator.capability_arg_i32(self: ComptimeEvaluator, args: ComptimeValue, index: i32, method: str, node: i32) -> i32:
+    let value = self.extra_values.get((args.extra_start + index) as i64)
+    if comptime_value_is_intlike(value) == 0:
+        let _ = self.fail(node, "capability method " ++ method ++ " expects an integer argument")
+        return 0
+    comptime_value_intlike(value) as i32
+
+fn ComptimeEvaluator.capability_resolve_project_path(self: ComptimeEvaluator, record: ComptimeCapabilityRecord, path: str, method: str, node: i32) -> str:
+    if not comptime_tool_path_is_project_relative(path):
+        let _ = self.fail(node, "ToolFs path escapes project root in " ++ method ++ ": " ++ path)
+        return ""
+    comptime_tool_join(record.project_root, path)
+
+fn ComptimeEvaluator.capability_write_file_allowed(self: ComptimeEvaluator, record: ComptimeCapabilityRecord, path: str) -> bool:
+    if record.write_scoped == 0:
+        return true
+    for i in 0..record.write_scope.len() as i32:
+        if comptime_tool_path_is_same_or_child(path, record.write_scope.get(i as i64)):
+            return true
+    false
+
+fn ComptimeEvaluator.capability_mkdir_allowed(self: ComptimeEvaluator, record: ComptimeCapabilityRecord, path: str) -> bool:
+    if record.write_scoped == 0:
+        return true
+    for i in 0..record.write_scope.len() as i32:
+        let allowed = record.write_scope.get(i as i64)
+        if comptime_tool_path_is_same_or_child(path, allowed) or comptime_tool_path_is_parent_of(path, allowed):
+            return true
+    false
+
+fn ComptimeEvaluator.capability_require_write_file_allowed(self: ComptimeEvaluator, record: ComptimeCapabilityRecord, path: str, method: str, node: i32) -> bool:
+    if not comptime_tool_path_is_project_relative(path):
+        let _ = self.fail(node, "ToolFs path escapes project root in " ++ method ++ ": " ++ path)
+        return false
+    if not self.capability_write_file_allowed(record, path):
+        let _ = self.fail(node, "ToolFs write path is not a declared action output in " ++ method ++ ": " ++ path)
+        return false
+    true
+
+fn ComptimeEvaluator.capability_require_mkdir_allowed(self: ComptimeEvaluator, record: ComptimeCapabilityRecord, path: str, method: str, node: i32) -> bool:
+    if not comptime_tool_path_is_project_relative(path):
+        let _ = self.fail(node, "ToolFs path escapes project root in " ++ method ++ ": " ++ path)
+        return false
+    if not self.capability_mkdir_allowed(record, path):
+        let _ = self.fail(node, "ToolFs mkdir path is not a declared action output in " ++ method ++ ": " ++ path)
+        return false
+    true
+
+fn ComptimeEvaluator.capability_project_relative_path(self: ComptimeEvaluator, record: ComptimeCapabilityRecord, path: str) -> str:
+    if record.project_root.len() == 0 or record.project_root == ".":
+        return path
+    let prefix = if record.project_root.ends_with("/"): record.project_root else: record.project_root ++ "/"
+    if path.starts_with(prefix):
+        return path.slice(prefix.len(), path.len())
+    path
+
 fn ComptimeEvaluator.eval_buildctx_capability_method(self: ComptimeEvaluator, recv_value: ComptimeValue, method: str, arg_count: i32, node: i32) -> ComptimeControl:
     if method == "new_build":
         if not self.capability_expect_arg_count(arg_count, 0, method, node):
@@ -977,13 +1142,207 @@ fn ComptimeEvaluator.eval_project_info_capability_method(self: ComptimeEvaluator
         return comptime_control_value(comptime_value_str(record.project_root))
     self.fail(node, "ProjectInfo capability method '" ++ method ++ "' is not implemented yet")
 
-fn ComptimeEvaluator.eval_capability_method_call(self: ComptimeEvaluator, recv_value: ComptimeValue, field: i32, arg_count: i32, node: i32) -> ComptimeControl:
+fn ComptimeEvaluator.eval_diagnostics_capability_method(self: ComptimeEvaluator, recv_value: ComptimeValue, method: str, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
+    if method != "warn" and method != "error":
+        return self.fail(node, "Diagnostics capability method '" ++ method ++ "' is not implemented yet")
+    if not self.capability_expect_arg_count(arg_count, 1, method, node):
+        return comptime_control_error()
+    let handle = self.validate_capability(recv_value, CapabilityKind.CK_BUILD_DIAGNOSTICS, method, node)
+    if handle < 0:
+        return comptime_control_error()
+    let args_signal = self.capability_args(extra_start, arg_count)
+    if args_signal.kind != ComptimeControlKind.CTL_VALUE:
+        return args_signal
+    let message = self.capability_arg_str(args_signal.value, 0, method, node)
+    if self.had_error != 0:
+        return comptime_control_error()
+    if method == "warn":
+        with_eprint("warning: " ++ message ++ "\n")
+        return comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
+    with_eprint("error: " ++ message ++ "\n")
+    self.fail(node, message)
+
+fn ComptimeEvaluator.eval_source_emitter_capability_method(self: ComptimeEvaluator, recv_value: ComptimeValue, method: str, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
+    if method != "generated_source":
+        return self.fail(node, "SourceEmitter capability method '" ++ method ++ "' is not implemented yet")
+    if not self.capability_expect_arg_count(arg_count, 2, method, node):
+        return comptime_control_error()
+    let handle = self.validate_capability(recv_value, CapabilityKind.CK_BUILD_SOURCE_EMITTER, method, node)
+    if handle < 0:
+        return comptime_control_error()
+    let args_signal = self.capability_args(extra_start, arg_count)
+    if args_signal.kind != ComptimeControlKind.CTL_VALUE:
+        return args_signal
+    let path = self.capability_arg_str(args_signal.value, 0, method, node)
+    let contents = self.capability_arg_str(args_signal.value, 1, method, node)
+    if self.had_error != 0:
+        return comptime_control_error()
+    let source_type = self.named_type_id("GeneratedSource", node)
+    if source_type == 0:
+        return comptime_control_error()
+    let start = self.extra_values.len() as i32
+    self.extra_values.push(comptime_value_str(path))
+    self.extra_values.push(comptime_value_str(contents))
+    comptime_control_value(comptime_value_struct(source_type, start, 2))
+
+fn ComptimeEvaluator.eval_toolfs_capability_method(self: ComptimeEvaluator, recv_value: ComptimeValue, method: str, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
+    let handle = self.validate_capability(recv_value, CapabilityKind.CK_BUILD_TOOL_FS, method, node)
+    if handle < 0:
+        return comptime_control_error()
+    let record = self.capability_records.get(handle as i64)
+
+    if method == "exists" or method == "is_dir" or method == "read_text" or method == "list_files" or method == "mkdir_all" or method == "remove_file" or method == "remove_tree":
+        if not self.capability_expect_arg_count(arg_count, 1, method, node):
+            return comptime_control_error()
+        let args_signal = self.capability_args(extra_start, arg_count)
+        if args_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return args_signal
+        let path = self.capability_arg_str(args_signal.value, 0, method, node)
+        if self.had_error != 0:
+            return comptime_control_error()
+        let resolved = self.capability_resolve_project_path(record, path, method, node)
+        if self.had_error != 0:
+            return comptime_control_error()
+        if method == "exists":
+            return comptime_control_value(comptime_value_bool(if with_fs_file_exists(resolved) != 0: 1 else: 0))
+        if method == "is_dir":
+            return comptime_control_value(comptime_value_bool(if with_fs_is_dir(resolved) != 0: 1 else: 0))
+        if method == "read_text":
+            return comptime_control_value(comptime_value_str(with_fs_read_file(resolved)))
+        if method == "list_files":
+            let raw_files = comptime_tool_split_nonempty_lines(with_fs_list_files(resolved))
+            let vec_type = self.node_type_or(node, 0)
+            if vec_type == 0:
+                return self.fail(node, "ToolFs.list_files result type is unknown")
+            let start = self.extra_values.len() as i32
+            for i in 0..raw_files.len() as i32:
+                self.extra_values.push(comptime_value_str(self.capability_project_relative_path(record, raw_files.get(i as i64))))
+            return comptime_control_value(comptime_value_vec(vec_type, start, raw_files.len() as i32))
+        if method == "mkdir_all":
+            if not self.capability_require_mkdir_allowed(record, path, method, node):
+                return comptime_control_error()
+            return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_fs_mkdir_p(resolved) as i64))
+        if method == "remove_file":
+            if not self.capability_require_write_file_allowed(record, path, method, node):
+                return comptime_control_error()
+            return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_fs_remove_file(resolved) as i64))
+        if method == "remove_tree":
+            if not self.capability_require_write_file_allowed(record, path, method, node):
+                return comptime_control_error()
+            return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_fs_remove_tree(resolved) as i64))
+    if method == "host_exists":
+        if not self.capability_expect_arg_count(arg_count, 1, method, node):
+            return comptime_control_error()
+        let args_signal = self.capability_args(extra_start, arg_count)
+        if args_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return args_signal
+        let path = self.capability_arg_str(args_signal.value, 0, method, node)
+        if self.had_error != 0:
+            return comptime_control_error()
+        return comptime_control_value(comptime_value_bool(if with_fs_file_exists(path) != 0: 1 else: 0))
+    if method == "write_text" or method == "copy_file" or method == "chmod" or method == "rename" or method == "copy_tree" or method == "symlink":
+        let expected =
+            if method == "chmod":
+                2
+            else:
+                2
+        if not self.capability_expect_arg_count(arg_count, expected, method, node):
+            return comptime_control_error()
+        let args_signal = self.capability_args(extra_start, arg_count)
+        if args_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return args_signal
+        if method == "write_text":
+            let path = self.capability_arg_str(args_signal.value, 0, method, node)
+            let contents = self.capability_arg_str(args_signal.value, 1, method, node)
+            if self.had_error != 0:
+                return comptime_control_error()
+            if not self.capability_require_write_file_allowed(record, path, method, node):
+                return comptime_control_error()
+            let resolved = self.capability_resolve_project_path(record, path, method, node)
+            if self.had_error != 0:
+                return comptime_control_error()
+            return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_fs_write_file(resolved, contents) as i64))
+        if method == "copy_file":
+            let src = self.capability_arg_str(args_signal.value, 0, method, node)
+            let dst = self.capability_arg_str(args_signal.value, 1, method, node)
+            if self.had_error != 0:
+                return comptime_control_error()
+            let resolved_src = self.capability_resolve_project_path(record, src, method, node)
+            if not self.capability_require_write_file_allowed(record, dst, method, node):
+                return comptime_control_error()
+            let dst_dir = comptime_tool_path_dirname(dst)
+            if dst_dir != ".":
+                if not self.capability_require_mkdir_allowed(record, dst_dir, method, node):
+                    return comptime_control_error()
+                let mkdir_rc = with_fs_mkdir_p(self.capability_resolve_project_path(record, dst_dir, method, node))
+                if mkdir_rc != 0:
+                    return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), mkdir_rc as i64))
+            let resolved_dst = self.capability_resolve_project_path(record, dst, method, node)
+            if self.had_error != 0:
+                return comptime_control_error()
+            return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_fs_write_file(resolved_dst, with_fs_read_file(resolved_src)) as i64))
+        if method == "chmod":
+            let path = self.capability_arg_str(args_signal.value, 0, method, node)
+            let mode = self.capability_arg_i32(args_signal.value, 1, method, node)
+            if self.had_error != 0:
+                return comptime_control_error()
+            if not self.capability_require_write_file_allowed(record, path, method, node):
+                return comptime_control_error()
+            let resolved = self.capability_resolve_project_path(record, path, method, node)
+            if self.had_error != 0:
+                return comptime_control_error()
+            return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_fs_chmod(resolved, mode) as i64))
+        if method == "rename":
+            let old_path = self.capability_arg_str(args_signal.value, 0, method, node)
+            let new_path = self.capability_arg_str(args_signal.value, 1, method, node)
+            if self.had_error != 0:
+                return comptime_control_error()
+            if not self.capability_require_write_file_allowed(record, old_path, method, node) or not self.capability_require_write_file_allowed(record, new_path, method, node):
+                return comptime_control_error()
+            let resolved_old = self.capability_resolve_project_path(record, old_path, method, node)
+            let resolved_new = self.capability_resolve_project_path(record, new_path, method, node)
+            if self.had_error != 0:
+                return comptime_control_error()
+            return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_fs_rename_file(resolved_old, resolved_new) as i64))
+        if method == "copy_tree":
+            let src = self.capability_arg_str(args_signal.value, 0, method, node)
+            let dst = self.capability_arg_str(args_signal.value, 1, method, node)
+            if self.had_error != 0:
+                return comptime_control_error()
+            let resolved_src = self.capability_resolve_project_path(record, src, method, node)
+            if not self.capability_require_write_file_allowed(record, dst, method, node):
+                return comptime_control_error()
+            let resolved_dst = self.capability_resolve_project_path(record, dst, method, node)
+            if self.had_error != 0:
+                return comptime_control_error()
+            return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_fs_copy_tree(resolved_src, resolved_dst) as i64))
+        if method == "symlink":
+            let target = self.capability_arg_str(args_signal.value, 0, method, node)
+            let link_path = self.capability_arg_str(args_signal.value, 1, method, node)
+            if self.had_error != 0:
+                return comptime_control_error()
+            let resolved_target = self.capability_resolve_project_path(record, target, method, node)
+            if not self.capability_require_write_file_allowed(record, link_path, method, node):
+                return comptime_control_error()
+            let resolved_link = self.capability_resolve_project_path(record, link_path, method, node)
+            if self.had_error != 0:
+                return comptime_control_error()
+            return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_fs_symlink(resolved_target, resolved_link) as i64))
+    self.fail(node, "ToolFs capability method '" ++ method ++ "' is not implemented yet")
+
+fn ComptimeEvaluator.eval_capability_method_call(self: ComptimeEvaluator, recv_value: ComptimeValue, field: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
     let method = self.pool.resolve(field)
     let kind = recv_value.data0 as i32
     if kind == CapabilityKind.CK_BUILD_CTX:
         return self.eval_buildctx_capability_method(recv_value, method, arg_count, node)
     if kind == CapabilityKind.CK_BUILD_PROJECT_INFO:
         return self.eval_project_info_capability_method(recv_value, method, arg_count, node)
+    if kind == CapabilityKind.CK_BUILD_DIAGNOSTICS:
+        return self.eval_diagnostics_capability_method(recv_value, method, extra_start, arg_count, node)
+    if kind == CapabilityKind.CK_BUILD_SOURCE_EMITTER:
+        return self.eval_source_emitter_capability_method(recv_value, method, extra_start, arg_count, node)
+    if kind == CapabilityKind.CK_BUILD_TOOL_FS:
+        return self.eval_toolfs_capability_method(recv_value, method, extra_start, arg_count, node)
     self.fail(node, "capability method dispatch is not implemented for " ++ capability_registry_kind_name(kind) ++ "." ++ method)
 
 fn ComptimeEvaluator.eval_module_let_decl(self: ComptimeEvaluator, decl: i32, use_node: i32) -> ComptimeControl:
@@ -1657,7 +2016,7 @@ fn ComptimeEvaluator.eval_call(self: ComptimeEvaluator, node: i32) -> ComptimeCo
         if recv_signal.kind != ComptimeControlKind.CTL_VALUE:
             return recv_signal
         if recv_signal.value.kind == ComptimeValueKind.CV_CAPABILITY:
-            return self.eval_capability_method_call(recv_signal.value, field, arg_count, node)
+            return self.eval_capability_method_call(recv_signal.value, field, self.ast.get_data1(node), arg_count, node)
         if recv_signal.value.kind == ComptimeValueKind.CV_STRUCT:
             let field_index = self.struct_field_index(recv_signal.value.type_id, field)
             if field_index >= 0:
@@ -1690,6 +2049,15 @@ fn ComptimeEvaluator.eval_fn_symbol_call(self: ComptimeEvaluator, fn_sym: i32, e
         return self.eval_src_call(node, arg_count)
     if fn_sym == self.sema.syms.embed_file:
         return self.eval_embed_file_call(node, arg_count)
+    let arg_values: Vec[ComptimeValue] = Vec.new()
+    for i in 0..arg_count:
+        let arg_signal = self.eval_expr(self.ast.get_extra(extra_start + i))
+        if arg_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return arg_signal
+        arg_values.push(arg_signal.value)
+    self.eval_fn_symbol_call_values(fn_sym, arg_values, node)
+
+fn ComptimeEvaluator.eval_fn_symbol_call_values(self: ComptimeEvaluator, fn_sym: i32, arg_values: Vec[ComptimeValue], node: i32) -> ComptimeControl:
     let fn_node = self.find_fn_decl_node(fn_sym)
     if self.allow_runtime_calls == 0 and self.fn_decl_node_is_comptime(fn_node) == 0:
         return self.fail(node, "comptime can only call comptime functions")
@@ -1705,19 +2073,13 @@ fn ComptimeEvaluator.eval_fn_symbol_call(self: ComptimeEvaluator, fn_sym: i32, e
         return self.fail(node, "missing comptime function metadata")
     let param_start = self.ast.fn_meta_param_start(meta)
     let param_count = self.ast.fn_meta_param_count(meta)
+    let arg_count = arg_values.len() as i32
     if arg_count > param_count:
         return self.fail(node, "wrong argument count in comptime call")
 
     let caller_path = self.current_source_path()
     let caller_text = self.current_source_text()
     let caller_fn_sym = if self.active_fn_syms.len() > 0: self.active_fn_syms.get((self.active_fn_syms.len() - 1) as i64) else: 0
-
-    let arg_values: Vec[ComptimeValue] = Vec.new()
-    for i in 0..arg_count:
-        let arg_signal = self.eval_expr(self.ast.get_extra(extra_start + i))
-        if arg_signal.kind != ComptimeControlKind.CTL_VALUE:
-            return arg_signal
-        arg_values.push(arg_signal.value)
 
     let saved_file = self.sema.local_file_id
     let saved_path = self.sema.current_module_path
