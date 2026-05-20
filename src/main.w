@@ -1031,12 +1031,6 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, opt_level: 
                 return action_rc
             completed_targets.push(target.name)
             continue
-        if target.kind == build_graph_kind_generate_compiler_entrypoints():
-            let gen_rc = build_graph_generate_compiler_entrypoints(root, target)
-            if gen_rc != 0:
-                return gen_rc
-            completed_targets.push(target.name)
-            continue
         if target.kind == build_graph_kind_with_compiler_build():
             let with_build_rc = build_graph_run_with_compiler_build(root, target)
             if with_build_rc != 0:
@@ -1047,12 +1041,6 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, opt_level: 
             let ir_rc = build_graph_run_with_compiler_ir(root, target)
             if ir_rc != 0:
                 return ir_rc
-            completed_targets.push(target.name)
-            continue
-        if target.kind == build_graph_kind_generate_llvm_link_metadata():
-            let llvm_metadata_rc = build_graph_generate_llvm_link_metadata(root, target)
-            if llvm_metadata_rc != 0:
-                return llvm_metadata_rc
             completed_targets.push(target.name)
             continue
         let source_path = resolve_join(root, target.entry)
