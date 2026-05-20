@@ -3,7 +3,7 @@
 Status: active checkpoint for agents. Update this file when phase status,
 blockers, or the next work queue changes.
 
-Last updated: 2026-05-19.
+Last updated: 2026-05-20.
 
 Read this file immediately after `AGENTS.md`. It exists so long-running build
 system and bootstrap work does not have to be reconstructed from git history or
@@ -11,9 +11,13 @@ conversation context after compaction.
 
 ## Current Focus
 
-Phase C extraction work is complete. The next major build-system direction is
-to continue with post-extraction hardening: action policy declarations,
-compiler-as-library/tool-mode APIs, shell-string removal, and Make retirement.
+Phase C extraction work is complete. Pre-Phase-D preparation is complete
+through P9. The next major build-system direction is Phase D D1:
+capability-bearing comptime evaluator dispatch for `build.w` and action
+targets, replacing generated runner binaries on the normal path.
+
+Do not start D2-D8 until D1 lands and passes the baseline verification in
+`docs/audits/pre-d1-baseline.md`.
 
 Completed quality-of-life slices:
 
@@ -24,16 +28,34 @@ Completed quality-of-life slices:
 
 ## Verification Baseline
 
-The latest completed code slices before this checkpoint passed:
+The pre-D1 baseline is recorded in `docs/audits/pre-d1-baseline.md`.
+The verified code/design commit is:
 
-```sh
-make build
-make fixpoint
-make test
-make install-user
+```text
+617aecd0913f88c598ccb18f4449b3d908dcba0f Reconcile Phase D design with pre-D artifacts
 ```
 
-Recent relevant commits:
+Commands passed:
+
+```sh
+out/bin/with build :build
+out/bin/with build :fixpoint
+out/bin/with build :test
+out/bin/with build :emit-c-test
+```
+
+Recent pre-D commits:
+
+- `617aecd` Reconcile Phase D design with pre-D artifacts.
+- `db64d01` Isolate generated action runner dispatch.
+- `6d1b052` Add pre-D build action behavior regressions.
+- `366b681` Design BuildOptions and CLI integration.
+- `af5a756` Design capability dispatch for Phase D.
+- `0ebdcd2` Survey build scripts before Phase D.
+- `3e10eed` Audit parallel compiler state before Phase D.
+- `1cbc348` Audit comptime evaluator before Phase D.
+
+Recent Phase C and hardening commits:
 
 - `c993471` Extract compiler generators to build actions.
 - `8f47830` Extract compiler build targets to build actions.
@@ -63,7 +85,9 @@ Recent relevant commits:
 ## Build Plan Status
 
 The authoritative plan remains `docs/build-plan.md`; the final architecture is
-specified in `docs/build-spec.md`.
+specified in `docs/build-spec.md`. Phase D implementation is governed by
+`docs/phase-d-design.md`; pre-D preparation is governed by
+`docs/pre-phase-d-plan.md`.
 
 Completed at a high level:
 
@@ -80,6 +104,8 @@ Still incomplete:
 
 - Phase C is complete. Project-specific build behavior no longer uses live
   compiler-dispatched project graph kinds.
+- Phase D is not implemented yet. `build.w` and action targets still execute
+  through generated runner binaries until D1 replaces that path.
 - Action timeout/cwd/env/network/install policy declarations are incomplete.
 - Jai-style workspace/build-options/message-loop APIs are incomplete.
 - Make remains a compatibility layer.
@@ -120,6 +146,13 @@ not a new compiler-dispatched project graph kind.
 
 ## Open Blockers And Follow-Ups
 
+- Start Phase D with D1 only: capability registry, evaluator dispatch,
+  capability handle validation, and driver replacement of generated
+  build/action runner execution.
+- Preserve the pre-D behavior tests during D1:
+  `behav_build_w_basic_invocation`, `behav_action_capability_filesystem`,
+  `behav_action_capability_process`, `behav_capability_token_mismatch`,
+  `behav_action_crash_diagnostic`, and `behav_action_no_deps_isolation`.
 - Decide whether in-process build graph test targets should also move to
   external parallel execution, or remain serial for diagnostic fidelity.
 - Keep manual-only heavy targets covered by fast smokes in `make test`.
@@ -131,13 +164,13 @@ not a new compiler-dispatched project graph kind.
 ## Local State
 
 At the time of this update, the source changes for Phase C completion were
-committed locally after passing:
+committed locally. The pre-D1 baseline passed:
 
 ```sh
-make build
-out/bin/with build :cli-selfhost-build-w-tests --no-deps
-make fixpoint
-make test
+out/bin/with build :build
+out/bin/with build :fixpoint
+out/bin/with build :test
+out/bin/with build :emit-c-test
 ```
 
 Always run `git status -sb` before editing; this file is a checkpoint, not a
