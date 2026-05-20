@@ -34,6 +34,8 @@ make install-user
 
 Recent relevant commits:
 
+- `c993471` Extract compiler generators to build actions.
+- `3242741` Add host existence checks to ToolFs.
 - `765c0d0` Extract emit-C targets to build actions.
 - `862a510` Preserve HashMap key types in emitted C.
 - `9ec2148` Materialize copy let bindings in MIR.
@@ -100,12 +102,14 @@ Completed Phase C-style extractions include:
 - `pcre2-check-generated` / `pcre2-promote`
 - `seed-download`
 - `emit-c-test` / `emit-c-fixpoint` / `emit-c-roundtrip`
+- `compiler-sources`
+- `bootstrap-llvm-link-metadata` / `llvm-link-metadata`
 
 Remaining Phase C areas include:
 
 - remaining selfhost fixture suites;
 - remaining PCRE2 action paths if any compiler-dispatched pieces remain;
-- compiler stage policy that is still project-specific;
+- compiler build / IR invocation targets that are still project-specific;
 - final `selfhost_suite_test` dispatcher removal after it has no children.
 
 Before starting another extraction, re-check `src/BuildGraphKinds.w`,
