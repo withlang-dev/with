@@ -1,6 +1,6 @@
 # Phase C Extraction Plan: Build.w Selfhost Tests
 
-Status: prospective plan. Implementation pending.
+Status: completed extraction plan. Implementation complete.
 
 This extraction will move `cli-selfhost-build-w-tests` out of generic
 compiler-driver dispatch and into a repository-local build action.
@@ -119,5 +119,5 @@ make fixpoint
 make test
 ```
 
-After the extraction commit lands, update `docs/build-kind-table-audit.md` in a
+After the extraction commit lands, update `build-kind-table-audit.md` in a
 separate follow-up commit so kind `1011` is listed as removed.

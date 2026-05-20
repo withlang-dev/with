@@ -114,9 +114,9 @@ No Phase C extraction areas remain. All old 1000-series repository-specific
 graph kinds are reserved as removed-kind diagnostics.
 
 Before adding new repository build policy, re-check `src/BuildGraphKinds.w`,
-`src/main.w`, `docs/phase-c-inventory.md`, and the current git log. New
-repository-specific behavior should go into project-local build modules, not a
-new compiler-dispatched project graph kind.
+`src/main.w`, `docs/completed/phase-c-inventory.md`, and the current git log.
+New repository-specific behavior should go into project-local build modules,
+not a new compiler-dispatched project graph kind.
 
 ## Open Blockers And Follow-Ups
 
