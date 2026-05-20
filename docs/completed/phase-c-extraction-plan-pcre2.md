@@ -1,6 +1,6 @@
 # Phase C Extraction Plan: PCRE2 Targets
 
-Status: plan for the PCRE2 extraction group. No implementation in this commit.
+Status: completed extraction plan. Implementation complete.
 
 This extraction will move the With repository's PCRE2 migrated-library targets
 out of generic compiler-driver dispatch and into project-local build actions.
@@ -183,7 +183,7 @@ For the PCRE2 extraction:
 7. Run `make fixpoint`.
 8. Run `make test`.
 9. Commit and push.
-10. Update `docs/build-kind-table-audit.md` in a separate docs-only commit.
+10. Update `build-kind-table-audit.md` in a separate docs-only commit.
 
 Do not combine a stdlib/runtime capability fix with a PCRE2 target extraction.
 

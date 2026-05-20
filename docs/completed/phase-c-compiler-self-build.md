@@ -1,6 +1,6 @@
 # Phase C Compiler Self-Build
 
-Status: design note. No extraction work has started.
+Status: completed design note. Phase C extraction is complete.
 
 Phase C moves project-specific build logic out of the generic compiler driver.
 The compiler project itself is one of those projects, so targets such as

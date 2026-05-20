@@ -1,6 +1,6 @@
 # Phase C Extraction Plan: C Migrator Core Tests
 
-Status: prospective plan. Implementation pending.
+Status: completed extraction plan. Implementation complete.
 
 This extraction will move `c-migrator-core-tests` out of generic
 compiler-driver dispatch and into a repository-local build action.
@@ -124,5 +124,5 @@ make fixpoint
 make test
 ```
 
-After the extraction commit lands, update `docs/build-kind-table-audit.md` in a
+After the extraction commit lands, update `build-kind-table-audit.md` in a
 separate follow-up commit so kind `1018` is listed as removed.

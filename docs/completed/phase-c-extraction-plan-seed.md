@@ -1,5 +1,7 @@
 # Phase C Extraction Plan: Seed Download
 
+Status: completed extraction plan. Implementation complete.
+
 ## Placement
 
 Seed acquisition is specific to the With compiler repository. The generic build
@@ -89,4 +91,4 @@ would replace the local seed.
 5. `make fixpoint`
 6. `make test`
 7. Commit and push the extraction
-8. Update `docs/build-kind-table-audit.md` in a separate docs-only commit
+8. Update `build-kind-table-audit.md` in a separate docs-only commit
