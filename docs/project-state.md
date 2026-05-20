@@ -11,8 +11,9 @@ conversation context after compaction.
 
 ## Current Focus
 
-Quality-of-life hardening is complete. The next major build-system direction is
-to return to Phase C extraction work unless a new bug interrupts it.
+Phase C extraction work is complete. The next major build-system direction is
+to continue with post-extraction hardening: action policy declarations,
+compiler-as-library/tool-mode APIs, shell-string removal, and Make retirement.
 
 Completed quality-of-life slices:
 
@@ -35,6 +36,9 @@ make install-user
 Recent relevant commits:
 
 - `c993471` Extract compiler generators to build actions.
+- `8f47830` Extract compiler build targets to build actions.
+- `7ead507` Preserve action runner output while capturing diagnostics.
+- `d852d2c` Lower binding initializers before binding locals.
 - `3242741` Add host existence checks to ToolFs.
 - `765c0d0` Extract emit-C targets to build actions.
 - `862a510` Preserve HashMap key types in emitted C.
@@ -74,8 +78,8 @@ Completed at a high level:
 
 Still incomplete:
 
-- Phase C is not finished. Project-specific build behavior still leaks into
-  compiler source modules.
+- Phase C is complete. Project-specific build behavior no longer uses live
+  compiler-dispatched project graph kinds.
 - Action timeout/cwd/env/network/install policy declarations are incomplete.
 - Jai-style workspace/build-options/message-loop APIs are incomplete.
 - Make remains a compatibility layer.
@@ -104,35 +108,36 @@ Completed Phase C-style extractions include:
 - `emit-c-test` / `emit-c-fixpoint` / `emit-c-roundtrip`
 - `compiler-sources`
 - `bootstrap-llvm-link-metadata` / `llvm-link-metadata`
+- compiler build / compiler IR targets
 
-Remaining Phase C areas include:
+No Phase C extraction areas remain. All old 1000-series repository-specific
+graph kinds are reserved as removed-kind diagnostics.
 
-- remaining selfhost fixture suites;
-- remaining PCRE2 action paths if any compiler-dispatched pieces remain;
-- compiler build / IR invocation targets that are still project-specific;
-- final `selfhost_suite_test` dispatcher removal after it has no children.
-
-Before starting another extraction, re-check `src/BuildGraphKinds.w`,
-`src/main.w`, `docs/phase-c-inventory.md`, and the current git log. Do not rely
-solely on this checkpoint for exact line ownership.
+Before adding new repository build policy, re-check `src/BuildGraphKinds.w`,
+`src/main.w`, `docs/phase-c-inventory.md`, and the current git log. New
+repository-specific behavior should go into project-local build modules, not a
+new compiler-dispatched project graph kind.
 
 ## Open Blockers And Follow-Ups
 
 - Decide whether in-process build graph test targets should also move to
   external parallel execution, or remain serial for diagnostic fidelity.
 - Keep manual-only heavy targets covered by fast smokes in `make test`.
-- Continue removing project-specific build dispatch from generic compiler
-  source one target group at a time.
+- Keep project-specific build policy in project-local modules and avoid adding
+  new compiler-dispatched project graph kinds.
 - Continue replacing shell/filesystem work in build internals with typed
   capabilities.
 
 ## Local State
 
-At the time of this update, the repository was clean:
+At the time of this update, the source changes for Phase C completion were
+committed locally after passing:
 
 ```sh
-git status -sb
-# ## main...origin/main
+make build
+out/bin/with build :cli-selfhost-build-w-tests --no-deps
+make fixpoint
+make test
 ```
 
 Always run `git status -sb` before editing; this file is a checkpoint, not a

@@ -1,13 +1,14 @@
 # Build Graph Kind Table Audit
 
-Status: current as of `c993471`.
+Status: current as of `8f47830`.
 
 This audit covers `src/BuildGraphKinds.w` after the Phase C selfhost smoke,
 one-liner, object-symbol, project, edge, PCRE2-prep, migrate-basic, and
 migrate-core, and build-w extractions. The old selfhost suite dispatcher is
 also removed. The embedded-runtime regression, all PCRE2 project targets, seed
 download, emit-C targets, compiler source generation, LLVM link metadata, and
-the selfhost suites extracted so far are now action targets.
+compiler build/IR targets are now action targets. No live project-specific
+graph kind remains.
 
 ## Standard Kinds
 
@@ -50,12 +51,7 @@ Removed standard kinds:
 
 ## Project Kinds
 
-Live project kinds:
-
-| Kind | Name |
-| --- | --- |
-| 1004 | `with_compiler_build` |
-| 1013 | `with_compiler_ir` |
+Live project kinds: none.
 
 Removed project kinds:
 
@@ -65,6 +61,7 @@ Removed project kinds:
 | 1001 | `removed_selfhost_noop_local_regression` |
 | 1002 | `removed_cli_selfhost_smoke_test` |
 | 1003 | `removed_generate_compiler_entrypoints` |
+| 1004 | `removed_with_compiler_build` |
 | 1005 | `removed_pcre2_run_test` |
 | 1006 | `removed_pcre2_generated_check` |
 | 1007 | `removed_pcre2_generated_promote` |
@@ -73,6 +70,7 @@ Removed project kinds:
 | 1010 | `removed_cli_selfhost_object_symbol_test` |
 | 1011 | `removed_cli_selfhost_build_w_test` |
 | 1012 | `removed_generate_compat_runtime` |
+| 1013 | `removed_with_compiler_ir` |
 | 1014 | `removed_cli_selfhost_project_test` |
 | 1015 | `removed_cli_selfhost_edge_test` |
 | 1016 | `removed_cli_selfhost_pcre2_prep_test` |
@@ -88,9 +86,9 @@ Removed project kinds:
 | 1026 | `removed_emit_c_fixpoint` |
 | 1027 | `removed_emit_c_roundtrip` |
 
-`build_graph_kind_is_project` accepts every live project kind and excludes
-every removed project kind. `build_graph_kind_removed` reserves every removed
-project kind.
+`build_graph_kind_is_project` returns `false` for every kind. All former
+1000-series repository-specific kinds are reserved by `build_graph_kind_removed`
+so stale serialized graphs fail with a regenerate diagnostic.
 
 Kind `1023` was never a live serialized target. It was skipped when project
 kinds were named in `3fd6f81`; it is now explicitly reserved as

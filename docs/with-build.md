@@ -575,10 +575,10 @@ pub fn build(ctx: BuildCtx) -> Build:
 ## The With Compiler Repository
 
 The With compiler itself uses `build.w` heavily. Repository-specific target
-kinds and actions live in the repository `build.w` and temporary compiler build
-graph modules, not in `std.build`. The repository is actively moving those
-project-specific paths to `Action` targets so the generic compiler driver only
-executes standard graph nodes and action invocations.
+kinds and actions live in the repository `build.w` and project-local build
+modules, not in `std.build`. The generic compiler driver executes standard
+graph nodes and project-local action invocations; repository policy stays in
+repository build modules.
 
 Common repository targets include:
 
@@ -627,7 +627,6 @@ Build files and build-system code should follow these rules:
 - Full Jai-style compiler-as-library workspace APIs are not implemented yet.
 - Cross-platform target plumbing exists, but only the current host path is
   routinely exercised.
-- Some repository targets are still project-specific custom node kinds.
 - `Command` and low-level toolchain targets are argv/file based, but the API is
   still being refined.
 - Make remains as a temporary compatibility layer in this repository.
