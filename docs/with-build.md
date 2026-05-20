@@ -13,9 +13,15 @@ with.toml  declarative package metadata
 build.w    executable build behavior
 ```
 
-The compiler driver discovers `build.w`, runs it in tool mode, receives a typed
-build graph, and executes that graph. Ordinary projects do not need Makefiles
-or shell scripts for normal builds.
+The compiler driver discovers `build.w`, runs it with driver-minted build
+capabilities, receives a typed build graph, and executes that graph. Ordinary
+projects do not need Makefiles or shell scripts for normal builds.
+
+Implementation note: current releases execute `build.w` and action functions
+through generated runner binaries. Phase D is replacing that internal path with
+capability-bearing comptime evaluation inside the driver. The public API is the
+same either way: `pub fn build(ctx: BuildCtx) -> Build`, `ActionCtx` for action
+targets, typed graph nodes, and explicit capabilities.
 
 ## Quick Start
 
@@ -81,13 +87,14 @@ with build :action --no-deps
 ```
 
 `with build` searches upward from the current directory for `build.w` or
-`with.toml`. If `build.w` exists, it is compiled and executed in tool mode. If
-no `build.w` exists, the driver falls back to a default build of `src/main.w`
-using the package name from `with.toml`.
+`with.toml`. If `build.w` exists, the driver invokes its `build(ctx)` entry
+point and executes the returned graph. If no `build.w` exists, the driver falls
+back to a default build of `src/main.w` using the package name from
+`with.toml`.
 
 `:target` selects a target by name from the graph returned by `build.w`.
 
-`--graph` prints the stable graph format emitted by `Build.emit_graph()`.
+`--graph` prints the stable graph format for the discovered project build.
 
 `--dry-run` currently prints the selected graph without executing it.
 
@@ -154,15 +161,16 @@ The compiler driver constructs `BuildCtx`. User code cannot construct
 `Build`, which is a typed graph of targets, generated sources, dependencies,
 and package metadata.
 
-`build.w` is ordinary With code except that it runs in tool mode and receives
-driver-minted capabilities.
+`build.w` is ordinary With code except that the driver invokes it with
+unforgeable capabilities. Capability-bearing functions are compile-time tool
+entry points; they cannot be called from runtime code with forged handles.
 
 ## Tool Mode
 
 Tool mode is the privileged build-driver environment. Privilege is explicit:
 build code can perform effects only through capabilities passed by the driver.
 
-The initial capabilities are:
+The currently exposed build capabilities are:
 
 ```text
 BuildCtx        top-level build entry capability
@@ -171,10 +179,14 @@ Diagnostics     warnings and fatal errors
 SourceEmitter   generated-source construction
 ToolFs          sandboxed project-relative filesystem operations
 ProcessRunner   argv-based external process capture
+ActionCtx       action-target invocation context
 ```
 
-Capability values are token-backed handles. They are not raw pointers and do
-not require shared address space with the compiler driver.
+Capability values are driver-minted handles. User code may receive, pass, and
+call methods on them, but may not construct or deserialize production
+capabilities. The current runner path uses validation tokens internally; Phase
+D is moving that validation into the evaluator capability store. Build code
+should not depend on either representation.
 
 ### BuildCtx
 
@@ -198,6 +210,26 @@ info.project_root()
 ```
 
 `project_root()` is the driver-discovered project root.
+
+### ActionCtx
+
+`ActionCtx` is passed to `Action` target functions:
+
+```with
+ctx.target_name()
+ctx.project_info()
+ctx.diagnostics()
+ctx.fs()
+ctx.process_runner()
+ctx.inputs()
+ctx.outputs()
+ctx.args()
+ctx.output()
+```
+
+`ctx.fs()` is scoped to the action's declared output and extra outputs. If an
+action needs to create additional files or directories, declare them with
+`target.extra_output(path)`.
 
 ### Diagnostics
 
@@ -245,8 +277,8 @@ root.
 ```with
 let proc = ctx.process_runner()
 let args: Vec[str] = Vec.new()
-args.push("tool")
-args.push("--version")
+args |> push("tool")
+args |> push("--version")
 let result = proc.run_capture(args, "out/tool.stdout", "out/tool.stderr", 30000)
 if result.rc != 0:
     ctx.diagnostics().error(result.stderr)
@@ -283,13 +315,16 @@ pub type Target {
     include_paths: Vec[str],
     defines: Vec[str],
     inputs: Vec[str],
+    extra_outputs: Vec[str],
+    write_scopes: Vec[str],
     deps: Vec[str],
     args: Vec[str],
+    action: fn(ActionCtx) -> i32,
 }
 ```
 
-The driver serializes the graph with `Build.emit_graph()`, filters it by the
-selected target and dependencies, then executes the selected graph.
+The driver validates the graph, filters it by the selected target and
+dependencies, then executes the selected graph.
 
 ## Target Construction
 
@@ -321,6 +356,8 @@ Target modifiers are value-returning methods:
 ```with
 target.output("out/bin/app")
 target.input("path")
+target.extra_output("path-or-directory")
+target.write_scope("directory")
 target.dep("other-target")
 target.arg("value")
 target.compiler("out/bin/with-stage2")
@@ -329,7 +366,9 @@ target.optimize(.release)
 ```
 
 `dep` names another target in the same graph. Selecting a target also runs its
-dependencies.
+dependencies. `extra_output` declares additional files or directories that an
+action may create. `write_scope` grants a broader project-relative write root
+when a target intentionally produces a tree of files.
 
 ## Standard Target Kinds
 
@@ -413,18 +452,22 @@ use std.build
 fn generate(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     assert(fs.mkdir_all("out/gen") == 0)
-    fs.write_text(ctx.output(), "pub let generated = true\n")
+    if fs.write_text(ctx.output(), "pub let generated = true\n") != 0:
+        ctx.diagnostics().error("failed to write generated source")
+        return 1
+    0
 
 pub fn build(ctx: BuildCtx) -> Build:
     var out = ctx.new_build()
     var gen = target_new(.Action, "generate", "").output("out/gen/generated.w")
     gen.action = generate
     out = out.add_target(gen)
-    out.executable("app", "src/main.w").default("app")
+    out = out.executable("app", "src/main.w")
+    out.default("app")
 ```
 
-Action functions can live in `build.w` or in repository-local modules imported
-by `build.w`. Keep reusable build-system abstractions in `std.build`; keep
+Action functions can live in `build.w` or in project-local modules imported by
+`build.w`. Keep reusable build-system abstractions in `std.build`; keep
 project policy, file lists, generated-source rules, and migration commands in
 the project build files.
 
@@ -574,11 +617,11 @@ pub fn build(ctx: BuildCtx) -> Build:
 
 ## The With Compiler Repository
 
-The With compiler itself uses `build.w` heavily. Repository-specific target
-kinds and actions live in the repository `build.w` and project-local build
-modules, not in `std.build`. The generic compiler driver executes standard
-graph nodes and project-local action invocations; repository policy stays in
-repository build modules.
+The With compiler itself uses `build.w` heavily. Repository-specific actions
+live in the repository `build.w` and project-local build modules, not in
+`std.build` and not as compiler-dispatched project graph kinds. The generic
+compiler driver executes standard graph nodes and project-local action
+invocations; repository policy stays in repository build modules.
 
 Common repository targets include:
 
@@ -604,12 +647,24 @@ with build :clean
 ```
 
 The default `with build :test` target tests the language, compiler, build
-system, and standard library. It does not run the full PCRE2 upstream corpus.
-Migrated-library corpora are explicit targets, for example
-`with build :pcre2-test`.
+system, standard library, and fast smoke coverage for migrated libraries and
+emit-C. It does not run the full PCRE2 upstream corpus or the full emit-C
+roundtrip. Heavy manual targets are explicit:
 
-Make remains as a repository compatibility shim while target parity is being
-verified. `with build` is the authoritative build path for new With projects.
+```sh
+with build :pcre2-test
+with build :emit-c-test
+with build :emit-c-fixpoint
+with build :emit-c-roundtrip
+```
+
+Run the full emit-C targets for release verification or when working on emit-C
+itself. For normal compiler, stdlib, and build-system work, the default test
+target includes the fast emit-C smoke.
+
+Make remains as a repository compatibility layer for familiar stage commands
+and bootstrap recovery. `with build` is the authoritative build path for new
+With projects and for ongoing build-system development.
 
 ## Safety Rules
 
@@ -624,12 +679,15 @@ Build files and build-system code should follow these rules:
 
 ## Repository Work Still In Progress
 
+- Phase D is in progress. The current public build API is stable, but generated
+  build/action runner binaries are still used internally until
+  capability-bearing comptime evaluator dispatch replaces them.
 - Full Jai-style compiler-as-library workspace APIs are not implemented yet.
 - Cross-platform target plumbing exists, but only the current host path is
   routinely exercised.
-- `Command` and low-level toolchain targets are argv/file based, but the API is
-  still being refined.
-- Make remains as a temporary compatibility layer in this repository.
+- `Command` and low-level toolchain targets are argv/file based. Prefer typed
+  target kinds and `ToolFs` operations when those exist.
+- Make remains as a compatibility layer in this repository.
 
 These are implementation gaps, not design changes. Unsupported operations
 should fail loudly rather than silently falling back.
