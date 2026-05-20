@@ -19,6 +19,8 @@ is in progress. Completed D1 sub-slices:
    kind for evaluator dispatch.
 2. Comptime function values and function-field calls, needed for evaluating
    `Build.action(..., action_fn)` targets without generated runner binaries.
+3. Comptime struct field assignment, needed to preserve `Target.action` and
+   other build-record mutations during direct `build.w` evaluation.
 
 Remaining D1 work is capability method dispatch, handle validation, direct
 `build.w` evaluation, and replacing generated build/action runner binaries on
