@@ -13,8 +13,13 @@ conversation context after compaction.
 
 Phase C extraction work is complete. Pre-Phase-D preparation is complete
 through P9, including the follow-up source-location diagnostic gap. Phase D D1
-is in progress. The first D1 sub-slice added the shared capability registry
-used by Sema and reserved a capability value kind for evaluator dispatch.
+is in progress. Completed D1 sub-slices:
+
+1. Shared capability registry used by Sema, plus a reserved capability value
+   kind for evaluator dispatch.
+2. Comptime function values and function-field calls, needed for evaluating
+   `Build.action(..., action_fn)` targets without generated runner binaries.
+
 Remaining D1 work is capability method dispatch, handle validation, direct
 `build.w` evaluation, and replacing generated build/action runner binaries on
 the normal path.

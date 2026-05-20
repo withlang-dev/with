@@ -16,6 +16,7 @@ enum ComptimeValueKind: i32:
     CV_VEC = 9
     CV_MAP = 10
     CV_CAPABILITY = 11
+    CV_FN = 12
 
 type ComptimeValue {
     kind: i32,
@@ -159,6 +160,17 @@ fn comptime_value_capability(type_id: i32, capability_kind: i32, handle_id: i32,
         extra_count: 0,
     }
 
+fn comptime_value_fn(type_id: i32, fn_sym: i32) -> ComptimeValue:
+    ComptimeValue {
+        kind: ComptimeValueKind.CV_FN,
+        type_id,
+        data0: fn_sym as i64,
+        data1: 0,
+        text: "",
+        extra_start: 0,
+        extra_count: 0,
+    }
+
 fn comptime_value_is_valid(value: ComptimeValue) -> i32:
     if value.kind == ComptimeValueKind.CV_INVALID:
         return 0
@@ -191,6 +203,7 @@ fn comptime_value_kind_name(kind: i32) -> str:
     if kind == ComptimeValueKind.CV_VEC: return "vec"
     if kind == ComptimeValueKind.CV_MAP: return "map"
     if kind == ComptimeValueKind.CV_CAPABILITY: return "capability"
+    if kind == ComptimeValueKind.CV_FN: return "function"
     "invalid"
 
 fn comptime_value_format(value: ComptimeValue, extras: Vec[ComptimeValue], sema: Sema) -> str:
@@ -248,6 +261,8 @@ fn comptime_value_format(value: ComptimeValue, extras: Vec[ComptimeValue], sema:
         return out ++ " }"
     if value.kind == ComptimeValueKind.CV_CAPABILITY:
         return "<capability " ++ capability_registry_kind_name(value.data0 as i32) ++ ">"
+    if value.kind == ComptimeValueKind.CV_FN:
+        return "<fn " ++ sema.pool_resolve(value.data0 as i32) ++ ">"
     if value.type_id != 0:
         return "<" ++ sema.type_name(value.type_id) ++ ">"
     "<invalid>"
@@ -312,6 +327,10 @@ fn comptime_values_equal(lhs: ComptimeValue, rhs: ComptimeValue, extras: Vec[Com
         return 1
     if lhs.kind == ComptimeValueKind.CV_CAPABILITY:
         if lhs.type_id == rhs.type_id and lhs.data0 == rhs.data0 and lhs.data1 == rhs.data1 and lhs.extra_start == rhs.extra_start:
+            return 1
+        return 0
+    if lhs.kind == ComptimeValueKind.CV_FN:
+        if lhs.type_id == rhs.type_id and lhs.data0 == rhs.data0:
             return 1
         return 0
     0

@@ -41,6 +41,7 @@ type ComptimeEvaluator {
     step_budget: i32,
     recursion_limit: i32,
     require_success: i32,
+    allow_runtime_calls: i32,
     had_error: i32,
     last_error_msg: str,
     has_pending_diag: i32,
@@ -90,6 +91,7 @@ fn ComptimeEvaluator.init(sema: Sema, ast: AstPool, pool: InternPool, require_su
         step_budget: COMPTIME_STEP_LIMIT,
         recursion_limit: COMPTIME_RECURSION_LIMIT,
         require_success,
+        allow_runtime_calls: 0,
         had_error: 0,
         last_error_msg: "",
         has_pending_diag: 0,
@@ -265,6 +267,30 @@ fn ComptimeEvaluator.find_module_let_decl(self: ComptimeEvaluator, sym: i32) -> 
         if self.ast.kind(decl) == NodeKind.NK_LET_DECL and self.ast.get_data0(decl) == sym:
             return decl as i32
         di = di - 1
+    0
+
+fn ComptimeEvaluator.find_fn_decl_node(self: ComptimeEvaluator, sym: i32) -> i32:
+    if self.sema.fn_decl_nodes.contains(sym):
+        return self.sema.fn_decl_nodes.get(sym).unwrap()
+    var di = self.ast.decl_count() as i32 - 1
+    while di >= 0:
+        let decl = self.ast.get_decl(di)
+        if self.ast.kind(decl) == NodeKind.NK_FN_DECL and self.ast.get_data0(decl) == sym:
+            return decl as i32
+        di = di - 1
+    0
+
+fn ComptimeEvaluator.fn_decl_node_is_comptime(self: ComptimeEvaluator, fn_node: i32) -> i32:
+    if fn_node == 0:
+        return 0
+    if self.ast.is_comptime_decl_node(fn_node) != 0:
+        return 1
+    let meta = self.ast.find_fn_meta(fn_node)
+    if meta < 0:
+        return 0
+    let flags = self.ast.fn_meta_flags(meta)
+    if (flags / FnFlags.COMPTIME) % 2 == 1:
+        return 1
     0
 
 fn ComptimeEvaluator.find_decl_index(self: ComptimeEvaluator, decl_node: i32) -> i32:
@@ -945,6 +971,8 @@ fn ComptimeEvaluator.eval_ident(self: ComptimeEvaluator, node: i32) -> ComptimeC
         return self.eval_module_let_decl(decl, node)
     if self.sema.variant_lookup.contains(sym):
         return self.eval_disc_variant_sym(sym, node)
+    if self.find_fn_decl_node(sym) != 0:
+        return comptime_control_value(comptime_value_fn(self.node_type_or(node, 0), sym))
     self.fail(node, "runtime value is not available at comptime")
 
 fn ComptimeEvaluator.eval_field_access(self: ComptimeEvaluator, node: i32) -> ComptimeControl:
@@ -1396,6 +1424,12 @@ fn ComptimeEvaluator.eval_call(self: ComptimeEvaluator, node: i32) -> ComptimeCo
         let recv_signal = self.eval_expr(recv_node)
         if recv_signal.kind != ComptimeControlKind.CTL_VALUE:
             return recv_signal
+        if recv_signal.value.kind == ComptimeValueKind.CV_STRUCT:
+            let field_index = self.struct_field_index(recv_signal.value.type_id, field)
+            if field_index >= 0:
+                let field_value = self.extra_values.get((recv_signal.value.extra_start + field_index) as i64)
+                if field_value.kind == ComptimeValueKind.CV_FN:
+                    return self.eval_fn_value_call(field_value, self.ast.get_data1(node), arg_count, node)
         if recv_signal.value.kind == ComptimeValueKind.CV_VEC:
             return self.eval_vec_method_call(recv_node, recv_signal.value, field, self.ast.get_data1(node), arg_count, node)
         if recv_signal.value.kind == ComptimeValueKind.CV_MAP:
@@ -1404,21 +1438,34 @@ fn ComptimeEvaluator.eval_call(self: ComptimeEvaluator, node: i32) -> ComptimeCo
     if self.ast.kind(callee) != NodeKind.NK_IDENT:
         return self.fail(node, "only direct comptime function calls are supported")
     let fn_sym = self.ast.get_data0(callee)
+    let callee_slot = self.lookup_slot_index(fn_sym)
+    if callee_slot >= 0:
+        let callee_value = self.slot_values.get(callee_slot as i64)
+        if callee_value.kind == ComptimeValueKind.CV_FN:
+            return self.eval_fn_value_call(callee_value, self.ast.get_data1(node), arg_count, node)
+        return self.fail(node, "callee is not a comptime function value")
+    self.eval_fn_symbol_call(fn_sym, self.ast.get_data1(node), arg_count, node)
+
+fn ComptimeEvaluator.eval_fn_value_call(self: ComptimeEvaluator, fn_value: ComptimeValue, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
+    if fn_value.kind != ComptimeValueKind.CV_FN:
+        return self.fail(node, "callee is not a comptime function value")
+    self.eval_fn_symbol_call(fn_value.data0 as i32, extra_start, arg_count, node)
+
+fn ComptimeEvaluator.eval_fn_symbol_call(self: ComptimeEvaluator, fn_sym: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
     if fn_sym == self.sema.syms.src:
         return self.eval_src_call(node, arg_count)
     if fn_sym == self.sema.syms.embed_file:
         return self.eval_embed_file_call(node, arg_count)
-    if self.sema.fn_symbol_is_comptime(fn_sym) == 0:
+    let fn_node = self.find_fn_decl_node(fn_sym)
+    if self.allow_runtime_calls == 0 and self.fn_decl_node_is_comptime(fn_node) == 0:
         return self.fail(node, "comptime can only call comptime functions")
     if self.sema.generic_fn_nodes.contains(fn_sym):
         return self.fail(node, "generic comptime functions are not supported yet")
-    if not self.sema.fn_decl_nodes.contains(fn_sym):
+    if fn_node == 0:
         return self.fail(node, "callee is not a comptime function body")
     if self.active_fn_syms.len() as i32 >= self.recursion_limit:
         return self.fail(node, "comptime recursion limit exceeded")
 
-    let extra_start = self.ast.get_data1(node)
-    let fn_node = self.sema.fn_decl_nodes.get(fn_sym).unwrap()
     let meta = self.ast.find_fn_meta(fn_node)
     if meta < 0:
         return self.fail(node, "missing comptime function metadata")
