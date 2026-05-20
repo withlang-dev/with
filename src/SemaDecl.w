@@ -5,6 +5,7 @@ use Ast
 use Span
 use Diagnostic
 use InternPool
+use CapabilityRegistry
 use render
 
 extern fn with_eprint(s: str) -> void
@@ -1850,9 +1851,7 @@ fn Sema.compiler_hook_param_is_supported(self: Sema, type_node: i32) -> i32:
     let type_sym = self.get_type_d0(resolved)
     let type_name = self.pool_resolve(type_sym)
     let type_path = self.named_type_path_for(type_sym, resolved)
-    if not sema_is_std_compiler_path(type_path):
-        return 0
-    if type_name == "ProjectInfo" or type_name == "Diagnostics" or type_name == "SourceEmitter":
+    if capability_registry_compiler_hook_param_supported(type_path, type_name):
         return 1
     0
 
