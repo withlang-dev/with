@@ -2664,10 +2664,11 @@ fn MirBuilder.lower_let_binding(self: MirBuilder, node: i32):
 
     let bind_ty = self.binding_type(node)
     if mutable == 0:
-        let alias_place = self.lower_binding_alias_place(rhs_expr)
-        if alias_place >= 0:
-            self.bind_alias_place(name_sym, alias_place, bind_ty)
-            return
+        if self.sema.is_copy(bind_ty) == 0:
+            let alias_place = self.lower_binding_alias_place(rhs_expr)
+            if alias_place >= 0:
+                self.bind_alias_place(name_sym, alias_place, bind_ty)
+                return
     let local_id = self.body.new_local(bind_ty, mutable, name_sym, 1)
     self.bind_local(name_sym, local_id)
 
