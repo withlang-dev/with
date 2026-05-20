@@ -21,8 +21,11 @@ is in progress. Completed D1 sub-slices:
    `Build.action(..., action_fn)` targets without generated runner binaries.
 3. Comptime struct field assignment, needed to preserve `Target.action` and
    other build-record mutations during direct `build.w` evaluation.
+4. Evaluator-owned capability records, handle validation, and initial
+   capability receiver dispatch for `BuildCtx.project_info()` and
+   `ProjectInfo` accessors.
 
-Remaining D1 work is capability method dispatch, handle validation, direct
+Remaining D1 work is the rest of the capability method handlers, direct
 `build.w` evaluation, and replacing generated build/action runner binaries on
 the normal path.
 
