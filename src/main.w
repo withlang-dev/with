@@ -17,6 +17,7 @@ use CiPrint
 use CiMigrate
 use BuildGraphKinds
 use BuildGraphModel
+use BuildGraphMaterialize
 use BuildGraphDispatch
 use BuildGraphOps
 use BuildGraphSupport

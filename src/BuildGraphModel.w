@@ -14,6 +14,7 @@ pub type BuildGraphTarget {
     extra_outputs: Vec[str],
     deps: Vec[str],
     args: Vec[str],
+    action_fn: i32,
 }
 
 pub type BuildGraphGeneratedSource {
@@ -70,6 +71,7 @@ fn build_graph_target_new(kind: i32, name: str, entry: str, target_kind: i32, op
         extra_outputs: Vec.new(),
         deps: Vec.new(),
         args: Vec.new(),
+        action_fn: 0,
     }
 
 fn build_graph_split_nonempty_lines(text: str) -> Vec[str]:
