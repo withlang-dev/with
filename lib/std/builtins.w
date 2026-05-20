@@ -52,19 +52,19 @@ pub fn print_bool(v: bool) -> void:
     with_println_bool(v)
 
 /// Assert that a condition is true. Panics with `msg` if false.
-pub fn assert(cond: bool, msg: str = "assertion failed") -> void:
+pub fn assert(cond: bool, msg: str = "assertion failed", loc: str = src()) -> void:
     if not cond:
-        with_panic(msg, "", 0)
+        with_panic(msg, loc, 0)
 
 /// Assert that a condition is true. Panics with `msg` if false.
-pub fn require(cond: bool, msg: str) -> void:
+pub fn require(cond: bool, msg: str, loc: str = src()) -> void:
     if not cond:
-        with_panic(msg, "", 0)
+        with_panic(msg, loc, 0)
 
 /// Assert that a condition is true. Panics with `msg` if false.
-pub fn check(cond: bool, msg: str) -> void:
+pub fn check(cond: bool, msg: str, loc: str = src()) -> void:
     if not cond:
-        with_panic(msg, "", 0)
+        with_panic(msg, loc, 0)
 
 // ── ToString trait and impls ────────────────────────────────────
 

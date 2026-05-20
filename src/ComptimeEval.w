@@ -758,6 +758,55 @@ fn ComptimeEvaluator.eval_src_call(self: ComptimeEvaluator, node: i32, arg_count
     let loc = comptime_source_loc(text, self.ast.get_start(node))
     comptime_control_value(comptime_value_str(f"{path}:{loc.line}:{loc.col}"))
 
+fn ComptimeEvaluator.node_is_src_call(self: ComptimeEvaluator, node: i32) -> i32:
+    if node == 0 or self.ast.kind(node) != NodeKind.NK_CALL:
+        return 0
+    if self.ast.get_data2(node) != 0:
+        return 0
+    let callee = self.ast.get_data0(node)
+    if callee == 0 or self.ast.kind(callee) != NodeKind.NK_IDENT:
+        return 0
+    let sym = self.ast.get_data0(callee)
+    if sym == self.sema.syms.src:
+        return 1
+    let canonical_sym = self.sema.pool_lookup_symbol(self.pool.resolve(sym))
+    if canonical_sym == self.sema.syms.src: 1 else: 0
+
+fn ComptimeEvaluator.magic_ident_kind(self: ComptimeEvaluator, node: i32) -> i32:
+    var kind = self.sema.magic_ident_kind(node)
+    if kind != SemaMagicIdentKind.NONE:
+        return kind
+    if node == 0 or self.ast.kind(node) != NodeKind.NK_IDENT:
+        return SemaMagicIdentKind.NONE
+    let sym = self.ast.get_data0(node)
+    if sym == self.sema.syms.file_magic:
+        return SemaMagicIdentKind.FILE
+    if sym == self.sema.syms.line_magic:
+        return SemaMagicIdentKind.LINE
+    if sym == self.sema.syms.fn_magic:
+        return SemaMagicIdentKind.FN
+    SemaMagicIdentKind.NONE
+
+fn ComptimeEvaluator.default_arg_uses_call_site(self: ComptimeEvaluator, default_node: i32) -> i32:
+    if self.node_is_src_call(default_node) != 0:
+        return 1
+    if self.magic_ident_kind(default_node) != SemaMagicIdentKind.NONE: 1 else: 0
+
+fn ComptimeEvaluator.eval_call_site_default_arg(self: ComptimeEvaluator, default_node: i32, call_node: i32, caller_path: str, caller_text: str, caller_fn_sym: i32) -> ComptimeControl:
+    if self.node_is_src_call(default_node) != 0:
+        let loc = comptime_source_loc(caller_text, self.ast.get_start(call_node))
+        return comptime_control_value(comptime_value_str(f"{caller_path}:{loc.line}:{loc.col}"))
+    let kind = self.magic_ident_kind(default_node)
+    if kind == SemaMagicIdentKind.FILE:
+        return comptime_control_value(comptime_value_str(caller_path))
+    if kind == SemaMagicIdentKind.LINE:
+        let loc = comptime_source_loc(caller_text, self.ast.get_start(call_node))
+        return comptime_control_value(comptime_value_int(self.sema.ty_u32 as i32, loc.line as i64))
+    if kind == SemaMagicIdentKind.FN:
+        let name = if caller_fn_sym != 0: self.pool.resolve(caller_fn_sym) else: ""
+        return comptime_control_value(comptime_value_str(name))
+    comptime_control_error()
+
 fn ComptimeEvaluator.eval_embed_file_call(self: ComptimeEvaluator, node: i32, arg_count: i32) -> ComptimeControl:
     if arg_count != 1:
         return self.fail(node, "embed_file() takes exactly one string argument")
@@ -876,6 +925,16 @@ fn ComptimeEvaluator.eval_disc_variant_sym(self: ComptimeEvaluator, sym: i32, no
 
 fn ComptimeEvaluator.eval_ident(self: ComptimeEvaluator, node: i32) -> ComptimeControl:
     let sym = self.ast.get_data0(node)
+    let magic_kind = self.magic_ident_kind(node)
+    if magic_kind == SemaMagicIdentKind.FILE:
+        return comptime_control_value(comptime_value_str(self.current_source_path()))
+    if magic_kind == SemaMagicIdentKind.LINE:
+        let loc = comptime_source_loc(self.current_source_text(), self.ast.get_start(node))
+        return comptime_control_value(comptime_value_int(self.sema.ty_u32 as i32, loc.line as i64))
+    if magic_kind == SemaMagicIdentKind.FN:
+        if self.active_fn_syms.len() > 0:
+            return comptime_control_value(comptime_value_str(self.pool.resolve(self.active_fn_syms.get((self.active_fn_syms.len() - 1) as i64))))
+        return comptime_control_value(comptime_value_str(""))
     let idx = self.lookup_slot_index(sym)
     if idx >= 0:
         return comptime_control_value(self.slot_values.get(idx as i64))
@@ -1368,6 +1427,10 @@ fn ComptimeEvaluator.eval_call(self: ComptimeEvaluator, node: i32) -> ComptimeCo
     if arg_count > param_count:
         return self.fail(node, "wrong argument count in comptime call")
 
+    let caller_path = self.current_source_path()
+    let caller_text = self.current_source_text()
+    let caller_fn_sym = if self.active_fn_syms.len() > 0: self.active_fn_syms.get((self.active_fn_syms.len() - 1) as i64) else: 0
+
     let arg_values: Vec[ComptimeValue] = Vec.new()
     for i in 0..arg_count:
         let arg_signal = self.eval_expr(self.ast.get_extra(extra_start + i))
@@ -1394,7 +1457,10 @@ fn ComptimeEvaluator.eval_call(self: ComptimeEvaluator, node: i32) -> ComptimeCo
                 self.sema.local_file_id = saved_file
                 self.sema.current_module_path = saved_path
                 return self.fail(node, "wrong argument count in comptime call")
-            let default_signal = self.eval_expr(default_node)
+            let default_signal = if self.default_arg_uses_call_site(default_node) != 0:
+                self.eval_call_site_default_arg(default_node, node, caller_path, caller_text, caller_fn_sym)
+            else:
+                self.eval_expr(default_node)
             if default_signal.kind != ComptimeControlKind.CTL_VALUE:
                 self.pop_scope()
                 self.active_fn_syms.pop()

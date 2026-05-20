@@ -2080,6 +2080,19 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
 // ── Expression checking helpers ──────────────────────────────────
 
 fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
+    if sym == self.syms.file_magic:
+        self.magic_ident_kinds.insert(node, SemaMagicIdentKind.FILE)
+        self.typed_expr_types.insert(node, self.ty_str as i32)
+        return self.ty_str as i32
+    if sym == self.syms.line_magic:
+        self.magic_ident_kinds.insert(node, SemaMagicIdentKind.LINE)
+        self.typed_expr_types.insert(node, self.ty_u32 as i32)
+        return self.ty_u32 as i32
+    if sym == self.syms.fn_magic:
+        self.magic_ident_kinds.insert(node, SemaMagicIdentKind.FN)
+        self.typed_expr_types.insert(node, self.ty_str as i32)
+        return self.ty_str as i32
+
     // Check local/param scope (always visible — local bindings are never c_import)
     let tid = self.scope_lookup(sym)
     if tid >= 0:
@@ -5140,6 +5153,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
             let ps = self.ast.fn_meta_param_start(meta)
             // Build resolved_args map: param_idx → arg_node
             let resolved_map: HashMap[i32, i32] = HashMap.new()
+            let resolved_defaults: HashMap[i32, i32] = HashMap.new()
             // First pass: assign positional args left-to-right
             var first_named_idx = arg_count
             for ai in 0..arg_count:
@@ -5190,6 +5204,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
                     let default_node = self.ast.get_fn_param_default(ps, pi)
                     if default_node != 0:
                         resolved_map.insert(pi, default_node)
+                        resolved_defaults.insert(pi, 1)
             // Store resolved arg order in sema (AST is frozen)
             let final_args: Vec[i32] = Vec.new()
             for pi in param_offset..param_count:
@@ -5198,6 +5213,9 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
                 else:
                     final_args.push(0)
             self.store_resolved_call_args(node, final_args)
+            for pi in param_offset..param_count:
+                if resolved_defaults.contains(pi):
+                    self.mark_resolved_call_arg_default(node, pi - param_offset)
             resolved_arg_count = param_count - param_offset
 
     // Implicit parameter resolution for plain calls (no named args).
@@ -5220,6 +5238,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
                             break
                     if has_implicit != 0:
                         let resolved_map: HashMap[i32, i32] = HashMap.new()
+                        let resolved_defaults: HashMap[i32, i32] = HashMap.new()
                         // Positional args
                         for ai in 0..arg_count:
                             resolved_map.insert(ai + param_offset, self.ast.get_extra(extra_start + ai))
@@ -5243,6 +5262,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
                                 let default_node = self.ast.get_fn_param_default(ps, pi)
                                 if default_node != 0:
                                     resolved_map.insert(pi, default_node)
+                                    resolved_defaults.insert(pi, 1)
                         let final_args: Vec[i32] = Vec.new()
                         for pi in param_offset..param_count:
                             if resolved_map.contains(pi):
@@ -5250,6 +5270,9 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
                             else:
                                 final_args.push(0)
                         self.store_resolved_call_args(node, final_args)
+                        for pi in param_offset..param_count:
+                            if resolved_defaults.contains(pi):
+                                self.mark_resolved_call_arg_default(node, pi - param_offset)
                         resolved_arg_count = param_count - param_offset
 
     // Check all arguments (with contextual expected-type propagation when
@@ -5468,6 +5491,20 @@ fn Sema.store_resolved_call_args(self: Sema, call_node: i32, args: Vec[i32]):
     for i in 0..count:
         self.call_resolved_args_data.push(args.get(i as i64))
     self.call_resolved_args_map.insert(call_node, start * 65536 + count)
+
+fn Sema.resolved_call_arg_key(self: Sema, call_node: i32, idx: i32) -> i32:
+    call_node * 65536 + idx
+
+fn Sema.mark_resolved_call_arg_default(self: Sema, call_node: i32, idx: i32):
+    self.call_resolved_default_arg_keys.insert(self.resolved_call_arg_key(call_node, idx), 1)
+
+fn Sema.resolved_call_arg_is_default(self: Sema, call_node: i32, idx: i32) -> i32:
+    if self.call_resolved_default_arg_keys.contains(self.resolved_call_arg_key(call_node, idx)): 1 else: 0
+
+fn Sema.magic_ident_kind(self: Sema, node: i32) -> i32:
+    if self.magic_ident_kinds.contains(node):
+        return self.magic_ident_kinds.get(node).unwrap()
+    SemaMagicIdentKind.NONE
 
 fn Sema.get_resolved_call_arg(self: Sema, call_node: i32, idx: i32) -> i32:
     if self.call_resolved_args_map.contains(call_node):

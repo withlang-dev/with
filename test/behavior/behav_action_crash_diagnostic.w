@@ -19,4 +19,5 @@ fn main:
     let result = p7_run(case_dir, "action-crash", p7_build_args())
     p7_assert_failure_contains(result, "panic-action", "action crash target")
     p7_assert_failure_contains(result, "failed with exit code", "action crash rc")
+    p7_assert_failure_contains(result, "build.w:5:5", "action crash source location")
     print("ok")

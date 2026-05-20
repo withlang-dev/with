@@ -7,6 +7,7 @@ use InternPool
 use Mir
 use Sema
 extern fn with_eprint(s: str) -> void
+extern fn with_fs_read_file(path: str) -> str
 
 // ── Builder state ────────────────────────────────────────────────
 
@@ -1533,6 +1534,96 @@ fn MirBuilder.lower_bool_lit(self: MirBuilder, value: i32) -> i32:
 
 fn MirBuilder.lower_str_lit(self: MirBuilder, sym: i32) -> i32:
     self.const_operand(ConstKind.CK_STR, sym, self.sema.ty_str)
+
+fn MirBuilder.node_is_src_call(self: MirBuilder, node: i32) -> i32:
+    if node == 0 or self.ast.kind(node) != NodeKind.NK_CALL:
+        return 0
+    if self.ast.get_data2(node) != 0:
+        return 0
+    let callee = self.ast.get_data0(node)
+    if callee == 0 or self.ast.kind(callee) != NodeKind.NK_IDENT:
+        return 0
+    let sym = self.ast.get_data0(callee)
+    if sym == self.sema.syms.src:
+        return 1
+    let canonical_sym = self.sema.pool_lookup_symbol(self.pool.resolve(sym))
+    if canonical_sym == self.sema.syms.src: 1 else: 0
+
+fn mir_source_text_for_path(fallback_text: str, path: str) -> str:
+    if path.len() > 0 and path != "<unknown>":
+        let text = with_fs_read_file(path)
+        if text.len() > 0:
+            return text
+    fallback_text
+
+fn MirBuilder.source_location_operand(self: MirBuilder, node: i32) -> i32:
+    let path = if self.sema.current_module_path.len() > 0: self.sema.current_module_path else: "<unknown>"
+    let text = mir_source_text_for_path(self.sema.source_text, path)
+    let span_start = self.ast.get_start(node)
+    var line = 1
+    var col = 1
+    var i = 0
+    while i < span_start and i < text.len() as i32:
+        if text.byte_at(i as i64) == 10:
+            line = line + 1
+            col = 1
+        else:
+            col = col + 1
+        i = i + 1
+    self.lower_str_lit(self.pool.intern(f"{path}:{line}:{col}"))
+
+fn MirBuilder.source_file_operand(self: MirBuilder, node: i32) -> i32:
+    let _ = node
+    let path = if self.sema.current_module_path.len() > 0: self.sema.current_module_path else: "<unknown>"
+    self.lower_str_lit(self.pool.intern(path))
+
+fn MirBuilder.source_line_operand(self: MirBuilder, node: i32) -> i32:
+    let path = if self.sema.current_module_path.len() > 0: self.sema.current_module_path else: "<unknown>"
+    let text = mir_source_text_for_path(self.sema.source_text, path)
+    let span_start = self.ast.get_start(node)
+    var line = 1
+    var i = 0
+    while i < span_start and i < text.len() as i32:
+        if text.byte_at(i as i64) == 10:
+            line = line + 1
+        i = i + 1
+    self.int_const_operand(line as i64, self.sema.ty_u32 as i32)
+
+fn MirBuilder.source_fn_operand(self: MirBuilder, node: i32) -> i32:
+    let _ = node
+    self.lower_str_lit(self.pool.intern(self.pool.resolve(self.body.fn_sym)))
+
+fn MirBuilder.lower_magic_ident(self: MirBuilder, kind: i32, node: i32) -> i32:
+    if kind == SemaMagicIdentKind.FILE:
+        return self.source_file_operand(node)
+    if kind == SemaMagicIdentKind.LINE:
+        return self.source_line_operand(node)
+    if kind == SemaMagicIdentKind.FN:
+        return self.source_fn_operand(node)
+    self.unit_operand()
+
+fn MirBuilder.magic_ident_kind(self: MirBuilder, node: i32) -> i32:
+    var kind = self.sema.magic_ident_kind(node)
+    if kind != SemaMagicIdentKind.NONE:
+        return kind
+    if node == 0 or self.ast.kind(node) != NodeKind.NK_IDENT:
+        return SemaMagicIdentKind.NONE
+    let sym = self.ast.get_data0(node)
+    if sym == self.sema.syms.file_magic:
+        return SemaMagicIdentKind.FILE
+    if sym == self.sema.syms.line_magic:
+        return SemaMagicIdentKind.LINE
+    if sym == self.sema.syms.fn_magic:
+        return SemaMagicIdentKind.FN
+    SemaMagicIdentKind.NONE
+
+fn MirBuilder.lower_default_call_arg(self: MirBuilder, default_node: i32, call_node: i32, sig_idx: i32, callable_fn_tid: i32, param_idx: i32) -> i32:
+    if self.node_is_src_call(default_node) != 0:
+        return self.source_location_operand(call_node)
+    let magic_kind = self.magic_ident_kind(default_node)
+    if magic_kind != 0:
+        return self.lower_magic_ident(magic_kind, call_node)
+    self.lower_call_arg(default_node, sig_idx, callable_fn_tid, param_idx)
 
 fn MirBuilder.lower_regex_literal(self: MirBuilder, node: i32) -> i32:
     let regex_ty = self.sema.lookup_named_type_visible(self.sema.syms.regex)
@@ -4360,7 +4451,10 @@ fn MirBuilder.lower_call(self: MirBuilder, fn_expr: i32, arg_exprs_start: i32, a
                 let impl_sym = 0 - arg_node
                 args.push(self.lower_var(impl_sym, 0, 0))
             else if arg_node != 0:
-                args.push(self.lower_call_arg(arg_node, sig_idx, callable_fn_tid, i))
+                if self.sema.resolved_call_arg_is_default(node, i) != 0:
+                    args.push(self.lower_default_call_arg(arg_node, node, sig_idx, callable_fn_tid, i))
+                else:
+                    args.push(self.lower_call_arg(arg_node, sig_idx, callable_fn_tid, i))
             else:
                 args.push(self.unit_operand())
     else:
@@ -4380,7 +4474,7 @@ fn MirBuilder.lower_call(self: MirBuilder, fn_expr: i32, arg_exprs_start: i32, a
                     for di in arg_exprs_count..param_count:
                         let def_node = self.ast.get_fn_param_default(param_start, di)
                         if def_node != 0:
-                            args.push(self.lower_call_arg(def_node, sig_idx, callable_fn_tid, di))
+                            args.push(self.lower_default_call_arg(def_node, node, sig_idx, callable_fn_tid, di))
 
     let args_id = self.body.new_call_args(args)
     let result_local = self.new_temp(ret_type_id)
@@ -5264,6 +5358,9 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         return self.unit_operand()
 
     if kind == NodeKind.NK_IDENT:
+        let magic_kind = self.magic_ident_kind(node)
+        if magic_kind != 0:
+            return self.lower_magic_ident(magic_kind, node)
         return self.lower_var(self.ast.get_data0(node), self.expr_type(node), node)
 
     if kind == NodeKind.NK_BINARY:
@@ -6246,7 +6343,9 @@ fn lower_module(sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirModule:
         if meta >= 0 and ast_pool.fn_meta_tp_count(meta) > 0:
             continue
 
-        var builder = MirBuilder.init(sema, ast_pool, pool, fn_sym)
+        var fn_sema = sema
+        fn_sema.update_decl_source_context(di)
+        var builder = MirBuilder.init(fn_sema, ast_pool, pool, fn_sym)
         let body = lower_fn(builder, decl as i32)
         mir_mod.add_body(body)
 

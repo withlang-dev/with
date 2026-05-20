@@ -7977,16 +7977,18 @@ checker. Nothing is hidden from the safety machinery.
 
 ### 17.0 Magic Constants
 
-With provides two built-in magic constants, evaluated at the point of use:
+With provides three built-in magic constants, evaluated at the point of use:
 
 | Constant | Type | Value |
 |----------|------|-------|
 | `__FILE__` | `str` | Path of the current source file |
 | `__LINE__` | `u32` | Line number of the expression |
+| `__FN__` | `str` | Name of the current function |
 
 ```
 print(__FILE__)    // prints "src/main.w"
 print(__LINE__)    // prints the current line number
+print(__FN__)      // prints the current function name
 ```
 
 These are especially useful as default parameter values for assertion

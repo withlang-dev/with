@@ -9110,18 +9110,27 @@ fn Codegen.gen_string_literal_raw(self: Codegen, text: str) -> i64:
 
 fn Codegen.gen_src_intrinsic(self: Codegen, node: i32) -> i64:
     let span_start = self.pool.get_start(node)
+    let source_path = if self.current_decl_source_file.len() > 0 and self.current_decl_source_file != "<unknown>":
+        self.current_decl_source_file
+    else:
+        self.source_file
+    var source_text = self.source_text
+    if source_path.len() > 0 and source_path != self.source_file:
+        let file_text = with_fs_read_file(source_path)
+        if file_text.len() > 0:
+            source_text = file_text
     // Compute line and column from byte offset
     var line = 1
     var col = 1
     var i = 0
-    while i < span_start and i < self.source_text.len() as i32:
-        if self.source_text.byte_at(i as i64) == 10:
+    while i < span_start and i < source_text.len() as i32:
+        if source_text.byte_at(i as i64) == 10:
             line = line + 1
             col = 1
         else:
             col = col + 1
         i = i + 1
-    let loc_str = f"{self.source_file}:{line}:{col}"
+    let loc_str = f"{source_path}:{line}:{col}"
     self.gen_string_literal_raw(loc_str)
 
 fn Codegen.gen_embed_file(self: Codegen, node: i32) -> i64:
