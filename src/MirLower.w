@@ -2670,7 +2670,6 @@ fn MirBuilder.lower_let_binding(self: MirBuilder, node: i32):
                 self.bind_alias_place(name_sym, alias_place, bind_ty)
                 return
     let local_id = self.body.new_local(bind_ty, mutable, name_sym, 1)
-    self.bind_local(name_sym, local_id)
 
     // d1 = 0 for normal storage, bind_ty for zero-init (no initializer)
     let storage_d1 = if rhs_expr == 0: bind_ty else: 0
@@ -2685,6 +2684,7 @@ fn MirBuilder.lower_let_binding(self: MirBuilder, node: i32):
         let rhs_op = self.lower_expr(rhs_expr)
         self.expected_type = saved_expected
         self.assign_operand_to_place(place, rhs_op, self.ast.get_start(node))
+    self.bind_local(name_sym, local_id)
 
 fn MirBuilder.lower_tuple_destructure(self: MirBuilder, node: i32):
     let extra_start = self.ast.get_data0(node)
