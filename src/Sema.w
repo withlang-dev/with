@@ -84,6 +84,12 @@ enum DeriveReq: i32:
     CLONE = 1
     EQ = 2
 
+enum SemaMagicIdentKind: i32:
+    NONE = 0
+    FILE = 1
+    LINE = 2
+    FN = 3
+
 type SemaBuiltinSymbols {
     task: i32,
     channel: i32,
@@ -96,6 +102,9 @@ type SemaBuiltinSymbols {
     unreachable: i32,
     track: i32,
     src: i32,
+    file_magic: i32,
+    line_magic: i32,
+    fn_magic: i32,
     embed_file: i32,
     copy_trait: i32,
     clone_trait: i32,
@@ -389,6 +398,8 @@ type Sema {
     // Resolved call args for named-arg calls: call_node → (start << 16 | count) in call_resolved_args_data
     call_resolved_args_map: HashMap[i32, i32],
     call_resolved_args_data: Vec[i32],
+    call_resolved_default_arg_keys: HashMap[i32, i32],
+    magic_ident_kinds: HashMap[i32, i32],
     // Implicit parameter bindings stack: pairs of (type_id, binding_sym)
     implicit_binding_types: Vec[i32],
     implicit_binding_syms: Vec[i32],
@@ -642,6 +653,9 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         unreachable: 0,
         track: 0,
         src: 0,
+        file_magic: 0,
+        line_magic: 0,
+        fn_magic: 0,
         embed_file: 0,
         copy_trait: 0,
         clone_trait: 0,
@@ -909,6 +923,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         capture_field_kinds: Vec.new(),
         call_resolved_args_map: sema_new_map_i32_i32(),
         call_resolved_args_data: Vec.new(),
+        call_resolved_default_arg_keys: sema_new_map_i32_i32(),
+        magic_ident_kinds: sema_new_map_i32_i32(),
         implicit_binding_types: Vec.new(),
         implicit_binding_syms: Vec.new(),
         comp_resolved: sema_new_map_i32_i32(),
@@ -1209,6 +1225,9 @@ fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.syms.unreachable = self.pool_intern("unreachable")
     self.syms.track = self.pool_intern("track")
     self.syms.src = self.pool_intern("src")
+    self.syms.file_magic = self.pool_intern("__FILE__")
+    self.syms.line_magic = self.pool_intern("__LINE__")
+    self.syms.fn_magic = self.pool_intern("__FN__")
     self.syms.embed_file = self.pool_intern("embed_file")
     self.syms.copy_trait = self.pool_intern("Copy")
     self.syms.clone_trait = self.pool_intern("Clone")

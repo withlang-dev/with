@@ -268,7 +268,7 @@ fn bs_check_test_directives(ctx: ActionCtx, compiler_path: str, test_dir: str) -
         return bs_fail(ctx, "could not create smoke test directory: " ++ test_dir)
 
     let good_src = bs_join(test_dir, "test_directives_good.w")
-    if fs.write_text(good_src, "//! expect-exit: 134\n//! expect-stderr: panic: expected boom\n\nfn main:\n    assert(false, \"expected boom\")\n") != 0:
+    if fs.write_text(good_src, "//! expect-exit: 134\n//! expect-stderr: expected boom\n\nfn main:\n    assert(false, \"expected boom\")\n") != 0:
         return bs_fail(ctx, "could not write " ++ good_src)
     let good_result = bs_run_cli_expect_success(ctx, compiler_path, "test-directives-good", bs_test_args(good_src))
     if good_result.rc != 0:

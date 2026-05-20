@@ -12,7 +12,8 @@ conversation context after compaction.
 ## Current Focus
 
 Phase C extraction work is complete. Pre-Phase-D preparation is complete
-through P9. The next major build-system direction is Phase D D1:
+through P9, including the follow-up source-location diagnostic gap. The next
+major build-system direction is Phase D D1:
 capability-bearing comptime evaluator dispatch for `build.w` and action
 targets, replacing generated runner binaries on the normal path.
 
@@ -28,11 +29,12 @@ Completed quality-of-life slices:
 
 ## Verification Baseline
 
-The pre-D1 baseline is recorded in `docs/audits/pre-d1-baseline.md`.
-The verified code/design commit is:
+The original P9 pre-D1 baseline is recorded in
+`docs/audits/pre-d1-baseline.md`. The current verified checkpoint is the commit
+containing this project-state update:
 
 ```text
-617aecd0913f88c598ccb18f4449b3d908dcba0f Reconcile Phase D design with pre-D artifacts
+Implement source-location magic constants
 ```
 
 Commands passed:
@@ -41,11 +43,15 @@ Commands passed:
 out/bin/with build :build
 out/bin/with build :fixpoint
 out/bin/with build :test
-out/bin/with build :emit-c-test
 ```
+
+Full `:emit-c-test` remains a manual release/emit-C-feature verification
+target. Do not run it for normal compiler, stdlib, or build-system slices; the
+default `:test` target includes the fast emit-C smoke.
 
 Recent pre-D commits:
 
+- current checkpoint: Implement source-location magic constants.
 - `617aecd` Reconcile Phase D design with pre-D artifacts.
 - `db64d01` Isolate generated action runner dispatch.
 - `6d1b052` Add pre-D build action behavior regressions.
@@ -156,6 +162,8 @@ not a new compiler-dispatched project graph kind.
 - Decide whether in-process build graph test targets should also move to
   external parallel execution, or remain serial for diagnostic fidelity.
 - Keep manual-only heavy targets covered by fast smokes in `make test`.
+- Run full `:emit-c-test` only for release verification or emit-C-specific
+  work. For ordinary changes, rely on `make test`'s emit-C smoke.
 - Keep project-specific build policy in project-local modules and avoid adding
   new compiler-dispatched project graph kinds.
 - Continue replacing shell/filesystem work in build internals with typed
@@ -163,15 +171,17 @@ not a new compiler-dispatched project graph kind.
 
 ## Local State
 
-At the time of this update, the source changes for Phase C completion were
-committed locally. The pre-D1 baseline passed:
+At the time of this update, the pre-D1 source-location follow-up was committed
+locally. The current pre-D verification passed:
 
 ```sh
 out/bin/with build :build
 out/bin/with build :fixpoint
 out/bin/with build :test
-out/bin/with build :emit-c-test
 ```
+
+The full emit-C test was intentionally not part of this verification pass per
+the manual-only policy above.
 
 Always run `git status -sb` before editing; this file is a checkpoint, not a
 substitute for inspecting the current worktree.

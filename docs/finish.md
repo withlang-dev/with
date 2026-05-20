@@ -188,11 +188,11 @@ Conventions:
   Architecture/design: parser-level desugarings onto existing call/combinator/for-comprehension machinery.
   Primary code: `src/Parser.w`, `src/MirLower.w`.
 
-- [ ] `22. Magic constants __FILE__ / __LINE__ / __FN__`
+- [x] `22. Magic constants __FILE__ / __LINE__ / __FN__`
   Refs: `test/behavior/behav_magic_const.w`.
-  Status: Not implemented.
-  Architecture/design: compile-time source-span intrinsics using existing source-location plumbing.
-  Primary code: `src/Parser.w`, `src/ComptimeEval.w`, `src/CodegenDispatch.w`.
+  Status: Implemented and covered by behavior tests.
+  Architecture/design: semantic magic identifiers lowered through Sema/MIR/comptime source-location plumbing.
+  Primary code: `src/SemaCheck.w`, `src/MirLower.w`, `src/ComptimeEval.w`, `src/CodegenDispatch.w`.
 
 - [ ] `23. Module declarations / full pub visibility`
   Refs: spec §§18.1 and 18.3; `test/behavior/behav_pub_module.w`.
