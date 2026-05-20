@@ -60,7 +60,6 @@ Already implemented:
 
 Still not acceptable as final state:
 
-- Project-specific build behavior still leaks into compiler source modules.
 - Action target process/install policy declarations are still incomplete.
 - Full Jai-style workspace/build-options/message-loop APIs are incomplete.
 - Make remains as a compatibility layer.
@@ -273,7 +272,11 @@ project-local actions:
 - compiler stage policy that is not a generic graph operation.
 - selfhost fixture suites.
 
-Status: in progress. Completed slices:
+Status: complete. All repository-specific 1000-series build graph kinds have
+been replaced by standard targets or project-local `Action` targets, and stale
+1000-series kind values are reserved for removed-kind diagnostics.
+
+Completed slices:
 
 - Moved `issue61-regression` from a compiler-hardcoded project kind to a
   `build.w` Action target and removed the old compiler dispatch path for that
@@ -309,6 +312,20 @@ Status: in progress. Completed slices:
   now an `Action`, project kind 1016 is reserved as removed legacy graph data,
   and `ProcessRunner` clears driver-private action capability environment while
   launching child processes so nested `with build` invocations are isolated.
+- Moved the remaining selfhost fixture suites, including migrate-basic,
+  migrate-core, build-w, embedded-runtime, and the old selfhost suite
+  dispatcher, into repository-local actions.
+- Moved all PCRE2 targets into `build_pcre2.w` actions or standard graph nodes:
+  reference, migrate, build, test, generated check, and promote.
+- Moved seed download/update policy into `build_seed.w`.
+- Moved emit-C test, fixpoint, and roundtrip policy into `build_emit_c.w`.
+- Moved compiler source generation and LLVM link metadata generation into
+  `build_compiler.w`.
+- Moved compiler build and compiler IR invocation targets into
+  `build_compiler.w` actions, and removed the old `BuildGraphCompiler.w`
+  project-kind dispatch module.
+- Reserved every old 1000-series project kind as removed graph data. No live
+  project-specific build kind remains.
 
 Generic compiler-driver code may retain only:
 
