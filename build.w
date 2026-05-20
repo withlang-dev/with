@@ -6,23 +6,38 @@ use build_seed
 use build_emit_c
 use build_compiler
 
-fn project_kind_with_compiler_build() -> BuildKind: 1004 as BuildKind
-fn project_kind_with_compiler_ir() -> BuildKind: 1013 as BuildKind
+fn build_project_dirname(path: str) -> str:
+    var last_slash = -1
+    for i in 0..path.len() as i32:
+        if path.byte_at(i as i64) == 47:
+            last_slash = i
+    if last_slash < 0:
+        return "."
+    if last_slash == 0:
+        return "/"
+    path.slice(0, last_slash as i64)
 
 fn with_object_target(name: str, compiler: str, source: str, output: str, opt: str, dep: str) -> Target:
-    var target = target_new(project_kind_with_compiler_build(), name, compiler).output(output)
+    var target = target_new(.Action, name, "").output(output)
+    target.action = run_with_compiler_build_action
+    target = target.compiler(compiler)
     target = target.input(source)
     target = target.arg("--emit-obj")
     target = target.arg("--no-prelude")
     target = target.arg(opt)
+    target = target.extra_output("out/command/" ++ name)
+    target = target.write_scope(build_project_dirname(output))
     if dep.len() > 0:
         target = target.dep(dep)
     target
 
 fn with_ir_target(name: str, compiler: str, source: str, output: str, dep: str) -> Target:
-    var target = target_new(project_kind_with_compiler_ir(), name, compiler).output(output)
+    var target = target_new(.Action, name, "").output(output)
+    target.action = run_with_compiler_ir_action
+    target = target.compiler(compiler)
     target = target.input(source)
     target = target.arg("--no-prelude")
+    target = target.write_scope(build_project_dirname(output))
     if dep.len() > 0:
         target = target.dep(dep)
     target
@@ -224,19 +239,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-embedded-objects-object")
     out = out.add_target(bootstrap_runtime)
 
-    var llvm_bridge = target_new(project_kind_with_compiler_build(), "llvm-bridge-object", "seed").output("out/lib/llvm_bridge.o")
-    llvm_bridge = llvm_bridge.input("rt/llvm_bridge.w")
-    llvm_bridge = llvm_bridge.arg("--emit-obj")
-    llvm_bridge = llvm_bridge.arg("--no-prelude")
-    llvm_bridge = llvm_bridge.arg("-O0")
-    out = out.add_target(llvm_bridge)
-
-    var clang_bridge = target_new(project_kind_with_compiler_build(), "clang-bridge-object", "seed").output("out/lib/clang_bridge.o")
-    clang_bridge = clang_bridge.input("rt/clang_bridge.w")
-    clang_bridge = clang_bridge.arg("--emit-obj")
-    clang_bridge = clang_bridge.arg("--no-prelude")
-    clang_bridge = clang_bridge.arg("-O0")
-    out = out.add_target(clang_bridge)
+    out = out.add_target(with_object_target("llvm-bridge-object", "seed", "rt/llvm_bridge.w", "out/lib/llvm_bridge.o", "-O0", ""))
+    out = out.add_target(with_object_target("clang-bridge-object", "seed", "rt/clang_bridge.w", "out/lib/clang_bridge.o", "-O0", ""))
 
     var llvm_link_metadata = target_new(.Action, "llvm-link-metadata", "").output("out/lib/.llvm-link-ready")
     llvm_link_metadata.action = run_generate_llvm_link_metadata_action
@@ -249,40 +253,60 @@ pub fn build(ctx: BuildCtx) -> Build:
     llvm_link_metadata = llvm_link_metadata.dep("clang-bridge-object")
     out = out.add_target(llvm_link_metadata)
 
-    var stage1 = target_new(project_kind_with_compiler_build(), "stage1", "seed").output("out/bin/with-stage1")
+    var stage1 = target_new(.Action, "stage1", "").output("out/bin/with-stage1")
+    stage1.action = run_with_compiler_build_action
+    stage1 = stage1.compiler("seed")
     stage1 = stage1.input("out/gen/main.w")
     stage1 = stage1.arg("-O0")
+    stage1 = stage1.extra_output("out/command/stage1")
+    stage1 = stage1.write_scope("out/bin")
     stage1 = stage1.dep("compiler-sources")
     stage1 = stage1.dep("compat-runtime-source")
     stage1 = stage1.dep("bootstrap-runtime")
     out = out.add_target(stage1)
 
-    var stage2 = target_new(project_kind_with_compiler_build(), "stage2", "out/bin/with-stage1").output("out/bin/with-stage2")
+    var stage2 = target_new(.Action, "stage2", "").output("out/bin/with-stage2")
+    stage2.action = run_with_compiler_build_action
+    stage2 = stage2.compiler("out/bin/with-stage1")
     stage2 = stage2.input("out/gen/main.w")
     stage2 = stage2.arg("-O0")
+    stage2 = stage2.extra_output("out/command/stage2")
+    stage2 = stage2.write_scope("out/bin")
     stage2 = stage2.dep("stage1")
     stage2 = stage2.dep("compat-runtime-source")
     out = out.add_target(stage2)
 
-    var stage3 = target_new(project_kind_with_compiler_build(), "stage3", "out/bin/with-stage2").output("out/bin/with-stage3")
+    var stage3 = target_new(.Action, "stage3", "").output("out/bin/with-stage3")
+    stage3.action = run_with_compiler_build_action
+    stage3 = stage3.compiler("out/bin/with-stage2")
     stage3 = stage3.input("out/gen/main.w")
     stage3 = stage3.arg("-O0")
+    stage3 = stage3.extra_output("out/command/stage3")
+    stage3 = stage3.write_scope("out/bin")
     stage3 = stage3.dep("stage2")
     stage3 = stage3.dep("compat-runtime-source")
     out = out.add_target(stage3)
 
-    var stage2_fixpoint = target_new(project_kind_with_compiler_build(), "stage2-fixpoint-object", "out/bin/with-stage1").output("out/bin/with-stage2-fixpoint.o")
+    var stage2_fixpoint = target_new(.Action, "stage2-fixpoint-object", "").output("out/bin/with-stage2-fixpoint.o")
+    stage2_fixpoint.action = run_with_compiler_build_action
+    stage2_fixpoint = stage2_fixpoint.compiler("out/bin/with-stage1")
     stage2_fixpoint = stage2_fixpoint.input("out/gen/main.w")
     stage2_fixpoint = stage2_fixpoint.arg("--emit-obj")
     stage2_fixpoint = stage2_fixpoint.arg("-O0")
+    stage2_fixpoint = stage2_fixpoint.extra_output("out/command/stage2-fixpoint-object")
+    stage2_fixpoint = stage2_fixpoint.write_scope("out/bin")
     stage2_fixpoint = stage2_fixpoint.dep("stage1")
     stage2_fixpoint = stage2_fixpoint.dep("compat-runtime-source")
     out = out.add_target(stage2_fixpoint)
 
-    var stage3_fixpoint = target_new(project_kind_with_compiler_build(), "stage3-fixpoint-object", "out/bin/with-stage2").output("out/bin/with-stage3-fixpoint.o")
+    var stage3_fixpoint = target_new(.Action, "stage3-fixpoint-object", "").output("out/bin/with-stage3-fixpoint.o")
+    stage3_fixpoint.action = run_with_compiler_build_action
+    stage3_fixpoint = stage3_fixpoint.compiler("out/bin/with-stage2")
     stage3_fixpoint = stage3_fixpoint.input("out/gen/main.w")
     stage3_fixpoint = stage3_fixpoint.arg("--emit-obj")
     stage3_fixpoint = stage3_fixpoint.arg("-O0")
+    stage3_fixpoint = stage3_fixpoint.extra_output("out/command/stage3-fixpoint-object")
+    stage3_fixpoint = stage3_fixpoint.write_scope("out/bin")
     stage3_fixpoint = stage3_fixpoint.dep("stage2")
     stage3_fixpoint = stage3_fixpoint.dep("compat-runtime-source")
     out = out.add_target(stage3_fixpoint)
@@ -305,87 +329,22 @@ pub fn build(ctx: BuildCtx) -> Build:
     verified = verified.dep("fixpoint")
     out = out.add_target(verified)
 
-    var rt_core = target_new(project_kind_with_compiler_build(), "rt-core-object", "out/bin/with-stage2").output("out/lib/rt_core.o")
-    rt_core = rt_core.input("rt/rt_core.w")
-    rt_core = rt_core.arg("--emit-obj")
-    rt_core = rt_core.arg("--no-prelude")
-    rt_core = rt_core.arg("-O2")
-    rt_core = rt_core.dep("stage2")
-    out = out.add_target(rt_core)
-
-    var rt_darwin = target_new(project_kind_with_compiler_build(), "rt-darwin-aarch64-object", "out/bin/with-stage2").output("out/lib/rt_darwin_aarch64.o")
-    rt_darwin = rt_darwin.input("rt/darwin_aarch64.w")
-    rt_darwin = rt_darwin.arg("--emit-obj")
-    rt_darwin = rt_darwin.arg("--no-prelude")
-    rt_darwin = rt_darwin.arg("-O2")
-    rt_darwin = rt_darwin.dep("stage2")
-    out = out.add_target(rt_darwin)
-
-    var cimport_stubs = target_new(project_kind_with_compiler_build(), "cimport-stubs-object", "out/bin/with-stage2").output("out/lib/cimport_stubs.o")
-    cimport_stubs = cimport_stubs.input("rt/cimport_stubs.w")
-    cimport_stubs = cimport_stubs.arg("--emit-obj")
-    cimport_stubs = cimport_stubs.arg("--no-prelude")
-    cimport_stubs = cimport_stubs.arg("-O0")
-    cimport_stubs = cimport_stubs.dep("stage2")
-    out = out.add_target(cimport_stubs)
-
-    var compat_runtime_obj = target_new(project_kind_with_compiler_build(), "compat-runtime-object", "out/bin/with-stage2").output("out/lib/compat_runtime.o")
-    compat_runtime_obj = compat_runtime_obj.input("out/gen/compat_runtime.w")
-    compat_runtime_obj = compat_runtime_obj.arg("--emit-obj")
-    compat_runtime_obj = compat_runtime_obj.arg("--no-prelude")
-    compat_runtime_obj = compat_runtime_obj.arg("-O0")
-    compat_runtime_obj = compat_runtime_obj.dep("stage2")
+    out = out.add_target(with_object_target("rt-core-object", "out/bin/with-stage2", "rt/rt_core.w", "out/lib/rt_core.o", "-O2", "stage2"))
+    out = out.add_target(with_object_target("rt-darwin-aarch64-object", "out/bin/with-stage2", "rt/darwin_aarch64.w", "out/lib/rt_darwin_aarch64.o", "-O2", "stage2"))
+    out = out.add_target(with_object_target("cimport-stubs-object", "out/bin/with-stage2", "rt/cimport_stubs.w", "out/lib/cimport_stubs.o", "-O0", "stage2"))
+    var compat_runtime_obj = with_object_target("compat-runtime-object", "out/bin/with-stage2", "out/gen/compat_runtime.w", "out/lib/compat_runtime.o", "-O0", "stage2")
     compat_runtime_obj = compat_runtime_obj.dep("compat-runtime-source")
     out = out.add_target(compat_runtime_obj)
-
-    var panic_runtime = target_new(project_kind_with_compiler_build(), "panic-runtime-object", "out/bin/with-stage2").output("out/lib/panic_runtime.o")
-    panic_runtime = panic_runtime.input("rt/panic_runtime.w")
-    panic_runtime = panic_runtime.arg("--emit-obj")
-    panic_runtime = panic_runtime.arg("--no-prelude")
-    panic_runtime = panic_runtime.arg("-O0")
-    panic_runtime = panic_runtime.dep("stage2")
-    out = out.add_target(panic_runtime)
-
-    var regex_runtime_ir = target_new(project_kind_with_compiler_ir(), "regex-runtime-ir", "out/bin/with-stage2").output("out/tmp/regex_runtime.ll")
-    regex_runtime_ir = regex_runtime_ir.input("rt/regex_runtime.w")
-    regex_runtime_ir = regex_runtime_ir.arg("--no-prelude")
-    regex_runtime_ir = regex_runtime_ir.dep("stage2")
-    out = out.add_target(regex_runtime_ir)
+    out = out.add_target(with_object_target("panic-runtime-object", "out/bin/with-stage2", "rt/panic_runtime.w", "out/lib/panic_runtime.o", "-O0", "stage2"))
+    out = out.add_target(with_ir_target("regex-runtime-ir", "out/bin/with-stage2", "rt/regex_runtime.w", "out/tmp/regex_runtime.ll", "stage2"))
 
     var regex_runtime = target_new(.CompileLlvmIrObject, "regex-runtime-object", "out/tmp/regex_runtime.ll").output("out/lib/regex_runtime.o")
     out = out.add_target(regex_runtime)
 
-    var fiber_stubs = target_new(project_kind_with_compiler_build(), "fiber-stubs-object", "out/bin/with-stage2").output("out/lib/fiber_stubs.o")
-    fiber_stubs = fiber_stubs.input("rt/fiber_stubs.w")
-    fiber_stubs = fiber_stubs.arg("--emit-obj")
-    fiber_stubs = fiber_stubs.arg("--no-prelude")
-    fiber_stubs = fiber_stubs.arg("-O0")
-    fiber_stubs = fiber_stubs.dep("stage2")
-    out = out.add_target(fiber_stubs)
-
-    var channel_runtime = target_new(project_kind_with_compiler_build(), "channel-runtime-object", "out/bin/with-stage2").output("out/lib/channel_runtime.o")
-    channel_runtime = channel_runtime.input("rt/channel_runtime.w")
-    channel_runtime = channel_runtime.arg("--emit-obj")
-    channel_runtime = channel_runtime.arg("--no-prelude")
-    channel_runtime = channel_runtime.arg("-O0")
-    channel_runtime = channel_runtime.dep("stage2")
-    out = out.add_target(channel_runtime)
-
-    var fiber_runtime = target_new(project_kind_with_compiler_build(), "fiber-runtime-object", "out/bin/with-stage2").output("out/lib/fiber_runtime.o")
-    fiber_runtime = fiber_runtime.input("rt/fiber_runtime.w")
-    fiber_runtime = fiber_runtime.arg("--emit-obj")
-    fiber_runtime = fiber_runtime.arg("--no-prelude")
-    fiber_runtime = fiber_runtime.arg("-O0")
-    fiber_runtime = fiber_runtime.dep("stage2")
-    out = out.add_target(fiber_runtime)
-
-    var fiber_core = target_new(project_kind_with_compiler_build(), "fiber-core-object", "out/bin/with-stage2").output("out/lib/fiber.o")
-    fiber_core = fiber_core.input("rt/fiber_core_darwin.w")
-    fiber_core = fiber_core.arg("--emit-obj")
-    fiber_core = fiber_core.arg("--no-prelude")
-    fiber_core = fiber_core.arg("-O0")
-    fiber_core = fiber_core.dep("stage2")
-    out = out.add_target(fiber_core)
+    out = out.add_target(with_object_target("fiber-stubs-object", "out/bin/with-stage2", "rt/fiber_stubs.w", "out/lib/fiber_stubs.o", "-O0", "stage2"))
+    out = out.add_target(with_object_target("channel-runtime-object", "out/bin/with-stage2", "rt/channel_runtime.w", "out/lib/channel_runtime.o", "-O0", "stage2"))
+    out = out.add_target(with_object_target("fiber-runtime-object", "out/bin/with-stage2", "rt/fiber_runtime.w", "out/lib/fiber_runtime.o", "-O0", "stage2"))
+    out = out.add_target(with_object_target("fiber-core-object", "out/bin/with-stage2", "rt/fiber_core_darwin.w", "out/lib/fiber.o", "-O0", "stage2"))
 
     var fiber_asm = target_new(.CompileAsmObject, "fiber-asm-object", "runtime/fiber_asm_aarch64.s").output("out/lib/fiber_asm.o")
     out = out.add_target(fiber_asm)
@@ -422,9 +381,13 @@ pub fn build(ctx: BuildCtx) -> Build:
     runtime = runtime.dep("embedded-objects-object")
     out = out.add_target(runtime)
 
-    var compiler = target_new(project_kind_with_compiler_build(), "build", "out/bin/with-stage2").output("out/bin/with")
+    var compiler = target_new(.Action, "build", "").output("out/bin/with")
+    compiler.action = run_with_compiler_build_action
+    compiler = compiler.compiler("out/bin/with-stage2")
     compiler = compiler.input("out/gen/main.w")
     compiler = compiler.arg("-O0")
+    compiler = compiler.extra_output("out/command/build")
+    compiler = compiler.write_scope("out/bin")
     compiler = compiler.dep("llvm-link-metadata")
     compiler = compiler.dep("embedded-objects-object")
     out = out.add_target(compiler)

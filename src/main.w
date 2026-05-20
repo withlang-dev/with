@@ -18,7 +18,6 @@ use CiMigrate
 use BuildGraphKinds
 use BuildGraphModel
 use BuildGraphDispatch
-use BuildGraphCompiler
 use BuildGraphOps
 use BuildGraphSupport
 use BuildGraphTools
@@ -1052,18 +1051,6 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, opt_level: 
             let action_rc = run_build_action_from_build_w(root, cfg, target, opt_level, no_std, alloc_mode, prelude_mode, debug_info)
             if action_rc != 0:
                 return action_rc
-            completed_targets.push(target.name)
-            continue
-        if target.kind == build_graph_kind_with_compiler_build():
-            let with_build_rc = build_graph_run_with_compiler_build(root, target)
-            if with_build_rc != 0:
-                return with_build_rc
-            completed_targets.push(target.name)
-            continue
-        if target.kind == build_graph_kind_with_compiler_ir():
-            let ir_rc = build_graph_run_with_compiler_ir(root, target)
-            if ir_rc != 0:
-                return ir_rc
             completed_targets.push(target.name)
             continue
         let source_path = resolve_join(root, target.entry)
