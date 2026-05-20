@@ -1202,6 +1202,16 @@ fn CCodegen.hashmap_value_tid(self: CCodegen, tid: i32) -> i32:
         return 0
     self.sema.get_generic_inst_arg(resolved as i32, 1)
 
+fn CCodegen.hashmap_key_tid(self: CCodegen, tid: i32) -> i32:
+    let resolved = self.sema.resolve_alias(tid)
+    if self.sema.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return 0
+    if self.generic_inst_base_name(resolved as i32) != "HashMap":
+        return 0
+    if self.sema.get_generic_inst_arg_count(resolved as i32) < 2:
+        return 0
+    self.sema.get_generic_inst_arg(resolved as i32, 0)
+
 fn CCodegen.option_tid_for_payload(self: CCodegen, payload_tid: i32) -> i32:
     if payload_tid == 0 or self.is_void_tid(payload_tid) != 0:
         return 0
@@ -2912,6 +2922,46 @@ fn CCodegen.local_usage_hint_tid(self: CCodegen, body: MirBody, local_id: i32) -
             self.local_usage_hint_cache_store(body.fn_sym, local_id, hint_tid)
             return hint_tid
 
+    // Locals that are first initialized independently and then moved into a
+    // typed aggregate field still need the field's semantic type. This is
+    // especially important for erased runtime handles such as HashMap[K, V]:
+    // the C storage is an i64, but HashMap.new() must know K and V to allocate
+    // the runtime map with the right key/value slot sizes.
+    for bb in 0..body.block_count():
+        let start = body.bb_stmt_starts.get(bb as i64)
+        let count = body.bb_stmt_counts.get(bb as i64)
+        for si in 0..count:
+            let stmt_id = start + si
+            if body.stmt_kinds.get(stmt_id as i64) != StmtKind.Assign:
+                continue
+            let rval_id = body.stmt_d1.get(stmt_id as i64)
+            if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
+                continue
+            if body.rval_kinds.get(rval_id as i64) != RvalueKind.RK_AGGREGATE:
+                continue
+            let fields_id = body.rval_d1.get(rval_id as i64)
+            if fields_id < 0 or fields_id >= body.agg_field_starts.len() as i32:
+                continue
+            let dst_tid = self.place_tid_no_infer(body, body.stmt_d0.get(stmt_id as i64))
+            let dst_resolved = self.sema.resolve_alias(dst_tid)
+            if self.sema.get_type_kind(dst_resolved) != TypeKind.TY_STRUCT:
+                continue
+            let field_start = body.agg_field_starts.get(fields_id as i64)
+            let field_count = body.agg_field_counts.get(fields_id as i64)
+            for fi in 0..field_count:
+                let operand_id = body.agg_field_operands.get((field_start + fi) as i64)
+                if self.operand_direct_local_id(body, operand_id) != local_id:
+                    continue
+                let name_sym = body.agg_field_name_syms.get((field_start + fi) as i64)
+                if name_sym == 0:
+                    continue
+                let field_tid = self.struct_field_tid(dst_resolved as i32, name_sym)
+                if field_tid == 0 or self.is_void_tid(field_tid) != 0:
+                    continue
+                hint_tid = field_tid
+                self.local_usage_hint_cache_store(body.fn_sym, local_id, hint_tid)
+                return hint_tid
+
     // Fallback: assignments from this local into a concretely typed local.
     for bb in 0..body.block_count():
         let start = body.bb_stmt_starts.get(bb as i64)
@@ -4364,7 +4414,16 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
     if kind == cc_builtin_map_new():
         var out = ""
         if has_ret != 0:
-            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = 0;\n"
+            let dst_tid = self.call_dest_expected_tid(body, dest_place)
+            var key_tid = self.hashmap_key_tid(dst_tid)
+            if key_tid == 0 or self.is_void_tid(key_tid) != 0:
+                key_tid = self.sema.ty_i64 as i32
+            var val_tid = self.hashmap_value_tid(dst_tid)
+            if val_tid == 0 or self.is_void_tid(val_tid) != 0:
+                val_tid = self.sema.ty_i64 as i32
+            let key_ty = self.c_type(key_tid, 0)
+            let val_ty = self.c_type(val_tid, 0)
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = (int64_t)(intptr_t)with_hashmap_new(sizeof(" ++ key_ty ++ "), sizeof(" ++ val_ty ++ "));\n"
         else:
             out = out ++ "    (void)0;\n"
         out = out ++ f"    goto bb{next_bb};"

@@ -674,6 +674,32 @@ fn bs_check_imported_module_dependency_order(ctx: ActionCtx, compiler_path: str,
     if result.rc != 0: return result.rc
     0
 
+fn bs_compile_emit_c_output(ctx: ActionCtx, root: str, case_dir: str, c_path: str, bin: str, label: str) -> i32:
+    let stdout_path = bs_capture_path(root, case_dir, label ++ "-compile", "stdout")
+    let stderr_path = bs_capture_path(root, case_dir, label ++ "-compile", "stderr")
+    var cc_args: Vec[str] = Vec.new()
+    cc_args |> push("zig")
+    cc_args |> push("cc")
+    cc_args |> push("-O2")
+    cc_args |> push("-o")
+    cc_args |> push(bs_abs(root, bin))
+    cc_args |> push(bs_abs(root, c_path))
+    cc_args |> push(bs_abs(root, "out/lib/rt_core.o"))
+    cc_args |> push(bs_abs(root, "out/lib/rt_darwin_aarch64.o"))
+    cc_args |> push(bs_abs(root, "out/lib/compat_runtime.o"))
+    cc_args |> push(bs_abs(root, "out/lib/panic_runtime.o"))
+    cc_args |> push(bs_abs(root, "out/lib/fiber_stubs.o"))
+    cc_args |> push(bs_abs(root, "out/lib/cimport_stubs.o"))
+    cc_args |> push(bs_abs(root, "out/lib/embedded_objects.o"))
+    cc_args |> push("-I")
+    cc_args |> push(bs_abs(root, "runtime"))
+    let cc_result = ctx.process_runner().run_capture(cc_args, stdout_path, stderr_path, 120000)
+    if cc_result.rc == 0:
+        return 0
+    ctx.diagnostics().error(ctx.target_name() ++ f": {label} C compile failed with exit code {cc_result.rc}")
+    ctx.diagnostics().error(cc_result.stderr)
+    cc_result.rc
+
 fn bs_check_emit_c_receiver_abi(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "receiver_abi.w")
@@ -706,32 +732,66 @@ fn bs_check_emit_c_receiver_abi(ctx: ActionCtx, compiler_path: str, case_dir: st
     let emit_result = bs_edge_expect_success(ctx, compiler_path, case_dir, "emit-c-receiver-abi", emit_args)
     if emit_result.rc != 0: return emit_result.rc
 
-    let stdout_path = bs_capture_path(root, case_dir, "compile-receiver-abi", "stdout")
-    let stderr_path = bs_capture_path(root, case_dir, "compile-receiver-abi", "stderr")
-    var cc_args: Vec[str] = Vec.new()
-    cc_args |> push("zig")
-    cc_args |> push("cc")
-    cc_args |> push("-O2")
-    cc_args |> push("-o")
-    cc_args |> push(bs_abs(root, bin))
-    cc_args |> push(bs_abs(root, c_path))
-    cc_args |> push(bs_abs(root, "out/lib/rt_core.o"))
-    cc_args |> push(bs_abs(root, "out/lib/rt_darwin_aarch64.o"))
-    cc_args |> push(bs_abs(root, "out/lib/compat_runtime.o"))
-    cc_args |> push(bs_abs(root, "out/lib/panic_runtime.o"))
-    cc_args |> push(bs_abs(root, "out/lib/fiber_stubs.o"))
-    cc_args |> push(bs_abs(root, "out/lib/cimport_stubs.o"))
-    cc_args |> push(bs_abs(root, "out/lib/embedded_objects.o"))
-    cc_args |> push("-I")
-    cc_args |> push(bs_abs(root, "runtime"))
-    let cc_result = ctx.process_runner().run_capture(cc_args, stdout_path, stderr_path, 120000)
-    if cc_result.rc != 0:
-        ctx.diagnostics().error(ctx.target_name() ++ f": emit-c receiver ABI C compile failed with exit code {cc_result.rc}")
-        ctx.diagnostics().error(cc_result.stderr)
-        return cc_result.rc
+    rc = bs_compile_emit_c_output(ctx, root, case_dir, c_path, bin, "emit-c-receiver-abi")
+    if rc != 0: return rc
     let run_result = bs_run_binary_capture(ctx, bin, "emit-c-receiver-abi-run", 120000)
     if run_result.rc != 0: return run_result.rc
     bs_edge_assert_exact(ctx, run_result.stdout, "ok", "emit_c_receiver_abi", "stdout")
+
+fn bs_check_emit_c_hashmap_new_field(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "hashmap_new_field.w")
+    let c_path = bs_join(case_dir, "hashmap_new_field.c")
+    let bin = bs_join(case_dir, "hashmap_new_field")
+    let source = "use std.prelude_core\n\n" ++
+        "extern fn with_print_str(s: str) -> void\n\n" ++
+        "type Registry {\n" ++
+        "    names: HashMap[str, i32],\n" ++
+        "}\n\n" ++
+        "fn Registry.new() -> Registry:\n" ++
+        "    Registry { names: HashMap.new() }\n\n" ++
+        "fn main() -> i32:\n" ++
+        "    let registry = Registry.new()\n" ++
+        "    registry.names.insert(\"name00\", 0)\n" ++
+        "    registry.names.insert(\"name01\", 1)\n" ++
+        "    registry.names.insert(\"name02\", 2)\n" ++
+        "    registry.names.insert(\"name03\", 3)\n" ++
+        "    registry.names.insert(\"name04\", 4)\n" ++
+        "    registry.names.insert(\"name05\", 5)\n" ++
+        "    registry.names.insert(\"name06\", 6)\n" ++
+        "    registry.names.insert(\"name07\", 7)\n" ++
+        "    registry.names.insert(\"name08\", 8)\n" ++
+        "    registry.names.insert(\"name09\", 9)\n" ++
+        "    registry.names.insert(\"name10\", 10)\n" ++
+        "    registry.names.insert(\"name11\", 11)\n" ++
+        "    registry.names.insert(\"name12\", 12)\n" ++
+        "    registry.names.insert(\"name13\", 13)\n" ++
+        "    registry.names.insert(\"name14\", 14)\n" ++
+        "    registry.names.insert(\"name15\", 15)\n" ++
+        "    registry.names.insert(\"name16\", 16)\n" ++
+        "    registry.names.insert(\"name17\", 17)\n" ++
+        "    registry.names.insert(\"name18\", 18)\n" ++
+        "    registry.names.insert(\"name19\", 19)\n" ++
+        "    if not registry.names.contains(\"name19\"):\n" ++
+        "        return 77\n" ++
+        "    with_print_str(\"ok\")\n" ++
+        "    0\n"
+    var rc = bs_write_fixture(ctx, src, source, "emit-c hashmap aggregate field source")
+    if rc != 0: return rc
+    var emit_args: Vec[str] = Vec.new()
+    emit_args |> push("build")
+    emit_args |> push(bs_abs(root, src))
+    emit_args |> push("--emit-c")
+    emit_args |> push("--no-prelude")
+    emit_args |> push("-o")
+    emit_args |> push(bs_abs(root, c_path))
+    let emit_result = bs_edge_expect_success(ctx, compiler_path, case_dir, "emit-c-hashmap-new-field", emit_args)
+    if emit_result.rc != 0: return emit_result.rc
+    rc = bs_compile_emit_c_output(ctx, root, case_dir, c_path, bin, "emit-c-hashmap-new-field")
+    if rc != 0: return rc
+    let run_result = bs_run_binary_capture(ctx, bin, "emit-c-hashmap-new-field-run", 120000)
+    if run_result.rc != 0: return run_result.rc
+    bs_edge_assert_exact(ctx, run_result.stdout, "ok", "emit_c_hashmap_new_field", "stdout")
 
 pub fn run_emit_c_smoke_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
@@ -801,6 +861,8 @@ pub fn run_emit_c_smoke_action(ctx: ActionCtx) -> i32:
     let output = bs_trim_trailing_line_endings(run_result.stdout)
     if output != "hello":
         return bs_fail(ctx, "emitted C binary output mismatch: " ++ output)
+    var rc = bs_check_emit_c_hashmap_new_field(ctx, compiler_path, bs_join(output_dir, "emit_c_hashmap_new_field_case"))
+    if rc != 0: return rc
     print("EMIT-C SMOKE OK")
     0
 
