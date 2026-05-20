@@ -26,11 +26,12 @@ is in progress. Completed D1 sub-slices:
    `ProjectInfo` accessors.
 5. Evaluator handlers for `BuildCtx.new_build()` and BuildCtx child
    capabilities: diagnostics, source emitter, ToolFs, and ProcessRunner.
+6. A typed `ComptimeValue(Build)` to `BuildGraph` materializer substrate,
+   including a driver-only action function reference on `BuildGraphTarget`.
 
-Remaining D1 work is the rest of the capability method handlers, direct
-`build.w` evaluation, a typed materializer from `ComptimeValue(Build)` to the
-driver-owned `BuildGraph`, and replacing generated build/action runner
-binaries on the normal path.
+Remaining D1 work is the rest of the capability method handlers, wiring direct
+`build.w` evaluation into the CLI path through the typed materializer, and
+replacing generated build/action runner binaries on the normal path.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.
