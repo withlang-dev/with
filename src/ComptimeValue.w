@@ -1,4 +1,5 @@
 use Sema
+use CapabilityRegistry
 
 extern fn with_str_eq(a: str, b: str) -> i32
 
@@ -14,6 +15,7 @@ enum ComptimeValueKind: i32:
     CV_STRUCT = 8
     CV_VEC = 9
     CV_MAP = 10
+    CV_CAPABILITY = 11
 
 type ComptimeValue {
     kind: i32,
@@ -146,6 +148,17 @@ fn comptime_value_map(type_id: i32, extra_start: i32, extra_count: i32) -> Compt
         extra_count,
     }
 
+fn comptime_value_capability(type_id: i32, capability_kind: i32, handle_id: i32, generation: i32) -> ComptimeValue:
+    ComptimeValue {
+        kind: ComptimeValueKind.CV_CAPABILITY,
+        type_id,
+        data0: capability_kind as i64,
+        data1: handle_id as i64,
+        text: "",
+        extra_start: generation,
+        extra_count: 0,
+    }
+
 fn comptime_value_is_valid(value: ComptimeValue) -> i32:
     if value.kind == ComptimeValueKind.CV_INVALID:
         return 0
@@ -177,6 +190,7 @@ fn comptime_value_kind_name(kind: i32) -> str:
     if kind == ComptimeValueKind.CV_STRUCT: return "struct"
     if kind == ComptimeValueKind.CV_VEC: return "vec"
     if kind == ComptimeValueKind.CV_MAP: return "map"
+    if kind == ComptimeValueKind.CV_CAPABILITY: return "capability"
     "invalid"
 
 fn comptime_value_format(value: ComptimeValue, extras: Vec[ComptimeValue], sema: Sema) -> str:
@@ -232,6 +246,8 @@ fn comptime_value_format(value: ComptimeValue, extras: Vec[ComptimeValue], sema:
             let item = extras.get((base + 1) as i64)
             out = out ++ comptime_value_format(key, extras, sema) ++ ": " ++ comptime_value_format(item, extras, sema)
         return out ++ " }"
+    if value.kind == ComptimeValueKind.CV_CAPABILITY:
+        return "<capability " ++ capability_registry_kind_name(value.data0 as i32) ++ ">"
     if value.type_id != 0:
         return "<" ++ sema.type_name(value.type_id) ++ ">"
     "<invalid>"
@@ -294,4 +310,8 @@ fn comptime_values_equal(lhs: ComptimeValue, rhs: ComptimeValue, extras: Vec[Com
             if comptime_values_equal(left_value, right_value, extras) == 0:
                 return 0
         return 1
+    if lhs.kind == ComptimeValueKind.CV_CAPABILITY:
+        if lhs.type_id == rhs.type_id and lhs.data0 == rhs.data0 and lhs.data1 == rhs.data1 and lhs.extra_start == rhs.extra_start:
+            return 1
+        return 0
     0

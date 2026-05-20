@@ -12,10 +12,12 @@ conversation context after compaction.
 ## Current Focus
 
 Phase C extraction work is complete. Pre-Phase-D preparation is complete
-through P9, including the follow-up source-location diagnostic gap. The next
-major build-system direction is Phase D D1:
-capability-bearing comptime evaluator dispatch for `build.w` and action
-targets, replacing generated runner binaries on the normal path.
+through P9, including the follow-up source-location diagnostic gap. Phase D D1
+is in progress. The first D1 sub-slice added the shared capability registry
+used by Sema and reserved a capability value kind for evaluator dispatch.
+Remaining D1 work is capability method dispatch, handle validation, direct
+`build.w` evaluation, and replacing generated build/action runner binaries on
+the normal path.
 
 Do not start D2-D8 until D1 lands and passes the baseline verification in
 `docs/audits/pre-d1-baseline.md`.
@@ -110,8 +112,9 @@ Still incomplete:
 
 - Phase C is complete. Project-specific build behavior no longer uses live
   compiler-dispatched project graph kinds.
-- Phase D is not implemented yet. `build.w` and action targets still execute
-  through generated runner binaries until D1 replaces that path.
+- Phase D D1 is partially implemented. `build.w` and action targets still
+  execute through generated runner binaries until the evaluator-backed driver
+  path replaces them.
 - Action timeout/cwd/env/network/install policy declarations are incomplete.
 - Jai-style workspace/build-options/message-loop APIs are incomplete.
 - Make remains a compatibility layer.
@@ -152,9 +155,9 @@ not a new compiler-dispatched project graph kind.
 
 ## Open Blockers And Follow-Ups
 
-- Start Phase D with D1 only: capability registry, evaluator dispatch,
-  capability handle validation, and driver replacement of generated
-  build/action runner execution.
+- Continue Phase D with D1 only: evaluator dispatch, capability handle
+  validation, and driver replacement of generated build/action runner
+  execution. Do not start D2-D8.
 - Preserve the pre-D behavior tests during D1:
   `behav_build_w_basic_invocation`, `behav_action_capability_filesystem`,
   `behav_action_capability_process`, `behav_capability_token_mismatch`,

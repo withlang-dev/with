@@ -5,6 +5,7 @@ use Ast
 use BorrowCfg
 use ComptimeEval
 use ComptimeValue
+use CapabilityRegistry
 use Span
 use Diagnostic
 use InternPool
@@ -67,26 +68,8 @@ fn sema_resolve_embed_file_path(source_path: str, raw_path: str) -> str:
         return raw_path
     dir ++ "/" ++ raw_path
 
-fn sema_is_std_build_path(path: str) -> bool:
-    path == "<embedded-std>/std/build.w" or path == "lib/std/build.w" or path.ends_with("/lib/std/build.w")
-
-fn sema_is_std_compiler_path(path: str) -> bool:
-    path == "<embedded-std>/std/compiler.w" or path == "lib/std/compiler.w" or path.ends_with("/lib/std/compiler.w")
-
-fn sema_is_std_build_capability_name(name: str) -> bool:
-    name == "BuildCtx" or
-        name == "ProjectInfo" or
-        name == "Diagnostics" or
-        name == "SourceEmitter" or
-        name == "ToolFs" or
-        name == "ProcessRunner" or
-        name == "ActionCtx"
-
-fn sema_is_std_compiler_capability_name(name: str) -> bool:
-    name == "Diagnostics" or name == "SourceEmitter"
-
 fn Sema.can_access_tool_capability_internals(self: Sema) -> bool:
-    if sema_is_std_build_path(self.current_module_path) or sema_is_std_compiler_path(self.current_module_path):
+    if capability_registry_is_std_build_path(self.current_module_path) or capability_registry_is_std_compiler_path(self.current_module_path):
         return true
     self.tool_mode_entry_path.len() > 0 and self.current_module_path == self.tool_mode_entry_path
 
@@ -98,21 +81,20 @@ fn Sema.named_type_path_for(self: Sema, sym: i32, tid: i32) -> str:
         i = i - 1
     ""
 
-fn Sema.is_tool_capability_type(self: Sema, tid: i32) -> bool:
+fn Sema.tool_capability_kind_for_type(self: Sema, tid: i32) -> i32:
     if tid == 0:
-        return false
+        return CapabilityKind.CK_NONE
     let resolved = self.resolve_alias(tid as TypeId)
     let tk = self.get_type_kind(resolved)
     if tk != TypeKind.TY_STRUCT:
-        return false
+        return CapabilityKind.CK_NONE
     let type_sym = self.get_type_d0(resolved)
     let type_name = self.pool_resolve(type_sym)
     let type_path = self.named_type_path_for(type_sym, resolved)
-    if sema_is_std_build_path(type_path):
-        return sema_is_std_build_capability_name(type_name)
-    if sema_is_std_compiler_path(type_path):
-        return sema_is_std_compiler_capability_name(type_name)
-    false
+    capability_registry_lookup(type_path, type_name)
+
+fn Sema.is_tool_capability_type(self: Sema, tid: i32) -> bool:
+    capability_registry_is_capability(self.tool_capability_kind_for_type(tid))
 
 fn Sema.reject_tool_capability_construction_if_needed(self: Sema, type_sym: i32, tid: i32, node: i32) -> bool:
     if not self.is_tool_capability_type(tid):
