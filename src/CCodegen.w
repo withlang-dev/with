@@ -789,6 +789,17 @@ fn CCodegen.type_is_payload_enum(self: CCodegen, tid: i32) -> i32:
             return 1
     0
 
+fn CCodegen.type_is_distinct(self: CCodegen, tid: i32) -> i32:
+    let resolved = self.sema.resolve_alias(tid)
+    if self.sema.get_type_kind(resolved) != TypeKind.TY_STRUCT:
+        return 0
+    let name_sym = self.sema.get_type_d0(resolved)
+    if name_sym == 0:
+        return 0
+    if self.sema.distinct_type_names.contains(name_sym):
+        return 1
+    0
+
 fn CCodegen.payload_enum_variant_field(self: CCodegen, variant_index: i32) -> str:
     let _ = self
     f"payload{variant_index}"
@@ -1022,6 +1033,8 @@ fn CCodegen.is_scalar_like_tid(self: CCodegen, tid: i32) -> i32:
     let resolved = self.sema.resolve_alias(tid)
     let tk = self.sema.get_type_kind(resolved)
     if tk == TypeKind.TY_INT or tk == TypeKind.TY_BOOL or tk == TypeKind.TY_FLOAT or tk == TypeKind.TY_ENUM:
+        return 1
+    if self.type_is_distinct(resolved as i32) != 0:
         return 1
     0
 
@@ -2086,6 +2099,26 @@ fn CCodegen.aggregate_compound_literal(self: CCodegen, body: MirBody, rval_id: i
             out = out ++ self.operand_text(body, body.agg_field_operands.get((start + i) as i64))
     out = out ++ cc_rbrace()
     out
+
+fn CCodegen.aggregate_array_initializer(self: CCodegen, body: MirBody, rval_id: i32) -> str:
+    if rval_id < 0 or rval_id >= body.rval_kinds.len() as i32:
+        return ""
+    if body.rval_kinds.get(rval_id as i64) != RvalueKind.RK_AGGREGATE:
+        return ""
+    let fields_id = body.rval_d1.get(rval_id as i64)
+    if fields_id < 0 or fields_id >= body.agg_field_starts.len() as i32:
+        return ""
+    let start = body.agg_field_starts.get(fields_id as i64)
+    let count = body.agg_field_counts.get(fields_id as i64)
+    var out = cc_lbrace()
+    if count <= 0:
+        out = out ++ "0"
+    else:
+        for i in 0..count:
+            if i > 0:
+                out = out ++ ", "
+            out = out ++ self.operand_text(body, body.agg_field_operands.get((start + i) as i64))
+    out ++ cc_rbrace()
 
 fn CCodegen.map_recv_text(self: CCodegen, body: MirBody, args_id: i32) -> str:
     let recv_operand = self.call_arg_operand(body, args_id, 0)
@@ -3676,6 +3709,7 @@ fn CCodegen.resolve_call_named_callee(self: CCodegen, body: MirBody, fn_sym: i32
         return self.extern_call_name(inferred_named, body, args_id, dest_place)
     let inferred_method = self.infer_qualified_method_sym(body, fn_sym, args_id, dest_place)
     if inferred_method == -2:
+        self.fail("C backend cannot lower ambiguous method call")
         return "/*ambiguous_method*/"
     if inferred_method > 0:
         let method_body_sym = self.canonical_body_sym(inferred_method)
@@ -3740,6 +3774,7 @@ fn CCodegen.call_return_tid_for_fn_sym(self: CCodegen, body: MirBody, fn_sym: i3
     fallback
 
 fn CCodegen.resolve_call_callee_text(self: CCodegen, body: MirBody, bb: i32, callee_operand: i32, args_id: i32, dest_place: i32) -> str:
+    let _ = bb
     if callee_operand < 0 or callee_operand >= body.operand_kinds.len() as i32:
         self.fail(f"invalid call callee operand id {callee_operand}")
         return "/*invalid_callee*/"
@@ -3751,6 +3786,7 @@ fn CCodegen.resolve_call_callee_text(self: CCodegen, body: MirBody, bb: i32, cal
         if local_id >= 0 and self.place_is_direct_local(body, od, local_id) != 0:
             let local_fn_sym = self.local_assigned_fn_sym(body, local_id)
             if local_fn_sym == -2:
+                self.fail("C backend cannot lower ambiguous indirect call")
                 return "/*ambiguous_call*/"
             if local_fn_sym > 0:
                 return self.resolve_call_named_callee(body, local_fn_sym, args_id, dest_place)
@@ -3759,12 +3795,14 @@ fn CCodegen.resolve_call_callee_text(self: CCodegen, body: MirBody, bb: i32, cal
             return self.place_text(body, od)
         let inferred = self.infer_direct_call_sym(body, args_id, dest_place)
         if inferred == -2:
+            self.fail("C backend cannot lower ambiguous direct call")
             return "/*ambiguous_call*/"
         if inferred > 0:
             let inferred_body_sym = self.canonical_body_sym(inferred)
             if inferred_body_sym != 0:
                 return self.fn_c_name(inferred_body_sym)
             return self.extern_call_name(inferred, body, args_id, dest_place)
+        self.fail("C backend cannot resolve call callee")
         return "/*unresolved_call*/"
 
     if ok == OperandKind.OK_CONSTANT:
@@ -3782,12 +3820,14 @@ fn CCodegen.resolve_call_callee_text(self: CCodegen, body: MirBody, bb: i32, cal
         // calls. Recover the callee from semantic signatures.
         let inferred = self.infer_direct_call_sym(body, args_id, dest_place)
         if inferred == -2:
+            self.fail("C backend cannot lower ambiguous direct call")
             return "/*ambiguous_call*/"
         if inferred > 0:
             let inferred_body_sym = self.canonical_body_sym(inferred)
             if inferred_body_sym != 0:
                 return self.fn_c_name(inferred_body_sym)
             return self.extern_call_name(inferred, body, args_id, dest_place)
+        self.fail("C backend cannot resolve call callee")
         return "/*unresolved_call*/"
 
     self.fail(f"unsupported call callee operand kind {ok}")
@@ -5648,6 +5688,12 @@ fn CCodegen.emit_stmt_line(self: CCodegen, body: MirBody, stmt_id: i32) -> str:
         if dst_tk == TypeKind.TY_ARRAY:
             if rval == "0" or rval == "0LL":
                 return "    memset(" ++ dst_place ++ ", 0, sizeof(" ++ dst_place ++ "));"
+            let arr_init = self.aggregate_array_initializer(body, d1)
+            if arr_init.len() > 0:
+                let elem_tid = self.sema.get_type_d0(dst_resolved)
+                let arr_size = self.sema.get_type_d1(dst_resolved)
+                let elem_c = self.c_type(elem_tid, 0)
+                return "    " ++ cc_lbrace() ++ " " ++ elem_c ++ f" __with_arr_tmp[{arr_size}] = " ++ arr_init ++ "; memcpy(" ++ dst_place ++ ", __with_arr_tmp, sizeof(" ++ dst_place ++ ")); " ++ cc_rbrace()
             let rv_tid = self.rvalue_tid(body, d1)
             let rv_resolved = if rv_tid != 0: self.sema.resolve_alias(rv_tid) else: 0
             let rv_tk = if rv_resolved != 0: self.sema.get_type_kind(rv_resolved) else: 0
@@ -5668,7 +5714,8 @@ fn CCodegen.emit_stmt_line(self: CCodegen, body: MirBody, stmt_id: i32) -> str:
             return "    " ++ dst_place ++ " = (with_vec)" ++ cc_lbrace() ++ "0" ++ cc_rbrace() ++ ";"
         // If destination is struct/str/vec and rvalue looks like a scalar, wrap it
         let dst_c_type = self.c_type(dst_tid, 0)
-        let dst_is_compound = dst_tk == TypeKind.TY_STRUCT or dst_tk == TypeKind.TY_STR or dst_tid == cc_pseudo_tid_vec() or dst_resolved == cc_pseudo_tid_vec() or dst_c_type == "with_str" or dst_c_type == "with_vec"
+        let dst_is_distinct = self.type_is_distinct(dst_tid)
+        let dst_is_compound = (dst_tk == TypeKind.TY_STRUCT and dst_is_distinct == 0) or dst_tk == TypeKind.TY_STR or dst_tid == cc_pseudo_tid_vec() or dst_resolved == cc_pseudo_tid_vec() or dst_c_type == "with_str" or dst_c_type == "with_vec"
         if dst_is_compound:
             if rval == "0" or rval == "0LL":
                 return "    " ++ dst_place ++ " = " ++ self.zero_value_text(dst_tid) ++ ";"
@@ -5781,13 +5828,8 @@ fn CCodegen.emit_term(self: CCodegen, body: MirBody, bb: i32) -> str:
         let callee = self.resolve_call_callee_text(body, bb, d0, d1, d2)
         let ret_tid = self.call_return_tid(body, bb, d0, d1, d2)
         if callee == "/*unresolved_call*/" or callee == "/*ambiguous_call*/" or callee == "/*ambiguous_method*/":
-            var out = ""
-            if self.is_void_tid(ret_tid) == 0:
-                out = out ++ "    " ++ self.place_text(body, d2) ++ " = " ++ self.zero_value_text(ret_tid) ++ ";\n"
-            else:
-                out = out ++ "    /* unresolved call elided */\n"
-            out = out ++ f"    goto bb{d3};"
-            return out
+            let _ = ret_tid
+            return "    abort();"
         let args = self.call_args_text(body, d1, d0)
         var out = ""
         if self.is_void_tid(ret_tid) != 0:

@@ -7630,9 +7630,20 @@ fn Sema.type_reflection_variant_payload_count(self: Sema, tid: i32, variant_inde
     self.type_extra.get((pos + 1) as i64)
 
 fn Sema.type_reflection_variant_discriminant(self: Sema, tid: i32, variant_index: i32) -> i64:
+    let base_tid = self.type_reflection_variant_base(tid)
+    if base_tid == 0:
+        return 0
+    if not self.disc_repr_types.contains(base_tid):
+        return variant_index as i64
     let name_sym = self.type_reflection_variant_name(tid, variant_index)
     if name_sym == 0:
-        return 0
+        return variant_index as i64
+    let type_name_sym = self.get_type_d0(base_tid)
+    if type_name_sym != 0:
+        let qual_name = self.pool_resolve(type_name_sym) ++ "." ++ self.pool_resolve(name_sym)
+        let qual_sym = self.pool_intern(qual_name)
+        if self.disc_values.contains(qual_sym):
+            return self.disc_values.get(qual_sym).unwrap() as i64
     if self.disc_values.contains(name_sym):
         return self.disc_values.get(name_sym).unwrap() as i64
     variant_index as i64
