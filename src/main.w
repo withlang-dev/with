@@ -20,7 +20,6 @@ use BuildGraphModel
 use BuildGraphDispatch
 use BuildGraphCompiler
 use BuildGraphOps
-use BuildGraphEmitC
 use BuildGraphSupport
 use BuildGraphTools
 use BuildGraphTests
@@ -1054,24 +1053,6 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, opt_level: 
             let llvm_metadata_rc = build_graph_generate_llvm_link_metadata(root, target)
             if llvm_metadata_rc != 0:
                 return llvm_metadata_rc
-            completed_targets.push(target.name)
-            continue
-        if target.kind == build_graph_kind_emit_c_test():
-            let emit_c_rc = build_graph_run_emit_c_test(root, target)
-            if emit_c_rc != 0:
-                return emit_c_rc
-            completed_targets.push(target.name)
-            continue
-        if target.kind == build_graph_kind_emit_c_fixpoint():
-            let emit_c_fixpoint_rc = build_graph_run_emit_c_fixpoint(root, target)
-            if emit_c_fixpoint_rc != 0:
-                return emit_c_fixpoint_rc
-            completed_targets.push(target.name)
-            continue
-        if target.kind == build_graph_kind_emit_c_roundtrip():
-            let emit_c_roundtrip_rc = build_graph_run_emit_c_roundtrip(root, target)
-            if emit_c_roundtrip_rc != 0:
-                return emit_c_roundtrip_rc
             completed_targets.push(target.name)
             continue
         let source_path = resolve_join(root, target.entry)
