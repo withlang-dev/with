@@ -335,6 +335,10 @@ fn ToolFs.project_relative_path(self: &Self, path: str) -> str:
 pub fn ToolFs.exists(self: &Self, path: str) -> bool:
     with_fs_file_exists(self.resolve_path(path)) != 0
 
+pub fn ToolFs.host_exists(self: &Self, path: str) -> bool:
+    tool_capability_require(self.token, "ToolFs")
+    with_fs_file_exists(path) != 0
+
 pub fn ToolFs.is_dir(self: &Self, path: str) -> bool:
     with_fs_is_dir(self.resolve_path(path)) != 0
 
