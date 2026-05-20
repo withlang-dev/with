@@ -5,6 +5,7 @@ use Span
 use Diagnostic
 use InternPool
 use TypeLayout
+use CapabilityRegistry
 
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_fs_file_exists(path: str) -> i32
@@ -25,6 +26,20 @@ type ComptimeControl {
     label: i32,
 }
 
+type ComptimeCapabilityRecord {
+    kind: i32,
+    generation: i32,
+    package_name: str,
+    package_version: str,
+    project_root: str,
+    target_name: str,
+    inputs: Vec[str],
+    outputs: Vec[str],
+    args: Vec[str],
+    write_scope: Vec[str],
+    write_scoped: i32,
+}
+
 type ComptimeEvaluator {
     sema: Sema,
     ast: AstPool,
@@ -37,6 +52,8 @@ type ComptimeEvaluator {
     extra_values: Vec[ComptimeValue],
     active_global_syms: Vec[i32],
     active_fn_syms: Vec[i32],
+    capability_records: Vec[ComptimeCapabilityRecord],
+    next_capability_generation: i32,
     steps: i32,
     step_budget: i32,
     recursion_limit: i32,
@@ -87,6 +104,8 @@ fn ComptimeEvaluator.init(sema: Sema, ast: AstPool, pool: InternPool, require_su
         extra_values: Vec.new(),
         active_global_syms: Vec.new(),
         active_fn_syms: Vec.new(),
+        capability_records: Vec.new(),
+        next_capability_generation: 1,
         steps: 0,
         step_budget: COMPTIME_STEP_LIMIT,
         recursion_limit: COMPTIME_RECURSION_LIMIT,
@@ -144,6 +163,21 @@ fn comptime_eval_result_invalid() -> ComptimeEvalResult:
         value: comptime_value_invalid(),
         extras: Vec.new(),
         error_msg: "",
+    }
+
+fn comptime_capability_record(kind: i32, package_name: str, package_version: str, project_root: str) -> ComptimeCapabilityRecord:
+    ComptimeCapabilityRecord {
+        kind,
+        generation: 0,
+        package_name,
+        package_version,
+        project_root,
+        target_name: "",
+        inputs: Vec.new(),
+        outputs: Vec.new(),
+        args: Vec.new(),
+        write_scope: Vec.new(),
+        write_scoped: 0,
     }
 
 fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
@@ -204,6 +238,53 @@ fn ComptimeEvaluator.fail(self: ComptimeEvaluator, node: i32, msg: str) -> Compt
 
 fn ComptimeEvaluator.unsupported(self: ComptimeEvaluator, node: i32) -> ComptimeControl:
     self.fail(node, "expression is not comptime-evaluable yet")
+
+fn ComptimeEvaluator.capability_type_name(self: ComptimeEvaluator, kind: i32) -> str:
+    if kind == CapabilityKind.CK_BUILD_CTX: return "BuildCtx"
+    if kind == CapabilityKind.CK_BUILD_PROJECT_INFO: return "ProjectInfo"
+    if kind == CapabilityKind.CK_BUILD_DIAGNOSTICS: return "Diagnostics"
+    if kind == CapabilityKind.CK_BUILD_SOURCE_EMITTER: return "SourceEmitter"
+    if kind == CapabilityKind.CK_BUILD_TOOL_FS: return "ToolFs"
+    if kind == CapabilityKind.CK_BUILD_PROCESS_RUNNER: return "ProcessRunner"
+    if kind == CapabilityKind.CK_BUILD_ACTION_CTX: return "ActionCtx"
+    ""
+
+fn ComptimeEvaluator.capability_type_id(self: ComptimeEvaluator, kind: i32, node: i32) -> i32:
+    let type_name = self.capability_type_name(kind)
+    if type_name.len() == 0:
+        let _ = self.fail(node, "unknown capability type")
+        return 0
+    let type_sym = self.pool.intern(type_name) as i32
+    let tid = self.sema.lookup_named_type_visible(type_sym)
+    if tid == 0:
+        let _ = self.fail(node, "capability type is not visible to comptime evaluator")
+        return 0
+    tid
+
+fn ComptimeEvaluator.mint_capability(self: ComptimeEvaluator, type_id: i32, record: ComptimeCapabilityRecord) -> ComptimeValue:
+    var stored = record
+    stored.generation = self.next_capability_generation
+    self.next_capability_generation = self.next_capability_generation + 1
+    let handle_id = self.capability_records.len() as i32
+    self.capability_records.push(stored)
+    comptime_value_capability(type_id, stored.kind, handle_id, stored.generation)
+
+fn ComptimeEvaluator.validate_capability(self: ComptimeEvaluator, value: ComptimeValue, expected_kind: i32, method: str, node: i32) -> i32:
+    if value.kind != ComptimeValueKind.CV_CAPABILITY:
+        let _ = self.fail(node, "capability receiver expected for " ++ method)
+        return -1
+    if value.data0 as i32 != expected_kind:
+        let _ = self.fail(node, "tool capability kind mismatch for " ++ method)
+        return -1
+    let handle_id = value.data1 as i32
+    if handle_id < 0 or handle_id >= self.capability_records.len() as i32:
+        let _ = self.fail(node, "invalid tool capability handle for " ++ method)
+        return -1
+    let record = self.capability_records.get(handle_id as i64)
+    if record.kind != expected_kind or record.generation != value.extra_start:
+        let _ = self.fail(node, "stale or invalid tool capability handle for " ++ method)
+        return -1
+    handle_id
 
 fn ComptimeEvaluator.step(self: ComptimeEvaluator, node: i32) -> i32:
     if self.had_error != 0:
@@ -782,6 +863,51 @@ fn ComptimeEvaluator.eval_static_type_method_call(self: ComptimeEvaluator, recv_
             return self.fail(node, "type.variants() requires an enum type")
         return self.eval_type_variants_array(recv_type)
     self.fail(node, "type method '" ++ method ++ "' is not comptime-evaluable yet")
+
+fn ComptimeEvaluator.capability_expect_arg_count(self: ComptimeEvaluator, arg_count: i32, expected: i32, method: str, node: i32) -> bool:
+    if arg_count == expected:
+        return true
+    let _ = self.fail(node, "wrong argument count for capability method " ++ method)
+    false
+
+fn ComptimeEvaluator.eval_buildctx_capability_method(self: ComptimeEvaluator, recv_value: ComptimeValue, method: str, arg_count: i32, node: i32) -> ComptimeControl:
+    if method == "project_info":
+        if not self.capability_expect_arg_count(arg_count, 0, method, node):
+            return comptime_control_error()
+        let handle = self.validate_capability(recv_value, CapabilityKind.CK_BUILD_CTX, method, node)
+        if handle < 0:
+            return comptime_control_error()
+        let record = self.capability_records.get(handle as i64)
+        let project_info_type = self.capability_type_id(CapabilityKind.CK_BUILD_PROJECT_INFO, node)
+        if project_info_type == 0:
+            return comptime_control_error()
+        let child = comptime_capability_record(CapabilityKind.CK_BUILD_PROJECT_INFO, record.package_name, record.package_version, record.project_root)
+        return comptime_control_value(self.mint_capability(project_info_type, child))
+    self.fail(node, "BuildCtx capability method '" ++ method ++ "' is not implemented yet")
+
+fn ComptimeEvaluator.eval_project_info_capability_method(self: ComptimeEvaluator, recv_value: ComptimeValue, method: str, arg_count: i32, node: i32) -> ComptimeControl:
+    if not self.capability_expect_arg_count(arg_count, 0, method, node):
+        return comptime_control_error()
+    let handle = self.validate_capability(recv_value, CapabilityKind.CK_BUILD_PROJECT_INFO, method, node)
+    if handle < 0:
+        return comptime_control_error()
+    let record = self.capability_records.get(handle as i64)
+    if method == "package_name":
+        return comptime_control_value(comptime_value_str(record.package_name))
+    if method == "package_version":
+        return comptime_control_value(comptime_value_str(record.package_version))
+    if method == "project_root":
+        return comptime_control_value(comptime_value_str(record.project_root))
+    self.fail(node, "ProjectInfo capability method '" ++ method ++ "' is not implemented yet")
+
+fn ComptimeEvaluator.eval_capability_method_call(self: ComptimeEvaluator, recv_value: ComptimeValue, field: i32, arg_count: i32, node: i32) -> ComptimeControl:
+    let method = self.pool.resolve(field)
+    let kind = recv_value.data0 as i32
+    if kind == CapabilityKind.CK_BUILD_CTX:
+        return self.eval_buildctx_capability_method(recv_value, method, arg_count, node)
+    if kind == CapabilityKind.CK_BUILD_PROJECT_INFO:
+        return self.eval_project_info_capability_method(recv_value, method, arg_count, node)
+    self.fail(node, "capability method dispatch is not implemented for " ++ capability_registry_kind_name(kind) ++ "." ++ method)
 
 fn ComptimeEvaluator.eval_module_let_decl(self: ComptimeEvaluator, decl: i32, use_node: i32) -> ComptimeControl:
     let sym = self.ast.get_data0(decl)
@@ -1453,6 +1579,8 @@ fn ComptimeEvaluator.eval_call(self: ComptimeEvaluator, node: i32) -> ComptimeCo
         let recv_signal = self.eval_expr(recv_node)
         if recv_signal.kind != ComptimeControlKind.CTL_VALUE:
             return recv_signal
+        if recv_signal.value.kind == ComptimeValueKind.CV_CAPABILITY:
+            return self.eval_capability_method_call(recv_signal.value, field, arg_count, node)
         if recv_signal.value.kind == ComptimeValueKind.CV_STRUCT:
             let field_index = self.struct_field_index(recv_signal.value.type_id, field)
             if field_index >= 0:
