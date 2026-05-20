@@ -1,13 +1,13 @@
 # Build Graph Kind Table Audit
 
-Status: current as of `765c0d0`.
+Status: current as of `c993471`.
 
 This audit covers `src/BuildGraphKinds.w` after the Phase C selfhost smoke,
 one-liner, object-symbol, project, edge, PCRE2-prep, migrate-basic, and
 migrate-core, and build-w extractions. The old selfhost suite dispatcher is
 also removed. The embedded-runtime regression, all PCRE2 project targets, seed
-download, emit-C targets, and the selfhost suites extracted so far are now
-action targets.
+download, emit-C targets, compiler source generation, LLVM link metadata, and
+the selfhost suites extracted so far are now action targets.
 
 ## Standard Kinds
 
@@ -54,10 +54,8 @@ Live project kinds:
 
 | Kind | Name |
 | --- | --- |
-| 1003 | `generate_compiler_entrypoints` |
 | 1004 | `with_compiler_build` |
 | 1013 | `with_compiler_ir` |
-| 1020 | `generate_llvm_link_metadata` |
 
 Removed project kinds:
 
@@ -66,6 +64,7 @@ Removed project kinds:
 | 1000 | `removed_embedded_runtime_extract_test` |
 | 1001 | `removed_selfhost_noop_local_regression` |
 | 1002 | `removed_cli_selfhost_smoke_test` |
+| 1003 | `removed_generate_compiler_entrypoints` |
 | 1005 | `removed_pcre2_run_test` |
 | 1006 | `removed_pcre2_generated_check` |
 | 1007 | `removed_pcre2_generated_promote` |
@@ -80,6 +79,7 @@ Removed project kinds:
 | 1017 | `removed_cli_selfhost_migrate_basic_test` |
 | 1018 | `removed_cli_selfhost_migrate_core_test` |
 | 1019 | `removed_selfhost_suite_test` |
+| 1020 | `removed_generate_llvm_link_metadata` |
 | 1021 | `removed_pcre2_reference_prepare` |
 | 1022 | `removed_pcre2_migrate` |
 | 1023 | `removed_unused_1023` |

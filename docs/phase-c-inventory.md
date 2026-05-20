@@ -20,7 +20,6 @@ File: `src/BuildGraphKinds.w`
 | ---: | --- | --- |
 | 1000 | `embedded_runtime_extract_test` | Selfhost fixture target for embedded runtime extraction behavior. |
 | 1002 | `cli_selfhost_smoke_test` | Selfhost CLI smoke target. |
-| 1003 | `generate_compiler_entrypoints` | Compiler-project target that generates versioned compiler entrypoint source. |
 | 1004 | `with_compiler_build` | Compiler-project target that builds the With compiler. |
 | 1005 | `pcre2_run_test` | PCRE2 migrated-library corpus test target. |
 | 1006 | `pcre2_generated_check` | PCRE2 generated-source check target. |
@@ -36,7 +35,6 @@ File: `src/BuildGraphKinds.w`
 | 1017 | `cli_selfhost_migrate_basic_test` | Selfhost fixture target for basic C migrator behavior. |
 | 1018 | `cli_selfhost_migrate_core_test` | Selfhost fixture target for core C migrator behavior. |
 | 1019 | `selfhost_suite_test` | Selfhost fixture suite aggregation target. |
-| 1020 | `generate_llvm_link_metadata` | Compiler-project target that generates LLVM link metadata. |
 | 1021 | `pcre2_reference_prepare` | PCRE2 reference source preparation target. |
 | 1022 | `pcre2_migrate` | PCRE2 migration target. |
 | 1024 | `seed_download` | Seed compiler download target. |
@@ -249,17 +247,15 @@ File: `src/BuildGraphCompiler.w`
 | Item | Lines | Description |
 | --- | ---: | --- |
 | `bgc_trim_space_and_newlines` | ~15 | Trims text for compiler-project command output parsing. |
-| `bgc_first_trimmed_line` | ~9 | Reads the first trimmed line from command output. |
-| `bgc_find_substr` | ~16 | Finds a substring in compiler-project text. |
-| `bgc_replace_all` | ~19 | Replaces text in generated compiler-project sources. |
 | `bgc_capture_text` | ~16 | Runs a compiler-project command and captures text. |
-| `bgc_resolve_compiler_version` | ~28 | Resolves the current compiler version string. |
-| `bgc_write_versioned_source` | ~18 | Writes generated versioned compiler source. |
-| `build_graph_generate_compiler_entrypoints` | ~27 | Build graph target runner for compiler entrypoint generation. |
 | `bgc_resolve_seed_compiler` | ~18 | Resolves the seed compiler path. |
 | `bgc_compiler_path` | ~5 | Resolves the compiler path used by compiler-project targets. |
 | `build_graph_run_with_compiler_build` | ~68 | Build graph target runner for building the compiler. |
 | `build_graph_run_with_compiler_ir` | ~55 | Build graph target runner for emitting compiler IR. |
+
+Compiler source generation and LLVM link metadata generation no longer live
+under `src/`; they moved to the project-local `build_compiler.w` action module
+in `c993471`.
 
 ## Selfhost Fixture Dispatch In `src/main.w`
 
