@@ -784,6 +784,26 @@ fn build_tool_runner_source(package_name: str, package_version: str, root: str, 
     "    let graph = build_graph.emit_graph()\n" ++
     "    assert(ctx.fs().write_text(\"" ++ cli_escape_with_string(graph_path) ++ "\", graph) == 0)\n"
 
+fn generate_action_runner_source(target: BuildGraphTarget, cfg: ProjectConfig, root: str, graph_path: str, token: str) -> str:
+    let _ = target
+    build_tool_runner_source(cfg.package_name, cfg.package_version, root, graph_path, token)
+
+fn compile_action_runner(target: BuildGraphTarget, runner_path: str, runner_bin: str, runner_source: str, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> str:
+    if with_fs_write_file(runner_path, runner_source) != 0:
+        with_eprint("error: action target '" ++ target.name ++ "' could not write generated action runner")
+        return ""
+    var comp = Compilation.init()
+    comp.configure(opt_level, no_std, alloc_mode)
+    comp.set_prelude_mode(prelude_mode)
+    comp.set_debug_info(debug_info)
+    comp.set_tool_mode_entry_path(runner_path)
+    let built_runner = comp.build_binary_to_path(runner_path, runner_bin)
+    let _remove_runner_source = with_fs_remove_file(runner_path)
+    if built_runner == "":
+        with_eprint("error: action target '" ++ target.name ++ "' runner compilation failed")
+        return ""
+    built_runner
+
 fn replay_action_capture(stdout_path: str, stderr_path: str, stdout_to_stderr: bool) -> void:
     let action_stderr = with_fs_read_file(stderr_path)
     if action_stderr.len() > 0:
@@ -798,6 +818,29 @@ fn replay_action_capture(stdout_path: str, stderr_path: str, stdout_to_stderr: b
 fn remove_action_capture(stdout_path: str, stderr_path: str) -> void:
     let _remove_action_stdout = with_fs_remove_file(stdout_path)
     let _remove_action_stderr = with_fs_remove_file(stderr_path)
+
+fn execute_action_runner(target: BuildGraphTarget, built_runner: str, capability_token: str, stdout_path: str, stderr_path: str) -> i32:
+    let old_capability_token = with_getenv_str("WITH_TOOL_CAPABILITY_TOKEN")
+    let old_action_name = with_getenv_str("WITH_BUILD_ACTION_NAME")
+    let _set_capability_token = with_setenv_str("WITH_TOOL_CAPABILITY_TOKEN", capability_token)
+    let _set_action_name = with_setenv_str("WITH_BUILD_ACTION_NAME", target.name)
+    var action_argv = ""
+    action_argv = build_graph_argv_append(action_argv, built_runner)
+    let rc = with_exec_argv_capture(action_argv, stdout_path, stderr_path, 3600000)
+    let _restore_action_name = with_setenv_str("WITH_BUILD_ACTION_NAME", old_action_name)
+    let _restore_capability_token = with_setenv_str("WITH_TOOL_CAPABILITY_TOKEN", old_capability_token)
+    if rc != 0:
+        replay_action_capture(stdout_path, stderr_path, true)
+        remove_action_capture(stdout_path, stderr_path)
+        with_eprint("error: action target '" ++ target.name ++ f"' failed with exit code {rc}")
+        return rc
+    replay_action_capture(stdout_path, stderr_path, false)
+    remove_action_capture(stdout_path, stderr_path)
+    0
+
+fn cleanup_action_runner(built_runner: str, runner_path: str) -> void:
+    let _remove_runner_source = with_fs_remove_file(runner_path)
+    cleanup_binary_artifacts(built_runner)
 
 fn run_build_action_from_build_w(root: str, cfg: ProjectConfig, target: BuildGraphTarget, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> i32:
     if target.output.len() == 0:
@@ -827,39 +870,17 @@ fn run_build_action_from_build_w(root: str, cfg: ProjectConfig, target: BuildGra
     // This first implementation re-runs build.w for each action invocation.
     // A later action registry should keep the graph and function table alive
     // for projects with many action targets.
-    let runner_source = build_tool_runner_source(cfg.package_name, cfg.package_version, root, "out/tmp/action-graph." ++ stamp ++ ".txt", capability_token)
-    if with_fs_write_file(runner_path, runner_source) != 0:
-        with_eprint("error: action target '" ++ target.name ++ "' could not write generated action runner")
-        return 1
-    var comp = Compilation.init()
-    comp.configure(opt_level, no_std, alloc_mode)
-    comp.set_prelude_mode(prelude_mode)
-    comp.set_debug_info(debug_info)
-    comp.set_tool_mode_entry_path(runner_path)
-    let built_runner = comp.build_binary_to_path(runner_path, runner_bin)
-    let _remove_runner_source = with_fs_remove_file(runner_path)
+    let runner_source = generate_action_runner_source(target, cfg, root, "out/tmp/action-graph." ++ stamp ++ ".txt", capability_token)
+    let built_runner = compile_action_runner(target, runner_path, runner_bin, runner_source, opt_level, no_std, alloc_mode, prelude_mode, debug_info)
     if built_runner == "":
-        with_eprint("error: action target '" ++ target.name ++ "' runner compilation failed")
+        cleanup_action_runner(built_runner, runner_path)
         return 1
-    let old_capability_token = with_getenv_str("WITH_TOOL_CAPABILITY_TOKEN")
-    let old_action_name = with_getenv_str("WITH_BUILD_ACTION_NAME")
-    let _set_capability_token = with_setenv_str("WITH_TOOL_CAPABILITY_TOKEN", capability_token)
-    let _set_action_name = with_setenv_str("WITH_BUILD_ACTION_NAME", target.name)
     let action_stdout_path = resolve_join(tmp_dir, "build-action-runner." ++ stamp ++ ".stdout")
     let action_stderr_path = resolve_join(tmp_dir, "build-action-runner." ++ stamp ++ ".stderr")
-    var action_argv = ""
-    action_argv = build_graph_argv_append(action_argv, built_runner)
-    let rc = with_exec_argv_capture(action_argv, action_stdout_path, action_stderr_path, 3600000)
-    let _restore_action_name = with_setenv_str("WITH_BUILD_ACTION_NAME", old_action_name)
-    let _restore_capability_token = with_setenv_str("WITH_TOOL_CAPABILITY_TOKEN", old_capability_token)
-    cleanup_binary_artifacts(built_runner)
+    let rc = execute_action_runner(target, built_runner, capability_token, action_stdout_path, action_stderr_path)
+    cleanup_action_runner(built_runner, runner_path)
     if rc != 0:
-        replay_action_capture(action_stdout_path, action_stderr_path, true)
-        remove_action_capture(action_stdout_path, action_stderr_path)
-        with_eprint("error: action target '" ++ target.name ++ f"' failed with exit code {rc}")
         return rc
-    replay_action_capture(action_stdout_path, action_stderr_path, false)
-    remove_action_capture(action_stdout_path, action_stderr_path)
     if with_fs_file_exists(output_path) == 0:
         with_eprint("error: action target '" ++ target.name ++ "' did not produce declared output: " ++ output_path)
         return 1
