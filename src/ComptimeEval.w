@@ -261,6 +261,52 @@ fn ComptimeEvaluator.capability_type_id(self: ComptimeEvaluator, kind: i32, node
         return 0
     tid
 
+fn ComptimeEvaluator.named_type_id(self: ComptimeEvaluator, type_name: str, node: i32) -> i32:
+    let type_sym = self.pool.intern(type_name) as i32
+    let tid = self.sema.lookup_named_type_visible(type_sym)
+    if tid == 0:
+        let _ = self.fail(node, "type '" ++ type_name ++ "' is not visible to comptime evaluator")
+        return 0
+    tid
+
+fn ComptimeEvaluator.empty_vec_for_field(self: ComptimeEvaluator, owner_type: i32, field_name: str, node: i32) -> ComptimeValue:
+    let field_sym = self.pool.intern(field_name) as i32
+    let field_index = self.struct_field_index(owner_type, field_sym)
+    if field_index < 0:
+        let _ = self.fail(node, "missing field '" ++ field_name ++ "' while constructing comptime struct")
+        return comptime_value_invalid()
+    let field_type = self.sema.type_reflection_field_type(owner_type, field_index)
+    comptime_value_vec(field_type, self.extra_values.len() as i32, 0)
+
+fn ComptimeEvaluator.eval_package_value(self: ComptimeEvaluator, record: ComptimeCapabilityRecord, node: i32) -> ComptimeValue:
+    let package_type = self.named_type_id("Package", node)
+    if package_type == 0:
+        return comptime_value_invalid()
+    let start = self.extra_values.len() as i32
+    self.extra_values.push(comptime_value_str(record.package_name))
+    self.extra_values.push(comptime_value_str(record.package_version))
+    comptime_value_struct(package_type, start, 2)
+
+fn ComptimeEvaluator.eval_new_build_value(self: ComptimeEvaluator, record: ComptimeCapabilityRecord, node: i32) -> ComptimeValue:
+    let build_type = self.named_type_id("Build", node)
+    if build_type == 0:
+        return comptime_value_invalid()
+    let package = self.eval_package_value(record, node)
+    if package.kind == ComptimeValueKind.CV_INVALID:
+        return package
+    let targets = self.empty_vec_for_field(build_type, "targets", node)
+    if targets.kind == ComptimeValueKind.CV_INVALID:
+        return targets
+    let generated_sources = self.empty_vec_for_field(build_type, "generated_sources", node)
+    if generated_sources.kind == ComptimeValueKind.CV_INVALID:
+        return generated_sources
+    let start = self.extra_values.len() as i32
+    self.extra_values.push(package)
+    self.extra_values.push(comptime_value_str(""))
+    self.extra_values.push(targets)
+    self.extra_values.push(generated_sources)
+    comptime_value_struct(build_type, start, 4)
+
 fn ComptimeEvaluator.mint_capability(self: ComptimeEvaluator, type_id: i32, record: ComptimeCapabilityRecord) -> ComptimeValue:
     var stored = record
     stored.generation = self.next_capability_generation
@@ -871,6 +917,16 @@ fn ComptimeEvaluator.capability_expect_arg_count(self: ComptimeEvaluator, arg_co
     false
 
 fn ComptimeEvaluator.eval_buildctx_capability_method(self: ComptimeEvaluator, recv_value: ComptimeValue, method: str, arg_count: i32, node: i32) -> ComptimeControl:
+    if method == "new_build":
+        if not self.capability_expect_arg_count(arg_count, 0, method, node):
+            return comptime_control_error()
+        let handle = self.validate_capability(recv_value, CapabilityKind.CK_BUILD_CTX, method, node)
+        if handle < 0:
+            return comptime_control_error()
+        let build_value = self.eval_new_build_value(self.capability_records.get(handle as i64), node)
+        if build_value.kind == ComptimeValueKind.CV_INVALID:
+            return comptime_control_error()
+        return comptime_control_value(build_value)
     if method == "project_info":
         if not self.capability_expect_arg_count(arg_count, 0, method, node):
             return comptime_control_error()
@@ -883,6 +939,27 @@ fn ComptimeEvaluator.eval_buildctx_capability_method(self: ComptimeEvaluator, re
             return comptime_control_error()
         let child = comptime_capability_record(CapabilityKind.CK_BUILD_PROJECT_INFO, record.package_name, record.package_version, record.project_root)
         return comptime_control_value(self.mint_capability(project_info_type, child))
+    if method == "diagnostics" or method == "source_emitter" or method == "fs" or method == "process_runner":
+        if not self.capability_expect_arg_count(arg_count, 0, method, node):
+            return comptime_control_error()
+        let handle = self.validate_capability(recv_value, CapabilityKind.CK_BUILD_CTX, method, node)
+        if handle < 0:
+            return comptime_control_error()
+        let child_kind =
+            if method == "diagnostics":
+                CapabilityKind.CK_BUILD_DIAGNOSTICS
+            else if method == "source_emitter":
+                CapabilityKind.CK_BUILD_SOURCE_EMITTER
+            else if method == "fs":
+                CapabilityKind.CK_BUILD_TOOL_FS
+            else:
+                CapabilityKind.CK_BUILD_PROCESS_RUNNER
+        let child_type = self.capability_type_id(child_kind, node)
+        if child_type == 0:
+            return comptime_control_error()
+        let record = self.capability_records.get(handle as i64)
+        let child = comptime_capability_record(child_kind, record.package_name, record.package_version, record.project_root)
+        return comptime_control_value(self.mint_capability(child_type, child))
     self.fail(node, "BuildCtx capability method '" ++ method ++ "' is not implemented yet")
 
 fn ComptimeEvaluator.eval_project_info_capability_method(self: ComptimeEvaluator, recv_value: ComptimeValue, method: str, arg_count: i32, node: i32) -> ComptimeControl:

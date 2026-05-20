@@ -24,10 +24,18 @@ is in progress. Completed D1 sub-slices:
 4. Evaluator-owned capability records, handle validation, and initial
    capability receiver dispatch for `BuildCtx.project_info()` and
    `ProjectInfo` accessors.
+5. Evaluator handlers for `BuildCtx.new_build()` and BuildCtx child
+   capabilities: diagnostics, source emitter, ToolFs, and ProcessRunner.
 
 Remaining D1 work is the rest of the capability method handlers, direct
-`build.w` evaluation, and replacing generated build/action runner binaries on
-the normal path.
+`build.w` evaluation, a typed materializer from `ComptimeValue(Build)` to the
+driver-owned `BuildGraph`, and replacing generated build/action runner
+binaries on the normal path.
+
+D1 architectural boundary: the evaluator must return a typed std.build `Build`
+value. The driver materializes that value directly into `BuildGraph`.
+`Build.emit_graph()` remains a debug/export compatibility facility and must not
+be the evaluator-to-driver transport.
 
 Do not start D2-D8 until D1 lands and passes the baseline verification in
 `docs/audits/pre-d1-baseline.md`.
