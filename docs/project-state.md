@@ -34,6 +34,10 @@ make install-user
 
 Recent relevant commits:
 
+- `765c0d0` Extract emit-C targets to build actions.
+- `862a510` Preserve HashMap key types in emitted C.
+- `9ec2148` Materialize copy let bindings in MIR.
+- `d9116c2` Fix emit-C enum and scalar lowering.
 - `5f81dca` Run external build tests in parallel batches.
 - `f078129` Add action `--no-deps` build flag.
 - `9186a59` Add build debugging helper scripts.
@@ -95,12 +99,12 @@ Completed Phase C-style extractions include:
 - `pcre2-build` / `pcre2-test`
 - `pcre2-check-generated` / `pcre2-promote`
 - `seed-download`
+- `emit-c-test` / `emit-c-fixpoint` / `emit-c-roundtrip`
 
 Remaining Phase C areas include:
 
 - remaining selfhost fixture suites;
 - remaining PCRE2 action paths if any compiler-dispatched pieces remain;
-- emit-C test/fixpoint/roundtrip extraction;
 - compiler stage policy that is still project-specific;
 - final `selfhost_suite_test` dispatcher removal after it has no children.
 
