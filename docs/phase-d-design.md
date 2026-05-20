@@ -1,14 +1,20 @@
 # Phase D Design: Capability-Bearing Comptime and Workspaces
 
-Status: implementation contract, v6 draft. Pre-Phase-D prerequisites complete. Implementation pending; D1 may begin after this revision is accepted.
+Status: implementation contract, v7 draft. Pre-Phase-D prerequisites are complete through P8. P9 baseline capture remains before D1 may begin.
 
-This is the design contract for Phase D. It supersedes v5 and incorporates a small set of final refinements: a "prefer explicit handles" note on `current_workspace`, a softer intern-pool identity requirement, and an explicit measurement methodology for D7's regression thresholds.
+This is the design contract for Phase D. It supersedes v6 and reconciles the design with the completed pre-Phase-D implementation artifacts.
 
-The pre-Phase-D work documented in `docs/pre-phase-d-impl.md` has completed: audits, capability dispatch design, BuildOptions design, behavior tests, and the `src/main.w` refactor are all in place. The findings from those efforts are absorbed into this document.
+The pre-Phase-D work documented in `docs/pre-phase-d-plan.md` is complete through P8: audits, capability dispatch design, BuildOptions design, behavior tests, and the `src/main.w` action-runner refactor are all in place. The findings from those efforts are absorbed into this document. P9 records the verification baseline after this design revision.
 
 ## Revision History
 
-**v6** (this document):
+**v7** (this document):
+
+* §4: reconciled capability identification and method backing with `docs/design/capability-dispatch.md`; D1 uses the explicit compiler registry and ordinary stdlib declarations, not new attribute syntax or an `intrinsic` declaration form.
+* §6 and §13: replaced placeholder CLI compatibility test names with the completed pre-D behavior regression set and the compatibility fixture set specified in `docs/design/build-options.md`.
+* §15 and §16: corrected pre-D artifact references to `docs/pre-phase-d-plan.md` and the P9 baseline path.
+
+**v6**:
 
 * §5: `current_workspace()` semantics retained but with explicit guidance that callers should prefer explicit workspace handles; the method exists for the single-workspace convenience case and may be deprecated if explicit handles cover all callers in practice.
 * §11: intern pool row softened. The requirement is that public symbol identity be content-stable; internal ids may remain allocation-based if they are never exposed in public output (object files, debug info, mangled names, diagnostics, graph output).
@@ -124,13 +130,13 @@ Phase D adds three extensions to the evaluator:
 
 **E1: Capability-aware method dispatch.** When evaluation reaches a method call on a capability-typed value, the evaluator consults a capability dispatch table (§4) and invokes the compiler-internal implementation rather than interpreting the method's MIR body. This extension is required for D1.
 
-**E2: Intrinsic effect dispatch.** Capability method implementations are compiler-internal native code that performs effects: filesystem operations, process invocation, compilation state mutation, and related driver operations. The evaluator calls these implementations via the dispatch table. Token validation happens at the entry of each call. This extension is required for D1.
+**E2: Intrinsic effect dispatch.** Capability method implementations are compiler-internal native code that performs effects: filesystem operations, process invocation, compilation state mutation, and related driver operations. The evaluator calls these implementations via the dispatch table. Capability handle validation happens at the entry of each call. This extension is required for D1.
 
 **E3: Cooperative suspension.** When `Workspace.wait_for_message` is invoked with an empty message queue, the evaluator must save its current execution state, return control to the compiler driver, and resume execution with a delivered message when one is available. This requires turning the evaluator loop into something resumable: either a coroutine implementation, a continuation-passing transform, or an explicit evaluator state object that can be paused and resumed. This extension is required for D4 and beyond. D1 through D3 do not require suspension.
 
 ### Implementation Strategy
 
-Capability-bearing comptime is implemented by interpreting MIR with capability-aware intrinsic dispatch. This is the implementation strategy for Phase D. If interpretation becomes a measured bottleneck in later phases, native compilation may be added as an optimization; the public semantics — capability dispatch, message loop, suspension behavior, token validation, and boundary-safe handles — remain evaluator-based regardless.
+Capability-bearing comptime is implemented by interpreting MIR with capability-aware intrinsic dispatch. This is the implementation strategy for Phase D. If interpretation becomes a measured bottleneck in later phases, native compilation may be added as an optimization; the public semantics — capability dispatch, message loop, suspension behavior, handle validation, and boundary-safe handles — remain evaluator-based regardless.
 
 Capability methods themselves execute at native speed because their implementations are compiler-internal native code. Interpretation overhead applies only to user logic between capability calls. In practice this overhead is expected to be small relative to the time spent inside compiler operations such as parsing, typechecking, codegen, IO, and process invocation. This expectation is not doctrine; if measured build workloads show evaluator overhead dominating, native execution may be introduced later behind the same public semantics.
 
@@ -142,49 +148,61 @@ This section absorbs `docs/design/capability-dispatch.md`.
 
 ### Capability Type Identification
 
-Capability types are marked with the `@[capability]` attribute:
+D1 uses the explicit compiler registry designed in
+`docs/design/capability-dispatch.md`. A capability type is identified by
+stable module path plus type name, not by raw symbol id and not by a new
+attribute syntax.
 
-```with
-@[capability]
-pub type Workspace:
-    token: str
-    workspace_id: i32
+The initial registry contains:
+
+```text
+std.build:    BuildCtx, ProjectInfo, Diagnostics, SourceEmitter, ToolFs,
+              ProcessRunner, ActionCtx
+std.compiler: Diagnostics, SourceEmitter
 ```
 
-The attribute is recognized by Sema. Types marked `@[capability]`:
+The registry is shared by Sema and the evaluator. Sema uses it to reject
+forged construction, runtime use, and escaping capability-bearing values. The
+evaluator uses it to recognize capability receivers and route method calls
+through the dispatch table.
 
-* May only be constructed by compiler-internal code. The driver mints them.
-* Cannot appear in runtime code paths. Sema rejects values of capability type in non-comptime contexts.
-* Have their methods routed through the capability dispatch table.
-
-This mechanism is location-independent. Capability types may live in any module; the attribute is the marker.
+An attribute such as `@[tool_capability]` may replace explicit registry
+entries in a later phase, but D1 must not depend on a new attribute system.
 
 ### Capability Method Declaration
 
-Methods on capability types are declared in `std.build` and `std.compiler` with the `@[capability_method]` attribute and the intrinsic declaration form defined by `docs/design/comptime-capability-syntax.md`:
+Methods on capability types remain ordinary declarations in `std.build` and
+`std.compiler` so normal Sema, editor tooling, and current transitional runner
+code can typecheck them:
 
 ```with
-@[capability_method("Workspace.compile")]
 pub fn Workspace.compile(&mut self) -> BuildResult:
-    intrinsic
+    // transitional body remains while old runner path exists
 
-@[capability_method("Workspace.add_string")]
 pub fn Workspace.add_string(&mut self, name: str, source: str):
-    intrinsic
+    // transitional body remains while old runner path exists
 ```
 
-The `intrinsic` declaration form means the method's implementation is supplied by the compiler. The attribute parameter is the dispatch key. The evaluator does not interpret a With body for these methods.
+During D1 evaluation, the evaluator dispatches by registered receiver
+capability kind plus stable method name before interpreting a method body. The
+With body is not the source of truth for capability effects on the D1-complete
+path. If a capability method body is reached outside the evaluator-backed tool
+path, it must fail loudly rather than silently perform a partial operation.
+
+Longer term, capability methods may become explicit intrinsic stubs. That is
+not required for D1 and is not a prerequisite for replacing generated runners.
 
 ### Dispatch Table
 
-The compiler maintains a dispatch table mapping `(capability_type_name, method_name)` to internal implementation functions:
+The compiler maintains a dispatch table mapping `(CapabilityKind,
+method_name)` to internal implementation functions:
 
 ```text
-("BuildCtx",   "create_workspace")  -> driver_create_workspace_impl
-("Workspace",  "compile")           -> workspace_compile_impl
-("Workspace",  "add_string")        -> workspace_add_string_impl
-("Workspace",  "wait_for_message")  -> workspace_wait_for_message_impl
-("ToolFs",     "read_text")         -> toolfs_read_text_impl
+("BuildCtx",  "new_build")      -> buildctx_new_build_impl
+("ActionCtx", "fs")             -> actionctx_fs_impl
+("ToolFs",    "read_text")      -> toolfs_read_text_impl
+("ToolFs",    "write_text")     -> toolfs_write_text_impl
+("ProcessRunner", "run")        -> process_runner_run_impl
 ```
 
 The table is populated once at compiler startup and is immutable thereafter for the lifetime of the compiler process. The evaluator consults it when dispatching capability method calls. Immutability means parallel reads are free of synchronization concerns; under `parallel` workspaces, dispatch table lookups require no locking.
@@ -193,25 +211,30 @@ User-defined capabilities are not part of Phase D. If a future phase introduces 
 
 ### Token Validation
 
-Every capability method call validates the capability's token field against the expected value for the workspace/context it belongs to:
+Every capability method call validates the capability handle against the
+current evaluator's `CapabilityStore`:
 
 ```text
-fn workspace_compile_impl(workspace: WorkspaceCapability, ...) -> BuildResult:
-    if workspace.token != driver.expected_token(workspace.workspace_id):
-        return tool_capability_violation(workspace, "compile")
+fn toolfs_read_text_impl(handle: CapabilityHandle, ...) -> str:
+    if !capability_store.valid(handle, .ToolFs):
+        return tool_capability_violation("ToolFs.read_text")
     ...
 ```
 
-Token storage moves from environment variables, the current transitional mechanism, to fields on the capability value itself. The driver stores expected tokens in per-workspace state. Validation happens at the entry of every capability method, not once at evaluator startup.
+Environment-variable tokens disappear from the build/action capability path in
+D1. The user-visible capability value is an abstract handle, not a token string
+or raw compiler pointer. Validation checks handle range, generation, receiver
+kind, and store ownership at the entry of every capability method.
 
 ### Adding New Capabilities
 
 To add a new capability in future phases, such as `LinkCap` or `NetworkCap`:
 
-1. Declare the type with `@[capability]` in the appropriate stdlib module.
-2. Declare its methods with `@[capability_method("TypeName.method_name")]`.
+1. Declare the public type and method surface in the appropriate stdlib module.
+2. Add the type to the compiler capability registry.
 3. Implement the dispatch handlers in the compiler.
 4. Register the handlers in the dispatch table at compiler startup.
+5. Add unforgeability and dispatch behavior tests.
 
 No core architectural changes are required. The dispatch table is extensible at compiler-build time; runtime extension is not in scope.
 
@@ -258,7 +281,7 @@ If future use cases require a different notion of "current," this API may grow a
 Public API lives in `std.build` unless otherwise noted.
 
 ```with
-@[capability]
+// Registered by the compiler capability registry.
 pub type Workspace
 
 pub fn BuildCtx.create_workspace(&mut self, name: str) -> Workspace
@@ -406,7 +429,10 @@ This refactor is the largest single piece of D2 integration work. It touches:
 * Validation: mutually exclusive flags, target-host compatibility, and related cross-field checks.
 * The main driver loop, which now calls a workspace instead of mutating `Compilation` directly.
 
-The refactor preserves byte-for-byte CLI compatibility. The behavior tests in `test/behavior/behav_cli_compat_*.w`, committed during pre-Phase-D, lock this in.
+The refactor preserves byte-for-byte CLI compatibility. The compatibility
+fixture set is specified in `docs/design/build-options.md`; those fixtures
+land with D2 because the pre-D behavior tests cover build/action runner
+semantics rather than the full CLI parser rewrite.
 
 Other subcommands (`with migrate`, `with run`, `with test`) keep their existing parsing in D2 and may be migrated later if useful. They are explicitly out of scope for D2.
 
@@ -696,7 +722,7 @@ The following compiler areas need integration work. Several involve real refacto
 
 * **Parser / Ast**: support named in-memory source units from `Workspace.add_string`. Source manager extended to track virtual file paths for generated sources.
 
-* **Sema**: expose stable `DeclSummary` construction. Enforce capability-value construction rules: capability types marked with `@[capability]` can only be constructed by compiler-internal code. Closure capture rules for capability values must prevent escape from the comptime context. Lifetime checks on containing structures (§5).
+* **Sema**: expose stable `DeclSummary` construction. Enforce capability-value construction rules using the shared capability registry: registered capability types can only be constructed by compiler-internal code. Closure capture rules for capability values must prevent escape from the comptime context. Lifetime checks on containing structures (§5).
 
 * **MIR lowering**: provide callable comptime function bodies to the evaluator. Continue failing loudly for unsupported comptime constructs.
 
@@ -716,17 +742,17 @@ Implement comptime evaluator dispatch for `build.w` and `Action` targets through
 
 D1 lands as one PR but may be split into two review commits for clarity:
 
-* **D1a:** capability attributes, capability-method declarations, dispatch table, evaluator dispatch, and token validation.
+* **D1a:** capability registry, capability method dispatch table, evaluator dispatch, capability handle representation, and handle validation.
 * **D1b:** driver replacement of generated build/action runner execution with evaluator dispatch.
 
 Both commits land together in the same PR. The tree at HEAD passes the full verification chain after D1b; intermediate states between D1a and D1b are not required to pass independently. The split is for review readability, not for tree-state staging.
 
 Scope:
 
-* `@[capability]` and `@[capability_method]` attributes recognized by Sema.
+* Shared capability registry used by Sema and the evaluator.
 * Capability dispatch table populated at compiler startup; immutable thereafter.
 * Evaluator routes capability method calls through the dispatch table.
-* Token validation at every capability method entry.
+* Capability handle validation at every capability method entry.
 * Driver invokes `build(ctx)` via the evaluator instead of generating a runner binary.
 * Driver invokes action functions via the evaluator with `ActionCtx`.
 * Crash diagnostics include entry point, target name, source location, evaluator stack frames, and capability operation in progress.
@@ -740,7 +766,7 @@ Removed:
 
 Focused verification:
 
-* Behavior tests from pre-Phase-D pass: `behav_build_w_basic_invocation`, `behav_action_capability_filesystem`, `behav_action_capability_process`, `behav_capability_token_mismatch`, `behav_action_crash_diagnostic`, `behav_action_no_deps_isolation`, and related CLI compatibility tests not affected by D1.
+* Behavior tests from pre-Phase-D pass: `behav_build_w_basic_invocation`, `behav_action_capability_filesystem`, `behav_action_capability_process`, `behav_capability_token_mismatch`, `behav_action_crash_diagnostic`, and `behav_action_no_deps_isolation`.
 * No generated runner files in `out/tmp/` during normal builds.
 * Capability token mismatch produces structured violation error.
 * `with build :build`, `with build :fixpoint`, and `with build :test` pass.
@@ -767,7 +793,7 @@ Out of scope:
 
 Focused verification:
 
-* Behavior tests `behav_cli_compat_*.w` pass byte-for-byte.
+* BuildOptions compatibility fixtures from `docs/design/build-options.md` pass byte-for-byte.
 * `with build :build`, `with build :fixpoint`, and `with build :test` pass.
 * Direct `with build src.w` produces identical output to pre-D2.
 * Other subcommands continue to work unchanged.
@@ -934,14 +960,13 @@ Docs-only changes do not require the full verification sequence but must be comm
 
 This document depends on the following pre-Phase-D artifacts:
 
-* `docs/pre-phase-d-impl.md` — the pre-D work contract.
+* `docs/pre-phase-d-plan.md` — the pre-D work contract.
 * `docs/audits/comptime-eval-audit.md` — ComptimeEval audit findings, absorbed into §3.
 * `docs/audits/parallel-state-audit.md` — global state enumeration, absorbed into §11.
 * `docs/audits/build-script-survey.md` — current build.w inventory, referenced by D7 scope.
 * `docs/design/capability-dispatch.md` — capability mechanism design, absorbed into §4.
 * `docs/design/build-options.md` — BuildOptions and CLI design, absorbed into §6.
-* `docs/design/comptime-capability-syntax.md` — capability-bearing comptime syntax and Sema rules, reflected in §4 and §5.
-* `docs/audits/d0-baseline.md` — verification baseline captured before D1 begins.
+* `docs/audits/pre-d1-baseline.md` — verification baseline captured before D1 begins.
 
 If any audit finding contradicts the design absorbed into this document, this document is updated and re-reviewed before implementation continues. Audit findings are the ground truth; the design conforms to them.
 
@@ -949,6 +974,6 @@ If any audit finding contradicts the design absorbed into this document, this do
 
 ## 16. What This Document Is Not
 
-This document does not specify pre-Phase-D work. That work is contracted in `docs/pre-phase-d-impl.md` and is presumed complete when D1 begins.
+This document does not specify pre-Phase-D work. That work is contracted in `docs/pre-phase-d-plan.md` and is presumed complete when D1 begins.
 
 This document does not specify future phases E and beyond. It is scoped to Phase D.
