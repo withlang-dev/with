@@ -488,24 +488,33 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
 
     if sub_kind == TypeDeclKind.Enum:
         let variant_count = self.ast.get_extra(extra_start)
-        let te_start = self.type_extra.len() as i32
+        let variant_names: Vec[i32] = Vec.new()
+        let payload_counts: Vec[i32] = Vec.new()
+        let payload_tids: Vec[i32] = Vec.new()
         var epos = extra_start + 1
         for vi in 0..variant_count:
             let v_name = self.ast.get_extra(epos)
             epos = epos + 1
             let payload_count = self.ast.get_extra(epos)
             epos = epos + 1
-            self.type_extra.push(v_name)
-            self.type_extra.push(payload_count)
+            variant_names.push(v_name)
+            payload_counts.push(payload_count)
             for pi in 0..payload_count:
                 let pt_node = self.ast.get_extra(epos)
                 epos = epos + 1
                 let pt_tid = self.resolve_type_expr(pt_node)
                 if self.is_opaque_value_type(pt_tid) != 0:
                     self.emit_error("opaque types cannot be stored in enum payloads by value; use a pointer or reference", pt_node)
-                self.type_extra.push(pt_tid as i32)
-            // Register variant lookup
-            self.variant_lookup.insert(v_name, vi)
+                payload_tids.push(pt_tid as i32)
+        let te_start = self.type_extra.len() as i32
+        var payload_cursor = 0
+        for vi in 0..variant_count:
+            self.type_extra.push(variant_names.get(vi as i64))
+            let payload_count = payload_counts.get(vi as i64)
+            self.type_extra.push(payload_count)
+            for pi in 0..payload_count:
+                self.type_extra.push(payload_tids.get(payload_cursor as i64))
+                payload_cursor = payload_cursor + 1
         let tid = self.add_type(TypeKind.TY_ENUM, name, te_start, variant_count)
         self.record_named_type(name, tid as i32)
         self.type_decl_tids.insert(node, tid as i32)
@@ -528,7 +537,9 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
         let repr_type_node = self.ast.get_extra(extra_start)
         let repr_type_tid = self.resolve_type_expr(repr_type_node)
         let variant_count = self.ast.get_extra(extra_start + 1)
-        let te_start = self.type_extra.len() as i32
+        let variant_names: Vec[i32] = Vec.new()
+        let payload_counts: Vec[i32] = Vec.new()
+        let payload_tids: Vec[i32] = Vec.new()
         var epos = extra_start + 2
         var disc_vals: Vec[i32] = Vec.new()
         for vi in 0..variant_count:
@@ -538,8 +549,8 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
             epos = epos + 1
             let payload_count = self.ast.get_extra(epos)
             epos = epos + 1
-            self.type_extra.push(v_name)
-            self.type_extra.push(payload_count)
+            variant_names.push(v_name)
+            payload_counts.push(payload_count)
             // Check for duplicate discriminant values
             for prev in 0..disc_vals.len() as i32:
                 if disc_vals.get(prev as i64) == disc_value:
@@ -558,8 +569,16 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
                 let pt_tid = self.resolve_type_expr(pt_node)
                 if self.is_opaque_value_type(pt_tid) != 0:
                     self.emit_error("opaque types cannot be stored in enum payloads by value; use a pointer or reference", pt_node)
-                self.type_extra.push(pt_tid as i32)
-            self.variant_lookup.insert(v_name, vi)
+                payload_tids.push(pt_tid as i32)
+        let te_start = self.type_extra.len() as i32
+        var payload_cursor = 0
+        for vi in 0..variant_count:
+            self.type_extra.push(variant_names.get(vi as i64))
+            let payload_count = payload_counts.get(vi as i64)
+            self.type_extra.push(payload_count)
+            for pi in 0..payload_count:
+                self.type_extra.push(payload_tids.get(payload_cursor as i64))
+                payload_cursor = payload_cursor + 1
         let tid = self.add_type(TypeKind.TY_ENUM, name, te_start, variant_count)
         self.record_named_type(name, tid as i32)
         self.type_decl_tids.insert(node, tid as i32)

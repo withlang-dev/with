@@ -93,6 +93,11 @@ Completed D4 substrate work:
    tagged-union shape specified by `docs/phase-d-design.md` instead of a flat
    message struct. Focused build-w selfhost coverage exercises payload enum
    construction and payload binding during direct `build(ctx)` evaluation.
+2. Enum type collection resolves payload types before writing enum layout rows
+   into `type_extra`, so generic payload resolution cannot interleave unrelated
+   type metadata into an in-progress enum layout. Behavior coverage protects an
+   enum with a generic payload followed by a variant whose name matches its
+   payload type.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.
