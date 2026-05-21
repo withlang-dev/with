@@ -105,9 +105,9 @@ Completed D4 substrate work:
    the real `std.build` import path.
 4. `Workspace.begin_intercept`, `wait_for_message`, and `end_intercept` have
    evaluator-backed lifecycle support for synchronous `Workspace.compile()`.
-   The first delivered message is a real `CompilerMessage.Complete(BuildResult)`
-   value produced from the workspace compile result. Phase emission,
-   cooperative suspension, and `set_link_command` remain the next D4 work.
+   Intercepted compilation now delivers produced artifacts, then the terminal
+   phase marker and terminal payload. Full phase emission, cooperative
+   suspension, and `set_link_command` remain the next D4 work.
 5. Tool build/action evaluation now rejects unfinished workspace interceptions
    at the evaluator boundary. A build script that returns with an active
    intercept and no delivered terminal message fails loudly instead of
