@@ -9,7 +9,9 @@ use Parser
 use InternPool
 use Diagnostic
 use Source
+use Sema
 use Compilation
+use ComptimeEval
 use ConanClient
 use Fmt
 use Lsp
@@ -785,6 +787,12 @@ fn build_tool_runner_source(package_name: str, package_version: str, root: str, 
     "    let graph = build_graph.emit_graph()\n" ++
     "    assert(ctx.fs().write_text(\"" ++ cli_escape_with_string(graph_path) ++ "\", graph) == 0)\n"
 
+fn build_tool_eval_entry_source() -> str:
+    "use std.build\n" ++
+    "use build\n\n" ++
+    "fn __with_build_eval_entry(ctx: BuildCtx) -> Build:\n" ++
+    "    build(ctx)\n"
+
 fn generate_action_runner_source(target: BuildGraphTarget, cfg: ProjectConfig, root: str, graph_path: str, token: str) -> str:
     let _ = target
     build_tool_runner_source(cfg.package_name, cfg.package_version, root, graph_path, token)
@@ -894,42 +902,26 @@ fn run_build_action_from_build_w(root: str, cfg: ProjectConfig, target: BuildGra
 
 fn load_build_graph_from_build_w(root: str, cfg: ProjectConfig, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> BuildGraph:
     var graph = empty_build_graph()
-    let tmp_dir = resolve_join(root, "out/tmp")
-    if with_fs_mkdir_p(tmp_dir) != 0:
-        graph.error_msg = "could not create build graph temp directory: " ++ tmp_dir
-        return graph
-    let stamp = f"{with_getpid()}.{with_clock_nanos()}"
-    let runner_path = resolve_join(root, "__with_build_runner." ++ stamp ++ ".w")
-    let graph_rel_path = "out/tmp/build-graph." ++ stamp ++ ".txt"
-    let graph_path = resolve_join(root, graph_rel_path)
-    let runner_bin = resolve_join(tmp_dir, "build-runner." ++ stamp)
-    let capability_token = "with-tool:" ++ stamp
-    let runner_source = build_tool_runner_source(cfg.package_name, cfg.package_version, root, graph_rel_path, capability_token)
-    if with_fs_write_file(runner_path, runner_source) != 0:
-        graph.error_msg = "could not write generated build.w runner"
-        return graph
+    let entry_path = resolve_join(root, "__with_build_eval.w")
     var comp = Compilation.init()
     comp.configure(opt_level, no_std, alloc_mode)
     comp.set_prelude_mode(prelude_mode)
     comp.set_debug_info(debug_info)
-    comp.set_tool_mode_entry_path(runner_path)
-    let built_runner = comp.build_binary_to_path(runner_path, runner_bin)
-    let _remove_runner_source = with_fs_remove_file(runner_path)
-    if built_runner == "":
-        graph.error_msg = "build.w runner compilation failed"
+    comp.set_tool_mode_entry_path(entry_path)
+    let pool = comp.compile_source_text_with_config(entry_path, build_tool_eval_entry_source(), cfg)
+    if pool.decl_count() == 0 or comp.has_errors():
+        graph.error_msg = "build.w evaluation wrapper compilation failed"
         return graph
-    let old_capability_token = with_getenv_str("WITH_TOOL_CAPABILITY_TOKEN")
-    let _set_capability_token = with_setenv_str("WITH_TOOL_CAPABILITY_TOKEN", capability_token)
-    let rc = with_exec_binary(built_runner)
-    let _restore_capability_token = with_setenv_str("WITH_TOOL_CAPABILITY_TOKEN", old_capability_token)
-    cleanup_binary_artifacts(built_runner)
-    if rc != 0:
-        let _remove_graph_on_error = with_fs_remove_file(graph_path)
-        graph.error_msg = f"build.w execution failed with exit code {rc}"
+    var sema = comp.zcu.last_sema
+    let entry_sym = sema.pool_lookup_symbol("__with_build_eval_entry")
+    if entry_sym == 0:
+        graph.error_msg = "build.w evaluation entry was not typechecked"
         return graph
-    let graph_text = with_fs_read_file(graph_path)
-    let _remove_graph = with_fs_remove_file(graph_path)
-    parse_build_graph(graph_text)
+    let eval_result = comptime_eval_tool_build_result(&raw mut sema as *mut Sema, sema.ast, sema.pool, entry_sym, cfg.package_name, cfg.package_version, root)
+    graph = materialize_build_graph_from_comptime(sema, eval_result.value, eval_result.extras)
+    if graph.error_msg.len() > 0 and eval_result.error_msg.len() > 0:
+        graph.error_msg = eval_result.error_msg
+    graph
 
 fn build_graph_find_build_root(start_dir: str) -> str:
     var cur = if start_dir.len() > 0: start_dir else: "."
