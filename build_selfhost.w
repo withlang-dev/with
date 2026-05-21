@@ -1941,6 +1941,13 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
         "    let result = ws.compile()\n" ++
         "    if result.rc != 0:\n" ++
         "        ctx.diagnostics().error(\"workspace message compile failed\")\n" ++
+        "    let phase_envelope = ws.wait_for_message()\n" ++
+        "    var saw_phase = false\n" ++
+        "    match phase_envelope.message:\n" ++
+        "        CompilerMessage.Phase(phase) => saw_phase = phase == CompilerPhase.complete\n" ++
+        "        _ => saw_phase = false\n" ++
+        "    if not saw_phase:\n" ++
+        "        ctx.diagnostics().error(\"workspace complete phase message missing\")\n" ++
         "    let envelope = ws.wait_for_message()\n" ++
         "    var saw_complete = false\n" ++
         "    match envelope.message:\n" ++
