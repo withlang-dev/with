@@ -890,20 +890,19 @@ pub fn run_emit_c_smoke_action(ctx: ActionCtx) -> i32:
     if not fs.exists(source_input):
         return bs_fail(ctx, "missing source: " ++ source_input)
     let compiler_path = bs_abs(root, compiler_input)
-    let source_path = bs_abs(root, source_input)
     let c_path = bs_join(output_dir, "hello.c")
     let bin_path = bs_join(output_dir, "hello")
 
-    var emit_args: Vec[str] = Vec.new()
-    emit_args |> push("build")
-    emit_args |> push(source_path)
-    emit_args |> push("--emit-c")
-    emit_args |> push("--no-prelude")
-    emit_args |> push("-o")
-    emit_args |> push(bs_abs(root, c_path))
-    let emit_result = bs_run_cli_capture(ctx, compiler_path, "emit-c-smoke-emit", emit_args, 120000)
+    let workspace = ctx.create_workspace("emit-c-smoke")
+    workspace.add_file(source_input)
+    var options = workspace.options()
+    options.output_kind = BuildOutputKind.C
+    options.output_path = c_path
+    options.prelude_mode = PreludeMode.None
+    workspace.set_options(options)
+    let emit_result = workspace.compile()
     if emit_result.rc != 0:
-        return bs_fail(ctx, f"emit-c failed with exit code {emit_result.rc}: " ++ emit_result.stderr)
+        return bs_fail(ctx, f"emit-c workspace compile failed with exit code {emit_result.rc}")
     if not fs.exists(c_path):
         return bs_fail(ctx, "emit-c did not produce " ++ c_path)
 

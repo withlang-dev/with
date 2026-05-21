@@ -329,6 +329,18 @@ pub fn BuildCtx.current_workspace(self: &Self) -> Workspace:
     exit(1)
     Workspace { self.token, -1 }
 
+pub fn ActionCtx.create_workspace(self: &Self, name: str) -> Workspace:
+    tool_capability_require(self.token, "Workspace")
+    with_eprint("error: ActionCtx.create_workspace requires compiler driver comptime evaluation\n")
+    exit(1)
+    Workspace { self.token, -1 }
+
+pub fn ActionCtx.current_workspace(self: &Self) -> Workspace:
+    tool_capability_require(self.token, "Workspace")
+    with_eprint("error: ActionCtx.current_workspace requires compiler driver comptime evaluation\n")
+    exit(1)
+    Workspace { self.token, -1 }
+
 pub fn Workspace.name(self: &Self) -> str:
     tool_capability_require(self.token, "Workspace")
     with_eprint("error: Workspace.name requires compiler driver comptime evaluation\n")

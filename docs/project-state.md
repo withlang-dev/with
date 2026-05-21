@@ -74,12 +74,13 @@ Completed D3 work:
 6. Focused selfhost coverage proves workspace file compilation, workspace
    source-string compilation, BuildResult artifact construction, and the
    `current_workspace()` failure diagnostic before a workspace exists.
+7. `ActionCtx` can mint workspaces for action-local compilation, and the fast
+   emit-C smoke action now emits `test/hello.w` to C through
+   `Workspace.compile()` instead of spawning `with build --emit-c`.
 
 Remaining D3 work:
 
 1. Workspace lifetime constraints tied to `BuildCtx`.
-2. Port one existing action from `ProcessRunner.run_capture(["with", ...])`
-   to `workspace.compile()`.
 
 Do not start D4-D8 until D3 lands and passes the same build/fixpoint/test
 baseline.
