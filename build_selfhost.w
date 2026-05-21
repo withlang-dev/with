@@ -1955,6 +1955,13 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
         "        _ => saw_complete = false\n" ++
         "    if not saw_complete:\n" ++
         "        ctx.diagnostics().error(\"workspace complete message missing\")\n" ++
+        "    let closed_envelope = ws.wait_for_message()\n" ++
+        "    var saw_closed = false\n" ++
+        "    match closed_envelope.message:\n" ++
+        "        CompilerMessage.Error(code, message, _) => saw_closed = code == 1 and message == \"Workspace message queue is closed\"\n" ++
+        "        _ => saw_closed = false\n" ++
+        "    if not saw_closed:\n" ++
+        "        ctx.diagnostics().error(\"workspace closed queue message missing\")\n" ++
         "    ws.end_intercept()\n" ++
         "    ctx.new_build().command(\"run-message-complete\", \"out/bin/message-complete\")\n"
     rc = bs_build_w_write_fixture(ctx, bs_join(message_dir, "build.w"), message_build, ctx.target_name(), "workspace message build.w")

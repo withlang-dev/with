@@ -118,6 +118,10 @@ Completed D4 substrate work:
 7. `Workspace.end_intercept()` now rejects attempts to end an interception
    while terminal messages are still unread, so build scripts cannot hide an
    abandoned message queue by closing the intercept before returning.
+8. The build-w selfhost workspace message fixture covers closed-queue
+   semantics: after `Complete(BuildResult)` is consumed, the next
+   `wait_for_message()` returns `CompilerMessage.Error(1, "Workspace message
+   queue is closed", unknown_span)`.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.
