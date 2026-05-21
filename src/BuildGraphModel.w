@@ -12,6 +12,7 @@ pub type BuildGraphTarget {
     defines: Vec[str],
     inputs: Vec[str],
     extra_outputs: Vec[str],
+    write_scopes: Vec[str],
     deps: Vec[str],
     args: Vec[str],
     action_fn: i32,
@@ -69,6 +70,7 @@ fn build_graph_target_new(kind: i32, name: str, entry: str, target_kind: i32, op
         defines: Vec.new(),
         inputs: Vec.new(),
         extra_outputs: Vec.new(),
+        write_scopes: Vec.new(),
         deps: Vec.new(),
         args: Vec.new(),
         action_fn: 0,
@@ -162,6 +164,8 @@ pub fn build_graph_emit(graph: BuildGraph) -> str:
             out = out ++ "input\t" ++ f"{ti}\t" ++ build_graph_escape(target.inputs.get(ini as i64)) ++ "\n"
         for outi in 0..target.extra_outputs.len() as i32:
             out = out ++ "extra_output\t" ++ f"{ti}\t" ++ build_graph_escape(target.extra_outputs.get(outi as i64)) ++ "\n"
+        for wsi in 0..target.write_scopes.len() as i32:
+            out = out ++ "write_scope\t" ++ f"{ti}\t" ++ build_graph_escape(target.write_scopes.get(wsi as i64)) ++ "\n"
         for depi in 0..target.deps.len() as i32:
             out = out ++ "dep\t" ++ f"{ti}\t" ++ build_graph_escape(target.deps.get(depi as i64)) ++ "\n"
         for ai in 0..target.args.len() as i32:
@@ -265,6 +269,11 @@ pub fn parse_build_graph(text: str) -> BuildGraph:
                 graph.error_msg = "invalid extra_output line in build graph"
                 return graph
             current.extra_outputs.push(fields.get(2))
+        else if tag == "write_scope":
+            if fields.len() != 3 or not has_current:
+                graph.error_msg = "invalid write_scope line in build graph"
+                return graph
+            current.write_scopes.push(fields.get(2))
         else if tag == "dep":
             if fields.len() != 3 or not has_current:
                 graph.error_msg = "invalid dep line in build graph"

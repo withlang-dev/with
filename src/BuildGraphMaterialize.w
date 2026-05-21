@@ -72,6 +72,7 @@ fn build_graph_materialized_target(kind: i32, name: str, entry: str, target_kind
         defines: Vec.new(),
         inputs: Vec.new(),
         extra_outputs: Vec.new(),
+        write_scopes: Vec.new(),
         deps: Vec.new(),
         args: Vec.new(),
         action_fn: 0,
@@ -123,6 +124,7 @@ fn BuildGraphMaterializer.materialize_target(self: BuildGraphMaterializer, value
     target.defines = self.string_vec_field(value, "defines")
     target.inputs = self.string_vec_field(value, "inputs")
     target.extra_outputs = self.string_vec_field(value, "extra_outputs")
+    target.write_scopes = self.string_vec_field(value, "write_scopes")
     target.deps = self.string_vec_field(value, "deps")
     target.args = self.string_vec_field(value, "args")
     let action = self.field_value(value, "action")
