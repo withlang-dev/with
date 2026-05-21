@@ -1941,6 +1941,13 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
         "    let result = ws.compile()\n" ++
         "    if result.rc != 0:\n" ++
         "        ctx.diagnostics().error(\"workspace message compile failed\")\n" ++
+        "    let artifact_envelope = ws.wait_for_message()\n" ++
+        "    var saw_artifact = false\n" ++
+        "    match artifact_envelope.message:\n" ++
+        "        CompilerMessage.Artifact(artifact) => saw_artifact = artifact.kind == ArtifactKind.executable and artifact.path == \"out/bin/message-complete\"\n" ++
+        "        _ => saw_artifact = false\n" ++
+        "    if not saw_artifact:\n" ++
+        "        ctx.diagnostics().error(\"workspace artifact message missing\")\n" ++
         "    let phase_envelope = ws.wait_for_message()\n" ++
         "    var saw_phase = false\n" ++
         "    match phase_envelope.message:\n" ++

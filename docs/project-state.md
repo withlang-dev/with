@@ -122,6 +122,9 @@ Completed D4 substrate work:
    semantics: after `Complete(BuildResult)` is consumed, the next
    `wait_for_message()` returns `CompilerMessage.Error(1, "Workspace message
    queue is closed", unknown_span)`.
+9. Successful intercepted `Workspace.compile()` calls now queue one
+   `CompilerMessage.Artifact(Artifact)` for each produced build artifact
+   before the terminal `Phase(complete)` / `Complete(BuildResult)` pair.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.
