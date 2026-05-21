@@ -1925,6 +1925,39 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
     rc = bs_expect_file_contains(ctx, bs_join(string_dir, "out/command/run-workspace-string/stdout.txt"), "workspace string", "build_w_workspace_string")
     if rc != 0: return rc
 
+    let enum_dir = bs_join(base_dir, "comptime_payload_enum")
+    rc = bs_write_project_manifest(ctx, enum_dir, "workspaceenum")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(enum_dir, "src/main.w"), "fn main:\n    print(\"workspace enum\")\n", ctx.target_name(), "workspace enum source")
+    if rc != 0: return rc
+    let enum_build =
+        "use std.build\n\n" ++
+        "enum LocalMessage:\n" ++
+        "    Phase(i32)\n" ++
+        "    Complete(str)\n\n" ++
+        "comptime fn local_message -> LocalMessage:\n" ++
+        "    Phase(7)\n\n" ++
+        "comptime with BuildCtx as ctx:\n" ++
+        "pub fn build -> Build:\n" ++
+        "    var matched = false\n" ++
+        "    match local_message():\n" ++
+        "        Phase(n) => matched = n == 7\n" ++
+        "        Complete(_) => matched = false\n" ++
+        "    if not matched:\n" ++
+        "        ctx.diagnostics().error(\"payload enum comptime match failed\")\n" ++
+        "    ctx.new_build().executable(\"workspace-enum\", \"src/main.w\")\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(enum_dir, "build.w"), enum_build, ctx.target_name(), "workspace enum build.w")
+    if rc != 0: return rc
+    let enum_result = bs_build_w_expect_success(ctx, compiler_path, enum_dir, "build-w-comptime-payload-enum", bs_blob_to_args(bs_argv_append("", "build")))
+    if enum_result.rc != 0: return enum_result.rc
+    let enum_bin = bs_join(enum_dir, "out/bin/workspace-enum")
+    if not ctx.fs().exists(enum_bin):
+        return bs_fail(ctx, "missing workspace enum output")
+    let enum_run = bs_run_binary_capture(ctx, enum_bin, "build-w-comptime-payload-enum-run", 120000)
+    if enum_run.rc != 0: return enum_run.rc
+    rc = bs_assert_contains(ctx, enum_run.stdout, "workspace enum", "build_w_comptime_payload_enum")
+    if rc != 0: return rc
+
     let current_dir = bs_join(base_dir, "current_workspace_before_create")
     rc = bs_write_project_manifest(ctx, current_dir, "workspacecurrent")
     if rc != 0: return rc

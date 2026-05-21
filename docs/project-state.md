@@ -13,7 +13,7 @@ conversation context after compaction.
 
 Phase C extraction work is complete. Pre-Phase-D preparation is complete
 through P9, including the follow-up source-location diagnostic gap. Phase D D1,
-D2, and D3 are complete. Next work starts at D4.
+D2, and D3 are complete. Phase D D4 is in progress.
 
 Completed D1 sub-slices:
 
@@ -86,6 +86,14 @@ Remaining D3 work: none.
 D4 may start after this D3 checkpoint lands and passes the same
 build/fixpoint/test baseline.
 
+Completed D4 substrate work:
+
+1. The comptime evaluator can represent payload enum values and match on
+   payload enum patterns. This is required before `CompilerMessage` can use the
+   tagged-union shape specified by `docs/phase-d-design.md` instead of a flat
+   message struct. Focused build-w selfhost coverage exercises payload enum
+   construction and payload binding during direct `build(ctx)` evaluation.
+
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.
 `Build.emit_graph()` remains a debug/export compatibility facility and must not
@@ -105,7 +113,7 @@ The original P9 pre-D1 baseline is recorded in
 containing this project-state update:
 
 ```text
-Implement workspace compile capability skeleton
+Support payload enum values in comptime evaluation
 ```
 
 Commands passed:
@@ -149,8 +157,10 @@ default `:test` target includes the fast emit-C smoke.
 
 Recent Phase D/pre-D commits:
 
-- current checkpoint: Implement workspace compile capability skeleton.
-- previous checkpoint: Implement capability-bearing comptime build entries.
+- current checkpoint: Support payload enum values in comptime evaluation.
+- previous checkpoint: Make Workspace an ephemeral capability.
+- previous checkpoint: Use workspaces for emit-C smoke compilation.
+- previous checkpoint: Implement workspace compile capability skeleton.
 - `5e5674a` Unify build CLI parsing with BuildOptions.
 - `2cba39a` Execute build actions in-process.
 - `f5cc0c5` Evaluate build.w graphs in-process.

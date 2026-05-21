@@ -1357,6 +1357,10 @@ fn ComptimeEvaluator.eval_pipeline(self: ComptimeEvaluator, node: i32) -> Compti
 fn ComptimeEvaluator.eval_static_type_method_call(self: ComptimeEvaluator, recv_type: i32, field: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
     let layout_sema = self.sema
     let method = self.pool.resolve(field)
+    let resolved_recv = self.sema.resolve_alias(recv_type)
+    if self.sema.enum_has_variant(resolved_recv as i32, field) != 0:
+        let variant_sym = self.sema.qualified_enum_variant_sym(resolved_recv as i32, field)
+        return self.eval_variant_constructor_call(variant_sym, extra_start, arg_count, node)
     if method == "name":
         if arg_count != 0:
             return self.fail(node, "type.name() takes no arguments")
@@ -1401,6 +1405,25 @@ fn ComptimeEvaluator.eval_static_type_method_call(self: ComptimeEvaluator, recv_
             return self.fail(node, "type.variants() requires an enum type")
         return self.eval_type_variants_array(recv_type)
     self.fail(node, "type method '" ++ method ++ "' is not comptime-evaluable yet")
+
+fn ComptimeEvaluator.eval_variant_constructor_call(self: ComptimeEvaluator, variant_sym: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
+    var resolved_variant = variant_sym
+    if self.sema.comp_resolved.contains(node):
+        resolved_variant = self.sema.comp_resolved.get(node).unwrap()
+    if not self.sema.variant_lookup.contains(resolved_variant):
+        return self.fail(node, "enum variant constructor is not resolved for comptime")
+    var enum_type = self.node_type_or(node, 0)
+    if enum_type == 0 and self.sema.variant_type_ids.contains(resolved_variant):
+        enum_type = self.sema.variant_type_ids.get(resolved_variant).unwrap()
+    if enum_type == 0:
+        return self.fail(node, "enum variant constructor type is unknown in comptime")
+    let payload_start = self.extra_values.len() as i32
+    for i in 0..arg_count:
+        let arg_signal = self.eval_expr(self.ast.get_extra(extra_start + i))
+        if arg_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return arg_signal
+        self.extra_values.push(arg_signal.value)
+    comptime_control_value(comptime_value_enum(enum_type, resolved_variant, payload_start, arg_count))
 
 fn ComptimeEvaluator.capability_expect_arg_count(self: ComptimeEvaluator, arg_count: i32, expected: i32, method: str, node: i32) -> bool:
     if arg_count == expected:
@@ -2783,6 +2806,28 @@ fn ComptimeEvaluator.match_pattern(self: ComptimeEvaluator, pat: i32, value: Com
             if self.match_pattern(elem_pat, elem_value, node) == 0:
                 return 0
         return 1
+    if kind == NodeKind.NK_PAT_VARIANT or kind == NodeKind.NK_PAT_ENUM_SHORTHAND:
+        var variant_sym = self.ast.get_data0(pat)
+        if self.sema.comp_resolved.contains(pat):
+            variant_sym = self.sema.comp_resolved.get(pat).unwrap()
+        if value.kind == ComptimeValueKind.CV_ENUM:
+            if value.data0 as i32 != variant_sym:
+                return 0
+            let bind_count = self.ast.get_data2(pat)
+            if bind_count != value.extra_count:
+                return 0
+            let extra_start = self.ast.get_data1(pat)
+            for i in 0..bind_count:
+                let inner_pat = self.ast.get_extra(extra_start + i)
+                let inner_value = self.extra_values.get((value.extra_start + i) as i64)
+                if self.match_pattern(inner_pat, inner_value, node) == 0:
+                    return 0
+            return 1
+        if comptime_value_is_intlike(value) != 0:
+            let variant_value = self.eval_disc_variant_sym(variant_sym, pat)
+            if variant_value.kind == ComptimeControlKind.CTL_VALUE and comptime_value_is_intlike(variant_value.value) != 0:
+                return if comptime_value_intlike(value) == comptime_value_intlike(variant_value.value): 1 else: 0
+        return 0
     if self.require_success != 0:
         let _ = self.fail(pat, "pattern is not comptime-evaluable yet")
     0
@@ -2996,6 +3041,8 @@ fn ComptimeEvaluator.eval_call(self: ComptimeEvaluator, node: i32) -> ComptimeCo
         if callee_value.kind == ComptimeValueKind.CV_FN:
             return self.eval_fn_value_call(callee_value, self.ast.get_data1(node), arg_count, node)
         return self.fail(node, "callee is not a comptime function value")
+    if self.sema.variant_lookup.contains(fn_sym):
+        return self.eval_variant_constructor_call(fn_sym, self.ast.get_data1(node), arg_count, node)
     self.eval_fn_symbol_call(fn_sym, self.ast.get_data1(node), arg_count, node)
 
 fn ComptimeEvaluator.eval_fn_value_call(self: ComptimeEvaluator, fn_value: ComptimeValue, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
