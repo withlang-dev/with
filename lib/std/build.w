@@ -65,6 +65,69 @@ pub enum OptimizeMode: i32:
     debug = 0
     release = 1
 
+pub enum BuildOutputKind: i32:
+    Binary = 0
+    Object = 1
+    C = 2
+    LlvmIr = 3
+    Archive = 4
+
+pub enum PreludeMode: i32:
+    Full = 0
+    Core = 1
+    None = 2
+
+pub type BuildOptions {
+    source_path: str,
+    output_path: str,
+    output_kind: BuildOutputKind,
+    opt_level: i32,
+    debug_info: bool,
+    no_std: bool,
+    alloc_mode: bool,
+    prelude_mode: PreludeMode,
+    deterministic: bool,
+    target: BuildTarget,
+    include_paths: Vec[str],
+    defines: Vec[str],
+    link_libs: Vec[str],
+    compiler_hooks_enabled: bool,
+}
+
+pub type TestOptions {
+    filter: str,
+    verbose: bool,
+    quiet: bool,
+}
+
+pub type BuildGraphOptions {
+    selected_target: str,
+    graph_only: bool,
+    dry_run: bool,
+    no_deps: bool,
+}
+
+pub type MigrateOptions {
+    source_path: str,
+    output_path: str,
+    include_paths: Vec[str],
+    forced_includes: Vec[str],
+    defines: Vec[str],
+    exclude_basenames: Vec[str],
+    check_mode: bool,
+    diff_mode: bool,
+    stats_mode: bool,
+    no_c_export: bool,
+    c_export_functions: bool,
+    convert_goto_to_structured: bool,
+    block_style: i32,
+    width_slice: i32,
+    shared_defs: str,
+    migrate_one: str,
+    shared_fragment: str,
+    ir_roundtrip: bool,
+}
+
 pub type Package {
     name: str,
     version: str,

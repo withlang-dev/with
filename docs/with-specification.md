@@ -8023,6 +8023,76 @@ perform I/O, allocate heap memory that persists to runtime, or call
 FFI functions. The result must be a value that can be embedded in the
 binary as a constant.
 
+### 17.1a Capability-Bearing Comptime
+
+Pure comptime is deterministic and effect-free. Build orchestration and
+compiler-driver tools use the same comptime evaluator, but with explicit
+driver-minted capabilities. A capability-bearing comptime entry point
+declares the capabilities it requires with a `comptime with` clause.
+
+The canonical form names both the capability type and the local binding:
+
+```with
+comptime with BuildCtx as ctx:
+pub fn build -> Build:
+    var out = ctx.new_build()
+    var app = target_new(.Executable, "app", "src/main.w")
+    out = out.add_target(app)
+    out.default("app")
+```
+
+The shorthand omits `as name` only when the capability type has a
+standard default binding:
+
+```with
+comptime with BuildCtx:
+pub fn build -> Build:
+    ctx.new_build()
+```
+
+This desugars to:
+
+```with
+comptime with BuildCtx as ctx:
+```
+
+Default bindings are part of the standard library capability contract.
+Initial defaults:
+
+| Capability | Default binding |
+|------------|-----------------|
+| `BuildCtx` | `ctx` |
+| `ActionCtx` | `ctx` |
+| `ToolFs` | `fs` |
+| `ProcessRunner` | `proc` |
+| `Diagnostics` | `diag` |
+| `SourceEmitter` | `emit` |
+| `ProjectInfo` | `project` |
+| `Workspace` | `workspace` |
+
+Multiple capabilities compose with commas:
+
+```with
+comptime with ToolFs as fs, ProcessRunner as proc:
+fn run_codegen(input: str, output: str) -> i32:
+    let result = proc.run_capture(["codegen", input, output], "out/tmp/codegen.out", "out/tmp/codegen.err", 30000)
+    if result.rc != 0:
+        return result.rc
+    fs.read_text(output).len() as i32
+```
+
+If two capabilities would use the same default binding in one `with`
+clause, the shorthand is ambiguous and the program must use explicit
+`as` bindings. Reusing a local capability binding name in the same
+`with` clause is an error.
+
+Pure comptime cannot forge or construct capability values. Only the
+compiler driver and explicitly privileged test harnesses can mint
+capabilities. A function that requires capabilities can be invoked only
+from a comptime context that already has those capabilities in scope or
+from a driver-discovered entry point such as `build.w` or an action
+target.
+
 ### 17.2 Compile-Time Type Introspection
 
 Comptime code can inspect type metadata by calling methods on type
@@ -8443,7 +8513,8 @@ default recipe:
 ```
 use std.build
 
-pub fn build(ctx: BuildCtx) -> Build:
+comptime with BuildCtx as ctx:
+pub fn build -> Build:
     let info = ctx.project_info()
     ctx.new_build().executable(info.package_name(), "src/main.w")
 ```
@@ -8455,13 +8526,13 @@ The standard build graph API lives in `std.build`. It defines
 `Build.generated_source`, `Target.optimize`, `Target.link_system_lib`,
 `Target.include_path`, and `Target.define`.
 
-`build.w` runs in tool-mode compiler-driver context, not ordinary pure
-`comptime`. Tool-mode code may perform build effects through
-`std.build` APIs supplied by the driver.
+`build.w` runs as capability-bearing comptime, not ordinary pure
+`comptime`. Build code may perform effects only through `std.build`
+capabilities supplied by the driver.
 
-The initial tool-mode driver executes `build.w`, passes a `BuildCtx`
-capability to `build(ctx)`, consumes the returned build graph, and builds
-executable, library, and test targets. Per-target
+The compiler driver discovers `build.w`, evaluates the `build` entry
+point with a driver-minted `BuildCtx`, consumes the returned typed build
+graph, and builds executable, library, and test targets. Per-target
 `link_system_lib`, `include_path`, and `define` settings are honored by
 the corresponding compile/test path. `Build.generated_source(path,
 contents)` declares a generated source file to write before target
