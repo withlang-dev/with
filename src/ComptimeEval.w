@@ -86,6 +86,11 @@ type ComptimeWorkspaceRecord {
     string_sources: Vec[str],
     options: ComptimeValue,
     migrate_options: ComptimeValue,
+    intercept_active: i32,
+    intercept_terminal: i32,
+    generation: i32,
+    messages: Vec[ComptimeValue],
+    message_cursor: i32,
 }
 
 type ComptimeEvaluator {
@@ -642,6 +647,11 @@ fn ComptimeEvaluator.new_workspace_record(self: ComptimeEvaluator, name: str, no
         string_sources: Vec.new(),
         options: self.default_build_options_value(node),
         migrate_options: self.default_migrate_options_value(node),
+        intercept_active: 0,
+        intercept_terminal: 0,
+        generation: 0,
+        messages: Vec.new(),
+        message_cursor: 0,
     }
 
 fn ComptimeEvaluator.store_workspace_record(self: ComptimeEvaluator, workspace_id: i32, record: ComptimeWorkspaceRecord):
@@ -1669,6 +1679,54 @@ fn ComptimeEvaluator.workspace_build_result_value(self: ComptimeEvaluator, works
     self.extra_values.push(diagnostic_vec)
     comptime_value_struct(result_type, result_start, 5)
 
+fn ComptimeEvaluator.enum_payload_value(self: ComptimeEvaluator, enum_name: str, variant_name: str, payloads: Vec[ComptimeValue], node: i32) -> ComptimeValue:
+    let enum_type = self.named_type_id(enum_name, node)
+    if enum_type == 0:
+        return comptime_value_invalid()
+    let variant_sym = self.pool.intern(enum_name ++ "." ++ variant_name) as i32
+    if not self.sema.variant_lookup.contains(variant_sym):
+        let _ = self.fail(node, "missing enum variant '" ++ enum_name ++ "." ++ variant_name ++ "'")
+        return comptime_value_invalid()
+    let payload_start = self.extra_values.len() as i32
+    for i in 0..payloads.len() as i32:
+        self.extra_values.push(payloads.get(i as i64))
+    comptime_value_enum(enum_type, variant_sym, payload_start, payloads.len() as i32)
+
+fn ComptimeEvaluator.compiler_message_value(self: ComptimeEvaluator, variant_name: str, payloads: Vec[ComptimeValue], node: i32) -> ComptimeValue:
+    self.enum_payload_value("CompilerMessage", variant_name, payloads, node)
+
+fn ComptimeEvaluator.compiler_message_complete_value(self: ComptimeEvaluator, result: ComptimeValue, node: i32) -> ComptimeValue:
+    let payloads: Vec[ComptimeValue] = Vec.new()
+    payloads.push(result)
+    self.compiler_message_value("Complete", payloads, node)
+
+fn ComptimeEvaluator.compiler_message_error_value(self: ComptimeEvaluator, code: i32, message: str, node: i32) -> ComptimeValue:
+    let span_type = self.named_type_id("SourceSpan", node)
+    if span_type == 0:
+        return comptime_value_invalid()
+    let span_start = self.extra_values.len() as i32
+    self.extra_values.push(comptime_value_str(""))
+    self.extra_values.push(comptime_value_int(self.sema.ty_i32 as i32, -1))
+    self.extra_values.push(comptime_value_int(self.sema.ty_i32 as i32, -1))
+    self.extra_values.push(comptime_value_int(self.sema.ty_i32 as i32, -1))
+    self.extra_values.push(comptime_value_int(self.sema.ty_i32 as i32, -1))
+    let span = comptime_value_struct(span_type, span_start, 5)
+    let payloads: Vec[ComptimeValue] = Vec.new()
+    payloads.push(comptime_value_int(self.sema.ty_i32 as i32, code as i64))
+    payloads.push(comptime_value_str(message))
+    payloads.push(span)
+    self.compiler_message_value("Error", payloads, node)
+
+fn ComptimeEvaluator.compiler_message_envelope_value(self: ComptimeEvaluator, workspace_name: str, generation: i32, message: ComptimeValue, node: i32) -> ComptimeValue:
+    let envelope_type = self.named_type_id("CompilerMessageEnvelope", node)
+    if envelope_type == 0:
+        return comptime_value_invalid()
+    let start = self.extra_values.len() as i32
+    self.extra_values.push(comptime_value_str(workspace_name))
+    self.extra_values.push(comptime_value_int(self.sema.ty_i32 as i32, generation as i64))
+    self.extra_values.push(message)
+    comptime_value_struct(envelope_type, start, 3)
+
 fn ComptimeEvaluator.compile_workspace_record(self: ComptimeEvaluator, record: ComptimeWorkspaceRecord, capability: ComptimeCapabilityRecord, node: i32) -> ComptimeValue:
     let options = record.options
     let option_source = self.workspace_str_option(options, "source_path")
@@ -2210,12 +2268,67 @@ fn ComptimeEvaluator.eval_workspace_capability_method(self: ComptimeEvaluator, r
         record.migrate_options = self.extra_values.get(args_signal.value.extra_start)
         self.store_workspace_record(workspace_id, record)
         return comptime_control_value(comptime_value_void(0))
+    if method == "begin_intercept":
+        if not self.capability_expect_arg_count(arg_count, 0, method, node):
+            return comptime_control_error()
+        if record.intercept_active != 0:
+            return self.fail(node, "Workspace.begin_intercept called while interception is already active")
+        record.intercept_active = 1
+        record.intercept_terminal = 0
+        record.generation = record.generation + 1
+        if record.generation <= 0:
+            record.generation = 1
+        record.messages = Vec.new()
+        record.message_cursor = 0
+        self.store_workspace_record(workspace_id, record)
+        return comptime_control_value(comptime_value_void(0))
+    if method == "wait_for_message":
+        if not self.capability_expect_arg_count(arg_count, 0, method, node):
+            return comptime_control_error()
+        if record.intercept_active == 0:
+            return self.fail(node, "Workspace.wait_for_message called without active interception")
+        if record.message_cursor < record.messages.len() as i32:
+            let message = record.messages.get(record.message_cursor as i64)
+            record.message_cursor = record.message_cursor + 1
+            self.store_workspace_record(workspace_id, record)
+            let envelope = self.compiler_message_envelope_value(record.name, record.generation, message, node)
+            if envelope.kind == ComptimeValueKind.CV_INVALID:
+                return comptime_control_error()
+            return comptime_control_value(envelope)
+        if record.intercept_terminal != 0:
+            let message = self.compiler_message_error_value(1, "Workspace message queue is closed", node)
+            if message.kind == ComptimeValueKind.CV_INVALID:
+                return comptime_control_error()
+            let envelope = self.compiler_message_envelope_value(record.name, record.generation, message, node)
+            if envelope.kind == ComptimeValueKind.CV_INVALID:
+                return comptime_control_error()
+            return comptime_control_value(envelope)
+        return self.fail(node, "Workspace.wait_for_message requires a pending message; cooperative suspension is not implemented yet")
+    if method == "end_intercept":
+        if not self.capability_expect_arg_count(arg_count, 0, method, node):
+            return comptime_control_error()
+        if record.intercept_active == 0:
+            return self.fail(node, "Workspace.end_intercept called without active interception")
+        record.intercept_active = 0
+        self.store_workspace_record(workspace_id, record)
+        return comptime_control_value(comptime_value_void(0))
+    if method == "set_link_command":
+        if not self.capability_expect_arg_count(arg_count, 1, method, node):
+            return comptime_control_error()
+        return self.fail(node, "Workspace.set_link_command requires PRE_LINK message support")
     if method == "compile":
         if not self.capability_expect_arg_count(arg_count, 0, method, node):
             return comptime_control_error()
         let result = self.compile_workspace_record(record, capability, node)
         if result.kind == ComptimeValueKind.CV_INVALID:
             return comptime_control_error()
+        if record.intercept_active != 0:
+            let message = self.compiler_message_complete_value(result, node)
+            if message.kind == ComptimeValueKind.CV_INVALID:
+                return comptime_control_error()
+            record.messages.push(message)
+            record.intercept_terminal = 1
+            self.store_workspace_record(workspace_id, record)
         return comptime_control_value(result)
     self.fail(node, "Workspace capability method '" ++ method ++ "' is not implemented yet")
 

@@ -1925,6 +1925,38 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
     rc = bs_expect_file_contains(ctx, bs_join(string_dir, "out/command/run-workspace-string/stdout.txt"), "workspace string", "build_w_workspace_string")
     if rc != 0: return rc
 
+    let message_dir = bs_join(base_dir, "workspace_message_complete")
+    rc = bs_write_project_manifest(ctx, message_dir, "workspacemessage")
+    if rc != 0: return rc
+    let message_build =
+        "use std.build\n\n" ++
+        "comptime with BuildCtx as ctx:\n" ++
+        "pub fn build -> Build:\n" ++
+        "    let ws = ctx.create_workspace(\"message-complete\")\n" ++
+        "    ws.add_string(\"src/message_complete.w\", \"fn main:\\n    print(\\\"workspace message\\\")\\n\")\n" ++
+        "    var opts = ws.options()\n" ++
+        "    opts.output_path = \"out/bin/message-complete\"\n" ++
+        "    ws.set_options(opts)\n" ++
+        "    ws.begin_intercept()\n" ++
+        "    let result = ws.compile()\n" ++
+        "    if result.rc != 0:\n" ++
+        "        ctx.diagnostics().error(\"workspace message compile failed\")\n" ++
+        "    let envelope = ws.wait_for_message()\n" ++
+        "    var saw_complete = false\n" ++
+        "    match envelope.message:\n" ++
+        "        CompilerMessage.Complete(done) => saw_complete = done.rc == 0 and done.workspace_name == \"message-complete\"\n" ++
+        "        _ => saw_complete = false\n" ++
+        "    if not saw_complete:\n" ++
+        "        ctx.diagnostics().error(\"workspace complete message missing\")\n" ++
+        "    ws.end_intercept()\n" ++
+        "    ctx.new_build().command(\"run-message-complete\", \"out/bin/message-complete\")\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(message_dir, "build.w"), message_build, ctx.target_name(), "workspace message build.w")
+    if rc != 0: return rc
+    let message_result = bs_build_w_expect_success(ctx, compiler_path, message_dir, "build-w-workspace-message-complete", bs_blob_to_args(bs_argv_append("", "build")))
+    if message_result.rc != 0: return message_result.rc
+    rc = bs_expect_file_contains(ctx, bs_join(message_dir, "out/command/run-message-complete/stdout.txt"), "workspace message", "build_w_workspace_message_complete")
+    if rc != 0: return rc
+
     let enum_dir = bs_join(base_dir, "comptime_payload_enum")
     rc = bs_write_project_manifest(ctx, enum_dir, "workspaceenum")
     if rc != 0: return rc

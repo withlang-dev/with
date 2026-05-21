@@ -470,6 +470,31 @@ pub fn Workspace.compile(self: &Self) -> BuildResult:
         diagnostics: Vec.new(),
     }
 
+pub fn Workspace.begin_intercept(self: &Self):
+    tool_capability_require(self.token, "Workspace")
+    with_eprint("error: Workspace.begin_intercept requires compiler driver comptime evaluation\n")
+    exit(1)
+
+pub fn Workspace.wait_for_message(self: &Self) -> CompilerMessageEnvelope:
+    tool_capability_require(self.token, "Workspace")
+    with_eprint("error: Workspace.wait_for_message requires compiler driver comptime evaluation\n")
+    exit(1)
+    CompilerMessageEnvelope {
+        workspace_name: "",
+        generation: 0,
+        message: CompilerMessage.Error(1, "Workspace.wait_for_message requires compiler driver comptime evaluation", SourceSpan { file: "", start: -1, end: -1, line: -1, column: -1 }),
+    }
+
+pub fn Workspace.end_intercept(self: &Self):
+    tool_capability_require(self.token, "Workspace")
+    with_eprint("error: Workspace.end_intercept requires compiler driver comptime evaluation\n")
+    exit(1)
+
+pub fn Workspace.set_link_command(self: &Self, command: LinkCommand):
+    tool_capability_require(self.token, "Workspace")
+    with_eprint("error: Workspace.set_link_command requires compiler driver comptime evaluation\n")
+    exit(1)
+
 pub fn process_env() -> ProcessEnv:
     ProcessEnv { vars: Vec.new() }
 
