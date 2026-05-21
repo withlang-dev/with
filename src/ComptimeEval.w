@@ -1728,6 +1728,24 @@ fn ComptimeEvaluator.compiler_message_phase_value(self: ComptimeEvaluator, phase
     payloads.push(phase)
     self.compiler_message_value("Phase", payloads, node)
 
+fn ComptimeEvaluator.compiler_message_artifact_value(self: ComptimeEvaluator, artifact: ComptimeValue, node: i32) -> ComptimeValue:
+    let payloads: Vec[ComptimeValue] = Vec.new()
+    payloads.push(artifact)
+    self.compiler_message_value("Artifact", payloads, node)
+
+fn ComptimeEvaluator.enqueue_artifact_messages(self: ComptimeEvaluator, record: ComptimeWorkspaceRecord, result: ComptimeValue, node: i32) -> ComptimeWorkspaceRecord:
+    let artifacts = self.struct_field_value_by_name(result, "artifacts")
+    if artifacts.kind != ComptimeValueKind.CV_VEC and artifacts.kind != ComptimeValueKind.CV_ARRAY:
+        return record
+    var out = record
+    for i in 0..artifacts.extra_count:
+        let artifact = self.extra_values.get((artifacts.extra_start + i) as i64)
+        let message = self.compiler_message_artifact_value(artifact, node)
+        if message.kind == ComptimeValueKind.CV_INVALID:
+            return out
+        out.messages.push(message)
+    out
+
 fn ComptimeEvaluator.compiler_message_complete_value(self: ComptimeEvaluator, result: ComptimeValue, node: i32) -> ComptimeValue:
     let payloads: Vec[ComptimeValue] = Vec.new()
     payloads.push(result)
@@ -2358,6 +2376,9 @@ fn ComptimeEvaluator.eval_workspace_capability_method(self: ComptimeEvaluator, r
         if result.kind == ComptimeValueKind.CV_INVALID:
             return comptime_control_error()
         if record.intercept_active != 0:
+            record = self.enqueue_artifact_messages(record, result, node)
+            if self.had_error != 0:
+                return comptime_control_error()
             let phase_message = self.compiler_message_phase_value(9, node)
             if phase_message.kind == ComptimeValueKind.CV_INVALID:
                 return comptime_control_error()
