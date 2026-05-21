@@ -633,6 +633,82 @@ fn bs_check_prelude_output_functions(ctx: ActionCtx, compiler_path: str, case_di
     if rc != 0: return rc
     bs_edge_assert_exact(ctx, result.stderr, "DE\nF", "prelude_output_functions", "stderr")
 
+fn bs_check_build_options_cli(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "hello_build_options.w")
+    var rc = bs_write_fixture(ctx, src, "fn main:\n    print(\"build-options\")\n", "build options source")
+    if rc != 0: return rc
+
+    let bin_path = bs_join(case_dir, "hello_build_options")
+    var build_args: Vec[str] = Vec.new()
+    build_args |> push("build")
+    build_args |> push(bs_abs(root, src))
+    build_args |> push("-O0")
+    build_args |> push("-o")
+    build_args |> push(bs_abs(root, bin_path))
+    let built = bs_edge_expect_success(ctx, compiler_path, case_dir, "build-options-binary", build_args)
+    if built.rc != 0: return built.rc
+    if not ctx.fs().exists(bin_path):
+        return bs_fail(ctx, "build options binary output missing: " ++ bin_path)
+    let run_result = bs_run_binary_capture(ctx, bin_path, "build-options-binary-run", 120000)
+    if run_result.rc != 0:
+        return bs_fail(ctx, f"build options binary failed with exit code {run_result.rc}: " ++ run_result.stderr)
+    rc = bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(run_result.stdout), "build-options", "build_options_binary", "stdout")
+    if rc != 0: return rc
+
+    let c_path = bs_join(case_dir, "hello_build_options.c")
+    var emit_c_args: Vec[str] = Vec.new()
+    emit_c_args |> push("build")
+    emit_c_args |> push(bs_abs(root, src))
+    emit_c_args |> push("--emit-c")
+    emit_c_args |> push("-o")
+    emit_c_args |> push(bs_abs(root, c_path))
+    let emitted_c = bs_edge_expect_success(ctx, compiler_path, case_dir, "build-options-emit-c", emit_c_args)
+    if emitted_c.rc != 0: return emitted_c.rc
+    if not ctx.fs().exists(c_path):
+        return bs_fail(ctx, "build options emit-c output missing: " ++ c_path)
+
+    let obj_path = bs_join(case_dir, "hello_build_options.o")
+    var emit_obj_args: Vec[str] = Vec.new()
+    emit_obj_args |> push("build")
+    emit_obj_args |> push(bs_abs(root, src))
+    emit_obj_args |> push("--emit-obj")
+    emit_obj_args |> push("-o")
+    emit_obj_args |> push(bs_abs(root, obj_path))
+    let emitted_obj = bs_edge_expect_success(ctx, compiler_path, case_dir, "build-options-emit-obj", emit_obj_args)
+    if emitted_obj.rc != 0: return emitted_obj.rc
+    if not ctx.fs().exists(obj_path):
+        return bs_fail(ctx, "build options emit-obj output missing: " ++ obj_path)
+
+    var release_args: Vec[str] = Vec.new()
+    release_args |> push("build")
+    release_args |> push(bs_abs(root, src))
+    release_args |> push("--release")
+    release_args |> push("-o")
+    release_args |> push(bs_abs(root, bs_join(case_dir, "hello_build_options_release")))
+    let release_build = bs_edge_expect_success(ctx, compiler_path, case_dir, "build-options-release", release_args)
+    if release_build.rc != 0: return release_build.rc
+
+    var conflict_args: Vec[str] = Vec.new()
+    conflict_args |> push("build")
+    conflict_args |> push(bs_abs(root, src))
+    conflict_args |> push("--emit-c")
+    conflict_args |> push("--emit-obj")
+    let conflict = bs_run_cli_capture_cwd(ctx, compiler_path, "build-options-emit-conflict", conflict_args, 120000, case_dir)
+    if conflict.rc == 0:
+        return bs_fail(ctx, "build options emit conflict unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, conflict.stderr, "--emit-c and --emit-obj are mutually exclusive", "build_options_emit_conflict")
+    if rc != 0: return rc
+
+    var bad_prelude_args: Vec[str] = Vec.new()
+    bad_prelude_args |> push("build")
+    bad_prelude_args |> push(bs_abs(root, src))
+    bad_prelude_args |> push("--prelude=bogus")
+    let bad_prelude = bs_run_cli_capture_cwd(ctx, compiler_path, "build-options-bad-prelude", bad_prelude_args, 120000, case_dir)
+    if bad_prelude.rc == 0:
+        return bs_fail(ctx, "build options bad prelude unexpectedly succeeded")
+    bs_assert_contains(ctx, bad_prelude.stderr, "invalid --prelude value 'bogus' (expected full|core|none)", "build_options_bad_prelude")
+
 fn bs_check_whole_program_extern_var_redecl(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let defs_src = bs_join(case_dir, "defs.w")
@@ -888,6 +964,8 @@ pub fn run_cli_selfhost_edge_action(ctx: ActionCtx) -> i32:
     var rc = bs_check_pointer_index_rejected(ctx, compiler_path, bs_join(output_dir, "pointer_index_rejected_case"))
     if rc != 0: return rc
     rc = bs_check_prelude_output_functions(ctx, compiler_path, bs_join(output_dir, "prelude_output_functions_case"))
+    if rc != 0: return rc
+    rc = bs_check_build_options_cli(ctx, compiler_path, bs_join(output_dir, "build_options_cli_case"))
     if rc != 0: return rc
     rc = bs_check_whole_program_extern_var_redecl(ctx, compiler_path, bs_join(output_dir, "whole_program_extern_var_redecl_case"))
     if rc != 0: return rc

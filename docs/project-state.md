@@ -3,7 +3,7 @@
 Status: active checkpoint for agents. Update this file when phase status,
 blockers, or the next work queue changes.
 
-Last updated: 2026-05-20.
+Last updated: 2026-05-21.
 
 Read this file immediately after `AGENTS.md`. It exists so long-running build
 system and bootstrap work does not have to be reconstructed from git history or
@@ -13,7 +13,9 @@ conversation context after compaction.
 
 Phase C extraction work is complete. Pre-Phase-D preparation is complete
 through P9, including the follow-up source-location diagnostic gap. Phase D D1
-is complete. Completed D1 sub-slices:
+and D2 are complete.
+
+Completed D1 sub-slices:
 
 1. Shared capability registry used by Sema, plus a reserved capability value
    kind for evaluator dispatch.
@@ -38,7 +40,22 @@ is complete. Completed D1 sub-slices:
    `ActionCtx`; generated action runner source files and binaries are no
    longer part of the normal action path.
 
-Next Phase D work starts at D2. Do not start D3-D8 until D2 lands and passes
+Completed D2 work:
+
+1. Added typed build option structs to `std.build`: `BuildOptions`,
+   `BuildGraphOptions`, `TestOptions`, and `MigrateOptions`.
+2. Added driver-side structured build option parsing for `with build`.
+3. Routed direct `with build` source builds and build graph execution through
+   `BuildCommandOptions` instead of long positional option lists.
+4. Added `Compilation.configure_options` as the typed compilation option
+   boundary.
+5. Added focused build-options API and CLI compatibility coverage.
+6. Updated the Phase D design and language specification with canonical
+   capability-bearing comptime syntax:
+   `comptime with BuildCtx as ctx:`, with `comptime with BuildCtx:` as the
+   standard default-binding shorthand.
+
+Next Phase D work starts at D3. Do not start D4-D8 until D3 lands and passes
 the same build/fixpoint/test baseline.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
@@ -46,8 +63,7 @@ value. The driver materializes that value directly into `BuildGraph`.
 `Build.emit_graph()` remains a debug/export compatibility facility and must not
 be the evaluator-to-driver transport.
 
-Do not start D2-D8 until D1 lands and passes the baseline verification in
-`docs/audits/pre-d1-baseline.md`.
+Do not start D4-D8 until D3 lands and passes the same baseline verification.
 
 Completed quality-of-life slices:
 
@@ -63,7 +79,7 @@ The original P9 pre-D1 baseline is recorded in
 containing this project-state update:
 
 ```text
-Execute build actions in-process
+Unify build CLI parsing with BuildOptions
 ```
 
 Commands passed:
@@ -71,6 +87,13 @@ Commands passed:
 ```sh
 make build
 out/bin/with build :build
+out/bin/with build :fixpoint
+out/bin/with build :test
+out/bin/with run test/behavior/behav_std_build_options_api.w
+out/bin/with build test/hello.w -o /tmp/with-d2-hello
+out/bin/with build test/hello.w --emit-c -o /tmp/with-d2-hello.c
+out/bin/with build test/hello.w --emit-obj -o /tmp/with-d2-hello.o
+out/bin/with build :cli-selfhost-edge-tests --no-deps
 out/bin/with test test/behavior/behav_build_w_basic_invocation.w
 out/bin/with test test/behavior/behav_action_capability_filesystem.w
 out/bin/with test test/behavior/behav_action_capability_process.w
@@ -90,7 +113,8 @@ default `:test` target includes the fast emit-C smoke.
 
 Recent Phase D/pre-D commits:
 
-- current checkpoint: Execute build actions in-process.
+- current checkpoint: Unify build CLI parsing with BuildOptions.
+- `2cba39a` Execute build actions in-process.
 - `f5cc0c5` Evaluate build.w graphs in-process.
 - previous checkpoint: Implement source-location magic constants.
 - `617aecd` Reconcile Phase D design with pre-D artifacts.
@@ -154,6 +178,9 @@ Still incomplete:
 - Phase D D1 is complete. `build.w` graph loading uses the evaluator-backed
   typed materializer path, and action targets execute through evaluator-backed
   `ActionCtx` dispatch instead of generated runner binaries.
+- Phase D D2 is complete. `with build` parsing now produces typed build
+  options, build graph target execution overlays those options per target, and
+  `std.build` exposes the option structs required by future workspaces.
 - Action timeout/cwd/env/network/install policy declarations are incomplete.
 - Jai-style workspace/build-options/message-loop APIs are incomplete.
 - Make remains a compatibility layer.
@@ -194,7 +221,7 @@ not a new compiler-dispatched project graph kind.
 
 ## Open Blockers And Follow-Ups
 
-- Continue Phase D with D2 next. Do not start D3-D8 until D2 is committed and
+- Continue Phase D with D3 next. Do not start D4-D8 until D3 is committed and
   passes the build/fixpoint/test baseline.
 - Preserve the pre-D behavior tests during D1:
   `behav_build_w_basic_invocation`, `behav_action_capability_filesystem`,
@@ -212,12 +239,19 @@ not a new compiler-dispatched project graph kind.
 
 ## Local State
 
-At the time of this update, Phase D D1 action execution was verified and ready
-to commit. The current D1 verification passed:
+At the time of this update, Phase D D2 BuildOptions/CLI unification was
+verified and ready to commit. The current D2 verification passed:
 
 ```sh
 make build
 out/bin/with build :build
+out/bin/with build :fixpoint
+out/bin/with build :test
+out/bin/with run test/behavior/behav_std_build_options_api.w
+out/bin/with build test/hello.w -o /tmp/with-d2-hello
+out/bin/with build test/hello.w --emit-c -o /tmp/with-d2-hello.c
+out/bin/with build test/hello.w --emit-obj -o /tmp/with-d2-hello.o
+out/bin/with build :cli-selfhost-edge-tests --no-deps
 out/bin/with test test/behavior/behav_build_w_basic_invocation.w
 out/bin/with test test/behavior/behav_action_capability_filesystem.w
 out/bin/with test test/behavior/behav_action_capability_process.w

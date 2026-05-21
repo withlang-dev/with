@@ -15,6 +15,7 @@ use compiler.Backend
 use compiler.Frontend
 use compiler.Link
 use compiler.ProjectConfig
+use compiler.DriverOptions
 use compiler.Zcu
 
 extern fn with_eprint(s: str) -> void
@@ -302,6 +303,12 @@ fn Compilation.configure(self: Compilation, opt_level: i32, no_std: bool, alloc_
     var zcu = self.zcu
     zcu.set_prelude_mode(self.config.prelude_mode)
     self.zcu = zcu
+
+fn Compilation.configure_options(self: Compilation, options: BuildCommandOptions):
+    self.configure(options.opt_level, options.no_std, options.alloc_mode)
+    self.set_prelude_mode(options.prelude_mode)
+    self.set_debug_info(options.debug_info)
+    self.set_compiler_hooks_enabled(options.compiler_hooks_enabled)
 
 fn Compilation.set_prelude_mode(self: Compilation, mode: i32):
     var cfg = self.config

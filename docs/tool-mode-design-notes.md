@@ -20,17 +20,17 @@ Pick the right answer for each axis independently.
 
 > Tool power in With is capability-based.
 >
-> The compiler driver discovers tool entry points by convention or annotation. It invokes ordinary With functions and passes unforgeable capability values. The capability parameters determine what privileged operations are available. Compiler phases determine when hooks run, not what power they have. Ordinary comptime remains pure and deterministic. Capabilities are abstract handles whose APIs must be implementation-boundary-safe. Tests receive mock or sandboxed capabilities from the test driver.
+> The compiler driver discovers tool entry points by convention or annotation. It evaluates capability-bearing comptime functions with unforgeable capability values bound by their `comptime with` clauses. The declared capabilities determine what privileged operations are available. Compiler phases determine when hooks run, not what power they have. Ordinary comptime remains pure and deterministic. Capabilities are abstract handles whose APIs must be implementation-boundary-safe. Tests receive mock or sandboxed capabilities from the test driver.
 
 ### The Seven-Point Design
 
 1. `build.w` is a conventional driver-discovered entry point.
-2. `pub fn build(ctx: BuildCtx) -> Build` is an ordinary function.
+2. `comptime with BuildCtx as ctx: pub fn build -> Build` is the canonical build entry point.
 3. `BuildCtx` and related objects are unforgeable capabilities.
 4. Helper functions receive only the capabilities they need.
 5. Compiler hooks later use annotations for scheduling only.
 6. Ordinary `comptime` stays pure and deterministic.
-7. Implementation may be same-process, separate binary, or RPC-backed, but the user model remains capability parameters.
+7. Implementation may be same-process, separate binary, or RPC-backed, but the user model remains capability bindings.
 
 ### Initial Capability Set
 
@@ -132,7 +132,7 @@ struct literals, direct calls to `.__driver_new`, and direct field access
 on tool capability values. Capability fields are implementation details;
 user code must call capability methods.
 
-`build.w` receives `BuildCtx`. From it, user code may request narrower
+`build.w` receives `BuildCtx` through its `comptime with` clause. From it, user code may request narrower
 capabilities such as `ProjectInfo`, `Diagnostics`, `SourceEmitter`,
 `ToolFs`, and `ProcessRunner`.
 

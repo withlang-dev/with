@@ -69,21 +69,22 @@ Compile-time evaluation in With is governed by capabilities, not by execution mo
 There is one compile-time execution abstraction: `comptime`. Effects are not a separate mode; they are gated by capability values passed as function parameters.
 
 ```text
-comptime:                     pure, deterministic, effect-free
-comptime with BuildCtx:       build orchestration authority
-comptime with Workspace:      workspace compilation authority
-comptime with ToolFs:         filesystem authority
-comptime with ProcessRunner:  process invocation authority
+comptime:                              pure, deterministic, effect-free
+comptime with BuildCtx as ctx:         build orchestration authority
+comptime with Workspace as workspace:  workspace compilation authority
+comptime with ToolFs as fs:            filesystem authority
+comptime with ProcessRunner as proc:   process invocation authority
 ```
 
 Operational rules:
 
 * Pure `comptime` evaluation is deterministic and effect-free. The existing `ComptimeEval` infrastructure handles this case.
-* A comptime function declares its required capabilities as ordinary parameters. The function's effects are bounded by the capabilities it receives.
+* A capability-bearing comptime function declares its required capabilities in a `comptime with` clause. The canonical spelling is `comptime with CapabilityType as local_name:`. The function's effects are bounded by the capabilities it receives.
+* `comptime with CapabilityType:` is shorthand only when that capability has a standard default binding. Initial defaults: `BuildCtx` and `ActionCtx` bind as `ctx`, `ToolFs` as `fs`, `ProcessRunner` as `proc`, `Diagnostics` as `diag`, `SourceEmitter` as `emit`, `ProjectInfo` as `project`, and `Workspace` as `workspace`. Ambiguous duplicate defaults require explicit `as` bindings.
 * Capability values are unforgeable, driver-minted handles. User code cannot construct, deserialize, or forge them.
-* The compiler driver is the sole entity that mints top-level capabilities, and it does so at well-defined points: invoking `pub fn build(ctx: BuildCtx)` at build-graph construction, dispatching action functions with `ActionCtx`, and so on.
-* A function with capability-typed parameters cannot be invoked from runtime code. Capability types exist only at compile time. The type system enforces this.
-* A pure comptime function, meaning a function with no capability parameters and no effectful capability calls, may be invoked from any context subject to the existing comptime rules. Runtime code does not execute it at runtime; it may trigger compile-time evaluation where the existing language rules allow that.
+* The compiler driver is the sole entity that mints top-level capabilities, and it does so at well-defined points: evaluating `build` with `BuildCtx` at build-graph construction, dispatching action functions with `ActionCtx`, and so on.
+* A function with a capability-bearing `comptime with` clause cannot be invoked from runtime code. Capability types exist only at compile time. The type system enforces this.
+* A pure comptime function, meaning a function with no capability-bearing `with` clause and no effectful capability calls, may be invoked from any context subject to the existing comptime rules. Runtime code does not execute it at runtime; it may trigger compile-time evaluation where the existing language rules allow that.
 
 The public user model must not depend on whether the compiler executes capability-bearing comptime in-process, in a helper binary, or over RPC. Phase D's implementation is in-process and interpreter-based, but the APIs remain boundary-safe: no raw pointer transport, no direct access to compiler-owned data structures, and no ABI promises based on shared address space.
 
@@ -256,7 +257,7 @@ Methods listed here but not yet implemented in a slice must not be exposed as in
 
 ### Lifetime and Ownership
 
-Workspaces are owned by the `BuildCtx` that minted them. `BuildCtx.create_workspace` returns a `Workspace` handle, which is a reference to compiler-owned storage. The handle's lifetime is bounded by the BuildCtx's lifetime, which is bounded by the driver's call to `pub fn build(ctx: BuildCtx) -> Build`.
+Workspaces are owned by the `BuildCtx` that minted them. `BuildCtx.create_workspace` returns a `Workspace` handle, which is a reference to compiler-owned storage. The handle's lifetime is bounded by the BuildCtx's lifetime, which is bounded by the driver's evaluation of the `build` entry point with a `BuildCtx` capability.
 
 User code may pass handles, borrow them, and store them in local data structures during comptime evaluation. User code cannot construct, serialize, or extend the lifetime of a workspace handle beyond the BuildCtx.
 
@@ -264,7 +265,29 @@ Any structure containing a `Workspace` handle (directly or transitively) inherit
 
 ### Entry Point Compatibility
 
-Existing `pub fn build(ctx: BuildCtx) -> Build` continues to work unchanged. A function whose parameter list includes a capability type is treated as a capability-bearing comptime entry point when invoked by the driver. Explicit `comptime fn` marker syntax is not required during Phase D; it may be added in a later phase if disambiguation becomes necessary.
+The canonical Phase D spelling for build entry points is:
+
+```with
+comptime with BuildCtx as ctx:
+pub fn build -> Build:
+    ...
+```
+
+The shorthand form is also valid and uses the standard `BuildCtx -> ctx`
+binding:
+
+```with
+comptime with BuildCtx:
+pub fn build -> Build:
+    ...
+```
+
+Existing `pub fn build(ctx: BuildCtx) -> Build` continues to work during
+the transition and is treated as a compatibility entry point when invoked
+by the driver. New examples and new build scripts should use
+`comptime with BuildCtx as ctx:` or its shorthand. Capability bindings
+remain ordinary values after binding; helper functions may still receive
+`ctx`, `fs`, `proc`, or narrower capabilities as explicit parameters.
 
 ### current_workspace Semantics
 
@@ -753,7 +776,7 @@ Scope:
 * Capability dispatch table populated at compiler startup; immutable thereafter.
 * Evaluator routes capability method calls through the dispatch table.
 * Capability handle validation at every capability method entry.
-* Driver invokes `build(ctx)` via the evaluator instead of generating a runner binary.
+* Driver evaluates `build` via the evaluator with a minted `BuildCtx` instead of generating a runner binary.
 * Driver invokes action functions via the evaluator with `ActionCtx`.
 * Crash diagnostics include entry point, target name, source location, evaluator stack frames, and capability operation in progress.
 
@@ -800,10 +823,12 @@ Focused verification:
 
 ### D3: Sequential Workspace Skeleton
 
-Implement the public `Workspace` API with sequential, non-parallel execution. `Workspace.compile()` is synchronous and returns a `BuildResult`.
+Implement the public `Workspace` API with sequential, non-parallel execution. `Workspace.compile()` is synchronous and returns a `BuildResult`. Add parser/sema support for capability-bearing `comptime with Capability as name:` entry points, including default capability bindings, while preserving the transitional explicit-parameter entry point form.
 
 Scope:
 
+* `comptime with Capability as name:` syntax for capability-bearing comptime functions.
+* Default bindings for standard capabilities, with diagnostics for ambiguous duplicate defaults.
 * `BuildCtx.create_workspace`, `BuildCtx.current_workspace`.
 * `Workspace.name`, `add_file`, `add_string`, `options`, `set_options`, `set_migrate_options`, `compile`.
 * `BuildResult` and `Artifact` construction.
@@ -818,6 +843,9 @@ Out of scope:
 
 Focused verification:
 
+* `comptime with BuildCtx as ctx:` build entry points work.
+* `comptime with BuildCtx:` desugars to the standard `ctx` binding.
+* Multiple capabilities with explicit aliases work; duplicate default aliases produce a structured diagnostic.
 * A build script can create a workspace, add a file, call compile, and receive a BuildResult.
 * `current_workspace()` aborts cleanly with a structured error if called before any workspace has been created.
 * A struct containing a `Workspace` field cannot outlive its `BuildCtx` (Sema rejection).

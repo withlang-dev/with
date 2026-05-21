@@ -28,6 +28,7 @@ use BuildGraphTools
 use BuildGraphTests
 use InitTemplates
 use BuildGraphRuntime
+use compiler.DriverOptions
 
 extern fn with_arg_count() -> i32
 extern fn with_arg_at(idx: i32) -> str
@@ -611,7 +612,11 @@ fn run_cli(argc: i32) -> i32:
         return run_run_command(cli_command(argc), opt_level, no_std, alloc_mode, prelude_mode, debug_info)
 
     if cli_command(argc) == "build":
-        return run_build_command(source, opt_level, no_std, alloc_mode, emit_c_mode, emit_obj_mode, output, prelude_mode, debug_info, cli_build_target_arg(argc), cli_has_flag(argc, "--graph"), cli_has_flag(argc, "--dry-run"), cli_has_flag(argc, "--no-deps"))
+        let parsed_build = parse_build_command_options(argc)
+        if not parsed_build.ok:
+            with_eprint("error: " ++ parsed_build.error_msg)
+            return 1
+        return run_build_command(parsed_build.build, parsed_build.graph)
     if cli_command(argc) == "run":
         if emit_c_mode:
             with_eprint("error: '--emit-c' is only supported with 'build'")
@@ -833,13 +838,11 @@ fn run_build_action_from_build_w(root: str, cfg: ProjectConfig, target: BuildGra
             return 1
     0
 
-fn load_build_graph_from_build_w(root: str, cfg: ProjectConfig, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> BuildGraphLoadResult:
+fn load_build_graph_from_build_w(root: str, cfg: ProjectConfig, options: BuildCommandOptions) -> BuildGraphLoadResult:
     var graph = empty_build_graph()
     let entry_path = resolve_join(root, "__with_build_eval.w")
     var comp = Compilation.init()
-    comp.configure(opt_level, no_std, alloc_mode)
-    comp.set_prelude_mode(prelude_mode)
-    comp.set_debug_info(debug_info)
+    comp.configure_options(options)
     comp.set_tool_mode_entry_path(entry_path)
     let pool = comp.compile_source_text_with_config(entry_path, build_tool_eval_entry_source(), cfg)
     var sema = comp.zcu.last_sema
@@ -955,11 +958,27 @@ fn build_graph_trim_space_and_newlines(text: str) -> str:
         end = end - 1
     text.slice(start as i64, end as i64)
 
-fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, action_sema: Sema, opt_level: i32, no_std: bool, alloc_mode: bool, output_path: str, prelude_mode: i32, debug_info: bool) -> i32:
+fn build_options_for_graph_target(root: str, base: BuildCommandOptions, target: BuildGraphTarget) -> BuildCommandOptions:
+    var options = base
+    if target.optimize_mode == 1 and options.opt_level < 2:
+        options.opt_level = 2
+    options.target_kind = target.target_kind
+    options.include_paths = build_graph_resolve_paths(root, target.include_paths)
+    options.defines = target.defines
+    options.link_libs = target.system_libs
+    if target.kind == 1 or target.kind == 4:
+        options.output_kind = BuildOutputKind.Archive
+    else if target.kind == 3:
+        options.output_kind = BuildOutputKind.Object
+    else:
+        options.output_kind = BuildOutputKind.Binary
+    options
+
+fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, action_sema: Sema, options: BuildCommandOptions) -> i32:
     if graph.targets.len() == 0:
         with_eprint("error: build.w did not declare any targets")
         return 1
-    let output_rc = build_graph_validate_outputs(root, graph, output_path)
+    let output_rc = build_graph_validate_outputs(root, graph, options.output_path)
     if output_rc != 0:
         return output_rc
     let generated_rc = build_graph_write_generated_sources(root, graph)
@@ -1001,12 +1020,9 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, action_sema
             completed_targets.push(target.name)
             continue
         let source_path = resolve_join(root, target.entry)
-        var target_opt = opt_level
-        if target.optimize_mode == 1 and target_opt < 2:
-            target_opt = 2
-        let include_paths = build_graph_resolve_paths(root, target.include_paths)
+        let target_options = build_options_for_graph_target(root, options, target)
         if target.kind == 2:
-            if output_path.len() > 0:
+            if options.output_path.len() > 0:
                 with_eprint("error: -o cannot be used with build.w test target '" ++ target.name ++ "'")
                 return 1
             let test_files = build_graph_test_target_files(root, target.entry)
@@ -1022,7 +1038,7 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, action_sema
             else:
                 for fi in 0..test_files.len() as i32:
                     let test_path = test_files.get(fi as i64)
-                    let test_rc = run_test_file_with_build_settings(test_path, target_opt, no_std, alloc_mode, prelude_mode, debug_info, false, false, "", include_paths, target.defines, target.system_libs)
+                    let test_rc = run_test_file_with_build_settings(test_path, target_options.opt_level, target_options.no_std, target_options.alloc_mode, target_options.prelude_mode, target_options.debug_info, false, false, "", target_options.include_paths, target_options.defines, target_options.link_libs)
                     if test_rc != 0:
                         with_eprint("error: build.w test target failed: " ++ target.name)
                         return test_rc
@@ -1031,15 +1047,13 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, action_sema
             completed_targets.push(target.name)
             continue
         if target.kind == 1:
-            let ar_path = build_graph_library_output_path(root, target, output_path, graph.targets.len() as i32)
+            let ar_path = build_graph_library_output_path(root, target, options.output_path, graph.targets.len() as i32)
             if ar_path.len() == 0:
                 with_eprint("error: -o cannot be used when build.w declares multiple targets")
                 return 1
             var comp = Compilation.init()
-            comp.configure(target_opt, no_std, alloc_mode)
-            comp.set_prelude_mode(prelude_mode)
-            comp.set_debug_info(debug_info)
-            let built = comp.emit_archive_to_path_with_build_settings(source_path, ar_path, include_paths, target.defines, target.system_libs)
+            comp.configure_options(target_options)
+            let built = comp.emit_archive_to_path_with_build_settings(source_path, ar_path, target_options.include_paths, target_options.defines, target_options.link_libs)
             if built == "":
                 with_eprint("error: build.w library target failed: " ++ target.name)
                 return 1
@@ -1047,15 +1061,13 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, action_sema
             completed_targets.push(target.name)
             continue
         if target.kind == 3:
-            let obj_path = build_graph_object_output_path(root, target, output_path, graph.targets.len() as i32)
+            let obj_path = build_graph_object_output_path(root, target, options.output_path, graph.targets.len() as i32)
             if obj_path.len() == 0:
                 with_eprint("error: -o cannot be used when build.w declares multiple targets")
                 return 1
             var comp = Compilation.init()
-            comp.configure(target_opt, no_std, alloc_mode)
-            comp.set_prelude_mode(prelude_mode)
-            comp.set_debug_info(debug_info)
-            let built = comp.emit_object_to_path_with_build_settings(source_path, obj_path, include_paths, target.defines, target.system_libs)
+            comp.configure_options(target_options)
+            let built = comp.emit_object_to_path_with_build_settings(source_path, obj_path, target_options.include_paths, target_options.defines, target_options.link_libs)
             if built == "":
                 with_eprint("error: build.w object target failed: " ++ target.name)
                 return 1
@@ -1063,30 +1075,26 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, action_sema
             completed_targets.push(target.name)
             continue
         if target.kind == 4:
-            let ar_path = build_graph_library_output_path(root, target, output_path, graph.targets.len() as i32)
+            let ar_path = build_graph_library_output_path(root, target, options.output_path, graph.targets.len() as i32)
             if ar_path.len() == 0:
                 with_eprint("error: -o cannot be used when build.w declares multiple targets")
                 return 1
             var comp = Compilation.init()
-            comp.configure(target_opt, no_std, alloc_mode)
-            comp.set_prelude_mode(prelude_mode)
-            comp.set_debug_info(debug_info)
-            let built = comp.emit_archive_to_path_with_build_settings(source_path, ar_path, include_paths, target.defines, target.system_libs)
+            comp.configure_options(target_options)
+            let built = comp.emit_archive_to_path_with_build_settings(source_path, ar_path, target_options.include_paths, target_options.defines, target_options.link_libs)
             if built == "":
                 with_eprint("error: build.w archive target failed: " ++ target.name)
                 return 1
             comp.print_warnings()
             completed_targets.push(target.name)
             continue
-        let bin_path = build_graph_output_path(root, target, output_path, graph.targets.len() as i32)
+        let bin_path = build_graph_output_path(root, target, options.output_path, graph.targets.len() as i32)
         if bin_path.len() == 0:
             with_eprint("error: -o cannot be used when build.w declares multiple targets")
             return 1
         var comp = Compilation.init()
-        comp.configure(target_opt, no_std, alloc_mode)
-        comp.set_prelude_mode(prelude_mode)
-        comp.set_debug_info(debug_info)
-        let built = comp.build_binary_to_path_with_build_settings(source_path, bin_path, include_paths, target.defines, target.system_libs)
+        comp.configure_options(target_options)
+        let built = comp.build_binary_to_path_with_build_settings(source_path, bin_path, target_options.include_paths, target_options.defines, target_options.link_libs)
         if built == "":
             with_eprint("error: build.w target failed: " ++ target.name)
             return 1
@@ -1094,9 +1102,9 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, action_sema
         completed_targets.push(target.name)
     0
 
-fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: bool, emit_c_mode: bool, emit_obj_mode: bool, output_path: str, prelude_mode: i32, debug_info: bool, build_target_name: str, graph_only: bool, dry_run: bool, no_deps: bool) -> i32:
-    var actual_source = source_file
-    var actual_output = output_path
+fn run_build_command(options: BuildCommandOptions, graph_options: BuildGraphCommandOptions) -> i32:
+    var actual_options = options
+    var actual_source = actual_options.source_path
     if actual_source == "":
         let root = build_graph_find_build_root(".")
         if root.len() == 0:
@@ -1108,41 +1116,40 @@ fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode:
             with_eprint("error: invalid with.toml: " ++ cfg.manifest_error)
             return 1
         if project_config_file_exists(build_path):
-            if emit_c_mode or emit_obj_mode:
+            if actual_options.output_kind != BuildOutputKind.Binary:
                 with_eprint("error: build.w tool-mode only supports binary builds")
                 return 1
-            let load_result = load_build_graph_from_build_w(root, cfg, opt_level, no_std, alloc_mode, prelude_mode, debug_info)
+            let load_result = load_build_graph_from_build_w(root, cfg, actual_options)
             let graph = load_result.graph
             if not graph.ok:
                 with_eprint("error: " ++ graph.error_msg)
                 return 1
-            var selected_target_name = build_target_name
+            var selected_target_name = graph_options.selected_target
             if selected_target_name.len() == 0 and graph.default_target.len() > 0:
                 selected_target_name = graph.default_target
-            let selected_graph = if no_deps: build_graph_filter_single_target(&graph, selected_target_name) else: build_graph_filter_target(&graph, selected_target_name)
+            let selected_graph = if graph_options.no_deps: build_graph_filter_single_target(&graph, selected_target_name) else: build_graph_filter_target(&graph, selected_target_name)
             if not selected_graph.ok:
                 with_eprint("error: " ++ selected_graph.error_msg)
                 return 1
-            if no_deps:
+            if graph_options.no_deps:
                 if selected_graph.targets.len() == 0 or selected_graph.targets.get(0).kind != 23:
                     with_eprint("error: --no-deps is only supported for build.w action targets")
                     return 1
-            if graph_only or dry_run:
+            if graph_options.graph_only or graph_options.dry_run:
                 with_write(selected_graph.raw_text)
                 return 0
-            return run_build_graph(root, cfg, selected_graph, load_result.sema, opt_level, no_std, alloc_mode, actual_output, prelude_mode, debug_info)
+            return run_build_graph(root, cfg, selected_graph, load_result.sema, actual_options)
         actual_source = root ++ "/src/main.w"
-        if actual_output == "" and cfg.package_name.len() > 0:
-            actual_output = "out/bin/" ++ cfg.package_name
-    if no_deps:
+        actual_options.source_path = actual_source
+        if actual_options.output_path == "" and cfg.package_name.len() > 0:
+            actual_options.output_path = "out/bin/" ++ cfg.package_name
+    if graph_options.no_deps:
         with_eprint("error: --no-deps is only supported for build.w action targets")
         return 1
     var comp = Compilation.init()
-    comp.configure(opt_level, no_std, alloc_mode)
-    comp.set_prelude_mode(prelude_mode)
-    comp.set_debug_info(debug_info)
-    if emit_c_mode:
-        let c_path = comp.emit_c(actual_source, actual_output)
+    comp.configure_options(actual_options)
+    if actual_options.output_kind == BuildOutputKind.C:
+        let c_path = comp.emit_c(actual_options.source_path, actual_options.output_path)
         if c_path == "":
             with_eprint("error: build failed")
             return 1
@@ -1151,17 +1158,17 @@ fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode:
         with_eprint("  zig cc -target <triple> -I runtime " ++ c_path ++ " runtime/with_runtime.c runtime/helpers.c runtime/fiber.c runtime/fiber_asm_<arch>.s -o <output>")
         comp.print_warnings()
         return 0
-    if emit_obj_mode:
-        var obj_path = actual_output
+    if actual_options.output_kind == BuildOutputKind.Object:
+        var obj_path = actual_options.output_path
         if obj_path == "":
-            obj_path = link_stage_output_path_for_source(actual_source) ++ ".o"
-        let result = comp.emit_object_to_path(actual_source, obj_path)
+            obj_path = link_stage_output_path_for_source(actual_options.source_path) ++ ".o"
+        let result = comp.emit_object_to_path(actual_options.source_path, obj_path)
         if result == "":
             with_eprint("error: build failed")
             return 1
         comp.print_warnings()
         return 0
-    let bin_path = comp.build_binary_to_path(actual_source, actual_output)
+    let bin_path = comp.build_binary_to_path(actual_options.source_path, actual_options.output_path)
     if bin_path == "":
         with_eprint("error: build failed")
         return 1
@@ -1879,7 +1886,15 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, p
     // Find test file/dir argument
     let target = find_source_arg(argc)
     if target == "":
-        return run_build_command("", opt_level, no_std, alloc_mode, false, false, "", prelude_mode, debug_info, "test", false, false, false)
+        var build_options = build_command_options_default()
+        build_options.opt_level = opt_level
+        build_options.no_std = no_std
+        build_options.alloc_mode = alloc_mode
+        build_options.prelude_mode = prelude_mode
+        build_options.debug_info = debug_info
+        var graph_options = build_graph_command_options_default()
+        graph_options.selected_target = "test"
+        return run_build_command(build_options, graph_options)
     if test_target_is_directory(target):
         let test_files = collect_test_files(target)
         if test_files.len() == 0:
