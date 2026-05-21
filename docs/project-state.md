@@ -31,10 +31,12 @@ is in progress. Completed D1 sub-slices:
 7. Build-time evaluator handlers for `Diagnostics.warn/error`,
    `SourceEmitter.generated_source`, and `ToolFs` filesystem operations used
    during direct `build(ctx)` evaluation.
+8. The normal `build.w` graph-load path now compiles an evaluator wrapper,
+   evaluates `build(ctx)` in-process, and materializes the typed returned
+   `Build` value directly into `BuildGraph`.
 
-Remaining D1 work is wiring direct `build.w` evaluation into the CLI path
-through the typed materializer, completing action-time capability handlers, and
-replacing generated build/action runner binaries on the normal path.
+Remaining D1 work is completing action-time capability handlers and replacing
+generated action runner binaries on the normal path.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.
@@ -134,9 +136,10 @@ Still incomplete:
 
 - Phase C is complete. Project-specific build behavior no longer uses live
   compiler-dispatched project graph kinds.
-- Phase D D1 is partially implemented. `build.w` and action targets still
-  execute through generated runner binaries until the evaluator-backed driver
-  path replaces them.
+- Phase D D1 is partially implemented. `build.w` graph loading now uses the
+  evaluator-backed typed materializer path. Action targets still execute
+  through generated runner binaries until the evaluator-backed action path
+  replaces them.
 - Action timeout/cwd/env/network/install policy declarations are incomplete.
 - Jai-style workspace/build-options/message-loop APIs are incomplete.
 - Make remains a compatibility layer.

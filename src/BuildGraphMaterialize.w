@@ -104,6 +104,9 @@ fn BuildGraphMaterializer.materialize_target(self: BuildGraphMaterializer, value
         out.error_msg = "duplicate build target name: " ++ name_value.text
         return out
     let kind = kind_value.data0 as i32
+    if build_graph_kind_removed(kind):
+        out.error_msg = "build target '" ++ name_value.text ++ "' kind " ++ build_graph_kind_name(kind) ++ f" ({kind}) was removed; regenerate your build graph"
+        return out
     if not build_graph_kind_valid(kind):
         out.error_msg = "build target '" ++ name_value.text ++ "' has invalid kind " ++ f"{kind}"
         return out
