@@ -9,8 +9,9 @@ enum CapabilityKind: i32:
     CK_BUILD_TOOL_FS = 5
     CK_BUILD_PROCESS_RUNNER = 6
     CK_BUILD_ACTION_CTX = 7
-    CK_COMPILER_DIAGNOSTICS = 8
-    CK_COMPILER_SOURCE_EMITTER = 9
+    CK_BUILD_WORKSPACE = 8
+    CK_COMPILER_DIAGNOSTICS = 9
+    CK_COMPILER_SOURCE_EMITTER = 10
 
 fn capability_registry_is_std_build_path(path: str) -> bool:
     path == "<embedded-std>/std/build.w" or path == "lib/std/build.w" or path.ends_with("/lib/std/build.w")
@@ -26,6 +27,7 @@ fn capability_registry_lookup_std_build(name: str) -> i32:
     if name == "ToolFs": return CapabilityKind.CK_BUILD_TOOL_FS
     if name == "ProcessRunner": return CapabilityKind.CK_BUILD_PROCESS_RUNNER
     if name == "ActionCtx": return CapabilityKind.CK_BUILD_ACTION_CTX
+    if name == "Workspace": return CapabilityKind.CK_BUILD_WORKSPACE
     CapabilityKind.CK_NONE
 
 fn capability_registry_lookup_std_compiler(name: str) -> i32:
@@ -51,6 +53,7 @@ fn capability_registry_kind_name(kind: i32) -> str:
     if kind == CapabilityKind.CK_BUILD_TOOL_FS: return "std.build.ToolFs"
     if kind == CapabilityKind.CK_BUILD_PROCESS_RUNNER: return "std.build.ProcessRunner"
     if kind == CapabilityKind.CK_BUILD_ACTION_CTX: return "std.build.ActionCtx"
+    if kind == CapabilityKind.CK_BUILD_WORKSPACE: return "std.build.Workspace"
     if kind == CapabilityKind.CK_COMPILER_DIAGNOSTICS: return "std.compiler.Diagnostics"
     if kind == CapabilityKind.CK_COMPILER_SOURCE_EMITTER: return "std.compiler.SourceEmitter"
     "none"

@@ -67,13 +67,18 @@ Completed D3 work:
    preserving the normal restriction against arbitrary runtime calls.
 4. Focused selfhost coverage proves canonical build entry points, shorthand
    default binding, and duplicate default-binding diagnostics.
+5. Sequential `Workspace` capability skeleton, including
+   `BuildCtx.create_workspace`, `BuildCtx.current_workspace`, source-file and
+   source-string inputs, typed `BuildOptions`, `Workspace.compile`, and typed
+   `BuildResult` / `Artifact` values.
+6. Focused selfhost coverage proves workspace file compilation, workspace
+   source-string compilation, BuildResult artifact construction, and the
+   `current_workspace()` failure diagnostic before a workspace exists.
 
 Remaining D3 work:
 
-1. Sequential `Workspace` API skeleton.
-2. `BuildResult` and `Artifact` values.
-3. Workspace lifetime constraints tied to `BuildCtx`.
-4. Port one existing action from `ProcessRunner.run_capture(["with", ...])`
+1. Workspace lifetime constraints tied to `BuildCtx`.
+2. Port one existing action from `ProcessRunner.run_capture(["with", ...])`
    to `workspace.compile()`.
 
 Do not start D4-D8 until D3 lands and passes the same build/fixpoint/test
@@ -100,10 +105,19 @@ The original P9 pre-D1 baseline is recorded in
 containing this project-state update:
 
 ```text
-Implement capability-bearing comptime build entries
+Implement workspace compile capability skeleton
 ```
 
 Commands passed:
+
+```sh
+make build
+out/bin/with build :cli-selfhost-build-w-tests --no-deps
+make fixpoint
+make test
+```
+
+The previous verified checkpoint also passed:
 
 ```sh
 make build
@@ -135,7 +149,8 @@ default `:test` target includes the fast emit-C smoke.
 
 Recent Phase D/pre-D commits:
 
-- current checkpoint: Implement capability-bearing comptime build entries.
+- current checkpoint: Implement workspace compile capability skeleton.
+- previous checkpoint: Implement capability-bearing comptime build entries.
 - `5e5674a` Unify build CLI parsing with BuildOptions.
 - `2cba39a` Execute build actions in-process.
 - `f5cc0c5` Evaluate build.w graphs in-process.

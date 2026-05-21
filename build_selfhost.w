@@ -1862,6 +1862,88 @@ fn bs_check_build_w_comptime_with_entry(ctx: ActionCtx, compiler_path: str, base
         return bs_fail(ctx, "duplicate comptime-with default binding unexpectedly succeeded")
     bs_assert_contains(ctx, duplicate.stderr, "duplicate capability binding", "build_w_comptime_with_duplicate")
 
+fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: str) -> i32:
+    let file_dir = bs_join(base_dir, "file_workspace")
+    var rc = bs_write_project_manifest(ctx, file_dir, "workspacefile")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(file_dir, "src/workspace_file.w"), "fn main:\n    print(\"workspace file\")\n", ctx.target_name(), "workspace file source")
+    if rc != 0: return rc
+    let file_build =
+        "use std.build\n\n" ++
+        "comptime with BuildCtx as ctx:\n" ++
+        "pub fn build -> Build:\n" ++
+        "    let ws = ctx.create_workspace(\"workspace-file\")\n" ++
+        "    if ws.name() != \"workspace-file\":\n" ++
+        "        ctx.diagnostics().error(\"workspace name mismatch\")\n" ++
+        "    ws.add_file(\"src/workspace_file.w\")\n" ++
+        "    var opts = ws.options()\n" ++
+        "    opts.output_path = \"out/bin/workspace-file\"\n" ++
+        "    ws.set_options(opts)\n" ++
+        "    let result = ws.compile()\n" ++
+        "    if result.rc != 0:\n" ++
+        "        ctx.diagnostics().error(\"workspace file compile failed\")\n" ++
+        "    if result.status != BuildStatus.ok:\n" ++
+        "        ctx.diagnostics().error(\"workspace file status mismatch\")\n" ++
+        "    if result.workspace_name != \"workspace-file\":\n" ++
+        "        ctx.diagnostics().error(\"workspace file result name mismatch\")\n" ++
+        "    if result.artifacts.len() != 1:\n" ++
+        "        ctx.diagnostics().error(\"workspace file artifact count mismatch\")\n" ++
+        "    else if result.artifacts.get(0).path != \"out/bin/workspace-file\":\n" ++
+        "        ctx.diagnostics().error(\"workspace file artifact path mismatch\")\n" ++
+        "    ctx.new_build().command(\"run-workspace-file\", \"out/bin/workspace-file\")\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(file_dir, "build.w"), file_build, ctx.target_name(), "workspace file build.w")
+    if rc != 0: return rc
+    let file_result = bs_build_w_expect_success(ctx, compiler_path, file_dir, "build-w-workspace-file", bs_blob_to_args(bs_argv_append("", "build")))
+    if file_result.rc != 0: return file_result.rc
+    rc = bs_expect_file_contains(ctx, bs_join(file_dir, "out/command/run-workspace-file/stdout.txt"), "workspace file", "build_w_workspace_file")
+    if rc != 0: return rc
+    if not ctx.fs().exists(bs_join(file_dir, "out/bin/workspace-file")):
+        return bs_fail(ctx, "missing workspace file compile output")
+
+    let string_dir = bs_join(base_dir, "string_workspace")
+    rc = bs_write_project_manifest(ctx, string_dir, "workspacestring")
+    if rc != 0: return rc
+    let string_source = bs_with_string_literal("fn main:\n    print(\"workspace string\")\n")
+    let string_build =
+        "use std.build\n\n" ++
+        "comptime with BuildCtx:\n" ++
+        "pub fn build -> Build:\n" ++
+        "    let ws = ctx.create_workspace(\"workspace-string\")\n" ++
+        "    ws.add_string(\"generated/workspace_string.w\", " ++ string_source ++ ")\n" ++
+        "    var opts = ws.options()\n" ++
+        "    opts.output_path = \"out/bin/workspace-string\"\n" ++
+        "    ws.set_options(opts)\n" ++
+        "    let result = ws.compile()\n" ++
+        "    if result.status != BuildStatus.ok:\n" ++
+        "        ctx.diagnostics().error(\"workspace string status mismatch\")\n" ++
+        "    if result.artifacts.len() != 1:\n" ++
+        "        ctx.diagnostics().error(\"workspace string artifact count mismatch\")\n" ++
+        "    ctx.new_build().command(\"run-workspace-string\", \"out/bin/workspace-string\")\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(string_dir, "build.w"), string_build, ctx.target_name(), "workspace string build.w")
+    if rc != 0: return rc
+    let string_result = bs_build_w_expect_success(ctx, compiler_path, string_dir, "build-w-workspace-string", bs_blob_to_args(bs_argv_append("", "build")))
+    if string_result.rc != 0: return string_result.rc
+    rc = bs_expect_file_contains(ctx, bs_join(string_dir, "out/command/run-workspace-string/stdout.txt"), "workspace string", "build_w_workspace_string")
+    if rc != 0: return rc
+
+    let current_dir = bs_join(base_dir, "current_workspace_before_create")
+    rc = bs_write_project_manifest(ctx, current_dir, "workspacecurrent")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(current_dir, "src/main.w"), "fn main:\n    print(\"should not build\")\n", ctx.target_name(), "workspace current source")
+    if rc != 0: return rc
+    let current_build =
+        "use std.build\n\n" ++
+        "comptime with BuildCtx as ctx:\n" ++
+        "pub fn build -> Build:\n" ++
+        "    let _ = ctx.current_workspace()\n" ++
+        "    ctx.new_build().executable(\"should-not-build\", \"src/main.w\")\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(current_dir, "build.w"), current_build, ctx.target_name(), "workspace current build.w")
+    if rc != 0: return rc
+    let current_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-workspace-current-before-create", bs_blob_to_args(bs_argv_append("", "build")), 120000, current_dir)
+    if current_result.rc == 0:
+        return bs_fail(ctx, "current_workspace before create unexpectedly succeeded")
+    bs_assert_contains(ctx, current_result.stderr, "current_workspace called before create_workspace", "build_w_workspace_current")
+
 fn bs_check_build_w_test_targets(ctx: ActionCtx, compiler_path: str, base_dir: str) -> i32:
     let single_dir = bs_join(base_dir, "single")
     var rc = bs_write_project_manifest(ctx, single_dir, "buildwtest")
@@ -2481,6 +2563,8 @@ pub fn run_cli_selfhost_build_w_action(ctx: ActionCtx) -> i32:
     var rc = bs_check_build_w_not_ignored(ctx, compiler_path, bs_join(base_dir, "not_ignored"))
     if rc != 0: return rc
     rc = bs_check_build_w_comptime_with_entry(ctx, compiler_path, bs_join(base_dir, "comptime_with"))
+    if rc != 0: return rc
+    rc = bs_check_build_w_workspace_api(ctx, compiler_path, bs_join(base_dir, "workspace_api"))
     if rc != 0: return rc
     rc = bs_check_build_w_test_targets(ctx, compiler_path, base_dir)
     if rc != 0: return rc

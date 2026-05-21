@@ -6,6 +6,7 @@ use Diagnostic
 use InternPool
 use TypeLayout
 use CapabilityRegistry
+use compiler.Compilation
 
 extern fn with_eprint(s: str) -> void
 extern fn with_fs_read_file(path: str) -> str
@@ -69,12 +70,22 @@ type ComptimeCapabilityRecord {
     package_name: str,
     package_version: str,
     project_root: str,
+    workspace_id: i32,
     target_name: str,
     inputs: Vec[str],
     outputs: Vec[str],
     args: Vec[str],
     write_scope: Vec[str],
     write_scoped: i32,
+}
+
+type ComptimeWorkspaceRecord {
+    name: str,
+    files: Vec[str],
+    string_names: Vec[str],
+    string_sources: Vec[str],
+    options: ComptimeValue,
+    migrate_options: ComptimeValue,
 }
 
 type ComptimeEvaluator {
@@ -90,6 +101,8 @@ type ComptimeEvaluator {
     active_global_syms: Vec[i32],
     active_fn_syms: Vec[i32],
     capability_records: Vec[ComptimeCapabilityRecord],
+    workspace_records: Vec[ComptimeWorkspaceRecord],
+    current_workspace_id: i32,
     next_capability_generation: i32,
     steps: i32,
     step_budget: i32,
@@ -148,6 +161,8 @@ fn ComptimeEvaluator.init(sema: Sema, ast: AstPool, pool: InternPool, require_su
         active_global_syms: Vec.new(),
         active_fn_syms: Vec.new(),
         capability_records: Vec.new(),
+        workspace_records: Vec.new(),
+        current_workspace_id: -1,
         next_capability_generation: 1,
         steps: 0,
         step_budget: COMPTIME_STEP_LIMIT,
@@ -324,6 +339,7 @@ fn comptime_capability_record(kind: i32, package_name: str, package_version: str
         package_name,
         package_version,
         project_root,
+        workspace_id: -1,
         target_name: "",
         inputs: Vec.new(),
         outputs: Vec.new(),
@@ -353,6 +369,7 @@ fn comptime_action_capability_record(package_name: str, package_version: str, pr
         package_name,
         package_version,
         project_root,
+        workspace_id: -1,
         target_name,
         inputs,
         outputs: comptime_action_outputs(output, extra_outputs),
@@ -494,6 +511,7 @@ fn ComptimeEvaluator.capability_type_name(self: ComptimeEvaluator, kind: i32) ->
     if kind == CapabilityKind.CK_BUILD_TOOL_FS: return "ToolFs"
     if kind == CapabilityKind.CK_BUILD_PROCESS_RUNNER: return "ProcessRunner"
     if kind == CapabilityKind.CK_BUILD_ACTION_CTX: return "ActionCtx"
+    if kind == CapabilityKind.CK_BUILD_WORKSPACE: return "Workspace"
     ""
 
 fn ComptimeEvaluator.capability_type_id(self: ComptimeEvaluator, kind: i32, node: i32) -> i32:
@@ -553,6 +571,83 @@ fn ComptimeEvaluator.eval_new_build_value(self: ComptimeEvaluator, record: Compt
     self.extra_values.push(targets)
     self.extra_values.push(generated_sources)
     comptime_value_struct(build_type, start, 4)
+
+fn ComptimeEvaluator.default_build_options_value(self: ComptimeEvaluator, node: i32) -> ComptimeValue:
+    let options_type = self.named_type_id("BuildOptions", node)
+    if options_type == 0:
+        return comptime_value_invalid()
+    let output_kind_type = self.named_type_id("BuildOutputKind", node)
+    let prelude_mode_type = self.named_type_id("PreludeMode", node)
+    let target_type = self.named_type_id("BuildTarget", node)
+    if output_kind_type == 0 or prelude_mode_type == 0 or target_type == 0:
+        return comptime_value_invalid()
+    let include_paths = self.empty_vec_for_field(options_type, "include_paths", node)
+    let defines = self.empty_vec_for_field(options_type, "defines", node)
+    let link_libs = self.empty_vec_for_field(options_type, "link_libs", node)
+    if include_paths.kind == ComptimeValueKind.CV_INVALID or defines.kind == ComptimeValueKind.CV_INVALID or link_libs.kind == ComptimeValueKind.CV_INVALID:
+        return comptime_value_invalid()
+    let start = self.extra_values.len() as i32
+    self.extra_values.push(comptime_value_str(""))
+    self.extra_values.push(comptime_value_str(""))
+    self.extra_values.push(comptime_value_int(output_kind_type, 0))
+    self.extra_values.push(comptime_value_int(self.sema.ty_i32 as i32, 1))
+    self.extra_values.push(comptime_value_bool(1))
+    self.extra_values.push(comptime_value_bool(0))
+    self.extra_values.push(comptime_value_bool(0))
+    self.extra_values.push(comptime_value_int(prelude_mode_type, 0))
+    self.extra_values.push(comptime_value_bool(0))
+    self.extra_values.push(comptime_value_int(target_type, 0))
+    self.extra_values.push(include_paths)
+    self.extra_values.push(defines)
+    self.extra_values.push(link_libs)
+    self.extra_values.push(comptime_value_bool(1))
+    comptime_value_struct(options_type, start, 14)
+
+fn ComptimeEvaluator.default_migrate_options_value(self: ComptimeEvaluator, node: i32) -> ComptimeValue:
+    let options_type = self.named_type_id("MigrateOptions", node)
+    if options_type == 0:
+        return comptime_value_invalid()
+    let include_paths = self.empty_vec_for_field(options_type, "include_paths", node)
+    let forced_includes = self.empty_vec_for_field(options_type, "forced_includes", node)
+    let defines = self.empty_vec_for_field(options_type, "defines", node)
+    let exclude_basenames = self.empty_vec_for_field(options_type, "exclude_basenames", node)
+    if include_paths.kind == ComptimeValueKind.CV_INVALID or forced_includes.kind == ComptimeValueKind.CV_INVALID or defines.kind == ComptimeValueKind.CV_INVALID or exclude_basenames.kind == ComptimeValueKind.CV_INVALID:
+        return comptime_value_invalid()
+    let start = self.extra_values.len() as i32
+    self.extra_values.push(comptime_value_str(""))
+    self.extra_values.push(comptime_value_str(""))
+    self.extra_values.push(include_paths)
+    self.extra_values.push(forced_includes)
+    self.extra_values.push(defines)
+    self.extra_values.push(exclude_basenames)
+    self.extra_values.push(comptime_value_bool(0))
+    self.extra_values.push(comptime_value_bool(0))
+    self.extra_values.push(comptime_value_bool(0))
+    self.extra_values.push(comptime_value_bool(1))
+    self.extra_values.push(comptime_value_bool(0))
+    self.extra_values.push(comptime_value_bool(0))
+    self.extra_values.push(comptime_value_int(self.sema.ty_i32 as i32, 0))
+    self.extra_values.push(comptime_value_int(self.sema.ty_i32 as i32, 8))
+    self.extra_values.push(comptime_value_str(""))
+    self.extra_values.push(comptime_value_str(""))
+    self.extra_values.push(comptime_value_str(""))
+    self.extra_values.push(comptime_value_bool(0))
+    comptime_value_struct(options_type, start, 18)
+
+fn ComptimeEvaluator.new_workspace_record(self: ComptimeEvaluator, name: str, node: i32) -> ComptimeWorkspaceRecord:
+    ComptimeWorkspaceRecord {
+        name,
+        files: Vec.new(),
+        string_names: Vec.new(),
+        string_sources: Vec.new(),
+        options: self.default_build_options_value(node),
+        migrate_options: self.default_migrate_options_value(node),
+    }
+
+fn ComptimeEvaluator.store_workspace_record(self: ComptimeEvaluator, workspace_id: i32, record: ComptimeWorkspaceRecord):
+    let slot_index = workspace_id as i64
+    with self.workspace_records.slot(slot_index) as mut slot:
+        slot.set(record)
 
 fn ComptimeEvaluator.mint_capability(self: ComptimeEvaluator, type_id: i32, record: ComptimeCapabilityRecord) -> ComptimeValue:
     var stored = record
@@ -1465,7 +1560,187 @@ fn ComptimeEvaluator.tool_process_result(self: ComptimeEvaluator, rc: i32, stdou
     self.extra_values.push(comptime_value_str(with_fs_read_file(stderr_path)))
     comptime_control_value(comptime_value_struct(result_type, start, 3))
 
+fn ComptimeEvaluator.workspace_record_index(self: ComptimeEvaluator, recv_value: ComptimeValue, method: str, node: i32) -> i32:
+    let handle = self.validate_capability(recv_value, CapabilityKind.CK_BUILD_WORKSPACE, method, node)
+    if handle < 0:
+        return -1
+    let capability = self.capability_records.get(handle as i64)
+    let workspace_id = capability.workspace_id
+    if workspace_id < 0 or workspace_id >= self.workspace_records.len() as i32:
+        let _ = self.fail(node, "invalid Workspace handle for " ++ method)
+        return -1
+    workspace_id
+
+fn ComptimeEvaluator.workspace_path(self: ComptimeEvaluator, root: str, path: str) -> str:
+    if path.len() == 0:
+        return path
+    if path.byte_at(0) == 47:
+        return path
+    let clean_root = if root.ends_with("/"): root.slice(0, root.len() - 1) else: root
+    clean_root ++ "/" ++ path
+
+fn ComptimeEvaluator.workspace_str_vec_field(self: ComptimeEvaluator, options: ComptimeValue, field_name: str) -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    let value = self.struct_field_value_by_name(options, field_name)
+    if value.kind != ComptimeValueKind.CV_VEC and value.kind != ComptimeValueKind.CV_ARRAY:
+        return out
+    for i in 0..value.extra_count:
+        let item = self.extra_values.get((value.extra_start + i) as i64)
+        if item.kind == ComptimeValueKind.CV_STR:
+            out.push(item.text)
+    out
+
+fn ComptimeEvaluator.workspace_str_option(self: ComptimeEvaluator, options: ComptimeValue, field_name: str) -> str:
+    let value = self.struct_field_value_by_name(options, field_name)
+    if value.kind == ComptimeValueKind.CV_STR:
+        return value.text
+    ""
+
+fn ComptimeEvaluator.workspace_i32_option(self: ComptimeEvaluator, options: ComptimeValue, field_name: str, default_value: i32) -> i32:
+    let value = self.struct_field_value_by_name(options, field_name)
+    if value.kind == ComptimeValueKind.CV_INT:
+        return value.data0 as i32
+    default_value
+
+fn ComptimeEvaluator.workspace_bool_option(self: ComptimeEvaluator, options: ComptimeValue, field_name: str, default_value: bool) -> bool:
+    let value = self.struct_field_value_by_name(options, field_name)
+    if value.kind == ComptimeValueKind.CV_BOOL:
+        return value.data0 != 0
+    default_value
+
+fn ComptimeEvaluator.workspace_artifact_kind_for_output(self: ComptimeEvaluator, output_kind: i32) -> i32:
+    if output_kind == 1: return 1
+    if output_kind == 2: return 4
+    if output_kind == 3: return 5
+    if output_kind == 4: return 2
+    0
+
+fn ComptimeEvaluator.workspace_build_result_value(self: ComptimeEvaluator, workspace_name: str, rc: i32, artifact_kind: i32, artifact_path: str, node: i32) -> ComptimeValue:
+    let result_type = self.named_type_id("BuildResult", node)
+    let artifact_type = self.named_type_id("Artifact", node)
+    let build_status_type = self.named_type_id("BuildStatus", node)
+    let artifact_kind_type = self.named_type_id("ArtifactKind", node)
+    if result_type == 0 or artifact_type == 0 or build_status_type == 0 or artifact_kind_type == 0:
+        return comptime_value_invalid()
+    let artifact_vec = self.empty_vec_for_field(result_type, "artifacts", node)
+    let diagnostic_vec = self.empty_vec_for_field(result_type, "diagnostics", node)
+    if artifact_vec.kind == ComptimeValueKind.CV_INVALID or diagnostic_vec.kind == ComptimeValueKind.CV_INVALID:
+        return comptime_value_invalid()
+
+    let artifact_vec_type = artifact_vec.type_id
+    var artifacts = artifact_vec
+    if rc == 0 and artifact_path.len() > 0:
+        let artifact_start = self.extra_values.len() as i32
+        self.extra_values.push(comptime_value_int(artifact_kind_type, artifact_kind as i64))
+        self.extra_values.push(comptime_value_str(artifact_path))
+        let artifact = comptime_value_struct(artifact_type, artifact_start, 2)
+        let vec_start = self.extra_values.len() as i32
+        self.extra_values.push(artifact)
+        artifacts = comptime_value_vec(artifact_vec_type, vec_start, 1)
+
+    let result_start = self.extra_values.len() as i32
+    self.extra_values.push(comptime_value_int(build_status_type, if rc == 0: 0 else: 1))
+    self.extra_values.push(comptime_value_int(self.sema.ty_i32 as i32, rc as i64))
+    self.extra_values.push(comptime_value_str(workspace_name))
+    self.extra_values.push(artifacts)
+    self.extra_values.push(diagnostic_vec)
+    comptime_value_struct(result_type, result_start, 5)
+
+fn ComptimeEvaluator.compile_workspace_record(self: ComptimeEvaluator, record: ComptimeWorkspaceRecord, capability: ComptimeCapabilityRecord, node: i32) -> ComptimeValue:
+    let options = record.options
+    let option_source = self.workspace_str_option(options, "source_path")
+    var source_path = option_source
+    if source_path.len() == 0 and record.files.len() > 0:
+        source_path = record.files.get(0)
+    let output_path = self.workspace_str_option(options, "output_path")
+    let output_kind = self.workspace_i32_option(options, "output_kind", 0)
+    let target_kind = self.workspace_i32_option(options, "target", 0)
+    if target_kind != 0:
+        let _ = self.fail(node, "Workspace.compile currently supports only the native target")
+        return comptime_value_invalid()
+    if source_path.len() == 0 and record.string_names.len() == 0:
+        let _ = self.fail(node, "Workspace.compile requires at least one source file or source string")
+        return comptime_value_invalid()
+    var final_output = output_path
+    if final_output.len() == 0:
+        final_output = "out/bin/" ++ record.name
+        if output_kind == 1:
+            final_output = "out/obj/" ++ record.name ++ ".o"
+        else if output_kind == 2:
+            final_output = "out/gen/" ++ record.name ++ ".c"
+        else if output_kind == 4:
+            final_output = "out/lib/lib" ++ record.name ++ ".a"
+    let absolute_output = self.workspace_path(capability.project_root, final_output)
+    let include_paths = self.workspace_str_vec_field(options, "include_paths")
+    let defines = self.workspace_str_vec_field(options, "defines")
+    let link_libs = self.workspace_str_vec_field(options, "link_libs")
+
+    var comp = Compilation.init()
+    comp.configure(self.workspace_i32_option(options, "opt_level", 1), self.workspace_bool_option(options, "no_std", false), self.workspace_bool_option(options, "alloc_mode", false))
+    comp.set_debug_info(self.workspace_bool_option(options, "debug_info", true))
+    comp.set_compiler_hooks_enabled(self.workspace_bool_option(options, "compiler_hooks_enabled", true))
+    comp.set_prelude_mode(self.workspace_i32_option(options, "prelude_mode", 0))
+
+    var artifact_path = ""
+    if record.string_names.len() > 0:
+        if output_kind != 0:
+            let _ = self.fail(node, "Workspace.compile source strings currently support binary output only")
+            return comptime_value_invalid()
+        let string_name = record.string_names.get(0)
+        let string_source = record.string_sources.get(0)
+        artifact_path = comp.build_entry_binary_from_source_to_path(self.workspace_path(capability.project_root, string_name), string_source, absolute_output)
+    else:
+        let absolute_source = self.workspace_path(capability.project_root, source_path)
+        if output_kind == 0:
+            artifact_path = comp.build_binary_to_path_with_build_settings(absolute_source, absolute_output, include_paths, defines, link_libs)
+        else if output_kind == 1:
+            artifact_path = comp.emit_object_to_path_with_build_settings(absolute_source, absolute_output, include_paths, defines, link_libs)
+        else if output_kind == 2:
+            artifact_path = comp.emit_c(absolute_source, absolute_output)
+        else if output_kind == 4:
+            artifact_path = comp.emit_archive_to_path_with_build_settings(absolute_source, absolute_output, include_paths, defines, link_libs)
+        else:
+            let _ = self.fail(node, "Workspace.compile output kind is not implemented yet")
+            return comptime_value_invalid()
+    let rc = if artifact_path.len() > 0: 0 else: 1
+    self.workspace_build_result_value(record.name, rc, self.workspace_artifact_kind_for_output(output_kind), final_output, node)
+
 fn ComptimeEvaluator.eval_buildctx_capability_method(self: ComptimeEvaluator, recv_value: ComptimeValue, method: str, arg_count: i32, node: i32) -> ComptimeControl:
+    if method == "create_workspace":
+        if not self.capability_expect_arg_count(arg_count, 1, method, node):
+            return comptime_control_error()
+        let handle = self.validate_capability(recv_value, CapabilityKind.CK_BUILD_CTX, method, node)
+        if handle < 0:
+            return comptime_control_error()
+        let args_signal = self.capability_args(self.ast.get_data1(node), arg_count)
+        if args_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return args_signal
+        let name = self.capability_arg_str(args_signal.value, 0, method, node)
+        let workspace_id = self.workspace_records.len() as i32
+        self.workspace_records.push(self.new_workspace_record(name, node))
+        self.current_workspace_id = workspace_id
+        let workspace_type = self.capability_type_id(CapabilityKind.CK_BUILD_WORKSPACE, node)
+        if workspace_type == 0:
+            return comptime_control_error()
+        var record = self.capability_records.get(handle as i64)
+        record.kind = CapabilityKind.CK_BUILD_WORKSPACE
+        record.workspace_id = workspace_id
+        return comptime_control_value(self.mint_capability(workspace_type, record))
+    if method == "current_workspace":
+        if not self.capability_expect_arg_count(arg_count, 0, method, node):
+            return comptime_control_error()
+        let handle = self.validate_capability(recv_value, CapabilityKind.CK_BUILD_CTX, method, node)
+        if handle < 0:
+            return comptime_control_error()
+        if self.current_workspace_id < 0:
+            return self.fail(node, "BuildCtx.current_workspace called before create_workspace")
+        let workspace_type = self.capability_type_id(CapabilityKind.CK_BUILD_WORKSPACE, node)
+        if workspace_type == 0:
+            return comptime_control_error()
+        var record = self.capability_records.get(handle as i64)
+        record.kind = CapabilityKind.CK_BUILD_WORKSPACE
+        record.workspace_id = self.current_workspace_id
+        return comptime_control_value(self.mint_capability(workspace_type, record))
     if method == "new_build":
         if not self.capability_expect_arg_count(arg_count, 0, method, node):
             return comptime_control_error()
@@ -1846,6 +2121,69 @@ fn ComptimeEvaluator.eval_actionctx_capability_method(self: ComptimeEvaluator, r
         child.write_scoped = 1
     comptime_control_value(self.mint_capability(child_type, child))
 
+fn ComptimeEvaluator.eval_workspace_capability_method(self: ComptimeEvaluator, recv_value: ComptimeValue, method: str, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
+    let workspace_id = self.workspace_record_index(recv_value, method, node)
+    if workspace_id < 0:
+        return comptime_control_error()
+    var record = self.workspace_records.get(workspace_id as i64)
+    let capability_handle = self.validate_capability(recv_value, CapabilityKind.CK_BUILD_WORKSPACE, method, node)
+    if capability_handle < 0:
+        return comptime_control_error()
+    let capability = self.capability_records.get(capability_handle as i64)
+    if method == "name":
+        if not self.capability_expect_arg_count(arg_count, 0, method, node):
+            return comptime_control_error()
+        return comptime_control_value(comptime_value_str(record.name))
+    if method == "add_file":
+        if not self.capability_expect_arg_count(arg_count, 1, method, node):
+            return comptime_control_error()
+        let args_signal = self.capability_args(extra_start, arg_count)
+        if args_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return args_signal
+        record.files.push(self.capability_arg_str(args_signal.value, 0, method, node))
+        self.store_workspace_record(workspace_id, record)
+        return comptime_control_value(comptime_value_void(0))
+    if method == "add_string":
+        if not self.capability_expect_arg_count(arg_count, 2, method, node):
+            return comptime_control_error()
+        let args_signal = self.capability_args(extra_start, arg_count)
+        if args_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return args_signal
+        record.string_names.push(self.capability_arg_str(args_signal.value, 0, method, node))
+        record.string_sources.push(self.capability_arg_str(args_signal.value, 1, method, node))
+        self.store_workspace_record(workspace_id, record)
+        return comptime_control_value(comptime_value_void(0))
+    if method == "options":
+        if not self.capability_expect_arg_count(arg_count, 0, method, node):
+            return comptime_control_error()
+        return comptime_control_value(record.options)
+    if method == "set_options":
+        if not self.capability_expect_arg_count(arg_count, 1, method, node):
+            return comptime_control_error()
+        let args_signal = self.capability_args(extra_start, arg_count)
+        if args_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return args_signal
+        record.options = self.extra_values.get(args_signal.value.extra_start)
+        self.store_workspace_record(workspace_id, record)
+        return comptime_control_value(comptime_value_void(0))
+    if method == "set_migrate_options":
+        if not self.capability_expect_arg_count(arg_count, 1, method, node):
+            return comptime_control_error()
+        let args_signal = self.capability_args(extra_start, arg_count)
+        if args_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return args_signal
+        record.migrate_options = self.extra_values.get(args_signal.value.extra_start)
+        self.store_workspace_record(workspace_id, record)
+        return comptime_control_value(comptime_value_void(0))
+    if method == "compile":
+        if not self.capability_expect_arg_count(arg_count, 0, method, node):
+            return comptime_control_error()
+        let result = self.compile_workspace_record(record, capability, node)
+        if result.kind == ComptimeValueKind.CV_INVALID:
+            return comptime_control_error()
+        return comptime_control_value(result)
+    self.fail(node, "Workspace capability method '" ++ method ++ "' is not implemented yet")
+
 fn ComptimeEvaluator.eval_capability_method_call(self: ComptimeEvaluator, recv_value: ComptimeValue, field: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
     let method = self.pool.resolve(field)
     let kind = recv_value.data0 as i32
@@ -1863,6 +2201,8 @@ fn ComptimeEvaluator.eval_capability_method_call(self: ComptimeEvaluator, recv_v
         return self.eval_process_runner_capability_method(recv_value, method, extra_start, arg_count, node)
     if kind == CapabilityKind.CK_BUILD_ACTION_CTX:
         return self.eval_actionctx_capability_method(recv_value, method, arg_count, node)
+    if kind == CapabilityKind.CK_BUILD_WORKSPACE:
+        return self.eval_workspace_capability_method(recv_value, method, extra_start, arg_count, node)
     self.fail(node, "capability method dispatch is not implemented for " ++ capability_registry_kind_name(kind) ++ "." ++ method)
 
 fn ComptimeEvaluator.eval_module_let_decl(self: ComptimeEvaluator, decl: i32, use_node: i32) -> ComptimeControl:
