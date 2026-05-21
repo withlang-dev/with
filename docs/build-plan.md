@@ -15,6 +15,9 @@ compiler driver.
 Already implemented:
 
 - `build.w` discovery and tool-mode execution.
+- Canonical capability-bearing comptime entry syntax:
+  `comptime with BuildCtx as ctx:`, with standard default-binding shorthand
+  such as `comptime with BuildCtx:`.
 - Driver-minted `BuildCtx` and narrower tool capabilities.
 - Sandboxed project-relative `ToolFs`.
 - Graph v2 serialization/parsing.
@@ -359,6 +362,33 @@ Commit after this phase.
 ## 7. Phase D: Complete Tool-Mode Compiler Driver APIs
 
 Goal: With has the Jai-style compiler-driver surface required by the spec.
+
+Phase D uses capability-bearing comptime as the public model. The canonical
+form is:
+
+```with
+comptime with BuildCtx as ctx:
+pub fn build -> Build:
+    ...
+```
+
+Capabilities are lexical bindings introduced by the `with` clause. For
+brevity, standard capabilities also have default bindings:
+
+| Capability | Default binding |
+|------------|-----------------|
+| `BuildCtx` | `ctx` |
+| `ActionCtx` | `ctx` |
+| `ToolFs` | `fs` |
+| `ProcessRunner` | `proc` |
+| `Diagnostics` | `diag` |
+| `SourceEmitter` | `emit` |
+| `ProjectInfo` | `project` |
+| `Workspace` | `workspace` |
+
+The shorthand `comptime with Capability:` is valid only for capabilities with
+standard defaults. Duplicate or ambiguous default bindings must be written
+explicitly with `as name`.
 
 Implement:
 
