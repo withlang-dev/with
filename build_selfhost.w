@@ -1815,6 +1815,53 @@ fn bs_check_build_w_not_ignored(ctx: ActionCtx, compiler_path: str, case_dir: st
     if explicit.rc != 0: return explicit.rc
     0
 
+fn bs_check_build_w_comptime_with_entry(ctx: ActionCtx, compiler_path: str, base_dir: str) -> i32:
+    let canonical_dir = bs_join(base_dir, "canonical")
+    var rc = bs_write_project_manifest(ctx, canonical_dir, "comptimewithcanonical")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(canonical_dir, "src/main.w"), "fn main:\n    print(\"canonical comptime with\")\n", ctx.target_name(), "canonical source")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(canonical_dir, "build.w"), "use std.build\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    var out = ctx.new_build()\n    out.executable(\"canonical\", \"src/main.w\")\n", ctx.target_name(), "canonical comptime-with build.w")
+    if rc != 0: return rc
+    let canonical = bs_build_w_expect_success(ctx, compiler_path, canonical_dir, "build-w-comptime-with-canonical", bs_blob_to_args(bs_argv_append("", "build")))
+    if canonical.rc != 0: return canonical.rc
+    let canonical_bin = bs_join(canonical_dir, "out/bin/canonical")
+    if not ctx.fs().exists(canonical_bin):
+        return bs_fail(ctx, "missing canonical comptime-with output")
+    let canonical_run = bs_run_binary_capture(ctx, canonical_bin, "build-w-comptime-with-canonical-run", 120000)
+    if canonical_run.rc != 0: return canonical_run.rc
+    rc = bs_assert_contains(ctx, canonical_run.stdout, "canonical comptime with", "build_w_comptime_with_canonical")
+    if rc != 0: return rc
+
+    let shorthand_dir = bs_join(base_dir, "shorthand")
+    rc = bs_write_project_manifest(ctx, shorthand_dir, "comptimewithshorthand")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(shorthand_dir, "src/main.w"), "fn main:\n    print(\"shorthand comptime with\")\n", ctx.target_name(), "shorthand source")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(shorthand_dir, "build.w"), "use std.build\n\ncomptime with BuildCtx:\npub fn build -> Build:\n    ctx.new_build().executable(\"shorthand\", \"src/main.w\")\n", ctx.target_name(), "shorthand comptime-with build.w")
+    if rc != 0: return rc
+    let shorthand = bs_build_w_expect_success(ctx, compiler_path, shorthand_dir, "build-w-comptime-with-shorthand", bs_blob_to_args(bs_argv_append("", "build")))
+    if shorthand.rc != 0: return shorthand.rc
+    let shorthand_bin = bs_join(shorthand_dir, "out/bin/shorthand")
+    if not ctx.fs().exists(shorthand_bin):
+        return bs_fail(ctx, "missing shorthand comptime-with output")
+    let shorthand_run = bs_run_binary_capture(ctx, shorthand_bin, "build-w-comptime-with-shorthand-run", 120000)
+    if shorthand_run.rc != 0: return shorthand_run.rc
+    rc = bs_assert_contains(ctx, shorthand_run.stdout, "shorthand comptime with", "build_w_comptime_with_shorthand")
+    if rc != 0: return rc
+
+    let duplicate_dir = bs_join(base_dir, "duplicate_default")
+    rc = bs_write_project_manifest(ctx, duplicate_dir, "comptimewithduplicate")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(duplicate_dir, "src/main.w"), "fn main:\n    print(\"should not build\")\n", ctx.target_name(), "duplicate source")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(duplicate_dir, "build.w"), "use std.build\n\ncomptime with BuildCtx, ActionCtx:\npub fn build -> Build:\n    ctx.new_build().executable(\"duplicate\", \"src/main.w\")\n", ctx.target_name(), "duplicate comptime-with build.w")
+    if rc != 0: return rc
+    let duplicate = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-comptime-with-duplicate", bs_blob_to_args(bs_argv_append("", "build")), 120000, duplicate_dir)
+    if duplicate.rc == 0:
+        return bs_fail(ctx, "duplicate comptime-with default binding unexpectedly succeeded")
+    bs_assert_contains(ctx, duplicate.stderr, "duplicate capability binding", "build_w_comptime_with_duplicate")
+
 fn bs_check_build_w_test_targets(ctx: ActionCtx, compiler_path: str, base_dir: str) -> i32:
     let single_dir = bs_join(base_dir, "single")
     var rc = bs_write_project_manifest(ctx, single_dir, "buildwtest")
@@ -2432,6 +2479,8 @@ pub fn run_cli_selfhost_build_w_action(ctx: ActionCtx) -> i32:
     let compiler_path = bs_abs(ctx.project_info().project_root(), compiler_input)
     let base_dir = output_dir
     var rc = bs_check_build_w_not_ignored(ctx, compiler_path, bs_join(base_dir, "not_ignored"))
+    if rc != 0: return rc
+    rc = bs_check_build_w_comptime_with_entry(ctx, compiler_path, bs_join(base_dir, "comptime_with"))
     if rc != 0: return rc
     rc = bs_check_build_w_test_targets(ctx, compiler_path, base_dir)
     if rc != 0: return rc

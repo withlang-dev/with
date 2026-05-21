@@ -13,7 +13,7 @@ conversation context after compaction.
 
 Phase C extraction work is complete. Pre-Phase-D preparation is complete
 through P9, including the follow-up source-location diagnostic gap. Phase D D1
-and D2 are complete.
+and D2 are complete. Phase D D3 is in progress.
 
 Completed D1 sub-slices:
 
@@ -55,8 +55,29 @@ Completed D2 work:
    `comptime with BuildCtx as ctx:`, with `comptime with BuildCtx:` as the
    standard default-binding shorthand.
 
-Next Phase D work starts at D3. Do not start D4-D8 until D3 lands and passes
-the same build/fixpoint/test baseline.
+Completed D3 work:
+
+1. Parser support for `comptime with Capability as name:` and standard
+   default-binding shorthand.
+2. Build entry points written as `comptime with BuildCtx as ctx:` or
+   `comptime with BuildCtx:` lower to the existing explicit `build(ctx)`
+   entry shape used by the evaluator-backed driver.
+3. Sema allows trusted `std.build` and `std.compiler` implementation-boundary
+   functions to be called from capability-bearing comptime functions while
+   preserving the normal restriction against arbitrary runtime calls.
+4. Focused selfhost coverage proves canonical build entry points, shorthand
+   default binding, and duplicate default-binding diagnostics.
+
+Remaining D3 work:
+
+1. Sequential `Workspace` API skeleton.
+2. `BuildResult` and `Artifact` values.
+3. Workspace lifetime constraints tied to `BuildCtx`.
+4. Port one existing action from `ProcessRunner.run_capture(["with", ...])`
+   to `workspace.compile()`.
+
+Do not start D4-D8 until D3 lands and passes the same build/fixpoint/test
+baseline.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.
@@ -79,13 +100,14 @@ The original P9 pre-D1 baseline is recorded in
 containing this project-state update:
 
 ```text
-Unify build CLI parsing with BuildOptions
+Implement capability-bearing comptime build entries
 ```
 
 Commands passed:
 
 ```sh
 make build
+out/bin/with build :cli-selfhost-build-w-tests --no-deps
 out/bin/with build :build
 out/bin/with build :fixpoint
 out/bin/with build :test
@@ -113,7 +135,8 @@ default `:test` target includes the fast emit-C smoke.
 
 Recent Phase D/pre-D commits:
 
-- current checkpoint: Unify build CLI parsing with BuildOptions.
+- current checkpoint: Implement capability-bearing comptime build entries.
+- `5e5674a` Unify build CLI parsing with BuildOptions.
 - `2cba39a` Execute build actions in-process.
 - `f5cc0c5` Evaluate build.w graphs in-process.
 - previous checkpoint: Implement source-location magic constants.

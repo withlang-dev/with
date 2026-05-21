@@ -2853,9 +2853,9 @@ fn Sema.check_if_expr(self: Sema, node: i32) -> i32:
     result_type as i32
 
 fn Sema.fn_symbol_is_comptime(self: Sema, fn_sym: i32) -> i32:
-    if not self.fn_decl_nodes.contains(fn_sym):
+    let fn_node = self.fn_symbol_decl_node(fn_sym)
+    if fn_node == 0:
         return 0
-    let fn_node = self.fn_decl_nodes.get(fn_sym).unwrap()
     if self.ast.is_comptime_decl_node(fn_node) != 0:
         return 1
     let meta = self.ast.find_fn_meta(fn_node)
@@ -2863,6 +2863,30 @@ fn Sema.fn_symbol_is_comptime(self: Sema, fn_sym: i32) -> i32:
         return 0
     let flags = self.ast.fn_meta_flags(meta)
     if (flags / FnFlags.COMPTIME) % 2 == 1:
+        return 1
+    0
+
+fn Sema.fn_symbol_decl_node(self: Sema, fn_sym: i32) -> i32:
+    if self.fn_decl_nodes.contains(fn_sym):
+        return self.fn_decl_nodes.get(fn_sym).unwrap()
+    if self.generic_fn_nodes.contains(fn_sym):
+        return self.generic_fn_nodes.get(fn_sym).unwrap()
+    0
+
+fn Sema.fn_symbol_source_path(self: Sema, fn_sym: i32) -> str:
+    let fn_node = self.fn_symbol_decl_node(fn_sym)
+    if fn_node == 0:
+        return ""
+    let di = self.find_decl_index(fn_node)
+    if di >= 0 and di < self.decl_source_paths.len() as i32:
+        return self.decl_source_paths.get(di as i64)
+    ""
+
+fn Sema.fn_symbol_is_tool_comptime_allowed(self: Sema, fn_sym: i32) -> i32:
+    let source_path = self.fn_symbol_source_path(fn_sym)
+    if capability_registry_is_std_build_path(source_path):
+        return 1
+    if capability_registry_is_std_compiler_path(source_path):
         return 1
     0
 
@@ -2878,6 +2902,8 @@ fn Sema.check_comptime_call_restriction(self: Sema, fn_sym: i32, node: i32) -> i
         self.emit_error("runtime intrinsic is not allowed in comptime", node)
         return 1
     if self.fn_decl_nodes.contains(fn_sym) or self.generic_fn_nodes.contains(fn_sym):
+        if self.fn_symbol_is_tool_comptime_allowed(fn_sym) != 0:
+            return 0
         if self.fn_symbol_is_comptime(fn_sym) == 0:
             self.emit_error("comptime can only call comptime functions", node)
             return 1
@@ -2885,6 +2911,8 @@ fn Sema.check_comptime_call_restriction(self: Sema, fn_sym: i32, node: i32) -> i
 
 fn Sema.check_comptime_method_restriction(self: Sema, method_sym: i32, node: i32) -> i32:
     if self.in_comptime_fn == 0 or method_sym == 0:
+        return 0
+    if self.fn_symbol_is_tool_comptime_allowed(method_sym) != 0:
         return 0
     if self.fn_symbol_is_comptime(method_sym) == 0:
         self.emit_error("comptime can only call comptime functions", node)
