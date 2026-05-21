@@ -80,6 +80,7 @@ Operational rules:
 
 * Pure `comptime` evaluation is deterministic and effect-free. The existing `ComptimeEval` infrastructure handles this case.
 * A capability-bearing comptime function declares its required capabilities in a `comptime with` clause. The canonical spelling is `comptime with CapabilityType as local_name:`. The function's effects are bounded by the capabilities it receives.
+* Capability access is through the local binding introduced by the `with` clause. The clause does not create implicit globals; it binds driver-minted capability values into the function's lexical scope.
 * `comptime with CapabilityType:` is shorthand only when that capability has a standard default binding. Initial defaults: `BuildCtx` and `ActionCtx` bind as `ctx`, `ToolFs` as `fs`, `ProcessRunner` as `proc`, `Diagnostics` as `diag`, `SourceEmitter` as `emit`, `ProjectInfo` as `project`, and `Workspace` as `workspace`. Ambiguous duplicate defaults require explicit `as` bindings.
 * Capability values are unforgeable, driver-minted handles. User code cannot construct, deserialize, or forge them.
 * The compiler driver is the sole entity that mints top-level capabilities, and it does so at well-defined points: evaluating `build` with `BuildCtx` at build-graph construction, dispatching action functions with `ActionCtx`, and so on.

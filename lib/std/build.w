@@ -128,6 +128,48 @@ pub type MigrateOptions {
     ir_roundtrip: bool,
 }
 
+pub enum BuildStatus: i32:
+    ok = 0
+    failed = 1
+    crashed = 2
+    cancelled = 3
+
+pub enum ArtifactKind: i32:
+    executable = 0
+    object = 1
+    static_library = 2
+    dynamic_library = 3
+    c_source = 4
+    llvm_ir = 5
+    diagnostics = 6
+
+pub type SourceSpan {
+    file: str,
+    start: i32,
+    end: i32,
+    line: i32,
+    column: i32,
+}
+
+pub type DiagnosticSummary {
+    severity: str,
+    message: str,
+    source: SourceSpan,
+}
+
+pub type Artifact {
+    kind: ArtifactKind,
+    path: str,
+}
+
+pub type BuildResult {
+    status: BuildStatus,
+    rc: i32,
+    workspace_name: str,
+    artifacts: Vec[Artifact],
+    diagnostics: Vec[DiagnosticSummary],
+}
+
 pub type Package {
     name: str,
     version: str,
@@ -155,6 +197,11 @@ pub type ToolFs {
 
 pub type ProcessRunner {
     token: str,
+}
+
+pub type Workspace {
+    token: str,
+    id: i32,
 }
 
 pub type ProcessEnvVar {
@@ -269,6 +316,77 @@ pub fn BuildCtx.fs(self: &Self) -> ToolFs:
 pub fn BuildCtx.process_runner(self: &Self) -> ProcessRunner:
     tool_capability_require(self.token, "ProcessRunner")
     self.process_runner
+
+pub fn BuildCtx.create_workspace(self: &Self, name: str) -> Workspace:
+    tool_capability_require(self.token, "Workspace")
+    with_eprint("error: BuildCtx.create_workspace requires compiler driver comptime evaluation\n")
+    exit(1)
+    Workspace { self.token, -1 }
+
+pub fn BuildCtx.current_workspace(self: &Self) -> Workspace:
+    tool_capability_require(self.token, "Workspace")
+    with_eprint("error: BuildCtx.current_workspace requires compiler driver comptime evaluation\n")
+    exit(1)
+    Workspace { self.token, -1 }
+
+pub fn Workspace.name(self: &Self) -> str:
+    tool_capability_require(self.token, "Workspace")
+    with_eprint("error: Workspace.name requires compiler driver comptime evaluation\n")
+    exit(1)
+    ""
+
+pub fn Workspace.add_file(self: &Self, path: str):
+    tool_capability_require(self.token, "Workspace")
+    with_eprint("error: Workspace.add_file requires compiler driver comptime evaluation\n")
+    exit(1)
+
+pub fn Workspace.add_string(self: &Self, name: str, source: str):
+    tool_capability_require(self.token, "Workspace")
+    with_eprint("error: Workspace.add_string requires compiler driver comptime evaluation\n")
+    exit(1)
+
+pub fn Workspace.options(self: &Self) -> BuildOptions:
+    tool_capability_require(self.token, "Workspace")
+    with_eprint("error: Workspace.options requires compiler driver comptime evaluation\n")
+    exit(1)
+    BuildOptions {
+        source_path: "",
+        output_path: "",
+        output_kind: BuildOutputKind.Binary,
+        opt_level: 1,
+        debug_info: true,
+        no_std: false,
+        alloc_mode: false,
+        prelude_mode: PreludeMode.Full,
+        deterministic: false,
+        target: BuildTarget.native,
+        include_paths: Vec.new(),
+        defines: Vec.new(),
+        link_libs: Vec.new(),
+        compiler_hooks_enabled: true,
+    }
+
+pub fn Workspace.set_options(self: &Self, options: BuildOptions):
+    tool_capability_require(self.token, "Workspace")
+    with_eprint("error: Workspace.set_options requires compiler driver comptime evaluation\n")
+    exit(1)
+
+pub fn Workspace.set_migrate_options(self: &Self, options: MigrateOptions):
+    tool_capability_require(self.token, "Workspace")
+    with_eprint("error: Workspace.set_migrate_options requires compiler driver comptime evaluation\n")
+    exit(1)
+
+pub fn Workspace.compile(self: &Self) -> BuildResult:
+    tool_capability_require(self.token, "Workspace")
+    with_eprint("error: Workspace.compile requires compiler driver comptime evaluation\n")
+    exit(1)
+    BuildResult {
+        status: BuildStatus.failed,
+        rc: 1,
+        workspace_name: "",
+        artifacts: Vec.new(),
+        diagnostics: Vec.new(),
+    }
 
 pub fn process_env() -> ProcessEnv:
     ProcessEnv { vars: Vec.new() }
