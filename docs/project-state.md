@@ -112,6 +112,9 @@ Completed D4 substrate work:
    at the evaluator boundary. A build script that returns with an active
    intercept and no delivered terminal message fails loudly instead of
    materializing a graph.
+6. Intercepted `Workspace.compile()` now queues the terminal phase marker and
+   terminal payload as separate messages: `Phase(complete)` followed by
+   `Complete(BuildResult)`.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.

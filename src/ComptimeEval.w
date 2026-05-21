@@ -1712,6 +1712,20 @@ fn ComptimeEvaluator.enum_payload_value(self: ComptimeEvaluator, enum_name: str,
 fn ComptimeEvaluator.compiler_message_value(self: ComptimeEvaluator, variant_name: str, payloads: Vec[ComptimeValue], node: i32) -> ComptimeValue:
     self.enum_payload_value("CompilerMessage", variant_name, payloads, node)
 
+fn ComptimeEvaluator.compiler_phase_value(self: ComptimeEvaluator, phase_value: i32, node: i32) -> ComptimeValue:
+    let phase_type = self.named_type_id("CompilerPhase", node)
+    if phase_type == 0:
+        return comptime_value_invalid()
+    comptime_value_int(phase_type, phase_value as i64)
+
+fn ComptimeEvaluator.compiler_message_phase_value(self: ComptimeEvaluator, phase_value: i32, node: i32) -> ComptimeValue:
+    let phase = self.compiler_phase_value(phase_value, node)
+    if phase.kind == ComptimeValueKind.CV_INVALID:
+        return phase
+    let payloads: Vec[ComptimeValue] = Vec.new()
+    payloads.push(phase)
+    self.compiler_message_value("Phase", payloads, node)
+
 fn ComptimeEvaluator.compiler_message_complete_value(self: ComptimeEvaluator, result: ComptimeValue, node: i32) -> ComptimeValue:
     let payloads: Vec[ComptimeValue] = Vec.new()
     payloads.push(result)
@@ -2340,9 +2354,13 @@ fn ComptimeEvaluator.eval_workspace_capability_method(self: ComptimeEvaluator, r
         if result.kind == ComptimeValueKind.CV_INVALID:
             return comptime_control_error()
         if record.intercept_active != 0:
+            let phase_message = self.compiler_message_phase_value(9, node)
+            if phase_message.kind == ComptimeValueKind.CV_INVALID:
+                return comptime_control_error()
             let message = self.compiler_message_complete_value(result, node)
             if message.kind == ComptimeValueKind.CV_INVALID:
                 return comptime_control_error()
+            record.messages.push(phase_message)
             record.messages.push(message)
             record.intercept_terminal = 1
             self.store_workspace_record(workspace_id, record)
