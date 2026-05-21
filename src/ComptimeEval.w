@@ -384,6 +384,8 @@ fn comptime_action_capability_record(package_name: str, package_version: str, pr
     }
 
 fn ComptimeEvaluator.check_workspace_intercepts_finished(self: ComptimeEvaluator):
+    if self.had_error != 0:
+        return
     for wi in 0..self.workspace_records.len() as i32:
         let record = self.workspace_records.get(wi as i64)
         if record.intercept_active == 0:
@@ -2340,6 +2342,8 @@ fn ComptimeEvaluator.eval_workspace_capability_method(self: ComptimeEvaluator, r
             return comptime_control_error()
         if record.intercept_active == 0:
             return self.fail(node, "Workspace.end_intercept called without active interception")
+        if record.intercept_terminal != 0 and record.message_cursor < record.messages.len() as i32:
+            return self.fail(node, "Workspace.end_intercept called before terminal message was consumed")
         record.intercept_active = 0
         self.store_workspace_record(workspace_id, record)
         return comptime_control_value(comptime_value_void(0))
