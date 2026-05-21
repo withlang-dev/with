@@ -8041,6 +8041,10 @@ pub fn build -> Build:
     out.default("app")
 ```
 
+Capability access is through this local binding. The `with` clause does not
+create implicit globals; it binds driver-minted capability values into the
+function's lexical scope.
+
 The shorthand omits `as name` only when the capability type has a
 standard default binding:
 
