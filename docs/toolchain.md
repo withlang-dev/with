@@ -110,20 +110,24 @@ A project with no `build.w` behaves as though this existed:
 ```
 use std.build
 
-pub fn build(ctx: BuildCtx) -> Build:
+comptime with BuildCtx as ctx:
+pub fn build -> Build:
     let info = ctx.project_info()
     ctx.new_build().executable(info.package_name(), "src/main.w")
 ```
 
-`BuildCtx` is a driver-created tool-mode capability. It exposes project
-metadata and creates the initial `Build` graph value.
+`BuildCtx` is a driver-minted capability. It exposes project metadata
+and creates the initial `Build` graph value. The shorter
+`comptime with BuildCtx:` form is equivalent and binds the standard
+local name `ctx`.
 
 A complex project:
 
 ```
 use std.build
 
-pub fn build(ctx: BuildCtx) -> Build:
+comptime with BuildCtx as ctx:
+pub fn build -> Build:
     var out = ctx.new_build()
     out = out.generated_source(
         "out/gen/version.w",
@@ -137,27 +141,38 @@ pub fn build(ctx: BuildCtx) -> Build:
     out.test("unit", "tests/*.w")
 ```
 
-### `build.w` is not ordinary `comptime`
+### `build.w` is capability-bearing `comptime`
 
 The spec's `comptime` is deterministic, side-effect-free, and cannot
 perform I/O, call FFI, or allocate heap memory that persists to
 runtime (§17.1, §17.7). A build system needs to read files, invoke
 tools, and write outputs.
 
-`build.w` is **tool-mode With code** run by the compiler driver.
-Normal `comptime` remains pure and deterministic; build effects are
-allowed only through `std.build` APIs, which the compiler driver
-provides as a privileged execution context. This is analogous to how
-`comptime_error` can emit diagnostics despite `comptime` having no
-I/O — the compiler provides the capability, not the language runtime.
+With's model is capability-bearing comptime:
+
+```
+comptime:                       pure, deterministic, effect-free
+comptime with BuildCtx as ctx:  build orchestration authority
+comptime with ActionCtx as ctx: action-target authority
+comptime with Workspace:        workspace compilation authority
+```
+
+Normal `comptime` remains pure and deterministic. Effects are allowed
+only through unforgeable capability values minted by the compiler
+driver. The current Phase D implementation evaluates `build.w`,
+action functions, and workspace operations in-process with
+capability-aware comptime dispatch. `Workspace.begin_intercept`,
+`Workspace.compile`, and `Workspace.wait_for_message` already deliver
+typed `CompilerMessage.Complete(BuildResult)` messages; full phase
+streams, cooperative suspension, and link-command replacement are still
+being implemented.
 
 ### Why this matters now
 
-The current build uses Make. That works for bootstrapping but doesn't
-compose with the language. The doctrine decision should happen early
-because it shapes documentation, examples, package layout, and the
-design of `std.build`. Implementation can be staged — the decision
-is what matters.
+`with build` is now the authoritative build path. Make remains only as
+compatibility/bootstrap glue while the remaining Phase D compiler-driver
+APIs land. The doctrine decision shapes documentation, examples,
+package layout, and the design of `std.build`.
 
 ---
 
@@ -414,11 +429,11 @@ declaration cannot be translated correctly, the compiler must say so.
 ### What already exists
 
 The spec describes `c_import` (§16.1), macro handling (§16.2), and
-`comptime_error` stubs for untranslatable constructs (§17.5). The C
-migrator already follows this principle — untranslatable function
-bodies become `comptime_error("untranslatable function body")` stubs,
-and the STRUCTURAL/LEGACY trace verification ensures the structural
-path actually fires.
+diagnostics for unsupported constructs. The C migrator must follow the
+same rule: if it cannot translate a declaration or function body
+correctly, it emits a diagnostic naming the construct and exits
+non-zero. It must not produce a placeholder body, an `extern fn` escape
+hatch, or a generated TODO that lets incomplete output appear usable.
 
 The `allow_untranslated` mechanism from the original proposal would
 formalize this:
@@ -440,11 +455,12 @@ Silent fallbacks are bugs.
 Generated code must not pretend to be complete.
 ```
 
-A `comptime_error` stub is acceptable — it is a loud, visible
-marker that fires on use. What is not acceptable is a silent
-placeholder that makes a binding surface appear complete when it
-is not. The distinction is between an honest "this is missing" and
-a quiet "this exists but does nothing."
+For migrator and code-generator output, a stub that compiles is not
+acceptable even if it would fail later when called. A generated package
+is either complete for the requested translation unit, or the tool
+fails loudly and leaves the omission visible at the command that created
+the output. The distinction is between an honest non-zero tool result
+and a quiet "this exists but does nothing."
 
 This principle applies to migration tools, code generators, schema
 compilers, derive macros, package publishing, and build steps.
@@ -600,17 +616,33 @@ async without the complexity of Rust's pinning model.
 ### The current state of the project
 
 The compiler is self-hosting and bootstraps through a three-stage
-fixpoint. The C migrator is translating PCRE2 (30 modules, 600K+
-lines of generated code). The regex library is being built on top
-of the migrated PCRE2. Implicit main was just spec'd. The test suite
-has 700+ tests.
+fixpoint. The build system is now primarily expressed in `build.w`;
+Make remains as compatibility/bootstrap glue, not the architectural
+build system. Repository-specific compiler targets, PCRE2 migration
+targets, and emit-C targets live in project build modules and standard
+graph/action nodes rather than hardcoded compiler project kinds.
+
+PCRE2 is treated as the first migrated library. Its migration,
+build, test, and promote commands are manual targets because upstream
+corpus validation is release/migration work, not part of the default
+developer test loop. The default test target still covers the regex
+language features, the standard regex shim, a PCRE2 migration smoke,
+a PCRE2 corpus smoke, and an emit-C smoke.
+
+Phase D is in progress. Capability-bearing comptime is replacing
+generated build/action runners inside the compiler driver. Direct
+`build(ctx)` compatibility remains, but the canonical form is
+`comptime with BuildCtx as ctx:` or the shorthand
+`comptime with BuildCtx:`.
 
 These are the actual near-term priorities:
-1. Finish the C migrator (remaining raw_string elimination)
-2. Get PCRE2 fully clean (regex-check at 0 errors)
-3. Ship the regex library (`std.re`)
-4. Implement implicit main
-5. Stabilize the language surface for early users
+1. Finish Phase D workspace/message-loop APIs.
+2. Keep `with build` as the authoritative path and reduce Make to
+   bootstrap compatibility.
+3. Continue the migrated-library workflow beyond PCRE2.
+4. Keep emit-C and migrate smoke coverage in the default suite while
+   reserving full corpus/roundtrip targets for release work.
+5. Stabilize the language surface for early users.
 
 A toolchain proposal that ignores this reality and jumps to
 "programmable build hooks" and "compiler introspection API" is
@@ -622,13 +654,12 @@ compiler.
 
 ## 10. Revised Priority Order
 
-### Phase 0: Decisions (no implementation required)
+### Phase 0: Decisions (complete)
 
 - **Build doctrine**: `build.w` is the build system, `with.toml` is
-  declarative configuration. Decide this now even if `std.build` ships
-  much later. It shapes documentation and examples immediately.
+  declarative configuration.
 
-### Phase 1: Near-term (during current compiler work)
+### Phase 1: Near-term compiler work
 
 - **`@[specified]` enums**: Small, clear, high value-to-cost ratio.
   Can land alongside other parser/sema work.
@@ -641,7 +672,23 @@ compiler.
   `c_import`. The behavior already exists in the migrator; this
   makes it a language-level feature.
 
-### Phase 2: After the compiler stabilizes
+### Phase 2: Build/comptime driver work
+
+- **Capability-bearing `comptime with`**: The public model for
+  `build.w`, action functions, and workspace compilation.
+
+- **Workspace message loop**: `Workspace.begin_intercept`,
+  `wait_for_message`, `end_intercept`, and typed compiler messages.
+  Completion messages are implemented; full phase streams,
+  cooperative suspension, generated-source re-entry, and link-command
+  replacement remain.
+
+- **Direct driver materialization**: The evaluator returns a typed
+  `Build` value; the driver materializes it into the internal
+  `BuildGraph`. Graph text is debug/export output, not the internal
+  execution protocol.
+
+### Phase 3: After the compiler stabilizes
 
 - **TempArena in std.alloc**: Implement `scratch_arena()` with `with`
   integration and ephemeral escape prevention. Depends on the
@@ -651,16 +698,16 @@ compiler.
   `@[derive(Deserialize)]`. Depends on `comptime` `T.fields()` being
   reliable.
 
-### Phase 3: Ecosystem tooling
+### Phase 4: Ecosystem tooling
 
-- **`std.build` implementation**: The actual build API, running in
-  tool-mode context. Depends on the compiler driver supporting
-  privileged execution of `build.w`.
+- **Package-manager integration**: Dependencies, publishing metadata,
+  and reproducible package graph behavior on top of the existing
+  `with.toml`/`build.w` split.
 
 - **Read-only compiler introspection**: `ProjectInfo` API for
   project-wide lints and diagnostics. Significant compiler work.
 
-### Phase 4: Advanced metaprogramming
+### Phase 5: Advanced metaprogramming
 
 - **`SourceEmitter.emit_source()`**: Explicit code generation from
   compiler-hook capability parameters. Only after read-only
@@ -748,23 +795,26 @@ lifetime annotations, `with` scoping instead of global context,
 ```
 1.  build.w is the only build behavior mechanism.
 2.  with.toml is declarative package configuration.
-3.  Add std.build with default synthesized build recipes.
+3.  std.build provides typed graph construction and driver-minted
+    capabilities.
 4.  Add std.context.Context (ephemeral) with implicit + with
     integration.
 5.  Add std.alloc.TempArena and scratch_arena().
 6.  Add @[specified] enums.
 7.  Formalize allow_untranslated in c_import.
-8.  Add read-only ProjectInfo compiler introspection (later).
-9.  Add SourceEmitter.emit_source() for compiler hooks.
-10. Add blessed derives: SoA, Serialize, Deserialize, ComponentId.
-11. Reject raw-pointer defaults, caller-scope macros, runtime
+8.  Use capability-bearing comptime for build entry points, action
+    targets, and workspaces.
+9.  Add typed compiler message streams and stable DeclSummary-based
+    compiler introspection.
+10. Add SourceEmitter.emit_source() for compiler hooks.
+11. Add blessed derives: SoA, Serialize, Deserialize, ComponentId.
+12. Reject raw-pointer defaults, caller-scope macros, runtime
     reflection by default, weak error conventions, and async
     replacement.
 ```
 
-Items 1–2 are decisions that cost nothing to make now.
-Items 4–7 are implementable during current compiler work.
-Items 3, 8–10 require the compiler and comptime to mature first.
+Items 1–3 and 8 are active implementation reality. Items 4–7 and
+9–11 remain staged work.
 
 ---
 
@@ -778,9 +828,9 @@ added or amended:
 | §4.4b (new) | `@[specified]` discriminant enums — attribute definition, compile error for missing values |
 | §8.3a (new) or std.alloc section | `TempArena` and `scratch_arena()` — type definition, arena distinction table, `with` integration |
 | §16.2b (new) | `allow_untranslated` — `c_import` parameter for explicit omission acknowledgment |
-| §18.5a (new) | `build.w` and `std.build` doctrine — tool-mode execution, default recipe synthesis, `with.toml` boundary |
+| §18.5a (new) | `build.w` and `std.build` doctrine — capability-bearing comptime execution, default recipe synthesis, `with.toml` boundary |
 | §7.3a (amend) | Add `std.context.Context` as the standard implicit context type |
-| §17 (amend) | Add future-work note for `ProjectInfo`, `compiler_hook`, and `SourceEmitter.emit_source()` |
+| §17 (amend) | Add capability-bearing `comptime with`, default capability bindings, `ProjectInfo`, `Workspace`, compiler messages, `compiler_hook`, and `SourceEmitter.emit_source()` |
 | stdlib module map | Add `std.context`, `std.build`, `std.alloc.TempArena` |
 
 These edits are ordered by implementation phase. §4.4b and §16.2b
