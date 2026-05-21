@@ -170,6 +170,76 @@ pub type BuildResult {
     diagnostics: Vec[DiagnosticSummary],
 }
 
+pub enum DeclKind: i32:
+    function = 0
+    type_decl = 1
+    global_decl = 2
+    method = 3
+    trait_decl = 4
+    impl_decl = 5
+
+pub type DeclSummary {
+    version: i32,
+    kind: DeclKind,
+    module_name: str,
+    name: str,
+    qualified_name: str,
+    public_value: bool,
+    docs: str,
+    type_text: str,
+    return_type_text: str,
+    param_count: i32,
+    generic_param_count: i32,
+    receiver_type_text: str,
+    source: SourceSpan,
+    notes: Vec[str],
+}
+
+pub enum CompilerPhase: i32:
+    pre_parse = 0
+    parsed = 1
+    pre_typecheck = 2
+    typechecked = 3
+    lowered_to_mir = 4
+    pre_codegen = 5
+    codegen_done = 6
+    pre_link = 7
+    linked = 8
+    complete = 9
+
+pub type EnvVar {
+    name: str,
+    value: str,
+}
+
+pub type LinkCommand {
+    linker: str,
+    args: Vec[str],
+    cwd: str,
+    env: Vec[EnvVar],
+    inputs: Vec[str],
+    outputs: Vec[str],
+}
+
+pub enum CompilerMessage:
+    Phase(CompilerPhase)
+    File(str)
+    Import(str, str)
+    Typechecked(Vec[DeclSummary])
+    Diagnostic(DiagnosticSummary)
+    Artifact(Artifact)
+    PreLink(LinkCommand)
+    Linked(LinkCommand, i32)
+    Complete(BuildResult)
+    Error(i32, str, SourceSpan)
+    DebugDump(str)
+
+pub type CompilerMessageEnvelope {
+    workspace_name: str,
+    generation: i32,
+    message: CompilerMessage,
+}
+
 pub type Package {
     name: str,
     version: str,

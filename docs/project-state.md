@@ -98,6 +98,11 @@ Completed D4 substrate work:
    type metadata into an in-progress enum layout. Behavior coverage protects an
    enum with a generic payload followed by a variant whose name matches its
    payload type.
+3. `std.build` exposes the public D4 message data surface:
+   `DeclSummary`, `CompilerPhase`, `LinkCommand`, `CompilerMessage`, and
+   `CompilerMessageEnvelope`. The build-w selfhost payload-enum fixture now
+   constructs and matches a public `CompilerMessage.Typechecked` value through
+   the real `std.build` import path.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.

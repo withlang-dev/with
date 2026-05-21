@@ -633,7 +633,7 @@ Comptime code receives stable summaries, not raw AST or Sema nodes. `DeclSummary
 pub enum DeclKind: i32:
     function = 0
     type_decl = 1
-    global = 2
+    global_decl = 2
     method = 3
     trait_decl = 4
     impl_decl = 5

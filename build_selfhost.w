@@ -1937,6 +1937,12 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
         "    Complete(str)\n\n" ++
         "comptime fn local_message -> LocalMessage:\n" ++
         "    Phase(7)\n\n" ++
+        "comptime fn public_message -> CompilerMessage:\n" ++
+        "    let unknown = SourceSpan { file: \"\", start: -1, end: -1, line: -1, column: -1 }\n" ++
+        "    let summary = DeclSummary { version: 1, kind: DeclKind.function, module_name: \"main\", name: \"build\", qualified_name: \"main.build\", public_value: true, docs: \"\", type_text: \"fn\", return_type_text: \"Build\", param_count: 0, generic_param_count: 0, receiver_type_text: \"\", source: unknown, notes: Vec.new() }\n" ++
+        "    var decls: Vec[DeclSummary] = Vec.new()\n" ++
+        "    decls.push(summary)\n" ++
+        "    CompilerMessage.Typechecked(decls)\n\n" ++
         "comptime with BuildCtx as ctx:\n" ++
         "pub fn build -> Build:\n" ++
         "    var matched = false\n" ++
@@ -1945,6 +1951,12 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
         "        Complete(_) => matched = false\n" ++
         "    if not matched:\n" ++
         "        ctx.diagnostics().error(\"payload enum comptime match failed\")\n" ++
+        "    var public_matched = false\n" ++
+        "    match public_message():\n" ++
+        "        CompilerMessage.Typechecked(decls) => public_matched = decls.len() == 1 and decls.get(0).name == \"build\"\n" ++
+        "        _ => public_matched = false\n" ++
+        "    if not public_matched:\n" ++
+        "        ctx.diagnostics().error(\"public compiler message comptime match failed\")\n" ++
         "    ctx.new_build().executable(\"workspace-enum\", \"src/main.w\")\n"
     rc = bs_build_w_write_fixture(ctx, bs_join(enum_dir, "build.w"), enum_build, ctx.target_name(), "workspace enum build.w")
     if rc != 0: return rc
