@@ -2011,6 +2011,32 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
     rc = bs_assert_contains(ctx, unread_intercept_result.stderr, "terminal message was not consumed", "build_w_workspace_intercept_unread")
     if rc != 0: return rc
 
+    let end_unread_dir = bs_join(base_dir, "workspace_intercept_end_unread")
+    rc = bs_write_project_manifest(ctx, end_unread_dir, "workspaceendunread")
+    if rc != 0: return rc
+    let end_unread_build =
+        "use std.build\n\n" ++
+        "comptime with BuildCtx as ctx:\n" ++
+        "pub fn build -> Build:\n" ++
+        "    let ws = ctx.create_workspace(\"end-unread-intercept\")\n" ++
+        "    ws.add_string(\"src/end_unread.w\", \"fn main:\\n    print(\\\"end unread\\\")\\n\")\n" ++
+        "    var opts = ws.options()\n" ++
+        "    opts.output_path = \"out/bin/end-unread\"\n" ++
+        "    ws.set_options(opts)\n" ++
+        "    ws.begin_intercept()\n" ++
+        "    let result = ws.compile()\n" ++
+        "    if result.rc != 0:\n" ++
+        "        ctx.diagnostics().error(\"workspace end unread compile failed\")\n" ++
+        "    ws.end_intercept()\n" ++
+        "    ctx.new_build()\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(end_unread_dir, "build.w"), end_unread_build, ctx.target_name(), "workspace end unread intercept build.w")
+    if rc != 0: return rc
+    let end_unread_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-workspace-intercept-end-unread", bs_blob_to_args(bs_argv_append("", "build")), 120000, end_unread_dir)
+    if end_unread_result.rc == 0:
+        ctx.diagnostics().error("error: build_w_workspace_intercept_end_unread unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, end_unread_result.stderr, "Workspace.end_intercept called before terminal message was consumed", "build_w_workspace_intercept_end_unread")
+    if rc != 0: return rc
+
     let enum_dir = bs_join(base_dir, "comptime_payload_enum")
     rc = bs_write_project_manifest(ctx, enum_dir, "workspaceenum")
     if rc != 0: return rc

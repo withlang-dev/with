@@ -854,9 +854,11 @@ fn load_build_graph_from_build_w(root: str, cfg: ProjectConfig, options: BuildCo
         graph.error_msg = "build.w evaluation entry was not typechecked"
         return BuildGraphLoadResult { graph, sema }
     let eval_result = comptime_eval_tool_build_result(&raw mut sema as *mut Sema, sema.ast, sema.pool, entry_sym, cfg.package_name, cfg.package_version, root)
-    graph = materialize_build_graph_from_comptime(sema, eval_result.value, eval_result.extras)
-    if graph.error_msg.len() > 0 and eval_result.error_msg.len() > 0:
+    if eval_result.error_msg.len() > 0:
+        graph.ok = false
         graph.error_msg = eval_result.error_msg
+        return BuildGraphLoadResult { graph, sema }
+    graph = materialize_build_graph_from_comptime(sema, eval_result.value, eval_result.extras)
     BuildGraphLoadResult { graph, sema }
 
 fn build_graph_find_build_root(start_dir: str) -> str:

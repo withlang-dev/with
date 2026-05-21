@@ -115,6 +115,9 @@ Completed D4 substrate work:
 6. Intercepted `Workspace.compile()` now queues the terminal phase marker and
    terminal payload as separate messages: `Phase(complete)` followed by
    `Complete(BuildResult)`.
+7. `Workspace.end_intercept()` now rejects attempts to end an interception
+   while terminal messages are still unread, so build scripts cannot hide an
+   abandoned message queue by closing the intercept before returning.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.
