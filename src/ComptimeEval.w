@@ -383,6 +383,21 @@ fn comptime_action_capability_record(package_name: str, package_version: str, pr
         write_scoped: 1,
     }
 
+fn ComptimeEvaluator.check_workspace_intercepts_finished(self: ComptimeEvaluator):
+    for wi in 0..self.workspace_records.len() as i32:
+        let record = self.workspace_records.get(wi as i64)
+        if record.intercept_active == 0:
+            continue
+        if record.intercept_terminal != 0 and record.message_cursor >= record.messages.len() as i32:
+            continue
+        let reason =
+            if record.intercept_terminal != 0:
+                "terminal message was not consumed"
+            else:
+                "workspace did not reach a terminal message"
+        let _ = self.fail(0, "incomplete workspace interception for '" ++ record.name ++ "': " ++ reason)
+        return
+
 fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
     var sema = unsafe: *sema_ptr
     sema.ast = ast
@@ -434,11 +449,12 @@ fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: AstPool, pool: Inte
     let args: Vec[ComptimeValue] = Vec.new()
     args.push(ctx_value)
     let signal = evaluator.eval_fn_symbol_call_values(fn_sym, args, call_node)
+    evaluator.check_workspace_intercepts_finished()
     evaluator.restore_runtime_env()
     if evaluator.has_pending_diag != 0:
         sema_ptr.diags.emit(evaluator.pending_diag)
     let value =
-        if signal.kind == ComptimeControlKind.CTL_VALUE or signal.kind == ComptimeControlKind.CTL_RETURN:
+        if evaluator.had_error == 0 and (signal.kind == ComptimeControlKind.CTL_VALUE or signal.kind == ComptimeControlKind.CTL_RETURN):
             signal.value
         else:
             comptime_value_invalid()
@@ -465,11 +481,12 @@ fn comptime_eval_tool_action_result(sema_ptr: *mut Sema, ast: AstPool, pool: Int
     let args: Vec[ComptimeValue] = Vec.new()
     args.push(ctx_value)
     let signal = evaluator.eval_fn_symbol_call_values(fn_sym, args, call_node)
+    evaluator.check_workspace_intercepts_finished()
     evaluator.restore_runtime_env()
     if evaluator.has_pending_diag != 0:
         sema_ptr.diags.emit(evaluator.pending_diag)
     let value =
-        if signal.kind == ComptimeControlKind.CTL_VALUE or signal.kind == ComptimeControlKind.CTL_RETURN:
+        if evaluator.had_error == 0 and (signal.kind == ComptimeControlKind.CTL_VALUE or signal.kind == ComptimeControlKind.CTL_RETURN):
             signal.value
         else:
             comptime_value_invalid()

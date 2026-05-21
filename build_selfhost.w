@@ -1957,6 +1957,53 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
     rc = bs_expect_file_contains(ctx, bs_join(message_dir, "out/command/run-message-complete/stdout.txt"), "workspace message", "build_w_workspace_message_complete")
     if rc != 0: return rc
 
+    let open_intercept_dir = bs_join(base_dir, "workspace_intercept_open")
+    rc = bs_write_project_manifest(ctx, open_intercept_dir, "workspaceopen")
+    if rc != 0: return rc
+    let open_intercept_build =
+        "use std.build\n\n" ++
+        "comptime with BuildCtx as ctx:\n" ++
+        "pub fn build -> Build:\n" ++
+        "    let ws = ctx.create_workspace(\"open-intercept\")\n" ++
+        "    ws.begin_intercept()\n" ++
+        "    ctx.new_build()\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(open_intercept_dir, "build.w"), open_intercept_build, ctx.target_name(), "workspace open intercept build.w")
+    if rc != 0: return rc
+    let open_intercept_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-workspace-intercept-open", bs_blob_to_args(bs_argv_append("", "build")), 120000, open_intercept_dir)
+    if open_intercept_result.rc == 0:
+        ctx.diagnostics().error("error: build_w_workspace_intercept_open unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, open_intercept_result.stderr, "incomplete workspace interception for 'open-intercept'", "build_w_workspace_intercept_open")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, open_intercept_result.stderr, "workspace did not reach a terminal message", "build_w_workspace_intercept_open")
+    if rc != 0: return rc
+
+    let unread_intercept_dir = bs_join(base_dir, "workspace_intercept_unread")
+    rc = bs_write_project_manifest(ctx, unread_intercept_dir, "workspaceunread")
+    if rc != 0: return rc
+    let unread_intercept_build =
+        "use std.build\n\n" ++
+        "comptime with BuildCtx as ctx:\n" ++
+        "pub fn build -> Build:\n" ++
+        "    let ws = ctx.create_workspace(\"unread-intercept\")\n" ++
+        "    ws.add_string(\"src/unread.w\", \"fn main:\\n    print(\\\"unread\\\")\\n\")\n" ++
+        "    var opts = ws.options()\n" ++
+        "    opts.output_path = \"out/bin/unread\"\n" ++
+        "    ws.set_options(opts)\n" ++
+        "    ws.begin_intercept()\n" ++
+        "    let result = ws.compile()\n" ++
+        "    if result.rc != 0:\n" ++
+        "        ctx.diagnostics().error(\"workspace unread compile failed\")\n" ++
+        "    ctx.new_build()\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(unread_intercept_dir, "build.w"), unread_intercept_build, ctx.target_name(), "workspace unread intercept build.w")
+    if rc != 0: return rc
+    let unread_intercept_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-workspace-intercept-unread", bs_blob_to_args(bs_argv_append("", "build")), 120000, unread_intercept_dir)
+    if unread_intercept_result.rc == 0:
+        ctx.diagnostics().error("error: build_w_workspace_intercept_unread unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, unread_intercept_result.stderr, "incomplete workspace interception for 'unread-intercept'", "build_w_workspace_intercept_unread")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, unread_intercept_result.stderr, "terminal message was not consumed", "build_w_workspace_intercept_unread")
+    if rc != 0: return rc
+
     let enum_dir = bs_join(base_dir, "comptime_payload_enum")
     rc = bs_write_project_manifest(ctx, enum_dir, "workspaceenum")
     if rc != 0: return rc
