@@ -1705,6 +1705,26 @@ fn ComptimeEvaluator.compile_workspace_record(self: ComptimeEvaluator, record: C
     let rc = if artifact_path.len() > 0: 0 else: 1
     self.workspace_build_result_value(record.name, rc, self.workspace_artifact_kind_for_output(output_kind), final_output, node)
 
+fn ComptimeEvaluator.mint_workspace_capability(self: ComptimeEvaluator, parent: ComptimeCapabilityRecord, workspace_id: i32, node: i32) -> ComptimeControl:
+    let workspace_type = self.capability_type_id(CapabilityKind.CK_BUILD_WORKSPACE, node)
+    if workspace_type == 0:
+        return comptime_control_error()
+    var record = parent
+    record.kind = CapabilityKind.CK_BUILD_WORKSPACE
+    record.workspace_id = workspace_id
+    comptime_control_value(self.mint_capability(workspace_type, record))
+
+fn ComptimeEvaluator.create_workspace_for_capability(self: ComptimeEvaluator, parent: ComptimeCapabilityRecord, name: str, node: i32) -> ComptimeControl:
+    let workspace_id = self.workspace_records.len() as i32
+    self.workspace_records.push(self.new_workspace_record(name, node))
+    self.current_workspace_id = workspace_id
+    self.mint_workspace_capability(parent, workspace_id, node)
+
+fn ComptimeEvaluator.current_workspace_for_capability(self: ComptimeEvaluator, parent: ComptimeCapabilityRecord, owner_name: str, node: i32) -> ComptimeControl:
+    if self.current_workspace_id < 0:
+        return self.fail(node, owner_name ++ ".current_workspace called before create_workspace")
+    self.mint_workspace_capability(parent, self.current_workspace_id, node)
+
 fn ComptimeEvaluator.eval_buildctx_capability_method(self: ComptimeEvaluator, recv_value: ComptimeValue, method: str, arg_count: i32, node: i32) -> ComptimeControl:
     if method == "create_workspace":
         if not self.capability_expect_arg_count(arg_count, 1, method, node):
@@ -1716,31 +1736,14 @@ fn ComptimeEvaluator.eval_buildctx_capability_method(self: ComptimeEvaluator, re
         if args_signal.kind != ComptimeControlKind.CTL_VALUE:
             return args_signal
         let name = self.capability_arg_str(args_signal.value, 0, method, node)
-        let workspace_id = self.workspace_records.len() as i32
-        self.workspace_records.push(self.new_workspace_record(name, node))
-        self.current_workspace_id = workspace_id
-        let workspace_type = self.capability_type_id(CapabilityKind.CK_BUILD_WORKSPACE, node)
-        if workspace_type == 0:
-            return comptime_control_error()
-        var record = self.capability_records.get(handle as i64)
-        record.kind = CapabilityKind.CK_BUILD_WORKSPACE
-        record.workspace_id = workspace_id
-        return comptime_control_value(self.mint_capability(workspace_type, record))
+        return self.create_workspace_for_capability(self.capability_records.get(handle as i64), name, node)
     if method == "current_workspace":
         if not self.capability_expect_arg_count(arg_count, 0, method, node):
             return comptime_control_error()
         let handle = self.validate_capability(recv_value, CapabilityKind.CK_BUILD_CTX, method, node)
         if handle < 0:
             return comptime_control_error()
-        if self.current_workspace_id < 0:
-            return self.fail(node, "BuildCtx.current_workspace called before create_workspace")
-        let workspace_type = self.capability_type_id(CapabilityKind.CK_BUILD_WORKSPACE, node)
-        if workspace_type == 0:
-            return comptime_control_error()
-        var record = self.capability_records.get(handle as i64)
-        record.kind = CapabilityKind.CK_BUILD_WORKSPACE
-        record.workspace_id = self.current_workspace_id
-        return comptime_control_value(self.mint_capability(workspace_type, record))
+        return self.current_workspace_for_capability(self.capability_records.get(handle as i64), "BuildCtx", node)
     if method == "new_build":
         if not self.capability_expect_arg_count(arg_count, 0, method, node):
             return comptime_control_error()
@@ -2077,12 +2080,21 @@ fn ComptimeEvaluator.eval_process_runner_capability_method(self: ComptimeEvaluat
     self.tool_process_result(rc, stdout_path, stderr_path, node)
 
 fn ComptimeEvaluator.eval_actionctx_capability_method(self: ComptimeEvaluator, recv_value: ComptimeValue, method: str, arg_count: i32, node: i32) -> ComptimeControl:
-    if not self.capability_expect_arg_count(arg_count, 0, method, node):
-        return comptime_control_error()
     let handle = self.validate_capability(recv_value, CapabilityKind.CK_BUILD_ACTION_CTX, method, node)
     if handle < 0:
         return comptime_control_error()
     let record = self.capability_records.get(handle as i64)
+    if method == "create_workspace":
+        if not self.capability_expect_arg_count(arg_count, 1, method, node):
+            return comptime_control_error()
+        let args_signal = self.capability_args(self.ast.get_data1(node), arg_count)
+        if args_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return args_signal
+        return self.create_workspace_for_capability(record, self.capability_arg_str(args_signal.value, 0, method, node), node)
+    if not self.capability_expect_arg_count(arg_count, 0, method, node):
+        return comptime_control_error()
+    if method == "current_workspace":
+        return self.current_workspace_for_capability(record, "ActionCtx", node)
     if method == "target_name":
         return comptime_control_value(comptime_value_str(record.target_name))
     if method == "inputs":

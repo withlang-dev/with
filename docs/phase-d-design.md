@@ -258,11 +258,24 @@ Methods listed here but not yet implemented in a slice must not be exposed as in
 
 ### Lifetime and Ownership
 
-Workspaces are owned by the `BuildCtx` that minted them. `BuildCtx.create_workspace` returns a `Workspace` handle, which is a reference to compiler-owned storage. The handle's lifetime is bounded by the BuildCtx's lifetime, which is bounded by the driver's evaluation of the `build` entry point with a `BuildCtx` capability.
+Workspaces are owned by the top-level compiler-driver context that minted
+them. Build-graph construction uses `BuildCtx.create_workspace`; action-target
+execution uses `ActionCtx.create_workspace` for action-local compilation such as
+fast smoke builds or generated tool invocations. Both return a `Workspace`
+handle, which is a reference to compiler-owned storage. The handle's lifetime
+is bounded by the owning context's lifetime, which is bounded by the driver's
+evaluation of the build entry point or action function.
 
-User code may pass handles, borrow them, and store them in local data structures during comptime evaluation. User code cannot construct, serialize, or extend the lifetime of a workspace handle beyond the BuildCtx.
+User code may pass handles, borrow them, and store them in local data
+structures during comptime evaluation. User code cannot construct, serialize,
+or extend the lifetime of a workspace handle beyond its owning driver context.
 
-Any structure containing a `Workspace` handle (directly or transitively) inherits the BuildCtx's lifetime bound. Sema enforces this: a struct field of type `Workspace`, or a struct field whose type transitively contains `Workspace`, can only be instantiated in a context that has access to a live BuildCtx, and the resulting struct value cannot outlive that BuildCtx.
+Any structure containing a `Workspace` handle (directly or transitively)
+inherits the owning context's lifetime bound. Sema enforces this: a struct
+field of type `Workspace`, or a struct field whose type transitively contains
+`Workspace`, can only be instantiated in a context that has access to a live
+workspace-minting capability, and the resulting struct value cannot outlive
+that capability.
 
 ### Entry Point Compatibility
 
@@ -292,7 +305,11 @@ remain ordinary values after binding; helper functions may still receive
 
 ### current_workspace Semantics
 
-`BuildCtx.current_workspace(&self) -> Workspace` returns the workspace most recently created by this `BuildCtx`. If no workspace has been created, the call aborts with a structured error identifying the BuildCtx and the call site.
+`BuildCtx.current_workspace(&self) -> Workspace` and
+`ActionCtx.current_workspace(&self) -> Workspace` return the workspace most
+recently created by the current driver evaluation. If no workspace has been
+created, the call aborts with a structured error identifying the owning context
+and the call site.
 
 The semantics deliberately match a "last created" model rather than any thread-local or stack-based notion of "currently compiling," because the build script does not run inside a workspace; it runs in the compiler's comptime evaluator and creates workspaces by calling `create_workspace`.
 
@@ -310,6 +327,8 @@ pub type Workspace
 
 pub fn BuildCtx.create_workspace(&mut self, name: str) -> Workspace
 pub fn BuildCtx.current_workspace(&self) -> Workspace
+pub fn ActionCtx.create_workspace(&mut self, name: str) -> Workspace
+pub fn ActionCtx.current_workspace(&self) -> Workspace
 
 pub fn Workspace.name(&self) -> str
 pub fn Workspace.add_file(&mut self, path: str)
@@ -850,7 +869,7 @@ Focused verification:
 * A build script can create a workspace, add a file, call compile, and receive a BuildResult.
 * `current_workspace()` aborts cleanly with a structured error if called before any workspace has been created.
 * A struct containing a `Workspace` field cannot outlive its `BuildCtx` (Sema rejection).
-* One existing action is ported from `ProcessRunner.run_capture(["with", "build", ...])` to `workspace.compile()`. Recommended target: `build_emit_c.w`'s emit-C invocation.
+* One existing action is ported from `ProcessRunner.run_capture(["with", "build", ...])` to `workspace.compile()`. Initial target: the fast emit-C smoke action's hello-world C emission. Full manual emit-C targets move later when their remaining external-tool work is factored.
 * Output is byte-equivalent to pre-D3 for the ported action.
 
 ### D4: Message Loop
