@@ -8,7 +8,8 @@ fn main:
     build_text = build_text ++ "use std.process\n\n"
     build_text = build_text ++ "fn bad(ctx: ActionCtx) -> i32:\n"
     build_text = build_text ++ "    assert(set_env(\"WITH_TOOL_CAPABILITY_TOKEN\", \"wrong-token\") == 0)\n"
-    build_text = build_text ++ "    let _name = ctx.target_name()\n"
+    build_text = build_text ++ "    let name = ctx.target_name()\n"
+    build_text = build_text ++ "    assert(ctx.fs().write_text(ctx.output(), name) == 0)\n"
     build_text = build_text ++ "    0\n\n"
     build_text = build_text ++ "pub fn build(ctx: BuildCtx) -> Build:\n"
     build_text = build_text ++ "    var out = ctx.new_build()\n"
@@ -18,6 +19,6 @@ fn main:
     build_text = build_text ++ "    out.default(\"bad-token\")\n"
     p7_write(case_dir, "build.w", build_text)
     let result = p7_run(case_dir, "token-mismatch", p7_build_args())
-    p7_assert_failure_contains(result, "invalid tool capability: ActionCtx", "token mismatch")
-    p7_assert_failure_contains(result, "bad-token", "token mismatch target")
+    p7_assert_success(result, "env token no longer controls minted ActionCtx")
+    p7_assert_file_contains(case_dir, "out/action/value.txt", "bad-token")
     print("ok")

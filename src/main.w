@@ -12,6 +12,7 @@ use Source
 use Sema
 use Compilation
 use ComptimeEval
+use ComptimeValue
 use ConanClient
 use Fmt
 use Lsp
@@ -774,84 +775,18 @@ fn test_unique_binary_path(source_file: str) -> str:
     let base = link_stage_output_path_for_source(source_file)
     f"{base}.test.{with_getpid()}.{with_clock_nanos()}"
 
-fn build_tool_runner_source(package_name: str, package_version: str, root: str, graph_path: str, token: str) -> str:
-    "use std.build\n" ++
-    "use build\n\n" ++
-    "fn main:\n" ++
-    "    let pkg = Package { name: \"" ++ cli_escape_with_string(package_name) ++ "\", version: \"" ++ cli_escape_with_string(package_version) ++ "\" }\n" ++
-    "    let ctx = BuildCtx.__driver_new(pkg, \"" ++ cli_escape_with_string(root) ++ "\", \"" ++ cli_escape_with_string(token) ++ "\")\n" ++
-    "    let build_graph = build(ctx)\n" ++
-    "    let action_name = __driver_action_name()\n" ++
-    "    if action_name.len() > 0:\n" ++
-    "        __driver_exit(build_graph.__driver_run_action(ctx, action_name))\n" ++
-    "    let graph = build_graph.emit_graph()\n" ++
-    "    assert(ctx.fs().write_text(\"" ++ cli_escape_with_string(graph_path) ++ "\", graph) == 0)\n"
-
 fn build_tool_eval_entry_source() -> str:
     "use std.build\n" ++
     "use build\n\n" ++
     "fn __with_build_eval_entry(ctx: BuildCtx) -> Build:\n" ++
     "    build(ctx)\n"
 
-fn generate_action_runner_source(target: BuildGraphTarget, cfg: ProjectConfig, root: str, graph_path: str, token: str) -> str:
-    let _ = target
-    build_tool_runner_source(cfg.package_name, cfg.package_version, root, graph_path, token)
+type BuildGraphLoadResult {
+    graph: BuildGraph,
+    sema: Sema,
+}
 
-fn compile_action_runner(target: BuildGraphTarget, runner_path: str, runner_bin: str, runner_source: str, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> str:
-    if with_fs_write_file(runner_path, runner_source) != 0:
-        with_eprint("error: action target '" ++ target.name ++ "' could not write generated action runner")
-        return ""
-    var comp = Compilation.init()
-    comp.configure(opt_level, no_std, alloc_mode)
-    comp.set_prelude_mode(prelude_mode)
-    comp.set_debug_info(debug_info)
-    comp.set_tool_mode_entry_path(runner_path)
-    let built_runner = comp.build_binary_to_path(runner_path, runner_bin)
-    let _remove_runner_source = with_fs_remove_file(runner_path)
-    if built_runner == "":
-        with_eprint("error: action target '" ++ target.name ++ "' runner compilation failed")
-        return ""
-    built_runner
-
-fn replay_action_capture(stdout_path: str, stderr_path: str, stdout_to_stderr: bool) -> void:
-    let action_stderr = with_fs_read_file(stderr_path)
-    if action_stderr.len() > 0:
-        with_ewrite(action_stderr)
-    let action_stdout = with_fs_read_file(stdout_path)
-    if action_stdout.len() > 0:
-        if stdout_to_stderr:
-            with_ewrite(action_stdout)
-        else:
-            with_write(action_stdout)
-
-fn remove_action_capture(stdout_path: str, stderr_path: str) -> void:
-    let _remove_action_stdout = with_fs_remove_file(stdout_path)
-    let _remove_action_stderr = with_fs_remove_file(stderr_path)
-
-fn execute_action_runner(target: BuildGraphTarget, built_runner: str, capability_token: str, stdout_path: str, stderr_path: str) -> i32:
-    let old_capability_token = with_getenv_str("WITH_TOOL_CAPABILITY_TOKEN")
-    let old_action_name = with_getenv_str("WITH_BUILD_ACTION_NAME")
-    let _set_capability_token = with_setenv_str("WITH_TOOL_CAPABILITY_TOKEN", capability_token)
-    let _set_action_name = with_setenv_str("WITH_BUILD_ACTION_NAME", target.name)
-    var action_argv = ""
-    action_argv = build_graph_argv_append(action_argv, built_runner)
-    let rc = with_exec_argv_capture(action_argv, stdout_path, stderr_path, 3600000)
-    let _restore_action_name = with_setenv_str("WITH_BUILD_ACTION_NAME", old_action_name)
-    let _restore_capability_token = with_setenv_str("WITH_TOOL_CAPABILITY_TOKEN", old_capability_token)
-    if rc != 0:
-        replay_action_capture(stdout_path, stderr_path, true)
-        remove_action_capture(stdout_path, stderr_path)
-        with_eprint("error: action target '" ++ target.name ++ f"' failed with exit code {rc}")
-        return rc
-    replay_action_capture(stdout_path, stderr_path, false)
-    remove_action_capture(stdout_path, stderr_path)
-    0
-
-fn cleanup_action_runner(built_runner: str, runner_path: str) -> void:
-    let _remove_runner_source = with_fs_remove_file(runner_path)
-    cleanup_binary_artifacts(built_runner)
-
-fn run_build_action_from_build_w(root: str, cfg: ProjectConfig, target: BuildGraphTarget, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> i32:
+fn run_build_action_from_build_w(root: str, cfg: ProjectConfig, target: BuildGraphTarget, sema: Sema) -> i32:
     if target.output.len() == 0:
         with_eprint("error: action target '" ++ target.name ++ "' requires a declared output")
         return 1
@@ -868,27 +803,25 @@ fn run_build_action_from_build_w(root: str, cfg: ProjectConfig, target: BuildGra
     if with_fs_mkdir_p(output_dir) != 0:
         with_eprint("error: action target '" ++ target.name ++ "' could not create output directory: " ++ output_dir)
         return 1
-    let tmp_dir = resolve_join(root, "out/tmp")
-    if with_fs_mkdir_p(tmp_dir) != 0:
-        with_eprint("error: action target '" ++ target.name ++ "' could not create temp directory: " ++ tmp_dir)
+    if target.action_fn == 0:
+        with_eprint("error: action target '" ++ target.name ++ "' is missing an evaluator action function")
         return 1
-    let stamp = f"{with_getpid()}.{with_clock_nanos()}"
-    let runner_path = resolve_join(root, "__with_build_action_runner." ++ stamp ++ ".w")
-    let runner_bin = resolve_join(tmp_dir, "build-action-runner." ++ stamp)
-    let capability_token = "with-tool:" ++ stamp
-    // This first implementation re-runs build.w for each action invocation.
-    // A later action registry should keep the graph and function table alive
-    // for projects with many action targets.
-    let runner_source = generate_action_runner_source(target, cfg, root, "out/tmp/action-graph." ++ stamp ++ ".txt", capability_token)
-    let built_runner = compile_action_runner(target, runner_path, runner_bin, runner_source, opt_level, no_std, alloc_mode, prelude_mode, debug_info)
-    if built_runner == "":
-        cleanup_action_runner(built_runner, runner_path)
+    var action_sema = sema
+    let result = comptime_eval_tool_action_result(&raw mut action_sema as *mut Sema, action_sema.ast, action_sema.pool, target.action_fn, cfg.package_name, cfg.package_version, root, target.name, target.inputs, target.output, target.extra_outputs, target.args, target.write_scopes)
+    if result.runtime_exit_code != 0:
+        if result.runtime_stderr.len() > 0:
+            with_ewrite(result.runtime_stderr)
+        with_eprint("error: action target '" ++ target.name ++ f"' failed with exit code {result.runtime_exit_code}")
+        return result.runtime_exit_code
+    if result.error_msg.len() > 0:
+        with_eprint("error: action target '" ++ target.name ++ "' failed during comptime evaluation: " ++ result.error_msg ++ "\n")
         return 1
-    let action_stdout_path = resolve_join(tmp_dir, "build-action-runner." ++ stamp ++ ".stdout")
-    let action_stderr_path = resolve_join(tmp_dir, "build-action-runner." ++ stamp ++ ".stderr")
-    let rc = execute_action_runner(target, built_runner, capability_token, action_stdout_path, action_stderr_path)
-    cleanup_action_runner(built_runner, runner_path)
+    if result.value.kind != ComptimeValueKind.CV_INT and result.value.kind != ComptimeValueKind.CV_BOOL:
+        with_eprint("error: action target '" ++ target.name ++ "' did not return an integer exit code")
+        return 1
+    let rc = result.value.data0 as i32
     if rc != 0:
+        with_eprint("error: action target '" ++ target.name ++ f"' failed with exit code {rc}")
         return rc
     if with_fs_file_exists(output_path) == 0:
         with_eprint("error: action target '" ++ target.name ++ "' did not produce declared output: " ++ output_path)
@@ -900,7 +833,7 @@ fn run_build_action_from_build_w(root: str, cfg: ProjectConfig, target: BuildGra
             return 1
     0
 
-fn load_build_graph_from_build_w(root: str, cfg: ProjectConfig, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> BuildGraph:
+fn load_build_graph_from_build_w(root: str, cfg: ProjectConfig, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> BuildGraphLoadResult:
     var graph = empty_build_graph()
     let entry_path = resolve_join(root, "__with_build_eval.w")
     var comp = Compilation.init()
@@ -909,19 +842,19 @@ fn load_build_graph_from_build_w(root: str, cfg: ProjectConfig, opt_level: i32, 
     comp.set_debug_info(debug_info)
     comp.set_tool_mode_entry_path(entry_path)
     let pool = comp.compile_source_text_with_config(entry_path, build_tool_eval_entry_source(), cfg)
+    var sema = comp.zcu.last_sema
     if pool.decl_count() == 0 or comp.has_errors():
         graph.error_msg = "build.w evaluation wrapper compilation failed"
-        return graph
-    var sema = comp.zcu.last_sema
+        return BuildGraphLoadResult { graph, sema }
     let entry_sym = sema.pool_lookup_symbol("__with_build_eval_entry")
     if entry_sym == 0:
         graph.error_msg = "build.w evaluation entry was not typechecked"
-        return graph
+        return BuildGraphLoadResult { graph, sema }
     let eval_result = comptime_eval_tool_build_result(&raw mut sema as *mut Sema, sema.ast, sema.pool, entry_sym, cfg.package_name, cfg.package_version, root)
     graph = materialize_build_graph_from_comptime(sema, eval_result.value, eval_result.extras)
     if graph.error_msg.len() > 0 and eval_result.error_msg.len() > 0:
         graph.error_msg = eval_result.error_msg
-    graph
+    BuildGraphLoadResult { graph, sema }
 
 fn build_graph_find_build_root(start_dir: str) -> str:
     var cur = if start_dir.len() > 0: start_dir else: "."
@@ -1022,7 +955,7 @@ fn build_graph_trim_space_and_newlines(text: str) -> str:
         end = end - 1
     text.slice(start as i64, end as i64)
 
-fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, opt_level: i32, no_std: bool, alloc_mode: bool, output_path: str, prelude_mode: i32, debug_info: bool) -> i32:
+fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, action_sema: Sema, opt_level: i32, no_std: bool, alloc_mode: bool, output_path: str, prelude_mode: i32, debug_info: bool) -> i32:
     if graph.targets.len() == 0:
         with_eprint("error: build.w did not declare any targets")
         return 1
@@ -1062,7 +995,7 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, opt_level: 
             completed_targets.push(target.name)
             continue
         if target.kind == 23:
-            let action_rc = run_build_action_from_build_w(root, cfg, target, opt_level, no_std, alloc_mode, prelude_mode, debug_info)
+            let action_rc = run_build_action_from_build_w(root, cfg, target, action_sema)
             if action_rc != 0:
                 return action_rc
             completed_targets.push(target.name)
@@ -1178,7 +1111,8 @@ fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode:
             if emit_c_mode or emit_obj_mode:
                 with_eprint("error: build.w tool-mode only supports binary builds")
                 return 1
-            let graph = load_build_graph_from_build_w(root, cfg, opt_level, no_std, alloc_mode, prelude_mode, debug_info)
+            let load_result = load_build_graph_from_build_w(root, cfg, opt_level, no_std, alloc_mode, prelude_mode, debug_info)
+            let graph = load_result.graph
             if not graph.ok:
                 with_eprint("error: " ++ graph.error_msg)
                 return 1
@@ -1196,7 +1130,7 @@ fn run_build_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode:
             if graph_only or dry_run:
                 with_write(selected_graph.raw_text)
                 return 0
-            return run_build_graph(root, cfg, selected_graph, opt_level, no_std, alloc_mode, actual_output, prelude_mode, debug_info)
+            return run_build_graph(root, cfg, selected_graph, load_result.sema, opt_level, no_std, alloc_mode, actual_output, prelude_mode, debug_info)
         actual_source = root ++ "/src/main.w"
         if actual_output == "" and cfg.package_name.len() > 0:
             actual_output = "out/bin/" ++ cfg.package_name

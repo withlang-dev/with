@@ -13,7 +13,7 @@ conversation context after compaction.
 
 Phase C extraction work is complete. Pre-Phase-D preparation is complete
 through P9, including the follow-up source-location diagnostic gap. Phase D D1
-is in progress. Completed D1 sub-slices:
+is complete. Completed D1 sub-slices:
 
 1. Shared capability registry used by Sema, plus a reserved capability value
    kind for evaluator dispatch.
@@ -34,9 +34,12 @@ is in progress. Completed D1 sub-slices:
 8. The normal `build.w` graph-load path now compiles an evaluator wrapper,
    evaluates `build(ctx)` in-process, and materializes the typed returned
    `Build` value directly into `BuildGraph`.
+9. Action targets now execute in-process through the evaluator with a minted
+   `ActionCtx`; generated action runner source files and binaries are no
+   longer part of the normal action path.
 
-Remaining D1 work is completing action-time capability handlers and replacing
-generated action runner binaries on the normal path.
+Next Phase D work starts at D2. Do not start D3-D8 until D2 lands and passes
+the same build/fixpoint/test baseline.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.
@@ -60,24 +63,36 @@ The original P9 pre-D1 baseline is recorded in
 containing this project-state update:
 
 ```text
-Implement source-location magic constants
+Execute build actions in-process
 ```
 
 Commands passed:
 
 ```sh
+make build
 out/bin/with build :build
-out/bin/with build :fixpoint
+out/bin/with test test/behavior/behav_build_w_basic_invocation.w
+out/bin/with test test/behavior/behav_action_capability_filesystem.w
+out/bin/with test test/behavior/behav_action_capability_process.w
+out/bin/with test test/behavior/behav_action_crash_diagnostic.w
+out/bin/with test test/behavior/behav_action_no_deps_isolation.w
+out/bin/with build :cli-selfhost-smoke-tests
+out/bin/with build :c-migrator-core-tests
+out/bin/with build :pcre2-reference
 out/bin/with build :test
+make fixpoint
+make test
 ```
 
 Full `:emit-c-test` remains a manual release/emit-C-feature verification
 target. Do not run it for normal compiler, stdlib, or build-system slices; the
 default `:test` target includes the fast emit-C smoke.
 
-Recent pre-D commits:
+Recent Phase D/pre-D commits:
 
-- current checkpoint: Implement source-location magic constants.
+- current checkpoint: Execute build actions in-process.
+- `f5cc0c5` Evaluate build.w graphs in-process.
+- previous checkpoint: Implement source-location magic constants.
 - `617aecd` Reconcile Phase D design with pre-D artifacts.
 - `db64d01` Isolate generated action runner dispatch.
 - `6d1b052` Add pre-D build action behavior regressions.
@@ -136,10 +151,9 @@ Still incomplete:
 
 - Phase C is complete. Project-specific build behavior no longer uses live
   compiler-dispatched project graph kinds.
-- Phase D D1 is partially implemented. `build.w` graph loading now uses the
-  evaluator-backed typed materializer path. Action targets still execute
-  through generated runner binaries until the evaluator-backed action path
-  replaces them.
+- Phase D D1 is complete. `build.w` graph loading uses the evaluator-backed
+  typed materializer path, and action targets execute through evaluator-backed
+  `ActionCtx` dispatch instead of generated runner binaries.
 - Action timeout/cwd/env/network/install policy declarations are incomplete.
 - Jai-style workspace/build-options/message-loop APIs are incomplete.
 - Make remains a compatibility layer.
@@ -180,9 +194,8 @@ not a new compiler-dispatched project graph kind.
 
 ## Open Blockers And Follow-Ups
 
-- Continue Phase D with D1 only: evaluator dispatch, capability handle
-  validation, and driver replacement of generated build/action runner
-  execution. Do not start D2-D8.
+- Continue Phase D with D2 next. Do not start D3-D8 until D2 is committed and
+  passes the build/fixpoint/test baseline.
 - Preserve the pre-D behavior tests during D1:
   `behav_build_w_basic_invocation`, `behav_action_capability_filesystem`,
   `behav_action_capability_process`, `behav_capability_token_mismatch`,
@@ -199,13 +212,23 @@ not a new compiler-dispatched project graph kind.
 
 ## Local State
 
-At the time of this update, the pre-D1 source-location follow-up was committed
-locally. The current pre-D verification passed:
+At the time of this update, Phase D D1 action execution was verified and ready
+to commit. The current D1 verification passed:
 
 ```sh
+make build
 out/bin/with build :build
-out/bin/with build :fixpoint
+out/bin/with test test/behavior/behav_build_w_basic_invocation.w
+out/bin/with test test/behavior/behav_action_capability_filesystem.w
+out/bin/with test test/behavior/behav_action_capability_process.w
+out/bin/with test test/behavior/behav_action_crash_diagnostic.w
+out/bin/with test test/behavior/behav_action_no_deps_isolation.w
+out/bin/with build :cli-selfhost-smoke-tests
+out/bin/with build :c-migrator-core-tests
+out/bin/with build :pcre2-reference
 out/bin/with build :test
+make fixpoint
+make test
 ```
 
 The full emit-C test was intentionally not part of this verification pass per

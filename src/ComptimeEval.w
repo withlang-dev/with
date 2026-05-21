@@ -20,12 +20,35 @@ extern fn with_fs_remove_tree(path: str) -> i32
 extern fn with_fs_rename_file(old_path: str, new_path: str) -> i32
 extern fn with_fs_symlink(target: str, link_path: str) -> i32
 extern fn with_fs_write_file(path: str, data: str) -> i32
+extern fn with_exec_argv(args: str) -> i32
+extern fn with_exec_argv_capture(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32) -> i32
+extern fn with_exec_argv_capture_cwd(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str) -> i32
+extern fn with_exec_argv_capture_input(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, stdin_path: str) -> i32
+extern fn with_exec_argv_capture_spawn(args: str, stdout_path: str, stderr_path: str) -> i32
+extern fn with_exec_wait(pid: i32, timeout_ms: i32) -> i32
+extern fn with_println_str(s: str) -> void
+extern fn with_println_i32(n: i32) -> void
+extern fn with_println_i64(n: i64) -> void
+extern fn with_println_bool(v: bool) -> void
+extern fn with_print_str(s: str) -> void
+extern fn with_write(s: str) -> void
+extern fn with_ewrite(s: str) -> void
+extern fn with_getenv_str(name: str) -> str
+extern fn with_setenv_str(name: str, value: str) -> i32
+extern fn with_str_len(s: str) -> i64
+extern fn with_str_byte_at(s: str, index: i64) -> i32
+extern fn with_str_slice(s: str, start: i64, end: i64) -> str
+extern fn with_str_contains(haystack: str, needle: str) -> i32
+extern fn with_str_starts_with(s: str, prefix: str) -> i32
+extern fn with_str_ends_with(s: str, suffix: str) -> i32
+extern fn with_str_replace(s: str, old: str, new_s: str) -> str
 extern fn with_sysinfo_os() -> str
 extern fn with_sysinfo_arch() -> str
 extern fn with_sysinfo_hostname() -> str
 
 const COMPTIME_RECURSION_LIMIT: i32 = 256
 const COMPTIME_STEP_LIMIT: i32 = 50000
+const COMPTIME_TOOL_STEP_LIMIT: i32 = 100000000
 
 enum ComptimeControlKind: i32:
     CTL_VALUE = 0
@@ -75,6 +98,10 @@ type ComptimeEvaluator {
     allow_runtime_calls: i32,
     had_error: i32,
     last_error_msg: str,
+    runtime_exit_code: i32,
+    runtime_stderr: str,
+    runtime_env_names: Vec[str],
+    runtime_env_values: Vec[str],
     has_pending_diag: i32,
     pending_diag: Diagnostic,
 }
@@ -83,6 +110,8 @@ type ComptimeEvalResult {
     value: ComptimeValue,
     extras: Vec[ComptimeValue],
     error_msg: str,
+    runtime_exit_code: i32,
+    runtime_stderr: str,
 }
 
 type ComptimeSourceLoc {
@@ -127,6 +156,10 @@ fn ComptimeEvaluator.init(sema: Sema, ast: AstPool, pool: InternPool, require_su
         allow_runtime_calls: 0,
         had_error: 0,
         last_error_msg: "",
+        runtime_exit_code: 0,
+        runtime_stderr: "",
+        runtime_env_names: Vec.new(),
+        runtime_env_values: Vec.new(),
         has_pending_diag: 0,
         pending_diag: Diagnostic.err("", Span { file: 0, start: 0, end: 0 }),
     }
@@ -171,6 +204,54 @@ fn comptime_type_name_has_base(type_name: str, base_name: str) -> i32:
     if type_name.byte_at(base_name.len() as i64) == 91:
         return 1
     0
+
+fn comptime_hex_digit_value(ch: i32) -> i32:
+    if ch >= 48 and ch <= 57:
+        return ch - 48
+    if ch >= 97 and ch <= 102:
+        return ch - 87
+    if ch >= 65 and ch <= 70:
+        return ch - 55
+    -1
+
+fn comptime_decode_string_escapes(text: str) -> str:
+    let raw_prefix = "\x01raw\x01"
+    if text.starts_with(raw_prefix):
+        return text.slice(raw_prefix.len(), text.len())
+    var out = ""
+    let len = text.len() as i32
+    var i = 0
+    while i < len:
+        let ch = text.byte_at(i as i64)
+        if ch == 92 and i + 1 < len:
+            i = i + 1
+            let esc = text.byte_at(i as i64)
+            if esc == 120 and i + 2 < len:
+                let hi = comptime_hex_digit_value(text.byte_at((i + 1) as i64))
+                let lo = comptime_hex_digit_value(text.byte_at((i + 2) as i64))
+                if hi >= 0 and lo >= 0:
+                    out = out ++ str_from_byte(hi * 16 + lo)
+                    i = i + 2
+                else:
+                    out = out ++ text.slice(i as i64, (i + 1) as i64)
+            else if esc == 110:
+                out = out ++ "\n"
+            else if esc == 116:
+                out = out ++ "\t"
+            else if esc == 114:
+                out = out ++ "\r"
+            else if esc == 48:
+                out = out ++ str_from_byte(0)
+            else if esc == 92:
+                out = out ++ "\\"
+            else if esc == 34:
+                out = out ++ "\""
+            else:
+                out = out ++ text.slice(i as i64, (i + 1) as i64)
+        else:
+            out = out ++ text.slice(i as i64, (i + 1) as i64)
+        i = i + 1
+    out
 
 fn comptime_tool_path_is_project_relative(path: str) -> bool:
     if path.len() == 0:
@@ -232,6 +313,8 @@ fn comptime_eval_result_invalid() -> ComptimeEvalResult:
         value: comptime_value_invalid(),
         extras: Vec.new(),
         error_msg: "",
+        runtime_exit_code: 0,
+        runtime_stderr: "",
     }
 
 fn comptime_capability_record(kind: i32, package_name: str, package_version: str, project_root: str) -> ComptimeCapabilityRecord:
@@ -249,6 +332,35 @@ fn comptime_capability_record(kind: i32, package_name: str, package_version: str
         write_scoped: 0,
     }
 
+fn comptime_action_outputs(output: str, extra_outputs: Vec[str]) -> Vec[str]:
+    let outputs: Vec[str] = Vec.new()
+    if output.len() > 0:
+        outputs.push(output)
+    for i in 0..extra_outputs.len() as i32:
+        outputs.push(extra_outputs.get(i as i64))
+    outputs
+
+fn comptime_action_write_scope(output: str, extra_outputs: Vec[str], write_scopes: Vec[str]) -> Vec[str]:
+    let scopes = comptime_action_outputs(output, extra_outputs)
+    for i in 0..write_scopes.len() as i32:
+        scopes.push(write_scopes.get(i as i64))
+    scopes
+
+fn comptime_action_capability_record(package_name: str, package_version: str, project_root: str, target_name: str, inputs: Vec[str], output: str, extra_outputs: Vec[str], args: Vec[str], write_scopes: Vec[str]) -> ComptimeCapabilityRecord:
+    ComptimeCapabilityRecord {
+        kind: CapabilityKind.CK_BUILD_ACTION_CTX,
+        generation: 0,
+        package_name,
+        package_version,
+        project_root,
+        target_name,
+        inputs,
+        outputs: comptime_action_outputs(output, extra_outputs),
+        args,
+        write_scope: comptime_action_write_scope(output, extra_outputs, write_scopes),
+        write_scoped: 1,
+    }
+
 fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
     var sema = unsafe: *sema_ptr
     sema.ast = ast
@@ -260,6 +372,8 @@ fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: Intern
         value,
         extras: evaluator.extra_values,
         error_msg: evaluator.last_error_msg,
+        runtime_exit_code: evaluator.runtime_exit_code,
+        runtime_stderr: evaluator.runtime_stderr,
     }
 
 fn comptime_force_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
@@ -273,6 +387,8 @@ fn comptime_force_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: Inte
         value,
         extras: evaluator.extra_values,
         error_msg: evaluator.last_error_msg,
+        runtime_exit_code: evaluator.runtime_exit_code,
+        runtime_stderr: evaluator.runtime_stderr,
     }
 
 fn comptime_try_eval_expr(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeValue:
@@ -286,15 +402,17 @@ fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: AstPool, pool: Inte
     sema.ast = ast
     var evaluator = ComptimeEvaluator.init(sema, ast, pool, 1)
     evaluator.allow_runtime_calls = 1
+    evaluator.step_budget = COMPTIME_TOOL_STEP_LIMIT
     let call_node = if ast.decl_count() > 0: ast.get_decl(0) else: 0
     let ctx_type = evaluator.capability_type_id(CapabilityKind.CK_BUILD_CTX, call_node)
     if ctx_type == 0:
-        return ComptimeEvalResult { value: comptime_value_invalid(), extras: evaluator.extra_values, error_msg: evaluator.last_error_msg }
+        return ComptimeEvalResult { value: comptime_value_invalid(), extras: evaluator.extra_values, error_msg: evaluator.last_error_msg, runtime_exit_code: evaluator.runtime_exit_code, runtime_stderr: evaluator.runtime_stderr }
     let ctx_record = comptime_capability_record(CapabilityKind.CK_BUILD_CTX, package_name, package_version, project_root)
     let ctx_value = evaluator.mint_capability(ctx_type, ctx_record)
     let args: Vec[ComptimeValue] = Vec.new()
     args.push(ctx_value)
     let signal = evaluator.eval_fn_symbol_call_values(fn_sym, args, call_node)
+    evaluator.restore_runtime_env()
     if evaluator.has_pending_diag != 0:
         sema_ptr.diags.emit(evaluator.pending_diag)
     let value =
@@ -306,6 +424,39 @@ fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: AstPool, pool: Inte
         value,
         extras: evaluator.extra_values,
         error_msg: evaluator.last_error_msg,
+        runtime_exit_code: evaluator.runtime_exit_code,
+        runtime_stderr: evaluator.runtime_stderr,
+    }
+
+fn comptime_eval_tool_action_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, fn_sym: i32, package_name: str, package_version: str, project_root: str, target_name: str, inputs: Vec[str], output: str, extra_outputs: Vec[str], args_values: Vec[str], write_scopes: Vec[str]) -> ComptimeEvalResult:
+    var sema = unsafe: *sema_ptr
+    sema.ast = ast
+    var evaluator = ComptimeEvaluator.init(sema, ast, pool, 1)
+    evaluator.allow_runtime_calls = 1
+    evaluator.step_budget = COMPTIME_TOOL_STEP_LIMIT
+    let call_node = if ast.decl_count() > 0: ast.get_decl(0) else: 0
+    let ctx_type = evaluator.capability_type_id(CapabilityKind.CK_BUILD_ACTION_CTX, call_node)
+    if ctx_type == 0:
+        return ComptimeEvalResult { value: comptime_value_invalid(), extras: evaluator.extra_values, error_msg: evaluator.last_error_msg, runtime_exit_code: evaluator.runtime_exit_code, runtime_stderr: evaluator.runtime_stderr }
+    let ctx_record = comptime_action_capability_record(package_name, package_version, project_root, target_name, inputs, output, extra_outputs, args_values, write_scopes)
+    let ctx_value = evaluator.mint_capability(ctx_type, ctx_record)
+    let args: Vec[ComptimeValue] = Vec.new()
+    args.push(ctx_value)
+    let signal = evaluator.eval_fn_symbol_call_values(fn_sym, args, call_node)
+    evaluator.restore_runtime_env()
+    if evaluator.has_pending_diag != 0:
+        sema_ptr.diags.emit(evaluator.pending_diag)
+    let value =
+        if signal.kind == ComptimeControlKind.CTL_VALUE or signal.kind == ComptimeControlKind.CTL_RETURN:
+            signal.value
+        else:
+            comptime_value_invalid()
+    ComptimeEvalResult {
+        value,
+        extras: evaluator.extra_values,
+        error_msg: evaluator.last_error_msg,
+        runtime_exit_code: evaluator.runtime_exit_code,
+        runtime_stderr: evaluator.runtime_stderr,
     }
 
 fn ComptimeEvaluator.eval_root(self: ComptimeEvaluator, node: i32) -> ComptimeValue:
@@ -455,6 +606,22 @@ fn ComptimeEvaluator.bind_value(self: ComptimeEvaluator, sym: i32, value: Compti
     self.slot_values.push(value)
     self.slot_muts.push(is_mut)
 
+fn ComptimeEvaluator.update_slot_value(self: ComptimeEvaluator, idx: i32, value: ComptimeValue) -> void:
+    let slot_index = idx as i64
+    with self.slot_values.slot(slot_index) as mut slot:
+        slot.set(value)
+
+fn ComptimeEvaluator.record_runtime_env_set(self: ComptimeEvaluator, name: str) -> void:
+    for i in 0..self.runtime_env_names.len() as i32:
+        if self.runtime_env_names.get(i as i64) == name:
+            return
+    self.runtime_env_names.push(name)
+    self.runtime_env_values.push(with_getenv_str(name) ++ "")
+
+fn ComptimeEvaluator.restore_runtime_env(self: ComptimeEvaluator) -> void:
+    for i in 0..self.runtime_env_names.len() as i32:
+        let _restore = with_setenv_str(self.runtime_env_names.get(i as i64), self.runtime_env_values.get(i as i64))
+
 fn ComptimeEvaluator.lookup_slot_index(self: ComptimeEvaluator, sym: i32) -> i32:
     var i = self.slot_syms.len() as i32 - 1
     while i >= 0:
@@ -480,7 +647,7 @@ fn ComptimeEvaluator.assign_value(self: ComptimeEvaluator, sym: i32, value: Comp
         return self.fail(node, "assignment target is not available at comptime")
     if self.slot_muts.get(idx as i64) == 0:
         return self.fail(node, "cannot assign to immutable variable")
-    self.bind_value(sym, value, self.slot_muts.get(idx as i64))
+    self.update_slot_value(idx, value)
     comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
 
 fn ComptimeEvaluator.assign_struct_field_value(self: ComptimeEvaluator, target: i32, value: ComptimeValue, node: i32) -> ComptimeControl:
@@ -507,7 +674,7 @@ fn ComptimeEvaluator.assign_struct_field_value(self: ComptimeEvaluator, target: 
         else:
             self.extra_values.push(self.extra_values.get((base_value.extra_start + fi) as i64))
     let updated = comptime_value_struct(base_value.type_id, new_start, base_value.extra_count)
-    self.bind_value(base_sym, updated, self.slot_muts.get(idx as i64))
+    self.update_slot_value(idx, updated)
     comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
 
 fn ComptimeEvaluator.find_module_let_decl(self: ComptimeEvaluator, sym: i32) -> i32:
@@ -609,7 +776,7 @@ fn ComptimeEvaluator.rebind_collection_receiver(self: ComptimeEvaluator, recv_no
         let idx = self.lookup_slot_index(sym)
         if idx < 0:
             return self.fail(node, "comptime collection mutation requires a local identifier receiver")
-        self.bind_value(sym, value, self.slot_muts.get(idx as i64))
+        self.update_slot_value(idx, value)
         return comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
     if self.ast.kind(recv_node) == NodeKind.NK_FIELD_ACCESS:
         return self.assign_struct_field_value(recv_node, value, node)
@@ -1027,6 +1194,18 @@ fn ComptimeEvaluator.eval_str_method_call(self: ComptimeEvaluator, recv_value: C
         if method == "ends_with":
             return comptime_control_value(comptime_value_bool(if text.ends_with(needle): 1 else: 0))
         return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), comptime_str_find(text, needle) as i64))
+    if method == "replace":
+        if arg_count != 2:
+            return self.fail(node, "str.replace() expects exactly two arguments")
+        let old_signal = self.eval_expr(self.ast.get_extra(extra_start))
+        if old_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return old_signal
+        let new_signal = self.eval_expr(self.ast.get_extra(extra_start + 1))
+        if new_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return new_signal
+        if old_signal.value.kind != ComptimeValueKind.CV_STR or new_signal.value.kind != ComptimeValueKind.CV_STR:
+            return self.fail(node, "str.replace() arguments must be strings")
+        return comptime_control_value(comptime_value_str(with_str_replace(text, old_signal.value.text, new_signal.value.text)))
     self.fail(node, "str method '" ++ method ++ "' is not comptime-evaluable yet")
 
 fn ComptimeEvaluator.eval_resolved_method_call(self: ComptimeEvaluator, fn_sym: i32, recv_value: ComptimeValue, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
@@ -1036,6 +1215,45 @@ fn ComptimeEvaluator.eval_resolved_method_call(self: ComptimeEvaluator, fn_sym: 
     args.push(recv_value)
     for i in 0..arg_count:
         let arg_signal = self.eval_expr(self.ast.get_extra(extra_start + i))
+        if arg_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return arg_signal
+        args.push(arg_signal.value)
+    self.eval_fn_symbol_call_values(fn_sym, args, node)
+
+fn ComptimeEvaluator.eval_pipeline_method_call(self: ComptimeEvaluator, lhs: i32, method: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
+    let recv_signal = self.eval_expr(lhs)
+    if recv_signal.kind != ComptimeControlKind.CTL_VALUE:
+        return recv_signal
+    if recv_signal.value.kind == ComptimeValueKind.CV_VEC:
+        return self.eval_vec_method_call(lhs, recv_signal.value, method, extra_start, arg_count, node)
+    if recv_signal.value.kind == ComptimeValueKind.CV_MAP:
+        return self.eval_map_method_call(lhs, recv_signal.value, method, extra_start, arg_count, node)
+    if recv_signal.value.kind == ComptimeValueKind.CV_STR:
+        return self.eval_str_method_call(recv_signal.value, method, extra_start, arg_count, node)
+    self.fail(node, "pipeline method '" ++ self.pool.resolve(method) ++ "' is not comptime-evaluable yet")
+
+fn ComptimeEvaluator.eval_pipeline(self: ComptimeEvaluator, node: i32) -> ComptimeControl:
+    let lhs = self.ast.get_data0(node)
+    let rhs = self.ast.get_data1(node)
+    var callee = rhs
+    var args_start = -1
+    var arg_count = 0
+    if self.ast.kind(rhs) == NodeKind.NK_CALL:
+        callee = self.ast.get_data0(rhs)
+        args_start = self.ast.get_data1(rhs)
+        arg_count = self.ast.get_data2(rhs)
+    if self.sema.pipeline_method_calls.contains(node):
+        return self.eval_pipeline_method_call(lhs, self.sema.pipeline_method_calls.get(node).unwrap(), args_start, arg_count, node)
+    if self.ast.kind(callee) != NodeKind.NK_IDENT:
+        return self.fail(node, "pipeline rhs is not comptime-evaluable")
+    let lhs_signal = self.eval_expr(lhs)
+    if lhs_signal.kind != ComptimeControlKind.CTL_VALUE:
+        return lhs_signal
+    let fn_sym = self.ast.get_data0(callee)
+    let args: Vec[ComptimeValue] = Vec.new()
+    args.push(lhs_signal.value)
+    for i in 0..arg_count:
+        let arg_signal = self.eval_expr(self.ast.get_extra(args_start + i))
         if arg_signal.kind != ComptimeControlKind.CTL_VALUE:
             return arg_signal
         args.push(arg_signal.value)
@@ -1169,6 +1387,83 @@ fn ComptimeEvaluator.capability_project_relative_path(self: ComptimeEvaluator, r
     if path.starts_with(prefix):
         return path.slice(prefix.len(), path.len())
     path
+
+fn ComptimeEvaluator.str_vec_value(self: ComptimeEvaluator, values: Vec[str], node: i32) -> ComptimeValue:
+    let vec_type = self.node_type_or(node, 0)
+    if vec_type == 0:
+        let _ = self.fail(node, "string vector result type is unknown")
+        return comptime_value_invalid()
+    let start = self.extra_values.len() as i32
+    for i in 0..values.len() as i32:
+        self.extra_values.push(comptime_value_str(values.get(i as i64)))
+    comptime_value_vec(vec_type, start, values.len() as i32)
+
+fn ComptimeEvaluator.struct_field_value_by_name(self: ComptimeEvaluator, value: ComptimeValue, field_name: str) -> ComptimeValue:
+    if value.kind != ComptimeValueKind.CV_STRUCT:
+        return comptime_value_invalid()
+    let field_sym = self.pool.intern(field_name) as i32
+    let index = self.struct_field_index(value.type_id, field_sym)
+    if index < 0 or index >= value.extra_count:
+        return comptime_value_invalid()
+    self.extra_values.get((value.extra_start + index) as i64)
+
+fn ComptimeEvaluator.vec_str_to_argv(self: ComptimeEvaluator, value: ComptimeValue, method: str, node: i32) -> str:
+    if value.kind != ComptimeValueKind.CV_VEC and value.kind != ComptimeValueKind.CV_ARRAY:
+        let _ = self.fail(node, "ProcessRunner." ++ method ++ "() expects Vec[str] args")
+        return ""
+    var out = ""
+    for i in 0..value.extra_count:
+        let item = self.extra_values.get((value.extra_start + i) as i64)
+        if item.kind != ComptimeValueKind.CV_STR:
+            let _ = self.fail(node, "ProcessRunner." ++ method ++ "() expects Vec[str] args")
+            return ""
+        out = out ++ item.text ++ "\0"
+    out
+
+fn ComptimeEvaluator.process_env_apply(self: ComptimeEvaluator, value: ComptimeValue, node: i32) -> ComptimeValue:
+    let env_type = self.named_type_id("ProcessEnv", node)
+    if env_type == 0:
+        return comptime_value_invalid()
+    if value.kind != ComptimeValueKind.CV_STRUCT:
+        let _ = self.fail(node, "ProcessRunner env argument must be ProcessEnv")
+        return comptime_value_invalid()
+    let vars = self.struct_field_value_by_name(value, "vars")
+    if vars.kind != ComptimeValueKind.CV_VEC and vars.kind != ComptimeValueKind.CV_ARRAY:
+        let _ = self.fail(node, "ProcessEnv.vars is not a vector")
+        return comptime_value_invalid()
+    let saved_start = self.extra_values.len() as i32
+    for i in 0..vars.extra_count:
+        let item = self.extra_values.get((vars.extra_start + i) as i64)
+        let name = self.struct_field_value_by_name(item, "name")
+        let env_value = self.struct_field_value_by_name(item, "value")
+        if name.kind != ComptimeValueKind.CV_STR or env_value.kind != ComptimeValueKind.CV_STR:
+            let _ = self.fail(node, "ProcessEnv vars must contain string name/value fields")
+            return comptime_value_invalid()
+        self.extra_values.push(comptime_value_str(name.text))
+        self.extra_values.push(comptime_value_str(with_getenv_str(name.text) ++ ""))
+        let _set = with_setenv_str(name.text, env_value.text)
+    comptime_value_vec(env_type, saved_start, vars.extra_count * 2)
+
+fn ComptimeEvaluator.process_env_restore(self: ComptimeEvaluator, saved: ComptimeValue):
+    if saved.kind != ComptimeValueKind.CV_VEC and saved.kind != ComptimeValueKind.CV_ARRAY:
+        return
+    var i = 0
+    while i + 1 < saved.extra_count:
+        let name = self.extra_values.get((saved.extra_start + i) as i64)
+        let value = self.extra_values.get((saved.extra_start + i + 1) as i64)
+        if name.kind == ComptimeValueKind.CV_STR and value.kind == ComptimeValueKind.CV_STR:
+            let _restore = with_setenv_str(name.text, value.text)
+        i = i + 2
+
+fn ComptimeEvaluator.tool_process_result(self: ComptimeEvaluator, rc: i32, stdout_path: str, stderr_path: str, node: i32) -> ComptimeControl:
+    let result_type = self.named_type_id("ToolProcessResult", node)
+    if result_type == 0:
+        return comptime_control_error()
+    let start = self.extra_values.len() as i32
+    self.extra_values.push(comptime_value_int(self.sema.ty_i32 as i32, rc as i64))
+    self.extra_values.push(comptime_value_str(with_fs_read_file(stdout_path)))
+    self.extra_values.push(comptime_value_str(with_fs_read_file(stderr_path)))
+    comptime_control_value(comptime_value_struct(result_type, start, 3))
 
 fn ComptimeEvaluator.eval_buildctx_capability_method(self: ComptimeEvaluator, recv_value: ComptimeValue, method: str, arg_count: i32, node: i32) -> ComptimeControl:
     if method == "new_build":
@@ -1419,6 +1714,138 @@ fn ComptimeEvaluator.eval_toolfs_capability_method(self: ComptimeEvaluator, recv
             return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_fs_symlink(resolved_target, resolved_link) as i64))
     self.fail(node, "ToolFs capability method '" ++ method ++ "' is not implemented yet")
 
+fn ComptimeEvaluator.eval_process_runner_capability_method(self: ComptimeEvaluator, recv_value: ComptimeValue, method: str, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
+    let handle = self.validate_capability(recv_value, CapabilityKind.CK_BUILD_PROCESS_RUNNER, method, node)
+    if handle < 0:
+        return comptime_control_error()
+    let _record = self.capability_records.get(handle as i64)
+    let expected =
+        if method == "run":
+            1
+        else if method == "spawn_capture":
+            3
+        else if method == "wait":
+            2
+        else if method == "run_capture":
+            4
+        else if method == "run_capture_with_env":
+            5
+        else if method == "run_capture_cwd" or method == "run_capture_input":
+            5
+        else if method == "run_capture_cwd_with_env":
+            6
+        else:
+            -1
+    if expected < 0:
+        return self.fail(node, "ProcessRunner capability method '" ++ method ++ "' is not implemented yet")
+    if not self.capability_expect_arg_count(arg_count, expected, method, node):
+        return comptime_control_error()
+    let args_signal = self.capability_args(extra_start, arg_count)
+    if args_signal.kind != ComptimeControlKind.CTL_VALUE:
+        return args_signal
+
+    if method == "wait":
+        let pid = self.capability_arg_i32(args_signal.value, 0, method, node)
+        let timeout_ms = self.capability_arg_i32(args_signal.value, 1, method, node)
+        if self.had_error != 0:
+            return comptime_control_error()
+        return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_exec_wait(pid, timeout_ms) as i64))
+
+    let argv_value = self.extra_values.get(args_signal.value.extra_start as i64)
+    let argv = self.vec_str_to_argv(argv_value, method, node)
+    if self.had_error != 0:
+        return comptime_control_error()
+
+    if method == "run":
+        return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_exec_argv(argv) as i64))
+
+    if method == "spawn_capture":
+        let stdout_path = self.capability_arg_str(args_signal.value, 1, method, node)
+        let stderr_path = self.capability_arg_str(args_signal.value, 2, method, node)
+        if self.had_error != 0:
+            return comptime_control_error()
+        return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_exec_argv_capture_spawn(argv, stdout_path, stderr_path) as i64))
+
+    let stdout_path = self.capability_arg_str(args_signal.value, 1, method, node)
+    let stderr_path = self.capability_arg_str(args_signal.value, 2, method, node)
+    let timeout_ms = self.capability_arg_i32(args_signal.value, 3, method, node)
+    if self.had_error != 0:
+        return comptime_control_error()
+
+    if method == "run_capture":
+        return self.tool_process_result(with_exec_argv_capture(argv, stdout_path, stderr_path, timeout_ms), stdout_path, stderr_path, node)
+    if method == "run_capture_cwd":
+        let cwd = self.capability_arg_str(args_signal.value, 4, method, node)
+        if self.had_error != 0:
+            return comptime_control_error()
+        return self.tool_process_result(with_exec_argv_capture_cwd(argv, stdout_path, stderr_path, timeout_ms, cwd), stdout_path, stderr_path, node)
+    if method == "run_capture_input":
+        let stdin_path = self.capability_arg_str(args_signal.value, 4, method, node)
+        if self.had_error != 0:
+            return comptime_control_error()
+        return self.tool_process_result(with_exec_argv_capture_input(argv, stdout_path, stderr_path, timeout_ms, stdin_path), stdout_path, stderr_path, node)
+    if method == "run_capture_with_env":
+        let saved_env = self.process_env_apply(self.extra_values.get((args_signal.value.extra_start + 4) as i64), node)
+        if self.had_error != 0:
+            return comptime_control_error()
+        let rc = with_exec_argv_capture(argv, stdout_path, stderr_path, timeout_ms)
+        self.process_env_restore(saved_env)
+        return self.tool_process_result(rc, stdout_path, stderr_path, node)
+    let cwd = self.capability_arg_str(args_signal.value, 4, method, node)
+    if self.had_error != 0:
+        return comptime_control_error()
+    let saved_env = self.process_env_apply(self.extra_values.get((args_signal.value.extra_start + 5) as i64), node)
+    if self.had_error != 0:
+        return comptime_control_error()
+    let rc = with_exec_argv_capture_cwd(argv, stdout_path, stderr_path, timeout_ms, cwd)
+    self.process_env_restore(saved_env)
+    self.tool_process_result(rc, stdout_path, stderr_path, node)
+
+fn ComptimeEvaluator.eval_actionctx_capability_method(self: ComptimeEvaluator, recv_value: ComptimeValue, method: str, arg_count: i32, node: i32) -> ComptimeControl:
+    if not self.capability_expect_arg_count(arg_count, 0, method, node):
+        return comptime_control_error()
+    let handle = self.validate_capability(recv_value, CapabilityKind.CK_BUILD_ACTION_CTX, method, node)
+    if handle < 0:
+        return comptime_control_error()
+    let record = self.capability_records.get(handle as i64)
+    if method == "target_name":
+        return comptime_control_value(comptime_value_str(record.target_name))
+    if method == "inputs":
+        return comptime_control_value(self.str_vec_value(record.inputs, node))
+    if method == "outputs":
+        return comptime_control_value(self.str_vec_value(record.outputs, node))
+    if method == "args":
+        return comptime_control_value(self.str_vec_value(record.args, node))
+    if method == "output":
+        if record.outputs.len() == 0:
+            return comptime_control_value(comptime_value_str(""))
+        return comptime_control_value(comptime_value_str(record.outputs.get(0)))
+    let child_kind =
+        if method == "project_info":
+            CapabilityKind.CK_BUILD_PROJECT_INFO
+        else if method == "diagnostics":
+            CapabilityKind.CK_BUILD_DIAGNOSTICS
+        else if method == "fs":
+            CapabilityKind.CK_BUILD_TOOL_FS
+        else if method == "process_runner":
+            CapabilityKind.CK_BUILD_PROCESS_RUNNER
+        else:
+            0
+    if child_kind == 0:
+        return self.fail(node, "ActionCtx capability method '" ++ method ++ "' is not implemented yet")
+    let child_type = self.capability_type_id(child_kind, node)
+    if child_type == 0:
+        return comptime_control_error()
+    var child = comptime_capability_record(child_kind, record.package_name, record.package_version, record.project_root)
+    child.target_name = record.target_name
+    child.inputs = record.inputs
+    child.outputs = record.outputs
+    child.args = record.args
+    if child_kind == CapabilityKind.CK_BUILD_TOOL_FS:
+        child.write_scope = record.write_scope
+        child.write_scoped = 1
+    comptime_control_value(self.mint_capability(child_type, child))
+
 fn ComptimeEvaluator.eval_capability_method_call(self: ComptimeEvaluator, recv_value: ComptimeValue, field: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
     let method = self.pool.resolve(field)
     let kind = recv_value.data0 as i32
@@ -1432,6 +1859,10 @@ fn ComptimeEvaluator.eval_capability_method_call(self: ComptimeEvaluator, recv_v
         return self.eval_source_emitter_capability_method(recv_value, method, extra_start, arg_count, node)
     if kind == CapabilityKind.CK_BUILD_TOOL_FS:
         return self.eval_toolfs_capability_method(recv_value, method, extra_start, arg_count, node)
+    if kind == CapabilityKind.CK_BUILD_PROCESS_RUNNER:
+        return self.eval_process_runner_capability_method(recv_value, method, extra_start, arg_count, node)
+    if kind == CapabilityKind.CK_BUILD_ACTION_CTX:
+        return self.eval_actionctx_capability_method(recv_value, method, arg_count, node)
     self.fail(node, "capability method dispatch is not implemented for " ++ capability_registry_kind_name(kind) ++ "." ++ method)
 
 fn ComptimeEvaluator.eval_module_let_decl(self: ComptimeEvaluator, decl: i32, use_node: i32) -> ComptimeControl:
@@ -1568,7 +1999,11 @@ fn ComptimeEvaluator.eval_struct_lit(self: ComptimeEvaluator, node: i32) -> Comp
     let init_values: Vec[ComptimeValue] = Vec.new()
 
     for fi in 0..init_count:
-        let field_sym = self.ast.get_extra(extra_start + fi * 2)
+        var field_sym = self.ast.get_extra(extra_start + fi * 2)
+        if field_sym == 0:
+            if fi >= field_total:
+                return self.fail(node, "too many fields in comptime struct literal for '" ++ self.sema.type_name(type_id) ++ "'")
+            field_sym = self.sema.type_reflection_field_name(type_id, fi)
         if self.struct_field_index(type_id, field_sym) < 0:
             return self.fail(node, "unknown comptime struct field '" ++ self.pool.resolve(field_sym) ++ "' for '" ++ self.sema.type_name(type_id) ++ "'")
         for pi in 0..init_syms.len() as i32:
@@ -1698,6 +2133,63 @@ fn ComptimeEvaluator.eval_field_access(self: ComptimeEvaluator, node: i32) -> Co
             return self.fail(node, "unknown comptime struct field")
         return comptime_control_value(self.extra_values.get((base_signal.value.extra_start + field_index) as i64))
     self.unsupported(node)
+
+fn ComptimeEvaluator.eval_index(self: ComptimeEvaluator, node: i32) -> ComptimeControl:
+    let base_signal = self.eval_expr(self.ast.get_data0(node))
+    if base_signal.kind != ComptimeControlKind.CTL_VALUE:
+        return base_signal
+    let index_signal = self.eval_expr(self.ast.get_data1(node))
+    if index_signal.kind != ComptimeControlKind.CTL_VALUE:
+        return index_signal
+    if comptime_value_is_intlike(index_signal.value) == 0:
+        return self.fail(node, "comptime index must be an integer")
+    let index = comptime_value_intlike(index_signal.value)
+    let base = base_signal.value
+    if base.kind == ComptimeValueKind.CV_ARRAY or base.kind == ComptimeValueKind.CV_TUPLE or base.kind == ComptimeValueKind.CV_VEC:
+        if index < 0 or index >= base.extra_count as i64:
+            return self.fail(node, "comptime index out of bounds")
+        return comptime_control_value(self.extra_values.get((base.extra_start + index as i32) as i64))
+    self.fail(node, "comptime index requires an array, tuple, or vec")
+
+fn ComptimeEvaluator.fstring_segment_text(self: ComptimeEvaluator, value: ComptimeValue, node: i32) -> str:
+    if value.kind == ComptimeValueKind.CV_STR:
+        return value.text
+    if value.kind == ComptimeValueKind.CV_INT:
+        return f"{value.data0}"
+    if value.kind == ComptimeValueKind.CV_BOOL:
+        if value.data0 != 0:
+            return "true"
+        return "false"
+    let _ = self.fail(node, "comptime f-string does not support " ++ comptime_value_kind_name(value.kind) ++ " interpolation yet")
+    ""
+
+fn ComptimeEvaluator.eval_fstring(self: ComptimeEvaluator, node: i32) -> ComptimeControl:
+    let segment_count = self.ast.get_data0(node)
+    let extra_start = self.ast.get_data1(node)
+    var out = ""
+    var cursor = extra_start
+    for si in 0..segment_count:
+        let segment_kind = self.ast.get_extra(cursor)
+        cursor = cursor + 1
+        if segment_kind == FStringSegmentKind.LITERAL:
+            let sym = self.ast.get_extra(cursor)
+            cursor = cursor + 1
+            out = out ++ comptime_decode_string_escapes(self.pool.resolve(sym))
+        else if segment_kind == FStringSegmentKind.EXPR:
+            let expr_node = self.ast.get_extra(cursor)
+            let spec_node = self.ast.get_extra(cursor + 1)
+            cursor = cursor + 2
+            if spec_node != 0:
+                return self.fail(node, "comptime f-string format specs are not supported yet")
+            let value_signal = self.eval_expr(expr_node)
+            if value_signal.kind != ComptimeControlKind.CTL_VALUE:
+                return value_signal
+            if self.had_error != 0:
+                return comptime_control_error()
+            out = out ++ self.fstring_segment_text(value_signal.value, expr_node)
+        else:
+            return self.fail(node, "invalid comptime f-string segment")
+    comptime_control_value(comptime_value_str(out))
 
 fn ComptimeEvaluator.eval_unary(self: ComptimeEvaluator, node: i32) -> ComptimeControl:
     let inner = self.eval_expr(self.ast.get_data1(node))
@@ -2172,10 +2664,119 @@ fn ComptimeEvaluator.eval_fn_symbol_call(self: ComptimeEvaluator, fn_sym: i32, e
         arg_values.push(arg_signal.value)
     self.eval_fn_symbol_call_values(fn_sym, arg_values, node)
 
-fn ComptimeEvaluator.eval_allowed_runtime_call(self: ComptimeEvaluator, fn_sym: i32, arg_count: i32, node: i32) -> ComptimeControl:
+fn ComptimeEvaluator.eval_allowed_runtime_call(self: ComptimeEvaluator, fn_sym: i32, arg_values: Vec[ComptimeValue], node: i32) -> ComptimeControl:
     let fn_name = self.pool.resolve(fn_sym)
+    if fn_name == "with_panic":
+        if arg_values.len() as i32 != 3:
+            return self.fail(node, "with_panic takes three arguments")
+        let message = arg_values.get(0)
+        let location = arg_values.get(1)
+        let line = arg_values.get(2)
+        if message.kind != ComptimeValueKind.CV_STR or location.kind != ComptimeValueKind.CV_STR or comptime_value_is_intlike(line) == 0:
+            return self.fail(node, "with_panic expects string, string, integer arguments")
+        let line_value = comptime_value_intlike(line)
+        let rendered_location =
+            if line_value > 0:
+                location.text ++ f":{line_value}"
+            else:
+                location.text
+        self.runtime_exit_code = 134
+        self.runtime_stderr = "panic at " ++ rendered_location ++ ": " ++ message.text ++ "\n"
+        self.had_error = 1
+        return comptime_control_error()
+    if fn_name == "with_println_str" or fn_name == "with_print_str" or fn_name == "with_eprint" or fn_name == "with_write" or fn_name == "with_ewrite":
+        if arg_values.len() as i32 != 1:
+            return self.fail(node, fn_name ++ " takes one argument")
+        let text = arg_values.get(0)
+        if text.kind != ComptimeValueKind.CV_STR:
+            return self.fail(node, fn_name ++ " argument must be a string")
+        if fn_name == "with_println_str":
+            with_println_str(text.text)
+        else if fn_name == "with_print_str":
+            with_print_str(text.text)
+        else if fn_name == "with_eprint":
+            with_eprint(text.text)
+        else if fn_name == "with_write":
+            with_write(text.text)
+        else:
+            with_ewrite(text.text)
+        return comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
+    if fn_name == "with_println_i32" or fn_name == "with_println_i64":
+        if arg_values.len() as i32 != 1:
+            return self.fail(node, fn_name ++ " takes one argument")
+        let value = arg_values.get(0)
+        if comptime_value_is_intlike(value) == 0:
+            return self.fail(node, fn_name ++ " argument must be an integer")
+        if fn_name == "with_println_i32":
+            with_println_i32(comptime_value_intlike(value) as i32)
+        else:
+            with_println_i64(comptime_value_intlike(value))
+        return comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
+    if fn_name == "with_println_bool":
+        if arg_values.len() as i32 != 1:
+            return self.fail(node, "with_println_bool takes one argument")
+        let value = arg_values.get(0)
+        if value.kind != ComptimeValueKind.CV_BOOL:
+            return self.fail(node, "with_println_bool argument must be a bool")
+        with_println_bool(value.data0 != 0)
+        return comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
+    if fn_name == "with_getenv_str":
+        if arg_values.len() as i32 != 1:
+            return self.fail(node, "with_getenv_str takes one argument")
+        let name = arg_values.get(0)
+        if name.kind != ComptimeValueKind.CV_STR:
+            return self.fail(node, "with_getenv_str argument must be a string")
+        return comptime_control_value(comptime_value_str(with_getenv_str(name.text)))
+    if fn_name == "with_setenv_str":
+        if arg_values.len() as i32 != 2:
+            return self.fail(node, "with_setenv_str takes two arguments")
+        let name = arg_values.get(0)
+        let value = arg_values.get(1)
+        if name.kind != ComptimeValueKind.CV_STR or value.kind != ComptimeValueKind.CV_STR:
+            return self.fail(node, "with_setenv_str expects string arguments")
+        self.record_runtime_env_set(name.text)
+        return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_setenv_str(name.text, value.text) as i64))
+    if fn_name == "with_str_len":
+        if arg_values.len() as i32 != 1:
+            return self.fail(node, "with_str_len takes one argument")
+        let text = arg_values.get(0)
+        if text.kind != ComptimeValueKind.CV_STR:
+            return self.fail(node, "with_str_len argument must be a string")
+        return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i64 as i32), with_str_len(text.text)))
+    if fn_name == "with_str_byte_at":
+        if arg_values.len() as i32 != 2:
+            return self.fail(node, "with_str_byte_at takes two arguments")
+        let text = arg_values.get(0)
+        let index = arg_values.get(1)
+        if text.kind != ComptimeValueKind.CV_STR or comptime_value_is_intlike(index) == 0:
+            return self.fail(node, "with_str_byte_at expects string and integer arguments")
+        return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_str_byte_at(text.text, comptime_value_intlike(index))))
+    if fn_name == "with_str_slice":
+        if arg_values.len() as i32 != 3:
+            return self.fail(node, "with_str_slice takes three arguments")
+        let text = arg_values.get(0)
+        let start = arg_values.get(1)
+        let end = arg_values.get(2)
+        if text.kind != ComptimeValueKind.CV_STR or comptime_value_is_intlike(start) == 0 or comptime_value_is_intlike(end) == 0:
+            return self.fail(node, "with_str_slice expects string and integer arguments")
+        return comptime_control_value(comptime_value_str(with_str_slice(text.text, comptime_value_intlike(start), comptime_value_intlike(end))))
+    if fn_name == "with_str_contains" or fn_name == "with_str_starts_with" or fn_name == "with_str_ends_with":
+        if arg_values.len() as i32 != 2:
+            return self.fail(node, fn_name ++ " takes two arguments")
+        let text = arg_values.get(0)
+        let needle = arg_values.get(1)
+        if text.kind != ComptimeValueKind.CV_STR or needle.kind != ComptimeValueKind.CV_STR:
+            return self.fail(node, fn_name ++ " expects string arguments")
+        let result =
+            if fn_name == "with_str_contains":
+                with_str_contains(text.text, needle.text)
+            else if fn_name == "with_str_starts_with":
+                with_str_starts_with(text.text, needle.text)
+            else:
+                with_str_ends_with(text.text, needle.text)
+        return comptime_control_value(comptime_value_bool(result))
     if fn_name == "with_sysinfo_os" or fn_name == "with_sysinfo_arch" or fn_name == "with_sysinfo_hostname":
-        if arg_count != 0:
+        if arg_values.len() as i32 != 0:
             return self.fail(node, "sysinfo runtime call takes no arguments")
         if fn_name == "with_sysinfo_os":
             return comptime_control_value(comptime_value_str(with_sysinfo_os()))
@@ -2187,7 +2788,7 @@ fn ComptimeEvaluator.eval_allowed_runtime_call(self: ComptimeEvaluator, fn_sym: 
 fn ComptimeEvaluator.eval_fn_symbol_call_values(self: ComptimeEvaluator, fn_sym: i32, arg_values: Vec[ComptimeValue], node: i32) -> ComptimeControl:
     let fn_node = self.find_fn_decl_node(fn_sym)
     if fn_node == 0 and self.allow_runtime_calls != 0:
-        let runtime_signal = self.eval_allowed_runtime_call(fn_sym, arg_values.len() as i32, node)
+        let runtime_signal = self.eval_allowed_runtime_call(fn_sym, arg_values, node)
         if runtime_signal.kind != ComptimeControlKind.CTL_ERROR or self.had_error != 0:
             return runtime_signal
     if self.allow_runtime_calls == 0 and self.fn_decl_node_is_comptime(fn_node) == 0:
@@ -2195,7 +2796,7 @@ fn ComptimeEvaluator.eval_fn_symbol_call_values(self: ComptimeEvaluator, fn_sym:
     if self.sema.generic_fn_nodes.contains(fn_sym):
         return self.fail(node, "generic comptime functions are not supported yet")
     if fn_node == 0:
-        return self.fail(node, "callee is not a comptime function body")
+        return self.fail(node, "callee '" ++ self.pool.resolve(fn_sym) ++ "' is not a comptime function body")
     if self.active_fn_syms.len() as i32 >= self.recursion_limit:
         return self.fail(node, "comptime recursion limit exceeded")
 
@@ -2342,13 +2943,17 @@ fn ComptimeEvaluator.eval_expr(self: ComptimeEvaluator, node: i32) -> ComptimeCo
     if kind == NodeKind.NK_BOOL_LIT:
         return comptime_control_value(comptime_value_bool(self.ast.get_data0(node)))
     if kind == NodeKind.NK_STRING_LIT:
-        return comptime_control_value(comptime_value_str(self.pool.resolve(self.ast.get_data0(node))))
+        return comptime_control_value(comptime_value_str(comptime_decode_string_escapes(self.pool.resolve(self.ast.get_data0(node)))))
+    if kind == NodeKind.NK_FSTRING:
+        return self.eval_fstring(node)
     if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_COMPTIME:
         return self.eval_expr(self.ast.get_data0(node))
     if kind == NodeKind.NK_IDENT:
         return self.eval_ident(node)
     if kind == NodeKind.NK_FIELD_ACCESS:
         return self.eval_field_access(node)
+    if kind == NodeKind.NK_INDEX:
+        return self.eval_index(node)
     if kind == NodeKind.NK_UNARY:
         return self.eval_unary(node)
     if kind == NodeKind.NK_MATCH_OP or kind == NodeKind.NK_NEG_MATCH_OP:
@@ -2389,6 +2994,8 @@ fn ComptimeEvaluator.eval_expr(self: ComptimeEvaluator, node: i32) -> ComptimeCo
         return self.eval_struct_lit(node)
     if kind == NodeKind.NK_RANGE:
         return self.eval_range(node)
+    if kind == NodeKind.NK_PIPELINE:
+        return self.eval_pipeline(node)
     if kind == NodeKind.NK_CAST:
         return self.eval_cast(node)
     if kind == NodeKind.NK_VARIANT_SHORTHAND:
