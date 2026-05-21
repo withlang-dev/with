@@ -12,8 +12,8 @@ conversation context after compaction.
 ## Current Focus
 
 Phase C extraction work is complete. Pre-Phase-D preparation is complete
-through P9, including the follow-up source-location diagnostic gap. Phase D D1
-and D2 are complete. Phase D D3 is in progress.
+through P9, including the follow-up source-location diagnostic gap. Phase D D1,
+D2, and D3 are complete. Next work starts at D4.
 
 Completed D1 sub-slices:
 
@@ -77,20 +77,19 @@ Completed D3 work:
 7. `ActionCtx` can mint workspaces for action-local compilation, and the fast
    emit-C smoke action now emits `test/hello.w` to C through
    `Workspace.compile()` instead of spawning `with build --emit-c`.
+8. `Workspace` is an ephemeral capability handle, so storing it in ordinary
+   long-lived structs is rejected by Sema. The compile-error suite covers this
+   with `err_workspace_ephemeral_struct_field.w`.
 
-Remaining D3 work:
+Remaining D3 work: none.
 
-1. Workspace lifetime constraints tied to `BuildCtx`.
-
-Do not start D4-D8 until D3 lands and passes the same build/fixpoint/test
-baseline.
+D4 may start after this D3 checkpoint lands and passes the same
+build/fixpoint/test baseline.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.
 `Build.emit_graph()` remains a debug/export compatibility facility and must not
 be the evaluator-to-driver transport.
-
-Do not start D4-D8 until D3 lands and passes the same baseline verification.
 
 Completed quality-of-life slices:
 

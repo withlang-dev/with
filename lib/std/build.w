@@ -199,7 +199,7 @@ pub type ProcessRunner {
     token: str,
 }
 
-pub type Workspace {
+pub type Workspace ephemeral {
     token: str,
     id: i32,
 }
