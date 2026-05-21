@@ -46,6 +46,8 @@ type Parser {
     pending_effect_param: i32,    // param name sym (0 = no pin)
     pending_effect_bits: i32,     // EFF_* bitmask
     pending_compiler_hook_phase: i32,
+    pending_comptime_with_names: Vec[i32],
+    pending_comptime_with_types: Vec[i32],
     pending_unsafe_fn: i32,
     pending_iter_of_self: i32,
     saw_implicit_it: i32,
@@ -110,6 +112,8 @@ fn Parser.init_with_pool(tokens: TokenList, source: str, file_id: i32, intern: I
         pending_effect_param: 0,
         pending_effect_bits: 0,
         pending_compiler_hook_phase: 0,
+        pending_comptime_with_names: Vec.new(),
+        pending_comptime_with_types: Vec.new(),
         pending_unsafe_fn: 0,
         pending_iter_of_self: 0,
         saw_implicit_it: 0,
@@ -186,7 +190,7 @@ fn Parser.top_level_starts_decl(self: Parser) -> i32:
     if t == TokenKind.TK_KW_COMPTIME:
         if self.pos + 1 < self.tokens.len():
             let next = self.tokens.get_tag(self.pos + 1)
-            if next == TokenKind.TK_KW_FN or next == TokenKind.TK_COLON:
+            if next == TokenKind.TK_KW_FN or next == TokenKind.TK_COLON or next == TokenKind.TK_KW_WITH:
                 return 1
         return 0
     if t == TokenKind.TK_KW_LET or t == TokenKind.TK_KW_VAR:
@@ -771,6 +775,8 @@ fn Parser.parse_decl(self: Parser) -> NodeId:
         return result
     if t == TokenKind.TK_KW_COMPTIME:
         self.advance()
+        if self.peek() == TokenKind.TK_KW_WITH:
+            return self.parse_comptime_with_decl(start, is_pub)
         if self.peek() != TokenKind.TK_KW_FN:
             self.emit_error("expected 'fn' after 'comptime'")
             return self.poisoned_expr()
@@ -798,6 +804,96 @@ fn Parser.parse_decl(self: Parser) -> NodeId:
 
     self.emit_error("expected declaration (fn, type, enum, let, use, extern)")
     0 as NodeId
+
+fn Parser.default_comptime_capability_binding(self: Parser, type_node: NodeId) -> i32:
+    if type_node == 0:
+        return 0
+    if self.pool.kind(type_node) != NodeKind.NK_TYPE_NAMED:
+        return 0
+    let type_sym = self.pool.get_data0(type_node)
+    let type_name = self.intern.resolve(type_sym)
+    if type_name == "BuildCtx" or type_name == "ActionCtx":
+        return self.intern.intern("ctx")
+    if type_name == "ToolFs":
+        return self.intern.intern("fs")
+    if type_name == "ProcessRunner":
+        return self.intern.intern("proc")
+    if type_name == "Diagnostics":
+        return self.intern.intern("diag")
+    if type_name == "SourceEmitter":
+        return self.intern.intern("emit")
+    if type_name == "ProjectInfo":
+        return self.intern.intern("project")
+    if type_name == "Workspace":
+        return self.intern.intern("workspace")
+    0
+
+fn Parser.pending_comptime_with_name_exists(self: Parser, name: i32) -> bool:
+    for i in 0..self.pending_comptime_with_names.len() as i32:
+        if self.pending_comptime_with_names.get(i as i64) == name:
+            return true
+    false
+
+fn Parser.clear_pending_comptime_with_params(self: Parser):
+    self.pending_comptime_with_names = Vec.new()
+    self.pending_comptime_with_types = Vec.new()
+
+fn Parser.parse_comptime_with_clause(self: Parser) -> i32:
+    if self.expect(TokenKind.TK_KW_WITH) == 0:
+        return 0
+    self.clear_pending_comptime_with_params()
+    while true:
+        self.skip_newlines()
+        let type_node = self.parse_type_expr()
+        if type_node == 0:
+            return 0
+
+        var name = 0
+        self.skip_newlines()
+        if self.peek() == TokenKind.TK_KW_AS:
+            self.advance()
+            self.skip_newlines()
+            name = self.expect_ident()
+            if name == 0:
+                return 0
+        else:
+            name = self.default_comptime_capability_binding(type_node)
+            if name == 0:
+                self.emit_error("capability requires an explicit binding name, e.g. 'as ctx'")
+                return 0
+
+        if self.pending_comptime_with_name_exists(name):
+            self.emit_error("duplicate capability binding in comptime with clause")
+            return 0
+        self.pending_comptime_with_names.push(name)
+        self.pending_comptime_with_types.push(type_node as i32)
+
+        self.skip_newlines()
+        if self.peek() != TokenKind.TK_COMMA:
+            break
+        self.advance()
+    self.expect(TokenKind.TK_COLON)
+
+fn Parser.parse_comptime_with_decl(self: Parser, start: i32, outer_pub: i32) -> NodeId:
+    if self.parse_comptime_with_clause() == 0:
+        self.clear_pending_comptime_with_params()
+        return self.poisoned_expr()
+    self.skip_newlines()
+
+    var is_pub = outer_pub
+    if self.peek() == TokenKind.TK_KW_PUB:
+        is_pub = Visibility.Public
+        self.advance()
+        self.skip_newlines()
+
+    if self.peek() != TokenKind.TK_KW_FN:
+        self.emit_error("expected 'fn' after 'comptime with' clause")
+        self.clear_pending_comptime_with_params()
+        return self.poisoned_expr()
+
+    let decl = self.parse_fn_decl(is_pub, start, 0, 0, 1)
+    self.clear_pending_comptime_with_params()
+    decl
 
 fn Parser.flush_pending_post_decls(self: Parser):
     for i in 0..self.pending_post_decls.len() as i32:
@@ -922,14 +1018,22 @@ fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is
     var required_param_count = 0
     self.last_param_pattern_start = self.pool.fn_param_patterns_len()
     self.last_param_pattern_count = 0
+    let pending_capability_param_count = self.pending_comptime_with_names.len() as i32
     if self.peek() == TokenKind.TK_L_PAREN:
         self.advance()
         param_count = self.parse_param_list()
         required_param_count = self.last_param_required_count
         if param_count > 0:
             params_start = self.pool.extra_len() - param_count * FN_PARAM_STRIDE
+        self.clear_pending_comptime_with_params()
         if self.expect(TokenKind.TK_R_PAREN) == 0:
             return self.poisoned_expr()
+    else if pending_capability_param_count > 0:
+        param_count = self.emit_pending_comptime_with_params()
+        required_param_count = self.last_param_required_count
+        if param_count > 0:
+            params_start = self.pool.extra_len() - param_count * FN_PARAM_STRIDE
+        self.clear_pending_comptime_with_params()
 
     // Return type
     var ret_type: NodeId = 0 as NodeId
@@ -6441,9 +6545,26 @@ fn Parser.parse_param_list(self: Parser) -> i32:
     self.last_param_pattern_start = pattern_start
     self.last_param_pattern_count = 0
     self.last_param_required_count = 0
+
+    let pending_count = self.pending_comptime_with_names.len() as i32
+    for ci in 0..pending_count:
+        params.push(self.pending_comptime_with_names.get(ci as i64))
+        params.push(self.pending_comptime_with_types.get(ci as i64))
+        params.push(0)
+        default_nodes.push(0)
+        self.pool.add_fn_param_pattern_value(0 as NodeId)
+        pattern_count = pattern_count + 1
+        required_count = required_count + 1
+
     self.skip_newlines()
     if self.peek() == TokenKind.TK_R_PAREN or self.peek() == TokenKind.TK_DOT_DOT_DOT:
-        return 0
+        let prefixed_count = (params.len() / (FN_PARAM_STRIDE as i64)) as i32
+        for pi in 0..params.len() as i32:
+            self.pool.add_extra(params.get(pi as i64))
+        self.last_param_pattern_start = pattern_start
+        self.last_param_pattern_count = pattern_count
+        self.last_param_required_count = required_count
+        return prefixed_count
     while true:
         self.skip_newlines()
         let param_flags = self.parse_param_attrs()
@@ -6531,6 +6652,19 @@ fn Parser.parse_param_list(self: Parser) -> i32:
     self.last_param_pattern_start = pattern_start
     self.last_param_pattern_count = pattern_count
     self.last_param_required_count = required_count
+    count
+
+fn Parser.emit_pending_comptime_with_params(self: Parser) -> i32:
+    let pattern_start = self.pool.fn_param_patterns_len()
+    let count = self.pending_comptime_with_names.len() as i32
+    for ci in 0..count:
+        self.pool.add_extra(self.pending_comptime_with_names.get(ci as i64))
+        self.pool.add_extra(self.pending_comptime_with_types.get(ci as i64))
+        self.pool.add_extra(0)
+        self.pool.add_fn_param_pattern_value(0 as NodeId)
+    self.last_param_pattern_start = pattern_start
+    self.last_param_pattern_count = count
+    self.last_param_required_count = count
     count
 
 fn Parser.parse_one_param(self: Parser) -> i32:
