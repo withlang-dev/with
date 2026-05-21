@@ -17,6 +17,7 @@ enum ComptimeValueKind: i32:
     CV_MAP = 10
     CV_CAPABILITY = 11
     CV_FN = 12
+    CV_ENUM = 13
 
 type ComptimeValue {
     kind: i32,
@@ -171,6 +172,17 @@ fn comptime_value_fn(type_id: i32, fn_sym: i32) -> ComptimeValue:
         extra_count: 0,
     }
 
+fn comptime_value_enum(type_id: i32, variant_sym: i32, extra_start: i32, extra_count: i32) -> ComptimeValue:
+    ComptimeValue {
+        kind: ComptimeValueKind.CV_ENUM,
+        type_id,
+        data0: variant_sym as i64,
+        data1: 0,
+        text: "",
+        extra_start,
+        extra_count,
+    }
+
 fn comptime_value_is_valid(value: ComptimeValue) -> i32:
     if value.kind == ComptimeValueKind.CV_INVALID:
         return 0
@@ -204,6 +216,7 @@ fn comptime_value_kind_name(kind: i32) -> str:
     if kind == ComptimeValueKind.CV_MAP: return "map"
     if kind == ComptimeValueKind.CV_CAPABILITY: return "capability"
     if kind == ComptimeValueKind.CV_FN: return "function"
+    if kind == ComptimeValueKind.CV_ENUM: return "enum"
     "invalid"
 
 fn comptime_value_format(value: ComptimeValue, extras: Vec[ComptimeValue], sema: Sema) -> str:
@@ -263,6 +276,16 @@ fn comptime_value_format(value: ComptimeValue, extras: Vec[ComptimeValue], sema:
         return "<capability " ++ capability_registry_kind_name(value.data0 as i32) ++ ">"
     if value.kind == ComptimeValueKind.CV_FN:
         return "<fn " ++ sema.pool_resolve(value.data0 as i32) ++ ">"
+    if value.kind == ComptimeValueKind.CV_ENUM:
+        var out = sema.pool_resolve(value.data0 as i32)
+        if value.extra_count > 0:
+            out = out ++ "("
+            for i in 0..value.extra_count:
+                if i > 0:
+                    out = out ++ ", "
+                out = out ++ comptime_value_format(extras.get((value.extra_start + i) as i64), extras, sema)
+            out = out ++ ")"
+        return out
     if value.type_id != 0:
         return "<" ++ sema.type_name(value.type_id) ++ ">"
     "<invalid>"
@@ -333,4 +356,13 @@ fn comptime_values_equal(lhs: ComptimeValue, rhs: ComptimeValue, extras: Vec[Com
         if lhs.type_id == rhs.type_id and lhs.data0 == rhs.data0:
             return 1
         return 0
+    if lhs.kind == ComptimeValueKind.CV_ENUM:
+        if lhs.type_id != rhs.type_id or lhs.data0 != rhs.data0 or lhs.extra_count != rhs.extra_count:
+            return 0
+        for i in 0..lhs.extra_count:
+            let left = extras.get((lhs.extra_start + i) as i64)
+            let right = extras.get((rhs.extra_start + i) as i64)
+            if comptime_values_equal(left, right, extras) == 0:
+                return 0
+        return 1
     0
