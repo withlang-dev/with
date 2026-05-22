@@ -105,9 +105,11 @@ Completed D4 substrate work:
    the real `std.build` import path.
 4. `Workspace.begin_intercept`, `wait_for_message`, and `end_intercept` have
    evaluator-backed lifecycle support for synchronous `Workspace.compile()`.
-   Intercepted compilation now delivers produced artifacts, then the terminal
-   phase marker and terminal payload. Full phase emission, cooperative
-   suspension, and `set_link_command` remain the next D4 work.
+   Intercepted compilation now delivers the typechecked phase marker,
+   `CompilerMessage.Typechecked(Vec[DeclSummary])` from the real sema snapshot,
+   produced artifacts, then the terminal phase marker and terminal payload.
+   Cooperative suspension, full nonterminal phase coverage, and
+   `set_link_command` remain the next D4 work.
 5. Tool build/action evaluation now rejects unfinished workspace interceptions
    at the evaluator boundary. A build script that returns with an active
    intercept and no delivered terminal message fails loudly instead of
@@ -125,6 +127,12 @@ Completed D4 substrate work:
 9. Successful intercepted `Workspace.compile()` calls now queue one
    `CompilerMessage.Artifact(Artifact)` for each produced build artifact
    before the terminal `Phase(complete)` / `Complete(BuildResult)` pair.
+10. Successful intercepted `Workspace.compile()` calls now queue
+   `Phase(typechecked)` followed by `Typechecked(Vec[DeclSummary])` before
+   artifact messages. The summaries are materialized directly from the
+   compiler's typed declaration snapshot and include function/type names,
+   module names, public flags, source spans, return type text, and parameter
+   counts.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.

@@ -7,6 +7,7 @@ use InternPool
 use TypeLayout
 use CapabilityRegistry
 use compiler.Compilation
+use render
 
 extern fn with_eprint(s: str) -> void
 extern fn with_fs_read_file(path: str) -> str
@@ -91,6 +92,16 @@ type ComptimeWorkspaceRecord {
     generation: i32,
     messages: Vec[ComptimeValue],
     message_cursor: i32,
+}
+
+type ComptimeWorkspaceCompileResult {
+    result: ComptimeValue,
+    messages: Vec[ComptimeValue],
+}
+
+type ComptimeLineColumn {
+    line: i32,
+    column: i32,
 }
 
 type ComptimeEvaluator {
@@ -1698,6 +1709,202 @@ fn ComptimeEvaluator.workspace_build_result_value(self: ComptimeEvaluator, works
     self.extra_values.push(diagnostic_vec)
     comptime_value_struct(result_type, result_start, 5)
 
+fn comptime_workspace_compile_result(result: ComptimeValue, messages: Vec[ComptimeValue]) -> ComptimeWorkspaceCompileResult:
+    ComptimeWorkspaceCompileResult { result, messages }
+
+fn comptime_workspace_compile_invalid() -> ComptimeWorkspaceCompileResult:
+    let messages: Vec[ComptimeValue] = Vec.new()
+    comptime_workspace_compile_result(comptime_value_invalid(), messages)
+
+fn comptime_module_name_for_path(root: str, path: str) -> str:
+    var rel = path
+    let prefix = if root.ends_with("/"): root else: root ++ "/"
+    if root.len() > 0 and path.starts_with(prefix):
+        rel = path.slice(prefix.len(), path.len())
+    if rel.ends_with(".w"):
+        rel = rel.slice(0, rel.len() - 2)
+    var out = ""
+    for i in 0..rel.len() as i32:
+        let ch = rel.byte_at(i as i64)
+        if ch == 47:
+            out = out ++ "."
+        else:
+            out = out ++ rel.slice(i as i64, (i + 1) as i64)
+    out
+
+fn comptime_line_column_for_offset(text: str, offset: i32) -> ComptimeLineColumn:
+    var line = 0
+    var column = 0
+    var i = 0
+    let clamped = if offset < 0: 0 else if offset > text.len() as i32: text.len() as i32 else: offset
+    while i < clamped:
+        if text.byte_at(i as i64) == 10:
+            line = line + 1
+            column = 0
+        else:
+            column = column + 1
+        i = i + 1
+    ComptimeLineColumn { line, column }
+
+fn ComptimeEvaluator.source_span_value(self: ComptimeEvaluator, file: str, text: str, start: i32, end: i32, node: i32) -> ComptimeValue:
+    let span_type = self.named_type_id("SourceSpan", node)
+    if span_type == 0:
+        return comptime_value_invalid()
+    let loc = comptime_line_column_for_offset(text, start)
+    let span_start = self.extra_values.len() as i32
+    self.extra_values.push(comptime_value_str(file))
+    self.extra_values.push(comptime_value_int(self.sema.ty_i32 as i32, start as i64))
+    self.extra_values.push(comptime_value_int(self.sema.ty_i32 as i32, end as i64))
+    self.extra_values.push(comptime_value_int(self.sema.ty_i32 as i32, loc.line as i64))
+    self.extra_values.push(comptime_value_int(self.sema.ty_i32 as i32, loc.column as i64))
+    comptime_value_struct(span_type, span_start, 5)
+
+fn ComptimeEvaluator.decl_summary_vec_type(self: ComptimeEvaluator, node: i32) -> i32:
+    let decl_type = self.named_type_id("DeclSummary", node)
+    if decl_type == 0:
+        return 0
+    let args: Vec[i32] = Vec.new()
+    args.push(decl_type)
+    let tid = self.sema.find_generic_inst_type(self.sema.syms.vec, args, 1) as i32
+    if tid == 0:
+        let _ = self.fail(node, "Vec[DeclSummary] type is not visible to comptime evaluator")
+    tid
+
+fn comptime_decl_kind_for_function(name: str) -> i32:
+    if name.contains("."):
+        return 3
+    0
+
+fn ComptimeEvaluator.function_decl_summary_value(self: ComptimeEvaluator, comp: Compilation, pool: AstPool, decl: NodeId, decl_index: i32, node: i32) -> ComptimeValue:
+    let decl_type = self.named_type_id("DeclSummary", node)
+    let kind_type = self.named_type_id("DeclKind", node)
+    if decl_type == 0 or kind_type == 0:
+        return comptime_value_invalid()
+    let path = comp.zcu.decl_source_path_frontend(decl_index)
+    let file_id = comp.zcu.decl_source_file_id_frontend(decl_index)
+    let source = comp.zcu.source_for_file_id_frontend(file_id)
+    let module_name = comptime_module_name_for_path(comp.zcu.project_config.root_dir, path)
+    let name = comp.zcu.pool.resolve(pool.get_data0(decl))
+    let flags = pool.get_data2(decl)
+    let is_pub = (flags / FnFlags.PUB) % 2 == 1
+    let meta = pool.find_fn_meta(decl)
+    var param_count = 0
+    var generic_param_count = 0
+    var return_type = "void"
+    if meta >= 0:
+        param_count = pool.fn_meta_param_count(meta)
+        generic_param_count = pool.fn_meta_tp_count(meta)
+        let ret_node = pool.fn_meta_ret(meta)
+        if ret_node != 0:
+            return_type = render_type_expr(pool, comp.zcu.pool, ret_node as NodeId)
+    let summary_source = self.source_span_value(path, source.text, pool.get_start(decl), pool.get_end(decl), node)
+    if summary_source.kind == ComptimeValueKind.CV_INVALID:
+        return summary_source
+    let notes = self.empty_vec_for_field(decl_type, "notes", node)
+    if notes.kind == ComptimeValueKind.CV_INVALID:
+        return notes
+    let start = self.extra_values.len() as i32
+    self.extra_values.push(comptime_value_int(self.sema.ty_i32 as i32, 1))
+    self.extra_values.push(comptime_value_int(kind_type, comptime_decl_kind_for_function(name) as i64))
+    self.extra_values.push(comptime_value_str(module_name))
+    self.extra_values.push(comptime_value_str(name))
+    self.extra_values.push(comptime_value_str(module_name ++ "." ++ name))
+    self.extra_values.push(comptime_value_bool(if is_pub: 1 else: 0))
+    self.extra_values.push(comptime_value_str(""))
+    self.extra_values.push(comptime_value_str("fn"))
+    self.extra_values.push(comptime_value_str(return_type))
+    self.extra_values.push(comptime_value_int(self.sema.ty_i32 as i32, param_count as i64))
+    self.extra_values.push(comptime_value_int(self.sema.ty_i32 as i32, generic_param_count as i64))
+    self.extra_values.push(comptime_value_str(""))
+    self.extra_values.push(summary_source)
+    self.extra_values.push(notes)
+    comptime_value_struct(decl_type, start, 14)
+
+fn ComptimeEvaluator.type_decl_summary_value(self: ComptimeEvaluator, comp: Compilation, pool: AstPool, decl: NodeId, decl_index: i32, node: i32) -> ComptimeValue:
+    let decl_type = self.named_type_id("DeclSummary", node)
+    let kind_type = self.named_type_id("DeclKind", node)
+    if decl_type == 0 or kind_type == 0:
+        return comptime_value_invalid()
+    let path = comp.zcu.decl_source_path_frontend(decl_index)
+    let file_id = comp.zcu.decl_source_file_id_frontend(decl_index)
+    let source = comp.zcu.source_for_file_id_frontend(file_id)
+    let module_name = comptime_module_name_for_path(comp.zcu.project_config.root_dir, path)
+    let name = comp.zcu.pool.resolve(pool.get_data0(decl))
+    let packed = pool.get_data2(decl)
+    let sub_kind = type_decl_sub_kind(packed)
+    let is_pub = type_decl_is_pub(pool, pool.get_data1(decl), sub_kind)
+    let summary_source = self.source_span_value(path, source.text, pool.get_start(decl), pool.get_end(decl), node)
+    if summary_source.kind == ComptimeValueKind.CV_INVALID:
+        return summary_source
+    let notes = self.empty_vec_for_field(decl_type, "notes", node)
+    if notes.kind == ComptimeValueKind.CV_INVALID:
+        return notes
+    let type_text =
+        if sub_kind == TypeDeclKind.Enum:
+            "enum"
+        else if sub_kind == TypeDeclKind.DiscEnum:
+            "disc_enum"
+        else if sub_kind == TypeDeclKind.Union:
+            "union"
+        else:
+            "type"
+    let start = self.extra_values.len() as i32
+    self.extra_values.push(comptime_value_int(self.sema.ty_i32 as i32, 1))
+    self.extra_values.push(comptime_value_int(kind_type, 1))
+    self.extra_values.push(comptime_value_str(module_name))
+    self.extra_values.push(comptime_value_str(name))
+    self.extra_values.push(comptime_value_str(module_name ++ "." ++ name))
+    self.extra_values.push(comptime_value_bool(if is_pub: 1 else: 0))
+    self.extra_values.push(comptime_value_str(""))
+    self.extra_values.push(comptime_value_str(type_text))
+    self.extra_values.push(comptime_value_str(""))
+    self.extra_values.push(comptime_value_int(self.sema.ty_i32 as i32, 0))
+    self.extra_values.push(comptime_value_int(self.sema.ty_i32 as i32, 0))
+    self.extra_values.push(comptime_value_str(""))
+    self.extra_values.push(summary_source)
+    self.extra_values.push(notes)
+    comptime_value_struct(decl_type, start, 14)
+
+fn ComptimeEvaluator.typechecked_message_value(self: ComptimeEvaluator, comp: Compilation, pool: AstPool, node: i32) -> ComptimeValue:
+    let vec_type = self.decl_summary_vec_type(node)
+    if vec_type == 0:
+        return comptime_value_invalid()
+    let summaries: Vec[ComptimeValue] = Vec.new()
+    for di in 0..pool.decl_count():
+        let decl = pool.get_decl(di)
+        let kind = pool.kind(decl)
+        if kind == NodeKind.NK_FN_DECL:
+            let summary = self.function_decl_summary_value(comp, pool, decl, di, node)
+            if summary.kind == ComptimeValueKind.CV_INVALID:
+                return summary
+            summaries.push(summary)
+        else if kind == NodeKind.NK_TYPE_DECL:
+            let summary = self.type_decl_summary_value(comp, pool, decl, di, node)
+            if summary.kind == ComptimeValueKind.CV_INVALID:
+                return summary
+            summaries.push(summary)
+    let start = self.extra_values.len() as i32
+    for i in 0..summaries.len() as i32:
+        self.extra_values.push(summaries.get(i as i64))
+    let decls = comptime_value_vec(vec_type, start, summaries.len() as i32)
+    let payloads: Vec[ComptimeValue] = Vec.new()
+    payloads.push(decls)
+    self.compiler_message_value("Typechecked", payloads, node)
+
+fn ComptimeEvaluator.workspace_typechecked_messages(self: ComptimeEvaluator, comp: Compilation, pool: AstPool, node: i32) -> Vec[ComptimeValue]:
+    let messages: Vec[ComptimeValue] = Vec.new()
+    if pool.decl_count() == 0:
+        return messages
+    let phase = self.compiler_message_phase_value(3, node)
+    if phase.kind == ComptimeValueKind.CV_INVALID:
+        return messages
+    let typechecked = self.typechecked_message_value(comp, pool, node)
+    if typechecked.kind == ComptimeValueKind.CV_INVALID:
+        return messages
+    messages.push(phase)
+    messages.push(typechecked)
+    messages
+
 fn ComptimeEvaluator.enum_payload_value(self: ComptimeEvaluator, enum_name: str, variant_name: str, payloads: Vec[ComptimeValue], node: i32) -> ComptimeValue:
     let enum_type = self.named_type_id(enum_name, node)
     if enum_type == 0:
@@ -1778,7 +1985,7 @@ fn ComptimeEvaluator.compiler_message_envelope_value(self: ComptimeEvaluator, wo
     self.extra_values.push(message)
     comptime_value_struct(envelope_type, start, 3)
 
-fn ComptimeEvaluator.compile_workspace_record(self: ComptimeEvaluator, record: ComptimeWorkspaceRecord, capability: ComptimeCapabilityRecord, node: i32) -> ComptimeValue:
+fn ComptimeEvaluator.compile_workspace_record(self: ComptimeEvaluator, record: ComptimeWorkspaceRecord, capability: ComptimeCapabilityRecord, node: i32) -> ComptimeWorkspaceCompileResult:
     let options = record.options
     let option_source = self.workspace_str_option(options, "source_path")
     var source_path = option_source
@@ -1789,10 +1996,10 @@ fn ComptimeEvaluator.compile_workspace_record(self: ComptimeEvaluator, record: C
     let target_kind = self.workspace_i32_option(options, "target", 0)
     if target_kind != 0:
         let _ = self.fail(node, "Workspace.compile currently supports only the native target")
-        return comptime_value_invalid()
+        return comptime_workspace_compile_invalid()
     if source_path.len() == 0 and record.string_names.len() == 0:
         let _ = self.fail(node, "Workspace.compile requires at least one source file or source string")
-        return comptime_value_invalid()
+        return comptime_workspace_compile_invalid()
     var final_output = output_path
     if final_output.len() == 0:
         final_output = "out/bin/" ++ record.name
@@ -1817,7 +2024,7 @@ fn ComptimeEvaluator.compile_workspace_record(self: ComptimeEvaluator, record: C
     if record.string_names.len() > 0:
         if output_kind != 0:
             let _ = self.fail(node, "Workspace.compile source strings currently support binary output only")
-            return comptime_value_invalid()
+            return comptime_workspace_compile_invalid()
         let string_name = record.string_names.get(0)
         let string_source = record.string_sources.get(0)
         artifact_path = comp.build_entry_binary_from_source_to_path(self.workspace_path(capability.project_root, string_name), string_source, absolute_output)
@@ -1833,9 +2040,19 @@ fn ComptimeEvaluator.compile_workspace_record(self: ComptimeEvaluator, record: C
             artifact_path = comp.emit_archive_to_path_with_build_settings(absolute_source, absolute_output, include_paths, defines, link_libs)
         else:
             let _ = self.fail(node, "Workspace.compile output kind is not implemented yet")
-            return comptime_value_invalid()
+            return comptime_workspace_compile_invalid()
     let rc = if artifact_path.len() > 0: 0 else: 1
-    self.workspace_build_result_value(record.name, rc, self.workspace_artifact_kind_for_output(output_kind), final_output, node)
+    let result = self.workspace_build_result_value(record.name, rc, self.workspace_artifact_kind_for_output(output_kind), final_output, node)
+    if result.kind == ComptimeValueKind.CV_INVALID:
+        return comptime_workspace_compile_invalid()
+    let messages =
+        if rc == 0:
+            self.workspace_typechecked_messages(comp, comp.zcu.last_sema.ast, node)
+        else:
+            Vec.new()
+    if self.had_error != 0:
+        return comptime_workspace_compile_invalid()
+    comptime_workspace_compile_result(result, messages)
 
 fn ComptimeEvaluator.mint_workspace_capability(self: ComptimeEvaluator, parent: ComptimeCapabilityRecord, workspace_id: i32, node: i32) -> ComptimeControl:
     let workspace_type = self.capability_type_id(CapabilityKind.CK_BUILD_WORKSPACE, node)
@@ -2372,10 +2589,13 @@ fn ComptimeEvaluator.eval_workspace_capability_method(self: ComptimeEvaluator, r
     if method == "compile":
         if not self.capability_expect_arg_count(arg_count, 0, method, node):
             return comptime_control_error()
-        let result = self.compile_workspace_record(record, capability, node)
+        let compiled = self.compile_workspace_record(record, capability, node)
+        let result = compiled.result
         if result.kind == ComptimeValueKind.CV_INVALID:
             return comptime_control_error()
         if record.intercept_active != 0:
+            for mi in 0..compiled.messages.len() as i32:
+                record.messages.push(compiled.messages.get(mi as i64))
             record = self.enqueue_artifact_messages(record, result, node)
             if self.had_error != 0:
                 return comptime_control_error()
