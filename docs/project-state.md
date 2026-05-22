@@ -176,6 +176,11 @@ Completed D4 substrate work:
     outputs. The positive workspace message fixture also appends a harmless
     linker argument before replacement, proving the accepted command is the one
     executed.
+20. `Workspace.set_link_command` now accepts `LinkCommand.cwd` and
+    `LinkCommand.env` replacements. The internal link command stores cwd/env,
+    link execution applies replacement env vars around the child process, and
+    a new runtime `with_exec_argv_cwd` primitive runs argv commands from a child
+    cwd without mutating the parent process cwd.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.

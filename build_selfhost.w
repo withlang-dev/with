@@ -2013,6 +2013,8 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
         "                    saw_prelink = true\n" ++
         "            var replacement = command\n" ++
         "            replacement.args.push(\"-Wl,-dead_strip\")\n" ++
+        "            replacement.cwd = ctx.project_info().project_root()\n" ++
+        "            replacement.env.push(EnvVar { name: \"WITH_LINK_COMMAND_ENV_TEST\", value: \"1\" })\n" ++
         "            ws.set_link_command(replacement)\n" ++
         "        _ => saw_prelink = false\n" ++
         "    if not saw_prelink:\n" ++
@@ -2030,7 +2032,9 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
         "        CompilerMessage.Linked(command, rc) =>\n" ++
         "            for output in command.outputs:\n" ++
         "                if rc == 0 and output.ends_with(\"out/bin/message-complete\"):\n" ++
-        "                    saw_linked = true\n" ++
+        "                    for item in command.env:\n" ++
+        "                        if item.name == \"WITH_LINK_COMMAND_ENV_TEST\" and item.value == \"1\" and command.cwd.len() > 0:\n" ++
+        "                            saw_linked = true\n" ++
         "        _ => saw_linked = false\n" ++
         "    if not saw_linked:\n" ++
         "        ctx.diagnostics().error(\"workspace linked command message missing\")\n" ++
@@ -2132,6 +2136,37 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
     if drop_output_result.rc == 0:
         return bs_fail(ctx, "build_w_workspace_drop_outputs unexpectedly succeeded")
     rc = bs_assert_contains(ctx, drop_output_result.stderr, "Workspace.set_link_command replacement must preserve declared outputs", "build_w_workspace_drop_outputs")
+    if rc != 0: return rc
+
+    let bad_cwd_dir = bs_join(base_dir, "workspace_bad_cwd")
+    rc = bs_write_project_manifest(ctx, bad_cwd_dir, "workspacebadcwd")
+    if rc != 0: return rc
+    let bad_cwd_build =
+        "use std.build\n\n" ++
+        "comptime with BuildCtx as ctx:\n" ++
+        "pub fn build -> Build:\n" ++
+        "    let ws = ctx.create_workspace(\"bad-cwd\")\n" ++
+        "    ws.add_string(\"src/bad_cwd.w\", \"fn main:\\n    print(\\\"bad cwd\\\")\\n\")\n" ++
+        "    var opts = ws.options()\n" ++
+        "    opts.output_path = \"out/bin/bad-cwd\"\n" ++
+        "    ws.set_options(opts)\n" ++
+        "    ws.begin_intercept()\n" ++
+        "    while true:\n" ++
+        "        let envelope = ws.wait_for_message()\n" ++
+        "        match envelope.message:\n" ++
+        "            CompilerMessage.PreLink(command) =>\n" ++
+        "                var replacement = command\n" ++
+        "                replacement.cwd = ctx.project_info().project_root() ++ \"/missing-link-cwd\"\n" ++
+        "                ws.set_link_command(replacement)\n" ++
+        "            CompilerMessage.Complete(_) => ctx.diagnostics().error(\"bad cwd prelink missing\")\n" ++
+        "            _ => false\n" ++
+        "    ctx.new_build()\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(bad_cwd_dir, "build.w"), bad_cwd_build, ctx.target_name(), "workspace bad cwd build.w")
+    if rc != 0: return rc
+    let bad_cwd_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-workspace-bad-cwd", bs_blob_to_args(bs_argv_append("", "build")), 120000, bad_cwd_dir)
+    if bad_cwd_result.rc == 0:
+        return bs_fail(ctx, "build_w_workspace_bad_cwd unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, bad_cwd_result.stderr, "bad cwd prelink missing", "build_w_workspace_bad_cwd")
     if rc != 0: return rc
 
     let open_intercept_dir = bs_join(base_dir, "workspace_intercept_open")

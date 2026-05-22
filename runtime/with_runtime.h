@@ -265,6 +265,7 @@ uint64_t with_bswap64(uint64_t x);
 int32_t with_system(with_str cmd);
 int32_t with_exec_binary(with_str path);
 int32_t with_exec_argv(with_str args);
+int32_t with_exec_argv_cwd(with_str args, with_str cwd);
 int32_t with_exec_argv_capture(with_str args, with_str stdout_path, with_str stderr_path, int32_t timeout_ms);
 int32_t with_exec_argv_capture_input(with_str args, with_str stdout_path, with_str stderr_path, int32_t timeout_ms, with_str stdin_path);
 int32_t with_exec_argv_capture_cwd(with_str args, with_str stdout_path, with_str stderr_path, int32_t timeout_ms, with_str cwd);
