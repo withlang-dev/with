@@ -491,9 +491,10 @@ not a new compiler-dispatched project graph kind.
 - Continue Phase D D7 by migrating project actions that currently shell out to
   `with build` only to compile With source. Keep ProcessRunner for external
   tools and for tests that intentionally exercise the CLI process boundary.
-  The current checkpoint fixed the latent tool-mode evaluator budget problem
-  that made the existing `pcre2-build` action exceed the step limit before any
-  workspace conversion.
+  The current checkpoint converts the final `pcre2-build` compilation of
+  `pcre2test.w` from an `out/bin/with build` subprocess to
+  `Workspace.compile()`. The generated-module error scan still intentionally
+  exercises the CLI diagnostic path.
 - Preserve the pre-D behavior tests during D1:
   `behav_build_w_basic_invocation`, `behav_action_capability_filesystem`,
   `behav_action_capability_process`, `behav_capability_token_mismatch`,
@@ -510,15 +511,13 @@ not a new compiler-dispatched project graph kind.
 
 ## Local State
 
-At the time of this update, the Phase D D7 evaluator substrate slice is
-verified and ready to commit. Non-intercepted `Workspace.compile()` no longer
-materializes compiler message streams that the caller cannot read, and the
-tool-mode step budget is large enough for real project actions such as
-`pcre2-build`. Current verification passed:
+At the time of this update, the Phase D D7 `pcre2-build` workspace conversion
+slice is verified and ready to commit. Current verification passed:
 
 ```sh
-out/bin/with check src/main.w
+out/bin/with check build_pcre2.w
 out/bin/with build :pcre2-build --no-deps
+out/bin/with check src/main.w
 make build
 make fixpoint
 make test
