@@ -155,6 +155,11 @@ Completed D4 substrate work:
     without executing it, and the existing result path executes the plan.
     This is the next substrate needed for validating and applying
     `Workspace.set_link_command` replacements before link execution.
+16. `Compilation.finish_binary_from_pool` is now split into
+    `prepare_binary_link_from_pool` and `execute_binary_link_plan`. Binary
+    compilation can produce the object file and typed link command before
+    executing the command, giving the workspace message loop a compiler-level
+    pause point to expose as `PreLink`.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.
