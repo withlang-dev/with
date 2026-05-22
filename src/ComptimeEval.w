@@ -3245,7 +3245,7 @@ fn ComptimeEvaluator.eval_field_access(self: ComptimeEvaluator, node: i32) -> Co
         if field_index < 0:
             return self.fail(node, "unknown comptime struct field")
         return comptime_control_value(self.extra_values.get((base_signal.value.extra_start + field_index) as i64))
-    self.unsupported(node)
+    self.fail(node, "comptime field access requires a struct value, got " ++ comptime_value_kind_name(base_signal.value.kind))
 
 fn ComptimeEvaluator.eval_index(self: ComptimeEvaluator, node: i32) -> ComptimeControl:
     let base_signal = self.eval_expr(self.ast.get_data0(node))
@@ -3923,6 +3923,8 @@ fn ComptimeEvaluator.eval_allowed_runtime_call(self: ComptimeEvaluator, fn_sym: 
     comptime_control_error()
 
 fn ComptimeEvaluator.eval_fn_symbol_call_values(self: ComptimeEvaluator, fn_sym: i32, arg_values: Vec[ComptimeValue], node: i32) -> ComptimeControl:
+    if self.pool.resolve(fn_sym) == "parallel":
+        return self.eval_parallel_workspaces_call(arg_values, node)
     let fn_node = self.find_fn_decl_node(fn_sym)
     if fn_node == 0 and self.allow_runtime_calls != 0:
         let runtime_signal = self.eval_allowed_runtime_call(fn_sym, arg_values, node)
@@ -4012,6 +4014,39 @@ fn ComptimeEvaluator.eval_fn_symbol_call_values(self: ComptimeEvaluator, fn_sym:
     if body_signal.kind == ComptimeControlKind.CTL_BREAK or body_signal.kind == ComptimeControlKind.CTL_CONTINUE:
         return self.fail(fn_node, "loop control escaped comptime function")
     body_signal
+
+fn ComptimeEvaluator.eval_parallel_workspaces_call(self: ComptimeEvaluator, arg_values: Vec[ComptimeValue], node: i32) -> ComptimeControl:
+    if arg_values.len() as i32 != 1:
+        return self.fail(node, "parallel takes one Vec[Workspace] argument")
+    let workspaces = arg_values.get(0)
+    if workspaces.kind != ComptimeValueKind.CV_VEC and workspaces.kind != ComptimeValueKind.CV_ARRAY:
+        return self.fail(node, "parallel expects a Vec[Workspace]")
+    if workspaces.extra_count > 1:
+        return self.fail(node, "parallel with multiple workspaces requires OS-thread workspace execution, which is not implemented yet")
+    let result_type = self.node_type_or(node, 0)
+    if result_type == 0:
+        return self.fail(node, "parallel result type is unknown")
+    let results: Vec[ComptimeValue] = Vec.new()
+    for i in 0..workspaces.extra_count:
+        let workspace_value = self.extra_values.get((workspaces.extra_start + i) as i64)
+        let workspace_id = self.workspace_record_index(workspace_value, "parallel", node)
+        if workspace_id < 0:
+            return comptime_control_error()
+        let capability_handle = self.validate_capability(workspace_value, CapabilityKind.CK_BUILD_WORKSPACE, "parallel", node)
+        if capability_handle < 0:
+            return comptime_control_error()
+        let record = self.workspace_records.get(workspace_id as i64)
+        if record.intercept_active != 0:
+            return self.fail(node, "parallel does not support intercepted workspaces yet")
+        let capability = self.capability_records.get(capability_handle as i64)
+        let compiled = self.compile_workspace_record(record, capability, node)
+        if compiled.result.kind == ComptimeValueKind.CV_INVALID:
+            return comptime_control_error()
+        results.push(compiled.result)
+    let start = self.extra_values.len() as i32
+    for i in 0..results.len() as i32:
+        self.extra_values.push(results.get(i as i64))
+    comptime_control_value(comptime_value_vec(result_type, start, workspaces.extra_count))
 
 fn ComptimeEvaluator.eval_return(self: ComptimeEvaluator, node: i32) -> ComptimeControl:
     let value_node = self.ast.get_data0(node)

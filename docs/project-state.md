@@ -12,8 +12,11 @@ conversation context after compaction.
 ## Current Focus
 
 Phase C extraction work is complete. Pre-Phase-D preparation is complete
-through P9, including the follow-up source-location diagnostic gap. Phase D D1,
-D2, and D3 are complete. Phase D D4 is in progress.
+through P9, including the follow-up source-location diagnostic gap. Phase D
+D1 through D5 are complete. Phase D D6 is in progress with the public
+`parallel(workspaces)` API and single-workspace evaluator path; true
+multi-workspace parallelism remains blocked on the OS-thread/runtime/global
+state work identified by `docs/audits/parallel-state-audit.md`.
 
 Completed D1 sub-slices:
 
@@ -182,7 +185,7 @@ Completed D4 substrate work:
     a new runtime `with_exec_argv_cwd` primitive runs argv commands from a child
     cwd without mutating the parent process cwd.
 
-Started D5 generated-source work:
+Completed D5 generated-source work:
 
 1. Workspace interceptions now track the last delivered compiler phase. This
    lets capability methods reject source-set mutation at phases where Phase D
@@ -204,6 +207,21 @@ Started D5 generated-source work:
    generation 1 typechecking, adds a generated source, then observes generation
    2 typechecking with the new declaration before linking.
 
+Started D6 parallel-workspace work:
+
+1. `std.build` exposes the public `parallel(workspaces: Vec[Workspace]) ->
+   Vec[BuildResult]` API as a driver-evaluated capability function.
+2. The evaluator handles `parallel([ws])` by compiling the single workspace
+   through the existing workspace compilation path and returning a
+   `Vec[BuildResult]` in input order.
+3. `parallel` with more than one workspace currently fails loudly with
+   `parallel with multiple workspaces requires OS-thread workspace execution,
+   which is not implemented yet`. This is intentional until D6's per-workspace
+   state isolation and OS-thread substrate are implemented; silently serializing
+   multiple workspaces would misrepresent the API.
+4. Focused build-w selfhost coverage proves single-workspace `parallel`
+   behavior and the loud multi-workspace diagnostic.
+
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.
 `Build.emit_graph()` remains a debug/export compatibility facility and must not
@@ -223,12 +241,15 @@ The original P9 pre-D1 baseline is recorded in
 containing this project-state update:
 
 ```text
-Support payload enum values in comptime evaluation
+Support single-workspace parallel API
 ```
 
 Commands passed:
 
 ```sh
+out/bin/with check src/main.w
+out/bin/with check build_selfhost.w
+git diff --check
 make build
 out/bin/with build :cli-selfhost-build-w-tests --no-deps
 make fixpoint
@@ -267,7 +288,13 @@ default `:test` target includes the fast emit-C smoke.
 
 Recent Phase D/pre-D commits:
 
-- current checkpoint: Support payload enum values in comptime evaluation.
+- current checkpoint: Support single-workspace parallel API.
+- previous checkpoint: Re-enter workspace compilation after generated source.
+- previous checkpoint: Compile all workspace source strings.
+- previous checkpoint: Reject add_string during pre-link interception.
+- previous checkpoint: Support link command cwd and env replacements.
+- previous checkpoint: Test link command argv replacement.
+- previous checkpoint: Support payload enum values in comptime evaluation.
 - previous checkpoint: Make Workspace an ephemeral capability.
 - previous checkpoint: Use workspaces for emit-C smoke compilation.
 - previous checkpoint: Implement workspace compile capability skeleton.
@@ -379,8 +406,9 @@ not a new compiler-dispatched project graph kind.
 
 ## Open Blockers And Follow-Ups
 
-- Continue Phase D with D3 next. Do not start D4-D8 until D3 is committed and
-  passes the build/fixpoint/test baseline.
+- Continue Phase D D6. The next large blocker is true multi-workspace
+  `parallel(workspaces)` execution: per-workspace compiler state, real OS
+  thread support, synchronized shared caches, and ProcessRunner reentrancy.
 - Preserve the pre-D behavior tests during D1:
   `behav_build_w_basic_invocation`, `behav_action_capability_filesystem`,
   `behav_action_capability_process`, `behav_capability_token_mismatch`,
@@ -397,28 +425,15 @@ not a new compiler-dispatched project graph kind.
 
 ## Local State
 
-At the time of this update, Phase D D2 BuildOptions/CLI unification was
-verified and ready to commit. The current D2 verification passed:
+At the time of this update, the Phase D D6 single-workspace `parallel` API
+slice is verified and ready to commit. Current verification passed:
 
 ```sh
+out/bin/with check src/main.w
+out/bin/with check build_selfhost.w
+git diff --check
 make build
-out/bin/with build :build
-out/bin/with build :fixpoint
-out/bin/with build :test
-out/bin/with run test/behavior/behav_std_build_options_api.w
-out/bin/with build test/hello.w -o /tmp/with-d2-hello
-out/bin/with build test/hello.w --emit-c -o /tmp/with-d2-hello.c
-out/bin/with build test/hello.w --emit-obj -o /tmp/with-d2-hello.o
-out/bin/with build :cli-selfhost-edge-tests --no-deps
-out/bin/with test test/behavior/behav_build_w_basic_invocation.w
-out/bin/with test test/behavior/behav_action_capability_filesystem.w
-out/bin/with test test/behavior/behav_action_capability_process.w
-out/bin/with test test/behavior/behav_action_crash_diagnostic.w
-out/bin/with test test/behavior/behav_action_no_deps_isolation.w
-out/bin/with build :cli-selfhost-smoke-tests
-out/bin/with build :c-migrator-core-tests
-out/bin/with build :pcre2-reference
-out/bin/with build :test
+out/bin/with build :cli-selfhost-build-w-tests --no-deps
 make fixpoint
 make test
 ```

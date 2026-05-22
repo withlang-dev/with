@@ -495,6 +495,11 @@ pub fn Workspace.set_link_command(self: &Self, command: LinkCommand):
     with_eprint("error: Workspace.set_link_command requires compiler driver comptime evaluation\n")
     exit(1)
 
+pub fn parallel(workspaces: Vec[Workspace]) -> Vec[BuildResult]:
+    with_eprint("error: parallel requires compiler driver comptime evaluation\n")
+    exit(1)
+    Vec.new()
+
 pub fn process_env() -> ProcessEnv:
     ProcessEnv { vars: Vec.new() }
 

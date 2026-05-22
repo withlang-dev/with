@@ -2248,6 +2248,58 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
     rc = bs_expect_file_contains(ctx, bs_join(add_string_reentry_dir, "out/command/run-add-string-reentry/stdout.txt"), "generated reentry", "build_w_workspace_add_string_reentry")
     if rc != 0: return rc
 
+    let parallel_single_dir = bs_join(base_dir, "workspace_parallel_single")
+    rc = bs_write_project_manifest(ctx, parallel_single_dir, "workspaceparallelsingle")
+    if rc != 0: return rc
+    let parallel_single_build =
+        "use std.build\n\n" ++
+        "comptime with BuildCtx as ctx:\n" ++
+        "pub fn build -> Build:\n" ++
+        "    let ws = ctx.create_workspace(\"parallel-single\")\n" ++
+        "    ws.add_string(\"src/parallel_single.w\", \"fn main:\\n    print(\\\"parallel single\\\")\\n\")\n" ++
+        "    var opts = ws.options()\n" ++
+        "    opts.output_path = \"out/bin/parallel-single\"\n" ++
+        "    ws.set_options(opts)\n" ++
+        "    let workspaces: Vec[Workspace] = Vec.new()\n" ++
+        "    workspaces.push(ws)\n" ++
+        "    let results = parallel(workspaces)\n" ++
+        "    if results.len() != 1:\n" ++
+        "        ctx.diagnostics().error(\"parallel single workspace failed\")\n" ++
+        "    let result = results.get(0)\n" ++
+        "    if result.rc != 0:\n" ++
+        "        ctx.diagnostics().error(\"parallel single workspace failed\")\n" ++
+        "    ctx.new_build().command(\"run-parallel-single\", \"out/bin/parallel-single\")\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(parallel_single_dir, "build.w"), parallel_single_build, ctx.target_name(), "workspace parallel single build.w")
+    if rc != 0: return rc
+    let parallel_single_result = bs_build_w_expect_success(ctx, compiler_path, parallel_single_dir, "build-w-workspace-parallel-single", bs_blob_to_args(bs_argv_append("", "build")))
+    if parallel_single_result.rc != 0: return parallel_single_result.rc
+    rc = bs_expect_file_contains(ctx, bs_join(parallel_single_dir, "out/command/run-parallel-single/stdout.txt"), "parallel single", "build_w_workspace_parallel_single")
+    if rc != 0: return rc
+
+    let parallel_multi_dir = bs_join(base_dir, "workspace_parallel_multi")
+    rc = bs_write_project_manifest(ctx, parallel_multi_dir, "workspaceparallelmulti")
+    if rc != 0: return rc
+    let parallel_multi_build =
+        "use std.build\n\n" ++
+        "comptime with BuildCtx as ctx:\n" ++
+        "pub fn build -> Build:\n" ++
+        "    let ws1 = ctx.create_workspace(\"parallel-a\")\n" ++
+        "    ws1.add_string(\"src/parallel_a.w\", \"fn main:\\n    print(\\\"a\\\")\\n\")\n" ++
+        "    let ws2 = ctx.create_workspace(\"parallel-b\")\n" ++
+        "    ws2.add_string(\"src/parallel_b.w\", \"fn main:\\n    print(\\\"b\\\")\\n\")\n" ++
+        "    let workspaces: Vec[Workspace] = Vec.new()\n" ++
+        "    workspaces.push(ws1)\n" ++
+        "    workspaces.push(ws2)\n" ++
+        "    let _ = parallel(workspaces)\n" ++
+        "    ctx.new_build()\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(parallel_multi_dir, "build.w"), parallel_multi_build, ctx.target_name(), "workspace parallel multi build.w")
+    if rc != 0: return rc
+    let parallel_multi_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-workspace-parallel-multi", bs_blob_to_args(bs_argv_append("", "build")), 120000, parallel_multi_dir)
+    if parallel_multi_result.rc == 0:
+        return bs_fail(ctx, "build_w_workspace_parallel_multi unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, parallel_multi_result.stderr, "parallel with multiple workspaces requires OS-thread workspace execution", "build_w_workspace_parallel_multi")
+    if rc != 0: return rc
+
     let open_intercept_dir = bs_join(base_dir, "workspace_intercept_open")
     rc = bs_write_project_manifest(ctx, open_intercept_dir, "workspaceopen")
     if rc != 0: return rc
