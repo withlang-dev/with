@@ -260,6 +260,10 @@ Started D6 parallel-workspace work:
     one-time process lock. Parallel workspace codegen creates one LLVM context
     per worker thread, but the `LLVMInitializeAArch64*` target registry calls
     mutate LLVM process-global state and must not run concurrently.
+14. The build-w selfhost workspace API suite includes a six-workspace
+    `parallel(workspaces)` stress fixture. This keeps the known parallel
+    workspace races covered by the default test target instead of relying only
+    on ad hoc direct loops.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.
@@ -280,7 +284,7 @@ The original P9 pre-D1 baseline is recorded in
 containing this project-state update:
 
 ```text
-Serialize LLVM target initialization
+Add parallel workspace stress coverage
 ```
 
 Commands passed:
@@ -293,10 +297,14 @@ out/bin/with run test/behavior/behav_std_thread_spawn_os.w
 out/bin/with run test/behavior/behav_std_thread_spawn_closure.w
 out/bin/with check rt/darwin_aarch64.w --no-prelude
 out/bin/with check src/main.w
+out/bin/with check build_selfhost.w
+git diff --check
 make build
 out/bin/with build :cli-selfhost-build-w-tests --no-deps
+for i in $(seq 1 50); do /Users/eric/with/out/bin/with build >/tmp/parallel_stress_loop.out 2>/tmp/parallel_stress_loop.err; rc=$?; if [ $rc -ne 0 ]; then echo fail iteration=$i rc=$rc; tail -80 /tmp/parallel_stress_loop.err; exit $rc; fi; done; echo ok
 make fixpoint
 make test
+make install-user
 ```
 
 The previous verified checkpoint also passed:
@@ -331,7 +339,8 @@ default `:test` target includes the fast emit-C smoke.
 
 Recent Phase D/pre-D commits:
 
-- current checkpoint: Serialize LLVM target initialization.
+- current checkpoint: Add parallel workspace stress coverage.
+- previous checkpoint: Serialize LLVM target initialization.
 - previous checkpoint: Serialize c_import expansion for parallel workspaces.
 - previous checkpoint: Compile parallel workspaces on OS threads.
 - previous checkpoint: Fix std.thread captured closure entry.
@@ -477,13 +486,14 @@ not a new compiler-dispatched project graph kind.
 
 ## Local State
 
-At the time of this update, the Phase D D6 LLVM target initialization slice is
+At the time of this update, the Phase D D6 parallel workspace stress slice is
 verified and ready to commit. Current verification passed:
 
 ```sh
-out/bin/with check rt/llvm_bridge.w --no-prelude
+out/bin/with check build_selfhost.w
 git diff --check
 out/bin/with build :cli-selfhost-build-w-tests --no-deps
+for i in $(seq 1 50); do /Users/eric/with/out/bin/with build >/tmp/parallel_stress_loop.out 2>/tmp/parallel_stress_loop.err; rc=$?; if [ $rc -ne 0 ]; then echo fail iteration=$i rc=$rc; tail -80 /tmp/parallel_stress_loop.err; exit $rc; fi; done; echo ok
 make build
 make fixpoint
 make test
