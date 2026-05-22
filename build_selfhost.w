@@ -1941,6 +1941,27 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
         "    let result = ws.compile()\n" ++
         "    if result.rc != 0:\n" ++
         "        ctx.diagnostics().error(\"workspace message compile failed\")\n" ++
+        "    let pre_parse_envelope = ws.wait_for_message()\n" ++
+        "    var saw_pre_parse = false\n" ++
+        "    match pre_parse_envelope.message:\n" ++
+        "        CompilerMessage.Phase(phase) => saw_pre_parse = phase == CompilerPhase.pre_parse\n" ++
+        "        _ => saw_pre_parse = false\n" ++
+        "    if not saw_pre_parse:\n" ++
+        "        ctx.diagnostics().error(\"workspace pre-parse phase message missing\")\n" ++
+        "    let parsed_envelope = ws.wait_for_message()\n" ++
+        "    var saw_parsed = false\n" ++
+        "    match parsed_envelope.message:\n" ++
+        "        CompilerMessage.Phase(phase) => saw_parsed = phase == CompilerPhase.parsed\n" ++
+        "        _ => saw_parsed = false\n" ++
+        "    if not saw_parsed:\n" ++
+        "        ctx.diagnostics().error(\"workspace parsed phase message missing\")\n" ++
+        "    let pre_typecheck_envelope = ws.wait_for_message()\n" ++
+        "    var saw_pre_typecheck = false\n" ++
+        "    match pre_typecheck_envelope.message:\n" ++
+        "        CompilerMessage.Phase(phase) => saw_pre_typecheck = phase == CompilerPhase.pre_typecheck\n" ++
+        "        _ => saw_pre_typecheck = false\n" ++
+        "    if not saw_pre_typecheck:\n" ++
+        "        ctx.diagnostics().error(\"workspace pre-typecheck phase message missing\")\n" ++
         "    let type_phase_envelope = ws.wait_for_message()\n" ++
         "    var saw_type_phase = false\n" ++
         "    match type_phase_envelope.message:\n" ++
@@ -1958,6 +1979,27 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
         "        _ => saw_typechecked = false\n" ++
         "    if not saw_typechecked:\n" ++
         "        ctx.diagnostics().error(\"workspace typechecked message missing main declaration\")\n" ++
+        "    let lowered_envelope = ws.wait_for_message()\n" ++
+        "    var saw_lowered = false\n" ++
+        "    match lowered_envelope.message:\n" ++
+        "        CompilerMessage.Phase(phase) => saw_lowered = phase == CompilerPhase.lowered_to_mir\n" ++
+        "        _ => saw_lowered = false\n" ++
+        "    if not saw_lowered:\n" ++
+        "        ctx.diagnostics().error(\"workspace lowered-to-mir phase message missing\")\n" ++
+        "    let pre_codegen_envelope = ws.wait_for_message()\n" ++
+        "    var saw_pre_codegen = false\n" ++
+        "    match pre_codegen_envelope.message:\n" ++
+        "        CompilerMessage.Phase(phase) => saw_pre_codegen = phase == CompilerPhase.pre_codegen\n" ++
+        "        _ => saw_pre_codegen = false\n" ++
+        "    if not saw_pre_codegen:\n" ++
+        "        ctx.diagnostics().error(\"workspace pre-codegen phase message missing\")\n" ++
+        "    let codegen_envelope = ws.wait_for_message()\n" ++
+        "    var saw_codegen = false\n" ++
+        "    match codegen_envelope.message:\n" ++
+        "        CompilerMessage.Phase(phase) => saw_codegen = phase == CompilerPhase.codegen_done\n" ++
+        "        _ => saw_codegen = false\n" ++
+        "    if not saw_codegen:\n" ++
+        "        ctx.diagnostics().error(\"workspace codegen-done phase message missing\")\n" ++
         "    let artifact_envelope = ws.wait_for_message()\n" ++
         "    var saw_artifact = false\n" ++
         "    match artifact_envelope.message:\n" ++
