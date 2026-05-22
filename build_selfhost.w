@@ -2000,6 +2000,40 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
         "        _ => saw_codegen = false\n" ++
         "    if not saw_codegen:\n" ++
         "        ctx.diagnostics().error(\"workspace codegen-done phase message missing\")\n" ++
+        "    let prelink_phase_envelope = ws.wait_for_message()\n" ++
+        "    var saw_prelink_phase = false\n" ++
+        "    match prelink_phase_envelope.message:\n" ++
+        "        CompilerMessage.Phase(phase) => saw_prelink_phase = phase == CompilerPhase.pre_link\n" ++
+        "        _ => saw_prelink_phase = false\n" ++
+        "    if not saw_prelink_phase:\n" ++
+        "        ctx.diagnostics().error(\"workspace pre-link phase message missing\")\n" ++
+        "    let prelink_envelope = ws.wait_for_message()\n" ++
+        "    var saw_prelink = false\n" ++
+        "    match prelink_envelope.message:\n" ++
+        "        CompilerMessage.PreLink(command) =>\n" ++
+        "            for output in command.outputs:\n" ++
+        "                if command.linker.len() > 0 and output.ends_with(\"out/bin/message-complete\"):\n" ++
+        "                    saw_prelink = true\n" ++
+        "        _ => saw_prelink = false\n" ++
+        "    if not saw_prelink:\n" ++
+        "        ctx.diagnostics().error(\"workspace pre-link command message missing\")\n" ++
+        "    let linked_phase_envelope = ws.wait_for_message()\n" ++
+        "    var saw_linked_phase = false\n" ++
+        "    match linked_phase_envelope.message:\n" ++
+        "        CompilerMessage.Phase(phase) => saw_linked_phase = phase == CompilerPhase.linked\n" ++
+        "        _ => saw_linked_phase = false\n" ++
+        "    if not saw_linked_phase:\n" ++
+        "        ctx.diagnostics().error(\"workspace linked phase message missing\")\n" ++
+        "    let linked_envelope = ws.wait_for_message()\n" ++
+        "    var saw_linked = false\n" ++
+        "    match linked_envelope.message:\n" ++
+        "        CompilerMessage.Linked(command, rc) =>\n" ++
+        "            for output in command.outputs:\n" ++
+        "                if rc == 0 and output.ends_with(\"out/bin/message-complete\"):\n" ++
+        "                    saw_linked = true\n" ++
+        "        _ => saw_linked = false\n" ++
+        "    if not saw_linked:\n" ++
+        "        ctx.diagnostics().error(\"workspace linked command message missing\")\n" ++
         "    let artifact_envelope = ws.wait_for_message()\n" ++
         "    var saw_artifact = false\n" ++
         "    match artifact_envelope.message:\n" ++
