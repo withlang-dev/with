@@ -662,7 +662,6 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     var pcre2_test_smoke = target_new(.Action, "pcre2-test-smoke", "").output("out/test-graph/pcre2-test-smoke")
     pcre2_test_smoke.action = run_pcre2_test_smoke_action
-    pcre2_test_smoke = pcre2_test_smoke.input("out/bin/with-stage2")
     pcre2_test_smoke = pcre2_test_smoke.input("lib/std/re/pcre2test.w")
     pcre2_test_smoke = pcre2_test_smoke.input("out/pcre2_reference/pcre2-10.47/RunTest")
     pcre2_test_smoke = pcre2_test_smoke.arg("out/pcre2_reference/pcre2-10.47")
