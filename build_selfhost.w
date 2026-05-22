@@ -2442,6 +2442,29 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
     rc = bs_expect_file_contains(ctx, bs_join(parallel_intercept_dir, "out/command/run-parallel-intercept-b/stdout.txt"), "parallel intercept b", "build_w_workspace_parallel_intercept_b")
     if rc != 0: return rc
 
+    let parallel_partial_intercept_dir = bs_join(base_dir, "workspace_parallel_partial_intercept")
+    rc = bs_write_project_manifest(ctx, parallel_partial_intercept_dir, "workspaceparallelpartialintercept")
+    if rc != 0: return rc
+    let parallel_partial_intercept_build =
+        "use std.build\n\n" ++
+        "comptime with BuildCtx as ctx:\n" ++
+        "pub fn build -> Build:\n" ++
+        "    let ws = ctx.create_workspace(\"parallel-partial-intercept\")\n" ++
+        "    ws.add_string(\"src/parallel_partial_intercept.w\", \"fn main:\\n    print(\\\"parallel partial intercept\\\")\\n\")\n" ++
+        "    ws.begin_intercept()\n" ++
+        "    let _first = ws.wait_for_message()\n" ++
+        "    let workspaces: Vec[Workspace] = Vec.new()\n" ++
+        "    workspaces.push(ws)\n" ++
+        "    let _results = parallel(workspaces)\n" ++
+        "    ctx.new_build()\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(parallel_partial_intercept_dir, "build.w"), parallel_partial_intercept_build, ctx.target_name(), "workspace parallel partial intercept build.w")
+    if rc != 0: return rc
+    let parallel_partial_intercept_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-workspace-parallel-partial-intercept", bs_blob_to_args(bs_argv_append("", "build")), 120000, parallel_partial_intercept_dir)
+    if parallel_partial_intercept_result.rc == 0:
+        return bs_fail(ctx, "build_w_workspace_parallel_partial_intercept unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, parallel_partial_intercept_result.stderr, "parallel does not support partially consumed intercepted workspaces yet", "build_w_workspace_parallel_partial_intercept")
+    if rc != 0: return rc
+
     let parallel_failure_dir = bs_join(base_dir, "workspace_parallel_failure")
     rc = bs_write_project_manifest(ctx, parallel_failure_dir, "workspaceparallelfailure")
     if rc != 0: return rc
