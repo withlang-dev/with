@@ -2004,16 +2004,35 @@ fn ComptimeEvaluator.link_command_value(self: ComptimeEvaluator, command: LinkSt
     if args.kind == ComptimeValueKind.CV_INVALID or env.kind == ComptimeValueKind.CV_INVALID or inputs.kind == ComptimeValueKind.CV_INVALID or outputs.kind == ComptimeValueKind.CV_INVALID:
         return comptime_value_invalid()
     let args_value = self.str_vec_value_with_type(args.type_id, command.args)
+    let env_value = self.link_command_env_value_with_type(env.type_id, command.env, node)
     let inputs_value = self.str_vec_value_with_type(inputs.type_id, command.inputs)
     let outputs_value = self.str_vec_value_with_type(outputs.type_id, command.outputs)
+    if env_value.kind == ComptimeValueKind.CV_INVALID:
+        return comptime_value_invalid()
     let start = self.extra_values.len() as i32
     self.extra_values.push(comptime_value_str(command.linker))
     self.extra_values.push(args_value)
-    self.extra_values.push(comptime_value_str(""))
-    self.extra_values.push(env)
+    self.extra_values.push(comptime_value_str(command.cwd))
+    self.extra_values.push(env_value)
     self.extra_values.push(inputs_value)
     self.extra_values.push(outputs_value)
     comptime_value_struct(command_type, start, 6)
+
+fn ComptimeEvaluator.link_command_env_value_with_type(self: ComptimeEvaluator, vec_type: i32, values: Vec[LinkStageEnvVar], node: i32) -> ComptimeValue:
+    let env_type = self.named_type_id("EnvVar", node)
+    if env_type == 0:
+        return comptime_value_invalid()
+    let items: Vec[ComptimeValue] = Vec.new()
+    for i in 0..values.len() as i32:
+        let item = values.get(i as i64)
+        let field_start = self.extra_values.len() as i32
+        self.extra_values.push(comptime_value_str(item.name))
+        self.extra_values.push(comptime_value_str(item.value))
+        items.push(comptime_value_struct(env_type, field_start, 2))
+    let vec_start = self.extra_values.len() as i32
+    for i in 0..items.len() as i32:
+        self.extra_values.push(items.get(i as i64))
+    comptime_value_vec(vec_type, vec_start, items.len() as i32)
 
 fn ComptimeEvaluator.link_command_str_field(self: ComptimeEvaluator, value: ComptimeValue, name: str, node: i32) -> str:
     let field = self.struct_field_value_by_name(value, name)
@@ -2036,21 +2055,33 @@ fn ComptimeEvaluator.link_command_str_vec_field(self: ComptimeEvaluator, value: 
         out.push(item.text)
     out
 
+fn ComptimeEvaluator.link_command_env_field(self: ComptimeEvaluator, value: ComptimeValue, node: i32) -> Vec[LinkStageEnvVar]:
+    let out: Vec[LinkStageEnvVar] = Vec.new()
+    let field = self.struct_field_value_by_name(value, "env")
+    if field.kind != ComptimeValueKind.CV_VEC and field.kind != ComptimeValueKind.CV_ARRAY:
+        let _ = self.fail(node, "LinkCommand.env must be a Vec[EnvVar]")
+        return out
+    for i in 0..field.extra_count:
+        let item = self.extra_values.get((field.extra_start + i) as i64)
+        if item.kind != ComptimeValueKind.CV_STRUCT:
+            let _ = self.fail(node, "LinkCommand.env contains a non-EnvVar value")
+            return out
+        let name = self.struct_field_value_by_name(item, "name")
+        let env_value = self.struct_field_value_by_name(item, "value")
+        if name.kind != ComptimeValueKind.CV_STR or env_value.kind != ComptimeValueKind.CV_STR:
+            let _ = self.fail(node, "LinkCommand.env entries must contain string name and value fields")
+            return out
+        out.push(LinkStageEnvVar { name: name.text, value: env_value.text })
+    out
+
 fn ComptimeEvaluator.link_command_from_value(self: ComptimeEvaluator, value: ComptimeValue, node: i32) -> LinkStageCommand:
     let linker = self.link_command_str_field(value, "linker", node)
     let cwd = self.link_command_str_field(value, "cwd", node)
     let args = self.link_command_str_vec_field(value, "args", node)
+    let env = self.link_command_env_field(value, node)
     let inputs = self.link_command_str_vec_field(value, "inputs", node)
     let outputs = self.link_command_str_vec_field(value, "outputs", node)
-    let env = self.struct_field_value_by_name(value, "env")
-    if cwd.len() > 0:
-        let _ = self.fail(node, "Workspace.set_link_command does not support LinkCommand.cwd yet")
-    if env.kind == ComptimeValueKind.CV_VEC or env.kind == ComptimeValueKind.CV_ARRAY:
-        if env.extra_count != 0:
-            let _ = self.fail(node, "Workspace.set_link_command does not support LinkCommand.env yet")
-    else:
-        let _ = self.fail(node, "LinkCommand.env must be a Vec[EnvVar]")
-    LinkStageCommand { linker, args, inputs, outputs }
+    LinkStageCommand { linker, args, cwd, env, inputs, outputs }
 
 fn link_command_outputs_superset(replacement: LinkStageCommand, original: LinkStageCommand) -> bool:
     for oi in 0..original.outputs.len() as i32:

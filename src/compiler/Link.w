@@ -1,11 +1,13 @@
 extern fn with_system(cmd: str) -> i32
 extern fn with_exec_argv(args: str) -> i32
+extern fn with_exec_argv_cwd(args: str, cwd: str) -> i32
 extern fn with_arg_at(idx: i32) -> str
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_fs_write_file(path: str, data: str) -> i32
 extern fn with_fs_mkdir_p(path: str) -> i32
 extern fn with_eprint(s: str) -> void
 extern fn with_getenv_str(name: str) -> str
+extern fn with_setenv_str(name: str, value: str) -> i32
 
 extern let with_embedded_cimport_stubs_o_start: u8
 extern let with_embedded_cimport_stubs_o_end: u8
@@ -30,9 +32,16 @@ extern let with_embedded_rt_core_o_end: u8
 extern let with_embedded_rt_darwin_aarch64_o_start: u8
 extern let with_embedded_rt_darwin_aarch64_o_end: u8
 
+type LinkStageEnvVar {
+    name: str,
+    value: str,
+}
+
 type LinkStageCommand {
     linker: str,
     args: Vec[str],
+    cwd: str,
+    env: Vec[LinkStageEnvVar],
     inputs: Vec[str],
     outputs: Vec[str],
 }
@@ -52,6 +61,8 @@ fn link_stage_empty_command() -> LinkStageCommand:
     LinkStageCommand {
         linker: "",
         args: Vec.new(),
+        cwd: "",
+        env: Vec.new(),
         inputs: Vec.new(),
         outputs: Vec.new(),
     }
@@ -77,15 +88,41 @@ fn link_stage_result_for_plan(plan: LinkStagePlan) -> LinkStageResult:
 fn link_stage_argv_append(argv: str, arg: str) -> str:
     argv ++ arg ++ "\0"
 
+type LinkStageSavedEnv {
+    names: Vec[str],
+    values: Vec[str],
+}
+
+fn link_stage_apply_env(env: Vec[LinkStageEnvVar]) -> LinkStageSavedEnv:
+    let names: Vec[str] = Vec.new()
+    let values: Vec[str] = Vec.new()
+    for i in 0..env.len() as i32:
+        let item = env.get(i as i64)
+        names.push(item.name)
+        values.push(with_getenv_str(item.name) ++ "")
+        let _ = with_setenv_str(item.name, item.value)
+    LinkStageSavedEnv { names, values }
+
+fn link_stage_restore_env(saved: LinkStageSavedEnv):
+    for i in 0..saved.names.len() as i32:
+        let _ = with_setenv_str(saved.names.get(i as i64), saved.values.get(i as i64))
+
 fn LinkStageCommand.run(self: LinkStageCommand) -> i32:
     var argv = ""
     argv = link_stage_argv_append(argv, self.linker)
     for i in 0..self.args.len() as i32:
         argv = link_stage_argv_append(argv, self.args.get(i as i64))
-    with_exec_argv(argv)
+    let saved = link_stage_apply_env(self.env)
+    let rc = if self.cwd.len() > 0:
+        with_exec_argv_cwd(argv, self.cwd)
+    else:
+        with_exec_argv(argv)
+    link_stage_restore_env(saved)
+    rc
 
 fn link_stage_make_link_command(linker: str, obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str]) -> LinkStageCommand:
     let args: Vec[str] = Vec.new()
+    let env: Vec[LinkStageEnvVar] = Vec.new()
     let inputs: Vec[str] = Vec.new()
     let outputs: Vec[str] = Vec.new()
     args.push(obj_path)
@@ -100,7 +137,7 @@ fn link_stage_make_link_command(linker: str, obj_path: str, bin_path: str, extra
     outputs.push(bin_path)
     for i in 0..link_libs.len() as i32:
         args.push("-l" ++ link_libs.get(i as i64))
-    LinkStageCommand { linker, args, inputs, outputs }
+    LinkStageCommand { linker, args, cwd: "", env, inputs, outputs }
 
 fn link_stage_make_llvm_link_command(llvm_cc: str, obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str]) -> LinkStageCommand:
     var command = link_stage_make_link_command(llvm_cc, obj_path, bin_path, extras, link_libs)
@@ -111,6 +148,8 @@ fn link_stage_make_llvm_link_command(llvm_cc: str, obj_path: str, bin_path: str,
     LinkStageCommand {
         linker: command.linker,
         args,
+        cwd: command.cwd,
+        env: command.env,
         inputs: command.inputs,
         outputs: command.outputs,
     }

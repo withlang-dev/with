@@ -215,7 +215,7 @@ fn argv_blob_count(blob: *const u8, len: i64) -> i32:
         offset += 1
     count
 
-fn run_argv_direct(blob: *const u8, len: i64) -> i32:
+fn run_argv_direct_cwd(blob: *const u8, len: i64, cwd: *const u8) -> i32:
     let argc = argv_blob_count(blob, len)
     if argc <= 0 or argc >= 256:
         return -1
@@ -230,6 +230,10 @@ fn run_argv_direct(blob: *const u8, len: i64) -> i32:
         restore_default_signal_handler(SIGTERM)
         restore_default_signal_handler(SIGHUP)
         restore_default_signal_handler(SIGQUIT)
+        if cwd as i64 != 0:
+            if chdir(cwd) != 0:
+                _exit(127)
+            let _ = setenv("PWD" as *const u8, cwd, 1)
         var argv: [256]*const u8 = [0 as *const u8; 256]
         var argi = 0
         var offset: i64 = 0
@@ -254,6 +258,9 @@ fn run_argv_direct(blob: *const u8, len: i64) -> i32:
     let rc = wait_for_child_process(pid)
     active_child_pgid = 0
     rc
+
+fn run_argv_direct(blob: *const u8, len: i64) -> i32:
+    run_argv_direct_cwd(blob, len, 0 as *const u8)
 
 fn redirect_fd_to_path(path: *const u8, fd: i32) -> i32:
     let out_fd = __open(path, 1 | 0x200 | 0x400, 0o644)
@@ -504,6 +511,27 @@ pub fn exec_argv(args: str) -> i32:
         return -1
     let rc = run_argv_direct(buf as *const u8, args.len())
     with_free(buf)
+    rc
+
+@[c_export("with_exec_argv_cwd")]
+pub fn exec_argv_cwd(args: str, cwd: str) -> i32:
+    let arg_buf = str_to_c_buf(args)
+    if arg_buf as i64 == 0:
+        return -1
+    let cwd_buf = str_to_c_buf(cwd)
+    if cwd_buf as i64 == 0:
+        with_free(arg_buf)
+        return -1
+    if interrupt_flag != 0:
+        with_free(arg_buf)
+        with_free(cwd_buf)
+        let errp = __error()
+        if errp as i64 != 0:
+            unsafe: *errp = EINTR
+        return -1
+    let rc = run_argv_direct_cwd(arg_buf as *const u8, args.len(), cwd_buf as *const u8)
+    with_free(arg_buf)
+    with_free(cwd_buf)
     rc
 
 @[c_export("with_exec_argv_capture")]
