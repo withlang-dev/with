@@ -2169,6 +2169,36 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
     rc = bs_assert_contains(ctx, bad_cwd_result.stderr, "bad cwd prelink missing", "build_w_workspace_bad_cwd")
     if rc != 0: return rc
 
+    let add_string_prelink_dir = bs_join(base_dir, "workspace_add_string_prelink")
+    rc = bs_write_project_manifest(ctx, add_string_prelink_dir, "workspaceaddstringprelink")
+    if rc != 0: return rc
+    let add_string_prelink_build =
+        "use std.build\n\n" ++
+        "comptime with BuildCtx as ctx:\n" ++
+        "pub fn build -> Build:\n" ++
+        "    let ws = ctx.create_workspace(\"add-string-prelink\")\n" ++
+        "    ws.add_string(\"src/add_string_prelink.w\", \"fn main:\\n    print(\\\"add string prelink\\\")\\n\")\n" ++
+        "    var opts = ws.options()\n" ++
+        "    opts.output_path = \"out/bin/add-string-prelink\"\n" ++
+        "    ws.set_options(opts)\n" ++
+        "    ws.begin_intercept()\n" ++
+        "    while true:\n" ++
+        "        let envelope = ws.wait_for_message()\n" ++
+        "        match envelope.message:\n" ++
+        "            CompilerMessage.Phase(phase) =>\n" ++
+        "                if phase == CompilerPhase.pre_link:\n" ++
+        "                    ws.add_string(\"src/too_late.w\", \"pub fn too_late -> i32: 1\\n\")\n" ++
+        "            CompilerMessage.Complete(_) => ctx.diagnostics().error(\"add_string prelink unexpectedly completed\")\n" ++
+        "            _ => false\n" ++
+        "    ctx.new_build()\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(add_string_prelink_dir, "build.w"), add_string_prelink_build, ctx.target_name(), "workspace add_string prelink build.w")
+    if rc != 0: return rc
+    let add_string_prelink_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-workspace-add-string-prelink", bs_blob_to_args(bs_argv_append("", "build")), 120000, add_string_prelink_dir)
+    if add_string_prelink_result.rc == 0:
+        return bs_fail(ctx, "build_w_workspace_add_string_prelink unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, add_string_prelink_result.stderr, "Workspace.add_string during PRE_LINK is not supported in Phase D", "build_w_workspace_add_string_prelink")
+    if rc != 0: return rc
+
     let open_intercept_dir = bs_join(base_dir, "workspace_intercept_open")
     rc = bs_write_project_manifest(ctx, open_intercept_dir, "workspaceopen")
     if rc != 0: return rc

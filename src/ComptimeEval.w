@@ -92,6 +92,7 @@ type ComptimeWorkspaceRecord {
     intercept_active: i32,
     intercept_terminal: i32,
     generation: i32,
+    intercept_phase: i32,
     messages: Vec[ComptimeValue],
     message_cursor: i32,
     intercept_started: i32,
@@ -690,6 +691,7 @@ fn ComptimeEvaluator.new_workspace_record(self: ComptimeEvaluator, name: str, no
         intercept_active: 0,
         intercept_terminal: 0,
         generation: 0,
+        intercept_phase: -1,
         messages: Vec.new(),
         message_cursor: 0,
         intercept_started: 0,
@@ -2156,6 +2158,19 @@ fn ComptimeEvaluator.compiler_message_envelope_value(self: ComptimeEvaluator, wo
     self.extra_values.push(message)
     comptime_value_struct(envelope_type, start, 3)
 
+fn ComptimeEvaluator.compiler_message_phase_id(self: ComptimeEvaluator, message: ComptimeValue) -> i32:
+    if message.kind != ComptimeValueKind.CV_ENUM:
+        return -1
+    let phase_variant = self.pool.intern("CompilerMessage.Phase") as i32
+    if message.data0 as i32 != phase_variant:
+        return -1
+    if message.extra_count != 1:
+        return -1
+    let payload = self.extra_values.get(message.extra_start as i64)
+    if comptime_value_is_intlike(payload) == 0:
+        return -1
+    comptime_value_intlike(payload) as i32
+
 fn ComptimeEvaluator.compile_workspace_record(self: ComptimeEvaluator, record: ComptimeWorkspaceRecord, capability: ComptimeCapabilityRecord, node: i32) -> ComptimeWorkspaceCompileResult:
     let options = record.options
     let option_source = self.workspace_str_option(options, "source_path")
@@ -2791,6 +2806,9 @@ fn ComptimeEvaluator.eval_workspace_capability_method(self: ComptimeEvaluator, r
         let args_signal = self.capability_args(extra_start, arg_count)
         if args_signal.kind != ComptimeControlKind.CTL_VALUE:
             return args_signal
+        if record.intercept_active != 0 and record.intercept_started != 0:
+            if record.intercept_phase >= 7:
+                return self.fail(node, "Workspace.add_string during PRE_LINK is not supported in Phase D")
         record.string_names.push(self.capability_arg_str(args_signal.value, 0, method, node))
         record.string_sources.push(self.capability_arg_str(args_signal.value, 1, method, node))
         self.store_workspace_record(workspace_id, record)
@@ -2827,6 +2845,7 @@ fn ComptimeEvaluator.eval_workspace_capability_method(self: ComptimeEvaluator, r
         record.generation = record.generation + 1
         if record.generation <= 0:
             record.generation = 1
+        record.intercept_phase = -1
         record.messages = Vec.new()
         record.message_cursor = 0
         self.store_workspace_record(workspace_id, record)
@@ -2846,6 +2865,9 @@ fn ComptimeEvaluator.eval_workspace_capability_method(self: ComptimeEvaluator, r
             self.store_workspace_record(workspace_id, record)
         if record.message_cursor < record.messages.len() as i32:
             let message = record.messages.get(record.message_cursor as i64)
+            let phase = self.compiler_message_phase_id(message)
+            if phase >= 0:
+                record.intercept_phase = phase
             record.message_cursor = record.message_cursor + 1
             self.store_workspace_record(workspace_id, record)
             let envelope = self.compiler_message_envelope_value(record.name, record.generation, message, node)
