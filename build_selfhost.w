@@ -2201,6 +2201,53 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
     rc = bs_assert_contains(ctx, add_string_prelink_result.stderr, "Workspace.add_string during PRE_LINK is not supported in Phase D", "build_w_workspace_add_string_prelink")
     if rc != 0: return rc
 
+    let add_string_reentry_dir = bs_join(base_dir, "workspace_add_string_reentry")
+    rc = bs_write_project_manifest(ctx, add_string_reentry_dir, "workspaceaddstringreentry")
+    if rc != 0: return rc
+    let add_string_reentry_build =
+        "use std.build\n\n" ++
+        "comptime with BuildCtx as ctx:\n" ++
+        "pub fn build -> Build:\n" ++
+        "    let ws = ctx.create_workspace(\"add-string-reentry\")\n" ++
+        "    ws.add_string(\"src/reentry_main.w\", \"fn main:\\n    print(\\\"generated reentry\\\")\\n\")\n" ++
+        "    var opts = ws.options()\n" ++
+        "    opts.output_path = \"out/bin/add-string-reentry\"\n" ++
+        "    ws.set_options(opts)\n" ++
+        "    ws.begin_intercept()\n" ++
+        "    var saw_first_typechecked = false\n" ++
+        "    var saw_second_typechecked = false\n" ++
+        "    var saw_generated_decl = false\n" ++
+        "    var saw_complete = false\n" ++
+        "    while not saw_complete:\n" ++
+        "        let envelope = ws.wait_for_message()\n" ++
+        "        match envelope.message:\n" ++
+        "            CompilerMessage.Typechecked(decls) =>\n" ++
+        "                if envelope.generation == 1 and not saw_first_typechecked:\n" ++
+        "                    saw_first_typechecked = true\n" ++
+        "                    ws.add_string(\"src/reentry_generated.w\", \"pub fn generated_value -> i32:\\n    42\\n\")\n" ++
+        "                else if envelope.generation == 2:\n" ++
+        "                    saw_second_typechecked = true\n" ++
+        "                    for decl in decls:\n" ++
+        "                        if decl.name == \"generated_value\":\n" ++
+        "                            saw_generated_decl = true\n" ++
+        "            CompilerMessage.Complete(done) => saw_complete = done.rc == 0\n" ++
+        "            CompilerMessage.Error(_, message, _) => ctx.diagnostics().error(message)\n" ++
+        "            _ => false\n" ++
+        "    if not saw_first_typechecked:\n" ++
+        "        ctx.diagnostics().error(\"first generation typechecked missing\")\n" ++
+        "    if not saw_second_typechecked:\n" ++
+        "        ctx.diagnostics().error(\"second generation typechecked missing\")\n" ++
+        "    if not saw_generated_decl:\n" ++
+        "        ctx.diagnostics().error(\"generated declaration missing after reentry\")\n" ++
+        "    ws.end_intercept()\n" ++
+        "    ctx.new_build().command(\"run-add-string-reentry\", \"out/bin/add-string-reentry\")\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(add_string_reentry_dir, "build.w"), add_string_reentry_build, ctx.target_name(), "workspace add_string reentry build.w")
+    if rc != 0: return rc
+    let add_string_reentry_result = bs_build_w_expect_success(ctx, compiler_path, add_string_reentry_dir, "build-w-workspace-add-string-reentry", bs_blob_to_args(bs_argv_append("", "build")))
+    if add_string_reentry_result.rc != 0: return add_string_reentry_result.rc
+    rc = bs_expect_file_contains(ctx, bs_join(add_string_reentry_dir, "out/command/run-add-string-reentry/stdout.txt"), "generated reentry", "build_w_workspace_add_string_reentry")
+    if rc != 0: return rc
+
     let open_intercept_dir = bs_join(base_dir, "workspace_intercept_open")
     rc = bs_write_project_manifest(ctx, open_intercept_dir, "workspaceopen")
     if rc != 0: return rc

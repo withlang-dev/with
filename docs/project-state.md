@@ -197,6 +197,12 @@ Started D5 generated-source work:
    paths, and in-memory source text mappings for diagnostics. Focused build-w
    selfhost coverage builds one generated source that calls a function declared
    in a second generated source.
+4. `Workspace.add_string` after a delivered `TYPECHECKED` message now creates a
+   new workspace generation, clears stale downstream messages from the prior
+   generation, and forces the next `wait_for_message()` to re-enter compilation
+   from parse/typecheck before link. Focused build-w selfhost coverage observes
+   generation 1 typechecking, adds a generated source, then observes generation
+   2 typechecking with the new declaration before linking.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.

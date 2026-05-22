@@ -2814,11 +2814,22 @@ fn ComptimeEvaluator.eval_workspace_capability_method(self: ComptimeEvaluator, r
         let args_signal = self.capability_args(extra_start, arg_count)
         if args_signal.kind != ComptimeControlKind.CTL_VALUE:
             return args_signal
-        if record.intercept_active != 0 and record.intercept_started != 0:
-            if record.intercept_phase >= 7:
-                return self.fail(node, "Workspace.add_string during PRE_LINK is not supported in Phase D")
         record.string_names.push(self.capability_arg_str(args_signal.value, 0, method, node))
         record.string_sources.push(self.capability_arg_str(args_signal.value, 1, method, node))
+        if record.intercept_active != 0 and record.intercept_started != 0:
+            if record.intercept_phase == 3:
+                record.generation = record.generation + 1
+                record.intercept_phase = -1
+                record.messages = Vec.new()
+                record.message_cursor = 0
+                record.intercept_started = 0
+                record.pending_link_active = 0
+                record.intercept_terminal = 0
+                self.store_workspace_record(workspace_id, record)
+                return comptime_control_value(comptime_value_void(0))
+            if record.intercept_phase >= 7:
+                return self.fail(node, "Workspace.add_string during PRE_LINK is not supported in Phase D")
+            return self.fail(node, "Workspace.add_string during interception is only supported after TYPECHECKED in Phase D")
         self.store_workspace_record(workspace_id, record)
         return comptime_control_value(comptime_value_void(0))
     if method == "options":
