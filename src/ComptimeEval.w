@@ -2211,9 +2211,12 @@ fn ComptimeEvaluator.compile_workspace_record(self: ComptimeEvaluator, record: C
         if output_kind != 0:
             let _ = self.fail(node, "Workspace.compile source strings currently support binary output only")
             return comptime_workspace_compile_invalid()
-        let string_name = record.string_names.get(0)
-        let string_source = record.string_sources.get(0)
-        artifact_path = comp.build_entry_binary_from_source_to_path(self.workspace_path(capability.project_root, string_name), string_source, absolute_output)
+        let source_paths: Vec[str] = Vec.new()
+        let source_texts: Vec[str] = Vec.new()
+        for si in 0..record.string_names.len() as i32:
+            source_paths.push(self.workspace_path(capability.project_root, record.string_names.get(si as i64)))
+            source_texts.push(record.string_sources.get(si as i64))
+        artifact_path = comp.build_entry_binary_from_sources_to_path(source_paths, source_texts, absolute_output)
     else:
         let absolute_source = self.workspace_path(capability.project_root, source_path)
         if output_kind == 0:
@@ -2282,8 +2285,13 @@ fn ComptimeEvaluator.start_intercept_workspace_compile(self: ComptimeEvaluator, 
     var pool = AstPool.new()
     var source_name = source_path
     if out.string_names.len() > 0:
-        source_name = out.string_names.get(0)
-        pool = comp.compile_entry_source_text(self.workspace_path(capability.project_root, source_name), out.string_sources.get(0))
+        let source_paths: Vec[str] = Vec.new()
+        let source_texts: Vec[str] = Vec.new()
+        for si in 0..out.string_names.len() as i32:
+            source_paths.push(self.workspace_path(capability.project_root, out.string_names.get(si as i64)))
+            source_texts.push(out.string_sources.get(si as i64))
+        source_name = source_paths.get(0)
+        pool = comp.compile_entry_source_texts(source_paths, source_texts)
     else:
         let absolute_source = self.workspace_path(capability.project_root, source_path)
         var cfg = project_config_load_for_source(absolute_source)

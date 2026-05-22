@@ -717,7 +717,19 @@ fn Compilation.compile_source_text_with_config(self: Compilation, source_path: s
     pool
 
 fn Compilation.compile_entry_source_text(self: Compilation, source_path: str, source_text: str) -> AstPool:
+    let source_paths: Vec[str] = Vec.new()
+    let source_texts: Vec[str] = Vec.new()
+    source_paths.push(source_path)
+    source_texts.push(source_text)
+    self.compile_entry_source_texts(source_paths, source_texts)
+
+fn Compilation.compile_entry_source_texts(self: Compilation, source_paths: Vec[str], source_texts: Vec[str]) -> AstPool:
+    if source_paths.len() == 0 or source_texts.len() == 0 or source_paths.len() != source_texts.len():
+        with_eprint("error: compile_entry_source_texts requires matching non-empty source paths and texts")
+        return AstPool.new()
     var zcu = self.zcu
+    let source_path = source_paths.get(0)
+    let source_text = source_texts.get(0)
     let source_dir = frontend_dirname(source_path)
     zcu.reset_for_new_invocation(source_dir, source_path, "")
     zcu.project_config = project_config_load_for_source(source_path)
@@ -726,6 +738,12 @@ fn Compilation.compile_entry_source_text(self: Compilation, source_path: str, so
         self.zcu = zcu
         return AstPool.new()
     zcu.set_current_source(source_dir, source_path, source_text)
+    let extra_names: Vec[str] = Vec.new()
+    let extra_texts: Vec[str] = Vec.new()
+    for i in 1..source_paths.len() as i32:
+        extra_names.push(source_paths.get(i as i64))
+        extra_texts.push(source_texts.get(i as i64))
+    zcu.set_extra_sources(extra_names, extra_texts)
     zcu = self.apply_cli_diag_mappings(zcu)
     let pool = zcu.compile_source_frontend_mode(source_text, source_path, 0, 1)
     self.zcu = zcu
@@ -927,14 +945,25 @@ fn Compilation.build_binary_from_source_to_path_with_build_settings(self: Compil
     self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
 
 fn Compilation.build_entry_binary_from_source_to_path(self: Compilation, source_path: str, source_text: str, bin_path: str) -> str:
+    let source_paths: Vec[str] = Vec.new()
+    let source_texts: Vec[str] = Vec.new()
+    source_paths.push(source_path)
+    source_texts.push(source_text)
+    self.build_entry_binary_from_sources_to_path(source_paths, source_texts, bin_path)
+
+fn Compilation.build_entry_binary_from_sources_to_path(self: Compilation, source_paths: Vec[str], source_texts: Vec[str], bin_path: str) -> str:
+    if source_paths.len() == 0 or source_texts.len() == 0 or source_paths.len() != source_texts.len():
+        with_eprint("error: build_entry_binary_from_sources_to_path requires matching non-empty source paths and texts")
+        return ""
+    let source_path = source_paths.get(0)
     if bin_path.len() == 0:
-        return self.build_binary_from_source(source_path, source_text)
+        return self.build_binary_from_source(source_path, source_texts.get(0))
     let obj_path = bin_path ++ ".o"
     let output_dir = link_stage_dirname(bin_path)
     let _ = ("mkdir -p " ++ output_dir) |> with_system
     let _ = ("rm -rf " ++ bin_path ++ ".dSYM") |> with_system
 
-    let pool = self.compile_entry_source_text(source_path, source_text)
+    let pool = self.compile_entry_source_texts(source_paths, source_texts)
     self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
 
 fn Compilation.emit_c(self: Compilation, source_path: str, output_path: str) -> str:

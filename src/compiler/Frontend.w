@@ -1006,6 +1006,20 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
         self.diagnostics = parser.diags
 
     self.seed_decl_source_paths(pool, name, file_id)
+    for extra_i in 0..self.extra_source_names.len() as i32:
+        let extra_name = self.extra_source_names.get(extra_i as i64)
+        let extra_text = self.extra_source_texts.get(extra_i as i64)
+        let extra_file_id = self.next_file_id
+        self.next_file_id = self.next_file_id + 1
+        self.add_source_text_mapping(extra_file_id, extra_name, extra_text)
+        let before = pool.decl_count()
+        var extra_lexer = Lexer.init(extra_text, extra_file_id)
+        let extra_tokens = extra_lexer.tokenize()
+        var extra_parser = Parser.init_with_pool(extra_tokens, extra_text, extra_file_id, self.pool, self.diagnostics, pool)
+        pool = extra_parser.parse_module()
+        self.pool = extra_parser.intern
+        self.diagnostics = extra_parser.diags
+        self.append_decl_source_paths(pool.decl_count() - before, extra_name, extra_file_id)
     if do_profile:
         let parse_ns = with_clock_nanos() - t_parse
         with_eprint(f"[profile] frontend.parse  {parse_ns / 1000000}.{(parse_ns % 1000000) / 1000} ms  decls={pool.decl_count()}")
