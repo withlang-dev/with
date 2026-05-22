@@ -138,6 +138,11 @@ Completed D4 substrate work:
    `pre_parse`, `parsed`, `pre_typecheck`, `typechecked`,
    `lowered_to_mir`, `pre_codegen`, and `codegen_done`. `PreLink`/`Linked`
    stay pending until `LinkCommand` interception is implemented.
+12. The primary link path now constructs an internal typed argv command
+   (`LinkStageCommand`) and executes it through `with_exec_argv` instead of
+   assembling shell command strings. This is the substrate for exposing
+   `CompilerMessage.PreLink(LinkCommand)` and accepting validated
+   `Workspace.set_link_command` replacements.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.
