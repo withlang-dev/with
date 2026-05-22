@@ -10,6 +10,8 @@
 // ── Runtime helpers (from rt_core.w) ────────────────────────────
 extern fn rt_write(fd: i32, buf: *const u8, len: u64) -> i64
 extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> void
+extern fn pthread_self() -> i64
+extern fn abort() -> void
 
 // ── LLVM enum constants ─────────────────────────────────────────
 let LLVM_CodeGenLevelNone: i32 = 0
@@ -341,14 +343,68 @@ extern fn LLVMGetBasicBlockParent(bb: *mut u8) -> *mut u8
 extern fn LLVMGetInlineAsm(fn_ty: *mut u8, asm_str: *const u8, asm_len: u64, constraints: *const u8, constraints_len: u64, has_side_effects: i32, is_align_stack: i32, dialect: i32, can_throw: i32) -> *mut u8
 
 // ── String helper ───────────────────────────────────────────────
-var cstr_bufs: [4][4096]u8 = [[0 as u8; 4096]; 4]
-var cstr_idx: i32 = 0
+enum Order: i32:
+    Relaxed = 0
+    Acquire = 1
+    Release = 2
+    AcqRel = 3
+    SeqCst = 4
+
+type Atomic[T] {
+    val: T,
+}
+
+let CSTR_THREAD_SLOTS: i32 = 64
+
+var cstr_slot_lock: Atomic[i32]
+var cstr_slot_owners: [64]i64 = [0 as i64; 64]
+var cstr_slot_indices: [64]i32 = [0 as i32; 64]
+var cstr_bufs: [64][4][4096]u8 = [[[0 as u8; 4096]; 4]; 64]
+
+fn cstr_lock():
+    while cstr_slot_lock.swap(1, .Acquire) != 0:
+        // The lock protects only slot metadata, so contention should be brief.
+        let _ = 0
+
+fn cstr_unlock():
+    cstr_slot_lock.store(0, .Release)
+
+fn cstr_thread_id() -> i64:
+    let tid = pthread_self()
+    if tid != 0:
+        return tid
+    1
+
+fn cstr_slot_for_current_thread() -> i32:
+    let tid = cstr_thread_id()
+    var slot = -1
+    cstr_lock()
+    for i in 0..CSTR_THREAD_SLOTS:
+        if cstr_slot_owners[i as i64] == tid:
+            slot = i
+            break
+    if slot < 0:
+        for i in 0..CSTR_THREAD_SLOTS:
+            if cstr_slot_owners[i as i64] == 0:
+                cstr_slot_owners[i as i64] = tid
+                cstr_slot_indices[i as i64] = 0
+                slot = i
+                break
+    if slot >= 0:
+        cstr_slot_indices[slot as i64] = (cstr_slot_indices[slot as i64] + 1) & 3
+    cstr_unlock()
+    slot
 
 fn to_cstr(s: str) -> *const u8:
-    cstr_idx = (cstr_idx + 1) & 3
+    let slot = cstr_slot_for_current_thread()
+    if slot < 0:
+        let _ = rt_write(2, "error: LLVM bridge exhausted thread-local cstr slots\n" as *const u8, 53)
+        abort()
+        return empty_cstr()
+    let idx = cstr_slot_indices[slot as i64]
     let n = if s.len() < 4095: s.len() else: 4095
     let src = unsafe: *(&s as *const *const u8)
-    let dst = &raw mut cstr_bufs[cstr_idx as i64] as *mut u8
+    let dst = &raw mut cstr_bufs[slot as i64][idx as i64] as *mut u8
     with_memcpy(dst, src, n)
     unsafe: *((dst as i64 + n) as *mut u8) = 0
     dst as *const u8
