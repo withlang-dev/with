@@ -171,6 +171,9 @@ Completed D4 substrate work:
     wait executes the pending command through the shared link-plan executor.
     `Workspace.set_link_command` validates same-linker replacements that
     preserve declared outputs before updating the pending command.
+19. Focused build-w selfhost coverage now proves `Workspace.set_link_command`
+    rejects linker executable changes and replacements that drop declared
+    outputs.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.
