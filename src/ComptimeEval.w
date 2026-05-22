@@ -1905,6 +1905,26 @@ fn ComptimeEvaluator.workspace_typechecked_messages(self: ComptimeEvaluator, com
     messages.push(typechecked)
     messages
 
+fn ComptimeEvaluator.workspace_phase_message_append(self: ComptimeEvaluator, messages: Vec[ComptimeValue], phase_value: i32, node: i32) -> Vec[ComptimeValue]:
+    let phase = self.compiler_message_phase_value(phase_value, node)
+    if phase.kind == ComptimeValueKind.CV_INVALID:
+        return messages
+    messages.push(phase)
+    messages
+
+fn ComptimeEvaluator.workspace_success_messages(self: ComptimeEvaluator, comp: Compilation, pool: AstPool, node: i32) -> Vec[ComptimeValue]:
+    var messages: Vec[ComptimeValue] = Vec.new()
+    messages = self.workspace_phase_message_append(messages, 0, node)
+    messages = self.workspace_phase_message_append(messages, 1, node)
+    messages = self.workspace_phase_message_append(messages, 2, node)
+    let typechecked = self.workspace_typechecked_messages(comp, pool, node)
+    for mi in 0..typechecked.len() as i32:
+        messages.push(typechecked.get(mi as i64))
+    messages = self.workspace_phase_message_append(messages, 4, node)
+    messages = self.workspace_phase_message_append(messages, 5, node)
+    messages = self.workspace_phase_message_append(messages, 6, node)
+    messages
+
 fn ComptimeEvaluator.enum_payload_value(self: ComptimeEvaluator, enum_name: str, variant_name: str, payloads: Vec[ComptimeValue], node: i32) -> ComptimeValue:
     let enum_type = self.named_type_id(enum_name, node)
     if enum_type == 0:
@@ -2047,7 +2067,7 @@ fn ComptimeEvaluator.compile_workspace_record(self: ComptimeEvaluator, record: C
         return comptime_workspace_compile_invalid()
     let messages =
         if rc == 0:
-            self.workspace_typechecked_messages(comp, comp.zcu.last_sema.ast, node)
+            self.workspace_success_messages(comp, comp.zcu.last_sema.ast, node)
         else:
             Vec.new()
     if self.had_error != 0:
