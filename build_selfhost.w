@@ -1941,6 +1941,23 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
         "    let result = ws.compile()\n" ++
         "    if result.rc != 0:\n" ++
         "        ctx.diagnostics().error(\"workspace message compile failed\")\n" ++
+        "    let type_phase_envelope = ws.wait_for_message()\n" ++
+        "    var saw_type_phase = false\n" ++
+        "    match type_phase_envelope.message:\n" ++
+        "        CompilerMessage.Phase(phase) => saw_type_phase = phase == CompilerPhase.typechecked\n" ++
+        "        _ => saw_type_phase = false\n" ++
+        "    if not saw_type_phase:\n" ++
+        "        ctx.diagnostics().error(\"workspace typechecked phase message missing\")\n" ++
+        "    let type_envelope = ws.wait_for_message()\n" ++
+        "    var saw_typechecked = false\n" ++
+        "    match type_envelope.message:\n" ++
+        "        CompilerMessage.Typechecked(decls) =>\n" ++
+        "            for decl in decls:\n" ++
+        "                if decl.name == \"main\" and decl.kind == DeclKind.function and decl.source.file.ends_with(\"src/message_complete.w\"):\n" ++
+        "                    saw_typechecked = true\n" ++
+        "        _ => saw_typechecked = false\n" ++
+        "    if not saw_typechecked:\n" ++
+        "        ctx.diagnostics().error(\"workspace typechecked message missing main declaration\")\n" ++
         "    let artifact_envelope = ws.wait_for_message()\n" ++
         "    var saw_artifact = false\n" ++
         "    match artifact_envelope.message:\n" ++
