@@ -471,9 +471,9 @@ fn rt_free_sized(ptr: *mut u8, size_arg: i64):
 
 fn rt_thread_entry(arg: *mut u8) -> *mut u8:
     let start = arg as *mut RtThreadStart
-    let raw = RtThreadClosureRaw { fn_ptr: (unsafe: *start).fn_ptr, ctx: 0 as *mut u8 }
+    let raw = RtThreadClosureRaw { fn_ptr: (unsafe: *start).fn_ptr, ctx: (unsafe: *start).ctx }
     let worker: RtThreadClosureFn = unsafe: transmute[RtThreadClosureFn](raw)
-    (unsafe: *start).result = worker((unsafe: *start).ctx)
+    (unsafe: *start).result = worker(0 as *mut u8)
     arg
 
 @[c_export("with_thread_spawn")]

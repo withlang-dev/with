@@ -237,6 +237,10 @@ Started D6 parallel-workspace work:
    slots selected by `pthread_self`, with a short atomic metadata lock and a
    loud abort if the fixed slot table is exhausted. This removes one
    process-global race before parallel workspace codegen.
+9. `std.thread.spawn_os` preserves captured closure contexts when entering the
+   OS thread. The runtime reconstructs the fat function value with the original
+   closure environment and calls it through the function-value ABI, so both
+   top-level functions and closures work as D6 worker substrates.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.
@@ -257,15 +261,17 @@ The original P9 pre-D1 baseline is recorded in
 containing this project-state update:
 
 ```text
-Make LLVM bridge cstr scratch thread-aware
+Fix std.thread captured closure entry
 ```
 
 Commands passed:
 
 ```sh
-out/bin/with check rt/llvm_bridge.w --no-prelude
+out/bin/with check rt/rt_core.w --no-prelude
 git diff --check
-out/bin/with build rt/llvm_bridge.w --emit-obj --no-prelude -O2 -o /tmp/llvm_bridge_threadsafe.o
+out/bin/with build rt/rt_core.w --emit-obj --no-prelude -O2 -o /tmp/rt_core_thread_closure.o
+out/bin/with run test/behavior/behav_std_thread_spawn_os.w
+out/bin/with run test/behavior/behav_std_thread_spawn_closure.w
 make build
 make fixpoint
 make test
@@ -303,7 +309,8 @@ default `:test` target includes the fast emit-C smoke.
 
 Recent Phase D/pre-D commits:
 
-- current checkpoint: Make LLVM bridge cstr scratch thread-aware.
+- current checkpoint: Fix std.thread captured closure entry.
+- previous checkpoint: Make LLVM bridge cstr scratch thread-aware.
 - previous checkpoint: Back std.thread with OS threads.
 - previous checkpoint: Synchronize runtime allocator state.
 - previous checkpoint: Support single-workspace parallel API.
