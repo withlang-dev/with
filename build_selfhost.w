@@ -2390,19 +2390,56 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
         "use std.build\n\n" ++
         "comptime with BuildCtx as ctx:\n" ++
         "pub fn build -> Build:\n" ++
-        "    let ws = ctx.create_workspace(\"parallel-intercept\")\n" ++
-        "    ws.add_string(\"src/parallel_intercept.w\", \"fn main:\\n    print(\\\"parallel intercept\\\")\\n\")\n" ++
-        "    ws.begin_intercept()\n" ++
+        "    let ws1 = ctx.create_workspace(\"parallel-intercept-a\")\n" ++
+        "    ws1.add_string(\"src/parallel_intercept_a.w\", \"fn main:\\n    print(\\\"parallel intercept a\\\")\\n\")\n" ++
+        "    var opts1 = ws1.options()\n" ++
+        "    opts1.output_path = \"out/bin/parallel-intercept-a\"\n" ++
+        "    ws1.set_options(opts1)\n" ++
+        "    ws1.begin_intercept()\n" ++
+        "    let ws2 = ctx.create_workspace(\"parallel-intercept-b\")\n" ++
+        "    ws2.add_string(\"src/parallel_intercept_b.w\", \"fn main:\\n    print(\\\"parallel intercept b\\\")\\n\")\n" ++
+        "    var opts2 = ws2.options()\n" ++
+        "    opts2.output_path = \"out/bin/parallel-intercept-b\"\n" ++
+        "    ws2.set_options(opts2)\n" ++
+        "    ws2.begin_intercept()\n" ++
         "    let workspaces: Vec[Workspace] = Vec.new()\n" ++
-        "    workspaces.push(ws)\n" ++
-        "    let _results = parallel(workspaces)\n" ++
-        "    ctx.new_build()\n"
+        "    workspaces.push(ws1)\n" ++
+        "    workspaces.push(ws2)\n" ++
+        "    let results = parallel(workspaces)\n" ++
+        "    if results.len() != 2:\n" ++
+        "        ctx.diagnostics().error(\"parallel intercept result count failed\")\n" ++
+        "    if results.get(0).rc != 0 or results.get(1).rc != 0:\n" ++
+        "        ctx.diagnostics().error(\"parallel intercept workspace failed\")\n" ++
+        "    var saw_a = false\n" ++
+        "    while not saw_a:\n" ++
+        "        let envelope = ws1.wait_for_message()\n" ++
+        "        if envelope.workspace_name != \"parallel-intercept-a\":\n" ++
+        "            ctx.diagnostics().error(\"parallel intercept workspace a identity failed\")\n" ++
+        "        match envelope.message:\n" ++
+        "            CompilerMessage.Complete(done) => saw_a = done.rc == 0 and done.workspace_name == \"parallel-intercept-a\"\n" ++
+        "            CompilerMessage.Error(_, message, _) => ctx.diagnostics().error(message)\n" ++
+        "            _ => false\n" ++
+        "    ws1.end_intercept()\n" ++
+        "    var saw_b = false\n" ++
+        "    while not saw_b:\n" ++
+        "        let envelope = ws2.wait_for_message()\n" ++
+        "        if envelope.workspace_name != \"parallel-intercept-b\":\n" ++
+        "            ctx.diagnostics().error(\"parallel intercept workspace b identity failed\")\n" ++
+        "        match envelope.message:\n" ++
+        "            CompilerMessage.Complete(done) => saw_b = done.rc == 0 and done.workspace_name == \"parallel-intercept-b\"\n" ++
+        "            CompilerMessage.Error(_, message, _) => ctx.diagnostics().error(message)\n" ++
+        "            _ => false\n" ++
+        "    ws2.end_intercept()\n" ++
+        "    var out = ctx.new_build()\n" ++
+        "    out = out.command(\"run-parallel-intercept-a\", \"out/bin/parallel-intercept-a\")\n" ++
+        "    out.command(\"run-parallel-intercept-b\", \"out/bin/parallel-intercept-b\")\n"
     rc = bs_build_w_write_fixture(ctx, bs_join(parallel_intercept_dir, "build.w"), parallel_intercept_build, ctx.target_name(), "workspace parallel intercept build.w")
     if rc != 0: return rc
-    let parallel_intercept_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-workspace-parallel-intercept", bs_blob_to_args(bs_argv_append("", "build")), 120000, parallel_intercept_dir)
-    if parallel_intercept_result.rc == 0:
-        return bs_fail(ctx, "build_w_workspace_parallel_intercept unexpectedly succeeded")
-    rc = bs_assert_contains(ctx, parallel_intercept_result.stderr, "parallel does not support intercepted workspaces yet", "build_w_workspace_parallel_intercept")
+    let parallel_intercept_result = bs_build_w_expect_success(ctx, compiler_path, parallel_intercept_dir, "build-w-workspace-parallel-intercept", bs_blob_to_args(bs_argv_append("", "build")))
+    if parallel_intercept_result.rc != 0: return parallel_intercept_result.rc
+    rc = bs_expect_file_contains(ctx, bs_join(parallel_intercept_dir, "out/command/run-parallel-intercept-a/stdout.txt"), "parallel intercept a", "build_w_workspace_parallel_intercept_a")
+    if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, bs_join(parallel_intercept_dir, "out/command/run-parallel-intercept-b/stdout.txt"), "parallel intercept b", "build_w_workspace_parallel_intercept_b")
     if rc != 0: return rc
 
     let parallel_failure_dir = bs_join(base_dir, "workspace_parallel_failure")
