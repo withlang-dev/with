@@ -2290,14 +2290,21 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
         "    let workspaces: Vec[Workspace] = Vec.new()\n" ++
         "    workspaces.push(ws1)\n" ++
         "    workspaces.push(ws2)\n" ++
-        "    let _ = parallel(workspaces)\n" ++
-        "    ctx.new_build()\n"
+        "    let results = parallel(workspaces)\n" ++
+        "    if results.len() != 2:\n" ++
+        "        ctx.diagnostics().error(\"parallel multi result count failed\")\n" ++
+        "    if results.get(0).rc != 0 or results.get(1).rc != 0:\n" ++
+        "        ctx.diagnostics().error(\"parallel multi workspace failed\")\n" ++
+        "    var out = ctx.new_build()\n" ++
+        "    out = out.command(\"run-parallel-a\", \"out/bin/parallel-a\")\n" ++
+        "    out.command(\"run-parallel-b\", \"out/bin/parallel-b\")\n"
     rc = bs_build_w_write_fixture(ctx, bs_join(parallel_multi_dir, "build.w"), parallel_multi_build, ctx.target_name(), "workspace parallel multi build.w")
     if rc != 0: return rc
-    let parallel_multi_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-workspace-parallel-multi", bs_blob_to_args(bs_argv_append("", "build")), 120000, parallel_multi_dir)
-    if parallel_multi_result.rc == 0:
-        return bs_fail(ctx, "build_w_workspace_parallel_multi unexpectedly succeeded")
-    rc = bs_assert_contains(ctx, parallel_multi_result.stderr, "parallel with multiple workspaces requires OS-thread workspace execution", "build_w_workspace_parallel_multi")
+    let parallel_multi_result = bs_build_w_expect_success(ctx, compiler_path, parallel_multi_dir, "build-w-workspace-parallel-multi", bs_blob_to_args(bs_argv_append("", "build")))
+    if parallel_multi_result.rc != 0: return parallel_multi_result.rc
+    rc = bs_expect_file_contains(ctx, bs_join(parallel_multi_dir, "out/command/run-parallel-a/stdout.txt"), "a", "build_w_workspace_parallel_multi_a")
+    if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, bs_join(parallel_multi_dir, "out/command/run-parallel-b/stdout.txt"), "b", "build_w_workspace_parallel_multi_b")
     if rc != 0: return rc
 
     let open_intercept_dir = bs_join(base_dir, "workspace_intercept_open")
