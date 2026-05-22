@@ -271,5 +271,7 @@ int32_t with_exec_argv_capture_input(with_str args, with_str stdout_path, with_s
 int32_t with_exec_argv_capture_cwd(with_str args, with_str stdout_path, with_str stderr_path, int32_t timeout_ms, with_str cwd);
 int32_t with_exec_argv_capture_spawn(with_str args, with_str stdout_path, with_str stderr_path);
 int32_t with_exec_wait(int32_t pid, int32_t timeout_ms);
+int64_t with_thread_spawn(void *fn_ptr, void *ctx);
+int32_t with_thread_join(int64_t handle);
 
 #endif // WITH_RUNTIME_H
