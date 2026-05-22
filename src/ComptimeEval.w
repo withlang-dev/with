@@ -1649,7 +1649,6 @@ fn ComptimeEvaluator.process_env_apply(self: ComptimeEvaluator, value: ComptimeV
     if vars.kind != ComptimeValueKind.CV_VEC and vars.kind != ComptimeValueKind.CV_ARRAY:
         let _ = self.fail(node, "ProcessEnv.vars is not a vector")
         return comptime_value_invalid()
-    let saved_start = self.extra_values.len() as i32
     for i in 0..vars.extra_count:
         let item = self.extra_values.get((vars.extra_start + i) as i64)
         let name = self.struct_field_value_by_name(item, "name")
@@ -1657,10 +1656,36 @@ fn ComptimeEvaluator.process_env_apply(self: ComptimeEvaluator, value: ComptimeV
         if name.kind != ComptimeValueKind.CV_STR or env_value.kind != ComptimeValueKind.CV_STR:
             let _ = self.fail(node, "ProcessEnv vars must contain string name/value fields")
             return comptime_value_invalid()
+    let saved_start = self.extra_values.len() as i32
+    let tool_token = with_getenv_str("WITH_TOOL_CAPABILITY_TOKEN") ++ ""
+    let action_name = with_getenv_str("WITH_BUILD_ACTION_NAME") ++ ""
+    let _clear_tool_token = with_setenv_str("WITH_TOOL_CAPABILITY_TOKEN", "")
+    let _clear_action_name = with_setenv_str("WITH_BUILD_ACTION_NAME", "")
+    for i in 0..vars.extra_count:
+        let item = self.extra_values.get((vars.extra_start + i) as i64)
+        let name = self.struct_field_value_by_name(item, "name")
+        let env_value = self.struct_field_value_by_name(item, "value")
         self.extra_values.push(comptime_value_str(name.text))
         self.extra_values.push(comptime_value_str(with_getenv_str(name.text) ++ ""))
         let _set = with_setenv_str(name.text, env_value.text)
-    comptime_value_vec(env_type, saved_start, vars.extra_count * 2)
+    self.extra_values.push(comptime_value_str("WITH_TOOL_CAPABILITY_TOKEN"))
+    self.extra_values.push(comptime_value_str(tool_token))
+    self.extra_values.push(comptime_value_str("WITH_BUILD_ACTION_NAME"))
+    self.extra_values.push(comptime_value_str(action_name))
+    comptime_value_vec(env_type, saved_start, vars.extra_count * 2 + 4)
+
+fn ComptimeEvaluator.process_driver_env_clear(self: ComptimeEvaluator, node: i32) -> ComptimeValue:
+    let env_type = self.named_type_id("ProcessEnv", node)
+    if env_type == 0:
+        return comptime_value_invalid()
+    let saved_start = self.extra_values.len() as i32
+    self.extra_values.push(comptime_value_str("WITH_TOOL_CAPABILITY_TOKEN"))
+    self.extra_values.push(comptime_value_str(with_getenv_str("WITH_TOOL_CAPABILITY_TOKEN") ++ ""))
+    self.extra_values.push(comptime_value_str("WITH_BUILD_ACTION_NAME"))
+    self.extra_values.push(comptime_value_str(with_getenv_str("WITH_BUILD_ACTION_NAME") ++ ""))
+    let _clear_tool_token = with_setenv_str("WITH_TOOL_CAPABILITY_TOKEN", "")
+    let _clear_action_name = with_setenv_str("WITH_BUILD_ACTION_NAME", "")
+    comptime_value_vec(env_type, saved_start, 4)
 
 fn ComptimeEvaluator.process_env_restore(self: ComptimeEvaluator, saved: ComptimeValue):
     if saved.kind != ComptimeValueKind.CV_VEC and saved.kind != ComptimeValueKind.CV_ARRAY:
@@ -2792,14 +2817,24 @@ fn ComptimeEvaluator.eval_process_runner_capability_method(self: ComptimeEvaluat
         return comptime_control_error()
 
     if method == "run":
-        return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_exec_argv(argv) as i64))
+        let saved_env = self.process_driver_env_clear(node)
+        if self.had_error != 0:
+            return comptime_control_error()
+        let rc = with_exec_argv(argv)
+        self.process_env_restore(saved_env)
+        return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), rc as i64))
 
     if method == "spawn_capture":
         let stdout_path = self.capability_arg_str(args_signal.value, 1, method, node)
         let stderr_path = self.capability_arg_str(args_signal.value, 2, method, node)
         if self.had_error != 0:
             return comptime_control_error()
-        return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_exec_argv_capture_spawn(argv, stdout_path, stderr_path) as i64))
+        let saved_env = self.process_driver_env_clear(node)
+        if self.had_error != 0:
+            return comptime_control_error()
+        let pid = with_exec_argv_capture_spawn(argv, stdout_path, stderr_path)
+        self.process_env_restore(saved_env)
+        return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), pid as i64))
 
     let stdout_path = self.capability_arg_str(args_signal.value, 1, method, node)
     let stderr_path = self.capability_arg_str(args_signal.value, 2, method, node)
@@ -2808,17 +2843,32 @@ fn ComptimeEvaluator.eval_process_runner_capability_method(self: ComptimeEvaluat
         return comptime_control_error()
 
     if method == "run_capture":
-        return self.tool_process_result(with_exec_argv_capture(argv, stdout_path, stderr_path, timeout_ms), stdout_path, stderr_path, node)
+        let saved_env = self.process_driver_env_clear(node)
+        if self.had_error != 0:
+            return comptime_control_error()
+        let rc = with_exec_argv_capture(argv, stdout_path, stderr_path, timeout_ms)
+        self.process_env_restore(saved_env)
+        return self.tool_process_result(rc, stdout_path, stderr_path, node)
     if method == "run_capture_cwd":
         let cwd = self.capability_arg_str(args_signal.value, 4, method, node)
         if self.had_error != 0:
             return comptime_control_error()
-        return self.tool_process_result(with_exec_argv_capture_cwd(argv, stdout_path, stderr_path, timeout_ms, cwd), stdout_path, stderr_path, node)
+        let saved_env = self.process_driver_env_clear(node)
+        if self.had_error != 0:
+            return comptime_control_error()
+        let rc = with_exec_argv_capture_cwd(argv, stdout_path, stderr_path, timeout_ms, cwd)
+        self.process_env_restore(saved_env)
+        return self.tool_process_result(rc, stdout_path, stderr_path, node)
     if method == "run_capture_input":
         let stdin_path = self.capability_arg_str(args_signal.value, 4, method, node)
         if self.had_error != 0:
             return comptime_control_error()
-        return self.tool_process_result(with_exec_argv_capture_input(argv, stdout_path, stderr_path, timeout_ms, stdin_path), stdout_path, stderr_path, node)
+        let saved_env = self.process_driver_env_clear(node)
+        if self.had_error != 0:
+            return comptime_control_error()
+        let rc = with_exec_argv_capture_input(argv, stdout_path, stderr_path, timeout_ms, stdin_path)
+        self.process_env_restore(saved_env)
+        return self.tool_process_result(rc, stdout_path, stderr_path, node)
     if method == "run_capture_with_env":
         let saved_env = self.process_env_apply(self.extra_values.get((args_signal.value.extra_start + 4) as i64), node)
         if self.had_error != 0:

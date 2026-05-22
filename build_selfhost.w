@@ -2939,6 +2939,12 @@ fn bs_check_build_w_action_target(ctx: ActionCtx, compiler_path: str, case_dir: 
         "    let env_result = ctx.process_runner().run_capture_with_env(env_args, \"out/action/env.txt\", \"out/action/env.err\", 120000, child_env)\n" ++
         "    assert(env_result.rc == 0)\n" ++
         "    assert(env_result.stdout.contains(\"WITH_ACTION_TEST_ENV=present\"))\n" ++
+        "    assert(not env_result.stdout.contains(\"WITH_TOOL_CAPABILITY_TOKEN=with-\"))\n" ++
+        "    assert(not env_result.stdout.contains(\"WITH_BUILD_ACTION_NAME=generate\"))\n" ++
+        "    let inherited_env_result = ctx.process_runner().run_capture(env_args, \"out/action/inherited-env.txt\", \"out/action/inherited-env.err\", 120000)\n" ++
+        "    assert(inherited_env_result.rc == 0)\n" ++
+        "    assert(not inherited_env_result.stdout.contains(\"WITH_TOOL_CAPABILITY_TOKEN=with-\"))\n" ++
+        "    assert(not inherited_env_result.stdout.contains(\"WITH_BUILD_ACTION_NAME=generate\"))\n" ++
         "    var direct_args: Vec[str] = Vec.new()\n" ++
         "    direct_args |> push(\"/bin/echo\")\n" ++
         "    direct_args |> push(\"streamed-process-run\")\n" ++
