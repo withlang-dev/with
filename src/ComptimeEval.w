@@ -54,7 +54,10 @@ extern fn with_sysinfo_hostname() -> str
 
 const COMPTIME_RECURSION_LIMIT: i32 = 256
 const COMPTIME_STEP_LIMIT: i32 = 50000
-const COMPTIME_TOOL_STEP_LIMIT: i32 = 100000000
+// Tool-mode functions are build programs. They can legitimately walk large
+// generated source trees and run many small capability calls; keep the guard
+// high enough for real project actions while still catching runaway loops.
+const COMPTIME_TOOL_STEP_LIMIT: i32 = 1000000000
 
 enum ComptimeControlKind: i32:
     CTL_VALUE = 0
@@ -2373,7 +2376,7 @@ fn comptime_workspace_thread_entry(arg: *mut u8) -> i32:
     (unsafe: *job).result = native
     0
 
-fn ComptimeEvaluator.compile_workspace_record(self: ComptimeEvaluator, record: ComptimeWorkspaceRecord, capability: ComptimeCapabilityRecord, node: i32) -> ComptimeWorkspaceCompileResult:
+fn ComptimeEvaluator.compile_workspace_record(self: ComptimeEvaluator, record: ComptimeWorkspaceRecord, capability: ComptimeCapabilityRecord, node: i32, want_messages: i32) -> ComptimeWorkspaceCompileResult:
     let plan = self.workspace_compile_plan(record, capability, node)
     if plan.valid == 0:
         return comptime_workspace_compile_invalid()
@@ -2382,7 +2385,7 @@ fn ComptimeEvaluator.compile_workspace_record(self: ComptimeEvaluator, record: C
     if result.kind == ComptimeValueKind.CV_INVALID:
         return comptime_workspace_compile_invalid()
     let messages =
-        if native.rc == 0:
+        if want_messages != 0 and native.rc == 0:
             self.workspace_success_messages(native.comp, native.comp.zcu.last_sema.ast, node)
         else:
             Vec.new()
@@ -3106,7 +3109,7 @@ fn ComptimeEvaluator.eval_workspace_capability_method(self: ComptimeEvaluator, r
     if method == "compile":
         if not self.capability_expect_arg_count(arg_count, 0, method, node):
             return comptime_control_error()
-        let compiled = self.compile_workspace_record(record, capability, node)
+        let compiled = self.compile_workspace_record(record, capability, node, if record.intercept_active != 0: 1 else: 0)
         let result = compiled.result
         if result.kind == ComptimeValueKind.CV_INVALID:
             return comptime_control_error()
