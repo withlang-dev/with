@@ -182,6 +182,16 @@ Completed D4 substrate work:
     a new runtime `with_exec_argv_cwd` primitive runs argv commands from a child
     cwd without mutating the parent process cwd.
 
+Started D5 generated-source work:
+
+1. Workspace interceptions now track the last delivered compiler phase. This
+   lets capability methods reject source-set mutation at phases where Phase D
+   has no safe re-entry semantics yet.
+2. `Workspace.add_string` during `PRE_LINK` or later now fails loudly with
+   `Workspace.add_string during PRE_LINK is not supported in Phase D` instead
+   of accepting source text that cannot affect the pending link. Focused
+   build-w selfhost coverage protects the diagnostic.
+
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.
 `Build.emit_graph()` remains a debug/export compatibility facility and must not
