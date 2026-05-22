@@ -2069,6 +2069,69 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
     rc = bs_expect_file_contains(ctx, bs_join(message_dir, "out/command/run-message-complete/stdout.txt"), "workspace message", "build_w_workspace_message_complete")
     if rc != 0: return rc
 
+    let bad_linker_dir = bs_join(base_dir, "workspace_bad_linker")
+    rc = bs_write_project_manifest(ctx, bad_linker_dir, "workspacebadlinker")
+    if rc != 0: return rc
+    let bad_linker_build =
+        "use std.build\n\n" ++
+        "comptime with BuildCtx as ctx:\n" ++
+        "pub fn build -> Build:\n" ++
+        "    let ws = ctx.create_workspace(\"bad-linker\")\n" ++
+        "    ws.add_string(\"src/bad_linker.w\", \"fn main:\\n    print(\\\"bad linker\\\")\\n\")\n" ++
+        "    var opts = ws.options()\n" ++
+        "    opts.output_path = \"out/bin/bad-linker\"\n" ++
+        "    ws.set_options(opts)\n" ++
+        "    ws.begin_intercept()\n" ++
+        "    while true:\n" ++
+        "        let envelope = ws.wait_for_message()\n" ++
+        "        match envelope.message:\n" ++
+        "            CompilerMessage.PreLink(command) =>\n" ++
+        "                var replacement = command\n" ++
+        "                replacement.linker = \"/bin/false\"\n" ++
+        "                ws.set_link_command(replacement)\n" ++
+        "            CompilerMessage.Complete(_) => ctx.diagnostics().error(\"bad linker prelink missing\")\n" ++
+        "            _ => false\n" ++
+        "    ctx.new_build()\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(bad_linker_dir, "build.w"), bad_linker_build, ctx.target_name(), "workspace bad linker build.w")
+    if rc != 0: return rc
+    let bad_linker_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-workspace-bad-linker", bs_blob_to_args(bs_argv_append("", "build")), 120000, bad_linker_dir)
+    if bad_linker_result.rc == 0:
+        return bs_fail(ctx, "build_w_workspace_bad_linker unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, bad_linker_result.stderr, "Workspace.set_link_command cannot change linker without ProcessRunner authority", "build_w_workspace_bad_linker")
+    if rc != 0: return rc
+
+    let drop_output_dir = bs_join(base_dir, "workspace_drop_outputs")
+    rc = bs_write_project_manifest(ctx, drop_output_dir, "workspacedropoutputs")
+    if rc != 0: return rc
+    let drop_output_build =
+        "use std.build\n\n" ++
+        "comptime with BuildCtx as ctx:\n" ++
+        "pub fn build -> Build:\n" ++
+        "    let ws = ctx.create_workspace(\"drop-outputs\")\n" ++
+        "    ws.add_string(\"src/drop_outputs.w\", \"fn main:\\n    print(\\\"drop outputs\\\")\\n\")\n" ++
+        "    var opts = ws.options()\n" ++
+        "    opts.output_path = \"out/bin/drop-outputs\"\n" ++
+        "    ws.set_options(opts)\n" ++
+        "    ws.begin_intercept()\n" ++
+        "    while true:\n" ++
+        "        let envelope = ws.wait_for_message()\n" ++
+        "        match envelope.message:\n" ++
+        "            CompilerMessage.PreLink(command) =>\n" ++
+        "                var replacement = command\n" ++
+        "                let empty: Vec[str] = Vec.new()\n" ++
+        "                replacement.outputs = empty\n" ++
+        "                ws.set_link_command(replacement)\n" ++
+        "            CompilerMessage.Complete(_) => ctx.diagnostics().error(\"drop outputs prelink missing\")\n" ++
+        "            _ => false\n" ++
+        "    ctx.new_build()\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(drop_output_dir, "build.w"), drop_output_build, ctx.target_name(), "workspace drop outputs build.w")
+    if rc != 0: return rc
+    let drop_output_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-workspace-drop-outputs", bs_blob_to_args(bs_argv_append("", "build")), 120000, drop_output_dir)
+    if drop_output_result.rc == 0:
+        return bs_fail(ctx, "build_w_workspace_drop_outputs unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, drop_output_result.stderr, "Workspace.set_link_command replacement must preserve declared outputs", "build_w_workspace_drop_outputs")
+    if rc != 0: return rc
+
     let open_intercept_dir = bs_join(base_dir, "workspace_intercept_open")
     rc = bs_write_project_manifest(ctx, open_intercept_dir, "workspaceopen")
     if rc != 0: return rc
