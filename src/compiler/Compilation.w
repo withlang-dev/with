@@ -287,6 +287,13 @@ type Compilation {
     last_link_rc: i32,
 }
 
+type CompilationBinaryLinkPlan {
+    ok: bool,
+    obj_path: str,
+    bin_path: str,
+    command: LinkStageCommand,
+}
+
 fn Compilation.init -> Compilation:
     compilation_debug_init("Compilation.init:start")
     let zcu: Zcu = Zcu.init()
@@ -663,6 +670,14 @@ fn compilation_cleanup_build_products(obj_path: str, bin_path: str):
         let _ = ("rm -f " ++ bin_path) |> with_system
         let _ = ("rm -rf " ++ bin_path ++ ".dSYM") |> with_system
 
+fn compilation_binary_link_plan_fail() -> CompilationBinaryLinkPlan:
+    CompilationBinaryLinkPlan {
+        ok: false,
+        obj_path: "",
+        bin_path: "",
+        command: link_stage_empty_command(),
+    }
+
 fn Compilation.build_binary(self: Compilation, source_path: str) -> str:
     self.build_binary_to_path(source_path, link_stage_output_path_for_source(source_path))
 
@@ -716,55 +731,72 @@ fn Compilation.compile_entry_source_text(self: Compilation, source_path: str, so
     self.zcu = zcu
     pool
 
-fn Compilation.finish_binary_from_pool(self: Compilation, pool: AstPool, source_path: str, obj_path: str, bin_path: str) -> str:
+fn Compilation.prepare_binary_link_from_pool(self: Compilation, pool: AstPool, source_path: str, obj_path: str, bin_path: str) -> CompilationBinaryLinkPlan:
     self.last_link_command_available = 0
     self.last_link_command = link_stage_empty_command()
     self.last_link_rc = 0
     compilation_debug_init(f"build_binary_to_path:compiled {source_path} decls={pool.decl_count()}")
     if pool.decl_count() == 0:
-        return ""
+        return compilation_binary_link_plan_fail()
     let prepared_pool = self.prepare_pool_after_typecheck_hooks(pool, source_path)
     if prepared_pool.decl_count() == 0:
         compilation_cleanup_build_products(obj_path, bin_path)
-        return ""
+        return compilation_binary_link_plan_fail()
     if not self.ensure_codegen_mir(prepared_pool):
         compilation_debug_init("build_binary_to_path:ensure_codegen_mir FAILED")
         compilation_cleanup_build_products(obj_path, bin_path)
-        return ""
+        return compilation_binary_link_plan_fail()
     let active_pool: AstPool = self.active_pool(prepared_pool)
     let opt_level = self.config.opt_level
     let requires_async_runtime = self.zcu.last_async_mir_module.requires_async_runtime()
     compilation_debug_pool_flow("build_binary_to_path:after_codegen", self.zcu.pool, active_pool, self.zcu.last_sema)
     compilation_debug_init("build_binary_to_path:compile_to_object_backend")
-    let t_backend = profile_now()
     let backend_rc = self.zcu.compile_to_object_backend(active_pool, opt_level, obj_path, self.config.debug_info, false)
     if backend_rc != 0:
         compilation_debug_init(f"build_binary_to_path:backend FAILED rc={backend_rc}")
         compilation_cleanup_build_products(obj_path, bin_path)
-        return ""
+        return compilation_binary_link_plan_fail()
     compilation_debug_init("build_binary_to_path:linking")
     // Merge dep_link_libs from project config into link libs
     var all_link_libs = self.zcu.last_link_lib_names
     for dli in 0..self.zcu.project_config.dep_link_libs.len() as i32:
         all_link_libs.push(self.zcu.project_config.dep_link_libs.get(dli as i64))
+    let link_plan = link_stage_link_object_to_binary_plan(obj_path, bin_path, all_link_libs, self.zcu.project_config.link_search_paths, requires_async_runtime)
+    if not link_plan.ok:
+        compilation_cleanup_build_products(obj_path, bin_path)
+        return compilation_binary_link_plan_fail()
+    CompilationBinaryLinkPlan {
+        ok: true,
+        obj_path,
+        bin_path,
+        command: link_plan.command,
+    }
+
+fn Compilation.execute_binary_link_plan(self: Compilation, plan: CompilationBinaryLinkPlan) -> str:
+    if not plan.ok:
+        return ""
     let t_link = profile_now()
-    let link_result = link_stage_link_object_to_binary_result(obj_path, bin_path, all_link_libs, self.zcu.project_config.link_search_paths, requires_async_runtime)
+    let link_result = link_stage_result_for_command(plan.command)
     self.last_link_command_available = 1
     self.last_link_command = link_result.command
     self.last_link_rc = link_result.rc
     if not link_result.ok:
         compilation_debug_init("build_binary_to_path:link FAILED")
-        compilation_cleanup_build_products(obj_path, bin_path)
+        compilation_cleanup_build_products(plan.obj_path, plan.bin_path)
         return ""
     if profile_enabled():
         profile_emit("link", t_link, "")
     if self.config.debug_info:
         let t_dsym = profile_now()
-        let _ = ("dsymutil " ++ bin_path ++ " 2>/dev/null") |> with_system
+        let _ = ("dsymutil " ++ plan.bin_path ++ " 2>/dev/null") |> with_system
         if profile_enabled():
             profile_emit("dsymutil", t_dsym, "")
-    let _ = ("rm -f " ++ obj_path) |> with_system
-    bin_path
+    let _ = ("rm -f " ++ plan.obj_path) |> with_system
+    plan.bin_path
+
+fn Compilation.finish_binary_from_pool(self: Compilation, pool: AstPool, source_path: str, obj_path: str, bin_path: str) -> str:
+    let link_plan = self.prepare_binary_link_from_pool(pool, source_path, obj_path, bin_path)
+    self.execute_binary_link_plan(link_plan)
 
 fn Compilation.emit_object_to_path(self: Compilation, source_path: str, obj_path: str) -> str:
     let output_dir = link_stage_dirname(obj_path)
