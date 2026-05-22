@@ -221,6 +221,10 @@ Started D6 parallel-workspace work:
    multiple workspaces would misrepresent the API.
 4. Focused build-w selfhost coverage proves single-workspace `parallel`
    behavior and the loud multi-workspace diagnostic.
+5. Atomic intrinsic lowering now handles global `Atomic[T]` receivers by
+   recovering the receiver storage type from MIR/Sema when LLVM cannot report
+   an allocated type for a global pointer. Native codegen coverage protects
+   global atomic load/store/swap.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.
@@ -408,7 +412,8 @@ not a new compiler-dispatched project graph kind.
 
 - Continue Phase D D6. The next large blocker is true multi-workspace
   `parallel(workspaces)` execution: per-workspace compiler state, real OS
-  thread support, synchronized shared caches, and ProcessRunner reentrancy.
+  thread support, runtime allocator synchronization, synchronized shared
+  caches, and ProcessRunner reentrancy.
 - Preserve the pre-D behavior tests during D1:
   `behav_build_w_basic_invocation`, `behav_action_capability_filesystem`,
   `behav_action_capability_process`, `behav_capability_token_mismatch`,
