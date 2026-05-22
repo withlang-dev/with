@@ -164,6 +164,13 @@ Completed D4 substrate work:
     `compilation_execute_binary_link_plan`, so the future workspace pre-link
     continuation can execute a validated replacement command through the same
     cleanup/profile/dSYM path as normal binary compilation.
+18. Intercepted workspaces now have the first real wait-driven compile path:
+    when `wait_for_message()` is called on an empty active interception, the
+    evaluator advances compilation to `PreLink`, queues messages through
+    `PreLink(LinkCommand)`, and stores the pending link command. A subsequent
+    wait executes the pending command through the shared link-plan executor.
+    `Workspace.set_link_command` validates same-linker replacements that
+    preserve declared outputs before updating the pending command.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.

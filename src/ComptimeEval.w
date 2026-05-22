@@ -8,6 +8,7 @@ use TypeLayout
 use CapabilityRegistry
 use compiler.Compilation
 use compiler.Link
+use compiler.ProjectConfig
 use render
 
 extern fn with_eprint(s: str) -> void
@@ -93,6 +94,14 @@ type ComptimeWorkspaceRecord {
     generation: i32,
     messages: Vec[ComptimeValue],
     message_cursor: i32,
+    intercept_started: i32,
+    pending_link_active: i32,
+    pending_link_obj_path: str,
+    pending_link_bin_path: str,
+    pending_link_output_path: str,
+    pending_link_output_kind: i32,
+    pending_link_debug_info: i32,
+    pending_link_command: LinkStageCommand,
 }
 
 type ComptimeWorkspaceCompileResult {
@@ -683,6 +692,14 @@ fn ComptimeEvaluator.new_workspace_record(self: ComptimeEvaluator, name: str, no
         generation: 0,
         messages: Vec.new(),
         message_cursor: 0,
+        intercept_started: 0,
+        pending_link_active: 0,
+        pending_link_obj_path: "",
+        pending_link_bin_path: "",
+        pending_link_output_path: "",
+        pending_link_output_kind: 0,
+        pending_link_debug_info: 0,
+        pending_link_command: link_stage_empty_command(),
     }
 
 fn ComptimeEvaluator.store_workspace_record(self: ComptimeEvaluator, workspace_id: i32, record: ComptimeWorkspaceRecord):
@@ -1998,6 +2015,54 @@ fn ComptimeEvaluator.link_command_value(self: ComptimeEvaluator, command: LinkSt
     self.extra_values.push(outputs_value)
     comptime_value_struct(command_type, start, 6)
 
+fn ComptimeEvaluator.link_command_str_field(self: ComptimeEvaluator, value: ComptimeValue, name: str, node: i32) -> str:
+    let field = self.struct_field_value_by_name(value, name)
+    if field.kind != ComptimeValueKind.CV_STR:
+        let _ = self.fail(node, "LinkCommand." ++ name ++ " must be a string")
+        return ""
+    field.text
+
+fn ComptimeEvaluator.link_command_str_vec_field(self: ComptimeEvaluator, value: ComptimeValue, name: str, node: i32) -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    let field = self.struct_field_value_by_name(value, name)
+    if field.kind != ComptimeValueKind.CV_VEC and field.kind != ComptimeValueKind.CV_ARRAY:
+        let _ = self.fail(node, "LinkCommand." ++ name ++ " must be a Vec[str]")
+        return out
+    for i in 0..field.extra_count:
+        let item = self.extra_values.get((field.extra_start + i) as i64)
+        if item.kind != ComptimeValueKind.CV_STR:
+            let _ = self.fail(node, "LinkCommand." ++ name ++ " contains a non-string value")
+            return out
+        out.push(item.text)
+    out
+
+fn ComptimeEvaluator.link_command_from_value(self: ComptimeEvaluator, value: ComptimeValue, node: i32) -> LinkStageCommand:
+    let linker = self.link_command_str_field(value, "linker", node)
+    let cwd = self.link_command_str_field(value, "cwd", node)
+    let args = self.link_command_str_vec_field(value, "args", node)
+    let inputs = self.link_command_str_vec_field(value, "inputs", node)
+    let outputs = self.link_command_str_vec_field(value, "outputs", node)
+    let env = self.struct_field_value_by_name(value, "env")
+    if cwd.len() > 0:
+        let _ = self.fail(node, "Workspace.set_link_command does not support LinkCommand.cwd yet")
+    if env.kind == ComptimeValueKind.CV_VEC or env.kind == ComptimeValueKind.CV_ARRAY:
+        if env.extra_count != 0:
+            let _ = self.fail(node, "Workspace.set_link_command does not support LinkCommand.env yet")
+    else:
+        let _ = self.fail(node, "LinkCommand.env must be a Vec[EnvVar]")
+    LinkStageCommand { linker, args, inputs, outputs }
+
+fn link_command_outputs_superset(replacement: LinkStageCommand, original: LinkStageCommand) -> bool:
+    for oi in 0..original.outputs.len() as i32:
+        let output = original.outputs.get(oi as i64)
+        var found = false
+        for ri in 0..replacement.outputs.len() as i32:
+            if replacement.outputs.get(ri as i64) == output:
+                found = true
+        if not found:
+            return false
+    true
+
 fn ComptimeEvaluator.compiler_message_prelink_value(self: ComptimeEvaluator, command: LinkStageCommand, node: i32) -> ComptimeValue:
     let command_value = self.link_command_value(command, node)
     if command_value.kind == ComptimeValueKind.CV_INVALID:
@@ -2128,6 +2193,116 @@ fn ComptimeEvaluator.compile_workspace_record(self: ComptimeEvaluator, record: C
     if self.had_error != 0:
         return comptime_workspace_compile_invalid()
     comptime_workspace_compile_result(result, messages)
+
+fn ComptimeEvaluator.start_intercept_workspace_compile(self: ComptimeEvaluator, record: ComptimeWorkspaceRecord, capability: ComptimeCapabilityRecord, node: i32) -> ComptimeWorkspaceRecord:
+    var out = record
+    out.intercept_started = 1
+    let options = out.options
+    let option_source = self.workspace_str_option(options, "source_path")
+    var source_path = option_source
+    if source_path.len() == 0 and out.files.len() > 0:
+        source_path = out.files.get(0)
+    let output_path = self.workspace_str_option(options, "output_path")
+    let output_kind = self.workspace_i32_option(options, "output_kind", 0)
+    let target_kind = self.workspace_i32_option(options, "target", 0)
+    if target_kind != 0:
+        let _ = self.fail(node, "Workspace.intercept currently supports only the native target")
+        return out
+    if output_kind != 0:
+        let _ = self.fail(node, "Workspace.intercept currently supports binary output only")
+        return out
+    if source_path.len() == 0 and out.string_names.len() == 0:
+        let _ = self.fail(node, "Workspace.intercept requires at least one source file or source string")
+        return out
+
+    var final_output = output_path
+    if final_output.len() == 0:
+        final_output = "out/bin/" ++ out.name
+    let absolute_output = self.workspace_path(capability.project_root, final_output)
+    let obj_path = absolute_output ++ ".o"
+    let output_dir = link_stage_dirname(absolute_output)
+    if output_dir.len() > 0:
+        let _ = with_fs_mkdir_p(output_dir)
+    let include_paths = self.workspace_str_vec_field(options, "include_paths")
+    let defines = self.workspace_str_vec_field(options, "defines")
+    let link_libs = self.workspace_str_vec_field(options, "link_libs")
+
+    var comp = Compilation.init()
+    comp.configure(self.workspace_i32_option(options, "opt_level", 1), self.workspace_bool_option(options, "no_std", false), self.workspace_bool_option(options, "alloc_mode", false))
+    comp.set_debug_info(self.workspace_bool_option(options, "debug_info", true))
+    comp.set_compiler_hooks_enabled(self.workspace_bool_option(options, "compiler_hooks_enabled", true))
+    comp.set_prelude_mode(self.workspace_i32_option(options, "prelude_mode", 0))
+
+    var pool = AstPool.new()
+    var source_name = source_path
+    if out.string_names.len() > 0:
+        source_name = out.string_names.get(0)
+        pool = comp.compile_entry_source_text(self.workspace_path(capability.project_root, source_name), out.string_sources.get(0))
+    else:
+        let absolute_source = self.workspace_path(capability.project_root, source_path)
+        var cfg = project_config_load_for_source(absolute_source)
+        for ii in 0..include_paths.len() as i32:
+            cfg.c_import_include_paths.push(include_paths.get(ii as i64))
+        for di in 0..defines.len() as i32:
+            cfg.c_import_defines.push(defines.get(di as i64))
+        for li in 0..link_libs.len() as i32:
+            cfg.dep_link_libs.push(link_libs.get(li as i64))
+        pool = comp.compile_entry_file_with_config(absolute_source, cfg)
+
+    let link_plan = comp.prepare_binary_link_from_pool(pool, source_name, obj_path, absolute_output)
+    if not link_plan.ok:
+        let _ = self.fail(node, "Workspace.intercept failed before PRE_LINK")
+        return out
+    let messages = self.workspace_success_messages(comp, comp.zcu.last_sema.ast, node)
+    for mi in 0..messages.len() as i32:
+        out.messages.push(messages.get(mi as i64))
+    let prelink_phase = self.compiler_message_phase_value(7, node)
+    if prelink_phase.kind == ComptimeValueKind.CV_INVALID:
+        return out
+    out.messages.push(prelink_phase)
+    let prelink = self.compiler_message_prelink_value(link_plan.command, node)
+    if prelink.kind == ComptimeValueKind.CV_INVALID:
+        return out
+    out.messages.push(prelink)
+    out.pending_link_active = 1
+    out.pending_link_obj_path = link_plan.obj_path
+    out.pending_link_bin_path = link_plan.bin_path
+    out.pending_link_output_path = final_output
+    out.pending_link_output_kind = output_kind
+    out.pending_link_debug_info = if self.workspace_bool_option(options, "debug_info", true): 1 else: 0
+    out.pending_link_command = link_plan.command
+    out
+
+fn ComptimeEvaluator.finish_intercept_workspace_link(self: ComptimeEvaluator, record: ComptimeWorkspaceRecord, node: i32) -> ComptimeWorkspaceRecord:
+    var out = record
+    if out.pending_link_active == 0:
+        return out
+    let plan = CompilationBinaryLinkPlan {
+        ok: true,
+        obj_path: out.pending_link_obj_path,
+        bin_path: out.pending_link_bin_path,
+        command: out.pending_link_command,
+    }
+    let link_result = compilation_execute_binary_link_plan(out.pending_link_debug_info != 0, plan)
+    out.pending_link_active = 0
+    let linked_phase = self.compiler_message_phase_value(8, node)
+    if linked_phase.kind != ComptimeValueKind.CV_INVALID:
+        out.messages.push(linked_phase)
+    let linked = self.compiler_message_linked_value(link_result.command, link_result.rc, node)
+    if linked.kind != ComptimeValueKind.CV_INVALID:
+        out.messages.push(linked)
+    let result = self.workspace_build_result_value(out.name, link_result.rc, self.workspace_artifact_kind_for_output(out.pending_link_output_kind), out.pending_link_output_path, node)
+    if result.kind == ComptimeValueKind.CV_INVALID:
+        return out
+    out = self.enqueue_artifact_messages(out, result, node)
+    let phase_message = self.compiler_message_phase_value(9, node)
+    if phase_message.kind != ComptimeValueKind.CV_INVALID:
+        out.messages.push(phase_message)
+    let complete = self.compiler_message_complete_value(result, node)
+    if complete.kind != ComptimeValueKind.CV_INVALID:
+        out.messages.push(complete)
+    out.intercept_terminal = 1
+    out
 
 fn ComptimeEvaluator.mint_workspace_capability(self: ComptimeEvaluator, parent: ComptimeCapabilityRecord, workspace_id: i32, node: i32) -> ComptimeControl:
     let workspace_type = self.capability_type_id(CapabilityKind.CK_BUILD_WORKSPACE, node)
@@ -2630,6 +2805,14 @@ fn ComptimeEvaluator.eval_workspace_capability_method(self: ComptimeEvaluator, r
             return comptime_control_error()
         if record.intercept_active == 0:
             return self.fail(node, "Workspace.wait_for_message called without active interception")
+        if record.message_cursor >= record.messages.len() as i32 and record.intercept_terminal == 0:
+            if record.pending_link_active != 0:
+                record = self.finish_intercept_workspace_link(record, node)
+            else if record.intercept_started == 0:
+                record = self.start_intercept_workspace_compile(record, capability, node)
+            if self.had_error != 0:
+                return comptime_control_error()
+            self.store_workspace_record(workspace_id, record)
         if record.message_cursor < record.messages.len() as i32:
             let message = record.messages.get(record.message_cursor as i64)
             record.message_cursor = record.message_cursor + 1
@@ -2660,7 +2843,22 @@ fn ComptimeEvaluator.eval_workspace_capability_method(self: ComptimeEvaluator, r
     if method == "set_link_command":
         if not self.capability_expect_arg_count(arg_count, 1, method, node):
             return comptime_control_error()
-        return self.fail(node, "Workspace.set_link_command requires PRE_LINK message support")
+        if record.pending_link_active == 0:
+            return self.fail(node, "Workspace.set_link_command called without a pending PRE_LINK command")
+        let args_signal = self.capability_args(extra_start, arg_count)
+        if args_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return args_signal
+        let replacement_value = self.extra_values.get(args_signal.value.extra_start)
+        let replacement = self.link_command_from_value(replacement_value, node)
+        if self.had_error != 0:
+            return comptime_control_error()
+        if replacement.linker != record.pending_link_command.linker:
+            return self.fail(node, "Workspace.set_link_command cannot change linker without ProcessRunner authority")
+        if not link_command_outputs_superset(replacement, record.pending_link_command):
+            return self.fail(node, "Workspace.set_link_command replacement must preserve declared outputs")
+        record.pending_link_command = replacement
+        self.store_workspace_record(workspace_id, record)
+        return comptime_control_value(comptime_value_void(0))
     if method == "compile":
         if not self.capability_expect_arg_count(arg_count, 0, method, node):
             return comptime_control_error()

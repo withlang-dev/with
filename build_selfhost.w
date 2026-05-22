@@ -1938,9 +1938,6 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
         "    opts.output_path = \"out/bin/message-complete\"\n" ++
         "    ws.set_options(opts)\n" ++
         "    ws.begin_intercept()\n" ++
-        "    let result = ws.compile()\n" ++
-        "    if result.rc != 0:\n" ++
-        "        ctx.diagnostics().error(\"workspace message compile failed\")\n" ++
         "    let pre_parse_envelope = ws.wait_for_message()\n" ++
         "    var saw_pre_parse = false\n" ++
         "    match pre_parse_envelope.message:\n" ++
@@ -2014,6 +2011,7 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
         "            for output in command.outputs:\n" ++
         "                if command.linker.len() > 0 and output.ends_with(\"out/bin/message-complete\"):\n" ++
         "                    saw_prelink = true\n" ++
+        "            ws.set_link_command(command)\n" ++
         "        _ => saw_prelink = false\n" ++
         "    if not saw_prelink:\n" ++
         "        ctx.diagnostics().error(\"workspace pre-link command message missing\")\n" ++
