@@ -28,6 +28,8 @@ extern fn rt_getpid() -> i32
 extern fn rt_raise(sig: i32) -> i32
 extern fn rt_sysinfo(out: *mut u8) -> i32
 extern fn gethostname(name: *mut u8, len: u64) -> i32
+extern fn rt_thread_spawn(start_routine: *mut u8, arg: *mut u8) -> i64
+extern fn rt_thread_join(handle: i64) -> i32
 
 // Filesystem extras (provided by platform backend)
 extern fn rt_mkdir(path: *const u8, mode: i32) -> i32
@@ -285,6 +287,20 @@ type Atomic[T] {
     val: T,
 }
 
+type RtThreadClosureFn = fn(*mut u8) -> i32
+
+type RtThreadClosureRaw {
+    fn_ptr: *mut u8,
+    ctx: *mut u8,
+}
+
+type RtThreadStart {
+    handle: i64,
+    fn_ptr: *mut u8,
+    ctx: *mut u8,
+    result: i32,
+}
+
 var rt_alloc_lock_word: Atomic[i32]
 
 fn rt_allocator_lock():
@@ -452,6 +468,43 @@ fn rt_free(ptr: *mut u8):
 fn rt_free_sized(ptr: *mut u8, size_arg: i64):
     let _ = size_arg
     rt_free(ptr)
+
+fn rt_thread_entry(arg: *mut u8) -> *mut u8:
+    let start = arg as *mut RtThreadStart
+    let raw = RtThreadClosureRaw { fn_ptr: (unsafe: *start).fn_ptr, ctx: 0 as *mut u8 }
+    let worker: RtThreadClosureFn = unsafe: transmute[RtThreadClosureFn](raw)
+    (unsafe: *start).result = worker((unsafe: *start).ctx)
+    arg
+
+@[c_export("with_thread_spawn")]
+pub fn thread_spawn_impl(fn_ptr: *mut u8, ctx: *mut u8) -> i64:
+    if fn_ptr as i64 == 0:
+        return -1
+    let start = rt_alloc(sizeof[RtThreadStart]()) as *mut RtThreadStart
+    (unsafe: *start).handle = 0
+    (unsafe: *start).fn_ptr = fn_ptr
+    (unsafe: *start).ctx = ctx
+    (unsafe: *start).result = 0
+    let handle = rt_thread_spawn(rt_thread_entry as *mut u8, start as *mut u8)
+    if handle < 0:
+        rt_free(start as *mut u8)
+        return handle
+    (unsafe: *start).handle = handle
+    start as i64
+
+@[c_export("with_thread_join")]
+pub fn thread_join_impl(handle: i64) -> i32:
+    if handle == 0:
+        return -1
+    if handle < 0:
+        return handle as i32
+    let start = handle as *mut RtThreadStart
+    let rc = rt_thread_join((unsafe: *start).handle)
+    if rc != 0:
+        return rc
+    let result = (unsafe: *start).result
+    rt_free(start as *mut u8)
+    result
 
 fn rt_realloc(ptr: *mut u8, old_size: i64, new_size: i64) -> *mut u8:
     if ptr as i64 == 0:

@@ -219,6 +219,8 @@ pub fn rt_nanosleep_impl(ns: i64) -> i32:
 extern fn getpid() -> i32
 extern fn raise(sig: i32) -> i32
 extern fn kill(pid: i32, sig: i32) -> i32
+extern fn pthread_create(thread: *mut i64, attr: *const u8, start_routine: *mut u8, arg: *mut u8) -> i32
+extern fn pthread_join(thread: i64, retval: *mut *mut u8) -> i32
 
 @[c_export("rt_getpid")]
 pub fn rt_getpid_impl() -> i32:
@@ -229,6 +231,22 @@ pub fn rt_raise_impl(sig: i32) -> i32:
     let r = raise(sig)
     if r < 0:
         return -get_errno()
+    0
+
+@[c_export("rt_thread_spawn")]
+pub fn rt_thread_spawn_impl(start_routine: *mut u8, arg: *mut u8) -> i64:
+    var handle: i64 = 0
+    let rc = pthread_create(&raw mut handle, 0 as *const u8, start_routine, arg)
+    if rc != 0:
+        return -(rc as i64)
+    handle
+
+@[c_export("rt_thread_join")]
+pub fn rt_thread_join_impl(handle: i64) -> i32:
+    var retval: *mut u8 = 0 as *mut u8
+    let rc = pthread_join(handle, &raw mut retval)
+    if rc != 0:
+        return -rc
     0
 
 // ── Filesystem extras ───────────────────────────────────────────
