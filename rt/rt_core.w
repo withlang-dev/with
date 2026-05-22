@@ -274,6 +274,30 @@ let RT_LARGE_THRESHOLD: i64 = 4096
 let RT_NUM_SIZE_CLASSES: i32 = 9
 let RT_ALLOC_HEADER_SIZE: i64 = 16
 
+enum Order: i32:
+    Relaxed = 0
+    Acquire = 1
+    Release = 2
+    AcqRel = 3
+    SeqCst = 4
+
+type Atomic[T] {
+    val: T,
+}
+
+var rt_alloc_lock_word: Atomic[i32]
+
+fn rt_allocator_lock():
+    var spins = 0
+    while rt_alloc_lock_word.swap(1, .Acquire) != 0:
+        spins = spins + 1
+        if spins >= 1024:
+            let _ = rt_nanosleep(1000)
+            spins = 0
+
+fn rt_allocator_unlock():
+    rt_alloc_lock_word.store(0, .Release)
+
 // Freelist node: just a pointer to next
 // We store this in the freed memory itself.
 // freelists[i] is the head pointer for size class i.
@@ -361,7 +385,7 @@ fn free_small_block(block: i64, idx: i32):
     unsafe: *(block as *mut i64) = old_head
     set_freelist(idx, block)
 
-fn rt_alloc(size_arg: i64) -> *mut u8:
+fn rt_alloc_unlocked(size_arg: i64) -> *mut u8:
     let size = alloc_align_size(size_arg)
 
     if size > RT_LARGE_THRESHOLD:
@@ -403,7 +427,13 @@ fn rt_alloc(size_arg: i64) -> *mut u8:
     alloc_store_small_header(block, cls_size)
     small_block_ptr(block)
 
-fn rt_free(ptr: *mut u8):
+fn rt_alloc(size_arg: i64) -> *mut u8:
+    rt_allocator_lock()
+    let ptr = rt_alloc_unlocked(size_arg)
+    rt_allocator_unlock()
+    ptr
+
+fn rt_free_unlocked(ptr: *mut u8):
     if ptr as i64 == 0:
         return
     let block = alloc_header_ptr(ptr as *const u8) as i64
@@ -413,6 +443,11 @@ fn rt_free(ptr: *mut u8):
         return
     let idx = size_class_index(size)
     free_small_block(block, idx)
+
+fn rt_free(ptr: *mut u8):
+    rt_allocator_lock()
+    rt_free_unlocked(ptr)
+    rt_allocator_unlock()
 
 fn rt_free_sized(ptr: *mut u8, size_arg: i64):
     let _ = size_arg
