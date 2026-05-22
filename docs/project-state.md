@@ -3,7 +3,7 @@
 Status: active checkpoint for agents. Update this file when phase status,
 blockers, or the next work queue changes.
 
-Last updated: 2026-05-21.
+Last updated: 2026-05-22.
 
 Read this file immediately after `AGENTS.md`. It exists so long-running build
 system and bootstrap work does not have to be reconstructed from git history or
@@ -14,10 +14,12 @@ conversation context after compaction.
 Phase C extraction work is complete. Pre-Phase-D preparation is complete
 through P9, including the follow-up source-location diagnostic gap. Phase D
 D1 through D5 are complete. Phase D D6 is in progress. The evaluator now
-supports true OS-thread execution for non-intercepted multi-workspace
-`parallel(workspaces)` calls by planning workspaces on the evaluator thread,
-compiling each plan on its own OS thread, and materializing `BuildResult`
-values back on the evaluator thread in input order.
+supports true OS-thread execution for multi-workspace `parallel(workspaces)`
+calls by planning workspaces on the evaluator thread, compiling each plan on
+its own OS thread, and materializing `BuildResult` values back on the
+evaluator thread in input order. Fresh intercepted workspaces are supported by
+queueing their independent message streams after the parallel compile joins;
+partially consumed intercepted workspaces still fail loudly.
 
 Completed D1 sub-slices:
 
@@ -246,10 +248,10 @@ Started D6 parallel-workspace work:
     platform default. MIR lowering and codegen use stack frames large enough
     that default secondary-thread stacks faulted immediately under parallel
     workspace compilation.
-11. `parallel(workspaces)` now supports multiple non-intercepted workspaces.
-    The evaluator validates handles and builds compile plans serially, runs the
-    independent `Compilation` work on OS threads, joins all workers, and then
-    constructs the public `Vec[BuildResult]` in input order without mutating
+11. `parallel(workspaces)` now supports multiple workspaces. The evaluator
+    validates handles and builds compile plans serially, runs the independent
+    `Compilation` work on OS threads, joins all workers, and then constructs
+    the public `Vec[BuildResult]` in input order without mutating
     evaluator-owned value storage from worker threads.
 12. `c_import` expansion is serialized behind a frontend lock. The C import
     and clang bridge code still contains process-global mutable session state,
@@ -269,10 +271,12 @@ Started D6 parallel-workspace work:
     stdlib/generated-runner path. Explicit `ProcessEnv` overrides are applied
     only after the driver variables are cleared and are restored before the
     driver variables are restored.
-16. Intercepted workspaces inside `parallel(workspaces)` are covered by a
-    loud-failure selfhost test. D6 currently supports true OS-thread
-    parallelism for non-intercepted workspaces only; intercepted workspace
-    message queues remain a separate implementation step.
+16. Fresh intercepted workspaces inside `parallel(workspaces)` are supported.
+    After worker joins, the evaluator queues each workspace's messages back on
+    the owning workspace record, preserving independent message streams and
+    workspace identities. Partially consumed intercepted workspaces remain a
+    loud failure because Phase D has no cross-thread pre-link continuation
+    semantics inside `parallel`.
 17. Failed workspaces in `parallel(workspaces)` now emit an evaluator-side
     diagnostic naming the workspace and exit code after worker joins. The
     build-w selfhost suite covers one successful workspace alongside one
@@ -482,10 +486,11 @@ not a new compiler-dispatched project graph kind.
 ## Open Blockers And Follow-Ups
 
 - Continue Phase D D6 hardening. True multi-workspace
-  `parallel(workspaces)` execution now exists for non-intercepted workspaces;
-  remaining work is stress coverage, intercepted-workspace policy, C
-  import/migration exclusion or session isolation, remaining shared-cache
-  audits, fiber/global state isolation, and ProcessRunner reentrancy.
+  `parallel(workspaces)` execution now exists for non-intercepted workspaces
+  and fresh intercepted workspaces; remaining work is the partially-consumed
+  intercepted-workspace policy, C import/migration session isolation beyond
+  the current serialization guard, remaining shared-cache audits,
+  fiber/global state isolation, and ProcessRunner reentrancy.
 - Preserve the pre-D behavior tests during D1:
   `behav_build_w_basic_invocation`, `behav_action_capability_filesystem`,
   `behav_action_capability_process`, `behav_capability_token_mismatch`,
@@ -502,8 +507,9 @@ not a new compiler-dispatched project graph kind.
 
 ## Local State
 
-At the time of this update, the Phase D D6 parallel failure diagnostic slice is
-verified and ready to commit. Current verification passed:
+At the time of this update, the Phase D D6 intercepted parallel workspace
+message-queue slice is verified and ready to commit. Current verification
+passed:
 
 ```sh
 out/bin/with check src/main.w
@@ -516,7 +522,7 @@ make test
 make install-user
 ```
 
-The full emit-C test was intentionally not part of this verification pass per
+The full emit-C test is intentionally not part of this verification pass per
 the manual-only policy above.
 
 Always run `git status -sb` before editing; this file is a checkpoint, not a

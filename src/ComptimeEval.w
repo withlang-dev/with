@@ -2185,6 +2185,24 @@ fn ComptimeEvaluator.enqueue_artifact_messages(self: ComptimeEvaluator, record: 
         out.messages.push(message)
     out
 
+fn ComptimeEvaluator.enqueue_workspace_compile_result(self: ComptimeEvaluator, record: ComptimeWorkspaceRecord, result: ComptimeValue, messages: Vec[ComptimeValue], node: i32) -> ComptimeWorkspaceRecord:
+    var out = record
+    for mi in 0..messages.len() as i32:
+        out.messages.push(messages.get(mi as i64))
+    out = self.enqueue_artifact_messages(out, result, node)
+    if self.had_error != 0:
+        return out
+    let phase_message = self.compiler_message_phase_value(9, node)
+    if phase_message.kind == ComptimeValueKind.CV_INVALID:
+        return out
+    let complete_message = self.compiler_message_complete_value(result, node)
+    if complete_message.kind == ComptimeValueKind.CV_INVALID:
+        return out
+    out.messages.push(phase_message)
+    out.messages.push(complete_message)
+    out.intercept_terminal = 1
+    out
+
 fn ComptimeEvaluator.compiler_message_complete_value(self: ComptimeEvaluator, result: ComptimeValue, node: i32) -> ComptimeValue:
     let payloads: Vec[ComptimeValue] = Vec.new()
     payloads.push(result)
@@ -3093,20 +3111,9 @@ fn ComptimeEvaluator.eval_workspace_capability_method(self: ComptimeEvaluator, r
         if result.kind == ComptimeValueKind.CV_INVALID:
             return comptime_control_error()
         if record.intercept_active != 0:
-            for mi in 0..compiled.messages.len() as i32:
-                record.messages.push(compiled.messages.get(mi as i64))
-            record = self.enqueue_artifact_messages(record, result, node)
+            record = self.enqueue_workspace_compile_result(record, result, compiled.messages, node)
             if self.had_error != 0:
                 return comptime_control_error()
-            let phase_message = self.compiler_message_phase_value(9, node)
-            if phase_message.kind == ComptimeValueKind.CV_INVALID:
-                return comptime_control_error()
-            let message = self.compiler_message_complete_value(result, node)
-            if message.kind == ComptimeValueKind.CV_INVALID:
-                return comptime_control_error()
-            record.messages.push(phase_message)
-            record.messages.push(message)
-            record.intercept_terminal = 1
             self.store_workspace_record(workspace_id, record)
         return comptime_control_value(result)
     self.fail(node, "Workspace capability method '" ++ method ++ "' is not implemented yet")
@@ -4179,6 +4186,8 @@ fn ComptimeEvaluator.eval_parallel_workspaces_call(self: ComptimeEvaluator, arg_
     if result_type == 0:
         return self.fail(node, "parallel result type is unknown")
     let plans: Vec[ComptimeWorkspaceCompilePlan] = Vec.new()
+    let workspace_ids: Vec[i32] = Vec.new()
+    let intercepted: Vec[i32] = Vec.new()
     for i in 0..workspaces.extra_count:
         let workspace_value = self.extra_values.get((workspaces.extra_start + i) as i64)
         let workspace_id = self.workspace_record_index(workspace_value, "parallel", node)
@@ -4189,12 +4198,15 @@ fn ComptimeEvaluator.eval_parallel_workspaces_call(self: ComptimeEvaluator, arg_
             return comptime_control_error()
         let record = self.workspace_records.get(workspace_id as i64)
         if record.intercept_active != 0:
-            return self.fail(node, "parallel does not support intercepted workspaces yet")
+            if record.intercept_started != 0 or record.messages.len() > 0 or record.pending_link_active != 0:
+                return self.fail(node, "parallel does not support partially consumed intercepted workspaces yet")
         let capability = self.capability_records.get(capability_handle as i64)
         let plan = self.workspace_compile_plan(record, capability, node)
         if plan.valid == 0:
             return comptime_control_error()
         plans.push(plan)
+        workspace_ids.push(workspace_id)
+        intercepted.push(if record.intercept_active != 0: 1 else: 0)
     let native_results: Vec[ComptimeWorkspaceNativeCompileResult] = Vec.new()
     if plans.len() as i32 == 1:
         native_results.push(comptime_execute_workspace_compile_plan(plans.get(0)))
@@ -4229,6 +4241,18 @@ fn ComptimeEvaluator.eval_parallel_workspaces_call(self: ComptimeEvaluator, arg_
         let result = self.workspace_build_result_value(plan.name, native.rc, self.workspace_artifact_kind_for_output(plan.output_kind), plan.final_output, node)
         if result.kind == ComptimeValueKind.CV_INVALID:
             return comptime_control_error()
+        if intercepted.get(i as i64) != 0:
+            var record = self.workspace_records.get(workspace_ids.get(i as i64) as i64)
+            let messages =
+                if native.rc == 0:
+                    self.workspace_success_messages(native.comp, native.comp.zcu.last_sema.ast, node)
+                else:
+                    Vec.new()
+            record.intercept_started = 1
+            record = self.enqueue_workspace_compile_result(record, result, messages, node)
+            if self.had_error != 0:
+                return comptime_control_error()
+            self.store_workspace_record(workspace_ids.get(i as i64), record)
         results.push(result)
     let start = self.extra_values.len() as i32
     for i in 0..results.len() as i32:
