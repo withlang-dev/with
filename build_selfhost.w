@@ -2307,6 +2307,82 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
     rc = bs_expect_file_contains(ctx, bs_join(parallel_multi_dir, "out/command/run-parallel-b/stdout.txt"), "b", "build_w_workspace_parallel_multi_b")
     if rc != 0: return rc
 
+    let parallel_stress_dir = bs_join(base_dir, "workspace_parallel_stress")
+    rc = bs_write_project_manifest(ctx, parallel_stress_dir, "workspaceparallelstress")
+    if rc != 0: return rc
+    let parallel_stress_build =
+        "use std.build\n\n" ++
+        "comptime with BuildCtx as ctx:\n" ++
+        "pub fn build -> Build:\n" ++
+        "    let ws0 = ctx.create_workspace(\"stress-0\")\n" ++
+        "    ws0.add_string(\"src/stress_0.w\", \"fn main:\\n    let xs: Vec[i32] = Vec.new()\\n    xs.push(0)\\n    xs.push(1)\\n    print(\\\"stress-0\\\")\\n\")\n" ++
+        "    var opts0 = ws0.options()\n" ++
+        "    opts0.output_path = \"out/bin/stress-0\"\n" ++
+        "    ws0.set_options(opts0)\n" ++
+        "    let ws1 = ctx.create_workspace(\"stress-1\")\n" ++
+        "    ws1.add_string(\"src/stress_1.w\", \"fn main:\\n    let xs: Vec[i32] = Vec.new()\\n    xs.push(1)\\n    xs.push(2)\\n    print(\\\"stress-1\\\")\\n\")\n" ++
+        "    var opts1 = ws1.options()\n" ++
+        "    opts1.output_path = \"out/bin/stress-1\"\n" ++
+        "    ws1.set_options(opts1)\n" ++
+        "    let ws2 = ctx.create_workspace(\"stress-2\")\n" ++
+        "    ws2.add_string(\"src/stress_2.w\", \"fn main:\\n    let xs: Vec[i32] = Vec.new()\\n    xs.push(2)\\n    xs.push(3)\\n    print(\\\"stress-2\\\")\\n\")\n" ++
+        "    var opts2 = ws2.options()\n" ++
+        "    opts2.output_path = \"out/bin/stress-2\"\n" ++
+        "    ws2.set_options(opts2)\n" ++
+        "    let ws3 = ctx.create_workspace(\"stress-3\")\n" ++
+        "    ws3.add_string(\"src/stress_3.w\", \"fn main:\\n    let xs: Vec[i32] = Vec.new()\\n    xs.push(3)\\n    xs.push(4)\\n    print(\\\"stress-3\\\")\\n\")\n" ++
+        "    var opts3 = ws3.options()\n" ++
+        "    opts3.output_path = \"out/bin/stress-3\"\n" ++
+        "    ws3.set_options(opts3)\n" ++
+        "    let ws4 = ctx.create_workspace(\"stress-4\")\n" ++
+        "    ws4.add_string(\"src/stress_4.w\", \"fn main:\\n    let xs: Vec[i32] = Vec.new()\\n    xs.push(4)\\n    xs.push(5)\\n    print(\\\"stress-4\\\")\\n\")\n" ++
+        "    var opts4 = ws4.options()\n" ++
+        "    opts4.output_path = \"out/bin/stress-4\"\n" ++
+        "    ws4.set_options(opts4)\n" ++
+        "    let ws5 = ctx.create_workspace(\"stress-5\")\n" ++
+        "    ws5.add_string(\"src/stress_5.w\", \"fn main:\\n    let xs: Vec[i32] = Vec.new()\\n    xs.push(5)\\n    xs.push(6)\\n    print(\\\"stress-5\\\")\\n\")\n" ++
+        "    var opts5 = ws5.options()\n" ++
+        "    opts5.output_path = \"out/bin/stress-5\"\n" ++
+        "    ws5.set_options(opts5)\n" ++
+        "    let workspaces: Vec[Workspace] = Vec.new()\n" ++
+        "    workspaces.push(ws0)\n" ++
+        "    workspaces.push(ws1)\n" ++
+        "    workspaces.push(ws2)\n" ++
+        "    workspaces.push(ws3)\n" ++
+        "    workspaces.push(ws4)\n" ++
+        "    workspaces.push(ws5)\n" ++
+        "    let results = parallel(workspaces)\n" ++
+        "    if results.len() != 6:\n" ++
+        "        ctx.diagnostics().error(\"parallel stress result count failed\")\n" ++
+        "    var i = 0\n" ++
+        "    while i < results.len():\n" ++
+        "        if results.get(i).rc != 0:\n" ++
+        "            ctx.diagnostics().error(\"parallel stress workspace failed\")\n" ++
+        "        i = i + 1\n" ++
+        "    var out = ctx.new_build()\n" ++
+        "    out = out.command(\"run-stress-0\", \"out/bin/stress-0\")\n" ++
+        "    out = out.command(\"run-stress-1\", \"out/bin/stress-1\")\n" ++
+        "    out = out.command(\"run-stress-2\", \"out/bin/stress-2\")\n" ++
+        "    out = out.command(\"run-stress-3\", \"out/bin/stress-3\")\n" ++
+        "    out = out.command(\"run-stress-4\", \"out/bin/stress-4\")\n" ++
+        "    out.command(\"run-stress-5\", \"out/bin/stress-5\")\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(parallel_stress_dir, "build.w"), parallel_stress_build, ctx.target_name(), "workspace parallel stress build.w")
+    if rc != 0: return rc
+    let parallel_stress_result = bs_build_w_expect_success(ctx, compiler_path, parallel_stress_dir, "build-w-workspace-parallel-stress", bs_blob_to_args(bs_argv_append("", "build")))
+    if parallel_stress_result.rc != 0: return parallel_stress_result.rc
+    rc = bs_expect_file_contains(ctx, bs_join(parallel_stress_dir, "out/command/run-stress-0/stdout.txt"), "stress-0", "build_w_workspace_parallel_stress_0")
+    if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, bs_join(parallel_stress_dir, "out/command/run-stress-1/stdout.txt"), "stress-1", "build_w_workspace_parallel_stress_1")
+    if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, bs_join(parallel_stress_dir, "out/command/run-stress-2/stdout.txt"), "stress-2", "build_w_workspace_parallel_stress_2")
+    if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, bs_join(parallel_stress_dir, "out/command/run-stress-3/stdout.txt"), "stress-3", "build_w_workspace_parallel_stress_3")
+    if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, bs_join(parallel_stress_dir, "out/command/run-stress-4/stdout.txt"), "stress-4", "build_w_workspace_parallel_stress_4")
+    if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, bs_join(parallel_stress_dir, "out/command/run-stress-5/stdout.txt"), "stress-5", "build_w_workspace_parallel_stress_5")
+    if rc != 0: return rc
+
     let open_intercept_dir = bs_join(base_dir, "workspace_intercept_open")
     rc = bs_write_project_manifest(ctx, open_intercept_dir, "workspaceopen")
     if rc != 0: return rc
