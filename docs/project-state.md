@@ -13,13 +13,13 @@ conversation context after compaction.
 
 Phase C extraction work is complete. Pre-Phase-D preparation is complete
 through P9, including the follow-up source-location diagnostic gap. Phase D
-D1 through D5 are complete. Phase D D6 is in progress. The evaluator now
-supports true OS-thread execution for multi-workspace `parallel(workspaces)`
-calls by planning workspaces on the evaluator thread, compiling each plan on
-its own OS thread, and materializing `BuildResult` values back on the
-evaluator thread in input order. Fresh intercepted workspaces are supported by
-queueing their independent message streams after the parallel compile joins;
-partially consumed intercepted workspaces still fail loudly.
+D1 through D6 are complete. Phase D D7 is in progress. The evaluator supports
+true OS-thread execution for multi-workspace `parallel(workspaces)` calls by
+planning workspaces on the evaluator thread, compiling each plan on its own OS
+thread, and materializing `BuildResult` values back on the evaluator thread in
+input order. Fresh intercepted workspaces are supported by queueing their
+independent message streams after the parallel compile joins; partially
+consumed intercepted workspaces fail loudly.
 
 Completed D1 sub-slices:
 
@@ -356,7 +356,9 @@ default `:test` target includes the fast emit-C smoke.
 
 Recent Phase D/pre-D commits:
 
-- current checkpoint: Report failed parallel workspace identity.
+- current checkpoint: Use workspaces for emit-C compiler source emission.
+- previous checkpoint: Fix emit-C lowering for Atomic and payload options.
+- previous checkpoint: Report failed parallel workspace identity.
 - previous checkpoint: Cover intercepted workspace parallel rejection.
 - previous checkpoint: Clear driver env for evaluator ProcessRunner.
 - previous checkpoint: Add parallel workspace stress coverage.
@@ -485,12 +487,9 @@ not a new compiler-dispatched project graph kind.
 
 ## Open Blockers And Follow-Ups
 
-- Continue Phase D D6 hardening. True multi-workspace
-  `parallel(workspaces)` execution now exists for non-intercepted workspaces
-  and fresh intercepted workspaces; remaining work is the partially-consumed
-  intercepted-workspace policy, C import/migration session isolation beyond
-  the current serialization guard, remaining shared-cache audits,
-  fiber/global state isolation, and ProcessRunner reentrancy.
+- Continue Phase D D7 by migrating project actions that currently shell out to
+  `with build` only to compile With source. Keep ProcessRunner for external
+  tools and for tests that intentionally exercise the CLI process boundary.
 - Preserve the pre-D behavior tests during D1:
   `behav_build_w_basic_invocation`, `behav_action_capability_filesystem`,
   `behav_action_capability_process`, `behav_capability_token_mismatch`,

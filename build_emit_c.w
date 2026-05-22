@@ -357,6 +357,20 @@ fn emitc_build_compiler_c(ctx: ActionCtx, compiler_path: str, main_c: str) -> i3
     argv |> push(emitc_abs(root, main_c))
     emitc_run_capture(ctx, "emit-compiler-c", argv, 600000)
 
+fn emitc_build_compiler_c_workspace(ctx: ActionCtx, source_w: str, main_c: str) -> i32:
+    let ws = ctx.create_workspace("emit-compiler-c")
+    ws.add_file(source_w)
+    var options = ws.options()
+    options.output_path = main_c
+    options.output_kind = BuildOutputKind.C
+    ws.set_options(options)
+    let result = ws.compile()
+    if result.rc != 0:
+        return emitc_fail(ctx, f"workspace emit-C failed with exit code {result.rc}")
+    if not ctx.fs().exists(main_c):
+        return emitc_fail(ctx, "workspace emit-C did not produce output: " ++ main_c)
+    0
+
 fn emitc_compile_c_compiler(ctx: ActionCtx, main_c: str, output_path: str) -> i32:
     let root = ctx.project_info().project_root()
     var argv: Vec[str] = Vec.new()
@@ -557,7 +571,7 @@ pub fn run_emit_c_test_action(ctx: ActionCtx) -> i32:
     let with_from_c = emitc_join(out_dir, "with-from-c")
     let hello_c = emitc_join(out_dir, "hello_test.c")
     let hello_bin = emitc_join(out_dir, "hello_test")
-    var rc = emitc_build_compiler_c(ctx, compiler_path, main_c)
+    var rc = emitc_build_compiler_c_workspace(ctx, "out/gen/main.w", main_c)
     if rc != 0: return rc
     rc = emitc_generate_stub_files(ctx)
     if rc != 0: return rc
@@ -625,7 +639,7 @@ pub fn run_emit_c_roundtrip_action(ctx: ActionCtx) -> i32:
     let migrated_w = emitc_join(out_dir, "main_roundtrip.w")
     let with_roundtrip = emitc_join(out_dir, "with-roundtrip")
     let with_rebuilt_by_roundtrip = emitc_join(out_dir, "with-rebuilt-by-roundtrip")
-    var rc = emitc_build_compiler_c(ctx, compiler_path, main_c)
+    var rc = emitc_build_compiler_c_workspace(ctx, "out/gen/main.w", main_c)
     if rc != 0: return rc
     rc = emitc_generate_stub_files(ctx)
     if rc != 0: return rc
