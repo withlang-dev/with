@@ -273,6 +273,11 @@ Started D6 parallel-workspace work:
     loud-failure selfhost test. D6 currently supports true OS-thread
     parallelism for non-intercepted workspaces only; intercepted workspace
     message queues remain a separate implementation step.
+17. Failed workspaces in `parallel(workspaces)` now emit an evaluator-side
+    diagnostic naming the workspace and exit code after worker joins. The
+    build-w selfhost suite covers one successful workspace alongside one
+    failing workspace and verifies the failed workspace identity appears in
+    stderr while the build script can still inspect `BuildResult.rc`.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.
@@ -293,7 +298,7 @@ The original P9 pre-D1 baseline is recorded in
 containing this project-state update:
 
 ```text
-Cover intercepted workspace parallel rejection
+Report failed parallel workspace identity
 ```
 
 Commands passed:
@@ -347,7 +352,8 @@ default `:test` target includes the fast emit-C smoke.
 
 Recent Phase D/pre-D commits:
 
-- current checkpoint: Cover intercepted workspace parallel rejection.
+- current checkpoint: Report failed parallel workspace identity.
+- previous checkpoint: Cover intercepted workspace parallel rejection.
 - previous checkpoint: Clear driver env for evaluator ProcessRunner.
 - previous checkpoint: Add parallel workspace stress coverage.
 - previous checkpoint: Serialize LLVM target initialization.
@@ -496,14 +502,15 @@ not a new compiler-dispatched project graph kind.
 
 ## Local State
 
-At the time of this update, the Phase D D6 intercepted parallel rejection slice is
+At the time of this update, the Phase D D6 parallel failure diagnostic slice is
 verified and ready to commit. Current verification passed:
 
 ```sh
+out/bin/with check src/main.w
 out/bin/with check build_selfhost.w
 git diff --check
-out/bin/with build :cli-selfhost-build-w-tests --no-deps
 make build
+out/bin/with build :cli-selfhost-build-w-tests --no-deps
 make fixpoint
 make test
 make install-user

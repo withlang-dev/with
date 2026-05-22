@@ -2405,6 +2405,41 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
     rc = bs_assert_contains(ctx, parallel_intercept_result.stderr, "parallel does not support intercepted workspaces yet", "build_w_workspace_parallel_intercept")
     if rc != 0: return rc
 
+    let parallel_failure_dir = bs_join(base_dir, "workspace_parallel_failure")
+    rc = bs_write_project_manifest(ctx, parallel_failure_dir, "workspaceparallelfailure")
+    if rc != 0: return rc
+    let parallel_failure_build =
+        "use std.build\n\n" ++
+        "comptime with BuildCtx as ctx:\n" ++
+        "pub fn build -> Build:\n" ++
+        "    let ok = ctx.create_workspace(\"parallel-fail-ok\")\n" ++
+        "    ok.add_string(\"src/parallel_ok.w\", \"fn main:\\n    print(\\\"parallel ok\\\")\\n\")\n" ++
+        "    var ok_opts = ok.options()\n" ++
+        "    ok_opts.output_path = \"out/bin/parallel-ok\"\n" ++
+        "    ok.set_options(ok_opts)\n" ++
+        "    let bad = ctx.create_workspace(\"parallel-fail-bad\")\n" ++
+        "    bad.add_string(\"src/parallel_bad.w\", \"fn main:\\n    let =\\n\")\n" ++
+        "    var bad_opts = bad.options()\n" ++
+        "    bad_opts.output_path = \"out/bin/parallel-bad\"\n" ++
+        "    bad.set_options(bad_opts)\n" ++
+        "    let workspaces: Vec[Workspace] = Vec.new()\n" ++
+        "    workspaces.push(ok)\n" ++
+        "    workspaces.push(bad)\n" ++
+        "    let results = parallel(workspaces)\n" ++
+        "    if results.len() != 2:\n" ++
+        "        ctx.diagnostics().error(\"parallel failure result count failed\")\n" ++
+        "    if results.get(0).rc != 0:\n" ++
+        "        ctx.diagnostics().error(\"parallel ok workspace failed\")\n" ++
+        "    if results.get(1).rc == 0:\n" ++
+        "        ctx.diagnostics().error(\"parallel bad workspace unexpectedly succeeded\")\n" ++
+        "    ctx.new_build().command(\"run-parallel-ok\", \"out/bin/parallel-ok\")\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(parallel_failure_dir, "build.w"), parallel_failure_build, ctx.target_name(), "workspace parallel failure build.w")
+    if rc != 0: return rc
+    let parallel_failure_result = bs_build_w_expect_success(ctx, compiler_path, parallel_failure_dir, "build-w-workspace-parallel-failure", bs_blob_to_args(bs_argv_append("", "build")))
+    if parallel_failure_result.rc != 0: return parallel_failure_result.rc
+    rc = bs_assert_contains(ctx, parallel_failure_result.stderr, "parallel workspace 'parallel-fail-bad' failed with exit code", "build_w_workspace_parallel_failure")
+    if rc != 0: return rc
+
     let open_intercept_dir = bs_join(base_dir, "workspace_intercept_open")
     rc = bs_write_project_manifest(ctx, open_intercept_dir, "workspaceopen")
     if rc != 0: return rc
