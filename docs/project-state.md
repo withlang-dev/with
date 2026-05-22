@@ -356,7 +356,8 @@ default `:test` target includes the fast emit-C smoke.
 
 Recent Phase D/pre-D commits:
 
-- current checkpoint: Use workspaces for emit-C compiler source emission.
+- current checkpoint: Use a workspace for pcre2-test-smoke's With compile.
+- previous checkpoint: Use workspaces for emit-C compiler source emission.
 - previous checkpoint: Fix emit-C lowering for Atomic and payload options.
 - previous checkpoint: Report failed parallel workspace identity.
 - previous checkpoint: Cover intercepted workspace parallel rejection.
