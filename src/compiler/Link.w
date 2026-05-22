@@ -37,6 +37,27 @@ type LinkStageCommand {
     outputs: Vec[str],
 }
 
+type LinkStageResult {
+    ok: bool,
+    rc: i32,
+    command: LinkStageCommand,
+}
+
+fn link_stage_empty_command() -> LinkStageCommand:
+    LinkStageCommand {
+        linker: "",
+        args: Vec.new(),
+        inputs: Vec.new(),
+        outputs: Vec.new(),
+    }
+
+fn link_stage_result_fail() -> LinkStageResult:
+    LinkStageResult { ok: false, rc: 1, command: link_stage_empty_command() }
+
+fn link_stage_result_for_command(command: LinkStageCommand) -> LinkStageResult:
+    let rc = command.run()
+    LinkStageResult { ok: rc == 0, rc, command }
+
 fn link_stage_argv_append(argv: str, arg: str) -> str:
     argv ++ arg ++ "\0"
 
@@ -137,14 +158,18 @@ fn link_stage_link_with_extras(obj_path: str, bin_path: str, extras: Vec[str]) -
     link_stage_link_with_extras_and_libs(obj_path, bin_path, extras, link_libs)
 
 fn link_stage_link_with_extras_and_libs(obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str]) -> bool:
+    link_stage_link_with_extras_and_libs_result(obj_path, bin_path, extras, link_libs).ok
+
+fn link_stage_link_with_extras_and_libs_result(obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str]) -> LinkStageResult:
     let command = link_stage_make_link_command("cc", obj_path, bin_path, extras, link_libs)
-    let result = command.run()
-    result == 0
+    link_stage_result_for_command(command)
 
 fn link_stage_link_with_llvm(obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str], llvm_cc: str) -> bool:
+    link_stage_link_with_llvm_result(obj_path, bin_path, extras, link_libs, llvm_cc).ok
+
+fn link_stage_link_with_llvm_result(obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str], llvm_cc: str) -> LinkStageResult:
     let command = link_stage_make_llvm_link_command(llvm_cc, obj_path, bin_path, extras, link_libs)
-    let result = command.run()
-    result == 0
+    link_stage_result_for_command(command)
 
 fn link_stage_str_contains(hay: str, needle: str) -> bool:
     let hay_len = hay.len() as i32
@@ -391,6 +416,9 @@ fn link_stage_output_path_for_source(source_path: str) -> str:
     link_stage_output_dir_for_source(source_path) ++ "/" ++ link_stage_source_stem(source_path)
 
 fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec[str], link_search_paths: Vec[str], needs_async_runtime: bool) -> bool:
+    link_stage_link_object_to_binary_result(obj_path, bin_path, link_libs, link_search_paths, needs_async_runtime).ok
+
+fn link_stage_link_object_to_binary_result(obj_path: str, bin_path: str, link_libs: Vec[str], link_search_paths: Vec[str], needs_async_runtime: bool) -> LinkStageResult:
     let extras: Vec[str] = Vec.new()
     for i in 0..link_search_paths.len() as i32:
         extras.push("-L" ++ link_search_paths.get(i as i64))
@@ -402,22 +430,22 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
         let channel_runtime_path = link_stage_find_runtime_object_path("channel_runtime.o")
         if channel_runtime_path.len() == 0:
             with_eprint("error: missing runtime/channel_runtime.o")
-            return false
+            return link_stage_result_fail()
         extras.push(channel_runtime_path)
         let fiber_runtime_path = link_stage_find_runtime_object_path("fiber_runtime.o")
         if fiber_runtime_path.len() == 0:
             with_eprint("error: missing runtime/fiber_runtime.o")
-            return false
+            return link_stage_result_fail()
         extras.push(fiber_runtime_path)
         let fiber_path = link_stage_find_runtime_object_path("fiber.o")
         if fiber_path.len() == 0:
             with_eprint("error: missing runtime/fiber.o")
-            return false
+            return link_stage_result_fail()
         extras.push(fiber_path)
         let fiber_asm_path = link_stage_find_runtime_object_path("fiber_asm.o")
         if fiber_asm_path.len() == 0:
             with_eprint("error: missing runtime/fiber_asm.o")
-            return false
+            return link_stage_result_fail()
         extras.push(fiber_asm_path)
 
     let needs_helpers_runtime = link_stage_undefined_symbols_need_helpers_runtime(undef)
@@ -431,38 +459,38 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
             let rt_core_path = link_stage_find_runtime_object_path("rt_core.o")
             if rt_core_path.len() == 0:
                 with_eprint("error: missing rt_core.o")
-                return false
+                return link_stage_result_fail()
             extras.push(rt_core_path)
             let rt_platform_path = link_stage_find_runtime_object_path("rt_darwin_aarch64.o")
             if rt_platform_path.len() == 0:
                 with_eprint("error: missing rt_darwin_aarch64.o")
-                return false
+                return link_stage_result_fail()
             extras.push(rt_platform_path)
             let panic_rt_path = link_stage_find_runtime_object_path("panic_runtime.o")
             if panic_rt_path.len() == 0:
                 with_eprint("error: missing runtime/panic_runtime.o")
-                return false
+                return link_stage_result_fail()
             let panic_ar = link_stage_make_archive(panic_rt_path)
             extras.push(if panic_ar.len() > 0: panic_ar else: panic_rt_path)
             if needs_regex_runtime != 0:
                 let regex_runtime_path = link_stage_find_runtime_object_path("regex_runtime.o")
                 if regex_runtime_path.len() == 0:
                     with_eprint("error: missing runtime/regex_runtime.o")
-                    return false
+                    return link_stage_result_fail()
                 let regex_runtime_ar = link_stage_make_archive(regex_runtime_path)
                 extras.push(if regex_runtime_ar.len() > 0: regex_runtime_ar else: regex_runtime_path)
             if needs_compat_runtime != 0:
                 let compat_runtime_path = link_stage_find_runtime_object_path("compat_runtime.o")
                 if compat_runtime_path.len() == 0:
                     with_eprint("error: missing runtime/compat_runtime.o")
-                    return false
+                    return link_stage_result_fail()
                 let compat_runtime_ar = link_stage_make_archive(compat_runtime_path)
                 extras.push(if compat_runtime_ar.len() > 0: compat_runtime_ar else: compat_runtime_path)
             if needs_fiber_runtime == 0:
                 let fiber_stubs_path = link_stage_find_runtime_object_path("fiber_stubs.o")
                 if fiber_stubs_path.len() == 0:
                     with_eprint("error: missing runtime/fiber_stubs.o")
-                    return false
+                    return link_stage_result_fail()
                 let fiber_stubs_ar = link_stage_make_archive(fiber_stubs_path)
                 extras.push(if fiber_stubs_ar.len() > 0: fiber_stubs_ar else: fiber_stubs_path)
         else if needs_llvm:
@@ -472,39 +500,39 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
             let rt_core_path = link_stage_find_runtime_object_path("rt_core.o")
             if rt_core_path.len() == 0:
                 with_eprint("error: missing rt_core.o")
-                return false
+                return link_stage_result_fail()
             extras.push(rt_core_path)
             let rt_platform_path = link_stage_find_runtime_object_path("rt_darwin_aarch64.o")
             if rt_platform_path.len() == 0:
                 with_eprint("error: missing rt_darwin_aarch64.o")
-                return false
+                return link_stage_result_fail()
             extras.push(rt_platform_path)
             let compat_runtime_path = link_stage_find_runtime_object_path("compat_runtime.o")
             if compat_runtime_path.len() == 0:
                 with_eprint("error: missing runtime/compat_runtime.o")
-                return false
+                return link_stage_result_fail()
             extras.push(compat_runtime_path)
             let panic_runtime_path = link_stage_find_runtime_object_path("panic_runtime.o")
             if panic_runtime_path.len() == 0:
                 with_eprint("error: missing runtime/panic_runtime.o")
-                return false
+                return link_stage_result_fail()
             extras.push(panic_runtime_path)
             if needs_regex_runtime != 0:
                 let regex_runtime_path = link_stage_find_runtime_object_path("regex_runtime.o")
                 if regex_runtime_path.len() == 0:
                     with_eprint("error: missing runtime/regex_runtime.o")
-                    return false
+                    return link_stage_result_fail()
                 extras.push(regex_runtime_path)
             if needs_fiber_runtime == 0:
                 let fiber_stubs_path = link_stage_find_runtime_object_path("fiber_stubs.o")
                 if fiber_stubs_path.len() == 0:
                     with_eprint("error: missing runtime/fiber_stubs.o")
-                    return false
+                    return link_stage_result_fail()
                 extras.push(fiber_stubs_path)
             let helpers_path = link_stage_find_runtime_object_path("cimport_stubs.o")
             if helpers_path.len() == 0:
                 with_eprint("error: missing runtime/cimport_stubs.o")
-                return false
+                return link_stage_result_fail()
             extras.push(helpers_path)
         else:
             // User program with c_import (cc/Apple ld64 path) — rt_core.o first,
@@ -513,44 +541,44 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
             let rt_core_path = link_stage_find_runtime_object_path("rt_core.o")
             if rt_core_path.len() == 0:
                 with_eprint("error: missing rt_core.o")
-                return false
+                return link_stage_result_fail()
             extras.push(rt_core_path)
             let rt_platform_path = link_stage_find_runtime_object_path("rt_darwin_aarch64.o")
             if rt_platform_path.len() == 0:
                 with_eprint("error: missing rt_darwin_aarch64.o")
-                return false
+                return link_stage_result_fail()
             extras.push(rt_platform_path)
             let panic_runtime_path = link_stage_find_runtime_object_path("panic_runtime.o")
             if panic_runtime_path.len() == 0:
                 with_eprint("error: missing runtime/panic_runtime.o")
-                return false
+                return link_stage_result_fail()
             let panic_ar = link_stage_make_archive(panic_runtime_path)
             extras.push(if panic_ar.len() > 0: panic_ar else: panic_runtime_path)
             if needs_regex_runtime != 0:
                 let regex_runtime_path = link_stage_find_runtime_object_path("regex_runtime.o")
                 if regex_runtime_path.len() == 0:
                     with_eprint("error: missing runtime/regex_runtime.o")
-                    return false
+                    return link_stage_result_fail()
                 let regex_runtime_ar = link_stage_make_archive(regex_runtime_path)
                 extras.push(if regex_runtime_ar.len() > 0: regex_runtime_ar else: regex_runtime_path)
             if needs_compat_runtime != 0:
                 let compat_runtime_path = link_stage_find_runtime_object_path("compat_runtime.o")
                 if compat_runtime_path.len() == 0:
                     with_eprint("error: missing runtime/compat_runtime.o")
-                    return false
+                    return link_stage_result_fail()
                 let compat_runtime_ar = link_stage_make_archive(compat_runtime_path)
                 extras.push(if compat_runtime_ar.len() > 0: compat_runtime_ar else: compat_runtime_path)
             if needs_fiber_runtime == 0:
                 let fiber_stubs_path = link_stage_find_runtime_object_path("fiber_stubs.o")
                 if fiber_stubs_path.len() == 0:
                     with_eprint("error: missing runtime/fiber_stubs.o")
-                    return false
+                    return link_stage_result_fail()
                 let fiber_stubs_ar = link_stage_make_archive(fiber_stubs_path)
                 extras.push(if fiber_stubs_ar.len() > 0: fiber_stubs_ar else: fiber_stubs_path)
             let helpers_path = link_stage_find_runtime_object_path("cimport_stubs.o")
             if helpers_path.len() == 0:
                 with_eprint("error: missing runtime/cimport_stubs.o")
-                return false
+                return link_stage_result_fail()
             let helpers_ar = link_stage_make_archive(helpers_path)
             extras.push(if helpers_ar.len() > 0: helpers_ar else: helpers_path)
 
@@ -571,10 +599,10 @@ fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec
             if with_fs_read_file(clang_bridge_path).len() > 0:
                 extras.push(clang_bridge_path)
             extras.push("@" ++ rsp_path)
-            return link_stage_link_with_llvm(obj_path, bin_path, extras, link_libs, cc_path)
+            return link_stage_link_with_llvm_result(obj_path, bin_path, extras, link_libs, cc_path)
         with_eprint("error: missing LLVM static bridge (need llvm_bridge.o + llvm_link.rsp + llvm_cc)")
-        return false
+        return link_stage_result_fail()
 
     if extras.len() == 0 and link_libs.len() == 0:
-        return link_stage_link(obj_path, bin_path)
-    link_stage_link_with_extras_and_libs(obj_path, bin_path, extras, link_libs)
+        return link_stage_link_with_extras_and_libs_result(obj_path, bin_path, extras, link_libs)
+    link_stage_link_with_extras_and_libs_result(obj_path, bin_path, extras, link_libs)

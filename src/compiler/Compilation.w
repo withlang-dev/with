@@ -282,6 +282,9 @@ type Compilation {
     cli_diag_source_names: Vec[str],
     cli_diag_source_texts: Vec[str],
     compiler_hook_emitted_source: str,
+    last_link_command_available: i32,
+    last_link_command: LinkStageCommand,
+    last_link_rc: i32,
 }
 
 fn Compilation.init -> Compilation:
@@ -296,6 +299,9 @@ fn Compilation.init -> Compilation:
         cli_diag_source_names: Vec.new(),
         cli_diag_source_texts: Vec.new(),
         compiler_hook_emitted_source: "",
+        last_link_command_available: 0,
+        last_link_command: link_stage_empty_command(),
+        last_link_rc: 0,
     }
 
 fn Compilation.configure(self: Compilation, opt_level: i32, no_std: bool, alloc_mode: bool):
@@ -711,6 +717,9 @@ fn Compilation.compile_entry_source_text(self: Compilation, source_path: str, so
     pool
 
 fn Compilation.finish_binary_from_pool(self: Compilation, pool: AstPool, source_path: str, obj_path: str, bin_path: str) -> str:
+    self.last_link_command_available = 0
+    self.last_link_command = link_stage_empty_command()
+    self.last_link_rc = 0
     compilation_debug_init(f"build_binary_to_path:compiled {source_path} decls={pool.decl_count()}")
     if pool.decl_count() == 0:
         return ""
@@ -739,7 +748,11 @@ fn Compilation.finish_binary_from_pool(self: Compilation, pool: AstPool, source_
     for dli in 0..self.zcu.project_config.dep_link_libs.len() as i32:
         all_link_libs.push(self.zcu.project_config.dep_link_libs.get(dli as i64))
     let t_link = profile_now()
-    if not link_stage_link_object_to_binary(obj_path, bin_path, all_link_libs, self.zcu.project_config.link_search_paths, requires_async_runtime):
+    let link_result = link_stage_link_object_to_binary_result(obj_path, bin_path, all_link_libs, self.zcu.project_config.link_search_paths, requires_async_runtime)
+    self.last_link_command_available = 1
+    self.last_link_command = link_result.command
+    self.last_link_rc = link_result.rc
+    if not link_result.ok:
         compilation_debug_init("build_binary_to_path:link FAILED")
         compilation_cleanup_build_products(obj_path, bin_path)
         return ""

@@ -143,6 +143,10 @@ Completed D4 substrate work:
    assembling shell command strings. This is the substrate for exposing
    `CompilerMessage.PreLink(LinkCommand)` and accepting validated
    `Workspace.set_link_command` replacements.
+13. `Compilation` now retains the last link command and link rc for successful
+   binary build attempts. The data is still internal, but it gives the
+   evaluator a real command object to materialize into `PreLink`/`Linked`
+   messages instead of re-planning or parsing textual command output.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.
