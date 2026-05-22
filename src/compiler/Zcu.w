@@ -53,6 +53,11 @@ type Zcu {
     next_file_id: i32,
     current_source_path: str,
     current_source_text: str,
+    extra_source_names: Vec[str],
+    extra_source_texts: Vec[str],
+    source_text_file_ids: Vec[i32],
+    source_text_names: Vec[str],
+    source_texts: Vec[str],
     tool_mode_entry_path: str,
     pending_warnings: Vec[str],
     last_resolved: ResolveResult,
@@ -101,6 +106,11 @@ fn Zcu.init -> Zcu:
         next_file_id: 1,
         current_source_path: "<unknown>",
         current_source_text: "",
+        extra_source_names: Vec.new(),
+        extra_source_texts: Vec.new(),
+        source_text_file_ids: Vec.new(),
+        source_text_names: Vec.new(),
+        source_texts: Vec.new(),
         tool_mode_entry_path: "",
         pending_warnings: Vec.new(),
         last_resolved: ResolveResult.init(),
@@ -239,6 +249,9 @@ fn Zcu.source_for_file_id_frontend(self: Zcu, file_id: i32) -> Source:
         if self.decl_source_file_ids.get(i as i64) != file_id:
             continue
         let path = self.decl_source_path_frontend(i)
+        for si in 0..self.source_text_file_ids.len() as i32:
+            if self.source_text_file_ids.get(si as i64) == file_id:
+                return Source.from_string(self.source_text_names.get(si as i64), self.source_texts.get(si as i64), file_id)
         let embedded_rel = embedded_std_rel_path(path)
         let text = if embedded_rel.len() > 0: embedded_std_source(embedded_rel) else: with_fs_read_file(path)
         return Source.from_string(path, text, file_id)
@@ -278,6 +291,15 @@ fn Zcu.set_current_source(self: Zcu, source_dir: str, path: str, text: str):
     self.current_source_path = path
     self.current_source_text = text
 
+fn Zcu.set_extra_sources(self: Zcu, names: Vec[str], texts: Vec[str]):
+    self.extra_source_names = names
+    self.extra_source_texts = texts
+
+fn Zcu.add_source_text_mapping(self: Zcu, file_id: i32, name: str, text: str):
+    self.source_text_file_ids.push(file_id)
+    self.source_text_names.push(zcu_owned_text(name))
+    self.source_texts.push(zcu_owned_text(text))
+
 fn Zcu.clear_stage_outputs(self: Zcu):
     self.last_resolved = ResolveResult.init()
     self.resolved_root_path = ""
@@ -294,9 +316,14 @@ fn Zcu.clear_stage_outputs(self: Zcu):
     self.last_async_mir_dump = ""
     self.reset_last_link_lib_names()
     self.trace_c_import_cache = 0
+    self.source_text_file_ids = Vec.new()
+    self.source_text_names = Vec.new()
+    self.source_texts = Vec.new()
 
 fn Zcu.reset_for_new_invocation(self: Zcu, source_dir: str, path: str, text: str):
     self.set_current_source(source_dir, path, text)
+    self.extra_source_names = Vec.new()
+    self.extra_source_texts = Vec.new()
     self.reset_import_state()
     self.reset_pending_warnings()
     self.clear_stage_outputs()

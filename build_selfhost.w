@@ -1902,13 +1902,15 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
     let string_dir = bs_join(base_dir, "string_workspace")
     rc = bs_write_project_manifest(ctx, string_dir, "workspacestring")
     if rc != 0: return rc
-    let string_source = bs_with_string_literal("fn main:\n    print(\"workspace string\")\n")
+    let string_source = bs_with_string_literal("fn main:\n    print(workspace_string_message())\n")
+    let string_helper_source = bs_with_string_literal("pub fn workspace_string_message -> str:\n    \"workspace string\"\n")
     let string_build =
         "use std.build\n\n" ++
         "comptime with BuildCtx:\n" ++
         "pub fn build -> Build:\n" ++
         "    let ws = ctx.create_workspace(\"workspace-string\")\n" ++
         "    ws.add_string(\"generated/workspace_string.w\", " ++ string_source ++ ")\n" ++
+        "    ws.add_string(\"generated/workspace_string_helper.w\", " ++ string_helper_source ++ ")\n" ++
         "    var opts = ws.options()\n" ++
         "    opts.output_path = \"out/bin/workspace-string\"\n" ++
         "    ws.set_options(opts)\n" ++

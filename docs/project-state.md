@@ -191,6 +191,12 @@ Started D5 generated-source work:
    `Workspace.add_string during PRE_LINK is not supported in Phase D` instead
    of accepting source text that cannot affect the pending link. Focused
    build-w selfhost coverage protects the diagnostic.
+3. The frontend and `Workspace.compile()` path now compile every in-memory
+   source unit collected through `Workspace.add_string`, not just the first.
+   Extra generated source units receive their own file ids, declaration source
+   paths, and in-memory source text mappings for diagnostics. Focused build-w
+   selfhost coverage builds one generated source that calls a function declared
+   in a second generated source.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.
