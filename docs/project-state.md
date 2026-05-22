@@ -136,8 +136,7 @@ Completed D4 substrate work:
 11. Successful intercepted `Workspace.compile()` calls now queue the
    non-link phase markers currently available on the synchronous path:
    `pre_parse`, `parsed`, `pre_typecheck`, `typechecked`,
-   `lowered_to_mir`, `pre_codegen`, and `codegen_done`. `PreLink`/`Linked`
-   stay pending until `LinkCommand` interception is implemented.
+   `lowered_to_mir`, `pre_codegen`, `codegen_done`, `pre_link`, and `linked`.
 12. The primary link path now constructs an internal typed argv command
    (`LinkStageCommand`) and executes it through `with_exec_argv` instead of
    assembling shell command strings. This is the substrate for exposing
@@ -147,6 +146,10 @@ Completed D4 substrate work:
    binary build attempts. The data is still internal, but it gives the
    evaluator a real command object to materialize into `PreLink`/`Linked`
    messages instead of re-planning or parsing textual command output.
+14. Successful intercepted binary `Workspace.compile()` calls now queue
+   `Phase(pre_link)`, `PreLink(LinkCommand)`, `Phase(linked)`, and
+   `Linked(LinkCommand, rc)` before artifact and terminal messages. Link
+   replacement through `Workspace.set_link_command` is still pending.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.

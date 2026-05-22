@@ -7,6 +7,7 @@ use InternPool
 use TypeLayout
 use CapabilityRegistry
 use compiler.Compilation
+use compiler.Link
 use render
 
 extern fn with_eprint(s: str) -> void
@@ -1556,6 +1557,12 @@ fn ComptimeEvaluator.str_vec_value(self: ComptimeEvaluator, values: Vec[str], no
         self.extra_values.push(comptime_value_str(values.get(i as i64)))
     comptime_value_vec(vec_type, start, values.len() as i32)
 
+fn ComptimeEvaluator.str_vec_value_with_type(self: ComptimeEvaluator, vec_type: i32, values: Vec[str]) -> ComptimeValue:
+    let start = self.extra_values.len() as i32
+    for i in 0..values.len() as i32:
+        self.extra_values.push(comptime_value_str(values.get(i as i64)))
+    comptime_value_vec(vec_type, start, values.len() as i32)
+
 fn ComptimeEvaluator.struct_field_value_by_name(self: ComptimeEvaluator, value: ComptimeValue, field_name: str) -> ComptimeValue:
     if value.kind != ComptimeValueKind.CV_STRUCT:
         return comptime_value_invalid()
@@ -1923,6 +1930,15 @@ fn ComptimeEvaluator.workspace_success_messages(self: ComptimeEvaluator, comp: C
     messages = self.workspace_phase_message_append(messages, 4, node)
     messages = self.workspace_phase_message_append(messages, 5, node)
     messages = self.workspace_phase_message_append(messages, 6, node)
+    if comp.last_link_command_available != 0:
+        messages = self.workspace_phase_message_append(messages, 7, node)
+        let prelink = self.compiler_message_prelink_value(comp.last_link_command, node)
+        if prelink.kind != ComptimeValueKind.CV_INVALID:
+            messages.push(prelink)
+        messages = self.workspace_phase_message_append(messages, 8, node)
+        let linked = self.compiler_message_linked_value(comp.last_link_command, comp.last_link_rc, node)
+        if linked.kind != ComptimeValueKind.CV_INVALID:
+            messages.push(linked)
     messages
 
 fn ComptimeEvaluator.enum_payload_value(self: ComptimeEvaluator, enum_name: str, variant_name: str, payloads: Vec[ComptimeValue], node: i32) -> ComptimeValue:
@@ -1959,6 +1975,45 @@ fn ComptimeEvaluator.compiler_message_artifact_value(self: ComptimeEvaluator, ar
     let payloads: Vec[ComptimeValue] = Vec.new()
     payloads.push(artifact)
     self.compiler_message_value("Artifact", payloads, node)
+
+fn ComptimeEvaluator.link_command_value(self: ComptimeEvaluator, command: LinkStageCommand, node: i32) -> ComptimeValue:
+    let command_type = self.named_type_id("LinkCommand", node)
+    if command_type == 0:
+        return comptime_value_invalid()
+    let args = self.empty_vec_for_field(command_type, "args", node)
+    let env = self.empty_vec_for_field(command_type, "env", node)
+    let inputs = self.empty_vec_for_field(command_type, "inputs", node)
+    let outputs = self.empty_vec_for_field(command_type, "outputs", node)
+    if args.kind == ComptimeValueKind.CV_INVALID or env.kind == ComptimeValueKind.CV_INVALID or inputs.kind == ComptimeValueKind.CV_INVALID or outputs.kind == ComptimeValueKind.CV_INVALID:
+        return comptime_value_invalid()
+    let args_value = self.str_vec_value_with_type(args.type_id, command.args)
+    let inputs_value = self.str_vec_value_with_type(inputs.type_id, command.inputs)
+    let outputs_value = self.str_vec_value_with_type(outputs.type_id, command.outputs)
+    let start = self.extra_values.len() as i32
+    self.extra_values.push(comptime_value_str(command.linker))
+    self.extra_values.push(args_value)
+    self.extra_values.push(comptime_value_str(""))
+    self.extra_values.push(env)
+    self.extra_values.push(inputs_value)
+    self.extra_values.push(outputs_value)
+    comptime_value_struct(command_type, start, 6)
+
+fn ComptimeEvaluator.compiler_message_prelink_value(self: ComptimeEvaluator, command: LinkStageCommand, node: i32) -> ComptimeValue:
+    let command_value = self.link_command_value(command, node)
+    if command_value.kind == ComptimeValueKind.CV_INVALID:
+        return command_value
+    let payloads: Vec[ComptimeValue] = Vec.new()
+    payloads.push(command_value)
+    self.compiler_message_value("PreLink", payloads, node)
+
+fn ComptimeEvaluator.compiler_message_linked_value(self: ComptimeEvaluator, command: LinkStageCommand, rc: i32, node: i32) -> ComptimeValue:
+    let command_value = self.link_command_value(command, node)
+    if command_value.kind == ComptimeValueKind.CV_INVALID:
+        return command_value
+    let payloads: Vec[ComptimeValue] = Vec.new()
+    payloads.push(command_value)
+    payloads.push(comptime_value_int(self.sema.ty_i32 as i32, rc as i64))
+    self.compiler_message_value("Linked", payloads, node)
 
 fn ComptimeEvaluator.enqueue_artifact_messages(self: ComptimeEvaluator, record: ComptimeWorkspaceRecord, result: ComptimeValue, node: i32) -> ComptimeWorkspaceRecord:
     let artifacts = self.struct_field_value_by_name(result, "artifacts")
