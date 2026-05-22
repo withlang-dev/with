@@ -4224,6 +4224,8 @@ fn ComptimeEvaluator.eval_parallel_workspaces_call(self: ComptimeEvaluator, arg_
     for i in 0..native_results.len() as i32:
         let plan = plans.get(i as i64)
         let native = native_results.get(i as i64)
+        if native.rc != 0:
+            with_eprint(f"error: parallel workspace '{plan.name}' failed with exit code {native.rc}\n")
         let result = self.workspace_build_result_value(plan.name, native.rc, self.workspace_artifact_kind_for_output(plan.output_kind), plan.final_output, node)
         if result.kind == ComptimeValueKind.CV_INVALID:
             return comptime_control_error()
