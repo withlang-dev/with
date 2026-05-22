@@ -2753,6 +2753,20 @@ fn Codegen.mir_intrinsic_recv_ptr(self: Codegen, body: MirBody, args_id: i32) ->
     wl_build_store(self.builder, val, alloca)
     alloca
 
+fn Codegen.mir_intrinsic_recv_storage_type(self: Codegen, body: MirBody, args_id: i32, recv_ptr: i64) -> i64:
+    let allocated = wl_get_allocated_type(recv_ptr)
+    if allocated != 0:
+        return allocated
+    let arg_start = body.call_arg_starts.get(args_id as i64)
+    let recv_op = body.call_arg_operands.get(arg_start as i64)
+    let recv_sema = self.mir_operand_sema_type(body, recv_op)
+    let recv_resolved = self.mir_unwrap_ref_like_sema_type(recv_sema)
+    if recv_resolved > 0:
+        let llvm_ty = self.mir_sema_type_to_llvm(recv_resolved)
+        if llvm_ty != 0:
+            return llvm_ty
+    self.type_fallback()
+
 fn Codegen.mir_intrinsic_recv_vec_value(self: Codegen, body: MirBody, args_id: i32) -> i64:
     let arg_start = body.call_arg_starts.get(args_id as i64)
     let recv_op = body.call_arg_operands.get(arg_start as i64)
@@ -4624,7 +4638,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let al_recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let al_order_raw = self.mir_intrinsic_arg(body, args_id, 1)
         // Get the element type from the Atomic struct (field 0)
-        let al_recv_ty = wl_get_allocated_type(al_recv_ptr)
+        let al_recv_ty = self.mir_intrinsic_recv_storage_type(body, args_id, al_recv_ptr)
         let al_elem_ty = wl_struct_get_type_at(al_recv_ty, 0)
         // GEP to field 0 (val)
         let al_val_ptr = wl_build_struct_gep(self.builder, al_recv_ty, al_recv_ptr, 0)
@@ -4637,7 +4651,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let as_recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let as_val = self.mir_intrinsic_arg(body, args_id, 1)
         let as_order_raw = self.mir_intrinsic_arg(body, args_id, 2)
-        let as_recv_ty = wl_get_allocated_type(as_recv_ptr)
+        let as_recv_ty = self.mir_intrinsic_recv_storage_type(body, args_id, as_recv_ptr)
         let as_val_ptr = wl_build_struct_gep(self.builder, as_recv_ty, as_recv_ptr, 0)
         let as_order = if self.is_const_int_value(as_order_raw): wl_const_int_sext_val(as_order_raw) as i32 else: AtomicOrdering.SEQ_CST
         wl_build_atomic_store(self.builder, as_val, as_val_ptr, as_order)
@@ -4647,7 +4661,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let ar_recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let ar_val = self.mir_intrinsic_arg(body, args_id, 1)
         let ar_order_raw = self.mir_intrinsic_arg(body, args_id, 2)
-        let ar_recv_ty = wl_get_allocated_type(ar_recv_ptr)
+        let ar_recv_ty = self.mir_intrinsic_recv_storage_type(body, args_id, ar_recv_ptr)
         let ar_val_ptr = wl_build_struct_gep(self.builder, ar_recv_ty, ar_recv_ptr, 0)
         let ar_order = if self.is_const_int_value(ar_order_raw): wl_const_int_sext_val(ar_order_raw) as i32 else: AtomicOrdering.SEQ_CST
         let ar_rmw_op = if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_SWAP: AtomicRmwOp.XCHG
@@ -4668,7 +4682,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let cas_desired = self.mir_intrinsic_arg(body, args_id, 2)
         let cas_success_raw = self.mir_intrinsic_arg(body, args_id, 3)
         let cas_failure_raw = self.mir_intrinsic_arg(body, args_id, 4)
-        let cas_recv_ty = wl_get_allocated_type(cas_recv_ptr)
+        let cas_recv_ty = self.mir_intrinsic_recv_storage_type(body, args_id, cas_recv_ptr)
         let cas_val_ptr = wl_build_struct_gep(self.builder, cas_recv_ty, cas_recv_ptr, 0)
         let cas_success_order = if self.is_const_int_value(cas_success_raw): wl_const_int_sext_val(cas_success_raw) as i32 else: AtomicOrdering.SEQ_CST
         let cas_failure_order = if self.is_const_int_value(cas_failure_raw): wl_const_int_sext_val(cas_failure_raw) as i32 else: AtomicOrdering.SEQ_CST
