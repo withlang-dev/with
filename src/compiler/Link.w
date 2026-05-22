@@ -1,4 +1,5 @@
 extern fn with_system(cmd: str) -> i32
+extern fn with_exec_argv(args: str) -> i32
 extern fn with_arg_at(idx: i32) -> str
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_fs_write_file(path: str, data: str) -> i32
@@ -28,6 +29,54 @@ extern let with_embedded_rt_core_o_start: u8
 extern let with_embedded_rt_core_o_end: u8
 extern let with_embedded_rt_darwin_aarch64_o_start: u8
 extern let with_embedded_rt_darwin_aarch64_o_end: u8
+
+type LinkStageCommand {
+    linker: str,
+    args: Vec[str],
+    inputs: Vec[str],
+    outputs: Vec[str],
+}
+
+fn link_stage_argv_append(argv: str, arg: str) -> str:
+    argv ++ arg ++ "\0"
+
+fn LinkStageCommand.run(self: LinkStageCommand) -> i32:
+    var argv = ""
+    argv = link_stage_argv_append(argv, self.linker)
+    for i in 0..self.args.len() as i32:
+        argv = link_stage_argv_append(argv, self.args.get(i as i64))
+    with_exec_argv(argv)
+
+fn link_stage_make_link_command(linker: str, obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str]) -> LinkStageCommand:
+    let args: Vec[str] = Vec.new()
+    let inputs: Vec[str] = Vec.new()
+    let outputs: Vec[str] = Vec.new()
+    args.push(obj_path)
+    inputs.push(obj_path)
+    for i in 0..extras.len() as i32:
+        let extra = extras.get(i as i64)
+        args.push(extra)
+        inputs.push(extra)
+    args.push("-Wl,-dead_strip")
+    args.push("-o")
+    args.push(bin_path)
+    outputs.push(bin_path)
+    for i in 0..link_libs.len() as i32:
+        args.push("-l" ++ link_libs.get(i as i64))
+    LinkStageCommand { linker, args, inputs, outputs }
+
+fn link_stage_make_llvm_link_command(llvm_cc: str, obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str]) -> LinkStageCommand:
+    var command = link_stage_make_link_command(llvm_cc, obj_path, bin_path, extras, link_libs)
+    let args: Vec[str] = Vec.new()
+    args.push("-fuse-ld=lld")
+    for i in 0..command.args.len() as i32:
+        args.push(command.args.get(i as i64))
+    LinkStageCommand {
+        linker: command.linker,
+        args,
+        inputs: command.inputs,
+        outputs: command.outputs,
+    }
 
 fn link_stage_str_from_raw_parts(ptr: *const u8, len: i64) -> str:
     if ptr as i64 == 0 or len <= 0:
@@ -88,23 +137,13 @@ fn link_stage_link_with_extras(obj_path: str, bin_path: str, extras: Vec[str]) -
     link_stage_link_with_extras_and_libs(obj_path, bin_path, extras, link_libs)
 
 fn link_stage_link_with_extras_and_libs(obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str]) -> bool:
-    var cmd = "cc " ++ obj_path
-    for i in 0..extras.len() as i32:
-        cmd = cmd ++ " " ++ extras.get(i as i64)
-    cmd = cmd ++ " -Wl,-dead_strip -o " ++ bin_path
-    for i in 0..link_libs.len() as i32:
-        cmd = cmd ++ " -l" ++ link_libs.get(i as i64)
-    let result = cmd |> with_system
+    let command = link_stage_make_link_command("cc", obj_path, bin_path, extras, link_libs)
+    let result = command.run()
     result == 0
 
 fn link_stage_link_with_llvm(obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str], llvm_cc: str) -> bool:
-    var cmd = llvm_cc ++ " -fuse-ld=lld " ++ obj_path
-    for i in 0..extras.len() as i32:
-        cmd = cmd ++ " " ++ extras.get(i as i64)
-    cmd = cmd ++ " -Wl,-dead_strip -o " ++ bin_path
-    for i in 0..link_libs.len() as i32:
-        cmd = cmd ++ " -l" ++ link_libs.get(i as i64)
-    let result = cmd |> with_system
+    let command = link_stage_make_llvm_link_command(llvm_cc, obj_path, bin_path, extras, link_libs)
+    let result = command.run()
     result == 0
 
 fn link_stage_str_contains(hay: str, needle: str) -> bool:
