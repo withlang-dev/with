@@ -710,21 +710,14 @@ pub fn run_pcre2_build_action(ctx: ActionCtx) -> i32:
     let pcre2test_bin = pcre2_join(bin_dir, "pcre2test")
     if not fs.exists(pcre2test_src):
         return pcre2_fail(ctx, "missing pcre2test source after copy: " ++ pcre2test_src)
-    let stdout_path = pcre2_abs(root, pcre2_join(tmp_dir, "build.stdout"))
-    let stderr_path = pcre2_abs(root, pcre2_join(tmp_dir, "build.stderr"))
-    var build_args: Vec[str] = Vec.new()
-    build_args |> push(pcre2_abs(root, compiler_path))
-    build_args |> push("build")
-    build_args |> push(pcre2_abs(root, pcre2test_src))
-    build_args |> push("-o")
-    build_args |> push(pcre2_abs(root, pcre2test_bin))
-    var env = process_env()
-    env = env.set("WITH_OUT_DIR", pcre2_abs(root, "out"))
-    let result = ctx.process_runner().run_capture_with_env(build_args, stdout_path, stderr_path, 600000, env)
-    if result.rc == 124:
-        return pcre2_fail(ctx, "timed out building pcre2test; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+    let workspace = ctx.create_workspace("pcre2-build")
+    workspace.add_file(pcre2test_src)
+    var options = workspace.options()
+    options.output_path = pcre2test_bin
+    workspace.set_options(options)
+    let result = workspace.compile()
     if result.rc != 0:
-        return pcre2_fail(ctx, f"failed building pcre2test with exit code {result.rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+        return pcre2_fail(ctx, f"failed building pcre2test with exit code {result.rc}")
     if not fs.exists(pcre2test_bin):
         return pcre2_fail(ctx, "did not produce pcre2test binary: " ++ pcre2test_bin)
     let remove_old_rc = pcre2_remove_tree_if_exists(ctx, output_dir)
