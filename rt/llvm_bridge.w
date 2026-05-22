@@ -10,6 +10,7 @@
 // ── Runtime helpers (from rt_core.w) ────────────────────────────
 extern fn rt_write(fd: i32, buf: *const u8, len: u64) -> i64
 extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> void
+extern fn with_nanosleep(ns: i64) -> i32
 extern fn pthread_self() -> i64
 extern fn abort() -> void
 
@@ -442,21 +443,49 @@ pub fn builder_dispose(b: i64): LLVMDisposeBuilder(b as *mut u8)
 
 // ── Target initialization ───────────────────────────────────────
 
+var llvm_init_lock_word: Atomic[i32]
+var llvm_native_target_done: i32 = 0
+var llvm_native_asm_printer_done: i32 = 0
+var llvm_native_asm_parser_done: i32 = 0
+
+fn llvm_init_lock():
+    var spins = 0
+    while llvm_init_lock_word.swap(1, .Acquire) != 0:
+        spins = spins + 1
+        if spins >= 1024:
+            let _ = with_nanosleep(1000)
+            spins = 0
+
+fn llvm_init_unlock():
+    llvm_init_lock_word.store(0, .Release)
+
 @[c_export("wl_init_native_target")]
 pub fn init_native_target() -> i32:
-    LLVMInitializeAArch64TargetInfo()
-    LLVMInitializeAArch64Target()
-    LLVMInitializeAArch64TargetMC()
+    llvm_init_lock()
+    if llvm_native_target_done == 0:
+        LLVMInitializeAArch64TargetInfo()
+        LLVMInitializeAArch64Target()
+        LLVMInitializeAArch64TargetMC()
+        llvm_native_target_done = 1
+    llvm_init_unlock()
     0
 
 @[c_export("wl_init_native_asm_printer")]
 pub fn init_native_asm_printer() -> i32:
-    LLVMInitializeAArch64AsmPrinter()
+    llvm_init_lock()
+    if llvm_native_asm_printer_done == 0:
+        LLVMInitializeAArch64AsmPrinter()
+        llvm_native_asm_printer_done = 1
+    llvm_init_unlock()
     0
 
 @[c_export("wl_init_native_asm_parser")]
 pub fn init_native_asm_parser() -> i32:
-    LLVMInitializeAArch64AsmParser()
+    llvm_init_lock()
+    if llvm_native_asm_parser_done == 0:
+        LLVMInitializeAArch64AsmParser()
+        llvm_native_asm_parser_done = 1
+    llvm_init_unlock()
     0
 
 fn codegen_level(level: i32) -> i32:

@@ -256,6 +256,10 @@ Started D6 parallel-workspace work:
     so parallel workspaces may compile ordinary With code concurrently while
     C import work remains correctness-first and single-threaded until the
     session-state refactor happens.
+13. LLVM target initialization in the With LLVM bridge is protected by a
+    one-time process lock. Parallel workspace codegen creates one LLVM context
+    per worker thread, but the `LLVMInitializeAArch64*` target registry calls
+    mutate LLVM process-global state and must not run concurrently.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.
@@ -276,7 +280,7 @@ The original P9 pre-D1 baseline is recorded in
 containing this project-state update:
 
 ```text
-Serialize c_import expansion for parallel workspaces
+Serialize LLVM target initialization
 ```
 
 Commands passed:
@@ -327,7 +331,8 @@ default `:test` target includes the fast emit-C smoke.
 
 Recent Phase D/pre-D commits:
 
-- current checkpoint: Serialize c_import expansion for parallel workspaces.
+- current checkpoint: Serialize LLVM target initialization.
+- previous checkpoint: Serialize c_import expansion for parallel workspaces.
 - previous checkpoint: Compile parallel workspaces on OS threads.
 - previous checkpoint: Fix std.thread captured closure entry.
 - previous checkpoint: Make LLVM bridge cstr scratch thread-aware.
@@ -472,12 +477,13 @@ not a new compiler-dispatched project graph kind.
 
 ## Local State
 
-At the time of this update, the Phase D D6 c_import serialization slice is
+At the time of this update, the Phase D D6 LLVM target initialization slice is
 verified and ready to commit. Current verification passed:
 
 ```sh
-out/bin/with check src/main.w
+out/bin/with check rt/llvm_bridge.w --no-prelude
 git diff --check
+out/bin/with build :cli-selfhost-build-w-tests --no-deps
 make build
 make fixpoint
 make test
