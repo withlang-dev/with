@@ -251,6 +251,11 @@ Started D6 parallel-workspace work:
     independent `Compilation` work on OS threads, joins all workers, and then
     constructs the public `Vec[BuildResult]` in input order without mutating
     evaluator-owned value storage from worker threads.
+12. `c_import` expansion is serialized behind a frontend lock. The C import
+    and clang bridge code still contains process-global mutable session state,
+    so parallel workspaces may compile ordinary With code concurrently while
+    C import work remains correctness-first and single-threaded until the
+    session-state refactor happens.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.
@@ -271,7 +276,7 @@ The original P9 pre-D1 baseline is recorded in
 containing this project-state update:
 
 ```text
-Compile parallel workspaces on OS threads
+Serialize c_import expansion for parallel workspaces
 ```
 
 Commands passed:
@@ -322,7 +327,8 @@ default `:test` target includes the fast emit-C smoke.
 
 Recent Phase D/pre-D commits:
 
-- current checkpoint: Compile parallel workspaces on OS threads.
+- current checkpoint: Serialize c_import expansion for parallel workspaces.
+- previous checkpoint: Compile parallel workspaces on OS threads.
 - previous checkpoint: Fix std.thread captured closure entry.
 - previous checkpoint: Make LLVM bridge cstr scratch thread-aware.
 - previous checkpoint: Back std.thread with OS threads.
@@ -466,20 +472,16 @@ not a new compiler-dispatched project graph kind.
 
 ## Local State
 
-At the time of this update, the Phase D D6 multi-workspace parallel slice is
+At the time of this update, the Phase D D6 c_import serialization slice is
 verified and ready to commit. Current verification passed:
 
 ```sh
-out/bin/with check rt/rt_core.w --no-prelude
-out/bin/with run test/behavior/behav_std_thread_spawn_os.w
-out/bin/with run test/behavior/behav_std_thread_spawn_closure.w
-out/bin/with check rt/darwin_aarch64.w --no-prelude
 out/bin/with check src/main.w
 git diff --check
 make build
-out/bin/with build :cli-selfhost-build-w-tests --no-deps
 make fixpoint
 make test
+make install-user
 ```
 
 The full emit-C test was intentionally not part of this verification pass per

@@ -24,11 +24,24 @@ extern fn with_eprint(s: str) -> void
 extern fn with_arg_at(idx: i32) -> str
 extern fn with_getenv_str(name: str) -> str
 extern fn with_clock_nanos() -> i64
+extern fn with_nanosleep(ns: i64) -> i32
 extern fn with_str_clone(s: str) -> str
 // Frontend pipeline: lex -> parse -> import resolution -> sema.
 
 var frontend_cimport_compiler_fingerprint_ready: i32 = 0
 var frontend_cimport_compiler_fingerprint: str = ""
+var frontend_cimport_lock_word: Atomic[i32]
+
+fn frontend_cimport_lock():
+    var spins = 0
+    while frontend_cimport_lock_word.swap(1, .Acquire) != 0:
+        spins = spins + 1
+        if spins >= 1024:
+            let _ = with_nanosleep(1000)
+            spins = 0
+
+fn frontend_cimport_unlock():
+    frontend_cimport_lock_word.store(0, .Release)
 
 fn frontend_owned_text(text: str) -> str:
     if text.len() == 0:
@@ -211,6 +224,12 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     if has_c_import == 0:
         return out
 
+    // CImport, CiMigrate, and the clang bridge still own process-global
+    // mutable session state. Parallel workspaces may compile ordinary With
+    // code concurrently, but c_import expansion must remain serialized until
+    // those globals move behind explicit session handles.
+    frontend_cimport_lock()
+
     // Pass project config include paths to clang bridge
     if self.project_config.c_import_include_paths.len() > 0:
         ci_set_include_paths(self.project_config.c_import_include_paths)
@@ -304,6 +323,7 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     self.decl_source_paths = ordered_paths
     self.decl_source_file_ids = ordered_file_ids
     self.decl_is_c_import = ordered_ci
+    frontend_cimport_unlock()
     out
 
 fn Zcu.c_import_cache_key_frontend(self: Zcu, pool: AstPool, decl: i32, header_spec: str) -> str:
