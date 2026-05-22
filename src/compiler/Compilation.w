@@ -775,24 +775,32 @@ fn Compilation.prepare_binary_link_from_pool(self: Compilation, pool: AstPool, s
 fn Compilation.execute_binary_link_plan(self: Compilation, plan: CompilationBinaryLinkPlan) -> str:
     if not plan.ok:
         return ""
-    let t_link = profile_now()
-    let link_result = link_stage_result_for_command(plan.command)
+    let link_result = compilation_execute_binary_link_plan(self.config.debug_info, plan)
     self.last_link_command_available = 1
     self.last_link_command = link_result.command
     self.last_link_rc = link_result.rc
     if not link_result.ok:
+        return ""
+    plan.bin_path
+
+fn compilation_execute_binary_link_plan(debug_info: bool, plan: CompilationBinaryLinkPlan) -> LinkStageResult:
+    if not plan.ok:
+        return link_stage_result_fail()
+    let t_link = profile_now()
+    let link_result = link_stage_result_for_command(plan.command)
+    if not link_result.ok:
         compilation_debug_init("build_binary_to_path:link FAILED")
         compilation_cleanup_build_products(plan.obj_path, plan.bin_path)
-        return ""
+        return link_result
     if profile_enabled():
         profile_emit("link", t_link, "")
-    if self.config.debug_info:
+    if debug_info:
         let t_dsym = profile_now()
         let _ = ("dsymutil " ++ plan.bin_path ++ " 2>/dev/null") |> with_system
         if profile_enabled():
             profile_emit("dsymutil", t_dsym, "")
     let _ = ("rm -f " ++ plan.obj_path) |> with_system
-    plan.bin_path
+    link_result
 
 fn Compilation.finish_binary_from_pool(self: Compilation, pool: AstPool, source_path: str, obj_path: str, bin_path: str) -> str:
     let link_plan = self.prepare_binary_link_from_pool(pool, source_path, obj_path, bin_path)

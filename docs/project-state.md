@@ -160,6 +160,10 @@ Completed D4 substrate work:
     compilation can produce the object file and typed link command before
     executing the command, giving the workspace message loop a compiler-level
     pause point to expose as `PreLink`.
+17. Binary link-plan execution is factored into
+    `compilation_execute_binary_link_plan`, so the future workspace pre-link
+    continuation can execute a validated replacement command through the same
+    cleanup/profile/dSYM path as normal binary compilation.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.
