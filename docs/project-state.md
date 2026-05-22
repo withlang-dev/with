@@ -225,6 +225,10 @@ Started D6 parallel-workspace work:
    recovering the receiver storage type from MIR/Sema when LLVM cannot report
    an allocated type for a global pointer. Native codegen coverage protects
    global atomic load/store/swap.
+6. The With runtime allocator now serializes its process-global small-allocation
+   freelists and slab pointer behind a global atomic spin lock. This is a
+   prerequisite for true OS-thread workspace execution; it is not full D6
+   parallelism.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.
@@ -245,17 +249,16 @@ The original P9 pre-D1 baseline is recorded in
 containing this project-state update:
 
 ```text
-Support single-workspace parallel API
+Synchronize runtime allocator state
 ```
 
 Commands passed:
 
 ```sh
-out/bin/with check src/main.w
-out/bin/with check build_selfhost.w
+out/bin/with check rt/rt_core.w --no-prelude
 git diff --check
+out/bin/with build rt/rt_core.w --emit-obj --no-prelude -O2 -o /tmp/rt_core_locked.o
 make build
-out/bin/with build :cli-selfhost-build-w-tests --no-deps
 make fixpoint
 make test
 ```
@@ -292,7 +295,8 @@ default `:test` target includes the fast emit-C smoke.
 
 Recent Phase D/pre-D commits:
 
-- current checkpoint: Support single-workspace parallel API.
+- current checkpoint: Synchronize runtime allocator state.
+- previous checkpoint: Support single-workspace parallel API.
 - previous checkpoint: Re-enter workspace compilation after generated source.
 - previous checkpoint: Compile all workspace source strings.
 - previous checkpoint: Reject add_string during pre-link interception.
@@ -412,8 +416,8 @@ not a new compiler-dispatched project graph kind.
 
 - Continue Phase D D6. The next large blocker is true multi-workspace
   `parallel(workspaces)` execution: per-workspace compiler state, real OS
-  thread support, runtime allocator synchronization, synchronized shared
-  caches, and ProcessRunner reentrancy.
+  thread support, remaining synchronized shared caches, fiber/bridge/global
+  state isolation, and ProcessRunner reentrancy.
 - Preserve the pre-D behavior tests during D1:
   `behav_build_w_basic_invocation`, `behav_action_capability_filesystem`,
   `behav_action_capability_process`, `behav_capability_token_mismatch`,
@@ -430,15 +434,14 @@ not a new compiler-dispatched project graph kind.
 
 ## Local State
 
-At the time of this update, the Phase D D6 single-workspace `parallel` API
-slice is verified and ready to commit. Current verification passed:
+At the time of this update, the Phase D D6 allocator synchronization
+prerequisite is verified and ready to commit. Current verification passed:
 
 ```sh
-out/bin/with check src/main.w
-out/bin/with check build_selfhost.w
+out/bin/with check rt/rt_core.w --no-prelude
 git diff --check
+out/bin/with build rt/rt_core.w --emit-obj --no-prelude -O2 -o /tmp/rt_core_locked.o
 make build
-out/bin/with build :cli-selfhost-build-w-tests --no-deps
 make fixpoint
 make test
 ```
