@@ -233,6 +233,10 @@ Started D6 parallel-workspace work:
    with the platform backend owning the Darwin pthread calls and `rt_core`
    owning the public `with_thread_*` ABI. This provides the first real
    OS-thread substrate for D6; it does not yet run workspaces in parallel.
+8. The LLVM bridge C-string scratch buffer is now split into per-OS-thread
+   slots selected by `pthread_self`, with a short atomic metadata lock and a
+   loud abort if the fixed slot table is exhausted. This removes one
+   process-global race before parallel workspace codegen.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.
@@ -253,19 +257,15 @@ The original P9 pre-D1 baseline is recorded in
 containing this project-state update:
 
 ```text
-Back std.thread with OS threads
+Make LLVM bridge cstr scratch thread-aware
 ```
 
 Commands passed:
 
 ```sh
-out/bin/with check rt/rt_core.w --no-prelude
-out/bin/with check rt/darwin_aarch64.w --no-prelude
-out/bin/with check lib/std/thread.w
+out/bin/with check rt/llvm_bridge.w --no-prelude
 git diff --check
-out/bin/with build rt/rt_core.w --emit-obj --no-prelude -O2 -o /tmp/rt_core_thread.o
-out/bin/with build rt/darwin_aarch64.w --emit-obj --no-prelude -O2 -o /tmp/rt_darwin_thread.o
-out/bin/with run test/behavior/behav_std_thread_spawn_os.w
+out/bin/with build rt/llvm_bridge.w --emit-obj --no-prelude -O2 -o /tmp/llvm_bridge_threadsafe.o
 make build
 make fixpoint
 make test
@@ -303,7 +303,8 @@ default `:test` target includes the fast emit-C smoke.
 
 Recent Phase D/pre-D commits:
 
-- current checkpoint: Back std.thread with OS threads.
+- current checkpoint: Make LLVM bridge cstr scratch thread-aware.
+- previous checkpoint: Back std.thread with OS threads.
 - previous checkpoint: Synchronize runtime allocator state.
 - previous checkpoint: Support single-workspace parallel API.
 - previous checkpoint: Re-enter workspace compilation after generated source.
@@ -426,7 +427,7 @@ not a new compiler-dispatched project graph kind.
 - Continue Phase D D6. The next large blocker is true multi-workspace
   `parallel(workspaces)` execution: per-workspace compiler state, real OS
   thread scheduling in the evaluator, remaining synchronized shared caches,
-  fiber/bridge/global state isolation, and ProcessRunner reentrancy.
+  fiber/global state isolation, and ProcessRunner reentrancy.
 - Preserve the pre-D behavior tests during D1:
   `behav_build_w_basic_invocation`, `behav_action_capability_filesystem`,
   `behav_action_capability_process`, `behav_capability_token_mismatch`,
@@ -443,17 +444,13 @@ not a new compiler-dispatched project graph kind.
 
 ## Local State
 
-At the time of this update, the Phase D D6 OS-thread substrate slice is
+At the time of this update, the Phase D D6 LLVM bridge scratch slice is
 verified and ready to commit. Current verification passed:
 
 ```sh
-out/bin/with check rt/rt_core.w --no-prelude
-out/bin/with check rt/darwin_aarch64.w --no-prelude
-out/bin/with check lib/std/thread.w
+out/bin/with check rt/llvm_bridge.w --no-prelude
 git diff --check
-out/bin/with build rt/rt_core.w --emit-obj --no-prelude -O2 -o /tmp/rt_core_thread.o
-out/bin/with build rt/darwin_aarch64.w --emit-obj --no-prelude -O2 -o /tmp/rt_darwin_thread.o
-out/bin/with run test/behavior/behav_std_thread_spawn_os.w
+out/bin/with build rt/llvm_bridge.w --emit-obj --no-prelude -O2 -o /tmp/llvm_bridge_threadsafe.o
 make build
 make fixpoint
 make test
