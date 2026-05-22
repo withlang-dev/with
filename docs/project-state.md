@@ -147,9 +147,14 @@ Completed D4 substrate work:
    evaluator a real command object to materialize into `PreLink`/`Linked`
    messages instead of re-planning or parsing textual command output.
 14. Successful intercepted binary `Workspace.compile()` calls now queue
-   `Phase(pre_link)`, `PreLink(LinkCommand)`, `Phase(linked)`, and
-   `Linked(LinkCommand, rc)` before artifact and terminal messages. Link
-   replacement through `Workspace.set_link_command` is still pending.
+    `Phase(pre_link)`, `PreLink(LinkCommand)`, `Phase(linked)`, and
+    `Linked(LinkCommand, rc)` before artifact and terminal messages. Link
+    replacement through `Workspace.set_link_command` is still pending.
+15. The link layer now has an internal planning boundary:
+    `link_stage_link_object_to_binary_plan` constructs the typed command
+    without executing it, and the existing result path executes the plan.
+    This is the next substrate needed for validating and applying
+    `Workspace.set_link_command` replacements before link execution.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.
