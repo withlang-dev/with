@@ -241,6 +241,15 @@ fn cc_builtin_vecslot_get -> i32:
 fn cc_builtin_vecslot_set -> i32:
     65
 
+fn cc_builtin_atomic_load -> i32:
+    70
+
+fn cc_builtin_atomic_store -> i32:
+    71
+
+fn cc_builtin_atomic_swap -> i32:
+    72
+
 fn cc_builtin_uses_vec_receiver(kind: i32) -> bool:
     if kind == cc_builtin_vec_push(): return true
     if kind == cc_builtin_vec_get(): return true
@@ -1180,6 +1189,8 @@ fn CCodegen.generic_inst_needs_struct_def(self: CCodegen, tid: i32) -> i32:
         return 1
     if base_name == "HashMapEntry":
         return 1
+    if base_name == "Atomic":
+        return 1
     0
 
 fn CCodegen.vecslot_element_tid(self: CCodegen, tid: i32) -> i32:
@@ -1863,6 +1874,10 @@ fn CCodegen.global_init_text(self: CCodegen, node: i32, tid: i32) -> str:
         return self.zero_value_text(tid)
     let kind = self.ast.kind(expr)
     if kind == NodeKind.NK_INT_LIT or kind == NodeKind.NK_UNARY:
+        let resolved = self.sema.resolve_alias(tid)
+        let tk = self.sema.get_type_kind(resolved)
+        if tk != TypeKind.TY_INT and tk != TypeKind.TY_BOOL and tk != TypeKind.TY_FLOAT:
+            return self.zero_value_text(tid)
         return self.exact_int_expr_text(expr, tid)
     if kind == NodeKind.NK_BOOL_LIT:
         return if self.ast.get_data0(expr) != 0: "true" else: "false"
@@ -2151,6 +2166,30 @@ fn CCodegen.vec_recv_ptr_text(self: CCodegen, body: MirBody, args_id: i32) -> st
         if inner != 0 and self.c_type(inner, 0) == "with_vec":
             return "((with_vec*)(" ++ recv ++ "))"
     "&(" ++ recv ++ ")"
+
+fn CCodegen.atomic_recv_ptr_text(self: CCodegen, body: MirBody, args_id: i32) -> str:
+    let recv_operand = self.call_arg_operand(body, args_id, 0)
+    let recv = self.operand_text(body, recv_operand)
+    let recv_tid = self.sema.resolve_alias(self.operand_tid(body, recv_operand))
+    let recv_tk = self.sema.get_type_kind(recv_tid)
+    if recv_tk == TypeKind.TY_PTR or recv_tk == TypeKind.TY_REF:
+        return "(" ++ recv ++ ")"
+    "&(" ++ recv ++ ")"
+
+fn CCodegen.atomic_recv_value_tid(self: CCodegen, body: MirBody, args_id: i32) -> i32:
+    let recv_operand = self.call_arg_operand(body, args_id, 0)
+    var recv_tid = self.sema.resolve_alias(self.operand_tid(body, recv_operand))
+    let recv_tk = self.sema.get_type_kind(recv_tid)
+    if recv_tk == TypeKind.TY_PTR or recv_tk == TypeKind.TY_REF:
+        recv_tid = self.sema.resolve_alias(self.sema.get_type_d0(recv_tid))
+    if self.sema.get_type_kind(recv_tid) == TypeKind.TY_GENERIC_INST and self.generic_inst_base_name(recv_tid as i32) == "Atomic":
+        if self.sema.get_generic_inst_arg_count(recv_tid as i32) > 0:
+            return self.sema.get_generic_inst_arg(recv_tid as i32, 0)
+    self.sema.ty_i64 as i32
+
+fn CCodegen.atomic_order_text(self: CCodegen, order_text: str) -> str:
+    let o = "(" ++ order_text ++ ")"
+    "(" ++ o ++ " == 0 ? __ATOMIC_RELAXED : " ++ o ++ " == 1 ? __ATOMIC_ACQUIRE : " ++ o ++ " == 2 ? __ATOMIC_RELEASE : " ++ o ++ " == 3 ? __ATOMIC_ACQ_REL : __ATOMIC_SEQ_CST)"
 
 fn CCodegen.call_arg_operand(self: CCodegen, body: MirBody, args_id: i32, idx: i32) -> i32:
     if args_id < 0 or args_id >= body.call_arg_starts.len() as i32:
@@ -3456,10 +3495,33 @@ fn CCodegen.call_builtin_kind(self: CCodegen, body: MirBody, callee_operand: i32
     let place_kind = if first_place >= 0: self.infer_place_kind(body, first_place) else: cc_place_kind_unknown()
     let first_tid = self.sema.resolve_alias(self.call_first_arg_resolved_tid(body, args_id))
     let first_tk = self.sema.get_type_kind(first_tid)
+    var first_atomic_tid = first_tid
+    if first_tk == TypeKind.TY_PTR or first_tk == TypeKind.TY_REF:
+        first_atomic_tid = self.sema.resolve_alias(self.sema.get_type_d0(first_tid))
+    let recv_is_atomic =
+        if self.sema.get_type_kind(first_atomic_tid) == TypeKind.TY_GENERIC_INST and self.generic_inst_base_name(first_atomic_tid as i32) == "Atomic":
+            1
+        else if cc_str_contains(first_owner, "Atomic") != 0:
+            1
+        else:
+            0
     let allow_place_kind_guess = if first_owner.len() == 0: 1 else: 0
     let recv_kind_is_vec = if recv_is_vec != 0 or (allow_place_kind_guess != 0 and place_kind == cc_place_kind_vec()): 1 else: 0
     let recv_kind_is_map = if recv_is_map != 0 or (allow_place_kind_guess != 0 and place_kind == cc_place_kind_hashmap()): 1 else: 0
     let recv_kind_is_opt = if recv_is_opt != 0 or (allow_place_kind_guess != 0 and place_kind == cc_place_kind_option()): 1 else: 0
+
+    if method == "load":
+        if recv_is_atomic != 0:
+            return cc_builtin_atomic_load()
+        return cc_builtin_none()
+    if method == "store":
+        if recv_is_atomic != 0:
+            return cc_builtin_atomic_store()
+        return cc_builtin_none()
+    if method == "swap":
+        if recv_is_atomic != 0:
+            return cc_builtin_atomic_swap()
+        return cc_builtin_none()
 
     if method == "slot":
         if recv_kind_is_vec != 0:
@@ -3680,6 +3742,10 @@ fn CCodegen.call_builtin_ret_tid(self: CCodegen, body: MirBody, callee_operand: 
         if dst != 0 and self.is_void_tid(dst) == 0:
             return dst
         return self.sema.ty_i64 as i32
+    if kind == cc_builtin_atomic_load() or kind == cc_builtin_atomic_swap():
+        return self.atomic_recv_value_tid(body, args_id)
+    if kind == cc_builtin_atomic_store():
+        return self.sema.ty_void as i32
     if kind == cc_builtin_str_len():
         return self.sema.ty_i64 as i32
     if kind == cc_builtin_str_byte_at():
@@ -4193,6 +4259,9 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: i32) -> i32:
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_REMOVE: return cc_builtin_map_remove()
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_OPT_IS_SOME: return cc_builtin_opt_is_some()
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_OPT_UNWRAP: return cc_builtin_opt_unwrap()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_LOAD: return cc_builtin_atomic_load()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_STORE: return cc_builtin_atomic_store()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_SWAP: return cc_builtin_atomic_swap()
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_LEN: return cc_builtin_str_len()
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_BYTE_AT: return cc_builtin_str_byte_at()
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_SLICE: return cc_builtin_str_slice()
@@ -4596,6 +4665,46 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
         out = out ++ f"    goto bb{next_bb};"
         return out
 
+    if kind == cc_builtin_atomic_load():
+        if argc < 2:
+            self.fail("Atomic.load expects two arguments")
+            return "    abort();"
+        let recv_ptr = self.atomic_recv_ptr_text(body, args_id)
+        let order = self.atomic_order_text(self.operand_text(body, self.call_arg_operand(body, args_id, 1)))
+        var out = ""
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = __atomic_load_n(&((" ++ recv_ptr ++ ")->val), " ++ order ++ ");\n"
+        else:
+            out = out ++ "    (void)__atomic_load_n(&((" ++ recv_ptr ++ ")->val), " ++ order ++ ");\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_atomic_store():
+        if argc < 3:
+            self.fail("Atomic.store expects three arguments")
+            return "    abort();"
+        let recv_ptr = self.atomic_recv_ptr_text(body, args_id)
+        let val = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
+        let order = self.atomic_order_text(self.operand_text(body, self.call_arg_operand(body, args_id, 2)))
+        var out = "    __atomic_store_n(&((" ++ recv_ptr ++ ")->val), " ++ val ++ ", " ++ order ++ ");\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == cc_builtin_atomic_swap():
+        if argc < 3:
+            self.fail("Atomic.swap expects three arguments")
+            return "    abort();"
+        let recv_ptr = self.atomic_recv_ptr_text(body, args_id)
+        let val = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
+        let order = self.atomic_order_text(self.operand_text(body, self.call_arg_operand(body, args_id, 2)))
+        var out = ""
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = __atomic_exchange_n(&((" ++ recv_ptr ++ ")->val), " ++ val ++ ", " ++ order ++ ");\n"
+        else:
+            out = out ++ "    (void)__atomic_exchange_n(&((" ++ recv_ptr ++ ")->val), " ++ val ++ ", " ++ order ++ ");\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
     if kind == cc_builtin_str_len():
         if argc < 1:
             self.fail("str.len expects one argument")
@@ -4819,12 +4928,22 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
         if argc < 1:
             self.fail("Option.is_none expects one argument")
             return "    abort();"
-        let opt_text = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let opt_operand = self.call_arg_operand(body, args_id, 0)
+        let opt_text = self.operand_text(body, opt_operand)
+        let opt_tid = self.operand_tid(body, opt_operand)
+        var test_text = "((" ++ opt_text ++ ") == 0)"
+        if self.type_is_payload_enum(opt_tid) != 0:
+            let some_variant = self.payload_enum_single_payload_variant(opt_tid)
+            if some_variant < 0:
+                self.fail("Option.is_none expects an enum with one payload-bearing variant")
+                return "    abort();"
+            let tag = self.sema.type_reflection_variant_discriminant(opt_tid, some_variant)
+            test_text = "((" ++ opt_text ++ ").tag != " ++ f"{tag}" ++ ")"
         var out = ""
         if has_ret != 0:
-            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = ((" ++ opt_text ++ ") == 0);\n"
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = " ++ test_text ++ ";\n"
         else:
-            out = out ++ "    (void)((" ++ opt_text ++ ") == 0);\n"
+            out = out ++ "    (void)" ++ test_text ++ ";\n"
         out = out ++ f"    goto bb{next_bb};"
         return out
 
@@ -5700,6 +5819,8 @@ fn CCodegen.zero_value_text(self: CCodegen, tid: i32) -> str:
         return "NULL"
     if tk == TypeKind.TY_GENERIC_INST and self.generic_inst_base_name(resolved as i32) == "Vec":
         return "(with_vec)" ++ cc_lbrace() ++ "0" ++ cc_rbrace()
+    if tk == TypeKind.TY_GENERIC_INST and self.generic_inst_needs_struct_def(resolved as i32) != 0:
+        return "(" ++ self.c_type(resolved, 0) ++ ")" ++ cc_lbrace() ++ "0" ++ cc_rbrace()
     if tk == TypeKind.TY_STR or tk == TypeKind.TY_STRUCT or self.type_is_payload_enum(resolved as i32) != 0:
         return "(" ++ self.c_type(resolved, 0) ++ ")" ++ cc_lbrace() ++ "0" ++ cc_rbrace()
     "0"
@@ -6113,6 +6234,10 @@ fn CCodegen.emit_struct_type_defs(self: CCodegen) -> str:
                     let key_tid = self.sema.resolve_alias(self.sema.get_generic_inst_arg(resolved, 0) as TypeId)
                     if (self.sema.get_type_kind(key_tid) == TypeKind.TY_STRUCT or self.type_is_payload_enum(key_tid as i32) != 0) and key_tid != resolved and not emitted_names.contains(key_tid as i32):
                         ready = 0
+                if base_name == "Atomic":
+                    let value_tid = self.sema.resolve_alias(self.sema.get_generic_inst_arg(resolved, 0) as TypeId)
+                    if (self.sema.get_type_kind(value_tid) == TypeKind.TY_STRUCT or self.type_is_payload_enum(value_tid as i32) != 0) and value_tid != resolved and not emitted_names.contains(value_tid as i32):
+                        ready = 0
             else if self.type_is_payload_enum(resolved) != 0:
                 let variant_count = self.sema.type_reflection_variant_count(resolved)
                 for vi in 0..variant_count:
@@ -6215,6 +6340,12 @@ fn CCodegen.emit_struct_type_defs(self: CCodegen) -> str:
             out = out ++ "struct " ++ name ++ " " ++ cc_lbrace() ++ "\n"
             out = out ++ "    int64_t map_ptr;\n"
             out = out ++ "    " ++ self.c_type(key_tid, 0) ++ " key;\n"
+            out = out ++ cc_rbrace() ++ ";\n\n"
+            continue
+        if generic_base_name == "Atomic":
+            let value_tid = self.sema.get_generic_inst_arg(resolved as i32, 0)
+            out = out ++ "struct " ++ name ++ " " ++ cc_lbrace() ++ "\n"
+            out = out ++ "    " ++ self.c_type(value_tid, 0) ++ " val;\n"
             out = out ++ cc_rbrace() ++ ";\n\n"
             continue
         let start = self.sema.get_type_d1(resolved)
@@ -6805,9 +6936,11 @@ fn CCodegen.emit_module(self: CCodegen) -> str:
     out.write("extern void with_free(void*);\n")
     out.write("extern void with_memcpy(void*, const void*, int64_t);\n")
     out.write("extern int64_t with_clock_nanos(void);\n")
+    out.write("extern int32_t with_nanosleep(int64_t);\n")
     out.write("extern double with_parse_float(with_str);\n")
     out.write("extern with_str with_sysinfo_os(void);\n")
     out.write("extern with_str with_sysinfo_arch(void);\n")
+    out.write("extern with_str with_sysinfo_hostname(void);\n")
     out.write("extern with_str with_str_trim(with_str);\n")
     out.write("extern with_str with_str_clone(with_str);\n\n")
 
