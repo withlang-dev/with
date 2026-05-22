@@ -2383,6 +2383,28 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
     rc = bs_expect_file_contains(ctx, bs_join(parallel_stress_dir, "out/command/run-stress-5/stdout.txt"), "stress-5", "build_w_workspace_parallel_stress_5")
     if rc != 0: return rc
 
+    let parallel_intercept_dir = bs_join(base_dir, "workspace_parallel_intercept")
+    rc = bs_write_project_manifest(ctx, parallel_intercept_dir, "workspaceparallelintercept")
+    if rc != 0: return rc
+    let parallel_intercept_build =
+        "use std.build\n\n" ++
+        "comptime with BuildCtx as ctx:\n" ++
+        "pub fn build -> Build:\n" ++
+        "    let ws = ctx.create_workspace(\"parallel-intercept\")\n" ++
+        "    ws.add_string(\"src/parallel_intercept.w\", \"fn main:\\n    print(\\\"parallel intercept\\\")\\n\")\n" ++
+        "    ws.begin_intercept()\n" ++
+        "    let workspaces: Vec[Workspace] = Vec.new()\n" ++
+        "    workspaces.push(ws)\n" ++
+        "    let _results = parallel(workspaces)\n" ++
+        "    ctx.new_build()\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(parallel_intercept_dir, "build.w"), parallel_intercept_build, ctx.target_name(), "workspace parallel intercept build.w")
+    if rc != 0: return rc
+    let parallel_intercept_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-workspace-parallel-intercept", bs_blob_to_args(bs_argv_append("", "build")), 120000, parallel_intercept_dir)
+    if parallel_intercept_result.rc == 0:
+        return bs_fail(ctx, "build_w_workspace_parallel_intercept unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, parallel_intercept_result.stderr, "parallel does not support intercepted workspaces yet", "build_w_workspace_parallel_intercept")
+    if rc != 0: return rc
+
     let open_intercept_dir = bs_join(base_dir, "workspace_intercept_open")
     rc = bs_write_project_manifest(ctx, open_intercept_dir, "workspaceopen")
     if rc != 0: return rc

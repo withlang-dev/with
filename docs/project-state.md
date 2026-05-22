@@ -269,6 +269,10 @@ Started D6 parallel-workspace work:
     stdlib/generated-runner path. Explicit `ProcessEnv` overrides are applied
     only after the driver variables are cleared and are restored before the
     driver variables are restored.
+16. Intercepted workspaces inside `parallel(workspaces)` are covered by a
+    loud-failure selfhost test. D6 currently supports true OS-thread
+    parallelism for non-intercepted workspaces only; intercepted workspace
+    message queues remain a separate implementation step.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.
@@ -289,7 +293,7 @@ The original P9 pre-D1 baseline is recorded in
 containing this project-state update:
 
 ```text
-Clear driver env for evaluator ProcessRunner
+Cover intercepted workspace parallel rejection
 ```
 
 Commands passed:
@@ -343,7 +347,8 @@ default `:test` target includes the fast emit-C smoke.
 
 Recent Phase D/pre-D commits:
 
-- current checkpoint: Clear driver env for evaluator ProcessRunner.
+- current checkpoint: Cover intercepted workspace parallel rejection.
+- previous checkpoint: Clear driver env for evaluator ProcessRunner.
 - previous checkpoint: Add parallel workspace stress coverage.
 - previous checkpoint: Serialize LLVM target initialization.
 - previous checkpoint: Serialize c_import expansion for parallel workspaces.
@@ -491,11 +496,10 @@ not a new compiler-dispatched project graph kind.
 
 ## Local State
 
-At the time of this update, the Phase D D6 evaluator ProcessRunner env slice is
+At the time of this update, the Phase D D6 intercepted parallel rejection slice is
 verified and ready to commit. Current verification passed:
 
 ```sh
-out/bin/with check src/main.w
 out/bin/with check build_selfhost.w
 git diff --check
 out/bin/with build :cli-selfhost-build-w-tests --no-deps
