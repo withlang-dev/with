@@ -2011,7 +2011,9 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
         "            for output in command.outputs:\n" ++
         "                if command.linker.len() > 0 and output.ends_with(\"out/bin/message-complete\"):\n" ++
         "                    saw_prelink = true\n" ++
-        "            ws.set_link_command(command)\n" ++
+        "            var replacement = command\n" ++
+        "            replacement.args.push(\"-Wl,-dead_strip\")\n" ++
+        "            ws.set_link_command(replacement)\n" ++
         "        _ => saw_prelink = false\n" ++
         "    if not saw_prelink:\n" ++
         "        ctx.diagnostics().error(\"workspace pre-link command message missing\")\n" ++

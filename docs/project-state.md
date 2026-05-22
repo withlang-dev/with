@@ -173,7 +173,9 @@ Completed D4 substrate work:
     preserve declared outputs before updating the pending command.
 19. Focused build-w selfhost coverage now proves `Workspace.set_link_command`
     rejects linker executable changes and replacements that drop declared
-    outputs.
+    outputs. The positive workspace message fixture also appends a harmless
+    linker argument before replacement, proving the accepted command is the one
+    executed.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.
