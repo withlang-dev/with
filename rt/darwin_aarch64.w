@@ -219,6 +219,9 @@ pub fn rt_nanosleep_impl(ns: i64) -> i32:
 extern fn getpid() -> i32
 extern fn raise(sig: i32) -> i32
 extern fn kill(pid: i32, sig: i32) -> i32
+extern fn pthread_attr_init(attr: *mut u8) -> i32
+extern fn pthread_attr_setstacksize(attr: *mut u8, stacksize: u64) -> i32
+extern fn pthread_attr_destroy(attr: *mut u8) -> i32
 extern fn pthread_create(thread: *mut i64, attr: *const u8, start_routine: *mut u8, arg: *mut u8) -> i32
 extern fn pthread_join(thread: i64, retval: *mut *mut u8) -> i32
 
@@ -236,7 +239,18 @@ pub fn rt_raise_impl(sig: i32) -> i32:
 @[c_export("rt_thread_spawn")]
 pub fn rt_thread_spawn_impl(start_routine: *mut u8, arg: *mut u8) -> i64:
     var handle: i64 = 0
-    let rc = pthread_create(&raw mut handle, 0 as *const u8, start_routine, arg)
+    var attr: [64]u8 = [0 as u8; 64]
+    var rc = pthread_attr_init(&raw mut attr[0])
+    if rc != 0:
+        return -(rc as i64)
+    rc = pthread_attr_setstacksize(&raw mut attr[0], 16 * 1024 * 1024)
+    if rc != 0:
+        let _ = pthread_attr_destroy(&raw mut attr[0])
+        return -(rc as i64)
+    rc = pthread_create(&raw mut handle, &raw const attr[0], start_routine, arg)
+    let destroy_rc = pthread_attr_destroy(&raw mut attr[0])
+    if rc == 0 and destroy_rc != 0:
+        return -(destroy_rc as i64)
     if rc != 0:
         return -(rc as i64)
     handle

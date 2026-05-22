@@ -13,10 +13,11 @@ conversation context after compaction.
 
 Phase C extraction work is complete. Pre-Phase-D preparation is complete
 through P9, including the follow-up source-location diagnostic gap. Phase D
-D1 through D5 are complete. Phase D D6 is in progress with the public
-`parallel(workspaces)` API and single-workspace evaluator path; true
-multi-workspace parallelism remains blocked on the OS-thread/runtime/global
-state work identified by `docs/audits/parallel-state-audit.md`.
+D1 through D5 are complete. Phase D D6 is in progress. The evaluator now
+supports true OS-thread execution for non-intercepted multi-workspace
+`parallel(workspaces)` calls by planning workspaces on the evaluator thread,
+compiling each plan on its own OS thread, and materializing `BuildResult`
+values back on the evaluator thread in input order.
 
 Completed D1 sub-slices:
 
@@ -241,6 +242,15 @@ Started D6 parallel-workspace work:
    OS thread. The runtime reconstructs the fat function value with the original
    closure environment and calls it through the function-value ABI, so both
    top-level functions and closures work as D6 worker substrates.
+10. Darwin OS threads are created with an explicit 16 MiB stack instead of the
+    platform default. MIR lowering and codegen use stack frames large enough
+    that default secondary-thread stacks faulted immediately under parallel
+    workspace compilation.
+11. `parallel(workspaces)` now supports multiple non-intercepted workspaces.
+    The evaluator validates handles and builds compile plans serially, runs the
+    independent `Compilation` work on OS threads, joins all workers, and then
+    constructs the public `Vec[BuildResult]` in input order without mutating
+    evaluator-owned value storage from worker threads.
 
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.
@@ -261,7 +271,7 @@ The original P9 pre-D1 baseline is recorded in
 containing this project-state update:
 
 ```text
-Fix std.thread captured closure entry
+Compile parallel workspaces on OS threads
 ```
 
 Commands passed:
@@ -272,7 +282,10 @@ git diff --check
 out/bin/with build rt/rt_core.w --emit-obj --no-prelude -O2 -o /tmp/rt_core_thread_closure.o
 out/bin/with run test/behavior/behav_std_thread_spawn_os.w
 out/bin/with run test/behavior/behav_std_thread_spawn_closure.w
+out/bin/with check rt/darwin_aarch64.w --no-prelude
+out/bin/with check src/main.w
 make build
+out/bin/with build :cli-selfhost-build-w-tests --no-deps
 make fixpoint
 make test
 ```
@@ -309,7 +322,8 @@ default `:test` target includes the fast emit-C smoke.
 
 Recent Phase D/pre-D commits:
 
-- current checkpoint: Fix std.thread captured closure entry.
+- current checkpoint: Compile parallel workspaces on OS threads.
+- previous checkpoint: Fix std.thread captured closure entry.
 - previous checkpoint: Make LLVM bridge cstr scratch thread-aware.
 - previous checkpoint: Back std.thread with OS threads.
 - previous checkpoint: Synchronize runtime allocator state.
@@ -431,10 +445,11 @@ not a new compiler-dispatched project graph kind.
 
 ## Open Blockers And Follow-Ups
 
-- Continue Phase D D6. The next large blocker is true multi-workspace
-  `parallel(workspaces)` execution: per-workspace compiler state, real OS
-  thread scheduling in the evaluator, remaining synchronized shared caches,
-  fiber/global state isolation, and ProcessRunner reentrancy.
+- Continue Phase D D6 hardening. True multi-workspace
+  `parallel(workspaces)` execution now exists for non-intercepted workspaces;
+  remaining work is stress coverage, intercepted-workspace policy, C
+  import/migration exclusion or session isolation, remaining shared-cache
+  audits, fiber/global state isolation, and ProcessRunner reentrancy.
 - Preserve the pre-D behavior tests during D1:
   `behav_build_w_basic_invocation`, `behav_action_capability_filesystem`,
   `behav_action_capability_process`, `behav_capability_token_mismatch`,
@@ -451,14 +466,18 @@ not a new compiler-dispatched project graph kind.
 
 ## Local State
 
-At the time of this update, the Phase D D6 LLVM bridge scratch slice is
+At the time of this update, the Phase D D6 multi-workspace parallel slice is
 verified and ready to commit. Current verification passed:
 
 ```sh
-out/bin/with check rt/llvm_bridge.w --no-prelude
+out/bin/with check rt/rt_core.w --no-prelude
+out/bin/with run test/behavior/behav_std_thread_spawn_os.w
+out/bin/with run test/behavior/behav_std_thread_spawn_closure.w
+out/bin/with check rt/darwin_aarch64.w --no-prelude
+out/bin/with check src/main.w
 git diff --check
-out/bin/with build rt/llvm_bridge.w --emit-obj --no-prelude -O2 -o /tmp/llvm_bridge_threadsafe.o
 make build
+out/bin/with build :cli-selfhost-build-w-tests --no-deps
 make fixpoint
 make test
 ```

@@ -30,6 +30,8 @@ extern fn with_exec_argv_capture_cwd(args: str, stdout_path: str, stderr_path: s
 extern fn with_exec_argv_capture_input(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, stdin_path: str) -> i32
 extern fn with_exec_argv_capture_spawn(args: str, stdout_path: str, stderr_path: str) -> i32
 extern fn with_exec_wait(pid: i32, timeout_ms: i32) -> i32
+extern fn with_thread_spawn(fn_ptr: *mut u8, ctx: *mut u8) -> i64
+extern fn with_thread_join(handle: i64) -> i32
 extern fn with_println_str(s: str) -> void
 extern fn with_println_i32(n: i32) -> void
 extern fn with_println_i64(n: i64) -> void
@@ -108,6 +110,38 @@ type ComptimeWorkspaceRecord {
 type ComptimeWorkspaceCompileResult {
     result: ComptimeValue,
     messages: Vec[ComptimeValue],
+}
+
+type ComptimeWorkspaceCompilePlan {
+    valid: i32,
+    name: str,
+    final_output: str,
+    absolute_output: str,
+    output_kind: i32,
+    has_strings: i32,
+    source_paths: Vec[str],
+    source_texts: Vec[str],
+    absolute_source: str,
+    include_paths: Vec[str],
+    defines: Vec[str],
+    link_libs: Vec[str],
+    opt_level: i32,
+    no_std: bool,
+    alloc_mode: bool,
+    debug_info: bool,
+    compiler_hooks_enabled: bool,
+    prelude_mode: i32,
+}
+
+type ComptimeWorkspaceNativeCompileResult {
+    rc: i32,
+    artifact_path: str,
+    comp: Compilation,
+}
+
+type ComptimeWorkspaceThreadJob {
+    plan: ComptimeWorkspaceCompilePlan,
+    result: ComptimeWorkspaceNativeCompileResult,
 }
 
 type ComptimeLineColumn {
@@ -2171,7 +2205,35 @@ fn ComptimeEvaluator.compiler_message_phase_id(self: ComptimeEvaluator, message:
         return -1
     comptime_value_intlike(payload) as i32
 
-fn ComptimeEvaluator.compile_workspace_record(self: ComptimeEvaluator, record: ComptimeWorkspaceRecord, capability: ComptimeCapabilityRecord, node: i32) -> ComptimeWorkspaceCompileResult:
+fn comptime_workspace_compile_plan_invalid() -> ComptimeWorkspaceCompilePlan:
+    ComptimeWorkspaceCompilePlan {
+        valid: 0,
+        name: "",
+        final_output: "",
+        absolute_output: "",
+        output_kind: 0,
+        has_strings: 0,
+        source_paths: Vec.new(),
+        source_texts: Vec.new(),
+        absolute_source: "",
+        include_paths: Vec.new(),
+        defines: Vec.new(),
+        link_libs: Vec.new(),
+        opt_level: 0,
+        no_std: false,
+        alloc_mode: false,
+        debug_info: false,
+        compiler_hooks_enabled: false,
+        prelude_mode: 0,
+    }
+
+fn comptime_workspace_native_compile_invalid() -> ComptimeWorkspaceNativeCompileResult:
+    ComptimeWorkspaceNativeCompileResult { rc: 1, artifact_path: "", comp: Compilation.init() }
+
+fn comptime_workspace_output_kind_supported(kind: i32) -> bool:
+    kind == 0 or kind == 1 or kind == 2 or kind == 4
+
+fn ComptimeEvaluator.workspace_compile_plan(self: ComptimeEvaluator, record: ComptimeWorkspaceRecord, capability: ComptimeCapabilityRecord, node: i32) -> ComptimeWorkspaceCompilePlan:
     let options = record.options
     let option_source = self.workspace_str_option(options, "source_path")
     var source_path = option_source
@@ -2182,10 +2244,10 @@ fn ComptimeEvaluator.compile_workspace_record(self: ComptimeEvaluator, record: C
     let target_kind = self.workspace_i32_option(options, "target", 0)
     if target_kind != 0:
         let _ = self.fail(node, "Workspace.compile currently supports only the native target")
-        return comptime_workspace_compile_invalid()
+        return comptime_workspace_compile_plan_invalid()
     if source_path.len() == 0 and record.string_names.len() == 0:
         let _ = self.fail(node, "Workspace.compile requires at least one source file or source string")
-        return comptime_workspace_compile_invalid()
+        return comptime_workspace_compile_plan_invalid()
     var final_output = output_path
     if final_output.len() == 0:
         final_output = "out/bin/" ++ record.name
@@ -2199,44 +2261,86 @@ fn ComptimeEvaluator.compile_workspace_record(self: ComptimeEvaluator, record: C
     let include_paths = self.workspace_str_vec_field(options, "include_paths")
     let defines = self.workspace_str_vec_field(options, "defines")
     let link_libs = self.workspace_str_vec_field(options, "link_libs")
-
-    var comp = Compilation.init()
-    comp.configure(self.workspace_i32_option(options, "opt_level", 1), self.workspace_bool_option(options, "no_std", false), self.workspace_bool_option(options, "alloc_mode", false))
-    comp.set_debug_info(self.workspace_bool_option(options, "debug_info", true))
-    comp.set_compiler_hooks_enabled(self.workspace_bool_option(options, "compiler_hooks_enabled", true))
-    comp.set_prelude_mode(self.workspace_i32_option(options, "prelude_mode", 0))
-
-    var artifact_path = ""
+    let source_paths: Vec[str] = Vec.new()
+    let source_texts: Vec[str] = Vec.new()
+    var absolute_source = ""
+    var has_strings = 0
     if record.string_names.len() > 0:
         if output_kind != 0:
             let _ = self.fail(node, "Workspace.compile source strings currently support binary output only")
-            return comptime_workspace_compile_invalid()
-        let source_paths: Vec[str] = Vec.new()
-        let source_texts: Vec[str] = Vec.new()
+            return comptime_workspace_compile_plan_invalid()
         for si in 0..record.string_names.len() as i32:
             source_paths.push(self.workspace_path(capability.project_root, record.string_names.get(si as i64)))
             source_texts.push(record.string_sources.get(si as i64))
-        artifact_path = comp.build_entry_binary_from_sources_to_path(source_paths, source_texts, absolute_output)
+        has_strings = 1
     else:
-        let absolute_source = self.workspace_path(capability.project_root, source_path)
-        if output_kind == 0:
-            artifact_path = comp.build_binary_to_path_with_build_settings(absolute_source, absolute_output, include_paths, defines, link_libs)
-        else if output_kind == 1:
-            artifact_path = comp.emit_object_to_path_with_build_settings(absolute_source, absolute_output, include_paths, defines, link_libs)
-        else if output_kind == 2:
-            artifact_path = comp.emit_c(absolute_source, absolute_output)
-        else if output_kind == 4:
-            artifact_path = comp.emit_archive_to_path_with_build_settings(absolute_source, absolute_output, include_paths, defines, link_libs)
-        else:
+        if not comptime_workspace_output_kind_supported(output_kind):
             let _ = self.fail(node, "Workspace.compile output kind is not implemented yet")
-            return comptime_workspace_compile_invalid()
-    let rc = if artifact_path.len() > 0: 0 else: 1
-    let result = self.workspace_build_result_value(record.name, rc, self.workspace_artifact_kind_for_output(output_kind), final_output, node)
+            return comptime_workspace_compile_plan_invalid()
+        absolute_source = self.workspace_path(capability.project_root, source_path)
+    ComptimeWorkspaceCompilePlan {
+        valid: 1,
+        name: record.name,
+        final_output,
+        absolute_output,
+        output_kind,
+        has_strings,
+        source_paths,
+        source_texts,
+        absolute_source,
+        include_paths,
+        defines,
+        link_libs,
+        opt_level: self.workspace_i32_option(options, "opt_level", 1),
+        no_std: self.workspace_bool_option(options, "no_std", false),
+        alloc_mode: self.workspace_bool_option(options, "alloc_mode", false),
+        debug_info: self.workspace_bool_option(options, "debug_info", true),
+        compiler_hooks_enabled: self.workspace_bool_option(options, "compiler_hooks_enabled", true),
+        prelude_mode: self.workspace_i32_option(options, "prelude_mode", 0),
+    }
+
+fn comptime_execute_workspace_compile_plan(plan: ComptimeWorkspaceCompilePlan) -> ComptimeWorkspaceNativeCompileResult:
+    if plan.valid == 0:
+        return comptime_workspace_native_compile_invalid()
+    var comp = Compilation.init()
+    comp.configure(plan.opt_level, plan.no_std, plan.alloc_mode)
+    comp.set_debug_info(plan.debug_info)
+    comp.set_compiler_hooks_enabled(plan.compiler_hooks_enabled)
+    comp.set_prelude_mode(plan.prelude_mode)
+
+    var artifact_path = ""
+    if plan.has_strings != 0:
+        artifact_path = comp.build_entry_binary_from_sources_to_path(plan.source_paths, plan.source_texts, plan.absolute_output)
+    else:
+        if plan.output_kind == 0:
+            artifact_path = comp.build_binary_to_path_with_build_settings(plan.absolute_source, plan.absolute_output, plan.include_paths, plan.defines, plan.link_libs)
+        else if plan.output_kind == 1:
+            artifact_path = comp.emit_object_to_path_with_build_settings(plan.absolute_source, plan.absolute_output, plan.include_paths, plan.defines, plan.link_libs)
+        else if plan.output_kind == 2:
+            artifact_path = comp.emit_c(plan.absolute_source, plan.absolute_output)
+        else if plan.output_kind == 4:
+            artifact_path = comp.emit_archive_to_path_with_build_settings(plan.absolute_source, plan.absolute_output, plan.include_paths, plan.defines, plan.link_libs)
+        else:
+            return comptime_workspace_native_compile_invalid()
+    ComptimeWorkspaceNativeCompileResult { rc: if artifact_path.len() > 0: 0 else: 1, artifact_path, comp }
+
+fn comptime_workspace_thread_entry(arg: *mut u8) -> i32:
+    let job = arg as *mut ComptimeWorkspaceThreadJob
+    let native = comptime_execute_workspace_compile_plan((unsafe: *job).plan)
+    (unsafe: *job).result = native
+    0
+
+fn ComptimeEvaluator.compile_workspace_record(self: ComptimeEvaluator, record: ComptimeWorkspaceRecord, capability: ComptimeCapabilityRecord, node: i32) -> ComptimeWorkspaceCompileResult:
+    let plan = self.workspace_compile_plan(record, capability, node)
+    if plan.valid == 0:
+        return comptime_workspace_compile_invalid()
+    let native = comptime_execute_workspace_compile_plan(plan)
+    let result = self.workspace_build_result_value(plan.name, native.rc, self.workspace_artifact_kind_for_output(plan.output_kind), plan.final_output, node)
     if result.kind == ComptimeValueKind.CV_INVALID:
         return comptime_workspace_compile_invalid()
     let messages =
-        if rc == 0:
-            self.workspace_success_messages(comp, comp.zcu.last_sema.ast, node)
+        if native.rc == 0:
+            self.workspace_success_messages(native.comp, native.comp.zcu.last_sema.ast, node)
         else:
             Vec.new()
     if self.had_error != 0:
@@ -4021,12 +4125,10 @@ fn ComptimeEvaluator.eval_parallel_workspaces_call(self: ComptimeEvaluator, arg_
     let workspaces = arg_values.get(0)
     if workspaces.kind != ComptimeValueKind.CV_VEC and workspaces.kind != ComptimeValueKind.CV_ARRAY:
         return self.fail(node, "parallel expects a Vec[Workspace]")
-    if workspaces.extra_count > 1:
-        return self.fail(node, "parallel with multiple workspaces requires OS-thread workspace execution, which is not implemented yet")
     let result_type = self.node_type_or(node, 0)
     if result_type == 0:
         return self.fail(node, "parallel result type is unknown")
-    let results: Vec[ComptimeValue] = Vec.new()
+    let plans: Vec[ComptimeWorkspaceCompilePlan] = Vec.new()
     for i in 0..workspaces.extra_count:
         let workspace_value = self.extra_values.get((workspaces.extra_start + i) as i64)
         let workspace_id = self.workspace_record_index(workspace_value, "parallel", node)
@@ -4039,10 +4141,43 @@ fn ComptimeEvaluator.eval_parallel_workspaces_call(self: ComptimeEvaluator, arg_
         if record.intercept_active != 0:
             return self.fail(node, "parallel does not support intercepted workspaces yet")
         let capability = self.capability_records.get(capability_handle as i64)
-        let compiled = self.compile_workspace_record(record, capability, node)
-        if compiled.result.kind == ComptimeValueKind.CV_INVALID:
+        let plan = self.workspace_compile_plan(record, capability, node)
+        if plan.valid == 0:
             return comptime_control_error()
-        results.push(compiled.result)
+        plans.push(plan)
+    let native_results: Vec[ComptimeWorkspaceNativeCompileResult] = Vec.new()
+    if plans.len() as i32 == 1:
+        native_results.push(comptime_execute_workspace_compile_plan(plans.get(0)))
+    else:
+        let jobs: Vec[ComptimeWorkspaceThreadJob] = Vec.new()
+        let handles: Vec[i64] = Vec.new()
+        for i in 0..plans.len() as i32:
+            jobs.push(ComptimeWorkspaceThreadJob { plan: plans.get(i as i64), result: comptime_workspace_native_compile_invalid() })
+        for i in 0..jobs.len() as i32:
+            let job_ptr = (jobs.ptr as *mut ComptimeWorkspaceThreadJob) + i as u64
+            let handle = with_thread_spawn(comptime_workspace_thread_entry as *mut u8, job_ptr as *mut u8)
+            if handle < 0:
+                for hi in 0..handles.len() as i32:
+                    let _ = with_thread_join(handles.get(hi as i64))
+                return self.fail(node, "parallel failed to spawn workspace thread")
+            handles.push(handle)
+        var thread_rc = 0
+        for hi in 0..handles.len() as i32:
+            let rc = with_thread_join(handles.get(hi as i64))
+            if rc != 0 and thread_rc == 0:
+                thread_rc = rc
+        if thread_rc != 0:
+            return self.fail(node, "parallel workspace thread failed")
+        for i in 0..jobs.len() as i32:
+            native_results.push(jobs.get(i as i64).result)
+    let results: Vec[ComptimeValue] = Vec.new()
+    for i in 0..native_results.len() as i32:
+        let plan = plans.get(i as i64)
+        let native = native_results.get(i as i64)
+        let result = self.workspace_build_result_value(plan.name, native.rc, self.workspace_artifact_kind_for_output(plan.output_kind), plan.final_output, node)
+        if result.kind == ComptimeValueKind.CV_INVALID:
+            return comptime_control_error()
+        results.push(result)
     let start = self.extra_values.len() as i32
     for i in 0..results.len() as i32:
         self.extra_values.push(results.get(i as i64))
