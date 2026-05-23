@@ -1,6 +1,8 @@
 # Fixing the With Build System
 
-Status: implementation plan.
+Status: completed planning archive. This plan was superseded by
+`docs/build-plan.md`, `docs/build-spec.md`, and the completed Phase C/Phase D
+work.
 
 The goal is to make With's build system feel like Jai's integrated build
 process: the project describes its build in With source, the compiler runs that

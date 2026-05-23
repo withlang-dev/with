@@ -1,10 +1,14 @@
 # Phase D Design: Capability-Bearing Comptime and Workspaces
 
-Status: implementation contract, v7 draft. Pre-Phase-D prerequisites are complete through P8. P9 baseline capture remains before D1 may begin.
+Status: completed design archive. Phase D D1 through D8 are implemented.
+
+Historical status at time of active use: implementation contract, v7 draft.
+Pre-Phase-D prerequisites were complete through P8, with P9 baseline capture
+remaining before D1.
 
 This is the design contract for Phase D. It supersedes v6 and reconciles the design with the completed pre-Phase-D implementation artifacts.
 
-The pre-Phase-D work documented in `docs/pre-phase-d-plan.md` is complete through P8: audits, capability dispatch design, BuildOptions design, behavior tests, and the `src/main.w` action-runner refactor are all in place. The findings from those efforts are absorbed into this document. P9 records the verification baseline after this design revision.
+The pre-Phase-D work documented in `docs/completed/pre-phase-d-plan.md` is complete through P8: audits, capability dispatch design, BuildOptions design, behavior tests, and the `src/main.w` action-runner refactor are all in place. The findings from those efforts are absorbed into this document. P9 records the verification baseline after this design revision.
 
 ## Revision History
 
@@ -12,7 +16,7 @@ The pre-Phase-D work documented in `docs/pre-phase-d-plan.md` is complete throug
 
 * §4: reconciled capability identification and method backing with `docs/design/capability-dispatch.md`; D1 uses the explicit compiler registry and ordinary stdlib declarations, not new attribute syntax or an `intrinsic` declaration form.
 * §6 and §13: replaced placeholder CLI compatibility test names with the completed pre-D behavior regression set and the compatibility fixture set specified in `docs/design/build-options.md`.
-* §15 and §16: corrected pre-D artifact references to `docs/pre-phase-d-plan.md` and the P9 baseline path.
+* §15 and §16: corrected pre-D artifact references to `docs/completed/pre-phase-d-plan.md` and the P9 baseline path.
 
 **v6**:
 
@@ -1008,7 +1012,7 @@ Docs-only changes do not require the full verification sequence but must be comm
 
 This document depends on the following pre-Phase-D artifacts:
 
-* `docs/pre-phase-d-plan.md` — the pre-D work contract.
+* `docs/completed/pre-phase-d-plan.md` — the pre-D work contract.
 * `docs/audits/comptime-eval-audit.md` — ComptimeEval audit findings, absorbed into §3.
 * `docs/audits/parallel-state-audit.md` — global state enumeration, absorbed into §11.
 * `docs/audits/build-script-survey.md` — current build.w inventory, referenced by D7 scope.
@@ -1022,6 +1026,6 @@ If any audit finding contradicts the design absorbed into this document, this do
 
 ## 16. What This Document Is Not
 
-This document does not specify pre-Phase-D work. That work is contracted in `docs/pre-phase-d-plan.md` and is presumed complete when D1 begins.
+This document does not specify pre-Phase-D work. That work is contracted in `docs/completed/pre-phase-d-plan.md` and is presumed complete when D1 begins.
 
 This document does not specify future phases E and beyond. It is scoped to Phase D.

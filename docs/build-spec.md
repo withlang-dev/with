@@ -110,7 +110,8 @@ Default recipe:
 ```with
 use std.build
 
-pub fn build(ctx: BuildCtx) -> Build:
+comptime with BuildCtx as ctx:
+pub fn build -> Build:
     let info = ctx.project_info()
     ctx.new_build().executable(info.package_name(), "src/main.w")
 ```
@@ -122,11 +123,9 @@ diagnostic.
 
 ## 4. Tool Mode
 
-`build.w` is compiled and run by the compiler driver as tool-mode With code.
-Tool mode is not ordinary `comptime`.
-
-Ordinary `comptime` remains deterministic and side-effect-free. Tool-mode code
-performs effects only through compiler-provided capabilities.
+`build.w` is compiled and run by the compiler driver as capability-bearing
+comptime With code. Pure `comptime` remains deterministic and side-effect-free.
+Tool-mode effects are available only through compiler-provided capabilities.
 
 Capability values are unforgeable driver handles. User code may receive, pass,
 borrow, store locally, and call methods on capability values, but may not
@@ -151,11 +150,13 @@ A project build file exposes:
 ```with
 use std.build
 
-pub fn build(ctx: BuildCtx) -> Build:
+comptime with BuildCtx as ctx:
+pub fn build -> Build:
     ...
 ```
 
-The driver constructs `BuildCtx`, invokes `build`, receives a `Build` graph,
+The driver constructs `BuildCtx`, binds it into the capability-bearing
+comptime entry point as `ctx`, evaluates `build`, receives a `Build` graph,
 validates it, selects the requested target closure, and executes it.
 
 `build.w` is normal With code. There is no separate build language.
@@ -272,11 +273,24 @@ Workspaces are isolated:
 Required workspace operations:
 
 ```with
-pub fn BuildCtx.add_source_file(self: &Self, workspace: Workspace, path: str)
-pub fn BuildCtx.add_source_string(self: &Self, workspace: Workspace, name: str, source: str)
-pub fn BuildCtx.set_build_options(self: &Self, workspace: Workspace, options: BuildOptions)
-pub fn BuildCtx.get_build_options(self: &Self, workspace: Workspace) -> BuildOptions
-pub fn BuildCtx.compile(self: &Self, workspace: Workspace) -> BuildResult
+pub fn BuildCtx.create_workspace(self: &Self, name: str) -> Workspace
+pub fn BuildCtx.current_workspace(self: &Self) -> Workspace
+pub fn ActionCtx.create_workspace(self: &Self, name: str) -> Workspace
+pub fn ActionCtx.current_workspace(self: &Self) -> Workspace
+
+pub fn Workspace.name(self: &Self) -> str
+pub fn Workspace.add_file(self: &Self, path: str)
+pub fn Workspace.add_string(self: &Self, name: str, source: str)
+pub fn Workspace.options(self: &Self) -> BuildOptions
+pub fn Workspace.set_options(self: &Self, options: BuildOptions)
+pub fn Workspace.set_migrate_options(self: &Self, options: MigrateOptions)
+pub fn Workspace.compile(self: &Self) -> BuildResult
+pub fn Workspace.begin_intercept(self: &Self)
+pub fn Workspace.wait_for_message(self: &Self) -> CompilerMessageEnvelope
+pub fn Workspace.end_intercept(self: &Self)
+pub fn Workspace.set_link_command(self: &Self, command: LinkCommand)
+
+pub fn parallel(workspaces: Vec[Workspace]) -> Vec[BuildResult]
 ```
 
 The storage representation of `Workspace` is compiler-private.
@@ -288,13 +302,13 @@ The storage representation of `Workspace` is compiler-private.
 Build options are typed values, not strings.
 
 ```with
-pub enum OutputKind: i32:
-    no_output = 0
-    executable = 1
-    static_library = 2
-    dynamic_library = 3
-    object_file = 4
-    c_source = 5
+pub enum BuildOutputKind: i32:
+    Binary = 0
+    Object = 1
+    C = 2
+    LlvmIr = 3
+    Archive = 4
+    Check = 5
 
 pub enum OptimizeMode: i32:
     debug = 0
@@ -302,29 +316,32 @@ pub enum OptimizeMode: i32:
 
 pub enum BuildTarget: i32:
     native = 0
-    darwin_aarch64 = 1
-    darwin_x86_64 = 2
-    linux_aarch64 = 3
-    linux_x86_64 = 4
+    linux_x86_64 = 1
+    linux_aarch64 = 2
+    darwin_x86_64 = 3
+    darwin_aarch64 = 4
     windows_x86_64 = 5
 
+pub enum PreludeMode: i32:
+    Full = 0
+    Core = 1
+    None = 2
+
 pub type BuildOptions {
-    output_kind: OutputKind,
-    output_name: str,
-    output_dir: str,
-    intermediate_dir: str,
-    target: BuildTarget,
-    optimize: OptimizeMode,
+    source_path: str,
+    output_path: str,
+    output_kind: BuildOutputKind,
+    opt_level: i32,
     debug_info: bool,
-    line_directives: bool,
-    array_bounds_check: bool,
-    cast_bounds_check: bool,
-    null_pointer_check: bool,
-    import_paths: Vec[str],
+    no_std: bool,
+    alloc_mode: bool,
+    prelude_mode: PreludeMode,
+    deterministic: bool,
+    target: BuildTarget,
     include_paths: Vec[str],
     defines: Vec[str],
-    system_libs: Vec[str],
-    library_paths: Vec[str],
+    link_libs: Vec[str],
+    compiler_hooks_enabled: bool,
 }
 ```
 
@@ -442,7 +459,8 @@ Project-specific build behavior must not require compiler source changes.
 ordinary With functions:
 
 ```with
-pub fn build(ctx: BuildCtx) -> Build:
+comptime with BuildCtx as ctx:
+pub fn build -> Build:
     var out = ctx.new_build()
     out = out.action("generate-bindings", generate_bindings)
     out
@@ -494,37 +512,37 @@ Empty globs fail loudly by default.
 
 Tool-mode build code can intercept compiler progress for a workspace.
 
-Message kinds:
+Message payloads:
 
 ```with
-pub enum CompilerMessageKind: i32:
-    file = 0
-    import = 1
-    phase = 2
-    typechecked = 3
-    diagnostic = 4
-    artifact = 5
-    complete = 6
+pub enum CompilerMessage:
+    Phase(CompilerPhase)
+    File(str)
+    Import(str, str)
+    Typechecked(Vec[DeclSummary])
+    Diagnostic(DiagnosticSummary)
+    Artifact(Artifact)
+    PreLink(LinkCommand)
+    Linked(LinkCommand, i32)
+    Complete(BuildResult)
+    Error(i32, str, SourceSpan)
+    DebugDump(str)
 ```
 
 Compiler phases:
 
 ```with
 pub enum CompilerPhase: i32:
-    parsed_all_sources = 0
-    typechecked_all_available = 1
-    generated_target_code = 2
-    pre_link = 3
-    post_link = 4
-    complete = 5
-```
-
-Required operations:
-
-```with
-pub fn BuildCtx.begin_intercept(self: &Self, workspace: Workspace)
-pub fn BuildCtx.wait_for_message(self: &Self, workspace: Workspace) -> CompilerMessage
-pub fn BuildCtx.end_intercept(self: &Self, workspace: Workspace)
+    pre_parse = 0
+    parsed = 1
+    pre_typecheck = 2
+    typechecked = 3
+    lowered_to_mir = 4
+    pre_codegen = 5
+    codegen_done = 6
+    pre_link = 7
+    linked = 8
+    complete = 9
 ```
 
 This supports build-time code inspection, generated source after typechecking,
