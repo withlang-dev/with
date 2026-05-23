@@ -47,6 +47,9 @@ capture and routes runtime access through `src/compiler/Runtime.w`.
 `lib/std/process.w` no longer exposes shell-string execution: `Command` stores
 argv entries, `.arg(...)` appends arguments, and command execution goes through
 typed argv runtime process execution.
+`rt/clang_bridge.w` no longer uses `popen`: SDK discovery and `cc -E`
+preprocessing use typed argv capture, and LLVM resource directory discovery
+uses direct directory enumeration.
 
 Completed D1 sub-slices:
 
