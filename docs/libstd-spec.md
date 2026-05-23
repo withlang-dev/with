@@ -42,7 +42,7 @@ spec does not redefine them.
 | `alloc` | Arena, Pool |
 | `hash` | Hasher, DefaultHasher, hash_str, hash_i64, combine |
 | `math` | Scalar: sqrt, sin, cos, pow, abs, min, max, clamp, PI, E, TAU |
-| `process` | args, env, set_env, exit_code, system_cmd, pid, Command |
+| `process` | args, env, set_env, exit_code, pid, run, Command |
 | `sys` | cpu_count, total_memory, page_size, memory_bandwidth |
 | `sysinfo` | os, arch, hostname |
 | `signal` | sigint, sigterm, sigkill, raise_signal |

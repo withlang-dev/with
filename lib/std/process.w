@@ -7,7 +7,7 @@ use std.collections
 
 extern fn rt_exit(code: i32) -> void
 extern fn with_getpid() -> i32
-extern fn with_system(cmd: str) -> i32
+extern fn with_exec_argv(args: str) -> i32
 extern fn with_arg_count() -> i32
 extern fn with_arg_at(idx: i32) -> str
 extern fn with_getenv_str(name: str) -> str
@@ -19,10 +19,6 @@ extern fn with_str_len(s: str) -> i64
 /// Exit the process with the given status code.
 pub fn exit_code(code: i32) -> void:
     rt_exit(code)
-
-/// Execute a shell command. Returns the exit status.
-pub fn system_cmd(cmd: str) -> i32:
-    with_system(cmd)
 
 /// Get the current process ID.
 pub fn pid -> i32:
@@ -48,19 +44,39 @@ pub fn env(name: str) -> str:
 pub fn set_env(name: str, value: str) -> i32:
     with_setenv_str(name, value)
 
-/// A shell command wrapper.
-type Command  {
-    cmd: str,
+fn argv_blob(items: Vec[str]) -> str:
+    var out = ""
+    for i in 0..items.len() as i32:
+        out = out ++ items.get(i as i64) ++ "\0"
+    out
+
+/// Execute an argument vector. The first item is the program name.
+pub fn run(argv: Vec[str]) -> i32:
+    with_exec_argv(argv_blob(argv))
+
+/// An argv-based command wrapper.
+pub type Command  {
+    args: Vec[str],
 }
 
-/// Create a Command from a shell command string.
-pub fn command(cmd: str) -> Command:
-    Command { cmd: cmd }
+/// Create a Command from a program path or name.
+pub fn command(program: str) -> Command:
+    var argv: Vec[str] = Vec.new()
+    argv.push(program)
+    Command { args: argv }
+
+/// Append one argument and return the updated command.
+pub fn Command.arg(self: Command, arg: str) -> Command:
+    var argv: Vec[str] = Vec.new()
+    for i in 0..self.args.len() as i32:
+        argv.push(self.args.get(i as i64))
+    argv.push(arg)
+    Command { args: argv }
 
 /// Run the command. Returns the exit status.
-fn Command.run(self: Command) -> i32:
-    with_system(self.cmd)
+pub fn Command.run(self: Command) -> i32:
+    run(self.args)
 
 /// Run the command and return its exit status.
-fn Command.status(self: Command) -> i32:
-    with_system(self.cmd)
+pub fn Command.status(self: Command) -> i32:
+    run(self.args)

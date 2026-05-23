@@ -44,6 +44,9 @@ stdout/stderr capture and benchmark execution also use typed runtime process
 wrappers, so `src/main.w` no longer depends on `with_system`.
 `src/compiler/ConanClient.w` now extracts Conan archives through typed argv
 capture and routes runtime access through `src/compiler/Runtime.w`.
+`lib/std/process.w` no longer exposes shell-string execution: `Command` stores
+argv entries, `.arg(...)` appends arguments, and command execution goes through
+typed argv runtime process execution.
 
 Completed D1 sub-slices:
 
