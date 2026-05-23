@@ -28,7 +28,6 @@ OUT_GEN_DIR := $(OUT)/gen
 
 GEN_MAIN_ENTRY := $(OUT_GEN_DIR)/main.w
 GEN_BOOTSTRAP_ENTRY := $(OUT_GEN_DIR)/bootstrap_main.w
-GEN_EMIT_TEMP_ENTRY := $(OUT_GEN_DIR)/main_emit_temp.w
 GEN_VERSION_FILE := $(OUT_GEN_DIR)/version.txt
 GEN_STAMP := $(OUT_GEN_DIR)/.generated-stamp
 REGEX_MIGRATE_STAMP := $(OUT_GEN_DIR)/.regex-migrate-stamp
@@ -404,7 +403,7 @@ $(OUT_BIN_DIR) $(OUT_LIB_DIR) $(OUT_LOG_DIR) $(OUT_TMP_DIR) $(OUT_GEN_DIR):
 STD_SOURCES := $(shell find lib/std -name '*.w' 2>/dev/null | sort)
 EMBED_STD_SOURCES := $(filter-out lib/std/re/%,$(STD_SOURCES))
 COMPILER_W_SOURCES := $(shell find src lib/std -name '*.w' 2>/dev/null | sort)
-GEN_SOURCE_INPUTS := src/main.w src/bootstrap_main.w src/main_emit_temp.w $(VERSION_SOURCE_FILE)
+GEN_SOURCE_INPUTS := src/main.w src/bootstrap_main.w $(VERSION_SOURCE_FILE)
 COMPILER_BUILD_SOURCES := $(filter-out $(GEN_SOURCE_INPUTS),$(COMPILER_W_SOURCES))
 GIT_HEAD_FILE := $(shell git -C "$(ROOT_DIR)" rev-parse --git-path HEAD 2>/dev/null || true)
 GIT_HEAD_REF_FILE := $(shell ref="$$(git -C "$(ROOT_DIR)" symbolic-ref -q HEAD 2>/dev/null || true)"; if [ -n "$$ref" ]; then git -C "$(ROOT_DIR)" rev-parse --git-path "$$ref"; fi)
@@ -448,7 +447,6 @@ $(GEN_STAMP): $(GEN_SOURCE_INPUTS) $(GEN_VERSION_DEPS) | $(OUT_BIN_DIR) $(OUT_LI
 	escaped="$${escaped//\"/\\\"}"; \
 	sed "s/$(VERSION_PLACEHOLDER)/$$escaped/g" "$(ROOT_DIR)/src/main.w" > "$(GEN_MAIN_ENTRY)"; \
 	sed "s/$(VERSION_PLACEHOLDER)/$$escaped/g" "$(ROOT_DIR)/src/bootstrap_main.w" > "$(GEN_BOOTSTRAP_ENTRY)"; \
-	sed "s/$(VERSION_PLACEHOLDER)/$$escaped/g" "$(ROOT_DIR)/src/main_emit_temp.w" > "$(GEN_EMIT_TEMP_ENTRY)"; \
 	printf '%s\n' "$$version" > "$(GEN_VERSION_FILE)"; \
 	touch "$@"
 

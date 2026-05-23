@@ -13,12 +13,12 @@ Initial scan:
 
 ```sh
 rg -n "with_system|/bin/bash|/bin/sh| sh -c|bash -c|zsh -c|\| awk|\| grep|2>/dev/null| > .*2>" \
-    src lib rt build.w build_*.w --glob '!src/main_emit_temp.w'
+    src lib rt build.w build_*.w
 ```
 
-`src/main_emit_temp.w` is excluded from the first pass because it is a tracked
-generated snapshot; it should be handled after the authoritative sources no
-longer produce shell-string internals.
+`src/main_emit_temp.w` was a tracked legacy entry snapshot generated only as an
+unused compiler source output. It has been removed from the source tree and
+compiler source generation graph.
 
 ## Findings
 
@@ -31,8 +31,8 @@ longer produce shell-string internals.
 | `src/CImport.w` | The orphan `with_system` extern was removed. The remaining shell pipeline text is a commented verification command. | Complete for Phase E. |
 | `lib/std/process.w` | Shell-string execution removed. `Command` now stores an argv vector and executes through typed argv runtime process execution. | Complete for Phase E. |
 | `rt/clang_bridge.w` | Shell probes removed. SDK discovery and `cc -E` preprocessing use typed argv capture; LLVM resource directory discovery uses direct directory enumeration. | Complete for Phase E. |
-| `rt/compat_runtime.w` | Provides legacy `with_system` by executing `/bin/sh`. | Retire only after all source users are removed. The runtime export remains the last compatibility layer, not a new dependency target. |
-| `build_pcre2.w` | Invokes upstream PCRE2 `RunTest` through `/bin/bash`. | Documented exception candidate: this is an upstream shell test runner boundary, not compiler/build internal filesystem work. Keep isolated and explicit unless PCRE2 tests are ported. |
+| `rt/compat_runtime.w` | Legacy shell exports removed. `with_system` and `with_extract_tgz` no longer exist; remaining process operations are argv/binary based. | Complete for Phase E. |
+| `build_pcre2.w` | Invokes upstream PCRE2 `RunTest` through typed argv with `/bin/bash` as the program. | Documented exception: owner is the PCRE2 migrated-library test target. This is an upstream shell test runner boundary, not compiler/build internal filesystem work. Keep isolated unless PCRE2 tests are ported. |
 | `build_selfhost.w` | Scan hit `shorthand` as a filename substring. | False positive. |
 
 ## First Code Slice
@@ -114,3 +114,34 @@ Completed:
   `cc` argv capture with stdout read from a temp file;
 - replaced `ls -1d ... | head -1` resource directory discovery with direct
   directory enumeration under `/usr/local/llvm/lib/clang`.
+
+## Compat Runtime Slice
+
+Completed:
+
+- removed `with_system`;
+- removed the shared `/bin/sh -c` helper;
+- removed `with_extract_tgz`, whose only former source user now uses typed
+  `tar` argv execution;
+- removed stale declarations from `runtime/with_runtime.h`;
+- removed `_with_system` from compat-runtime link detection.
+
+## Legacy Entry Snapshot Slice
+
+Completed:
+
+- removed the unused tracked `src/main_emit_temp.w` snapshot;
+- removed `out/gen/main_emit_temp.w` generation from the project build graph
+  and Makefile source generation path.
+
+## Remaining Scan Hits
+
+After Phase E cleanup, the only source scan hits are:
+
+- `build_pcre2.w` invoking upstream PCRE2 `RunTest` through typed argv with
+  `/bin/bash` as the executable. This is a documented migrated-library test
+  runner exception, owned by the PCRE2 build module.
+- `build_selfhost.w` containing `shorthand` in a filename. This is a false
+  positive.
+
+Makefile shell usage remains outside Phase E by design while Make still exists.

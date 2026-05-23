@@ -140,39 +140,6 @@ fn wait_for_child_process_timeout(pid: i32, timeout_ms: i32) -> i32:
             return CAPTURE_TIMEOUT_RC
         let _sleep_poll = with_usleep(10000)
 
-fn run_shell_command(cmd: *const u8) -> i32:
-    var prev_mask: u32 = 0 as u32
-    let mask_rc = block_interrupt_signals(&raw mut prev_mask)
-    let pid = fork()
-    if pid == 0:
-        if mask_rc == 0:
-            restore_signal_mask(&prev_mask as *const u32)
-        let _ = setpgid(0, 0)
-        restore_default_signal_handler(SIGINT)
-        restore_default_signal_handler(SIGTERM)
-        restore_default_signal_handler(SIGHUP)
-        restore_default_signal_handler(SIGQUIT)
-        var argv: [5]*const u8 = [0 as *const u8; 5]
-        argv[0] = "sh" as *const u8
-        argv[1] = "-c" as *const u8
-        argv[2] = cmd
-        argv[3] = 0 as *const u8
-        argv[4] = 0 as *const u8
-        let _ = execv("/bin/sh" as *const u8, (&argv) as *const [5]*const u8 as *const *const u8)
-        _exit(127)
-    if pid < 0:
-        if mask_rc == 0:
-            restore_signal_mask(&prev_mask as *const u32)
-        return -1
-
-    active_child_pgid = pid
-    let _ = setpgid(pid, pid)
-    if mask_rc == 0:
-        restore_signal_mask(&prev_mask as *const u32)
-    let rc = wait_for_child_process(pid)
-    active_child_pgid = 0
-    rc
-
 fn run_binary_direct(path: *const u8) -> i32:
     var prev_mask: u32 = 0 as u32
     let mask_rc = block_interrupt_signals(&raw mut prev_mask)
@@ -468,21 +435,6 @@ pub fn raise_stack_limit():
 pub fn interrupt_requested() -> i32:
     interrupt_flag
 
-@[c_export("with_system")]
-pub fn system_str(cmd: str) -> i32:
-    let buf = str_to_c_buf(cmd)
-    if buf as i64 == 0:
-        return -1
-    if interrupt_flag != 0:
-        with_free(buf)
-        let errp = __error()
-        if errp as i64 != 0:
-            unsafe: *errp = EINTR
-        return -1
-    let rc = run_shell_command(buf as *const u8)
-    with_free(buf)
-    rc
-
 @[c_export("with_exec_binary")]
 pub fn exec_binary(path: str) -> i32:
     let buf = str_to_c_buf(path)
@@ -670,39 +622,3 @@ pub fn exec_wait(pid: i32, timeout_ms: i32) -> i32:
     let rc = wait_for_child_process_timeout(pid, timeout_ms)
     active_child_pgid = 0
     rc
-
-@[c_export("with_extract_tgz")]
-pub fn extract_tgz(archive: str, dest: str) -> i32:
-    let prefix = "tar xzf '" as *const u8
-    let middle = "' -C '" as *const u8
-    let suffix = "'" as *const u8
-    let prefix_len = 9 as i64
-    let middle_len = 7 as i64
-    let suffix_len = 1 as i64
-    let total = prefix_len + archive.len() + middle_len + dest.len() + suffix_len
-    let cmd = with_alloc(total + 1)
-    if cmd as i64 == 0:
-        return -1
-    let archive_ptr = unsafe: *(&archive as *const *const u8)
-    let dest_ptr = unsafe: *(&dest as *const *const u8)
-    var pos: i64 = 0
-    with_memcpy((cmd as i64 + pos) as *mut u8, prefix, prefix_len)
-    pos = pos + prefix_len
-    if archive.len() > 0:
-        with_memcpy((cmd as i64 + pos) as *mut u8, archive_ptr, archive.len())
-        pos = pos + archive.len()
-    with_memcpy((cmd as i64 + pos) as *mut u8, middle, middle_len)
-    pos = pos + middle_len
-    if dest.len() > 0:
-        with_memcpy((cmd as i64 + pos) as *mut u8, dest_ptr, dest.len())
-        pos = pos + dest.len()
-    with_memcpy((cmd as i64 + pos) as *mut u8, suffix, suffix_len)
-    unsafe: *((cmd as i64 + total) as *mut u8) = 0
-    if interrupt_flag != 0:
-        with_free(cmd)
-        return -1
-    let rc = run_shell_command(cmd as *const u8)
-    with_free(cmd)
-    if rc == 0:
-        return 0
-    -1

@@ -301,8 +301,6 @@ pub fn run_generate_compiler_entrypoints_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     rc = comp_write_versioned_source(ctx, "src/bootstrap_main.w", "out/gen/bootstrap_main.w", version)
     if rc != 0: return rc
-    rc = comp_write_versioned_source(ctx, "src/main_emit_temp.w", "out/gen/main_emit_temp.w", version)
-    if rc != 0: return rc
     let fs = ctx.fs()
     if fs.write_text("out/gen/version.txt", version ++ "\n") != 0:
         return comp_fail(ctx, "could not write: out/gen/version.txt")

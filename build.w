@@ -150,11 +150,9 @@ pub fn build(ctx: BuildCtx) -> Build:
     compiler_sources.action = run_generate_compiler_entrypoints_action
     compiler_sources = compiler_sources.input("src/main.w")
     compiler_sources = compiler_sources.input("src/bootstrap_main.w")
-    compiler_sources = compiler_sources.input("src/main_emit_temp.w")
     compiler_sources = compiler_sources.input("src/version")
     compiler_sources = compiler_sources.extra_output("out/gen/main.w")
     compiler_sources = compiler_sources.extra_output("out/gen/bootstrap_main.w")
-    compiler_sources = compiler_sources.extra_output("out/gen/main_emit_temp.w")
     compiler_sources = compiler_sources.extra_output("out/gen/version.txt")
     compiler_sources = compiler_sources.extra_output("out/command/compiler-sources")
     out = out.add_target(compiler_sources)
