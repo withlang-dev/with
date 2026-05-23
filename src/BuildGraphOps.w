@@ -287,6 +287,55 @@ pub fn build_graph_copy_manifest_files(root: str, target: BuildGraphTarget, oper
             return 1
     0
 
+pub fn build_graph_promote_tree_if_verified(root: str, target: BuildGraphTarget) -> i32:
+    if target.entry.len() == 0 or target.output.len() == 0:
+        build_graph_rt_eprint("error: promote_tree_if_verified target '" ++ target.name ++ "' requires source and output directories")
+        return 1
+    if target.inputs.len() == 0:
+        build_graph_rt_eprint("error: promote_tree_if_verified target '" ++ target.name ++ "' requires explicit relative input paths")
+        return 1
+    let source_dir = build_graph_resolve_project_path(root, target.entry)
+    let output_dir = build_graph_resolve_project_path(root, target.output)
+    var stale_count = 0
+    var fresh_count = 0
+    for ii in 0..target.inputs.len() as i32:
+        let rel = target.inputs.get(ii as i64)
+        if not build_graph_manifest_relative_path_valid(rel):
+            build_graph_rt_eprint("error: promote_tree_if_verified target '" ++ target.name ++ "' has invalid relative input path: " ++ rel)
+            return 1
+        let source_path = resolve_join(source_dir, rel)
+        let dest_path = resolve_join(output_dir, rel)
+        if build_graph_rt_file_exists(source_path) == 0:
+            build_graph_rt_eprint("error: promote_tree_if_verified target '" ++ target.name ++ "' missing input: " ++ source_path)
+            return 1
+        let source_contents = build_graph_rt_read_file(source_path)
+        if build_graph_rt_file_exists(dest_path) != 0:
+            let dest_contents = build_graph_rt_read_file(dest_path)
+            if source_contents.len() == dest_contents.len():
+                var same = true
+                var ci = 0
+                while ci < source_contents.len() as i32:
+                    if source_contents.byte_at(ci as i64) != dest_contents.byte_at(ci as i64):
+                        same = false
+                        break
+                    ci = ci + 1
+                if same:
+                    fresh_count = fresh_count + 1
+                    continue
+        stale_count = stale_count + 1
+        let dest_dir_path = build_graph_dirname(dest_path)
+        if build_graph_rt_mkdir_p(dest_dir_path) != 0:
+            build_graph_rt_eprint("error: promote_tree_if_verified target '" ++ target.name ++ "' could not create destination directory: " ++ dest_dir_path)
+            return 1
+        if build_graph_rt_write_file(dest_path, source_contents) != 0:
+            build_graph_rt_eprint("error: promote_tree_if_verified target '" ++ target.name ++ "' could not write destination: " ++ dest_path)
+            return 1
+    if stale_count > 0:
+        build_graph_rt_eprint(f"promote: updated {stale_count} stale files in " ++ target.output)
+    else:
+        build_graph_rt_eprint("promote: all " ++ f"{fresh_count}" ++ " files in " ++ target.output ++ " are up to date")
+    0
+
 pub fn build_graph_run_corpus_test(root: str, target: BuildGraphTarget) -> i32:
     if target.entry.len() == 0:
         build_graph_rt_eprint("error: run_corpus_test target '" ++ target.name ++ "' requires a runner")

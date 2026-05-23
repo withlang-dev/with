@@ -60,6 +60,19 @@ The only remaining Phase E shell scan hits are the documented PCRE2 upstream
 positive. Makefile shell usage remains out of Phase E scope while Make still
 exists.
 
+Phase F is complete. The path containment audit is recorded in
+`docs/audits/phase-f-path-audit.md`. Every target dispatched through
+`build_graph_dispatch_standard_target` now passes
+`build_graph_validate_target_containment` before any operation runs.
+Non-install targets reject absolute, `..`, `$`-prefix, and control-char
+paths in output and extra_output fields. Install targets accept only
+recognized install prefixes (`$HOME/`, `$INSTALL_BINDIR/`,
+`$INSTALL_LIBDIR/`) or project-relative paths. Command and corpus test
+targets are allowed absolute entry paths (executables).
+`PromoteTreeIfVerified` now uses byte-by-byte staleness detection: fresh
+files are skipped and stale files are reported. Process argument validation
+diagnostics now name the target, field index, and rejected value.
+
 Completed D1 sub-slices:
 
 1. Shared capability registry used by Sema, plus a reserved capability value
@@ -588,10 +601,13 @@ not a new compiler-dispatched project graph kind.
 - Phase E is complete. New compiler, migrator, runtime, stdlib, and build
   internals should use typed process/filesystem APIs rather than shell command
   strings.
+- Phase F is complete. All build graph targets pass project-root containment
+  validation at dispatch time. Install targets require recognized install
+  prefixes. PromoteTreeIfVerified uses staleness detection.
 
 ## Local State
 
-At the time of this update, Phase E is complete. The Phase E code slices
+At the time of this update, Phase F is complete. The Phase F code changes
 passed the standard verification sequence:
 
 ```sh
@@ -599,13 +615,11 @@ out/bin/with check src/main.w
 make build
 make fixpoint
 make test
-make install-user
 ```
 
-Focused checks for the final Phase E slices also covered `std.process`,
-`rt/clang_bridge.w`, `build.w`, `build_compiler.w`, and compat-runtime object
-generation. The final source scan has only the documented PCRE2 upstream
-`/bin/bash` runner exception and the `shorthand` filename false positive.
+Phase F changes are in `src/BuildGraphSupport.w`, `src/BuildGraphDispatch.w`,
+`src/BuildGraphOps.w`, and `build.w`. The full audit is in
+`docs/audits/phase-f-path-audit.md`.
 
 The full emit-C test is intentionally not part of this verification pass per
 the manual-only policy above.

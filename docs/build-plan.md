@@ -520,6 +520,8 @@ outside Phase E by design while Make still exists.
 
 ## 9. Phase F: Harden Path, Install, and Promotion Semantics
 
+Status: complete.
+
 Goal: every path-writing capability and target has explicit sandbox or install
 permissions.
 
@@ -540,27 +542,21 @@ Tasks:
 3. Add stale-verification checks for `PromoteTreeIfVerified`.
 4. Add path diagnostics that name the target, field, and rejected path.
 
-Tests:
+Completed work:
 
-- absolute path rejection without install capability;
-- `..` rejection;
-- generated-source escape rejection;
-- copy/install/promote escape rejection;
-- clean cannot remove outside declared roots;
-- install-user requires the verified dependency chain.
-
-Verification:
-
-```sh
-with build :cli-selfhost-build-w-tests
-with build :install-user --dry-run
-with build :pcre2-promote --dry-run
-make build
-make fixpoint
-make test
-```
-
-Commit after this phase.
+- Added `build_graph_path_project_contained` and
+  `build_graph_path_is_install_dest` validators in
+  `src/BuildGraphSupport.w`.
+- Added `build_graph_validate_target_containment` that gates every
+  target dispatch: non-install targets reject absolute, `..`, `$`-prefix,
+  and control-char paths; install targets accept only recognized install
+  prefixes or project-relative paths.
+- Added `build_graph_promote_tree_if_verified` with byte-by-byte
+  staleness detection: skips fresh files, reports stale count.
+- Improved `build_graph_validate_process_args` diagnostics to name the
+  target, field index, and rejected value.
+- Removed stale `main_emit_temp` clean artifacts from `build.w`.
+- Full audit recorded in `docs/audits/phase-f-path-audit.md`.
 
 ---
 

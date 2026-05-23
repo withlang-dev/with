@@ -95,6 +95,9 @@ fn build_graph_verify_completed_deps(target: BuildGraphTarget, completed: Vec[st
     0
 
 pub fn build_graph_dispatch_standard_target(root: str, target: BuildGraphTarget, completed_targets: Vec[str]) -> BuildGraphDispatchResult:
+    let containment_rc = build_graph_validate_target_containment(target)
+    if containment_rc != 0:
+        return build_graph_dispatch_result(true, containment_rc)
     if target.kind == 7:
         return build_graph_dispatch_result(true, build_graph_run_command(root, target))
     if target.kind == 8:
@@ -129,7 +132,7 @@ pub fn build_graph_dispatch_standard_target(root: str, target: BuildGraphTarget,
         let deps_rc = build_graph_verify_completed_deps(target, completed_targets, "promote_tree_if_verified", true)
         if deps_rc != 0:
             return build_graph_dispatch_result(true, deps_rc)
-        return build_graph_dispatch_result(true, build_graph_copy_manifest_files(root, target, "promote_tree_if_verified"))
+        return build_graph_dispatch_result(true, build_graph_promote_tree_if_verified(root, target))
     if target.kind == 21:
         return build_graph_dispatch_result(true, build_graph_run_clean(root, target))
     if target.kind == 22:
