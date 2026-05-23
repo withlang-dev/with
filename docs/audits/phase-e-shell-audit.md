@@ -1,7 +1,6 @@
 # Phase E Shell-String Audit
 
-Status: active audit for Phase E. `src/compiler/Compilation.w` cleanup
-complete.
+Status: complete. Phase E shell-string cleanup is implemented and verified.
 
 Phase E removes shell command strings from compiler, migrator, runtime,
 stdlib, and build-system internals. Shell syntax remains acceptable in the
@@ -87,9 +86,8 @@ make fixpoint
 make test
 ```
 
-After each Phase E slice, rerun the scan and update this audit until every
-remaining hit is either removed, a false positive, an allowed fixture, or a
-documented exception with an owner.
+Each Phase E slice reran the scan and updated this audit. The remaining hits
+are either false positives or documented exceptions with owners.
 
 ## Std Process Slice
 

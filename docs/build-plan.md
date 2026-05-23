@@ -450,6 +450,8 @@ with a workspace message-loop integration that consumes stable
 
 ## 8. Phase E: Remove Shell Command Strings From Build Internals
 
+Status: complete.
+
 Goal: compiler, migrator, runtime, stdlib, and build-system code do filesystem
 and process work through typed APIs, not shell strings.
 
@@ -491,7 +493,28 @@ make test
 Every remaining hit must be either a false positive, a test fixture, or an
 explicitly documented exception.
 
-Commit after this phase.
+Completed slices:
+
+- `src/compiler/Compilation.w`, `src/compiler/Link.w`, and compiler module
+  runtime access now use typed runtime process/filesystem wrappers.
+- `src/main.w` cleanup, CLI run, test capture, and benchmark execution no
+  longer use shell command strings.
+- `src/compiler/ConanClient.w` extracts Conan archives through typed argv.
+- `lib/std/process.w` is argv-first; shell-string execution was removed from
+  the public process API.
+- `rt/clang_bridge.w` no longer uses `popen`; SDK discovery and preprocessing
+  use typed argv capture and resource-directory discovery uses direct
+  directory enumeration.
+- `rt/compat_runtime.w` no longer exports `with_system` or
+  `with_extract_tgz`.
+- The unused tracked legacy entry snapshot `src/main_emit_temp.w` was removed
+  from source generation.
+
+Final source scan hits are documented in
+`docs/audits/phase-e-shell-audit.md`: PCRE2's upstream `RunTest` bash runner
+is an isolated migrated-library test boundary, and `shorthand` in
+`build_selfhost.w` is a filename false positive. Makefile shell usage remains
+outside Phase E by design while Make still exists.
 
 ---
 
