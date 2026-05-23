@@ -22,11 +22,12 @@ independent message streams after the parallel compile joins; partially
 consumed intercepted workspaces fail loudly.
 
 Phase E has started. The initial shell-string audit is recorded in
-`docs/audits/phase-e-shell-audit.md`. The first implementation slice removed
-`rm -f`, `rm -rf`, and `mkdir -p` shell strings from
-`src/compiler/Compilation.w`; output directory creation now fails loudly and
-cleanup uses typed runtime filesystem primitives. `dsymutil` in
-`Compilation.w` remains the next process-execution cleanup in that file.
+`docs/audits/phase-e-shell-audit.md`. `src/compiler/Compilation.w` is clean of
+shell command strings and raw runtime extern declarations: output directory
+creation fails loudly through typed runtime filesystem primitives, cleanup uses
+typed runtime filesystem primitives, and `dsymutil` runs through typed argv
+capture. `src/compiler/Runtime.w` is the explicit raw-runtime boundary for the
+compiler module slices that have been migrated so far.
 
 Completed D1 sub-slices:
 

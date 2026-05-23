@@ -17,38 +17,25 @@ use compiler.Link
 use compiler.ProjectConfig
 use compiler.DriverOptions
 use compiler.Zcu
-
-extern fn with_eprint(s: str) -> void
-extern fn with_exec_binary(path: str) -> i32
-extern fn with_fs_write_file(path: str, data: str) -> i32
-extern fn with_fs_read_file(path: str) -> str
-extern fn with_fs_remove_file(path: str) -> i32
-extern fn with_fs_remove_dir(path: str) -> i32
-extern fn with_fs_remove_tree(path: str) -> i32
-extern fn with_fs_mkdir_p(path: str) -> i32
-extern fn with_getenv_str(name: str) -> str
-extern fn with_setenv_str(name: str, value: str) -> i32
-extern fn with_system(cmd: str) -> i32
-extern fn with_clock_nanos() -> i64
-extern fn with_getpid() -> i32
+use compiler.Runtime
 
 fn profile_enabled() -> bool:
-    with_getenv_str("WITH_PROFILE").len() > 0
+    runtime_getenv("WITH_PROFILE").len() > 0
 
 fn profile_now() -> i64:
-    with_clock_nanos()
+    runtime_clock_nanos()
 
 fn profile_emit(name: str, start: i64, counters: str):
-    let elapsed_ns = with_clock_nanos() - start
+    let elapsed_ns = runtime_clock_nanos() - start
     let ms_whole = elapsed_ns / 1000000
     let ms_frac = (elapsed_ns % 1000000) / 1000
     if counters.len() > 0:
-        with_eprint(f"[profile] {name}  {ms_whole}.{ms_frac} ms  {counters}")
+        runtime_eprint(f"[profile] {name}  {ms_whole}.{ms_frac} ms  {counters}")
     else:
-        with_eprint(f"[profile] {name}  {ms_whole}.{ms_frac} ms")
+        runtime_eprint(f"[profile] {name}  {ms_whole}.{ms_frac} ms")
 
 fn compilation_debug_init_enabled() -> i32:
-    let raw = with_getenv_str("WITH_DEBUG_STAGE1_TRACE")
+    let raw = runtime_getenv("WITH_DEBUG_STAGE1_TRACE")
     if raw.len() == 0:
         return 0
     1
@@ -56,10 +43,10 @@ fn compilation_debug_init_enabled() -> i32:
 fn compilation_debug_init(msg: str):
     if compilation_debug_init_enabled() == 0:
         return
-    with_eprint("[comp-init] " ++ msg)
+    runtime_eprint("[comp-init] " ++ msg)
 
 fn compilation_debug_pool_flow_enabled() -> i32:
-    let raw = with_getenv_str("WITH_DEBUG_POOL_FLOW")
+    let raw = runtime_getenv("WITH_DEBUG_POOL_FLOW")
     if raw.len() == 0:
         return 0
     1
@@ -67,34 +54,45 @@ fn compilation_debug_pool_flow_enabled() -> i32:
 fn compilation_debug_pool_flow(label: str, pool: InternPool, typed_pool: AstPool, sema: Sema):
     if compilation_debug_pool_flow_enabled() == 0:
         return
-    with_eprint(f"[comp] {label} pool.symbols={pool.state.symbol_texts.len() as i32} typed.decls={typed_pool.decl_count()} sema.pool.symbols={sema.pool.state.symbol_texts.len() as i32} sema.ast.decls={sema.ast.decl_count()}")
+    runtime_eprint(f"[comp] {label} pool.symbols={pool.state.symbol_texts.len() as i32} typed.decls={typed_pool.decl_count()} sema.pool.symbols={sema.pool.state.symbol_texts.len() as i32} sema.ast.decls={sema.ast.decl_count()}")
 
 fn compilation_ensure_output_dir(path: str) -> bool:
     if path.len() == 0:
         return true
-    let rc = with_fs_mkdir_p(path)
+    let rc = runtime_mkdir_p(path)
     if rc != 0:
-        with_eprint(f"error: failed to create output directory '{path}'")
+        runtime_eprint(f"error: failed to create output directory '{path}'")
         return false
     true
 
 fn compilation_remove_file_best_effort(path: str):
     if path.len() == 0:
         return
-    let _ = with_fs_remove_file(path)
+    let _ = runtime_remove_file(path)
 
 fn compilation_remove_tree_best_effort(path: str):
     if path.len() == 0:
         return
-    let _ = with_fs_remove_tree(path)
+    let _ = runtime_remove_tree(path)
 
 fn compilation_remove_dsym_best_effort(bin_path: str):
     if bin_path.len() == 0:
         return
     compilation_remove_tree_best_effort(bin_path ++ ".dSYM")
 
+fn compilation_argv_append(argv: str, arg: str) -> str:
+    argv ++ arg ++ "\0"
+
+fn compilation_run_dsymutil_best_effort(bin_path: str):
+    if bin_path.len() == 0:
+        return
+    var argv = ""
+    argv = compilation_argv_append(argv, "dsymutil")
+    argv = compilation_argv_append(argv, bin_path)
+    let _ = runtime_exec_argv_capture(argv, "/dev/null", "/dev/null", 0)
+
 fn compilation_debug_type_names_enabled() -> i32:
-    let raw = with_getenv_str("WITH_DEBUG_TYPE_NAMES")
+    let raw = runtime_getenv("WITH_DEBUG_TYPE_NAMES")
     if raw.len() == 0:
         return 0
     if raw == "0":
@@ -104,7 +102,7 @@ fn compilation_debug_type_names_enabled() -> i32:
 fn compilation_dump_type_names(stage: str, pool: AstPool, intern: InternPool):
     if compilation_debug_type_names_enabled() == 0:
         return
-    with_eprint(f"[type-names] stage={stage} decls={pool.decl_count()}")
+    runtime_eprint(f"[type-names] stage={stage} decls={pool.decl_count()}")
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
         if pool.kind(decl) != NodeKind.NK_TYPE_DECL:
@@ -122,7 +120,7 @@ fn compilation_dump_type_names(stage: str, pool: AstPool, intern: InternPool):
         let name_sym = pool.get_data0(decl)
         let name = intern.resolve(name_sym)
         let msg = f"[type-names] {stage} decl={di} node={decl as i32} kind={kind_name} name_sym={name_sym} name={name}"
-        with_eprint(msg)
+        runtime_eprint(msg)
 
 fn compilation_find_fn_decl_index(pool: AstPool, fn_sym: i32) -> i32:
     for di in 0..pool.decl_count():
@@ -606,27 +604,27 @@ fn Compilation.run_after_typecheck_hooks(self: Compilation, pool: AstPool, sourc
     let zcu = self.zcu
     let root = if zcu.project_config.root_dir.len() > 0: zcu.project_config.root_dir else: frontend_dirname(source_path)
     let tmp_dir = root ++ "/out/tmp"
-    if with_fs_mkdir_p(tmp_dir) != 0:
-        with_eprint("error: could not create compiler hook temp directory: " ++ tmp_dir)
+    if runtime_mkdir_p(tmp_dir) != 0:
+        runtime_eprint("error: could not create compiler hook temp directory: " ++ tmp_dir)
         return false
-    let stamp = f"{with_getpid()}.{with_clock_nanos()}"
+    let stamp = f"{runtime_getpid()}.{runtime_clock_nanos()}"
     let runner_path = root ++ "/__with_compiler_hook_runner." ++ stamp ++ ".w"
     let runner_bin = tmp_dir ++ "/compiler-hook-runner." ++ stamp
     let diag_path = tmp_dir ++ "/compiler-hook-diags." ++ stamp ++ ".txt"
     let emitted_source_path = tmp_dir ++ "/compiler-hook-source." ++ stamp ++ ".w"
     let capability_token = "with-compiler-hook:" ++ stamp
-    if with_fs_write_file(diag_path, "") != 0:
-        with_eprint("error: could not initialize compiler hook diagnostics")
+    if runtime_write_file(diag_path, "") != 0:
+        runtime_eprint("error: could not initialize compiler hook diagnostics")
         return false
-    if with_fs_write_file(emitted_source_path, "") != 0:
-        let _remove_diag_init = with_fs_remove_file(diag_path)
-        with_eprint("error: could not initialize compiler hook emitted source")
+    if runtime_write_file(emitted_source_path, "") != 0:
+        let _remove_diag_init = runtime_remove_file(diag_path)
+        runtime_eprint("error: could not initialize compiler hook emitted source")
         return false
     let runner_source = self.compiler_hook_runner_source(pool, source_path, diag_path, emitted_source_path, capability_token)
-    if with_fs_write_file(runner_path, runner_source) != 0:
-        let _ = with_fs_remove_file(diag_path)
-        let _remove_emitted_init = with_fs_remove_file(emitted_source_path)
-        with_eprint("error: could not write compiler hook runner")
+    if runtime_write_file(runner_path, runner_source) != 0:
+        let _ = runtime_remove_file(diag_path)
+        let _remove_emitted_init = runtime_remove_file(emitted_source_path)
+        runtime_eprint("error: could not write compiler hook runner")
         return false
     var runner_comp = Compilation.init()
     runner_comp.configure(self.config.opt_level, self.config.no_std, self.config.alloc_mode)
@@ -635,28 +633,28 @@ fn Compilation.run_after_typecheck_hooks(self: Compilation, pool: AstPool, sourc
     runner_comp.set_compiler_hooks_enabled(false)
     runner_comp.set_tool_mode_entry_path(runner_path)
     let built_runner = runner_comp.build_binary_to_path(runner_path, runner_bin)
-    let _remove_runner_source = with_fs_remove_file(runner_path)
+    let _remove_runner_source = runtime_remove_file(runner_path)
     if built_runner == "":
-        let _remove_diag = with_fs_remove_file(diag_path)
-        let _remove_emitted = with_fs_remove_file(emitted_source_path)
-        with_eprint("error: compiler hook runner compilation failed")
+        let _remove_diag = runtime_remove_file(diag_path)
+        let _remove_emitted = runtime_remove_file(emitted_source_path)
+        runtime_eprint("error: compiler hook runner compilation failed")
         return false
-    let old_capability_token = with_getenv_str("WITH_TOOL_CAPABILITY_TOKEN")
-    let _set_capability_token = with_setenv_str("WITH_TOOL_CAPABILITY_TOKEN", capability_token)
-    let rc = with_exec_binary(built_runner)
-    let _restore_capability_token = with_setenv_str("WITH_TOOL_CAPABILITY_TOKEN", old_capability_token)
-    let diag_text = with_fs_read_file(diag_path)
-    let emitted_source = with_fs_read_file(emitted_source_path)
-    let _remove_diag_after = with_fs_remove_file(diag_path)
-    let _remove_emitted_after = with_fs_remove_file(emitted_source_path)
-    let _remove_runner_bin = with_fs_remove_file(built_runner)
-    let _remove_runner_obj = with_fs_remove_file(built_runner ++ ".o")
-    let _remove_runner_dsym = with_fs_remove_dir(built_runner ++ ".dSYM")
+    let old_capability_token = runtime_getenv("WITH_TOOL_CAPABILITY_TOKEN")
+    let _set_capability_token = runtime_setenv("WITH_TOOL_CAPABILITY_TOKEN", capability_token)
+    let rc = runtime_exec_binary(built_runner)
+    let _restore_capability_token = runtime_setenv("WITH_TOOL_CAPABILITY_TOKEN", old_capability_token)
+    let diag_text = runtime_read_file(diag_path)
+    let emitted_source = runtime_read_file(emitted_source_path)
+    let _remove_diag_after = runtime_remove_file(diag_path)
+    let _remove_emitted_after = runtime_remove_file(emitted_source_path)
+    let _remove_runner_bin = runtime_remove_file(built_runner)
+    let _remove_runner_obj = runtime_remove_file(built_runner ++ ".o")
+    let _remove_runner_dsym = runtime_remove_dir(built_runner ++ ".dSYM")
     let emitted = self.emit_compiler_hook_diagnostics(diag_text)
     if emitted > 0:
         return false
     if rc != 0:
-        with_eprint(f"error: compiler hook execution failed with exit code {rc}")
+        runtime_eprint(f"error: compiler hook execution failed with exit code {rc}")
         return false
     self.compiler_hook_emitted_source = emitted_source
     true
@@ -668,7 +666,7 @@ fn Compilation.prepare_pool_after_typecheck_hooks(self: Compilation, pool: AstPo
         return AstPool.new()
     if self.compiler_hook_emitted_source.len() == 0:
         return pool
-    let base_source = if self.zcu.current_source_text.len() > 0: self.zcu.current_source_text else: with_fs_read_file(source_path)
+    let base_source = if self.zcu.current_source_text.len() > 0: self.zcu.current_source_text else: runtime_read_file(source_path)
     let cfg = self.zcu.project_config
     let combined = base_source ++ "\n\n// <with compiler hook emitted source>\n" ++ self.compiler_hook_emitted_source
     self.compiler_hook_emitted_source = ""
@@ -719,7 +717,7 @@ fn Compilation.compile_source_text(self: Compilation, source_path: str, source_t
     zcu.reset_for_new_invocation(source_dir, source_path, "")
     zcu.project_config = project_config_load_for_source(source_path)
     if zcu.project_config.manifest_error.len() > 0:
-        with_eprint("error: invalid with.toml: " ++ zcu.project_config.manifest_error)
+        runtime_eprint("error: invalid with.toml: " ++ zcu.project_config.manifest_error)
         self.zcu = zcu
         return AstPool.new()
     zcu.set_current_source(source_dir, source_path, source_text)
@@ -733,7 +731,7 @@ fn Compilation.compile_source_text_with_config(self: Compilation, source_path: s
     zcu.reset_for_new_invocation(source_dir, source_path, "")
     zcu.project_config = cfg
     if zcu.project_config.manifest_error.len() > 0:
-        with_eprint("error: invalid with.toml: " ++ zcu.project_config.manifest_error)
+        runtime_eprint("error: invalid with.toml: " ++ zcu.project_config.manifest_error)
         self.zcu = zcu
         return AstPool.new()
     zcu.set_current_source(source_dir, source_path, source_text)
@@ -750,7 +748,7 @@ fn Compilation.compile_entry_source_text(self: Compilation, source_path: str, so
 
 fn Compilation.compile_entry_source_texts(self: Compilation, source_paths: Vec[str], source_texts: Vec[str]) -> AstPool:
     if source_paths.len() == 0 or source_texts.len() == 0 or source_paths.len() != source_texts.len():
-        with_eprint("error: compile_entry_source_texts requires matching non-empty source paths and texts")
+        runtime_eprint("error: compile_entry_source_texts requires matching non-empty source paths and texts")
         return AstPool.new()
     var zcu = self.zcu
     let source_path = source_paths.get(0)
@@ -759,7 +757,7 @@ fn Compilation.compile_entry_source_texts(self: Compilation, source_paths: Vec[s
     zcu.reset_for_new_invocation(source_dir, source_path, "")
     zcu.project_config = project_config_load_for_source(source_path)
     if zcu.project_config.manifest_error.len() > 0:
-        with_eprint("error: invalid with.toml: " ++ zcu.project_config.manifest_error)
+        runtime_eprint("error: invalid with.toml: " ++ zcu.project_config.manifest_error)
         self.zcu = zcu
         return AstPool.new()
     zcu.set_current_source(source_dir, source_path, source_text)
@@ -862,7 +860,7 @@ fn compilation_execute_binary_link_plan(debug_info: bool, plan: CompilationBinar
         profile_emit("link", t_link, "")
     if debug_info:
         let t_dsym = profile_now()
-        let _ = ("dsymutil " ++ plan.bin_path ++ " 2>/dev/null") |> with_system
+        compilation_run_dsymutil_best_effort(plan.bin_path)
         if profile_enabled():
             profile_emit("dsymutil", t_dsym, "")
     compilation_remove_file_best_effort(plan.obj_path)
@@ -1008,7 +1006,7 @@ fn Compilation.build_entry_binary_from_source_to_path(self: Compilation, source_
 
 fn Compilation.build_entry_binary_from_sources_to_path(self: Compilation, source_paths: Vec[str], source_texts: Vec[str], bin_path: str) -> str:
     if source_paths.len() == 0 or source_texts.len() == 0 or source_paths.len() != source_texts.len():
-        with_eprint("error: build_entry_binary_from_sources_to_path requires matching non-empty source paths and texts")
+        runtime_eprint("error: build_entry_binary_from_sources_to_path requires matching non-empty source paths and texts")
         return ""
     let source_path = source_paths.get(0)
     if bin_path.len() == 0:
@@ -1030,7 +1028,7 @@ fn Compilation.emit_c(self: Compilation, source_path: str, output_path: str) -> 
     if prepared_pool.decl_count() == 0:
         return ""
     if not self.ensure_codegen_mir(prepared_pool):
-        with_eprint("error: C emission failed during MIR lowering")
+        runtime_eprint("error: C emission failed during MIR lowering")
         return ""
     let typed_pool: AstPool = self.active_pool(prepared_pool)
 
@@ -1042,12 +1040,12 @@ fn Compilation.emit_c(self: Compilation, source_path: str, output_path: str) -> 
 
     let emitted = c_emit_module(self.zcu.last_mir_module, typed_pool, self.zcu.pool, self.zcu.last_sema, self.zcu.current_source_path, self.zcu.current_source_text)
     if emitted.ok == 0:
-        with_eprint("error: C emission failed: " ++ emitted.err_msg)
+        runtime_eprint("error: C emission failed: " ++ emitted.err_msg)
         return ""
 
-    let write_rc = with_fs_write_file(final_output, emitted.source)
+    let write_rc = runtime_write_file(final_output, emitted.source)
     if write_rc != 0:
-        with_eprint("error: failed to write '" ++ final_output ++ "'")
+        runtime_eprint("error: failed to write '" ++ final_output ++ "'")
         return ""
 
     final_output
@@ -1056,7 +1054,7 @@ fn Compilation.emit_typed(self: Compilation, pool: AstPool) -> bool:
     var zcu = self.zcu
     let typed_pool = pool
     if typed_pool.decl_count() == 0:
-        with_eprint("error: no source loaded for typed emission")
+        runtime_eprint("error: no source loaded for typed emission")
         return false
     if zcu.last_sema.ast.decl_count() == typed_pool.decl_count() and typed_pool.decl_count() > 0:
         zcu.last_sema.emit_typed_module(0)
