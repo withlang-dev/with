@@ -38,6 +38,8 @@ archives produced by direct `ar rcs`. The orphan `with_system` declaration in
 through `src/compiler/Runtime.w` instead of declaring raw `with_*` externs.
 `src/compiler/Frontend.w` now does the same for file IO, diagnostics,
 environment reads, timing, string hashing/cloning, argv access, and nanosleep.
+In `src/main.w`, CLI `run`/one-liner binary execution and binary artifact
+cleanup now use typed runtime wrappers instead of shell command strings.
 
 Completed D1 sub-slices:
 

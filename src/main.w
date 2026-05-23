@@ -48,7 +48,6 @@ extern fn with_str_slice(s: str, start: i64, end: i64) -> str
 extern fn with_eprint(s: str) -> void
 extern fn with_ewrite(s: str) -> void
 extern fn with_system(cmd: str) -> i32
-extern fn with_exec_binary(path: str) -> i32
 extern fn with_exec_argv(args: str) -> i32
 extern fn with_exec_argv_capture(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32) -> i32
 extern fn with_exec_argv_capture_cwd(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str) -> i32
@@ -576,10 +575,10 @@ fn run_one_liner_command(argc: i32, one: CliOneLiner, no_std: bool, alloc_mode: 
     if built == "":
         return 1
     comp.print_warnings()
-    let rc = with_exec_binary(built)
-    let _ = with_fs_remove_file(built)
-    let _ = with_fs_remove_file(built ++ ".o")
-    let _ = with_fs_remove_dir(built ++ ".dSYM")
+    let rc = build_graph_rt_exec_binary(built)
+    let _bin = build_graph_rt_remove_file(built)
+    let _obj = build_graph_rt_remove_file(built ++ ".o")
+    let _dsym = build_graph_rt_remove_tree(built ++ ".dSYM")
     rc
 
 fn run_cli(argc: i32) -> i32:
@@ -773,8 +772,8 @@ fn find_output_arg(argc: i32) -> str:
 fn cleanup_binary_artifacts(bin_path: str):
     if bin_path.len() == 0:
         return
-    let _ = ("rm -f " ++ bin_path) |> with_system
-    let _ = ("rm -rf " ++ bin_path ++ ".dSYM") |> with_system
+    let _bin = build_graph_rt_remove_file(bin_path)
+    let _dsym = build_graph_rt_remove_tree(bin_path ++ ".dSYM")
 
 fn test_unique_binary_path(source_file: str) -> str:
     let base = link_stage_output_path_for_source(source_file)
@@ -1190,7 +1189,7 @@ fn run_run_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: b
         with_eprint("error: run failed")
         return 1
     comp.print_warnings()
-    let run_rc = with_system(bin_path)
+    let run_rc = build_graph_rt_exec_binary(bin_path)
     cleanup_binary_artifacts(bin_path)
     run_rc
 
