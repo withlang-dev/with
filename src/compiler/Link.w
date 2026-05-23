@@ -1,13 +1,4 @@
-extern fn with_system(cmd: str) -> i32
-extern fn with_exec_argv(args: str) -> i32
-extern fn with_exec_argv_cwd(args: str, cwd: str) -> i32
-extern fn with_arg_at(idx: i32) -> str
-extern fn with_fs_read_file(path: str) -> str
-extern fn with_fs_write_file(path: str, data: str) -> i32
-extern fn with_fs_mkdir_p(path: str) -> i32
-extern fn with_eprint(s: str) -> void
-extern fn with_getenv_str(name: str) -> str
-extern fn with_setenv_str(name: str, value: str) -> i32
+use compiler.Runtime
 
 extern let with_embedded_cimport_stubs_o_start: u8
 extern let with_embedded_cimport_stubs_o_end: u8
@@ -99,13 +90,13 @@ fn link_stage_apply_env(env: Vec[LinkStageEnvVar]) -> LinkStageSavedEnv:
     for i in 0..env.len() as i32:
         let item = env.get(i as i64)
         names.push(item.name)
-        values.push(with_getenv_str(item.name) ++ "")
-        let _ = with_setenv_str(item.name, item.value)
+        values.push(runtime_getenv(item.name) ++ "")
+        let _ = runtime_setenv(item.name, item.value)
     LinkStageSavedEnv { names, values }
 
 fn link_stage_restore_env(saved: LinkStageSavedEnv):
     for i in 0..saved.names.len() as i32:
-        let _ = with_setenv_str(saved.names.get(i as i64), saved.values.get(i as i64))
+        let _ = runtime_setenv(saved.names.get(i as i64), saved.values.get(i as i64))
 
 fn LinkStageCommand.run(self: LinkStageCommand) -> i32:
     var argv = ""
@@ -114,9 +105,9 @@ fn LinkStageCommand.run(self: LinkStageCommand) -> i32:
         argv = link_stage_argv_append(argv, self.args.get(i as i64))
     let saved = link_stage_apply_env(self.env)
     let rc = if self.cwd.len() > 0:
-        with_exec_argv_cwd(argv, self.cwd)
+        runtime_exec_argv_cwd(argv, self.cwd)
     else:
-        with_exec_argv(argv)
+        runtime_exec_argv(argv)
     link_stage_restore_env(saved)
     rc
 
@@ -199,7 +190,7 @@ fn link_stage_extract_runtime_obj(name: str, path: str) -> i32:
     let data = link_stage_embedded_runtime_object(name)
     if data.len() == 0:
         return 1
-    if with_fs_write_file(path, data) != 0:
+    if runtime_write_file(path, data) != 0:
         return 1
     0
 
@@ -256,13 +247,16 @@ fn link_stage_str_contains(hay: str, needle: str) -> bool:
 
 fn link_stage_undefined_symbols_for_object(obj_path: str) -> str:
     let report_path = obj_path ++ ".undef"
-    let probe_cmd = "nm -u " ++ obj_path ++ " > " ++ report_path ++ " 2>/dev/null"
-    let probe_rc = probe_cmd |> with_system
+    var argv = ""
+    argv = link_stage_argv_append(argv, "nm")
+    argv = link_stage_argv_append(argv, "-u")
+    argv = link_stage_argv_append(argv, obj_path)
+    let probe_rc = runtime_exec_argv_capture(argv, report_path, "/dev/null", 0)
     if probe_rc != 0:
-        let _ = ("rm -f " ++ report_path) |> with_system
+        let _ = runtime_remove_file(report_path)
         return "<probe-failed>"
-    let symbols = with_fs_read_file(report_path)
-    let _ = ("rm -f " ++ report_path) |> with_system
+    let symbols = runtime_read_file(report_path)
+    let _ = runtime_remove_file(report_path)
     symbols
 
 fn link_stage_undefined_symbols_need_helpers_runtime(undef: str) -> i32:
@@ -314,13 +308,13 @@ fn link_stage_undefined_symbols_need_compat_runtime(undef: str) -> i32:
     0
 
 fn link_stage_compiler_runtime_dir() -> str:
-    let argv0 = with_arg_at(0)
+    let argv0 = runtime_arg_at(0)
     if argv0.len() == 0:
         return "runtime"
     link_stage_dirname(argv0) ++ "/runtime"
 
 fn link_stage_resolve_runtime_root() -> str:
-    let argv0 = with_arg_at(0)
+    let argv0 = runtime_arg_at(0)
     let compiler_dir = if argv0.len() > 0: link_stage_dirname(argv0) else: "."
     let candidates: Vec[str] = Vec.new()
     // Prefer the current workspace artifact root during bootstrap. This lets
@@ -338,7 +332,7 @@ fn link_stage_resolve_runtime_root() -> str:
     for i in 0..candidates.len() as i32:
         let dir = candidates.get(i as i64)
         let probe = dir ++ "/cimport_stubs.o"
-        if with_fs_read_file(probe).len() > 0:
+        if runtime_read_file(probe).len() > 0:
             return dir
     // Fall back to compiler-relative runtime dir.
     compiler_dir ++ "/runtime"
@@ -348,12 +342,12 @@ fn link_stage_find_llvm_static_bridge() -> str:
     let bridge_o = root ++ "/llvm_bridge.o"
     let rsp = root ++ "/llvm_link.rsp"
     let cc_file = root ++ "/llvm_cc"
-    if with_fs_read_file(bridge_o).len() > 0 and with_fs_read_file(rsp).len() > 0 and with_fs_read_file(cc_file).len() > 0:
+    if runtime_read_file(bridge_o).len() > 0 and runtime_read_file(rsp).len() > 0 and runtime_read_file(cc_file).len() > 0:
         return bridge_o
     ""
 
 fn link_stage_read_file_trimmed(path: str) -> str:
-    let content = with_fs_read_file(path)
+    let content = runtime_read_file(path)
     if content.len() == 0:
         return ""
     // Trim trailing newline
@@ -363,7 +357,7 @@ fn link_stage_read_file_trimmed(path: str) -> str:
     content.slice(0, end as i64)
 
 fn link_stage_artifact_root() -> str:
-    let env_root = with_getenv_str("WITH_OUT_DIR")
+    let env_root = runtime_getenv("WITH_OUT_DIR")
     if env_root.len() > 0:
         return env_root
     "out"
@@ -371,11 +365,11 @@ fn link_stage_artifact_root() -> str:
 fn link_stage_find_runtime_object_path(name: str) -> str:
     let root = link_stage_resolve_runtime_root()
     let p = root ++ "/" ++ name
-    if with_fs_read_file(p).len() > 0:
+    if runtime_read_file(p).len() > 0:
         return p
     // Fall back to embedded runtime objects (self-contained binary)
     let tmp_dir = link_stage_artifact_root() ++ "/tmp/with_runtime"
-    if with_fs_mkdir_p(tmp_dir) != 0:
+    if runtime_mkdir_p(tmp_dir) != 0:
         return ""
     let tmp_path = tmp_dir ++ "/" ++ name
     if link_stage_extract_runtime_obj(name, tmp_path) == 0:
@@ -389,8 +383,13 @@ fn link_stage_make_archive(obj_path: str) -> str:
     link_stage_make_archive_to_path(obj_path, ar_path)
 
 fn link_stage_make_archive_to_path(obj_path: str, ar_path: str) -> str:
-    let cmd = "if [ ! -f " ++ ar_path ++ " ] || [ " ++ obj_path ++ " -nt " ++ ar_path ++ " ]; then ar rcs " ++ ar_path ++ " " ++ obj_path ++ "; fi"
-    let rc = with_system(cmd)
+    var argv = ""
+    argv = link_stage_argv_append(argv, "libtool")
+    argv = link_stage_argv_append(argv, "-static")
+    argv = link_stage_argv_append(argv, "-o")
+    argv = link_stage_argv_append(argv, ar_path)
+    argv = link_stage_argv_append(argv, obj_path)
+    let rc = runtime_exec_argv(argv)
     if rc == 0:
         return ar_path
     ""
@@ -656,11 +655,11 @@ fn link_stage_link_object_to_binary_plan(obj_path: str, bin_path: str, link_libs
             extras.push(static_bridge)
             // Include embedded runtime objects for self-contained binary
             let embedded_path = root ++ "/embedded_objects.o"
-            if with_fs_read_file(embedded_path).len() > 0:
+            if runtime_read_file(embedded_path).len() > 0:
                 extras.push(embedded_path)
             // Include clang bridge for c_import support
             let clang_bridge_path = root ++ "/clang_bridge.o"
-            if with_fs_read_file(clang_bridge_path).len() > 0:
+            if runtime_read_file(clang_bridge_path).len() > 0:
                 extras.push(clang_bridge_path)
             extras.push("@" ++ rsp_path)
             return link_stage_link_with_llvm_plan(obj_path, bin_path, extras, link_libs, cc_path)
