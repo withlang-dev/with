@@ -13,7 +13,7 @@ conversation context after compaction.
 
 Phase C extraction work is complete. Pre-Phase-D preparation is complete
 through P9, including the follow-up source-location diagnostic gap. Phase D
-D1 through D6 are complete. Phase D D7 is in progress. The evaluator supports
+D1 through D7 are complete. Phase D D8 is next. The evaluator supports
 true OS-thread execution for multi-workspace `parallel(workspaces)` calls by
 planning workspaces on the evaluator thread, compiling each plan on its own OS
 thread, and materializing `BuildResult` values back on the evaluator thread in
@@ -283,6 +283,28 @@ Started D6 parallel-workspace work:
     failing workspace and verifies the failed workspace identity appears in
     stderr while the build script can still inspect `BuildResult.rc`.
 
+Completed D7 project-action workspace migration work:
+
+1. The fast emit-C smoke action emits `test/hello.w` to C through
+   `Workspace.compile()` instead of spawning the current compiler.
+2. Compiler source emission for the primary emit-C compiler test uses a
+   workspace when the current compiler is the intended compiler.
+3. The final `pcre2-build` compilation of `pcre2test.w` uses
+   `Workspace.compile()` instead of spawning `out/bin/with build`.
+4. The migrator directory/shared-defs implementation no longer shells out to
+   `find`, `rm`, or a self-reinvoked `with migrate` process. It lists files
+   through the runtime filesystem primitive and merges shared fragments
+   in-process.
+5. `Workspace.compile()` supports typed `MigrateOptions`, and the build-w
+   selfhost suite covers a build script that migrates C source through a
+   workspace and inspects the generated With source.
+6. `pcre2-migrate` and `pcre2-migrate-smoke` use the workspace migration path
+   instead of spawning `with migrate`.
+7. Remaining ProcessRunner uses are intentional boundaries: external tools
+   (`curl`, `tar`, `zig cc`, upstream PCRE2 corpus runners), stage-chain or
+   emitted compiler binaries, CLI selfhost fixtures, and current diagnostic
+   scans that deliberately exercise CLI output.
+
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.
 `Build.emit_graph()` remains a debug/export compatibility facility and must not
@@ -448,6 +470,10 @@ Still incomplete:
 - Phase D D2 is complete. `with build` parsing now produces typed build
   options, build graph target execution overlays those options per target, and
   `std.build` exposes the option structs required by future workspaces.
+- Phase D D7 is complete. Project actions that used the current compiler only
+  as a With source compiler now use workspaces; remaining process calls are
+  explicit external-tool, alternate-compiler, CLI-test, or diagnostic
+  boundaries.
 - Action timeout/cwd/env/network/install policy declarations are incomplete.
 - Jai-style workspace/build-options/message-loop APIs are incomplete.
 - Make remains a compatibility layer.
@@ -488,17 +514,10 @@ not a new compiler-dispatched project graph kind.
 
 ## Open Blockers And Follow-Ups
 
-- Continue Phase D D7 by migrating project actions that currently shell out to
-  `with build` only to compile With source. Keep ProcessRunner for external
-  tools and for tests that intentionally exercise the CLI process boundary.
-  Recent D7 checkpoints convert the final `pcre2-build` compilation of
-  `pcre2test.w` from an `out/bin/with build` subprocess to
-  `Workspace.compile()`, remove the migrator's shell-based directory
-  listing/shared-defs self-reinvocation path, and add evaluator-backed
-  `Workspace.compile()` support for typed `MigrateOptions`. The
-  `pcre2-migrate` and `pcre2-migrate-smoke` actions now use that workspace
-  migration path instead of spawning `with migrate`. The generated-module error
-  scan still intentionally exercises the CLI diagnostic path.
+- Continue Phase D with D8: replace an existing external diagnostic/generation
+  step with a `DeclSummary`-driven workspace message-loop integration. The
+  generated-module error scan in `build_pcre2.w` is the leading candidate
+  because it still intentionally exercises CLI diagnostics after D7.
 - Preserve the pre-D behavior tests during D1:
   `behav_build_w_basic_invocation`, `behav_action_capability_filesystem`,
   `behav_action_capability_process`, `behav_capability_token_mismatch`,
@@ -515,8 +534,8 @@ not a new compiler-dispatched project graph kind.
 
 ## Local State
 
-At the time of this update, the Phase D D7 PCRE2 migration action conversion
-slice is verified and ready to commit. Current verification passed:
+At the time of this update, Phase D D7 is complete and D8 is the next active
+slice. The last D7 code slice passed:
 
 ```sh
 out/bin/with check build_pcre2.w
