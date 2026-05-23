@@ -50,6 +50,15 @@ typed argv runtime process execution.
 `rt/clang_bridge.w` no longer uses `popen`: SDK discovery and `cc -E`
 preprocessing use typed argv capture, and LLVM resource directory discovery
 uses direct directory enumeration.
+`rt/compat_runtime.w` no longer exports shell execution helpers:
+`with_system`, `with_extract_tgz`, and the shared `/bin/sh -c` runner have
+been removed.
+The unused tracked `src/main_emit_temp.w` legacy entry snapshot has been
+removed from the source tree and from compiler source generation.
+The only remaining Phase E shell scan hits are the documented PCRE2 upstream
+`RunTest` `/bin/bash` argv boundary and the `shorthand` filename false
+positive. Makefile shell usage remains out of Phase E scope while Make still
+exists.
 
 Completed D1 sub-slices:
 

@@ -2451,8 +2451,6 @@ pub fn abs_i32(n: i32) -> i32:
 pub fn fill_random(buf: *mut u8, len: i64):
     arc4random_buf(buf, len as u64)
 
-// with_system: provided by compat_runtime.w (needs libc fork/exec)
-
 // ── Codegen loop state ─────────────────────────────────────────────
 // Used by LLVM codegen for break/continue within loops.
 

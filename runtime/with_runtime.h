@@ -184,7 +184,6 @@ int32_t with_net_close(int32_t fd);
 int32_t with_net_udp_bind(int32_t port);
 
 // Extract a .tgz archive to dest directory. Returns 0 on success.
-int32_t with_extract_tgz(with_str archive, with_str dest);
 
 // String builder helpers (used by compiler debug dumps).
 int64_t with_sb_new(void);
@@ -262,7 +261,6 @@ uint64_t with_bswap64(uint64_t x);
 
 // ── System ─────────────────────────────────────────────────────────
 
-int32_t with_system(with_str cmd);
 int32_t with_exec_binary(with_str path);
 int32_t with_exec_argv(with_str args);
 int32_t with_exec_argv_cwd(with_str args, with_str cwd);

@@ -301,8 +301,6 @@ fn link_stage_undefined_symbols_need_compat_runtime(undef: str) -> i32:
         return 0
     if link_stage_str_contains(undef, "_with_exec_"):
         return 1
-    if link_stage_str_contains(undef, "_with_system"):
-        return 1
     if link_stage_str_contains(undef, "_with_setenv_str"):
         return 1
     0
