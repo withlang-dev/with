@@ -17,11 +17,14 @@ extern fn rename(old: *const u8, new_path: *const u8) -> i32
 extern fn unlink(path: *const u8) -> i32
 extern fn close(fd: i32) -> i32
 extern fn write(fd: i32, buf: *const u8, nbyte: u64) -> i64
-extern fn popen(command: *const u8, mode: *const u8) -> *mut u8
-extern fn pclose(stream: *mut u8) -> i32
-extern fn fgets(buf: *mut u8, size: i32, stream: *mut u8) -> *mut u8
+extern fn opendir(path: *const u8) -> *mut u8
+extern fn readdir(dirp: *mut u8) -> *mut u8
+extern fn closedir(dirp: *mut u8) -> i32
 extern fn strtod(str: *const u8, endptr: *mut *mut u8) -> f64
 extern fn realpath(path: *const u8, resolved_name: *mut u8) -> *mut u8
+extern fn with_exec_argv_capture(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32) -> i32
+extern fn with_fs_read_file(path: str) -> str
+extern fn with_fs_remove_file(path: str) -> i32
 
 // ── libclang types ──────────────────────────────────────────────
 // Struct layouts match the C ABI exactly.
@@ -508,29 +511,6 @@ unsafe fn buf_append_str(buf: *mut u8, pos: *mut i64, cap: i64, s: *const u8):
         i = i + 1
     *((buf as i64 + *pos) as *mut u8) = 0
 
-// Append a string to a buffer, replacing each ' with '\'' for shell safety.
-unsafe fn buf_append_shell_escaped(buf: *mut u8, pos: *mut i64, cap: i64, s: *const u8):
-    if s as i64 == 0: return
-    let len = c_strlen(s)
-    var i: i64 = 0
-    while i < len and *pos < cap - 5:
-        let ch = *((s as i64 + i) as *const u8)
-        if ch == 39:  // single quote
-            // Write '\'' (4 chars)
-            *((buf as i64 + *pos) as *mut u8) = 39       // '
-            *pos = *pos + 1
-            *((buf as i64 + *pos) as *mut u8) = 92       // backslash
-            *pos = *pos + 1
-            *((buf as i64 + *pos) as *mut u8) = 39       // '
-            *pos = *pos + 1
-            *((buf as i64 + *pos) as *mut u8) = 39       // '
-            *pos = *pos + 1
-        else:
-            *((buf as i64 + *pos) as *mut u8) = ch
-            *pos = *pos + 1
-        i = i + 1
-    *((buf as i64 + *pos) as *mut u8) = 0
-
 unsafe fn buf_append_i64(buf: *mut u8, pos: *mut i64, cap: i64, val: i64):
     var tmp: [32]u8 = [0 as u8; 32]
     var v = val
@@ -578,19 +558,93 @@ var sdk_path_resolved: i32 = 0
 var resource_dir_buf: [1024]u8 = [0 as u8; 1024]
 var resource_dir_resolved: i32 = 0
 
+let DARWIN_DIRENT_NAME_OFFSET: i64 = 21
+
+unsafe fn dirent_name(ent: *mut u8) -> *const u8:
+    (ent as i64 + DARWIN_DIRENT_NAME_OFFSET) as *const u8
+
+unsafe fn cstr_starts_with_digit(s: *const u8) -> bool:
+    if s as i64 == 0:
+        return false
+    let ch = *s
+    ch >= 48 and ch <= 57
+
+unsafe fn copy_cstr_to_buf(dst: *mut u8, cap: i64, src: *const u8):
+    if cap <= 0:
+        return
+    var i: i64 = 0
+    while i < cap - 1 and src as i64 != 0 and *((src as i64 + i) as *const u8) != 0:
+        *((dst as i64 + i) as *mut u8) = *((src as i64 + i) as *const u8)
+        i = i + 1
+    *((dst as i64 + i) as *mut u8) = 0
+
+unsafe fn str_data_ptr(s: str) -> *const u8:
+    *(&s as *const *const u8)
+
+unsafe fn copy_first_line_to_buf(text: str, dst: *mut u8, cap: i64) -> i32:
+    if cap <= 0:
+        return 0
+    let data = str_data_ptr(text)
+    if data as i64 == 0 or text.len() == 0:
+        *dst = 0
+        return 0
+    var i: i64 = 0
+    while i < text.len() and i < cap - 1:
+        let ch = *((data as i64 + i) as *const u8)
+        if ch == 10 or ch == 13:
+            break
+        *((dst as i64 + i) as *mut u8) = ch
+        i = i + 1
+    *((dst as i64 + i) as *mut u8) = 0
+    if i > 0: 1 else: 0
+
+unsafe fn append_argv_arg(argv: str, arg: str) -> str:
+    argv ++ arg ++ "\0"
+
+unsafe fn c_path_to_str(path: *const u8) -> str:
+    make_str(path)
+
+unsafe fn capture_command_stdout(argv: str, template_path: *mut u8, timeout_ms: i32) -> str:
+    let fd = mkstemp(template_path)
+    if fd < 0:
+        return ""
+    let _ = close(fd)
+    let out_path = c_path_to_str(template_path)
+    let rc = with_exec_argv_capture(argv, out_path, "/dev/null", timeout_ms)
+    if rc != 0:
+        let _remove_failed = with_fs_remove_file(out_path)
+        return ""
+    let output = with_fs_read_file(out_path)
+    let _remove = with_fs_remove_file(out_path)
+    output
+
+unsafe fn append_cc_common_args(argv: str) -> str:
+    var out = argv
+    let sysroot = get_sdk_path()
+    if sysroot as i64 != 0:
+        out = append_argv_arg(out, "-isysroot")
+        out = append_argv_arg(out, make_str(sysroot))
+    var ip: i32 = 0
+    while ip < g_cimport_include_count:
+        out = append_argv_arg(out, "-I")
+        out = append_argv_arg(out, make_str(g_cimport_include_paths[ip as i64] as *const u8))
+        ip = ip + 1
+    out
+
 // ── SDK path detection ──────────────────────────────────────────
 
 unsafe fn get_sdk_path() -> *const u8:
     if sdk_path_resolved == 0:
         sdk_path_resolved = 1
-        let p = popen("xcrun --show-sdk-path 2>/dev/null\0" as *const u8, "r\0" as *const u8)
-        if p as i64 != 0:
-            let r = fgets(&raw mut sdk_path_buf as *mut [1024]u8 as *mut u8, 1024, p)
-            if r as i64 != 0:
-                let len = c_strlen(&sdk_path_buf as *const [1024]u8 as *const u8)
-                if len > 0 and sdk_path_buf[(len - 1) as i64] == 10:
-                    sdk_path_buf[(len - 1) as i64] = 0
-            let _ = pclose(p)
+        var out_template: [32]u8 = [0 as u8; 32]
+        let tmpl = "/tmp/with_xcrun_XXXXXX\0"
+        let tp = *(&tmpl as *const *const u8)
+        with_memcpy(&raw mut out_template as *mut [32]u8 as *mut u8, tp, 24)
+        var argv = ""
+        argv = append_argv_arg(argv, "xcrun")
+        argv = append_argv_arg(argv, "--show-sdk-path")
+        let output = capture_command_stdout(argv, &raw mut out_template as *mut [32]u8 as *mut u8, 30000)
+        let _copied = copy_first_line_to_buf(output, &raw mut sdk_path_buf as *mut [1024]u8 as *mut u8, 1024)
     if sdk_path_buf[0] != 0:
         return &sdk_path_buf as *const [1024]u8 as *const u8
     0 as *const u8
@@ -598,15 +652,25 @@ unsafe fn get_sdk_path() -> *const u8:
 unsafe fn get_clang_resource_dir() -> *const u8:
     if resource_dir_resolved == 0:
         resource_dir_resolved = 1
-        // Try LLVM_PREFIX/lib/clang/<version> by listing the directory
-        let p = popen("ls -1d /usr/local/llvm/lib/clang/[0-9]* 2>/dev/null | head -1\0" as *const u8, "r\0" as *const u8)
-        if p as i64 != 0:
-            let r = fgets(&raw mut resource_dir_buf as *mut [1024]u8 as *mut u8, 1024, p)
-            if r as i64 != 0:
-                let len = c_strlen(&resource_dir_buf as *const [1024]u8 as *const u8)
-                if len > 0 and resource_dir_buf[(len - 1) as i64] == 10:
-                    resource_dir_buf[(len - 1) as i64] = 0
-            let _ = pclose(p)
+        let base = "/usr/local/llvm/lib/clang\0" as *const u8
+        let dir = opendir(base)
+        if dir as i64 != 0:
+            var best_name: [256]u8 = [0 as u8; 256]
+            while true:
+                let ent = readdir(dir)
+                if ent as i64 == 0:
+                    break
+                let name = dirent_name(ent)
+                if not cstr_starts_with_digit(name):
+                    continue
+                if best_name[0] == 0 or c_strcmp(name, &best_name as *const [256]u8 as *const u8) < 0:
+                    copy_cstr_to_buf(&raw mut best_name as *mut [256]u8 as *mut u8, 256, name)
+            let _close = closedir(dir)
+            if best_name[0] != 0:
+                var pos: i64 = 0
+                buf_append_str(&raw mut resource_dir_buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, base)
+                buf_append_str(&raw mut resource_dir_buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, "/\0" as *const u8)
+                buf_append_str(&raw mut resource_dir_buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, &best_name as *const [256]u8 as *const u8)
     if resource_dir_buf[0] != 0:
         return &resource_dir_buf as *const [1024]u8 as *const u8
     0 as *const u8
@@ -1841,36 +1905,38 @@ pub unsafe fn cimport_parse_macros(header_code: str) -> i64:
     *(((&raw mut c_path) as i64 + tlen + 2) as *mut u8) = 0
     let _ = rename(&template_path as *const [40]u8 as *const u8, &c_path as *const [64]u8 as *const u8)
 
-    // Build command: cc [-isysroot ...] [-I ...]* -E -dM file.c
-    var cmd: [1024]u8 = [0 as u8; 1024]
-    var cpos: i64 = 0
-    let sysroot = get_sdk_path()
-    if sysroot as i64 != 0:
-        buf_append_str(&raw mut cmd as *mut [1024]u8 as *mut u8, &raw mut cpos, 1024, "cc -isysroot '\0" as *const u8)
-        buf_append_shell_escaped(&raw mut cmd as *mut [1024]u8 as *mut u8, &raw mut cpos, 1024, sysroot)
-        buf_append_str(&raw mut cmd as *mut [1024]u8 as *mut u8, &raw mut cpos, 1024, "'\0" as *const u8)
-    else:
-        buf_append_str(&raw mut cmd as *mut [1024]u8 as *mut u8, &raw mut cpos, 1024, "cc\0" as *const u8)
-    var ip: i32 = 0
-    while ip < g_cimport_include_count:
-        buf_append_str(&raw mut cmd as *mut [1024]u8 as *mut u8, &raw mut cpos, 1024, " -I '\0" as *const u8)
-        buf_append_shell_escaped(&raw mut cmd as *mut [1024]u8 as *mut u8, &raw mut cpos, 1024, g_cimport_include_paths[ip as i64] as *const u8)
-        buf_append_str(&raw mut cmd as *mut [1024]u8 as *mut u8, &raw mut cpos, 1024, "'\0" as *const u8)
-        ip = ip + 1
-    buf_append_str(&raw mut cmd as *mut [1024]u8 as *mut u8, &raw mut cpos, 1024, " -E -dM '\0" as *const u8)
-    buf_append_str(&raw mut cmd as *mut [1024]u8 as *mut u8, &raw mut cpos, 1024, &c_path as *const [64]u8 as *const u8)
-    buf_append_str(&raw mut cmd as *mut [1024]u8 as *mut u8, &raw mut cpos, 1024, "'\0" as *const u8)
+    var argv = ""
+    argv = append_argv_arg(argv, "cc")
+    argv = append_cc_common_args(argv)
+    argv = append_argv_arg(argv, "-E")
+    argv = append_argv_arg(argv, "-dM")
+    argv = append_argv_arg(argv, make_str(&c_path as *const [64]u8 as *const u8))
 
-    let p = popen(&cmd as *const [1024]u8 as *const u8, "r\0" as *const u8)
-    if p as i64 == 0:
+    var out_template: [40]u8 = [0 as u8; 40]
+    let out_tmpl = "/tmp/with_cimport_macros_XXXXXX\0"
+    let out_tp = *(&out_tmpl as *const *const u8)
+    with_memcpy(&raw mut out_template as *mut [40]u8 as *mut u8, out_tp, 32)
+    let output = capture_command_stdout(argv, &raw mut out_template as *mut [40]u8 as *mut u8, 120000)
+    if output.len() == 0:
         let _ = unlink(&c_path as *const [64]u8 as *const u8)
         return ms as i64
 
+    let output_data = str_data_ptr(output)
+    var output_pos: i64 = 0
     var line: [4096]u8 = [0 as u8; 4096]
-    while true:
-        let line_ptr = fgets(&raw mut line as *mut [4096]u8 as *mut u8, 4096, p)
-        if line_ptr as i64 == 0:
-            break
+    while output_pos < output.len():
+        var line_len: i64 = 0
+        while output_pos < output.len() and line_len < 4095:
+            let ch = *((output_data as i64 + output_pos) as *const u8)
+            output_pos = output_pos + 1
+            if ch == 10:
+                break
+            *(((&raw mut line) as i64 + line_len) as *mut u8) = ch
+            line_len = line_len + 1
+        *(((&raw mut line) as i64 + line_len) as *mut u8) = 0
+        while output_pos < output.len() and *((output_data as i64 + output_pos) as *const u8) != 10 and line_len >= 4095:
+            output_pos = output_pos + 1
+        let line_ptr = &raw mut line as *mut [4096]u8 as *mut u8
         if c_strncmp(line_ptr as *const u8, "#define \0" as *const u8, 8) != 0:
             continue
         let name_start = (line_ptr as i64 + 8) as *const u8
@@ -1966,7 +2032,6 @@ pub unsafe fn cimport_parse_macros(header_code: str) -> i64:
         *(((*ms).param_counts as i64 + ci * 4) as *mut i32) = macro_param_count
         (*ms).count = (*ms).count + 1
 
-    let _ = pclose(p)
     let _ = unlink(&c_path as *const [64]u8 as *const u8)
     ms as i64
 
@@ -1993,67 +2058,19 @@ pub unsafe fn cimport_preprocess_text(source_code: str) -> str:
     *(((&raw mut c_path) as i64 + tlen + 2) as *mut u8) = 0
     let _ = rename(&template_path as *const [40]u8 as *const u8, &c_path as *const [64]u8 as *const u8)
 
-    var cmd: [1024]u8 = [0 as u8; 1024]
-    var cpos: i64 = 0
-    let sysroot = get_sdk_path()
-    if sysroot as i64 != 0:
-        buf_append_str(&raw mut cmd as *mut [1024]u8 as *mut u8, &raw mut cpos, 1024, "cc -isysroot '\0" as *const u8)
-        buf_append_shell_escaped(&raw mut cmd as *mut [1024]u8 as *mut u8, &raw mut cpos, 1024, sysroot)
-        buf_append_str(&raw mut cmd as *mut [1024]u8 as *mut u8, &raw mut cpos, 1024, "'\0" as *const u8)
-    else:
-        buf_append_str(&raw mut cmd as *mut [1024]u8 as *mut u8, &raw mut cpos, 1024, "cc\0" as *const u8)
-    var ip: i32 = 0
-    while ip < g_cimport_include_count:
-        buf_append_str(&raw mut cmd as *mut [1024]u8 as *mut u8, &raw mut cpos, 1024, " -I '\0" as *const u8)
-        buf_append_shell_escaped(&raw mut cmd as *mut [1024]u8 as *mut u8, &raw mut cpos, 1024, g_cimport_include_paths[ip as i64] as *const u8)
-        buf_append_str(&raw mut cmd as *mut [1024]u8 as *mut u8, &raw mut cpos, 1024, "'\0" as *const u8)
-        ip = ip + 1
-    buf_append_str(&raw mut cmd as *mut [1024]u8 as *mut u8, &raw mut cpos, 1024, " -E '\0" as *const u8)
-    buf_append_str(&raw mut cmd as *mut [1024]u8 as *mut u8, &raw mut cpos, 1024, &c_path as *const [64]u8 as *const u8)
-    buf_append_str(&raw mut cmd as *mut [1024]u8 as *mut u8, &raw mut cpos, 1024, "' 2>/dev/null\0" as *const u8)
+    var argv = ""
+    argv = append_argv_arg(argv, "cc")
+    argv = append_cc_common_args(argv)
+    argv = append_argv_arg(argv, "-E")
+    argv = append_argv_arg(argv, make_str(&c_path as *const [64]u8 as *const u8))
 
-    let p = popen(&cmd as *const [1024]u8 as *const u8, "r\0" as *const u8)
-    if p as i64 == 0:
-        let _ = unlink(&c_path as *const [64]u8 as *const u8)
-        return ""
-
-    var output: *mut u8 = 0 as *mut u8
-    var out_len: i64 = 0
-    var out_cap: i64 = 0
-    var line: [4096]u8 = [0 as u8; 4096]
-    while true:
-        let line_ptr = fgets(&raw mut line as *mut [4096]u8 as *mut u8, 4096, p)
-        if line_ptr as i64 == 0:
-            break
-        let line_len = c_strlen(line_ptr as *const u8)
-        if out_len + line_len + 1 > out_cap:
-            var new_cap = if out_cap > 0: out_cap * 2 else: 8192
-            while new_cap < out_len + line_len + 1:
-                new_cap = new_cap * 2
-            let new_buf = with_alloc(new_cap)
-            if new_buf as i64 == 0:
-                if output as i64 != 0:
-                    with_free(output)
-                let _ = pclose(p)
-                let _ = unlink(&c_path as *const [64]u8 as *const u8)
-                return ""
-            if output as i64 != 0 and out_len > 0:
-                with_memcpy(new_buf, output as *const u8, out_len)
-                with_free(output)
-            output = new_buf
-            out_cap = new_cap
-        with_memcpy((output as i64 + out_len) as *mut u8, line_ptr as *const u8, line_len)
-        out_len = out_len + line_len
-    let _ = pclose(p)
+    var out_template: [40]u8 = [0 as u8; 40]
+    let out_tmpl = "/tmp/with_cimport_ppout_XXXXXX\0"
+    let out_tp = *(&out_tmpl as *const *const u8)
+    with_memcpy(&raw mut out_template as *mut [40]u8 as *mut u8, out_tp, 31)
+    let result = capture_command_stdout(argv, &raw mut out_template as *mut [40]u8 as *mut u8, 120000)
     let _ = unlink(&c_path as *const [64]u8 as *const u8)
 
-    if output as i64 == 0 or out_len == 0:
-        if output as i64 != 0:
-            with_free(output)
-        return ""
-    *((output as i64 + out_len) as *mut u8) = 0
-    let result = make_str(output as *const u8)
-    with_free(output)
     result
 
 @[c_export("with_cimport_collect_object_macro_types")]

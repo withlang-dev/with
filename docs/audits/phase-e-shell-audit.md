@@ -30,7 +30,7 @@ longer produce shell-string internals.
 | `src/compiler/ConanClient.w` | Shell command strings removed. Conan package extraction runs `tar` through typed argv capture; runtime access goes through `compiler.Runtime`. | Complete for Phase E. |
 | `src/CImport.w` | The orphan `with_system` extern was removed. The remaining shell pipeline text is a commented verification command. | Complete for Phase E. |
 | `lib/std/process.w` | Shell-string execution removed. `Command` now stores an argv vector and executes through typed argv runtime process execution. | Complete for Phase E. |
-| `rt/clang_bridge.w` | Uses `popen` shell probes for SDK/clang resource discovery and diagnostic command construction. | Replace probes with typed process capture and/or direct filesystem enumeration. |
+| `rt/clang_bridge.w` | Shell probes removed. SDK discovery and `cc -E` preprocessing use typed argv capture; LLVM resource directory discovery uses direct directory enumeration. | Complete for Phase E. |
 | `rt/compat_runtime.w` | Provides legacy `with_system` by executing `/bin/sh`. | Retire only after all source users are removed. The runtime export remains the last compatibility layer, not a new dependency target. |
 | `build_pcre2.w` | Invokes upstream PCRE2 `RunTest` through `/bin/bash`. | Documented exception candidate: this is an upstream shell test runner boundary, not compiler/build internal filesystem work. Keep isolated and explicit unless PCRE2 tests are ported. |
 | `build_selfhost.w` | Scan hit `shorthand` as a filename substring. | False positive. |
@@ -103,3 +103,14 @@ Completed:
 
 This keeps `std.process` at the runtime process boundary but removes shell
 parsing from the standard API.
+
+## Clang Bridge Slice
+
+Completed:
+
+- removed `popen`, `pclose`, and `fgets` from the libclang bridge;
+- changed `xcrun --show-sdk-path` discovery to typed argv capture;
+- changed macro parsing and preprocessing from shell command strings to typed
+  `cc` argv capture with stdout read from a temp file;
+- replaced `ls -1d ... | head -1` resource directory discovery with direct
+  directory enumeration under `/usr/local/llvm/lib/clang`.
