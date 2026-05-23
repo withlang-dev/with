@@ -4,6 +4,7 @@ extern fn with_exec_argv_capture(args: str, stdout_path: str, stderr_path: str, 
 extern fn with_exec_argv_capture_cwd(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str) -> i32
 extern fn with_exec_argv_capture_spawn(args: str, stdout_path: str, stderr_path: str) -> i32
 extern fn with_exec_wait(pid: i32, timeout_ms: i32) -> i32
+extern fn with_exec_binary(path: str) -> i32
 extern fn with_exec_argv(args: str) -> i32
 extern fn with_getenv_str(name: str) -> str
 extern fn with_setenv_str(name: str, value: str) -> i32
@@ -24,6 +25,9 @@ extern fn with_eprint(s: str) -> void
 
 pub fn build_graph_rt_exec_argv(args: str) -> i32:
     with_exec_argv(args)
+
+pub fn build_graph_rt_exec_binary(path: str) -> i32:
+    with_exec_binary(path)
 
 pub fn build_graph_rt_exec_argv_capture(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32) -> i32:
     with_exec_argv_capture(args, stdout_path, stderr_path, timeout_ms)
