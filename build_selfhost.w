@@ -1927,6 +1927,46 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
     rc = bs_expect_file_contains(ctx, bs_join(string_dir, "out/command/run-workspace-string/stdout.txt"), "workspace string", "build_w_workspace_string")
     if rc != 0: return rc
 
+    let check_dir = bs_join(base_dir, "check_workspace")
+    rc = bs_write_project_manifest(ctx, check_dir, "workspacecheck")
+    if rc != 0: return rc
+    let check_source = bs_with_string_literal("pub fn checked_symbol -> i32:\n    7\n")
+    let check_build =
+        "use std.build\n\n" ++
+        "comptime with BuildCtx as ctx:\n" ++
+        "pub fn build -> Build:\n" ++
+        "    let ws = ctx.create_workspace(\"workspace-check\")\n" ++
+        "    ws.add_string(\"generated/workspace_check.w\", " ++ check_source ++ ")\n" ++
+        "    var opts = ws.options()\n" ++
+        "    opts.output_kind = BuildOutputKind.Check\n" ++
+        "    ws.set_options(opts)\n" ++
+        "    ws.begin_intercept()\n" ++
+        "    let result = ws.compile()\n" ++
+        "    if result.status != BuildStatus.ok:\n" ++
+        "        ctx.diagnostics().error(\"workspace check status mismatch\")\n" ++
+        "    if result.artifacts.len() != 0:\n" ++
+        "        ctx.diagnostics().error(\"workspace check should not produce artifacts\")\n" ++
+        "    var saw_checked_symbol = false\n" ++
+        "    var saw_complete = false\n" ++
+        "    while not saw_complete:\n" ++
+        "        let envelope = ws.wait_for_message()\n" ++
+        "        match envelope.message:\n" ++
+        "            CompilerMessage.Typechecked(decls) =>\n" ++
+        "                for decl in decls:\n" ++
+        "                    if decl.name == \"checked_symbol\" and decl.kind == DeclKind.function and decl.source.file.ends_with(\"generated/workspace_check.w\"):\n" ++
+        "                        saw_checked_symbol = true\n" ++
+        "            CompilerMessage.Complete(done) => saw_complete = done.rc == 0\n" ++
+        "            CompilerMessage.Error(_, message, _) => ctx.diagnostics().error(message)\n" ++
+        "            _ => false\n" ++
+        "    if not saw_checked_symbol:\n" ++
+        "        ctx.diagnostics().error(\"workspace check missing DeclSummary for checked_symbol\")\n" ++
+        "    ws.end_intercept()\n" ++
+        "    ctx.new_build().group(\"workspace-check-ok\")\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(check_dir, "build.w"), check_build, ctx.target_name(), "workspace check build.w")
+    if rc != 0: return rc
+    let check_result = bs_build_w_expect_success(ctx, compiler_path, check_dir, "build-w-workspace-check", bs_blob_to_args(bs_argv_append("", "build")))
+    if check_result.rc != 0: return check_result.rc
+
     let migrate_dir = bs_join(base_dir, "migrate_workspace")
     rc = bs_write_project_manifest(ctx, migrate_dir, "workspacemigrate")
     if rc != 0: return rc

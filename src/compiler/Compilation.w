@@ -749,6 +749,29 @@ fn Compilation.compile_entry_source_texts(self: Compilation, source_paths: Vec[s
     self.zcu = zcu
     pool
 
+fn Compilation.check_pool(self: Compilation, pool: AstPool, source_path: str) -> bool:
+    if pool.decl_count() == 0:
+        return false
+    let prepared_pool = self.prepare_pool_after_typecheck_hooks(pool, source_path)
+    prepared_pool.decl_count() != 0
+
+fn Compilation.check_file_with_build_settings(self: Compilation, source_path: str, include_paths: Vec[str], defines: Vec[str], link_libs: Vec[str]) -> bool:
+    var cfg = project_config_load_for_source(source_path)
+    for ii in 0..include_paths.len() as i32:
+        cfg.c_import_include_paths.push(include_paths.get(ii as i64))
+    for di in 0..defines.len() as i32:
+        cfg.c_import_defines.push(defines.get(di as i64))
+    for li in 0..link_libs.len() as i32:
+        cfg.dep_link_libs.push(link_libs.get(li as i64))
+    let pool = self.compile_file_with_config(source_path, cfg)
+    self.check_pool(pool, source_path)
+
+fn Compilation.check_source_texts(self: Compilation, source_paths: Vec[str], source_texts: Vec[str]) -> bool:
+    let pool = self.compile_entry_source_texts(source_paths, source_texts)
+    if source_paths.len() == 0:
+        return false
+    self.check_pool(pool, source_paths.get(0))
+
 fn Compilation.prepare_binary_link_from_pool(self: Compilation, pool: AstPool, source_path: str, obj_path: str, bin_path: str) -> CompilationBinaryLinkPlan:
     self.last_link_command_available = 0
     self.last_link_command = link_stage_empty_command()

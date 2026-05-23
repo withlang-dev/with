@@ -71,6 +71,7 @@ pub enum BuildOutputKind: i32:
     C = 2
     LlvmIr = 3
     Archive = 4
+    Check = 5
 
 pub enum PreludeMode: i32:
     Full = 0
