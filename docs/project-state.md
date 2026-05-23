@@ -36,6 +36,8 @@ archives produced by direct `ar rcs`. The orphan `with_system` declaration in
 `src/CImport.w` has been removed. `src/compiler/ProjectConfig.w`,
 `src/compiler/Backend.w`, and `src/compiler/Zcu.w` now route runtime access
 through `src/compiler/Runtime.w` instead of declaring raw `with_*` externs.
+`src/compiler/Frontend.w` now does the same for file IO, diagnostics,
+environment reads, timing, string hashing/cloning, argv access, and nanosleep.
 
 Completed D1 sub-slices:
 
