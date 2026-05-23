@@ -1,6 +1,6 @@
 # Phase E Shell-String Audit
 
-Status: active audit for Phase E.
+Status: active audit for Phase E. First implementation slice complete.
 
 Phase E removes shell command strings from compiler, migrator, runtime,
 stdlib, and build-system internals. Shell syntax remains acceptable in the
@@ -23,7 +23,7 @@ longer produce shell-string internals.
 
 | Area | Current shape | Phase E action |
 |------|---------------|----------------|
-| `src/compiler/Compilation.w` | Uses `with_system` for `rm -f`, `rm -rf`, `mkdir -p`, and `dsymutil ... 2>/dev/null`. | First code slice: replace filesystem cleanup and directory creation with typed runtime filesystem primitives. Later slice: run `dsymutil` through argv process execution. |
+| `src/compiler/Compilation.w` | Filesystem cleanup and directory creation now use typed runtime filesystem primitives. `dsymutil ... 2>/dev/null` still uses `with_system`. | Later slice: run `dsymutil` through argv process execution. |
 | `src/compiler/Link.w` | Uses `with_system` to run link commands, `nm -u > file 2>/dev/null`, `rm -f`, and an `ar rcs` shell condition. | Replace link execution with typed argv command execution, replace `nm` with argv capture, replace cleanup with filesystem primitives, and make archive creation typed. |
 | `src/main.w` | Uses `with_system` for cleanup, direct binary execution, test stdout/stderr redirection, and benchmark command execution. | Replace cleanup with filesystem primitives and replace execution/redirection with argv process APIs that support env, cwd, capture, and timeout. |
 | `src/compiler/ConanClient.w` | Uses `tar xzf ... -C ... 2>/dev/null` through `with_system`. | Decide whether Conan support is still live. If live, replace with typed archive extraction or argv execution. If dead, remove the client. |
@@ -36,14 +36,15 @@ longer produce shell-string internals.
 
 ## First Code Slice
 
-Remove filesystem shell strings from `src/compiler/Compilation.w` only:
+Completed in the first implementation slice:
 
 - `rm -f` -> typed file removal;
 - `rm -rf <binary>.dSYM` -> typed tree removal;
 - `mkdir -p` -> typed recursive directory creation.
 
-Leave `dsymutil` command execution for a later process-execution slice. The
-first slice should not change link command construction or test execution.
+The slice intentionally left `dsymutil` command execution for a later
+process-execution slice and did not change link command construction or test
+execution.
 
 ## Verification
 

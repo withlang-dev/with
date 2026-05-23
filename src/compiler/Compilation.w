@@ -24,6 +24,7 @@ extern fn with_fs_write_file(path: str, data: str) -> i32
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_fs_remove_file(path: str) -> i32
 extern fn with_fs_remove_dir(path: str) -> i32
+extern fn with_fs_remove_tree(path: str) -> i32
 extern fn with_fs_mkdir_p(path: str) -> i32
 extern fn with_getenv_str(name: str) -> str
 extern fn with_setenv_str(name: str, value: str) -> i32
@@ -67,6 +68,30 @@ fn compilation_debug_pool_flow(label: str, pool: InternPool, typed_pool: AstPool
     if compilation_debug_pool_flow_enabled() == 0:
         return
     with_eprint(f"[comp] {label} pool.symbols={pool.state.symbol_texts.len() as i32} typed.decls={typed_pool.decl_count()} sema.pool.symbols={sema.pool.state.symbol_texts.len() as i32} sema.ast.decls={sema.ast.decl_count()}")
+
+fn compilation_ensure_output_dir(path: str) -> bool:
+    if path.len() == 0:
+        return true
+    let rc = with_fs_mkdir_p(path)
+    if rc != 0:
+        with_eprint(f"error: failed to create output directory '{path}'")
+        return false
+    true
+
+fn compilation_remove_file_best_effort(path: str):
+    if path.len() == 0:
+        return
+    let _ = with_fs_remove_file(path)
+
+fn compilation_remove_tree_best_effort(path: str):
+    if path.len() == 0:
+        return
+    let _ = with_fs_remove_tree(path)
+
+fn compilation_remove_dsym_best_effort(bin_path: str):
+    if bin_path.len() == 0:
+        return
+    compilation_remove_tree_best_effort(bin_path ++ ".dSYM")
 
 fn compilation_debug_type_names_enabled() -> i32:
     let raw = with_getenv_str("WITH_DEBUG_TYPE_NAMES")
@@ -665,10 +690,10 @@ fn Compilation.emit_ir(self: Compilation, pool: AstPool) -> bool:
 
 fn compilation_cleanup_build_products(obj_path: str, bin_path: str):
     if obj_path.len() > 0:
-        let _ = ("rm -f " ++ obj_path) |> with_system
+        compilation_remove_file_best_effort(obj_path)
     if bin_path.len() > 0:
-        let _ = ("rm -f " ++ bin_path) |> with_system
-        let _ = ("rm -rf " ++ bin_path ++ ".dSYM") |> with_system
+        compilation_remove_file_best_effort(bin_path)
+        compilation_remove_dsym_best_effort(bin_path)
 
 fn compilation_binary_link_plan_fail() -> CompilationBinaryLinkPlan:
     CompilationBinaryLinkPlan {
@@ -840,7 +865,7 @@ fn compilation_execute_binary_link_plan(debug_info: bool, plan: CompilationBinar
         let _ = ("dsymutil " ++ plan.bin_path ++ " 2>/dev/null") |> with_system
         if profile_enabled():
             profile_emit("dsymutil", t_dsym, "")
-    let _ = ("rm -f " ++ plan.obj_path) |> with_system
+    compilation_remove_file_best_effort(plan.obj_path)
     link_result
 
 fn Compilation.finish_binary_from_pool(self: Compilation, pool: AstPool, source_path: str, obj_path: str, bin_path: str) -> str:
@@ -849,7 +874,8 @@ fn Compilation.finish_binary_from_pool(self: Compilation, pool: AstPool, source_
 
 fn Compilation.emit_object_to_path(self: Compilation, source_path: str, obj_path: str) -> str:
     let output_dir = link_stage_dirname(obj_path)
-    let _ = ("mkdir -p " ++ output_dir) |> with_system
+    if not compilation_ensure_output_dir(output_dir):
+        return ""
 
     let pool = self.compile_file(source_path)
     if pool.decl_count() == 0:
@@ -863,13 +889,14 @@ fn Compilation.emit_object_to_path(self: Compilation, source_path: str, obj_path
     let opt_level = self.config.opt_level
     let backend_rc = self.zcu.compile_to_object_backend(active_pool, opt_level, obj_path, self.config.debug_info, true)
     if backend_rc != 0:
-        let _ = ("rm -f " ++ obj_path) |> with_system
+        compilation_remove_file_best_effort(obj_path)
         return ""
     obj_path
 
 fn Compilation.emit_object_to_path_with_build_settings(self: Compilation, source_path: str, obj_path: str, include_paths: Vec[str], defines: Vec[str], link_libs: Vec[str]) -> str:
     let output_dir = link_stage_dirname(obj_path)
-    let _ = ("mkdir -p " ++ output_dir) |> with_system
+    if not compilation_ensure_output_dir(output_dir):
+        return ""
 
     var cfg = project_config_load_for_source(source_path)
     for ii in 0..include_paths.len() as i32:
@@ -887,7 +914,7 @@ fn Compilation.emit_object_to_path_with_build_settings(self: Compilation, source
     let opt_level = self.config.opt_level
     let backend_rc = self.zcu.compile_to_object_backend(active_pool, opt_level, obj_path, self.config.debug_info, true)
     if backend_rc != 0:
-        let _ = ("rm -f " ++ obj_path) |> with_system
+        compilation_remove_file_best_effort(obj_path)
         return ""
     obj_path
 
@@ -895,13 +922,14 @@ fn Compilation.emit_archive_to_path_with_build_settings(self: Compilation, sourc
     if ar_path.len() == 0:
         return ""
     let output_dir = link_stage_dirname(ar_path)
-    let _ = ("mkdir -p " ++ output_dir) |> with_system
+    if not compilation_ensure_output_dir(output_dir):
+        return ""
     let obj_path = ar_path ++ ".o"
     let obj = self.emit_object_to_path_with_build_settings(source_path, obj_path, include_paths, defines, link_libs)
     if obj == "":
         return ""
     let ar = link_stage_make_archive_to_path(obj, ar_path)
-    let _ = ("rm -f " ++ obj) |> with_system
+    compilation_remove_file_best_effort(obj)
     ar
 
 fn Compilation.build_binary_to_path(self: Compilation, source_path: str, bin_path: str) -> str:
@@ -909,8 +937,9 @@ fn Compilation.build_binary_to_path(self: Compilation, source_path: str, bin_pat
         return self.build_binary(source_path)
     let obj_path = bin_path ++ ".o"
     let output_dir = link_stage_dirname(bin_path)
-    let _ = ("mkdir -p " ++ output_dir) |> with_system
-    let _ = ("rm -rf " ++ bin_path ++ ".dSYM") |> with_system
+    if not compilation_ensure_output_dir(output_dir):
+        return ""
+    compilation_remove_dsym_best_effort(bin_path)
 
     let pool = self.compile_entry_file(source_path)
     self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
@@ -920,8 +949,9 @@ fn Compilation.build_binary_to_path_with_build_settings(self: Compilation, sourc
         return self.build_binary_to_path(source_path, bin_path)
     let obj_path = bin_path ++ ".o"
     let output_dir = link_stage_dirname(bin_path)
-    let _ = ("mkdir -p " ++ output_dir) |> with_system
-    let _ = ("rm -rf " ++ bin_path ++ ".dSYM") |> with_system
+    if not compilation_ensure_output_dir(output_dir):
+        return ""
+    compilation_remove_dsym_best_effort(bin_path)
 
     var cfg = project_config_load_for_source(source_path)
     for ii in 0..include_paths.len() as i32:
@@ -943,8 +973,9 @@ fn Compilation.build_binary_from_source_to_path(self: Compilation, source_path: 
         return self.build_binary_from_source(source_path, source_text)
     let obj_path = bin_path ++ ".o"
     let output_dir = link_stage_dirname(bin_path)
-    let _ = ("mkdir -p " ++ output_dir) |> with_system
-    let _ = ("rm -rf " ++ bin_path ++ ".dSYM") |> with_system
+    if not compilation_ensure_output_dir(output_dir):
+        return ""
+    compilation_remove_dsym_best_effort(bin_path)
 
     let pool = self.compile_source_text(source_path, source_text)
     self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
@@ -954,8 +985,9 @@ fn Compilation.build_binary_from_source_to_path_with_build_settings(self: Compil
         return self.build_binary_from_source_to_path(source_path, source_text, bin_path)
     let obj_path = bin_path ++ ".o"
     let output_dir = link_stage_dirname(bin_path)
-    let _ = ("mkdir -p " ++ output_dir) |> with_system
-    let _ = ("rm -rf " ++ bin_path ++ ".dSYM") |> with_system
+    if not compilation_ensure_output_dir(output_dir):
+        return ""
+    compilation_remove_dsym_best_effort(bin_path)
 
     var cfg = project_config_load_for_source(source_path)
     for ii in 0..include_paths.len() as i32:
@@ -983,8 +1015,9 @@ fn Compilation.build_entry_binary_from_sources_to_path(self: Compilation, source
         return self.build_binary_from_source(source_path, source_texts.get(0))
     let obj_path = bin_path ++ ".o"
     let output_dir = link_stage_dirname(bin_path)
-    let _ = ("mkdir -p " ++ output_dir) |> with_system
-    let _ = ("rm -rf " ++ bin_path ++ ".dSYM") |> with_system
+    if not compilation_ensure_output_dir(output_dir):
+        return ""
+    compilation_remove_dsym_best_effort(bin_path)
 
     let pool = self.compile_entry_source_texts(source_paths, source_texts)
     self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
@@ -1004,7 +1037,8 @@ fn Compilation.emit_c(self: Compilation, source_path: str, output_path: str) -> 
     var final_output = output_path
     if final_output.len() == 0:
         final_output = link_stage_output_path_for_source(source_path) ++ ".c"
-    let _ = ("mkdir -p " ++ link_stage_dirname(final_output)) |> with_system
+    if not compilation_ensure_output_dir(link_stage_dirname(final_output)):
+        return ""
 
     let emitted = c_emit_module(self.zcu.last_mir_module, typed_pool, self.zcu.pool, self.zcu.last_sema, self.zcu.current_source_path, self.zcu.current_source_text)
     if emitted.ok == 0:

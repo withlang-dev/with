@@ -21,6 +21,13 @@ input order. Fresh intercepted workspaces are supported by queueing their
 independent message streams after the parallel compile joins; partially
 consumed intercepted workspaces fail loudly.
 
+Phase E has started. The initial shell-string audit is recorded in
+`docs/audits/phase-e-shell-audit.md`. The first implementation slice removed
+`rm -f`, `rm -rf`, and `mkdir -p` shell strings from
+`src/compiler/Compilation.w`; output directory creation now fails loudly and
+cleanup uses typed runtime filesystem primitives. `dsymutil` in
+`Compilation.w` remains the next process-execution cleanup in that file.
+
 Completed D1 sub-slices:
 
 1. Shared capability registry used by Sema, plus a reserved capability value
