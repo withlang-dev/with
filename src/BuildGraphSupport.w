@@ -136,6 +136,59 @@ pub fn build_graph_process_arg_valid(arg: str) -> bool:
             return false
     true
 
+pub fn build_graph_path_project_contained(path: str) -> bool:
+    if path.len() == 0:
+        return true
+    if path.byte_at(0) == 47:
+        return false
+    if path.contains(".."):
+        return false
+    if path.starts_with("$"):
+        return false
+    for i in 0..path.len() as i32:
+        let ch = path.byte_at(i as i64)
+        if ch == 0 or ch == 10 or ch == 13 or ch == 9:
+            return false
+    true
+
+pub fn build_graph_path_is_install_dest(path: str) -> bool:
+    path.starts_with("$HOME/") or path.starts_with("$INSTALL_BINDIR/") or path.starts_with("$INSTALL_LIBDIR/")
+
+pub fn build_graph_validate_target_containment(target: BuildGraphTarget) -> i32:
+    let kind = target.kind
+    let is_install = kind == 8
+    let is_promote = kind == 20
+    let is_clean = kind == 21
+    if is_clean:
+        return 0
+    if target.output.len() > 0:
+        if is_install:
+            if not build_graph_path_is_install_dest(target.output) and not build_graph_path_project_contained(target.output):
+                build_graph_rt_eprint("error: install target '" ++ target.name ++ "' output escapes project root without install prefix: " ++ target.output)
+                return 1
+        else if is_promote:
+            if not build_graph_path_project_contained(target.output):
+                build_graph_rt_eprint("error: promote target '" ++ target.name ++ "' output escapes project root: " ++ target.output)
+                return 1
+        else:
+            if not build_graph_path_project_contained(target.output):
+                build_graph_rt_eprint("error: target '" ++ target.name ++ "' output escapes project root: " ++ target.output)
+                return 1
+    let is_command = kind == 7
+    let is_corpus = kind == 19
+    let is_action = kind == 23
+    let entry_is_executable = is_command or is_corpus
+    if target.entry.len() > 0 and not is_install and not entry_is_executable and not is_action:
+        if not build_graph_path_project_contained(target.entry):
+            build_graph_rt_eprint("error: target '" ++ target.name ++ "' entry escapes project root: " ++ target.entry)
+            return 1
+    for oi in 0..target.extra_outputs.len() as i32:
+        let extra = target.extra_outputs.get(oi as i64)
+        if not build_graph_path_project_contained(extra):
+            build_graph_rt_eprint("error: target '" ++ target.name ++ "' extra_output escapes project root: " ++ extra)
+            return 1
+    0
+
 pub fn build_graph_argv_append(argv_blob: str, arg: str) -> str:
     argv_blob ++ arg ++ "\0"
 
@@ -148,18 +201,18 @@ pub fn build_graph_exec_argv(target: BuildGraphTarget, operation_name: str, argv
 
 pub fn build_graph_validate_process_args(target: BuildGraphTarget) -> i32:
     if not build_graph_process_arg_valid(target.entry):
-        build_graph_rt_eprint("error: build.w target '" ++ target.name ++ "' entry contains a NUL byte")
+        build_graph_rt_eprint("error: target '" ++ target.name ++ "' field 'entry' contains a NUL byte: " ++ target.entry)
         return 1
     if not build_graph_process_arg_valid(target.output):
-        build_graph_rt_eprint("error: build.w target '" ++ target.name ++ "' output contains a NUL byte")
+        build_graph_rt_eprint("error: target '" ++ target.name ++ "' field 'output' contains a NUL byte: " ++ target.output)
         return 1
     for ii in 0..target.inputs.len() as i32:
         if not build_graph_process_arg_valid(target.inputs.get(ii as i64)):
-            build_graph_rt_eprint("error: build.w target '" ++ target.name ++ "' input contains a NUL byte")
+            build_graph_rt_eprint("error: target '" ++ target.name ++ f"' field 'input[{ii}]' contains a NUL byte")
             return 1
     for ai in 0..target.args.len() as i32:
         if not build_graph_process_arg_valid(target.args.get(ai as i64)):
-            build_graph_rt_eprint("error: build.w target '" ++ target.name ++ "' arg contains a NUL byte")
+            build_graph_rt_eprint("error: target '" ++ target.name ++ f"' field 'arg[{ai}]' contains a NUL byte")
             return 1
     0
 
