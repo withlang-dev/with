@@ -39,7 +39,9 @@ through `src/compiler/Runtime.w` instead of declaring raw `with_*` externs.
 `src/compiler/Frontend.w` now does the same for file IO, diagnostics,
 environment reads, timing, string hashing/cloning, argv access, and nanosleep.
 In `src/main.w`, CLI `run`/one-liner binary execution and binary artifact
-cleanup now use typed runtime wrappers instead of shell command strings.
+cleanup now use typed runtime wrappers instead of shell command strings. Test
+stdout/stderr capture and benchmark execution also use typed runtime process
+wrappers, so `src/main.w` no longer depends on `with_system`.
 
 Completed D1 sub-slices:
 
