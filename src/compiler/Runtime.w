@@ -20,6 +20,8 @@ extern fn with_getpid() -> i32
 extern fn with_str_clone(s: str) -> str
 extern fn with_str_hash(s: str) -> i64
 extern fn with_nanosleep(ns: i64) -> i32
+extern fn with_sysinfo_os() -> str
+extern fn with_sysinfo_arch() -> str
 
 pub fn runtime_eprint(s: str):
     with_eprint(s)
@@ -77,3 +79,9 @@ pub fn runtime_str_hash(s: str) -> i64:
 
 pub fn runtime_nanosleep(ns: i64) -> i32:
     with_nanosleep(ns)
+
+pub fn runtime_sysinfo_os() -> str:
+    with_sysinfo_os()
+
+pub fn runtime_sysinfo_arch() -> str:
+    with_sysinfo_arch()

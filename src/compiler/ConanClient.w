@@ -3,13 +3,9 @@
 // Downloads prebuilt binary packages from Conan Center (center.conan.io)
 // using the Conan v2 REST API. No dependency on the conan CLI.
 
-extern fn with_fs_read_file(path: str) -> str
-extern fn with_fs_write_file(path: str, data: str) -> i32
-extern fn with_fs_mkdir_p(path: str) -> i32
-extern fn with_system(cmd: str) -> i32
-extern fn with_eprint(s: str) -> void
 fn CONAN_CENTER_URL -> str: "https://center.conan.io"
 
+use compiler.Runtime
 use std.http
 
 // Native HTTPS via With's TLS stack (no curl dependency)
@@ -19,9 +15,17 @@ fn conan_http_get(url: str) -> str:
 fn conan_http_download(url: str, path: str) -> i32:
     https_download(url, path)
 
+fn conan_argv_append(argv: str, arg: str) -> str:
+    argv ++ arg ++ "\0"
+
 fn conan_extract_tgz(archive: str, dest: str) -> i32:
-    let cmd = "tar xzf '" ++ archive ++ "' -C '" ++ dest ++ "' 2>/dev/null"
-    with_system(cmd)
+    var argv = ""
+    argv = conan_argv_append(argv, "tar")
+    argv = conan_argv_append(argv, "xzf")
+    argv = conan_argv_append(argv, archive)
+    argv = conan_argv_append(argv, "-C")
+    argv = conan_argv_append(argv, dest)
+    runtime_exec_argv_capture(argv, "/dev/null", "/dev/null", 120000)
 
 // ── JSON helpers (minimal, for machine-generated Conan responses) ──
 
@@ -94,14 +98,11 @@ fn conan_get_latest_recipe_rev(name: str, version: str) -> str:
         return ""
     json_extract_string(response, "revision")
 
-extern fn with_sysinfo_os() -> str
-extern fn with_sysinfo_arch() -> str
-
 fn conan_detect_os -> str:
-    with_sysinfo_os()
+    runtime_sysinfo_os()
 
 fn conan_detect_arch -> str:
-    with_sysinfo_arch()
+    runtime_sysinfo_arch()
 
 fn conan_find_matching_package(name: str, version: str, rev: str) -> str:
     // Use /search endpoint which returns all packages with inline settings
@@ -165,23 +166,23 @@ fn conan_download_and_extract(name: str, version: str, rev: str, pkg_id: str, de
     let latest_url = CONAN_CENTER_URL() ++ "/v2/conans/" ++ name ++ "/" ++ version ++ "/_/_/revisions/" ++ rev ++ "/packages/" ++ pkg_id ++ "/latest"
     let latest = conan_http_get(latest_url)
     if latest.len() == 0:
-        with_eprint("error: failed to get package revision for " ++ name)
+        runtime_eprint("error: failed to get package revision for " ++ name)
         return -1
     let pkg_rev = json_extract_string(latest, "revision")
     if pkg_rev.len() == 0:
-        with_eprint("error: failed to parse package revision for " ++ name)
+        runtime_eprint("error: failed to parse package revision for " ++ name)
         return -1
     // Download conan_package.tgz
     let tgz_url = CONAN_CENTER_URL() ++ "/v2/conans/" ++ name ++ "/" ++ version ++ "/_/_/revisions/" ++ rev ++ "/packages/" ++ pkg_id ++ "/revisions/" ++ pkg_rev ++ "/files/conan_package.tgz"
     let tgz_path = dest_dir ++ "/conan_package.tgz"
-    with_eprint("  downloading " ++ name ++ "/" ++ version ++ "...")
+    runtime_eprint("  downloading " ++ name ++ "/" ++ version ++ "...")
     if conan_http_download(tgz_url, tgz_path) != 0:
-        with_eprint("error: failed to download package for " ++ name)
+        runtime_eprint("error: failed to download package for " ++ name)
         return -1
     // Extract
-    with_eprint("  extracting...")
+    runtime_eprint("  extracting...")
     if conan_extract_tgz(tgz_path, dest_dir) != 0:
-        with_eprint("error: failed to extract package for " ++ name)
+        runtime_eprint("error: failed to extract package for " ++ name)
         return -1
     0
 
@@ -197,39 +198,39 @@ fn conan_write_metadata(dest_dir: str, name: str, version: str) -> i32:
     meta = meta ++ "  " ++ q ++ "lib_paths" ++ q ++ ": [" ++ q ++ "lib" ++ q ++ "]," ++ nl
     meta = meta ++ "  " ++ q ++ "libs" ++ q ++ ": [" ++ q ++ name ++ q ++ "]" ++ nl
     meta = meta ++ cb ++ nl
-    with_fs_write_file(dest_dir ++ "/metadata.json", meta)
+    runtime_write_file(dest_dir ++ "/metadata.json", meta)
 
 // ── Public API ─────────────────────────────────────────────────────
 
 fn conan_install(name: str, version_hint: str, project_root: str) -> i32:
-    with_eprint("resolving " ++ name ++ "...")
+    runtime_eprint("resolving " ++ name ++ "...")
     // Use provided version or resolve latest
     var version = version_hint
     if version.len() == 0:
         // TODO: resolve latest version from search API
-        with_eprint("error: version required (latest resolution not yet implemented)")
-        with_eprint("  usage: with get c." ++ name ++ "@<version>")
+        runtime_eprint("error: version required (latest resolution not yet implemented)")
+        runtime_eprint("  usage: with get c." ++ name ++ "@<version>")
         return -1
     // Get latest recipe revision
     let rev = conan_get_latest_recipe_rev(name, version)
     if rev.len() == 0:
-        with_eprint("error: package " ++ name ++ "/" ++ version ++ " not found on Conan Center")
+        runtime_eprint("error: package " ++ name ++ "/" ++ version ++ " not found on Conan Center")
         return -1
-    with_eprint("  revision: " ++ rev.slice(0, if rev.len() > 12: 12 else: rev.len()))
+    runtime_eprint("  revision: " ++ rev.slice(0, if rev.len() > 12: 12 else: rev.len()))
     // Find binary for current platform
     let pkg_id = conan_find_matching_package(name, version, rev)
     if pkg_id.len() == 0:
-        with_eprint("error: no prebuilt binary found for " ++ name ++ "/" ++ version ++ " on this platform")
+        runtime_eprint("error: no prebuilt binary found for " ++ name ++ "/" ++ version ++ " on this platform")
         return -1
-    with_eprint("  binary: " ++ pkg_id.slice(0, if pkg_id.len() > 12: 12 else: pkg_id.len()))
+    runtime_eprint("  binary: " ++ pkg_id.slice(0, if pkg_id.len() > 12: 12 else: pkg_id.len()))
     // Download and extract
     let dep_dir = project_root ++ "/.with/deps/c/" ++ name ++ "/" ++ version
-    with_fs_mkdir_p(dep_dir)
+    runtime_mkdir_p(dep_dir)
     if conan_download_and_extract(name, version, rev, pkg_id, dep_dir) != 0:
         return -1
     // Write metadata.json
     if conan_write_metadata(dep_dir, name, version) != 0:
-        with_eprint("error: failed to write metadata for " ++ name)
+        runtime_eprint("error: failed to write metadata for " ++ name)
         return -1
-    with_eprint("  installed to .with/deps/c/" ++ name ++ "/" ++ version ++ "/")
+    runtime_eprint("  installed to .with/deps/c/" ++ name ++ "/" ++ version ++ "/")
     0
