@@ -42,6 +42,8 @@ In `src/main.w`, CLI `run`/one-liner binary execution and binary artifact
 cleanup now use typed runtime wrappers instead of shell command strings. Test
 stdout/stderr capture and benchmark execution also use typed runtime process
 wrappers, so `src/main.w` no longer depends on `with_system`.
+`src/compiler/ConanClient.w` now extracts Conan archives through typed argv
+capture and routes runtime access through `src/compiler/Runtime.w`.
 
 Completed D1 sub-slices:
 
