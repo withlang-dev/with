@@ -1927,6 +1927,57 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
     rc = bs_expect_file_contains(ctx, bs_join(string_dir, "out/command/run-workspace-string/stdout.txt"), "workspace string", "build_w_workspace_string")
     if rc != 0: return rc
 
+    let migrate_dir = bs_join(base_dir, "migrate_workspace")
+    rc = bs_write_project_manifest(ctx, migrate_dir, "workspacemigrate")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(migrate_dir, "csrc/tiny.c"), "int answer(void) { return 42; }\n", ctx.target_name(), "workspace migrate c source")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(migrate_dir, "src/main.w"), "fn main:\n    print(\"workspace migrate\")\n", ctx.target_name(), "workspace migrate main")
+    if rc != 0: return rc
+    let migrate_build =
+        "use std.build\n\n" ++
+        "comptime with BuildCtx as ctx:\n" ++
+        "pub fn build -> Build:\n" ++
+        "    let ws = ctx.create_workspace(\"workspace-migrate\")\n" ++
+        "    let opts = MigrateOptions {\n" ++
+        "        source_path: \"csrc\",\n" ++
+        "        output_path: \"out/migrated\",\n" ++
+        "        include_paths: Vec.new(),\n" ++
+        "        forced_includes: Vec.new(),\n" ++
+        "        defines: Vec.new(),\n" ++
+        "        exclude_basenames: Vec.new(),\n" ++
+        "        check_mode: false,\n" ++
+        "        diff_mode: false,\n" ++
+        "        stats_mode: false,\n" ++
+        "        no_c_export: true,\n" ++
+        "        c_export_functions: false,\n" ++
+        "        convert_goto_to_structured: false,\n" ++
+        "        block_style: 2,\n" ++
+        "        width_slice: 0,\n" ++
+        "        shared_defs: \"\",\n" ++
+        "        migrate_one: \"\",\n" ++
+        "        shared_fragment: \"\",\n" ++
+        "        ir_roundtrip: false,\n" ++
+        "    }\n" ++
+        "    ws.set_migrate_options(opts)\n" ++
+        "    let result = ws.compile()\n" ++
+        "    if result.rc != 0:\n" ++
+        "        ctx.diagnostics().error(\"workspace migrate failed\")\n" ++
+        "    if result.artifacts.len() != 1:\n" ++
+        "        ctx.diagnostics().error(\"workspace migrate artifact count mismatch\")\n" ++
+        "    else if result.artifacts.get(0).kind != ArtifactKind.source_tree or result.artifacts.get(0).path != \"out/migrated\":\n" ++
+        "        ctx.diagnostics().error(\"workspace migrate artifact mismatch\")\n" ++
+        "    let migrated = ctx.fs().read_text(\"out/migrated/tiny.w\")\n" ++
+        "    if not migrated.contains(\"fn answer\"):\n" ++
+        "        ctx.diagnostics().error(\"workspace migrate output missing function\")\n" ++
+        "    ctx.new_build().executable(\"workspace-migrate\", \"src/main.w\")\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(migrate_dir, "build.w"), migrate_build, ctx.target_name(), "workspace migrate build.w")
+    if rc != 0: return rc
+    let migrate_result = bs_build_w_expect_success(ctx, compiler_path, migrate_dir, "build-w-workspace-migrate", bs_blob_to_args(bs_argv_append("", "build")))
+    if migrate_result.rc != 0: return migrate_result.rc
+    if not ctx.fs().exists(bs_join(migrate_dir, "out/migrated/tiny.w")):
+        return bs_fail(ctx, "missing workspace migrate output")
+
     let message_dir = bs_join(base_dir, "workspace_message_complete")
     rc = bs_write_project_manifest(ctx, message_dir, "workspacemessage")
     if rc != 0: return rc

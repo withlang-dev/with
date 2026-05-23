@@ -493,9 +493,11 @@ not a new compiler-dispatched project graph kind.
   tools and for tests that intentionally exercise the CLI process boundary.
   Recent D7 checkpoints convert the final `pcre2-build` compilation of
   `pcre2test.w` from an `out/bin/with build` subprocess to
-  `Workspace.compile()`, and remove the migrator's shell-based directory
-  listing/shared-defs self-reinvocation path. The generated-module error scan
-  still intentionally exercises the CLI diagnostic path.
+  `Workspace.compile()`, remove the migrator's shell-based directory
+  listing/shared-defs self-reinvocation path, and add evaluator-backed
+  `Workspace.compile()` support for typed `MigrateOptions`. The
+  generated-module error scan still intentionally exercises the CLI diagnostic
+  path.
 - Preserve the pre-D behavior tests during D1:
   `behav_build_w_basic_invocation`, `behav_action_capability_filesystem`,
   `behav_action_capability_process`, `behav_capability_token_mismatch`,
@@ -512,16 +514,15 @@ not a new compiler-dispatched project graph kind.
 
 ## Local State
 
-At the time of this update, the Phase D D7 migrator directory/shared-defs
-in-process conversion slice is verified and ready to commit. Current
-verification passed:
+At the time of this update, the Phase D D7 workspace migration substrate slice
+is verified and ready to commit. Current verification passed:
 
 ```sh
 out/bin/with check src/main.w
+out/bin/with check build_selfhost.w
+out/bin/with run test/behavior/behav_std_build_options_api.w
 make build
-out/bin/with build :pcre2-migrate-smoke --no-deps
-out/bin/with build :pcre2-migrate --no-deps
-out/bin/with build :pcre2-build --no-deps
+out/bin/with build :cli-selfhost-build-w-tests --no-deps
 make fixpoint
 make test
 ```
