@@ -3583,7 +3583,7 @@ fn bs_check_pcre2_jit_no_support(ctx: ActionCtx, compiler_path: str, base_dir: s
     if result.rc != 0: return result.rc
     0
 
-fn bs_check_pcre2_generated_existing_main(ctx: ActionCtx, compiler_input: str, case_dir: str) -> i32:
+fn bs_check_pcre2_generated_existing_main(ctx: ActionCtx, case_dir: str) -> i32:
     let generated_dir = bs_join(case_dir, "generated")
     var rc = bs_write_fixture(ctx, bs_join(generated_dir, "defs.w"), "// std.re.defs\ntype c_int = i32\n", "pcre2 generated defs")
     if rc != 0: return rc
@@ -3591,7 +3591,7 @@ fn bs_check_pcre2_generated_existing_main(ctx: ActionCtx, compiler_input: str, c
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(generated_dir, "pcre2test.w"), "// Migrated from PCRE2\nuse std.re.defs\n\nfn main() -> i32:\n    0\n", "pcre2 generated existing main")
     if rc != 0: return rc
-    let errors = pcre2_count_generated_errors(ctx, compiler_input, generated_dir, true)
+    let errors = pcre2_count_generated_errors(ctx, generated_dir, true)
     if errors < 0:
         return 1
     if errors != 0:
@@ -3635,7 +3635,7 @@ pub fn run_cli_selfhost_pcre2_prep_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     rc = bs_check_pcre2_jit_no_support(ctx, compiler_path, bs_join(output_dir, "pcre2_jit_no_support_case"))
     if rc != 0: return rc
-    bs_check_pcre2_generated_existing_main(ctx, compiler_input, bs_join(output_dir, "pcre2_generated_existing_main_case"))
+    bs_check_pcre2_generated_existing_main(ctx, bs_join(output_dir, "pcre2_generated_existing_main_case"))
 
 fn bs_split_words(line: str) -> Vec[str]:
     let words: Vec[str] = Vec.new()
