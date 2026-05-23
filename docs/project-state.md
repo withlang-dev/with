@@ -491,10 +491,11 @@ not a new compiler-dispatched project graph kind.
 - Continue Phase D D7 by migrating project actions that currently shell out to
   `with build` only to compile With source. Keep ProcessRunner for external
   tools and for tests that intentionally exercise the CLI process boundary.
-  The current checkpoint converts the final `pcre2-build` compilation of
+  Recent D7 checkpoints convert the final `pcre2-build` compilation of
   `pcre2test.w` from an `out/bin/with build` subprocess to
-  `Workspace.compile()`. The generated-module error scan still intentionally
-  exercises the CLI diagnostic path.
+  `Workspace.compile()`, and remove the migrator's shell-based directory
+  listing/shared-defs self-reinvocation path. The generated-module error scan
+  still intentionally exercises the CLI diagnostic path.
 - Preserve the pre-D behavior tests during D1:
   `behav_build_w_basic_invocation`, `behav_action_capability_filesystem`,
   `behav_action_capability_process`, `behav_capability_token_mismatch`,
@@ -511,17 +512,18 @@ not a new compiler-dispatched project graph kind.
 
 ## Local State
 
-At the time of this update, the Phase D D7 `pcre2-build` workspace conversion
-slice is verified and ready to commit. Current verification passed:
+At the time of this update, the Phase D D7 migrator directory/shared-defs
+in-process conversion slice is verified and ready to commit. Current
+verification passed:
 
 ```sh
-out/bin/with check build_pcre2.w
-out/bin/with build :pcre2-build --no-deps
 out/bin/with check src/main.w
 make build
+out/bin/with build :pcre2-migrate-smoke --no-deps
+out/bin/with build :pcre2-migrate --no-deps
+out/bin/with build :pcre2-build --no-deps
 make fixpoint
 make test
-make install-user
 ```
 
 The full emit-C test is intentionally not part of this verification pass per

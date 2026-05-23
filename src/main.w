@@ -1981,7 +1981,6 @@ fn run_migrate_command(argc: i32) -> i32:
     var source_path = ""
     var output_path = ""
     var exclude_basenames = ""
-    var reinvoke_args = ""
     var ai = 2
     while ai < argc:
         let arg = with_arg_at(ai)
@@ -1991,17 +1990,14 @@ fn run_migrate_command(argc: i32) -> i32:
             continue
         if arg == "-I" and ai + 1 < argc:
             migrate_add_include_path(with_arg_at(ai + 1))
-            reinvoke_args = f"{reinvoke_args} -I {test_shell_quote(with_arg_at(ai + 1))}"
             ai = ai + 2
             continue
         if arg == "-include" and ai + 1 < argc:
             migrate_add_forced_include(with_arg_at(ai + 1))
-            reinvoke_args = f"{reinvoke_args} -include {test_shell_quote(with_arg_at(ai + 1))}"
             ai = ai + 2
             continue
         if arg == "-D" and ai + 1 < argc:
             migrate_add_define(with_arg_at(ai + 1))
-            reinvoke_args = f"{reinvoke_args} -D {test_shell_quote(with_arg_at(ai + 1))}"
             ai = ai + 2
             continue
         if arg == "--check" or arg == "--diff" or arg == "--stats":
@@ -2009,17 +2005,14 @@ fn run_migrate_command(argc: i32) -> i32:
             continue  // TODO: implement modes
         if arg == "--no-c-export":
             migrate_set_no_c_export(1)
-            reinvoke_args = f"{reinvoke_args} --no-c-export"
             ai = ai + 1
             continue
         if arg == "--c-export-functions":
             migrate_set_export_function_defs(1)
-            reinvoke_args = f"{reinvoke_args} --c-export-functions"
             ai = ai + 1
             continue
         if arg == "--convert-goto-to-structured":
             migrate_set_convert_goto_to_structured(1)
-            reinvoke_args = f"{reinvoke_args} --convert-goto-to-structured"
             ai = ai + 1
             continue
         if arg == "--prefer-curly":
@@ -2027,22 +2020,18 @@ fn run_migrate_command(argc: i32) -> i32:
             return 1
         if arg == "--prefer-brace":
             migrate_set_block_style(2)
-            reinvoke_args = f"{reinvoke_args} --prefer-brace"
             ai = ai + 1
             continue
         if arg == "--prefer-colon":
             migrate_set_block_style(0)
-            reinvoke_args = f"{reinvoke_args} --prefer-colon"
             ai = ai + 1
             continue
         if arg == "--width-slice" and ai + 1 < argc:
             migrate_set_width_slice(cli_parse_small_int(with_arg_at(ai + 1)))
-            reinvoke_args = f"{reinvoke_args} --width-slice {test_shell_quote(with_arg_at(ai + 1))}"
             ai = ai + 2
             continue
         if arg == "--shared-defs" and ai + 1 < argc:
             migrate_set_shared_defs(with_arg_at(ai + 1))
-            reinvoke_args = f"{reinvoke_args} --shared-defs {test_shell_quote(with_arg_at(ai + 1))}"
             ai = ai + 2
             continue
         if arg == "--migrate-one" and ai + 1 < argc:
@@ -2055,12 +2044,10 @@ fn run_migrate_command(argc: i32) -> i32:
             continue
         if arg == "--exclude" and ai + 1 < argc:
             exclude_basenames = exclude_basenames ++ "|" ++ with_arg_at(ai + 1) ++ "|"
-            reinvoke_args = f"{reinvoke_args} --exclude {test_shell_quote(with_arg_at(ai + 1))}"
             ai = ai + 2
             continue
         if arg.len() > 10 and arg.slice(0, 10) == "--exclude=":
             exclude_basenames = exclude_basenames ++ "|" ++ arg.slice(10, arg.len()) ++ "|"
-            reinvoke_args = f"{reinvoke_args} --exclude {test_shell_quote(arg.slice(10, arg.len()))}"
             ai = ai + 1
             continue
         if arg.len() > 0 and arg.byte_at(0) != 45:  // not a flag
@@ -2078,7 +2065,6 @@ fn run_migrate_command(argc: i32) -> i32:
         // Directory mode
         if output_path.len() == 0:
             output_path = source_path ++ "_migrated"
-        migrate_set_reinvoke_args(reinvoke_args)
         return migrate_c_directory(source_path, output_path, exclude_basenames)
 
     // Single file mode — default output: replace .c with .w
