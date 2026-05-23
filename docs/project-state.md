@@ -33,7 +33,9 @@ link execution, `nm -u` capture, archive creation, and cleanup use typed
 runtime process/filesystem wrappers. Darwin archive creation uses
 `libtool -static`, not `ar`, because ld64 rejects unaligned Mach-O members in
 archives produced by direct `ar rcs`. The orphan `with_system` declaration in
-`src/CImport.w` has been removed.
+`src/CImport.w` has been removed. `src/compiler/ProjectConfig.w`,
+`src/compiler/Backend.w`, and `src/compiler/Zcu.w` now route runtime access
+through `src/compiler/Runtime.w` instead of declaring raw `with_*` externs.
 
 Completed D1 sub-slices:
 

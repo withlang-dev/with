@@ -8,18 +8,15 @@ use Mir
 use AsyncMir
 use compiler.Compilation.Config
 use compiler.ProjectConfig
-
-extern fn with_eprint(s: str) -> void
-extern fn with_getenv_str(name: str) -> str
-extern fn with_str_clone(s: str) -> str
+use compiler.Runtime
 
 fn zcu_owned_text(text: str) -> str:
     if text.len() == 0:
         return ""
-    with_str_clone(text)
+    runtime_str_clone(text)
 
 fn zcu_debug_init_enabled() -> i32:
-    let raw = with_getenv_str("WITH_DEBUG_STAGE1_TRACE")
+    let raw = runtime_getenv("WITH_DEBUG_STAGE1_TRACE")
     if raw.len() == 0:
         return 0
     1
@@ -27,10 +24,10 @@ fn zcu_debug_init_enabled() -> i32:
 fn zcu_debug_init(msg: str):
     if zcu_debug_init_enabled() == 0:
         return
-    with_eprint("[zcu-init] " ++ msg)
+    runtime_eprint("[zcu-init] " ++ msg)
 
 fn zcu_debug_pool_flow_enabled() -> i32:
-    let raw = with_getenv_str("WITH_DEBUG_POOL_FLOW")
+    let raw = runtime_getenv("WITH_DEBUG_POOL_FLOW")
     if raw.len() == 0:
         return 0
     1
@@ -253,7 +250,7 @@ fn Zcu.source_for_file_id_frontend(self: Zcu, file_id: i32) -> Source:
             if self.source_text_file_ids.get(si as i64) == file_id:
                 return Source.from_string(self.source_text_names.get(si as i64), self.source_texts.get(si as i64), file_id)
         let embedded_rel = embedded_std_rel_path(path)
-        let text = if embedded_rel.len() > 0: embedded_std_source(embedded_rel) else: with_fs_read_file(path)
+        let text = if embedded_rel.len() > 0: embedded_std_source(embedded_rel) else: runtime_read_file(path)
         return Source.from_string(path, text, file_id)
     Source.from_string(self.current_source_path, self.current_source_text, 0)
 
@@ -262,7 +259,7 @@ fn Zcu.render_all_diagnostics_frontend(self: Zcu):
         let diag = self.diagnostics.items.get(i as i64)
         self.render_diag_frontend(diag)
         if i + 1 < self.diagnostics.items.len() as i32:
-            with_eprint("")
+            runtime_eprint("")
 
 fn Zcu.render_warnings_frontend(self: Zcu):
     var printed = 0
@@ -271,7 +268,7 @@ fn Zcu.render_warnings_frontend(self: Zcu):
         if diag.severity != DiagSeverity.Warning:
             continue
         if printed != 0:
-            with_eprint("")
+            runtime_eprint("")
         let source = self.source_for_file_id_frontend(diag.primary.file)
         diag.render(source)
         printed = printed + 1
@@ -340,7 +337,7 @@ fn Zcu.set_frontend_pool(self: Zcu, pool: InternPool):
 
 fn Zcu.sync_from_sema(self: Zcu, sema: Sema):
     if zcu_debug_pool_flow_enabled() != 0:
-        with_eprint(f"[zcu] sync_from_sema:before zcu.pool={self.pool.state.symbol_texts.len() as i32} sema.pool={sema.pool.state.symbol_texts.len() as i32} sema.ast.decls={sema.ast.decl_count()}")
+        runtime_eprint(f"[zcu] sync_from_sema:before zcu.pool={self.pool.state.symbol_texts.len() as i32} sema.pool={sema.pool.state.symbol_texts.len() as i32} sema.ast.decls={sema.ast.decl_count()}")
     self.pool = sema.pool
     self.diagnostics = sema.diags
     self.typed_expr_types = sema.typed_expr_types
@@ -349,7 +346,7 @@ fn Zcu.sync_from_sema(self: Zcu, sema: Sema):
     self.typed_binding_muts = sema.typed_binding_muts
     self.last_sema = sema
     if zcu_debug_pool_flow_enabled() != 0:
-        with_eprint(f"[zcu] sync_from_sema:after zcu.pool={self.pool.state.symbol_texts.len() as i32} last_sema.pool={self.last_sema.pool.state.symbol_texts.len() as i32} last_sema.ast.decls={self.last_sema.ast.decl_count()}")
+        runtime_eprint(f"[zcu] sync_from_sema:after zcu.pool={self.pool.state.symbol_texts.len() as i32} last_sema.pool={self.last_sema.pool.state.symbol_texts.len() as i32} last_sema.ast.decls={self.last_sema.ast.decl_count()}")
 
 fn Zcu.set_resolve_snapshot(self: Zcu, result: ResolveResult, root_path: str):
     self.last_resolved = result
