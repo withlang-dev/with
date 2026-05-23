@@ -47,7 +47,6 @@ extern fn with_str_contains(s: str, needle: str) -> i32
 extern fn with_str_slice(s: str, start: i64, end: i64) -> str
 extern fn with_eprint(s: str) -> void
 extern fn with_ewrite(s: str) -> void
-extern fn with_system(cmd: str) -> i32
 extern fn with_exec_argv(args: str) -> i32
 extern fn with_exec_argv_capture(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32) -> i32
 extern fn with_exec_argv_capture_cwd(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str) -> i32
@@ -1690,20 +1689,6 @@ fn test_effective_prelude_mode(default_mode: i32, args: str) -> i32:
         return PreludeMode.FullMode as i32
     default_mode
 
-fn test_shell_quote(text: str) -> str:
-    var out = "'"
-    var run_start = 0
-    for i in 0..text.len():
-        if text.byte_at(i as i64) != 39:
-            continue
-        if i > run_start:
-            out = out ++ text.slice(run_start as i64, i as i64)
-        out = out ++ "'\\''"
-        run_start = i + 1
-    if run_start < text.len():
-        out = out ++ text.slice(run_start as i64, text.len())
-    out ++ "'"
-
 fn split_nonempty_lines(text: str) -> Vec[str]:
     let lines: Vec[str] = Vec.new()
     let text_len = text.len() as i32
@@ -1755,16 +1740,25 @@ fn run_test_process(bin_path: str, test_name: str, quiet: bool) -> TestRunResult
     let suffix = test_capture_suffix(test_name)
     let out_path = bin_path ++ suffix ++ ".stdout"
     let err_path = bin_path ++ suffix ++ ".stderr"
-    let _ = ("rm -f " ++ test_shell_quote(out_path) ++ " " ++ test_shell_quote(err_path)) |> with_system
-    var cmd = test_shell_quote(bin_path)
+    let _remove_old_stdout = build_graph_rt_remove_file(out_path)
+    let _remove_old_stderr = build_graph_rt_remove_file(err_path)
+    let old_filter = build_graph_rt_getenv("WITH_TEST_FILTER") ++ ""
+    let old_short = build_graph_rt_getenv("WITH_TEST_SHORT") ++ ""
     if test_name.len() > 0:
-        cmd = "WITH_TEST_FILTER=" ++ test_shell_quote(test_name) ++ " " ++ cmd
+        let _set_filter = build_graph_rt_setenv("WITH_TEST_FILTER", test_name)
     if quiet:
-        cmd = "WITH_TEST_SHORT=1 " ++ cmd
-    let rc = with_system(cmd ++ " > " ++ test_shell_quote(out_path) ++ " 2> " ++ test_shell_quote(err_path))
+        let _set_short = build_graph_rt_setenv("WITH_TEST_SHORT", "1")
+    var argv = ""
+    argv = build_graph_argv_append(argv, bin_path)
+    let rc = with_exec_argv_capture(argv, out_path, err_path, 120000)
+    if test_name.len() > 0:
+        let _restore_filter = build_graph_rt_setenv("WITH_TEST_FILTER", old_filter)
+    if quiet:
+        let _restore_short = build_graph_rt_setenv("WITH_TEST_SHORT", old_short)
     let stdout = with_fs_read_file(out_path)
     let stderr = with_fs_read_file(err_path)
-    let _cleanup = ("rm -f " ++ test_shell_quote(out_path) ++ " " ++ test_shell_quote(err_path)) |> with_system
+    let _cleanup_stdout = build_graph_rt_remove_file(out_path)
+    let _cleanup_stderr = build_graph_rt_remove_file(err_path)
     if not quiet:
         if stdout.len() > 0:
             with_write(stdout)
@@ -1931,10 +1925,12 @@ fn run_bench_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, p
     if bin_path == "":
         with_eprint("error: bench build failed for '" ++ target ++ "'")
         return 1
-    var cmd = test_shell_quote(bin_path)
+    let old_filter = build_graph_rt_getenv("WITH_BENCH_FILTER") ++ ""
     if filter.len() > 0:
-        cmd = "WITH_BENCH_FILTER=" ++ test_shell_quote(filter) ++ " " ++ cmd
-    let rc = with_system(cmd)
+        let _set_filter = build_graph_rt_setenv("WITH_BENCH_FILTER", filter)
+    let rc = build_graph_rt_exec_binary(bin_path)
+    if filter.len() > 0:
+        let _restore_filter = build_graph_rt_setenv("WITH_BENCH_FILTER", old_filter)
     cleanup_binary_artifacts(bin_path)
     rc
 
