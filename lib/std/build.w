@@ -142,6 +142,7 @@ pub enum ArtifactKind: i32:
     c_source = 4
     llvm_ir = 5
     diagnostics = 6
+    source_tree = 7
 
 pub type SourceSpan {
     file: str,

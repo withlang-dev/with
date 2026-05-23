@@ -90,6 +90,25 @@ pub fn migrate_add_include_path(path: str) -> void:
 pub fn migrate_add_forced_include(path: str) -> void:
     g_migrate_forced_includes.push(path)
 
+pub fn migrate_reset_options():
+    g_migrate_width_slice = 0
+    g_migrate_shared_defs_prefix = ""
+    ci_migrate_shared_defs_reset()
+    g_migrate_directory_one_basename = ""
+    g_migrate_shared_fragment_path = ""
+    g_migrate_include_paths = Vec.new()
+    g_migrate_forced_includes = Vec.new()
+    g_migrate_defines = ""
+    g_migrate_file_error = ""
+    g_migrate_no_c_export = 0
+    g_migrate_export_function_defs = 0
+    g_migrate_block_style = 0
+    g_migrate_convert_goto_to_structured = 0
+    g_migrate_fn_translated = 0
+    g_migrate_fn_untranslatable = 0
+    g_migrate_fn_translated_total = 0
+    g_migrate_fn_untranslatable_total = 0
+
 fn ci_migrate_shared_defs_active() -> bool:
     g_migrate_shared_defs_prefix.len() > 0
 

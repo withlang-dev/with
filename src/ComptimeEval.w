@@ -10,6 +10,7 @@ use compiler.Compilation
 use compiler.Link
 use compiler.ProjectConfig
 use render
+use CiMigrate
 
 extern fn with_eprint(s: str) -> void
 extern fn with_fs_read_file(path: str) -> str
@@ -118,6 +119,7 @@ type ComptimeWorkspaceCompileResult {
 type ComptimeWorkspaceCompilePlan {
     valid: i32,
     name: str,
+    is_migrate: i32,
     final_output: str,
     absolute_output: str,
     output_kind: i32,
@@ -134,12 +136,27 @@ type ComptimeWorkspaceCompilePlan {
     debug_info: bool,
     compiler_hooks_enabled: bool,
     prelude_mode: i32,
+    migrate_is_dir: i32,
+    migrate_source: str,
+    migrate_include_paths: Vec[str],
+    migrate_forced_includes: Vec[str],
+    migrate_defines: Vec[str],
+    migrate_exclude_basenames: str,
+    migrate_no_c_export: bool,
+    migrate_c_export_functions: bool,
+    migrate_convert_goto_to_structured: bool,
+    migrate_block_style: i32,
+    migrate_width_slice: i32,
+    migrate_shared_defs: str,
+    migrate_one: str,
+    migrate_shared_fragment: str,
 }
 
 type ComptimeWorkspaceNativeCompileResult {
     rc: i32,
     artifact_path: str,
     comp: Compilation,
+    is_migrate: i32,
 }
 
 type ComptimeWorkspaceThreadJob {
@@ -1759,6 +1776,20 @@ fn ComptimeEvaluator.workspace_bool_option(self: ComptimeEvaluator, options: Com
         return value.data0 != 0
     default_value
 
+fn ComptimeEvaluator.workspace_path_vec_field(self: ComptimeEvaluator, root: str, options: ComptimeValue, field_name: str) -> Vec[str]:
+    let raw = self.workspace_str_vec_field(options, field_name)
+    let out: Vec[str] = Vec.new()
+    for i in 0..raw.len() as i32:
+        out.push(self.workspace_path(root, raw.get(i as i64)))
+    out
+
+fn ComptimeEvaluator.workspace_exclude_basenames_field(self: ComptimeEvaluator, options: ComptimeValue) -> str:
+    let excludes = self.workspace_str_vec_field(options, "exclude_basenames")
+    var out = ""
+    for i in 0..excludes.len() as i32:
+        out = out ++ "|" ++ excludes.get(i as i64) ++ "|"
+    out
+
 fn ComptimeEvaluator.workspace_artifact_kind_for_output(self: ComptimeEvaluator, output_kind: i32) -> i32:
     if output_kind == 1: return 1
     if output_kind == 2: return 4
@@ -2255,6 +2286,7 @@ fn comptime_workspace_compile_plan_invalid() -> ComptimeWorkspaceCompilePlan:
     ComptimeWorkspaceCompilePlan {
         valid: 0,
         name: "",
+        is_migrate: 0,
         final_output: "",
         absolute_output: "",
         output_kind: 0,
@@ -2271,16 +2303,112 @@ fn comptime_workspace_compile_plan_invalid() -> ComptimeWorkspaceCompilePlan:
         debug_info: false,
         compiler_hooks_enabled: false,
         prelude_mode: 0,
+        migrate_is_dir: 0,
+        migrate_source: "",
+        migrate_include_paths: Vec.new(),
+        migrate_forced_includes: Vec.new(),
+        migrate_defines: Vec.new(),
+        migrate_exclude_basenames: "",
+        migrate_no_c_export: false,
+        migrate_c_export_functions: false,
+        migrate_convert_goto_to_structured: false,
+        migrate_block_style: 0,
+        migrate_width_slice: 0,
+        migrate_shared_defs: "",
+        migrate_one: "",
+        migrate_shared_fragment: "",
     }
 
 fn comptime_workspace_native_compile_invalid() -> ComptimeWorkspaceNativeCompileResult:
-    ComptimeWorkspaceNativeCompileResult { rc: 1, artifact_path: "", comp: Compilation.init() }
+    ComptimeWorkspaceNativeCompileResult { rc: 1, artifact_path: "", comp: Compilation.init(), is_migrate: 0 }
 
 fn comptime_workspace_output_kind_supported(kind: i32) -> bool:
     kind == 0 or kind == 1 or kind == 2 or kind == 4
 
+fn comptime_execute_workspace_migrate_plan(plan: ComptimeWorkspaceCompilePlan) -> i32:
+    migrate_reset_options()
+    for i in 0..plan.migrate_include_paths.len() as i32:
+        migrate_add_include_path(plan.migrate_include_paths.get(i as i64))
+    for i in 0..plan.migrate_forced_includes.len() as i32:
+        migrate_add_forced_include(plan.migrate_forced_includes.get(i as i64))
+    for i in 0..plan.migrate_defines.len() as i32:
+        migrate_add_define(plan.migrate_defines.get(i as i64))
+    if plan.migrate_no_c_export:
+        migrate_set_no_c_export(1)
+    if plan.migrate_c_export_functions:
+        migrate_set_export_function_defs(1)
+    if plan.migrate_convert_goto_to_structured:
+        migrate_set_convert_goto_to_structured(1)
+    migrate_set_block_style(plan.migrate_block_style)
+    migrate_set_width_slice(plan.migrate_width_slice)
+    if plan.migrate_shared_defs.len() > 0:
+        migrate_set_shared_defs(plan.migrate_shared_defs)
+    if plan.migrate_one.len() > 0:
+        migrate_set_directory_one_basename(plan.migrate_one)
+    if plan.migrate_shared_fragment.len() > 0:
+        migrate_set_shared_fragment_path(plan.migrate_shared_fragment)
+    if plan.migrate_is_dir != 0:
+        return migrate_c_directory(plan.migrate_source, plan.absolute_output, plan.migrate_exclude_basenames)
+    migrate_c_file(plan.migrate_source, plan.absolute_output)
+
 fn ComptimeEvaluator.workspace_compile_plan(self: ComptimeEvaluator, record: ComptimeWorkspaceRecord, capability: ComptimeCapabilityRecord, node: i32) -> ComptimeWorkspaceCompilePlan:
     let options = record.options
+    let migrate_options = record.migrate_options
+    let migrate_source_option = self.workspace_str_option(migrate_options, "source_path")
+    if migrate_source_option.len() > 0:
+        if self.workspace_bool_option(migrate_options, "check_mode", false) or self.workspace_bool_option(migrate_options, "diff_mode", false) or self.workspace_bool_option(migrate_options, "stats_mode", false):
+            let _ = self.fail(node, "Workspace.compile migrate check/diff/stats modes are not implemented yet")
+            return comptime_workspace_compile_plan_invalid()
+        if self.workspace_bool_option(migrate_options, "ir_roundtrip", false):
+            let _ = self.fail(node, "Workspace.compile migrate ir_roundtrip mode is not implemented yet")
+            return comptime_workspace_compile_plan_invalid()
+        let migrate_source = self.workspace_path(capability.project_root, migrate_source_option)
+        var migrate_output = self.workspace_str_option(migrate_options, "output_path")
+        let migrate_is_dir = if with_fs_is_dir(migrate_source) != 0 or (migrate_source.len() > 2 and migrate_source.slice(migrate_source.len() - 2, migrate_source.len()) != ".c" and migrate_source.slice(migrate_source.len() - 2, migrate_source.len()) != ".h"): 1 else: 0
+        if migrate_output.len() == 0:
+            if migrate_is_dir != 0:
+                migrate_output = migrate_source_option ++ "_migrated"
+            else if migrate_source_option.len() > 2 and migrate_source_option.slice(migrate_source_option.len() - 2, migrate_source_option.len()) == ".c":
+                migrate_output = migrate_source_option.slice(0, migrate_source_option.len() - 2) ++ ".w"
+            else:
+                migrate_output = migrate_source_option ++ ".w"
+        let absolute_migrate_output = self.workspace_path(capability.project_root, migrate_output)
+        return ComptimeWorkspaceCompilePlan {
+            valid: 1,
+            name: record.name,
+            is_migrate: 1,
+            final_output: migrate_output,
+            absolute_output: absolute_migrate_output,
+            output_kind: 0,
+            has_strings: 0,
+            source_paths: Vec.new(),
+            source_texts: Vec.new(),
+            absolute_source: "",
+            include_paths: Vec.new(),
+            defines: Vec.new(),
+            link_libs: Vec.new(),
+            opt_level: 0,
+            no_std: false,
+            alloc_mode: false,
+            debug_info: false,
+            compiler_hooks_enabled: false,
+            prelude_mode: 0,
+            migrate_is_dir,
+            migrate_source,
+            migrate_include_paths: self.workspace_path_vec_field(capability.project_root, migrate_options, "include_paths"),
+            migrate_forced_includes: self.workspace_path_vec_field(capability.project_root, migrate_options, "forced_includes"),
+            migrate_defines: self.workspace_str_vec_field(migrate_options, "defines"),
+            migrate_exclude_basenames: self.workspace_exclude_basenames_field(migrate_options),
+            migrate_no_c_export: self.workspace_bool_option(migrate_options, "no_c_export", true),
+            migrate_c_export_functions: self.workspace_bool_option(migrate_options, "c_export_functions", false),
+            migrate_convert_goto_to_structured: self.workspace_bool_option(migrate_options, "convert_goto_to_structured", false),
+            migrate_block_style: self.workspace_i32_option(migrate_options, "block_style", 0),
+            migrate_width_slice: self.workspace_i32_option(migrate_options, "width_slice", 8),
+            migrate_shared_defs: self.workspace_str_option(migrate_options, "shared_defs"),
+            migrate_one: self.workspace_str_option(migrate_options, "migrate_one"),
+            migrate_shared_fragment: self.workspace_str_option(migrate_options, "shared_fragment"),
+        }
+
     let option_source = self.workspace_str_option(options, "source_path")
     var source_path = option_source
     if source_path.len() == 0 and record.files.len() > 0:
@@ -2327,6 +2455,7 @@ fn ComptimeEvaluator.workspace_compile_plan(self: ComptimeEvaluator, record: Com
     ComptimeWorkspaceCompilePlan {
         valid: 1,
         name: record.name,
+        is_migrate: 0,
         final_output,
         absolute_output,
         output_kind,
@@ -2343,11 +2472,28 @@ fn ComptimeEvaluator.workspace_compile_plan(self: ComptimeEvaluator, record: Com
         debug_info: self.workspace_bool_option(options, "debug_info", true),
         compiler_hooks_enabled: self.workspace_bool_option(options, "compiler_hooks_enabled", true),
         prelude_mode: self.workspace_i32_option(options, "prelude_mode", 0),
+        migrate_is_dir: 0,
+        migrate_source: "",
+        migrate_include_paths: Vec.new(),
+        migrate_forced_includes: Vec.new(),
+        migrate_defines: Vec.new(),
+        migrate_exclude_basenames: "",
+        migrate_no_c_export: false,
+        migrate_c_export_functions: false,
+        migrate_convert_goto_to_structured: false,
+        migrate_block_style: 0,
+        migrate_width_slice: 0,
+        migrate_shared_defs: "",
+        migrate_one: "",
+        migrate_shared_fragment: "",
     }
 
 fn comptime_execute_workspace_compile_plan(plan: ComptimeWorkspaceCompilePlan) -> ComptimeWorkspaceNativeCompileResult:
     if plan.valid == 0:
         return comptime_workspace_native_compile_invalid()
+    if plan.is_migrate != 0:
+        let rc = comptime_execute_workspace_migrate_plan(plan)
+        return ComptimeWorkspaceNativeCompileResult { rc, artifact_path: if rc == 0: plan.final_output else: "", comp: Compilation.init(), is_migrate: 1 }
     var comp = Compilation.init()
     comp.configure(plan.opt_level, plan.no_std, plan.alloc_mode)
     comp.set_debug_info(plan.debug_info)
@@ -2368,7 +2514,7 @@ fn comptime_execute_workspace_compile_plan(plan: ComptimeWorkspaceCompilePlan) -
             artifact_path = comp.emit_archive_to_path_with_build_settings(plan.absolute_source, plan.absolute_output, plan.include_paths, plan.defines, plan.link_libs)
         else:
             return comptime_workspace_native_compile_invalid()
-    ComptimeWorkspaceNativeCompileResult { rc: if artifact_path.len() > 0: 0 else: 1, artifact_path, comp }
+    ComptimeWorkspaceNativeCompileResult { rc: if artifact_path.len() > 0: 0 else: 1, artifact_path, comp, is_migrate: 0 }
 
 fn comptime_workspace_thread_entry(arg: *mut u8) -> i32:
     let job = arg as *mut ComptimeWorkspaceThreadJob
@@ -2381,11 +2527,12 @@ fn ComptimeEvaluator.compile_workspace_record(self: ComptimeEvaluator, record: C
     if plan.valid == 0:
         return comptime_workspace_compile_invalid()
     let native = comptime_execute_workspace_compile_plan(plan)
-    let result = self.workspace_build_result_value(plan.name, native.rc, self.workspace_artifact_kind_for_output(plan.output_kind), plan.final_output, node)
+    let artifact_kind = if plan.is_migrate != 0: 7 else: self.workspace_artifact_kind_for_output(plan.output_kind)
+    let result = self.workspace_build_result_value(plan.name, native.rc, artifact_kind, plan.final_output, node)
     if result.kind == ComptimeValueKind.CV_INVALID:
         return comptime_workspace_compile_invalid()
     let messages =
-        if want_messages != 0 and native.rc == 0:
+        if want_messages != 0 and native.rc == 0 and native.is_migrate == 0:
             self.workspace_success_messages(native.comp, native.comp.zcu.last_sema.ast, node)
         else:
             Vec.new()
@@ -2396,6 +2543,9 @@ fn ComptimeEvaluator.compile_workspace_record(self: ComptimeEvaluator, record: C
 fn ComptimeEvaluator.start_intercept_workspace_compile(self: ComptimeEvaluator, record: ComptimeWorkspaceRecord, capability: ComptimeCapabilityRecord, node: i32) -> ComptimeWorkspaceRecord:
     var out = record
     out.intercept_started = 1
+    if self.workspace_str_option(out.migrate_options, "source_path").len() > 0:
+        let _ = self.fail(node, "Workspace.intercept does not support MigrateOptions in Phase D")
+        return out
     let options = out.options
     let option_source = self.workspace_str_option(options, "source_path")
     var source_path = option_source
