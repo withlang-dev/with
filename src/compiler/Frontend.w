@@ -14,18 +14,8 @@ use CImport
 use render
 use compiler.EmbeddedStdlib
 use compiler.ProjectConfig
+use compiler.Runtime
 use compiler.Zcu
-
-extern fn with_fs_read_file(path: str) -> str
-extern fn with_fs_write_file(path: str, data: str) -> i32
-extern fn with_fs_mkdir_p(path: str) -> i32
-extern fn with_str_hash(s: str) -> i64
-extern fn with_eprint(s: str) -> void
-extern fn with_arg_at(idx: i32) -> str
-extern fn with_getenv_str(name: str) -> str
-extern fn with_clock_nanos() -> i64
-extern fn with_nanosleep(ns: i64) -> i32
-extern fn with_str_clone(s: str) -> str
 // Frontend pipeline: lex -> parse -> import resolution -> sema.
 
 var frontend_cimport_compiler_fingerprint_ready: i32 = 0
@@ -37,7 +27,7 @@ fn frontend_cimport_lock():
     while frontend_cimport_lock_word.swap(1, .Acquire) != 0:
         spins = spins + 1
         if spins >= 1024:
-            let _ = with_nanosleep(1000)
+            let _ = runtime_nanosleep(1000)
             spins = 0
 
 fn frontend_cimport_unlock():
@@ -46,7 +36,7 @@ fn frontend_cimport_unlock():
 fn frontend_owned_text(text: str) -> str:
     if text.len() == 0:
         return ""
-    with_str_clone(text)
+    runtime_str_clone(text)
 
 fn frontend_str_contains_byte(text: str, target: i32) -> bool:
     for i in 0..text.len():
@@ -57,12 +47,12 @@ fn frontend_str_contains_byte(text: str, target: i32) -> bool:
 fn frontend_resolve_executable_path(argv0: str) -> str:
     if argv0.len() == 0:
         return ""
-    if with_fs_read_file(argv0).len() > 0:
+    if runtime_read_file(argv0).len() > 0:
         return argv0
     if frontend_str_contains_byte(argv0, 47):
         return ""
 
-    let search_path = with_getenv_str("PATH")
+    let search_path = runtime_getenv("PATH")
     if search_path.len() == 0:
         return ""
 
@@ -74,7 +64,7 @@ fn frontend_resolve_executable_path(argv0: str) -> str:
         if ch == 58:
             let dir = search_path.slice(segment_start as i64, i as i64)
             let candidate = if dir.len() == 0: "./" ++ argv0 else: dir ++ "/" ++ argv0
-            if with_fs_read_file(candidate).len() > 0:
+            if runtime_read_file(candidate).len() > 0:
                 return candidate
             segment_start = i + 1
         i = i + 1
@@ -84,13 +74,13 @@ fn frontend_cimport_compiler_fingerprint_line() -> str:
     if frontend_cimport_compiler_fingerprint_ready != 0:
         return frontend_cimport_compiler_fingerprint
     frontend_cimport_compiler_fingerprint_ready = 1
-    let compiler_path = frontend_resolve_executable_path(with_arg_at(0))
+    let compiler_path = frontend_resolve_executable_path(runtime_arg_at(0))
     if compiler_path.len() == 0:
         return ""
-    let compiler_image = with_fs_read_file(compiler_path)
+    let compiler_image = runtime_read_file(compiler_path)
     if compiler_image.len() == 0:
         return ""
-    frontend_cimport_compiler_fingerprint = frontend_owned_text(f"\n#compiler-hash:{with_str_hash(compiler_image)}")
+    frontend_cimport_compiler_fingerprint = frontend_owned_text(f"\n#compiler-hash:{runtime_str_hash(compiler_image)}")
     frontend_cimport_compiler_fingerprint
 
 fn count_non_use_decls_frontend(pool: AstPool) -> i32:
@@ -124,7 +114,7 @@ fn c_import_str_contains(text: str, needle: str) -> bool:
 
 fn Zcu.read_trace_c_import_cache_frontend(self: Zcu) -> i32:
     let _ = self
-    let raw = with_getenv_str("WITH_TRACE_CIMPORT_CACHE")
+    let raw = runtime_getenv("WITH_TRACE_CIMPORT_CACHE")
     if raw.len() == 0:
         return 0
     if raw == "0":
@@ -132,7 +122,7 @@ fn Zcu.read_trace_c_import_cache_frontend(self: Zcu) -> i32:
     1
 
 fn frontend_debug_type_names_enabled() -> i32:
-    let raw = with_getenv_str("WITH_DEBUG_TYPE_NAMES")
+    let raw = runtime_getenv("WITH_DEBUG_TYPE_NAMES")
     if raw.len() == 0:
         return 0
     if raw == "0":
@@ -142,7 +132,7 @@ fn frontend_debug_type_names_enabled() -> i32:
 fn frontend_dump_type_decl_names(stage: str, pool: AstPool, intern: InternPool):
     if frontend_debug_type_names_enabled() == 0:
         return
-    with_eprint(f"[type-names] stage={stage} decls={pool.decl_count()}")
+    runtime_eprint(f"[type-names] stage={stage} decls={pool.decl_count()}")
     for di in 0..pool.decl_count():
         let decl = pool.get_decl(di)
         if pool.kind(decl) != NodeKind.NK_TYPE_DECL:
@@ -160,7 +150,7 @@ fn frontend_dump_type_decl_names(stage: str, pool: AstPool, intern: InternPool):
         let name_sym = pool.get_data0(decl)
         let name = intern.resolve(name_sym)
         let msg = f"[type-names] {stage} decl={di} node={decl as i32} kind={kind_name} name_sym={name_sym} name={name}"
-        with_eprint(msg)
+        runtime_eprint(msg)
 
 fn Sema.init_module_graph(mut self: Sema, resolved: &ResolveResult) -> void:
     self.module_paths = Vec.new()
@@ -263,25 +253,25 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         if cached.len() > 0:
             // Already injected in this compilation — skip to avoid duplicate declarations
             if self.trace_c_import_cache != 0:
-                with_eprint("c_import cache hit (memory) — skipping duplicate")
+                runtime_eprint("c_import cache hit (memory) — skipping duplicate")
             continue
         else:
             // Check file-system cache
             let fs_cached = c_import_fs_cache_lookup(cache_key)
             if fs_cached.len() > 0:
                 if self.trace_c_import_cache != 0:
-                    with_eprint("c_import cache hit (fs)")
+                    runtime_eprint("c_import cache hit (fs)")
                 synthetic = fs_cached
                 self.c_import_cache_store(cache_key, synthetic)
                 // Populate dedup table so subsequent c_imports don't re-emit these names
                 ci_mark_cached_names(synthetic)
             else:
                 if self.trace_c_import_cache != 0:
-                    with_eprint("c_import cache miss")
+                    runtime_eprint("c_import cache miss")
                 let libclang_result = process_c_import_with_defines(resolved_header_spec, self.project_config.c_import_defines)
                 if self.trace_c_import_cache != 0 and libclang_result.len() > 0:
-                    with_eprint("c_import generated:")
-                    with_eprint(libclang_result)
+                    runtime_eprint("c_import generated:")
+                    runtime_eprint(libclang_result)
                 if libclang_result.len() > 0:
                     synthetic = libclang_result
                 else:
@@ -343,13 +333,13 @@ fn Zcu.c_import_cache_key_frontend(self: Zcu, pool: AstPool, decl: i32, header_s
     for di in 0..self.project_config.c_import_defines.len() as i32:
         key = key ++ "|" ++ self.project_config.c_import_defines.get(di as i64)
     key = key ++ frontend_cimport_compiler_fingerprint_line()
-    let epoch = with_getenv_str("WITH_CIMPORT_CACHE_EPOCH")
+    let epoch = runtime_getenv("WITH_CIMPORT_CACHE_EPOCH")
     if epoch.len() > 0:
         key = key ++ "\n#epoch:" ++ epoch
     key
 
 fn c_import_fs_cache_dir() -> str:
-    let home = with_getenv_str("HOME")
+    let home = runtime_getenv("HOME")
     if home.len() == 0:
         return ""
     home ++ "/.cache/with/c_import"
@@ -358,25 +348,25 @@ fn c_import_fs_cache_lookup(cache_key: str) -> str:
     let dir = c_import_fs_cache_dir()
     if dir.len() == 0:
         return ""
-    let h = with_str_hash(cache_key)
+    let h = runtime_str_hash(cache_key)
     // Make hash positive for filename
     var hash_str = f"{h}"
     if h < 0:
         hash_str = f"n{0 - h}"
     let path = f"{dir}/{hash_str}.w"
-    with_fs_read_file(path)
+    runtime_read_file(path)
 
 fn c_import_fs_cache_store(cache_key: str, value: str):
     let dir = c_import_fs_cache_dir()
     if dir.len() == 0:
         return
-    with_fs_mkdir_p(dir)
-    let h = with_str_hash(cache_key)
+    runtime_mkdir_p(dir)
+    let h = runtime_str_hash(cache_key)
     var hash_str = f"{h}"
     if h < 0:
         hash_str = f"n{0 - h}"
     let path = f"{dir}/{hash_str}.w"
-    with_fs_write_file(path, value)
+    runtime_write_file(path, value)
 
 fn Zcu.c_import_emit_header_error_frontend(self: Zcu, decl: i32, header_spec: str):
     let _ = decl
@@ -940,78 +930,78 @@ fn Zcu.compile_file_frontend(self: Zcu, path: str) -> AstPool:
     self.compile_file_frontend_with_config(path, project_config_load_for_source(path))
 
 fn Zcu.compile_file_frontend_with_config(self: Zcu, path: str, cfg: ProjectConfig) -> AstPool:
-    let do_profile = with_getenv_str("WITH_PROFILE").len() > 0
+    let do_profile = runtime_getenv("WITH_PROFILE").len() > 0
     if zcu_debug_init_enabled() != 0:
-        with_eprint("[frontend] compile_file:start " ++ path)
+        runtime_eprint("[frontend] compile_file:start " ++ path)
     let source_dir = frontend_dirname(path)
     self.reset_for_new_invocation(source_dir, path, "")
     self.project_config = cfg
     if self.project_config.manifest_error.len() > 0:
-        with_eprint("error: invalid with.toml: " ++ self.project_config.manifest_error)
+        runtime_eprint("error: invalid with.toml: " ++ self.project_config.manifest_error)
         self.set_resolve_snapshot(ResolveResult.init(), path)
         return AstPool.new()
 
-    let t_read = with_clock_nanos()
-    let text = with_fs_read_file(path)
+    let t_read = runtime_clock_nanos()
+    let text = runtime_read_file(path)
     if text.len() == 0:
-        with_eprint("error: cannot open '" ++ path ++ "'")
+        runtime_eprint("error: cannot open '" ++ path ++ "'")
         self.set_resolve_snapshot(ResolveResult.init(), path)
         return AstPool.new()
     if do_profile:
-        let read_ns = with_clock_nanos() - t_read
-        with_eprint(f"[profile] frontend.read  {read_ns / 1000000}.{(read_ns % 1000000) / 1000} ms  bytes={text.len() as i32}")
+        let read_ns = runtime_clock_nanos() - t_read
+        runtime_eprint(f"[profile] frontend.read  {read_ns / 1000000}.{(read_ns % 1000000) / 1000} ms  bytes={text.len() as i32}")
 
     self.set_current_source(source_dir, path, text)
     if zcu_debug_init_enabled() != 0:
-        with_eprint(f"[frontend] compile_file:source_ready bytes={text.len() as i32}")
+        runtime_eprint(f"[frontend] compile_file:source_ready bytes={text.len() as i32}")
     let pool = self.compile_source_frontend(text, path, 0)
     if pool.decl_count() == 0 and not self.diagnostics.has_errors():
-        with_eprint("error: compiler produced an empty module for '" ++ path ++ "'")
+        runtime_eprint("error: compiler produced an empty module for '" ++ path ++ "'")
     pool
 
 fn Zcu.compile_file_frontend_entry(self: Zcu, path: str) -> AstPool:
     self.compile_file_frontend_entry_with_config(path, project_config_load_for_source(path))
 
 fn Zcu.compile_file_frontend_entry_with_config(self: Zcu, path: str, cfg: ProjectConfig) -> AstPool:
-    let do_profile = with_getenv_str("WITH_PROFILE").len() > 0
+    let do_profile = runtime_getenv("WITH_PROFILE").len() > 0
     if zcu_debug_init_enabled() != 0:
-        with_eprint("[frontend] compile_file_entry:start " ++ path)
+        runtime_eprint("[frontend] compile_file_entry:start " ++ path)
     let source_dir = frontend_dirname(path)
     self.reset_for_new_invocation(source_dir, path, "")
     self.project_config = cfg
     if self.project_config.manifest_error.len() > 0:
-        with_eprint("error: invalid with.toml: " ++ self.project_config.manifest_error)
+        runtime_eprint("error: invalid with.toml: " ++ self.project_config.manifest_error)
         self.set_resolve_snapshot(ResolveResult.init(), path)
         return AstPool.new()
 
-    let t_read = with_clock_nanos()
-    let text = with_fs_read_file(path)
+    let t_read = runtime_clock_nanos()
+    let text = runtime_read_file(path)
     if text.len() == 0:
-        with_eprint("error: cannot open '" ++ path ++ "'")
+        runtime_eprint("error: cannot open '" ++ path ++ "'")
         self.set_resolve_snapshot(ResolveResult.init(), path)
         return AstPool.new()
     if do_profile:
-        let read_ns = with_clock_nanos() - t_read
-        with_eprint(f"[profile] frontend.read  {read_ns / 1000000}.{(read_ns % 1000000) / 1000} ms  bytes={text.len() as i32}")
+        let read_ns = runtime_clock_nanos() - t_read
+        runtime_eprint(f"[profile] frontend.read  {read_ns / 1000000}.{(read_ns % 1000000) / 1000} ms  bytes={text.len() as i32}")
 
     self.set_current_source(source_dir, path, text)
     let pool = self.compile_source_frontend_mode(text, path, 0, 1)
     if pool.decl_count() == 0 and not self.diagnostics.has_errors():
-        with_eprint("error: compiler produced an empty module for '" ++ path ++ "'")
+        runtime_eprint("error: compiler produced an empty module for '" ++ path ++ "'")
     pool
 
 fn Zcu.compile_source_frontend(self: Zcu, text: str, name: str, file_id: i32) -> AstPool:
     self.compile_source_frontend_mode(text, name, file_id, 0)
 
 fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i32, implicit_main_mode: i32) -> AstPool:
-    let do_profile = with_getenv_str("WITH_PROFILE").len() > 0
+    let do_profile = runtime_getenv("WITH_PROFILE").len() > 0
     if zcu_debug_init_enabled() != 0:
-        with_eprint("[frontend] compile_source:parse")
+        runtime_eprint("[frontend] compile_source:parse")
 
     // Phase 1+2: Lex + Parse.  When prelude is enabled, parse the prelude
     // USE declaration first so it appears at decl position 0, ensuring
     // prelude-provided types are imported before user modules.
-    let t_parse = with_clock_nanos()
+    let t_parse = runtime_clock_nanos()
     var pool: AstPool = AstPool.new()
     if self.prelude_mode != PRELUDE_NONE():
         pool = self.parse_with_prelude_first_mode(text, file_id, implicit_main_mode)
@@ -1041,8 +1031,8 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
         self.diagnostics = extra_parser.diags
         self.append_decl_source_paths(pool.decl_count() - before, extra_name, extra_file_id)
     if do_profile:
-        let parse_ns = with_clock_nanos() - t_parse
-        with_eprint(f"[profile] frontend.parse  {parse_ns / 1000000}.{(parse_ns % 1000000) / 1000} ms  decls={pool.decl_count()}")
+        let parse_ns = runtime_clock_nanos() - t_parse
+        runtime_eprint(f"[profile] frontend.parse  {parse_ns / 1000000}.{(parse_ns % 1000000) / 1000} ms  decls={pool.decl_count()}")
 
     let root_local_decl_count = count_non_use_decls_frontend(pool)
 
@@ -1052,13 +1042,13 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
         return AstPool.new()
 
     if zcu_debug_init_enabled() != 0:
-        with_eprint("[frontend] compile_source:resolve")
+        runtime_eprint("[frontend] compile_source:resolve")
     // Wave 4: sidecar resolved artifact.
-    let t_resolve = with_clock_nanos()
+    let t_resolve = runtime_clock_nanos()
     let artifacts = resolve_from_root_pool(name, text, file_id, pool, self.pool, self.diagnostics, false)
     if do_profile:
-        let resolve_ns = with_clock_nanos() - t_resolve
-        with_eprint(f"[profile] frontend.resolve  {resolve_ns / 1000000}.{(resolve_ns % 1000000) / 1000} ms")
+        let resolve_ns = runtime_clock_nanos() - t_resolve
+        runtime_eprint(f"[profile] frontend.resolve  {resolve_ns / 1000000}.{(resolve_ns % 1000000) / 1000} ms")
     self.pool = artifacts.pool
     self.diagnostics = artifacts.diags
     self.set_resolve_snapshot(artifacts.result, name)
@@ -1070,21 +1060,21 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
         return AstPool.new()
 
     if zcu_debug_init_enabled() != 0:
-        with_eprint("[frontend] compile_source:imports")
+        runtime_eprint("[frontend] compile_source:imports")
     // Build the sema/codegen pool via recursive syntactic import expansion.
     // This still sees implicit prelude imports because `inject_prelude_frontend`
     // materializes them as normal `use` declarations in the root pool.
-    let t_imports = with_clock_nanos()
+    let t_imports = runtime_clock_nanos()
     pool = self.process_imports_frontend(pool)
     if do_profile:
-        let imports_ns = with_clock_nanos() - t_imports
-        with_eprint(f"[profile] frontend.imports  {imports_ns / 1000000}.{(imports_ns % 1000000) / 1000} ms")
-    let t_cimport = with_clock_nanos()
+        let imports_ns = runtime_clock_nanos() - t_imports
+        runtime_eprint(f"[profile] frontend.imports  {imports_ns / 1000000}.{(imports_ns % 1000000) / 1000} ms")
+    let t_cimport = runtime_clock_nanos()
     self.trace_c_import_cache = self.read_trace_c_import_cache_frontend()
     pool = self.expand_c_imports_frontend(pool)
     if do_profile:
-        let cimport_ns = with_clock_nanos() - t_cimport
-        with_eprint(f"[profile] frontend.c_import  {cimport_ns / 1000000}.{(cimport_ns % 1000000) / 1000} ms")
+        let cimport_ns = runtime_clock_nanos() - t_cimport
+        runtime_eprint(f"[profile] frontend.c_import  {cimport_ns / 1000000}.{(cimport_ns % 1000000) / 1000} ms")
     pool.set_local_decl_count(root_local_decl_count)
     self.set_typed_snapshot("", pool)
     self.set_frontend_pool(self.pool)
@@ -1097,10 +1087,10 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
 
     // Comptime transform: fold forced comptime expressions and prune dead
     // comptime branches before final sema.
-    let t_comptime = with_clock_nanos()
+    let t_comptime = runtime_clock_nanos()
     if pool.has_comptime_nodes() or pool.has_type_derives():
         if zcu_debug_init_enabled() != 0:
-            with_eprint("[frontend] compile_source:comptime-transform")
+            runtime_eprint("[frontend] compile_source:comptime-transform")
         var pre_sema = Sema.init(self.pool, self.diagnostics, pool)
         pre_sema.source_text = text
         pre_sema.decl_source_paths = self.decl_source_paths
@@ -1124,16 +1114,16 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
             return AstPool.new()
 
     if do_profile:
-        let comptime_ns = with_clock_nanos() - t_comptime
+        let comptime_ns = runtime_clock_nanos() - t_comptime
         if comptime_ns > 100000:
-            with_eprint(f"[profile] frontend.comptime  {comptime_ns / 1000000}.{(comptime_ns % 1000000) / 1000} ms")
+            runtime_eprint(f"[profile] frontend.comptime  {comptime_ns / 1000000}.{(comptime_ns % 1000000) / 1000} ms")
 
     // AstPool construction is complete — freeze to catch any future mutations.
     pool.freeze()
 
     if zcu_debug_init_enabled() != 0:
-        with_eprint("[frontend] compile_source:sema")
-    let t_sema = with_clock_nanos()
+        runtime_eprint("[frontend] compile_source:sema")
+    let t_sema = runtime_clock_nanos()
     var sema = Sema.init(self.pool, self.diagnostics, pool)
     sema.source_text = text
     sema.decl_source_paths = self.decl_source_paths
@@ -1143,8 +1133,8 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
     sema.init_module_graph(&self.last_resolved)
     sema.check_module()
     if do_profile:
-        let sema_ns = with_clock_nanos() - t_sema
-        with_eprint(f"[profile] frontend.sema  {sema_ns / 1000000}.{(sema_ns % 1000000) / 1000} ms  decls={pool.decl_count()}")
+        let sema_ns = runtime_clock_nanos() - t_sema
+        runtime_eprint(f"[profile] frontend.sema  {sema_ns / 1000000}.{(sema_ns % 1000000) / 1000} ms  decls={pool.decl_count()}")
     self.sync_from_sema(sema)
     frontend_dump_type_decl_names("post-sema", self.last_sema.ast, self.last_sema.pool)
     self.last_typed_dump = ""
@@ -1155,7 +1145,7 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
         return AstPool.new()
 
     if pool.decl_count() == 0:
-        with_eprint("error: parser returned an empty module without diagnostics for '" ++ name ++ "'")
+        runtime_eprint("error: parser returned an empty module without diagnostics for '" ++ name ++ "'")
         return AstPool.new()
 
     pool
@@ -1172,7 +1162,7 @@ fn Zcu.merge_resolved_modules_frontend(self: Zcu, root_pool: AstPool, root_path:
         if path.len() == 0 or path == root_path:
             continue
 
-        let text = with_fs_read_file(path)
+        let text = runtime_read_file(path)
         if text.len() == 0:
             let span = Span { file: 0, start: 0, end: 0 }
             self.diagnostics.emit(Diagnostic.err("failed to read imported module", span))
@@ -1678,7 +1668,7 @@ fn Zcu.resolve_module_path_frontend(self: Zcu, module_name: str, source_dir_raw:
 
 fn Zcu.parse_imported_file_frontend(self: Zcu, path: str, target_pool: AstPool) -> AstPool:
     let embedded_rel = embedded_std_rel_path(path)
-    let text = if embedded_rel.len() > 0: embedded_std_source(embedded_rel) else: with_fs_read_file(path)
+    let text = if embedded_rel.len() > 0: embedded_std_source(embedded_rel) else: runtime_read_file(path)
     if text.len() == 0:
         return target_pool
 
