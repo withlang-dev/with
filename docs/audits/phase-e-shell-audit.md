@@ -29,7 +29,7 @@ longer produce shell-string internals.
 | `src/main.w` | Shell command strings removed. Cleanup, `run`/one-liner execution, test stdout/stderr capture, and benchmark execution use typed runtime process/filesystem wrappers. | Complete for Phase E. |
 | `src/compiler/ConanClient.w` | Shell command strings removed. Conan package extraction runs `tar` through typed argv capture; runtime access goes through `compiler.Runtime`. | Complete for Phase E. |
 | `src/CImport.w` | The orphan `with_system` extern was removed. The remaining shell pipeline text is a commented verification command. | Complete for Phase E. |
-| `lib/std/process.w` | Public `Process` wrapper stores shell command strings and executes them with `with_system`. | Redesign as an argv-first API. If an explicit shell API remains, it must be named as shell execution and documented as such. |
+| `lib/std/process.w` | Shell-string execution removed. `Command` now stores an argv vector and executes through typed argv runtime process execution. | Complete for Phase E. |
 | `rt/clang_bridge.w` | Uses `popen` shell probes for SDK/clang resource discovery and diagnostic command construction. | Replace probes with typed process capture and/or direct filesystem enumeration. |
 | `rt/compat_runtime.w` | Provides legacy `with_system` by executing `/bin/sh`. | Retire only after all source users are removed. The runtime export remains the last compatibility layer, not a new dependency target. |
 | `build_pcre2.w` | Invokes upstream PCRE2 `RunTest` through `/bin/bash`. | Documented exception candidate: this is an upstream shell test runner boundary, not compiler/build internal filesystem work. Keep isolated and explicit unless PCRE2 tests are ported. |
@@ -90,3 +90,16 @@ make test
 After each Phase E slice, rerun the scan and update this audit until every
 remaining hit is either removed, a false positive, an allowed fixture, or a
 documented exception with an owner.
+
+## Std Process Slice
+
+Completed:
+
+- removed the public `system_cmd(cmd: str)` shell-string helper;
+- removed `Command { cmd: str }` shell command storage;
+- added argv-first `process.run(Vec[str])`;
+- changed `Command` to store `Vec[str]`, append via `.arg(...)`, and execute
+  through `with_exec_argv`.
+
+This keeps `std.process` at the runtime process boundary but removes shell
+parsing from the standard API.
