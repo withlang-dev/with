@@ -1766,8 +1766,15 @@ fn ComptimeEvaluator.workspace_str_option(self: ComptimeEvaluator, options: Comp
 
 fn ComptimeEvaluator.workspace_i32_option(self: ComptimeEvaluator, options: ComptimeValue, field_name: str, default_value: i32) -> i32:
     let value = self.struct_field_value_by_name(options, field_name)
-    if value.kind == ComptimeValueKind.CV_INT:
+    if comptime_value_is_intlike(value) != 0:
         return value.data0 as i32
+    if value.kind == ComptimeValueKind.CV_ENUM:
+        let sym = value.data0 as i32
+        if self.sema.variant_type_ids.contains(sym):
+            let enum_tid = self.sema.variant_type_ids.get(sym).unwrap()
+            let enum_resolved = self.sema.resolve_alias(enum_tid as TypeId)
+            if self.sema.disc_repr_types.contains(enum_resolved as i32) and not self.sema.disc_has_payload.contains(enum_resolved as i32):
+                return if self.sema.disc_values.contains(sym): self.sema.disc_values.get(sym).unwrap() else: self.sema.variant_lookup.get(sym).unwrap()
     default_value
 
 fn ComptimeEvaluator.workspace_bool_option(self: ComptimeEvaluator, options: ComptimeValue, field_name: str, default_value: bool) -> bool:
@@ -1795,6 +1802,7 @@ fn ComptimeEvaluator.workspace_artifact_kind_for_output(self: ComptimeEvaluator,
     if output_kind == 2: return 4
     if output_kind == 3: return 5
     if output_kind == 4: return 2
+    if output_kind == 5: return 6
     0
 
 fn ComptimeEvaluator.workspace_build_result_value(self: ComptimeEvaluator, workspace_name: str, rc: i32, artifact_kind: i32, artifact_path: str, node: i32) -> ComptimeValue:
@@ -2323,7 +2331,7 @@ fn comptime_workspace_native_compile_invalid() -> ComptimeWorkspaceNativeCompile
     ComptimeWorkspaceNativeCompileResult { rc: 1, artifact_path: "", comp: Compilation.init(), is_migrate: 0 }
 
 fn comptime_workspace_output_kind_supported(kind: i32) -> bool:
-    kind == 0 or kind == 1 or kind == 2 or kind == 4
+    kind == 0 or kind == 1 or kind == 2 or kind == 4 or kind == 5
 
 fn comptime_execute_workspace_migrate_plan(plan: ComptimeWorkspaceCompilePlan) -> i32:
     migrate_reset_options()
@@ -2440,8 +2448,8 @@ fn ComptimeEvaluator.workspace_compile_plan(self: ComptimeEvaluator, record: Com
     var absolute_source = ""
     var has_strings = 0
     if record.string_names.len() > 0:
-        if output_kind != 0:
-            let _ = self.fail(node, "Workspace.compile source strings currently support binary output only")
+        if output_kind != 0 and output_kind != 5:
+            let _ = self.fail(node, "Workspace.compile source strings currently support binary or check output only")
             return comptime_workspace_compile_plan_invalid()
         for si in 0..record.string_names.len() as i32:
             source_paths.push(self.workspace_path(capability.project_root, record.string_names.get(si as i64)))
@@ -2493,7 +2501,12 @@ fn comptime_execute_workspace_compile_plan(plan: ComptimeWorkspaceCompilePlan) -
         return comptime_workspace_native_compile_invalid()
     if plan.is_migrate != 0:
         let rc = comptime_execute_workspace_migrate_plan(plan)
-        return ComptimeWorkspaceNativeCompileResult { rc, artifact_path: if rc == 0: plan.final_output else: "", comp: Compilation.init(), is_migrate: 1 }
+        return ComptimeWorkspaceNativeCompileResult {
+            rc: rc,
+            artifact_path: if rc == 0: plan.final_output else: "",
+            comp: Compilation.init(),
+            is_migrate: 1,
+        }
     var comp = Compilation.init()
     comp.configure(plan.opt_level, plan.no_std, plan.alloc_mode)
     comp.set_debug_info(plan.debug_info)
@@ -2501,20 +2514,38 @@ fn comptime_execute_workspace_compile_plan(plan: ComptimeWorkspaceCompilePlan) -
     comp.set_prelude_mode(plan.prelude_mode)
 
     var artifact_path = ""
+    var success = false
     if plan.has_strings != 0:
-        artifact_path = comp.build_entry_binary_from_sources_to_path(plan.source_paths, plan.source_texts, plan.absolute_output)
+        if plan.output_kind == 5:
+            if comp.check_source_texts(plan.source_paths, plan.source_texts):
+                success = true
+        else:
+            artifact_path = comp.build_entry_binary_from_sources_to_path(plan.source_paths, plan.source_texts, plan.absolute_output)
+            success = artifact_path.len() > 0
     else:
         if plan.output_kind == 0:
             artifact_path = comp.build_binary_to_path_with_build_settings(plan.absolute_source, plan.absolute_output, plan.include_paths, plan.defines, plan.link_libs)
+            success = artifact_path.len() > 0
         else if plan.output_kind == 1:
             artifact_path = comp.emit_object_to_path_with_build_settings(plan.absolute_source, plan.absolute_output, plan.include_paths, plan.defines, plan.link_libs)
+            success = artifact_path.len() > 0
         else if plan.output_kind == 2:
             artifact_path = comp.emit_c(plan.absolute_source, plan.absolute_output)
+            success = artifact_path.len() > 0
         else if plan.output_kind == 4:
             artifact_path = comp.emit_archive_to_path_with_build_settings(plan.absolute_source, plan.absolute_output, plan.include_paths, plan.defines, plan.link_libs)
+            success = artifact_path.len() > 0
+        else if plan.output_kind == 5:
+            if comp.check_file_with_build_settings(plan.absolute_source, plan.include_paths, plan.defines, plan.link_libs):
+                success = true
         else:
             return comptime_workspace_native_compile_invalid()
-    ComptimeWorkspaceNativeCompileResult { rc: if artifact_path.len() > 0: 0 else: 1, artifact_path, comp, is_migrate: 0 }
+    ComptimeWorkspaceNativeCompileResult {
+        rc: if success: 0 else: 1,
+        artifact_path: artifact_path,
+        comp: comp,
+        is_migrate: 0,
+    }
 
 fn comptime_workspace_thread_entry(arg: *mut u8) -> i32:
     let job = arg as *mut ComptimeWorkspaceThreadJob
@@ -2528,7 +2559,8 @@ fn ComptimeEvaluator.compile_workspace_record(self: ComptimeEvaluator, record: C
         return comptime_workspace_compile_invalid()
     let native = comptime_execute_workspace_compile_plan(plan)
     let artifact_kind = if plan.is_migrate != 0: 7 else: self.workspace_artifact_kind_for_output(plan.output_kind)
-    let result = self.workspace_build_result_value(plan.name, native.rc, artifact_kind, plan.final_output, node)
+    let result_artifact_path = if plan.output_kind == 5 and plan.is_migrate == 0: "" else: plan.final_output
+    let result = self.workspace_build_result_value(plan.name, native.rc, artifact_kind, result_artifact_path, node)
     if result.kind == ComptimeValueKind.CV_INVALID:
         return comptime_workspace_compile_invalid()
     let messages =
