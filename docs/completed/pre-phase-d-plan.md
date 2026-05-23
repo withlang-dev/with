@@ -1,12 +1,16 @@
 # Pre-Phase-D Implementation Plan
 
-Status: implementation plan for work that must complete before Phase D (D1)
-begins. This document is the contract for pre-D work. It is not part of
-Phase D itself; everything here lands before the first D1 commit.
+Status: completed plan archive. All pre-Phase-D work required for Phase D D1
+was completed before Phase D implementation began.
+
+Historical status at time of active use: implementation plan for work that
+must complete before Phase D (D1) begins. This document was the contract for
+pre-D work. It is not part of Phase D itself; everything here landed before the
+first D1 commit.
 
 ## 1. Purpose
 
-The Phase D design (`docs/phase-d-design.md` v2) has been reviewed and
+The Phase D design (`docs/completed/phase-d-design.md` v2) has been reviewed and
 sharpened, but it cannot be implemented directly. Several open questions
 need source-level investigation, several design refinements need concrete
 shape, and several regression-coverage gaps need filling so D1 can detect
@@ -14,7 +18,7 @@ behavior changes.
 
 This document enumerates that pre-D work. Each section names a deliverable,
 the question it answers, and its done criteria. Some sections produce
-revisions to `docs/phase-d-design.md`. Some produce new audit documents.
+revisions to `docs/completed/phase-d-design.md`. Some produce new audit documents.
 Some land code (tests, isolated refactors). All complete before D1.
 
 The bar is the same as Phase C: no implementation begins on a slice until
@@ -26,7 +30,7 @@ of catching it during D1 implementation is a session.
 
 Before D1 implementation begins, the following must exist:
 
-- `docs/phase-d-design.md` v3, incorporating all review feedback from v2.
+- `docs/completed/phase-d-design.md` v3, incorporating all review feedback from v2.
 - `docs/audits/comptime-eval-audit.md`, answering the three ComptimeEval
   questions with source-level evidence.
 - `docs/audits/parallel-state-audit.md`, enumerating current global
@@ -47,7 +51,7 @@ Before D1 implementation begins, the following must exist:
 
 ## 3. P1: Design Doc v3
 
-Revise `docs/phase-d-design.md` from v2 to v3 incorporating the v2 review.
+Revise `docs/completed/phase-d-design.md` from v2 to v3 incorporating the v2 review.
 
 ### Required changes from v2
 
@@ -535,7 +539,7 @@ costs more.
 All of the following must be true before D1 implementation begins:
 
 - All deliverables in §2 exist and are committed.
-- `docs/phase-d-design.md` v3 has passed re-review.
+- `docs/completed/phase-d-design.md` v3 has passed re-review.
 - All P7 tests pass against the P8 refactor.
 - The P9 baseline is captured.
 - No open questions remain in the design doc (no "TBD" or "to be
@@ -548,7 +552,7 @@ When this list is checked off, D1 begins. Not before.
 ## 14. What This Document Is Not
 
 This document does not specify Phase D itself. The design contract for
-Phase D lives in `docs/phase-d-design.md`. This document is the
+Phase D lives in `docs/completed/phase-d-design.md`. This document is the
 preparation contract — the work that must complete before that design
 can be implemented confidently.
 

@@ -3,7 +3,7 @@
 Status: P2 pre-Phase-D audit. Source evidence captured before D1.
 
 This audit answers the three ComptimeEval questions in
-`docs/pre-phase-d-plan.md`. It is source-level evidence for the Phase D
+`docs/completed/pre-phase-d-plan.md`. It is source-level evidence for the Phase D
 capability-bearing comptime design.
 
 ## Summary

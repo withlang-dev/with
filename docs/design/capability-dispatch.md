@@ -4,7 +4,7 @@ Status: pre-Phase-D design for D1 implementation.
 
 This document specifies how user-level capability method calls reach
 compiler-internal implementations during capability-bearing comptime
-evaluation. It answers P4 from `docs/pre-phase-d-plan.md`.
+evaluation. It answers P4 from `docs/completed/pre-phase-d-plan.md`.
 
 ## Goals
 

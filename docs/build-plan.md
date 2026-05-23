@@ -60,11 +60,14 @@ Already implemented:
   - several emit-C targets
 - Make compatibility targets delegate many paths to `with build :...`.
 - Default `with build :test` no longer runs the full PCRE2 upstream corpus.
+- Phase D's capability-bearing comptime build/action evaluator, workspace
+  APIs, typed build options, message loop, generated-source re-entry,
+  `parallel(workspaces)`, link command interception, workspace-backed project
+  action migration, and one real `DeclSummary` tooling use case are complete.
 
 Still not acceptable as final state:
 
 - Action target process/install policy declarations are still incomplete.
-- Full Jai-style workspace/build-options/message-loop APIs are incomplete.
 - Make remains as a compatibility layer.
 - Some repository scripts still exist because old workflows or tests reference
   them.
@@ -149,7 +152,8 @@ commit). Action capability hardening continues in Phase B.1.
 Design and implement a project-local action mechanism:
 
 ```with
-pub fn build(ctx: BuildCtx) -> Build:
+comptime with BuildCtx as ctx:
+pub fn build -> Build:
     var out = ctx.new_build()
     out = out.action("name", action_fn)
     out
@@ -363,6 +367,10 @@ Commit after this phase.
 
 Goal: With has the Jai-style compiler-driver surface required by the spec.
 
+Status: complete. Phase D D1 through D8 landed, passed the full verification
+sequence, and the completed design/plan documents are archived under
+`docs/completed/`.
+
 Phase D uses capability-bearing comptime as the public model. The canonical
 form is:
 
@@ -390,7 +398,7 @@ The shorthand `comptime with Capability:` is valid only for capabilities with
 standard defaults. Duplicate or ambiguous default bindings must be written
 explicitly with `as name`.
 
-Implement:
+Implemented:
 
 1. `Workspace` capability.
 2. `BuildOptions` typed API.
@@ -415,7 +423,7 @@ Implement:
    - timing;
    - exit code.
 
-Tests:
+Implemented tests include:
 
 - build file creates two independent workspaces;
 - generated source in one workspace does not leak into another;
@@ -434,7 +442,9 @@ make fixpoint
 make test
 ```
 
-Commit after this phase.
+Completed D8 also replaced a real external diagnostic scan in `build_pcre2.w`
+with a workspace message-loop integration that consumes stable
+`DeclSummary` values.
 
 ---
 

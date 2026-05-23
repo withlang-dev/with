@@ -82,10 +82,10 @@ with build :action --no-deps
 ```
 
 `with build` searches upward from the current directory for `build.w` or
-`with.toml`. If `build.w` exists, the driver invokes its `build(ctx)` entry
-point and executes the returned graph. If no `build.w` exists, the driver falls
-back to a default build of `src/main.w` using the package name from
-`with.toml`.
+`with.toml`. If `build.w` exists, the driver evaluates its
+`comptime with BuildCtx` build entry point and executes the returned graph. If
+no `build.w` exists, the driver falls back to a default build of `src/main.w`
+using the package name from `with.toml`.
 
 `:target` selects a target by name from the graph returned by `build.w`.
 
@@ -491,7 +491,8 @@ fn generate(ctx: ActionCtx) -> i32:
         return 1
     0
 
-pub fn build(ctx: BuildCtx) -> Build:
+comptime with BuildCtx as ctx:
+pub fn build -> Build:
     var out = ctx.new_build()
     var gen = target_new(.Action, "generate", "").output("out/gen/generated.w")
     gen.action = generate
@@ -537,9 +538,10 @@ BuildTarget.darwin_aarch64
 BuildTarget.windows_x86_64
 ```
 
-The current implementation is Mac-first because that is the current developer
-host. Non-host build targets may fail loudly. The language design does not
-privilege macOS.
+Cross-platform target values are part of the build API. Host support is
+implemented incrementally, and a target that is not yet supported on the
+current host must fail loudly. The language design does not privilege one
+operating system over another.
 
 ## Optimization
 
@@ -584,7 +586,8 @@ must not contain parent-directory escapes.
 ```with
 use std.build
 
-pub fn build(ctx: BuildCtx) -> Build:
+comptime with BuildCtx as ctx:
+pub fn build -> Build:
     var out = ctx.new_build().executable("app", "src/main.w")
     out = out.test("test", "tests/*.w")
     out.default("app")
@@ -595,7 +598,8 @@ pub fn build(ctx: BuildCtx) -> Build:
 ```with
 use std.build
 
-pub fn build(ctx: BuildCtx) -> Build:
+comptime with BuildCtx as ctx:
+pub fn build -> Build:
     var out = ctx.new_build()
     out = out.library("mylib", "src/lib.w")
     out = out.test("test", "tests/*.w")
@@ -607,7 +611,8 @@ pub fn build(ctx: BuildCtx) -> Build:
 ```with
 use std.build
 
-pub fn build(ctx: BuildCtx) -> Build:
+comptime with BuildCtx as ctx:
+pub fn build -> Build:
     var app = target_new(.Executable, "app", "src/main.w")
     app = app.include_path("include")
     app = app.define("WITH_FEATURE=1")
@@ -621,7 +626,8 @@ pub fn build(ctx: BuildCtx) -> Build:
 ```with
 use std.build
 
-pub fn build(ctx: BuildCtx) -> Build:
+comptime with BuildCtx as ctx:
+pub fn build -> Build:
     let fs = ctx.fs()
     let emitter = ctx.source_emitter()
     let text = fs.read_text("templates/generated.w")
@@ -637,7 +643,8 @@ pub fn build(ctx: BuildCtx) -> Build:
 ```with
 use std.build
 
-pub fn build(ctx: BuildCtx) -> Build:
+comptime with BuildCtx as ctx:
+pub fn build -> Build:
     var out = ctx.new_build()
     out = out.executable("app", "src/main.w")
     out = out.test("test", "tests/*.w")
@@ -722,5 +729,4 @@ Build files and build-system code should follow these rules:
   target kinds and `ToolFs` operations when those exist.
 - Make remains as a compatibility layer in this repository.
 
-These are implementation gaps, not design changes. Unsupported operations
-should fail loudly rather than silently falling back.
+Unsupported operations should fail loudly rather than silently falling back.

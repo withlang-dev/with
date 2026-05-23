@@ -3,7 +3,7 @@
 Status: active checkpoint for agents. Update this file when phase status,
 blockers, or the next work queue changes.
 
-Last updated: 2026-05-22.
+Last updated: 2026-05-23.
 
 Read this file immediately after `AGENTS.md`. It exists so long-running build
 system and bootstrap work does not have to be reconstructed from git history or
@@ -96,9 +96,10 @@ Completed D4 substrate work:
 
 1. The comptime evaluator can represent payload enum values and match on
    payload enum patterns. This is required before `CompilerMessage` can use the
-   tagged-union shape specified by `docs/phase-d-design.md` instead of a flat
-   message struct. Focused build-w selfhost coverage exercises payload enum
-   construction and payload binding during direct `build(ctx)` evaluation.
+   tagged-union shape specified by `docs/completed/phase-d-design.md` instead
+   of a flat message struct. Focused build-w selfhost coverage exercises
+   payload enum construction and payload binding during direct `build(ctx)`
+   evaluation.
 2. Enum type collection resolves payload types before writing enum layout rows
    into `type_extra`, so generic payload resolution cannot interleave unrelated
    type metadata into an in-progress enum layout. Behavior coverage protects an
@@ -210,20 +211,19 @@ Completed D5 generated-source work:
    generation 1 typechecking, adds a generated source, then observes generation
    2 typechecking with the new declaration before linking.
 
-Started D6 parallel-workspace work:
+Completed D6 parallel-workspace work:
 
 1. `std.build` exposes the public `parallel(workspaces: Vec[Workspace]) ->
    Vec[BuildResult]` API as a driver-evaluated capability function.
 2. The evaluator handles `parallel([ws])` by compiling the single workspace
    through the existing workspace compilation path and returning a
    `Vec[BuildResult]` in input order.
-3. `parallel` with more than one workspace currently fails loudly with
-   `parallel with multiple workspaces requires OS-thread workspace execution,
-   which is not implemented yet`. This is intentional until D6's per-workspace
-   state isolation and OS-thread substrate are implemented; silently serializing
-   multiple workspaces would misrepresent the API.
-4. Focused build-w selfhost coverage proves single-workspace `parallel`
-   behavior and the loud multi-workspace diagnostic.
+3. The initial multi-workspace loud failure protected the API until
+   per-workspace state isolation and the OS-thread substrate were implemented.
+   Later D6 slices replaced that guard with true multi-workspace execution.
+4. Focused build-w selfhost coverage proves single-workspace behavior,
+   multi-workspace execution, independent intercepted queues, and failed
+   workspace identity diagnostics.
 5. Atomic intrinsic lowering now handles global `Atomic[T]` receivers by
    recovering the receiver storage type from MIR/Sema when LLVM cannot report
    an allocated type for a global pointer. Native codegen coverage protects
@@ -458,9 +458,9 @@ Recent Phase C and hardening commits:
 ## Build Plan Status
 
 The authoritative plan remains `docs/build-plan.md`; the final architecture is
-specified in `docs/build-spec.md`. Phase D implementation is governed by
-`docs/phase-d-design.md`; pre-D preparation is governed by
-`docs/pre-phase-d-plan.md`.
+specified in `docs/build-spec.md`. Completed Phase D implementation history is
+archived in `docs/completed/phase-d-design.md`; completed pre-D preparation is
+archived in `docs/completed/pre-phase-d-plan.md`.
 
 Completed at a high level:
 
@@ -473,7 +473,7 @@ Completed at a high level:
 - Several repository-specific build targets have moved to project-local action
   modules.
 
-Still incomplete:
+Remaining To Reach The Final Build Spec:
 
 - Phase C is complete. Project-specific build behavior no longer uses live
   compiler-dispatched project graph kinds.
@@ -491,8 +491,6 @@ Still incomplete:
   workspace message loop and stable `DeclSummary` values instead of spawning a
   compiler process and parsing diagnostic text.
 - Action timeout/cwd/env/network/install policy declarations are incomplete.
-- Jai-style workspace/build-options/message-loop APIs from Phase D are
-  implemented for the current driver model.
 - Make remains a compatibility layer.
 - Some repository scripts remain because workflows or tests still reference
   them.

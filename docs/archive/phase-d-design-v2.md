@@ -1,7 +1,7 @@
 # Archived Phase D Design (Pre-v3)
 
 This is the only pre-v3 Phase D design committed in repository history
-(`313f9bf`). The exact v2 text referenced by `docs/pre-phase-d-plan.md` was
+(`313f9bf`). The exact v2 text referenced by `docs/completed/pre-phase-d-plan.md` was
 not present as a separate git revision; this archive preserves the historical
 pre-review design under the required path for reference.
 
