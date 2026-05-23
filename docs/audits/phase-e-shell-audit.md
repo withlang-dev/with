@@ -25,7 +25,7 @@ longer produce shell-string internals.
 | Area | Current shape | Phase E action |
 |------|---------------|----------------|
 | `src/compiler/Compilation.w` | Shell command strings removed. Filesystem cleanup and directory creation use typed runtime filesystem primitives; `dsymutil` uses typed argv capture. Runtime exports are reached through `compiler.Runtime`, not local `extern fn` declarations. | Complete for Phase E. |
-| `src/compiler/Link.w` | Uses `with_system` to run link commands, `nm -u > file 2>/dev/null`, `rm -f`, and an `ar rcs` shell condition. | Replace link execution with typed argv command execution, replace `nm` with argv capture, replace cleanup with filesystem primitives, and make archive creation typed. |
+| `src/compiler/Link.w` | Shell command strings removed. Link command execution, `nm -u` capture, archive creation, and cleanup use typed runtime process/filesystem wrappers. Runtime exports are reached through `compiler.Runtime`, not local `extern fn` declarations. | Complete for Phase E. |
 | `src/main.w` | Uses `with_system` for cleanup, direct binary execution, test stdout/stderr redirection, and benchmark command execution. | Replace cleanup with filesystem primitives and replace execution/redirection with argv process APIs that support env, cwd, capture, and timeout. |
 | `src/compiler/ConanClient.w` | Uses `tar xzf ... -C ... 2>/dev/null` through `with_system`. | Decide whether Conan support is still live. If live, replace with typed archive extraction or argv execution. If dead, remove the client. |
 | `src/CImport.w` | Declares `with_system`; scan found only a comment using shell pipeline syntax. | Confirm the extern is orphaned and remove it in a cleanup slice if unused. |
@@ -50,6 +50,25 @@ Completed in the second implementation slice:
   calls through `src/compiler/Runtime.w`.
 
 The slices did not change broader link command construction or test execution.
+
+## Link Slice
+
+Completed:
+
+- `nm -u <object> > <report> 2>/dev/null` -> typed argv capture;
+- `rm -f <report>` -> typed file removal;
+- shell `ar rcs` condition -> typed argv archive creation through Darwin
+  `libtool -static`;
+- raw runtime extern declarations in `Link.w` -> `src/compiler/Runtime.w`.
+
+The old shell condition avoided unnecessary archive invocations but was not a
+semantic requirement. Direct `ar rcs` produced Mach-O archive members that ld64
+rejected as not 8-byte aligned; Darwin static archives are now created through
+typed `libtool -static` argv execution. `make fixpoint` is the guard against any
+determinism regression from that change.
+
+The remaining `Link.w` scan hit for `_with_system` is a symbol-name string used
+to decide which runtime object a user program needs; it is not shell execution.
 
 ## Verification
 
