@@ -32,7 +32,8 @@ is also clean of shell command strings and raw runtime extern declarations:
 link execution, `nm -u` capture, archive creation, and cleanup use typed
 runtime process/filesystem wrappers. Darwin archive creation uses
 `libtool -static`, not `ar`, because ld64 rejects unaligned Mach-O members in
-archives produced by direct `ar rcs`.
+archives produced by direct `ar rcs`. The orphan `with_system` declaration in
+`src/CImport.w` has been removed.
 
 Completed D1 sub-slices:
 
