@@ -1,7 +1,5 @@
 use Resolve
-
-extern fn with_fs_read_file(path: str) -> str
-extern fn with_getenv_str(name: str) -> str
+use compiler.Runtime
 
 type ProjectConfig {
     root_dir: str,
@@ -29,7 +27,7 @@ fn project_config_default -> ProjectConfig:
     }
 
 fn project_config_file_exists(path: str) -> bool:
-    with_fs_read_file(path).len() > 0
+    runtime_read_file(path).len() > 0
 
 fn project_config_find_root(start_dir: str) -> str:
     var cur = if start_dir.len() > 0: start_dir else: "."
@@ -50,7 +48,7 @@ fn project_config_load_for_source(source_path_raw: str) -> ProjectConfig:
         return project_config_default()
 
     let manifest_path = resolve_join(root, "with.toml")
-    let text = with_fs_read_file(manifest_path)
+    let text = runtime_read_file(manifest_path)
 
     var cfg = project_config_default()
     cfg.root_dir = root
@@ -131,7 +129,7 @@ fn project_config_load_dep_metadata(cfg: ProjectConfig, name: str, version: str)
     // Read metadata.json from .with/deps/c/<name>/<version>/
     let dep_dir = out.root_dir ++ "/.with/deps/c/" ++ name ++ "/" ++ version
     let meta_path = dep_dir ++ "/metadata.json"
-    let meta = with_fs_read_file(meta_path)
+    let meta = runtime_read_file(meta_path)
     if meta.len() == 0:
         return out
     // Extract include_paths, lib_paths, libs from JSON
@@ -338,7 +336,7 @@ fn project_config_absolutize_path(path: str) -> str:
         return path
     if project_config_is_absolute_path(path):
         return project_config_normalize_absolute_path(path)
-    let cwd = with_getenv_str("PWD")
+    let cwd = runtime_getenv("PWD")
     if cwd.len() == 0:
         return path
     project_config_normalize_absolute_path(resolve_join(cwd, path))
