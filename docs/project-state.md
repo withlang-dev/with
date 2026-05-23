@@ -21,7 +21,7 @@ input order. Fresh intercepted workspaces are supported by queueing their
 independent message streams after the parallel compile joins; partially
 consumed intercepted workspaces fail loudly.
 
-Phase E has started. The initial shell-string audit is recorded in
+Phase E is complete. The shell-string audit is recorded in
 `docs/audits/phase-e-shell-audit.md`. `src/compiler/Compilation.w` is clean of
 shell command strings and raw runtime extern declarations: output directory
 creation fails loudly through typed runtime filesystem primitives, cleanup uses
@@ -585,28 +585,27 @@ not a new compiler-dispatched project graph kind.
   work. For ordinary changes, rely on `make test`'s emit-C smoke.
 - Keep project-specific build policy in project-local modules and avoid adding
   new compiler-dispatched project graph kinds.
-- Continue replacing shell/filesystem work in build internals with typed
-  capabilities.
+- Phase E is complete. New compiler, migrator, runtime, stdlib, and build
+  internals should use typed process/filesystem APIs rather than shell command
+  strings.
 
 ## Local State
 
-At the time of this update, Phase D D1 through D8 are complete. The D8 slice
-passed:
+At the time of this update, Phase E is complete. The Phase E code slices
+passed the standard verification sequence:
 
 ```sh
 out/bin/with check src/main.w
-out/bin/with check build_pcre2.w
-out/bin/with check build_selfhost.w
-git diff --check
 make build
-out/bin/with build :pcre2-build --no-deps
-out/bin/with build :pcre2-check-generated --no-deps
-out/bin/with build :c-migrator-pcre2-prep-tests --no-deps
-out/bin/with build :cli-selfhost-build-w-tests --no-deps
 make fixpoint
 make test
 make install-user
 ```
+
+Focused checks for the final Phase E slices also covered `std.process`,
+`rt/clang_bridge.w`, `build.w`, `build_compiler.w`, and compat-runtime object
+generation. The final source scan has only the documented PCRE2 upstream
+`/bin/bash` runner exception and the `shorthand` filename false positive.
 
 The full emit-C test is intentionally not part of this verification pass per
 the manual-only policy above.
