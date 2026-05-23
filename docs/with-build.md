@@ -13,15 +13,9 @@ with.toml  declarative package metadata
 build.w    executable build behavior
 ```
 
-The compiler driver discovers `build.w`, runs it with driver-minted build
+The compiler driver discovers `build.w`, evaluates it with driver-minted build
 capabilities, receives a typed build graph, and executes that graph. Ordinary
 projects do not need Makefiles or shell scripts for normal builds.
-
-Implementation note: current releases execute `build.w` and action functions
-through generated runner binaries. Phase D is replacing that internal path with
-capability-bearing comptime evaluation inside the driver. The public API is the
-same either way: `pub fn build(ctx: BuildCtx) -> Build`, `ActionCtx` for action
-targets, typed graph nodes, and explicit capabilities.
 
 ## Quick Start
 
@@ -58,7 +52,8 @@ version = "0.1.0"
 ```with
 use std.build
 
-pub fn build(ctx: BuildCtx) -> Build:
+comptime with BuildCtx as ctx:
+pub fn build -> Build:
     var out = ctx.new_build().executable("my_app", "src/main.w")
     var tests = target_new(.Test, "test", "tests/*.w")
     out = out.add_target(tests)
@@ -152,14 +147,16 @@ A build file exposes:
 ```with
 use std.build
 
-pub fn build(ctx: BuildCtx) -> Build:
+comptime with BuildCtx as ctx:
+pub fn build -> Build:
     ...
 ```
 
-The compiler driver constructs `BuildCtx`. User code cannot construct
-`BuildCtx` or other tool capabilities directly. The build function returns a
-`Build`, which is a typed graph of targets, generated sources, dependencies,
-and package metadata.
+The compiler driver constructs `BuildCtx` and binds it as `ctx` for the
+capability-bearing comptime entry point. User code cannot construct `BuildCtx`
+or other tool capabilities directly. The build function returns a `Build`,
+which is a typed graph of targets, generated sources, dependencies, and package
+metadata.
 
 `build.w` is ordinary With code except that the driver invokes it with
 unforgeable capabilities. Capability-bearing functions are compile-time tool
@@ -180,13 +177,13 @@ SourceEmitter   generated-source construction
 ToolFs          sandboxed project-relative filesystem operations
 ProcessRunner   argv-based external process capture
 ActionCtx       action-target invocation context
+Workspace       isolated compiler workspace for tool-mode compilation
 ```
 
 Capability values are driver-minted handles. User code may receive, pass, and
 call methods on them, but may not construct or deserialize production
-capabilities. The current runner path uses validation tokens internally; Phase
-D is moving that validation into the evaluator capability store. Build code
-should not depend on either representation.
+capabilities. The implementation validates those handles in the evaluator
+capability store; build code should depend only on the public capability APIs.
 
 ### BuildCtx
 
@@ -286,6 +283,43 @@ if result.rc != 0:
 
 Use process execution for external tools. Do not assemble shell command strings
 in compiler, runtime, migrator, stdlib, or build-system code.
+
+### Workspace
+
+`Workspace` is a tool-mode compiler workspace. Build and action code uses it
+when it needs to compile, check, migrate, or inspect With source without
+spawning another `with` process.
+
+```with
+let ws = ctx.create_workspace("generated-check")
+ws.add_string("generated.w", "fn generated_symbol -> i32: 7\n")
+var options = ws.options()
+options.output_kind = BuildOutputKind.Check
+ws.set_options(options)
+ws.begin_intercept()
+let result = ws.compile()
+while true:
+    let envelope = ws.wait_for_message()
+    match envelope.message:
+        CompilerMessage.Typechecked(decls) =>
+            // inspect Vec[DeclSummary]
+            false
+        CompilerMessage.Complete(done) =>
+            break
+        CompilerMessage.Error(_, message, _) =>
+            ctx.diagnostics().error(message)
+        _ => false
+ws.end_intercept()
+```
+
+`BuildOutputKind.Check` typechecks the workspace and produces no public
+artifact. Other output kinds produce artifacts described by `BuildResult`.
+
+`Workspace.begin_intercept()` enables a typed message stream. The stable message
+surface includes `CompilerMessage.Phase`, `Typechecked(Vec[DeclSummary])`,
+`PreLink(LinkCommand)`, `Linked(LinkCommand, rc)`, `Artifact(Artifact)`, and
+`Complete(BuildResult)`. `DeclSummary` is the public declaration-inspection
+surface; build code does not receive raw AST or Sema nodes.
 
 ## Build Graph Data Model
 
@@ -679,10 +713,9 @@ Build files and build-system code should follow these rules:
 
 ## Repository Work Still In Progress
 
-- Phase D is in progress. The current public build API is stable, but generated
-  build/action runner binaries are still used internally until
-  capability-bearing comptime evaluator dispatch replaces them.
-- Full Jai-style compiler-as-library workspace APIs are not implemented yet.
+- Phase D's in-process build/action evaluator, workspaces, typed message loop,
+  generated-source re-entry, workspace parallelism, link command interception,
+  and `DeclSummary` tooling surface are implemented.
 - Cross-platform target plumbing exists, but only the current host path is
   routinely exercised.
 - `Command` and low-level toolchain targets are argv/file based. Prefer typed

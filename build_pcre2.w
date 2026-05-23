@@ -278,20 +278,70 @@ fn pcre2_module_body_for_synthetic_check(text: str) -> str:
             out = out ++ line
     out
 
-fn pcre2_count_error_lines(text: str) -> i32:
-    var count = 0
+fn pcre2_first_function_name(text: str) -> str:
     var line_start = 0
     for i in 0..text.len() as i32:
         if text.byte_at(i as i64) == 10:
             let line = text.slice(line_start as i64, i as i64)
-            if line.contains("error:"):
-                count = count + 1
+            if line.starts_with("fn "):
+                var end = 3
+                while end < line.len() as i32:
+                    let ch = line.byte_at(end as i64)
+                    if ch == 40 or ch == 58 or ch == 32 or ch == 9:
+                        break
+                    end = end + 1
+                return line.slice(3, end as i64)
             line_start = i + 1
     if line_start < text.len() as i32:
         let line = text.slice(line_start as i64, text.len())
-        if line.contains("error:"):
-            count = count + 1
-    count
+        if line.starts_with("fn "):
+            var end = 3
+            while end < line.len() as i32:
+                let ch = line.byte_at(end as i64)
+                if ch == 40 or ch == 58 or ch == 32 or ch == 9:
+                    break
+                end = end + 1
+            return line.slice(3, end as i64)
+    ""
+
+fn pcre2_decls_contain_function(decls: Vec[DeclSummary], name: str, source_suffix: str) -> bool:
+    for di in 0..decls.len() as i32:
+        let decl = decls.get(di as i64)
+        if decl.kind == DeclKind.function and decl.name == name and decl.source.file.ends_with(source_suffix):
+            return true
+    false
+
+fn pcre2_check_synthetic_module(ctx: ActionCtx, mod_name: str, source_name: str, source_text: str, expected_decl: str) -> i32:
+    let ws = ctx.create_workspace("pcre2-check-" ++ mod_name)
+    ws.add_string(source_name, source_text)
+    var options = ws.options()
+    options.output_kind = BuildOutputKind.Check
+    ws.set_options(options)
+    ws.begin_intercept()
+    let result = ws.compile()
+    var saw_expected = expected_decl.len() == 0
+    var saw_complete = false
+    var rc = result.rc
+    while not saw_complete:
+        let envelope = ws.wait_for_message()
+        match envelope.message:
+            CompilerMessage.Typechecked(decls) =>
+                if expected_decl.len() > 0 and pcre2_decls_contain_function(decls, expected_decl, source_name):
+                    saw_expected = true
+            CompilerMessage.Complete(done) =>
+                rc = done.rc
+                saw_complete = true
+            CompilerMessage.Error(_, message, _) =>
+                let _ = pcre2_fail(ctx, "generated-check workspace error in " ++ mod_name ++ ": " ++ message)
+                return -1
+            _ => false
+    ws.end_intercept()
+    if rc != 0:
+        return 1
+    if not saw_expected:
+        let _ = pcre2_fail(ctx, "generated-check missing expected declaration '" ++ expected_decl ++ "' in " ++ mod_name)
+        return 1
+    0
 
 fn pcre2_ensure_generated_dependencies(ctx: ActionCtx, generated_dir: str) -> i32:
     let compile_path = pcre2_join(generated_dir, "pcre2_compile.w")
@@ -332,12 +382,8 @@ fn pcre2_ensure_generated_dependencies(ctx: ActionCtx, generated_dir: str) -> i3
             return pcre2_fail(ctx, "could not update imports in " ++ pcre2test_path)
     0
 
-pub fn pcre2_count_generated_errors(ctx: ActionCtx, compiler_path: str, generated_dir: str, print_summary: bool) -> i32:
+pub fn pcre2_count_generated_errors(ctx: ActionCtx, generated_dir: str, print_summary: bool) -> i32:
     let fs = ctx.fs()
-    let root = ctx.project_info().project_root()
-    if not fs.exists(compiler_path):
-        let _ = pcre2_fail(ctx, "missing compiler: " ++ compiler_path)
-        return -1
     if not fs.is_dir(generated_dir):
         let _ = pcre2_fail(ctx, "missing generated directory: " ++ generated_dir)
         return -1
@@ -349,16 +395,6 @@ pub fn pcre2_count_generated_errors(ctx: ActionCtx, compiler_path: str, generate
         return -1
     let defs_text = fs.read_text(defs_path)
     let files = fs.list_files(generated_dir)
-    let tmp_dir = pcre2_join(pcre2_scratch_dir(), "generated-check-" ++ ctx.target_name())
-    if fs.exists(tmp_dir) and fs.remove_tree(tmp_dir) != 0:
-        let _ = pcre2_fail(ctx, "could not remove old generated-check temp directory")
-        return -1
-    if fs.mkdir_all(tmp_dir) != 0:
-        let _ = pcre2_fail(ctx, "could not create generated-check temp directory")
-        return -1
-    let tmp_path = pcre2_join(tmp_dir, "synthetic.w")
-    let check_stdout = pcre2_abs(root, pcre2_join(tmp_dir, "check.stdout"))
-    let check_stderr = pcre2_abs(root, pcre2_join(tmp_dir, "check.stderr"))
     var ok = 0
     var total_errors = 0
     for fi in 0..files.len() as i32:
@@ -370,24 +406,16 @@ pub fn pcre2_count_generated_errors(ctx: ActionCtx, compiler_path: str, generate
         var synthetic = defs_text ++ pcre2_module_body_for_synthetic_check(module_text)
         if not pcre2_module_defines_main(module_text):
             synthetic = synthetic ++ "\nfn main { print(\"ok\") }\n"
-        if fs.write_text(tmp_path, synthetic) != 0:
-            let _ = pcre2_fail(ctx, "could not write generated-check temp file")
+        let expected_decl = pcre2_first_function_name(module_text)
+        let source_name = pcre2_join(generated_dir, "__check_" ++ mod_name ++ ".w")
+        let errors = pcre2_check_synthetic_module(ctx, mod_name, source_name, synthetic, expected_decl)
+        if errors < 0:
             return -1
-        var check_args: Vec[str] = Vec.new()
-        check_args |> push(pcre2_abs(root, compiler_path))
-        check_args |> push("check")
-        check_args |> push(pcre2_abs(root, tmp_path))
-        let result = ctx.process_runner().run_capture(check_args, check_stdout, check_stderr, 180000)
-        if result.rc == 124:
-            let _ = pcre2_fail(ctx, "timed out checking generated module: " ++ mod_name)
-            return -1
-        let errors = pcre2_count_error_lines(result.stdout ++ result.stderr)
         if errors == 0:
             ok = ok + 1
         else:
             print(mod_name ++ f" {errors} {module_text.len()}")
             total_errors = total_errors + errors
-    let _remove_tmp = fs.remove_tree(tmp_dir)
     if print_summary:
         print(f"OK={ok} TOTAL_ERRORS={total_errors}")
     total_errors
@@ -667,12 +695,9 @@ pub fn run_pcre2_build_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
     let root = ctx.project_info().project_root()
     let output_dir = ctx.output()
-    let compiler_path = "out/bin/with"
     if inputs.len() == 0 or output_dir.len() == 0:
         return pcre2_fail(ctx, "requires migrated-dir input and output directory")
     let migrated_dir = inputs.get(0)
-    if not fs.exists(compiler_path):
-        return pcre2_fail(ctx, "missing compiler: " ++ compiler_path)
     if not fs.is_dir(migrated_dir):
         return pcre2_fail(ctx, "missing migrated PCRE2 directory: " ++ migrated_dir ++ " - run pcre2-migrate deliberately")
     if fs.mkdir_all(pcre2_scratch_dir()) != 0:
@@ -688,7 +713,7 @@ pub fn run_pcre2_build_action(ctx: ActionCtx) -> i32:
     let copy_rc = pcre2_copy_w_files(ctx, migrated_dir, re_dir)
     if copy_rc != 0:
         return copy_rc
-    let errors = pcre2_count_generated_errors(ctx, compiler_path, re_dir, true)
+    let errors = pcre2_count_generated_errors(ctx, re_dir, true)
     if errors < 0:
         return 1
     if errors != 0:
@@ -763,11 +788,10 @@ pub fn run_pcre2_check_generated_action(ctx: ActionCtx) -> i32:
     if inputs.len() == 0 or output.len() == 0:
         return pcre2_fail(ctx, "requires generated-dir input and stamp output")
     let generated_dir = inputs.get(0)
-    let compiler_path = "out/bin/with"
     let c_export_errors = pcre2_reject_c_exports(ctx, generated_dir)
     if c_export_errors != 0:
         return 1
-    let errors = pcre2_count_generated_errors(ctx, compiler_path, generated_dir, true)
+    let errors = pcre2_count_generated_errors(ctx, generated_dir, true)
     if errors < 0:
         return 1
     if errors != 0:
@@ -784,11 +808,10 @@ pub fn run_pcre2_promote_action(ctx: ActionCtx) -> i32:
     if inputs.len() == 0 or dest_dir.len() == 0:
         return pcre2_fail(ctx, "requires generated-dir input and destination output")
     let generated_dir = inputs.get(0)
-    let compiler_path = "out/bin/with"
     let c_export_errors = pcre2_reject_c_exports(ctx, generated_dir)
     if c_export_errors != 0:
         return 1
-    let errors = pcre2_count_generated_errors(ctx, compiler_path, generated_dir, true)
+    let errors = pcre2_count_generated_errors(ctx, generated_dir, true)
     if errors < 0:
         return 1
     if errors != 0:

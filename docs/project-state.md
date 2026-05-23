@@ -13,7 +13,7 @@ conversation context after compaction.
 
 Phase C extraction work is complete. Pre-Phase-D preparation is complete
 through P9, including the follow-up source-location diagnostic gap. Phase D
-D1 through D7 are complete. Phase D D8 is next. The evaluator supports
+D1 through D8 are complete. The evaluator supports
 true OS-thread execution for multi-workspace `parallel(workspaces)` calls by
 planning workspaces on the evaluator thread, compiling each plan on its own OS
 thread, and materializing `BuildResult` values back on the evaluator thread in
@@ -305,6 +305,19 @@ Completed D7 project-action workspace migration work:
    emitted compiler binaries, CLI selfhost fixtures, and current diagnostic
    scans that deliberately exercise CLI output.
 
+Completed D8 DeclSummary-driven tooling work:
+
+1. `BuildOutputKind.Check` supports workspace typecheck-only compilation
+   through `Workspace.compile()` without materializing a public artifact.
+2. PCRE2 generated-module validation now creates in-process workspaces,
+   compiles synthetic modules in check mode, and inspects
+   `CompilerMessage.Typechecked(Vec[DeclSummary])` instead of spawning
+   `out/bin/with check` and parsing CLI diagnostic text.
+3. The stable DeclSummary v1 fields used by the PCRE2 tooling integration are
+   `DeclSummary.kind`, `DeclSummary.name`, and `DeclSummary.source.file`.
+4. Remaining PCRE2 ProcessRunner calls are explicit external-tool or corpus
+   runner boundaries, not self-invoked compiler diagnostic scans.
+
 D1 architectural boundary: the evaluator must return a typed std.build `Build`
 value. The driver materializes that value directly into `BuildGraph`.
 `Build.emit_graph()` remains a debug/export compatibility facility and must not
@@ -324,22 +337,20 @@ The original P9 pre-D1 baseline is recorded in
 containing this project-state update:
 
 ```text
-Report failed parallel workspace identity
+Use DeclSummary workspace checks for PCRE2 generated modules
 ```
 
 Commands passed:
 
 ```sh
-out/bin/with check rt/rt_core.w --no-prelude
-git diff --check
-out/bin/with build rt/rt_core.w --emit-obj --no-prelude -O2 -o /tmp/rt_core_thread_closure.o
-out/bin/with run test/behavior/behav_std_thread_spawn_os.w
-out/bin/with run test/behavior/behav_std_thread_spawn_closure.w
-out/bin/with check rt/darwin_aarch64.w --no-prelude
 out/bin/with check src/main.w
+out/bin/with check build_pcre2.w
 out/bin/with check build_selfhost.w
 git diff --check
 make build
+out/bin/with build :pcre2-build --no-deps
+out/bin/with build :pcre2-check-generated --no-deps
+out/bin/with build :c-migrator-pcre2-prep-tests --no-deps
 out/bin/with build :cli-selfhost-build-w-tests --no-deps
 make fixpoint
 make test
@@ -378,7 +389,9 @@ default `:test` target includes the fast emit-C smoke.
 
 Recent Phase D/pre-D commits:
 
-- current checkpoint: Use a workspace for pcre2-test-smoke's With compile.
+- current checkpoint: Use DeclSummary workspace checks for PCRE2 generated modules.
+- previous checkpoint: Add workspace check output mode.
+- previous checkpoint: Use a workspace for pcre2-test-smoke's With compile.
 - previous checkpoint: Use workspaces for emit-C compiler source emission.
 - previous checkpoint: Fix emit-C lowering for Atomic and payload options.
 - previous checkpoint: Report failed parallel workspace identity.
@@ -474,8 +487,12 @@ Still incomplete:
   as a With source compiler now use workspaces; remaining process calls are
   explicit external-tool, alternate-compiler, CLI-test, or diagnostic
   boundaries.
+- Phase D D8 is complete. A real compiler-tooling action now consumes the
+  workspace message loop and stable `DeclSummary` values instead of spawning a
+  compiler process and parsing diagnostic text.
 - Action timeout/cwd/env/network/install policy declarations are incomplete.
-- Jai-style workspace/build-options/message-loop APIs are incomplete.
+- Jai-style workspace/build-options/message-loop APIs from Phase D are
+  implemented for the current driver model.
 - Make remains a compatibility layer.
 - Some repository scripts remain because workflows or tests still reference
   them.
@@ -514,10 +531,12 @@ not a new compiler-dispatched project graph kind.
 
 ## Open Blockers And Follow-Ups
 
-- Continue Phase D with D8: replace an existing external diagnostic/generation
-  step with a `DeclSummary`-driven workspace message-loop integration. The
-  generated-module error scan in `build_pcre2.w` is the leading candidate
-  because it still intentionally exercises CLI diagnostics after D7.
+- Phase D is complete. The next major direction is not selected in this file.
+- The D8 PCRE2 generated-module check currently creates one workspace per
+  generated module and retains substantial compiler state during the action.
+  It passes, but future performance work should consider a batched or reusable
+  workspace shape before expanding the pattern to larger generated-module
+  scans.
 - Preserve the pre-D behavior tests during D1:
   `behav_build_w_basic_invocation`, `behav_action_capability_filesystem`,
   `behav_action_capability_process`, `behav_capability_token_mismatch`,
@@ -534,17 +553,22 @@ not a new compiler-dispatched project graph kind.
 
 ## Local State
 
-At the time of this update, Phase D D7 is complete and D8 is the next active
-slice. The last D7 code slice passed:
+At the time of this update, Phase D D1 through D8 are complete. The D8 slice
+passed:
 
 ```sh
+out/bin/with check src/main.w
 out/bin/with check build_pcre2.w
-out/bin/with build :pcre2-migrate-smoke --no-deps
-out/bin/with build :pcre2-migrate --no-deps
-out/bin/with build :pcre2-build --no-deps
+out/bin/with check build_selfhost.w
+git diff --check
 make build
+out/bin/with build :pcre2-build --no-deps
+out/bin/with build :pcre2-check-generated --no-deps
+out/bin/with build :c-migrator-pcre2-prep-tests --no-deps
+out/bin/with build :cli-selfhost-build-w-tests --no-deps
 make fixpoint
 make test
+make install-user
 ```
 
 The full emit-C test is intentionally not part of this verification pass per
