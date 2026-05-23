@@ -135,7 +135,6 @@ extern fn with_eprint(s: str) -> void
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_fs_write_file(path: str, data: str) -> i32
 extern fn with_fs_mkdir_p(path: str) -> i32
-extern fn with_system(cmd: str) -> i32
 
 // CXCursorKind constants (old API — decl-level)
 let CK_STRUCT: i32 = 2
