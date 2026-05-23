@@ -11,9 +11,9 @@ use CiIR
 use CiPrint
 use CImport
 
-extern fn with_arg_at(idx: i32) -> str
 extern fn with_write_stdout(s: str) -> void
 extern fn with_flush_stdout() -> void
+extern fn with_fs_list_files(path: str) -> str
 
 // Width-slice mode: when > 0, skip declarations belonging to
 // non-target PCRE2 width families during migration.
@@ -60,7 +60,6 @@ var g_migrate_shared_defs_prefix: str = ""
 var g_migrate_shared_decl_buf: str = ""
 var g_migrate_shared_decl_keys: str = ""
 var g_migrate_shared_decl_records: str = ""
-var g_migrate_reinvoke_args: str = ""
 var g_migrate_directory_one_basename: str = ""
 var g_migrate_shared_fragment_path: str = ""
 var g_migrate_include_paths: Vec[str] = Vec.new()
@@ -78,9 +77,6 @@ var g_migrate_libc_symbols_used: str = ""
 
 pub fn migrate_set_shared_defs(prefix: str):
     g_migrate_shared_defs_prefix = prefix
-
-pub fn migrate_set_reinvoke_args(args: str):
-    g_migrate_reinvoke_args = args
 
 pub fn migrate_set_directory_one_basename(basename: str):
     g_migrate_directory_one_basename = basename
@@ -307,6 +303,11 @@ fn ci_migrate_write_shared_defs(output_dir: str):
         eprint("migrate: wrote shared defs: " ++ defs_path)
 
 fn ci_migrate_write_shared_fragment(path: str):
+    let fragment = ci_migrate_shared_fragment_text()
+    if with_fs_write_file(path, fragment) != 0:
+        eprint(f"migrate: failed to write shared fragment: {path}")
+
+fn ci_migrate_shared_fragment_text() -> str:
     var fragment = g_migrate_shared_decl_records
     var pending_i = 0
     while pending_i < g_migrate_shared_pending_extern_vars.len() as i32:
@@ -314,8 +315,7 @@ fn ci_migrate_write_shared_fragment(path: str):
         fragment = fragment ++ f"@@PENDING|{pending.kind}|{pending.name}\n{pending.rendered}\n@@END\n"
         pending_i = pending_i + 1
     fragment = fragment ++ f"@@USES\n{g_migrate_shared_usage_idents}\n@@END\n"
-    if with_fs_write_file(path, fragment) != 0:
-        eprint(f"migrate: failed to write shared fragment: {path}")
+    fragment
 
 fn ci_migrate_merge_usage_keys(keys: str):
     var i = 0
@@ -366,16 +366,11 @@ fn ci_migrate_merge_shared_fragment_text(text: str):
             ci_migrate_merge_usage_keys(body)
         pos = body_end + 7
 
-fn ci_migrate_merge_shared_fragments(output_dir: str, fragments: Vec[str]):
+fn ci_migrate_merge_shared_fragment_texts(output_dir: str, fragments: Vec[str]):
     ci_migrate_shared_defs_reset()
     var i = 0
     while i < fragments.len() as i32:
-        let path = fragments.get(i as i64)
-        let text = with_fs_read_file(path)
-        if text.len() == 0:
-            eprint(f"migrate: missing shared fragment: {path}")
-        else:
-            ci_migrate_merge_shared_fragment_text(text)
+        ci_migrate_merge_shared_fragment_text(fragments.get(i as i64))
         i = i + 1
     ci_migrate_write_shared_defs(output_dir)
 
@@ -942,9 +937,6 @@ fn ci_migrate_sorted_files(files: Vec[str]) -> Vec[str]:
         i = i + 1
     sorted
 
-fn ci_migrate_shell_arg(s: str) -> str:
-    "'" ++ ci_shell_escape(s) ++ "'"
-
 fn ci_migrate_directory_output_path(input_dir: str, output_dir: str, file_path: str) -> str:
     var out_path = ""
     if ci_starts_with(file_path, input_dir):
@@ -972,12 +964,48 @@ fn ci_migrate_ensure_parent_dir(path: str):
     if dir_end > 0:
         with_fs_mkdir_p(path.slice(0, dir_end as i64))
 
+fn ci_migrate_path_is_c_file(path: str) -> bool:
+    path.len() > 2 and path.slice(path.len() - 2, path.len()) == ".c"
+
+fn ci_migrate_basename_is_hidden(path: str) -> bool:
+    let base = ci_migrate_path_basename(path)
+    base.len() > 0 and base.byte_at(0) == 46
+
+fn ci_migrate_sorted_insert(files: Vec[str], path: str) -> Vec[str]:
+    let sorted: Vec[str] = Vec.new()
+    var inserted = false
+    var i = 0
+    while i < files.len() as i32:
+        let existing = files.get(i as i64)
+        if not inserted and ci_str_compare(path, existing) < 0:
+            sorted.push(path)
+            inserted = true
+        sorted.push(existing)
+        i = i + 1
+    if not inserted:
+        sorted.push(path)
+    sorted
+
+fn ci_migrate_collect_c_files(input_dir: str, exclude_basenames: str) -> Vec[str]:
+    var files: Vec[str] = Vec.new()
+    let listing = with_fs_list_files(input_dir)
+    var pos = 0
+    let n = listing.len() as i32
+    while pos < n:
+        var line_end = pos
+        while line_end < n and listing.byte_at(line_end as i64) != 10:
+            line_end = line_end + 1
+        if line_end > pos:
+            let file_path = listing.slice(pos as i64, line_end as i64)
+            let base = ci_migrate_path_basename(file_path)
+            if ci_migrate_path_is_c_file(file_path) and not ci_migrate_basename_is_hidden(file_path) and not ci_migrate_excludes_contains(exclude_basenames, base):
+                files = ci_migrate_sorted_insert(files, file_path)
+        pos = line_end + 1
+    files
+
 fn ci_migrate_directory_filewise(input_dir: str, output_dir: str, files: Vec[str]) -> i32:
     let fragments: Vec[str] = Vec.new()
-    let fragment_dir = f"{output_dir}/.shared_fragments"
     with_fs_mkdir_p(output_dir)
-    with_fs_mkdir_p(fragment_dir)
-    let self_bin = with_arg_at(0)
     var migrated = 0
     var i = 0
     let total = files.len() as i32
@@ -987,17 +1015,24 @@ fn ci_migrate_directory_filewise(input_dir: str, output_dir: str, files: Vec[str
         let out_path = ci_migrate_directory_output_path(input_dir, output_dir, file_path)
         ci_migrate_ensure_parent_dir(out_path)
         ci_migrate_print_progress(file_path, i + 1, total)
-        let fragment = f"{fragment_dir}/{base}.defs"
-        fragments.push(fragment)
-        let cmd = ci_migrate_shell_arg(self_bin) ++ " migrate " ++ ci_migrate_shell_arg(input_dir) ++ " -o " ++ ci_migrate_shell_arg(output_dir) ++ " " ++ g_migrate_reinvoke_args ++ " --migrate-one " ++ ci_migrate_shell_arg(base) ++ " --shared-fragment " ++ ci_migrate_shell_arg(fragment)
-        let rc = with_system(cmd)
+
+        ci_migrate_shared_defs_reset()
+        var project = CiProject.new()
+        var scan_i = 0
+        while scan_i < files.len() as i32:
+            if project.migrate_scan_file(files.get(scan_i as i64)) != 0:
+                eprint(f"migrate: failed while scanning project for {base}")
+                return 1
+            scan_i = scan_i + 1
+
+        let rc = ci_migrate_file_inner(file_path, out_path, true, &project)
         if rc != 0:
             eprint(f"migrate: failed while migrating {base}")
             return rc
         migrated = migrated + 1
+        fragments.push(ci_migrate_shared_fragment_text())
         i = i + 1
-    ci_migrate_merge_shared_fragments(output_dir, fragments)
-    let _cleanup = with_system("rm -rf " ++ ci_migrate_shell_arg(fragment_dir))
+    ci_migrate_merge_shared_fragment_texts(output_dir, fragments)
     eprint(f"migrate: {migrated}/{files.len() as i32} files translated from {input_dir} -> {output_dir}")
     if migrated == 0: 1 else: 0
 
@@ -1010,49 +1045,26 @@ pub fn migrate_c_directory(input_dir: str, output_dir: str, exclude_basenames: s
     // Create output directory
     with_fs_mkdir_p(output_dir)
 
-    // Find all .c files using shell
-    let find_cmd = "find '" ++ ci_shell_escape(input_dir) ++ "' -name '*.c' -not -name '.*' -type f 2>/dev/null | sort"
-    let find_result = with_fs_read_file_cmd(find_cmd)
-    if find_result.len() == 0:
+    let files = ci_migrate_collect_c_files(input_dir, exclude_basenames)
+    if files.len() == 0:
         eprint("migrate: no .c files found in " ++ input_dir)
         return 1
 
-    // Parse the file list (newline-separated)
-    let files: Vec[str] = Vec.new()
-    var files_scanned = 0
-    var files_migrated = 0
-    var pos = 0
-    let flen = find_result.len() as i32
-    while pos < flen:
-        // Find end of line
-        var line_end = pos
-        while line_end < flen and find_result.byte_at(line_end as i64) != 10:
-            line_end = line_end + 1
-        if line_end > pos:
-            let file_path = find_result.slice(pos as i64, line_end as i64)
-            if file_path.len() > 2:
-                let base = ci_migrate_path_basename(file_path)
-                if ci_migrate_excludes_contains(exclude_basenames, base):
-                    pos = line_end + 1
-                    continue
-                files_scanned = files_scanned + 1
-                files.push(file_path)
-        pos = line_end + 1
-
     let sorted_files = ci_migrate_sorted_files(files)
+    let files_scanned = sorted_files.len() as i32
+    var files_migrated = 0
 
     if ci_migrate_shared_defs_active() and g_migrate_directory_one_basename.len() == 0:
         return ci_migrate_directory_filewise(input_dir, output_dir, sorted_files)
 
     var project = CiProject.new()
+    var scan_i = 0
+    while scan_i < sorted_files.len() as i32:
+        if project.migrate_scan_file(sorted_files.get(scan_i as i64)) != 0:
+            return 1
+        scan_i = scan_i + 1
 
     var fi = 0
-    while fi < sorted_files.len() as i32:
-        if project.migrate_scan_file(sorted_files.get(fi as i64)) != 0:
-            return 1
-        fi = fi + 1
-
-    fi = 0
     let total_files = sorted_files.len() as i32
     while fi < sorted_files.len() as i32:
         let file_path = sorted_files.get(fi as i64)
@@ -1092,15 +1104,6 @@ pub fn migrate_c_directory(input_dir: str, output_dir: str, exclude_basenames: s
         return 0
     eprint(f"migrate: {files_migrated}/{files_scanned} files, {fn_total} functions translated from {input_dir} -> {output_dir}")
     if files_migrated == 0: 1 else: 0
-
-// Run a shell command and capture stdout (for find, ls, etc.)
-fn with_fs_read_file_cmd(cmd: str) -> str:
-    // Write command output to temp file, read it back
-    let tmp = ".with_migrate_cmd_output"
-    with_system(cmd ++ " > " ++ tmp)
-    let result = with_fs_read_file(tmp)
-    with_system("rm -f " ++ tmp)
-    result
 
 // Translate a function with body — key difference from ci_translate_function:
 // 1. Translates ALL functions, not just static inline
