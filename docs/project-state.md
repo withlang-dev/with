@@ -496,8 +496,9 @@ not a new compiler-dispatched project graph kind.
   `Workspace.compile()`, remove the migrator's shell-based directory
   listing/shared-defs self-reinvocation path, and add evaluator-backed
   `Workspace.compile()` support for typed `MigrateOptions`. The
-  generated-module error scan still intentionally exercises the CLI diagnostic
-  path.
+  `pcre2-migrate` and `pcre2-migrate-smoke` actions now use that workspace
+  migration path instead of spawning `with migrate`. The generated-module error
+  scan still intentionally exercises the CLI diagnostic path.
 - Preserve the pre-D behavior tests during D1:
   `behav_build_w_basic_invocation`, `behav_action_capability_filesystem`,
   `behav_action_capability_process`, `behav_capability_token_mismatch`,
@@ -514,15 +515,15 @@ not a new compiler-dispatched project graph kind.
 
 ## Local State
 
-At the time of this update, the Phase D D7 workspace migration substrate slice
-is verified and ready to commit. Current verification passed:
+At the time of this update, the Phase D D7 PCRE2 migration action conversion
+slice is verified and ready to commit. Current verification passed:
 
 ```sh
-out/bin/with check src/main.w
-out/bin/with check build_selfhost.w
-out/bin/with run test/behavior/behav_std_build_options_api.w
+out/bin/with check build_pcre2.w
+out/bin/with build :pcre2-migrate-smoke --no-deps
+out/bin/with build :pcre2-migrate --no-deps
+out/bin/with build :pcre2-build --no-deps
 make build
-out/bin/with build :cli-selfhost-build-w-tests --no-deps
 make fixpoint
 make test
 ```
