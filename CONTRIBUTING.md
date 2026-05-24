@@ -15,7 +15,7 @@
 ```bash
 git clone https://github.com/QuixiAI/with.git
 cd with
-make
+with build
 ```
 
 If you don't have `with` on PATH, first download the seed:
@@ -24,7 +24,7 @@ If you don't have `with` on PATH, first download the seed:
 make seed
 ```
 
-Then `make` builds Stage 2. The output is `out/bin/with-stage2`.
+Then `with build` compiles the full compiler. The output is `out/bin/with`.
 
 ### Verify It Works
 
@@ -39,7 +39,7 @@ If you see `Hello, World!`, you're ready.
 ### Run the Test Suite
 
 ```bash
-./scripts/run_tests.sh
+with build :test
 ```
 
 All tests should pass. If any fail on a clean checkout, open an
@@ -98,20 +98,21 @@ lib/
         string.w        string operations
         ...
 
+rt/
+    rt_core.w           core runtime (With source)
+    llvm_bridge.w       LLVM-C API bridge
+    clang_bridge.w      libclang bridge
+    fiber_core_darwin.w fiber runtime
+    ...
+
 runtime/
-    fiber.c             fiber runtime (C)
     fiber_asm_aarch64.s stack switching (ARM64 assembly)
-    llvm_bridge.c       LLVM-C API bridge (statically linked into compiler)
-    helpers.c           runtime helpers
 
 test/
-    wave1/ .. wave8/    per-wave test suites
-    cases/              individual test cases
-
-scripts/
-    run_tests.sh        unified test runner
-    run_cli_selfhost_tests.sh
-                        self-hosted CLI and migrator regression tests
+    behavior/           behavior tests
+    compile_errors/     negative compilation tests
+    codegen/            code generation tests
+    spec/               specification conformance tests
 ```
 
 ### Key Concepts
@@ -143,8 +144,8 @@ made ambient by the prelude, not compiler builtins.
 ### Workflow
 
 1. Make your change.
-2. Rebuild: `make build`
-3. Run tests: `./scripts/run_tests.sh`
+2. Rebuild: `with build`
+3. Run tests: `with build :test`
 4. If you changed the compiler, verify fixpoint (see below).
 5. Open a PR.
 
@@ -154,7 +155,7 @@ If your change touches the compiler itself (anything in `src/`),
 verify the compiler still reproduces itself:
 
 ```bash
-make fixpoint
+with build :fixpoint
 ```
 
 This builds stage3 from stage2 and checks they are byte-identical.
@@ -165,8 +166,7 @@ timestamps, or uninitialized memory read as data.
 
 ### What Gets Tested
 
-The test runner (`scripts/run_tests.sh`) reads directives from
-test files:
+The test runner reads directives from test files:
 
 ```
 //! expect-stdout: Hello, World!
