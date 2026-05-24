@@ -2318,6 +2318,13 @@ pub fn fs_mkdir_impl(path: str) -> i32:
     let cpath = str_to_cstr(path)
     rt_mkdir(cpath, 493)
 
+@[c_export("with_str_from_byte")]
+pub fn str_from_byte_impl(byte: i32) -> str:
+    let buf = rt_alloc(2) as *mut u8
+    unsafe: *buf = byte as u8
+    unsafe: *((buf as i64 + 1) as *mut u8) = 0
+    make_str(buf as *const u8, 1)
+
 // ── Bitwise builtins ───────────────────────────────────────────────
 
 @[c_export("with_clz")]
