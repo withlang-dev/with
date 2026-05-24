@@ -307,7 +307,7 @@ define RUN_GRAPH_TARGET
 endef
 
 __build:
-	@$(MAKE) --no-print-directory $(CANONICAL_BIN)
+	$(call RUN_GRAPH_TARGET,build)
 
 __stage1:
 	$(call RUN_GRAPH_TARGET,stage1)
@@ -367,35 +367,17 @@ __seed:
 	chmod +x "$$dest"; \
 	echo "seed installed: $$dest"
 
-__regex-migrate: $(REGEX_MIGRATE_STAMP)
+__regex-migrate:
+	$(call RUN_GRAPH_TARGET,pcre2-migrate)
 
-__regex-build: $(REGEX_BUILD_STAMP)
+__regex-build:
+	$(call RUN_GRAPH_TARGET,pcre2-build)
 
 __regex-test:
-	@if [ ! -d "$(ROOT_DIR)/$(REGEX_MIGRATE_DIR)" ]; then \
-		echo "error: missing migrated PCRE2 sources: $(ROOT_DIR)/$(REGEX_MIGRATE_DIR)" >&2; \
-		echo "run make pcre2-migrate deliberately to refresh migrated PCRE2 sources" >&2; \
-		exit 1; \
-	fi
-	@if [ ! -x "$(ROOT_DIR)/$(REGEX_PCRE2TEST_BIN)" ]; then \
-		echo "error: missing migrated PCRE2 test binary: $(ROOT_DIR)/$(REGEX_PCRE2TEST_BIN)" >&2; \
-		echo "run make pcre2-build after a deliberate make pcre2-migrate" >&2; \
-		exit 1; \
-	fi
-	@if [ ! -d "$(ROOT_DIR)/$(REGEX_PCRE2_REF_DIR)" ]; then \
-		echo "error: missing PCRE2 reference tree: $(ROOT_DIR)/$(REGEX_PCRE2_REF_DIR)" >&2; \
-		echo "run make pcre2-migrate to fetch and prepare the PCRE2 release" >&2; \
-		exit 1; \
-	fi
-	@$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" build :pcre2-test
+	$(call RUN_GRAPH_TARGET,pcre2-test)
 
-__regex-promote: $(REGEX_BUILD_STAMP)
-	@if [ ! -x "$(ROOT_DIR)/$(CANONICAL_BIN)" ]; then \
-		echo "error: missing compiler binary: $(ROOT_DIR)/$(CANONICAL_BIN)" >&2; \
-		echo "run make build before pcre2-promote" >&2; \
-		exit 1; \
-	fi
-	@$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" build :pcre2-promote
+__regex-promote:
+	$(call RUN_GRAPH_TARGET,pcre2-promote)
 
 $(OUT_BIN_DIR) $(OUT_LIB_DIR) $(OUT_LOG_DIR) $(OUT_TMP_DIR) $(OUT_GEN_DIR):
 	@mkdir -p "$@"
@@ -729,8 +711,8 @@ test: | $(OUT_TMP_DIR)
 test-pcre2: | $(OUT_TMP_DIR)
 	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __test-pcre2)
 
-__test: __build
-	$(WITH_BUILD_ENV) "$(CANONICAL_BIN)" build :test
+__test:
+	$(call RUN_GRAPH_TARGET,test)
 
 __test-pcre2: __regex-test
 
@@ -805,20 +787,13 @@ install-user: | $(OUT_TMP_DIR)
 # canonical) that takes minutes. Run `make build` first if you
 # need a fresh binary, then `make install-user` to publish it.
 __install-user:
-	@if [ ! -x "$(CANONICAL_BIN)" ]; then \
-		echo "error: $(CANONICAL_BIN) does not exist — run 'make build' first" >&2; \
-		exit 1; \
-	fi
-	install -d "$(USER_BINDIR)"
-	install -m 0755 "$(CANONICAL_BIN)" "$(USER_BINDIR)/with"
-	@echo "installed: $(USER_BINDIR)/with"
+	$(call RUN_GRAPH_TARGET,install-user)
 
 update-seed: | $(OUT_TMP_DIR)
 	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __update-seed)
 
-__update-seed: __fixpoint
-	@cp "$(STAGE2_BIN)" "$(SEED_PATH)"
-	@echo "seed updated: $(SEED_PATH)"
+__update-seed:
+	$(call RUN_GRAPH_TARGET,update-seed)
 
 clean: | $(OUT_TMP_DIR)
 	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __clean)

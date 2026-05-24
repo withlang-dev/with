@@ -38,6 +38,7 @@ fn with_ir_target(name: str, compiler: str, source: str, output: str, dep: str) 
     target = target.input(source)
     target = target.arg("--no-prelude")
     target = target.write_scope(build_project_dirname(output))
+    target = target.write_scope("out/command/" ++ name)
     if dep.len() > 0:
         target = target.dep(dep)
     target
@@ -693,4 +694,4 @@ pub fn build(ctx: BuildCtx) -> Build:
     pcre2_promote = pcre2_promote.dep("pcre2-test")
     out = out.add_target(pcre2_promote)
 
-    out.default("verified-existing-stage")
+    out.default("build")
