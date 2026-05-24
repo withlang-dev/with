@@ -40,6 +40,7 @@ pub type BuildGraphCommandOptions {
     graph_only: bool,
     dry_run: bool,
     no_deps: bool,
+    explain_target: str,
 }
 
 pub type TestCommandOptions {
@@ -100,6 +101,7 @@ pub fn build_graph_command_options_default -> BuildGraphCommandOptions:
         graph_only: false,
         dry_run: false,
         no_deps: false,
+        explain_target: "",
     }
 
 pub fn migrate_command_options_default -> MigrateCommandOptions:
@@ -149,7 +151,7 @@ fn driver_build_source_arg(argc: i32) -> str:
         if arg == "-o":
             step = 2
             skip = true
-        if not skip and (arg == "--output" or arg == "--filter" or arg == "-f"):
+        if not skip and (arg == "--output" or arg == "--filter" or arg == "-f" or arg == "--explain"):
             step = 2
             skip = true
         if not skip and driver_has_output_prefix(arg):
@@ -171,6 +173,17 @@ fn driver_output_arg(argc: i32) -> str:
             return ""
         if driver_has_output_prefix(arg):
             return with_str_slice(arg, 9, with_str_len(arg))
+        i = i + 1
+    ""
+
+fn driver_explain_arg(argc: i32) -> str:
+    var i = 2
+    while i < argc:
+        let arg = with_arg_at(i)
+        if arg == "--explain":
+            if i + 1 < argc:
+                return with_arg_at(i + 1)
+            return ""
         i = i + 1
     ""
 
@@ -266,4 +279,5 @@ pub fn parse_build_command_options(argc: i32) -> BuildCommandParseResult:
     graph.graph_only = driver_has_flag(argc, "--graph")
     graph.dry_run = driver_has_flag(argc, "--dry-run")
     graph.no_deps = driver_has_flag(argc, "--no-deps")
+    graph.explain_target = driver_explain_arg(argc)
     BuildCommandParseResult { ok: true, error_msg: "", build, graph }

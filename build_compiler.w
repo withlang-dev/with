@@ -465,3 +465,26 @@ pub fn run_with_compiler_ir_action(ctx: ActionCtx) -> i32:
         return comp_fail(ctx, "could not move output to: " ++ output_path)
     let _remove_stderr_done = comp_remove_file_if_exists(fs, stderr_path)
     0
+
+pub fn run_check_committed_state_action(ctx: ActionCtx) -> i32:
+    let args = ctx.args()
+    for i in 0..args.len() as i32:
+        if args.get(i as i64) == "--force":
+            return 0
+    let proc = ctx.process_runner()
+    let fs = ctx.fs()
+    let stdout_path = "out/command/" ++ ctx.target_name() ++ "/stdout"
+    let stderr_path = "out/command/" ++ ctx.target_name() ++ "/stderr"
+    fs.mkdir_all("out/command/" ++ ctx.target_name())
+    let git_args: Vec[str] = Vec.new()
+    git_args.push("git")
+    git_args.push("status")
+    git_args.push("--porcelain")
+    let result = proc.run_capture(git_args, stdout_path, stderr_path, 30000)
+    if result.rc != 0:
+        return comp_fail(ctx, "git status failed (rc=" ++ f"{result.rc}" ++ ")")
+    if result.stdout.len() > 0:
+        ctx.diagnostics().error(ctx.target_name() ++ ": uncommitted changes detected; commit before installing or pass --force arg")
+        return 1
+    fs.write_text("out/command/" ++ ctx.target_name() ++ "/ok", "ok\n")
+    0

@@ -550,10 +550,16 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("emit-c-smoke")
     out = out.add_target(tests)
 
+    var check_committed = target_new(.Action, "check-committed-state", "").output("out/command/check-committed-state/ok")
+    check_committed.action = run_check_committed_state_action
+    check_committed = check_committed.write_scope("out/command/check-committed-state")
+    out = out.add_target(check_committed)
+
     var install_user = target_new(.Install, "install-user", "out/bin/with").output("$HOME/.local/bin/with")
     install_user = install_user.input("out/bin/with")
     install_user = install_user.arg("0755")
     install_user = install_user.dep("build")
+    install_user = install_user.dep("check-committed-state")
     out = out.add_target(install_user)
 
     out = out.add_target(install_file_target("install-compiler", "out/bin/with-stage2", "$INSTALL_BINDIR/with", "0755", "stage2"))
@@ -606,6 +612,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     update_seed = update_seed.input("out/bin/with-stage2")
     update_seed = update_seed.arg("0755")
     update_seed = update_seed.dep("verified-existing-stage")
+    update_seed = update_seed.dep("check-committed-state")
     out = out.add_target(update_seed)
 
     var clean = target_new(.Clean, "clean", "")

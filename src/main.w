@@ -691,6 +691,8 @@ fn run_cli(argc: i32) -> i32:
         return run_help_command(argc)
     if cli_command(argc) == "clean":
         return run_clean_command()
+    if cli_command(argc) == "install-user":
+        return run_graph_target_command("install-user")
     if cli_command(argc) == "init":
         return run_init_command(argc)
     if cli_command(argc) == "get":
@@ -1102,6 +1104,75 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, action_sema
         completed_targets.push(target.name)
     0
 
+fn explain_kind_name(kind: i32) -> str:
+    if kind == 0: return "Executable"
+    if kind == 1: return "Library"
+    if kind == 2: return "Test"
+    if kind == 3: return "Object"
+    if kind == 4: return "Archive"
+    if kind == 7: return "Command"
+    if kind == 8: return "Install"
+    if kind == 9: return "Group"
+    if kind == 10: return "BinaryCompare"
+    if kind == 11: return "FixpointCompare"
+    if kind == 12: return "CompileCObject"
+    if kind == 13: return "CompileAsmObject"
+    if kind == 14: return "CompileLlvmIrObject"
+    if kind == 15: return "CreateStaticArchive"
+    if kind == 16: return "GenerateResponseFile"
+    if kind == 17: return "EmbedObjectFiles"
+    if kind == 18: return "CopyTree"
+    if kind == 19: return "RunCorpusTest"
+    if kind == 20: return "PromoteTreeIfVerified"
+    if kind == 21: return "Clean"
+    if kind == 22: return "CopyFile"
+    if kind == 23: return "Action"
+    f"Unknown({kind})"
+
+fn explain_build_target(graph: &BuildGraph, name: str) -> i32:
+    var found = false
+    for i in 0..graph.targets.len() as i32:
+        let target = graph.targets.get(i as i64)
+        if target.name == name:
+            found = true
+            with_write("target: " ++ target.name ++ "\n")
+            with_write("  kind: " ++ explain_kind_name(target.kind) ++ "\n")
+            if target.entry.len() > 0:
+                with_write("  entry: " ++ target.entry ++ "\n")
+            if target.output.len() > 0:
+                with_write("  output: " ++ target.output ++ "\n")
+            if target.deps.len() > 0:
+                with_write("  deps:\n")
+                for j in 0..target.deps.len() as i32:
+                    with_write("    - " ++ target.deps.get(j as i64) ++ "\n")
+            if target.inputs.len() > 0:
+                with_write("  inputs:\n")
+                for j in 0..target.inputs.len() as i32:
+                    with_write("    - " ++ target.inputs.get(j as i64) ++ "\n")
+            if target.extra_outputs.len() > 0:
+                with_write("  extra_outputs:\n")
+                for j in 0..target.extra_outputs.len() as i32:
+                    with_write("    - " ++ target.extra_outputs.get(j as i64) ++ "\n")
+            if target.args.len() > 0:
+                with_write("  args:\n")
+                for j in 0..target.args.len() as i32:
+                    with_write("    - " ++ target.args.get(j as i64) ++ "\n")
+            break
+    if not found:
+        with_eprint("error: target '" ++ name ++ "' not found in build graph\n")
+        with_eprint("available targets:\n")
+        for i in 0..graph.targets.len() as i32:
+            let target = graph.targets.get(i as i64)
+            with_eprint("  " ++ target.name ++ " (" ++ explain_kind_name(target.kind) ++ ")\n")
+        return 1
+    0
+
+fn run_graph_target_command(target_name: str) -> i32:
+    let build_options = build_command_options_default()
+    var graph_options = build_graph_command_options_default()
+    graph_options.selected_target = target_name
+    run_build_command(build_options, graph_options)
+
 fn run_build_command(options: BuildCommandOptions, graph_options: BuildGraphCommandOptions) -> i32:
     var actual_options = options
     var actual_source = actual_options.source_path
@@ -1135,6 +1206,8 @@ fn run_build_command(options: BuildCommandOptions, graph_options: BuildGraphComm
                 if selected_graph.targets.len() == 0 or selected_graph.targets.get(0).kind != 23:
                     with_eprint("error: --no-deps is only supported for build.w action targets")
                     return 1
+            if graph_options.explain_target.len() > 0:
+                return explain_build_target(&graph, graph_options.explain_target)
             if graph_options.graph_only or graph_options.dry_run:
                 with_write(selected_graph.raw_text)
                 return 0
@@ -2131,6 +2204,11 @@ fn run_fmt_command(argc: i32) -> i32:
     0
 
 fn run_clean_command -> i32:
+    let root = build_graph_find_build_root(".")
+    if root.len() > 0:
+        let build_path = resolve_join(root, "build.w")
+        if project_config_file_exists(build_path):
+            return run_graph_target_command("clean")
     let out_rc = with_fs_remove_tree("out")
     if out_rc != 0 and with_fs_file_exists("out") != 0:
         with_eprint("error: clean failed removing out/")
@@ -2161,6 +2239,7 @@ fn print_usage:
     with_write("  get              Add a package dependency\n")
     with_write("  remove           Remove a package dependency\n")
     with_write("  clean            Delete build artifacts\n")
+    with_write("  install-user     Install compiler to ~/.local/bin\n")
     with_write("\n")
     with_write("  ast              Parse and print the AST\n")
     with_write("  tokens           Lex and print tokens\n")
