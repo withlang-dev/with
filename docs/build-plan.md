@@ -67,13 +67,18 @@ Already implemented:
 
 Still not acceptable as final state:
 
-- Action target process/install policy declarations are still incomplete.
-- Make remains as a compatibility layer.
-- Some repository scripts still exist because old workflows or tests reference
-  them.
-- Some compiler/build paths still assemble shell command strings internally.
+- Action target process/install policy declarations are still incomplete
+  (timeout, cwd/env, network-access, install-path).
+- Make remains as a thin delegation layer; CI still uses `make` commands.
+- `scripts/generate_wl_stubs.sh` remains for `make cross` (Zig
+  cross-compilation).
 - Cross-platform target plumbing exists, but only current-host paths are
   routinely exercised.
+- Several spec §6 capabilities are not yet implemented: `ToolFs.glob`,
+  `ToolFs.normalize`, `ToolFs.join`, `ProcessSpec` struct API, `--explain`
+  flag, `Build.download`, `Build.extract_tar_gz`.
+- No committed-source-state enforcement before install/update-seed (spec §17).
+- No repository lock or incrementality in the driver (spec §18).
 
 ---
 
@@ -83,14 +88,13 @@ Every remaining item is completed one slice at a time:
 
 1. Implement one logical capability or target group.
 2. Run focused verification for that slice.
-3. Run `make build`.
-4. Run `make fixpoint`.
-5. Run relevant `with build :...` parity checks.
-6. Run `make test` when code behavior changed.
-7. Commit and push.
+3. Run `with build` (or `make build`, which delegates to it).
+4. Run `with build :fixpoint` (or `make fixpoint`).
+5. Run `with build :test` when code behavior changed (or `make test`).
+6. Commit and push.
 
-Do not replace Make until every target it protects has a proven `with build`
-path.
+`make` targets are thin delegations to `with build` and remain as the CI
+entry point until CI is migrated.
 
 ---
 
@@ -131,9 +135,9 @@ Verification:
 ```sh
 with build :cli-selfhost-build-w-tests
 with build --graph
-make build
-make fixpoint
-make test
+with build
+with build :fixpoint
+with build :test
 ```
 
 Commit after this phase.
@@ -191,9 +195,9 @@ Verification:
 
 ```sh
 with build :cli-selfhost-build-w-tests
-make build
-make fixpoint
-make test
+with build
+with build :fixpoint
+with build :test
 ```
 
 Commit after this phase.
@@ -249,9 +253,9 @@ Verification:
 
 ```sh
 with build :cli-selfhost-build-w-tests
-make build
-make fixpoint
-make test
+with build
+with build :fixpoint
+with build :test
 ```
 
 Commit after this phase.
@@ -354,9 +358,8 @@ with build :emit-c-test
 with build :emit-c-fixpoint
 with build :emit-c-roundtrip
 with build :test
-make build
-make fixpoint
-make test
+with build
+with build :fixpoint
 ```
 
 Commit after this phase.
@@ -437,9 +440,8 @@ Verification:
 ```sh
 with build :cli-selfhost-build-w-tests
 with build :test
-make build
-make fixpoint
-make test
+with build
+with build :fixpoint
 ```
 
 Completed D8 also replaced a real external diagnostic scan in `build_pcre2.w`
@@ -485,9 +487,8 @@ Verification:
 ```sh
 rg -n "with_system|\\|>|<| rm |mkdir -p|\\| awk|\\| grep" src lib rt build.w
 with build :test
-make build
-make fixpoint
-make test
+with build
+with build :fixpoint
 ```
 
 Every remaining hit must be either a false positive, a test fixture, or an
@@ -722,4 +723,8 @@ all pass without Make or required repository shell scripts, and:
 - every `std.build` target kind is implemented or removed;
 - no compiler/build-system internal path relies on shell command strings;
 - generated/promoted code is verified before promotion;
-- the Makefile is gone.
+- the Makefile is removed or reduced to a bootstrap-only shim.
+
+Note: Phase H implemented the Makefile as a thin delegation layer rather than
+deleting it outright. Full removal is gated on CI migration to `with build`
+and cross-compilation (`make cross`) moving into `build.w`.

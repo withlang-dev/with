@@ -289,6 +289,7 @@ pub type ToolProcessResult {
     rc: i32,
     stdout: str,
     stderr: str,
+    timed_out: bool,
 }
 
 pub type BuildCtx {
@@ -557,6 +558,46 @@ fn tool_path_dirname(path: str) -> str:
         return "/"
     path.slice(0, last_slash as i64)
 
+fn tool_path_normalize(path: str) -> str:
+    if path.len() == 0:
+        return "."
+    let parts: Vec[str] = Vec.new()
+    var start = 0
+    var is_absolute = path.byte_at(0) == 47
+    for i in 0..path.len() as i32:
+        if path.byte_at(i as i64) == 47:
+            if i > start:
+                let part = path.slice(start as i64, i as i64)
+                if part == "..":
+                    if parts.len() > 0 and parts.get(parts.len() - 1) != "..":
+                        parts.pop()
+                    else if not is_absolute:
+                        parts.push(part)
+                else if part != ".":
+                    parts.push(part)
+            start = i + 1
+    if start < path.len() as i32:
+        let part = path.slice(start as i64, path.len() as i64)
+        if part == "..":
+            if parts.len() > 0 and parts.get(parts.len() - 1) != "..":
+                parts.pop()
+            else if not is_absolute:
+                parts.push(part)
+        else if part != ".":
+            parts.push(part)
+    if parts.len() == 0:
+        if is_absolute:
+            return "/"
+        return "."
+    var result = ""
+    if is_absolute:
+        result = "/"
+    for i in 0..parts.len() as i32:
+        if i > 0:
+            result = result ++ "/"
+        result = result ++ parts.get(i as i64)
+    result
+
 fn ToolFs.resolve_path(self: &Self, path: str) -> str:
     tool_capability_require(self.token, "ToolFs")
     tool_path_require_project_relative(path)
@@ -695,6 +736,19 @@ pub fn ToolFs.symlink(self: &Self, target: str, link_path: str) -> i32:
     self.require_write_file_allowed(link_path)
     with_fs_symlink(self.resolve_path(target), self.resolve_path(link_path))
 
+pub fn ToolFs.normalize(self: &Self, path: str) -> str:
+    tool_path_normalize(path)
+
+pub fn ToolFs.join(self: &Self, base: str, child: str) -> str:
+    if base.len() == 0:
+        return child
+    if child.len() == 0:
+        return base
+    if base.ends_with("/"):
+        base ++ child
+    else:
+        base ++ "/" ++ child
+
 pub fn SourceEmitter.generated_source(self: &Self, path: str, contents: str) -> GeneratedSource:
     tool_capability_require(self.token, "SourceEmitter")
     GeneratedSource { path, contents }
@@ -756,6 +810,7 @@ pub fn ProcessRunner.run_capture(self: &Self, args: Vec[str], stdout_path: str, 
         rc,
         stdout: with_fs_read_file(stdout_path),
         stderr: with_fs_read_file(stderr_path),
+        timed_out: rc == 124,
     }
 
 pub fn ProcessRunner.run(self: &Self, args: Vec[str]) -> i32:
@@ -774,6 +829,7 @@ pub fn ProcessRunner.run_capture_with_env(self: &Self, args: Vec[str], stdout_pa
         rc,
         stdout: with_fs_read_file(stdout_path),
         stderr: with_fs_read_file(stderr_path),
+        timed_out: rc == 124,
     }
 
 pub fn ProcessRunner.run_capture_cwd(self: &Self, args: Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str) -> ToolProcessResult:
@@ -785,6 +841,7 @@ pub fn ProcessRunner.run_capture_cwd(self: &Self, args: Vec[str], stdout_path: s
         rc,
         stdout: with_fs_read_file(stdout_path),
         stderr: with_fs_read_file(stderr_path),
+        timed_out: rc == 124,
     }
 
 pub fn ProcessRunner.run_capture_cwd_with_env(self: &Self, args: Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str, process_env: ProcessEnv) -> ToolProcessResult:
@@ -796,6 +853,7 @@ pub fn ProcessRunner.run_capture_cwd_with_env(self: &Self, args: Vec[str], stdou
         rc,
         stdout: with_fs_read_file(stdout_path),
         stderr: with_fs_read_file(stderr_path),
+        timed_out: rc == 124,
     }
 
 pub fn ProcessRunner.run_capture_input(self: &Self, args: Vec[str], stdout_path: str, stderr_path: str, timeout_ms: i32, stdin_path: str) -> ToolProcessResult:
@@ -807,6 +865,7 @@ pub fn ProcessRunner.run_capture_input(self: &Self, args: Vec[str], stdout_path:
         rc,
         stdout: with_fs_read_file(stdout_path),
         stderr: with_fs_read_file(stderr_path),
+        timed_out: rc == 124,
     }
 
 pub fn ProcessRunner.spawn_capture(self: &Self, args: Vec[str], stdout_path: str, stderr_path: str) -> i32:

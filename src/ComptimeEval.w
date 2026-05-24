@@ -380,6 +380,46 @@ fn comptime_tool_join(root: str, path: str) -> str:
         return root ++ path
     root ++ "/" ++ path
 
+fn comptime_tool_path_normalize(path: str) -> str:
+    if path.len() == 0:
+        return "."
+    let parts: Vec[str] = Vec.new()
+    var start = 0
+    var is_absolute = path.byte_at(0) == 47
+    for i in 0..path.len() as i32:
+        if path.byte_at(i as i64) == 47:
+            if i > start:
+                let part = path.slice(start as i64, i as i64)
+                if part == "..":
+                    if parts.len() > 0 and parts.get(parts.len() - 1) != "..":
+                        parts.pop()
+                    else if not is_absolute:
+                        parts.push(part)
+                else if part != ".":
+                    parts.push(part)
+            start = i + 1
+    if start < path.len() as i32:
+        let part = path.slice(start as i64, path.len() as i64)
+        if part == "..":
+            if parts.len() > 0 and parts.get(parts.len() - 1) != "..":
+                parts.pop()
+            else if not is_absolute:
+                parts.push(part)
+        else if part != ".":
+            parts.push(part)
+    if parts.len() == 0:
+        if is_absolute:
+            return "/"
+        return "."
+    var result = ""
+    if is_absolute:
+        result = "/"
+    for i in 0..parts.len() as i32:
+        if i > 0:
+            result = result ++ "/"
+        result = result ++ parts.get(i as i64)
+    result
+
 fn comptime_tool_path_is_same_or_child(path: str, root: str) -> bool:
     if path == root:
         return true
@@ -1726,7 +1766,8 @@ fn ComptimeEvaluator.tool_process_result(self: ComptimeEvaluator, rc: i32, stdou
     self.extra_values.push(comptime_value_int(self.sema.ty_i32 as i32, rc as i64))
     self.extra_values.push(comptime_value_str(with_fs_read_file(stdout_path)))
     self.extra_values.push(comptime_value_str(with_fs_read_file(stderr_path)))
-    comptime_control_value(comptime_value_struct(result_type, start, 3))
+    self.extra_values.push(comptime_value_bool(if rc == 124: 1 else: 0))
+    comptime_control_value(comptime_value_struct(result_type, start, 4))
 
 fn ComptimeEvaluator.workspace_record_index(self: ComptimeEvaluator, recv_value: ComptimeValue, method: str, node: i32) -> i32:
     let handle = self.validate_capability(recv_value, CapabilityKind.CK_BUILD_WORKSPACE, method, node)
@@ -2838,6 +2879,32 @@ fn ComptimeEvaluator.eval_toolfs_capability_method(self: ComptimeEvaluator, recv
         return comptime_control_error()
     let record = self.capability_records.get(handle as i64)
 
+    if method == "normalize":
+        if not self.capability_expect_arg_count(arg_count, 1, method, node):
+            return comptime_control_error()
+        let args_signal = self.capability_args(extra_start, arg_count)
+        if args_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return args_signal
+        let path = self.capability_arg_str(args_signal.value, 0, method, node)
+        if self.had_error != 0:
+            return comptime_control_error()
+        return comptime_control_value(comptime_value_str(comptime_tool_path_normalize(path)))
+    if method == "join":
+        if not self.capability_expect_arg_count(arg_count, 2, method, node):
+            return comptime_control_error()
+        let args_signal = self.capability_args(extra_start, arg_count)
+        if args_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return args_signal
+        let base = self.capability_arg_str(args_signal.value, 0, method, node)
+        let child = self.capability_arg_str(args_signal.value, 1, method, node)
+        if self.had_error != 0:
+            return comptime_control_error()
+        if base.len() == 0:
+            return comptime_control_value(comptime_value_str(child))
+        if child.len() == 0:
+            return comptime_control_value(comptime_value_str(base))
+        let joined = if base.ends_with("/"): base ++ child else: base ++ "/" ++ child
+        return comptime_control_value(comptime_value_str(joined))
     if method == "exists" or method == "is_dir" or method == "read_text" or method == "list_files" or method == "mkdir_all" or method == "remove_file" or method == "remove_tree":
         if not self.capability_expect_arg_count(arg_count, 1, method, node):
             return comptime_control_error()
