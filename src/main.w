@@ -28,6 +28,7 @@ use BuildGraphTools
 use BuildGraphTests
 use InitTemplates
 use BuildGraphRuntime
+use BuildGraphCache
 use compiler.DriverOptions
 
 extern fn with_arg_count() -> i32
@@ -989,6 +990,7 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, action_sema
     if generated_rc != 0:
         return generated_rc
     let completed_targets: Vec[str] = Vec.new()
+    let skipped_targets: Vec[str] = Vec.new()
     for ti in 0..graph.targets.len() as i32:
         let target = graph.targets.get(ti as i64)
         if build_graph_kind_removed(target.kind):
@@ -1011,16 +1013,30 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, action_sema
             if not build_graph_define_valid(define):
                 with_eprint("error: invalid build.w define for '" ++ target.name ++ "': " ++ define)
                 return 1
+        if build_cache_is_cacheable(target.kind):
+            var dep_rebuilt = false
+            for di in 0..target.deps.len() as i32:
+                let dep_name = target.deps.get(di as i64)
+                if not skipped_targets.contains(dep_name):
+                    if completed_targets.contains(dep_name):
+                        dep_rebuilt = true
+                        break
+            if build_cache_check_fresh(root, target, dep_rebuilt):
+                skipped_targets.push(target.name)
+                completed_targets.push(target.name)
+                continue
         let standard_result = build_graph_dispatch_standard_target(root, target, completed_targets)
         if standard_result.handled:
             if standard_result.rc != 0:
                 return standard_result.rc
+            build_cache_record(root, target)
             completed_targets.push(target.name)
             continue
         if target.kind == 23:
             let action_rc = run_build_action_from_build_w(root, cfg, target, action_sema)
             if action_rc != 0:
                 return action_rc
+            build_cache_record(root, target)
             completed_targets.push(target.name)
             continue
         let source_path = resolve_join(root, target.entry)
@@ -1062,6 +1078,7 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, action_sema
                 with_eprint("error: build.w library target failed: " ++ target.name)
                 return 1
             comp.print_warnings()
+            build_cache_record(root, target)
             completed_targets.push(target.name)
             continue
         if target.kind == 3:
@@ -1076,6 +1093,7 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, action_sema
                 with_eprint("error: build.w object target failed: " ++ target.name)
                 return 1
             comp.print_warnings()
+            build_cache_record(root, target)
             completed_targets.push(target.name)
             continue
         if target.kind == 4:
@@ -1090,6 +1108,7 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, action_sema
                 with_eprint("error: build.w archive target failed: " ++ target.name)
                 return 1
             comp.print_warnings()
+            build_cache_record(root, target)
             completed_targets.push(target.name)
             continue
         let bin_path = build_graph_output_path(root, target, options.output_path, graph.targets.len() as i32)
@@ -1103,6 +1122,7 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, action_sema
             with_eprint("error: build.w target failed: " ++ target.name)
             return 1
         comp.print_warnings()
+        build_cache_record(root, target)
         completed_targets.push(target.name)
     0
 
