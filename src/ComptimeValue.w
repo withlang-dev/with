@@ -18,6 +18,7 @@ enum ComptimeValueKind: i32:
     CV_CAPABILITY = 11
     CV_FN = 12
     CV_ENUM = 13
+    CV_BYTES = 14
 
 type ComptimeValue {
     kind: i32,
@@ -183,6 +184,17 @@ fn comptime_value_enum(type_id: i32, variant_sym: i32, extra_start: i32, extra_c
         extra_count,
     }
 
+fn comptime_value_bytes(type_id: i32, data: str) -> ComptimeValue:
+    ComptimeValue {
+        kind: ComptimeValueKind.CV_BYTES,
+        type_id,
+        data0: 0,
+        data1: 0,
+        text: data,
+        extra_start: 0,
+        extra_count: 0,
+    }
+
 fn comptime_value_is_valid(value: ComptimeValue) -> i32:
     if value.kind == ComptimeValueKind.CV_INVALID:
         return 0
@@ -217,6 +229,7 @@ fn comptime_value_kind_name(kind: i32) -> str:
     if kind == ComptimeValueKind.CV_CAPABILITY: return "capability"
     if kind == ComptimeValueKind.CV_FN: return "function"
     if kind == ComptimeValueKind.CV_ENUM: return "enum"
+    if kind == ComptimeValueKind.CV_BYTES: return "bytes"
     "invalid"
 
 fn comptime_value_format(value: ComptimeValue, extras: Vec[ComptimeValue], sema: Sema) -> str:
@@ -286,6 +299,8 @@ fn comptime_value_format(value: ComptimeValue, extras: Vec[ComptimeValue], sema:
                 out = out ++ comptime_value_format(extras.get((value.extra_start + i) as i64), extras, sema)
             out = out ++ ")"
         return out
+    if value.kind == ComptimeValueKind.CV_BYTES:
+        return f"Vec[u8]({value.text.len()} bytes)"
     if value.type_id != 0:
         return "<" ++ sema.type_name(value.type_id) ++ ">"
     "<invalid>"
@@ -365,4 +380,6 @@ fn comptime_values_equal(lhs: ComptimeValue, rhs: ComptimeValue, extras: Vec[Com
             if comptime_values_equal(left, right, extras) == 0:
                 return 0
         return 1
+    if lhs.kind == ComptimeValueKind.CV_BYTES:
+        return with_str_eq(lhs.text, rhs.text)
     0

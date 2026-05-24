@@ -46,6 +46,8 @@ extern fn with_str_len(s: str) -> i64
 extern fn with_str_byte_at(s: str, index: i64) -> i32
 extern fn with_str_slice(s: str, start: i64, end: i64) -> str
 extern fn with_str_contains(haystack: str, needle: str) -> i32
+extern fn with_str_concat(a: str, b: str) -> str
+extern fn with_str_from_byte(byte: i32) -> str
 extern fn with_str_starts_with(s: str, prefix: str) -> i32
 extern fn with_str_ends_with(s: str, suffix: str) -> i32
 extern fn with_str_replace(s: str, old: str, new_s: str) -> str
@@ -1286,6 +1288,88 @@ fn ComptimeEvaluator.eval_static_collection_new(self: ComptimeEvaluator, result_
         return comptime_control_value(comptime_value_map(result_type, empty_start, 0))
     self.fail(node, "static method is not comptime-evaluable yet")
 
+fn ComptimeEvaluator.eval_bytes_method_call(self: ComptimeEvaluator, recv_node: i32, recv_value: ComptimeValue, field: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
+    let method = self.pool.resolve(field)
+    if method == "len":
+        if arg_count != 0:
+            return self.fail(node, "Vec[u8].len() takes no arguments")
+        return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i64 as i32), recv_value.text.len()))
+    if method == "get":
+        if arg_count != 1:
+            return self.fail(node, "Vec[u8].get() expects exactly one argument")
+        let index_signal = self.eval_expr(self.ast.get_extra(extra_start))
+        if index_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return index_signal
+        if comptime_value_is_intlike(index_signal.value) == 0:
+            return self.fail(node, "Vec[u8].get() index must be an integer")
+        let index = comptime_value_intlike(index_signal.value)
+        if index < 0 or index >= recv_value.text.len():
+            return self.fail(node, "Vec[u8].get() index out of bounds in comptime")
+        return comptime_control_value(comptime_value_int(self.sema.ty_u8 as i32, with_str_byte_at(recv_value.text, index) as i64))
+    if method == "push":
+        if arg_count != 1:
+            return self.fail(node, "Vec[u8].push() expects exactly one argument")
+        let arg_signal = self.eval_expr(self.ast.get_extra(extra_start))
+        if arg_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return arg_signal
+        if comptime_value_is_intlike(arg_signal.value) == 0:
+            return self.fail(node, "Vec[u8].push() argument must be an integer")
+        let byte_val = comptime_value_intlike(arg_signal.value) as i32
+        let new_text = with_str_concat(recv_value.text, with_str_from_byte(byte_val))
+        let updated = comptime_value_bytes(recv_value.type_id, new_text)
+        return self.rebind_collection_receiver(recv_node, updated, node)
+    if method == "contains":
+        if arg_count != 1:
+            return self.fail(node, "Vec[u8].contains() expects exactly one argument")
+        let needle_signal = self.eval_expr(self.ast.get_extra(extra_start))
+        if needle_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return needle_signal
+        if comptime_value_is_intlike(needle_signal.value) == 0:
+            return self.fail(node, "Vec[u8].contains() argument must be an integer")
+        let needle_byte = comptime_value_intlike(needle_signal.value) as i32
+        for i in 0..recv_value.text.len():
+            if with_str_byte_at(recv_value.text, i) == needle_byte:
+                return comptime_control_value(comptime_value_bool(1))
+        return comptime_control_value(comptime_value_bool(0))
+    if method == "pop":
+        if arg_count != 0:
+            return self.fail(node, "Vec[u8].pop() takes no arguments")
+        if recv_value.text.len() <= 0:
+            return self.fail(node, "Vec[u8].pop() on empty comptime byte vector")
+        let last_byte = with_str_byte_at(recv_value.text, recv_value.text.len() - 1)
+        let new_text = with_str_slice(recv_value.text, 0, recv_value.text.len() - 1)
+        let updated = comptime_value_bytes(recv_value.type_id, new_text)
+        let rebind = self.rebind_collection_receiver(recv_node, updated, node)
+        if rebind.kind != ComptimeControlKind.CTL_VALUE:
+            return rebind
+        return comptime_control_value(comptime_value_int(self.sema.ty_u8 as i32, last_byte as i64))
+    if method == "clear":
+        if arg_count != 0:
+            return self.fail(node, "Vec[u8].clear() takes no arguments")
+        let updated = comptime_value_bytes(recv_value.type_id, "")
+        return self.rebind_collection_receiver(recv_node, updated, node)
+    if method == "remove":
+        if arg_count != 1:
+            return self.fail(node, "Vec[u8].remove() expects exactly one argument")
+        let index_signal = self.eval_expr(self.ast.get_extra(extra_start))
+        if index_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return index_signal
+        if comptime_value_is_intlike(index_signal.value) == 0:
+            return self.fail(node, "Vec[u8].remove() index must be an integer")
+        let index = comptime_value_intlike(index_signal.value)
+        if index < 0 or index >= recv_value.text.len():
+            return self.fail(node, "Vec[u8].remove() index out of bounds in comptime")
+        let removed_byte = with_str_byte_at(recv_value.text, index)
+        let prefix = with_str_slice(recv_value.text, 0, index)
+        let suffix = with_str_slice(recv_value.text, index + 1, recv_value.text.len())
+        let new_text = with_str_concat(prefix, suffix)
+        let updated = comptime_value_bytes(recv_value.type_id, new_text)
+        let rebind = self.rebind_collection_receiver(recv_node, updated, node)
+        if rebind.kind != ComptimeControlKind.CTL_VALUE:
+            return rebind
+        return comptime_control_value(comptime_value_int(self.sema.ty_u8 as i32, removed_byte as i64))
+    self.fail(node, "Vec[u8] method '" ++ method ++ "' is not comptime-evaluable yet")
+
 fn ComptimeEvaluator.eval_vec_method_call(self: ComptimeEvaluator, recv_node: i32, recv_value: ComptimeValue, field: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
     let method = self.pool.resolve(field)
 
@@ -1567,7 +1651,9 @@ fn ComptimeEvaluator.eval_pipeline_method_call(self: ComptimeEvaluator, lhs: i32
     let recv_signal = self.eval_expr(lhs)
     if recv_signal.kind != ComptimeControlKind.CTL_VALUE:
         return recv_signal
-    if recv_signal.value.kind == ComptimeValueKind.CV_VEC:
+    if recv_signal.value.kind == ComptimeValueKind.CV_VEC or recv_signal.value.kind == ComptimeValueKind.CV_BYTES:
+        if recv_signal.value.kind == ComptimeValueKind.CV_BYTES:
+            return self.eval_bytes_method_call(lhs, recv_signal.value, method, extra_start, arg_count, node)
         return self.eval_vec_method_call(lhs, recv_signal.value, method, extra_start, arg_count, node)
     if recv_signal.value.kind == ComptimeValueKind.CV_MAP:
         return self.eval_map_method_call(lhs, recv_signal.value, method, extra_start, arg_count, node)
@@ -3051,7 +3137,7 @@ fn ComptimeEvaluator.eval_toolfs_capability_method(self: ComptimeEvaluator, recv
         for gi in 0..sorted.len() as i32:
             self.extra_values.push(comptime_value_str(sorted.get(gi as i64)))
         return comptime_control_value(comptime_value_vec(vec_type, gstart, sorted.len() as i32))
-    if method == "exists" or method == "is_dir" or method == "read_text" or method == "list_files" or method == "mkdir_all" or method == "remove_file" or method == "remove_tree":
+    if method == "exists" or method == "is_dir" or method == "read_text" or method == "read_binary" or method == "list_files" or method == "mkdir_all" or method == "remove_file" or method == "remove_tree":
         if not self.capability_expect_arg_count(arg_count, 1, method, node):
             return comptime_control_error()
         let args_signal = self.capability_args(extra_start, arg_count)
@@ -3069,6 +3155,11 @@ fn ComptimeEvaluator.eval_toolfs_capability_method(self: ComptimeEvaluator, recv
             return comptime_control_value(comptime_value_bool(if with_fs_is_dir(resolved) != 0: 1 else: 0))
         if method == "read_text":
             return comptime_control_value(comptime_value_str(with_fs_read_file(resolved)))
+        if method == "read_binary":
+            let vec_type = self.node_type_or(node, 0)
+            if vec_type == 0:
+                return self.fail(node, "ToolFs.read_binary result type is unknown")
+            return comptime_control_value(comptime_value_bytes(vec_type, with_fs_read_file(resolved)))
         if method == "list_files":
             let raw_files = comptime_tool_split_nonempty_lines(with_fs_list_files(resolved))
             let vec_type = self.node_type_or(node, 0)
@@ -3188,6 +3279,34 @@ fn ComptimeEvaluator.eval_toolfs_capability_method(self: ComptimeEvaluator, recv
             if self.had_error != 0:
                 return comptime_control_error()
             return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_fs_symlink(resolved_target, resolved_link) as i64))
+    if method == "write_binary":
+        if not self.capability_expect_arg_count(arg_count, 2, method, node):
+            return comptime_control_error()
+        let args_signal = self.capability_args(extra_start, arg_count)
+        if args_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return args_signal
+        let path = self.capability_arg_str(args_signal.value, 0, method, node)
+        if self.had_error != 0:
+            return comptime_control_error()
+        if not self.capability_require_write_file_allowed(record, path, method, node):
+            return comptime_control_error()
+        let resolved = self.capability_resolve_project_path(record, path, method, node)
+        if self.had_error != 0:
+            return comptime_control_error()
+        let bytes_value = self.extra_values.get((args_signal.value.extra_start + 1) as i64)
+        let data = if bytes_value.kind == ComptimeValueKind.CV_BYTES:
+            bytes_value.text
+        else:
+            if bytes_value.kind == ComptimeValueKind.CV_VEC:
+                var assembled = ""
+                for i in 0..bytes_value.extra_count:
+                    let elem = self.extra_values.get((bytes_value.extra_start + i) as i64)
+                    assembled = with_str_concat(assembled, with_str_from_byte(comptime_value_intlike(elem) as i32))
+                assembled
+            else:
+                let _ = self.fail(node, "write_binary second argument must be Vec[u8]")
+                return comptime_control_error()
+        return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_fs_write_file(resolved, data) as i64))
     self.fail(node, "ToolFs capability method '" ++ method ++ "' is not implemented yet")
 
 fn ComptimeEvaluator.eval_process_runner_capability_method(self: ComptimeEvaluator, recv_value: ComptimeValue, method: str, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
@@ -4376,7 +4495,9 @@ fn ComptimeEvaluator.eval_call(self: ComptimeEvaluator, node: i32) -> ComptimeCo
                     return self.eval_fn_value_call(field_value, self.ast.get_data1(node), arg_count, node)
             if self.sema.comp_resolved.contains(node):
                 return self.eval_resolved_method_call(self.sema.comp_resolved.get(node).unwrap(), recv_signal.value, self.ast.get_data1(node), arg_count, node)
-        if recv_signal.value.kind == ComptimeValueKind.CV_VEC:
+        if recv_signal.value.kind == ComptimeValueKind.CV_VEC or recv_signal.value.kind == ComptimeValueKind.CV_BYTES:
+            if recv_signal.value.kind == ComptimeValueKind.CV_BYTES:
+                return self.eval_bytes_method_call(recv_node, recv_signal.value, field, self.ast.get_data1(node), arg_count, node)
             return self.eval_vec_method_call(recv_node, recv_signal.value, field, self.ast.get_data1(node), arg_count, node)
         if recv_signal.value.kind == ComptimeValueKind.CV_MAP:
             return self.eval_map_method_call(recv_node, recv_signal.value, field, self.ast.get_data1(node), arg_count, node)

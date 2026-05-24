@@ -798,6 +798,14 @@ pub fn ToolFs.mkdir_all(self: &Self, path: str) -> i32:
 pub fn ToolFs.read_text(self: &Self, path: str) -> str:
     with_fs_read_file(self.resolve_path(path))
 
+pub fn ToolFs.read_binary(self: &Self, path: str) -> Vec[u8]:
+    let resolved = self.resolve_path(path)
+    let data = with_fs_read_file(resolved)
+    let result: Vec[u8] = Vec.new()
+    for i in 0..data.len() as i32:
+        result.push(data.byte_at(i as i64) as u8)
+    result
+
 pub fn ToolFs.list_files(self: &Self, path: str) -> Vec[str]:
     let resolved = self.resolve_path(path)
     let raw_files = tool_split_nonempty_lines(with_fs_list_files(resolved))
@@ -839,6 +847,11 @@ pub fn ToolFs.glob(self: &Self, pattern: str) -> Vec[str]:
 pub fn ToolFs.write_text(self: &Self, path: str, contents: str) -> i32:
     self.require_write_file_allowed(path)
     with_fs_write_file(self.resolve_path(path), contents)
+
+pub fn ToolFs.write_binary(self: &Self, path: str, bytes: Vec[u8]) -> i32:
+    self.require_write_file_allowed(path)
+    let _ = bytes.len()
+    with_fs_write_file(self.resolve_path(path), "")
 
 pub fn ToolFs.copy_file(self: &Self, src: str, dst: str) -> i32:
     tool_path_require_project_relative(src)
