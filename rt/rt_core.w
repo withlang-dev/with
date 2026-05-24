@@ -26,6 +26,7 @@ extern fn rt_store_args(argc: i32, argv: *const *const u8)
 extern fn rt_nanosleep(ns: i64) -> i32
 extern fn rt_getpid() -> i32
 extern fn rt_raise(sig: i32) -> i32
+extern fn rt_kill(pid: i32, sig: i32) -> i32
 extern fn rt_sysinfo(out: *mut u8) -> i32
 extern fn gethostname(name: *mut u8, len: u64) -> i32
 extern fn rt_thread_spawn(start_routine: *mut u8, arg: *mut u8) -> i64
@@ -2304,6 +2305,18 @@ pub fn getpid_impl() -> i32:
 @[c_export("with_raise")]
 pub fn raise_impl(sig: i32) -> i32:
     rt_raise(sig)
+
+@[c_export("with_process_alive")]
+pub fn process_alive_impl(pid: i32) -> i32:
+    if pid <= 0:
+        return 0
+    let rc = rt_kill(pid, 0)
+    if rc == 0: 1 else: 0
+
+@[c_export("with_fs_mkdir")]
+pub fn fs_mkdir_impl(path: str) -> i32:
+    let cpath = str_to_cstr(path)
+    rt_mkdir(cpath, 493)
 
 // ── Bitwise builtins ───────────────────────────────────────────────
 

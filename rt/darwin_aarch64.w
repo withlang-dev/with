@@ -229,6 +229,13 @@ extern fn pthread_join(thread: i64, retval: *mut *mut u8) -> i32
 pub fn rt_getpid_impl() -> i32:
     getpid()
 
+@[c_export("rt_kill")]
+pub fn rt_kill_impl(pid: i32, sig: i32) -> i32:
+    let r = kill(pid, sig)
+    if r < 0:
+        return -get_errno()
+    0
+
 @[c_export("rt_raise")]
 pub fn rt_raise_impl(sig: i32) -> i32:
     let r = raise(sig)

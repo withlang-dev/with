@@ -8,6 +8,8 @@ jobs:
   selfhost-macos:
     name: selfhost (macOS)
     runs-on: macos-latest
+    env:
+      WITH_OUT_DIR: ${{ github.workspace }}/out
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,7 +24,7 @@ jobs:
         run: make build
 
       - name: Fixpoint
-        run: make fixpoint
+        run: ./out/bin/with build :fixpoint
 
       - name: Test
-        run: make test
+        run: ./out/bin/with build :test
