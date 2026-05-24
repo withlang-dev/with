@@ -61,6 +61,8 @@ extern fn with_setenv_str(name: str, value: str) -> i32
 // graph-tool captures, and native test captures.
 extern fn with_clock_nanos() -> i64
 extern fn with_getpid() -> i32
+extern fn with_process_alive(pid: i32) -> i32
+extern fn with_fs_mkdir(path: str) -> i32
 extern fn with_write(s: str) -> void
 extern fn exit(code: i32) -> void
 extern fn with_install_interrupt_handlers() -> void
@@ -1183,6 +1185,74 @@ fn run_graph_target_command(target_name: str) -> i32:
     graph_options.selected_target = target_name
     run_build_command(build_options, graph_options)
 
+fn repo_lock_path() -> str:
+    let out_dir = with_getenv_str("WITH_OUT_DIR")
+    let base = if out_dir.len() > 0: out_dir else: "out"
+    base ++ "/tmp/repo-serial.lock"
+
+fn repo_lock_owner_path() -> str:
+    repo_lock_path() ++ "/owner"
+
+fn repo_lock_parse_pid(owner: str) -> i32:
+    var start = -1
+    for i in 0..(owner.len() as i32 - 4):
+        if owner.slice(i as i64, (i + 4) as i64) == "pid=":
+            start = i + 4
+            break
+    if start < 0:
+        return -1
+    var end = start
+    while end < owner.len() as i32:
+        let ch = owner.byte_at(end as i64)
+        if ch < 48 or ch > 57:
+            break
+        end = end + 1
+    if end == start:
+        return -1
+    var pid = 0
+    for i in start..end:
+        pid = pid * 10 + (owner.byte_at(i as i64) - 48)
+    pid
+
+fn repo_lock_acquire(target_name: str) -> bool:
+    if with_getenv_str("WITH_REPO_LOCKED").len() > 0:
+        return true
+    let lock_dir = repo_lock_path()
+    let parent = lock_dir.slice(0, lock_dir.len() - "/repo-serial.lock".len())
+    let _ = with_fs_mkdir_p(parent)
+    let rc = with_fs_mkdir(lock_dir)
+    if rc == 0:
+        let owner_file = repo_lock_owner_path()
+        let pid = with_getpid()
+        let _ = with_fs_write_file(owner_file, f"target={target_name} pid={pid}")
+        let _ = with_setenv_str("WITH_REPO_LOCKED", "1")
+        return true
+    if with_fs_file_exists(repo_lock_owner_path()) != 0:
+        let owner = with_fs_read_file(repo_lock_owner_path())
+        let owner_pid = repo_lock_parse_pid(owner)
+        if owner_pid > 0 and owner_pid == with_getpid():
+            return true
+        if owner_pid > 0 and with_process_alive(owner_pid) == 0:
+            let _ = with_fs_remove_tree(lock_dir)
+            let rc2 = with_fs_mkdir(lock_dir)
+            if rc2 == 0:
+                let pid = with_getpid()
+                let _ = with_fs_write_file(repo_lock_owner_path(), f"target={target_name} pid={pid}")
+                let _ = with_setenv_str("WITH_REPO_LOCKED", "1")
+                return true
+        with_eprint("error: another build is already running: " ++ owner ++ "\n")
+    else:
+        with_eprint("error: could not acquire build lock\n")
+    false
+
+fn repo_lock_release():
+    let lock_dir = repo_lock_path()
+    if with_fs_file_exists(repo_lock_owner_path()) != 0:
+        let owner = with_fs_read_file(repo_lock_owner_path())
+        let owner_pid = repo_lock_parse_pid(owner)
+        if owner_pid == with_getpid():
+            let _ = with_fs_remove_tree(lock_dir)
+
 fn run_build_command(options: BuildCommandOptions, graph_options: BuildGraphCommandOptions) -> i32:
     var actual_options = options
     var actual_source = actual_options.source_path
@@ -1221,7 +1291,11 @@ fn run_build_command(options: BuildCommandOptions, graph_options: BuildGraphComm
             if graph_options.graph_only or graph_options.dry_run:
                 with_write(selected_graph.raw_text)
                 return 0
-            return run_build_graph(root, cfg, selected_graph, load_result.sema, actual_options)
+            if not repo_lock_acquire(selected_target_name):
+                return 1
+            let build_rc = run_build_graph(root, cfg, selected_graph, load_result.sema, actual_options)
+            repo_lock_release()
+            return build_rc
         actual_source = root ++ "/src/main.w"
         actual_options.source_path = actual_source
         if actual_options.output_path == "" and cfg.package_name.len() > 0:
