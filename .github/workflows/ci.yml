@@ -18,8 +18,11 @@ jobs:
       - name: Export LLVM_PREFIX
         run: echo "LLVM_PREFIX=$(brew --prefix llvm)" >> "$GITHUB_ENV"
 
-      - name: Build stage2 self-hosted compiler
-        run: make stage2
+      - name: Build
+        run: make build
 
-      - name: Stage2 test suites
-        run: make test-stage2
+      - name: Fixpoint
+        run: make fixpoint
+
+      - name: Test
+        run: make test
