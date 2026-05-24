@@ -86,6 +86,10 @@ type ComptimeCapabilityRecord {
     args: Vec[str],
     write_scope: Vec[str],
     write_scoped: i32,
+    timeout_ms: i32,
+    cwd: str,
+    env: Vec[str],
+    network: i32,
 }
 
 type ComptimeWorkspaceRecord {
@@ -444,6 +448,88 @@ fn comptime_tool_split_nonempty_lines(text: str) -> Vec[str]:
         lines.push(text.slice(start as i64, text.len()))
     lines
 
+fn comptime_glob_split_by_slash(path: str) -> Vec[str]:
+    let parts: Vec[str] = Vec.new()
+    var start = 0
+    for i in 0..path.len() as i32:
+        if path.byte_at(i as i64) == 47:
+            if i > start:
+                parts.push(path.slice(start as i64, i as i64))
+            start = i + 1
+    if start < path.len() as i32:
+        parts.push(path.slice(start as i64, path.len()))
+    parts
+
+fn comptime_glob_segment_matches(pattern: str, name: str) -> bool:
+    var star = -1
+    for i in 0..pattern.len() as i32:
+        if pattern.byte_at(i as i64) == 42:
+            if star >= 0:
+                return false
+            star = i
+    if star < 0:
+        return pattern == name
+    let prefix = pattern.slice(0, star as i64)
+    let suffix = pattern.slice((star + 1) as i64, pattern.len())
+    if name.len() < prefix.len() + suffix.len():
+        return false
+    if prefix.len() > 0 and name.slice(0, prefix.len()) != prefix:
+        return false
+    if suffix.len() > 0:
+        let suffix_start = name.len() - suffix.len()
+        if name.slice(suffix_start, name.len()) != suffix:
+            return false
+    true
+
+fn comptime_glob_segments_match(pat_segs: Vec[str], pi: i32, file_segs: Vec[str], fi: i32) -> bool:
+    if pi >= pat_segs.len() as i32:
+        return fi >= file_segs.len() as i32
+    let seg = pat_segs.get(pi as i64)
+    if seg == "**":
+        var k = fi
+        while k <= file_segs.len() as i32:
+            if comptime_glob_segments_match(pat_segs, pi + 1, file_segs, k):
+                return true
+            k = k + 1
+        return false
+    if fi >= file_segs.len() as i32:
+        return false
+    if not comptime_glob_segment_matches(seg, file_segs.get(fi as i64)):
+        return false
+    comptime_glob_segments_match(pat_segs, pi + 1, file_segs, fi + 1)
+
+fn comptime_glob_str_compare(a: str, b: str) -> i32:
+    let min_len = if a.len() < b.len(): a.len() else: b.len()
+    var i = 0
+    while i < min_len as i32:
+        let ac = a.byte_at(i as i64)
+        let bc = b.byte_at(i as i64)
+        if ac != bc:
+            return ac - bc
+        i = i + 1
+    if a.len() == b.len():
+        return 0
+    if a.len() < b.len():
+        return -1
+    1
+
+fn comptime_glob_sort(items: Vec[str]) -> Vec[str]:
+    var sorted: Vec[str] = Vec.new()
+    for i in 0..items.len() as i32:
+        let item = items.get(i as i64)
+        var inserted = false
+        var out: Vec[str] = Vec.new()
+        for j in 0..sorted.len() as i32:
+            let existing = sorted.get(j as i64)
+            if not inserted and comptime_glob_str_compare(item, existing) < 0:
+                out.push(item)
+                inserted = true
+            out.push(existing)
+        if not inserted:
+            out.push(item)
+        sorted = out
+    sorted
+
 fn comptime_eval_result_invalid() -> ComptimeEvalResult:
     ComptimeEvalResult {
         value: comptime_value_invalid(),
@@ -467,6 +553,10 @@ fn comptime_capability_record(kind: i32, package_name: str, package_version: str
         args: Vec.new(),
         write_scope: Vec.new(),
         write_scoped: 0,
+        timeout_ms: 0,
+        cwd: "",
+        env: Vec.new(),
+        network: 0,
     }
 
 fn comptime_action_outputs(output: str, extra_outputs: Vec[str]) -> Vec[str]:
@@ -483,7 +573,7 @@ fn comptime_action_write_scope(output: str, extra_outputs: Vec[str], write_scope
         scopes.push(write_scopes.get(i as i64))
     scopes
 
-fn comptime_action_capability_record(package_name: str, package_version: str, project_root: str, target_name: str, inputs: Vec[str], output: str, extra_outputs: Vec[str], args: Vec[str], write_scopes: Vec[str]) -> ComptimeCapabilityRecord:
+fn comptime_action_capability_record(package_name: str, package_version: str, project_root: str, target_name: str, inputs: Vec[str], output: str, extra_outputs: Vec[str], args: Vec[str], write_scopes: Vec[str], timeout_ms: i32, cwd: str, env: Vec[str], network: i32) -> ComptimeCapabilityRecord:
     ComptimeCapabilityRecord {
         kind: CapabilityKind.CK_BUILD_ACTION_CTX,
         generation: 0,
@@ -497,6 +587,10 @@ fn comptime_action_capability_record(package_name: str, package_version: str, pr
         args,
         write_scope: comptime_action_write_scope(output, extra_outputs, write_scopes),
         write_scoped: 1,
+        timeout_ms,
+        cwd,
+        env,
+        network,
     }
 
 fn ComptimeEvaluator.check_workspace_intercepts_finished(self: ComptimeEvaluator):
@@ -584,7 +678,7 @@ fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: AstPool, pool: Inte
         runtime_stderr: evaluator.runtime_stderr,
     }
 
-fn comptime_eval_tool_action_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, fn_sym: i32, package_name: str, package_version: str, project_root: str, target_name: str, inputs: Vec[str], output: str, extra_outputs: Vec[str], args_values: Vec[str], write_scopes: Vec[str]) -> ComptimeEvalResult:
+fn comptime_eval_tool_action_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, fn_sym: i32, package_name: str, package_version: str, project_root: str, target_name: str, inputs: Vec[str], output: str, extra_outputs: Vec[str], args_values: Vec[str], write_scopes: Vec[str], timeout_ms: i32, cwd: str, env: Vec[str], network: i32) -> ComptimeEvalResult:
     var sema = unsafe: *sema_ptr
     sema.ast = ast
     var evaluator = ComptimeEvaluator.init(sema, ast, pool, 1)
@@ -594,7 +688,7 @@ fn comptime_eval_tool_action_result(sema_ptr: *mut Sema, ast: AstPool, pool: Int
     let ctx_type = evaluator.capability_type_id(CapabilityKind.CK_BUILD_ACTION_CTX, call_node)
     if ctx_type == 0:
         return ComptimeEvalResult { value: comptime_value_invalid(), extras: evaluator.extra_values, error_msg: evaluator.last_error_msg, runtime_exit_code: evaluator.runtime_exit_code, runtime_stderr: evaluator.runtime_stderr }
-    let ctx_record = comptime_action_capability_record(package_name, package_version, project_root, target_name, inputs, output, extra_outputs, args_values, write_scopes)
+    let ctx_record = comptime_action_capability_record(package_name, package_version, project_root, target_name, inputs, output, extra_outputs, args_values, write_scopes, timeout_ms, cwd, env, network)
     let ctx_value = evaluator.mint_capability(ctx_type, ctx_record)
     let args: Vec[ComptimeValue] = Vec.new()
     args.push(ctx_value)
@@ -2911,6 +3005,52 @@ fn ComptimeEvaluator.eval_toolfs_capability_method(self: ComptimeEvaluator, recv
             return comptime_control_value(comptime_value_str(base))
         let joined = if base.ends_with("/"): base ++ child else: base ++ "/" ++ child
         return comptime_control_value(comptime_value_str(joined))
+    if method == "glob":
+        if not self.capability_expect_arg_count(arg_count, 1, method, node):
+            return comptime_control_error()
+        let args_signal = self.capability_args(extra_start, arg_count)
+        if args_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return args_signal
+        let pattern = self.capability_arg_str(args_signal.value, 0, method, node)
+        if self.had_error != 0:
+            return comptime_control_error()
+        var last_clean_slash = -1
+        var has_glob = false
+        for gi in 0..pattern.len() as i32:
+            let gc = pattern.byte_at(gi as i64)
+            if gc == 42:
+                has_glob = true
+                break
+            if gc == 47:
+                last_clean_slash = gi
+        if not has_glob:
+            return self.fail(node, "glob pattern contains no wildcards: " ++ pattern)
+        let glob_base = if last_clean_slash < 0: "." else: pattern.slice(0, last_clean_slash as i64)
+        let glob_suffix = if last_clean_slash < 0: pattern else: pattern.slice((last_clean_slash + 1) as i64, pattern.len())
+        let resolved_base = self.capability_resolve_project_path(record, glob_base, method, node)
+        if self.had_error != 0:
+            return comptime_control_error()
+        let raw_files = comptime_tool_split_nonempty_lines(with_fs_list_files(resolved_base))
+        let pat_segs = comptime_glob_split_by_slash(glob_suffix)
+        let results: Vec[str] = Vec.new()
+        for gi in 0..raw_files.len() as i32:
+            let abs_file = raw_files.get(gi as i64)
+            let rel_file = self.capability_project_relative_path(record, abs_file)
+            let base_prefix = if glob_base == ".": "" else: glob_base ++ "/"
+            let rel_to_base = if base_prefix.len() > 0 and rel_file.starts_with(base_prefix): rel_file.slice(base_prefix.len(), rel_file.len()) else: rel_file
+            let file_segs = comptime_glob_split_by_slash(rel_to_base)
+            if comptime_glob_segments_match(pat_segs, 0, file_segs, 0):
+                results.push(rel_file)
+        if results.len() == 0:
+            return self.fail(node, "glob pattern matched no files: " ++ pattern)
+        let sorted = comptime_glob_sort(results)
+        let vec_type = self.node_type_or(node, 0)
+        if vec_type == 0:
+            return self.fail(node, "ToolFs.glob result type is unknown")
+        let gstart = self.extra_values.len() as i32
+        for gi in 0..sorted.len() as i32:
+            self.extra_values.push(comptime_value_str(sorted.get(gi as i64)))
+        return comptime_control_value(comptime_value_vec(vec_type, gstart, sorted.len() as i32))
     if method == "exists" or method == "is_dir" or method == "read_text" or method == "list_files" or method == "mkdir_all" or method == "remove_file" or method == "remove_tree":
         if not self.capability_expect_arg_count(arg_count, 1, method, node):
             return comptime_control_error()
@@ -3236,6 +3376,14 @@ fn ComptimeEvaluator.eval_actionctx_capability_method(self: ComptimeEvaluator, r
         if record.outputs.len() == 0:
             return comptime_control_value(comptime_value_str(""))
         return comptime_control_value(comptime_value_str(record.outputs.get(0)))
+    if method == "timeout":
+        return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), record.timeout_ms as i64))
+    if method == "working_dir":
+        return comptime_control_value(comptime_value_str(record.cwd))
+    if method == "env":
+        return comptime_control_value(self.str_vec_value(record.env, node))
+    if method == "network":
+        return comptime_control_value(comptime_value_bool(if record.network != 0: 1 else: 0))
     let child_kind =
         if method == "project_info":
             CapabilityKind.CK_BUILD_PROJECT_INFO

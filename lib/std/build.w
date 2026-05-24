@@ -334,6 +334,10 @@ pub type ActionCtx {
     inputs_value: Vec[str],
     outputs_value: Vec[str],
     args_value: Vec[str],
+    timeout_ms_value: i32,
+    cwd_value: str,
+    env_value: Vec[str],
+    network_value: bool,
 }
 
 fn build_noop_action(ctx: ActionCtx) -> i32:
@@ -355,6 +359,10 @@ pub type Target {
     deps: Vec[str],
     args: Vec[str],
     action: fn(ActionCtx) -> i32,
+    timeout_ms: i32,
+    cwd: str,
+    env: Vec[str],
+    network: bool,
 }
 
 pub type GeneratedSource {
@@ -621,6 +629,88 @@ fn tool_path_normalize(path: str) -> str:
         result = result ++ parts.get(i as i64)
     result
 
+fn tool_split_by_slash(path: str) -> Vec[str]:
+    let parts: Vec[str] = Vec.new()
+    var start = 0
+    for i in 0..path.len() as i32:
+        if path.byte_at(i as i64) == 47:
+            if i > start:
+                parts.push(path.slice(start as i64, i as i64))
+            start = i + 1
+    if start < path.len() as i32:
+        parts.push(path.slice(start as i64, path.len()))
+    parts
+
+fn tool_glob_segment_matches(pattern: str, name: str) -> bool:
+    var star = -1
+    for i in 0..pattern.len() as i32:
+        if pattern.byte_at(i as i64) == 42:
+            if star >= 0:
+                return false
+            star = i
+    if star < 0:
+        return pattern == name
+    let prefix = pattern.slice(0, star as i64)
+    let suffix = pattern.slice((star + 1) as i64, pattern.len())
+    if name.len() < prefix.len() + suffix.len():
+        return false
+    if prefix.len() > 0 and name.slice(0, prefix.len()) != prefix:
+        return false
+    if suffix.len() > 0:
+        let suffix_start = name.len() - suffix.len()
+        if name.slice(suffix_start, name.len()) != suffix:
+            return false
+    true
+
+fn tool_glob_segments_match(pat_segs: Vec[str], pi: i32, file_segs: Vec[str], fi: i32) -> bool:
+    if pi >= pat_segs.len() as i32:
+        return fi >= file_segs.len() as i32
+    let seg = pat_segs.get(pi as i64)
+    if seg == "**":
+        var k = fi
+        while k <= file_segs.len() as i32:
+            if tool_glob_segments_match(pat_segs, pi + 1, file_segs, k):
+                return true
+            k = k + 1
+        return false
+    if fi >= file_segs.len() as i32:
+        return false
+    if not tool_glob_segment_matches(seg, file_segs.get(fi as i64)):
+        return false
+    tool_glob_segments_match(pat_segs, pi + 1, file_segs, fi + 1)
+
+fn tool_glob_str_compare(a: str, b: str) -> i32:
+    let min_len = if a.len() < b.len(): a.len() else: b.len()
+    var i = 0
+    while i < min_len as i32:
+        let ac = a.byte_at(i as i64)
+        let bc = b.byte_at(i as i64)
+        if ac != bc:
+            return ac - bc
+        i = i + 1
+    if a.len() == b.len():
+        return 0
+    if a.len() < b.len():
+        return -1
+    1
+
+fn tool_glob_sort(items: Vec[str]) -> Vec[str]:
+    var sorted: Vec[str] = Vec.new()
+    for i in 0..items.len() as i32:
+        let item = items.get(i as i64)
+        var inserted = false
+        var out: Vec[str] = Vec.new()
+        for j in 0..sorted.len() as i32:
+            let existing = sorted.get(j as i64)
+            if not inserted and tool_glob_str_compare(item, existing) < 0:
+                out.push(item)
+                inserted = true
+            out.push(existing)
+        if not inserted:
+            out.push(item)
+        sorted = out
+    sorted
+
 fn ToolFs.resolve_path(self: &Self, path: str) -> str:
     tool_capability_require(self.token, "ToolFs")
     tool_path_require_project_relative(path)
@@ -715,6 +805,36 @@ pub fn ToolFs.list_files(self: &Self, path: str) -> Vec[str]:
     for i in 0..raw_files.len() as i32:
         files.push(self.project_relative_path(raw_files.get(i as i64)))
     files
+
+pub fn ToolFs.glob(self: &Self, pattern: str) -> Vec[str]:
+    var last_clean_slash = -1
+    var has_glob = false
+    for i in 0..pattern.len() as i32:
+        let c = pattern.byte_at(i as i64)
+        if c == 42:
+            has_glob = true
+            break
+        if c == 47:
+            last_clean_slash = i
+    if not has_glob:
+        with_eprint("error: glob pattern contains no wildcards: " ++ pattern ++ "\n")
+        exit(1)
+    let base_dir = if last_clean_slash < 0: "." else: pattern.slice(0, last_clean_slash as i64)
+    let glob_suffix = if last_clean_slash < 0: pattern else: pattern.slice((last_clean_slash + 1) as i64, pattern.len())
+    let all_files = self.list_files(base_dir)
+    let pat_segs = tool_split_by_slash(glob_suffix)
+    let results: Vec[str] = Vec.new()
+    let prefix = if base_dir == ".": "" else: base_dir ++ "/"
+    for i in 0..all_files.len() as i32:
+        let file = all_files.get(i as i64)
+        let rel = if prefix.len() > 0 and file.starts_with(prefix): file.slice(prefix.len(), file.len()) else: file
+        let file_segs = tool_split_by_slash(rel)
+        if tool_glob_segments_match(pat_segs, 0, file_segs, 0):
+            results.push(file)
+    if results.len() == 0:
+        with_eprint("error: glob pattern matched no files: " ++ pattern ++ "\n")
+        exit(1)
+    tool_glob_sort(results)
 
 pub fn ToolFs.write_text(self: &Self, path: str, contents: str) -> i32:
     self.require_write_file_allowed(path)
@@ -957,6 +1077,22 @@ pub fn ActionCtx.output(self: &Self) -> str:
         return ""
     self.outputs_value.get(0)
 
+pub fn ActionCtx.timeout(self: &Self) -> i32:
+    tool_capability_require(self.token, "ActionCtx")
+    self.timeout_ms_value
+
+pub fn ActionCtx.working_dir(self: &Self) -> str:
+    tool_capability_require(self.token, "ActionCtx")
+    self.cwd_value
+
+pub fn ActionCtx.env(self: &Self) -> Vec[str]:
+    tool_capability_require(self.token, "ActionCtx")
+    self.env_value
+
+pub fn ActionCtx.network(self: &Self) -> bool:
+    tool_capability_require(self.token, "ActionCtx")
+    self.network_value
+
 fn build_graph_escape(value: str) -> str:
     var out = ""
     for i in 0..value.len() as i32:
@@ -1002,7 +1138,27 @@ pub fn target_new(kind: BuildKind, name: str, entry: str) -> Target:
         deps: Vec.new(),
         args: Vec.new(),
         action: build_noop_action,
+        timeout_ms: 0,
+        cwd: "",
+        env: Vec.new(),
+        network: false,
     }
+
+pub fn Target.timeout(mut self: Target, ms: i32) -> Target:
+    self.timeout_ms = ms
+    self
+
+pub fn Target.working_dir(mut self: Target, path: str) -> Target:
+    self.cwd = path
+    self
+
+pub fn Target.with_env(mut self: Target, key: str, value: str) -> Target:
+    self.env.push(key ++ "=" ++ value)
+    self
+
+pub fn Target.allow_network(mut self: Target) -> Target:
+    self.network = true
+    self
 
 pub fn Build.add_target(mut self: Build, target: Target) -> Build:
     self.targets.push(target)
@@ -1235,6 +1391,10 @@ pub fn Target.target(self: Target, target: BuildTarget) -> Target:
         deps: self.deps,
         args: self.args,
         action: self.action,
+        timeout_ms: self.timeout_ms,
+        cwd: self.cwd,
+        env: self.env,
+        network: self.network,
     }
 
 pub fn Target.optimize(self: Target, mode: OptimizeMode) -> Target:
@@ -1254,6 +1414,10 @@ pub fn Target.optimize(self: Target, mode: OptimizeMode) -> Target:
         deps: self.deps,
         args: self.args,
         action: self.action,
+        timeout_ms: self.timeout_ms,
+        cwd: self.cwd,
+        env: self.env,
+        network: self.network,
     }
 
 pub fn Target.link_system_lib(mut self: Target, lib: str) -> Target:
@@ -1285,6 +1449,10 @@ pub fn Target.output(self: Target, output: str) -> Target:
         deps: self.deps,
         args: self.args,
         action: self.action,
+        timeout_ms: self.timeout_ms,
+        cwd: self.cwd,
+        env: self.env,
+        network: self.network,
     }
 
 pub fn Target.input(mut self: Target, input: str) -> Target:
@@ -1338,6 +1506,10 @@ fn build_action_ctx(ctx: BuildCtx, target: Target) -> ActionCtx:
         inputs_value: target.inputs,
         outputs_value: ctx_outputs,
         args_value: target.args,
+        timeout_ms_value: target.timeout_ms,
+        cwd_value: target.cwd,
+        env_value: target.env,
+        network_value: target.network,
     }
 
 pub fn Build.__driver_run_action(self: Build, ctx: BuildCtx, action_name: str) -> i32:

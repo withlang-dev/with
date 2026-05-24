@@ -16,6 +16,10 @@ pub type BuildGraphTarget {
     deps: Vec[str],
     args: Vec[str],
     action_fn: i32,
+    timeout_ms: i32,
+    cwd: str,
+    env: Vec[str],
+    network: i32,
 }
 
 pub type BuildGraphGeneratedSource {
@@ -74,6 +78,10 @@ fn build_graph_target_new(kind: i32, name: str, entry: str, target_kind: i32, op
         deps: Vec.new(),
         args: Vec.new(),
         action_fn: 0,
+        timeout_ms: 0,
+        cwd: "",
+        env: Vec.new(),
+        network: 0,
     }
 
 fn build_graph_split_nonempty_lines(text: str) -> Vec[str]:
@@ -170,6 +178,14 @@ pub fn build_graph_emit(graph: BuildGraph) -> str:
             out = out ++ "dep\t" ++ f"{ti}\t" ++ build_graph_escape(target.deps.get(depi as i64)) ++ "\n"
         for ai in 0..target.args.len() as i32:
             out = out ++ "arg\t" ++ f"{ti}\t" ++ build_graph_escape(target.args.get(ai as i64)) ++ "\n"
+        if target.timeout_ms != 0:
+            out = out ++ "timeout_ms\t" ++ f"{ti}\t" ++ f"{target.timeout_ms}" ++ "\n"
+        if target.cwd.len() > 0:
+            out = out ++ "cwd\t" ++ f"{ti}\t" ++ build_graph_escape(target.cwd) ++ "\n"
+        for ei in 0..target.env.len() as i32:
+            out = out ++ "env\t" ++ f"{ti}\t" ++ build_graph_escape(target.env.get(ei as i64)) ++ "\n"
+        if target.network != 0:
+            out = out ++ "network\t" ++ f"{ti}\t1\n"
     out
 
 fn build_graph_parse_i32(text: str) -> i32:
@@ -284,6 +300,26 @@ pub fn parse_build_graph(text: str) -> BuildGraph:
                 graph.error_msg = "invalid arg line in build graph"
                 return graph
             current.args.push(fields.get(2))
+        else if tag == "timeout_ms":
+            if fields.len() != 3 or not has_current:
+                graph.error_msg = "invalid timeout_ms line in build graph"
+                return graph
+            current.timeout_ms = build_graph_parse_i32(fields.get(2))
+        else if tag == "cwd":
+            if fields.len() != 3 or not has_current:
+                graph.error_msg = "invalid cwd line in build graph"
+                return graph
+            current.cwd = fields.get(2)
+        else if tag == "env":
+            if fields.len() != 3 or not has_current:
+                graph.error_msg = "invalid env line in build graph"
+                return graph
+            current.env.push(fields.get(2))
+        else if tag == "network":
+            if fields.len() != 3 or not has_current:
+                graph.error_msg = "invalid network line in build graph"
+                return graph
+            current.network = build_graph_parse_i32(fields.get(2))
         else:
             graph.error_msg = "unknown build graph line: " ++ tag
             return graph
