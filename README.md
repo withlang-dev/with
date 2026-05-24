@@ -61,25 +61,25 @@ The compiler is self-hosting. The build chain is `seed -> stage1 -> stage2`:
 ```sh
 git clone https://github.com/withlang-dev/with.git
 cd with
-make seed       # download seed compiler (if `with` is not on PATH)
-make build      # build stage2
-make test       # run test suite
+with build :seed        # download seed compiler (if `with` is not on PATH)
+with build              # build the compiler
+with build :test        # run test suite
 ```
 
 Install to your PATH:
 
 ```sh
-make install-user       # installs to ~/.local/bin/with
+with build :install-user    # installs to ~/.local/bin/with
 ```
 
 ### Fixpoint Verification
 
-The compiler compiles itself. `make fixpoint` builds stage3 from stage2 and
-verifies they are byte-identical. If fixpoint breaks, the compiler has a
+The compiler compiles itself. `with build :fixpoint` builds stage3 from stage2
+and verifies they are byte-identical. If fixpoint breaks, the compiler has a
 nondeterminism bug.
 
 ```sh
-make fixpoint
+with build :fixpoint
 ```
 
 ## Editor Support

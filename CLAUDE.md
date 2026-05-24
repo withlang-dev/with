@@ -125,8 +125,7 @@ reporting problem. The bar is correctness, not coverage.
 ## Runtime Architecture
 
 ```
-rt_core.o    (With)  = the future. All new runtime functions go here.
-helpers.o    (C)     = legacy. Functions migrate OUT, never in.
+rt_core.o    (With)  = core runtime. All runtime functions live here.
 ```
 
 Two link paths:
@@ -136,26 +135,22 @@ Two link paths:
 Linking rules:
 - Pure With programs (no c_import): `rt_core.o` only
 - User programs with c_import: `rt_core.o` first, then
-  `helpers.a` as archive (linker pulls only missing symbols)
-- Compiler build: `helpers.o` + `support_runtime.o` (no rt_core.o)
+  `cimport_stubs.o` as archive (linker pulls only missing symbols)
 
-**Direction is always: With replaces C. Never duplicate in C.**
 When a runtime function is needed, implement it in `rt_core.w`
-with `@[c_export("symbol_name")]`. Never add new code to
-`helpers.c`.
+with `@[c_export("symbol_name")]`.
 
 ---
 
 ## Build System
 
 ```
-make stage1      # seed → stage1
-make stage2      # stage1 → stage2
-make build       # stage1 + stage2 + runtime objects
-make stage3      # stage2 → stage3
-make fixpoint    # verify stage2 == stage3 (byte-identical)
-make test        # run test suite
-make smoke       # quick smoke test
+with build              # full build (seed → stage1 → stage2 → final)
+with build :stage1      # seed → stage1
+with build :stage2      # stage1 → stage2
+with build :fixpoint    # verify stage2 == stage3 (byte-identical)
+with build :test        # run test suite
+with build :clean       # remove build artifacts
 ```
 
 Stage chain: `seed → stage1 → stage2 → stage3`
@@ -211,8 +206,8 @@ possible.
 
 After each change:
 ```
-make build          # must pass
-make fixpoint       # must pass
+with build              # must pass
+with build :fixpoint    # must pass
 ```
 
 If either fails, stop adding changes. Debug the failure.
@@ -261,9 +256,10 @@ seed with a known-good binary.
 ```
 src/              compiler source (.w)
 lib/std/          standard library (.w)
-rt/               runtime interface + platform backends (.w, .s)
-runtime/          legacy C runtime (helpers.c — being migrated out)
+rt/               runtime source + platform backends (.w, .s)
+runtime/          platform assembly (fiber_asm_*.s)
 test/             test suite
+build.w           build system (with build entry point)
 out/bin/          compiler binaries (build artifacts)
 out/lib/          compiled runtime objects (build artifacts)
 docs/             specifications
@@ -319,9 +315,9 @@ flag on `NK_LET_DECL`.
 A change is acceptable only if:
 
 ```
-make build      # compiles
-make fixpoint   # stage2 == stage3
-make test       # no regressions
+with build              # compiles
+with build :fixpoint    # stage2 == stage3
+with build :test        # no regressions
 ```
 
 If any step fails, continue debugging until it passes.
@@ -333,30 +329,26 @@ If any step fails, continue debugging until it passes.
 ### The seed compiler is frozen
 The installed compiler at ~/.local/bin/with has its own Link.w, its own
 embedded runtime objects, and its own codegen logic baked into the binary.
-You cannot change its behavior by editing source files. If the seed's
-Link.w expects helpers.o, no amount of editing Link.w on disk changes that.
-The seed will always look for helpers.o until you install a new seed.
+You cannot change its behavior by editing source files. The seed will
+keep using its baked-in behavior until you install a new seed.
 
-### Never run `make install` with uncommitted changes
-`make install` updates the seed. A broken seed breaks all future builds.
-Only run `make install` after `make fixpoint` passes on committed code.
+### Never run `with build :install` with uncommitted changes
+`with build :install` updates the seed. A broken seed breaks all future
+builds. Only run install after `with build :fixpoint` passes on committed
+code.
 
 ### Never change Link.w and runtime files in the same commit
 Commit 1: Add new exports to rt_core.w (old link path still works)
-Commit 2: Change Link.w + strip helpers.c (new link path activates)
-Each commit must independently pass `make fixpoint`.
+Commit 2: Change Link.w (new link path activates)
+Each commit must independently pass `with build :fixpoint`.
 
 ### Bootstrap order for runtime migration
 1. git checkout all runtime/link files to last green state
-2. make build && make fixpoint (verify green baseline)
+2. with build && with build :fixpoint (verify green baseline)
 3. Apply rt_core.w changes ONLY (new exports, ABI fixes)
-4. make build && make fixpoint (old link path, new symbols available)
-5. Apply Link.w + helpers.c + compat_runtime.w changes
+4. with build && with build :fixpoint (old link path, new symbols available)
+5. Apply Link.w changes
 6. Build stage1 with old seed (old link path)
 7. Stage1 has new Link.w — it builds stage2 with new link path
-8. make fixpoint (stage2 == stage3, new link path converges)
-9. make install (seed is now updated)
-
-### If bootstrap is broken, don't guess
-Run `make doctor` to see what state the seed, stage binaries, and
-runtime objects are in.
+8. with build :fixpoint (stage2 == stage3, new link path converges)
+9. with build :install (seed is now updated)

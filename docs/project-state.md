@@ -525,29 +525,18 @@ Completed at a high level:
 - Several repository-specific build targets have moved to project-local action
   modules.
 
-Remaining To Reach The Final Build Spec:
+Build system completion:
 
-- Phase C is complete. Project-specific build behavior no longer uses live
-  compiler-dispatched project graph kinds.
-- Phase D D1 is complete. `build.w` graph loading uses the evaluator-backed
-  typed materializer path, and action targets execute through evaluator-backed
-  `ActionCtx` dispatch instead of generated runner binaries.
-- Phase D D2 is complete. `with build` parsing now produces typed build
-  options, build graph target execution overlays those options per target, and
-  `std.build` exposes the option structs required by future workspaces.
-- Phase D D7 is complete. Project actions that used the current compiler only
-  as a With source compiler now use workspaces; remaining process calls are
-  explicit external-tool, alternate-compiler, CLI-test, or diagnostic
-  boundaries.
-- Phase D D8 is complete. A real compiler-tooling action now consumes the
-  workspace message loop and stable `DeclSummary` values instead of spawning a
-  compiler process and parsing diagnostic text.
-- Action timeout/cwd/env/network/install policy declarations are incomplete.
-- Make remains a compatibility layer.
-- Some repository scripts remain because workflows or tests still reference
-  them.
-- Cross-platform plumbing exists, but current-host paths are the routinely
-  exercised ones.
+- All phases (A through I) are complete.
+- Every `make` target delegates to `with build :target`.
+- The Makefile is a thin compatibility layer (all build logic lives in
+  `build.w` and the `build_*.w` action modules).
+- All obsolete shell scripts have been deleted. Only
+  `scripts/generate_wl_stubs.sh` remains (for cross-compilation).
+- CI uses `make build`, `make fixpoint`, `make test` (which delegate to
+  `with build`).
+- `with build` (no target) runs the default build target, matching `make`
+  behavior.
 
 ## Phase C Extraction Status
 

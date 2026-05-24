@@ -1,6 +1,6 @@
 # Build System Completion Plan
 
-Status: implementation plan.
+Status: complete. All phases implemented and verified.
 
 This plan describes the remaining work needed to make
 [build-spec.md](build-spec.md) describe reality. The end state is a With-native
