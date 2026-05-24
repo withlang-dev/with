@@ -76,6 +76,10 @@ fn build_graph_materialized_target(kind: i32, name: str, entry: str, target_kind
         deps: Vec.new(),
         args: Vec.new(),
         action_fn: 0,
+        timeout_ms: 0,
+        cwd: "",
+        env: Vec.new(),
+        network: 0,
     }
 
 fn BuildGraphMaterializer.target_name_exists(self: BuildGraphMaterializer, graph: BuildGraph, name: str) -> bool:
@@ -127,6 +131,16 @@ fn BuildGraphMaterializer.materialize_target(self: BuildGraphMaterializer, value
     target.write_scopes = self.string_vec_field(value, "write_scopes")
     target.deps = self.string_vec_field(value, "deps")
     target.args = self.string_vec_field(value, "args")
+    let timeout_field = self.field_value(value, "timeout_ms")
+    if timeout_field.kind == ComptimeValueKind.CV_INT:
+        target.timeout_ms = timeout_field.data0 as i32
+    let cwd_field = self.field_value(value, "cwd")
+    if cwd_field.kind == ComptimeValueKind.CV_STR:
+        target.cwd = cwd_field.text
+    target.env = self.string_vec_field(value, "env")
+    let network_field = self.field_value(value, "network")
+    if network_field.kind == ComptimeValueKind.CV_BOOL:
+        target.network = if network_field.data0 != 0: 1 else: 0
     let action = self.field_value(value, "action")
     if kind == 23:
         if action.kind != ComptimeValueKind.CV_FN:

@@ -812,7 +812,7 @@ fn run_build_action_from_build_w(root: str, cfg: ProjectConfig, target: BuildGra
         with_eprint("error: action target '" ++ target.name ++ "' is missing an evaluator action function")
         return 1
     var action_sema = sema
-    let result = comptime_eval_tool_action_result(&raw mut action_sema as *mut Sema, action_sema.ast, action_sema.pool, target.action_fn, cfg.package_name, cfg.package_version, root, target.name, target.inputs, target.output, target.extra_outputs, target.args, target.write_scopes)
+    let result = comptime_eval_tool_action_result(&raw mut action_sema as *mut Sema, action_sema.ast, action_sema.pool, target.action_fn, cfg.package_name, cfg.package_version, root, target.name, target.inputs, target.output, target.extra_outputs, target.args, target.write_scopes, target.timeout_ms, target.cwd, target.env, target.network)
     if result.runtime_exit_code != 0:
         if result.runtime_stderr.len() > 0:
             with_ewrite(result.runtime_stderr)
@@ -1157,6 +1157,16 @@ fn explain_build_target(graph: &BuildGraph, name: str) -> i32:
                 with_write("  args:\n")
                 for j in 0..target.args.len() as i32:
                     with_write("    - " ++ target.args.get(j as i64) ++ "\n")
+            if target.timeout_ms != 0:
+                with_write(f"  timeout_ms: {target.timeout_ms}\n")
+            if target.cwd.len() > 0:
+                with_write("  cwd: " ++ target.cwd ++ "\n")
+            if target.env.len() > 0:
+                with_write("  env:\n")
+                for j in 0..target.env.len() as i32:
+                    with_write("    - " ++ target.env.get(j as i64) ++ "\n")
+            if target.network != 0:
+                with_write("  network: true\n")
             break
     if not found:
         with_eprint("error: target '" ++ name ++ "' not found in build graph\n")
