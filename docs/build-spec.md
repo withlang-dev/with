@@ -643,12 +643,144 @@ Required behavior:
 - stale lock diagnosis is explicit;
 - nested graph execution inside one top-level action does not deadlock.
 
-The driver tracks declared inputs and outputs. A stale artifact is a
-build-system bug.
+The driver tracks declared inputs, outputs, tool identities, options, and
+selected environment. Incrementality is a correctness feature first. A target
+may be skipped only when the driver can prove that every declared output was
+produced by the same logical action from the same logical inputs.
 
-Initial incrementality may be deterministic stamps and content hashes. The
-long-term cache may be content-addressed, but correctness takes priority over
-cache cleverness.
+### Build State
+
+The driver stores build state under the active output root, not in source
+directories. The state database records one entry per graph node:
+
+- build schema version;
+- compiler identity and compiler build fingerprint;
+- package root and normalized graph node name;
+- graph node kind and source location in `build.w` when available;
+- stable action signature;
+- sorted declared input fingerprints;
+- sorted dependency output fingerprints;
+- sorted declared output fingerprints;
+- relevant environment fingerprints;
+- tool and external executable fingerprints;
+- completion status.
+
+Changing the state schema, graph-node encoding, standard target kind table, or
+compiler cache-key algorithm invalidates affected entries. Stale serialized
+state must fail with a regenerate diagnostic or be ignored and rebuilt; it must
+not be partially interpreted.
+
+### Fingerprints
+
+The canonical fingerprint for file contents is a cryptographic content hash.
+Modification time is allowed only as a fast path for deciding whether to
+re-read a file before computing the authoritative content hash. It is never
+proof that a target is fresh.
+
+A file fingerprint includes:
+
+- normalized project-relative or capability-granted absolute path;
+- file kind: regular file, directory, symlink, or absent;
+- content hash for regular files;
+- symlink target for symlinks;
+- executable bit when relevant to an action;
+- file size as a diagnostic aid, not as the identity.
+
+Directory and glob fingerprints are computed from sorted child entries. Empty
+globs fail unless the graph node explicitly opted into empty input sets.
+
+Generated source and in-memory source strings use their declared logical path
+and content hash. Two generated sources with identical contents but different
+declared paths are distinct inputs because diagnostics and import resolution
+observe the path.
+
+### Action Signatures
+
+A target action signature includes all data that can change the outputs:
+
+- target kind and target name;
+- typed build options;
+- target platform and optimization/debug settings;
+- declared argv, cwd, timeout, capture policy, and stdin for command targets;
+- declared environment variables and their values;
+- source file list, generated source list, include paths, defines, link libs,
+  and runtime object selection for compiler workspaces;
+- compiler version, standard-library version, and runtime object fingerprints;
+- external executable identity for process-backed targets;
+- implementation version for standard target kinds and project-local action
+  functions.
+
+Project-local actions must declare an implementation version or function body
+fingerprint. If the driver cannot fingerprint the action implementation, the
+action is treated as stale rather than assumed fresh.
+
+Environment is opt-in. The driver fingerprints only variables declared by the
+target or required by a standard operation. If an action reads undeclared
+environment through a capability, the capability records the read and the
+driver diagnoses the missing declaration.
+
+### Freshness Rules
+
+A graph node is fresh only when all of these are true:
+
+- its state entry exists and has a compatible schema version;
+- its action signature matches;
+- every declared input fingerprint matches current filesystem state;
+- every dependency output fingerprint matches the dependency's current
+  declared outputs;
+- every declared output exists and matches the recorded output fingerprint;
+- no previous execution of the node ended in failure or partial completion.
+
+If any condition is false, the node is stale and must run. Missing outputs are
+stale. Extra undeclared outputs are a diagnostic unless the target kind
+explicitly owns an output directory and records its directory fingerprint.
+
+Skipped nodes are reported as skipped, not successful reruns. `--explain
+<target>` must say which freshness rule passed or failed for each selected
+node, naming the first stale input, output, dependency, tool, or environment
+entry when available.
+
+### Execution and Atomicity
+
+Targets write into a target-private temporary directory or temporary file.
+After successful execution, the driver verifies that all declared outputs were
+created, fingerprints them, and atomically promotes them into their declared
+locations where the platform supports atomic replacement.
+
+If execution fails, times out, or is interrupted, the state entry remains
+failed and no fresh stamp is written. Partial outputs are removed when safe, or
+left with a diagnostic naming them when removal is unsafe.
+
+`ToolFs.write_text`, `ToolFs.write_binary`, generated source emission, copy,
+promotion, response-file generation, and install staging use skip-if-unchanged
+writes: if the destination already contains the requested bytes and metadata,
+the driver does not rewrite the file. This preserves downstream freshness and
+prevents timestamp churn.
+
+### Dependency Tracking
+
+Declared graph inputs are authoritative. Standard compiler workspace targets
+also record compiler-observed imports, C imports, included headers, runtime
+objects, and linker inputs. If observed inputs differ from declared inputs,
+the driver updates the recorded observed-input set for future freshness checks
+and reports the mismatch in verbose or explain output.
+
+Process-backed project actions may only be cached from declared inputs,
+declared outputs, declared environment, and declared tools. The driver must not
+infer arbitrary process filesystem reads by tracing the operating system as a
+substitute for declarations. A future traced-input mode may diagnose missing
+declarations, but it is not part of the correctness proof for a cache hit.
+
+### Cache Reuse
+
+The initial implementation may use per-output-root state and local artifact
+fingerprints. A later content-addressed cache may reuse artifacts across output
+roots only when the action signature and all input fingerprints match exactly.
+
+Cache reuse is an optimization. If the cache is missing, corrupt, has an
+unknown schema, or cannot verify an output hash, the target rebuilds or fails
+loudly according to the target kind. The driver must never fabricate a
+declared output to satisfy downstream targets.
 
 ---
 
