@@ -1698,6 +1698,12 @@ fn ComptimeEvaluator.vec_str_to_argv(self: ComptimeEvaluator, value: ComptimeVal
         out = out ++ item.text ++ "\0"
     out
 
+fn ComptimeEvaluator.vec_str_to_argv_from_parts(self: ComptimeEvaluator, parts: Vec[str], method: str, node: i32) -> str:
+    var out = ""
+    for i in 0..parts.len() as i32:
+        out = out ++ parts.get(i as i64) ++ "\0"
+    out
+
 fn ComptimeEvaluator.process_env_apply(self: ComptimeEvaluator, value: ComptimeValue, node: i32) -> ComptimeValue:
     let env_type = self.named_type_id("ProcessEnv", node)
     if env_type == 0:
@@ -3049,6 +3055,52 @@ fn ComptimeEvaluator.eval_process_runner_capability_method(self: ComptimeEvaluat
     if handle < 0:
         return comptime_control_error()
     let _record = self.capability_records.get(handle as i64)
+    if method == "run_spec":
+        if not self.capability_expect_arg_count(arg_count, 3, method, node):
+            return comptime_control_error()
+        let spec_args_signal = self.capability_args(extra_start, arg_count)
+        if spec_args_signal.kind != ComptimeControlKind.CTL_VALUE:
+            return spec_args_signal
+        let spec_val = self.extra_values.get(spec_args_signal.value.extra_start as i64)
+        if spec_val.kind != ComptimeValueKind.CV_STRUCT:
+            return self.fail(node, "run_spec first argument must be ProcessSpec struct")
+        let executable = self.struct_field_value_by_name(spec_val, "executable")
+        let spec_args = self.struct_field_value_by_name(spec_val, "args")
+        let spec_cwd = self.struct_field_value_by_name(spec_val, "cwd")
+        let spec_env = self.struct_field_value_by_name(spec_val, "env")
+        let spec_timeout = self.struct_field_value_by_name(spec_val, "timeout_ms")
+        let spec_stdin = self.struct_field_value_by_name(spec_val, "stdin_path")
+        var argv_parts: Vec[str] = Vec.new()
+        argv_parts.push(executable.text)
+        if spec_args.kind == ComptimeValueKind.CV_VEC or spec_args.kind == ComptimeValueKind.CV_ARRAY:
+            for ai in 0..spec_args.extra_count:
+                let elem = self.extra_values.get((spec_args.extra_start + ai) as i64)
+                argv_parts.push(elem.text)
+        let argv = self.vec_str_to_argv_from_parts(argv_parts, method, node)
+        if self.had_error != 0:
+            return comptime_control_error()
+        let stdout_path = self.capability_arg_str(spec_args_signal.value, 1, method, node)
+        let stderr_path = self.capability_arg_str(spec_args_signal.value, 2, method, node)
+        if self.had_error != 0:
+            return comptime_control_error()
+        let timeout_ms = spec_timeout.data0 as i32
+        let has_cwd = spec_cwd.text.len() > 0
+        let env_vars = if spec_env.kind == ComptimeValueKind.CV_STRUCT: self.struct_field_value_by_name(spec_env, "vars") else: comptime_value_invalid()
+        let has_env = env_vars.kind == ComptimeValueKind.CV_VEC and env_vars.extra_count > 0
+        let has_stdin = spec_stdin.text.len() > 0
+        if has_env:
+            let saved_env = self.process_env_apply(spec_env, node)
+            if self.had_error != 0:
+                return comptime_control_error()
+            let rc = if has_cwd: with_exec_argv_capture_cwd(argv, stdout_path, stderr_path, timeout_ms, spec_cwd.text) else: with_exec_argv_capture(argv, stdout_path, stderr_path, timeout_ms)
+            self.process_env_restore(saved_env)
+            return self.tool_process_result(rc, stdout_path, stderr_path, node)
+        let saved_env = self.process_driver_env_clear(node)
+        if self.had_error != 0:
+            return comptime_control_error()
+        let rc = if has_cwd: with_exec_argv_capture_cwd(argv, stdout_path, stderr_path, timeout_ms, spec_cwd.text) else if has_stdin: with_exec_argv_capture_input(argv, stdout_path, stderr_path, timeout_ms, spec_stdin.text) else: with_exec_argv_capture(argv, stdout_path, stderr_path, timeout_ms)
+        self.process_env_restore(saved_env)
+        return self.tool_process_result(rc, stdout_path, stderr_path, node)
     let expected =
         if method == "run":
             1

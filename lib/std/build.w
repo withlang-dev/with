@@ -285,6 +285,29 @@ pub type ProcessEnv {
     vars: Vec[ProcessEnvVar],
 }
 
+pub type ProcessSpec {
+    executable: str,
+    args: Vec[str],
+    cwd: str,
+    env: ProcessEnv,
+    timeout_ms: i32,
+    stdin_path: str,
+    capture_stdout: bool,
+    capture_stderr: bool,
+}
+
+pub fn process_spec(executable: str) -> ProcessSpec:
+    ProcessSpec {
+        executable,
+        args: Vec.new(),
+        cwd: "",
+        env: ProcessEnv { vars: Vec.new() },
+        timeout_ms: 0,
+        stdin_path: "",
+        capture_stdout: true,
+        capture_stderr: true,
+    }
+
 pub type ToolProcessResult {
     rc: i32,
     stdout: str,
@@ -879,6 +902,23 @@ pub fn ProcessRunner.wait(self: &Self, pid: i32, timeout_ms: i32) -> i32:
     tool_capability_require(self.token, "ProcessRunner")
     with_exec_wait(pid, timeout_ms)
 
+pub fn ProcessRunner.run_spec(self: &Self, spec: ProcessSpec, stdout_path: str, stderr_path: str) -> ToolProcessResult:
+    tool_capability_require(self.token, "ProcessRunner")
+    let full_args: Vec[str] = Vec.new()
+    full_args.push(spec.executable)
+    for i in 0..spec.args.len() as i32:
+        full_args.push(spec.args.get(i as i64))
+    let timeout = if spec.timeout_ms > 0: spec.timeout_ms else: 0
+    if spec.env.vars.len() > 0:
+        if spec.cwd.len() > 0:
+            return self.run_capture_cwd_with_env(full_args, stdout_path, stderr_path, timeout, spec.cwd, spec.env)
+        return self.run_capture_with_env(full_args, stdout_path, stderr_path, timeout, spec.env)
+    if spec.cwd.len() > 0:
+        return self.run_capture_cwd(full_args, stdout_path, stderr_path, timeout, spec.cwd)
+    if spec.stdin_path.len() > 0:
+        return self.run_capture_input(full_args, stdout_path, stderr_path, timeout, spec.stdin_path)
+    self.run_capture(full_args, stdout_path, stderr_path, timeout)
+
 pub fn ActionCtx.target_name(self: &Self) -> str:
     tool_capability_require(self.token, "ActionCtx")
     self.target_name_value
@@ -1066,6 +1106,117 @@ pub fn Build.run_corpus_test(self: Build, name: str, runner: str) -> Build:
 pub fn Build.promote_tree_if_verified(self: Build, name: str, source_dir: str, output_dir: str) -> Build:
     let target = target_new(.PromoteTreeIfVerified, name, source_dir).output(output_dir)
     self.add_target(target)
+
+pub type Download {
+    url: str,
+    sha256: str,
+    output_path: str,
+}
+
+pub fn Build.download(self: Build, name: str, spec: Download) -> Build:
+    var target = target_new(.Action, name, "").output(spec.output_path)
+    target.action = build_download_action
+    target = target.write_scope(build_path_dirname(spec.output_path))
+    target = target.write_scope("out/command/" ++ name)
+    target = target.arg(spec.url)
+    target = target.arg(spec.sha256)
+    self.add_target(target)
+
+pub fn Build.extract_tar_gz(self: Build, name: str, archive: str, output_dir: str) -> Build:
+    var target = target_new(.Action, name, "").output(output_dir)
+    target.action = build_extract_tar_gz_action
+    target = target.input(archive)
+    target = target.write_scope(output_dir)
+    target = target.write_scope("out/command/" ++ name)
+    self.add_target(target)
+
+fn build_path_dirname(path: str) -> str:
+    var last_slash = -1
+    for i in 0..path.len() as i32:
+        if path.byte_at(i as i64) == 47:
+            last_slash = i
+    if last_slash < 0:
+        return "."
+    if last_slash == 0:
+        return "/"
+    path.slice(0, last_slash as i64)
+
+fn build_download_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let proc = ctx.process_runner()
+    let args = ctx.args()
+    let output_path = ctx.output()
+    if args.len() < 2 or output_path.len() == 0:
+        ctx.diagnostics().error(ctx.target_name() ++ ": download requires url, sha256, and output")
+        return 1
+    let url = args.get(0)
+    let sha256 = args.get(1)
+    let output_dir = build_path_dirname(output_path)
+    if fs.mkdir_all(output_dir) != 0:
+        ctx.diagnostics().error(ctx.target_name() ++ ": could not create directory: " ++ output_dir)
+        return 1
+    let cmd_dir = "out/command/" ++ ctx.target_name()
+    fs.mkdir_all(cmd_dir)
+    let tmp_path = output_path ++ ".download.tmp"
+    let curl_args: Vec[str] = Vec.new()
+    curl_args.push("curl")
+    curl_args.push("-L")
+    curl_args.push("--fail")
+    curl_args.push("--show-error")
+    curl_args.push("--output")
+    curl_args.push(tmp_path)
+    curl_args.push(url)
+    let stdout_path = cmd_dir ++ "/stdout"
+    let stderr_path = cmd_dir ++ "/stderr"
+    let result = proc.run_capture(curl_args, stdout_path, stderr_path, 300000)
+    if result.rc != 0:
+        ctx.diagnostics().error(ctx.target_name() ++ ": curl failed (rc=" ++ f"{result.rc}" ++ ")")
+        return 1
+    if sha256.len() > 0:
+        let sum_args: Vec[str] = Vec.new()
+        sum_args.push("shasum")
+        sum_args.push("-a")
+        sum_args.push("256")
+        sum_args.push(tmp_path)
+        let sum_result = proc.run_capture(sum_args, cmd_dir ++ "/sha.stdout", cmd_dir ++ "/sha.stderr", 30000)
+        if sum_result.rc != 0:
+            ctx.diagnostics().error(ctx.target_name() ++ ": shasum failed")
+            return 1
+        let actual = sum_result.stdout.slice(0, 64)
+        if actual != sha256:
+            ctx.diagnostics().error(ctx.target_name() ++ ": sha256 mismatch: expected " ++ sha256 ++ " got " ++ actual)
+            let _ = fs.remove_file(tmp_path)
+            return 1
+    else:
+        ctx.diagnostics().warn(ctx.target_name() ++ ": no sha256 checksum specified for download")
+    if fs.rename(tmp_path, output_path) != 0:
+        ctx.diagnostics().error(ctx.target_name() ++ ": could not publish: " ++ output_path)
+        return 1
+    0
+
+fn build_extract_tar_gz_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let proc = ctx.process_runner()
+    let inputs = ctx.inputs()
+    let output_dir = ctx.output()
+    if inputs.len() == 0 or output_dir.len() == 0:
+        ctx.diagnostics().error(ctx.target_name() ++ ": extract requires archive input and output dir")
+        return 1
+    let archive = inputs.get(0)
+    fs.mkdir_all(output_dir)
+    let cmd_dir = "out/command/" ++ ctx.target_name()
+    fs.mkdir_all(cmd_dir)
+    let tar_args: Vec[str] = Vec.new()
+    tar_args.push("tar")
+    tar_args.push("xzf")
+    tar_args.push(archive)
+    tar_args.push("-C")
+    tar_args.push(output_dir)
+    let result = proc.run_capture(tar_args, cmd_dir ++ "/stdout", cmd_dir ++ "/stderr", 120000)
+    if result.rc != 0:
+        ctx.diagnostics().error(ctx.target_name() ++ ": tar extraction failed (rc=" ++ f"{result.rc}" ++ ")")
+        return 1
+    0
 
 pub fn Target.target(self: Target, target: BuildTarget) -> Target:
     Target {
