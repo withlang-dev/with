@@ -1013,14 +1013,19 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, action_sema
             if not build_graph_define_valid(define):
                 with_eprint("error: invalid build.w define for '" ++ target.name ++ "': " ++ define)
                 return 1
+        var dep_rebuilt = false
+        for di in 0..target.deps.len() as i32:
+            let dep_name = target.deps.get(di as i64)
+            if not skipped_targets.contains(dep_name):
+                if completed_targets.contains(dep_name):
+                    dep_rebuilt = true
+                    break
+        if target.kind == 9:
+            if not dep_rebuilt:
+                skipped_targets.push(target.name)
+            completed_targets.push(target.name)
+            continue
         if build_cache_is_cacheable(target.kind):
-            var dep_rebuilt = false
-            for di in 0..target.deps.len() as i32:
-                let dep_name = target.deps.get(di as i64)
-                if not skipped_targets.contains(dep_name):
-                    if completed_targets.contains(dep_name):
-                        dep_rebuilt = true
-                        break
             if build_cache_check_fresh(root, target, dep_rebuilt):
                 skipped_targets.push(target.name)
                 completed_targets.push(target.name)
