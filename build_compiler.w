@@ -267,25 +267,46 @@ fn comp_resolve_compiler_version(ctx: ActionCtx) -> str:
     let override_version = env("WITH_VERSION")
     if override_version.len() > 0:
         return override_version
-    var hash_argv: Vec[str] = Vec.new()
-    hash_argv |> push("git")
-    hash_argv |> push("-C")
-    hash_argv |> push(root)
-    hash_argv |> push("rev-parse")
-    hash_argv |> push("--short=9")
-    hash_argv |> push("HEAD")
-    let short_hash = comp_capture_stdout(ctx, "git-hash", hash_argv, 30000)
-    var count_argv: Vec[str] = Vec.new()
-    count_argv |> push("git")
-    count_argv |> push("-C")
-    count_argv |> push(root)
-    count_argv |> push("rev-list")
-    count_argv |> push("--count")
-    count_argv |> push("HEAD")
-    let commit_count = comp_capture_stdout(ctx, "git-count", count_argv, 30000)
-    if short_hash.len() > 0 and commit_count.len() > 0:
-        return base ++ "-" ++ commit_count ++ "-g" ++ short_hash
+    let short_hash = comp_read_git_short_hash(fs, root)
+    if short_hash.len() > 0:
+        return base ++ "-g" ++ short_hash
     base
+
+fn comp_read_git_short_hash(fs: ToolFs, root: str) -> str:
+    let head_raw = fs.read_text(".git/HEAD")
+    let head = comp_first_trimmed_line(head_raw)
+    if head.len() == 0:
+        return ""
+    if head.len() > 5 and head.slice(0, 5) == "ref: ":
+        let ref_path = head.slice(5, head.len())
+        let loose = comp_first_trimmed_line(fs.read_text(".git/" ++ ref_path))
+        if loose.len() >= 9:
+            return loose.slice(0, 9)
+        return comp_find_packed_ref(fs, root, ref_path)
+    if head.len() >= 9:
+        return head.slice(0, 9)
+    ""
+
+fn comp_find_packed_ref(fs: ToolFs, root: str, ref_path: str) -> str:
+    let packed = fs.read_text(".git/packed-refs")
+    if packed.len() == 0:
+        return ""
+    var line_start: i64 = 0
+    for i in 0..packed.len() as i32:
+        if packed.byte_at(i as i64) == 10:
+            let line = packed.slice(line_start, i as i64)
+            if line.len() > 41 and line.byte_at(0) != 35:
+                let ref_in_line = line.slice(41, line.len())
+                if ref_in_line == ref_path:
+                    return line.slice(0, 9)
+            line_start = i as i64 + 1
+    if line_start < packed.len():
+        let line = packed.slice(line_start, packed.len())
+        if line.len() > 41 and line.byte_at(0) != 35:
+            let ref_in_line = line.slice(41, line.len())
+            if ref_in_line == ref_path:
+                return line.slice(0, 9)
+    ""
 
 fn comp_write_versioned_source(ctx: ActionCtx, source: str, output: str, version: str) -> i32:
     let fs = ctx.fs()
