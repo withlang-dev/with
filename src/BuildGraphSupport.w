@@ -268,29 +268,13 @@ fn build_graph_sorted_strings(items: Vec[str]) -> Vec[str]:
     sorted
 
 pub fn collect_test_files(target_dir: str) -> Vec[str]:
-    let files: Vec[str] = Vec.new()
-    if build_graph_rt_mkdir_p("out/tmp") != 0:
-        return files
-    let stamp = f"{build_graph_rt_getpid()}.{build_graph_rt_clock_nanos()}"
-    let manifest_path = "out/tmp/test-files." ++ stamp ++ ".txt"
-    let err_path = manifest_path ++ ".stderr"
-    var argv = ""
-    argv = build_graph_argv_append(argv, "/usr/bin/find")
-    argv = build_graph_argv_append(argv, target_dir)
-    argv = build_graph_argv_append(argv, "-maxdepth")
-    argv = build_graph_argv_append(argv, "1")
-    argv = build_graph_argv_append(argv, "-type")
-    argv = build_graph_argv_append(argv, "f")
-    argv = build_graph_argv_append(argv, "-name")
-    argv = build_graph_argv_append(argv, "*.w")
-    let rc = build_graph_rt_exec_argv_capture(argv, manifest_path, err_path, 60000)
-    if rc != 0:
-        let _remove_manifest_on_error = build_graph_rt_remove_file(manifest_path)
-        let _remove_err_on_error = build_graph_rt_remove_file(err_path)
-        return files
-    let listing = build_graph_rt_read_file(manifest_path)
-    let _remove_manifest = build_graph_rt_remove_file(manifest_path)
-    let _remove_err = build_graph_rt_remove_file(err_path)
+    let listing = build_graph_rt_list_files(target_dir)
     if listing.len() == 0:
-        return files
-    build_graph_sorted_strings(build_graph_split_nonempty_lines(listing))
+        return Vec.new()
+    let all_files = build_graph_split_nonempty_lines(listing)
+    let w_files: Vec[str] = Vec.new()
+    for i in 0..all_files.len() as i32:
+        let path = all_files.get(i as i64)
+        if path.ends_with(".w"):
+            w_files.push(path)
+    build_graph_sorted_strings(w_files)

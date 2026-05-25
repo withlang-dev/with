@@ -16,6 +16,7 @@ extern fn with_fs_read_file(path: str) -> str
 extern fn with_fs_remove_dir(path: str) -> i32
 extern fn with_fs_remove_file(path: str) -> i32
 extern fn with_fs_remove_tree(path: str) -> i32
+extern fn with_fs_list_files(path: str) -> str
 extern fn with_fs_rename_file(old_path: str, new_path: str) -> i32
 extern fn with_fs_write_file(path: str, data: str) -> i32
 extern fn with_getpid() -> i32
@@ -67,6 +68,9 @@ pub fn build_graph_rt_remove_dir(path: str) -> i32:
 
 pub fn build_graph_rt_remove_tree(path: str) -> i32:
     with_fs_remove_tree(path)
+
+pub fn build_graph_rt_list_files(path: str) -> str:
+    with_fs_list_files(path)
 
 pub fn build_graph_rt_rename_file(old_path: str, new_path: str) -> i32:
     with_fs_rename_file(old_path, new_path)
