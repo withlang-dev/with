@@ -110,6 +110,14 @@ extern fn LLVMDisposeTargetData(dl: *mut u8)
 extern fn LLVMDisposeMessage(msg: *mut u8)
 extern fn LLVMDisposeTargetMachine(tm: *mut u8)
 
+// IR/Assembly file compilation
+extern fn LLVMCreateMemoryBufferWithContentsOfFile(path: *const u8, out_buf: *mut *mut u8, out_msg: *mut *mut u8) -> i32
+extern fn LLVMParseIRInContext2(ctx: *mut u8, buf: *mut u8, out_mod: *mut *mut u8, out_msg: *mut *mut u8) -> i32
+extern fn LLVMSetModuleInlineAsm2(m: *mut u8, asm_text: *const u8, len: u64)
+extern fn LLVMGetBufferStart(buf: *mut u8) -> *const u8
+extern fn LLVMGetBufferSize(buf: *mut u8) -> u64
+extern fn LLVMDisposeMemoryBuffer(buf: *mut u8)
+
 // Types
 extern fn LLVMInt1TypeInContext(c: *mut u8) -> *mut u8
 extern fn LLVMInt8TypeInContext(c: *mut u8) -> *mut u8
@@ -1387,3 +1395,105 @@ pub fn get_inline_asm(fn_ty: i64, asm_str: str, constraints: str, has_side_effec
         if has_side_effects != 0: 1 else: 0,
         if is_align_stack != 0: 1 else: 0,
         LLVM_InlineAsmDialectATT, 0) as i64
+
+// ── Standalone file compilation ─────────────────────────────────
+
+fn path_to_cstr(path: str, buf: *mut u8) -> *const u8:
+    let n = if path.len() < 4095: path.len() else: 4095
+    let src = unsafe: *(&path as *const *const u8)
+    with_memcpy(buf, src, n)
+    unsafe: *((buf as i64 + n) as *mut u8) = 0
+    buf as *const u8
+
+@[c_export("wl_assemble_to_object")]
+pub fn assemble_to_object(source_path: str, output_path: str) -> i32:
+    let _ = init_native_target()
+    let _ = init_native_asm_printer()
+    let _ = init_native_asm_parser()
+    var src_buf: [4096]u8 = [0 as u8; 4096]
+    let src_cstr = path_to_cstr(source_path, &src_buf as *mut u8)
+    var mem_buf: *mut u8 = 0 as *mut u8
+    var err: *mut u8 = 0 as *mut u8
+    if LLVMCreateMemoryBufferWithContentsOfFile(src_cstr, &raw mut mem_buf, &raw mut err) != 0:
+        if err as i64 != 0:
+            let _ = rt_write(2, "error: could not read assembly file\n" as *const u8, 36)
+            LLVMDisposeMessage(err)
+        return 1
+    let asm_ptr = LLVMGetBufferStart(mem_buf)
+    let asm_len = LLVMGetBufferSize(mem_buf)
+    let ctx = LLVMContextCreate()
+    let m = LLVMModuleCreateWithNameInContext("asm\0" as *const u8, ctx)
+    let triple = LLVMGetDefaultTargetTriple()
+    LLVMSetTarget(m, triple as *const u8)
+    LLVMSetModuleInlineAsm2(m, asm_ptr, asm_len)
+    LLVMDisposeMemoryBuffer(mem_buf)
+    var target: *mut u8 = 0 as *mut u8
+    var terr: *mut u8 = 0 as *mut u8
+    if LLVMGetTargetFromTriple(triple as *const u8, &raw mut target, &raw mut terr) != 0:
+        if terr as i64 != 0: LLVMDisposeMessage(terr)
+        LLVMDisposeMessage(triple)
+        LLVMDisposeModule(m)
+        LLVMContextDispose(ctx)
+        return 1
+    let tm = LLVMCreateTargetMachine(target, triple as *const u8, "generic" as *const u8, empty_cstr(), LLVM_CodeGenLevelDefault, LLVM_RelocDefault, LLVM_CodeModelDefault)
+    LLVMDisposeMessage(triple)
+    var out_buf: [4096]u8 = [0 as u8; 4096]
+    let out_cstr = path_to_cstr(output_path, &out_buf as *mut u8)
+    var emit_err: *mut u8 = 0 as *mut u8
+    let rc = LLVMTargetMachineEmitToFile(tm, m, out_cstr as *mut u8, LLVM_ObjectFile, &raw mut emit_err)
+    if rc != 0 and emit_err as i64 != 0:
+        let _ = rt_write(2, "error: assembly emit failed\n" as *const u8, 28)
+        LLVMDisposeMessage(emit_err)
+    LLVMDisposeTargetMachine(tm)
+    LLVMDisposeModule(m)
+    LLVMContextDispose(ctx)
+    rc
+
+@[c_export("wl_compile_ir_to_object")]
+pub fn compile_ir_to_object(source_path: str, output_path: str) -> i32:
+    let _ = init_native_target()
+    let _ = init_native_asm_printer()
+    var src_buf: [4096]u8 = [0 as u8; 4096]
+    let src_cstr = path_to_cstr(source_path, &src_buf as *mut u8)
+    var mem_buf: *mut u8 = 0 as *mut u8
+    var err: *mut u8 = 0 as *mut u8
+    if LLVMCreateMemoryBufferWithContentsOfFile(src_cstr, &raw mut mem_buf, &raw mut err) != 0:
+        if err as i64 != 0:
+            let _ = rt_write(2, "error: could not read IR file\n" as *const u8, 30)
+            LLVMDisposeMessage(err)
+        return 1
+    let ctx = LLVMContextCreate()
+    var m: *mut u8 = 0 as *mut u8
+    var parse_err: *mut u8 = 0 as *mut u8
+    if LLVMParseIRInContext2(ctx, mem_buf, &raw mut m, &raw mut parse_err) != 0:
+        if parse_err as i64 != 0:
+            let _ = rt_write(2, "error: IR parse failed\n" as *const u8, 22)
+            LLVMDisposeMessage(parse_err)
+        LLVMContextDispose(ctx)
+        return 1
+    let triple = LLVMGetDefaultTargetTriple()
+    LLVMSetTarget(m, triple as *const u8)
+    var target: *mut u8 = 0 as *mut u8
+    var terr: *mut u8 = 0 as *mut u8
+    if LLVMGetTargetFromTriple(triple as *const u8, &raw mut target, &raw mut terr) != 0:
+        if terr as i64 != 0: LLVMDisposeMessage(terr)
+        LLVMDisposeMessage(triple)
+        LLVMDisposeModule(m)
+        LLVMContextDispose(ctx)
+        return 1
+    let tm = LLVMCreateTargetMachine(target, triple as *const u8, "generic" as *const u8, empty_cstr(), LLVM_CodeGenLevelDefault, LLVM_RelocDefault, LLVM_CodeModelDefault)
+    let layout = LLVMCreateTargetDataLayout(tm)
+    LLVMSetModuleDataLayout(m, layout)
+    LLVMDisposeTargetData(layout)
+    LLVMDisposeMessage(triple)
+    var out_buf: [4096]u8 = [0 as u8; 4096]
+    let out_cstr = path_to_cstr(output_path, &out_buf as *mut u8)
+    var emit_err: *mut u8 = 0 as *mut u8
+    let rc = LLVMTargetMachineEmitToFile(tm, m, out_cstr as *mut u8, LLVM_ObjectFile, &raw mut emit_err)
+    if rc != 0 and emit_err as i64 != 0:
+        let _ = rt_write(2, "error: IR emit failed\n" as *const u8, 21)
+        LLVMDisposeMessage(emit_err)
+    LLVMDisposeTargetMachine(tm)
+    LLVMDisposeModule(m)
+    LLVMContextDispose(ctx)
+    rc
