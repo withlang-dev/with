@@ -5838,6 +5838,21 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
     if kind == NodeKind.NK_ARRAY_LIT:
         let extra_start = self.ast.get_data0(node)
         let elem_count = self.ast.get_data1(node)
+        if elem_count > 64:
+            let first_node = self.ast.get_extra(extra_start)
+            var is_fill = true
+            for fi in 1..elem_count:
+                if self.ast.get_extra(extra_start + fi) != first_node:
+                    is_fill = false
+                    break
+            if is_fill:
+                let fill_op = self.lower_expr(first_node)
+                let fill_rv = self.body.new_rvalue(RvalueKind.RK_ARRAY_FILL, fill_op, elem_count, 0)
+                let fill_ty = self.expr_type(node)
+                let fill_tmp = self.new_temp(fill_ty)
+                let fill_place = self.place_for_local(fill_tmp)
+                self.body.push_stmt(self.cur_bb, StmtKind.Assign, fill_place, fill_rv, self.ast.get_start(node))
+                return self.body.new_operand(OperandKind.OK_COPY, fill_place)
         let arr_fields: Vec[i32] = Vec.new()
         let arr_names: Vec[i32] = Vec.new()
         for i in 0..elem_count:

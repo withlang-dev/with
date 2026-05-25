@@ -2454,6 +2454,54 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
             return wl_build_extract_value(self.builder, loaded, 1)
         return wl_const_int(wl_i64_type(self.context), 0, 0)
 
+    if rk == RvalueKind.RK_ARRAY_FILL:
+        let fill_operand = d0
+        let fill_count = d1
+        var af_ty = dest_ty
+        if af_ty == 0 and dest_sema_ty > 0:
+            af_ty = self.mir_sema_type_to_llvm(dest_sema_ty)
+        if af_ty != 0 and wl_get_type_kind(af_ty) == wl_array_type_kind():
+            let af_alloca = self.create_entry_alloca(af_ty)
+            let af_elem_ty = wl_get_element_type(af_ty)
+            let af_arr_len = wl_get_array_length(af_ty)
+            let af_val = self.mir_eval_operand(body, fill_operand, af_elem_ty)
+            if wl_get_type_kind(af_elem_ty) == wl_integer_type_kind() and wl_get_int_type_width(af_elem_ty) == 8:
+                let af_fill_val = self.coerce_value_to_type(af_val, wl_i8_type(self.context))
+                let af_len_val = wl_const_int(wl_i64_type(self.context), af_arr_len, 0)
+                let af_is_volatile = wl_const_int(wl_i1_type(self.context), 0, 0)
+                let ms_sym = self.intern.intern("llvm.memset.p0.i64")
+                var ms_func = 0 as i64
+                let ms_cached = self.fn_values.get(ms_sym)
+                if ms_cached.is_some():
+                    ms_func = ms_cached.unwrap() as i64
+                else:
+                    let ms_params: Vec[i64] = Vec.new()
+                    ms_params.push(wl_ptr_type(self.context))
+                    ms_params.push(wl_i8_type(self.context))
+                    ms_params.push(wl_i64_type(self.context))
+                    ms_params.push(wl_i1_type(self.context))
+                    let ms_ft = wl_function_type(wl_void_type(self.context), vec_data_i64(&ms_params), 4, 0)
+                    ms_func = wl_add_function(self.llmod, "llvm.memset.p0.i64", ms_ft)
+                    self.fn_values.insert(ms_sym, ms_func)
+                    self.fn_fn_types.insert(ms_sym, ms_ft)
+                let ms_ft = self.fn_fn_types.get(ms_sym).unwrap() as i64
+                let ms_args: Vec[i64] = Vec.new()
+                ms_args.push(af_alloca)
+                ms_args.push(af_fill_val)
+                ms_args.push(af_len_val)
+                ms_args.push(af_is_volatile)
+                wl_build_call(self.builder, ms_ft, ms_func, vec_data_i64(&ms_args), 4)
+            else:
+                wl_build_store(self.builder, self.build_default_value(af_ty), af_alloca)
+                let af_coerced = self.coerce_value_to_type(af_val, af_elem_ty)
+                for i in 0..fill_count:
+                    let af_indices: Vec[i64] = Vec.new()
+                    af_indices.push(wl_const_int(wl_i32_type(self.context), 0, 0))
+                    af_indices.push(wl_const_int(wl_i32_type(self.context), i as i64, 0))
+                    let af_gep = wl_build_gep(self.builder, af_ty, af_alloca, vec_data_i64(&af_indices), 2)
+                    wl_build_store(self.builder, af_coerced, af_gep)
+            return wl_build_load(self.builder, af_ty, af_alloca)
+
     wl_get_undef(fallback_ty)
 
 fn Codegen.mir_emit_drop_ptr(self: Codegen, ptr: i64, ty: i64) -> void:
@@ -2510,6 +2558,95 @@ fn Codegen.mir_emit_stmt(self: Codegen, body: MirBody, stmt_id: i32) -> bool:
             let dst_ty_opt = self.mir_local_types.get(dst_local)
             if dst_ptr != 0 and dst_ty_opt.is_some():
                 dst_ty = dst_ty_opt.unwrap() as i64
+        if d1 >= 0 and d1 < body.rval_kinds.len() as i32 and body.rval_kinds.get(d1 as i64) == RvalueKind.RK_ARRAY_FILL:
+            let af_operand = body.rval_d0.get(d1 as i64)
+            let af_count = body.rval_d1.get(d1 as i64)
+            var af_arr_ty = dst_ty
+            if af_arr_ty == 0 and dst_sema_ty > 0:
+                af_arr_ty = self.mir_sema_type_to_llvm(dst_sema_ty)
+            if af_arr_ty != 0 and wl_get_type_kind(af_arr_ty) == wl_array_type_kind():
+                if dst_ptr == 0:
+                    dst_ptr = self.mir_get_or_create_local_ptr(dst_local, af_arr_ty)
+                    self.mir_local_types.insert(dst_local, af_arr_ty)
+                let af_elem_ty = wl_get_element_type(af_arr_ty)
+                let af_arr_len = wl_get_array_length(af_arr_ty)
+                let af_val = self.mir_eval_operand(body, af_operand, af_elem_ty)
+                if wl_get_type_kind(af_elem_ty) == wl_integer_type_kind() and wl_get_int_type_width(af_elem_ty) == 8:
+                    let af_fill = self.coerce_value_to_type(af_val, wl_i8_type(self.context))
+                    let af_len = wl_const_int(wl_i64_type(self.context), af_arr_len, 0)
+                    let af_vol = wl_const_int(wl_i1_type(self.context), 0, 0)
+                    let ms_sym = self.intern.intern("llvm.memset.p0.i64")
+                    var ms_func = 0 as i64
+                    let ms_cached = self.fn_values.get(ms_sym)
+                    if ms_cached.is_some():
+                        ms_func = ms_cached.unwrap() as i64
+                    else:
+                        let ms_params: Vec[i64] = Vec.new()
+                        ms_params.push(wl_ptr_type(self.context))
+                        ms_params.push(wl_i8_type(self.context))
+                        ms_params.push(wl_i64_type(self.context))
+                        ms_params.push(wl_i1_type(self.context))
+                        let ms_ft = wl_function_type(wl_void_type(self.context), vec_data_i64(&ms_params), 4, 0)
+                        ms_func = wl_add_function(self.llmod, "llvm.memset.p0.i64", ms_ft)
+                        self.fn_values.insert(ms_sym, ms_func)
+                        self.fn_fn_types.insert(ms_sym, ms_ft)
+                    let ms_ft = self.fn_fn_types.get(ms_sym).unwrap() as i64
+                    let ms_args: Vec[i64] = Vec.new()
+                    ms_args.push(dst_ptr)
+                    ms_args.push(af_fill)
+                    ms_args.push(af_len)
+                    ms_args.push(af_vol)
+                    wl_build_call(self.builder, ms_ft, ms_func, vec_data_i64(&ms_args), 4)
+                    return true
+                else:
+                    let af_coerced = self.coerce_value_to_type(af_val, af_elem_ty)
+                    for afi in 0..af_count:
+                        let af_indices: Vec[i64] = Vec.new()
+                        af_indices.push(wl_const_int(wl_i32_type(self.context), 0, 0))
+                        af_indices.push(wl_const_int(wl_i32_type(self.context), afi as i64, 0))
+                        let af_gep = wl_build_gep(self.builder, af_arr_ty, dst_ptr, vec_data_i64(&af_indices), 2)
+                        wl_build_store(self.builder, af_coerced, af_gep)
+                    return true
+        if d1 >= 0 and d1 < body.rval_kinds.len() as i32 and body.rval_kinds.get(d1 as i64) == RvalueKind.RK_USE:
+            let use_op_id = body.rval_d0.get(d1 as i64)
+            if use_op_id >= 0 and use_op_id < body.operand_kinds.len() as i32:
+                let use_ok = body.operand_kinds.get(use_op_id as i64)
+                if use_ok == OperandKind.OK_COPY or use_ok == OperandKind.OK_MOVE:
+                    let use_place = body.operand_d0.get(use_op_id as i64)
+                    var use_arr_ty = dst_ty
+                    if use_arr_ty == 0 and dst_sema_ty > 0:
+                        use_arr_ty = self.mir_sema_type_to_llvm(dst_sema_ty)
+                    if use_arr_ty != 0 and wl_get_type_kind(use_arr_ty) == wl_array_type_kind() and wl_get_array_length(use_arr_ty) > 64:
+                        let src_ptr = self.mir_place_ptr(body, use_place, false, 0)
+                        if src_ptr != 0:
+                            if dst_ptr == 0:
+                                dst_ptr = self.mir_get_or_create_local_ptr(dst_local, use_arr_ty)
+                                self.mir_local_types.insert(dst_local, use_arr_ty)
+                            let mc_sym = self.intern.intern("llvm.memcpy.p0.p0.i64")
+                            var mc_func = 0 as i64
+                            let mc_cached = self.fn_values.get(mc_sym)
+                            if mc_cached.is_some():
+                                mc_func = mc_cached.unwrap() as i64
+                            else:
+                                let mc_params: Vec[i64] = Vec.new()
+                                mc_params.push(wl_ptr_type(self.context))
+                                mc_params.push(wl_ptr_type(self.context))
+                                mc_params.push(wl_i64_type(self.context))
+                                mc_params.push(wl_i1_type(self.context))
+                                let mc_ft = wl_function_type(wl_void_type(self.context), vec_data_i64(&mc_params), 4, 0)
+                                mc_func = wl_add_function(self.llmod, "llvm.memcpy.p0.p0.i64", mc_ft)
+                                self.fn_values.insert(mc_sym, mc_func)
+                                self.fn_fn_types.insert(mc_sym, mc_ft)
+                            let mc_ft = self.fn_fn_types.get(mc_sym).unwrap() as i64
+                            let mc_len = wl_const_int(wl_i64_type(self.context), wl_get_array_length(use_arr_ty), 0)
+                            let mc_vol = wl_const_int(wl_i1_type(self.context), 0, 0)
+                            let mc_args: Vec[i64] = Vec.new()
+                            mc_args.push(dst_ptr)
+                            mc_args.push(src_ptr)
+                            mc_args.push(mc_len)
+                            mc_args.push(mc_vol)
+                            wl_build_call(self.builder, mc_ft, mc_func, vec_data_i64(&mc_args), 4)
+                            return true
         let value = self.mir_eval_rvalue(body, d1, dst_ty, dst_sema_ty)
         if dst_ptr == 0:
             if has_projections:
