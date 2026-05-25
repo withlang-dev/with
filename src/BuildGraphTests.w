@@ -24,6 +24,9 @@ pub fn build_graph_test_target_files(root: str, entry: str) -> Vec[str]:
     let candidates = collect_test_files(search_dir)
     for ci in 0..candidates.len() as i32:
         let candidate = candidates.get(ci as i64)
+        let candidate_dir = build_graph_dirname(candidate)
+        if candidate_dir != search_dir:
+            continue
         let base = build_graph_path_basename(candidate)
         if build_graph_single_star_pattern_matches(pattern, base):
             files.push(candidate)

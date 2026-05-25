@@ -788,6 +788,10 @@ pub fn ToolFs.host_exists(self: &Self, path: str) -> bool:
     tool_capability_require(self.token, "ToolFs")
     with_fs_file_exists(path) != 0
 
+pub fn ToolFs.host_list_files(self: &Self, path: str) -> Vec[str]:
+    tool_capability_require(self.token, "ToolFs")
+    tool_split_nonempty_lines(with_fs_list_files(path))
+
 pub fn ToolFs.is_dir(self: &Self, path: str) -> bool:
     with_fs_is_dir(self.resolve_path(path)) != 0
 

@@ -155,7 +155,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     compiler_sources = compiler_sources.extra_output("out/gen/main.w")
     compiler_sources = compiler_sources.extra_output("out/gen/bootstrap_main.w")
     compiler_sources = compiler_sources.extra_output("out/gen/version.txt")
-    compiler_sources = compiler_sources.extra_output("out/command/compiler-sources")
     out = out.add_target(compiler_sources)
 
     var compat_runtime = target_new(.Action, "compat-runtime-source", "").output("out/gen/compat_runtime.w")
@@ -173,7 +172,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.input("out/bootstrap-lib/clang_bridge.o")
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.extra_output("out/bootstrap-lib/llvm_link.rsp")
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.extra_output("out/bootstrap-lib/llvm_cc")
-    bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.extra_output("out/command/bootstrap-llvm-link-metadata")
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.dep("bootstrap-llvm-bridge-object")
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.dep("bootstrap-clang-bridge-object")
     out = out.add_target(bootstrap_llvm_link_metadata)
@@ -247,7 +245,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     llvm_link_metadata = llvm_link_metadata.input("out/lib/clang_bridge.o")
     llvm_link_metadata = llvm_link_metadata.extra_output("out/lib/llvm_link.rsp")
     llvm_link_metadata = llvm_link_metadata.extra_output("out/lib/llvm_cc")
-    llvm_link_metadata = llvm_link_metadata.extra_output("out/command/llvm-link-metadata")
     llvm_link_metadata = llvm_link_metadata.dep("llvm-bridge-object")
     llvm_link_metadata = llvm_link_metadata.dep("clang-bridge-object")
     out = out.add_target(llvm_link_metadata)
