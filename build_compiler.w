@@ -162,10 +162,14 @@ fn comp_host_sdk_path(ctx: ActionCtx) -> str:
     let sdkroot = env("SDKROOT")
     if sdkroot.len() > 0:
         return sdkroot
-    var argv: Vec[str] = Vec.new()
-    argv |> push("/usr/bin/xcrun")
-    argv |> push("--show-sdk-path")
-    comp_capture_stdout(ctx, "xcrun-sdk-path", argv, 30000)
+    let fs = ctx.fs()
+    let clt = "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"
+    if fs.host_exists(clt):
+        return clt
+    let xcode = "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
+    if fs.host_exists(xcode):
+        return xcode
+    ""
 
 fn comp_arg_value(args: Vec[str], prefix: str) -> str:
     for i in 0..args.len() as i32:
@@ -184,12 +188,19 @@ fn comp_resolve_seed_compiler(ctx: ActionCtx) -> str:
     let fs = ctx.fs()
     if fs.exists("out/bin/with"):
         return "out/bin/with"
-    var path_probe: Vec[str] = Vec.new()
-    path_probe |> push("with")
-    path_probe |> push("--version")
-    let installed_version = comp_capture_stdout(ctx, "with-version", path_probe, 30000)
-    if installed_version.len() > 0:
-        return "with"
+    let path_env = env("PATH")
+    if path_env.len() > 0:
+        var start = 0
+        for i in 0..path_env.len() as i32 + 1:
+            let at_end = i == path_env.len() as i32
+            let is_sep = not at_end and path_env.byte_at(i as i64) == 58
+            if is_sep or at_end:
+                if i > start:
+                    let dir = path_env.slice(start as i64, i as i64)
+                    let candidate = dir ++ "/with"
+                    if fs.host_exists(candidate):
+                        return candidate
+                start = i + 1
     if fs.exists("src/main"):
         return "src/main"
     "with"

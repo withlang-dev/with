@@ -1,10 +1,10 @@
 // BuildGraphOps -- generic executable build graph node operations.
 
+use Archive
 use Resolve
 use BuildGraphKinds
 use BuildGraphModel
 use BuildGraphSupport
-use BuildGraphTools
 use BuildGraphRuntime
 
 fn build_graph_target_input_path(root: str, target: BuildGraphTarget, index: i32) -> str:
@@ -177,13 +177,11 @@ pub fn build_graph_create_archive(root: str, target: BuildGraphTarget) -> i32:
             return 1
         resolved_inputs.push(input_path)
     let _remove_old_archive = build_graph_rt_remove_file(output_path)
-    var argv = ""
-    argv = build_graph_argv_append(argv, build_graph_ar_tool().executable)
-    argv = build_graph_argv_append(argv, "rcs")
-    argv = build_graph_argv_append(argv, output_path)
-    for ri in 0..resolved_inputs.len() as i32:
-        argv = build_graph_argv_append(argv, resolved_inputs.get(ri as i64))
-    build_graph_exec_argv(target, "create_static_archive", argv)
+    let ar_rc = create_static_archive(output_path, resolved_inputs)
+    if ar_rc != 0:
+        build_graph_rt_eprint("error: create_static_archive target '" ++ target.name ++ "' failed")
+        return ar_rc
+    0
 
 fn build_graph_asm_quote_path(path: str) -> str:
     var out = "\""

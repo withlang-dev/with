@@ -51,6 +51,7 @@ enum RvalueKind: i32:
     RK_DISCRIMINANT = 6
     RK_CAST = 7
     RK_LEN = 8
+    RK_ARRAY_FILL = 9
 
 // ── Operand kinds ────────────────────────────────────────────────
 
@@ -972,6 +973,9 @@ fn mir_rvalue_text(body: MirBody, rval_id: i32, pool: InternPool, sema: Sema) ->
     if k == RvalueKind.RK_LEN:
         return "len(" ++ mir_place_text(body, d0) ++ ")"
 
+    if k == RvalueKind.RK_ARRAY_FILL:
+        return f"array_fill({mir_operand_text(body, d0, pool, sema)}, count={d1})"
+
     return f"rvalue<{k}>({d0}, {d1}, {d2})"
 
 fn mir_operand_text(body: MirBody, operand_id: i32, pool: InternPool, sema: Sema) -> str:
@@ -1413,6 +1417,10 @@ fn validate_mir_body(body: MirBody) -> str:
         if rv_kind == RvalueKind.RK_LEN:
             if not mir_index_in_range(d0, place_count):
                 return f"rvalue{ri}: len place out of range"
+            continue
+        if rv_kind == RvalueKind.RK_ARRAY_FILL:
+            if not mir_index_in_range(d0, operand_count):
+                return f"rvalue{ri}: array_fill operand out of range"
             continue
 
         return f"rvalue{ri}: unknown rvalue kind {rv_kind}"

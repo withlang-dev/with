@@ -1,3 +1,4 @@
+use Archive
 use compiler.Runtime
 
 extern let with_embedded_cimport_stubs_o_start: u8
@@ -381,13 +382,9 @@ fn link_stage_make_archive(obj_path: str) -> str:
     link_stage_make_archive_to_path(obj_path, ar_path)
 
 fn link_stage_make_archive_to_path(obj_path: str, ar_path: str) -> str:
-    var argv = ""
-    argv = link_stage_argv_append(argv, "libtool")
-    argv = link_stage_argv_append(argv, "-static")
-    argv = link_stage_argv_append(argv, "-o")
-    argv = link_stage_argv_append(argv, ar_path)
-    argv = link_stage_argv_append(argv, obj_path)
-    let rc = runtime_exec_argv(argv)
+    let members: Vec[str] = Vec.new()
+    members.push(obj_path)
+    let rc = create_static_archive(ar_path, members)
     if rc == 0:
         return ar_path
     ""
