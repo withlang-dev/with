@@ -30,32 +30,33 @@ pipelines, or multi-binary builds.
 with init my_app
 cd my_app
 with build
-with run src/main.w
+with run main.w
 ```
 
 This produces:
 
 ```
 my_app/
+  main.w
   with.toml
-  src/main.w
+  build.w
+  README.md
+  AGENTS.md
+  CLAUDE.md
+  .gitignore
+  test/
+    test_main.w
 ```
+
+`with init` also runs `git init` if git is available (fails silently if not).
 
 Options:
 
 ```sh
-with init              # interactive, asks for name
-with init --lib        # library project (src/lib.w, no main)
-with init --name foo   # non-interactive
-```
-
-### Minimal Project Structure
-
-```
-my_app/
-  with.toml
-  src/main.w
-  tests/smoke.w        # optional
+with init              # init in current directory, name from dirname
+with init my_app       # create my_app/ directory
+with init --lib        # library project (lib.w, no main)
+with init --name foo   # override project name
 ```
 
 ---
@@ -285,8 +286,8 @@ use std.build
 
 comptime with BuildCtx as ctx:
 pub fn build -> Build:
-    var out = ctx.new_build().executable("my_app", "src/main.w")
-    out = out.test("test", "tests/*.w")
+    var out = ctx.new_build().executable("my_app", "main.w")
+    out = out.test("test", "test/*.w")
     out.default("my_app")
 ```
 
@@ -295,7 +296,8 @@ selects the requested target closure, and executes it.
 
 ### Default Recipe
 
-If no `build.w` exists but `src/main.w` does, the driver synthesizes:
+If no `build.w` exists but `main.w` (or `src/main.w`) does, the driver
+synthesizes:
 
 ```with
 use std.build
@@ -303,7 +305,7 @@ use std.build
 comptime with BuildCtx as ctx:
 pub fn build -> Build:
     let info = ctx.project_info()
-    ctx.new_build().executable(info.package_name(), "src/main.w")
+    ctx.new_build().executable(info.package_name(), "main.w")
 ```
 
 ---

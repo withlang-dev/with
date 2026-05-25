@@ -1309,9 +1309,8 @@ Useful project facts for AI contributors:
 - The With compiler is self-hosting.
 - Bootstrap uses a multi-stage fixpoint; stage outputs should match.
 - LLVM is the backend.
-- Current build may still use Make.
-- Planned build system: `build.w` using With code.
-- `with build`, `with run`, `with test`, `with fmt`, `with doc`, `with repl` are the intended CLI surface.
+- Build system: `build.w` using With code (`with build`).
+- `with build`, `with run`, `with test`, `with fmt`, `with doc`, `with repl` are the CLI surface.
 - `with migrate` translates C source to With.
 - C interop is a day-zero requirement.
 ```

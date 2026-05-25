@@ -467,7 +467,7 @@ fn bs_check_init_common_files(ctx: ActionCtx, project_dir: str, package_name: st
     if rc != 0: return rc
     rc = bs_expect_file(ctx, bs_join(project_dir, "CLAUDE.md"), label ++ " claude")
     if rc != 0: return rc
-    rc = bs_expect_file(ctx, bs_join(project_dir, "tests/smoke.w"), label ++ " smoke test")
+    rc = bs_expect_file(ctx, bs_join(project_dir, "test/test_main.w"), label ++ " test")
     if rc != 0: return rc
     rc = bs_expect_file_contains(ctx, bs_join(project_dir, "with.toml"), "[package]", label ++ " manifest package section")
     if rc != 0: return rc
@@ -475,7 +475,7 @@ fn bs_check_init_common_files(ctx: ActionCtx, project_dir: str, package_name: st
     if rc != 0: return rc
     rc = bs_expect_file_contains(ctx, bs_join(project_dir, "README.md"), "# " ++ package_name, label ++ " readme title")
     if rc != 0: return rc
-    rc = bs_expect_file_contains(ctx, bs_join(project_dir, ".gitignore"), ".with/", label ++ " gitignore with cache")
+    rc = bs_expect_file_contains(ctx, bs_join(project_dir, ".gitignore"), "out/", label ++ " gitignore out")
     if rc != 0: return rc
     bs_check_init_ai_docs(ctx, project_dir, label)
 
@@ -487,13 +487,13 @@ fn bs_check_init_in_cwd(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i3
     if result.rc != 0: return result.rc
     var rc = bs_expect_file(ctx, bs_join(case_dir, "with.toml"), "init_in_cwd manifest")
     if rc != 0: return rc
-    rc = bs_expect_file(ctx, bs_join(case_dir, "src/main.w"), "init_in_cwd main")
+    rc = bs_expect_file(ctx, bs_join(case_dir, "main.w"), "init_in_cwd main")
     if rc != 0: return rc
     rc = bs_check_init_common_files(ctx, case_dir, expected_name, "init_in_cwd")
     if rc != 0: return rc
     rc = bs_expect_absent(ctx, bs_join(bs_join(case_dir, expected_name), "with.toml"), "init_in_cwd nested manifest")
     if rc != 0: return rc
-    rc = bs_expect_absent(ctx, bs_join(bs_join(bs_join(case_dir, expected_name), "src"), "main.w"), "init_in_cwd nested main")
+    rc = bs_expect_absent(ctx, bs_join(bs_join(case_dir, expected_name), "main.w"), "init_in_cwd nested main")
     if rc != 0: return rc
     rc = bs_expect_file_contains(ctx, bs_join(case_dir, "with.toml"), "name = \"" ++ expected_name ++ "\"", "init_in_cwd manifest name")
     if rc != 0: return rc
@@ -511,13 +511,13 @@ fn bs_check_init_named_dir(ctx: ActionCtx, compiler_path: str, case_dir: str) ->
     let project_dir = bs_join(case_dir, project_name)
     var rc = bs_expect_file(ctx, bs_join(project_dir, "with.toml"), "init_named_dir manifest")
     if rc != 0: return rc
-    rc = bs_expect_file(ctx, bs_join(project_dir, "src/main.w"), "init_named_dir main")
+    rc = bs_expect_file(ctx, bs_join(project_dir, "main.w"), "init_named_dir main")
     if rc != 0: return rc
     rc = bs_check_init_common_files(ctx, project_dir, project_name, "init_named_dir")
     if rc != 0: return rc
     rc = bs_expect_absent(ctx, bs_join(case_dir, "with.toml"), "init_named_dir root manifest")
     if rc != 0: return rc
-    rc = bs_expect_absent(ctx, bs_join(case_dir, "src/main.w"), "init_named_dir root main")
+    rc = bs_expect_absent(ctx, bs_join(case_dir, "main.w"), "init_named_dir root main")
     if rc != 0: return rc
     rc = bs_expect_file_contains(ctx, bs_join(project_dir, "with.toml"), "name = \"" ++ project_name ++ "\"", "init_named_dir manifest name")
     if rc != 0: return rc
@@ -525,7 +525,7 @@ fn bs_check_init_named_dir(ctx: ActionCtx, compiler_path: str, case_dir: str) ->
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, result.stderr, "  " ++ project_name ++ "/with.toml", "init_named_dir manifest path")
     if rc != 0: return rc
-    bs_assert_contains(ctx, result.stderr, "  " ++ project_name ++ "/src/main.w", "init_named_dir main path")
+    bs_assert_contains(ctx, result.stderr, "  " ++ project_name ++ "/main.w", "init_named_dir main path")
 
 fn bs_check_build_uses_package_section_name(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "pkgdemo")
