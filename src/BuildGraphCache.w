@@ -2,7 +2,6 @@
 
 use BuildGraphModel
 use BuildGraphRuntime
-use BuildGraphSupport
 
 extern fn with_str_hash(s: str) -> i64
 
@@ -68,31 +67,16 @@ fn build_cache_is_stage_target(target: BuildGraphTarget) -> bool:
 
 fn build_cache_list_w_files(root: str, dir: str) -> Vec[str]:
     let full_dir = root ++ "/" ++ dir
-    if build_graph_rt_mkdir_p("out/tmp") != 0:
-        return Vec.new()
-    let stamp = f"{build_graph_rt_getpid()}.{build_graph_rt_clock_nanos()}"
-    let manifest_path = root ++ "/out/tmp/cache-find." ++ stamp ++ ".txt"
-    let err_path = manifest_path ++ ".stderr"
-    var argv = ""
-    argv = build_graph_argv_append(argv, "/usr/bin/find")
-    argv = build_graph_argv_append(argv, full_dir)
-    argv = build_graph_argv_append(argv, "-maxdepth")
-    argv = build_graph_argv_append(argv, "1")
-    argv = build_graph_argv_append(argv, "-type")
-    argv = build_graph_argv_append(argv, "f")
-    argv = build_graph_argv_append(argv, "-name")
-    argv = build_graph_argv_append(argv, "*.w")
-    let rc = build_graph_rt_exec_argv_capture(argv, manifest_path, err_path, 60000)
-    if rc != 0:
-        let _ = build_graph_rt_remove_file(manifest_path)
-        let _ = build_graph_rt_remove_file(err_path)
-        return Vec.new()
-    let listing = build_graph_rt_read_file(manifest_path)
-    let _ = build_graph_rt_remove_file(manifest_path)
-    let _ = build_graph_rt_remove_file(err_path)
+    let listing = build_graph_rt_list_files(full_dir)
     if listing.len() == 0:
         return Vec.new()
-    build_cache_sorted_strings(build_cache_split_lines(listing))
+    let all_files = build_cache_split_lines(listing)
+    let w_files: Vec[str] = Vec.new()
+    for i in 0..all_files.len() as i32:
+        let path = all_files.get(i as i64)
+        if path.ends_with(".w"):
+            w_files.push(path)
+    build_cache_sorted_strings(w_files)
 
 fn build_cache_split_lines(text: str) -> Vec[str]:
     let lines: Vec[str] = Vec.new()
