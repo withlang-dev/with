@@ -2,6 +2,7 @@
 
 use BuildGraphModel
 use BuildGraphRuntime
+use BuildGraphSupport
 
 extern fn with_str_hash(s: str) -> i64
 
@@ -37,7 +38,123 @@ pub fn build_cache_fingerprint_file(path: str) -> i64:
     let contents = build_graph_rt_read_file(path)
     with_str_hash(contents)
 
-fn build_cache_compute_signature(target: BuildGraphTarget) -> i64:
+fn build_cache_target_has_arg(target: BuildGraphTarget, needle: str) -> bool:
+    for i in 0..target.args.len() as i32:
+        if target.args.get(i as i64) == needle:
+            return true
+    false
+
+fn build_cache_target_compiler_path(root: str, target: BuildGraphTarget) -> str:
+    for i in 0..target.args.len() as i32:
+        let arg = target.args.get(i as i64)
+        if arg.starts_with("compiler="):
+            let path = arg.slice(9, arg.len())
+            if path == "seed":
+                return ""
+            return root ++ "/" ++ path
+    ""
+
+fn build_cache_is_stage_target(target: BuildGraphTarget) -> bool:
+    if target.kind != 23:
+        return false
+    var has_compiler = false
+    for i in 0..target.args.len() as i32:
+        let arg = target.args.get(i as i64)
+        if arg == "--no-prelude":
+            return false
+        if arg.starts_with("compiler="):
+            has_compiler = true
+    has_compiler
+
+fn build_cache_list_w_files(root: str, dir: str) -> Vec[str]:
+    let full_dir = root ++ "/" ++ dir
+    if build_graph_rt_mkdir_p("out/tmp") != 0:
+        return Vec.new()
+    let stamp = f"{build_graph_rt_getpid()}.{build_graph_rt_clock_nanos()}"
+    let manifest_path = root ++ "/out/tmp/cache-find." ++ stamp ++ ".txt"
+    let err_path = manifest_path ++ ".stderr"
+    var argv = ""
+    argv = build_graph_argv_append(argv, "/usr/bin/find")
+    argv = build_graph_argv_append(argv, full_dir)
+    argv = build_graph_argv_append(argv, "-maxdepth")
+    argv = build_graph_argv_append(argv, "1")
+    argv = build_graph_argv_append(argv, "-type")
+    argv = build_graph_argv_append(argv, "f")
+    argv = build_graph_argv_append(argv, "-name")
+    argv = build_graph_argv_append(argv, "*.w")
+    let rc = build_graph_rt_exec_argv_capture(argv, manifest_path, err_path, 60000)
+    if rc != 0:
+        let _ = build_graph_rt_remove_file(manifest_path)
+        let _ = build_graph_rt_remove_file(err_path)
+        return Vec.new()
+    let listing = build_graph_rt_read_file(manifest_path)
+    let _ = build_graph_rt_remove_file(manifest_path)
+    let _ = build_graph_rt_remove_file(err_path)
+    if listing.len() == 0:
+        return Vec.new()
+    build_cache_sorted_strings(build_cache_split_lines(listing))
+
+fn build_cache_split_lines(text: str) -> Vec[str]:
+    let lines: Vec[str] = Vec.new()
+    let text_len = text.len() as i32
+    var start = 0
+    var i = 0
+    while i <= text_len:
+        var ch = 10
+        if i < text_len:
+            ch = text.byte_at(i as i64)
+        if ch == 10:
+            var line = text.slice(start as i64, i as i64)
+            if line.len() > 0 and line.byte_at(line.len() as i64 - 1) == 13:
+                line = line.slice(0, line.len() - 1)
+            if line.len() > 0:
+                lines.push(line)
+            start = i + 1
+        i = i + 1
+    lines
+
+fn build_cache_str_compare(a: str, b: str) -> i32:
+    let min_len = if a.len() < b.len(): a.len() else: b.len()
+    var i = 0
+    while i < min_len as i32:
+        let ac = a.byte_at(i as i64)
+        let bc = b.byte_at(i as i64)
+        if ac != bc:
+            return ac - bc
+        i = i + 1
+    if a.len() == b.len():
+        return 0
+    if a.len() < b.len():
+        return -1
+    1
+
+fn build_cache_sorted_strings(items: Vec[str]) -> Vec[str]:
+    var sorted: Vec[str] = Vec.new()
+    for i in 0..items.len() as i32:
+        let item = items.get(i as i64)
+        var inserted = false
+        var out: Vec[str] = Vec.new()
+        for j in 0..sorted.len() as i32:
+            let existing = sorted.get(j as i64)
+            if not inserted and build_cache_str_compare(item, existing) < 0:
+                out.push(item)
+                inserted = true
+            out.push(existing)
+        if not inserted:
+            out.push(item)
+        sorted = out
+    sorted
+
+pub fn build_cache_hash_directory_w_files(root: str, dir: str) -> i64:
+    let files = build_cache_list_w_files(root, dir)
+    var combined = ""
+    for i in 0..files.len() as i32:
+        let path = files.get(i as i64)
+        let contents = build_graph_rt_read_file(path)
+        combined = combined ++ path ++ ":" ++ f"{with_str_hash(contents)}" ++ "\n"
+    with_str_hash(combined)
+
+fn build_cache_compute_signature(target: BuildGraphTarget, root: str) -> i64:
     var sig = f"{target.kind}:{target.name}:{target.entry}:{target.output}"
     sig = sig ++ f":{target.optimize_mode}:{target.target_kind}"
     for i in 0..target.args.len() as i32:
@@ -48,6 +165,13 @@ fn build_cache_compute_signature(target: BuildGraphTarget) -> i64:
         sig = sig ++ ":I:" ++ target.include_paths.get(i as i64)
     for i in 0..target.system_libs.len() as i32:
         sig = sig ++ ":L:" ++ target.system_libs.get(i as i64)
+    if build_cache_is_stage_target(target):
+        let src_hash = build_cache_hash_directory_w_files(root, "src")
+        sig = sig ++ f":SRC:{src_hash}"
+        let compiler_path = build_cache_target_compiler_path(root, target)
+        if compiler_path.len() > 0:
+            let compiler_hash = build_cache_fingerprint_file(compiler_path)
+            sig = sig ++ f":COMPILER:{compiler_hash}"
     with_str_hash(sig)
 
 fn build_cache_collect_input_paths(root: str, target: BuildGraphTarget) -> Vec[str]:
@@ -79,7 +203,7 @@ pub fn build_cache_check_fresh(root: str, target: BuildGraphTarget, dep_rebuilt:
     let state_text = build_graph_rt_read_file(state_path)
     if state_text.len() == 0:
         return false
-    let expected_sig = build_cache_compute_signature(target)
+    let expected_sig = build_cache_compute_signature(target, root)
     var state_sig: i64 = 0
     var input_hashes: Vec[str] = Vec.new()
     var output_hashes: Vec[str] = Vec.new()
@@ -135,7 +259,7 @@ pub fn build_cache_record(root: str, target: BuildGraphTarget):
     let state_dir = build_cache_state_dir(root)
     let _ = build_graph_rt_mkdir_p(state_dir)
     let state_path = build_cache_state_path(root, target.name)
-    let sig = build_cache_compute_signature(target)
+    let sig = build_cache_compute_signature(target, root)
     var content = f"v1\nsig:{sig}\n"
     let input_paths = build_cache_collect_input_paths(root, target)
     for idx in 0..input_paths.len() as i32:
