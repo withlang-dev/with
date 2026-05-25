@@ -115,9 +115,9 @@ pub fn build_graph_dispatch_standard_target(root: str, target: BuildGraphTarget,
     if target.kind == 12:
         return build_graph_dispatch_result(true, build_graph_compile_object(root, target, "compile_c_object", build_graph_cc_tool().executable))
     if target.kind == 13:
-        return build_graph_dispatch_result(true, build_graph_compile_object(root, target, "compile_asm_object", build_graph_cc_tool().executable))
+        return build_graph_dispatch_result(true, build_graph_assemble_to_object(root, target))
     if target.kind == 14:
-        return build_graph_dispatch_result(true, build_graph_compile_object(root, target, "compile_llvm_ir_object", build_graph_llvm_clang_tool().executable))
+        return build_graph_dispatch_result(true, build_graph_compile_ir_to_object(root, target))
     if target.kind == 15:
         return build_graph_dispatch_result(true, build_graph_create_archive(root, target))
     if target.kind == 16:

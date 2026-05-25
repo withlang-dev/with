@@ -144,6 +144,42 @@ pub fn build_graph_compile_object(root: str, target: BuildGraphTarget, operation
     argv = build_graph_argv_append(argv, output_path)
     build_graph_exec_argv(target, operation_name, argv)
 
+pub fn build_graph_assemble_to_object(root: str, target: BuildGraphTarget) -> i32:
+    if target.entry.len() == 0 or target.output.len() == 0:
+        build_graph_rt_eprint("error: compile_asm_object target '" ++ target.name ++ "' requires source and output paths")
+        return 1
+    let source_path = build_graph_resolve_project_path(root, target.entry)
+    let output_path = build_graph_resolve_project_path(root, target.output)
+    if build_graph_rt_file_exists(source_path) == 0:
+        build_graph_rt_eprint("error: compile_asm_object target '" ++ target.name ++ "' missing source: " ++ source_path)
+        return 1
+    let output_dir = build_graph_dirname(output_path)
+    if build_graph_rt_mkdir_p(output_dir) != 0:
+        build_graph_rt_eprint("error: could not create object output directory for target '" ++ target.name ++ "': " ++ output_dir)
+        return 1
+    let rc = build_graph_rt_assemble_to_object(source_path, output_path)
+    if rc != 0:
+        build_graph_rt_eprint("error: compile_asm_object target '" ++ target.name ++ "' failed")
+    rc
+
+pub fn build_graph_compile_ir_to_object(root: str, target: BuildGraphTarget) -> i32:
+    if target.entry.len() == 0 or target.output.len() == 0:
+        build_graph_rt_eprint("error: compile_llvm_ir_object target '" ++ target.name ++ "' requires source and output paths")
+        return 1
+    let source_path = build_graph_resolve_project_path(root, target.entry)
+    let output_path = build_graph_resolve_project_path(root, target.output)
+    if build_graph_rt_file_exists(source_path) == 0:
+        build_graph_rt_eprint("error: compile_llvm_ir_object target '" ++ target.name ++ "' missing source: " ++ source_path)
+        return 1
+    let output_dir = build_graph_dirname(output_path)
+    if build_graph_rt_mkdir_p(output_dir) != 0:
+        build_graph_rt_eprint("error: could not create object output directory for target '" ++ target.name ++ "': " ++ output_dir)
+        return 1
+    let rc = build_graph_rt_compile_ir_to_object(source_path, output_path)
+    if rc != 0:
+        build_graph_rt_eprint("error: compile_llvm_ir_object target '" ++ target.name ++ "' failed")
+    rc
+
 fn build_graph_archive_member_seen(inputs: Vec[str], count: i32, basename: str) -> bool:
     for i in 0..count:
         if build_graph_path_basename(inputs.get(i as i64)) == basename:
