@@ -503,20 +503,110 @@ pub fn run_check_committed_state_action(ctx: ActionCtx) -> i32:
     for i in 0..args.len() as i32:
         if args.get(i as i64) == "--force":
             return 0
-    let proc = ctx.process_runner()
     let fs = ctx.fs()
-    let stdout_path = "out/command/" ++ ctx.target_name() ++ "/stdout"
-    let stderr_path = "out/command/" ++ ctx.target_name() ++ "/stderr"
-    fs.mkdir_all("out/command/" ++ ctx.target_name())
-    let git_args: Vec[str] = Vec.new()
-    git_args.push("git")
-    git_args.push("status")
-    git_args.push("--porcelain")
-    let result = proc.run_capture(git_args, stdout_path, stderr_path, 30000)
-    if result.rc != 0:
-        return comp_fail(ctx, "git status failed (rc=" ++ f"{result.rc}" ++ ")")
-    if result.stdout.len() > 0:
-        ctx.diagnostics().error(ctx.target_name() ++ ": uncommitted changes detected; commit before installing or pass --force arg")
+    let manifest = fs.read_text("out/.build-state/blessed-manifest")
+    if manifest.len() == 0:
+        ctx.diagnostics().error("no blessed manifest found; run `with build :fixpoint` first or pass --force")
+        return 1
+    let changed = comp_check_manifest(fs, manifest)
+    if changed.len() > 0:
+        ctx.diagnostics().error("source files changed since last fixpoint:\n" ++ changed ++ "run `with build :fixpoint` to re-bless, or pass --force")
         return 1
     fs.write_text("out/command/" ++ ctx.target_name() ++ "/ok", "ok\n")
     0
+
+pub fn run_bless_manifest_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    fs.mkdir_all("out/.build-state")
+    let manifest = comp_build_source_manifest(fs)
+    if manifest.len() == 0:
+        return comp_fail(ctx, "could not build source manifest")
+    if fs.write_text("out/.build-state/blessed-manifest", manifest) != 0:
+        return comp_fail(ctx, "could not write blessed-manifest")
+    0
+
+fn comp_build_source_manifest(fs: ToolFs) -> str:
+    let dirs: Vec[str] = Vec.new()
+    dirs.push("src")
+    dirs.push("rt")
+    dirs.push("lib/std")
+    let all_files: Vec[str] = Vec.new()
+    for di in 0..dirs.len() as i32:
+        let dir = dirs.get(di as i64)
+        let listing = fs.list_files(dir)
+        for fi in 0..listing.len() as i32:
+            let path = listing.get(fi as i64)
+            if path.ends_with(".w"):
+                all_files.push(path)
+    all_files.push("build.w")
+    all_files.push("build_compiler.w")
+    let sorted = comp_sort_strings(all_files)
+    var manifest = ""
+    for i in 0..sorted.len() as i32:
+        let path = sorted.get(i as i64)
+        let contents = fs.read_text(path)
+        let hash = comp_fnv1a(contents)
+        manifest = manifest ++ path ++ ":" ++ f"{hash}" ++ "\n"
+    manifest
+
+fn comp_check_manifest(fs: ToolFs, manifest: str) -> str:
+    var changed = ""
+    var line_start: i64 = 0
+    for i in 0..manifest.len() as i32:
+        if manifest.byte_at(i as i64) == 10:
+            let line = manifest.slice(line_start, i as i64)
+            if line.len() > 0:
+                let sep = comp_last_colon_pos(line)
+                if sep > 0:
+                    let path = line.slice(0, sep)
+                    let expected_str = line.slice(sep + 1, line.len())
+                    let contents = fs.read_text(path)
+                    let actual = comp_fnv1a(contents)
+                    if f"{actual}" != expected_str:
+                        changed = changed ++ "  " ++ path ++ "\n"
+            line_start = i as i64 + 1
+    changed
+
+fn comp_fnv1a(s: str) -> i64:
+    var h: i64 = -3750763034362895579
+    for i in 0..s.len() as i32:
+        h = h ^ (s.byte_at(i as i64) as i64)
+        h = h * 1099511628211
+    h
+
+fn comp_last_colon_pos(line: str) -> i64:
+    var pos: i64 = -1
+    for i in 0..line.len() as i32:
+        if line.byte_at(i as i64) == 58:
+            pos = i as i64
+    pos
+
+fn comp_str_compare(a: str, b: str) -> i32:
+    let min_len = if a.len() < b.len(): a.len() else: b.len()
+    for i in 0..min_len as i32:
+        let ac = a.byte_at(i as i64)
+        let bc = b.byte_at(i as i64)
+        if ac != bc:
+            return ac - bc
+    if a.len() == b.len():
+        return 0
+    if a.len() < b.len():
+        return -1
+    1
+
+fn comp_sort_strings(items: Vec[str]) -> Vec[str]:
+    var sorted: Vec[str] = Vec.new()
+    for i in 0..items.len() as i32:
+        let item = items.get(i as i64)
+        var inserted = false
+        var out: Vec[str] = Vec.new()
+        for j in 0..sorted.len() as i32:
+            let existing = sorted.get(j as i64)
+            if not inserted and comp_str_compare(item, existing) < 0:
+                out.push(item)
+                inserted = true
+            out.push(existing)
+        if not inserted:
+            out.push(item)
+        sorted = out
+    sorted

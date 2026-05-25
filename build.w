@@ -317,10 +317,21 @@ pub fn build(ctx: BuildCtx) -> Build:
     selfcheck = selfcheck.dep("stage2")
     out = out.add_target(selfcheck)
 
-    var fixpoint = target_new(.FixpointCompare, "fixpoint", "out/bin/with-stage2-fixpoint.o")
-    fixpoint = fixpoint.arg("out/bin/with-stage3-fixpoint.o")
-    fixpoint = fixpoint.dep("stage2-fixpoint-object")
-    fixpoint = fixpoint.dep("stage3-fixpoint-object")
+    var fixpoint_compare = target_new(.FixpointCompare, "fixpoint-compare", "out/bin/with-stage2-fixpoint.o")
+    fixpoint_compare = fixpoint_compare.arg("out/bin/with-stage3-fixpoint.o")
+    fixpoint_compare = fixpoint_compare.dep("stage2-fixpoint-object")
+    fixpoint_compare = fixpoint_compare.dep("stage3-fixpoint-object")
+    out = out.add_target(fixpoint_compare)
+
+    var bless_manifest = target_new(.Action, "bless-manifest", "").output("out/.build-state/blessed-manifest")
+    bless_manifest.action = run_bless_manifest_action
+    bless_manifest = bless_manifest.write_scope("out/.build-state")
+    bless_manifest = bless_manifest.dep("fixpoint-compare")
+    out = out.add_target(bless_manifest)
+
+    var fixpoint = target_new(.Group, "fixpoint", "")
+    fixpoint = fixpoint.dep("fixpoint-compare")
+    fixpoint = fixpoint.dep("bless-manifest")
     out = out.add_target(fixpoint)
 
     var verified = target_new(.Group, "verified-existing-stage", "")
@@ -559,6 +570,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     install_user = install_user.input("out/bin/with")
     install_user = install_user.arg("0755")
     install_user = install_user.dep("build")
+    install_user = install_user.dep("bless-manifest")
     install_user = install_user.dep("check-committed-state")
     out = out.add_target(install_user)
 
@@ -612,6 +624,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     update_seed = update_seed.input("out/bin/with-stage2")
     update_seed = update_seed.arg("0755")
     update_seed = update_seed.dep("verified-existing-stage")
+    update_seed = update_seed.dep("bless-manifest")
     update_seed = update_seed.dep("check-committed-state")
     out = out.add_target(update_seed)
 
