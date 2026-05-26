@@ -90,11 +90,13 @@ git push origin v0.14.0
 Prepare the platform-named asset:
 
 ```sh
-mkdir -p out/release
-cp out/bin/with out/release/with-darwin-aarch64
-cp scripts/install.sh out/release/install.sh
-shasum -a 256 out/release/with-darwin-aarch64
+scripts/package-darwin-aarch64.sh
 ```
+
+This produces `out/release/with-darwin-aarch64` and `out/release/install.sh`.
+The public Darwin bootstrap binary intentionally excludes `clang_bridge.o` and
+must not have an `@rpath/libclang.dylib` load command. The package script checks
+that with `otool -L`.
 
 Create the GitHub release:
 
