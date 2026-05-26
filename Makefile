@@ -248,7 +248,7 @@ __seed:
 			gh release list --repo "$$repo" --limit 10 --json tagName,isDraft -q '.[] | select(.isDraft | not) | .tagName' 2>/dev/null | \
 			while IFS= read -r candidate; do \
 				if [ -z "$$candidate" ]; then continue; fi; \
-				if gh release view "$$candidate" --repo "$$repo" --json assets -q '.assets[].name' 2>/dev/null | grep -qx main; then \
+				if gh release view "$$candidate" --repo "$$repo" --json assets -q '.assets[].name' 2>/dev/null | grep -qx with-darwin-aarch64; then \
 					printf '%s\n' "$$candidate"; \
 					break; \
 				fi; \
@@ -263,7 +263,7 @@ __seed:
 		fi; \
 		echo "latest seed release: $$tag"; \
 	fi; \
-	url="https://github.com/$$repo/releases/download/$$tag/main"; \
+	url="https://github.com/$$repo/releases/download/$$tag/with-darwin-aarch64"; \
 	echo "downloading seed from: $$url"; \
 	curl -fSL -o "$$dest" "$$url"; \
 	chmod +x "$$dest"; \

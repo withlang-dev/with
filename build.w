@@ -614,7 +614,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     seed.action = run_seed_download_action
     seed = seed.write_scope("out/tmp")
     seed = seed.arg("withlang-dev/with")
-    seed = seed.arg("main")
+    seed = seed.arg("with-darwin-aarch64")
     out = out.add_target(seed)
 
     var update_seed = target_new(.Install, "update-seed", "out/bin/with-stage2").output("src/main")
