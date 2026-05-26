@@ -42,12 +42,23 @@ let config = with Config.default() as mut c:
 
 ## Quick Start
 
-Download a [pre-built binary](https://github.com/withlang-dev/with/releases)
-and add it to your PATH, or build from source (see below).
+Install the latest Darwin arm64 binary:
+
+```sh
+mkdir -p ~/.local/bin && \
+curl -fL https://github.com/withlang-dev/with/releases/latest/download/with-darwin-aarch64 -o ~/.local/bin/with && \
+chmod +x ~/.local/bin/with && \
+~/.local/bin/with version
+```
+
+Make sure `~/.local/bin` is on your PATH, then run:
 
 ```sh
 with run examples/hello.w
 ```
+
+All release binaries are listed on the
+[releases page](https://github.com/withlang-dev/with/releases).
 
 ## Building from Source
 
