@@ -688,7 +688,7 @@ fn run_cli(argc: i32) -> i32:
     if cli_command(argc) == "bench":
         return run_bench_command(argc, opt_level, no_std, alloc_mode, prelude_mode, debug_info)
     if cli_command(argc) == "version" or cli_command(argc) == "--version":
-        with_write("with " ++ "WITH_VERSION" ++ "_PLACEHOLDER\n")
+        with_write("with WITH_VERSION_PLACEHOLDER\n")
         return 0
     if cli_command(argc) == "help" or cli_command(argc) == "--help" or cli_command(argc) == "-h":
         return run_help_command(argc)
