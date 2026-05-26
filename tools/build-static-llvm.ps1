@@ -1,0 +1,86 @@
+$ErrorActionPreference = "Stop"
+
+$LLVM_VERSION = if ($env:LLVM_VERSION) { $env:LLVM_VERSION } else { "22.1.6" }
+$LLVM_TAG = "llvmorg-$LLVM_VERSION"
+$LLVM_SOURCE_SHA256 = if ($env:LLVM_SOURCE_SHA256) { $env:LLVM_SOURCE_SHA256 } else { "6e0b376a1f6d9873e7dfb09ae6e04b9c7024400f01733fa4c29be69d5c138bc2" }
+$TARGETS = if ($env:LLVM_TARGETS_TO_BUILD) { $env:LLVM_TARGETS_TO_BUILD } else { "AArch64;X86" }
+
+$ROOT = if ($env:ROOT) { $env:ROOT } else { Join-Path (Get-Location) ".deps" }
+$HOST_TAG = if ($env:HOST_TAG) { $env:HOST_TAG } else { "windows-x86_64-msvc" }
+$SRC_DIR = Join-Path $ROOT "src"
+$BUILD_DIR = Join-Path $ROOT "build\llvm-$LLVM_VERSION-$HOST_TAG"
+$INSTALL_PREFIX = if ($env:INSTALL_PREFIX) { $env:INSTALL_PREFIX } else { Join-Path $ROOT "llvm-$LLVM_VERSION-$HOST_TAG" }
+
+function Require-Tool($name) {
+  if (-not (Get-Command $name -ErrorAction SilentlyContinue)) {
+    throw "missing required tool: $name"
+  }
+}
+
+Require-Tool "curl.exe"
+Require-Tool "tar.exe"
+Require-Tool "cmake.exe"
+Require-Tool "ninja.exe"
+
+New-Item -ItemType Directory -Force -Path $SRC_DIR | Out-Null
+New-Item -ItemType Directory -Force -Path $BUILD_DIR | Out-Null
+Set-Location $SRC_DIR
+
+$archive = "llvm-project-$LLVM_VERSION.src.tar.xz"
+$sourceDir = "llvm-project-$LLVM_VERSION.src"
+
+if (-not (Test-Path $sourceDir)) {
+  if (-not (Test-Path $archive)) {
+    curl.exe -L -O "https://github.com/llvm/llvm-project/releases/download/$LLVM_TAG/$archive"
+  }
+
+  $hash = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+  if ($hash -ne $LLVM_SOURCE_SHA256) {
+    throw "bad llvm source hash: $hash"
+  }
+
+  tar.exe -xf $archive
+}
+
+cmake.exe -S (Join-Path $SRC_DIR "$sourceDir\llvm") `
+  -B $BUILD_DIR `
+  -G Ninja `
+  -DCMAKE_BUILD_TYPE=Release `
+  -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" `
+  -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded `
+  -DLLVM_ENABLE_PROJECTS="clang;lld" `
+  -DLLVM_TARGETS_TO_BUILD="$TARGETS" `
+  -DLIBCLANG_BUILD_STATIC=ON `
+  -DLLVM_ENABLE_PIC=OFF `
+  -DBUILD_SHARED_LIBS=OFF `
+  -DLLVM_BUILD_LLVM_DYLIB=OFF `
+  -DLLVM_LINK_LLVM_DYLIB=OFF `
+  -DCLANG_LINK_CLANG_DYLIB=OFF `
+  -DLLVM_INCLUDE_TESTS=OFF `
+  -DLLVM_INCLUDE_BENCHMARKS=OFF `
+  -DLLVM_INCLUDE_EXAMPLES=OFF `
+  -DCLANG_INCLUDE_TESTS=OFF `
+  -DCLANG_BUILD_EXAMPLES=OFF `
+  -DLLVM_ENABLE_ZLIB=OFF `
+  -DLLVM_ENABLE_ZSTD=OFF
+
+cmake.exe --build $BUILD_DIR --target install --parallel
+
+$libclang = Join-Path $INSTALL_PREFIX "lib\libclang.lib"
+if (-not (Test-Path $libclang)) {
+  throw "static libclang archive was not installed: $libclang"
+}
+
+$nm = Join-Path $INSTALL_PREFIX "bin\llvm-nm.exe"
+if (-not (Test-Path $nm)) {
+  throw "missing llvm-nm in static SDK: $nm"
+}
+
+& $nm -g $libclang | findstr "clang_createIndex" | Out-Null
+if ($LASTEXITCODE -ne 0) {
+  throw "$libclang does not export clang_createIndex"
+}
+
+Write-Host "static LLVM SDK ready: $INSTALL_PREFIX"
+Write-Host "`$env:LLVM_PREFIX=`"$INSTALL_PREFIX`""
+Write-Host "`$env:WITH_LIBCLANG=`"$libclang`""

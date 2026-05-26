@@ -1,6 +1,7 @@
-module build_emit_c
+module build.emit_c
 
 use std.build
+use std.process
 
 type EmitCParam {
     name: str,
@@ -64,6 +65,19 @@ fn emitc_trim(text: str) -> str:
             break
         end = end - 1
     text.slice(start as i64, end as i64)
+
+fn emitc_c_compiler() -> str:
+    let explicit = env("WITH_EMIT_C_CC")
+    if explicit.len() > 0:
+        return explicit
+    let cc = env("CC")
+    if cc.len() > 0:
+        return cc
+    "cc"
+
+fn emitc_push_c_compiler(argv: Vec[str]) -> Vec[str]:
+    argv.push(emitc_c_compiler())
+    argv
 
 fn emitc_index_of(text: str, needle: str) -> i32:
     if needle.len() == 0:
@@ -374,8 +388,7 @@ fn emitc_build_compiler_c_workspace(ctx: ActionCtx, source_w: str, main_c: str) 
 fn emitc_compile_c_compiler(ctx: ActionCtx, main_c: str, output_path: str) -> i32:
     let root = ctx.project_info().project_root()
     var argv: Vec[str] = Vec.new()
-    argv |> push("zig")
-    argv |> push("cc")
+    argv = emitc_push_c_compiler(argv)
     argv |> push("-O2")
     argv |> push("-o")
     argv |> push(emitc_abs(root, output_path))
@@ -506,8 +519,7 @@ fn emitc_build_hello_c(ctx: ActionCtx, compiler_path: str, hello_c: str) -> i32:
 fn emitc_compile_hello(ctx: ActionCtx, hello_c: str, output_path: str) -> i32:
     let root = ctx.project_info().project_root()
     var argv: Vec[str] = Vec.new()
-    argv |> push("zig")
-    argv |> push("cc")
+    argv = emitc_push_c_compiler(argv)
     argv |> push("-O2")
     argv |> push("-o")
     argv |> push(emitc_abs(root, output_path))

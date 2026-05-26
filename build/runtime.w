@@ -1,4 +1,4 @@
-module build_runtime
+module build.runtime
 
 use std.build
 

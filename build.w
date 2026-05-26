@@ -1,10 +1,10 @@
 use std.build
-use build_runtime
-use build_selfhost
-use build_pcre2
-use build_seed
-use build_emit_c
-use build_compiler
+use build.runtime
+use build.selfhost
+use build.pcre2
+use build.seed
+use build.emit_c
+use build.compiler
 
 fn build_project_dirname(path: str) -> str:
     var last_slash = -1
@@ -172,6 +172,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.input("out/bootstrap-lib/clang_bridge.o")
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.extra_output("out/bootstrap-lib/llvm_link.rsp")
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.extra_output("out/bootstrap-lib/llvm_cc")
+    bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.extra_output("out/bootstrap-lib/llvm_ld.rsp")
+    bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.extra_output("out/bootstrap-lib/llvm_ld")
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.dep("bootstrap-llvm-bridge-object")
     bootstrap_llvm_link_metadata = bootstrap_llvm_link_metadata.dep("bootstrap-clang-bridge-object")
     out = out.add_target(bootstrap_llvm_link_metadata)
@@ -245,6 +247,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     llvm_link_metadata = llvm_link_metadata.input("out/lib/clang_bridge.o")
     llvm_link_metadata = llvm_link_metadata.extra_output("out/lib/llvm_link.rsp")
     llvm_link_metadata = llvm_link_metadata.extra_output("out/lib/llvm_cc")
+    llvm_link_metadata = llvm_link_metadata.extra_output("out/lib/llvm_ld.rsp")
+    llvm_link_metadata = llvm_link_metadata.extra_output("out/lib/llvm_ld")
     llvm_link_metadata = llvm_link_metadata.dep("llvm-bridge-object")
     llvm_link_metadata = llvm_link_metadata.dep("clang-bridge-object")
     out = out.add_target(llvm_link_metadata)
@@ -589,6 +593,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(install_file_target("install-clang-bridge", "out/lib/clang_bridge.o", "$INSTALL_LIBDIR/clang_bridge.o", "0644", "llvm-link-metadata"))
     out = out.add_target(install_file_target("install-llvm-link-rsp", "out/lib/llvm_link.rsp", "$INSTALL_LIBDIR/llvm_link.rsp", "0644", "llvm-link-metadata"))
     out = out.add_target(install_file_target("install-llvm-cc", "out/lib/llvm_cc", "$INSTALL_LIBDIR/llvm_cc", "0644", "llvm-link-metadata"))
+    out = out.add_target(install_file_target("install-llvm-ld-rsp", "out/lib/llvm_ld.rsp", "$INSTALL_LIBDIR/llvm_ld.rsp", "0644", "llvm-link-metadata"))
+    out = out.add_target(install_file_target("install-llvm-ld", "out/lib/llvm_ld", "$INSTALL_LIBDIR/llvm_ld", "0644", "llvm-link-metadata"))
     var install = target_new(.Group, "install", "")
     install = install.dep("install-compiler")
     install = install.dep("install-rt-core")
@@ -608,6 +614,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     install = install.dep("install-clang-bridge")
     install = install.dep("install-llvm-link-rsp")
     install = install.dep("install-llvm-cc")
+    install = install.dep("install-llvm-ld-rsp")
+    install = install.dep("install-llvm-ld")
     out = out.add_target(install)
 
     var seed = target_new(.Action, "seed", "").output("src/main")

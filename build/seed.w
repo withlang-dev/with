@@ -1,4 +1,4 @@
-module build_seed
+module build.seed
 
 use std.build
 use std.process

@@ -1,4 +1,4 @@
-module build_compiler
+module build.compiler
 
 use std.build
 use std.process
@@ -120,6 +120,9 @@ fn comp_llvm_prefix() -> str:
 fn comp_llvm_clang_tool() -> str:
     comp_tool_from_env("WITH_LLVM_CC", "LLVM_CC", comp_llvm_prefix() ++ "/bin/clang")
 
+fn comp_llvm_lld_tool() -> str:
+    comp_tool_from_env("WITH_LLVM_LD", "LLVM_LD", comp_llvm_prefix() ++ "/bin/ld64.lld")
+
 fn comp_libclang_path() -> str:
     let explicit = env("WITH_LIBCLANG")
     if explicit.len() > 0:
@@ -128,6 +131,21 @@ fn comp_libclang_path() -> str:
     if legacy.len() > 0:
         return legacy
     comp_llvm_prefix() ++ "/lib/libclang.dylib"
+
+fn comp_select_libclang_path(fs: ToolFs) -> str:
+    let explicit = env("WITH_LIBCLANG")
+    if explicit.len() > 0:
+        return explicit
+    let legacy = env("LIBCLANG_FILE")
+    if legacy.len() > 0:
+        return legacy
+    let static_libclang = comp_llvm_prefix() ++ "/lib/libclang.a"
+    if fs.host_exists(static_libclang):
+        return static_libclang
+    ""
+
+fn comp_link_path_is_dynamic(path: str) -> bool:
+    not path.ends_with(".a")
 
 fn comp_host_sdk_path(ctx: ActionCtx) -> str:
     let sdkroot = env("SDKROOT")
@@ -325,42 +343,69 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
         if not fs.exists(input_path):
             return comp_fail(ctx, "missing input: " ++ input_path)
     let llvm_clang = comp_llvm_clang_tool()
-    let libclang = comp_libclang_path()
-    if not fs.host_exists(llvm_clang):
-        return comp_fail(ctx, "missing LLVM clang: " ++ llvm_clang)
+    let llvm_ld = comp_llvm_lld_tool()
+    let libclang = comp_select_libclang_path(fs)
+    if not fs.host_exists(llvm_ld):
+        return comp_fail(ctx, "missing LLVM linker: " ++ llvm_ld)
+    if libclang.len() == 0:
+        return comp_fail(ctx, "missing static libclang archive: " ++ comp_llvm_prefix() ++ "/lib/libclang.a")
+    if not libclang.ends_with(".a"):
+        return comp_fail(ctx, "libclang must be linked statically; expected libclang.a, got: " ++ libclang)
     if not fs.host_exists(libclang):
-        return comp_fail(ctx, "missing libclang: " ++ libclang)
+        return comp_fail(ctx, "missing static libclang archive: " ++ libclang)
     let llvm_lib_dir = comp_llvm_prefix() ++ "/lib"
     let lib_files = fs.host_list_files(llvm_lib_dir)
     if lib_files.len() == 0:
         return comp_fail(ctx, "could not list: " ++ llvm_lib_dir)
-    var rsp = ""
+    var clang_archives: Vec[str] = Vec.new()
+    var llvm_archives: Vec[str] = Vec.new()
     for i in 0..lib_files.len() as i32:
         let path = lib_files.get(i as i64)
         let name = comp_path_basename(path)
         if name.ends_with(".a"):
-            if name.starts_with("libLLVM") or name.starts_with("libclang"):
-                rsp = rsp ++ path ++ "\n"
+            if name.starts_with("libclang") and path != libclang:
+                clang_archives.push(path)
+            else:
+                if name.starts_with("libLLVM"):
+                    llvm_archives.push(path)
+    var rsp = ""
+    var ld_rsp = ""
+    rsp = rsp ++ libclang ++ "\n"
+    ld_rsp = ld_rsp ++ libclang ++ "\n"
+    let sorted_clang_archives = comp_sort_strings(clang_archives)
+    for i in 0..sorted_clang_archives.len() as i32:
+        let path = sorted_clang_archives.get(i as i64)
+        rsp = rsp ++ path ++ "\n"
+        ld_rsp = ld_rsp ++ path ++ "\n"
+    let sorted_llvm_archives = comp_sort_strings(llvm_archives)
+    for i in 0..sorted_llvm_archives.len() as i32:
+        let path = sorted_llvm_archives.get(i as i64)
+        rsp = rsp ++ path ++ "\n"
+        ld_rsp = ld_rsp ++ path ++ "\n"
     let sdk_path = comp_host_sdk_path(ctx)
     if sdk_path.len() > 0:
         rsp = rsp ++ "-isysroot\n" ++ sdk_path ++ "\n"
+        ld_rsp = ld_rsp ++ "-syslibroot\n" ++ sdk_path ++ "\n"
     rsp = rsp ++ "-lm\n"
-    rsp = rsp ++ "-lz\n"
-    let zstd_archive = "/opt/homebrew/lib/libzstd.a"
-    if fs.host_exists(zstd_archive):
-        rsp = rsp ++ zstd_archive ++ "\n"
-    else:
-        rsp = rsp ++ "-lzstd\n"
-    rsp = rsp ++ "-lxml2\n"
     rsp = rsp ++ "-lc++\n"
-    rsp = rsp ++ libclang ++ "\n"
-    rsp = rsp ++ "-Wl,-rpath," ++ comp_dirname(libclang) ++ "/\n"
+    if comp_link_path_is_dynamic(libclang):
+        rsp = rsp ++ "-Wl,-rpath," ++ comp_dirname(libclang) ++ "/\n"
+    ld_rsp = ld_rsp ++ "-lm\n"
+    ld_rsp = ld_rsp ++ "-lc++\n"
+    if comp_link_path_is_dynamic(libclang):
+        ld_rsp = ld_rsp ++ "-rpath\n" ++ comp_dirname(libclang) ++ "/\n"
     let rsp_path = comp_join(output_dir, "llvm_link.rsp")
     let cc_path = comp_join(output_dir, "llvm_cc")
+    let ld_rsp_path = comp_join(output_dir, "llvm_ld.rsp")
+    let ld_path = comp_join(output_dir, "llvm_ld")
     if fs.write_text(rsp_path, rsp) != 0:
         return comp_fail(ctx, "could not write: " ++ rsp_path)
     if fs.write_text(cc_path, llvm_clang ++ "\n") != 0:
         return comp_fail(ctx, "could not write: " ++ cc_path)
+    if fs.write_text(ld_rsp_path, ld_rsp) != 0:
+        return comp_fail(ctx, "could not write: " ++ ld_rsp_path)
+    if fs.write_text(ld_path, llvm_ld ++ "\n") != 0:
+        return comp_fail(ctx, "could not write: " ++ ld_path)
     if fs.write_text(output_path, "ok\n") != 0:
         return comp_fail(ctx, "could not write stamp: " ++ output_path)
     0
@@ -481,6 +526,7 @@ fn comp_build_source_manifest(fs: ToolFs) -> str:
     dirs.push("src")
     dirs.push("rt")
     dirs.push("lib/std")
+    dirs.push("build")
     let all_files: Vec[str] = Vec.new()
     for di in 0..dirs.len() as i32:
         let dir = dirs.get(di as i64)
@@ -490,7 +536,6 @@ fn comp_build_source_manifest(fs: ToolFs) -> str:
             if path.ends_with(".w"):
                 all_files.push(path)
     all_files.push("build.w")
-    all_files.push("build_compiler.w")
     let sorted = comp_sort_strings(all_files)
     var manifest = ""
     for i in 0..sorted.len() as i32:

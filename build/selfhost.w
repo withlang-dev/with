@@ -1,6 +1,6 @@
-module build_selfhost
+module build.selfhost
 
-use build_pcre2
+use pcre2
 use std.build
 use std.process
 
@@ -64,6 +64,19 @@ fn bs_with_string_literal(value: str) -> str:
 
 fn bs_capture_path(root: str, output_dir: str, label: str, suffix: str) -> str:
     bs_abs(root, bs_join(output_dir, label ++ "." ++ suffix))
+
+fn bs_c_compiler() -> str:
+    let explicit = env("WITH_EMIT_C_CC")
+    if explicit.len() > 0:
+        return explicit
+    let cc = env("CC")
+    if cc.len() > 0:
+        return cc
+    "cc"
+
+fn bs_push_c_compiler(argv: Vec[str]) -> Vec[str]:
+    argv.push(bs_c_compiler())
+    argv
 
 fn bs_run_cli_capture(ctx: ActionCtx, compiler_path: str, label: str, args: Vec[str], timeout_ms: i32) -> SelfhostRunResult:
     let root = ctx.project_info().project_root()
@@ -754,8 +767,7 @@ fn bs_compile_emit_c_output(ctx: ActionCtx, root: str, case_dir: str, c_path: st
     let stdout_path = bs_capture_path(root, case_dir, label ++ "-compile", "stdout")
     let stderr_path = bs_capture_path(root, case_dir, label ++ "-compile", "stderr")
     var cc_args: Vec[str] = Vec.new()
-    cc_args |> push("zig")
-    cc_args |> push("cc")
+    cc_args = bs_push_c_compiler(cc_args)
     cc_args |> push("-O2")
     cc_args |> push("-o")
     cc_args |> push(bs_abs(root, bin))
@@ -909,8 +921,7 @@ pub fn run_emit_c_smoke_action(ctx: ActionCtx) -> i32:
     let compile_stdout = bs_capture_path(root, output_dir, "emit-c-smoke-compile", "stdout")
     let compile_stderr = bs_capture_path(root, output_dir, "emit-c-smoke-compile", "stderr")
     var cc_args: Vec[str] = Vec.new()
-    cc_args |> push("zig")
-    cc_args |> push("cc")
+    cc_args = bs_push_c_compiler(cc_args)
     cc_args |> push("-O2")
     cc_args |> push("-o")
     cc_args |> push(bs_abs(root, bin_path))
@@ -926,9 +937,9 @@ pub fn run_emit_c_smoke_action(ctx: ActionCtx) -> i32:
     cc_args |> push(bs_abs(root, "runtime"))
     let compile_result = ctx.process_runner().run_capture(cc_args, compile_stdout, compile_stderr, 120000)
     if compile_result.rc != 0:
-        return bs_fail(ctx, f"zig cc failed with exit code {compile_result.rc}; stdout=" ++ compile_stdout ++ " stderr=" ++ compile_stderr)
+        return bs_fail(ctx, f"C compiler failed with exit code {compile_result.rc}; stdout=" ++ compile_stdout ++ " stderr=" ++ compile_stderr)
     if not fs.exists(bin_path):
-        return bs_fail(ctx, "zig cc did not produce " ++ bin_path)
+        return bs_fail(ctx, "C compiler did not produce " ++ bin_path)
 
     let run_result = bs_run_binary_capture(ctx, bin_path, "emit-c-smoke-run", 120000)
     if run_result.rc != 0:
@@ -1427,7 +1438,7 @@ fn bs_check_migrate_ulong_max_width(ctx: ActionCtx, compiler_path: str, case_dir
     let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-ulong-max-width", args)
     if result.rc != 0: return result.rc
     let out_text = ctx.fs().read_text(out_w)
-    rc = bs_assert_contains(ctx, out_text, "9223372036854775807 as c_ulong", "ulong_max_width")
+    rc = bs_assert_contains(ctx, out_text, "((0 as c_ulong) -% 1)", "ulong_max_width")
     if rc != 0: return rc
     rc = bs_assert_not_contains(ctx, out_text, "9223372036854775807 as c_uint", "ulong_max_width")
     if rc != 0: return rc

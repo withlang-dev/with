@@ -3,7 +3,7 @@
 Status: active checkpoint for agents. Update this file when phase status,
 blockers, or the next work queue changes.
 
-Last updated: 2026-05-23.
+Last updated: 2026-05-26.
 
 Read this file immediately after `AGENTS.md`. It exists so long-running build
 system and bootstrap work does not have to be reconstructed from git history or
@@ -72,6 +72,23 @@ targets are allowed absolute entry paths (executables).
 `PromoteTreeIfVerified` now uses byte-by-byte staleness detection: fresh
 files are skipped and stale files are reported. Process argument validation
 diagnostics now name the target, field index, and rejected value.
+
+Build graph support modules have been moved out of the repository root. The
+root keeps `build.w`; support source now lives under `build/` and is imported
+through dotted modules such as `build.compiler` and `build.selfhost`.
+LLVM bridge link metadata now records direct linker metadata (`llvm_ld` and
+`llvm_ld.rsp`) in addition to the legacy clang-driver files. Source `Link.w`
+uses `ld64.lld` metadata directly for LLVM/static-bridge links instead of
+invoking clang with `-fuse-ld=lld`; release compiler links require
+`libclang.a` and include the Clang component archives from the pinned static
+LLVM SDK.
+
+The Darwin arm64 static LLVM SDK has been built locally from LLVM 22.1.6
+under `.deps/llvm-22.1.6-darwin-arm64`. A fresh compiler build against that
+SDK links no dynamic LLVM/Clang, zlib, zstd, or libxml2 libraries; `otool -L`
+shows only `/usr/lib/libSystem.B.dylib` and `/usr/lib/libc++.1.dylib`.
+Emit-C/bootstrap compilation now uses `WITH_EMIT_C_CC`, then `CC`, then `cc`;
+Zig is no longer the default or required C compiler.
 
 Completed D1 sub-slices:
 
@@ -353,7 +370,7 @@ Completed D7 project-action workspace migration work:
 6. `pcre2-migrate` and `pcre2-migrate-smoke` use the workspace migration path
    instead of spawning `with migrate`.
 7. Remaining ProcessRunner uses are intentional boundaries: external tools
-   (`curl`, `tar`, `zig cc`, upstream PCRE2 corpus runners), stage-chain or
+   (`curl`, `tar`, the configured C compiler, upstream PCRE2 corpus runners), stage-chain or
    emitted compiler binaries, CLI selfhost fixtures, and current diagnostic
    scans that deliberately exercise CLI output.
 
@@ -396,8 +413,8 @@ Commands passed:
 
 ```sh
 out/bin/with check src/main.w
-out/bin/with check build_pcre2.w
-out/bin/with check build_selfhost.w
+out/bin/with check build/pcre2.w
+out/bin/with check build/selfhost.w
 git diff --check
 make build
 out/bin/with build :pcre2-build --no-deps

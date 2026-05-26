@@ -1337,8 +1337,8 @@ fn run_build_command(options: BuildCommandOptions, graph_options: BuildGraphComm
             with_eprint("error: build failed")
             return 1
         with_eprint("emitted C: " ++ c_path)
-        with_eprint("compile with zig cc (example):")
-        with_eprint("  zig cc -target <triple> -I runtime " ++ c_path ++ " runtime/with_runtime.c runtime/helpers.c runtime/fiber.c runtime/fiber_asm_<arch>.s -o <output>")
+        with_eprint("compile with a C compiler (example):")
+        with_eprint("  cc -I runtime " ++ c_path ++ " runtime/with_runtime.c runtime/helpers.c runtime/fiber.c runtime/fiber_asm_<arch>.s -o <output>")
         comp.print_warnings()
         return 0
     if actual_options.output_kind == BuildOutputKind.Object:

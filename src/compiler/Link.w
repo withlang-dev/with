@@ -131,20 +131,31 @@ fn link_stage_make_link_command(linker: str, obj_path: str, bin_path: str, extra
         args.push("-l" ++ link_libs.get(i as i64))
     LinkStageCommand { linker, args, cwd: "", env, inputs, outputs }
 
-fn link_stage_make_llvm_link_command(llvm_cc: str, obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str]) -> LinkStageCommand:
-    var command = link_stage_make_link_command(llvm_cc, obj_path, bin_path, extras, link_libs)
+fn link_stage_make_llvm_link_command(llvm_ld: str, obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str]) -> LinkStageCommand:
     let args: Vec[str] = Vec.new()
-    args.push("-fuse-ld=lld")
-    for i in 0..command.args.len() as i32:
-        args.push(command.args.get(i as i64))
-    LinkStageCommand {
-        linker: command.linker,
-        args,
-        cwd: command.cwd,
-        env: command.env,
-        inputs: command.inputs,
-        outputs: command.outputs,
-    }
+    let env: Vec[LinkStageEnvVar] = Vec.new()
+    let inputs: Vec[str] = Vec.new()
+    let outputs: Vec[str] = Vec.new()
+    args.push("-arch")
+    args.push("arm64")
+    args.push("-platform_version")
+    args.push("macos")
+    args.push("11.0")
+    args.push("11.0")
+    args.push("-dead_strip")
+    args.push("-o")
+    args.push(bin_path)
+    outputs.push(bin_path)
+    args.push(obj_path)
+    inputs.push(obj_path)
+    for i in 0..extras.len() as i32:
+        let extra = extras.get(i as i64)
+        args.push(extra)
+        inputs.push(extra)
+    for i in 0..link_libs.len() as i32:
+        args.push("-l" ++ link_libs.get(i as i64))
+    args.push("-lSystem")
+    LinkStageCommand { llvm_ld, args, cwd: "", env, inputs, outputs }
 
 fn link_stage_str_from_raw_parts(ptr: *const u8, len: i64) -> str:
     if ptr as i64 == 0 or len <= 0:
@@ -214,14 +225,14 @@ fn link_stage_link_with_extras_and_libs_plan(obj_path: str, bin_path: str, extra
     let command = link_stage_make_link_command("cc", obj_path, bin_path, extras, link_libs)
     link_stage_plan_for_command(command)
 
-fn link_stage_link_with_llvm(obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str], llvm_cc: str) -> bool:
-    link_stage_link_with_llvm_result(obj_path, bin_path, extras, link_libs, llvm_cc).ok
+fn link_stage_link_with_llvm(obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str], llvm_ld: str) -> bool:
+    link_stage_link_with_llvm_result(obj_path, bin_path, extras, link_libs, llvm_ld).ok
 
-fn link_stage_link_with_llvm_result(obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str], llvm_cc: str) -> LinkStageResult:
-    link_stage_result_for_plan(link_stage_link_with_llvm_plan(obj_path, bin_path, extras, link_libs, llvm_cc))
+fn link_stage_link_with_llvm_result(obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str], llvm_ld: str) -> LinkStageResult:
+    link_stage_result_for_plan(link_stage_link_with_llvm_plan(obj_path, bin_path, extras, link_libs, llvm_ld))
 
-fn link_stage_link_with_llvm_plan(obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str], llvm_cc: str) -> LinkStagePlan:
-    let command = link_stage_make_llvm_link_command(llvm_cc, obj_path, bin_path, extras, link_libs)
+fn link_stage_link_with_llvm_plan(obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str], llvm_ld: str) -> LinkStagePlan:
+    let command = link_stage_make_llvm_link_command(llvm_ld, obj_path, bin_path, extras, link_libs)
     link_stage_plan_for_command(command)
 
 fn link_stage_str_contains(hay: str, needle: str) -> bool:
@@ -339,9 +350,9 @@ fn link_stage_resolve_runtime_root() -> str:
 fn link_stage_find_llvm_static_bridge() -> str:
     let root = link_stage_resolve_runtime_root()
     let bridge_o = root ++ "/llvm_bridge.o"
-    let rsp = root ++ "/llvm_link.rsp"
-    let cc_file = root ++ "/llvm_cc"
-    if runtime_read_file(bridge_o).len() > 0 and runtime_read_file(rsp).len() > 0 and runtime_read_file(cc_file).len() > 0:
+    let rsp = root ++ "/llvm_ld.rsp"
+    let ld_file = root ++ "/llvm_ld"
+    if runtime_read_file(bridge_o).len() > 0 and runtime_read_file(rsp).len() > 0 and runtime_read_file(ld_file).len() > 0:
         return bridge_o
     ""
 
@@ -645,8 +656,8 @@ fn link_stage_link_object_to_binary_plan(obj_path: str, bin_path: str, link_libs
         if static_bridge.len() > 0:
             // Static LLVM linking: use llvm_bridge.o + LLVM static libs
             let root = link_stage_resolve_runtime_root()
-            let rsp_path = root ++ "/llvm_link.rsp"
-            let cc_path = link_stage_read_file_trimmed(root ++ "/llvm_cc")
+            let rsp_path = root ++ "/llvm_ld.rsp"
+            let ld_path = link_stage_read_file_trimmed(root ++ "/llvm_ld")
             extras.push(static_bridge)
             // Include embedded runtime objects for self-contained binary
             let embedded_path = root ++ "/embedded_objects.o"
@@ -657,8 +668,8 @@ fn link_stage_link_object_to_binary_plan(obj_path: str, bin_path: str, link_libs
             if runtime_read_file(clang_bridge_path).len() > 0:
                 extras.push(clang_bridge_path)
             extras.push("@" ++ rsp_path)
-            return link_stage_link_with_llvm_plan(obj_path, bin_path, extras, link_libs, cc_path)
-        with_eprint("error: missing LLVM static bridge (need llvm_bridge.o + llvm_link.rsp + llvm_cc)")
+            return link_stage_link_with_llvm_plan(obj_path, bin_path, extras, link_libs, ld_path)
+        with_eprint("error: missing LLVM static bridge (need llvm_bridge.o + llvm_ld.rsp + llvm_ld)")
         return link_stage_plan_fail()
 
     if extras.len() == 0 and link_libs.len() == 0:

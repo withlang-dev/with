@@ -184,8 +184,8 @@ broken, the compiler cannot be recovered.
 
 ## Releases
 
-For release tasks, follow `docs/release.md`. It is the canonical release
-runbook.
+For release tasks, follow `docs/with-release-runbook.md`. It is the canonical
+release runbook.
 
 Release work is packaging and verification by default. Do not make compiler,
 runtime, stdlib, migrator, build-system, or test changes during a release
