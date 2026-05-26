@@ -24,6 +24,7 @@ out/
 *.dSYM/
 
 # Dependencies
+.deps/
 node_modules/
 
 # Editor / OS

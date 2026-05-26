@@ -1,4 +1,4 @@
-module build_pcre2
+module build.pcre2
 
 use std.build
 

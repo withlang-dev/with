@@ -94,9 +94,10 @@ scripts/package-darwin-aarch64.sh
 ```
 
 This produces `out/release/with-darwin-aarch64` and `out/release/install.sh`.
-The public Darwin bootstrap binary intentionally excludes `clang_bridge.o` and
-must not have an `@rpath/libclang.dylib` load command. The package script checks
-that with `otool -L`.
+The public Darwin binary is the verified compiler copied under the platform
+asset name. It must not have dynamic LLVM, Clang, zlib, zstd, or libxml2 load
+commands, and it must contain static libclang symbols. The package script
+checks this with `otool -L` and `nm`.
 
 Create the GitHub release:
 

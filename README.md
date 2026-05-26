@@ -89,7 +89,8 @@ Install to your PATH:
 with build :install-user    # installs to ~/.local/bin/with
 ```
 
-Release publishing uses the checklist in [docs/release.md](docs/release.md).
+Release publishing uses the checklist in
+[docs/with-release-runbook.md](docs/with-release-runbook.md).
 
 ### Fixpoint Verification
 
