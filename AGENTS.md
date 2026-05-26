@@ -171,13 +171,31 @@ code generation is nondeterministic. Stop and fix.
 
 Resolution order: `WITH=<path>` → `with` on PATH → `src/main`
 
-`src/main` is not checked into git. It's a GitHub release asset.
-Run `make seed` to fetch. After `make build`, `make fixpoint`,
+`src/main` is not checked into git. It is the local seed path fetched
+from the `with-darwin-aarch64` GitHub release asset. Run `make seed`
+or `with build :seed` to fetch it. After `make build`, `make fixpoint`,
 and `make test` all pass, update the installed user compiler:
 `make install-user`.
 
 If the seed, installed compiler, and release binaries are all
 broken, the compiler cannot be recovered.
+
+---
+
+## Releases
+
+For release tasks, follow `docs/release.md`. It is the canonical release
+runbook.
+
+Release work is packaging and verification by default. Do not make compiler,
+runtime, stdlib, migrator, build-system, or test changes during a release
+unless the maintainer explicitly approves expanding the release scope.
+
+If release prep exposes an unrelated bug, file an issue with the repro and
+stop there unless the maintainer says it blocks the release.
+
+Publish the Darwin arm64 binary as `with-darwin-aarch64`. Do not publish a
+release binary asset named `main`; `src/main` is only the local seed path.
 
 ---
 

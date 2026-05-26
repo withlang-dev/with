@@ -72,6 +72,8 @@ Install to your PATH:
 with build :install-user    # installs to ~/.local/bin/with
 ```
 
+Release publishing uses the checklist in [docs/release.md](docs/release.md).
+
 ### Fixpoint Verification
 
 The compiler compiles itself. `with build :fixpoint` builds stage3 from stage2
