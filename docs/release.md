@@ -92,6 +92,7 @@ Prepare the platform-named asset:
 ```sh
 mkdir -p out/release
 cp out/bin/with out/release/with-darwin-aarch64
+cp scripts/install.sh out/release/install.sh
 shasum -a 256 out/release/with-darwin-aarch64
 ```
 
@@ -100,6 +101,7 @@ Create the GitHub release:
 ```sh
 gh release create v0.14.0 \
   out/release/with-darwin-aarch64 \
+  out/release/install.sh \
   --repo withlang-dev/with \
   --title "v0.14.0: <release title>" \
   --notes-file <release-notes.md>
@@ -129,6 +131,7 @@ gh release view v0.14.0 \
 Expected asset list:
 
 ```text
+install.sh
 with-darwin-aarch64
 ```
 
@@ -144,4 +147,3 @@ Confirm the seed downloader still points at the published asset name:
 ```sh
 rg -n 'with-darwin-aarch64|releases/download/.*/main|seed\.arg\("main"\)' Makefile build.w
 ```
-

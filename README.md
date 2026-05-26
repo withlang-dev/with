@@ -45,13 +45,19 @@ let config = with Config.default() as mut c:
 Install the latest Darwin arm64 binary:
 
 ```sh
-mkdir -p ~/.local/bin && \
-curl -fL https://github.com/withlang-dev/with/releases/latest/download/with-darwin-aarch64 -o ~/.local/bin/with && \
-chmod +x ~/.local/bin/with && \
-~/.local/bin/with version
+curl -fsSL https://github.com/withlang-dev/with/releases/latest/download/install.sh | sh
 ```
 
-Make sure `~/.local/bin` is on your PATH, then run:
+Inspect the installer before running it:
+
+```sh
+curl -fsSL https://github.com/withlang-dev/with/releases/latest/download/install.sh | less
+```
+
+The installer writes `with` to `~/.local/bin` by default. Set
+`WITH_INSTALL_DIR` to choose another directory.
+
+Make sure the install directory is on your PATH, then run:
 
 ```sh
 with run examples/hello.w
