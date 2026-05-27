@@ -120,14 +120,16 @@ for creating the first native With compiler.
 1. On a supported host, generate the compiler C output:
 
    ```sh
-   make emit-c-test
+   WITH_VERSION=vX.Y.Z scripts/package-bootstrap-c.sh
    ```
 
-2. Transfer the emitted C source, runtime support C files, and static LLVM SDK
-   to the target platform.
+2. Transfer or download `out/release/with-bootstrap-c-vX.Y.Z.tar.zst` and the
+   static LLVM SDK to the target platform.
 
-3. Compile the emitted C with the target platform C compiler, linking against
-   the static LLVM SDK and static libclang archive.
+3. Compile the emitted C bundle with the target platform C compiler, linking
+   against the static LLVM SDK and static libclang archive. The bundle includes
+   emitted C for the compiler, LLVM bridge, Clang bridge, runtime core, and a
+   temporary Linux x86_64 platform shim.
 
 4. Use the resulting native `with` as `WITH` on the target:
 
