@@ -37,6 +37,7 @@ with_str with_i64_to_str(int64_t n);
 with_str with_bool_to_str(bool b);
 int64_t with_parse_i64(with_str s);
 with_str i64_to_string(int64_t n);
+with_str with_str_from_byte(int32_t b);
 with_str str_from_byte(int32_t b);
 
 // ── Vec type ───────────────────────────────────────────────────────
@@ -158,6 +159,7 @@ with_str with_fs_read_file(with_str path);
 int32_t with_fs_file_exists(with_str path);
 int32_t with_fs_write_file(with_str path, with_str data);
 int32_t with_fs_mkdir_p(with_str path);
+int32_t with_fs_mkdir(with_str path);
 int32_t with_fs_is_dir(with_str path);
 int32_t with_fs_remove_file(with_str path);
 int32_t with_fs_chmod(with_str path, int32_t mode);
@@ -173,6 +175,7 @@ void with_lines_out(with_vec *out, with_str s);
 with_str with_getenv_str(with_str name);
 int32_t with_setenv_str(with_str name, with_str value);
 int32_t with_getpid(void);
+int32_t with_process_alive(int32_t pid);
 void with_fill_random(uint8_t *buf, int64_t len);
 
 int32_t with_net_tcp_listen(int32_t port, int32_t backlog);

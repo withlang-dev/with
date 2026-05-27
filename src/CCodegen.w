@@ -1571,6 +1571,8 @@ fn CCodegen.rvalue_uses_local(self: CCodegen, body: MirBody, rval_id: i32, local
     let d2 = body.rval_d2.get(rval_id as i64)
     if rk == RvalueKind.RK_USE:
         return self.operand_uses_local(body, d0, local_id)
+    if rk == RvalueKind.RK_ARRAY_FILL:
+        return self.operand_uses_local(body, d0, local_id)
     if rk == RvalueKind.RK_BIN_OP:
         if self.operand_uses_local(body, d1, local_id) != 0:
             return 1
@@ -1614,6 +1616,9 @@ fn CCodegen.local_value_use_mark_rvalue(self: CCodegen, body: MirBody, rval_id: 
     let d1 = body.rval_d1.get(rval_id as i64)
     let d2 = body.rval_d2.get(rval_id as i64)
     if rk == RvalueKind.RK_USE:
+        self.local_value_use_mark_operand(body, d0)
+        return
+    if rk == RvalueKind.RK_ARRAY_FILL:
         self.local_value_use_mark_operand(body, d0)
         return
     if rk == RvalueKind.RK_BIN_OP:
@@ -1962,6 +1967,8 @@ fn CCodegen.rvalue_tid(self: CCodegen, body: MirBody, rval_id: i32) -> i32:
     let d1 = body.rval_d1.get(rval_id as i64)
     if rk == RvalueKind.RK_USE:
         return self.operand_tid(body, d0)
+    if rk == RvalueKind.RK_ARRAY_FILL:
+        return self.operand_tid(body, d0)
     if rk == RvalueKind.RK_CAST:
         return d1
     if rk == RvalueKind.RK_BIN_OP:
@@ -2001,6 +2008,9 @@ fn CCodegen.rvalue_text(self: CCodegen, body: MirBody, rval_id: i32) -> str:
     let d2 = body.rval_d2.get(rval_id as i64)
     if rk == RvalueKind.RK_USE:
         return self.operand_text(body, d0)
+    if rk == RvalueKind.RK_ARRAY_FILL:
+        self.fail("array fill rvalue requires an array assignment destination")
+        return "0"
     if rk == RvalueKind.RK_BIN_OP:
         let lhs = self.operand_text(body, d1)
         let rhs = self.operand_text(body, d2)
@@ -2119,7 +2129,7 @@ fn CCodegen.aggregate_compound_literal(self: CCodegen, body: MirBody, rval_id: i
                 0
             if dst_tk == TypeKind.TY_STRUCT and name_sym != 0:
                 let field_name = cc_intern_resolve(self.intern, name_sym)
-                if field_name.len() > 0:
+                if field_name.len() > 0 and self.struct_field_tid(dst_resolved as i32, name_sym) != 0:
                     out = out ++ "." ++ field_name ++ " = "
             out = out ++ self.operand_text(body, body.agg_field_operands.get((start + i) as i64))
     out = out ++ cc_rbrace()
@@ -5440,6 +5450,10 @@ fn CCodegen.rvalue_infer_tid(self: CCodegen, body: MirBody, rval_id: i32) -> i32
         if no_infer != 0:
             return self.operand_tid_no_infer(body, d0)
         return self.operand_tid(body, d0)
+    if rk == RvalueKind.RK_ARRAY_FILL:
+        if no_infer != 0:
+            return self.operand_tid_no_infer(body, d0)
+        return self.operand_tid(body, d0)
     if rk == RvalueKind.RK_BIN_OP:
         if d0 == BinaryOp.OP_EQ or d0 == BinaryOp.OP_NEQ or d0 == BinaryOp.OP_LT or d0 == BinaryOp.OP_GT or d0 == BinaryOp.OP_LTE or d0 == BinaryOp.OP_GTE or d0 == BinaryOp.OP_AND or d0 == BinaryOp.OP_OR:
             return self.sema.ty_bool as i32
@@ -5855,10 +5869,15 @@ fn CCodegen.emit_stmt_line(self: CCodegen, body: MirBody, stmt_id: i32) -> str:
         let dst_place = self.place_text(body, d0)
         if self.is_unit_rvalue(body, d1) != 0:
             return "    " ++ dst_place ++ " = (__typeof__(" ++ dst_place ++ "))" ++ cc_lbrace() ++ "0" ++ cc_rbrace() ++ ";"
-        let rval = self.rvalue_text(body, d1)
         let dst_tid = self.place_tid(body, d0)
         let dst_resolved = self.sema.resolve_alias(dst_tid)
         let dst_tk = self.sema.get_type_kind(dst_resolved)
+        if dst_tk == TypeKind.TY_ARRAY and d1 >= 0 and d1 < body.rval_kinds.len() as i32 and body.rval_kinds.get(d1 as i64) == RvalueKind.RK_ARRAY_FILL:
+            let fill_op = body.rval_d0.get(d1 as i64)
+            let fill_count = body.rval_d1.get(d1 as i64)
+            let fill_text = self.operand_text(body, fill_op)
+            return "    " ++ cc_lbrace() ++ " __typeof__(" ++ dst_place ++ "[0]) __with_fill = " ++ fill_text ++ "; for (int64_t __with_i = 0; __with_i < " ++ f"{fill_count}" ++ "; __with_i++) " ++ cc_lbrace() ++ " " ++ dst_place ++ "[__with_i] = __with_fill; " ++ cc_rbrace() ++ " " ++ cc_rbrace()
+        let rval = self.rvalue_text(body, d1)
         let dst_c_type_for_assign = self.c_type(dst_tid, 0)
         if cc_str_contains(dst_c_type_for_assign, "*") != 0 and rval != "0" and rval != "0LL" and rval != "NULL":
             let rval_looks_address = cc_str_contains(rval, "&") != 0 or cc_str_contains(rval, "*)") != 0 or cc_str_contains(rval, "* const") != 0
