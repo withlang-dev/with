@@ -6964,6 +6964,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
     // Check for extern fn ABI transformations (sret/byval for large structs)
     var abi_has_sret = 0
     var abi_byval_mask: i64 = 0
+    var abi_byval_types: Vec[i64] = Vec.new()
     var abi_sret_ty: i64 = 0
     var abi_sret_buf: i64 = 0
     if callee_fn_sym != 0:
@@ -6973,6 +6974,9 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
         let bv_opt = self.extern_fn_byval_params.get(callee_fn_sym)
         if bv_opt.is_some():
             abi_byval_mask = bv_opt.unwrap() as i64
+        let bvt_opt = self.extern_fn_byval_types.get(callee_fn_sym)
+        if bvt_opt.is_some():
+            abi_byval_types = bvt_opt.unwrap()
         let srt_opt = self.extern_fn_sret_type.get(callee_fn_sym)
         if srt_opt.is_some():
             abi_sret_ty = srt_opt.unwrap() as i64
@@ -7072,6 +7076,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
         return self.emit_async_fn_spawn(callee_fn_sym, callee, call_ft, args, dest_place, body, next_bb)
 
     let call_val = wl_build_call(self.builder, call_ft, actual_callee, vec_data_i64(&args), actual_arg_count)
+    self.apply_c_abi_call_attrs(call_val, abi_has_sret, abi_sret_ty, abi_byval_mask, abi_byval_types, arg_count, if is_indirect: 1 else: 0)
     // Guaranteed mutual @[tailrec] edges are emitted as musttail.
     if self.mir_emit_mutual_tail_call != 0 and call_val != 0:
         wl_set_musttail_call(call_val)

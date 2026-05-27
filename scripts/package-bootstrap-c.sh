@@ -19,12 +19,46 @@ fi
 rm -rf "$work_dir"
 mkdir -p "$work_dir/src" "$work_dir/runtime"
 
+mkdir -p out/gen
+escaped_version="$(printf '%s' "$version" | sed 's/[\/&]/\\&/g')"
+sed "s|WITH_VERSION_PLACEHOLDER|$escaped_version|g" src/main.w > out/gen/main.w
+printf '%s\n' "$version" > out/gen/version.txt
 "$compiler" build out/gen/main.w --emit-c -o "$work_dir/src/with_compiler.c"
 "$compiler" build rt/llvm_bridge.w --emit-c --no-prelude -o "$work_dir/src/llvm_bridge.c"
 "$compiler" build rt/clang_bridge.w --emit-c --no-prelude -o "$work_dir/src/clang_bridge.c"
 "$compiler" build rt/rt_core.w --emit-c --no-prelude -o "$work_dir/src/rt_core.c"
+"$compiler" build rt/panic_runtime.w --emit-c --no-prelude -o "$work_dir/src/panic_runtime.c"
+"$compiler" build rt/regex_runtime.w --emit-c --no-prelude -o "$work_dir/src/regex_runtime.c"
+"$compiler" build rt/fiber_stubs.w --emit-c --no-prelude -o "$work_dir/src/fiber_stubs.c"
+"$compiler" build rt/compat_runtime.w --emit-c --no-prelude -o "$work_dir/src/compat_runtime.c"
 
 cp runtime/with_runtime.h "$work_dir/runtime/with_runtime.h"
+cat >"$work_dir/runtime/bootstrap_types.h" <<'EOF'
+#ifndef WITH_BOOTSTRAP_TYPES_H
+#define WITH_BOOTSTRAP_TYPES_H
+
+#include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
+
+typedef struct {
+    const char *ptr;
+    int64_t len;
+} with_str;
+
+#define WITH_STR_LIT(s) ((with_str){(s), (int64_t)(sizeof(s) - 1)})
+#define with_len(v) ((v).len)
+#define with_is_empty(v) (((v).len == 0) ? 1 : 0)
+
+typedef struct {
+    void *ptr;
+    int64_t len;
+    int64_t cap;
+    int64_t elem_size;
+} with_vec;
+
+#endif
+EOF
 
 if [ ! -f out/gen/wl_decls.h ]; then
     echo "error: missing out/gen/wl_decls.h; run make emit-c-test first" >&2
@@ -151,6 +185,14 @@ int32_t rt_sysinfo(uint8_t *out) {
     return 0;
 }
 
+with_str rt_sysinfo_os(void) {
+    return (with_str){ .ptr = (uint8_t *)"Linux", .len = 5 };
+}
+
+with_str rt_sysinfo_arch(void) {
+    return (with_str){ .ptr = (uint8_t *)"x86_64", .len = 6 };
+}
+
 int64_t rt_thread_spawn(uint8_t *start_routine, uint8_t *arg) {
     pthread_t thread;
     if (pthread_create(&thread, NULL, (void *(*)(void *))start_routine, arg) != 0) return 0;
@@ -209,28 +251,54 @@ int32_t rt_copy_tree(const uint8_t *src, const uint8_t *dst) {
     return -ENOSYS;
 }
 
-with_str rt_list_files(const uint8_t *path) {
-    DIR *dir = opendir(rt_cstr(path));
-    if (dir == NULL) return rt_owned_str("");
-    size_t cap = 256;
-    size_t len = 0;
-    char *buf = (char *)malloc(cap);
-    if (buf == NULL) { closedir(dir); return rt_owned_str(""); }
+static int rt_list_append(char **buf, size_t *len, size_t *cap, const char *path) {
+    size_t path_len = strlen(path);
+    if (*len + path_len + 1 > *cap) {
+        while (*len + path_len + 1 > *cap) *cap *= 2;
+        char *next = (char *)realloc(*buf, *cap);
+        if (next == NULL) return -ENOMEM;
+        *buf = next;
+    }
+    memcpy(*buf + *len, path, path_len);
+    *len += path_len;
+    (*buf)[(*len)++] = '\n';
+    return 0;
+}
+
+static int rt_list_walk(const char *path, char **buf, size_t *len, size_t *cap) {
+    struct stat st;
+    if (lstat(path, &st) != 0) return -rt_errno();
+    if (!S_ISDIR(st.st_mode)) return rt_list_append(buf, len, cap, path);
+    DIR *dir = opendir(path);
+    if (dir == NULL) return -rt_errno();
     struct dirent *ent;
     while ((ent = readdir(dir)) != NULL) {
         if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0) continue;
+        size_t base_len = strlen(path);
         size_t name_len = strlen(ent->d_name);
-        if (len + name_len + 1 > cap) {
-            while (len + name_len + 1 > cap) cap *= 2;
-            char *next = (char *)realloc(buf, cap);
-            if (next == NULL) { free(buf); closedir(dir); return rt_owned_str(""); }
-            buf = next;
-        }
-        memcpy(buf + len, ent->d_name, name_len);
-        len += name_len;
-        buf[len++] = '\n';
+        char *child = (char *)malloc(base_len + 1 + name_len + 1);
+        if (child == NULL) { closedir(dir); return -ENOMEM; }
+        memcpy(child, path, base_len);
+        child[base_len] = '/';
+        memcpy(child + base_len + 1, ent->d_name, name_len + 1);
+        int rc = rt_list_walk(child, buf, len, cap);
+        free(child);
+        if (rc != 0) { closedir(dir); return rc; }
     }
     closedir(dir);
+    return 0;
+}
+
+with_str rt_list_files(const uint8_t *path) {
+    size_t cap = 256;
+    size_t len = 0;
+    char *buf = (char *)malloc(cap);
+    if (buf == NULL) return rt_owned_str("");
+    int rc = rt_list_walk(rt_cstr(path), &buf, &len, &cap);
+    if (rc != 0) {
+        free(buf);
+        return rt_owned_str("");
+    }
     return (with_str){ .ptr = (uint8_t *)buf, .len = (int64_t)len };
 }
 
@@ -255,6 +323,42 @@ void arc4random_buf(void *buf, size_t len) {
         }
     }
 }
+
+void rt_fill_random(uint8_t *buf, uint64_t len) {
+    arc4random_buf(buf, (size_t)len);
+}
+
+int *__error(void) { return __errno_location(); }
+
+int __open(const uint8_t *path, int flags, int mode) {
+    int native = flags & 3;
+    if (flags & 0x0008) native |= O_APPEND;
+    if (flags & 0x0200) native |= O_CREAT;
+    if (flags & 0x0400) native |= O_TRUNC;
+    if (flags & 0x0800) native |= O_EXCL;
+    return open((const char *)path, native, (mode_t)mode);
+}
+
+#define WITH_EMPTY_EMBEDDED_OBJECT(name) \
+    __asm__(".section .rodata\n" \
+            ".globl with_embedded_" #name "_start\n" \
+            "with_embedded_" #name "_start:\n" \
+            ".globl with_embedded_" #name "_end\n" \
+            "with_embedded_" #name "_end:\n" \
+            ".previous\n")
+
+WITH_EMPTY_EMBEDDED_OBJECT(cimport_stubs_o);
+WITH_EMPTY_EMBEDDED_OBJECT(compat_runtime_o);
+WITH_EMPTY_EMBEDDED_OBJECT(panic_runtime_o);
+WITH_EMPTY_EMBEDDED_OBJECT(regex_runtime_o);
+WITH_EMPTY_EMBEDDED_OBJECT(fiber_stubs_o);
+WITH_EMPTY_EMBEDDED_OBJECT(channel_runtime_o);
+WITH_EMPTY_EMBEDDED_OBJECT(fiber_runtime_o);
+WITH_EMPTY_EMBEDDED_OBJECT(fiber_o);
+WITH_EMPTY_EMBEDDED_OBJECT(fiber_asm_o);
+WITH_EMPTY_EMBEDDED_OBJECT(rt_core_o);
+WITH_EMPTY_EMBEDDED_OBJECT(rt_darwin_aarch64_o);
+WITH_EMPTY_EMBEDDED_OBJECT(rt_linux_x86_64_o);
 EOF
 
 cat >"$work_dir/README.bootstrap.md" <<EOF
@@ -269,6 +373,10 @@ It contains emitted C for:
 - src/llvm_bridge.c: LLVM-C bridge
 - src/clang_bridge.c: libclang bridge
 - src/rt_core.c: With runtime core
+- src/panic_runtime.c: panic surface
+- src/regex_runtime.c: regex runtime
+- src/fiber_stubs.c: non-async fiber/runtime lifecycle stubs
+- src/compat_runtime.c: compiler process/env compatibility runtime
 - src/linux_platform.c: temporary Linux x86_64 libc platform shim
 
 The bootstrap compiler is temporary. Use it only to run the normal With stage
@@ -284,20 +392,27 @@ Build a With-owned static LLVM SDK first:
 
     HOST_TAG=linux-x86_64 tools/build-static-llvm.sh
 
-Then compile this bundle with a C compiler:
+Then compile the C files and link with a C++ linker driver because LLVM's
+static libraries contain C++:
 
-    cc -O2 \\
-      -Iruntime \\
-      -include runtime/wl_decls.h \\
-      src/with_compiler.c \\
-      src/llvm_bridge.c \\
-      src/clang_bridge.c \\
-      src/rt_core.c \\
-      src/linux_platform.c \\
-      -L/path/to/llvm-static-sdk/lib \\
-      /path/to/llvm-static-sdk/lib/libclang.a \\
-      /path/to/llvm-static-sdk/lib/libLLVM*.a \\
-      -lpthread -ldl -lm -lc \\
+    LLVM_PREFIX=/path/to/llvm-static-sdk
+    mkdir -p obj
+
+    cc -std=gnu11 -O2 -D_GNU_SOURCE -Iruntime -I"\$LLVM_PREFIX/include" \\
+      -include runtime/wl_decls.h -c src/with_compiler.c -o obj/with_compiler.o
+
+    for file in src/llvm_bridge.c src/clang_bridge.c src/linux_platform.c; do
+      cc -std=gnu11 -O2 -D_GNU_SOURCE -Iruntime -I"\$LLVM_PREFIX/include" \\
+        -c "\$file" -o "obj/\$(basename "\$file" .c).o"
+    done
+
+    for file in src/rt_core.c src/panic_runtime.c src/regex_runtime.c src/fiber_stubs.c src/compat_runtime.c; do
+      cc -std=gnu11 -O2 -D_GNU_SOURCE -DWITH_RUNTIME_H -Iruntime -I"\$LLVM_PREFIX/include" \\
+        -include runtime/bootstrap_types.h -c "\$file" -o "obj/\$(basename "\$file" .c).o"
+    done
+    c++ obj/*.o \\
+      -Wl,--start-group "\$LLVM_PREFIX"/lib/libclang*.a "\$LLVM_PREFIX"/lib/libLLVM*.a "\$LLVM_PREFIX"/lib/liblld*.a -Wl,--end-group \\
+      -lpthread -ldl -lm -lz -lzstd -lxml2 -lc \\
       -o with-bootstrap
 
 Exact LLVM archive ordering may need adjustment by platform/linker. The release
@@ -307,11 +422,15 @@ EOF
 
 (
     cd "$work_dir"
-    find . -type f | sort | xargs shasum -a 256 > SHA256SUMS
+    find . -type f ! -name SHA256SUMS | sort | xargs shasum -a 256 > SHA256SUMS
 )
 
 mkdir -p "$release_dir"
 asset="$release_dir/with-bootstrap-c-${version}.tar.zst"
 rm -f "$asset"
-tar -C "$work_dir" -cf - . | zstd -19 -T0 -o "$asset"
+tar_no_xattrs=
+if tar --help 2>/dev/null | grep -q -- '--no-xattrs'; then
+    tar_no_xattrs=--no-xattrs
+fi
+COPYFILE_DISABLE=1 tar $tar_no_xattrs -C "$work_dir" -cf - . | zstd -19 -T0 -o "$asset"
 shasum -a 256 "$asset"

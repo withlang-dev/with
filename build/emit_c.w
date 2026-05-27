@@ -2,6 +2,7 @@ module build.emit_c
 
 use std.build
 use std.process
+use std.sysinfo
 
 type EmitCParam {
     name: str,
@@ -77,6 +78,26 @@ fn emitc_c_compiler() -> str:
 
 fn emitc_push_c_compiler(argv: Vec[str]) -> Vec[str]:
     argv.push(emitc_c_compiler())
+    argv
+
+fn emitc_host_platform_runtime_object() -> str:
+    let host_os = os()
+    let host_arch = arch()
+    if host_os == "Linux" and host_arch == "x86_64":
+        return "rt_linux_x86_64.o"
+    if host_os == "Macos" and (host_arch == "armv8" or host_arch == "aarch64"):
+        return "rt_darwin_aarch64.o"
+    ""
+
+fn emitc_push_host_c_flags(argv: Vec[str]) -> Vec[str]:
+    if os() == "Linux":
+        argv |> push("-no-pie")
+    argv
+
+fn emitc_push_system_libs(argv: Vec[str]) -> Vec[str]:
+    argv |> push("-lc")
+    if os() == "Linux":
+        argv |> push("-lm")
     argv
 
 fn emitc_index_of(text: str, needle: str) -> i32:
@@ -350,9 +371,9 @@ fn emitc_run_capture(ctx: ActionCtx, label: str, argv: Vec[str], timeout_ms: i32
         ctx.diagnostics().error(result.stderr)
     emitc_fail(ctx, "step '" ++ label ++ f"' failed with exit code {result.rc}; stdout=" ++ stdout_rel ++ " stderr=" ++ stderr_rel)
 
-fn emitc_compile_runtime_args(root: str, argv: Vec[str]) -> Vec[str]:
+fn emitc_compile_runtime_args(root: str, argv: Vec[str], platform_obj: str) -> Vec[str]:
     argv |> push(emitc_abs(root, "out/lib/rt_core.o"))
-    argv |> push(emitc_abs(root, "out/lib/rt_darwin_aarch64.o"))
+    argv |> push(emitc_abs(root, "out/lib/" ++ platform_obj))
     argv |> push(emitc_abs(root, "out/lib/compat_runtime.o"))
     argv |> push(emitc_abs(root, "out/lib/panic_runtime.o"))
     argv |> push(emitc_abs(root, "out/lib/regex_runtime.o"))
@@ -387,45 +408,53 @@ fn emitc_build_compiler_c_workspace(ctx: ActionCtx, source_w: str, main_c: str) 
 
 fn emitc_compile_c_compiler(ctx: ActionCtx, main_c: str, output_path: str) -> i32:
     let root = ctx.project_info().project_root()
+    let platform_obj = emitc_host_platform_runtime_object()
+    if platform_obj.len() == 0:
+        return emitc_fail(ctx, "unsupported host runtime object for emit-c C compile: " ++ os() ++ "/" ++ arch())
     var argv: Vec[str] = Vec.new()
     argv = emitc_push_c_compiler(argv)
     argv |> push("-O2")
+    argv = emitc_push_host_c_flags(argv)
     argv |> push("-o")
     argv |> push(emitc_abs(root, output_path))
     argv |> push(emitc_abs(root, main_c))
     argv |> push(emitc_abs(root, "out/gen/wl_stubs.c"))
-    argv = emitc_compile_runtime_args(root, argv)
+    argv = emitc_compile_runtime_args(root, argv, platform_obj)
     argv |> push(emitc_abs(root, "out/lib/embedded_objects.o"))
     argv |> push("-I")
     argv |> push(emitc_abs(root, "runtime"))
     argv |> push("-include")
     argv |> push(emitc_abs(root, "out/gen/wl_decls.h"))
-    argv |> push("-lc")
+    argv = emitc_push_system_libs(argv)
     emitc_run_capture(ctx, "compile-with-from-c", argv, 600000)
 
 fn emitc_compile_c_compiler_with_bridges(ctx: ActionCtx, main_c: str, output_path: str) -> i32:
     let fs = ctx.fs()
     let root = ctx.project_info().project_root()
+    let platform_obj = emitc_host_platform_runtime_object()
+    if platform_obj.len() == 0:
+        return emitc_fail(ctx, "unsupported host runtime object for full emit-c C compile: " ++ os() ++ "/" ++ arch())
     let cc_path = emitc_trim(fs.read_text("out/lib/llvm_cc"))
     if cc_path.len() == 0:
         return emitc_fail(ctx, "missing LLVM compiler metadata: out/lib/llvm_cc")
     var argv: Vec[str] = Vec.new()
     argv |> push(cc_path)
     argv |> push("-O2")
+    argv = emitc_push_host_c_flags(argv)
     argv |> push("-fuse-ld=lld")
     argv |> push("-o")
     argv |> push(emitc_abs(root, output_path))
     argv |> push(emitc_abs(root, main_c))
     argv |> push(emitc_abs(root, "out/lib/llvm_bridge.o"))
     argv |> push(emitc_abs(root, "out/lib/clang_bridge.o"))
-    argv = emitc_compile_runtime_args(root, argv)
+    argv = emitc_compile_runtime_args(root, argv, platform_obj)
     argv |> push(emitc_abs(root, "out/lib/embedded_objects.o"))
     argv |> push("-I")
     argv |> push(emitc_abs(root, "runtime"))
     argv |> push("-include")
     argv |> push(emitc_abs(root, "out/gen/wl_decls.h"))
     argv |> push("@" ++ emitc_abs(root, "out/lib/llvm_link.rsp"))
-    argv |> push("-lc")
+    argv = emitc_push_system_libs(argv)
     emitc_run_capture(ctx, "compile-with-from-c-full", argv, 900000)
 
 fn emitc_migrate_compiler_c(ctx: ActionCtx, compiler_path: str, main_c: str, output_w: str) -> i32:
@@ -518,16 +547,20 @@ fn emitc_build_hello_c(ctx: ActionCtx, compiler_path: str, hello_c: str) -> i32:
 
 fn emitc_compile_hello(ctx: ActionCtx, hello_c: str, output_path: str) -> i32:
     let root = ctx.project_info().project_root()
+    let platform_obj = emitc_host_platform_runtime_object()
+    if platform_obj.len() == 0:
+        return emitc_fail(ctx, "unsupported host runtime object for emit-c hello compile: " ++ os() ++ "/" ++ arch())
     var argv: Vec[str] = Vec.new()
     argv = emitc_push_c_compiler(argv)
     argv |> push("-O2")
+    argv = emitc_push_host_c_flags(argv)
     argv |> push("-o")
     argv |> push(emitc_abs(root, output_path))
     argv |> push(emitc_abs(root, hello_c))
-    argv = emitc_compile_runtime_args(root, argv)
+    argv = emitc_compile_runtime_args(root, argv, platform_obj)
     argv |> push("-I")
     argv |> push(emitc_abs(root, "runtime"))
-    argv |> push("-lc")
+    argv = emitc_push_system_libs(argv)
     emitc_run_capture(ctx, "compile-hello", argv, 600000)
 
 fn emitc_run_hello(ctx: ActionCtx, hello_path: str) -> i32:

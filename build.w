@@ -5,6 +5,7 @@ use build.pcre2
 use build.seed
 use build.emit_c
 use build.compiler
+use std.sysinfo
 
 fn build_project_dirname(path: str) -> str:
     var last_slash = -1
@@ -42,6 +43,89 @@ fn with_ir_target(name: str, compiler: str, source: str, output: str, dep: str) 
     if dep.len() > 0:
         target = target.dep(dep)
     target
+
+fn run_write_empty_file_action(ctx: ActionCtx) -> i32:
+    let output = ctx.output()
+    if output.len() == 0:
+        ctx.diagnostics().error(ctx.target_name() ++ ": missing output")
+        return 1
+    let dir = build_project_dirname(output)
+    let fs = ctx.fs()
+    if fs.mkdir_all(dir) != 0:
+        ctx.diagnostics().error(ctx.target_name() ++ ": could not create output directory: " ++ dir)
+        return 1
+    if fs.write_text(output, "") != 0:
+        ctx.diagnostics().error(ctx.target_name() ++ ": could not write: " ++ output)
+        return 1
+    0
+
+fn empty_file_target(name: str, output: str) -> Target:
+    var target = target_new(.Action, name, "").output(output)
+    target.action = run_write_empty_file_action
+    target = target.write_scope(build_project_dirname(output))
+    target
+
+fn run_prepare_bootstrap_link_root_action(ctx: ActionCtx) -> i32:
+    // Old seed compilers prefer out/lib before out/bootstrap-lib. Removing the
+    // probe object makes stage1 select the freshly generated bootstrap runtime.
+    let fs = ctx.fs()
+    let _remove_probe = fs.remove_file("out/lib/cimport_stubs.o")
+    let output = ctx.output()
+    if fs.mkdir_all(build_project_dirname(output)) != 0:
+        ctx.diagnostics().error(ctx.target_name() ++ ": could not create output directory: " ++ build_project_dirname(output))
+        return 1
+    if fs.write_text(output, "ok\n") != 0:
+        ctx.diagnostics().error(ctx.target_name() ++ ": could not write: " ++ output)
+        return 1
+    0
+
+fn target_with_embedded_stdlib_inputs(target: Target, ctx: BuildCtx) -> Target:
+    var out = target
+    let files = ctx.fs().list_files("lib/std")
+    for i in 0..files.len() as i32:
+        let path = files.get(i as i64)
+        if path.ends_with(".w") and not path.starts_with("lib/std/re/"):
+            out = out.input(path)
+    out
+
+type HostRuntimeSpec:
+    platform_source: str
+    bootstrap_platform_object: str
+    platform_object: str
+    platform_install_object: str
+    platform_symbol: str
+    opposite_bootstrap_platform_blob: str
+    opposite_platform_blob: str
+    opposite_platform_symbol: str
+    fiber_core_source: str
+    fiber_asm_source: str
+
+fn host_runtime_spec() -> HostRuntimeSpec:
+    if os() == "Linux" and arch() == "x86_64":
+        return HostRuntimeSpec {
+            platform_source: "rt/linux_x86_64.w",
+            bootstrap_platform_object: "out/bootstrap-lib/rt_linux_x86_64.o",
+            platform_object: "out/lib/rt_linux_x86_64.o",
+            platform_install_object: "rt_linux_x86_64.o",
+            platform_symbol: "rt_linux_x86_64_o",
+            opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_darwin_aarch64.bin",
+            opposite_platform_blob: "out/lib/empty_rt_darwin_aarch64.bin",
+            opposite_platform_symbol: "rt_darwin_aarch64_o",
+            fiber_core_source: "rt/fiber_core_darwin.w",
+            fiber_asm_source: "runtime/fiber_asm_linux_x86_64.s",
+        }
+    HostRuntimeSpec {
+        platform_source: "rt/darwin_aarch64.w",
+        bootstrap_platform_object: "out/bootstrap-lib/rt_darwin_aarch64.o",
+        platform_object: "out/lib/rt_darwin_aarch64.o",
+        platform_install_object: "rt_darwin_aarch64.o",
+        platform_symbol: "rt_darwin_aarch64_o",
+        opposite_bootstrap_platform_blob: "out/bootstrap-lib/empty_rt_linux_x86_64.bin",
+        opposite_platform_blob: "out/lib/empty_rt_linux_x86_64.bin",
+        opposite_platform_symbol: "rt_linux_x86_64_o",
+        fiber_core_source: "rt/fiber_core_darwin.w",
+        fiber_asm_source: "runtime/fiber_asm_aarch64.s",
+    }
 
 fn install_file_target(name: str, source: str, dest: str, mode: str, dep: str) -> Target:
     var target = target_new(.Install, name, source).output(dest)
@@ -146,6 +230,7 @@ fn issue61_regression_action(ctx: ActionCtx) -> i32:
 
 pub fn build(ctx: BuildCtx) -> Build:
     var out = ctx.new_build()
+    let host_runtime = host_runtime_spec()
 
     var compiler_sources = target_new(.Action, "compiler-sources", "").output("out/gen/.generated-stamp")
     compiler_sources.action = run_generate_compiler_entrypoints_action
@@ -160,6 +245,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var compat_runtime = target_new(.Action, "compat-runtime-source", "").output("out/gen/compat_runtime.w")
     compat_runtime = compat_runtime.extra_output("out/gen/compiler/EmbeddedStdlibData.w")
     compat_runtime = compat_runtime.input("rt/compat_runtime.w")
+    compat_runtime = target_with_embedded_stdlib_inputs(compat_runtime, ctx)
     compat_runtime.action = generate_compat_runtime_action
     out = out.add_target(compat_runtime)
 
@@ -179,7 +265,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(bootstrap_llvm_link_metadata)
 
     out = out.add_target(with_object_target("bootstrap-rt-core-object", "seed", "rt/rt_core.w", "out/bootstrap-lib/rt_core.o", "-O2", ""))
-    out = out.add_target(with_object_target("bootstrap-rt-darwin-aarch64-object", "seed", "rt/darwin_aarch64.w", "out/bootstrap-lib/rt_darwin_aarch64.o", "-O2", ""))
+    out = out.add_target(with_object_target("bootstrap-rt-platform-object", "seed", host_runtime.platform_source, host_runtime.bootstrap_platform_object, "-O2", ""))
+    out = out.add_target(empty_file_target("bootstrap-empty-opposite-runtime-blob", host_runtime.opposite_bootstrap_platform_blob))
     out = out.add_target(with_object_target("bootstrap-cimport-stubs-object", "seed", "rt/cimport_stubs.w", "out/bootstrap-lib/cimport_stubs.o", "-O0", ""))
     out = out.add_target(with_object_target("bootstrap-compat-runtime-object", "seed", "out/gen/compat_runtime.w", "out/bootstrap-lib/compat_runtime.o", "-O0", "compat-runtime-source"))
     out = out.add_target(with_object_target("bootstrap-panic-runtime-object", "seed", "rt/panic_runtime.w", "out/bootstrap-lib/panic_runtime.o", "-O0", ""))
@@ -190,8 +277,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(with_object_target("bootstrap-fiber-stubs-object", "seed", "rt/fiber_stubs.w", "out/bootstrap-lib/fiber_stubs.o", "-O0", ""))
     out = out.add_target(with_object_target("bootstrap-channel-runtime-object", "seed", "rt/channel_runtime.w", "out/bootstrap-lib/channel_runtime.o", "-O0", ""))
     out = out.add_target(with_object_target("bootstrap-fiber-runtime-object", "seed", "rt/fiber_runtime.w", "out/bootstrap-lib/fiber_runtime.o", "-O0", ""))
-    out = out.add_target(with_object_target("bootstrap-fiber-core-object", "seed", "rt/fiber_core_darwin.w", "out/bootstrap-lib/fiber.o", "-O0", ""))
-    var bootstrap_fiber_asm = target_new(.CompileAsmObject, "bootstrap-fiber-asm-object", "runtime/fiber_asm_aarch64.s").output("out/bootstrap-lib/fiber_asm.o")
+    out = out.add_target(with_object_target("bootstrap-fiber-core-object", "seed", host_runtime.fiber_core_source, "out/bootstrap-lib/fiber.o", "-O0", ""))
+    var bootstrap_fiber_asm = target_new(.CompileAsmObject, "bootstrap-fiber-asm-object", host_runtime.fiber_asm_source).output("out/bootstrap-lib/fiber_asm.o")
     out = out.add_target(bootstrap_fiber_asm)
 
     var bootstrap_embedded_objects = target_new(.EmbedObjectFiles, "bootstrap-embedded-objects-asm", "").output("out/bootstrap-lib/embedded_objects.s")
@@ -215,8 +302,10 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_embedded_objects = bootstrap_embedded_objects.arg("fiber_asm_o")
     bootstrap_embedded_objects = bootstrap_embedded_objects.input("out/bootstrap-lib/rt_core.o")
     bootstrap_embedded_objects = bootstrap_embedded_objects.arg("rt_core_o")
-    bootstrap_embedded_objects = bootstrap_embedded_objects.input("out/bootstrap-lib/rt_darwin_aarch64.o")
-    bootstrap_embedded_objects = bootstrap_embedded_objects.arg("rt_darwin_aarch64_o")
+    bootstrap_embedded_objects = bootstrap_embedded_objects.input(host_runtime.bootstrap_platform_object)
+    bootstrap_embedded_objects = bootstrap_embedded_objects.arg(host_runtime.platform_symbol)
+    bootstrap_embedded_objects = bootstrap_embedded_objects.input(host_runtime.opposite_bootstrap_platform_blob)
+    bootstrap_embedded_objects = bootstrap_embedded_objects.arg(host_runtime.opposite_platform_symbol)
     out = out.add_target(bootstrap_embedded_objects)
     var bootstrap_embedded_objects_obj = target_new(.CompileAsmObject, "bootstrap-embedded-objects-object", "out/bootstrap-lib/embedded_objects.s").output("out/bootstrap-lib/embedded_objects.o")
     bootstrap_embedded_objects_obj = bootstrap_embedded_objects_obj.dep("bootstrap-embedded-objects-asm")
@@ -225,7 +314,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     var bootstrap_runtime = target_new(.Group, "bootstrap-runtime", "")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-llvm-link-metadata")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-rt-core-object")
-    bootstrap_runtime = bootstrap_runtime.dep("bootstrap-rt-darwin-aarch64-object")
+    bootstrap_runtime = bootstrap_runtime.dep("bootstrap-rt-platform-object")
+    bootstrap_runtime = bootstrap_runtime.dep("bootstrap-empty-opposite-runtime-blob")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-cimport-stubs-object")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-compat-runtime-object")
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-panic-runtime-object")
@@ -238,8 +328,20 @@ pub fn build(ctx: BuildCtx) -> Build:
     bootstrap_runtime = bootstrap_runtime.dep("bootstrap-embedded-objects-object")
     out = out.add_target(bootstrap_runtime)
 
-    out = out.add_target(with_object_target("llvm-bridge-object", "seed", "rt/llvm_bridge.w", "out/lib/llvm_bridge.o", "-O0", ""))
-    out = out.add_target(with_object_target("clang-bridge-object", "seed", "rt/clang_bridge.w", "out/lib/clang_bridge.o", "-O0", ""))
+    var prepare_bootstrap_link_root = target_new(.Action, "prepare-bootstrap-link-root", "").output("out/bootstrap-lib/.prepared-link-root")
+    prepare_bootstrap_link_root.action = run_prepare_bootstrap_link_root_action
+    prepare_bootstrap_link_root = prepare_bootstrap_link_root.input("rt/llvm_bridge.w")
+    prepare_bootstrap_link_root = prepare_bootstrap_link_root.input("rt/clang_bridge.w")
+    prepare_bootstrap_link_root = prepare_bootstrap_link_root.input("rt/cimport_stubs.w")
+    prepare_bootstrap_link_root = prepare_bootstrap_link_root.input("rt/rt_core.w")
+    prepare_bootstrap_link_root = prepare_bootstrap_link_root.input(host_runtime.platform_source)
+    prepare_bootstrap_link_root = prepare_bootstrap_link_root.write_scope("out/lib")
+    prepare_bootstrap_link_root = prepare_bootstrap_link_root.write_scope("out/bootstrap-lib")
+    prepare_bootstrap_link_root = prepare_bootstrap_link_root.dep("bootstrap-runtime")
+    out = out.add_target(prepare_bootstrap_link_root)
+
+    out = out.add_target(with_object_target("llvm-bridge-object", "out/bin/with-stage2", "rt/llvm_bridge.w", "out/lib/llvm_bridge.o", "-O0", "stage2"))
+    out = out.add_target(with_object_target("clang-bridge-object", "out/bin/with-stage2", "rt/clang_bridge.w", "out/lib/clang_bridge.o", "-O0", "stage2"))
 
     var llvm_link_metadata = target_new(.Action, "llvm-link-metadata", "").output("out/lib/.llvm-link-ready")
     llvm_link_metadata.action = run_generate_llvm_link_metadata_action
@@ -262,7 +364,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage1 = stage1.write_scope("out/bin")
     stage1 = stage1.dep("compiler-sources")
     stage1 = stage1.dep("compat-runtime-source")
-    stage1 = stage1.dep("bootstrap-runtime")
+    stage1 = stage1.dep("prepare-bootstrap-link-root")
     out = out.add_target(stage1)
 
     var stage2 = target_new(.Action, "stage2", "").output("out/bin/with-stage2")
@@ -341,7 +443,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(verified)
 
     out = out.add_target(with_object_target("rt-core-object", "out/bin/with-stage2", "rt/rt_core.w", "out/lib/rt_core.o", "-O2", "stage2"))
-    out = out.add_target(with_object_target("rt-darwin-aarch64-object", "out/bin/with-stage2", "rt/darwin_aarch64.w", "out/lib/rt_darwin_aarch64.o", "-O2", "stage2"))
+    out = out.add_target(with_object_target("rt-platform-object", "out/bin/with-stage2", host_runtime.platform_source, host_runtime.platform_object, "-O2", "stage2"))
+    out = out.add_target(empty_file_target("empty-opposite-runtime-blob", host_runtime.opposite_platform_blob))
     out = out.add_target(with_object_target("cimport-stubs-object", "out/bin/with-stage2", "rt/cimport_stubs.w", "out/lib/cimport_stubs.o", "-O0", "stage2"))
     var compat_runtime_obj = with_object_target("compat-runtime-object", "out/bin/with-stage2", "out/gen/compat_runtime.w", "out/lib/compat_runtime.o", "-O0", "stage2")
     compat_runtime_obj = compat_runtime_obj.dep("compat-runtime-source")
@@ -355,9 +458,9 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(with_object_target("fiber-stubs-object", "out/bin/with-stage2", "rt/fiber_stubs.w", "out/lib/fiber_stubs.o", "-O0", "stage2"))
     out = out.add_target(with_object_target("channel-runtime-object", "out/bin/with-stage2", "rt/channel_runtime.w", "out/lib/channel_runtime.o", "-O0", "stage2"))
     out = out.add_target(with_object_target("fiber-runtime-object", "out/bin/with-stage2", "rt/fiber_runtime.w", "out/lib/fiber_runtime.o", "-O0", "stage2"))
-    out = out.add_target(with_object_target("fiber-core-object", "out/bin/with-stage2", "rt/fiber_core_darwin.w", "out/lib/fiber.o", "-O0", "stage2"))
+    out = out.add_target(with_object_target("fiber-core-object", "out/bin/with-stage2", host_runtime.fiber_core_source, "out/lib/fiber.o", "-O0", "stage2"))
 
-    var fiber_asm = target_new(.CompileAsmObject, "fiber-asm-object", "runtime/fiber_asm_aarch64.s").output("out/lib/fiber_asm.o")
+    var fiber_asm = target_new(.CompileAsmObject, "fiber-asm-object", host_runtime.fiber_asm_source).output("out/lib/fiber_asm.o")
     out = out.add_target(fiber_asm)
 
     var embedded_objects = target_new(.EmbedObjectFiles, "embedded-objects-asm", "").output("out/lib/embedded_objects.s")
@@ -381,8 +484,10 @@ pub fn build(ctx: BuildCtx) -> Build:
     embedded_objects = embedded_objects.arg("fiber_asm_o")
     embedded_objects = embedded_objects.input("out/lib/rt_core.o")
     embedded_objects = embedded_objects.arg("rt_core_o")
-    embedded_objects = embedded_objects.input("out/lib/rt_darwin_aarch64.o")
-    embedded_objects = embedded_objects.arg("rt_darwin_aarch64_o")
+    embedded_objects = embedded_objects.input(host_runtime.platform_object)
+    embedded_objects = embedded_objects.arg(host_runtime.platform_symbol)
+    embedded_objects = embedded_objects.input(host_runtime.opposite_platform_blob)
+    embedded_objects = embedded_objects.arg(host_runtime.opposite_platform_symbol)
     out = out.add_target(embedded_objects)
 
     var embedded_objects_obj = target_new(.CompileAsmObject, "embedded-objects-object", "out/lib/embedded_objects.s").output("out/lib/embedded_objects.o")
@@ -390,6 +495,7 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     var runtime = target_new(.Group, "runtime", "")
     runtime = runtime.dep("embedded-objects-object")
+    runtime = runtime.dep("empty-opposite-runtime-blob")
     out = out.add_target(runtime)
 
     var compiler = target_new(.Action, "build", "").output("out/bin/with")
@@ -433,8 +539,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(emit_c_roundtrip)
 
     var behavior_tests = target_new(.Test, "behavior-tests", "test/behavior/*.w")
-    behavior_tests = behavior_tests.arg("compiler=out/bin/with-stage2")
-    behavior_tests = behavior_tests.dep("selfcheck")
+    behavior_tests = behavior_tests.arg("compiler=out/bin/with")
+    behavior_tests = behavior_tests.dep("build")
     out = out.add_target(behavior_tests)
 
     var native_compile_error_tests = target_new(.Test, "native-compile-error-tests", "test/compile_errors/*.w")
@@ -455,64 +561,64 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     var cli_selfhost_smoke_tests = target_new(.Action, "cli-selfhost-smoke-tests", "").output("out/test-graph/cli-selfhost-smoke-tests")
     cli_selfhost_smoke_tests.action = run_cli_selfhost_smoke_action
-    cli_selfhost_smoke_tests = cli_selfhost_smoke_tests.input("out/bin/with-stage2")
-    cli_selfhost_smoke_tests = cli_selfhost_smoke_tests.dep("selfcheck")
+    cli_selfhost_smoke_tests = cli_selfhost_smoke_tests.input("out/bin/with")
+    cli_selfhost_smoke_tests = cli_selfhost_smoke_tests.dep("build")
     out = out.add_target(cli_selfhost_smoke_tests)
 
     var cli_selfhost_one_liner_tests = target_new(.Action, "cli-selfhost-one-liner-tests", "").output("out/test-graph/cli-selfhost-one-liner-tests")
     cli_selfhost_one_liner_tests.action = run_cli_selfhost_one_liner_action
-    cli_selfhost_one_liner_tests = cli_selfhost_one_liner_tests.input("out/bin/with-stage2")
-    cli_selfhost_one_liner_tests = cli_selfhost_one_liner_tests.dep("selfcheck")
+    cli_selfhost_one_liner_tests = cli_selfhost_one_liner_tests.input("out/bin/with")
+    cli_selfhost_one_liner_tests = cli_selfhost_one_liner_tests.dep("build")
     out = out.add_target(cli_selfhost_one_liner_tests)
 
     var cli_selfhost_object_symbol_tests = target_new(.Action, "cli-selfhost-object-symbol-tests", "").output("out/test-graph/cli-selfhost-object-symbol-tests")
     cli_selfhost_object_symbol_tests.action = run_cli_selfhost_object_symbol_action
     cli_selfhost_object_symbol_tests = cli_selfhost_object_symbol_tests.arg("nm")
-    cli_selfhost_object_symbol_tests = cli_selfhost_object_symbol_tests.input("out/bin/with-stage2")
-    cli_selfhost_object_symbol_tests = cli_selfhost_object_symbol_tests.dep("selfcheck")
+    cli_selfhost_object_symbol_tests = cli_selfhost_object_symbol_tests.input("out/bin/with")
+    cli_selfhost_object_symbol_tests = cli_selfhost_object_symbol_tests.dep("build")
     out = out.add_target(cli_selfhost_object_symbol_tests)
 
     var cli_selfhost_build_w_tests = target_new(.Action, "cli-selfhost-build-w-tests", "").output("out/test-graph/cli-selfhost-build-w-tests")
     cli_selfhost_build_w_tests.action = run_cli_selfhost_build_w_action
-    cli_selfhost_build_w_tests = cli_selfhost_build_w_tests.input("out/bin/with-stage2")
-    cli_selfhost_build_w_tests = cli_selfhost_build_w_tests.dep("selfcheck")
+    cli_selfhost_build_w_tests = cli_selfhost_build_w_tests.input("out/bin/with")
+    cli_selfhost_build_w_tests = cli_selfhost_build_w_tests.dep("build")
     out = out.add_target(cli_selfhost_build_w_tests)
 
     var cli_selfhost_project_tests = target_new(.Action, "cli-selfhost-project-tests", "").output("out/test-graph/cli-selfhost-project-tests")
     cli_selfhost_project_tests.action = run_cli_selfhost_project_action
-    cli_selfhost_project_tests = cli_selfhost_project_tests.input("out/bin/with-stage2")
-    cli_selfhost_project_tests = cli_selfhost_project_tests.dep("selfcheck")
+    cli_selfhost_project_tests = cli_selfhost_project_tests.input("out/bin/with")
+    cli_selfhost_project_tests = cli_selfhost_project_tests.dep("build")
     out = out.add_target(cli_selfhost_project_tests)
 
     var cli_selfhost_edge_tests = target_new(.Action, "cli-selfhost-edge-tests", "").output("out/test-graph/cli-selfhost-edge-tests")
     cli_selfhost_edge_tests.action = run_cli_selfhost_edge_action
-    cli_selfhost_edge_tests = cli_selfhost_edge_tests.input("out/bin/with-stage2")
-    cli_selfhost_edge_tests = cli_selfhost_edge_tests.dep("selfcheck")
+    cli_selfhost_edge_tests = cli_selfhost_edge_tests.input("out/bin/with")
+    cli_selfhost_edge_tests = cli_selfhost_edge_tests.dep("build")
     out = out.add_target(cli_selfhost_edge_tests)
 
     var cli_selfhost_parallel_tests = target_new(.Action, "cli-selfhost-parallel-tests", "").output("out/test-graph/cli-selfhost-parallel-tests")
     cli_selfhost_parallel_tests.action = run_cli_selfhost_parallel_action
-    cli_selfhost_parallel_tests = cli_selfhost_parallel_tests.input("out/bin/with-stage2")
-    cli_selfhost_parallel_tests = cli_selfhost_parallel_tests.dep("selfcheck")
+    cli_selfhost_parallel_tests = cli_selfhost_parallel_tests.input("out/bin/with")
+    cli_selfhost_parallel_tests = cli_selfhost_parallel_tests.dep("build")
     out = out.add_target(cli_selfhost_parallel_tests)
 
     var c_migrator_pcre2_prep_tests = target_new(.Action, "c-migrator-pcre2-prep-tests", "").output("out/test-graph/c-migrator-pcre2-prep-tests")
     c_migrator_pcre2_prep_tests.action = run_cli_selfhost_pcre2_prep_action
-    c_migrator_pcre2_prep_tests = c_migrator_pcre2_prep_tests.input("out/bin/with-stage2")
+    c_migrator_pcre2_prep_tests = c_migrator_pcre2_prep_tests.input("out/bin/with")
     c_migrator_pcre2_prep_tests = c_migrator_pcre2_prep_tests.write_scope("out/pcre2_tmp")
-    c_migrator_pcre2_prep_tests = c_migrator_pcre2_prep_tests.dep("selfcheck")
+    c_migrator_pcre2_prep_tests = c_migrator_pcre2_prep_tests.dep("build")
     out = out.add_target(c_migrator_pcre2_prep_tests)
 
     var c_migrator_basic_tests = target_new(.Action, "c-migrator-basic-tests", "").output("out/test-graph/c-migrator-basic-tests")
     c_migrator_basic_tests.action = run_cli_selfhost_migrate_basic_action
-    c_migrator_basic_tests = c_migrator_basic_tests.input("out/bin/with-stage2")
-    c_migrator_basic_tests = c_migrator_basic_tests.dep("selfcheck")
+    c_migrator_basic_tests = c_migrator_basic_tests.input("out/bin/with")
+    c_migrator_basic_tests = c_migrator_basic_tests.dep("build")
     out = out.add_target(c_migrator_basic_tests)
 
     var c_migrator_core_tests = target_new(.Action, "c-migrator-core-tests", "").output("out/test-graph/c-migrator-core-tests")
     c_migrator_core_tests.action = run_cli_selfhost_migrate_core_action
-    c_migrator_core_tests = c_migrator_core_tests.input("out/bin/with-stage2")
-    c_migrator_core_tests = c_migrator_core_tests.dep("selfcheck")
+    c_migrator_core_tests = c_migrator_core_tests.input("out/bin/with")
+    c_migrator_core_tests = c_migrator_core_tests.dep("build")
     out = out.add_target(c_migrator_core_tests)
 
     var c_migrator_tests = target_new(.Group, "c-migrator-tests", "")
@@ -523,8 +629,8 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     var issue61_regression = target_new(.Action, "issue61-regression", "").output("out/test-graph/issue61-regression")
     issue61_regression.action = issue61_regression_action
-    issue61_regression = issue61_regression.input("out/bin/with-stage2")
-    issue61_regression = issue61_regression.dep("selfcheck")
+    issue61_regression = issue61_regression.input("out/bin/with")
+    issue61_regression = issue61_regression.dep("build")
     out = out.add_target(issue61_regression)
 
     var embedded_runtime_regression = target_new(.Action, "embedded-runtime-regression", "").output("out/test-graph/embedded-runtime-regression")
@@ -535,9 +641,9 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     var emit_c_smoke = target_new(.Action, "emit-c-smoke", "").output("out/test-graph/emit-c-smoke")
     emit_c_smoke.action = run_emit_c_smoke_action
-    emit_c_smoke = emit_c_smoke.input("out/bin/with-stage2")
+    emit_c_smoke = emit_c_smoke.input("out/bin/with")
     emit_c_smoke = emit_c_smoke.input("test/hello.w")
-    emit_c_smoke = emit_c_smoke.dep("selfcheck")
+    emit_c_smoke = emit_c_smoke.dep("build")
     emit_c_smoke = emit_c_smoke.dep("runtime")
     out = out.add_target(emit_c_smoke)
 
@@ -577,7 +683,7 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     out = out.add_target(install_file_target("install-compiler", "out/bin/with-stage2", "$INSTALL_BINDIR/with", "0755", "stage2"))
     out = out.add_target(install_file_target("install-rt-core", "out/lib/rt_core.o", "$INSTALL_LIBDIR/rt_core.o", "0644", "runtime"))
-    out = out.add_target(install_file_target("install-rt-darwin-aarch64", "out/lib/rt_darwin_aarch64.o", "$INSTALL_LIBDIR/rt_darwin_aarch64.o", "0644", "runtime"))
+    out = out.add_target(install_file_target("install-rt-platform", host_runtime.platform_object, "$INSTALL_LIBDIR/" ++ host_runtime.platform_install_object, "0644", "runtime"))
     out = out.add_target(install_file_target("install-cimport-stubs", "out/lib/cimport_stubs.o", "$INSTALL_LIBDIR/cimport_stubs.o", "0644", "runtime"))
     out = out.add_target(install_file_target("install-compat-runtime", "out/lib/compat_runtime.o", "$INSTALL_LIBDIR/compat_runtime.o", "0644", "runtime"))
     out = out.add_target(install_file_target("install-panic-runtime", "out/lib/panic_runtime.o", "$INSTALL_LIBDIR/panic_runtime.o", "0644", "runtime"))
@@ -598,7 +704,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var install = target_new(.Group, "install", "")
     install = install.dep("install-compiler")
     install = install.dep("install-rt-core")
-    install = install.dep("install-rt-darwin-aarch64")
+    install = install.dep("install-rt-platform")
     install = install.dep("install-cimport-stubs")
     install = install.dep("install-compat-runtime")
     install = install.dep("install-panic-runtime")

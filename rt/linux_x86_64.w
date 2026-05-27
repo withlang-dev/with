@@ -1,60 +1,42 @@
-// rt/darwin_aarch64.w — macOS aarch64 runtime backend
+// rt/linux_x86_64.w -- Linux x86_64 runtime backend.
 //
-// Implements the 13 rt_* functions by calling libSystem.
-// All libSystem symbols declared as extern fn (no c_import, no libc headers).
-//
+// Implements the rt_* platform boundary through stable libc/POSIX ABI symbols.
 // Error convention: negative return = negated errno.
-// EINTR rule: retry internally on EINTR.
-// rt_mmap returns null on failure (not MAP_FAILED).
-
-// ── libSystem declarations ──────────────────────────────────────
-// These are stable ABI symbols from libSystem.B.dylib.
-// __open is the non-variadic internal symbol (open is variadic in C,
-// which has a different calling convention on aarch64).
 
 extern fn write(fd: i32, buf: *const u8, len: u64) -> i64
 extern fn read(fd: i32, buf: *mut u8, len: u64) -> i64
-extern fn __open(path: *const u8, flags: i32, mode: i32) -> i32
+extern fn open(path: *const u8, flags: i32, mode: i32) -> i32
 extern fn close(fd: i32) -> i32
 extern fn lseek(fd: i32, offset: i64, whence: i32) -> i64
 extern fn getcwd(buf: *mut u8, size: u64) -> *mut u8
 extern fn mmap(addr: *mut u8, len: u64, prot: i32, flags: i32, fd: i32, offset: i64) -> *mut u8
 extern fn munmap(addr: *mut u8, len: u64) -> i32
 extern fn getenv(name: *const u8) -> *const u8
-extern fn sysconf(name: i32) -> i64
 extern fn stat(path: *const u8, buf: *mut u8) -> i32
 extern fn chmod(path: *const u8, mode: i32) -> i32
 extern fn _exit(code: i32) -> void
-extern fn mach_absolute_time() -> u64
-extern fn __error() -> *mut i32
-extern fn arc4random_buf(buf: *mut u8, len: u64)
+extern fn __errno_location() -> *mut i32
+extern fn getrandom(buf: *mut u8, len: u64, flags: u32) -> i64
+extern fn sysconf(name: i32) -> i64
 extern fn sigaltstack(ss: *const u8, old_ss: *mut u8) -> i32
 extern fn sigaction(sig: i32, act: *const u8, old_act: *mut u8) -> i32
-extern var __stdinp: *mut u8
-extern var __stdoutp: *mut u8
-extern var __stderrp: *mut u8
-
-type MachTimebaseInfo:
-    numer: u32
-    denom: u32
-
-extern fn mach_timebase_info(info: *mut MachTimebaseInfo) -> i32
-
-// ── Helpers ─────────────────────────────────────────────────────
+extern var stdin: *mut u8
+extern var stdout: *mut u8
+extern var stderr: *mut u8
 
 fn get_errno() -> i32:
-    let p = __error()
+    let p = __errno_location()
     unsafe: *p
 
-// ── StatBuf (stdlib's view of metadata) ─────────────────────────
+@[c_export("__error")]
+pub fn linux_darwin_error_compat() -> *mut i32:
+    __errno_location()
 
 type RtStatBuf:
     size: i64
     is_dir: i32
     is_file: i32
     modified_ns: i64
-
-// ── Argv storage ────────────────────────────────────────────────
 
 var rt_argc: i32 = 0
 var rt_argv_raw: i64 = 0
@@ -64,75 +46,113 @@ pub fn store_args(argc_val: i32, argv_val: *const *const u8):
     rt_argc = argc_val
     rt_argv_raw = argv_val as i64
 
+fn rt_random_fail():
+    let msg = "fatal: could not read OS randomness\n" as *const u8
+    let _ = write(2, msg, 36)
+    _exit(1)
+
 @[c_export("rt_fill_random")]
 pub fn rt_fill_random_impl(buf: *mut u8, len: u64):
-    arc4random_buf(buf, len)
+    var off: u64 = 0
+    while off < len:
+        let p = (buf as i64 + off as i64) as *mut u8
+        let n = getrandom(p, len - off, 0 as u32)
+        if n > 0:
+            off = off + n as u64
+        else:
+            if get_errno() == 4:
+                continue
+            break
+    if off < len:
+        let fd = open("/dev/urandom" as *const u8, 0, 0)
+        if fd < 0:
+            rt_random_fail()
+        while off < len:
+            let p = (buf as i64 + off as i64) as *mut u8
+            let n = rt_read_impl(fd, p, len - off)
+            if n <= 0:
+                let _close = rt_close_impl(fd)
+                rt_random_fail()
+            off = off + n as u64
+        let _close = rt_close_impl(fd)
 
 @[c_export("rt_libc_stdin")]
 pub fn rt_libc_stdin_impl() -> *mut u8:
-    __stdinp
+    stdin
 
 @[c_export("rt_libc_stdout")]
 pub fn rt_libc_stdout_impl() -> *mut u8:
-    __stdoutp
+    stdout
 
 @[c_export("rt_libc_stderr")]
 pub fn rt_libc_stderr_impl() -> *mut u8:
-    __stderrp
+    stderr
 
 @[c_export("rt_fiber_page_size")]
 pub fn rt_fiber_page_size_impl() -> i64:
-    let page_size = sysconf(29)
+    let page_size = sysconf(30)
     if page_size > 0:
         return page_size
-    16384
+    4096
 
 @[c_export("rt_fiber_mmap_flags")]
 pub fn rt_fiber_mmap_flags_impl() -> i32:
-    // Darwin: MAP_PRIVATE | MAP_ANON.
-    0x1002
+    // Linux: MAP_PRIVATE | MAP_ANONYMOUS.
+    0x22
 
 @[c_export("rt_fiber_fault_addr")]
 pub fn rt_fiber_fault_addr_impl(info: *const u8) -> i64:
     if info as i64 == 0:
         return 0
     unsafe:
-        *((info as i64 + 24) as *const i64)
+        *((info as i64 + 16) as *const i64)
 
-fn darwin_store_i64(base: i64, offset: i64, value: i64):
+fn linux_store_i64(base: i64, offset: i64, value: i64):
     unsafe:
         *((base + offset) as *mut i64) = value
 
-fn darwin_store_i32(base: i64, offset: i64, value: i32):
+fn linux_store_i32(base: i64, offset: i64, value: i32):
     unsafe:
         *((base + offset) as *mut i32) = value
 
-fn darwin_zero_sigaction(sig: i32):
-    var sa: [16]u8 = [0 as u8; 16]
-    let sa_base = (&raw mut sa) as *mut [16]u8 as i64
+fn linux_zero_sigaction(sig: i32):
+    var sa: [152]u8 = [0 as u8; 152]
+    let sa_base = (&raw mut sa) as *mut [152]u8 as i64
     let _ = sigaction(sig, sa_base as *const u8, 0 as *mut u8)
 
 @[c_export("rt_fiber_reset_signal_handler")]
 pub fn rt_fiber_reset_signal_handler_impl(sig: i32):
-    darwin_zero_sigaction(sig)
+    linux_zero_sigaction(sig)
 
 @[c_export("rt_fiber_install_signal_handlers")]
 pub fn rt_fiber_install_signal_handlers_impl(alt_stack: *mut u8, alt_stack_size: i64, handler: i64):
     var ss: [24]u8 = [0 as u8; 24]
     let ss_base = (&raw mut ss) as *mut [24]u8 as i64
-    darwin_store_i64(ss_base, 0, alt_stack as i64)
-    darwin_store_i64(ss_base, 8, alt_stack_size)
-    darwin_store_i32(ss_base, 16, 0)
+    linux_store_i64(ss_base, 0, alt_stack as i64)
+    linux_store_i32(ss_base, 8, 0)
+    linux_store_i64(ss_base, 16, alt_stack_size)
     let _ = sigaltstack(ss_base as *const u8, 0 as *mut u8)
 
-    var sa: [16]u8 = [0 as u8; 16]
-    let sa_base = (&raw mut sa) as *mut [16]u8 as i64
-    darwin_store_i64(sa_base, 0, handler)
-    darwin_store_i32(sa_base, 12, 0x0040 | 0x0001)
+    var sa: [152]u8 = [0 as u8; 152]
+    let sa_base = (&raw mut sa) as *mut [152]u8 as i64
+    linux_store_i64(sa_base, 0, handler)
+    linux_store_i32(sa_base, 136, 134217728 | 4)
     let _ = sigaction(11, sa_base as *const u8, 0 as *mut u8)
-    let _ = sigaction(10, sa_base as *const u8, 0 as *mut u8)
+    let _ = sigaction(7, sa_base as *const u8, 0 as *mut u8)
 
-// ── I/O ─────────────────────────────────────────────────────────
+@[c_export("__open")]
+pub fn linux_darwin_open_compat(path: *const u8, flags: i32, mode: i32) -> i32:
+    var native = flags & 3
+    if (flags & 0x0008) != 0: native = native | 0x400
+    if (flags & 0x0200) != 0: native = native | 0x40
+    if (flags & 0x0400) != 0: native = native | 0x200
+    if (flags & 0x0800) != 0: native = native | 0x80
+    var r: i32 = 0
+    loop:
+        r = open(path, native, mode)
+        if r >= 0 or get_errno() != 4:
+            break
+    r
 
 @[c_export("rt_write")]
 pub fn rt_write_impl(fd: i32, buf: *const u8, len: i64) -> i64:
@@ -158,16 +178,16 @@ pub fn rt_read_impl(fd: i32, buf: *mut u8, len: i64) -> i64:
 
 @[c_export("rt_open")]
 pub fn rt_open_impl(path: *const u8, flags: i32, mode: i32) -> i32:
-    // Map canonical flags to native darwin flags
-    // Canonical: O_RDONLY=0, O_WRONLY=1, O_RDWR=2, O_CREAT=0x200, O_TRUNC=0x400, O_APPEND=0x800
-    // Darwin:    O_RDONLY=0, O_WRONLY=1, O_RDWR=2, O_CREAT=0x200, O_TRUNC=0x400, O_APPEND=0x008
+    // Canonical: O_RDONLY=0, O_WRONLY=1, O_RDWR=2, O_CREAT=0x200,
+    // O_TRUNC=0x400, O_APPEND=0x800.
+    // Linux: O_CREAT=0x40, O_EXCL=0x80, O_TRUNC=0x200, O_APPEND=0x400.
     var native = flags & 3
-    if (flags & 0x200) != 0: native = native | 0x200
-    if (flags & 0x400) != 0: native = native | 0x400
-    if (flags & 0x800) != 0: native = native | 0x008
+    if (flags & 0x200) != 0: native = native | 0x40
+    if (flags & 0x400) != 0: native = native | 0x200
+    if (flags & 0x800) != 0: native = native | 0x400
     var r: i32 = 0
     loop:
-        r = __open(path, native, mode)
+        r = open(path, native, mode)
         if r >= 0 or get_errno() != 4:
             break
     if r < 0:
@@ -192,23 +212,29 @@ pub fn rt_seek_impl(fd: i32, offset: i64, whence: i32) -> i64:
         return -(get_errno() as i64)
     r
 
+let S_IFMT: i32 = 61440
+let S_IFDIR: i32 = 16384
+let S_IFREG: i32 = 32768
+let LINUX_STAT_SIZE: i64 = 144
+let LINUX_STAT_MODE_OFFSET: i64 = 24
+let LINUX_STAT_SIZE_OFFSET: i64 = 48
+let LINUX_STAT_MTIME_SEC_OFFSET: i64 = 88
+let LINUX_STAT_MTIME_NSEC_OFFSET: i64 = 96
+
 @[c_export("rt_stat")]
 pub fn rt_stat_impl(path: *const u8, out: *mut RtStatBuf) -> i32:
     var native_buf: [144]u8 = [0 as u8; 144]
-    let r = stat(path, &native_buf as *mut u8)
+    let r = stat(path, &native_buf as *mut [144]u8 as *mut u8)
     if r < 0:
         return -get_errno()
-    // Extract fields from native stat struct (darwin aarch64 layout):
-    // offset 4: st_mode (u16), offset 48: st_mtimespec.tv_sec (i64),
-    // offset 56: st_mtimespec.tv_nsec (i64), offset 96: st_size (i64)
     let base = &native_buf as i64
-    let size = unsafe: *((base + 96) as *const i64)
-    let mode = unsafe: *((base + 4) as *const u16)
-    let mtime_sec = unsafe: *((base + 48) as *const i64)
-    let mtime_nsec = unsafe: *((base + 56) as *const i64)
+    let size = unsafe: *((base + LINUX_STAT_SIZE_OFFSET) as *const i64)
+    let mode = unsafe: *((base + LINUX_STAT_MODE_OFFSET) as *const i32)
+    let mtime_sec = unsafe: *((base + LINUX_STAT_MTIME_SEC_OFFSET) as *const i64)
+    let mtime_nsec = unsafe: *((base + LINUX_STAT_MTIME_NSEC_OFFSET) as *const i64)
     (unsafe: *out).size = size
-    (unsafe: *out).is_dir = if (mode as i32 & 0o170000) == 0o040000: 1 else: 0
-    (unsafe: *out).is_file = if (mode as i32 & 0o170000) == 0o100000: 1 else: 0
+    (unsafe: *out).is_dir = if (mode & S_IFMT) == S_IFDIR: 1 else: 0
+    (unsafe: *out).is_file = if (mode & S_IFMT) == S_IFREG: 1 else: 0
     (unsafe: *out).modified_ns = mtime_sec * 1000000000 + mtime_nsec
     0
 
@@ -226,21 +252,16 @@ pub fn rt_getcwd_impl(buf: *mut u8, size: i64) -> i32:
         return -get_errno()
     0
 
-// ── Memory ──────────────────────────────────────────────────────
-
 @[c_export("rt_mmap")]
 pub fn rt_mmap_impl(size: i64) -> *mut u8:
-    // PROT_READ|PROT_WRITE = 3, MAP_PRIVATE|MAP_ANON = 0x1002
-    let p = mmap(0 as *mut u8, size as u64, 3, 0x1002, -1, 0)
-    if p as i64 == -1:  // MAP_FAILED
+    let p = mmap(0 as *mut u8, size as u64, 3, 0x22, -1, 0)
+    if p as i64 == -1:
         return 0 as *mut u8
     p
 
 @[c_export("rt_munmap")]
 pub fn rt_munmap_impl(ptr: *mut u8, size: i64):
     let _ = munmap(ptr, size as u64)
-
-// ── Process ─────────────────────────────────────────────────────
 
 @[c_export("rt_exit")]
 pub fn rt_exit_impl(code: i32):
@@ -250,28 +271,19 @@ pub fn rt_exit_impl(code: i32):
 pub fn rt_args_impl() -> (*const *const u8, i32):
     (rt_argv_raw as *const *const u8, rt_argc)
 
-// ── Time ────────────────────────────────────────────────────────
-
-var timebase_numer: i64 = 0
-var timebase_denom: i64 = 0
-
-@[c_export("rt_clock_ns")]
-pub fn rt_clock_ns_impl() -> i64:
-    if timebase_denom == 0:
-        var info = MachTimebaseInfo { numer: 0, denom: 0 }
-        let _ = mach_timebase_info(&raw mut info)
-        timebase_numer = info.numer as i64
-        timebase_denom = info.denom as i64
-    let ticks = mach_absolute_time() as i64
-    ticks * timebase_numer / timebase_denom
-
-// ── Sleep ───────────────────────────────────────────────────────
-
 type Timespec:
     tv_sec: i64
     tv_nsec: i64
 
+extern fn clock_gettime(clk_id: i32, tp: *mut Timespec) -> i32
 extern fn nanosleep(req: *const Timespec, rem: *mut Timespec) -> i32
+
+@[c_export("rt_clock_ns")]
+pub fn rt_clock_ns_impl() -> i64:
+    var ts = Timespec { tv_sec: 0, tv_nsec: 0 }
+    if clock_gettime(1, &raw mut ts) != 0:
+        return 0
+    ts.tv_sec * 1000000000 + ts.tv_nsec
 
 @[c_export("rt_nanosleep")]
 pub fn rt_nanosleep_impl(ns: i64) -> i32:
@@ -282,20 +294,14 @@ pub fn rt_nanosleep_impl(ns: i64) -> i32:
         r = nanosleep(&req, &raw mut rem)
         if r >= 0 or get_errno() != 4:
             break
-        // EINTR: use remaining time for next attempt
         req = rem
     if r < 0:
         return -get_errno()
     0
 
-// ── Process extras ──────────────────────────────────────────────
-
 extern fn getpid() -> i32
 extern fn raise(sig: i32) -> i32
 extern fn kill(pid: i32, sig: i32) -> i32
-extern fn pthread_attr_init(attr: *mut u8) -> i32
-extern fn pthread_attr_setstacksize(attr: *mut u8, stacksize: u64) -> i32
-extern fn pthread_attr_destroy(attr: *mut u8) -> i32
 extern fn pthread_create(thread: *mut i64, attr: *const u8, start_routine: *mut u8, arg: *mut u8) -> i32
 extern fn pthread_join(thread: i64, retval: *mut *mut u8) -> i32
 
@@ -320,18 +326,7 @@ pub fn rt_raise_impl(sig: i32) -> i32:
 @[c_export("rt_thread_spawn")]
 pub fn rt_thread_spawn_impl(start_routine: *mut u8, arg: *mut u8) -> i64:
     var handle: i64 = 0
-    var attr: [64]u8 = [0 as u8; 64]
-    var rc = pthread_attr_init(&raw mut attr[0])
-    if rc != 0:
-        return -(rc as i64)
-    rc = pthread_attr_setstacksize(&raw mut attr[0], 16 * 1024 * 1024)
-    if rc != 0:
-        let _ = pthread_attr_destroy(&raw mut attr[0])
-        return -(rc as i64)
-    rc = pthread_create(&raw mut handle, &raw const attr[0], start_routine, arg)
-    let destroy_rc = pthread_attr_destroy(&raw mut attr[0])
-    if rc == 0 and destroy_rc != 0:
-        return -(destroy_rc as i64)
+    let rc = pthread_create(&raw mut handle, 0 as *const u8, start_routine, arg)
     if rc != 0:
         return -(rc as i64)
     handle
@@ -344,10 +339,7 @@ pub fn rt_thread_join_impl(handle: i64) -> i32:
         return -rc
     0
 
-// ── Filesystem extras ───────────────────────────────────────────
-// Beyond the core 13 rt_* functions — needed by std/fs.w
-
-extern fn mkdir(path: *const u8, mode: u16) -> i32
+extern fn mkdir(path: *const u8, mode: i32) -> i32
 extern fn unlink(path: *const u8) -> i32
 extern fn rmdir(path: *const u8) -> i32
 extern fn rename(old_path: *const u8, new_path: *const u8) -> i32
@@ -360,11 +352,7 @@ extern fn closedir(dirp: *mut u8) -> i32
 extern fn with_str_from_cstr(s: *const u8) -> str
 extern fn with_str_concat(a: str, b: str) -> str
 
-let S_IFMT: i32 = 61440
-let S_IFDIR: i32 = 16384
-let DARWIN_STAT_SIZE: i64 = 144
-let DARWIN_STAT_MODE_OFFSET: i64 = 4
-let DARWIN_DIRENT_NAME_OFFSET: i64 = 21
+let LINUX_DIRENT_NAME_OFFSET: i64 = 19
 let RT_PATH_MAX: i64 = 4096
 
 fn rt_cstr_len(s: *const u8) -> i64:
@@ -376,7 +364,7 @@ fn rt_cstr_len(s: *const u8) -> i64:
     len
 
 fn rt_dirent_name(ent: *mut u8) -> *const u8:
-    (ent as i64 + DARWIN_DIRENT_NAME_OFFSET) as *const u8
+    (ent as i64 + LINUX_DIRENT_NAME_OFFSET) as *const u8
 
 fn rt_dirent_is_dot_or_dotdot(name: *const u8) -> bool:
     let first = unsafe: *name
@@ -417,7 +405,7 @@ fn rt_lstat_mode(path: *const u8, mode_out: *mut i32) -> i32:
     let r = lstat(path, &st as *mut [144]u8 as *mut u8)
     if r < 0:
         return -get_errno()
-    unsafe: *mode_out = (unsafe: *((&st as i64 + DARWIN_STAT_MODE_OFFSET) as *const u16)) as i32
+    unsafe: *mode_out = unsafe: *((&st as i64 + LINUX_STAT_MODE_OFFSET) as *const i32)
     0
 
 fn rt_lstat_is_dir(path: *const u8) -> bool:
@@ -430,7 +418,7 @@ fn rt_lstat_is_dir(path: *const u8) -> bool:
 pub fn rt_mkdir_impl(path: *const u8, mode: i32) -> i32:
     var r: i32 = 0
     loop:
-        r = mkdir(path, mode as u16)
+        r = mkdir(path, mode)
         if r >= 0 or get_errno() != 4:
             break
     if r < 0:
@@ -586,11 +574,9 @@ fn rt_newline_str() -> str:
     with_str_from_cstr(&newline as *const [2]u8 as *const u8)
 
 fn rt_list_files_append_line(out: str, path: *const u8) -> str:
-    // TODO: O(n^2) string accumulation; replace with a builder when listed trees grow.
     with_str_concat(with_str_concat(out, with_str_from_cstr(path)), rt_newline_str())
 
 fn rt_list_files_walk(path: *const u8, out: str) -> str:
-    // TODO: partial-result on directory enumeration errors; propagate failures when callers need completeness guarantees.
     var mode: i32 = 0
     let stat_rc = rt_lstat_mode(path, &mode as *mut i32)
     if stat_rc != 0:
@@ -628,43 +614,28 @@ pub fn rt_access_impl(path: *const u8, mode: i32) -> i32:
         return -get_errno()
     0
 
-// ── System info ─────────────────────────────────────────────────
-
 type RtSysInfo:
     cpu_cores: i32
     memory_total: i64
     page_size: i64
 
-extern fn sysctlbyname(name: *const u8, oldp: *mut u8, oldlenp: *mut i64, newp: *const u8, newlen: i64) -> i32
-
 @[c_export("rt_sysinfo")]
 pub fn rt_sysinfo_impl(out: *mut RtSysInfo) -> i32:
-    // CPU cores: sysctl hw.logicalcpu
-    var cores: i32 = 0
-    var cores_len: i64 = 4
-    let _ = sysctlbyname("hw.logicalcpu" as *const u8, &cores as *mut u8, &raw mut cores_len, 0 as *const u8, 0)
-    (unsafe: *out).cpu_cores = if cores > 0: cores else: 1
-
-    // Total memory: sysctl hw.memsize
-    var memsize: i64 = 0
-    var memsize_len: i64 = 8
-    let _ = sysctlbyname("hw.memsize" as *const u8, &memsize as *mut u8, &raw mut memsize_len, 0 as *const u8, 0)
-    (unsafe: *out).memory_total = memsize
-
-    // Page size: sysconf(_SC_PAGESIZE)
-    let ps = sysconf(29)  // _SC_PAGESIZE = 29 on darwin
-    (unsafe: *out).page_size = ps
+    let page_size = sysconf(30)
+    let pages = sysconf(85)
+    let cores = sysconf(84)
+    (unsafe: *out).cpu_cores = if cores > 0: cores as i32 else: 1
+    (unsafe: *out).page_size = if page_size > 0: page_size else: 4096
+    (unsafe: *out).memory_total = if pages > 0 and page_size > 0: pages * page_size else: 0
     0
 
 @[c_export("rt_sysinfo_os")]
 pub fn rt_sysinfo_os_impl() -> str:
-    with_str_from_cstr("Macos" as *const u8)
+    with_str_from_cstr("Linux" as *const u8)
 
 @[c_export("rt_sysinfo_arch")]
 pub fn rt_sysinfo_arch_impl() -> str:
-    with_str_from_cstr("armv8" as *const u8)
-
-// ── Environment ─────────────────────────────────────────────────
+    with_str_from_cstr("x86_64" as *const u8)
 
 @[c_export("rt_getenv")]
 pub fn rt_getenv_impl(name: *const u8) -> *const u8:

@@ -3656,11 +3656,11 @@ fn expand_input_buffers() {
     }
 
     if (__ci_expr_logic_0 != 0) {
-        colour_begin(31, __stderrp)
+        colour_begin(31, libc_stderr())
 
-        fprintf(__stderrp, "pcre2test: malloc(%zu) failed\n", __local_new_pbuffer8_size)
+        fprintf(libc_stderr(), "pcre2test: malloc(%zu) failed\n", __local_new_pbuffer8_size)
 
-        colour_end(__stderrp)
+        colour_end(libc_stderr())
 
 
         exit(1)
@@ -3705,11 +3705,11 @@ fn extend_inputline(__param_f: *mut c_void, __param_start: *mut u8, __param_prom
             }
 
             if (isatty(fileno(__param_f)) != 0) {
-                colour_begin(34, __stdoutp)
+                colour_begin(34, libc_stdout())
 
-                fprintf(__stdoutp, "%s", __param_prompt)
+                fprintf(libc_stdout(), "%s", __param_prompt)
 
-                colour_end(__stdoutp)
+                colour_end(libc_stdout())
 
             }
 
@@ -6147,11 +6147,11 @@ fn config_str_8(__param_what: c_uint, __param_where_: *mut i8) {
     }
 
     if (__ci_expr_logic_1 != 0) {
-        colour_begin(31, __stderrp)
+        colour_begin(31, libc_stderr())
 
-        fprintf(__stderrp, "pcre2test: Error in pcre2_config(%d)\n", __param_what)
+        fprintf(libc_stderr(), "pcre2test: Error in pcre2_config(%d)\n", __param_what)
 
-        colour_end(__stderrp)
+        colour_end(libc_stderr())
 
 
         exit(1)
@@ -14175,9 +14175,9 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_31 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, "pcre2test: realloc(%zu) failed\n", dbuffer_size)
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), "pcre2test: realloc(%zu) failed\n", dbuffer_size)
+        colour_end(libc_stderr())
         exit(1)
         goto '__ci_bb_32
     }
@@ -14381,9 +14381,9 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_56 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, "pcre2test: realloc(%zu) failed\n", dbuffer_size)
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), "pcre2test: realloc(%zu) failed\n", dbuffer_size)
+        colour_end(libc_stderr())
         exit(1)
         goto '__ci_bb_57
     }
@@ -22956,9 +22956,9 @@ fn unittest_8() {
     }
 
     '__ci_bb_674 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, "pcre2test: Unit test error in %s\n", __local_failure__goto_5632_13)
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), "pcre2test: Unit test error in %s\n", __local_failure__goto_5632_13)
+        colour_end(libc_stderr())
         exit(1)
         goto '__ci_bb_675
     }
@@ -23214,11 +23214,11 @@ fn c_option(__param_arg: *const i8) -> c_int {
 
 
         if ((if __local_i >= 13: 1 else: 0) != 0) {
-            colour_begin(31, __stderrp)
+            colour_begin(31, libc_stderr())
 
-            fprintf(__stderrp, "pcre2test: Unknown -C option \"%s\"\n", __param_arg)
+            fprintf(libc_stderr(), "pcre2test: Unknown -C option \"%s\"\n", __param_arg)
 
-            colour_end(__stderrp)
+            colour_end(libc_stderr())
 
 
             return 0
@@ -23297,7 +23297,7 @@ fn c_option(__param_arg: *const i8) -> c_int {
     }
 
 
-    print_version(__stdoutp, 0)
+    print_version(libc_stdout(), 0)
 
     printf("Compiled with\n")
 
@@ -23320,7 +23320,7 @@ fn c_option(__param_arg: *const i8) -> c_int {
     if ((if __local_optval != 0: 1 else: 0) != 0) {
         printf("  UTF and UCP support (")
 
-        print_unicode_version(__stdoutp)
+        print_unicode_version(libc_stdout())
 
         printf(")\n")
 
@@ -23335,7 +23335,7 @@ fn c_option(__param_arg: *const i8) -> c_int {
 
         printf("    Architecture: ")
 
-        print_jit_target(__stdoutp)
+        print_jit_target(libc_stdout())
 
         printf("\n")
 
@@ -23352,18 +23352,18 @@ fn c_option(__param_arg: *const i8) -> c_int {
                     printf("No (so cannot work)\n")
                 },
                 _ => {
-                    colour_begin(31, __stdoutp)
+                    colour_begin(31, libc_stdout())
 
-                    fprintf(__stdoutp, "\n** Unexpected return %d from pcre2_jit_compile(NULL, PCRE2_JIT_TEST_ALLOC)\n", __local_rc)
+                    fprintf(libc_stdout(), "\n** Unexpected return %d from pcre2_jit_compile(NULL, PCRE2_JIT_TEST_ALLOC)\n", __local_rc)
 
-                    colour_end(__stdoutp)
+                    colour_end(libc_stdout())
 
 
-                    colour_begin(31, __stdoutp)
+                    colour_begin(31, libc_stdout())
 
-                    fprintf(__stdoutp, "** Should not occur\n")
+                    fprintf(libc_stdout(), "** Should not occur\n")
 
-                    colour_end(__stdoutp)
+                    colour_end(libc_stdout())
 
 
                     (__local_yield_ = 1)
@@ -23667,11 +23667,11 @@ fn display_properties(__param_wantscripts: c_int) {
 
 
             if ((if __local_m >= 5: 1 else: 0) != 0) {
-                colour_begin(31, __stdoutp)
+                colour_begin(31, libc_stdout())
 
-                fprintf(__stdoutp, "** Too many synonyms: %s ignored\n", ((&(unsafe: utt_names[0]) as *const c_char) + ((__local_tt.name_offset as c_uint) as usize)))
+                fprintf(libc_stdout(), "** Too many synonyms: %s ignored\n", ((&(unsafe: utt_names[0]) as *const c_char) + ((__local_tt.name_offset as c_uint) as usize)))
 
-                colour_end(__stdoutp)
+                colour_end(libc_stdout())
 
             } else {
                 var __ci_expr_old_7: c_int = __local_m
@@ -24152,7 +24152,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     '__ci_bb_6 {
         (__ci_expr_logic_40 = 0)
         if ((if infile != null: 1 else: 0) != 0) {
-            (__ci_expr_logic_40 = (if (if infile != __stdinp: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_40 = (if (if infile != libc_stdin(): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_40 != 0) {
             goto '__ci_bb_197
@@ -24233,9 +24233,9 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_18 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, "pcre2test: This version of PCRE2 was built without 16-bit support\n")
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), "pcre2test: This version of PCRE2 was built without 16-bit support\n")
+        colour_end(libc_stderr())
         exit(1)
         goto '__ci_bb_20
     }
@@ -24253,9 +24253,9 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_21 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, "pcre2test: This version of PCRE2 was built without 32-bit support\n")
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), "pcre2test: This version of PCRE2 was built without 32-bit support\n")
+        colour_end(libc_stderr())
         exit(1)
         goto '__ci_bb_23
     }
@@ -24339,9 +24339,9 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_33 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, "pcre2test: Argument for -S is too big\n")
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), "pcre2test: Argument for -S is too big\n")
+        colour_end(libc_stderr())
         exit(1)
         goto '__ci_bb_34
     }
@@ -24363,9 +24363,9 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_35 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, "pcre2test: requested stack size %luMiB is greater than hard limit ", (__local_stack_size__goto_3781_14 as c_ulong))
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), "pcre2test: requested stack size %luMiB is greater than hard limit ", (__local_stack_size__goto_3781_14 as c_ulong))
+        colour_end(libc_stderr())
         if ((if (((&raw const __local_rlim__goto_3782_19 as *const rlimit).rlim_max as c_ulonglong) % (1048576 as c_ulonglong)) == 0: 1 else: 0) != 0) {
             goto '__ci_bb_37
         } else {
@@ -24390,9 +24390,9 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_37 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, "%luMiB\n", ((((&raw const __local_rlim__goto_3782_19 as *const rlimit).rlim_max as c_ulonglong) / (1048576 as c_ulonglong)) as c_ulong))
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), "%luMiB\n", ((((&raw const __local_rlim__goto_3782_19 as *const rlimit).rlim_max as c_ulonglong) / (1048576 as c_ulonglong)) as c_ulong))
+        colour_end(libc_stderr())
         goto '__ci_bb_39
     }
 
@@ -24410,16 +24410,16 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_40 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, "%luKiB\n", ((((&raw const __local_rlim__goto_3782_19 as *const rlimit).rlim_max as c_ulonglong) / (1024 as c_ulonglong)) as c_ulong))
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), "%luKiB\n", ((((&raw const __local_rlim__goto_3782_19 as *const rlimit).rlim_max as c_ulonglong) / (1024 as c_ulonglong)) as c_ulong))
+        colour_end(libc_stderr())
         goto '__ci_bb_42
     }
 
     '__ci_bb_41 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, "%lu bytes\n", ((&raw const __local_rlim__goto_3782_19 as *const rlimit).rlim_max as c_ulong))
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), "%lu bytes\n", ((&raw const __local_rlim__goto_3782_19 as *const rlimit).rlim_max as c_ulong))
+        colour_end(libc_stderr())
         goto '__ci_bb_42
     }
 
@@ -24441,9 +24441,9 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_45 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, "pcre2test: setting stack size %luMiB failed: %s\n", (__local_stack_size__goto_3781_14 as c_ulong), strerror((unsafe: *__error())))
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), "pcre2test: setting stack size %luMiB failed: %s\n", (__local_stack_size__goto_3781_14 as c_ulong), strerror((unsafe: *__error())))
+        colour_end(libc_stderr())
         exit(1)
         goto '__ci_bb_46
     }
@@ -24617,9 +24617,9 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
 
     '__ci_bb_70 {
         (def_patctl.jit = (((1 as c_uint) | (2 as c_uint)) as c_uint) | (4 as c_uint))
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, "pcre2test: Warning: JIT support is not available: -jit[fast|verify] calls functions that do nothing.\n")
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), "pcre2test: Warning: JIT support is not available: -jit[fast|verify] calls functions that do nothing.\n")
+        colour_end(libc_stderr())
         goto '__ci_bb_67
     }
 
@@ -24683,9 +24683,9 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_79 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, "pcre2test: Argument for %s must not be zero\n", __local_arg__goto_3683_9)
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), "pcre2test: Argument for %s must not be zero\n", __local_arg__goto_3683_9)
+        colour_end(libc_stderr())
         exit(1)
         goto '__ci_bb_80
     }
@@ -24699,9 +24699,9 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_81 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, "pcre2test: Argument for %s is too big\n", __local_arg__goto_3683_9)
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), "pcre2test: Argument for %s is too big\n", __local_arg__goto_3683_9)
+        colour_end(libc_stderr())
         exit(1)
         goto '__ci_bb_82
     }
@@ -24767,7 +24767,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_91 {
-        print_version(__stdoutp, 0)
+        print_version(libc_stdout(), 0)
         goto '__ci_bb_6
     }
 
@@ -24848,9 +24848,9 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_104 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, "pcre2test: Missing value for %s\n", __local_arg__goto_3683_9)
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), "pcre2test: Missing value for %s\n", __local_arg__goto_3683_9)
+        colour_end(libc_stderr())
         (__local_yield___goto_3644_10 = 1)
         goto '__ci_bb_6
     }
@@ -24893,9 +24893,9 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_110 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, "pcre2test: Unknown or malformed option \"%s\"\n", __local_arg__goto_3683_9)
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), "pcre2test: Unknown or malformed option \"%s\"\n", __local_arg__goto_3683_9)
+        colour_end(libc_stderr())
         usage()
         (__local_yield___goto_3644_10 = 1)
         goto '__ci_bb_6
@@ -24945,9 +24945,9 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_119 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, "pcre2test: Invalid value for \"%.*s\"\n", (((((__local_val__goto_3931_11 - ((1 as isize) as usize)) as usize) -% (__local_arg__goto_3683_9 as usize)) / sizeof[c_char]()) as c_int), __local_arg__goto_3683_9)
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), "pcre2test: Invalid value for \"%.*s\"\n", (((((__local_val__goto_3931_11 - ((1 as isize) as usize)) as usize) -% (__local_arg__goto_3683_9 as usize)) / sizeof[c_char]()) as c_int), __local_arg__goto_3683_9)
+        colour_end(libc_stderr())
         (__local_yield___goto_3644_10 = 1)
         goto '__ci_bb_6
     }
@@ -24963,7 +24963,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     '__ci_bb_122 {
         (max_oveccount = 15)
         init_globals()
-        (outfile = __stderrp)
+        (outfile = libc_stderr())
         (__ci_expr_logic_20 = 0)
         if ((if __local_arg_pattern__goto_3652_7 != null: 1 else: 0) != 0) {
             (__ci_expr_logic_20 = (if (if not (decode_modifiers((__local_arg_pattern__goto_3652_7 as *mut u8), CTX_DEFPAT, (&raw mut def_patctl as *mut patctl), null) != 0): 1 else: 0) != 0: 1 else: 0))
@@ -25022,9 +25022,9 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_127 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, "pcre2test: \"%s\" is not a valid error number list\n", __local_arg_error__goto_3653_7)
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), "pcre2test: \"%s\" is not a valid error number list\n", __local_arg_error__goto_3653_7)
+        colour_end(libc_stderr())
         (__local_yield___goto_3644_10 = 1)
         goto '__ci_bb_6
     }
@@ -25032,7 +25032,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     '__ci_bb_128 {
         (__local_errcode__goto_3962_7 = ((__local_li__goto_3964_8 as c_int)))
         printf("Error %d: ", __local_errcode__goto_3962_7)
-        print_error_message_file(__stdoutp, __local_errcode__goto_3962_7, "", "\n", 1)
+        print_error_message_file(libc_stdout(), __local_errcode__goto_3962_7, "", "\n", 1)
         if ((if (unsafe: *__local_endptr__goto_3963_9) == 0: 1 else: 0) != 0) {
             goto '__ci_bb_129
         } else {
@@ -25055,8 +25055,8 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_132 {
-        (infile = __stdinp)
-        (outfile = __stdoutp)
+        (infile = libc_stdin())
+        (outfile = libc_stdout())
         (__ci_expr_logic_23 = 0)
         if ((if __local_argc > 1: 1 else: 0) != 0) {
             (__ci_expr_logic_23 = (if (if string_cmp((unsafe: __param_argv[__local_op__goto_3645_10]), "-") != 0: 1 else: 0) != 0: 1 else: 0))
@@ -25086,9 +25086,9 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_135 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, "pcre2test: Failed to open \"%s\": %s\n", (unsafe: __param_argv[__local_op__goto_3645_10]), strerror((unsafe: *__error())))
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), "pcre2test: Failed to open \"%s\": %s\n", (unsafe: __param_argv[__local_op__goto_3645_10]), strerror((unsafe: *__error())))
+        colour_end(libc_stderr())
         (__local_yield___goto_3644_10 = 1)
         goto '__ci_bb_6
     }
@@ -25115,9 +25115,9 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     }
 
     '__ci_bb_139 {
-        colour_begin(31, __stderrp)
-        fprintf(__stderrp, "pcre2test: Failed to open \"%s\": %s\n", (unsafe: __param_argv[((__local_op__goto_3645_10 as c_uint) +% (1 as c_uint))]), strerror((unsafe: *__error())))
-        colour_end(__stderrp)
+        colour_begin(31, libc_stderr())
+        fprintf(libc_stderr(), "pcre2test: Failed to open \"%s\": %s\n", (unsafe: __param_argv[((__local_op__goto_3645_10 as c_uint) +% (1 as c_uint))]), strerror((unsafe: *__error())))
+        colour_end(libc_stderr())
         (__local_yield___goto_3644_10 = 1)
         goto '__ci_bb_6
     }
@@ -25595,7 +25595,7 @@ fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
     '__ci_bb_198 {
         (__ci_expr_logic_41 = 0)
         if ((if outfile != null: 1 else: 0) != 0) {
-            (__ci_expr_logic_41 = (if (if outfile != __stdoutp: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_41 = (if (if outfile != libc_stdout(): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_41 != 0) {
             goto '__ci_bb_199

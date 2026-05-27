@@ -20,6 +20,7 @@ extern fn write(fd: i32, buf: *const u8, nbyte: u64) -> i64
 extern fn opendir(path: *const u8) -> *mut u8
 extern fn readdir(dirp: *mut u8) -> *mut u8
 extern fn closedir(dirp: *mut u8) -> i32
+extern fn getenv(name: *const u8) -> *const u8
 extern fn strtod(str: *const u8, endptr: *mut *mut u8) -> f64
 extern fn realpath(path: *const u8, resolved_name: *mut u8) -> *mut u8
 extern fn with_exec_argv_capture(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32) -> i32
@@ -559,9 +560,13 @@ var resource_dir_buf: [1024]u8 = [0 as u8; 1024]
 var resource_dir_resolved: i32 = 0
 
 let DARWIN_DIRENT_NAME_OFFSET: i64 = 21
+let LINUX_DIRENT_NAME_OFFSET: i64 = 19
 
 unsafe fn dirent_name(ent: *mut u8) -> *const u8:
-    (ent as i64 + DARWIN_DIRENT_NAME_OFFSET) as *const u8
+    let darwin_name = (ent as i64 + DARWIN_DIRENT_NAME_OFFSET) as *const u8
+    if cstr_starts_with_digit(darwin_name):
+        return darwin_name
+    (ent as i64 + LINUX_DIRENT_NAME_OFFSET) as *const u8
 
 unsafe fn cstr_starts_with_digit(s: *const u8) -> bool:
     if s as i64 == 0:
@@ -649,28 +654,47 @@ unsafe fn get_sdk_path() -> *const u8:
         return &sdk_path_buf as *const [1024]u8 as *const u8
     0 as *const u8
 
+unsafe fn find_clang_resource_dir_under(base: *const u8) -> i32:
+    if base as i64 == 0:
+        return 0
+    let dir = opendir(base)
+    if dir as i64 == 0:
+        return 0
+    var best_name: [256]u8 = [0 as u8; 256]
+    while true:
+        let ent = readdir(dir)
+        if ent as i64 == 0:
+            break
+        let name = dirent_name(ent)
+        if not cstr_starts_with_digit(name):
+            continue
+        if best_name[0] == 0 or c_strcmp(name, &best_name as *const [256]u8 as *const u8) > 0:
+            copy_cstr_to_buf(&raw mut best_name as *mut [256]u8 as *mut u8, 256, name)
+    let _close = closedir(dir)
+    if best_name[0] == 0:
+        return 0
+    var pos: i64 = 0
+    buf_append_str(&raw mut resource_dir_buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, base)
+    buf_append_str(&raw mut resource_dir_buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, "/\0" as *const u8)
+    buf_append_str(&raw mut resource_dir_buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, &best_name as *const [256]u8 as *const u8)
+    1
+
 unsafe fn get_clang_resource_dir() -> *const u8:
     if resource_dir_resolved == 0:
         resource_dir_resolved = 1
-        let base = "/usr/local/llvm/lib/clang\0" as *const u8
-        let dir = opendir(base)
-        if dir as i64 != 0:
-            var best_name: [256]u8 = [0 as u8; 256]
-            while true:
-                let ent = readdir(dir)
-                if ent as i64 == 0:
-                    break
-                let name = dirent_name(ent)
-                if not cstr_starts_with_digit(name):
-                    continue
-                if best_name[0] == 0 or c_strcmp(name, &best_name as *const [256]u8 as *const u8) < 0:
-                    copy_cstr_to_buf(&raw mut best_name as *mut [256]u8 as *mut u8, 256, name)
-            let _close = closedir(dir)
-            if best_name[0] != 0:
+        let explicit = getenv("WITH_CLANG_RESOURCE_DIR\0" as *const u8)
+        if explicit as i64 != 0 and explicit[0] != 0:
+            copy_cstr_to_buf(&raw mut resource_dir_buf as *mut [1024]u8 as *mut u8, 1024, explicit)
+        if resource_dir_buf[0] == 0:
+            let llvm_prefix = getenv("LLVM_PREFIX\0" as *const u8)
+            if llvm_prefix as i64 != 0 and llvm_prefix[0] != 0:
+                var base_buf: [1024]u8 = [0 as u8; 1024]
                 var pos: i64 = 0
-                buf_append_str(&raw mut resource_dir_buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, base)
-                buf_append_str(&raw mut resource_dir_buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, "/\0" as *const u8)
-                buf_append_str(&raw mut resource_dir_buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, &best_name as *const [256]u8 as *const u8)
+                buf_append_str(&raw mut base_buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, llvm_prefix)
+                buf_append_str(&raw mut base_buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, "/lib/clang\0" as *const u8)
+                let _found = find_clang_resource_dir_under(&raw mut base_buf as *mut [1024]u8 as *const u8)
+        if resource_dir_buf[0] == 0:
+            let _found_default = find_clang_resource_dir_under("/usr/local/llvm/lib/clang\0" as *const u8)
     if resource_dir_buf[0] != 0:
         return &resource_dir_buf as *const [1024]u8 as *const u8
     0 as *const u8

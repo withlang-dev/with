@@ -2,6 +2,7 @@ module build.compiler
 
 use std.build
 use std.process
+use std.sysinfo
 
 const COMPILER_DEFAULT_LLVM_PREFIX: str = "/usr/local/llvm"
 
@@ -121,7 +122,8 @@ fn comp_llvm_clang_tool() -> str:
     comp_tool_from_env("WITH_LLVM_CC", "LLVM_CC", comp_llvm_prefix() ++ "/bin/clang")
 
 fn comp_llvm_lld_tool() -> str:
-    comp_tool_from_env("WITH_LLVM_LD", "LLVM_LD", comp_llvm_prefix() ++ "/bin/ld64.lld")
+    let fallback = if os() == "Linux": comp_llvm_prefix() ++ "/bin/ld.lld" else: comp_llvm_prefix() ++ "/bin/ld64.lld"
+    comp_tool_from_env("WITH_LLVM_LD", "LLVM_LD", fallback)
 
 fn comp_libclang_path() -> str:
     let explicit = env("WITH_LIBCLANG")
@@ -382,16 +384,34 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
         let path = sorted_llvm_archives.get(i as i64)
         rsp = rsp ++ path ++ "\n"
         ld_rsp = ld_rsp ++ path ++ "\n"
-    let sdk_path = comp_host_sdk_path(ctx)
-    if sdk_path.len() > 0:
-        rsp = rsp ++ "-isysroot\n" ++ sdk_path ++ "\n"
-        ld_rsp = ld_rsp ++ "-syslibroot\n" ++ sdk_path ++ "\n"
-    rsp = rsp ++ "-lm\n"
-    rsp = rsp ++ "-lc++\n"
+    if os() == "Macos":
+        let sdk_path = comp_host_sdk_path(ctx)
+        if sdk_path.len() > 0:
+            rsp = rsp ++ "-isysroot\n" ++ sdk_path ++ "\n"
+            ld_rsp = ld_rsp ++ "-syslibroot\n" ++ sdk_path ++ "\n"
+        rsp = rsp ++ "-lm\n"
+        rsp = rsp ++ "-lc++\n"
+        ld_rsp = ld_rsp ++ "-lm\n"
+        ld_rsp = ld_rsp ++ "-lc++\n"
+    else if os() == "Linux":
+        rsp = rsp ++ "-lpthread\n"
+        rsp = rsp ++ "-ldl\n"
+        rsp = rsp ++ "-lm\n"
+        rsp = rsp ++ "-lstdc++\n"
+        rsp = rsp ++ "-lz\n"
+        rsp = rsp ++ "-lzstd\n"
+        rsp = rsp ++ "-lxml2\n"
+        ld_rsp = ld_rsp ++ "-lpthread\n"
+        ld_rsp = ld_rsp ++ "-ldl\n"
+        ld_rsp = ld_rsp ++ "-lm\n"
+        ld_rsp = ld_rsp ++ "-lstdc++\n"
+        ld_rsp = ld_rsp ++ "-lz\n"
+        ld_rsp = ld_rsp ++ "-lzstd\n"
+        ld_rsp = ld_rsp ++ "-lxml2\n"
+    else:
+        return comp_fail(ctx, "unsupported host for LLVM link metadata: " ++ os() ++ "/" ++ arch())
     if comp_link_path_is_dynamic(libclang):
         rsp = rsp ++ "-Wl,-rpath," ++ comp_dirname(libclang) ++ "/\n"
-    ld_rsp = ld_rsp ++ "-lm\n"
-    ld_rsp = ld_rsp ++ "-lc++\n"
     if comp_link_path_is_dynamic(libclang):
         ld_rsp = ld_rsp ++ "-rpath\n" ++ comp_dirname(libclang) ++ "/\n"
     let rsp_path = comp_join(output_dir, "llvm_link.rsp")

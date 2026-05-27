@@ -6226,12 +6226,16 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody
     let ret_ty = builder.body.local_type_ids.get(0)
     builder.expected_type = ret_ty
 
-    var result = builder.lower_expr(body_expr)
+    let ret_is_void = ret_ty == builder.sema.ty_void
+    var result = if ret_is_void:
+        builder.lower_expr_discard(body_expr)
+    else:
+        builder.lower_expr(body_expr)
 
     // Implicit Ok wrapping: if return type is Result[T, E] and body type is T,
     // wrap the result in Ok(value) — an enum variant construction with tag 0.
     let ret_resolved = builder.sema.resolve_alias(ret_ty)
-    if builder.sema.get_type_kind(ret_resolved) == TypeKind.TY_GENERIC_INST:
+    if not ret_is_void and builder.sema.get_type_kind(ret_resolved) == TypeKind.TY_GENERIC_INST:
         let ret_base = builder.sema.get_generic_inst_base(ret_resolved)
         if builder.sema.pool_resolve(ret_base) == "Result" and builder.sema.get_generic_inst_arg_count(ret_resolved) == 2:
             let body_ty = builder.expr_type(body_expr)
@@ -6251,8 +6255,9 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody
                     result = builder.body.new_operand(OperandKind.OK_COPY, ok_place)
 
     // Implicit return value assignment for non-diverging tail expressions.
-    let ret_place = builder.place_for_local(0)
-    builder.assign_operand_to_place(ret_place, result, builder.ast.get_end(fn_node))
+    if not ret_is_void:
+        let ret_place = builder.place_for_local(0)
+        builder.assign_operand_to_place(ret_place, result, builder.ast.get_end(fn_node))
 
     builder.emit_defers_for_return()
     builder.pop_scope_inline()

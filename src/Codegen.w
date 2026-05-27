@@ -143,6 +143,8 @@ extern fn wl_add_fn_attr(ctx: i64, f: i64, attr_name: str) -> void
 extern fn wl_add_param_attr(ctx: i64, f: i64, param_idx: i32, attr_name: str) -> void
 extern fn wl_add_param_byval_attr(ctx: i64, f: i64, param_idx: i32, ty: i64) -> void
 extern fn wl_add_sret_attr(ctx: i64, f: i64, param_idx: i32, ty: i64) -> void
+extern fn wl_add_call_param_byval_attr(ctx: i64, call: i64, param_idx: i32, ty: i64) -> void
+extern fn wl_add_call_sret_attr(ctx: i64, call: i64, param_idx: i32, ty: i64) -> void
 
 // Basic blocks
 extern fn wl_append_bb(ctx: i64, f: i64, name: str) -> i64
@@ -345,6 +347,8 @@ extern fn wl_di_create_lexical_block(b: i64, scope: i64, file: i64, line: i32, c
 extern fn with_str_concat(a: str, b: str) -> str
 extern fn with_str_eq(a: str, b: str) -> i32
 extern fn with_write(s: str) -> void
+extern fn with_sysinfo_os() -> str
+extern fn with_sysinfo_arch() -> str
 
 // ── Codegen state ─────────────────────────────────────────────────
 
@@ -3466,6 +3470,7 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
     let function = wl_add_function(self.llmod, effective_name, fn_type)
     if has_sret != 0:
         wl_add_sret_attr(self.context, function, 0, sret_ty)
+    self.apply_c_abi_byval_attrs(function, byval_mask, byval_types, param_count, if has_sret != 0: 1 else: 0)
     self.apply_noalias_param_attrs_with_offset(function, param_start, param_count, if has_sret != 0: 1 else: 0)
 
     // Whole-program codegen internalizes non-prelude functions because imported
@@ -3511,11 +3516,13 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
         if alias_sym != 0:
             self.extern_fn_has_sret.insert(alias_sym, has_sret)
             self.extern_fn_byval_params.insert(alias_sym, byval_mask)
+            self.extern_fn_byval_types.insert(alias_sym, byval_types)
             if has_sret != 0:
                 self.extern_fn_sret_type.insert(alias_sym, sret_ty)
         if method_key_sym != 0:
             self.extern_fn_has_sret.insert(method_key_sym, has_sret)
             self.extern_fn_byval_params.insert(method_key_sym, byval_mask)
+            self.extern_fn_byval_types.insert(method_key_sym, byval_types)
             if has_sret != 0:
                 self.extern_fn_sret_type.insert(method_key_sym, sret_ty)
 
@@ -3605,6 +3612,47 @@ fn Codegen.fn_callconv_name(self: Codegen, meta: i32) -> str:
 fn Codegen.fn_uses_c_abi(self: Codegen, cc_name: str) -> bool:
     cc_name == "c" or (cc_name.len() > 9 and cc_name.slice(0, 9) == "c_export:")
 
+fn codegen_c_abi_needs_byval_attr() -> bool:
+    let os = with_sysinfo_os()
+    let arch = with_sysinfo_arch()
+    arch == "x86_64" and (os == "Linux" or os == "Macos")
+
+fn Codegen.apply_c_abi_byval_attrs(self: Codegen, function: i64, byval_mask: i64, byval_types: Vec[i64], param_count: i32, param_offset: i32):
+    if function == 0 or byval_mask == 0:
+        return
+    if not codegen_c_abi_needs_byval_attr():
+        return
+    for pi in 0..param_count:
+        if (byval_mask & ((1 as i64) << (pi as u32))) == 0:
+            continue
+        if pi >= byval_types.len() as i32:
+            continue
+        let byval_ty = byval_types.get(pi as i64)
+        if byval_ty == 0:
+            continue
+        wl_add_param_byval_attr(self.context, function, pi + param_offset, byval_ty)
+
+fn Codegen.apply_c_abi_call_attrs(self: Codegen, call_val: i64, has_sret: i32, sret_ty: i64, byval_mask: i64, byval_types: Vec[i64], original_arg_count: i32, arg_prefix_count: i32):
+    if call_val == 0:
+        return
+    var byval_offset = arg_prefix_count
+    if has_sret != 0 and sret_ty != 0:
+        wl_add_call_sret_attr(self.context, call_val, arg_prefix_count, sret_ty)
+        byval_offset = byval_offset + 1
+    if byval_mask == 0:
+        return
+    if not codegen_c_abi_needs_byval_attr():
+        return
+    for ai in 0..original_arg_count:
+        if (byval_mask & ((1 as i64) << (ai as u32))) == 0:
+            continue
+        if ai >= byval_types.len() as i32:
+            continue
+        let byval_ty = byval_types.get(ai as i64)
+        if byval_ty == 0:
+            continue
+        wl_add_call_param_byval_attr(self.context, call_val, byval_offset + ai, byval_ty)
+
 // ── Declare extern fn ─────────────────────────────────────────────
 
 fn Codegen.declare_extern_fn(self: Codegen, ext_node: i32):
@@ -3675,12 +3723,9 @@ fn Codegen.declare_extern_fn(self: Codegen, ext_node: i32):
     if existing == 0:
         function = wl_add_function(self.llmod, link_name, fn_type)
 
-    // Add sret attribute to first param if needed
     if has_sret != 0:
         wl_add_sret_attr(self.context, function, 0, sret_ty)
-
-    // No byval attribute needed — clang on aarch64 uses plain ptr for indirect
-    // struct params. The caller copies the struct to an alloca and passes a pointer.
+    self.apply_c_abi_byval_attrs(function, byval_mask, byval_types, param_count, if has_sret != 0: 1 else: 0)
 
     // Record ABI transformations for call sites
     if has_sret != 0 or byval_mask != 0:
