@@ -18,6 +18,7 @@ OUT_GEN_DIR := $(OUT)/gen
 CANONICAL_BIN := $(OUT_BIN_DIR)/with
 SEED_PATH := src/main
 SEED_VERSION ?=
+SEED_ASSET ?= auto
 
 # Seed compiler: WITH env var, out/bin/with, `with` on PATH, or src/main.
 WITH ?= $(shell \
@@ -237,6 +238,19 @@ __seed:
 	fi; \
 	dest="$(SEED_PATH)"; \
 	repo="$(REPO_FULL_NAME)"; \
+	asset="$(SEED_ASSET)"; \
+	if [ "$$asset" = "auto" ]; then \
+		case "$$(uname -s):$$(uname -m)" in \
+			Darwin:arm64|Darwin:aarch64) asset="with-darwin-aarch64" ;; \
+			Linux:x86_64) asset="with-linux-x86_64" ;; \
+			*) asset="" ;; \
+		esac; \
+	fi; \
+	if [ -z "$$asset" ]; then \
+		echo "error: unsupported seed host: $$(uname -s)/$$(uname -m)" >&2; \
+		echo "set SEED_ASSET to a published release asset name" >&2; \
+		exit 1; \
+	fi; \
 	if [ -x "$$dest" ]; then \
 		echo "seed binary already exists: $$dest"; \
 		echo "remove it first if you want to re-download"; \
@@ -248,7 +262,7 @@ __seed:
 			gh release list --repo "$$repo" --limit 10 --json tagName,isDraft -q '.[] | select(.isDraft | not) | .tagName' 2>/dev/null | \
 			while IFS= read -r candidate; do \
 				if [ -z "$$candidate" ]; then continue; fi; \
-				if gh release view "$$candidate" --repo "$$repo" --json assets -q '.assets[].name' 2>/dev/null | grep -qx with-darwin-aarch64; then \
+				if gh release view "$$candidate" --repo "$$repo" --json assets -q '.assets[].name' 2>/dev/null | grep -qx "$$asset"; then \
 					printf '%s\n' "$$candidate"; \
 					break; \
 				fi; \
@@ -263,7 +277,7 @@ __seed:
 		fi; \
 		echo "latest seed release: $$tag"; \
 	fi; \
-	url="https://github.com/$$repo/releases/download/$$tag/with-darwin-aarch64"; \
+	url="https://github.com/$$repo/releases/download/$$tag/$$asset"; \
 	echo "downloading seed from: $$url"; \
 	curl -fSL -o "$$dest" "$$url"; \
 	chmod +x "$$dest"; \

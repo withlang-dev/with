@@ -2,23 +2,19 @@
 set -eu
 
 repo="withlang-dev/with"
-asset="with-darwin-aarch64"
 install_dir="${WITH_INSTALL_DIR:-$HOME/.local/bin}"
 install_name="${WITH_INSTALL_NAME:-with}"
 version="${WITH_VERSION:-latest}"
 
-case "$(uname -s)" in
-    Darwin) ;;
-    *)
-        echo "error: this installer currently supports macOS only" >&2
-        exit 1
+case "$(uname -s):$(uname -m)" in
+    Darwin:arm64|Darwin:aarch64)
+        asset="with-darwin-aarch64"
         ;;
-esac
-
-case "$(uname -m)" in
-    arm64|aarch64) ;;
+    Linux:x86_64)
+        asset="with-linux-x86_64"
+        ;;
     *)
-        echo "error: this installer currently supports Darwin arm64 only" >&2
+        echo "error: unsupported platform: $(uname -s)/$(uname -m)" >&2
         exit 1
         ;;
 esac

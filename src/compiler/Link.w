@@ -249,7 +249,6 @@ fn link_stage_make_linux_llvm_link_command(llvm_ld: str, obj_path: str, bin_path
         args.push("-l" ++ link_libs.get(i as i64))
     args.push("-lc")
     args.push("-lgcc")
-    args.push("-lgcc_s")
 
     let crtend = gcc_dir ++ "/crtend.o"
     args.push(crtend)

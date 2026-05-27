@@ -98,6 +98,12 @@ normal With build path. The latest checkpoint passed `make build`,
 `make fixpoint`, `make test`, and forced `make emit-c-fixpoint` on macOS
 Darwin arm64 and Ubuntu Linux x86_64.
 
+Release packaging now treats Linux x86_64 as a first-class platform asset:
+`with-linux-x86_64`. Seed download paths are host-aware, the installer selects
+the Darwin or Linux asset from the host platform, and compiler version source
+generation declares `WITH_VERSION` plus the current Git ref as build inputs so
+release binaries do not reuse stale generated version text after commits.
+
 Completed D1 sub-slices:
 
 1. Shared capability registry used by Sema, plus a reserved capability value
