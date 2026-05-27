@@ -24,6 +24,7 @@ Publish the Darwin arm64 compiler binary as:
 
 ```text
 with-darwin-aarch64
+with-bootstrap-c-vX.Y.Z.tar.zst
 ```
 
 Do not publish a binary asset named `main`. `src/main` is the local seed path;
@@ -91,6 +92,7 @@ Prepare the platform-named asset:
 
 ```sh
 scripts/package-darwin-aarch64.sh
+scripts/package-bootstrap-c.sh
 ```
 
 This produces `out/release/with-darwin-aarch64` and `out/release/install.sh`.
@@ -99,11 +101,17 @@ asset name. It must not have dynamic LLVM, Clang, zlib, zstd, or libxml2 load
 commands, and it must contain static libclang symbols. The package script
 checks this with `otool -L` and `nm`.
 
+The bootstrap-C package produces
+`out/release/with-bootstrap-c-$WITH_VERSION.tar.zst`. It is an emitted-C source
+bundle for bringing up a new native platform before a With seed exists there.
+It is not a release compiler binary.
+
 Create the GitHub release:
 
 ```sh
 gh release create v0.14.0 \
   out/release/with-darwin-aarch64 \
+  out/release/with-bootstrap-c-v0.14.0.tar.zst \
   out/release/install.sh \
   --repo withlang-dev/with \
   --title "v0.14.0: <release title>" \
@@ -135,6 +143,7 @@ Expected asset list:
 
 ```text
 install.sh
+with-bootstrap-c-v0.14.0.tar.zst
 with-darwin-aarch64
 ```
 
