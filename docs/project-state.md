@@ -3,7 +3,7 @@
 Status: active checkpoint for agents. Update this file when phase status,
 blockers, or the next work queue changes.
 
-Last updated: 2026-05-26.
+Last updated: 2026-05-27.
 
 Read this file immediately after `AGENTS.md`. It exists so long-running build
 system and bootstrap work does not have to be reconstructed from git history or
@@ -89,6 +89,14 @@ SDK links no dynamic LLVM/Clang, zlib, zstd, or libxml2 libraries; `otool -L`
 shows only `/usr/lib/libSystem.B.dylib` and `/usr/lib/libc++.1.dylib`.
 Emit-C/bootstrap compilation now uses `WITH_EMIT_C_CC`, then `CC`, then `cc`;
 Zig is no longer the default or required C compiler.
+
+Linux x86_64 bootstrap support is active and verified on Ubuntu 22.04 at
+`quixi@192.168.86.211`. The Linux runtime backend, fiber assembly backend,
+direct `ld.lld` link path, static LLVM SDK inputs, and emitted-C C compiler
+link path all build without requiring Zig or the `clang` executable in the
+normal With build path. The latest checkpoint passed `make build`,
+`make fixpoint`, `make test`, and forced `make emit-c-fixpoint` on macOS
+Darwin arm64 and Ubuntu Linux x86_64.
 
 Completed D1 sub-slices:
 

@@ -3,6 +3,7 @@ module build.selfhost
 use pcre2
 use std.build
 use std.process
+use std.sysinfo
 
 type SelfhostRunResult {
     rc: i32,
@@ -77,6 +78,15 @@ fn bs_c_compiler() -> str:
 fn bs_push_c_compiler(argv: Vec[str]) -> Vec[str]:
     argv.push(bs_c_compiler())
     argv
+
+fn bs_host_platform_runtime_object() -> str:
+    let host_os = os()
+    let host_arch = arch()
+    if host_os == "Linux" and host_arch == "x86_64":
+        return "rt_linux_x86_64.o"
+    if host_os == "Macos" and (host_arch == "armv8" or host_arch == "aarch64"):
+        return "rt_darwin_aarch64.o"
+    ""
 
 fn bs_run_cli_capture(ctx: ActionCtx, compiler_path: str, label: str, args: Vec[str], timeout_ms: i32) -> SelfhostRunResult:
     let root = ctx.project_info().project_root()
@@ -766,14 +776,19 @@ fn bs_check_imported_module_dependency_order(ctx: ActionCtx, compiler_path: str,
 fn bs_compile_emit_c_output(ctx: ActionCtx, root: str, case_dir: str, c_path: str, bin: str, label: str) -> i32:
     let stdout_path = bs_capture_path(root, case_dir, label ++ "-compile", "stdout")
     let stderr_path = bs_capture_path(root, case_dir, label ++ "-compile", "stderr")
+    let platform_obj = bs_host_platform_runtime_object()
+    if platform_obj.len() == 0:
+        return bs_fail(ctx, "unsupported host runtime object for emit-c C compile: " ++ os() ++ "/" ++ arch())
     var cc_args: Vec[str] = Vec.new()
     cc_args = bs_push_c_compiler(cc_args)
     cc_args |> push("-O2")
+    if os() == "Linux":
+        cc_args |> push("-no-pie")
     cc_args |> push("-o")
     cc_args |> push(bs_abs(root, bin))
     cc_args |> push(bs_abs(root, c_path))
     cc_args |> push(bs_abs(root, "out/lib/rt_core.o"))
-    cc_args |> push(bs_abs(root, "out/lib/rt_darwin_aarch64.o"))
+    cc_args |> push(bs_abs(root, "out/lib/" ++ platform_obj))
     cc_args |> push(bs_abs(root, "out/lib/compat_runtime.o"))
     cc_args |> push(bs_abs(root, "out/lib/panic_runtime.o"))
     cc_args |> push(bs_abs(root, "out/lib/fiber_stubs.o"))
@@ -781,6 +796,8 @@ fn bs_compile_emit_c_output(ctx: ActionCtx, root: str, case_dir: str, c_path: st
     cc_args |> push(bs_abs(root, "out/lib/embedded_objects.o"))
     cc_args |> push("-I")
     cc_args |> push(bs_abs(root, "runtime"))
+    if os() == "Linux":
+        cc_args |> push("-lm")
     let cc_result = ctx.process_runner().run_capture(cc_args, stdout_path, stderr_path, 120000)
     if cc_result.rc == 0:
         return 0
@@ -920,14 +937,19 @@ pub fn run_emit_c_smoke_action(ctx: ActionCtx) -> i32:
 
     let compile_stdout = bs_capture_path(root, output_dir, "emit-c-smoke-compile", "stdout")
     let compile_stderr = bs_capture_path(root, output_dir, "emit-c-smoke-compile", "stderr")
+    let platform_obj = bs_host_platform_runtime_object()
+    if platform_obj.len() == 0:
+        return bs_fail(ctx, "unsupported host runtime object for emit-c smoke C compile: " ++ os() ++ "/" ++ arch())
     var cc_args: Vec[str] = Vec.new()
     cc_args = bs_push_c_compiler(cc_args)
     cc_args |> push("-O2")
+    if os() == "Linux":
+        cc_args |> push("-no-pie")
     cc_args |> push("-o")
     cc_args |> push(bs_abs(root, bin_path))
     cc_args |> push(bs_abs(root, c_path))
     cc_args |> push(bs_abs(root, "out/lib/rt_core.o"))
-    cc_args |> push(bs_abs(root, "out/lib/rt_darwin_aarch64.o"))
+    cc_args |> push(bs_abs(root, "out/lib/" ++ platform_obj))
     cc_args |> push(bs_abs(root, "out/lib/compat_runtime.o"))
     cc_args |> push(bs_abs(root, "out/lib/panic_runtime.o"))
     cc_args |> push(bs_abs(root, "out/lib/fiber_stubs.o"))
@@ -2032,6 +2054,7 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
     let message_dir = bs_join(base_dir, "workspace_message_complete")
     rc = bs_write_project_manifest(ctx, message_dir, "workspacemessage")
     if rc != 0: return rc
+    let message_link_flag = if os() == "Linux": "-Wl,--gc-sections" else: "-Wl,-dead_strip"
     let message_build =
         "use std.build\n\n" ++
         "comptime with BuildCtx as ctx:\n" ++
@@ -2116,7 +2139,7 @@ fn bs_check_build_w_workspace_api(ctx: ActionCtx, compiler_path: str, base_dir: 
         "                if command.linker.len() > 0 and output.ends_with(\"out/bin/message-complete\"):\n" ++
         "                    saw_prelink = true\n" ++
         "            var replacement = command\n" ++
-        "            replacement.args.push(\"-Wl,-dead_strip\")\n" ++
+        "            replacement.args.push(\"" ++ message_link_flag ++ "\")\n" ++
         "            replacement.cwd = ctx.project_info().project_root()\n" ++
         "            replacement.env.push(EnvVar { name: \"WITH_LINK_COMMAND_ENV_TEST\", value: \"1\" })\n" ++
         "            ws.set_link_command(replacement)\n" ++
@@ -3685,6 +3708,10 @@ fn bs_split_nonempty_lines(text: str) -> Vec[str]:
     lines
 
 fn bs_strip_mach_o_underscore(name: str) -> str:
+    if name.len() >= 3 and name.byte_at(0) == 95 and name.byte_at(1) == 95 and name.byte_at(2) == 95:
+        return name.slice(1, name.len())
+    if name.len() >= 2 and name.byte_at(0) == 95 and name.byte_at(1) == 95:
+        return name
     if name.len() > 0 and name.byte_at(0) == 95:
         return name.slice(1, name.len())
     name

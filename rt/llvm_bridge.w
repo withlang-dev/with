@@ -30,6 +30,9 @@ let LLVM_StructTypeKind: i32 = 10
 let LLVM_ArrayTypeKind: i32 = 11
 let LLVM_PointerTypeKind: i32 = 12
 let LLVM_FunctionValueKind: i32 = 5
+let LLVM_GlobalAliasValueKind: i32 = 6
+let LLVM_GlobalIFuncValueKind: i32 = 7
+let LLVM_GlobalVariableValueKind: i32 = 8
 let LLVM_IntEQ: i32 = 32
 let LLVM_IntNE: i32 = 33
 let LLVM_IntUGT: i32 = 34
@@ -100,6 +103,11 @@ extern fn LLVMInitializeAArch64Target()
 extern fn LLVMInitializeAArch64TargetMC()
 extern fn LLVMInitializeAArch64AsmPrinter()
 extern fn LLVMInitializeAArch64AsmParser()
+extern fn LLVMInitializeX86TargetInfo()
+extern fn LLVMInitializeX86Target()
+extern fn LLVMInitializeX86TargetMC()
+extern fn LLVMInitializeX86AsmPrinter()
+extern fn LLVMInitializeX86AsmParser()
 extern fn LLVMGetDefaultTargetTriple() -> *mut u8
 extern fn LLVMGetTargetFromTriple(triple: *const u8, target: *mut *mut u8, err: *mut *mut u8) -> i32
 extern fn LLVMCreateTargetMachine(target: *mut u8, triple: *const u8, cpu: *const u8, features: *const u8, level: i32, reloc: i32, model: i32) -> *mut u8
@@ -178,6 +186,7 @@ extern fn LLVMGetEnumAttributeKindForName(name: *const u8, len: u64) -> u32
 extern fn LLVMCreateEnumAttribute(c: *mut u8, kind: u32, val: u64) -> *mut u8
 extern fn LLVMCreateTypeAttribute(c: *mut u8, kind: u32, ty: *mut u8) -> *mut u8
 extern fn LLVMAddAttributeAtIndex(v: *mut u8, idx: u32, attr: *mut u8)
+extern fn LLVMAddCallSiteAttribute(call: *mut u8, idx: u32, attr: *mut u8)
 
 // Basic blocks
 extern fn LLVMAppendBasicBlockInContext(c: *mut u8, fn_val: *mut u8, name: *const u8) -> *mut u8
@@ -474,6 +483,9 @@ pub fn init_native_target() -> i32:
         LLVMInitializeAArch64TargetInfo()
         LLVMInitializeAArch64Target()
         LLVMInitializeAArch64TargetMC()
+        LLVMInitializeX86TargetInfo()
+        LLVMInitializeX86Target()
+        LLVMInitializeX86TargetMC()
         llvm_native_target_done = 1
     llvm_init_unlock()
     0
@@ -483,6 +495,7 @@ pub fn init_native_asm_printer() -> i32:
     llvm_init_lock()
     if llvm_native_asm_printer_done == 0:
         LLVMInitializeAArch64AsmPrinter()
+        LLVMInitializeX86AsmPrinter()
         llvm_native_asm_printer_done = 1
     llvm_init_unlock()
     0
@@ -492,6 +505,7 @@ pub fn init_native_asm_parser() -> i32:
     llvm_init_lock()
     if llvm_native_asm_parser_done == 0:
         LLVMInitializeAArch64AsmParser()
+        LLVMInitializeX86AsmParser()
         llvm_native_asm_parser_done = 1
     llvm_init_unlock()
     0
@@ -508,12 +522,22 @@ pub fn init_target_machine(mod_ref: i64, level: i32) -> i64:
     var target: *mut u8 = 0 as *mut u8
     var err: *mut u8 = 0 as *mut u8
     if LLVMGetTargetFromTriple(triple as *const u8, &raw mut target, &raw mut err) != 0:
-        if err as i64 != 0: LLVMDisposeMessage(err)
+        if err as i64 != 0:
+            let err_len = c_strlen(err as *const u8)
+            if err_len > 0:
+                let _ = rt_write(2, err as *const u8, err_len as u64)
+                let _ = rt_write(2, "\n" as *const u8, 1)
+            LLVMDisposeMessage(err)
         LLVMDisposeMessage(triple)
         return 0
     let tm = LLVMCreateTargetMachine(target, triple as *const u8,
         "generic" as *const u8, empty_cstr(),
         codegen_level(level), LLVM_RelocDefault, LLVM_CodeModelDefault)
+    if tm as i64 == 0:
+        let msg = "LLVM target machine creation failed\n"
+        let _ = rt_write(2, msg as *const u8, 36)
+        LLVMDisposeMessage(triple)
+        return 0
     let layout = LLVMCreateTargetDataLayout(tm)
     LLVMSetModuleDataLayout(mod_ref as *mut u8, layout)
     let triple2 = LLVMGetDefaultTargetTriple()
@@ -603,7 +627,13 @@ pub fn get_int_type_width(ty: i64) -> i32: LLVMGetIntTypeWidth(ty as *mut u8) as
 @[c_export("wl_is_fn_var_arg")]
 pub fn is_fn_var_arg(ft: i64) -> i32: LLVMIsFunctionVarArg(ft as *mut u8)
 @[c_export("wl_global_get_value_type")]
-pub fn global_get_value_type(v: i64) -> i64: LLVMGlobalGetValueType(v as *mut u8) as i64
+pub fn global_get_value_type(v: i64) -> i64:
+    if v == 0:
+        return 0
+    let kind = LLVMGetValueKind(v as *mut u8)
+    if kind != LLVM_FunctionValueKind and kind != LLVM_GlobalAliasValueKind and kind != LLVM_GlobalIFuncValueKind and kind != LLVM_GlobalVariableValueKind:
+        return 0
+    LLVMGlobalGetValueType(v as *mut u8) as i64
 @[c_export("wl_get_allocated_type")]
 pub fn get_allocated_type(v: i64) -> i64: LLVMGetAllocatedType(v as *mut u8) as i64
 
@@ -762,6 +792,22 @@ pub fn add_sret_attr(ctx: i64, fn_val: i64, param_idx: i32, ty: i64):
     if kind != 0:
         let attr = LLVMCreateTypeAttribute(ctx as *mut u8, kind, ty as *mut u8)
         LLVMAddAttributeAtIndex(fn_val as *mut u8, (param_idx + 1) as u32, attr)
+
+@[c_export("wl_add_call_param_byval_attr")]
+pub fn add_call_param_byval_attr(ctx: i64, call_val: i64, param_idx: i32, ty: i64):
+    let name = "byval" as *const u8
+    let kind = LLVMGetEnumAttributeKindForName(name, 5 as u64)
+    if kind != 0:
+        let attr = LLVMCreateTypeAttribute(ctx as *mut u8, kind, ty as *mut u8)
+        LLVMAddCallSiteAttribute(call_val as *mut u8, (param_idx + 1) as u32, attr)
+
+@[c_export("wl_add_call_sret_attr")]
+pub fn add_call_sret_attr(ctx: i64, call_val: i64, param_idx: i32, ty: i64):
+    let name = "sret" as *const u8
+    let kind = LLVMGetEnumAttributeKindForName(name, 4 as u64)
+    if kind != 0:
+        let attr = LLVMCreateTypeAttribute(ctx as *mut u8, kind, ty as *mut u8)
+        LLVMAddCallSiteAttribute(call_val as *mut u8, (param_idx + 1) as u32, attr)
 
 // ── Basic blocks ────────────────────────────────────────────────
 
@@ -1100,6 +1146,14 @@ pub fn verify_module(m: i64) -> i32:
 
 @[c_export("wl_emit_object")]
 pub fn emit_object(tm: i64, m: i64, path: str) -> i32:
+    if tm == 0:
+        let msg = "LLVM emit error: null target machine\n"
+        let _ = rt_write(2, msg as *const u8, 37)
+        return 1
+    if m == 0:
+        let msg = "LLVM emit error: null module\n"
+        let _ = rt_write(2, msg as *const u8, 29)
+        return 1
     var path_buf: [4096]u8 = [0 as u8; 4096]
     let n = if path.len() < 4095: path.len() else: 4095
     let sp = unsafe: *(&path as *const *const u8)

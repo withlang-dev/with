@@ -10,12 +10,15 @@ extern fn with_memset(dst: *mut u8, val: i32, len: i64) -> void
 extern fn mmap(addr: *mut u8, len: u64, prot: i32, flags: i32, fd: i32, offset: i64) -> *mut u8
 extern fn mprotect(addr: *mut u8, len: u64, prot: i32) -> i32
 extern fn munmap(addr: *mut u8, len: u64) -> i32
-extern fn sigaltstack(ss: *const u8, old_ss: *mut u8) -> i32
-extern fn sigaction(sig: i32, act: *const u8, old_act: *mut u8) -> i32
 extern fn raise(sig: i32) -> i32
 extern fn write(fd: i32, buf: *const u8, len: u64) -> i64
 extern fn _exit(code: i32) -> void
 extern fn abort() -> void
+extern fn rt_fiber_page_size() -> i64
+extern fn rt_fiber_mmap_flags() -> i32
+extern fn rt_fiber_install_signal_handlers(alt_stack: *mut u8, alt_stack_size: i64, handler: i64) -> void
+extern fn rt_fiber_reset_signal_handler(sig: i32) -> void
+extern fn rt_fiber_fault_addr(info: *const u8) -> i64
 
 extern fn with_fiber_switch(save: *mut u8, restore: *mut u8) -> void
 extern fn with_fiber_prepare_initial_context(ctx: *mut u8, stack: *mut u8, stack_size: i64) -> void
@@ -51,25 +54,11 @@ let FIBER_OFF_PANIC_MSG_LEN: i64 = 272
 
 let PROT_NONE: i32 = 0
 let PROT_READ_WRITE: i32 = 3
-let MAP_PRIVATE_ANON: i32 = 0x1002
 let MAP_FAILED: i64 = -1
-// SC_PAGESIZE_DARWIN removed — page size hardcoded to 16384 (aarch64 Darwin)
 
 let SIGBUS: i32 = 10
 let SIGSEGV: i32 = 11
-let SA_ONSTACK: i32 = 0x0001
-let SA_SIGINFO: i32 = 0x0040
 
-let STACK_T_SIZE: i64 = 24
-let STACK_T_OFF_SP: i64 = 0
-let STACK_T_OFF_SIZE: i64 = 8
-let STACK_T_OFF_FLAGS: i64 = 16
-
-let SIGACTION_SIZE: i64 = 16
-let SIGACTION_OFF_HANDLER: i64 = 0
-let SIGACTION_OFF_FLAGS: i64 = 12
-
-let SIGINFO_OFF_ADDR: i64 = 24
 let FIBER_ALT_STACK_SIZE: i64 = 131072
 
 var current_fiber: i64 = 0
@@ -348,15 +337,15 @@ fn dequeue_any() -> i64:
 fn guard_page_size() -> i64:
     if fiber_page_size != 0:
         return fiber_page_size
-    // Darwin aarch64 always uses 16K pages; x86_64 uses 4K.
-    // Hardcoded to avoid sysconf libc dependency.
-    fiber_page_size = 16384
+    fiber_page_size = rt_fiber_page_size()
+    if fiber_page_size <= 0:
+        abort()
     fiber_page_size
 
 fn allocate_stack_region(size: i64) -> *mut u8:
     let page_sz = guard_page_size()
     let total = page_sz + size
-    let region = mmap(0 as *mut u8, total as u64, PROT_READ_WRITE, MAP_PRIVATE_ANON, -1, 0)
+    let region = mmap(0 as *mut u8, total as u64, PROT_READ_WRITE, rt_fiber_mmap_flags(), -1, 0)
     if region as i64 == MAP_FAILED:
         return 0 as *mut u8
     let _ = mprotect(region, page_sz as u64, PROT_NONE)
@@ -446,7 +435,7 @@ fn fiber_write_i32(fd: i32, n: i32):
 @[c_export("with_fiber_stack_overflow_handler")]
 pub fn fiber_stack_overflow_handler(sig: i32, info: *const u8, ucontext: *mut u8):
     let _ = ucontext
-    let fault_addr = if info as i64 != 0: unsafe: *((info as i64 + SIGINFO_OFF_ADDR) as *const i64) else: 0
+    let fault_addr = rt_fiber_fault_addr(info)
     if current_fiber != 0:
         let stack = fiber_stack(current_fiber)
         if stack as i64 != 0:
@@ -459,28 +448,11 @@ pub fn fiber_stack_overflow_handler(sig: i32, info: *const u8, ucontext: *mut u8
                 let _ = write(2, ")\n" as *const u8, 2)
                 _exit(134)
 
-    var sa: [16]u8 = [0 as u8; 16]
-    let sa_base = (&raw mut sa) as *mut [16]u8 as i64
-    with_memset(sa_base as *mut u8, 0, SIGACTION_SIZE)
-    let _ = sigaction(sig, sa_base as *const u8, 0 as *mut u8)
+    rt_fiber_reset_signal_handler(sig)
     let _ = raise(sig)
 
 fn fiber_install_signal_handlers():
-    var ss: [24]u8 = [0 as u8; 24]
-    let ss_base = (&raw mut ss) as *mut [24]u8 as i64
-    with_memset(ss_base as *mut u8, 0, STACK_T_SIZE)
-    store_i64(ss_base, STACK_T_OFF_SP, alt_stack_ptr() as i64)
-    store_i64(ss_base, STACK_T_OFF_SIZE, FIBER_ALT_STACK_SIZE)
-    store_i32(ss_base, STACK_T_OFF_FLAGS, 0)
-    let _ = sigaltstack(ss_base as *const u8, 0 as *mut u8)
-
-    var sa: [16]u8 = [0 as u8; 16]
-    let sa_base = (&raw mut sa) as *mut [16]u8 as i64
-    with_memset(sa_base as *mut u8, 0, SIGACTION_SIZE)
-    store_i64(sa_base, SIGACTION_OFF_HANDLER, fiber_stack_overflow_handler as i64)
-    store_i32(sa_base, SIGACTION_OFF_FLAGS, SA_SIGINFO | SA_ONSTACK)
-    let _ = sigaction(SIGSEGV, sa_base as *const u8, 0 as *mut u8)
-    let _ = sigaction(SIGBUS, sa_base as *const u8, 0 as *mut u8)
+    rt_fiber_install_signal_handlers(alt_stack_ptr(), FIBER_ALT_STACK_SIZE, fiber_stack_overflow_handler as i64)
 
 @[c_export("with_fiber_bootstrap_load")]
 pub fn fiber_bootstrap_load(entry_out: *mut i64, arg_out: *mut i64, result_out: *mut i64):

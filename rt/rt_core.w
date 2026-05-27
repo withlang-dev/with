@@ -31,6 +31,7 @@ extern fn rt_sysinfo(out: *mut u8) -> i32
 extern fn gethostname(name: *mut u8, len: u64) -> i32
 extern fn rt_thread_spawn(start_routine: *mut u8, arg: *mut u8) -> i64
 extern fn rt_thread_join(handle: i64) -> i32
+extern fn rt_fill_random(buf: *mut u8, len: u64) -> void
 
 // Filesystem extras (provided by platform backend)
 extern fn rt_mkdir(path: *const u8, mode: i32) -> i32
@@ -45,9 +46,6 @@ extern fn rt_access(path: *const u8, mode: i32) -> i32
 extern fn rt_chmod(path: *const u8, mode: i32) -> i32
 // stat is in the core 13 but declared with a different name to avoid confusion
 extern fn rt_stat(path: *const u8, out: *mut u8) -> i32
-
-// Random fill (from libSystem)
-extern fn arc4random_buf(buf: *mut u8, len: u64)
 
 // ── Float formatting ────────────────────────────────────────────
 // Implements f64-to-decimal conversion without libc.
@@ -2469,7 +2467,7 @@ pub fn abs_i32(n: i32) -> i32:
 
 @[c_export("with_fill_random")]
 pub fn fill_random(buf: *mut u8, len: i64):
-    arc4random_buf(buf, len as u64)
+    rt_fill_random(buf, len as u64)
 
 // ── Codegen loop state ─────────────────────────────────────────────
 // Used by LLVM codegen for break/continue within loops.
@@ -2572,13 +2570,16 @@ pub fn extract_runtime_obj(name: str, path: str) -> i32:
 
 // ── Sysinfo ────────────────────────────────────────────────────────
 
+extern fn rt_sysinfo_os() -> str
+extern fn rt_sysinfo_arch() -> str
+
 @[c_export("with_sysinfo_os")]
 pub fn sysinfo_os() -> str:
-    make_str("Macos" as *const u8, 5)
+    rt_sysinfo_os()
 
 @[c_export("with_sysinfo_arch")]
 pub fn sysinfo_arch() -> str:
-    make_str("armv8" as *const u8, 5)
+    rt_sysinfo_arch()
 
 @[c_export("with_sysinfo_hostname")]
 pub fn sysinfo_hostname() -> str:

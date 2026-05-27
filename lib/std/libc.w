@@ -16,6 +16,19 @@ pub extern var __stdinp: *mut c_void
 pub extern var __stdoutp: *mut c_void
 pub extern var __stderrp: *mut c_void
 
+extern fn rt_libc_stdin() -> *mut c_void
+extern fn rt_libc_stdout() -> *mut c_void
+extern fn rt_libc_stderr() -> *mut c_void
+
+pub fn libc_stdin() -> *mut c_void:
+    rt_libc_stdin()
+
+pub fn libc_stdout() -> *mut c_void:
+    rt_libc_stdout()
+
+pub fn libc_stderr() -> *mut c_void:
+    rt_libc_stderr()
+
 // stdio
 pub extern fn fprintf(stream: *mut c_void, fmt: *const i8, ...) -> i32
 pub extern fn printf(fmt: *const i8, ...) -> i32

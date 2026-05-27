@@ -1803,6 +1803,8 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: str, macro_
 
         // Try to translate function-like macros; fall back to comptime_error
         if fn_like != 0:
+            if ci_libc_symbol_allowed_as(name, CI_LIBC_KIND_FN):
+                continue
             if name.len() > 0 and name.byte_at(0) != 95:
                 if with_cimport_is_name_emitted(name) == 0:
                     with_cimport_mark_name_emitted(name)
@@ -4967,6 +4969,53 @@ fn ci_expr_is_zero_int_lit(exprs: CiExprPool, id: CiExprId) -> bool:
         return false
     exprs.get_string(exprs.get_d0(id)) == "0"
 
+fn ci_expr_strip_casts_and_parens(exprs: CiExprPool, id: CiExprId) -> CiExprId:
+    var cur = id
+    var depth = 0
+    while (cur as i32) != 0 and depth < 16:
+        let kind = exprs.kind(cur)
+        if kind == CiExprKind.CIE_PAREN:
+            cur = (exprs.get_d0(cur)) as CiExprId
+        else if kind == CiExprKind.CIE_CAST:
+            cur = (exprs.get_d1(cur)) as CiExprId
+        else:
+            return cur
+        depth = depth + 1
+    cur
+
+fn ci_expr_is_int_lit_text(exprs: CiExprPool, id: CiExprId, text: str) -> bool:
+    let cur = ci_expr_strip_casts_and_parens(exprs, id)
+    if (cur as i32) == 0 or exprs.kind(cur) != CiExprKind.CIE_INT_LIT:
+        return false
+    exprs.get_string(exprs.get_d0(cur)) == text
+
+fn ci_expr_is_signed_long_max_atom(exprs: CiExprPool, id: CiExprId) -> bool:
+    let cur = ci_expr_strip_casts_and_parens(exprs, id)
+    if (cur as i32) == 0:
+        return false
+    if exprs.kind(cur) == CiExprKind.CIE_INT_LIT:
+        return exprs.get_string(exprs.get_d0(cur)) == "9223372036854775807"
+    if exprs.kind(cur) == CiExprKind.CIE_IDENT:
+        let name = exprs.get_string(exprs.get_d0(cur))
+        return name == "LONG_MAX" or name == "__LONG_MAX__"
+    false
+
+fn ci_expr_is_mul_two_signed_long_max(exprs: CiExprPool, id: CiExprId) -> bool:
+    let cur = ci_expr_strip_casts_and_parens(exprs, id)
+    if (cur as i32) == 0 or exprs.kind(cur) != CiExprKind.CIE_BINARY:
+        return false
+    let op = exprs.get_d0(cur)
+    if op != CiBinOp.CIBO_MUL and op != CiBinOp.CIBO_MUL_WRAP:
+        return false
+    let lhs = (exprs.get_d1(cur)) as CiExprId
+    let rhs = (exprs.get_d2(cur)) as CiExprId
+    (ci_expr_is_signed_long_max_atom(exprs, lhs) and ci_expr_is_int_lit_text(exprs, rhs, "2")) or
+    (ci_expr_is_signed_long_max_atom(exprs, rhs) and ci_expr_is_int_lit_text(exprs, lhs, "2"))
+
+fn ci_expr_is_unsigned_long_max_sum(exprs: CiExprPool, lhs: CiExprId, rhs: CiExprId) -> bool:
+    (ci_expr_is_mul_two_signed_long_max(exprs, lhs) and ci_expr_is_int_lit_text(exprs, rhs, "1")) or
+    (ci_expr_is_mul_two_signed_long_max(exprs, rhs) and ci_expr_is_int_lit_text(exprs, lhs, "1"))
+
 fn ci_cursor_type_is_pointerish(session: i64, cursor: i32) -> bool:
     if cursor < 0:
         return false
@@ -5326,6 +5375,9 @@ fn CiExprPool.lower_expr_ir(self: CiExprPool, session: i64, cursor: i32, types: 
 
     // Binary operator.
     if kind == CXK_BINARY_OP:
+        let glibc_ctype_mask_id = self.lower_glibc_ctype_mask_macro(session, cursor, types, scope)
+        if (glibc_ctype_mask_id as i32) != 0:
+            return glibc_ctype_mask_id
         let bin_id = self.lower_binary_simple(session, cursor, types, scope)
         if (bin_id as i32) != 0:
             return bin_id
@@ -5373,6 +5425,9 @@ fn CiExprPool.lower_expr_ir(self: CiExprPool, session: i64, cursor: i32, types: 
 
     // Array subscript — `base[idx]`.
     if kind == CXK_ARRAY_SUBSCRIPT:
+        let glibc_ctype_case_id = self.lower_glibc_ctype_case_macro(session, cursor, types, scope)
+        if (glibc_ctype_case_id as i32) != 0:
+            return glibc_ctype_case_id
         let nc = with_ci_num_children(session, cursor)
         if nc >= 2:
             let arr_cursor = with_ci_child(session, cursor, 0)
@@ -5668,6 +5723,102 @@ fn ci_peel_transparent(session: i64, cursor: i32) -> i32:
         c = with_ci_child(session, c, 0)
         depth = depth + 1
     c
+
+fn ci_peel_transparent_and_cstyle(session: i64, cursor: i32) -> i32:
+    var c = ci_peel_transparent(session, cursor)
+    var depth = 0
+    while depth < 16 and with_ci_cursor_kind(session, c) == CXK_CSTYLE_CAST and with_ci_num_children(session, c) == 1:
+        c = ci_peel_transparent(session, with_ci_child(session, c, 0))
+        depth = depth + 1
+    c
+
+fn ci_cursor_contains_decl_ref(session: i64, cursor: i32, name: str, depth: i32) -> bool:
+    if depth > 32 or cursor < 0:
+        return false
+    if with_ci_cursor_kind(session, cursor) == CXK_DECL_REF and with_ci_cursor_spelling(session, cursor) == name:
+        return true
+    let nc = with_ci_num_children(session, cursor)
+    var i = 0
+    while i < nc:
+        if ci_cursor_contains_decl_ref(session, with_ci_child(session, cursor, i), name, depth + 1):
+            return true
+        i = i + 1
+    false
+
+fn ci_glibc_ctype_mask_function(mask_name: str) -> str:
+    if mask_name == "_ISalpha": return "isalpha"
+    if mask_name == "_ISdigit": return "isdigit"
+    if mask_name == "_ISalnum": return "isalnum"
+    if mask_name == "_ISspace": return "isspace"
+    if mask_name == "_ISupper": return "isupper"
+    if mask_name == "_ISlower": return "islower"
+    if mask_name == "_ISxdigit": return "isxdigit"
+    if mask_name == "_ISprint": return "isprint"
+    if mask_name == "_ISgraph": return "isgraph"
+    if mask_name == "_ISpunct": return "ispunct"
+    if mask_name == "_IScntrl": return "iscntrl"
+    ""
+
+fn CiExprPool.lower_glibc_ctype_mask_macro(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
+    let expr_cursor = ci_peel_transparent(session, cursor)
+    if with_ci_cursor_kind(session, expr_cursor) != CXK_BINARY_OP or with_ci_binary_op(session, expr_cursor) != BO_AND:
+        return 0 as CiExprId
+    if with_ci_num_children(session, expr_cursor) < 2:
+        return 0 as CiExprId
+    let lhs_cursor = with_ci_child(session, expr_cursor, 0)
+    let rhs_cursor = with_ci_child(session, expr_cursor, 1)
+    let rhs_peeled = ci_peel_transparent_and_cstyle(session, rhs_cursor)
+    if with_ci_cursor_kind(session, rhs_peeled) != CXK_DECL_REF:
+        return 0 as CiExprId
+    let ctype_fn = ci_glibc_ctype_mask_function(with_ci_cursor_spelling(session, rhs_peeled))
+    if ctype_fn.len() == 0:
+        return 0 as CiExprId
+    let lhs_peeled = ci_peel_transparent_and_cstyle(session, lhs_cursor)
+    if with_ci_cursor_kind(session, lhs_peeled) != CXK_ARRAY_SUBSCRIPT or with_ci_num_children(session, lhs_peeled) < 2:
+        return 0 as CiExprId
+    let table_cursor = with_ci_child(session, lhs_peeled, 0)
+    if not ci_cursor_contains_decl_ref(session, table_cursor, "__ctype_b_loc", 0):
+        return 0 as CiExprId
+    let arg_cursor = ci_peel_transparent_and_cstyle(session, with_ci_child(session, lhs_peeled, 1))
+    var arg_id = self.lower_expr_ir(session, arg_cursor, types, scope)
+    if (arg_id as i32) == 0:
+        return 0 as CiExprId
+    let c_int_ty = types.named_type_from_text("c_int")
+    if (c_int_ty as i32) != 0:
+        arg_id = self.cast_if_needed(c_int_ty, arg_id, arg_cursor, session, types)
+    let args: Vec[i32] = Vec.new()
+    args.push(arg_id as i32)
+    ci_migrate_note_libc_symbol(ctype_fn)
+    self.build_named_call_expr(ctype_fn, &args)
+
+fn ci_glibc_ctype_case_function(cursor_name: str) -> str:
+    if cursor_name == "__ctype_tolower_loc": return "tolower"
+    if cursor_name == "__ctype_toupper_loc": return "toupper"
+    ""
+
+fn CiExprPool.lower_glibc_ctype_case_macro(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
+    let expr_cursor = ci_peel_transparent_and_cstyle(session, cursor)
+    if with_ci_cursor_kind(session, expr_cursor) != CXK_ARRAY_SUBSCRIPT or with_ci_num_children(session, expr_cursor) < 2:
+        return 0 as CiExprId
+    let table_cursor = with_ci_child(session, expr_cursor, 0)
+    var ctype_fn = ""
+    if ci_cursor_contains_decl_ref(session, table_cursor, "__ctype_tolower_loc", 0):
+        ctype_fn = "tolower"
+    else if ci_cursor_contains_decl_ref(session, table_cursor, "__ctype_toupper_loc", 0):
+        ctype_fn = "toupper"
+    if ctype_fn.len() == 0:
+        return 0 as CiExprId
+    let arg_cursor = ci_peel_transparent_and_cstyle(session, with_ci_child(session, expr_cursor, 1))
+    var arg_id = self.lower_expr_ir(session, arg_cursor, types, scope)
+    if (arg_id as i32) == 0:
+        return 0 as CiExprId
+    let c_int_ty = types.named_type_from_text("c_int")
+    if (c_int_ty as i32) != 0:
+        arg_id = self.cast_if_needed(c_int_ty, arg_id, arg_cursor, session, types)
+    let args: Vec[i32] = Vec.new()
+    args.push(arg_id as i32)
+    ci_migrate_note_libc_symbol(ctype_fn)
+    self.build_named_call_expr(ctype_fn, &args)
 
 fn CiExprPool.lower_binary_pointer(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
     self.lower_plain_value_expr_ir(session, cursor, types, scope)
@@ -6678,6 +6829,12 @@ fn CiExprPool.build_binary_value_expr_from_ids(self: CiExprPool, session: i64, c
         ci_op = CiBinOp.CIBO_SHL
     if op == BO_SHR:
         ci_op = CiBinOp.CIBO_SHR
+    if op == BO_ADD and is_unsigned != 0 and ci_expr_is_unsigned_long_max_sum(self.val(), lhs_value, rhs_value):
+        let result_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
+        if (result_ty as i32) != 0:
+            let zero = self.cast(result_ty, self.int_lit(self.add_string("0"), 0 as CiTypeId))
+            let one = self.int_lit(self.add_string("1"), 0 as CiTypeId)
+            return self.binary(CiBinOp.CIBO_SUB_WRAP, zero, one, result_ty)
     self.binary(ci_op, lhs_value, rhs_value, 0 as CiTypeId)
 
 fn CiExprPool.build_unary_value_expr_from_id(self: CiExprPool, session: i64, cursor: i32, child_cursor: i32, child_id: CiExprId, types: CiTypePool) -> CiExprId:
@@ -7082,6 +7239,9 @@ fn CiStmtPool.lower_value_expr_ir(self: CiStmtPool, session: i64, cursor: i32, e
         return ci_value_ir_invalid()
 
     if kind == CXK_BINARY_OP and nc >= 2:
+        let glibc_ctype_mask_id = exprs.lower_glibc_ctype_mask_macro(session, cursor, types, scope)
+        if (glibc_ctype_mask_id as i32) != 0:
+            return ci_value_ir_plain(glibc_ctype_mask_id)
         let lhs_cursor = with_ci_child(session, cursor, 0)
         let rhs_cursor = with_ci_child(session, cursor, 1)
         let op = with_ci_binary_op(session, cursor)
@@ -7416,6 +7576,9 @@ fn CiStmtPool.lower_value_expr_ir(self: CiStmtPool, session: i64, cursor: i32, e
         return ci_value_ir_invalid()
 
     if kind == CXK_ARRAY_SUBSCRIPT and nc >= 2:
+        let glibc_ctype_case_id = exprs.lower_glibc_ctype_case_macro(session, cursor, types, scope)
+        if (glibc_ctype_case_id as i32) != 0:
+            return ci_value_ir_plain(glibc_ctype_case_id)
         let arr_cursor = with_ci_child(session, cursor, 0)
         let idx_cursor = with_ci_child(session, cursor, 1)
         let arr = self.lower_value_expr_ir(session, arr_cursor, exprs, types, scope)
