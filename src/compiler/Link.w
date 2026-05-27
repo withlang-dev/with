@@ -23,6 +23,8 @@ extern let with_embedded_rt_core_o_start: u8
 extern let with_embedded_rt_core_o_end: u8
 extern let with_embedded_rt_darwin_aarch64_o_start: u8
 extern let with_embedded_rt_darwin_aarch64_o_end: u8
+extern let with_embedded_rt_linux_x86_64_o_start: u8
+extern let with_embedded_rt_linux_x86_64_o_end: u8
 
 type LinkStageEnvVar {
     name: str,
@@ -123,15 +125,54 @@ fn link_stage_make_link_command(linker: str, obj_path: str, bin_path: str, extra
         let extra = extras.get(i as i64)
         args.push(extra)
         inputs.push(extra)
-    args.push("-Wl,-dead_strip")
+    if runtime_sysinfo_os() == "Macos":
+        args.push("-Wl,-dead_strip")
+    else if runtime_sysinfo_os() == "Linux":
+        args.push("-no-pie")
+        args.push("-Wl,--gc-sections")
     args.push("-o")
     args.push(bin_path)
     outputs.push(bin_path)
     for i in 0..link_libs.len() as i32:
         args.push("-l" ++ link_libs.get(i as i64))
+    if runtime_sysinfo_os() == "Linux":
+        args.push("-lm")
     LinkStageCommand { linker, args, cwd: "", env, inputs, outputs }
 
-fn link_stage_make_llvm_link_command(llvm_ld: str, obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str]) -> LinkStageCommand:
+fn link_stage_file_exists(path: str) -> bool:
+    runtime_read_file(path).len() > 0
+
+fn link_stage_linux_dynamic_linker() -> str:
+    if link_stage_file_exists("/lib64/ld-linux-x86-64.so.2"):
+        return "/lib64/ld-linux-x86-64.so.2"
+    if link_stage_file_exists("/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2"):
+        return "/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2"
+    ""
+
+fn link_stage_linux_crt_object(name: str) -> str:
+    let usr = "/usr/lib/x86_64-linux-gnu/" ++ name
+    if link_stage_file_exists(usr):
+        return usr
+    let lib = "/lib/x86_64-linux-gnu/" ++ name
+    if link_stage_file_exists(lib):
+        return lib
+    ""
+
+fn link_stage_linux_gcc_dir() -> str:
+    let candidates: Vec[str] = Vec.new()
+    candidates.push("/usr/lib/gcc/x86_64-linux-gnu/14")
+    candidates.push("/usr/lib/gcc/x86_64-linux-gnu/13")
+    candidates.push("/usr/lib/gcc/x86_64-linux-gnu/12")
+    candidates.push("/usr/lib/gcc/x86_64-linux-gnu/11")
+    candidates.push("/usr/lib/gcc/x86_64-linux-gnu/10")
+    candidates.push("/usr/lib/gcc/x86_64-linux-gnu/9")
+    for i in 0..candidates.len() as i32:
+        let dir = candidates.get(i as i64)
+        if link_stage_file_exists(dir ++ "/crtbegin.o"):
+            return dir
+    ""
+
+fn link_stage_make_darwin_llvm_link_command(llvm_ld: str, obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str]) -> LinkStageCommand:
     let args: Vec[str] = Vec.new()
     let env: Vec[LinkStageEnvVar] = Vec.new()
     let inputs: Vec[str] = Vec.new()
@@ -156,6 +197,76 @@ fn link_stage_make_llvm_link_command(llvm_ld: str, obj_path: str, bin_path: str,
         args.push("-l" ++ link_libs.get(i as i64))
     args.push("-lSystem")
     LinkStageCommand { llvm_ld, args, cwd: "", env, inputs, outputs }
+
+fn link_stage_make_linux_llvm_link_command(llvm_ld: str, obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str]) -> LinkStageCommand:
+    let args: Vec[str] = Vec.new()
+    let env: Vec[LinkStageEnvVar] = Vec.new()
+    let inputs: Vec[str] = Vec.new()
+    let outputs: Vec[str] = Vec.new()
+    let dynamic_linker = link_stage_linux_dynamic_linker()
+    let crt1 = link_stage_linux_crt_object("crt1.o")
+    let crti = link_stage_linux_crt_object("crti.o")
+    let crtn = link_stage_linux_crt_object("crtn.o")
+    let gcc_dir = link_stage_linux_gcc_dir()
+    if dynamic_linker.len() == 0 or crt1.len() == 0 or crti.len() == 0 or crtn.len() == 0 or gcc_dir.len() == 0:
+        with_eprint("error: could not locate Linux x86_64 crt/linker files for direct ld.lld link")
+        return LinkStageCommand { linker: "", args, cwd: "", env, inputs, outputs }
+
+    args.push("-m")
+    args.push("elf_x86_64")
+    args.push("--eh-frame-hdr")
+    args.push("--hash-style=gnu")
+    args.push("--build-id")
+    args.push("--gc-sections")
+    args.push("--as-needed")
+    args.push("-dynamic-linker")
+    args.push(dynamic_linker)
+    args.push("-o")
+    args.push(bin_path)
+    outputs.push(bin_path)
+
+    args.push(crt1)
+    inputs.push(crt1)
+    args.push(crti)
+    inputs.push(crti)
+    let crtbegin = gcc_dir ++ "/crtbegin.o"
+    args.push(crtbegin)
+    inputs.push(crtbegin)
+
+    args.push(obj_path)
+    inputs.push(obj_path)
+    for i in 0..extras.len() as i32:
+        let extra = extras.get(i as i64)
+        args.push(extra)
+        inputs.push(extra)
+
+    args.push("-L" ++ gcc_dir)
+    args.push("-L/usr/lib/x86_64-linux-gnu")
+    args.push("-L/lib/x86_64-linux-gnu")
+    args.push("-L/usr/lib")
+    args.push("-L/lib")
+    for i in 0..link_libs.len() as i32:
+        args.push("-l" ++ link_libs.get(i as i64))
+    args.push("-lc")
+    args.push("-lgcc")
+    args.push("-lgcc_s")
+
+    let crtend = gcc_dir ++ "/crtend.o"
+    args.push(crtend)
+    inputs.push(crtend)
+    args.push(crtn)
+    inputs.push(crtn)
+    LinkStageCommand { llvm_ld, args, cwd: "", env, inputs, outputs }
+
+fn link_stage_make_llvm_link_command(llvm_ld: str, obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str]) -> LinkStageCommand:
+    let os = runtime_sysinfo_os()
+    let arch = runtime_sysinfo_arch()
+    if os == "Linux" and arch == "x86_64":
+        return link_stage_make_linux_llvm_link_command(llvm_ld, obj_path, bin_path, extras, link_libs)
+    if os == "Macos" and (arch == "armv8" or arch == "aarch64"):
+        return link_stage_make_darwin_llvm_link_command(llvm_ld, obj_path, bin_path, extras, link_libs)
+    with_eprint("error: unsupported host LLVM linker platform: " ++ os ++ "/" ++ arch)
+    LinkStageCommand { linker: "", args: Vec.new(), cwd: "", env: Vec.new(), inputs: Vec.new(), outputs: Vec.new() }
 
 fn link_stage_str_from_raw_parts(ptr: *const u8, len: i64) -> str:
     if ptr as i64 == 0 or len <= 0:
@@ -196,6 +307,8 @@ fn link_stage_embedded_runtime_object(name: str) -> str:
         return link_stage_embedded_obj_slice(&with_embedded_rt_core_o_start as *const u8, &with_embedded_rt_core_o_end as *const u8)
     if name == "rt_darwin_aarch64.o":
         return link_stage_embedded_obj_slice(&with_embedded_rt_darwin_aarch64_o_start as *const u8, &with_embedded_rt_darwin_aarch64_o_end as *const u8)
+    if name == "rt_linux_x86_64.o":
+        return link_stage_embedded_obj_slice(&with_embedded_rt_linux_x86_64_o_start as *const u8, &with_embedded_rt_linux_x86_64_o_end as *const u8)
     ""
 
 fn link_stage_extract_runtime_obj(name: str, path: str) -> i32:
@@ -233,6 +346,8 @@ fn link_stage_link_with_llvm_result(obj_path: str, bin_path: str, extras: Vec[st
 
 fn link_stage_link_with_llvm_plan(obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str], llvm_ld: str) -> LinkStagePlan:
     let command = link_stage_make_llvm_link_command(llvm_ld, obj_path, bin_path, extras, link_libs)
+    if command.linker.len() == 0:
+        return link_stage_plan_fail()
     link_stage_plan_for_command(command)
 
 fn link_stage_str_contains(hay: str, needle: str) -> bool:
@@ -257,6 +372,11 @@ fn link_stage_str_contains(hay: str, needle: str) -> bool:
         i = i + 1
     false
 
+fn link_stage_undef_contains_symbol(undef: str, name: str) -> bool:
+    if link_stage_str_contains(undef, "_" ++ name):
+        return true
+    link_stage_str_contains(undef, name)
+
 fn link_stage_undefined_symbols_for_object(obj_path: str) -> str:
     let report_path = obj_path ++ ".undef"
     var argv = ""
@@ -276,13 +396,13 @@ fn link_stage_undefined_symbols_need_helpers_runtime(undef: str) -> i32:
         return 1
     if undef.len() == 0:
         return 0
-    if link_stage_str_contains(undef, "_with_"):
+    if link_stage_undef_contains_symbol(undef, "with_"):
         return 1
-    if link_stage_str_contains(undef, "_int_to_string"):
+    if link_stage_undef_contains_symbol(undef, "int_to_string"):
         return 1
-    if link_stage_str_contains(undef, "_i32_to_str"):
+    if link_stage_undef_contains_symbol(undef, "i32_to_str"):
         return 1
-    if link_stage_str_contains(undef, "_str_from_byte"):
+    if link_stage_undef_contains_symbol(undef, "str_from_byte"):
         return 1
     0
 
@@ -291,9 +411,9 @@ fn link_stage_undefined_symbols_need_fiber_runtime(undef: str) -> i32:
         return 0
     if undef.len() == 0:
         return 0
-    if link_stage_str_contains(undef, "_with_channel_"):
+    if link_stage_undef_contains_symbol(undef, "with_channel_"):
         return 1
-    if link_stage_str_contains(undef, "_with_fiber_"):
+    if link_stage_undef_contains_symbol(undef, "with_fiber_"):
         return 1
     0
 
@@ -302,7 +422,7 @@ fn link_stage_undefined_symbols_need_regex_runtime(undef: str) -> i32:
         return 1
     if undef.len() == 0:
         return 0
-    if link_stage_str_contains(undef, "_with_regex_"):
+    if link_stage_undef_contains_symbol(undef, "with_regex_"):
         return 1
     0
 
@@ -311,9 +431,9 @@ fn link_stage_undefined_symbols_need_compat_runtime(undef: str) -> i32:
         return 1
     if undef.len() == 0:
         return 0
-    if link_stage_str_contains(undef, "_with_exec_"):
+    if link_stage_undef_contains_symbol(undef, "with_exec_"):
         return 1
-    if link_stage_str_contains(undef, "_with_setenv_str"):
+    if link_stage_undef_contains_symbol(undef, "with_setenv_str"):
         return 1
     0
 
@@ -326,6 +446,7 @@ fn link_stage_compiler_runtime_dir() -> str:
 fn link_stage_resolve_runtime_root() -> str:
     let argv0 = runtime_arg_at(0)
     let compiler_dir = if argv0.len() > 0: link_stage_dirname(argv0) else: "."
+    let platform_object = link_stage_host_platform_runtime_object()
     let candidates: Vec[str] = Vec.new()
     // Prefer the current workspace artifact root during bootstrap. This lets
     // external seed compilers link against the runtime objects generated for
@@ -342,7 +463,8 @@ fn link_stage_resolve_runtime_root() -> str:
     for i in 0..candidates.len() as i32:
         let dir = candidates.get(i as i64)
         let probe = dir ++ "/cimport_stubs.o"
-        if runtime_read_file(probe).len() > 0:
+        let platform_probe = if platform_object.len() > 0: dir ++ "/" ++ platform_object else: ""
+        if runtime_read_file(probe).len() > 0 and (platform_probe.len() == 0 or runtime_read_file(platform_probe).len() > 0):
             return dir
     // Fall back to compiler-relative runtime dir.
     compiler_dir ++ "/runtime"
@@ -386,10 +508,20 @@ fn link_stage_find_runtime_object_path(name: str) -> str:
         return tmp_path
     ""
 
+fn link_stage_host_platform_runtime_object() -> str:
+    let os = runtime_sysinfo_os()
+    let arch = runtime_sysinfo_arch()
+    if os == "Linux" and arch == "x86_64":
+        return "rt_linux_x86_64.o"
+    if os == "Macos" and (arch == "armv8" or arch == "aarch64"):
+        return "rt_darwin_aarch64.o"
+    with_eprint("error: unsupported host runtime platform: " ++ os ++ "/" ++ arch)
+    ""
+
 fn link_stage_make_archive(obj_path: str) -> str:
     // Wrap a .o file in a .a archive so the linker treats it as a library
     // (only pulling in symbols that aren't already defined).
-    let ar_path = obj_path ++ ".a"
+    let ar_path = obj_path ++ f".{runtime_getpid()}.{runtime_clock_nanos()}.a"
     link_stage_make_archive_to_path(obj_path, ar_path)
 
 fn link_stage_make_archive_to_path(obj_path: str, ar_path: str) -> str:
@@ -407,26 +539,26 @@ fn link_stage_should_use_rt_core_from_undef(undef: str) -> bool:
     if undef == "<probe-failed>":
         return false
     // If it needs LLVM bridge, it's the compiler — use libc runtime
-    if link_stage_str_contains(undef, "_wl_"):
+    if link_stage_undef_contains_symbol(undef, "wl_"):
         return false
     // If it uses c_import symbols or libc functions directly, use libc runtime
-    if link_stage_str_contains(undef, "_fopen"):
+    if link_stage_undef_contains_symbol(undef, "fopen"):
         return false
-    if link_stage_str_contains(undef, "_fwrite"):
+    if link_stage_undef_contains_symbol(undef, "fwrite"):
         return false
-    if link_stage_str_contains(undef, "_printf"):
+    if link_stage_undef_contains_symbol(undef, "printf"):
         return false
-    if link_stage_str_contains(undef, "_malloc"):
+    if link_stage_undef_contains_symbol(undef, "malloc"):
         return false
-    if link_stage_str_contains(undef, "_fclose"):
+    if link_stage_undef_contains_symbol(undef, "fclose"):
         return false
     // Check if it needs with_* symbols (which we provide in rt_core)
-    if link_stage_str_contains(undef, "_with_"):
+    if link_stage_undef_contains_symbol(undef, "with_"):
         return true
     false
 
 fn link_stage_undefined_symbols_need_llvm_bridge(undef: str) -> bool:
-    link_stage_str_contains(undef, "_wl_")
+    link_stage_undef_contains_symbol(undef, "wl_")
 
 fn link_stage_dirname(path: str) -> str:
     var last_slash = -1
@@ -530,9 +662,12 @@ fn link_stage_link_object_to_binary_plan(obj_path: str, bin_path: str, link_libs
                 with_eprint("error: missing rt_core.o")
                 return link_stage_plan_fail()
             extras.push(rt_core_path)
-            let rt_platform_path = link_stage_find_runtime_object_path("rt_darwin_aarch64.o")
+            let rt_platform_object = link_stage_host_platform_runtime_object()
+            if rt_platform_object.len() == 0:
+                return link_stage_plan_fail()
+            let rt_platform_path = link_stage_find_runtime_object_path(rt_platform_object)
             if rt_platform_path.len() == 0:
-                with_eprint("error: missing rt_darwin_aarch64.o")
+                with_eprint("error: missing " ++ rt_platform_object)
                 return link_stage_plan_fail()
             extras.push(rt_platform_path)
             let panic_rt_path = link_stage_find_runtime_object_path("panic_runtime.o")
@@ -571,9 +706,12 @@ fn link_stage_link_object_to_binary_plan(obj_path: str, bin_path: str, link_libs
                 with_eprint("error: missing rt_core.o")
                 return link_stage_plan_fail()
             extras.push(rt_core_path)
-            let rt_platform_path = link_stage_find_runtime_object_path("rt_darwin_aarch64.o")
+            let rt_platform_object = link_stage_host_platform_runtime_object()
+            if rt_platform_object.len() == 0:
+                return link_stage_plan_fail()
+            let rt_platform_path = link_stage_find_runtime_object_path(rt_platform_object)
             if rt_platform_path.len() == 0:
-                with_eprint("error: missing rt_darwin_aarch64.o")
+                with_eprint("error: missing " ++ rt_platform_object)
                 return link_stage_plan_fail()
             extras.push(rt_platform_path)
             let compat_runtime_path = link_stage_find_runtime_object_path("compat_runtime.o")
@@ -612,9 +750,12 @@ fn link_stage_link_object_to_binary_plan(obj_path: str, bin_path: str, link_libs
                 with_eprint("error: missing rt_core.o")
                 return link_stage_plan_fail()
             extras.push(rt_core_path)
-            let rt_platform_path = link_stage_find_runtime_object_path("rt_darwin_aarch64.o")
+            let rt_platform_object = link_stage_host_platform_runtime_object()
+            if rt_platform_object.len() == 0:
+                return link_stage_plan_fail()
+            let rt_platform_path = link_stage_find_runtime_object_path(rt_platform_object)
             if rt_platform_path.len() == 0:
-                with_eprint("error: missing rt_darwin_aarch64.o")
+                with_eprint("error: missing " ++ rt_platform_object)
                 return link_stage_plan_fail()
             extras.push(rt_platform_path)
             let panic_runtime_path = link_stage_find_runtime_object_path("panic_runtime.o")
