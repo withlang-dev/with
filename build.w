@@ -88,6 +88,42 @@ fn target_with_embedded_stdlib_inputs(target: Target, ctx: BuildCtx) -> Target:
             out = out.input(path)
     out
 
+fn build_project_trim_line(text: str) -> str:
+    var end = 0
+    while end < text.len() as i32:
+        let ch = text.byte_at(end as i64)
+        if ch == 10 or ch == 13:
+            break
+        end = end + 1
+    var start = 0
+    while start < end:
+        let ch = text.byte_at(start as i64)
+        if ch != 9 and ch != 32:
+            break
+        start = start + 1
+    while end > start:
+        let ch = text.byte_at((end - 1) as i64)
+        if ch != 9 and ch != 32:
+            break
+        end = end - 1
+    text.slice(start as i64, end as i64)
+
+fn target_with_version_inputs(target: Target, ctx: BuildCtx) -> Target:
+    var out = target
+    out = out.arg("version-env=" ++ env("WITH_VERSION"))
+    let fs = ctx.fs()
+    if not fs.exists(".git/HEAD"):
+        return out
+    out = out.input(".git/HEAD")
+    let head = build_project_trim_line(fs.read_text(".git/HEAD"))
+    if head.starts_with("ref: "):
+        let ref_path = ".git/" ++ head.slice(5, head.len())
+        if fs.exists(ref_path):
+            out = out.input(ref_path)
+        else if fs.exists(".git/packed-refs"):
+            out = out.input(".git/packed-refs")
+    out
+
 type HostRuntimeSpec:
     platform_source: str
     bootstrap_platform_object: str
@@ -126,6 +162,13 @@ fn host_runtime_spec() -> HostRuntimeSpec:
         fiber_core_source: "rt/fiber_core_darwin.w",
         fiber_asm_source: "runtime/fiber_asm_aarch64.s",
     }
+
+fn release_asset_for_host() -> str:
+    if os() == "Linux" and arch() == "x86_64":
+        return "with-linux-x86_64"
+    if os() == "Macos" and (arch() == "armv8" or arch() == "aarch64"):
+        return "with-darwin-aarch64"
+    "with-darwin-aarch64"
 
 fn install_file_target(name: str, source: str, dest: str, mode: str, dep: str) -> Target:
     var target = target_new(.Install, name, source).output(dest)
@@ -240,6 +283,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     compiler_sources = compiler_sources.extra_output("out/gen/main.w")
     compiler_sources = compiler_sources.extra_output("out/gen/bootstrap_main.w")
     compiler_sources = compiler_sources.extra_output("out/gen/version.txt")
+    compiler_sources = target_with_version_inputs(compiler_sources, ctx)
     out = out.add_target(compiler_sources)
 
     var compat_runtime = target_new(.Action, "compat-runtime-source", "").output("out/gen/compat_runtime.w")
@@ -728,7 +772,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     seed.action = run_seed_download_action
     seed = seed.write_scope("out/tmp")
     seed = seed.arg("withlang-dev/with")
-    seed = seed.arg("with-darwin-aarch64")
+    seed = seed.arg(release_asset_for_host())
     out = out.add_target(seed)
 
     var update_seed = target_new(.Install, "update-seed", "out/bin/with-stage2").output("src/main")

@@ -146,6 +146,17 @@ for creating the first native With compiler.
    The temporary C compiler output is not the release asset unless it passes the
    full With stage-chain gates.
 
+6. Before publishing the new platform, run the emitted-C self-host gate:
+
+   ```sh
+   make emit-c-fixpoint
+   ```
+
+   This builds binary A through the normal self-host path, emits the compiler
+   to C, compiles that C to binary B with the host C compiler, then uses B to
+   build binary C through the normal build path. A and C must be byte-identical.
+   A mismatch is an emit-C bug, not a release packaging issue.
+
 ## Failure Policy
 
 Do not work around missing static resources by linking dynamically.
@@ -169,3 +180,25 @@ Once the new platform passes bootstrap gates:
 3. Update `docs/with-release-runbook.md` with the new asset name and
    post-publish checks.
 4. Publish only after the release runbook gates pass on the final asset.
+
+## Current Release Platform Notes
+
+Linux x86_64 is now a release platform with asset name:
+
+```text
+with-linux-x86_64
+```
+
+Lessons from the first Linux bootstrap:
+
+- Do not use Darwin runtime objects as normal Linux link inputs. Non-host
+  runtime object symbols may be embedded as empty blobs only so one compiler
+  binary can carry both symbol names.
+- Emit-C C compilation must select the host platform runtime object and host
+  linker flags. Linux x86_64 uses `rt_linux_x86_64.o`, `-no-pie`, and `-lm`.
+- The seed downloader must choose the release asset for the host platform.
+  `with-darwin-aarch64` is not a valid Linux seed.
+- Release version generation depends on both `WITH_VERSION` and the current
+  Git ref. If a release build reports an old commit hash, rebuild the generated
+  compiler entrypoints before packaging; the build graph now declares those
+  inputs explicitly.
