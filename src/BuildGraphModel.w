@@ -84,6 +84,9 @@ fn build_graph_target_new(kind: i32, name: str, entry: str, target_kind: i32, op
         network: 0,
     }
 
+pub fn empty_build_graph_target -> BuildGraphTarget:
+    build_graph_target_new(-1, "", "", 0, 0, "")
+
 fn build_graph_split_nonempty_lines(text: str) -> Vec[str]:
     let lines: Vec[str] = Vec.new()
     let text_len = text.len() as i32

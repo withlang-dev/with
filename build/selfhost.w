@@ -578,6 +578,28 @@ fn bs_check_build_rejects_imperative_manifest(ctx: ActionCtx, compiler_path: str
         return bs_fail(ctx, "imperative manifest explicit source unexpectedly succeeded")
     bs_assert_contains(ctx, explicit.stderr, "error: invalid with.toml: imperative build configuration belongs in build.w", "imperative manifest explicit source diagnostic")
 
+fn bs_check_run_project_targets(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    var rc = bs_write_project_manifest(ctx, case_dir, "rundemo")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "src/main.w"), "fn main:\n    print(\"default-run\")\n", "run project default main")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "src/tool.w"), "fn main:\n    print(\"tool-run\")\n", "run project tool main")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    var out = ctx.new_build()\n    out = out.executable(\"app\", \"src/main.w\")\n    out = out.executable(\"tool\", \"src/tool.w\")\n    out.default(\"app\")\n", "run project build")
+    if rc != 0: return rc
+
+    let default_result = bs_project_expect_success(ctx, compiler_path, case_dir, "run-project-default", bs_project_args("run"))
+    if default_result.rc != 0: return default_result.rc
+    rc = bs_assert_stdout_exact(ctx, default_result, "default-run", "run_project_default")
+    if rc != 0: return rc
+
+    var target_args: Vec[str] = Vec.new()
+    target_args |> push("run")
+    target_args |> push(":tool")
+    let target_result = bs_project_expect_success(ctx, compiler_path, case_dir, "run-project-target", target_args)
+    if target_result.rc != 0: return target_result.rc
+    bs_assert_stdout_exact(ctx, target_result, "tool-run", "run_project_target")
+
 pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
     if inputs.len() == 0:
@@ -603,7 +625,9 @@ pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     rc = bs_check_build_uses_package_section_name(ctx, compiler_path, bs_join(output_dir, "build_package_section_case"))
     if rc != 0: return rc
-    bs_check_build_rejects_imperative_manifest(ctx, compiler_path, bs_join(output_dir, "build_imperative_manifest_case"))
+    rc = bs_check_build_rejects_imperative_manifest(ctx, compiler_path, bs_join(output_dir, "build_imperative_manifest_case"))
+    if rc != 0: return rc
+    bs_check_run_project_targets(ctx, compiler_path, bs_join(output_dir, "run_project_case"))
 
 fn bs_edge_assert_exact(ctx: ActionCtx, actual: str, expected: str, label: str, stream_name: str) -> i32:
     if actual == expected:
