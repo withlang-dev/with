@@ -610,7 +610,7 @@ fn run_cli(argc: i32) -> i32:
 
     // `with hello.w` is shorthand for `with run hello.w`
     if cli_is_implicit_run(argc):
-        return run_run_command(cli_command(argc), opt_level, no_std, alloc_mode, prelude_mode, debug_info)
+        return run_run_command(cli_command(argc), "", opt_level, no_std, alloc_mode, prelude_mode, debug_info)
 
     if cli_command(argc) == "build":
         let parsed_build = parse_build_command_options(argc)
@@ -622,7 +622,7 @@ fn run_cli(argc: i32) -> i32:
         if emit_c_mode:
             with_eprint("error: '--emit-c' is only supported with 'build'")
             return 1
-        return run_run_command(source, opt_level, no_std, alloc_mode, prelude_mode, debug_info)
+        return run_run_command(source, find_target_selector_arg(argc), opt_level, no_std, alloc_mode, prelude_mode, debug_info)
     if cli_command(argc) == "ir":
         if source == "":
             with_eprint("error: 'ir' requires a source file argument")
@@ -770,6 +770,15 @@ fn find_output_arg(argc: i32) -> str:
             return ""
         if has_output_prefix(arg):
             return with_str_slice(arg, 9, with_str_len(arg))
+        i = i + 1
+    ""
+
+fn find_target_selector_arg(argc: i32) -> str:
+    var i = 2
+    while i < argc:
+        let arg = with_arg_at(i)
+        if with_str_len(arg) > 1 and with_str_byte_at(arg, 0) == 58:
+            return with_str_slice(arg, 1, with_str_len(arg))
         i = i + 1
     ""
 
@@ -1210,6 +1219,13 @@ fn run_graph_target_command(target_name: str) -> i32:
     graph_options.selected_target = target_name
     run_build_command(build_options, graph_options)
 
+fn build_graph_find_target_by_name(graph: &BuildGraph, target_name: str) -> BuildGraphTarget:
+    for i in 0..graph.targets.len() as i32:
+        let target = graph.targets.get(i as i64)
+        if target.name == target_name:
+            return target
+    empty_build_graph_target()
+
 fn repo_lock_path() -> str:
     let out_dir = with_getenv_str("WITH_OUT_DIR")
     let base = if out_dir.len() > 0: out_dir else: "out"
@@ -1358,10 +1374,63 @@ fn run_build_command(options: BuildCommandOptions, graph_options: BuildGraphComm
     comp.print_warnings()
     0
 
-fn run_run_command(source_file: str, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> i32:
-    if source_file == "":
-        with_eprint("error: 'run' requires a source file argument")
+fn run_run_project_command(selected_target_hint: str, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> i32:
+    let root = build_graph_find_build_root(".")
+    if root.len() == 0:
+        with_eprint("error: 'run' requires a source file argument, build.w, or a with.toml project")
         return 1
+    let build_path = resolve_join(root, "build.w")
+    if not project_config_file_exists(build_path):
+        with_eprint("error: 'run' requires a source file argument or build.w project")
+        return 1
+    let cfg = project_config_load_for_source(root ++ "/src/main.w")
+    if cfg.manifest_error.len() > 0:
+        with_eprint("error: invalid with.toml: " ++ cfg.manifest_error)
+        return 1
+    var options = build_command_options_default()
+    options.opt_level = opt_level
+    options.no_std = no_std
+    options.alloc_mode = alloc_mode
+    options.prelude_mode = prelude_mode
+    options.debug_info = debug_info
+    let load_result = load_build_graph_from_build_w(root, cfg, options)
+    let graph = load_result.graph
+    if not graph.ok:
+        with_eprint("error: " ++ graph.error_msg)
+        return 1
+    var selected_target_name = selected_target_hint
+    if selected_target_name.len() == 0:
+        selected_target_name = graph.default_target
+    if selected_target_name.len() == 0:
+        with_eprint("error: 'run' needs an executable default target in build.w or ':target'")
+        return 1
+    let selected_target = build_graph_find_target_by_name(&graph, selected_target_name)
+    if selected_target.name.len() == 0:
+        with_eprint("error: target '" ++ selected_target_name ++ "' not found in build graph")
+        return 1
+    if selected_target.kind != 0:
+        with_eprint("error: run target '" ++ selected_target_name ++ "' is not executable")
+        return 1
+    let selected_graph = build_graph_filter_target(&graph, selected_target_name)
+    if not selected_graph.ok:
+        with_eprint("error: " ++ selected_graph.error_msg)
+        return 1
+    if not repo_lock_acquire(selected_target_name):
+        return 1
+    let build_rc = run_build_graph(root, cfg, selected_graph, load_result.sema, options)
+    repo_lock_release()
+    if build_rc != 0:
+        return build_rc
+    let selected_built_target = build_graph_find_target_by_name(&selected_graph, selected_target_name)
+    let bin_path = build_graph_output_path(root, selected_built_target, "", selected_graph.targets.len() as i32)
+    if bin_path.len() == 0 or with_fs_file_exists(bin_path) == 0:
+        with_eprint("error: run target '" ++ selected_target_name ++ "' did not produce executable output")
+        return 1
+    build_graph_rt_exec_binary(bin_path)
+
+fn run_run_command(source_file: str, selected_target_hint: str, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> i32:
+    if source_file == "":
+        return run_run_project_command(selected_target_hint, opt_level, no_std, alloc_mode, prelude_mode, debug_info)
     var comp = Compilation.init()
     comp.configure(opt_level, no_std, alloc_mode)
     comp.set_prelude_mode(prelude_mode)
@@ -2528,6 +2597,77 @@ fn cli_parse_small_int(s: str) -> i32:
         i = i + 1
     result
 
+fn cli_trim_line(text: str) -> str:
+    var start = 0
+    var end = text.len() as i32
+    while start < end:
+        let ch = text.byte_at(start as i64)
+        if ch != 32 and ch != 9 and ch != 10 and ch != 13:
+            break
+        start = start + 1
+    while end > start:
+        let ch = text.byte_at((end - 1) as i64)
+        if ch != 32 and ch != 9 and ch != 10 and ch != 13:
+            break
+        end = end - 1
+    text.slice(start as i64, end as i64)
+
+fn cli_dep_line_matches(line: str, pkg_name: str) -> bool:
+    let trimmed = cli_trim_line(line)
+    var eq = -1
+    for i in 0..trimmed.len() as i32:
+        if trimmed.byte_at(i as i64) == 61:
+            eq = i
+            break
+    if eq < 0:
+        return false
+    let key = cli_trim_line(trimmed.slice(0, eq as i64))
+    key == "c." ++ pkg_name
+
+fn cli_line_is_section(line: str) -> bool:
+    let trimmed = cli_trim_line(line)
+    trimmed.len() >= 2 and trimmed.byte_at(0) == 91 and trimmed.byte_at(trimmed.len() - 1) == 93
+
+fn cli_update_manifest_dep(toml: str, pkg_name: str, pkg_version: str) -> str:
+    let dep_line = "c." ++ pkg_name ++ " = \"" ++ pkg_version ++ "\""
+    var out = ""
+    var found_dep = false
+    var has_deps = false
+    var in_deps = false
+    var start = 0
+    var i = 0
+    let n = toml.len() as i32
+    while i <= n:
+        let at_end = i == n
+        let ch = if at_end: 10 else: toml.byte_at(i as i64)
+        if ch == 10:
+            let line = toml.slice(start as i64, i as i64)
+            let trimmed = cli_trim_line(line)
+            if cli_line_is_section(line) and in_deps and not found_dep:
+                out = out ++ dep_line ++ "\n"
+                found_dep = true
+            if trimmed == "[deps]":
+                has_deps = true
+                in_deps = true
+            else if cli_line_is_section(line):
+                in_deps = false
+            if in_deps and cli_dep_line_matches(line, pkg_name):
+                out = out ++ dep_line ++ "\n"
+                found_dep = true
+            else:
+                out = out ++ line
+                if not at_end or line.len() > 0:
+                    out = out ++ "\n"
+            start = i + 1
+        i = i + 1
+    if found_dep:
+        return out
+    if not has_deps:
+        if out.len() > 0 and not out.ends_with("\n"):
+            out = out ++ "\n"
+        out = out ++ "\n[deps]\n"
+    out ++ dep_line ++ "\n"
+
 fn cli_flag_value(argc: i32, flag: str) -> str:
     var i = 2
     while i < argc - 1:
@@ -2773,23 +2913,15 @@ fn run_get_command(argc: i32) -> i32:
     if root.len() == 0:
         with_eprint("error: no with.toml found. Run 'with init' first.")
         return 1
-    let rc = conan_install(pkg_name, pkg_version, root)
-    if rc != 0:
+    let resolved_version = conan_install(pkg_name, pkg_version, root)
+    if resolved_version.len() == 0:
         return 1
-    var version_for_toml = "latest"
-    if pkg_version.len() > 0:
-        version_for_toml = pkg_version
     let manifest_path = root ++ "/with.toml"
     let toml = with_fs_read_file(manifest_path)
     if toml.len() > 0:
-        var updated = toml
-        if not updated.contains("[deps]"):
-            updated = updated ++ "\n[deps]\n"
-        let dep_line = "c." ++ pkg_name ++ " = \"" ++ version_for_toml ++ "\"\n"
-        if not updated.contains("c." ++ pkg_name):
-            updated = updated ++ dep_line
+        let updated = cli_update_manifest_dep(toml, pkg_name, resolved_version)
         with_fs_write_file(manifest_path, updated)
-    with_eprint("added c." ++ pkg_name)
+    with_eprint("added c." ++ pkg_name ++ "@" ++ resolved_version)
     0
 
 fn run_remove_command(argc: i32) -> i32:

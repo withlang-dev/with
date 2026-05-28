@@ -11,6 +11,7 @@ type ProjectConfig {
     c_import_defines: Vec[str],
     link_search_paths: Vec[str],
     dep_link_libs: Vec[str],
+    dep_link_args: Vec[str],
 }
 
 fn project_config_default -> ProjectConfig:
@@ -24,6 +25,7 @@ fn project_config_default -> ProjectConfig:
         c_import_defines: Vec.new(),
         link_search_paths: Vec.new(),
         dep_link_libs: Vec.new(),
+        dep_link_args: Vec.new(),
     }
 
 fn project_config_file_exists(path: str) -> bool:
@@ -131,12 +133,17 @@ fn project_config_load_dep_metadata(cfg: ProjectConfig, name: str, version: str)
     let meta_path = dep_dir ++ "/metadata.json"
     let meta = runtime_read_file(meta_path)
     if meta.len() == 0:
+        if out.manifest_error.len() == 0:
+            out.manifest_error = "missing metadata for dependency c." ++ name ++ "@" ++ version ++ " at " ++ meta_path ++ "; run 'with get c." ++ name ++ "@" ++ version ++ "'"
         return out
     // Extract include_paths, lib_paths, libs from JSON
     let includes = project_config_json_str_array(meta, "include_paths")
     for i in 0..includes.len() as i32:
         let inc = includes.get(i as i64)
         out.c_import_include_paths.push(dep_dir ++ "/" ++ inc)
+    let defines = project_config_json_str_array(meta, "defines")
+    for i in 0..defines.len() as i32:
+        out.c_import_defines.push(defines.get(i as i64))
     let lib_paths = project_config_json_str_array(meta, "lib_paths")
     for i in 0..lib_paths.len() as i32:
         let lp = lib_paths.get(i as i64)
@@ -144,6 +151,17 @@ fn project_config_load_dep_metadata(cfg: ProjectConfig, name: str, version: str)
     let libs = project_config_json_str_array(meta, "libs")
     for i in 0..libs.len() as i32:
         out.dep_link_libs.push(libs.get(i as i64))
+    let link_args = project_config_json_str_array(meta, "link_args")
+    for i in 0..link_args.len() as i32:
+        out.dep_link_args.push(link_args.get(i as i64))
+    let requires = project_config_json_str_array(meta, "requires")
+    for i in 0..requires.len() as i32:
+        let req = requires.get(i as i64)
+        let slash = project_config_find_char(req, 47)
+        if slash > 0:
+            let req_name = req.slice(0, slash as i64)
+            let req_version = req.slice((slash + 1) as i64, req.len())
+            out = project_config_load_dep_metadata(out, req_name, req_version)
     out
 
 fn project_config_json_str_array(json: str, key: str) -> Vec[str]:

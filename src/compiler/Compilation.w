@@ -825,7 +825,7 @@ fn Compilation.prepare_binary_link_from_pool(self: Compilation, pool: AstPool, s
     var all_link_libs = self.zcu.last_link_lib_names
     for dli in 0..self.zcu.project_config.dep_link_libs.len() as i32:
         all_link_libs.push(self.zcu.project_config.dep_link_libs.get(dli as i64))
-    let link_plan = link_stage_link_object_to_binary_plan(obj_path, bin_path, all_link_libs, self.zcu.project_config.link_search_paths, requires_async_runtime)
+    let link_plan = link_stage_link_object_to_binary_plan(obj_path, bin_path, all_link_libs, self.zcu.project_config.link_search_paths, self.zcu.project_config.dep_link_args, requires_async_runtime)
     if not link_plan.ok:
         compilation_cleanup_build_products(obj_path, bin_path)
         return compilation_binary_link_plan_fail()
@@ -1230,5 +1230,3 @@ fn Compilation.ensure_codegen_mir(self: Compilation, pool: AstPool) -> bool:
     if self.zcu.diagnostics.has_errors():
         return false
     self.zcu.last_mir_module.body_count() > 0
-
-let _compiler_compilation_eof_guard = 0

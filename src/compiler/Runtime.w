@@ -9,6 +9,9 @@ extern fn with_exec_argv_capture(args: str, stdout_path: str, stderr_path: str, 
 extern fn with_arg_at(idx: i32) -> str
 extern fn with_fs_write_file(path: str, data: str) -> i32
 extern fn with_fs_read_file(path: str) -> str
+extern fn with_fs_file_exists(path: str) -> i32
+extern fn with_fs_is_dir(path: str) -> i32
+extern fn with_fs_list_files(path: str) -> str
 extern fn with_fs_remove_file(path: str) -> i32
 extern fn with_fs_remove_dir(path: str) -> i32
 extern fn with_fs_remove_tree(path: str) -> i32
@@ -46,6 +49,15 @@ pub fn runtime_write_file(path: str, data: str) -> i32:
 
 pub fn runtime_read_file(path: str) -> str:
     with_fs_read_file(path)
+
+pub fn runtime_file_exists(path: str) -> i32:
+    with_fs_file_exists(path)
+
+pub fn runtime_is_dir(path: str) -> i32:
+    with_fs_is_dir(path)
+
+pub fn runtime_list_files(path: str) -> str:
+    with_fs_list_files(path)
 
 pub fn runtime_remove_file(path: str) -> i32:
     with_fs_remove_file(path)

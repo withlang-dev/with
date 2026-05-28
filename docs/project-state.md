@@ -42,8 +42,11 @@ In `src/main.w`, CLI `run`/one-liner binary execution and binary artifact
 cleanup now use typed runtime wrappers instead of shell command strings. Test
 stdout/stderr capture and benchmark execution also use typed runtime process
 wrappers, so `src/main.w` no longer depends on `with_system`.
-`src/compiler/ConanClient.w` now extracts Conan archives through typed argv
-capture and routes runtime access through `src/compiler/Runtime.w`.
+`src/compiler/ConanClient.w` now talks to ConanCenter v2, resolves omitted
+package versions to the newest available recipe (for example `c.raylib` →
+`raylib/6.0` on 2026-05-27), downloads packages through typed `curl` argv
+capture, extracts Conan archives through typed argv capture, records transitive
+dependency metadata, and routes runtime access through `src/compiler/Runtime.w`.
 `lib/std/process.w` no longer exposes shell-string execution: `Command` stores
 argv entries, `.arg(...)` appends arguments, and command execution goes through
 typed argv runtime process execution.
@@ -624,6 +627,10 @@ not a new compiler-dispatched project graph kind.
 - Phase F is complete. All build graph targets pass project-root containment
   validation at dispatch time. Install targets require recognized install
   prefixes. PromoteTreeIfVerified uses staleness detection.
+- `with get c.raylib` now installs and links the ConanCenter `raylib/6.0`
+  binary package on Darwin arm64 when the program declares the C ABI manually.
+  `use c_import("raylib.h")` still fails in the header translator; tracked as
+  https://github.com/withlang-dev/with/issues/288.
 
 ## Local State
 
