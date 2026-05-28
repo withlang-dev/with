@@ -627,10 +627,9 @@ not a new compiler-dispatched project graph kind.
 - Phase F is complete. All build graph targets pass project-root containment
   validation at dispatch time. Install targets require recognized install
   prefixes. PromoteTreeIfVerified uses staleness detection.
-- `with get c.raylib` now installs and links the ConanCenter `raylib/6.0`
-  binary package on Darwin arm64 when the program declares the C ABI manually.
-  `use c_import("raylib.h")` still fails in the header translator; tracked as
-  https://github.com/withlang-dev/with/issues/288.
+- `with get c.raylib` installs the ConanCenter `raylib/6.0` binary package on
+  Darwin arm64, and the issue #288 repro with `use c_import("raylib.h")` now
+  checks successfully.
 
 ## Local State
 

@@ -268,16 +268,26 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
             else:
                 if self.trace_c_import_cache != 0:
                     runtime_eprint("c_import cache miss")
-                let libclang_result = process_c_import_with_defines(resolved_header_spec, self.project_config.c_import_defines)
+                let libclang_header_spec = c_import_decode_escapes(resolved_header_spec)
+                let libclang_result = process_c_import_with_defines(libclang_header_spec, self.project_config.c_import_defines)
                 if self.trace_c_import_cache != 0 and libclang_result.len() > 0:
                     runtime_eprint("c_import generated:")
                     runtime_eprint(libclang_result)
+                let untranslated_macro = self.c_import_first_unallowed_untranslated_frontend(out, decl, c_import_untranslated_macros())
+                if untranslated_macro.len() > 0:
+                    self.c_import_emit_untranslated_error_frontend(out, decl, "macro", untranslated_macro)
+                    continue
                 if libclang_result.len() > 0:
                     synthetic = libclang_result
                 else:
-                    synthetic = self.c_import_expand_header_spec_frontend(header_spec, out, decl)
-                    if self.diagnostics.has_errors():
+                    let libclang_error = c_import_last_error()
+                    if libclang_error.len() > 0:
+                        self.c_import_emit_header_error_detail_frontend(decl, header_spec, libclang_error)
                         continue
+                    else:
+                        synthetic = self.c_import_expand_header_spec_frontend(header_spec, out, decl)
+                        if self.diagnostics.has_errors():
+                            continue
                 self.c_import_cache_store(cache_key, synthetic)
                 // Store to file-system cache
                 if synthetic.len() > 0:
@@ -368,7 +378,7 @@ fn c_import_fs_cache_store(cache_key: str, value: str):
     let path = f"{dir}/{hash_str}.w"
     runtime_write_file(path, value)
 
-fn Zcu.c_import_emit_header_error_frontend(self: Zcu, decl: i32, header_spec: str):
+fn Zcu.c_import_emit_header_error_detail_frontend(self: Zcu, decl: i32, header_spec: str, detail: str):
     let _ = decl
     let span = Span {
         file: 0,
@@ -379,7 +389,11 @@ fn Zcu.c_import_emit_header_error_frontend(self: Zcu, decl: i32, header_spec: st
         "failed to compile C header snippet: " ++ header_spec
     else:
         "failed to compile C header snippet"
-    self.diagnostics.emit(Diagnostic.err(msg, span))
+    let full_msg = if detail.len() > 0: msg ++ ": " ++ detail else: msg
+    self.diagnostics.emit(Diagnostic.err(full_msg, span))
+
+fn Zcu.c_import_emit_header_error_frontend(self: Zcu, decl: i32, header_spec: str):
+    self.c_import_emit_header_error_detail_frontend(decl, header_spec, "")
 
 fn Zcu.c_import_emit_untranslated_error_frontend(self: Zcu, pool: AstPool, decl: i32, kind: str, name: str):
     let display_name = if name.len() > 0: name else: "<unknown>"
@@ -402,6 +416,21 @@ fn Zcu.c_import_decl_allows_untranslated_frontend(self: Zcu, pool: AstPool, decl
         if self.pool.resolve(allow_sym) == name:
             return true
     false
+
+fn Zcu.c_import_first_unallowed_untranslated_frontend(self: Zcu, pool: AstPool, decl: i32, names: str) -> str:
+    var i = 0
+    let total = names.len() as i32
+    while i < total:
+        while i < total and names.byte_at(i as i64) == 124:
+            i = i + 1
+        let start = i
+        while i < total and names.byte_at(i as i64) != 124:
+            i = i + 1
+        if i > start:
+            let name = names.slice(start as i64, i as i64)
+            if not self.c_import_decl_allows_untranslated_frontend(pool, decl, name):
+                return name
+    ""
 
 fn Zcu.c_import_expand_header_spec_frontend(self: Zcu, header_spec_raw: str, pool: AstPool, decl: i32) -> str:
     let decoded = c_import_decode_escapes(header_spec_raw)

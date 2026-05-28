@@ -775,7 +775,7 @@ fn ci_migrate_file_inner(input_path: str, output_path: str, project_active: bool
         if kind == CK_FUNCTION:
             output_parts.push(ci_migrate_translate_function(session, i, translated_structs))
         else if kind == CK_STRUCT or kind == CK_UNION:
-            let struct_result = ci_translate_struct(session, i, kind == CK_UNION, translated_structs, demoted_types)
+            let struct_result = ci_translate_struct(session, i, kind == CK_UNION, translated_structs, demoted_types, count)
             output_parts.push(struct_result)
             if struct_result.len() > 0:
                 let sname = with_cimport_decl_name(session, i)
@@ -789,7 +789,7 @@ fn ci_migrate_file_inner(input_path: str, output_path: str, project_active: bool
         else if kind == CK_ENUM:
             output_parts.push(ci_translate_enum(session, i))
         else if kind == CK_TYPEDEF:
-            let td_result = ci_translate_typedef(session, i)
+            let td_result = ci_translate_typedef(session, i, count)
             output_parts.push(td_result)
             if td_result.len() > 0:
                 let td_name = with_cimport_decl_name(session, i)
