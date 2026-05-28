@@ -331,6 +331,76 @@ fn ci_is_implicit_compiler_macro(name: str) -> bool:
     if name == "__va_copy": return true
     false
 
+fn ci_compound_literal_type_name(raw_type: str) -> str:
+    var t = ci_trim(raw_type)
+    if ci_starts_with(t, "struct "):
+        t = ci_trim(t.slice(7, t.len()))
+    else if ci_starts_with(t, "union "):
+        t = ci_trim(t.slice(6, t.len()))
+    ci_escape_reserved(ci_normalize_translated_type_name(t))
+
+fn ci_find_compound_literal_brace(s: str) -> i32:
+    var paren_depth = 0
+    var i = 0
+    while i < s.len() as i32:
+        let c = s.byte_at(i as i64)
+        if c == 34 or c == 39:
+            let quote = c
+            i = i + 1
+            while i < s.len() as i32:
+                let inner = s.byte_at(i as i64)
+                if inner == 92:
+                    i = i + 2
+                    continue
+                if inner == quote:
+                    break
+                i = i + 1
+            i = i + 1
+            continue
+        if c == 40:
+            paren_depth = paren_depth + 1
+        else if c == 41 and paren_depth > 0:
+            paren_depth = paren_depth - 1
+        else if c == 123 and paren_depth == 0:
+            return i
+        i = i + 1
+    -1
+
+fn ci_compound_literal_type_from_prefix(prefix_raw: str) -> str:
+    let prefix = ci_trim(prefix_raw)
+    if prefix.len() == 0:
+        return ""
+    if ci_starts_with(prefix, "CLITERAL("):
+        let close = ci_find_matching_paren(prefix, 8)
+        if close == prefix.len() as i32 - 1:
+            return ci_compound_literal_type_name(prefix.slice(9, close as i64))
+        return ""
+    if prefix.byte_at(0) == 40:
+        let close = ci_find_matching_paren(prefix, 0)
+        if close == prefix.len() as i32 - 1:
+            return ci_compound_literal_type_name(prefix.slice(1, close as i64))
+    ""
+
+fn ci_compound_literal_macro_type(value: str) -> str:
+    let t = ci_trim(value)
+    let brace = ci_find_compound_literal_brace(t)
+    if brace <= 0:
+        return ""
+    let close = ci_find_matching_brace(t, brace)
+    if close != t.len() as i32 - 1:
+        return ""
+    ci_compound_literal_type_from_prefix(t.slice(0, brace as i64))
+
+fn ci_try_translate_compound_literal_macro(session: i64, value: str) -> str:
+    let t = ci_trim(value)
+    let ty = ci_compound_literal_macro_type(t)
+    if ty.len() == 0:
+        return ""
+    let brace = ci_find_compound_literal_brace(t)
+    if brace <= 0:
+        return ""
+    ci_translate_c_initializer_for_type(session, t.slice(brace as i64, t.len()), ty)
+
 fn process_c_import(header_spec: str) -> str:
     let defines: Vec[str] = Vec.new()
     process_c_import_with_defines(header_spec, defines)
@@ -2174,20 +2244,25 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: str, macro_
             if not ci_migrate_shared_decl_add("let", safe_name, let_line):
                 output = output ++ let_line ++ "\n"
         else:
-            let offsetof_result = ci_try_translate_offsetof_expr(type_session, stripped)
+            let compound_literal_ty = ci_compound_literal_macro_type(stripped)
+            let compound_literal_result = if compound_literal_ty.len() > 0: ci_try_translate_compound_literal_macro(type_session, stripped) else: ""
+            let offsetof_result = if compound_literal_result.len() > 0: "" else: ci_try_translate_offsetof_expr(type_session, stripped)
             let cast_expr_result = if offsetof_result.len() > 0: offsetof_result else: ci_translate_c_expr(stripped, "", known_values)
             let semantic_expr_ty = ci_lookup_known(name, object_macro_types)
             var cast_expr_ty = ""
-            if offsetof_result.len() > 0:
+            if compound_literal_result.len() > 0:
+                cast_expr_ty = compound_literal_ty
+            else if offsetof_result.len() > 0:
                 cast_expr_ty = "c_int"
             else if semantic_expr_ty.len() > 0:
                 cast_expr_ty = semantic_expr_ty
             else:
                 cast_expr_ty = ci_infer_cast_return_type(cast_expr_result)
-            if cast_expr_result.len() > 0 and cast_expr_ty.len() > 0:
+            let macro_expr_result = if compound_literal_result.len() > 0: compound_literal_result else: cast_expr_result
+            if macro_expr_result.len() > 0 and cast_expr_ty.len() > 0:
                 let safe_name = ci_escape_reserved(name)
                 with_cimport_mark_name_emitted(name)
-                let let_line = "let " ++ safe_name ++ ": " ++ cast_expr_ty ++ " = " ++ cast_expr_result
+                let let_line = "let " ++ safe_name ++ ": " ++ cast_expr_ty ++ " = " ++ macro_expr_result
                 if not ci_migrate_shared_decl_add("let", safe_name, let_line):
                     output = output ++ let_line ++ "\n"
             else:
