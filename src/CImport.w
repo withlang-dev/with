@@ -11,6 +11,7 @@ use std.cfg.stackify
 
 extern fn with_cimport_add_include_path(path: str) -> void
 extern fn with_cimport_clear_include_paths() -> void
+extern fn with_parse_float(s: str) -> f64
 extern fn with_cimport_available() -> i32
 extern fn with_cimport_parse(header_code: str) -> i64
 extern fn with_cimport_dispose(session: i64) -> void
@@ -40,12 +41,15 @@ extern fn with_cimport_enum_const_value(session: i64, idx: i32, ci: i32) -> i64
 extern fn with_cimport_enum_int_type(session: i64, idx: i32) -> str
 extern fn with_cimport_typedef_underlying(session: i64, idx: i32) -> str
 extern fn with_cimport_parse_macros(header_code: str) -> i64
+extern fn with_cimport_parse_macro_probe(header_code: str, macro_name: str) -> i64
 extern fn with_cimport_realpath(path: str) -> str
 extern fn with_cimport_collect_object_macro_types(header_code: str, macro_names: str) -> str
 extern fn with_cimport_preprocess_text(header_code: str) -> str
 extern fn with_cimport_macro_count(session: i64) -> i32
 extern fn with_cimport_macro_name(session: i64, idx: i32) -> str
 extern fn with_cimport_macro_value(session: i64, idx: i32) -> str
+extern fn with_cimport_macro_location(session: i64, idx: i32) -> str
+extern fn with_cimport_macro_is_system(session: i64, idx: i32) -> i32
 extern fn with_cimport_macro_is_fn_like(session: i64, idx: i32) -> i32
 extern fn with_cimport_dispose_macros(session: i64) -> void
 extern fn with_cimport_is_name_emitted(name: str) -> i32
@@ -310,6 +314,9 @@ fn c_import_untranslated_macros() -> str:
 fn ci_record_untranslated_macro(name: str):
     if g_cimport_report_untranslated_macros == 0:
         return
+    ci_record_untranslated_macro_always(name)
+
+fn ci_record_untranslated_macro_always(name: str):
     if name.len() == 0:
         return
     let needle = "|" ++ name ++ "|"
@@ -408,6 +415,7 @@ fn process_c_import(header_spec: str) -> str:
 fn process_c_import_with_defines(header_spec: str, defines: Vec[str]) -> str:
     c_import_last_error_clear()
     c_import_untranslated_macros_clear()
+    ci_record_field_caches_clear()
     g_cimport_report_untranslated_macros = ci_should_report_untranslated_macros(header_spec)
     if with_cimport_available() == 0:
         return ""
@@ -1990,7 +1998,7 @@ fn ci_collect_object_macro_type_map(session: i64, macro_source: str) -> str:
     while i < count:
         if with_cimport_macro_is_fn_like(session, i) == 0:
             let name = with_cimport_macro_name(session, i)
-            let value = with_cimport_macro_value(session, i)
+            let value = ci_trim(ci_strip_c_comments(with_cimport_macro_value(session, i)))
             if name.len() > 0 and name.byte_at(0) != 95 and value.len() > 0:
                 names = names ++ "|" ++ name ++ "|"
         i = i + 1
@@ -2005,7 +2013,7 @@ fn ci_collect_object_macro_values(session: i64) -> str:
         if with_cimport_macro_is_fn_like(session, i) != 0:
             continue
         let name = with_cimport_macro_name(session, i)
-        let value = with_cimport_macro_value(session, i)
+        let value = ci_trim(ci_strip_c_comments(with_cimport_macro_value(session, i)))
         if name.len() == 0 or value.len() == 0 or value == name:
             continue
         if ci_str_contains(value, "|"):
@@ -2044,16 +2052,91 @@ fn ci_try_translate_offsetof_expr(session: i64, expr: str) -> str:
         return ""
     i64_to_string(offset)
 
+fn ci_strip_c_type_qualifier_prefixes(raw: str) -> str:
+    var t = ci_trim(raw)
+    var changed = true
+    while changed:
+        changed = false
+        if ci_starts_with(t, "const "):
+            t = ci_trim(t.slice(6, t.len()))
+            changed = true
+        else if ci_starts_with(t, "volatile "):
+            t = ci_trim(t.slice(9, t.len()))
+            changed = true
+        else if ci_starts_with(t, "restrict "):
+            t = ci_trim(t.slice(9, t.len()))
+            changed = true
+    t
+
+fn ci_strip_c_pointer_suffix(raw: str) -> str:
+    var t = ci_trim(raw)
+    while t.len() > 0 and t.byte_at(t.len() - 1) == 42:
+        t = ci_trim(t.slice(0, t.len() - 1))
+        t = ci_strip_c_type_qualifier_prefixes(t)
+    t
+
+fn ci_is_c_tag_type_name(raw: str) -> bool:
+    let t = ci_trim(raw)
+    if ci_starts_with(t, "struct "):
+        return ci_is_c_ident(ci_trim(t.slice(7, t.len())))
+    if ci_starts_with(t, "union "):
+        return ci_is_c_ident(ci_trim(t.slice(6, t.len())))
+    if ci_starts_with(t, "enum "):
+        return ci_is_c_ident(ci_trim(t.slice(5, t.len())))
+    false
+
+fn ci_object_macro_value_is_type_like(raw: str) -> bool:
+    var t = ci_strip_parens(ci_trim(raw))
+    t = ci_strip_c_type_qualifier_prefixes(t)
+    if ci_is_c_type_name(t) or ci_is_c_tag_type_name(t):
+        return true
+    let base = ci_strip_c_pointer_suffix(t)
+    if base != t and (ci_is_c_type_name(base) or ci_is_c_tag_type_name(base)):
+        return true
+    false
+
+fn ci_try_translate_object_macro_probe(macro_source: str, name: str) -> str:
+    ci_record_field_caches_clear()
+    let probe_session = with_cimport_parse_macro_probe(macro_source, name)
+    if probe_session == 0:
+        return ""
+    let probe_name = "__with_macro_probe_" ++ name
+    let count = with_cimport_decl_count(probe_session)
+    var result = ""
+    var i = 0
+    while i < count:
+        if with_cimport_decl_kind(probe_session, i) == CK_VAR and with_cimport_decl_name(probe_session, i) == probe_name:
+            let ty = with_cimport_var_type_translated(probe_session, i)
+            if ty.len() > 0 and not ci_starts_with(ty, "__UNSUPPORTED"):
+                let init = ci_try_eval_var_init_for_type(probe_session, i, ty)
+                if ci_var_init_translation_is_valid(ty, init) and not ci_str_contains(init, name):
+                    result = "let " ++ ci_escape_reserved(name) ++ ": " ++ ty ++ " = " ++ init
+            i = count
+        else:
+            i = i + 1
+    with_cimport_dispose(probe_session)
+    ci_record_field_caches_clear()
+    result
+
+fn ci_record_untranslated_object_macro(name: str, is_system: i32):
+    if is_system != 0:
+        ci_record_untranslated_macro(name)
+    else:
+        ci_record_untranslated_macro_always(name)
+
 fn ci_translate_macros(session: i64, type_session: i64, extern_vars: str, macro_source: str) -> str:
     let count = with_cimport_macro_count(session)
     var output = ""
     var known_values = ""
     var blank_macros = ""
     let object_macro_types = ci_collect_object_macro_type_map(session, macro_source)
+    g_migrate_macro_session = session
     for i in 0..count:
         let name = with_cimport_macro_name(session, i)
-        let value = with_cimport_macro_value(session, i)
+        let raw_value = with_cimport_macro_value(session, i)
+        let value = ci_trim(ci_strip_c_comments(raw_value))
         let fn_like = with_cimport_macro_is_fn_like(session, i)
+        let macro_is_system = with_cimport_macro_is_system(session, i)
 
         // Skip self-defined macros: #define FOO FOO (common feature-test pattern)
         if fn_like == 0 and value == name:
@@ -2061,6 +2144,11 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: str, macro_
 
         // C2: skip width-family macros when width slicing is active
         if ci_migrate_is_width_family_name(name):
+            continue
+
+        // raylib uses CLITERAL as a C-only cast helper inside object macros.
+        // Constants that depend on it are translated from their macro bodies.
+        if name == "CLITERAL":
             continue
 
         // Try to translate function-like macros; record explicit omissions
@@ -2244,8 +2332,20 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: str, macro_
             if not ci_migrate_shared_decl_add("let", safe_name, let_line):
                 output = output ++ let_line ++ "\n"
         else:
+            if ci_object_macro_value_is_type_like(stripped):
+                continue
             let compound_literal_ty = ci_compound_literal_macro_type(stripped)
             let compound_literal_result = if compound_literal_ty.len() > 0: ci_try_translate_compound_literal_macro(type_session, stripped) else: ""
+            if compound_literal_ty.len() > 0 and compound_literal_result.len() == 0:
+                ci_record_untranslated_object_macro(name, macro_is_system)
+                continue
+            if compound_literal_result.len() == 0:
+                let probe_result = if macro_is_system == 0: ci_try_translate_object_macro_probe(macro_source, name) else: ""
+                if probe_result.len() > 0:
+                    with_cimport_mark_name_emitted(name)
+                    if not ci_migrate_shared_decl_add("let", ci_escape_reserved(name), probe_result):
+                        output = output ++ probe_result ++ "\n"
+                    continue
             let offsetof_result = if compound_literal_result.len() > 0: "" else: ci_try_translate_offsetof_expr(type_session, stripped)
             let cast_expr_result = if offsetof_result.len() > 0: offsetof_result else: ci_translate_c_expr(stripped, "", known_values)
             let semantic_expr_ty = ci_lookup_known(name, object_macro_types)
@@ -2258,7 +2358,11 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: str, macro_
                 cast_expr_ty = semantic_expr_ty
             else:
                 cast_expr_ty = ci_infer_cast_return_type(cast_expr_result)
-            let macro_expr_result = if compound_literal_result.len() > 0: compound_literal_result else: cast_expr_result
+            var macro_expr_result = if compound_literal_result.len() > 0: compound_literal_result else: cast_expr_result
+            if macro_expr_result.len() > 0 and (cast_expr_ty == "f32" or cast_expr_ty == "f64" or cast_expr_ty == "c_longdouble"):
+                let folded_float = ci_eval_float_const_expr_ctx(stripped, known_values)
+                if folded_float.len() > 0:
+                    macro_expr_result = folded_float
             if macro_expr_result.len() > 0 and cast_expr_ty.len() > 0:
                 let safe_name = ci_escape_reserved(name)
                 with_cimport_mark_name_emitted(name)
@@ -2288,6 +2392,9 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: str, macro_
                             let let_line = "let " ++ safe_name ++ ": " ++ expr_ty ++ " = " ++ expr_result
                             if not ci_migrate_shared_decl_add("let", safe_name, let_line):
                                 output = output ++ let_line ++ "\n"
+                    else:
+                        ci_record_untranslated_object_macro(name, macro_is_system)
+    g_migrate_macro_session = 0
     g_macro_type_names = ""
     g_macro_type_aliases = ""
     output
@@ -2296,7 +2403,7 @@ fn ci_translate_macros(session: i64, type_session: i64, extern_vars: str, macro_
 // Translates a C macro body to With source code.
 // params: pipe-delimited parameter names "|a|b|"
 // known: pipe-delimited known constant values "NAME=val|"
-// Returns "" on failure (triggers comptime_error fallback).
+// Returns "" on failure; callers must surface unsupported public macros.
 
 // ── Recursive descent C expression parser ──────────────────────────
 // Follows Zig's MacroTranslator precedence structure exactly:
@@ -2650,7 +2757,7 @@ fn ci_parse_postfix_expr(s: str, params: str, known: str) -> str:
         else:
             let kv = ci_lookup_known(base_ident, known)
             if kv.len() > 0:
-                base_resolved = base_ident
+                base_resolved = kv
             else if with_cimport_is_name_emitted(base_ident) != 0 and not ci_str_contains(g_macro_type_names, "|" ++ base_ident ++ "|"):
                 base_resolved = base_ident
         if base_resolved.len() > 0:
@@ -3593,6 +3700,88 @@ fn ci_render_sizeof_type(c_type: str) -> str:
 fn ci_eval_const_expr(s: str) -> str:
     ci_eval_const_expr_ctx(s, "")
 
+fn ci_decimal_digit(d: i64) -> str:
+    let digits = "0123456789"
+    if d < 0 or d > 9:
+        return "0"
+    digits.slice(d, d + 1)
+
+fn ci_trim_float_literal_zeros(raw: str) -> str:
+    if not ci_str_contains(raw, "."):
+        return raw
+    var end = raw.len() as i32
+    while end > 0 and raw.byte_at((end - 1) as i64) == 48:
+        end = end - 1
+    if end > 0 and raw.byte_at((end - 1) as i64) == 46:
+        end = end + 1
+    raw.slice(0, end as i64)
+
+fn ci_f64_decimal_literal(value: f64) -> str:
+    var v = value
+    var prefix = ""
+    if v < 0.0:
+        prefix = "-"
+        v = 0.0 - v
+    let int_part = v as i64
+    var frac = v - int_part as f64
+    var out = prefix ++ i64_to_string(int_part) ++ "."
+    var i = 0
+    while i < 9:
+        frac = frac * 10.0
+        var digit = frac as i64
+        if digit < 0:
+            digit = 0
+        if digit > 9:
+            digit = 9
+        out = out ++ ci_decimal_digit(digit)
+        frac = frac - digit as f64
+        i = i + 1
+    ci_trim_float_literal_zeros(out)
+
+fn ci_eval_float_const_expr_ctx(s: str, known: str) -> str:
+    let trimmed = ci_trim(ci_strip_parens(s))
+    if trimmed.len() == 0:
+        return ""
+    if ci_is_int_literal(trimmed):
+        return ci_strip_int_suffix(trimmed)
+    if ci_is_float_literal(trimmed):
+        return ci_strip_float_suffix(trimmed)
+    if trimmed.byte_at(0) == 45:
+        let inner = ci_eval_float_const_expr_ctx(trimmed.slice(1, trimmed.len()), known)
+        if inner.len() > 0:
+            if inner.byte_at(0) == 45:
+                return inner.slice(1, inner.len())
+            return "-" ++ inner
+        return ""
+    if trimmed.byte_at(0) == 40:
+        let cast_end = ci_find_matching_paren(trimmed, 0)
+        if cast_end > 0 and cast_end as i64 + 1 < trimmed.len():
+            let inside = trimmed.slice(1, cast_end as i64)
+            if ci_is_c_type_name(inside):
+                let after = ci_trim(trimmed.slice(cast_end as i64 + 1, trimmed.len()))
+                return ci_eval_float_const_expr_ctx(after, known)
+    let op_info = ci_find_binary_op(trimmed)
+    if op_info >= 0:
+        let op_pos = op_info / 256
+        let op_len = op_info % 256
+        let op = trimmed.slice(op_pos as i64, (op_pos + op_len) as i64)
+        if op == "+" or op == "-" or op == "*" or op == "/":
+            let lhs_str = ci_eval_float_const_expr_ctx(trimmed.slice(0, op_pos as i64), known)
+            let rhs_str = ci_eval_float_const_expr_ctx(trimmed.slice((op_pos + op_len) as i64, trimmed.len()), known)
+            if lhs_str.len() > 0 and rhs_str.len() > 0:
+                let lhs = with_parse_float(lhs_str)
+                let rhs = with_parse_float(rhs_str)
+                if op == "+": return ci_f64_decimal_literal(lhs + rhs)
+                if op == "-": return ci_f64_decimal_literal(lhs - rhs)
+                if op == "*": return ci_f64_decimal_literal(lhs * rhs)
+                if op == "/" and rhs != 0.0: return ci_f64_decimal_literal(lhs / rhs)
+    if ci_is_c_ident(trimmed):
+        let builtin_val = ci_map_compiler_builtin(trimmed)
+        if builtin_val.len() > 0:
+            return builtin_val
+        return ci_lookup_known(trimmed, known)
+    ""
+
 fn ci_eval_const_expr_ctx(s: str, known: str) -> str:
     let trimmed = ci_trim(ci_strip_parens(s))
     if trimmed.len() == 0:
@@ -3933,6 +4122,29 @@ fn ci_lookup_known(name: str, known: str) -> str:
         while pos < known.len() as i32 and known.byte_at(pos as i64) != 124:
             pos = pos + 1
         pos = pos + 1
+    let macro_value = ci_lookup_simple_literal_macro_value(name)
+    if macro_value.len() > 0:
+        return macro_value
+    ""
+
+fn ci_lookup_simple_literal_macro_value(name: str) -> str:
+    if name.len() == 0:
+        return ""
+    let needle = "|" ++ name ++ "="
+    let pos = ci_find_str(g_migrate_macro_values, needle)
+    if pos < 0:
+        return ""
+    let start = pos + needle.len() as i32
+    var end = start
+    while end < g_migrate_macro_values.len() as i32 and g_migrate_macro_values.byte_at(end as i64) != 124:
+        end = end + 1
+    let value = ci_strip_parens(ci_trim(g_migrate_macro_values.slice(start as i64, end as i64)))
+    if ci_is_int_literal(value):
+        return ci_strip_int_suffix(value)
+    if ci_is_float_literal(value):
+        return ci_strip_float_suffix(value)
+    if ci_is_char_literal(value):
+        return ci_char_to_int(value)
     ""
 
 fn ci_find_binary_op(s: str) -> i32:
@@ -5417,6 +5629,13 @@ var g_ci_record_count_cache_values: Vec[i32] = Vec.new()
 var g_ci_record_field_cache_keys: Vec[str] = Vec.new()
 var g_ci_record_field_name_cache_values: Vec[str] = Vec.new()
 var g_ci_record_field_type_cache_values: Vec[str] = Vec.new()
+
+fn ci_record_field_caches_clear():
+    g_ci_record_count_cache_keys = Vec.new()
+    g_ci_record_count_cache_values = Vec.new()
+    g_ci_record_field_cache_keys = Vec.new()
+    g_ci_record_field_name_cache_values = Vec.new()
+    g_ci_record_field_type_cache_values = Vec.new()
 
 fn ci_record_cache_type_text(session: i64, ty_text: str, ty: i32) -> str:
     if ty_text.len() > 0:
@@ -10231,13 +10450,15 @@ fn ci_lookup_macro_value(session: i64, name: str) -> str:
         return g_migrate_macro_values.slice(start as i64, end as i64)
     if ci_macro_miss_contains(name):
         return ""
-    let macro_session = if g_migrate_macro_session != 0: g_migrate_macro_session else: session
+    let macro_session = g_migrate_macro_session
+    if macro_session == 0:
+        return ""
     let count = with_cimport_macro_count(macro_session)
     var i = 0
     while i < count:
         if with_cimport_macro_is_fn_like(macro_session, i) == 0:
             if with_cimport_macro_name(macro_session, i) == name:
-                let value = with_cimport_macro_value(macro_session, i)
+                let value = ci_trim(ci_strip_c_comments(with_cimport_macro_value(macro_session, i)))
                 if value.len() > 0 and value != name and not ci_str_contains(value, "|"):
                     g_migrate_macro_values = g_migrate_macro_values ++ needle ++ value
                 return value
@@ -10257,7 +10478,10 @@ fn ci_macro_miss_contains(name: str) -> bool:
 // calls another fn-like macro that stringifies (e.g. XSTRING -> STRING -> #a).
 fn ci_is_stringify_macro(session: i64, name: str, depth: i32) -> bool:
     if depth > 5: return false
-    let macro_session = if g_migrate_macro_session != 0: g_migrate_macro_session else: session
+    let _ = session
+    let macro_session = g_migrate_macro_session
+    if macro_session == 0:
+        return false
     let count = with_cimport_macro_count(macro_session)
     var i = 0
     while i < count:

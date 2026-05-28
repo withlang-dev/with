@@ -451,6 +451,12 @@ pub fn cimport_parse_macros(h: str) -> i64:
     let _ = h
     0
 
+@[weak] @[c_export("with_cimport_parse_macro_probe")]
+pub fn cimport_parse_macro_probe(h: str, name: str) -> i64:
+    let _ = h
+    let _ = name
+    0
+
 @[weak] @[c_export("with_cimport_collect_object_macro_types")]
 pub fn cimport_collect_object_macro_types(h: str, names: str) -> str:
     let _ = h
@@ -478,6 +484,18 @@ pub fn cimport_macro_value(s: i64, i: i32) -> str:
     let _ = s
     let _ = i
     empty_str()
+
+@[weak] @[c_export("with_cimport_macro_location")]
+pub fn cimport_macro_location(s: i64, i: i32) -> str:
+    let _ = s
+    let _ = i
+    empty_str()
+
+@[weak] @[c_export("with_cimport_macro_is_system")]
+pub fn cimport_macro_is_system(s: i64, i: i32) -> i32:
+    let _ = s
+    let _ = i
+    0
 
 @[weak] @[c_export("with_cimport_macro_is_fn_like")]
 pub fn cimport_macro_is_fn_like(s: i64, i: i32) -> i32:

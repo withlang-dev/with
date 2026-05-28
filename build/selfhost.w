@@ -1694,7 +1694,7 @@ fn bs_check_migrate_typed_cast_macros(ctx: ActionCtx, compiler_path: str, case_d
     let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-typed-cast-macros", args)
     if result.rc != 0: return result.rc
     let out_text = ctx.fs().read_text(out_w)
-    rc = bs_assert_contains(ctx, out_text, "let ZERO_TERM: c_ulong = (-1 as c_ulong)", "typed_cast_macros")
+    rc = bs_assert_contains(ctx, out_text, "let ZERO_TERM: c_ulong = ((0 as c_ulong) -% 1)", "typed_cast_macros")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "patlen == ((-1 as c_ulong))", "typed_cast_macros")
     if rc != 0: return rc
