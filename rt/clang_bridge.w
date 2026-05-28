@@ -679,6 +679,24 @@ unsafe fn find_clang_resource_dir_under(base: *const u8) -> i32:
     buf_append_str(&raw mut resource_dir_buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, &best_name as *const [256]u8 as *const u8)
     1
 
+unsafe fn find_clang_resource_dir_from_llvm_config() -> i32:
+    var out_template: [32]u8 = [0 as u8; 32]
+    let tmpl = "/tmp/with_llvmcfg_XXXXXX\0"
+    let tp = *(&tmpl as *const *const u8)
+    with_memcpy(&raw mut out_template as *mut [32]u8 as *mut u8, tp, 25)
+    var argv = ""
+    argv = append_argv_arg(argv, "llvm-config")
+    argv = append_argv_arg(argv, "--libdir")
+    let output = capture_command_stdout(argv, &raw mut out_template as *mut [32]u8 as *mut u8, 30000)
+    var libdir_buf: [1024]u8 = [0 as u8; 1024]
+    if copy_first_line_to_buf(output, &raw mut libdir_buf as *mut [1024]u8 as *mut u8, 1024) == 0:
+        return 0
+    var base_buf: [1024]u8 = [0 as u8; 1024]
+    var pos: i64 = 0
+    buf_append_str(&raw mut base_buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, &raw mut libdir_buf as *mut [1024]u8 as *const u8)
+    buf_append_str(&raw mut base_buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, "/clang\0" as *const u8)
+    find_clang_resource_dir_under(&raw mut base_buf as *mut [1024]u8 as *const u8)
+
 unsafe fn get_clang_resource_dir() -> *const u8:
     if resource_dir_resolved == 0:
         resource_dir_resolved = 1
@@ -693,6 +711,8 @@ unsafe fn get_clang_resource_dir() -> *const u8:
                 buf_append_str(&raw mut base_buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, llvm_prefix)
                 buf_append_str(&raw mut base_buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, "/lib/clang\0" as *const u8)
                 let _found = find_clang_resource_dir_under(&raw mut base_buf as *mut [1024]u8 as *const u8)
+        if resource_dir_buf[0] == 0:
+            let _found_llvm_config = find_clang_resource_dir_from_llvm_config()
         if resource_dir_buf[0] == 0:
             let _found_default = find_clang_resource_dir_under("/usr/local/llvm/lib/clang\0" as *const u8)
     if resource_dir_buf[0] != 0:
