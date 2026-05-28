@@ -217,7 +217,10 @@ let CXCursor_FunctionDecl: i32 = 8
 let CXCursor_VarDecl: i32 = 9
 let CXCursor_TypedefDecl: i32 = 20
 let CXCursor_TranslationUnit: i32 = 350
+let CXCursor_MacroDefinition: i32 = 501
 let CXCursor_StaticAssert: i32 = 602
+
+let CXTranslationUnit_DetailedPreprocessingRecord: u32 = 1
 
 // ── CXChildVisitResult ──────────────────────────────────────────
 let CXChildVisit_Break: i32 = 0
@@ -373,11 +376,17 @@ type ChildCollector:
 type MacroSession:
     names: *mut *mut u8
     values: *mut *mut u8
+    locations: *mut *mut u8
     fn_like: *mut i32
+    system_flags: *mut i32
     params: *mut *mut *mut u8
     param_counts: *mut i32
     count: i32
     cap: i32
+
+type MacroCollectContext:
+    session: *mut CImportSession
+    macros: *mut MacroSession
 
 // ── String helpers ──────────────────────────────────────────────
 
@@ -1922,12 +1931,332 @@ pub unsafe fn cimport_realpath(path: str) -> str:
 
 // ── Macro extraction ────────────────────────────────────────
 
+unsafe fn cimport_location_path_is_system(path: *const u8) -> i32:
+    if path as i64 == 0:
+        return 0
+    if c_strncmp(path, "/usr/\0" as *const u8, 5) == 0:
+        return 1
+    if c_strncmp(path, "/Library/\0" as *const u8, 9) == 0:
+        return 1
+    if c_strncmp(path, "/Applications/Xcode\0" as *const u8, 19) == 0:
+        return 1
+    if c_strstr(path, "/usr/include/\0" as *const u8) as i64 != 0:
+        return 1
+    if c_strstr(path, "/SDKs/\0" as *const u8) as i64 != 0:
+        return 1
+    if c_strstr(path, "/clang/\0" as *const u8) as i64 != 0:
+        return 1
+    0
+
+unsafe fn macro_location_from_cursor(s: *mut CImportSession, cursor: CXCursor) -> str:
+    let loc = clang_getCursorLocation(cursor)
+    var file: *mut u8 = 0 as *mut u8
+    var line_val: u32 = 0
+    var col_val: u32 = 0
+    clang_getSpellingLocation(loc, &raw mut file, &raw mut line_val, &raw mut col_val, 0 as *mut u32)
+    if file as i64 == 0:
+        clang_getExpansionLocation(loc, &raw mut file, &raw mut line_val, &raw mut col_val, 0 as *mut u32)
+    if file as i64 == 0:
+        return ""
+    let fname = clang_getFileName(file)
+    let fname_str = clang_getCString(fname)
+    if fname_str as i64 == 0 or *fname_str == 0:
+        clang_disposeString(fname)
+        return ""
+    var buf: [1024]u8 = [0 as u8; 1024]
+    var pos: i64 = 0
+    buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, fname_str)
+    buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, ":\0" as *const u8)
+    buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, line_val as i64)
+    buf_append_str(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, ":\0" as *const u8)
+    buf_append_i64(&raw mut buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, col_val as i64)
+    clang_disposeString(fname)
+    session_make_str(s, &buf as *const [1024]u8 as *const u8)
+
+unsafe fn macro_source_line_from_cursor(s: *mut CImportSession, cursor: CXCursor) -> str:
+    let loc = clang_getCursorLocation(cursor)
+    var file: *mut u8 = 0 as *mut u8
+    var line_val: u32 = 0
+    clang_getSpellingLocation(loc, &raw mut file, &raw mut line_val, 0 as *mut u32, 0 as *mut u32)
+    if file as i64 == 0:
+        clang_getExpansionLocation(loc, &raw mut file, &raw mut line_val, 0 as *mut u32, 0 as *mut u32)
+    if file as i64 == 0 or line_val == 0:
+        return ""
+    let fname = clang_getFileName(file)
+    let fname_str = clang_getCString(fname)
+    if fname_str as i64 == 0 or *fname_str == 0:
+        clang_disposeString(fname)
+        return ""
+    let path = session_make_str(s, fname_str)
+    clang_disposeString(fname)
+    let text = with_fs_read_file(path)
+    if text.len() == 0:
+        return ""
+    var current: u32 = 1
+    var start: i32 = 0
+    var i: i32 = 0
+    while i <= text.len() as i32:
+        if i == text.len() as i32 or text.byte_at(i as i64) == 10:
+            if current == line_val:
+                var end = i
+                if end > start and text.byte_at((end - 1) as i64) == 13:
+                    end = end - 1
+                var result = text.slice(start as i64, end as i64)
+                // Preserve simple backslash continuations in multi-line macros.
+                var next_start = i + 1
+                var keep_going = result.len() > 0 and result.byte_at(result.len() - 1) == 92
+                while keep_going and next_start < text.len() as i32:
+                    var next_end = next_start
+                    while next_end < text.len() as i32 and text.byte_at(next_end as i64) != 10:
+                        next_end = next_end + 1
+                    var trimmed_next_end = next_end
+                    if trimmed_next_end > next_start and text.byte_at((trimmed_next_end - 1) as i64) == 13:
+                        trimmed_next_end = trimmed_next_end - 1
+                    result = result ++ "\n" ++ text.slice(next_start as i64, trimmed_next_end as i64)
+                    keep_going = trimmed_next_end > next_start and text.byte_at((trimmed_next_end - 1) as i64) == 92
+                    next_start = next_end + 1
+                return result
+            current = current + 1
+            start = i + 1
+        i = i + 1
+    ""
+
+unsafe fn macro_location_is_system_from_cursor(cursor: CXCursor) -> i32:
+    let loc = clang_getCursorLocation(cursor)
+    var file: *mut u8 = 0 as *mut u8
+    clang_getSpellingLocation(loc, &raw mut file, 0 as *mut u32, 0 as *mut u32, 0 as *mut u32)
+    if file as i64 == 0:
+        clang_getExpansionLocation(loc, &raw mut file, 0 as *mut u32, 0 as *mut u32, 0 as *mut u32)
+    if file as i64 == 0:
+        return 0
+    let fname = clang_getFileName(file)
+    let fname_str = clang_getCString(fname)
+    let result = cimport_location_path_is_system(fname_str)
+    clang_disposeString(fname)
+    result
+
+unsafe fn macro_session_grow(ms: *mut MacroSession):
+    if (*ms).count < (*ms).cap:
+        return
+    (*ms).cap = if (*ms).cap > 0: (*ms).cap * 2 else: 64
+    let nc = (*ms).cap as i64
+    let nn = with_alloc(nc * 8)
+    let nv = with_alloc(nc * 8)
+    let nl = with_alloc(nc * 8)
+    let nf = with_alloc(nc * 4)
+    let ns = with_alloc(nc * 4)
+    let np = with_alloc(nc * 8)
+    let npc = with_alloc(nc * 4)
+    if (*ms).count > 0:
+        let oc = (*ms).count as i64
+        if (*ms).names as i64 != 0: with_memcpy(nn, (*ms).names as *const u8, oc * 8)
+        if (*ms).values as i64 != 0: with_memcpy(nv, (*ms).values as *const u8, oc * 8)
+        if (*ms).locations as i64 != 0: with_memcpy(nl, (*ms).locations as *const u8, oc * 8)
+        if (*ms).fn_like as i64 != 0: with_memcpy(nf, (*ms).fn_like as *const u8, oc * 4)
+        if (*ms).system_flags as i64 != 0: with_memcpy(ns, (*ms).system_flags as *const u8, oc * 4)
+        if (*ms).params as i64 != 0: with_memcpy(np, (*ms).params as *const u8, oc * 8)
+        if (*ms).param_counts as i64 != 0: with_memcpy(npc, (*ms).param_counts as *const u8, oc * 4)
+    if (*ms).names as i64 != 0: with_free((*ms).names as *mut u8)
+    if (*ms).values as i64 != 0: with_free((*ms).values as *mut u8)
+    if (*ms).locations as i64 != 0: with_free((*ms).locations as *mut u8)
+    if (*ms).fn_like as i64 != 0: with_free((*ms).fn_like as *mut u8)
+    if (*ms).system_flags as i64 != 0: with_free((*ms).system_flags as *mut u8)
+    if (*ms).params as i64 != 0: with_free((*ms).params as *mut u8)
+    if (*ms).param_counts as i64 != 0: with_free((*ms).param_counts as *mut u8)
+    (*ms).names = nn as *mut *mut u8
+    (*ms).values = nv as *mut *mut u8
+    (*ms).locations = nl as *mut *mut u8
+    (*ms).fn_like = nf as *mut i32
+    (*ms).system_flags = ns as *mut i32
+    (*ms).params = np as *mut *mut *mut u8
+    (*ms).param_counts = npc as *mut i32
+
+fn macro_source_is_define_line(source: str) -> bool:
+    var i = 0
+    while i < source.len() as i32 and (source.byte_at(i as i64) == 32 or source.byte_at(i as i64) == 9):
+        i = i + 1
+    i + 7 <= source.len() as i32 and source.slice(i as i64, (i + 7) as i64) == "#define"
+
+unsafe fn macro_session_add_from_define_line(ms: *mut MacroSession, line_ptr: *const u8, loc_ptr: *const u8, is_system: i32):
+    if line_ptr as i64 == 0:
+        return
+    var define_start = line_ptr
+    while *(define_start) == 32 or *(define_start) == 9:
+        define_start = (define_start as i64 + 1) as *const u8
+    if c_strncmp(define_start, "#define\0" as *const u8, 7) == 0:
+        define_start = (define_start as i64 + 7) as *const u8
+    while *(define_start) == 32 or *(define_start) == 9:
+        define_start = (define_start as i64 + 1) as *const u8
+    if *define_start == 0:
+        return
+    if *define_start == 95 and *((define_start as i64 + 1) as *const u8) == 95:
+        return
+
+    var name_end = define_start
+    while *(name_end) != 0 and *(name_end) != 32 and *(name_end) != 9 and *(name_end) != 40 and *(name_end) != 10:
+        name_end = (name_end as i64 + 1) as *const u8
+    let is_fn_like = if *(name_end) == 40: 1 else: 0
+    let name_len = name_end as i64 - define_start as i64
+    if name_len <= 0:
+        return
+    let name = with_alloc(name_len + 1)
+    with_memcpy(name, define_start, name_len)
+    *((name as i64 + name_len) as *mut u8) = 0
+
+    var value_start = name_end
+    var macro_params: *mut *mut u8 = 0 as *mut *mut u8
+    var macro_param_count: i32 = 0
+    if is_fn_like != 0:
+        let pstart = (name_end as i64 + 1) as *const u8
+        var pend = pstart
+        while *(pend) != 0 and *(pend) != 41:
+            pend = (pend as i64 + 1) as *const u8
+        if pend as i64 > pstart as i64:
+            var pcap: i32 = 8
+            macro_params = with_alloc(pcap as i64 * 8) as *mut *mut u8
+            var pp = pstart
+            while pp as i64 < pend as i64:
+                while pp as i64 < pend as i64 and (*(pp) == 32 or *(pp) == 9):
+                    pp = (pp as i64 + 1) as *const u8
+                let tok = pp
+                while pp as i64 < pend as i64 and *(pp) != 44 and *(pp) != 32 and *(pp) != 9:
+                    pp = (pp as i64 + 1) as *const u8
+                if pp as i64 > tok as i64:
+                    if macro_param_count >= pcap:
+                        pcap = pcap * 2
+                        let new_p = with_alloc(pcap as i64 * 8)
+                        with_memcpy(new_p, macro_params as *const u8, macro_param_count as i64 * 8)
+                        with_free(macro_params as *mut u8)
+                        macro_params = new_p as *mut *mut u8
+                    let tlen2 = pp as i64 - tok as i64
+                    let pname = with_alloc(tlen2 + 1)
+                    with_memcpy(pname, tok, tlen2)
+                    *((pname as i64 + tlen2) as *mut u8) = 0
+                    *((macro_params as i64 + macro_param_count as i64 * 8) as *mut *mut u8) = pname
+                    macro_param_count = macro_param_count + 1
+                while pp as i64 < pend as i64 and (*(pp) == 44 or *(pp) == 32 or *(pp) == 9):
+                    pp = (pp as i64 + 1) as *const u8
+        value_start = pend
+        if *(value_start) == 41:
+            value_start = (value_start as i64 + 1) as *const u8
+    while *(value_start) == 32 or *(value_start) == 9:
+        value_start = (value_start as i64 + 1) as *const u8
+
+    var value_len = c_strlen(value_start)
+    while value_len > 0 and (*((value_start as i64 + value_len - 1) as *const u8) == 10 or *((value_start as i64 + value_len - 1) as *const u8) == 13):
+        value_len = value_len - 1
+    let value = with_alloc(value_len + 1)
+    if value_len > 0:
+        with_memcpy(value, value_start, value_len)
+    *((value as i64 + value_len) as *mut u8) = 0
+
+    macro_session_grow(ms)
+    let ci = (*ms).count as i64
+    *(((*ms).names as i64 + ci * 8) as *mut *mut u8) = name
+    *(((*ms).values as i64 + ci * 8) as *mut *mut u8) = value
+    *(((*ms).locations as i64 + ci * 8) as *mut *mut u8) = c_strdup(loc_ptr)
+    *(((*ms).fn_like as i64 + ci * 4) as *mut i32) = is_fn_like
+    *(((*ms).system_flags as i64 + ci * 4) as *mut i32) = is_system
+    *(((*ms).params as i64 + ci * 8) as *mut *mut *mut u8) = macro_params
+    *(((*ms).param_counts as i64 + ci * 4) as *mut i32) = macro_param_count
+    (*ms).count = (*ms).count + 1
+
+@[callconv("c")]
+unsafe fn collect_macro_def(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
+    let ctx = data as *mut MacroCollectContext
+    if clang_getCursorKind(cursor) != CXCursor_MacroDefinition:
+        return CXChildVisit_Continue
+    let s = (*ctx).session
+    let ms = (*ctx).macros
+    let loc = macro_location_from_cursor(s, cursor)
+    let is_system = macro_location_is_system_from_cursor(cursor)
+    var source = macro_source_line_from_cursor(s, cursor)
+    if not macro_source_is_define_line(source):
+        source = cursor_source_text_from_cursor(s, cursor)
+    if not macro_source_is_define_line(source):
+        let token_text = cursor_token_text_from_cursor(s, cursor)
+        if token_text.len() > 0:
+            source = "#define " ++ token_text
+    let source_ptr = str_to_cstr(source)
+    let loc_ptr = str_to_cstr(loc)
+    macro_session_add_from_define_line(ms, source_ptr as *const u8, loc_ptr as *const u8, is_system)
+    if source_ptr as i64 != 0:
+        with_free(source_ptr)
+    if loc_ptr as i64 != 0:
+        with_free(loc_ptr)
+    CXChildVisit_Continue
+
+unsafe fn cimport_collect_macros_from_libclang(ms: *mut MacroSession, header_code: str) -> i32:
+    let size = 232  // sizeof(CImportSession)
+    let s = with_alloc(size) as *mut CImportSession
+    if s as i64 == 0:
+        return 0
+    with_memset(s as *mut u8, 0, size)
+
+    var template_path: [40]u8 = [0 as u8; 40]
+    let tmpl = "/tmp/with_cimport_macro_XXXXXX\0"
+    let tp = *(&tmpl as *const *const u8)
+    with_memcpy(&raw mut template_path as *mut [40]u8 as *mut u8, tp, 31)
+    let fd = mkstemp(&raw mut template_path as *mut [40]u8 as *mut u8)
+    if fd < 0:
+        cimport_dispose(s as i64)
+        return 0
+    let src_ptr = *(&header_code as *const *const u8)
+    let _ = write(fd, src_ptr, header_code.len() as u64)
+    let _ = write(fd, "\n\0" as *const u8, 1 as u64)
+    let _ = close(fd)
+
+    var c_path: [64]u8 = [0 as u8; 64]
+    with_memcpy(&raw mut c_path as *mut [64]u8 as *mut u8, &template_path as *const [40]u8 as *const u8, 40)
+    let tlen = c_strlen(&template_path as *const [40]u8 as *const u8)
+    *(((&raw mut c_path) as i64 + tlen) as *mut u8) = 46
+    *(((&raw mut c_path) as i64 + tlen + 1) as *mut u8) = 99
+    *(((&raw mut c_path) as i64 + tlen + 2) as *mut u8) = 0
+    let _ = rename(&template_path as *const [40]u8 as *const u8, &c_path as *const [64]u8 as *const u8)
+    (*s).tmp_path = c_strdup(&c_path as *const [64]u8 as *const u8)
+
+    var args: [64]*const u8 = [0 as *const u8; 64]
+    var nargs: i32 = 0
+    let sysroot = get_sdk_path()
+    if sysroot as i64 != 0:
+        args[nargs as i64] = "-isysroot\0" as *const u8
+        nargs = nargs + 1
+        args[nargs as i64] = sysroot
+        nargs = nargs + 1
+    let resdir = get_clang_resource_dir()
+    if resdir as i64 != 0:
+        args[nargs as i64] = "-resource-dir\0" as *const u8
+        nargs = nargs + 1
+        args[nargs as i64] = resdir
+        nargs = nargs + 1
+    var ip: i32 = 0
+    while ip < g_cimport_include_count and nargs < 62:
+        args[nargs as i64] = "-I\0" as *const u8
+        nargs = nargs + 1
+        args[nargs as i64] = g_cimport_include_paths[ip as i64] as *const u8
+        nargs = nargs + 1
+        ip = ip + 1
+
+    (*s).index = clang_createIndex(0, 0)
+    (*s).tu = clang_parseTranslationUnit((*s).index, (*s).tmp_path as *const u8, &args as *const [64]*const u8 as *const *const u8, nargs, 0 as *mut u8, 0 as u32, CXTranslationUnit_DetailedPreprocessingRecord)
+    if (*s).tu as i64 == 0:
+        cimport_dispose(s as i64)
+        return 0
+
+    var ctx = MacroCollectContext { session: s, macros: ms }
+    let root = clang_getTranslationUnitCursor((*s).tu)
+    let _ = clang_visitChildren(root, collect_macro_def as *const u8, &raw mut ctx as *mut MacroCollectContext as *mut u8)
+    cimport_dispose(s as i64)
+    1
+
 @[c_export("with_cimport_parse_macros")]
 pub unsafe fn cimport_parse_macros(header_code: str) -> i64:
-    let ms_size = 56  // sizeof(MacroSession)
+    let ms_size = 72  // sizeof(MacroSession)
     let ms = with_alloc(ms_size) as *mut MacroSession
     if ms as i64 == 0: return 0
     with_memset(ms as *mut u8, 0, ms_size)
+    if cimport_collect_macros_from_libclang(ms, header_code) != 0:
+        return ms as i64
 
     // Write header to temp file
     var template_path: [40]u8 = [0 as u8; 40]
@@ -2215,6 +2544,76 @@ pub unsafe fn cimport_collect_object_macro_types(header_code: str, macro_names: 
     cimport_dispose(s as i64)
     result
 
+@[c_export("with_cimport_parse_macro_probe")]
+pub unsafe fn cimport_parse_macro_probe(header_code: str, macro_name: str) -> i64:
+    if macro_name.len() == 0:
+        return 0
+
+    let size = 232  // sizeof(CImportSession)
+    let s = with_alloc(size) as *mut CImportSession
+    if s as i64 == 0:
+        return 0
+    with_memset(s as *mut u8, 0, size)
+
+    var template_path: [32]u8 = [0 as u8; 32]
+    let tmpl = "/tmp/with_cimport_XXXXXX\0"
+    let tp = *(&tmpl as *const *const u8)
+    with_memcpy(&raw mut template_path as *mut [32]u8 as *mut u8, tp, 25)
+    let fd = mkstemp(&raw mut template_path as *mut [32]u8 as *mut u8)
+    if fd < 0:
+        cimport_dispose(s as i64)
+        return 0
+
+    let src_ptr = *(&header_code as *const *const u8)
+    let _ = write(fd, src_ptr, header_code.len() as u64)
+    let _ = write(fd, "\n\0" as *const u8, 1 as u64)
+    let probe_line = "__typeof__(" ++ macro_name ++ ") __with_macro_probe_" ++ macro_name ++ " = " ++ macro_name ++ ";\n"
+    let probe_ptr = *(&probe_line as *const *const u8)
+    let _ = write(fd, probe_ptr, probe_line.len() as u64)
+    let _ = close(fd)
+
+    var c_path_buf: [64]u8 = [0 as u8; 64]
+    with_memcpy(&raw mut c_path_buf as *mut [64]u8 as *mut u8, &template_path as *const [32]u8 as *const u8, 32)
+    let tlen = c_strlen(&template_path as *const [32]u8 as *const u8)
+    *(((&raw mut c_path_buf) as i64 + tlen) as *mut u8) = 46
+    *(((&raw mut c_path_buf) as i64 + tlen + 1) as *mut u8) = 99
+    *(((&raw mut c_path_buf) as i64 + tlen + 2) as *mut u8) = 0
+    let _ = rename(&template_path as *const [32]u8 as *const u8, &c_path_buf as *const [64]u8 as *const u8)
+    (*s).tmp_path = c_strdup(&c_path_buf as *const [64]u8 as *const u8)
+
+    var args: [64]*const u8 = [0 as *const u8; 64]
+    var nargs: i32 = 0
+    let sysroot = get_sdk_path()
+    if sysroot as i64 != 0:
+        args[nargs as i64] = "-isysroot\0" as *const u8
+        nargs = nargs + 1
+        args[nargs as i64] = sysroot
+        nargs = nargs + 1
+    let resdir = get_clang_resource_dir()
+    if resdir as i64 != 0:
+        args[nargs as i64] = "-resource-dir\0" as *const u8
+        nargs = nargs + 1
+        args[nargs as i64] = resdir
+        nargs = nargs + 1
+    var ip: i32 = 0
+    while ip < g_cimport_include_count and nargs < 62:
+        args[nargs as i64] = "-I\0" as *const u8
+        nargs = nargs + 1
+        args[nargs as i64] = g_cimport_include_paths[ip as i64] as *const u8
+        nargs = nargs + 1
+        ip = ip + 1
+
+    (*s).index = clang_createIndex(0, 0)
+    (*s).tu = clang_parseTranslationUnit((*s).index, (*s).tmp_path as *const u8, &args as *const [64]*const u8 as *const *const u8, nargs, 0 as *mut u8, 0 as u32, 0 as u32)
+    if (*s).tu as i64 == 0:
+        cimport_dispose(s as i64)
+        return 0
+
+    (*s).header_file = clang_getFile((*s).tu, (*s).tmp_path as *const u8)
+    let root = clang_getTranslationUnitCursor((*s).tu)
+    let _ = clang_visitChildren(root, collect_decl as *const u8, s as *mut u8)
+    s as i64
+
 @[c_export("with_cimport_macro_count")]
 pub unsafe fn cimport_macro_count(session: i64) -> i32:
     let ms = session as *mut MacroSession
@@ -2233,6 +2632,20 @@ pub unsafe fn cimport_macro_value(session: i64, idx: i32) -> str:
     if ms as i64 == 0 or idx < 0 or idx >= (*ms).count: return ""
     make_str(*(((*ms).values as i64 + idx as i64 * 8) as *const *const u8))
 
+@[c_export("with_cimport_macro_location")]
+pub unsafe fn cimport_macro_location(session: i64, idx: i32) -> str:
+    let ms = session as *mut MacroSession
+    if ms as i64 == 0 or idx < 0 or idx >= (*ms).count: return ""
+    if (*ms).locations as i64 == 0: return ""
+    make_str(*(((*ms).locations as i64 + idx as i64 * 8) as *const *const u8))
+
+@[c_export("with_cimport_macro_is_system")]
+pub unsafe fn cimport_macro_is_system(session: i64, idx: i32) -> i32:
+    let ms = session as *mut MacroSession
+    if ms as i64 == 0 or idx < 0 or idx >= (*ms).count: return 0
+    if (*ms).system_flags as i64 == 0: return 0
+    *(((*ms).system_flags as i64 + idx as i64 * 4) as *const i32)
+
 @[c_export("with_cimport_macro_is_fn_like")]
 pub unsafe fn cimport_macro_is_fn_like(session: i64, idx: i32) -> i32:
     let ms = session as *mut MacroSession
@@ -2248,6 +2661,8 @@ pub unsafe fn cimport_dispose_macros(session: i64):
         let ci = i as i64
         with_free(*(((*ms).names as i64 + ci * 8) as *const *mut u8))
         with_free(*(((*ms).values as i64 + ci * 8) as *const *mut u8))
+        if (*ms).locations as i64 != 0:
+            with_free(*(((*ms).locations as i64 + ci * 8) as *const *mut u8))
         let params = *(((*ms).params as i64 + ci * 8) as *const *mut *mut u8)
         if params as i64 != 0:
             let pc = *(((*ms).param_counts as i64 + ci * 4) as *const i32)
@@ -2259,7 +2674,9 @@ pub unsafe fn cimport_dispose_macros(session: i64):
         i = i + 1
     if (*ms).names as i64 != 0: with_free((*ms).names as *mut u8)
     if (*ms).values as i64 != 0: with_free((*ms).values as *mut u8)
+    if (*ms).locations as i64 != 0: with_free((*ms).locations as *mut u8)
     if (*ms).fn_like as i64 != 0: with_free((*ms).fn_like as *mut u8)
+    if (*ms).system_flags as i64 != 0: with_free((*ms).system_flags as *mut u8)
     if (*ms).params as i64 != 0: with_free((*ms).params as *mut u8)
     if (*ms).param_counts as i64 != 0: with_free((*ms).param_counts as *mut u8)
     with_free(ms as *mut u8)
