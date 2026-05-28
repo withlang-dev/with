@@ -552,8 +552,9 @@ Completed at a high level:
 
 - Build actions and capability plumbing exist.
 - Scoped `ToolFs` writes and declared extra outputs exist.
-- Default `with build :test` no longer runs the full PCRE2 upstream corpus.
-- Fast smoke coverage exists for PCRE2 migration, PCRE2 tests, and emit-C.
+- Default `with build :test` does not run PCRE2 targets. PCRE2 migration,
+  generated-module checks, and corpus tests are manual-only and should be run
+  when intentionally migrating or validating a PCRE2 version.
 - Action targets support `--no-deps` for focused iteration.
 - External-compiler build graph test targets run in parallel batches.
 - Several repository-specific build targets have moved to project-local action
@@ -616,7 +617,8 @@ not a new compiler-dispatched project graph kind.
   `behav_action_crash_diagnostic`, and `behav_action_no_deps_isolation`.
 - Decide whether in-process build graph test targets should also move to
   external parallel execution, or remain serial for diagnostic fidelity.
-- Keep manual-only heavy targets covered by fast smokes in `make test`.
+- Keep PCRE2 targets manual-only; do not wire PCRE2 migration, generated-module
+  checks, corpus tests, or smokes into `make test`.
 - Run full `:emit-c-test` only for release verification or emit-C-specific
   work. For ordinary changes, rely on `make test`'s emit-C smoke.
 - Keep project-specific build policy in project-local modules and avoid adding
@@ -629,7 +631,8 @@ not a new compiler-dispatched project graph kind.
   prefixes. PromoteTreeIfVerified uses staleness detection.
 - `with get c.raylib` installs the ConanCenter `raylib/6.0` binary package on
   Darwin arm64, and the issue #288 repro with `use c_import("raylib.h")` now
-  checks successfully.
+  checks successfully, including raylib `CLITERAL(Color){...}` color macros
+  such as `RAYWHITE` and `LIGHTGRAY`.
 
 ## Local State
 

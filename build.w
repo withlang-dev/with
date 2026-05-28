@@ -668,7 +668,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     var c_migrator_tests = target_new(.Group, "c-migrator-tests", "")
     c_migrator_tests = c_migrator_tests.dep("c-migrator-basic-tests")
     c_migrator_tests = c_migrator_tests.dep("c-migrator-core-tests")
-    c_migrator_tests = c_migrator_tests.dep("c-migrator-pcre2-prep-tests")
     out = out.add_target(c_migrator_tests)
 
     var issue61_regression = target_new(.Action, "issue61-regression", "").output("out/test-graph/issue61-regression")
@@ -705,8 +704,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("cli-selfhost-edge-tests")
     tests = tests.dep("cli-selfhost-parallel-tests")
     tests = tests.dep("c-migrator-tests")
-    tests = tests.dep("pcre2-migrate-smoke")
-    tests = tests.dep("pcre2-test-smoke")
     tests = tests.dep("issue61-regression")
     tests = tests.dep("embedded-runtime-regression")
     tests = tests.dep("emit-c-smoke")
