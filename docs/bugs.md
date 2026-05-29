@@ -216,7 +216,14 @@
   │                                                                                                                │             │                   │      │ types, and Sender[T].send rejects ephemeral    │
   │                                                                                                                │             │                   │      │ payloads through the method-call path. Spec    │
   │                                                                                                                │             │                   │      │ §14.15.                                        │
-  │ #260-#265, #267-#274                                                                                          │         Yes │           Partial │   No │ Remaining §14 async sketches. Runtime has many │
+  │ #260 (blocked)                                                                                                │         Yes │           Partial │   No │ §14.16 needs non-async scoped OS threads:      │
+  │                                                                                                                │             │                   │      │ `scope s => s.spawn(...)`. The compiler only   │
+  │                                                                                                                │             │                   │      │ has NK_ASYNC_SCOPE, async s.track lowering,    │
+  │                                                                                                                │             │                   │      │ and unscoped spawn_os. There is no parser/AST/ │
+  │                                                                                                                │             │                   │      │ MIR/codegen/runtime handle-list design for     │
+  │                                                                                                                │             │                   │      │ auto-joining scoped OS threads, and closure    │
+  │                                                                                                                │             │                   │      │ escape analysis has no ScopedSend context.     │
+  │ #261-#265, #267-#274                                                                                          │         Yes │           Partial │   No │ Remaining §14 async sketches. Runtime has many │
   │                                                                                                                │             │                   │      │ behavior tests now, but spec sketches still    │
   │                                                                                                                │             │                   │      │ cover missing/unchecked semantics:             │
   │                                                                                                                │             │                   │      │ cancellation, ScopedSend, no-await-in-         │
