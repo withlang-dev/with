@@ -190,8 +190,12 @@
   │                                                                                                                │             │                   │      │ Sema/MIR agreement, and supports shared        │
   │                                                                                                                │             │                   │      │ auto-ref for operator call arguments. Spec     │
   │                                                                                                                │             │                   │      │ §11.7.                                         │
-  │ #245-#246                                                                                                      │         Yes │                No │   No │ Remaining §11 derive sketches. Need derive and │
-  │                                                                                                                │             │                   │      │ derive(Builder) coverage.                      │
+  │ [x] #245                                                                                                       │         Yes │               Yes │   No │ Completed: derive now generates Copy marker    │
+  │                                                                                                                │             │                   │      │ impls, field-wise Clone, Eq, Hash, Debug, and │
+  │                                                                                                                │             │                   │      │ conservative derive(all); the skipped sketch   │
+  │                                                                                                                │             │                   │      │ is executable with positive and negative       │
+  │                                                                                                                │             │                   │      │ regressions. Spec §11.8.                       │
+  │ #246                                                                                                           │         Yes │                No │   No │ Remaining §11 derive(Builder) sketch.          │
   │ #257-#274                                                                                                      │         Yes │           Partial │   No │ §14 async sketches. Runtime has many behavior  │
   │                                                                                                                │             │                   │      │ tests now, but spec sketches still cover       │
   │                                                                                                                │             │                   │      │ missing/unchecked semantics: fairness,         │
