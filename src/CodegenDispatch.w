@@ -906,7 +906,20 @@ fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected
                 text = raw.slice(5, raw.len())
             else:
                 text = self.decode_string_escapes(raw)
+        let const_sema_ty = if const_id >= 0 and const_id < body.const_types.len() as i32: body.const_types.get(const_id as i64) else: 0
+        if self.mir_sema_type_is_ref_to_str(const_sema_ty) != 0:
+            return self.gen_string_literal_ref(text)
         return self.gen_string_literal_raw(text)
+
+    if ck == ConstKind.CK_C_STR:
+        var text = ""
+        if cd != 0:
+            let raw = self.intern.resolve(cd)
+            if raw.len() >= 5 and raw.byte_at(0) == 1 and raw.byte_at(1) == 114 and raw.byte_at(2) == 97 and raw.byte_at(3) == 119 and raw.byte_at(4) == 1:
+                text = raw.slice(5, raw.len())
+            else:
+                text = self.decode_string_escapes(raw)
+        return self.gen_c_string_literal_ref(text)
 
     if ck == ConstKind.CK_UNIT:
         if materialize_ty != 0 and materialize_ty != wl_void_type(self.context):
@@ -1114,6 +1127,8 @@ fn Codegen.mir_coerce_value_to_sema_type(self: Codegen, val: i64, target_ty: i64
     let val_ty = wl_type_of(val)
     if val_ty == target_ty:
         return val
+    if self.mir_sema_type_is_ref_to_str(target_sema_ty) != 0 and self.is_str_type(val_ty):
+        return self.build_str_ref_from_value(val)
     let vk = wl_get_type_kind(val_ty)
     let tk = wl_get_type_kind(target_ty)
     if vk == wl_integer_type_kind() and tk == wl_integer_type_kind():
@@ -2933,6 +2948,19 @@ fn Codegen.mir_intrinsic_arg(self: Codegen, body: MirBody, args_id: i32, idx: i3
     let op_id = body.call_arg_operands.get((arg_start + idx) as i64)
     self.mir_eval_operand(body, op_id, 0)
 
+fn Codegen.mir_intrinsic_recv_str_value(self: Codegen, body: MirBody, args_id: i32) -> i64:
+    let arg_start = body.call_arg_starts.get(args_id as i64)
+    let recv_op = body.call_arg_operands.get(arg_start as i64)
+    let recv = self.mir_intrinsic_arg(body, args_id, 0)
+    if self.is_str_type(wl_type_of(recv)):
+        return recv
+    let recv_sema = self.mir_operand_sema_type(body, recv_op)
+    if self.mir_sema_type_is_ref_to_str(recv_sema) != 0 and wl_get_type_kind(wl_type_of(recv)) == wl_pointer_type_kind():
+        let str_ty = self.str_llvm_type()
+        if str_ty != 0:
+            return wl_build_load(self.builder, str_ty, recv)
+    recv
+
 fn Codegen.mir_extract_map_ptr(self: Codegen, recv: i64) -> i64:
     // HashMap value is either { ptr } struct or raw ptr (from field access).
     let recv_ty = wl_type_of(recv)
@@ -4225,13 +4253,13 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
             result = recv
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_LEN:
-        let recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let recv = self.mir_intrinsic_recv_str_value(body, args_id)
         if self.debug_mir_codegen_enabled():
             with_eprint(f"[mir-str-len] recv_ty_kind={wl_get_type_kind(wl_type_of(recv))}")
         result = wl_build_extract_value(self.builder, recv, 1)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_BYTE_AT:
-        let recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let recv = self.mir_intrinsic_recv_str_value(body, args_id)
         let index = self.mir_intrinsic_arg(body, args_id, 1)
         let index64 = self.coerce_int(index, i64_ty)
         let fn_val = self.ensure_c_fn("with_str_byte_at", i32_ty, 2)
@@ -4241,7 +4269,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         result = wl_build_call(self.builder, self.get_runtime_fn_type("with_str_byte_at", i32_ty, 2), fn_val, vec_data_i64(&args), 2)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_SLICE:
-        let recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let recv = self.mir_intrinsic_recv_str_value(body, args_id)
         let str_ptr = wl_build_extract_value(self.builder, recv, 0)
         let start = self.mir_intrinsic_arg(body, args_id, 1)
         let end = self.mir_intrinsic_arg(body, args_id, 2)
@@ -4255,7 +4283,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         result = self.build_str_value(new_ptr, new_len)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_CONTAINS:
-        let recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let recv = self.mir_intrinsic_recv_str_value(body, args_id)
         let needle = self.mir_intrinsic_arg(body, args_id, 1)
         let fn_val = self.ensure_c_fn("with_str_contains", i32_ty, 2)
         let args: Vec[i64] = Vec.new()
@@ -4265,7 +4293,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(i32_ty, 0, 0))
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_STARTS_WITH:
-        let recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let recv = self.mir_intrinsic_recv_str_value(body, args_id)
         let prefix = self.mir_intrinsic_arg(body, args_id, 1)
         let fn_val = self.ensure_c_fn("with_str_starts_with", i32_ty, 2)
         let args: Vec[i64] = Vec.new()
@@ -4275,7 +4303,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(i32_ty, 0, 0))
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_ENDS_WITH:
-        let recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let recv = self.mir_intrinsic_recv_str_value(body, args_id)
         let suffix = self.mir_intrinsic_arg(body, args_id, 1)
         let fn_val = self.ensure_c_fn("with_str_ends_with", i32_ty, 2)
         let args: Vec[i64] = Vec.new()
@@ -4285,7 +4313,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(i32_ty, 0, 0))
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_FIND:
-        let recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let recv = self.mir_intrinsic_recv_str_value(body, args_id)
         let needle = self.mir_intrinsic_arg(body, args_id, 1)
         let fn_val = self.ensure_c_fn("with_str_index_of", i64_ty, 2)
         let args: Vec[i64] = Vec.new()
@@ -5137,7 +5165,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
             result = wl_const_int(wl_i1_type(self.context), 0, 0)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_TRIM:
-        let r1 = self.mir_intrinsic_arg(body, args_id, 0)
+        let r1 = self.mir_intrinsic_recv_str_value(body, args_id)
         let t1 = wl_type_of(r1)
         let f1 = self.ensure_c_fn("with_str_trim", t1, 1)
         let a1: Vec[i64] = Vec.new()
@@ -5145,7 +5173,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         result = wl_build_call(self.builder, self.get_runtime_fn_type("with_str_trim", t1, 1), f1, vec_data_i64(&a1), 1)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_TO_UPPER:
-        let r2 = self.mir_intrinsic_arg(body, args_id, 0)
+        let r2 = self.mir_intrinsic_recv_str_value(body, args_id)
         let t2 = wl_type_of(r2)
         let f2 = self.ensure_c_fn("with_str_to_upper", t2, 1)
         let a2: Vec[i64] = Vec.new()
@@ -5153,7 +5181,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         result = wl_build_call(self.builder, self.get_runtime_fn_type("with_str_to_upper", t2, 1), f2, vec_data_i64(&a2), 1)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_TO_LOWER:
-        let r3 = self.mir_intrinsic_arg(body, args_id, 0)
+        let r3 = self.mir_intrinsic_recv_str_value(body, args_id)
         let t3 = wl_type_of(r3)
         let f3 = self.ensure_c_fn("with_str_to_lower", t3, 1)
         let a3: Vec[i64] = Vec.new()
@@ -5161,7 +5189,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         result = wl_build_call(self.builder, self.get_runtime_fn_type("with_str_to_lower", t3, 1), f3, vec_data_i64(&a3), 1)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_REPLACE:
-        let r4 = self.mir_intrinsic_arg(body, args_id, 0)
+        let r4 = self.mir_intrinsic_recv_str_value(body, args_id)
         let t4 = wl_type_of(r4)
         let s4a = self.mir_intrinsic_arg(body, args_id, 1)
         let s4b = self.mir_intrinsic_arg(body, args_id, 2)
@@ -5173,7 +5201,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         result = wl_build_call(self.builder, self.get_runtime_fn_type("with_str_replace", t4, 3), f4, vec_data_i64(&a4), 3)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_SPLIT:
-        let r6 = self.mir_intrinsic_arg(body, args_id, 0)
+        let r6 = self.mir_intrinsic_recv_str_value(body, args_id)
         let t6 = wl_type_of(r6)
         let d6 = self.mir_intrinsic_arg(body, args_id, 1)
         let vt6 = self.get_or_create_vec_type(0, t6)
@@ -5192,7 +5220,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         result = wl_build_load(self.builder, vt6, out6)
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_INDEX_OF:
-        let r5 = self.mir_intrinsic_arg(body, args_id, 0)
+        let r5 = self.mir_intrinsic_recv_str_value(body, args_id)
         let n5 = self.mir_intrinsic_arg(body, args_id, 1)
         let f5 = self.ensure_c_fn("with_str_index_of", i64_ty, 2)
         let a5: Vec[i64] = Vec.new()
@@ -5221,7 +5249,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         result = 0
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_REPEAT:
-        let sr_recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let sr_recv = self.mir_intrinsic_recv_str_value(body, args_id)
         let sr_n = self.mir_intrinsic_arg(body, args_id, 1)
         let sr_n64 = self.coerce_int(sr_n, i64_ty)
         let sr_ty = wl_type_of(sr_recv)
@@ -9378,6 +9406,58 @@ fn Codegen.gen_string_literal_raw(self: Codegen, text: str) -> i64:
     wl_build_store(self.builder, wl_const_int(wl_i64_type(self.context), text.len(), 1), len_gep)
     wl_build_load(self.builder, str_type, alloca)
 
+fn Codegen.gen_string_literal_ref(self: Codegen, text: str) -> i64:
+    let str_type = self.str_llvm_type()
+    if str_type == 0:
+        with_eprint("error: str builtin type not found")
+        return wl_const_null(wl_ptr_type(self.context))
+    let name = f"__with_str_view_{codegen_hash_name_component(with_str_hash(text))}_{text.len()}"
+    var str_global = wl_get_named_global(self.llmod, name)
+    if str_global == 0:
+        let ptr_value = self.const_c_string_pointer(text, wl_ptr_type(self.context))
+        if ptr_value == 0:
+            with_eprint("error: failed to create string literal byte storage")
+            return wl_const_null(wl_ptr_type(self.context))
+        let fields: Vec[i64] = Vec.new()
+        fields.push(ptr_value)
+        fields.push(wl_const_int(wl_i64_type(self.context), text.len(), 1))
+        let init = wl_const_named_struct(str_type, vec_data_i64(&fields), 2)
+        str_global = wl_add_global(self.llmod, str_type, name)
+        wl_set_initializer(str_global, init)
+        wl_set_global_constant(str_global, 1)
+        wl_set_linkage(str_global, wl_private_linkage())
+    let as_ptr = self.coerce_const_value_to_type(str_global, wl_ptr_type(self.context))
+    if as_ptr != 0:
+        return as_ptr
+    str_global
+
+fn Codegen.gen_c_string_literal_ref(self: Codegen, text: str) -> i64:
+    let cstr_sym = self.intern.intern("CStr")
+    let st_opt = self.struct_type_map.get(cstr_sym)
+    if not st_opt.is_some():
+        with_eprint("error: CStr builtin type not found")
+        return wl_const_null(wl_ptr_type(self.context))
+    let cstr_type = self.struct_llvm_types.get(st_opt.unwrap() as i64)
+    let name = f"__with_cstr_view_{codegen_hash_name_component(with_str_hash(text))}_{text.len()}"
+    var cstr_global = wl_get_named_global(self.llmod, name)
+    if cstr_global == 0:
+        let ptr_value = self.const_c_string_pointer(text, wl_ptr_type(self.context))
+        if ptr_value == 0:
+            with_eprint("error: failed to create C-string byte storage")
+            return wl_const_null(wl_ptr_type(self.context))
+        let fields: Vec[i64] = Vec.new()
+        fields.push(ptr_value)
+        fields.push(wl_const_int(wl_i64_type(self.context), text.len(), 1))
+        let init = wl_const_named_struct(cstr_type, vec_data_i64(&fields), 2)
+        cstr_global = wl_add_global(self.llmod, cstr_type, name)
+        wl_set_initializer(cstr_global, init)
+        wl_set_global_constant(cstr_global, 1)
+        wl_set_linkage(cstr_global, wl_private_linkage())
+    let as_ptr = self.coerce_const_value_to_type(cstr_global, wl_ptr_type(self.context))
+    if as_ptr != 0:
+        return as_ptr
+    cstr_global
+
 fn Codegen.gen_src_intrinsic(self: Codegen, node: i32) -> i64:
     let span_start = self.pool.get_start(node)
     let source_path = if self.current_decl_source_file.len() > 0 and self.current_decl_source_file != "<unknown>":
@@ -9434,6 +9514,24 @@ fn Codegen.is_str_type(self: Codegen, ty: i64) -> bool:
     let str_type = self.struct_llvm_types.get(st_opt.unwrap() as i64)
     ty == str_type
 
+fn Codegen.str_llvm_type(self: Codegen) -> i64:
+    let str_sym = self.intern.intern("str")
+    let st_opt = self.struct_type_map.get(str_sym)
+    if not st_opt.is_some():
+        return 0
+    self.struct_llvm_types.get(st_opt.unwrap() as i64)
+
+fn Codegen.mir_sema_type_is_ref_to_str(self: Codegen, sema_ty: i32) -> i32:
+    if sema_ty <= 0:
+        return 0
+    let resolved = self.mir_input.mir_resolve_alias(sema_ty)
+    if self.mir_input.mir_get_type_kind(resolved) != TypeKind.TY_REF:
+        return 0
+    let inner = self.mir_input.mir_resolve_alias(self.mir_input.mir_get_type_d0(resolved))
+    if self.mir_input.mir_get_type_kind(inner) == TypeKind.TY_STR:
+        return 1
+    0
+
 fn Codegen.build_str_value(self: Codegen, ptr: i64, len: i64) -> i64:
     let str_sym = self.intern.intern("str")
     let st_opt = self.struct_type_map.get(str_sym)
@@ -9445,6 +9543,14 @@ fn Codegen.build_str_value(self: Codegen, ptr: i64, len: i64) -> i64:
     result = wl_build_insert_value(self.builder, result, ptr, 0)
     result = wl_build_insert_value(self.builder, result, len, 1)
     result
+
+fn Codegen.build_str_ref_from_value(self: Codegen, value: i64) -> i64:
+    let str_ty = wl_type_of(value)
+    if not self.is_str_type(str_ty):
+        return value
+    let slot = self.create_entry_alloca(str_ty)
+    wl_build_store(self.builder, value, slot)
+    slot
 
 fn Codegen.coerce_ptr_to_str(self: Codegen, ptr_val: i64) -> i64:
     // c_import return coercion: *void / *u8 → str with null safety.

@@ -61,9 +61,10 @@
   │                                                                                                                │             │                   │      │ missing/unchecked semantics: fairness,         │
   │                                                                                                                │             │                   │      │ cancellation, ScopedSend, no-await-in-         │
   │                                                                                                                │             │                   │      │ iterators, task ephemerality.                  │
-  │ #275-#276                                                                                                      │         Yes │                No │   No │ §15.3 string literal sketches. Implement C-    │
-  │                                                                                                                │             │                   │      │ string literal/default-type executable         │
-  │                                                                                                                │             │                   │      │ coverage.                                      │
+  │ [x] #275-#276                                                                                                  │         Yes │               Yes │   No │ Completed: c"..." now lowers as &CStr with     │
+  │                                                                                                                │             │                   │      │ NUL-terminated static storage, string          │
+  │                                                                                                                │             │                   │      │ literals default to str, and &str coercions    │
+  │                                                                                                                │             │                   │      │ keep str views instead of raw byte pointers.   │
   │ #277-#279                                                                                                      │         Yes │           Partial │   No │ §16 FFI/c_import sketches. c_import improved,  │
   │                                                                                                                │             │                   │      │ but skipped spec still includes manual extern  │
   │                                                                                                                │             │                   │      │ C, fn-ptr closure rules, raw                   │
