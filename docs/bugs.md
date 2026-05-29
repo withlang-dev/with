@@ -269,8 +269,13 @@
   │                                                                                                                │             │                   │      │ scopes store only fiber ids, and cleanup cannot│
   │                                                                                                                │             │                   │      │ know whether await already consumed/freed the  │
   │                                                                                                                │             │                   │      │ result buffer. Spec §14.9.                     │
-  │ #272-#274                                                                                                     │         Yes │           Partial │   No │ Remaining §14 async sketches still cover       │
-  │                                                                                                                │             │                   │      │ select-await and general async coverage.        │
+  │ [x] #272                                                                                                      │         Yes │               Yes │   No │ Completed: select-await sketch is executable   │
+  │                                                                                                                │             │                   │      │ for first-completed branch dispatch, branch    │
+  │                                                                                                                │             │                   │      │ break from loops, and branch-local ?           │
+  │                                                                                                                │             │                   │      │ propagation. Spec §14.10.                      │
+  │ #273-#274                                                                                                     │         Yes │           Partial │   No │ Remaining §14 async sketches still cover       │
+  │                                                                                                                │             │                   │      │ let-else in select branches and general async  │
+  │                                                                                                                │             │                   │      │ coverage.                                      │
   │ [x] #275-#276                                                                                                  │         Yes │               Yes │   No │ Completed: c"..." now lowers as &CStr with     │
   │                                                                                                                │             │                   │      │ NUL-terminated static storage, string          │
   │                                                                                                                │             │                   │      │ literals default to str, and &str coercions    │

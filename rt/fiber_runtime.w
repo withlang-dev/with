@@ -8,6 +8,7 @@ extern fn with_runtime_core_shutdown() -> void
 extern fn with_runtime_core_has_fibers() -> i32
 extern fn with_runtime_core_run_one_step() -> void
 extern fn with_runtime_fiber_is_completed(fiber_id: i32) -> i32
+extern fn with_runtime_fiber_is_live(fiber_id: i32) -> i32
 extern fn with_runtime_take_completed_fiber(fiber_id: i32, panic_msg_out: *mut *const u8, panic_msg_len_out: *mut i32, cancelled_return_out: *mut i32) -> i32
 extern fn with_runtime_take_panicked_fiber(fiber_id_out: *mut i32, panic_msg_out: *mut *const u8, panic_msg_len_out: *mut i32) -> i32
 extern fn with_runtime_request_cancel(fiber_id: i32) -> i32
@@ -193,6 +194,10 @@ pub fn fiber_await(fiber_id: i32):
                 with_ewrite("\n")
                 abort()
             return
+        if with_runtime_fiber_is_live(fiber_id) == 0:
+            last_await_fiber_id = fiber_id
+            last_await_cancelled_return = 0
+            return
 
         if with_fiber_in_fiber() != 0:
             if with_runtime_current_cancel_requested() != 0:
@@ -220,6 +225,10 @@ pub fn fiber_cleanup_await(fiber_id: i32):
                 with_ewrite(make_str(panic_msg, panic_msg_len as i64))
                 with_ewrite("\n")
                 abort()
+            return
+        if with_runtime_fiber_is_live(fiber_id) == 0:
+            last_await_fiber_id = fiber_id
+            last_await_cancelled_return = 0
             return
 
         if with_fiber_in_fiber() != 0:
