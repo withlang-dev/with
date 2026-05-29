@@ -38,9 +38,13 @@
   │                                                                                                                │             │                   │      │ spec §14.3/§24. Unskipped async_basic,         │
   │                                                                                                                │             │                   │      │ async_block_capture, async_tuple_await;        │
   │                                                                                                                │             │                   │      │ updated obsolete negative await diagnostic.    │
-  │ #191-#192, #194-#195                                                                                           │         Yes │                No │   No │ §2 ownership/drop skipped spec sketches.       │
+  │ [x] #191                                                                                                       │         Yes │               Yes │   No │ Completed: Copy safety mixed sketch split into │
+  │                                                                                                                │             │                   │      │ executable Copy pass cases and negative        │
+  │                                                                                                                │             │                   │      │ regressions for non-Copy fields and Copy after │
+  │                                                                                                                │             │                   │      │ Drop. Spec §2.3.                               │
+  │ #192, #194-#195                                                                                                │         Yes │                No │   No │ §2 ownership/drop skipped spec sketches.       │
   │                                                                                                                │             │                   │      │ Convert to executable positive/negative tests; │
-  │                                                                                                                │             │                   │      │ implement missing Drop/copy diagnostics.       │
+  │                                                                                                                │             │                   │      │ implement missing Drop diagnostics.            │
   │ [x] #193                                                                                                       │         Yes │               Yes │   No │ Completed: defer/errdefer already rejected     │
   │                                                                                                                │             │                   │      │ non-local control flow; skipped mixed sketch   │
   │                                                                                                                │             │                   │      │ split into executable positive and negative    │
