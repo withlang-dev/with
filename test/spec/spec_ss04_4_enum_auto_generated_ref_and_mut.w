@@ -1,28 +1,41 @@
-//! skip: non-executable spec sketch for Section 4.4 — Enum Auto-Generated _ref and _mut (formerly 25.93); contains pseudo-code for unimplemented feature work
-// Spec test: Section 4.4 — Enum Auto-Generated _ref and _mut (formerly 25.93)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+// Spec test: Section 4.4 - Enum Auto-Generated _ref and _mut.
 
-// PASS: as_variant_ref returns Option[&T]
-enum Value { Str(str) | Num(f64) | Null }
+enum RefMutValue { Str(str) | Num(f64) | Pair(i32, i32) | Null }
 
-fn test:
-    let v = Value.Str("hello")
-    assert(v.as_str_ref() == Some(&"hello"))
-    assert(v.as_num_ref() == None)
+fn test_enum_as_variant_ref_returns_option_ref:
+    let v = RefMutValue.Str("hello")
+    match v.as_str_ref():
+        Some(text) => assert(*text == "hello")
+        None => assert(false)
+    assert(v.as_num_ref().is_none())
 
-// PASS: as_variant_mut returns Option[&mut T]
-fn test:
-    var v = Value.Num(42.0)
-    if let Some(n) = v.as_num_mut():
-        *n = 99.0
-    assert(v.as_num_ref() == Some(&99.0))
+fn test_enum_as_variant_mut_updates_payload:
+    let v = RefMutValue.Num(42.0)
+    match v.as_num_mut():
+        Some(n) => *n = 99.0
+        None => assert(false)
 
-// PASS: navigating tree structures by reference
-enum Json { Null | Bool(bool) | Num(f64) | Str(str) }
-         | Array(Vec[Json]) | Object(HashMap[str, Json])
+    match v.as_num_ref():
+        Some(n) => assert(*n == 99.0)
+        None => assert(false)
 
-fn test:
-    let data = Json.Object(/* ... */)
-    let name = data.as_object_ref()?.get("name")?.as_str_ref()
-    assert(name.is_some())
+fn test_enum_as_variant_mut_returns_none_for_other_variant:
+    let v = RefMutValue.Str("hello")
+    assert(v.as_num_mut().is_none())
+    match v.as_str_ref():
+        Some(text) => assert(*text == "hello")
+        None => assert(false)
+
+fn test_enum_as_variant_mut_multi_field_tuple:
+    let v = RefMutValue.Pair(3, 4)
+    match v.as_pair_mut():
+        Some((left, right)) =>
+            *left = 30
+            *right = 40
+        None => assert(false)
+
+    match v.as_pair_ref():
+        Some((left, right)) =>
+            assert(*left == 30)
+            assert(*right == 40)
+        None => assert(false)
