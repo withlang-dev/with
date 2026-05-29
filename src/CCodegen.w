@@ -241,6 +241,9 @@ fn cc_builtin_vecslot_get -> i32:
 fn cc_builtin_vecslot_set -> i32:
     65
 
+fn cc_builtin_vec_get_disjoint -> i32:
+    73
+
 fn cc_builtin_atomic_load -> i32:
     70
 
@@ -265,6 +268,7 @@ fn cc_builtin_uses_vec_receiver(kind: i32) -> bool:
     if kind == cc_builtin_vec_contains(): return true
     if kind == cc_builtin_vec_join(): return true
     if kind == cc_builtin_vec_slot(): return true
+    if kind == cc_builtin_vec_get_disjoint(): return true
     false
 
 fn cc_builtin_uses_option_receiver(kind: i32) -> bool:
@@ -3871,6 +3875,10 @@ fn CCodegen.call_builtin_kind(self: CCodegen, body: MirBody, callee_operand: i32
         if recv_kind_is_vec != 0:
             return cc_builtin_vec_slot()
         return cc_builtin_none()
+    if method == "get_disjoint":
+        if recv_kind_is_vec != 0:
+            return cc_builtin_vec_get_disjoint()
+        return cc_builtin_none()
 
     if method == "push":
         if recv_kind_is_vec != 0:
@@ -4664,6 +4672,7 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: i32) -> i32:
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_FMT_BUF_WRITE_FMT: return cc_builtin_fmt_buf_write_fmt()
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_FMT_BUF_FINISH: return cc_builtin_fmt_buf_finish()
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_SLOT: return cc_builtin_vec_slot()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_GET_DISJOINT: return cc_builtin_vec_get_disjoint()
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_VECSLOT_GET: return cc_builtin_vecslot_get()
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_VECSLOT_SET: return cc_builtin_vecslot_set()
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_INT_SWAP_BYTES: return cc_builtin_int_swap_bytes()
@@ -4716,6 +4725,10 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
             out = out ++ "    (void)0;\n"
         out = out ++ f"    goto bb{next_bb};"
         return out
+
+    if kind == cc_builtin_vec_get_disjoint():
+        self.fail("C backend does not yet support Vec.get_disjoint; use the LLVM backend or add tuple-valued VecSlot lowering")
+        return "    abort();"
 
     if kind == cc_builtin_vecslot_get():
         if argc < 1:

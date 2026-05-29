@@ -1,11 +1,25 @@
-//! skip: non-executable spec sketch for Section 3.4 — Disjoint Slice Operations (formerly 25.78); contains pseudo-code for unimplemented feature work
-// Spec test: Section 3.4 — Disjoint Slice Operations (formerly 25.78)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+// Spec test: Section 3.6 — Disjoint field/index access.
+// Array/slice index disjointness is not inferred; use get_disjoint for
+// explicit, checked simultaneous access to distinct collection elements.
 
-// PASS: split_at_mut returns disjoint slices — compiler knows
-fn test:
-    var data = vec![1, 2, 3, 4, 5]
-    let (left, right) = data.split_at_mut(3)
-    left[0] = 10                        // OK: disjoint
-    right[0] = 40                       // OK: no aliasing
+fn filled_vec() -> Vec[i32]:
+    var xs = Vec.new()
+    xs.push(1)
+    xs.push(2)
+    xs.push(3)
+    xs
+
+fn test_get_disjoint_mutates_distinct_elements:
+    var xs = filled_vec()
+    with xs.get_disjoint(0, 2) as mut (left, right):
+        left.set(10)
+        right.set(30)
+    assert(xs.get(0) == 10)
+    assert(xs.get(1) == 2)
+    assert(xs.get(2) == 30)
+
+fn test_get_disjoint_read_only_slots:
+    var xs = filled_vec()
+    with xs.get_disjoint(0, 1) as (left, right):
+        assert(left.get() == 1)
+        assert(right.get() == 2)
