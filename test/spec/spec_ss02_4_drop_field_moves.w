@@ -1,16 +1,31 @@
-//! skip: non-executable spec sketch for Section 2.4 — Drop Field Moves (formerly 25.80); contains pseudo-code for unimplemented feature work
 // Spec test: Section 2.4 — Drop Field Moves (formerly 25.80)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
 
-// PASS: field moves allowed INSIDE drop
-type FileWrapper { fd: File, name: String }
-impl Drop for FileWrapper:
-    fn drop(self: Self):
-        close_file(self.fd)   // OK: field move inside drop
-        // self.name NOT moved → compiler drops it automatically
+var DROP_FIELD_MOVE_TRACE = ""
 
-// FAIL: field moves forbidden OUTSIDE drop
-fn test_fail:
-    let w = FileWrapper { fd: open_file(), name: "A" }
-    let fd = w.fd             // ERROR: partial move from Drop type
+type DropFieldMoveFile { id: str }
+impl Drop for DropFieldMoveFile:
+    fn drop(move self: Self):
+        DROP_FIELD_MOVE_TRACE = DROP_FIELD_MOVE_TRACE ++ self.id
+
+type DropFieldMoveName { id: str }
+impl Drop for DropFieldMoveName:
+    fn drop(move self: Self):
+        DROP_FIELD_MOVE_TRACE = DROP_FIELD_MOVE_TRACE ++ self.id
+
+type DropFieldMoveWrapper { fd: DropFieldMoveFile, name: DropFieldMoveName }
+impl Drop for DropFieldMoveWrapper:
+    fn drop(move self: Self):
+        let taken = self.fd
+        DROP_FIELD_MOVE_TRACE = DROP_FIELD_MOVE_TRACE ++ "W"
+
+fn drop_field_move_make_wrapper:
+    let _w = DropFieldMoveWrapper {
+        fd: DropFieldMoveFile { id: "F" },
+        name: DropFieldMoveName { id: "N" },
+    }
+
+// PASS: field moves are allowed inside drop, and only remaining fields are dropped after the body.
+fn test_drop_field_move_inside_drop:
+    DROP_FIELD_MOVE_TRACE = ""
+    drop_field_move_make_wrapper()
+    assert(DROP_FIELD_MOVE_TRACE == "WFN")

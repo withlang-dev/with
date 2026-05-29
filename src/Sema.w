@@ -337,6 +337,10 @@ type Sema {
     method_lookup: SemaMethodLookup,
     drop_method_cache: HashMap[i32, i32],
     copy_visit_stack: Vec[i32],
+    current_drop_type_sym: i32,
+    drop_control_flow_depth: i32,
+    drop_consumed_field_owner_syms: Vec[i32],
+    drop_consumed_field_syms: Vec[i32],
 
     // Scope binding storage (stack-based with watermarks)
     bind_names: Vec[i32],
@@ -874,6 +878,10 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         method_lookup,
         drop_method_cache,
         copy_visit_stack: Vec.new(),
+        current_drop_type_sym: 0,
+        drop_control_flow_depth: 0,
+        drop_consumed_field_owner_syms: Vec.new(),
+        drop_consumed_field_syms: Vec.new(),
         bind_names: Vec.new(),
         bind_types: Vec.new(),
         bind_muts: Vec.new(),
@@ -3056,6 +3064,23 @@ fn Sema.has_drop_method(self: Sema, type_name: i32) -> i32:
 
     self.drop_method_cache.insert(type_name, has)
     has
+
+fn Sema.record_drop_consumed_field(self: Sema, owner_sym: i32, field_sym: i32):
+    if owner_sym == 0 or field_sym == 0:
+        return
+    for i in 0..self.drop_consumed_field_owner_syms.len() as i32:
+        if self.drop_consumed_field_owner_syms.get(i as i64) == owner_sym and self.drop_consumed_field_syms.get(i as i64) == field_sym:
+            return
+    self.drop_consumed_field_owner_syms.push(owner_sym)
+    self.drop_consumed_field_syms.push(field_sym)
+
+fn Sema.drop_consumed_field(self: Sema, owner_sym: i32, field_sym: i32) -> i32:
+    if owner_sym == 0 or field_sym == 0:
+        return 0
+    for i in 0..self.drop_consumed_field_owner_syms.len() as i32:
+        if self.drop_consumed_field_owner_syms.get(i as i64) == owner_sym and self.drop_consumed_field_syms.get(i as i64) == field_sym:
+            return 1
+    0
 
 // ── Borrow checking ──────────────────────────────────────────────
 

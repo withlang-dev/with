@@ -1,24 +1,25 @@
-//! skip: non-executable spec sketch for Section 2.4 — By-Value Drop (formerly 25.61); contains pseudo-code for unimplemented feature work
 // Spec test: Section 2.4 — By-Value Drop (formerly 25.61)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
 
-// PASS: drop takes self by value — no double-free risk
-type Handle { fd: i32 }
-impl Drop for Handle:
-    fn drop(self: Self):
-        close(self.fd)
-        // self is consumed — no need to null out fd
+var BY_VALUE_DROP_TRACE = ""
 
-// PASS: field destructors run after user drop body
-type Wrapper { name: String, handle: Handle }
-impl Drop for Wrapper:
-    fn drop(self: Self):
-        print(f"dropping {self.name}")
-        // after this returns, Handle::drop runs for self.handle
-        //: String::drop runs for self.name
+type ByValueDropHandle { id: str }
+impl Drop for ByValueDropHandle:
+    fn drop(move self: Self):
+        BY_VALUE_DROP_TRACE = BY_VALUE_DROP_TRACE ++ self.id
 
-// FAIL: Copy + Drop is still forbidden
-type Bad { x: i32 } with Copy
-impl Drop for Bad:
-    fn drop(self: Self): ()  // ERROR: Copy + Drop conflict
+type ByValueDropWrapper { name: str, handle: ByValueDropHandle }
+impl Drop for ByValueDropWrapper:
+    fn drop(move self: Self):
+        BY_VALUE_DROP_TRACE = BY_VALUE_DROP_TRACE ++ self.name
+
+fn by_value_drop_make_wrapper:
+    let _w = ByValueDropWrapper {
+        name: "W",
+        handle: ByValueDropHandle { id: "H" },
+    }
+
+// PASS: drop takes self by value, and field destructors run after user drop.
+fn test_by_value_drop_body_then_fields:
+    BY_VALUE_DROP_TRACE = ""
+    by_value_drop_make_wrapper()
+    assert(BY_VALUE_DROP_TRACE == "WH")
