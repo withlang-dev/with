@@ -170,9 +170,16 @@
   │                                                                                                                │             │                   │      │ builder, non-Unit tails return the tail value, │
   │                                                                                                                │             │                   │      │ and function return position is covered.       │
   │                                                                                                                │             │                   │      │ Spec §7.2.                                    │
-  │ #242-#246                                                                                                      │         Yes │                No │   No │ §11 trait/operator/derive sketches. Need       │
-  │                                                                                                                │             │                   │      │ object safety, multi-index/@, one-impl rule,   │
-  │                                                                                                                │             │                   │      │ derive/Builder coverage.                       │
+  │ [x] #242                                                                                                       │         Yes │               Yes │   No │ Completed: explicit dyn vs impl Trait type     │
+  │                                                                                                                │             │                   │      │ syntax is distinguished in the AST, dyn object │
+  │                                                                                                                │             │                   │      │ safety rejects move-self receivers and Self    │
+  │                                                                                                                │             │                   │      │ mentions outside the receiver, and executable  │
+  │                                                                                                                │             │                   │      │ regressions cover positive/negative paths.     │
+  │                                                                                                                │             │                   │      │ Box[dyn Trait] consuming calls remain blocked  │
+  │                                                                                                                │             │                   │      │ under #202. Spec §11.3.                        │
+  │ #243-#246                                                                                                      │         Yes │                No │   No │ §11 trait/operator/derive sketches. Need       │
+  │                                                                                                                │             │                   │      │ multi-index/@, one-impl rule, derive, and      │
+  │                                                                                                                │             │                   │      │ derive(Builder) coverage.                      │
   │ #257-#274                                                                                                      │         Yes │           Partial │   No │ §14 async sketches. Runtime has many behavior  │
   │                                                                                                                │             │                   │      │ tests now, but spec sketches still cover       │
   │                                                                                                                │             │                   │      │ missing/unchecked semantics: fairness,         │

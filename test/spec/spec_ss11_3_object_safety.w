@@ -1,17 +1,45 @@
-//! skip: non-executable spec sketch for Section 11.3 — Object Safety (formerly 25.83); contains pseudo-code for unimplemented feature work
-// Spec test: Section 11.3 — Object Safety (formerly 25.83)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+// Spec test: Section 11.3 - Object Safety.
 
-// PASS: trait with &Self methods is object-safe
+var DRAW_TOTAL: i32 = 0
+
 trait Drawable:
     fn draw(self: &Self)
-fn render(d: &dyn Drawable): d.draw()
+    fn label(self: &Self) -> str
 
-// FAIL: trait with by-value self is not object-safe (without Box)
-trait Consumable:
-    fn consume(self: Self)
-fn bad(c: &dyn Consumable): ...   // ERROR: Consumable is not object-safe
+type Circle { id: i32 }
 
-// PASS: by-value self through Box
-fn good(c: Box[dyn Consumable]): c.consume()  // OK via generated shim
+impl Drawable for Circle:
+    fn draw(self: &Self):
+        DRAW_TOTAL = DRAW_TOTAL + self.id
+
+    fn label(self: &Self) -> str:
+        "circle"
+
+fn render(d: &dyn Drawable) -> str:
+    d.draw()
+    d.label()
+
+fn test_ref_self_methods_are_object_safe:
+    DRAW_TOTAL = 0
+    let c = Circle { id: 7 }
+    assert(render(&c) == "circle")
+    assert(DRAW_TOTAL == 7)
+
+trait Mutator:
+    fn bump(mut self: Self)
+
+type Counter { value: i32 }
+
+impl Mutator for Counter:
+    fn bump(mut self: Self):
+        self.value = self.value + 1
+
+fn accepts_mutator(_m: &dyn Mutator) -> i32:
+    1
+
+fn test_mut_self_methods_are_object_safe:
+    var c = Counter { value: 1 }
+    assert(accepts_mutator(&c) == 1)
+
+// Consuming `move self: Self` through Box[dyn Trait] is tracked separately by
+// #202 because the standard Box[T] type and Box[dyn Trait] shims do not exist yet.

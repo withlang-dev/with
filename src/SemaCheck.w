@@ -294,7 +294,7 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> TypeId:
         if not self.lang_trait_syms.contains(trait_sym) and not self.trait_lookup.contains(trait_sym):
             self.emit_error("unknown trait", node)
             return 0 as TypeId
-        if self.ensure_trait_object_safe(trait_sym, node) == 0:
+        if self.ast.get_data1(node) != TYPE_TRAIT_OBJECT_IMPL and self.ensure_trait_object_safe(trait_sym, node) == 0:
             return 0 as TypeId
         return self.ensure_exact_type(TypeKind.TY_TRAIT_OBJ, trait_sym, 0, 0)
 

@@ -1007,7 +1007,8 @@ fn render_type_expr(pool: AstPool, intern: InternPool, node: NodeId) -> str:
         return "[]" ++ render_type_expr(pool, intern, (elem) as NodeId)
 
     if kind == NodeKind.NK_TYPE_TRAIT_OBJ:
-        return "dyn " ++ intern.resolve(pool.get_data0(node))
+        let prefix = if pool.get_data1(node) == TYPE_TRAIT_OBJECT_IMPL: "impl " else: "dyn "
+        return prefix ++ intern.resolve(pool.get_data0(node))
 
     if kind == NodeKind.NK_TYPE_INFERRED:
         return "_"

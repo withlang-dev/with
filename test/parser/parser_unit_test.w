@@ -124,6 +124,10 @@ fn test_type_expr_impl_for:
     let param_start = pool.fn_meta_param_start(meta)
     let param_type = pool.get_extra(param_start + 1)
     assert(pool.kind(param_type) == NodeKind.NK_TYPE_TRAIT_OBJ())
+    assert(pool.get_data1(param_type) == TYPE_TRAIT_OBJECT_IMPL)
+    let ret_type = pool.fn_meta_ret(meta)
+    assert(pool.kind(ret_type) == NodeKind.NK_TYPE_TRAIT_OBJ())
+    assert(pool.get_data1(ret_type) == TYPE_TRAIT_OBJECT_DYN)
 
 fn test_type_expr_slice_alt:
     let src = "fn f(x: [i32]) -> []i32:\n    x\n"
