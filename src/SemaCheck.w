@@ -4648,16 +4648,6 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
             if body_root != 0:
                 self.note_param_view_origin(body_root, self.compute_expr_view_origin_mask(body))
 
-    // Phase 1 ephemerality rule: closures cannot capture ephemeral refs/values.
-    var bi = 0
-    while bi < outer_count:
-        let cap_sym = self.bind_names.get(bi as i64)
-        if self.expr_uses_symbol(body, cap_sym) != 0:
-            let cap_ty = self.bind_types.get(bi as i64)
-            if self.type_is_ephemeral_value(cap_ty) != 0:
-                self.emit_error("closures cannot capture ephemeral references", node)
-                break
-        bi = bi + 1
     self.pop_scope()
 
     let closure_capture_effs: Vec[i32] = Vec.new()
@@ -4683,8 +4673,13 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
         self.borrow_path_starts.pop()
         self.borrow_path_counts.pop()
 
-    // Mark non-escaping if this closure is a direct call argument
-    let is_non_escaping = self.closure_direct_arg_depth > 0 and self.ast.is_move_closure(node) == 0
+    var direct_arg_escapes = 0
+    if self.closure_direct_arg_escape_flags.len() > 0:
+        direct_arg_escapes = self.closure_direct_arg_escape_flags.get((self.closure_direct_arg_escape_flags.len() - 1) as i64)
+
+    // Mark non-escaping if this closure is a direct call argument whose
+    // receiving parameter does not let the closure escape the call.
+    let is_non_escaping = self.closure_direct_arg_depth > 0 and direct_arg_escapes == 0 and self.ast.is_move_closure(node) == 0
     if is_non_escaping:
         self.ast.mark_non_escaping_closure(node)
         // Register borrows for captured variables.
@@ -4722,6 +4717,15 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
     // Mark captured non-Copy variables as moved so subsequent uses error.
     let is_escaping = not is_non_escaping
     if is_escaping:
+        var ebi = 0
+        while ebi < outer_count:
+            let cap_sym = self.bind_names.get(ebi as i64)
+            if self.expr_uses_symbol(body, cap_sym) != 0:
+                let cap_ty = self.bind_types.get(ebi as i64)
+                if self.type_is_ephemeral_value(cap_ty) != 0:
+                    self.emit_error("escaping closure cannot capture ephemeral references", node)
+                    break
+            ebi = ebi + 1
         var emitted_capability_escape = 0
         for cci in 0..closure_capture_syms.len() as i32:
             let cap_sym2 = closure_capture_syms.get(cci as i64)
@@ -5483,10 +5487,19 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
             arg_types.push(self.scope_lookup(bind_sym))
             continue
         let is_closure_arg = self.ast.kind(arg_node) == NodeKind.NK_CLOSURE
+        var closure_arg_escapes = 0
+        if is_closure_arg and sig_idx >= 0:
+            let param_i_for_effect = ai + param_offset
+            if param_i_for_effect < self.sig_get_param_count(sig_idx):
+                let param_eff = self.sig_param_effect(sig_idx, param_i_for_effect)
+                if (param_eff & (EFF_ESCAPE_VALUE | EFF_ESCAPE_VIEW)) != 0:
+                    closure_arg_escapes = 1
         if is_closure_arg:
             self.closure_direct_arg_depth = self.closure_direct_arg_depth + 1
+            self.closure_direct_arg_escape_flags.push(closure_arg_escapes)
         let arg_ty = if expected_ty != 0: self.check_expr_with_expected(arg_node, expected_ty as TypeId) else: self.check_expr(arg_node)
         if is_closure_arg:
+            self.closure_direct_arg_escape_flags.pop()
             self.closure_direct_arg_depth = self.closure_direct_arg_depth - 1
         arg_types.push(arg_ty as i32)
         let iter_idx = self.maybe_register_iter_of_self_borrow(arg_node)
@@ -7089,20 +7102,31 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
 
     // Check all arguments (with expected-type propagation for Atomic ordering params)
     let mc_order_type = self.resolve_atomic_order_type(obj_type as i32)
+    let mc_owner_sym_for_effect = self.method_owner_symbol_for_type(obj_type as i32)
+    let mc_sig_idx_for_effect = if mc_owner_sym_for_effect != 0: self.lookup_method_sig(mc_owner_sym_for_effect, field) else: -1
     let arg_types: Vec[i32] = Vec.new()
     // docs/mut.md Rev 8 §15.8 — see check_call.
     let mc_iter_borrow_idxs: Vec[i32] = Vec.new()
     for ai in 0..arg_count:
         let mc_arg_node = self.ast.get_extra(extra_start + ai)
         let mc_is_closure = self.ast.kind(mc_arg_node) == NodeKind.NK_CLOSURE
+        var mc_closure_arg_escapes = 0
+        if mc_is_closure and mc_sig_idx_for_effect >= 0:
+            let mc_param_i_for_effect = ai + 1
+            if mc_param_i_for_effect < self.sig_get_param_count(mc_sig_idx_for_effect):
+                let mc_param_eff = self.sig_param_effect(mc_sig_idx_for_effect, mc_param_i_for_effect)
+                if (mc_param_eff & (EFF_ESCAPE_VALUE | EFF_ESCAPE_VIEW)) != 0:
+                    mc_closure_arg_escapes = 1
         if mc_is_closure:
             self.closure_direct_arg_depth = self.closure_direct_arg_depth + 1
+            self.closure_direct_arg_escape_flags.push(mc_closure_arg_escapes)
         var mc_expected = self.atomic_method_expected_arg_type(mc_order_type, field, ai)
         if mc_expected == 0:
             mc_expected = self.method_expected_arg_type(obj_type as i32, field, ai)
         let mc_arg_ty = if mc_expected != 0: self.check_expr_with_expected(mc_arg_node, mc_expected as TypeId) else: self.check_expr(mc_arg_node)
         arg_types.push(mc_arg_ty as i32)
         if mc_is_closure:
+            self.closure_direct_arg_escape_flags.pop()
             self.closure_direct_arg_depth = self.closure_direct_arg_depth - 1
         let mc_iter_idx = self.maybe_register_iter_of_self_borrow(mc_arg_node)
         if mc_iter_idx >= 0:

@@ -1,31 +1,15 @@
-//! skip: non-executable spec sketch for Section 3 — References and Second-Class Rule (formerly 25.2); contains pseudo-code for unimplemented feature work
-// Spec test: Section 3 — References and Second-Class Rule (formerly 25.2)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+// Spec test: Section 3 - References and the Second-Class Rule.
 
-// PASS: reference as local
-fn test:
+fn call_value(f: fn() -> i32) -> i32:
+    f()
+
+fn test_reference_as_local:
     let x = 42
     let r = &x
-    print(r)
+    assert(*r == 42)
 
-// FAIL: reference in struct
-type Bad { data: &i32 }        // ERROR
-
-// FAIL: reference in container
-fn test:
-    let x = 42
-    var v = Vec.new()
-    v.push(&x)                   // ERROR
-
-// PASS: non-escaping closure captures ref
-fn test:
+fn test_non_escaping_closure_captures_ref:
     let x = 42
     let r = &x
-    vec![1, 2, 3].for_each(item => print(f"{item} {r}"))
-
-// FAIL: escaping closure captures ref
-fn test:
-    let x = 42
-    let r = &x
-    thread.spawn_os(() => print(r))   // ERROR
+    let y = call_value(() => *r + 1)
+    assert(y == 43)

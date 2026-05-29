@@ -717,6 +717,10 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
                     cur_ty = 0
             active_variant_idx = -1
         else if pk == 2: // ProjKind.PK_DEREF
+            if i == 0 and self.mir_ref_capture_local_types.get(base_local).is_some():
+                let ref_cap_ptr = self.mir_indirect_value_local_ptr(base_local, cur_ptr)
+                if ref_cap_ptr != 0:
+                    cur_ptr = ref_cap_ptr
             // Load the pointer value, then use it as the new base
             cur_ptr = wl_build_load(self.builder, wl_ptr_type(self.context), cur_ptr)
             // Resolve pointee type from base local's sema type (via snapshot)
@@ -7438,11 +7442,13 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
     let fresh_mir_locals: HashMap[i32, i64] = HashMap.new()
     let fresh_mir_local_types: HashMap[i32, i64] = HashMap.new()
     let fresh_mir_indirect_value_local_types: HashMap[i32, i64] = HashMap.new()
+    let fresh_mir_ref_capture_local_types: HashMap[i32, i64] = HashMap.new()
     let fresh_mir_bbs: Vec[i64] = Vec.new()
     let fresh_mir_default_unreachable_bbs: Vec[i64] = Vec.new()
     self.mir_local_ptrs = fresh_mir_locals
     self.mir_local_types = fresh_mir_local_types
     self.mir_indirect_value_local_types = fresh_mir_indirect_value_local_types
+    self.mir_ref_capture_local_types = fresh_mir_ref_capture_local_types
     self.mir_bb_values = fresh_mir_bbs
     self.mir_default_unreachable_bbs = fresh_mir_default_unreachable_bbs
 
@@ -7816,16 +7822,19 @@ fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, bod
     let saved_mir_locals = self.mir_local_ptrs
     let saved_mir_local_types = self.mir_local_types
     let saved_mir_indirect_value_local_types = self.mir_indirect_value_local_types
+    let saved_mir_ref_capture_local_types = self.mir_ref_capture_local_types
     let saved_mir_bbs = self.mir_bb_values
     let saved_mir_default_unreachable_bbs = self.mir_default_unreachable_bbs
     let fresh_mir_locals: HashMap[i32, i64] = HashMap.new()
     let fresh_mir_local_types: HashMap[i32, i64] = HashMap.new()
     let fresh_mir_indirect_value_local_types: HashMap[i32, i64] = HashMap.new()
+    let fresh_mir_ref_capture_local_types: HashMap[i32, i64] = HashMap.new()
     let fresh_mir_bbs: Vec[i64] = Vec.new()
     let fresh_mir_default_unreachable_bbs: Vec[i64] = Vec.new()
     self.mir_local_ptrs = fresh_mir_locals
     self.mir_local_types = fresh_mir_local_types
     self.mir_indirect_value_local_types = fresh_mir_indirect_value_local_types
+    self.mir_ref_capture_local_types = fresh_mir_ref_capture_local_types
     self.mir_bb_values = fresh_mir_bbs
     self.mir_default_unreachable_bbs = fresh_mir_default_unreachable_bbs
 
@@ -8078,6 +8087,7 @@ fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, bod
     self.mir_local_ptrs = saved_mir_locals
     self.mir_local_types = saved_mir_local_types
     self.mir_indirect_value_local_types = saved_mir_indirect_value_local_types
+    self.mir_ref_capture_local_types = saved_mir_ref_capture_local_types
     self.mir_bb_values = saved_mir_bbs
     self.mir_default_unreachable_bbs = saved_mir_default_unreachable_bbs
     if saved_bb != 0:
@@ -8889,11 +8899,13 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
             indices.push(wl_const_int(i32_ty, ci as i64, 0))
             let gep = wl_build_gep(self.builder, cap_struct_type, cap_ptr, vec_data_i64(&indices), 2)
             if is_ref_capture:
-                // Reference capture: load the pointer to outer alloca, use directly
+                // Reference capture: keep a local slot that points at the
+                // captured binding's outer storage. MIR indirect-local
+                // metadata below defines the value stored at that outer
+                // storage, including pointer-typed reference bindings.
                 let outer_ptr = wl_build_load(self.builder, ptr_ty, gep)
                 let outer_ptr_slot = self.create_entry_alloca(ptr_ty)
                 wl_build_store(self.builder, outer_ptr, outer_ptr_slot)
-                let orig_ty = cap_orig_types.get(ci as i64)
                 // Look up outer mutability
                 let outer_mut_opt = saved_muts.get(sym)
                 let outer_mut = if outer_mut_opt.is_some(): outer_mut_opt.unwrap() else: 0
@@ -8918,16 +8930,19 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
     let saved_mir_locals = self.mir_local_ptrs
     let saved_mir_local_types = self.mir_local_types
     let saved_mir_indirect_value_local_types = self.mir_indirect_value_local_types
+    let saved_mir_ref_capture_local_types = self.mir_ref_capture_local_types
     let saved_mir_bbs = self.mir_bb_values
     let saved_mir_unreachable = self.mir_default_unreachable_bbs
     let fresh_cl_mir_locals: HashMap[i32, i64] = HashMap.new()
     let fresh_cl_mir_local_types: HashMap[i32, i64] = HashMap.new()
     let fresh_cl_mir_indirect_value_local_types: HashMap[i32, i64] = HashMap.new()
+    let fresh_cl_mir_ref_capture_local_types: HashMap[i32, i64] = HashMap.new()
     let fresh_cl_mir_bbs: Vec[i64] = Vec.new()
     let fresh_cl_mir_unreachable: Vec[i64] = Vec.new()
     self.mir_local_ptrs = fresh_cl_mir_locals
     self.mir_local_types = fresh_cl_mir_local_types
     self.mir_indirect_value_local_types = fresh_cl_mir_indirect_value_local_types
+    self.mir_ref_capture_local_types = fresh_cl_mir_ref_capture_local_types
     self.mir_bb_values = fresh_cl_mir_bbs
     self.mir_default_unreachable_bbs = fresh_cl_mir_unreachable
 
@@ -9005,11 +9020,23 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
             self.mir_local_ptrs.insert(cl_m_local_id, cl_m_alloca_opt.unwrap())
             let cl_m_ty_opt = self.local_types.get(cl_m_sym)
             if cl_m_ty_opt.is_some():
-                self.mir_local_types.insert(cl_m_local_id, cl_m_ty_opt.unwrap())
+                let cl_storage_ty = cl_m_ty_opt.unwrap() as i64
+                self.mir_local_types.insert(cl_m_local_id, cl_storage_ty)
                 if is_ref_capture:
-                    let cl_orig_ty = cap_orig_types.get(cl_mi as i64)
-                    if cl_orig_ty != 0:
-                        self.mir_indirect_value_local_types.insert(cl_m_local_id, cl_orig_ty)
+                    let cl_sem_ty_opt = self.local_sema_types.get(cl_m_sym)
+                    if cl_sem_ty_opt.is_some():
+                        let cl_sem_ty = cl_sem_ty_opt.unwrap()
+                        let cl_sem_llvm_ty = self.sema_type_to_llvm(cl_sem_ty)
+                        if cl_sem_llvm_ty != 0:
+                            self.mir_indirect_value_local_types.insert(cl_m_local_id, cl_sem_llvm_ty)
+                            let cl_resolved_ty = self.sema.resolve_alias(cl_sem_ty)
+                            let cl_kind = self.sema.get_type_kind(cl_resolved_ty)
+                            if cl_kind == TypeKind.TY_REF or cl_kind == TypeKind.TY_PTR:
+                                self.mir_ref_capture_local_types.insert(cl_m_local_id, cl_sem_llvm_ty)
+                    else:
+                        let cl_orig_ty = cap_orig_types.get(cl_mi as i64)
+                        if cl_orig_ty != 0:
+                            self.mir_indirect_value_local_types.insert(cl_m_local_id, cl_orig_ty)
 
     // Map param MIR locals to existing LLVM allocas
     for cl_pmi in 0..param_count:
@@ -9064,6 +9091,7 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
     self.mir_local_ptrs = saved_mir_locals
     self.mir_local_types = saved_mir_local_types
     self.mir_indirect_value_local_types = saved_mir_indirect_value_local_types
+    self.mir_ref_capture_local_types = saved_mir_ref_capture_local_types
     self.mir_bb_values = saved_mir_bbs
     self.mir_default_unreachable_bbs = saved_mir_unreachable
     // Restore state
@@ -10013,6 +10041,7 @@ fn Codegen.gen_async_block(self: Codegen, node: i32) -> i64:
     let saved_mir_locals = self.mir_local_ptrs
     let saved_mir_types = self.mir_local_types
     let saved_mir_indirect_value_local_types = self.mir_indirect_value_local_types
+    let saved_mir_ref_capture_local_types = self.mir_ref_capture_local_types
     let saved_mir_bbs = self.mir_bb_values
 
     // 5. Fresh context for trampoline body
@@ -10085,6 +10114,7 @@ fn Codegen.gen_async_block(self: Codegen, node: i32) -> i64:
     self.mir_local_ptrs = HashMap.new()
     self.mir_local_types = HashMap.new()
     self.mir_indirect_value_local_types = HashMap.new()
+    self.mir_ref_capture_local_types = HashMap.new()
     // Map capture MIR locals
     for ci in 0..capture_count:
         let sym = captures.get(ci as i64)
@@ -10127,6 +10157,7 @@ fn Codegen.gen_async_block(self: Codegen, node: i32) -> i64:
     self.mir_local_ptrs = saved_mir_locals
     self.mir_local_types = saved_mir_types
     self.mir_indirect_value_local_types = saved_mir_indirect_value_local_types
+    self.mir_ref_capture_local_types = saved_mir_ref_capture_local_types
     self.mir_bb_values = saved_mir_bbs
     self.current_function = saved_fn
     self.current_ret_type = saved_ret

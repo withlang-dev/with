@@ -56,10 +56,15 @@
   │                                                                                                                │             │                   │      │ be requested explicitly. Equal-index access    │
   │                                                                                                                │             │                   │      │ now panics loudly; emit-C fails loudly instead │
   │                                                                                                                │             │                   │      │ of emitting invalid get_disjoint C.            │
-  │ #202-#203                                                                                                      │         Yes │                No │   No │ §3 references/borrowing skipped sketches.      │
-  │                                                                                                                │             │                   │      │ Implement executable tests for disjoint        │
-  │                                                                                                                │             │                   │      │ borrows, trait object coercion, and            │
-  │                                                                                                                │             │                   │      │ second-class references.                       │
+  │ #202                                                                                                           │         Yes │                No │   No │ §3.9 implicit trait object coercion skipped    │
+  │                                                                                                                │             │                   │      │ sketch. Implement executable positive/negative │
+  │                                                                                                                │             │                   │      │ coverage for &T / Box[T] to dyn Trait.         │
+  │ [x] #203                                                                                                       │         Yes │               Yes │   No │ Completed: second-class reference sketch is    │
+  │                                                                                                                │             │                   │      │ executable coverage for local references and   │
+  │                                                                                                                │             │                   │      │ non-escaping closure reference captures;       │
+  │                                                                                                                │             │                   │      │ negative regressions cover structs, generic    │
+  │                                                                                                                │             │                   │      │ containers, bound closures, and std.thread     │
+  │                                                                                                                │             │                   │      │ escaping closures. Spec §3 / §12.              │
   │ [x] #198                                                                                                       │         Yes │               Yes │   No │ Completed: disjoint closure capture sketch is  │
   │                                                                                                                │             │                   │      │ now executable coverage for field-path closure │
   │                                                                                                                │             │                   │      │ captures, including shared overlap and         │
