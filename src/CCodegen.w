@@ -250,6 +250,9 @@ fn cc_builtin_dyn_call -> i32:
 fn cc_builtin_slotmap -> i32:
     80
 
+fn cc_builtin_multi_index -> i32:
+    81
+
 fn cc_builtin_atomic_load -> i32:
     70
 
@@ -4699,6 +4702,8 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: i32) -> i32:
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAP_GET_DISJOINT: return cc_builtin_slotmap()
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAPSLOT_GET: return cc_builtin_slotmap()
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAPSLOT_SET: return cc_builtin_slotmap()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_MULTI_INDEX: return cc_builtin_multi_index()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_MULTI_INDEX_SET: return cc_builtin_multi_index()
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_INT_SWAP_BYTES: return cc_builtin_int_swap_bytes()
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_POPCOUNT: return cc_builtin_popcount()
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_CLZ: return cc_builtin_clz()
@@ -4726,6 +4731,10 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
 
     if kind == cc_builtin_dyn_call():
         self.fail("C backend does not yet support dyn trait method dispatch")
+        return "    abort();"
+
+    if kind == cc_builtin_multi_index():
+        self.fail("C backend does not yet support MultiIndex intrinsics; use the LLVM backend or add MultiIndex lowering")
         return "    abort();"
 
     if kind == cc_builtin_vec_new():

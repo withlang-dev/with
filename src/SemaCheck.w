@@ -3333,22 +3333,56 @@ fn Sema.check_assign(self: Sema, node: i32) -> i32:
     let target = self.ast.get_data0(node)
     let value = self.ast.get_data1(node)
 
+    if self.is_runtime_multi_index_node(target) != 0:
+        let base_expr = self.multi_index_base_expr(target)
+        let base_ty = self.check_multi_index_like_operands(target)
+        var expected_value_type = 0
+
+        if base_ty != 0:
+            let base_resolved = self.resolve_alias(base_ty)
+            let base_name = self.get_type_name(base_resolved as i32)
+            if base_name != 0:
+                let mis_sym = self.pool_intern("multi_index_set")
+                let mis_sig = self.lookup_method_sig(base_name, mis_sym)
+                if mis_sig >= 0:
+                    if self.validate_multi_index_method_sig(mis_sig, mis_sym, 1, target) != 0:
+                        expected_value_type = self.sig_param_type(mis_sig, 3)
+                else:
+                    self.emit_error("type does not support indexed assignment (no multi_index_set method)", target)
+            else:
+                self.emit_error("type does not support indexed assignment (no multi_index_set method)", target)
+
+        let value_type = if expected_value_type != 0: self.check_expr_with_expected(value, expected_value_type as TypeId) else: self.check_expr(value)
+        self.note_place_effect(base_expr, EFF_WRITE)
+
+        let lhs_packed = self.classify_place(base_expr)
+        let lhs_kind = unpack_place_kind(lhs_packed)
+        let lhs_mut_state = unpack_place_mut(lhs_packed)
+        if lhs_kind == PlaceKind.PK_NotPlace:
+            self.emit_warning("cannot assign to a non-place expression", node)
+        else if lhs_mut_state == PlaceMut.PM_ReadOnly:
+            self.emit_error("cannot assign through a read-only place (e.g., dereferenced &T or *const T) (§15.10)", node)
+
+        let assign_root = self.place_root_sym(base_expr)
+        if assign_root != 0 and self.scope_is_view_bound(assign_root) != 0:
+            self.emit_error("cannot mutate through read-only view yielded by iterator (§15.17)", node)
+
+        if lhs_kind != PlaceKind.PK_NotPlace and lhs_mut_state != PlaceMut.PM_ReadOnly:
+            self.check_mutation_against_views(base_expr, node)
+
+        if expected_value_type != 0 and value_type != 0:
+            if self.types_compatible(expected_value_type as TypeId, value_type as TypeId) == 0:
+                if self.arithmetic_result_type(expected_value_type as TypeId, value_type as TypeId) == 0:
+                    self.emit_error("type mismatch in assignment", node)
+
+        self.mark_moved_if_consumed(value)
+        return self.ty_void as i32
+
     let target_type = self.check_expr(target)
     let value_type = if target_type != 0: self.check_expr_with_expected(value, target_type) else: self.check_expr(value)
 
     // If assignment target's root is a parameter, record EFF_WRITE
     self.note_place_effect(target, EFF_WRITE)
-
-    // Multi-index assignment: a[i, j] = value → requires multi_index_set
-    if self.ast.kind(target) == NodeKind.NK_MULTI_INDEX:
-        let mi_base = self.ast.get_data0(target)
-        let mi_base_resolved = self.resolve_alias(target_type)
-        let mi_name = self.get_type_name(mi_base_resolved as i32)
-        if mi_name != 0:
-            let mis_sym = self.pool_intern("multi_index_set")
-            let mis_sig = self.lookup_method_sig(mi_name, mis_sym)
-            if mis_sig < 0:
-                self.emit_error("type does not support indexed assignment (no multi_index_set method)", target)
 
     // Check mutability
     if self.ast.kind(target) == NodeKind.NK_IDENT:
@@ -3744,6 +3778,9 @@ fn Sema.check_index(self: Sema, node: i32) -> i32:
             self.check_expr(index2)
         return 0
 
+    if index2 != 0 and self.index_expr_is_type_level(expr) == 0:
+        return self.check_pair_multi_index(node, arr_type)
+
     let resolved = self.resolve_alias(arr_type)
     let tk = self.get_type_kind(resolved)
     if tk == TypeKind.TY_PTR:
@@ -3822,32 +3859,125 @@ fn Sema.check_index(self: Sema, node: i32) -> i32:
                     return ci_tid as i32
     0
 
-fn Sema.check_multi_index(self: Sema, node: i32) -> i32:
+fn Sema.is_runtime_multi_index_node(self: Sema, node: i32) -> i32:
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_MULTI_INDEX:
+        return 1
+    if kind == NodeKind.NK_INDEX:
+        if self.ast.get_data2(node) != 0 and self.index_expr_is_type_level(self.ast.get_data0(node)) == 0:
+            return 1
+    0
+
+fn Sema.multi_index_base_expr(self: Sema, node: i32) -> i32:
+    self.ast.get_data0(node)
+
+fn Sema.check_multi_index_part(self: Sema, node: i32, label: str):
+    if node == 0:
+        return
+    let ty = self.check_expr_with_expected(node, self.ty_i64)
+    if ty == 0:
+        return
+    let resolved = self.resolve_alias(ty)
+    if self.get_type_kind(resolved) != TypeKind.TY_INT:
+        self.emit_error("multi-dimensional index " ++ label ++ " must be an integer", node)
+
+fn Sema.check_multi_index_operands(self: Sema, node: i32) -> TypeId:
     let base = self.ast.get_data0(node)
     let specs_start = self.ast.get_data1(node)
     let specs_count = self.ast.get_data2(node)
     let base_ty = self.check_expr(base)
-    // Check each index spec
+    var ellipsis_count = 0
     for si in 0..specs_count:
         let spec = self.ast.get_extra(specs_start + si)
         let d0 = self.ast.get_data0(spec)
         let d1 = self.ast.get_data1(spec)
         let d2 = self.ast.get_data2(spec)
         let kind = d2 / INDEX_KIND_SHIFT
-        if d0 != 0: self.check_expr(d0)
-        if d1 != 0: self.check_expr(d1)
+        if kind == INDEX_ELLIPSIS:
+            ellipsis_count = ellipsis_count + 1
+        if ellipsis_count > 1:
+            self.emit_error("multi-dimensional index may contain at most one ellipsis", spec)
+        self.check_multi_index_part(d0, "start")
+        self.check_multi_index_part(d1, "stop")
         let step = d2 - kind * INDEX_KIND_SHIFT
-        if step != 0: self.check_expr(step)
-    // Look up multi_index method on base type
+        self.check_multi_index_part(step, "step")
+    base_ty
+
+fn Sema.check_pair_multi_index_operands(self: Sema, node: i32, base_ty: TypeId) -> TypeId:
+    self.check_multi_index_part(self.ast.get_data1(node), "start")
+    self.check_multi_index_part(self.ast.get_data2(node), "start")
+    base_ty
+
+fn Sema.check_multi_index_like_operands(self: Sema, node: i32) -> TypeId:
+    if self.ast.kind(node) == NodeKind.NK_MULTI_INDEX:
+        return self.check_multi_index_operands(node)
+    if self.ast.kind(node) == NodeKind.NK_INDEX:
+        let base_ty = self.check_expr(self.ast.get_data0(node))
+        return self.check_pair_multi_index_operands(node, base_ty)
+    0 as TypeId
+
+fn Sema.check_multi_index_method(self: Sema, node: i32, base_ty: TypeId) -> i32:
+    if base_ty == 0:
+        return 0
     let base_resolved = self.resolve_alias(base_ty)
     let base_name = self.get_type_name(base_resolved as i32)
     if base_name != 0:
         let mi_sym = self.pool_intern("multi_index")
         let mi_sig = self.lookup_method_sig(base_name, mi_sym)
         if mi_sig >= 0:
-            return self.sig_return_type(mi_sig)
+            if self.validate_multi_index_method_sig(mi_sig, mi_sym, 0, node) != 0:
+                return self.sig_return_type(mi_sig)
+            return 0
     self.emit_error("type does not support multi-dimensional indexing", node)
     0
+
+fn Sema.check_pair_multi_index(self: Sema, node: i32, base_ty: TypeId) -> i32:
+    let checked_base_ty = self.check_pair_multi_index_operands(node, base_ty)
+    self.check_multi_index_method(node, checked_base_ty)
+
+fn Sema.is_index_spec_slice_ref_type(self: Sema, tid: i32) -> i32:
+    if tid == 0:
+        return 0
+    let ref_resolved = self.resolve_alias(tid as TypeId)
+    if self.get_type_kind(ref_resolved) != TypeKind.TY_REF:
+        return 0
+    let slice_tid = self.get_type_d0(ref_resolved)
+    let slice_resolved = self.resolve_alias(slice_tid as TypeId)
+    if self.get_type_kind(slice_resolved) != TypeKind.TY_SLICE:
+        return 0
+    let elem_tid = self.get_type_d0(slice_resolved)
+    let elem_resolved = self.resolve_alias(elem_tid as TypeId)
+    if self.get_type_kind(elem_resolved) != TypeKind.TY_STRUCT:
+        return 0
+    let elem_name = self.get_type_d0(elem_resolved)
+    if self.pool_resolve(elem_name) == "IndexSpec":
+        return 1
+    0
+
+fn Sema.validate_multi_index_method_sig(self: Sema, sig_idx: i32, method_sym: i32, is_set: i32, node: i32) -> i32:
+    let method_name = self.pool_resolve(method_sym)
+    let expected_count = if is_set != 0: 4 else: 3
+    if self.sig_get_param_count(sig_idx) != expected_count:
+        let value_text = if is_set != 0: ", value" else: ""
+        self.emit_error("method `" ++ method_name ++ "` must have signature `(self, specs: &[IndexSpec], count: i32" ++ value_text ++ ")`", node)
+        return 0
+    if self.is_index_spec_slice_ref_type(self.sig_param_type(sig_idx, 1)) == 0:
+        self.emit_error("method `" ++ method_name ++ "` second parameter must be `&[IndexSpec]`", node)
+        return 0
+    let count_ty = self.resolve_alias(self.sig_param_type(sig_idx, 2) as TypeId)
+    if count_ty != self.ty_i32:
+        self.emit_error("method `" ++ method_name ++ "` count parameter must be `i32`", node)
+        return 0
+    if is_set != 0:
+        let ret_ty = self.resolve_alias(self.sig_return_type(sig_idx) as TypeId)
+        if ret_ty != self.ty_void:
+            self.emit_error("method `" ++ method_name ++ "` must return void", node)
+            return 0
+    1
+
+fn Sema.check_multi_index(self: Sema, node: i32) -> i32:
+    let base_ty = self.check_multi_index_operands(node)
+    self.check_multi_index_method(node, base_ty)
 
 fn Sema.check_slice(self: Sema, node: i32) -> i32:
     let expr = self.ast.get_data0(node)
@@ -9371,7 +9501,7 @@ fn Sema.place_root_sym(self: Sema, node: i32) -> i32:
     let kind = self.ast.kind(node)
     if kind == NodeKind.NK_IDENT:
         return self.ast.get_data0(node)
-    if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_INDEX or kind == NodeKind.NK_GROUPED:
+    if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_INDEX or kind == NodeKind.NK_MULTI_INDEX or kind == NodeKind.NK_GROUPED:
         return self.place_root_sym(self.ast.get_data0(node))
     // &x.field — strip the reference operator to get the underlying place's root
     if kind == NodeKind.NK_UNARY:

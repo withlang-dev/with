@@ -177,8 +177,14 @@
   │                                                                                                                │             │                   │      │ regressions cover positive/negative paths.     │
   │                                                                                                                │             │                   │      │ Box[dyn Trait] consuming calls remain blocked  │
   │                                                                                                                │             │                   │      │ under #202. Spec §11.3.                        │
-  │ #243-#246                                                                                                      │         Yes │                No │   No │ §11 trait/operator/derive sketches. Need       │
-  │                                                                                                                │             │                   │      │ multi-index/@, one-impl rule, derive, and      │
+  │ [x] #243                                                                                                       │         Yes │               Yes │   No │ Completed: MultiIndex read/write now dispatch │
+  │                                                                                                                │             │                   │      │ through multi_index/multi_index_set, including │
+  │                                                                                                                │             │                   │      │ two-scalar value indexing, slice/newaxis/      │
+  │                                                                                                                │             │                   │      │ ellipsis specs, loud signature/missing-set     │
+  │                                                                                                                │             │                   │      │ diagnostics, and reversed operator dispatch.   │
+  │                                                                                                                │             │                   │      │ Spec §11.7.                                    │
+  │ #244-#246                                                                                                      │         Yes │                No │   No │ Remaining §11 trait/operator/derive sketches. │
+  │                                                                                                                │             │                   │      │ Need one-impl rule, derive, and                │
   │                                                                                                                │             │                   │      │ derive(Builder) coverage.                      │
   │ #257-#274                                                                                                      │         Yes │           Partial │   No │ §14 async sketches. Runtime has many behavior  │
   │                                                                                                                │             │                   │      │ tests now, but spec sketches still cover       │
