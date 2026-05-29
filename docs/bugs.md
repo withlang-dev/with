@@ -142,9 +142,17 @@
   │                                                                                                                │             │                   │      │ Result[Unit, E] empty tails, `?` propagation, │
   │                                                                                                                │             │                   │      │ explicit Ok/Err, no double wrapping, and       │
   │                                                                                                                │             │                   │      │ defaultable empty tails. Spec §4.9.            │
-  │ #215-#217                                                                                                      │         Yes │                No │   No │ §5-§6 ephemeral/handles sketches. Split into   │
-  │                                                                                                                │             │                   │      │ concrete tests and implement remaining         │
-  │                                                                                                                │             │                   │      │ ephemeral/slotmap behavior.                    │
+  │ [x] #215, [x] #216                                                                                            │         Yes │               Yes │   No │ Completed: Section 5 ephemeral sketches are    │
+  │                                                                                                                │             │                   │      │ executable. `type T = ephemeral { ... }` is    │
+  │                                                                                                                │             │                   │      │ accepted, structural ephemerality propagates   │
+  │                                                                                                                │             │                   │      │ through generic instances, and ephemeral       │
+  │                                                                                                                │             │                   │      │ values are rejected at escaping storage        │
+  │                                                                                                                │             │                   │      │ boundaries: non-ephemeral fields, enum         │
+  │                                                                                                                │             │                   │      │ payloads, and globals. Spec §5 / §5.5.         │
+  │ #217                                                                                                           │         Yes │                No │   No │ §6 Handle/SlotMap sketch. Need stdlib surface  │
+  │                                                                                                                │             │                   │      │ and implementation for typed handles, insert,  │
+  │                                                                                                                │             │                   │      │ get/slot, remove/replace, disjoint access,     │
+  │                                                                                                                │             │                   │      │ contains, and len.                             │
   │ #218-#222                                                                                                      │         Yes │                No │   No │ §7 with block sketches. Need executable tests  │
   │ #242-#246                                                                                                      │         Yes │                No │   No │ §11 trait/operator/derive sketches. Need       │
   │                                                                                                                │             │                   │      │ object safety, multi-index/@, one-impl rule,   │

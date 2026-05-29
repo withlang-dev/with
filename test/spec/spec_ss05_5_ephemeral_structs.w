@@ -1,11 +1,10 @@
-//! skip: non-executable spec sketch for Section 5.5 — Ephemeral Structs (formerly 25.41); contains pseudo-code for unimplemented feature work
-// Spec test: Section 5.5 — Ephemeral Structs (formerly 25.41)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+// Spec test: Section 5.5 — Ephemeral Structs.
 
-enum TokenKind { Ident | Number | String | LParen | RParen }
+enum TokenKind:
+    Ident
+    Number
+    String
 
-// PASS: ephemeral struct with view fields
 type Token = ephemeral {
     text: StrView,
     kind: TokenKind,
@@ -13,33 +12,22 @@ type Token = ephemeral {
 }
 
 fn first_token(src: StrView) -> Option[Token]:
-    if src.len() == 0: return None
-    Some(Token { text: src.slice(0, 1), kind: .Ident, line: 1 })
+    if src.len() == 0:
+        return None
+    Some(Token { text: src, kind: .Ident, line: 1 })
 
-fn test:
-    let src = "hello world"
-    let tok = first_token(src.as_view())?
-    assert(tok.kind == .Ident)
-
-// PASS: ephemeral struct in pattern matching
 fn describe(tok: Token) -> str:
     match tok.kind:
-        .Ident  => "identifier: {tok.text}"
-        .Number => "number: {tok.text}"
-        _       => "other"
+        .Ident => "identifier"
+        .Number => "number"
+        .String => "string"
 
-// PASS: Vec of ephemeral struct (Vec itself becomes ephemeral)
-fn tokenize(src: StrView) -> Vec[Token]:
-    // Vec[Token] is ephemeral — cannot escape scope of src
-    Vec.new()
+fn test_ephemeral_struct_with_view_fields:
+    let tok = first_token("hello").unwrap()
+    assert(tok.kind == .Ident)
+    assert(tok.text.len() == 5)
+    assert(tok.line == 1)
 
-// FAIL: non-ephemeral struct with ephemeral field
-type BadToken {
-    text: StrView,     // ERROR: ephemeral field in non-ephemeral struct
-    kind: TokenKind,
-}
-
-// FAIL: store ephemeral struct in long-lived container
-type Module {
-    tokens: Vec[Token]  // ERROR: ephemeral field in non-ephemeral struct
-}
+fn test_ephemeral_struct_in_pattern_matching:
+    let tok = Token { text: "123", kind: .Number, line: 2 }
+    assert(describe(tok) == "number")
