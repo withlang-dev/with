@@ -74,6 +74,57 @@ time, and whenever emit-C or bootstrap packaging changed:
 with build :emit-c-fixpoint
 ```
 
+### Linux Release Host
+
+The current Linux x86_64 release host is:
+
+```sh
+ssh quixi@192.168.86.211
+cd ~/with
+```
+
+`~/with` may contain local work in progress. Do not reset, clean, checkout, or
+stash it for release work. If it is dirty, create a separate detached release
+worktree from the fetched `origin/main` commit:
+
+```sh
+cd ~/with
+git fetch origin --tags
+git worktree add --detach ../with-release-$WITH_VERSION origin/main
+cd ../with-release-$WITH_VERSION
+```
+
+Noninteractive SSH shells on this host do not currently put `with` on `PATH`.
+Use the existing compiler from the main checkout as the first seed, and point
+the clean worktree at the LLVM SDK from the main checkout:
+
+```sh
+export RELEASE_SEED=/home/quixi/with/out/bin/with
+export LLVM_PREFIX=/home/quixi/with/.deps/llvm-22.1.6-linux-x86_64
+export WITH=$RELEASE_SEED
+
+WITH_VERSION=$WITH_VERSION $RELEASE_SEED build
+```
+
+After the first build creates `out/bin/with` in the release worktree, use that
+compiler for the remaining Linux gates and packaging:
+
+```sh
+export WITH=$PWD/out/bin/with
+
+WITH_VERSION=$WITH_VERSION ./out/bin/with build :fixpoint
+WITH_VERSION=$WITH_VERSION ./out/bin/with build :test
+WITH_VERSION=$WITH_VERSION ./out/bin/with version
+WITH_VERSION=$WITH_VERSION scripts/package-linux-x86_64.sh
+```
+
+Copy the Linux asset back to the macOS release checkout before creating the
+GitHub release:
+
+```sh
+scp quixi@192.168.86.211:~/with-release-$WITH_VERSION/out/release/with-linux-x86_64 out/release/
+```
+
 Confirm the produced compiler reports the release version:
 
 ```sh
