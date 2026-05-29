@@ -5201,6 +5201,8 @@ fn Sema.check_let_else(self: Sema, node: i32) -> i32:
     let value = self.ast.get_data1(node)
     let else_body = self.ast.get_data2(node)
     let val_type = self.check_expr(value)
+    if val_type != 0 and val_type != self.ty_void:
+        self.typed_expr_types.insert(value, val_type as i32)
     self.check_pattern(pattern, val_type as i32)
     self.check_expr(else_body)
     self.ty_void as i32

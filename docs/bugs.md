@@ -125,8 +125,14 @@
   │                                                                                                                │             │                   │      │ executable coverage for exclusive/inclusive    │
   │                                                                                                                │             │                   │      │ loops, stored range iteration, membership,     │
   │                                                                                                                │             │                   │      │ and range patterns. Spec §4.7.                 │
-  │ #212-#214                                                                                                      │         Yes │                No │   No │ Remaining §4 values/types skipped sketches.   │
-  │                                                                                                                │             │                   │      │ Cover tuples, unit elision, implicit Ok.       │
+  │ [x] #212                                                                                                       │         Yes │               Yes │   No │ Completed: tuple sketch replaced with          │
+  │                                                                                                                │             │                   │      │ executable coverage for construction, field    │
+  │                                                                                                                │             │                   │      │ access, returns, nested destructuring, for     │
+  │                                                                                                                │             │                   │      │ patterns, and Copy tuples. Nested tuple let    │
+  │                                                                                                                │             │                   │      │ destructuring now uses normal pattern binding. │
+  │                                                                                                                │             │                   │      │ Spec §4.8.                                     │
+  │ #213-#214                                                                                                      │         Yes │                No │   No │ Remaining §4 values/types skipped sketches.   │
+  │                                                                                                                │             │                   │      │ Cover unit elision and implicit Ok.            │
   │ #215-#217                                                                                                      │         Yes │                No │   No │ §5-§6 ephemeral/handles sketches. Split into   │
   │                                                                                                                │             │                   │      │ concrete tests and implement remaining         │
   │                                                                                                                │             │                   │      │ ephemeral/slotmap behavior.                    │

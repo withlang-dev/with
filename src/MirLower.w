@@ -2838,6 +2838,10 @@ fn MirBuilder.lower_let_else(self: MirBuilder, node: i32):
     let rhs_ty = self.expr_type(rhs)
     let rhs_place = self.materialize_operand(rhs_op, rhs_ty, self.ast.get_start(rhs))
 
+    if else_body == 0:
+        let _ = self.lower_pattern(pat, rhs_place)
+        return
+
     let success_bb = self.new_block()
     let fail_bb = self.new_block()
     let cont_bb = self.new_block()

@@ -1,41 +1,39 @@
-//! skip: non-executable spec sketch for Section 4.8 — Tuples (formerly 25.36); contains pseudo-code for unimplemented feature work
-// Spec test: Section 4.8 — Tuples (formerly 25.36)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+// Spec test: Section 4.8 - Tuples.
 
-// PASS: tuple construction and destructuring
-fn test:
+fn divmod_tuple(a: i32, b: i32) -> (i32, i32): (a / b, a % b)
+
+fn test_tuple_construction_and_destructuring:
     let pair = (42, "hello")
     let (n, s) = pair
     assert(n == 42)
+    assert(s == "hello")
 
-// PASS: tuple access by index
-fn test:
+fn test_tuple_access_by_index:
     let t = (1, 2, 3)
     assert(t.0 == 1)
     assert(t.2 == 3)
 
-// PASS: tuple return from function
-fn divmod(a: i32, b: i32) -> (i32, i32): (a / b, a % b)
-fn test:
-    let (q, r) = divmod(17, 5)
+fn test_tuple_return_from_function:
+    let (q, r) = divmod_tuple(17, 5)
     assert(q == 3)
     assert(r == 2)
 
-// PASS: nested destructuring
-fn test:
+fn test_nested_tuple_destructuring:
     let ((a, b), c) = ((1, 2), 3)
     assert(a == 1)
+    assert(b == 2)
     assert(c == 3)
 
-// PASS: tuples in for loops
-fn test:
-    let pairs = vec![(1, "a"), (2, "b")]
+fn test_tuple_destructuring_in_for_loops:
+    let pairs = [(1, "a"), (2, "b")]
+    var total = 0
     for (n, s) in pairs:
-        assert(n > 0)
+        total += n
+        assert(s.len() == 1)
+    assert(total == 3)
 
-// PASS: tuple is Copy when all elements are Copy
-fn test:
+fn test_tuple_is_copy_when_all_elements_are_copy:
     let t: (i32, bool) = (1, true)
-    let t2 = t                    // copy
-    assert(t.0 == 1)              // original still valid
+    let t2 = t
+    assert(t.0 == 1)
+    assert(t2.1)

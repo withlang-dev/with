@@ -5700,51 +5700,15 @@ fn Parser.parse_let_binding(self: Parser) -> NodeId:
         is_mut = true
         self.advance()
 
-    // Tuple destructuring (supports identifier, wildcard, and ..rest bindings).
+    // Tuple destructuring uses the normal pattern tree so nested tuple
+    // bindings share the same Sema/MIR path as tuple patterns elsewhere.
     if self.peek() == TokenKind.TK_L_PAREN:
-        self.advance()
-        self.skip_newlines()
-        let names: Vec[i32] = Vec.new()
-        while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
-            // Rest pattern: ..name or ..
-            if self.peek() == TokenKind.TK_DOT_DOT:
-                self.advance()
-                if self.peek() == TokenKind.TK_IDENT:
-                    let rest_sym = self.intern_current()
-                    self.advance()
-                    // Use negative sym to mark rest binding
-                    names.push(0 - rest_sym)
-                else:
-                    // .. without name: just discard remaining
-                    names.push(0)
-            else if self.peek() == TokenKind.TK_IDENT:
-                let n_sym = self.intern_current()
-                self.advance()
-                if self.intern.resolve(n_sym) == "_":
-                    names.push(0)
-                else:
-                    names.push(n_sym)
-            else:
-                self.emit_error("tuple destructuring requires identifier bindings")
-                while self.peek() != TokenKind.TK_COMMA and self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
-                    self.advance()
-
-            self.skip_newlines()
-            if self.peek() == TokenKind.TK_COMMA:
-                self.advance()
-                self.skip_newlines()
-            else:
-                break
-
-        self.expect(TokenKind.TK_R_PAREN)
+        let pat = self.parse_pattern()
         if self.expect(TokenKind.TK_EQ) == 0:
             return self.poisoned_expr()
         self.skip_newlines()
         let value = self.parse_expr()
-        let extra_start = self.pool.extra_len()
-        for ni in 0..names.len() as i32:
-            self.pool.add_extra(names.get(ni as i64))
-        return self.pool.add_node(NodeKind.NK_TUPLE_DESTRUCTURE, start, self.prev_end(), extra_start, names.len() as i32, value)
+        return self.pool.add_node(NodeKind.NK_LET_ELSE, start, self.prev_end(), pat, value, 0)
 
     // Let-else: with variant shorthand: let .Some(v) = expr else: body
     if self.peek() == TokenKind.TK_DOT_IDENT:
