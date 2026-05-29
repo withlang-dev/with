@@ -321,6 +321,7 @@ type Sema {
 
     // Must-use / result-option / task fn tracking
     must_use_types: HashMap[i32, i32],
+    no_await_guard_types: HashMap[i32, i32],
     must_use_fns: HashMap[i32, i32],
     result_option_fns: HashMap[i32, i32],
     task_fns: HashMap[i32, i32],
@@ -784,6 +785,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let sealed_impl_starts = sema_new_map_i32_i32()
     let sealed_impl_counts = sema_new_map_i32_i32()
     let must_use_types = sema_new_map_i32_i32()
+    let no_await_guard_types = sema_new_map_i32_i32()
     let must_use_fns = sema_new_map_i32_i32()
     let result_option_fns = sema_new_map_i32_i32()
     let task_fns = sema_new_map_i32_i32()
@@ -882,6 +884,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         sealed_impl_starts,
         sealed_impl_counts,
         must_use_types,
+        no_await_guard_types,
         must_use_fns,
         result_option_fns,
         task_fns,

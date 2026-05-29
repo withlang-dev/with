@@ -8,8 +8,11 @@ type Guard {
 async fn work() -> i32:
     42
 
-async fn main:
+fn helper() -> i32:
+    let task = work()
+    task.await
+
+fn main:
     let held = Guard { value: 1 }
-    let t = work()
+    let _ = helper()
     assert(held.value == 1)
-    t.await

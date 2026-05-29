@@ -1618,15 +1618,53 @@ fn Sema.expr_is_scoped_task_value(self: Sema, node: i32) -> i32:
                 return 1
     0
 
+fn Sema.type_is_no_await_guard_direct(self: Sema, tid: i32) -> i32:
+    if tid <= 0:
+        return 0
+    let kind = self.get_type_kind(tid as TypeId)
+    if kind == TypeKind.TY_STRUCT or kind == TypeKind.TY_ENUM or kind == TypeKind.TY_ALIAS:
+        let type_sym = self.get_type_d0(tid as TypeId)
+        if self.no_await_guard_types.contains(type_sym):
+            return 1
+    if kind == TypeKind.TY_GENERIC_INST:
+        let base_sym = self.get_type_d0(tid as TypeId)
+        if self.no_await_guard_types.contains(base_sym):
+            return 1
+    0
+
+fn Sema.type_is_no_await_guard(self: Sema, tid: i32) -> i32:
+    if tid <= 0:
+        return 0
+    if self.type_is_no_await_guard_direct(tid) != 0:
+        return 1
+    let resolved = self.resolve_alias(tid as TypeId) as i32
+    if resolved != tid and self.type_is_no_await_guard_direct(resolved) != 0:
+        return 1
+    0
+
 fn Sema.has_live_await_guard(self: Sema) -> i32:
     var i = self.bind_names.len() as i32 - 1
     while i >= 0:
         if self.bind_states.get(i as i64) == VarState.LIVE:
-            let name = self.pool_resolve(self.bind_names.get(i as i64))
-            if name.ends_with("_guard"):
+            let tid = self.bind_types.get(i as i64)
+            if self.type_is_no_await_guard(tid) != 0:
                 return 1
         i = i - 1
     0
+
+fn Sema.emit_no_await_guard_may_suspend_call(self: Sema, node: i32, fn_sym: i32):
+    if self.has_live_await_guard() == 0:
+        return
+    let visiting: HashMap[i32, i32] = HashMap.new()
+    if self.fn_symbol_may_suspend(fn_sym, visiting) != 0:
+        self.emit_error("E0701: may_suspend call while no_await_guard value is live", node)
+
+fn Sema.emit_no_await_guard_may_suspend_expr(self: Sema, node: i32, expr: i32):
+    if self.has_live_await_guard() == 0:
+        return
+    let visiting: HashMap[i32, i32] = HashMap.new()
+    if self.expr_may_suspend(expr, visiting) != 0:
+        self.emit_error("E0701: may_suspend call while no_await_guard value is live", node)
 
 fn Sema.fn_symbol_may_suspend(self: Sema, fn_sym: i32, visiting: HashMap[i32, i32]) -> i32:
     if fn_sym == 0:
@@ -5948,6 +5986,8 @@ fn Sema.try_unit_elide_call_arg(self: Sema, call_node: i32, arg_count: i32, expe
     1
 
 fn Sema.check_callable_value_call(self: Sema, call_name: str, fn_tid: i32, closure_node: i32, node: i32, extra_start: i32, arg_count: i32, param_offset: i32, has_resolved: i32, arg_types: Vec[i32]) -> i32:
+    if closure_node > 0:
+        self.emit_no_await_guard_may_suspend_expr(node, closure_node)
     let expected = self.get_type_d1(fn_tid)
     let actual = arg_count + param_offset
     if self.ast.has_call_named_args(node) == 0 and self.has_resolved_call_args(node) == 0:
@@ -6333,6 +6373,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
     // Known function
     if sig_idx >= 0:
         self.comp_resolved.insert(node, fn_sym)
+        self.emit_no_await_guard_may_suspend_call(node, fn_sym)
         let ret = self.sig_return_type(sig_idx) as i32
         // Check arg count (supports default parameters via required-count
         // metadata packed into fn_meta flags by the parser).
@@ -6428,6 +6469,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
     // Generic function
     if self.generic_fn_nodes.contains(fn_sym):
         let fn_node = self.generic_fn_nodes.get(fn_sym).unwrap()
+        self.emit_no_await_guard_may_suspend_call(node, fn_sym)
         let ret = self.check_generic_call(fn_sym, fn_node, arg_types, resolved_arg_count, node)
         self.comp_resolved.insert(node, fn_sym)
         self.typed_expr_types.insert(node, ret)
@@ -8461,6 +8503,7 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
     if type_name_sym != 0:
         let generic_method_fn = self.lookup_generic_method_fn(type_name_sym, field)
         if generic_method_fn != 0:
+            self.emit_no_await_guard_may_suspend_call(node, generic_method_fn)
             let generic_ret = self.check_generic_method_call(type_name_sym, recv_type as i32, generic_method_fn, is_static_receiver, arg_types, extra_start, mc_resolved_arg_count, node)
             return generic_ret
 
@@ -8472,6 +8515,7 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                 return 0
             if method_fn_sym != 0:
                 self.comp_resolved.insert(node, method_fn_sym)
+                self.emit_no_await_guard_may_suspend_call(node, method_fn_sym)
             let mc_ret = self.sig_return_type(sig_idx)
             // For TypeKind.TY_GENERIC_INST receivers, check arg types and substitute return type
             let mc_resolved_tk = self.get_type_kind(recv_type)
