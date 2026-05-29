@@ -86,6 +86,78 @@ fn Codegen.find_trait_method_offset(self: Codegen, trait_idx: i32, method_sym: i
             return i
     -1
 
+fn codegen_type_node_mentions_self(pool: AstPool, self_sym: i32, type_node: i32) -> i32:
+    if type_node == 0:
+        return 0
+    let kind = pool.kind(type_node)
+    if kind == NodeKind.NK_TYPE_NAMED:
+        return if pool.get_data0(type_node) == self_sym: 1 else: 0
+    if kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_ARRAY or kind == NodeKind.NK_TYPE_SLICE or kind == NodeKind.NK_TYPE_OPTIONAL:
+        return codegen_type_node_mentions_self(pool, self_sym, pool.get_data0(type_node))
+    if kind == NodeKind.NK_TYPE_TUPLE:
+        let extra_start = pool.get_data0(type_node)
+        let elem_count = pool.get_data1(type_node)
+        for ei in 0..elem_count:
+            if codegen_type_node_mentions_self(pool, self_sym, pool.get_extra(extra_start + ei)) != 0:
+                return 1
+        return 0
+    if kind == NodeKind.NK_TYPE_GENERIC:
+        let extra_start = pool.get_data1(type_node)
+        let arg_count = pool.get_data2(type_node)
+        for ai in 0..arg_count:
+            if codegen_type_node_mentions_self(pool, self_sym, pool.get_extra(extra_start + ai)) != 0:
+                return 1
+    0
+
+fn Codegen.dyn_trait_method_fn_type(self: Codegen, trait_sym: i32, method_sym: i32) -> i64:
+    let trait_idx_opt = self.trait_map.get(trait_sym)
+    if not trait_idx_opt.is_some():
+        with_eprint("error: missing trait metadata for dyn dispatch on '" ++ self.intern.resolve(trait_sym) ++ "'")
+        self.had_error = 1
+        return 0
+    let trait_idx = trait_idx_opt.unwrap()
+    let method_offset = self.find_trait_method_offset(trait_idx, method_sym)
+    if method_offset < 0:
+        with_eprint("error: missing trait method '" ++ self.intern.resolve(method_sym) ++ "' in dyn trait '" ++ self.intern.resolve(trait_sym) ++ "'")
+        self.had_error = 1
+        return 0
+    let method_idx = self.trait_method_starts.get(trait_idx as i64) + method_offset
+    let param_start = self.trait_method_param_starts.get(method_idx as i64)
+    let param_count = self.trait_method_param_counts.get(method_idx as i64)
+    let ret_node = self.trait_method_ret_nodes.get(method_idx as i64)
+
+    let ptr_ty = wl_ptr_type(self.context)
+    let param_types: Vec[i64] = Vec.new()
+    param_types.push(ptr_ty)
+    var pi = 1
+    while pi < param_count:
+        let p_type_node = self.pool.fn_param_type(param_start, pi)
+        if codegen_type_node_mentions_self(self.pool, self.sym_Self, p_type_node) != 0:
+            with_eprint("error: cannot lower dyn trait method '" ++ self.intern.resolve(method_sym) ++ "' because a non-receiver parameter mentions Self")
+            self.had_error = 1
+            return 0
+        var p_ty = self.resolve_type(p_type_node)
+        if p_ty == 0:
+            with_eprint("error: cannot resolve parameter type for dyn trait method '" ++ self.intern.resolve(method_sym) ++ "'")
+            self.had_error = 1
+            return 0
+        param_types.push(p_ty)
+        pi = pi + 1
+
+    var ret_ty = wl_void_type(self.context)
+    if ret_node != 0:
+        if codegen_type_node_mentions_self(self.pool, self.sym_Self, ret_node) != 0:
+            with_eprint("error: cannot lower dyn trait method '" ++ self.intern.resolve(method_sym) ++ "' because its return type mentions Self")
+            self.had_error = 1
+            return 0
+        ret_ty = self.resolve_type(ret_node)
+        if ret_ty == 0:
+            with_eprint("error: cannot resolve return type for dyn trait method '" ++ self.intern.resolve(method_sym) ++ "'")
+            self.had_error = 1
+            return 0
+
+    wl_function_type(ret_ty, vec_data_i64(&param_types), param_types.len() as i32, 0)
+
 fn Codegen.find_decl_index(self: Codegen, node: i32) -> i32:
     for i in 0..self.pool.decl_count():
         if self.pool.get_decl(i) == node:

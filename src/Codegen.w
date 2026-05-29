@@ -1215,15 +1215,70 @@ fn Codegen.get_dyn_fat_ptr_type(self: Codegen) -> i64:
 
 fn Codegen.get_fn_dyn_param_trait(self: Codegen, fn_sym: i32, param_idx: i32) -> i32:
     let base_opt = self.fn_dyn_param_starts.get(fn_sym)
-    if not base_opt.is_some():
-        return 0
     if param_idx < 0:
         return 0
-    let base = base_opt.unwrap()
-    let slot = base + param_idx
-    if slot < 0 or slot >= self.fn_dyn_param_data.len() as i32:
+    if base_opt.is_some():
+        let base = base_opt.unwrap()
+        let slot = base + param_idx
+        if slot >= 0 and slot < self.fn_dyn_param_data.len() as i32:
+            let recorded_trait = self.fn_dyn_param_data.get(slot as i64)
+            if recorded_trait != 0:
+                if self.trait_map.get(recorded_trait).is_some():
+                    return recorded_trait
+                let cg_trait = self.sema_sym_to_codegen_sym(recorded_trait)
+                if cg_trait != 0:
+                    return cg_trait
+                return recorded_trait
+
+    let fn_name = self.intern.resolve(fn_sym)
+    let sema_fn_sym = if fn_name.len() > 0: self.sema.pool_lookup_symbol(fn_name) else: 0
+    if sema_fn_sym == 0:
         return 0
-    self.fn_dyn_param_data.get(slot as i64)
+    if not self.sema.fn_decl_nodes.contains(sema_fn_sym):
+        return 0
+    let fn_node = self.sema.fn_decl_nodes.get(sema_fn_sym).unwrap()
+    let meta = self.sema.ast.find_fn_meta(fn_node)
+    if meta < 0:
+        return 0
+    let param_count = self.sema.ast.fn_meta_param_count(meta)
+    if param_idx < 0 or param_idx >= param_count:
+        return 0
+    let param_start = self.sema.ast.fn_meta_param_start(meta)
+    let p_type_node = self.sema.ast.fn_param_type(param_start, param_idx)
+    let sema_trait = self.sema.trait_object_from_type_node(p_type_node)
+    if sema_trait == 0:
+        return 0
+    let cg_trait2 = self.sema_sym_to_codegen_sym(sema_trait)
+    if cg_trait2 != 0:
+        return cg_trait2
+    sema_trait
+
+fn Codegen.get_raw_fn_dyn_param_trait(self: Codegen, raw_fn_sym: i32, param_idx: i32) -> i32:
+    if raw_fn_sym == 0 or param_idx < 0:
+        return 0
+    var sema_fn_sym = raw_fn_sym
+    if not self.sema.fn_decl_nodes.contains(sema_fn_sym):
+        let fn_text = self.sema_symbol_text(raw_fn_sym)
+        if fn_text.len() > 0:
+            sema_fn_sym = self.sema.pool_lookup_symbol(fn_text)
+    if sema_fn_sym == 0 or not self.sema.fn_decl_nodes.contains(sema_fn_sym):
+        return 0
+    let fn_node = self.sema.fn_decl_nodes.get(sema_fn_sym).unwrap()
+    let meta = self.sema.ast.find_fn_meta(fn_node)
+    if meta < 0:
+        return 0
+    let param_count = self.sema.ast.fn_meta_param_count(meta)
+    if param_idx >= param_count:
+        return 0
+    let param_start = self.sema.ast.fn_meta_param_start(meta)
+    let p_type_node = self.sema.ast.fn_param_type(param_start, param_idx)
+    let sema_trait = self.sema.trait_object_from_type_node(p_type_node)
+    if sema_trait == 0:
+        return 0
+    let cg_trait = self.sema_sym_to_codegen_sym(sema_trait)
+    if cg_trait != 0:
+        return cg_trait
+    sema_trait
 
 fn Codegen.is_const_int_value(self: Codegen, val: i64) -> bool:
     // LLVMIsConstant is broader than integer constants; only this kind is safe
@@ -1717,7 +1772,9 @@ fn Codegen.build_dyn_trait_value(self: Codegen, concrete_val: i64, type_sym: i32
     let key = codegen_hash_type_trait_key(type_sym, trait_sym)
     let vg = self.vtable_globals.get(key)
     if not vg.is_some():
-        return concrete_val
+        with_eprint("error: missing vtable for type '" ++ self.intern.resolve(type_sym) ++ "' implementing trait '" ++ self.intern.resolve(trait_sym) ++ "'")
+        self.had_error = 1
+        return wl_get_undef(self.get_dyn_fat_ptr_type())
 
     let alloca = wl_build_alloca(self.builder, wl_type_of(concrete_val))
     wl_build_store(self.builder, concrete_val, alloca)
@@ -1732,7 +1789,9 @@ fn Codegen.build_dyn_trait_value_from_ptr(self: Codegen, data_ptr: i64, type_sym
     let key = codegen_hash_type_trait_key(type_sym, trait_sym)
     let vg = self.vtable_globals.get(key)
     if not vg.is_some():
-        return data_ptr
+        with_eprint("error: missing vtable for type '" ++ self.intern.resolve(type_sym) ++ "' implementing trait '" ++ self.intern.resolve(trait_sym) ++ "'")
+        self.had_error = 1
+        return wl_get_undef(self.get_dyn_fat_ptr_type())
 
     let ptr_ty = wl_ptr_type(self.context)
     let fat_ty = self.get_dyn_fat_ptr_type()
@@ -3330,8 +3389,14 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
     let name_str = self.intern.resolve(name_sym)
     if name_sym == 0:
         return
-    let parsed_name = if name_str.len() == 0: self.fn_decl_name_from_node(fn_node) else: ""
-    let alias_sym = if parsed_name.len() > 0: self.intern.intern(parsed_name) else: 0
+    let sema_name_str = self.sema_symbol_text(name_sym)
+    let parsed_name = if sema_name_str.len() == 0 and name_str.len() == 0: self.fn_decl_name_from_node(fn_node) else: ""
+    let alias_text =
+        if sema_name_str.len() > 0:
+            sema_name_str
+        else:
+            parsed_name
+    let alias_sym = if alias_text.len() > 0: self.intern.intern(alias_text) else: 0
     let flags = self.pool.get_data2(fn_node)
     let meta = self.pool.find_fn_meta(fn_node)
     if meta < 0: return

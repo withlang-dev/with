@@ -56,9 +56,11 @@
   │                                                                                                                │             │                   │      │ be requested explicitly. Equal-index access    │
   │                                                                                                                │             │                   │      │ now panics loudly; emit-C fails loudly instead │
   │                                                                                                                │             │                   │      │ of emitting invalid get_disjoint C.            │
-  │ #202                                                                                                           │         Yes │                No │   No │ §3.9 implicit trait object coercion skipped    │
-  │                                                                                                                │             │                   │      │ sketch. Implement executable positive/negative │
-  │                                                                                                                │             │                   │      │ coverage for &T / Box[T] to dyn Trait.         │
+  │ #202 (blocked)                                                                                                 │         Yes │           Partial │   No │ &T/value to &dyn Trait coercion and dyn method │
+  │                                                                                                                │             │                   │      │ dispatch now have executable positive/negative │
+  │                                                                                                                │             │                   │      │ regressions. Blocked on Box[T] -> Box[dyn      │
+  │                                                                                                                │             │                   │      │ Trait]: Box has no std/prelude type, Box.new,  │
+  │                                                                                                                │             │                   │      │ allocator/drop semantics, or object shims.     │
   │ [x] #203                                                                                                       │         Yes │               Yes │   No │ Completed: second-class reference sketch is    │
   │                                                                                                                │             │                   │      │ executable coverage for local references and   │
   │                                                                                                                │             │                   │      │ non-escaping closure reference captures;       │

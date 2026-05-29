@@ -146,6 +146,10 @@ fn Codegen.mir_sema_type_to_llvm(self: Codegen, sema_ty: i32) -> i64:
             arr_elem_llvm = self.type_fallback()
         return wl_array_type(arr_elem_llvm, arr_len as i64)
     if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
+        let pointee_tid = self.mir_input.mir_get_type_d0(resolved)
+        let pointee_resolved = self.mir_input.mir_resolve_alias(pointee_tid)
+        if self.mir_input.mir_get_type_kind(pointee_resolved) == TypeKind.TY_TRAIT_OBJ:
+            return self.get_dyn_fat_ptr_type()
         return wl_ptr_type(self.context)
     if tk == TypeKind.TY_FN:
         let ptr_ty = wl_ptr_type(self.context)
@@ -3358,6 +3362,184 @@ fn Codegen.mir_struct_sym_from_sema_type(self: Codegen, sema_ty: i32) -> i32:
             return mono_sym
     0
 
+fn Codegen.mir_dyn_arg_info_from_operand(self: Codegen, body: MirBody, operand_id: i32, arg_val: i64) -> DynArgInfo:
+    let sema_ty = self.mir_operand_sema_type(body, operand_id)
+    if sema_ty > 0:
+        let resolved = self.mir_input.mir_resolve_alias(sema_ty)
+        let tk = self.mir_input.mir_get_type_kind(resolved)
+        if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
+            let inner = self.mir_input.mir_get_type_d0(resolved)
+            let inner_sym = self.mir_struct_sym_from_sema_type(inner)
+            if inner_sym != 0:
+                return DynArgInfo { type_sym: inner_sym, use_ptr: 1 }
+        else:
+            let value_sym = self.mir_struct_sym_from_sema_type(resolved)
+            if value_sym != 0:
+                return DynArgInfo { type_sym: value_sym, use_ptr: 0 }
+
+    self.find_dyn_concrete_arg(0, wl_type_of(arg_val))
+
+fn Codegen.mir_dyn_arg_info_from_sema_type(self: Codegen, sema_ty: i32, use_ptr_if_value: i32) -> DynArgInfo:
+    if sema_ty <= 0:
+        return DynArgInfo { type_sym: 0, use_ptr: 0 }
+
+    let resolved = self.mir_input.mir_resolve_alias(sema_ty)
+    var tk = self.mir_input.mir_get_type_kind(resolved)
+    if tk == 0:
+        let live_resolved = self.sema.resolve_alias(sema_ty as TypeId) as i32
+        tk = self.sema.get_type_kind(live_resolved as TypeId)
+        if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
+            let inner = self.sema.get_type_d0(live_resolved as TypeId) as i32
+            let inner_sym = self.mir_struct_sym_from_sema_type(inner)
+            if inner_sym != 0:
+                return DynArgInfo { type_sym: inner_sym, use_ptr: 1 }
+        else:
+            let value_sym = self.mir_struct_sym_from_sema_type(live_resolved)
+            if value_sym != 0:
+                return DynArgInfo { type_sym: value_sym, use_ptr: use_ptr_if_value }
+        return DynArgInfo { type_sym: 0, use_ptr: 0 }
+
+    if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
+        let inner_sym = self.mir_struct_sym_from_sema_type(self.mir_input.mir_get_type_d0(resolved))
+        if inner_sym != 0:
+            return DynArgInfo { type_sym: inner_sym, use_ptr: 1 }
+
+    let value_sym = self.mir_struct_sym_from_sema_type(resolved)
+    if value_sym != 0:
+        return DynArgInfo { type_sym: value_sym, use_ptr: use_ptr_if_value }
+
+    DynArgInfo { type_sym: 0, use_ptr: 0 }
+
+fn Codegen.mir_dyn_arg_info_from_ast_node(self: Codegen, arg_node: i32, arg_val: i64) -> DynArgInfo:
+    let existing = self.find_dyn_concrete_arg(arg_node, wl_type_of(arg_val))
+    if existing.type_sym != 0:
+        return existing
+    if arg_node == 0:
+        return DynArgInfo { type_sym: 0, use_ptr: 0 }
+
+    let node_ty = self.sema_type_of_node(arg_node)
+    let by_node_ty = self.mir_dyn_arg_info_from_sema_type(node_ty, 0)
+    if by_node_ty.type_sym != 0:
+        return by_node_ty
+
+    if self.pool.kind(arg_node) == NodeKind.NK_UNARY:
+        let op = self.pool.get_data0(arg_node)
+        if op == UnaryOp.UOP_REF or op == UnaryOp.UOP_RAW_REF_CONST or op == UnaryOp.UOP_RAW_REF_MUT:
+            let inner = self.pool.get_data1(arg_node)
+            let inner_ty = self.sema_type_of_node(inner)
+            let by_inner_ty = self.mir_dyn_arg_info_from_sema_type(inner_ty, 1)
+            if by_inner_ty.type_sym != 0:
+                return by_inner_ty
+
+    DynArgInfo { type_sym: 0, use_ptr: 0 }
+
+fn Codegen.mir_dyn_trait_symbol_from_sema_type(self: Codegen, sema_ty: i32) -> i32:
+    if sema_ty <= 0:
+        return 0
+    let resolved = self.mir_input.mir_resolve_alias(sema_ty)
+    let tk = self.mir_input.mir_get_type_kind(resolved)
+    if tk == TypeKind.TY_TRAIT_OBJ:
+        return self.sema_sym_to_codegen_sym(self.mir_input.mir_get_type_d0(resolved))
+    if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
+        return self.mir_dyn_trait_symbol_from_sema_type(self.mir_input.mir_get_type_d0(resolved))
+    if tk == TypeKind.TY_GENERIC_INST:
+        let base_sym = self.mir_input.mir_get_type_d0(resolved)
+        if self.sema_symbol_text(base_sym) == "Box" and self.mir_input.mir_get_type_d2(resolved) == 1:
+            let extra_start = self.mir_input.mir_get_type_d1(resolved)
+            return self.mir_dyn_trait_symbol_from_sema_type(self.mir_input.mir_get_type_extra(extra_start))
+    0
+
+fn Codegen.mir_emit_dyn_call_error(self: Codegen, msg: str, next_bb: i32) -> bool:
+    with_eprint(msg)
+    self.had_error = 1
+    if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+        wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
+    true
+
+fn Codegen.mir_emit_dyn_trait_call(self: Codegen, body: MirBody, callee_operand: i32, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
+    let co_k = body.operand_kinds.get(callee_operand as i64)
+    let co_d = body.operand_d0.get(callee_operand as i64)
+    var method_sym = 0
+    if co_k == OperandKind.OK_CONSTANT and co_d >= 0 and co_d < body.const_kinds.len() as i32:
+        if body.const_kinds.get(co_d as i64) == ConstKind.CK_FN:
+            let raw_method_sym = body.const_d0.get(co_d as i64)
+            let method_text = self.sema_symbol_text(raw_method_sym)
+            if method_text.len() > 0:
+                method_sym = self.intern.intern(method_text)
+    if method_sym == 0:
+        return self.mir_emit_dyn_call_error("error: dyn trait call missing method symbol", next_bb)
+
+    let arg_start = body.call_arg_starts.get(args_id as i64)
+    let arg_count = body.call_arg_counts.get(args_id as i64)
+    if arg_count <= 0:
+        return self.mir_emit_dyn_call_error("error: dyn trait call missing receiver", next_bb)
+    let recv_op = body.call_arg_operands.get(arg_start as i64)
+    let recv_sema_ty = self.mir_operand_sema_type(body, recv_op)
+    let trait_sym = self.mir_dyn_trait_symbol_from_sema_type(recv_sema_ty)
+    if trait_sym == 0:
+        return self.mir_emit_dyn_call_error("error: dyn trait call receiver is not a dyn trait object", next_bb)
+
+    let trait_idx_opt = self.trait_map.get(trait_sym)
+    if not trait_idx_opt.is_some():
+        return self.mir_emit_dyn_call_error("error: missing trait metadata for dyn dispatch on '" ++ self.intern.resolve(trait_sym) ++ "'", next_bb)
+    let trait_idx = trait_idx_opt.unwrap()
+    let method_offset = self.find_trait_method_offset(trait_idx, method_sym)
+    if method_offset < 0:
+        return self.mir_emit_dyn_call_error("error: missing dyn trait method '" ++ self.intern.resolve(method_sym) ++ "'", next_bb)
+
+    let recv_val = self.mir_eval_operand(body, recv_op, 0)
+    let recv_ty = wl_type_of(recv_val)
+    if wl_get_type_kind(recv_ty) != wl_struct_type_kind() or wl_count_struct_elem_types(recv_ty) < 2:
+        return self.mir_emit_dyn_call_error("error: dyn trait receiver did not lower to a fat pointer", next_bb)
+    let data_ptr = wl_build_extract_value(self.builder, recv_val, 0)
+    let vtable_ptr = wl_build_extract_value(self.builder, recv_val, 1)
+
+    let fn_ty = self.dyn_trait_method_fn_type(trait_sym, method_sym)
+    if fn_ty == 0:
+        return self.mir_emit_dyn_call_error("error: failed to build dyn trait method function type", next_bb)
+
+    let vtable_ty = self.trait_vtable_types.get(trait_idx as i64)
+    let slot_ptr = wl_build_struct_gep(self.builder, vtable_ty, vtable_ptr, method_offset)
+    let fn_ptr = wl_build_load(self.builder, wl_ptr_type(self.context), slot_ptr)
+
+    let param_count = wl_count_param_types(fn_ty)
+    let param_types: Vec[i64] = Vec.new()
+    for pi in 0..param_count:
+        param_types.push(wl_i32_type(self.context))
+    if param_count > 0:
+        wl_get_param_types(fn_ty, vec_data_i64(&param_types))
+
+    let call_args: Vec[i64] = Vec.new()
+    call_args.push(data_ptr)
+    var ai = 1
+    while ai < arg_count:
+        let op_id = body.call_arg_operands.get((arg_start + ai) as i64)
+        var expected_ty: i64 = 0
+        if ai < param_types.len() as i32:
+            expected_ty = param_types.get(ai as i64)
+        let val = self.mir_eval_call_operand(body, op_id, expected_ty, "dyn trait method", ai - 1)
+        call_args.push(val)
+        ai = ai + 1
+
+    let result = wl_build_call(self.builder, fn_ty, fn_ptr, vec_data_i64(&call_args), call_args.len() as i32)
+    let ret_ty = wl_get_return_type(fn_ty)
+    if ret_ty != wl_void_type(self.context):
+        if dest_place < 0 or dest_place >= body.place_locals.len() as i32:
+            return self.mir_emit_dyn_call_error("error: dyn trait call has no destination for non-void return", next_bb)
+        var dst_ty = self.mir_dest_llvm_type(body, dest_place)
+        if dst_ty == 0:
+            dst_ty = ret_ty
+        let dst_ptr = self.mir_place_ptr(body, dest_place, true, dst_ty)
+        if dst_ptr == 0:
+            return self.mir_emit_dyn_call_error("error: dyn trait call destination could not be materialized", next_bb)
+        let stored = self.enforce_coerced_type(result, dst_ty, "return type mismatch at dyn trait call site")
+        wl_build_store(self.builder, stored, dst_ptr)
+
+    if next_bb < 0 or next_bb >= self.mir_bb_values.len() as i32:
+        return false
+    wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
+    true
+
 fn Codegen.mir_vec_elem_type(self: Codegen, body: MirBody, recv_op_id: i32) -> i64:
     // Infer Vec element LLVM type from the receiver's sema type (using snapshot).
     let sema_ty = self.mir_operand_sema_type(body, recv_op_id)
@@ -6229,6 +6411,8 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
     let mir_intrinsic = body.call_intrinsic(args_id)
     if self.debug_mir_codegen_enabled():
         with_eprint(f"[mir-call-pre] intrinsic={mir_intrinsic} callee_op={callee_operand} args_id={args_id} dest={dest_place}")
+    if mir_intrinsic == MirIntrinsic.MIR_INTRINSIC_DYN_CALL:
+        return self.mir_emit_dyn_trait_call(body, callee_operand, args_id, dest_place, next_bb)
     if mir_intrinsic == MirIntrinsic.MIR_INTRINSIC_GENERIC_CALL:
         let gc_node = body.call_ast_node(args_id)
         if gc_node > 0:
@@ -7007,12 +7191,14 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
     // Resolve callee fn_sym for dyn trait parameter lookup.
     // ConstKind.CK_FN syms are from sema pool — translate to codegen intern pool.
     var callee_fn_sym: i32 = 0
+    var callee_raw_fn_sym: i32 = 0
     if callee_operand >= 0 and callee_operand < body.operand_kinds.len() as i32:
         let co_k = body.operand_kinds.get(callee_operand as i64)
         let co_d = body.operand_d0.get(callee_operand as i64)
         if co_k == OperandKind.OK_CONSTANT and co_d >= 0 and co_d < body.const_kinds.len() as i32:
             if body.const_kinds.get(co_d as i64) == ConstKind.CK_FN:
                 let raw_sym = body.const_d0.get(co_d as i64)
+                callee_raw_fn_sym = raw_sym
                 // Translate sema pool sym to codegen intern pool sym
                 let sym_text = self.sema_symbol_text(raw_sym)
                 if sym_text.len() > 0:
@@ -7099,6 +7285,8 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
         var dyn_trait_sym: i32 = 0
         if callee_fn_sym != 0:
             dyn_trait_sym = self.get_fn_dyn_param_trait(callee_fn_sym, ai)
+        if dyn_trait_sym == 0 and callee_raw_fn_sym != 0:
+            dyn_trait_sym = self.get_raw_fn_dyn_param_trait(callee_raw_fn_sym, ai)
         var arg_val: i64 = 0
         if needs_ref:
             // Evaluate first to check if operand is already a pointer.
@@ -7119,15 +7307,24 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
         else if dyn_trait_sym != 0:
             // Evaluate without coercion so we get the raw concrete value.
             arg_val = self.mir_eval_operand(body, operand_id, 0)
-            let arg_ty = wl_type_of(arg_val)
-            var concrete_sym: i32 = 0
-            for si in 0..self.struct_llvm_types.len() as i32:
-                if self.struct_llvm_types.get(si as i64) == arg_ty:
-                    if si < self.struct_index_syms.len() as i32:
-                        concrete_sym = self.struct_index_syms.get(si as i64)
-                    break
-            if concrete_sym != 0:
-                arg_val = self.build_dyn_trait_value(arg_val, concrete_sym, dyn_trait_sym)
+            var dyn_info = self.mir_dyn_arg_info_from_operand(body, operand_id, arg_val)
+            if dyn_info.type_sym == 0:
+                let dyn_call_node = body.call_ast_node(args_id)
+                if dyn_call_node > 0 and self.pool.kind(dyn_call_node) == NodeKind.NK_CALL:
+                    let dyn_ast_arg_start = self.pool.get_data1(dyn_call_node)
+                    let dyn_ast_arg_count = self.pool.get_data2(dyn_call_node)
+                    if ai < dyn_ast_arg_count:
+                        let dyn_arg_node = self.pool.get_extra(dyn_ast_arg_start + ai)
+                        dyn_info = self.mir_dyn_arg_info_from_ast_node(dyn_arg_node, arg_val)
+            if dyn_info.type_sym != 0:
+                if dyn_info.use_ptr != 0:
+                    arg_val = self.build_dyn_trait_value_from_ptr(arg_val, dyn_info.type_sym, dyn_trait_sym)
+                else:
+                    arg_val = self.build_dyn_trait_value(arg_val, dyn_info.type_sym, dyn_trait_sym)
+            else:
+                with_eprint(f"error: cannot lower argument {ai + 1} to dyn trait '{self.intern.resolve(dyn_trait_sym)}'")
+                self.had_error = 1
+                arg_val = wl_get_undef(self.get_dyn_fat_ptr_type())
         else:
             arg_val = self.mir_eval_call_operand(body, operand_id, expected_ty, call_context, ai)
         args.push(arg_val)
