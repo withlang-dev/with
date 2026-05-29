@@ -168,6 +168,9 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> TypeId:
 
     let kind = self.ast.kind(node)
 
+    if kind == NodeKind.NK_INDEX:
+        return self.resolve_type_level_arg_expr(node) as TypeId
+
     if kind == NodeKind.NK_TYPE_NAMED:
         let sym = self.ast.get_data0(node)
         let prim = self.primitive_type_by_sym(sym)
@@ -304,6 +307,51 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> TypeId:
         return self.ty_i32
 
     0 as TypeId
+
+fn Sema.resolve_type_level_arg_expr(self: Sema, node: i32) -> i32:
+    if node == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_IDENT or kind == NodeKind.NK_TYPE_NAMED:
+        let sym = self.ast.get_data0(node)
+        let prim = self.primitive_type_by_sym(sym)
+        if prim != 0:
+            return prim as i32
+        let subst = self.lookup_generic_subst(sym)
+        if subst != 0:
+            return subst as i32
+        return self.lookup_named_type_visible(sym)
+    if kind == NodeKind.NK_TYPE_GENERIC:
+        return self.resolve_generic_type(node)
+    if kind == NodeKind.NK_INDEX:
+        let base = self.ast.get_data0(node)
+        if self.ast.kind(base) != NodeKind.NK_IDENT:
+            return 0
+        var base_sym = self.ast.get_data0(base)
+        var base_tid = self.lookup_named_type_visible(base_sym)
+        if base_tid == 0:
+            let canonical_base = self.canonical_symbol_by_text(base_sym)
+            if canonical_base != 0 and canonical_base != base_sym:
+                base_sym = canonical_base
+                base_tid = self.lookup_named_type_visible(base_sym)
+        if base_tid == 0:
+            return 0
+        let arg1_node = self.ast.get_data1(node)
+        let arg1_ty = self.resolve_type_level_arg_expr(arg1_node)
+        if arg1_ty == 0:
+            return 0
+        let args: Vec[i32] = Vec.new()
+        args.push(arg1_ty)
+        var arg_count = 1
+        let arg2_node = self.ast.get_data2(node)
+        if arg2_node != 0:
+            let arg2_ty = self.resolve_type_level_arg_expr(arg2_node)
+            if arg2_ty == 0:
+                return 0
+            args.push(arg2_ty)
+            arg_count = 2
+        return self.ensure_generic_inst_type(base_sym, args, arg_count) as i32
+    self.resolve_type_expr(node) as i32
 
 // ── Pass 2: Check function bodies ────────────────────────────────
 
@@ -3751,28 +3799,13 @@ fn Sema.check_index(self: Sema, node: i32) -> i32:
         if self.ast.kind(expr) == NodeKind.NK_IDENT:
             let ci_base_sym = self.ast.get_data0(expr)
             if self.has_named_type_visible(ci_base_sym) != 0:
-                let arg_kind = self.ast.kind(index)
-                var ci_arg_type = 0
-                if arg_kind == NodeKind.NK_IDENT or arg_kind == NodeKind.NK_TYPE_NAMED:
-                    let arg_sym = self.ast.get_data0(index)
-                    let prim = self.primitive_type_by_sym(arg_sym)
-                    if prim != 0:
-                        ci_arg_type = prim
-                    else:
-                        ci_arg_type = self.lookup_named_type_visible(arg_sym)
+                var ci_arg_type = self.resolve_type_level_arg_expr(index)
                 if ci_arg_type > 0:
                     // Check for second type arg (d2 of NodeKind.NK_INDEX) — HashMap[K, V]
                     let ci_index2 = self.ast.get_data2(node)
                     var ci_arg2_type = 0
                     if ci_index2 != 0:
-                        let a2_kind = self.ast.kind(ci_index2)
-                        if a2_kind == NodeKind.NK_IDENT or a2_kind == NodeKind.NK_TYPE_NAMED:
-                            let a2_sym = self.ast.get_data0(ci_index2)
-                            let a2_prim = self.primitive_type_by_sym(a2_sym)
-                            if a2_prim != 0:
-                                ci_arg2_type = a2_prim
-                            else:
-                                ci_arg2_type = self.lookup_named_type_visible(a2_sym)
+                        ci_arg2_type = self.resolve_type_level_arg_expr(ci_index2)
                     let ci_args: Vec[i32] = Vec.new()
                     ci_args.push(ci_arg_type)
                     var ci_arg_count = 1
@@ -5017,6 +5050,18 @@ fn Sema.pipeline_generic_builtin_method_exists(self: Sema, owner_sym: i32, field
         if field == self.syms.insert or field == self.syms.clear:
             return 1
         if field == self.syms.contains or field == self.syms.remove or field == self.syms.len:
+            return 1
+    if owner_sym == self.syms.slotmap:
+        if field == self.syms.new or field == self.syms.insert or field == self.syms.get:
+            return 1
+        if field == self.syms.slot or field == self.syms.get_disjoint:
+            return 1
+        if field == self.syms.remove or field == self.syms.replace:
+            return 1
+        if field == self.syms.contains or field == self.syms.len:
+            return 1
+    if owner_sym == self.syms.slotmapslot:
+        if field == self.syms.get or self.pool_resolve(field) == "set":
             return 1
     if owner_sym == self.syms.option:
         if field == self.syms.unwrap or field == self.syms.is_some or field == self.syms.is_none or field == self.syms.filter or self.pool_resolve(field) == "unwrap_or":
@@ -6622,6 +6667,8 @@ fn Sema.select_trait_impl(self: Sema, type_sym: i32, trait_sym: i32) -> i32:
             let target_base = self.blanket_target_base_syms.get(bi as i64)
             if target_base != 0 and target_base != type_sym:
                 continue
+            if target_base != 0 and self.type_decl_type_param_count(type_sym) == 0:
+                continue
             // Check if type_sym satisfies all bounds
             let b_start = self.blanket_bound_starts.get(bi as i64)
             let b_count = self.blanket_bound_counts.get(bi as i64)
@@ -7130,6 +7177,41 @@ fn Sema.ensure_vec_str_type(self: Sema) -> i32:
     args.push(self.ty_str as i32)
     self.ensure_generic_inst_type(self.syms.vec, args, 1) as i32
 
+fn Sema.ensure_handle_type_for(self: Sema, elem_ty: i32) -> i32:
+    let found = self.find_generic_inst(self.syms.handle, elem_ty)
+    if found != 0:
+        return found
+    let args: Vec[i32] = Vec.new()
+    args.push(elem_ty)
+    self.ensure_generic_inst_type(self.syms.handle, args, 1) as i32
+
+fn Sema.ensure_slotmapslot_type_for(self: Sema, elem_ty: i32) -> i32:
+    let found = self.find_generic_inst(self.syms.slotmapslot, elem_ty)
+    if found != 0:
+        return found
+    let args: Vec[i32] = Vec.new()
+    args.push(elem_ty)
+    self.ensure_generic_inst_type(self.syms.slotmapslot, args, 1) as i32
+
+fn Sema.ensure_option_ref_type_for(self: Sema, elem_ty: i32) -> i32:
+    let ref_ty = self.ensure_exact_type(TypeKind.TY_REF, elem_ty, 0, 0) as i32
+    if ref_ty == 0:
+        return 0
+    let found = self.find_generic_inst(self.syms.option, ref_ty)
+    if found != 0:
+        return found
+    let args: Vec[i32] = Vec.new()
+    args.push(ref_ty)
+    self.ensure_generic_inst_type(self.syms.option, args, 1) as i32
+
+fn Sema.ensure_option_type_for(self: Sema, elem_ty: i32) -> i32:
+    let found = self.find_generic_inst(self.syms.option, elem_ty)
+    if found != 0:
+        return found
+    let args: Vec[i32] = Vec.new()
+    args.push(elem_ty)
+    self.ensure_generic_inst_type(self.syms.option, args, 1) as i32
+
 fn Sema.builtin_intrinsic_method_return_type(self: Sema, recv_type: i32, owner_sym: i32, field: i32) -> i32:
     if recv_type == 0:
         return 0
@@ -7148,6 +7230,35 @@ fn Sema.builtin_intrinsic_method_return_type(self: Sema, recv_type: i32, owner_s
     if owner_sym == self.syms.hashset:
         if field == self.syms.new:
             return self.generic_constructor_return_type(owner_sym, recv_type)
+    if owner_sym == self.syms.slotmap:
+        if field == self.syms.new:
+            return self.generic_constructor_return_type(owner_sym, recv_type)
+        if tk == TypeKind.TY_GENERIC_INST:
+            let elem_ty = self.get_generic_inst_arg(resolved as i32, 0)
+            if field == self.syms.insert:
+                return self.ensure_handle_type_for(elem_ty)
+            if field == self.syms.get:
+                return self.ensure_option_ref_type_for(elem_ty)
+            if field == self.syms.slot:
+                return self.ensure_slotmapslot_type_for(elem_ty)
+            if field == self.syms.get_disjoint:
+                let slot_ty = self.ensure_slotmapslot_type_for(elem_ty)
+                let elems: Vec[i32] = Vec.new()
+                elems.push(slot_ty)
+                elems.push(slot_ty)
+                return self.ensure_tuple_type(elems, 2) as i32
+            if field == self.syms.remove or field == self.syms.replace:
+                return self.ensure_option_type_for(elem_ty)
+            if field == self.syms.contains:
+                return self.ty_bool as i32
+            if field == self.syms.len:
+                return self.ty_i64 as i32
+    if owner_sym == self.syms.slotmapslot:
+        if tk == TypeKind.TY_GENERIC_INST:
+            if field == self.syms.get:
+                return self.get_generic_inst_arg(resolved as i32, 0)
+            if method_name == "set":
+                return self.ty_void as i32
     if owner_sym == self.syms.option:
         if field == self.syms.is_some or field == self.syms.is_none:
             return self.ty_bool as i32
@@ -7858,7 +7969,7 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
     if self.get_type_kind(recv_type) == TypeKind.TY_GENERIC_INST:
         let mc_call_name = self.pool_resolve(type_name_sym) ++ "." ++ self.pool_resolve(field)
         let mc_method_name_raw = self.pool_resolve(field)
-        if (type_name_sym == self.syms.vec or type_name_sym == self.syms.hashmap or type_name_sym == self.syms.hashset or self.pool_resolve(type_name_sym) == "Atomic") and field == self.syms.new:
+        if (type_name_sym == self.syms.vec or type_name_sym == self.syms.hashmap or type_name_sym == self.syms.hashset or type_name_sym == self.syms.slotmap or self.pool_resolve(type_name_sym) == "Atomic") and field == self.syms.new:
             return recv_type as i32
         if type_name_sym == self.syms.vec and mc_method_name_raw == "with_capacity":
             return recv_type as i32
@@ -7916,6 +8027,46 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                 if elem_ty != 0 and a0_ty != 0:
                     if self.builtin_arg_type_compatible(elem_ty, a0_ty) == 0:
                             self.emit_argument_type_mismatch(mc_call_name, 0, 0, 0, elem_ty, a0_ty, self.ast.get_extra(extra_start))
+        else if type_name_sym == self.syms.slotmap:
+            let sm_elem_ty = self.get_generic_inst_arg(recv_type, 0)
+            let sm_handle_ty = self.ensure_handle_type_for(sm_elem_ty)
+            if field == self.syms.insert:
+                if arg_count >= 1:
+                    let a0_ty = arg_types.get(0)
+                    if sm_elem_ty != 0 and a0_ty != 0:
+                        if self.builtin_arg_type_compatible(sm_elem_ty, a0_ty) == 0:
+                            self.emit_argument_type_mismatch(mc_call_name, 0, 0, 0, sm_elem_ty, a0_ty, self.ast.get_extra(extra_start))
+            else if field == self.syms.get or field == self.syms.slot or field == self.syms.remove or field == self.syms.contains:
+                if arg_count >= 1:
+                    let h_ty = arg_types.get(0)
+                    if sm_handle_ty != 0 and h_ty != 0:
+                        if self.builtin_arg_type_compatible(sm_handle_ty, h_ty) == 0:
+                            self.emit_argument_type_mismatch(mc_call_name, 0, 0, 0, sm_handle_ty, h_ty, self.ast.get_extra(extra_start))
+            else if field == self.syms.replace:
+                if arg_count >= 1:
+                    let h_ty2 = arg_types.get(0)
+                    if sm_handle_ty != 0 and h_ty2 != 0:
+                        if self.builtin_arg_type_compatible(sm_handle_ty, h_ty2) == 0:
+                            self.emit_argument_type_mismatch(mc_call_name, 0, 0, 0, sm_handle_ty, h_ty2, self.ast.get_extra(extra_start))
+                if arg_count >= 2:
+                    let v_ty = arg_types.get(1)
+                    if sm_elem_ty != 0 and v_ty != 0:
+                        if self.builtin_arg_type_compatible(sm_elem_ty, v_ty) == 0:
+                            self.emit_argument_type_mismatch(mc_call_name, 0, 1, 1, sm_elem_ty, v_ty, self.ast.get_extra(extra_start + 1))
+            else if field == self.syms.get_disjoint:
+                for sm_hi in 0..2:
+                    if arg_count > sm_hi:
+                        let h_ty3 = arg_types.get(sm_hi as i64)
+                        if sm_handle_ty != 0 and h_ty3 != 0:
+                            if self.builtin_arg_type_compatible(sm_handle_ty, h_ty3) == 0:
+                                self.emit_argument_type_mismatch(mc_call_name, 0, sm_hi, sm_hi, sm_handle_ty, h_ty3, self.ast.get_extra(extra_start + sm_hi))
+        else if type_name_sym == self.syms.slotmapslot:
+            if mc_method_name_raw == "set" and arg_count >= 1:
+                let slot_elem_ty = self.get_generic_inst_arg(recv_type, 0)
+                let set_arg_ty = arg_types.get(0)
+                if slot_elem_ty != 0 and set_arg_ty != 0:
+                    if self.builtin_arg_type_compatible(slot_elem_ty, set_arg_ty) == 0:
+                        self.emit_argument_type_mismatch(mc_call_name, 0, 0, 0, slot_elem_ty, set_arg_ty, self.ast.get_extra(extra_start))
         // Return types for builtin generic methods
         if type_name_sym == self.syms.vec:
             if field == self.syms.push:
@@ -8088,6 +8239,31 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                 return self.ty_bool as i32
             if field == self.syms.len:
                 return self.ty_i64 as i32
+        if type_name_sym == self.syms.slotmap:
+            let sm_elem_ret_ty = self.get_generic_inst_arg(recv_type, 0)
+            if field == self.syms.insert:
+                return self.ensure_handle_type_for(sm_elem_ret_ty)
+            if field == self.syms.get:
+                return self.ensure_option_ref_type_for(sm_elem_ret_ty)
+            if field == self.syms.slot:
+                return self.ensure_slotmapslot_type_for(sm_elem_ret_ty)
+            if field == self.syms.get_disjoint:
+                let sm_slot_ty = self.ensure_slotmapslot_type_for(sm_elem_ret_ty)
+                let sm_tuple_elems: Vec[i32] = Vec.new()
+                sm_tuple_elems.push(sm_slot_ty)
+                sm_tuple_elems.push(sm_slot_ty)
+                return self.ensure_tuple_type(sm_tuple_elems, 2) as i32
+            if field == self.syms.remove or field == self.syms.replace:
+                return self.ensure_option_type_for(sm_elem_ret_ty)
+            if field == self.syms.contains:
+                return self.ty_bool as i32
+            if field == self.syms.len:
+                return self.ty_i64 as i32
+        if type_name_sym == self.syms.slotmapslot:
+            if field == self.syms.get:
+                return self.get_generic_inst_arg(recv_type, 0)
+            if mc_method_name_raw == "set":
+                return self.ty_void as i32
         if type_name_sym == self.syms.option:
             if field == self.syms.unwrap:
                 return self.get_generic_inst_arg(recv_type, 0)

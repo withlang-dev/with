@@ -128,6 +128,9 @@ type SemaBuiltinSymbols {
     result: i32,
     hashmap: i32,
     hashset: i32,
+    handle: i32,
+    slotmap: i32,
+    slotmapslot: i32,
     box: i32,
     regex: i32,
     ok: i32,
@@ -690,6 +693,9 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         result: 0,
         hashmap: 0,
         hashset: 0,
+        handle: 0,
+        slotmap: 0,
+        slotmapslot: 0,
         box: 0,
         regex: 0,
         ok: 0,
@@ -1283,6 +1289,9 @@ fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.syms.result = self.pool_intern("Result")
     self.syms.hashmap = self.pool_intern("HashMap")
     self.syms.hashset = self.pool_intern("HashSet")
+    self.syms.handle = self.pool_intern("Handle")
+    self.syms.slotmap = self.pool_intern("SlotMap")
+    self.syms.slotmapslot = self.pool_intern("SlotMapSlot")
     self.syms.box = self.pool_intern("Box")
     self.syms.ok = self.pool_intern("Ok")
     self.syms.err = self.pool_intern("Err")
@@ -3075,6 +3084,8 @@ fn Sema.is_copy(self: Sema, tid: TypeId) -> i32:
     if tk == TypeKind.TY_SLICE:
         return 1
     if tk == TypeKind.TY_GENERIC_INST:
+        if self.get_generic_inst_base(resolved as i32) == self.syms.handle:
+            return 1
         // Generic instances (Vec[T], etc.) are non-Copy by default.
         // Copy iff there is an explicit `impl[T: Copy] Copy for Base[T]` registered.
         // Do NOT call type_implements_trait(copy_trait) here — it just calls is_copy() back.

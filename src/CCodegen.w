@@ -247,6 +247,9 @@ fn cc_builtin_vec_get_disjoint -> i32:
 fn cc_builtin_dyn_call -> i32:
     74
 
+fn cc_builtin_slotmap -> i32:
+    80
+
 fn cc_builtin_atomic_load -> i32:
     70
 
@@ -1223,6 +1226,8 @@ fn CCodegen.c_type(self: CCodegen, tid: i32, as_return: i32) -> str:
             return "int64_t"  // opaque handle, passed as int64_t to runtime functions
         if base_name == "HashSet":
             return "int64_t"  // opaque handle, same runtime representation as HashMap
+        if base_name == "SlotMap":
+            return "int64_t"  // opaque handle, LLVM backend owns SlotMap intrinsics
         if self.type_is_payload_enum(resolved as i32) != 0:
             return self.struct_c_name(resolved)
         // Other generic types: treat as opaque struct
@@ -1287,6 +1292,10 @@ fn CCodegen.generic_inst_needs_struct_def(self: CCodegen, tid: i32) -> i32:
     if base_name == "VecIterPlace":
         return 1
     if base_name == "HashMapEntry":
+        return 1
+    if base_name == "Handle":
+        return 1
+    if base_name == "SlotMapSlot":
         return 1
     if base_name == "Atomic":
         return 1
@@ -4679,6 +4688,17 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: i32) -> i32:
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_GET_DISJOINT: return cc_builtin_vec_get_disjoint()
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_VECSLOT_GET: return cc_builtin_vecslot_get()
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_VECSLOT_SET: return cc_builtin_vecslot_set()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAP_NEW: return cc_builtin_slotmap()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAP_INSERT: return cc_builtin_slotmap()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAP_GET: return cc_builtin_slotmap()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAP_SLOT: return cc_builtin_slotmap()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAP_REMOVE: return cc_builtin_slotmap()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAP_REPLACE: return cc_builtin_slotmap()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAP_CONTAINS: return cc_builtin_slotmap()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAP_LEN: return cc_builtin_slotmap()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAP_GET_DISJOINT: return cc_builtin_slotmap()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAPSLOT_GET: return cc_builtin_slotmap()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAPSLOT_SET: return cc_builtin_slotmap()
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_INT_SWAP_BYTES: return cc_builtin_int_swap_bytes()
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_POPCOUNT: return cc_builtin_popcount()
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_CLZ: return cc_builtin_clz()
@@ -4736,6 +4756,10 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
 
     if kind == cc_builtin_vec_get_disjoint():
         self.fail("C backend does not yet support Vec.get_disjoint; use the LLVM backend or add tuple-valued VecSlot lowering")
+        return "    abort();"
+
+    if kind == cc_builtin_slotmap():
+        self.fail("C backend does not yet support SlotMap intrinsics; use the LLVM backend or add SlotMap lowering")
         return "    abort();"
 
     if kind == cc_builtin_vecslot_get():

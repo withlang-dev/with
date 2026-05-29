@@ -1648,6 +1648,186 @@ pub fn vec_pop_i32(v: *mut u8) -> i32:
     let es = vec_get_elem_size(v)
     unsafe *((vec_get_ptr_field(v) as i64 + (vlen - 1) * es) as *const i32)
 
+// ── SlotMap operations ────────────────────────────────────────────
+//
+// SlotMap struct layout:
+//   0: values (*mut u8)      8: occupied (*mut u8)
+//  16: generations (*mut u8) 24: len (i64)
+//  32: cap (i64)            40: elem_size (i64)
+// Total: 48 bytes
+
+let SM_OFF_VALUES: i64 = 0
+let SM_OFF_OCC: i64 = 8
+let SM_OFF_GENS: i64 = 16
+let SM_OFF_LEN: i64 = 24
+let SM_OFF_CAP: i64 = 32
+let SM_OFF_ESZ: i64 = 40
+let SM_SIZE: i64 = 48
+
+fn sm_values(m: i64) -> *mut u8:
+    unsafe *(m as *const *mut u8)
+fn sm_occ(m: i64) -> *mut u8:
+    unsafe *((m + SM_OFF_OCC) as *const *mut u8)
+fn sm_gens(m: i64) -> *mut u8:
+    unsafe *((m + SM_OFF_GENS) as *const *mut u8)
+fn sm_len(m: i64) -> i64:
+    unsafe *((m + SM_OFF_LEN) as *const i64)
+fn sm_cap(m: i64) -> i64:
+    unsafe *((m + SM_OFF_CAP) as *const i64)
+fn sm_elem_size(m: i64) -> i64:
+    unsafe *((m + SM_OFF_ESZ) as *const i64)
+
+fn sm_set_values(m: i64, v: *mut u8):
+    unsafe *(m as *mut *mut u8) = v
+fn sm_set_occ(m: i64, v: *mut u8):
+    unsafe *((m + SM_OFF_OCC) as *mut *mut u8) = v
+fn sm_set_gens(m: i64, v: *mut u8):
+    unsafe *((m + SM_OFF_GENS) as *mut *mut u8) = v
+fn sm_set_len(m: i64, v: i64):
+    unsafe *((m + SM_OFF_LEN) as *mut i64) = v
+fn sm_set_cap(m: i64, v: i64):
+    unsafe *((m + SM_OFF_CAP) as *mut i64) = v
+fn sm_set_elem_size(m: i64, v: i64):
+    unsafe *((m + SM_OFF_ESZ) as *mut i64) = v
+
+fn sm_occ_at(m: i64, idx: i64) -> i32:
+    unsafe *((sm_occ(m) as i64 + idx) as *const u8) as i32
+fn sm_set_occ_at(m: i64, idx: i64, val: i32):
+    unsafe *((sm_occ(m) as i64 + idx) as *mut u8) = val as u8
+fn sm_generation_at(m: i64, idx: i64) -> u32:
+    unsafe *((sm_gens(m) as i64 + idx * 4) as *const u32)
+fn sm_set_generation_at(m: i64, idx: i64, val: u32):
+    unsafe *((sm_gens(m) as i64 + idx * 4) as *mut u32) = val
+fn sm_value_ptr_at(m: i64, idx: i64) -> *mut u8:
+    (sm_values(m) as i64 + idx * sm_elem_size(m)) as *mut u8
+
+fn sm_normalize_generation(g: u32) -> u32:
+    if g == 0 as u32: 1 as u32 else: g
+
+fn sm_grow(m: i64):
+    let old_cap = sm_cap(m)
+    let new_cap = if old_cap < 8: 8 as i64 else: old_cap * 2
+    let es = sm_elem_size(m)
+    let old_values = sm_values(m)
+    let old_occ = sm_occ(m)
+    let old_gens = sm_gens(m)
+    let new_values = rt_alloc(new_cap * es)
+    let new_occ = rt_alloc(new_cap)
+    let new_gens = rt_alloc(new_cap * 4)
+    rt_memset(new_occ, 0, new_cap)
+    var i: i64 = 0
+    while i < new_cap:
+        unsafe *((new_gens as i64 + i * 4) as *mut u32) = 1 as u32
+        i = i + 1
+    if old_cap > 0:
+        rt_memcpy(new_values, old_values as *const u8, old_cap * es)
+        rt_memcpy(new_occ, old_occ as *const u8, old_cap)
+        rt_memcpy(new_gens, old_gens as *const u8, old_cap * 4)
+        rt_free_sized(old_values, old_cap * es)
+        rt_free_sized(old_occ, old_cap)
+        rt_free_sized(old_gens, old_cap * 4)
+    sm_set_values(m, new_values)
+    sm_set_occ(m, new_occ)
+    sm_set_gens(m, new_gens)
+    sm_set_cap(m, new_cap)
+
+fn sm_write_handle(out: *mut u8, idx: u32, generation_value: u32):
+    unsafe *(out as *mut u32) = idx
+    unsafe *((out as i64 + 4) as *mut u32) = generation_value
+
+fn sm_valid(m: i64, index: u32, generation: u32) -> i32:
+    if m == 0:
+        return 0
+    let idx = index as i64
+    if idx < 0 or idx >= sm_cap(m):
+        return 0
+    if sm_occ_at(m, idx) == 0:
+        return 0
+    if sm_generation_at(m, idx) != generation:
+        return 0
+    1
+
+@[c_export("with_slotmap_new")]
+pub fn slotmap_new(elem_size: i64) -> *mut u8:
+    let m = rt_alloc(SM_SIZE)
+    sm_set_values(m as i64, 0 as *mut u8)
+    sm_set_occ(m as i64, 0 as *mut u8)
+    sm_set_gens(m as i64, 0 as *mut u8)
+    sm_set_len(m as i64, 0)
+    sm_set_cap(m as i64, 0)
+    sm_set_elem_size(m as i64, elem_size)
+    m
+
+@[c_export("with_slotmap_insert_out")]
+pub fn slotmap_insert_out(map: *mut u8, val: *const u8, out: *mut u8):
+    let m = map as i64
+    if sm_len(m) >= sm_cap(m):
+        sm_grow(m)
+    var idx: i64 = 0
+    while idx < sm_cap(m):
+        if sm_occ_at(m, idx) == 0:
+            let generation_value = sm_normalize_generation(sm_generation_at(m, idx))
+            sm_set_generation_at(m, idx, generation_value)
+            rt_memcpy(sm_value_ptr_at(m, idx), val, sm_elem_size(m))
+            sm_set_occ_at(m, idx, 1)
+            sm_set_len(m, sm_len(m) + 1)
+            sm_write_handle(out, idx as u32, generation_value)
+            return
+        idx = idx + 1
+    panic_impl(make_str("SlotMap insert failed to find a free slot" as *const u8, 41), make_str("" as *const u8, 0), 0)
+
+@[c_export("with_slotmap_get_ptr")]
+pub fn slotmap_get_ptr(map: *mut u8, index: u32, generation: u32) -> *mut u8:
+    let m = map as i64
+    if sm_valid(m, index, generation) == 0:
+        return 0 as *mut u8
+    sm_value_ptr_at(m, index as i64)
+
+@[c_export("with_slotmap_contains")]
+pub fn slotmap_contains(map: *mut u8, index: u32, generation: u32) -> i32:
+    sm_valid(map as i64, index, generation)
+
+@[c_export("with_slotmap_len")]
+pub fn slotmap_len(map: *mut u8) -> i64:
+    if map as i64 == 0:
+        return 0
+    sm_len(map as i64)
+
+@[c_export("with_slotmap_remove")]
+pub fn slotmap_remove(map: *mut u8, index: u32, generation: u32, out: *mut u8) -> i32:
+    let m = map as i64
+    if sm_valid(m, index, generation) == 0:
+        return 0
+    let idx = index as i64
+    if out as i64 != 0:
+        rt_memcpy(out, sm_value_ptr_at(m, idx) as *const u8, sm_elem_size(m))
+    sm_set_occ_at(m, idx, 0)
+    var next_gen = generation + 1 as u32
+    if next_gen == 0 as u32:
+        next_gen = 1 as u32
+    sm_set_generation_at(m, idx, next_gen)
+    sm_set_len(m, sm_len(m) - 1)
+    1
+
+@[c_export("with_slotmap_replace")]
+pub fn slotmap_replace(map: *mut u8, index: u32, generation: u32, val: *const u8, out: *mut u8) -> i32:
+    let m = map as i64
+    if sm_valid(m, index, generation) == 0:
+        return 0
+    let dst = sm_value_ptr_at(m, index as i64)
+    if out as i64 != 0:
+        rt_memcpy(out, dst as *const u8, sm_elem_size(m))
+    rt_memcpy(dst, val, sm_elem_size(m))
+    1
+
+@[c_export("with_slotmap_set")]
+pub fn slotmap_set(map: *mut u8, index: u32, generation: u32, val: *const u8) -> i32:
+    let m = map as i64
+    if sm_valid(m, index, generation) == 0:
+        return 0
+    rt_memcpy(sm_value_ptr_at(m, index as i64), val, sm_elem_size(m))
+    1
+
 // ── HashMap operations ─────────────────────────────────────────────
 //
 // FNV-1a hash. Open-addressing with linear probing.

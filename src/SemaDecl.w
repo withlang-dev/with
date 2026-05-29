@@ -1400,6 +1400,29 @@ fn Sema.collect_trait_decl(self: Sema, node: i32, is_local: i32):
     if is_local != 0:
         self.local_trait_names.insert(name, 1)
 
+fn Sema.type_decl_type_param_count(self: Sema, type_name: i32) -> i32:
+    if not self.type_decl_nodes.contains(type_name):
+        return 0
+    let td_node = self.type_decl_nodes.get(type_name).unwrap()
+    let td_extra_start = self.ast.get_data1(td_node)
+    let td_packed = self.ast.get_data2(td_node)
+    let td_sub_kind = type_decl_sub_kind(td_packed)
+    if td_sub_kind == TypeDeclKind.Struct:
+        let field_count = self.ast.get_extra(td_extra_start)
+        let after_fields = td_extra_start + 1 + field_count * 4
+        return self.ast.get_extra(after_fields + 2)
+    if td_sub_kind == TypeDeclKind.Alias or td_sub_kind == TypeDeclKind.Distinct:
+        return self.ast.get_extra(td_extra_start + 3)
+    if td_sub_kind == TypeDeclKind.Enum:
+        let variant_count = self.ast.get_extra(td_extra_start)
+        var epos = td_extra_start + 1
+        for vi in 0..variant_count:
+            epos = epos + 1
+            let payload_count = self.ast.get_extra(epos)
+            epos = epos + 1 + payload_count
+        return self.ast.get_extra(epos + 2)
+    0
+
 // Check if a new direct impl overlaps with any existing blanket impl
 fn Sema.check_direct_overlap(self: Sema, type_name: i32, trait_sym: i32, node: i32):
     for bi in 0..self.blanket_trait_syms.len() as i32:
@@ -1409,6 +1432,8 @@ fn Sema.check_direct_overlap(self: Sema, type_name: i32, trait_sym: i32, node: i
         // it only overlaps if this direct impl is for that same base type.
         let target_base = self.blanket_target_base_syms.get(bi as i64)
         if target_base != 0 and target_base != type_name:
+            continue
+        if target_base != 0 and self.type_decl_type_param_count(type_name) == 0:
             continue
         let b_start = self.blanket_bound_starts.get(bi as i64)
         let b_count = self.blanket_bound_counts.get(bi as i64)
@@ -1427,6 +1452,8 @@ fn Sema.check_blanket_overlap(self: Sema, trait_sym: i32, bound_start: i32, boun
         let t_sym = self.impl_type_syms.get(ti as i64)
         // If the blanket targets a specific type, only check that type.
         if target_base != 0 and target_base != t_sym:
+            continue
+        if target_base != 0 and self.type_decl_type_param_count(t_sym) == 0:
             continue
         let t_start = self.impl_starts.get(ti as i64)
         let t_count = self.impl_counts.get(ti as i64)
