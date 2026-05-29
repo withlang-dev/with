@@ -26,6 +26,12 @@ extern fn with_regex_capture_name_at(code: *const i8, index: i32) -> str
 // docs/mut.md Rev 8 — P12 lockdown active. `&mut T` is rejected.
 const STRICT_NO_MUT_REF: i32 = 1
 
+fn sema_node_is_zero_int_literal(ast: AstPool, node: i32) -> bool:
+    if node == 0 or ast.kind(node) != NodeKind.NK_INT_LIT:
+        return false
+    let fast = ast.int_literal_fast_i64(node as NodeId)
+    fast.ok != 0 and fast.value == 0
+
 fn sema_regex_compile_options(flags: str) -> i32:
     var options = 0
     var i: i64 = 0
@@ -2115,8 +2121,9 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
             let task_ty = self.check_expr(task)
             if self.expr_is_task_value(task) == 0:
                 self.emit_error("select await arm requires a Task value", task)
+            let arm_result_ty = self.unwrap_task_type(task_ty)
             self.push_scope()
-            self.scope_put(arm_name, task_ty as i32, 0)
+            self.scope_put(arm_name, arm_result_ty as i32, 0)
             self.scope_set_is_task(arm_name, 0)
             result = self.check_expr(arm_body)
             self.pop_scope()
@@ -2487,6 +2494,23 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
         if (lhs_cmp_kind == TypeKind.TY_PTR and rhs_cmp_kind == TypeKind.TY_ARRAY) or (lhs_cmp_kind == TypeKind.TY_ARRAY and rhs_cmp_kind == TypeKind.TY_PTR):
             self.emit_error("cannot compare pointer and array; use explicit &array[0]", node)
             return 0
+        if op != BinaryOp.OP_IN and op != BinaryOp.OP_NOT_IN:
+            let bool_int_cmp = (lhs_cmp_kind == TypeKind.TY_BOOL and rhs_cmp_kind == TypeKind.TY_INT) or (lhs_cmp_kind == TypeKind.TY_INT and rhs_cmp_kind == TypeKind.TY_BOOL)
+            let lhs_option_ptr = self.is_option_pointer_type(lhs as i32) != 0
+            let rhs_option_ptr = self.is_option_pointer_type(rhs as i32) != 0
+            let lhs_ptr_like = lhs_cmp_kind == TypeKind.TY_PTR or lhs_cmp_kind == TypeKind.TY_REF or lhs_cmp_kind == TypeKind.TY_FN or lhs_cmp_kind == TypeKind.TY_GENERIC_FN or lhs_option_ptr
+            let rhs_ptr_like = rhs_cmp_kind == TypeKind.TY_PTR or rhs_cmp_kind == TypeKind.TY_REF or rhs_cmp_kind == TypeKind.TY_FN or rhs_cmp_kind == TypeKind.TY_GENERIC_FN or rhs_option_ptr
+            let ptr_like_cmp = lhs_ptr_like and rhs_ptr_like
+            let ptr_zero_cmp = (lhs_ptr_like and rhs_cmp_kind == TypeKind.TY_INT and sema_node_is_zero_int_literal(self.ast, rhs_node)) or (rhs_ptr_like and lhs_cmp_kind == TypeKind.TY_INT and sema_node_is_zero_int_literal(self.ast, lhs_node))
+            let lhs_none = (self.ast.kind(lhs_node) == NodeKind.NK_VARIANT_SHORTHAND or self.ast.kind(lhs_node) == NodeKind.NK_IDENT) and self.ast.get_data0(lhs_node) == self.syms.none
+            let rhs_none = (self.ast.kind(rhs_node) == NodeKind.NK_VARIANT_SHORTHAND or self.ast.kind(rhs_node) == NodeKind.NK_IDENT) and self.ast.get_data0(rhs_node) == self.syms.none
+            let ptr_none_cmp = ((lhs_cmp_kind == TypeKind.TY_PTR or lhs_option_ptr) and rhs_none) or ((rhs_cmp_kind == TypeKind.TY_PTR or rhs_option_ptr) and lhs_none)
+            if lhs_ptr_like != rhs_ptr_like and ptr_zero_cmp == 0 and ptr_none_cmp == 0:
+                self.emit_error("comparison operands must have compatible types", node)
+                return 0
+            if bool_int_cmp == 0 and ptr_like_cmp == 0 and ptr_zero_cmp == 0 and ptr_none_cmp == 0 and (lhs_ptr_like or rhs_ptr_like) and self.builtin_arg_type_compatible(lhs, rhs) == 0 and self.builtin_arg_type_compatible(rhs, lhs) == 0:
+                self.emit_error("comparison operands must have compatible types", node)
+                return 0
         return self.ty_bool as i32
 
     // Logical operators
@@ -3436,11 +3460,7 @@ fn Sema.field_access_type_no_diagnostic(self: Sema, node: i32) -> i32:
                 obj_type = static_named as TypeId
     if obj_type == 0:
         return 0
-    let resolved = self.resolve_alias(obj_type)
-    let tk = self.get_type_kind(resolved)
-    var field_base: TypeId = resolved
-    if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
-        field_base = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
+    let field_base = self.auto_deref_ref_ptr_type(obj_type)
     let ftk = self.get_type_kind(field_base)
     if ftk == TypeKind.TY_STRUCT or ftk == TypeKind.TY_GENERIC_INST:
         return self.struct_field_type(field_base as i32, field)
@@ -3456,6 +3476,20 @@ fn Sema.field_access_type_no_diagnostic(self: Sema, node: i32) -> i32:
         if idx < elem_count:
             return self.type_extra.get((te_start + idx) as i64)
     0
+
+fn Sema.auto_deref_ref_ptr_type(self: Sema, tid: TypeId) -> TypeId:
+    var current = self.resolve_alias(tid)
+    var depth = 0
+    while depth < 32:
+        let tk = self.get_type_kind(current)
+        if tk != TypeKind.TY_PTR and tk != TypeKind.TY_REF:
+            return current
+        let inner = self.get_type_d0(current)
+        if inner == 0:
+            return current
+        current = self.resolve_alias(inner as TypeId)
+        depth = depth + 1
+    current
 
 fn Sema.check_field_access(self: Sema, node: i32) -> i32:
     let expr = self.ast.get_data0(node)
@@ -3501,13 +3535,7 @@ fn Sema.check_field_access(self: Sema, node: i32) -> i32:
     if obj_type == 0:
         return 0
 
-    let resolved = self.resolve_alias(obj_type)
-    let tk = self.get_type_kind(resolved)
-
-    // Auto-deref through ptrs and refs
-    var field_base: TypeId = resolved
-    if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
-        field_base = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
+    let field_base = self.auto_deref_ref_ptr_type(obj_type)
 
     if self.is_tool_capability_type(field_base as i32) and not self.can_access_tool_capability_internals():
         self.emit_error("tool capability fields are private; use capability methods instead", node)
@@ -7087,12 +7115,9 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
         return 0
 
     let resolved = self.resolve_alias(obj_type)
-    // Normalize method receivers through one layer of ref/ptr so builtin
+    // Normalize method receivers through ref/ptr layers so builtin
     // method typing matches field access auto-deref behavior.
-    var recv_type = resolved
-    let resolved_tk0 = self.get_type_kind(recv_type)
-    if resolved_tk0 == TypeKind.TY_PTR or resolved_tk0 == TypeKind.TY_REF:
-        recv_type = self.resolve_alias(self.get_type_d0(recv_type) as TypeId)
+    var recv_type = self.auto_deref_ref_ptr_type(resolved)
     let type_name_sym = self.method_owner_symbol_for_type(recv_type as i32)
     if type_name_sym != 0:
         if self.builtin_method_requires_mutable_receiver(type_name_sym, field) != 0:

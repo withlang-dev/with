@@ -1,22 +1,46 @@
-//! skip: non-executable spec sketch for Section 3.7 — Auto-Dereferencing (formerly 25.90); contains pseudo-code for unimplemented feature work
 // Spec test: Section 3.7 — Auto-Dereferencing (formerly 25.90)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
 
-// PASS: auto-deref through Box
-fn test:
-    type User { name: str }
-    let u: Box[User] = Box.new(User { name: "Alice" })
-    assert(u.name == "Alice")             // auto-deref Box → User → .name
+type AutoDerefUser { name: str, score: i32 }
 
-// PASS: auto-deref through multiple references
-fn test:
+impl AutoDerefUser:
+    fn label(self: &Self) -> str:
+        self.name
+
+fn test_auto_deref_field_through_references:
+    let user = AutoDerefUser { name: "Alice", score: 7 }
+    let r = &user
+    let rr = &r
+    assert(rr.name == "Alice")
+
+fn test_auto_deref_method_receiver_through_references:
+    let user = AutoDerefUser { name: "Ada", score: 9 }
+    let r = &user
+    let rr = &r
+    assert(rr.label() == "Ada")
+
+fn test_auto_deref_vec_method_through_references:
+    var values = Vec.new()
+    values.push(10)
+    values.push(20)
+    let r = &values
+    let rr = &r
+    assert(rr.len() == 2)
+
+fn test_explicit_value_deref_through_references:
     let x = 42
     let r = &x
     let rr = &r
-    assert(rr == 42)                      // auto-deref through &&i32
+    assert(**rr == 42)
 
-// PASS: auto-deref for method calls
-fn test:
-    let v: Box[Vec[i32]] = Box.new(vec![1, 2, 3])
-    assert(v.len() == 3)                  // auto-deref Box → Vec → .len()
+unsafe fn auto_deref_raw_pointer_score(p: *mut AutoDerefUser) -> i32:
+    p.score
+
+unsafe fn auto_deref_raw_pointer_set_score(p: *mut AutoDerefUser, value: i32):
+    p.score = value
+
+fn test_auto_deref_raw_pointer_field_inside_unsafe:
+    var user = AutoDerefUser { name: "Grace", score: 11 }
+    let p = &raw mut user as *mut AutoDerefUser
+    assert(unsafe { auto_deref_raw_pointer_score(p) } == 11)
+    unsafe { auto_deref_raw_pointer_set_score(p, 12) }
+    assert(user.score == 12)
