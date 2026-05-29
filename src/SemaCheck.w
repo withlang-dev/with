@@ -5075,7 +5075,9 @@ fn Sema.check_range(self: Sema, node: i32) -> i32:
         let end_ty = self.check_expr(end)
         if start == 0:
             elem_type = end_ty
-    self.add_type(TypeKind.TY_RANGE, elem_type as i32, inclusive, 0) as i32
+        else if self.types_compatible(elem_type, end_ty) == 0:
+            self.emit_error("range bounds must have compatible types", node)
+    self.ensure_exact_type(TypeKind.TY_RANGE, elem_type as i32, inclusive, 0) as i32
 
 fn Sema.check_with_expr(self: Sema, node: i32) -> i32:
     let source = self.ast.get_data0(node)
@@ -6438,6 +6440,16 @@ fn Sema.resolve_generic_return_type_node(self: Sema, ret_node: i32, tp_start: i3
         let gi_base = self.ast.get_data0(ret_node)
         let gi_extra = self.ast.get_data1(ret_node)
         let gi_argc = self.ast.get_data2(ret_node)
+        let range_inclusive = self.canonical_range_type_constructor_inclusive(gi_base)
+        if range_inclusive >= 0:
+            if gi_argc != 1:
+                self.emit_error("Range expects exactly one type argument", ret_node)
+                return 0
+            let elem_ty = self.resolve_generic_return_type_node(self.ast.get_extra(gi_extra), tp_start, tp_count)
+            if elem_ty == 0:
+                return 0
+            return self.ensure_exact_type(TypeKind.TY_RANGE, elem_ty, range_inclusive, 0) as i32
+        let final_base = self.canonical_symbol_by_text(gi_base)
         let gi_args: Vec[i32] = Vec.new()
         for gi in 0..gi_argc:
             let ga_node = self.ast.get_extra(gi_extra + gi)
@@ -6445,7 +6457,7 @@ fn Sema.resolve_generic_return_type_node(self: Sema, ret_node: i32, tp_start: i3
             if ga_tid == 0:
                 return 0
             gi_args.push(ga_tid)
-        return self.ensure_generic_inst_type(gi_base, gi_args, gi_argc) as i32
+        return self.ensure_generic_inst_type(final_base, gi_args, gi_argc) as i32
 
     if kind == NodeKind.NK_TYPE_OPTIONAL:
         let inner = self.resolve_generic_return_type_node(self.ast.get_data0(ret_node), tp_start, tp_count)
@@ -6722,13 +6734,23 @@ fn Sema.resolve_type_node_with_current_subst(self: Sema, type_node: i32, self_ty
         let base_sym = self.ast.get_data0(type_node)
         let extra_start = self.ast.get_data1(type_node)
         let arg_count = self.ast.get_data2(type_node)
+        let range_inclusive = self.canonical_range_type_constructor_inclusive(base_sym)
+        if range_inclusive >= 0:
+            if arg_count != 1:
+                self.emit_error("Range expects exactly one type argument", type_node)
+                return 0
+            let elem_ty = self.resolve_type_node_with_current_subst(self.ast.get_extra(extra_start), self_ty)
+            if elem_ty == 0:
+                return 0
+            return self.ensure_exact_type(TypeKind.TY_RANGE, elem_ty, range_inclusive, 0) as i32
+        let final_base = self.canonical_symbol_by_text(base_sym)
         let args: Vec[i32] = Vec.new()
         for ai in 0..arg_count:
             let arg_ty = self.resolve_type_node_with_current_subst(self.ast.get_extra(extra_start + ai), self_ty)
             if arg_ty == 0:
                 return 0
             args.push(arg_ty)
-        return self.ensure_generic_inst_type(base_sym, args, arg_count) as i32
+        return self.ensure_generic_inst_type(final_base, args, arg_count) as i32
     if kind == NodeKind.NK_TYPE_OPTIONAL:
         let inner = self.resolve_type_node_with_current_subst(self.ast.get_data0(type_node), self_ty)
         let args: Vec[i32] = Vec.new()

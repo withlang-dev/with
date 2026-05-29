@@ -116,9 +116,13 @@
   │                                                                                                                │             │                   │      │ constructors to enum owners and reports        │
   │                                                                                                                │             │                   │      │ invalid/ambiguous selector imports. Spec       │
   │                                                                                                                │             │                   │      │ §4.4 / §18.2.                                  │
-  │ #210-#214                                                                                                      │         Yes │                No │   No │ Remaining §4 values/types skipped sketches.   │
-  │                                                                                                                │             │                   │      │ Cover ranges, tuples, unit elision, implicit   │
-  │                                                                                                                │             │                   │      │ Ok.                                            │
+  │ [x] #210                                                                                                       │         Yes │               Yes │   No │ Completed: Range[T] and RangeInclusive[T] now  │
+  │                                                                                                                │             │                   │      │ resolve to canonical TY_RANGE values, range    │
+  │                                                                                                                │             │                   │      │ literals reuse canonical range types, and      │
+  │                                                                                                                │             │                   │      │ exclusive/inclusive mismatch fails loudly.     │
+  │                                                                                                                │             │                   │      │ Spec §4.7.                                     │
+  │ #211-#214                                                                                                      │         Yes │                No │   No │ Remaining §4 values/types skipped sketches.   │
+  │                                                                                                                │             │                   │      │ Cover tuples, unit elision, implicit Ok.       │
   │ #215-#217                                                                                                      │         Yes │                No │   No │ §5-§6 ephemeral/handles sketches. Split into   │
   │                                                                                                                │             │                   │      │ concrete tests and implement remaining         │
   │                                                                                                                │             │                   │      │ ephemeral/slotmap behavior.                    │
