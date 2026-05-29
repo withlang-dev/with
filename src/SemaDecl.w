@@ -2042,6 +2042,7 @@ fn Sema.primitive_type_by_sym(self: Sema, sym: i32) -> i32:
     if with_str_eq(name, "f64") != 0: return self.ty_f64 as i32
     if with_str_eq(name, "bool") != 0: return self.ty_bool as i32
     if with_str_eq(name, "void") != 0: return self.ty_void as i32
+    if with_str_eq(name, "Unit") != 0: return self.ty_void as i32
     if with_str_eq(name, "Never") != 0: return self.ty_never as i32
     if with_str_eq(name, "str") != 0: return self.ty_str as i32
     if with_str_eq(name, "String") != 0: return self.ty_str as i32

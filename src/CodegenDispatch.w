@@ -91,6 +91,8 @@ fn Codegen.mir_sema_type_to_llvm(self: Codegen, sema_ty: i32) -> i64:
     if tk == TypeKind.TY_STR:
         let str_sym = self.intern.intern("str")
         return self.resolve_named_type(str_sym)
+    if tk == TypeKind.TY_VOID:
+        return wl_void_type(self.context)
     if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM:
         let name_sym = self.mir_input.mir_get_type_d0(resolved)
         if name_sym != 0:
@@ -223,6 +225,11 @@ fn Codegen.regex_literal_global(self: Codegen, name: str, ty: i64, init: i64) ->
     gv
 
 fn Codegen.gen_regex_literal_value(self: Codegen, body: MirBody, const_id: i32, regex_ty: i64) -> i64:
+    if regex_ty == 0 or wl_get_type_kind(regex_ty) != wl_struct_type_kind() or wl_count_struct_elem_types(regex_ty) < 10:
+        self.had_error = 1
+        let regex_kind = if regex_ty != 0: wl_get_type_kind(regex_ty) else: -1
+        with_eprint(f"error: regex literal requires the concrete Regex struct type, got llvm kind {regex_kind} type {self.llvm_type_mangle(regex_ty)}")
+        return wl_get_undef(wl_i32_type(self.context))
     let ptr_ty = wl_ptr_type(self.context)
     let i32_ty = wl_i32_type(self.context)
     let i64_ty = wl_i64_type(self.context)
@@ -347,11 +354,18 @@ fn Codegen.mir_build_raw_fn_type(self: Codegen, sema_ty: i32) -> i64:
             param_types.push(self.type_fallback())
     wl_function_type(llvm_ret, vec_data_i64(&param_types), param_count, 0)
 
+fn Codegen.mir_storage_type_for_value(self: Codegen, ty: i64) -> i64:
+    if ty == 0:
+        return self.type_fallback()
+    if wl_get_type_kind(ty) == wl_void_type_kind():
+        return wl_i32_type(self.context)
+    ty
+
 fn Codegen.mir_get_or_create_local_ptr(self: Codegen, local_id: i32, ty: i64) -> i64:
     let existing = self.mir_local_ptrs.get(local_id)
     if existing.is_some():
         return existing.unwrap() as i64
-    let alloc_ty = if ty != 0: ty else: self.type_fallback()
+    let alloc_ty = self.mir_storage_type_for_value(ty)
     let ptr = self.create_entry_alloca(alloc_ty)
     self.mir_local_ptrs.insert(local_id, ptr)
     ptr
@@ -624,7 +638,7 @@ fn Codegen.mir_place_ptr(self: Codegen, body: MirBody, place_id: i32, create_bas
     if cur_ptr == 0:
         if create_base:
             cur_ptr = self.mir_get_or_create_local_ptr(base_local, create_type)
-            let alloc_ty = if create_type != 0: create_type else: self.type_fallback()
+            let alloc_ty = self.mir_storage_type_for_value(create_type)
             self.mir_local_types.insert(base_local, alloc_ty)
             let _ = self.mir_try_init_const_local(body, base_local, cur_ptr, alloc_ty)
         else:
@@ -955,7 +969,13 @@ fn Codegen.mir_const_value(self: Codegen, body: MirBody, const_id: i32, expected
         return wl_const_int(wl_i32_type(self.context), 0, 0)
 
     if ck == ConstKind.CK_REGEX_LIT:
-        let regex_ty = if materialize_ty != 0: materialize_ty else: self.resolve_named_type(self.intern.intern("Regex"))
+        var regex_ty: i64 = 0
+        if const_id >= 0 and const_id < body.const_types.len() as i32:
+            let regex_sema_ty = body.const_types.get(const_id as i64)
+            if regex_sema_ty > 0:
+                regex_ty = self.mir_sema_type_to_llvm(regex_sema_ty)
+        if regex_ty == 0:
+            regex_ty = self.resolve_named_type(self.intern.intern("Regex"))
         return self.gen_regex_literal_value(body, const_id, regex_ty)
 
     if ck == ConstKind.CK_CLOSURE:
@@ -2273,8 +2293,10 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
             let agg_count = body.agg_field_counts.get(agg_fields_id as i64)
             var struct_ty = dest_ty
             if struct_ty == 0 and dest_sema_ty > 0:
-                struct_ty = self.mir_sema_type_to_llvm(dest_sema_ty)
-            if struct_ty == 0 and self.current_ret_type != 0 and wl_get_type_kind(self.current_ret_type) == wl_struct_type_kind():
+                let sema_struct_ty = self.mir_sema_type_to_llvm(dest_sema_ty)
+                if sema_struct_ty != 0 and wl_get_type_kind(sema_struct_ty) != wl_void_type_kind():
+                    struct_ty = sema_struct_ty
+            if (struct_ty == 0 or wl_get_type_kind(struct_ty) == wl_void_type_kind()) and self.current_ret_type != 0 and wl_get_type_kind(self.current_ret_type) == wl_struct_type_kind():
                 struct_ty = self.current_ret_type
             if self.debug_mir_codegen_enabled():
                 with_eprint(f"[mir-agg] fn={self.intern.resolve(self.current_function_name_sym)} count={agg_count} dest_ty_kind={if dest_ty != 0: wl_get_type_kind(dest_ty) else: -1} dest_ty_fields={if dest_ty != 0 and wl_get_type_kind(dest_ty) == wl_struct_type_kind(): wl_count_struct_elem_types(dest_ty) else: -1}")
@@ -2316,10 +2338,17 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
                 // Store payload in field 1 if any
                 if agg_count > 0 and wl_count_struct_elem_types(struct_ty) > 1:
                     let ev_payload_ty = self.mir_enum_variant_payload_llvm_type(dest_sema_ty, ev_tag)
+                    let ev_payload_sema = self.mir_enum_payload_sema_type(dest_sema_ty, ev_tag, 0)
+                    let ev_payload_resolved = if ev_payload_sema > 0: self.mir_input.mir_resolve_alias(ev_payload_sema) else: 0
+                    let ev_payload_is_unit = if ev_payload_resolved > 0 and self.mir_input.mir_get_type_kind(ev_payload_resolved) == TypeKind.TY_VOID: 1 else: 0
                     if ev_payload_ty == 0:
+                        if ev_payload_is_unit != 0:
+                            return wl_build_load(self.builder, struct_ty, ev_alloca)
                         with_eprint(f"error: aggregate enum payload missing destination payload type fn={self.intern.resolve(self.current_function_name_sym)} variant={ev_tag}")
                         self.had_error = 1
                         return wl_get_undef(fallback_ty)
+                    if wl_get_type_kind(ev_payload_ty) == wl_void_type_kind() or self.abi_size_of(ev_payload_ty) == 0:
+                        return wl_build_load(self.builder, struct_ty, ev_alloca)
                     let ev_data_ptr = wl_build_struct_gep(self.builder, struct_ty, ev_alloca, 1)
                     if agg_count > 1 and wl_get_type_kind(ev_payload_ty) == wl_struct_type_kind():
                         let ev_payload_ptr = wl_build_bitcast(self.builder, ev_data_ptr, wl_ptr_type(self.context))
@@ -2342,7 +2371,7 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
                 // Fall through to bitpacked handler below
                 0
             else if struct_ty == 0 or wl_get_type_kind(struct_ty) != wl_struct_type_kind():
-                with_eprint(f"error: aggregate rvalue missing destination struct type fn={self.intern.resolve(self.current_function_name_sym)} count={agg_count}")
+                with_eprint(f"error: aggregate rvalue missing destination struct type fn={self.intern.resolve(self.current_function_name_sym)} count={agg_count} dest_sema={dest_sema_ty} current_ret={self.llvm_type_mangle(self.current_ret_type)}")
                 self.had_error = 1
                 return wl_get_undef(fallback_ty)
             // Check if this struct is bitpacked (stored as iN)
@@ -7375,15 +7404,19 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
         var dst_ty = ret_ty
         let dst_ty_opt = self.mir_local_types.get(dst_local)
         if dst_ty_opt.is_some():
-            dst_ty = dst_ty_opt.unwrap() as i64
-        else:
+            let cached_dst_ty = dst_ty_opt.unwrap() as i64
+            if cached_dst_ty != 0:
+                dst_ty = cached_dst_ty
+        if dst_ty == 0 or dst_ty == ret_ty:
             if dst_local >= 0 and dst_local < body.local_type_ids.len() as i32:
                 let sema_ty = body.local_type_ids.get(dst_local as i64)
                 if sema_ty > 0:
                     let resolved_llvm = self.mir_sema_type_to_llvm(sema_ty)
-                    if resolved_llvm != 0:
+                    if resolved_llvm != 0 and wl_get_type_kind(resolved_llvm) != wl_void_type_kind():
                         dst_ty = resolved_llvm
-            self.mir_local_types.insert(dst_local, dst_ty)
+        if dst_ty == 0:
+            dst_ty = ret_ty
+        self.mir_local_types.insert(dst_local, self.mir_storage_type_for_value(dst_ty))
         if self.debug_mir_codegen_enabled():
             with_eprint(f"[mir-call-ret] dst_local={dst_local} ret_ty_kind={wl_get_type_kind(ret_ty)} dst_ty_kind={wl_get_type_kind(dst_ty)} is_str={if self.is_str_type(dst_ty): 1 else: 0}")
         let dst_ptr = self.mir_place_ptr(body, dest_place, true, dst_ty)
@@ -7972,7 +8005,7 @@ fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, bod
     let fn_direct_ret_ty_opt = self.extern_fn_direct_ret_type.get(mono_sym)
     if fn_direct_ret_ty_opt.is_some():
         self.current_ret_type = fn_direct_ret_ty_opt.unwrap() as i64
-    self.current_method_owner_sym = 0
+    self.current_method_owner_sym = saved_owner
 
     let fresh_local_allocas: HashMap[i32, i64] = HashMap.new()
     let fresh_local_types: HashMap[i32, i64] = HashMap.new()

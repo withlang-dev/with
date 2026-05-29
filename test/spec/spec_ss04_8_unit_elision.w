@@ -1,31 +1,30 @@
-//! skip: non-executable spec sketch for Section 4.8 — Unit Elision (formerly 25.45); contains pseudo-code for unimplemented feature work
-// Spec test: Section 4.8 — Unit Elision (formerly 25.45)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+// Spec test: Section 4.8 — Unit Elision.
 
-// PASS: Ok() with Unit elision
 fn do_work -> Result[Unit, str]: Ok()
-fn test:
+
+fn do_work_explicit -> Result[Unit, str]: Ok(())
+
+fn takes_unit(value: Unit):
+    ()
+
+fn test_ok_unit_elision:
     assert(do_work().is_ok())
+    assert(do_work_explicit().is_ok())
 
-// PASS: Ok(()) still works
-fn do_work2 -> Result[Unit, str]: Ok(())
-fn test:
-    assert(do_work2().is_ok())
+fn test_function_unit_elision:
+    takes_unit()
+    takes_unit(())
 
-// PASS: unwrap_or with Unit elision
-fn test:
+fn test_result_unwrap_or_unit_elision:
     let r: Result[Unit, str] = Err("fail")
-    r.unwrap_or()                   // desugars to .unwrap_or(())
+    r.unwrap_or()
 
-// PASS: Unit elision in match
-fn test:
+fn test_unit_elision_in_match:
     let r: Result[Unit, str] = Ok()
     match r:
         Ok() => assert(true)
         Err(_) => assert(false)
 
-// PASS: no elision when T != Unit (Ok still requires argument)
-fn test:
-    let r: Result[i32, str] = Ok(42)   // 42 required, not Unit
+fn test_no_elision_when_payload_is_not_unit:
+    let r: Result[i32, str] = Ok(42)
     assert(r.unwrap_or(0) == 42)
