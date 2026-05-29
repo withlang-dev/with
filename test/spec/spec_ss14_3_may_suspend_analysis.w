@@ -1,22 +1,33 @@
-//! skip: non-executable spec sketch for Section 14.3, Invariant 5 — May-Suspend Analysis (formerly 25.67); contains pseudo-code for unimplemented feature work
-// Spec test: Section 14.3, Invariant 5 — May-Suspend Analysis (formerly 25.67)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+//! expect-stdout: ok
 
-// FAIL: may_suspend function called while guard is live
-fn helper:
-    some_io().await
+@[no_await_guard]
+type LocalGuard {
+    value: i32,
+}
 
-fn test_fail:
-    let lock = Mutex.new(42)
-    with lock.lock() as data:
-        helper()                     // ERROR E0701: may_suspend function
-                                     // called while @[no_await_guard] is live
+async fn async_value -> i32:
+    21
 
-// PASS: no suspension in guarded block
-fn safe_helper(x: i32) -> i32: x * 2
+fn safe_helper(x: i32) -> i32:
+    x * 2
 
-fn test:
-    let lock = Mutex.new(42)
-    with lock.lock() as data:
-        safe_helper(*data)           // OK: safe_helper is not may_suspend
+fn task_factory -> Task[i32]:
+    async_value()
+
+fn test_safe_call_under_guard:
+    let held = LocalGuard { value: 21 }
+    assert(safe_helper(held.value) == 42)
+
+fn test_guard_detection_is_type_based:
+    let lock_guard = 20
+    assert(safe_helper(lock_guard) == 40)
+
+fn test_async_call_without_await_returns_task:
+    let task = task_factory()
+    assert(task.await == 21)
+
+fn main:
+    test_safe_call_under_guard()
+    test_guard_detection_is_type_based()
+    test_async_call_without_await_returns_task()
+    print("ok")

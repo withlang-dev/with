@@ -734,6 +734,8 @@ fn Sema.collect_type_decl(self: Sema, node: i32, is_local: i32):
 
     if self.ast.is_must_use_type_node(node) != 0:
         self.must_use_types.insert(name, 1)
+    if self.ast.is_no_await_guard_type_node(node) != 0:
+        self.no_await_guard_types.insert(name, 1)
 
     if is_local != 0:
         self.local_type_names.insert(name, 1)

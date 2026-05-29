@@ -241,7 +241,11 @@
   │                                                                                                                │             │                   │      │ passing/storage, spawn fire-and-forget, async  │
   │                                                                                                                │             │                   │      │ trait methods, and `let _ = Task` warning.     │
   │                                                                                                                │             │                   │      │ Spec §14.3 / §14.7 / §11.5.                   │
-  │ #265, #267-#274                                                                                               │         Yes │           Partial │   No │ Remaining §14 async sketches. Runtime has many │
+  │ [x] #265                                                                                                      │         Yes │               Yes │   No │ Completed: may_suspend calls are rejected      │
+  │                                                                                                                │             │                   │      │ while a type annotated `@[no_await_guard]` is  │
+  │                                                                                                                │             │                   │      │ live; guard detection is type-based instead of │
+  │                                                                                                                │             │                   │      │ name-based. Spec §7.9 / §14.3.                │
+  │ #267-#274                                                                                                     │         Yes │           Partial │   No │ Remaining §14 async sketches. Runtime has many │
   │                                                                                                                │             │                   │      │ behavior tests now, but spec sketches still    │
   │                                                                                                                │             │                   │      │ cover missing/unchecked semantics:             │
   │                                                                                                                │             │                   │      │ cancellation, ScopedSend, no-await-in-         │

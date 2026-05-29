@@ -26,6 +26,7 @@ type Parser {
     pending_inline: i32,
     pending_noinline: i32,
     pending_must_use: i32,
+    pending_no_await_guard: i32,
     pending_panic_handler: i32,
     pending_entry: i32,
     pending_no_main: i32,
@@ -92,6 +93,7 @@ fn Parser.init_with_pool(tokens: TokenList, source: str, file_id: i32, intern: I
         pending_inline: 0,
         pending_noinline: 0,
         pending_must_use: 0,
+        pending_no_await_guard: 0,
         pending_panic_handler: 0,
         pending_entry: 0,
         pending_no_main: 0,
@@ -433,6 +435,7 @@ fn Parser.skip_attributes(self: Parser):
     self.pending_inline = 0
     self.pending_noinline = 0
     self.pending_must_use = 0
+    self.pending_no_await_guard = 0
     self.pending_panic_handler = 0
     self.pending_entry = 0
     self.pending_no_main = 0
@@ -469,6 +472,8 @@ fn Parser.skip_attributes(self: Parser):
             let attr_text = self.source.slice(attr_s as i64, attr_e as i64)
             if attr_text == "must_use":
                 self.pending_must_use = 1
+            if attr_text == "no_await_guard":
+                self.pending_no_await_guard = 1
             if attr_text == "flags":
                 self.pending_flags = 1
             if attr_text == "specified":
@@ -511,6 +516,9 @@ fn Parser.skip_attributes(self: Parser):
             self.pending_noinline = 1
             self.advance()
         else if self.is_ident_named("must_use"):
+            // Already handled by standalone check above
+            self.advance()
+        else if self.is_ident_named("no_await_guard"):
             // Already handled by standalone check above
             self.advance()
         else if self.is_ident_named("panic_handler"):
@@ -1457,6 +1465,9 @@ fn Parser.finish_type_decl(self: Parser, node: NodeId) -> NodeId:
     self.pending_derive_count = 0
     if self.pending_must_use != 0:
         self.pool.mark_must_use_type(node)
+    if self.pending_no_await_guard != 0:
+        self.pool.mark_no_await_guard_type(node)
+    self.pending_no_await_guard = 0
     node
 
 fn Parser.parse_struct_body(self: Parser) -> i32:
