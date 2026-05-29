@@ -101,9 +101,14 @@
   │                                                                                                                │             │                   │      │ non-Copy bases, moves non-overwritten fields   │
   │                                                                                                                │             │                   │      │ into the result, and drops overwritten fields. │
   │                                                                                                                │             │                   │      │ Spec §4.3 / §7.4.                              │
-  │ #207-#214                                                                                                      │         Yes │                No │   No │ Remaining §4 values/types skipped sketches.   │
-  │                                                                                                                │             │                   │      │ Cover enum accessors, ranges, tuples, unit     │
-  │                                                                                                                │             │                   │      │ elision, implicit Ok.                          │
+  │ [x] #207                                                                                                       │         Yes │               Yes │   No │ Completed: enum variant accessor methods are   │
+  │                                                                                                                │             │                   │      │ generated as Sema-recognized methods and lower │
+  │                                                                                                                │             │                   │      │ through MIR discriminants/downcasts; Option    │
+  │                                                                                                                │             │                   │      │ tuple payloads now have LLVM type mappings.    │
+  │                                                                                                                │             │                   │      │ Spec §4.4.                                     │
+  │ #208-#214                                                                                                      │         Yes │                No │   No │ Remaining §4 values/types skipped sketches.   │
+  │                                                                                                                │             │                   │      │ Cover ranges, tuples, unit elision, implicit   │
+  │                                                                                                                │             │                   │      │ Ok.                                            │
   │ #215-#217                                                                                                      │         Yes │                No │   No │ §5-§6 ephemeral/handles sketches. Split into   │
   │                                                                                                                │             │                   │      │ concrete tests and implement remaining         │
   │                                                                                                                │             │                   │      │ ephemeral/slotmap behavior.                    │

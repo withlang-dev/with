@@ -2685,6 +2685,29 @@ fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
         if cg_sym != 0:
             return self.resolve_named_type(cg_sym)
         return self.resolve_named_type(sym)
+    if tk == TypeKind.TY_TUPLE:
+        let elem_start = self.sema.get_type_d0(resolved_tid)
+        let elem_count = self.sema.get_type_d1(resolved_tid)
+        let elem_types: Vec[i64] = Vec.new()
+        for i in 0..elem_count:
+            let elem_tid = self.sema.type_extra.get((elem_start + i) as i64)
+            var elem_ty = self.sema_type_to_llvm(elem_tid)
+            if elem_ty == 0:
+                elem_ty = self.type_fallback()
+            elem_types.push(elem_ty)
+        if elem_count > 0:
+            return wl_struct_type(self.context, vec_data_i64(&elem_types), elem_count, 0)
+        return wl_i32_type(self.context)
+    if tk == TypeKind.TY_RANGE:
+        let elem_tid = self.sema.get_type_d0(resolved_tid)
+        var elem_ty = self.sema_type_to_llvm(elem_tid)
+        if elem_ty == 0:
+            elem_ty = wl_i32_type(self.context)
+        let range_fields: Vec[i64] = Vec.new()
+        range_fields.push(elem_ty)
+        range_fields.push(elem_ty)
+        range_fields.push(wl_i8_type(self.context))
+        return wl_struct_type(self.context, vec_data_i64(&range_fields), 3, 0)
     if tk == TypeKind.TY_ARRAY:
         let elem_tid = self.sema.get_type_d0(resolved_tid)
         let arr_len = self.sema.get_type_d1(resolved_tid)
@@ -2700,6 +2723,11 @@ fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
         fat_types.push(ptr_ty)
         fat_types.push(ptr_ty)
         return wl_struct_type(self.context, vec_data_i64(&fat_types), 2, 0)
+    if tk == TypeKind.TY_SLICE:
+        let slice_fields: Vec[i64] = Vec.new()
+        slice_fields.push(wl_ptr_type(self.context))
+        slice_fields.push(wl_i64_type(self.context))
+        return wl_struct_type(self.context, vec_data_i64(&slice_fields), 2, 0)
     0
 
 // Reverse map: LLVM type → sema TypeId (for primitives and str)
