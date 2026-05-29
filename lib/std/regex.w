@@ -152,7 +152,7 @@ pub fn Regex.compile_flags(pattern: str, flags: str) -> Result[Regex, RegexError
 pub fn Regex.__literal_code(slot: *mut *const i8, pattern: str, options: i32) -> *const i8:
     if slot as i64 == 0:
         return null
-    let existing = unsafe: *slot
+    let existing = unsafe *slot
     if existing as i64 != 0:
         return existing
     var err_code: i32 = 0
@@ -161,7 +161,7 @@ pub fn Regex.__literal_code(slot: *mut *const i8, pattern: str, options: i32) ->
     if compiled as i64 == 0:
         with_panic("invalid regex literal: " ++ regex_error_message(err_code), "", 0)
         return null
-    unsafe: *slot = compiled
+    unsafe *slot = compiled
     compiled
 
 pub fn Regex.pattern(self: &Self) -> str:
@@ -202,7 +202,7 @@ pub fn Regex.captures_at(self: &Self, text: str, start_offset: i32) -> Option[Ca
     let spans: Vec[i32] = Vec.new()
     var i: i32 = 0
     while i < ints_count:
-        spans.push(unsafe: *((raw as i64 + i as i64 * 4) as *const i32))
+        spans.push(unsafe *((raw as i64 + i as i64 * 4) as *const i32))
         i = i + 1
     with_free(raw as *mut u8)
     Some(Captures { regex_ptr: self.ptr, subject: text, spans: spans, })
@@ -213,33 +213,33 @@ pub fn Regex.is_match(self: &Self, text: str) -> bool:
 pub fn Regex.captures_match_op(self: &Self, text: str) -> Option[Captures]:
     if not self.is_global() or self.global_pos as i64 == 0 or self.global_subject_ptr as i64 == 0 or self.global_subject_len as i64 == 0:
         return self.captures(text)
-    let subject_ptr = unsafe: *(&text as *const *const u8) as i64
+    let subject_ptr = unsafe *(&text as *const *const u8) as i64
     let subject_len = text.len()
-    if unsafe: *self.global_subject_ptr != subject_ptr or unsafe: *self.global_subject_len != subject_len:
-        unsafe: *self.global_subject_ptr = subject_ptr
-        unsafe: *self.global_subject_len = subject_len
-        unsafe: *self.global_pos = 0
-    let start_offset = unsafe: *self.global_pos
+    if unsafe *self.global_subject_ptr != subject_ptr or unsafe *self.global_subject_len != subject_len:
+        unsafe *self.global_subject_ptr = subject_ptr
+        unsafe *self.global_subject_len = subject_len
+        unsafe *self.global_pos = 0
+    let start_offset = unsafe *self.global_pos
     match self.captures_at(text, start_offset):
         Some(captures) => {
             match captures.get(0):
                 Some(found) => {
                     if found.end == found.start:
                         if found.end >= text.len() as i32:
-                            unsafe: *self.global_pos = text.len() as i32 + 1
+                            unsafe *self.global_pos = text.len() as i32 + 1
                         else:
-                            unsafe: *self.global_pos = found.end + 1
+                            unsafe *self.global_pos = found.end + 1
                     else:
-                        unsafe: *self.global_pos = found.end
+                        unsafe *self.global_pos = found.end
                     Some(captures)
                 }
                 None => {
-                    unsafe: *self.global_pos = 0
+                    unsafe *self.global_pos = 0
                     None
                 }
         }
         None => {
-            unsafe: *self.global_pos = 0
+            unsafe *self.global_pos = 0
             None
         }
 

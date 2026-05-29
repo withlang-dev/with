@@ -15,7 +15,7 @@ fn test_global_variables:
 fn test_pointer_deref:
     var x: i32 = 3
     let y = &raw mut x
-    unsafe: *y = *y + 1
+    unsafe *y = unsafe *y + 1
     assert(x == 4)
 
 fn test_variable_mutation:
@@ -146,7 +146,7 @@ fn test_struct_mutation:
     assert(p.y == 20)
 
 fn inc(x: *mut i32):
-    unsafe: *x = *x + 1
+    unsafe *x = unsafe *x + 1
 
 fn test_pass_by_ptr:
     var val = 41

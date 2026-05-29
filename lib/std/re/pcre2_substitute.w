@@ -325,9 +325,9 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
         (__local_substitute_case_callout__goto_765_14 = ((null as *mut fn(*const u8, c_ulong, *mut u8, c_ulong, c_int, *mut c_void) -> c_ulong)))
         (__local_substitute_case_callout_data__goto_767_7 = null)
         (__local_buff_offset__goto_760_12 = 0)
-        (__local_buff_length__goto_760_25 = (unsafe: *__param_blength))
+        (__local_buff_length__goto_760_25 = (unsafe *__param_blength))
         (__local_lengthleft__goto_760_38 = __local_buff_length__goto_760_25)
-        ((unsafe: *__param_blength) = (~(0 as c_ulong)))
+        ((unsafe *__param_blength) = (~(0 as c_ulong)))
         if ((if __param_mcontext != null: 1 else: 0) != 0) {
             goto '__ci_bb_1
         } else {
@@ -382,7 +382,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_8 {
-        (__local_replacement = (&(unsafe: __local_null_str__goto_755_13[0]) as *mut u8))
+        (__local_replacement = (&__local_null_str__goto_755_13[0] as *mut u8))
         goto '__ci_bb_6
     }
 
@@ -421,7 +421,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_14 {
-        (__local_subject = (&(unsafe: __local_null_str__goto_755_13[0]) as *mut u8))
+        (__local_subject = (&__local_null_str__goto_755_13[0] as *mut u8))
         goto '__ci_bb_12
     }
 
@@ -576,9 +576,9 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
 
     '__ci_bb_33 {
         if ((if __param_mcontext == null: 1 else: 0) != 0) {
-            with_memcpy((&raw mut __ci_expr_ternary_6 as *i8), (&raw const (unsafe: *(__param_code as *mut pcre2_real_code_8)).memctl as *i8), sizeof[pcre2_memctl]())
+            with_memcpy((&raw mut __ci_expr_ternary_6 as *i8), (&raw const (unsafe *(__param_code as *mut pcre2_real_code_8)).memctl as *i8), sizeof[pcre2_memctl]())
         } else {
-            with_memcpy((&raw mut __ci_expr_ternary_6 as *i8), (&raw const (unsafe: *__param_mcontext).memctl as *i8), sizeof[pcre2_memctl]())
+            with_memcpy((&raw mut __ci_expr_ternary_6 as *i8), (&raw const (unsafe *__param_mcontext).memctl as *i8), sizeof[pcre2_memctl]())
         }
         with_memcpy((&raw mut __local_gcontext__goto_876_25.memctl as *i8), (&raw const __ci_expr_ternary_6 as *i8), sizeof[pcre2_memctl]())
         (__local_internal_match_data__goto_748_19 = pcre2_match_data_create_from_pattern_8(__param_code, (&raw mut __local_gcontext__goto_876_25 as *mut pcre2_real_general_context_8)))
@@ -616,9 +616,9 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
 
     '__ci_bb_38 {
         if ((if __param_mcontext == null: 1 else: 0) != 0) {
-            with_memcpy((&raw mut __ci_expr_ternary_7 as *i8), (&raw const (unsafe: *(__param_code as *mut pcre2_real_code_8)).memctl as *i8), sizeof[pcre2_memctl]())
+            with_memcpy((&raw mut __ci_expr_ternary_7 as *i8), (&raw const (unsafe *(__param_code as *mut pcre2_real_code_8)).memctl as *i8), sizeof[pcre2_memctl]())
         } else {
-            with_memcpy((&raw mut __ci_expr_ternary_7 as *i8), (&raw const (unsafe: *__param_mcontext).memctl as *i8), sizeof[pcre2_memctl]())
+            with_memcpy((&raw mut __ci_expr_ternary_7 as *i8), (&raw const (unsafe *__param_mcontext).memctl as *i8), sizeof[pcre2_memctl]())
         }
         with_memcpy((&raw mut __local_gcontext__goto_888_25.memctl as *i8), (&raw const __ci_expr_ternary_7 as *i8), sizeof[pcre2_memctl]())
         (__ci_expr_ternary_8 = 0)
@@ -646,9 +646,9 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
 
     '__ci_bb_41 {
         with_memcpy((__local_internal_match_data__goto_748_19 as *i8), (__local_match_data as *i8), (((120 as c_ulong) +% ((((2 * __local_pairs__goto_887_7) as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong)) as i64))
-        ((unsafe: *__local_internal_match_data__goto_748_19).heapframes = ((null as *mut heapframe)))
-        ((unsafe: *__local_internal_match_data__goto_748_19).heapframes_size = 0)
-        ((unsafe: *__local_internal_match_data__goto_748_19).flags = __local_internal_match_data__goto_748_19.flags & (~1))
+        ((unsafe *__local_internal_match_data__goto_748_19).heapframes = ((null as *mut heapframe)))
+        ((unsafe *__local_internal_match_data__goto_748_19).heapframes_size = 0)
+        ((unsafe *__local_internal_match_data__goto_748_19).flags = __local_internal_match_data__goto_748_19.flags & (~1))
         (__local_match_data = __local_internal_match_data__goto_748_19)
         goto '__ci_bb_39
     }
@@ -677,7 +677,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_44 {
-        (__local_rc__goto_743_5 = _pcre2_valid_utf_8(__local_replacement, __local_rlength, ((&raw const (unsafe: *__local_match_data).startchar as *const c_ulong) as *mut c_ulong)))
+        (__local_rc__goto_743_5 = _pcre2_valid_utf_8(__local_replacement, __local_rlength, ((&raw const (unsafe *__local_match_data).startchar as *const c_ulong) as *mut c_ulong)))
         if ((if __local_rc__goto_743_5 != 0: 1 else: 0) != 0) {
             goto '__ci_bb_46
         } else {
@@ -696,7 +696,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_46 {
-        ((unsafe: *__local_match_data).leftchar = 0)
+        ((unsafe *__local_match_data).leftchar = 0)
         goto '__ci_bb_48
     }
 
@@ -713,7 +713,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_49 {
-        ((unsafe: *__local_match_data).leftchar = 0)
+        ((unsafe *__local_match_data).leftchar = 0)
         (__local_rc__goto_743_5 = -33)
         goto '__ci_bb_48
     }
@@ -901,10 +901,10 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_80 {
-        if ((if (unsafe: __local_ovector__goto_761_13[1]) < (unsafe: __local_ovector__goto_761_13[0]): 1 else: 0) != 0) {
+        if ((if (unsafe __local_ovector__goto_761_13[1]) < (unsafe __local_ovector__goto_761_13[0]): 1 else: 0) != 0) {
             (__ci_expr_logic_10 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_10 = (if (if (unsafe: __local_ovector__goto_761_13[0]) < __local_start_offset: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_10 = (if (if (unsafe __local_ovector__goto_761_13[0]) < __local_start_offset: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_10 != 0) {
             goto '__ci_bb_81
@@ -923,19 +923,19 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
         if ((if __local_subs__goto_744_5 > 0: 1 else: 0) != 0) {
             var __ci_expr_logic_13: c_int
 
-            if ((if (unsafe: __local_ovector__goto_761_13[1]) > __local_ovecsave__goto_762_12[1]: 1 else: 0) != 0) {
+            if ((if (unsafe __local_ovector__goto_761_13[1]) > __local_ovecsave__goto_762_12[1]: 1 else: 0) != 0) {
                 (__ci_expr_logic_13 = (if true: 1 else: 0))
             } else {
                 var __ci_expr_logic_12: c_int = 0
 
                 var __ci_expr_logic_11: c_int = 0
 
-                if ((if (unsafe: __local_ovector__goto_761_13[1]) == (unsafe: __local_ovector__goto_761_13[0]): 1 else: 0) != 0) {
+                if ((if (unsafe __local_ovector__goto_761_13[1]) == (unsafe __local_ovector__goto_761_13[0]): 1 else: 0) != 0) {
                     (__ci_expr_logic_11 = (if (if __local_ovecsave__goto_762_12[1] > __local_ovecsave__goto_762_12[0]: 1 else: 0) != 0: 1 else: 0))
                 }
 
                 if (__ci_expr_logic_11 != 0) {
-                    (__ci_expr_logic_12 = (if (if (unsafe: __local_ovector__goto_761_13[1]) == __local_ovecsave__goto_762_12[1]: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_12 = (if (if (unsafe __local_ovector__goto_761_13[1]) == __local_ovecsave__goto_762_12[1]: 1 else: 0) != 0: 1 else: 0))
                 }
 
                 (__ci_expr_logic_13 = (if __ci_expr_logic_12 != 0: 1 else: 0))
@@ -957,8 +957,8 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_84 {
-        (__local_ovecsave__goto_762_12[0] = (unsafe: __local_ovector__goto_761_13[0]))
-        (__local_ovecsave__goto_762_12[1] = (unsafe: __local_ovector__goto_761_13[1]))
+        (__local_ovecsave__goto_762_12[0] = (unsafe __local_ovector__goto_761_13[0]))
+        (__local_ovecsave__goto_762_12[1] = (unsafe __local_ovector__goto_761_13[1]))
         if ((if __local_subs__goto_744_5 == 2147483647: 1 else: 0) != 0) {
             goto '__ci_bb_88
         } else {
@@ -1003,7 +1003,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_91 {
-        (__local_fraglength__goto_760_50 = (((unsafe: __local_ovector__goto_761_13[0]) as c_ulong) -% (__local_start_offset as c_ulong)))
+        (__local_fraglength__goto_760_50 = (((unsafe __local_ovector__goto_761_13[0]) as c_ulong) -% (__local_start_offset as c_ulong)))
         if ((if not (__local_replacement_only__goto_752_6 != 0): 1 else: 0) != 0) {
             goto '__ci_bb_92
         } else {
@@ -1260,11 +1260,11 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     '__ci_bb_131 {
         (__ci_expr_logic_16 = 0)
         (__ci_expr_logic_15 = 0)
-        if ((if (unsafe: __local_ptr__goto_757_12[0]) == 92: 1 else: 0) != 0) {
+        if ((if (unsafe __local_ptr__goto_757_12[0]) == 92: 1 else: 0) != 0) {
             (__ci_expr_logic_15 = (if (if __local_ptr__goto_757_12 < (__local_repend__goto_758_12 - ((1 as isize) as usize)): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_15 != 0) {
-            (__ci_expr_logic_16 = (if (if (unsafe: __local_ptr__goto_757_12[1]) == 69: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_16 = (if (if (unsafe __local_ptr__goto_757_12[1]) == 69: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_16 != 0) {
             goto '__ci_bb_133
@@ -1274,7 +1274,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_132 {
-        if ((if (unsafe: *__local_ptr__goto_757_12) == 36: 1 else: 0) != 0) {
+        if ((if (unsafe *__local_ptr__goto_757_12) == 36: 1 else: 0) != 0) {
             goto '__ci_bb_136
         } else {
             goto '__ci_bb_137
@@ -1295,7 +1295,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
         (__local_ch_start__goto_1585_18 = __local_ptr__goto_757_12)
         (__ci_expr_old_52 = __local_ptr__goto_757_12)
         (__local_ptr__goto_757_12 = __local_ptr__goto_757_12 + 1)
-        (__local_ch__goto_1053_14 = (unsafe: *__ci_expr_old_52))
+        (__local_ch__goto_1053_14 = (unsafe *__ci_expr_old_52))
         (__ci_expr_logic_53 = 0)
         if (__local_utf__goto_753_6 != 0) {
             (__ci_expr_logic_53 = (if (if __local_ch__goto_1053_14 >= 192: 1 else: 0) != 0: 1 else: 0))
@@ -1319,7 +1319,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     '__ci_bb_137 {
         (__ci_expr_logic_42 = 0)
         if ((if ((__local_suboptions__goto_747_10 as c_uint) & (512 as c_uint)) != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_42 = (if (if (unsafe: *__local_ptr__goto_757_12) == 92: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_42 = (if (if (unsafe *__local_ptr__goto_757_12) == 92: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_42 != 0) {
             goto '__ci_bb_333
@@ -1337,7 +1337,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_140 {
-        (__local_next__goto_1094_19 = (unsafe: *__local_ptr__goto_757_12))
+        (__local_next__goto_1094_19 = (unsafe *__local_ptr__goto_757_12))
         if ((if __local_next__goto_1094_19 == 36: 1 else: 0) != 0) {
             goto '__ci_bb_142
         } else {
@@ -1431,18 +1431,18 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_151 {
-        ((unsafe: *__param_blength) = (((((__local_ptr__goto_757_12 as usize) -% (__local_replacement as usize)) / sizeof[u8]()) as c_ulong)))
+        ((unsafe *__param_blength) = (((((__local_ptr__goto_757_12 as usize) -% (__local_replacement as usize)) / sizeof[u8]()) as c_ulong)))
         goto '__ci_bb_48
     }
 
     '__ci_bb_152 {
         (__local_subptr__goto_1095_18 = __local_subject)
-        (__local_subptrend__goto_1095_26 = __local_subject + ((unsafe: __local_ovector__goto_761_13[0]) as usize))
+        (__local_subptrend__goto_1095_26 = __local_subject + ((unsafe __local_ovector__goto_761_13[0]) as usize))
         goto '__ci_bb_154
     }
 
     '__ci_bb_153 {
-        (__local_subptr__goto_1095_18 = __local_subject + ((unsafe: __local_ovector__goto_761_13[1]) as usize))
+        (__local_subptr__goto_1095_18 = __local_subject + ((unsafe __local_ovector__goto_761_13[1]) as usize))
         (__local_subptrend__goto_1095_26 = __local_subject + (__local_length as usize))
         goto '__ci_bb_154
     }
@@ -1476,7 +1476,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
             var __ci_expr_logic_18: c_int = 0
 
             if ((if (__local_ptr__goto_757_12 + ((1 as isize) as usize)) < __local_repend__goto_758_12: 1 else: 0) != 0) {
-                (__ci_expr_logic_18 = (if (if (unsafe: __local_ptr__goto_757_12[1]) == 123: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_18 = (if (if (unsafe __local_ptr__goto_757_12[1]) == 123: 1 else: 0) != 0: 1 else: 0))
             }
 
             (__ci_expr_logic_19 = (if (if not (__ci_expr_logic_18 != 0): 1 else: 0) != 0: 1 else: 0))
@@ -1563,7 +1563,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_169 {
-        if ((if (unsafe: __local_ovector__goto_761_13[(2 * __local_group__goto_1055_9)]) != (~(0 as c_ulong)): 1 else: 0) != 0) {
+        if ((if (unsafe __local_ovector__goto_761_13[(2 * __local_group__goto_1055_9)]) != (~(0 as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_172
         } else {
             goto '__ci_bb_173
@@ -1642,7 +1642,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_182 {
-        (__local_next__goto_1094_19 = (unsafe: *__local_ptr__goto_757_12))
+        (__local_next__goto_1094_19 = (unsafe *__local_ptr__goto_757_12))
         (__local_inparens__goto_1090_12 = 1)
         goto '__ci_bb_180
     }
@@ -1665,7 +1665,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_186 {
-        (__local_next__goto_1094_19 = (unsafe: *__local_ptr__goto_757_12))
+        (__local_next__goto_1094_19 = (unsafe *__local_ptr__goto_757_12))
         (__local_inangle__goto_1091_12 = 1)
         goto '__ci_bb_184
     }
@@ -1704,7 +1704,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_190 {
-        (__local_next__goto_1094_19 = (unsafe: *__local_ptr__goto_757_12))
+        (__local_next__goto_1094_19 = (unsafe *__local_ptr__goto_757_12))
         (__local_star__goto_1092_12 = 1)
         goto '__ci_bb_188
     }
@@ -1743,7 +1743,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_195 {
-        (__local_next__goto_1094_19 = (unsafe: *__local_ptr__goto_757_12))
+        (__local_next__goto_1094_19 = (unsafe *__local_ptr__goto_757_12))
         if ((if __local_next__goto_1094_19 < 48: 1 else: 0) != 0) {
             (__ci_expr_logic_24 = (if true: 1 else: 0))
         } else {
@@ -1799,10 +1799,10 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
         (__ci_expr_logic_25 = 0)
         (__local_ptr__goto_757_12 = __local_ptr__goto_757_12 + 1)
         if ((if __local_ptr__goto_757_12 < __local_repend__goto_758_12: 1 else: 0) != 0) {
-            (__ci_expr_logic_25 = (if (if (unsafe: *__local_ptr__goto_757_12) >= 48: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_25 = (if (if (unsafe *__local_ptr__goto_757_12) >= 48: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_25 != 0) {
-            (__ci_expr_logic_26 = (if (if (unsafe: *__local_ptr__goto_757_12) <= 57: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_26 = (if (if (unsafe *__local_ptr__goto_757_12) <= 57: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_26 != 0) {
             goto '__ci_bb_205
@@ -1825,7 +1825,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
 
     '__ci_bb_208 {
         (__local_name_len__goto_1239_20 = ((__local_ptr__goto_757_12 as usize) -% (__local_name_start__goto_1240_20 as usize)) / sizeof[u8]())
-        with_memcpy(((&(unsafe: __local_name__goto_1061_17[0]) as *mut u8) as *i8), (__local_name_start__goto_1240_20 as *i8), (((__local_name_len__goto_1239_20 as c_ulong) *% (1 as c_ulong)) as i64))
+        with_memcpy(((&__local_name__goto_1061_17[0] as *mut u8) as *i8), (__local_name_start__goto_1240_20 as *i8), (((__local_name_len__goto_1239_20 as c_ulong) *% (1 as c_ulong)) as i64))
         (__local_name__goto_1061_17[__local_name_len__goto_1239_20] = 0)
         goto '__ci_bb_193
     }
@@ -1841,7 +1841,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
             (__ci_expr_logic_28 = (if (if __local_ptr__goto_757_12 < (__local_repend__goto_758_12 - ((2 as isize) as usize)): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_28 != 0) {
-            (__ci_expr_logic_29 = (if (if (unsafe: *__local_ptr__goto_757_12) == 58: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_29 = (if (if (unsafe *__local_ptr__goto_757_12) == 58: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_29 != 0) {
             goto '__ci_bb_211
@@ -1860,7 +1860,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
 
     '__ci_bb_211 {
         (__local_ptr__goto_757_12 = __local_ptr__goto_757_12 + 1)
-        (__local_special__goto_1056_14 = (unsafe: *__local_ptr__goto_757_12))
+        (__local_special__goto_1056_14 = (unsafe *__local_ptr__goto_757_12))
         (__ci_expr_logic_30 = 0)
         if ((if __local_special__goto_1056_14 != 43: 1 else: 0) != 0) {
             (__ci_expr_logic_30 = (if (if __local_special__goto_1056_14 != 45: 1 else: 0) != 0: 1 else: 0))
@@ -1876,7 +1876,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
         if ((if __local_ptr__goto_757_12 >= __local_repend__goto_758_12: 1 else: 0) != 0) {
             (__ci_expr_logic_32 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_32 = (if (if (unsafe: *__local_ptr__goto_757_12) != 125: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_32 = (if (if (unsafe *__local_ptr__goto_757_12) != 125: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_32 != 0) {
             goto '__ci_bb_222
@@ -1914,7 +1914,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
         (__local_text1_end__goto_1058_16 = __local_ptr__goto_757_12)
         (__ci_expr_logic_31 = 0)
         if ((if __local_special__goto_1056_14 == 43: 1 else: 0) != 0) {
-            (__ci_expr_logic_31 = (if (if (unsafe: *__local_ptr__goto_757_12) == 58: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_31 = (if (if (unsafe *__local_ptr__goto_757_12) == 58: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_31 != 0) {
             goto '__ci_bb_218
@@ -1960,7 +1960,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
         if ((if __local_ptr__goto_757_12 >= __local_repend__goto_758_12: 1 else: 0) != 0) {
             (__ci_expr_logic_33 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_33 = (if (if (unsafe: *__local_ptr__goto_757_12) != 62: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_33 = (if (if (unsafe *__local_ptr__goto_757_12) != 62: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_33 != 0) {
             goto '__ci_bb_226
@@ -1987,7 +1987,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_228 {
-        if ((if _pcre2_strcmp_c8_8((&(unsafe: __local_name__goto_1061_17[0]) as *mut u8), "\x4d\x41\x52\x4b") == 0: 1 else: 0) != 0) {
+        if ((if _pcre2_strcmp_c8_8((&__local_name__goto_1061_17[0] as *mut u8), "\x4d\x41\x52\x4b") == 0: 1 else: 0) != 0) {
             goto '__ci_bb_231
         } else {
             goto '__ci_bb_232
@@ -2020,7 +2020,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_234 {
-        (__local_fraglength__goto_760_50 = (unsafe: __local_mark__goto_1306_22[-1]))
+        (__local_fraglength__goto_760_50 = (unsafe __local_mark__goto_1306_22[-1]))
         (__ci_expr_logic_34 = 0)
         if ((if (&raw const __local_forcecase__goto_962_14 as *const case_state).to_case != 0: 1 else: 0) != 0) {
             (__ci_expr_logic_34 = (if (if __local_substitute_case_callout__goto_765_14 == null: 1 else: 0) != 0: 1 else: 0))
@@ -2209,7 +2209,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_264 {
-        (__local_rc__goto_743_5 = pcre2_substring_nametable_scan_8(__param_code, (&(unsafe: __local_name__goto_1061_17[0]) as *mut u8), (&raw mut __local_first__goto_1335_22 as *mut *const u8), (&raw mut __local_last__goto_1335_29 as *mut *const u8)))
+        (__local_rc__goto_743_5 = pcre2_substring_nametable_scan_8(__param_code, (&__local_name__goto_1061_17[0] as *mut u8), (&raw mut __local_first__goto_1335_22 as *mut *const u8), (&raw mut __local_last__goto_1335_29 as *mut *const u8)))
         (__ci_expr_logic_36 = 0)
         if ((if __local_rc__goto_743_5 == -49: 1 else: 0) != 0) {
             (__ci_expr_logic_36 = (if (if ((__local_suboptions__goto_747_10 as c_uint) & (2048 as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
@@ -2265,7 +2265,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_272 {
-        (__local_ng__goto_1347_24 = ((((((unsafe: __local_entry__goto_1335_35[0]) as c_int) << (8 as c_uint)) | ((unsafe: __local_entry__goto_1335_35[(0 + 1)]) as c_int)) as c_uint)))
+        (__local_ng__goto_1347_24 = ((((((unsafe __local_entry__goto_1335_35[0]) as c_int) << (8 as c_uint)) | ((unsafe __local_entry__goto_1335_35[(0 + 1)]) as c_int)) as c_uint)))
         if ((if __local_ng__goto_1347_24 < __local_ovector_count__goto_745_10: 1 else: 0) != 0) {
             goto '__ci_bb_275
         } else {
@@ -2304,7 +2304,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_278 {
-        if ((if (unsafe: __local_ovector__goto_761_13[((__local_ng__goto_1347_24 as c_uint) *% (2 as c_uint))]) != (~(0 as c_ulong)): 1 else: 0) != 0) {
+        if ((if (unsafe __local_ovector__goto_761_13[((__local_ng__goto_1347_24 as c_uint) *% (2 as c_uint))]) != (~(0 as c_ulong)): 1 else: 0) != 0) {
             goto '__ci_bb_279
         } else {
             goto '__ci_bb_280
@@ -2321,7 +2321,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_281 {
-        (__local_group__goto_1055_9 = ((((((unsafe: __local_first__goto_1335_22[0]) as c_int) << (8 as c_uint)) | ((unsafe: __local_first__goto_1335_22[(0 + 1)]) as c_int)) as c_uint)))
+        (__local_group__goto_1055_9 = ((((((unsafe __local_first__goto_1335_22[0]) as c_int) << (8 as c_uint)) | ((unsafe __local_first__goto_1335_22[(0 + 1)]) as c_int)) as c_uint)))
         goto '__ci_bb_282
     }
 
@@ -2433,8 +2433,8 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_299 {
-        (__local_subptr__goto_1095_18 = __local_subject + ((unsafe: __local_ovector__goto_761_13[(__local_group__goto_1055_9 * 2)]) as usize))
-        (__local_subptrend__goto_1095_26 = __local_subject + ((unsafe: __local_ovector__goto_761_13[((__local_group__goto_1055_9 * 2) + 1)]) as usize))
+        (__local_subptr__goto_1095_18 = __local_subject + ((unsafe __local_ovector__goto_761_13[(__local_group__goto_1055_9 * 2)]) as usize))
+        (__local_subptrend__goto_1095_26 = __local_subject + ((unsafe __local_ovector__goto_761_13[((__local_group__goto_1055_9 * 2) + 1)]) as usize))
         goto '__ci_bb_155
     }
 
@@ -2674,7 +2674,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_338 {
-        if ((unsafe: __local_ptr__goto_757_12[1]) == 76) {
+        if ((unsafe __local_ptr__goto_757_12[1]) == 76) {
             goto '__ci_bb_340
         } else {
             goto '__ci_bb_349
@@ -2699,10 +2699,10 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
         (__ci_expr_logic_44 = 0)
         (__ci_expr_logic_43 = 0)
         if ((if (__local_ptr__goto_757_12 + ((2 as isize) as usize)) < __local_repend__goto_758_12: 1 else: 0) != 0) {
-            (__ci_expr_logic_43 = (if (if (unsafe: __local_ptr__goto_757_12[0]) == 92: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_43 = (if (if (unsafe __local_ptr__goto_757_12[0]) == 92: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_43 != 0) {
-            (__ci_expr_logic_44 = (if (if (unsafe: __local_ptr__goto_757_12[1]) == 85: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_44 = (if (if (unsafe __local_ptr__goto_757_12[1]) == 85: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_44 != 0) {
             goto '__ci_bb_342
@@ -2736,10 +2736,10 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
         (__ci_expr_logic_46 = 0)
         (__ci_expr_logic_45 = 0)
         if ((if (__local_ptr__goto_757_12 + ((2 as isize) as usize)) < __local_repend__goto_758_12: 1 else: 0) != 0) {
-            (__ci_expr_logic_45 = (if (if (unsafe: __local_ptr__goto_757_12[0]) == 92: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_45 = (if (if (unsafe __local_ptr__goto_757_12[0]) == 92: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_45 != 0) {
-            (__ci_expr_logic_46 = (if (if (unsafe: __local_ptr__goto_757_12[1]) == 76: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_46 = (if (if (unsafe __local_ptr__goto_757_12[1]) == 76: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_46 != 0) {
             goto '__ci_bb_346
@@ -2764,7 +2764,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_349 {
-        if ((unsafe: __local_ptr__goto_757_12[1]) == 108) {
+        if ((unsafe __local_ptr__goto_757_12[1]) == 108) {
             goto '__ci_bb_341
         } else {
             goto '__ci_bb_350
@@ -2772,7 +2772,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_350 {
-        if ((unsafe: __local_ptr__goto_757_12[1]) == 85) {
+        if ((unsafe __local_ptr__goto_757_12[1]) == 85) {
             goto '__ci_bb_344
         } else {
             goto '__ci_bb_351
@@ -2780,7 +2780,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_351 {
-        if ((unsafe: __local_ptr__goto_757_12[1]) == 117) {
+        if ((unsafe __local_ptr__goto_757_12[1]) == 117) {
             goto '__ci_bb_345
         } else {
             goto '__ci_bb_348
@@ -3017,7 +3017,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_390 {
-        (__local_chlen__goto_1054_18 = _pcre2_ord2utf_8(__local_ch__goto_1053_14, (&(unsafe: __local_temp__goto_754_13[0]) as *mut u8)))
+        (__local_chlen__goto_1054_18 = _pcre2_ord2utf_8(__local_ch__goto_1053_14, (&__local_temp__goto_754_13[0] as *mut u8)))
         goto '__ci_bb_392
     }
 
@@ -3059,7 +3059,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
         } else {
             (__ci_expr_ternary_49 = __local_lengthleft__goto_760_38)
         }
-        (__local_chkcc_rc__goto_1539_11 = default_substitute_case_callout((&(unsafe: __local_temp__goto_754_13[0]) as *mut u8), __local_chkcc_length__goto_1539_11, (__param_buffer + (__local_buff_offset__goto_760_12 as usize)), __ci_expr_ternary_49, (&raw mut __local_forcecase__goto_962_14 as *mut case_state), __param_code))
+        (__local_chkcc_rc__goto_1539_11 = default_substitute_case_callout((&__local_temp__goto_754_13[0] as *mut u8), __local_chkcc_length__goto_1539_11, (__param_buffer + (__local_buff_offset__goto_760_12 as usize)), __ci_expr_ternary_49, (&raw mut __local_forcecase__goto_962_14 as *mut case_state), __param_code))
         if (__local_overflowed__goto_750_6 != 0) {
             goto '__ci_bb_399
         } else {
@@ -3191,7 +3191,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_417 {
-        with_memcpy(((__param_buffer + (__local_buff_offset__goto_760_12 as usize)) as *i8), ((&(unsafe: __local_temp__goto_754_13[0]) as *mut u8) as *i8), (((__local_chkmc_length__goto_1541_11 as c_ulong) *% (1 as c_ulong)) as i64))
+        with_memcpy(((__param_buffer + (__local_buff_offset__goto_760_12 as usize)) as *i8), ((&__local_temp__goto_754_13[0] as *mut u8) as *i8), (((__local_chkmc_length__goto_1541_11 as c_ulong) *% (1 as c_ulong)) as i64))
         (__local_buff_offset__goto_760_12 = __local_buff_offset__goto_760_12 + __local_chkmc_length__goto_1541_11)
         (__local_lengthleft__goto_760_38 = __local_lengthleft__goto_760_38 - __local_chkmc_length__goto_1541_11)
         goto '__ci_bb_418
@@ -3215,7 +3215,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
         if ((if __local_ptr__goto_757_12 >= __local_repend__goto_758_12: 1 else: 0) != 0) {
             (__ci_expr_logic_50 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_50 = (if (if (unsafe: *__local_ptr__goto_757_12) != 60: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_50 = (if (if (unsafe *__local_ptr__goto_757_12) != 60: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_50 != 0) {
             goto '__ci_bb_422
@@ -3247,7 +3247,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
         if ((if __local_ptr__goto_757_12 >= __local_repend__goto_758_12: 1 else: 0) != 0) {
             (__ci_expr_logic_51 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_51 = (if (if (unsafe: *__local_ptr__goto_757_12) != 62: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_51 = (if (if (unsafe *__local_ptr__goto_757_12) != 62: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_51 != 0) {
             goto '__ci_bb_426
@@ -3264,7 +3264,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
         (__local_ptr__goto_757_12 = __local_ptr__goto_757_12 + 1)
         (__local_special__goto_1056_14 = 0)
         (__local_group__goto_1055_9 = -1)
-        with_memcpy(((&(unsafe: __local_name__goto_1061_17[0]) as *mut u8) as *i8), (__local_name_start__goto_1547_22 as *i8), (((__local_name_len__goto_1546_22 as c_ulong) *% (1 as c_ulong)) as i64))
+        with_memcpy(((&__local_name__goto_1061_17[0] as *mut u8) as *i8), (__local_name_start__goto_1547_22 as *i8), (((__local_name_len__goto_1546_22 as c_ulong) *% (1 as c_ulong)) as i64))
         (__local_name__goto_1061_17[__local_name_len__goto_1546_22] = 0)
         goto '__ci_bb_146
     }
@@ -3351,7 +3351,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     '__ci_bb_438 {
         (__ci_expr_old_54 = __local_ptr__goto_757_12)
         (__local_ptr__goto_757_12 = __local_ptr__goto_757_12 + 1)
-        (__local_ch__goto_1053_14 = (((((__local_ch__goto_1053_14 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((unsafe: *__ci_expr_old_54) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+        (__local_ch__goto_1053_14 = (((((__local_ch__goto_1053_14 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((unsafe *__ci_expr_old_54) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
         goto '__ci_bb_440
     }
 
@@ -3368,7 +3368,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_441 {
-        (__local_ch__goto_1053_14 = (((((((__local_ch__goto_1053_14 as c_uint) & (15 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint) | (((((((unsafe: *__local_ptr__goto_757_12) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_ptr__goto_757_12[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+        (__local_ch__goto_1053_14 = (((((((__local_ch__goto_1053_14 as c_uint) & (15 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint) | (((((((unsafe *__local_ptr__goto_757_12) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_ptr__goto_757_12[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
         (__local_ptr__goto_757_12 = __local_ptr__goto_757_12 + ((2 as isize) as usize))
         goto '__ci_bb_443
     }
@@ -3386,7 +3386,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_444 {
-        (__local_ch__goto_1053_14 = (((((((((__local_ch__goto_1053_14 as c_uint) & (7 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint) | (((((((unsafe: *__local_ptr__goto_757_12) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_ptr__goto_757_12[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_ptr__goto_757_12[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+        (__local_ch__goto_1053_14 = (((((((((__local_ch__goto_1053_14 as c_uint) & (7 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint) | (((((((unsafe *__local_ptr__goto_757_12) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_757_12[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_ptr__goto_757_12[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
         (__local_ptr__goto_757_12 = __local_ptr__goto_757_12 + ((3 as isize) as usize))
         goto '__ci_bb_446
     }
@@ -3404,13 +3404,13 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_447 {
-        (__local_ch__goto_1053_14 = (((((((((((__local_ch__goto_1053_14 as c_uint) & (3 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint) | (((((((unsafe: *__local_ptr__goto_757_12) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_ptr__goto_757_12[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_ptr__goto_757_12[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_ptr__goto_757_12[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+        (__local_ch__goto_1053_14 = (((((((((((__local_ch__goto_1053_14 as c_uint) & (3 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint) | (((((((unsafe *__local_ptr__goto_757_12) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_757_12[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_757_12[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_ptr__goto_757_12[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
         (__local_ptr__goto_757_12 = __local_ptr__goto_757_12 + ((4 as isize) as usize))
         goto '__ci_bb_449
     }
 
     '__ci_bb_448 {
-        (__local_ch__goto_1053_14 = (((((((((((((__local_ch__goto_1053_14 as c_uint) & (1 as c_uint)) as c_uint) << (30 as c_uint)) as c_uint) | (((((((unsafe: *__local_ptr__goto_757_12) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_ptr__goto_757_12[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_ptr__goto_757_12[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_ptr__goto_757_12[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_ptr__goto_757_12[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+        (__local_ch__goto_1053_14 = (((((((((((((__local_ch__goto_1053_14 as c_uint) & (1 as c_uint)) as c_uint) << (30 as c_uint)) as c_uint) | (((((((unsafe *__local_ptr__goto_757_12) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_757_12[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_757_12[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_757_12[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_ptr__goto_757_12[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
         (__local_ptr__goto_757_12 = __local_ptr__goto_757_12 + ((5 as isize) as usize))
         goto '__ci_bb_449
     }
@@ -3772,7 +3772,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
             (__ci_expr_ternary_59 = ((__local_newlength_buf__goto_1654_18 as c_ulong) +% (__local_newlength_extra__goto_1655_18 as c_ulong)))
         }
         (__local_newlength__goto_1656_18 = __ci_expr_ternary_59)
-        (__local_oldlength__goto_1659_18 = (((unsafe: __local_ovector__goto_761_13[1]) as c_ulong) -% ((unsafe: __local_ovector__goto_761_13[0]) as c_ulong)))
+        (__local_oldlength__goto_1659_18 = (((unsafe __local_ovector__goto_761_13[1]) as c_ulong) -% ((unsafe __local_ovector__goto_761_13[0]) as c_ulong)))
         if ((if __local_oldlength__goto_1659_18 > __local_newlength__goto_1656_18: 1 else: 0) != 0) {
             goto '__ci_bb_524
         } else {
@@ -3786,7 +3786,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
 
     '__ci_bb_505 {
         (__local_newlength__goto_1630_20 = (((&raw const __local_scb__goto_763_32 as *const pcre2_substitute_callout_block_8).output_offsets[1] as c_ulong) -% ((&raw const __local_scb__goto_763_32 as *const pcre2_substitute_callout_block_8).output_offsets[0] as c_ulong)))
-        (__local_oldlength__goto_1631_20 = (((unsafe: __local_ovector__goto_761_13[1]) as c_ulong) -% ((unsafe: __local_ovector__goto_761_13[0]) as c_ulong)))
+        (__local_oldlength__goto_1631_20 = (((unsafe __local_ovector__goto_761_13[1]) as c_ulong) -% ((unsafe __local_ovector__goto_761_13[0]) as c_ulong)))
         (__local_buff_offset__goto_760_12 = __local_buff_offset__goto_760_12 - __local_newlength__goto_1630_20)
         (__local_lengthleft__goto_760_38 = __local_lengthleft__goto_760_38 + __local_newlength__goto_1630_20)
         if ((if not (__local_replacement_only__goto_752_6 != 0): 1 else: 0) != 0) {
@@ -3871,7 +3871,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_518 {
-        with_memcpy(((__param_buffer + (__local_buff_offset__goto_760_12 as usize)) as *i8), ((__local_subject + ((unsafe: __local_ovector__goto_761_13[0]) as usize)) as *i8), (((__local_chkmc_length__goto_1635_32 as c_ulong) *% (1 as c_ulong)) as i64))
+        with_memcpy(((__param_buffer + (__local_buff_offset__goto_760_12 as usize)) as *i8), ((__local_subject + ((unsafe __local_ovector__goto_761_13[0]) as usize)) as *i8), (((__local_chkmc_length__goto_1635_32 as c_ulong) *% (1 as c_ulong)) as i64))
         (__local_buff_offset__goto_760_12 = __local_buff_offset__goto_760_12 + __local_chkmc_length__goto_1635_32)
         (__local_lengthleft__goto_760_38 = __local_lengthleft__goto_760_38 - __local_chkmc_length__goto_1635_32)
         goto '__ci_bb_519
@@ -3923,7 +3923,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_528 {
-        (__local_start_offset = (unsafe: __local_ovector__goto_761_13[1]))
+        (__local_start_offset = (unsafe __local_ovector__goto_761_13[1]))
         goto '__ci_bb_71
     }
 
@@ -4099,7 +4099,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_557 {
-        with_memcpy(((__param_buffer + (__local_buff_offset__goto_760_12 as usize)) as *i8), ((&(unsafe: __local_temp__goto_754_13[0]) as *mut u8) as *i8), (((__local_chkmc_length__goto_1708_1 as c_ulong) *% (1 as c_ulong)) as i64))
+        with_memcpy(((__param_buffer + (__local_buff_offset__goto_760_12 as usize)) as *i8), ((&__local_temp__goto_754_13[0] as *mut u8) as *i8), (((__local_chkmc_length__goto_1708_1 as c_ulong) *% (1 as c_ulong)) as i64))
         (__local_buff_offset__goto_760_12 = __local_buff_offset__goto_760_12 + __local_chkmc_length__goto_1708_1)
         (__local_lengthleft__goto_760_38 = __local_lengthleft__goto_760_38 - __local_chkmc_length__goto_1708_1)
         goto '__ci_bb_558
@@ -4130,7 +4130,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
 
     '__ci_bb_562 {
         (__local_rc__goto_743_5 = __local_subs__goto_744_5)
-        ((unsafe: *__param_blength) = ((__local_buff_offset__goto_760_12 as c_ulong) -% (1 as c_ulong)))
+        ((unsafe *__param_blength) = ((__local_buff_offset__goto_760_12 as c_ulong) -% (1 as c_ulong)))
         goto '__ci_bb_563
     }
 
@@ -4143,7 +4143,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_565 {
-        ((unsafe: *__param_blength) = ((__local_buff_length__goto_760_25 as c_ulong) +% (__local_extra_needed__goto_759_12 as c_ulong)))
+        ((unsafe *__param_blength) = ((__local_buff_length__goto_760_25 as c_ulong) +% (__local_extra_needed__goto_759_12 as c_ulong)))
         goto '__ci_bb_563
     }
 
@@ -4153,7 +4153,7 @@ fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param_subject: *
     }
 
     '__ci_bb_567 {
-        ((unsafe: *__local_match_data).rc = __local_rc__goto_743_5)
+        ((unsafe *__local_match_data).rc = __local_rc__goto_743_5)
         goto '__ci_bb_568
     }
 
@@ -4194,7 +4194,7 @@ fn find_text_end(__param_code: *const pcre2_real_code_8, __param_ptrptr: *mut *c
         (__local_rc__goto_80_5 = 0)
         (__local_nestlevel__goto_81_10 = 0)
         (__local_literal__goto_82_6 = 0)
-        (__local_ptr__goto_83_12 = (unsafe: *__param_ptrptr))
+        (__local_ptr__goto_83_12 = (unsafe *__param_ptrptr))
         goto '__ci_bb_1
     }
 
@@ -4227,11 +4227,11 @@ fn find_text_end(__param_code: *const pcre2_real_code_8, __param_ptrptr: *mut *c
     '__ci_bb_5 {
         (__ci_expr_logic_1 = 0)
         (__ci_expr_logic_0 = 0)
-        if ((if (unsafe: __local_ptr__goto_83_12[0]) == 92: 1 else: 0) != 0) {
+        if ((if (unsafe __local_ptr__goto_83_12[0]) == 92: 1 else: 0) != 0) {
             (__ci_expr_logic_0 = (if (if __local_ptr__goto_83_12 < (__param_ptrend - ((1 as isize) as usize)): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_0 != 0) {
-            (__ci_expr_logic_1 = (if (if (unsafe: __local_ptr__goto_83_12[1]) == 69: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_1 = (if (if (unsafe __local_ptr__goto_83_12[1]) == 69: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_1 != 0) {
             goto '__ci_bb_8
@@ -4241,7 +4241,7 @@ fn find_text_end(__param_code: *const pcre2_real_code_8, __param_ptrptr: *mut *c
     }
 
     '__ci_bb_6 {
-        if ((if (unsafe: *__local_ptr__goto_83_12) == 125: 1 else: 0) != 0) {
+        if ((if (unsafe *__local_ptr__goto_83_12) == 125: 1 else: 0) != 0) {
             goto '__ci_bb_10
         } else {
             goto '__ci_bb_11
@@ -4273,7 +4273,7 @@ fn find_text_end(__param_code: *const pcre2_real_code_8, __param_ptrptr: *mut *c
     '__ci_bb_11 {
         (__ci_expr_logic_3 = 0)
         (__ci_expr_logic_2 = 0)
-        if ((if (unsafe: *__local_ptr__goto_83_12) == 58: 1 else: 0) != 0) {
+        if ((if (unsafe *__local_ptr__goto_83_12) == 58: 1 else: 0) != 0) {
             (__ci_expr_logic_2 = (if (if not (__param_last != 0): 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_2 != 0) {
@@ -4300,7 +4300,7 @@ fn find_text_end(__param_code: *const pcre2_real_code_8, __param_ptrptr: *mut *c
     }
 
     '__ci_bb_15 {
-        ((unsafe: *__param_ptrptr) = __local_ptr__goto_83_12)
+        ((unsafe *__param_ptrptr) = __local_ptr__goto_83_12)
         return __local_rc__goto_80_5
     }
 
@@ -4309,7 +4309,7 @@ fn find_text_end(__param_code: *const pcre2_real_code_8, __param_ptrptr: *mut *c
     }
 
     '__ci_bb_17 {
-        if ((if (unsafe: *__local_ptr__goto_83_12) == 36: 1 else: 0) != 0) {
+        if ((if (unsafe *__local_ptr__goto_83_12) == 36: 1 else: 0) != 0) {
             goto '__ci_bb_19
         } else {
             goto '__ci_bb_20
@@ -4323,7 +4323,7 @@ fn find_text_end(__param_code: *const pcre2_real_code_8, __param_ptrptr: *mut *c
     '__ci_bb_19 {
         (__ci_expr_logic_4 = 0)
         if ((if __local_ptr__goto_83_12 < (__param_ptrend - ((1 as isize) as usize)): 1 else: 0) != 0) {
-            (__ci_expr_logic_4 = (if (if (unsafe: __local_ptr__goto_83_12[1]) == 123: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_4 = (if (if (unsafe __local_ptr__goto_83_12[1]) == 123: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_4 != 0) {
             goto '__ci_bb_22
@@ -4333,7 +4333,7 @@ fn find_text_end(__param_code: *const pcre2_real_code_8, __param_ptrptr: *mut *c
     }
 
     '__ci_bb_20 {
-        if ((if (unsafe: *__local_ptr__goto_83_12) == 92: 1 else: 0) != 0) {
+        if ((if (unsafe *__local_ptr__goto_83_12) == 92: 1 else: 0) != 0) {
             goto '__ci_bb_24
         } else {
             goto '__ci_bb_25
@@ -4381,7 +4381,7 @@ fn find_text_end(__param_code: *const pcre2_real_code_8, __param_ptrptr: *mut *c
     }
 
     '__ci_bb_28 {
-        if ((unsafe: __local_ptr__goto_83_12[1]) == 76) {
+        if ((unsafe __local_ptr__goto_83_12[1]) == 76) {
             goto '__ci_bb_30
         } else {
             goto '__ci_bb_31
@@ -4398,7 +4398,7 @@ fn find_text_end(__param_code: *const pcre2_real_code_8, __param_ptrptr: *mut *c
     }
 
     '__ci_bb_31 {
-        if ((unsafe: __local_ptr__goto_83_12[1]) == 108) {
+        if ((unsafe __local_ptr__goto_83_12[1]) == 108) {
             goto '__ci_bb_30
         } else {
             goto '__ci_bb_32
@@ -4406,7 +4406,7 @@ fn find_text_end(__param_code: *const pcre2_real_code_8, __param_ptrptr: *mut *c
     }
 
     '__ci_bb_32 {
-        if ((unsafe: __local_ptr__goto_83_12[1]) == 85) {
+        if ((unsafe __local_ptr__goto_83_12[1]) == 85) {
             goto '__ci_bb_30
         } else {
             goto '__ci_bb_33
@@ -4414,7 +4414,7 @@ fn find_text_end(__param_code: *const pcre2_real_code_8, __param_ptrptr: *mut *c
     }
 
     '__ci_bb_33 {
-        if ((unsafe: __local_ptr__goto_83_12[1]) == 117) {
+        if ((unsafe __local_ptr__goto_83_12[1]) == 117) {
             goto '__ci_bb_30
         } else {
             goto '__ci_bb_29
@@ -4536,7 +4536,7 @@ fn read_name_subst(__param_ptrptr: *mut *const u8, __param_ptrend: *const u8, __
     goto '__ci_bb_0
 
     '__ci_bb_0 {
-        (__local_ptr__goto_200_12 = (unsafe: *__param_ptrptr))
+        (__local_ptr__goto_200_12 = (unsafe *__param_ptrptr))
         (__local_nameptr__goto_201_12 = __local_ptr__goto_200_12)
         if ((if __local_ptr__goto_200_12 >= __param_ptrend: 1 else: 0) != 0) {
             goto '__ci_bb_1
@@ -4558,7 +4558,7 @@ fn read_name_subst(__param_ptrptr: *mut *const u8, __param_ptrend: *const u8, __
     }
 
     '__ci_bb_3 {
-        ((unsafe: *__param_ptrptr) = __local_ptr__goto_200_12)
+        ((unsafe *__param_ptrptr) = __local_ptr__goto_200_12)
         return 0
     }
 
@@ -4587,7 +4587,7 @@ fn read_name_subst(__param_ptrptr: *mut *const u8, __param_ptrend: *const u8, __
     }
 
     '__ci_bb_8 {
-        (__local_c__goto_215_12 = (unsafe: *__local_ptr__goto_200_12))
+        (__local_c__goto_215_12 = (unsafe *__local_ptr__goto_200_12))
         if ((if __local_c__goto_215_12 >= 192: 1 else: 0) != 0) {
             goto '__ci_bb_10
         } else {
@@ -4608,7 +4608,7 @@ fn read_name_subst(__param_ptrptr: *mut *const u8, __param_ptrend: *const u8, __
     }
 
     '__ci_bb_11 {
-        (__local_type___goto_215_15 = ((&(unsafe: _pcre2_ucd_records_8[0]) as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_c__goto_215_12 as c_int) / 128)] as c_int) * 128) + ((__local_c__goto_215_12 as c_int) % 128))] as c_uint) as usize)).chartype)
+        (__local_type___goto_215_15 = ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_c__goto_215_12 as c_int) / 128)] as c_int) * 128) + ((__local_c__goto_215_12 as c_int) % 128))] as c_uint) as usize)).chartype)
         (__ci_expr_logic_1 = 0)
         (__ci_expr_logic_0 = 0)
         if ((if __local_type___goto_215_15 != 13: 1 else: 0) != 0) {
@@ -4625,7 +4625,7 @@ fn read_name_subst(__param_ptrptr: *mut *const u8, __param_ptrend: *const u8, __
     }
 
     '__ci_bb_12 {
-        (__local_c__goto_215_12 = (((((__local_c__goto_215_12 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((unsafe: __local_ptr__goto_200_12[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+        (__local_c__goto_215_12 = (((((__local_c__goto_215_12 as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((unsafe __local_ptr__goto_200_12[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
         goto '__ci_bb_14
     }
 
@@ -4642,7 +4642,7 @@ fn read_name_subst(__param_ptrptr: *mut *const u8, __param_ptrend: *const u8, __
     }
 
     '__ci_bb_15 {
-        (__local_c__goto_215_12 = (((((((__local_c__goto_215_12 as c_uint) & (15 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint) | (((((((unsafe: __local_ptr__goto_200_12[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_ptr__goto_200_12[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+        (__local_c__goto_215_12 = (((((((__local_c__goto_215_12 as c_uint) & (15 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_200_12[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_ptr__goto_200_12[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
         goto '__ci_bb_17
     }
 
@@ -4659,7 +4659,7 @@ fn read_name_subst(__param_ptrptr: *mut *const u8, __param_ptrend: *const u8, __
     }
 
     '__ci_bb_18 {
-        (__local_c__goto_215_12 = (((((((((__local_c__goto_215_12 as c_uint) & (7 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint) | (((((((unsafe: __local_ptr__goto_200_12[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_ptr__goto_200_12[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_ptr__goto_200_12[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+        (__local_c__goto_215_12 = (((((((((__local_c__goto_215_12 as c_uint) & (7 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_200_12[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_200_12[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_ptr__goto_200_12[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
         goto '__ci_bb_20
     }
 
@@ -4676,12 +4676,12 @@ fn read_name_subst(__param_ptrptr: *mut *const u8, __param_ptrend: *const u8, __
     }
 
     '__ci_bb_21 {
-        (__local_c__goto_215_12 = (((((((((((__local_c__goto_215_12 as c_uint) & (3 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint) | (((((((unsafe: __local_ptr__goto_200_12[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_ptr__goto_200_12[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_ptr__goto_200_12[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_ptr__goto_200_12[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+        (__local_c__goto_215_12 = (((((((((((__local_c__goto_215_12 as c_uint) & (3 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_200_12[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_200_12[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_200_12[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_ptr__goto_200_12[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
         goto '__ci_bb_23
     }
 
     '__ci_bb_22 {
-        (__local_c__goto_215_12 = (((((((((((((__local_c__goto_215_12 as c_uint) & (1 as c_uint)) as c_uint) << (30 as c_uint)) as c_uint) | (((((((unsafe: __local_ptr__goto_200_12[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_ptr__goto_200_12[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_ptr__goto_200_12[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_ptr__goto_200_12[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_ptr__goto_200_12[5]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+        (__local_c__goto_215_12 = (((((((((((((__local_c__goto_215_12 as c_uint) & (1 as c_uint)) as c_uint) << (30 as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_200_12[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_200_12[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_200_12[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr__goto_200_12[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_ptr__goto_200_12[5]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
         goto '__ci_bb_23
     }
 
@@ -4701,7 +4701,7 @@ fn read_name_subst(__param_ptrptr: *mut *const u8, __param_ptrend: *const u8, __
     '__ci_bb_26 {
         (__ci_expr_logic_2 = 0)
         if ((if __local_ptr__goto_200_12 < __param_ptrend: 1 else: 0) != 0) {
-            (__ci_expr_logic_2 = (if (if ((((unsafe: *__local_ptr__goto_200_12) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_2 = (if (if ((((unsafe *__local_ptr__goto_200_12) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_2 != 0) {
             goto '__ci_bb_27
@@ -4726,7 +4726,7 @@ fn read_name_subst(__param_ptrptr: *mut *const u8, __param_ptrend: *const u8, __
             (__ci_expr_logic_3 = (if 1 != 0: 1 else: 0))
         }
         if (__ci_expr_logic_3 != 0) {
-            (__ci_expr_logic_4 = (if (if (((unsafe: __param_ctypes[(unsafe: *__local_ptr__goto_200_12)]) as c_int) & 16) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_4 = (if (if (((unsafe __param_ctypes[(unsafe *__local_ptr__goto_200_12)]) as c_int) & 16) != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_4 != 0) {
             goto '__ci_bb_30
@@ -4761,7 +4761,7 @@ fn read_name_subst(__param_ptrptr: *mut *const u8, __param_ptrend: *const u8, __
     }
 
     '__ci_bb_35 {
-        ((unsafe: *__param_ptrptr) = __local_ptr__goto_200_12)
+        ((unsafe *__param_ptrptr) = __local_ptr__goto_200_12)
         return 1
     }
 
@@ -4825,7 +4825,7 @@ fn default_substitute_case_callout(__param_input: *const u8, __param_input_len: 
 
                 (__local_rest_to_upper = 0)
 
-                ((unsafe: *__param_state).to_case = 1)
+                ((unsafe *__param_state).to_case = 1)
 
             },
             4 => {
@@ -4833,7 +4833,7 @@ fn default_substitute_case_callout(__param_input: *const u8, __param_input_len: 
 
                 (__local_rest_to_upper = 1)
 
-                ((unsafe: *__param_state).to_case = 2)
+                ((unsafe *__param_state).to_case = 2)
 
             },
             _ => {
@@ -4853,7 +4853,7 @@ fn default_substitute_case_callout(__param_input: *const u8, __param_input_len: 
     (__local_single_char = __param_state.single_char)
 
     if (__local_single_char != 0) {
-        ((unsafe: *__param_state).to_case = 0)
+        ((unsafe *__param_state).to_case = 0)
     }
 
     while ((if __local_input < __local_input_end: 1 else: 0) != 0) {
@@ -4865,7 +4865,7 @@ fn default_substitute_case_callout(__param_input: *const u8, __param_input_len: 
 
         (__local_input = __local_input + 1)
 
-        (__local_ch = (unsafe: *__ci_expr_old_1))
+        (__local_ch = (unsafe *__ci_expr_old_1))
 
 
         var __ci_expr_logic_2: c_int = 0
@@ -4880,28 +4880,28 @@ fn default_substitute_case_callout(__param_input: *const u8, __param_input_len: 
 
                 (__local_input = __local_input + 1)
 
-                (__local_ch = (((((__local_ch as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((unsafe: *__ci_expr_old_3) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                (__local_ch = (((((__local_ch as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((unsafe *__ci_expr_old_3) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
 
             } else {
                 if ((if ((__local_ch as c_uint) & (16 as c_uint)) == 0: 1 else: 0) != 0) {
-                    (__local_ch = (((((((__local_ch as c_uint) & (15 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint) | (((((((unsafe: *__local_input) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_input[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                    (__local_ch = (((((((__local_ch as c_uint) & (15 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint) | (((((((unsafe *__local_input) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_input[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
 
                     (__local_input = __local_input + ((2 as isize) as usize))
 
                 } else {
                     if ((if ((__local_ch as c_uint) & (8 as c_uint)) == 0: 1 else: 0) != 0) {
-                        (__local_ch = (((((((((__local_ch as c_uint) & (7 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint) | (((((((unsafe: *__local_input) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_input[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_input[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                        (__local_ch = (((((((((__local_ch as c_uint) & (7 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint) | (((((((unsafe *__local_input) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_input[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_input[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
 
                         (__local_input = __local_input + ((3 as isize) as usize))
 
                     } else {
                         if ((if ((__local_ch as c_uint) & (4 as c_uint)) == 0: 1 else: 0) != 0) {
-                            (__local_ch = (((((((((((__local_ch as c_uint) & (3 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint) | (((((((unsafe: *__local_input) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_input[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_input[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_input[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                            (__local_ch = (((((((((((__local_ch as c_uint) & (3 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint) | (((((((unsafe *__local_input) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_input[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_input[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_input[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
 
                             (__local_input = __local_input + ((4 as isize) as usize))
 
                         } else {
-                            (__local_ch = (((((((((((((__local_ch as c_uint) & (1 as c_uint)) as c_uint) << (30 as c_uint)) as c_uint) | (((((((unsafe: *__local_input) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_input[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_input[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_input[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_input[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                            (__local_ch = (((((((((((((__local_ch as c_uint) & (1 as c_uint)) as c_uint) << (30 as c_uint)) as c_uint) | (((((((unsafe *__local_input) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_input[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_input[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_input[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_input[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
 
                             (__local_input = __local_input + ((5 as isize) as usize))
 
@@ -4928,7 +4928,7 @@ fn default_substitute_case_callout(__param_input: *const u8, __param_input_len: 
         }
 
         if (__ci_expr_logic_5 != 0) {
-            var __local_type_: c_uint = ((&(unsafe: _pcre2_ucd_records_8[0]) as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_ch as c_int) / 128)] as c_int) * 128) + ((__local_ch as c_int) % 128))] as c_uint) as usize)).chartype
+            var __local_type_: c_uint = ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_ch as c_int) / 128)] as c_int) * 128) + ((__local_ch as c_int) % 128))] as c_uint) as usize)).chartype
 
             var __ci_expr_logic_7: c_int = 0
 
@@ -4946,7 +4946,7 @@ fn default_substitute_case_callout(__param_input: *const u8, __param_input_len: 
             }
 
             if (__ci_expr_logic_7 != 0) {
-                (__local_ch = ((((__local_ch as c_int) + ((&(unsafe: _pcre2_ucd_records_8[0]) as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_ch as c_int) / 128)] as c_int) * 128) + ((__local_ch as c_int) % 128))] as c_uint) as usize)).other_case) as c_uint)))
+                (__local_ch = ((((__local_ch as c_int) + ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_ch as c_int) / 128)] as c_int) * 128) + ((__local_ch as c_int) % 128))] as c_uint) as usize)).other_case) as c_uint)))
             }
 
 
@@ -4960,8 +4960,8 @@ fn default_substitute_case_callout(__param_input: *const u8, __param_input_len: 
                     (__ci_expr_ternary_8 = 128)
                 }
 
-                if ((if ((((unsafe: ((__param_code.tables + ((512 as isize) as usize)) + ((__ci_expr_ternary_8 as isize) as usize))[((__local_ch as c_uint) / (8 as c_uint))]) as c_int) as c_uint) & (((1 as c_uint) << (((__local_ch as c_uint) % (8 as c_uint)) as c_uint)) as c_uint)) == 0: 1 else: 0) != 0) {
-                    (__local_ch = (unsafe: (__param_code.tables + ((256 as isize) as usize))[__local_ch]))
+                if ((if ((((unsafe ((__param_code.tables + ((512 as isize) as usize)) + ((__ci_expr_ternary_8 as isize) as usize))[((__local_ch as c_uint) / (8 as c_uint))]) as c_int) as c_uint) & (((1 as c_uint) << (((__local_ch as c_uint) % (8 as c_uint)) as c_uint)) as c_uint)) == 0: 1 else: 0) != 0) {
+                    (__local_ch = (unsafe (__param_code.tables + ((256 as isize) as usize))[__local_ch]))
                 }
 
 
@@ -4970,7 +4970,7 @@ fn default_substitute_case_callout(__param_input: *const u8, __param_input_len: 
 
 
         if (__local_utf != 0) {
-            (__local_chlen = _pcre2_ord2utf_8(__local_ch, (&(unsafe: __local_temp[0]) as *mut u8)))
+            (__local_chlen = _pcre2_ord2utf_8(__local_ch, (&__local_temp[0] as *mut u8)))
         } else {
             (__local_temp[0] = __local_ch)
 
@@ -4985,7 +4985,7 @@ fn default_substitute_case_callout(__param_input: *const u8, __param_input_len: 
         }
 
         if (__ci_expr_logic_9 != 0) {
-            with_memcpy((__local_output as *i8), ((&(unsafe: __local_temp[0]) as *mut u8) as *i8), (((__local_chlen as c_uint) *% (1 as c_uint)) as i64))
+            with_memcpy((__local_output as *i8), ((&__local_temp[0] as *mut u8) as *i8), (((__local_chlen as c_uint) *% (1 as c_uint)) as i64))
 
             (__local_output = __local_output + (__local_chlen as usize))
 
@@ -5071,7 +5071,7 @@ fn do_case_copy(__param_input_output: *mut u8, __param_input_len: c_ulong, __par
                     (__local_rc = __param_substitute_case_callout(__local_input, __param_input_len, __local_output, __param_output_cap, __param_state.to_case, __param_substitute_case_callout_data))
 
                     if ((if __param_state.to_case == 3: 1 else: 0) != 0) {
-                        ((unsafe: *__param_state).to_case = 1)
+                        ((unsafe *__param_state).to_case = 1)
                     }
 
                     return __local_rc
@@ -5088,7 +5088,7 @@ fn do_case_copy(__param_input_output: *mut u8, __param_input_len: c_ulong, __par
                     (__local_rc = __param_substitute_case_callout(__local_input, __param_input_len, __local_output, __param_output_cap, __param_state.to_case, __param_substitute_case_callout_data))
 
                     if ((if __param_state.to_case == 3: 1 else: 0) != 0) {
-                        ((unsafe: *__param_state).to_case = 1)
+                        ((unsafe *__param_state).to_case = 1)
                     }
 
                     return __local_rc
@@ -5105,7 +5105,7 @@ fn do_case_copy(__param_input_output: *mut u8, __param_input_len: c_ulong, __par
                     (__local_rc = __param_substitute_case_callout(__local_input, __param_input_len, __local_output, __param_output_cap, __param_state.to_case, __param_substitute_case_callout_data))
 
                     if ((if __param_state.to_case == 3: 1 else: 0) != 0) {
-                        ((unsafe: *__param_state).to_case = 1)
+                        ((unsafe *__param_state).to_case = 1)
                     }
 
                     return __local_rc
@@ -5145,7 +5145,7 @@ fn do_case_copy(__param_input_output: *mut u8, __param_input_len: c_ulong, __par
 
     (__local_ch_end = __local_ch_end + 1)
 
-    (__local_ch = (unsafe: *__ci_expr_old_1))
+    (__local_ch = (unsafe *__ci_expr_old_1))
 
 
     var __ci_expr_logic_2: c_int = 0
@@ -5160,28 +5160,28 @@ fn do_case_copy(__param_input_output: *mut u8, __param_input_len: c_ulong, __par
 
             (__local_ch_end = __local_ch_end + 1)
 
-            (__local_ch = (((((__local_ch as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((unsafe: *__ci_expr_old_3) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+            (__local_ch = (((((__local_ch as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((unsafe *__ci_expr_old_3) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
 
         } else {
             if ((if ((__local_ch as c_uint) & (16 as c_uint)) == 0: 1 else: 0) != 0) {
-                (__local_ch = (((((((__local_ch as c_uint) & (15 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint) | (((((((unsafe: *__local_ch_end) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_ch_end[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                (__local_ch = (((((((__local_ch as c_uint) & (15 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint) | (((((((unsafe *__local_ch_end) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_ch_end[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
 
                 (__local_ch_end = __local_ch_end + ((2 as isize) as usize))
 
             } else {
                 if ((if ((__local_ch as c_uint) & (8 as c_uint)) == 0: 1 else: 0) != 0) {
-                    (__local_ch = (((((((((__local_ch as c_uint) & (7 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint) | (((((((unsafe: *__local_ch_end) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_ch_end[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_ch_end[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                    (__local_ch = (((((((((__local_ch as c_uint) & (7 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint) | (((((((unsafe *__local_ch_end) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ch_end[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_ch_end[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
 
                     (__local_ch_end = __local_ch_end + ((3 as isize) as usize))
 
                 } else {
                     if ((if ((__local_ch as c_uint) & (4 as c_uint)) == 0: 1 else: 0) != 0) {
-                        (__local_ch = (((((((((((__local_ch as c_uint) & (3 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint) | (((((((unsafe: *__local_ch_end) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_ch_end[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_ch_end[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_ch_end[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                        (__local_ch = (((((((((((__local_ch as c_uint) & (3 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint) | (((((((unsafe *__local_ch_end) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ch_end[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ch_end[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_ch_end[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
 
                         (__local_ch_end = __local_ch_end + ((4 as isize) as usize))
 
                     } else {
-                        (__local_ch = (((((((((((((__local_ch as c_uint) & (1 as c_uint)) as c_uint) << (30 as c_uint)) as c_uint) | (((((((unsafe: *__local_ch_end) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_ch_end[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_ch_end[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_ch_end[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_ch_end[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                        (__local_ch = (((((((((((((__local_ch as c_uint) & (1 as c_uint)) as c_uint) << (30 as c_uint)) as c_uint) | (((((((unsafe *__local_ch_end) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ch_end[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ch_end[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ch_end[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_ch_end[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
 
                         (__local_ch_end = __local_ch_end + ((5 as isize) as usize))
 
@@ -5201,7 +5201,7 @@ fn do_case_copy(__param_input_output: *mut u8, __param_input_len: c_ulong, __par
 
     (__local_ch1_len = ((__local_ch_end as usize) -% (__local_input as usize)) / sizeof[u8]())
 
-    with_memcpy(((&(unsafe: __local_ch1[0]) as *mut u8) as *i8), (__local_input as *i8), (((__local_ch1_len as c_ulong) *% (1 as c_ulong)) as i64))
+    with_memcpy(((&__local_ch1[0] as *mut u8) as *i8), (__local_input as *i8), (((__local_ch1_len as c_ulong) *% (1 as c_ulong)) as i64))
 
 
     (__local_rest = __local_input + (__local_ch1_len as usize))
@@ -5221,7 +5221,7 @@ fn do_case_copy(__param_input_output: *mut u8, __param_input_len: c_ulong, __par
     (__local_max_ch1_cap = ((__param_output_cap as c_ulong) -% (__local_rest_len as c_ulong)))
 
     while (1 != 0) {
-        (__local_rc = __param_substitute_case_callout((&(unsafe: __local_ch1[0]) as *mut u8), __local_ch1_len, __local_output, __local_ch1_cap, __local_ch1_to_case, __param_substitute_case_callout_data))
+        (__local_rc = __param_substitute_case_callout((&__local_ch1[0] as *mut u8), __local_ch1_len, __local_output, __local_ch1_cap, __local_ch1_to_case, __param_substitute_case_callout_data))
 
         if ((if __local_rc == (~(0 as c_ulong)): 1 else: 0) != 0) {
             return __local_rc
@@ -5259,7 +5259,7 @@ fn do_case_copy(__param_input_output: *mut u8, __param_input_len: c_ulong, __par
 
         (__local_rc2 = __local_rest_len)
 
-        ((unsafe: *__param_state).to_case = 0)
+        ((unsafe *__param_state).to_case = 0)
 
     } else {
         var __local_dummy: [1]u8
@@ -5267,7 +5267,7 @@ fn do_case_copy(__param_input_output: *mut u8, __param_input_len: c_ulong, __par
         var __ci_expr_ternary_4: *mut u8 = null
 
         if (__local_ch1_overflow != 0) {
-            (__ci_expr_ternary_4 = (&(unsafe: __local_dummy[0]) as *mut u8))
+            (__ci_expr_ternary_4 = (&__local_dummy[0] as *mut u8))
         } else {
             (__ci_expr_ternary_4 = __local_output + (__local_rc as usize))
         }
@@ -5309,7 +5309,7 @@ fn do_case_copy(__param_input_output: *mut u8, __param_input_len: c_ulong, __par
         }
 
 
-        ((unsafe: *__param_state).to_case = 2)
+        ((unsafe *__param_state).to_case = 2)
 
     }
 

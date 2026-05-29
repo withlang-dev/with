@@ -16,6 +16,6 @@ fn main:
     assert(s_global.inner.x == 9)
     assert(s_global.a == 41)
     assert(s_global.b == 7)
-    assert((unsafe: *p_global.p) == 7 as u8)
+    assert((unsafe *p_global.p) == 7 as u8)
     assert(f_global.f() == 41)
     print("ok")

@@ -45,7 +45,7 @@ unsafe fn tls_send_record(fd: i32, content_type: u8, data: *const u8, data_len: 
     hdr[4] = (data_len & 0xFF) as u8
 
     // Send header
-    let hdr_str = unsafe: *(&hdr[0] as *const str)
+    let hdr_str = unsafe *(&hdr[0] as *const str)
     // Actually, we need to construct a str from ptr+len
     // Use the with_net_send extern directly
     let hp = &hdr[0] as *const u8
@@ -823,7 +823,7 @@ fn tls_connect(hostname: str, port: i32) -> TlsConn:
     if fd < 0:
         return TlsConn.new(-1)
     var conn = TlsConn.new(fd)
-    let r = unsafe: tls_handshake(&raw mut conn as *mut TlsConn, hostname)
+    let r = unsafe { tls_handshake(&raw mut conn as *mut TlsConn, hostname) }
     if r < 0:
         socket_close(fd)
         return TlsConn.new(-1)

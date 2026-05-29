@@ -10,8 +10,8 @@ fn main:
         *ptr = 7
         *p1 = 9
         *(ptr + 2) = 11
-    assert(unsafe: *ptr == 7)
-    assert(unsafe: *(ptr + 1) == 9)
-    assert(unsafe: *(ptr + 2) == 11)
+    assert(unsafe *ptr == 7)
+    assert(unsafe *(ptr + 1) == 9)
+    assert(unsafe *(ptr + 2) == 11)
     let _ = realloc(raw, 0)
     print("ok")

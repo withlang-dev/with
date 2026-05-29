@@ -21,7 +21,7 @@ fn _pcre2_script_run_8(__param_ptr: *const u8, __param_endptr: *const u8, __para
 
     (__local_ptr = __local_ptr + 1)
 
-    (__local_c = (unsafe: *__ci_expr_old_0))
+    (__local_c = (unsafe *__ci_expr_old_0))
 
 
     var __ci_expr_logic_1: c_int = 0
@@ -36,28 +36,28 @@ fn _pcre2_script_run_8(__param_ptr: *const u8, __param_endptr: *const u8, __para
 
             (__local_ptr = __local_ptr + 1)
 
-            (__local_c = (((((__local_c as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((unsafe: *__ci_expr_old_2) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+            (__local_c = (((((__local_c as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((unsafe *__ci_expr_old_2) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
 
         } else {
             if ((if ((__local_c as c_uint) & (16 as c_uint)) == 0: 1 else: 0) != 0) {
-                (__local_c = (((((((__local_c as c_uint) & (15 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint) | (((((((unsafe: *__local_ptr) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_ptr[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                (__local_c = (((((((__local_c as c_uint) & (15 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint) | (((((((unsafe *__local_ptr) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_ptr[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
 
                 (__local_ptr = __local_ptr + ((2 as isize) as usize))
 
             } else {
                 if ((if ((__local_c as c_uint) & (8 as c_uint)) == 0: 1 else: 0) != 0) {
-                    (__local_c = (((((((((__local_c as c_uint) & (7 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint) | (((((((unsafe: *__local_ptr) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_ptr[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_ptr[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                    (__local_c = (((((((((__local_c as c_uint) & (7 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint) | (((((((unsafe *__local_ptr) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_ptr[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
 
                     (__local_ptr = __local_ptr + ((3 as isize) as usize))
 
                 } else {
                     if ((if ((__local_c as c_uint) & (4 as c_uint)) == 0: 1 else: 0) != 0) {
-                        (__local_c = (((((((((((__local_c as c_uint) & (3 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint) | (((((((unsafe: *__local_ptr) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_ptr[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_ptr[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_ptr[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                        (__local_c = (((((((((((__local_c as c_uint) & (3 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint) | (((((((unsafe *__local_ptr) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_ptr[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
 
                         (__local_ptr = __local_ptr + ((4 as isize) as usize))
 
                     } else {
-                        (__local_c = (((((((((((((__local_c as c_uint) & (1 as c_uint)) as c_uint) << (30 as c_uint)) as c_uint) | (((((((unsafe: *__local_ptr) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_ptr[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_ptr[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_ptr[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_ptr[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                        (__local_c = (((((((((((((__local_c as c_uint) & (1 as c_uint)) as c_uint) << (30 as c_uint)) as c_uint) | (((((((unsafe *__local_ptr) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_ptr[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
 
                         (__local_ptr = __local_ptr + ((5 as isize) as usize))
 
@@ -84,7 +84,7 @@ fn _pcre2_script_run_8(__param_ptr: *const u8, __param_endptr: *const u8, __para
 
 
     while true {
-        var __local_ucd: *const ucd_record = ((&(unsafe: _pcre2_ucd_records_8[0]) as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_c as c_int) / 128)] as c_int) * 128) + ((__local_c as c_int) % 128))] as c_uint) as usize))
+        var __local_ucd: *const ucd_record = ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_c as c_int) / 128)] as c_int) * 128) + ((__local_c as c_int) % 128))] as c_uint) as usize))
 
         var __local_script: c_uint = __local_ucd.script
 
@@ -110,9 +110,9 @@ fn _pcre2_script_run_8(__param_ptr: *const u8, __param_endptr: *const u8, __para
         if (__ci_expr_logic_4 != 0) {
             var __local_OK: c_int
 
-            with_memcpy(((&(unsafe: __local_map[0]) as *mut c_uint) as *i8), (((&(unsafe: _pcre2_ucd_script_sets_8[0]) as *const c_uint) + ((((__local_ucd.scriptx_bidiclass as c_int) & 1023) as isize) as usize)) as *i8), (((4 as c_ulong) *% (sizeof[u32]() as c_ulong)) as i64))
+            with_memcpy(((&__local_map[0] as *mut c_uint) as *i8), (((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + ((((__local_ucd.scriptx_bidiclass as c_int) & 1023) as isize) as usize)) as *i8), (((4 as c_ulong) *% (sizeof[u32]() as c_ulong)) as i64))
 
-            with_memset((((&(unsafe: __local_map[0]) as *mut c_uint) + ((((ucp_Unknown / 32) + 1) as isize) as usize)) as *i8), 0, (((2 as c_ulong) *% (sizeof[u32]() as c_ulong)) as i64))
+            with_memset((((&__local_map[0] as *mut c_uint) + ((((ucp_Unknown / 32) + 1) as isize) as usize)) as *i8), 0, (((2 as c_ulong) *% (sizeof[u32]() as c_ulong)) as i64))
 
             var __ci_expr_logic_5: c_int = 0
 
@@ -146,7 +146,7 @@ fn _pcre2_script_run_8(__param_ptr: *const u8, __param_endptr: *const u8, __para
                                     (__local_require_state = 5)
                                 },
                                 _ => {
-                                    with_memcpy(((&(unsafe: __local_require_map[0]) as *mut c_uint) as *i8), ((&(unsafe: __local_map[0]) as *mut c_uint) as *i8), (((6 as c_ulong) *% (sizeof[u32]() as c_ulong)) as i64))
+                                    with_memcpy(((&__local_require_map[0] as *mut c_uint) as *i8), ((&__local_map[0] as *mut c_uint) as *i8), (((6 as c_ulong) *% (sizeof[u32]() as c_ulong)) as i64))
 
                                     (__local_require_state = 1)
 
@@ -323,7 +323,7 @@ fn _pcre2_script_run_8(__param_ptr: *const u8, __param_endptr: *const u8, __para
 
         (__local_ptr = __local_ptr + 1)
 
-        (__local_c = (unsafe: *__ci_expr_old_9))
+        (__local_c = (unsafe *__ci_expr_old_9))
 
 
         var __ci_expr_logic_10: c_int = 0
@@ -338,28 +338,28 @@ fn _pcre2_script_run_8(__param_ptr: *const u8, __param_endptr: *const u8, __para
 
                 (__local_ptr = __local_ptr + 1)
 
-                (__local_c = (((((__local_c as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((unsafe: *__ci_expr_old_11) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                (__local_c = (((((__local_c as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((unsafe *__ci_expr_old_11) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
 
             } else {
                 if ((if ((__local_c as c_uint) & (16 as c_uint)) == 0: 1 else: 0) != 0) {
-                    (__local_c = (((((((__local_c as c_uint) & (15 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint) | (((((((unsafe: *__local_ptr) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_ptr[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                    (__local_c = (((((((__local_c as c_uint) & (15 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint) | (((((((unsafe *__local_ptr) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_ptr[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
 
                     (__local_ptr = __local_ptr + ((2 as isize) as usize))
 
                 } else {
                     if ((if ((__local_c as c_uint) & (8 as c_uint)) == 0: 1 else: 0) != 0) {
-                        (__local_c = (((((((((__local_c as c_uint) & (7 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint) | (((((((unsafe: *__local_ptr) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_ptr[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_ptr[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                        (__local_c = (((((((((__local_c as c_uint) & (7 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint) | (((((((unsafe *__local_ptr) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_ptr[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
 
                         (__local_ptr = __local_ptr + ((3 as isize) as usize))
 
                     } else {
                         if ((if ((__local_c as c_uint) & (4 as c_uint)) == 0: 1 else: 0) != 0) {
-                            (__local_c = (((((((((((__local_c as c_uint) & (3 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint) | (((((((unsafe: *__local_ptr) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_ptr[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_ptr[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_ptr[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                            (__local_c = (((((((((((__local_c as c_uint) & (3 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint) | (((((((unsafe *__local_ptr) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_ptr[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
 
                             (__local_ptr = __local_ptr + ((4 as isize) as usize))
 
                         } else {
-                            (__local_c = (((((((((((((__local_c as c_uint) & (1 as c_uint)) as c_uint) << (30 as c_uint)) as c_uint) | (((((((unsafe: *__local_ptr) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_ptr[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_ptr[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_ptr[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_ptr[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                            (__local_c = (((((((((((((__local_c as c_uint) & (1 as c_uint)) as c_uint) << (30 as c_uint)) as c_uint) | (((((((unsafe *__local_ptr) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_ptr[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_ptr[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
 
                             (__local_ptr = __local_ptr + ((5 as isize) as usize))
 

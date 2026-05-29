@@ -344,7 +344,7 @@ unsafe fn json_parse_impl(parser: *mut JsonParser, js: str, len: i32, tokens: *m
 /// or a negative error code (JSON_ERROR_NOMEM, JSON_ERROR_INVAL, JSON_ERROR_PART).
 pub fn json_parse(parser: *mut JsonParser, js: str, tokens: *mut JsonToken, num_tokens: i32) -> i32:
     let len = js.len() as i32
-    unsafe: json_parse_impl(parser, js, len, tokens, num_tokens)
+    unsafe { json_parse_impl(parser, js, len, tokens, num_tokens) }
 
 fn json_panic(msg: str) -> void:
     with_panic(msg, "", 0)
@@ -371,7 +371,7 @@ pub fn JsonDocument.root(self: &JsonDocument) -> JsonView:
 fn JsonView.token_type(self: JsonView) -> i32:
     if self.index < 0:
         json_panic("missing JSON value")
-    unsafe: (*(self.tokens + self.index as u64)).tok_type
+    unsafe (*(self.tokens + self.index as u64)).tok_type
 
 pub fn JsonView.raw(self: JsonView) -> str:
     json_str(self.source, self.tokens, self.index)

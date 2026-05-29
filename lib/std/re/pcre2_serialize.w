@@ -19,9 +19,9 @@ fn pcre2_serialize_encode_8(__param_codes: *mut *const pcre2_real_code_8, __para
     var __local_memctl: *const pcre2_memctl = with 0 as __ci_expr_seq_16 {
         var __ci_expr_ternary_0: *mut pcre2_memctl = null
         if ((if __param_gcontext != null: 1 else: 0) != 0) {
-            (__ci_expr_ternary_0 = (((&raw const (unsafe: *__param_gcontext).memctl as *const pcre2_memctl) as *mut pcre2_memctl)))
+            (__ci_expr_ternary_0 = (((&raw const (unsafe *__param_gcontext).memctl as *const pcre2_memctl) as *mut pcre2_memctl)))
         } else {
-            (__ci_expr_ternary_0 = (((&raw const (unsafe: *(&raw const _pcre2_default_compile_context_8 as *const pcre2_real_compile_context_8)).memctl as *const pcre2_memctl) as *mut pcre2_memctl)))
+            (__ci_expr_ternary_0 = (((&raw const (unsafe *(&raw const _pcre2_default_compile_context_8 as *const pcre2_real_compile_context_8)).memctl as *const pcre2_memctl) as *mut pcre2_memctl)))
         }
         (__ci_expr_ternary_0 as *const pcre2_memctl)
     }
@@ -58,11 +58,11 @@ fn pcre2_serialize_encode_8(__param_codes: *mut *const pcre2_real_code_8, __para
     (__local_i = 0)
 
     while ((if __local_i < __param_number_of_codes: 1 else: 0) != 0) {
-        if ((if (unsafe: __param_codes[__local_i]) == null: 1 else: 0) != 0) {
+        if ((if (unsafe __param_codes[__local_i]) == null: 1 else: 0) != 0) {
             return -51
         }
 
-        (__local_re = (unsafe: __param_codes[__local_i]))
+        (__local_re = (unsafe __param_codes[__local_i]))
 
         if ((if __local_re.magic_number != 1346589253: 1 else: 0) != 0) {
             return -31
@@ -96,13 +96,13 @@ fn pcre2_serialize_encode_8(__param_codes: *mut *const pcre2_real_code_8, __para
 
     (__local_data = ((__local_bytes as *mut pcre2_serialized_data)))
 
-    ((unsafe: *__local_data).magic = 1347564115)
+    ((unsafe *__local_data).magic = 1347564115)
 
-    ((unsafe: *__local_data).version = 3080202)
+    ((unsafe *__local_data).version = 3080202)
 
-    ((unsafe: *__local_data).config = 526337)
+    ((unsafe *__local_data).config = 526337)
 
-    ((unsafe: *__local_data).number_of_codes = __param_number_of_codes)
+    ((unsafe *__local_data).number_of_codes = __param_number_of_codes)
 
     (__local_dst_bytes = __local_bytes + (sizeof[pcre2_serialized_data]() as usize))
 
@@ -113,7 +113,7 @@ fn pcre2_serialize_encode_8(__param_codes: *mut *const pcre2_real_code_8, __para
     (__local_i = 0)
 
     while ((if __local_i < __param_number_of_codes: 1 else: 0) != 0) {
-        (__local_re = (unsafe: __param_codes[__local_i]))
+        (__local_re = (unsafe __param_codes[__local_i]))
 
         with_memcpy((__local_dst_bytes as *i8), ((__local_re as *const c_char) as *i8), (__local_re.blocksize as i64))
 
@@ -131,9 +131,9 @@ fn pcre2_serialize_encode_8(__param_codes: *mut *const pcre2_real_code_8, __para
     }
 
 
-    ((unsafe: *__param_serialized_bytes) = __local_bytes)
+    ((unsafe *__param_serialized_bytes) = __local_bytes)
 
-    ((unsafe: *__param_serialized_size) = __local_total_size)
+    ((unsafe *__param_serialized_size) = __local_total_size)
 
     return __param_number_of_codes
 
@@ -146,9 +146,9 @@ fn pcre2_serialize_decode_8(__param_codes: *mut *mut pcre2_real_code_8, __param_
     var __local_memctl: *const pcre2_memctl = with 0 as __ci_expr_seq_10 {
         var __ci_expr_ternary_0: *mut pcre2_memctl = null
         if ((if __param_gcontext != null: 1 else: 0) != 0) {
-            (__ci_expr_ternary_0 = (((&raw const (unsafe: *__param_gcontext).memctl as *const pcre2_memctl) as *mut pcre2_memctl)))
+            (__ci_expr_ternary_0 = (((&raw const (unsafe *__param_gcontext).memctl as *const pcre2_memctl) as *mut pcre2_memctl)))
         } else {
-            (__ci_expr_ternary_0 = (((&raw const (unsafe: *(&raw const _pcre2_default_compile_context_8 as *const pcre2_real_compile_context_8)).memctl as *const pcre2_memctl) as *mut pcre2_memctl)))
+            (__ci_expr_ternary_0 = (((&raw const (unsafe *(&raw const _pcre2_default_compile_context_8 as *const pcre2_real_compile_context_8)).memctl as *const pcre2_memctl) as *mut pcre2_memctl)))
         }
         (__ci_expr_ternary_0 as *const pcre2_memctl)
     }
@@ -211,7 +211,7 @@ fn pcre2_serialize_decode_8(__param_codes: *mut *mut pcre2_real_code_8, __param_
 
     with_memcpy((__local_tables as *i8), (__local_src_bytes as *i8), (1088 as i64))
 
-    ((unsafe: *((__local_tables + ((((512 + 320) + 256) as isize) as usize)) as *mut c_ulong)) = __local_number_of_codes)
+    ((unsafe *((__local_tables + ((((512 + 320) + 256) as isize) as usize)) as *mut c_ulong)) = __local_number_of_codes)
 
     (__local_src_bytes = __local_src_bytes + ((((512 + 320) + 256) as isize) as usize))
 
@@ -234,9 +234,9 @@ fn pcre2_serialize_decode_8(__param_codes: *mut *mut pcre2_real_code_8, __param_
             (__local_j = 0)
 
             while ((if __local_j < __local_i: 1 else: 0) != 0) {
-                __local_memctl.free((unsafe: __param_codes[__local_j]), __local_memctl.memory_data)
+                __local_memctl.free((unsafe __param_codes[__local_j]), __local_memctl.memory_data)
 
-                ((unsafe: __param_codes[__local_j]) = ((null as *mut pcre2_real_code_8)))
+                ((unsafe __param_codes[__local_j]) = ((null as *mut pcre2_real_code_8)))
 
 
                 (__local_j = __local_j + 1)
@@ -274,13 +274,13 @@ fn pcre2_serialize_decode_8(__param_codes: *mut *mut pcre2_real_code_8, __param_
         }
 
 
-        ((unsafe: *__local_dst_re).tables = ((__local_tables as *const u8)))
+        ((unsafe *__local_dst_re).tables = ((__local_tables as *const u8)))
 
-        ((unsafe: *__local_dst_re).executable_jit = null)
+        ((unsafe *__local_dst_re).executable_jit = null)
 
-        ((unsafe: *__local_dst_re).flags = __local_dst_re.flags | 262144)
+        ((unsafe *__local_dst_re).flags = __local_dst_re.flags | 262144)
 
-        ((unsafe: __param_codes[__local_i]) = __local_dst_re)
+        ((unsafe __param_codes[__local_i]) = __local_dst_re)
 
         (__local_src_bytes = __local_src_bytes + (__local_blocksize as usize))
 

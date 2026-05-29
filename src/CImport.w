@@ -1580,7 +1580,7 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: st
             field_str = ci_str_replace_last_field(field_str, ci_escape_reserved(accessor_name), "_" ++ ci_escape_reserved(accessor_name))
             // Emit accessor method
             let accessor_expr = "((&self._" ++ ci_escape_reserved(accessor_name) ++ ") as *" ++ elem_type ++ ")"
-            let accessor_body = if migrate_prefer_brace(): "    unsafe { " ++ accessor_expr ++ " }" else: "    unsafe: " ++ accessor_expr
+            let accessor_body = "    unsafe { " ++ accessor_expr ++ " }"
             flex_accessor = ci_render_generated_fn_body("fn " ++ ci_escape_reserved(accessor_name) ++ "(self: *" ++ safe_name ++ ") -> *" ++ elem_type, accessor_body) ++ "\n"
 
     let packed_prefix = if is_really_packed: "@[packed]\n" else: ""
@@ -2665,7 +2665,7 @@ fn ci_parse_unary_expr(s: str, params: str, known: str) -> str:
     if c0 == 42:
         let inner = ci_parse_cast_expr(t.slice(1, t.len()), params, known)
         if inner.len() > 0:
-            return "(unsafe: *" ++ inner ++ ")"
+            return "(unsafe *" ++ inner ++ ")"
         return ""
     // sizeof(T)
     if ci_starts_with(t, "sizeof"):
@@ -6658,7 +6658,7 @@ fn CiExprPool.lower_implicit_cast(self: CiExprPool, session: i64, cursor: i32, t
         let scoped_inner_ty = ci_scope_type_for_cursor(session, inner_cursor, scope)
         // `(&inner[0] as DEST)` — DEST preserves pointee const
         // qualifiers from the cast's destination type. Structural:
-        //   CIE_INDEX(inner, int_lit(0)) → unsafe pointer/array-param index
+        //   CIE_INDEX(inner, int_lit(0)) → safe array element index
         //   CIE_ADDR_OF(idx_e, mut=0)    → &inner[0]
         //   CIE_CAST(dest_ty, addr_e)    → (&inner[0] as dest)
         let dest_cxtype = with_ci_cursor_type(session, cursor)
@@ -6671,7 +6671,7 @@ fn CiExprPool.lower_implicit_cast(self: CiExprPool, session: i64, cursor: i32, t
             return self.cast_if_needed(dest_ty_id, inner_id, inner_cursor, session, types)
         let zero_s = self.add_string("0")
         let zero_e = self.int_lit(zero_s, 0 as CiTypeId)
-        let idx_e = self.add(CiExprKind.CIE_INDEX, inner_id as i32, zero_e as i32, 1, 0 as CiTypeId)
+        let idx_e = self.add(CiExprKind.CIE_INDEX, inner_id as i32, zero_e as i32, 0, 0 as CiTypeId)
         let addr_e = self.add(CiExprKind.CIE_ADDR_OF, idx_e as i32, 0, 0, 0 as CiTypeId)
         return self.cast(dest_ty_id, addr_e)
 
@@ -7462,7 +7462,7 @@ fn CiExprPool.apply_implicit_cast_to_value_id(self: CiExprPool, session: i64, cu
             return self.cast_if_needed(dest_ty, inner_id, inner_cursor, session, types)
         let zero_idx = self.add_string("0")
         let zero = self.int_lit(zero_idx, 0 as CiTypeId)
-        let idx_e = self.add(CiExprKind.CIE_INDEX, inner_id as i32, zero as i32, 1, 0 as CiTypeId)
+        let idx_e = self.add(CiExprKind.CIE_INDEX, inner_id as i32, zero as i32, 0, 0 as CiTypeId)
         let addr_e = self.add(CiExprKind.CIE_ADDR_OF, idx_e as i32, 0, 0, 0 as CiTypeId)
         return self.cast(dest_ty, addr_e)
     if cast_kind == CI_CAST_BITCAST or cast_kind == CI_CAST_PTR_CAST or cast_kind == CI_CAST_INT_WIDEN or cast_kind == CI_CAST_INT_WIDEN_SIGN or cast_kind == CI_CAST_INT_TRUNC or cast_kind == CI_CAST_FLOAT_CAST or cast_kind == CI_CAST_FLOAT_TO_INT or cast_kind == CI_CAST_INT_TO_FLOAT:

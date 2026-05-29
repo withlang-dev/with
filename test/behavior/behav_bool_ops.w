@@ -56,7 +56,7 @@ fn test_short_circuit_and:
     assert(evaluated_rhs2)
 
 fn side_effect(flag: *mut bool) -> bool:
-    unsafe: *flag = true
+    unsafe *flag = true
     true
 
 fn test_bool_not:

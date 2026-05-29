@@ -21,7 +21,7 @@ fn _pcre2_ckd_smul_8(__param_r: *mut c_ulong, __param_a: c_int, __param_b: c_int
     }
 
 
-    ((unsafe: *__param_r) = ((__local_m as c_ulong)))
+    ((unsafe *__param_r) = ((__local_m as c_ulong)))
 
     return 0
 

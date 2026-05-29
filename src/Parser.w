@@ -3290,7 +3290,7 @@ fn Parser.desugar_interpolated_string(self: Parser, content: str, start: i32, en
                 seg_data2.push(0)
             // Find matching }. Track the first top-level colon as a fallback
             // format-spec split point, but give the whole hole expression
-            // precedence later so constructs like `unsafe: *p` parse as real
+            // precedence later so constructs like `unsafe *p` parse as real
             // expressions instead of being mistaken for `{expr:spec}`.
             var depth = 1
             var expr_start_pos = i + 1
@@ -4589,11 +4589,24 @@ fn Parser.parse_unsafe(self: Parser) -> NodeId:
     let start = self.current_start()
     self.advance()
     var body: NodeId = 0 as NodeId
-    if self.peek() == TokenKind.TK_L_BRACE or self.peek() == TokenKind.TK_COLON:
+    var unsafe_kind = UNSAFE_KIND_PREFIX
+    if self.peek() == TokenKind.TK_L_BRACE:
+        unsafe_kind = UNSAFE_KIND_BLOCK
         body = self.parse_body()
+    else if self.peek() == TokenKind.TK_COLON:
+        unsafe_kind = UNSAFE_KIND_BLOCK
+        self.advance()
+        if self.peek() != TokenKind.TK_NEWLINE:
+            self.emit_error("unsafe: requires a newline and indented block; use unsafe { ... } or unsafe *ptr")
+            body = self.parse_expr()
+        else:
+            body = self.parse_block_or_expr()
     else:
-        body = self.parse_expr()
-    self.pool.add_node(NodeKind.NK_UNSAFE_BLOCK, start, self.prev_end(), body, 0, 0)
+        // Prefix unsafe authorizes one unary/postfix raw-memory access chain.
+        // Binary operators bind outside the unsafe marker, so
+        // `unsafe *p + 1` parses as `(unsafe *p) + 1`.
+        body = self.parse_precedence(13)
+    self.pool.add_node(NodeKind.NK_UNSAFE_BLOCK, start, self.prev_end(), body, unsafe_kind, 0)
 
 fn Parser.parse_asm_expr(self: Parser) -> NodeId:
     // asm("template" : outputs : inputs : clobbers)

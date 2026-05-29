@@ -244,6 +244,11 @@ const INDEX_ELLIPSIS: i32 = 2
 const INDEX_NEWAXIS: i32 = 3
 const INDEX_KIND_SHIFT: i32 = 268435456  // 1 << 28
 
+// NK_UNSAFE_BLOCK.d1 distinguishes a true unsafe block from the narrow
+// `unsafe *p` / `unsafe p[i]` raw-access prefix form.
+const UNSAFE_KIND_BLOCK: i32 = 0
+const UNSAFE_KIND_PREFIX: i32 = 1
+
 fn fn_param_is_noalias(flags: i32) -> i32:
     (flags / FN_PARAM_FLAG_NOALIAS) % 2
 

@@ -27,7 +27,7 @@ type RawStr:
 fn make_str(ptr: *const u8, len: i64) -> str:
     let raw = RawStr { ptr: ptr, len: len }
     let p = &raw as *const str
-    unsafe: *p
+    unsafe *p
 
 var last_await_fiber_id: i32 = 0
 var last_await_cancelled_return: i32 = 0
@@ -84,7 +84,7 @@ pub fn fiber_select(fiber_ids: *const i32, count: i32, result_index: *mut i32):
     while true:
         var i = 0
         while i < count:
-            let fid = unsafe: *((fiber_ids as i64 + i as i64 * 4) as *const i32)
+            let fid = unsafe *((fiber_ids as i64 + i as i64 * 4) as *const i32)
             if with_runtime_fiber_is_completed(fid) != 0:
                 unsafe:
                     *result_index = i

@@ -60,7 +60,7 @@ if x > 0:
 if x > 0 { print("positive") }    // braced
 ```
 
-This applies broadly: `fn`, `if`, `while`, `for`, `with`, `defer`, `errdefer`, `unsafe`, `comptime`, match arms, and labeled blocks.
+This applies broadly: `fn`, `if`, `while`, `for`, `with`, `defer`, `errdefer`, `comptime`, match arms, and labeled blocks. `unsafe` is narrower: use `unsafe:` only as a newline block, `unsafe { ... }` for inline blocks, or `unsafe *p`/`unsafe p[i]` for raw access.
 
 **Use whichever block style makes the most sense for the code you are currently writing.** It is common and idiomatic to switch between inline colon, indented colon, and braced forms depending on the exact circumstances — block length, nesting depth, readability, and surrounding code. Do not force a single style everywhere.
 

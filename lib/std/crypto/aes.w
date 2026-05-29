@@ -73,7 +73,7 @@ unsafe fn aes128_init(ctx: *mut Aes128, key: *const u8):
 
 fn Aes128.new(key: *const u8) -> Aes128:
     var ctx = Aes128 { round_keys: [0 as u8; 176] }
-    unsafe: aes128_init(&raw mut ctx as *mut Aes128, key)
+    unsafe { aes128_init(&raw mut ctx as *mut Aes128, key) }
     ctx
 
 // Block cipher operations
@@ -143,4 +143,4 @@ unsafe fn aes128_encrypt_block(ctx: *const Aes128, block: *mut u8):
 
 // Public wrapper
 fn Aes128.encrypt_block(self: *const Aes128, block: *mut u8):
-    unsafe: aes128_encrypt_block(self, block)
+    unsafe { aes128_encrypt_block(self, block) }

@@ -6,7 +6,7 @@ fn pcre2_maketables_8(__param_gcontext: *mut pcre2_real_general_context_8) -> *c
     var __local_yield_: *mut u8 = with 0 as __ci_expr_seq_9 {
         var __ci_expr_ternary_0: *mut c_void = null
         if ((if __param_gcontext != null: 1 else: 0) != 0) {
-            (__ci_expr_ternary_0 = (&raw const (unsafe: *__param_gcontext).memctl as *const pcre2_memctl).malloc(1088, (&raw const (unsafe: *__param_gcontext).memctl as *const pcre2_memctl).memory_data))
+            (__ci_expr_ternary_0 = (&raw const (unsafe *__param_gcontext).memctl as *const pcre2_memctl).malloc(1088, (&raw const (unsafe *__param_gcontext).memctl as *const pcre2_memctl).memory_data))
         } else {
             (__ci_expr_ternary_0 = ((with_alloc((1088 as i64)) as *mut c_void)))
         }
@@ -40,7 +40,7 @@ fn pcre2_maketables_8(__param_gcontext: *mut pcre2_real_general_context_8) -> *c
             (__ci_expr_ternary_2 = __local_i)
         }
 
-        ((unsafe: *__ci_expr_old_1) = __ci_expr_ternary_2)
+        ((unsafe *__ci_expr_old_1) = __ci_expr_ternary_2)
 
 
 
@@ -74,7 +74,7 @@ fn pcre2_maketables_8(__param_gcontext: *mut pcre2_real_general_context_8) -> *c
             (__ci_expr_ternary_5 = __local_i)
         }
 
-        ((unsafe: *__ci_expr_old_4) = __ci_expr_ternary_5)
+        ((unsafe *__ci_expr_old_4) = __ci_expr_ternary_5)
 
 
 
@@ -89,47 +89,47 @@ fn pcre2_maketables_8(__param_gcontext: *mut pcre2_real_general_context_8) -> *c
 
     while ((if __local_i < 256: 1 else: 0) != 0) {
         if (isdigit(__local_i) != 0) {
-            ((unsafe: __local_p[(64 + (__local_i / 8))]) = (unsafe: __local_p[(64 + (__local_i / 8))]) | ((1 as c_uint) << ((__local_i & 7) as c_uint)))
+            ((unsafe __local_p[(64 + (__local_i / 8))]) = (unsafe __local_p[(64 + (__local_i / 8))]) | ((1 as c_uint) << ((__local_i & 7) as c_uint)))
         }
 
         if (isupper(__local_i) != 0) {
-            ((unsafe: __local_p[(96 + (__local_i / 8))]) = (unsafe: __local_p[(96 + (__local_i / 8))]) | ((1 as c_uint) << ((__local_i & 7) as c_uint)))
+            ((unsafe __local_p[(96 + (__local_i / 8))]) = (unsafe __local_p[(96 + (__local_i / 8))]) | ((1 as c_uint) << ((__local_i & 7) as c_uint)))
         }
 
         if (islower(__local_i) != 0) {
-            ((unsafe: __local_p[(128 + (__local_i / 8))]) = (unsafe: __local_p[(128 + (__local_i / 8))]) | ((1 as c_uint) << ((__local_i & 7) as c_uint)))
+            ((unsafe __local_p[(128 + (__local_i / 8))]) = (unsafe __local_p[(128 + (__local_i / 8))]) | ((1 as c_uint) << ((__local_i & 7) as c_uint)))
         }
 
         if (isalnum(__local_i) != 0) {
-            ((unsafe: __local_p[(160 + (__local_i / 8))]) = (unsafe: __local_p[(160 + (__local_i / 8))]) | ((1 as c_uint) << ((__local_i & 7) as c_uint)))
+            ((unsafe __local_p[(160 + (__local_i / 8))]) = (unsafe __local_p[(160 + (__local_i / 8))]) | ((1 as c_uint) << ((__local_i & 7) as c_uint)))
         }
 
         if ((if __local_i == 95: 1 else: 0) != 0) {
-            ((unsafe: __local_p[(160 + (__local_i / 8))]) = (unsafe: __local_p[(160 + (__local_i / 8))]) | ((1 as c_uint) << ((__local_i & 7) as c_uint)))
+            ((unsafe __local_p[(160 + (__local_i / 8))]) = (unsafe __local_p[(160 + (__local_i / 8))]) | ((1 as c_uint) << ((__local_i & 7) as c_uint)))
         }
 
         if (isspace(__local_i) != 0) {
-            ((unsafe: __local_p[(0 + (__local_i / 8))]) = (unsafe: __local_p[(0 + (__local_i / 8))]) | ((1 as c_uint) << ((__local_i & 7) as c_uint)))
+            ((unsafe __local_p[(0 + (__local_i / 8))]) = (unsafe __local_p[(0 + (__local_i / 8))]) | ((1 as c_uint) << ((__local_i & 7) as c_uint)))
         }
 
         if (isxdigit(__local_i) != 0) {
-            ((unsafe: __local_p[(32 + (__local_i / 8))]) = (unsafe: __local_p[(32 + (__local_i / 8))]) | ((1 as c_uint) << ((__local_i & 7) as c_uint)))
+            ((unsafe __local_p[(32 + (__local_i / 8))]) = (unsafe __local_p[(32 + (__local_i / 8))]) | ((1 as c_uint) << ((__local_i & 7) as c_uint)))
         }
 
         if (isgraph(__local_i) != 0) {
-            ((unsafe: __local_p[(192 + (__local_i / 8))]) = (unsafe: __local_p[(192 + (__local_i / 8))]) | ((1 as c_uint) << ((__local_i & 7) as c_uint)))
+            ((unsafe __local_p[(192 + (__local_i / 8))]) = (unsafe __local_p[(192 + (__local_i / 8))]) | ((1 as c_uint) << ((__local_i & 7) as c_uint)))
         }
 
         if (isprint(__local_i) != 0) {
-            ((unsafe: __local_p[(224 + (__local_i / 8))]) = (unsafe: __local_p[(224 + (__local_i / 8))]) | ((1 as c_uint) << ((__local_i & 7) as c_uint)))
+            ((unsafe __local_p[(224 + (__local_i / 8))]) = (unsafe __local_p[(224 + (__local_i / 8))]) | ((1 as c_uint) << ((__local_i & 7) as c_uint)))
         }
 
         if (ispunct(__local_i) != 0) {
-            ((unsafe: __local_p[(256 + (__local_i / 8))]) = (unsafe: __local_p[(256 + (__local_i / 8))]) | ((1 as c_uint) << ((__local_i & 7) as c_uint)))
+            ((unsafe __local_p[(256 + (__local_i / 8))]) = (unsafe __local_p[(256 + (__local_i / 8))]) | ((1 as c_uint) << ((__local_i & 7) as c_uint)))
         }
 
         if (iscntrl(__local_i) != 0) {
-            ((unsafe: __local_p[(288 + (__local_i / 8))]) = (unsafe: __local_p[(288 + (__local_i / 8))]) | ((1 as c_uint) << ((__local_i & 7) as c_uint)))
+            ((unsafe __local_p[(288 + (__local_i / 8))]) = (unsafe __local_p[(288 + (__local_i / 8))]) | ((1 as c_uint) << ((__local_i & 7) as c_uint)))
         }
 
 
@@ -178,7 +178,7 @@ fn pcre2_maketables_8(__param_gcontext: *mut pcre2_real_general_context_8) -> *c
 
         (__local_p = __local_p + 1)
 
-        ((unsafe: *__ci_expr_old_7) = __local_x)
+        ((unsafe *__ci_expr_old_7) = __local_x)
 
 
 
@@ -193,7 +193,7 @@ fn pcre2_maketables_8(__param_gcontext: *mut pcre2_real_general_context_8) -> *c
 
 fn pcre2_maketables_free_8(__param_gcontext: *mut pcre2_real_general_context_8, __param_tables: *const u8) {
     if ((if __param_gcontext != null: 1 else: 0) != 0) {
-        (&raw const (unsafe: *__param_gcontext).memctl as *const pcre2_memctl).free((__param_tables as *mut c_void), (&raw const (unsafe: *__param_gcontext).memctl as *const pcre2_memctl).memory_data)
+        (&raw const (unsafe *__param_gcontext).memctl as *const pcre2_memctl).free((__param_tables as *mut c_void), (&raw const (unsafe *__param_gcontext).memctl as *const pcre2_memctl).memory_data)
     } else {
         with_free(((__param_tables as *mut c_void) as *mut i8))
     }

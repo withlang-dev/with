@@ -108,8 +108,8 @@ fn main:
         print(f"match ok: {rc} capture groups")
         let ov = pcre2_get_ovector_pointer_8(md)
         if ov as i64 != 0:
-            let start = unsafe: *ov
-            let end_pos = unsafe: *(ov + 1)
+            let start = unsafe *ov
+            let end_pos = unsafe *(ov + 1)
             print(f"match at [{start}, {end_pos})")
 
     pcre2_match_data_free_8(md)

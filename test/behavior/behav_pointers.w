@@ -6,24 +6,24 @@
 fn test_basic_pointer:
     var x: i32 = 42
     let p = &raw mut x
-    unsafe: assert(*p == 42)
+    unsafe { assert(*p == 42) }
 
 fn test_pointer_mutation:
     var x: i32 = 10
     let p = &raw mut x
-    unsafe: *p = 20
+    unsafe *p = 20
     assert(x == 20)
 
 fn test_pointer_increment:
     var x: i32 = 0
     let p = &raw mut x
-    unsafe: *p = *p + 1
-    unsafe: *p = *p + 1
-    unsafe: *p = *p + 1
+    unsafe *p = unsafe *p + 1
+    unsafe *p = unsafe *p + 1
+    unsafe *p = unsafe *p + 1
     assert(x == 3)
 
 fn set_to_42(p: *mut i32):
-    unsafe: *p = 42
+    unsafe *p = 42
 
 fn test_pointer_as_argument:
     var x: i32 = 0
@@ -44,7 +44,7 @@ fn test_swap:
     assert(y == 10)
 
 fn add_to(p: *mut i32, val: i32):
-    unsafe: *p = *p + val
+    unsafe *p = unsafe *p + val
 
 fn test_pointer_accumulate:
     var sum: i32 = 0
@@ -56,7 +56,7 @@ fn test_pointer_accumulate:
 type Counter { value: i32 }
 
 fn counter_inc(c: *mut Counter):
-    unsafe: (*c).value = (*c).value + 1
+    unsafe (*c).value = unsafe (*c).value + 1
 
 fn counter_get(c: *const Counter) -> i32:
     c.value

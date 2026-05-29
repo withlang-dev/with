@@ -613,7 +613,7 @@ fn ComptimeEvaluator.check_workspace_intercepts_finished(self: ComptimeEvaluator
         return
 
 fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
-    var sema = unsafe: *sema_ptr
+    var sema = unsafe *sema_ptr
     sema.ast = ast
     var evaluator = ComptimeEvaluator.init(sema, ast, pool, 0)
     let value = evaluator.eval_root(node)
@@ -628,7 +628,7 @@ fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: Intern
     }
 
 fn comptime_force_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, node: i32) -> ComptimeEvalResult:
-    var sema = unsafe: *sema_ptr
+    var sema = unsafe *sema_ptr
     sema.ast = ast
     var evaluator = ComptimeEvaluator.init(sema, ast, pool, 1)
     let value = evaluator.eval_root(node)
@@ -649,7 +649,7 @@ fn comptime_force_eval_expr(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool,
     comptime_force_eval_expr_result(sema_ptr, ast, pool, node).value
 
 fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, fn_sym: i32, package_name: str, package_version: str, project_root: str) -> ComptimeEvalResult:
-    var sema = unsafe: *sema_ptr
+    var sema = unsafe *sema_ptr
     sema.ast = ast
     var evaluator = ComptimeEvaluator.init(sema, ast, pool, 1)
     evaluator.allow_runtime_calls = 1
@@ -681,7 +681,7 @@ fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: AstPool, pool: Inte
     }
 
 fn comptime_eval_tool_action_result(sema_ptr: *mut Sema, ast: AstPool, pool: InternPool, fn_sym: i32, package_name: str, package_version: str, project_root: str, target_name: str, inputs: Vec[str], output: str, extra_outputs: Vec[str], args_values: Vec[str], write_scopes: Vec[str], timeout_ms: i32, cwd: str, env: Vec[str], network: i32) -> ComptimeEvalResult:
-    var sema = unsafe: *sema_ptr
+    var sema = unsafe *sema_ptr
     sema.ast = ast
     var evaluator = ComptimeEvaluator.init(sema, ast, pool, 1)
     evaluator.allow_runtime_calls = 1
@@ -2776,8 +2776,8 @@ fn comptime_execute_workspace_compile_plan(plan: ComptimeWorkspaceCompilePlan) -
 
 fn comptime_workspace_thread_entry(arg: *mut u8) -> i32:
     let job = arg as *mut ComptimeWorkspaceThreadJob
-    let native = comptime_execute_workspace_compile_plan((unsafe: *job).plan)
-    (unsafe: *job).result = native
+    let native = comptime_execute_workspace_compile_plan((unsafe *job).plan)
+    (unsafe *job).result = native
     0
 
 fn ComptimeEvaluator.compile_workspace_record(self: ComptimeEvaluator, record: ComptimeWorkspaceRecord, capability: ComptimeCapabilityRecord, node: i32, want_messages: i32) -> ComptimeWorkspaceCompileResult:

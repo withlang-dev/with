@@ -13,9 +13,9 @@ fn pcre2_regcomp(__param_preg: *mut regex_t, __param_pattern: *const i8, __param
 
     var __local_re_nsub: c_int = 0
 
-    ((unsafe: *__param_preg).re_match_data = null)
+    ((unsafe *__param_preg).re_match_data = null)
 
-    ((unsafe: *__param_preg).re_pcre2_code = null)
+    ((unsafe *__param_preg).re_pcre2_code = null)
 
     var __ci_expr_ternary_0: c_ulong = 0
 
@@ -56,11 +56,11 @@ fn pcre2_regcomp(__param_preg: *mut regex_t, __param_pattern: *const i8, __param
         (__local_options = __local_options | 262144)
     }
 
-    ((unsafe: *__param_preg).re_cflags = __param_cflags)
+    ((unsafe *__param_preg).re_cflags = __param_cflags)
 
-    ((unsafe: *__param_preg).re_pcre2_code = ((pcre2_compile_8((__param_pattern as *const u8), __local_patlen, __local_options, (&raw mut __local_errorcode as *mut c_int), (&raw mut __local_erroffset as *mut c_ulong), null) as *mut c_void)))
+    ((unsafe *__param_preg).re_pcre2_code = ((pcre2_compile_8((__param_pattern as *const u8), __local_patlen, __local_options, (&raw mut __local_errorcode as *mut c_int), (&raw mut __local_erroffset as *mut c_ulong), null) as *mut c_void)))
 
-    ((unsafe: *__param_preg).re_erroffset = __local_erroffset)
+    ((unsafe *__param_preg).re_erroffset = __local_erroffset)
 
     if ((if __param_preg.re_pcre2_code == null: 1 else: 0) != 0) {
         var __local_i: c_uint
@@ -93,16 +93,16 @@ fn pcre2_regcomp(__param_preg: *mut regex_t, __param_pattern: *const i8, __param
 
     pcre2_pattern_info_8((__param_preg.re_pcre2_code as *const pcre2_real_code_8), 4, (&raw mut __local_re_nsub as *mut c_int))
 
-    ((unsafe: *__param_preg).re_nsub = ((__local_re_nsub as c_ulong)))
+    ((unsafe *__param_preg).re_nsub = ((__local_re_nsub as c_ulong)))
 
-    ((unsafe: *__param_preg).re_match_data = ((pcre2_match_data_create_8((__local_re_nsub + 1), null) as *mut c_void)))
+    ((unsafe *__param_preg).re_match_data = ((pcre2_match_data_create_8((__local_re_nsub + 1), null) as *mut c_void)))
 
-    ((unsafe: *__param_preg).re_erroffset = ((-1 as c_ulong)))
+    ((unsafe *__param_preg).re_erroffset = ((-1 as c_ulong)))
 
     if ((if __param_preg.re_match_data == null: 1 else: 0) != 0) {
         pcre2_code_free_8(__param_preg.re_pcre2_code)
 
-        ((unsafe: *__param_preg).re_pcre2_code = null)
+        ((unsafe *__param_preg).re_pcre2_code = null)
 
         return REG_ESPACE
 
@@ -146,7 +146,7 @@ fn pcre2_regexec(__param_preg: *const regex_t, __param_string: *const i8, __para
     if ((if (__param_preg.re_cflags & 32) != 0: 1 else: 0) != 0) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if (if (&(unsafe: __param_pmatch[0]) as *mut c_void) == null: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if (if (&(unsafe __param_pmatch[0]) as *mut c_void) == null: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_0 != 0) {
@@ -155,13 +155,13 @@ fn pcre2_regexec(__param_preg: *const regex_t, __param_string: *const i8, __para
 
 
     if ((if (__param_eflags & 128) != 0: 1 else: 0) != 0) {
-        if ((if (&(unsafe: __param_pmatch[0]) as *mut c_void) == null: 1 else: 0) != 0) {
+        if ((if (&(unsafe __param_pmatch[0]) as *mut c_void) == null: 1 else: 0) != 0) {
             return REG_INVARG
         }
 
-        (__local_so = (unsafe: __param_pmatch[0]).rm_so)
+        (__local_so = (unsafe __param_pmatch[0]).rm_so)
 
-        (__local_eo = (unsafe: __param_pmatch[0]).rm_eo)
+        (__local_eo = (unsafe __param_pmatch[0]).rm_eo)
 
     } else {
         (__local_so = 0)
@@ -186,24 +186,24 @@ fn pcre2_regexec(__param_preg: *const regex_t, __param_string: *const i8, __para
         while ((if __local_i < ((__local_rc as c_ulong)): 1 else: 0) != 0) {
             var __ci_expr_ternary_1: c_int = 0
 
-            if ((if (unsafe: __local_ovector[((__local_i as c_ulong) *% (2 as c_ulong))]) == (~(0 as c_ulong)): 1 else: 0) != 0) {
+            if ((if (unsafe __local_ovector[((__local_i as c_ulong) *% (2 as c_ulong))]) == (~(0 as c_ulong)): 1 else: 0) != 0) {
                 (__ci_expr_ternary_1 = -1)
             } else {
-                (__ci_expr_ternary_1 = (((((unsafe: __local_ovector[((__local_i as c_ulong) *% (2 as c_ulong))]) as c_ulong) +% (__local_so as c_ulong)) as c_int)))
+                (__ci_expr_ternary_1 = (((((unsafe __local_ovector[((__local_i as c_ulong) *% (2 as c_ulong))]) as c_ulong) +% (__local_so as c_ulong)) as c_int)))
             }
 
-            ((unsafe: __param_pmatch[__local_i]).rm_so = __ci_expr_ternary_1)
+            ((unsafe __param_pmatch[__local_i]).rm_so = __ci_expr_ternary_1)
 
 
             var __ci_expr_ternary_2: c_int = 0
 
-            if ((if (unsafe: __local_ovector[((((__local_i as c_ulong) *% (2 as c_ulong)) as c_ulong) +% (1 as c_ulong))]) == (~(0 as c_ulong)): 1 else: 0) != 0) {
+            if ((if (unsafe __local_ovector[((((__local_i as c_ulong) *% (2 as c_ulong)) as c_ulong) +% (1 as c_ulong))]) == (~(0 as c_ulong)): 1 else: 0) != 0) {
                 (__ci_expr_ternary_2 = -1)
             } else {
-                (__ci_expr_ternary_2 = (((((unsafe: __local_ovector[((((__local_i as c_ulong) *% (2 as c_ulong)) as c_ulong) +% (1 as c_ulong))]) as c_ulong) +% (__local_so as c_ulong)) as c_int)))
+                (__ci_expr_ternary_2 = (((((unsafe __local_ovector[((((__local_i as c_ulong) *% (2 as c_ulong)) as c_ulong) +% (1 as c_ulong))]) as c_ulong) +% (__local_so as c_ulong)) as c_int)))
             }
 
-            ((unsafe: __param_pmatch[__local_i]).rm_eo = __ci_expr_ternary_2)
+            ((unsafe __param_pmatch[__local_i]).rm_eo = __ci_expr_ternary_2)
 
 
 
@@ -213,9 +213,9 @@ fn pcre2_regexec(__param_preg: *const regex_t, __param_string: *const i8, __para
 
 
         while ((if __local_i < __local_nmatch: 1 else: 0) != 0) {
-            ((unsafe: __param_pmatch[__local_i]).rm_eo = -1)
+            ((unsafe __param_pmatch[__local_i]).rm_eo = -1)
 
-            ((unsafe: __param_pmatch[__local_i]).rm_so = (unsafe: __param_pmatch[__local_i]).rm_eo)
+            ((unsafe __param_pmatch[__local_i]).rm_so = (unsafe __param_pmatch[__local_i]).rm_eo)
 
 
             (__local_i = __local_i + 1)
@@ -314,7 +314,7 @@ fn pcre2_regerror(__param_errcode: c_int, __param_preg: *const regex_t, __param_
     }
 
     if (__ci_expr_logic_2 != 0) {
-        (__local_snprintf_rc = snprintf((&(unsafe: __local_offset_buf[0]) as *mut c_char), (23 * sizeof[c_char]()), " at offset %d", (__param_preg.re_erroffset as c_int)))
+        (__local_snprintf_rc = snprintf((&(unsafe __local_offset_buf[0]) as *mut c_char), (23 * sizeof[c_char]()), " at offset %d", (__param_preg.re_erroffset as c_int)))
 
         (__ci_expr_logic_3 = (if (if __local_snprintf_rc > 0: 1 else: 0) != 0: 1 else: 0))
 
@@ -334,9 +334,9 @@ fn pcre2_regerror(__param_errcode: c_int, __param_preg: *const regex_t, __param_
 
     (__local_i = 0)
 
-    while ((if (unsafe: *__local_message) != 0: 1 else: 0) != 0) {
+    while ((if (unsafe *__local_message) != 0: 1 else: 0) != 0) {
         if ((if ((__local_i as c_ulong) +% (1 as c_ulong)) < __param_errbuf_size: 1 else: 0) != 0) {
-            ((unsafe: __param_errbuf[__local_i]) = (unsafe: *__local_message))
+            ((unsafe __param_errbuf[__local_i]) = (unsafe *__local_message))
         }
 
         (__local_i = __local_i + 1)
@@ -348,11 +348,11 @@ fn pcre2_regerror(__param_errcode: c_int, __param_preg: *const regex_t, __param_
 
 
     if (__local_have_offset != 0) {
-        (__local_message = (&(unsafe: __local_offset_buf[0]) as *const c_char))
+        (__local_message = (&(unsafe __local_offset_buf[0]) as *const c_char))
 
-        while ((if (unsafe: *__local_message) != 0: 1 else: 0) != 0) {
+        while ((if (unsafe *__local_message) != 0: 1 else: 0) != 0) {
             if ((if ((__local_i as c_ulong) +% (1 as c_ulong)) < __param_errbuf_size: 1 else: 0) != 0) {
-                ((unsafe: __param_errbuf[__local_i]) = (unsafe: *__local_message))
+                ((unsafe __param_errbuf[__local_i]) = (unsafe *__local_message))
             }
 
             (__local_i = __local_i + 1)
@@ -374,7 +374,7 @@ fn pcre2_regerror(__param_errcode: c_int, __param_preg: *const regex_t, __param_
             (__ci_expr_ternary_5 = ((__param_errbuf_size as c_ulong) -% (1 as c_ulong)))
         }
 
-        ((unsafe: __param_errbuf[__ci_expr_ternary_5]) = 0)
+        ((unsafe __param_errbuf[__ci_expr_ternary_5]) = 0)
 
     }
 

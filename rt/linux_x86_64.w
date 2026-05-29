@@ -26,7 +26,7 @@ extern var stderr: *mut u8
 
 fn get_errno() -> i32:
     let p = __errno_location()
-    unsafe: *p
+    unsafe *p
 
 @[c_export("__error")]
 pub fn linux_darwin_error_compat() -> *mut i32:
@@ -228,14 +228,14 @@ pub fn rt_stat_impl(path: *const u8, out: *mut RtStatBuf) -> i32:
     if r < 0:
         return -get_errno()
     let base = &native_buf as i64
-    let size = unsafe: *((base + LINUX_STAT_SIZE_OFFSET) as *const i64)
-    let mode = unsafe: *((base + LINUX_STAT_MODE_OFFSET) as *const i32)
-    let mtime_sec = unsafe: *((base + LINUX_STAT_MTIME_SEC_OFFSET) as *const i64)
-    let mtime_nsec = unsafe: *((base + LINUX_STAT_MTIME_NSEC_OFFSET) as *const i64)
-    (unsafe: *out).size = size
-    (unsafe: *out).is_dir = if (mode & S_IFMT) == S_IFDIR: 1 else: 0
-    (unsafe: *out).is_file = if (mode & S_IFMT) == S_IFREG: 1 else: 0
-    (unsafe: *out).modified_ns = mtime_sec * 1000000000 + mtime_nsec
+    let size = unsafe *((base + LINUX_STAT_SIZE_OFFSET) as *const i64)
+    let mode = unsafe *((base + LINUX_STAT_MODE_OFFSET) as *const i32)
+    let mtime_sec = unsafe *((base + LINUX_STAT_MTIME_SEC_OFFSET) as *const i64)
+    let mtime_nsec = unsafe *((base + LINUX_STAT_MTIME_NSEC_OFFSET) as *const i64)
+    (unsafe *out).size = size
+    (unsafe *out).is_dir = if (mode & S_IFMT) == S_IFDIR: 1 else: 0
+    (unsafe *out).is_file = if (mode & S_IFMT) == S_IFREG: 1 else: 0
+    (unsafe *out).modified_ns = mtime_sec * 1000000000 + mtime_nsec
     0
 
 @[c_export("rt_chmod")]
@@ -359,7 +359,7 @@ fn rt_cstr_len(s: *const u8) -> i64:
     if s as i64 == 0:
         return 0
     var len: i64 = 0
-    while unsafe: *((s as i64 + len) as *const u8) != 0:
+    while unsafe *((s as i64 + len) as *const u8) != 0:
         len = len + 1
     len
 
@@ -367,37 +367,37 @@ fn rt_dirent_name(ent: *mut u8) -> *const u8:
     (ent as i64 + LINUX_DIRENT_NAME_OFFSET) as *const u8
 
 fn rt_dirent_is_dot_or_dotdot(name: *const u8) -> bool:
-    let first = unsafe: *name
+    let first = unsafe *name
     if first != 46:
         return false
-    let second = unsafe: *((name as i64 + 1) as *const u8)
+    let second = unsafe *((name as i64 + 1) as *const u8)
     if second == 0:
         return true
     if second != 46:
         return false
-    (unsafe: *((name as i64 + 2) as *const u8)) == 0
+    (unsafe *((name as i64 + 2) as *const u8)) == 0
 
 fn rt_path_join(parent: *const u8, name: *const u8, out: *mut u8, cap: i64) -> i32:
     let parent_len = rt_cstr_len(parent)
     let name_len = rt_cstr_len(name)
     var need_slash = true
-    if parent_len > 0 and unsafe: *((parent as i64 + parent_len - 1) as *const u8) == 47:
+    if parent_len > 0 and unsafe *((parent as i64 + parent_len - 1) as *const u8) == 47:
         need_slash = false
     let slash_len: i64 = if need_slash: 1 else: 0
     if parent_len + slash_len + name_len + 1 > cap:
         return -36
     var i: i64 = 0
     while i < parent_len:
-        unsafe: *((out as i64 + i) as *mut u8) = unsafe: *((parent as i64 + i) as *const u8)
+        unsafe *((out as i64 + i) as *mut u8) = unsafe *((parent as i64 + i) as *const u8)
         i = i + 1
     if need_slash:
-        unsafe: *((out as i64 + i) as *mut u8) = 47
+        unsafe *((out as i64 + i) as *mut u8) = 47
         i = i + 1
     var j: i64 = 0
     while j < name_len:
-        unsafe: *((out as i64 + i + j) as *mut u8) = unsafe: *((name as i64 + j) as *const u8)
+        unsafe *((out as i64 + i + j) as *mut u8) = unsafe *((name as i64 + j) as *const u8)
         j = j + 1
-    unsafe: *((out as i64 + i + j) as *mut u8) = 0
+    unsafe *((out as i64 + i + j) as *mut u8) = 0
     0
 
 fn rt_lstat_mode(path: *const u8, mode_out: *mut i32) -> i32:
@@ -405,7 +405,7 @@ fn rt_lstat_mode(path: *const u8, mode_out: *mut i32) -> i32:
     let r = lstat(path, &st as *mut [144]u8 as *mut u8)
     if r < 0:
         return -get_errno()
-    unsafe: *mode_out = unsafe: *((&st as i64 + LINUX_STAT_MODE_OFFSET) as *const i32)
+    unsafe *mode_out = unsafe *((&st as i64 + LINUX_STAT_MODE_OFFSET) as *const i32)
     0
 
 fn rt_lstat_is_dir(path: *const u8) -> bool:
@@ -624,9 +624,9 @@ pub fn rt_sysinfo_impl(out: *mut RtSysInfo) -> i32:
     let page_size = sysconf(30)
     let pages = sysconf(85)
     let cores = sysconf(84)
-    (unsafe: *out).cpu_cores = if cores > 0: cores as i32 else: 1
-    (unsafe: *out).page_size = if page_size > 0: page_size else: 4096
-    (unsafe: *out).memory_total = if pages > 0 and page_size > 0: pages * page_size else: 0
+    (unsafe *out).cpu_cores = if cores > 0: cores as i32 else: 1
+    (unsafe *out).page_size = if page_size > 0: page_size else: 4096
+    (unsafe *out).memory_total = if pages > 0 and page_size > 0: pages * page_size else: 0
     0
 
 @[c_export("rt_sysinfo_os")]

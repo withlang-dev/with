@@ -16,13 +16,13 @@ fn pcre2_get_error_message_8(__param_enumber: c_int, __param_buffer: *mut u8, __
     }
 
     if ((if __param_enumber >= 100: 1 else: 0) != 0) {
-        (__local_message = (&(unsafe: compile_error_texts[0]) as *const u8))
+        (__local_message = (&compile_error_texts[0] as *const u8))
 
         (__local_n = __param_enumber - 100)
 
     } else {
         if ((if __param_enumber < 0: 1 else: 0) != 0) {
-            (__local_message = (&(unsafe: match_error_texts[0]) as *const u8))
+            (__local_message = (&match_error_texts[0] as *const u8))
 
             (__local_n = 0 - __param_enumber)
 
@@ -40,13 +40,13 @@ fn pcre2_get_error_message_8(__param_enumber: c_int, __param_buffer: *mut u8, __
 
             (__local_message = __local_message + 1)
 
-            if (not ((if (unsafe: *__ci_expr_old_0) != 0: 1 else: 0) != 0)) {
+            if (not ((if (unsafe *__ci_expr_old_0) != 0: 1 else: 0) != 0)) {
                 break
             }
 
         }
 
-        if ((if (unsafe: *__local_message) == 0: 1 else: 0) != 0) {
+        if ((if (unsafe *__local_message) == 0: 1 else: 0) != 0) {
             return -29
         }
 
@@ -57,7 +57,7 @@ fn pcre2_get_error_message_8(__param_enumber: c_int, __param_buffer: *mut u8, __
 
     (__local_i = 0)
 
-    while ((if (unsafe: *__local_message) != 0: 1 else: 0) != 0) {
+    while ((if (unsafe *__local_message) != 0: 1 else: 0) != 0) {
         if ((if __local_i >= ((__param_size as c_ulong) -% (1 as c_ulong)): 1 else: 0) != 0) {
             (__local_rc = -48)
 
@@ -69,7 +69,7 @@ fn pcre2_get_error_message_8(__param_enumber: c_int, __param_buffer: *mut u8, __
 
         (__local_message = __local_message + 1)
 
-        ((unsafe: __param_buffer[__local_i]) = (unsafe: *__ci_expr_old_1))
+        ((unsafe __param_buffer[__local_i]) = (unsafe *__ci_expr_old_1))
 
 
 
@@ -78,7 +78,7 @@ fn pcre2_get_error_message_8(__param_enumber: c_int, __param_buffer: *mut u8, __
     }
 
 
-    ((unsafe: __param_buffer[__local_i]) = 0)
+    ((unsafe __param_buffer[__local_i]) = 0)
 
     var __ci_expr_ternary_2: c_int = 0
 

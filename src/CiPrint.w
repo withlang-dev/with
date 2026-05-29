@@ -1,7 +1,7 @@
 // CiPrint — pretty-printer for the CiIR migrator IR.
 //
 // This is the sole owner of indentation, parenthesization, array
-// decay, `unsafe:` wrapping, cast rendering, and semicolons. It
+// decay, `unsafe` raw-access wrapping, cast rendering, and semicolons. It
 // never queries libclang and never makes semantic decisions — those
 // happened in the lowering pass that produced the IR.
 //
@@ -190,11 +190,11 @@ fn ci_float_type_name(bits: i32) -> str:
     if bits == 64: return "f64"
     "f64"
 
-// Wrap an expression source snippet in `(unsafe: ...)` for rendering
-// raw pointer access. Keeping the `unsafe:` wrapping in one place makes
+// Wrap an expression source snippet in `(unsafe ...)` for rendering
+// raw pointer access. Keeping the `unsafe` wrapping in one place makes
 // it cheap to change the convention later.
 fn ci_wrap_unsafe(inner: str) -> str:
-    "(unsafe: " ++ inner ++ ")"
+    "(unsafe " ++ inner ++ ")"
 
 fn ci_print_compact_stmt_local(stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: CiStmtId, depth: i32) -> str:
     if (id as i32) == 0:
@@ -533,7 +533,7 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
         let base_ty = exprs.get_type(base)
         if wants_ptr != 0 and (base_ty as i32) != 0 and types.kind(base_ty) == CiTypeKind.CT_POINTER:
             let base_text = ci_print_expr(exprs, types, base, 0, 0)
-            return f"(unsafe: *{base_text}).{field}"
+            return f"(unsafe *{base_text}).{field}"
         if wants_ptr == 0 and ci_field_base_needs_borrow(types, base_ty):
             let base_text = ci_print_expr(exprs, types, base, 0, 1)
             return f"(&raw const {base_text} as *const {ci_print_type(types, base_ty)}).{field}"
@@ -567,11 +567,14 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
                 let base_kw = if is_mut != 0: "&raw mut " else: "&raw const "
                 let ptr_kw = if is_mut != 0: "*mut " else: "*const "
                 let base_text = ci_print_expr(exprs, types, base, 0, 0)
-                return f"{kw}(unsafe: *({base_kw}{base_text} as {ptr_kw}{ci_print_type(types, base_ty)})).{field}"
+                return f"{kw}(unsafe *({base_kw}{base_text} as {ptr_kw}{ci_print_type(types, base_ty)})).{field}"
         return kw ++ ci_print_expr(exprs, types, operand, 0, 1)
     if kind == CiExprKind.CIE_ARRAY_DECAY:
         let operand = (exprs.get_d0(id)) as CiExprId
-        let indexed = ci_wrap_unsafe(ci_print_expr(exprs, types, operand, 0, 0) ++ "[0]")
+        let operand_text = ci_print_expr(exprs, types, operand, 0, 0)
+        let operand_ty = exprs.get_type(operand)
+        let operand_is_ptr = (operand_ty as i32) != 0 and types.kind(operand_ty) == CiTypeKind.CT_POINTER
+        let indexed = if operand_is_ptr: ci_wrap_unsafe(operand_text ++ "[0]") else: operand_text ++ "[0]"
         let target_ty = exprs.get_type(id)
         if (target_ty as i32) != 0 and types.kind(target_ty) == CiTypeKind.CT_POINTER:
             let pointee_ty = (types.get_d0(target_ty)) as CiTypeId

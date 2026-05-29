@@ -6,7 +6,7 @@ fn pcre2_next_match_8(__param_match_data: *mut pcre2_real_match_data_8, __param_
 
     var __local_start_offset: c_ulong = __param_match_data.start_offset
 
-    var __local_ovector: *mut c_ulong = ((&raw const (unsafe: *__param_match_data).ovector[0] as *mut c_ulong))
+    var __local_ovector: *mut c_ulong = ((&raw const (unsafe *__param_match_data).ovector[0] as *mut c_ulong))
 
     if ((if __local_rc < 0: 1 else: 0) != 0) {
         return 0
@@ -18,8 +18,8 @@ fn pcre2_next_match_8(__param_match_data: *mut pcre2_real_match_data_8, __param_
 
     var __ci_expr_logic_0: c_int = 0
 
-    if ((if (unsafe: __local_ovector[0]) != __local_start_offset: 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if (if (unsafe: __local_ovector[1]) == __local_start_offset: 1 else: 0) != 0: 1 else: 0))
+    if ((if (unsafe __local_ovector[0]) != __local_start_offset: 1 else: 0) != 0) {
+        (__ci_expr_logic_0 = (if (if (unsafe __local_ovector[1]) == __local_start_offset: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_0 != 0) {
@@ -27,31 +27,31 @@ fn pcre2_next_match_8(__param_match_data: *mut pcre2_real_match_data_8, __param_
             return 0
         }
 
-        ((unsafe: *__param_pstart_offset) = do_bumpalong(__param_match_data, (unsafe: __local_ovector[1])))
+        ((unsafe *__param_pstart_offset) = do_bumpalong(__param_match_data, (unsafe __local_ovector[1])))
 
-        ((unsafe: *__param_poptions) = 0)
+        ((unsafe *__param_poptions) = 0)
 
         return 1
 
     }
 
 
-    if ((if (unsafe: __local_ovector[0]) == (unsafe: __local_ovector[1]): 1 else: 0) != 0) {
-        if ((if (unsafe: __local_ovector[0]) >= __param_match_data.subject_length: 1 else: 0) != 0) {
+    if ((if (unsafe __local_ovector[0]) == (unsafe __local_ovector[1]): 1 else: 0) != 0) {
+        if ((if (unsafe __local_ovector[0]) >= __param_match_data.subject_length: 1 else: 0) != 0) {
             return 0
         }
 
-        ((unsafe: *__param_pstart_offset) = (unsafe: __local_ovector[1]))
+        ((unsafe *__param_pstart_offset) = (unsafe __local_ovector[1]))
 
-        ((unsafe: *__param_poptions) = 8)
+        ((unsafe *__param_poptions) = 8)
 
         return 1
 
     }
 
-    ((unsafe: *__param_pstart_offset) = (unsafe: __local_ovector[1]))
+    ((unsafe *__param_pstart_offset) = (unsafe __local_ovector[1]))
 
-    ((unsafe: *__param_poptions) = 0)
+    ((unsafe *__param_poptions) = 0)
 
     return 1
 
@@ -68,12 +68,12 @@ fn do_bumpalong(__param_match_data: *mut pcre2_real_match_data_8, __param_offset
 
     var __ci_expr_logic_0: c_int = 0
 
-    if ((if (unsafe: __local_subject[__param_offset]) == 13: 1 else: 0) != 0) {
+    if ((if (unsafe __local_subject[__param_offset]) == 13: 1 else: 0) != 0) {
         (__ci_expr_logic_0 = (if (if ((__param_offset as c_ulong) +% (1 as c_ulong)) < __local_subject_length: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_0 != 0) {
-        (__ci_expr_logic_1 = (if (if (unsafe: __local_subject[((__param_offset as c_ulong) +% (1 as c_ulong))]) == 10: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_1 = (if (if (unsafe __local_subject[((__param_offset as c_ulong) +% (1 as c_ulong))]) == 10: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_1 != 0) {
@@ -103,7 +103,7 @@ fn do_bumpalong(__param_match_data: *mut pcre2_real_match_data_8, __param_offset
             var __ci_expr_logic_2: c_int = 0
 
             if ((if __local_next < __local_subject_end: 1 else: 0) != 0) {
-                (__ci_expr_logic_2 = (if (if ((((unsafe: *__local_next) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_2 = (if (if ((((unsafe *__local_next) as c_int) as c_uint) & (192 as c_uint)) == 128: 1 else: 0) != 0: 1 else: 0))
             }
 
             if (not (__ci_expr_logic_2 != 0)) {
