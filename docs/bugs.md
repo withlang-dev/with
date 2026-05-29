@@ -263,9 +263,14 @@
   │                                                                                                                │             │                   │      │ executable. `spawn task` reaches completion as │
   │                                                                                                                │             │                   │      │ detached work; `let _ = task` cancellation     │
   │                                                                                                                │             │                   │      │ drains without running past await. Spec §14.7. │
-  │ #271-#274                                                                                                     │         Yes │           Partial │   No │ Remaining §14 async sketches still cover       │
-  │                                                                                                                │             │                   │      │ ScopedSend, no-await-in-iterators, and related │
-  │                                                                                                                │             │                   │      │ unchecked semantics.                           │
+  │ #271 (blocked)                                                                                                │         Yes │           Partial │   No │ Blocked on a real ScopedTask ownership design. │
+  │                                                                                                                │             │                   │      │ Current s.track returns plain Task[T]; MIR can │
+  │                                                                                                                │             │                   │      │ still schedule normal Task drops, runtime      │
+  │                                                                                                                │             │                   │      │ scopes store only fiber ids, and cleanup cannot│
+  │                                                                                                                │             │                   │      │ know whether await already consumed/freed the  │
+  │                                                                                                                │             │                   │      │ result buffer. Spec §14.9.                     │
+  │ #272-#274                                                                                                     │         Yes │           Partial │   No │ Remaining §14 async sketches still cover       │
+  │                                                                                                                │             │                   │      │ select-await and general async coverage.        │
   │ [x] #275-#276                                                                                                  │         Yes │               Yes │   No │ Completed: c"..." now lowers as &CStr with     │
   │                                                                                                                │             │                   │      │ NUL-terminated static storage, string          │
   │                                                                                                                │             │                   │      │ literals default to str, and &str coercions    │
