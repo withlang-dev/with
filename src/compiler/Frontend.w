@@ -342,11 +342,26 @@ fn Zcu.c_import_cache_key_frontend(self: Zcu, pool: AstPool, decl: i32, header_s
     key = key ++ "\n#defines:"
     for di in 0..self.project_config.c_import_defines.len() as i32:
         key = key ++ "|" ++ self.project_config.c_import_defines.get(di as i64)
+    key = key ++ c_import_header_content_fingerprint_line(header_spec)
     key = key ++ frontend_cimport_compiler_fingerprint_line()
     let epoch = runtime_getenv("WITH_CIMPORT_CACHE_EPOCH")
     if epoch.len() > 0:
         key = key ++ "\n#epoch:" ++ epoch
     key
+
+fn c_import_header_content_fingerprint_line(header_spec: str) -> str:
+    let decoded = c_import_trim(c_import_decode_escapes(header_spec))
+    if decoded.len() < 3:
+        return ""
+    if decoded.byte_at(0) != 34 or decoded.byte_at(decoded.len() as i64 - 1) != 34:
+        return ""
+    let path = decoded.slice(1, decoded.len() - 1)
+    if path.len() == 0 or path.byte_at(0) != 47:
+        return ""
+    let text = runtime_read_file(path)
+    if text.len() == 0:
+        return "\n#header-path:" ++ path ++ "\n#header-missing"
+    "\n#header-path:" ++ path ++ "\n#header-len:" ++ f"{text.len()}" ++ "\n#header-hash:" ++ f"{runtime_str_hash(text)}"
 
 fn c_import_fs_cache_dir() -> str:
     let home = runtime_getenv("HOME")
