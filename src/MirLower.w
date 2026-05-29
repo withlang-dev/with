@@ -1322,6 +1322,18 @@ fn MirBuilder.variant_index(self: MirBuilder, variant_sym: i32) -> i32:
         return self.sema.variant_lookup.get(variant_sym).unwrap()
     0
 
+fn MirBuilder.enum_variant_index_for_type(self: MirBuilder, enum_ty: i32, variant_sym: i32) -> i32:
+    let index = self.sema.enum_variant_index_for_type(enum_ty, variant_sym)
+    if index >= 0:
+        return index
+    self.variant_index(variant_sym)
+
+fn MirBuilder.enum_variant_discriminant_for_type(self: MirBuilder, enum_ty: i32, variant_sym: i32) -> i32:
+    let disc = self.sema.enum_variant_discriminant_for_type(enum_ty, variant_sym)
+    if disc >= 0:
+        return disc
+    self.variant_index(variant_sym)
+
 // Resolve variant sym from an AST node, checking sema's comprehension sidecar first.
 fn MirBuilder.resolve_variant_sym(self: MirBuilder, node: i32) -> i32:
     let sym = self.ast.get_data0(node)
@@ -4858,6 +4870,11 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
             if ret_name_sym == type_sym:
                 recv_type = ret_type
     let method_name = self.pool.resolve_symbol(method_sym)
+    let enum_accessor_recv_type = if recv_type != 0 and recv_type != self.sema.ty_void as i32: self.sema.auto_deref_ref_ptr_type(recv_type as TypeId) as i32 else: recv_type
+    let enum_accessor_variant = self.sema.enum_accessor_variant_for_method(enum_accessor_recv_type, method_sym)
+    if enum_accessor_variant != 0:
+        return self.lower_enum_accessor_call(self_expr, method_sym, node)
+
     var intrinsic = self.classify_intrinsic(recv_type, method_name)
 
     // When classify_intrinsic fails for "unwrap"/"is_some", handle as Option
@@ -5056,6 +5073,150 @@ fn MirBuilder.lower_intrinsic_call(self: MirBuilder, intrinsic: i32, self_expr: 
 fn MirBuilder.lower_vtable_call(self: MirBuilder, dyn_expr: i32, _trait_sym: i32, method_sym: i32, args_start: i32, args_count: i32, node: i32) -> i32:
     // Conservative lowering: treat as method call on dynamic receiver.
     self.lower_method_call(dyn_expr, method_sym, args_start, args_count, node)
+
+fn MirBuilder.cancel_scheduled_value_drop_for_receiver_expr(self: MirBuilder, expr: i32):
+    if expr == 0:
+        return
+    let kind = self.ast.kind(expr)
+    if kind == NodeKind.NK_GROUPED:
+        self.cancel_scheduled_value_drop_for_receiver_expr(self.ast.get_data0(expr))
+        return
+    if kind != NodeKind.NK_IDENT:
+        return
+    let sym = self.ast.get_data0(expr)
+    let local = self.lookup_local(sym)
+    if local >= 0:
+        self.cancel_scheduled_value_drop_for_local(local)
+
+fn MirBuilder.enum_accessor_payload_operand(self: MirBuilder, enum_place: i32, enum_ty: i32, variant_sym: i32, variant_index: i32, accessor_kind: i32, result_ty: i32, span: i32) -> i32:
+    let payloads = self.sema.enum_variant_payload_types(enum_ty, variant_sym)
+    let payload_count = payloads.len() as i32
+    let unwrapped_ty = self.sema.try_unwrapped_type(result_ty) as i32
+    if payload_count <= 0 or unwrapped_ty == 0:
+        with_eprint("error: enum accessor lowering missing payload type")
+        self.mark_unsupported()
+        return self.unit_operand()
+
+    let variant_place = self.body.new_downcast_place(enum_place, variant_index, enum_ty)
+    if payload_count == 1:
+        let payload_ty = payloads.get(0)
+        let field_place = self.body.new_field_place(variant_place, 0, payload_ty)
+        if accessor_kind == 3:
+            let ref_rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, field_place, 0)
+            let ref_tmp = self.new_temp(unwrapped_ty)
+            let ref_place = self.place_for_local(ref_tmp)
+            self.body.push_stmt(self.cur_bb, StmtKind.Assign, ref_place, ref_rv, span)
+            return self.body.new_operand(OperandKind.OK_COPY, ref_place)
+        let op_kind = if self.sema.is_copy(payload_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE
+        return self.body.new_operand(op_kind, field_place)
+
+    let tuple_fields: Vec[i32] = Vec.new()
+    let tuple_names: Vec[i32] = Vec.new()
+    let tuple_elem_start = if self.sema.get_type_kind(self.sema.resolve_alias(unwrapped_ty as TypeId)) == TypeKind.TY_TUPLE: self.sema.get_type_d0(self.sema.resolve_alias(unwrapped_ty as TypeId)) else: 0
+    for pi in 0..payload_count:
+        let payload_ty = payloads.get(pi as i64)
+        let field_place = self.body.new_field_place(variant_place, pi, payload_ty)
+        if accessor_kind == 3:
+            let elem_ty = if tuple_elem_start > 0: self.sema.type_extra.get((tuple_elem_start + pi) as i64) else: self.sema.ensure_exact_type(TypeKind.TY_REF, payload_ty, 0, 0) as i32
+            let ref_rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, field_place, 0)
+            let ref_tmp = self.new_temp(elem_ty)
+            let ref_place = self.place_for_local(ref_tmp)
+            self.body.push_stmt(self.cur_bb, StmtKind.Assign, ref_place, ref_rv, span)
+            tuple_fields.push(self.body.new_operand(OperandKind.OK_COPY, ref_place))
+        else:
+            let op_kind = if self.sema.is_copy(payload_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE
+            tuple_fields.push(self.body.new_operand(op_kind, field_place))
+        tuple_names.push(0)
+    let tuple_fid = self.body.new_agg_fields(tuple_fields, tuple_names)
+    let tuple_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, tuple_fid, 0)
+    let tuple_tmp = self.new_temp(unwrapped_ty)
+    let tuple_place = self.place_for_local(tuple_tmp)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, tuple_place, tuple_rv, span)
+    self.body.new_operand(if self.sema.is_copy(unwrapped_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, tuple_place)
+
+fn MirBuilder.assign_enum_variant_to_place(self: MirBuilder, result_place: i32, result_ty: i32, variant_sym: i32, fields: Vec[i32], span: i32):
+    let names: Vec[i32] = Vec.new()
+    for _ in 0..fields.len() as i32:
+        names.push(0)
+    let fid = self.body.new_agg_fields(fields, names)
+    let tag = self.enum_variant_discriminant_for_type(result_ty, variant_sym)
+    let rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, fid, tag)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, result_place, rv, span)
+
+fn MirBuilder.lower_enum_accessor_call(self: MirBuilder, self_expr: i32, method_sym: i32, node: i32) -> i32:
+    var enum_ty = self.expr_type(self_expr)
+    if enum_ty == 0 or enum_ty == self.sema.ty_void as i32:
+        enum_ty = self.type_receiver_type(self_expr)
+    if enum_ty == 0 or enum_ty == self.sema.ty_void as i32:
+        self.mark_unsupported()
+        return self.unit_operand()
+    enum_ty = self.sema.auto_deref_ref_ptr_type(enum_ty as TypeId) as i32
+
+    let variant_sym = self.sema.enum_accessor_variant_for_method(enum_ty, method_sym)
+    let accessor_kind = self.sema.enum_accessor_kind_for_method(enum_ty, method_sym)
+    let variant_index = self.enum_variant_index_for_type(enum_ty, variant_sym)
+    let variant_disc = self.enum_variant_discriminant_for_type(enum_ty, variant_sym)
+    let span = self.ast.get_start(node)
+
+    if accessor_kind == 1:
+        let recv_place = self.lower_field_base_place(self_expr)
+        let disc = self.lower_enum_discriminant(recv_place)
+        let expected = self.int_const_operand(variant_disc as i64, self.sema.ty_i32)
+        let cmp_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_EQ, disc, expected)
+        let cmp_tmp = self.new_temp(self.sema.ty_bool as i32)
+        let cmp_place = self.place_for_local(cmp_tmp)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, span)
+        return self.body.new_operand(OperandKind.OK_COPY, cmp_place)
+
+    let result_ty = self.expr_type(node)
+    if result_ty == 0 or result_ty == self.sema.ty_void as i32:
+        with_eprint("error: enum accessor lowering missing result type")
+        self.mark_unsupported()
+        return self.unit_operand()
+
+    var recv_place = 0
+    if accessor_kind == 2:
+        let saved_expected = self.expected_type
+        self.expected_type = enum_ty
+        let recv_op = self.lower_expr(self_expr)
+        self.expected_type = saved_expected
+        let recv_tmp = self.new_temp(enum_ty)
+        recv_place = self.place_for_local(recv_tmp)
+        self.assign_operand_to_place(recv_place, recv_op, span)
+        self.cancel_scheduled_value_drop_for_receiver_expr(self_expr)
+    else:
+        recv_place = self.lower_field_base_place(self_expr)
+
+    let result_tmp = self.new_temp(result_ty)
+    let result_place = self.place_for_local(result_tmp)
+    let some_bb = self.new_block()
+    let none_bb = self.new_block()
+    let join_bb = self.new_block()
+
+    let disc = self.lower_enum_discriminant(recv_place)
+    let vals: Vec[i32] = Vec.new()
+    vals.push(variant_disc)
+    let targets: Vec[i32] = Vec.new()
+    targets.push(some_bb as i32)
+    let table = self.body.new_switch_table(vals, targets)
+    self.terminate(TermKind.TK_SWITCH_INT, disc, table, none_bb, 0)
+
+    self.switch_to(none_bb)
+    if accessor_kind == 2 and self.sema.is_copy(enum_ty) == 0:
+        self.body.push_stmt(self.cur_bb, StmtKind.Drop, recv_place, 0, span)
+    let none_fields: Vec[i32] = Vec.new()
+    self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.none, none_fields, span)
+    self.terminate(TermKind.TK_GOTO, join_bb as i32, 0, 0, 0)
+
+    self.switch_to(some_bb)
+    let payload = self.enum_accessor_payload_operand(recv_place, enum_ty, variant_sym, variant_index, accessor_kind, result_ty, span)
+    let some_fields: Vec[i32] = Vec.new()
+    some_fields.push(payload)
+    self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.some, some_fields, span)
+    self.terminate(TermKind.TK_GOTO, join_bb as i32, 0, 0, 0)
+
+    self.switch_to(join_bb)
+    self.body.new_operand(if self.sema.is_copy(result_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, result_place)
 
 fn MirBuilder.lower_question_mark(self: MirBuilder, expr: i32, node: i32) -> i32:
     let value_op = self.lower_expr(expr)

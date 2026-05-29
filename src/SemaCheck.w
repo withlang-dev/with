@@ -16,6 +16,7 @@ extern fn with_write(s: str) -> void
 extern fn with_eprint(s: str) -> void
 extern fn with_fs_file_exists(path: str) -> i32
 extern fn with_str_eq(a: str, b: str) -> i32
+extern fn str_from_byte(b: i32) -> str
 extern fn with_regex_compile(pattern: str, options: i32, err_code: *mut i32, err_offset: *mut i32) -> *const i8
 extern fn with_regex_error_message(code: i32) -> str
 extern fn with_regex_code_free(code: *const i8) -> void
@@ -4315,6 +4316,151 @@ fn Sema.enum_variant_payload_types(self: Sema, enum_tid: i32, variant_name: i32)
             pos = pos + 2 + payload_count
     result
 
+fn sema_accessor_char_lower(ch: i32) -> str:
+    if ch >= 65 and ch <= 90:
+        return str_from_byte(ch + 32)
+    str_from_byte(ch)
+
+fn sema_accessor_snake_name(name: str) -> str:
+    var result = ""
+    var prev_lower = false
+    var prev_upper = false
+    var i = 0
+    while i < name.len() as i32:
+        let ch = name.byte_at(i as i64)
+        let is_upper = ch >= 65 and ch <= 90
+        let is_lower = ch >= 97 and ch <= 122
+        let is_digit = ch >= 48 and ch <= 57
+        if is_upper:
+            if prev_lower:
+                result = result ++ "_"
+            else if prev_upper and i > 1 and i + 1 < name.len() as i32:
+                let next = name.byte_at((i + 1) as i64)
+                if next >= 97 and next <= 122 and result.len() > 0:
+                    result = result ++ "_"
+            result = result ++ sema_accessor_char_lower(ch)
+            prev_upper = true
+            prev_lower = false
+        else if is_lower:
+            result = result ++ name.slice(i as i64, (i + 1) as i64)
+            prev_upper = false
+            prev_lower = true
+        else if is_digit:
+            result = result ++ name.slice(i as i64, (i + 1) as i64)
+            prev_upper = false
+            prev_lower = false
+        else if ch == 95:
+            if result.len() > 0:
+                result = result ++ "_"
+            prev_upper = false
+            prev_lower = false
+        else:
+            result = result ++ name.slice(i as i64, (i + 1) as i64)
+            prev_upper = false
+            prev_lower = false
+        i = i + 1
+    result
+
+fn Sema.enum_variant_decl_type(self: Sema, enum_tid: i32) -> i32:
+    if enum_tid == 0:
+        return 0
+    let resolved = self.resolve_alias(enum_tid)
+    let kind = self.get_type_kind(resolved)
+    if kind == TypeKind.TY_ENUM:
+        return resolved as i32
+    if kind == TypeKind.TY_GENERIC_INST:
+        let base_sym = self.get_generic_inst_base(resolved as i32)
+        let base_tid = self.lookup_named_type_visible(base_sym)
+        if base_tid != 0 and self.get_type_kind(self.resolve_alias(base_tid as TypeId)) == TypeKind.TY_ENUM:
+            return self.resolve_alias(base_tid as TypeId) as i32
+    0
+
+fn Sema.enum_accessor_variant_for_method(self: Sema, enum_tid: i32, method_sym: i32) -> i32:
+    let enum_decl = self.enum_variant_decl_type(enum_tid)
+    if enum_decl == 0:
+        return 0
+    let method_name = self.pool_resolve(method_sym)
+    let te_start = self.get_type_d1(enum_decl)
+    let variant_count = self.get_type_d2(enum_decl)
+    var pos = te_start
+    for _ in 0..variant_count:
+        let variant_sym = self.type_extra.get(pos as i64)
+        let payload_count = self.type_extra.get((pos + 1) as i64)
+        let snake = sema_accessor_snake_name(self.pool_resolve(variant_sym))
+        if method_name == "is_" ++ snake:
+            return variant_sym
+        if method_name == "as_" ++ snake:
+            return variant_sym
+        if method_name == "as_" ++ snake ++ "_ref":
+            return variant_sym
+        pos = pos + 2 + payload_count
+    0
+
+// 1 = is_variant, 2 = as_variant by value, 3 = as_variant_ref by shared ref.
+fn Sema.enum_accessor_kind_for_method(self: Sema, enum_tid: i32, method_sym: i32) -> i32:
+    let variant_sym = self.enum_accessor_variant_for_method(enum_tid, method_sym)
+    if variant_sym == 0:
+        return 0
+    let method_name = self.pool_resolve(method_sym)
+    let snake = sema_accessor_snake_name(self.pool_resolve(variant_sym))
+    if method_name == "is_" ++ snake:
+        return 1
+    if method_name == "as_" ++ snake:
+        return 2
+    if method_name == "as_" ++ snake ++ "_ref":
+        return 3
+    0
+
+fn Sema.enum_variant_index_for_type(self: Sema, enum_tid: i32, variant_sym: i32) -> i32:
+    let enum_decl = self.enum_variant_decl_type(enum_tid)
+    if enum_decl == 0 or variant_sym == 0:
+        return -1
+    let te_start = self.get_type_d1(enum_decl)
+    let variant_count = self.get_type_d2(enum_decl)
+    var pos = te_start
+    for vi in 0..variant_count:
+        let cur_sym = self.type_extra.get(pos as i64)
+        let payload_count = self.type_extra.get((pos + 1) as i64)
+        if cur_sym == variant_sym:
+            return vi
+        pos = pos + 2 + payload_count
+    -1
+
+fn Sema.enum_variant_discriminant_for_type(self: Sema, enum_tid: i32, variant_sym: i32) -> i32:
+    let enum_decl = self.enum_variant_decl_type(enum_tid)
+    if enum_decl == 0:
+        return -1
+    let index = self.enum_variant_index_for_type(enum_decl, variant_sym)
+    if index < 0:
+        return -1
+    let qualified = self.qualified_enum_variant_sym(enum_decl, variant_sym)
+    if self.disc_values.contains(qualified):
+        return self.disc_values.get(qualified).unwrap()
+    if self.disc_values.contains(variant_sym):
+        return self.disc_values.get(variant_sym).unwrap()
+    index
+
+fn Sema.enum_accessor_return_type(self: Sema, enum_tid: i32, variant_sym: i32, accessor_kind: i32) -> i32:
+    if accessor_kind == 1:
+        return self.ty_bool as i32
+    let payloads = self.enum_variant_payload_types(enum_tid, variant_sym)
+    let payload_count = payloads.len() as i32
+    if payload_count <= 0:
+        return 0
+    let elem_tys: Vec[i32] = Vec.new()
+    for pi in 0..payload_count:
+        var elem_ty = payloads.get(pi as i64)
+        if accessor_kind == 3:
+            elem_ty = self.ensure_exact_type(TypeKind.TY_REF, elem_ty, 0, 0) as i32
+        elem_tys.push(elem_ty)
+    let payload_ty = if payload_count == 1:
+        elem_tys.get(0)
+    else:
+        self.ensure_tuple_type(elem_tys, payload_count) as i32
+    let opt_args: Vec[i32] = Vec.new()
+    opt_args.push(payload_ty)
+    self.ensure_generic_inst_type(self.syms.option, opt_args, 1) as i32
+
 fn Sema.expected_variant_constructor_type(self: Sema, variant_name: i32) -> i32:
     if self.has_expected_type == 0 or self.expected_expr_type == 0:
         return 0
@@ -7335,6 +7481,32 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
         let dyn_ret = self.check_dyn_trait_method_call(dyn_trait_sym, field, arg_types, extra_start, arg_count, node)
         if dyn_ret != 0:
             return dyn_ret
+        return 0
+
+    let enum_accessor_variant = self.enum_accessor_variant_for_method(recv_type as i32, field)
+    if enum_accessor_variant != 0:
+        let enum_accessor_kind = self.enum_accessor_kind_for_method(recv_type as i32, field)
+        if arg_count != 0:
+            self.emit_error("enum accessor method expects zero arguments", node)
+            return 0
+        let enum_payloads = self.enum_variant_payload_types(recv_type as i32, enum_accessor_variant)
+        if enum_accessor_kind == 2 or enum_accessor_kind == 3:
+            if enum_payloads.len() as i32 == 0:
+                self.emit_error("unit enum variant has no payload accessor; use .is_" ++ sema_accessor_snake_name(self.pool_resolve(enum_accessor_variant)) ++ "() instead", node)
+                return 0
+        if enum_accessor_kind == 2:
+            let obj_resolved = self.resolve_alias(obj_type)
+            let obj_kind = self.get_type_kind(obj_resolved)
+            if obj_kind == TypeKind.TY_REF or obj_kind == TypeKind.TY_PTR:
+                self.emit_error("by-value enum accessor requires an owned enum receiver; use the _ref accessor for borrowed receivers", node)
+                return 0
+            self.mark_moved_if_consumed(expr)
+        else if enum_accessor_kind == 3:
+            self.check_borrow_create(expr, BorrowKind.SHARED, node)
+        let enum_accessor_ret = self.enum_accessor_return_type(recv_type as i32, enum_accessor_variant, enum_accessor_kind)
+        if enum_accessor_ret != 0:
+            self.typed_expr_types.insert(node, enum_accessor_ret)
+            return enum_accessor_ret
         return 0
 
     let type_name_sym = self.method_owner_symbol_for_type(recv_type as i32)
