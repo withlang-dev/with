@@ -1187,6 +1187,12 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
             with_cimport_mark_name_emitted(name)
             g_migrate_fn_translated = g_migrate_fn_translated + 1
             return "// Variadic C helper cfprintf is inlined at statement call sites.\n\n"
+        let loc = with_ci_cursor_location(session, fn_cursor)
+        let loc_suffix = if loc.len() > 0: " at " ++ loc else: ""
+        let msg = f"migrate: untranslatable function '{name}': variadic function definitions are not supported{loc_suffix}"
+        eprint(msg)
+        ci_migrate_set_error(msg)
+        return ""
 
     var params = ""
     var has_unsupported = false

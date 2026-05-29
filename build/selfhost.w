@@ -1700,6 +1700,28 @@ fn bs_check_migrate_sizeof_pointer_width(ctx: ActionCtx, compiler_path: str, cas
     if check.rc != 0: return check.rc
     0
 
+fn bs_check_migrate_variadic_definition_rejected(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "variadic_definition.c")
+    let out_w = bs_join(case_dir, "variadic_definition.w")
+    let c_text = "#include <stdarg.h>\n\nint total(int count, ...) {\n  va_list ap;\n  va_start(ap, count);\n  int sum = 0;\n  for (int i = 0; i < count; i++) {\n    sum += va_arg(ap, int);\n  }\n  va_end(ap);\n  return sum;\n}\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "variadic definition")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "migrate-variadic-definition-rejected", args, 180000, case_dir)
+    if result.rc == 0:
+        return bs_fail(ctx, "variadic definition migration unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, result.stderr, "migrate: untranslatable function 'total': variadic function definitions are not supported", "variadic_definition_rejected")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, result.stderr, "variadic_definition.c:", "variadic_definition_rejected")
+    if rc != 0: return rc
+    bs_expect_absent(ctx, out_w, "variadic definition rejected output")
+
 pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
     if inputs.len() == 0:
@@ -1735,7 +1757,9 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     rc = bs_check_migrate_switch_macro_case_values(ctx, compiler_path, bs_join(output_dir, "switch_macro_case_values"))
     if rc != 0: return rc
-    bs_check_migrate_sizeof_pointer_width(ctx, compiler_path, bs_join(output_dir, "sizeof_pointer_width"))
+    rc = bs_check_migrate_sizeof_pointer_width(ctx, compiler_path, bs_join(output_dir, "sizeof_pointer_width"))
+    if rc != 0: return rc
+    bs_check_migrate_variadic_definition_rejected(ctx, compiler_path, bs_join(output_dir, "variadic_definition_rejected"))
 
 fn bs_check_migrate_libc_ctype(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
