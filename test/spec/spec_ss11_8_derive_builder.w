@@ -1,28 +1,40 @@
-//! skip: non-executable spec sketch for Section 11.8 — derive(Builder) (formerly 25.96); contains pseudo-code for unimplemented feature work
-// Spec test: Section 11.8 — derive(Builder) (formerly 25.96)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+//! expect-stdout: ok
 
-// PASS: generated builder with required and optional fields
 @[derive(Builder)]
 type Config {
     host: str,
     port: i32 = 8080,
 }
 
-fn test:
-    let c = Config.builder()
-        .host("localhost")
-        .build()
-        .unwrap()
+@[derive(Builder)]
+type GenericConfig[T] {
+    value: T,
+    label: str = "default",
+}
+
+fn test_required_and_default_fields:
+    let c = Config.builder().host("localhost").build().unwrap()
     assert(c.host == "localhost")
     assert(c.port == 8080)
 
-// PASS: override defaults
-fn test:
-    let c = Config.builder()
-        .host("prod.example.com")
-        .port(443)
-        .build()
-        .unwrap()
+fn test_override_default:
+    let c = Config.builder().host("prod.example.com").port(443).build().unwrap()
     assert(c.port == 443)
+
+fn test_missing_required_field:
+    let missing = Config.builder().build()
+    match missing:
+        Err(.MissingField(field)) => assert(field == "host")
+        _ => assert(false)
+
+fn test_generic_builder:
+    let c = GenericConfig[i32].builder().value(7).build().unwrap()
+    assert(c.value == 7)
+    assert(c.label == "default")
+
+fn main:
+    test_required_and_default_fields()
+    test_override_default()
+    test_missing_required_field()
+    test_generic_builder()
+    print("ok")

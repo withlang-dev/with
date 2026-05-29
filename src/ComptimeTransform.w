@@ -1638,6 +1638,36 @@ fn ct_build_method_call(out: AstPool, decl: i32, receiver: i32, method_sym: i32,
     let callee = out.ct_build_field_access(decl, receiver, method_sym)
     out.ct_build_call(decl, callee, args)
 
+fn ct_build_generic_type(out: AstPool, decl: i32, type_sym: i32, args: Vec[i32]) -> i32:
+    let arg_start = out.extra_len()
+    for ai in 0..args.len() as i32:
+        out.add_extra(args.get(ai as i64))
+    out.add_node(NodeKind.NK_TYPE_GENERIC, out.get_start(decl), out.get_end(decl), type_sym, arg_start, args.len() as i32) as i32
+
+fn ct_build_option_type(out: AstPool, intern: InternPool, decl: i32, payload_type: i32) -> i32:
+    let args: Vec[i32] = Vec.new()
+    args.push(payload_type)
+    ct_build_generic_type(out, decl, intern.intern("Option"), args)
+
+fn ct_build_result_type(out: AstPool, intern: InternPool, decl: i32, ok_type: i32, err_type: i32) -> i32:
+    let args: Vec[i32] = Vec.new()
+    args.push(ok_type)
+    args.push(err_type)
+    ct_build_generic_type(out, decl, intern.intern("Result"), args)
+
+fn ct_build_variant_call(out: AstPool, intern: InternPool, decl: i32, variant_name: str, args: Vec[i32]) -> i32:
+    let callee = out.ct_build_ident(decl, intern.intern(variant_name))
+    out.ct_build_call(decl, callee, args)
+
+fn ct_build_variant_shorthand(out: AstPool, intern: InternPool, decl: i32, variant_name: str, args: Vec[i32]) -> i32:
+    let extra_start = out.extra_len()
+    for ai in 0..args.len() as i32:
+        out.add_extra(args.get(ai as i64))
+    out.add_node(NodeKind.NK_VARIANT_SHORTHAND, out.get_start(decl), out.get_end(decl), intern.intern(variant_name), extra_start, args.len() as i32) as i32
+
+fn ct_build_return(out: AstPool, decl: i32, value: i32) -> i32:
+    out.add_node(NodeKind.NK_RETURN, out.get_start(decl), out.get_end(decl), value, 0, 0) as i32
+
 fn Sema.ct_generate_copy_derive(self: Sema, out: AstPool, intern: InternPool, decl: i32) -> Vec[i32]:
     let generated: Vec[i32] = Vec.new()
     let copy_trait_sym = intern.intern("Copy")
@@ -1974,6 +2004,172 @@ fn Sema.ct_generate_clone_derive(self: Sema, out: AstPool, intern: InternPool, d
     generated.push(impl_node as i32)
     generated
 
+fn Sema.ct_generate_builder_derive(self: Sema, out: AstPool, intern: InternPool, decl: i32) -> Vec[i32]:
+    let generated: Vec[i32] = Vec.new()
+    if type_decl_sub_kind(out.get_data2(decl)) != TypeDeclKind.Struct:
+        return generated
+
+    let builder_derive_sym = intern.intern("Builder")
+    if self.type_decl_has_derive(decl, builder_derive_sym) == 0:
+        return generated
+
+    let type_name_sym = out.get_data0(decl)
+    let type_name = intern.resolve(type_name_sym)
+    let builder_name = type_name ++ "Builder"
+    let builder_sym = intern.intern(builder_name)
+    if self.lookup_named_type_visible(builder_sym) != 0:
+        self.ct_emit_error(out, decl, "derive Builder target type '" ++ builder_name ++ "' already exists")
+        return generated
+    let builder_method_sym = intern.intern("builder")
+    if self.lookup_method_sig(type_name_sym, builder_method_sym) >= 0:
+        self.ct_emit_error(out, decl, "derive Builder target method '" ++ type_name ++ ".builder' already exists")
+        return generated
+
+    let tid = self.lookup_named_type_visible(type_name_sym)
+    if tid == 0:
+        return generated
+    let resolved = self.resolve_alias(tid)
+    if self.get_type_kind(resolved) != TypeKind.TY_STRUCT:
+        return generated
+
+    let start = out.get_start(decl)
+    let end = out.get_end(decl)
+    let self_sym = intern.intern("self")
+    let val_sym = intern.intern("val")
+    let build_sym = intern.intern("build")
+    let builder_error_sym = intern.intern("BuilderError")
+    let tp_count = ct_type_decl_tp_count(out, decl)
+    let tp_start = ct_type_decl_tp_start(out, decl)
+    let type_extra_start = out.get_data1(decl)
+    let te_start = self.get_type_d1(resolved)
+    let field_count = self.get_type_d2(resolved)
+
+    for fi in 0..field_count:
+        let field_sym = self.type_extra.get((te_start + fi * 3) as i64)
+        if field_sym == build_sym:
+            self.ct_emit_error(out, decl, "derive Builder cannot generate a setter for field 'build' because it conflicts with build()")
+            return generated
+
+    let builder_field_syms: Vec[i32] = Vec.new()
+    let builder_field_types: Vec[i32] = Vec.new()
+    for fi2 in 0..field_count:
+        builder_field_syms.push(self.type_extra.get((te_start + fi2 * 3) as i64))
+        let field_type_node = out.get_extra(type_extra_start + 1 + fi2 * 3 + 1)
+        let field_type = out.ct_clone_tree_with_subst(field_type_node, 0, 0, 0, 0)
+        let option_type = ct_build_option_type(out, intern, decl, field_type)
+        builder_field_types.push(option_type)
+
+    let builder_tp_start = if tp_count > 0: ct_copy_type_params(out, tp_start, tp_count) else: 0
+    let builder_extra = out.extra_len()
+    out.add_extra(field_count)
+    for fi2b in 0..field_count:
+        out.add_extra(builder_field_syms.get(fi2b as i64))
+        out.add_extra(builder_field_types.get(fi2b as i64))
+        out.add_extra(0)
+    for fi3 in 0..field_count:
+        out.add_extra(0)
+    out.add_extra(ct_struct_type_decl_vis(out, decl))
+    out.add_extra(builder_tp_start)
+    out.add_extra(tp_count)
+    let builder_type_node = out.add_node(NodeKind.NK_TYPE_DECL, start, end, builder_sym, builder_extra, pack_type_decl_kind(TypeDeclKind.Struct, 0))
+    generated.push(builder_type_node as i32)
+
+    let builder_self_type = ct_build_generic_self_type(out, decl, builder_sym, tp_start, tp_count)
+    for fi4 in 0..field_count:
+        let field_sym = self.type_extra.get((te_start + fi4 * 3) as i64)
+        let field_type_node = out.get_extra(type_extra_start + 1 + fi4 * 3 + 1)
+        let param_type = out.ct_clone_tree_with_subst(field_type_node, 0, 0, 0, 0)
+        let val_ident = out.ct_build_ident(decl, val_sym)
+        let some_args: Vec[i32] = Vec.new()
+        some_args.push(val_ident)
+        let some_value = ct_build_variant_call(out, intern, decl, "Some", some_args)
+        let update_extra = out.extra_len()
+        out.add_extra(field_sym)
+        out.add_extra(some_value)
+        let source_self = out.ct_build_ident(decl, self_sym)
+        let body = out.add_node(NodeKind.NK_RECORD_UPDATE, start, end, source_self, update_extra, 1)
+        let param_start = out.extra_len()
+        out.ct_add_fn_param(self_sym, builder_self_type as i32, FN_PARAM_FLAG_MOVE_SELF)
+        out.ct_add_fn_param(val_sym, param_type, 0)
+        let fn_sym = intern.intern(builder_name ++ "." ++ intern.resolve(field_sym))
+        let fn_node = out.add_node(NodeKind.NK_FN_DECL, start, end, fn_sym, body as i32, 0)
+        out.add_fn_meta(fn_node, 2 * FN_META_REQUIRED_UNIT, builder_self_type as i32, param_start, 2, 0, 0)
+        generated.push(fn_node as i32)
+
+    let target_type = ct_build_generic_self_type(out, decl, type_name_sym, tp_start, tp_count)
+    let err_type = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, builder_error_sym, 0, 0)
+    let build_ret_type = ct_build_result_type(out, intern, decl, target_type, err_type as i32)
+    let field_syms: Vec[i32] = Vec.new()
+    let field_values: Vec[i32] = Vec.new()
+    for fi5 in 0..field_count:
+        let field_sym = self.type_extra.get((te_start + fi5 * 3) as i64)
+        let opt_value = ct_build_self_field(out, decl, self_sym, field_sym)
+        let default_node = out.get_extra(type_extra_start + 1 + fi5 * 3 + 2)
+        var fallback: i32 = 0
+        if default_node != 0:
+            fallback = out.ct_clone_tree_with_subst(default_node, 0, 0, 0, 0)
+        else:
+            let missing_args: Vec[i32] = Vec.new()
+            missing_args.push(out.ct_build_string_lit(intern, decl, intern.resolve(field_sym)))
+            let missing = ct_build_variant_shorthand(out, intern, decl, "MissingField", missing_args)
+            let err_args: Vec[i32] = Vec.new()
+            err_args.push(missing)
+            let err_value = ct_build_variant_call(out, intern, decl, "Err", err_args)
+            fallback = ct_build_return(out, decl, err_value)
+        let value = out.ct_build_binary(decl, BinaryOp.OP_DEFAULT, opt_value, fallback)
+        field_syms.push(field_sym)
+        field_values.push(value)
+    let build_field_extra = out.extra_len()
+    for fi6 in 0..field_values.len() as i32:
+        out.add_extra(field_syms.get(fi6 as i64))
+        out.add_extra(field_values.get(fi6 as i64))
+    let build_body = out.add_node(NodeKind.NK_STRUCT_LIT, start, end, type_name_sym, build_field_extra, field_count)
+    let build_param_start = out.extra_len()
+    out.ct_add_fn_param(self_sym, builder_self_type as i32, FN_PARAM_FLAG_MOVE_SELF)
+    let build_fn_sym = intern.intern(builder_name ++ ".build")
+    let build_fn = out.add_node(NodeKind.NK_FN_DECL, start, end, build_fn_sym, build_body as i32, 0)
+    out.add_fn_meta(build_fn, FN_META_REQUIRED_UNIT, build_ret_type, build_param_start, 1, 0, 0)
+    generated.push(build_fn as i32)
+
+    let none_sym = intern.intern("None")
+    let ctor_fields: Vec[i32] = Vec.new()
+    for fi7 in 0..field_count:
+        let field_sym = self.type_extra.get((te_start + fi7 * 3) as i64)
+        ctor_fields.push(field_sym)
+        ctor_fields.push(out.ct_build_ident(decl, none_sym))
+    let ctor_extra = out.extra_len()
+    for ci in 0..ctor_fields.len() as i32:
+        out.add_extra(ctor_fields.get(ci as i64))
+    let ctor_body = out.add_node(NodeKind.NK_STRUCT_LIT, start, end, builder_sym, ctor_extra, field_count)
+    let builder_ret_type = ct_build_generic_self_type(out, decl, builder_sym, tp_start, tp_count)
+    let ctor_fn_sym = intern.intern(type_name ++ ".builder")
+    let ctor_fn = out.add_node(NodeKind.NK_FN_DECL, start, end, ctor_fn_sym, ctor_body as i32, 0)
+    out.add_fn_meta(ctor_fn, 0, builder_ret_type, out.extra_len(), 0, 0, 0)
+    generated.push(ctor_fn as i32)
+
+    let builder_impl_extra = out.extra_len()
+    out.add_extra(0)
+    out.add_extra(field_count + 1)
+    let builder_impl = out.add_node(NodeKind.NK_IMPL_DECL, start, end, builder_sym, builder_impl_extra, 0)
+    if tp_count > 0:
+        let impl_tp_start = ct_copy_type_params(out, tp_start, tp_count)
+        out.add_impl_type_params(builder_impl, impl_tp_start, tp_count)
+        let impl_target = ct_build_generic_self_type(out, decl, builder_sym, impl_tp_start, tp_count)
+        out.add_impl_target_type_node(builder_impl, impl_target as NodeId)
+    generated.push(builder_impl as i32)
+
+    let source_impl_extra = out.extra_len()
+    out.add_extra(0)
+    out.add_extra(1)
+    let source_impl = out.add_node(NodeKind.NK_IMPL_DECL, start, end, type_name_sym, source_impl_extra, 0)
+    if tp_count > 0:
+        let source_impl_tp_start = ct_copy_type_params(out, tp_start, tp_count)
+        out.add_impl_type_params(source_impl, source_impl_tp_start, tp_count)
+        let source_target = ct_build_generic_self_type(out, decl, type_name_sym, source_impl_tp_start, tp_count)
+        out.add_impl_target_type_node(source_impl, source_target as NodeId)
+    generated.push(source_impl as i32)
+    generated
+
 fn Sema.ct_generate_serialize_derive(self: Sema, out: AstPool, intern: InternPool, decl: i32) -> Vec[i32]:
     let generated: Vec[i32] = Vec.new()
     if type_decl_sub_kind(out.get_data2(decl)) != TypeDeclKind.Struct:
@@ -2200,6 +2396,7 @@ fn Sema.comptime_transform_module(mut self: Sema, source_ast: AstPool, intern: I
     let eq_trait_sym = intern.intern("Eq")
     let hash_trait_sym = intern.intern("Hash")
     let debug_trait_sym = intern.intern("Debug")
+    let builder_trait_sym = intern.intern("Builder")
     let soa_trait_sym = intern.intern("SoA")
     let serialize_trait_sym = intern.intern("Serialize")
     let deserialize_trait_sym = intern.intern("Deserialize")
@@ -2279,6 +2476,15 @@ fn Sema.comptime_transform_module(mut self: Sema, source_ast: AstPool, intern: I
                 ordered_ci.push(decl_ci)
             if ct_source_decl_is_local(source_ast, di) != 0:
                 generated_local_count = generated_local_count + generated_clone.len() as i32
+        if self.type_decl_has_derive(decl as i32, builder_trait_sym) != 0:
+            let generated_builder = self.ct_generate_builder_derive(out, intern, decl as i32)
+            for gi in 0..generated_builder.len() as i32:
+                ordered.push(generated_builder.get(gi as i64))
+                ordered_paths.push(decl_path)
+                ordered_file_ids.push(decl_file_id)
+                ordered_ci.push(decl_ci)
+            if ct_source_decl_is_local(source_ast, di) != 0:
+                generated_local_count = generated_local_count + generated_builder.len() as i32
         if self.type_decl_has_derive(decl as i32, soa_trait_sym) != 0:
             let generated_soa = self.ct_generate_soa_derive(out, intern, decl as i32)
             for gi in 0..generated_soa.len() as i32:

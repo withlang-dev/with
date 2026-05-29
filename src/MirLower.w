@@ -5609,8 +5609,16 @@ fn MirBuilder.lower_record_update(self: MirBuilder, base_expr: i32, field_update
         if self.body.place_proj_counts.get(base_place as i64) == 0:
             self.cancel_scheduled_value_drop_for_local(self.body.place_locals.get(base_place as i64))
     let resolved_ty = self.sema.resolve_alias(ty)
-    let struct_extra = self.sema.get_type_d1(resolved_ty)
-    let struct_fc = self.sema.get_type_d2(resolved_ty)
+    var struct_extra = self.sema.get_type_d1(resolved_ty)
+    var struct_fc = self.sema.get_type_d2(resolved_ty)
+    if self.sema.get_type_kind(resolved_ty) == TypeKind.TY_GENERIC_INST:
+        let base_sym = self.sema.get_generic_inst_base(resolved_ty as i32)
+        let base_tid = self.sema.lookup_named_type_visible(base_sym)
+        if base_tid != 0:
+            let base_resolved = self.sema.resolve_alias(base_tid)
+            if self.sema.get_type_kind(base_resolved) == TypeKind.TY_STRUCT:
+                struct_extra = self.sema.get_type_d1(base_resolved)
+                struct_fc = self.sema.get_type_d2(base_resolved)
 
     let update_ops: Vec[i32] = Vec.new()
     for i in 0..field_updates_count:
@@ -5628,7 +5636,7 @@ fn MirBuilder.lower_record_update(self: MirBuilder, base_expr: i32, field_update
     let result_names: Vec[i32] = Vec.new()
     for fi in 0..struct_fc:
         let f_name_sym = self.sema.type_extra.get((struct_extra + fi * 3) as i64)
-        let field_ty = self.sema.type_extra.get((struct_extra + fi * 3 + 1) as i64)
+        let field_ty = self.struct_field_type(ty, f_name_sym)
         let src_field_place = self.body.new_field_place(base_place, f_name_sym, field_ty)
         var update_idx = -1
         for ui in 0..field_updates_count:

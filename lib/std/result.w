@@ -12,6 +12,11 @@
 /// `.map(fn)` / `.map_err(fn)` to transform.
 enum Result[T, E] { Ok(T) | Err(E) }
 
+/// Error type returned by compiler-generated `@[derive(Builder)]`
+/// `.build()` methods when a required field has not been supplied.
+error BuilderError =
+    | MissingField(str)
+
 /// An error with a message and an underlying source error.
 type ContextError[E]  {
     msg: str
