@@ -3318,7 +3318,10 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
         is_task_val = self.type_is_task(bind_type as i32)
     self.scope_set_is_task(name, is_task_val)
     self.scope_set_is_scoped_task(name, self.expr_is_scoped_task_value(value))
-    self.scope_set_is_ephemeral_task(name, self.expr_is_ephemeral_task(value))
+    let is_ephemeral_task = self.expr_is_ephemeral_task(value)
+    self.scope_set_is_ephemeral_task(name, is_ephemeral_task)
+    if is_task_val != 0 and is_ephemeral_task != 0:
+        self.ephemeral_task_binding_nodes.insert(node, 1)
     if self.ast.kind(value) == NodeKind.NK_CLOSURE:
         self.binding_closure_nodes.insert(name, value)
     else:
