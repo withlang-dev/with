@@ -211,6 +211,7 @@ enum MirIntrinsic: i32:
     MIR_INTRINSIC_SLOTMAPSLOT_GET = 126
     MIR_INTRINSIC_SLOTMAPSLOT_SET = 127
     MIR_INTRINSIC_FIBER_SELECT_BIASED = 128
+    MIR_INTRINSIC_FIBER_DETACH_CANCEL = 129
 
 // ── Projection kinds ─────────────────────────────────────────────
 
@@ -225,6 +226,8 @@ enum ProjKind: i32:
 enum DropKind: i32:
     DK_VALUE = 0
     DK_STORAGE = 1
+    DK_TASK_DETACHED = 2
+    DK_TASK_EPHEMERAL = 3
 
 // ── Data records ─────────────────────────────────────────────────
 

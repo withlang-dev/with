@@ -5841,6 +5841,37 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
             wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
         return true
 
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FIBER_DETACH_CANCEL:
+        // Detached cancel: transfer an unawaited Task handle to the runtime.
+        // The runtime requests cancellation, drains completion later, and frees
+        // the result buffer once no awaiter owns it.
+        let task_op = self.mir_intrinsic_arg(body, args_id, 0)
+        let task_ty = wl_type_of(task_op)
+        let task_alloca = self.create_entry_alloca(task_ty)
+        wl_build_store(self.builder, task_op, task_alloca)
+        let fid_ptr = wl_build_struct_gep(self.builder, task_ty, task_alloca, 0)
+        let fid = wl_build_load(self.builder, wl_i32_type(self.context), fid_ptr)
+        let rbuf_ptr = wl_build_struct_gep(self.builder, task_ty, task_alloca, 1)
+        let rbuf = wl_build_load(self.builder, wl_ptr_type(self.context), rbuf_ptr)
+
+        let detach_fn_name = "with_fiber_detach_cancel"
+        var detach_fn = wl_get_named_function(self.llmod, detach_fn_name)
+        if detach_fn == 0:
+            let dp: Vec[i64] = Vec.new()
+            dp.push(wl_i32_type(self.context))
+            dp.push(wl_ptr_type(self.context))
+            let dft = wl_function_type(wl_i32_type(self.context), vec_data_i64(&dp), 2, 0)
+            detach_fn = wl_add_function(self.llmod, detach_fn_name, dft)
+        let dft2 = wl_global_get_value_type(detach_fn)
+        let da: Vec[i64] = Vec.new()
+        da.push(fid)
+        da.push(rbuf)
+        result = wl_build_call(self.builder, dft2, detach_fn, vec_data_i64(&da), 2)
+
+        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+            wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
+        return true
+
     else:
         return self.mir_emit_intrinsic_call_ext(body, intrinsic, args_id, dest_place, next_bb)
 

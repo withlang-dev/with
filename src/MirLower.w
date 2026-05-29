@@ -156,16 +156,56 @@ fn MirBuilder.schedule_drop(self: MirBuilder, local_id: i32, drop_kind: i32) -> 
     self.drop_local_ids.push(local_id)
     self.drop_kinds.push(drop_kind)
 
+fn MirBuilder.drop_kind_owns_value(self: MirBuilder, drop_kind: i32) -> i32:
+    let _ = self
+    if drop_kind == DropKind.DK_VALUE or drop_kind == DropKind.DK_TASK_DETACHED or drop_kind == DropKind.DK_TASK_EPHEMERAL:
+        return 1
+    0
+
 fn MirBuilder.cancel_scheduled_value_drop_for_local(self: MirBuilder, local_id: i32) -> void:
     var i = self.drop_local_ids.len() as i32 - 1
     while i >= 0:
-        if self.drop_local_ids.get(i as i64) == local_id and self.drop_kinds.get(i as i64) == DropKind.DK_VALUE:
+        if self.drop_local_ids.get(i as i64) == local_id and self.drop_kind_owns_value(self.drop_kinds.get(i as i64)) != 0:
             self.drop_kinds.set_i32(i as i64, DropKind.DK_STORAGE)
             return
         i = i - 1
 
+fn MirBuilder.task_drop_kind_for_binding(self: MirBuilder, node: i32, bind_ty: i32) -> i32:
+    if self.sema.type_is_task(bind_ty) == 0:
+        return DropKind.DK_VALUE
+    if self.sema.ephemeral_task_binding_nodes.contains(node):
+        return DropKind.DK_TASK_EPHEMERAL
+    DropKind.DK_TASK_DETACHED
+
+fn MirBuilder.emit_task_cancel_call(self: MirBuilder, task_op: i32, intrinsic: i32, node: i32):
+    let cancel_args: Vec[i32] = Vec.new()
+    cancel_args.push(task_op)
+    let cancel_call_id = self.body.new_call_args(cancel_args)
+    self.body.set_call_intrinsic(cancel_call_id, intrinsic)
+    self.body.set_call_ast_node(cancel_call_id, node)
+    let cancel_result_local = self.new_temp(self.sema.ty_i32)
+    let cancel_result_place = self.place_for_local(cancel_result_local)
+    let after_cancel_bb = self.new_block()
+    self.terminate(TermKind.TK_CALL, self.unit_operand(), cancel_call_id, cancel_result_place, after_cancel_bb)
+    self.switch_to(after_cancel_bb)
+
 fn MirBuilder.emit_drop_entry(self: MirBuilder, local_id: i32, drop_kind: i32):
     if drop_kind == DropKind.DK_STORAGE:
+        self.body.push_stmt(self.cur_bb, StmtKind.StorageDead, local_id, 0, 0)
+        return
+    if drop_kind == DropKind.DK_TASK_DETACHED:
+        let task_place = self.place_for_local(local_id)
+        let task_op = self.body.new_operand(OperandKind.OK_COPY, task_place)
+        self.emit_task_cancel_call(task_op, MirIntrinsic.MIR_INTRINSIC_FIBER_DETACH_CANCEL, 0)
+        self.body.push_stmt(self.cur_bb, StmtKind.StorageDead, local_id, 0, 0)
+        return
+    if drop_kind == DropKind.DK_TASK_EPHEMERAL:
+        let cancel_place = self.place_for_local(local_id)
+        let cancel_op = self.body.new_operand(OperandKind.OK_COPY, cancel_place)
+        self.emit_task_cancel_call(cancel_op, MirIntrinsic.MIR_INTRINSIC_FIBER_CANCEL, 0)
+        let await_place = self.place_for_local(local_id)
+        let await_op = self.body.new_operand(OperandKind.OK_COPY, await_place)
+        self.lower_cleanup_await(await_op, 0)
         self.body.push_stmt(self.cur_bb, StmtKind.StorageDead, local_id, 0, 0)
         return
     let place = self.body.new_place(local_id)
@@ -2851,6 +2891,7 @@ fn MirBuilder.lower_let_binding(self: MirBuilder, node: i32):
     let rhs_expr = self.ast.get_data1(node)
     let flags = self.ast.get_data2(node)
     let mutable = flags % 2
+    let is_discard_binding = if name_sym != 0 and self.pool.resolve_symbol(name_sym) == "_": 1 else: 0
 
     let bind_ty = self.binding_type(node)
     if mutable == 0:
@@ -2864,8 +2905,11 @@ fn MirBuilder.lower_let_binding(self: MirBuilder, node: i32):
     // d1 = 0 for normal storage, bind_ty for zero-init (no initializer)
     let storage_d1 = if rhs_expr == 0: bind_ty else: 0
     self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, storage_d1, self.ast.get_start(node))
+    var scheduled_drop_kind = DropKind.DK_VALUE
     if self.sema.is_copy(bind_ty) == 0:
-        self.schedule_drop(local_id, DropKind.DK_VALUE)
+        scheduled_drop_kind = self.task_drop_kind_for_binding(node, bind_ty)
+        if is_discard_binding == 0:
+            self.schedule_drop(local_id, scheduled_drop_kind)
 
     if rhs_expr != 0:
         let place = self.place_for_local(local_id)
@@ -2874,6 +2918,12 @@ fn MirBuilder.lower_let_binding(self: MirBuilder, node: i32):
         let rhs_op = self.lower_expr(rhs_expr)
         self.expected_type = saved_expected
         self.assign_operand_to_place(place, rhs_op, self.ast.get_start(node))
+    if is_discard_binding != 0:
+        if self.sema.is_copy(bind_ty) == 0:
+            self.emit_drop_entry(local_id, scheduled_drop_kind)
+        else:
+            self.body.push_stmt(self.cur_bb, StmtKind.StorageDead, local_id, 0, self.ast.get_start(node))
+        return
     self.bind_local(name_sym, local_id)
 
 fn MirBuilder.lower_tuple_destructure(self: MirBuilder, node: i32):
@@ -3004,10 +3054,13 @@ fn MirBuilder.lower_block_mode(self: MirBuilder, node: i32, want_result: i32) ->
             continue
         let _ = self.lower_expr_discard(stmt)
 
-    let result = if tail_expr != 0:
-        if want_result != 0: self.lower_expr(tail_expr) else: self.lower_expr_discard(tail_expr)
-    else:
-        self.unit_operand()
+    var result = self.unit_operand()
+    if tail_expr != 0:
+        if want_result != 0:
+            self.cancel_scheduled_value_drop_for_receiver_expr(tail_expr)
+            result = self.lower_expr(tail_expr)
+        else:
+            result = self.lower_expr_discard(tail_expr)
 
     // Emit defers added in this block scope (LIFO order), before popping scope
     let defer_end = self.defer_nodes.len() as i32
@@ -3860,6 +3913,8 @@ fn MirBuilder.lower_return(self: MirBuilder, node: i32) -> i32:
     let ret_ty = self.body.local_type_ids.get(0)
     if ret_ty > 0:
         self.expected_type = ret_ty
+    if value_expr != 0:
+        self.cancel_scheduled_value_drop_for_receiver_expr(value_expr)
     let ret_op = if value_expr != 0: self.lower_expr(value_expr) else: self.unit_operand()
     self.expected_type = saved_expected
     let ret_place = self.place_for_local(0)
@@ -6408,8 +6463,13 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
     if kind == NodeKind.NK_CLOSURE:
         return self.lower_closure(0, 0, self.ast.get_data1(node), self.ast.get_data2(node), node)
 
-    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_MOVE_ARG:
+    if kind == NodeKind.NK_GROUPED:
         return self.lower_expr(self.ast.get_data0(node))
+
+    if kind == NodeKind.NK_MOVE_ARG:
+        let inner = self.ast.get_data0(node)
+        self.cancel_scheduled_value_drop_for_receiver_expr(inner)
+        return self.lower_expr(inner)
 
     if kind == NodeKind.NK_COPY_ARG:
         let inner = self.ast.get_data0(node)
@@ -6456,6 +6516,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
             var ta_task_ops: Vec[i32] = Vec.new()
             for ta_i in 0..ta_count:
                 let ta_elem = self.ast.get_extra(ta_extra + ta_i)
+                self.cancel_scheduled_value_drop_for_receiver_expr(ta_elem)
                 ta_task_ops.push(self.lower_expr(ta_elem))
             // Await each sequentially, collect results
             var ta_awaited_ops: Vec[i32] = Vec.new()
@@ -6476,6 +6537,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
             return self.body.new_operand(OperandKind.OK_COPY, ta_place)
 
         // Single task await
+        self.cancel_scheduled_value_drop_for_receiver_expr(inner)
         let task_op = self.lower_expr(inner)
         let result_ty = self.expr_type(node)
         let task_inner_ty = self.expr_type(inner)
@@ -6564,6 +6626,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         var task_ops: Vec[i32] = Vec.new()
         for ai in 0..arm_count:
             let task_node = self.ast.get_extra(extra_start + ai * 3 + 1)
+            self.cancel_scheduled_value_drop_for_receiver_expr(task_node)
             let task_op = self.lower_expr(task_node)
             task_ops.push(task_op)
 

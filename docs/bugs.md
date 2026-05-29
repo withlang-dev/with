@@ -249,11 +249,14 @@
   │                                                                                                                │             │                   │      │ executable coverage for Task-returning blocks, │
   │                                                                                                                │             │                   │      │ variable capture, and async-scope tracking.    │
   │                                                                                                                │             │                   │      │ Spec §14.6.                                   │
-  │ #268-#274                                                                                                     │         Yes │           Partial │   No │ Remaining §14 async sketches. Runtime has many │
-  │                                                                                                                │             │                   │      │ behavior tests now, but spec sketches still    │
-  │                                                                                                                │             │                   │      │ cover missing/unchecked semantics:             │
-  │                                                                                                                │             │                   │      │ cancellation, ScopedSend, no-await-in-         │
-  │                                                                                                                │             │                   │      │ iterators.                                     │
+  │ [x] #268                                                                                                      │         Yes │               Yes │   No │ Completed: Task drop lowering now implements   │
+  │                                                                                                                │             │                   │      │ §14.7 cancellation semantics. Ephemeral Task   │
+  │                                                                                                                │             │                   │      │ drops cancel and cleanup-await before          │
+  │                                                                                                                │             │                   │      │ continuation; ordinary Task drops detach-      │
+  │                                                                                                                │             │                   │      │ cancel and runtime-drain completion.           │
+  │ #269-#274                                                                                                     │         Yes │           Partial │   No │ Remaining §14 async sketches still cover       │
+  │                                                                                                                │             │                   │      │ ScopedSend, no-await-in-iterators, OS-thread   │
+  │                                                                                                                │             │                   │      │ restrictions, and related unchecked semantics. │
   │ [x] #275-#276                                                                                                  │         Yes │               Yes │   No │ Completed: c"..." now lowers as &CStr with     │
   │                                                                                                                │             │                   │      │ NUL-terminated static storage, string          │
   │                                                                                                                │             │                   │      │ literals default to str, and &str coercions    │
