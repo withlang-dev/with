@@ -1,23 +1,35 @@
-//! skip: non-executable spec sketch for Section 3.6 — Disjoint Closure Captures (formerly 25.55); contains pseudo-code for unimplemented feature work
-// Spec test: Section 3.6 — Disjoint Closure Captures (formerly 25.55)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+// Spec test: Section 3.6 - Disjoint Closure Captures.
 
-type World { positions: Vec[Vec2], velocities: Vec[Vec2], sprites: Vec[Sprite] }
+type ClosureCaptureWorld {
+    positions: i32,
+    velocities: i32,
+    sprites: i32,
+}
 
-// PASS: closures capture disjoint fields
-fn test:
-    var world = World { ... }
-    scope s =>
-        s.spawn(() => update_physics(&mut world.velocities, &world.positions))
-        s.spawn(() => render(&world.positions, &world.sprites))
-    // OK: first captures velocities (mut) + positions (shared)
-    //     second captures positions (shared) + sprites (shared)
-    //     no conflict — disjoint mutable access
+fn apply_two(a: fn() -> void, b: fn() -> void):
+    a()
+    b()
 
-// FAIL: overlapping mutable capture
-fn test_fail:
-    var world = World { ... }
-    scope s =>
-        s.spawn(() => modify(&mut world.positions))
-        s.spawn(() => modify(&mut world.positions))  // ERROR: conflicting borrows
+fn write_then_read(writer: fn() -> void, reader: fn() -> i32) -> i32:
+    writer()
+    reader()
+
+fn test_disjoint_mutating_field_captures:
+    var world = ClosureCaptureWorld { positions: 1, velocities: 2, sprites: 3 }
+    apply_two(
+        () => world.velocities = world.velocities + 10,
+        () => world.sprites = world.sprites + 20,
+    )
+    assert(world.positions == 1)
+    assert(world.velocities == 12)
+    assert(world.sprites == 23)
+
+fn test_shared_overlap_with_disjoint_mutating_capture:
+    var world = ClosureCaptureWorld { positions: 5, velocities: 10, sprites: 20 }
+    let observed = write_then_read(
+        () => world.velocities = world.positions + world.velocities,
+        () => world.positions + world.sprites,
+    )
+    assert(world.positions == 5)
+    assert(world.velocities == 15)
+    assert(observed == 25)
