@@ -273,7 +273,7 @@ fn Sema.ct_build_type_expr(self: Sema, pool: AstPool, intern: InternPool, type_i
 
     if tk == TypeKind.TY_TRAIT_OBJ:
         let trait_sym = intern.intern(self.pool_resolve(self.get_type_d0(resolved)))
-        return pool.add_node(NodeKind.NK_TYPE_TRAIT_OBJ, start, end, trait_sym, 0, 0) as i32
+        return pool.add_node(NodeKind.NK_TYPE_TRAIT_OBJ, start, end, trait_sym, TYPE_TRAIT_OBJECT_DYN, 0) as i32
 
     let type_sym = intern.intern(self.type_name(type_id))
     pool.add_node(NodeKind.NK_TYPE_NAMED, start, end, type_sym, 0, 0) as i32

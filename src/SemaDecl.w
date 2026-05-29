@@ -1698,6 +1698,41 @@ fn Sema.emit_trait_object_safety_error(self: Sema, trait_sym: i32, method_sym: i
     let method_name = self.pool_resolve(method_sym)
     self.emit_error("trait '" ++ trait_name ++ "' is not object-safe: method '" ++ method_name ++ "' " ++ reason, node)
 
+fn Sema.type_node_mentions_self(self: Sema, type_node: i32) -> i32:
+    if type_node == 0:
+        return 0
+    let kind = self.ast.kind(type_node)
+    if kind == NodeKind.NK_TYPE_NAMED:
+        return if self.ast.get_data0(type_node) == self.syms.self_type: 1 else: 0
+    if kind == NodeKind.NK_TYPE_ASSOC:
+        return if self.ast.get_data0(type_node) == self.syms.self_type: 1 else: 0
+    if kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_OPTIONAL or kind == NodeKind.NK_TYPE_SLICE or kind == NodeKind.NK_TYPE_ARRAY:
+        return self.type_node_mentions_self(self.ast.get_data0(type_node))
+    if kind == NodeKind.NK_TYPE_TUPLE:
+        let extra_start = self.ast.get_data0(type_node)
+        let elem_count = self.ast.get_data1(type_node)
+        for ei in 0..elem_count:
+            if self.type_node_mentions_self(self.ast.get_extra(extra_start + ei)) != 0:
+                return 1
+        return 0
+    if kind == NodeKind.NK_TYPE_FN:
+        let extra_start = self.ast.get_data0(type_node)
+        let param_count = self.ast.get_data1(type_node)
+        let ret_node = self.ast.get_data2(type_node)
+        for pi in 0..param_count:
+            if self.type_node_mentions_self(self.ast.get_extra(extra_start + pi)) != 0:
+                return 1
+        return self.type_node_mentions_self(ret_node)
+    if kind == NodeKind.NK_TYPE_GENERIC:
+        if self.ast.get_data0(type_node) == self.syms.self_type:
+            return 1
+        let extra_start = self.ast.get_data1(type_node)
+        let arg_count = self.ast.get_data2(type_node)
+        for ai in 0..arg_count:
+            if self.type_node_mentions_self(self.ast.get_extra(extra_start + ai)) != 0:
+                return 1
+    0
+
 fn Sema.ensure_trait_object_safe(self: Sema, trait_sym: i32, node: i32) -> i32:
     let trait_node = self.find_trait_decl_node(trait_sym)
     if trait_node == 0:
@@ -1716,7 +1751,6 @@ fn Sema.ensure_trait_object_safe(self: Sema, trait_sym: i32, node: i32) -> i32:
     pos = pos + 1
 
     let self_name_sym = self.pool_intern("self")
-    let self_type_sym = self.syms.self_type
     for mi in 0..method_count:
         let method_sym = self.ast.get_extra(pos)
         pos = pos + 1
@@ -1739,12 +1773,26 @@ fn Sema.ensure_trait_object_safe(self: Sema, trait_sym: i32, node: i32) -> i32:
             self.emit_trait_object_safety_error(trait_sym, method_sym, "has no self parameter", node)
             return 0
 
+        let first_param_flags = self.ast.fn_param_flags(param_start, 0)
+        if fn_param_is_move_self(first_param_flags) != 0:
+            self.emit_trait_object_safety_error(trait_sym, method_sym, "uses consuming receiver 'move self: Self'; use Box[dyn Trait] for consuming trait-object calls", node)
+            return 0
+        if fn_param_is_ref_self(first_param_flags) == 0 and fn_param_is_mut_self(first_param_flags) == 0:
+            self.emit_trait_object_safety_error(trait_sym, method_sym, "receiver is not object-safe; use 'self: &Self' or 'mut self: Self'", node)
+            return 0
+
         if (method_flags / sema_trait_method_flag_generic()) % 2 == 1:
             self.emit_trait_object_safety_error(trait_sym, method_sym, "is generic", node)
             return 0
 
-        if ret_node != 0 and self.ast.kind(ret_node) == NodeKind.NK_TYPE_NAMED and self.ast.get_data0(ret_node) == self_type_sym:
-            self.emit_trait_object_safety_error(trait_sym, method_sym, "returns Self", node)
+        for pi in 1..param_count:
+            let p_type_node = self.ast.fn_param_type(param_start, pi)
+            if self.type_node_mentions_self(p_type_node) != 0:
+                self.emit_trait_object_safety_error(trait_sym, method_sym, "parameter mentions Self outside the receiver", node)
+                return 0
+
+        if self.type_node_mentions_self(ret_node) != 0:
+            self.emit_trait_object_safety_error(trait_sym, method_sym, "return type mentions Self", node)
             return 0
 
     1
@@ -1806,7 +1854,8 @@ fn Sema.validate_type_expr_with_type_params(self: Sema, node: i32, tp_start: i32
         if not self.lang_trait_syms.contains(trait_sym) and not self.trait_lookup.contains(trait_sym):
             self.emit_error("unknown trait", node)
             return
-        let _ok = self.ensure_trait_object_safe(trait_sym, node)
+        if self.ast.get_data1(node) != TYPE_TRAIT_OBJECT_IMPL:
+            let _ok = self.ensure_trait_object_safe(trait_sym, node)
         return
 
 fn Sema.validate_where_clause(self: Sema, fn_node: i32, tp_start: i32, tp_count: i32):

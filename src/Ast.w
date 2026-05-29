@@ -244,6 +244,9 @@ const INDEX_ELLIPSIS: i32 = 2
 const INDEX_NEWAXIS: i32 = 3
 const INDEX_KIND_SHIFT: i32 = 268435456  // 1 << 28
 
+const TYPE_TRAIT_OBJECT_DYN: i32 = 1
+const TYPE_TRAIT_OBJECT_IMPL: i32 = 2
+
 // NK_UNSAFE_BLOCK.d1 distinguishes a true unsafe block from the narrow
 // `unsafe *p` / `unsafe p[i]` raw-access prefix form.
 const UNSAFE_KIND_BLOCK: i32 = 0
@@ -1445,7 +1448,7 @@ fn AstPool.for_binding_is_pattern(self: AstPool, node: NodeId) -> bool:
 // NodeKind.NK_TYPE_OPTIONAL: d0=inner(node), d1=0, d2=0
 // NodeKind.NK_TYPE_ARRAY:    d0=element(node), d1=size_low, d2=size_high
 // NodeKind.NK_TYPE_SLICE:    d0=element(node), d1=0, d2=0
-// NodeKind.NK_TYPE_TRAIT_OBJ: d0=sym, d1=0, d2=0
+// NodeKind.NK_TYPE_TRAIT_OBJ: d0=sym, d1=TYPE_TRAIT_OBJECT_*, d2=0
 // NodeKind.NK_TYPE_INFERRED: d0=0, d1=0, d2=0
 //
 // Pattern nodes:

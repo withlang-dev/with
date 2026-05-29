@@ -6454,7 +6454,7 @@ fn Parser.parse_type_expr(self: Parser) -> NodeId:
             return self.poisoned_expr()
         let sym = self.intern_current()
         self.advance()
-        return self.pool.add_node(NodeKind.NK_TYPE_TRAIT_OBJ, start, self.prev_end(), sym, 0, 0)
+        return self.pool.add_node(NodeKind.NK_TYPE_TRAIT_OBJ, start, self.prev_end(), sym, TYPE_TRAIT_OBJECT_DYN, 0)
 
     if t == TokenKind.TK_KW_IMPL:
         self.advance()
@@ -6468,7 +6468,7 @@ fn Parser.parse_type_expr(self: Parser) -> NodeId:
         let target = self.parse_type_expr()
         if target == 0:
             return self.poisoned_expr()
-        return self.pool.add_node(NodeKind.NK_TYPE_TRAIT_OBJ, start, self.prev_end(), sym, 0, 0)
+        return self.pool.add_node(NodeKind.NK_TYPE_TRAIT_OBJ, start, self.prev_end(), sym, TYPE_TRAIT_OBJECT_IMPL, 0)
 
     if t == TokenKind.TK_IDENT:
         let sym = self.intern_current()
