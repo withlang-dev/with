@@ -155,7 +155,14 @@
   │                                                                                                                │             │                   │      │ remove/replace, disjoint access, contains,     │
   │                                                                                                                │             │                   │      │ len, stale-handle invalidation, and handle     │
   │                                                                                                                │             │                   │      │ storage in generic containers. Spec §6.        │
-  │ #218-#222                                                                                                      │         Yes │                No │   No │ §7 with block sketches. Need executable tests  │
+  │ #218, #220-#222                                                                                                │         Yes │                No │   No │ Remaining §7 with block sketches. Need guard   │
+  │                                                                                                                │             │                   │      │ inference/dispatch, no-await guard coverage,   │
+  │                                                                                                                │             │                   │      │ and remaining with-block executable tests.     │
+  │ [x] #219                                                                                                       │         Yes │               Yes │   No │ Completed: builder with-block return sketch is │
+  │                                                                                                                │             │                   │      │ executable; Unit tails return the mutated      │
+  │                                                                                                                │             │                   │      │ builder, non-Unit tails return the tail value, │
+  │                                                                                                                │             │                   │      │ and function return position is covered.       │
+  │                                                                                                                │             │                   │      │ Spec §7.2.                                    │
   │ #242-#246                                                                                                      │         Yes │                No │   No │ §11 trait/operator/derive sketches. Need       │
   │                                                                                                                │             │                   │      │ object safety, multi-index/@, one-impl rule,   │
   │                                                                                                                │             │                   │      │ derive/Builder coverage.                       │
