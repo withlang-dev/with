@@ -1,18 +1,35 @@
-//! skip: non-executable spec sketch for Section 3.4 — Returning References (formerly 25.3); contains pseudo-code for unimplemented feature work
 // Spec test: Section 3.4 — Returning References (formerly 25.3)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
 
-// PASS: return ref, use locally
-fn first(xs: &Vec[i32]) -> Option[&i32]:
-    if xs.is_empty(): None else: Some(&xs[0])
+let shared_global: i32 = 99
 
-fn test:
-    let v = vec![1, 2, 3]
-    match first(&v):
-        Some(x) => print(x)
-        None    => ()
+fn same_ref(x: &i32) -> &i32:
+    x
 
-// PASS: ephemeral to owned conversion
-fn get_name(user: &User) -> StrView: user.name.as_view()
-fn owned(user: &User) -> String: get_name(user).to_string()
+fn maybe_ref(x: &i32, take: bool) -> Option[&i32]:
+    if take: Some(x) else: None
+
+fn global_ref() -> &i32:
+    &shared_global
+
+fn test_return_ref_use_locally:
+    let x = 42
+    let r = same_ref(&x)
+    assert(*r == 42)
+
+fn test_return_option_ref_use_locally:
+    let x = 7
+    let r = maybe_ref(&x, true)
+    match r:
+        Some(v) => assert(*v == 7)
+        None => assert(false)
+
+fn test_return_option_ref_none:
+    let x = 7
+    let r = maybe_ref(&x, false)
+    match r:
+        Some(_) => assert(false)
+        None => assert(true)
+
+fn test_return_global_ref:
+    let r = global_ref()
+    assert(*r == 99)

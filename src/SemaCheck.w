@@ -2777,6 +2777,9 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
         if tail_type as TypeId != self.ty_void and tail_type != 0:
             result = tail_type
         self.typed_expr_types.insert(tail, tail_type as i32)
+        let tail_kind = self.get_type_kind(self.resolve_alias(tail_type))
+        if tail_kind == TypeKind.TY_REF:
+            self.check_returned_view_origins(tail, tail)
     self.expire_dead_borrows_in_block(extra_start, stmt_count, stmt_count, 0)
 
     self.current_block_extra_start = saved_block_extra
@@ -3067,7 +3070,11 @@ fn Sema.collect_expr_view_deps(self: Sema, node: i32, out: Vec[i32]):
         self.collect_expr_view_deps(self.ast.get_data0(node), out)
         return
     if kind == NodeKind.NK_UNARY:
-        self.collect_expr_view_deps(self.ast.get_data1(node), out)
+        let op = self.ast.get_data0(node)
+        if op == UnaryOp.UOP_REF:
+            self.push_unique_i32(out, self.place_root_sym(self.ast.get_data1(node)))
+        else:
+            self.collect_expr_view_deps(self.ast.get_data1(node), out)
         return
     if kind == NodeKind.NK_BLOCK:
         self.collect_expr_view_deps(self.ast.get_data2(node), out)
@@ -3115,14 +3122,34 @@ fn Sema.record_view_binding_from_expr(self: Sema, sym: i32, expr_node: i32):
     self.collect_expr_view_deps(expr_node, deps)
     self.set_binding_view_deps(sym, param_mask, deps)
 
+fn Sema.view_origin_is_stack_local(self: Sema, sym: i32) -> i32:
+    if sym == 0:
+        return 0
+    if self.param_index_for_sym(sym) >= 0:
+        return 0
+    if self.global_value_decl_kind(sym) != 0:
+        return 0
+    if self.scope_has(sym) != 0:
+        return 1
+    0
+
 fn Sema.check_returned_view_origins(self: Sema, expr_node: i32, report_node: i32):
     if expr_node == 0:
         return
+    if self.ast.kind(expr_node) == NodeKind.NK_UNARY and self.ast.get_data0(expr_node) == UnaryOp.UOP_REF:
+        let origin_sym = self.place_root_sym(self.ast.get_data1(expr_node))
+        if self.view_origin_is_stack_local(origin_sym) != 0:
+            let origin_name = self.pool_resolve(origin_sym)
+            self.emit_error("returned view may outlive its origin '" ++ origin_name ++ "'", report_node)
+            return
     if self.ast.kind(expr_node) == NodeKind.NK_CALL:
         let callee = self.ast.get_data0(expr_node)
         if self.ast.kind(callee) == NodeKind.NK_IDENT:
             let fn_sym = if self.comp_resolved.contains(expr_node): self.comp_resolved.get(expr_node).unwrap() else: self.ast.get_data0(callee)
-            let sig_idx = self.get_sig(fn_sym)
+            var sig_idx = self.get_sig(fn_sym)
+            if sig_idx < 0:
+                let sema_fn_sym = self.pool_lookup_symbol(self.pool_resolve(fn_sym))
+                sig_idx = self.get_sig(sema_fn_sym)
             if sig_idx >= 0:
                 let has_resolved = self.has_resolved_call_args(expr_node)
                 let extra_start = self.ast.get_data1(expr_node)
@@ -3139,7 +3166,7 @@ fn Sema.check_returned_view_origins(self: Sema, expr_node: i32, report_node: i32
                             continue
                         let origin_arg = if has_resolved != 0: self.get_resolved_call_arg(expr_node, origin_pi) else: self.ast.get_extra(extra_start + origin_pi)
                         let origin_sym = self.place_root_sym(origin_arg)
-                        if origin_sym != 0 and self.param_index_for_sym(origin_sym) < 0 and self.scope_has(origin_sym) != 0:
+                        if self.view_origin_is_stack_local(origin_sym) != 0:
                             let origin_name = self.pool_resolve(origin_sym)
                             self.emit_error("returned view may outlive its origin '" ++ origin_name ++ "'", report_node)
                             return
@@ -3152,7 +3179,13 @@ fn Sema.check_returned_view_origins(self: Sema, expr_node: i32, report_node: i32
                 if self.binding_value_nodes.contains(view_sym):
                     let init_node = self.binding_value_nodes.get(view_sym).unwrap()
                     let init_kind = self.ast.kind(init_node)
-                    if init_kind == NodeKind.NK_CALL or init_kind == NodeKind.NK_FIELD_ACCESS:
+                    if init_kind == NodeKind.NK_UNARY and self.ast.get_data0(init_node) == UnaryOp.UOP_REF:
+                        let origin_sym = self.place_root_sym(self.ast.get_data1(init_node))
+                        if self.view_origin_is_stack_local(origin_sym) != 0:
+                            let origin_name = self.pool_resolve(origin_sym)
+                            self.emit_error("returned view may outlive its origin '" ++ origin_name ++ "'", report_node)
+                            return
+                    if init_kind == NodeKind.NK_CALL or init_kind == NodeKind.NK_FIELD_ACCESS or init_kind == NodeKind.NK_UNARY:
                         let view_name = self.pool_resolve(view_sym)
                         self.emit_error("returned view may outlive its origin via local binding '" ++ view_name ++ "'", report_node)
                         return
@@ -3162,9 +3195,7 @@ fn Sema.check_returned_view_origins(self: Sema, expr_node: i32, report_node: i32
         let origin_sym = deps.get(i as i64)
         if origin_sym == 0:
             continue
-        if self.param_index_for_sym(origin_sym) >= 0:
-            continue
-        if self.scope_has(origin_sym) != 0:
+        if self.view_origin_is_stack_local(origin_sym) != 0:
             let origin_name = self.pool_resolve(origin_sym)
             self.emit_error("returned view may outlive its origin '" ++ origin_name ++ "'", report_node)
             return

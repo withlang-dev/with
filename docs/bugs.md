@@ -50,10 +50,14 @@
   │                                                                                                                │             │                   │      │ non-local control flow; skipped mixed sketch   │
   │                                                                                                                │             │                   │      │ split into executable positive and negative    │
   │                                                                                                                │             │                   │      │ regressions for return, ?, break, continue.    │
-  │ #196-#199, #202-#203                                                                                           │         Yes │                No │   No │ §3 references/borrowing skipped sketches.      │
+  │ #196, #198-#199, #202-#203                                                                                      │         Yes │                No │   No │ §3 references/borrowing skipped sketches.      │
   │                                                                                                                │             │                   │      │ Implement executable tests for disjoint        │
-  │                                                                                                                │             │                   │      │ borrows, returning refs, trait object coercion,│
-  │                                                                                                                │             │                   │      │ and second-class references.                   │
+  │                                                                                                                │             │                   │      │ borrows, trait object coercion, and            │
+  │                                                                                                                │             │                   │      │ second-class references.                       │
+  │ [x] #197                                                                                                       │         Yes │               Yes │   No │ Completed: returning references is covered by  │
+  │                                                                                                                │             │                   │      │ executable positive tests and negative         │
+  │                                                                                                                │             │                   │      │ regressions for direct, binding, and call-     │
+  │                                                                                                                │             │                   │      │ mediated local-reference escapes. Spec §3.4.   │
   │ [x] #200                                                                                                       │         Yes │               Yes │   No │ Completed: ref/ptr auto-deref now follows      │
   │                                                                                                                │             │                   │      │ multiple layers for fields and method          │
   │                                                                                                                │             │                   │      │ receivers; invalid value-position ref/value    │
