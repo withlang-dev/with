@@ -1109,8 +1109,10 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
         if regex_ty != 0:
             return regex_ty
         return self.sema.ty_void as i32
-    if kind == NodeKind.NK_STRING_LIT or kind == NodeKind.NK_C_STRING_LIT:
+    if kind == NodeKind.NK_STRING_LIT:
         return self.sema.ty_str as i32
+    if kind == NodeKind.NK_C_STRING_LIT:
+        return self.sema.ty_cstr_view as i32
     if kind == NodeKind.NK_FSTRING:
         return self.sema.ty_str as i32
     if kind == NodeKind.NK_NULL_LIT:
@@ -1534,6 +1536,13 @@ fn MirBuilder.lower_bool_lit(self: MirBuilder, value: i32) -> i32:
 
 fn MirBuilder.lower_str_lit(self: MirBuilder, sym: i32) -> i32:
     self.const_operand(ConstKind.CK_STR, sym, self.sema.ty_str)
+
+fn MirBuilder.lower_str_lit_as(self: MirBuilder, sym: i32, type_id: i32) -> i32:
+    let ty = if type_id != 0: type_id else: self.sema.ty_str as i32
+    self.const_operand(ConstKind.CK_STR, sym, ty)
+
+fn MirBuilder.lower_c_str_lit(self: MirBuilder, sym: i32) -> i32:
+    self.const_operand(ConstKind.CK_C_STR, sym, self.sema.ty_cstr_view)
 
 fn MirBuilder.node_is_src_call(self: MirBuilder, node: i32) -> i32:
     if node == 0 or self.ast.kind(node) != NodeKind.NK_CALL:
@@ -5306,8 +5315,10 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, self.ast.get_start(node))
         return self.body.new_operand(OperandKind.OK_COPY, place)
 
-    if kind == NodeKind.NK_STRING_LIT or kind == NodeKind.NK_C_STRING_LIT:
-        return self.lower_str_lit(self.ast.get_data0(node))
+    if kind == NodeKind.NK_STRING_LIT:
+        return self.lower_str_lit_as(self.ast.get_data0(node), self.expr_type(node))
+    if kind == NodeKind.NK_C_STRING_LIT:
+        return self.lower_c_str_lit(self.ast.get_data0(node))
 
     if kind == NodeKind.NK_FSTRING:
         return self.lower_fstring(node)

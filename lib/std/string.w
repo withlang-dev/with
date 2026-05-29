@@ -40,6 +40,10 @@ pub fn view_is_empty(v: &str) -> bool:
 pub fn view_eq(a: &str, b: &str) -> bool:
     a == b
 
+/// C string byte length, excluding the trailing NUL.
+pub fn CStr.len(self: &Self) -> i64:
+    self.len
+
 /// Compare two strings for equality. Returns true if equal.
 pub fn string_eq(a: str, b: str) -> bool:
     with_str_eq(a, b) != 0

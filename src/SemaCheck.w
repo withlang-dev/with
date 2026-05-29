@@ -1652,6 +1652,13 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         return self.ty_bool
 
     if kind == NodeKind.NK_STRING_LIT:
+        if self.has_expected_type != 0 and self.expected_expr_type != 0:
+            let expected = self.resolve_alias(self.expected_expr_type)
+            if self.get_type_kind(expected) == TypeKind.TY_REF:
+                let inner = self.resolve_alias(self.get_type_d0(expected) as TypeId)
+                if self.get_type_kind(inner) == TypeKind.TY_STR:
+                    self.typed_expr_types.insert(node, self.expected_expr_type as i32)
+                    return self.expected_expr_type
         return self.ty_str
 
     if kind == NodeKind.NK_REGEX_LIT:
@@ -1666,7 +1673,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         return self.check_fstring(node) as TypeId
 
     if kind == NodeKind.NK_C_STRING_LIT:
-        return self.ty_const_i8_ptr
+        return self.ty_cstr_view
 
     if kind == NodeKind.NK_NULL_LIT:
         if self.has_expected_type != 0 and self.expected_expr_type != 0:

@@ -2167,8 +2167,8 @@ fn CCodegen.global_init_text(self: CCodegen, node: i32, tid: i32) -> str:
                 return "((" ++ self.c_type(tid, 0) ++ ")\"" ++ cc_escape_c_string(text) ++ "\")"
         return "WITH_STR_LIT(\"" ++ cc_escape_c_string(text) ++ "\")"
     if kind == NodeKind.NK_C_STRING_LIT:
-        let text = cc_string_literal_payload(cc_intern_resolve(self.intern, self.ast.get_data0(expr)))
-        return "(\"" ++ cc_escape_c_string(text) ++ "\")"
+        self.fail("emit-c does not yet support c-string literal CStr objects")
+        return "0"
     if kind == NodeKind.NK_NULL_LIT:
         return "NULL"
     let resolved = self.sema.resolve_alias(tid)
@@ -2191,6 +2191,9 @@ fn CCodegen.const_text(self: CCodegen, body: MirBody, const_id: i32) -> str:
     if ck == ConstKind.CK_STR:
         let text = if cd != 0: cc_string_literal_payload(cc_intern_resolve(self.intern, cd)) else: ""
         return "WITH_STR_LIT(\"" ++ cc_escape_c_string(text) ++ "\")"
+    if ck == ConstKind.CK_C_STR:
+        self.fail("emit-c does not yet support c-string literal CStr objects")
+        return "0"
     if ck == ConstKind.CK_UNIT:
         let unit_tid = body.const_types.get(const_id as i64)
         if unit_tid != 0:

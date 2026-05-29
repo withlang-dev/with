@@ -506,6 +506,8 @@ type Sema {
     ty_never: TypeId,
     ty_str: TypeId,
     ty_str_view: TypeId,
+    ty_cstr: TypeId,
+    ty_cstr_view: TypeId,
     ty_usize: TypeId,
     ty_isize: TypeId,
     ty_const_i8_ptr: TypeId,
@@ -990,6 +992,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         ty_u8: 0, ty_u16: 0, ty_u32: 0, ty_u64: 0, ty_u128: 0,
         ty_f32: 0, ty_f64: 0, ty_bool: 0, ty_void: 0,
         ty_never: 0, ty_str: 0, ty_str_view: 0,
+        ty_cstr: 0, ty_cstr_view: 0,
         ty_usize: 0, ty_isize: 0, ty_const_i8_ptr: 0,
         ty_field_info: 0, ty_variant_info: 0,
         decl_source_paths: Vec.new(),
@@ -1050,6 +1053,14 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     s.ty_usize = s.add_type(TypeKind.TY_INT, 64, 0, 1)
     s.ty_isize = s.add_type(TypeKind.TY_INT, 64, 1, 1)
     s.ty_const_i8_ptr = s.add_type(TypeKind.TY_PTR, s.ty_i8, 0, 0)
+    let cstr_field_names: Vec[str] = Vec.new()
+    cstr_field_names.push("ptr")
+    cstr_field_names.push("len")
+    let cstr_field_types: Vec[i32] = Vec.new()
+    cstr_field_types.push(s.ty_const_i8_ptr as i32)
+    cstr_field_types.push(s.ty_i64 as i32)
+    s.ty_cstr = s.register_builtin_struct_type("CStr", cstr_field_names, cstr_field_types, 2) as TypeId
+    s.ty_cstr_view = s.add_type(TypeKind.TY_REF, s.ty_cstr, 0, 0)
 
     // Sub-byte and non-standard integer widths for bitpacked structs.
     for w in 1..8:
@@ -1078,6 +1089,7 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     s.register_prim("str", s.ty_str)
     s.register_prim("String", s.ty_str)
     s.register_prim("StrView", s.ty_str_view)
+    s.register_prim("CStr", s.ty_cstr)
     s.register_prim("usize", s.ty_usize)
     s.register_prim("isize", s.ty_isize)
     s.init_builtin_reflection_types()

@@ -395,6 +395,7 @@ type Codegen {
     sym_void: i32,
     sym_never: i32,
     sym_str: i32,
+    sym_cstr: i32,
     sym_sizeof: i32,
     sym_size_of: i32,
     sym_alignof: i32,
@@ -740,6 +741,7 @@ fn Codegen.init_with_opt_and_intern(module_name: str, opt_level: i32, intern: In
     cg.sym_void = cg.intern.intern("void")
     cg.sym_never = cg.intern.intern("Never")
     cg.sym_str = cg.intern.intern("str")
+    cg.sym_cstr = cg.intern.intern("CStr")
     cg.sym_sizeof = cg.intern.intern("sizeof")
     cg.sym_size_of = cg.intern.intern("size_of")
     cg.sym_alignof = cg.intern.intern("alignof")
@@ -792,7 +794,7 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         sym_box: 0, sym_context_error: 0,
         sym_Self: 0, sym_self: 0, sym_unit: 0,
         sym_bool: 0, sym_usize: 0, sym_isize: 0, sym_void: 0,
-        sym_never: 0, sym_str: 0,
+        sym_never: 0, sym_str: 0, sym_cstr: 0,
         sym_sizeof: 0, sym_size_of: 0, sym_alignof: 0, sym_align_of: 0, sym_chan: 0,
         sym_todo: 0, sym_unreachable: 0, sym_src: 0, sym_transmute: 0,
         sym_nameof: 0, sym_type_name: 0, sym_embed_file: 0,
@@ -2710,6 +2712,34 @@ fn Codegen.declare_builtin_str_type(self: Codegen):
     self.struct_llvm_field_indices.push(1)
 
     self.struct_type_map.insert(str_sym, idx)
+
+fn Codegen.declare_builtin_cstr_type(self: Codegen):
+    let cstr_sym = self.intern.intern("CStr")
+    if self.struct_type_map.get(cstr_sym).is_some():
+        return
+    let cstr_type = wl_struct_create_named(self.context, "CStr")
+    wl_struct_set_body_2(cstr_type, wl_ptr_type(self.context), wl_i64_type(self.context), 0)
+
+    let idx = self.struct_llvm_types.len() as i32
+    self.struct_llvm_types.push(cstr_type)
+    self.struct_index_syms.push(cstr_sym)
+    self.struct_field_starts.push(self.struct_field_names.len() as i32)
+    self.struct_field_counts.push(2)
+
+    let ptr_sym = self.intern.intern("ptr")
+    let len_sym = self.intern.intern("len")
+    self.struct_field_names.push(ptr_sym)
+    self.struct_field_names.push(len_sym)
+    self.struct_field_types.push(wl_ptr_type(self.context))
+    self.struct_field_types.push(wl_i64_type(self.context))
+    self.struct_field_type_nodes.push(0)
+    self.struct_field_type_nodes.push(0)
+    self.struct_field_defaults.push(0)
+    self.struct_field_defaults.push(0)
+    self.struct_llvm_field_indices.push(0)
+    self.struct_llvm_field_indices.push(1)
+
+    self.struct_type_map.insert(cstr_sym, idx)
 
 fn Codegen.predeclare_struct_type(self: Codegen, name_sym: i32):
     if self.struct_type_map.get(name_sym).is_some():
@@ -4753,8 +4783,9 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
 
     self.debug_init_module()
 
-    // Declare built-in str type before user types
+    // Declare built-in string view types before user types.
     self.declare_builtin_str_type()
+    self.declare_builtin_cstr_type()
 
     // Pass 0a: predeclare all struct/enum names so forward references resolve.
     for i in 0..self.pool.decl_count():
