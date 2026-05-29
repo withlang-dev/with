@@ -94,6 +94,7 @@ fn Sema.collect_declarations(self: Sema):
 
     self.collecting_types = 0
     self.resolve_deferred_non_generic_type_decls()
+    self.collect_enum_constructor_imports()
 
     // Pass 3: collect function signatures and top-level let decls.
     for di in 0..self.ast.decl_count():
@@ -119,6 +120,37 @@ fn Sema.collect_declarations(self: Sema):
         self.must_use_types.insert(sym_result, 1)
     if sym_task != 0:
         self.must_use_types.insert(sym_task, 1)
+
+fn Sema.collect_enum_constructor_imports(self: Sema):
+    for di in 0..self.ast.decl_count():
+        self.update_decl_source_context(di)
+        let decl = self.ast.get_decl(di)
+        if self.ast.kind(decl) != NodeKind.NK_USE_DECL:
+            continue
+        let selector_count = self.ast.get_data2(decl)
+        if selector_count <= 0:
+            continue
+        let path_start = self.ast.get_data0(decl)
+        let path_count = self.ast.get_data1(decl)
+        if path_count <= 0:
+            continue
+        let type_sym = self.ast.get_extra(path_start + path_count - 1)
+        let type_tid = self.lookup_named_type_visible(type_sym)
+        if type_tid == 0:
+            continue
+        let enum_tid = self.enum_variant_decl_type(type_tid)
+        if enum_tid == 0:
+            continue
+        for si in 0..selector_count:
+            let variant_sym = self.ast.get_extra(path_start + path_count + si)
+            if self.enum_has_variant(enum_tid, variant_sym) == 0:
+                self.emit_error("variant '" ++ self.pool_resolve(variant_sym) ++ "' does not belong to enum '" ++ self.pool_resolve(type_sym) ++ "'", decl)
+                continue
+            let existing = self.imported_variant_owners.get(variant_sym)
+            if existing.is_some() and existing.unwrap() != enum_tid:
+                self.emit_error("ambiguous enum constructor import '" ++ self.pool_resolve(variant_sym) ++ "'", decl)
+                continue
+            self.imported_variant_owners.insert(variant_sym, enum_tid)
 
 fn Sema.resolve_deferred_non_generic_type_decls(self: Sema):
     for di in 0..self.ast.decl_count():

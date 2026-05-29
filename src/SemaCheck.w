@@ -2228,7 +2228,9 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
 
     // Check enum variants
     if self.variant_lookup.contains(sym) and self.is_ci_visible(sym) != 0:
-        let variant_expected_tid = self.expected_variant_constructor_type(sym)
+        var variant_expected_tid = self.expected_variant_constructor_type(sym)
+        if variant_expected_tid == 0 and self.imported_variant_owners.contains(sym):
+            variant_expected_tid = self.imported_variant_owners.get(sym).unwrap()
         if variant_expected_tid != 0:
             let resolved_variant_sym = self.qualified_enum_variant_sym(variant_expected_tid, sym)
             self.comp_resolved.insert(node, resolved_variant_sym)
@@ -5817,8 +5819,10 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
     // Enum variant constructor
     if self.variant_lookup.contains(fn_sym):
         let inferred_variant_ty = self.infer_generic_enum_variant_type(fn_sym, arg_types, arg_count)
+        let imported_variant_ty = if self.imported_variant_owners.contains(fn_sym): self.imported_variant_owners.get(fn_sym).unwrap() else: 0
         let variant_tid = self.variant_type_ids.get(fn_sym).unwrap()
-        var final_variant_ty: TypeId = if variant_expected_ty != 0: variant_expected_ty as TypeId else: variant_tid as TypeId
+        var final_variant_ty: TypeId = if variant_expected_ty != 0: variant_expected_ty as TypeId else:
+            if imported_variant_ty != 0: imported_variant_ty as TypeId else: variant_tid as TypeId
         if inferred_variant_ty != 0:
             final_variant_ty = self.preferred_compatible_type(final_variant_ty, inferred_variant_ty as TypeId)
         let resolved_variant_sym = self.qualified_enum_variant_sym(final_variant_ty as i32, fn_sym)

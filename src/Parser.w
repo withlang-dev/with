@@ -2054,6 +2054,7 @@ fn Parser.parse_use_decl(self: Parser, start: i32) -> NodeId:
 
     let extra_start = self.pool.extra_len()
     var path_count = 0
+    var selector_count = 0
 
     let first = self.peek()
     if first == TokenKind.TK_IDENT or parser_is_keyword_tag(first):
@@ -2079,6 +2080,16 @@ fn Parser.parse_use_decl(self: Parser, start: i32) -> NodeId:
             else if self.peek() == TokenKind.TK_L_BRACE:
                 self.advance()
                 while self.peek() != TokenKind.TK_R_BRACE and self.peek() != TokenKind.TK_EOF and self.peek() != TokenKind.TK_NEWLINE:
+                    if self.peek() == TokenKind.TK_COMMA:
+                        self.advance()
+                        continue
+                    if self.peek() == TokenKind.TK_IDENT or parser_is_keyword_tag(self.peek()):
+                        let selector_sym = self.expect_ident_or_keyword()
+                        if selector_sym != 0:
+                            self.pool.add_extra(selector_sym)
+                            selector_count = selector_count + 1
+                        continue
+                    self.emit_error("expected import selector")
                     self.advance()
                 if self.peek() == TokenKind.TK_R_BRACE:
                     self.advance()
@@ -2111,7 +2122,7 @@ fn Parser.parse_use_decl(self: Parser, start: i32) -> NodeId:
                 depth = depth - 1
             self.advance()
 
-    self.pool.add_node(NodeKind.NK_USE_DECL, start, self.prev_end(), extra_start, path_count, 0)
+    self.pool.add_node(NodeKind.NK_USE_DECL, start, self.prev_end(), extra_start, path_count, selector_count)
 
 fn Parser.parse_c_import(self: Parser, start: i32) -> NodeId:
     self.advance()  // consume c_import

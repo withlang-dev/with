@@ -251,6 +251,8 @@ type Sema {
     variant_lookup: HashMap[i32, i32],
     // Variant type IDs: variant_sym → enum_tid
     variant_type_ids: HashMap[i32, i32],
+    // Explicit constructor imports: variant_sym -> enum_tid.
+    imported_variant_owners: HashMap[i32, i32],
     // Discriminant enum data
     disc_repr_types: HashMap[i32, i32],
     disc_values: HashMap[i32, i32],
@@ -752,6 +754,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let generic_fn_nodes = sema_new_map_i32_i32()
     let variant_lookup = sema_new_map_i32_i32()
     let variant_type_ids = sema_new_map_i32_i32()
+    let imported_variant_owners = sema_new_map_i32_i32()
     let disc_repr_types = sema_new_map_i32_i32()
     let disc_values = sema_new_map_i32_i32()
     let disc_has_payload = sema_new_map_i32_i32()
@@ -819,6 +822,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         generic_fn_nodes,
         variant_lookup,
         variant_type_ids,
+        imported_variant_owners,
         disc_repr_types,
         disc_values,
         disc_has_payload,

@@ -1240,7 +1240,7 @@ fn Zcu.strip_use_decls_frontend(self: Zcu, pool: AstPool) -> AstPool:
     let ordered_c_import: Vec[i32] = Vec.new()
     for i in 0..out.decl_count():
         let decl = out.get_decl(i)
-        if out.kind(decl) != NodeKind.NK_USE_DECL:
+        if out.kind(decl) != NodeKind.NK_USE_DECL or out.get_data2(decl) > 0:
             ordered.push(decl as i32)
             ordered_paths.push(self.decl_source_path_frontend(i))
             ordered_file_ids.push(self.decl_source_file_id_frontend(i))
@@ -1304,13 +1304,18 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
             let pps = merged_pool.get_data0(decl)
             let ppc = merged_pool.get_data1(decl)
             if ppc > 0:
-                let ppname = self.use_path_name_frontend(merged_pool, pps, ppc)
-                let ppfpath = self.resolve_module_path_frontend(ppname, self.decl_source_dir_frontend(pi))
-                if ppfpath.len() > 0 and self.has_imported_path(ppfpath) == 0:
-                    self.add_imported_path(ppfpath)
-                    merged_pool = self.parse_imported_file_frontend(ppfpath, merged_pool)
-                else if ppfpath.len() == 0:
-                    self.emit_missing_import_frontend(merged_pool, decl)
+                if self.use_decl_is_local_type_selector_frontend(merged_pool, decl):
+                    prelude_ordered.push(decl as i32)
+                    prelude_paths.push(self.decl_source_path_frontend(pi))
+                    prelude_file_ids.push(self.decl_source_file_id_frontend(pi))
+                else:
+                    let ppname = self.use_path_name_frontend(merged_pool, pps, ppc)
+                    let ppfpath = self.resolve_module_path_frontend(ppname, self.decl_source_dir_frontend(pi))
+                    if ppfpath.len() > 0 and self.has_imported_path(ppfpath) == 0:
+                        self.add_imported_path(ppfpath)
+                        merged_pool = self.parse_imported_file_frontend(ppfpath, merged_pool)
+                    else if ppfpath.len() == 0:
+                        self.emit_missing_import_frontend(merged_pool, decl)
             pi = pi + 1
     let after_prelude = merged_pool.decl_count()
 
@@ -1328,13 +1333,18 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         let ups = merged_pool.get_data0(decl)
         let upc = merged_pool.get_data1(decl)
         if upc > 0:
-            let upname = self.use_path_name_frontend(merged_pool, ups, upc)
-            let upfpath = self.resolve_module_path_frontend(upname, self.decl_source_dir_frontend(ui))
-            if upfpath.len() > 0 and self.has_imported_path(upfpath) == 0:
-                self.add_imported_path(upfpath)
-                merged_pool = self.parse_imported_file_frontend(upfpath, merged_pool)
-            else if upfpath.len() == 0:
-                self.emit_missing_import_frontend(merged_pool, decl)
+            if self.use_decl_is_local_type_selector_frontend(merged_pool, decl):
+                root_ordered.push(decl as i32)
+                root_paths.push(self.decl_source_path_frontend(ui))
+                root_file_ids.push(self.decl_source_file_id_frontend(ui))
+            else:
+                let upname = self.use_path_name_frontend(merged_pool, ups, upc)
+                let upfpath = self.resolve_module_path_frontend(upname, self.decl_source_dir_frontend(ui))
+                if upfpath.len() > 0 and self.has_imported_path(upfpath) == 0:
+                    self.add_imported_path(upfpath)
+                    merged_pool = self.parse_imported_file_frontend(upfpath, merged_pool)
+                else if upfpath.len() == 0:
+                    self.emit_missing_import_frontend(merged_pool, decl)
 
     // Scan decls added by user-import expansion (from after_prelude onward).
     var ui2 = after_prelude
@@ -1350,13 +1360,18 @@ fn Zcu.process_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
         let ups = merged_pool.get_data0(decl)
         let upc = merged_pool.get_data1(decl)
         if upc > 0:
-            let upname = self.use_path_name_frontend(merged_pool, ups, upc)
-            let upfpath = self.resolve_module_path_frontend(upname, self.decl_source_dir_frontend(ui2))
-            if upfpath.len() > 0 and self.has_imported_path(upfpath) == 0:
-                self.add_imported_path(upfpath)
-                merged_pool = self.parse_imported_file_frontend(upfpath, merged_pool)
-            else if upfpath.len() == 0:
-                self.emit_missing_import_frontend(merged_pool, decl)
+            if self.use_decl_is_local_type_selector_frontend(merged_pool, decl):
+                user_import_ordered.push(decl as i32)
+                user_import_paths.push(self.decl_source_path_frontend(ui2))
+                user_import_file_ids.push(self.decl_source_file_id_frontend(ui2))
+            else:
+                let upname = self.use_path_name_frontend(merged_pool, ups, upc)
+                let upfpath = self.resolve_module_path_frontend(upname, self.decl_source_dir_frontend(ui2))
+                if upfpath.len() > 0 and self.has_imported_path(upfpath) == 0:
+                    self.add_imported_path(upfpath)
+                    merged_pool = self.parse_imported_file_frontend(upfpath, merged_pool)
+                else if upfpath.len() == 0:
+                    self.emit_missing_import_frontend(merged_pool, decl)
         ui2 = ui2 + 1
 
     let prelude_reordered = self.reorder_import_tier_frontend(prelude_ordered, prelude_paths, prelude_file_ids)
@@ -1676,6 +1691,28 @@ fn Zcu.use_path_name_frontend(self: Zcu, pool: AstPool, path_start: i32, path_co
         let seg = pool.get_extra(path_start + pi)
         path = path ++ self.pool.resolve(seg)
     path
+
+fn frontend_pool_has_type_decl_named(pool: AstPool, sym: i32) -> bool:
+    if sym == 0:
+        return false
+    for di in 0..pool.decl_count():
+        let decl = pool.get_decl(di)
+        if pool.kind(decl) == NodeKind.NK_TYPE_DECL and pool.get_data0(decl) == sym:
+            return true
+    false
+
+fn Zcu.use_decl_is_local_type_selector_frontend(self: Zcu, pool: AstPool, decl: i32) -> bool:
+    if pool.kind(decl) != NodeKind.NK_USE_DECL:
+        return false
+    let selector_count = pool.get_data2(decl)
+    if selector_count <= 0:
+        return false
+    let path_start = pool.get_data0(decl)
+    let path_count = pool.get_data1(decl)
+    if path_count != 1:
+        return false
+    let type_sym = pool.get_extra(path_start)
+    frontend_pool_has_type_decl_named(pool, type_sym)
 
 fn Zcu.resolve_module_path_frontend(self: Zcu, module_name: str, source_dir_raw: str) -> str:
     let module_rel = frontend_normalize_module_path(module_name)
