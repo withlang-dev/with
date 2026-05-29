@@ -2519,6 +2519,31 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
 
     wl_get_undef(fallback_ty)
 
+fn Codegen.mir_emit_drop_fields_ptr(self: Codegen, ptr: i64, ty: i64, owner_sym: i32) -> void:
+    if ptr == 0 or ty == 0:
+        return
+    if wl_get_type_kind(ty) != wl_struct_type_kind():
+        return
+    let struct_idx = self.find_struct_index_by_type(ty)
+    if struct_idx < 0:
+        return
+    if self.is_union_struct_index(struct_idx) or self.is_bitpacked_struct(ty):
+        return
+    let field_start = self.struct_field_starts.get(struct_idx as i64)
+    let field_count = self.struct_field_counts.get(struct_idx as i64)
+    var fi = field_count - 1
+    while fi >= 0:
+        let field_slot = field_start + fi
+        let field_sym = self.struct_field_names.get(field_slot as i64)
+        if owner_sym != 0 and self.sema.drop_consumed_field(owner_sym, field_sym) != 0:
+            fi = fi - 1
+            continue
+        let field_ty = self.struct_field_types.get(field_slot as i64)
+        let llvm_fi = self.get_llvm_field_index(ty, fi)
+        let field_ptr = wl_build_struct_gep(self.builder, ty, ptr, llvm_fi)
+        self.mir_emit_drop_ptr(field_ptr, field_ty)
+        fi = fi - 1
+
 fn Codegen.mir_emit_drop_ptr(self: Codegen, ptr: i64, ty: i64) -> void:
     if ptr == 0 or ty == 0:
         return
@@ -2533,19 +2558,19 @@ fn Codegen.mir_emit_drop_ptr(self: Codegen, ptr: i64, ty: i64) -> void:
 
     let dfv = self.drop_fn_values.get(type_sym)
     let dft = self.drop_fn_types.get(type_sym)
-    if not dfv.is_some() or not dft.is_some():
-        return
 
     // Drop methods take self by value in the spec, but the compiler lowers
     // struct self params as pointers. Pass pointer for struct types.
-    let drop_fn_ty = dft.unwrap() as i64
-    let args: Vec[i64] = Vec.new()
-    if wl_get_type_kind(ty) == wl_struct_type_kind():
-        args.push(ptr)
-    else:
-        let value = wl_build_load(self.builder, ty, ptr)
-        args.push(value)
-    let _ = wl_build_call(self.builder, drop_fn_ty, dfv.unwrap() as i64, vec_data_i64(&args), 1)
+    if dfv.is_some() and dft.is_some():
+        let drop_fn_ty = dft.unwrap() as i64
+        let args: Vec[i64] = Vec.new()
+        if wl_get_type_kind(ty) == wl_struct_type_kind():
+            args.push(ptr)
+        else:
+            let value = wl_build_load(self.builder, ty, ptr)
+            args.push(value)
+        let _ = wl_build_call(self.builder, drop_fn_ty, dfv.unwrap() as i64, vec_data_i64(&args), 1)
+    self.mir_emit_drop_fields_ptr(ptr, ty, type_sym)
 
 fn Codegen.mir_emit_stmt(self: Codegen, body: MirBody, stmt_id: i32) -> bool:
     if stmt_id < 0 or stmt_id >= body.stmt_kinds.len() as i32:

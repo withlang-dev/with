@@ -1,18 +1,25 @@
-//! skip: non-executable spec sketch for Section 2.4 — Partial Move from Drop Types (formerly 25.64); contains pseudo-code for unimplemented feature work
 // Spec test: Section 2.4 — Partial Move from Drop Types (formerly 25.64)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
 
-type Wrapper { fd: File, name: String }
-impl Drop for Wrapper:
-    fn drop(self: Self): close(self.fd)
+var PARTIAL_MOVE_DROP_TRACE = ""
 
-// FAIL: partial move from Drop type
-fn test_fail:
-    let w = Wrapper { fd: open(), name: "A" }
-    let w2 = { w with name: "B" }  // ERROR: partial move from Drop type
+type PartialMoveFile { id: str }
+impl Drop for PartialMoveFile:
+    fn drop(move self: Self):
+        PARTIAL_MOVE_DROP_TRACE = PARTIAL_MOVE_DROP_TRACE ++ self.id
 
-// PASS: clone field instead
-fn test:
-    let w = Wrapper { fd: open(), name: "A" }
-    let w2 = Wrapper { fd: w.fd.clone(), name: "B" }
+type PartialMoveWrapper { fd: PartialMoveFile, name: str }
+impl Drop for PartialMoveWrapper:
+    fn drop(move self: Self):
+        PARTIAL_MOVE_DROP_TRACE = PARTIAL_MOVE_DROP_TRACE ++ self.name
+
+fn partial_move_make_wrapper:
+    let _w = PartialMoveWrapper {
+        fd: PartialMoveFile { id: "F" },
+        name: "W",
+    }
+
+// PASS: constructing and dropping the whole Drop value is allowed.
+fn test_partial_move_whole_value_ok:
+    PARTIAL_MOVE_DROP_TRACE = ""
+    partial_move_make_wrapper()
+    assert(PARTIAL_MOVE_DROP_TRACE == "WF")

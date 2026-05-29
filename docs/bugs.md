@@ -42,9 +42,10 @@
   │                                                                                                                │             │                   │      │ executable Copy pass cases and negative        │
   │                                                                                                                │             │                   │      │ regressions for non-Copy fields and Copy after │
   │                                                                                                                │             │                   │      │ Drop. Spec §2.3.                               │
-  │ #192, #194-#195                                                                                                │         Yes │                No │   No │ §2 ownership/drop skipped spec sketches.       │
-  │                                                                                                                │             │                   │      │ Convert to executable positive/negative tests; │
-  │                                                                                                                │             │                   │      │ implement missing Drop diagnostics.            │
+  │ [x] #192, #194-#195                                                                                            │         Yes │               Yes │   No │ Completed: Drop now runs user drop bodies then │
+  │                                                                                                                │             │                   │      │ remaining Drop field destructors; field moves  │
+  │                                                                                                                │             │                   │      │ are allowed inside drop, forbidden outside,    │
+  │                                                                                                                │             │                   │      │ and Drop after Copy is rejected. Spec §2.4.    │
   │ [x] #193                                                                                                       │         Yes │               Yes │   No │ Completed: defer/errdefer already rejected     │
   │                                                                                                                │             │                   │      │ non-local control flow; skipped mixed sketch   │
   │                                                                                                                │             │                   │      │ split into executable positive and negative    │

@@ -451,10 +451,16 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
     self.collect_function_labels(body)
     self.validate_function_gotos()
     self.push_label_boundary()
+    let saved_drop_type_sym = self.current_drop_type_sym
+    let saved_drop_control_flow_depth = self.drop_control_flow_depth
+    self.current_drop_type_sym = self.drop_owner_for_fn_symbol(fn_name)
+    self.drop_control_flow_depth = 0
     if body_expected_ret != 0 and body_expected_ret != self.ty_void:
         self.expected_expr_type = body_expected_ret
         self.has_expected_type = 1
     let body_ty = self.check_expr(body)
+    self.current_drop_type_sym = saved_drop_type_sym
+    self.drop_control_flow_depth = saved_drop_control_flow_depth
     self.pop_label_frame()
     self.emit_unused_label_warnings()
     self.restore_label_registry(saved_label_registry)
@@ -1751,7 +1757,11 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
                 self.push_scope()
                 pushed_regex_capture_scope = 1
                 self.regex_bind_capture_scope(rhs)
+        let saved_drop_cf = self.drop_control_flow_depth
+        if self.current_drop_type_sym != 0:
+            self.drop_control_flow_depth = self.drop_control_flow_depth + 1
         self.check_expr(body)
+        self.drop_control_flow_depth = saved_drop_cf
         if pushed_regex_capture_scope != 0:
             self.pop_scope()
         self.pop_label_frame()
@@ -1764,7 +1774,11 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         let label = self.ast.get_data2(node)
         self.loop_depth = self.loop_depth + 1
         self.push_label_frame(label, LabelFrameKind.LFK_WHILE, node)
+        let saved_drop_cf_dw = self.drop_control_flow_depth
+        if self.current_drop_type_sym != 0:
+            self.drop_control_flow_depth = self.drop_control_flow_depth + 1
         self.check_expr(body)
+        self.drop_control_flow_depth = saved_drop_cf_dw
         self.pop_label_frame()
         self.loop_depth = self.loop_depth - 1
         self.check_expr(cond)
@@ -1773,7 +1787,11 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
     if kind == NodeKind.NK_LOOP:
         self.loop_depth = self.loop_depth + 1
         self.push_label_frame(self.ast.get_data1(node), LabelFrameKind.LFK_WHILE, node)
+        let saved_drop_cf_loop = self.drop_control_flow_depth
+        if self.current_drop_type_sym != 0:
+            self.drop_control_flow_depth = self.drop_control_flow_depth + 1
         self.check_expr(self.ast.get_data0(node))
+        self.drop_control_flow_depth = saved_drop_cf_loop
         self.pop_label_frame()
         self.loop_depth = self.loop_depth - 1
         return self.ty_void
@@ -2882,7 +2900,11 @@ fn Sema.check_if_expr(self: Sema, node: i32) -> i32:
             self.push_scope()
             pushed_regex_capture_scope = 1
             self.regex_bind_capture_scope(rhs)
+    let saved_drop_cf_then = self.drop_control_flow_depth
+    if self.current_drop_type_sym != 0:
+        self.drop_control_flow_depth = self.drop_control_flow_depth + 1
     let then_type = if outer_expected != 0: self.check_expr_with_expected(then_body, outer_expected) else: self.check_expr(then_body)
+    self.drop_control_flow_depth = saved_drop_cf_then
     if pushed_regex_capture_scope != 0:
         self.pop_scope()
     // If then branch always terminates, restore pre-then states for the continuation.
@@ -2895,7 +2917,11 @@ fn Sema.check_if_expr(self: Sema, node: i32) -> i32:
         let then_is_never = self.get_type_kind(self.resolve_alias(then_type as TypeId)) == TypeKind.TY_NEVER
         let else_expected: TypeId = if then_type != 0 and then_type != self.ty_void and then_is_never == 0: then_type else: outer_expected
         let pre_else_states = self.save_scope_states()
+        let saved_drop_cf_else = self.drop_control_flow_depth
+        if self.current_drop_type_sym != 0:
+            self.drop_control_flow_depth = self.drop_control_flow_depth + 1
         let else_type = if else_expected != 0: self.check_expr_with_expected(else_body, else_expected) else: self.check_expr(else_body)
+        self.drop_control_flow_depth = saved_drop_cf_else
         // If else branch always terminates, restore pre-else states.
         let else_is_never = self.get_type_kind(self.resolve_alias(else_type as TypeId)) == TypeKind.TY_NEVER
         if else_is_never:
@@ -3322,7 +3348,11 @@ fn Sema.check_for(self: Sema, node: i32) -> i32:
             self.scope_put(index_binding, self.ty_i64 as i32, 0)
     self.loop_depth = self.loop_depth + 1
     self.push_label_frame(label, LabelFrameKind.LFK_FOR, node)
+    let saved_drop_cf_for = self.drop_control_flow_depth
+    if self.current_drop_type_sym != 0:
+        self.drop_control_flow_depth = self.drop_control_flow_depth + 1
     self.check_expr(body)
+    self.drop_control_flow_depth = saved_drop_cf_for
     self.pop_label_frame()
     self.loop_depth = self.loop_depth - 1
     self.pop_scope()
@@ -3887,9 +3917,17 @@ fn Sema.check_match_expr(self: Sema, node: i32) -> i32:
         if self.ast.kind(pat) == NodeKind.NK_PAT_REGEX:
             self.regex_bind_capture_scope(pat)
         if guard != 0:
+            let saved_drop_cf_guard = self.drop_control_flow_depth
+            if self.current_drop_type_sym != 0:
+                self.drop_control_flow_depth = self.drop_control_flow_depth + 1
             self.check_expr(guard)
+            self.drop_control_flow_depth = saved_drop_cf_guard
         let arm_expected: TypeId = if result_type != 0: result_type else: match_expected
+        let saved_drop_cf_arm = self.drop_control_flow_depth
+        if self.current_drop_type_sym != 0:
+            self.drop_control_flow_depth = self.drop_control_flow_depth + 1
         let arm_type = if arm_expected != 0: self.check_expr_with_expected(arm_body, arm_expected) else: self.check_expr(arm_body)
+        self.drop_control_flow_depth = saved_drop_cf_arm
         self.pop_scope()
 
         if result_type == 0:
@@ -4891,6 +4929,10 @@ fn Sema.check_record_update(self: Sema, node: i32) -> i32:
     let extra_start = self.ast.get_data1(node)
     let field_count = self.ast.get_data2(node)
     let source_ty = self.check_expr(source)
+    if source_ty != 0:
+        let source_owner = self.method_owner_symbol_for_type(self.resolve_alias(source_ty) as i32)
+        if source_owner != 0 and self.has_drop_method(source_owner) != 0 and self.current_drop_type_sym != source_owner:
+            self.emit_error("partial move from Drop type", source)
     for fi in 0..field_count:
         let f_name = self.ast.get_extra(extra_start + fi * 2)
         let f_value = self.ast.get_extra(extra_start + fi * 2 + 1)
@@ -9081,6 +9123,21 @@ fn Sema.mark_moved_if_consumed(self: Sema, node: i32):
     if node == 0:
         return
     let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_FIELD_ACCESS:
+        let field_ty_opt = self.typed_expr_types.get(node)
+        let field_ty = if field_ty_opt.is_some(): field_ty_opt.unwrap() else: self.field_access_type_no_diagnostic(node)
+        if field_ty != 0 and self.is_copy(field_ty as TypeId) == 0:
+            let owner_sym = self.drop_owner_for_field_access(node)
+            if owner_sym != 0 and self.has_drop_method(owner_sym) != 0:
+                let field_sym = self.ast.get_data1(node)
+                if self.current_drop_type_sym == owner_sym:
+                    if self.drop_control_flow_depth != 0:
+                        self.emit_error("field move inside drop cannot be conditional", node)
+                        return
+                    self.record_drop_consumed_field(owner_sym, field_sym)
+                else:
+                    self.emit_error("partial move from Drop type", node)
+        return
     if kind == NodeKind.NK_IDENT:
         let sym = self.ast.get_data0(node)
         if self.scope_has(sym) != 0:
@@ -9101,6 +9158,40 @@ fn Sema.mark_moved_if_consumed(self: Sema, node: i32):
     // move: binding already invalidated in check_expr; avoid double-processing.
     if kind == NodeKind.NK_MOVE_ARG:
         return
+
+fn Sema.drop_owner_for_fn_symbol(self: Sema, fn_sym: i32) -> i32:
+    let text = self.pool_resolve(fn_sym)
+    if text.len() == 0:
+        return 0
+    let dot = sema_str_find_char(text, 46)
+    if dot <= 0:
+        return 0
+    let method = text.slice((dot + 1) as i64, text.len())
+    if method != "drop":
+        return 0
+    let owner_text = text.slice(0, dot as i64)
+    let owner_sym = self.pool_intern(owner_text)
+    if owner_sym != 0 and self.has_drop_method(owner_sym) != 0:
+        return owner_sym
+    0
+
+fn Sema.drop_owner_for_field_access(self: Sema, node: i32) -> i32:
+    if node == 0 or self.ast.kind(node) != NodeKind.NK_FIELD_ACCESS:
+        return 0
+    let base = self.ast.get_data0(node)
+    var base_ty = 0
+    let cached = self.typed_expr_types.get(base)
+    if cached.is_some():
+        base_ty = cached.unwrap()
+    else:
+        base_ty = self.check_expr(base) as i32
+    if base_ty == 0:
+        return 0
+    var resolved = self.resolve_alias(base_ty as TypeId)
+    let tk = self.get_type_kind(resolved)
+    if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
+        resolved = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
+    self.method_owner_symbol_for_type(resolved as i32)
 
 fn Sema.lookup_method_sig(self: Sema, type_sym: i32, method_sym: i32) -> i32:
     if type_sym <= 0 or method_sym <= 0:

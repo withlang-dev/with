@@ -1443,6 +1443,11 @@ fn Sema.collect_impl_decl(self: Sema, node: i32, is_local_impl: i32) -> void:
                         self.emit_error("type '" ++ self.pool_resolve(type_name) ++ "' cannot implement Copy: field '" ++ self.pool_resolve(field_name) ++ "' is not Copy", node)
                         return
 
+    if trait_name == "Drop":
+        if self.select_trait_impl(type_name, self.syms.copy_trait) != 0:
+            self.emit_error("type '" ++ self.pool_resolve(type_name) ++ "' cannot implement Drop because it implements Copy", node)
+            return
+
     // Validate associated types: impl must provide all required (no-default) associated types
     if not is_lang_trait and self.trait_lookup.contains(trait_sym):
         let trait_idx = self.trait_lookup.get(trait_sym).unwrap()
