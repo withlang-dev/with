@@ -800,6 +800,38 @@ fn bs_check_prelude_output_functions(ctx: ActionCtx, compiler_path: str, case_di
     if rc != 0: return rc
     bs_edge_assert_exact(ctx, result.stderr, "DE\nF", "prelude_output_functions", "stderr")
 
+fn bs_check_unit_tail_value_not_returned(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "unit_tail_value_not_returned.w")
+    let source =
+        "type Frame {\n" ++
+        "    kind: i32,\n" ++
+        "    label: i32,\n" ++
+        "}\n\n" ++
+        "fn callee -> void:\n" ++
+        "    var v: Vec[Frame] = Vec.new()\n" ++
+        "    v.push(Frame { kind: 1, label: 2 })\n" ++
+        "    v.pop()\n\n" ++
+        "fn main:\n" ++
+        "    callee()\n"
+    var rc = bs_write_fixture(ctx, src, source, "unit tail value source")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("check")
+    args |> push("--dump-mir")
+    args |> push(bs_abs(root, src))
+    let result = bs_edge_expect_success(ctx, compiler_path, case_dir, "unit-tail-value-not-returned", args)
+    if result.rc != 0: return result.rc
+    let callee_start = bs_index_of(result.stdout, "(callee) {")
+    if callee_start < 0:
+        return bs_fail(ctx, "unit tail MIR missing callee function")
+    let tail = result.stdout.slice(callee_start as i64, result.stdout.len())
+    let next_fn = bs_index_of(tail, "\nfn ")
+    let callee_mir = if next_fn >= 0: tail.slice(0, next_fn as i64) else: tail
+    rc = bs_assert_contains(ctx, callee_mir, "return;", "unit_tail_value_not_returned")
+    if rc != 0: return rc
+    bs_assert_not_contains(ctx, callee_mir, "_0 =", "unit_tail_value_not_returned")
+
 fn bs_check_build_options_cli(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "hello_build_options.w")
@@ -1297,6 +1329,8 @@ pub fn run_cli_selfhost_edge_action(ctx: ActionCtx) -> i32:
     var rc = bs_check_pointer_index_rejected(ctx, compiler_path, bs_join(output_dir, "pointer_index_rejected_case"))
     if rc != 0: return rc
     rc = bs_check_prelude_output_functions(ctx, compiler_path, bs_join(output_dir, "prelude_output_functions_case"))
+    if rc != 0: return rc
+    rc = bs_check_unit_tail_value_not_returned(ctx, compiler_path, bs_join(output_dir, "unit_tail_value_not_returned_case"))
     if rc != 0: return rc
     rc = bs_check_build_options_cli(ctx, compiler_path, bs_join(output_dir, "build_options_cli_case"))
     if rc != 0: return rc

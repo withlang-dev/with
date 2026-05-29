@@ -13,11 +13,11 @@
   │ [x] #183 (https://github.com/withlang-dev/with/issues/183)                                                     │         Yes │               Yes │   No │ Completed in 45b2438: let binding no longer   │
   │                                                                                                                │             │                   │      │ re-reads the mutated Vec slot. Spec §4.1.      │
   │                                                                                                                │             │                   │      │ Regression added.                              │
-  │ #182 (https://github.com/withlang-dev/with/issues/182)                                                         │         Yes │                No │   No │ Still real: repro IR still stores %Frame into  │
-  │                                                                                                                │             │                   │      │ an i32 slot in a void function. Fix            │
-  │                                                                                                                │             │                   │      │ MirLower.lower_fn_with_sig/Sema to discard or  │
-  │                                                                                                                │             │                   │      │ reject non-Unit tail expressions in Unit-      │
-  │                                                                                                                │             │                   │      │ returning funcs. Related §4.10.                │
+  │ [x] #182 (https://github.com/withlang-dev/with/issues/182)                                                     │         Yes │               Yes │   No │ Completed: discarded expression lowering now   │
+  │                                                                                                                │             │                   │      │ returns Unit by contract, and selfhost MIR     │
+  │                                                                                                                │             │                   │      │ regression verifies explicit void tail values  │
+  │                                                                                                                │             │                   │      │ are not assigned into the return slot.         │
+  │                                                                                                                │             │                   │      │ Related §4.10.                                 │
   │ #181 (https://github.com/withlang-dev/with/issues/181)                                                         │         Yes │                No │   No │ Compiler still accepts unsafe: *p; spec still  │
   │                                                                                                                │             │                   │      │ has inline unsafe: examples. Fix parser/spec   │
   │                                                                                                                │             │                   │      │ so unsafe: requires newline block; add narrow  │

@@ -2839,7 +2839,8 @@ fn MirBuilder.lower_expr_discard(self: MirBuilder, node: i32) -> i32:
     else:
         self.lower_expr(node)
     self.expected_type = saved_expected
-    result
+    let _ = result
+    self.unit_operand()
 
 fn MirBuilder.lower_block(self: MirBuilder, node: i32) -> i32:
     self.lower_block_mode(node, 1)
