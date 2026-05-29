@@ -1,4 +1,3 @@
-//! skip: async is a separate feature project
 //! expect-stdout: ok
 
 // Test: tuple concurrent await — spawn two tasks, await both as a tuple.
