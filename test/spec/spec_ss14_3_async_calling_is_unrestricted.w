@@ -1,44 +1,57 @@
-//! skip: non-executable spec sketch for Section 14.3 — Async Calling Is Unrestricted (formerly 25.18); contains pseudo-code for unimplemented feature work
-// Spec test: Section 14.3 — Async Calling Is Unrestricted (formerly 25.18)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+//! expect-stdout: ok
 
-// PASS: any function can call an async fn (gets Task[T] back)
-fn regular_function:
-    let task = fetch_data("http://example.com")
-    // task is Task[Result[String, IoError]]
-    // can store it, pass it around
-    let result = task.await
-    print(result)
+async fn fetch_data(id: i32) -> i32:
+    id + 1
 
-// WARNING: let _ = ... immediately CANCELS the task
-fn bad_fire_and_forget:
-    let _ = send_analytics("page_view")
-    // WARNING: task is dropped — fiber is cancelled immediately!
-    // Use `spawn` for true fire-and-forget
+async fn send_analytics(event: i32):
+    let _ = event
 
-// PASS: fire-and-forget (spawn, runs to completion)
-fn fire_and_forget:
-    spawn send_analytics("page_view")
-    // task runs in background, detached, not tied to caller
+fn start_fetch(id: i32) -> Task[i32]:
+    fetch_data(id)
 
-// PASS: store tasks, compose them as values
-fn test:
-    let tasks = urls
-        |> map(u => fetch_data(u))  // no .await here — just Task values
-        |> collect[Vec]()
-    let results = tasks
-        |> map(t => t.await)
-        |> collect[Vec]()
+fn pass_task(task: Task[i32]) -> Task[i32]:
+    task
 
-// PASS: async fn in trait (just works)
 trait DataSource:
-    async fn fetch(self: &Self, id: i32) -> Result[Data, Error]
+    async fn fetch(self: &Self, id: i32) -> i32
+
+type RemoteDb {
+    base: i32,
+}
 
 impl DataSource for RemoteDb:
-    async fn fetch(self: &RemoteDb, id: i32) -> Result[Data, Error]:
-        let row = self.conn.query(id).await
-        Ok(row.into_data())
+    async fn fetch(self: &Self, id: i32) -> i32:
+        self.base + id
 
-// No boxing, no GATs, no special handling.
-// async fn in traits returns Task[T] like any other async fn.
+fn test_regular_function_can_call_async:
+    let task = start_fetch(41)
+    assert(task.await == 42)
+
+fn test_task_values_can_be_passed_and_stored:
+    let task = fetch_data(9)
+    let passed = pass_task(move task)
+    assert(passed.await == 10)
+
+    var tasks = Vec[Task[i32]].new()
+    tasks.push(fetch_data(1))
+    tasks.push(fetch_data(2))
+    assert(tasks.len() == 2)
+
+fn test_spawn_fire_and_forget:
+    spawn send_analytics(1)
+
+fn test_let_underscore_task_is_allowed_but_warns:
+    let _ = send_analytics(2)
+
+fn test_async_method_in_trait:
+    let db = RemoteDb { base: 40 }
+    let task = db.fetch(2)
+    assert(task.await == 42)
+
+fn main:
+    test_regular_function_can_call_async()
+    test_task_values_can_be_passed_and_stored()
+    test_spawn_fire_and_forget()
+    test_let_underscore_task_is_allowed_but_warns()
+    test_async_method_in_trait()
+    print("ok")

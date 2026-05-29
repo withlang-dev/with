@@ -3263,6 +3263,8 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
     if self.is_opaque_value_type(bind_type as i32) != 0:
         let opaque_node = if ann_type_node != 0: ann_type_node else: value
         self.emit_error("opaque values cannot be stored by value; use a pointer or reference", opaque_node)
+    if self.pool_resolve(name) == "_" and self.expr_is_task_value(value) != 0 and self.expr_is_scoped_task_value(value) == 0:
+        self.emit_warning("`let _ = ...` on a Task immediately cancels it", node)
 
     let had_binding = self.scope_has(name)
     self.scope_put_at(name, bind_type as i32, is_mut, node)

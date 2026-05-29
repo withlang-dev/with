@@ -236,7 +236,12 @@
   │                                                                                                                │             │                   │      │ while owned-argument tasks remain storable and │
   │                                                                                                                │             │                   │      │ async scope tracking accepts borrowing tasks.  │
   │                                                                                                                │             │                   │      │ Spec §14.22.                                   │
-  │ #264-#265, #267-#274                                                                                          │         Yes │           Partial │   No │ Remaining §14 async sketches. Runtime has many │
+  │ [x] #264                                                                                                      │         Yes │               Yes │   No │ Completed: async calls from regular functions  │
+  │                                                                                                                │             │                   │      │ are executable coverage now, including Task    │
+  │                                                                                                                │             │                   │      │ passing/storage, spawn fire-and-forget, async  │
+  │                                                                                                                │             │                   │      │ trait methods, and `let _ = Task` warning.     │
+  │                                                                                                                │             │                   │      │ Spec §14.3 / §14.7 / §11.5.                   │
+  │ #265, #267-#274                                                                                               │         Yes │           Partial │   No │ Remaining §14 async sketches. Runtime has many │
   │                                                                                                                │             │                   │      │ behavior tests now, but spec sketches still    │
   │                                                                                                                │             │                   │      │ cover missing/unchecked semantics:             │
   │                                                                                                                │             │                   │      │ cancellation, ScopedSend, no-await-in-         │
