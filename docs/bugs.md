@@ -92,10 +92,14 @@
   │                                                                                                                │             │                   │      │ executable coverage and equality/membership    │
   │                                                                                                                │             │                   │      │ precedence operators are rejected as           │
   │                                                                                                                │             │                   │      │ non-associative. Spec §4.2.7.                  │
-  │ #204, #206-#214                                                                                                │         Yes │                No │   No │ Remaining §4 values/types skipped sketches.   │
-  │                                                                                                                │             │                   │      │ Cover implicit default return, record update   │
-  │                                                                                                                │             │                   │      │ drops, enum accessors, ranges, tuples, unit    │
-  │                                                                                                                │             │                   │      │ elision, implicit Ok.                          │
+  │ [x] #204                                                                                                       │         Yes │               Yes │   No │ Completed: implicit Unit-tail returns are      │
+  │                                                                                                                │             │                   │      │ allowed only for defaultable return types;     │
+  │                                                                                                                │             │                   │      │ builtins, Option, derived Default, and         │
+  │                                                                                                                │             │                   │      │ Result success-payload defaults are covered.   │
+  │                                                                                                                │             │                   │      │ Spec §4.10.                                    │
+  │ #206-#214                                                                                                      │         Yes │                No │   No │ Remaining §4 values/types skipped sketches.   │
+  │                                                                                                                │             │                   │      │ Cover record update drops, enum accessors,     │
+  │                                                                                                                │             │                   │      │ ranges, tuples, unit elision, implicit Ok.     │
   │ #215-#217                                                                                                      │         Yes │                No │   No │ §5-§6 ephemeral/handles sketches. Split into   │
   │                                                                                                                │             │                   │      │ concrete tests and implement remaining         │
   │                                                                                                                │             │                   │      │ ephemeral/slotmap behavior.                    │
