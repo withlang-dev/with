@@ -210,6 +210,7 @@ enum MirIntrinsic: i32:
     MIR_INTRINSIC_SLOTMAP_GET_DISJOINT = 125
     MIR_INTRINSIC_SLOTMAPSLOT_GET = 126
     MIR_INTRINSIC_SLOTMAPSLOT_SET = 127
+    MIR_INTRINSIC_FIBER_SELECT_BIASED = 128
 
 // ── Projection kinds ─────────────────────────────────────────────
 

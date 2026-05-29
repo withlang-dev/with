@@ -6572,7 +6572,9 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         for ai in 0..arm_count:
             select_args.push(task_ops.get(ai as i64))
         let select_call_id = self.body.new_call_args(select_args)
-        self.body.set_call_intrinsic(select_call_id, MirIntrinsic.MIR_INTRINSIC_FIBER_SELECT)
+        let select_biased = self.ast.get_data2(node)
+        let select_intrinsic = if select_biased != 0: MirIntrinsic.MIR_INTRINSIC_FIBER_SELECT_BIASED else: MirIntrinsic.MIR_INTRINSIC_FIBER_SELECT
+        self.body.set_call_intrinsic(select_call_id, select_intrinsic)
         self.body.set_call_ast_node(select_call_id, node)
         let select_result_local = self.new_temp(self.sema.ty_i32)
         let select_result_place = self.place_for_local(select_result_local)

@@ -31,6 +31,11 @@ fn make_str(ptr: *const u8, len: i64) -> str:
 
 var last_await_fiber_id: i32 = 0
 var last_await_cancelled_return: i32 = 0
+var select_rng_state: u32 = 1 as u32
+
+fn select_next_u32() -> u32:
+    select_rng_state = (select_rng_state *% (1664525 as u32)) +% (1013904223 as u32)
+    select_rng_state
 
 fn fiber_report_unhandled_panics() -> i32:
     var had_unhandled = 0
@@ -79,17 +84,31 @@ pub fn runtime_run():
     if fiber_report_unhandled_panics() != 0:
         _exit(1)
 
-@[c_export("with_fiber_select")]
-pub fn fiber_select(fiber_ids: *const i32, count: i32, result_index: *mut i32):
+fn fiber_select_ready_index(fiber_ids: *const i32, count: i32, biased: i32) -> i32:
+    var chosen = -1
+    var ready_seen = 0
+    var i = 0
+    while i < count:
+        let fid = unsafe *((fiber_ids as i64 + i as i64 * 4) as *const i32)
+        if with_runtime_fiber_is_completed(fid) != 0:
+            if biased != 0:
+                return i
+            ready_seen = ready_seen + 1
+            if chosen < 0:
+                chosen = i
+            else if (select_next_u32() % (ready_seen as u32)) == 0 as u32:
+                chosen = i
+        i = i + 1
+    chosen
+
+@[c_export("with_fiber_select_mode")]
+pub fn fiber_select_mode(fiber_ids: *const i32, count: i32, biased: i32, result_index: *mut i32):
     while true:
-        var i = 0
-        while i < count:
-            let fid = unsafe *((fiber_ids as i64 + i as i64 * 4) as *const i32)
-            if with_runtime_fiber_is_completed(fid) != 0:
-                unsafe:
-                    *result_index = i
-                return
-            i = i + 1
+        let selected = fiber_select_ready_index(fiber_ids, count, biased)
+        if selected >= 0:
+            unsafe:
+                *result_index = selected
+            return
 
         if with_fiber_in_fiber() != 0:
             with_fiber_yield()
@@ -99,6 +118,10 @@ pub fn fiber_select(fiber_ids: *const i32, count: i32, result_index: *mut i32):
             unsafe:
                 *result_index = -1
             return
+
+@[c_export("with_fiber_select")]
+pub fn fiber_select(fiber_ids: *const i32, count: i32, result_index: *mut i32):
+    fiber_select_mode(fiber_ids, count, 0, result_index)
 
 @[c_export("with_fiber_await")]
 pub fn fiber_await(fiber_id: i32):

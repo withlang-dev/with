@@ -475,7 +475,8 @@ fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
     if kind == NodeKind.NK_SELECT_AWAIT:
         let extra_start = pool.get_data0(node)
         let arm_count = pool.get_data1(node)
-        var out = prefix ++ "select await:\n"
+        let biased = pool.get_data2(node)
+        var out = if biased != 0: prefix ++ "select await biased:\n" else: prefix ++ "select await:\n"
         for ai in 0..arm_count:
             let name_sym = pool.get_extra(extra_start + ai * 3)
             let task = pool.get_extra(extra_start + ai * 3 + 1)

@@ -4812,6 +4812,10 @@ fn Parser.parse_select_await(self: Parser) -> NodeId:
     let start = self.current_start()
     self.advance()  // consume select
     self.expect(TokenKind.TK_KW_AWAIT)
+    var biased = 0
+    if self.is_ident_named("biased"):
+        biased = 1
+        self.advance()
     var select_braced = false
     if self.peek() == TokenKind.TK_L_BRACE:
         select_braced = true
@@ -4869,7 +4873,7 @@ fn Parser.parse_select_await(self: Parser) -> NodeId:
     let extra_start = self.pool.extra_len()
     for ei in 0..arm_entries.len() as i32:
         self.pool.add_extra(arm_entries.get(ei as i64))
-    self.pool.add_node(NodeKind.NK_SELECT_AWAIT, start, self.prev_end(), extra_start, arm_count, 0)
+    self.pool.add_node(NodeKind.NK_SELECT_AWAIT, start, self.prev_end(), extra_start, arm_count, biased)
 
 // ── Loop expressions ─────────────────────────────────────────────
 
