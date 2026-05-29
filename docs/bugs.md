@@ -223,7 +223,11 @@
   │                                                                                                                │             │                   │      │ MIR/codegen/runtime handle-list design for     │
   │                                                                                                                │             │                   │      │ auto-joining scoped OS threads, and closure    │
   │                                                                                                                │             │                   │      │ escape analysis has no ScopedSend context.     │
-  │ #261-#265, #267-#274                                                                                          │         Yes │           Partial │   No │ Remaining §14 async sketches. Runtime has many │
+  │ [x] #261                                                                                                      │         Yes │               Yes │   No │ Completed: extern callback arguments with fn   │
+  │                                                                                                                │             │                   │      │ parameter types now reject direct and          │
+  │                                                                                                                │             │                   │      │ transitive may_suspend bodies. Spec §14.3 /    │
+  │                                                                                                                │             │                   │      │ §14.19.                                        │
+  │ #262-#265, #267-#274                                                                                          │         Yes │           Partial │   No │ Remaining §14 async sketches. Runtime has many │
   │                                                                                                                │             │                   │      │ behavior tests now, but spec sketches still    │
   │                                                                                                                │             │                   │      │ cover missing/unchecked semantics:             │
   │                                                                                                                │             │                   │      │ cancellation, ScopedSend, no-await-in-         │
