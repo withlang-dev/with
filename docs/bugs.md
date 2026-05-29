@@ -137,8 +137,11 @@
   │                                                                                                                │             │                   │      │ Unit elision only when the expected type is    │
   │                                                                                                                │             │                   │      │ statically Unit. Non-Unit and unconstrained    │
   │                                                                                                                │             │                   │      │ generic omissions fail loudly. Spec §4.8.      │
-  │ #214                                                                                                           │         Yes │                No │   No │ Remaining §4 values/types sketch for implicit │
-  │                                                                                                                │             │                   │      │ Ok wrapping.                                   │
+  │ [x] #214                                                                                                       │         Yes │               Yes │   No │ Completed: implicit Ok wrapping now has       │
+  │                                                                                                                │             │                   │      │ executable coverage for tail values,           │
+  │                                                                                                                │             │                   │      │ Result[Unit, E] empty tails, `?` propagation, │
+  │                                                                                                                │             │                   │      │ explicit Ok/Err, no double wrapping, and       │
+  │                                                                                                                │             │                   │      │ defaultable empty tails. Spec §4.9.            │
   │ #215-#217                                                                                                      │         Yes │                No │   No │ §5-§6 ephemeral/handles sketches. Split into   │
   │                                                                                                                │             │                   │      │ concrete tests and implement remaining         │
   │                                                                                                                │             │                   │      │ ephemeral/slotmap behavior.                    │
