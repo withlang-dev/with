@@ -155,9 +155,16 @@
   │                                                                                                                │             │                   │      │ remove/replace, disjoint access, contains,     │
   │                                                                                                                │             │                   │      │ len, stale-handle invalidation, and handle     │
   │                                                                                                                │             │                   │      │ storage in generic containers. Spec §6.        │
-  │ #218, #220-#222                                                                                                │         Yes │                No │   No │ Remaining §7 with block sketches. Need guard   │
-  │                                                                                                                │             │                   │      │ inference/dispatch, no-await guard coverage,   │
-  │                                                                                                                │             │                   │      │ and remaining with-block executable tests.     │
+  │ #218, #220 (blocked)                                                                                           │         Yes │                No │   No │ Blocked on missing std.sync Mutex/RwLock,      │
+  │                                                                                                                │             │                   │      │ Scoped/ScopedMut traits, and guarded-with      │
+  │                                                                                                                │             │                   │      │ enter/exit lowering. Current `with expr as`    │
+  │                                                                                                                │             │                   │      │ supports scoped binding/builder only.          │
+  │ #221 (blocked)                                                                                                 │         Yes │                No │   No │ Blocked on missing `@[no_await_guard]` type    │
+  │                                                                                                                │             │                   │      │ metadata and NLL liveness for guard values;    │
+  │                                                                                                                │             │                   │      │ current E0701 check is name-based. Spec §7.9. │
+  │ #222 (blocked)                                                                                                 │         Yes │           Partial │   No │ Builder/scoped-binding parts are covered, but  │
+  │                                                                                                                │             │                   │      │ the full sketch is blocked on multi-with       │
+  │                                                                                                                │             │                   │      │ parsing plus the guarded Scoped form above.    │
   │ [x] #219                                                                                                       │         Yes │               Yes │   No │ Completed: builder with-block return sketch is │
   │                                                                                                                │             │                   │      │ executable; Unit tails return the mutated      │
   │                                                                                                                │             │                   │      │ builder, non-Unit tails return the tail value, │
