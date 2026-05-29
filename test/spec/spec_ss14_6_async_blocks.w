@@ -1,29 +1,32 @@
-//! skip: non-executable spec sketch for Section 14.6 — Async Blocks (formerly 25.59); contains pseudo-code for unimplemented feature work
-// Spec test: Section 14.6 — Async Blocks (formerly 25.59)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+//! expect-stdout: ok
 
-// PASS: async: block returns Task[T]
-async fn test:
+async fn compute(id: i32) -> i32:
+    id + 1
+
+fn test_async_block_returns_task:
     let task = async:
-        sleep(10.millis()).await
-        42
-    let result = task.await
-    assert(result == 42)
+        let value = compute(41).await
+        value
+    assert(task.await == 42)
 
-// PASS: async: block in structured concurrency
-async fn test:
-    async scope s =>
+fn test_async_block_captures_variables:
+    let x = 10
+    let y = 32
+    let task = async:
+        x + y
+    assert(task.await == 42)
+
+async fn tracked_async_blocks:
+    async scope s =>:
         s.track(async:
-            print("hello from fiber 1")
+            let _ = compute(20).await
         )
         s.track(async:
-            print("hello from fiber 2")
+            let _ = compute(21).await
         )
 
-// PASS: async: block captures variables
-async fn test:
-    let url = "http://example.com"
-    let task = async:
-        fetch(url).await    // captures url by reference
-    let result = task.await
+fn main:
+    test_async_block_returns_task()
+    test_async_block_captures_variables()
+    tracked_async_blocks().await
+    print("ok")

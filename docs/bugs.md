@@ -245,7 +245,11 @@
   │                                                                                                                │             │                   │      │ while a type annotated `@[no_await_guard]` is  │
   │                                                                                                                │             │                   │      │ live; guard detection is type-based instead of │
   │                                                                                                                │             │                   │      │ name-based. Spec §7.9 / §14.3.                │
-  │ #267-#274                                                                                                     │         Yes │           Partial │   No │ Remaining §14 async sketches. Runtime has many │
+  │ [x] #267                                                                                                      │         Yes │               Yes │   No │ Completed: async block spec sketch is          │
+  │                                                                                                                │             │                   │      │ executable coverage for Task-returning blocks, │
+  │                                                                                                                │             │                   │      │ variable capture, and async-scope tracking.    │
+  │                                                                                                                │             │                   │      │ Spec §14.6.                                   │
+  │ #268-#274                                                                                                     │         Yes │           Partial │   No │ Remaining §14 async sketches. Runtime has many │
   │                                                                                                                │             │                   │      │ behavior tests now, but spec sketches still    │
   │                                                                                                                │             │                   │      │ cover missing/unchecked semantics:             │
   │                                                                                                                │             │                   │      │ cancellation, ScopedSend, no-await-in-         │
