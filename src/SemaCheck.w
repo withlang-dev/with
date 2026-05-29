@@ -349,6 +349,23 @@ fn Sema.resolve_type_level_arg_expr(self: Sema, node: i32) -> i32:
     if node == 0:
         return 0
     let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_GROUPED:
+        return self.resolve_type_level_arg_expr(self.ast.get_data0(node))
+    if kind == NodeKind.NK_UNARY:
+        let op = self.ast.get_data0(node)
+        let inner = self.resolve_type_level_arg_expr(self.ast.get_data1(node))
+        if inner == 0:
+            return 0
+        if op == UnaryOp.UOP_REF:
+            return self.ensure_exact_type(TypeKind.TY_REF, inner, 0, 0) as i32
+        if op == UnaryOp.UOP_MUT_REF:
+            self.emit_error("`&mut T` is not part of safe With (§15.1); use mut self / *mut T (unsafe) / owned-by-value parameter", node)
+            return self.ensure_exact_type(TypeKind.TY_REF, inner, 1, 0) as i32
+        if op == UnaryOp.UOP_RAW_REF_CONST:
+            return self.ensure_exact_type(TypeKind.TY_PTR, inner, 0, 0) as i32
+        if op == UnaryOp.UOP_RAW_REF_MUT:
+            return self.ensure_exact_type(TypeKind.TY_PTR, inner, 1, 0) as i32
+        return 0
     if kind == NodeKind.NK_IDENT or kind == NodeKind.NK_TYPE_NAMED:
         let sym = self.ast.get_data0(node)
         let prim = self.primitive_type_by_sym(sym)
@@ -5637,22 +5654,27 @@ fn Sema.is_chan_call(self: Sema, callee: i32) -> i32:
 fn Sema.chan_return_type(self: Sema, callee: i32) -> i32:
     // chan[T](cap) → (Sender[T], Receiver[T])
     // Extract T from the generic call's type argument
-    let type_arg_node = self.ast.get_data1(callee)
-    var elem_type = self.ty_i32 as i32
+    var type_arg_node = self.ast.get_data1(callee)
+    if self.ast.kind(callee) == NodeKind.NK_TYPE_GENERIC:
+        let type_arg_start = self.ast.get_data1(callee)
+        let type_arg_count = self.ast.get_data2(callee)
+        if type_arg_count != 1:
+            self.emit_error("chan expects exactly one element type", callee)
+            return 0
+        type_arg_node = self.ast.get_extra(type_arg_start)
+    var elem_type = 0
     if type_arg_node > 0:
-        // Look up the type from sema's type cache
-        if self.typed_expr_types.contains(type_arg_node):
-            elem_type = self.typed_expr_types.get(type_arg_node).unwrap()
+        let resolved_elem = self.resolve_type_level_arg_expr(type_arg_node)
+        if resolved_elem != 0:
+            elem_type = resolved_elem
         else:
-            // Try to resolve as a named type
-            let ta_kind = self.ast.kind(type_arg_node)
-            if ta_kind == NodeKind.NK_IDENT or ta_kind == NodeKind.NK_TYPE_NAMED:
-                let ta_sym = self.ast.get_data0(type_arg_node)
-                let prim = self.primitive_type_by_sym(ta_sym)
-                if prim != 0:
-                    elem_type = prim as i32
-                else if self.named_types.contains(ta_sym):
-                    elem_type = self.named_types.get(ta_sym).unwrap()
+            self.emit_error("channel element type could not be resolved", type_arg_node)
+            return 0
+    else:
+        self.emit_error("chan expects exactly one element type", callee)
+        return 0
+    if self.type_is_ephemeral_value(elem_type) != 0:
+        self.emit_error("channel element type must be Send", if type_arg_node > 0: type_arg_node else: callee)
     // Build Sender[T] and Receiver[T] types
     let sender_sym = self.pool_intern("Sender")
     let receiver_sym = self.pool_intern("Receiver")
@@ -7626,6 +7648,19 @@ fn Sema.method_expected_arg_type(self: Sema, recv_type: i32, field: i32, arg_ind
         return self.get_generic_inst_arg(resolved as i32, 0)
     0
 
+fn Sema.sender_send_element_type(self: Sema, recv_type: i32, field: i32, arg_index: i32) -> i32:
+    if recv_type == 0 or arg_index != 0:
+        return 0
+    if self.pool_resolve(field) != "send":
+        return 0
+    let resolved = self.resolve_alias(recv_type as TypeId)
+    if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return 0
+    let owner_sym = self.get_generic_inst_base(resolved as i32)
+    if self.pool_resolve(owner_sym) != "Sender":
+        return 0
+    self.get_generic_inst_arg(resolved as i32, 0)
+
 fn Sema.trait_object_from_type_node(self: Sema, type_node: i32) -> i32:
     if type_node == 0:
         return 0
@@ -7960,6 +7995,10 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
             mc_expected = self.method_expected_arg_type(obj_type as i32, field, ai)
         let mc_arg_ty = if mc_expected != 0: self.check_expr_with_expected(mc_arg_node, mc_expected as TypeId) else: self.check_expr(mc_arg_node)
         arg_types.push(mc_arg_ty as i32)
+        let mc_sender_elem_ty = self.sender_send_element_type(obj_type as i32, field, ai)
+        if mc_sender_elem_ty != 0:
+            if self.type_is_ephemeral_value(mc_sender_elem_ty) != 0 or self.type_is_ephemeral_value(mc_arg_ty as i32) != 0 or self.expr_is_ephemeral_value(mc_arg_node) != 0 or self.expr_is_ephemeral_task(mc_arg_node) != 0:
+                self.emit_error("channel send requires Send value", mc_arg_node)
         if mc_is_closure:
             self.closure_direct_arg_escape_flags.pop()
             self.closure_direct_arg_depth = self.closure_direct_arg_depth - 1
@@ -8631,10 +8670,10 @@ fn Sema.check_intrinsic_call(self: Sema, fn_sym: i32, node: i32, arg_types: Vec[
                 self.emit_error("send() expects channel handle as integer value", self.ast.get_extra(args_start))
                 return 0
         let payload_node = self.ast.get_extra(args_start + 1)
-        if self.expr_is_ephemeral_value(payload_node) != 0 or self.expr_is_ephemeral_task(payload_node) != 0:
+        let payload_ty = arg_types.get(1)
+        if self.expr_is_ephemeral_value(payload_node) != 0 or self.expr_is_ephemeral_task(payload_node) != 0 or self.type_is_ephemeral_value(payload_ty) != 0:
             self.emit_error("channel send requires Send value", payload_node)
             return 0
-        let payload_ty = arg_types.get(1)
         if payload_ty != 0:
             let payload_kind = self.get_type_kind(self.resolve_alias(payload_ty))
             if payload_kind != TypeKind.TY_INT:

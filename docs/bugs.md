@@ -212,7 +212,11 @@
   │                                                                                                                │             │                   │      │ and Vec.fold closures works; closure MIR       │
   │                                                                                                                │             │                   │      │ emission now terminates await cancellation's   │
   │                                                                                                                │             │                   │      │ default-unreachable block. Spec §14.13.        │
-  │ #259-#265, #267-#274                                                                                          │         Yes │           Partial │   No │ Remaining §14 async sketches. Runtime has many │
+  │ [x] #259                                                                                                      │         Yes │               Yes │   No │ Completed: chan[T] rejects ephemeral element   │
+  │                                                                                                                │             │                   │      │ types, and Sender[T].send rejects ephemeral    │
+  │                                                                                                                │             │                   │      │ payloads through the method-call path. Spec    │
+  │                                                                                                                │             │                   │      │ §14.15.                                        │
+  │ #260-#265, #267-#274                                                                                          │         Yes │           Partial │   No │ Remaining §14 async sketches. Runtime has many │
   │                                                                                                                │             │                   │      │ behavior tests now, but spec sketches still    │
   │                                                                                                                │             │                   │      │ cover missing/unchecked semantics:             │
   │                                                                                                                │             │                   │      │ cancellation, ScopedSend, no-await-in-         │
