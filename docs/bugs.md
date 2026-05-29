@@ -50,7 +50,13 @@
   │                                                                                                                │             │                   │      │ non-local control flow; skipped mixed sketch   │
   │                                                                                                                │             │                   │      │ split into executable positive and negative    │
   │                                                                                                                │             │                   │      │ regressions for return, ?, break, continue.    │
-  │ #196, #198-#199, #202-#203                                                                                      │         Yes │                No │   No │ §3 references/borrowing skipped sketches.      │
+  │ [x] #196                                                                                                       │         Yes │               Yes │   No │ Completed: stale split_at_mut sketch replaced │
+  │                                                                                                                │             │                   │      │ with executable get_disjoint coverage, matching│
+  │                                                                                                                │             │                   │      │ current §3.6 rule that index disjointness must │
+  │                                                                                                                │             │                   │      │ be requested explicitly. Equal-index access    │
+  │                                                                                                                │             │                   │      │ now panics loudly; emit-C fails loudly instead │
+  │                                                                                                                │             │                   │      │ of emitting invalid get_disjoint C.            │
+  │ #198-#199, #202-#203                                                                                            │         Yes │                No │   No │ §3 references/borrowing skipped sketches.      │
   │                                                                                                                │             │                   │      │ Implement executable tests for disjoint        │
   │                                                                                                                │             │                   │      │ borrows, trait object coercion, and            │
   │                                                                                                                │             │                   │      │ second-class references.                       │

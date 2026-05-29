@@ -4545,7 +4545,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let gd_ok_bb = wl_append_bb(self.context, self.current_function, "gd.ok")
         wl_build_cond_br(self.builder, gd_fail, gd_panic_bb, gd_ok_bb)
         wl_position_at_end(self.builder, gd_panic_bb)
-        let _ = wl_build_unreachable(self.builder)
+        self.emit_runtime_panic("Vec.get_disjoint requires distinct in-bounds indices")
         wl_position_at_end(self.builder, gd_ok_bb)
         let gd_data_raw = wl_build_extract_value(self.builder, gd_recv, 0)
         let gd_data_i64 = wl_build_ptr_to_int(self.builder, gd_data_raw, i64_ty)
@@ -9612,7 +9612,11 @@ fn Codegen.get_runtime_fn_type(self: Codegen, name: str, ret_ty: i64, param_coun
     let str_type = if st_opt.is_some(): self.struct_llvm_types.get(st_opt.unwrap() as i64) else: wl_i64_type(self.context)
     let i64_ty = wl_i64_type(self.context)
     let params: Vec[i64] = Vec.new()
-    if name == "with_str_contains" or
+    if name == "with_panic":
+        params.push(str_type)
+        params.push(str_type)
+        params.push(wl_i32_type(self.context))
+    else if name == "with_str_contains" or
        name == "with_str_starts_with" or
        name == "with_str_ends_with" or
        name == "with_str_index_of" or
@@ -9632,6 +9636,16 @@ fn Codegen.get_runtime_fn_type(self: Codegen, name: str, ret_ty: i64, param_coun
         for i in 0..param_count:
             params.push(i64_ty)
     wl_function_type(ret_ty, vec_data_i64(&params), param_count, 0)
+
+fn Codegen.emit_runtime_panic(self: Codegen, msg: str) -> void:
+    let panic_fn = self.ensure_c_fn("with_panic", wl_void_type(self.context), 3)
+    let panic_ty = self.get_runtime_fn_type("with_panic", wl_void_type(self.context), 3)
+    let args: Vec[i64] = Vec.new()
+    args.push(self.gen_string_literal_raw(msg))
+    args.push(self.gen_string_literal_raw(""))
+    args.push(wl_const_int(wl_i32_type(self.context), 0, 0))
+    let _call = wl_build_call(self.builder, panic_ty, panic_fn, vec_data_i64(&args), 3)
+    let _unreachable = wl_build_unreachable(self.builder)
 
 // ── VecIter.next() codegen intrinsic ──────────────────────────────
 // VecIter[T] = { data_ptr: i64, len: i64, idx: i64 }
