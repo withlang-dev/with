@@ -1,26 +1,30 @@
-//! skip: non-executable spec sketch for Section 14.5 — Postfix `.await` (formerly 25.33); contains pseudo-code for unimplemented feature work
-// Spec test: Section 14.5 — Postfix `.await` (formerly 25.33)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+//! expect-stdout: ok
 
-// PASS: basic postfix .await
-async fn fetch(url: str) -> Result[String, IoError]: ...
-async fn test:
-    let data = fetch("http://example.com").await
-    assert(data.is_ok())
+async fn fetch(n: i32) -> Result[i32, str]:
+    n + 1
 
-// PASS: chaining .await with ?
-async fn test:
-    let text = fetch("http://example.com").await?
-    assert(text.len() > 0)
+async fn double(n: i32) -> i32:
+    n * 2
 
-// PASS: chaining .await through method calls
-async fn test(pool: &Pool):
-    let row = pool.acquire().await?.query("SELECT 1").await?
-    assert(row.is_some())
+async fn plus_one(n: i32) -> Result[i32, str]:
+    n + 1
 
-// PASS: .await on stored task
-async fn test:
-    let task = fetch("http://example.com")   // Task, not awaited yet
-    let result = task.await                   // await later
-    assert(result.is_ok())
+async fn await_with_question -> Result[i32, str]:
+    let v = plus_one(40).await?
+    v + 1
+
+async fn await_stored_task -> i32:
+    let task = double(21)
+    task.await
+
+async fn main:
+    let direct = fetch(1).await.unwrap()
+    assert(direct == 2)
+
+    let chained = await_with_question().await.unwrap()
+    assert(chained == 42)
+
+    let stored = await_stored_task().await
+    assert(stored == 42)
+
+    print("ok")
