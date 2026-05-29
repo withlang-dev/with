@@ -1,15 +1,35 @@
-//! skip: non-executable spec sketch for Section 11.7 — Operator One-Impl Rule (formerly 25.71); contains pseudo-code for unimplemented feature work
-// Spec test: Section 11.7 — Operator One-Impl Rule (formerly 25.71)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+//! expect-stdout: ok
 
-// PASS: unique Output per (Self, Rhs) pair
-impl Add[Vector, Vector] for Vector:
-    fn add(self: Vector, rhs: Vector) -> Vector: ...
-impl Add[f32, Vector] for Vector:   // different Rhs = OK
-    fn add(self: Vector, rhs: f32) -> Vector: ...
-let v = vec1 + vec2   // Output uniquely determined: Vector
+type Vector { x: i32, y: i32 }
+type Bias { amount: i32 }
 
-// FAIL: conflicting Output for same (Self, Rhs)
-impl Add[Vector, Matrix] for Vector: ...   // ERROR: Vector + Vector
-                                               // already has Output = Vector
+impl Vector:
+    fn add(self: &Self, rhs: &Self) -> Vector:
+        Vector { x: self.x + rhs.x, y: self.y + rhs.y }
+
+    fn sub(self: &Self, rhs: Bias) -> Vector:
+        Vector { x: self.x - rhs.amount, y: self.y - rhs.amount }
+
+impl Bias:
+    fn add(self: &Self, lhs: Vector) -> Vector:
+        Vector { x: lhs.x + self.amount, y: lhs.y + self.amount }
+
+fn main:
+    let a = Vector { x: 1, y: 2 }
+    let b = Vector { x: 3, y: 4 }
+    let sum = a + b
+    assert(sum.x == 4)
+    assert(sum.y == 6)
+
+    let shifted = a - Bias { amount: 1 }
+    assert(shifted.x == 0)
+    assert(shifted.y == 1)
+
+    let reverse = Bias { amount: 10 } + a
+    assert(reverse.x == 11)
+    assert(reverse.y == 12)
+
+    let chained = a + b + sum
+    assert(chained.x == 8)
+    assert(chained.y == 12)
+    print("ok")

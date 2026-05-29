@@ -1165,7 +1165,7 @@ fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
     let mir_mod: MirModule = lower_module(sema, active_pool, zcu.pool)
     let tailrec_syms = collect_tailrec_fn_syms(active_pool)
     if tailrec_syms.len() > 0:
-        let tailrec_violations = mir_mod.verify_tailrec_contracts(sema, active_pool, tailrec_syms)
+        let tailrec_violations = mir_mod.verify_tailrec_contracts(&sema, active_pool, tailrec_syms)
         if tailrec_violations.len() > 0:
             zcu.sync_from_sema(sema)
             compilation_debug_pool_flow("run_mir_lower:after_sync", zcu.pool, active_pool, zcu.last_sema)

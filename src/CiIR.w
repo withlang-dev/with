@@ -891,7 +891,7 @@ fn CiProject.new -> CiProject:
         types: CiTypePool.new(),
     }
 
-fn CiProject.ensure_module(mut self: CiProject, path: str) -> i32:
+fn CiProject.ensure_module(self: &CiProject, path: str) -> i32:
     var i = 0
     while i < self.module_paths.len() as i32:
         if self.module_paths.get(i as i64) == path:
@@ -911,7 +911,7 @@ fn CiProject.find_symbol(self: &CiProject, kind: i32, name: str) -> i32:
         i = i - 1
     -1
 
-fn CiProject.ensure_symbol(mut self: CiProject, kind: i32, name: str) -> i32:
+fn CiProject.ensure_symbol(self: &CiProject, kind: i32, name: str) -> i32:
     let existing = self.find_symbol(kind, name)
     if existing >= 0:
         return existing
@@ -919,7 +919,7 @@ fn CiProject.ensure_symbol(mut self: CiProject, kind: i32, name: str) -> i32:
     self.symbols.push(CiProjectSymbol.new(name, kind))
     id
 
-fn CiProject.update_symbol(mut self: CiProject, symbol_id: i32, symbol: CiProjectSymbol):
+fn CiProject.update_symbol(self: &CiProject, symbol_id: i32, symbol: CiProjectSymbol):
     if symbol_id < 0 or symbol_id >= self.symbols.len() as i32:
         return
     let dst = self.symbols.ptr as *mut CiProjectSymbol
