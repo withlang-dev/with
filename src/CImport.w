@@ -11929,7 +11929,7 @@ type CiGotoCfg {
     stmt_ids: Vec[i32],
 }
 
-type CiGotoCfgContext {
+type CiGotoCfgContextState {
     cfg: CiGotoCfg,
     current: i32 = -1,
     ok: bool = true,
@@ -11942,6 +11942,11 @@ type CiGotoCfgContext {
     continue_targets: Vec[i32],
     switch_cases: CiGotoSwitchCase,
 }
+
+type CiGotoCfgContext {
+    state: *mut CiGotoCfgContextState,
+}
+impl Copy for CiGotoCfgContext
 
 type CiGotoSwitchCaseState {
     values: Vec[i32],
@@ -11977,63 +11982,66 @@ fn ci_stackify_no_args() -> Vec[i32]:
 fn ci_goto_cfg_new(entry_desc: str) -> CiGotoCfgContext:
     var graph = StackifyGraph.new(0)
     let entry = graph.add_block(entry_desc)
-    CiGotoCfgContext {
-        cfg: CiGotoCfg {
-            graph,
-            stmt_blocks: Vec.new(),
-            stmt_ids: Vec.new(),
-        },
-        current: entry,
-        ok: true,
-        message: "",
-        location: "",
-        label_names: Vec.new(),
-        label_blocks: Vec.new(),
-        label_defined: Vec.new(),
-        break_targets: Vec.new(),
-        continue_targets: Vec.new(),
-        switch_cases: CiGotoSwitchCase { state: 0 as *mut CiGotoSwitchCaseState },
-    }
+    let ptr = with_alloc(sizeof[CiGotoCfgContextState]()) as *mut CiGotoCfgContextState
+    unsafe:
+        *ptr = CiGotoCfgContextState {
+            cfg: CiGotoCfg {
+                graph,
+                stmt_blocks: Vec.new(),
+                stmt_ids: Vec.new(),
+            },
+            current: entry,
+            ok: true,
+            message: "",
+            location: "",
+            label_names: Vec.new(),
+            label_blocks: Vec.new(),
+            label_defined: Vec.new(),
+            break_targets: Vec.new(),
+            continue_targets: Vec.new(),
+            switch_cases: CiGotoSwitchCase { state: 0 as *mut CiGotoSwitchCaseState },
+        }
+    CiGotoCfgContext { state: ptr }
 
-fn CiGotoCfgContext.fail(mut self: CiGotoCfgContext, msg: str, loc: str):
-    if self.ok:
-        self.ok = false
-        self.message = msg
-        self.location = loc
+fn CiGotoCfgContext.fail(self: CiGotoCfgContext, msg: str, loc: str):
+    if self.state.ok:
+        self.state.ok = false
+        self.state.message = msg
+        self.state.location = loc
         g_ci_bail_message = msg
         g_ci_bail_location = loc
         g_ci_bail_kind = CXK_GOTO_STMT
 
-fn CiGotoCfgContext.new_block(mut self: CiGotoCfgContext, desc: str) -> i32:
-    self.cfg.graph.add_block(desc)
+fn CiGotoCfgContext.new_block(self: CiGotoCfgContext, desc: str) -> i32:
+    self.state.cfg.graph.add_block(desc)
 
-fn CiGotoCfgContext.block_has_term(self: &CiGotoCfgContext, block: i32) -> bool:
-    if block < 0 or block >= self.cfg.graph.blocks.len() as i32:
+fn CiGotoCfgContext.block_has_term(self: CiGotoCfgContext, block: i32) -> bool:
+    if block < 0 or block >= self.state.cfg.graph.blocks.len() as i32:
         return true
-    let b = self.cfg.graph.blocks.get(block as i64)
+    let b = self.state.cfg.graph.blocks.get(block as i64)
     b.term_kind == StackifyTermKind.Br or b.term_kind == StackifyTermKind.CondBr or b.term_kind == StackifyTermKind.Return or b.term_kind == StackifyTermKind.Unreachable or b.term_kind == StackifyTermKind.Select
 
-fn CiGotoCfgContext.block_has_pred(self: &CiGotoCfgContext, target: i32) -> bool:
-    if target < 0 or target >= self.cfg.graph.blocks.len() as i32:
+fn CiGotoCfgContext.block_has_pred(self: CiGotoCfgContext, target: i32) -> bool:
+    if target < 0 or target >= self.state.cfg.graph.blocks.len() as i32:
         return false
     var bi = 0
-    while bi < self.cfg.graph.blocks.len() as i32:
-        let block = self.cfg.graph.blocks.get(bi as i64)
+    while bi < self.state.cfg.graph.blocks.len() as i32:
+        let block = self.state.cfg.graph.blocks.get(bi as i64)
         var si = 0
         while si < block.succs_count:
-            if self.cfg.graph.succs.get((block.succs_start + si) as i64) == target:
+            if self.state.cfg.graph.succs.get((block.succs_start + si) as i64) == target:
                 return true
             si = si + 1
         bi = bi + 1
     false
 
-fn CiGotoCfgContext.set_current(mut self: CiGotoCfgContext, block: i32):
-    if not self.ok:
+fn CiGotoCfgContext.set_current(self: CiGotoCfgContext, block: i32):
+    if not self.state.ok:
         return
-    self.current = block
+    self.state.current = block
 
-fn CiGotoCfgContext.append_stmt(mut self: CiGotoCfgContext, stmts: CiStmtPool, stmt_id: CiStmtId) -> void:
-    if not self.ok or self.current < 0 or (stmt_id as i32) == 0:
+fn CiGotoCfgContext.append_stmt(self: CiGotoCfgContext, stmts: CiStmtPool, stmt_id: CiStmtId) -> void:
+    if not self.state.ok or self.state.current < 0 or (stmt_id as i32) == 0:
         return
     let kind = stmts.kind(stmt_id)
     if kind == CiStmtKind.CIS_BLOCK and stmts.get_d2(stmt_id) == 0:
@@ -12044,72 +12052,72 @@ fn CiGotoCfgContext.append_stmt(mut self: CiGotoCfgContext, stmts: CiStmtPool, s
             self.append_stmt(stmts, (stmts.get_extra(start + i)) as CiStmtId)
             i = i + 1
         return
-    self.cfg.stmt_blocks.push(self.current)
-    self.cfg.stmt_ids.push(stmt_id as i32)
+    self.state.cfg.stmt_blocks.push(self.state.current)
+    self.state.cfg.stmt_ids.push(stmt_id as i32)
 
-fn CiGotoCfgContext.branch_current(mut self: CiGotoCfgContext, target: i32, loc: str):
-    if not self.ok:
+fn CiGotoCfgContext.branch_current(self: CiGotoCfgContext, target: i32, loc: str):
+    if not self.state.ok:
         return
-    if self.current < 0:
+    if self.state.current < 0:
         return
-    if self.block_has_term(self.current):
-        self.current = -1
+    if self.block_has_term(self.state.current):
+        self.state.current = -1
         return
     if target < 0:
         self.fail("goto CFG branch target is invalid", loc)
         return
-    self.cfg.graph.set_br(self.current, target, ci_stackify_no_args())
-    self.current = -1
+    self.state.cfg.graph.set_br(self.state.current, target, ci_stackify_no_args())
+    self.state.current = -1
 
-fn CiGotoCfgContext.cond_current(mut self: CiGotoCfgContext, cond: CiExprId, true_block: i32, false_block: i32, loc: str):
-    if not self.ok:
+fn CiGotoCfgContext.cond_current(self: CiGotoCfgContext, cond: CiExprId, true_block: i32, false_block: i32, loc: str):
+    if not self.state.ok:
         return
-    if self.current < 0:
+    if self.state.current < 0:
         return
     if (cond as i32) == 0 or true_block < 0 or false_block < 0:
         self.fail("goto CFG conditional branch is invalid", loc)
         return
-    self.cfg.graph.set_cond_br(self.current, cond as i32, true_block, ci_stackify_no_args(), false_block, ci_stackify_no_args())
-    self.current = -1
+    self.state.cfg.graph.set_cond_br(self.state.current, cond as i32, true_block, ci_stackify_no_args(), false_block, ci_stackify_no_args())
+    self.state.current = -1
 
-fn CiGotoCfgContext.return_current(mut self: CiGotoCfgContext, values: Vec[i32]):
-    if not self.ok or self.current < 0:
+fn CiGotoCfgContext.return_current(self: CiGotoCfgContext, values: Vec[i32]):
+    if not self.state.ok or self.state.current < 0:
         return
-    self.cfg.graph.set_return(self.current, values)
-    self.current = -1
+    self.state.cfg.graph.set_return(self.state.current, values)
+    self.state.current = -1
 
-fn CiGotoCfgContext.unreachable_current(mut self: CiGotoCfgContext):
-    if not self.ok or self.current < 0:
+fn CiGotoCfgContext.unreachable_current(self: CiGotoCfgContext):
+    if not self.state.ok or self.state.current < 0:
         return
-    self.cfg.graph.set_unreachable(self.current)
-    self.current = -1
+    self.state.cfg.graph.set_unreachable(self.state.current)
+    self.state.current = -1
 
-fn CiGotoCfgContext.find_label(self: &CiGotoCfgContext, name: str) -> i32:
+fn CiGotoCfgContext.find_label(self: CiGotoCfgContext, name: str) -> i32:
     var i = 0
-    while i < self.label_names.len() as i32:
-        if self.label_names.get(i as i64) == name:
+    while i < self.state.label_names.len() as i32:
+        if self.state.label_names.get(i as i64) == name:
             return i
         i = i + 1
     -1
 
-fn CiGotoCfgContext.get_label_block(mut self: CiGotoCfgContext, name: str) -> i32:
+fn CiGotoCfgContext.get_label_block(self: CiGotoCfgContext, name: str) -> i32:
     let found = self.find_label(name)
     if found >= 0:
-        return self.label_blocks.get(found as i64)
+        return self.state.label_blocks.get(found as i64)
     let block = self.new_block("label " ++ name)
-    self.label_names.push(name)
-    self.label_blocks.push(block)
-    self.label_defined.push(0)
+    self.state.label_names.push(name)
+    self.state.label_blocks.push(block)
+    self.state.label_defined.push(0)
     block
 
-fn CiGotoCfgContext.define_label(mut self: CiGotoCfgContext, name: str, loc: str) -> i32:
+fn CiGotoCfgContext.define_label(self: CiGotoCfgContext, name: str, loc: str) -> i32:
     let block = self.get_label_block(name)
     let idx = self.find_label(name)
     if idx >= 0:
-        if self.label_defined.get(idx as i64) != 0:
+        if self.state.label_defined.get(idx as i64) != 0:
             self.fail("duplicate C label '" ++ name ++ "'", loc)
             return block
-        self.label_defined.set_i32(idx as i64, 1)
+        self.state.label_defined.set_i32(idx as i64, 1)
     block
 
 fn ci_goto_cfg_target_label_from_goto(session: i64, cursor: i32) -> str:
@@ -12121,26 +12129,26 @@ fn ci_goto_cfg_target_label_from_goto(session: i64, cursor: i32) -> str:
     with_ci_cursor_spelling(session, cursor)
 
 fn CiGotoCfgContext.push_break_target(self: CiGotoCfgContext, target: i32) -> void:
-    self.break_targets.push(target)
+    self.state.break_targets.push(target)
 
 fn CiGotoCfgContext.pop_break_target(self: CiGotoCfgContext):
-    if self.break_targets.len() > 0:
-        let _ = self.break_targets.pop()
+    if self.state.break_targets.len() > 0:
+        let _ = self.state.break_targets.pop()
 
 fn CiGotoCfgContext.push_continue_target(self: CiGotoCfgContext, target: i32) -> void:
-    self.continue_targets.push(target)
+    self.state.continue_targets.push(target)
 
 fn CiGotoCfgContext.pop_continue_target(self: CiGotoCfgContext):
-    if self.continue_targets.len() > 0:
-        let _ = self.continue_targets.pop()
+    if self.state.continue_targets.len() > 0:
+        let _ = self.state.continue_targets.pop()
 
 fn ci_goto_cfg_top_target(stack: &Vec[i32]) -> i32:
     if stack.len() == 0:
         return -1
     stack.get(stack.len() - 1)
 
-fn CiGotoCfgContext.append_lowered_leaf(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope):
-    if not self.ok or self.current < 0:
+fn CiGotoCfgContext.append_lowered_leaf(self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope):
+    if not self.state.ok or self.state.current < 0:
         return
     let stmt_id = stmts.lower_stmt_ir(session, cursor, exprs, types, 0, scope)
     if (stmt_id as i32) != 0:
@@ -12152,8 +12160,8 @@ fn CiGotoCfgContext.append_lowered_leaf(mut self: CiGotoCfgContext, session: i64
         else:
             self.fail("unsupported statement in goto CFG", with_ci_cursor_location(session, cursor))
 
-fn CiGotoCfgContext.lower_return(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope):
-    if not self.ok or self.current < 0:
+fn CiGotoCfgContext.lower_return(self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope):
+    if not self.state.ok or self.state.current < 0:
         return
     let nc = with_ci_num_children(session, cursor)
     let values: Vec[i32] = Vec.new()
@@ -12179,15 +12187,15 @@ fn CiGotoCfgContext.lower_return(mut self: CiGotoCfgContext, session: i64, curso
     values.push(ret_value as i32)
     self.return_current(values)
 
-fn CiGotoCfgContext.lower_compound(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope):
+fn CiGotoCfgContext.lower_compound(self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope):
     let nc = with_ci_num_children(session, cursor)
     var block_scope = scope
     let block_mark = ci_scope_mark(block_scope)
     var i = 0
-    while i < nc and self.ok:
+    while i < nc and self.state.ok:
         let child = with_ci_child(session, cursor, i)
         let ck = with_ci_cursor_kind(session, child)
-        if self.current < 0:
+        if self.state.current < 0:
             if ck == CXK_DECL_STMT:
                 block_scope = ci_goto_scope_add_decl_mappings(session, child, block_scope)
             else if ck == CXK_LABEL_STMT or ci_subtree_has_labels(session, child):
@@ -12207,12 +12215,12 @@ fn CiGotoCfgContext.lower_compound(mut self: CiGotoCfgContext, session: i64, cur
         i = i + 1
     let _ = ci_scope_restore(block_scope, block_mark)
 
-fn CiGotoCfgContext.lower_if(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope):
+fn CiGotoCfgContext.lower_if(self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope):
     let nc = with_ci_num_children(session, cursor)
     if nc < 2:
         self.fail("malformed if statement in goto CFG", with_ci_cursor_location(session, cursor))
         return
-    if self.current < 0:
+    if self.state.current < 0:
         if ci_subtree_has_labels(session, cursor):
             self.lower_stmt(session, with_ci_child(session, cursor, 1), stmts, exprs, types, scope)
             if nc > 2:
@@ -12231,7 +12239,7 @@ fn CiGotoCfgContext.lower_if(mut self: CiGotoCfgContext, session: i64, cursor: i
 
     self.set_current(then_block)
     self.lower_stmt(session, with_ci_child(session, cursor, 1), stmts, exprs, types, scope)
-    let then_alive = self.current >= 0
+    let then_alive = self.state.current >= 0
     if then_alive:
         self.branch_current(after_block, with_ci_cursor_location(session, cursor))
 
@@ -12239,7 +12247,7 @@ fn CiGotoCfgContext.lower_if(mut self: CiGotoCfgContext, session: i64, cursor: i
     if nc > 2:
         self.set_current(else_block)
         self.lower_stmt(session, with_ci_child(session, cursor, 2), stmts, exprs, types, scope)
-        else_alive = self.current >= 0
+        else_alive = self.state.current >= 0
         if else_alive:
             self.branch_current(after_block, with_ci_cursor_location(session, cursor))
     else:
@@ -12250,7 +12258,7 @@ fn CiGotoCfgContext.lower_if(mut self: CiGotoCfgContext, session: i64, cursor: i
         if not self.block_has_pred(after_block):
             self.unreachable_current()
 
-fn CiGotoCfgContext.lower_while(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope):
+fn CiGotoCfgContext.lower_while(self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope):
     let nc = with_ci_num_children(session, cursor)
     if nc < 2:
         self.fail("malformed while statement in goto CFG", with_ci_cursor_location(session, cursor))
@@ -12273,7 +12281,7 @@ fn CiGotoCfgContext.lower_while(mut self: CiGotoCfgContext, session: i64, cursor
     self.push_continue_target(cond_block)
     self.set_current(body_block)
     self.lower_stmt(session, with_ci_child(session, cursor, 1), stmts, exprs, types, scope)
-    if self.current >= 0:
+    if self.state.current >= 0:
         self.branch_current(cond_block, with_ci_cursor_location(session, cursor))
     self.pop_continue_target()
     self.pop_break_target()
@@ -12281,7 +12289,7 @@ fn CiGotoCfgContext.lower_while(mut self: CiGotoCfgContext, session: i64, cursor
     if not self.block_has_pred(after_block):
         self.unreachable_current()
 
-fn CiGotoCfgContext.lower_do(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope):
+fn CiGotoCfgContext.lower_do(self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope):
     let nc = with_ci_num_children(session, cursor)
     if nc < 2:
         self.fail("malformed do statement in goto CFG", with_ci_cursor_location(session, cursor))
@@ -12294,7 +12302,7 @@ fn CiGotoCfgContext.lower_do(mut self: CiGotoCfgContext, session: i64, cursor: i
     self.push_continue_target(cond_block)
     self.set_current(body_block)
     self.lower_stmt(session, with_ci_child(session, cursor, 0), stmts, exprs, types, scope)
-    if self.current >= 0:
+    if self.state.current >= 0:
         self.branch_current(cond_block, with_ci_cursor_location(session, cursor))
     self.pop_continue_target()
     self.pop_break_target()
@@ -12311,14 +12319,14 @@ fn CiGotoCfgContext.lower_do(mut self: CiGotoCfgContext, session: i64, cursor: i
     if not self.block_has_pred(after_block):
         self.unreachable_current()
 
-fn CiGotoCfgContext.lower_for(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope):
+fn CiGotoCfgContext.lower_for(self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope):
     let parts = ci_extract_for_parts(session, cursor)
     let scope_mark = ci_scope_mark(scope)
     if parts.body_cursor < 0:
         self.fail("malformed for statement in goto CFG", with_ci_cursor_location(session, cursor))
         return
     var loop_scope = scope
-    if self.current >= 0 and parts.init_cursor >= 0:
+    if self.state.current >= 0 and parts.init_cursor >= 0:
         if with_ci_cursor_kind(session, parts.init_cursor) == CXK_DECL_STMT:
             let decl_ir = stmts.lower_decl_stmt_structural(session, parts.init_cursor, loop_scope, true, exprs, types)
             loop_scope = decl_ir.updated_scope
@@ -12353,7 +12361,7 @@ fn CiGotoCfgContext.lower_for(mut self: CiGotoCfgContext, session: i64, cursor: 
     self.push_continue_target(inc_block)
     self.set_current(body_block)
     self.lower_stmt(session, parts.body_cursor, stmts, exprs, types, loop_scope)
-    if self.current >= 0:
+    if self.state.current >= 0:
         self.branch_current(inc_block, with_ci_cursor_location(session, cursor))
     self.pop_continue_target()
     self.pop_break_target()
@@ -12387,14 +12395,14 @@ fn CiGotoSwitchCase.record_case(self: CiGotoSwitchCase, value: CiExprId, block: 
     self.state.values.push(value as i32)
     self.state.blocks.push(block)
 
-fn CiGotoCfgContext.lower_case_children(mut self: CiGotoCfgContext, session: i64, cursor: i32, first_child: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope, cases: CiGotoSwitchCase):
-    let saved_cases = self.switch_cases
-    self.switch_cases = cases
+fn CiGotoCfgContext.lower_case_children(self: CiGotoCfgContext, session: i64, cursor: i32, first_child: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope, cases: CiGotoSwitchCase):
+    let saved_cases = self.state.switch_cases
+    self.state.switch_cases = cases
     let case_mark = ci_scope_mark(scope)
     var case_scope = scope
     let nc = with_ci_num_children(session, cursor)
     var i = first_child
-    while i < nc and self.ok:
+    while i < nc and self.state.ok:
         let child = with_ci_child(session, cursor, i)
         let ck = with_ci_cursor_kind(session, child)
         if ck == CXK_CASE_STMT or ck == CXK_DEFAULT_STMT:
@@ -12403,7 +12411,7 @@ fn CiGotoCfgContext.lower_case_children(mut self: CiGotoCfgContext, session: i64
             i = i + 1
             continue
         if ck == CXK_DECL_STMT:
-            if self.current >= 0:
+            if self.state.current >= 0:
                 let decl_ir = stmts.lower_decl_stmt_structural(session, child, case_scope, true, exprs, types)
                 case_scope = decl_ir.updated_scope
                 self.append_stmt(stmts, decl_ir.stmt_id)
@@ -12416,10 +12424,10 @@ fn CiGotoCfgContext.lower_case_children(mut self: CiGotoCfgContext, session: i64
             case_scope = ci_goto_scope_after_label_stmt(session, child, case_scope)
         i = i + 1
     let _ = ci_scope_restore(scope, case_mark)
-    self.switch_cases = saved_cases
+    self.state.switch_cases = saved_cases
 
-fn CiGotoCfgContext.lower_case_node(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope, cases: CiGotoSwitchCase):
-    if not self.ok:
+fn CiGotoCfgContext.lower_case_node(self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope, cases: CiGotoSwitchCase):
+    if not self.state.ok:
         return
     let kind = with_ci_cursor_kind(session, cursor)
     let nc = with_ci_num_children(session, cursor)
@@ -12431,38 +12439,38 @@ fn CiGotoCfgContext.lower_case_node(mut self: CiGotoCfgContext, session: i64, cu
         if (case_val as i32) == 0:
             self.fail("unsupported case value in goto CFG", with_ci_cursor_location(session, cursor))
             return
-        cases.record_case(case_val, self.current)
+        cases.record_case(case_val, self.state.current)
         if nc >= 2:
             self.lower_case_children(session, cursor, 1, stmts, exprs, types, scope, cases)
         return
     if kind == CXK_DEFAULT_STMT:
         cases.state.has_default = true
-        cases.state.default_block = self.current
+        cases.state.default_block = self.state.current
         if nc >= 1:
             self.lower_case_children(session, cursor, 0, stmts, exprs, types, scope, cases)
         return
     self.fail("expected switch case/default in goto CFG", with_ci_cursor_location(session, cursor))
 
-fn CiGotoCfgContext.lower_switch_body(mut self: CiGotoCfgContext, session: i64, body_cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope, cases: CiGotoSwitchCase):
-    let saved_cases = self.switch_cases
-    self.switch_cases = cases
+fn CiGotoCfgContext.lower_switch_body(self: CiGotoCfgContext, session: i64, body_cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope, cases: CiGotoSwitchCase):
+    let saved_cases = self.state.switch_cases
+    self.state.switch_cases = cases
     let nc = with_ci_num_children(session, body_cursor)
     let switch_mark = ci_scope_mark(scope)
     var switch_scope = scope
     var i = 0
-    while i < nc and self.ok:
+    while i < nc and self.state.ok:
         let child = with_ci_child(session, body_cursor, i)
         let ck = with_ci_cursor_kind(session, child)
         if ck == CXK_CASE_STMT or ck == CXK_DEFAULT_STMT:
             let case_block = self.new_block("switch case")
-            if self.current >= 0:
+            if self.state.current >= 0:
                 self.branch_current(case_block, with_ci_cursor_location(session, child))
             self.set_current(case_block)
             self.lower_case_node(session, child, stmts, exprs, types, switch_scope, cases)
             ci_goto_switch_scope_after_case(session, child, switch_scope)
             i = i + 1
             continue
-        if self.current < 0:
+        if self.state.current < 0:
             if ck == CXK_DECL_STMT:
                 switch_scope = ci_goto_scope_add_decl_mappings(session, child, switch_scope)
             else if ck == CXK_LABEL_STMT or ci_subtree_has_labels(session, child):
@@ -12482,20 +12490,20 @@ fn CiGotoCfgContext.lower_switch_body(mut self: CiGotoCfgContext, session: i64, 
             switch_scope = ci_goto_scope_after_label_stmt(session, child, switch_scope)
         i = i + 1
     let _ = ci_scope_restore(scope, switch_mark)
-    self.switch_cases = saved_cases
+    self.state.switch_cases = saved_cases
 
-fn CiGotoCfgContext.emit_switch_dispatch(mut self: CiGotoCfgContext, exprs: CiExprPool, subject_id: CiExprId, dispatch_block: i32, after_block: i32, cases: CiGotoSwitchCase, loc: str):
-    if not self.ok:
+fn CiGotoCfgContext.emit_switch_dispatch(self: CiGotoCfgContext, exprs: CiExprPool, subject_id: CiExprId, dispatch_block: i32, after_block: i32, cases: CiGotoSwitchCase, loc: str):
+    if not self.state.ok:
         return
     let value_count = cases.state.values.len() as i32
     if value_count == 0:
         let target = if cases.state.has_default: cases.state.default_block else: after_block
-        self.current = dispatch_block
+        self.state.current = dispatch_block
         self.branch_current(target, loc)
         return
     var chain_block = dispatch_block
     var i = 0
-    while i < value_count and self.ok:
+    while i < value_count and self.state.ok:
         let case_value = cases.state.values.get(i as i64) as CiExprId
         let case_block = cases.state.blocks.get(i as i64)
         let false_block = if i == value_count - 1:
@@ -12503,17 +12511,17 @@ fn CiGotoCfgContext.emit_switch_dispatch(mut self: CiGotoCfgContext, exprs: CiEx
         else:
             self.new_block("switch dispatch")
         let cond = exprs.binary(CiBinOp.CIBO_EQ, subject_id, case_value, 0 as CiTypeId)
-        self.current = chain_block
+        self.state.current = chain_block
         self.cond_current(cond, case_block, false_block, loc)
         chain_block = false_block
         i = i + 1
 
-fn CiGotoCfgContext.lower_switch(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope):
+fn CiGotoCfgContext.lower_switch(self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope):
     let nc = with_ci_num_children(session, cursor)
     if nc < 2:
         self.fail("malformed switch statement in goto CFG", with_ci_cursor_location(session, cursor))
         return
-    if self.current < 0:
+    if self.state.current < 0:
         let body_cursor = with_ci_child(session, cursor, 1)
         if ci_subtree_has_labels(session, body_cursor):
             var dead_cases = ci_goto_switch_case_new()
@@ -12532,9 +12540,9 @@ fn CiGotoCfgContext.lower_switch(mut self: CiGotoCfgContext, session: i64, curso
 
     self.push_break_target(after_block)
     var cases = ci_goto_switch_case_new()
-    self.current = -1
+    self.state.current = -1
     self.lower_switch_body(session, body_cursor, stmts, exprs, types, scope, cases)
-    if self.current >= 0:
+    if self.state.current >= 0:
         self.branch_current(after_block, with_ci_cursor_location(session, cursor))
     self.pop_break_target()
     self.emit_switch_dispatch(exprs, prepared_subject.value_expr, dispatch_block, after_block, cases, with_ci_cursor_location(session, cursor))
@@ -12542,8 +12550,8 @@ fn CiGotoCfgContext.lower_switch(mut self: CiGotoCfgContext, session: i64, curso
     if not self.block_has_pred(after_block):
         self.unreachable_current()
 
-fn CiGotoCfgContext.lower_stmt(mut self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope):
-    if not self.ok:
+fn CiGotoCfgContext.lower_stmt(self: CiGotoCfgContext, session: i64, cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope):
+    if not self.state.ok:
         return
     let kind = with_ci_cursor_kind(session, cursor)
     let nc = with_ci_num_children(session, cursor)
@@ -12552,7 +12560,7 @@ fn CiGotoCfgContext.lower_stmt(mut self: CiGotoCfgContext, session: i64, cursor:
             self.lower_stmt(session, with_ci_child(session, cursor, 0), stmts, exprs, types, scope)
             return
         let inner_expr = ci_find_last_expr_child(session, cursor)
-        if inner_expr >= 0 and self.current >= 0:
+        if inner_expr >= 0 and self.state.current >= 0:
             self.append_lowered_leaf(session, cursor, stmts, exprs, types, scope)
         return
     if kind == CXK_NULL_STMT:
@@ -12563,27 +12571,27 @@ fn CiGotoCfgContext.lower_stmt(mut self: CiGotoCfgContext, session: i64, cursor:
             self.fail("empty C label in goto CFG", with_ci_cursor_location(session, cursor))
             return
         let label_block = self.define_label(label_name, with_ci_cursor_location(session, cursor))
-        if self.current >= 0 and self.current != label_block:
+        if self.state.current >= 0 and self.state.current != label_block:
             self.branch_current(label_block, with_ci_cursor_location(session, cursor))
         self.set_current(label_block)
         if nc > 0:
             var child_cursor = with_ci_child(session, cursor, 0)
             var child_kind = with_ci_cursor_kind(session, child_cursor)
-            while child_kind == CXK_LABEL_STMT and self.ok:
+            while child_kind == CXK_LABEL_STMT and self.state.ok:
                 let inner_name = with_ci_cursor_spelling(session, child_cursor)
                 if inner_name.len() == 0:
                     self.fail("empty C label in goto CFG", with_ci_cursor_location(session, child_cursor))
                     return
                 let inner_block = self.define_label(inner_name, with_ci_cursor_location(session, child_cursor))
-                if self.current >= 0 and self.current != inner_block:
+                if self.state.current >= 0 and self.state.current != inner_block:
                     self.branch_current(inner_block, with_ci_cursor_location(session, child_cursor))
                 self.set_current(inner_block)
                 if with_ci_num_children(session, child_cursor) == 0:
                     return
                 child_cursor = with_ci_child(session, child_cursor, 0)
                 child_kind = with_ci_cursor_kind(session, child_cursor)
-            if (child_kind == CXK_CASE_STMT or child_kind == CXK_DEFAULT_STMT) and (self.switch_cases.state as i64) != 0:
-                self.lower_case_node(session, child_cursor, stmts, exprs, types, scope, self.switch_cases)
+            if (child_kind == CXK_CASE_STMT or child_kind == CXK_DEFAULT_STMT) and (self.state.switch_cases.state as i64) != 0:
+                self.lower_case_node(session, child_cursor, stmts, exprs, types, scope, self.state.switch_cases)
             else:
                 self.lower_stmt(session, child_cursor, stmts, exprs, types, scope)
         return
@@ -12596,14 +12604,14 @@ fn CiGotoCfgContext.lower_stmt(mut self: CiGotoCfgContext, session: i64, cursor:
         self.branch_current(target, with_ci_cursor_location(session, cursor))
         return
     if kind == CXK_BREAK_STMT:
-        let target = ci_goto_cfg_top_target(&self.break_targets)
+        let target = ci_goto_cfg_top_target(&self.state.break_targets)
         if target < 0:
             self.fail("break without active target in goto CFG", with_ci_cursor_location(session, cursor))
             return
         self.branch_current(target, with_ci_cursor_location(session, cursor))
         return
     if kind == CXK_CONTINUE_STMT:
-        let target = ci_goto_cfg_top_target(&self.continue_targets)
+        let target = ci_goto_cfg_top_target(&self.state.continue_targets)
         if target < 0:
             self.fail("continue without active loop in goto CFG", with_ci_cursor_location(session, cursor))
             return
@@ -12631,7 +12639,7 @@ fn CiGotoCfgContext.lower_stmt(mut self: CiGotoCfgContext, session: i64, cursor:
         self.lower_switch(session, cursor, stmts, exprs, types, scope)
         return
     if kind == CXK_DECL_STMT:
-        if self.current >= 0:
+        if self.state.current >= 0:
             let decl_ir = stmts.lower_decl_stmt_structural(session, cursor, scope, true, exprs, types)
             self.append_stmt(stmts, decl_ir.stmt_id)
         return
@@ -12641,7 +12649,7 @@ fn CiGotoCfgContext.lower_stmt(mut self: CiGotoCfgContext, session: i64, cursor:
     if ci_cursor_kind_is_expression(kind):
         self.append_lowered_leaf(session, cursor, stmts, exprs, types, scope)
         return
-    if self.current >= 0:
+    if self.state.current >= 0:
         self.fail("unsupported statement in goto CFG", with_ci_cursor_location(session, cursor))
 
 
@@ -12987,11 +12995,11 @@ fn CiStmtPool.native_goto_emit_cfg(self: CiStmtPool, cfg: CiGotoCfg, hoisted_stm
 
     self.from_flat_ids(&ids)
 
-fn CiGotoCfgContext.verify_labels(mut self: CiGotoCfgContext):
+fn CiGotoCfgContext.verify_labels(self: CiGotoCfgContext):
     var i = 0
-    while i < self.label_names.len() as i32 and self.ok:
-        if self.label_defined.get(i as i64) == 0:
-            self.fail("unresolved goto label '" ++ self.label_names.get(i as i64) ++ "'", "")
+    while i < self.state.label_names.len() as i32 and self.state.ok:
+        if self.state.label_defined.get(i as i64) == 0:
+            self.fail("unresolved goto label '" ++ self.state.label_names.get(i as i64) ++ "'", "")
         i = i + 1
 
 fn CiStmtPool.lower_goto_body_stackify(self: CiStmtPool, session: i64, body_cursor: i32, scope: CiScope, exprs: CiExprPool, types: CiTypePool) -> CiStmtId:
@@ -13017,9 +13025,9 @@ fn CiStmtPool.lower_goto_body_stackify(self: CiStmtPool, session: i64, body_curs
 
     var ctx = ci_goto_cfg_new("entry")
     ctx.lower_compound(session, body_cursor, self.val(), exprs, types, scope)
-    if ctx.ok and ctx.current >= 0:
-        let reachable = ci_goto_cfg_reachable_blocks(ctx.cfg)
-        if ctx.current < reachable.len() as i32 and reachable.get(ctx.current as i64) == 0:
+    if ctx.state.ok and ctx.state.current >= 0:
+        let reachable = ci_goto_cfg_reachable_blocks(ctx.state.cfg)
+        if ctx.state.current < reachable.len() as i32 and reachable.get(ctx.state.current as i64) == 0:
             ctx.unreachable_current()
         else:
             let ret_ty = ci_scope_get_return_type(scope)
@@ -13029,19 +13037,19 @@ fn CiStmtPool.lower_goto_body_stackify(self: CiStmtPool, session: i64, body_curs
             else:
                 ctx.fail("goto CFG function can fall through without returning", with_ci_cursor_location(session, body_cursor))
     ctx.verify_labels()
-    if not ctx.ok:
+    if not ctx.state.ok:
         return 0 as CiStmtId
 
     if not migrate_convert_goto_to_structured():
-        return self.native_goto_emit_cfg(ctx.cfg, &hoisted_stmt_ids, exprs, types)
+        return self.native_goto_emit_cfg(ctx.state.cfg, &hoisted_stmt_ids, exprs, types)
 
-    let result = stackify_graph(ctx.cfg.graph)
+    let result = stackify_graph(ctx.state.cfg.graph)
     if not result.ok:
-        g_ci_bail_location = if ctx.location.len() > 0: ctx.location else: with_ci_cursor_location(session, body_cursor)
+        g_ci_bail_location = if ctx.state.location.len() > 0: ctx.state.location else: with_ci_cursor_location(session, body_cursor)
         g_ci_bail_message = "stackify: " ++ result.message
         g_ci_bail_kind = CXK_GOTO_STMT
         return 0 as CiStmtId
-    let body_id = self.stack_emit_tree(result.tree, ctx.cfg, exprs, types)
+    let body_id = self.stack_emit_tree(result.tree, ctx.state.cfg, exprs, types)
     if (body_id as i32) == 0:
         if g_ci_bail_message.len() == 0:
             g_ci_bail_message = "stackify emitter produced no body"

@@ -2222,6 +2222,12 @@ fn MirBuilder.lower_bin_op(self: MirBuilder, op: i32, lhs_expr: i32, rhs_expr: i
         return self.lower_short_circuit(op, lhs_expr, rhs_expr, node)
     if op == BinaryOp.OP_IN or op == BinaryOp.OP_NOT_IN:
         return self.lower_membership(op, lhs_expr, rhs_expr, node)
+    if self.sema.operator_method_calls.contains(node):
+        let method_sym = self.sema.operator_method_calls.get(node).unwrap()
+        let reversed = if self.sema.operator_method_reversed.contains(node): self.sema.operator_method_reversed.get(node).unwrap() else: 0
+        if reversed != 0:
+            return self.lower_method_bin_op(rhs_expr, lhs_expr, method_sym, node)
+        return self.lower_method_bin_op(lhs_expr, rhs_expr, method_sym, node)
     // Check for operator overloading: if LHS is a struct with an operator method, lower as call
     let lhs_ty = self.expr_type(lhs_expr)
     let rhs_ty = self.expr_type(rhs_expr)
@@ -4662,13 +4668,32 @@ fn MirBuilder.lower_call_arg(self: MirBuilder, arg_node: i32, sig_idx: i32, call
         expected_ty = self.sema.callable_fn_param_type(callable_fn_tid as TypeId, arg_i)
         if expected_ty != 0 and expected_ty != self.sema.ty_void:
             self.expected_type = expected_ty
-    let autoref_op = self.lower_auto_deref_call_arg(arg_node, expected_ty)
+    let autoref_op = self.lower_auto_ref_call_arg(arg_node, expected_ty)
     if autoref_op >= 0:
         self.expected_type = saved_expected
         return autoref_op
+    let autoderef_op = self.lower_auto_deref_call_arg(arg_node, expected_ty)
+    if autoderef_op >= 0:
+        self.expected_type = saved_expected
+        return autoderef_op
     let lowered = self.lower_expr(arg_node)
     self.expected_type = saved_expected
     lowered
+
+fn MirBuilder.lower_auto_ref_call_arg(self: MirBuilder, arg_node: i32, expected_ty: i32) -> i32:
+    if arg_node == 0 or expected_ty == 0:
+        return -1
+    let actual_ty = self.expr_type(arg_node)
+    if actual_ty == 0:
+        return -1
+    if self.sema.can_auto_ref_arg(expected_ty, actual_ty) == 0:
+        return -1
+    let place = self.lower_expr_place(arg_node)
+    let rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, place, 0)
+    let temp = self.new_temp(expected_ty)
+    let temp_place = self.place_for_local(temp)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, temp_place, rv, self.ast.get_start(arg_node))
+    self.body.new_operand(OperandKind.OK_COPY, temp_place)
 
 fn MirBuilder.lower_auto_deref_call_arg(self: MirBuilder, arg_node: i32, expected_ty: i32) -> i32:
     if arg_node == 0 or expected_ty == 0:
@@ -6983,7 +7008,7 @@ fn mir_fn_is_tailrec(ast_pool: AstPool, fn_sym: i32) -> i32:
         return 1
     0
 
-fn mir_tailrec_sig_compatible(sema: Sema, ast_pool: AstPool, fn_a: i32, fn_b: i32) -> i32:
+fn mir_tailrec_sig_compatible(sema: &Sema, ast_pool: AstPool, fn_a: i32, fn_b: i32) -> i32:
     let sig_a = sema.get_sig(fn_a)
     let sig_b = sema.get_sig(fn_b)
     if sig_a < 0 or sig_b < 0:
@@ -7025,7 +7050,7 @@ type TailrecViolation {
 fn tailrec_no_violation -> TailrecViolation:
     TailrecViolation { node: 0, message: "" }
 
-fn tailrec_verify_recursive_edges(sema: Sema, node: i32, scc: &Vec[i32], in_tail: i32, active_cleanup: i32) -> TailrecViolation:
+fn tailrec_verify_recursive_edges(sema: &Sema, node: i32, scc: &Vec[i32], in_tail: i32, active_cleanup: i32) -> TailrecViolation:
     if node == 0:
         return tailrec_no_violation()
     let kind = sema.ast.kind(node)
@@ -7113,7 +7138,7 @@ fn tailrec_verify_recursive_edges(sema: Sema, node: i32, scc: &Vec[i32], in_tail
         return tailrec_verify_recursive_edges(sema, sema.ast.get_data0(node), scc, in_tail, active_cleanup)
     tailrec_no_violation()
 
-fn MirModule.body_reaches(mut self: MirModule, start_idx: i32, target_idx: i32) -> bool:
+fn MirModule.body_reaches(self: &MirModule, start_idx: i32, target_idx: i32) -> bool:
     if start_idx == target_idx:
         return true
     let body_count = self.body_count()
@@ -7145,7 +7170,7 @@ fn MirModule.body_reaches(mut self: MirModule, start_idx: i32, target_idx: i32) 
                 stack.push(callee_idx)
     false
 
-fn MirModule.collect_tailrec_scc(mut self: MirModule, start_idx: i32) -> Vec[i32]:
+fn MirModule.collect_tailrec_scc(self: &MirModule, start_idx: i32) -> Vec[i32]:
     var members: Vec[i32] = Vec.new()
     let body_count = self.body_count()
     for idx in 0..body_count:
@@ -7153,7 +7178,7 @@ fn MirModule.collect_tailrec_scc(mut self: MirModule, start_idx: i32) -> Vec[i32
             members.push(idx)
     members
 
-fn MirModule.mark_tailrec_scc_edges(mut self: MirModule, scc: &Vec[i32]):
+fn MirModule.mark_tailrec_scc_edges(self: &MirModule, scc: &Vec[i32]):
     for si in 0..scc.len() as i32:
         let src_idx = scc.get(si as i64)
         let body = self.bodies.get(src_idx as i64)
@@ -7171,7 +7196,7 @@ fn MirModule.mark_tailrec_scc_edges(mut self: MirModule, scc: &Vec[i32]):
                     mir_push_unique_i32(body.mutual_tail_bbs, bb)
                     break
 
-fn MirModule.tailrec_scc_syms(mut self: MirModule, scc: &Vec[i32]) -> Vec[i32]:
+fn MirModule.tailrec_scc_syms(self: &MirModule, scc: &Vec[i32]) -> Vec[i32]:
     var syms: Vec[i32] = Vec.new()
     for si in 0..scc.len() as i32:
         let body_idx = scc.get(si as i64)
@@ -7180,7 +7205,7 @@ fn MirModule.tailrec_scc_syms(mut self: MirModule, scc: &Vec[i32]) -> Vec[i32]:
         syms.push(self.bodies.get(body_idx as i64).fn_sym)
     syms
 
-fn MirModule.verify_tailrec_contracts(mut self: MirModule, sema: Sema, ast_pool: AstPool, tailrec_syms: Vec[i32]) -> Vec[TailrecViolation]:
+fn MirModule.verify_tailrec_contracts(self: &MirModule, sema: &Sema, ast_pool: AstPool, tailrec_syms: Vec[i32]) -> Vec[TailrecViolation]:
     let violations: Vec[TailrecViolation] = Vec.new()
     let body_count = self.body_count()
     var processed: Vec[i32] = Vec.new()

@@ -183,8 +183,14 @@
   │                                                                                                                │             │                   │      │ ellipsis specs, loud signature/missing-set     │
   │                                                                                                                │             │                   │      │ diagnostics, and reversed operator dispatch.   │
   │                                                                                                                │             │                   │      │ Spec §11.7.                                    │
-  │ #244-#246                                                                                                      │         Yes │                No │   No │ Remaining §11 trait/operator/derive sketches. │
-  │                                                                                                                │             │                   │      │ Need one-impl rule, derive, and                │
+  │ [x] #244                                                                                                       │         Yes │               Yes │   No │ Completed: operator dispatch now resolves the  │
+  │                                                                                                                │             │                   │      │ unique applicable implementation for the full  │
+  │                                                                                                                │             │                   │      │ lhs/rhs pair, rejects ambiguous or             │
+  │                                                                                                                │             │                   │      │ inapplicable overloads loudly, preserves       │
+  │                                                                                                                │             │                   │      │ Sema/MIR agreement, and supports shared        │
+  │                                                                                                                │             │                   │      │ auto-ref for operator call arguments. Spec     │
+  │                                                                                                                │             │                   │      │ §11.7.                                         │
+  │ #245-#246                                                                                                      │         Yes │                No │   No │ Remaining §11 derive sketches. Need derive and │
   │                                                                                                                │             │                   │      │ derive(Builder) coverage.                      │
   │ #257-#274                                                                                                      │         Yes │           Partial │   No │ §14 async sketches. Runtime has many behavior  │
   │                                                                                                                │             │                   │      │ tests now, but spec sketches still cover       │

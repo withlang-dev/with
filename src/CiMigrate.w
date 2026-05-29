@@ -573,7 +573,7 @@ fn ci_migrate_project_var_owner_rank(definition_kind: i32) -> i32:
         return 1
     0
 
-fn CiProject.migrate_var_type_id(mut self: CiProject, session: i64, idx: i32, owner_type: str) -> CiTypeId:
+fn CiProject.migrate_var_type_id(self: &CiProject, session: i64, idx: i32, owner_type: str) -> CiTypeId:
     let cursor = with_cimport_decl_cursor(session, idx)
     if cursor < 0:
         return 0 as CiTypeId
@@ -584,7 +584,7 @@ fn CiProject.migrate_var_type_id(mut self: CiProject, session: i64, idx: i32, ow
         ty_id = self.types.type_from_translated_text(owner_type)
     ty_id
 
-fn CiProject.migrate_scan_file(mut self: CiProject, input_path: str) -> i32:
+fn CiProject.migrate_scan_file(self: &CiProject, input_path: str) -> i32:
     ci_migrate_prepare_include_path(input_path)
     let source = ci_migrate_wrapped_source(input_path)
     if source.len() == 0:

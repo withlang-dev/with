@@ -160,6 +160,43 @@ fn Sema.builtin_arg_type_compatible(self: Sema, expected: i32, actual: i32) -> i
             return 1
     0
 
+fn Sema.can_auto_ref_arg(self: Sema, expected: i32, actual: i32) -> i32:
+    if expected == 0 or actual == 0:
+        return 0
+    let expected_resolved = self.resolve_alias(expected as TypeId)
+    if self.get_type_kind(expected_resolved) != TypeKind.TY_REF:
+        return 0
+    if self.get_type_d1(expected_resolved) != 0:
+        return 0
+    let pointee = self.get_type_d0(expected_resolved)
+    if pointee == 0:
+        return 0
+    let pointee_resolved = self.resolve_alias(pointee as TypeId)
+    let actual_resolved = self.resolve_alias(actual as TypeId)
+    if pointee_resolved == actual_resolved:
+        return 1
+    let pointee_kind = self.get_type_kind(pointee_resolved)
+    let actual_kind = self.get_type_kind(actual_resolved)
+    if pointee_kind == TypeKind.TY_STRUCT and actual_kind == TypeKind.TY_STRUCT:
+        return if self.get_type_d0(pointee_resolved) == self.get_type_d0(actual_resolved): 1 else: 0
+    if pointee_kind == TypeKind.TY_ENUM and actual_kind == TypeKind.TY_ENUM:
+        return if self.get_type_d0(pointee_resolved) == self.get_type_d0(actual_resolved): 1 else: 0
+    if pointee_kind == TypeKind.TY_GENERIC_INST and actual_kind == TypeKind.TY_GENERIC_INST:
+        return self.types_compatible(pointee, actual)
+    0
+
+fn Sema.call_arg_type_compatible(self: Sema, expected: i32, actual: i32) -> i32:
+    if self.builtin_arg_type_compatible(expected, actual) != 0:
+        return 1
+    self.can_auto_ref_arg(expected, actual)
+
+fn Sema.note_auto_ref_call_arg(self: Sema, expected: i32, actual: i32, arg_node: i32, err_node: i32):
+    if self.can_auto_ref_arg(expected, actual) == 0:
+        return
+    if arg_node <= 0:
+        return
+    self.check_borrow_create(arg_node, BorrowKind.SHARED, if err_node > 0: err_node else: arg_node)
+
 // ── Type expression resolution ───────────────────────────────────
 
 fn Sema.resolve_type_expr(self: Sema, node: i32) -> TypeId:
@@ -2480,6 +2517,114 @@ fn Sema.validate_fstring_spec(self: Sema, spec_node: i32, expr_ty: i32, expr_nod
         if not is_numeric:
             self.emit_error("sign '+' requires numeric type", spec_node)
 
+type SemaOperatorCandidate {
+    sig: i32,
+    fn_sym: i32,
+    owner_sym: i32,
+}
+
+fn sema_operator_candidate_none -> SemaOperatorCandidate:
+    SemaOperatorCandidate { sig: -1, fn_sym: 0, owner_sym: 0 }
+
+fn sema_operator_method_name(op: i32) -> str:
+    if op == BinaryOp.OP_ADD: return "add"
+    if op == BinaryOp.OP_SUB: return "sub"
+    if op == BinaryOp.OP_MUL: return "mul"
+    if op == BinaryOp.OP_DIV: return "div"
+    if op == BinaryOp.OP_MOD: return "mod"
+    if op == BinaryOp.OP_EQ: return "eq"
+    if op == BinaryOp.OP_NEQ: return "ne"
+    if op == BinaryOp.OP_LT: return "lt"
+    if op == BinaryOp.OP_GT: return "gt"
+    if op == BinaryOp.OP_LTE: return "le"
+    if op == BinaryOp.OP_GTE: return "ge"
+    if op == BinaryOp.OP_MATMUL: return "matmul"
+    ""
+
+fn sema_operator_symbol_text(op: i32) -> str:
+    if op == BinaryOp.OP_ADD: return "+"
+    if op == BinaryOp.OP_SUB: return "-"
+    if op == BinaryOp.OP_MUL: return "*"
+    if op == BinaryOp.OP_DIV: return "/"
+    if op == BinaryOp.OP_MOD: return "%"
+    if op == BinaryOp.OP_EQ: return "=="
+    if op == BinaryOp.OP_NEQ: return "!="
+    if op == BinaryOp.OP_LT: return "<"
+    if op == BinaryOp.OP_GT: return ">"
+    if op == BinaryOp.OP_LTE: return "<="
+    if op == BinaryOp.OP_GTE: return ">="
+    if op == BinaryOp.OP_MATMUL: return "@"
+    "?"
+
+fn Sema.operator_candidate_for(self: Sema, owner_ty: i32, peer_ty: i32, method_sym: i32) -> SemaOperatorCandidate:
+    if owner_ty == 0 or peer_ty == 0 or method_sym == 0:
+        return sema_operator_candidate_none()
+    let owner_resolved = self.resolve_alias(owner_ty as TypeId)
+    let owner_sym = self.get_type_name(owner_resolved)
+    if owner_sym == 0:
+        return sema_operator_candidate_none()
+    let sig = self.lookup_method_sig(owner_sym, method_sym)
+    if sig < 0:
+        return sema_operator_candidate_none()
+    if self.sig_get_param_count(sig) != 2:
+        return sema_operator_candidate_none()
+    let self_ty = self.sig_param_type(sig, 0)
+    let rhs_ty = self.sig_param_type(sig, 1)
+    if self.call_arg_type_compatible(self_ty, owner_ty) == 0:
+        return sema_operator_candidate_none()
+    if self.call_arg_type_compatible(rhs_ty, peer_ty) == 0:
+        return sema_operator_candidate_none()
+    let fn_sym = self.lookup_method_fn(owner_sym, method_sym)
+    if fn_sym == 0:
+        return sema_operator_candidate_none()
+    SemaOperatorCandidate { sig, fn_sym, owner_sym }
+
+fn Sema.type_has_operator_method(self: Sema, tid: i32, method_sym: i32) -> i32:
+    if tid == 0 or method_sym == 0:
+        return 0
+    let resolved = self.resolve_alias(tid as TypeId)
+    let owner_sym = self.get_type_name(resolved)
+    if owner_sym == 0:
+        return 0
+    if self.lookup_method_sig(owner_sym, method_sym) >= 0:
+        return 1
+    0
+
+fn Sema.check_binary_operator_method(self: Sema, node: i32, op: i32, lhs: i32, rhs: i32) -> i32:
+    let method_name = sema_operator_method_name(op)
+    if method_name.len() == 0:
+        return 0
+    let method_sym = self.pool_intern(method_name)
+    let lhs_candidate = self.operator_candidate_for(lhs, rhs, method_sym)
+    let rhs_candidate = self.operator_candidate_for(rhs, lhs, method_sym)
+    let lhs_ok = if lhs_candidate.sig >= 0: 1 else: 0
+    let rhs_ok = if rhs_candidate.sig >= 0: 1 else: 0
+    if lhs_ok != 0 and rhs_ok != 0 and lhs_candidate.fn_sym != rhs_candidate.fn_sym:
+        let op_text = sema_operator_symbol_text(op)
+        self.emit_error("ambiguous operator '" ++ op_text ++ "': both operand types provide applicable implementations", node)
+        return 0
+    var selected = sema_operator_candidate_none()
+    var reversed = 0
+    if lhs_ok != 0:
+        selected = lhs_candidate
+    else if rhs_ok != 0:
+        selected = rhs_candidate
+        reversed = 1
+    else:
+        let has_named_method = self.type_has_operator_method(lhs, method_sym) != 0 or self.type_has_operator_method(rhs, method_sym) != 0
+        if has_named_method != 0:
+            let op_text2 = sema_operator_symbol_text(op)
+            self.emit_error("operator '" ++ op_text2 ++ "' has no applicable implementation for " ++ self.type_name(lhs) ++ " and " ++ self.type_name(rhs), node)
+        return 0
+    let ret = self.sig_return_type(selected.sig)
+    if op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ or op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE:
+        if self.types_compatible(self.ty_bool as i32, ret) == 0:
+            self.emit_error("comparison operator method must return bool", node)
+            return 0
+    self.operator_method_calls.insert(node, selected.fn_sym)
+    self.operator_method_reversed.insert(node, reversed)
+    ret
+
 fn Sema.check_binary(self: Sema, node: i32) -> i32:
     let op = self.ast.get_data0(node)
     let lhs_node = self.ast.get_data1(node)
@@ -2583,6 +2728,13 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
             if bool_int_cmp == 0 and ptr_like_cmp == 0 and ptr_zero_cmp == 0 and ptr_none_cmp == 0 and (lhs_ptr_like or rhs_ptr_like) and self.builtin_arg_type_compatible(lhs, rhs) == 0 and self.builtin_arg_type_compatible(rhs, lhs) == 0:
                 self.emit_error("comparison operands must have compatible types", node)
                 return 0
+            let cmp_method_sym = self.pool_intern(sema_operator_method_name(op))
+            let has_cmp_method = self.type_has_operator_method(lhs as i32, cmp_method_sym) != 0 or self.type_has_operator_method(rhs as i32, cmp_method_sym) != 0
+            if has_cmp_method != 0:
+                let cmp_ret = self.check_binary_operator_method(node, op, lhs as i32, rhs as i32)
+                if cmp_ret == 0:
+                    return 0
+                return cmp_ret
         return self.ty_bool as i32
 
     // Logical operators
@@ -2601,20 +2753,13 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
 
     // @ matmul operator — always dispatches to method
     if op == BinaryOp.OP_MATMUL:
-        let lhs_resolved = self.resolve_alias(lhs)
-        let lhs_name = self.get_type_name(lhs_resolved as i32)
         let matmul_sym = self.pool_intern("matmul")
-        if lhs_name != 0:
-            let sig = self.lookup_method_sig(lhs_name, matmul_sym)
-            if sig >= 0:
-                return self.sig_return_type(sig)
-        // Reversed-operand lookup
-        let rhs_resolved = self.resolve_alias(rhs)
-        let rhs_name = self.get_type_name(rhs_resolved as i32)
-        if rhs_name != 0:
-            let sig = self.lookup_method_sig(rhs_name, matmul_sym)
-            if sig >= 0:
-                return self.sig_return_type(sig)
+        let has_matmul_method = self.type_has_operator_method(lhs as i32, matmul_sym) != 0 or self.type_has_operator_method(rhs as i32, matmul_sym) != 0
+        if has_matmul_method != 0:
+            let matmul_ret = self.check_binary_operator_method(node, op, lhs as i32, rhs as i32)
+            if matmul_ret == 0:
+                return 0
+            return matmul_ret
         self.emit_error("@ operator requires a type implementing 'matmul'", node)
         return 0
 
@@ -2639,25 +2784,18 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
         let result = self.arithmetic_result_type(lhs, rhs)
         if result != 0:
             return result as i32
-        let lhs_resolved = self.resolve_alias(lhs)
-        let lhs_name = self.get_type_name(lhs_resolved as i32)
         let method_name = if op == BinaryOp.OP_ADD: "add" else:
             if op == BinaryOp.OP_SUB: "sub" else:
             if op == BinaryOp.OP_MUL: "mul" else:
             if op == BinaryOp.OP_DIV: "div" else:
             "mod"
         let method_sym = self.pool_intern(method_name)
-        if lhs_name != 0:
-            let method_sig = self.lookup_method_sig(lhs_name, method_sym)
-            if method_sig >= 0:
-                return self.sig_return_type(method_sig)
-        // Reversed-operand lookup: try RHS type
-        let rhs_resolved = self.resolve_alias(rhs)
-        let rhs_name = self.get_type_name(rhs_resolved as i32)
-        if rhs_name != 0:
-            let rhs_method_sig = self.lookup_method_sig(rhs_name, method_sym)
-            if rhs_method_sig >= 0:
-                return self.sig_return_type(rhs_method_sig)
+        let has_arith_method = self.type_has_operator_method(lhs as i32, method_sym) != 0 or self.type_has_operator_method(rhs as i32, method_sym) != 0
+        if has_arith_method != 0:
+            let method_ret = self.check_binary_operator_method(node, op, lhs as i32, rhs as i32)
+            if method_ret == 0:
+                return 0
+            return method_ret
         self.emit_error("arithmetic operator requires numeric operands", node)
         return 0
 
@@ -5614,10 +5752,11 @@ fn Sema.check_callable_value_call(self: Sema, call_name: str, fn_tid: i32, closu
         if expected_ty != 0 and arg_ty != 0:
             let exp_resolved = self.resolve_alias(expected_ty)
             if self.type_is_dyn_object(exp_resolved) == 0:
-                if self.types_compatible(expected_ty, arg_ty) == 0:
-                    if self.arithmetic_result_type(expected_ty, arg_ty) == 0:
-                        let err_arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(extra_start + ai)
-                        self.emit_argument_type_mismatch(call_name, 0, ai, param_i, expected_ty, arg_ty, if err_arg_node > 0: err_arg_node else: node)
+                let err_arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(extra_start + ai)
+                if self.call_arg_type_compatible(expected_ty, arg_ty) == 0:
+                    self.emit_argument_type_mismatch(call_name, 0, ai, param_i, expected_ty, arg_ty, if err_arg_node > 0: err_arg_node else: node)
+                else:
+                    self.note_auto_ref_call_arg(expected_ty, arg_ty, err_arg_node, node)
         let eph_arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(extra_start + ai)
         if eph_arg_node > 0 and self.expr_is_ephemeral_task(eph_arg_node) != 0 and self.param_is_by_reference(expected_ty) == 0:
             self.emit_warning("ephemeral Task passed by value may escape", eph_arg_node)
@@ -6014,11 +6153,12 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
             if expected_ty != 0 and arg_ty != 0:
                 let exp_resolved = self.resolve_alias(expected_ty)
                 if self.type_is_dyn_object(exp_resolved) == 0:
-                    if self.types_compatible(expected_ty, arg_ty) == 0:
-                        if self.arithmetic_result_type(expected_ty, arg_ty) == 0:
-                            let err_arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
-                            if not (self.ci_syms.contains(fn_sym) and self.try_ci_coercion(arg_ty, expected_ty) != 0):
-                                self.emit_argument_type_mismatch(self.safe_symbol_text(fn_sym), fn_sym, ai, param_i, expected_ty, arg_ty, if err_arg_node > 0: err_arg_node else: node)
+                    let err_arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
+                    if self.call_arg_type_compatible(expected_ty, arg_ty) == 0:
+                        if not (self.ci_syms.contains(fn_sym) and self.try_ci_coercion(arg_ty, expected_ty) != 0):
+                            self.emit_argument_type_mismatch(self.safe_symbol_text(fn_sym), fn_sym, ai, param_i, expected_ty, arg_ty, if err_arg_node > 0: err_arg_node else: node)
+                    else:
+                        self.note_auto_ref_call_arg(expected_ty, arg_ty, err_arg_node, node)
             let eph_arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
             if eph_arg_node > 0 and self.expr_is_ephemeral_task(eph_arg_node) != 0 and self.param_is_by_reference(expected_ty) == 0:
                 self.emit_warning("ephemeral Task passed by value may escape", eph_arg_node)
@@ -7120,9 +7260,11 @@ fn Sema.check_generic_method_call(self: Sema, owner_sym: i32, owner_type: i32, m
         let expected_ty = self.resolve_type_node_with_current_subst(self.ast.fn_param_type(param_start, pi3), concrete_owner)
         let actual_ty = arg_types.get(ai3 as i64)
         if expected_ty != 0 and actual_ty != 0:
-            if self.types_compatible(expected_ty, actual_ty) == 0:
-                if self.arithmetic_result_type(expected_ty, actual_ty) == 0:
-                    self.emit_argument_type_mismatch(self.safe_symbol_text(method_fn_sym), method_fn_sym, ai3, pi3, expected_ty, actual_ty, self.ast.get_extra(extra_start + ai3))
+            let gen_method_arg = self.ast.get_extra(extra_start + ai3)
+            if self.call_arg_type_compatible(expected_ty, actual_ty) == 0:
+                self.emit_argument_type_mismatch(self.safe_symbol_text(method_fn_sym), method_fn_sym, ai3, pi3, expected_ty, actual_ty, gen_method_arg)
+            else:
+                self.note_auto_ref_call_arg(expected_ty, actual_ty, gen_method_arg, node)
 
     let ret_node = self.ast.fn_meta_ret(meta)
     let ret_ty = self.resolve_type_node_with_current_subst(ret_node, concrete_owner)
@@ -8083,10 +8225,11 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                         if exp_ty != 0 and arg_ty != 0:
                             let exp_r = self.resolve_alias(exp_ty)
                             if self.type_is_dyn_object(exp_r) == 0:
-                                if self.types_compatible(exp_ty, arg_ty) == 0:
-                                    if self.arithmetic_result_type(exp_ty, arg_ty) == 0:
-                                        let mc_err_arg = if mc_has_resolved_args != 0: self.get_resolved_call_arg(node, mc_ai) else: self.ast.get_extra(extra_start + mc_ai)
-                                        self.emit_argument_type_mismatch(mc_method_name, method_fn_sym, mc_ai, mc_sig_pi, exp_ty, arg_ty, if mc_err_arg > 0: mc_err_arg else: node)
+                                let mc_err_arg = if mc_has_resolved_args != 0: self.get_resolved_call_arg(node, mc_ai) else: self.ast.get_extra(extra_start + mc_ai)
+                                if self.call_arg_type_compatible(exp_ty, arg_ty) == 0:
+                                    self.emit_argument_type_mismatch(mc_method_name, method_fn_sym, mc_ai, mc_sig_pi, exp_ty, arg_ty, if mc_err_arg > 0: mc_err_arg else: node)
+                                else:
+                                    self.note_auto_ref_call_arg(exp_ty, arg_ty, mc_err_arg, node)
                 let mc_subst_ret = self.substitute_method_return_for_generic_inst(recv_type, type_name_sym, field, method_fn_sym, mc_ret)
                 if mc_subst_ret != 0:
                     self.record_call_view_origins(node, sig_idx, 1, expr, extra_start, mc_resolved_arg_count, mc_has_resolved_args)

@@ -420,6 +420,10 @@ type Sema {
     comp_resolved: HashMap[i32, i32],
     // Pipeline method calls: NK_PIPELINE node → method-name symbol.
     pipeline_method_calls: HashMap[i32, i32],
+    // Operator method calls: NK_BINARY node -> resolved function symbol, plus
+    // node -> 1 when the right operand is the receiver.
+    operator_method_calls: HashMap[i32, i32],
+    operator_method_reversed: HashMap[i32, i32],
     // Match value-pattern sidecar: pattern node → symbol compared by value.
     pattern_value_syms: HashMap[i32, i32],
     // Regex literal metadata sidecars, keyed by NK_REGEX_LIT/NK_PAT_REGEX node.
@@ -954,6 +958,8 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         implicit_binding_syms: Vec.new(),
         comp_resolved: sema_new_map_i32_i32(),
         pipeline_method_calls: sema_new_map_i32_i32(),
+        operator_method_calls: sema_new_map_i32_i32(),
+        operator_method_reversed: sema_new_map_i32_i32(),
         pattern_value_syms: sema_new_map_i32_i32(),
         regex_capture_counts: sema_new_map_i32_i32(),
         regex_capture_name_starts: sema_new_map_i32_i32(),
