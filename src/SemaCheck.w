@@ -507,6 +507,9 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
     if not has_ret_annotation:
         let inferred_ret = if body_ty != 0: body_ty else: self.ty_void
         self.set_sig_return_type(sig_idx, inferred_ret)
+    else if body_expected_ret != 0 and body_expected_ret != self.ty_void and body_ty == self.ty_void:
+        if self.type_has_default_value(body_expected_ret as i32) == 0:
+            self.emit_error("return type does not implement Default", body)
     else if body_expected_ret != 0 and body_ty != 0 and body_ty != self.ty_void and body_expected_ret != self.ty_void:
         // Check tail expression type against body's expected return type
         let compat = self.types_compatible(body_expected_ret as i32, body_ty as i32)
@@ -6383,6 +6386,34 @@ fn Sema.type_implements_trait(self: Sema, tid: i32, trait_sym: i32) -> i32:
     if type_sym == 0:
         return 0
     self.select_trait_impl(type_sym, trait_sym)
+
+fn Sema.type_has_default_value(self: Sema, tid: i32) -> i32:
+    if tid == 0:
+        return 0
+    let resolved = self.resolve_alias(tid as TypeId)
+    let tk = self.get_type_kind(resolved)
+    if tk == TypeKind.TY_VOID or tk == TypeKind.TY_INT or tk == TypeKind.TY_FLOAT or tk == TypeKind.TY_BOOL or tk == TypeKind.TY_STR or tk == TypeKind.TY_PTR:
+        return 1
+    if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_RANGE:
+        return self.type_has_default_value(self.get_type_d0(resolved))
+    if tk == TypeKind.TY_TUPLE:
+        let te_start = self.get_type_d0(resolved)
+        let elem_count = self.get_type_d1(resolved)
+        for ei in 0..elem_count:
+            if self.type_has_default_value(self.type_extra.get((te_start + ei) as i64)) == 0:
+                return 0
+        return 1
+    if tk == TypeKind.TY_GENERIC_INST:
+        let base = self.get_generic_inst_base(resolved as i32)
+        let arg_count = self.get_generic_inst_arg_count(resolved as i32)
+        if base == self.syms.option or base == self.syms.vec or base == self.syms.hashmap or base == self.syms.hashset:
+            return 1
+        if base == self.syms.result and arg_count == 2:
+            return self.type_has_default_value(self.get_generic_inst_arg(resolved as i32, 0))
+    let default_trait = self.pool_lookup_symbol("Default")
+    if default_trait != 0 and self.type_implements_trait(resolved as i32, default_trait) != 0:
+        return 1
+    0
 
 // Resolve an associated type from a specific impl: find the impl block for (type_sym, trait_sym)
 // and look up the associated type binding for assoc_sym.
