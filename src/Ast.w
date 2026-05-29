@@ -1360,8 +1360,8 @@ fn AstPool.for_binding_is_pattern(self: AstPool, node: NodeId) -> bool:
 //                   For enum: extra=[variant_count, [var_name, payload_count, payload_type...]*, vis, tp_start, tp_count]
 //                   For alias/distinct: extra=[aliased_or_inner_type, vis, tp_start, tp_count]
 //
-// NodeKind.NK_USE_DECL:      d0=extra_start, d1=path_count, d2=0
-//                   extra: [sym, sym, ...]
+// NodeKind.NK_USE_DECL:      d0=extra_start, d1=path_count, d2=selector_count
+//                   extra: [path_sym..., selector_sym...]
 //
 // NodeKind.NK_LET_DECL:      d0=name(sym), d1=value(node), d2=flags (bit0=mut, bit1=pub)
 //                   extra: [type_expr(node)] if type annotation present

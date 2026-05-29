@@ -110,7 +110,13 @@
   │                                                                                                                │             │                   │      │ now return internal exclusive refs, enforce    │
   │                                                                                                                │             │                   │      │ mutable-place receivers, and lower through     │
   │                                                                                                                │             │                   │      │ MIR downcasts. Spec §4.4 / impl notes §19.     │
-  │ #209-#214                                                                                                      │         Yes │                No │   No │ Remaining §4 values/types skipped sketches.   │
+  │ [x] #209                                                                                                       │         Yes │               Yes │   No │ Completed: use Type.{Variant...} selector      │
+  │                                                                                                                │             │                   │      │ imports are preserved for local enum           │
+  │                                                                                                                │             │                   │      │ constructor imports; Sema binds imported       │
+  │                                                                                                                │             │                   │      │ constructors to enum owners and reports        │
+  │                                                                                                                │             │                   │      │ invalid/ambiguous selector imports. Spec       │
+  │                                                                                                                │             │                   │      │ §4.4 / §18.2.                                  │
+  │ #210-#214                                                                                                      │         Yes │                No │   No │ Remaining §4 values/types skipped sketches.   │
   │                                                                                                                │             │                   │      │ Cover ranges, tuples, unit elision, implicit   │
   │                                                                                                                │             │                   │      │ Ok.                                            │
   │ #215-#217                                                                                                      │         Yes │                No │   No │ §5-§6 ephemeral/handles sketches. Split into   │
