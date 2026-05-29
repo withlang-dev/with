@@ -116,6 +116,8 @@ type SemaBuiltinSymbols {
     veciterplace: i32,
     vecrange: i32,
     veciterref: i32,
+    range_type: i32,
+    range_inclusive_type: i32,
     iter_place: i32,
     iter_ref: i32,
     range_method: i32,
@@ -676,6 +678,8 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         veciterplace: 0,
         vecrange: 0,
         veciterref: 0,
+        range_type: 0,
+        range_inclusive_type: 0,
         iter_place: 0,
         iter_ref: 0,
         range_method: 0,
@@ -1266,6 +1270,8 @@ fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.syms.veciterplace = self.pool_intern("VecIterPlace")
     self.syms.vecrange = self.pool_intern("VecRange")
     self.syms.veciterref = self.pool_intern("VecIterRef")
+    self.syms.range_type = self.pool_intern("Range")
+    self.syms.range_inclusive_type = self.pool_intern("RangeInclusive")
     self.syms.iter_place = self.pool_intern("iter_place")
     self.syms.iter_ref = self.pool_intern("iter_ref")
     self.syms.range_method = self.pool_intern("range")
@@ -1735,6 +1741,29 @@ fn Sema.find_range_type(self: Sema, elem_tid: TypeId, inclusive: i32) -> TypeId:
                     return ti as TypeId
     0 as TypeId
 
+fn Sema.range_type_constructor_inclusive(self: Sema, sym: i32) -> i32:
+    if sym == self.syms.range_type:
+        return 0
+    if sym == self.syms.range_inclusive_type:
+        return 1
+    -1
+
+fn Sema.canonical_symbol_by_text(self: Sema, sym: i32) -> i32:
+    let text = self.pool_resolve_symbol(sym)
+    let canonical = if text.len() > 0: self.pool_lookup_symbol(text) else: 0
+    if canonical != 0:
+        return canonical
+    sym
+
+fn Sema.canonical_range_type_constructor_inclusive(self: Sema, sym: i32) -> i32:
+    let direct = self.range_type_constructor_inclusive(sym)
+    if direct >= 0:
+        return direct
+    let canonical = self.canonical_symbol_by_text(sym)
+    if canonical != sym:
+        return self.range_type_constructor_inclusive(canonical)
+    -1
+
 // Pre-register generic instantiation types needed by MirLower so that
 // downstream passes never need to mutate the type tables.
 // Must be called after check_module() and before freeze_types().
@@ -1802,10 +1831,20 @@ fn Sema.preregister_mir_types(self: Sema):
 
 fn Sema.resolve_generic_type(self: Sema, node: i32) -> i32:
     var gi_base_sym = self.ast.get_data0(node)
+    let range_inclusive = self.canonical_range_type_constructor_inclusive(gi_base_sym)
+    if range_inclusive >= 0:
+        let gi_arg_count = self.ast.get_data2(node)
+        if gi_arg_count != 1:
+            self.emit_error("Range expects exactly one type argument", node)
+            return 0
+        let gi_extra_start = self.ast.get_data1(node)
+        let elem_tid = self.resolve_type_expr(self.ast.get_extra(gi_extra_start))
+        if elem_tid == 0:
+            return 0
+        return self.ensure_exact_type(TypeKind.TY_RANGE, elem_tid as i32, range_inclusive, 0) as i32
     var gi_base_tid = self.lookup_named_type_visible(gi_base_sym)
     if gi_base_tid == 0:
-        let gi_base_text = self.pool_resolve_symbol(gi_base_sym)
-        let canonical_base = if gi_base_text.len() > 0: self.pool_lookup_symbol(gi_base_text) else: 0
+        let canonical_base = self.canonical_symbol_by_text(gi_base_sym)
         if canonical_base != 0 and canonical_base != gi_base_sym:
             gi_base_sym = canonical_base
             gi_base_tid = self.lookup_named_type_visible(gi_base_sym)
@@ -2820,6 +2859,10 @@ fn Sema.types_compatible_fast(self: Sema, expected: TypeId, actual: TypeId) -> i
         return if self.get_type_d0(exp_r) == self.get_type_d0(act_r): 1 else: 0
     if exp_k == TypeKind.TY_ENUM and act_k == TypeKind.TY_ENUM:
         return if self.get_type_d0(exp_r) == self.get_type_d0(act_r): 1 else: 0
+    if exp_k == TypeKind.TY_RANGE and act_k == TypeKind.TY_RANGE:
+        if self.get_type_d1(exp_r) != self.get_type_d1(act_r):
+            return 0
+        return self.types_compatible_fast(self.get_type_d0(exp_r), self.get_type_d0(act_r))
     // TypeKind.TY_GENERIC_INST: compatible if same base and all args compatible
     if exp_k == TypeKind.TY_GENERIC_INST and act_k == TypeKind.TY_GENERIC_INST:
         if self.get_type_d0(exp_r) == self.get_type_d0(act_r):
