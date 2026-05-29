@@ -52,10 +52,18 @@ git status -sb
 git pull --ff-only
 ```
 
-Set the release version explicitly:
+Set the release version explicitly for the rest of the flow:
 
 ```sh
 export WITH_VERSION=v0.14.3
+```
+
+Bump `src/version` to the release tag and commit it:
+
+```sh
+echo "$WITH_VERSION" >src/version
+git add src/version
+git commit -m "release: $WITH_VERSION"
 ```
 
 Run the release gates with the primary build interface on every release
