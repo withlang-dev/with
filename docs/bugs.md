@@ -208,7 +208,11 @@
   │                                                                                                                │             │                   │      │ randomly chooses among ready branches, and     │
   │                                                                                                                │             │                   │      │ biased select chooses the first ready branch.  │
   │                                                                                                                │             │                   │      │ Spec §14.10.                                   │
-  │ #258-#265, #267-#274                                                                                          │         Yes │           Partial │   No │ Remaining §14 async sketches. Runtime has many │
+  │ [x] #258                                                                                                      │         Yes │               Yes │   No │ Completed: .await inside higher-order Vec.map  │
+  │                                                                                                                │             │                   │      │ and Vec.fold closures works; closure MIR       │
+  │                                                                                                                │             │                   │      │ emission now terminates await cancellation's   │
+  │                                                                                                                │             │                   │      │ default-unreachable block. Spec §14.13.        │
+  │ #259-#265, #267-#274                                                                                          │         Yes │           Partial │   No │ Remaining §14 async sketches. Runtime has many │
   │                                                                                                                │             │                   │      │ behavior tests now, but spec sketches still    │
   │                                                                                                                │             │                   │      │ cover missing/unchecked semantics:             │
   │                                                                                                                │             │                   │      │ cancellation, ScopedSend, no-await-in-         │
