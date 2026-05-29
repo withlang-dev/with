@@ -3321,6 +3321,10 @@ fn Sema.check_assign(self: Sema, node: i32) -> i32:
         if assign_root != 0 and self.scope_is_view_bound(assign_root) != 0:
             self.emit_error("cannot mutate through read-only view yielded by iterator (§15.17)", node)
 
+    let mutation_packed = self.classify_place(target)
+    if unpack_place_kind(mutation_packed) != PlaceKind.PK_NotPlace and unpack_place_mut(mutation_packed) != PlaceMut.PM_ReadOnly:
+        self.check_mutation_against_views(target, node)
+
     // Check type compatibility
     if target_type != 0 and value_type != 0:
         if self.types_compatible(target_type as i32, value_type as i32) == 0:
@@ -8206,7 +8210,7 @@ fn Sema.check_mutation_against_views(self: Sema, place_node: i32, err_node: i32)
         let last_use = self.find_last_use_in_block(self.current_block_extra_start, self.current_block_stmt_count, self.current_block_stmt_index + 1, self.current_block_tail, ref_sym)
         let mutation_start = self.ast.get_start(err_node)
         let mutation_end = self.ast.get_end(err_node)
-        let diag = Diagnostic.warn("cannot mutate `" ++ place_name ++ "` while read-only view `" ++ ref_name ++ "` is live (§15.6)", Span { file: self.local_file_id, start: mutation_start, end: mutation_end })
+        let diag = Diagnostic.err("cannot mutate `" ++ place_name ++ "` while read-only view `" ++ ref_name ++ "` is live (§15.6)", Span { file: self.local_file_id, start: mutation_start, end: mutation_end })
         if creation_node != 0:
             let cr_start = self.ast.get_start(creation_node)
             let cr_end = self.ast.get_end(creation_node)

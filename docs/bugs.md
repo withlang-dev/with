@@ -56,10 +56,14 @@
   │                                                                                                                │             │                   │      │ be requested explicitly. Equal-index access    │
   │                                                                                                                │             │                   │      │ now panics loudly; emit-C fails loudly instead │
   │                                                                                                                │             │                   │      │ of emitting invalid get_disjoint C.            │
-  │ #198-#199, #202-#203                                                                                            │         Yes │                No │   No │ §3 references/borrowing skipped sketches.      │
+  │ #198, #202-#203                                                                                                 │         Yes │                No │   No │ §3 references/borrowing skipped sketches.      │
   │                                                                                                                │             │                   │      │ Implement executable tests for disjoint        │
   │                                                                                                                │             │                   │      │ borrows, trait object coercion, and            │
   │                                                                                                                │             │                   │      │ second-class references.                       │
+  │ [x] #199                                                                                                       │         Yes │               Yes │   No │ Completed: assignment now checks path-aware    │
+  │                                                                                                                │             │                   │      │ live views, so same-field and whole-value      │
+  │                                                                                                                │             │                   │      │ mutations are rejected while disjoint field    │
+  │                                                                                                                │             │                   │      │ mutations remain accepted. Spec §3.6 / §21.1.  │
   │ [x] #197                                                                                                       │         Yes │               Yes │   No │ Completed: returning references is covered by  │
   │                                                                                                                │             │                   │      │ executable positive tests and negative         │
   │                                                                                                                │             │                   │      │ regressions for direct, binding, and call-     │
