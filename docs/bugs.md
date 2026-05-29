@@ -106,7 +106,11 @@
   │                                                                                                                │             │                   │      │ through MIR discriminants/downcasts; Option    │
   │                                                                                                                │             │                   │      │ tuple payloads now have LLVM type mappings.    │
   │                                                                                                                │             │                   │      │ Spec §4.4.                                     │
-  │ #208-#214                                                                                                      │         Yes │                No │   No │ Remaining §4 values/types skipped sketches.   │
+  │ [x] #208                                                                                                       │         Yes │               Yes │   No │ Completed: as_*_mut generated enum accessors   │
+  │                                                                                                                │             │                   │      │ now return internal exclusive refs, enforce    │
+  │                                                                                                                │             │                   │      │ mutable-place receivers, and lower through     │
+  │                                                                                                                │             │                   │      │ MIR downcasts. Spec §4.4 / impl notes §19.     │
+  │ #209-#214                                                                                                      │         Yes │                No │   No │ Remaining §4 values/types skipped sketches.   │
   │                                                                                                                │             │                   │      │ Cover ranges, tuples, unit elision, implicit   │
   │                                                                                                                │             │                   │      │ Ok.                                            │
   │ #215-#217                                                                                                      │         Yes │                No │   No │ §5-§6 ephemeral/handles sketches. Split into   │

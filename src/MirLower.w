@@ -5101,8 +5101,9 @@ fn MirBuilder.enum_accessor_payload_operand(self: MirBuilder, enum_place: i32, e
     if payload_count == 1:
         let payload_ty = payloads.get(0)
         let field_place = self.body.new_field_place(variant_place, 0, payload_ty)
-        if accessor_kind == 3:
-            let ref_rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, field_place, 0)
+        if accessor_kind == 3 or accessor_kind == 4:
+            let borrow_kind = if accessor_kind == 4: BorrowKind.EXCLUSIVE else: BorrowKind.SHARED
+            let ref_rv = self.body.new_rvalue(RvalueKind.RK_REF, borrow_kind, field_place, 0)
             let ref_tmp = self.new_temp(unwrapped_ty)
             let ref_place = self.place_for_local(ref_tmp)
             self.body.push_stmt(self.cur_bb, StmtKind.Assign, ref_place, ref_rv, span)
@@ -5116,9 +5117,11 @@ fn MirBuilder.enum_accessor_payload_operand(self: MirBuilder, enum_place: i32, e
     for pi in 0..payload_count:
         let payload_ty = payloads.get(pi as i64)
         let field_place = self.body.new_field_place(variant_place, pi, payload_ty)
-        if accessor_kind == 3:
-            let elem_ty = if tuple_elem_start > 0: self.sema.type_extra.get((tuple_elem_start + pi) as i64) else: self.sema.ensure_exact_type(TypeKind.TY_REF, payload_ty, 0, 0) as i32
-            let ref_rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, field_place, 0)
+        if accessor_kind == 3 or accessor_kind == 4:
+            let ref_mut = if accessor_kind == 4: 1 else: 0
+            let elem_ty = if tuple_elem_start > 0: self.sema.type_extra.get((tuple_elem_start + pi) as i64) else: self.sema.ensure_exact_type(TypeKind.TY_REF, payload_ty, ref_mut, 0) as i32
+            let borrow_kind = if accessor_kind == 4: BorrowKind.EXCLUSIVE else: BorrowKind.SHARED
+            let ref_rv = self.body.new_rvalue(RvalueKind.RK_REF, borrow_kind, field_place, 0)
             let ref_tmp = self.new_temp(elem_ty)
             let ref_place = self.place_for_local(ref_tmp)
             self.body.push_stmt(self.cur_bb, StmtKind.Assign, ref_place, ref_rv, span)

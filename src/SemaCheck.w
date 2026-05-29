@@ -4393,10 +4393,13 @@ fn Sema.enum_accessor_variant_for_method(self: Sema, enum_tid: i32, method_sym: 
             return variant_sym
         if method_name == "as_" ++ snake ++ "_ref":
             return variant_sym
+        if method_name == "as_" ++ snake ++ "_mut":
+            return variant_sym
         pos = pos + 2 + payload_count
     0
 
-// 1 = is_variant, 2 = as_variant by value, 3 = as_variant_ref by shared ref.
+// 1 = is_variant, 2 = as_variant by value, 3 = as_variant_ref by shared ref,
+// 4 = as_variant_mut by exclusive ref.
 fn Sema.enum_accessor_kind_for_method(self: Sema, enum_tid: i32, method_sym: i32) -> i32:
     let variant_sym = self.enum_accessor_variant_for_method(enum_tid, method_sym)
     if variant_sym == 0:
@@ -4409,6 +4412,8 @@ fn Sema.enum_accessor_kind_for_method(self: Sema, enum_tid: i32, method_sym: i32
         return 2
     if method_name == "as_" ++ snake ++ "_ref":
         return 3
+    if method_name == "as_" ++ snake ++ "_mut":
+        return 4
     0
 
 fn Sema.enum_variant_index_for_type(self: Sema, enum_tid: i32, variant_sym: i32) -> i32:
@@ -4452,6 +4457,8 @@ fn Sema.enum_accessor_return_type(self: Sema, enum_tid: i32, variant_sym: i32, a
         var elem_ty = payloads.get(pi as i64)
         if accessor_kind == 3:
             elem_ty = self.ensure_exact_type(TypeKind.TY_REF, elem_ty, 0, 0) as i32
+        else if accessor_kind == 4:
+            elem_ty = self.ensure_exact_type(TypeKind.TY_REF, elem_ty, 1, 0) as i32
         elem_tys.push(elem_ty)
     let payload_ty = if payload_count == 1:
         elem_tys.get(0)
@@ -7490,7 +7497,7 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
             self.emit_error("enum accessor method expects zero arguments", node)
             return 0
         let enum_payloads = self.enum_variant_payload_types(recv_type as i32, enum_accessor_variant)
-        if enum_accessor_kind == 2 or enum_accessor_kind == 3:
+        if enum_accessor_kind == 2 or enum_accessor_kind == 3 or enum_accessor_kind == 4:
             if enum_payloads.len() as i32 == 0:
                 self.emit_error("unit enum variant has no payload accessor; use .is_" ++ sema_accessor_snake_name(self.pool_resolve(enum_accessor_variant)) ++ "() instead", node)
                 return 0
@@ -7503,6 +7510,19 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
             self.mark_moved_if_consumed(expr)
         else if enum_accessor_kind == 3:
             self.check_borrow_create(expr, BorrowKind.SHARED, node)
+        else if enum_accessor_kind == 4:
+            let recv_packed = self.classify_place(expr)
+            let recv_kind = unpack_place_kind(recv_packed)
+            let recv_mut_state = unpack_place_mut(recv_packed)
+            let recv_via_ro_ref = self.place_base_is_read_only_ref(expr)
+            if recv_kind == PlaceKind.PK_NotPlace:
+                self.emit_error("mutable enum accessor requires a place receiver", node)
+                return 0
+            if recv_mut_state == PlaceMut.PM_ReadOnly or recv_via_ro_ref != 0:
+                self.emit_error("cannot call mutable enum accessor through a read-only place", node)
+                return 0
+            self.check_mutation_against_views(expr, node)
+            self.check_borrow_create(expr, BorrowKind.EXCLUSIVE, node)
         let enum_accessor_ret = self.enum_accessor_return_type(recv_type as i32, enum_accessor_variant, enum_accessor_kind)
         if enum_accessor_ret != 0:
             self.typed_expr_types.insert(node, enum_accessor_ret)
@@ -9123,7 +9143,9 @@ fn Sema.classify_deref(self: Sema, operand_type: i32) -> i64:
     let resolved = self.resolve_alias(operand_type as TypeId)
     let tk = self.get_type_kind(resolved)
     if tk == TypeKind.TY_REF:
-        // *r where r: &T is always read-only (§2.3).
+        if self.get_type_d1(resolved) != 0:
+            return pack_place(PlaceKind.PK_DerefRef, PlaceMut.PM_Mutable)
+        // *r where r: &T is read-only (§2.3).
         return pack_place(PlaceKind.PK_DerefRef, PlaceMut.PM_ReadOnly)
     if tk == TypeKind.TY_PTR:
         if self.get_type_d1(resolved) != 0:
