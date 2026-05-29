@@ -268,6 +268,8 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> TypeId:
     if kind == NodeKind.NK_TYPE_TUPLE:
         let extra_start = self.ast.get_data0(node)
         let elem_count = self.ast.get_data1(node)
+        if elem_count == 0:
+            return self.ty_void
         let tuple_elems: Vec[i32] = Vec.new()
         for ei in 0..elem_count:
             let e_node = self.ast.get_extra(extra_start + ei)
@@ -1698,6 +1700,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
             self.emit_error("Regex type is not available; import std.regex", node)
             return 0 as TypeId
         self.validate_regex_literal(node)
+        self.typed_expr_types.insert(node, regex_ty)
         return regex_ty as TypeId
 
     if kind == NodeKind.NK_FSTRING:
@@ -4613,6 +4616,17 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
         if resolved_kind == TypeKind.TY_GENERIC_INST and payload_count > 0:
             let gi_base = self.get_generic_inst_base(resolved)
             gi_payload_types = self.resolve_generic_enum_payload(resolved, gi_base, v_name, payload_count)
+        var unit_elided_payload_pattern = 0
+        if bind_count == 0 and payload_count == 1:
+            var only_payload_ty = self.type_extra.get(payload_start as i64)
+            if gi_payload_types.len() as i32 > 0 and gi_payload_types.get(0) != 0:
+                only_payload_ty = gi_payload_types.get(0)
+            if self.type_is_unit(only_payload_ty) != 0:
+                unit_elided_payload_pattern = 1
+        if unit_elided_payload_pattern == 0 and bind_count != payload_count:
+            let v_text = self.pool_resolve(v_name)
+            self.emit_error(f"variant pattern '{v_text}' expects {payload_count} payload pattern(s), found {bind_count}", node)
+            return
         for bi in 0..bind_count:
             let inner_pat = self.ast.get_extra(v_extra + bi)
             var inner_ty = if bi < payload_count: self.type_extra.get((payload_start + bi) as i64) else: 0
@@ -5005,10 +5019,10 @@ fn Sema.pipeline_generic_builtin_method_exists(self: Sema, owner_sym: i32, field
         if field == self.syms.contains or field == self.syms.remove or field == self.syms.len:
             return 1
     if owner_sym == self.syms.option:
-        if field == self.syms.unwrap or field == self.syms.is_some or field == self.syms.is_none or field == self.syms.filter:
+        if field == self.syms.unwrap or field == self.syms.is_some or field == self.syms.is_none or field == self.syms.filter or self.pool_resolve(field) == "unwrap_or":
             return 1
     if owner_sym == self.syms.result:
-        if field == self.syms.unwrap or field == self.syms.is_ok or field == self.syms.is_err:
+        if field == self.syms.unwrap or field == self.syms.is_ok or field == self.syms.is_err or self.pool_resolve(field) == "unwrap_or":
             return 1
     if owner_sym == self.syms.vecslot or owner_sym == self.syms.vecrange:
         if field == self.syms.get or self.pool_resolve(field) == "set" or self.pool_resolve(field) == "len":
@@ -5041,6 +5055,9 @@ fn Sema.pipeline_method_exists(self: Sema, recv_type: i32, method: i32) -> i32:
 fn Sema.check_tuple(self: Sema, node: i32) -> i32:
     let extra_start = self.ast.get_data0(node)
     let elem_count = self.ast.get_data1(node)
+    if elem_count == 0:
+        self.typed_expr_types.insert(node, self.ty_void as i32)
+        return self.ty_void as i32
     var expected_tuple = 0
     var expected_elem_start = 0
     if self.has_expected_type != 0 and self.expected_expr_type != 0:
@@ -5376,6 +5393,33 @@ fn Sema.transmute_target_type(self: Sema, callee: i32) -> i32:
         self.ast.get_data1(callee)
     self.resolve_type_expr(tp_node) as i32
 
+fn Sema.type_is_unit(self: Sema, tid: i32) -> i32:
+    if tid == 0:
+        return 0
+    let resolved = self.resolve_alias(tid as TypeId)
+    if resolved == self.ty_void:
+        return 1
+    if self.get_type_kind(resolved) == TypeKind.TY_TUPLE and self.get_type_d1(resolved) == 0:
+        return 1
+    0
+
+fn Sema.store_unit_elided_call_arg(self: Sema, call_node: i32):
+    let args: Vec[i32] = Vec.new()
+    args.push(0)
+    self.store_resolved_call_args(call_node, args)
+
+fn Sema.try_unit_elide_call_arg(self: Sema, call_node: i32, arg_count: i32, expected_ty: i32) -> i32:
+    if arg_count != 0:
+        return 0
+    if self.ast.has_call_named_args(call_node) != 0:
+        return 0
+    if self.has_resolved_call_args(call_node) != 0:
+        return 0
+    if self.type_is_unit(expected_ty) == 0:
+        return 0
+    self.store_unit_elided_call_arg(call_node)
+    1
+
 fn Sema.check_callable_value_call(self: Sema, call_name: str, fn_tid: i32, closure_node: i32, node: i32, extra_start: i32, arg_count: i32, param_offset: i32, has_resolved: i32, arg_types: Vec[i32]) -> i32:
     let expected = self.get_type_d1(fn_tid)
     let actual = arg_count + param_offset
@@ -5515,7 +5559,16 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
     let sig_idx_raw = if self.generic_fn_nodes.contains(fn_sym): -1 else: self.get_sig(fn_sym)
     let sig_idx = if sig_idx_raw >= 0 and self.is_ci_visible(fn_sym) == 0: -1 else: sig_idx_raw
     let variant_expected_ty = if self.variant_lookup.contains(fn_sym) and self.is_ci_visible(fn_sym) != 0: self.expected_variant_constructor_type(fn_sym) else: 0
-    let variant_payload_tys = if variant_expected_ty != 0: self.enum_variant_payload_types(variant_expected_ty, fn_sym) else: Vec.new()
+    let imported_variant_owner_for_call = if self.imported_variant_owners.contains(fn_sym): self.imported_variant_owners.get(fn_sym).unwrap() else: 0
+    let variant_payload_owner = if variant_expected_ty != 0:
+        variant_expected_ty
+    else if imported_variant_owner_for_call != 0:
+        imported_variant_owner_for_call
+    else if self.variant_type_ids.contains(fn_sym):
+        self.variant_type_ids.get(fn_sym).unwrap()
+    else:
+        0
+    let variant_payload_tys = if variant_payload_owner != 0: self.enum_variant_payload_types(variant_payload_owner, fn_sym) else: Vec.new()
 
     // Resolve named arguments: reorder args to match parameter order, fill defaults
     var resolved_extra_start = extra_start
@@ -5649,6 +5702,33 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
                             if resolved_defaults.contains(pi):
                                 self.mark_resolved_call_arg_default(node, pi - param_offset)
                         resolved_arg_count = param_count - param_offset
+
+    if self.has_resolved_call_args(node) == 0 and self.ast.has_call_named_args(node) == 0 and arg_count == 0:
+        if sig_idx >= 0:
+            let sig_param_count = self.sig_get_param_count(sig_idx)
+            if sig_param_count - param_offset == 1:
+                let expected_unit_ty = self.sig_param_type(sig_idx, param_offset)
+                if self.try_unit_elide_call_arg(node, arg_count, expected_unit_ty) != 0:
+                    resolved_arg_count = 1
+        else if callable_value_tid != 0:
+            let callable_param_count = self.get_type_d1(callable_value_tid as TypeId)
+            if callable_param_count - param_offset == 1:
+                let expected_callable_ty = self.callable_fn_param_type(callable_value_tid as TypeId, param_offset)
+                if self.try_unit_elide_call_arg(node, arg_count, expected_callable_ty) != 0:
+                    resolved_arg_count = 1
+        else if variant_payload_tys.len() as i32 == 1:
+            let expected_variant_unit_ty = variant_payload_tys.get(0)
+            if self.try_unit_elide_call_arg(node, arg_count, expected_variant_unit_ty) != 0:
+                resolved_arg_count = 1
+        else if self.generic_fn_nodes.contains(fn_sym):
+            let gen_fn_node = self.generic_fn_nodes.get(fn_sym).unwrap()
+            let gen_meta = self.ast.find_fn_meta(gen_fn_node)
+            if gen_meta >= 0 and self.ast.fn_meta_param_count(gen_meta) == 1:
+                let gen_param_start = self.ast.fn_meta_param_start(gen_meta)
+                let gen_param_ty_node = self.ast.fn_param_type(gen_param_start, 0)
+                let gen_expected_ty = if gen_param_ty_node != 0: self.resolve_type_expr(gen_param_ty_node) as i32 else: 0
+                if self.try_unit_elide_call_arg(node, arg_count, gen_expected_ty) != 0:
+                    resolved_arg_count = 1
 
     // Check all arguments (with contextual expected-type propagation when
     // calling a known function signature).
@@ -5815,20 +5895,36 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
     // Generic function
     if self.generic_fn_nodes.contains(fn_sym):
         let fn_node = self.generic_fn_nodes.get(fn_sym).unwrap()
-        let ret = self.check_generic_call(fn_sym, fn_node, arg_types, arg_count, node)
+        let ret = self.check_generic_call(fn_sym, fn_node, arg_types, resolved_arg_count, node)
         self.comp_resolved.insert(node, fn_sym)
         self.typed_expr_types.insert(node, ret)
         return ret
 
     // Enum variant constructor
     if self.variant_lookup.contains(fn_sym):
-        let inferred_variant_ty = self.infer_generic_enum_variant_type(fn_sym, arg_types, arg_count)
-        let imported_variant_ty = if self.imported_variant_owners.contains(fn_sym): self.imported_variant_owners.get(fn_sym).unwrap() else: 0
+        let inferred_variant_ty = self.infer_generic_enum_variant_type(fn_sym, arg_types, resolved_arg_count)
+        let imported_variant_ty = imported_variant_owner_for_call
         let variant_tid = self.variant_type_ids.get(fn_sym).unwrap()
         var final_variant_ty: TypeId = if variant_expected_ty != 0: variant_expected_ty as TypeId else:
             if imported_variant_ty != 0: imported_variant_ty as TypeId else: variant_tid as TypeId
         if inferred_variant_ty != 0:
             final_variant_ty = self.preferred_compatible_type(final_variant_ty, inferred_variant_ty as TypeId)
+        let final_payload_tys = self.enum_variant_payload_types(final_variant_ty as i32, fn_sym)
+        let expected_payload_count = final_payload_tys.len() as i32
+        if resolved_arg_count != expected_payload_count:
+            let variant_name = self.pool_resolve(fn_sym)
+            self.emit_error(f"enum variant constructor '{variant_name}' expects {expected_payload_count} argument(s), found {resolved_arg_count}", node)
+        for ai in 0..resolved_arg_count:
+            if ai >= expected_payload_count:
+                break
+            let expected_ty = final_payload_tys.get(ai as i64)
+            let arg_ty = arg_types.get(ai as i64)
+            if expected_ty != 0 and arg_ty != 0:
+                if self.types_compatible(expected_ty, arg_ty) == 0:
+                    if self.arithmetic_result_type(expected_ty, arg_ty) == 0:
+                        let err_arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
+                        let variant_name2 = self.pool_resolve(fn_sym)
+                        self.emit_argument_type_mismatch(variant_name2, fn_sym, ai, ai, expected_ty, arg_ty, if err_arg_node > 0: err_arg_node else: node)
         let resolved_variant_sym = self.qualified_enum_variant_sym(final_variant_ty as i32, fn_sym)
         self.comp_resolved.insert(node, resolved_variant_sym)
         self.typed_expr_types.insert(node, final_variant_ty as i32)
@@ -7055,7 +7151,7 @@ fn Sema.builtin_intrinsic_method_return_type(self: Sema, recv_type: i32, owner_s
     if owner_sym == self.syms.option:
         if field == self.syms.is_some or field == self.syms.is_none:
             return self.ty_bool as i32
-        if field == self.syms.unwrap:
+        if field == self.syms.unwrap or method_name == "unwrap_or":
             if tk == TypeKind.TY_GENERIC_INST:
                 return self.get_generic_inst_arg(resolved as i32, 0)
         if field == self.syms.filter:
@@ -7063,7 +7159,7 @@ fn Sema.builtin_intrinsic_method_return_type(self: Sema, recv_type: i32, owner_s
     if owner_sym == self.syms.result:
         if field == self.syms.is_ok or field == self.syms.is_err:
             return self.ty_bool as i32
-        if field == self.syms.unwrap:
+        if field == self.syms.unwrap or method_name == "unwrap_or":
             if tk == TypeKind.TY_GENERIC_INST:
                 return self.get_generic_inst_arg(resolved as i32, 0)
     if self.pool_resolve(owner_sym) == "Atomic":
@@ -7142,6 +7238,8 @@ fn Sema.method_expected_arg_type(self: Sema, recv_type: i32, field: i32, arg_ind
         if field == self.syms.insert and arg_index == 1:
             return self.get_generic_inst_arg(resolved as i32, 1)
     if owner_name == "Sender" and method_name == "send" and arg_index == 0:
+        return self.get_generic_inst_arg(resolved as i32, 0)
+    if (owner_sym == self.syms.option or owner_sym == self.syms.result) and method_name == "unwrap_or" and arg_index == 0:
         return self.get_generic_inst_arg(resolved as i32, 0)
     0
 
@@ -7441,8 +7539,28 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
     let arg_types: Vec[i32] = Vec.new()
     // docs/mut.md Rev 8 §15.8 — see check_call.
     let mc_iter_borrow_idxs: Vec[i32] = Vec.new()
-    for ai in 0..arg_count:
-        let mc_arg_node = self.ast.get_extra(extra_start + ai)
+    var mc_resolved_arg_count = arg_count
+    if self.has_resolved_call_args(node) == 0 and self.ast.has_call_named_args(node) == 0 and arg_count == 0:
+        var mc_unit_expected = self.atomic_method_expected_arg_type(mc_order_type, field, 0)
+        if mc_unit_expected == 0:
+            mc_unit_expected = self.method_expected_arg_type(obj_type as i32, field, 0)
+        if mc_unit_expected == 0 and self.static_receiver_type_is_known(expr) != 0 and self.enum_has_variant(obj_type, field) != 0:
+            let mc_payload_tys = self.enum_variant_payload_types(obj_type, field)
+            if mc_payload_tys.len() as i32 == 1:
+                mc_unit_expected = mc_payload_tys.get(0)
+        if self.try_unit_elide_call_arg(node, arg_count, mc_unit_expected) != 0:
+            mc_resolved_arg_count = 1
+    let mc_has_resolved_args = self.has_resolved_call_args(node)
+    for ai in 0..mc_resolved_arg_count:
+        let mc_arg_node = if mc_has_resolved_args != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(extra_start + ai)
+        if mc_arg_node == 0:
+            arg_types.push(0)
+            continue
+        if mc_arg_node < 0:
+            let mc_bind_sym = 0 - mc_arg_node
+            arg_types.push(self.scope_lookup(mc_bind_sym) as i32)
+            continue
+
         let mc_is_closure = self.ast.kind(mc_arg_node) == NodeKind.NK_CLOSURE
         var mc_closure_arg_escapes = 0
         if mc_is_closure and mc_sig_idx_for_effect >= 0:
@@ -7471,9 +7589,9 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
         mc_ibi = mc_ibi - 1
 
     // docs/mut.md Rev 8 §9.2 — closure capture conflict detection.
-    self.check_closure_capture_conflicts(extra_start, arg_count, 0, node)
+    self.check_closure_capture_conflicts(extra_start, mc_resolved_arg_count, mc_has_resolved_args, node)
 
-    let inferred_pending_receiver = self.infer_pending_generic_method_receiver(expr, field, arg_types, arg_count, node)
+    let inferred_pending_receiver = self.infer_pending_generic_method_receiver(expr, field, arg_types, mc_resolved_arg_count, node)
     if inferred_pending_receiver != 0:
         obj_type = inferred_pending_receiver as TypeId
 
@@ -7485,7 +7603,7 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
     if field == self.syms.cancel or field == self.syms.is_done:
         if self.expr_is_task_value(expr) == 0 and self.expr_is_scoped_task_value(expr) == 0:
             return 0
-        if arg_count != 0:
+        if mc_resolved_arg_count != 0:
             self.emit_error("task method expects zero arguments", node)
             return 0
         if field == self.syms.cancel:
@@ -7496,7 +7614,7 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
         if self.ast.kind(expr) != NodeKind.NK_IDENT or self.is_active_async_scope_symbol(self.ast.get_data0(expr)) == 0:
             self.emit_error("track() is only available inside async scope", node)
             return 0
-        if arg_count <= 0:
+        if mc_resolved_arg_count <= 0:
             self.emit_error("track() requires a Task value", node)
             return 0
         let task_arg = self.ast.get_extra(extra_start)
@@ -7513,7 +7631,7 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
     var recv_type = self.auto_deref_ref_ptr_type(resolved)
     let dyn_trait_sym = self.dyn_trait_symbol_for_type(obj_type as i32)
     if dyn_trait_sym != 0:
-        let dyn_ret = self.check_dyn_trait_method_call(dyn_trait_sym, field, arg_types, extra_start, arg_count, node)
+        let dyn_ret = self.check_dyn_trait_method_call(dyn_trait_sym, field, arg_types, extra_start, mc_resolved_arg_count, node)
         if dyn_ret != 0:
             return dyn_ret
         return 0
@@ -7521,7 +7639,7 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
     let enum_accessor_variant = self.enum_accessor_variant_for_method(recv_type as i32, field)
     if enum_accessor_variant != 0:
         let enum_accessor_kind = self.enum_accessor_kind_for_method(recv_type as i32, field)
-        if arg_count != 0:
+        if mc_resolved_arg_count != 0:
             self.emit_error("enum accessor method expects zero arguments", node)
             return 0
         let enum_payloads = self.enum_variant_payload_types(recv_type as i32, enum_accessor_variant)
@@ -7648,11 +7766,11 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
     if self.static_receiver_type_is_known(expr) != 0 and self.enum_has_variant(obj_type, field) != 0:
         let payload_tys = self.enum_variant_payload_types(obj_type, field)
         let expected = payload_tys.len() as i32
-        if arg_count != expected:
+        if mc_resolved_arg_count != expected:
             let owner_name = self.type_name(obj_type)
             let variant_name = self.pool_resolve(field)
-            self.emit_error(f"enum variant constructor '{owner_name}.{variant_name}' expects {expected} argument(s), found {arg_count}", node)
-        for ai in 0..arg_count:
+            self.emit_error(f"enum variant constructor '{owner_name}.{variant_name}' expects {expected} argument(s), found {mc_resolved_arg_count}", node)
+        for ai in 0..mc_resolved_arg_count:
             if ai >= expected:
                 break
             let expected_ty = payload_tys.get(ai as i64)
@@ -7662,7 +7780,8 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                 if self.arithmetic_result_type(expected_ty, arg_ty) == 0:
                         let owner_name = self.type_name(obj_type)
                         let variant_name = self.pool_resolve(field)
-                        self.emit_argument_type_mismatch(owner_name ++ "." ++ variant_name, field, ai, ai, expected_ty, arg_ty, self.ast.get_extra(extra_start + ai))
+                        let err_arg_node = if mc_has_resolved_args != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(extra_start + ai)
+                        self.emit_argument_type_mismatch(owner_name ++ "." ++ variant_name, field, ai, ai, expected_ty, arg_ty, if err_arg_node > 0: err_arg_node else: node)
         return obj_type as i32
 
     if self.static_receiver_type_is_known(expr) != 0 and self.pool_resolve(field) == "from_int":
@@ -7688,7 +7807,7 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
     if type_name_sym != 0:
         let generic_method_fn = self.lookup_generic_method_fn(type_name_sym, field)
         if generic_method_fn != 0:
-            let generic_ret = self.check_generic_method_call(type_name_sym, recv_type as i32, generic_method_fn, is_static_receiver, arg_types, extra_start, arg_count, node)
+            let generic_ret = self.check_generic_method_call(type_name_sym, recv_type as i32, generic_method_fn, is_static_receiver, arg_types, extra_start, mc_resolved_arg_count, node)
             return generic_ret
 
     if type_name_sym != 0:
@@ -7711,7 +7830,7 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                     let mc_sig_pc = self.sig_get_param_count(sig_idx)
                     // sig params include self as first param; user args start at index 1
                     let mc_sig_poff = if mc_sig_pc > 0: 1 else: 0
-                    for mc_ai in 0..arg_count:
+                    for mc_ai in 0..mc_resolved_arg_count:
                         let mc_sig_pi = mc_ai + mc_sig_poff
                         if mc_sig_pi >= mc_sig_pc:
                             break
@@ -7725,12 +7844,13 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                             if self.type_is_dyn_object(exp_r) == 0:
                                 if self.types_compatible(exp_ty, arg_ty) == 0:
                                     if self.arithmetic_result_type(exp_ty, arg_ty) == 0:
-                                        self.emit_argument_type_mismatch(mc_method_name, method_fn_sym, mc_ai, mc_sig_pi, exp_ty, arg_ty, self.ast.get_extra(extra_start + mc_ai))
+                                        let mc_err_arg = if mc_has_resolved_args != 0: self.get_resolved_call_arg(node, mc_ai) else: self.ast.get_extra(extra_start + mc_ai)
+                                        self.emit_argument_type_mismatch(mc_method_name, method_fn_sym, mc_ai, mc_sig_pi, exp_ty, arg_ty, if mc_err_arg > 0: mc_err_arg else: node)
                 let mc_subst_ret = self.substitute_method_return_for_generic_inst(recv_type, type_name_sym, field, method_fn_sym, mc_ret)
                 if mc_subst_ret != 0:
-                    self.record_call_view_origins(node, sig_idx, 1, expr, extra_start, arg_count, 0)
+                    self.record_call_view_origins(node, sig_idx, 1, expr, extra_start, mc_resolved_arg_count, mc_has_resolved_args)
                     return mc_subst_ret
-            self.record_call_view_origins(node, sig_idx, 1, expr, extra_start, arg_count, 0)
+            self.record_call_view_origins(node, sig_idx, 1, expr, extra_start, mc_resolved_arg_count, mc_has_resolved_args)
             return mc_ret
 
     // For TypeKind.TY_GENERIC_INST receivers without a registered signature,
@@ -7971,10 +8091,20 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
         if type_name_sym == self.syms.option:
             if field == self.syms.unwrap:
                 return self.get_generic_inst_arg(recv_type, 0)
+            if mc_method_name_raw == "unwrap_or":
+                if mc_resolved_arg_count != 1:
+                    self.emit_error("Option.unwrap_or() expects exactly one argument", node)
+                    return 0
+                return self.get_generic_inst_arg(recv_type, 0)
             if field == self.syms.is_some or field == self.syms.is_none:
                 return self.ty_bool as i32
         if type_name_sym == self.syms.result:
             if field == self.syms.unwrap:
+                return self.get_generic_inst_arg(recv_type, 0)
+            if mc_method_name_raw == "unwrap_or":
+                if mc_resolved_arg_count != 1:
+                    self.emit_error("Result.unwrap_or() expects exactly one argument", node)
+                    return 0
                 return self.get_generic_inst_arg(recv_type, 0)
             if field == self.syms.is_ok or field == self.syms.is_err:
                 return self.ty_bool as i32

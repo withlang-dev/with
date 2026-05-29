@@ -1160,6 +1160,8 @@ fn Codegen.abi_size_of(self: Codegen, ty: i64) -> i64:
     if ty == 0:
         self.had_error = 1
         return 0
+    if wl_get_type_kind(ty) == wl_void_type_kind():
+        return 0
     let dl = wl_get_module_data_layout(self.llmod)
     if dl == 0:
         self.had_error = 1
@@ -1553,7 +1555,12 @@ fn Codegen.enforce_coerced_type(self: Codegen, value: i64, expected_ty: i64, con
             return coerced_str
 
     self.had_error = 1
-    with_eprint("error: " ++ context)
+    var msg = "error: " ++ context
+    msg = msg ++ f" actual={self.llvm_type_mangle(wl_type_of(value))}"
+    msg = msg ++ f" expected={self.llvm_type_mangle(expected_ty)}"
+    if self.current_function_name_sym != 0:
+        msg = msg ++ f" fn={self.intern.resolve(self.current_function_name_sym)}"
+    with_eprint(msg)
     self.build_default_value(expected_ty)
 
 fn Codegen.canonical_local_sym(self: Codegen, sym: i32) -> i32:
@@ -3553,6 +3560,8 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
         var p_ty = self.resolve_type(p_type_node)
         if p_ty == 0:
             p_ty = wl_i32_type(self.context)
+        if wl_get_type_kind(p_ty) == wl_void_type_kind():
+            p_ty = wl_i32_type(self.context)
         param_types.push(p_ty)
         pi = pi + 1
 
@@ -4213,7 +4222,7 @@ fn Codegen.get_or_create_option_type(self: Codegen, sema_tid: i32, payload_ty: i
     // Option[T] = { i32 tag, T payload }
     let body: Vec[i64] = Vec.new()
     body.push(wl_i32_type(self.context))
-    if payload_ty != 0:
+    if payload_ty != 0 and wl_get_type_kind(payload_ty) != wl_void_type_kind():
         body.push(payload_ty)
     let opt_type = wl_struct_type(self.context, vec_data_i64(&body), body.len() as i32, 0)
     self.option_cache_map.insert(cache_key, opt_type)

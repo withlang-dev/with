@@ -1656,7 +1656,8 @@ fn MirBuilder.lower_default_call_arg(self: MirBuilder, default_node: i32, call_n
 
 fn MirBuilder.lower_regex_literal(self: MirBuilder, node: i32) -> i32:
     let regex_ty = self.sema.lookup_named_type_visible(self.sema.syms.regex)
-    let result_ty = if self.expr_type(node) != 0: self.expr_type(node) else: regex_ty
+    let inferred_ty = self.expr_type(node)
+    let result_ty = if inferred_ty != 0 and self.sema.type_is_unit(inferred_ty) == 0: inferred_ty else: regex_ty
     let c = self.body.new_const(ConstKind.CK_REGEX_LIT, self.ast.get_data0(node), self.ast.get_data1(node), node, result_ty)
     self.body.new_operand(OperandKind.OK_CONSTANT, c)
 
@@ -4879,6 +4880,9 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
     if enum_accessor_variant != 0:
         return self.lower_enum_accessor_call(self_expr, method_sym, node)
 
+    if method_name == "unwrap_or" and self.is_option_or_result_type(enum_accessor_recv_type) != 0:
+        return self.lower_unwrap_or_method(self_expr, arg_start, arg_count, node)
+
     var intrinsic = self.classify_intrinsic(recv_type, method_name)
 
     // When classify_intrinsic fails for "unwrap"/"is_some", handle as Option
@@ -5304,6 +5308,83 @@ fn MirBuilder.lower_double_question(self: MirBuilder, expr: i32, default_expr: i
     self.switch_to(none_bb)
     let default_op = self.lower_expr(default_expr)
     self.assign_operand_to_place(result_place, default_op, self.ast.get_start(default_expr))
+    self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+
+    self.switch_to(join_bb)
+    if self.sema.is_copy(result_ty) != 0:
+        return self.body.new_operand(OperandKind.OK_COPY, result_place)
+    self.body.new_operand(OperandKind.OK_MOVE, result_place)
+
+fn MirBuilder.is_option_or_result_type(self: MirBuilder, type_id: i32) -> i32:
+    if type_id == 0:
+        return 0
+    let resolved = self.sema.resolve_alias(type_id as TypeId)
+    if self.sema.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return 0
+    let base = self.sema.get_generic_inst_base(resolved as i32)
+    if base == self.sema.syms.option or base == self.sema.syms.result: 1 else: 0
+
+fn MirBuilder.lower_method_arg_or_unit(self: MirBuilder, node: i32, arg_start: i32, arg_count: i32, idx: i32) -> i32:
+    if self.sema.has_resolved_call_args(node) != 0:
+        if idx >= self.sema.get_resolved_call_arg_count(node):
+            return self.unit_operand()
+        let resolved_arg = self.sema.get_resolved_call_arg(node, idx)
+        if resolved_arg == 0:
+            return self.unit_operand()
+        if resolved_arg < 0:
+            return self.lower_var(0 - resolved_arg, 0, 0)
+        return self.lower_expr(resolved_arg)
+    if idx >= arg_count:
+        return self.unit_operand()
+    self.lower_expr(self.ast.get_extra(arg_start + idx))
+
+fn MirBuilder.lower_unwrap_or_method(self: MirBuilder, self_expr: i32, arg_start: i32, arg_count: i32, node: i32) -> i32:
+    let value_op = self.lower_expr(self_expr)
+    let value_ty = self.expr_type(self_expr)
+    let value_place = self.materialize_operand(value_op, value_ty, self.ast.get_start(self_expr))
+
+    let some_bb = self.new_block()
+    let none_bb = self.new_block()
+    let join_bb = self.new_block()
+
+    let disc = self.lower_enum_discriminant(value_place)
+    let vals: Vec[i32] = Vec.new()
+    vals.push(self.success_variant_index())
+    let targets: Vec[i32] = Vec.new()
+    targets.push(some_bb as i32)
+    let table = self.body.new_switch_table(vals, targets)
+    self.terminate(TermKind.TK_SWITCH_INT, disc, table, none_bb, 0)
+
+    var result_ty = self.expr_type(node)
+    if result_ty == 0:
+        result_ty = self.sema.try_unwrapped_type(value_ty) as i32
+    if result_ty == 0:
+        result_ty = self.sema.ty_void as i32
+
+    if self.sema.type_is_unit(result_ty) != 0:
+        self.switch_to(some_bb)
+        self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+
+        self.switch_to(none_bb)
+        let _ = self.lower_method_arg_or_unit(node, arg_start, arg_count, 0)
+        self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+
+        self.switch_to(join_bb)
+        return self.unit_operand()
+
+    let result_local = self.new_temp(result_ty)
+    let result_place = self.place_for_local(result_local)
+
+    self.switch_to(some_bb)
+    let downcast_place = self.body.new_downcast_place(value_place, self.success_variant_index(), value_ty)
+    let payload_place = self.body.new_field_place(downcast_place, 0, result_ty)
+    let some_op = self.body.new_operand(if self.sema.is_copy(result_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, payload_place)
+    self.assign_operand_to_place(result_place, some_op, self.ast.get_start(self_expr))
+    self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+
+    self.switch_to(none_bb)
+    let default_op = self.lower_method_arg_or_unit(node, arg_start, arg_count, 0)
+    self.assign_operand_to_place(result_place, default_op, self.ast.get_start(node))
     self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
     self.switch_to(join_bb)
@@ -5912,12 +5993,13 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                 if vc_result_ty == 0:
                     vc_result_ty = self.sema.variant_type_ids.get(vc_sym).unwrap()
                 let vc_args_start = self.ast.get_data1(node)
-                let vc_args_count = self.ast.get_data2(node)
+                let vc_has_resolved = self.sema.has_resolved_call_args(node)
+                let vc_args_count = if vc_has_resolved != 0: self.sema.get_resolved_call_arg_count(node) else: self.ast.get_data2(node)
                 let vc_fields: Vec[i32] = Vec.new()
                 let vc_names: Vec[i32] = Vec.new()
                 for vci in 0..vc_args_count:
-                    let vc_arg = self.ast.get_extra(vc_args_start + vci)
-                    vc_fields.push(self.lower_expr(vc_arg))
+                    let vc_arg = if vc_has_resolved != 0: self.sema.get_resolved_call_arg(node, vci) else: self.ast.get_extra(vc_args_start + vci)
+                    vc_fields.push(if vc_arg == 0: self.unit_operand() else: self.lower_expr(vc_arg))
                     vc_names.push(0)
                 let vc_fid = self.body.new_agg_fields(vc_fields, vc_names)
                 let vc_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, vc_fid, vc_variant_idx)
@@ -6107,6 +6189,8 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
     if kind == NodeKind.NK_TUPLE:
         let extra_start = self.ast.get_data0(node)
         let elem_count = self.ast.get_data1(node)
+        if elem_count == 0:
+            return self.unit_operand()
         let tup_fields: Vec[i32] = Vec.new()
         let tup_names: Vec[i32] = Vec.new()
         let saved_expected = self.expected_type

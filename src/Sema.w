@@ -1103,6 +1103,7 @@ fn Sema.init(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Sema:
     s.register_prim("f64", s.ty_f64)
     s.register_prim("bool", s.ty_bool)
     s.register_prim("void", s.ty_void)
+    s.register_prim("Unit", s.ty_void)
     s.register_prim("Never", s.ty_never)
     s.register_prim("str", s.ty_str)
     s.register_prim("String", s.ty_str)

@@ -131,8 +131,14 @@
   │                                                                                                                │             │                   │      │ patterns, and Copy tuples. Nested tuple let    │
   │                                                                                                                │             │                   │      │ destructuring now uses normal pattern binding. │
   │                                                                                                                │             │                   │      │ Spec §4.8.                                     │
-  │ #213-#214                                                                                                      │         Yes │                No │   No │ Remaining §4 values/types skipped sketches.   │
-  │                                                                                                                │             │                   │      │ Cover unit elision and implicit Ok.            │
+  │ [x] #213                                                                                                       │         Yes │               Yes │   No │ Completed: Unit and () now resolve to the same │
+  │                                                                                                                │             │                   │      │ semantic type; functions, variant constructors,│
+  │                                                                                                                │             │                   │      │ variant patterns, and Result.unwrap_or support │
+  │                                                                                                                │             │                   │      │ Unit elision only when the expected type is    │
+  │                                                                                                                │             │                   │      │ statically Unit. Non-Unit and unconstrained    │
+  │                                                                                                                │             │                   │      │ generic omissions fail loudly. Spec §4.8.      │
+  │ #214                                                                                                           │         Yes │                No │   No │ Remaining §4 values/types sketch for implicit │
+  │                                                                                                                │             │                   │      │ Ok wrapping.                                   │
   │ #215-#217                                                                                                      │         Yes │                No │   No │ §5-§6 ephemeral/handles sketches. Split into   │
   │                                                                                                                │             │                   │      │ concrete tests and implement remaining         │
   │                                                                                                                │             │                   │      │ ephemeral/slotmap behavior.                    │
