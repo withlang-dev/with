@@ -639,6 +639,45 @@ fn bs_check_get_force_reinstall(ctx: ActionCtx, compiler_path: str, case_dir: st
         return bs_fail(ctx, "force reinstall did not recreate dependency directory")
     bs_expect_file(ctx, metadata, "get force metadata after reinstall")
 
+fn bs_check_get_raylib_versions(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let latest_dir = bs_join(case_dir, "latest")
+    var rc = bs_write_project_manifest(ctx, latest_dir, "getraylib")
+    if rc != 0: return rc
+
+    var latest_args: Vec[str] = Vec.new()
+    latest_args |> push("get")
+    latest_args |> push("c.raylib")
+    let latest = bs_run_cli_capture_cwd(ctx, compiler_path, "get-raylib-latest", latest_args, 300000, latest_dir)
+    if latest.rc != 0:
+        ctx.diagnostics().error(ctx.target_name() ++ f": project selfhost case 'get-raylib-latest' failed with exit code {latest.rc}")
+        return latest.rc
+    rc = bs_assert_contains(ctx, latest.stderr, "resolving raylib/6.0", "get_raylib_latest")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, latest.stderr, "added c.raylib@6.0", "get_raylib_latest")
+    if rc != 0: return rc
+    rc = bs_expect_file(ctx, bs_join(latest_dir, ".with/deps/c/raylib/6.0/metadata.json"), "get raylib latest metadata")
+    if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, bs_join(latest_dir, "with.toml"), "c.raylib = \"6.0\"", "get raylib latest manifest dep")
+    if rc != 0: return rc
+
+    let pinned_dir = bs_join(case_dir, "pinned_5_5")
+    rc = bs_write_project_manifest(ctx, pinned_dir, "getraylib55")
+    if rc != 0: return rc
+    var pinned_args: Vec[str] = Vec.new()
+    pinned_args |> push("get")
+    pinned_args |> push("c.raylib@5.5")
+    let pinned = bs_run_cli_capture_cwd(ctx, compiler_path, "get-raylib-5-5", pinned_args, 300000, pinned_dir)
+    if pinned.rc != 0:
+        ctx.diagnostics().error(ctx.target_name() ++ f": project selfhost case 'get-raylib-5-5' failed with exit code {pinned.rc}")
+        return pinned.rc
+    rc = bs_assert_contains(ctx, pinned.stderr, "resolving raylib/5.5", "get_raylib_5_5")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, pinned.stderr, "added c.raylib@5.5", "get_raylib_5_5")
+    if rc != 0: return rc
+    rc = bs_expect_file(ctx, bs_join(pinned_dir, ".with/deps/c/raylib/5.5/metadata.json"), "get raylib 5.5 metadata")
+    if rc != 0: return rc
+    bs_expect_file_contains(ctx, bs_join(pinned_dir, "with.toml"), "c.raylib = \"5.5\"", "get raylib 5.5 manifest dep")
+
 fn bs_check_build_cache_tracks_compiler(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "cachecompiler")
     if rc != 0: return rc
@@ -701,6 +740,8 @@ pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
     rc = bs_check_build_rejects_imperative_manifest(ctx, compiler_path, bs_join(output_dir, "build_imperative_manifest_case"))
     if rc != 0: return rc
     rc = bs_check_get_force_reinstall(ctx, compiler_path, bs_join(output_dir, "get_force_reinstall_case"))
+    if rc != 0: return rc
+    rc = bs_check_get_raylib_versions(ctx, compiler_path, bs_join(output_dir, "get_raylib_versions_case"))
     if rc != 0: return rc
     rc = bs_check_build_cache_tracks_compiler(ctx, compiler_path, bs_join(output_dir, "build_cache_compiler_case"))
     if rc != 0: return rc
@@ -876,6 +917,35 @@ fn bs_check_imported_module_dependency_order(ctx: ActionCtx, compiler_path: str,
     if result.rc != 0: return result.rc
     0
 
+fn bs_check_c_import_header_cache_tracks_contents(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let header = bs_join(case_dir, "answer.h")
+    let first_src = bs_join(case_dir, "first.w")
+    let second_src = bs_join(case_dir, "second.w")
+
+    var rc = bs_write_fixture(ctx, header, "enum { ANSWER = 1 };\n", "c_import cache first header")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, first_src, "use c_import(\"answer.h\")\n\nfn main:\n    assert(ANSWER == 1)\n    print(\"ok\")\n", "c_import cache first source")
+    if rc != 0: return rc
+    var first_args: Vec[str] = Vec.new()
+    first_args |> push("run")
+    first_args |> push(bs_abs(root, first_src))
+    let first = bs_edge_expect_success(ctx, compiler_path, case_dir, "c-import-header-cache-first", first_args)
+    if first.rc != 0: return first.rc
+    rc = bs_assert_stdout_exact(ctx, first, "ok", "c_import_header_cache_first")
+    if rc != 0: return rc
+
+    rc = bs_write_fixture(ctx, header, "enum { ANSWER = 2 };\n", "c_import cache second header")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, second_src, "use c_import(\"answer.h\")\n\nfn main:\n    assert(ANSWER == 2)\n    print(\"ok\")\n", "c_import cache second source")
+    if rc != 0: return rc
+    var second_args: Vec[str] = Vec.new()
+    second_args |> push("run")
+    second_args |> push(bs_abs(root, second_src))
+    let second = bs_edge_expect_success(ctx, compiler_path, case_dir, "c-import-header-cache-second", second_args)
+    if second.rc != 0: return second.rc
+    bs_assert_stdout_exact(ctx, second, "ok", "c_import_header_cache_second")
+
 fn bs_compile_emit_c_output(ctx: ActionCtx, root: str, case_dir: str, c_path: str, bin: str, label: str) -> i32:
     let stdout_path = bs_capture_path(root, case_dir, label ++ "-compile", "stdout")
     let stderr_path = bs_capture_path(root, case_dir, label ++ "-compile", "stderr")
@@ -1001,6 +1071,37 @@ fn bs_check_emit_c_hashmap_new_field(ctx: ActionCtx, compiler_path: str, case_di
     if run_result.rc != 0: return run_result.rc
     bs_edge_assert_exact(ctx, run_result.stdout, "ok", "emit_c_hashmap_new_field", "stdout")
 
+fn bs_check_emit_c_array_fill_rvalue(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "array_fill_rvalue.w")
+    let c_path = bs_join(case_dir, "array_fill_rvalue.c")
+    let bin = bs_join(case_dir, "array_fill_rvalue")
+    let source = "extern fn with_print_str(s: str) -> void\n\n" ++
+        "fn main() -> i32:\n" ++
+        "    var buf: [u8; 128] = [7u8; 128]\n" ++
+        "    if buf[0] != 7u8:\n" ++
+        "        return 1\n" ++
+        "    if buf[127] != 7u8:\n" ++
+        "        return 2\n" ++
+        "    with_print_str(\"ok\")\n" ++
+        "    0\n"
+    var rc = bs_write_fixture(ctx, src, source, "emit-c array fill rvalue source")
+    if rc != 0: return rc
+    var emit_args: Vec[str] = Vec.new()
+    emit_args |> push("build")
+    emit_args |> push(bs_abs(root, src))
+    emit_args |> push("--emit-c")
+    emit_args |> push("--no-prelude")
+    emit_args |> push("-o")
+    emit_args |> push(bs_abs(root, c_path))
+    let emit_result = bs_edge_expect_success(ctx, compiler_path, case_dir, "emit-c-array-fill-rvalue", emit_args)
+    if emit_result.rc != 0: return emit_result.rc
+    rc = bs_compile_emit_c_output(ctx, root, case_dir, c_path, bin, "emit-c-array-fill-rvalue")
+    if rc != 0: return rc
+    let run_result = bs_run_binary_capture(ctx, bin, "emit-c-array-fill-rvalue-run", 120000)
+    if run_result.rc != 0: return run_result.rc
+    bs_edge_assert_exact(ctx, run_result.stdout, "ok", "emit_c_array_fill_rvalue", "stdout")
+
 fn bs_check_darwin_arm64_c_abi_direct_aggregates(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
     if not (os() == "Macos" and (arch() == "armv8" or arch() == "aarch64")):
         return 0
@@ -1018,7 +1119,11 @@ fn bs_check_darwin_arm64_c_abi_direct_aggregates(ctx: ActionCtx, compiler_path: 
         "#define WITH_C_ABI_DIRECT_AGGREGATES_H\n" ++
         "typedef struct Color { unsigned char r; unsigned char g; unsigned char b; unsigned char a; } Color;\n" ++
         "typedef struct Vector2 { float x; float y; } Vector2;\n" ++
+        "#define CLITERAL(type) (type)\n" ++
+        "#define RAYWHITE_TEST CLITERAL(Color){245, 245, 245, 255}\n" ++
+        "#define LIGHTGRAY_TEST CLITERAL(Color){200, 200, 200, 255}\n" ++
         "int seen_color(Color c);\n" ++
+        "int seen_lightgray(Color c);\n" ++
         "Color make_color(void);\n" ++
         "int seen_vec2(Vector2 v);\n" ++
         "#endif\n",
@@ -1027,6 +1132,7 @@ fn bs_check_darwin_arm64_c_abi_direct_aggregates(ctx: ActionCtx, compiler_path: 
     rc = bs_write_fixture(ctx, helper_c,
         "#include \"abi.h\"\n" ++
         "int seen_color(Color c) { return c.r == 245 && c.g == 245 && c.b == 245 && c.a == 255; }\n" ++
+        "int seen_lightgray(Color c) { return c.r == 200 && c.g == 200 && c.b == 200 && c.a == 255; }\n" ++
         "Color make_color(void) { Color c = {245, 245, 245, 255}; return c; }\n" ++
         "int seen_vec2(Vector2 v) { return v.x == 1.5f && v.y == 2.25f; }\n",
         "direct aggregate ABI helper")
@@ -1038,7 +1144,7 @@ fn bs_check_darwin_arm64_c_abi_direct_aggregates(ctx: ActionCtx, compiler_path: 
         "    let c = Color { r: 245, g: 245, b: 245, a: 255 }\n" ++
         "    let made = make_color()\n" ++
         "    let v = Vector2 { x: 1.5 as f32, y: 2.25 as f32 }\n" ++
-        "    if seen_color(c) == 1 and seen_color(made) == 1 and seen_vec2(v) == 1:\n" ++
+        "    if seen_color(c) == 1 and seen_color(made) == 1 and seen_color(RAYWHITE_TEST) == 1 and seen_lightgray(LIGHTGRAY_TEST) == 1 and seen_vec2(v) == 1:\n" ++
         "        return 0\n" ++
         "    return 1\n",
         "direct aggregate ABI source")
@@ -1198,7 +1304,11 @@ pub fn run_cli_selfhost_edge_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     rc = bs_check_imported_module_dependency_order(ctx, compiler_path, bs_join(output_dir, "imported_module_dependency_order_case"))
     if rc != 0: return rc
+    rc = bs_check_c_import_header_cache_tracks_contents(ctx, compiler_path, bs_join(output_dir, "c_import_header_cache_case"))
+    if rc != 0: return rc
     rc = bs_check_emit_c_receiver_abi(ctx, compiler_path, bs_join(output_dir, "emit_c_receiver_abi_case"))
+    if rc != 0: return rc
+    rc = bs_check_emit_c_array_fill_rvalue(ctx, compiler_path, bs_join(output_dir, "emit_c_array_fill_rvalue_case"))
     if rc != 0: return rc
     bs_check_darwin_arm64_c_abi_direct_aggregates(ctx, compiler_path, bs_join(output_dir, "darwin_arm64_c_abi_direct_aggregates_case"))
 
@@ -1532,6 +1642,64 @@ fn bs_check_migrate_shared_defs_ownerless_extern(ctx: ActionCtx, compiler_path: 
         return bs_fail(ctx, "shared_defs_ownerless_extern emitted duplicate or missing string_find_char helper")
     0
 
+fn bs_check_migrate_switch_macro_case_values(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "switch_macro_cases.c")
+    let out_w = bs_join(case_dir, "switch_macro_cases.w")
+    let c_text = "#define A 10\n#define B (A + 2)\n\nint f(int x) {\n  switch (x) {\n    case A: return 1;\n    case B: return 2;\n    default: return 3;\n  }\n}\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "switch macro case values")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-switch-macro-case-values", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_contains(ctx, out_text, "match __param_x:", "switch_macro_case_values")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "        10 =>", "switch_macro_case_values")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "        12 =>", "switch_macro_case_values")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "let B: c_int = 12", "switch_macro_case_values")
+    if rc != 0: return rc
+    var check_args: Vec[str] = Vec.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-switch-macro-case-values", check_args)
+    if check.rc != 0: return check.rc
+    0
+
+fn bs_check_migrate_sizeof_pointer_width(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "sizeof_pointer_width.c")
+    let out_w = bs_join(case_dir, "sizeof_pointer_width.w")
+    let c_text = "int sizes(char *p, const char *q, char **r) {\n  return (int)(sizeof(char *) + sizeof(const char *) + sizeof(p) + sizeof(q) + sizeof(*r));\n}\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "sizeof pointer width")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-sizeof-pointer-width", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_contains(ctx, out_text, "sizeof[usize]()", "sizeof_pointer_width")
+    if rc != 0: return rc
+    rc = bs_assert_not_contains(ctx, out_text, "sizeof[*", "sizeof_pointer_width")
+    if rc != 0: return rc
+    var check_args: Vec[str] = Vec.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-sizeof-pointer-width", check_args)
+    if check.rc != 0: return check.rc
+    0
+
 pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
     if inputs.len() == 0:
@@ -1563,7 +1731,11 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     rc = bs_check_migrate_cross_file_global_owner_arrays(ctx, compiler_path, bs_join(output_dir, "cross_file_global_owner_arrays"))
     if rc != 0: return rc
-    bs_check_migrate_shared_defs_ownerless_extern(ctx, compiler_path, bs_join(output_dir, "shared_defs_ownerless_extern"))
+    rc = bs_check_migrate_shared_defs_ownerless_extern(ctx, compiler_path, bs_join(output_dir, "shared_defs_ownerless_extern"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_switch_macro_case_values(ctx, compiler_path, bs_join(output_dir, "switch_macro_case_values"))
+    if rc != 0: return rc
+    bs_check_migrate_sizeof_pointer_width(ctx, compiler_path, bs_join(output_dir, "sizeof_pointer_width"))
 
 fn bs_check_migrate_libc_ctype(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()

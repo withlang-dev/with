@@ -631,6 +631,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var cli_selfhost_project_tests = target_new(.Action, "cli-selfhost-project-tests", "").output("out/test-graph/cli-selfhost-project-tests")
     cli_selfhost_project_tests.action = run_cli_selfhost_project_action
     cli_selfhost_project_tests = cli_selfhost_project_tests.input("out/bin/with")
+    cli_selfhost_project_tests = cli_selfhost_project_tests.allow_network()
     cli_selfhost_project_tests = cli_selfhost_project_tests.dep("build")
     out = out.add_target(cli_selfhost_project_tests)
 
