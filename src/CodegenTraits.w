@@ -1241,6 +1241,8 @@ fn Codegen.is_collection_runtime_intrinsic(self: Codegen, intrinsic: i32) -> boo
         return true
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_NEW or intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_INSERT or intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_GET or intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_CONTAINS or intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_LEN or intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_REMOVE or intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_CLEAR or intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_INCREMENT:
         return true
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAP_NEW or intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAP_INSERT or intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAP_GET or intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAP_SLOT or intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAP_REMOVE or intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAP_REPLACE or intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAP_CONTAINS or intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAP_LEN or intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAP_GET_DISJOINT or intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAPSLOT_GET or intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAPSLOT_SET:
+        return true
     false
 
 fn Codegen.module_const_contains_runtime_collection(self: Codegen, node: i32) -> bool:

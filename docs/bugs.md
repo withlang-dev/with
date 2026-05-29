@@ -149,10 +149,12 @@
   │                                                                                                                │             │                   │      │ values are rejected at escaping storage        │
   │                                                                                                                │             │                   │      │ boundaries: non-ephemeral fields, enum         │
   │                                                                                                                │             │                   │      │ payloads, and globals. Spec §5 / §5.5.         │
-  │ #217                                                                                                           │         Yes │                No │   No │ §6 Handle/SlotMap sketch. Need stdlib surface  │
-  │                                                                                                                │             │                   │      │ and implementation for typed handles, insert,  │
-  │                                                                                                                │             │                   │      │ get/slot, remove/replace, disjoint access,     │
-  │                                                                                                                │             │                   │      │ contains, and len.                             │
+  │ [x] #217                                                                                                       │         Yes │               Yes │   No │ Completed: Handle[T], SlotMap[T], and          │
+  │                                                                                                                │             │                   │      │ SlotMapSlot[T] now have stdlib/compiler-backed │
+  │                                                                                                                │             │                   │      │ coverage for typed handles, insert, get/slot,  │
+  │                                                                                                                │             │                   │      │ remove/replace, disjoint access, contains,     │
+  │                                                                                                                │             │                   │      │ len, stale-handle invalidation, and handle     │
+  │                                                                                                                │             │                   │      │ storage in generic containers. Spec §6.        │
   │ #218-#222                                                                                                      │         Yes │                No │   No │ §7 with block sketches. Need executable tests  │
   │ #242-#246                                                                                                      │         Yes │                No │   No │ §11 trait/operator/derive sketches. Need       │
   │                                                                                                                │             │                   │      │ object safety, multi-index/@, one-impl rule,   │

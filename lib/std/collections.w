@@ -33,6 +33,38 @@ type HashSet[T]  {
     ptr: *const i8,
 }
 
+/// Type-safe generational handle into a SlotMap[T].
+/// Handles are Copy and carry their owner element type at compile time, so a
+/// Handle[Texture] cannot be used with a SlotMap[Mesh].
+pub type Handle[T] {
+    index: u32,
+    generation: u32,
+}
+
+impl[T] Copy for Handle[T]
+
+impl[T] Eq for Handle[T] =
+    fn eq(self: Handle[T], other: Handle[T]) -> bool:
+        self.index == other.index and self.generation == other.generation
+
+impl[T] Hash for Handle[T] =
+    fn hash_value(self: Handle[T]) -> i64:
+        ((self.index as i64) << 32) ^ (self.generation as i64)
+
+/// Generational dense-ish storage for long-lived relationships.
+/// Runtime storage is compiler-backed like Vec and HashMap.
+pub type SlotMap[T] {
+    ptr: *const i8,
+}
+
+/// Scoped mutable slot handle returned by SlotMap.slot/get_disjoint.
+/// Use `.get()` / `.set(value)` inside the `with` block, matching VecSlot.
+pub type SlotMapSlot[T] {
+    map_ptr: i64,
+    index: u32,
+    generation: u32,
+}
+
 /// Memory ordering for atomic operations.
 enum Order: i32:
     Relaxed = 0

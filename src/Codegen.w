@@ -380,6 +380,9 @@ type Codegen {
     sym_result: i32,
     sym_hashmap: i32,
     sym_hashset: i32,
+    sym_handle: i32,
+    sym_slotmap: i32,
+    sym_slotmapslot: i32,
     sym_vecslot: i32,
     sym_vecrange: i32,
     sym_veciterref: i32,
@@ -663,6 +666,8 @@ type Codegen {
 
     // HashSet type cache (elem LLVM type → HashSet LLVM struct type)
     hs_cache_map: HashMap[i64, i64],
+    // SlotMap type cache (elem LLVM type → SlotMap LLVM struct type)
+    slotmap_cache_map: HashMap[i64, i64],
 
     // Active type bindings (for monomorphization)
     type_binding_syms: Vec[i32],
@@ -727,6 +732,9 @@ fn Codegen.init_with_opt_and_intern(module_name: str, opt_level: i32, intern: In
     cg.sym_result = cg.intern.intern("Result")
     cg.sym_hashmap = cg.intern.intern("HashMap")
     cg.sym_hashset = cg.intern.intern("HashSet")
+    cg.sym_handle = cg.intern.intern("Handle")
+    cg.sym_slotmap = cg.intern.intern("SlotMap")
+    cg.sym_slotmapslot = cg.intern.intern("SlotMapSlot")
     cg.sym_vecslot = cg.intern.intern("VecSlot")
     cg.sym_vecrange = cg.intern.intern("VecRange")
     cg.sym_veciterref = cg.intern.intern("VecIterRef")
@@ -791,7 +799,8 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         current_function_name_sym: 0,
         current_method_owner_sym: 0,
         sym_vec: 0, sym_option: 0, sym_result: 0, sym_hashmap: 0,
-        sym_hashset: 0, sym_vecslot: 0, sym_vecrange: 0, sym_veciterref: 0, sym_veciterplace: 0,
+        sym_hashset: 0, sym_handle: 0, sym_slotmap: 0, sym_slotmapslot: 0,
+        sym_vecslot: 0, sym_vecrange: 0, sym_veciterref: 0, sym_veciterplace: 0,
         sym_box: 0, sym_context_error: 0,
         sym_Self: 0, sym_self: 0, sym_unit: 0,
         sym_bool: 0, sym_usize: 0, sym_isize: 0, sym_void: 0,
@@ -954,6 +963,7 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         hm_cache_map: HashMap.new(),
         hm_is_hm: HashMap.new(),
         hs_cache_map: HashMap.new(),
+        slotmap_cache_map: HashMap.new(),
         type_binding_syms: Vec.new(),
         type_binding_types: Vec.new(),
         type_bindings_len: 0,
@@ -2582,6 +2592,16 @@ fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
             let elem_ty = self.sema_type_to_llvm(elem_tid)
             if elem_ty != 0:
                 return self.get_or_create_hashset_type(resolved_tid, elem_ty)
+        if cg_base_sym == self.sym_slotmap and arg_count > 0:
+            let elem_tid = self.sema.get_generic_inst_arg(resolved_tid, 0)
+            let elem_ty = self.sema_type_to_llvm(elem_tid)
+            if elem_ty != 0:
+                return self.get_or_create_slotmap_type(resolved_tid, elem_ty)
+        if cg_base_sym == self.sym_handle:
+            let h_fields: Vec[i64] = Vec.new()
+            h_fields.push(wl_i32_type(self.context))
+            h_fields.push(wl_i32_type(self.context))
+            return wl_struct_type(self.context, vec_data_i64(&h_fields), 2, 0)
         if cg_base_sym == self.sym_option and arg_count > 0:
             let payload_tid = self.sema.get_generic_inst_arg(resolved_tid, 0)
             let payload_ty = self.sema_type_to_llvm(payload_tid)
@@ -2600,6 +2620,13 @@ fn Codegen.sema_type_to_llvm(self: Codegen, tid: i32) -> i64:
             vs_fields.push(wl_i64_type(self.context))
             vs_fields.push(wl_i64_type(self.context))
             return wl_struct_type(self.context, vec_data_i64(&vs_fields), 2, 0)
+        // SlotMapSlot[T] = { map_ptr: i64, index: u32, generation: u32 }
+        if cg_base_sym == self.sym_slotmapslot:
+            let sms_fields: Vec[i64] = Vec.new()
+            sms_fields.push(wl_i64_type(self.context))
+            sms_fields.push(wl_i32_type(self.context))
+            sms_fields.push(wl_i32_type(self.context))
+            return wl_struct_type(self.context, vec_data_i64(&sms_fields), 3, 0)
         // VecRange[T] = { data_ptr: i64, offset: i64, len: i64 }
         if cg_base_sym == self.sym_vecrange:
             let vr_fields: Vec[i64] = Vec.new()
@@ -4354,6 +4381,19 @@ fn Codegen.get_or_create_hashset_type(self: Codegen, sema_tid: i32, elem_ty: i64
     wl_struct_set_body(hs_ty, vec_data_i64(&body), 1, 0)
     self.hs_cache_map.insert(cache_key, hs_ty)
     hs_ty
+
+fn Codegen.get_or_create_slotmap_type(self: Codegen, sema_tid: i32, elem_ty: i64) -> i64:
+    let cache_key = if sema_tid > 0: sema_tid as i64 else: elem_ty
+    let cached = self.slotmap_cache_map.get(cache_key)
+    if cached.is_some():
+        return cached.unwrap()
+    let body: Vec[i64] = Vec.new()
+    body.push(wl_ptr_type(self.context))
+    let name = self.collection_wrapper_name_1("__with.SlotMap", elem_ty)
+    let sm_ty = wl_struct_create_named(self.context, name)
+    wl_struct_set_body(sm_ty, vec_data_i64(&body), 1, 0)
+    self.slotmap_cache_map.insert(cache_key, sm_ty)
+    sm_ty
 
 // ── Monomorphize struct (stub) ────────────────────────────────────
 

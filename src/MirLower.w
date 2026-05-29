@@ -677,15 +677,7 @@ fn MirBuilder.resolve_index_generic_inst(self: MirBuilder, node: i32) -> i32:
     0
 
 fn MirBuilder.resolve_type_arg_node(self: MirBuilder, type_arg_node: i32) -> i32:
-    let arg_kind = self.ast.kind(type_arg_node)
-    if arg_kind == NodeKind.NK_IDENT or arg_kind == NodeKind.NK_TYPE_NAMED:
-        let arg_sym = self.ast.get_data0(type_arg_node)
-        let prim = self.sema.primitive_type_by_sym(arg_sym)
-        if prim != 0:
-            return prim
-        if self.sema.named_types.contains(arg_sym):
-            return self.sema.named_types.get(arg_sym).unwrap()
-    0
+    self.sema.resolve_type_level_arg_expr(type_arg_node)
 
 fn MirBuilder.type_receiver_type(self: MirBuilder, node: i32) -> i32:
     // Resolve a type-level receiver expression to its base sema type.
@@ -843,6 +835,37 @@ fn MirBuilder.intrinsic_return_type(self: MirBuilder, recv_type: i32, method_nam
                 if tk == TypeKind.TY_GENERIC_INST:
                     let elem_ty = self.sema.get_generic_inst_arg(resolved, 0)
                     return elem_ty
+            if method_name == "set":
+                return self.sema.ty_void as i32
+            return self.sema.ty_void as i32
+        if type_name == "SlotMap":
+            if method_name == "new":
+                return recv_type
+            if tk == TypeKind.TY_GENERIC_INST:
+                let elem_ty = self.sema.get_generic_inst_arg(resolved, 0)
+                if method_name == "insert":
+                    return self.sema.ensure_handle_type_for(elem_ty)
+                if method_name == "get":
+                    return self.sema.ensure_option_ref_type_for(elem_ty)
+                if method_name == "slot":
+                    return self.sema.ensure_slotmapslot_type_for(elem_ty)
+                if method_name == "get_disjoint":
+                    let slot_ty = self.sema.ensure_slotmapslot_type_for(elem_ty)
+                    let elems: Vec[i32] = Vec.new()
+                    elems.push(slot_ty)
+                    elems.push(slot_ty)
+                    return self.sema.ensure_tuple_type(elems, 2) as i32
+                if method_name == "remove" or method_name == "replace":
+                    return self.sema.ensure_option_type_for(elem_ty)
+                if method_name == "contains":
+                    return self.sema.ty_bool as i32
+                if method_name == "len":
+                    return self.sema.ty_i64 as i32
+            return self.sema.ty_void as i32
+        if type_name == "SlotMapSlot":
+            if method_name == "get":
+                if tk == TypeKind.TY_GENERIC_INST:
+                    return self.sema.get_generic_inst_arg(resolved, 0)
             if method_name == "set":
                 return self.sema.ty_void as i32
             return self.sema.ty_void as i32
@@ -4764,6 +4787,21 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
         if method_name == "get": return MirIntrinsic.MIR_INTRINSIC_VECSLOT_GET
         if method_name == "set": return MirIntrinsic.MIR_INTRINSIC_VECSLOT_SET
         return MirIntrinsic.MIR_INTRINSIC_NONE
+    if type_name == "SlotMap":
+        if method_name == "new": return MirIntrinsic.MIR_INTRINSIC_SLOTMAP_NEW
+        if method_name == "insert": return MirIntrinsic.MIR_INTRINSIC_SLOTMAP_INSERT
+        if method_name == "get": return MirIntrinsic.MIR_INTRINSIC_SLOTMAP_GET
+        if method_name == "slot": return MirIntrinsic.MIR_INTRINSIC_SLOTMAP_SLOT
+        if method_name == "remove": return MirIntrinsic.MIR_INTRINSIC_SLOTMAP_REMOVE
+        if method_name == "replace": return MirIntrinsic.MIR_INTRINSIC_SLOTMAP_REPLACE
+        if method_name == "contains": return MirIntrinsic.MIR_INTRINSIC_SLOTMAP_CONTAINS
+        if method_name == "len": return MirIntrinsic.MIR_INTRINSIC_SLOTMAP_LEN
+        if method_name == "get_disjoint": return MirIntrinsic.MIR_INTRINSIC_SLOTMAP_GET_DISJOINT
+        return MirIntrinsic.MIR_INTRINSIC_NONE
+    if type_name == "SlotMapSlot":
+        if method_name == "get": return MirIntrinsic.MIR_INTRINSIC_SLOTMAPSLOT_GET
+        if method_name == "set": return MirIntrinsic.MIR_INTRINSIC_SLOTMAPSLOT_SET
+        return MirIntrinsic.MIR_INTRINSIC_NONE
     if type_name == "VecRange":
         if method_name == "get": return MirIntrinsic.MIR_INTRINSIC_VECRANGE_GET
         if method_name == "set": return MirIntrinsic.MIR_INTRINSIC_VECRANGE_SET
@@ -4845,11 +4883,13 @@ fn MirBuilder.receiver_option_intrinsic(self: MirBuilder, recv_expr: i32) -> i32
     if type_name_sym == 0:
         return MirIntrinsic.MIR_INTRINSIC_NONE
     let type_name = self.pool.resolve_symbol(type_name_sym)
-    // HashMap.get and HashMap.contains return Option-wrapped values
+    // HashMap.get and SlotMap.get return Option-wrapped values.
     if type_name == "HashMap":
         if method_name == "get": return MirIntrinsic.MIR_INTRINSIC_MAP_GET
     if type_name == "HashSet":
         if method_name == "contains": return MirIntrinsic.MIR_INTRINSIC_MAP_CONTAINS
+    if type_name == "SlotMap":
+        if method_name == "get": return MirIntrinsic.MIR_INTRINSIC_SLOTMAP_GET
     MirIntrinsic.MIR_INTRINSIC_NONE
 
 fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i32, arg_start: i32, arg_count: i32, node: i32) -> i32:
@@ -5010,7 +5050,7 @@ fn MirBuilder.lower_intrinsic_call(self: MirBuilder, intrinsic: i32, self_expr: 
 
     // Build argument operands. For static calls (Vec.new, HashMap.new),
     // the receiver is a type ident — skip it. For instance methods, include it.
-    let is_static = intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_NEW or intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_WITH_CAPACITY or intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_NEW
+    let is_static = intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_NEW or intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_WITH_CAPACITY or intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_NEW or intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAP_NEW
     let call_args: Vec[i32] = Vec.new()
     if not is_static:
         let recv_ty = self.expr_type(self_expr)
