@@ -244,6 +244,9 @@ fn cc_builtin_vecslot_set -> i32:
 fn cc_builtin_vec_get_disjoint -> i32:
     73
 
+fn cc_builtin_dyn_call -> i32:
+    74
+
 fn cc_builtin_atomic_load -> i32:
     70
 
@@ -4659,6 +4662,7 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: i32) -> i32:
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_JOIN: return cc_builtin_vec_join()
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_DYN_VTABLE_CMP: return cc_builtin_dyn_vtable_cmp()
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_DYN_DOWNCAST: return cc_builtin_dyn_downcast()
+    if intrinsic == MirIntrinsic.MIR_INTRINSIC_DYN_CALL: return cc_builtin_dyn_call()
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_OPT_FILTER: return cc_builtin_opt_filter()
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_ROTATE_LEFT: return cc_builtin_rotate_left()
     if intrinsic == MirIntrinsic.MIR_INTRINSIC_ROTATE_RIGHT: return cc_builtin_rotate_right()
@@ -4699,6 +4703,10 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
     let argc = self.call_arg_count(body, args_id)
     let ret_tid = self.call_builtin_ret_tid(body, callee_operand, args_id, dest_place)
     let has_ret = if self.is_void_tid(ret_tid) == 0: 1 else: 0
+
+    if kind == cc_builtin_dyn_call():
+        self.fail("C backend does not yet support dyn trait method dispatch")
+        return "    abort();"
 
     if kind == cc_builtin_vec_new():
         var out = ""

@@ -26,6 +26,21 @@ extern fn with_regex_capture_name_at(code: *const i8, index: i32) -> str
 // docs/mut.md Rev 8 — P12 lockdown active. `&mut T` is rejected.
 const STRICT_NO_MUT_REF: i32 = 1
 
+type SemaDynTraitMethodInfo {
+    ok: i32,
+    param_start: i32,
+    param_count: i32,
+    ret_node: i32,
+}
+
+fn sema_dyn_trait_method_missing -> SemaDynTraitMethodInfo:
+    SemaDynTraitMethodInfo {
+        ok: 0,
+        param_start: 0,
+        param_count: 0,
+        ret_node: 0,
+    }
+
 fn sema_node_is_zero_int_literal(ast: AstPool, node: i32) -> bool:
     if node == 0 or ast.kind(node) != NodeKind.NK_INT_LIT:
         return false
@@ -6924,6 +6939,100 @@ fn Sema.trait_object_from_type_node(self: Sema, type_node: i32) -> i32:
         return self.trait_object_from_type_node(self.ast.get_extra(extra_start))
     0
 
+fn Sema.dyn_trait_symbol_for_type(self: Sema, tid: i32) -> i32:
+    if tid == 0:
+        return 0
+    let resolved = self.resolve_alias(tid)
+    let tk = self.get_type_kind(resolved)
+    if tk == TypeKind.TY_TRAIT_OBJ:
+        return self.get_type_d0(resolved)
+    if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
+        return self.dyn_trait_symbol_for_type(self.get_type_d0(resolved))
+    if tk == TypeKind.TY_GENERIC_INST:
+        let base = self.get_generic_inst_base(resolved as i32)
+        if base == self.syms.box and self.get_generic_inst_arg_count(resolved as i32) == 1:
+            return self.dyn_trait_symbol_for_type(self.get_generic_inst_arg(resolved as i32, 0))
+    0
+
+fn Sema.find_dyn_trait_method_info(self: Sema, trait_sym: i32, method_sym: i32) -> SemaDynTraitMethodInfo:
+    let trait_node = self.find_trait_decl_node(trait_sym)
+    if trait_node == 0:
+        return sema_dyn_trait_method_missing()
+
+    let extra_start = self.ast.get_data1(trait_node)
+    var pos = extra_start
+    pos = pos + 2
+    let assoc_count = self.ast.get_extra(pos)
+    pos = pos + 1
+    for ai in 0..assoc_count:
+        let bound_count = self.ast.get_extra(pos + 1)
+        pos = pos + 2 + bound_count + 1
+
+    let method_count = self.ast.get_extra(pos)
+    pos = pos + 1
+    for mi in 0..method_count:
+        let cur_method_sym = self.ast.get_extra(pos)
+        pos = pos + 1
+        let _method_flags = self.ast.get_extra(pos)
+        pos = pos + 1
+        let param_start = self.ast.get_extra(pos)
+        pos = pos + 1
+        let param_count = self.ast.get_extra(pos)
+        pos = pos + 1
+        let ret_node = self.ast.get_extra(pos)
+        pos = pos + 1
+        pos = pos + 1
+        if cur_method_sym == method_sym:
+            return SemaDynTraitMethodInfo {
+                ok: 1,
+                param_start,
+                param_count,
+                ret_node,
+            }
+
+    sema_dyn_trait_method_missing()
+
+fn Sema.check_dyn_trait_method_call(self: Sema, trait_sym: i32, method_sym: i32, arg_types: Vec[i32], extra_start: i32, arg_count: i32, node: i32) -> i32:
+    let info = self.find_dyn_trait_method_info(trait_sym, method_sym)
+    if info.ok == 0:
+        self.emit_error("unknown method '" ++ self.pool_resolve(method_sym) ++ "' for dyn trait '" ++ self.pool_resolve(trait_sym) ++ "'", node)
+        return 0
+    if self.ensure_trait_object_safe(trait_sym, node) == 0:
+        return 0
+    if info.param_count <= 0:
+        self.emit_error("dyn trait method has no self parameter", node)
+        return 0
+
+    let expected_args = info.param_count - 1
+    if arg_count != expected_args:
+        self.emit_error("wrong argument count", node)
+
+    for ai in 0..arg_count:
+        let param_i = ai + 1
+        if param_i >= info.param_count:
+            break
+        let p_type_node = self.ast.fn_param_type(info.param_start, param_i)
+        if p_type_node != 0 and self.ast.kind(p_type_node) == NodeKind.NK_TYPE_NAMED and self.ast.get_data0(p_type_node) == self.syms.self_type:
+            self.emit_error("dyn trait method parameter cannot mention Self outside the receiver", self.ast.get_extra(extra_start + ai))
+            continue
+        let expected_ty = self.resolve_type_expr(p_type_node) as i32
+        let actual_ty = arg_types.get(ai as i64)
+        if expected_ty != 0 and actual_ty != 0:
+            if self.types_compatible(expected_ty as TypeId, actual_ty as TypeId) == 0:
+                if self.arithmetic_result_type(expected_ty as TypeId, actual_ty as TypeId) == 0:
+                    self.emit_argument_type_mismatch(self.pool_resolve(method_sym), method_sym, ai, param_i, expected_ty, actual_ty, self.ast.get_extra(extra_start + ai))
+
+    if info.ret_node == 0:
+        self.typed_expr_types.insert(node, self.ty_void as i32)
+        return self.ty_void as i32
+    if self.ast.kind(info.ret_node) == NodeKind.NK_TYPE_NAMED and self.ast.get_data0(info.ret_node) == self.syms.self_type:
+        self.emit_error("dyn trait method return type cannot be Self", node)
+        return 0
+    let ret_ty = self.resolve_type_expr(info.ret_node) as i32
+    if ret_ty != 0:
+        self.typed_expr_types.insert(node, ret_ty)
+    ret_ty
+
 fn Sema.dyn_arg_concrete_type_symbol(self: Sema, tid: i32) -> i32:
     let resolved = self.resolve_alias(tid)
     let tk = self.get_type_kind(resolved)
@@ -7177,6 +7286,13 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
     // Normalize method receivers through ref/ptr layers so builtin
     // method typing matches field access auto-deref behavior.
     var recv_type = self.auto_deref_ref_ptr_type(resolved)
+    let dyn_trait_sym = self.dyn_trait_symbol_for_type(obj_type as i32)
+    if dyn_trait_sym != 0:
+        let dyn_ret = self.check_dyn_trait_method_call(dyn_trait_sym, field, arg_types, extra_start, arg_count, node)
+        if dyn_ret != 0:
+            return dyn_ret
+        return 0
+
     let type_name_sym = self.method_owner_symbol_for_type(recv_type as i32)
     if type_name_sym != 0:
         if self.builtin_method_requires_mutable_receiver(type_name_sym, field) != 0:

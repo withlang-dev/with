@@ -4487,6 +4487,7 @@ fn MirBuilder.lower_call(self: MirBuilder, fn_expr: i32, arg_exprs_start: i32, a
                             args.push(self.lower_default_call_arg(def_node, node, sig_idx, callable_fn_tid, di))
 
     let args_id = self.body.new_call_args(args)
+    self.body.set_call_ast_node(args_id, node)
     let result_local = self.new_temp(ret_type_id)
     let result_place = self.place_for_local(result_local)
     let next_bb = self.new_block()
@@ -4506,6 +4507,7 @@ fn MirBuilder.lower_call_redirected(self: MirBuilder, fn_op: i32, fn_sym: i32, a
         let arg_node = self.ast.get_extra(arg_exprs_start + i)
         args.push(self.lower_call_arg(arg_node, sig_idx, 0, i))
     let args_id = self.body.new_call_args(args)
+    self.body.set_call_ast_node(args_id, node)
     let result_local = self.new_temp(ret_type_id)
     let result_place = self.place_for_local(result_local)
     let next_bb = self.new_block()
@@ -4524,6 +4526,7 @@ fn MirBuilder.lower_call_with_arg_nodes(self: MirBuilder, fn_op: i32, callee_sym
     for i in 0..arg_node_vec.len() as i32:
         args.push(self.lower_call_arg(arg_node_vec.get(i as i64), sig_idx, 0, i))
     let args_id = self.body.new_call_args(args)
+    self.body.set_call_ast_node(args_id, node)
     let result_local = self.new_temp(ret_type_id)
     let result_place = self.place_for_local(result_local)
     let next_bb = self.new_block()
@@ -4878,6 +4881,27 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
     // Instead, emit the call terminator directly with an intrinsic tag.
     if intrinsic != MirIntrinsic.MIR_INTRINSIC_NONE:
         return self.lower_intrinsic_call(intrinsic, self_expr, method_sym, arg_start, arg_count, node)
+
+    if self.sema.dyn_trait_symbol_for_type(recv_type) != 0:
+        let dyn_fn_op = self.const_operand(ConstKind.CK_FN, method_sym, 0)
+        let dyn_args: Vec[i32] = Vec.new()
+        dyn_args.push(self.lower_expr(self_expr))
+        for dyn_ai in 0..arg_count:
+            dyn_args.push(self.lower_expr(self.ast.get_extra(arg_start + dyn_ai)))
+        let dyn_args_id = self.body.new_call_args(dyn_args)
+        self.body.set_call_intrinsic(dyn_args_id, MirIntrinsic.MIR_INTRINSIC_DYN_CALL)
+        self.body.set_call_ast_node(dyn_args_id, node)
+        var dyn_ret_ty = self.expr_type(node)
+        if dyn_ret_ty == 0:
+            dyn_ret_ty = self.sema.ty_void as i32
+        let dyn_result = self.new_temp(dyn_ret_ty)
+        let dyn_place = self.place_for_local(dyn_result)
+        let dyn_next = self.new_block()
+        self.terminate(TermKind.TK_CALL, dyn_fn_op, dyn_args_id, dyn_place, dyn_next)
+        self.switch_to(dyn_next)
+        if self.sema.is_copy(dyn_ret_ty) != 0:
+            return self.body.new_operand(OperandKind.OK_COPY, dyn_place)
+        return self.body.new_operand(OperandKind.OK_MOVE, dyn_place)
 
     // If resolution returned bare method_sym, the method is unresolved.
     // Route through MirIntrinsic.MIR_INTRINSIC_GENERIC_CALL so codegen's gen_call handles it
