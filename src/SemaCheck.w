@@ -1840,6 +1840,12 @@ fn Sema.check_ephemeral_task_arg_escape(self: Sema, arg_node: i32, expected_ty: 
         return
     self.emit_warning("ephemeral Task passed by value may escape", arg_node)
 
+fn Sema.check_ephemeral_task_storage(self: Sema, value_node: i32, context: str):
+    if value_node <= 0:
+        return
+    if self.expr_is_ephemeral_task(value_node) != 0:
+        self.emit_error("ephemeral Task cannot be stored in " ++ context, value_node)
+
 fn Sema.expr_is_ephemeral_value(self: Sema, node: i32) -> i32:
     if node == 0:
         return 0
@@ -4086,6 +4092,7 @@ fn Sema.check_vec_literal_elem(self: Sema, elem_ty: i32, elem_node: i32, arg_ind
     if elem_node == 0:
         return
     let actual_ty = self.check_expr_with_expected(elem_node, elem_ty)
+    self.check_ephemeral_task_storage(elem_node, "generic container")
     if elem_ty != 0 and actual_ty != 0:
         if self.types_compatible(elem_ty, actual_ty) == 0:
             if self.arithmetic_result_type(elem_ty, actual_ty) == 0:
@@ -4360,6 +4367,7 @@ fn Sema.check_array_literal(self: Sema, node: i32) -> i32:
             self.check_expr_with_expected(elem, elem_type as TypeId)
         else:
             self.check_expr(elem)
+        self.check_ephemeral_task_storage(elem, "array")
         if elem_type == 0:
             elem_type = et as i32
 
@@ -4412,6 +4420,8 @@ fn Sema.check_struct_literal(self: Sema, node: i32) -> i32:
                     else:
                         field_expected = self.struct_field_type(expected_struct_ty as i32, f_name)
                 let val_ty = if field_expected != 0: self.check_expr_with_expected(f_value, field_expected as TypeId) else: self.check_expr(f_value)
+                if not self.ephemeral_types.contains(name):
+                    self.check_ephemeral_task_storage(f_value, "non-ephemeral struct")
                 val_types.push(val_ty as i32)
             // Check if struct has type params — infer GenericInst
             if self.type_decl_nodes.contains(name):
@@ -6440,12 +6450,13 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
                 break
             let expected_ty = final_payload_tys.get(ai as i64)
             let arg_ty = arg_types.get(ai as i64)
+            let payload_arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
+            self.check_ephemeral_task_storage(if payload_arg_node > 0: payload_arg_node else: node, "enum payload")
             if expected_ty != 0 and arg_ty != 0:
                 if self.types_compatible(expected_ty, arg_ty) == 0:
                     if self.arithmetic_result_type(expected_ty, arg_ty) == 0:
-                        let err_arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
                         let variant_name2 = self.pool_resolve(fn_sym)
-                        self.emit_argument_type_mismatch(variant_name2, fn_sym, ai, ai, expected_ty, arg_ty, if err_arg_node > 0: err_arg_node else: node)
+                        self.emit_argument_type_mismatch(variant_name2, fn_sym, ai, ai, expected_ty, arg_ty, if payload_arg_node > 0: payload_arg_node else: node)
         let resolved_variant_sym = self.qualified_enum_variant_sym(final_variant_ty as i32, fn_sym)
         self.comp_resolved.insert(node, resolved_variant_sym)
         self.typed_expr_types.insert(node, final_variant_ty as i32)
@@ -7832,6 +7843,38 @@ fn Sema.method_expected_arg_type(self: Sema, recv_type: i32, field: i32, arg_ind
         return self.get_generic_inst_arg(resolved as i32, 0)
     0
 
+fn Sema.method_arg_stores_value(self: Sema, recv_type: i32, field: i32, arg_index: i32) -> i32:
+    if recv_type == 0:
+        return 0
+    var resolved = self.resolve_alias(recv_type as TypeId)
+    resolved = self.auto_deref_ref_ptr_type(resolved) as TypeId
+    if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return 0
+    let owner_sym = self.get_generic_inst_base(resolved as i32)
+    let method_name = self.pool_resolve(field)
+    if owner_sym == self.syms.vec:
+        if field == self.syms.push and arg_index == 0:
+            return 1
+    if owner_sym == self.syms.hashset:
+        if field == self.syms.insert and arg_index == 0:
+            return 1
+    if owner_sym == self.syms.hashmap:
+        if field == self.syms.insert and (arg_index == 0 or arg_index == 1):
+            return 1
+    if owner_sym == self.syms.hashmapentry:
+        if field == self.syms.or_insert and arg_index == 0:
+            return 1
+        if method_name == "set" and arg_index == 0:
+            return 1
+    if owner_sym == self.syms.slotmap:
+        if field == self.syms.insert and arg_index == 0:
+            return 1
+        if field == self.syms.replace and arg_index == 1:
+            return 1
+    if owner_sym == self.syms.slotmapslot and method_name == "set" and arg_index == 0:
+        return 1
+    0
+
 fn Sema.sender_send_element_type(self: Sema, recv_type: i32, field: i32, arg_index: i32) -> i32:
     if recv_type == 0 or arg_index != 0:
         return 0
@@ -8179,6 +8222,8 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
             mc_expected = self.method_expected_arg_type(obj_type as i32, field, ai)
         let mc_arg_ty = if mc_expected != 0: self.check_expr_with_expected(mc_arg_node, mc_expected as TypeId) else: self.check_expr(mc_arg_node)
         arg_types.push(mc_arg_ty as i32)
+        if self.method_arg_stores_value(obj_type as i32, field, ai) != 0:
+            self.check_ephemeral_task_storage(mc_arg_node, "generic container")
         let mc_sender_elem_ty = self.sender_send_element_type(obj_type as i32, field, ai)
         if mc_sender_elem_ty != 0:
             if self.type_is_ephemeral_value(mc_sender_elem_ty) != 0 or self.type_is_ephemeral_value(mc_arg_ty as i32) != 0 or self.expr_is_ephemeral_value(mc_arg_node) != 0 or self.expr_is_ephemeral_task(mc_arg_node) != 0:
@@ -8381,13 +8426,14 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                 break
             let expected_ty = payload_tys.get(ai as i64)
             let arg_ty = arg_types.get(ai as i64)
+            let static_payload_arg_node = if mc_has_resolved_args != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(extra_start + ai)
+            self.check_ephemeral_task_storage(if static_payload_arg_node > 0: static_payload_arg_node else: node, "enum payload")
             if expected_ty != 0 and arg_ty != 0:
                 if self.types_compatible(expected_ty, arg_ty) == 0:
-                if self.arithmetic_result_type(expected_ty, arg_ty) == 0:
+                    if self.arithmetic_result_type(expected_ty, arg_ty) == 0:
                         let owner_name = self.type_name(obj_type)
                         let variant_name = self.pool_resolve(field)
-                        let err_arg_node = if mc_has_resolved_args != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(extra_start + ai)
-                        self.emit_argument_type_mismatch(owner_name ++ "." ++ variant_name, field, ai, ai, expected_ty, arg_ty, if err_arg_node > 0: err_arg_node else: node)
+                        self.emit_argument_type_mismatch(owner_name ++ "." ++ variant_name, field, ai, ai, expected_ty, arg_ty, if static_payload_arg_node > 0: static_payload_arg_node else: node)
         return obj_type as i32
 
     if self.static_receiver_type_is_known(expr) != 0 and self.pool_resolve(field) == "from_int":

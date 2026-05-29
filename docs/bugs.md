@@ -231,11 +231,16 @@
   │                                                                                                                │             │                   │      │ value to extern functions now fail loudly,     │
   │                                                                                                                │             │                   │      │ while by-reference inspection remains valid.   │
   │                                                                                                                │             │                   │      │ Spec §14.22.                                   │
-  │ #263-#265, #267-#274                                                                                          │         Yes │           Partial │   No │ Remaining §14 async sketches. Runtime has many │
+  │ [x] #263                                                                                                      │         Yes │               Yes │   No │ Completed: ephemeral Task storage now fails    │
+  │                                                                                                                │             │                   │      │ loudly at aggregate/container storage sinks,   │
+  │                                                                                                                │             │                   │      │ while owned-argument tasks remain storable and │
+  │                                                                                                                │             │                   │      │ async scope tracking accepts borrowing tasks.  │
+  │                                                                                                                │             │                   │      │ Spec §14.22.                                   │
+  │ #264-#265, #267-#274                                                                                          │         Yes │           Partial │   No │ Remaining §14 async sketches. Runtime has many │
   │                                                                                                                │             │                   │      │ behavior tests now, but spec sketches still    │
   │                                                                                                                │             │                   │      │ cover missing/unchecked semantics:             │
   │                                                                                                                │             │                   │      │ cancellation, ScopedSend, no-await-in-         │
-  │                                                                                                                │             │                   │      │ iterators, task ephemerality.                  │
+  │                                                                                                                │             │                   │      │ iterators.                                     │
   │ [x] #275-#276                                                                                                  │         Yes │               Yes │   No │ Completed: c"..." now lowers as &CStr with     │
   │                                                                                                                │             │                   │      │ NUL-terminated static storage, string          │
   │                                                                                                                │             │                   │      │ literals default to str, and &str coercions    │
