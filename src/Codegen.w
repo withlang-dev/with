@@ -693,6 +693,7 @@ type Codegen {
     mir_local_ptrs: HashMap[i32, i64],
     mir_local_types: HashMap[i32, i64],
     mir_indirect_value_local_types: HashMap[i32, i64],
+    mir_ref_capture_local_types: HashMap[i32, i64],
     mir_bb_values: Vec[i64],
     mir_default_unreachable_bbs: Vec[i64],
 }
@@ -965,6 +966,7 @@ fn Codegen.init_with_opt(module_name: str, opt_level: i32) -> Codegen:
         mir_local_ptrs: HashMap.new(),
         mir_local_types: HashMap.new(),
         mir_indirect_value_local_types: HashMap.new(),
+        mir_ref_capture_local_types: HashMap.new(),
         mir_bb_values: Vec.new(),
         mir_default_unreachable_bbs: Vec.new(),
         debug_info: 1,
