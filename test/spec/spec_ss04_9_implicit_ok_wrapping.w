@@ -1,27 +1,53 @@
-//! skip: non-executable spec sketch for Section 4.9 — Implicit Ok Wrapping (formerly 25.27b); contains pseudo-code for unimplemented feature work
-// Spec test: Section 4.9 — Implicit Ok Wrapping (formerly 25.27b)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+// Spec test: Section 4.9 — Implicit Ok Wrapping.
 
-// PASS: value auto-wrapped in Ok
 fn get_number -> Result[i32, str]:
-    42                       // auto-wrapped to Ok(42)
+    42
 
-// PASS: Result[Unit, E] with no trailing expression
-fn do_stuff -> Result[Unit, IoError]:
-    let f = fs.open("test.txt")?
-    f.write_all(b"hello")?
-    // implicit Ok(())
+fn do_stuff -> Result[Unit, str]:
+    let x = 1
 
-// PASS: explicit Ok still works
 fn explicit -> Result[i32, str]:
     Ok(42)
 
-// PASS: explicit Err still works
 fn fail -> Result[i32, str]:
     Err("nope")
 
-// PASS: ? still propagates errors
-fn chain -> Result[User, DbError]:
-    let row = db.query("SELECT ...", id)?
-    User.from_row(row)       // auto-wrapped in Ok(...)
+fn read_ok -> Result[i32, str]:
+    41
+
+fn read_err -> Result[i32, str]:
+    Err("bad")
+
+fn chain_ok -> Result[i32, str]:
+    let value = read_ok()?
+    value + 1
+
+fn chain_err -> Result[i32, str]:
+    let value = read_err()?
+    value + 1
+
+fn already_result -> Result[i32, str]:
+    Ok(7)
+
+fn default_i32 -> Result[i32, str]:
+    let x = 1
+
+fn test_value_auto_wrapped:
+    assert(get_number().unwrap() == 42)
+
+fn test_result_unit_empty_tail:
+    assert(do_stuff().is_ok())
+
+fn test_explicit_result_variants_still_work:
+    assert(explicit().unwrap() == 42)
+    assert(fail().is_err())
+
+fn test_question_propagates_and_tail_wraps:
+    assert(chain_ok().unwrap() == 42)
+    assert(chain_err().is_err())
+
+fn test_existing_result_not_double_wrapped:
+    assert(already_result().unwrap() == 7)
+
+fn test_defaultable_empty_tail_wraps_default:
+    assert(default_i32().unwrap() == 0)
