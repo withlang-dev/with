@@ -203,9 +203,14 @@
   │ [x] #266                                                                                                      │         Yes │               Yes │   No │ Completed: postfix .await sketch is executable │
   │                                                                                                                │             │                   │      │ for direct await, await with ?, and stored     │
   │                                                                                                                │             │                   │      │ task await. Spec §14.5.                        │
-  │ #257-#265, #267-#274                                                                                          │         Yes │           Partial │   No │ Remaining §14 async sketches. Runtime has many │
+  │ [x] #257                                                                                                      │         Yes │               Yes │   No │ Completed: select await now carries biased     │
+  │                                                                                                                │             │                   │      │ mode through AST/MIR/codegen, default select   │
+  │                                                                                                                │             │                   │      │ randomly chooses among ready branches, and     │
+  │                                                                                                                │             │                   │      │ biased select chooses the first ready branch.  │
+  │                                                                                                                │             │                   │      │ Spec §14.10.                                   │
+  │ #258-#265, #267-#274                                                                                          │         Yes │           Partial │   No │ Remaining §14 async sketches. Runtime has many │
   │                                                                                                                │             │                   │      │ behavior tests now, but spec sketches still    │
-  │                                                                                                                │             │                   │      │ cover missing/unchecked semantics: fairness,   │
+  │                                                                                                                │             │                   │      │ cover missing/unchecked semantics:             │
   │                                                                                                                │             │                   │      │ cancellation, ScopedSend, no-await-in-         │
   │                                                                                                                │             │                   │      │ iterators, task ephemerality.                  │
   │ [x] #275-#276                                                                                                  │         Yes │               Yes │   No │ Completed: c"..." now lowers as &CStr with     │

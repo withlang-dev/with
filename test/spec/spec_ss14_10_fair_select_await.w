@@ -1,15 +1,51 @@
-//! skip: non-executable spec sketch for Section 14.10 — Fair Select Await (formerly 25.72); contains pseudo-code for unimplemented feature work
-// Spec test: Section 14.10 — Fair Select Await (formerly 25.72)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+//! expect-stdout: ok
 
-// PASS: fair select (default — random among ready branches)
-loop:
-    select await
-        data = fast_stream.recv() => handle(data)
-        _ = shutdown.recv() => break    // will eventually fire
+extern fn with_runtime_run_one_step() -> void
 
-// PASS: biased select (explicit — top-to-bottom priority)
-select await biased
-    urgent = priority_rx.recv() => handle_urgent(urgent)
-    normal = normal_rx.recv() => handle_normal(normal)
+async fn value(n: i32) -> i32:
+    n
+
+fn complete_two_ready_tasks():
+    with_runtime_run_one_step()
+    with_runtime_run_one_step()
+
+fn test_fair_select:
+    var left_wins = 0
+    var right_wins = 0
+    var i = 0
+    while i < 64:
+        let left = value(1)
+        let right = value(2)
+        complete_two_ready_tasks()
+
+        select await:
+            x = left => left_wins = left_wins + x
+            y = right => right_wins = right_wins + (y / 2)
+
+        i = i + 1
+
+    assert(left_wins > 0)
+    assert(right_wins > 0)
+
+fn test_biased_select:
+    var left_wins = 0
+    var right_wins = 0
+    var i = 0
+    while i < 16:
+        let left = value(1)
+        let right = value(2)
+        complete_two_ready_tasks()
+
+        select await biased:
+            x = left => left_wins = left_wins + x
+            y = right => right_wins = right_wins + (y / 2)
+
+        i = i + 1
+
+    assert(left_wins == 16)
+    assert(right_wins == 0)
+
+fn main:
+    test_fair_select()
+    test_biased_select()
+    print("ok")

@@ -1436,7 +1436,7 @@ fn AstPool.for_binding_is_pattern(self: AstPool, node: NodeId) -> bool:
 // NodeKind.NK_YIELD:         d0=expr(node), d1=0, d2=0
 // NodeKind.NK_COMPTIME:      d0=expr(node), d1=0, d2=0
 // NodeKind.NK_ASYNC_SCOPE:   d0=name(sym), d1=body(node), d2=0
-// NodeKind.NK_SELECT_AWAIT:  d0=extra_start, d1=arm_count, d2=0
+// NodeKind.NK_SELECT_AWAIT:  d0=extra_start, d1=arm_count, d2=biased(0/1)
 //
 // Type expression nodes:
 // NodeKind.NK_TYPE_NAMED:    d0=sym, d1=0, d2=0

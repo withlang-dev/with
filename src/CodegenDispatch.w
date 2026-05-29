@@ -5752,9 +5752,9 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
             wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
         return true
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FIBER_SELECT:
+    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FIBER_SELECT or intrinsic == MirIntrinsic.MIR_INTRINSIC_FIBER_SELECT_BIASED:
         // Select: extract fiber_ids from all Task operands, pack into array,
-        // call with_fiber_select(ids, count, &winner_index), store winner index.
+        // call with_fiber_select_mode(ids, count, biased, &winner_index), store winner index.
 
         // Allocate array of fiber IDs on stack
         let arr_ty = wl_array_type(i32_ty, arg_count as i64)
@@ -5777,15 +5777,16 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         // Allocate winner_index on stack
         let winner_alloca = self.create_entry_alloca(i32_ty)
 
-        // Call with_fiber_select(ids_ptr, count, &winner_index)
-        let select_fn_name = "with_fiber_select"
+        // Call with_fiber_select_mode(ids_ptr, count, biased, &winner_index)
+        let select_fn_name = "with_fiber_select_mode"
         var select_fn = wl_get_named_function(self.llmod, select_fn_name)
         if select_fn == 0:
             let sp: Vec[i64] = Vec.new()
             sp.push(ptr_ty)    // ids
             sp.push(i32_ty)    // count
+            sp.push(i32_ty)    // biased
             sp.push(ptr_ty)    // result_index
-            let sel_ft = wl_function_type(wl_void_type(self.context), vec_data_i64(&sp), 3, 0)
+            let sel_ft = wl_function_type(wl_void_type(self.context), vec_data_i64(&sp), 4, 0)
             select_fn = wl_add_function(self.llmod, select_fn_name, sel_ft)
         let sel_ft2 = wl_global_get_value_type(select_fn)
         let sa: Vec[i64] = Vec.new()
@@ -5795,8 +5796,9 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let ids_ptr = wl_build_gep(self.builder, arr_ty, ids_alloca, vec_data_i64(&zero_idx), 2)
         sa.push(ids_ptr)
         sa.push(wl_const_int(i32_ty, arg_count as i64, 0))
+        sa.push(wl_const_int(i32_ty, if intrinsic == MirIntrinsic.MIR_INTRINSIC_FIBER_SELECT_BIASED: 1 else: 0, 0))
         sa.push(winner_alloca)
-        wl_build_call(self.builder, sel_ft2, select_fn, vec_data_i64(&sa), 3)
+        wl_build_call(self.builder, sel_ft2, select_fn, vec_data_i64(&sa), 4)
 
         // Load winner index and store to dest
         let winner_idx = wl_build_load(self.builder, i32_ty, winner_alloca)
@@ -9896,14 +9898,24 @@ fn Codegen.ensure_async_runtime_declared(self: Codegen):
         let ft = wl_function_type(void_ty, vec_data_i64(&no_params), 0, 0)
         wl_add_function(self.llmod, "with_fiber_yield", ft)
 
-    // i32 with_fiber_select(ids: ptr, count: i32, result_out: ptr) -> i32
+    // void with_fiber_select(ids: ptr, count: i32, result_out: ptr)
     if wl_get_named_function(self.llmod, "with_fiber_select") == 0:
         let params: Vec[i64] = Vec.new()
         params.push(ptr_ty)
         params.push(i32_ty)
         params.push(ptr_ty)
-        let ft = wl_function_type(i32_ty, vec_data_i64(&params), 3, 0)
+        let ft = wl_function_type(void_ty, vec_data_i64(&params), 3, 0)
         wl_add_function(self.llmod, "with_fiber_select", ft)
+
+    // void with_fiber_select_mode(ids: ptr, count: i32, biased: i32, result_out: ptr)
+    if wl_get_named_function(self.llmod, "with_fiber_select_mode") == 0:
+        let params: Vec[i64] = Vec.new()
+        params.push(ptr_ty)
+        params.push(i32_ty)
+        params.push(i32_ty)
+        params.push(ptr_ty)
+        let ft = wl_function_type(void_ty, vec_data_i64(&params), 4, 0)
+        wl_add_function(self.llmod, "with_fiber_select_mode", ft)
 
     self.uses_async = true
 
