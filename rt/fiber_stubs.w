@@ -25,6 +25,11 @@ pub fn runtime_fiber_is_completed(fiber_id: i32) -> i32:
     let _ = fiber_id
     0
 
+@[c_export("with_runtime_fiber_is_live")]
+pub fn runtime_fiber_is_live(fiber_id: i32) -> i32:
+    let _ = fiber_id
+    0
+
 @[c_export("with_runtime_take_completed_fiber")]
 pub fn runtime_take_completed_fiber(fiber_id: i32, panic_msg_out: *mut *const u8, panic_msg_len_out: *mut i32, cancelled_return_out: *mut i32) -> i32:
     let _ = fiber_id

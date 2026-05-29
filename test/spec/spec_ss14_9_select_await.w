@@ -1,31 +1,48 @@
-//! skip: non-executable spec sketch for Section 14.9 — Select Await (formerly 25.51); contains pseudo-code for unimplemented feature work
-// Spec test: Section 14.9 — Select Await (formerly 25.51)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+//! expect-stdout: ok
 
-// PASS: basic select with timeout
-async fn test:
-    let (tx, rx) = channel[str]()
-    tx.send("hello").await
-    select await
-        msg = rx.recv() => assert(msg == "hello")
-        _ = timeout(1.secs()) => unreachable()
+async fn ready(value: i32) -> i32:
+    value
 
-// PASS: select in a loop with break
-async fn test:
-    let (tx, rx) = channel[i32]()
+async fn delayed(value: i32) -> i32:
+    let _ = ready(0).await
+    value
+
+async fn fallible(value: i32) -> Result[i32, str]:
+    if value < 0:
+        Err("negative")
+    else:
+        Ok(value)
+
+fn test_first_completed_branch:
+    let fast = ready(42)
+    let slow = delayed(99)
+    select await:
+        value = fast => assert(value == 42)
+        value = slow => assert(value == 99)
+
+fn test_select_branch_break:
     var sum = 0
-    tx.send(1).await
-    tx.send(2).await
-    tx.close()
+    var current = 1
     loop:
-        select await
-            n = rx.recv() => sum += n
-            _ = timeout(100.millis()) => break
+        let item = ready(current)
+        select await:
+            value = item =>
+                sum = sum + value
+                if current == 2:
+                    break
+                current = current + 1
     assert(sum == 3)
 
-// PASS: select with error propagation
-async fn do_work(rx: Receiver[str], cancel: CancelToken) -> Result[str, AppError]:
-    select await
-        msg = rx.recv() => Ok(msg)
-        _ = cancel.cancelled() => Err(.Cancelled)
+async fn select_with_question -> Result[i32, str]:
+    let task = fallible(-1)
+    select await:
+        value = task => value?
+
+async fn main:
+    test_first_completed_branch()
+    test_select_branch_break()
+    let result = select_with_question().await
+    match result:
+        Ok(_) => assert(false)
+        Err(message) => assert(message == "negative")
+    print("ok")

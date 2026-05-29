@@ -719,6 +719,13 @@ pub fn runtime_fiber_is_completed(fiber_id: i32) -> i32:
         return 0
     if fiber_state(f) == FIBER_STATE_DONE: 1 else: 0
 
+@[c_export("with_runtime_fiber_is_live")]
+pub fn runtime_fiber_is_live(fiber_id: i32) -> i32:
+    let f = fiber_lookup(fiber_id)
+    if f == 0:
+        return 0
+    1
+
 @[c_export("with_fiber_pool_reuses")]
 pub fn fiber_pool_reuses() -> i64:
     fiber_pool_reuse_count
