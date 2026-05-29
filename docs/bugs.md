@@ -195,7 +195,11 @@
   │                                                                                                                │             │                   │      │ conservative derive(all); the skipped sketch   │
   │                                                                                                                │             │                   │      │ is executable with positive and negative       │
   │                                                                                                                │             │                   │      │ regressions. Spec §11.8.                       │
-  │ #246                                                                                                           │         Yes │                No │   No │ Remaining §11 derive(Builder) sketch.          │
+  │ [x] #246                                                                                                      │         Yes │               Yes │   No │ Completed: derive(Builder) now generates a     │
+  │                                                                                                                │             │                   │      │ typed builder, setters, build() Result,        │
+  │                                                                                                                │             │                   │      │ required-field errors, and conflict diagnostics│
+  │                                                                                                                │             │                   │      │ with executable and negative regressions. Spec │
+  │                                                                                                                │             │                   │      │ §11.8.                                         │
   │ #257-#274                                                                                                      │         Yes │           Partial │   No │ §14 async sketches. Runtime has many behavior  │
   │                                                                                                                │             │                   │      │ tests now, but spec sketches still cover       │
   │                                                                                                                │             │                   │      │ missing/unchecked semantics: fairness,         │
