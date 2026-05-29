@@ -227,7 +227,11 @@
   │                                                                                                                │             │                   │      │ parameter types now reject direct and          │
   │                                                                                                                │             │                   │      │ transitive may_suspend bodies. Spec §14.3 /    │
   │                                                                                                                │             │                   │      │ §14.19.                                        │
-  │ #262-#265, #267-#274                                                                                          │         Yes │           Partial │   No │ Remaining §14 async sketches. Runtime has many │
+  │ [x] #262                                                                                                      │         Yes │               Yes │   No │ Completed: ephemeral Task values passed by     │
+  │                                                                                                                │             │                   │      │ value to extern functions now fail loudly,     │
+  │                                                                                                                │             │                   │      │ while by-reference inspection remains valid.   │
+  │                                                                                                                │             │                   │      │ Spec §14.22.                                   │
+  │ #263-#265, #267-#274                                                                                          │         Yes │           Partial │   No │ Remaining §14 async sketches. Runtime has many │
   │                                                                                                                │             │                   │      │ behavior tests now, but spec sketches still    │
   │                                                                                                                │             │                   │      │ cover missing/unchecked semantics:             │
   │                                                                                                                │             │                   │      │ cancellation, ScopedSend, no-await-in-         │

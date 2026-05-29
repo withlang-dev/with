@@ -1828,6 +1828,18 @@ fn Sema.expr_is_ephemeral_task(self: Sema, node: i32) -> i32:
         return 0
     0
 
+fn Sema.check_ephemeral_task_arg_escape(self: Sema, arg_node: i32, expected_ty: i32, is_extern_call: i32):
+    if arg_node <= 0:
+        return
+    if self.expr_is_ephemeral_task(arg_node) == 0:
+        return
+    if self.param_is_by_reference(expected_ty) != 0:
+        return
+    if is_extern_call != 0:
+        self.emit_error("ephemeral Task cannot be passed by value to extern function", arg_node)
+        return
+    self.emit_warning("ephemeral Task passed by value may escape", arg_node)
+
 fn Sema.expr_is_ephemeral_value(self: Sema, node: i32) -> i32:
     if node == 0:
         return 0
@@ -5948,8 +5960,7 @@ fn Sema.check_callable_value_call(self: Sema, call_name: str, fn_tid: i32, closu
                 else:
                     self.note_auto_ref_call_arg(expected_ty, arg_ty, err_arg_node, node)
         let eph_arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(extra_start + ai)
-        if eph_arg_node > 0 and self.expr_is_ephemeral_task(eph_arg_node) != 0 and self.param_is_by_reference(expected_ty) == 0:
-            self.emit_warning("ephemeral Task passed by value may escape", eph_arg_node)
+        self.check_ephemeral_task_arg_escape(eph_arg_node, expected_ty, 0)
 
     if closure_node > 0:
         let capture_count = self.closure_capture_summary_count(closure_node)
@@ -6356,8 +6367,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
                     else:
                         self.note_auto_ref_call_arg(expected_ty, arg_ty, err_arg_node, node)
             let eph_arg_node = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
-            if eph_arg_node > 0 and self.expr_is_ephemeral_task(eph_arg_node) != 0 and self.param_is_by_reference(expected_ty) == 0:
-                self.emit_warning("ephemeral Task passed by value may escape", eph_arg_node)
+            self.check_ephemeral_task_arg_escape(eph_arg_node, expected_ty, if self.extern_fn_names.contains(fn_sym): 1 else: 0)
             // Effect enforcement: if the callee may consume/escape this arg, it must be explicitly moved or copied
             let param_eff = self.sig_param_effect(sig_idx, param_i)
             // Transitive effect propagation: if this arg is a param of the current function,
