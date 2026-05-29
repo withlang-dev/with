@@ -66,13 +66,13 @@ fn AesGcm.new(key: *const u8, iv: *const u8, iv_len: i32) -> AesGcm:
     var j0: [u8; 16] = [0 as u8; 16]
     if iv_len == 12:
         for i in 0..12:
-            j0[i] = unsafe: *(iv + i as u64)
+            j0[i] = unsafe *(iv + i as u64)
         j0[15] = 1 as u8
 
     var counter: [u8; 16] = [0 as u8; 16]
     for i in 0..16:
         counter[i] = j0[i]
-    unsafe: increment_counter(&raw mut counter[0] as *mut u8)
+    unsafe { increment_counter(&raw mut counter[0] as *mut u8) }
 
     AesGcm {
         aes: aes_ctx, h, j0, counter,
@@ -103,7 +103,7 @@ unsafe fn aesgcm_aad(ctx: *mut AesGcm, data: *const u8, len: i32):
         ctx.ghash_state[i] = gs[i]
 
 fn AesGcm.aad(self: *mut AesGcm, data: *const u8, len: i32):
-    unsafe: aesgcm_aad(self, data, len)
+    unsafe { aesgcm_aad(self, data, len) }
 
 unsafe fn aesgcm_encrypt(ctx: *mut AesGcm, pt: *const u8, ct: *mut u8, len: i32):
     ctx.ct_len = ctx.ct_len + len as u64
@@ -142,7 +142,7 @@ unsafe fn aesgcm_encrypt(ctx: *mut AesGcm, pt: *const u8, ct: *mut u8, len: i32)
         ctx.ghash_state[i] = gs[i]
 
 fn AesGcm.encrypt(self: *mut AesGcm, pt: *const u8, ct: *mut u8, len: i32):
-    unsafe: aesgcm_encrypt(self, pt, ct, len)
+    unsafe { aesgcm_encrypt(self, pt, ct, len) }
 
 // Decrypt: XOR with keystream (same as encrypt) but GHASH the INPUT (ciphertext)
 unsafe fn aesgcm_decrypt(ctx: *mut AesGcm, ct_in: *const u8, pt_out: *mut u8, len: i32):
@@ -187,7 +187,7 @@ unsafe fn aesgcm_decrypt(ctx: *mut AesGcm, ct_in: *const u8, pt_out: *mut u8, le
         ctx.ghash_state[i] = gs[i]
 
 fn AesGcm.decrypt(self: *mut AesGcm, ct_in: *const u8, pt_out: *mut u8, len: i32):
-    unsafe: aesgcm_decrypt(self, ct_in, pt_out, len)
+    unsafe { aesgcm_decrypt(self, ct_in, pt_out, len) }
 
 unsafe fn aesgcm_tag(ctx: *mut AesGcm, out: *mut u8):
     var gs: [u8; 16] = [0 as u8; 16]
@@ -217,4 +217,4 @@ unsafe fn aesgcm_tag(ctx: *mut AesGcm, out: *mut u8):
         *(out + i as u64) = gs[i] ^ j0_enc[i]
 
 fn AesGcm.tag(self: *mut AesGcm, out: *mut u8):
-    unsafe: aesgcm_tag(self, out)
+    unsafe { aesgcm_tag(self, out) }

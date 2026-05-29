@@ -2732,7 +2732,7 @@ fn MirBuilder.lower_expr_place(self: MirBuilder, node: i32) -> i32:
 
     // Transparent pass-through. lower_expr already does this for the rvalue
     // case (line 4043); the place version was missing the same handling, so
-    // `(unsafe: *p) = expr` would fall through to the materialize-as-temp
+    // `(unsafe *p) = expr` would fall through to the materialize-as-temp
     // fallback below — silently dropping the store. The migrator emits this
     // pattern for every C struct assignment `*p = q`, so the breakage was
     // load-bearing for PCRE2.

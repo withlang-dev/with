@@ -832,6 +832,25 @@ fn bs_check_unit_tail_value_not_returned(ctx: ActionCtx, compiler_path: str, cas
     if rc != 0: return rc
     bs_assert_not_contains(ctx, callee_mir, "_0 =", "unit_tail_value_not_returned")
 
+fn bs_check_unsafe_prefix_redundant_warning(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "unsafe_prefix_redundant_warning.w")
+    let source =
+        "fn main:\n" ++
+        "    var x = 1\n" ++
+        "    let p = &raw mut x\n" ++
+        "    unsafe:\n" ++
+        "        let y = unsafe *p\n" ++
+        "        assert(y == 1)\n"
+    var rc = bs_write_fixture(ctx, src, source, "unsafe prefix warning source")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("check")
+    args |> push(bs_abs(root, src))
+    let result = bs_edge_expect_success(ctx, compiler_path, case_dir, "unsafe-prefix-redundant-warning", args)
+    if result.rc != 0: return result.rc
+    bs_assert_contains(ctx, result.stderr, "warning: redundant unsafe prefix inside unsafe context", "unsafe_prefix_redundant_warning")
+
 fn bs_check_build_options_cli(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "hello_build_options.w")
@@ -1332,6 +1351,8 @@ pub fn run_cli_selfhost_edge_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     rc = bs_check_unit_tail_value_not_returned(ctx, compiler_path, bs_join(output_dir, "unit_tail_value_not_returned_case"))
     if rc != 0: return rc
+    rc = bs_check_unsafe_prefix_redundant_warning(ctx, compiler_path, bs_join(output_dir, "unsafe_prefix_redundant_warning_case"))
+    if rc != 0: return rc
     rc = bs_check_build_options_cli(ctx, compiler_path, bs_join(output_dir, "build_options_cli_case"))
     if rc != 0: return rc
     rc = bs_check_whole_program_extern_var_redecl(ctx, compiler_path, bs_join(output_dir, "whole_program_extern_var_redecl_case"))
@@ -1515,9 +1536,9 @@ fn bs_check_migrate_assignment_compat(ctx: ActionCtx, compiler_path: str, case_d
     let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-assignment-compat", args)
     if result.rc != 0: return result.rc
     let out_text = ctx.fs().read_text(out_w)
-    rc = bs_assert_contains(ctx, out_text, "(__local_cb.groupinfo = (&(unsafe: __local_stack_groupinfo[0]) as *mut c_uint))", "assignment_compat")
+    rc = bs_assert_contains(ctx, out_text, "(__local_cb.groupinfo = (&__local_stack_groupinfo[0] as *mut c_uint))", "assignment_compat")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "(__local_cb.parsed_pattern = (&(unsafe: __local_stack_parsed_pattern[0]) as *mut c_uint))", "assignment_compat")
+    rc = bs_assert_contains(ctx, out_text, "(__local_cb.parsed_pattern = (&__local_stack_parsed_pattern[0] as *mut c_uint))", "assignment_compat")
     if rc != 0: return rc
     let pp_simple = "(__local_pp = (__local_pp +% 1))"
     let pp_casted = "(__local_pp = ((__local_pp as c_uint) +% (1 as c_uint)))"
@@ -1556,9 +1577,9 @@ fn bs_check_migrate_rvalue_sequencing(ctx: ActionCtx, compiler_path: str, case_d
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "(__local_p = __local_p + 1)", "rvalue_sequencing")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "(unsafe: *__ci_expr_old_", "rvalue_sequencing")
+    rc = bs_assert_contains(ctx, out_text, "(unsafe *__ci_expr_old_", "rvalue_sequencing")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "((unsafe: *__local_p) = __local_c)", "rvalue_sequencing")
+    rc = bs_assert_contains(ctx, out_text, "((unsafe *__local_p) = __local_c)", "rvalue_sequencing")
     if rc != 0: return rc
     var check_args: Vec[str] = Vec.new()
     check_args |> push("check")
@@ -2012,9 +2033,9 @@ fn bs_check_migrate_raw_pointer_index(ctx: ActionCtx, compiler_path: str, case_d
     let out_text = ctx.fs().read_text(out_w)
     rc = bs_assert_contains(ctx, out_text, "__param_p +", "raw_pointer_index_unsafe")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "(unsafe: __local_r[0])", "raw_pointer_index_unsafe")
+    rc = bs_assert_contains(ctx, out_text, "(unsafe __local_r[0])", "raw_pointer_index_unsafe")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "(unsafe: __param_p[1])", "raw_pointer_index_unsafe")
+    rc = bs_assert_contains(ctx, out_text, "(unsafe __param_p[1])", "raw_pointer_index_unsafe")
     if rc != 0: return rc
     var check_args: Vec[str] = Vec.new()
     check_args |> push("check")

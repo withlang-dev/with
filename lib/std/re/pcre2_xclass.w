@@ -7,7 +7,7 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, __param_char_list
     var __local_utf = __param_utf
     var __local_t: u8
 
-    var __local_not_negated: c_int = (if (((unsafe: *__local_data) as c_int) & 1) == 0: 1 else: 0)
+    var __local_not_negated: c_int = (if (((unsafe *__local_data) as c_int) & 1) == 0: 1 else: 0)
 
     var __local_type_: c_uint
 
@@ -26,9 +26,9 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, __param_char_list
 
     (__local_data = __local_data + 1)
 
-    if ((if (((unsafe: *__ci_expr_old_0) as c_int) & 2) != 0: 1 else: 0) != 0) {
+    if ((if (((unsafe *__ci_expr_old_0) as c_int) & 2) != 0: 1 else: 0) != 0) {
         if ((if __local_c < 256: 1 else: 0) != 0) {
-            return (if ((((unsafe: __local_data[((__local_c as c_uint) / (8 as c_uint))]) as c_int) as c_uint) & (((1 as c_uint) << (((__local_c as c_uint) & (7 as c_uint)) as c_uint)) as c_uint)) != 0: 1 else: 0)
+            return (if ((((unsafe __local_data[((__local_c as c_uint) / (8 as c_uint))]) as c_int) as c_uint) & (((1 as c_uint) << (((__local_c as c_uint) & (7 as c_uint)) as c_uint)) as c_uint)) != 0: 1 else: 0)
         }
 
         (__local_data = __local_data + (((32 as c_ulong) / (sizeof[u8]() as c_ulong)) as usize))
@@ -38,14 +38,14 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, __param_char_list
 
     var __ci_expr_logic_1: c_int
 
-    if ((if (unsafe: *__local_data) == 3: 1 else: 0) != 0) {
+    if ((if (unsafe *__local_data) == 3: 1 else: 0) != 0) {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_1 = (if (if (unsafe: *__local_data) == 4: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_1 = (if (if (unsafe *__local_data) == 4: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_1 != 0) {
-        var __local_prop: *const ucd_record = ((&(unsafe: _pcre2_ucd_records_8[0]) as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_c as c_int) / 128)] as c_int) * 128) + ((__local_c as c_int) % 128))] as c_uint) as usize))
+        var __local_prop: *const ucd_record = ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_c as c_int) / 128)] as c_int) * 128) + ((__local_c as c_int) % 128))] as c_uint) as usize))
 
         do {
             var __local_chartype: c_int
@@ -53,13 +53,13 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, __param_char_list
             var __local_isprop: c_int = with 0 as __ci_expr_seq_37 {
                 var __ci_expr_old_3: *const u8 = __local_data
                 (__local_data = __local_data + 1)
-                (if (unsafe: *__ci_expr_old_3) == 3: 1 else: 0)
+                (if (unsafe *__ci_expr_old_3) == 3: 1 else: 0)
             }
 
             var __local_ok: c_int
 
             while true {
-                match (unsafe: *__local_data) {
+                match (unsafe *__local_data) {
                     0 => {
                         (__local_chartype = __local_prop.chartype)
 
@@ -86,27 +86,27 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, __param_char_list
 
                     },
                     1 => {
-                        if ((if (if (unsafe: __local_data[1]) == _pcre2_ucp_gentype_8[__local_prop.chartype]: 1 else: 0) == __local_isprop: 1 else: 0) != 0) {
+                        if ((if (if (unsafe __local_data[1]) == _pcre2_ucp_gentype_8[__local_prop.chartype]: 1 else: 0) == __local_isprop: 1 else: 0) != 0) {
                             return __local_not_negated
                         }
                     },
                     2 => {
-                        if ((if (if (unsafe: __local_data[1]) == __local_prop.chartype: 1 else: 0) == __local_isprop: 1 else: 0) != 0) {
+                        if ((if (if (unsafe __local_data[1]) == __local_prop.chartype: 1 else: 0) == __local_isprop: 1 else: 0) != 0) {
                             return __local_not_negated
                         }
                     },
                     3 => {
-                        if ((if (if (unsafe: __local_data[1]) == __local_prop.script: 1 else: 0) == __local_isprop: 1 else: 0) != 0) {
+                        if ((if (if (unsafe __local_data[1]) == __local_prop.script: 1 else: 0) == __local_isprop: 1 else: 0) != 0) {
                             return __local_not_negated
                         }
                     },
                     4 => {
                         var __ci_expr_logic_6: c_int
 
-                        if ((if (unsafe: __local_data[1]) == __local_prop.script: 1 else: 0) != 0) {
+                        if ((if (unsafe __local_data[1]) == __local_prop.script: 1 else: 0) != 0) {
                             (__ci_expr_logic_6 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_6 = (if (if (((unsafe: ((&(unsafe: _pcre2_ucd_script_sets_8[0]) as *const c_uint) + ((((__local_prop.scriptx_bidiclass as c_int) & 1023) as isize) as usize))[(((unsafe: __local_data[1]) as c_int) / 32)]) as c_uint) & (((1 as c_uint) << ((((unsafe: __local_data[1]) as c_int) % 32) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_6 = (if (if (((unsafe ((&_pcre2_ucd_script_sets_8[0] as *const c_uint) + ((((__local_prop.scriptx_bidiclass as c_int) & 1023) as isize) as usize))[(((unsafe __local_data[1]) as c_int) / 32)]) as c_uint) & (((1 as c_uint) << ((((unsafe __local_data[1]) as c_int) % 32) as c_uint)) as c_uint)) != 0: 1 else: 0) != 0: 1 else: 0))
                         }
 
                         (__local_ok = __ci_expr_logic_6)
@@ -495,12 +495,12 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, __param_char_list
                         }
                     },
                     11 => {
-                        if ((if (if ((__local_prop.scriptx_bidiclass as c_int) >> (11 as c_uint)) == (unsafe: __local_data[1]): 1 else: 0) == __local_isprop: 1 else: 0) != 0) {
+                        if ((if (if ((__local_prop.scriptx_bidiclass as c_int) >> (11 as c_uint)) == (unsafe __local_data[1]): 1 else: 0) == __local_isprop: 1 else: 0) != 0) {
                             return __local_not_negated
                         }
                     },
                     12 => {
-                        (__local_ok = (if (((unsafe: ((&(unsafe: _pcre2_ucd_boolprop_sets_8[0]) as *const c_uint) + ((((__local_prop.bprops as c_int) & 4095) as isize) as usize))[(((unsafe: __local_data[1]) as c_int) / 32)]) as c_uint) & (((1 as c_uint) << ((((unsafe: __local_data[1]) as c_int) % 32) as c_uint)) as c_uint)) != 0: 1 else: 0))
+                        (__local_ok = (if (((unsafe ((&_pcre2_ucd_boolprop_sets_8[0] as *const c_uint) + ((((__local_prop.bprops as c_int) & 4095) as isize) as usize))[(((unsafe __local_data[1]) as c_int) / 32)]) as c_uint) & (((1 as c_uint) << ((((unsafe __local_data[1]) as c_int) % 32) as c_uint)) as c_uint)) != 0: 1 else: 0))
 
                         if ((if __local_ok == __local_isprop: 1 else: 0) != 0) {
                             return __local_not_negated
@@ -740,10 +740,10 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, __param_char_list
 
         } while { var __ci_expr_logic_2: c_int
 
-        if ((if (unsafe: *__local_data) == 3: 1 else: 0) != 0) {
+        if ((if (unsafe *__local_data) == 3: 1 else: 0) != 0) {
             (__ci_expr_logic_2 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_2 = (if (if (unsafe: *__local_data) == 4: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_2 = (if (if (unsafe *__local_data) == 4: 1 else: 0) != 0: 1 else: 0))
         }; (__ci_expr_logic_2 != 0) }
 
     }
@@ -757,13 +757,13 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, __param_char_list
         (__ci_expr_ternary_41 = 4096)
     }
 
-    if ((if (unsafe: *__local_data) < __ci_expr_ternary_41: 1 else: 0) != 0) {
+    if ((if (unsafe *__local_data) < __ci_expr_ternary_41: 1 else: 0) != 0) {
         while true {
             var __ci_expr_old_42: *const u8 = __local_data
 
             (__local_data = __local_data + 1)
 
-            (__local_t = (unsafe: *__ci_expr_old_42))
+            (__local_t = (unsafe *__ci_expr_old_42))
 
             if (not ((if __local_t != 0: 1 else: 0) != 0)) {
                 break
@@ -778,7 +778,7 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, __param_char_list
 
                 (__local_data = __local_data + 1)
 
-                (__local_x = (unsafe: *__ci_expr_old_43))
+                (__local_x = (unsafe *__ci_expr_old_43))
 
 
                 if ((if __local_x >= 192: 1 else: 0) != 0) {
@@ -787,28 +787,28 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, __param_char_list
 
                         (__local_data = __local_data + 1)
 
-                        (__local_x = (((((__local_x as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((unsafe: *__ci_expr_old_44) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                        (__local_x = (((((__local_x as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((unsafe *__ci_expr_old_44) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
 
                     } else {
                         if ((if ((__local_x as c_uint) & (16 as c_uint)) == 0: 1 else: 0) != 0) {
-                            (__local_x = (((((((__local_x as c_uint) & (15 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint) | (((((((unsafe: *__local_data) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_data[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                            (__local_x = (((((((__local_x as c_uint) & (15 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint) | (((((((unsafe *__local_data) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_data[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
 
                             (__local_data = __local_data + ((2 as isize) as usize))
 
                         } else {
                             if ((if ((__local_x as c_uint) & (8 as c_uint)) == 0: 1 else: 0) != 0) {
-                                (__local_x = (((((((((__local_x as c_uint) & (7 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint) | (((((((unsafe: *__local_data) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_data[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_data[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                                (__local_x = (((((((((__local_x as c_uint) & (7 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint) | (((((((unsafe *__local_data) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_data[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_data[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
 
                                 (__local_data = __local_data + ((3 as isize) as usize))
 
                             } else {
                                 if ((if ((__local_x as c_uint) & (4 as c_uint)) == 0: 1 else: 0) != 0) {
-                                    (__local_x = (((((((((((__local_x as c_uint) & (3 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint) | (((((((unsafe: *__local_data) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_data[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_data[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_data[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                                    (__local_x = (((((((((((__local_x as c_uint) & (3 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint) | (((((((unsafe *__local_data) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_data[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_data[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_data[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
 
                                     (__local_data = __local_data + ((4 as isize) as usize))
 
                                 } else {
-                                    (__local_x = (((((((((((((__local_x as c_uint) & (1 as c_uint)) as c_uint) << (30 as c_uint)) as c_uint) | (((((((unsafe: *__local_data) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_data[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_data[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_data[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_data[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                                    (__local_x = (((((((((((((__local_x as c_uint) & (1 as c_uint)) as c_uint) << (30 as c_uint)) as c_uint) | (((((((unsafe *__local_data) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_data[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_data[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_data[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_data[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
 
                                     (__local_data = __local_data + ((5 as isize) as usize))
 
@@ -824,7 +824,7 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, __param_char_list
 
                 (__local_data = __local_data + 1)
 
-                (__local_x = (unsafe: *__ci_expr_old_45))
+                (__local_x = (unsafe *__ci_expr_old_45))
 
             }
 
@@ -855,7 +855,7 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, __param_char_list
 
                 (__local_data = __local_data + 1)
 
-                (__local_y = (unsafe: *__ci_expr_old_47))
+                (__local_y = (unsafe *__ci_expr_old_47))
 
 
                 if ((if __local_y >= 192: 1 else: 0) != 0) {
@@ -864,28 +864,28 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, __param_char_list
 
                         (__local_data = __local_data + 1)
 
-                        (__local_y = (((((__local_y as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((unsafe: *__ci_expr_old_48) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                        (__local_y = (((((__local_y as c_uint) & (31 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint) | (((((unsafe *__ci_expr_old_48) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
 
                     } else {
                         if ((if ((__local_y as c_uint) & (16 as c_uint)) == 0: 1 else: 0) != 0) {
-                            (__local_y = (((((((__local_y as c_uint) & (15 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint) | (((((((unsafe: *__local_data) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_data[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                            (__local_y = (((((((__local_y as c_uint) & (15 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint) | (((((((unsafe *__local_data) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_data[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
 
                             (__local_data = __local_data + ((2 as isize) as usize))
 
                         } else {
                             if ((if ((__local_y as c_uint) & (8 as c_uint)) == 0: 1 else: 0) != 0) {
-                                (__local_y = (((((((((__local_y as c_uint) & (7 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint) | (((((((unsafe: *__local_data) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_data[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_data[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                                (__local_y = (((((((((__local_y as c_uint) & (7 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint) | (((((((unsafe *__local_data) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_data[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_data[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
 
                                 (__local_data = __local_data + ((3 as isize) as usize))
 
                             } else {
                                 if ((if ((__local_y as c_uint) & (4 as c_uint)) == 0: 1 else: 0) != 0) {
-                                    (__local_y = (((((((((((__local_y as c_uint) & (3 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint) | (((((((unsafe: *__local_data) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_data[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_data[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_data[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                                    (__local_y = (((((((((((__local_y as c_uint) & (3 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint) | (((((((unsafe *__local_data) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_data[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_data[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_data[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
 
                                     (__local_data = __local_data + ((4 as isize) as usize))
 
                                 } else {
-                                    (__local_y = (((((((((((((__local_y as c_uint) & (1 as c_uint)) as c_uint) << (30 as c_uint)) as c_uint) | (((((((unsafe: *__local_data) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_data[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_data[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe: __local_data[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe: __local_data[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
+                                    (__local_y = (((((((((((((__local_y as c_uint) & (1 as c_uint)) as c_uint) << (30 as c_uint)) as c_uint) | (((((((unsafe *__local_data) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (24 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_data[1]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (18 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_data[2]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (12 as c_uint)) as c_uint)) as c_uint) | (((((((unsafe __local_data[3]) as c_int) as c_uint) & (63 as c_uint)) as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) | (((((unsafe __local_data[4]) as c_int) as c_uint) & (63 as c_uint)) as c_uint))
 
                                     (__local_data = __local_data + ((5 as isize) as usize))
 
@@ -901,7 +901,7 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, __param_char_list
 
                 (__local_data = __local_data + 1)
 
-                (__local_y = (unsafe: *__ci_expr_old_49))
+                (__local_y = (unsafe *__ci_expr_old_49))
 
             }
 
@@ -925,11 +925,11 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, __param_char_list
     }
 
 
-    (__local_type_ = (((((unsafe: __local_data[0]) as c_int) << (8 as c_uint)) as c_uint) as c_uint) | (((unsafe: __local_data[1]) as c_int) as c_uint))
+    (__local_type_ = (((((unsafe __local_data[0]) as c_int) << (8 as c_uint)) as c_uint) as c_uint) | (((unsafe __local_data[1]) as c_int) as c_uint))
 
     (__local_data = __local_data + ((2 as isize) as usize))
 
-    (__local_next_char = __param_char_lists_end - ((((((((unsafe: __local_data[0]) as c_int) << (8 as c_uint)) | ((unsafe: __local_data[(0 + 1)]) as c_int)) as c_uint) as c_uint) << (1 as c_uint)) as usize))
+    (__local_next_char = __param_char_lists_end - ((((((((unsafe __local_data[0]) as c_int) << (8 as c_uint)) | ((unsafe __local_data[(0 + 1)]) as c_int)) as c_uint) as c_uint) << (1 as c_uint)) as usize))
 
     (__local_type_ = __local_type_ & 4095)
 
@@ -941,7 +941,7 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, __param_char_list
         (__local_max_index = (__local_type_ as c_uint) & (3 as c_uint))
 
         if ((if __local_max_index == 3: 1 else: 0) != 0) {
-            (__local_max_index = (unsafe: *(__local_next_char as *const c_ushort)))
+            (__local_max_index = (unsafe *(__local_next_char as *const c_ushort)))
 
             do {
                 0
@@ -963,7 +963,7 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, __param_char_list
         (__local_c = ((((((__local_c as c_uint) << (1 as c_uint)) as c_uint) | (1 as c_uint)) as c_ushort)))
 
         if ((if __local_max_index == 3: 1 else: 0) != 0) {
-            (__local_max_index = (unsafe: *(__local_next_char as *const c_ushort)))
+            (__local_max_index = (unsafe *(__local_next_char as *const c_ushort)))
 
             do {
                 0
@@ -978,7 +978,7 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, __param_char_list
         if ((if __local_max_index == 0: 1 else: 0) != 0) {
             (__ci_expr_logic_51 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_51 = (if (if __local_c < (unsafe: *(__local_next_char as *const c_ushort)): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_51 = (if (if __local_c < (unsafe *(__local_next_char as *const c_ushort)): 1 else: 0) != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_51 != 0) {
@@ -990,7 +990,7 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, __param_char_list
 
         (__local_max_index = __local_max_index - 1)
 
-        (__local_value = (unsafe: (__local_next_char as *const c_ushort)[__local_max_index]))
+        (__local_value = (unsafe (__local_next_char as *const c_ushort)[__local_max_index]))
 
 
         if ((if __local_c >= __local_value: 1 else: 0) != 0) {
@@ -1011,12 +1011,12 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, __param_char_list
         while (1 != 0) {
             var __local_mid_index: c_uint = ((((__local_min_index as c_uint) +% (__local_max_index as c_uint)) as c_uint) >> (1 as c_uint))
 
-            (__local_value = (unsafe: (__local_next_char as *const c_ushort)[__local_mid_index]))
+            (__local_value = (unsafe (__local_next_char as *const c_ushort)[__local_mid_index]))
 
             if ((if __local_c < __local_value: 1 else: 0) != 0) {
                 (__local_max_index = ((__local_mid_index as c_uint) -% (1 as c_uint)))
             } else {
-                if ((if (unsafe: (__local_next_char as *const c_ushort)[((__local_mid_index as c_uint) +% (1 as c_uint))]) <= __local_c: 1 else: 0) != 0) {
+                if ((if (unsafe (__local_next_char as *const c_ushort)[((__local_mid_index as c_uint) +% (1 as c_uint))]) <= __local_c: 1 else: 0) != 0) {
                     (__local_min_index = ((__local_mid_index as c_uint) +% (1 as c_uint)))
                 } else {
                     var __ci_expr_logic_53: c_int
@@ -1039,7 +1039,7 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, __param_char_list
     (__local_max_index = (__local_type_ as c_uint) & (3 as c_uint))
 
     if ((if __local_max_index == 3: 1 else: 0) != 0) {
-        (__local_max_index = (unsafe: *(__local_next_char as *const c_ushort)))
+        (__local_max_index = (unsafe *(__local_next_char as *const c_ushort)))
 
         do {
             0
@@ -1062,7 +1062,7 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, __param_char_list
     (__local_c = (((__local_c as c_uint) << (1 as c_uint)) as c_uint) | (1 as c_uint))
 
     if ((if __local_max_index == 3: 1 else: 0) != 0) {
-        (__local_max_index = (unsafe: *(__local_next_char as *const c_uint)))
+        (__local_max_index = (unsafe *(__local_next_char as *const c_uint)))
 
         (__local_next_char = __local_next_char + ((4 as isize) as usize))
 
@@ -1073,7 +1073,7 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, __param_char_list
     if ((if __local_max_index == 0: 1 else: 0) != 0) {
         (__ci_expr_logic_54 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_54 = (if (if __local_c < (unsafe: *(__local_next_char as *const c_uint)): 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_54 = (if (if __local_c < (unsafe *(__local_next_char as *const c_uint)): 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_54 != 0) {
@@ -1085,7 +1085,7 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, __param_char_list
 
     (__local_max_index = __local_max_index - 1)
 
-    (__local_value = (unsafe: (__local_next_char as *const c_uint)[__local_max_index]))
+    (__local_value = (unsafe (__local_next_char as *const c_uint)[__local_max_index]))
 
 
     if ((if __local_c >= __local_value: 1 else: 0) != 0) {
@@ -1106,12 +1106,12 @@ fn _pcre2_xclass_8(__param_c: c_uint, __param_data: *const u8, __param_char_list
     while (1 != 0) {
         var __local_mid_index_1: c_uint = ((((__local_min_index as c_uint) +% (__local_max_index as c_uint)) as c_uint) >> (1 as c_uint))
 
-        (__local_value = (unsafe: (__local_next_char as *const c_uint)[__local_mid_index_1]))
+        (__local_value = (unsafe (__local_next_char as *const c_uint)[__local_mid_index_1]))
 
         if ((if __local_c < __local_value: 1 else: 0) != 0) {
             (__local_max_index = ((__local_mid_index_1 as c_uint) -% (1 as c_uint)))
         } else {
-            if ((if (unsafe: (__local_next_char as *const c_uint)[((__local_mid_index_1 as c_uint) +% (1 as c_uint))]) <= __local_c: 1 else: 0) != 0) {
+            if ((if (unsafe (__local_next_char as *const c_uint)[((__local_mid_index_1 as c_uint) +% (1 as c_uint))]) <= __local_c: 1 else: 0) != 0) {
                 (__local_min_index = ((__local_mid_index_1 as c_uint) +% (1 as c_uint)))
             } else {
                 var __ci_expr_logic_56: c_int
@@ -1148,7 +1148,7 @@ fn _pcre2_eclass_8(__param_c: c_uint, __param_data_start: *const u8, __param_dat
 
     (__local_ptr = __local_ptr + 1)
 
-    (__local_flags = (unsafe: *__ci_expr_old_0))
+    (__local_flags = (unsafe *__ci_expr_old_0))
 
 
     do {
@@ -1157,7 +1157,7 @@ fn _pcre2_eclass_8(__param_c: c_uint, __param_data_start: *const u8, __param_dat
 
     if ((if ((__local_flags as c_int) & 1) != 0: 1 else: 0) != 0) {
         if ((if __param_c < 256: 1 else: 0) != 0) {
-            return (if ((((unsafe: __local_ptr[((__param_c as c_uint) / (8 as c_uint))]) as c_int) as c_uint) & (((1 as c_uint) << (((__param_c as c_uint) & (7 as c_uint)) as c_uint)) as c_uint)) != 0: 1 else: 0)
+            return (if ((((unsafe __local_ptr[((__param_c as c_uint) / (8 as c_uint))]) as c_int) as c_uint) & (((1 as c_uint) << (((__param_c as c_uint) & (7 as c_uint)) as c_uint)) as c_uint)) != 0: 1 else: 0)
         }
 
         (__local_ptr = __local_ptr + (((32 as c_ulong) / (sizeof[u8]() as c_ulong)) as usize))
@@ -1166,7 +1166,7 @@ fn _pcre2_eclass_8(__param_c: c_uint, __param_data_start: *const u8, __param_dat
 
     while ((if __local_ptr < __param_data_end: 1 else: 0) != 0) {
         while true {
-            match (unsafe: *__local_ptr) {
+            match (unsafe *__local_ptr) {
                 1 => {
                     (__local_ptr = __local_ptr + 1)
 
@@ -1216,7 +1216,7 @@ fn _pcre2_eclass_8(__param_c: c_uint, __param_data_start: *const u8, __param_dat
                 5 => {
                     var __local_matched: c_uint = _pcre2_xclass_8(__param_c, ((__local_ptr + ((1 as isize) as usize)) + ((2 as isize) as usize)), __param_char_lists_end, __param_utf)
 
-                    (__local_ptr = __local_ptr + ((((((unsafe: __local_ptr[1]) as c_int) << (8 as c_uint)) | ((unsafe: __local_ptr[(1 + 1)]) as c_int)) as c_uint) as usize))
+                    (__local_ptr = __local_ptr + ((((((unsafe __local_ptr[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_ptr[(1 + 1)]) as c_int)) as c_uint) as usize))
 
                     (__local_stack = (((__local_stack as c_uint) << (1 as c_uint)) as c_uint) | (__local_matched as c_uint))
 

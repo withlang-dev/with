@@ -13,9 +13,9 @@ unsafe fn push_via_inner_ptr(item: *mut Inner):
 fn main:
     var items: Vec[Inner] = Vec.new()
     items.push(Inner { tags: Vec.new() })
-    unsafe: push_via_vec_ptr((&raw mut items) as *mut Vec[Inner])
+    unsafe { push_via_vec_ptr((&raw mut items) as *mut Vec[Inner]) }
 
     var inner = Inner { tags: Vec.new() }
-    unsafe: push_via_inner_ptr((&raw mut inner) as *mut Inner)
+    unsafe { push_via_inner_ptr((&raw mut inner) as *mut Inner) }
 
     print("ok")

@@ -58,7 +58,7 @@ pub fn compile(device: Device, source: ProgramSource) -> Result[Program, DemoErr
 pub fn program_kind(prog: Program) -> i32:
     if prog == 0:
         return 0
-    unsafe: (*program_rec(prog)).kind
+    unsafe (*program_rec(prog)).kind
 
 pub fn program_destroy(prog: Program):
     if prog == 0:

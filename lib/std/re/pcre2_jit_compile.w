@@ -23,7 +23,7 @@ fn pcre2_jit_compile_8(__param_code: *mut pcre2_real_code_8, __param_options: c_
 
     if ((if ((__param_options as c_uint) & (256 as c_uint)) != 0: 1 else: 0) != 0) {
         if ((if ((__local_re.overall_options as c_uint) & (67108864 as c_uint)) == 0: 1 else: 0) != 0) {
-            ((unsafe: *__local_re).overall_options = __local_re.overall_options | 67108864)
+            ((unsafe *__local_re).overall_options = __local_re.overall_options | 67108864)
 
         }
 
@@ -46,7 +46,7 @@ fn pcre2_jit_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *c
 
     __param_mcontext
 
-    ((unsafe: *__param_match_data).rc = -45)
+    ((unsafe *__param_match_data).rc = -45)
 
     return __param_match_data.rc
 
@@ -105,6 +105,6 @@ fn _pcre2_jit_get_size_8(__param_executable_jit: *mut c_void) -> c_ulong {
 }
 
 fn _pcre2_jit_get_target_8() -> *const i8 {
-    return (&(unsafe: "JIT is not supported"[0]) as *mut c_char)
+    return (&(unsafe "JIT is not supported"[0]) as *mut c_char)
 
 }

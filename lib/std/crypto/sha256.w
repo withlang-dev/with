@@ -141,8 +141,8 @@ unsafe fn sha256_finish(ctx: *mut Sha256, out: *mut u8):
 fn sha256_hash(data: *const u8, len: i32, out: *mut u8):
     var ctx = Sha256.new()
     let p = &raw mut ctx as *mut Sha256
-    unsafe: sha256_update(p, data, len)
-    unsafe: sha256_finish(p, out)
+    unsafe { sha256_update(p, data, len) }
+    unsafe { sha256_finish(p, out) }
 
 // Convenience: hash a string
 fn sha256_hash_str(s: str, out: *mut u8):
@@ -153,7 +153,7 @@ fn sha256_hex(digest: *const u8) -> str:
     let hex_chars = "0123456789abcdef"
     var result = ""
     for i in 0..32:
-        let b = (unsafe: *(digest + i as u64)) as i32
+        let b = (unsafe *(digest + i as u64)) as i32
         let hi = (b >> 4) & 0x0F
         let lo = b & 0x0F
         result = result ++ hex_chars.slice(hi as i64, (hi + 1) as i64) ++ hex_chars.slice(lo as i64, (lo + 1) as i64)

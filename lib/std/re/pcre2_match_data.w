@@ -19,13 +19,13 @@ fn pcre2_match_data_create_8(__param_oveccount: c_uint, __param_gcontext: *mut p
         return null
     }
 
-    ((unsafe: *__local_yield_).oveccount = __local_oveccount)
+    ((unsafe *__local_yield_).oveccount = __local_oveccount)
 
-    ((unsafe: *__local_yield_).flags = 0)
+    ((unsafe *__local_yield_).flags = 0)
 
-    ((unsafe: *__local_yield_).heapframes = ((null as *mut heapframe)))
+    ((unsafe *__local_yield_).heapframes = ((null as *mut heapframe)))
 
-    ((unsafe: *__local_yield_).heapframes_size = 0)
+    ((unsafe *__local_yield_).heapframes_size = 0)
 
     return __local_yield_
 
@@ -48,14 +48,14 @@ fn pcre2_match_data_create_from_pattern_8(__param_code: *const pcre2_real_code_8
 fn pcre2_match_data_free_8(__param_match_data: *mut pcre2_real_match_data_8) {
     if ((if __param_match_data != null: 1 else: 0) != 0) {
         if ((if __param_match_data.heapframes != null: 1 else: 0) != 0) {
-            (&raw const (unsafe: *__param_match_data).memctl as *const pcre2_memctl).free(__param_match_data.heapframes, (&raw const (unsafe: *__param_match_data).memctl as *const pcre2_memctl).memory_data)
+            (&raw const (unsafe *__param_match_data).memctl as *const pcre2_memctl).free(__param_match_data.heapframes, (&raw const (unsafe *__param_match_data).memctl as *const pcre2_memctl).memory_data)
         }
 
         if ((if (((__param_match_data.flags as c_int) as c_uint) & (1 as c_uint)) != 0: 1 else: 0) != 0) {
-            (&raw const (unsafe: *__param_match_data).memctl as *const pcre2_memctl).free((__param_match_data.subject as *mut c_void), (&raw const (unsafe: *__param_match_data).memctl as *const pcre2_memctl).memory_data)
+            (&raw const (unsafe *__param_match_data).memctl as *const pcre2_memctl).free((__param_match_data.subject as *mut c_void), (&raw const (unsafe *__param_match_data).memctl as *const pcre2_memctl).memory_data)
         }
 
-        (&raw const (unsafe: *__param_match_data).memctl as *const pcre2_memctl).free(__param_match_data, (&raw const (unsafe: *__param_match_data).memctl as *const pcre2_memctl).memory_data)
+        (&raw const (unsafe *__param_match_data).memctl as *const pcre2_memctl).free(__param_match_data, (&raw const (unsafe *__param_match_data).memctl as *const pcre2_memctl).memory_data)
 
     }
 
@@ -82,7 +82,7 @@ fn pcre2_get_ovector_count_8(__param_match_data: *mut pcre2_real_match_data_8) -
 }
 
 fn pcre2_get_ovector_pointer_8(__param_match_data: *mut pcre2_real_match_data_8) -> *mut c_ulong {
-    return (&(unsafe: __param_match_data.ovector[0]) as *mut c_ulong)
+    return (&(unsafe __param_match_data.ovector[0]) as *mut c_ulong)
 
 }
 

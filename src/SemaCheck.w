@@ -1550,6 +1550,61 @@ fn Sema.expr_is_ephemeral_value(self: Sema, node: i32) -> i32:
         return self.expr_is_ephemeral_task(node)
     0
 
+fn Sema.cached_or_checked_expr_type(self: Sema, node: i32) -> i32:
+    if node == 0:
+        return 0
+    let cached = self.typed_expr_types.get(node)
+    if cached.is_some():
+        return cached.unwrap()
+    let saved_unsafe = self.in_unsafe
+    self.in_unsafe = 1
+    let checked = self.check_expr(node) as i32
+    self.in_unsafe = saved_unsafe
+    checked
+
+fn Sema.type_is_raw_pointer_value(self: Sema, ty: i32) -> i32:
+    if ty == 0:
+        return 0
+    let resolved = self.resolve_alias(ty as TypeId)
+    let kind = self.get_type_kind(resolved)
+    if kind == TypeKind.TY_PTR:
+        return 1
+    if kind == TypeKind.TY_REF:
+        let inner = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
+        if self.get_type_kind(inner) == TypeKind.TY_PTR:
+            return 1
+    0
+
+fn Sema.unsafe_prefix_has_raw_access(self: Sema, node: i32) -> i32:
+    if node == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_GROUPED:
+        return self.unsafe_prefix_has_raw_access(self.ast.get_data0(node))
+    if kind == NodeKind.NK_CAST:
+        return self.unsafe_prefix_has_raw_access(self.ast.get_data0(node))
+    if kind == NodeKind.NK_UNSAFE_BLOCK:
+        return self.unsafe_prefix_has_raw_access(self.ast.get_data0(node))
+    if kind == NodeKind.NK_UNARY:
+        let op = self.ast.get_data0(node)
+        if op == UnaryOp.UOP_DEREF:
+            let operand = self.ast.get_data1(node)
+            if self.type_is_raw_pointer_value(self.cached_or_checked_expr_type(operand)) != 0:
+                return 1
+            return self.unsafe_prefix_has_raw_access(operand)
+        return 0
+    if kind == NodeKind.NK_INDEX:
+        let base = self.ast.get_data0(node)
+        if self.type_is_raw_pointer_value(self.cached_or_checked_expr_type(base)) != 0:
+            return 1
+        return self.unsafe_prefix_has_raw_access(base)
+    if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS:
+        let base = self.ast.get_data0(node)
+        if self.type_is_raw_pointer_value(self.cached_or_checked_expr_type(base)) != 0:
+            return 1
+        return self.unsafe_prefix_has_raw_access(base)
+    0
+
 fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
     if node == 0:
         return 0 as TypeId
@@ -1805,11 +1860,17 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
     if kind == NodeKind.NK_UNSAFE_BLOCK:
         if self.in_comptime_fn != 0:
             self.emit_error("unsafe is not allowed in comptime", node)
+        let is_prefix = self.ast.get_data1(node) == UNSAFE_KIND_PREFIX
         let saved_unsafe = self.in_unsafe
+        if is_prefix and saved_unsafe != 0:
+            self.emit_warning("redundant unsafe prefix inside unsafe context", node)
         self.in_unsafe = 1
+        let body = self.ast.get_data0(node)
         // Propagate expected type through unsafe block
-        let unsafe_result = if self.has_expected_type != 0: self.check_expr_with_expected(self.ast.get_data0(node), self.expected_expr_type) else: self.check_expr(self.ast.get_data0(node))
+        let unsafe_result = if self.has_expected_type != 0: self.check_expr_with_expected(body, self.expected_expr_type) else: self.check_expr(body)
         self.in_unsafe = saved_unsafe
+        if is_prefix and unsafe_result != 0 and self.unsafe_prefix_has_raw_access(body) == 0:
+            self.emit_error("unsafe prefix requires a raw pointer dereference or raw pointer index; use unsafe { ... } for compound unsafe expressions", node)
         return unsafe_result
 
     if kind == NodeKind.NK_ASM_EXPR:
@@ -8634,11 +8695,15 @@ fn Sema.classify_place(self: Sema, node: i32) -> i64:
     // Parenthesized: classify inner.
     if kind == NodeKind.NK_GROUPED:
         return self.classify_place(self.ast.get_data0(node))
-    // `unsafe: <expr>` form wraps a single expression; classify the inner.
-    // Block form (NK_UNSAFE_BLOCK over NK_BLOCK) won't classify as a place
-    // because NK_BLOCK isn't in any of the place arms.
+    // `unsafe *p` / `unsafe p[i]` wraps a single place expression; classify
+    // the inner. Block form (NK_UNSAFE_BLOCK over NK_BLOCK) won't classify as
+    // a place because NK_BLOCK isn't in any of the place arms.
     if kind == NodeKind.NK_UNSAFE_BLOCK:
-        return self.classify_place(self.ast.get_data0(node))
+        let saved_unsafe = self.in_unsafe
+        self.in_unsafe = 1
+        let packed = self.classify_place(self.ast.get_data0(node))
+        self.in_unsafe = saved_unsafe
+        return packed
     // Index: §2.2 / §2.4 — `p[i]` for raw pointer `p` is always a place
     // (mutability from the pointer's mut bit, unsafe required to access),
     // regardless of whether `p` itself is a place. For non-pointer bases,

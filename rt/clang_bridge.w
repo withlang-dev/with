@@ -1010,24 +1010,24 @@ unsafe fn collect_decl(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32
     if kind != CXCursor_FunctionDecl and kind != CXCursor_StructDecl and kind != CXCursor_UnionDecl and kind != CXCursor_EnumDecl and kind != CXCursor_TypedefDecl and kind != CXCursor_VarDecl and kind != CXCursor_StaticAssert:
         return CXChildVisit_Continue
     // Filter transitive includes
-    if (unsafe: *s).header_file as i64 != 0:
+    if (unsafe *s).header_file as i64 != 0:
         let loc = clang_getCursorLocation(cursor)
         var file: *mut u8 = 0 as *mut u8
         clang_getFileLocation(loc, &raw mut file, 0 as *mut u32, 0 as *mut u32, 0 as *mut u32)
-        if file as i64 != 0 and clang_File_isEqual(file, (unsafe: *s).header_file) == 0:
+        if file as i64 != 0 and clang_File_isEqual(file, (unsafe *s).header_file) == 0:
             return CXChildVisit_Continue
     // Grow decl array
-    if (unsafe: *s).decl_count >= (unsafe: *s).decl_cap:
-        (unsafe: *s).decl_cap = if (unsafe: *s).decl_cap > 0: (unsafe: *s).decl_cap * 2 else: 256
-        let new_buf = with_alloc((unsafe: *s).decl_cap as i64 * 32)  // sizeof(CXCursor) = 32
-        if (unsafe: *s).decls as i64 != 0 and (unsafe: *s).decl_count > 0:
-            with_memcpy(new_buf, (unsafe: *s).decls as *const u8, (unsafe: *s).decl_count as i64 * 32)
-        if (unsafe: *s).decls as i64 != 0:
-            with_free((unsafe: *s).decls as *mut u8)
-        (unsafe: *s).decls = new_buf as *mut CXCursor
-    let dst = (((unsafe: *s).decls as i64) + ((unsafe: *s).decl_count as i64 * 32)) as *mut CXCursor
-    unsafe: *dst = cursor
-    (unsafe: *s).decl_count = (unsafe: *s).decl_count + 1
+    if (unsafe *s).decl_count >= (unsafe *s).decl_cap:
+        (unsafe *s).decl_cap = if (unsafe *s).decl_cap > 0: (unsafe *s).decl_cap * 2 else: 256
+        let new_buf = with_alloc((unsafe *s).decl_cap as i64 * 32)  // sizeof(CXCursor) = 32
+        if (unsafe *s).decls as i64 != 0 and (unsafe *s).decl_count > 0:
+            with_memcpy(new_buf, (unsafe *s).decls as *const u8, (unsafe *s).decl_count as i64 * 32)
+        if (unsafe *s).decls as i64 != 0:
+            with_free((unsafe *s).decls as *mut u8)
+        (unsafe *s).decls = new_buf as *mut CXCursor
+    let dst = (((unsafe *s).decls as i64) + ((unsafe *s).decl_count as i64 * 32)) as *mut CXCursor
+    unsafe *dst = cursor
+    (unsafe *s).decl_count = (unsafe *s).decl_count + 1
     CXChildVisit_Continue
 
 @[callconv("c")]
@@ -2797,16 +2797,16 @@ unsafe fn store_type(s: *mut CImportSession, ty: CXType) -> i32:
 @[callconv("c")]
 unsafe fn collect_child_cursor(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
     let cc = data as *mut ChildCollector
-    if (unsafe: *cc).count >= (unsafe: *cc).cap:
-        (unsafe: *cc).cap = if (unsafe: *cc).cap > 0: (unsafe: *cc).cap * 2 else: 64
-        let new_buf = with_alloc((unsafe: *cc).cap as i64 * 4)
-        if (unsafe: *cc).indices as i64 != 0 and (unsafe: *cc).count > 0:
-            with_memcpy(new_buf, (unsafe: *cc).indices as *const u8, (unsafe: *cc).count as i64 * 4)
-        if (unsafe: *cc).indices as i64 != 0: with_free((unsafe: *cc).indices as *mut u8)
-        (unsafe: *cc).indices = new_buf as *mut i32
-    let stored_idx = store_cursor((unsafe: *cc).session, cursor)
-    unsafe: *((((unsafe: *cc).indices as i64) + ((unsafe: *cc).count as i64 * 4)) as *mut i32) = stored_idx
-    (unsafe: *cc).count = (unsafe: *cc).count + 1
+    if (unsafe *cc).count >= (unsafe *cc).cap:
+        (unsafe *cc).cap = if (unsafe *cc).cap > 0: (unsafe *cc).cap * 2 else: 64
+        let new_buf = with_alloc((unsafe *cc).cap as i64 * 4)
+        if (unsafe *cc).indices as i64 != 0 and (unsafe *cc).count > 0:
+            with_memcpy(new_buf, (unsafe *cc).indices as *const u8, (unsafe *cc).count as i64 * 4)
+        if (unsafe *cc).indices as i64 != 0: with_free((unsafe *cc).indices as *mut u8)
+        (unsafe *cc).indices = new_buf as *mut i32
+    let stored_idx = store_cursor((unsafe *cc).session, cursor)
+    unsafe *((((unsafe *cc).indices as i64) + ((unsafe *cc).count as i64 * 4)) as *mut i32) = stored_idx
+    (unsafe *cc).count = (unsafe *cc).count + 1
     CXChildVisit_Continue
 
 unsafe fn ensure_children_cached(s: *mut CImportSession, cursor_idx: i32):

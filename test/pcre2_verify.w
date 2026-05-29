@@ -125,8 +125,8 @@ fn main:
         var i: c_uint = 0
         let group_count = rc as c_uint
         while i < group_count:
-            let start = unsafe: *(ov + ((i * 2) as isize))
-            let end_pos = unsafe: *(ov + ((i * 2 + 1) as isize))
+            let start = unsafe *(ov + ((i * 2) as isize))
+            let end_pos = unsafe *(ov + ((i * 2 + 1) as isize))
             let prefix = if i < 10: f" {i}: " else: f"{i}: "
             // Group didn't participate: offset is PCRE2_UNSET (~0)
             if start == (0 -% 1) as c_ulong:

@@ -53,13 +53,13 @@ var active_child_pgid: i32 = 0
 fn make_str(ptr: *const u8, len: i64) -> str:
     var raw: [2]i64 = [ptr as i64, len]
     let p = &raw as *const str
-    unsafe: *p
+    unsafe *p
 
 fn store_i64(base: i64, offset: i64, value: i64):
-    unsafe: *((base + offset) as *mut i64) = value
+    unsafe *((base + offset) as *mut i64) = value
 
 fn load_u64(base: i64, offset: i64) -> u64:
-    unsafe: *((base + offset) as *const u64)
+    unsafe *((base + offset) as *const u64)
 
 fn signal_bit(signo: i32) -> u32:
     if signo <= 0:
@@ -72,9 +72,9 @@ fn str_to_c_buf(s: str) -> *mut u8:
         return 0 as *mut u8
     if s.len() > 0:
         let sp = &s as *const *const u8
-        let data = unsafe: *sp
+        let data = unsafe *sp
         with_memcpy(out, data, s.len())
-    unsafe: *((out as i64 + s.len()) as *mut u8) = 0
+    unsafe *((out as i64 + s.len()) as *mut u8) = 0
     out
 
 fn restore_default_signal_handler(signo: i32):
@@ -108,7 +108,7 @@ fn wait_for_child_process(pid: i32) -> i32:
             return status
         if waited < 0:
             let errp = __error()
-            if errp as i64 != 0 and unsafe: *errp == EINTR:
+            if errp as i64 != 0 and unsafe *errp == EINTR:
                 continue
             return -1
 
@@ -127,7 +127,7 @@ fn wait_for_child_process_timeout(pid: i32, timeout_ms: i32) -> i32:
             return status
         if waited < 0:
             let errp = __error()
-            if errp as i64 != 0 and unsafe: *errp == EINTR:
+            if errp as i64 != 0 and unsafe *errp == EINTR:
                 continue
             return -1
         if timeout_ms > 0 and with_clock_nanos() - start_ns >= timeout_ns:
@@ -177,7 +177,7 @@ fn argv_blob_count(blob: *const u8, len: i64) -> i32:
     var offset: i64 = 0
     while offset < len:
         count += 1
-        while offset < len and (unsafe: *((blob as i64 + offset) as *const u8)) != 0:
+        while offset < len and (unsafe *((blob as i64 + offset) as *const u8)) != 0:
             offset += 1
         offset += 1
     count
@@ -207,7 +207,7 @@ fn run_argv_direct_cwd(blob: *const u8, len: i64, cwd: *const u8) -> i32:
         while offset < len and argi < 255:
             argv[argi] = (blob as i64 + offset) as *const u8
             argi += 1
-            while offset < len and (unsafe: *((blob as i64 + offset) as *const u8)) != 0:
+            while offset < len and (unsafe *((blob as i64 + offset) as *const u8)) != 0:
                 offset += 1
             offset += 1
         argv[argi] = 0 as *const u8
@@ -277,7 +277,7 @@ fn spawn_argv_capture(blob: *const u8, len: i64, stdout_path: *const u8, stderr_
         while offset < len and argi < 255:
             argv[argi] = (blob as i64 + offset) as *const u8
             argi += 1
-            while offset < len and (unsafe: *((blob as i64 + offset) as *const u8)) != 0:
+            while offset < len and (unsafe *((blob as i64 + offset) as *const u8)) != 0:
                 offset += 1
             offset += 1
         argv[argi] = 0 as *const u8
@@ -319,7 +319,7 @@ fn run_argv_capture_input(blob: *const u8, len: i64, stdout_path: *const u8, std
         while offset < len and argi < 255:
             argv[argi] = (blob as i64 + offset) as *const u8
             argi += 1
-            while offset < len and (unsafe: *((blob as i64 + offset) as *const u8)) != 0:
+            while offset < len and (unsafe *((blob as i64 + offset) as *const u8)) != 0:
                 offset += 1
             offset += 1
         argv[argi] = 0 as *const u8
@@ -367,7 +367,7 @@ fn run_argv_capture_cwd(blob: *const u8, len: i64, stdout_path: *const u8, stder
         while offset < len and argi < 255:
             argv[argi] = (blob as i64 + offset) as *const u8
             argi += 1
-            while offset < len and (unsafe: *((blob as i64 + offset) as *const u8)) != 0:
+            while offset < len and (unsafe *((blob as i64 + offset) as *const u8)) != 0:
                 offset += 1
             offset += 1
         argv[argi] = 0 as *const u8
@@ -444,7 +444,7 @@ pub fn exec_binary(path: str) -> i32:
         with_free(buf)
         let errp = __error()
         if errp as i64 != 0:
-            unsafe: *errp = EINTR
+            unsafe *errp = EINTR
         return -1
     let rc = run_binary_direct(buf as *const u8)
     with_free(buf)
@@ -459,7 +459,7 @@ pub fn exec_argv(args: str) -> i32:
         with_free(buf)
         let errp = __error()
         if errp as i64 != 0:
-            unsafe: *errp = EINTR
+            unsafe *errp = EINTR
         return -1
     let rc = run_argv_direct(buf as *const u8, args.len())
     with_free(buf)
@@ -479,7 +479,7 @@ pub fn exec_argv_cwd(args: str, cwd: str) -> i32:
         with_free(cwd_buf)
         let errp = __error()
         if errp as i64 != 0:
-            unsafe: *errp = EINTR
+            unsafe *errp = EINTR
         return -1
     let rc = run_argv_direct_cwd(arg_buf as *const u8, args.len(), cwd_buf as *const u8)
     with_free(arg_buf)
@@ -506,7 +506,7 @@ pub fn exec_argv_capture(args: str, stdout_path: str, stderr_path: str, timeout_
         with_free(err_buf)
         let errp = __error()
         if errp as i64 != 0:
-            unsafe: *errp = EINTR
+            unsafe *errp = EINTR
         return -1
     let rc = run_argv_capture(arg_buf as *const u8, args.len(), out_buf as *const u8, err_buf as *const u8, timeout_ms)
     with_free(arg_buf)
@@ -541,7 +541,7 @@ pub fn exec_argv_capture_input(args: str, stdout_path: str, stderr_path: str, ti
         with_free(in_buf)
         let errp = __error()
         if errp as i64 != 0:
-            unsafe: *errp = EINTR
+            unsafe *errp = EINTR
         return -1
     let rc = run_argv_capture_input(arg_buf as *const u8, args.len(), out_buf as *const u8, err_buf as *const u8, timeout_ms, in_buf as *const u8)
     with_free(arg_buf)
@@ -577,7 +577,7 @@ pub fn exec_argv_capture_cwd(args: str, stdout_path: str, stderr_path: str, time
         with_free(cwd_buf)
         let errp = __error()
         if errp as i64 != 0:
-            unsafe: *errp = EINTR
+            unsafe *errp = EINTR
         return -1
     let rc = run_argv_capture_cwd(arg_buf as *const u8, args.len(), out_buf as *const u8, err_buf as *const u8, timeout_ms, cwd_buf as *const u8)
     with_free(arg_buf)
@@ -606,7 +606,7 @@ pub fn exec_argv_capture_spawn(args: str, stdout_path: str, stderr_path: str) ->
         with_free(err_buf)
         let errp = __error()
         if errp as i64 != 0:
-            unsafe: *errp = EINTR
+            unsafe *errp = EINTR
         return -1
     let pid = spawn_argv_capture(arg_buf as *const u8, args.len(), out_buf as *const u8, err_buf as *const u8)
     with_free(arg_buf)

@@ -2242,7 +2242,7 @@ fn UCD_SCRIPTX_PROP() -> Never {
     comptime_error("untranslatable C macro: UCD_SCRIPTX_PROP")
 }
 fn UCHAR21[T](eptr: T) -> T {
-    (unsafe: *eptr)
+    (unsafe *eptr)
 }
 // untranslatable fn-like macro
 fn UCHAR21INC() -> Never {
@@ -2253,7 +2253,7 @@ fn UCHAR21INCTEST() -> Never {
     comptime_error("untranslatable C macro: UCHAR21INCTEST")
 }
 fn UCHAR21TEST[T](eptr: T) -> T {
-    (unsafe: *eptr)
+    (unsafe *eptr)
 }
 let UCHAR_MAX: c_int = ((127 * 2) + 1)
 let UID_MAX: c_uint = 2147483647

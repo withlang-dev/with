@@ -15,7 +15,7 @@ fn write_i32(mem: Memory, index: i32, value: i32):
 
 fn read_i32(mem: Memory, index: i32) -> i32:
     let ptr = memory_ptr(mem) as *mut i32
-    unsafe: *(ptr + index as i64)
+    unsafe *(ptr + index as i64)
 
 fn reduce_then_relu:
     let count: i32 = 4

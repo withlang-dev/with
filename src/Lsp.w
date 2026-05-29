@@ -239,7 +239,7 @@ unsafe fn jsmn_parse(parser: *mut JsonParser, js: str, len: i32, tokens: *mut Js
 
 fn lsp_json_parse(js: str, tokens: *mut JsonToken, num_tokens: i32) -> i32:
     var parser = JsonParser { pos: 0, toknext: 0, toksuper: -1 }
-    unsafe: jsmn_parse(&raw mut parser as *mut JsonParser, js, js.len() as i32, tokens, num_tokens)
+    unsafe { jsmn_parse(&raw mut parser as *mut JsonParser, js, js.len() as i32, tokens, num_tokens) }
 
 fn json_tok_str(js: str, tokens: *mut JsonToken, idx: i32) -> str:
     if idx < 0:

@@ -77,7 +77,7 @@ type CiTypePool {
 
 fn CiTypePool.new -> CiTypePool:
     let ptr = with_alloc(256) as *mut CiTypePoolState
-    unsafe: *ptr = CiTypePoolState {
+    unsafe *ptr = CiTypePoolState {
         kinds: Vec.new(),
         data0: Vec.new(),
         data1: Vec.new(),
@@ -293,7 +293,7 @@ type CiExprPool {
 
 fn CiExprPool.new -> CiExprPool:
     let ptr = with_alloc(256) as *mut CiExprPoolState
-    unsafe: *ptr = CiExprPoolState {
+    unsafe *ptr = CiExprPoolState {
         kinds: Vec.new(),
         data0: Vec.new(),
         data1: Vec.new(),
@@ -923,7 +923,7 @@ fn CiProject.update_symbol(mut self: CiProject, symbol_id: i32, symbol: CiProjec
     if symbol_id < 0 or symbol_id >= self.symbols.len() as i32:
         return
     let dst = self.symbols.ptr as *mut CiProjectSymbol
-    unsafe: *(dst + ((symbol_id as isize) as usize)) = symbol.owned_copy()
+    unsafe *(dst + ((symbol_id as isize) as usize)) = symbol.owned_copy()
 
 fn CiProject.owner_module_path(self: &CiProject, symbol_id: i32) -> str:
     if symbol_id < 0 or symbol_id >= self.symbols.len() as i32:

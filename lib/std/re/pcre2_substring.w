@@ -29,7 +29,7 @@ fn pcre2_substring_copy_byname_8(__param_match_data: *mut pcre2_real_match_data_
     (__local_entry = __local_first)
 
     while ((if __local_entry <= __local_last: 1 else: 0) != 0) {
-        var __local_n: c_uint = ((((((unsafe: __local_entry[0]) as c_int) << (8 as c_uint)) | ((unsafe: __local_entry[(0 + 1)]) as c_int)) as c_uint))
+        var __local_n: c_uint = ((((((unsafe __local_entry[0]) as c_int) << (8 as c_uint)) | ((unsafe __local_entry[(0 + 1)]) as c_int)) as c_uint))
 
         if ((if __local_n < __param_match_data.oveccount: 1 else: 0) != 0) {
             if ((if __param_match_data.ovector[((__local_n as c_uint) *% (2 as c_uint))] != (~(0 as c_ulong)): 1 else: 0) != 0) {
@@ -61,7 +61,7 @@ fn pcre2_substring_copy_bynumber_8(__param_match_data: *mut pcre2_real_match_dat
         return __local_rc
     }
 
-    if ((if ((__local_size as c_ulong) +% (1 as c_ulong)) > (unsafe: *__param_sizeptr): 1 else: 0) != 0) {
+    if ((if ((__local_size as c_ulong) +% (1 as c_ulong)) > (unsafe *__param_sizeptr): 1 else: 0) != 0) {
         return -48
     }
 
@@ -69,9 +69,9 @@ fn pcre2_substring_copy_bynumber_8(__param_match_data: *mut pcre2_real_match_dat
         with_memcpy((__param_buffer as *i8), ((__param_match_data.subject + (__param_match_data.ovector[((__param_stringnumber as c_uint) *% (2 as c_uint))] as usize)) as *i8), (((__local_size as c_ulong) *% (1 as c_ulong)) as i64))
     }
 
-    ((unsafe: __param_buffer[__local_size]) = 0)
+    ((unsafe __param_buffer[__local_size]) = 0)
 
-    ((unsafe: *__param_sizeptr) = __local_size)
+    ((unsafe *__param_sizeptr) = __local_size)
 
     return 0
 
@@ -115,7 +115,7 @@ fn pcre2_substring_get_byname_8(__param_match_data: *mut pcre2_real_match_data_8
     (__local_entry = __local_first)
 
     while ((if __local_entry <= __local_last: 1 else: 0) != 0) {
-        var __local_n: c_uint = ((((((unsafe: __local_entry[0]) as c_int) << (8 as c_uint)) | ((unsafe: __local_entry[(0 + 1)]) as c_int)) as c_uint))
+        var __local_n: c_uint = ((((((unsafe __local_entry[0]) as c_int) << (8 as c_uint)) | ((unsafe __local_entry[(0 + 1)]) as c_int)) as c_uint))
 
         if ((if __local_n < __param_match_data.oveccount: 1 else: 0) != 0) {
             if ((if __param_match_data.ovector[((__local_n as c_uint) *% (2 as c_uint))] != (~(0 as c_ulong)): 1 else: 0) != 0) {
@@ -161,11 +161,11 @@ fn pcre2_substring_get_bynumber_8(__param_match_data: *mut pcre2_real_match_data
         with_memcpy((__local_yield_ as *i8), ((__param_match_data.subject + (__param_match_data.ovector[((__param_stringnumber as c_uint) *% (2 as c_uint))] as usize)) as *i8), (((__local_size as c_ulong) *% (1 as c_ulong)) as i64))
     }
 
-    ((unsafe: __local_yield_[__local_size]) = 0)
+    ((unsafe __local_yield_[__local_size]) = 0)
 
-    ((unsafe: *__param_stringptr) = __local_yield_)
+    ((unsafe *__param_stringptr) = __local_yield_)
 
-    ((unsafe: *__param_sizeptr) = __local_size)
+    ((unsafe *__param_sizeptr) = __local_size)
 
     return 0
 
@@ -199,7 +199,7 @@ fn pcre2_substring_length_byname_8(__param_match_data: *mut pcre2_real_match_dat
     (__local_entry = __local_first)
 
     while ((if __local_entry <= __local_last: 1 else: 0) != 0) {
-        var __local_n: c_uint = ((((((unsafe: __local_entry[0]) as c_int) << (8 as c_uint)) | ((unsafe: __local_entry[(0 + 1)]) as c_int)) as c_uint))
+        var __local_n: c_uint = ((((((unsafe __local_entry[0]) as c_int) << (8 as c_uint)) | ((unsafe __local_entry[(0 + 1)]) as c_int)) as c_uint))
 
         if ((if __local_n < __param_match_data.oveccount: 1 else: 0) != 0) {
             if ((if __param_match_data.ovector[((__local_n as c_uint) *% (2 as c_uint))] != (~(0 as c_ulong)): 1 else: 0) != 0) {
@@ -303,7 +303,7 @@ fn pcre2_substring_length_bynumber_8(__param_match_data: *mut pcre2_real_match_d
             (__ci_expr_ternary_2 = ((__local_right as c_ulong) -% (__local_left as c_ulong)))
         }
 
-        ((unsafe: *__param_sizeptr) = __ci_expr_ternary_2)
+        ((unsafe *__param_sizeptr) = __ci_expr_ternary_2)
 
     }
 
@@ -363,7 +363,7 @@ fn pcre2_substring_nametable_scan_8(__param_code: *const pcre2_real_code_8, __pa
                 var __ci_expr_ternary_0: c_int = 0
 
                 if ((if __local_first == __local_last: 1 else: 0) != 0) {
-                    (__ci_expr_ternary_0 = (((((((unsafe: __local_entry[0]) as c_int) << (8 as c_uint)) | ((unsafe: __local_entry[(0 + 1)]) as c_int)) as c_uint) as c_int)))
+                    (__ci_expr_ternary_0 = (((((((unsafe __local_entry[0]) as c_int) << (8 as c_uint)) | ((unsafe __local_entry[(0 + 1)]) as c_int)) as c_uint) as c_int)))
                 } else {
                     (__ci_expr_ternary_0 = -50)
                 }
@@ -372,9 +372,9 @@ fn pcre2_substring_nametable_scan_8(__param_code: *const pcre2_real_code_8, __pa
 
             }
 
-            ((unsafe: *__param_firstptr) = __local_first)
+            ((unsafe *__param_firstptr) = __local_first)
 
-            ((unsafe: *__param_lastptr) = __local_last)
+            ((unsafe *__param_lastptr) = __local_last)
 
             return __local_entrysize
 
@@ -440,7 +440,7 @@ fn pcre2_substring_list_get_8(__param_match_data: *mut pcre2_real_match_data_8, 
 
     (__local_count2 = 2 * __local_count)
 
-    (__local_ovector = (&(unsafe: __param_match_data.ovector[0]) as *mut c_ulong))
+    (__local_ovector = (&(unsafe __param_match_data.ovector[0]) as *mut c_ulong))
 
     (__local_size = ((sizeof[pcre2_memctl]() as c_ulong) +% (sizeof[usize]() as c_ulong)))
 
@@ -453,8 +453,8 @@ fn pcre2_substring_list_get_8(__param_match_data: *mut pcre2_real_match_data_8, 
     while ((if __local_i < __local_count2: 1 else: 0) != 0) {
         (__local_size = __local_size + ((sizeof[usize]() as c_ulong) +% (1 as c_ulong)))
 
-        if ((if (unsafe: __local_ovector[(__local_i + 1)]) > (unsafe: __local_ovector[__local_i]): 1 else: 0) != 0) {
-            (__local_size = __local_size + (((((unsafe: __local_ovector[(__local_i + 1)]) as c_ulong) -% ((unsafe: __local_ovector[__local_i]) as c_ulong)) as c_ulong) *% (1 as c_ulong)))
+        if ((if (unsafe __local_ovector[(__local_i + 1)]) > (unsafe __local_ovector[__local_i]): 1 else: 0) != 0) {
+            (__local_size = __local_size + (((((unsafe __local_ovector[(__local_i + 1)]) as c_ulong) -% ((unsafe __local_ovector[__local_i]) as c_ulong)) as c_ulong) *% (1 as c_ulong)))
         }
 
 
@@ -471,7 +471,7 @@ fn pcre2_substring_list_get_8(__param_match_data: *mut pcre2_real_match_data_8, 
 
     (__local_listp = ((((__local_memp as *mut c_char) + (sizeof[pcre2_memctl]() as usize)) as *mut *mut u8)))
 
-    ((unsafe: *__param_listptr) = __local_listp)
+    ((unsafe *__param_listptr) = __local_listp)
 
 
     (__local_lensp = ((((__local_listp as *mut c_char) + (((sizeof[usize]() as c_ulong) *% ((__local_count + 1) as c_ulong)) as usize)) as *mut c_ulong)))
@@ -482,7 +482,7 @@ fn pcre2_substring_list_get_8(__param_match_data: *mut pcre2_real_match_data_8, 
         (__local_lensp = ((null as *mut c_ulong)))
 
     } else {
-        ((unsafe: *__param_lengthsptr) = __local_lensp)
+        ((unsafe *__param_lengthsptr) = __local_lensp)
 
         (__local_sp = ((((__local_lensp as *mut c_char) + (((sizeof[usize]() as c_ulong) *% (__local_count as c_ulong)) as usize)) as *mut u8)))
 
@@ -493,8 +493,8 @@ fn pcre2_substring_list_get_8(__param_match_data: *mut pcre2_real_match_data_8, 
     while ((if __local_i < __local_count2: 1 else: 0) != 0) {
         var __ci_expr_ternary_0: c_ulong = 0
 
-        if ((if (unsafe: __local_ovector[(__local_i + 1)]) > (unsafe: __local_ovector[__local_i]): 1 else: 0) != 0) {
-            (__ci_expr_ternary_0 = (((unsafe: __local_ovector[(__local_i + 1)]) as c_ulong) -% ((unsafe: __local_ovector[__local_i]) as c_ulong)))
+        if ((if (unsafe __local_ovector[(__local_i + 1)]) > (unsafe __local_ovector[__local_i]): 1 else: 0) != 0) {
+            (__ci_expr_ternary_0 = (((unsafe __local_ovector[(__local_i + 1)]) as c_ulong) -% ((unsafe __local_ovector[__local_i]) as c_ulong)))
         } else {
             (__ci_expr_ternary_0 = 0)
         }
@@ -503,14 +503,14 @@ fn pcre2_substring_list_get_8(__param_match_data: *mut pcre2_real_match_data_8, 
 
 
         if ((if __local_size != 0: 1 else: 0) != 0) {
-            with_memcpy((__local_sp as *i8), ((__param_match_data.subject + ((unsafe: __local_ovector[__local_i]) as usize)) as *i8), (((__local_size as c_ulong) *% (1 as c_ulong)) as i64))
+            with_memcpy((__local_sp as *i8), ((__param_match_data.subject + ((unsafe __local_ovector[__local_i]) as usize)) as *i8), (((__local_size as c_ulong) *% (1 as c_ulong)) as i64))
         }
 
         var __ci_expr_old_1: *mut *mut u8 = __local_listp
 
         (__local_listp = __local_listp + 1)
 
-        ((unsafe: *__ci_expr_old_1) = __local_sp)
+        ((unsafe *__ci_expr_old_1) = __local_sp)
 
 
         if ((if __local_lensp != null: 1 else: 0) != 0) {
@@ -518,7 +518,7 @@ fn pcre2_substring_list_get_8(__param_match_data: *mut pcre2_real_match_data_8, 
 
             (__local_lensp = __local_lensp + 1)
 
-            ((unsafe: *__ci_expr_old_2) = __local_size)
+            ((unsafe *__ci_expr_old_2) = __local_size)
 
         }
 
@@ -528,7 +528,7 @@ fn pcre2_substring_list_get_8(__param_match_data: *mut pcre2_real_match_data_8, 
 
         (__local_sp = __local_sp + 1)
 
-        ((unsafe: *__ci_expr_old_3) = 0)
+        ((unsafe *__ci_expr_old_3) = 0)
 
 
 
@@ -537,7 +537,7 @@ fn pcre2_substring_list_get_8(__param_match_data: *mut pcre2_real_match_data_8, 
     }
 
 
-    ((unsafe: *__local_listp) = ((null as *mut u8)))
+    ((unsafe *__local_listp) = ((null as *mut u8)))
 
     return 0
 

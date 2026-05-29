@@ -18,11 +18,11 @@
   │                                                                                                                │             │                   │      │ regression verifies explicit void tail values  │
   │                                                                                                                │             │                   │      │ are not assigned into the return slot.         │
   │                                                                                                                │             │                   │      │ Related §4.10.                                 │
-  │ #181 (https://github.com/withlang-dev/with/issues/181)                                                         │         Yes │                No │   No │ Compiler still accepts unsafe: *p; spec still  │
-  │                                                                                                                │             │                   │      │ has inline unsafe: examples. Fix parser/spec   │
-  │                                                                                                                │             │                   │      │ so unsafe: requires newline block; add narrow  │
-  │                                                                                                                │             │                   │      │ unsafe *p raw-access prefix. Spec §16.11,      │
-  │                                                                                                                │             │                   │      │ §19.2a.                                        │
+  │ [x] #181 (https://github.com/withlang-dev/with/issues/181)                                                     │         Yes │               Yes │   No │ Completed: unsafe: now requires a newline      │
+  │                                                                                                                │             │                   │      │ block, unsafe { ... } remains the inline block │
+  │                                                                                                                │             │                   │      │ form, and unsafe *p / unsafe p[i] authorize    │
+  │                                                                                                                │             │                   │      │ only one raw-access chain. Regressions added.  │
+  │                                                                                                                │             │                   │      │ Spec §16.11, §19.2a.                           │
   │ [x] #176 (https://github.com/withlang-dev/with/issues/176)                                                     │         Yes │               Yes │   No │ Completed in 45b2438: migrator now prints     │
   │                                                                                                                │             │                   │      │ pointer sizeof as sizeof[usize]();             │
   │                                                                                                                │             │                   │      │ regression added.                              │

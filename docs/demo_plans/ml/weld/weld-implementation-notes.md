@@ -147,7 +147,7 @@ type Storage = {
 fn storage_new(device: i64, size: usize) -> *mut Storage:
     let mem = crux_alloc(device, size)
     if mem == 0: return null
-    let s = unsafe: malloc(sizeof[Storage]()) as *mut Storage
+    let s = unsafe { malloc(sizeof[Storage]()) } as *mut Storage
     unsafe:
         (*s).memory = mem
         (*s).refcount = 1
@@ -156,7 +156,7 @@ fn storage_new(device: i64, size: usize) -> *mut Storage:
     s
 
 fn storage_retain(s: *mut Storage):
-    unsafe: (*s).refcount = (*s).refcount + 1
+    unsafe (*s).refcount = unsafe (*s).refcount + 1
 
 fn storage_release(s: *mut Storage):
     unsafe:
@@ -328,7 +328,7 @@ type GradMeta = {
 }
 
 fn alloc_grad_meta(requires_grad: bool, is_leaf: bool) -> *mut GradMeta:
-    let gm = unsafe: malloc(sizeof[GradMeta]()) as *mut GradMeta
+    let gm = unsafe { malloc(sizeof[GradMeta]()) } as *mut GradMeta
     unsafe:
         (*gm).grad = null
         (*gm).grad_fn = null

@@ -38,9 +38,9 @@ fn run_reduce(bindings: Bindings):
     var i: Size = 0usize
     let count = view_elem_count(a_view)
     while i < count:
-        sum = sum + unsafe: *(a_ptr + i as i64)
+        sum = sum + unsafe *(a_ptr + i as i64)
         i = i + 1usize
-    let base = unsafe: *out_ptr
+    let base = unsafe *out_ptr
     unsafe:
         *out_ptr = base + sum
 
@@ -52,7 +52,7 @@ fn run_relu(bindings: Bindings):
     var i: Size = 0usize
     let count = view_elem_count(a_view)
     while i < count:
-        let value = unsafe: *(a_ptr + i as i64)
+        let value = unsafe *(a_ptr + i as i64)
         let relu = if value < 0: 0 else: value
         unsafe:
             *(out_ptr + i as i64) = relu
@@ -78,7 +78,7 @@ pub fn dispatch(stream: Stream, prog: Program, bindings: Bindings) -> Result[Eve
 pub fn event_is_done(event: Event) -> bool:
     if event == 0:
         return false
-    unsafe: (*event_rec(event)).done
+    unsafe (*event_rec(event)).done
 
 pub fn event_destroy(event: Event):
     if event == 0:

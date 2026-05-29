@@ -24,10 +24,10 @@ fn test_u32_deref_cmp:
     (buf[1] = opaque_u32(2147483648))
     let p = (&raw mut buf[0] as *mut u32)
     let q = (&raw mut buf[1] as *mut u32)
-    assert((unsafe: *p) < (unsafe: *q))
-    assert((unsafe: *q) > (unsafe: *p))
-    assert((unsafe: *p) <= (unsafe: *q))
-    assert((unsafe: *q) >= (unsafe: *p))
+    assert((unsafe *p) < (unsafe *q))
+    assert((unsafe *q) > (unsafe *p))
+    assert((unsafe *p) <= (unsafe *q))
+    assert((unsafe *q) >= (unsafe *p))
 
 fn test_u32_array_cmp:
     var arr: [2]u32

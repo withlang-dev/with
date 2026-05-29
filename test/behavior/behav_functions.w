@@ -82,7 +82,7 @@ fn test_side_effects:
     assert(g_side_effect == 3)
 
 fn void_fn(x: *mut i32):
-    unsafe: *x = 42
+    unsafe *x = 42
 
 fn test_void_function:
     var val = 0

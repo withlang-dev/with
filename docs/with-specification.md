@@ -5462,7 +5462,7 @@ do:
     if should_skip:
         continue        // jumps to the while condition below
     process(p)
-while { p = p + 1; unsafe: *p != 0 }
+while { p = p + 1; unsafe *p != 0 }
 ```
 
 **Labeled form:**
@@ -5573,7 +5573,7 @@ Iterator with lookahead:
 ```
 var p = start
 do:
-    let ch = unsafe: *p
+    let ch = unsafe *p
     if ch == delimiter: break
     buffer.push(ch)
 while { p = p + 1; p < end }
@@ -5603,22 +5603,22 @@ do {
 With translation:
 ```
 do:
-    if (unsafe: *list) < new_start:
-        if (unsafe: *list) + 1 == new_start:
+    if (unsafe *list) < new_start:
+        if (unsafe *list) + 1 == new_start:
             new_start = new_start - 1
             continue
-    else if (unsafe: *list) > new_end:
-        if (unsafe: *list) - 1 == new_end:
+    else if (unsafe *list) > new_end:
+        if (unsafe *list) - 1 == new_end:
             new_end = new_end + 1
             continue
     else:
         continue
     result = result + 2
     if buffer != null:
-        unsafe: buffer[0] = unsafe: *list
-        unsafe: buffer[1] = unsafe: *list
+        unsafe buffer[0] = unsafe *list
+        unsafe buffer[1] = unsafe *list
         buffer = buffer + 2
-while { list = list + 1; (unsafe: *list) != NOTACHAR }
+while { list = list + 1; (unsafe *list) != NOTACHAR }
 ```
 
 No `goto` required. `continue` correctly jumps to the `while`
@@ -7716,7 +7716,7 @@ type Value = union {
 }
 
 let v = Value { i: 42 }
-let as_float = unsafe: v.f    // reinterpret bits as f32
+let as_float = unsafe { v.f }    // reinterpret bits as f32
 ```
 
 Unions have the size of their largest field. All fields share offset 0.
@@ -7843,7 +7843,8 @@ fn use_ptr(p: *mut i32, end: *mut i32):
 
 Certain operations in With can violate memory safety if misused.
 These operations are permitted only within an `unsafe` context:
-the body of an `unsafe fn` or the scope of an `unsafe:` block.
+the body of an `unsafe fn`, the scope of an `unsafe:`/`unsafe {}` block,
+or the narrow `unsafe *p` / `unsafe p[i]` raw-access prefix.
 
 The operations that require an unsafe context are:
 
@@ -7851,6 +7852,25 @@ The operations that require an unsafe context are:
 - Raw pointer indexing (`p[i]` for read, `p[i] = v` for write)
 - Calls to `extern` functions
 - Other operations explicitly marked as unsafe in their definition
+
+For the common raw-memory access case, `unsafe` may be used as a
+narrow prefix over one contiguous raw access chain:
+
+```
+let x = unsafe *p
+let y = unsafe p[i]
+let z = unsafe **pp
+let item = unsafe *(p + 1)
+
+unsafe *p = 42
+unsafe p[i] = 42
+```
+
+The prefix does not wrap arbitrary expressions. `unsafe *p + 1`
+means `(unsafe *p) + 1`; a second raw access must be marked
+separately or placed in an unsafe block. Use `unsafe { ... }` or a
+newline `unsafe:` block for unsafe calls, transmutes, asm, and
+compound unsafe expressions.
 
 The following operations involving raw pointers are safe and do
 not require an unsafe context:
@@ -7898,7 +7918,7 @@ calculations.
 **`transmute`:**
 
 ```
-let bits: u32 = unsafe: transmute[u32](3.14f32)
+let bits: u32 = unsafe { transmute[u32](3.14f32) }
 ```
 
 Reinterprets the bits of one type as another. Both types must have
@@ -9059,16 +9079,16 @@ unsafe fn sha256_compress(ctx: *mut Sha256):
 ```
 
 Inside an `unsafe fn` body, all operations that would normally
-require `unsafe:` or `unsafe {}` are permitted without a wrapper.
+require `unsafe`, `unsafe:`, or `unsafe {}` are permitted without a wrapper.
 The `unsafe` keyword on the function signature is the declaration
 of intent — every line in the body is implicitly unsafe.
 
 **Callers must acknowledge the unsafety:** Calling an `unsafe fn`
-from safe code requires `unsafe:` at the call site (or being
+from safe code requires an unsafe block at the call site (or being
 inside another `unsafe fn`):
 
 ```
-unsafe: sha256_compress(&raw mut ctx)    // caller acknowledges
+unsafe { sha256_compress(&raw mut ctx) }    // caller acknowledges
 ```
 
 This preserves the audit trail — `grep unsafe` finds every
@@ -9734,12 +9754,16 @@ The following keywords are reserved and cannot be used as identifiers:
 
 ### 29.13 Block Body Syntax
 
-Every construct that introduces a statement or expression body supports
+Most constructs that introduce a statement or expression body support
 three interchangeable body forms. The choice is purely stylistic; all
 three produce identical AST and compiled output. The three-form rule
-applies universally: `fn`, `while`, `for`, `loop`, `with`, `defer`,
-`errdefer`, `comptime`, `unsafe`, labeled blocks, match arms, and any
-future block-introducing construct.
+applies to `fn`, `while`, `for`, `loop`, `with`, `defer`, `errdefer`,
+`comptime`, labeled blocks, match arms, and any future block-introducing
+construct unless that construct states a narrower syntax.
+
+`unsafe` is the deliberate exception: `unsafe:` is always a newline
+block, `unsafe { ... }` is the inline block expression form, and
+`unsafe *p` / `unsafe p[i]` is the narrow raw-access prefix form.
 
 `if`/`else if`/`else` support all three forms and additionally the
 `then` expression shorthand — see §9.1 for the full `if` syntax.

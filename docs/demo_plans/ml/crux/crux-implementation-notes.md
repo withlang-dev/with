@@ -52,7 +52,7 @@ object whose pointer is cast to `i64`.
 
 ```
 // CPU: malloc → pointer → i64
-let mem_ptr = unsafe: malloc(size) as *mut u8
+let mem_ptr = unsafe { malloc(size) } as *mut u8
 let handle = mem_ptr as i64
 
 // Metal: ObjC bridge → C struct pointer → i64
@@ -556,8 +556,8 @@ type CPUMemory = {
 }
 
 fn cpu_alloc(size: usize) -> i64:
-    let raw = unsafe: malloc(sizeof[CPUMemory]()) as *mut CPUMemory
-    let data = unsafe: malloc(size) as *mut u8
+    let raw = unsafe { malloc(sizeof[CPUMemory]()) } as *mut CPUMemory
+    let data = unsafe { malloc(size) } as *mut u8
     if data == null:
         return 0  // OOM
     unsafe:
@@ -573,11 +573,11 @@ fn cpu_free(handle: i64):
 
 fn cpu_memory_ptr(handle: i64) -> *mut u8:
     let mem = handle as *mut CPUMemory
-    unsafe: (*mem).ptr
+    unsafe (*mem).ptr
 
 fn cpu_memory_size(handle: i64) -> usize:
     let mem = handle as *mut CPUMemory
-    unsafe: (*mem).size
+    unsafe (*mem).size
 ```
 
 No Vec registry. Pointers only.
@@ -590,8 +590,8 @@ type CPUStream = {
 }
 
 fn cpu_stream_create(device: i64) -> i64:
-    let s = unsafe: malloc(sizeof[CPUStream]()) as *mut CPUStream
-    unsafe: (*s).device = device
+    let s = unsafe { malloc(sizeof[CPUStream]()) } as *mut CPUStream
+    unsafe (*s).device = device
     s as i64
 
 fn cpu_stream_sync(handle: i64):
@@ -607,8 +607,8 @@ type CPUEvent = {
 }
 
 fn cpu_event_create() -> i64:
-    let e = unsafe: malloc(sizeof[CPUEvent]()) as *mut CPUEvent
-    unsafe: (*e).done = 1
+    let e = unsafe { malloc(sizeof[CPUEvent]()) } as *mut CPUEvent
+    unsafe (*e).done = 1
     e as i64
 
 fn cpu_event_is_done(handle: i64) -> bool:

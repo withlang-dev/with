@@ -82,7 +82,7 @@ fn test_struct_with_floats:
 type Counter { value: i32 }
 
 fn counter_inc(c: *mut Counter):
-    unsafe: (*c).value = (*c).value + 1
+    unsafe (*c).value = unsafe (*c).value + 1
 
 fn test_struct_pointer:
     var c = Counter { value: 0 }
