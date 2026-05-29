@@ -38,9 +38,13 @@
   │                                                                                                                │             │                   │      │ spec §14.3/§24. Unskipped async_basic,         │
   │                                                                                                                │             │                   │      │ async_block_capture, async_tuple_await;        │
   │                                                                                                                │             │                   │      │ updated obsolete negative await diagnostic.    │
-  │ #191-#195                                                                                                      │         Yes │                No │   No │ §2 ownership/drop skipped spec sketches.       │
+  │ #191-#192, #194-#195                                                                                           │         Yes │                No │   No │ §2 ownership/drop skipped spec sketches.       │
   │                                                                                                                │             │                   │      │ Convert to executable positive/negative tests; │
-  │                                                                                                                │             │                   │      │ implement missing Drop/copy/defer diagnostics. │
+  │                                                                                                                │             │                   │      │ implement missing Drop/copy diagnostics.       │
+  │ [x] #193                                                                                                       │         Yes │               Yes │   No │ Completed: defer/errdefer already rejected     │
+  │                                                                                                                │             │                   │      │ non-local control flow; skipped mixed sketch   │
+  │                                                                                                                │             │                   │      │ split into executable positive and negative    │
+  │                                                                                                                │             │                   │      │ regressions for return, ?, break, continue.    │
   │ #196-#203                                                                                                      │         Yes │                No │   No │ §3 references/borrowing skipped sketches.      │
   │                                                                                                                │             │                   │      │ Implement executable tests for disjoint        │
   │                                                                                                                │             │                   │      │ borrows, returning refs, auto-deref/ref, trait │
