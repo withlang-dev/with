@@ -9656,16 +9656,20 @@ fn Sema.type_is_ephemeral_value(self: Sema, tid: i32) -> i32:
             if self.type_is_ephemeral_value(self.type_extra.get((te_start + ei) as i64)) != 0:
                 return 1
         return 0
+    if tk == TypeKind.TY_GENERIC_INST:
+        let base_sym = self.get_type_d0(resolved)
+        if self.ephemeral_types.contains(base_sym):
+            return 1
+        let arg_count = self.get_type_d2(resolved)
+        let arg_start = self.get_type_d1(resolved)
+        for ai in 0..arg_count:
+            if self.type_is_ephemeral_value(self.type_extra.get((arg_start + ai) as i64)) != 0:
+                return 1
+        return 0
     if tk == TypeKind.TY_STRUCT:
         let st_name = self.get_type_d0(resolved)
         if self.ephemeral_types.contains(st_name):
             return 1
-        let te_start = self.get_type_d1(resolved)
-        let field_count = self.get_type_d2(resolved)
-        for fi in 0..field_count:
-            let ft = self.type_extra.get((te_start + fi * 3 + 1) as i64)
-            if self.type_is_ephemeral_value(ft) != 0:
-                return 1
         return 0
     0
 

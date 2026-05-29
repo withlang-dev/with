@@ -1269,7 +1269,8 @@ fn Parser.parse_type_decl(self: Parser, is_pub: i32, start: i32) -> NodeId:
         return self.finish_type_decl(node)
 
     if self.peek() == TokenKind.TK_L_BRACE:
-        self.emit_legacy_struct_decl_error()
+        if is_ephemeral == 0:
+            self.emit_legacy_struct_decl_error()
         let extra_start = self.parse_struct_body()
         self.pool.add_extra(is_pub)
         self.pool.add_extra(tp_start)
