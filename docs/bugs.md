@@ -259,7 +259,11 @@
   │                                                                                                                │             │                   │      │ ephemeral Tasks, including named functions.    │
   │                                                                                                                │             │                   │      │ Positive async-context coverage remains.       │
   │                                                                                                                │             │                   │      │ Spec §14.7 / §14.16.                           │
-  │ #270-#274                                                                                                     │         Yes │           Partial │   No │ Remaining §14 async sketches still cover       │
+  │ [x] #270                                                                                                      │         Yes │               Yes │   No │ Completed: spawn fire-and-forget sketch is     │
+  │                                                                                                                │             │                   │      │ executable. `spawn task` reaches completion as │
+  │                                                                                                                │             │                   │      │ detached work; `let _ = task` cancellation     │
+  │                                                                                                                │             │                   │      │ drains without running past await. Spec §14.7. │
+  │ #271-#274                                                                                                     │         Yes │           Partial │   No │ Remaining §14 async sketches still cover       │
   │                                                                                                                │             │                   │      │ ScopedSend, no-await-in-iterators, and related │
   │                                                                                                                │             │                   │      │ unchecked semantics.                           │
   │ [x] #275-#276                                                                                                  │         Yes │               Yes │   No │ Completed: c"..." now lowers as &CStr with     │
