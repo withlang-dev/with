@@ -9013,6 +9013,7 @@ link = ["custom"]
 | `with init` | Create new project with `with.toml` and `src/main.w` |
 | `with get c.X` | Add C dependency via Conan |
 | `with get c.X@2.78` | Pin specific version |
+| `with get --force-reinstall c.X@2.78` | Delete and recreate the local installed C package |
 | `with remove c.X` | Remove dependency |
 | `with update` | Update all deps to latest compatible |
 | `with get` (no args) | Restore deps from lock file |

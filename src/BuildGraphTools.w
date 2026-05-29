@@ -1,8 +1,11 @@
 // BuildGraphTools -- typed host tool resolution for build graph nodes.
 
 extern fn with_getenv_str(name: str) -> str
+extern fn with_sysinfo_os() -> str
+extern fn with_sysinfo_arch() -> str
 
-const BUILD_GRAPH_DEFAULT_LLVM_PREFIX: str = "/usr/local/llvm"
+const BUILD_GRAPH_LLVM_VERSION: str = "22.1.6"
+const BUILD_GRAPH_FALLBACK_LLVM_PREFIX: str = "/usr/local/llvm"
 
 pub type BuildTool {
     name: str,
@@ -48,7 +51,13 @@ pub fn build_graph_llvm_prefix() -> str:
     let prefix = with_getenv_str("LLVM_PREFIX")
     if prefix.len() > 0:
         return prefix
-    BUILD_GRAPH_DEFAULT_LLVM_PREFIX
+    let host_os = with_sysinfo_os()
+    let host_arch = with_sysinfo_arch()
+    if host_os == "Macos" and (host_arch == "armv8" or host_arch == "aarch64"):
+        return ".deps/llvm-" ++ BUILD_GRAPH_LLVM_VERSION ++ "-darwin-arm64"
+    if host_os == "Linux" and host_arch == "x86_64":
+        return ".deps/llvm-" ++ BUILD_GRAPH_LLVM_VERSION ++ "-linux-x86_64"
+    BUILD_GRAPH_FALLBACK_LLVM_PREFIX
 
 pub fn build_graph_llvm_config_tool() -> BuildTool:
     let explicit = with_getenv_str("WITH_LLVM_CONFIG")

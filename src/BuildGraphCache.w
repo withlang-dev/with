@@ -5,6 +5,9 @@ use BuildGraphRuntime
 
 extern fn with_str_hash(s: str) -> i64
 
+var build_cache_compiler_fingerprint_ready: i32 = 0
+var build_cache_compiler_fingerprint: i64 = 0
+
 pub fn build_cache_state_dir(root: str) -> str:
     root ++ "/out/.build-state"
 
@@ -36,6 +39,56 @@ pub fn build_cache_fingerprint_file(path: str) -> i64:
         return 0
     let contents = build_graph_rt_read_file(path)
     with_str_hash(contents)
+
+fn build_cache_str_contains_byte(text: str, target: i32) -> bool:
+    for i in 0..text.len() as i32:
+        if text.byte_at(i as i64) == target:
+            return true
+    false
+
+fn build_cache_resolve_executable_path(argv0: str) -> str:
+    if argv0.len() == 0:
+        return ""
+    if build_graph_rt_file_exists(argv0) != 0:
+        return argv0
+    if build_cache_str_contains_byte(argv0, 47):
+        return ""
+
+    let search_path = build_graph_rt_getenv("PATH")
+    if search_path.len() == 0:
+        return ""
+
+    var segment_start = 0
+    var i = 0
+    while i <= search_path.len() as i32:
+        let at_end = i == search_path.len() as i32
+        let ch = if at_end: 58 else: search_path.byte_at(i as i64)
+        if ch == 58:
+            let dir = search_path.slice(segment_start as i64, i as i64)
+            let candidate = if dir.len() == 0: "./" ++ argv0 else: dir ++ "/" ++ argv0
+            if build_graph_rt_file_exists(candidate) != 0:
+                return candidate
+            segment_start = i + 1
+        i = i + 1
+    ""
+
+fn build_cache_current_compiler_fingerprint() -> i64:
+    if build_cache_compiler_fingerprint_ready != 0:
+        return build_cache_compiler_fingerprint
+    build_cache_compiler_fingerprint_ready = 1
+    let compiler_path = build_cache_resolve_executable_path(build_graph_rt_arg_at(0))
+    if compiler_path.len() == 0:
+        return 0
+    build_cache_compiler_fingerprint = build_cache_fingerprint_file(compiler_path)
+    build_cache_compiler_fingerprint
+
+fn build_cache_target_uses_current_compiler(target: BuildGraphTarget) -> bool:
+    if target.kind == 0: return true
+    if target.kind == 1: return true
+    if target.kind == 3: return true
+    if target.kind == 4: return true
+    if target.kind == 23: return true
+    false
 
 fn build_cache_target_has_arg(target: BuildGraphTarget, needle: str) -> bool:
     for i in 0..target.args.len() as i32:
@@ -138,6 +191,12 @@ pub fn build_cache_hash_directory_w_files(root: str, dir: str) -> i64:
         combined = combined ++ path ++ ":" ++ f"{with_str_hash(contents)}" ++ "\n"
     with_str_hash(combined)
 
+fn build_cache_hash_build_graph_sources(root: str) -> i64:
+    var combined = "build.w:" ++ f"{build_cache_fingerprint_file(root ++ "/build.w")}" ++ "\n"
+    combined = combined ++ "build:" ++ f"{build_cache_hash_directory_w_files(root, "build")}" ++ "\n"
+    combined = combined ++ "std.build:" ++ f"{build_cache_fingerprint_file(root ++ "/lib/std/build.w")}" ++ "\n"
+    with_str_hash(combined)
+
 fn build_cache_compute_signature(target: BuildGraphTarget, root: str) -> i64:
     var sig = f"{target.kind}:{target.name}:{target.entry}:{target.output}"
     sig = sig ++ f":{target.optimize_mode}:{target.target_kind}"
@@ -149,6 +208,10 @@ fn build_cache_compute_signature(target: BuildGraphTarget, root: str) -> i64:
         sig = sig ++ ":I:" ++ target.include_paths.get(i as i64)
     for i in 0..target.system_libs.len() as i32:
         sig = sig ++ ":L:" ++ target.system_libs.get(i as i64)
+    if build_cache_target_uses_current_compiler(target):
+        sig = sig ++ f":WITH:{build_cache_current_compiler_fingerprint()}"
+    if target.kind == 23:
+        sig = sig ++ f":BUILD_GRAPH:{build_cache_hash_build_graph_sources(root)}"
     if build_cache_is_stage_target(target):
         let src_hash = build_cache_hash_directory_w_files(root, "src")
         sig = sig ++ f":SRC:{src_hash}"
@@ -245,6 +308,8 @@ pub fn build_cache_record(root: str, target: BuildGraphTarget):
     let state_path = build_cache_state_path(root, target.name)
     let sig = build_cache_compute_signature(target, root)
     var content = f"v1\nsig:{sig}\n"
+    if build_cache_target_uses_current_compiler(target):
+        content = content ++ f"compiler:{build_cache_current_compiler_fingerprint()}\n"
     let input_paths = build_cache_collect_input_paths(root, target)
     for idx in 0..input_paths.len() as i32:
         let path = input_paths.get(idx as i64)

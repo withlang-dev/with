@@ -6,6 +6,7 @@ extern fn with_exec_argv_capture_spawn(args: str, stdout_path: str, stderr_path:
 extern fn with_exec_wait(pid: i32, timeout_ms: i32) -> i32
 extern fn with_exec_binary(path: str) -> i32
 extern fn with_exec_argv(args: str) -> i32
+extern fn with_arg_at(idx: i32) -> str
 extern fn with_getenv_str(name: str) -> str
 extern fn with_setenv_str(name: str, value: str) -> i32
 extern fn with_fs_chmod(path: str, mode: i32) -> i32
@@ -28,6 +29,9 @@ extern fn wl_compile_ir_to_object(source_path: str, output_path: str) -> i32
 
 pub fn build_graph_rt_exec_argv(args: str) -> i32:
     with_exec_argv(args)
+
+pub fn build_graph_rt_arg_at(idx: i32) -> str:
+    with_arg_at(idx)
 
 pub fn build_graph_rt_exec_binary(path: str) -> i32:
     with_exec_binary(path)

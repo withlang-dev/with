@@ -4,7 +4,8 @@ use std.build
 use std.process
 use std.sysinfo
 
-const COMPILER_DEFAULT_LLVM_PREFIX: str = "/usr/local/llvm"
+const COMPILER_LLVM_VERSION: str = "22.1.6"
+const COMPILER_FALLBACK_LLVM_PREFIX: str = "/usr/local/llvm"
 
 fn comp_fail(ctx: ActionCtx, message: str) -> i32:
     ctx.diagnostics().error(ctx.target_name() ++ ": " ++ message)
@@ -112,36 +113,48 @@ fn comp_tool_from_env(primary: str, legacy: str, fallback: str) -> str:
         return old
     fallback
 
+fn comp_default_llvm_prefix() -> str:
+    let host_os = os()
+    let host_arch = arch()
+    if host_os == "Macos" and (host_arch == "armv8" or host_arch == "aarch64"):
+        return ".deps/llvm-" ++ COMPILER_LLVM_VERSION ++ "-darwin-arm64"
+    if host_os == "Linux" and host_arch == "x86_64":
+        return ".deps/llvm-" ++ COMPILER_LLVM_VERSION ++ "-linux-x86_64"
+    COMPILER_FALLBACK_LLVM_PREFIX
+
 fn comp_llvm_prefix() -> str:
     let prefix = env("LLVM_PREFIX")
     if prefix.len() > 0:
         return prefix
-    COMPILER_DEFAULT_LLVM_PREFIX
+    comp_default_llvm_prefix()
 
-fn comp_llvm_clang_tool() -> str:
-    comp_tool_from_env("WITH_LLVM_CC", "LLVM_CC", comp_llvm_prefix() ++ "/bin/clang")
+fn comp_llvm_prefix_for_root(root: str) -> str:
+    comp_abs(root, comp_llvm_prefix())
 
-fn comp_llvm_lld_tool() -> str:
-    let fallback = if os() == "Linux": comp_llvm_prefix() ++ "/bin/ld.lld" else: comp_llvm_prefix() ++ "/bin/ld64.lld"
+fn comp_llvm_clang_tool(llvm_prefix: str) -> str:
+    comp_tool_from_env("WITH_LLVM_CC", "LLVM_CC", llvm_prefix ++ "/bin/clang")
+
+fn comp_llvm_lld_tool(llvm_prefix: str) -> str:
+    let fallback = if os() == "Linux": llvm_prefix ++ "/bin/ld.lld" else: llvm_prefix ++ "/bin/ld64.lld"
     comp_tool_from_env("WITH_LLVM_LD", "LLVM_LD", fallback)
 
-fn comp_libclang_path() -> str:
+fn comp_libclang_path(llvm_prefix: str) -> str:
     let explicit = env("WITH_LIBCLANG")
     if explicit.len() > 0:
         return explicit
     let legacy = env("LIBCLANG_FILE")
     if legacy.len() > 0:
         return legacy
-    comp_llvm_prefix() ++ "/lib/libclang.dylib"
+    llvm_prefix ++ "/lib/libclang.dylib"
 
-fn comp_select_libclang_path(fs: ToolFs) -> str:
+fn comp_select_libclang_path(fs: ToolFs, llvm_prefix: str) -> str:
     let explicit = env("WITH_LIBCLANG")
     if explicit.len() > 0:
         return explicit
     let legacy = env("LIBCLANG_FILE")
     if legacy.len() > 0:
         return legacy
-    let static_libclang = comp_llvm_prefix() ++ "/lib/libclang.a"
+    let static_libclang = llvm_prefix ++ "/lib/libclang.a"
     if fs.host_exists(static_libclang):
         return static_libclang
     ""
@@ -333,6 +346,7 @@ pub fn run_generate_compiler_entrypoints_action(ctx: ActionCtx) -> i32:
 
 pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
+    let root = ctx.project_info().project_root()
     let output_path = ctx.output()
     if output_path.len() == 0:
         return comp_fail(ctx, "requires a stamp output path")
@@ -344,18 +358,19 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
         let input_path = inputs.get(ii as i64)
         if not fs.exists(input_path):
             return comp_fail(ctx, "missing input: " ++ input_path)
-    let llvm_clang = comp_llvm_clang_tool()
-    let llvm_ld = comp_llvm_lld_tool()
-    let libclang = comp_select_libclang_path(fs)
+    let llvm_prefix = comp_llvm_prefix_for_root(root)
+    let llvm_clang = comp_llvm_clang_tool(llvm_prefix)
+    let llvm_ld = comp_llvm_lld_tool(llvm_prefix)
+    let libclang = comp_select_libclang_path(fs, llvm_prefix)
     if not fs.host_exists(llvm_ld):
         return comp_fail(ctx, "missing LLVM linker: " ++ llvm_ld)
     if libclang.len() == 0:
-        return comp_fail(ctx, "missing static libclang archive: " ++ comp_llvm_prefix() ++ "/lib/libclang.a")
+        return comp_fail(ctx, "missing static libclang archive: " ++ llvm_prefix ++ "/lib/libclang.a")
     if not libclang.ends_with(".a"):
         return comp_fail(ctx, "libclang must be linked statically; expected libclang.a, got: " ++ libclang)
     if not fs.host_exists(libclang):
         return comp_fail(ctx, "missing static libclang archive: " ++ libclang)
-    let llvm_lib_dir = comp_llvm_prefix() ++ "/lib"
+    let llvm_lib_dir = llvm_prefix ++ "/lib"
     let lib_files = fs.host_list_files(llvm_lib_dir)
     if lib_files.len() == 0:
         return comp_fail(ctx, "could not list: " ++ llvm_lib_dir)

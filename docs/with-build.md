@@ -104,12 +104,15 @@ c.sqlite3 = "3.45"
 with get json              # add a With package
 with get c.glib            # add a C package (latest stable)
 with get c.glib@2.78       # pin a specific version
+with get --force-reinstall c.glib@2.78
 with get                   # restore all deps from lock file
 ```
 
 `with get c.X` resolves the package, downloads headers, prebuilt libraries,
 and transitive deps into `.with/deps/c/<name>/<version>/`, and updates
 `with.toml`.
+Use `--force-reinstall` to delete and recreate the local `.with/deps` package
+directory even when metadata already exists.
 
 #### Removing and Updating
 
@@ -141,6 +144,13 @@ If auto-resolution picks the wrong library:
 ```with
 use c_import("<glib.h>", link: "glib-2.0", "gio-2.0")
 ```
+
+#### Build Cache
+
+`with build` and `with run` store target state under `out/.build-state/`.
+Compiled targets record the `with` compiler binary fingerprint in that state.
+When you install or run a different compiler binary, those targets are stale
+and rebuild automatically.
 
 #### Directory Structure
 

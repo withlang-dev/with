@@ -600,6 +600,79 @@ fn bs_check_run_project_targets(ctx: ActionCtx, compiler_path: str, case_dir: st
     if target_result.rc != 0: return target_result.rc
     bs_assert_stdout_exact(ctx, target_result, "tool-run", "run_project_target")
 
+fn bs_check_get_force_reinstall(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    var rc = bs_write_project_manifest(ctx, case_dir, "getforcedemo")
+    if rc != 0: return rc
+
+    var first_args: Vec[str] = Vec.new()
+    first_args |> push("get")
+    first_args |> push("c.opengl@system")
+    let first = bs_project_expect_success(ctx, compiler_path, case_dir, "get-force-first", first_args)
+    if first.rc != 0: return first.rc
+
+    let dep_dir = bs_join(case_dir, ".with/deps/c/opengl/system")
+    let metadata = bs_join(dep_dir, "metadata.json")
+    rc = bs_expect_file(ctx, metadata, "get force metadata")
+    if rc != 0: return rc
+    rc = bs_expect_file_contains(ctx, bs_join(case_dir, "with.toml"), "c.opengl = \"system\"", "get force manifest dep")
+    if rc != 0: return rc
+
+    let sentinel = bs_join(dep_dir, "sentinel.txt")
+    rc = bs_write_fixture(ctx, sentinel, "cached", "get force sentinel")
+    if rc != 0: return rc
+
+    var cached_args: Vec[str] = Vec.new()
+    cached_args |> push("get")
+    cached_args |> push("c.opengl@system")
+    let cached = bs_project_expect_success(ctx, compiler_path, case_dir, "get-force-cached", cached_args)
+    if cached.rc != 0: return cached.rc
+    if not ctx.fs().exists(sentinel):
+        return bs_fail(ctx, "cached get unexpectedly reinstalled package")
+
+    var force_args: Vec[str] = Vec.new()
+    force_args |> push("get")
+    force_args |> push("--force-reinstall")
+    force_args |> push("c.opengl@system")
+    let forced = bs_project_expect_success(ctx, compiler_path, case_dir, "get-force-reinstall", force_args)
+    if forced.rc != 0: return forced.rc
+    if ctx.fs().exists(sentinel):
+        return bs_fail(ctx, "force reinstall did not recreate dependency directory")
+    bs_expect_file(ctx, metadata, "get force metadata after reinstall")
+
+fn bs_check_build_cache_tracks_compiler(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    var rc = bs_write_project_manifest(ctx, case_dir, "cachecompiler")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "main.w"), "fn main:\n    print(\"cache\")\n", "cache compiler main")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), "use std.build\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    var out = ctx.new_build().executable(\"cachecompiler\", \"main.w\")\n    out.default(\"cachecompiler\")\n", "cache compiler build")
+    if rc != 0: return rc
+
+    let result = bs_project_expect_success(ctx, compiler_path, case_dir, "build-cache-compiler", bs_project_args("build"))
+    if result.rc != 0: return result.rc
+    bs_expect_file_contains(ctx, bs_join(case_dir, "out/.build-state/cachecompiler.state"), "compiler:", "build cache compiler fingerprint")
+
+fn bs_check_build_cache_tracks_action_source(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    var rc = bs_write_project_manifest(ctx, case_dir, "cacheaction")
+    if rc != 0: return rc
+    let build_dir = bs_join(case_dir, "build")
+    if ctx.fs().mkdir_all(build_dir) != 0:
+        return bs_fail(ctx, "could not create build action module directory")
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), "use std.build\nuse build.actions\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    var out = ctx.new_build()\n    var stamp = target_new(.Action, \"stamp\", \"\").output(\"out/stamp.txt\")\n    stamp.action = write_stamp\n    stamp = stamp.write_scope(\"out\")\n    out = out.add_target(stamp)\n    out.default(\"stamp\")\n", "cache action build")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(build_dir, "actions.w"), "use std.build\n\npub fn write_stamp(ctx: ActionCtx) -> i32:\n    let fs = ctx.fs()\n    if fs.mkdir_all(\"out\") != 0:\n        return 1\n    if fs.write_text(\"out/stamp.txt\", \"first\\n\") != 0:\n        return 1\n    0\n", "cache action source first")
+    if rc != 0: return rc
+
+    let first = bs_project_expect_success(ctx, compiler_path, case_dir, "build-cache-action-first", bs_project_args("build"))
+    if first.rc != 0: return first.rc
+    rc = bs_expect_file_contains(ctx, bs_join(case_dir, "out/stamp.txt"), "first", "build cache action first output")
+    if rc != 0: return rc
+
+    rc = bs_write_fixture(ctx, bs_join(build_dir, "actions.w"), "use std.build\n\npub fn write_stamp(ctx: ActionCtx) -> i32:\n    let fs = ctx.fs()\n    if fs.mkdir_all(\"out\") != 0:\n        return 1\n    if fs.write_text(\"out/stamp.txt\", \"second\\n\") != 0:\n        return 1\n    0\n", "cache action source second")
+    if rc != 0: return rc
+    let second = bs_project_expect_success(ctx, compiler_path, case_dir, "build-cache-action-second", bs_project_args("build"))
+    if second.rc != 0: return second.rc
+    bs_expect_file_contains(ctx, bs_join(case_dir, "out/stamp.txt"), "second", "build cache action source invalidation")
+
 pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
     if inputs.len() == 0:
@@ -626,6 +699,12 @@ pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
     rc = bs_check_build_uses_package_section_name(ctx, compiler_path, bs_join(output_dir, "build_package_section_case"))
     if rc != 0: return rc
     rc = bs_check_build_rejects_imperative_manifest(ctx, compiler_path, bs_join(output_dir, "build_imperative_manifest_case"))
+    if rc != 0: return rc
+    rc = bs_check_get_force_reinstall(ctx, compiler_path, bs_join(output_dir, "get_force_reinstall_case"))
+    if rc != 0: return rc
+    rc = bs_check_build_cache_tracks_compiler(ctx, compiler_path, bs_join(output_dir, "build_cache_compiler_case"))
+    if rc != 0: return rc
+    rc = bs_check_build_cache_tracks_action_source(ctx, compiler_path, bs_join(output_dir, "build_cache_action_case"))
     if rc != 0: return rc
     bs_check_run_project_targets(ctx, compiler_path, bs_join(output_dir, "run_project_case"))
 
@@ -922,6 +1001,98 @@ fn bs_check_emit_c_hashmap_new_field(ctx: ActionCtx, compiler_path: str, case_di
     if run_result.rc != 0: return run_result.rc
     bs_edge_assert_exact(ctx, run_result.stdout, "ok", "emit_c_hashmap_new_field", "stdout")
 
+fn bs_check_darwin_arm64_c_abi_direct_aggregates(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    if not (os() == "Macos" and (arch() == "armv8" or arch() == "aarch64")):
+        return 0
+
+    let root = ctx.project_info().project_root()
+    let header = bs_join(case_dir, "abi.h")
+    let helper_c = bs_join(case_dir, "abi_helper.c")
+    let src = bs_join(case_dir, "main.w")
+    let with_obj = bs_join(case_dir, "main.o")
+    let helper_obj = bs_join(case_dir, "abi_helper.o")
+    let bin = bs_join(case_dir, "abi_direct")
+
+    var rc = bs_write_fixture(ctx, header,
+        "#ifndef WITH_C_ABI_DIRECT_AGGREGATES_H\n" ++
+        "#define WITH_C_ABI_DIRECT_AGGREGATES_H\n" ++
+        "typedef struct Color { unsigned char r; unsigned char g; unsigned char b; unsigned char a; } Color;\n" ++
+        "typedef struct Vector2 { float x; float y; } Vector2;\n" ++
+        "int seen_color(Color c);\n" ++
+        "Color make_color(void);\n" ++
+        "int seen_vec2(Vector2 v);\n" ++
+        "#endif\n",
+        "direct aggregate ABI header")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, helper_c,
+        "#include \"abi.h\"\n" ++
+        "int seen_color(Color c) { return c.r == 245 && c.g == 245 && c.b == 245 && c.a == 255; }\n" ++
+        "Color make_color(void) { Color c = {245, 245, 245, 255}; return c; }\n" ++
+        "int seen_vec2(Vector2 v) { return v.x == 1.5f && v.y == 2.25f; }\n",
+        "direct aggregate ABI helper")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, src,
+        "use c_import(\"abi.h\")\n\n" ++
+        "@[entry]\n" ++
+        "fn main() -> i32:\n" ++
+        "    let c = Color { r: 245, g: 245, b: 245, a: 255 }\n" ++
+        "    let made = make_color()\n" ++
+        "    let v = Vector2 { x: 1.5 as f32, y: 2.25 as f32 }\n" ++
+        "    if seen_color(c) == 1 and seen_color(made) == 1 and seen_vec2(v) == 1:\n" ++
+        "        return 0\n" ++
+        "    return 1\n",
+        "direct aggregate ABI source")
+    if rc != 0: return rc
+
+    var build_args: Vec[str] = Vec.new()
+    build_args |> push("build")
+    build_args |> push(bs_abs(root, src))
+    build_args |> push("--emit-obj")
+    build_args |> push("--no-prelude")
+    build_args |> push("-O0")
+    build_args |> push("-o")
+    build_args |> push(bs_abs(root, with_obj))
+    let build_result = bs_edge_expect_success(ctx, compiler_path, case_dir, "darwin-arm64-c-abi-direct-with-obj", build_args)
+    if build_result.rc != 0: return build_result.rc
+
+    let cc_stdout = bs_capture_path(root, case_dir, "darwin-arm64-c-abi-direct-cc", "stdout")
+    let cc_stderr = bs_capture_path(root, case_dir, "darwin-arm64-c-abi-direct-cc", "stderr")
+    var cc_args: Vec[str] = Vec.new()
+    cc_args = bs_push_c_compiler(cc_args)
+    cc_args |> push("-c")
+    cc_args |> push(bs_abs(root, helper_c))
+    cc_args |> push("-o")
+    cc_args |> push(bs_abs(root, helper_obj))
+    let cc_result = ctx.process_runner().run_capture(cc_args, cc_stdout, cc_stderr, 120000)
+    if cc_result.rc != 0:
+        return bs_fail(ctx, f"direct aggregate ABI C helper compile failed with exit code {cc_result.rc}: " ++ cc_result.stderr)
+
+    let platform_obj = bs_host_platform_runtime_object()
+    if platform_obj.len() == 0:
+        return bs_fail(ctx, "unsupported host runtime object for direct aggregate ABI test: " ++ os() ++ "/" ++ arch())
+    let link_stdout = bs_capture_path(root, case_dir, "darwin-arm64-c-abi-direct-link", "stdout")
+    let link_stderr = bs_capture_path(root, case_dir, "darwin-arm64-c-abi-direct-link", "stderr")
+    var link_args: Vec[str] = Vec.new()
+    link_args = bs_push_c_compiler(link_args)
+    link_args |> push("-o")
+    link_args |> push(bs_abs(root, bin))
+    link_args |> push(bs_abs(root, with_obj))
+    link_args |> push(bs_abs(root, helper_obj))
+    link_args |> push(bs_abs(root, "out/lib/rt_core.o"))
+    link_args |> push(bs_abs(root, "out/lib/" ++ platform_obj))
+    link_args |> push(bs_abs(root, "out/lib/compat_runtime.o"))
+    link_args |> push(bs_abs(root, "out/lib/panic_runtime.o"))
+    link_args |> push(bs_abs(root, "out/lib/fiber_stubs.o"))
+    link_args |> push(bs_abs(root, "out/lib/cimport_stubs.o"))
+    link_args |> push(bs_abs(root, "out/lib/embedded_objects.o"))
+    let link_result = ctx.process_runner().run_capture(link_args, link_stdout, link_stderr, 120000)
+    if link_result.rc != 0:
+        return bs_fail(ctx, f"direct aggregate ABI link failed with exit code {link_result.rc}: " ++ link_result.stderr)
+
+    let run_result = bs_run_binary_capture(ctx, bin, "darwin-arm64-c-abi-direct-run", 120000)
+    if run_result.rc != 0: return run_result.rc
+    bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(run_result.stdout), "", "darwin_arm64_c_abi_direct_aggregates", "stdout")
+
 pub fn run_emit_c_smoke_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()
     if inputs.len() < 2:
@@ -1027,7 +1198,9 @@ pub fn run_cli_selfhost_edge_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     rc = bs_check_imported_module_dependency_order(ctx, compiler_path, bs_join(output_dir, "imported_module_dependency_order_case"))
     if rc != 0: return rc
-    bs_check_emit_c_receiver_abi(ctx, compiler_path, bs_join(output_dir, "emit_c_receiver_abi_case"))
+    rc = bs_check_emit_c_receiver_abi(ctx, compiler_path, bs_join(output_dir, "emit_c_receiver_abi_case"))
+    if rc != 0: return rc
+    bs_check_darwin_arm64_c_abi_direct_aggregates(ctx, compiler_path, bs_join(output_dir, "darwin_arm64_c_abi_direct_aggregates_case"))
 
 pub fn run_cli_selfhost_parallel_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()

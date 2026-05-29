@@ -2415,7 +2415,7 @@ fn print_usage:
     with_write("  migrate          Migrate C source to With\n")
     with_write("\n")
     with_write("  init             Initialize a With project\n")
-    with_write("  get              Add a package dependency\n")
+    with_write("  get              Add or reinstall a package dependency\n")
     with_write("  remove           Remove a package dependency\n")
     with_write("  clean            Delete build artifacts\n")
     with_write("  install-user     Install compiler to ~/.local/bin\n")
@@ -2888,11 +2888,39 @@ fn run_init_command(argc: i32) -> i32:
     cli_init_try_git_init(target_dir)
     0
 
+type GetCommandOptions {
+    spec: str,
+    force_reinstall: bool,
+}
+
+fn get_command_usage():
+    with_eprint("usage: with get [--force-reinstall] c.<package>[@version]")
+
+fn parse_get_command_options(argc: i32) -> GetCommandOptions:
+    var spec = ""
+    var force_reinstall = false
+    var i = 2
+    while i < argc:
+        let arg = with_arg_at(i)
+        if arg == "--force-reinstall" or arg == "--force":
+            force_reinstall = true
+        else if arg.starts_with("-"):
+            with_eprint("error: unknown with get option '" ++ arg ++ "'")
+            return GetCommandOptions { spec: "", force_reinstall }
+        else if spec.len() == 0:
+            spec = arg
+        else:
+            with_eprint("error: unexpected with get argument '" ++ arg ++ "'")
+            return GetCommandOptions { spec: "", force_reinstall }
+        i = i + 1
+    GetCommandOptions { spec, force_reinstall }
+
 fn run_get_command(argc: i32) -> i32:
-    if argc < 3:
-        with_eprint("usage: with get c.<package>[@version]")
+    let options = parse_get_command_options(argc)
+    if options.spec.len() == 0:
+        get_command_usage()
         return 1
-    let spec = with_arg_at(2)
+    let spec = options.spec
     if not spec.starts_with("c."):
         with_eprint("error: only C packages supported. Use c.<name> (e.g. c.sqlite3)")
         return 1
@@ -2913,7 +2941,7 @@ fn run_get_command(argc: i32) -> i32:
     if root.len() == 0:
         with_eprint("error: no with.toml found. Run 'with init' first.")
         return 1
-    let resolved_version = conan_install(pkg_name, pkg_version, root)
+    let resolved_version = conan_install(pkg_name, pkg_version, root, options.force_reinstall)
     if resolved_version.len() == 0:
         return 1
     let manifest_path = root ++ "/with.toml"
