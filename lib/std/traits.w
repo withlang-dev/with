@@ -70,13 +70,29 @@ impl Eq for bool =
     fn eq(self: bool, other: bool) -> bool:
         self == other
 
+impl Eq for u8 =
+    fn eq(self: u8, other: u8) -> bool:
+        self == other
+
 impl Default for i32 =
     fn default() -> i32:
+        0
+
+impl Default for i64 =
+    fn default() -> i64:
+        0
+
+impl Default for u8 =
+    fn default() -> u8:
         0
 
 impl Default for bool =
     fn default() -> bool:
         false
+
+impl Default for str =
+    fn default() -> str:
+        ""
 
 impl Eq for str =
     fn eq(self: str, other: str) -> bool:
@@ -89,6 +105,14 @@ impl Eq for i64 =
 impl Debug for i32 =
     fn debug_str(self: i32) -> str:
         with_i32_to_str(self)
+
+impl Debug for i64 =
+    fn debug_str(self: i64) -> str:
+        with_i64_to_str(self)
+
+impl Debug for u8 =
+    fn debug_str(self: u8) -> str:
+        with_i32_to_str(self as i32)
 
 impl Debug for bool =
     fn debug_str(self: bool) -> str:
@@ -103,6 +127,10 @@ impl Debug for str =
 
 impl Hash for i32 =
     fn hash_value(self: i32) -> i64:
+        (1469598103934665603 *% 1099511628211) ^ (self as i64)
+
+impl Hash for u8 =
+    fn hash_value(self: u8) -> i64:
         (1469598103934665603 *% 1099511628211) ^ (self as i64)
 
 impl Hash for i64 =
