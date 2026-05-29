@@ -1884,8 +1884,6 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         return self.check_tuple_destructure(node) as TypeId
 
     if kind == NodeKind.NK_AWAIT:
-        if self.in_async_fn == 0:
-            self.emit_error("await requires async context", node)
         if self.in_comptime_fn != 0:
             self.emit_error("await is not allowed in comptime", node)
         if self.has_live_await_guard() != 0:

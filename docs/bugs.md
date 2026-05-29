@@ -33,10 +33,11 @@
   │                                                                                                                │             │                   │      │ fail loudly/non-zero with function+location    │
   │                                                                                                                │             │                   │      │ instead of emitting bogus va_list output.      │
   │                                                                                                                │             │                   │      │ Regression added. Migration policy / §16.      │
-  │ #188-#190 (https://github.com/withlang-dev/with/issues/188)                                                    │   Mostly no │ Functionality yes │  Yes │ Legacy skipped async behavior files are        │
-  │                                                                                                                │             │                   │      │ duplicated by runnable behav_async_basic,      │
-  │                                                                                                                │             │                   │      │ behav_async_block, behav_async_tuple_await.    │
-  │                                                                                                                │             │                   │      │ Delete/unskip old files and close.             │
+  │ [x] #188-#190 (https://github.com/withlang-dev/with/issues/188)                                                │         Yes │               Yes │   No │ Completed: .await is no longer gated on        │
+  │                                                                                                                │             │                   │      │ async fn syntax, matching no-colored-functions │
+  │                                                                                                                │             │                   │      │ spec §14.3/§24. Unskipped async_basic,         │
+  │                                                                                                                │             │                   │      │ async_block_capture, async_tuple_await;        │
+  │                                                                                                                │             │                   │      │ updated obsolete negative await diagnostic.    │
   │ #191-#195                                                                                                      │         Yes │                No │   No │ §2 ownership/drop skipped spec sketches.       │
   │                                                                                                                │             │                   │      │ Convert to executable positive/negative tests; │
   │                                                                                                                │             │                   │      │ implement missing Drop/copy/defer diagnostics. │
