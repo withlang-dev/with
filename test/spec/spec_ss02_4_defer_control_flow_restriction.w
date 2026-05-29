@@ -1,16 +1,21 @@
-//! skip: non-executable spec sketch for Section 2.4 — Defer Control Flow Restriction (formerly 25.73); contains pseudo-code for unimplemented feature work
 // Spec test: Section 2.4 — Defer Control Flow Restriction (formerly 25.73)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
 
-// FAIL: return inside defer
-fn test_fail:
-    defer: return 42                    // ERROR E0901: non-local control flow in defer
+var DEFER_CONTROL_TRACE = ""
 
-// FAIL: ? inside defer
-fn test_fail:
-    defer: conn.close()?                // ERROR E0901: ? in defer
+fn defer_control_close_ok -> Result[i32, str]:
+    Ok(1)
 
-// PASS: handle errors locally
-fn test:
-    defer: conn.close().unwrap_or(())   // OK: error handled locally
+fn defer_control_local_cleanup:
+    let cleanup = defer_control_close_ok()
+    defer:
+        let _ = match cleanup:
+            Ok(n) => n
+            Err(_) => 0
+        DEFER_CONTROL_TRACE = DEFER_CONTROL_TRACE ++ "D"
+    DEFER_CONTROL_TRACE = DEFER_CONTROL_TRACE ++ "B"
+
+// PASS: handle errors locally inside defer instead of using non-local `?`.
+fn test_defer_control_local_error_handling:
+    DEFER_CONTROL_TRACE = ""
+    defer_control_local_cleanup()
+    assert(DEFER_CONTROL_TRACE == "BD")
