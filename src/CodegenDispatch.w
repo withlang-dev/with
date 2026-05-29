@@ -9786,6 +9786,12 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
                 if wl_get_bb_terminator(cl_llbb) == 0:
                     let _ = wl_build_ret(self.builder, wl_const_int(ret_ty, 0, 0))
 
+    if self.mir_default_unreachable_bbs.len() as i32 > 0:
+        let ubb = self.mir_default_unreachable_bbs.get(0)
+        if wl_get_bb_terminator(ubb) == 0:
+            wl_position_at_end(self.builder, ubb)
+            wl_build_unreachable(self.builder)
+
     // Restore outer MIR state
     self.mir_local_ptrs = saved_mir_locals
     self.mir_local_types = saved_mir_local_types
