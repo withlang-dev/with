@@ -2249,7 +2249,7 @@ fn MirBuilder.lower_bin_op(self: MirBuilder, op: i32, lhs_expr: i32, rhs_expr: i
                     let rhs_method_sym = self.sema.pool_lookup_symbol(self.sema.pool_resolve(rhs_type_name_sym) ++ "." ++ rhs_method_name)
                     let rhs_sig = self.sema.get_sig(rhs_method_sym)
                     if rhs_sig >= 0:
-                        return self.lower_method_bin_op(lhs_expr, rhs_expr, rhs_method_sym, node)
+                        return self.lower_method_bin_op(rhs_expr, lhs_expr, rhs_method_sym, node)
     let saved_expected = self.expected_type
     if self.is_bare_none(lhs_expr) and (rhs_tk == TypeKind.TY_PTR or rhs_tk == TypeKind.TY_REF):
         self.expected_type = rhs_ty
@@ -2402,6 +2402,83 @@ fn MirBuilder.lower_method_bin_op(self: MirBuilder, lhs_expr: i32, rhs_expr: i32
     arg_nodes.push(lhs_expr)
     arg_nodes.push(rhs_expr)
     self.lower_call_with_arg_nodes(fn_op, method_sym, arg_nodes, self.expr_type(node), node)
+
+fn MirBuilder.is_runtime_pair_multi_index(self: MirBuilder, node: i32) -> i32:
+    if self.ast.kind(node) != NodeKind.NK_INDEX:
+        return 0
+    if self.ast.get_data2(node) == 0:
+        return 0
+    if self.sema.index_expr_is_type_level(self.ast.get_data0(node)) != 0:
+        return 0
+    1
+
+fn MirBuilder.lower_multi_index_read(self: MirBuilder, node: i32) -> i32:
+    let base_op = self.lower_expr(self.ast.get_data0(node))
+    let mi_args: Vec[i32] = Vec.new()
+    mi_args.push(base_op)
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_INDEX:
+        mi_args.push(self.lower_expr(self.ast.get_data1(node)))
+        mi_args.push(self.int_const_operand(0, self.sema.ty_i64))
+        mi_args.push(self.int_const_operand(0, self.sema.ty_i64))
+        mi_args.push(self.lower_expr(self.ast.get_data2(node)))
+        mi_args.push(self.int_const_operand(0, self.sema.ty_i64))
+        mi_args.push(self.int_const_operand(0, self.sema.ty_i64))
+    else:
+        let specs_start = self.ast.get_data1(node)
+        let specs_count = self.ast.get_data2(node)
+        for si in 0..specs_count:
+            let spec = self.ast.get_extra(specs_start + si)
+            let d0 = self.ast.get_data0(spec)
+            let d1 = self.ast.get_data1(spec)
+            let d2 = self.ast.get_data2(spec)
+            let step_node = d2 - (d2 / INDEX_KIND_SHIFT) * INDEX_KIND_SHIFT
+            mi_args.push(if d0 != 0: self.lower_expr(d0) else: self.int_const_operand(0, self.sema.ty_i64))
+            mi_args.push(if d1 != 0: self.lower_expr(d1) else: self.int_const_operand(0, self.sema.ty_i64))
+            mi_args.push(if step_node != 0: self.lower_expr(step_node) else: self.int_const_operand(0, self.sema.ty_i64))
+    let mi_args_id = self.body.new_call_args(mi_args)
+    self.body.set_call_intrinsic(mi_args_id, MirIntrinsic.MIR_INTRINSIC_MULTI_INDEX)
+    self.body.set_call_ast_node(mi_args_id, node)
+    let mi_ret_ty = self.expr_type(node)
+    let mi_result = self.new_temp(mi_ret_ty)
+    let mi_result_place = self.place_for_local(mi_result)
+    let mi_next_bb = self.new_block()
+    self.terminate(TermKind.TK_CALL, self.unit_operand(), mi_args_id, mi_result_place, mi_next_bb)
+    self.switch_to(mi_next_bb)
+    mi_result_place
+
+fn MirBuilder.lower_multi_index_set(self: MirBuilder, place_expr: i32, rhs_expr: i32):
+    let mi_base_op = self.lower_expr(self.ast.get_data0(place_expr))
+    let mi_args: Vec[i32] = Vec.new()
+    mi_args.push(mi_base_op)
+    let kind = self.ast.kind(place_expr)
+    if kind == NodeKind.NK_INDEX:
+        mi_args.push(self.lower_expr(self.ast.get_data1(place_expr)))
+        mi_args.push(self.int_const_operand(0, self.sema.ty_i64))
+        mi_args.push(self.int_const_operand(0, self.sema.ty_i64))
+        mi_args.push(self.lower_expr(self.ast.get_data2(place_expr)))
+        mi_args.push(self.int_const_operand(0, self.sema.ty_i64))
+        mi_args.push(self.int_const_operand(0, self.sema.ty_i64))
+    else:
+        let specs_start = self.ast.get_data1(place_expr)
+        let specs_count = self.ast.get_data2(place_expr)
+        for si in 0..specs_count:
+            let spec = self.ast.get_extra(specs_start + si)
+            let d0 = self.ast.get_data0(spec)
+            let d1 = self.ast.get_data1(spec)
+            let d2 = self.ast.get_data2(spec)
+            let step_node = d2 - (d2 / INDEX_KIND_SHIFT) * INDEX_KIND_SHIFT
+            mi_args.push(if d0 != 0: self.lower_expr(d0) else: self.int_const_operand(0, self.sema.ty_i64))
+            mi_args.push(if d1 != 0: self.lower_expr(d1) else: self.int_const_operand(0, self.sema.ty_i64))
+            mi_args.push(if step_node != 0: self.lower_expr(step_node) else: self.int_const_operand(0, self.sema.ty_i64))
+    let mi_rhs_op = self.lower_expr(rhs_expr)
+    mi_args.push(mi_rhs_op)
+    let mi_args_id = self.body.new_call_args(mi_args)
+    self.body.set_call_intrinsic(mi_args_id, MirIntrinsic.MIR_INTRINSIC_MULTI_INDEX_SET)
+    self.body.set_call_ast_node(mi_args_id, place_expr)
+    let mi_next_bb = self.new_block()
+    self.terminate(TermKind.TK_CALL, self.unit_operand(), mi_args_id, self.place_for_local(0), mi_next_bb)
+    self.switch_to(mi_next_bb)
 
 fn MirBuilder.lower_fn_address(self: MirBuilder, expr: i32, type_id: i32) -> i32:
     if expr == 0:
@@ -2601,18 +2678,8 @@ fn MirBuilder.lower_ref(self: MirBuilder, expr: i32, borrow_kind: i32, node: i32
 
 fn MirBuilder.lower_assign(self: MirBuilder, place_expr: i32, rhs_expr: i32):
     // Multi-index assignment: a[i, j] = value → call multi_index_set
-    if self.ast.kind(place_expr) == NodeKind.NK_MULTI_INDEX:
-        let mi_base_op = self.lower_expr(self.ast.get_data0(place_expr))
-        let mi_rhs_op = self.lower_expr(rhs_expr)
-        let mi_args: Vec[i32] = Vec.new()
-        mi_args.push(mi_base_op)
-        mi_args.push(mi_rhs_op)
-        let mi_args_id = self.body.new_call_args(mi_args)
-        self.body.set_call_intrinsic(mi_args_id, MirIntrinsic.MIR_INTRINSIC_MULTI_INDEX_SET)
-        self.body.set_call_ast_node(mi_args_id, place_expr)
-        let mi_next_bb = self.new_block()
-        self.terminate(TermKind.TK_CALL, self.unit_operand(), mi_args_id, self.place_for_local(0), mi_next_bb)
-        self.switch_to(mi_next_bb)
+    if self.ast.kind(place_expr) == NodeKind.NK_MULTI_INDEX or self.is_runtime_pair_multi_index(place_expr) != 0:
+        self.lower_multi_index_set(place_expr, rhs_expr)
         return
     if self.ast.kind(place_expr) == NodeKind.NK_INDEX:
         var ip_base_ty = self.expr_type(self.ast.get_data0(place_expr))
@@ -2733,39 +2800,12 @@ fn MirBuilder.lower_expr_place(self: MirBuilder, node: i32) -> i32:
             let p = self.place_for_local(tmp)
             self.assign_operand_to_place(p, op, self.ast.get_start(node))
             return p
+        if self.is_runtime_pair_multi_index(node) != 0:
+            return self.lower_multi_index_read(node)
         return self.lower_index(self.ast.get_data0(node), self.ast.get_data1(node))
 
     if kind == NodeKind.NK_MULTI_INDEX:
-        // Multi-dimensional indexing via MIR_INTRINSIC_MULTI_INDEX.
-        // Lower base + all spec expressions as MIR args.
-        // Arg layout: [base, spec0_start, spec0_stop, spec0_step, spec1_start, ...]
-        // Each spec contributes 3 args (0 if absent). The AST node carries
-        // kind/has_* metadata that codegen reads directly.
-        let base_op = self.lower_expr(self.ast.get_data0(node))
-        let mi_args: Vec[i32] = Vec.new()
-        mi_args.push(base_op)
-        let specs_start = self.ast.get_data1(node)
-        let specs_count = self.ast.get_data2(node)
-        for si in 0..specs_count:
-            let spec = self.ast.get_extra(specs_start + si)
-            let d0 = self.ast.get_data0(spec)
-            let d1 = self.ast.get_data1(spec)
-            let d2 = self.ast.get_data2(spec)
-            let step_node = d2 - (d2 / INDEX_KIND_SHIFT) * INDEX_KIND_SHIFT
-            // Lower each expression or emit 0
-            mi_args.push(if d0 != 0: self.lower_expr(d0) else: self.int_const_operand(0, self.sema.ty_i64))
-            mi_args.push(if d1 != 0: self.lower_expr(d1) else: self.int_const_operand(0, self.sema.ty_i64))
-            mi_args.push(if step_node != 0: self.lower_expr(step_node) else: self.int_const_operand(0, self.sema.ty_i64))
-        let mi_args_id = self.body.new_call_args(mi_args)
-        self.body.set_call_intrinsic(mi_args_id, MirIntrinsic.MIR_INTRINSIC_MULTI_INDEX)
-        self.body.set_call_ast_node(mi_args_id, node)
-        let mi_ret_ty = self.expr_type(node)
-        let mi_result = self.new_temp(mi_ret_ty)
-        let mi_result_place = self.place_for_local(mi_result)
-        let mi_next_bb = self.new_block()
-        self.terminate(TermKind.TK_CALL, self.unit_operand(), mi_args_id, mi_result_place, mi_next_bb)
-        self.switch_to(mi_next_bb)
-        return mi_result_place
+        return self.lower_multi_index_read(node)
 
     if kind == NodeKind.NK_ASSIGN:
         let target = self.ast.get_data0(node)
@@ -5869,6 +5909,9 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         let vec_ty = self.vec_literal_type(node)
         if vec_ty != 0:
             return self.lower_vec_literal(node, vec_ty)
+        if self.is_runtime_pair_multi_index(node) != 0:
+            let mi_place = self.lower_multi_index_read(node)
+            return self.body.new_operand(OperandKind.OK_COPY, mi_place)
         var ip_rd_base_ty = self.expr_type(self.ast.get_data0(node))
         while ip_rd_base_ty > 0 and self.sema.get_type_kind(self.sema.resolve_alias(ip_rd_base_ty)) == TypeKind.TY_REF:
             ip_rd_base_ty = self.sema.get_type_d0(self.sema.resolve_alias(ip_rd_base_ty))
@@ -5893,6 +5936,10 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                 return self.body.new_operand(OperandKind.OK_COPY, ip_rd_place)
         let place = self.lower_index(self.ast.get_data0(node), self.ast.get_data1(node))
         return self.body.new_operand(OperandKind.OK_COPY, place)
+
+    if kind == NodeKind.NK_MULTI_INDEX:
+        let mi_place = self.lower_multi_index_read(node)
+        return self.body.new_operand(OperandKind.OK_COPY, mi_place)
 
     if kind == NodeKind.NK_BLOCK:
         return self.lower_block(node)

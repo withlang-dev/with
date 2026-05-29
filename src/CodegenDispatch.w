@@ -3461,6 +3461,128 @@ fn Codegen.mir_struct_sym_from_sema_type(self: Codegen, sema_ty: i32) -> i32:
             return mono_sym
     0
 
+fn Codegen.mir_multi_index_failure_value(self: Codegen, body: MirBody, dest_place: i32) -> i64:
+    let dest_ty = self.mir_dest_llvm_type(body, dest_place)
+    if dest_ty != 0 and dest_ty != wl_void_type(self.context):
+        return wl_get_undef(dest_ty)
+    wl_get_undef(wl_i32_type(self.context))
+
+fn Codegen.mir_build_multi_index_specs_ref(self: Codegen, body: MirBody, args_id: i32, mi_node: i32, is_set: i32) -> i64:
+    let _ = is_set
+    let mi_kind = self.pool.kind(mi_node)
+    let specs_start = if mi_kind == NodeKind.NK_MULTI_INDEX: self.pool.get_data1(mi_node) else: 0
+    let specs_count = if mi_kind == NodeKind.NK_INDEX: 2 else: self.pool.get_data2(mi_node)
+    let ctx = self.context
+    let spec_fields: Vec[i64] = Vec.new()
+    spec_fields.push(wl_i32_type(ctx))
+    spec_fields.push(wl_i64_type(ctx))
+    spec_fields.push(wl_i64_type(ctx))
+    spec_fields.push(wl_i64_type(ctx))
+    spec_fields.push(wl_i1_type(ctx))
+    spec_fields.push(wl_i1_type(ctx))
+    spec_fields.push(wl_i1_type(ctx))
+    let spec_ty = wl_struct_type(ctx, vec_data_i64(&spec_fields), 7, 0)
+    let arr_ty = wl_array_type(spec_ty, specs_count as i64)
+    let arr_ptr = self.create_entry_alloca(arr_ty)
+    let zero_i32 = wl_const_int(wl_i32_type(ctx), 0, 0)
+    let i64_ty = wl_i64_type(ctx)
+
+    for si in 0..specs_count:
+        var d0 = 0
+        var d1 = 0
+        var kind = INDEX_SCALAR
+        var step_node = 0
+        if mi_kind == NodeKind.NK_INDEX:
+            d0 = if si == 0: self.pool.get_data1(mi_node) else: self.pool.get_data2(mi_node)
+        else:
+            let spec_node = self.pool.get_extra(specs_start + si)
+            d0 = self.pool.get_data0(spec_node)
+            d1 = self.pool.get_data1(spec_node)
+            let d2 = self.pool.get_data2(spec_node)
+            kind = d2 / INDEX_KIND_SHIFT
+            step_node = d2 - kind * INDEX_KIND_SHIFT
+        let elem_indices: Vec[i64] = Vec.new()
+        elem_indices.push(zero_i32)
+        elem_indices.push(wl_const_int(wl_i32_type(ctx), si as i64, 0))
+        let elem_ptr = wl_build_gep(self.builder, arr_ty, arr_ptr, vec_data_i64(&elem_indices), 2)
+        wl_build_store(self.builder, wl_const_int(wl_i32_type(ctx), kind as i64, 0), wl_build_struct_gep(self.builder, spec_ty, elem_ptr, 0))
+        let arg_base = 1 + si * 3
+        let start_val = self.coerce_value_to_type(self.mir_intrinsic_arg(body, args_id, arg_base), i64_ty)
+        let stop_val = self.coerce_value_to_type(self.mir_intrinsic_arg(body, args_id, arg_base + 1), i64_ty)
+        let step_val = self.coerce_value_to_type(self.mir_intrinsic_arg(body, args_id, arg_base + 2), i64_ty)
+        wl_build_store(self.builder, start_val, wl_build_struct_gep(self.builder, spec_ty, elem_ptr, 1))
+        wl_build_store(self.builder, stop_val, wl_build_struct_gep(self.builder, spec_ty, elem_ptr, 2))
+        wl_build_store(self.builder, step_val, wl_build_struct_gep(self.builder, spec_ty, elem_ptr, 3))
+        wl_build_store(self.builder, wl_const_int(wl_i1_type(ctx), if d0 != 0: 1 else: 0, 0), wl_build_struct_gep(self.builder, spec_ty, elem_ptr, 4))
+        wl_build_store(self.builder, wl_const_int(wl_i1_type(ctx), if d1 != 0: 1 else: 0, 0), wl_build_struct_gep(self.builder, spec_ty, elem_ptr, 5))
+        wl_build_store(self.builder, wl_const_int(wl_i1_type(ctx), if step_node != 0: 1 else: 0, 0), wl_build_struct_gep(self.builder, spec_ty, elem_ptr, 6))
+
+    let data_indices: Vec[i64] = Vec.new()
+    data_indices.push(zero_i32)
+    data_indices.push(zero_i32)
+    let data_ptr = if specs_count > 0: wl_build_gep(self.builder, arr_ty, arr_ptr, vec_data_i64(&data_indices), 2) else: wl_const_null(wl_ptr_type(ctx))
+    let slice_fields: Vec[i64] = Vec.new()
+    slice_fields.push(wl_ptr_type(ctx))
+    slice_fields.push(i64_ty)
+    let slice_ty = wl_struct_type(ctx, vec_data_i64(&slice_fields), 2, 0)
+    var slice_val = wl_get_undef(slice_ty)
+    slice_val = wl_build_insert_value(self.builder, slice_val, data_ptr, 0)
+    slice_val = wl_build_insert_value(self.builder, slice_val, wl_const_int(i64_ty, specs_count as i64, 0), 1)
+    let slice_ptr = self.create_entry_alloca(slice_ty)
+    wl_build_store(self.builder, slice_val, slice_ptr)
+    slice_ptr
+
+fn Codegen.mir_emit_multi_index_method_call(self: Codegen, body: MirBody, args_id: i32, dest_place: i32, is_set: i32) -> i64:
+    let mi_node = body.call_ast_node(args_id)
+    if mi_node == 0:
+        with_eprint("error: cannot lower multi-index expression without source metadata")
+        self.had_error = 1
+        return self.mir_multi_index_failure_value(body, dest_place)
+    let arg_start = body.call_arg_starts.get(args_id as i64)
+    let base_op = body.call_arg_operands.get(arg_start as i64)
+    let base_val = self.mir_eval_operand(body, base_op, 0)
+    let base_ty = wl_type_of(base_val)
+    let base_sema = self.mir_unwrap_ref_like_sema_type(self.mir_operand_sema_type(body, base_op))
+    var owner_sym = self.mir_struct_sym_from_sema_type(base_sema)
+    if owner_sym == 0:
+        owner_sym = self.find_struct_type_by_llvm(base_ty)
+    if owner_sym == 0:
+        with_eprint("error: cannot lower multi-index expression; receiver type has no concrete method owner")
+        self.had_error = 1
+        return self.mir_multi_index_failure_value(body, dest_place)
+
+    let owner_name = self.intern.resolve(owner_sym)
+    let method_name = if is_set != 0: "multi_index_set" else: "multi_index"
+    let qualified = owner_name ++ "." ++ method_name
+    let fn_sym = self.intern.intern(qualified)
+    let fn_val_opt = self.fn_values.get(fn_sym)
+    let fn_ty_opt = self.fn_fn_types.get(fn_sym)
+    if not fn_val_opt.is_some() or not fn_ty_opt.is_some():
+        with_eprint("error: cannot lower multi-index expression; missing concrete method `" ++ qualified ++ "`")
+        self.had_error = 1
+        return self.mir_multi_index_failure_value(body, dest_place)
+
+    let call_args: Vec[i64] = Vec.new()
+    if self.is_ref_param(fn_sym, 0):
+        let base_ptr = self.mir_try_place_ptr_for_ref(body, base_op)
+        if base_ptr != 0:
+            call_args.push(base_ptr)
+        else:
+            call_args.push(self.get_mutable_receiver_ptr(self.pool.get_data0(mi_node), base_val, base_ty))
+    else:
+        call_args.push(base_val)
+    call_args.push(self.mir_build_multi_index_specs_ref(body, args_id, mi_node, is_set))
+    let specs_count = if self.pool.kind(mi_node) == NodeKind.NK_INDEX: 2 else: self.pool.get_data2(mi_node)
+    call_args.push(wl_const_int(wl_i32_type(self.context), specs_count as i64, 0))
+    if is_set != 0:
+        let rhs_arg = body.call_arg_operands.get((arg_start + 1 + specs_count * 3) as i64)
+        call_args.push(self.mir_eval_operand(body, rhs_arg, 0))
+
+    let fn_val = fn_val_opt.unwrap() as i64
+    let fn_ty = fn_ty_opt.unwrap() as i64
+    let coerced = self.coerce_call_args_for_fn_value(fn_sym, fn_val, -1, 0, call_args, call_args.len() as i32, "method " ++ qualified, mi_node)
+    wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&coerced), coerced.len() as i32)
+
 fn Codegen.mir_dyn_arg_info_from_operand(self: Codegen, body: MirBody, operand_id: i32, arg_val: i64) -> DynArgInfo:
     let sema_ty = self.mir_operand_sema_type(body, operand_id)
     if sema_ty > 0:
@@ -5527,62 +5649,25 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         return true
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MULTI_INDEX:
-        let mi_node = body.call_ast_node(args_id)
-        if mi_node != 0:
-            let base_val = self.mir_intrinsic_arg(body, args_id, 0)
-            let mi_specs_start = self.pool.get_data1(mi_node)
-            let mi_specs_count = self.pool.get_data2(mi_node)
-            // Build IndexSpec LLVM struct type: {i32, i64, i64, i64, i1, i1, i1}
-            let mi_ctx = self.context
-            let mi_spec_fields: Vec[i64] = Vec.new()
-            mi_spec_fields.push(wl_i32_type(mi_ctx))   // kind
-            mi_spec_fields.push(wl_i64_type(mi_ctx))   // start
-            mi_spec_fields.push(wl_i64_type(mi_ctx))   // stop
-            mi_spec_fields.push(wl_i64_type(mi_ctx))   // step
-            mi_spec_fields.push(wl_i1_type(mi_ctx))    // has_start
-            mi_spec_fields.push(wl_i1_type(mi_ctx))    // has_stop
-            mi_spec_fields.push(wl_i1_type(mi_ctx))    // has_step
-            let mi_spec_ty = wl_struct_type(mi_ctx, vec_data_i64(&mi_spec_fields), 7, 0)
-            // Allocate IndexSpec[N] on stack
-            let mi_arr_ty = wl_array_type(mi_spec_ty, mi_specs_count as i64)
-            let mi_arr_ptr = self.create_entry_alloca(mi_arr_ty)
-            // Populate each spec from MIR args (base at arg 0, specs at 1+si*3)
-            for mi_si in 0..mi_specs_count:
-                let mi_spec_node = self.pool.get_extra(mi_specs_start + mi_si)
-                let mi_d2 = self.pool.get_data2(mi_spec_node)
-                let mi_kind = mi_d2 / INDEX_KIND_SHIFT
-                let mi_step_node = mi_d2 - mi_kind * INDEX_KIND_SHIFT
-                let mi_d0 = self.pool.get_data0(mi_spec_node)
-                let mi_d1 = self.pool.get_data1(mi_spec_node)
-                // GEP to array element
-                let mi_elem_ptr = wl_build_struct_gep(self.builder, mi_arr_ty, mi_arr_ptr, mi_si)
-                // Store kind
-                wl_build_store(self.builder, wl_const_int(wl_i32_type(mi_ctx), mi_kind as i64, 0), wl_build_struct_gep(self.builder, mi_spec_ty, mi_elem_ptr, 0))
-                // Store start/stop/step from MIR args
-                let mi_arg_base = 1 + mi_si * 3
-                wl_build_store(self.builder, self.mir_intrinsic_arg(body, args_id, mi_arg_base), wl_build_struct_gep(self.builder, mi_spec_ty, mi_elem_ptr, 1))
-                wl_build_store(self.builder, self.mir_intrinsic_arg(body, args_id, mi_arg_base + 1), wl_build_struct_gep(self.builder, mi_spec_ty, mi_elem_ptr, 2))
-                wl_build_store(self.builder, self.mir_intrinsic_arg(body, args_id, mi_arg_base + 2), wl_build_struct_gep(self.builder, mi_spec_ty, mi_elem_ptr, 3))
-                // Store has_start/has_stop/has_step booleans
-                wl_build_store(self.builder, wl_const_int(wl_i1_type(mi_ctx), if mi_d0 != 0: 1 else: 0, 0), wl_build_struct_gep(self.builder, mi_spec_ty, mi_elem_ptr, 4))
-                wl_build_store(self.builder, wl_const_int(wl_i1_type(mi_ctx), if mi_d1 != 0: 1 else: 0, 0), wl_build_struct_gep(self.builder, mi_spec_ty, mi_elem_ptr, 5))
-                wl_build_store(self.builder, wl_const_int(wl_i1_type(mi_ctx), if mi_step_node != 0: 1 else: 0, 0), wl_build_struct_gep(self.builder, mi_spec_ty, mi_elem_ptr, 6))
-            // Look up multi_index method on base type and call it
-            // For now: pass through base value (method call dispatch deferred
-            // until a concrete MultiIndex impl is available to test against)
-            result = base_val
+        result = self.mir_emit_multi_index_method_call(body, args_id, dest_place, 0)
+        if dest_place >= 0 and result != 0:
+            let result_ty = wl_type_of(result)
+            if result_ty != wl_void_type(self.context):
+                let dest_ptr = self.mir_place_ptr(body, dest_place, true, result_ty)
+                if dest_ptr != 0:
+                    wl_build_store(self.builder, result, dest_ptr)
         if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
             wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
         return true
 
     else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MULTI_INDEX_SET:
-        let mis_node = body.call_ast_node(args_id)
-        if mis_node != 0:
-            let mis_base = self.mir_intrinsic_arg(body, args_id, 0)
-            let mis_value = self.mir_intrinsic_arg(body, args_id, 1)
-            // IndexSpec construction same as MULTI_INDEX above.
-            // Method call to multi_index_set deferred until impl available.
-            result = mis_value
+        result = self.mir_emit_multi_index_method_call(body, args_id, dest_place, 1)
+        if dest_place >= 0 and result != 0:
+            let result_ty = wl_type_of(result)
+            if result_ty != wl_void_type(self.context):
+                let dest_ptr = self.mir_place_ptr(body, dest_place, true, result_ty)
+                if dest_ptr != 0:
+                    wl_build_store(self.builder, result, dest_ptr)
         if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
             wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
         return true

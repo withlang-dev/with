@@ -1,27 +1,122 @@
-//! skip: non-executable spec sketch for Section 11.7 — Multi-Index and `@` Dispatch (formerly 25.104); contains pseudo-code for unimplemented feature work
-// Spec test: Section 11.7 — Multi-Index and `@` Dispatch (formerly 25.104)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+//! expect-stdout: ok
 
-// PASS: generalized indexing syntax routes through MultiIndex
-type Tensor { ... }
-type TensorView { ... }
-impl MultiIndex[TensorView] for Tensor:
-    fn multi_index(self: &Self, specs: &[IndexSpec]) -> TensorView: ...
-impl MultiIndexMut[f32] for Tensor:
-    fn multi_index_set(self: &mut Self, specs: &[IndexSpec], value: f32): ...
+// Spec test: Section 11.7 - Multi-Index and `@` Dispatch.
 
-fn test:
-    let patch = tensor[2:5, :, newaxis]
-    tensor[..., 0] = 1.0
+type Matrix {
+    a00: i32,
+    a01: i32,
+    a10: i32,
+    a11: i32,
+    writes: i32,
+}
 
-// PASS: right-side operator dispatch and matmul
-type Array { ... }
-impl Add[f64, Array] for Array:
-    fn add(self: &Self, lhs: &f64) -> Array: ...
-impl MatMul[Array, Array] for Array:
-    fn matmul(self: &Self, rhs: &Array) -> Array: ...
+impl Matrix:
+    fn at(self: &Self, row: i64, col: i64) -> i32:
+        if row == 0 and col == 0:
+            return self.a00
+        if row == 0 and col == 1:
+            return self.a01
+        if row == 1 and col == 0:
+            return self.a10
+        self.a11
 
-fn test:
-    let shifted = 1.0 + arr
-    let prod = a @ b
+    fn set_at(mut self: Self, row: i64, col: i64, value: i32) -> void:
+        if row == 0 and col == 0:
+            self.a00 = value
+            return
+        if row == 0 and col == 1:
+            self.a01 = value
+            return
+        if row == 1 and col == 0:
+            self.a10 = value
+            return
+        self.a11 = value
+
+    fn multi_index(self: &Self, specs: &[IndexSpec], count: i32) -> i32:
+        assert(count == 2)
+        let row = specs[0]
+        let col = specs[1]
+        assert(row.kind == 0)
+        assert(col.kind == 0)
+        assert(row.has_start)
+        assert(col.has_start)
+        self.at(row.start, col.start)
+
+    fn multi_index_set(mut self: Self, specs: &[IndexSpec], count: i32, value: i32) -> void:
+        assert(count == 2)
+        let row = specs[0]
+        let col = specs[1]
+        assert(row.kind == 0)
+        assert(col.kind == 0)
+        self.set_at(row.start, col.start, value)
+        self.writes = self.writes + 1
+
+type SpecProbe { marker: i32 }
+
+impl SpecProbe:
+    fn multi_index(self: &Self, specs: &[IndexSpec], count: i32) -> i32:
+        assert(count == 4)
+        let range = specs[0]
+        let full = specs[1]
+        let axis = specs[2]
+        let dots = specs[3]
+        assert(range.kind == 1)
+        assert(range.has_start)
+        assert(range.has_stop)
+        assert(not range.has_step)
+        assert(range.start == 2)
+        assert(range.stop == 5)
+        assert(full.kind == 1)
+        assert(not full.has_start)
+        assert(not full.has_stop)
+        assert(axis.kind == 3)
+        assert(dots.kind == 2)
+        self.marker
+
+type Offset { value: i32 }
+
+impl Offset:
+    fn add(self: Offset, lhs: i32) -> Offset:
+        Offset { value: self.value + lhs * 10 }
+
+type Mat2 { a: i32, b: i32, c: i32, d: i32 }
+
+impl Mat2:
+    fn matmul(self: Mat2, rhs: Mat2) -> Mat2:
+        Mat2 {
+            a: self.a * rhs.a + self.b * rhs.c,
+            b: self.a * rhs.b + self.b * rhs.d,
+            c: self.c * rhs.a + self.d * rhs.c,
+            d: self.c * rhs.b + self.d * rhs.d,
+        }
+
+fn test_multi_index_read_write:
+    var m = Matrix { a00: 1, a01: 2, a10: 3, a11: 4, writes: 0 }
+    assert(m[1, 0] == 3)
+    m[0, 1] = 9
+    assert(m.a01 == 9)
+    assert(m.writes == 1)
+
+fn test_multi_index_specs:
+    let probe = SpecProbe { marker: 77 }
+    assert(probe[2:5, :, newaxis, ...] == 77)
+
+fn test_right_side_dispatch:
+    let shifted = 3 + Offset { value: 4 }
+    assert(shifted.value == 34)
+
+fn test_matmul_dispatch:
+    let identity = Mat2 { a: 1, b: 0, c: 0, d: 1 }
+    let m = Mat2 { a: 1, b: 2, c: 3, d: 4 }
+    let result = identity @ m
+    assert(result.a == 1)
+    assert(result.b == 2)
+    assert(result.c == 3)
+    assert(result.d == 4)
+
+fn main:
+    test_multi_index_read_write()
+    test_multi_index_specs()
+    test_right_side_dispatch()
+    test_matmul_dispatch()
+    print("ok")
