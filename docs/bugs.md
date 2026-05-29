@@ -50,10 +50,14 @@
   │                                                                                                                │             │                   │      │ non-local control flow; skipped mixed sketch   │
   │                                                                                                                │             │                   │      │ split into executable positive and negative    │
   │                                                                                                                │             │                   │      │ regressions for return, ?, break, continue.    │
-  │ #196-#203                                                                                                      │         Yes │                No │   No │ §3 references/borrowing skipped sketches.      │
+  │ #196-#200, #202-#203                                                                                           │         Yes │                No │   No │ §3 references/borrowing skipped sketches.      │
   │                                                                                                                │             │                   │      │ Implement executable tests for disjoint        │
-  │                                                                                                                │             │                   │      │ borrows, returning refs, auto-deref/ref, trait │
-  │                                                                                                                │             │                   │      │ object coercion.                               │
+  │                                                                                                                │             │                   │      │ borrows, returning refs, auto-deref, trait     │
+  │                                                                                                                │             │                   │      │ object coercion, and second-class references.  │
+  │ [x] #201                                                                                                       │         Yes │               Yes │   No │ Completed: shared auto-ref is covered for      │
+  │                                                                                                                │             │                   │      │ function arguments and method receivers; the   │
+  │                                                                                                                │             │                   │      │ obsolete safe `&mut T` sketch is covered as a  │
+  │                                                                                                                │             │                   │      │ loud P12 rejection. Spec §3.8 / §15.1.         │
   │ #204-#214                                                                                                      │         Yes │                No │   No │ §4 values/types skipped sketches. Cover        │
   │                                                                                                                │             │                   │      │ implicit default return, chained comparisons,  │
   │                                                                                                                │             │                   │      │ record update drops, enum accessors, ranges,   │
