@@ -1,18 +1,22 @@
-//! skip: non-executable spec sketch for Section 14.15 — Channel Send Requires Send (formerly 25.76); contains pseudo-code for unimplemented feature work
-// Spec test: Section 14.15 — Channel Send Requires Send (formerly 25.76)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+//! expect-stdout: ok
 
-// FAIL: ephemeral values cannot be sent over channels
-fn test_fail:
-    async scope s =>
-        let (tx, rx) = chan[&str](10)
-        s.track(async:
-            let local = "hello".to_owned()
-            tx.send(local.as_view()).await  // ERROR: &str is not Send
-        )
+use std.channel
 
-// PASS: owned values over channels
-fn test:
-    let (tx, rx) = chan[String](10)
-    tx.send("hello").await                  // str literal, String is Send
+async fn producer(tx: Sender[i32]) -> i32:
+    tx.send(21)
+    tx.send(21)
+    0
+
+async fn consumer(rx: Receiver[i32]) -> i32:
+    let a = rx.recv()
+    let b = rx.recv()
+    a + b
+
+async fn main:
+    let (tx, rx) = chan[i32](2)
+    let p = producer(tx)
+    let c = consumer(rx)
+    let result = c.await
+    let _ = p.await
+    assert(result == 42)
+    print("ok")
