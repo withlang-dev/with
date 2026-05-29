@@ -6961,10 +6961,13 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                 if sym_text.len() > 0:
                     callee_fn_sym = self.intern.intern(sym_text)
 
-    // Check for extern fn ABI transformations (sret/byval for large structs)
+    // Check for extern fn ABI transformations (sret/byval/direct aggregates)
     var abi_has_sret = 0
     var abi_byval_mask: i64 = 0
     var abi_byval_types: Vec[i64] = Vec.new()
+    var abi_direct_mask: i64 = 0
+    var abi_direct_types: Vec[i64] = Vec.new()
+    var abi_direct_ret_ty: i64 = 0
     var abi_sret_ty: i64 = 0
     var abi_sret_buf: i64 = 0
     if callee_fn_sym != 0:
@@ -6977,6 +6980,15 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
         let bvt_opt = self.extern_fn_byval_types.get(callee_fn_sym)
         if bvt_opt.is_some():
             abi_byval_types = bvt_opt.unwrap()
+        let dp_opt = self.extern_fn_direct_params.get(callee_fn_sym)
+        if dp_opt.is_some():
+            abi_direct_mask = dp_opt.unwrap() as i64
+        let dpt_opt = self.extern_fn_direct_param_types.get(callee_fn_sym)
+        if dpt_opt.is_some():
+            abi_direct_types = dpt_opt.unwrap()
+        let drt_opt = self.extern_fn_direct_ret_type.get(callee_fn_sym)
+        if drt_opt.is_some():
+            abi_direct_ret_ty = drt_opt.unwrap() as i64
         let srt_opt = self.extern_fn_sret_type.get(callee_fn_sym)
         if srt_opt.is_some():
             abi_sret_ty = srt_opt.unwrap() as i64
@@ -7009,6 +7021,13 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                 let tmp = self.create_entry_alloca(val_ty)
                 wl_build_store(self.builder, val, tmp)
                 args.push(tmp)
+            continue
+
+        // Direct aggregate: small Darwin arm64 C structs are passed as integer
+        // or homogeneous-float aggregate ABI values, not as LLVM structs.
+        if (abi_direct_mask & ((1 as i64) << (ai as u32))) != 0:
+            let val = self.mir_eval_operand(body, operand_id, 0)
+            args.push(self.c_abi_pack_direct_value(val, expected_ty))
             continue
 
         // Ref param check: pass pointer to place instead of loading value.
@@ -7118,7 +7137,8 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
             return false
         if dst_ty == 0:
             return false
-        let stored = self.enforce_coerced_type(call_val, dst_ty, "return type mismatch at call site")
+        let raw_ret = if abi_direct_ret_ty != 0: self.c_abi_unpack_direct_value(call_val, abi_direct_ret_ty) else: call_val
+        let stored = self.enforce_coerced_type(raw_ret, dst_ty, "return type mismatch at call site")
         wl_build_store(self.builder, stored, dst_ptr)
 
     if next_bb < 0 or next_bb >= self.mir_bb_values.len() as i32:
@@ -7194,8 +7214,14 @@ fn Codegen.mir_emit_term(self: Codegen, body: MirBody, bb: i32) -> bool:
             wl_build_store(self.builder, sret_val, sret_ptr)
             let _ = wl_build_ret_void(self.builder)
             return true
+        let fn_direct_ret_ty_opt = self.extern_fn_direct_ret_type.get(self.current_function_name_sym)
+        let fn_direct_ret_ty = if fn_direct_ret_ty_opt.is_some(): fn_direct_ret_ty_opt.unwrap() as i64 else: 0
+        let fn_value_ty = wl_global_get_value_type(self.current_function)
+        let fn_abi_ret_ty = if fn_value_ty != 0: wl_get_return_type(fn_value_ty) else: self.current_ret_type
         if not ret_ptr_opt.is_some():
-            let _ = wl_build_ret(self.builder, self.build_default_value(self.current_ret_type))
+            let default_ret = self.build_default_value(self.current_ret_type)
+            let final_ret = if fn_direct_ret_ty != 0: self.c_abi_pack_direct_value(default_ret, fn_abi_ret_ty) else: default_ret
+            let _ = wl_build_ret(self.builder, final_ret)
             return true
         let ret_ptr = ret_ptr_opt.unwrap() as i64
         var ret_ptr_ty = self.current_ret_type
@@ -7203,10 +7229,14 @@ fn Codegen.mir_emit_term(self: Codegen, body: MirBody, bb: i32) -> bool:
         if ret_ptr_ty_opt.is_some():
             ret_ptr_ty = ret_ptr_ty_opt.unwrap() as i64
         if ret_ptr_ty == 0:
-            let _ = wl_build_ret(self.builder, self.build_default_value(self.current_ret_type))
+            let default_ret2 = self.build_default_value(self.current_ret_type)
+            let final_ret2 = if fn_direct_ret_ty != 0: self.c_abi_pack_direct_value(default_ret2, fn_abi_ret_ty) else: default_ret2
+            let _ = wl_build_ret(self.builder, final_ret2)
             return true
         let ret_val = wl_build_load(self.builder, ret_ptr_ty, ret_ptr)
-        let _ = wl_build_ret(self.builder, self.enforce_coerced_type(ret_val, self.current_ret_type, "return type mismatch"))
+        let semantic_ret = self.enforce_coerced_type(ret_val, self.current_ret_type, "return type mismatch")
+        let final_ret = if fn_direct_ret_ty != 0: self.c_abi_pack_direct_value(semantic_ret, fn_abi_ret_ty) else: semantic_ret
+        let _ = wl_build_ret(self.builder, final_ret)
         return true
 
     if tk == TermKind.TK_UNREACHABLE:
@@ -7306,6 +7336,9 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
         let fn_sret_ty_opt = self.extern_fn_sret_type.get(name_sym)
         if fn_sret_ty_opt.is_some():
             self.current_ret_type = fn_sret_ty_opt.unwrap() as i64
+    let fn_direct_ret_ty_opt = self.extern_fn_direct_ret_type.get(name_sym)
+    if fn_direct_ret_ty_opt.is_some():
+        self.current_ret_type = fn_direct_ret_ty_opt.unwrap() as i64
     self.current_method_owner_sym = 0
 
     let fresh_local_allocas: HashMap[i32, i64] = HashMap.new()
@@ -7388,6 +7421,12 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
     let fn_byval_types_opt = self.extern_fn_byval_types.get(name_sym)
     if fn_byval_types_opt.is_some():
         fn_byval_types = fn_byval_types_opt.unwrap()
+    let fn_direct_mask_opt = self.extern_fn_direct_params.get(name_sym)
+    let fn_direct_mask = if fn_direct_mask_opt.is_some(): fn_direct_mask_opt.unwrap() as i64 else: 0
+    var fn_direct_types: Vec[i64] = Vec.new()
+    let fn_direct_types_opt = self.extern_fn_direct_param_types.get(name_sym)
+    if fn_direct_types_opt.is_some():
+        fn_direct_types = fn_direct_types_opt.unwrap()
 
     var method_owner_sym = 0
     for di in 0..name_str.len() as i32:
@@ -7404,6 +7443,39 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
         let param_val = wl_get_param(function, actual_pi)
         var param_type = wl_type_of(param_val)
         let alloca = self.create_entry_alloca(param_type)
+        if (fn_direct_mask & ((1 as i64) << (pi as u32))) != 0:
+            if pi < fn_direct_types.len() as i32 and fn_direct_types.get(pi as i64) != 0:
+                param_type = fn_direct_types.get(pi as i64)
+            let direct_alloca = self.create_entry_alloca(param_type)
+            let unpacked = self.c_abi_unpack_direct_value(param_val, param_type)
+            wl_build_store(self.builder, unpacked, direct_alloca)
+            self.record_local(p_name, direct_alloca, param_type, 1)
+            var p_sema_ty_direct = if pi + 1 < body.local_type_ids.len() as i32: body.local_type_ids.get((pi + 1) as i64) else: 0
+            if p_type_node != 0:
+                let resolved_p_sema_direct = self.sema.resolve_type_expr(p_type_node)
+                if resolved_p_sema_direct != 0:
+                    p_sema_ty_direct = resolved_p_sema_direct as i32
+            self.record_local_sema_type(p_name, p_sema_ty_direct)
+            self.mir_local_ptrs.insert(pi + 1, direct_alloca)
+            self.mir_local_types.insert(pi + 1, param_type)
+            if p_type_node != 0:
+                let pk = self.pool.kind(p_type_node)
+                if pk == NodeKind.NK_TYPE_FN:
+                    let fn_sig = self.build_fn_type_from_ast(p_type_node)
+                    self.record_local_fn_sig(p_name, fn_sig)
+                if pk == NodeKind.NK_TYPE_PTR or pk == NodeKind.NK_TYPE_REF:
+                    let pointee_node = self.pool.get_data0(p_type_node)
+                    if self.pool.kind(pointee_node) == NodeKind.NK_TYPE_NAMED:
+                        let ps = self.pool.get_data0(pointee_node)
+                        if self.struct_type_map.get(ps).is_some():
+                            self.record_local_pointee_struct(p_name, ps)
+                if pk == NodeKind.NK_TYPE_NAMED:
+                    let p_sym = self.pool.get_data0(p_type_node)
+                    if method_owner_sym == 0 and p_name == self.sym_self and self.struct_type_map.get(p_sym).is_some():
+                        if p_sym != self.sym_str:
+                            method_owner_sym = p_sym
+                            self.current_method_owner_sym = method_owner_sym
+            continue
         if (fn_byval_mask & ((1 as i64) << (pi as u32))) != 0:
             if pi < fn_byval_types.len() as i32 and fn_byval_types.get(pi as i64) != 0:
                 param_type = fn_byval_types.get(pi as i64)
@@ -7641,6 +7713,9 @@ fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, bod
         let fn_sret_ty_opt = self.extern_fn_sret_type.get(mono_sym)
         if fn_sret_ty_opt.is_some():
             self.current_ret_type = fn_sret_ty_opt.unwrap() as i64
+    let fn_direct_ret_ty_opt = self.extern_fn_direct_ret_type.get(mono_sym)
+    if fn_direct_ret_ty_opt.is_some():
+        self.current_ret_type = fn_direct_ret_ty_opt.unwrap() as i64
     self.current_method_owner_sym = 0
 
     let fresh_local_allocas: HashMap[i32, i64] = HashMap.new()
@@ -7721,6 +7796,12 @@ fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, bod
     let fn_byval_types_opt = self.extern_fn_byval_types.get(mono_sym)
     if fn_byval_types_opt.is_some():
         fn_byval_types = fn_byval_types_opt.unwrap()
+    let fn_direct_mask_opt = self.extern_fn_direct_params.get(mono_sym)
+    let fn_direct_mask = if fn_direct_mask_opt.is_some(): fn_direct_mask_opt.unwrap() as i64 else: 0
+    var fn_direct_types: Vec[i64] = Vec.new()
+    let fn_direct_types_opt = self.extern_fn_direct_param_types.get(mono_sym)
+    if fn_direct_types_opt.is_some():
+        fn_direct_types = fn_direct_types_opt.unwrap()
 
     // Detect method owner from mangled name (e.g. "Vec__i32.push")
     var method_owner_sym = 0
@@ -7738,6 +7819,39 @@ fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, bod
         let param_val = wl_get_param(function, actual_pi)
         var param_type = wl_type_of(param_val)
         let alloca = self.create_entry_alloca(param_type)
+        if (fn_direct_mask & ((1 as i64) << (pi as u32))) != 0:
+            if pi < fn_direct_types.len() as i32 and fn_direct_types.get(pi as i64) != 0:
+                param_type = fn_direct_types.get(pi as i64)
+            let direct_alloca = self.create_entry_alloca(param_type)
+            let unpacked = self.c_abi_unpack_direct_value(param_val, param_type)
+            wl_build_store(self.builder, unpacked, direct_alloca)
+            self.record_local(p_name, direct_alloca, param_type, 1)
+            var p_sema_ty_direct = if pi + 1 < body.local_type_ids.len() as i32: body.local_type_ids.get((pi + 1) as i64) else: 0
+            if p_type_node != 0:
+                let resolved_p_sema_direct = self.sema.resolve_type_expr(p_type_node)
+                if resolved_p_sema_direct != 0:
+                    p_sema_ty_direct = resolved_p_sema_direct as i32
+            self.record_local_sema_type(p_name, p_sema_ty_direct)
+            self.mir_local_ptrs.insert(pi + 1, direct_alloca)
+            self.mir_local_types.insert(pi + 1, param_type)
+            if p_type_node != 0:
+                let pk = self.pool.kind(p_type_node)
+                if pk == NodeKind.NK_TYPE_FN:
+                    let fn_sig = self.build_fn_type_from_ast(p_type_node)
+                    self.record_local_fn_sig(p_name, fn_sig)
+                if pk == NodeKind.NK_TYPE_PTR or pk == NodeKind.NK_TYPE_REF:
+                    let pointee_node = self.pool.get_data0(p_type_node)
+                    if self.pool.kind(pointee_node) == NodeKind.NK_TYPE_NAMED:
+                        let ps = self.pool.get_data0(pointee_node)
+                        if self.struct_type_map.get(ps).is_some():
+                            self.record_local_pointee_struct(p_name, ps)
+                if pk == NodeKind.NK_TYPE_NAMED:
+                    let p_sym = self.pool.get_data0(p_type_node)
+                    if method_owner_sym == 0 and p_name == self.sym_self and self.struct_type_map.get(p_sym).is_some():
+                        if p_sym != self.sym_str:
+                            method_owner_sym = p_sym
+                            self.current_method_owner_sym = method_owner_sym
+            continue
         if (fn_byval_mask & ((1 as i64) << (pi as u32))) != 0:
             if pi < fn_byval_types.len() as i32 and fn_byval_types.get(pi as i64) != 0:
                 param_type = fn_byval_types.get(pi as i64)

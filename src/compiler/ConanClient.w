@@ -594,7 +594,7 @@ fn conan_write_known_system_package(name: str, version: str, project_root: str) 
     let requires: Vec[str] = Vec.new()
     conan_write_metadata(dep_dir, name, version, "system", "system", "system", include_paths, lib_paths, libs, defines, link_args, requires) == 0
 
-fn conan_resolve_and_install_requirements(requirements: Vec[str], project_root: str, depth: i32) -> Vec[str]:
+fn conan_resolve_and_install_requirements(requirements: Vec[str], project_root: str, depth: i32, force_reinstall: bool) -> Vec[str]:
     let resolved: Vec[str] = Vec.new()
     for i in 0..requirements.len() as i32:
         let req = requirements.get(i as i64)
@@ -603,7 +603,7 @@ fn conan_resolve_and_install_requirements(requirements: Vec[str], project_root: 
         if req_name.len() == 0 or req_hint.len() == 0:
             runtime_eprint("error: unsupported Conan requirement reference: " ++ req)
             return Vec.new()
-        let actual = conan_install_internal(req_name, req_hint, project_root, depth + 1)
+        let actual = conan_install_internal(req_name, req_hint, project_root, depth + 1, force_reinstall)
         if actual.len() == 0:
             return Vec.new()
         resolved.push(req_name ++ "/" ++ actual)
@@ -627,7 +627,7 @@ fn conan_write_binary_metadata(name: str, version: str, recipe_rev: str, package
     let final_link_args = known.lib_paths
     conan_write_metadata(dep_dir, name, version, recipe_rev, package_id, package_rev, include_paths, lib_paths, libs, defines, final_link_args, requirements)
 
-fn conan_install_binary(name: str, version: str, recipe_rev: str, project_root: str, depth: i32) -> str:
+fn conan_install_binary(name: str, version: str, recipe_rev: str, project_root: str, depth: i32, force_reinstall: bool) -> str:
     let pick = conan_find_matching_package(name, version, recipe_rev)
     if pick.package_id.len() == 0:
         return ""
@@ -648,7 +648,7 @@ fn conan_install_binary(name: str, version: str, recipe_rev: str, project_root: 
         let _remove = runtime_remove_tree(dep_dir)
         return ""
     let requirements = conan_parse_requires_from_info(info)
-    let resolved_requirements = conan_resolve_and_install_requirements(requirements, project_root, depth)
+    let resolved_requirements = conan_resolve_and_install_requirements(requirements, project_root, depth, force_reinstall)
     if requirements.len() > 0 and resolved_requirements.len() == 0:
         let _remove = runtime_remove_tree(dep_dir)
         return ""
@@ -834,7 +834,7 @@ fn conan_install_source_fallback(name: str, version: str, project_root: str) -> 
     runtime_eprint("  built source package at .with/deps/c/" ++ name ++ "/" ++ version ++ "/")
     version
 
-fn conan_install_internal(name: str, version_hint: str, project_root: str, depth: i32) -> str:
+fn conan_install_internal(name: str, version_hint: str, project_root: str, depth: i32, force_reinstall: bool) -> str:
     if depth > 8:
         runtime_eprint("error: Conan dependency graph too deep while resolving " ++ name)
         return ""
@@ -843,7 +843,7 @@ fn conan_install_internal(name: str, version_hint: str, project_root: str, depth
         runtime_eprint("error: package " ++ name ++ "/" ++ version_hint ++ " not found on Conan Center")
         return ""
     let meta_path = project_root ++ "/.with/deps/c/" ++ name ++ "/" ++ version ++ "/metadata.json"
-    if runtime_file_exists(meta_path) != 0:
+    if not force_reinstall and runtime_file_exists(meta_path) != 0:
         return version
     if conan_write_known_system_package(name, version, project_root):
         runtime_eprint("  using system package " ++ name ++ "/" ++ version)
@@ -854,11 +854,11 @@ fn conan_install_internal(name: str, version_hint: str, project_root: str, depth
         runtime_eprint("error: package " ++ name ++ "/" ++ version ++ " not found on Conan Center")
         return ""
     runtime_eprint("  revision: " ++ recipe_rev.slice(0, if recipe_rev.len() > 12: 12 else: recipe_rev.len()))
-    let installed_binary = conan_install_binary(name, version, recipe_rev, project_root, depth)
+    let installed_binary = conan_install_binary(name, version, recipe_rev, project_root, depth, force_reinstall)
     if installed_binary.len() > 0:
         return installed_binary
     conan_install_source_fallback(name, version, project_root)
 
 // Public API. Returns the concrete installed version, or "" on failure.
-fn conan_install(name: str, version_hint: str, project_root: str) -> str:
-    conan_install_internal(name, version_hint, project_root, 0)
+fn conan_install(name: str, version_hint: str, project_root: str, force_reinstall: bool) -> str:
+    conan_install_internal(name, version_hint, project_root, 0, force_reinstall)
