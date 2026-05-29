@@ -254,9 +254,14 @@
   │                                                                                                                │             │                   │      │ drops cancel and cleanup-await before          │
   │                                                                                                                │             │                   │      │ continuation; ordinary Task drops detach-      │
   │                                                                                                                │             │                   │      │ cancel and runtime-drain completion.           │
-  │ #269-#274                                                                                                     │         Yes │           Partial │   No │ Remaining §14 async sketches still cover       │
-  │                                                                                                                │             │                   │      │ ScopedSend, no-await-in-iterators, OS-thread   │
-  │                                                                                                                │             │                   │      │ restrictions, and related unchecked semantics. │
+  │ [x] #269                                                                                                      │         Yes │               Yes │   No │ Completed: spawn_os workers and extern C       │
+  │                                                                                                                │             │                   │      │ callbacks now reject callables that create     │
+  │                                                                                                                │             │                   │      │ ephemeral Tasks, including named functions.    │
+  │                                                                                                                │             │                   │      │ Positive async-context coverage remains.       │
+  │                                                                                                                │             │                   │      │ Spec §14.7 / §14.16.                           │
+  │ #270-#274                                                                                                     │         Yes │           Partial │   No │ Remaining §14 async sketches still cover       │
+  │                                                                                                                │             │                   │      │ ScopedSend, no-await-in-iterators, and related │
+  │                                                                                                                │             │                   │      │ unchecked semantics.                           │
   │ [x] #275-#276                                                                                                  │         Yes │               Yes │   No │ Completed: c"..." now lowers as &CStr with     │
   │                                                                                                                │             │                   │      │ NUL-terminated static storage, string          │
   │                                                                                                                │             │                   │      │ literals default to str, and &str coercions    │
