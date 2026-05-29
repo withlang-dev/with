@@ -156,6 +156,14 @@ fn MirBuilder.schedule_drop(self: MirBuilder, local_id: i32, drop_kind: i32) -> 
     self.drop_local_ids.push(local_id)
     self.drop_kinds.push(drop_kind)
 
+fn MirBuilder.cancel_scheduled_value_drop_for_local(self: MirBuilder, local_id: i32) -> void:
+    var i = self.drop_local_ids.len() as i32 - 1
+    while i >= 0:
+        if self.drop_local_ids.get(i as i64) == local_id and self.drop_kinds.get(i as i64) == DropKind.DK_VALUE:
+            self.drop_kinds.set_i32(i as i64, DropKind.DK_STORAGE)
+            return
+        i = i - 1
+
 fn MirBuilder.emit_drop_entry(self: MirBuilder, local_id: i32, drop_kind: i32):
     if drop_kind == DropKind.DK_STORAGE:
         self.body.push_stmt(self.cur_bb, StmtKind.StorageDead, local_id, 0, 0)
@@ -5241,39 +5249,58 @@ fn MirBuilder.lower_with_form2_3(self: MirBuilder, pat_or_name: i32, rhs_expr: i
     result
 
 fn MirBuilder.lower_record_update(self: MirBuilder, base_expr: i32, field_updates_start: i32, field_updates_count: i32, node: i32) -> i32:
-    // Copy base struct to a temp, then overwrite specified fields
-    let base = self.lower_expr(base_expr)
     let ty = self.expr_type(node)
-    let tmp = self.new_temp(ty)
-    let base_place = self.place_for_local(tmp)
-    // Assign base to temp
-    let use_rv = self.body.new_rvalue(RvalueKind.RK_USE, base, 0, 0)
-    self.body.push_stmt(self.cur_bb, StmtKind.Assign, base_place, use_rv, self.ast.get_start(node))
-    // Overwrite each updated field
+    let base_place = self.lower_expr_place(base_expr)
+    if ty != 0 and self.sema.is_copy(ty) == 0 and base_place >= 0 and base_place < self.body.place_locals.len() as i32:
+        if self.body.place_proj_counts.get(base_place as i64) == 0:
+            self.cancel_scheduled_value_drop_for_local(self.body.place_locals.get(base_place as i64))
     let resolved_ty = self.sema.resolve_alias(ty)
     let struct_extra = self.sema.get_type_d1(resolved_ty)
     let struct_fc = self.sema.get_type_d2(resolved_ty)
+
+    let update_ops: Vec[i32] = Vec.new()
     for i in 0..field_updates_count:
         let f_name_sym = self.ast.get_extra(field_updates_start + i * 2)
         let f_val_node = self.ast.get_extra(field_updates_start + i * 2 + 1)
-        // Find field index by name
-        var fi = -1
-        for j in 0..struct_fc:
-            let sf_name = self.sema.type_extra.get((struct_extra + j * 3) as i64)
-            if sf_name == f_name_sym:
-                fi = j
+        let field_ty = self.struct_field_type(ty, f_name_sym)
+        let saved_expected = self.expected_type
+        if field_ty != 0:
+            self.expected_type = field_ty
+        let f_val = self.lower_expr(f_val_node)
+        self.expected_type = saved_expected
+        update_ops.push(f_val)
+
+    let result_fields: Vec[i32] = Vec.new()
+    let result_names: Vec[i32] = Vec.new()
+    for fi in 0..struct_fc:
+        let f_name_sym = self.sema.type_extra.get((struct_extra + fi * 3) as i64)
+        let field_ty = self.sema.type_extra.get((struct_extra + fi * 3 + 1) as i64)
+        let src_field_place = self.body.new_field_place(base_place, f_name_sym, field_ty)
+        var update_idx = -1
+        for ui in 0..field_updates_count:
+            if self.ast.get_extra(field_updates_start + ui * 2) == f_name_sym:
+                update_idx = ui
                 break
-        if fi >= 0:
-            let field_ty = self.struct_field_type(ty, f_name_sym)
-            let saved_expected = self.expected_type
-            if field_ty != 0:
-                self.expected_type = field_ty
-            let f_val = self.lower_expr(f_val_node)
-            self.expected_type = saved_expected
-            let field_place = self.body.new_field_place(base_place, f_name_sym, field_ty)
-            let field_rv = self.body.new_rvalue(RvalueKind.RK_USE, f_val, 0, 0)
-            self.body.push_stmt(self.cur_bb, StmtKind.Assign, field_place, field_rv, self.ast.get_start(node))
-    self.body.new_operand(OperandKind.OK_COPY, base_place)
+        if update_idx >= 0:
+            if field_ty != 0 and self.sema.is_copy(field_ty) == 0:
+                let old_field_tmp = self.new_temp(field_ty)
+                let old_field_place = self.place_for_local(old_field_tmp)
+                let old_field_op = self.body.new_operand(OperandKind.OK_MOVE, src_field_place)
+                self.assign_operand_to_place(old_field_place, old_field_op, self.ast.get_start(node))
+                self.body.push_stmt(self.cur_bb, StmtKind.Drop, old_field_place, 0, self.ast.get_start(node))
+            result_fields.push(update_ops.get(update_idx as i64))
+        else:
+            let op_kind = if field_ty != 0 and self.sema.is_copy(field_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE
+            let field_op = self.body.new_operand(op_kind, src_field_place)
+            result_fields.push(field_op)
+        result_names.push(f_name_sym)
+
+    let result_fid = self.body.new_agg_fields(result_fields, result_names)
+    let result_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, result_fid, 0)
+    let tmp = self.new_temp(ty)
+    let result_place = self.place_for_local(tmp)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, result_place, result_rv, self.ast.get_start(node))
+    self.body.new_operand(OperandKind.OK_MOVE, result_place)
 
 fn MirBuilder.lower_implicit_ok(self: MirBuilder, expr: i32, ok_type_id: i32) -> i32:
     let op = self.lower_expr(expr)
