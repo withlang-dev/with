@@ -4562,24 +4562,83 @@ fn MirBuilder.callable_fn_type_for_expr(self: MirBuilder, fn_expr: i32) -> i32:
 
 fn MirBuilder.lower_call_arg(self: MirBuilder, arg_node: i32, sig_idx: i32, callable_fn_tid: i32, arg_i: i32) -> i32:
     let saved_expected = self.expected_type
+    var expected_ty = 0
     if sig_idx >= 0 and arg_i >= 0 and arg_i < self.sema.sig_get_param_count(sig_idx):
-        let expected_ty = self.sema.sig_param_type(sig_idx, arg_i)
+        expected_ty = self.sema.sig_param_type(sig_idx, arg_i)
         if expected_ty != 0 and expected_ty != self.sema.ty_void:
             self.expected_type = expected_ty
     else if callable_fn_tid != 0:
-        let expected_ty = self.sema.callable_fn_param_type(callable_fn_tid as TypeId, arg_i)
+        expected_ty = self.sema.callable_fn_param_type(callable_fn_tid as TypeId, arg_i)
         if expected_ty != 0 and expected_ty != self.sema.ty_void:
             self.expected_type = expected_ty
+    let autoref_op = self.lower_auto_deref_call_arg(arg_node, expected_ty)
+    if autoref_op >= 0:
+        self.expected_type = saved_expected
+        return autoref_op
     let lowered = self.lower_expr(arg_node)
     self.expected_type = saved_expected
     lowered
+
+fn MirBuilder.lower_auto_deref_call_arg(self: MirBuilder, arg_node: i32, expected_ty: i32) -> i32:
+    if arg_node == 0 or expected_ty == 0:
+        return -1
+    let expected_resolved = self.sema.resolve_alias(expected_ty as TypeId)
+    let expected_kind = self.sema.get_type_kind(expected_resolved)
+    if expected_kind != TypeKind.TY_REF and expected_kind != TypeKind.TY_PTR:
+        return -1
+    var current_ty = self.expr_type(arg_node)
+    if current_ty == 0:
+        return -1
+    if self.sema.types_compatible(expected_ty, current_ty) != 0:
+        return -1
+
+    var deref_count = 0
+    var depth = 0
+    while current_ty > 0 and depth < 32:
+        let current_resolved = self.sema.resolve_alias(current_ty as TypeId)
+        let current_kind = self.sema.get_type_kind(current_resolved)
+        if current_kind != TypeKind.TY_REF and current_kind != TypeKind.TY_PTR:
+            break
+        deref_count = deref_count + 1
+        current_ty = self.sema.get_type_d0(current_resolved)
+        if current_ty != 0 and self.sema.types_compatible(expected_ty, current_ty) != 0:
+            var place = self.lower_expr_place(arg_node)
+            for _ in 0..deref_count:
+                place = self.body.new_deref_place(place)
+            return self.body.new_operand(OperandKind.OK_COPY, place)
+        depth = depth + 1
+    -1
+
+fn MirBuilder.lower_receiver_with_method_autoderef(self: MirBuilder, recv_node: i32) -> i32:
+    var current_ty = self.expr_type(recv_node)
+    if current_ty == 0:
+        return self.lower_expr(recv_node)
+    var deref_count = 0
+    var depth = 0
+    while current_ty > 0 and depth < 32:
+        let current_resolved = self.sema.resolve_alias(current_ty as TypeId)
+        let current_kind = self.sema.get_type_kind(current_resolved)
+        if current_kind != TypeKind.TY_REF and current_kind != TypeKind.TY_PTR:
+            break
+        let inner_ty = self.sema.get_type_d0(current_resolved)
+        if inner_ty == 0:
+            break
+        deref_count = deref_count + 1
+        current_ty = inner_ty
+        depth = depth + 1
+    if deref_count == 0:
+        return self.lower_expr(recv_node)
+    var place = self.lower_expr_place(recv_node)
+    for _ in 0..deref_count:
+        place = self.body.new_deref_place(place)
+    self.body.new_operand(OperandKind.OK_COPY, place)
 
 fn MirBuilder.resolve_method_callee_sym(self: MirBuilder, self_expr: i32, method_sym: i32) -> i32:
     // Translate method_sym from AST pool to sema pool for method lookups.
     let sema_method_sym = self.sema.pool_lookup_symbol(self.pool.resolve_symbol(method_sym))
     let obj_type = self.expr_type(self_expr)
     if obj_type != 0 and obj_type != self.sema.ty_void:
-        let resolved = self.sema.resolve_alias(obj_type)
+        let resolved = self.sema.auto_deref_ref_ptr_type(obj_type as TypeId)
         let type_name_sym = self.sema.method_owner_symbol_for_type(resolved as i32)
         if type_name_sym != 0:
             let method_fn = self.sema.lookup_method_fn(type_name_sym, sema_method_sym)
@@ -4606,7 +4665,7 @@ fn MirBuilder.resolve_method_callee_sym(self: MirBuilder, self_expr: i32, method
 fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: str) -> i32:
     if recv_type == 0 or method_name.len() == 0:
         return MirIntrinsic.MIR_INTRINSIC_NONE
-    let resolved = self.sema.resolve_alias(recv_type)
+    let resolved = self.sema.auto_deref_ref_ptr_type(recv_type as TypeId)
     // Check primitive types first (no type_name_sym for TypeKind.TY_STR, TypeKind.TY_INT, etc.)
     let tk = self.sema.get_type_kind(resolved)
     if tk == TypeKind.TY_STR:
@@ -4897,7 +4956,14 @@ fn MirBuilder.lower_intrinsic_call(self: MirBuilder, intrinsic: i32, self_expr: 
     let is_static = intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_NEW or intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_WITH_CAPACITY or intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_NEW
     let call_args: Vec[i32] = Vec.new()
     if not is_static:
-        call_args.push(self.lower_expr(self_expr))
+        let recv_ty = self.expr_type(self_expr)
+        let recv_resolved = if recv_ty != 0: self.sema.resolve_alias(recv_ty as TypeId) else: 0
+        let recv_kind = self.sema.get_type_kind(recv_resolved)
+        let raw_pointer_option_receiver = recv_kind == TypeKind.TY_PTR and (intrinsic == MirIntrinsic.MIR_INTRINSIC_OPT_UNWRAP or intrinsic == MirIntrinsic.MIR_INTRINSIC_OPT_IS_SOME or intrinsic == MirIntrinsic.MIR_INTRINSIC_OPT_IS_NONE or intrinsic == MirIntrinsic.MIR_INTRINSIC_OPT_FILTER)
+        if raw_pointer_option_receiver:
+            call_args.push(self.lower_expr(self_expr))
+        else:
+            call_args.push(self.lower_receiver_with_method_autoderef(self_expr))
     for i in 0..arg_count:
         let arg_node = self.ast.get_extra(arg_start + i)
         call_args.push(self.lower_expr(arg_node))
@@ -6112,6 +6178,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         for ai in 0..arm_count:
             self.switch_to(arm_bbs.get(ai as i64) as i32)
             let arm_name = self.ast.get_extra(extra_start + ai * 3)
+            let task_node = self.ast.get_extra(extra_start + ai * 3 + 1)
             let arm_body = self.ast.get_extra(extra_start + ai * 3 + 2)
 
             // Await the winning task to get its result
@@ -6120,7 +6187,11 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
             let await_call_id = self.body.new_call_args(await_args)
             self.body.set_call_intrinsic(await_call_id, MirIntrinsic.MIR_INTRINSIC_FIBER_AWAIT)
             self.body.set_call_ast_node(await_call_id, node)
-            let await_result_ty = self.expr_type(node)
+            var await_result_ty = self.expr_type(task_node)
+            if await_result_ty != 0:
+                await_result_ty = self.sema.unwrap_task_type(await_result_ty as TypeId) as i32
+            if await_result_ty == 0:
+                await_result_ty = self.expr_type(node)
             let await_result_local = self.new_temp(await_result_ty)
             let await_result_place = self.place_for_local(await_result_local)
             let after_await_bb = self.new_block()

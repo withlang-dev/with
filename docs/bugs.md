@@ -50,10 +50,14 @@
   │                                                                                                                │             │                   │      │ non-local control flow; skipped mixed sketch   │
   │                                                                                                                │             │                   │      │ split into executable positive and negative    │
   │                                                                                                                │             │                   │      │ regressions for return, ?, break, continue.    │
-  │ #196-#200, #202-#203                                                                                           │         Yes │                No │   No │ §3 references/borrowing skipped sketches.      │
+  │ #196-#199, #202-#203                                                                                           │         Yes │                No │   No │ §3 references/borrowing skipped sketches.      │
   │                                                                                                                │             │                   │      │ Implement executable tests for disjoint        │
-  │                                                                                                                │             │                   │      │ borrows, returning refs, auto-deref, trait     │
-  │                                                                                                                │             │                   │      │ object coercion, and second-class references.  │
+  │                                                                                                                │             │                   │      │ borrows, returning refs, trait object coercion,│
+  │                                                                                                                │             │                   │      │ and second-class references.                   │
+  │ [x] #200                                                                                                       │         Yes │               Yes │   No │ Completed: ref/ptr auto-deref now follows      │
+  │                                                                                                                │             │                   │      │ multiple layers for fields and method          │
+  │                                                                                                                │             │                   │      │ receivers; invalid value-position ref/value    │
+  │                                                                                                                │             │                   │      │ comparisons fail in Sema. Spec §3.7.           │
   │ [x] #201                                                                                                       │         Yes │               Yes │   No │ Completed: shared auto-ref is covered for      │
   │                                                                                                                │             │                   │      │ function arguments and method receivers; the   │
   │                                                                                                                │             │                   │      │ obsolete safe `&mut T` sketch is covered as a  │
