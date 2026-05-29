@@ -1,16 +1,18 @@
-//! skip: non-executable spec sketch for Section 4.2.7 — Chained Comparisons (formerly 25.102); contains pseudo-code for unimplemented feature work
-// Spec test: Section 4.2.7 — Chained Comparisons (formerly 25.102)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+// Spec test: Section 4.2.7 — Chained Comparisons.
 
-// PASS: ordered comparisons chain
-fn test:
+var CHAIN_COMPARE_COUNT = 0
+
+fn chain_compare_middle -> i32:
+    CHAIN_COMPARE_COUNT = CHAIN_COMPARE_COUNT + 1
+    5
+
+fn test_ordered_comparisons_chain:
     let x = 5
     assert(0 < x < 10)
     assert(not (0 < x < 4))
     assert(5 <= x <= 5)
 
-// FAIL: equality does not chain
-fn test:
-    let x = 1
-    x == x == true     // ERROR
+fn test_chained_comparison_evaluates_middle_once:
+    CHAIN_COMPARE_COUNT = 0
+    assert(0 < chain_compare_middle() < 10)
+    assert(CHAIN_COMPARE_COUNT == 1)

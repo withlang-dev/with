@@ -88,10 +88,14 @@
   │                                                                                                                │             │                   │      │ function arguments and method receivers; the   │
   │                                                                                                                │             │                   │      │ obsolete safe `&mut T` sketch is covered as a  │
   │                                                                                                                │             │                   │      │ loud P12 rejection. Spec §3.8 / §15.1.         │
-  │ #204-#214                                                                                                      │         Yes │                No │   No │ §4 values/types skipped sketches. Cover        │
-  │                                                                                                                │             │                   │      │ implicit default return, chained comparisons,  │
-  │                                                                                                                │             │                   │      │ record update drops, enum accessors, ranges,   │
-  │                                                                                                                │             │                   │      │ tuples, unit elision, implicit Ok.             │
+  │ [x] #205                                                                                                       │         Yes │               Yes │   No │ Completed: ordered comparison chains are       │
+  │                                                                                                                │             │                   │      │ executable coverage and equality/membership    │
+  │                                                                                                                │             │                   │      │ precedence operators are rejected as           │
+  │                                                                                                                │             │                   │      │ non-associative. Spec §4.2.7.                  │
+  │ #204, #206-#214                                                                                                │         Yes │                No │   No │ Remaining §4 values/types skipped sketches.   │
+  │                                                                                                                │             │                   │      │ Cover implicit default return, record update   │
+  │                                                                                                                │             │                   │      │ drops, enum accessors, ranges, tuples, unit    │
+  │                                                                                                                │             │                   │      │ elision, implicit Ok.                          │
   │ #215-#217                                                                                                      │         Yes │                No │   No │ §5-§6 ephemeral/handles sketches. Split into   │
   │                                                                                                                │             │                   │      │ concrete tests and implement remaining         │
   │                                                                                                                │             │                   │      │ ephemeral/slotmap behavior.                    │

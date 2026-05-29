@@ -2827,6 +2827,13 @@ fn Parser.parse_precedence(self: Parser, min_prec: i32) -> NodeId:
             lhs = self.pool.add_node(NodeKind.NK_RANGE, self.pool.get_start(lhs), self.prev_end(), lhs, rhs, 1)
         else:
             lhs = self.pool.add_node(NodeKind.NK_BINARY, self.pool.get_start(lhs), self.prev_end(), op_code, lhs, rhs)
+            if parser_infix_op_is_non_associative(op_code):
+                let next_info = self.infix_op()
+                if next_info != 0:
+                    let follow_prec = next_info / 1000
+                    let next_op = next_info % 1000
+                    if follow_prec == prec and parser_infix_op_is_non_associative(next_op):
+                        self.emit_error("non-associative operator cannot be chained; add parentheses")
             // Chained comparisons: a < b < c → (a < b) and (b < c)
             if op_code >= BinaryOp.OP_LT and op_code <= BinaryOp.OP_GTE:
                 var last_cmp = lhs  // track the latest comparison node
@@ -2867,6 +2874,15 @@ fn Parser.parse_precedence(self: Parser, min_prec: i32) -> NodeId:
     lhs
 
 // Returns encoded info: prec * 1000 + op_code, or 0 if not infix
+fn parser_infix_op_is_non_associative(op_code: i32) -> bool:
+    if op_code == BinaryOp.OP_EQ: return true
+    if op_code == BinaryOp.OP_NEQ: return true
+    if op_code == BinaryOp.OP_IN: return true
+    if op_code == BinaryOp.OP_NOT_IN: return true
+    if op_code == 506: return true  // =~
+    if op_code == 507: return true  // !~
+    false
+
 fn Parser.infix_op(self: Parser) -> i32:
     let t = self.peek()
     if t == TokenKind.TK_KW_OR: return 1 * 1000 + BinaryOp.OP_OR
