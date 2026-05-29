@@ -5015,15 +5015,28 @@ fn Sema.check_record_update(self: Sema, node: i32) -> i32:
     let field_count = self.ast.get_data2(node)
     let source_ty = self.check_expr(source)
     if source_ty != 0:
-        let source_owner = self.method_owner_symbol_for_type(self.resolve_alias(source_ty) as i32)
+        let source_resolved = self.resolve_alias(source_ty)
+        let source_tk = self.get_type_kind(source_resolved)
+        if source_tk != TypeKind.TY_STRUCT and source_tk != TypeKind.TY_GENERIC_INST:
+            self.emit_error("record update requires struct type", source)
+        let source_owner = self.method_owner_symbol_for_type(source_resolved as i32)
         if source_owner != 0 and self.has_drop_method(source_owner) != 0 and self.current_drop_type_sym != source_owner:
             self.emit_error("partial move from Drop type", source)
     for fi in 0..field_count:
         let f_name = self.ast.get_extra(extra_start + fi * 2)
         let f_value = self.ast.get_extra(extra_start + fi * 2 + 1)
-        self.check_expr(f_value)
+        var field_ty = 0
+        if source_ty != 0:
+            field_ty = self.struct_field_type(source_ty as i32, f_name)
+            if field_ty == 0:
+                self.emit_error("unknown field in record update", f_value)
+        if field_ty != 0:
+            self.check_expr_with_expected(f_value, field_ty as TypeId)
+        else:
+            self.check_expr(f_value)
     if source_ty != 0 and source_ty != self.ty_void:
         self.typed_expr_types.insert(node, source_ty as i32)
+        self.mark_moved_if_consumed(source)
     source_ty as i32
 
 fn Sema.check_let_else(self: Sema, node: i32) -> i32:
