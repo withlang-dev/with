@@ -4685,6 +4685,19 @@ fn MirBuilder.lower_call_with_arg_nodes(self: MirBuilder, fn_op: i32, callee_sym
         return self.body.new_operand(OperandKind.OK_COPY, result_place)
     self.body.new_operand(OperandKind.OK_MOVE, result_place)
 
+fn MirBuilder.lower_std_drop_call(self: MirBuilder, node: i32) -> i32:
+    let args_start = self.ast.get_data1(node)
+    let arg_count = self.ast.get_data2(node)
+    if arg_count != 1:
+        return self.unit_operand()
+    let arg_node = self.ast.get_extra(args_start)
+    let place = self.lower_expr_place(arg_node)
+    self.body.push_stmt(self.cur_bb, StmtKind.Drop, place, 0, self.ast.get_start(arg_node))
+    let local_id = mir_place_plain_local(&self.body, place)
+    if local_id >= 0:
+        self.cancel_scheduled_value_drop_for_local(local_id)
+    self.unit_operand()
+
 fn MirBuilder.call_sig_for_sym(self: MirBuilder, sym: i32) -> i32:
     if sym == 0:
         return -1
@@ -6213,6 +6226,8 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         // Generic function call — delegate to codegen's monomorphize_generic_call
         if self.ast.kind(callee) == NodeKind.NK_IDENT:
             let gc_sym = self.ast.get_data0(callee)
+            if self.sema.fn_symbol_is_std_builtins_drop(gc_sym) != 0:
+                return self.lower_std_drop_call(node)
             if self.sema.generic_fn_nodes.contains(gc_sym):
                 // Lower args and emit call. Codegen intercepts via MirIntrinsic.MIR_INTRINSIC_GENERIC_CALL
                 // and routes to monomorphize_generic_call_core with pre-evaluated MIR args.

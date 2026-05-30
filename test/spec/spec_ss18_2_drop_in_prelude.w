@@ -1,13 +1,22 @@
-//! skip: non-executable spec sketch for Section 18.2 — Drop in Prelude (formerly 25.57); contains pseudo-code for unimplemented feature work
-// Spec test: Section 18.2 — Drop in Prelude (formerly 25.57)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+//! expect-stdout: drop:after
 
-// PASS: drop closes channel sender
-fn test:
-    let (tx, rx) = chan[i32](10)
-    tx.send(1)
-    tx.send(2)
-    drop(tx)                     // close sender
-    let items: Vec[i32] = rx.iter() |> collect()
-    assert(items == vec![1, 2])
+// Spec test: Section 18.2 — Drop in Prelude.
+// `drop` is available from the ambient prelude and triggers cleanup at the
+// call site instead of waiting for the end of the enclosing scope.
+
+var PRELUDE_DROP_TRACE = ""
+
+type PreludeDropProbe { label: str }
+impl Drop for PreludeDropProbe:
+    fn drop(move self: Self):
+        PRELUDE_DROP_TRACE = PRELUDE_DROP_TRACE ++ self.label
+
+fn test_drop_is_in_prelude:
+    let probe = PreludeDropProbe { label: "drop" }
+    drop(probe)
+    PRELUDE_DROP_TRACE = PRELUDE_DROP_TRACE ++ ":after"
+    assert(PRELUDE_DROP_TRACE == "drop:after")
+
+fn main:
+    test_drop_is_in_prelude()
+    write(PRELUDE_DROP_TRACE)

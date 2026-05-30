@@ -2804,8 +2804,15 @@ fn Codegen.mir_emit_stmt(self: Codegen, body: MirBody, stmt_id: i32) -> bool:
     if sk == StmtKind.Drop:
         if d0 < 0 or d0 >= body.place_locals.len() as i32:
             return false
-        let local_id = body.place_locals.get(d0 as i64)
-        let drop_ty = self.mir_local_llvm_type(body, local_id)
+        var drop_ty = self.mir_place_projected_type(body, d0)
+        let drop_proj_count = body.place_proj_counts.get(d0 as i64)
+        if drop_ty == 0 and drop_proj_count > 0:
+            let sema_ty = self.mir_place_sema_type(body, d0)
+            if sema_ty > 0:
+                drop_ty = self.mir_sema_type_to_llvm(sema_ty)
+        if drop_ty == 0:
+            let local_id = body.place_locals.get(d0 as i64)
+            drop_ty = self.mir_local_llvm_type(body, local_id)
         var ptr = self.mir_place_ptr(body, d0, false, 0)
         if ptr == 0 and drop_ty != 0:
             ptr = self.mir_place_ptr(body, d0, true, drop_ty)
@@ -8079,8 +8086,15 @@ fn Codegen.mir_emit_term(self: Codegen, body: MirBody, bb: i32) -> bool:
     if tk == TermKind.TK_DROP_AND_GOTO:
         if d0 < 0 or d0 >= body.place_locals.len() as i32:
             return false
-        let local_id = body.place_locals.get(d0 as i64)
-        let drop_ty = self.mir_local_llvm_type(body, local_id)
+        var drop_ty = self.mir_place_projected_type(body, d0)
+        let drop_term_proj_count = body.place_proj_counts.get(d0 as i64)
+        if drop_ty == 0 and drop_term_proj_count > 0:
+            let sema_ty = self.mir_place_sema_type(body, d0)
+            if sema_ty > 0:
+                drop_ty = self.mir_sema_type_to_llvm(sema_ty)
+        if drop_ty == 0:
+            let local_id = body.place_locals.get(d0 as i64)
+            drop_ty = self.mir_local_llvm_type(body, local_id)
         var ptr = self.mir_place_ptr(body, d0, false, 0)
         if ptr == 0 and drop_ty != 0:
             ptr = self.mir_place_ptr(body, d0, true, drop_ty)

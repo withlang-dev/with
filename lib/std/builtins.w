@@ -66,6 +66,10 @@ pub fn check(cond: bool, msg: str, loc: str = src()) -> void:
     if not cond:
         with_panic(msg, loc, 0)
 
+/// Explicitly drop a value at this point in the current scope.
+pub fn drop[T](val: T) -> void:
+    ()
+
 // ── ToString trait and impls ────────────────────────────────────
 
 pub trait ToString =
