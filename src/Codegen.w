@@ -4997,7 +4997,6 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
             // Distinct type: transparent — same LLVM type as inner type.
             // Type safety enforced by sema, not by LLVM types.
             continue
-            continue
         if sub_kind == TypeDeclKind.Alias:
             let extra_start = self.pool.get_data1(decl)
             let aliased_node = self.pool.get_extra(extra_start)
