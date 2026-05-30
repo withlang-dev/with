@@ -18,7 +18,7 @@ let users: Vec[User] = Vec.new()
 let name: String = "alice"
 
 fn render[T](value: T):
-    println(f"{value}")
+    print(f"{value}")
 ```
 
 No `use` is needed for `Vec`, `String`, `Option`, `Result`,
@@ -35,11 +35,11 @@ write empty parentheses.
 ```
 // ✗ verbose
 fn greet():
-    println("hello")
+    print("hello")
 
 // ✓ idiomatic
 fn greet:
-    println("hello")
+    print("hello")
 ```
 
 **Drop the return type when it's Unit.** If a function doesn't
@@ -48,11 +48,11 @@ return anything, don't annotate it.
 ```
 // ✗ verbose
 fn greet() -> Unit:
-    println("hello")
+    print("hello")
 
 // ✓ idiomatic
 fn greet:
-    println("hello")
+    print("hello")
 ```
 
 **Drop the return type when the body makes it obvious.** The
@@ -91,12 +91,12 @@ shouldn't need to say so.
 ```
 // ✗ C-brain
 fn main -> i32:
-    println("Hello, World!")
+    print("Hello, World!")
     0
 
 // ✓ idiomatic
 fn main:
-    println("Hello, World!")
+    print("Hello, World!")
 ```
 
 ---
@@ -156,7 +156,7 @@ let found: bool = list.contains(x)
 // ✓ idiomatic
 let x = 42
 let name = "Alice"
-let items = Vec.new[i32]()
+let items = Vec[i32].new()
 let found = list.contains(x)
 ```
 
@@ -352,14 +352,14 @@ of the full `TypeName.Variant`.
 ```
 // ✗ verbose
 fn color_name(c: Color) -> str:
-    match c
+    match c:
         Color.Red   => "red"
         Color.Green => "green"
         Color.Blue  => "blue"
 
 // ✓ idiomatic
 fn color_name(c: Color) -> str:
-    match c
+    match c:
         .Red   => "red"
         .Green => "green"
         .Blue  => "blue"
@@ -385,7 +385,7 @@ must map to specific integers (protocol codes, file formats, FFI):
 
 ```
 // ✓ discriminant enum — explicit integer mapping
-enum HttpMethod:
+enum HttpMethod: i32:
     Get = 1
     Post = 2
     Put = 3
@@ -511,7 +511,7 @@ When you need to unwrap or bail, `let ... else` reads cleanly.
 
 ```
 // ✗ nested
-match parse_config(path)
+match parse_config(path):
     Ok(config) =>
         // rest of function indented
     Err(e) =>
@@ -557,11 +557,11 @@ let result = data
 **Use method chains for objects, pipelines for free functions.**
 
 ```
-// ✓ methods — the value is the subject
-let names = users.iter()
+// ✓ methods — the value is the subject. `map`/`filter` apply directly to
+//   the collection and return a collection; no `.iter()` / `.collect()`.
+let names = users
     .filter(u => u.active)
     .map(u => u.name)
-    .collect[Vec]()
 
 // ✓ pipeline — data flows through transformations
 let report = raw_data
@@ -571,9 +571,9 @@ let report = raw_data
     |> render_chart
 ```
 
-Collection pipelines support implicit `.iter()`: `Vec`, arrays, slices,
-`HashMap`, and `HashSet` can flow directly into `map`/`filter`/`count`
-without calling `.iter()` explicitly.
+Collections support implicit iteration: `Vec`, arrays, slices, `HashMap`, and
+`HashSet` flow directly into `map`/`filter`/`count` without an explicit
+`.iter()`, and the result is again a collection (no terminal `.collect()`).
 
 ---
 
@@ -680,13 +680,13 @@ else if status == .ServerError:
     handle_500()
 
 // ✓ idiomatic — expression-position match is exhaustive
-match status
+match status:
     .Ok          => handle_success()
     .NotFound    => handle_404()
     .ServerError => handle_500()
 
 // ✓ statement-position partial match
-match event
+match event:
     .Click(pos) => on_click(pos)
     .KeyDown(k) => on_key(k)
 ```
@@ -695,14 +695,14 @@ match event
 
 ```
 // ✗ match then access
-match result
-    Ok(val) => println(f"{val.name}: {val.score}")
-    Err(e)  => println(f"error: {e}")
+match result:
+    Ok(val) => print(f"{val.name}: {val.score}")
+    Err(e)  => print(f"error: {e}")
 
 // ✓ idiomatic — destructure deeper if it helps
-match result
-    Ok({ name, score }) => println(f"{name}: {score}")
-    Err(e)              => println(f"error: {e}")
+match result:
+    Ok({ name, score }) => print(f"{name}: {score}")
+    Err(e)              => print(f"error: {e}")
 ```
 
 ---
@@ -753,7 +753,7 @@ for item in items:
 
 ```
 // ✗ manual accumulation
-var result = Vec.new[i32]()
+var result = Vec[i32].new()
 for x in 0..10:
     result.push(x * x)
 
@@ -848,7 +848,7 @@ type Point:
     y: i32
 
 fn render(point: Point):
-    println(f"{point.x}, {point.y}")
+    print(f"{point.x}, {point.y}")
 ```
 
 Use braces when they improve locality, especially for short one-liners or
@@ -887,11 +887,11 @@ type World:
 
 // Handles are Copy — store them freely
 let player = world.spawn("player")
-let enemies = vec![world.spawn("e1"), world.spawn("e2")]
+let enemies = [world.spawn(name) for name in ["e1", "e2"]]
 
 // Safe access — None if entity was despawned
 if let Some(tf) = world.transforms.get(player):
-    println(f"pos: {tf.position}")
+    print(f"pos: {tf.position}")
 ```
 
 Handles compose naturally with the ECS pattern:
@@ -906,15 +906,19 @@ for (entity, tf, sprite) in query2(&world.transforms, &world.sprites):
 
 ## Use `traverse` for Bulk Fallible Operations
 
+> **Planned — not yet implemented.** `traverse`/`sequence` are not currently
+> available as collection methods. For now, write the manual loop with `?`
+> inside (the "✗" form below is the working idiom until these land).
+
 When applying a fallible function to a collection, use
 `traverse` instead of a manual loop with error handling.
 Use `sequence` when you already have `Vec[Result[T, E]]`.
 
 ```
 // ✗ manual loop with error handling
-var results = Vec.new[i32]()
+var results = Vec[i32].new()
 for s in strings:
-    match s.parse_int()
+    match s.parse_int():
         Ok(n)  => results.push(n)
         Err(e) => return Err(e)
 
@@ -926,7 +930,7 @@ let results = strings.traverse(s => s.parse_int())?
 
 ```
 // ✗ manual unwrapping
-var users = Vec.new[User]()
+var users = Vec[User].new()
 for result in fetch_results:
     users.push(result?)
 
@@ -966,9 +970,7 @@ Scatter-gather pattern:
 // Fire off N parallel fetches, collect results
 let profiles = async scope s =>
     ids |> map(id => s.track(get_profile(id)))
-        |> collect[Vec]()
         |> map(task => task.await)
-        |> collect[Vec]()
 ```
 
 Scoped borrows — tasks can borrow local data without lifetimes:
@@ -1034,7 +1036,7 @@ if kind in [.Plus, .Minus, .Star, .Slash]:
 Works in match arms:
 
 ```
-match token
+match token:
     in [.Red, .Green, .Blue] => "color"
     in [.Bold, .Italic]      => "style"
     _                         => "other"
@@ -1049,10 +1051,10 @@ if user.role not in [.Admin, .Moderator] then
 
 ---
 
-## Use Chained `if let` to Avoid Nesting
+## Avoid Nested `if let`
 
-Multiple `if let` bindings can be chained with commas.
-All patterns must match for the body to execute.
+Don't build a pyramid of `if let`. When you need several values and any
+miss should bail, sequential `let ... else` reads flat:
 
 ```
 // ✗ pyramid of doom
@@ -1061,23 +1063,22 @@ if let Some(a) = store_a.get(entity):
         if let Some(c) = store_c.get(entity):
             yield (entity, a, b, c)
 
-// ✓ idiomatic — flat
-if let Some(a) = store_a.get(entity),
-   let Some(b) = store_b.get(entity),
-   let Some(c) = store_c.get(entity):
-    yield (entity, a, b, c)
+// ✓ idiomatic — flat; each binding bails on a miss
+let Some(a) = store_a.get(entity) else continue
+let Some(b) = store_b.get(entity) else continue
+let Some(c) = store_c.get(entity) else continue
+yield (entity, a, b, c)
 ```
 
-Especially useful for extracting nested optional data:
+For navigating a value's nested optional fields, use `?.` chaining (see
+"Use `?` and `??`"), which flattens the layers:
 
 ```
-if let Some(user) = find_user(id),
-   let Some(addr) = user.address,
-   let Some(city) = addr.city:
-    println(f"User lives in {city}")
-else:
-    println("Address unknown")
+let city = user.address?.city   // Option[str]
 ```
+
+(Comma-chained `if let a, let b:` in a single condition is planned but not
+yet available — use the sequential `let ... else` form above.)
 
 ---
 
@@ -1145,7 +1146,7 @@ Debug-only instrumentation:
 ```
 fn process(x: i32) -> i32:
     comptime if cfg.is_debug:
-        println(f"debug: processing {x}")
+        print(f"debug: processing {x}")
     x * x + 1
 ```
 
@@ -1416,10 +1417,10 @@ Before submitting code, check:
 17. **No `== true` or `== false`** — just `if active` or `if not active`
 18. **No artificial newlines** — if a trait/impl/fn fits on one line, keep it there
 19. **No pointer-based relationships** — use `Handle[T]` with `SlotMap`
-20. **No manual error-collecting loops** — use `traverse` / `sequence`
+20. **No manual error-collecting loops** — use `traverse` / `sequence` *(planned)*
 21. **No unstructured task spawning** — use `async scope` with `s.track()`
 22. **No equality chains for membership** — use `in` / `not in`
-23. **No nested `if let` pyramids** — chain with commas
+23. **No nested `if let` pyramids** — use sequential `let ... else`
 24. **No full `match` for single variant tests** — use `let ... else`
 25. **No runtime checks for compile-time facts** — use `comptime if`
 26. **No manual `extern fn` declarations** — use `c_import` with `c"..."` strings
