@@ -1012,6 +1012,8 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
     let param_start = self.ast.fn_meta_param_start(meta)
     let param_count = self.ast.fn_meta_param_count(meta)
     let tp_count = self.ast.fn_meta_tp_count(meta)
+    if (flags / FnFlags.ASYNC) % 2 == 1:
+        self.require_async_runtime(node, "async fn")
 
     // docs/mutability.md — every method must declare an explicit receiver mode.
     // Plain `self: Self` without &, mut, or move is a compile error.
@@ -1379,8 +1381,11 @@ fn Sema.collect_trait_decl(self: Sema, node: i32, is_local: i32):
     pos = pos + 1
     for i in 0..method_count:
         let mt_name = self.ast.get_extra(pos)
+        let mt_flags = self.ast.get_extra(pos + 1)
         let mt_param_start = self.ast.get_extra(pos + 2)
         let mt_param_count = self.ast.get_extra(pos + 3)
+        if (mt_flags / FnFlags.ASYNC) % 2 == 1:
+            self.require_async_runtime(node, "async trait method")
         // docs/mutability.md — trait method must declare explicit receiver mode.
         if mt_param_count > 0:
             let p0_name = self.ast.get_extra(mt_param_start)

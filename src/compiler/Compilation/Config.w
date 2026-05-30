@@ -5,6 +5,7 @@ type CompilationConfig {
     opt_level: i32,
     no_std: bool,
     alloc_mode: bool,
+    runtime_available: bool,
     emit_ir: bool,
     emit_bin: bool,
     is_test: bool,
@@ -31,6 +32,7 @@ fn compilation_config_default -> CompilationConfig:
         opt_level: 0,
         no_std: false,
         alloc_mode: false,
+        runtime_available: true,
         emit_ir: false,
         emit_bin: true,
         is_test: false,
@@ -40,10 +42,11 @@ fn compilation_config_default -> CompilationConfig:
         tool_mode_entry_path: "",
     }
 
-fn compilation_config_from_cli(opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32) -> CompilationConfig:
+fn compilation_config_from_cli(opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> CompilationConfig:
     var cfg = compilation_config_default()
     cfg.opt_level = opt_level
     cfg.no_std = no_std
     cfg.alloc_mode = alloc_mode
+    cfg.runtime_available = runtime_available
     cfg.prelude_mode = compilation_normalize_prelude_mode(prelude_mode)
     cfg

@@ -334,17 +334,26 @@ fn Compilation.init -> Compilation:
         last_link_rc: 0,
     }
 
-fn Compilation.configure(self: Compilation, opt_level: i32, no_std: bool, alloc_mode: bool):
-    self.config = compilation_config_from_cli(opt_level, no_std, alloc_mode, self.config.prelude_mode)
+fn Compilation.configure(self: Compilation, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool):
+    self.config = compilation_config_from_cli(opt_level, no_std, alloc_mode, runtime_available, self.config.prelude_mode)
     var zcu = self.zcu
     zcu.set_prelude_mode(self.config.prelude_mode)
     self.zcu = zcu
 
 fn Compilation.configure_options(self: Compilation, options: BuildCommandOptions):
-    self.configure(options.opt_level, options.no_std, options.alloc_mode)
+    self.configure(options.opt_level, options.no_std, options.alloc_mode, options.runtime_available)
     self.set_prelude_mode(options.prelude_mode)
     self.set_debug_info(options.debug_info)
     self.set_compiler_hooks_enabled(options.compiler_hooks_enabled)
+
+fn Compilation.apply_runtime_config(self: Compilation, cfg: ProjectConfig) -> ProjectConfig:
+    var out = cfg
+    if not self.config.runtime_available:
+        out.runtime_available = false
+    out
+
+fn Compilation.project_config_for_source(self: Compilation, source_path: str) -> ProjectConfig:
+    self.apply_runtime_config(project_config_load_for_source(source_path))
 
 fn Compilation.set_prelude_mode(self: Compilation, mode: i32):
     var cfg = self.config
@@ -392,7 +401,7 @@ fn Compilation.apply_cli_diag_mappings(self: Compilation, zcu: Zcu) -> Zcu:
 fn Compilation.compile_file(self: Compilation, path: str) -> AstPool:
     compilation_debug_init("Compilation.compile_file:start " ++ path)
     var zcu = self.zcu
-    let pool = zcu.compile_file_frontend(path)
+    let pool = zcu.compile_file_frontend_with_config(path, self.project_config_for_source(path))
     self.zcu = zcu
     compilation_debug_init(f"Compilation.compile_file:done decls={pool.decl_count()}")
     pool
@@ -400,7 +409,7 @@ fn Compilation.compile_file(self: Compilation, path: str) -> AstPool:
 fn Compilation.compile_file_with_config(self: Compilation, path: str, cfg: ProjectConfig) -> AstPool:
     compilation_debug_init("Compilation.compile_file_with_config:start " ++ path)
     var zcu = self.zcu
-    let pool = zcu.compile_file_frontend_with_config(path, cfg)
+    let pool = zcu.compile_file_frontend_with_config(path, self.apply_runtime_config(cfg))
     self.zcu = zcu
     compilation_debug_init(f"Compilation.compile_file_with_config:done decls={pool.decl_count()}")
     pool
@@ -408,7 +417,7 @@ fn Compilation.compile_file_with_config(self: Compilation, path: str, cfg: Proje
 fn Compilation.compile_entry_file(self: Compilation, path: str) -> AstPool:
     compilation_debug_init("Compilation.compile_entry_file:start " ++ path)
     var zcu = self.zcu
-    let pool = zcu.compile_file_frontend_entry(path)
+    let pool = zcu.compile_file_frontend_entry_with_config(path, self.project_config_for_source(path))
     self.zcu = zcu
     compilation_debug_init(f"Compilation.compile_entry_file:done decls={pool.decl_count()}")
     pool
@@ -416,7 +425,7 @@ fn Compilation.compile_entry_file(self: Compilation, path: str) -> AstPool:
 fn Compilation.compile_entry_file_with_config(self: Compilation, path: str, cfg: ProjectConfig) -> AstPool:
     compilation_debug_init("Compilation.compile_entry_file_with_config:start " ++ path)
     var zcu = self.zcu
-    let pool = zcu.compile_file_frontend_entry_with_config(path, cfg)
+    let pool = zcu.compile_file_frontend_entry_with_config(path, self.apply_runtime_config(cfg))
     self.zcu = zcu
     compilation_debug_init(f"Compilation.compile_entry_file_with_config:done decls={pool.decl_count()}")
     pool
@@ -627,7 +636,7 @@ fn Compilation.run_after_typecheck_hooks(self: Compilation, pool: AstPool, sourc
         runtime_eprint("error: could not write compiler hook runner")
         return false
     var runner_comp = Compilation.init()
-    runner_comp.configure(self.config.opt_level, self.config.no_std, self.config.alloc_mode)
+    runner_comp.configure(self.config.opt_level, self.config.no_std, self.config.alloc_mode, self.config.runtime_available)
     runner_comp.set_prelude_mode(self.config.prelude_mode)
     runner_comp.set_debug_info(self.config.debug_info)
     runner_comp.set_compiler_hooks_enabled(false)
@@ -715,7 +724,7 @@ fn Compilation.compile_source_text(self: Compilation, source_path: str, source_t
     var zcu = self.zcu
     let source_dir = frontend_dirname(source_path)
     zcu.reset_for_new_invocation(source_dir, source_path, "")
-    zcu.project_config = project_config_load_for_source(source_path)
+    zcu.project_config = self.project_config_for_source(source_path)
     if zcu.project_config.manifest_error.len() > 0:
         runtime_eprint("error: invalid with.toml: " ++ zcu.project_config.manifest_error)
         self.zcu = zcu
@@ -729,7 +738,7 @@ fn Compilation.compile_source_text_with_config(self: Compilation, source_path: s
     var zcu = self.zcu
     let source_dir = frontend_dirname(source_path)
     zcu.reset_for_new_invocation(source_dir, source_path, "")
-    zcu.project_config = cfg
+    zcu.project_config = self.apply_runtime_config(cfg)
     if zcu.project_config.manifest_error.len() > 0:
         runtime_eprint("error: invalid with.toml: " ++ zcu.project_config.manifest_error)
         self.zcu = zcu
@@ -755,7 +764,7 @@ fn Compilation.compile_entry_source_texts(self: Compilation, source_paths: Vec[s
     let source_text = source_texts.get(0)
     let source_dir = frontend_dirname(source_path)
     zcu.reset_for_new_invocation(source_dir, source_path, "")
-    zcu.project_config = project_config_load_for_source(source_path)
+    zcu.project_config = self.project_config_for_source(source_path)
     if zcu.project_config.manifest_error.len() > 0:
         runtime_eprint("error: invalid with.toml: " ++ zcu.project_config.manifest_error)
         self.zcu = zcu
@@ -779,7 +788,7 @@ fn Compilation.check_pool(self: Compilation, pool: AstPool, source_path: str) ->
     prepared_pool.decl_count() != 0
 
 fn Compilation.check_file_with_build_settings(self: Compilation, source_path: str, include_paths: Vec[str], defines: Vec[str], link_libs: Vec[str]) -> bool:
-    var cfg = project_config_load_for_source(source_path)
+    var cfg = self.project_config_for_source(source_path)
     for ii in 0..include_paths.len() as i32:
         cfg.c_import_include_paths.push(include_paths.get(ii as i64))
     for di in 0..defines.len() as i32:
@@ -896,7 +905,7 @@ fn Compilation.emit_object_to_path_with_build_settings(self: Compilation, source
     if not compilation_ensure_output_dir(output_dir):
         return ""
 
-    var cfg = project_config_load_for_source(source_path)
+    var cfg = self.project_config_for_source(source_path)
     for ii in 0..include_paths.len() as i32:
         cfg.c_import_include_paths.push(include_paths.get(ii as i64))
     for di in 0..defines.len() as i32:
@@ -951,7 +960,7 @@ fn Compilation.build_binary_to_path_with_build_settings(self: Compilation, sourc
         return ""
     compilation_remove_dsym_best_effort(bin_path)
 
-    var cfg = project_config_load_for_source(source_path)
+    var cfg = self.project_config_for_source(source_path)
     for ii in 0..include_paths.len() as i32:
         cfg.c_import_include_paths.push(include_paths.get(ii as i64))
     for di in 0..defines.len() as i32:
@@ -987,7 +996,7 @@ fn Compilation.build_binary_from_source_to_path_with_build_settings(self: Compil
         return ""
     compilation_remove_dsym_best_effort(bin_path)
 
-    var cfg = project_config_load_for_source(source_path)
+    var cfg = self.project_config_for_source(source_path)
     for ii in 0..include_paths.len() as i32:
         cfg.c_import_include_paths.push(include_paths.get(ii as i64))
     for di in 0..defines.len() as i32:
@@ -1064,6 +1073,7 @@ fn Compilation.emit_typed(self: Compilation, pool: AstPool) -> bool:
     var sema = Sema.init(zcu.pool, zcu.diagnostics, typed_pool)
     sema.source_text = zcu.current_source_text
     sema.tool_mode_entry_path = zcu.tool_mode_entry_path
+    sema.runtime_available = if zcu.project_config.runtime_available: 1 else: 0
     if self.config.no_std:
         sema.no_std = 1
     if self.config.alloc_mode:
@@ -1138,6 +1148,7 @@ fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
     sema.decl_source_file_ids = zcu.decl_source_file_ids
     sema.decl_is_c_import = zcu.decl_is_c_import
     sema.tool_mode_entry_path = zcu.tool_mode_entry_path
+    sema.runtime_available = if zcu.project_config.runtime_available: 1 else: 0
     sema.init_module_graph(&zcu.last_resolved)
     if self.config.no_std:
         sema.no_std = 1

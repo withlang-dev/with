@@ -139,6 +139,7 @@ type ComptimeWorkspaceCompilePlan {
     opt_level: i32,
     no_std: bool,
     alloc_mode: bool,
+    runtime_available: bool,
     debug_info: bool,
     compiler_hooks_enabled: bool,
     prelude_mode: i32,
@@ -2535,6 +2536,7 @@ fn comptime_workspace_compile_plan_invalid() -> ComptimeWorkspaceCompilePlan:
         opt_level: 0,
         no_std: false,
         alloc_mode: false,
+        runtime_available: true,
         debug_info: false,
         compiler_hooks_enabled: false,
         prelude_mode: 0,
@@ -2625,6 +2627,7 @@ fn ComptimeEvaluator.workspace_compile_plan(self: ComptimeEvaluator, record: Com
             opt_level: 0,
             no_std: false,
             alloc_mode: false,
+            runtime_available: true,
             debug_info: false,
             compiler_hooks_enabled: false,
             prelude_mode: 0,
@@ -2704,6 +2707,7 @@ fn ComptimeEvaluator.workspace_compile_plan(self: ComptimeEvaluator, record: Com
         opt_level: self.workspace_i32_option(options, "opt_level", 1),
         no_std: self.workspace_bool_option(options, "no_std", false),
         alloc_mode: self.workspace_bool_option(options, "alloc_mode", false),
+        runtime_available: self.workspace_bool_option(options, "runtime_available", true),
         debug_info: self.workspace_bool_option(options, "debug_info", true),
         compiler_hooks_enabled: self.workspace_bool_option(options, "compiler_hooks_enabled", true),
         prelude_mode: self.workspace_i32_option(options, "prelude_mode", 0),
@@ -2735,7 +2739,7 @@ fn comptime_execute_workspace_compile_plan(plan: ComptimeWorkspaceCompilePlan) -
             is_migrate: 1,
         }
     var comp = Compilation.init()
-    comp.configure(plan.opt_level, plan.no_std, plan.alloc_mode)
+    comp.configure(plan.opt_level, plan.no_std, plan.alloc_mode, plan.runtime_available)
     comp.set_debug_info(plan.debug_info)
     comp.set_compiler_hooks_enabled(plan.compiler_hooks_enabled)
     comp.set_prelude_mode(plan.prelude_mode)
@@ -2836,7 +2840,7 @@ fn ComptimeEvaluator.start_intercept_workspace_compile(self: ComptimeEvaluator, 
     let link_libs = self.workspace_str_vec_field(options, "link_libs")
 
     var comp = Compilation.init()
-    comp.configure(self.workspace_i32_option(options, "opt_level", 1), self.workspace_bool_option(options, "no_std", false), self.workspace_bool_option(options, "alloc_mode", false))
+    comp.configure(self.workspace_i32_option(options, "opt_level", 1), self.workspace_bool_option(options, "no_std", false), self.workspace_bool_option(options, "alloc_mode", false), self.workspace_bool_option(options, "runtime_available", true))
     comp.set_debug_info(self.workspace_bool_option(options, "debug_info", true))
     comp.set_compiler_hooks_enabled(self.workspace_bool_option(options, "compiler_hooks_enabled", true))
     comp.set_prelude_mode(self.workspace_i32_option(options, "prelude_mode", 0))

@@ -91,7 +91,7 @@ fn run_build(argc: i32) -> i32:
     let emit_c_mode = has_emit_c_flag(argc)
     let output_path = parse_output_arg(argc)
     var comp = Compilation.init()
-    comp.configure(0, false, false)
+    comp.configure(0, false, false, true)
     if emit_c_mode:
         let c_path = comp.emit_c(source_file, output_path)
         if c_path == "":
@@ -113,7 +113,7 @@ fn run_check(argc: i32) -> i32:
         with_eprint("error: 'check' requires a source file argument")
         return 1
     var comp = Compilation.init()
-    comp.configure(0, false, false)
+    comp.configure(0, false, false, true)
     let pool = comp.compile_file(source_file)
     if pool.decl_count() == 0:
         with_eprint("error: check failed during compilation")
