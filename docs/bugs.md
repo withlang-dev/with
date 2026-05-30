@@ -285,10 +285,14 @@
   │                                                                                                                │             │                   │      │ NUL-terminated static storage, string          │
   │                                                                                                                │             │                   │      │ literals default to str, and &str coercions    │
   │                                                                                                                │             │                   │      │ keep str views instead of raw byte pointers.   │
-  │ #277-#279                                                                                                      │         Yes │           Partial │   No │ §16 FFI/c_import sketches. c_import improved,  │
-  │                                                                                                                │             │                   │      │ but skipped spec still includes manual extern  │
-  │                                                                                                                │             │                   │      │ C, fn-ptr closure rules, raw                   │
-  │                                                                                                                │             │                   │      │ pointer .as_option.                            │
+  │ #277, #279                                                                                                     │         Yes │           Partial │   No │ §16 FFI/c_import sketches. c_import improved,  │
+  │                                                                                                                │             │                   │      │ but skipped specs still include sqlite forward │
+  │                                                                                                                │             │                   │      │ declarations and extern C fn-pointer closure   │
+  │                                                                                                                │             │                   │      │ syntax/rules.                                  │
+  │ [x] #278                                                                                                      │         Yes │               Yes │   No │ Completed: raw pointer .as_option() now        │
+  │                                                                                                                │             │                   │      │ returns Option[*T] as a no-op nullable-pointer │
+  │                                                                                                                │             │                   │      │ conversion; regressions cover null/non-null    │
+  │                                                                                                                │             │                   │      │ mut/const pointers and bad arity. Spec §16.1.  │
   │ #280                                                                                                           │         Yes │                No │   No │ §17.4 comptime cascade sketch. Needs design/   │
   │                                                                                                                │             │                   │      │ implementation or executable negative/positive │
   │                                                                                                                │             │                   │      │ tests.                                         │
