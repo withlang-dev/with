@@ -1975,8 +1975,14 @@ fn ci_translate_typedef(session: i64, idx: i32, count: i32) -> str:
                 if ci_migrate_shared_decl_add("type", name, rendered):
                     return ""
                 return rendered
-        // The struct was shadowed, so emit nothing — the typedef name IS the struct.
-        // Mark as emitted so nothing else: claims it.
+        if is_forward_struct or is_forward_union:
+            // The typedef is only a forward alias for a record that has a body
+            // elsewhere in this translation unit. Leave the name unclaimed so
+            // the real struct/union cursor emits the usable declaration.
+            return ""
+        // The typedef is an identity alias for a non-record type or an already
+        // resolved spelling. Mark it claimed so no later weak declaration takes
+        // the same public name.
         with_cimport_mark_name_emitted(name)
         return ""
 
