@@ -302,9 +302,11 @@
   │                                                                                                                │             │                   │      │ callback types, but current `fn(...)` is a fat │
   │                                                                                                                │             │                   │      │ closure value and c_import callbacks are raw   │
   │                                                                                                                │             │                   │      │ pointer-to-function shapes.                    │
-  │ #280                                                                                                           │         Yes │                No │   No │ §17.4 comptime cascade sketch. Needs design/   │
-  │                                                                                                                │             │                   │      │ implementation or executable negative/positive │
-  │                                                                                                                │             │                   │      │ tests.                                         │
+  │ [x] #280                                                                                                      │         Yes │               Yes │   No │ Completed: generic comptime function calls now │
+  │                                                                                                                │             │                   │      │ carry explicit type arguments into the         │
+  │                                                                                                                │             │                   │      │ evaluator, so `T.fields()` / `T.name()` inside │
+  │                                                                                                                │             │                   │      │ a `comptime fn` cascade without redundant      │
+  │                                                                                                                │             │                   │      │ prefixes. Spec §17.2 / §17.4.                 │
   │ #281-#284                                                                                                      │         Yes │                No │   No │ §18 prelude/stdlib/freestanding sketches. Need │
   │                                                                                                                │             │                   │      │ Drop prelude, length methods, unreachable/     │
   │                                                                                                                │             │                   │      │ todo/assert_matches, freestanding behavior.    │

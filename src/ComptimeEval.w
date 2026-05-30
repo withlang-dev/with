@@ -176,6 +176,20 @@ type ComptimeLineColumn {
     column: i32,
 }
 
+type ComptimeGenericSubstSnapshot {
+    tp_syms: Vec[i32],
+    saved_named_had: Vec[i32],
+    saved_named_tys: Vec[i32],
+    saved_subst_syms: Vec[i32],
+    saved_subst_tys: Vec[i32],
+}
+
+type ComptimeGenericResolvedArgs {
+    ok: i32,
+    tp_syms: Vec[i32],
+    tp_tys: Vec[i32],
+}
+
 type ComptimeEvaluator {
     sema: Sema,
     ast: AstPool,
@@ -1177,6 +1191,9 @@ fn ComptimeEvaluator.static_type_expr(self: ComptimeEvaluator, node: i32) -> i32
         let prim = self.sema.primitive_type_by_sym(sym)
         if prim != 0:
             return prim
+        let subst = self.sema.lookup_generic_subst(sym)
+        if subst != 0:
+            return subst
         if self.sema.named_types.contains(sym):
             return self.sema.named_types.get(sym).unwrap()
         return 0
@@ -4486,6 +4503,119 @@ fn ComptimeEvaluator.eval_for(self: ComptimeEvaluator, node: i32) -> ComptimeCon
     self.loop_labels.pop()
     comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
 
+fn ComptimeEvaluator.generic_callee_symbol(self: ComptimeEvaluator, callee: i32) -> i32:
+    let kind = self.ast.kind(callee)
+    if kind == NodeKind.NK_TYPE_GENERIC:
+        let sym = self.ast.get_data0(callee)
+        if self.sema.generic_fn_nodes.contains(sym):
+            return sym
+        return 0
+    if kind != NodeKind.NK_INDEX:
+        return 0
+    let base = self.ast.get_data0(callee)
+    if self.ast.kind(base) != NodeKind.NK_IDENT:
+        return 0
+    let sym2 = self.ast.get_data0(base)
+    if self.sema.generic_fn_nodes.contains(sym2):
+        return sym2
+    0
+
+fn ComptimeEvaluator.generic_callee_type_arg_count(self: ComptimeEvaluator, callee: i32) -> i32:
+    let kind = self.ast.kind(callee)
+    if kind == NodeKind.NK_TYPE_GENERIC:
+        let count = self.ast.get_data2(callee)
+        if count == 0 and self.ast.get_data1(callee) != 0:
+            return 1
+        return count
+    if kind == NodeKind.NK_INDEX:
+        if self.ast.get_data2(callee) != 0:
+            return 2
+        return 1
+    0
+
+fn ComptimeEvaluator.generic_callee_type_arg_node(self: ComptimeEvaluator, callee: i32, index: i32) -> i32:
+    let kind = self.ast.kind(callee)
+    if kind == NodeKind.NK_TYPE_GENERIC:
+        let count = self.ast.get_data2(callee)
+        if count == 0:
+            if index == 0:
+                return self.ast.get_data1(callee)
+            return 0
+        return self.ast.get_extra(self.ast.get_data1(callee) + index)
+    if kind == NodeKind.NK_INDEX:
+        if index == 0:
+            return self.ast.get_data1(callee)
+        if index == 1:
+            return self.ast.get_data2(callee)
+    0
+
+fn ComptimeEvaluator.install_generic_substitutions(self: ComptimeEvaluator, tp_syms: Vec[i32], tp_tys: Vec[i32], node: i32) -> ComptimeGenericSubstSnapshot:
+    let saved_named_had: Vec[i32] = Vec.new()
+    let saved_named_tys: Vec[i32] = Vec.new()
+    let saved_subst_syms = self.sema.generic_subst_param_syms
+    let saved_subst_tys = self.sema.generic_subst_type_ids
+    self.sema.generic_subst_param_syms = Vec.new()
+    self.sema.generic_subst_type_ids = Vec.new()
+    for i in 0..tp_syms.len() as i32:
+        let tp_sym = tp_syms.get(i as i64)
+        if self.sema.named_types.contains(tp_sym):
+            saved_named_had.push(1)
+            saved_named_tys.push(self.sema.named_types.get(tp_sym).unwrap())
+        else:
+            saved_named_had.push(0)
+            saved_named_tys.push(0)
+        let tp_ty = tp_tys.get(i as i64)
+        self.sema.named_types.insert(tp_sym, tp_ty)
+        self.sema.put_generic_subst(tp_sym, tp_ty, node)
+        let tp_text = self.pool.resolve(tp_sym)
+        let canonical = if tp_text.len() > 0: self.sema.pool_lookup_symbol(tp_text) else: 0
+        if canonical != 0 and canonical != tp_sym:
+            self.sema.put_generic_subst(canonical, tp_ty, node)
+    ComptimeGenericSubstSnapshot {
+        tp_syms: tp_syms,
+        saved_named_had: saved_named_had,
+        saved_named_tys: saved_named_tys,
+        saved_subst_syms: saved_subst_syms,
+        saved_subst_tys: saved_subst_tys,
+    }
+
+fn ComptimeEvaluator.restore_generic_substitutions(self: ComptimeEvaluator, snapshot: ComptimeGenericSubstSnapshot):
+    for i in 0..snapshot.tp_syms.len() as i32:
+        let tp_sym = snapshot.tp_syms.get(i as i64)
+        if snapshot.saved_named_had.get(i as i64) == 1:
+            self.sema.named_types.insert(tp_sym, snapshot.saved_named_tys.get(i as i64))
+        else:
+            self.sema.named_types.remove(tp_sym)
+    self.sema.generic_subst_param_syms = snapshot.saved_subst_syms
+    self.sema.generic_subst_type_ids = snapshot.saved_subst_tys
+
+fn ComptimeEvaluator.resolve_generic_comptime_type_args(self: ComptimeEvaluator, fn_node: i32, callee: i32, node: i32) -> ComptimeGenericResolvedArgs:
+    let out_syms: Vec[i32] = Vec.new()
+    let out_tys: Vec[i32] = Vec.new()
+    let meta = self.ast.find_fn_meta(fn_node)
+    if meta < 0:
+        let _ = self.fail(node, "missing comptime function metadata")
+        return ComptimeGenericResolvedArgs { ok: 0, tp_syms: out_syms, tp_tys: out_tys }
+    let tp_start = self.ast.fn_meta_tp_start(meta)
+    let tp_count = self.ast.fn_meta_tp_count(meta)
+    let explicit_count = self.generic_callee_type_arg_count(callee)
+    if explicit_count != tp_count:
+        let _ = self.fail(node, f"generic comptime function expects {tp_count} type argument(s), found {explicit_count}")
+        return ComptimeGenericResolvedArgs { ok: 0, tp_syms: out_syms, tp_tys: out_tys }
+    var tp_pos = tp_start
+    for ti in 0..tp_count:
+        let tp_sym = self.ast.get_extra(tp_pos)
+        let bound_count = self.ast.get_extra(tp_pos + 1)
+        let type_node = self.generic_callee_type_arg_node(callee, ti)
+        let type_id = self.sema.resolve_type_level_arg_expr(type_node)
+        if type_id == 0:
+            let _ = self.fail(type_node, "generic comptime type argument could not be resolved")
+            return ComptimeGenericResolvedArgs { ok: 0, tp_syms: out_syms, tp_tys: out_tys }
+        out_syms.push(tp_sym)
+        out_tys.push(type_id)
+        tp_pos = tp_pos + 2 + bound_count
+    ComptimeGenericResolvedArgs { ok: 1, tp_syms: out_syms, tp_tys: out_tys }
+
 fn ComptimeEvaluator.eval_call(self: ComptimeEvaluator, node: i32) -> ComptimeControl:
     let callee = self.ast.get_data0(node)
     let arg_count = self.ast.get_data2(node)
@@ -4525,6 +4655,20 @@ fn ComptimeEvaluator.eval_call(self: ComptimeEvaluator, node: i32) -> ComptimeCo
         if recv_signal.value.kind == ComptimeValueKind.CV_STR:
             return self.eval_str_method_call(recv_signal.value, field, self.ast.get_data1(node), arg_count, node)
         return self.fail(node, "method '" ++ self.pool.resolve(field) ++ "' is not comptime-evaluable yet")
+    let generic_fn_sym = self.generic_callee_symbol(callee)
+    if generic_fn_sym != 0:
+        let fn_node = self.find_fn_decl_node(generic_fn_sym)
+        let resolved_type_args = self.resolve_generic_comptime_type_args(fn_node, callee, node)
+        if resolved_type_args.ok == 0:
+            return comptime_control_error()
+        let arg_values: Vec[ComptimeValue] = Vec.new()
+        let extra_start = self.ast.get_data1(node)
+        for i in 0..arg_count:
+            let arg_signal = self.eval_expr(self.ast.get_extra(extra_start + i))
+            if arg_signal.kind != ComptimeControlKind.CTL_VALUE:
+                return arg_signal
+            arg_values.push(arg_signal.value)
+        return self.eval_fn_symbol_call_values_with_type_args(generic_fn_sym, arg_values, node, resolved_type_args.tp_syms, resolved_type_args.tp_tys)
     if self.ast.kind(callee) != NodeKind.NK_IDENT:
         return self.fail(node, "only direct comptime function calls are supported")
     let fn_sym = self.ast.get_data0(callee)
@@ -4678,6 +4822,11 @@ fn ComptimeEvaluator.eval_allowed_runtime_call(self: ComptimeEvaluator, fn_sym: 
     comptime_control_error()
 
 fn ComptimeEvaluator.eval_fn_symbol_call_values(self: ComptimeEvaluator, fn_sym: i32, arg_values: Vec[ComptimeValue], node: i32) -> ComptimeControl:
+    let empty_tp_syms: Vec[i32] = Vec.new()
+    let empty_tp_tys: Vec[i32] = Vec.new()
+    self.eval_fn_symbol_call_values_with_type_args(fn_sym, arg_values, node, empty_tp_syms, empty_tp_tys)
+
+fn ComptimeEvaluator.eval_fn_symbol_call_values_with_type_args(self: ComptimeEvaluator, fn_sym: i32, arg_values: Vec[ComptimeValue], node: i32, tp_syms: Vec[i32], tp_tys: Vec[i32]) -> ComptimeControl:
     if self.pool.resolve(fn_sym) == "parallel":
         return self.eval_parallel_workspaces_call(arg_values, node)
     let fn_node = self.find_fn_decl_node(fn_sym)
@@ -4687,8 +4836,6 @@ fn ComptimeEvaluator.eval_fn_symbol_call_values(self: ComptimeEvaluator, fn_sym:
             return runtime_signal
     if self.allow_runtime_calls == 0 and self.fn_decl_node_is_comptime(fn_node) == 0:
         return self.fail(node, "comptime can only call comptime functions")
-    if self.sema.generic_fn_nodes.contains(fn_sym):
-        return self.fail(node, "generic comptime functions are not supported yet")
     if fn_node == 0:
         return self.fail(node, "callee '" ++ self.pool.resolve(fn_sym) ++ "' is not a comptime function body")
     if self.active_fn_syms.len() as i32 >= self.recursion_limit:
@@ -4697,6 +4844,10 @@ fn ComptimeEvaluator.eval_fn_symbol_call_values(self: ComptimeEvaluator, fn_sym:
     let meta = self.ast.find_fn_meta(fn_node)
     if meta < 0:
         return self.fail(node, "missing comptime function metadata")
+    let tp_count = self.ast.fn_meta_tp_count(meta)
+    let explicit_tp_count = tp_syms.len() as i32
+    if explicit_tp_count != tp_count:
+        return self.fail(node, f"generic comptime function expects {tp_count} type argument(s), found {explicit_tp_count}")
     let param_start = self.ast.fn_meta_param_start(meta)
     let param_count = self.ast.fn_meta_param_count(meta)
     let arg_count = arg_values.len() as i32
@@ -4709,6 +4860,18 @@ fn ComptimeEvaluator.eval_fn_symbol_call_values(self: ComptimeEvaluator, fn_sym:
 
     let saved_file = self.sema.local_file_id
     let saved_path = self.sema.current_module_path
+    let has_generic_subst = if tp_count > 0: 1 else: 0
+    let generic_snapshot =
+        if has_generic_subst != 0:
+            self.install_generic_substitutions(tp_syms, tp_tys, node)
+        else:
+            ComptimeGenericSubstSnapshot {
+                tp_syms: Vec.new(),
+                saved_named_had: Vec.new(),
+                saved_named_tys: Vec.new(),
+                saved_subst_syms: Vec.new(),
+                saved_subst_tys: Vec.new(),
+            }
     self.sema.local_file_id = self.decl_file_id(fn_node)
     self.sema.current_module_path = self.decl_path(fn_node)
     self.active_fn_syms.push(fn_sym)
@@ -4727,6 +4890,8 @@ fn ComptimeEvaluator.eval_fn_symbol_call_values(self: ComptimeEvaluator, fn_sym:
                 self.active_fn_syms.pop()
                 self.sema.local_file_id = saved_file
                 self.sema.current_module_path = saved_path
+                if has_generic_subst != 0:
+                    self.restore_generic_substitutions(generic_snapshot)
                 return self.fail(node, "wrong argument count in comptime call")
             let default_signal = if self.default_arg_uses_call_site(default_node) != 0:
                 self.eval_call_site_default_arg(default_node, node, caller_path, caller_text, caller_fn_sym)
@@ -4737,6 +4902,8 @@ fn ComptimeEvaluator.eval_fn_symbol_call_values(self: ComptimeEvaluator, fn_sym:
                 self.active_fn_syms.pop()
                 self.sema.local_file_id = saved_file
                 self.sema.current_module_path = saved_path
+                if has_generic_subst != 0:
+                    self.restore_generic_substitutions(generic_snapshot)
                 return default_signal
             self.bind_value(param_name, default_signal.value, param_mut)
 
@@ -4757,6 +4924,8 @@ fn ComptimeEvaluator.eval_fn_symbol_call_values(self: ComptimeEvaluator, fn_sym:
                         self.active_fn_syms.pop()
                         self.sema.local_file_id = saved_file
                         self.sema.current_module_path = saved_path
+                        if has_generic_subst != 0:
+                            self.restore_generic_substitutions(generic_snapshot)
                         return self.fail(ppat, "comptime argument did not match parameter pattern")
 
     let body_signal = self.eval_expr(self.ast.get_data1(fn_node))
@@ -4764,6 +4933,8 @@ fn ComptimeEvaluator.eval_fn_symbol_call_values(self: ComptimeEvaluator, fn_sym:
     self.active_fn_syms.pop()
     self.sema.local_file_id = saved_file
     self.sema.current_module_path = saved_path
+    if has_generic_subst != 0:
+        self.restore_generic_substitutions(generic_snapshot)
     if body_signal.kind == ComptimeControlKind.CTL_RETURN:
         return comptime_control_value(body_signal.value)
     if body_signal.kind == ComptimeControlKind.CTL_BREAK or body_signal.kind == ComptimeControlKind.CTL_CONTINUE:

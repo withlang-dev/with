@@ -1,22 +1,31 @@
-//! skip: non-executable spec sketch for Section 17.4 — Comptime Cascade (formerly 25.95); contains pseudo-code for unimplemented feature work
-// Spec test: Section 17.4 — Comptime Cascade (formerly 25.95)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+//! expect-stdout: ok
 
-// PASS: no comptime prefix needed inside comptime fn
+type Point { x: i32, y: i32 }
+
 comptime fn count_fields[T: type] -> usize:
-    let mut n = 0
-    for field in T.fields():       // cascade: no comptime prefix
-        n += 1
+    var n = 0usize
+    for field in T.fields():
+        let _ = field
+        n = n + 1usize
     n
 
-@[test]
-fn test:
-    assert(count_fields[Point]() == 2)
+comptime fn type_name[T: type] -> str:
+    T.name()
 
-// PASS: type method syntax
-comptime fn type_name[T: type] -> str: T.name()
+comptime fn field_summary[T: type] -> str:
+    var out = ""
+    for field in T.fields():
+        if out.len() > 0:
+            out = out ++ ","
+        out = out ++ field.name ++ ":" ++ field.type_name
+    out
 
-@[test]
-fn test:
-    assert(type_name[i32]() == "i32")
+const POINT_FIELD_COUNT: usize = comptime count_fields[Point]()
+const I32_TYPE_NAME: str = comptime type_name[i32]()
+const POINT_FIELD_SUMMARY: str = comptime field_summary[Point]()
+
+fn main:
+    assert(POINT_FIELD_COUNT == 2usize)
+    assert(I32_TYPE_NAME == "i32")
+    assert(POINT_FIELD_SUMMARY == "x:i32,y:i32")
+    print("ok")
