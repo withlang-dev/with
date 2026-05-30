@@ -39,6 +39,10 @@ type Parser {
     pending_sealed: i32,
     pending_flags: i32,
     pending_specified: i32,
+    // Set by the bare-enum variant parser: the synthesized i32 backing node
+    // when a backing-less enum is fieldless (so it is treated as a disc enum),
+    // or 0 when it carries payloads (a real ADT enum).
+    pending_inferred_disc_repr: i32,
     pending_packed: i32,
     pending_bitpacked: i32,
     pending_weak: i32,
@@ -106,6 +110,7 @@ fn Parser.init_with_pool(tokens: TokenList, source: str, file_id: i32, intern: I
         pending_sealed: 0,
         pending_flags: 0,
         pending_specified: 0,
+        pending_inferred_disc_repr: 0,
         pending_packed: 0,
         pending_bitpacked: 0,
         pending_weak: 0,
@@ -1444,10 +1449,15 @@ fn Parser.parse_enum_named_decl(self: Parser, start: i32, name: i32, is_pub: i32
     else:
         if self.pending_specified != 0:
             self.emit_error("@[specified] requires a discriminant enum with an explicit backing type")
+        self.pending_inferred_disc_repr = 0
         if use_block_body != 0:
             extra_start = self.parse_enum_variants_block()
         else:
             extra_start = self.parse_enum_variants_braced()
+        // A fieldless backing-less enum infers an i32 backing (#309): the
+        // variant parser emitted disc-enum format and recorded the backing.
+        if self.pending_inferred_disc_repr != 0:
+            sub_kind = TypeDeclKind.DiscEnum
 
     self.pool.add_extra(is_pub)
     self.pool.add_extra(tp_start)
@@ -1744,9 +1754,23 @@ fn Parser.parse_enum_variants_braced(self: Parser) -> i32:
     extra_start
 
 fn Parser.parse_enum_variants_block(self: Parser) -> i32:
-    var variants: Vec[i32] = Vec.new()
+    // Parses a backing-less enum body. Collects each variant's name, payloads,
+    // and an optional explicit discriminant (auto-incrementing from the last
+    // value). If no variant carries a payload, the enum is fieldless and an
+    // i32 backing is inferred — it is emitted in discriminant-enum format and
+    // `pending_inferred_disc_repr` records the synthesized backing node so the
+    // caller marks the declaration as a disc enum. With payloads it stays a
+    // plain ADT enum.
+    self.pending_inferred_disc_repr = 0
+    let synth_pos = self.current_start()
+    var names: Vec[i32] = Vec.new()
+    var discs: Vec[i32] = Vec.new()
+    var pcounts: Vec[i32] = Vec.new()
+    var payloads_flat: Vec[i32] = Vec.new()
     var variant_count = 0
     var variant_col = -1
+    var current_disc = 0
+    var has_payload = 0
 
     while self.peek() != TokenKind.TK_EOF:
         let cur_col = column_of(self.source, self.current_start())
@@ -1759,8 +1783,9 @@ fn Parser.parse_enum_variants_block(self: Parser) -> i32:
         let vname = self.expect_ident()
         if vname == 0:
             break
-        var payloads: Vec[i32] = Vec.new()
+        var pcount = 0
         if self.peek() == TokenKind.TK_L_PAREN:
+            has_payload = 1
             self.advance()
             while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
                 if self.peek() == TokenKind.TK_IDENT and
@@ -1771,7 +1796,8 @@ fn Parser.parse_enum_variants_block(self: Parser) -> i32:
                     self.skip_newlines()
                 let before_payload = self.pos
                 let pty = self.parse_type_expr()
-                payloads.push(pty as i32)
+                payloads_flat.push(pty as i32)
+                pcount = pcount + 1
                 if self.peek() == TokenKind.TK_COMMA:
                     self.advance()
                     self.skip_newlines()
@@ -1780,10 +1806,28 @@ fn Parser.parse_enum_variants_block(self: Parser) -> i32:
                     if self.pos == before_payload:
                         self.advance()
             self.expect(TokenKind.TK_R_PAREN)
-        variants.push(vname)
-        variants.push(payloads.len() as i32)
-        for pi in 0..payloads.len() as i32:
-            variants.push(payloads.get(pi as i64))
+        // Optional explicit discriminant (meaningful only for fieldless enums).
+        if self.peek() == TokenKind.TK_EQ:
+            self.advance()
+            self.skip_newlines()
+            var negate = 0
+            if self.peek() == TokenKind.TK_MINUS:
+                negate = 1
+                self.advance()
+            if self.peek() == TokenKind.TK_INT_LIT:
+                let text = self.source.slice(self.current_start() as i64, self.current_end() as i64)
+                let val = parse_i64(text) as i32
+                if negate != 0:
+                    current_disc = 0 - val
+                else:
+                    current_disc = val
+                self.advance()
+            else:
+                self.emit_error("expected integer literal for discriminant value")
+        names.push(vname)
+        discs.push(current_disc)
+        pcounts.push(pcount)
+        current_disc = current_disc + 1
         variant_count = variant_count + 1
         self.skip_newlines()
         if self.peek() == TokenKind.TK_COMMA:
@@ -1794,10 +1838,36 @@ fn Parser.parse_enum_variants_block(self: Parser) -> i32:
         let next_col = column_of(self.source, self.current_start())
         if next_col != variant_col:
             break
+
+    if has_payload == 0:
+        // Fieldless → infer an i32 backing, emit in discriminant-enum format.
+        let i32_repr = self.pool.add_node(NodeKind.NK_TYPE_NAMED, synth_pos, self.prev_end(), self.intern.intern("i32"), 0, 0)
+        self.pending_inferred_disc_repr = i32_repr as i32
+        let extra_start = self.pool.extra_len()
+        self.pool.add_extra(i32_repr as i32)
+        self.pool.add_extra(variant_count)
+        var pidx = 0
+        for vi in 0..variant_count:
+            self.pool.add_extra(names.get(vi as i64))
+            self.pool.add_extra(discs.get(vi as i64))
+            let pc = pcounts.get(vi as i64)
+            self.pool.add_extra(pc)
+            for pj in 0..pc:
+                self.pool.add_extra(payloads_flat.get(pidx as i64))
+                pidx = pidx + 1
+        return extra_start
+
+    // Has payloads → plain ADT enum format: [count, (name, pcount, payloads...)*].
     let extra_start = self.pool.extra_len()
     self.pool.add_extra(variant_count)
-    for vi in 0..variants.len() as i32:
-        self.pool.add_extra(variants.get(vi as i64))
+    var pidx2 = 0
+    for vi in 0..variant_count:
+        self.pool.add_extra(names.get(vi as i64))
+        let pc = pcounts.get(vi as i64)
+        self.pool.add_extra(pc)
+        for pj in 0..pc:
+            self.pool.add_extra(payloads_flat.get(pidx2 as i64))
+            pidx2 = pidx2 + 1
     extra_start
 
 fn Parser.parse_disc_enum_variants(self: Parser, repr_type_node: i32) -> i32:
