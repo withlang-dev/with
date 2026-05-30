@@ -5035,6 +5035,10 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
             if ret_name_sym == type_sym:
                 recv_type = ret_type
     let method_name = self.pool.resolve_symbol(method_sym)
+    if method_name == "as_option":
+        let resolved_recv = self.sema.resolve_alias(recv_type as TypeId)
+        if self.sema.get_type_kind(resolved_recv) == TypeKind.TY_PTR:
+            return self.lower_expr(self_expr)
     let enum_accessor_recv_type = if recv_type != 0 and recv_type != self.sema.ty_void as i32: self.sema.auto_deref_ref_ptr_type(recv_type as TypeId) as i32 else: recv_type
     let enum_accessor_variant = self.sema.enum_accessor_variant_for_method(enum_accessor_recv_type, method_sym)
     if enum_accessor_variant != 0:

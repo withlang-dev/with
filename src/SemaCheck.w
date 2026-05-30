@@ -8569,6 +8569,15 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
         return 0
 
     let resolved = self.resolve_alias(obj_type)
+    let method_name_raw = self.pool_resolve(field)
+    if method_name_raw == "as_option":
+        if self.get_type_kind(resolved) == TypeKind.TY_PTR:
+            if mc_resolved_arg_count != 0:
+                self.emit_error("raw pointer as_option() expects no arguments", node)
+                return 0
+            let opt_ty = self.ensure_option_type_for(resolved as i32)
+            self.typed_expr_types.insert(node, opt_ty)
+            return opt_ty
     // Normalize method receivers through ref/ptr layers so builtin
     // method typing matches field access auto-deref behavior.
     var recv_type = self.auto_deref_ref_ptr_type(resolved)
