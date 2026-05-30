@@ -5791,7 +5791,7 @@ fn Sema.pipeline_generic_builtin_method_exists(self: Sema, owner_sym: i32, field
             return 1
         if field == self.syms.get or field == self.syms.pop or field == self.syms.remove:
             return 1
-        if field == self.syms.len or field == self.syms.contains or field == self.syms.join:
+        if self.is_collection_len_method(field) or field == self.syms.contains or field == self.syms.join:
             return 1
         if field == self.syms.iter or field == self.syms.slot or field == self.syms.get_disjoint:
             return 1
@@ -5804,7 +5804,7 @@ fn Sema.pipeline_generic_builtin_method_exists(self: Sema, owner_sym: i32, field
             return 1
         if field == self.syms.get or field == self.syms.contains or field == self.syms.remove:
             return 1
-        if field == self.syms.len or field == self.syms.keys or field == self.syms.entry:
+        if self.is_collection_len_method(field) or field == self.syms.keys or field == self.syms.entry:
             return 1
         if self.pool_resolve(field) == "increment":
             return 1
@@ -5816,7 +5816,7 @@ fn Sema.pipeline_generic_builtin_method_exists(self: Sema, owner_sym: i32, field
     if owner_sym == self.syms.hashset:
         if field == self.syms.insert or field == self.syms.clear:
             return 1
-        if field == self.syms.contains or field == self.syms.remove or field == self.syms.len:
+        if field == self.syms.contains or field == self.syms.remove or self.is_collection_len_method(field):
             return 1
     if owner_sym == self.syms.slotmap:
         if field == self.syms.new or field == self.syms.insert or field == self.syms.get:
@@ -5825,7 +5825,7 @@ fn Sema.pipeline_generic_builtin_method_exists(self: Sema, owner_sym: i32, field
             return 1
         if field == self.syms.remove or field == self.syms.replace:
             return 1
-        if field == self.syms.contains or field == self.syms.len:
+        if field == self.syms.contains or self.is_collection_len_method(field):
             return 1
     if owner_sym == self.syms.slotmapslot:
         if field == self.syms.get or self.pool_resolve(field) == "set":
@@ -5837,7 +5837,7 @@ fn Sema.pipeline_generic_builtin_method_exists(self: Sema, owner_sym: i32, field
         if field == self.syms.unwrap or field == self.syms.is_ok or field == self.syms.is_err or self.pool_resolve(field) == "unwrap_or":
             return 1
     if owner_sym == self.syms.vecslot or owner_sym == self.syms.vecrange:
-        if field == self.syms.get or self.pool_resolve(field) == "set" or self.pool_resolve(field) == "len":
+        if field == self.syms.get or self.pool_resolve(field) == "set" or self.is_collection_len_method(field):
             return 1
     if owner_sym == self.syms.veciter or owner_sym == self.syms.veciterref or owner_sym == self.syms.veciterplace:
         if field == self.syms.next:
@@ -8019,12 +8019,27 @@ fn Sema.ensure_option_type_for(self: Sema, elem_ty: i32) -> i32:
     args.push(elem_ty)
     self.ensure_generic_inst_type(self.syms.option, args, 1) as i32
 
+fn Sema.collection_len_method_return_type(self: Sema, method_name: str) -> i32:
+    if method_name == "len":
+        return self.ty_usize as i32
+    if method_name == "len32":
+        return self.ty_i32 as i32
+    if method_name == "len64":
+        return self.ty_i64 as i32
+    if method_name == "ulen32":
+        return self.ty_u32 as i32
+    0
+
+fn Sema.is_collection_len_method(self: Sema, field: i32) -> bool:
+    self.collection_len_method_return_type(self.pool_resolve(field)) != 0
+
 fn Sema.builtin_intrinsic_method_return_type(self: Sema, recv_type: i32, owner_sym: i32, field: i32) -> i32:
     if recv_type == 0:
         return 0
     let resolved = self.resolve_alias(recv_type as TypeId)
     let tk = self.get_type_kind(resolved)
     let method_name = self.pool_resolve(field)
+    let len_method_ret = self.collection_len_method_return_type(method_name)
 
     if owner_sym == self.syms.vec:
         if field == self.syms.new or method_name == "with_capacity":
@@ -8058,8 +8073,8 @@ fn Sema.builtin_intrinsic_method_return_type(self: Sema, recv_type: i32, owner_s
                 return self.ensure_option_type_for(elem_ty)
             if field == self.syms.contains:
                 return self.ty_bool as i32
-            if field == self.syms.len:
-                return self.ty_i64 as i32
+            if len_method_ret != 0:
+                return len_method_ret
     if owner_sym == self.syms.slotmapslot:
         if tk == TypeKind.TY_GENERIC_INST:
             if field == self.syms.get:
@@ -8100,8 +8115,8 @@ fn Sema.builtin_intrinsic_method_return_type(self: Sema, recv_type: i32, owner_s
             return self.ty_void as i32
 
     if tk == TypeKind.TY_STR:
-        if field == self.syms.len:
-            return self.ty_i64 as i32
+        if len_method_ret != 0:
+            return len_method_ret
         if method_name == "byte_at":
             return self.ty_i32 as i32
         if field == self.syms.contains or field == self.syms.starts_with or field == self.syms.ends_with:
@@ -8113,8 +8128,8 @@ fn Sema.builtin_intrinsic_method_return_type(self: Sema, recv_type: i32, owner_s
         if method_name == "split":
             return self.ensure_vec_str_type()
     if tk == TypeKind.TY_ARRAY:
-        if field == self.syms.len:
-            return self.ty_i32 as i32
+        if len_method_ret != 0:
+            return len_method_ret
     if tk == TypeKind.TY_INT:
         if method_name == "rotate_left" or method_name == "rotate_right" or method_name == "swap_bytes" or method_name == "bitreverse" or method_name == "min" or method_name == "max":
             return recv_type
@@ -8939,6 +8954,7 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                     if self.builtin_arg_type_compatible(slot_elem_ty, set_arg_ty) == 0:
                         self.emit_argument_type_mismatch(mc_call_name, 0, 0, 0, slot_elem_ty, set_arg_ty, self.ast.get_extra(extra_start))
         // Return types for builtin generic methods
+        let generic_len_ret = self.collection_len_method_return_type(mc_method_name_raw)
         if type_name_sym == self.syms.vec:
             if field == self.syms.push:
                 return recv_type as i32
@@ -8946,8 +8962,8 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                 return self.ty_void as i32
             if field == self.syms.get or field == self.syms.pop or field == self.syms.remove:
                 return self.get_generic_inst_arg(recv_type, 0)
-            if field == self.syms.len:
-                return self.ty_i64 as i32
+            if generic_len_ret != 0:
+                return generic_len_ret
             if field == self.syms.contains:
                 return self.ty_bool as i32
             if field == self.syms.join:
@@ -9031,8 +9047,8 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                 return self.get_generic_inst_arg(recv_type, 0)
             if mc_method_name_raw == "set":
                 return self.ty_void as i32
-            if mc_method_name_raw == "len":
-                return self.ty_i64 as i32
+            if generic_len_ret != 0:
+                return generic_len_ret
         if type_name_sym == self.syms.veciterplace:
             if field == self.syms.next:
                 let ip_elem_ty = self.get_generic_inst_arg(recv_type, 0)
@@ -9079,8 +9095,8 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                 return self.ty_bool as i32
             if field == self.syms.remove:
                 return self.get_generic_inst_arg(recv_type, 1)
-            if field == self.syms.len:
-                return self.ty_i64 as i32
+            if generic_len_ret != 0:
+                return generic_len_ret
             if field == self.syms.keys:
                 let key_ty = self.get_generic_inst_arg(recv_type, 0)
                 let key_vec_tid = self.find_generic_inst(self.syms.vec, key_ty)
@@ -9108,8 +9124,8 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                 return self.ty_void as i32
             if field == self.syms.contains or field == self.syms.remove:
                 return self.ty_bool as i32
-            if field == self.syms.len:
-                return self.ty_i64 as i32
+            if generic_len_ret != 0:
+                return generic_len_ret
         if type_name_sym == self.syms.slotmap:
             let sm_elem_ret_ty = self.get_generic_inst_arg(recv_type, 0)
             if field == self.syms.insert:
@@ -9128,8 +9144,8 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                 return self.ensure_option_type_for(sm_elem_ret_ty)
             if field == self.syms.contains:
                 return self.ty_bool as i32
-            if field == self.syms.len:
-                return self.ty_i64 as i32
+            if generic_len_ret != 0:
+                return generic_len_ret
         if type_name_sym == self.syms.slotmapslot:
             if field == self.syms.get:
                 return self.get_generic_inst_arg(recv_type, 0)
@@ -9158,15 +9174,16 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
 
     // Return types for primitive type methods
     let resolved_tk = self.get_type_kind(recv_type)
+    let primitive_len_ret = self.collection_len_method_return_type(self.pool_resolve(field))
     if resolved_tk == TypeKind.TY_STR:
-        if field == self.syms.len:
-            return self.ty_i64 as i32
+        if primitive_len_ret != 0:
+            return primitive_len_ret
         let str_builtin_ret = self.builtin_intrinsic_method_return_type(recv_type as i32, type_name_sym, field)
         if str_builtin_ret != 0:
             return str_builtin_ret
     if resolved_tk == TypeKind.TY_ARRAY:
-        if field == self.syms.len:
-            return self.ty_i32 as i32
+        if primitive_len_ret != 0:
+            return primitive_len_ret
 
     // Static method call on a named type expression.
     if static_type_sym != 0 and self.static_receiver_type_is_known(expr) != 0:

@@ -246,6 +246,42 @@ change harder. If surrounding code is ugly, improve the shape locally as
 part of the change instead of preserving the ugliness. Prefer small named
 helpers, clear predicates, typed data, and readable control flow.
 
+Use the language ergonomics. Closed sets are enums, not integer constants
+or nullary functions. Enum variant names live under the enum namespace, so
+do not repeat the enum name in every variant (`CcCalleeHint.NONE`, not
+`CcCalleeHint.CC_CALLEE_HINT_NONE`). Omit redundant type annotations when
+the initializer already determines the type, especially `: i32` on integer
+values.
+
+Give tag enums an integer backing type (`enum Thing: i32:`). The backing
+type is load-bearing, not decoration: a backing-less `enum Thing:` is a
+non-Copy tagged ADT, while `enum Thing: i32:` is a Copy integer tag. Any
+enum that is passed by value, stored in a `Vec`/`HashMap`, compared, or used
+as a lightweight tag (like `TypeKind`, `NodeKind`, `MirIntrinsic`,
+`CcBuiltin`) must be `: i32`-backed, or the move-checker will reject ordinary
+by-value use. Only omit the backing type for true sum types whose variants
+carry payloads and are meant to be moved.
+
+Use semantic types at semantic boundaries. If a value represents a
+`MirIntrinsic`, `TypeKind`, `NodeKind`, `BinaryOp`, or local enum such as
+`CcBuiltin`, helper parameters and return types should use that enum type,
+not `i32`. Raw integers are acceptable only at real storage, wire-format,
+FFI, table-index, or bitfield boundaries. Convert at the boundary and keep
+the rest of the code typed.
+
+When cleaning a bad local pattern, clean the whole touched slice. Do not
+make the maintainer point out each leftover instance one by one. If you
+replace function-shaped constants with an enum, update the helper
+signatures, sentinel checks, variant names, and nearby callers in the same
+logical change. If you cannot complete that cleanup safely, stop and explain
+the exact boundary instead of leaving a half-modernized hybrid.
+
+Write With like With. Prefer `enum Thing: A B C` plus `Thing.A` over
+C-style prefixes, prefer `let x = value` over redundant annotations, and
+prefer small typed helpers over long chains of stringly or integerly
+conditionals. Existing bad style is context to improve, not precedent to
+copy.
+
 ### Shell commands
 
 Compiler, migrator, runtime, and stdlib code must not assemble shell

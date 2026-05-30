@@ -3143,6 +3143,25 @@ fn Codegen.mir_intrinsic_dest_sema_type(self: Codegen, body: MirBody, dest_place
         return 0
     body.local_type_ids.get(local_id as i64)
 
+fn Codegen.mir_convert_len_method_result(self: Codegen, raw_len: i64, intrinsic: MirIntrinsic) -> i64:
+    let i64_ty = wl_i64_type(self.context)
+    let i32_ty = wl_i32_type(self.context)
+    let raw64 = self.coerce_int_ext(raw_len, i64_ty, true)
+    if mir_intrinsic_is_len64(intrinsic):
+        return raw64
+    if mir_intrinsic_is_len32(intrinsic) or mir_intrinsic_is_ulen32(intrinsic):
+        let max_value: i64 = if mir_intrinsic_is_len32(intrinsic): 2147483647 else: 4294967295
+        let too_big = wl_build_icmp(self.builder, wl_int_ugt(), raw64, wl_const_int(i64_ty, max_value, 0))
+        let panic_bb = wl_append_bb(self.context, self.current_function, "len.narrow.panic")
+        let ok_bb = wl_append_bb(self.context, self.current_function, "len.narrow.ok")
+        wl_build_cond_br(self.builder, too_big, panic_bb, ok_bb)
+        wl_position_at_end(self.builder, panic_bb)
+        let msg = if mir_intrinsic_is_len32(intrinsic): "collection length does not fit in len32()" else: "collection length does not fit in ulen32()"
+        self.emit_runtime_panic(msg)
+        wl_position_at_end(self.builder, ok_bb)
+        return wl_build_trunc(self.builder, raw64, i32_ty)
+    raw64
+
 fn Codegen.mir_vec_elem_size(self: Codegen, body: MirBody, dest_place: i32) -> i64:
     // Determine Vec element size from dest place sema type (TypeKind.TY_GENERIC_INST).
     let sema_ty = self.mir_intrinsic_dest_sema_type(body, dest_place)
@@ -3887,157 +3906,165 @@ fn Codegen.ast_static_type_expr(self: Codegen, node: i32) -> i32:
         return self.sema.find_generic_inst_type(base_sym, args, arg_count) as i32
     0
 
-fn Codegen.classify_generic_call_intrinsic(self: Codegen, recv_type: i32, method_sym: i32) -> i32:
+fn Codegen.classify_generic_call_intrinsic(self: Codegen, recv_type: i32, method_sym: i32) -> MirIntrinsic:
     if recv_type == 0 or method_sym == 0:
-        return MirIntrinsic.MIR_INTRINSIC_NONE
+        return MirIntrinsic.NONE
     let resolved = self.sema.resolve_alias(recv_type as TypeId)
     let tk = self.sema.get_type_kind(resolved)
+    let method_name = self.intern.resolve(method_sym)
     if tk == TypeKind.TY_STR:
-        if method_sym == self.sym_len:
-            return MirIntrinsic.MIR_INTRINSIC_STR_LEN
-        return MirIntrinsic.MIR_INTRINSIC_NONE
+        let str_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.STR_LEN, method_name)
+        if str_len_intrinsic != MirIntrinsic.NONE:
+            return str_len_intrinsic
+        return MirIntrinsic.NONE
     if tk == TypeKind.TY_ARRAY:
-        if method_sym == self.sym_len:
-            return MirIntrinsic.MIR_INTRINSIC_ARR_LEN
-        return MirIntrinsic.MIR_INTRINSIC_NONE
+        let arr_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.ARR_LEN, method_name)
+        if arr_len_intrinsic != MirIntrinsic.NONE:
+            return arr_len_intrinsic
+        return MirIntrinsic.NONE
     let type_name_sym = self.sema.get_type_name(resolved)
     if type_name_sym == 0:
-        return MirIntrinsic.MIR_INTRINSIC_NONE
+        return MirIntrinsic.NONE
     let type_name = self.intern.resolve(type_name_sym)
-    let method_name = self.intern.resolve(method_sym)
     if type_name == "Vec":
-        if method_name == "new": return MirIntrinsic.MIR_INTRINSIC_VEC_NEW
-        if method_name == "with_capacity": return MirIntrinsic.MIR_INTRINSIC_VEC_WITH_CAPACITY
-        if method_name == "push": return MirIntrinsic.MIR_INTRINSIC_VEC_PUSH
-        if method_name == "get": return MirIntrinsic.MIR_INTRINSIC_VEC_GET
-        if method_name == "len": return MirIntrinsic.MIR_INTRINSIC_VEC_LEN
-        if method_name == "set_i32": return MirIntrinsic.MIR_INTRINSIC_VEC_SET
-        if method_name == "remove": return MirIntrinsic.MIR_INTRINSIC_VEC_REMOVE
-        if method_name == "clear": return MirIntrinsic.MIR_INTRINSIC_VEC_CLEAR
-        if method_name == "pop": return MirIntrinsic.MIR_INTRINSIC_VEC_POP
-        if method_name == "iter": return MirIntrinsic.MIR_INTRINSIC_VEC_ITER
-        if method_name == "iter_ref": return MirIntrinsic.MIR_INTRINSIC_VEC_ITER_REF
-        if method_name == "slot": return MirIntrinsic.MIR_INTRINSIC_VEC_SLOT
-        if method_name == "get_disjoint": return MirIntrinsic.MIR_INTRINSIC_VEC_GET_DISJOINT
-        if method_name == "range": return MirIntrinsic.MIR_INTRINSIC_VEC_RANGE
-        if method_name == "iter_place": return MirIntrinsic.MIR_INTRINSIC_VEC_ITER_PLACE
-        if method_name == "map": return MirIntrinsic.MIR_INTRINSIC_VEC_MAP
-        if method_name == "filter": return MirIntrinsic.MIR_INTRINSIC_VEC_FILTER
-        if method_name == "fold": return MirIntrinsic.MIR_INTRINSIC_VEC_FOLD
-        if method_name == "contains": return MirIntrinsic.MIR_INTRINSIC_VEC_CONTAINS
-        if method_name == "join": return MirIntrinsic.MIR_INTRINSIC_VEC_JOIN
-        return MirIntrinsic.MIR_INTRINSIC_NONE
+        if method_name == "new": return MirIntrinsic.VEC_NEW
+        if method_name == "with_capacity": return MirIntrinsic.VEC_WITH_CAPACITY
+        if method_name == "push": return MirIntrinsic.VEC_PUSH
+        if method_name == "get": return MirIntrinsic.VEC_GET
+        let vec_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.VEC_LEN, method_name)
+        if vec_len_intrinsic != MirIntrinsic.NONE: return vec_len_intrinsic
+        if method_name == "set_i32": return MirIntrinsic.VEC_SET
+        if method_name == "remove": return MirIntrinsic.VEC_REMOVE
+        if method_name == "clear": return MirIntrinsic.VEC_CLEAR
+        if method_name == "pop": return MirIntrinsic.VEC_POP
+        if method_name == "iter": return MirIntrinsic.VEC_ITER
+        if method_name == "iter_ref": return MirIntrinsic.VEC_ITER_REF
+        if method_name == "slot": return MirIntrinsic.VEC_SLOT
+        if method_name == "get_disjoint": return MirIntrinsic.VEC_GET_DISJOINT
+        if method_name == "range": return MirIntrinsic.VEC_RANGE
+        if method_name == "iter_place": return MirIntrinsic.VEC_ITER_PLACE
+        if method_name == "map": return MirIntrinsic.VEC_MAP
+        if method_name == "filter": return MirIntrinsic.VEC_FILTER
+        if method_name == "fold": return MirIntrinsic.VEC_FOLD
+        if method_name == "contains": return MirIntrinsic.VEC_CONTAINS
+        if method_name == "join": return MirIntrinsic.VEC_JOIN
+        return MirIntrinsic.NONE
     if type_name == "VecIter":
         if method_name == "next":
-            return MirIntrinsic.MIR_INTRINSIC_VECITER_NEXT
-        return MirIntrinsic.MIR_INTRINSIC_NONE
+            return MirIntrinsic.VECITER_NEXT
+        return MirIntrinsic.NONE
     if type_name == "VecIterRef":
         if method_name == "next":
-            return MirIntrinsic.MIR_INTRINSIC_VECITERREF_NEXT
-        return MirIntrinsic.MIR_INTRINSIC_NONE
+            return MirIntrinsic.VECITERREF_NEXT
+        return MirIntrinsic.NONE
     if type_name == "VecSlot":
-        if method_name == "get": return MirIntrinsic.MIR_INTRINSIC_VECSLOT_GET
-        if method_name == "set": return MirIntrinsic.MIR_INTRINSIC_VECSLOT_SET
-        return MirIntrinsic.MIR_INTRINSIC_NONE
+        if method_name == "get": return MirIntrinsic.VECSLOT_GET
+        if method_name == "set": return MirIntrinsic.VECSLOT_SET
+        return MirIntrinsic.NONE
     if type_name == "SlotMap":
-        if method_name == "new": return MirIntrinsic.MIR_INTRINSIC_SLOTMAP_NEW
-        if method_name == "insert": return MirIntrinsic.MIR_INTRINSIC_SLOTMAP_INSERT
-        if method_name == "get": return MirIntrinsic.MIR_INTRINSIC_SLOTMAP_GET
-        if method_name == "slot": return MirIntrinsic.MIR_INTRINSIC_SLOTMAP_SLOT
-        if method_name == "remove": return MirIntrinsic.MIR_INTRINSIC_SLOTMAP_REMOVE
-        if method_name == "replace": return MirIntrinsic.MIR_INTRINSIC_SLOTMAP_REPLACE
-        if method_name == "contains": return MirIntrinsic.MIR_INTRINSIC_SLOTMAP_CONTAINS
-        if method_name == "len": return MirIntrinsic.MIR_INTRINSIC_SLOTMAP_LEN
-        if method_name == "get_disjoint": return MirIntrinsic.MIR_INTRINSIC_SLOTMAP_GET_DISJOINT
-        return MirIntrinsic.MIR_INTRINSIC_NONE
+        if method_name == "new": return MirIntrinsic.SLOTMAP_NEW
+        if method_name == "insert": return MirIntrinsic.SLOTMAP_INSERT
+        if method_name == "get": return MirIntrinsic.SLOTMAP_GET
+        if method_name == "slot": return MirIntrinsic.SLOTMAP_SLOT
+        if method_name == "remove": return MirIntrinsic.SLOTMAP_REMOVE
+        if method_name == "replace": return MirIntrinsic.SLOTMAP_REPLACE
+        if method_name == "contains": return MirIntrinsic.SLOTMAP_CONTAINS
+        let slotmap_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.SLOTMAP_LEN, method_name)
+        if slotmap_len_intrinsic != MirIntrinsic.NONE: return slotmap_len_intrinsic
+        if method_name == "get_disjoint": return MirIntrinsic.SLOTMAP_GET_DISJOINT
+        return MirIntrinsic.NONE
     if type_name == "SlotMapSlot":
-        if method_name == "get": return MirIntrinsic.MIR_INTRINSIC_SLOTMAPSLOT_GET
-        if method_name == "set": return MirIntrinsic.MIR_INTRINSIC_SLOTMAPSLOT_SET
-        return MirIntrinsic.MIR_INTRINSIC_NONE
+        if method_name == "get": return MirIntrinsic.SLOTMAPSLOT_GET
+        if method_name == "set": return MirIntrinsic.SLOTMAPSLOT_SET
+        return MirIntrinsic.NONE
     if type_name == "VecRange":
-        if method_name == "get": return MirIntrinsic.MIR_INTRINSIC_VECRANGE_GET
-        if method_name == "set": return MirIntrinsic.MIR_INTRINSIC_VECRANGE_SET
-        if method_name == "len": return MirIntrinsic.MIR_INTRINSIC_VECRANGE_LEN
-        return MirIntrinsic.MIR_INTRINSIC_NONE
+        if method_name == "get": return MirIntrinsic.VECRANGE_GET
+        if method_name == "set": return MirIntrinsic.VECRANGE_SET
+        let vecrange_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.VECRANGE_LEN, method_name)
+        if vecrange_len_intrinsic != MirIntrinsic.NONE: return vecrange_len_intrinsic
+        return MirIntrinsic.NONE
     if type_name == "VecIterPlace":
-        if method_name == "next": return MirIntrinsic.MIR_INTRINSIC_VECITERPLACE_NEXT
-        return MirIntrinsic.MIR_INTRINSIC_NONE
+        if method_name == "next": return MirIntrinsic.VECITERPLACE_NEXT
+        return MirIntrinsic.NONE
     if type_name == "HashMap":
-        if method_name == "new": return MirIntrinsic.MIR_INTRINSIC_MAP_NEW
-        if method_name == "insert": return MirIntrinsic.MIR_INTRINSIC_MAP_INSERT
-        if method_name == "get": return MirIntrinsic.MIR_INTRINSIC_MAP_GET
-        if method_name == "contains": return MirIntrinsic.MIR_INTRINSIC_MAP_CONTAINS
-        if method_name == "len": return MirIntrinsic.MIR_INTRINSIC_MAP_LEN
-        if method_name == "remove": return MirIntrinsic.MIR_INTRINSIC_MAP_REMOVE
-        if method_name == "clear": return MirIntrinsic.MIR_INTRINSIC_MAP_CLEAR
-        if method_name == "increment": return MirIntrinsic.MIR_INTRINSIC_MAP_INCREMENT
-        if method_name == "keys": return MirIntrinsic.MIR_INTRINSIC_MAP_KEYS
-        if method_name == "entry": return MirIntrinsic.MIR_INTRINSIC_MAP_ENTRY
-        return MirIntrinsic.MIR_INTRINSIC_NONE
+        if method_name == "new": return MirIntrinsic.MAP_NEW
+        if method_name == "insert": return MirIntrinsic.MAP_INSERT
+        if method_name == "get": return MirIntrinsic.MAP_GET
+        if method_name == "contains": return MirIntrinsic.MAP_CONTAINS
+        let map_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.MAP_LEN, method_name)
+        if map_len_intrinsic != MirIntrinsic.NONE: return map_len_intrinsic
+        if method_name == "remove": return MirIntrinsic.MAP_REMOVE
+        if method_name == "clear": return MirIntrinsic.MAP_CLEAR
+        if method_name == "increment": return MirIntrinsic.MAP_INCREMENT
+        if method_name == "keys": return MirIntrinsic.MAP_KEYS
+        if method_name == "entry": return MirIntrinsic.MAP_ENTRY
+        return MirIntrinsic.NONE
     if type_name == "HashMapEntry":
-        if method_name == "or_insert": return MirIntrinsic.MIR_INTRINSIC_ENTRY_OR_INSERT
-        if method_name == "get": return MirIntrinsic.MIR_INTRINSIC_ENTRY_GET
-        if method_name == "set": return MirIntrinsic.MIR_INTRINSIC_ENTRY_SET
-        return MirIntrinsic.MIR_INTRINSIC_NONE
+        if method_name == "or_insert": return MirIntrinsic.ENTRY_OR_INSERT
+        if method_name == "get": return MirIntrinsic.ENTRY_GET
+        if method_name == "set": return MirIntrinsic.ENTRY_SET
+        return MirIntrinsic.NONE
     if type_name == "HashSet":
-        if method_name == "new": return MirIntrinsic.MIR_INTRINSIC_MAP_NEW
-        if method_name == "insert": return MirIntrinsic.MIR_INTRINSIC_MAP_INSERT
-        if method_name == "contains": return MirIntrinsic.MIR_INTRINSIC_MAP_CONTAINS
-        if method_name == "len": return MirIntrinsic.MIR_INTRINSIC_MAP_LEN
-        if method_name == "remove": return MirIntrinsic.MIR_INTRINSIC_MAP_REMOVE
-        if method_name == "clear": return MirIntrinsic.MIR_INTRINSIC_MAP_CLEAR
-        return MirIntrinsic.MIR_INTRINSIC_NONE
+        if method_name == "new": return MirIntrinsic.MAP_NEW
+        if method_name == "insert": return MirIntrinsic.MAP_INSERT
+        if method_name == "contains": return MirIntrinsic.MAP_CONTAINS
+        let set_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.MAP_LEN, method_name)
+        if set_len_intrinsic != MirIntrinsic.NONE: return set_len_intrinsic
+        if method_name == "remove": return MirIntrinsic.MAP_REMOVE
+        if method_name == "clear": return MirIntrinsic.MAP_CLEAR
+        return MirIntrinsic.NONE
     if type_name == "Option":
-        if method_name == "unwrap": return MirIntrinsic.MIR_INTRINSIC_OPT_UNWRAP
-        if method_name == "is_some": return MirIntrinsic.MIR_INTRINSIC_OPT_IS_SOME
-        if method_name == "is_none": return MirIntrinsic.MIR_INTRINSIC_OPT_IS_NONE
-        return MirIntrinsic.MIR_INTRINSIC_NONE
+        if method_name == "unwrap": return MirIntrinsic.OPT_UNWRAP
+        if method_name == "is_some": return MirIntrinsic.OPT_IS_SOME
+        if method_name == "is_none": return MirIntrinsic.OPT_IS_NONE
+        return MirIntrinsic.NONE
     if type_name == "Channel":
-        if method_name == "new": return MirIntrinsic.MIR_INTRINSIC_CHAN_CREATE
-        return MirIntrinsic.MIR_INTRINSIC_NONE
+        if method_name == "new": return MirIntrinsic.CHAN_CREATE
+        return MirIntrinsic.NONE
     if type_name == "Sender":
-        if method_name == "send": return MirIntrinsic.MIR_INTRINSIC_CHAN_SEND
-        if method_name == "close": return MirIntrinsic.MIR_INTRINSIC_CHAN_CLOSE
-        return MirIntrinsic.MIR_INTRINSIC_NONE
+        if method_name == "send": return MirIntrinsic.CHAN_SEND
+        if method_name == "close": return MirIntrinsic.CHAN_CLOSE
+        return MirIntrinsic.NONE
     if type_name == "Receiver":
-        if method_name == "recv": return MirIntrinsic.MIR_INTRINSIC_CHAN_RECV
-        if method_name == "close": return MirIntrinsic.MIR_INTRINSIC_CHAN_CLOSE
-        return MirIntrinsic.MIR_INTRINSIC_NONE
+        if method_name == "recv": return MirIntrinsic.CHAN_RECV
+        if method_name == "close": return MirIntrinsic.CHAN_CLOSE
+        return MirIntrinsic.NONE
     if type_name == "Atomic":
-        if method_name == "load": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_LOAD
-        if method_name == "store": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_STORE
-        if method_name == "swap": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_SWAP
-        if method_name == "fetch_add": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_ADD
-        if method_name == "fetch_sub": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_SUB
-        if method_name == "fetch_and": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_AND
-        if method_name == "fetch_or": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_OR
-        if method_name == "fetch_xor": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_XOR
-        if method_name == "fetch_min": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_MIN
-        if method_name == "fetch_max": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_MAX
-        if method_name == "compare_exchange": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_CAS
-        if method_name == "compare_exchange_weak": return MirIntrinsic.MIR_INTRINSIC_ATOMIC_CAS_WEAK
-        return MirIntrinsic.MIR_INTRINSIC_NONE
-    MirIntrinsic.MIR_INTRINSIC_NONE
+        if method_name == "load": return MirIntrinsic.ATOMIC_LOAD
+        if method_name == "store": return MirIntrinsic.ATOMIC_STORE
+        if method_name == "swap": return MirIntrinsic.ATOMIC_SWAP
+        if method_name == "fetch_add": return MirIntrinsic.ATOMIC_FETCH_ADD
+        if method_name == "fetch_sub": return MirIntrinsic.ATOMIC_FETCH_SUB
+        if method_name == "fetch_and": return MirIntrinsic.ATOMIC_FETCH_AND
+        if method_name == "fetch_or": return MirIntrinsic.ATOMIC_FETCH_OR
+        if method_name == "fetch_xor": return MirIntrinsic.ATOMIC_FETCH_XOR
+        if method_name == "fetch_min": return MirIntrinsic.ATOMIC_FETCH_MIN
+        if method_name == "fetch_max": return MirIntrinsic.ATOMIC_FETCH_MAX
+        if method_name == "compare_exchange": return MirIntrinsic.ATOMIC_CAS
+        if method_name == "compare_exchange_weak": return MirIntrinsic.ATOMIC_CAS_WEAK
+        return MirIntrinsic.NONE
+    MirIntrinsic.NONE
 
-fn Codegen.classify_generic_call_intrinsic_by_llvm(self: Codegen, recv_ty: i64, method_sym: i32) -> i32:
+fn Codegen.classify_generic_call_intrinsic_by_llvm(self: Codegen, recv_ty: i64, method_sym: i32) -> MirIntrinsic:
     if recv_ty == 0 or method_sym == 0:
-        return MirIntrinsic.MIR_INTRINSIC_NONE
+        return MirIntrinsic.NONE
     let method_name = self.intern.resolve(method_sym)
     if self.vec_is_vec.contains(recv_ty):
-        if method_name == "push": return MirIntrinsic.MIR_INTRINSIC_VEC_PUSH
-        if method_name == "get": return MirIntrinsic.MIR_INTRINSIC_VEC_GET
-        if method_name == "len": return MirIntrinsic.MIR_INTRINSIC_VEC_LEN
-        if method_name == "set_i32": return MirIntrinsic.MIR_INTRINSIC_VEC_SET
-        if method_name == "remove": return MirIntrinsic.MIR_INTRINSIC_VEC_REMOVE
-        if method_name == "clear": return MirIntrinsic.MIR_INTRINSIC_VEC_CLEAR
-        if method_name == "pop": return MirIntrinsic.MIR_INTRINSIC_VEC_POP
-        if method_name == "iter": return MirIntrinsic.MIR_INTRINSIC_VEC_ITER
-        if method_name == "iter_ref": return MirIntrinsic.MIR_INTRINSIC_VEC_ITER_REF
-        if method_name == "slot": return MirIntrinsic.MIR_INTRINSIC_VEC_SLOT
-        if method_name == "range": return MirIntrinsic.MIR_INTRINSIC_VEC_RANGE
-    MirIntrinsic.MIR_INTRINSIC_NONE
+        if method_name == "push": return MirIntrinsic.VEC_PUSH
+        if method_name == "get": return MirIntrinsic.VEC_GET
+        let vec_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.VEC_LEN, method_name)
+        if vec_len_intrinsic != MirIntrinsic.NONE: return vec_len_intrinsic
+        if method_name == "set_i32": return MirIntrinsic.VEC_SET
+        if method_name == "remove": return MirIntrinsic.VEC_REMOVE
+        if method_name == "clear": return MirIntrinsic.VEC_CLEAR
+        if method_name == "pop": return MirIntrinsic.VEC_POP
+        if method_name == "iter": return MirIntrinsic.VEC_ITER
+        if method_name == "iter_ref": return MirIntrinsic.VEC_ITER_REF
+        if method_name == "slot": return MirIntrinsic.VEC_SLOT
+        if method_name == "range": return MirIntrinsic.VEC_RANGE
+    MirIntrinsic.NONE
 
-fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
+fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: MirIntrinsic, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
     let byte_ty = wl_i8_type(self.context)
     let i64_ty = wl_i64_type(self.context)
     let i32_ty = wl_i32_type(self.context)
@@ -4047,7 +4074,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
     let arg_count = body.call_arg_counts.get(args_id as i64)
     var result: i64 = 0
 
-    if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_NEW:
+    if intrinsic == MirIntrinsic.VEC_NEW:
         var vec_elem_ty = wl_i64_type(self.context)
         let dest_sema_new = self.mir_intrinsic_dest_sema_type(body, dest_place)
         if dest_sema_new > 0:
@@ -4073,7 +4100,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let _ = wl_build_call(self.builder, new_ty, new_fn, vec_data_i64(&args), 2)
         result = wl_build_load(self.builder, vec_ty, alloca)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_WITH_CAPACITY:
+    else if intrinsic == MirIntrinsic.VEC_WITH_CAPACITY:
         let wc_cap = self.mir_intrinsic_arg(body, args_id, 0)
         let wc_cap64 = self.coerce_int_ext(wc_cap, i64_ty, false)
         var wc_elem_ty = i64_ty
@@ -4102,7 +4129,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let _ = wl_build_call(self.builder, wc_ft, wc_fn, vec_data_i64(&wc_args), 3)
         result = wl_build_load(self.builder, wc_vty, wc_al)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_PUSH:
+    else if intrinsic == MirIntrinsic.VEC_PUSH:
         let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let elem_raw = self.mir_intrinsic_arg(body, args_id, 1)
         // Coerce element to match Vec's element type (e.g. f64 literal → f32 for Vec[f32])
@@ -4127,7 +4154,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
                 push_vec_ty = self.get_or_create_vec_type(0, push_elem_ty)
             result = wl_build_load(self.builder, push_vec_ty, recv_ptr)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_GET:
+    else if intrinsic == MirIntrinsic.VEC_GET:
         let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let idx = self.mir_intrinsic_arg(body, args_id, 1)
         let idx64 = self.coerce_int(idx, i64_ty)
@@ -4145,7 +4172,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let raw_ptr = wl_build_call(self.builder, get_ty, get_fn, vec_data_i64(&args), 2)
         result = wl_build_load(self.builder, elem_ty, raw_ptr)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_GET_REF:
+    else if intrinsic == MirIntrinsic.VEC_GET_REF:
         let gr_recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let gr_idx = self.mir_intrinsic_arg(body, args_id, 1)
         let gr_idx64 = self.coerce_int(gr_idx, i64_ty)
@@ -4156,7 +4183,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         gr_args.push(gr_idx64)
         result = wl_build_call(self.builder, gr_ty, gr_fn, vec_data_i64(&gr_args), 2)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_LEN:
+    else if intrinsic == MirIntrinsic.VEC_LEN:
         let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let len_fn = self.ensure_vec_runtime_fn("with_vec_len", i64_ty, 1)
         let len_ty = self.get_vec_fn_type("with_vec_len", i64_ty, 1)
@@ -4164,7 +4191,16 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         args.push(recv_ptr)
         result = wl_build_call(self.builder, len_ty, len_fn, vec_data_i64(&args), 1)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_SET:
+    else if intrinsic == MirIntrinsic.VEC_LEN32 or intrinsic == MirIntrinsic.VEC_LEN64 or intrinsic == MirIntrinsic.VEC_ULEN32:
+        let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+        let len_fn = self.ensure_vec_runtime_fn("with_vec_len", i64_ty, 1)
+        let len_ty = self.get_vec_fn_type("with_vec_len", i64_ty, 1)
+        let args: Vec[i64] = Vec.new()
+        args.push(recv_ptr)
+        let raw_len = wl_build_call(self.builder, len_ty, len_fn, vec_data_i64(&args), 1)
+        result = self.mir_convert_len_method_result(raw_len, intrinsic)
+
+    else if intrinsic == MirIntrinsic.VEC_SET:
         let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let idx = self.mir_intrinsic_arg(body, args_id, 1)
         let val = self.mir_intrinsic_arg(body, args_id, 2)
@@ -4185,7 +4221,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         args.push(val32)
         result = wl_build_call(self.builder, set_ty, set_fn, vec_data_i64(&args), 3)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_REMOVE:
+    else if intrinsic == MirIntrinsic.VEC_REMOVE:
         let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let idx = self.mir_intrinsic_arg(body, args_id, 1)
         let idx64 = self.coerce_int(idx, i64_ty)
@@ -4196,7 +4232,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         args.push(idx64)
         result = wl_build_call(self.builder, remove_ty, remove_fn, vec_data_i64(&args), 2)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_CLEAR:
+    else if intrinsic == MirIntrinsic.VEC_CLEAR:
         let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let clear_fn = self.ensure_vec_runtime_fn("with_vec_clear", void_ty, 1)
         let clear_ty = self.get_vec_fn_type("with_vec_clear", void_ty, 1)
@@ -4204,7 +4240,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         args.push(recv_ptr)
         result = wl_build_call(self.builder, clear_ty, clear_fn, vec_data_i64(&args), 1)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_POP:
+    else if intrinsic == MirIntrinsic.VEC_POP:
         // Pop: get last element, remove it. Simplified: just return default.
         let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let recv = self.mir_intrinsic_recv_vec_value(body, args_id)
@@ -4229,7 +4265,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         rm_args.push(last_idx)
         let _ = wl_build_call(self.builder, remove_ty, remove_fn, vec_data_i64(&rm_args), 2)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_NEW:
+    else if intrinsic == MirIntrinsic.MAP_NEW:
         // Determine key/val sizes from dest sema type (TypeKind.TY_GENERIC_INST).
         var hm_key_size: i64 = 8
         var hm_val_size: i64 = 8
@@ -4275,7 +4311,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let empty = self.build_default_value(hm_ty)
         result = wl_build_insert_value(self.builder, empty, handle, 0)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_INSERT:
+    else if intrinsic == MirIntrinsic.MAP_INSERT:
         let recv_op = body.call_arg_operands.get(arg_start as i64)
         let recv_base_sym = self.mir_map_recv_base_sym(body, recv_op)
         let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
@@ -4312,7 +4348,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         args.push(is_str_val)
         result = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 4)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_GET:
+    else if intrinsic == MirIntrinsic.MAP_GET:
         let recv_op = body.call_arg_operands.get(arg_start as i64)
         let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
         let key_raw = self.mir_intrinsic_arg(body, args_id, 1)
@@ -4352,7 +4388,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         else:
             result = val
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_CONTAINS:
+    else if intrinsic == MirIntrinsic.MAP_CONTAINS:
         let recv_op = body.call_arg_operands.get(arg_start as i64)
         let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
         let key_raw = self.mir_intrinsic_arg(body, args_id, 1)
@@ -4374,7 +4410,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let raw = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 3)
         result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(i64_ty, 0, 0))
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_LEN:
+    else if intrinsic == MirIntrinsic.MAP_LEN:
         let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
         let fn_val = self.ensure_hm_fn("with_hashmap_len", i64_ty)
         let fn_ty = wl_function_type(i64_ty, vec_data_i64(&self.make_ptr_vec()), 1, 0)
@@ -4382,7 +4418,16 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         args.push(map_ptr)
         result = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 1)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_REMOVE:
+    else if intrinsic == MirIntrinsic.MAP_LEN32 or intrinsic == MirIntrinsic.MAP_LEN64 or intrinsic == MirIntrinsic.MAP_ULEN32:
+        let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
+        let fn_val = self.ensure_hm_fn("with_hashmap_len", i64_ty)
+        let fn_ty = wl_function_type(i64_ty, vec_data_i64(&self.make_ptr_vec()), 1, 0)
+        let args: Vec[i64] = Vec.new()
+        args.push(map_ptr)
+        let raw_len = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 1)
+        result = self.mir_convert_len_method_result(raw_len, intrinsic)
+
+    else if intrinsic == MirIntrinsic.MAP_REMOVE:
         let recv_op = body.call_arg_operands.get(arg_start as i64)
         let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
         let key_raw = self.mir_intrinsic_arg(body, args_id, 1)
@@ -4425,7 +4470,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
             let raw = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 4)
             result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(i64_ty, 0, 0))
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_CLEAR:
+    else if intrinsic == MirIntrinsic.MAP_CLEAR:
         let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
         let fn_val = self.ensure_hm_fn("with_hashmap_clear", void_ty)
         let fn_ty = wl_function_type(void_ty, vec_data_i64(&self.make_ptr_vec()), 1, 0)
@@ -4433,7 +4478,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         args.push(map_ptr)
         result = wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 1)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_KEYS:
+    else if intrinsic == MirIntrinsic.MAP_KEYS:
         let recv_op = body.call_arg_operands.get(arg_start as i64)
         let map_ptr = self.mir_intrinsic_map_handle(body, args_id)
         var key_ty = self.mir_hashmap_key_type(body, recv_op)
@@ -4461,7 +4506,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let _ = wl_build_call(self.builder, keys_ty, keys_fn, vec_data_i64(&keys_args), 3)
         result = wl_build_load(self.builder, vec_ty, out_alloca)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAP_NEW:
+    else if intrinsic == MirIntrinsic.SLOTMAP_NEW:
         var sm_elem_ty = i64_ty
         let sm_dest_sema = self.mir_intrinsic_dest_sema_type(body, dest_place)
         var sm_ty: i64 = 0
@@ -4485,7 +4530,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
             sm_ty = self.get_or_create_slotmap_type(0, sm_elem_ty)
         result = wl_build_insert_value(self.builder, self.build_default_value(sm_ty), sm_handle, 0)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAP_INSERT:
+    else if intrinsic == MirIntrinsic.SLOTMAP_INSERT:
         let sm_map = self.mir_intrinsic_slotmap_handle(body, args_id)
         let sm_val_raw = self.mir_intrinsic_arg(body, args_id, 1)
         let sm_elem_ty = self.mir_slotmap_elem_type_from_recv(body, args_id)
@@ -4512,7 +4557,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         wl_build_call(self.builder, sm_insert_ty, sm_insert_fn, vec_data_i64(&sm_insert_args), 3)
         result = wl_build_load(self.builder, sm_h_ty, sm_out)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAP_GET:
+    else if intrinsic == MirIntrinsic.SLOTMAP_GET:
         let sm_map = self.mir_intrinsic_slotmap_handle(body, args_id)
         let sm_h = self.mir_intrinsic_arg(body, args_id, 1)
         let sm_idx = wl_build_extract_value(self.builder, sm_h, 0)
@@ -4531,7 +4576,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let sm_dest_ty = self.mir_sema_type_to_llvm(self.mir_intrinsic_dest_sema_type(body, dest_place))
         result = if sm_dest_ty != 0 and wl_get_type_kind(sm_dest_ty) == wl_pointer_type_kind(): self.coerce_value_to_type(sm_ptr, sm_dest_ty) else: sm_ptr
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAP_SLOT:
+    else if intrinsic == MirIntrinsic.SLOTMAP_SLOT:
         let sm_map = self.mir_intrinsic_slotmap_handle(body, args_id)
         let sm_h = self.mir_intrinsic_arg(body, args_id, 1)
         let sm_idx = wl_build_extract_value(self.builder, sm_h, 0)
@@ -4548,7 +4593,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let sms_1 = wl_build_insert_value(self.builder, sms_0, sm_idx, 1)
         result = wl_build_insert_value(self.builder, sms_1, sm_gen, 2)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAP_CONTAINS:
+    else if intrinsic == MirIntrinsic.SLOTMAP_CONTAINS:
         let sm_map = self.mir_intrinsic_slotmap_handle(body, args_id)
         let sm_h = self.mir_intrinsic_arg(body, args_id, 1)
         let sm_idx = wl_build_extract_value(self.builder, sm_h, 0)
@@ -4566,7 +4611,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let sm_raw = wl_build_call(self.builder, sm_contains_ty, sm_contains_fn, vec_data_i64(&sm_contains_args), 3)
         result = wl_build_icmp(self.builder, wl_int_ne(), sm_raw, wl_const_int(i32_ty, 0, 0))
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAP_LEN:
+    else if intrinsic == MirIntrinsic.SLOTMAP_LEN:
         let sm_map = self.mir_intrinsic_slotmap_handle(body, args_id)
         let sm_len_fn = self.ensure_c_fn("with_slotmap_len", i64_ty, 1)
         let sm_len_params: Vec[i64] = Vec.new()
@@ -4576,7 +4621,18 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         sm_len_args.push(sm_map)
         result = wl_build_call(self.builder, sm_len_ty, sm_len_fn, vec_data_i64(&sm_len_args), 1)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAP_REMOVE or intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAP_REPLACE:
+    else if intrinsic == MirIntrinsic.SLOTMAP_LEN32 or intrinsic == MirIntrinsic.SLOTMAP_LEN64 or intrinsic == MirIntrinsic.SLOTMAP_ULEN32:
+        let sm_map = self.mir_intrinsic_slotmap_handle(body, args_id)
+        let sm_len_fn = self.ensure_c_fn("with_slotmap_len", i64_ty, 1)
+        let sm_len_params: Vec[i64] = Vec.new()
+        sm_len_params.push(ptr_ty)
+        let sm_len_ty = wl_function_type(i64_ty, vec_data_i64(&sm_len_params), 1, 0)
+        let sm_len_args: Vec[i64] = Vec.new()
+        sm_len_args.push(sm_map)
+        let raw_len = wl_build_call(self.builder, sm_len_ty, sm_len_fn, vec_data_i64(&sm_len_args), 1)
+        result = self.mir_convert_len_method_result(raw_len, intrinsic)
+
+    else if intrinsic == MirIntrinsic.SLOTMAP_REMOVE or intrinsic == MirIntrinsic.SLOTMAP_REPLACE:
         let sm_map = self.mir_intrinsic_slotmap_handle(body, args_id)
         let sm_h = self.mir_intrinsic_arg(body, args_id, 1)
         let sm_idx = wl_build_extract_value(self.builder, sm_h, 0)
@@ -4584,7 +4640,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let sm_elem_ty = self.mir_slotmap_elem_type_from_recv(body, args_id)
         let sm_out = wl_build_alloca(self.builder, sm_elem_ty)
         var sm_found: i64 = 0
-        if intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAP_REMOVE:
+        if intrinsic == MirIntrinsic.SLOTMAP_REMOVE:
             let sm_remove_fn = self.ensure_c_fn("with_slotmap_remove", i32_ty, 4)
             let sm_remove_params: Vec[i64] = Vec.new()
             sm_remove_params.push(ptr_ty)
@@ -4625,7 +4681,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let sm_none = self.build_option_none(sm_opt_ty)
         result = wl_build_select(self.builder, sm_is_found, sm_some, sm_none)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAP_GET_DISJOINT:
+    else if intrinsic == MirIntrinsic.SLOTMAP_GET_DISJOINT:
         let sm_map = self.mir_intrinsic_slotmap_handle(body, args_id)
         let sm_h1 = self.mir_intrinsic_arg(body, args_id, 1)
         let sm_h2 = self.mir_intrinsic_arg(body, args_id, 2)
@@ -4682,7 +4738,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let sm_tuple0 = wl_build_insert_value(self.builder, self.build_default_value(sm_tuple_ty), sm_s0, 0)
         result = wl_build_insert_value(self.builder, sm_tuple0, sm_s1, 1)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAPSLOT_GET:
+    else if intrinsic == MirIntrinsic.SLOTMAPSLOT_GET:
         let sms_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let sms_fields: Vec[i64] = Vec.new()
         sms_fields.push(i64_ty)
@@ -4717,7 +4773,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let sms_elem_ty = self.mir_slotmapslot_elem_type_from_recv(body, args_id)
         result = wl_build_load(self.builder, sms_elem_ty, sms_val_ptr)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_SLOTMAPSLOT_SET:
+    else if intrinsic == MirIntrinsic.SLOTMAPSLOT_SET:
         let sms_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let sms_fields: Vec[i64] = Vec.new()
         sms_fields.push(i64_ty)
@@ -4758,7 +4814,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         wl_position_at_end(self.builder, sms_set_ok)
         result = wl_const_int(i32_ty, 0, 0)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_ENTRY:
+    else if intrinsic == MirIntrinsic.MAP_ENTRY:
         // HashMap.entry(key) → HashMapEntry { map_ptr, key }
         let me_map_ptr = self.mir_intrinsic_map_handle(body, args_id)
         let me_recv_op = body.call_arg_operands.get(arg_start as i64)
@@ -4778,7 +4834,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         wl_build_store(self.builder, me_key, me_f1)
         result = wl_build_load(self.builder, me_struct_ty, me_alloca)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ENTRY_OR_INSERT:
+    else if intrinsic == MirIntrinsic.ENTRY_OR_INSERT:
         // HashMapEntry.or_insert(default) → contains? get : insert+get
         let oi_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let oi_default = self.mir_intrinsic_arg(body, args_id, 1)
@@ -4863,7 +4919,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let _ = wl_build_call(self.builder, oi_g_fn_ty, oi_get_fn, vec_data_i64(&oi_g_args), 4)
         result = wl_build_load(self.builder, oi_val_ty, oi_out_alloca)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ENTRY_GET:
+    else if intrinsic == MirIntrinsic.ENTRY_GET:
         // HashMapEntry.get() → hashmap_get(map_ptr, &key)
         let eg_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let eg_recv_op = body.call_arg_operands.get(arg_start as i64)
@@ -4916,7 +4972,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let _ = wl_build_call(self.builder, eg_g_fn_ty, eg_get_fn, vec_data_i64(&eg_g_args), 4)
         result = wl_build_load(self.builder, eg_val_ty, eg_out_alloca)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ENTRY_SET:
+    else if intrinsic == MirIntrinsic.ENTRY_SET:
         // HashMapEntry.set(value) → hashmap_insert(map_ptr, &key, &value)
         let es_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let es_val = self.mir_intrinsic_arg(body, args_id, 1)
@@ -4959,7 +5015,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         es_i_args.push(es_is_str)
         result = wl_build_call(self.builder, es_i_fn_ty, es_ins_fn, vec_data_i64(&es_i_args), 4)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_OPT_IS_SOME:
+    else if intrinsic == MirIntrinsic.OPT_IS_SOME:
         let recv = self.mir_intrinsic_arg(body, args_id, 0)
         let recv_tk = wl_get_type_kind(wl_type_of(recv))
         if recv_tk == wl_struct_type_kind():
@@ -4972,7 +5028,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
             // Non-struct Option (e.g., raw value) — treat as always Some
             result = wl_const_int(wl_i1_type(self.context), 1, 0)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_OPT_UNWRAP:
+    else if intrinsic == MirIntrinsic.OPT_UNWRAP:
         let recv_op = body.call_arg_operands.get(arg_start as i64)
         let recv_sema = self.mir_operand_sema_type(body, recv_op)
         let recv_resolved = if recv_sema > 0: self.mir_input.mir_resolve_alias(recv_sema) else: 0
@@ -5003,13 +5059,18 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
             // Non-struct Option — return the raw value
             result = recv
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_LEN:
+    else if intrinsic == MirIntrinsic.STR_LEN:
         let recv = self.mir_intrinsic_recv_str_value(body, args_id)
         if self.debug_mir_codegen_enabled():
             with_eprint(f"[mir-str-len] recv_ty_kind={wl_get_type_kind(wl_type_of(recv))}")
         result = wl_build_extract_value(self.builder, recv, 1)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_BYTE_AT:
+    else if intrinsic == MirIntrinsic.STR_LEN32 or intrinsic == MirIntrinsic.STR_LEN64 or intrinsic == MirIntrinsic.STR_ULEN32:
+        let recv = self.mir_intrinsic_recv_str_value(body, args_id)
+        let raw_len = wl_build_extract_value(self.builder, recv, 1)
+        result = self.mir_convert_len_method_result(raw_len, intrinsic)
+
+    else if intrinsic == MirIntrinsic.STR_BYTE_AT:
         let recv = self.mir_intrinsic_recv_str_value(body, args_id)
         let index = self.mir_intrinsic_arg(body, args_id, 1)
         let index64 = self.coerce_int(index, i64_ty)
@@ -5019,7 +5080,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         args.push(index64)
         result = wl_build_call(self.builder, self.get_runtime_fn_type("with_str_byte_at", i32_ty, 2), fn_val, vec_data_i64(&args), 2)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_SLICE:
+    else if intrinsic == MirIntrinsic.STR_SLICE:
         let recv = self.mir_intrinsic_recv_str_value(body, args_id)
         let str_ptr = wl_build_extract_value(self.builder, recv, 0)
         let start = self.mir_intrinsic_arg(body, args_id, 1)
@@ -5033,7 +5094,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let new_len = wl_build_sub(self.builder, end64, start64)
         result = self.build_str_value(new_ptr, new_len)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_CONTAINS:
+    else if intrinsic == MirIntrinsic.STR_CONTAINS:
         let recv = self.mir_intrinsic_recv_str_value(body, args_id)
         let needle = self.mir_intrinsic_arg(body, args_id, 1)
         let fn_val = self.ensure_c_fn("with_str_contains", i32_ty, 2)
@@ -5043,7 +5104,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let raw = wl_build_call(self.builder, self.get_runtime_fn_type("with_str_contains", i32_ty, 2), fn_val, vec_data_i64(&args), 2)
         result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(i32_ty, 0, 0))
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_STARTS_WITH:
+    else if intrinsic == MirIntrinsic.STR_STARTS_WITH:
         let recv = self.mir_intrinsic_recv_str_value(body, args_id)
         let prefix = self.mir_intrinsic_arg(body, args_id, 1)
         let fn_val = self.ensure_c_fn("with_str_starts_with", i32_ty, 2)
@@ -5053,7 +5114,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let raw = wl_build_call(self.builder, self.get_runtime_fn_type("with_str_starts_with", i32_ty, 2), fn_val, vec_data_i64(&args), 2)
         result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(i32_ty, 0, 0))
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_ENDS_WITH:
+    else if intrinsic == MirIntrinsic.STR_ENDS_WITH:
         let recv = self.mir_intrinsic_recv_str_value(body, args_id)
         let suffix = self.mir_intrinsic_arg(body, args_id, 1)
         let fn_val = self.ensure_c_fn("with_str_ends_with", i32_ty, 2)
@@ -5063,7 +5124,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let raw = wl_build_call(self.builder, self.get_runtime_fn_type("with_str_ends_with", i32_ty, 2), fn_val, vec_data_i64(&args), 2)
         result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(i32_ty, 0, 0))
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_FIND:
+    else if intrinsic == MirIntrinsic.STR_FIND:
         let recv = self.mir_intrinsic_recv_str_value(body, args_id)
         let needle = self.mir_intrinsic_arg(body, args_id, 1)
         let fn_val = self.ensure_c_fn("with_str_index_of", i64_ty, 2)
@@ -5072,7 +5133,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         args.push(needle)
         result = wl_build_call(self.builder, self.get_runtime_fn_type("with_str_index_of", i64_ty, 2), fn_val, vec_data_i64(&args), 2)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VECITER_NEXT:
+    else if intrinsic == MirIntrinsic.VECITER_NEXT:
         // VecIter[T].next() — advance iterator, return Option[T]
         // VecIter = { data_ptr: i64, len: i64, idx: i64 }
         let iter_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
@@ -5143,7 +5204,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         wl_add_incoming(phi, vec_data_i64(&phi_vals), vec_data_i64(&phi_bbs), 2)
         result = phi
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_ITER:
+    else if intrinsic == MirIntrinsic.VEC_ITER:
         // Vec.iter() — create VecIter[T] from Vec
         // VecIter = { data_ptr: i64, len: i64, idx: i64 }
         let recv = self.mir_intrinsic_recv_vec_value(body, args_id)
@@ -5164,7 +5225,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), f2)
         result = wl_build_load(self.builder, iter_struct_ty, iter_alloca)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_ITER_REF:
+    else if intrinsic == MirIntrinsic.VEC_ITER_REF:
         // Vec.iter_ref() — create VecIterRef[T] from Vec (same layout as VecIter)
         let iref_recv = self.mir_intrinsic_recv_vec_value(body, args_id)
         let iref_fields: Vec[i64] = Vec.new()
@@ -5184,7 +5245,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), iref_f2)
         result = wl_build_load(self.builder, iref_struct_ty, iref_alloca)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VECITERREF_NEXT:
+    else if intrinsic == MirIntrinsic.VECITERREF_NEXT:
         // VecIterRef[T].next() — advance iterator, return Option[&T] (nullable pointer)
         let irn_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let irn_fields: Vec[i64] = Vec.new()
@@ -5231,7 +5292,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         wl_add_incoming(irn_phi, vec_data_i64(&irn_phi_vals), vec_data_i64(&irn_phi_bbs), 2)
         result = irn_phi
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_SLOT:
+    else if intrinsic == MirIntrinsic.VEC_SLOT:
         // Vec.slot(index) — create VecSlot[T] from Vec
         // VecSlot = { data_ptr: i64, index: i64 }
         let vs_recv = self.mir_intrinsic_recv_vec_value(body, args_id)
@@ -5249,7 +5310,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         wl_build_store(self.builder, vs_index, sf1)
         result = wl_build_load(self.builder, slot_struct_ty, slot_alloca)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_GET_DISJOINT:
+    else if intrinsic == MirIntrinsic.VEC_GET_DISJOINT:
         // Vec.get_disjoint(i, j) — return (VecSlot[T], VecSlot[T])
         // Panics if indices out of bounds or equal
         let gd_recv = self.mir_intrinsic_recv_vec_value(body, args_id)
@@ -5302,7 +5363,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         wl_build_store(self.builder, gd_slot_b, gd_tf1)
         result = wl_build_load(self.builder, gd_tup_ty, gd_tup)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_RANGE:
+    else if intrinsic == MirIntrinsic.VEC_RANGE:
         // Vec.range(start..end) — create VecRange[T] = { data_ptr: i64, offset: i64, len: i64 }
         let vr_recv = self.mir_intrinsic_recv_vec_value(body, args_id)
         let vr_range = self.mir_intrinsic_arg(body, args_id, 1)
@@ -5345,7 +5406,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         wl_build_store(self.builder, vr_range_len, vr_f2)
         result = wl_build_load(self.builder, vr_struct_ty, vr_alloca)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VECRANGE_GET:
+    else if intrinsic == MirIntrinsic.VECRANGE_GET:
         // VecRange[T].get(i) — load element at data_ptr[offset + i]
         let vrg_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let vrg_idx = self.mir_intrinsic_arg(body, args_id, 1)
@@ -5383,7 +5444,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let vrg_elem_ptr = wl_build_gep(self.builder, vrg_elem_ty, vrg_typed_ptr, vec_data_i64(&vrg_gep), 1)
         result = wl_build_load(self.builder, vrg_elem_ty, vrg_elem_ptr)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VECRANGE_SET:
+    else if intrinsic == MirIntrinsic.VECRANGE_SET:
         // VecRange[T].set(i, value) — store value at data_ptr[offset + i]
         let vrs_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let vrs_idx = self.mir_intrinsic_arg(body, args_id, 1)
@@ -5417,7 +5478,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let vrs_elem_ptr = wl_build_gep(self.builder, vrs_elem_ty, vrs_typed_ptr, vec_data_i64(&vrs_gep), 1)
         wl_build_store(self.builder, vrs_val, vrs_elem_ptr)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VECRANGE_LEN:
+    else if intrinsic == MirIntrinsic.VECRANGE_LEN:
         // VecRange[T].len() — return len field (field 2 of {i64,i64,i64})
         let vrl_recv = self.mir_intrinsic_arg(body, args_id, 0)
         if wl_get_type_kind(wl_type_of(vrl_recv)) == wl_struct_type_kind():
@@ -5432,7 +5493,23 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
             let vrl_len_ptr = wl_build_struct_gep(self.builder, vrl_struct_ty, vrl_ptr, 2)
             result = wl_build_load(self.builder, i64_ty, vrl_len_ptr)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_ITER_PLACE:
+    else if intrinsic == MirIntrinsic.VECRANGE_LEN32 or intrinsic == MirIntrinsic.VECRANGE_LEN64 or intrinsic == MirIntrinsic.VECRANGE_ULEN32:
+        let vrl_recv = self.mir_intrinsic_arg(body, args_id, 0)
+        var raw_len: i64 = 0
+        if wl_get_type_kind(wl_type_of(vrl_recv)) == wl_struct_type_kind():
+            raw_len = wl_build_extract_value(self.builder, vrl_recv, 2)
+        else:
+            let vrl_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+            let vrl_fields: Vec[i64] = Vec.new()
+            vrl_fields.push(i64_ty)
+            vrl_fields.push(i64_ty)
+            vrl_fields.push(i64_ty)
+            let vrl_struct_ty = wl_struct_type(self.context, vec_data_i64(&vrl_fields), 3, 0)
+            let vrl_len_ptr = wl_build_struct_gep(self.builder, vrl_struct_ty, vrl_ptr, 2)
+            raw_len = wl_build_load(self.builder, i64_ty, vrl_len_ptr)
+        result = self.mir_convert_len_method_result(raw_len, intrinsic)
+
+    else if intrinsic == MirIntrinsic.VEC_ITER_PLACE:
         // Vec.iter_place() — create VecIterPlace[T] from Vec
         // VecIterPlace = { data_ptr: i64, len: i64, idx: i64 }
         let vip_recv = self.mir_intrinsic_recv_vec_value(body, args_id)
@@ -5453,7 +5530,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), vip_f2)
         result = wl_build_load(self.builder, vip_struct_ty, vip_alloca)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VECITERPLACE_NEXT:
+    else if intrinsic == MirIntrinsic.VECITERPLACE_NEXT:
         // VecIterPlace[T].next() — advance iterator, return Option[VecSlot[T]]
         // VecIterPlace = { data_ptr: i64, len: i64, idx: i64 }
         // VecSlot = { data_ptr: i64, index: i64 }
@@ -5506,7 +5583,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         wl_add_incoming(ipn_phi, vec_data_i64(&ipn_phi_vals), vec_data_i64(&ipn_phi_bbs), 2)
         result = ipn_phi
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VECSLOT_GET:
+    else if intrinsic == MirIntrinsic.VECSLOT_GET:
         // VecSlot[T].get() — load element from data_ptr[index]
         // VecSlot = { data_ptr: i64, index: i64 }
         let sg_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
@@ -5530,7 +5607,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let sg_elem_ptr = wl_build_gep(self.builder, sg_elem_ty, sg_typed_ptr, vec_data_i64(&sg_gep_indices), 1)
         result = wl_build_load(self.builder, sg_elem_ty, sg_elem_ptr)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VECSLOT_SET:
+    else if intrinsic == MirIntrinsic.VECSLOT_SET:
         // VecSlot[T].set(value) — store value at data_ptr[index]
         let ss_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let ss_val = self.mir_intrinsic_arg(body, args_id, 1)
@@ -5549,7 +5626,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let ss_elem_ptr = wl_build_gep(self.builder, ss_elem_ty, ss_typed_ptr, vec_data_i64(&ss_gep_indices), 1)
         wl_build_store(self.builder, ss_val, ss_elem_ptr)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_LOAD:
+    else if intrinsic == MirIntrinsic.ATOMIC_LOAD:
         // Atomic[T].load(order) — atomic load from field 0 (val)
         let al_recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let al_order_raw = self.mir_intrinsic_arg(body, args_id, 1)
@@ -5562,7 +5639,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let al_order = if self.is_const_int_value(al_order_raw): wl_const_int_sext_val(al_order_raw) as i32 else: AtomicOrdering.SEQ_CST
         result = wl_build_atomic_load(self.builder, al_elem_ty, al_val_ptr, al_order)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_STORE:
+    else if intrinsic == MirIntrinsic.ATOMIC_STORE:
         // Atomic[T].store(val, order) — atomic store to field 0
         let as_recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let as_val = self.mir_intrinsic_arg(body, args_id, 1)
@@ -5572,7 +5649,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let as_order = if self.is_const_int_value(as_order_raw): wl_const_int_sext_val(as_order_raw) as i32 else: AtomicOrdering.SEQ_CST
         wl_build_atomic_store(self.builder, as_val, as_val_ptr, as_order)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_SWAP or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_ADD or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_SUB or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_AND or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_OR or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_XOR or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_MIN or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_MAX:
+    else if intrinsic == MirIntrinsic.ATOMIC_SWAP or intrinsic == MirIntrinsic.ATOMIC_FETCH_ADD or intrinsic == MirIntrinsic.ATOMIC_FETCH_SUB or intrinsic == MirIntrinsic.ATOMIC_FETCH_AND or intrinsic == MirIntrinsic.ATOMIC_FETCH_OR or intrinsic == MirIntrinsic.ATOMIC_FETCH_XOR or intrinsic == MirIntrinsic.ATOMIC_FETCH_MIN or intrinsic == MirIntrinsic.ATOMIC_FETCH_MAX:
         // Atomic[T].fetch_*(val, order) — atomicrmw on field 0
         let ar_recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let ar_val = self.mir_intrinsic_arg(body, args_id, 1)
@@ -5580,18 +5657,18 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let ar_recv_ty = self.mir_intrinsic_recv_storage_type(body, args_id, ar_recv_ptr)
         let ar_val_ptr = wl_build_struct_gep(self.builder, ar_recv_ty, ar_recv_ptr, 0)
         let ar_order = if self.is_const_int_value(ar_order_raw): wl_const_int_sext_val(ar_order_raw) as i32 else: AtomicOrdering.SEQ_CST
-        let ar_rmw_op = if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_SWAP: AtomicRmwOp.XCHG
-            else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_ADD: AtomicRmwOp.ADD
-            else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_SUB: AtomicRmwOp.SUB
-            else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_AND: AtomicRmwOp.AND
-            else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_OR: AtomicRmwOp.OR
-            else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_XOR: AtomicRmwOp.XOR
-            else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_MIN: AtomicRmwOp.MIN
-            else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FETCH_MAX: AtomicRmwOp.MAX
+        let ar_rmw_op = if intrinsic == MirIntrinsic.ATOMIC_SWAP: AtomicRmwOp.XCHG
+            else if intrinsic == MirIntrinsic.ATOMIC_FETCH_ADD: AtomicRmwOp.ADD
+            else if intrinsic == MirIntrinsic.ATOMIC_FETCH_SUB: AtomicRmwOp.SUB
+            else if intrinsic == MirIntrinsic.ATOMIC_FETCH_AND: AtomicRmwOp.AND
+            else if intrinsic == MirIntrinsic.ATOMIC_FETCH_OR: AtomicRmwOp.OR
+            else if intrinsic == MirIntrinsic.ATOMIC_FETCH_XOR: AtomicRmwOp.XOR
+            else if intrinsic == MirIntrinsic.ATOMIC_FETCH_MIN: AtomicRmwOp.MIN
+            else if intrinsic == MirIntrinsic.ATOMIC_FETCH_MAX: AtomicRmwOp.MAX
             else: AtomicRmwOp.XCHG
         result = wl_build_atomic_rmw(self.builder, ar_rmw_op, ar_val_ptr, ar_val, ar_order)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_CAS or intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_CAS_WEAK:
+    else if intrinsic == MirIntrinsic.ATOMIC_CAS or intrinsic == MirIntrinsic.ATOMIC_CAS_WEAK:
         // compare_exchange(expected, desired, success_order, failure_order)
         let cas_recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
         let cas_expected = self.mir_intrinsic_arg(body, args_id, 1)
@@ -5602,17 +5679,17 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let cas_val_ptr = wl_build_struct_gep(self.builder, cas_recv_ty, cas_recv_ptr, 0)
         let cas_success_order = if self.is_const_int_value(cas_success_raw): wl_const_int_sext_val(cas_success_raw) as i32 else: AtomicOrdering.SEQ_CST
         let cas_failure_order = if self.is_const_int_value(cas_failure_raw): wl_const_int_sext_val(cas_failure_raw) as i32 else: AtomicOrdering.SEQ_CST
-        let cas_is_weak = if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_CAS_WEAK: 1 else: 0
+        let cas_is_weak = if intrinsic == MirIntrinsic.ATOMIC_CAS_WEAK: 1 else: 0
         let cas_result = wl_build_cmpxchg(self.builder, cas_val_ptr, cas_expected, cas_desired, cas_success_order, cas_failure_order, cas_is_weak)
         // Extract old value (index 0) from {T, i1} result
         result = wl_extract_value(self.builder, cas_result, 0)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ATOMIC_FENCE:
+    else if intrinsic == MirIntrinsic.ATOMIC_FENCE:
         let fence_order_raw = self.mir_intrinsic_arg(body, args_id, 0)
         let fence_order = if self.is_const_int_value(fence_order_raw): wl_const_int_sext_val(fence_order_raw) as i32 else: AtomicOrdering.SEQ_CST
         wl_build_fence(self.builder, fence_order)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ASM:
+    else if intrinsic == MirIntrinsic.ASM:
         // Inline assembly: read template, constraints, and operands from AST node
         let asm_node = body.call_ast_node(args_id)
         if asm_node != 0:
@@ -5655,7 +5732,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
             wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
         return true
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MULTI_INDEX:
+    else if intrinsic == MirIntrinsic.MULTI_INDEX:
         result = self.mir_emit_multi_index_method_call(body, args_id, dest_place, 0)
         if dest_place >= 0 and result != 0:
             let result_ty = wl_type_of(result)
@@ -5667,7 +5744,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
             wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
         return true
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MULTI_INDEX_SET:
+    else if intrinsic == MirIntrinsic.MULTI_INDEX_SET:
         result = self.mir_emit_multi_index_method_call(body, args_id, dest_place, 1)
         if dest_place >= 0 and result != 0:
             let result_ty = wl_type_of(result)
@@ -5679,7 +5756,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
             wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
         return true
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FIBER_AWAIT or intrinsic == MirIntrinsic.MIR_INTRINSIC_FIBER_CLEANUP_AWAIT:
+    else if intrinsic == MirIntrinsic.FIBER_AWAIT or intrinsic == MirIntrinsic.FIBER_CLEANUP_AWAIT:
         // Await: extract fiber_id and result_buf from Task struct,
         // call with_fiber_await(fiber_id), load result from buffer, free buffer.
         // Cancellation checks are at MIR level (IS_CANCELLED / WAS_CANCELLED_RETURN
@@ -5702,7 +5779,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let rbuf_ptr = wl_build_struct_gep(self.builder, task_ty, task_alloca, 1)
         let rbuf = wl_build_load(self.builder, wl_ptr_type(self.context), rbuf_ptr)
         // Call the appropriate runtime await helper.
-        let await_fn_name = if intrinsic == MirIntrinsic.MIR_INTRINSIC_FIBER_CLEANUP_AWAIT: "with_fiber_cleanup_await" else: "with_fiber_await"
+        let await_fn_name = if intrinsic == MirIntrinsic.FIBER_CLEANUP_AWAIT: "with_fiber_cleanup_await" else: "with_fiber_await"
         var await_fn = wl_get_named_function(self.llmod, await_fn_name)
         if await_fn == 0:
             let ap: Vec[i64] = Vec.new()
@@ -5759,7 +5836,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
             wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
         return true
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FIBER_SELECT or intrinsic == MirIntrinsic.MIR_INTRINSIC_FIBER_SELECT_BIASED:
+    else if intrinsic == MirIntrinsic.FIBER_SELECT or intrinsic == MirIntrinsic.FIBER_SELECT_BIASED:
         // Select: extract fiber_ids from all Task operands, pack into array,
         // call with_fiber_select_mode(ids, count, biased, &winner_index), store winner index.
 
@@ -5803,7 +5880,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         let ids_ptr = wl_build_gep(self.builder, arr_ty, ids_alloca, vec_data_i64(&zero_idx), 2)
         sa.push(ids_ptr)
         sa.push(wl_const_int(i32_ty, arg_count as i64, 0))
-        sa.push(wl_const_int(i32_ty, if intrinsic == MirIntrinsic.MIR_INTRINSIC_FIBER_SELECT_BIASED: 1 else: 0, 0))
+        sa.push(wl_const_int(i32_ty, if intrinsic == MirIntrinsic.FIBER_SELECT_BIASED: 1 else: 0, 0))
         sa.push(winner_alloca)
         wl_build_call(self.builder, sel_ft2, select_fn, vec_data_i64(&sa), 4)
 
@@ -5820,7 +5897,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
             wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
         return true
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FIBER_CANCEL:
+    else if intrinsic == MirIntrinsic.FIBER_CANCEL:
         // Cancel: extract fiber_id from Task and request cancellation.
         // The caller is responsible for later awaiting/draining the Task and
         // freeing its result buffer once the fiber has actually unwound.
@@ -5848,7 +5925,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
             wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
         return true
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FIBER_DETACH_CANCEL:
+    else if intrinsic == MirIntrinsic.FIBER_DETACH_CANCEL:
         // Detached cancel: transfer an unawaited Task handle to the runtime.
         // The runtime requests cancellation, drains completion later, and frees
         // the result buffer once no awaiter owns it.
@@ -5895,11 +5972,11 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: i32,
         wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
     true
 
-fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: i32, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
+fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: MirIntrinsic, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
     let i64_ty = wl_i64_type(self.context)
     var result: i64 = 0
 
-    if intrinsic == MirIntrinsic.MIR_INTRINSIC_OPT_IS_NONE:
+    if intrinsic == MirIntrinsic.OPT_IS_NONE:
         let recv = self.mir_intrinsic_arg(body, args_id, 0)
         let tk = wl_get_type_kind(wl_type_of(recv))
         if tk == wl_struct_type_kind():
@@ -5911,7 +5988,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         else:
             result = wl_const_int(wl_i1_type(self.context), 0, 0)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_TRIM:
+    else if intrinsic == MirIntrinsic.STR_TRIM:
         let r1 = self.mir_intrinsic_recv_str_value(body, args_id)
         let t1 = wl_type_of(r1)
         let f1 = self.ensure_c_fn("with_str_trim", t1, 1)
@@ -5919,7 +5996,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         a1.push(r1)
         result = wl_build_call(self.builder, self.get_runtime_fn_type("with_str_trim", t1, 1), f1, vec_data_i64(&a1), 1)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_TO_UPPER:
+    else if intrinsic == MirIntrinsic.STR_TO_UPPER:
         let r2 = self.mir_intrinsic_recv_str_value(body, args_id)
         let t2 = wl_type_of(r2)
         let f2 = self.ensure_c_fn("with_str_to_upper", t2, 1)
@@ -5927,7 +6004,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         a2.push(r2)
         result = wl_build_call(self.builder, self.get_runtime_fn_type("with_str_to_upper", t2, 1), f2, vec_data_i64(&a2), 1)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_TO_LOWER:
+    else if intrinsic == MirIntrinsic.STR_TO_LOWER:
         let r3 = self.mir_intrinsic_recv_str_value(body, args_id)
         let t3 = wl_type_of(r3)
         let f3 = self.ensure_c_fn("with_str_to_lower", t3, 1)
@@ -5935,7 +6012,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         a3.push(r3)
         result = wl_build_call(self.builder, self.get_runtime_fn_type("with_str_to_lower", t3, 1), f3, vec_data_i64(&a3), 1)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_REPLACE:
+    else if intrinsic == MirIntrinsic.STR_REPLACE:
         let r4 = self.mir_intrinsic_recv_str_value(body, args_id)
         let t4 = wl_type_of(r4)
         let s4a = self.mir_intrinsic_arg(body, args_id, 1)
@@ -5947,7 +6024,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         a4.push(s4b)
         result = wl_build_call(self.builder, self.get_runtime_fn_type("with_str_replace", t4, 3), f4, vec_data_i64(&a4), 3)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_SPLIT:
+    else if intrinsic == MirIntrinsic.STR_SPLIT:
         let r6 = self.mir_intrinsic_recv_str_value(body, args_id)
         let t6 = wl_type_of(r6)
         let d6 = self.mir_intrinsic_arg(body, args_id, 1)
@@ -5966,7 +6043,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         let _ = wl_build_call(self.builder, ft6, f6, vec_data_i64(&a6), 3)
         result = wl_build_load(self.builder, vt6, out6)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_INDEX_OF:
+    else if intrinsic == MirIntrinsic.STR_INDEX_OF:
         let r5 = self.mir_intrinsic_recv_str_value(body, args_id)
         let n5 = self.mir_intrinsic_arg(body, args_id, 1)
         let f5 = self.ensure_c_fn("with_str_index_of", i64_ty, 2)
@@ -5975,7 +6052,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         a5.push(n5)
         result = wl_build_call(self.builder, self.get_runtime_fn_type("with_str_index_of", i64_ty, 2), f5, vec_data_i64(&a5), 2)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MAP_INCREMENT:
+    else if intrinsic == MirIntrinsic.MAP_INCREMENT:
         let r7 = self.mir_intrinsic_arg(body, args_id, 0)
         let mp7 = self.mir_extract_map_ptr(r7)
         let k7 = self.mir_intrinsic_arg(body, args_id, 1)
@@ -5995,7 +6072,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         let _ = wl_build_call(self.builder, ft7, f7, vec_data_i64(&a7), 3)
         result = 0
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_STR_REPEAT:
+    else if intrinsic == MirIntrinsic.STR_REPEAT:
         let sr_recv = self.mir_intrinsic_recv_str_value(body, args_id)
         let sr_n = self.mir_intrinsic_arg(body, args_id, 1)
         let sr_n64 = self.coerce_int(sr_n, i64_ty)
@@ -6006,16 +6083,25 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         sr_args.push(sr_n64)
         result = wl_build_call(self.builder, self.get_runtime_fn_type("with_str_repeat", sr_ty, 2), sr_fn, vec_data_i64(&sr_args), 2)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ARR_LEN:
+    else if intrinsic == MirIntrinsic.ARR_LEN:
         // Array.len() returns the compile-time length of the array type
         let al_recv = self.mir_intrinsic_arg(body, args_id, 0)
         let al_ty = wl_type_of(al_recv)
         var al_len = 0
         if wl_get_type_kind(al_ty) == wl_array_type_kind():
             al_len = wl_get_array_length(al_ty) as i32
-        result = wl_const_int(wl_i32_type(self.context), al_len as i64, 0)
+        result = wl_const_int(i64_ty, al_len as i64, 0)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ROTATE_LEFT or intrinsic == MirIntrinsic.MIR_INTRINSIC_ROTATE_RIGHT:
+    else if intrinsic == MirIntrinsic.ARR_LEN32 or intrinsic == MirIntrinsic.ARR_LEN64 or intrinsic == MirIntrinsic.ARR_ULEN32:
+        let al_recv = self.mir_intrinsic_arg(body, args_id, 0)
+        let al_ty = wl_type_of(al_recv)
+        var al_len = 0
+        if wl_get_type_kind(al_ty) == wl_array_type_kind():
+            al_len = wl_get_array_length(al_ty) as i32
+        let raw_len = wl_const_int(i64_ty, al_len as i64, 0)
+        result = self.mir_convert_len_method_result(raw_len, intrinsic)
+
+    else if intrinsic == MirIntrinsic.ROTATE_LEFT or intrinsic == MirIntrinsic.ROTATE_RIGHT:
         let rot_val = self.mir_intrinsic_arg(body, args_id, 0)
         let rot_amt = self.mir_intrinsic_arg(body, args_id, 1)
         let rot_ty = wl_type_of(rot_val)
@@ -6023,7 +6109,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         let rot_w_const = wl_const_int(rot_ty, rot_width as i64, 0)
         // Coerce shift amount to same type as value
         let rot_n = self.coerce_value_to_type(rot_amt, rot_ty)
-        if intrinsic == MirIntrinsic.MIR_INTRINSIC_ROTATE_LEFT:
+        if intrinsic == MirIntrinsic.ROTATE_LEFT:
             // (x << n) | (x >> (W - n))
             let shl = wl_build_shl(self.builder, rot_val, rot_n)
             let sub = wl_build_sub(self.builder, rot_w_const, rot_n)
@@ -6036,7 +6122,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
             let shl = wl_build_shl(self.builder, rot_val, sub)
             result = wl_build_or(self.builder, shr, shl)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_INT_SWAP_BYTES:
+    else if intrinsic == MirIntrinsic.INT_SWAP_BYTES:
         let sb_val = self.mir_intrinsic_arg(body, args_id, 0)
         let sb_ty = wl_type_of(sb_val)
         let sb_width = wl_get_int_type_width(sb_ty)
@@ -6064,7 +6150,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
                 sb_args.push(sb_val)
                 result = wl_build_call(self.builder, sb_fnt, sb_func, vec_data_i64(&sb_args), 1)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_POPCOUNT:
+    else if intrinsic == MirIntrinsic.POPCOUNT:
         let pc_val = self.mir_intrinsic_arg(body, args_id, 0)
         let pc_ty = wl_type_of(pc_val)
         let pc_width = wl_get_int_type_width(pc_ty)
@@ -6089,11 +6175,11 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
             let pc_raw = wl_build_call(self.builder, pc_fnt, pc_func, vec_data_i64(&pc_args), 1)
             result = if pc_width == 32: pc_raw else: wl_build_zext(self.builder, pc_raw, wl_i32_type(self.context))
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_CLZ or intrinsic == MirIntrinsic.MIR_INTRINSIC_CTZ:
+    else if intrinsic == MirIntrinsic.CLZ or intrinsic == MirIntrinsic.CTZ:
         let ct_val = self.mir_intrinsic_arg(body, args_id, 0)
         let ct_ty = wl_type_of(ct_val)
         let ct_width = wl_get_int_type_width(ct_ty)
-        let ct_prefix = if intrinsic == MirIntrinsic.MIR_INTRINSIC_CLZ: "llvm.ctlz.i" else: "llvm.cttz.i"
+        let ct_prefix = if intrinsic == MirIntrinsic.CLZ: "llvm.ctlz.i" else: "llvm.cttz.i"
         let ct_fn_name = if ct_width == 8: ct_prefix ++ "8" else if ct_width == 16: ct_prefix ++ "16" else if ct_width == 32: ct_prefix ++ "32" else: ct_prefix ++ "64"
         let ct_sym = self.intern.intern(ct_fn_name)
         let ct_fv = self.fn_values.get(ct_sym)
@@ -6120,7 +6206,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
             let ct_raw = wl_build_call(self.builder, ct_fnt, ct_func, vec_data_i64(&ct_args), 2)
             result = if ct_width == 32: ct_raw else: wl_build_zext(self.builder, ct_raw, wl_i32_type(self.context))
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_BITREVERSE:
+    else if intrinsic == MirIntrinsic.BITREVERSE:
         let br_val = self.mir_intrinsic_arg(body, args_id, 0)
         let br_ty = wl_type_of(br_val)
         let br_width = wl_get_int_type_width(br_ty)
@@ -6143,14 +6229,14 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
             br_args.push(br_val)
             result = wl_build_call(self.builder, br_fnt, br_func, vec_data_i64(&br_args), 1)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_MIN or intrinsic == MirIntrinsic.MIR_INTRINSIC_MAX:
+    else if intrinsic == MirIntrinsic.MIN or intrinsic == MirIntrinsic.MAX:
         let mm_a = self.mir_intrinsic_arg(body, args_id, 0)
         let mm_b = self.mir_intrinsic_arg(body, args_id, 1)
         let mm_ty = wl_type_of(mm_a)
         let mm_tk = wl_get_type_kind(mm_ty)
         let mm_is_float = mm_tk == wl_float_type_kind() or mm_tk == wl_double_type_kind()
         if mm_is_float:
-            let mm_fn_prefix = if intrinsic == MirIntrinsic.MIR_INTRINSIC_MIN: "llvm.minnum." else: "llvm.maxnum."
+            let mm_fn_prefix = if intrinsic == MirIntrinsic.MIN: "llvm.minnum." else: "llvm.maxnum."
             let mm_suffix = if mm_tk == wl_float_type_kind(): "f32" else: "f64"
             let mm_fn_name = mm_fn_prefix ++ mm_suffix
             let mm_sym = self.intern.intern(mm_fn_name)
@@ -6175,12 +6261,12 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
                 result = wl_build_call(self.builder, mm_fnt, mm_func, vec_data_i64(&mm_args), 2)
         else:
             // Integer min/max: icmp + select
-            let mm_is_min = intrinsic == MirIntrinsic.MIR_INTRINSIC_MIN
+            let mm_is_min = intrinsic == MirIntrinsic.MIN
             let mm_pred = if mm_is_min: wl_int_slt() else: wl_int_sgt()
             let mm_cmp = wl_build_icmp(self.builder, mm_pred, mm_a, mm_b)
             result = wl_build_select(self.builder, mm_cmp, mm_a, mm_b)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_ABS:
+    else if intrinsic == MirIntrinsic.ABS:
         let abs_val = self.mir_intrinsic_arg(body, args_id, 0)
         let abs_ty = wl_type_of(abs_val)
         let abs_tk = wl_get_type_kind(abs_ty)
@@ -6211,7 +6297,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
             let abs_is_neg = wl_build_icmp(self.builder, wl_int_slt(), abs_val, abs_zero)
             result = wl_build_select(self.builder, abs_is_neg, abs_neg, abs_val)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FMA:
+    else if intrinsic == MirIntrinsic.FMA:
         let fma_a = self.mir_intrinsic_arg(body, args_id, 0)
         let fma_b = self.mir_intrinsic_arg(body, args_id, 1)
         let fma_c = self.mir_intrinsic_arg(body, args_id, 2)
@@ -6242,19 +6328,19 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
             fma_args.push(fma_c)
             result = wl_build_call(self.builder, fma_fnt, fma_func, vec_data_i64(&fma_args), 3)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_OPT_FILTER:
+    else if intrinsic == MirIntrinsic.OPT_FILTER:
         result = self.mir_emit_opt_filter(body, args_id)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_MAP:
+    else if intrinsic == MirIntrinsic.VEC_MAP:
         result = self.mir_emit_vec_map(body, args_id)
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_FILTER:
+    else if intrinsic == MirIntrinsic.VEC_FILTER:
         result = self.mir_emit_vec_filter(body, args_id)
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_FOLD:
+    else if intrinsic == MirIntrinsic.VEC_FOLD:
         result = self.mir_emit_vec_fold(body, args_id)
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_CONTAINS:
+    else if intrinsic == MirIntrinsic.VEC_CONTAINS:
         result = self.mir_emit_vec_contains(body, args_id)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_VEC_JOIN:
+    else if intrinsic == MirIntrinsic.VEC_JOIN:
         let vj_recv = self.mir_intrinsic_recv_vec_value(body, args_id)
         let vj_sep = self.mir_intrinsic_arg(body, args_id, 1)
         let vj_str_sym = self.intern.intern("str")
@@ -6272,7 +6358,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         vj_args.push(vj_sep)
         result = wl_build_call(self.builder, vj_ft, vj_fn, vec_data_i64(&vj_args), 2)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_DYN_DOWNCAST:
+    else if intrinsic == MirIntrinsic.DYN_DOWNCAST:
         // Extract concrete value from dyn trait object.
         // Args: (fat_ptr, type_sym_as_int)
         let dd_recv = self.mir_intrinsic_arg(body, args_id, 0)
@@ -6293,7 +6379,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         else:
             result = wl_build_load(self.builder, wl_i32_type(self.context), dd_data_ptr)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_DYN_VTABLE_CMP:
+    else if intrinsic == MirIntrinsic.DYN_VTABLE_CMP:
         // Compare vtable pointer of dyn trait object against expected vtable.
         // Args: (fat_ptr, type_sym_as_int, trait_sym_as_int)
         let dv_recv = self.mir_intrinsic_arg(body, args_id, 0)
@@ -6325,7 +6411,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         else:
             result = wl_const_int(wl_i1_type(self.context), 0, 0)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FMT_TO_STR:
+    else if intrinsic == MirIntrinsic.FMT_TO_STR:
         let fmt_val = self.mir_intrinsic_arg(body, args_id, 0)
         let fmt_arg_start = body.call_arg_starts.get(args_id as i64)
         let fmt_op = body.call_arg_operands.get(fmt_arg_start as i64)
@@ -6333,19 +6419,19 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         let fmt_str_ty = self.resolve_named_type(self.intern.intern("str"))
         result = self.coerce_typed_val_to_str(fmt_val, fmt_sema_ty, fmt_str_ty)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FMT_DEBUG_STR:
+    else if intrinsic == MirIntrinsic.FMT_DEBUG_STR:
         let dbg_val = self.mir_intrinsic_arg(body, args_id, 0)
         let dbg_str_ty = self.resolve_named_type(self.intern.intern("str"))
         result = self.call_runtime_str_fn("with_fmt_str_debug", dbg_val, dbg_str_ty)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FMT_DEBUG:
+    else if intrinsic == MirIntrinsic.FMT_DEBUG:
         let dbg_val = self.mir_intrinsic_arg(body, args_id, 0)
         let dbg_type_val = self.mir_intrinsic_arg(body, args_id, 1)
         let dbg_sema_ty = wl_const_int_sext_val(dbg_type_val) as i32
         let dbg_str_ty = self.resolve_named_type(self.intern.intern("str"))
         result = self.gen_debug_format(dbg_val, dbg_sema_ty, dbg_str_ty)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FMT_SPEC:
+    else if intrinsic == MirIntrinsic.FMT_SPEC:
         // args: [value, flags, width, precision, sema_type_id]
         let sp_val = self.mir_intrinsic_arg(body, args_id, 0)
         let sp_flags_v = self.mir_intrinsic_arg(body, args_id, 1)
@@ -6360,16 +6446,16 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         result = self.gen_fmt_with_spec(sp_val, sp_flags, sp_width, sp_prec, sp_mode, sp_str_ty)
 
     // ── FmtBuffer intrinsics (f-string formatting via buffer) ────
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FMT_BUF_NEW:
+    else if intrinsic == MirIntrinsic.FMT_BUF_NEW:
         result = self.gen_fmt_buf_new()
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FMT_BUF_WRITE_STR:
+    else if intrinsic == MirIntrinsic.FMT_BUF_WRITE_STR:
         let fb_buf = self.mir_intrinsic_arg(body, args_id, 0)
         let fb_str = self.mir_intrinsic_arg(body, args_id, 1)
         self.gen_fmt_buf_write_str(fb_buf, fb_str)
         result = wl_const_int(wl_i32_type(self.context), 0, 0)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FMT_BUF_WRITE_FMT:
+    else if intrinsic == MirIntrinsic.FMT_BUF_WRITE_FMT:
         // args: [buf, value, flags, width, precision, sema_type_id]
         let fb_buf = self.mir_intrinsic_arg(body, args_id, 0)
         let fb_val = self.mir_intrinsic_arg(body, args_id, 1)
@@ -6384,11 +6470,11 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         self.gen_fmt_buf_write_fmt(fb_buf, fb_val, fb_flags, fb_width, fb_prec, fb_mode)
         result = wl_const_int(wl_i32_type(self.context), 0, 0)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FMT_BUF_FINISH:
+    else if intrinsic == MirIntrinsic.FMT_BUF_FINISH:
         let fb_buf = self.mir_intrinsic_arg(body, args_id, 0)
         result = self.gen_fmt_buf_finish(fb_buf)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_CHAN_SEND:
+    else if intrinsic == MirIntrinsic.CHAN_SEND:
         // Sender.send(value): extract handle, alloca value, store, call with_channel_send
         let send_recv = self.mir_intrinsic_arg(body, args_id, 0)
         let send_val = self.mir_intrinsic_arg(body, args_id, 1)
@@ -6414,7 +6500,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         wl_build_call(self.builder, csft2, cs_fn, vec_data_i64(&csa), 2)
         result = wl_const_int(wl_i32_type(self.context), 0, 0)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_CHAN_CREATE:
+    else if intrinsic == MirIntrinsic.CHAN_CREATE:
         // Channel[T].new(capacity): extract elem_size from generic T arg, call with_channel_create
         let create_cap = self.mir_intrinsic_arg(body, args_id, 0)
         // Determine element size from destination type (Channel[T])
@@ -6452,7 +6538,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         let empty_chan = self.build_default_value(chan_struct_ty)
         result = wl_build_insert_value(self.builder, empty_chan, chan_handle, 0)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_CHAN_RECV:
+    else if intrinsic == MirIntrinsic.CHAN_RECV:
         // Receiver.recv(): extract handle, alloca for result, call with_channel_recv, load result
         let recv_self = self.mir_intrinsic_arg(body, args_id, 0)
         // Extract handle from Receiver struct
@@ -6484,7 +6570,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         // Load the received value
         result = wl_build_load(self.builder, recv_elem_ty, recv_slot)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_CHAN_CLOSE:
+    else if intrinsic == MirIntrinsic.CHAN_CLOSE:
         // .close(): extract handle, call with_channel_close(handle)
         let close_recv = self.mir_intrinsic_arg(body, args_id, 0)
         let close_handle = wl_build_extract_value(self.builder, close_recv, 0)
@@ -6501,7 +6587,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         wl_build_call(self.builder, ccft2, cc_fn, vec_data_i64(&cca), 1)
         result = wl_const_int(wl_i32_type(self.context), 0, 0)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_SCOPE_CREATE:
+    else if intrinsic == MirIntrinsic.SCOPE_CREATE:
         // with_scope_create() -> i64
         var sc_fn = wl_get_named_function(self.llmod, "with_scope_create")
         if sc_fn == 0:
@@ -6510,7 +6596,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         let scft2 = wl_global_get_value_type(sc_fn)
         result = wl_build_call(self.builder, scft2, sc_fn, 0, 0)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_SCOPE_AWAIT_ALL:
+    else if intrinsic == MirIntrinsic.SCOPE_AWAIT_ALL:
         // with_scope_await_all(handle: i64)
         let sa_handle = self.mir_intrinsic_arg(body, args_id, 0)
         var sa_fn = wl_get_named_function(self.llmod, "with_scope_await_all")
@@ -6525,7 +6611,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         wl_build_call(self.builder, saft2, sa_fn, vec_data_i64(&saa), 1)
         result = wl_const_int(wl_i32_type(self.context), 0, 0)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_SCOPE_DESTROY:
+    else if intrinsic == MirIntrinsic.SCOPE_DESTROY:
         // with_scope_destroy(handle: i64)
         let sd_handle = self.mir_intrinsic_arg(body, args_id, 0)
         var sd_fn = wl_get_named_function(self.llmod, "with_scope_destroy")
@@ -6540,7 +6626,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         wl_build_call(self.builder, sdft2, sd_fn, vec_data_i64(&sda), 1)
         result = wl_const_int(wl_i32_type(self.context), 0, 0)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FIBER_IS_CANCELLED:
+    else if intrinsic == MirIntrinsic.FIBER_IS_CANCELLED:
         var ic_fn = wl_get_named_function(self.llmod, "with_fiber_is_cancelled")
         if ic_fn == 0:
             let icft = wl_function_type(wl_i32_type(self.context), 0, 0, 0)
@@ -6548,7 +6634,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         let icft2 = wl_global_get_value_type(ic_fn)
         result = wl_build_call(self.builder, icft2, ic_fn, 0, 0)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FIBER_WAS_CANCELLED_RETURN:
+    else if intrinsic == MirIntrinsic.FIBER_WAS_CANCELLED_RETURN:
         let wcr_fid = self.mir_intrinsic_arg(body, args_id, 0)
         var wcr_fn = wl_get_named_function(self.llmod, "with_fiber_was_cancelled_return")
         if wcr_fn == 0:
@@ -6561,7 +6647,7 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         wcra.push(wcr_fid)
         result = wl_build_call(self.builder, wcrft2, wcr_fn, vec_data_i64(&wcra), 1)
 
-    else if intrinsic == MirIntrinsic.MIR_INTRINSIC_FIBER_SET_CANCELLED_RETURN:
+    else if intrinsic == MirIntrinsic.FIBER_SET_CANCELLED_RETURN:
         var scr_fn = wl_get_named_function(self.llmod, "with_fiber_set_cancelled_return")
         if scr_fn == 0:
             let scrft = wl_function_type(wl_void_type(self.context), 0, 0, 0)
@@ -6947,9 +7033,9 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
     let mir_intrinsic = body.call_intrinsic(args_id)
     if self.debug_mir_codegen_enabled():
         with_eprint(f"[mir-call-pre] intrinsic={mir_intrinsic} callee_op={callee_operand} args_id={args_id} dest={dest_place}")
-    if mir_intrinsic == MirIntrinsic.MIR_INTRINSIC_DYN_CALL:
+    if mir_intrinsic == MirIntrinsic.DYN_CALL:
         return self.mir_emit_dyn_trait_call(body, callee_operand, args_id, dest_place, next_bb)
-    if mir_intrinsic == MirIntrinsic.MIR_INTRINSIC_GENERIC_CALL:
+    if mir_intrinsic == MirIntrinsic.GENERIC_CALL:
         let gc_node = body.call_ast_node(args_id)
         if gc_node > 0:
             // Extract callee sym from ConstKind.CK_FN constant
@@ -7341,7 +7427,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                     if gc_recv_tk == TypeKind.TY_REF or gc_recv_tk == TypeKind.TY_PTR:
                         gc_recv_type_unwrapped = self.mir_input.mir_get_type_d0(self.mir_input.mir_resolve_alias(gc_recv_type_unwrapped))
                 let gc_intrinsic = self.classify_generic_call_intrinsic(gc_recv_type_unwrapped, gc_method_sym)
-                if gc_intrinsic != MirIntrinsic.MIR_INTRINSIC_NONE:
+                if gc_intrinsic != MirIntrinsic.NONE:
                     return self.mir_emit_intrinsic_call(body, gc_intrinsic, args_id, dest_place, next_bb)
                 let gc_method_name = self.intern.resolve(gc_method_sym)
                 // Eval receiver from MIR operand 0
@@ -7350,7 +7436,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                     let gc_recv_val = self.mir_eval_operand(body, gc_recv_op, 0)
                     let gc_recv_ty = wl_type_of(gc_recv_val)
                     let gc_llvm_intrinsic = self.classify_generic_call_intrinsic_by_llvm(gc_recv_ty, gc_method_sym)
-                    if gc_llvm_intrinsic != MirIntrinsic.MIR_INTRINSIC_NONE:
+                    if gc_llvm_intrinsic != MirIntrinsic.NONE:
                         return self.mir_emit_intrinsic_call(body, gc_llvm_intrinsic, args_id, dest_place, next_bb)
                     var gc_recv_type_sym = self.mir_struct_sym_from_sema_type(gc_recv_type_unwrapped)
                     if gc_recv_type_sym == 0:
@@ -7655,13 +7741,13 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                         else:
                             0
                     with_eprint(f"[generic-call-unhandled] recv_ast_ty={self.ast_static_type_expr(fatal_recv)} recv_mir_ty={fatal_recv_ty} base_ast_ty={fatal_base_ty} base_local_ty={fatal_base_local_ty} owner={self.function_symbol_name(self.current_method_owner_sym)} field_sym={fatal_field} field_text={if fatal_field != 0: self.intern.resolve(fatal_field) else: \"\"}")
-                with_eprint(f"FATAL: unhandled MirIntrinsic.MIR_INTRINSIC_GENERIC_CALL sym={gc_name} node_kind={self.pool.kind(gc_node)} recv_ty={fatal_recv_ty} recv_kind={if fatal_recv != 0: self.pool.kind(fatal_recv) else: -1} arg_count={fatal_mir_count}")
+                with_eprint(f"FATAL: unhandled MirIntrinsic.GENERIC_CALL sym={gc_name} node_kind={self.pool.kind(gc_node)} recv_ty={fatal_recv_ty} recv_kind={if fatal_recv != 0: self.pool.kind(fatal_recv) else: -1} arg_count={fatal_mir_count}")
                 self.had_error = 1
             if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
                 let gc_next_val = self.mir_bb_values.get(next_bb as i64)
                 wl_build_br(self.builder, gc_next_val)
             return true
-    if mir_intrinsic != MirIntrinsic.MIR_INTRINSIC_NONE:
+    if mir_intrinsic != MirIntrinsic.NONE:
         return self.mir_emit_intrinsic_call(body, mir_intrinsic, args_id, dest_place, next_bb)
     let callee = self.mir_eval_operand(body, callee_operand, 0)
     if self.debug_mir_codegen_enabled():

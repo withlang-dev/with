@@ -82,136 +82,196 @@ enum ConstKind: i32:
 // inferring builtin kind from method names at codegen time.
 
 enum MirIntrinsic: i32:
-    MIR_INTRINSIC_NONE = 0
-    MIR_INTRINSIC_VEC_NEW = 1
-    MIR_INTRINSIC_VEC_PUSH = 2
-    MIR_INTRINSIC_VEC_GET = 3
-    MIR_INTRINSIC_VEC_LEN = 4
-    MIR_INTRINSIC_VEC_SET = 5
-    MIR_INTRINSIC_VEC_REMOVE = 6
-    MIR_INTRINSIC_VEC_CLEAR = 7
-    MIR_INTRINSIC_VEC_POP = 8
-    MIR_INTRINSIC_MAP_NEW = 9
-    MIR_INTRINSIC_MAP_INSERT = 10
-    MIR_INTRINSIC_MAP_GET = 11
-    MIR_INTRINSIC_MAP_CONTAINS = 12
-    MIR_INTRINSIC_MAP_LEN = 13
-    MIR_INTRINSIC_MAP_REMOVE = 14
-    MIR_INTRINSIC_OPT_IS_SOME = 15
-    MIR_INTRINSIC_OPT_UNWRAP = 16
-    MIR_INTRINSIC_STR_LEN = 17
-    MIR_INTRINSIC_STR_BYTE_AT = 18
-    MIR_INTRINSIC_STR_SLICE = 19
-    MIR_INTRINSIC_STR_CONTAINS = 20
-    MIR_INTRINSIC_STR_STARTS_WITH = 21
-    MIR_INTRINSIC_STR_ENDS_WITH = 22
-    MIR_INTRINSIC_STR_FIND = 23
-    MIR_INTRINSIC_MAP_CLEAR = 24
-    MIR_INTRINSIC_VECITER_NEXT = 25
-    MIR_INTRINSIC_VEC_ITER = 26
-    MIR_INTRINSIC_OPT_IS_NONE = 27
-    MIR_INTRINSIC_STR_SPLIT = 28
-    MIR_INTRINSIC_STR_TRIM = 29
-    MIR_INTRINSIC_STR_TO_UPPER = 30
-    MIR_INTRINSIC_STR_TO_LOWER = 31
-    MIR_INTRINSIC_STR_REPLACE = 32
-    MIR_INTRINSIC_STR_INDEX_OF = 33
-    MIR_INTRINSIC_MAP_INCREMENT = 34
-    MIR_INTRINSIC_VEC_MAP = 35
-    MIR_INTRINSIC_VEC_FILTER = 36
-    MIR_INTRINSIC_VEC_FOLD = 37
-    MIR_INTRINSIC_VEC_CONTAINS = 38
-    MIR_INTRINSIC_STR_REPEAT = 39
-    MIR_INTRINSIC_ARR_LEN = 40
-    MIR_INTRINSIC_GENERIC_CALL = 41
-    MIR_INTRINSIC_VEC_JOIN = 42
-    MIR_INTRINSIC_DYN_VTABLE_CMP = 43
-    MIR_INTRINSIC_DYN_DOWNCAST = 44
-    MIR_INTRINSIC_OPT_FILTER = 45
-    MIR_INTRINSIC_ROTATE_LEFT = 46
-    MIR_INTRINSIC_ROTATE_RIGHT = 47
-    MIR_INTRINSIC_VEC_WITH_CAPACITY = 48
-    MIR_INTRINSIC_FMT_TO_STR = 49
-    MIR_INTRINSIC_FMT_DEBUG_STR = 50
-    MIR_INTRINSIC_FMT_DEBUG = 51
-    MIR_INTRINSIC_FMT_SPEC = 52
-    MIR_INTRINSIC_INT_SWAP_BYTES = 53
-    MIR_INTRINSIC_MAP_KEYS = 54
-    MIR_INTRINSIC_POPCOUNT = 55
-    MIR_INTRINSIC_CLZ = 56
-    MIR_INTRINSIC_CTZ = 57
-    MIR_INTRINSIC_BITREVERSE = 58
-    MIR_INTRINSIC_MIN = 59
-    MIR_INTRINSIC_MAX = 60
-    MIR_INTRINSIC_ABS = 61
-    MIR_INTRINSIC_FMA = 62
-    MIR_INTRINSIC_ASM = 63
-    MIR_INTRINSIC_MULTI_INDEX = 81
-    MIR_INTRINSIC_MULTI_INDEX_SET = 82
-    MIR_INTRINSIC_FIBER_SPAWN = 83
-    MIR_INTRINSIC_FIBER_AWAIT = 84
-    MIR_INTRINSIC_FIBER_SELECT = 85
-    MIR_INTRINSIC_FIBER_CANCEL = 86
-    MIR_INTRINSIC_CHAN_CREATE = 87
-    MIR_INTRINSIC_CHAN_SEND = 88
-    MIR_INTRINSIC_CHAN_RECV = 89
-    MIR_INTRINSIC_CHAN_CLOSE = 90
-    MIR_INTRINSIC_ASYNC_BLOCK_SPAWN = 91
-    MIR_INTRINSIC_FIBER_IS_CANCELLED = 95
-    MIR_INTRINSIC_FIBER_WAS_CANCELLED_RETURN = 96
-    MIR_INTRINSIC_FIBER_SET_CANCELLED_RETURN = 97
-    MIR_INTRINSIC_FIBER_CLEANUP_AWAIT = 98
-    MIR_INTRINSIC_SCOPE_CREATE = 92
-    MIR_INTRINSIC_SCOPE_AWAIT_ALL = 93
-    MIR_INTRINSIC_SCOPE_DESTROY = 94
-    MIR_INTRINSIC_ATOMIC_LOAD = 64
-    MIR_INTRINSIC_ATOMIC_STORE = 65
-    MIR_INTRINSIC_ATOMIC_SWAP = 66
-    MIR_INTRINSIC_ATOMIC_FETCH_ADD = 67
-    MIR_INTRINSIC_ATOMIC_FETCH_SUB = 68
-    MIR_INTRINSIC_ATOMIC_FETCH_AND = 69
-    MIR_INTRINSIC_ATOMIC_FETCH_OR = 70
-    MIR_INTRINSIC_ATOMIC_FETCH_XOR = 71
-    MIR_INTRINSIC_ATOMIC_FETCH_MIN = 72
-    MIR_INTRINSIC_ATOMIC_FETCH_MAX = 73
-    MIR_INTRINSIC_ATOMIC_CAS = 74
-    MIR_INTRINSIC_ATOMIC_CAS_WEAK = 75
-    MIR_INTRINSIC_ATOMIC_FENCE = 76
-    MIR_INTRINSIC_FMT_BUF_NEW = 77
-    MIR_INTRINSIC_FMT_BUF_WRITE_STR = 78
-    MIR_INTRINSIC_FMT_BUF_WRITE_FMT = 79
-    MIR_INTRINSIC_FMT_BUF_FINISH = 80
-    MIR_INTRINSIC_VEC_SLOT = 99
-    MIR_INTRINSIC_VECSLOT_GET = 100
-    MIR_INTRINSIC_VECSLOT_SET = 101
-    MIR_INTRINSIC_VEC_ITER_PLACE = 102
-    MIR_INTRINSIC_VECITERPLACE_NEXT = 103
-    MIR_INTRINSIC_MAP_ENTRY = 104
-    MIR_INTRINSIC_ENTRY_OR_INSERT = 105
-    MIR_INTRINSIC_ENTRY_GET = 106
-    MIR_INTRINSIC_ENTRY_SET = 107
-    MIR_INTRINSIC_VEC_GET_DISJOINT = 108
-    MIR_INTRINSIC_VEC_RANGE = 109
-    MIR_INTRINSIC_VECRANGE_GET = 110
-    MIR_INTRINSIC_VECRANGE_SET = 111
-    MIR_INTRINSIC_VECRANGE_LEN = 112
-    MIR_INTRINSIC_VEC_ITER_REF = 113
-    MIR_INTRINSIC_VECITERREF_NEXT = 114
-    MIR_INTRINSIC_VEC_GET_REF = 115
-    MIR_INTRINSIC_DYN_CALL = 116
-    MIR_INTRINSIC_SLOTMAP_NEW = 117
-    MIR_INTRINSIC_SLOTMAP_INSERT = 118
-    MIR_INTRINSIC_SLOTMAP_GET = 119
-    MIR_INTRINSIC_SLOTMAP_SLOT = 120
-    MIR_INTRINSIC_SLOTMAP_REMOVE = 121
-    MIR_INTRINSIC_SLOTMAP_REPLACE = 122
-    MIR_INTRINSIC_SLOTMAP_CONTAINS = 123
-    MIR_INTRINSIC_SLOTMAP_LEN = 124
-    MIR_INTRINSIC_SLOTMAP_GET_DISJOINT = 125
-    MIR_INTRINSIC_SLOTMAPSLOT_GET = 126
-    MIR_INTRINSIC_SLOTMAPSLOT_SET = 127
-    MIR_INTRINSIC_FIBER_SELECT_BIASED = 128
-    MIR_INTRINSIC_FIBER_DETACH_CANCEL = 129
+    NONE
+    VEC_NEW
+    VEC_PUSH
+    VEC_GET
+    VEC_LEN
+    VEC_SET
+    VEC_REMOVE
+    VEC_CLEAR
+    VEC_POP
+    MAP_NEW
+    MAP_INSERT
+    MAP_GET
+    MAP_CONTAINS
+    MAP_LEN
+    MAP_REMOVE
+    OPT_IS_SOME
+    OPT_UNWRAP
+    STR_LEN
+    STR_BYTE_AT
+    STR_SLICE
+    STR_CONTAINS
+    STR_STARTS_WITH
+    STR_ENDS_WITH
+    STR_FIND
+    MAP_CLEAR
+    VECITER_NEXT
+    VEC_ITER
+    OPT_IS_NONE
+    STR_SPLIT
+    STR_TRIM
+    STR_TO_UPPER
+    STR_TO_LOWER
+    STR_REPLACE
+    STR_INDEX_OF
+    MAP_INCREMENT
+    VEC_MAP
+    VEC_FILTER
+    VEC_FOLD
+    VEC_CONTAINS
+    STR_REPEAT
+    ARR_LEN
+    GENERIC_CALL
+    VEC_JOIN
+    DYN_VTABLE_CMP
+    DYN_DOWNCAST
+    OPT_FILTER
+    ROTATE_LEFT
+    ROTATE_RIGHT
+    VEC_WITH_CAPACITY
+    FMT_TO_STR
+    FMT_DEBUG_STR
+    FMT_DEBUG
+    FMT_SPEC
+    INT_SWAP_BYTES
+    MAP_KEYS
+    POPCOUNT
+    CLZ
+    CTZ
+    BITREVERSE
+    MIN
+    MAX
+    ABS
+    FMA
+    ASM
+    MULTI_INDEX
+    MULTI_INDEX_SET
+    FIBER_SPAWN
+    FIBER_AWAIT
+    FIBER_SELECT
+    FIBER_CANCEL
+    CHAN_CREATE
+    CHAN_SEND
+    CHAN_RECV
+    CHAN_CLOSE
+    ASYNC_BLOCK_SPAWN
+    FIBER_IS_CANCELLED
+    FIBER_WAS_CANCELLED_RETURN
+    FIBER_SET_CANCELLED_RETURN
+    FIBER_CLEANUP_AWAIT
+    SCOPE_CREATE
+    SCOPE_AWAIT_ALL
+    SCOPE_DESTROY
+    ATOMIC_LOAD
+    ATOMIC_STORE
+    ATOMIC_SWAP
+    ATOMIC_FETCH_ADD
+    ATOMIC_FETCH_SUB
+    ATOMIC_FETCH_AND
+    ATOMIC_FETCH_OR
+    ATOMIC_FETCH_XOR
+    ATOMIC_FETCH_MIN
+    ATOMIC_FETCH_MAX
+    ATOMIC_CAS
+    ATOMIC_CAS_WEAK
+    ATOMIC_FENCE
+    FMT_BUF_NEW
+    FMT_BUF_WRITE_STR
+    FMT_BUF_WRITE_FMT
+    FMT_BUF_FINISH
+    VEC_SLOT
+    VECSLOT_GET
+    VECSLOT_SET
+    VEC_ITER_PLACE
+    VECITERPLACE_NEXT
+    MAP_ENTRY
+    ENTRY_OR_INSERT
+    ENTRY_GET
+    ENTRY_SET
+    VEC_GET_DISJOINT
+    VEC_RANGE
+    VECRANGE_GET
+    VECRANGE_SET
+    VECRANGE_LEN
+    VEC_ITER_REF
+    VECITERREF_NEXT
+    VEC_GET_REF
+    DYN_CALL
+    SLOTMAP_NEW
+    SLOTMAP_INSERT
+    SLOTMAP_GET
+    SLOTMAP_SLOT
+    SLOTMAP_REMOVE
+    SLOTMAP_REPLACE
+    SLOTMAP_CONTAINS
+    SLOTMAP_LEN
+    SLOTMAP_GET_DISJOINT
+    SLOTMAPSLOT_GET
+    SLOTMAPSLOT_SET
+    FIBER_SELECT_BIASED
+    FIBER_DETACH_CANCEL
+    VEC_LEN32
+    VEC_LEN64
+    VEC_ULEN32
+    MAP_LEN32
+    MAP_LEN64
+    MAP_ULEN32
+    STR_LEN32
+    STR_LEN64
+    STR_ULEN32
+    ARR_LEN32
+    ARR_LEN64
+    ARR_ULEN32
+    VECRANGE_LEN32
+    VECRANGE_LEN64
+    VECRANGE_ULEN32
+    SLOTMAP_LEN32
+    SLOTMAP_LEN64
+    SLOTMAP_ULEN32
+
+// Copy: MirIntrinsic is a lightweight integer tag passed by value, stored in
+// Vec/HashMap, and compared throughout MIR lowering and codegen.
+impl Copy for MirIntrinsic
+
+fn mir_len_method_intrinsic(base: MirIntrinsic, method_name: str) -> MirIntrinsic:
+    if method_name == "len":
+        return base
+    if base == MirIntrinsic.VEC_LEN:
+        if method_name == "len32": return MirIntrinsic.VEC_LEN32
+        if method_name == "len64": return MirIntrinsic.VEC_LEN64
+        if method_name == "ulen32": return MirIntrinsic.VEC_ULEN32
+    if base == MirIntrinsic.MAP_LEN:
+        if method_name == "len32": return MirIntrinsic.MAP_LEN32
+        if method_name == "len64": return MirIntrinsic.MAP_LEN64
+        if method_name == "ulen32": return MirIntrinsic.MAP_ULEN32
+    if base == MirIntrinsic.STR_LEN:
+        if method_name == "len32": return MirIntrinsic.STR_LEN32
+        if method_name == "len64": return MirIntrinsic.STR_LEN64
+        if method_name == "ulen32": return MirIntrinsic.STR_ULEN32
+    if base == MirIntrinsic.ARR_LEN:
+        if method_name == "len32": return MirIntrinsic.ARR_LEN32
+        if method_name == "len64": return MirIntrinsic.ARR_LEN64
+        if method_name == "ulen32": return MirIntrinsic.ARR_ULEN32
+    if base == MirIntrinsic.VECRANGE_LEN:
+        if method_name == "len32": return MirIntrinsic.VECRANGE_LEN32
+        if method_name == "len64": return MirIntrinsic.VECRANGE_LEN64
+        if method_name == "ulen32": return MirIntrinsic.VECRANGE_ULEN32
+    if base == MirIntrinsic.SLOTMAP_LEN:
+        if method_name == "len32": return MirIntrinsic.SLOTMAP_LEN32
+        if method_name == "len64": return MirIntrinsic.SLOTMAP_LEN64
+        if method_name == "ulen32": return MirIntrinsic.SLOTMAP_ULEN32
+    MirIntrinsic.NONE
+
+fn mir_intrinsic_is_len32(intrinsic: MirIntrinsic) -> bool:
+    intrinsic == MirIntrinsic.VEC_LEN32 or intrinsic == MirIntrinsic.MAP_LEN32 or intrinsic == MirIntrinsic.STR_LEN32 or intrinsic == MirIntrinsic.ARR_LEN32 or intrinsic == MirIntrinsic.VECRANGE_LEN32 or intrinsic == MirIntrinsic.SLOTMAP_LEN32
+
+fn mir_intrinsic_is_len64(intrinsic: MirIntrinsic) -> bool:
+    intrinsic == MirIntrinsic.VEC_LEN64 or intrinsic == MirIntrinsic.MAP_LEN64 or intrinsic == MirIntrinsic.STR_LEN64 or intrinsic == MirIntrinsic.ARR_LEN64 or intrinsic == MirIntrinsic.VECRANGE_LEN64 or intrinsic == MirIntrinsic.SLOTMAP_LEN64
+
+fn mir_intrinsic_is_ulen32(intrinsic: MirIntrinsic) -> bool:
+    intrinsic == MirIntrinsic.VEC_ULEN32 or intrinsic == MirIntrinsic.MAP_ULEN32 or intrinsic == MirIntrinsic.STR_ULEN32 or intrinsic == MirIntrinsic.ARR_ULEN32 or intrinsic == MirIntrinsic.VECRANGE_ULEN32 or intrinsic == MirIntrinsic.SLOTMAP_ULEN32
 
 // ── Projection kinds ─────────────────────────────────────────────
 
@@ -311,7 +371,7 @@ type MirBody {
     call_arg_operands: Vec[i32],
 
     // Call intrinsic markers (parallel to call_arg_starts)
-    call_intrinsic_kinds: Vec[i32],
+    call_intrinsic_kinds: Vec[MirIntrinsic],
     // AST call node for generic calls (parallel to call_arg_starts, 0 if N/A)
     call_ast_nodes: Vec[i32],
 }
@@ -663,19 +723,21 @@ fn MirBody.new_call_args(mut self: MirBody, operands: Vec[i32]) -> i32:
     let count = operands.len() as i32
     self.call_arg_starts.push(start)
     self.call_arg_counts.push(count)
-    self.call_intrinsic_kinds.push(MirIntrinsic.MIR_INTRINSIC_NONE)
+    self.call_intrinsic_kinds.push(MirIntrinsic.NONE)
     self.call_ast_nodes.push(0)
     for i in 0..count:
         self.call_arg_operands.push(operands.get(i as i64))
     id
 
-fn MirBody.set_call_intrinsic(mut self: MirBody, call_id: i32, kind: i32):
+fn MirBody.set_call_intrinsic(mut self: MirBody, call_id: i32, kind: MirIntrinsic):
     if call_id >= 0 and call_id < self.call_intrinsic_kinds.len() as i32:
-        self.call_intrinsic_kinds.set_i32(call_id, kind)
+        let call_idx = call_id as i64
+        with self.call_intrinsic_kinds.slot(call_idx) as mut slot:
+            slot.set(kind)
 
-fn MirBody.call_intrinsic(self: &MirBody, call_id: i32) -> i32:
+fn MirBody.call_intrinsic(self: &MirBody, call_id: i32) -> MirIntrinsic:
     if call_id < 0 or call_id >= self.call_intrinsic_kinds.len() as i32:
-        return MirIntrinsic.MIR_INTRINSIC_NONE
+        return MirIntrinsic.NONE
     self.call_intrinsic_kinds.get(call_id as i64)
 
 fn MirBody.set_call_ast_node(mut self: MirBody, call_id: i32, node: i32):
