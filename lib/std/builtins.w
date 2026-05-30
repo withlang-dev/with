@@ -66,6 +66,17 @@ pub fn check(cond: bool, msg: str, loc: str = src()) -> void:
     if not cond:
         with_panic(msg, loc, 0)
 
+/// Assert that two values are equal. Panics showing both values if not.
+/// (No location parameter: generic functions cannot yet take default args.)
+pub fn assert_eq[T: Eq + Debug](left: T, right: T) -> void:
+    if left != right:
+        with_panic(f"assertion failed: {left:?} != {right:?}", "", 0)
+
+/// Assert that two values are not equal. Panics showing both values if they are.
+pub fn assert_ne[T: Eq + Debug](left: T, right: T) -> void:
+    if left == right:
+        with_panic(f"assertion failed: {left:?} == {right:?}", "", 0)
+
 /// Explicitly drop a value at this point in the current scope.
 pub fn drop[T](val: T) -> void:
     ()
