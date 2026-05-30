@@ -1214,7 +1214,7 @@ fn _pcre2_eclass_8(__param_c: c_uint, __param_data_start: *const u8, __param_dat
 
                 },
                 5 => {
-                    var __local_matched: c_uint = _pcre2_xclass_8(__param_c, ((__local_ptr + ((1 as isize) as usize)) + ((2 as isize) as usize)), __param_char_lists_end, __param_utf)
+                    var __local_matched: c_uint = _pcre2_xclass_8(__param_c, ((__local_ptr + ((1 as isize) as usize)) + ((2 as isize) as usize)), __param_char_lists_end, __param_utf) as c_uint
 
                     (__local_ptr = __local_ptr + ((((((unsafe __local_ptr[1]) as c_int) << (8 as c_uint)) | ((unsafe __local_ptr[(1 + 1)]) as c_int)) as c_uint) as usize))
 

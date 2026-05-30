@@ -331,9 +331,10 @@
   │                                                                                                                │             │                   │      │ trailing code). §20b.6 sketch is now executable│
   │                                                                                                                │             │                   │      │ + negative compile_errors tests. Spec §20b.6.  │
   │ #286 (partial)                                                                                                 │         Yes │           Partial │   No │ §20b denied patterns. Done: unreachable code,  │
-  │                                                                                                                │             │                   │      │ unused Task (E0801), unused Result (E0802).    │
-  │                                                                                                                │             │                   │      │ Remaining (each its own design issue):         │
-  │                                                                                                                │             │                   │      │ unnecessary unsafe → #303, implicit narrowing/ │
-  │                                                                                                                │             │                   │      │ sign conversion → #304, @[no_await_guard] await│
-  │                                                                                                                │             │                   │      │ → #221.                                        │
+  │                                                                                                                │             │                   │      │ unused Task (E0801), unused Result (E0802),    │
+  │                                                                                                                │             │                   │      │ implicit narrowing + sign conversion at let    │
+  │                                                                                                                │             │                   │      │ bindings (9 migrated-PCRE2 narrowings made     │
+  │                                                                                                                │             │                   │      │ explicit). Remaining: unnecessary unsafe →      │
+  │                                                                                                                │             │                   │      │ #303, narrowing at assign/arg/return + migrator│
+  │                                                                                                                │             │                   │      │ casts → #304, @[no_await_guard] await → #221.  │
   └────────────────────────────────────────────────────────────────────────────────────────────────────────────────┴─────────────┴───────────────────┴──────┴────────────────────────────────────────────────

@@ -321,7 +321,7 @@ fn pcre2_substring_nametable_scan_8(__param_code: *const pcre2_real_code_8, __pa
     var __local_nametable: *const u8 = ((((__param_code as *const c_char) + (sizeof[pcre2_real_code_8]() as usize)) as *const u8))
 
     while ((if __local_top > __local_bot: 1 else: 0) != 0) {
-        var __local_mid: c_ushort = (((__local_top as c_int) + (__local_bot as c_int)) / 2)
+        var __local_mid: c_ushort = ((((__local_top as c_int) + (__local_bot as c_int)) / 2)) as c_ushort
 
         var __local_entry: *const u8 = (__local_nametable + ((((__local_entrysize as c_int) * (__local_mid as c_int)) as isize) as usize))
 
