@@ -1851,6 +1851,18 @@ fn Sema.fn_symbol_is_std_thread_spawn_os(self: Sema, fn_sym: i32) -> i32:
         return 1
     0
 
+fn Sema.fn_symbol_is_std_builtins_drop(self: Sema, fn_sym: i32) -> i32:
+    if self.pool_resolve(fn_sym) != "drop":
+        return 0
+    let source_path = self.fn_symbol_source_path(fn_sym)
+    if source_path == "lib/std/builtins.w":
+        return 1
+    if source_path == "<embedded-std>/std/builtins.w":
+        return 1
+    if source_path.ends_with("/lib/std/builtins.w"):
+        return 1
+    0
+
 fn Sema.type_is_fn_value(self: Sema, tid: i32) -> i32:
     if tid == 0:
         return 0
@@ -6617,6 +6629,20 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
 
     if self.check_comptime_call_restriction(fn_sym, node) != 0:
         return 0
+
+    // std.builtins.drop is a prelude-resolved builtin: it consumes its single
+    // argument without requiring call-site `move`, then lowers to an immediate
+    // drop instead of a runtime generic function call.
+    if self.fn_symbol_is_std_builtins_drop(fn_sym) != 0:
+        if resolved_arg_count != 1:
+            self.emit_error("function 'drop' expects 1 argument(s)", node)
+        else:
+            let drop_arg_nd = if has_resolved != 0: self.get_resolved_call_arg(node, 0) else: self.ast.get_extra(resolved_extra_start)
+            if drop_arg_nd > 0:
+                self.mark_moved_if_consumed(drop_arg_nd)
+        self.comp_resolved.insert(node, fn_sym)
+        self.typed_expr_types.insert(node, self.ty_void as i32)
+        return self.ty_void as i32
 
     // Known function
     if sig_idx >= 0:

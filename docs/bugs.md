@@ -307,9 +307,16 @@
   │                                                                                                                │             │                   │      │ evaluator, so `T.fields()` / `T.name()` inside │
   │                                                                                                                │             │                   │      │ a `comptime fn` cascade without redundant      │
   │                                                                                                                │             │                   │      │ prefixes. Spec §17.2 / §17.4.                 │
-  │ #281-#284                                                                                                      │         Yes │                No │   No │ §18 prelude/stdlib/freestanding sketches. Need │
-  │                                                                                                                │             │                   │      │ Drop prelude, length methods, unreachable/     │
-  │                                                                                                                │             │                   │      │ todo/assert_matches, freestanding behavior.    │
+  │ [x] #281                                                                                                      │         Yes │               Yes │   No │ Completed: std.builtins now exports prelude    │
+  │                                                                                                                │             │                   │      │ drop[T](val), Sema recognizes only that        │
+  │                                                                                                                │             │                   │      │ resolved declaration as an explicit consume,   │
+  │                                                                                                                │             │                   │      │ and MIR lowers it to an immediate drop while  │
+  │                                                                                                                │             │                   │      │ canceling the later whole-local drop.          │
+  │                                                                                                                │             │                   │      │ Regressions cover immediate cleanup and        │
+  │                                                                                                                │             │                   │      │ use-after-drop. Spec §18.2 / §2.4.             │
+  │ #282-#284                                                                                                      │         Yes │                No │   No │ §18 prelude/stdlib/freestanding sketches. Need │
+  │                                                                                                                │             │                   │      │ length methods, unreachable/todo/              │
+  │                                                                                                                │             │                   │      │ assert_matches, freestanding behavior.         │
   │ #285-#286                                                                                                      │         Yes │                No │   No │ §20b denied-patterns sketches. Implement       │
   │                                                                                                                │             │                   │      │ diagnostics/comptime-unreachable exemption or  │
   │                                                                                                                │             │                   │      │ rewrite into concrete tests.                   │
