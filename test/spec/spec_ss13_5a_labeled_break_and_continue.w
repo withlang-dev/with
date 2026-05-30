@@ -46,13 +46,11 @@ fn test_labeled_blocks:
     'colon:
         n = 1
         break 'colon
-        n = 99
     assert(n == 1)
 
     'brace {
         n += 1
         break 'brace
-        n = 99
     }
     assert(n == 2)
 
@@ -73,7 +71,6 @@ fn test_cleanup_on_labeled_break:
             defer: TRACE = TRACE ++ "B"
             errdefer: TRACE = TRACE ++ "E"
             break 'outer
-            TRACE = TRACE ++ "x"
     assert(TRACE == "BA")
 
 fn test_drop_on_labeled_break:

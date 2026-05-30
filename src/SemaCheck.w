@@ -3439,9 +3439,19 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
     self.current_block_tail = tail
 
     var last_stmt_ty: TypeId = 0 as TypeId
+    // Unreachable-code detection: once a statement unconditionally transfers
+    // control out of the block (return / break / continue), the remaining
+    // statements and the tail can never execute. Detected by node kind rather
+    // than Never typing: a void function whose body ends in a bare `return`
+    // is itself typed Never, so a *call* to it is Never without diverging.
+    var block_diverged = 0
+    var reported_unreachable = 0
     for i in 0..stmt_count:
         self.current_block_stmt_index = i
         let stmt = self.ast.get_extra(extra_start + i)
+        if block_diverged != 0 and reported_unreachable == 0:
+            self.emit_error("unreachable code", stmt)
+            reported_unreachable = 1
         let saved_stmt_pos = self.match_in_stmt_pos
         let saved_label_stmt_pos = self.stmt_pos_depth
         let saved_expected = self.expected_expr_type
@@ -3458,6 +3468,8 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
         self.typed_expr_types.insert(stmt, stmt_ty as i32)
         last_stmt_ty = stmt_ty as TypeId
         let stmt_kind = self.ast.kind(stmt)
+        if stmt_kind == NodeKind.NK_RETURN or stmt_kind == NodeKind.NK_BREAK or stmt_kind == NodeKind.NK_CONTINUE:
+            block_diverged = 1
         let can_discard_task = stmt_kind == NodeKind.NK_CALL or stmt_kind == NodeKind.NK_IDENT or stmt_kind == NodeKind.NK_GROUPED or stmt_kind == NodeKind.NK_ASYNC_BLOCK or stmt_kind == NodeKind.NK_TUPLE
         let is_discarded_task = can_discard_task and stmt_kind != NodeKind.NK_SPAWN and self.expr_is_task_value(stmt) != 0 and self.expr_is_scoped_task_value(stmt) == 0
         if is_discarded_task:
@@ -3465,6 +3477,9 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
         self.expire_dead_borrows_in_block(extra_start, stmt_count, i + 1, tail)
 
     var result: TypeId = if tail == 0 and last_stmt_ty == self.ty_never: self.ty_never else: self.ty_void
+    if tail != 0 and block_diverged != 0 and reported_unreachable == 0:
+        self.emit_error("unreachable code", tail)
+        reported_unreachable = 1
     if tail != 0:
         // If the tail is a match in a void/unspecified-return context, treat as statement
         // position so partial enum match is allowed (value is not used).

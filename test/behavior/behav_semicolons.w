@@ -28,7 +28,7 @@ fn test_return_before_semicolon:
     assert(r == 42)
 
 fn helper_return() -> i32:
-    return 42; return 99
+    let a = 42; return a
 
 fn test_if_with_semicolons:
     let x = 5

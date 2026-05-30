@@ -324,7 +324,13 @@
   │                                                                                                                │             │                   │      │ taking builtin, not a stdlib fn), assert_eq/   │
   │                                                                                                                │             │                   │      │ assert_ne, and full §18.7 freestanding         │
   │                                                                                                                │             │                   │      │ behavior.                                      │
-  │ #285-#286                                                                                                      │         Yes │                No │   No │ §20b denied-patterns sketches. Implement       │
-  │                                                                                                                │             │                   │      │ diagnostics/comptime-unreachable exemption or  │
-  │                                                                                                                │             │                   │      │ rewrite into concrete tests.                   │
+  │ [x] #285                                                                                                       │         Yes │               Yes │   No │ Done: unreachable-code detection flags code    │
+  │                                                                                                                │             │                   │      │ after return/break/continue (by node kind, so  │
+  │                                                                                                                │             │                   │      │ a comptime-if return does not falsely flag the │
+  │                                                                                                                │             │                   │      │ trailing code). §20b.6 sketch is now executable│
+  │                                                                                                                │             │                   │      │ + negative compile_errors tests. Spec §20b.6.  │
+  │ #286 (partial)                                                                                                 │         Yes │           Partial │   No │ §20b denied patterns. Done: unreachable code,  │
+  │                                                                                                                │             │                   │      │ unused Task (E0801). Remaining: unused Result, │
+  │                                                                                                                │             │                   │      │ unnecessary unsafe, implicit narrowing, sign   │
+  │                                                                                                                │             │                   │      │ conversion, @[no_await_guard] await (→ #221).  │
   └────────────────────────────────────────────────────────────────────────────────────────────────────────────────┴─────────────┴───────────────────┴──────┴────────────────────────────────────────────────
