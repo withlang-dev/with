@@ -330,7 +330,8 @@
   │                                                                                                                │             │                   │      │ trailing code). §20b.6 sketch is now executable│
   │                                                                                                                │             │                   │      │ + negative compile_errors tests. Spec §20b.6.  │
   │ #286 (partial)                                                                                                 │         Yes │           Partial │   No │ §20b denied patterns. Done: unreachable code,  │
-  │                                                                                                                │             │                   │      │ unused Task (E0801). Remaining: unused Result, │
-  │                                                                                                                │             │                   │      │ unnecessary unsafe, implicit narrowing, sign   │
-  │                                                                                                                │             │                   │      │ conversion, @[no_await_guard] await (→ #221).  │
+  │                                                                                                                │             │                   │      │ unused Task (E0801), unused Result (E0802).    │
+  │                                                                                                                │             │                   │      │ Remaining: unnecessary unsafe, implicit        │
+  │                                                                                                                │             │                   │      │ narrowing, sign conversion, @[no_await_guard]  │
+  │                                                                                                                │             │                   │      │ await (→ #221).                                │
   └────────────────────────────────────────────────────────────────────────────────────────────────────────────────┴─────────────┴───────────────────┴──────┴────────────────────────────────────────────────
