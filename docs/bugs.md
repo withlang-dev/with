@@ -314,9 +314,16 @@
   │                                                                                                                │             │                   │      │ canceling the later whole-local drop.          │
   │                                                                                                                │             │                   │      │ Regressions cover immediate cleanup and        │
   │                                                                                                                │             │                   │      │ use-after-drop. Spec §18.2 / §2.4.             │
-  │ #282-#284                                                                                                      │         Yes │                No │   No │ §18 prelude/stdlib/freestanding sketches. Need │
-  │                                                                                                                │             │                   │      │ length methods, unreachable/todo/              │
-  │                                                                                                                │             │                   │      │ assert_matches, freestanding behavior.         │
+  │ #282-#284 (partial)                                                                                            │         Yes │           Partial │   No │ §18.6 length methods DONE: len/len32/len64/    │
+  │                                                                                                                │             │                   │      │ ulen32 lower through MirIntrinsic with i32/u32 │
+  │                                                                                                                │             │                   │      │ overflow narrowing on both LLVM and C backends;│
+  │                                                                                                                │             │                   │      │ Sema return types and executable coverage      │
+  │                                                                                                                │             │                   │      │ (spec_ss18_6_collection_length_methods, 7      │
+  │                                                                                                                │             │                   │      │ tests). unreachable()/todo() already work.     │
+  │                                                                                                                │             │                   │      │ Remaining: assert_matches (needs a pattern-    │
+  │                                                                                                                │             │                   │      │ taking builtin, not a stdlib fn), assert_eq/   │
+  │                                                                                                                │             │                   │      │ assert_ne, and full §18.7 freestanding         │
+  │                                                                                                                │             │                   │      │ behavior.                                      │
   │ #285-#286                                                                                                      │         Yes │                No │   No │ §20b denied-patterns sketches. Implement       │
   │                                                                                                                │             │                   │      │ diagnostics/comptime-unreachable exemption or  │
   │                                                                                                                │             │                   │      │ rewrite into concrete tests.                   │
