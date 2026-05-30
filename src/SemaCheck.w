@@ -620,9 +620,6 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
     else if body_expected_ret != 0 and body_expected_ret != self.ty_void and body_ty == self.ty_void:
         if self.type_has_default_value(body_expected_ret as i32) == 0:
             self.emit_error("return type does not implement Default", body)
-    else if body_expected_ret == self.ty_void and self.type_is_result(body_ty) != 0:
-        // Explicitly void-returning function whose body is a discarded Result.
-        self.emit_error("E0802: unused Result value; handle it, propagate with `?`, or discard with `let _ =`", body)
     else if body_expected_ret != 0 and body_ty != 0 and body_ty != self.ty_void and body_expected_ret != self.ty_void:
         // Check tail expression type against body's expected return type
         let compat = self.types_compatible(body_expected_ret as i32, body_ty as i32)
@@ -1571,16 +1568,6 @@ fn Sema.expr_is_tuple_of_tasks(self: Sema, node: i32) -> i32:
         if self.expr_is_task_value(self.ast.get_extra(extra_start + ei)) == 0:
             return 0
     1
-
-fn Sema.type_is_result(self: Sema, tid: TypeId) -> i32:
-    if tid == 0:
-        return 0
-    let resolved = self.resolve_alias(tid)
-    if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
-        return 0
-    if self.get_generic_inst_base(resolved as i32) == self.syms.result and self.get_generic_inst_arg_count(resolved) == 2:
-        return 1
-    0
 
 fn Sema.expr_is_task_value(self: Sema, node: i32) -> i32:
     if node == 0:
@@ -3487,13 +3474,6 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
         let is_discarded_task = can_discard_task and stmt_kind != NodeKind.NK_SPAWN and self.expr_is_task_value(stmt) != 0 and self.expr_is_scoped_task_value(stmt) == 0
         if is_discarded_task:
             self.emit_error("E0801: unused Task value", stmt)
-        // Must-use Result: a Result-typed expression used purely for effect
-        // (a statement, value discarded) almost always means an unhandled
-        // error. Bind it (`let x = ...`), propagate it (`...?`), or discard
-        // explicitly (`let _ = ...`).
-        let is_discarded_result = can_discard_task and block_diverged == 0 and self.type_is_result(stmt_ty as TypeId) != 0
-        if is_discarded_result:
-            self.emit_error("E0802: unused Result value; handle it, propagate with `?`, or discard with `let _ =`", stmt)
         self.expire_dead_borrows_in_block(extra_start, stmt_count, i + 1, tail)
 
     var result: TypeId = if tail == 0 and last_stmt_ty == self.ty_never: self.ty_never else: self.ty_void
