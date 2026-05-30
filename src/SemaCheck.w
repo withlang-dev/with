@@ -2740,7 +2740,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
 
     if kind == NodeKind.NK_OPTIONAL_CHAIN:
         let base = self.check_expr(self.ast.get_data0(node))
-        return base
+        return self.optional_chain_result_type(base as i32, self.ast.get_data1(node)) as TypeId
 
     if kind == NodeKind.NK_POISONED_EXPR:
         return 0 as TypeId
@@ -4206,6 +4206,33 @@ fn Sema.struct_field_info_by_index(self: Sema, struct_type: i32, index: i32) -> 
             let f_type = self.type_extra.get((te_start + index * 3 + 1) as i64)
             return (f_name as i64) | ((f_type as i64) * 4294967296)
     0
+
+// Result type of `base?.member` (field access form). `base` is the receiver
+// type — typically `Option[T]`, whose payload `T` carries the field. Per §10.3
+// type-aware desugaring: if the field is itself `Option[U]` the result is
+// `Option[U]` (and_then / flatten); otherwise it is `Option[F]` (map / wrap).
+// The wrap goes through `ensure_option_type_for` so the synthesized Option is
+// the same interned TypeId as a written `Option[F]` annotation.
+fn Sema.optional_chain_result_type(self: Sema, base: i32, member: i32) -> i32:
+    if base == 0:
+        return base
+    let resolved = self.resolve_alias(base as TypeId)
+    if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return base
+    if self.get_type_d0(resolved) != self.syms.option:
+        return base
+    let payload = self.get_generic_inst_arg(resolved as i32, 0)
+    if payload == 0:
+        return base
+    let f = self.struct_field_type(payload, member)
+    if f == 0:
+        // Not a field (e.g. a method-call form) — keep the receiver type.
+        return base
+    let fr = self.resolve_alias(f as TypeId)
+    if self.get_type_kind(fr) == TypeKind.TY_GENERIC_INST:
+        if self.get_type_d0(fr) == self.syms.option:
+            return f
+    return self.ensure_option_type_for(f)
 
 fn Sema.struct_field_type(self: Sema, struct_type: i32, field: i32) -> i32:
     if struct_type == 0:
