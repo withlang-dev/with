@@ -1188,6 +1188,15 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
             has_unsupported = true
             unsupported_reason = ptype.slice(14, ptype.len())
 
+        // A bare opaque type (incomplete C struct → `c_void`) passed by value is
+        // uncallable from With — you can never construct an opaque value — and
+        // lowers to a non-first-class LLVM argument. Stub the function rather than
+        // emit an extern decl the backend will reject. (A `*c_void` pointer param
+        // is fine; only the by-value bare form is rejected here.)
+        if ptype == "c_void":
+            has_unsupported = true
+            unsupported_reason = "opaque type passed by value (parameter " ++ pname ++ ")"
+
         params = params ++ ci_param_signature_name(ci_escape_reserved(pname), pi) ++ ": " ++ ptype
 
     if is_variadic != 0:
@@ -1202,6 +1211,12 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: str) -> str:
     if ci_starts_with(ret, "__UNSUPPORTED:"):
         has_unsupported = true
         unsupported_reason = ret.slice(14, ret.len())
+
+    // A bare opaque (`c_void`) return by value is likewise uncallable and not
+    // first-class in the backend — stub it instead of emitting the extern.
+    if ret == "c_void":
+        has_unsupported = true
+        unsupported_reason = "opaque type returned by value"
 
     with_cimport_mark_name_emitted(name)
 
