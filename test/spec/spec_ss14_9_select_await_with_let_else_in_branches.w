@@ -1,25 +1,54 @@
-//! skip: non-executable spec sketch for Section 14.9 — Select Await with Let-Else in Branches (formerly 25.56); contains pseudo-code for unimplemented feature work
-// Spec test: Section 14.9 — Select Await with Let-Else in Branches (formerly 25.56)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+//! expect-stdout: ok
 
-// PASS: let...else: inside branch body
-async fn test(rx: Receiver[i32]):
-    var items = Vec.new()
+async fn maybe_item(value: i32) -> Option[i32]:
+    if value <= 2:
+        Some(value)
+    else:
+        None
+
+async fn maybe_connection(attempt: i32) -> Result[i32, str]:
+    if attempt < 2:
+        Err("retry")
+    else:
+        Ok(7)
+
+async fn maybe_control(attempt: i32) -> Option[str]:
+    let _ = maybe_item(1).await
+    if attempt < 3:
+        Some("keep-going")
+    else:
+        None
+
+fn test_let_else_break:
+    var sum = 0
+    var current = 1
     loop:
-        select await
-            opt = rx.recv() =>
+        let task = maybe_item(current)
+        select await:
+            opt = task =>
                 let Some(item) = opt else: break
-                items.push(item)
-            _ = timeout(1.secs()) => break
+                sum = sum + item
+                current = current + 1
+    assert(sum == 3)
 
-// PASS: multiple branches with let...else
-async fn serve(listener: TcpListener, ctrl: Receiver[str]):
+fn test_let_else_continue_and_break:
+    var attempts = 0
+    var accepted = 0
     loop:
-        select await
-            result = listener.accept() =>
+        attempts = attempts + 1
+        let conn_task = maybe_connection(attempts)
+        let ctrl_task = maybe_control(attempts)
+        select await biased:
+            result = conn_task =>
                 let Ok(conn) = result else: continue
-                handle(conn)
-            opt = ctrl.recv() =>
-                let Some(msg) = opt else: break
-                process(msg)
+                accepted = conn
+                break
+            opt = ctrl_task =>
+                let Some(_) = opt else: break
+    assert(attempts == 2)
+    assert(accepted == 7)
+
+fn main:
+    test_let_else_break()
+    test_let_else_continue_and_break()
+    print("ok")
