@@ -283,7 +283,7 @@ fn _pcre2_script_run_8(__param_ptr: *const u8, __param_endptr: *const u8, __para
 
                 var __local_bot: c_int = 1
 
-                var __local_top: c_int = _pcre2_ucd_digit_sets_8[0]
+                var __local_top: c_int = _pcre2_ucd_digit_sets_8[0] as c_int
 
                 while true {
                     if ((if __local_top <= (__local_bot + 1): 1 else: 0) != 0) {

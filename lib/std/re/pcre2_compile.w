@@ -24800,7 +24800,7 @@ fn is_anchored(__param_code: *const u8, __param_bracket_map: c_uint, __param_cb:
             }
 
             if (__ci_expr_logic_5 != 0) {
-                var __local_n: c_int = ((((((unsafe __local_scode[(1 + 2)]) as c_int) << (8 as c_uint)) | ((unsafe __local_scode[((1 + 2) + 1)]) as c_int)) as c_uint))
+                var __local_n: c_int = (((((((unsafe __local_scode[(1 + 2)]) as c_int) << (8 as c_uint)) | ((unsafe __local_scode[((1 + 2) + 1)]) as c_int)) as c_uint))) as c_int
 
                 var __local_new_map: c_uint = with 0 as __ci_expr_seq_49 {
                     var __ci_expr_ternary_6: c_uint = 0
@@ -25074,7 +25074,7 @@ fn is_startline(__param_code: *const u8, __param_bracket_map: c_uint, __param_cb
             }
 
             if (__ci_expr_logic_6 != 0) {
-                var __local_n: c_int = ((((((unsafe __local_scode[(1 + 2)]) as c_int) << (8 as c_uint)) | ((unsafe __local_scode[((1 + 2) + 1)]) as c_int)) as c_uint))
+                var __local_n: c_int = (((((((unsafe __local_scode[(1 + 2)]) as c_int) << (8 as c_uint)) | ((unsafe __local_scode[((1 + 2) + 1)]) as c_int)) as c_uint))) as c_int
 
                 var __local_new_map: c_uint = with 0 as __ci_expr_seq_70 {
                     var __ci_expr_ternary_7: c_uint = 0

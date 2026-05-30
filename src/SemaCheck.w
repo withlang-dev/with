@@ -3529,6 +3529,26 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
         self.typed_expr_types.insert(node, result as i32)
     result as i32
 
+// True when assigning a value of type `actual` to a slot of type `expected`
+// loses information: a narrower integer (fewer bits), or a sign flip at equal
+// width. Both require an explicit `as` cast. Literals are adapted to the
+// expected type before this is consulted, so only genuinely-typed values reach
+// here with a wider/differently-signed type.
+fn Sema.int_narrowing_requires_cast(self: Sema, expected: TypeId, actual: TypeId) -> i32:
+    if expected == 0 or actual == 0:
+        return 0
+    let er = self.resolve_alias(expected)
+    let ar = self.resolve_alias(actual)
+    if self.get_type_kind(er) != TypeKind.TY_INT or self.get_type_kind(ar) != TypeKind.TY_INT:
+        return 0
+    let ew = self.get_type_d0(er)
+    let aw = self.get_type_d0(ar)
+    if ew < aw:
+        return 1
+    if ew == aw and self.get_type_d1(er) != self.get_type_d1(ar):
+        return 1
+    0
+
 fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
     let name = self.ast.get_data0(node)
     var bind_name = self.extract_decl_name_after(node, "let")
@@ -3573,7 +3593,9 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
     if ann_type != 0:
         bind_type = ann_type
         if val_type != 0:
-            if self.types_compatible(ann_type as i32, val_type as i32) == 0:
+            if self.int_narrowing_requires_cast(ann_type, val_type) != 0:
+                self.emit_error("implicit integer narrowing or sign change; use an explicit `as` cast", node)
+            else if self.types_compatible(ann_type as i32, val_type as i32) == 0:
                 if self.arithmetic_result_type(ann_type, val_type) == 0:
                     self.emit_error("type mismatch in binding", node)
 

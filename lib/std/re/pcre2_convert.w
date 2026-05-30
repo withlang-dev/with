@@ -2260,9 +2260,9 @@ fn convert_glob(__param_options: c_uint, __param_pattern: *const u8, __param_ple
 
     var __local_pattern_end: *const u8 = (__local_pattern + (__param_plength as usize))
 
-    var __local_separator: u8 = __param_ccontext.glob_separator
+    var __local_separator: u8 = __param_ccontext.glob_separator as u8
 
-    var __local_escape: u8 = __param_ccontext.glob_escape
+    var __local_escape: u8 = __param_ccontext.glob_escape as u8
 
     var __local_c: u8
 

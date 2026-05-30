@@ -2191,10 +2191,10 @@ fn more_workspace(__param_rwsptr: *mut *mut RWS_anchor, __param_ovecsize: c_uint
             } else {
                 (__ci_expr_ternary_0 = ((__local_rws.size as c_uint) *% (2 as c_uint)))
             }
-            __ci_expr_ternary_0
+            __ci_expr_ternary_0 as c_uint
         }
 
-        var __local_newsizeK: c_uint = ((__local_newsize as c_ulong) / (((1024 as c_ulong) / (sizeof[c_int]() as c_ulong)) as c_ulong))
+        var __local_newsizeK: c_uint = (((__local_newsize as c_ulong) / (((1024 as c_ulong) / (sizeof[c_int]() as c_ulong)) as c_ulong))) as c_uint
 
         if ((if ((__local_newsizeK as c_ulong) +% (__param_mb.heap_used as c_ulong)) > __param_mb.heap_limit: 1 else: 0) != 0) {
             (__local_newsizeK = ((((__param_mb.heap_limit as c_ulong) -% (__param_mb.heap_used as c_ulong)) as c_uint)))
