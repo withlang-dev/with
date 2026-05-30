@@ -12,6 +12,7 @@ type ProjectConfig {
     link_search_paths: Vec[str],
     dep_link_libs: Vec[str],
     dep_link_args: Vec[str],
+    runtime_available: bool,
 }
 
 fn project_config_default -> ProjectConfig:
@@ -26,6 +27,7 @@ fn project_config_default -> ProjectConfig:
         link_search_paths: Vec.new(),
         dep_link_libs: Vec.new(),
         dep_link_args: Vec.new(),
+        runtime_available: true,
     }
 
 fn project_config_file_exists(path: str) -> bool:
@@ -108,6 +110,13 @@ fn project_config_apply_entry(cfg: ProjectConfig, section: str, key: str, value:
         out.package_name = project_config_strip_quotes(value)
     else if (section == "project" or section == "package") and key == "version":
         out.package_version = project_config_strip_quotes(value)
+    else if (section == "" or section == "project" or section == "package") and key == "runtime":
+        let parsed_runtime = project_config_parse_bool(value)
+        if parsed_runtime < 0:
+            if out.manifest_error.len() == 0:
+                out.manifest_error = "runtime must be true or false"
+        else:
+            out.runtime_available = parsed_runtime != 0
     else if section == "c_import" and key == "include_paths":
         out.c_import_include_paths = project_config_parse_path_array(value, out.root_dir)
     else if section == "link" and key == "search_paths":
@@ -125,6 +134,14 @@ fn project_config_strip_quotes(value: str) -> str:
     if len >= 2 and value.byte_at(0) == 34 and value.byte_at((len - 1) as i64) == 34:
         return value.slice(1, (len - 1) as i64)
     value
+
+fn project_config_parse_bool(value: str) -> i32:
+    let text = project_config_strip_quotes(project_config_trim(value))
+    if text == "true":
+        return 1
+    if text == "false":
+        return 0
+    -1
 
 fn project_config_load_dep_metadata(cfg: ProjectConfig, name: str, version: str) -> ProjectConfig:
     var out = cfg
@@ -203,6 +220,8 @@ fn project_config_json_str_array(json: str, key: str) -> Vec[str]:
 
 fn project_config_wants_key(section: str, key: str) -> bool:
     if (section == "project" or section == "package") and (key == "name" or key == "version"):
+        return true
+    if (section == "" or section == "project" or section == "package") and key == "runtime":
         return true
     if section == "c_import" and key == "include_paths":
         return true

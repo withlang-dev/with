@@ -84,6 +84,7 @@ type CliOptions {
     opt_level: i32,
     no_std: bool,
     alloc_mode: bool,
+    runtime_available: bool,
     dump_tokens_flag: bool,
     dump_ast_flag: bool,
     dump_resolved_flag: bool,
@@ -178,6 +179,7 @@ fn cli_options_default -> CliOptions:
         opt_level: 0,
         no_std: false,
         alloc_mode: false,
+        runtime_available: true,
         dump_tokens_flag: false,
         dump_ast_flag: false,
         dump_resolved_flag: false,
@@ -297,6 +299,9 @@ fn cli_prelude_mode(argc: i32) -> i32:
         i = i + 1
     mode
 
+fn cli_runtime_available(argc: i32) -> bool:
+    not cli_has_flag(argc, "--no-runtime") and not cli_has_flag(argc, "--freestanding")
+
 fn parse_cli_options(argc: i32) -> CliOptions:
     var opts = cli_options_default()
     opts.command = cli_command(argc)
@@ -305,6 +310,7 @@ fn parse_cli_options(argc: i32) -> CliOptions:
     opts.opt_level = cli_opt_level(argc)
     opts.no_std = cli_has_flag(argc, "--no-std") or cli_has_flag(argc, "--freestanding")
     opts.alloc_mode = cli_has_flag(argc, "--alloc")
+    opts.runtime_available = cli_runtime_available(argc)
     opts.dump_tokens_flag = cli_has_flag(argc, "--dump-tokens")
     opts.dump_ast_flag = cli_has_flag(argc, "--dump-ast")
     opts.dump_resolved_flag = cli_has_flag(argc, "--dump-resolved")
@@ -356,7 +362,7 @@ fn cli_one_liner_known_value_option(arg: str) -> bool:
 fn cli_one_liner_known_flag(arg: str) -> bool:
     arg == "-O0" or arg == "-O1" or arg == "-O2" or arg == "-O3" or
     arg == "--release" or arg == "--alloc" or arg == "--no-std" or
-    arg == "--freestanding" or arg == "--no-prelude" or
+    arg == "--no-runtime" or arg == "--freestanding" or arg == "--no-prelude" or
     arg == "-g0" or arg == "-h" or arg == "--help"
 
 fn cli_one_liner_scan(argc: i32) -> CliOneLiner:
@@ -546,7 +552,7 @@ fn cli_build_synthetic_source(one: CliOneLiner) -> CliSyntheticSource:
 fn cli_one_liner_bin_path -> str:
     f"out/tmp/with-cli-one-liner-{with_getpid()}-{with_clock_nanos()}"
 
-fn run_one_liner_command(argc: i32, one: CliOneLiner, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> i32:
+fn run_one_liner_command(argc: i32, one: CliOneLiner, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool) -> i32:
     let _ = argc
     let _ = debug_info
     if not one.ok:
@@ -563,7 +569,7 @@ fn run_one_liner_command(argc: i32, one: CliOneLiner, no_std: bool, alloc_mode: 
     let source_name = cli_one_liner_source_name(one.mode, one.code_parts.len() as i32)
     let bin_path = cli_one_liner_bin_path()
     var comp = Compilation.init()
-    comp.configure(one.opt_level, no_std, alloc_mode)
+    comp.configure(one.opt_level, no_std, alloc_mode, runtime_available)
     comp.set_prelude_mode(prelude_mode)
     comp.set_debug_info(false)
     for mi in 0..synthetic.gen_starts.len() as i32:
@@ -587,6 +593,7 @@ fn run_cli(argc: i32) -> i32:
     let opt_level = cli_opt_level(argc)
     let no_std = cli_has_flag(argc, "--no-std") or cli_has_flag(argc, "--freestanding")
     let alloc_mode = cli_has_flag(argc, "--alloc")
+    let runtime_available = cli_runtime_available(argc)
     let emit_c_mode = cli_has_flag(argc, "--emit-c")
     let emit_obj_mode = cli_has_flag(argc, "--emit-obj")
     let prelude_mode = cli_prelude_mode(argc)
@@ -606,11 +613,11 @@ fn run_cli(argc: i32) -> i32:
 
     let one_liner = cli_one_liner_scan(argc)
     if one_liner.seen:
-        return run_one_liner_command(argc, one_liner, no_std, alloc_mode, prelude_mode, debug_info)
+        return run_one_liner_command(argc, one_liner, no_std, alloc_mode, runtime_available, prelude_mode, debug_info)
 
     // `with hello.w` is shorthand for `with run hello.w`
     if cli_is_implicit_run(argc):
-        return run_run_command(cli_command(argc), "", opt_level, no_std, alloc_mode, prelude_mode, debug_info)
+        return run_run_command(cli_command(argc), "", opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info)
 
     if cli_command(argc) == "build":
         let parsed_build = parse_build_command_options(argc)
@@ -622,13 +629,13 @@ fn run_cli(argc: i32) -> i32:
         if emit_c_mode:
             with_eprint("error: '--emit-c' is only supported with 'build'")
             return 1
-        return run_run_command(source, find_target_selector_arg(argc), opt_level, no_std, alloc_mode, prelude_mode, debug_info)
+        return run_run_command(source, find_target_selector_arg(argc), opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info)
     if cli_command(argc) == "ir":
         if source == "":
             with_eprint("error: 'ir' requires a source file argument")
             return 1
         var comp = Compilation.init()
-        comp.configure(opt_level, no_std, alloc_mode)
+        comp.configure(opt_level, no_std, alloc_mode, runtime_available)
         comp.set_prelude_mode(prelude_mode)
         let pool = comp.compile_file(source)
         if pool.decl_count() == 0:
@@ -656,17 +663,17 @@ fn run_cli(argc: i32) -> i32:
         if dump_ast_flag:
             return dump_ast(source, no_std, alloc_mode, true)
         if dump_resolved_flag:
-            return dump_resolved_artifact(source, no_std, alloc_mode, prelude_mode)
+            return dump_resolved_artifact(source, no_std, alloc_mode, runtime_available, prelude_mode)
         if dump_typed_flag:
-            return dump_typed_artifact(source, no_std, alloc_mode, prelude_mode)
+            return dump_typed_artifact(source, no_std, alloc_mode, runtime_available, prelude_mode)
         if dump_project_info_flag:
-            return dump_project_info_artifact(source, no_std, alloc_mode, prelude_mode)
+            return dump_project_info_artifact(source, no_std, alloc_mode, runtime_available, prelude_mode)
         if dump_mir_flag:
-            return dump_mir_artifact(source, no_std, alloc_mode, prelude_mode)
+            return dump_mir_artifact(source, no_std, alloc_mode, runtime_available, prelude_mode)
         if dump_async_mir_flag:
-            return dump_async_mir_artifact(source, no_std, alloc_mode, prelude_mode)
+            return dump_async_mir_artifact(source, no_std, alloc_mode, runtime_available, prelude_mode)
         var comp = Compilation.init()
-        comp.configure(0, no_std, alloc_mode)
+        comp.configure(0, no_std, alloc_mode, runtime_available)
         comp.set_prelude_mode(prelude_mode)
         let pool = comp.compile_file(source)
         if pool.decl_count() == 0:
@@ -684,9 +691,9 @@ fn run_cli(argc: i32) -> i32:
             return 1
         return dump_tokens(source, deterministic_mode)
     if cli_command(argc) == "test":
-        return run_test_command(argc, opt_level, no_std, alloc_mode, prelude_mode, debug_info)
+        return run_test_command(argc, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info)
     if cli_command(argc) == "bench":
-        return run_bench_command(argc, opt_level, no_std, alloc_mode, prelude_mode, debug_info)
+        return run_bench_command(argc, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info)
     if cli_command(argc) == "version" or cli_command(argc) == "--version":
         with_write("with WITH_VERSION_PLACEHOLDER\n")
         return 0
@@ -1072,7 +1079,7 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, action_sema
             else:
                 for fi in 0..test_files.len() as i32:
                     let test_path = test_files.get(fi as i64)
-                    let test_rc = run_test_file_with_build_settings(test_path, target_options.opt_level, target_options.no_std, target_options.alloc_mode, target_options.prelude_mode, target_options.debug_info, false, false, "", target_options.include_paths, target_options.defines, target_options.link_libs)
+                    let test_rc = run_test_file_with_build_settings(test_path, target_options.opt_level, target_options.no_std, target_options.alloc_mode, target_options.runtime_available, target_options.prelude_mode, target_options.debug_info, false, false, "", target_options.include_paths, target_options.defines, target_options.link_libs)
                     if test_rc != 0:
                         with_eprint("error: build.w test target failed: " ++ target.name)
                         return test_rc
@@ -1374,7 +1381,7 @@ fn run_build_command(options: BuildCommandOptions, graph_options: BuildGraphComm
     comp.print_warnings()
     0
 
-fn run_run_project_command(selected_target_hint: str, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> i32:
+fn run_run_project_command(selected_target_hint: str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool) -> i32:
     let root = build_graph_find_build_root(".")
     if root.len() == 0:
         with_eprint("error: 'run' requires a source file argument, build.w, or a with.toml project")
@@ -1391,6 +1398,7 @@ fn run_run_project_command(selected_target_hint: str, opt_level: i32, no_std: bo
     options.opt_level = opt_level
     options.no_std = no_std
     options.alloc_mode = alloc_mode
+    options.runtime_available = runtime_available
     options.prelude_mode = prelude_mode
     options.debug_info = debug_info
     let load_result = load_build_graph_from_build_w(root, cfg, options)
@@ -1428,11 +1436,11 @@ fn run_run_project_command(selected_target_hint: str, opt_level: i32, no_std: bo
         return 1
     build_graph_rt_exec_binary(bin_path)
 
-fn run_run_command(source_file: str, selected_target_hint: str, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> i32:
+fn run_run_command(source_file: str, selected_target_hint: str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool) -> i32:
     if source_file == "":
-        return run_run_project_command(selected_target_hint, opt_level, no_std, alloc_mode, prelude_mode, debug_info)
+        return run_run_project_command(selected_target_hint, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info)
     var comp = Compilation.init()
-    comp.configure(opt_level, no_std, alloc_mode)
+    comp.configure(opt_level, no_std, alloc_mode, runtime_available)
     comp.set_prelude_mode(prelude_mode)
     comp.set_debug_info(debug_info)
     let bin_path = comp.build_binary(source_file)
@@ -1527,9 +1535,9 @@ fn dump_tokens(source_file: str, deterministic: bool) -> i32:
         with_write(tag_text ++ " |" ++ text_slice ++ "|\n")
     0
 
-fn dump_resolved_artifact(source_file: str, no_std: bool, alloc_mode: bool, prelude_mode: i32) -> i32:
+fn dump_resolved_artifact(source_file: str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
     var comp = Compilation.init()
-    comp.configure(0, no_std, alloc_mode)
+    comp.configure(0, no_std, alloc_mode, runtime_available)
     comp.set_prelude_mode(prelude_mode)
     let result = comp.resolve_file(source_file, true)
     let has_errors = comp.has_errors()
@@ -1540,9 +1548,9 @@ fn dump_resolved_artifact(source_file: str, no_std: bool, alloc_mode: bool, prel
     with_write(resolved_text)
     0
 
-fn dump_typed_artifact(source_file: str, no_std: bool, alloc_mode: bool, prelude_mode: i32) -> i32:
+fn dump_typed_artifact(source_file: str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
     var comp = Compilation.init()
-    comp.configure(0, no_std, alloc_mode)
+    comp.configure(0, no_std, alloc_mode, runtime_available)
     comp.set_prelude_mode(prelude_mode)
     let typed_ok = comp.emit_typed_file(source_file)
     if not typed_ok:
@@ -1550,9 +1558,9 @@ fn dump_typed_artifact(source_file: str, no_std: bool, alloc_mode: bool, prelude
         return 1
     0
 
-fn dump_project_info_artifact(source_file: str, no_std: bool, alloc_mode: bool, prelude_mode: i32) -> i32:
+fn dump_project_info_artifact(source_file: str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
     var comp = Compilation.init()
-    comp.configure(0, no_std, alloc_mode)
+    comp.configure(0, no_std, alloc_mode, runtime_available)
     comp.set_prelude_mode(prelude_mode)
     let text = comp.dump_project_info_file(source_file)
     if text.len() == 0:
@@ -1561,9 +1569,9 @@ fn dump_project_info_artifact(source_file: str, no_std: bool, alloc_mode: bool, 
     with_write(text)
     0
 
-fn dump_mir_artifact(source_file: str, no_std: bool, alloc_mode: bool, prelude_mode: i32) -> i32:
+fn dump_mir_artifact(source_file: str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
     var comp = Compilation.init()
-    comp.configure(0, no_std, alloc_mode)
+    comp.configure(0, no_std, alloc_mode, runtime_available)
     comp.set_prelude_mode(prelude_mode)
     let mir_ok = comp.print_mir_file(source_file)
     if not mir_ok:
@@ -1571,9 +1579,9 @@ fn dump_mir_artifact(source_file: str, no_std: bool, alloc_mode: bool, prelude_m
         return 1
     0
 
-fn dump_async_mir_artifact(source_file: str, no_std: bool, alloc_mode: bool, prelude_mode: i32) -> i32:
+fn dump_async_mir_artifact(source_file: str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
     var comp = Compilation.init()
-    comp.configure(0, no_std, alloc_mode)
+    comp.configure(0, no_std, alloc_mode, runtime_available)
     comp.set_prelude_mode(prelude_mode)
     let async_mir_text = comp.dump_async_mir_file(source_file)
     if async_mir_text.len() == 0:
@@ -2046,7 +2054,7 @@ fn run_test_binary_checked(bin_path: str, target: str, test_name: str, quiet: bo
         return 0
     1
 
-fn run_test_file_with_build_settings(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, filter: str, include_paths: Vec[str], defines: Vec[str], link_libs: Vec[str]) -> i32:
+fn run_test_file_with_build_settings(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, filter: str, include_paths: Vec[str], defines: Vec[str], link_libs: Vec[str]) -> i32:
     let directives = parse_test_directives_for_target(target)
     let directive_rc = run_test_directive_command(target, directives, quiet)
     if directive_rc >= 0:
@@ -2054,9 +2062,10 @@ fn run_test_file_with_build_settings(target: str, opt_level: i32, no_std: bool, 
     let discovery = discover_tests_for_target(target)
     let effective_opt_level = test_effective_opt_level(opt_level, directives.extra_args)
     let effective_no_std = no_std or test_extra_arg_present(directives.extra_args, "--no-std") or test_extra_arg_present(directives.extra_args, "--freestanding")
+    let effective_runtime_available = runtime_available and not test_extra_arg_present(directives.extra_args, "--no-runtime") and not test_extra_arg_present(directives.extra_args, "--freestanding")
     let effective_prelude_mode = test_effective_prelude_mode(prelude_mode, directives.extra_args)
     var comp = Compilation.init()
-    comp.configure(effective_opt_level, effective_no_std, alloc_mode)
+    comp.configure(effective_opt_level, effective_no_std, alloc_mode, effective_runtime_available)
     comp.set_prelude_mode(effective_prelude_mode)
     comp.set_debug_info(debug_info)
     let synthetic_source = maybe_synthesize_test_source(target)
@@ -2118,13 +2127,13 @@ fn run_test_file_with_build_settings(target: str, opt_level: i32, no_std: bool, 
     print_test_summary(target, 0, 1, run_quiet)
     run_rc
 
-fn run_test_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, filter: str) -> i32:
+fn run_test_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, filter: str) -> i32:
     let include_paths: Vec[str] = Vec.new()
     let defines: Vec[str] = Vec.new()
     let link_libs: Vec[str] = Vec.new()
-    run_test_file_with_build_settings(target, opt_level, no_std, alloc_mode, prelude_mode, debug_info, verbose, quiet, filter, include_paths, defines, link_libs)
+    run_test_file_with_build_settings(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, filter, include_paths, defines, link_libs)
 
-fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> i32:
+fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool) -> i32:
     let verbose = cli_test_verbose(argc)
     var quiet = cli_test_quiet(argc)
     if verbose:
@@ -2137,6 +2146,7 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, p
         build_options.opt_level = opt_level
         build_options.no_std = no_std
         build_options.alloc_mode = alloc_mode
+        build_options.runtime_available = runtime_available
         build_options.prelude_mode = prelude_mode
         build_options.debug_info = debug_info
         var graph_options = build_graph_command_options_default()
@@ -2149,14 +2159,14 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, p
             return 1
         for ti in 0..test_files.len() as i32:
             let test_file = test_files.get(ti as i64)
-            let run_rc = run_test_file(test_file, opt_level, no_std, alloc_mode, prelude_mode, debug_info, verbose, quiet, filter)
+            let run_rc = run_test_file(test_file, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, filter)
             if run_rc != 0:
                 with_eprint("error: test failed in '" ++ test_file ++ "'")
                 return run_rc
         return 0
-    run_test_file(target, opt_level, no_std, alloc_mode, prelude_mode, debug_info, verbose, quiet, filter)
+    run_test_file(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, filter)
 
-fn run_bench_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool, filter: str) -> i32:
+fn run_bench_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, filter: str) -> i32:
     let text = with_fs_read_file(target)
     if text.len() == 0:
         with_eprint("error: could not read '" ++ target ++ "'")
@@ -2170,7 +2180,7 @@ fn run_bench_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, p
         return 1
     let synthetic_source = synthesize_bench_main_source(text, discovery.bench_names)
     var comp = Compilation.init()
-    comp.configure(opt_level, no_std, alloc_mode)
+    comp.configure(opt_level, no_std, alloc_mode, runtime_available)
     comp.set_prelude_mode(prelude_mode)
     comp.set_debug_info(debug_info)
     let bin_path = comp.build_binary_from_source(target, synthetic_source)
@@ -2186,7 +2196,7 @@ fn run_bench_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, p
     cleanup_binary_artifacts(bin_path)
     rc
 
-fn run_bench_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, prelude_mode: i32, debug_info: bool) -> i32:
+fn run_bench_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool) -> i32:
     let filter = cli_test_filter(argc)
     let target = find_source_arg(argc)
     if target == "":
@@ -2206,13 +2216,13 @@ fn run_bench_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, 
             let disc = discover_bench_functions(text)
             if not disc.parse_ok or disc.bench_names.len() == 0:
                 continue
-            let rc = run_bench_file(file, opt_level, no_std, alloc_mode, prelude_mode, debug_info, filter)
+            let rc = run_bench_file(file, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, filter)
             if rc != 0:
                 any_failed = true
         if any_failed:
             return 1
         return 0
-    run_bench_file(target, opt_level, no_std, alloc_mode, prelude_mode, debug_info, filter)
+    run_bench_file(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, filter)
 
 fn run_migrate_command(argc: i32) -> i32:
     if argc < 3:
@@ -2442,9 +2452,10 @@ fn print_usage:
     with_write("  --dump-project-info\n")
     with_write("                   Print resolved project metadata from 'check'\n")
     with_write("  --no-std         Disable standard library support\n")
+    with_write("  --no-runtime     Disable the fiber runtime; async constructs are errors\n")
     with_write("  --no-prelude     Disable implicit prelude import\n")
     with_write("  --prelude=<mode> Select prelude mode: full, core, none\n")
-    with_write("  --freestanding   Alias for --no-std --no-prelude\n")
+    with_write("  --freestanding   Alias for --no-std --no-runtime --no-prelude\n")
 
 fn run_help_command(argc: i32) -> i32:
     let topic = cli_help_topic(argc)

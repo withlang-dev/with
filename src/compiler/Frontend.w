@@ -1141,6 +1141,7 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
         pre_sema.decl_source_file_ids = self.decl_source_file_ids
         pre_sema.decl_is_c_import = self.decl_is_c_import
         pre_sema.tool_mode_entry_path = self.tool_mode_entry_path
+        pre_sema.runtime_available = if self.project_config.runtime_available: 1 else: 0
         pre_sema.init_module_graph(&self.last_resolved)
         pre_sema.prepare_for_comptime_transform()
         // The comptime transform must run against the same intern pool that
@@ -1174,6 +1175,7 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
     sema.decl_source_file_ids = self.decl_source_file_ids
     sema.decl_is_c_import = self.decl_is_c_import
     sema.tool_mode_entry_path = self.tool_mode_entry_path
+    sema.runtime_available = if self.project_config.runtime_available: 1 else: 0
     sema.init_module_graph(&self.last_resolved)
     sema.check_module()
     if do_profile:

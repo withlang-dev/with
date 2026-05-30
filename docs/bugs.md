@@ -276,8 +276,11 @@
   │ [x] #273                                                                                                      │         Yes │               Yes │   No │ Completed: select-await branches now have      │
   │                                                                                                                │             │                   │      │ executable let-else coverage for break,        │
   │                                                                                                                │             │                   │      │ continue, and multiple branches. Spec §14.10. │
-  │ #274                                                                                                          │         Yes │           Partial │   No │ Remaining §14 async overview sketch still      │
-  │                                                                                                                │             │                   │      │ needs executable coverage or blockers.         │
+  │ [x] #274                                                                                                      │         Yes │               Yes │   No │ Completed: §14 async overview is executable    │
+  │                                                                                                                │             │                   │      │ for async calls from sync functions, tuple     │
+  │                                                                                                                │             │                   │      │ await, references across await, scoped         │
+  │                                                                                                                │             │                   │      │ tracking, storable Tasks, await?, and          │
+  │                                                                                                                │             │                   │      │ no-runtime async diagnostics. Spec §14.2-14.7.│
   │ [x] #275-#276                                                                                                  │         Yes │               Yes │   No │ Completed: c"..." now lowers as &CStr with     │
   │                                                                                                                │             │                   │      │ NUL-terminated static storage, string          │
   │                                                                                                                │             │                   │      │ literals default to str, and &str coercions    │

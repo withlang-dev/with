@@ -26,6 +26,7 @@ pub type BuildCommandOptions {
     debug_info: bool,
     no_std: bool,
     alloc_mode: bool,
+    runtime_available: bool,
     prelude_mode: i32,
     deterministic: bool,
     target_kind: i32,
@@ -86,6 +87,7 @@ pub fn build_command_options_default -> BuildCommandOptions:
         debug_info: true,
         no_std: false,
         alloc_mode: false,
+        runtime_available: true,
         prelude_mode: DriverPreludeMode.Full,
         deterministic: false,
         target_kind: 0,
@@ -249,6 +251,7 @@ pub fn parse_build_command_options(argc: i32) -> BuildCommandParseResult:
     build.opt_level = driver_build_opt_level(argc)
     build.no_std = driver_has_flag(argc, "--no-std") or driver_has_flag(argc, "--freestanding")
     build.alloc_mode = driver_has_flag(argc, "--alloc")
+    build.runtime_available = not driver_has_flag(argc, "--no-runtime") and not driver_has_flag(argc, "--freestanding")
     build.debug_info = not driver_has_flag(argc, "-g0") and not driver_has_flag(argc, "--release")
     build.deterministic = driver_has_flag(argc, "--deterministic")
     let prelude = driver_parse_prelude_mode(argc)

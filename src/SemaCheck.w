@@ -27,6 +27,11 @@ extern fn with_regex_capture_name_at(code: *const i8, index: i32) -> str
 // docs/mut.md Rev 8 — P12 lockdown active. `&mut T` is rejected.
 const STRICT_NO_MUT_REF: i32 = 1
 
+fn Sema.require_async_runtime(self: Sema, node: i32, feature: str):
+    if self.runtime_available != 0:
+        return
+    self.emit_error(feature ++ " requires the fiber runtime", node)
+
 type SemaDynTraitMethodInfo {
     ok: i32,
     param_start: i32,
@@ -2551,6 +2556,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         return self.check_tuple_destructure(node) as TypeId
 
     if kind == NodeKind.NK_AWAIT:
+        self.require_async_runtime(node, "await")
         if self.in_comptime_fn != 0:
             self.emit_error("await is not allowed in comptime", node)
         if self.has_live_await_guard() != 0:
@@ -2589,6 +2595,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
 
 
     if kind == NodeKind.NK_ASYNC_BLOCK:
+        self.require_async_runtime(node, "async")
         if self.in_comptime_fn != 0:
             self.emit_error("async is not allowed in comptime", node)
         let ab_saved_label_registry = self.save_label_registry()
@@ -2609,6 +2616,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         return ab_body_ty
 
     if kind == NodeKind.NK_SPAWN:
+        self.require_async_runtime(node, "spawn")
         if self.in_comptime_fn != 0:
             self.emit_error("spawn is not allowed in comptime", node)
         let inner = self.ast.get_data0(node)
@@ -2661,6 +2669,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         return ty
 
     if kind == NodeKind.NK_ASYNC_SCOPE:
+        self.require_async_runtime(node, "async scope")
         let body = self.ast.get_data1(node)
         let name = self.ast.get_data0(node)
         self.push_scope()
@@ -2680,6 +2689,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         return result
 
     if kind == NodeKind.NK_SELECT_AWAIT:
+        self.require_async_runtime(node, "select await")
         if self.has_live_await_guard() != 0:
             self.emit_error("E0701: may_suspend call while no_await_guard value is live", node)
         let extra_start = self.ast.get_data0(node)
