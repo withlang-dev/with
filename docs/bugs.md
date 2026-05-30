@@ -331,7 +331,8 @@
   │                                                                                                                │             │                   │      │ + negative compile_errors tests. Spec §20b.6.  │
   │ #286 (partial)                                                                                                 │         Yes │           Partial │   No │ §20b denied patterns. Done: unreachable code,  │
   │                                                                                                                │             │                   │      │ unused Task (E0801), unused Result (E0802).    │
-  │                                                                                                                │             │                   │      │ Remaining: unnecessary unsafe, implicit        │
-  │                                                                                                                │             │                   │      │ narrowing, sign conversion, @[no_await_guard]  │
-  │                                                                                                                │             │                   │      │ await (→ #221).                                │
+  │                                                                                                                │             │                   │      │ Remaining (each its own design issue):         │
+  │                                                                                                                │             │                   │      │ unnecessary unsafe → #303, implicit narrowing/ │
+  │                                                                                                                │             │                   │      │ sign conversion → #304, @[no_await_guard] await│
+  │                                                                                                                │             │                   │      │ → #221.                                        │
   └────────────────────────────────────────────────────────────────────────────────────────────────────────────────┴─────────────┴───────────────────┴──────┴────────────────────────────────────────────────
