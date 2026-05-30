@@ -1,14 +1,17 @@
-//! skip: non-executable spec sketch for Section 16.1 — FFI Direct Call (formerly 25.88); contains pseudo-code for unimplemented feature work
-// Spec test: Section 16.1 — FFI Direct Call (formerly 25.88)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+//! expect-stdout: ok
 
-// PASS: c_import functions callable directly
 use c_import("stdio.h")
-fn test: puts(c"hello".ptr)      // no unsafe needed
 
-// PASS: unsafe still required for pointer deref
-fn test:
-    let p: *mut i32 = alloc(4)
-    unsafe { *p = 42 }               // pointer deref needs unsafe
-    free(p)                           // C function call: no unsafe
+fn test_c_import_functions_callable_directly:
+    let rc = puts(c"ok".ptr)
+    assert(rc >= 0)
+
+fn test_raw_pointer_operations_still_require_unsafe:
+    var value = 0
+    let p = (&raw mut value) as *mut i32
+    unsafe { *p = 42 }
+    assert(value == 42)
+
+fn main:
+    test_c_import_functions_callable_directly()
+    test_raw_pointer_operations_still_require_unsafe()

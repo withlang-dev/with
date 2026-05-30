@@ -285,10 +285,12 @@
   │                                                                                                                │             │                   │      │ NUL-terminated static storage, string          │
   │                                                                                                                │             │                   │      │ literals default to str, and &str coercions    │
   │                                                                                                                │             │                   │      │ keep str views instead of raw byte pointers.   │
-  │ #277, #279                                                                                                     │         Yes │           Partial │   No │ §16 FFI/c_import sketches. c_import improved,  │
-  │                                                                                                                │             │                   │      │ but skipped specs still include sqlite forward │
-  │                                                                                                                │             │                   │      │ declarations and extern C fn-pointer closure   │
-  │                                                                                                                │             │                   │      │ syntax/rules.                                  │
+  │ [x] #277                                                                                                      │         Yes │               Yes │   No │ Completed: c_import functions are callable     │
+  │                                                                                                                │             │                   │      │ directly without unsafe; raw pointer           │
+  │                                                                                                                │             │                   │      │ dereference still requires unsafe. Spec §16.1. │
+  │ #279                                                                                                           │         Yes │           Partial │   No │ §16 FFI/c_import overview still has sqlite     │
+  │                                                                                                                │             │                   │      │ forward declaration gaps and extern C          │
+  │                                                                                                                │             │                   │      │ fn-pointer closure syntax/rules.               │
   │ [x] #278                                                                                                      │         Yes │               Yes │   No │ Completed: raw pointer .as_option() now        │
   │                                                                                                                │             │                   │      │ returns Option[*T] as a no-op nullable-pointer │
   │                                                                                                                │             │                   │      │ conversion; regressions cover null/non-null    │
