@@ -28,6 +28,37 @@ answers in minutes. Stop adding debug prints and rebuilding.
 
 ---
 
+## Language Design Philosophy
+
+**Don't make the user write anything the compiler already knows,
+could figure out, or that doesn't matter.** This is the single
+principle behind With's surface syntax, and it must be applied
+*pervasively and consistently*. It is why:
+
+- a function returning `i32` doesn't need a trailing `0`
+- you don't write `Ok(())` or `Ok(value)` — `?` handles the sad
+  path, the happy path just returns the value
+- return types are inferred when the body makes them obvious
+- `fn main:` not `fn main -> i32:`
+- enum variants use `.Variant` when the type is known
+
+**Never force the user to write ceremony for something that does
+not matter.** The clearest violation is requiring `let _ = expr`
+to discard a value whose discard has no effect. A dropped `Result`
+does nothing, so a "must-use Result" diagnostic that forces
+`let _ =` is **forbidden** — it makes the user annotate a fact the
+compiler already knows and that changes nothing. (Contrast: a
+dropped `Task` *cancels* it, so requiring an explicit choice there
+is acceptable — the discard actually matters.)
+
+Before adding any rule, error, or required annotation, ask: *does
+this make the user state something the compiler already knows, can
+infer, or that has no consequence?* If yes, don't add it. A
+diagnostic earns its place only by catching a real mistake the
+compiler cannot otherwise resolve — not by enforcing ritual.
+
+---
+
 ## No Silent Fallbacks
 
 When code cannot be correctly generated, the only acceptable
