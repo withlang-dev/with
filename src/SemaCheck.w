@@ -4962,7 +4962,9 @@ fn Sema.check_match_exhaustiveness(self: Sema, node: i32, subject_type: i32, ext
                 else:
                     has_false = 1
         if has_true == 0 or has_false == 0:
-            self.emit_warning("non-exhaustive match on bool", node)
+            // §9.7: a match that requires exhaustiveness (expression position, or
+            // a @[must_use] subject) is a compile error when not exhaustive.
+            self.emit_error("non-exhaustive match on bool", node)
         return
 
     // Sealed trait object exhaustiveness
@@ -5014,7 +5016,9 @@ fn Sema.check_match_exhaustiveness(self: Sema, node: i32, subject_type: i32, ext
                 covered = 1
                 break
         if covered == 0:
-            self.emit_warning("non-exhaustive match: missing variant", node)
+            // §9.7: expression-position (and @[must_use]) matches must be
+            // exhaustive — a missing variant is a compile error, not a warning.
+            self.emit_error("non-exhaustive match: missing variant '" ++ self.pool_resolve(v_name_sym) ++ "'", node)
             return
         pos = pos + 2 + pc
 
