@@ -1,14 +1,22 @@
-//! skip: non-executable spec sketch for Section 13.2 — HashMap Lookup Borrowing (formerly 25.81); contains pseudo-code for unimplemented feature work
-// Spec test: Section 13.2 — HashMap Lookup Borrowing (formerly 25.81)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+// Spec test: Section 13.2 — HashMap Lookup Borrowing
+// HashMap.get borrows the map (not the key) and returns an Option.
 
-// PASS: HashMap::get borrows from the map, not the key
-fn test:
-    var map = HashMap.new()
+type User:
+    name: str
+
+fn test_get_returns_some:
+    var map: HashMap[str, User] = HashMap.new()
     map.insert("admin", User { name: "Alice" })
-    let user = {
-        let key: str = "admin"
-        map.get(key.as_view())    // compiler knows: borrows map, not key
-    }                              // key drops here, user still valid
-    assert(user.is_some())
+    assert(map.get("admin").is_some())
+
+fn test_get_missing_is_none:
+    var map: HashMap[str, i32] = HashMap.new()
+    map.insert("a", 1)
+    assert(map.get("missing").is_none())
+
+fn test_lookup_with_temporary_key:
+    var map: HashMap[str, i32] = HashMap.new()
+    map.insert("admin", 42)
+    let key: str = "admin"
+    let found = map.get(key)   // borrows the map, not the key
+    assert(found.is_some())

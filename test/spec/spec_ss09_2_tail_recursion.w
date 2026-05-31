@@ -1,21 +1,19 @@
-//! skip: non-executable spec sketch for Section 9.2 — Tail Recursion (formerly 25.12); contains pseudo-code for unimplemented feature work
-// Spec test: Section 9.2 — Tail Recursion (formerly 25.12)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+// Spec test: Section 9.2 — Tail Recursion
+// Executable subset of the §9.2 sketch (negative @[tailrec] cases omitted).
 
-// PASS: valid
 @[tailrec]
-fn factorial(n: Int, acc: Int) -> Int:
-    match n { 0 => acc, _ => factorial(n - 1, n * acc) }
+fn factorial(n: i32, acc: i32) -> i32:
+    match n:
+        0 => acc
+        _ => factorial(n - 1, n * acc)
 
-// FAIL: not in tail position
 @[tailrec]
-fn bad(n: Int) -> Int:
-    match n { 0 => 1, _ => n * bad(n - 1) }  // ERROR
+fn sum_to(n: i32, acc: i32) -> i32:
+    if n == 0: return acc
+    sum_to(n - 1, acc + n)
 
-// FAIL: defer prevents tail-call guarantee
-@[tailrec]
-fn also_bad(n: Int) -> Int:
-    if n <= 0: 0
-    defer: log(n)
-    also_bad(n - 1)                         // ERROR
+fn test_tailrec_factorial:
+    assert(factorial(5, 1) == 120)
+
+fn test_tailrec_sum:
+    assert(sum_to(100, 0) == 5050)

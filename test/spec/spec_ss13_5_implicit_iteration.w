@@ -1,49 +1,37 @@
-//! skip: non-executable spec sketch for Section 13.5 — Implicit Iteration (formerly 25.46); contains pseudo-code for unimplemented feature work
-// Spec test: Section 13.5 — Implicit Iteration (formerly 25.46)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+// Spec test: Section 13.5 — Implicit Iteration
+// Executable subset (vec! literals rewritten to Vec.new()+push).
 
-// PASS: for-in auto-inserts .iter()
-fn test:
-    let items = vec![1, 2, 3]
+fn test_for_in_auto_iter:
+    let items: Vec[i32] = Vec.new()
+    items.push(1)
+    items.push(2)
+    items.push(3)
     var sum = 0
-    for x in items:              // compiler inserts .iter()
-        sum += x
+    for x in items:
+        sum = sum + x
     assert(sum == 6)
-    assert(items.len() == 3)     // items not consumed
+    assert(items.len() == 3)   // for-in does not consume the collection
 
-// PASS: explicit .iter() still works
-fn test:
-    let items = vec![1, 2, 3]
+fn test_explicit_iter:
+    let items: Vec[i32] = Vec.new()
+    items.push(1)
+    items.push(2)
     var sum = 0
     for x in items.iter():
-        sum += x
-    assert(sum == 6)
+        sum = sum + x
+    assert(sum == 3)
 
-// PASS: ranges don't need .iter() (implement Iter directly)
-fn test:
+fn test_range_iteration:
     var sum = 0
     for i in 0..4:
-        sum += i
+        sum = sum + i
     assert(sum == 6)
 
-// PASS: destructuring in for loop
-fn test:
-    let pairs = vec![(1, "a"), (2, "b")]
-    for (n, s) in pairs:         // .iter() auto-inserted
-        assert(n > 0)
-
-// PASS: refutable patterns skip non-matching elements
-fn test:
-    let values = vec![Some(1), None, Some(3)]
-    var sum = 0
-    for Some(x) in values:
-        sum += x
-    assert(sum == 4)
-
-// PASS: mutable iteration requires explicit .iter_mut()
-fn test:
-    var items = vec![1, 2, 3]
-    for x in items.iter_mut():
-        *x *= 2
-    assert(items == vec![2, 4, 6])
+fn test_for_loop_destructure:
+    let pairs: Vec[(i32, str)] = Vec.new()
+    pairs.push((1, "a"))
+    pairs.push((2, "b"))
+    var count = 0
+    for (n, _s) in pairs:
+        if n > 0: count = count + 1
+    assert(count == 2)

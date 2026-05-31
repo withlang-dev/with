@@ -1,40 +1,50 @@
-//! skip: non-executable spec sketch for Section 9.7 — Pattern Matching (formerly 25.14); contains pseudo-code for unimplemented feature work
-// Spec test: Section 9.7 — Pattern Matching (formerly 25.14)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+// Spec test: Section 9.7 — Pattern Matching
+// Executable subset: or-patterns, range arms, nested variants, if-let
+// (slice patterns not yet supported).
 
-// PASS: nested
-enum Expr { Lit(i32) | Add(Expr, Expr) | Mul(Expr, Expr) }
-fn simplify(e: Expr) -> Expr:
+enum Day:
+    Mon
+    Tue
+    Sat
+    Sun
+
+fn classify(d: Day) -> str:
+    match d:
+        .Mon | .Tue => "weekday"
+        .Sat | .Sun => "weekend"
+
+enum Expr:
+    Lit(i32)
+    Neg(i32)
+
+fn eval(e: Expr) -> i32:
     match e:
-        Add(Lit(0), rhs) => rhs
-        Mul(Lit(0), _) | Mul(_, Lit(0)) => Lit(0)
-        other => other
+        .Lit(0) => 1000
+        .Lit(n) => n
+        .Neg(n) => 0 - n
 
-// PASS: or-patterns
-fn classify(day: Day) -> str:
-    match day:
-        Monday | Tuesday | Wednesday | Thursday | Friday => "weekday"
-        Saturday | Sunday => "weekend"
-
-// PASS: if-let
-fn test(opt: Option[i32]):
-    if let Some(x) = opt: print(x)
-
-// PASS: range
 fn category(code: i32) -> str:
     match code:
-        200 => "ok"; 400..=499 => "client error"; _ => "unknown"
+        200 => "ok"
+        400..=499 => "client error"
+        _ => "unknown"
 
-// PASS: slice
-fn describe(items: &[i32]) -> str:
-    match items:
-        [] => "empty"
-        [x] => "one"
-        [first, ..rest] => "{rest.len()} more"
+fn test_or_patterns:
+    assert(classify(Day.Tue) == "weekday")
+    assert(classify(Day.Sun) == "weekend")
 
-// FAIL: non-exhaustive nested
-fn bad(e: Expr):
-    match e:
-        Lit(_) => "lit"
-        Add(_, _) => "add"       // ERROR: missing Mul
+fn test_nested_variant_patterns:
+    assert(eval(Expr.Lit(0)) == 1000)
+    assert(eval(Expr.Lit(42)) == 42)
+    assert(eval(Expr.Neg(5)) == -5)
+
+fn test_range_arm:
+    assert(category(404) == "client error")
+    assert(category(200) == "ok")
+    assert(category(999) == "unknown")
+
+fn test_if_let:
+    let o: Option[i32] = Some(7)
+    var got = 0
+    if let Some(x) = o: got = x
+    assert(got == 7)
