@@ -1,5 +1,5 @@
 //! args: --emit-c
-//! expect-build-fail: C backend does not yet support Vec.get_disjoint
+//! expect-build-fail: C backend is LLVM-only for Vec.get_disjoint by design
 
 fn main:
     var xs = Vec.new()

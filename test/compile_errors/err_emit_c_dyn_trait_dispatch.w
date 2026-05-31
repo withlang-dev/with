@@ -1,5 +1,5 @@
 //! args: --emit-c
-//! expect-build-fail: C backend does not yet support dyn trait method dispatch
+//! expect-build-fail: C backend is LLVM-only for dyn trait method dispatch by design
 
 trait Greet:
     fn hello(self: &Self) -> str

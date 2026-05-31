@@ -4703,12 +4703,19 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
     let ret_tid = self.call_builtin_ret_tid(body, callee_operand, args_id, dest_place)
     let has_ret = if self.is_void_tid(ret_tid) == 0: 1 else: 0
 
+    // LLVM-only-by-design intrinsic families (#301). The C backend exists only to
+    // self-bootstrap the compiler (see with-bootstrap-runbook.md, "Scope of the C
+    // backend"); the compiler uses none of these internally, and user programs are
+    // always compiled through LLVM. These loud failures are intentional and
+    // permanent — reaching parity is NOT a goal. If the compiler ever starts using
+    // one of these, `make emit-c-fixpoint` fails loudly and points here. Keep the
+    // loud fail; never add a silent fallback to make --emit-c pass.
     if kind == CcBuiltin.DYN_CALL:
-        self.fail("C backend does not yet support dyn trait method dispatch")
+        self.fail("C backend is LLVM-only for dyn trait method dispatch by design (#301); compile this program with the LLVM backend")
         return "    abort();"
 
     if kind == CcBuiltin.MULTI_INDEX:
-        self.fail("C backend does not yet support MultiIndex intrinsics; use the LLVM backend or add MultiIndex lowering")
+        self.fail("C backend is LLVM-only for MultiIndex intrinsics by design (#301); compile this program with the LLVM backend")
         return "    abort();"
 
     if kind == CcBuiltin.VEC_NEW:
@@ -4737,16 +4744,19 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
         out = out ++ f"    goto bb{next_bb};"
         return out
 
+    // See the LLVM-only-by-design note above (#301). get_disjoint / SlotMap /
+    // VecRange (and their *_LEN32/64/ULEN32 variants, which route here) are
+    // intentionally unsupported in the C backend.
     if kind == CcBuiltin.VEC_GET_DISJOINT:
-        self.fail("C backend does not yet support Vec.get_disjoint; use the LLVM backend or add tuple-valued VecSlot lowering")
+        self.fail("C backend is LLVM-only for Vec.get_disjoint by design (#301); compile this program with the LLVM backend")
         return "    abort();"
 
     if kind == CcBuiltin.SLOTMAP:
-        self.fail("C backend does not yet support SlotMap intrinsics; use the LLVM backend or add SlotMap lowering")
+        self.fail("C backend is LLVM-only for SlotMap intrinsics by design (#301); compile this program with the LLVM backend")
         return "    abort();"
 
     if kind == CcBuiltin.VECRANGE:
-        self.fail("C backend does not yet support VecRange intrinsics; use the LLVM backend or add VecRange lowering")
+        self.fail("C backend is LLVM-only for VecRange intrinsics by design (#301); compile this program with the LLVM backend")
         return "    abort();"
 
     if kind == CcBuiltin.VECSLOT_GET:

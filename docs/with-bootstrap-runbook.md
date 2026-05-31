@@ -184,6 +184,27 @@ for creating the first native With compiler.
    build binary C through the normal build path. A and C must be byte-identical.
    A mismatch is an emit-C bug, not a release packaging issue.
 
+### Scope of the C backend (why some intrinsics are LLVM-only)
+
+The C backend (`--emit-c`) exists for exactly one job: this no-LLVM bootstrap.
+It only has to emit **the compiler's own source** — nothing more. User programs
+are always compiled through the LLVM backend (the release binary embeds its own
+LLVM/libclang), so they never route through `--emit-c`.
+
+Consequently several intrinsic families are **LLVM-only by design**, and the C
+backend loudly `self.fail(...)`s on them instead of lowering them: dyn-trait
+method dispatch, `MultiIndex`, `Vec.get_disjoint` (tuple-valued slots),
+`SlotMap`, and `VecRange` (plus their `len32`/`len64`/`ulen32` variants). The
+compiler does not use any of these internally, so they can never block this
+bootstrap. The guarantee is enforced, not assumed: if a future compiler change
+starts using one of them, the `make emit-c-fixpoint` gate above fails loudly and
+points at it.
+
+Reaching LLVM↔C parity for these families is therefore **not a requirement**
+(issue #301). Keep the loud failure; never add a silent fallback to make
+`--emit-c` pass. The only emit-C gaps worth fixing are ones the *compiler's own
+source* hits — those surface as `emit-c-fixpoint` failures.
+
 ## Failure Policy
 
 Do not work around missing static resources by linking dynamically.
