@@ -26,6 +26,8 @@ extern let with_embedded_rt_darwin_aarch64_o_end: u8
 extern let with_embedded_rt_linux_x86_64_o_start: u8
 extern let with_embedded_rt_linux_x86_64_o_end: u8
 
+var link_stage_temp_archives: Vec[str] = Vec.new()
+
 type LinkStageEnvVar {
     name: str,
     value: str,
@@ -38,6 +40,7 @@ type LinkStageCommand {
     env: Vec[LinkStageEnvVar],
     inputs: Vec[str],
     outputs: Vec[str],
+    cleanup_files: Vec[str],
 }
 
 type LinkStageResult {
@@ -59,6 +62,7 @@ fn link_stage_empty_command() -> LinkStageCommand:
         env: Vec.new(),
         inputs: Vec.new(),
         outputs: Vec.new(),
+        cleanup_files: Vec.new(),
     }
 
 fn link_stage_result_fail() -> LinkStageResult:
@@ -72,6 +76,7 @@ fn link_stage_plan_for_command(command: LinkStageCommand) -> LinkStagePlan:
 
 fn link_stage_result_for_command(command: LinkStageCommand) -> LinkStageResult:
     let rc = command.run()
+    link_stage_cleanup_files(command.cleanup_files)
     LinkStageResult { ok: rc == 0, rc, command }
 
 fn link_stage_result_for_plan(plan: LinkStagePlan) -> LinkStageResult:
@@ -81,6 +86,75 @@ fn link_stage_result_for_plan(plan: LinkStagePlan) -> LinkStageResult:
 
 fn link_stage_argv_append(argv: str, arg: str) -> str:
     argv ++ arg ++ "\0"
+
+fn link_stage_is_digit(ch: i32) -> bool:
+    ch >= 48 and ch <= 57
+
+fn link_stage_is_temp_archive_path(path: str) -> bool:
+    if not path.ends_with(".a"):
+        return false
+    var i = 0
+    while i + 3 < path.len():
+        if path.slice(i as i64, (i + 3) as i64) == ".o.":
+            return link_stage_is_digit(path.byte_at((i + 3) as i64))
+        i = i + 1
+    false
+
+fn link_stage_collect_cleanup_files(extras: Vec[str]) -> Vec[str]:
+    let cleanup: Vec[str] = Vec.new()
+    for i in 0..extras.len() as i32:
+        let extra = extras.get(i as i64)
+        if link_stage_is_temp_archive_path(extra):
+            cleanup.push(extra)
+    cleanup
+
+fn link_stage_cleanup_files(files: Vec[str]):
+    for i in 0..files.len() as i32:
+        let _remove = runtime_remove_file(files.get(i as i64))
+
+fn link_stage_register_temp_archive(path: str):
+    link_stage_temp_archives.push(path)
+
+fn link_stage_basename(path: str) -> str:
+    var last_slash = -1
+    for i in 0..path.len() as i32:
+        if path.byte_at(i as i64) == 47:
+            last_slash = i
+    if last_slash < 0:
+        return path
+    path.slice((last_slash + 1) as i64, path.len())
+
+fn link_stage_owned_temp_archive(path: str, pid_text: str) -> bool:
+    let name = link_stage_basename(path)
+    if not name.ends_with(".a"):
+        return false
+    link_stage_str_contains(name, ".o." ++ pid_text ++ ".")
+
+fn link_stage_cleanup_owned_temp_archives_in(dir: str, pid_text: str):
+    let listing = runtime_list_files(dir)
+    var start = 0
+    for i in 0..listing.len() as i32:
+        let ch = listing.byte_at(i as i64)
+        if ch == 10 or ch == 13:
+            if i > start:
+                let path = listing.slice(start as i64, i as i64)
+                if link_stage_owned_temp_archive(path, pid_text):
+                    let remove_path = if link_stage_str_contains(path, "/"): path else: dir ++ "/" ++ path
+                    let _remove = runtime_remove_file(remove_path)
+            start = i + 1
+    if start < listing.len() as i32:
+        let path = listing.slice(start as i64, listing.len())
+        if link_stage_owned_temp_archive(path, pid_text):
+            let remove_path = if link_stage_str_contains(path, "/"): path else: dir ++ "/" ++ path
+            let _remove = runtime_remove_file(remove_path)
+
+pub fn link_stage_cleanup_current_process_temp_archives():
+    link_stage_cleanup_files(link_stage_temp_archives)
+    link_stage_temp_archives = Vec.new()
+    let root = link_stage_artifact_root()
+    let pid_text = f"{runtime_getpid()}"
+    link_stage_cleanup_owned_temp_archives_in(root ++ "/lib", pid_text)
+    link_stage_cleanup_owned_temp_archives_in(root ++ "/bootstrap-lib", pid_text)
 
 type LinkStageSavedEnv {
     names: Vec[str],
@@ -139,7 +213,8 @@ fn link_stage_make_link_command(linker: str, obj_path: str, bin_path: str, extra
         args.push(link_args.get(i as i64))
     if runtime_sysinfo_os() == "Linux":
         args.push("-lm")
-    LinkStageCommand { linker, args, cwd: "", env, inputs, outputs }
+    let cleanup_files = link_stage_collect_cleanup_files(extras)
+    LinkStageCommand { linker, args, cwd: "", env, inputs, outputs, cleanup_files }
 
 fn link_stage_file_exists(path: str) -> bool:
     runtime_read_file(path).len() > 0
@@ -200,7 +275,8 @@ fn link_stage_make_darwin_llvm_link_command(llvm_ld: str, obj_path: str, bin_pat
     for i in 0..link_args.len() as i32:
         args.push(link_args.get(i as i64))
     args.push("-lSystem")
-    LinkStageCommand { llvm_ld, args, cwd: "", env, inputs, outputs }
+    let cleanup_files = link_stage_collect_cleanup_files(extras)
+    LinkStageCommand { llvm_ld, args, cwd: "", env, inputs, outputs, cleanup_files }
 
 fn link_stage_make_linux_llvm_link_command(llvm_ld: str, obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str], link_args: Vec[str]) -> LinkStageCommand:
     let args: Vec[str] = Vec.new()
@@ -214,7 +290,7 @@ fn link_stage_make_linux_llvm_link_command(llvm_ld: str, obj_path: str, bin_path
     let gcc_dir = link_stage_linux_gcc_dir()
     if dynamic_linker.len() == 0 or crt1.len() == 0 or crti.len() == 0 or crtn.len() == 0 or gcc_dir.len() == 0:
         with_eprint("error: could not locate Linux x86_64 crt/linker files for direct ld.lld link")
-        return LinkStageCommand { linker: "", args, cwd: "", env, inputs, outputs }
+        return LinkStageCommand { linker: "", args, cwd: "", env, inputs, outputs, cleanup_files: Vec.new() }
 
     args.push("-m")
     args.push("elf_x86_64")
@@ -261,7 +337,8 @@ fn link_stage_make_linux_llvm_link_command(llvm_ld: str, obj_path: str, bin_path
     inputs.push(crtend)
     args.push(crtn)
     inputs.push(crtn)
-    LinkStageCommand { llvm_ld, args, cwd: "", env, inputs, outputs }
+    let cleanup_files = link_stage_collect_cleanup_files(extras)
+    LinkStageCommand { llvm_ld, args, cwd: "", env, inputs, outputs, cleanup_files }
 
 fn link_stage_make_llvm_link_command(llvm_ld: str, obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str], link_args: Vec[str]) -> LinkStageCommand:
     let os = runtime_sysinfo_os()
@@ -271,7 +348,7 @@ fn link_stage_make_llvm_link_command(llvm_ld: str, obj_path: str, bin_path: str,
     if os == "Macos" and (arch == "armv8" or arch == "aarch64"):
         return link_stage_make_darwin_llvm_link_command(llvm_ld, obj_path, bin_path, extras, link_libs, link_args)
     with_eprint("error: unsupported host LLVM linker platform: " ++ os ++ "/" ++ arch)
-    LinkStageCommand { linker: "", args: Vec.new(), cwd: "", env: Vec.new(), inputs: Vec.new(), outputs: Vec.new() }
+    LinkStageCommand { linker: "", args: Vec.new(), cwd: "", env: Vec.new(), inputs: Vec.new(), outputs: Vec.new(), cleanup_files: Vec.new() }
 
 fn link_stage_str_from_raw_parts(ptr: *const u8, len: i64) -> str:
     if ptr as i64 == 0 or len <= 0:
@@ -535,7 +612,10 @@ fn link_stage_make_archive(obj_path: str) -> str:
     // Wrap a .o file in a .a archive so the linker treats it as a library
     // (only pulling in symbols that aren't already defined).
     let ar_path = obj_path ++ f".{runtime_getpid()}.{runtime_clock_nanos()}.a"
-    link_stage_make_archive_to_path(obj_path, ar_path)
+    let out = link_stage_make_archive_to_path(obj_path, ar_path)
+    if out.len() > 0:
+        link_stage_register_temp_archive(out)
+    out
 
 fn link_stage_make_archive_to_path(obj_path: str, ar_path: str) -> str:
     let members: Vec[str] = Vec.new()

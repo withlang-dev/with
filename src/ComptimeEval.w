@@ -610,7 +610,20 @@ fn comptime_action_capability_record(package_name: str, package_version: str, pr
         network,
     }
 
+fn ComptimeEvaluator.cleanup_workspace_pending_links(self: ComptimeEvaluator):
+    for wi in 0..self.workspace_records.len() as i32:
+        var record = self.workspace_records.get(wi as i64)
+        if record.pending_link_active == 0:
+            continue
+        link_stage_cleanup_files(record.pending_link_command.cleanup_files)
+        let _remove_obj = with_fs_remove_file(record.pending_link_obj_path)
+        let _remove_bin = with_fs_remove_file(record.pending_link_bin_path)
+        let _remove_dsym = with_fs_remove_tree(record.pending_link_bin_path ++ ".dSYM")
+        record.pending_link_active = 0
+        self.store_workspace_record(wi, record)
+
 fn ComptimeEvaluator.check_workspace_intercepts_finished(self: ComptimeEvaluator):
+    self.cleanup_workspace_pending_links()
     if self.had_error != 0:
         return
     for wi in 0..self.workspace_records.len() as i32:
@@ -2429,7 +2442,7 @@ fn ComptimeEvaluator.link_command_from_value(self: ComptimeEvaluator, value: Com
     let env = self.link_command_env_field(value, node)
     let inputs = self.link_command_str_vec_field(value, "inputs", node)
     let outputs = self.link_command_str_vec_field(value, "outputs", node)
-    LinkStageCommand { linker, args, cwd, env, inputs, outputs }
+    LinkStageCommand { linker, args, cwd, env, inputs, outputs, cleanup_files: Vec.new() }
 
 fn link_command_outputs_superset(replacement: LinkStageCommand, original: LinkStageCommand) -> bool:
     for oi in 0..original.outputs.len() as i32:
@@ -3702,13 +3715,14 @@ fn ComptimeEvaluator.eval_workspace_capability_method(self: ComptimeEvaluator, r
         if args_signal.kind != ComptimeControlKind.CTL_VALUE:
             return args_signal
         let replacement_value = self.extra_values.get(args_signal.value.extra_start)
-        let replacement = self.link_command_from_value(replacement_value, node)
+        var replacement = self.link_command_from_value(replacement_value, node)
         if self.had_error != 0:
             return comptime_control_error()
         if replacement.linker != record.pending_link_command.linker:
             return self.fail(node, "Workspace.set_link_command cannot change linker without ProcessRunner authority")
         if not link_command_outputs_superset(replacement, record.pending_link_command):
             return self.fail(node, "Workspace.set_link_command replacement must preserve declared outputs")
+        replacement.cleanup_files = record.pending_link_command.cleanup_files
         record.pending_link_command = replacement
         self.store_workspace_record(workspace_id, record)
         return comptime_control_value(comptime_value_void(0))

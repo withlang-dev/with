@@ -270,6 +270,95 @@ fn comp_remove_tree_if_exists(fs: ToolFs, path: str) -> i32:
         return 0
     fs.remove_tree(path)
 
+fn comp_run_first_line(ctx: ActionCtx, capture_dir: str, label: str, argv: Vec[str], timeout_ms: i32) -> str:
+    let root = ctx.project_info().project_root()
+    let stdout_path = comp_join(capture_dir, label ++ ".stdout")
+    let stderr_path = comp_join(capture_dir, label ++ ".stderr")
+    let result = ctx.process_runner().run_capture(argv, comp_abs(root, stdout_path), comp_abs(root, stderr_path), timeout_ms)
+    if result.rc != 0:
+        return ""
+    comp_first_trimmed_line(result.stdout)
+
+fn comp_first_field(text: str) -> str:
+    let line = comp_first_trimmed_line(text)
+    for i in 0..line.len() as i32:
+        let ch = line.byte_at(i as i64)
+        if ch == 9 or ch == 32:
+            return line.slice(0, i as i64)
+    line
+
+fn comp_json_escape(text: str) -> str:
+    var out = ""
+    for i in 0..text.len() as i32:
+        let ch = text.byte_at(i as i64)
+        if ch == 34:
+            out = out ++ "\\\""
+        else if ch == 92:
+            out = out ++ "\\\\"
+        else if ch == 10:
+            out = out ++ "\\n"
+        else if ch == 13:
+            out = out ++ "\\r"
+        else if ch == 9:
+            out = out ++ "\\t"
+        else:
+            out = out ++ text.slice(i as i64, (i + 1) as i64)
+    out
+
+fn comp_resolve_command_file(ctx: ActionCtx, capture_dir: str, path: str) -> str:
+    if path != "with":
+        return comp_abs(ctx.project_info().project_root(), path)
+    let which_args: Vec[str] = Vec.new()
+    which_args.push("which")
+    which_args.push("with")
+    let resolved = comp_run_first_line(ctx, capture_dir, "seed-which", which_args, 30000)
+    if resolved.len() > 0:
+        return resolved
+    path
+
+fn comp_sha256_file(ctx: ActionCtx, capture_dir: str, label: str, path: str) -> str:
+    let shasum_args: Vec[str] = Vec.new()
+    shasum_args.push("shasum")
+    shasum_args.push("-a")
+    shasum_args.push("256")
+    shasum_args.push(path)
+    let shasum = comp_run_first_line(ctx, capture_dir, label ++ "-shasum", shasum_args, 30000)
+    if shasum.len() > 0:
+        return comp_first_field(shasum)
+    let sha256_args: Vec[str] = Vec.new()
+    sha256_args.push("sha256sum")
+    sha256_args.push(path)
+    let sha256 = comp_run_first_line(ctx, capture_dir, label ++ "-sha256sum", sha256_args, 30000)
+    if sha256.len() > 0:
+        return comp_first_field(sha256)
+    ""
+
+fn comp_record_seed_input(ctx: ActionCtx, compiler_path: str, capture_dir: str) -> i32:
+    let fs = ctx.fs()
+    if fs.mkdir_all("out/.build-state") != 0:
+        return comp_fail(ctx, "could not create out/.build-state")
+    let root = ctx.project_info().project_root()
+    let version_args: Vec[str] = Vec.new()
+    version_args.push(comp_path_for_process(root, compiler_path))
+    version_args.push("version")
+    let version = comp_run_first_line(ctx, capture_dir, "seed-version", version_args, 60000)
+    if version.len() == 0:
+        return comp_fail(ctx, "could not read seed compiler version")
+    let resolved_path = comp_resolve_command_file(ctx, capture_dir, compiler_path)
+    let sha = comp_sha256_file(ctx, capture_dir, "seed-input", resolved_path)
+    if sha.len() == 0:
+        return comp_fail(ctx, "could not hash seed compiler: " ++ resolved_path)
+    let text =
+        "{\n" ++
+        "  \"compiler_arg\": \"" ++ comp_json_escape(compiler_path) ++ "\",\n" ++
+        "  \"resolved_path\": \"" ++ comp_json_escape(resolved_path) ++ "\",\n" ++
+        "  \"version\": \"" ++ comp_json_escape(version) ++ "\",\n" ++
+        "  \"sha256\": \"" ++ comp_json_escape(sha) ++ "\"\n" ++
+        "}\n"
+    if fs.write_text("out/.build-state/seed-input.json", text) != 0:
+        return comp_fail(ctx, "could not write out/.build-state/seed-input.json")
+    0
+
 fn comp_resolve_compiler_version(ctx: ActionCtx) -> str:
     let fs = ctx.fs()
     let root = ctx.project_info().project_root()
@@ -487,19 +576,32 @@ pub fn run_with_compiler_build_action(ctx: ActionCtx) -> i32:
     let capture_dir = comp_join("out/command", ctx.target_name())
     if fs.mkdir_all(capture_dir) != 0:
         return comp_fail(ctx, "could not create capture directory: " ++ capture_dir)
+    if compiler_arg == "seed" and ctx.target_name() == "stage1":
+        let seed_rc = comp_record_seed_input(ctx, compiler_path, capture_dir)
+        if seed_rc != 0:
+            return seed_rc
     let stdout_path = comp_join(capture_dir, "stdout.txt")
     let stderr_path = comp_join(capture_dir, "stderr.txt")
     let rc = comp_run_compiler_capture(ctx, "build", argv, stdout_path, stderr_path, 600000)
     if rc != 0:
+        let _cleanup_tmp_bin = comp_remove_file_if_exists(fs, tmp_output)
+        let _cleanup_tmp_obj = comp_remove_file_if_exists(fs, tmp_output ++ ".o")
+        let _cleanup_tmp_dsym_fail = comp_remove_tree_if_exists(fs, tmp_output ++ ".dSYM")
         return rc
     if not fs.exists(tmp_output):
+        let _cleanup_tmp_obj_missing = comp_remove_file_if_exists(fs, tmp_output ++ ".o")
+        let _cleanup_tmp_dsym_missing = comp_remove_tree_if_exists(fs, tmp_output ++ ".dSYM")
         return comp_fail(ctx, "did not produce output: " ++ tmp_output)
     let _remove_old = comp_remove_file_if_exists(fs, output_path)
     let _remove_old_dsym = comp_remove_tree_if_exists(fs, output_path ++ ".dSYM")
     if fs.rename(tmp_output, output_path) != 0:
+        let _cleanup_tmp_bin_rename = comp_remove_file_if_exists(fs, tmp_output)
+        let _cleanup_tmp_obj_rename = comp_remove_file_if_exists(fs, tmp_output ++ ".o")
+        let _cleanup_tmp_dsym_rename = comp_remove_tree_if_exists(fs, tmp_output ++ ".dSYM")
         return comp_fail(ctx, "could not move output to: " ++ output_path)
     if fs.exists(tmp_output ++ ".dSYM"):
-        let _move_dsym = fs.rename(tmp_output ++ ".dSYM", output_path ++ ".dSYM")
+        if fs.rename(tmp_output ++ ".dSYM", output_path ++ ".dSYM") != 0:
+            let _cleanup_tmp_dsym_move = comp_remove_tree_if_exists(fs, tmp_output ++ ".dSYM")
     if not output_path.contains(".o"):
         print("[" ++ ctx.target_name() ++ "] wrote " ++ output_path)
     let _remove_stdout = fs.remove_file(stdout_path)

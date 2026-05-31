@@ -152,6 +152,12 @@ Compiled targets record the `with` compiler binary fingerprint in that state.
 When you install or run a different compiler binary, those targets are stale
 and rebuild automatically.
 
+Project build artifacts are bounded by explicit cleanup targets. `with build
+:prune` reports stale temporary artifacts; `with build :prune-apply` removes
+stale `out/bin/*.tmp.*.dSYM` bundles, temporary archive wrappers in `out/lib/`
+and `out/bootstrap-lib/`, stale build-state files, and old archived seeds
+beyond the configured retention window.
+
 #### Directory Structure
 
 ```
@@ -235,6 +241,7 @@ with build :target       # build a named target
 with build --graph       # print the stable graph format
 with build --dry-run     # print planned actions, don't execute
 with build :action --no-deps  # run one action without deps (debugging)
+with build :prune        # report stale build artifacts
 ```
 
 `with build` searches upward for `build.w` or `with.toml`. If `build.w`
