@@ -193,13 +193,26 @@ Expected output:
 with v0.14.3
 ```
 
-Install the verified compiler locally after the gates pass:
+Finalize the local development seed after the gates pass. This step is
+required: the release is not done until the compiler that this checkout will
+use for the next self-host build (`out/bin/with`) and the installed user
+compiler both report the released version.
 
 ```sh
-cp out/bin/with ~/.local/bin/with
-chmod +x ~/.local/bin/with
+with build :install-user
+out/bin/with version
 ~/.local/bin/with version
 ```
+
+Both commands must print:
+
+```text
+with v0.14.3
+```
+
+Do not leave a release with `out/bin/with` reporting an older version or a
+different development build. If this check fails, rerun the release gates with
+`WITH_VERSION` still set and stop before publishing.
 
 ## Publish
 
