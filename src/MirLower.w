@@ -6886,6 +6886,10 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody
         let param_start = builder.ast.fn_meta_param_start(meta)
         let param_count = builder.ast.fn_meta_param_count(meta)
 
+        // Parameter locals must occupy locals 1..n contiguously (codegen binds
+        // incoming arguments to them in order), so create them all first and
+        // record their ids before destructuring any parameter patterns.
+        let param_locals: Vec[i32] = Vec.new()
         for i in 0..param_count:
             let p_name = builder.ast.fn_param_name(param_start, i)
             var p_ty = 0
@@ -6903,7 +6907,21 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody
             builder.body.push_stmt(builder.cur_bb, StmtKind.StorageLive, local_id, 0, builder.ast.get_start(fn_node))
             if builder.sema.is_copy(p_ty) == 0:
                 builder.schedule_drop(local_id, DropKind.DK_VALUE)
+            param_locals.push(local_id)
         builder.body.n_params = param_count
+
+        // Parameter patterns (§9.7): `fn f({ x, y }: Point)` destructures the
+        // incoming parameter, binding the pattern's variables. Done after all
+        // param locals exist so the field-locals don't split the param range.
+        let ppmeta = builder.ast.find_fn_param_pattern_meta(fn_node)
+        if ppmeta >= 0:
+            let pp_start = builder.ast.fn_param_pattern_meta_start(ppmeta)
+            let pp_count = builder.ast.fn_param_pattern_meta_count(ppmeta)
+            for i in 0..param_count:
+                if i < pp_count:
+                    let ppat = builder.ast.fn_param_pattern_value(pp_start + i)
+                    if ppat != 0:
+                        let _ = builder.lower_pattern(ppat, builder.place_for_local(param_locals.get(i as i64)))
 
     // Set expected_type to the function's return type so that intrinsic calls
     // (Vec.new, HashMap.new) in tail position can resolve their generic inst type.

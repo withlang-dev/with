@@ -1,26 +1,51 @@
-//! skip: non-executable spec sketch for Section 9.7 — Parameter Patterns (formerly 25.25); contains pseudo-code for unimplemented feature work
-// Spec test: Section 9.7 — Parameter Patterns (formerly 25.25)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+// Spec test: Section 9.7 — Parameter Patterns
+//
+// A function parameter can be an irrefutable pattern (struct or tuple). The
+// incoming argument is destructured at entry, binding the pattern's variables
+// in the body. Field shorthand and field renaming both work, and pattern
+// parameters compose with ordinary parameters in any position.
+//
+// (The spec sketch's `distance` example uses f64 `.sqrt()`, an unrelated
+// stdlib gap; the Manhattan distance below exercises the same destructuring.)
 
-// PASS: struct destructuring in parameters
-fn distance({ x: x1, y: y1 }: Point, { x: x2, y: y2 }: Point) -> f64:
-    let dx = x2 - x1
-    let dy = y2 - y1
-    (dx * dx + dy * dy).sqrt()
+type Point { x: i32, y: i32 }
 
-fn test:
-    let d = distance(Point { x: 0.0, y: 0.0 }, Point { x: 3.0, y: 4.0 })
-    assert(d == 5.0)
+// Struct parameter with field shorthand.
+fn sum_pt({ x, y }: Point) -> i32:
+    x + y
 
-// PASS: tuple destructuring in parameters
-fn swap((a, b): (i32, i32)) -> (i32, i32): (b, a)
+// Two struct parameters with renamed fields.
+fn manhattan({ x: x1, y: y1 }: Point, { x: x2, y: y2 }: Point) -> i32:
+    let dx = if x2 > x1: x2 - x1 else: x1 - x2
+    let dy = if y2 > y1: y2 - y1 else: y1 - y2
+    dx + dy
 
-fn test:
-    assert(swap((1, 2)) == (2, 1))
+// Tuple parameter destructuring.
+fn swap((a, b): (i32, i32)) -> (i32, i32):
+    (b, a)
 
-// PASS: destructuring in for loop
-fn test:
-    let pairs = vec![(1, "a"), (2, "b")]
-    for (num, letter) in pairs:
-        print(f"{num}: {letter}")
+// A pattern parameter followed by an ordinary parameter.
+fn offset_sum({ x, y }: Point, z: i32) -> i32:
+    x + y + z
+
+fn test_struct_param_shorthand:
+    assert(sum_pt(Point { x: 3, y: 4 }) == 7)
+
+fn test_struct_param_rename:
+    assert(manhattan(Point { x: 0, y: 0 }, Point { x: 3, y: 4 }) == 7)
+
+fn test_tuple_param:
+    let s = swap((1, 2))
+    assert(s.0 == 2 and s.1 == 1)
+
+fn test_pattern_then_ordinary_param:
+    assert(offset_sum(Point { x: 1, y: 2 }, 3) == 6)
+
+fn test_for_loop_destructure:
+    var pairs: Vec[(i32, i32)] = Vec.new()
+    pairs.push((1, 10))
+    pairs.push((2, 20))
+    var sum = 0
+    for (a, b) in pairs:
+        sum += a + b
+    assert(sum == 33)
