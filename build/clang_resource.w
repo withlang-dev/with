@@ -100,7 +100,11 @@ fn cr_relpath(path: str, base: str) -> str:
 
 // Find <prefix>/lib/clang/<n>/include by scanning for a listed file under it.
 fn cr_find_include_dir(ctx: ActionCtx) -> str:
-    let prefix = compiler_llvm_prefix()
+    // Must be the in-project .deps path (relative): the build's ToolFs sandbox
+    // refuses list_files on absolute paths outside the project root, so the SDK
+    // is read from .deps (populated by `with build :deps`), not an external
+    // LLVM_PREFIX. The link step may still use an absolute LLVM_PREFIX.
+    let prefix = compiler_default_llvm_prefix()
     let clang_root = prefix ++ "/lib/clang"
     let all = ctx.fs().list_files(clang_root)
     for i in 0..all.len() as i32:
@@ -154,7 +158,7 @@ pub fn generate_embedded_clang_resource_action(ctx: ActionCtx) -> i32:
         return cr_fail(ctx, "requires an output path")
     let include_dir = cr_find_include_dir(ctx)
     if include_dir.len() == 0:
-        return cr_fail(ctx, "could not find clang builtin headers under " ++ compiler_llvm_prefix() ++ "/lib/clang; run `with build :deps` or build the SDK")
+        return cr_fail(ctx, "could not find clang builtin headers under " ++ compiler_default_llvm_prefix() ++ "/lib/clang; run `with build :deps` or build the SDK")
     // The clang resource version is the numeric dir name (e.g. "22").
     let version = cr_basename(cr_dirname(include_dir))
     // Embed the entire builtin-header tree (~15 MB), preserving subdirectories.
