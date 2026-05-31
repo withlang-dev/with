@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 
 .PHONY: all build stage1 stage2 stage3 runtime selfcheck smoke test test-pcre2 \
-	fixpoint install install-user update-seed clean seed print-version \
+	fixpoint install install-user update-seed clean seed deps print-version \
 	emit-c-test emit-c-fixpoint emit-c-roundtrip cross \
 	pcre2-migrate pcre2-build pcre2-test pcre2-promote \
 	regex-migrate regex-build regex-test regex-promote
@@ -146,6 +146,9 @@ clean: | $(OUT_TMP_DIR)
 seed: | $(OUT_TMP_DIR)
 	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __seed)
 
+deps: | $(OUT_TMP_DIR)
+	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __deps)
+
 pcre2-migrate: | $(OUT_TMP_DIR)
 	$(call WITH_REPO_LOCK,$(MAKE) --no-print-directory __regex-migrate)
 
@@ -214,6 +217,9 @@ __install-user:
 
 __update-seed:
 	$(call RUN_GRAPH_TARGET,update-seed)
+
+__deps:
+	$(call RUN_GRAPH_TARGET,deps)
 
 __clean:
 	@$(WITH_BUILD_ENV) "$(WITH)" build :clean

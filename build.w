@@ -170,6 +170,23 @@ fn release_asset_for_host() -> str:
         return "with-darwin-aarch64"
     "with-darwin-aarch64"
 
+// "with-darwin-aarch64" -> "darwin-aarch64"
+fn release_platform_tag() -> str:
+    let asset = release_asset_for_host()
+    if asset.starts_with("with-"):
+        return asset.slice(5, asset.len())
+    asset
+
+// ".deps/llvm-<ver>-<host>" -> "llvm-<ver>-<host>"
+fn llvm_sdk_dir_basename() -> str:
+    let prefix = compiler_default_llvm_prefix()
+    if prefix.starts_with(".deps/"):
+        return prefix.slice(6, prefix.len())
+    prefix
+
+fn llvm_sdk_asset_for_host() -> str:
+    "with-llvm-sdk-" ++ compiler_llvm_version() ++ "-" ++ release_platform_tag() ++ ".tar.zst"
+
 fn install_file_target(name: str, source: str, dest: str, mode: str, dep: str) -> Target:
     var target = target_new(.Install, name, source).output(dest)
     target = target.input(source)
@@ -772,6 +789,18 @@ pub fn build(ctx: BuildCtx) -> Build:
     seed = seed.arg("withlang-dev/with")
     seed = seed.arg(release_asset_for_host())
     out = out.add_target(seed)
+
+    // `with build :deps` — fetch the pinned, per-platform static LLVM SDK that
+    // bootstrap built and a release published, into `.deps/llvm-<ver>-<host>`,
+    // so a build never rebuilds LLVM from source or trusts a system LLVM.
+    var deps = target_new(.Action, "deps", "").output(compiler_default_llvm_prefix() ++ "/lib/libclang.a")
+    deps.action = run_deps_download_action
+    deps = deps.write_scope("out/tmp")
+    deps = deps.write_scope(".deps")
+    deps = deps.arg("withlang-dev/with")
+    deps = deps.arg(llvm_sdk_asset_for_host())
+    deps = deps.arg(llvm_sdk_dir_basename())
+    out = out.add_target(deps)
 
     var update_seed = target_new(.Install, "update-seed", "out/bin/with-stage2").output("src/main")
     update_seed = update_seed.input("out/bin/with-stage2")

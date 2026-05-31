@@ -175,3 +175,97 @@ pub fn run_seed_download_action(ctx: ActionCtx) -> i32:
         return seed_fail(ctx, "could not chmod seed: " ++ output_path)
     print("seed installed: " ++ output_path)
     0
+
+// Fetch the pinned, per-platform static LLVM/Clang/lld SDK that bootstrap built
+// and a release published, instead of rebuilding LLVM from source or trusting a
+// system LLVM. Mirrors run_seed_download_action, plus tar.zst extraction into
+// `.deps/<sdk_base>`. Args: repo, asset_name, sdk_base (= "llvm-<ver>-<host>").
+// Output: the SDK marker `.deps/<sdk_base>/lib/libclang.a`.
+pub fn run_deps_download_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let args = ctx.args()
+    let marker = ctx.output()
+    let root = ctx.project_info().project_root()
+    if args.len() < 3 or marker.len() == 0:
+        return seed_fail(ctx, "requires repo arg, asset arg, sdk-base arg, and marker output")
+    let repo = args.get(0)
+    let asset_name = args.get(1)
+    let sdk_base = args.get(2)
+    if fs.exists(marker):
+        print("static LLVM SDK already present: " ++ seed_join(".deps", sdk_base))
+        return 0
+
+    var tag = env("WITH_LLVM_SDK_VERSION")
+    if tag.len() == 0:
+        tag = seed_release_from_api(ctx, repo, asset_name)
+        if tag.len() == 0:
+            ctx.diagnostics().error("deps: could not find a release containing asset '" ++ asset_name ++ "'")
+            ctx.diagnostics().error("set WITH_LLVM_SDK_VERSION to a release tag, or build it from source: tools/build-static-llvm.sh")
+            return 1
+        print("latest SDK release: " ++ tag)
+
+    let url = "https://github.com/" ++ repo ++ "/releases/download/" ++ tag ++ "/" ++ asset_name
+    let tmp_dir = seed_join("out/tmp", "deps-download")
+    if fs.mkdir_all(tmp_dir) != 0:
+        return seed_fail(ctx, "could not create temp directory: " ++ tmp_dir)
+    let archive_path = seed_join(tmp_dir, asset_name)
+    let _remove_archive = fs.remove_file(archive_path)
+    print("downloading static LLVM SDK from: " ++ url)
+    var curl_args: Vec[str] = Vec.new()
+    curl_args |> push(seed_tool_from_env("CURL", "curl"))
+    curl_args |> push("-L")
+    curl_args |> push("--fail")
+    curl_args |> push("--show-error")
+    curl_args |> push("--output")
+    curl_args |> push(seed_abs(root, archive_path))
+    curl_args |> push(url)
+    let curl_rc = ctx.process_runner().run(curl_args)
+    if curl_rc != 0:
+        return seed_fail(ctx, f"curl failed with exit code {curl_rc}")
+
+    // Decompress .tar.zst → .tar, then extract (avoids relying on tar's own zstd
+    // support, which varies between GNU tar and bsdtar).
+    let tar_path = seed_join(tmp_dir, sdk_base ++ ".tar")
+    let _remove_tar = fs.remove_file(tar_path)
+    var zstd_args: Vec[str] = Vec.new()
+    zstd_args |> push(seed_tool_from_env("ZSTD", "zstd"))
+    zstd_args |> push("-d")
+    zstd_args |> push("-f")
+    zstd_args |> push(seed_abs(root, archive_path))
+    zstd_args |> push("-o")
+    zstd_args |> push(seed_abs(root, tar_path))
+    let zstd_rc = ctx.process_runner().run(zstd_args)
+    if zstd_rc != 0:
+        return seed_fail(ctx, f"zstd decompression failed with exit code {zstd_rc}")
+
+    let extract_dir = seed_join(tmp_dir, "extract")
+    if fs.exists(extract_dir) and fs.remove_tree(extract_dir) != 0:
+        return seed_fail(ctx, "could not remove old extract directory: " ++ extract_dir)
+    if fs.mkdir_all(extract_dir) != 0:
+        return seed_fail(ctx, "could not create extract directory: " ++ extract_dir)
+    var tar_args: Vec[str] = Vec.new()
+    tar_args |> push(seed_tool_from_env("TAR", "tar"))
+    tar_args |> push("-xf")
+    tar_args |> push(seed_abs(root, tar_path))
+    tar_args |> push("-C")
+    tar_args |> push(seed_abs(root, extract_dir))
+    let tar_rc = ctx.process_runner().run(tar_args)
+    if tar_rc != 0:
+        return seed_fail(ctx, f"tar extraction failed with exit code {tar_rc}")
+
+    let extracted_sdk = seed_join(extract_dir, sdk_base)
+    if not fs.is_dir(extracted_sdk):
+        return seed_fail(ctx, "archive did not contain expected SDK directory: " ++ sdk_base)
+    let target_dir = seed_join(".deps", sdk_base)
+    if fs.mkdir_all(".deps") != 0:
+        return seed_fail(ctx, "could not create .deps directory")
+    if fs.exists(target_dir) and fs.remove_tree(target_dir) != 0:
+        return seed_fail(ctx, "could not remove existing SDK directory: " ++ target_dir)
+    if fs.rename(extracted_sdk, target_dir) != 0:
+        return seed_fail(ctx, "could not move SDK into place: " ++ target_dir)
+    let _cleanup_tar = fs.remove_file(tar_path)
+    let _cleanup_extract = fs.remove_tree(extract_dir)
+    if not fs.exists(marker):
+        return seed_fail(ctx, "SDK installed but missing expected archive: " ++ marker)
+    print("static LLVM SDK installed: " ++ target_dir)
+    0
