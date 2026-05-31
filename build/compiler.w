@@ -139,6 +139,11 @@ pub fn compiler_llvm_version() -> str:
 pub fn compiler_default_llvm_prefix() -> str:
     comp_default_llvm_prefix()
 
+// Env-aware (honors LLVM_PREFIX) — the prefix the build actually links against,
+// and where the clang builtin headers to embed live.
+pub fn compiler_llvm_prefix() -> str:
+    comp_llvm_prefix()
+
 fn comp_llvm_clang_tool(llvm_prefix: str) -> str:
     comp_tool_from_env("WITH_LLVM_CC", "LLVM_CC", llvm_prefix ++ "/bin/clang")
 
