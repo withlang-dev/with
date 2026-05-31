@@ -7212,7 +7212,15 @@ fn Sema.check_generic_call(self: Sema, fn_sym: i32, fn_node: i32, arg_types: Vec
     let tp_count = self.ast.fn_meta_tp_count(meta)
     let ret_node = self.ast.fn_meta_ret(meta)
 
-    if arg_count != param_count:
+    // Trailing parameters with defaults may be omitted; the defaults are filled
+    // at lowering, the same as for non-generic calls (#302).
+    var generic_trailing_defaults = 0
+    var generic_def_pi = param_count - 1
+    while generic_def_pi >= 0 and self.ast.get_fn_param_default(param_start, generic_def_pi) != 0:
+        generic_trailing_defaults = generic_trailing_defaults + 1
+        generic_def_pi = generic_def_pi - 1
+    let generic_min_args = param_count - generic_trailing_defaults
+    if arg_count < generic_min_args or arg_count > param_count:
         self.emit_error("wrong argument count", call_node)
 
     self.clear_generic_substitution()
