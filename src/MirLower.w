@@ -6257,6 +6257,16 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
                 for gc_ai in 0..gc_ac:
                     let gc_arg_node = self.ast.get_extra(gc_as + gc_ai)
                     gc_args.push(self.lower_expr(gc_arg_node))
+                // Fill default values for omitted trailing parameters, the same
+                // as non-generic calls do in lower_call (#302).
+                let gc_meta = self.ast.find_fn_meta(self.sema.generic_fn_nodes.get(gc_sym).unwrap())
+                if gc_meta >= 0:
+                    let gc_ps = self.ast.fn_meta_param_start(gc_meta)
+                    let gc_pc = self.ast.fn_meta_param_count(gc_meta)
+                    for gc_di in gc_ac..gc_pc:
+                        let gc_def = self.ast.get_fn_param_default(gc_ps, gc_di)
+                        if gc_def != 0:
+                            gc_args.push(self.lower_default_call_arg(gc_def, node, -1, 0, gc_di))
                 let gc_args_id = self.body.new_call_args(gc_args)
                 self.body.set_call_intrinsic(gc_args_id, MirIntrinsic.GENERIC_CALL)
                 self.body.set_call_ast_node(gc_args_id, node)
