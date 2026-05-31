@@ -10,6 +10,13 @@ if [ "${WITH_VERSION:-}" = "" ]; then
     exit 1
 fi
 
+source_version="$(sed -n '1{s/[[:space:]]*$//;p;}' src/version)"
+if [ "$source_version" != "$WITH_VERSION" ]; then
+    echo "error: src/version is '$source_version', expected '$WITH_VERSION'" >&2
+    echo "update src/version and build the release from that committed version" >&2
+    exit 1
+fi
+
 case "$(uname -s)" in
     Darwin) ;;
     *)

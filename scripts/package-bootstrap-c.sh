@@ -10,6 +10,13 @@ if [ "$version" = "" ]; then
     exit 1
 fi
 
+source_version="$(sed -n '1{s/[[:space:]]*$//;p;}' src/version)"
+if [ "$source_version" != "$version" ]; then
+    echo "error: src/version is '$source_version', expected '$version'" >&2
+    echo "update src/version and build the release from that committed version" >&2
+    exit 1
+fi
+
 compiler="${WITH_RELEASE_COMPILER:-out/bin/with}"
 if [ ! -x "$compiler" ]; then
     echo "error: missing compiler: $compiler" >&2
