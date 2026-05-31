@@ -177,6 +177,52 @@ with `@[c_export("symbol_name")]`. Never add new code to
 
 ---
 
+## Self-Contained Toolchain (we build our own LLVM)
+
+**After bootstrap the seed depends on nothing external from LLVM.**
+This is a hard invariant, not an aspiration.
+
+*We* build the entire static LLVM/Clang/lld SDK from source via
+`tools/build-static-llvm.sh` (`cmake --target install` into
+`.deps/llvm-<ver>-<host>` = `LLVM_PREFIX`). That build produces every
+static resource the compiler needs:
+
+- `lib/libclang.a`, `lib/libLLVM*.a`, `lib/liblld*.a` — the archives.
+- `lib/clang/<v>/include/` — clang's **builtin headers** (`stddef.h`,
+  `stdarg.h`, `stdint.h`, …) that `c_import` needs to parse any C header.
+
+The release binary **embeds** these, the same way it already embeds the
+stdlib (`build/runtime.w` → `EmbeddedStdlibData.w`, served via the
+`<embedded-std>/` virtual FS) and the runtime objects (`.EmbedObjectFiles`
+→ `with_embedded_*` incbin'd into the binary). libclang is statically
+linked; the final binary loads **no** `libclang`/`libLLVM` dylib (the
+bootstrap runbook's Failure Policy enforces this). `LLVM_PREFIX` and
+`WITH_LIBCLANG` are **build-time link inputs only** — never a runtime
+dependency. The static SDK they point at is published per-platform per
+release and fetched with `with build :deps` / `make deps` (#313); LLVM is
+built from source (`tools/build-static-llvm.sh`) only when bringing up a new
+platform or bumping `COMPILER_LLVM_VERSION`. Never rebuild it or point at a
+system LLVM during a normal build.
+
+**Never trust a system-installed LLVM.** We didn't build it, so we don't
+trust it — and a system LLVM almost never ships the static `.a` we need
+anyway. Do **not** resolve any LLVM/Clang resource (archive *or* header)
+from an external path at runtime. If `c_import` can't find a builtin
+header (`'stddef.h' file not found`), the bug is that the resource is
+missing *from the binary* — fix the embedding. **Do not** "fix" it by
+pointing `WITH_CLANG_RESOURCE_DIR` / `LLVM_PREFIX` / `llvm-config` at a
+system or `.deps` LLVM; that re-introduces the external dependency this
+invariant exists to forbid, and a clean release host won't have it.
+
+> Known gap (issue #312 — fix, don't paper over): `get_clang_resource_dir()`
+> in `rt/clang_bridge.w` still falls back to external paths (`LLVM_PREFIX`,
+> `llvm-config`, `/usr/local/llvm`, `WITH_CLANG_RESOURCE_DIR`), and macro
+> extraction shells out to `cc`. Until clang's builtin headers are embedded
+> like the stdlib, `c_import` is not self-contained on a bare host. Embed
+> them; demote the external lookup to an override-only last resort.
+
+---
+
 ## Build System
 
 ```

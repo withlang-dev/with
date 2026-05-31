@@ -35,7 +35,14 @@ llvm-static-sdk/
     libclang.a              # Unix/macOS
     libLLVM*.a
     libclang*.a
+    clang/<v>/include/      # clang builtin headers (stddef.h, stdarg.h, …)
 ```
+
+The `lib/clang/<v>/include/` tree is **part of the SDK we build**, not an
+afterthought: it holds the clang builtin headers `c_import` needs to parse
+any C header. It is embedded into the binary (like the stdlib and runtime
+objects) and served from inside — never fetched from a system or `.deps`
+LLVM at runtime. See AGENTS.md → *Self-Contained Toolchain*.
 
 On Windows/MSVC the required static C API archive is:
 
@@ -58,6 +65,26 @@ On Windows, run from Developer PowerShell:
 
 The scripts fail unless the static libclang archive exists and exports
 `clang_createIndex`.
+
+**This is the only runbook that builds the static SDK from LLVM source.**
+Building the `.a` archives and clang's builtin headers from source is a
+bootstrap step — done once per platform, when no seed exists there yet. Once a
+seed exists, a *release* (`docs/with-release-runbook.md`) **reuses** this
+already-built SDK and the resources the seed embeds; it never rebuilds LLVM and
+never falls back to a system LLVM. If you find yourself building LLVM during a
+release, you are in the wrong runbook.
+
+After building the SDK from source, package it so future releases (and clean
+checkouts) can fetch it instead of rebuilding:
+
+```sh
+scripts/package-llvm-sdk.sh   # → out/release/with-llvm-sdk-<llvm-ver>-<platform>.tar.zst
+```
+
+Publish that asset with the platform's release (see `docs/with-release-runbook.md`
+→ *Static LLVM SDK asset*). Thereafter `with build :deps` fetches it; LLVM is
+built from source only when `COMPILER_LLVM_VERSION` bumps to an SDK no release
+has published yet.
 
 ## Bootstrap Paths
 
@@ -168,6 +195,19 @@ The build must fail if any of these are true:
 - The final release binary loads `libclang`, `libLLVM`, or any other LLVM/Clang
   dynamic library.
 - The normal build path invokes `clang` as a linker driver.
+
+The same rule applies to **resources, not just archives**. We build our own
+static SDK; the binary embeds it; at runtime the compiler trusts only what it
+embedded. A clean release host has no LLVM at all — not in `/usr`, not in
+`.deps`. So:
+
+- `c_import` must obtain clang's builtin headers (`stddef.h`, …) from the
+  embedded resource dir, never from a system path, `LLVM_PREFIX`, `llvm-config`,
+  or `WITH_CLANG_RESOURCE_DIR` discovered at runtime.
+- Any runtime lookup that probes the filesystem for an LLVM/Clang resource is a
+  bug, even if it happens to succeed on a dev box that has LLVM installed. We
+  did not build that LLVM, so we do not trust it — and it will not have the
+  static resources we need anyway.
 
 If a platform cannot satisfy these constraints yet, it is not release-ready.
 

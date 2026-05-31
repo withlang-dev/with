@@ -18,29 +18,74 @@ If release prep exposes an unrelated bug:
 feature/sprint targets. They are not normal release gates. The default
 `:test` target already includes the fast emit-C smoke.
 
+## Toolchain: reuse what bootstrap built — never rebuild, never trust the system
+
+A release **reuses** the static LLVM/Clang/lld SDK that the *bootstrap* runbook
+already built from source (`tools/build-static-llvm.sh` →
+`.deps/llvm-<ver>-<host>`), together with the resources the seed already carries
+embedded (stdlib, runtime objects, and — once #312 lands — clang's builtin
+headers). Building LLVM from source is **bootstrap's** job, for a brand-new
+platform that has no seed yet. A release does not. Specifically, a release:
+
+- does **not** rebuild LLVM from source;
+- does **not** fetch, link against, or otherwise trust a system-installed LLVM —
+  we did not build it, and it will not have the static `.a` / resources we need;
+- does **not** resolve any LLVM/Clang resource (archive *or* header) from an
+  external path at runtime. If a release build or test needs
+  `WITH_CLANG_RESOURCE_DIR`, `LLVM_PREFIX`, or `llvm-config` to locate clang's
+  builtin headers at *runtime*, that is bug #312 — fix the embedding, do not
+  configure the host around it.
+
+`LLVM_PREFIX` / `WITH_LIBCLANG` appear below only as **build-time link inputs**
+pointing at the already-built `.deps` SDK. They are reused, not rebuilt, and are
+never a runtime dependency.
+
 ## Release Asset
 
-Publish platform compiler binaries as:
+Publish, per release:
 
 ```text
-with-darwin-aarch64
-with-linux-x86_64
-with-bootstrap-c-vX.Y.Z.tar.zst
+with-darwin-aarch64                          # Darwin arm64 compiler binary
+with-linux-x86_64                            # Linux x86_64 compiler binary
+with-bootstrap-c-vX.Y.Z.tar.zst              # emitted-C bootstrap bundle
+with-llvm-sdk-<llvm-ver>-darwin-aarch64.tar.zst   # static LLVM SDK (Darwin arm64)
+with-llvm-sdk-<llvm-ver>-linux-x86_64.tar.zst     # static LLVM SDK (Linux x86_64)
+install.sh
 ```
 
 Do not publish a binary asset named `main`. `src/main` is the local seed path;
 it is not the release asset name.
 
-Seed download paths must use the host-specific asset name:
+### Static LLVM SDK asset
 
-- `Makefile` fallback `make seed`
-- `build.w` target `with build :seed`
+The build links the next compiler against the static LLVM/Clang/lld archives in
+`.deps/llvm-<ver>-<host>`. So that a release (or any clean checkout) can obtain
+that SDK without rebuilding LLVM from source or trusting a system LLVM, publish
+it as a per-platform asset and let the build fetch it the same way it fetches
+the seed (issue #313):
 
-Current seed assets:
+- **Package** (per platform, after the SDK exists in `.deps`):
+  `scripts/package-llvm-sdk.sh` → `out/release/with-llvm-sdk-<llvm-ver>-<platform>.tar.zst`.
+  It ships only what the build links against — `lib/*.a`, `lib/clang/<v>/include/`,
+  and `bin/lld` (+ driver symlinks) and `bin/llvm-nm` — not `bin/clang` or the
+  LLVM C++ `include/` tree, so the asset is ~65 MB, not ~2 GB.
+- **Fetch**: `with build :deps` (or `make deps`) downloads
+  `with-llvm-sdk-<COMPILER_LLVM_VERSION>-<host>.tar.zst` from the matching
+  release and extracts it into `.deps/llvm-<ver>-<host>`. `WITH_LLVM_SDK_VERSION`
+  pins the release tag; otherwise the newest release carrying the asset is used.
+- The SDK bytes change only when `COMPILER_LLVM_VERSION` (`build/compiler.w`)
+  bumps; publishing it on every release keeps each release self-describing.
+
+Seed and SDK download paths must use the host-specific asset names:
+
+- `Makefile` fallback `make seed` / `build.w` target `with build :seed`
+- `build.w` target `with build :deps`
+
+Current per-host assets:
 
 ```text
-Darwin arm64: with-darwin-aarch64
-Linux x86_64: with-linux-x86_64
+Darwin arm64: with-darwin-aarch64   with-llvm-sdk-<llvm-ver>-darwin-aarch64.tar.zst
+Linux x86_64: with-linux-x86_64     with-llvm-sdk-<llvm-ver>-linux-x86_64.tar.zst
 ```
 
 ## Verification
@@ -96,7 +141,10 @@ cd ../with-release-$WITH_VERSION
 
 Noninteractive SSH shells on this host do not currently put `with` on `PATH`.
 Use the existing compiler from the main checkout as the first seed, and point
-the clean worktree at the LLVM SDK from the main checkout:
+the clean worktree at the **already-built** static LLVM SDK from the main
+checkout (the one bootstrap produced under `.deps` — we reuse it for linking,
+we do not rebuild it, and it is a build-time input only, never consulted at
+runtime):
 
 ```sh
 export RELEASE_SEED=/home/quixi/with/out/bin/with
@@ -161,6 +209,16 @@ Prepare the platform-named assets on their native platforms:
 scripts/package-darwin-aarch64.sh
 scripts/package-linux-x86_64.sh
 scripts/package-bootstrap-c.sh
+scripts/package-llvm-sdk.sh
+```
+
+`scripts/package-llvm-sdk.sh` runs on each native platform and packages that
+host's `.deps/llvm-<ver>-<host>` static SDK into
+`out/release/with-llvm-sdk-<llvm-ver>-<platform>.tar.zst`. Copy the Linux SDK
+asset back alongside the Linux binary:
+
+```sh
+scp quixi@192.168.86.211:~/with-release-$WITH_VERSION/out/release/with-llvm-sdk-*-linux-x86_64.tar.zst out/release/
 ```
 
 This produces platform assets under `out/release/` plus `install.sh`.
@@ -184,6 +242,8 @@ gh release create v0.14.3 \
   out/release/with-darwin-aarch64 \
   out/release/with-linux-x86_64 \
   out/release/with-bootstrap-c-v0.14.3.tar.zst \
+  out/release/with-llvm-sdk-*-darwin-aarch64.tar.zst \
+  out/release/with-llvm-sdk-*-linux-x86_64.tar.zst \
   out/release/install.sh \
   --repo withlang-dev/with \
   --title "v0.14.3: <release title>" \
@@ -219,6 +279,8 @@ install.sh
 with-bootstrap-c-v0.14.3.tar.zst
 with-darwin-aarch64
 with-linux-x86_64
+with-llvm-sdk-<llvm-ver>-darwin-aarch64.tar.zst
+with-llvm-sdk-<llvm-ver>-linux-x86_64.tar.zst
 ```
 
 Confirm the tag points at the verified commit:
