@@ -3115,6 +3115,17 @@ fn Sema.check_binary_operator_method(self: Sema, node: i32, op: i32, lhs: i32, r
     self.operator_method_reversed.insert(node, reversed)
     ret
 
+// For comparison, a `&str` behaves like the `str` it points at (string value
+// compare), so it is not treated as a bare pointer. Derefs only str references;
+// `&i32` etc. keep pointer semantics. (#293)
+fn Sema.cmp_normalize_str_ref(self: Sema, ty: i32) -> i32:
+    let r = self.resolve_alias(ty as TypeId)
+    if self.get_type_kind(r) == TypeKind.TY_REF:
+        let inner = self.get_type_d0(r)
+        if self.get_type_kind(self.resolve_alias(inner as TypeId)) == TypeKind.TY_STR:
+            return inner
+    ty
+
 fn Sema.check_binary(self: Sema, node: i32) -> i32:
     let op = self.ast.get_data0(node)
     let lhs_node = self.ast.get_data1(node)
@@ -3196,8 +3207,8 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
 
     // Comparison operators return bool
     if op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ or op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE or op == BinaryOp.OP_IN or op == BinaryOp.OP_NOT_IN:
-        let lhs_cmp_kind = self.get_type_kind(self.resolve_alias(lhs))
-        let rhs_cmp_kind = self.get_type_kind(self.resolve_alias(rhs))
+        let lhs_cmp_kind = self.get_type_kind(self.resolve_alias(self.cmp_normalize_str_ref(lhs) as TypeId))
+        let rhs_cmp_kind = self.get_type_kind(self.resolve_alias(self.cmp_normalize_str_ref(rhs) as TypeId))
         if (lhs_cmp_kind == TypeKind.TY_PTR and rhs_cmp_kind == TypeKind.TY_ARRAY) or (lhs_cmp_kind == TypeKind.TY_ARRAY and rhs_cmp_kind == TypeKind.TY_PTR):
             self.emit_error("cannot compare pointer and array; use explicit &array[0]", node)
             return 0

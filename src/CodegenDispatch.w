@@ -1168,6 +1168,11 @@ fn Codegen.mir_compare_dispatch_kind(self: Codegen, sema_ty: i32) -> i32:
         return 0
     let resolved = self.mir_input.mir_resolve_alias(sema_ty)
     let tk = self.mir_input.mir_get_type_kind(resolved)
+    // A `&str` compares as the str it points at, not as a bare pointer (#293).
+    if tk == TypeKind.TY_REF:
+        let ref_inner = self.mir_input.mir_resolve_alias(self.mir_input.mir_get_type_d0(resolved))
+        if self.mir_input.mir_get_type_kind(ref_inner) == TypeKind.TY_STR:
+            return 1
     if tk == TypeKind.TY_STR:
         return 1
     if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM or tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_TUPLE or tk == TypeKind.TY_GENERIC_INST or tk == TypeKind.TY_SLICE:
@@ -1183,6 +1188,15 @@ fn Codegen.mir_compare_dispatch_kind(self: Codegen, sema_ty: i32) -> i32:
 fn Codegen.mir_coerce_compare_operand(self: Codegen, val: i64, sema_ty: i32) -> i64:
     if sema_ty <= 0:
         return val
+    // A `&str` operand is a pointer to the str aggregate; load it so it compares
+    // as a str value (#293).
+    let cmp_resolved = self.mir_input.mir_resolve_alias(sema_ty)
+    if self.mir_input.mir_get_type_kind(cmp_resolved) == TypeKind.TY_REF:
+        let cmp_inner = self.mir_input.mir_get_type_d0(cmp_resolved)
+        if self.mir_input.mir_get_type_kind(self.mir_input.mir_resolve_alias(cmp_inner)) == TypeKind.TY_STR:
+            let cmp_str_ty = self.mir_sema_type_to_llvm(cmp_inner)
+            if cmp_str_ty != 0 and wl_get_type_kind(wl_type_of(val)) == wl_pointer_type_kind():
+                return wl_build_load(self.builder, cmp_str_ty, val)
     let llvm_ty = self.mir_sema_type_to_llvm(sema_ty)
     if llvm_ty == 0 or wl_type_of(val) == llvm_ty:
         return val
