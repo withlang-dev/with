@@ -131,6 +131,14 @@ fn comp_llvm_prefix() -> str:
 fn comp_llvm_prefix_for_root(root: str) -> str:
     comp_abs(root, comp_llvm_prefix())
 
+// Exposed so the `deps` target can name the per-platform SDK asset and the
+// `.deps/llvm-<ver>-<host>` directory it extracts into.
+pub fn compiler_llvm_version() -> str:
+    COMPILER_LLVM_VERSION
+
+pub fn compiler_default_llvm_prefix() -> str:
+    comp_default_llvm_prefix()
+
 fn comp_llvm_clang_tool(llvm_prefix: str) -> str:
     comp_tool_from_env("WITH_LLVM_CC", "LLVM_CC", llvm_prefix ++ "/bin/clang")
 
