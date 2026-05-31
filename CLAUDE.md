@@ -173,6 +173,34 @@ with `@[c_export("symbol_name")]`.
 
 ---
 
+## Self-Contained Toolchain (we build our own LLVM)
+
+**After bootstrap the seed depends on nothing external from LLVM.** A
+hard invariant.
+
+*We* build the static LLVM/Clang/lld SDK from source via
+`tools/build-static-llvm.sh` into `.deps/llvm-<ver>-<host>`
+(`LLVM_PREFIX`). That build produces the archives (`libclang.a`,
+`libLLVM*.a`, `liblld*.a`) **and** clang's builtin headers
+(`lib/clang/<v>/include/`: `stddef.h`, `stdarg.h`, …) that `c_import`
+needs to parse C headers. The release binary **embeds** these — like it
+already embeds the stdlib and runtime objects — and links libclang
+statically; the final binary loads no LLVM/Clang dylib. `LLVM_PREFIX` /
+`WITH_LIBCLANG` are **build-time link inputs only**, never runtime deps.
+
+**Never trust a system-installed LLVM** — we didn't build it, and it
+won't have the static `.a` we need. Do not resolve any LLVM/Clang
+resource (archive *or* header) from an external path at runtime. If
+`c_import` reports `'stddef.h' file not found`, the resource is missing
+*from the binary* — fix the embedding. **Never** point
+`WITH_CLANG_RESOURCE_DIR` / `LLVM_PREFIX` / `llvm-config` at a system or
+`.deps` LLVM to make it pass; that re-introduces the dependency this
+invariant forbids, and a clean release host won't have it. (Known gap,
+issue #312: `get_clang_resource_dir()` in `rt/clang_bridge.w` still falls
+back to external paths — embed the headers like the stdlib instead.)
+
+---
+
 ## Build System
 
 ```
