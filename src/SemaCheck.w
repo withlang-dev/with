@@ -1582,8 +1582,12 @@ fn Sema.expr_is_task_value(self: Sema, node: i32) -> i32:
     if kind == NodeKind.NK_IDENT:
         return self.scope_lookup_is_task(self.ast.get_data0(node))
     if kind == NodeKind.NK_INDEX or kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_OPTIONAL_CHAIN:
-        // Conservative task-container handling.
-        return 1
+        // Check the actual result type rather than assuming a task container —
+        // a field/index/`?.` result is only a Task if its type says so. Blindly
+        // returning 1 mis-flagged e.g. an `Option` from `?.` as a Task (#307).
+        if self.typed_expr_types.contains(node):
+            return self.type_is_task(self.typed_expr_types.get(node).unwrap())
+        return 0
     if kind == NodeKind.NK_TUPLE:
         return self.expr_is_tuple_of_tasks(node)
     0
