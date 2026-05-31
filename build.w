@@ -5,6 +5,7 @@ use build.pcre2
 use build.seed
 use build.emit_c
 use build.compiler
+use build.clang_resource
 use std.sysinfo
 
 fn build_project_dirname(path: str) -> str:
@@ -260,6 +261,11 @@ fn issue61_regression_action(ctx: ActionCtx) -> i32:
     if fs.write_text(embedded_dst, fs.read_text(embedded_src)) != 0:
         return issue61_fail(ctx, "could not copy embedded stdlib data module")
 
+    let clang_res_src = "out/gen/compiler/EmbeddedClangResourceData.w"
+    let clang_res_dst = build_project_join(repo_copy, "out/gen/compiler/EmbeddedClangResourceData.w")
+    if fs.write_text(clang_res_dst, fs.read_text(clang_res_src)) != 0:
+        return issue61_fail(ctx, "could not copy embedded clang resource data module")
+
     let sema_path = build_project_join(repo_copy, "src/SemaCheck.w")
     let sema_text = fs.read_text(sema_path)
     let marker = "    // Check all arguments (with expected-type propagation for Atomic ordering params)"
@@ -309,6 +315,12 @@ pub fn build(ctx: BuildCtx) -> Build:
     compat_runtime = target_with_embedded_stdlib_inputs(compat_runtime, ctx)
     compat_runtime.action = generate_compat_runtime_action
     out = out.add_target(compat_runtime)
+
+    // Embed clang's builtin headers into the binary so c_import is self-contained
+    // at runtime (#312). Generated from the static SDK fetched/built into .deps.
+    var clang_resource = target_new(.Action, "embedded-clang-resource-source", "").output("out/gen/compiler/EmbeddedClangResourceData.w")
+    clang_resource.action = generate_embedded_clang_resource_action
+    out = out.add_target(clang_resource)
 
     out = out.add_target(with_object_target("bootstrap-llvm-bridge-object", "seed", "rt/llvm_bridge.w", "out/bootstrap-lib/llvm_bridge.o", "-O0", ""))
     out = out.add_target(with_object_target("bootstrap-clang-bridge-object", "seed", "rt/clang_bridge.w", "out/bootstrap-lib/clang_bridge.o", "-O0", ""))
@@ -425,6 +437,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage1 = stage1.write_scope("out/bin")
     stage1 = stage1.dep("compiler-sources")
     stage1 = stage1.dep("compat-runtime-source")
+    stage1 = stage1.dep("embedded-clang-resource-source")
     stage1 = stage1.dep("prepare-bootstrap-link-root")
     out = out.add_target(stage1)
 
@@ -437,6 +450,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage2 = stage2.write_scope("out/bin")
     stage2 = stage2.dep("stage1")
     stage2 = stage2.dep("compat-runtime-source")
+    stage2 = stage2.dep("embedded-clang-resource-source")
     out = out.add_target(stage2)
 
     var stage3 = target_new(.Action, "stage3", "").output("out/bin/with-stage3")
@@ -448,6 +462,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage3 = stage3.write_scope("out/bin")
     stage3 = stage3.dep("stage2")
     stage3 = stage3.dep("compat-runtime-source")
+    stage3 = stage3.dep("embedded-clang-resource-source")
     out = out.add_target(stage3)
 
     var stage2_fixpoint = target_new(.Action, "stage2-fixpoint-object", "").output("out/bin/with-stage2-fixpoint.o")
@@ -460,6 +475,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage2_fixpoint = stage2_fixpoint.write_scope("out/bin")
     stage2_fixpoint = stage2_fixpoint.dep("stage1")
     stage2_fixpoint = stage2_fixpoint.dep("compat-runtime-source")
+    stage2_fixpoint = stage2_fixpoint.dep("embedded-clang-resource-source")
     out = out.add_target(stage2_fixpoint)
 
     var stage3_fixpoint = target_new(.Action, "stage3-fixpoint-object", "").output("out/bin/with-stage3-fixpoint.o")
@@ -472,6 +488,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage3_fixpoint = stage3_fixpoint.write_scope("out/bin")
     stage3_fixpoint = stage3_fixpoint.dep("stage2")
     stage3_fixpoint = stage3_fixpoint.dep("compat-runtime-source")
+    stage3_fixpoint = stage3_fixpoint.dep("embedded-clang-resource-source")
     out = out.add_target(stage3_fixpoint)
 
     var selfcheck = target_new(.RunCorpusTest, "selfcheck", "out/bin/with-stage2")

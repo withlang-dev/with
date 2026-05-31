@@ -214,12 +214,15 @@ pointing `WITH_CLANG_RESOURCE_DIR` / `LLVM_PREFIX` / `llvm-config` at a
 system or `.deps` LLVM; that re-introduces the external dependency this
 invariant exists to forbid, and a clean release host won't have it.
 
-> Known gap (issue #312 — fix, don't paper over): `get_clang_resource_dir()`
-> in `rt/clang_bridge.w` still falls back to external paths (`LLVM_PREFIX`,
-> `llvm-config`, `/usr/local/llvm`, `WITH_CLANG_RESOURCE_DIR`), and macro
-> extraction shells out to `cc`. Until clang's builtin headers are embedded
-> like the stdlib, `c_import` is not self-contained on a bare host. Embed
-> them; demote the external lookup to an override-only last resort.
+> Clang's builtin headers ARE now embedded (#312): the build bakes
+> `lib/clang/<v>/include` into the binary
+> (`out/gen/compiler/EmbeddedClangResourceData.w`), and at first `c_import`
+> the compiler materializes them to `~/.cache/with/clang-resource/<v>/` and
+> points `-resource-dir` there. `get_clang_resource_dir()` no longer probes
+> `LLVM_PREFIX` / `llvm-config` / `/usr/local/llvm`; `WITH_CLANG_RESOURCE_DIR`
+> remains an explicit override-only escape hatch. Remaining #312 items are
+> about the *host's own* libc, not LLVM-we-built: `get_sdk_path()` shells to
+> `xcrun` for the macOS sysroot, and macro extraction shells to `cc`.
 
 ---
 
