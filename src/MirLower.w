@@ -2393,16 +2393,81 @@ fn MirBuilder.lower_range_value_membership(self: MirBuilder, op: i32, lhs_expr: 
     let inclusive = self.sema.get_type_d1(range_ty)
     self.lower_range_membership_from_parts(op, lhs_place, start_op, end_op, inclusive, self.ast.get_start(node))
 
+// `x in [a, b, c]` — §9.9 optimizes array-literal membership to a chain of
+// zero-allocation equality comparisons (`x == a or x == b or x == c`).
+fn MirBuilder.lower_array_literal_membership(self: MirBuilder, op: i32, lhs_expr: i32, rhs_expr: i32, node: i32) -> i32:
+    let span = self.ast.get_start(node)
+    let extra_start = self.ast.get_data0(rhs_expr)
+    let elem_count = self.ast.get_data1(rhs_expr)
+    var lhs_ty = self.expr_type(lhs_expr)
+    if lhs_ty == 0 and elem_count > 0:
+        lhs_ty = self.expr_type(self.ast.get_extra(extra_start))
+    let lhs_op = self.lower_expr(lhs_expr)
+    let lhs_place = self.materialize_operand(lhs_op, lhs_ty, self.ast.get_start(lhs_expr))
+    var acc = 0
+    var has_acc = 0
+    for i in 0..elem_count:
+        let elem_node = self.ast.get_extra(extra_start + i)
+        let lhs_copy = self.body.new_operand(OperandKind.OK_COPY, lhs_place)
+        let elem_op = self.lower_expr(elem_node)
+        let cmp = self.lower_bin_op_operand(BinaryOp.OP_EQ, lhs_copy, elem_op, self.sema.ty_bool as i32, span)
+        if has_acc == 0:
+            acc = cmp
+            has_acc = 1
+        else:
+            acc = self.lower_bin_op_operand(BinaryOp.OP_OR, acc, cmp, self.sema.ty_bool as i32, span)
+    if has_acc == 0:
+        acc = self.int_const_operand(0, self.sema.ty_bool as i32)
+    if op == BinaryOp.OP_NOT_IN:
+        return self.lower_not_operand(acc, span)
+    acc
+
+// `ch in some_str` — emit a STR_CONTAINS_CHAR intrinsic call (recv str, i32 char).
+fn MirBuilder.lower_str_contains_char(self: MirBuilder, op: i32, lhs_expr: i32, rhs_expr: i32, node: i32) -> i32:
+    let fn_op = self.const_operand(ConstKind.CK_FN, 0, self.sema.ty_void)
+    let call_args: Vec[i32] = Vec.new()
+    call_args.push(self.lower_receiver_with_method_autoderef(rhs_expr))
+    call_args.push(self.lower_expr(lhs_expr))
+    let args_id = self.body.new_call_args(call_args)
+    self.body.set_call_intrinsic(args_id, MirIntrinsic.STR_CONTAINS_CHAR)
+    self.body.set_call_ast_node(args_id, node)
+    let result = self.new_temp(self.sema.ty_bool as i32)
+    let place = self.place_for_local(result)
+    let next = self.new_block()
+    self.terminate(TermKind.TK_CALL, fn_op, args_id, place, next)
+    self.switch_to(next)
+    let val = self.body.new_operand(OperandKind.OK_COPY, place)
+    if op == BinaryOp.OP_NOT_IN:
+        return self.lower_not_operand(val, self.ast.get_start(node))
+    val
+
 fn MirBuilder.lower_membership(self: MirBuilder, op: i32, lhs_expr: i32, rhs_expr: i32, node: i32) -> i32:
     if self.ast.kind(rhs_expr) == NodeKind.NK_RANGE:
         return self.lower_range_literal_membership(op, lhs_expr, rhs_expr, node)
+    if self.ast.kind(rhs_expr) == NodeKind.NK_ARRAY_LIT:
+        return self.lower_array_literal_membership(op, lhs_expr, rhs_expr, node)
     let rhs_ty = self.expr_type(rhs_expr)
     let rhs_resolved = if rhs_ty != 0: self.sema.resolve_alias(rhs_ty) else: 0
     if rhs_resolved != 0 and self.sema.get_type_kind(rhs_resolved) == TypeKind.TY_RANGE:
         return self.lower_range_value_membership(op, lhs_expr, rhs_expr, rhs_resolved, node)
-    with_eprint("error: unsupported 'in' membership target in MIR lowering")
-    self.mark_unsupported()
-    self.int_const_operand(0, self.sema.ty_bool as i32)
+    // §9.9: `ch in some_str` tests byte/codepoint membership. Chars lower to
+    // ints, so distinguish from substring search (`"sub" in str`) by the lhs
+    // type — a non-str lhs against a str rhs is char membership (#234).
+    if rhs_resolved != 0 and self.sema.get_type_kind(rhs_resolved) == TypeKind.TY_STR:
+        let lhs_ty = self.expr_type(lhs_expr)
+        let lhs_resolved = if lhs_ty != 0: self.sema.resolve_alias(lhs_ty) else: 0
+        if lhs_resolved == 0 or self.sema.get_type_kind(lhs_resolved) != TypeKind.TY_STR:
+            return self.lower_str_contains_char(op, lhs_expr, rhs_expr, node)
+    // §9.9: `x in collection` desugars to `collection.contains(x)` (Contains
+    // trait) for Vec / str / HashMap etc.
+    let contains_sym = self.pool.intern("contains")
+    // The call-argument extra slot was pre-reserved at parse time (the AST is
+    // frozen now); read it back rather than mutating the frozen pool (#234).
+    let arg_idx = self.ast.find_membership_arg(node)
+    let result = self.lower_method_call(rhs_expr, contains_sym, arg_idx, 1, node)
+    if op == BinaryOp.OP_NOT_IN:
+        return self.lower_not_operand(result, self.ast.get_start(node))
+    result
 
 fn MirBuilder.lower_short_circuit(self: MirBuilder, op: i32, lhs_expr: i32, rhs_expr: i32, node: i32) -> i32:
     // Short-circuit: for `a or b`, evaluate a; if true, result is true, else: evaluate b.
