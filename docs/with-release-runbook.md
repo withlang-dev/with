@@ -23,8 +23,8 @@ feature/sprint targets. They are not normal release gates. The default
 A release **reuses** the static LLVM/Clang/lld SDK that the *bootstrap* runbook
 already built from source (`tools/build-static-llvm.sh` →
 `.deps/llvm-<ver>-<host>`), together with the resources the seed already carries
-embedded (stdlib, runtime objects, and — once #312 lands — clang's builtin
-headers). Building LLVM from source is **bootstrap's** job, for a brand-new
+embedded (stdlib, runtime objects, and clang's builtin headers). Building LLVM
+from source is **bootstrap's** job, for a brand-new
 platform that has no seed yet. A release does not. Specifically, a release:
 
 - does **not** rebuild LLVM from source;

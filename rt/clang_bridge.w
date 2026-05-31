@@ -26,6 +26,9 @@ extern fn realpath(path: *const u8, resolved_name: *mut u8) -> *mut u8
 extern fn with_exec_argv_capture(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32) -> i32
 extern fn with_fs_read_file(path: str) -> str
 extern fn with_fs_remove_file(path: str) -> i32
+// Materializes clang's builtin headers embedded in this binary and returns the
+// resource dir (compiler/EmbeddedClangResource.w). Makes c_import self-contained.
+extern fn with_ensure_clang_resource_dir() -> str
 
 // ── libclang types ──────────────────────────────────────────────
 // Struct layouts match the C ABI exactly.
@@ -663,67 +666,26 @@ unsafe fn get_sdk_path() -> *const u8:
         return &sdk_path_buf as *const [1024]u8 as *const u8
     0 as *const u8
 
-unsafe fn find_clang_resource_dir_under(base: *const u8) -> i32:
-    if base as i64 == 0:
-        return 0
-    let dir = opendir(base)
-    if dir as i64 == 0:
-        return 0
-    var best_name: [256]u8 = [0 as u8; 256]
-    while true:
-        let ent = readdir(dir)
-        if ent as i64 == 0:
-            break
-        let name = dirent_name(ent)
-        if not cstr_starts_with_digit(name):
-            continue
-        if best_name[0] == 0 or c_strcmp(name, &best_name as *const [256]u8 as *const u8) > 0:
-            copy_cstr_to_buf(&raw mut best_name as *mut [256]u8 as *mut u8, 256, name)
-    let _close = closedir(dir)
-    if best_name[0] == 0:
-        return 0
-    var pos: i64 = 0
-    buf_append_str(&raw mut resource_dir_buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, base)
-    buf_append_str(&raw mut resource_dir_buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, "/\0" as *const u8)
-    buf_append_str(&raw mut resource_dir_buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, &best_name as *const [256]u8 as *const u8)
-    1
-
-unsafe fn find_clang_resource_dir_from_llvm_config() -> i32:
-    var out_template: [32]u8 = [0 as u8; 32]
-    let tmpl = "/tmp/with_llvmcfg_XXXXXX\0"
-    let tp = *(&tmpl as *const *const u8)
-    with_memcpy(&raw mut out_template as *mut [32]u8 as *mut u8, tp, 25)
-    var argv = ""
-    argv = append_argv_arg(argv, "llvm-config")
-    argv = append_argv_arg(argv, "--libdir")
-    let output = capture_command_stdout(argv, &raw mut out_template as *mut [32]u8 as *mut u8, 30000)
-    var libdir_buf: [1024]u8 = [0 as u8; 1024]
-    if copy_first_line_to_buf(output, &raw mut libdir_buf as *mut [1024]u8 as *mut u8, 1024) == 0:
-        return 0
-    var base_buf: [1024]u8 = [0 as u8; 1024]
-    var pos: i64 = 0
-    buf_append_str(&raw mut base_buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, &raw mut libdir_buf as *mut [1024]u8 as *const u8)
-    buf_append_str(&raw mut base_buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, "/clang\0" as *const u8)
-    find_clang_resource_dir_under(&raw mut base_buf as *mut [1024]u8 as *const u8)
+// (Removed: find_clang_resource_dir_under / find_clang_resource_dir_from_llvm_config.
+// The seed no longer probes LLVM_PREFIX / llvm-config / /usr/local/llvm for an
+// external clang resource dir — clang's builtin headers are embedded in this
+// binary and materialized on demand. See get_clang_resource_dir below.)
 
 unsafe fn get_clang_resource_dir() -> *const u8:
     if resource_dir_resolved == 0:
         resource_dir_resolved = 1
+        // Explicit override only — an escape hatch for a header outside the
+        // embedded set. We do NOT auto-probe LLVM_PREFIX / llvm-config /
+        // /usr/local/llvm: the seed is self-contained and never trusts a
+        // system LLVM (see AGENTS.md → Self-Contained Toolchain).
         let explicit = getenv("WITH_CLANG_RESOURCE_DIR\0" as *const u8)
         if explicit as i64 != 0 and explicit[0] != 0:
             copy_cstr_to_buf(&raw mut resource_dir_buf as *mut [1024]u8 as *mut u8, 1024, explicit)
         if resource_dir_buf[0] == 0:
-            let llvm_prefix = getenv("LLVM_PREFIX\0" as *const u8)
-            if llvm_prefix as i64 != 0 and llvm_prefix[0] != 0:
-                var base_buf: [1024]u8 = [0 as u8; 1024]
-                var pos: i64 = 0
-                buf_append_str(&raw mut base_buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, llvm_prefix)
-                buf_append_str(&raw mut base_buf as *mut [1024]u8 as *mut u8, &raw mut pos, 1024, "/lib/clang\0" as *const u8)
-                let _found = find_clang_resource_dir_under(&raw mut base_buf as *mut [1024]u8 as *const u8)
-        if resource_dir_buf[0] == 0:
-            let _found_llvm_config = find_clang_resource_dir_from_llvm_config()
-        if resource_dir_buf[0] == 0:
-            let _found_default = find_clang_resource_dir_under("/usr/local/llvm/lib/clang\0" as *const u8)
+            // Materialize the clang builtin headers embedded in THIS binary and
+            // point -resource-dir at the cache. No external LLVM is consulted.
+            let dir = with_ensure_clang_resource_dir()
+            let _copied = copy_first_line_to_buf(dir, &raw mut resource_dir_buf as *mut [1024]u8 as *mut u8, 1024)
     if resource_dir_buf[0] != 0:
         return &resource_dir_buf as *const [1024]u8 as *const u8
     0 as *const u8

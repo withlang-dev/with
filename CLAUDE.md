@@ -195,9 +195,10 @@ resource (archive *or* header) from an external path at runtime. If
 *from the binary* — fix the embedding. **Never** point
 `WITH_CLANG_RESOURCE_DIR` / `LLVM_PREFIX` / `llvm-config` at a system or
 `.deps` LLVM to make it pass; that re-introduces the dependency this
-invariant forbids, and a clean release host won't have it. (Known gap,
-issue #312: `get_clang_resource_dir()` in `rt/clang_bridge.w` still falls
-back to external paths — embed the headers like the stdlib instead.)
+invariant forbids, and a clean release host won't have it. (Clang's builtin
+headers are now embedded in the binary and materialized to a cache at first
+`c_import` (#312); `get_clang_resource_dir()` no longer probes external LLVM,
+and `WITH_CLANG_RESOURCE_DIR` is an override-only escape hatch.)
 
 ---
 

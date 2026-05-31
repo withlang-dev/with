@@ -13,6 +13,7 @@ use Diagnostic
 use CImport
 use render
 use compiler.EmbeddedStdlib
+use compiler.EmbeddedClangResource
 use compiler.ProjectConfig
 use compiler.Runtime
 use compiler.Zcu
@@ -219,6 +220,12 @@ fn Zcu.expand_c_imports_frontend(self: Zcu, pool: AstPool) -> AstPool:
     // code concurrently, but c_import expansion must remain serialized until
     // those globals move behind explicit session handles.
     frontend_cimport_lock()
+
+    // Materialize clang's builtin headers embedded in this binary before
+    // libclang parses anything, so c_import is self-contained at runtime (#312).
+    // (Also keeps the materializer in the compile graph for the bridge's
+    // with_ensure_clang_resource_dir extern.)
+    let _resource_dir = ensure_clang_resource_dir()
 
     // Pass project config include paths to clang bridge
     if self.project_config.c_import_include_paths.len() > 0:
