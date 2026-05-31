@@ -8226,6 +8226,17 @@ fn Sema.method_expected_arg_type(self: Sema, recv_type: i32, field: i32, arg_ind
     if owner_sym == self.syms.vec:
         if (field == self.syms.push or field == self.syms.contains) and arg_index == 0:
             return self.get_generic_inst_arg(resolved as i32, 0)
+        // `map`'s closure parameter is the element type; push `fn(elem) -> _`
+        // as the expected arg type so the closure param is typed from the Vec's
+        // element instead of defaulting to i32 (#306). The closure return is
+        // left to inference (ret = 0), so the mapped element type comes from the
+        // closure body, not the input element.
+        if field == self.syms.map and arg_index == 0:
+            let map_elem = self.get_generic_inst_arg(resolved as i32, 0)
+            if map_elem != 0:
+                let map_params: Vec[i32] = Vec.new()
+                map_params.push(map_elem)
+                return self.ensure_fn_type(map_params, 1, 0 as TypeId) as i32
     if owner_sym == self.syms.hashset:
         if (field == self.syms.insert or field == self.syms.contains or field == self.syms.remove) and arg_index == 0:
             return self.get_generic_inst_arg(resolved as i32, 0)
