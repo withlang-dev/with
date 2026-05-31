@@ -6761,17 +6761,39 @@ fn Codegen.mir_emit_vec_map(self: Codegen, body: MirBody, args_id: i32) -> i64:
         fn_ptr = wl_build_extract_value(self.builder, fn_val, 0)
         ctx_ptr = wl_build_extract_value(self.builder, fn_val, 1)
         is_fat = 1
+    // Input element type (from the receiver Vec) and output element type (the
+    // closure's return type). Previously both were hardcoded to i32, so mapping
+    // a Vec of any non-i32-sized element (structs, str, …) loaded the wrong
+    // bytes and produced garbage (#306).
+    let map_arg_start = body.call_arg_starts.get(args_id as i64)
+    let map_recv_op = body.call_arg_operands.get(map_arg_start as i64)
+    let map_fn_op = body.call_arg_operands.get((map_arg_start + 1) as i64)
     var elem_ty = i32_ty
+    var map_in = self.mir_input.mir_resolve_alias(self.mir_operand_sema_type(body, map_recv_op))
+    let map_in_tk = self.mir_input.mir_get_type_kind(map_in)
+    if map_in_tk == TypeKind.TY_REF or map_in_tk == TypeKind.TY_PTR:
+        map_in = self.mir_input.mir_resolve_alias(self.mir_input.mir_get_type_d0(map_in))
+    if self.mir_input.mir_get_type_kind(map_in) == TypeKind.TY_GENERIC_INST:
+        let map_in_elem = self.mir_input.mir_get_type_extra(self.mir_input.mir_get_type_d1(map_in))
+        let map_in_llvm = self.mir_sema_type_to_llvm(map_in_elem)
+        if map_in_llvm != 0:
+            elem_ty = map_in_llvm
+    var out_elem_ty = i32_ty
+    let map_fn_sema = self.mir_input.mir_resolve_alias(self.mir_operand_sema_type(body, map_fn_op))
+    if self.mir_input.mir_get_type_kind(map_fn_sema) == TypeKind.TY_FN:
+        let map_ret_llvm = self.mir_sema_type_to_llvm(self.mir_input.mir_get_type_d2(map_fn_sema))
+        if map_ret_llvm != 0:
+            out_elem_ty = map_ret_llvm
     var fn_ty: i64 = 0
-    var ret_ty: i64 = 0
+    var ret_ty: i64 = out_elem_ty
     if is_fat != 0:
         // Fat pointer closure: fn_ptr is extract_value, not a global.
-        // Build fn_ty from closure calling convention: fn(ptr, elem) -> i32
+        // Build fn_ty from closure calling convention: fn(ptr, elem) -> ret
         let fp: Vec[i64] = Vec.new()
         fp.push(ptr_ty)
         fp.push(elem_ty)
-        fn_ty = wl_function_type(i32_ty, vec_data_i64(&fp), 2, 0)
-        ret_ty = i32_ty
+        fn_ty = wl_function_type(out_elem_ty, vec_data_i64(&fp), 2, 0)
+        ret_ty = out_elem_ty
     else:
         fn_ty = wl_global_get_value_type(fn_ptr)
         ret_ty = wl_get_return_type(fn_ty)
