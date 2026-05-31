@@ -1229,6 +1229,20 @@ pub fn str_contains(hay: str, needle: str) -> i32:
         i = i + 1
     0
 
+// Byte/codepoint membership: `ch in some_str`. Chars lower to ints, so the
+// needle arrives as an i32 byte value (#234, §9.9).
+@[c_export("with_str_contains_char")]
+pub fn str_contains_char(hay: str, ch: i32) -> i32:
+    let hl = str_length(hay)
+    let hp = str_data(hay)
+    let target = (ch & 0xff) as u8
+    var i: i64 = 0
+    while i < hl:
+        if (unsafe *((hp as i64 + i) as *const u8)) == target:
+            return 1
+        i = i + 1
+    0
+
 @[c_export("with_str_index_of")]
 pub fn str_index_of(hay: str, needle: str) -> i64:
     let nl = str_length(needle)

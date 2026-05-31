@@ -5118,6 +5118,16 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: MirI
         let raw = wl_build_call(self.builder, self.get_runtime_fn_type("with_str_contains", i32_ty, 2), fn_val, vec_data_i64(&args), 2)
         result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(i32_ty, 0, 0))
 
+    else if intrinsic == MirIntrinsic.STR_CONTAINS_CHAR:
+        let recv = self.mir_intrinsic_recv_str_value(body, args_id)
+        let ch = self.mir_intrinsic_arg(body, args_id, 1)
+        let fn_val = self.ensure_c_fn("with_str_contains_char", i32_ty, 2)
+        let args: Vec[i64] = Vec.new()
+        args.push(recv)
+        args.push(ch)
+        let raw = wl_build_call(self.builder, self.get_runtime_fn_type("with_str_contains_char", i32_ty, 2), fn_val, vec_data_i64(&args), 2)
+        result = wl_build_icmp(self.builder, wl_int_ne(), raw, wl_const_int(i32_ty, 0, 0))
+
     else if intrinsic == MirIntrinsic.STR_STARTS_WITH:
         let recv = self.mir_intrinsic_recv_str_value(body, args_id)
         let prefix = self.mir_intrinsic_arg(body, args_id, 1)
@@ -10536,6 +10546,9 @@ fn Codegen.get_runtime_fn_type(self: Codegen, name: str, ret_ty: i64, param_coun
        name == "with_str_replace":
         for i in 0..param_count:
             params.push(str_type)
+    else if name == "with_str_contains_char":
+        params.push(str_type)
+        params.push(wl_i32_type(self.context))
     else if name == "with_str_byte_at":
         params.push(str_type)
         params.push(i64_ty)

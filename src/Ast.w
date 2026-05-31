@@ -415,6 +415,10 @@ type AstPoolState {
     impl_target_type_nodes: Vec[i32],
     impl_trait_type_args: Vec[i32],
     fn_meta_map: HashMap[i32, i32],
+    // For `x in collection` / `x not in collection` binary nodes: the extra-array
+    // index of the pre-reserved `collection.contains(x)` argument. Allocated at
+    // parse time because the pool freezes before MIR lowering (#234, §9.9).
+    membership_arg_map: HashMap[i32, i32],
     type_meta_map: HashMap[i32, i32],
     pattern_qualifier_map: HashMap[i32, i32],
     where_meta_map: HashMap[i32, i32],
@@ -488,6 +492,7 @@ fn AstPool.new -> AstPool:
             impl_target_type_nodes: Vec.new(),
             impl_trait_type_args: Vec.new(),
             fn_meta_map: HashMap.new(),
+            membership_arg_map: HashMap.new(),
             type_meta_map: HashMap.new(),
             pattern_qualifier_map: HashMap.new(),
             where_meta_map: HashMap.new(),
@@ -1069,6 +1074,17 @@ fn AstPool.add_fn_meta(self: AstPool, node: NodeId, flags: i32, ret: i32, ps: i3
     self.state.fn_meta.push(ts)
     self.state.fn_meta.push(tc)
     self.state.fn_meta_map.insert(node as i32, idx)
+
+// Record the extra-array slot holding the `contains` argument for an `in` node.
+fn AstPool.set_membership_arg(self: AstPool, node: NodeId, slot: i32):
+    self.state.membership_arg_map.insert(node as i32, slot)
+
+// Get the pre-reserved `contains` argument slot for an `in` node, or -1.
+fn AstPool.find_membership_arg(self: AstPool, node: NodeId) -> i32:
+    let opt = self.state.membership_arg_map.get(node as i32)
+    if opt.is_some():
+        return opt.unwrap()
+    -1
 
 // Get fn metadata for a given fn decl node. Returns 7-int record start or -1.
 fn AstPool.find_fn_meta(self: AstPool, node: NodeId) -> i32:

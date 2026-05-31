@@ -2919,7 +2919,12 @@ fn Parser.parse_precedence(self: Parser, min_prec: i32) -> NodeId:
         else if op_code == 503:  // range ..=
             lhs = self.pool.add_node(NodeKind.NK_RANGE, self.pool.get_start(lhs), self.prev_end(), lhs, rhs, 1)
         else:
-            lhs = self.pool.add_node(NodeKind.NK_BINARY, self.pool.get_start(lhs), self.prev_end(), op_code, lhs, rhs)
+            let bin_node = self.pool.add_node(NodeKind.NK_BINARY, self.pool.get_start(lhs), self.prev_end(), op_code, lhs, rhs)
+            if op_code == BinaryOp.OP_IN or op_code == BinaryOp.OP_NOT_IN:
+                // Pre-reserve the desugared `rhs.contains(lhs)` argument slot while
+                // the pool is still mutable; MIR runs after freeze (#234, §9.9).
+                self.pool.set_membership_arg(bin_node, self.pool.add_extra(lhs))
+            lhs = bin_node
             if parser_infix_op_is_non_associative(op_code):
                 let next_info = self.infix_op()
                 if next_info != 0:
@@ -5382,6 +5387,7 @@ fn Parser.parse_match_arms(self: Parser) -> i32:
             // Build guard: `__v in collection`
             let bind_ref = self.pool.add_node(NodeKind.NK_IDENT, arm_start, arm_start, bind_sym, 0, 0)
             in_guard_expr = self.pool.add_node(NodeKind.NK_BINARY, arm_start, self.prev_end(), BinaryOp.OP_IN, bind_ref, collection_expr)
+            self.pool.set_membership_arg(in_guard_expr, self.pool.add_extra(bind_ref))
         else:
             pattern = self.parse_pattern()
 
@@ -5457,6 +5463,7 @@ fn Parser.parse_inline_match_arms(self: Parser) -> i32:
             pattern = self.pool.add_node(NodeKind.NK_PAT_IDENT, arm_start, arm_start, bind_sym, 0, 0)
             let bind_ref = self.pool.add_node(NodeKind.NK_IDENT, arm_start, arm_start, bind_sym, 0, 0)
             in_guard_expr = self.pool.add_node(NodeKind.NK_BINARY, arm_start, self.prev_end(), BinaryOp.OP_IN, bind_ref, collection_expr)
+            self.pool.set_membership_arg(in_guard_expr, self.pool.add_extra(bind_ref))
         else:
             pattern = self.parse_pattern()
         if self.peek() == TokenKind.TK_PIPE:

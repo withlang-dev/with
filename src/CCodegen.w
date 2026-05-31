@@ -75,6 +75,7 @@ enum CcBuiltin: i32:
     STR_BYTE_AT
     STR_SLICE
     STR_CONTAINS
+    STR_CONTAINS_CHAR
     STR_STARTS_WITH
     STR_ENDS_WITH
     STR_FIND
@@ -4612,6 +4613,7 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.STR_BYTE_AT: return CcBuiltin.STR_BYTE_AT
     if intrinsic == MirIntrinsic.STR_SLICE: return CcBuiltin.STR_SLICE
     if intrinsic == MirIntrinsic.STR_CONTAINS: return CcBuiltin.STR_CONTAINS
+    if intrinsic == MirIntrinsic.STR_CONTAINS_CHAR: return CcBuiltin.STR_CONTAINS_CHAR
     if intrinsic == MirIntrinsic.STR_STARTS_WITH: return CcBuiltin.STR_STARTS_WITH
     if intrinsic == MirIntrinsic.STR_ENDS_WITH: return CcBuiltin.STR_ENDS_WITH
     if intrinsic == MirIntrinsic.STR_FIND: return CcBuiltin.STR_FIND
@@ -5138,6 +5140,20 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
             out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_contains(" ++ recv ++ ", " ++ needle ++ ");\n"
         else:
             out = out ++ "    (void)with_str_contains(" ++ recv ++ ", " ++ needle ++ ");\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == CcBuiltin.STR_CONTAINS_CHAR:
+        if argc < 2:
+            self.fail("char-in-str membership expects two arguments")
+            return "    abort();"
+        let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+        let ch = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
+        var out = ""
+        if has_ret != 0:
+            out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = with_str_contains_char(" ++ recv ++ ", (int32_t)(" ++ ch ++ "));\n"
+        else:
+            out = out ++ "    (void)with_str_contains_char(" ++ recv ++ ", (int32_t)(" ++ ch ++ "));\n"
         out = out ++ f"    goto bb{next_bb};"
         return out
 
@@ -7508,6 +7524,7 @@ fn CCodegen.emit_module(self: CCodegen) -> str:
     out.write("extern with_str with_str_concat(with_str, with_str);\n")
     out.write("extern int64_t with_str_len(with_str);\n")
     out.write("extern int32_t with_str_byte_at(with_str, int64_t);\n")
+    out.write("extern int32_t with_str_contains_char(with_str, int32_t);\n")
     out.write("extern with_str with_str_from_cstr(uint8_t*);\n")
     out.write("extern with_str with_str_from_bytes(uint8_t*, int64_t);\n")
     out.write("extern with_str with_i64_to_str(int64_t);\n")
