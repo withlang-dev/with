@@ -5828,9 +5828,9 @@ fn Parser.parse_let_binding(self: Parser) -> NodeId:
         is_mut = true
         self.advance()
 
-    // Tuple destructuring uses the normal pattern tree so nested tuple
-    // bindings share the same Sema/MIR path as tuple patterns elsewhere.
-    if self.peek() == TokenKind.TK_L_PAREN:
+    // Tuple and struct destructuring use the normal pattern tree so the
+    // bindings share the same Sema/MIR path as patterns elsewhere (§9.7).
+    if self.peek() == TokenKind.TK_L_PAREN or self.peek() == TokenKind.TK_L_BRACE:
         let pat = self.parse_pattern()
         if self.expect(TokenKind.TK_EQ) == 0:
             return self.poisoned_expr()
