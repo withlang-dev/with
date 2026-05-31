@@ -17,7 +17,7 @@ failure chain to the deepest credible cause. Fix that. Never
 fix symptoms.
 
 **Build is verification, not experimentation.** A build takes
-5 minutes. Before running `make build`, state what specific
+5 minutes. Before running `with build`, state what specific
 question you're answering and what each possible outcome tells
 you. If you can answer the question with `grep`, `nm`, `otool`,
 `lldb`, or reading code — do that instead.
@@ -219,7 +219,7 @@ linked; the final binary loads **no** `libclang`/`libLLVM` dylib (the
 bootstrap runbook's Failure Policy enforces this). `LLVM_PREFIX` and
 `WITH_LIBCLANG` are **build-time link inputs only** — never a runtime
 dependency. The static SDK they point at is published per-platform per
-release and fetched with `with build :deps` / `make deps` (#313); LLVM is
+release and fetched with `with build :deps` (#313); LLVM is
 built from source (`tools/build-static-llvm.sh`) only when bringing up a new
 platform or bumping `COMPILER_LLVM_VERSION`. Never rebuild it or point at a
 system LLVM during a normal build.
@@ -249,13 +249,13 @@ invariant exists to forbid, and a clean release host won't have it.
 ## Build System
 
 ```
-make stage1      # seed → stage1
-make stage2      # stage1 → stage2
-make build       # stage1 + stage2 + runtime objects
-make stage3      # stage2 → stage3
-make fixpoint    # verify stage2 == stage3 (byte-identical)
-make test        # run test suite
-make smoke       # quick smoke test
+with build              # full build (seed → stage1 → stage2 → final)
+with build :stage1      # seed → stage1
+with build :stage2      # stage1 → stage2
+with build :stage3      # stage2 → stage3
+with build :fixpoint    # verify stage2 == stage3 (byte-identical)
+with build :test        # run test suite
+with build :prune       # report stale build artifacts
 ```
 
 Stage chain: `seed → stage1 → stage2 → stage3`
@@ -272,10 +272,11 @@ code generation is nondeterministic. Stop and fix.
 Resolution order: `WITH=<path>` → `with` on PATH → `src/main`
 
 `src/main` is not checked into git. It is the local seed path fetched
-from the `with-darwin-aarch64` GitHub release asset. Run `make seed`
-or `with build :seed` to fetch it. After `make build`, `make fixpoint`,
-and `make test` all pass, update the installed user compiler:
-`make install-user`.
+from the `with-darwin-aarch64` GitHub release asset. Run `with build :seed`
+to fetch it. After `with build`, `with build :fixpoint`, and
+`with build :test` all pass, run `with build :last-green`, then update
+the local bootstrap seed with `with build :update-seed` and the installed
+user compiler with `with build :install-user`.
 
 If the seed, installed compiler, and release binaries are all
 broken, the compiler cannot be recovered.
@@ -396,8 +397,8 @@ point.
 
 After each change:
 ```
-make build          # must pass
-make fixpoint       # must pass
+with build              # must pass
+with build :fixpoint    # must pass
 ```
 
 If either fails, stop adding changes. Debug the failure.
@@ -487,7 +488,7 @@ flag on `NK_LET_DECL`.
   to With. Use `@[c_export]` for exported symbols.
 - **Guessing linker flags.** Understand which link path you're
   on (cc vs lld) before changing anything.
-- **Using `make build` as a debugging tool.** It takes 5 minutes.
+- **Using `with build` as a debugging tool.** It takes 5 minutes.
   Use `grep`, `nm`, `lldb`, or `with check` for diagnosis.
 - **Iterating unordered maps** or using pointer-address ordering.
   These break fixpoint determinism.
@@ -504,15 +505,15 @@ flag on `NK_LET_DECL`.
 A change is acceptable only if:
 
 ```
-make build      # compiles
-make fixpoint   # stage2 == stage3
-make test       # no regressions
+with build              # compiles
+with build :fixpoint    # stage2 == stage3
+with build :test        # no regressions
 ```
 
 If any step fails, continue debugging until it passes.
 
 After all three steps pass, deploy the verified compiler to
-`~/.local/bin/with` with `make install-user`. Do not deploy a
+`~/.local/bin/with` with `with build :install-user`. Do not deploy a
 compiler that has not passed the full checklist.
 
 ---
@@ -526,26 +527,27 @@ You cannot change its behavior by editing source files. If the seed's
 Link.w expects helpers.o, no amount of editing Link.w on disk changes that.
 The seed will always look for helpers.o until you install a new seed.
 
-### Never run `make install` with uncommitted changes
-`make install` updates the seed. A broken seed breaks all future builds.
-Only run `make install` after `make fixpoint` passes on committed code.
+### Never run seed/install targets with uncommitted changes
+`with build :update-seed` updates `src/main`; `with build :install-user`
+updates `~/.local/bin/with`. A broken seed breaks future builds. Only run
+these targets after `with build :fixpoint` passes on committed code.
 
 ### Never change Link.w and runtime files in the same commit
 Commit 1: Add new exports to rt_core.w (old link path still works)
 Commit 2: Change Link.w + strip helpers.c (new link path activates)
-Each commit must independently pass `make fixpoint`.
+Each commit must independently pass `with build :fixpoint`.
 
 ### Bootstrap order for runtime migration
 1. git checkout all runtime/link files to last green state
-2. make build && make fixpoint (verify green baseline)
+2. with build && with build :fixpoint (verify green baseline)
 3. Apply rt_core.w changes ONLY (new exports, ABI fixes)
-4. make build && make fixpoint (old link path, new symbols available)
+4. with build && with build :fixpoint (old link path, new symbols available)
 5. Apply Link.w + helpers.c + compat_runtime.w changes
 6. Build stage1 with old seed (old link path)
 7. Stage1 has new Link.w — it builds stage2 with new link path
-8. make fixpoint (stage2 == stage3, new link path converges)
-9. make install (seed is now updated)
+8. with build :fixpoint (stage2 == stage3, new link path converges)
+9. with build :update-seed (local bootstrap seed is now updated)
 
 ### If bootstrap is broken, don't guess
-Run `make doctor` to see what state the seed, stage binaries, and
-runtime objects are in.
+Inspect `WITH`, `src/main`, `out/bin/with`, the stage binaries, and runtime
+objects directly before making changes.

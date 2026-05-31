@@ -6,6 +6,7 @@ use build.seed
 use build.emit_c
 use build.compiler
 use build.clang_resource
+use build.retention
 use std.sysinfo
 
 fn build_project_dirname(path: str) -> str:
@@ -123,6 +124,12 @@ fn target_with_version_inputs(target: Target, ctx: BuildCtx) -> Target:
             out = out.input(ref_path)
         else if fs.exists(".git/packed-refs"):
             out = out.input(".git/packed-refs")
+    out
+
+fn target_with_live_targets(target: Target, graph: Build) -> Target:
+    var out = target
+    for i in 0..graph.targets.len() as i32:
+        out = out.arg("live-target=" ++ graph.targets.get(i as i64).name)
     out
 
 type HostRuntimeSpec:
@@ -434,7 +441,9 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage1 = stage1.input("out/gen/main.w")
     stage1 = stage1.arg("-O0")
     stage1 = stage1.extra_output("out/command/stage1")
+    stage1 = stage1.extra_output("out/.build-state/seed-input.json")
     stage1 = stage1.write_scope("out/bin")
+    stage1 = stage1.write_scope("out/.build-state")
     stage1 = stage1.dep("compiler-sources")
     stage1 = stage1.dep("compat-runtime-source")
     stage1 = stage1.dep("embedded-clang-resource-source")
@@ -744,6 +753,22 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("emit-c-smoke")
     out = out.add_target(tests)
 
+    var last_green = target_new(.Action, "last-green", "").output("out/.build-state/last-green.json")
+    last_green.action = run_last_green_action
+    last_green = last_green.input("out/bin/with")
+    last_green = last_green.input("out/bin/with-stage2-fixpoint.o")
+    last_green = last_green.input("out/bin/with-stage3-fixpoint.o")
+    last_green = last_green.input("out/.build-state/seed-input.json")
+    last_green = last_green.input("src/version")
+    last_green = last_green.extra_output("out/seed-archive")
+    last_green = last_green.extra_output("out/command/last-green")
+    last_green = last_green.write_scope("out/.build-state")
+    last_green = last_green.write_scope("out/seed-archive")
+    last_green = last_green.write_scope("out/command/last-green")
+    last_green = last_green.dep("fixpoint")
+    last_green = last_green.dep("test")
+    out = out.add_target(last_green)
+
     var check_committed = target_new(.Action, "check-committed-state", "").output("out/command/check-committed-state/ok")
     check_committed.action = run_check_committed_state_action
     check_committed = check_committed.write_scope("out/command/check-committed-state")
@@ -752,8 +777,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var install_user = target_new(.Install, "install-user", "out/bin/with").output("$HOME/.local/bin/with")
     install_user = install_user.input("out/bin/with")
     install_user = install_user.arg("0755")
-    install_user = install_user.dep("build")
-    install_user = install_user.dep("bless-manifest")
+    install_user = install_user.dep("last-green")
     install_user = install_user.dep("check-committed-state")
     out = out.add_target(install_user)
 
@@ -819,11 +843,10 @@ pub fn build(ctx: BuildCtx) -> Build:
     deps = deps.arg(llvm_sdk_dir_basename())
     out = out.add_target(deps)
 
-    var update_seed = target_new(.Install, "update-seed", "out/bin/with-stage2").output("src/main")
-    update_seed = update_seed.input("out/bin/with-stage2")
+    var update_seed = target_new(.Install, "update-seed", "out/bin/with").output("src/main")
+    update_seed = update_seed.input("out/bin/with")
     update_seed = update_seed.arg("0755")
-    update_seed = update_seed.dep("verified-existing-stage")
-    update_seed = update_seed.dep("bless-manifest")
+    update_seed = update_seed.dep("last-green")
     update_seed = update_seed.dep("check-committed-state")
     out = out.add_target(update_seed)
 
@@ -912,5 +935,33 @@ pub fn build(ctx: BuildCtx) -> Build:
     pcre2_promote = pcre2_promote.input("out/pcre2_build/lib/std/re")
     pcre2_promote = pcre2_promote.dep("pcre2-test")
     out = out.add_target(pcre2_promote)
+
+    var prune = target_new(.Action, "prune", "").output("out/.build-state/prune.always")
+    prune.action = run_prune_action
+    prune = prune.arg("dry-run")
+    prune = prune.arg("live-target=prune")
+    prune = prune.arg("live-target=prune-apply")
+    prune = target_with_live_targets(prune, out)
+    prune = prune.write_scope("out/bin")
+    prune = prune.write_scope("out/lib")
+    prune = prune.write_scope("out/bootstrap-lib")
+    prune = prune.write_scope("out/.build-state")
+    prune = prune.write_scope("out/seed-archive")
+    prune = prune.write_scope("out/command/prune")
+    out = out.add_target(prune)
+
+    var prune_apply = target_new(.Action, "prune-apply", "").output("out/.build-state/prune-apply.always")
+    prune_apply.action = run_prune_action
+    prune_apply = prune_apply.arg("apply")
+    prune_apply = prune_apply.arg("live-target=prune")
+    prune_apply = prune_apply.arg("live-target=prune-apply")
+    prune_apply = target_with_live_targets(prune_apply, out)
+    prune_apply = prune_apply.write_scope("out/bin")
+    prune_apply = prune_apply.write_scope("out/lib")
+    prune_apply = prune_apply.write_scope("out/bootstrap-lib")
+    prune_apply = prune_apply.write_scope("out/.build-state")
+    prune_apply = prune_apply.write_scope("out/seed-archive")
+    prune_apply = prune_apply.write_scope("out/command/prune-apply")
+    out = out.add_target(prune_apply)
 
     out.default("build")

@@ -3,13 +3,24 @@
 Status: active checkpoint for agents. Update this file when phase status,
 blockers, or the next work queue changes.
 
-Last updated: 2026-05-27.
+Last updated: 2026-05-31.
 
 Read this file immediately after `AGENTS.md`. It exists so long-running build
 system and bootstrap work does not have to be reconstructed from git history or
 conversation context after compaction.
 
 ## Current Focus
+
+Build and release flow now treats `with build` as canonical. `with build
+:last-green` records the seed used for stage1, writes
+`out/.build-state/last-green.json`, and archives verified `out/bin/with`
+under `out/seed-archive/` with a five-seed retention window. `with build
+:update-seed` copies the verified final compiler (`out/bin/with`) to
+`src/main`, and `with build :install-user` installs the same verified final
+compiler to `~/.local/bin/with`. `with build :prune` is a dry-run report for
+stale build artifacts; `with build :prune-apply` removes stale temporary
+dSYM bundles, runtime archive wrappers, stale build state, and old seed
+archives without touching `.deps/` or `out/release/`.
 
 Phase C extraction work is complete. Pre-Phase-D preparation is complete
 through P9, including the follow-up source-location diagnostic gap. Phase D
@@ -97,8 +108,9 @@ Linux x86_64 bootstrap support is active and verified on Ubuntu 22.04 at
 `quixi@192.168.86.211`. The Linux runtime backend, fiber assembly backend,
 direct `ld.lld` link path, static LLVM SDK inputs, and emitted-C C compiler
 link path all build without requiring Zig or the `clang` executable in the
-normal With build path. The latest checkpoint passed `make build`,
-`make fixpoint`, `make test`, and forced `make emit-c-fixpoint` on macOS
+normal With build path. The latest checkpoint passed `with build`,
+`with build :fixpoint`, `with build :test`, and forced
+`with build :emit-c-fixpoint` on macOS
 Darwin arm64 and Ubuntu Linux x86_64.
 
 Release packaging now treats Linux x86_64 as a first-class platform asset:
@@ -433,20 +445,20 @@ out/bin/with check src/main.w
 out/bin/with check build/pcre2.w
 out/bin/with check build/selfhost.w
 git diff --check
-make build
+with build
 out/bin/with build :pcre2-build --no-deps
 out/bin/with build :pcre2-check-generated --no-deps
 out/bin/with build :c-migrator-pcre2-prep-tests --no-deps
 out/bin/with build :cli-selfhost-build-w-tests --no-deps
-make fixpoint
-make test
-make install-user
+with build :fixpoint
+with build :test
+with build :install-user
 ```
 
 The previous verified checkpoint also passed:
 
 ```sh
-make build
+with build
 out/bin/with build :cli-selfhost-build-w-tests --no-deps
 out/bin/with build :build
 out/bin/with build :fixpoint
@@ -465,8 +477,8 @@ out/bin/with build :cli-selfhost-smoke-tests
 out/bin/with build :c-migrator-core-tests
 out/bin/with build :pcre2-reference
 out/bin/with build :test
-make fixpoint
-make test
+with build :fixpoint
+with build :test
 ```
 
 Full `:emit-c-test` remains a manual release/emit-C-feature verification
@@ -563,15 +575,14 @@ Completed at a high level:
 Build system completion:
 
 - All phases (A through I) are complete.
-- Every `make` target delegates to `with build :target`.
-- The Makefile is a thin compatibility layer (all build logic lives in
-  `build.w` and the `build_*.w` action modules).
+- `with build` is the canonical build interface. Make is legacy compatibility,
+  not the source of truth for build or release procedure.
+- All build logic lives in `build.w` and project-local modules under `build/`.
 - All obsolete shell scripts have been deleted. Only
   `scripts/generate_wl_stubs.sh` remains (for cross-compilation).
-- CI uses `make build`, `make fixpoint`, `make test` (which delegate to
-  `with build`).
-- `with build` (no target) runs the default build target, matching `make`
-  behavior.
+- CI and release verification should use `with build`, `with build :fixpoint`,
+  and `with build :test` directly.
+- `with build` (no target) runs the default build target.
 
 ## Phase C Extraction Status
 
@@ -618,9 +629,9 @@ not a new compiler-dispatched project graph kind.
 - Decide whether in-process build graph test targets should also move to
   external parallel execution, or remain serial for diagnostic fidelity.
 - Keep PCRE2 targets manual-only; do not wire PCRE2 migration, generated-module
-  checks, corpus tests, or smokes into `make test`.
+  checks, corpus tests, or smokes into `with build :test`.
 - Run full `:emit-c-test` only for release verification or emit-C-specific
-  work. For ordinary changes, rely on `make test`'s emit-C smoke.
+  work. For ordinary changes, rely on `with build :test`'s emit-C smoke.
 - Keep project-specific build policy in project-local modules and avoid adding
   new compiler-dispatched project graph kinds.
 - Phase E is complete. New compiler, migrator, runtime, stdlib, and build
@@ -641,9 +652,9 @@ passed the standard verification sequence:
 
 ```sh
 out/bin/with check src/main.w
-make build
-make fixpoint
-make test
+with build
+with build :fixpoint
+with build :test
 ```
 
 Phase F changes are in `src/BuildGraphSupport.w`, `src/BuildGraphDispatch.w`,
@@ -658,9 +669,10 @@ substitute for inspecting the current worktree.
 
 ## Environment Notes
 
-- Stale `/tmp/openjai_test_*` directories and `out/bin/with.tmp.*` artifacts can
-  consume large amounts of disk after interrupted runs.
+- Stale `/tmp/openjai_test_*` directories and build artifacts can consume
+  large amounts of disk after interrupted runs. Use `with build :prune` to
+  inspect project-local leftovers and `with build :prune-apply` to remove the
+  recognized stale artifacts.
 - If link errors mention missing regex runtime exports, inspect
   `out/lib/regex_runtime.o`; a disk-full interruption once left it truncated and
   required regenerating the object.
-- `make doctor` is mentioned in `AGENTS.md` but is not currently implemented.

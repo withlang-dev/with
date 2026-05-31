@@ -69,7 +69,7 @@ the seed (issue #313):
   It ships only what the build links against — `lib/*.a`, `lib/clang/<v>/include/`,
   and `bin/lld` (+ driver symlinks) and `bin/llvm-nm` — not `bin/clang` or the
   LLVM C++ `include/` tree, so the asset is ~65 MB, not ~2 GB.
-- **Fetch**: `with build :deps` (or `make deps`) downloads
+- **Fetch**: `with build :deps` downloads
   `with-llvm-sdk-<COMPILER_LLVM_VERSION>-<host>.tar.zst` from the matching
   release and extracts it into `.deps/llvm-<ver>-<host>`. `WITH_LLVM_SDK_VERSION`
   pins the release tag; otherwise the newest release carrying the asset is used.
@@ -78,8 +78,8 @@ the seed (issue #313):
 
 Seed and SDK download paths must use the host-specific asset names:
 
-- `Makefile` fallback `make seed` / `build.w` target `with build :seed`
-- `build.w` target `with build :deps`
+- `with build :seed`
+- `with build :deps`
 
 Current per-host assets:
 
@@ -118,7 +118,27 @@ platform:
 with build
 with build :fixpoint
 with build :test
+with build :last-green
 ```
+
+`:last-green` depends on the fixpoint and test gates, records the seed that
+started the stage chain in `out/.build-state/seed-input.json`, writes the
+verified compiler manifest to `out/.build-state/last-green.json`, and archives
+the verified `out/bin/with` under `out/seed-archive/`. The archive keeps the
+five most recent verified seeds total.
+
+If the working `out/` tree has accumulated old build leftovers, inspect and
+then apply the bounded cleanup before packaging:
+
+```sh
+with build :prune
+with build :prune-apply
+```
+
+The prune target removes stale `out/bin/*.tmp.*.dSYM` directories, stale
+temporary runtime archive wrappers in `out/lib/` and `out/bootstrap-lib/`, stale
+build-state files, and seed archives beyond the retention window. It does not
+remove `.deps/` or `out/release/`.
 
 Run the emitted-C self-host check before publishing a platform for the first
 time, and whenever emit-C or bootstrap packaging changed:
@@ -170,6 +190,7 @@ export WITH=$PWD/out/bin/with
 
 WITH_VERSION=$WITH_VERSION ./out/bin/with build :fixpoint
 WITH_VERSION=$WITH_VERSION ./out/bin/with build :test
+WITH_VERSION=$WITH_VERSION ./out/bin/with build :last-green
 WITH_VERSION=$WITH_VERSION ./out/bin/with version
 WITH_VERSION=$WITH_VERSION scripts/package-linux-x86_64.sh
 ```
@@ -193,13 +214,15 @@ Expected output:
 with v0.14.3
 ```
 
-Finalize the local development seed after the gates pass. This step is
+Finalize the local development seeds after the gates pass. This step is
 required: the release is not done until the compiler that this checkout will
-use for the next self-host build (`out/bin/with`) and the installed user
-compiler both report the released version.
+use for the next self-host build (`out/bin/with`), the local bootstrap seed
+(`src/main`), and the installed user compiler all report the released version.
 
 ```sh
+with build :update-seed
 with build :install-user
+src/main version
 out/bin/with version
 ~/.local/bin/with version
 ```
@@ -210,9 +233,10 @@ Both commands must print:
 with v0.14.3
 ```
 
-Do not leave a release with `out/bin/with` reporting an older version or a
-different development build. If this check fails, rerun the release gates with
-`WITH_VERSION` still set and stop before publishing.
+Do not leave a release with `src/main`, `out/bin/with`, or
+`~/.local/bin/with` reporting an older version or a different development
+build. If this check fails, rerun the release gates with `WITH_VERSION` still
+set and stop before publishing.
 
 ## Publish
 
@@ -277,6 +301,7 @@ The release notes verification section should list:
 WITH_VERSION=v0.14.3 with build
 WITH_VERSION=v0.14.3 with build :fixpoint
 WITH_VERSION=v0.14.3 with build :test
+WITH_VERSION=v0.14.3 with build :last-green
 WITH_VERSION=v0.14.3 with build :emit-c-fixpoint
 ```
 
@@ -314,5 +339,5 @@ git rev-parse --short v0.14.3^{}
 Confirm the seed downloader still points at the published asset name:
 
 ```sh
-rg -n 'with-darwin-aarch64|with-linux-x86_64|releases/download/.*/main|seed\.arg\("main"\)' Makefile build.w
+rg -n 'with-darwin-aarch64|with-linux-x86_64|releases/download/.*/main|seed\.arg\("main"\)' build.w scripts docs/with-release-runbook.md
 ```

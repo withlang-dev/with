@@ -1343,6 +1343,7 @@ fn run_build_command(options: BuildCommandOptions, graph_options: BuildGraphComm
                 return 1
             let build_rc = run_build_graph(root, cfg, selected_graph, load_result.sema, actual_options)
             repo_lock_release()
+            link_stage_cleanup_current_process_temp_archives()
             return build_rc
         let root_main = root ++ "/main.w"
         actual_source = if with_fs_file_exists(root_main) != 0: root_main else: root ++ "/src/main.w"
@@ -1358,11 +1359,13 @@ fn run_build_command(options: BuildCommandOptions, graph_options: BuildGraphComm
         let c_path = comp.emit_c(actual_options.source_path, actual_options.output_path)
         if c_path == "":
             with_eprint("error: build failed")
+            link_stage_cleanup_current_process_temp_archives()
             return 1
         with_eprint("emitted C: " ++ c_path)
         with_eprint("compile with a C compiler (example):")
         with_eprint("  cc -I runtime " ++ c_path ++ " runtime/with_runtime.c runtime/helpers.c runtime/fiber.c runtime/fiber_asm_<arch>.s -o <output>")
         comp.print_warnings()
+        link_stage_cleanup_current_process_temp_archives()
         return 0
     if actual_options.output_kind == BuildOutputKind.Object:
         var obj_path = actual_options.output_path
@@ -1371,14 +1374,18 @@ fn run_build_command(options: BuildCommandOptions, graph_options: BuildGraphComm
         let result = comp.emit_object_to_path(actual_options.source_path, obj_path)
         if result == "":
             with_eprint("error: build failed")
+            link_stage_cleanup_current_process_temp_archives()
             return 1
         comp.print_warnings()
+        link_stage_cleanup_current_process_temp_archives()
         return 0
     let bin_path = comp.build_binary_to_path(actual_options.source_path, actual_options.output_path)
     if bin_path == "":
         with_eprint("error: build failed")
+        link_stage_cleanup_current_process_temp_archives()
         return 1
     comp.print_warnings()
+    link_stage_cleanup_current_process_temp_archives()
     0
 
 fn run_run_project_command(selected_target_hint: str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool) -> i32:

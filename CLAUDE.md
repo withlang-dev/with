@@ -17,7 +17,7 @@ failure chain to the deepest credible cause. Fix that. Never
 fix symptoms.
 
 **Build is verification, not experimentation.** A build takes
-5 minutes. Before running `make build`, state what specific
+5 minutes. Before running `with build`, state what specific
 question you're answering and what each possible outcome tells
 you. If you can answer the question with `grep`, `nm`, `otool`,
 `lldb`, or reading code — do that instead.
@@ -138,8 +138,8 @@ to a warning, add an exemption, or route around it.
 **"Pre-existing" without evidence.** A failure is only
 pre-existing if you've verified it existed on the previous
 commit. Otherwise it's your failure and you've just renamed
-it. `git stash && make test && git stash pop` answers this
-question in under a minute.
+it. Never use `git stash` to answer this question; use `git worktree`
+or a separate clone.
 
 **Silent fallbacks in generated output.** See "No Silent
 Fallbacks" above. Placeholder bodies, TODO comments in
@@ -247,9 +247,11 @@ code generation is nondeterministic. Stop and fix.
 Resolution order: `WITH=<path>` → `with` on PATH → `src/main`
 
 `src/main` is not checked into git. It is the local seed path fetched
-from the `with-darwin-aarch64` GitHub release asset. Run `make seed`
-or `with build :seed` to fetch it. After a successful fixpoint, update
-the installed compiler: `make install-user`.
+from the `with-darwin-aarch64` GitHub release asset. Run `with build :seed`
+to fetch it. After `with build`, `with build :fixpoint`, and
+`with build :test` pass, run `with build :last-green`, then update
+`src/main` with `with build :update-seed` and the installed compiler with
+`with build :install-user`.
 
 If the seed, installed compiler, and release binaries are all
 broken, the compiler cannot be recovered.
@@ -396,7 +398,7 @@ flag on `NK_LET_DECL`.
   to With. Use `@[c_export]` for exported symbols.
 - **Guessing linker flags.** Understand which link path you're
   on (cc vs lld) before changing anything.
-- **Using `make build` as a debugging tool.** It takes 5 minutes.
+- **Using `with build` as a debugging tool.** It takes 5 minutes.
   Use `grep`, `nm`, `lldb`, or `with check` for diagnosis.
 - **Iterating unordered maps** or using pointer-address ordering.
   These break fixpoint determinism.
