@@ -175,6 +175,26 @@ When a runtime function is needed, implement it in `rt_core.w`
 with `@[c_export("symbol_name")]`. Never add new code to
 `helpers.c`.
 
+### `with_*` is compiler-internal — user programs never call it
+
+Two surfaces. Never conflate them:
+
+- **User programs** use exactly two things: the **language syntax**
+  (wired into the stdlib) and the **`std.*` stdlib APIs** (e.g.
+  `std.regex`, in `lib/std/`). That is the entire user-facing surface.
+- **`with_*` symbols and everything in `rt/*.w` are the compiler's own
+  internal runtime/ABI.** User *source* never names a `with_*` symbol —
+  the compiler emits those calls. `rt/regex_runtime.w` (`with_regex_*`)
+  is the **compiler's** regex; it is compiler code, not a user-facing
+  runtime. It is compiled as part of the compiler, not a foreign object
+  to embed and hand out.
+
+So never reason as if a user program must *link* or *resolve* the internal
+runtime on its own behalf. If you catch yourself asking "how does a user
+program get the `with_regex_*` symbols?", **stop** — the question is
+malformed. Users reach regex through `std.regex`, never through
+`with_regex_*`. `rt/*.w` is part of the compiler; treat it that way.
+
 ---
 
 ## Self-Contained Toolchain (we build our own LLVM)
