@@ -90,8 +90,30 @@ fn cr_raw_string_literal(text: str) -> str:
         hashes = hashes ++ "#"
     "r" ++ hashes ++ "\"" ++ text ++ "\"" ++ hashes
 
-// Path relative to the include dir, preserving subdirectories (the full tree
-// has nested dirs such as openmp_wrappers/).
+// We embed the C/POSIX builtin headers a c_import realistically needs, NOT the
+// full ~15 MB tree. The bulk of the full tree is SIMD/GPU intrinsics (arm_neon
+// 3 MB, arm_sve, arm_mve, opencl-c, altivec, …) that FFI never includes, and a
+// 15 MB generated module is ~46x the working embedded-stdlib data — the seed's
+// comptime evaluator is SIGKILL'd building a string that large. The subset is
+// ~156 KB. WITH_CLANG_RESOURCE_DIR overrides for the rare header outside it.
+fn cr_should_embed(name: str) -> bool:
+    if name.ends_with(".modulemap"):
+        return true
+    if name.starts_with("__stddef_") and name.ends_with(".h"):
+        return true
+    if name.starts_with("__stdarg_") and name.ends_with(".h"):
+        return true
+    if name == "stddef.h" or name == "stdarg.h" or name == "stdint.h" or name == "stdbool.h":
+        return true
+    if name == "stdalign.h" or name == "stdnoreturn.h" or name == "stdatomic.h" or name == "stdckdint.h":
+        return true
+    if name == "limits.h" or name == "float.h" or name == "iso646.h" or name == "varargs.h":
+        return true
+    if name == "tgmath.h" or name == "inttypes.h" or name == "stdcountof.h" or name == "mm_malloc.h":
+        return true
+    false
+
+// Path relative to the include dir, preserving subdirectories.
 fn cr_relpath(path: str, base: str) -> str:
     let prefix = base ++ "/"
     if path.starts_with(prefix):
@@ -161,10 +183,15 @@ pub fn generate_embedded_clang_resource_action(ctx: ActionCtx) -> i32:
         return cr_fail(ctx, "could not find clang builtin headers under " ++ compiler_default_llvm_prefix() ++ "/lib/clang; run `with build :deps` or build the SDK")
     // The clang resource version is the numeric dir name (e.g. "22").
     let version = cr_basename(cr_dirname(include_dir))
-    // Embed the entire builtin-header tree (~15 MB), preserving subdirectories.
-    let files = cr_sorted(fs.list_files(include_dir))
+    // Embed the curated C/POSIX builtin headers (see cr_should_embed).
+    let all = cr_sorted(fs.list_files(include_dir))
+    let files: Vec[str] = Vec.new()
+    for i in 0..all.len() as i32:
+        let path = all.get(i as i64)
+        if cr_should_embed(cr_basename(path)):
+            files.push(path)
     if files.len() == 0:
-        return cr_fail(ctx, "found no builtin headers under " ++ include_dir)
+        return cr_fail(ctx, "found no C/POSIX builtin headers under " ++ include_dir)
     let generated = cr_generate(ctx, include_dir, files, version)
     if generated.len() == 0:
         return 1
