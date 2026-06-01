@@ -230,6 +230,7 @@ with build :stage1      # seed → stage1
 with build :stage2      # stage1 → stage2
 with build :fixpoint    # verify stage2 == stage3 (byte-identical)
 with build :test        # run test suite
+with build :test-green  # verify/record current test evidence
 with build :clean       # remove build artifacts
 ```
 
@@ -249,9 +250,11 @@ Resolution order: `WITH=<path>` → `with` on PATH → `src/main`
 `src/main` is not checked into git. It is the local seed path fetched
 from the `with-darwin-aarch64` GitHub release asset. Run `with build :seed`
 to fetch it. After `with build`, `with build :fixpoint`, and
-`with build :test` pass, run `with build :last-green`, then update
-`src/main` with `with build :update-seed` and the installed compiler with
-`with build :install-user`.
+`with build :test` pass, run `with build :test-green` and
+`with build :last-green`, then update `src/main` with
+`with build :update-seed` and the installed compiler with
+`with build :install-user`. `with build :test-green` records evidence from a
+completed test run; it is not a substitute for running `with build :test`.
 
 If the seed, installed compiler, and release binaries are all
 broken, the compiler cannot be recovered.
@@ -418,6 +421,7 @@ A change is acceptable only if:
 with build              # compiles
 with build :fixpoint    # stage2 == stage3
 with build :test        # no regressions
+with build :test-green  # current test evidence recorded
 ```
 
 If any step fails, continue debugging until it passes.

@@ -1092,6 +1092,7 @@ fn run_build_graph(root: str, cfg: ProjectConfig, graph: BuildGraph, action_sema
                         return test_rc
             if build_graph_path_has_glob(target.entry):
                 with_write(f"ok: {test_files.len()} files passed in build.w test target {target.name}\n")
+            build_cache_record_test_success(root, target, test_files, test_compiler)
             completed_targets.push(target.name)
             continue
         if target.kind == 1:

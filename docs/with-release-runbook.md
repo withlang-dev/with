@@ -118,14 +118,19 @@ platform:
 with build
 with build :fixpoint
 with build :test
+with build :test-green
 with build :last-green
 ```
 
-`:last-green` depends on the fixpoint and test gates, records the seed that
-started the stage chain in `out/.build-state/seed-input.json`, writes the
-verified compiler manifest to `out/.build-state/last-green.json`, and archives
-the verified `out/bin/with` under `out/seed-archive/`. The archive keeps the
-five most recent verified seeds total.
+`:test` runs the full suite and records current test evidence. `:test-green`
+is a fast evidence check/recorder for that completed test run; it is not a
+substitute for running `:test`. `:last-green` consumes the current fixpoint and
+test evidence, records the seed that started the stage chain in
+`out/.build-state/seed-input.json`, writes the verified compiler manifest to
+`out/.build-state/last-green.json`, and archives the verified `out/bin/with`
+under `out/seed-archive/`. The archive keeps the five most recent verified
+seeds total. When the gates are current, `:last-green` must not rerun the test
+suite.
 
 If the working `out/` tree has accumulated old build leftovers, inspect and
 then apply the bounded cleanup before packaging:
@@ -137,8 +142,9 @@ with build :prune-apply
 
 The prune target removes stale `out/bin/*.tmp.*.dSYM` directories, stale
 temporary runtime archive wrappers in `out/lib/` and `out/bootstrap-lib/`, stale
-build-state files, and seed archives beyond the retention window. It does not
-remove `.deps/` or `out/release/`.
+build-state files, stale retained test-graph compiler copies, stale
+issue61-regression fixture directories, and seed archives beyond the retention
+window. It does not remove `.deps/` or `out/release/`.
 
 Run the emitted-C self-host check before publishing a platform for the first
 time, and whenever emit-C or bootstrap packaging changed:
@@ -190,6 +196,7 @@ export WITH=$PWD/out/bin/with
 
 WITH_VERSION=$WITH_VERSION ./out/bin/with build :fixpoint
 WITH_VERSION=$WITH_VERSION ./out/bin/with build :test
+WITH_VERSION=$WITH_VERSION ./out/bin/with build :test-green
 WITH_VERSION=$WITH_VERSION ./out/bin/with build :last-green
 WITH_VERSION=$WITH_VERSION ./out/bin/with version
 WITH_VERSION=$WITH_VERSION scripts/package-linux-x86_64.sh
@@ -301,6 +308,7 @@ The release notes verification section should list:
 WITH_VERSION=v0.14.3 with build
 WITH_VERSION=v0.14.3 with build :fixpoint
 WITH_VERSION=v0.14.3 with build :test
+WITH_VERSION=v0.14.3 with build :test-green
 WITH_VERSION=v0.14.3 with build :last-green
 WITH_VERSION=v0.14.3 with build :emit-c-fixpoint
 ```
