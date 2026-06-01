@@ -9570,7 +9570,7 @@ fn Codegen.monomorphize_generic_call_core(self: Codegen, fn_sym: i32, fn_node: i
             mono_param_types.push(arg_tys.get(pi as i64))
         else:
             mono_param_types.push(self.type_fallback())
-    let mono_ret_ty = if ret_type_node != 0: self.resolve_type(ret_type_node) else: self.type_fallback()
+    let mono_ret_ty = self.resolve_type(ret_type_node)
     if mono_ret_ty == 0:
         self.type_binding_syms = saved_bind_syms
         self.type_binding_types = saved_bind_tys
