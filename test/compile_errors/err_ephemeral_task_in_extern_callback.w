@@ -11,4 +11,4 @@ fn callback() -> i32:
     0
 
 fn main:
-    let _ = c_run(callback)
+    let _ = unsafe { c_run(callback) }

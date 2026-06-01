@@ -6,4 +6,4 @@ async fn weight(value: i32) -> i32:
     value
 
 fn main:
-    let _ = c_compare((a, b) => weight(a).await - weight(b).await)
+    let _ = unsafe { c_compare((a, b) => weight(a).await - weight(b).await) }
