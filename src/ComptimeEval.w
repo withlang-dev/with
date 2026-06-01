@@ -647,7 +647,7 @@ fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: Intern
     var evaluator = ComptimeEvaluator.init(sema, ast, pool, 0)
     let value = evaluator.eval_root(node)
     if evaluator.has_pending_diag != 0:
-        sema_ptr.diags.emit(evaluator.pending_diag)
+        unsafe { sema_ptr.diags.emit(evaluator.pending_diag) }
     ComptimeEvalResult {
         value,
         extras: evaluator.extra_values,
@@ -662,7 +662,7 @@ fn comptime_force_eval_expr_result(sema_ptr: *mut Sema, ast: AstPool, pool: Inte
     var evaluator = ComptimeEvaluator.init(sema, ast, pool, 1)
     let value = evaluator.eval_root(node)
     if evaluator.has_pending_diag != 0:
-        sema_ptr.diags.emit(evaluator.pending_diag)
+        unsafe { sema_ptr.diags.emit(evaluator.pending_diag) }
     ComptimeEvalResult {
         value,
         extras: evaluator.extra_values,
@@ -695,7 +695,7 @@ fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: AstPool, pool: Inte
     evaluator.check_workspace_intercepts_finished()
     evaluator.restore_runtime_env()
     if evaluator.has_pending_diag != 0:
-        sema_ptr.diags.emit(evaluator.pending_diag)
+        unsafe { sema_ptr.diags.emit(evaluator.pending_diag) }
     let value =
         if evaluator.had_error == 0 and (signal.kind == ComptimeControlKind.CTL_VALUE or signal.kind == ComptimeControlKind.CTL_RETURN):
             signal.value
@@ -727,7 +727,7 @@ fn comptime_eval_tool_action_result(sema_ptr: *mut Sema, ast: AstPool, pool: Int
     evaluator.check_workspace_intercepts_finished()
     evaluator.restore_runtime_env()
     if evaluator.has_pending_diag != 0:
-        sema_ptr.diags.emit(evaluator.pending_diag)
+        unsafe { sema_ptr.diags.emit(evaluator.pending_diag) }
     let value =
         if evaluator.had_error == 0 and (signal.kind == ComptimeControlKind.CTL_VALUE or signal.kind == ComptimeControlKind.CTL_RETURN):
             signal.value

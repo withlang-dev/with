@@ -109,10 +109,24 @@ fn sema_path_is_runtime_implementation(path: str) -> i32:
         return 1
     0
 
+fn sema_path_is_migrated_regex_implementation(path: str) -> i32:
+    if path.starts_with("lib/std/re/") or path.starts_with("<embedded-std>/std/re/"):
+        return 1
+    if path.contains("/lib/std/re/"):
+        return 1
+    0
+
 fn sema_name_is_compiler_abi_extern(name: str) -> i32:
     if name.starts_with("with_") or name.starts_with("wl_") or name.starts_with("rt_"):
         return 1
     if name == "str_from_byte" or name == "i64_to_string" or name == "exit":
+        return 1
+    0
+
+fn sema_path_is_compiler_source_implementation(path: str) -> i32:
+    if path.starts_with("src/"):
+        return 1
+    if path.contains("/src/"):
         return 1
     0
 
@@ -121,7 +135,7 @@ fn sema_extern_is_compiler_implementation(name: str, path: str) -> i32:
         return 1
     if sema_path_is_runtime_implementation(path) != 0:
         return 1
-    if path.starts_with("src/") or path.contains("/src/"):
+    if sema_path_is_compiler_source_implementation(path) != 0:
         return sema_name_is_compiler_abi_extern(name)
     0
 
@@ -2236,6 +2250,31 @@ fn Sema.type_is_raw_pointer_value(self: Sema, ty: i32) -> i32:
         let inner = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
         if self.get_type_kind(inner) == TypeKind.TY_PTR:
             return 1
+    0
+
+fn Sema.raw_pointer_pointee_type(self: Sema, ty: i32) -> i32:
+    if ty == 0:
+        return 0
+    var resolved = self.resolve_alias(ty as TypeId)
+    if self.get_type_kind(resolved) == TypeKind.TY_REF:
+        resolved = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
+    if self.get_type_kind(resolved) != TypeKind.TY_PTR:
+        return 0
+    self.resolve_alias(self.get_type_d0(resolved) as TypeId) as i32
+
+fn Sema.type_is_compiler_handle_state_pointer(self: Sema, ty: i32) -> i32:
+    if sema_path_is_compiler_source_implementation(self.current_module_path) == 0:
+        return 0
+    let pointee = self.raw_pointer_pointee_type(ty)
+    if pointee == 0 or self.get_type_kind(pointee as TypeId) != TypeKind.TY_STRUCT:
+        return 0
+    let state_name = self.pool_resolve(self.get_type_d0(pointee as TypeId))
+    if state_name == "AstPoolState" or state_name == "InternPoolState" or state_name == "DepOrderAccumState":
+        return 1
+    if state_name == "CiGotoCfgContextState" or state_name == "CiGotoSwitchCaseState":
+        return 1
+    if state_name == "CiTypePoolState" or state_name == "CiExprPoolState" or state_name == "CiStmtPoolState" or state_name == "CiDeclPoolState":
+        return 1
     0
 
 fn Sema.note_unsafe_operation(self: Sema):
@@ -4681,8 +4720,9 @@ fn Sema.check_field_access(self: Sema, node: i32) -> i32:
         return 0
 
     let field_base = self.auto_deref_ref_ptr_type(obj_type)
-    if self.in_unsafe != 0 and self.type_is_raw_pointer_value(obj_type as i32) != 0:
-        self.note_unsafe_operation()
+    if self.type_is_raw_pointer_value(obj_type as i32) != 0:
+        if self.type_is_compiler_handle_state_pointer(obj_type as i32) == 0 and sema_path_is_migrated_regex_implementation(self.current_module_path) == 0 and self.require_unsafe_operation("raw pointer field access requires unsafe context", node) == 0:
+            return 0
 
     if self.is_tool_capability_type(field_base as i32) and not self.can_access_tool_capability_internals():
         self.emit_error("tool capability fields are private; use capability methods instead", node)
