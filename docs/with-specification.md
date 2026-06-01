@@ -3795,31 +3795,24 @@ type Option[T] = Some(T) | None
 
 No exceptions. Errors are values.
 
-**`@[must_use]`:** Both `Result` and `Option` are annotated
-`@[must_use]`. Ignoring a `Result` silently swallows an error.
-Ignoring an `Option` silently discards a value. Both produce
-**warnings**:
+Discarding a `Result` or `Option` has no side effect. The compiler
+does not require ceremony such as `let _ = expr` merely to acknowledge
+that discard. Propagate, match, or bind the value when handling it
+matters; otherwise an expression statement is already an explicit
+choice to ignore the value:
 
 ```
-// WARNING: unused Result — error may be silently swallowed
+// OK: the result is intentionally ignored
 db.execute("DROP TABLE users")
 
-// Fix: propagate, handle, or explicitly discard
+// Also OK: handle or propagate when the error matters
 db.execute("DROP TABLE users")?                    // propagate
 db.execute("DROP TABLE users").unwrap_or(())       // handle
-let _ = db.execute("DROP TABLE users")             // intentional discard
 ```
 
-This catches the single most common class of "why isn't this
-working?" bugs in systems code. `let _ = expr` makes intentional
-discard visible and grep-able. Projects that want stricter
-enforcement can promote `@[must_use]` warnings to errors via
-`with.toml`:
-
-```toml
-[lint]
-must_use = "error"    # promote to compile error
-```
+This keeps discard semantics honest: `Result` and `Option` do not
+start background work or acquire resources merely by existing. Use
+`let _ = expr` when that local style is useful, but it is not required.
 
 ### 10.2 The `?` Operator
 
@@ -6007,7 +6000,7 @@ warning: `let _ = ...` on a Task immediately cancels it
    = help: use `cancel(task)` for explicit cancellation
 ```
 
-See §20b.3.
+See §20b.2.
 
 **Cancellation semantics:**
 
@@ -9185,23 +9178,7 @@ fetch(url).await
 This does NOT apply to connection pools, transactions, file handles,
 or other guarded types that don't carry the annotation. See §7.9.
 
-### 20b.2 Unused `Result` or `Option`
-
-Ignoring a `Result` silently swallows an error. Ignoring an `Option`
-discards a value.
-
-```
-// ERROR:
-db.execute("DROP TABLE users")
-
-// FIX: propagate, handle, or explicitly discard
-db.execute("DROP TABLE users")?
-let _ = db.execute("DROP TABLE users")
-```
-
-See §10.1.
-
-### 20b.3 Unused `Task`
+### 20b.2 Unused `Task`
 
 Dropping a `Task` without `await`ing or `cancel`ing it silently
 cancels work.
@@ -9228,7 +9205,7 @@ fire-and-forget.
 
 See §14.7.
 
-### 20b.4 Unnecessary `unsafe` Block
+### 20b.3 Unnecessary `unsafe` Block
 
 An `unsafe` block with no unsafe operations dilutes the safety
 signal.
@@ -9243,7 +9220,7 @@ let x = 1 + 2
 
 See §19.4.
 
-### 20b.5 Implicit Numeric Narrowing
+### 20b.4 Implicit Numeric Narrowing
 
 Assigning a wider type to a narrower type silently truncates.
 
@@ -9259,7 +9236,7 @@ let small: i32 = big as i32
 Signed/unsigned conversions at the same width also require `as`.
 See §4.2.
 
-### 20b.6 Unreachable Code
+### 20b.5 Unreachable Code
 
 Code after an unconditional `return`, labeled or unlabeled `break`,
 labeled or unlabeled `continue`, `goto`, or diverging expression is
@@ -9310,7 +9287,7 @@ comptime if cfg.is_debug:
 let result = expensive_computation()
 ```
 
-### 20b.7 Pointer Compared to Array
+### 20b.6 Pointer Compared to Array
 Arrays never implicitly decay to pointers, so comparing a pointer
 directly with an array is rejected:
 
