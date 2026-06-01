@@ -2902,7 +2902,53 @@ fn Codegen.mir_indirect_value_local_ptr(self: Codegen, local_id: i32, storage_pt
         return 0
     wl_build_load(self.builder, ptr_ty, storage_ptr)
 
-fn Codegen.mir_eval_call_operand(self: Codegen, body: MirBody, operand_id: i32, expected_ty: i64, call_context: str, arg_index: i32) -> i64:
+fn Codegen.sema_type_is_c_char_pointer(self: Codegen, sema_ty: i32) -> i32:
+    if sema_ty <= 0:
+        return 0
+    let resolved = self.sema.resolve_alias(sema_ty as TypeId) as i32
+    let tk = self.sema.get_type_kind(resolved)
+    if tk != TypeKind.TY_PTR and tk != TypeKind.TY_REF:
+        return 0
+    let pointee = self.sema.resolve_alias(self.sema.get_type_d0(resolved) as TypeId) as i32
+    if pointee == self.sema.ty_i8 as i32:
+        return 1
+    0
+
+fn Codegen.copy_str_to_cstr_temp(self: Codegen, str_val: i64) -> i64:
+    let str_ty = wl_type_of(str_val)
+    if str_ty == 0:
+        return str_val
+    var fn_val = wl_get_named_function(self.llmod, "with_str_to_cstr")
+    if fn_val == 0:
+        let params: Vec[i64] = Vec.new()
+        params.push(str_ty)
+        let fn_ty = wl_function_type(wl_ptr_type(self.context), vec_data_i64(&params), 1, 0)
+        fn_val = wl_add_function(self.llmod, "with_str_to_cstr", fn_ty)
+    if fn_val == 0:
+        return self.extract_str_ptr(str_val)
+    let fn_ty = wl_global_get_value_type(fn_val)
+    let args: Vec[i64] = Vec.new()
+    args.push(str_val)
+    wl_build_call(self.builder, fn_ty, fn_val, vec_data_i64(&args), 1)
+
+fn Codegen.free_call_temp_ptrs(self: Codegen, ptrs: Vec[i64]):
+    if ptrs.len() == 0:
+        return
+    var free_fn = wl_get_named_function(self.llmod, "with_free")
+    if free_fn == 0:
+        let fp: Vec[i64] = Vec.new()
+        fp.push(wl_ptr_type(self.context))
+        let fft = wl_function_type(wl_void_type(self.context), vec_data_i64(&fp), 1, 0)
+        free_fn = wl_add_function(self.llmod, "with_free", fft)
+    if free_fn == 0:
+        return
+    let free_ty = wl_global_get_value_type(free_fn)
+    for i in 0..ptrs.len() as i32:
+        let args: Vec[i64] = Vec.new()
+        args.push(ptrs.get(i as i64))
+        wl_build_call(self.builder, free_ty, free_fn, vec_data_i64(&args), 1)
+
+fn Codegen.mir_eval_call_operand_info(self: Codegen, body: MirBody, operand_id: i32, expected_ty: i64, expected_sema_ty: i32, is_c_abi_arg: i32, call_context: str, arg_index: i32) -> CallArgValue:
     var eval_expected_ty = expected_ty
     if expected_ty != 0 and wl_get_type_kind(expected_ty) == wl_pointer_type_kind():
         eval_expected_ty = 0
@@ -2912,14 +2958,23 @@ fn Codegen.mir_eval_call_operand(self: Codegen, body: MirBody, operand_id: i32, 
         let expected_kind = wl_get_type_kind(expected_ty)
         let actual_kind = wl_get_type_kind(wl_type_of(out))
         if expected_kind == wl_pointer_type_kind() and actual_kind == wl_struct_type_kind():
-            let place_ptr = self.mir_try_place_ptr_for_ref(body, operand_id)
-            if place_ptr != 0:
-                out = place_ptr
+            if self.is_str_type(wl_type_of(out)):
+                if is_c_abi_arg != 0 and self.sema_type_is_c_char_pointer(expected_sema_ty) != 0:
+                    let cstr = self.copy_str_to_cstr_temp(out)
+                    let coerced_cstr = self.enforce_coerced_type(cstr, expected_ty, "wrong argument type")
+                    return CallArgValue { value: coerced_cstr, cleanup_ptr: cstr }
+            else:
+                let place_ptr = self.mir_try_place_ptr_for_ref(body, operand_id)
+                if place_ptr != 0:
+                    out = place_ptr
     let had_error_before = self.had_error
     let coerced = self.enforce_coerced_type(out, expected_ty, "wrong argument type")
     if self.had_error != had_error_before:
         self.debug_call_coerce_failure(call_context, 0, arg_index, 0, out, expected_ty)
-    coerced
+    CallArgValue { value: coerced, cleanup_ptr: 0 }
+
+fn Codegen.mir_eval_call_operand(self: Codegen, body: MirBody, operand_id: i32, expected_ty: i64, call_context: str, arg_index: i32) -> i64:
+    self.mir_eval_call_operand_info(body, operand_id, expected_ty, 0, 0, call_context, arg_index).value
 
 fn Codegen.mir_unwrap_ref_like_sema_type(self: Codegen, sema_ty: i32) -> i32:
     var current = sema_ty
@@ -7904,7 +7959,10 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
         if srt_opt.is_some():
             abi_sret_ty = srt_opt.unwrap() as i64
 
+    let sema_sig_idx = if callee_raw_fn_sym != 0: self.sema.get_sig(callee_raw_fn_sym) else: -1
+    let is_c_abi_call = if callee_raw_fn_sym != 0 and self.sema.extern_fn_names.contains(callee_raw_fn_sym): 1 else: 0
     let args: Vec[i64] = Vec.new()
+    let call_temp_cleanups: Vec[i64] = Vec.new()
     if is_indirect:
         args.push(ctx_ptr_val)
 
@@ -7921,6 +7979,9 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
         let abi_param_offset = param_offset + (if abi_has_sret != 0: 1 else: 0)
         if abi_param_offset < param_count:
             expected_ty = param_types.get(abi_param_offset as i64)
+        var expected_sema_ty = 0
+        if sema_sig_idx >= 0 and param_offset < self.sema.sig_get_param_count(sema_sig_idx):
+            expected_sema_ty = self.sema.sig_param_type(sema_sig_idx, param_offset)
 
         // Byval: large struct param → alloca + store + pass pointer
         if (abi_byval_mask & ((1 as i64) << (ai as u32))) != 0:
@@ -7994,7 +8055,10 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                 self.had_error = 1
                 arg_val = wl_get_undef(self.get_dyn_fat_ptr_type())
         else:
-            arg_val = self.mir_eval_call_operand(body, operand_id, expected_ty, call_context, ai)
+            let arg_info = self.mir_eval_call_operand_info(body, operand_id, expected_ty, expected_sema_ty, is_c_abi_call, call_context, ai)
+            arg_val = arg_info.value
+            if arg_info.cleanup_ptr != 0:
+                call_temp_cleanups.push(arg_info.cleanup_ptr)
         args.push(arg_val)
 
     let actual_callee = if is_indirect: fn_ptr_val else: callee
@@ -8007,6 +8071,7 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
     // LLVM intrinsic recognition: emit hardware instructions for known math functions.
     let llvm_intrinsic_result = self.try_emit_llvm_math_intrinsic(callee_fn_sym, args, dest_place, body, next_bb)
     if llvm_intrinsic_result:
+        self.free_call_temp_ptrs(call_temp_cleanups)
         return true
 
     // Async function call → fiber spawn.
@@ -8014,13 +8079,16 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
     // generate a trampoline, heap-allocate result buffer, and call
     // with_fiber_spawn. Return Task { fiber_id, result_buf }.
     if callee_fn_sym != 0 and self.sema.task_fns.contains(callee_fn_sym):
-        return self.emit_async_fn_spawn(callee_fn_sym, callee, call_ft, args, dest_place, body, next_bb)
+        let spawn_result = self.emit_async_fn_spawn(callee_fn_sym, callee, call_ft, args, dest_place, body, next_bb)
+        self.free_call_temp_ptrs(call_temp_cleanups)
+        return spawn_result
 
     let call_val = wl_build_call(self.builder, call_ft, actual_callee, vec_data_i64(&args), actual_arg_count)
     self.apply_c_abi_call_attrs(call_val, abi_has_sret, abi_sret_ty, abi_byval_mask, abi_byval_types, arg_count, if is_indirect: 1 else: 0)
     // Guaranteed mutual @[tailrec] edges are emitted as musttail.
-    if self.mir_emit_mutual_tail_call != 0 and call_val != 0:
+    if self.mir_emit_mutual_tail_call != 0 and call_val != 0 and call_temp_cleanups.len() == 0:
         wl_set_musttail_call(call_val)
+    self.free_call_temp_ptrs(call_temp_cleanups)
 
     // Handle sret: load result from the sret buffer instead of using call_val
     if abi_has_sret != 0 and abi_sret_buf != 0 and abi_sret_ty != 0:

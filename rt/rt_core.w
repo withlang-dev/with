@@ -540,6 +540,10 @@ fn str_to_cstr(s: str) -> *const u8:
     unsafe *((buf as i64 + slen) as *mut u8) = 0
     buf as *const u8
 
+@[c_export("with_str_to_cstr")]
+pub fn str_to_cstr_export(s: str) -> *mut u8:
+    str_to_cstr(s) as *mut u8
+
 // ── Exported allocator/memory API for std/mem.w ───────────────────
 
 @[c_export("with_alloc")]
