@@ -5172,6 +5172,8 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
         if method_name == "remove": return MirIntrinsic.MAP_REMOVE
         if method_name == "clear": return MirIntrinsic.MAP_CLEAR
         if method_name == "increment": return MirIntrinsic.MAP_INCREMENT
+        if method_name == "decrement": return MirIntrinsic.MAP_DECREMENT
+        if method_name == "update": return MirIntrinsic.MAP_UPDATE
         if method_name == "keys": return MirIntrinsic.MAP_KEYS
         if method_name == "entry": return MirIntrinsic.MAP_ENTRY
         return MirIntrinsic.NONE

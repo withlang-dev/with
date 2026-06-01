@@ -119,6 +119,8 @@ enum MirIntrinsic: i32:
     STR_REPLACE
     STR_INDEX_OF
     MAP_INCREMENT
+    MAP_DECREMENT
+    MAP_UPDATE
     VEC_MAP
     VEC_FILTER
     VEC_FOLD
