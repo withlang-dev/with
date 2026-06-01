@@ -643,8 +643,8 @@ type Codegen {
     had_error: i32,
 
     // Monomorphization context (for duck-typing error messages)
-    mono_inst_name: i32,
-    mono_inst_node: i32,
+    mono_inst_name: i32 = 0,
+    mono_inst_node: i32 = 0,
 
     // Generator state
     gen_state_ptr: i64,

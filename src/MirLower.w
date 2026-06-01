@@ -6509,6 +6509,35 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
             sl_fields.push(self.lower_expr(f_val_node))
             sl_names.push(resolved_name)
             self.expected_type = saved_expected
+        if self.sema.type_decl_nodes.contains(sl_name_sym):
+            let sl_td_node = self.sema.type_decl_nodes.get(sl_name_sym).unwrap()
+            let sl_td_extra = self.ast.get_data1(sl_td_node)
+            let sl_td_packed = self.ast.get_data2(sl_td_node)
+            if type_decl_sub_kind(sl_td_packed) == TypeDeclKind.Struct:
+                let sl_decl_field_count = self.ast.get_extra(sl_td_extra)
+                let sl_positional = if sl_field_count > 0: self.ast.get_extra(sl_fields_start) == 0 else: false
+                for dfi in 0..sl_decl_field_count:
+                    let decl_base = sl_td_extra + 1 + dfi * 3
+                    let decl_field_name = self.ast.get_extra(decl_base)
+                    let decl_default = self.ast.get_extra(decl_base + 2)
+                    var present = false
+                    if sl_positional:
+                        present = dfi < sl_field_count
+                    else:
+                        for li in 0..sl_field_count:
+                            let lit_f = self.ast.get_extra(sl_fields_start + li * 2)
+                            if lit_f == decl_field_name:
+                                present = true
+                                break
+                    if not present and decl_default != 0:
+                        let saved_expected = self.expected_type
+                        let info = self.sema.struct_field_info_by_index(sl_struct_ty, dfi)
+                        let decl_field_ty = (info / 4294967296) as i32
+                        if decl_field_ty != 0:
+                            self.expected_type = decl_field_ty
+                        sl_fields.push(self.lower_expr(decl_default))
+                        sl_names.push(decl_field_name)
+                        self.expected_type = saved_expected
         let sl_fid = self.body.new_agg_fields(sl_fields, sl_names)
         let sl_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, sl_fid, 0)
         var sl_ty = self.expr_type(node)

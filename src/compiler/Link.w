@@ -276,7 +276,7 @@ fn link_stage_make_darwin_llvm_link_command(llvm_ld: str, obj_path: str, bin_pat
         args.push(link_args.get(i as i64))
     args.push("-lSystem")
     let cleanup_files = link_stage_collect_cleanup_files(extras)
-    LinkStageCommand { llvm_ld, args, cwd: "", env, inputs, outputs, cleanup_files }
+    LinkStageCommand { linker: llvm_ld, args, cwd: "", env, inputs, outputs, cleanup_files }
 
 fn link_stage_make_linux_llvm_link_command(llvm_ld: str, obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str], link_args: Vec[str]) -> LinkStageCommand:
     let args: Vec[str] = Vec.new()
@@ -338,7 +338,7 @@ fn link_stage_make_linux_llvm_link_command(llvm_ld: str, obj_path: str, bin_path
     args.push(crtn)
     inputs.push(crtn)
     let cleanup_files = link_stage_collect_cleanup_files(extras)
-    LinkStageCommand { llvm_ld, args, cwd: "", env, inputs, outputs, cleanup_files }
+    LinkStageCommand { linker: llvm_ld, args, cwd: "", env, inputs, outputs, cleanup_files }
 
 fn link_stage_make_llvm_link_command(llvm_ld: str, obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str], link_args: Vec[str]) -> LinkStageCommand:
     let os = runtime_sysinfo_os()
