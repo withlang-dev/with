@@ -248,6 +248,8 @@ type Sema {
     extern_fn_names: HashMap[i32, i32],
     // Function AST node indices by name
     fn_decl_nodes: HashMap[i32, i32],
+    // Function declaration source path by name
+    fn_decl_source_paths: HashMap[i32, str],
     // Generic function node indices by name
     generic_fn_nodes: HashMap[i32, i32],
 
@@ -769,6 +771,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let sig_lookup = sema_new_map_i32_i32()
     let extern_fn_names = sema_new_map_i32_i32()
     let fn_decl_nodes = sema_new_map_i32_i32()
+    let fn_decl_source_paths = HashMap[i32, str].new()
     let generic_fn_nodes = sema_new_map_i32_i32()
     let variant_lookup = sema_new_map_i32_i32()
     let variant_type_ids = sema_new_map_i32_i32()
@@ -839,6 +842,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         sig_value_ref_abi_params: Vec.new(),
         extern_fn_names,
         fn_decl_nodes,
+        fn_decl_source_paths,
         generic_fn_nodes,
         variant_lookup,
         variant_type_ids,

@@ -9,4 +9,4 @@ fn compare_weight(a: i32, b: i32) -> i32:
     weight(a).await - weight(b).await
 
 fn main:
-    let _ = c_compare((a, b) => compare_weight(a, b))
+    let _ = unsafe { c_compare((a, b) => compare_weight(a, b)) }

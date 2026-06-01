@@ -998,6 +998,7 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
                 self.emit_error(f"function '{fn_name_str}' is already defined", node)
                 return
     self.fn_decl_nodes.insert(fn_name, node)
+    self.fn_decl_source_paths.insert(fn_name, self.current_module_path)
 
     // Look up fn_meta for parameter info
     let meta = self.ast.find_fn_meta(node)
@@ -1062,6 +1063,7 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
         let bi_tp_meta = self.ast.find_impl_type_params(bi_impl)
         if bi_tp_meta >= 0:
             self.generic_fn_nodes.insert(fn_name, node)
+            self.fn_decl_source_paths.insert(fn_name, self.current_module_path)
             if self_type_id != 0:
                 self.named_types.remove(self_sym)
             return
@@ -1076,6 +1078,7 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
                     let cf_td = self.type_decl_nodes.get(cf_owner_sym).unwrap()
                     if self.type_decl_tp_count(cf_td) > 0:
                         self.generic_fn_nodes.insert(fn_name, node)
+                        self.fn_decl_source_paths.insert(fn_name, self.current_module_path)
                         self.named_types.remove(self_sym)
                         return
                 break
@@ -1083,6 +1086,7 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
     // Generic functions: store for later monomorphization
     if tp_count > 0:
         self.generic_fn_nodes.insert(fn_name, node)
+        self.fn_decl_source_paths.insert(fn_name, self.current_module_path)
         for pi in 0..param_count:
             let p_type_node = self.ast.fn_param_type(param_start, pi)
             self.validate_type_expr_with_type_params(p_type_node, self.ast.fn_meta_tp_start(meta), tp_count)
@@ -1164,6 +1168,7 @@ fn Sema.collect_extern_fn(self: Sema, node: i32, is_local: i32):
     let name = self.ast.get_data0(node)
     if is_local != 0:
         self.set_pretty_symbol(name, self.extract_decl_name_after(node, "fn"))
+    self.fn_decl_source_paths.insert(name, self.current_module_path)
 
     // Error if this extern fn shadows a regular function from the same file or
     // the prelude. An extern fn silently replaces the existing signature with an

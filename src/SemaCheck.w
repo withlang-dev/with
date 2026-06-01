@@ -95,6 +95,36 @@ fn sema_resolve_embed_file_path(source_path: str, raw_path: str) -> str:
         return raw_path
     dir ++ "/" ++ raw_path
 
+fn sema_path_is_std_implementation(path: str) -> i32:
+    if path.starts_with("lib/std/") or path.starts_with("<embedded-std>/"):
+        return 1
+    if path.contains("/lib/std/"):
+        return 1
+    0
+
+fn sema_path_is_runtime_implementation(path: str) -> i32:
+    if path.starts_with("rt/") or path.starts_with("out/gen/"):
+        return 1
+    if path.contains("/rt/") or path.contains("/out/gen/"):
+        return 1
+    0
+
+fn sema_name_is_compiler_abi_extern(name: str) -> i32:
+    if name.starts_with("with_") or name.starts_with("wl_") or name.starts_with("rt_"):
+        return 1
+    if name == "str_from_byte" or name == "i64_to_string" or name == "exit":
+        return 1
+    0
+
+fn sema_extern_is_compiler_implementation(name: str, path: str) -> i32:
+    if sema_path_is_std_implementation(path) != 0:
+        return 1
+    if sema_path_is_runtime_implementation(path) != 0:
+        return 1
+    if path.starts_with("src/") or path.contains("/src/"):
+        return sema_name_is_compiler_abi_extern(name)
+    0
+
 fn Sema.can_access_tool_capability_internals(self: Sema) -> bool:
     if capability_registry_is_std_build_path(self.current_module_path) or capability_registry_is_std_compiler_path(self.current_module_path):
         return true
@@ -2235,6 +2265,8 @@ fn Sema.fn_symbol_is_manual_extern(self: Sema, fn_sym: i32) -> i32:
         return 0
     if self.ci_syms.contains(fn_sym):
         return 0
+    if sema_extern_is_compiler_implementation(self.pool_resolve(fn_sym), self.fn_symbol_source_path(fn_sym)) != 0:
+        return 0
     1
 
 fn Sema.unsafe_prefix_has_raw_access(self: Sema, node: i32) -> i32:
@@ -3948,6 +3980,8 @@ fn Sema.fn_symbol_decl_node(self: Sema, fn_sym: i32) -> i32:
     0
 
 fn Sema.fn_symbol_source_path(self: Sema, fn_sym: i32) -> str:
+    if self.fn_decl_source_paths.contains(fn_sym):
+        return self.fn_decl_source_paths.get(fn_sym).unwrap()
     let fn_node = self.fn_symbol_decl_node(fn_sym)
     if fn_node == 0:
         return ""
@@ -7086,8 +7120,9 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
     if self.fn_symbol_is_unsafe(fn_sym) != 0:
         if self.require_unsafe_operation("unsafe function call requires unsafe context", node) == 0:
             return 0
-    else if self.fn_symbol_is_manual_extern(fn_sym) != 0 and self.in_unsafe != 0:
-        self.note_unsafe_operation()
+    else if self.fn_symbol_is_manual_extern(fn_sym) != 0:
+        if self.require_unsafe_operation("manual extern function call requires unsafe context", node) == 0:
+            return 0
 
     // std.builtins.drop is a prelude-resolved builtin: it consumes its single
     // argument without requiring call-site `move`, then lowers to an immediate

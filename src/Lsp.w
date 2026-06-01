@@ -16,8 +16,8 @@ use compiler.Frontend
 use compiler.Zcu
 use compiler.EmbeddedStdlib
 
-extern fn malloc(size: i64) -> *mut u8
-extern fn free(ptr: *mut u8) -> void
+extern fn with_alloc(size: i64) -> *mut u8
+extern fn with_free(ptr: *mut u8) -> void
 
 extern fn with_eprint(s: str) -> void
 extern fn with_read_line_stdin() -> str
@@ -1958,7 +1958,7 @@ let LSP_MAX_TOKENS: i32 = 256
 
 fn run_lsp() -> i32:
     var state = LspState.new()
-    let tokens = malloc((LSP_MAX_TOKENS * 20) as i64) as *mut JsonToken
+    let tokens = with_alloc((LSP_MAX_TOKENS * 20) as i64) as *mut JsonToken
 
     while true:
         let msg = lsp_read_message()
@@ -1989,7 +1989,7 @@ fn run_lsp() -> i32:
             lsp_write_response(jrpc_result_null(id))
 
         else if method == "exit":
-            free(tokens as *mut u8)
+            with_free(tokens as *mut u8)
             return 0
 
         else if method == "textDocument/didOpen":
@@ -2128,5 +2128,5 @@ fn run_lsp() -> i32:
             if id >= 0:
                 lsp_write_response(jrpc_error(id, -32601, "Method not found: " ++ method))
 
-    free(tokens as *mut u8)
+    with_free(tokens as *mut u8)
     0
