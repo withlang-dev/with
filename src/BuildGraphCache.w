@@ -244,7 +244,7 @@ fn build_cache_collect_output_paths(root: str, target: BuildGraphTarget) -> Vec[
 pub fn build_cache_check_fresh(root: str, target: BuildGraphTarget, dep_rebuilt: bool) -> bool:
     if target.name == "prune" or target.name == "prune-apply":
         return false
-    if target.name == "last-green" or target.name == "check-committed-state":
+    if target.name == "last-green" or target.name == "require-last-green" or target.name == "check-committed-state":
         return false
     if dep_rebuilt:
         return false

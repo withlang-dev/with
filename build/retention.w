@@ -2,6 +2,7 @@ module build.retention
 
 use std.build
 use std.sysinfo
+use std.process
 
 const RET_SEED_KEEP: i32 = 5
 
@@ -316,6 +317,84 @@ pub fn run_last_green_action(ctx: ActionCtx) -> i32:
     if fs.write_text("out/.build-state/last-green.json", manifest) != 0:
         return ret_fail(ctx, "could not write out/.build-state/last-green.json")
     print("[last-green] archived verified seed and wrote out/.build-state/last-green.json")
+    0
+
+pub fn run_require_last_green_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    if not fs.exists("out/bin/with"):
+        return ret_fail(ctx, "missing out/bin/with; run `with build` first")
+    let manifest = fs.read_text("out/.build-state/last-green.json")
+    if manifest.len() == 0:
+        return ret_fail(ctx, "missing last-green manifest; run `with build :last-green` after build/fixpoint/test")
+    let compiler_sha = ret_sha256_file(ctx, "verified-compiler-check", "out/bin/with")
+    if compiler_sha.len() == 0:
+        return ret_fail(ctx, "could not hash out/bin/with")
+    let expected = "\"compiler_sha256\": \"" ++ compiler_sha ++ "\""
+    if not manifest.contains(expected):
+        return ret_fail(ctx, "out/bin/with is not the compiler recorded by last-green; run `with build`, `with build :fixpoint`, `with build :test`, then `with build :last-green`")
+    let output = ctx.output()
+    if output.len() > 0:
+        let dir = ret_dirname(output)
+        if dir.len() > 0 and fs.mkdir_all(dir) != 0:
+            return ret_fail(ctx, "could not create " ++ dir)
+        if fs.write_text(output, "ok\n") != 0:
+            return ret_fail(ctx, "could not write " ++ output)
+    0
+
+fn ret_install_dest_abs(root: str, dest: str) -> str:
+    if dest.starts_with("$HOME/"):
+        let home = env("HOME")
+        if home.len() == 0:
+            return ""
+        return ret_join(home, dest.slice(6, dest.len()))
+    if dest.len() > 0 and dest.byte_at(0) == 47:
+        return dest
+    ret_abs(root, dest)
+
+pub fn run_install_verified_compiler_action(ctx: ActionCtx) -> i32:
+    let args = ctx.args()
+    if args.len() < 3:
+        return ret_fail(ctx, "requires source, destination, and mode args")
+    let root = ctx.project_info().project_root()
+    let source = args.get(0)
+    let dest = args.get(1)
+    let mode = args.get(2)
+    let fs = ctx.fs()
+    if not fs.exists(source):
+        return ret_fail(ctx, "missing source compiler: " ++ source)
+    let source_abs = ret_abs(root, source)
+    let dest_abs = ret_install_dest_abs(root, dest)
+    if dest_abs.len() == 0:
+        return ret_fail(ctx, "could not resolve install destination: " ++ dest)
+    let proc = ctx.process_runner()
+    let mkdir_args: Vec[str] = Vec.new()
+    mkdir_args.push("mkdir")
+    mkdir_args.push("-p")
+    mkdir_args.push(ret_dirname(dest_abs))
+    let mkdir_rc = proc.run(mkdir_args)
+    if mkdir_rc != 0:
+        return ret_fail(ctx, "could not create install directory: " ++ ret_dirname(dest_abs))
+    let copy_args: Vec[str] = Vec.new()
+    copy_args.push("cp")
+    copy_args.push(source_abs)
+    copy_args.push(dest_abs)
+    let copy_rc = proc.run(copy_args)
+    if copy_rc != 0:
+        return ret_fail(ctx, "could not copy compiler to " ++ dest)
+    let chmod_args: Vec[str] = Vec.new()
+    chmod_args.push("chmod")
+    chmod_args.push(mode)
+    chmod_args.push(dest_abs)
+    let chmod_rc = proc.run(chmod_args)
+    if chmod_rc != 0:
+        return ret_fail(ctx, "could not chmod " ++ dest)
+    let output = ctx.output()
+    if output.len() > 0 and output != dest:
+        let out_dir = ret_dirname(output)
+        if fs.mkdir_all(out_dir) != 0:
+            return ret_fail(ctx, "could not create " ++ out_dir)
+        if fs.write_text(output, "ok\n") != 0:
+            return ret_fail(ctx, "could not write " ++ output)
     0
 
 fn ret_live_targets(args: Vec[str]) -> Vec[str]:
