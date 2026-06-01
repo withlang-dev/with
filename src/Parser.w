@@ -4696,12 +4696,18 @@ fn Parser.parse_if_let(self: Parser, start: i32) -> NodeId:
             let p = self.parse_pattern()
             if self.expect(TokenKind.TK_EQ) == 0:
                 return self.poisoned_expr()
+            let saved_chain_sb = self.suppress_brace
+            self.suppress_brace = 1
             let s = self.parse_expr()
+            self.suppress_brace = saved_chain_sb
             clauses.push(0)
             clauses.push(p as i32)
             clauses.push(s as i32)
         else:
+            let saved_chain_sb = self.suppress_brace
+            self.suppress_brace = 1
             let cond = self.parse_expr()
+            self.suppress_brace = saved_chain_sb
             clauses.push(1)
             clauses.push(cond as i32)
             clauses.push(0)
