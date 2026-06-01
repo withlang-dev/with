@@ -1011,6 +1011,21 @@ fn AstPool.compiler_hook_phase_at(self: AstPool, idx: i32) -> i32:
 fn AstPool.get_extra(self: AstPool, idx: i32) -> i32:
     self.state.extra.get(idx as i64)
 
+fn AstPool.optional_chain_is_call(self: AstPool, extra_start: i32) -> i32:
+    if extra_start < 0 or extra_start >= self.extra_len():
+        return 0
+    self.get_extra(extra_start)
+
+fn AstPool.optional_chain_arg_count(self: AstPool, extra_start: i32) -> i32:
+    if self.optional_chain_is_call(extra_start) == 0:
+        return 0
+    if extra_start + 1 >= self.extra_len():
+        return 0
+    self.get_extra(extra_start + 1)
+
+fn AstPool.optional_chain_arg_start(self: AstPool, extra_start: i32) -> i32:
+    extra_start + 2
+
 fn AstPool.get_string(self: AstPool, idx: i32) -> str:
     self.state.strings.get(idx as i64)
 
@@ -1459,7 +1474,7 @@ fn AstPool.for_binding_is_pattern(self: AstPool, node: NodeId) -> bool:
 // NodeKind.NK_ENUM_VARIANT:  d0=type_name(sym), d1=variant_name(sym), d2=extra_start
 //                   extra: [arg_count, args...]
 // NodeKind.NK_OPTIONAL_CHAIN: d0=expr(node), d1=member(sym), d2=extra_start
-//                    extra: [has_args(0/1), arg_count, args...]
+//                    extra: [has_call(0/1), arg_count, args...]
 // NodeKind.NK_AWAIT:         d0=expr(node), d1=0, d2=0
 // NodeKind.NK_ASYNC_BLOCK:   d0=body(node), d1=0, d2=0
 // NodeKind.NK_SPAWN:         d0=expr(node), d1=0, d2=0

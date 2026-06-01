@@ -1383,12 +1383,10 @@ fn Sema.check_expr_reachable_comptime_errors(self: Sema, node: i32):
     if kind == NodeKind.NK_OPTIONAL_CHAIN:
         self.check_expr_reachable_comptime_errors(self.ast.get_data0(node))
         let extra_start7 = self.ast.get_data2(node)
-        if extra_start7 != 0:
-            let has_args = self.ast.get_extra(extra_start7)
-            if has_args != 0:
-                let arg_count4 = self.ast.get_extra(extra_start7 + 1)
-                for oai in 0..arg_count4:
-                    self.check_expr_reachable_comptime_errors(self.ast.get_extra(extra_start7 + 2 + oai))
+        let arg_count4 = self.ast.optional_chain_arg_count(extra_start7)
+        let arg_start4 = self.ast.optional_chain_arg_start(extra_start7)
+        for oai in 0..arg_count4:
+            self.check_expr_reachable_comptime_errors(self.ast.get_extra(arg_start4 + oai))
         return
 
     if kind == NodeKind.NK_ARRAY_COMPREHENSION:
@@ -1730,10 +1728,24 @@ fn Sema.expr_may_suspend(self: Sema, node: i32, visiting: HashMap[i32, i32]) -> 
         if self.expr_may_suspend(self.ast.get_data1(node), visiting) != 0:
             return 1
         return self.expr_may_suspend(self.ast.get_data2(node), visiting)
-    if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_INDEX or kind == NodeKind.NK_OPTIONAL_CHAIN:
+    if kind == NodeKind.NK_FIELD_ACCESS:
+        if self.expr_may_suspend(self.ast.get_data0(node), visiting) != 0:
+            return 1
+        return 0
+    if kind == NodeKind.NK_INDEX:
         if self.expr_may_suspend(self.ast.get_data0(node), visiting) != 0:
             return 1
         return self.expr_may_suspend(self.ast.get_data1(node), visiting)
+    if kind == NodeKind.NK_OPTIONAL_CHAIN:
+        if self.expr_may_suspend(self.ast.get_data0(node), visiting) != 0:
+            return 1
+        let extra_start = self.ast.get_data2(node)
+        let arg_count = self.ast.optional_chain_arg_count(extra_start)
+        let arg_start = self.ast.optional_chain_arg_start(extra_start)
+        for ai in 0..arg_count:
+            if self.expr_may_suspend(self.ast.get_extra(arg_start + ai), visiting) != 0:
+                return 1
+        return 0
     if kind == NodeKind.NK_MULTI_INDEX:
         if self.expr_may_suspend(self.ast.get_data0(node), visiting) != 0:
             return 1
@@ -1969,10 +1981,24 @@ fn Sema.expr_creates_ephemeral_task(self: Sema, node: i32, visiting: HashMap[i32
         if self.expr_creates_ephemeral_task(self.ast.get_data1(node), visiting) != 0:
             return 1
         return self.expr_creates_ephemeral_task(self.ast.get_data2(node), visiting)
-    if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_INDEX or kind == NodeKind.NK_OPTIONAL_CHAIN:
+    if kind == NodeKind.NK_FIELD_ACCESS:
+        if self.expr_creates_ephemeral_task(self.ast.get_data0(node), visiting) != 0:
+            return 1
+        return 0
+    if kind == NodeKind.NK_INDEX:
         if self.expr_creates_ephemeral_task(self.ast.get_data0(node), visiting) != 0:
             return 1
         return self.expr_creates_ephemeral_task(self.ast.get_data1(node), visiting)
+    if kind == NodeKind.NK_OPTIONAL_CHAIN:
+        if self.expr_creates_ephemeral_task(self.ast.get_data0(node), visiting) != 0:
+            return 1
+        let extra_start2 = self.ast.get_data2(node)
+        let arg_count2 = self.ast.optional_chain_arg_count(extra_start2)
+        let arg_start2 = self.ast.optional_chain_arg_start(extra_start2)
+        for ai2 in 0..arg_count2:
+            if self.expr_creates_ephemeral_task(self.ast.get_extra(arg_start2 + ai2), visiting) != 0:
+                return 1
+        return 0
     if kind == NodeKind.NK_MULTI_INDEX:
         if self.expr_creates_ephemeral_task(self.ast.get_data0(node), visiting) != 0:
             return 1
@@ -2744,7 +2770,11 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
 
     if kind == NodeKind.NK_OPTIONAL_CHAIN:
         let base = self.check_expr(self.ast.get_data0(node))
-        let result = self.optional_chain_result_type(base as i32, self.ast.get_data1(node))
+        let extra_start = self.ast.get_data2(node)
+        let result = if self.ast.optional_chain_is_call(extra_start) != 0:
+            self.optional_chain_method_result_type(base as i32, self.ast.get_data1(node), extra_start, node)
+        else:
+            self.optional_chain_result_type(base as i32, self.ast.get_data1(node))
         self.typed_expr_types.insert(node, result)
         return result as TypeId
 
@@ -4230,15 +4260,20 @@ fn Sema.struct_field_info_by_index(self: Sema, struct_type: i32, index: i32) -> 
 // `Option[U]` (and_then / flatten); otherwise it is `Option[F]` (map / wrap).
 // The wrap goes through `ensure_option_type_for` so the synthesized Option is
 // the same interned TypeId as a written `Option[F]` annotation.
+fn Sema.optional_chain_payload_type(self: Sema, base: i32) -> i32:
+    if base == 0:
+        return 0
+    let resolved = self.resolve_alias(base as TypeId)
+    if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return 0
+    if self.get_type_d0(resolved) != self.syms.option:
+        return 0
+    self.get_generic_inst_arg(resolved as i32, 0)
+
 fn Sema.optional_chain_result_type(self: Sema, base: i32, member: i32) -> i32:
     if base == 0:
         return base
-    let resolved = self.resolve_alias(base as TypeId)
-    if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
-        return base
-    if self.get_type_d0(resolved) != self.syms.option:
-        return base
-    let payload = self.get_generic_inst_arg(resolved as i32, 0)
+    let payload = self.optional_chain_payload_type(base)
     if payload == 0:
         return base
     let f = self.struct_field_type(payload, member)
@@ -4250,6 +4285,61 @@ fn Sema.optional_chain_result_type(self: Sema, base: i32, member: i32) -> i32:
         if self.get_type_d0(fr) == self.syms.option:
             return f
     return self.ensure_option_type_for(f)
+
+fn Sema.optional_chain_method_raw_result_type(self: Sema, payload: i32, member: i32) -> i32:
+    if payload == 0:
+        return 0
+    let recv_type = self.auto_deref_ref_ptr_type(payload as TypeId) as i32
+    if recv_type == 0:
+        return 0
+    let owner_sym = self.method_owner_symbol_for_type(recv_type)
+    let builtin_ret = self.builtin_intrinsic_method_return_type(recv_type, owner_sym, member)
+    if builtin_ret != 0:
+        return builtin_ret
+    if owner_sym != 0:
+        let method_fn_sym = self.lookup_method_fn(owner_sym, member)
+        let sig_idx = self.lookup_method_sig(owner_sym, member)
+        if sig_idx >= 0:
+            let ret = self.sig_return_type(sig_idx)
+            let recv_resolved = self.resolve_alias(recv_type as TypeId)
+            if self.get_type_kind(recv_resolved) == TypeKind.TY_GENERIC_INST:
+                let subst_ret = self.substitute_method_return_for_generic_inst(recv_type, owner_sym, member, method_fn_sym, ret)
+                if subst_ret != 0:
+                    return subst_ret
+            return ret
+    0
+
+fn Sema.optional_chain_wrap_result_type(self: Sema, raw_ret: i32) -> i32:
+    let rr = self.resolve_alias(raw_ret as TypeId)
+    if self.get_type_kind(rr) == TypeKind.TY_GENERIC_INST:
+        if self.get_type_d0(rr) == self.syms.option:
+            return raw_ret
+    self.ensure_option_type_for(raw_ret)
+
+fn Sema.optional_chain_method_result_type_no_check(self: Sema, base: i32, member: i32) -> i32:
+    let payload = self.optional_chain_payload_type(base)
+    if payload == 0:
+        return base
+    let raw_ret = self.optional_chain_method_raw_result_type(payload, member)
+    if raw_ret == 0:
+        return 0
+    self.optional_chain_wrap_result_type(raw_ret)
+
+fn Sema.optional_chain_method_result_type(self: Sema, base: i32, member: i32, extra_start: i32, node: i32) -> i32:
+    let payload = self.optional_chain_payload_type(base)
+    if payload == 0:
+        return base
+    let arg_count = self.ast.optional_chain_arg_count(extra_start)
+    let arg_start = self.ast.optional_chain_arg_start(extra_start)
+    for ai in 0..arg_count:
+        self.check_expr(self.ast.get_extra(arg_start + ai))
+    let raw_ret = self.optional_chain_method_raw_result_type(payload, member)
+    if raw_ret == 0:
+        let recv_name = self.type_name(payload)
+        let method_name = self.pool_resolve(member)
+        self.emit_error("unknown method '" ++ method_name ++ "' for optional-chain payload type '" ++ recv_name ++ "'", node)
+        return 0
+    self.optional_chain_wrap_result_type(raw_ret)
 
 fn Sema.struct_field_type(self: Sema, struct_type: i32, field: i32) -> i32:
     if struct_type == 0:
@@ -10094,13 +10184,11 @@ fn Sema.expr_uses_symbol(self: Sema, node: i32, sym: i32) -> i32:
         if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
             return 1
         let extra_start = self.ast.get_data2(node)
-        if extra_start != 0:
-            let has_args = self.ast.get_extra(extra_start)
-            if has_args != 0:
-                let arg_count = self.ast.get_extra(extra_start + 1)
-                for ai in 0..arg_count:
-                    if self.expr_uses_symbol(self.ast.get_extra(extra_start + 2 + ai), sym) != 0:
-                        return 1
+        let arg_count = self.ast.optional_chain_arg_count(extra_start)
+        let arg_start = self.ast.optional_chain_arg_start(extra_start)
+        for ai in 0..arg_count:
+            if self.expr_uses_symbol(self.ast.get_extra(arg_start + ai), sym) != 0:
+                return 1
         return 0
     if kind == NodeKind.NK_INDEX:
         if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:

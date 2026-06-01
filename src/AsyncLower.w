@@ -288,9 +288,10 @@ fn AsyncLower.walk_expr(self: AsyncLower, node: i32):
     if kind == NodeKind.NK_OPTIONAL_CHAIN:
         self.walk_expr(async_ast_get_data0(self.ast, node))
         let extra_start = async_ast_get_data2(self.ast, node)
-        let arg_count = async_extra_or_zero(self.ast, extra_start)
+        let arg_count = self.ast.optional_chain_arg_count(extra_start)
+        let arg_start = self.ast.optional_chain_arg_start(extra_start)
         for ai in 0..arg_count:
-            self.walk_expr(async_extra_or_zero(self.ast, extra_start + 1 + ai))
+            self.walk_expr(async_extra_or_zero(self.ast, arg_start + ai))
         return
 
     if kind == NodeKind.NK_VARIANT_SHORTHAND:
