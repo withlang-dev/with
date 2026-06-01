@@ -1063,7 +1063,7 @@ fn bs_check_emit_c_receiver_abi(ctx: ActionCtx, compiler_path: str, case_dir: st
         "    c = c.bump(5)\n" ++
         "    if c.value != 7:\n" ++
         "        return c.value\n" ++
-        "    with_print_str(\"ok\")\n" ++
+        "    unsafe { with_print_str(\"ok\") }\n" ++
         "    0\n"
     var rc = bs_write_fixture(ctx, src, source, "emit-c receiver ABI source")
     if rc != 0: return rc
@@ -1119,7 +1119,7 @@ fn bs_check_emit_c_hashmap_new_field(ctx: ActionCtx, compiler_path: str, case_di
         "    registry.names.insert(\"name19\", 19)\n" ++
         "    if not registry.names.contains(\"name19\"):\n" ++
         "        return 77\n" ++
-        "    with_print_str(\"ok\")\n" ++
+        "    unsafe { with_print_str(\"ok\") }\n" ++
         "    0\n"
     var rc = bs_write_fixture(ctx, src, source, "emit-c hashmap aggregate field source")
     if rc != 0: return rc
