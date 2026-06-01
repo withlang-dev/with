@@ -269,10 +269,10 @@ fn Sema.clamp_sig_param_count(self: Sema, sig_idx: i32, meta_param_count: i32) -
 
 fn Sema.dump_typed_module(self: Sema) -> str:
     self.reset_typed_dump_safety()
-    var out = ""
+    var out = StringBuilder.new()
     let total_decl_count = self.ast.decl_count()
     let dump_decl_count = total_decl_count
-    out = out ++ f"typed module decls={dump_decl_count}\n"
+    out.push_str(f"typed module decls={dump_decl_count}\n")
 
     for di in 0..dump_decl_count:
         let decl = self.ast.get_decl(di)
@@ -280,7 +280,7 @@ fn Sema.dump_typed_module(self: Sema) -> str:
         let start = self.ast.get_start(decl)
         let end = self.ast.get_end(decl)
 
-        out = out ++ f"decl[{di}] kind={typed_decl_kind_name(kind)} span={start}..{end}\n"
+        out.push_str(f"decl[{di}] kind={typed_decl_kind_name(kind)} span={start}..{end}\n")
 
         if kind == NodeKind.NK_FN_DECL:
             let fn_name_sym = self.ast.get_data0(decl)
@@ -294,7 +294,9 @@ fn Sema.dump_typed_module(self: Sema) -> str:
                     fn_name = owner_type_name ++ "." ++ fn_name
             let sig_idx = self.get_sig(fn_name_sym)
             if fn_name_sym > 0 and self.sig_idx_valid(sig_idx) != 0:
-                out = out ++ "  fn " ++ fn_name ++ "("
+                out.push_str("  fn ")
+                out.push_str(fn_name)
+                out.push_str("(")
                 let meta = self.ast.find_fn_meta(decl)
                 var param_start = 0
                 var meta_param_count = 0
@@ -304,16 +306,25 @@ fn Sema.dump_typed_module(self: Sema) -> str:
                 let param_count = self.clamp_sig_param_count(sig_idx, meta_param_count)
                 for pi in 0..param_count:
                     if pi > 0:
-                        out = out ++ ", "
+                        out.push_str(", ")
                     let p_name_sym = if meta >= 0: self.ast.fn_param_name(param_start, pi) else: 0
                     let p_name = if p_name_sym != 0: self.safe_symbol_text(p_name_sym) else: "_"
-                    out = out ++ p_name ++ ": " ++ self.type_name(self.sig_param_type(sig_idx, pi))
-                out = out ++ ") -> " ++ self.type_name(self.sig_return_type(sig_idx)) ++ "\n"
+                    out.push_str(p_name)
+                    out.push_str(": ")
+                    out.push_str(self.type_name(self.sig_param_type(sig_idx, pi)))
+                out.push_str(") -> ")
+                out.push_str(self.type_name(self.sig_return_type(sig_idx)))
+                out.push_str("\n")
                 let inferred_ret = if meta >= 0 and self.ast.fn_meta_ret(meta) == 0: self.sig_return_type(sig_idx) else: 0
-                out = out ++ (if inferred_ret != 0 and inferred_ret != self.ty_void: "  inferred_return: " ++ self.type_name(inferred_ret) ++ "\n" else: "")
+                if inferred_ret != 0 and inferred_ret != self.ty_void:
+                    out.push_str("  inferred_return: ")
+                    out.push_str(self.type_name(inferred_ret))
+                    out.push_str("\n")
             else:
-                out = out ++ "  fn " ++ fn_name ++ "(<unknown>)\n"
-            out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(decl), 2)
+                out.push_str("  fn ")
+                out.push_str(fn_name)
+                out.push_str("(<unknown>)\n")
+            out.push_str(self.dump_typed_expr_tree(self.ast.get_data1(decl), 2))
             continue
 
         if kind == NodeKind.NK_EXTERN_FN:
@@ -321,7 +332,9 @@ fn Sema.dump_typed_module(self: Sema) -> str:
             let ext_name = self.safe_symbol_text(ext_name_sym)
             let sig_idx = self.get_sig(ext_name_sym)
             if ext_name_sym > 0 and self.sig_idx_valid(sig_idx) != 0:
-                out = out ++ "  extern fn " ++ ext_name ++ "("
+                out.push_str("  extern fn ")
+                out.push_str(ext_name)
+                out.push_str("(")
                 let meta = self.ast.find_fn_meta(decl)
                 var param_start = 0
                 var meta_param_count = 0
@@ -331,13 +344,17 @@ fn Sema.dump_typed_module(self: Sema) -> str:
                 let param_count = self.clamp_sig_param_count(sig_idx, meta_param_count)
                 for pi in 0..param_count:
                     if pi > 0:
-                        out = out ++ ", "
+                        out.push_str(", ")
                     let p_name_sym = if meta >= 0: self.ast.fn_param_name(param_start, pi) else: 0
                     let p_name = if p_name_sym != 0: self.safe_symbol_text(p_name_sym) else: "_"
-                    out = out ++ p_name ++ ": " ++ self.type_name(self.sig_param_type(sig_idx, pi))
-                out = out ++ ") -> " ++ self.type_name(self.sig_return_type(sig_idx)) ++ "\n"
+                    out.push_str(p_name)
+                    out.push_str(": ")
+                    out.push_str(self.type_name(self.sig_param_type(sig_idx, pi)))
+                out.push_str(") -> ")
+                out.push_str(self.type_name(self.sig_return_type(sig_idx)))
+                out.push_str("\n")
             else:
-                out = out ++ "  extern fn (<unknown>)\n"
+                out.push_str("  extern fn (<unknown>)\n")
             continue
 
         if kind == NodeKind.NK_LET_DECL:
@@ -346,54 +363,73 @@ fn Sema.dump_typed_module(self: Sema) -> str:
             if has_resolved:
                 let ty = self.typed_binding_types.get(decl as i32).unwrap()
                 let is_mut = if self.typed_binding_muts.contains(decl as i32): self.typed_binding_muts.get(decl as i32).unwrap() else: 0
-                out = out ++ "  let " ++ name
+                out.push_str("  let ")
+                out.push_str(name)
                 if is_mut != 0:
-                    out = out ++ " (mut)"
-                out = out ++ ": " ++ self.type_name(ty) ++ "\n"
+                    out.push_str(" (mut)")
+                out.push_str(": ")
+                out.push_str(self.type_name(ty))
+                out.push_str("\n")
             else:
                 // Stage0 parity: emit <annotated> when type expr present but unresolved,
                 // <inferred> when no annotation at all.
                 let flags = self.ast.get_data2(decl)
                 let has_ann = self.top_level_let_type_ann_extra(flags) >= 0
-                out = out ++ "  let " ++ name ++ ": " ++ (if has_ann: "<annotated>" else: "<inferred>") ++ "\n"
+                out.push_str("  let ")
+                out.push_str(name)
+                out.push_str(": ")
+                out.push_str(if has_ann: "<annotated>" else: "<inferred>")
+                out.push_str("\n")
             continue
 
         if kind == NodeKind.NK_TYPE_DECL:
-            out = out ++ "  type " ++ self.safe_symbol_text(self.ast.get_data0(decl)) ++ "\n"
+            out.push_str("  type ")
+            out.push_str(self.safe_symbol_text(self.ast.get_data0(decl)))
+            out.push_str("\n")
             continue
 
         if kind == NodeKind.NK_TRAIT_DECL:
-            out = out ++ "  trait " ++ self.safe_symbol_text(self.ast.get_data0(decl)) ++ "\n"
+            out.push_str("  trait ")
+            out.push_str(self.safe_symbol_text(self.ast.get_data0(decl)))
+            out.push_str("\n")
             continue
 
         if kind == NodeKind.NK_IMPL_DECL:
             let type_name = self.safe_symbol_text(self.ast.get_data0(decl))
             let trait_sym = self.ast.get_data2(decl)
             if trait_sym != 0:
-                out = out ++ "  impl " ++ self.safe_symbol_text(trait_sym) ++ " for " ++ type_name ++ "\n"
+                out.push_str("  impl ")
+                out.push_str(self.safe_symbol_text(trait_sym))
+                out.push_str(" for ")
+                out.push_str(type_name)
+                out.push_str("\n")
             else:
-                out = out ++ "  impl " ++ type_name ++ "\n"
+                out.push_str("  impl ")
+                out.push_str(type_name)
+                out.push_str("\n")
             continue
 
         if kind == NodeKind.NK_USE_DECL:
             let extra_start = self.ast.get_data0(decl)
             let path_count = self.ast.get_data1(decl)
-            out = out ++ "  use "
+            out.push_str("  use ")
             for pi in 0..path_count:
                 if pi > 0:
-                    out = out ++ "."
-                out = out ++ self.safe_symbol_text(self.ast.get_extra(extra_start + pi))
-            out = out ++ "\n"
+                    out.push_str(".")
+                out.push_str(self.safe_symbol_text(self.ast.get_extra(extra_start + pi)))
+            out.push_str("\n")
             continue
 
         if kind == NodeKind.NK_C_IMPORT:
-            out = out ++ "  c_import \"" ++ self.safe_symbol_text(self.ast.get_data0(decl)) ++ "\"\n"
+            out.push_str("  c_import \"")
+            out.push_str(self.safe_symbol_text(self.ast.get_data0(decl)))
+            out.push_str("\"\n")
             continue
 
         if kind == NodeKind.NK_POISONED_DECL:
-            out = out ++ "  <poisoned>\n"
+            out.push_str("  <poisoned>\n")
 
-    out
+    out.to_str()
 
 fn Sema.emit_typed_module(self: Sema, requested_limit: i32):
     self.reset_typed_dump_safety()

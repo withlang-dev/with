@@ -285,7 +285,7 @@ fn ci_set_include_paths(paths: Vec[str]):
         with_cimport_add_include_path(paths.get(i as i64))
 
 fn ci_build_define_prefix(defines: Vec[str]) -> str:
-    var out = ""
+    var out = StringBuilder.new()
     for i in 0..defines.len() as i32:
         let define = defines.get(i as i64)
         if define.len() > 0:
@@ -294,8 +294,10 @@ fn ci_build_define_prefix(defines: Vec[str]) -> str:
                 if define.byte_at(di as i64) == 61:
                     rendered = define.slice(0, di as i64) ++ " " ++ define.slice((di + 1) as i64, define.len())
                     break
-            out = out ++ "#define " ++ rendered ++ "\n"
-    out
+            out.push_str("#define ")
+            out.push_str(rendered)
+            out.push_str("\n")
+    out.to_str()
 
 fn c_import_last_error_clear():
     g_cimport_last_error = ""
@@ -432,27 +434,27 @@ fn process_c_import_with_defines(header_spec: str, defines: Vec[str]) -> str:
         with_cimport_dispose(session)
         return ""
 
-    var output = ""
+    var output = StringBuilder.new()
     let count = with_cimport_decl_count(session)
 
     // Emit c_void opaque type for void pointer translation
     if with_cimport_is_name_emitted("c_void") == 0:
-        output = "type c_void = opaque\n"
+        output.push_str("type c_void = opaque\n")
         with_cimport_mark_name_emitted("c_void")
 
     // Emit platform-specific C type aliases (matching Zig's c_int, c_long, etc.)
     if with_cimport_is_name_emitted("c_char") == 0:
         // arm64 macOS: char=signed, int=32, long=64, short=16
-        output = output ++ "type c_char = i8\n"
-        output = output ++ "type c_short = i16\n"
-        output = output ++ "type c_ushort = u16\n"
-        output = output ++ "type c_int = i32\n"
-        output = output ++ "type c_uint = u32\n"
-        output = output ++ "type c_long = i64\n"
-        output = output ++ "type c_ulong = u64\n"
-        output = output ++ "type c_longlong = i64\n"
-        output = output ++ "type c_ulonglong = u64\n"
-        output = output ++ "type c_longdouble = f64\n"
+        output.push_str("type c_char = i8\n")
+        output.push_str("type c_short = i16\n")
+        output.push_str("type c_ushort = u16\n")
+        output.push_str("type c_int = i32\n")
+        output.push_str("type c_uint = u32\n")
+        output.push_str("type c_long = i64\n")
+        output.push_str("type c_ulong = u64\n")
+        output.push_str("type c_longlong = i64\n")
+        output.push_str("type c_ulonglong = u64\n")
+        output.push_str("type c_longdouble = f64\n")
         with_cimport_mark_name_emitted("c_char")
         with_cimport_mark_name_emitted("c_short")
         with_cimport_mark_name_emitted("c_ushort")
@@ -466,24 +468,24 @@ fn process_c_import_with_defines(header_spec: str, defines: Vec[str]) -> str:
 
     // Emit Complex32/Complex64 for _Complex float/double
     if with_cimport_is_name_emitted("Complex32") == 0:
-        output = output ++ "type Complex32 \{ real: f32, imag: f32 }\n"
-        output = output ++ "type Complex64 \{ real: f64, imag: f64 }\n"
+        output.push_str("type Complex32 \{ real: f32, imag: f32 }\n")
+        output.push_str("type Complex64 \{ real: f64, imag: f64 }\n")
         with_cimport_mark_name_emitted("Complex32")
         with_cimport_mark_name_emitted("Complex64")
 
     // Emit runtime wrappers for __builtin_* bit manipulation
     if with_cimport_is_name_emitted("with_clz") == 0:
-        output = output ++ "extern fn with_clz(x: i32) -> i32\n"
-        output = output ++ "extern fn with_ctz(x: i32) -> i32\n"
-        output = output ++ "extern fn with_popcount(x: i32) -> i32\n"
-        output = output ++ "extern fn with_bswap16(x: u16) -> u16\n"
-        output = output ++ "extern fn with_bswap32(x: u32) -> u32\n"
-        output = output ++ "extern fn with_bswap64(x: u64) -> u64\n"
-        output = output ++ "extern fn with_clzl(x: i64) -> i32\n"
-        output = output ++ "extern fn with_clzll(x: i64) -> i32\n"
-        output = output ++ "extern fn with_ctzl(x: i64) -> i32\n"
-        output = output ++ "extern fn with_ctzll(x: i64) -> i32\n"
-        output = output ++ "extern fn with_abs(x: i32) -> i32\n"
+        output.push_str("extern fn with_clz(x: i32) -> i32\n")
+        output.push_str("extern fn with_ctz(x: i32) -> i32\n")
+        output.push_str("extern fn with_popcount(x: i32) -> i32\n")
+        output.push_str("extern fn with_bswap16(x: u16) -> u16\n")
+        output.push_str("extern fn with_bswap32(x: u32) -> u32\n")
+        output.push_str("extern fn with_bswap64(x: u64) -> u64\n")
+        output.push_str("extern fn with_clzl(x: i64) -> i32\n")
+        output.push_str("extern fn with_clzll(x: i64) -> i32\n")
+        output.push_str("extern fn with_ctzl(x: i64) -> i32\n")
+        output.push_str("extern fn with_ctzll(x: i64) -> i32\n")
+        output.push_str("extern fn with_abs(x: i32) -> i32\n")
         with_cimport_mark_name_emitted("with_clz")
         with_cimport_mark_name_emitted("with_ctz")
         with_cimport_mark_name_emitted("with_popcount")
@@ -497,16 +499,16 @@ fn process_c_import_with_defines(header_spec: str, defines: Vec[str]) -> str:
         with_cimport_mark_name_emitted("with_abs")
 
     if with_cimport_is_name_emitted("with_alloc") == 0:
-        output = output ++ "extern fn with_alloc(size: i64) -> *mut u8\n"
-        output = output ++ "extern fn with_alloc_zeroed(count: i64, size: i64) -> *mut u8\n"
-        output = output ++ "extern fn with_realloc(ptr: *mut u8, old_size: i64, new_size: i64) -> *mut u8\n"
-        output = output ++ "extern fn with_free(ptr: *mut u8) -> void\n"
+        output.push_str("extern fn with_alloc(size: i64) -> *mut u8\n")
+        output.push_str("extern fn with_alloc_zeroed(count: i64, size: i64) -> *mut u8\n")
+        output.push_str("extern fn with_realloc(ptr: *mut u8, old_size: i64, new_size: i64) -> *mut u8\n")
+        output.push_str("extern fn with_free(ptr: *mut u8) -> void\n")
         with_cimport_mark_name_emitted("with_alloc")
         with_cimport_mark_name_emitted("with_alloc_zeroed")
         with_cimport_mark_name_emitted("with_realloc")
         with_cimport_mark_name_emitted("with_free")
 
-    output = output ++ ci_render_missing_pointer_opaques(session, count)
+    output.push_str(ci_render_missing_pointer_opaques(session, count))
 
     // Pre-scan: collect extern var names for macro reference detection
     var extern_vars = ""
@@ -540,10 +542,10 @@ fn process_c_import_with_defines(header_spec: str, defines: Vec[str]) -> str:
     while i < count:
         let kind = with_cimport_decl_kind(session, i)
         if kind == CK_FUNCTION:
-            output = output ++ ci_translate_function(session, i, translated_structs)
+            output.push_str(ci_translate_function(session, i, translated_structs))
         else if kind == CK_STRUCT or kind == CK_UNION:
             let struct_result = ci_translate_struct(session, i, kind == CK_UNION, translated_structs, demoted_types, count)
-            output = output ++ struct_result
+            output.push_str(struct_result)
             // Track struct name for typedef resolution (only if actually translated)
             if struct_result.len() > 0:
                 let sname = with_cimport_decl_name(session, i)
@@ -554,14 +556,14 @@ fn process_c_import_with_defines(header_spec: str, defines: Vec[str]) -> str:
                         let alias_name = "struct_" ++ sname
                         if with_cimport_is_name_emitted(alias_name) == 0:
                             with_cimport_mark_name_emitted(alias_name)
-                            output = output ++ "type " ++ alias_name ++ " = " ++ ci_escape_reserved(sname) ++ "\n"
+                            output.push_str("type " ++ alias_name ++ " = " ++ ci_escape_reserved(sname) ++ "\n")
         else if kind == CK_ENUM:
-            output = output ++ ci_translate_enum(session, i)
+            output.push_str(ci_translate_enum(session, i))
         else if kind == CK_VAR:
-            output = output ++ ci_translate_var(session, i, translated_structs)
+            output.push_str(ci_translate_var(session, i, translated_structs))
         else if kind == CK_TYPEDEF:
             let td_result = ci_translate_typedef(session, i, count)
-            output = output ++ td_result
+            output.push_str(td_result)
             // Track typedef name if it aliases a translated struct
             if td_result.len() > 0:
                 let td_name = with_cimport_decl_name(session, i)
@@ -570,15 +572,15 @@ fn process_c_import_with_defines(header_spec: str, defines: Vec[str]) -> str:
         else if kind == CK_STATIC_ASSERT:
             let sa_name = with_cimport_decl_name(session, i)
             if sa_name.len() > 0:
-                output = output ++ "// static_assert: " ++ sa_name ++ "\n"
+                output.push_str("// static_assert: " ++ sa_name ++ "\n")
         i = i + 1
 
     // Member function detection (Zig-style): attach C functions whose first
     // parameter is *StructType as methods of that struct.
-    output = output ++ ci_detect_member_functions(session, count, translated_structs)
+    output.push_str(ci_detect_member_functions(session, count, translated_structs))
     // Extract macros using a separate preprocessor pass
     if macro_session != 0:
-        output = output ++ ci_translate_macros(macro_session, session, extern_vars, include_text)
+        output.push_str(ci_translate_macros(macro_session, session, extern_vars, include_text))
         with_cimport_dispose_macros(macro_session)
     with_cimport_dispose(session)
     g_macro_type_names = ""
@@ -586,7 +588,7 @@ fn process_c_import_with_defines(header_spec: str, defines: Vec[str]) -> str:
     g_migrate_macro_values = ""
     g_migrate_macro_miss_names = Vec.new()
 
-    output
+    output.to_str()
 
 // Mark all declaration names from cached text as emitted in the global dedup table.
 // This ensures that fs-cached c_import results don't conflict with subsequent c_imports.
