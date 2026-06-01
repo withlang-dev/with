@@ -3162,6 +3162,115 @@ fn Sema.cmp_normalize_str_ref(self: Sema, ty: i32) -> i32:
             return inner
     ty
 
+fn Sema.membership_rhs_uses_special_lowering(self: Sema, rhs_node: i32, rhs_ty: i32) -> i32:
+    let rhs_kind = self.ast.kind(rhs_node)
+    if rhs_kind == NodeKind.NK_RANGE or rhs_kind == NodeKind.NK_ARRAY_LIT:
+        return 1
+    if rhs_ty == 0:
+        return 0
+    let resolved = self.resolve_alias(rhs_ty as TypeId)
+    let kind = self.get_type_kind(resolved)
+    if kind == TypeKind.TY_RANGE or kind == TypeKind.TY_ARRAY or kind == TypeKind.TY_STR:
+        return 1
+    0
+
+fn Sema.membership_has_contains(self: Sema, rhs_ty: i32, contains_sym: i32) -> i32:
+    if rhs_ty == 0 or contains_sym == 0:
+        return 0
+    let recv_type = self.auto_deref_ref_ptr_type(rhs_ty as TypeId) as i32
+    let owner_sym = self.method_owner_symbol_for_type(recv_type)
+    if owner_sym != 0:
+        if self.lookup_generic_method_fn(owner_sym, contains_sym) != 0:
+            return 1
+        if self.lookup_method_sig(owner_sym, contains_sym) >= 0:
+            return 1
+        if self.get_type_kind(self.resolve_alias(recv_type as TypeId)) == TypeKind.TY_GENERIC_INST:
+            if self.pipeline_generic_builtin_method_exists(owner_sym, contains_sym) != 0:
+                return 1
+    if self.builtin_intrinsic_method_return_type(recv_type, owner_sym, contains_sym) != 0:
+        return 1
+    0
+
+fn Sema.membership_contains_trait_arg_type(self: Sema, rhs_ty: i32, contains_trait_sym: i32) -> i32:
+    if rhs_ty == 0 or contains_trait_sym == 0:
+        return 0
+    let recv_type = self.auto_deref_ref_ptr_type(rhs_ty as TypeId) as i32
+    let owner_sym = self.method_owner_symbol_for_type(recv_type)
+    if owner_sym == 0:
+        return 0
+    for di in 0..self.ast.decl_count():
+        let decl = self.ast.get_decl(di)
+        if self.ast.kind(decl) != NodeKind.NK_IMPL_DECL:
+            continue
+        if self.ast.get_data0(decl) != owner_sym or self.ast.get_data2(decl) != contains_trait_sym:
+            continue
+        let tta_idx = self.ast.find_impl_trait_type_args(decl as NodeId)
+        if tta_idx < 0:
+            return 0
+        let arg_start = self.ast.state.impl_trait_type_args.get((tta_idx + 1) as i64)
+        let arg_count = self.ast.state.impl_trait_type_args.get((tta_idx + 2) as i64)
+        if arg_count <= 0:
+            return 0
+        return self.resolve_type_expr(self.ast.get_extra(arg_start)) as i32
+    0
+
+fn Sema.validate_membership_contains_signature(self: Sema, node: i32, lhs_node: i32, lhs_ty: i32, rhs_ty: i32, contains_sym: i32, contains_trait_sym: i32) -> i32:
+    let recv_type = self.auto_deref_ref_ptr_type(rhs_ty as TypeId) as i32
+    let owner_sym = self.method_owner_symbol_for_type(recv_type)
+    if owner_sym == 0:
+        return 1
+    let sig_idx = self.lookup_method_sig(owner_sym, contains_sym)
+    let trait_arg_ty = self.membership_contains_trait_arg_type(rhs_ty, contains_trait_sym)
+    if trait_arg_ty != 0 and self.call_arg_type_compatible(trait_arg_ty, lhs_ty) == 0:
+        let trait_method_name = self.pool_resolve(owner_sym) ++ ".contains"
+        let trait_fn_sym = self.lookup_method_fn(owner_sym, contains_sym)
+        self.emit_argument_type_mismatch(trait_method_name, trait_fn_sym, 0, 1, trait_arg_ty, lhs_ty, lhs_node)
+        return 0
+    if sig_idx < 0:
+        return 1
+    let method_name = self.pool_resolve(owner_sym) ++ ".contains"
+    let fn_sym = self.lookup_method_fn(owner_sym, contains_sym)
+    if self.sig_get_param_count(sig_idx) != 2:
+        self.emit_error("Contains.contains used by `in` must take exactly one value parameter", node)
+        return 0
+    let recv_expected = self.sig_param_type(sig_idx, 0)
+    if recv_expected != 0 and self.call_arg_type_compatible(recv_expected, rhs_ty) == 0:
+        self.emit_argument_type_mismatch(method_name, fn_sym, 0, 0, recv_expected, rhs_ty, node)
+        return 0
+    let value_expected = self.sig_param_type(sig_idx, 1)
+    if value_expected != 0 and self.call_arg_type_compatible(value_expected, lhs_ty) == 0:
+        self.emit_argument_type_mismatch(method_name, fn_sym, 0, 1, value_expected, lhs_ty, lhs_node)
+        return 0
+    let ret = self.sig_return_type(sig_idx)
+    if self.types_compatible(self.ty_bool as i32, ret) == 0:
+        self.emit_error("Contains.contains used by `in` must return bool", node)
+        return 0
+    1
+
+fn Sema.check_membership_operator(self: Sema, node: i32, lhs_node: i32, rhs_node: i32, lhs_ty: i32, rhs_ty: i32) -> i32:
+    if self.membership_rhs_uses_special_lowering(rhs_node, rhs_ty) != 0:
+        self.typed_expr_types.insert(node, self.ty_bool as i32)
+        return self.ty_bool as i32
+    let contains_sym = self.syms.contains
+    let contains_trait_sym = self.pool_intern("Contains")
+    if self.membership_has_contains(rhs_ty, contains_sym) == 0:
+        self.emit_error("type '" ++ self.type_name(rhs_ty) ++ "' does not implement Contains[" ++ self.type_name(lhs_ty) ++ "] for `in`", node)
+        return 0
+    if self.validate_membership_contains_signature(node, lhs_node, lhs_ty, rhs_ty, contains_sym, contains_trait_sym) == 0:
+        return 0
+    let arg_idx = self.ast.find_membership_arg(node)
+    if arg_idx < 0:
+        self.emit_error("malformed `in` expression: missing membership argument", node)
+        return 0
+    let ret = self.check_method_call_parts(rhs_node, contains_sym, arg_idx, 1, node)
+    if ret == 0:
+        return 0
+    if self.types_compatible(self.ty_bool as i32, ret) == 0:
+        self.emit_error("Contains.contains used by `in` must return bool", node)
+        return 0
+    self.typed_expr_types.insert(node, self.ty_bool as i32)
+    self.ty_bool as i32
+
 fn Sema.check_binary(self: Sema, node: i32) -> i32:
     let op = self.ast.get_data0(node)
     let lhs_node = self.ast.get_data1(node)
@@ -3241,37 +3350,39 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
     if lhs == 0 or rhs == 0:
         return 0
 
+    if op == BinaryOp.OP_IN or op == BinaryOp.OP_NOT_IN:
+        return self.check_membership_operator(node, lhs_node, rhs_node, lhs as i32, rhs as i32)
+
     // Comparison operators return bool
-    if op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ or op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE or op == BinaryOp.OP_IN or op == BinaryOp.OP_NOT_IN:
+    if op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ or op == BinaryOp.OP_LT or op == BinaryOp.OP_GT or op == BinaryOp.OP_LTE or op == BinaryOp.OP_GTE:
         let lhs_cmp_kind = self.get_type_kind(self.resolve_alias(self.cmp_normalize_str_ref(lhs) as TypeId))
         let rhs_cmp_kind = self.get_type_kind(self.resolve_alias(self.cmp_normalize_str_ref(rhs) as TypeId))
         if (lhs_cmp_kind == TypeKind.TY_PTR and rhs_cmp_kind == TypeKind.TY_ARRAY) or (lhs_cmp_kind == TypeKind.TY_ARRAY and rhs_cmp_kind == TypeKind.TY_PTR):
             self.emit_error("cannot compare pointer and array; use explicit &array[0]", node)
             return 0
-        if op != BinaryOp.OP_IN and op != BinaryOp.OP_NOT_IN:
-            let bool_int_cmp = (lhs_cmp_kind == TypeKind.TY_BOOL and rhs_cmp_kind == TypeKind.TY_INT) or (lhs_cmp_kind == TypeKind.TY_INT and rhs_cmp_kind == TypeKind.TY_BOOL)
-            let lhs_option_ptr = self.is_option_pointer_type(lhs as i32) != 0
-            let rhs_option_ptr = self.is_option_pointer_type(rhs as i32) != 0
-            let lhs_ptr_like = lhs_cmp_kind == TypeKind.TY_PTR or lhs_cmp_kind == TypeKind.TY_REF or lhs_cmp_kind == TypeKind.TY_FN or lhs_cmp_kind == TypeKind.TY_GENERIC_FN or lhs_option_ptr
-            let rhs_ptr_like = rhs_cmp_kind == TypeKind.TY_PTR or rhs_cmp_kind == TypeKind.TY_REF or rhs_cmp_kind == TypeKind.TY_FN or rhs_cmp_kind == TypeKind.TY_GENERIC_FN or rhs_option_ptr
-            let ptr_like_cmp = lhs_ptr_like and rhs_ptr_like
-            let ptr_zero_cmp = (lhs_ptr_like and rhs_cmp_kind == TypeKind.TY_INT and sema_node_is_zero_int_literal(self.ast, rhs_node)) or (rhs_ptr_like and lhs_cmp_kind == TypeKind.TY_INT and sema_node_is_zero_int_literal(self.ast, lhs_node))
-            let lhs_none = (self.ast.kind(lhs_node) == NodeKind.NK_VARIANT_SHORTHAND or self.ast.kind(lhs_node) == NodeKind.NK_IDENT) and self.ast.get_data0(lhs_node) == self.syms.none
-            let rhs_none = (self.ast.kind(rhs_node) == NodeKind.NK_VARIANT_SHORTHAND or self.ast.kind(rhs_node) == NodeKind.NK_IDENT) and self.ast.get_data0(rhs_node) == self.syms.none
-            let ptr_none_cmp = ((lhs_cmp_kind == TypeKind.TY_PTR or lhs_option_ptr) and rhs_none) or ((rhs_cmp_kind == TypeKind.TY_PTR or rhs_option_ptr) and lhs_none)
-            if lhs_ptr_like != rhs_ptr_like and ptr_zero_cmp == 0 and ptr_none_cmp == 0:
-                self.emit_error("comparison operands must have compatible types", node)
+        let bool_int_cmp = (lhs_cmp_kind == TypeKind.TY_BOOL and rhs_cmp_kind == TypeKind.TY_INT) or (lhs_cmp_kind == TypeKind.TY_INT and rhs_cmp_kind == TypeKind.TY_BOOL)
+        let lhs_option_ptr = self.is_option_pointer_type(lhs as i32) != 0
+        let rhs_option_ptr = self.is_option_pointer_type(rhs as i32) != 0
+        let lhs_ptr_like = lhs_cmp_kind == TypeKind.TY_PTR or lhs_cmp_kind == TypeKind.TY_REF or lhs_cmp_kind == TypeKind.TY_FN or lhs_cmp_kind == TypeKind.TY_GENERIC_FN or lhs_option_ptr
+        let rhs_ptr_like = rhs_cmp_kind == TypeKind.TY_PTR or rhs_cmp_kind == TypeKind.TY_REF or rhs_cmp_kind == TypeKind.TY_FN or rhs_cmp_kind == TypeKind.TY_GENERIC_FN or rhs_option_ptr
+        let ptr_like_cmp = lhs_ptr_like and rhs_ptr_like
+        let ptr_zero_cmp = (lhs_ptr_like and rhs_cmp_kind == TypeKind.TY_INT and sema_node_is_zero_int_literal(self.ast, rhs_node)) or (rhs_ptr_like and lhs_cmp_kind == TypeKind.TY_INT and sema_node_is_zero_int_literal(self.ast, lhs_node))
+        let lhs_none = (self.ast.kind(lhs_node) == NodeKind.NK_VARIANT_SHORTHAND or self.ast.kind(lhs_node) == NodeKind.NK_IDENT) and self.ast.get_data0(lhs_node) == self.syms.none
+        let rhs_none = (self.ast.kind(rhs_node) == NodeKind.NK_VARIANT_SHORTHAND or self.ast.kind(rhs_node) == NodeKind.NK_IDENT) and self.ast.get_data0(rhs_node) == self.syms.none
+        let ptr_none_cmp = ((lhs_cmp_kind == TypeKind.TY_PTR or lhs_option_ptr) and rhs_none) or ((rhs_cmp_kind == TypeKind.TY_PTR or rhs_option_ptr) and lhs_none)
+        if lhs_ptr_like != rhs_ptr_like and ptr_zero_cmp == 0 and ptr_none_cmp == 0:
+            self.emit_error("comparison operands must have compatible types", node)
+            return 0
+        if bool_int_cmp == 0 and ptr_like_cmp == 0 and ptr_zero_cmp == 0 and ptr_none_cmp == 0 and (lhs_ptr_like or rhs_ptr_like) and self.builtin_arg_type_compatible(lhs, rhs) == 0 and self.builtin_arg_type_compatible(rhs, lhs) == 0:
+            self.emit_error("comparison operands must have compatible types", node)
+            return 0
+        let cmp_method_sym = self.pool_intern(sema_operator_method_name(op))
+        let has_cmp_method = self.type_has_operator_method(lhs as i32, cmp_method_sym) != 0 or self.type_has_operator_method(rhs as i32, cmp_method_sym) != 0
+        if has_cmp_method != 0:
+            let cmp_ret = self.check_binary_operator_method(node, op, lhs as i32, rhs as i32)
+            if cmp_ret == 0:
                 return 0
-            if bool_int_cmp == 0 and ptr_like_cmp == 0 and ptr_zero_cmp == 0 and ptr_none_cmp == 0 and (lhs_ptr_like or rhs_ptr_like) and self.builtin_arg_type_compatible(lhs, rhs) == 0 and self.builtin_arg_type_compatible(rhs, lhs) == 0:
-                self.emit_error("comparison operands must have compatible types", node)
-                return 0
-            let cmp_method_sym = self.pool_intern(sema_operator_method_name(op))
-            let has_cmp_method = self.type_has_operator_method(lhs as i32, cmp_method_sym) != 0 or self.type_has_operator_method(rhs as i32, cmp_method_sym) != 0
-            if has_cmp_method != 0:
-                let cmp_ret = self.check_binary_operator_method(node, op, lhs as i32, rhs as i32)
-                if cmp_ret == 0:
-                    return 0
-                return cmp_ret
+            return cmp_ret
         return self.ty_bool as i32
 
     // Logical operators

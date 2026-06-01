@@ -52,6 +52,11 @@ pub trait Iter[T] =
 pub trait IntoIter[T] =
     fn iter(self) -> VecIter[T]
 
+/// Membership test. Implement to enable `x in collection` and
+/// `x not in collection`.
+pub trait Contains[T] =
+    fn contains(self: &Self, value: &T) -> bool
+
 // IntoIter for Vec — enables `for x in vec.iter()` via trait dispatch.
 // docs/mut.md Rev 8 §15.8 — `@[iter_of_self]` registers a SHARED borrow on
 // the receiver place root for the duration of the enclosing call, so a

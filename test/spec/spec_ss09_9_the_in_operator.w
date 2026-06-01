@@ -7,15 +7,15 @@
 //
 // Covered here (executable): array-literal membership, fixed-size array value
 // membership, `not in`, integer and char ranges, substring-in-string,
-// char-in-string, Vec / HashMap / HashSet membership, enum-variant-in-array,
-// compound conditions, the literal-array optimization's semantic equivalence,
-// and the distinction between a `for ... in` loop and a membership `in` test.
+// char-in-string, Vec / HashMap / HashSet membership, user-defined Contains
+// dispatch, enum-variant-in-array, compound conditions, the literal-array
+// optimization's semantic equivalence, and the distinction between a `for ...
+// in` loop and a membership `in` test.
 //
 // Deferred to follow-up issues (not yet implemented):
 //   - `in` patterns in match arms (`in [...]:`) and `@ in` range bindings
 //   - membership filters inside comprehensions / pipeline `filter`
-//   - user-defined `Contains[T]` trait dispatch
-//   - negative cases (`in` requires Contains; `in` is non-associative)
+//   - negative case: `in` is non-associative
 
 enum Color { Red | Green | Blue | Yellow }
 
@@ -85,6 +85,19 @@ fn test_hashset_membership:
     set.insert(20)
     assert(10 in set)
     assert(30 not in set)
+
+type Whitelist { allowed: HashSet[i32] }
+
+impl Contains[i32] for Whitelist =
+    fn contains(self: &Self, value: &i32) -> bool:
+        *value in self.allowed
+
+fn test_user_defined_contains_membership:
+    var wl = Whitelist { allowed: HashSet.new() }
+    wl.allowed.insert(1)
+    wl.allowed.insert(2)
+    assert(1 in wl)
+    assert(3 not in wl)
 
 // Enum variant shorthand inside an array literal.
 fn test_enum_variant_in_array:
