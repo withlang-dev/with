@@ -142,6 +142,7 @@ enum NodeKind: i32:
     NK_PAT_AT_BINDING = 112
     NK_PAT_SLICE = 113
     NK_PAT_TYPED_BIND = 114
+    NK_PAT_REST = 125
     NK_PAT_REGEX = 121
     NK_DO_WHILE = 122
 
@@ -1361,6 +1362,7 @@ fn ast_is_pattern_kind(kind: i32) -> bool:
     kind == NodeKind.NK_PAT_AT_BINDING or
     kind == NodeKind.NK_PAT_SLICE or
     kind == NodeKind.NK_PAT_TYPED_BIND or
+    kind == NodeKind.NK_PAT_REST or
     kind == NodeKind.NK_PAT_REGEX
 
 fn AstPool.is_pattern_node(self: AstPool, node: i32) -> bool:
@@ -1495,6 +1497,7 @@ fn AstPool.for_binding_is_pattern(self: AstPool, node: NodeId) -> bool:
 // NodeKind.NK_PAT_SLICE:     d0=extra_start, d1=head_count, d2=rest(sym,0=none)
 //                   extra: [has_rest(0/1), head_syms..., tail_count, tail_syms...]
 // NodeKind.NK_PAT_TYPED_BIND:  d0=binding(sym), d1=type(sym), d2=0
+// NodeKind.NK_PAT_REST:      d0=0, d1=0, d2=0
 // NodeKind.NK_MATCH_OP:     d0=lhs(str expr), d1=regex expr, d2=0
 // NodeKind.NK_NEG_MATCH_OP: d0=lhs(str expr), d1=regex expr, d2=0
 // NodeKind.NK_PAT_REGEX:    d0=pattern_sym, d1=flags_sym, d2=0

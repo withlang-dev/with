@@ -5522,6 +5522,10 @@ fn Parser.parse_pattern(self: Parser) -> NodeId:
     let end = self.current_end()
     let t = self.peek()
 
+    if t == TokenKind.TK_DOT_DOT:
+        self.advance()
+        return self.pool.add_node(NodeKind.NK_PAT_REST, start, self.prev_end(), 0, 0, 0)
+
     if t == TokenKind.TK_INT_LIT:
         let text = self.source.slice(start as i64, end as i64)
         self.advance()

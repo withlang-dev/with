@@ -4272,7 +4272,7 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
             if inner_pat == 0:
                 continue
             let inner_pk = self.ast.kind(inner_pat)
-            if inner_pk == NodeKind.NK_PAT_WILDCARD or inner_pk == NodeKind.NK_PAT_IDENT:
+            if inner_pk == NodeKind.NK_PAT_WILDCARD or inner_pk == NodeKind.NK_PAT_IDENT or inner_pk == NodeKind.NK_PAT_REST:
                 continue
             needs_payload_checks = true
             break
@@ -4293,7 +4293,7 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
             if inner_pat == 0:
                 continue
             let inner_pk = self.ast.kind(inner_pat)
-            if inner_pk == NodeKind.NK_PAT_WILDCARD or inner_pk == NodeKind.NK_PAT_IDENT:
+            if inner_pk == NodeKind.NK_PAT_WILDCARD or inner_pk == NodeKind.NK_PAT_IDENT or inner_pk == NodeKind.NK_PAT_REST:
                 continue
             let field_place = self.body.new_field_place(variant_place, bi, 0)
             let next_test_bb = self.new_block()
@@ -4505,8 +4505,10 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
         let variant_place = self.body.new_downcast_place(scrutinee_place, self.variant_index(variant_sym), 0)
         for bi in 0..bind_count:
             let raw = self.ast.get_extra(bind_start + bi)
-            let field_place = self.body.new_field_place(variant_place, bi, 0)
             let inner_pat = self.pattern_payload_node(pat_node, raw)
+            if inner_pat != 0 and self.ast.kind(inner_pat) == NodeKind.NK_PAT_REST:
+                continue
+            let field_place = self.body.new_field_place(variant_place, bi, 0)
             if inner_pat != 0:
                 let inner = self.lower_pattern(inner_pat, field_place)
                 for i in 0..inner.len() as i32:

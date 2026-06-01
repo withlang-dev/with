@@ -27,17 +27,33 @@ fn test_todo_compiles:
 enum DbError { NotFound(str, str) | Timeout }
 enum AppError { Db(DbError) | Auth(str) }
 
+// PASS: tuple-variant rest payload patterns.
+fn test_match_tuple_variant_rest:
+    let e = DbError.NotFound("users", "42")
+    var matched = false
+    match e:
+        .NotFound(..) => matched = true
+        _ => matched = false
+    assert(matched)
+
+// PASS: tuple-variant rest can follow explicit payload patterns.
+fn test_match_tuple_variant_prefix_rest:
+    let e = DbError.NotFound("users", "42")
+    var matched = false
+    match e:
+        .NotFound("users", ..) => matched = true
+        _ => matched = false
+    assert(matched)
+
 // PASS: assert_matches with an enum pattern.
 fn test_assert_matches_enum:
     let r: Result[i32, str] = Err("not found")
     assert_matches(r, Err(_))
 
 // PASS: assert_matches with a nested pattern.
-// NOTE: the spec writes `.Db(.NotFound(..))`; the `..` rest pattern in tuple
-// variants is tracked separately (#305), so explicit wildcards are used here.
 fn test_assert_matches_nested:
     let e = AppError.Db(DbError.NotFound("users", "42"))
-    assert_matches(e, .Db(.NotFound(_, _)))
+    assert_matches(e, .Db(.NotFound(..)))
 
 // PASS: assert_eq / assert_ne.
 fn test_assert_eq_ne:

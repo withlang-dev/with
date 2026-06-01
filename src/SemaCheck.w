@@ -5429,6 +5429,10 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
     if kind == NodeKind.NK_PAT_WILDCARD:
         return
 
+    if kind == NodeKind.NK_PAT_REST:
+        self.emit_error("rest pattern '..' is only valid inside a payload pattern list", node)
+        return
+
     if kind == NodeKind.NK_PAT_IDENT:
         let sym = self.ast.get_data0(node)
         self.scope_put(sym, subject_type, 0)
@@ -5533,6 +5537,31 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
         if resolved_kind == TypeKind.TY_GENERIC_INST and payload_count > 0:
             let gi_base = self.get_generic_inst_base(resolved)
             gi_payload_types = self.resolve_generic_enum_payload(resolved, gi_base, v_name, payload_count)
+        var rest_pos = -1
+        for bi in 0..bind_count:
+            let inner_pat = self.ast.get_extra(v_extra + bi)
+            if self.ast.kind(inner_pat) == NodeKind.NK_PAT_REST:
+                if rest_pos >= 0:
+                    self.emit_error("variant pattern can contain only one '..' rest pattern", inner_pat)
+                    return
+                rest_pos = bi
+        if rest_pos >= 0:
+            if rest_pos != bind_count - 1:
+                self.emit_error("variant '..' rest pattern must be last", self.ast.get_extra(v_extra + rest_pos))
+                return
+            if bind_count - 1 > payload_count:
+                let v_text = self.pool_resolve(v_name)
+                self.emit_error(f"variant pattern '{v_text}' expects {payload_count} payload pattern(s), found {bind_count - 1}", node)
+                return
+            for bi in 0..rest_pos:
+                let inner_pat = self.ast.get_extra(v_extra + bi)
+                var inner_ty = if bi < payload_count: self.type_extra.get((payload_start + bi) as i64) else: 0
+                if bi < gi_payload_types.len() as i32:
+                    let gi_ty = gi_payload_types.get(bi as i64)
+                    if gi_ty != 0:
+                        inner_ty = gi_ty
+                self.check_pattern(inner_pat, inner_ty)
+            return
         var unit_elided_payload_pattern = 0
         if bind_count == 0 and payload_count == 1:
             var only_payload_ty = self.type_extra.get(payload_start as i64)
