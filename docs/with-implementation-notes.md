@@ -36,7 +36,6 @@ Source → Lexer → Parser → AST
     → Suspend-Safety Check (@[no_await_guard] NLL liveness, extern callback)
     → Denied-Pattern Check (unused Task, unnecessary unsafe,
           unreachable code, implicit narrowing)
-    → Lint Warnings (unused Result/@[must_use], configurable severity)
     → MIR Lowering (desugaring: with-blocks, generators, pattern matching,
           defer, select await, closures, distinct types, tuples)
     → Optimization
@@ -1069,19 +1068,6 @@ error[E0701]: may_suspend call while `@[no_await_guard]` guard is live
    = help: call helper after guard drop, or refactor helper to be non-suspending
 ```
 
-**Unused Result:**
-```
-warning[W0802]: unused `Result` — error may be silently swallowed
-  --> src/main.w:8:5
-   |
- 8 |     db.execute("DROP TABLE users")
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Result[Unit, DbError] unused
-   |
-   = help: propagate with `?`, handle with match, or discard with
-           `let _ = ...`
-   = note: promote to error with `must_use = "error"` in with.toml
-```
-
 **Unused Task:**
 ```
 error[E0801]: unused `Task` will be cancelled on drop
@@ -1166,19 +1152,13 @@ all of the following unconditionally:
 |---------|------|----------|----------|
 | `.await` while `@[no_await_guard]` is live | E0701 | §20b.1 | Error |
 | `may_suspend` call while guard is live | E0701 | §20b.1 | Error |
-| Unused `Result` value | W0802 | §20b.2 | Warning (configurable) |
-| Unused `Task` value | E0801 | §20b.3 | Error |
-| Unnecessary `unsafe` block | E0901 | §20b.4 | Error |
-| Implicit numeric narrowing | E0201 | §20b.5 | Error |
-| Unreachable code | E0601 | §20b.6 | Error |
+| Unused `Task` value | E0801 | §20b.2 | Error |
+| Unnecessary `unsafe` block | E0901 | §20b.3 | Error |
+| Implicit numeric narrowing | E0201 | §20b.4 | Error |
+| Unreachable code | E0601 | §20b.5 | Error |
 
-Unused `Result` is a warning by default. Projects can promote it to
-an error via `with.toml`:
-
-```toml
-[lint]
-must_use = "error"
-```
+Unused `Result` and `Option` values are not diagnostics. Dropping them has no
+runtime effect, so requiring `let _ = expr` would only add ceremony.
 
 **Implementation order:** The denied-pattern checks run as a
 late pass after borrow checking and may-suspend analysis, since
@@ -1187,7 +1167,7 @@ data. The unreachable code check (E0601) runs after comptime
 evaluation — branches eliminated by `comptime if` are erased
 before the check.
 
-**`let _ = task` warning:** Per spec §20b.3, `let _ = ...` on a
+**`let _ = task` warning:** Per spec §20b.2, `let _ = ...` on a
 Task cancels immediately and should emit a warning (not error)
 suggesting `spawn` for fire-and-forget or `.await` for completion.
 
@@ -2379,7 +2359,7 @@ stack that may be shared with paused C frames.
 |-----------|-----------|--------|
 | `@[tailrec]` | Functions | Verify tail recursion; compile to loop |
 | `@[no_await_guard]` | Types | Reject `.await`/`may_suspend` while live |
-| `@[must_use]` | Types | Warn/error on unused values |
+| `@[must_use]` | Types | Require exhaustive statement-position matches and semantic discard checks such as unused `Task` |
 | `@[derive(...)]` | Types | Generate trait implementations (incl. Builder) |
 | `@[repr(C)]` | Types | C-compatible memory layout |
 | `@[c_export("name")]` | Functions | Export with C linkage |
