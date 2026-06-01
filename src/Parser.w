@@ -5392,6 +5392,15 @@ fn Parser.parse_match_arms(self: Parser) -> i32:
             let bind_ref = self.pool.add_node(NodeKind.NK_IDENT, arm_start, arm_start, bind_sym, 0, 0)
             in_guard_expr = self.pool.add_node(NodeKind.NK_BINARY, arm_start, self.prev_end(), BinaryOp.OP_IN, bind_ref, collection_expr)
             self.pool.set_membership_arg(in_guard_expr, self.pool.add_extra(bind_ref))
+        else if self.peek() == TokenKind.TK_IDENT and self.pos + 2 < self.tokens.len() and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_AT and self.tokens.get_tag(self.pos + 2) == TokenKind.TK_KW_IN:
+            let bind_sym2 = self.expect_ident()
+            self.expect(TokenKind.TK_AT)
+            self.expect(TokenKind.TK_KW_IN)
+            let collection_expr2 = self.parse_expr()
+            pattern = self.pool.add_node(NodeKind.NK_PAT_IDENT, arm_start, arm_start, bind_sym2, 0, 0)
+            let bind_ref2 = self.pool.add_node(NodeKind.NK_IDENT, arm_start, arm_start, bind_sym2, 0, 0)
+            in_guard_expr = self.pool.add_node(NodeKind.NK_BINARY, arm_start, self.prev_end(), BinaryOp.OP_IN, bind_ref2, collection_expr2)
+            self.pool.set_membership_arg(in_guard_expr, self.pool.add_extra(bind_ref2))
         else:
             pattern = self.parse_pattern()
 
@@ -5468,6 +5477,15 @@ fn Parser.parse_inline_match_arms(self: Parser) -> i32:
             let bind_ref = self.pool.add_node(NodeKind.NK_IDENT, arm_start, arm_start, bind_sym, 0, 0)
             in_guard_expr = self.pool.add_node(NodeKind.NK_BINARY, arm_start, self.prev_end(), BinaryOp.OP_IN, bind_ref, collection_expr)
             self.pool.set_membership_arg(in_guard_expr, self.pool.add_extra(bind_ref))
+        else if self.peek() == TokenKind.TK_IDENT and self.pos + 2 < self.tokens.len() and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_AT and self.tokens.get_tag(self.pos + 2) == TokenKind.TK_KW_IN:
+            let bind_sym2 = self.expect_ident()
+            self.expect(TokenKind.TK_AT)
+            self.expect(TokenKind.TK_KW_IN)
+            let collection_expr2 = self.parse_expr()
+            pattern = self.pool.add_node(NodeKind.NK_PAT_IDENT, arm_start, arm_start, bind_sym2, 0, 0)
+            let bind_ref2 = self.pool.add_node(NodeKind.NK_IDENT, arm_start, arm_start, bind_sym2, 0, 0)
+            in_guard_expr = self.pool.add_node(NodeKind.NK_BINARY, arm_start, self.prev_end(), BinaryOp.OP_IN, bind_ref2, collection_expr2)
+            self.pool.set_membership_arg(in_guard_expr, self.pool.add_extra(bind_ref2))
         else:
             pattern = self.parse_pattern()
         if self.peek() == TokenKind.TK_PIPE:
