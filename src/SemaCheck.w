@@ -130,6 +130,15 @@ fn sema_path_is_compiler_source_implementation(path: str) -> i32:
         return 1
     0
 
+fn sema_path_is_user_lint_source(path: str) -> i32:
+    if path.len() == 0:
+        return 1
+    if sema_path_is_std_implementation(path) != 0:
+        return 0
+    if sema_path_is_runtime_implementation(path) != 0:
+        return 0
+    1
+
 fn sema_extern_is_compiler_implementation(name: str, path: str) -> i32:
     if sema_path_is_std_implementation(path) != 0:
         return 1
@@ -4285,6 +4294,49 @@ fn Sema.check_return(self: Sema, node: i32) -> i32:
                     self.emit_error("return type mismatch", node)
     self.ty_never as i32
 
+fn Sema.expr_is_symbol_value(self: Sema, node: i32, sym: i32) -> i32:
+    if node == 0 or sym == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_IDENT:
+        return if self.ast.get_data0(node) == sym: 1 else: 0
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG:
+        return self.expr_is_symbol_value(self.ast.get_data0(node), sym)
+    0
+
+fn Sema.concat_expr_includes_symbol_value(self: Sema, node: i32, sym: i32) -> i32:
+    if self.expr_is_symbol_value(node, sym) != 0:
+        return 1
+    if node == 0 or sym == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG:
+        return self.concat_expr_includes_symbol_value(self.ast.get_data0(node), sym)
+    if kind == NodeKind.NK_BINARY and self.ast.get_data0(node) == BinaryOp.OP_CONCAT:
+        if self.concat_expr_includes_symbol_value(self.ast.get_data1(node), sym) != 0:
+            return 1
+        return self.concat_expr_includes_symbol_value(self.ast.get_data2(node), sym)
+    0
+
+fn Sema.warn_loop_string_concat_accumulation(self: Sema, node: i32, target: i32, value: i32, target_type: TypeId):
+    if self.loop_depth <= 0 or target == 0 or value == 0 or target_type == 0:
+        return
+    if sema_path_is_user_lint_source(self.current_module_path) == 0:
+        return
+    if self.ast.kind(target) != NodeKind.NK_IDENT:
+        return
+    if self.resolve_alias(target_type) != self.ty_str:
+        return
+    if self.ast.kind(value) == NodeKind.NK_GROUPED or self.ast.kind(value) == NodeKind.NK_CAST or self.ast.kind(value) == NodeKind.NK_COMPTIME or self.ast.kind(value) == NodeKind.NK_COPY_ARG or self.ast.kind(value) == NodeKind.NK_MOVE_ARG:
+        self.warn_loop_string_concat_accumulation(node, target, self.ast.get_data0(value), target_type)
+        return
+    if self.ast.kind(value) != NodeKind.NK_BINARY or self.ast.get_data0(value) != BinaryOp.OP_CONCAT:
+        return
+    let target_sym = self.ast.get_data0(target)
+    if self.concat_expr_includes_symbol_value(value, target_sym) == 0:
+        return
+    self.emit_warning("string concatenation with ++ inside a loop repeatedly copies the accumulator; use StringBuilder or collect pieces and concatenate once", node)
+
 fn Sema.check_assign(self: Sema, node: i32) -> i32:
     let target = self.ast.get_data0(node)
     let value = self.ast.get_data1(node)
@@ -4392,6 +4444,8 @@ fn Sema.check_assign(self: Sema, node: i32) -> i32:
         if self.types_compatible(target_type as i32, value_type as i32) == 0:
             if self.arithmetic_result_type(target_type, value_type) == 0:
                 self.emit_error("type mismatch in assignment", node)
+
+    self.warn_loop_string_concat_accumulation(node, target, value, target_type)
 
     // Move semantics
     self.mark_moved_if_consumed(value)
