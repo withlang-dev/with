@@ -1384,6 +1384,43 @@ fn Parser.queue_synthetic_copy_impl(self: Parser, type_name: i32, tp_start: i32,
         self.pool.add_impl_target_type_node(impl_node, target_node)
     self.pending_post_decls.push(impl_node as i32)
 
+fn Parser.pending_derive_contains(self: Parser, trait_sym: i32) -> i32:
+    for i in 0..self.pending_derive_count:
+        if self.pool.get_extra(self.pending_derive_start + i) == trait_sym:
+            return 1
+    0
+
+fn Parser.append_pending_derive_trait(self: Parser, trait_sym: i32):
+    if trait_sym == 0 or self.pending_derive_contains(trait_sym) != 0:
+        return
+    let new_start = self.pool.extra_len()
+    for i in 0..self.pending_derive_count:
+        self.pool.add_extra(self.pool.get_extra(self.pending_derive_start + i))
+    self.pool.add_extra(trait_sym)
+    self.pending_derive_start = new_start
+    self.pending_derive_count = self.pending_derive_count + 1
+
+fn Parser.parse_type_with_clause(self: Parser):
+    self.skip_newlines()
+    if self.peek() != TokenKind.TK_KW_WITH:
+        return
+    self.advance()
+    self.skip_newlines()
+    var found_trait = 0
+    while self.peek() != TokenKind.TK_EOF:
+        if self.peek() != TokenKind.TK_IDENT:
+            if found_trait == 0:
+                self.emit_error("expected trait name after 'with'")
+            return
+        self.append_pending_derive_trait(self.intern_current())
+        found_trait = 1
+        self.advance()
+        self.skip_newlines()
+        if self.peek() != TokenKind.TK_COMMA:
+            break
+        self.advance()
+        self.skip_newlines()
+
 fn Parser.parse_enum_decl(self: Parser, is_pub: i32, start: i32) -> NodeId:
     if self.expect(TokenKind.TK_KW_ENUM) == 0:
         return self.poisoned_expr()
@@ -1469,6 +1506,7 @@ fn Parser.parse_enum_named_decl(self: Parser, start: i32, name: i32, is_pub: i32
     return self.finish_type_decl(node)
 
 fn Parser.finish_type_decl(self: Parser, node: NodeId) -> NodeId:
+    self.parse_type_with_clause()
     if self.pending_derive_count > 0:
         self.pool.add_type_meta(node, self.pending_derive_start, self.pending_derive_count)
     self.pending_derive_start = 0
