@@ -106,14 +106,13 @@ fn test_local_let_type_annotation_storage:
     let ty_node = pool.get_extra(encoded - 1)
     assert(pool.kind(ty_node) == NodeKind.NK_TYPE_NAMED())
 
-fn test_compose_lowering:
-    let src = "fn f:\n    let add_one = x => x + 1\n    let double = x => x * 2\n    add_one >> double\n"
+fn test_shift_lowering:
+    let src = "fn f:\n    a >> b\n"
     let pool = parse_module(src)
     let decl = pool.get_decl(0)
     let body = pool.get_data1(decl)
-    assert(pool.kind(body) == NodeKind.NK_BLOCK())
-    let tail = pool.get_data2(body)
-    assert(pool.kind(tail) == NodeKind.NK_CLOSURE())
+    assert(pool.kind(body) == NodeKind.NK_BINARY())
+    assert(pool.get_data0(body) == BinaryOp.OP_SHR)
 
 fn test_type_expr_impl_for:
     let src = "fn f(x: impl Show for i32) -> dyn Show:\n    x\n"
@@ -231,17 +230,23 @@ fn test_chained_sugar_precedence_and_associativity:
     assert(pipe_pool.kind(pipe_pool.get_data0(pipe_lhs)) == NodeKind.NK_IDENT())
     assert(pipe_pool.kind(pipe_pool.get_data1(pipe_lhs)) == NodeKind.NK_IDENT())
 
-    let compose_src = "fn g:\n    a >> b >> c\n"
-    let compose_pool = parse_module(compose_src)
-    let compose_decl = compose_pool.get_decl(0)
-    let compose_body = compose_pool.get_data1(compose_decl)
-    assert(compose_pool.kind(compose_body) == NodeKind.NK_CLOSURE())
+    let shr_src = "fn g:\n    a >> b >> c\n"
+    let shr_pool = parse_module(shr_src)
+    let shr_decl = shr_pool.get_decl(0)
+    let shr_body = shr_pool.get_data1(shr_decl)
+    assert(shr_pool.kind(shr_body) == NodeKind.NK_BINARY())
+    assert(shr_pool.get_data0(shr_body) == BinaryOp.OP_SHR)
+    assert(shr_pool.kind(shr_pool.get_data1(shr_body)) == NodeKind.NK_BINARY())
+    assert(shr_pool.get_data0(shr_pool.get_data1(shr_body)) == BinaryOp.OP_SHR)
 
-    let rev_compose_src = "fn h:\n    a << b << c\n"
-    let rev_pool = parse_module(rev_compose_src)
-    let rev_decl = rev_pool.get_decl(0)
-    let rev_body = rev_pool.get_data1(rev_decl)
-    assert(rev_pool.kind(rev_body) == NodeKind.NK_CLOSURE())
+    let shl_src = "fn h:\n    a << b << c\n"
+    let shl_pool = parse_module(shl_src)
+    let shl_decl = shl_pool.get_decl(0)
+    let shl_body = shl_pool.get_data1(shl_decl)
+    assert(shl_pool.kind(shl_body) == NodeKind.NK_BINARY())
+    assert(shl_pool.get_data0(shl_body) == BinaryOp.OP_SHL)
+    assert(shl_pool.kind(shl_pool.get_data1(shl_body)) == NodeKind.NK_BINARY())
+    assert(shl_pool.get_data0(shl_pool.get_data1(shl_body)) == BinaryOp.OP_SHL)
 
     // ?? has higher precedence than pipeline.
     let mixed_src = "fn p:\n    a ?? b |> c\n"
@@ -297,7 +302,7 @@ fn main:
     test_callconv_metadata_unquotes_string_literal()
     test_type_param_layout()
     test_local_let_type_annotation_storage()
-    test_compose_lowering()
+    test_shift_lowering()
     test_type_expr_impl_for()
     test_type_expr_slice_alt()
     test_trait_layout_contains_assoc_and_methods()

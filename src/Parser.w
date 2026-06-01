@@ -2948,10 +2948,6 @@ fn Parser.parse_precedence(self: Parser, min_prec: i32) -> NodeId:
             lhs = self.pool.add_node(NodeKind.NK_NEG_MATCH_OP, self.pool.get_start(lhs), self.prev_end(), lhs, rhs, 0)
         else if op_code == 501:  // reverse pipeline
             lhs = self.pool.add_node(NodeKind.NK_PIPELINE, self.pool.get_start(lhs), self.prev_end(), rhs, lhs, 0)
-        else if op_code == 504:  // backward compose <<
-            lhs = self.build_composed_closure(lhs, rhs, 0)
-        else if op_code == 505:  // forward compose >>
-            lhs = self.build_composed_closure(lhs, rhs, 1)
         else if op_code == 502:  // range ..
             lhs = self.pool.add_node(NodeKind.NK_RANGE, self.pool.get_start(lhs), self.prev_end(), lhs, rhs, 0)
         else if op_code == 503:  // range ..=
@@ -4094,56 +4090,6 @@ fn Parser.parse_dot(self: Parser, lhs: i32) -> NodeId:
         return self.pool.add_node(NodeKind.NK_FIELD_ACCESS, self.pool.get_start(lhs), self.prev_end(), lhs, field, 0)
     let field = self.expect_ident_or_keyword()
     self.pool.add_node(NodeKind.NK_FIELD_ACCESS, self.pool.get_start(lhs), self.prev_end(), lhs, field, 0)
-
-fn Parser.build_composed_closure(self: Parser, lhs_fn: i32, rhs_fn: i32, is_forward: i32) -> NodeId:
-    let param_name = f"__pipe_arg_{self.pos}"
-    let param_sym = self.intern.intern(param_name)
-    let param_expr = self.pool.add_node(
-        NodeKind.NK_IDENT,
-        self.pool.get_start(lhs_fn),
-        self.pool.get_end(lhs_fn),
-        param_sym,
-        0,
-        0,
-    )
-
-    let first_callee = if is_forward != 0: lhs_fn else: rhs_fn
-    let second_callee = if is_forward != 0: rhs_fn else: lhs_fn
-
-    let first_args = self.pool.extra_len()
-    self.pool.add_extra(param_expr)
-    let first_call = self.pool.add_node(
-        NodeKind.NK_CALL,
-        self.pool.get_start(lhs_fn),
-        self.pool.get_end(rhs_fn),
-        first_callee,
-        first_args,
-        1,
-    )
-
-    let second_args = self.pool.extra_len()
-    self.pool.add_extra(first_call)
-    let second_call = self.pool.add_node(
-        NodeKind.NK_CALL,
-        self.pool.get_start(lhs_fn),
-        self.pool.get_end(rhs_fn),
-        second_callee,
-        second_args,
-        1,
-    )
-
-    // NodeKind.NK_CLOSURE expects [name, type] pairs.
-    let params_start = self.pool.extra_len()
-    self.pool.add_extra(param_sym)
-    self.pool.add_extra(0)
-    self.pool.add_node(
-        NodeKind.NK_CLOSURE,
-        self.pool.get_start(lhs_fn),
-        self.pool.get_end(second_call),
-        second_call,
-        params_start,
-        1,
-    )
 
 fn Parser.is_positional_struct_literal(self: Parser) -> i32:
     if self.peek() == TokenKind.TK_R_BRACE:
