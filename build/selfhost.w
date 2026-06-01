@@ -867,6 +867,24 @@ fn bs_check_unsafe_prefix_redundant_warning(ctx: ActionCtx, compiler_path: str, 
     if result.rc != 0: return result.rc
     bs_assert_contains(ctx, result.stderr, "warning: redundant unsafe prefix inside unsafe context", "unsafe_prefix_redundant_warning")
 
+fn bs_check_loop_string_concat_warning(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "loop_string_concat_warning.w")
+    let source =
+        "fn main:\n" ++
+        "    var acc = \"\"\n" ++
+        "    for i in 0..3:\n" ++
+        "        acc = acc ++ \"x\"\n" ++
+        "    let done = acc\n"
+    var rc = bs_write_fixture(ctx, src, source, "loop string concat warning source")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("check")
+    args |> push(bs_abs(root, src))
+    let result = bs_edge_expect_success(ctx, compiler_path, case_dir, "loop-string-concat-warning", args)
+    if result.rc != 0: return result.rc
+    bs_assert_contains(ctx, result.stderr, "warning: string concatenation with ++ inside a loop repeatedly copies the accumulator", "loop_string_concat_warning")
+
 fn bs_check_build_options_cli(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "hello_build_options.w")
@@ -1398,6 +1416,8 @@ pub fn run_cli_selfhost_edge_action(ctx: ActionCtx) -> i32:
     rc = bs_check_unit_tail_value_not_returned(ctx, compiler_path, bs_join(output_dir, "unit_tail_value_not_returned_case"))
     if rc != 0: return rc
     rc = bs_check_unsafe_prefix_redundant_warning(ctx, compiler_path, bs_join(output_dir, "unsafe_prefix_redundant_warning_case"))
+    if rc != 0: return rc
+    rc = bs_check_loop_string_concat_warning(ctx, compiler_path, bs_join(output_dir, "loop_string_concat_warning_case"))
     if rc != 0: return rc
     rc = bs_check_build_options_cli(ctx, compiler_path, bs_join(output_dir, "build_options_cli_case"))
     if rc != 0: return rc
