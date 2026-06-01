@@ -52,6 +52,7 @@ enum RvalueKind: i32:
     RK_CAST = 7
     RK_LEN = 8
     RK_ARRAY_FILL = 9
+    RK_STR_CONCAT_N = 10
 
 // ── Operand kinds ────────────────────────────────────────────────
 
@@ -1056,6 +1057,9 @@ fn mir_rvalue_text(body: MirBody, rval_id: i32, pool: InternPool, sema: Sema) ->
     if k == RvalueKind.RK_ARRAY_FILL:
         return f"array_fill({mir_operand_text(body, d0, pool, sema)}, count={d1})"
 
+    if k == RvalueKind.RK_STR_CONCAT_N:
+        return f"str_concat_n([{mir_call_args_text(body, d0, pool, sema)}])"
+
     return f"rvalue<{k}>({d0}, {d1}, {d2})"
 
 fn mir_operand_text(body: MirBody, operand_id: i32, pool: InternPool, sema: Sema) -> str:
@@ -1506,6 +1510,10 @@ fn validate_mir_body(body: MirBody) -> str:
         if rv_kind == RvalueKind.RK_ARRAY_FILL:
             if not mir_index_in_range(d0, operand_count):
                 return f"rvalue{ri}: array_fill operand out of range"
+            continue
+        if rv_kind == RvalueKind.RK_STR_CONCAT_N:
+            if not mir_index_in_range(d0, call_args_count):
+                return f"rvalue{ri}: str_concat_n args out of range"
             continue
 
         return f"rvalue{ri}: unknown rvalue kind {rv_kind}"

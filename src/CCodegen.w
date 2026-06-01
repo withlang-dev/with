@@ -1780,6 +1780,15 @@ fn CCodegen.rvalue_uses_local(self: CCodegen, body: MirBody, rval_id: i32, local
         if self.operand_uses_local(body, d1, local_id) != 0:
             return 1
         return self.operand_uses_local(body, d2, local_id)
+    if rk == RvalueKind.RK_STR_CONCAT_N:
+        if d0 < 0 or d0 >= body.call_arg_starts.len() as i32:
+            return 0
+        let start = body.call_arg_starts.get(d0 as i64)
+        let count = body.call_arg_counts.get(d0 as i64)
+        for i in 0..count:
+            if self.operand_uses_local(body, body.call_arg_operands.get((start + i) as i64), local_id) != 0:
+                return 1
+        return 0
     if rk == RvalueKind.RK_UN_OP:
         return self.operand_uses_local(body, d1, local_id)
     if rk == RvalueKind.RK_REF or rk == RvalueKind.RK_ADDR_OF or rk == RvalueKind.RK_DISCRIMINANT or rk == RvalueKind.RK_LEN:
@@ -1827,6 +1836,14 @@ fn CCodegen.local_value_use_mark_rvalue(self: CCodegen, body: MirBody, rval_id: 
     if rk == RvalueKind.RK_BIN_OP:
         self.local_value_use_mark_operand(body, d1)
         self.local_value_use_mark_operand(body, d2)
+        return
+    if rk == RvalueKind.RK_STR_CONCAT_N:
+        if d0 < 0 or d0 >= body.call_arg_starts.len() as i32:
+            return
+        let start = body.call_arg_starts.get(d0 as i64)
+        let count = body.call_arg_counts.get(d0 as i64)
+        for i in 0..count:
+            self.local_value_use_mark_operand(body, body.call_arg_operands.get((start + i) as i64))
         return
     if rk == RvalueKind.RK_UN_OP:
         self.local_value_use_mark_operand(body, d1)
@@ -2185,6 +2202,8 @@ fn CCodegen.rvalue_tid(self: CCodegen, body: MirBody, rval_id: i32) -> i32:
         return d1
     if rk == RvalueKind.RK_BIN_OP:
         return self.operand_tid(body, d1)
+    if rk == RvalueKind.RK_STR_CONCAT_N:
+        return self.sema.ty_str as i32
     if rk == RvalueKind.RK_UN_OP:
         return self.operand_tid(body, d1)
     0
@@ -2223,6 +2242,8 @@ fn CCodegen.rvalue_text(self: CCodegen, body: MirBody, rval_id: i32) -> str:
     if rk == RvalueKind.RK_ARRAY_FILL:
         self.fail("array fill rvalue requires an array assignment destination")
         return "0"
+    if rk == RvalueKind.RK_STR_CONCAT_N:
+        return self.str_concat_n_text(body, d0)
     if rk == RvalueKind.RK_BIN_OP:
         let lhs = self.operand_text(body, d1)
         let rhs = self.operand_text(body, d2)
@@ -2483,6 +2504,23 @@ fn CCodegen.call_arg_operand(self: CCodegen, body: MirBody, args_id: i32, idx: i
     if at < 0 or at >= body.call_arg_operands.len() as i32:
         return 0
     body.call_arg_operands.get(at as i64)
+
+fn CCodegen.str_concat_n_text(self: CCodegen, body: MirBody, args_id: i32) -> str:
+    if args_id < 0 or args_id >= body.call_arg_starts.len() as i32:
+        self.fail(f"invalid str_concat_n args id {args_id}")
+        return "WITH_STR_LIT(\"\")"
+    let start = body.call_arg_starts.get(args_id as i64)
+    let count = body.call_arg_counts.get(args_id as i64)
+    if count <= 0:
+        return "WITH_STR_LIT(\"\")"
+    if count == 1:
+        return self.operand_text(body, body.call_arg_operands.get(start as i64))
+    var out = "with_str_concat_n((const with_str[]){"
+    for i in 0..count:
+        if i > 0:
+            out = out ++ ", "
+        out = out ++ self.operand_text(body, body.call_arg_operands.get((start + i) as i64))
+    out ++ "}, " ++ with_i64_to_str(count as i64) ++ ")"
 
 fn CCodegen.local_assigned_fn_sym_depth(self: CCodegen, body: MirBody, local_id: i32, depth: i32) -> i32:
     if local_id < 0:
@@ -4397,6 +4435,8 @@ fn CCodegen.infer_local_tid_impl(self: CCodegen, body: MirBody, local_id: i32) -
                 if rt != 0 and self.is_void_tid(rt) == 0:
                     return rt
                 continue
+            if rk == RvalueKind.RK_STR_CONCAT_N:
+                return self.sema.ty_str as i32
             if rk == RvalueKind.RK_UN_OP:
                 if d0 == UnaryOp.UOP_NOT:
                     return self.sema.ty_bool as i32
@@ -5858,6 +5898,8 @@ fn CCodegen.rvalue_infer_tid(self: CCodegen, body: MirBody, rval_id: i32) -> i32
         if no_infer != 0:
             return self.operand_tid_no_infer(body, d2)
         return self.operand_tid(body, d2)
+    if rk == RvalueKind.RK_STR_CONCAT_N:
+        return self.sema.ty_str as i32
     if rk == RvalueKind.RK_UN_OP:
         if d0 == UnaryOp.UOP_NOT:
             return self.sema.ty_bool as i32
@@ -6064,6 +6106,8 @@ fn CCodegen.infer_struct_field_tid_from_usage(self: CCodegen, struct_tid: i32, f
                                 rv_tid = self.sema.ty_bool as i32
                             else if rd0 == BinaryOp.OP_CONCAT:
                                 rv_tid = self.sema.ty_str as i32
+                        else if rk == RvalueKind.RK_STR_CONCAT_N:
+                            rv_tid = self.sema.ty_str as i32
                         else if rk == RvalueKind.RK_UN_OP:
                             if rd0 == UnaryOp.UOP_NOT:
                                 rv_tid = self.sema.ty_bool as i32
@@ -7532,6 +7576,7 @@ fn CCodegen.emit_module(self: CCodegen) -> str:
     out.write("extern with_str with_str_clone(with_str);\n\n")
     out.write("#ifdef WITH_BOOTSTRAP_TYPES_H\n")
     out.write("extern with_str with_str_concat(with_str, with_str);\n")
+    out.write("extern with_str with_str_concat_n(const with_str*, int64_t);\n")
     out.write("extern int64_t with_str_len(with_str);\n")
     out.write("extern int32_t with_str_byte_at(with_str, int64_t);\n")
     out.write("extern int32_t with_str_contains_char(with_str, int32_t);\n")

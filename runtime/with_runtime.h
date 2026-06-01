@@ -21,6 +21,7 @@ typedef struct {
 #define with_is_empty(v) (((v).len == 0) ? 1 : 0)
 
 with_str with_str_concat(with_str a, with_str b);
+with_str with_str_concat_n(const with_str *parts, int64_t count);
 bool with_str_eq(with_str a, with_str b);
 with_str with_str_from_cstr(const char *s);
 with_str with_str_substr(with_str s, int64_t start, int64_t len);

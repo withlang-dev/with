@@ -1457,6 +1457,56 @@ fn Codegen.mir_str_concat(self: Codegen, lhs: i64, rhs: i64) -> i64:
     args.push(rhs_v)
     wl_build_call(self.builder, fn_type, func, vec_data_i64(&args), 2)
 
+fn Codegen.mir_str_concat_n(self: Codegen, body: MirBody, args_id: i32) -> i64:
+    let str_ty = self.resolve_named_type(self.intern.intern("str"))
+    if args_id < 0 or args_id >= body.call_arg_starts.len() as i32:
+        with_eprint("error: invalid MIR str_concat_n argument table")
+        self.had_error = 1
+        return wl_get_undef(str_ty)
+    let arg_start = body.call_arg_starts.get(args_id as i64)
+    let arg_count = body.call_arg_counts.get(args_id as i64)
+    if arg_count <= 0:
+        return self.gen_string_literal_raw("")
+    if arg_count == 1:
+        return self.mir_eval_operand(body, body.call_arg_operands.get(arg_start as i64), str_ty)
+
+    let arr_ty = wl_array_type(str_ty, arg_count as i64)
+    let arr_alloca = self.create_entry_alloca(arr_ty)
+    for i in 0..arg_count:
+        let op_id = body.call_arg_operands.get((arg_start + i) as i64)
+        let value = self.mir_eval_operand(body, op_id, str_ty)
+        let indices: Vec[i64] = Vec.new()
+        indices.push(wl_const_int(wl_i32_type(self.context), 0, 0))
+        indices.push(wl_const_int(wl_i32_type(self.context), i as i64, 0))
+        let slot = wl_build_gep(self.builder, arr_ty, arr_alloca, vec_data_i64(&indices), 2)
+        wl_build_store(self.builder, self.coerce_value_to_type(value, str_ty), slot)
+
+    let data_indices: Vec[i64] = Vec.new()
+    data_indices.push(wl_const_int(wl_i32_type(self.context), 0, 0))
+    data_indices.push(wl_const_int(wl_i32_type(self.context), 0, 0))
+    let parts_ptr = wl_build_gep(self.builder, arr_ty, arr_alloca, vec_data_i64(&data_indices), 2)
+
+    let concat_sym = self.intern.intern("with_str_concat_n")
+    let fv = self.fn_values.get(concat_sym)
+    let ft = self.fn_fn_types.get(concat_sym)
+    if fv.is_some() and ft.is_some():
+        let args: Vec[i64] = Vec.new()
+        args.push(parts_ptr)
+        args.push(wl_const_int(wl_i64_type(self.context), arg_count as i64, 0))
+        return wl_build_call(self.builder, ft.unwrap() as i64, fv.unwrap() as i64, vec_data_i64(&args), 2)
+
+    let param_types: Vec[i64] = Vec.new()
+    param_types.push(wl_ptr_type(self.context))
+    param_types.push(wl_i64_type(self.context))
+    let fn_type = wl_function_type(str_ty, vec_data_i64(&param_types), 2, 0)
+    let func = wl_add_function(self.llmod, "with_str_concat_n", fn_type)
+    self.fn_values.insert(concat_sym, func)
+    self.fn_fn_types.insert(concat_sym, fn_type)
+    let args: Vec[i64] = Vec.new()
+    args.push(parts_ptr)
+    args.push(wl_const_int(wl_i64_type(self.context), arg_count as i64, 0))
+    wl_build_call(self.builder, fn_type, func, vec_data_i64(&args), 2)
+
 fn Codegen.mir_display_resolved_type(self: Codegen, sema_ty: i32) -> i32:
     if sema_ty <= 0:
         return 0
@@ -2199,6 +2249,9 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
         if dest_ty != 0:
             return self.mir_coerce_value_to_sema_type(val, dest_ty, dest_sema_ty, self.mir_operand_is_unsigned(body, d0))
         return val
+
+    if rk == RvalueKind.RK_STR_CONCAT_N:
+        return self.mir_str_concat_n(body, d0)
 
     if rk == RvalueKind.RK_BIN_OP:
         let lhs = self.mir_eval_operand(body, d1, 0)
