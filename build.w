@@ -631,18 +631,26 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(behavior_tests)
 
     var native_compile_error_tests = target_new(.Test, "native-compile-error-tests", "test/compile_errors/*.w")
+    native_compile_error_tests = native_compile_error_tests.arg("compiler=out/bin/with")
+    native_compile_error_tests = native_compile_error_tests.dep("build")
     native_compile_error_tests = native_compile_error_tests.dep("selfcheck")
     out = out.add_target(native_compile_error_tests)
 
     var native_codegen_tests = target_new(.Test, "native-codegen-tests", "test/codegen/*.w")
+    native_codegen_tests = native_codegen_tests.arg("compiler=out/bin/with")
+    native_codegen_tests = native_codegen_tests.dep("build")
     native_codegen_tests = native_codegen_tests.dep("selfcheck")
     out = out.add_target(native_codegen_tests)
 
     var native_spec_tests = target_new(.Test, "native-spec-tests", "test/spec/*.w")
+    native_spec_tests = native_spec_tests.arg("compiler=out/bin/with")
+    native_spec_tests = native_spec_tests.dep("build")
     native_spec_tests = native_spec_tests.dep("selfcheck")
     out = out.add_target(native_spec_tests)
 
     var native_phase_tests = target_new(.Test, "native-phase-tests", "test/phase/*.w")
+    native_phase_tests = native_phase_tests.arg("compiler=out/bin/with")
+    native_phase_tests = native_phase_tests.dep("build")
     native_phase_tests = native_phase_tests.dep("selfcheck")
     out = out.add_target(native_phase_tests)
 
@@ -769,16 +777,23 @@ pub fn build(ctx: BuildCtx) -> Build:
     last_green = last_green.dep("test")
     out = out.add_target(last_green)
 
+    var require_last_green = target_new(.Action, "require-last-green", "").output("out/command/require-last-green/ok")
+    require_last_green.action = run_require_last_green_action
+    require_last_green = require_last_green.write_scope("out/command/require-last-green")
+    out = out.add_target(require_last_green)
+
     var check_committed = target_new(.Action, "check-committed-state", "").output("out/command/check-committed-state/ok")
     check_committed.action = run_check_committed_state_action
     check_committed = check_committed.write_scope("out/command/check-committed-state")
     out = out.add_target(check_committed)
 
-    var install_user = target_new(.Install, "install-user", "out/bin/with").output("$HOME/.local/bin/with")
-    install_user = install_user.input("out/bin/with")
+    var install_user = target_new(.Action, "install-user", "").output("out/command/install-user/ok")
+    install_user.action = run_install_verified_compiler_action
+    install_user = install_user.arg("out/bin/with")
+    install_user = install_user.arg("$HOME/.local/bin/with")
     install_user = install_user.arg("0755")
-    install_user = install_user.dep("last-green")
-    install_user = install_user.dep("check-committed-state")
+    install_user = install_user.write_scope("out/command/install-user")
+    install_user = install_user.dep("require-last-green")
     out = out.add_target(install_user)
 
     out = out.add_target(install_file_target("install-compiler", "out/bin/with-stage2", "$INSTALL_BINDIR/with", "0755", "stage2"))
@@ -843,11 +858,13 @@ pub fn build(ctx: BuildCtx) -> Build:
     deps = deps.arg(llvm_sdk_dir_basename())
     out = out.add_target(deps)
 
-    var update_seed = target_new(.Install, "update-seed", "out/bin/with").output("src/main")
-    update_seed = update_seed.input("out/bin/with")
+    var update_seed = target_new(.Action, "update-seed", "").output("src/main")
+    update_seed.action = run_install_verified_compiler_action
+    update_seed = update_seed.arg("out/bin/with")
+    update_seed = update_seed.arg("src/main")
     update_seed = update_seed.arg("0755")
-    update_seed = update_seed.dep("last-green")
-    update_seed = update_seed.dep("check-committed-state")
+    update_seed = update_seed.write_scope("src")
+    update_seed = update_seed.dep("require-last-green")
     out = out.add_target(update_seed)
 
     var clean = target_new(.Clean, "clean", "")
