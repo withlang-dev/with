@@ -807,6 +807,87 @@ fn ComptimeEvaluator.empty_vec_for_field(self: ComptimeEvaluator, owner_type: i3
     let field_type = self.sema.type_reflection_field_type(owner_type, field_index)
     comptime_value_vec(field_type, self.extra_values.len() as i32, 0)
 
+fn ComptimeEvaluator.unsupported_default_value(self: ComptimeEvaluator, type_id: i32, node: i32) -> ComptimeValue:
+    let _ = self.fail(node, "implicit default return for " ++ self.sema.type_name(type_id) ++ " is not comptime-evaluable yet")
+    comptime_value_invalid()
+
+fn ComptimeEvaluator.default_value_for_type(self: ComptimeEvaluator, type_id: i32, node: i32) -> ComptimeValue:
+    if type_id == 0:
+        return comptime_value_invalid()
+    let resolved = self.sema.resolve_alias(type_id as TypeId)
+    let kind = self.sema.get_type_kind(resolved)
+    if kind == TypeKind.TY_VOID:
+        return comptime_value_void(resolved as i32)
+    if kind == TypeKind.TY_INT:
+        return comptime_value_int(resolved as i32, 0)
+    if kind == TypeKind.TY_BOOL:
+        return comptime_value_bool(0)
+    if kind == TypeKind.TY_STR:
+        return comptime_value_str("")
+    if kind == TypeKind.TY_ENUM and self.sema.enum_repr_type(resolved as i32) != 0:
+        return comptime_value_int(resolved as i32, 0)
+    if kind == TypeKind.TY_ARRAY:
+        let elem_type = self.sema.get_type_d0(resolved)
+        let elem_count = self.sema.get_type_d1(resolved)
+        let start = self.extra_values.len() as i32
+        for _ in 0..elem_count:
+            let elem_value = self.default_value_for_type(elem_type, node)
+            if elem_value.kind == ComptimeValueKind.CV_INVALID:
+                return elem_value
+            self.extra_values.push(elem_value)
+        return comptime_value_array(resolved as i32, start, elem_count)
+    if kind == TypeKind.TY_TUPLE:
+        let elem_start = self.sema.get_type_d0(resolved)
+        let elem_count = self.sema.get_type_d1(resolved)
+        let start = self.extra_values.len() as i32
+        for i in 0..elem_count:
+            let elem_type = self.sema.type_extra.get((elem_start + i) as i64)
+            let elem_value = self.default_value_for_type(elem_type, node)
+            if elem_value.kind == ComptimeValueKind.CV_INVALID:
+                return elem_value
+            self.extra_values.push(elem_value)
+        return comptime_value_tuple(resolved as i32, start, elem_count)
+    if kind == TypeKind.TY_GENERIC_INST:
+        let base = self.sema.get_generic_inst_base(resolved as i32)
+        if base == self.sema.syms.option:
+            return comptime_value_enum(resolved as i32, self.sema.syms.none, self.extra_values.len() as i32, 0)
+        if base == self.sema.syms.vec:
+            return comptime_value_vec(resolved as i32, self.extra_values.len() as i32, 0)
+        if base == self.sema.syms.hashmap or base == self.sema.syms.hashset:
+            return comptime_value_map(resolved as i32, self.extra_values.len() as i32, 0)
+        let arg_count = self.sema.get_generic_inst_arg_count(resolved as i32)
+        if base == self.sema.syms.result and arg_count == 2:
+            let ok_type = self.sema.get_generic_inst_arg(resolved as i32, 0)
+            let ok_value = self.default_value_for_type(ok_type, node)
+            if ok_value.kind == ComptimeValueKind.CV_INVALID:
+                return ok_value
+            let start = self.extra_values.len() as i32
+            self.extra_values.push(ok_value)
+            return comptime_value_enum(resolved as i32, self.sema.syms.ok, start, 1)
+    self.unsupported_default_value(resolved as i32, node)
+
+fn ComptimeEvaluator.comptime_fn_return_type(self: ComptimeEvaluator, fn_sym: i32, tp_syms: Vec[i32], tp_tys: Vec[i32]) -> i32:
+    let sig_idx = self.sema.get_sig(fn_sym)
+    if sig_idx < 0:
+        return 0
+    let ret_type = self.sema.sig_return_type(sig_idx)
+    if tp_syms.len() as i32 == 0:
+        return ret_type
+    self.sema.substitute_type(ret_type, tp_syms, tp_tys, tp_syms.len() as i32)
+
+fn ComptimeEvaluator.apply_implicit_default_return(self: ComptimeEvaluator, fn_node: i32, ret_type: i32, signal: ComptimeControl) -> ComptimeControl:
+    if signal.kind == ComptimeControlKind.CTL_RETURN or signal.kind == ComptimeControlKind.CTL_VALUE:
+        if signal.value.kind == ComptimeValueKind.CV_VOID and ret_type != 0:
+            let resolved = self.sema.resolve_alias(ret_type as TypeId)
+            if self.sema.get_type_kind(resolved) != TypeKind.TY_VOID:
+                let default_value = self.default_value_for_type(ret_type, fn_node)
+                if default_value.kind == ComptimeValueKind.CV_INVALID:
+                    return comptime_control_error()
+                return comptime_control_value(default_value)
+    if signal.kind == ComptimeControlKind.CTL_RETURN:
+        return comptime_control_value(signal.value)
+    signal
+
 fn ComptimeEvaluator.eval_package_value(self: ComptimeEvaluator, record: ComptimeCapabilityRecord, node: i32) -> ComptimeValue:
     let package_type = self.named_type_id("Package", node)
     if package_type == 0:
@@ -4943,14 +5024,15 @@ fn ComptimeEvaluator.eval_fn_symbol_call_values_with_type_args(self: ComptimeEva
                         return self.fail(ppat, "comptime argument did not match parameter pattern")
 
     let body_signal = self.eval_expr(self.ast.get_data1(fn_node))
+    let ret_type = self.comptime_fn_return_type(fn_sym, tp_syms, tp_tys)
     self.pop_scope()
     self.active_fn_syms.pop()
     self.sema.local_file_id = saved_file
     self.sema.current_module_path = saved_path
     if has_generic_subst != 0:
         self.restore_generic_substitutions(generic_snapshot)
-    if body_signal.kind == ComptimeControlKind.CTL_RETURN:
-        return comptime_control_value(body_signal.value)
+    if body_signal.kind == ComptimeControlKind.CTL_RETURN or body_signal.kind == ComptimeControlKind.CTL_VALUE:
+        return self.apply_implicit_default_return(fn_node, ret_type, body_signal)
     if body_signal.kind == ComptimeControlKind.CTL_BREAK or body_signal.kind == ComptimeControlKind.CTL_CONTINUE:
         return self.fail(fn_node, "loop control escaped comptime function")
     body_signal
