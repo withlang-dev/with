@@ -297,6 +297,16 @@ fn bs_check_test_directives(ctx: ActionCtx, compiler_path: str, test_dir: str) -
     if good_result.rc != 0:
         return good_result.rc
 
+    let compile_error_src = bs_join(test_dir, "test_directives_compile_error.w")
+    if fs.write_text(compile_error_src, "//! expect-error: undefined variable\n\nfn main:\n    missing_name\n") != 0:
+        return bs_fail(ctx, "could not write " ++ compile_error_src)
+    let compile_error_result = bs_run_cli_expect_success(ctx, compiler_path, "test-directives-compile-error", bs_test_args(compile_error_src))
+    if compile_error_result.rc != 0:
+        return compile_error_result.rc
+    let compile_error_summary = bs_assert_contains(ctx, compile_error_result.stdout, "ok: 1 test passed in ", "test_compile_error_directives")
+    if compile_error_summary != 0:
+        return compile_error_summary
+
     let bad_stdout_src = bs_join(test_dir, "test_directives_bad_stdout.w")
     if fs.write_text(bad_stdout_src, "//! expect-stdout: missing\n\nfn main:\n    print(\"ok\")\n") != 0:
         return bs_fail(ctx, "could not write " ++ bad_stdout_src)
@@ -339,7 +349,9 @@ pub fn run_cli_selfhost_smoke_action(ctx: ActionCtx) -> i32:
         return help_rc
 
     let test_dir = bs_join(output_dir, "test-directives")
-    bs_check_test_directives(ctx, compiler_path, test_dir)
+    let directives_rc = bs_check_test_directives(ctx, compiler_path, test_dir)
+    if directives_rc != 0:
+        return directives_rc
 
 fn bs_one_liner_args(first: str, second: str) -> Vec[str]:
     let args: Vec[str] = Vec.new()

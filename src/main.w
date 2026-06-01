@@ -2065,6 +2065,11 @@ fn run_test_file_with_build_settings(target: str, opt_level: i32, no_std: bool, 
     let directives = parse_test_directives_for_target(target)
     let directive_rc = run_test_directive_command(target, directives, quiet)
     if directive_rc >= 0:
+        if not directives.skip:
+            if directive_rc == 0:
+                print_test_summary(target, 1, 0, quiet)
+            else:
+                print_test_summary(target, 0, 1, quiet)
         return directive_rc
     let discovery = discover_tests_for_target(target)
     let effective_opt_level = test_effective_opt_level(opt_level, directives.extra_args)
