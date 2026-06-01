@@ -4923,6 +4923,47 @@ fn MirBuilder.resolve_method_callee_sym(self: MirBuilder, self_expr: i32, method
 
     method_sym
 
+fn MirBuilder.receiver_is_static_type_expr(self: MirBuilder, expr: i32) -> i32:
+    if expr == 0:
+        return 0
+    let kind = self.ast.kind(expr)
+    if kind == NodeKind.NK_IDENT:
+        let sym = self.ast.get_data0(expr)
+        if self.lookup_local(sym) < 0 and self.sema.named_types.contains(sym):
+            return 1
+    if kind == NodeKind.NK_TYPE_NAMED or kind == NodeKind.NK_TYPE_GENERIC or kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_ARRAY or kind == NodeKind.NK_TYPE_SLICE or kind == NodeKind.NK_TYPE_TUPLE or kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_TRAIT_OBJ:
+        return 1
+    if kind == NodeKind.NK_INDEX:
+        return self.receiver_is_static_type_expr(self.ast.get_data0(expr))
+    0
+
+fn MirBuilder.lower_static_enum_variant_call(self: MirBuilder, enum_ty: i32, variant_sym: i32, arg_start: i32, arg_count: i32, node: i32) -> i32:
+    var result_ty = self.expr_type(node)
+    if result_ty == 0 or result_ty == self.sema.ty_void:
+        result_ty = enum_ty
+    let payload_tys = self.sema.enum_variant_payload_types(result_ty, variant_sym)
+    let has_resolved = self.sema.has_resolved_call_args(node)
+    let count = if has_resolved != 0: self.sema.get_resolved_call_arg_count(node) else: arg_count
+    let fields: Vec[i32] = Vec.new()
+    let names: Vec[i32] = Vec.new()
+    for i in 0..count:
+        let arg_node = if has_resolved != 0: self.sema.get_resolved_call_arg(node, i) else: self.ast.get_extra(arg_start + i)
+        let saved_expected = self.expected_type
+        if i < payload_tys.len() as i32:
+            let payload_ty = payload_tys.get(i as i64)
+            if payload_ty != 0:
+                self.expected_type = payload_ty
+        fields.push(if arg_node == 0: self.unit_operand() else: self.lower_expr(arg_node))
+        self.expected_type = saved_expected
+        names.push(0)
+    let fid = self.body.new_agg_fields(fields, names)
+    let tag = self.enum_variant_discriminant_for_type(result_ty, variant_sym)
+    let rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, fid, tag)
+    let tmp = self.new_temp(result_ty)
+    let place = self.place_for_local(tmp)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, self.ast.get_start(node))
+    self.body.new_operand(OperandKind.OK_COPY, place)
+
 fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: str) -> MirIntrinsic:
     if recv_type == 0 or method_name.len() == 0:
         return MirIntrinsic.NONE
@@ -5136,6 +5177,8 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
         let resolved_recv = self.sema.resolve_alias(recv_type as TypeId)
         if self.sema.get_type_kind(resolved_recv) == TypeKind.TY_PTR:
             return self.lower_expr(self_expr)
+    if self.receiver_is_static_type_expr(self_expr) != 0 and recv_type != 0 and self.sema.enum_has_variant(recv_type, method_sym) != 0:
+        return self.lower_static_enum_variant_call(recv_type, method_sym, arg_start, arg_count, node)
     let enum_accessor_recv_type = if recv_type != 0 and recv_type != self.sema.ty_void as i32: self.sema.auto_deref_ref_ptr_type(recv_type as TypeId) as i32 else: recv_type
     let enum_accessor_variant = self.sema.enum_accessor_variant_for_method(enum_accessor_recv_type, method_sym)
     if enum_accessor_variant != 0:

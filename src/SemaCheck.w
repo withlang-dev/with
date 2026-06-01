@@ -8612,7 +8612,11 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
             return 0
     
 
+    let mc_is_static_enum_variant = self.static_receiver_type_is_known(expr) != 0 and self.enum_has_variant(obj_type, field) != 0
+    let mc_static_variant_payload_tys = if mc_is_static_enum_variant: self.enum_variant_payload_types(obj_type, field) else: Vec.new()
+
     // Check all arguments (with expected-type propagation for Atomic ordering params)
+    // Also applies method and static enum variant payload expected types.
     let mc_order_type = self.resolve_atomic_order_type(obj_type as i32)
     let mc_owner_sym_for_effect = self.method_owner_symbol_for_type(obj_type as i32)
     let mc_sig_idx_for_effect = if mc_owner_sym_for_effect != 0: self.lookup_method_sig(mc_owner_sym_for_effect, field) else: -1
@@ -8655,6 +8659,8 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
         var mc_expected = self.atomic_method_expected_arg_type(mc_order_type, field, ai)
         if mc_expected == 0:
             mc_expected = self.method_expected_arg_type(obj_type as i32, field, ai)
+        if mc_expected == 0 and ai < mc_static_variant_payload_tys.len() as i32:
+            mc_expected = mc_static_variant_payload_tys.get(ai as i64)
         let mc_arg_ty = if mc_expected != 0: self.check_expr_with_expected(mc_arg_node, mc_expected as TypeId) else: self.check_expr(mc_arg_node)
         arg_types.push(mc_arg_ty as i32)
         if self.method_arg_stores_value(obj_type as i32, field, ai) != 0:
@@ -8858,8 +8864,8 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                         ai = ai + 1
 
     // Static enum variant constructor: Shape.Rect(1, 2), Option[i32].Some(1)
-    if self.static_receiver_type_is_known(expr) != 0 and self.enum_has_variant(obj_type, field) != 0:
-        let payload_tys = self.enum_variant_payload_types(obj_type, field)
+    if mc_is_static_enum_variant:
+        let payload_tys = mc_static_variant_payload_tys
         let expected = payload_tys.len() as i32
         if mc_resolved_arg_count != expected:
             let owner_name = self.type_name(obj_type)
