@@ -2422,6 +2422,37 @@ fn MirBuilder.lower_array_literal_membership(self: MirBuilder, op: i32, lhs_expr
         return self.lower_not_operand(acc, span)
     acc
 
+// `x in arr` where `arr` is a fixed-size array value. The array length is known,
+// so lower to the same zero-allocation equality chain as array literals.
+fn MirBuilder.lower_array_value_membership(self: MirBuilder, op: i32, lhs_expr: i32, rhs_expr: i32, array_ty: i32, node: i32) -> i32:
+    let span = self.ast.get_start(node)
+    let elem_ty = self.sema.get_type_d0(array_ty)
+    let elem_count = self.sema.get_type_d1(array_ty)
+    var lhs_ty = self.expr_type(lhs_expr)
+    if lhs_ty == 0:
+        lhs_ty = elem_ty
+    let lhs_op = self.lower_expr(lhs_expr)
+    let lhs_place = self.materialize_operand(lhs_op, lhs_ty, self.ast.get_start(lhs_expr))
+    let rhs_op = self.lower_expr(rhs_expr)
+    let rhs_place = self.materialize_operand(rhs_op, array_ty, self.ast.get_start(rhs_expr))
+    var acc = 0
+    var has_acc = 0
+    for i in 0..elem_count:
+        let lhs_copy = self.body.new_operand(OperandKind.OK_COPY, lhs_place)
+        let elem_place = self.body.new_field_place(rhs_place, i, elem_ty)
+        let elem_op = self.body.new_operand(OperandKind.OK_COPY, elem_place)
+        let cmp = self.lower_bin_op_operand(BinaryOp.OP_EQ, lhs_copy, elem_op, self.sema.ty_bool as i32, span)
+        if has_acc == 0:
+            acc = cmp
+            has_acc = 1
+        else:
+            acc = self.lower_bin_op_operand(BinaryOp.OP_OR, acc, cmp, self.sema.ty_bool as i32, span)
+    if has_acc == 0:
+        acc = self.int_const_operand(0, self.sema.ty_bool as i32)
+    if op == BinaryOp.OP_NOT_IN:
+        return self.lower_not_operand(acc, span)
+    acc
+
 // `ch in some_str` — emit a STR_CONTAINS_CHAR intrinsic call (recv str, i32 char).
 fn MirBuilder.lower_str_contains_char(self: MirBuilder, op: i32, lhs_expr: i32, rhs_expr: i32, node: i32) -> i32:
     let fn_op = self.const_operand(ConstKind.CK_FN, 0, self.sema.ty_void)
@@ -2450,6 +2481,8 @@ fn MirBuilder.lower_membership(self: MirBuilder, op: i32, lhs_expr: i32, rhs_exp
     let rhs_resolved = if rhs_ty != 0: self.sema.resolve_alias(rhs_ty) else: 0
     if rhs_resolved != 0 and self.sema.get_type_kind(rhs_resolved) == TypeKind.TY_RANGE:
         return self.lower_range_value_membership(op, lhs_expr, rhs_expr, rhs_resolved, node)
+    if rhs_resolved != 0 and self.sema.get_type_kind(rhs_resolved) == TypeKind.TY_ARRAY:
+        return self.lower_array_value_membership(op, lhs_expr, rhs_expr, rhs_resolved, node)
     // §9.9: `ch in some_str` tests byte/codepoint membership. Chars lower to
     // ints, so distinguish from substring search (`"sub" in str`) by the lhs
     // type — a non-str lhs against a str rhs is char membership (#234).

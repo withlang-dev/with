@@ -5,14 +5,13 @@
 // comparison chains, and desugars collection cases to `collection.contains(x)`.
 // `x not in collection` is its negation.
 //
-// Covered here (executable): array-literal membership, `not in`, integer and
-// char ranges, substring-in-string, char-in-string, Vec / HashMap / HashSet
-// membership, enum-variant-in-array, compound conditions, the literal-array
-// optimization's semantic equivalence, and the distinction between a `for ... in`
-// loop and a membership `in` test.
+// Covered here (executable): array-literal membership, fixed-size array value
+// membership, `not in`, integer and char ranges, substring-in-string,
+// char-in-string, Vec / HashMap / HashSet membership, enum-variant-in-array,
+// compound conditions, the literal-array optimization's semantic equivalence,
+// and the distinction between a `for ... in` loop and a membership `in` test.
 //
 // Deferred to follow-up issues (not yet implemented):
-//   - membership over a fixed-size array *variable* (`x in some_array_var`)
 //   - `in` patterns in match arms (`in [...]:`) and `@ in` range bindings
 //   - membership filters inside comprehensions / pipeline `filter`
 //   - user-defined `Contains[T]` trait dispatch
@@ -25,6 +24,12 @@ fn test_array_literal_membership:
     let x = 3
     assert(x in [1, 2, 3, 4, 5])
     assert(not (x in [6, 7, 8]))
+
+// Fixed-size array value membership is lowered to the same equality chain.
+fn test_array_value_membership:
+    let arr = [1, 2, 3, 4, 5]
+    assert(3 in arr)
+    assert(9 not in arr)
 
 // The `not in` operator negates membership.
 fn test_not_in_operator:
