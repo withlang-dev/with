@@ -3141,11 +3141,18 @@ fn Parser.parse_primary(self: Parser) -> NodeId:
         return self.poisoned_expr()
     if t == TokenKind.TK_KW_COPY:
         let copy_start = self.current_start()
+        let copy_end = self.current_end()
+        if self.pos + 1 < self.tokens.len() and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_L_PAREN:
+            let sym = self.intern.intern("copy")
+            self.advance()
+            let node = self.pool.add_node(NodeKind.NK_IDENT, copy_start, copy_end, sym, 0, 0)
+            return self.parse_postfix(node)
         self.advance()
         let inner = self.parse_expr()
         return self.pool.add_node(NodeKind.NK_COPY_ARG, copy_start, self.prev_end(), inner, 0, 0)
     if t == TokenKind.TK_KW_MOVE:
         let move_kw_start = self.current_start()
+        let move_kw_end = self.current_end()
         self.advance()
         // move IDENT => expr
         if self.peek() == TokenKind.TK_IDENT:
@@ -3171,6 +3178,9 @@ fn Parser.parse_primary(self: Parser) -> NodeId:
                 let node = self.parse_fat_arrow_paren_closure()
                 if node != 0: self.pool.mark_move_closure(node)
                 return node
+            let sym = self.intern.intern("move")
+            let call_node = self.pool.add_node(NodeKind.NK_IDENT, move_kw_start, move_kw_end, sym, 0, 0)
+            return self.parse_postfix(call_node)
         // move expr — explicit move at call site (not a closure)
         let move_inner = self.parse_expr()
         return self.pool.add_node(NodeKind.NK_MOVE_ARG, move_kw_start, self.prev_end(), move_inner, 0, 0)
