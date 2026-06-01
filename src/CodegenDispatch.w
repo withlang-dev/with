@@ -4118,6 +4118,8 @@ fn Codegen.classify_generic_call_intrinsic(self: Codegen, recv_type: i32, method
         if method_name == "remove": return MirIntrinsic.MAP_REMOVE
         if method_name == "clear": return MirIntrinsic.MAP_CLEAR
         if method_name == "increment": return MirIntrinsic.MAP_INCREMENT
+        if method_name == "decrement": return MirIntrinsic.MAP_DECREMENT
+        if method_name == "update": return MirIntrinsic.MAP_UPDATE
         if method_name == "keys": return MirIntrinsic.MAP_KEYS
         if method_name == "entry": return MirIntrinsic.MAP_ENTRY
         return MirIntrinsic.NONE
@@ -6106,6 +6108,7 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: MirI
 
 fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: MirIntrinsic, args_id: i32, dest_place: i32, next_bb: i32) -> bool:
     let i64_ty = wl_i64_type(self.context)
+    let arg_start = body.call_arg_starts.get(args_id as i64)
     var result: i64 = 0
 
     if intrinsic == MirIntrinsic.OPT_IS_NONE:
@@ -6184,14 +6187,14 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         a5.push(n5)
         result = wl_build_call(self.builder, self.get_runtime_fn_type("with_str_index_of", i64_ty, 2), f5, vec_data_i64(&a5), 2)
 
-    else if intrinsic == MirIntrinsic.MAP_INCREMENT:
+    else if intrinsic == MirIntrinsic.MAP_INCREMENT or intrinsic == MirIntrinsic.MAP_DECREMENT:
         let r7 = self.mir_intrinsic_arg(body, args_id, 0)
         let mp7 = self.mir_extract_map_ptr(r7)
         let k7 = self.mir_intrinsic_arg(body, args_id, 1)
         let ka7 = wl_build_alloca(self.builder, wl_type_of(k7))
         wl_build_store(self.builder, k7, ka7)
         let is7 = wl_const_int(i64_ty, if self.is_str_type(wl_type_of(k7)): 1 else: 0, 0)
-        let f7 = self.ensure_hm_fn("with_hashmap_increment", wl_void_type(self.context))
+        let f7 = self.ensure_hm_fn(if intrinsic == MirIntrinsic.MAP_INCREMENT: "with_hashmap_increment" else: "with_hashmap_decrement", wl_void_type(self.context))
         let p7: Vec[i64] = Vec.new()
         p7.push(wl_ptr_type(self.context))
         p7.push(wl_ptr_type(self.context))
@@ -6202,6 +6205,83 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         a7.push(ka7)
         a7.push(is7)
         let _ = wl_build_call(self.builder, ft7, f7, vec_data_i64(&a7), 3)
+        result = 0
+
+    else if intrinsic == MirIntrinsic.MAP_UPDATE:
+        let upd_recv_op = body.call_arg_operands.get(arg_start as i64)
+        let upd_map_ptr = self.mir_intrinsic_map_handle(body, args_id)
+        let upd_key_raw = self.mir_intrinsic_arg(body, args_id, 1)
+        var upd_key_ty = self.mir_hashmap_key_type(body, upd_recv_op)
+        if upd_key_ty == 0:
+            upd_key_ty = wl_type_of(upd_key_raw)
+        let upd_key = if wl_type_of(upd_key_raw) != upd_key_ty: self.coerce_value_to_type(upd_key_raw, upd_key_ty) else: upd_key_raw
+        let upd_key_alloca = wl_build_alloca(self.builder, upd_key_ty)
+        wl_build_store(self.builder, upd_key, upd_key_alloca)
+        let upd_default_raw = self.mir_intrinsic_arg(body, args_id, 2)
+        var upd_val_ty = self.mir_hashmap_value_type(body, upd_recv_op)
+        if upd_val_ty == 0:
+            upd_val_ty = wl_type_of(upd_default_raw)
+        let upd_default = if wl_type_of(upd_default_raw) != upd_val_ty: self.coerce_value_to_type(upd_default_raw, upd_val_ty) else: upd_default_raw
+        let upd_val_alloca = wl_build_alloca(self.builder, upd_val_ty)
+        let upd_is_str = wl_const_int(i64_ty, if self.is_str_type(upd_key_ty): 1 else: 0, 0)
+        let upd_get_fn = self.ensure_hm_fn("with_hashmap_get", i64_ty)
+        let upd_hm_params: Vec[i64] = Vec.new()
+        upd_hm_params.push(wl_ptr_type(self.context))
+        upd_hm_params.push(wl_ptr_type(self.context))
+        upd_hm_params.push(wl_ptr_type(self.context))
+        upd_hm_params.push(i64_ty)
+        let upd_get_ty = wl_function_type(i64_ty, vec_data_i64(&upd_hm_params), 4, 0)
+        let upd_get_args: Vec[i64] = Vec.new()
+        upd_get_args.push(upd_map_ptr)
+        upd_get_args.push(upd_key_alloca)
+        upd_get_args.push(upd_val_alloca)
+        upd_get_args.push(upd_is_str)
+        let upd_found = wl_build_call(self.builder, upd_get_ty, upd_get_fn, vec_data_i64(&upd_get_args), 4)
+        let upd_missing = wl_build_icmp(self.builder, wl_int_eq(), upd_found, wl_const_int(i64_ty, 0, 0))
+        let upd_default_bb = wl_append_bb(self.context, self.current_function, "map.update.default")
+        let upd_call_bb = wl_append_bb(self.context, self.current_function, "map.update.call")
+        wl_build_cond_br(self.builder, upd_missing, upd_default_bb, upd_call_bb)
+        wl_position_at_end(self.builder, upd_default_bb)
+        wl_build_store(self.builder, upd_default, upd_val_alloca)
+        wl_build_br(self.builder, upd_call_bb)
+        wl_position_at_end(self.builder, upd_call_bb)
+        let upd_fn_val = self.mir_intrinsic_arg(body, args_id, 3)
+        let upd_fn_ty_raw = wl_type_of(upd_fn_val)
+        var upd_fn_ptr = upd_fn_val
+        var upd_ctx_ptr: i64 = 0
+        var upd_is_fat = 0
+        if wl_get_type_kind(upd_fn_ty_raw) == wl_struct_type_kind() and wl_count_struct_elem_types(upd_fn_ty_raw) == 2:
+            upd_fn_ptr = wl_build_extract_value(self.builder, upd_fn_val, 0)
+            upd_ctx_ptr = wl_build_extract_value(self.builder, upd_fn_val, 1)
+            upd_is_fat = 1
+        var upd_call_ty: i64 = 0
+        if upd_is_fat != 0:
+            let upd_call_params: Vec[i64] = Vec.new()
+            upd_call_params.push(wl_ptr_type(self.context))
+            upd_call_params.push(upd_val_ty)
+            upd_call_ty = wl_function_type(upd_val_ty, vec_data_i64(&upd_call_params), 2, 0)
+        else:
+            upd_call_ty = wl_global_get_value_type(upd_fn_ptr)
+        if upd_call_ty == 0:
+            let upd_fallback_params: Vec[i64] = Vec.new()
+            upd_fallback_params.push(upd_val_ty)
+            upd_call_ty = wl_function_type(upd_val_ty, vec_data_i64(&upd_fallback_params), 1, 0)
+        let upd_current = wl_build_load(self.builder, upd_val_ty, upd_val_alloca)
+        let upd_call_args: Vec[i64] = Vec.new()
+        if upd_is_fat != 0:
+            upd_call_args.push(upd_ctx_ptr)
+        upd_call_args.push(upd_current)
+        let upd_updated_raw = wl_build_call(self.builder, upd_call_ty, upd_fn_ptr, vec_data_i64(&upd_call_args), upd_call_args.len() as i32)
+        let upd_updated = if wl_type_of(upd_updated_raw) != upd_val_ty: self.coerce_value_to_type(upd_updated_raw, upd_val_ty) else: upd_updated_raw
+        wl_build_store(self.builder, upd_updated, upd_val_alloca)
+        let upd_insert_fn = self.ensure_hm_fn("with_hashmap_insert", wl_void_type(self.context))
+        let upd_insert_ty = wl_function_type(wl_void_type(self.context), vec_data_i64(&upd_hm_params), 4, 0)
+        let upd_insert_args: Vec[i64] = Vec.new()
+        upd_insert_args.push(upd_map_ptr)
+        upd_insert_args.push(upd_key_alloca)
+        upd_insert_args.push(upd_val_alloca)
+        upd_insert_args.push(upd_is_str)
+        let _ = wl_build_call(self.builder, upd_insert_ty, upd_insert_fn, vec_data_i64(&upd_insert_args), 4)
         result = 0
 
     else if intrinsic == MirIntrinsic.STR_REPEAT:

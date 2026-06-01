@@ -90,6 +90,8 @@ enum CcBuiltin: i32:
     STR_REPLACE
     STR_INDEX_OF
     MAP_INCREMENT
+    MAP_DECREMENT
+    MAP_UPDATE
     VEC_MAP
     VEC_FILTER
     VEC_FOLD
@@ -4668,6 +4670,8 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.STR_REPLACE: return CcBuiltin.STR_REPLACE
     if intrinsic == MirIntrinsic.STR_INDEX_OF: return CcBuiltin.STR_INDEX_OF
     if intrinsic == MirIntrinsic.MAP_INCREMENT: return CcBuiltin.MAP_INCREMENT
+    if intrinsic == MirIntrinsic.MAP_DECREMENT: return CcBuiltin.MAP_DECREMENT
+    if intrinsic == MirIntrinsic.MAP_UPDATE: return CcBuiltin.MAP_UPDATE
     if intrinsic == MirIntrinsic.VEC_MAP: return CcBuiltin.VEC_MAP
     if intrinsic == MirIntrinsic.VEC_FILTER: return CcBuiltin.VEC_FILTER
     if intrinsic == MirIntrinsic.VEC_FOLD: return CcBuiltin.VEC_FOLD
@@ -5354,9 +5358,9 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
         out = out ++ f"    goto bb{next_bb};"
         return out
 
-    if kind == CcBuiltin.MAP_INCREMENT:
+    if kind == CcBuiltin.MAP_INCREMENT or kind == CcBuiltin.MAP_DECREMENT:
         if argc < 2:
-            self.fail("map.increment expects two arguments")
+            self.fail("map increment/decrement expects two arguments")
             return "    abort();"
         let recv = self.map_recv_text(body, args_id)
         let key_operand = self.call_arg_operand(body, args_id, 1)
@@ -5366,7 +5370,14 @@ fn CCodegen.emit_builtin_call_term(self: CCodegen, body: MirBody, bb: i32, calle
             key_tid = self.sema.ty_i64 as i32
         let key_ty = self.c_type(key_tid, 0)
         let is_str_key = if self.sema.get_type_kind(self.sema.resolve_alias(key_tid as TypeId)) == TypeKind.TY_STR: "1" else: "0"
-        var out = "    " ++ cc_lbrace() ++ " " ++ key_ty ++ " __with_k = " ++ key_text ++ "; with_hashmap_increment((void*)(intptr_t)(" ++ recv ++ "), &__with_k, " ++ is_str_key ++ "); " ++ cc_rbrace() ++ "\n"
+        let fn_name = if kind == CcBuiltin.MAP_INCREMENT: "with_hashmap_increment" else: "with_hashmap_decrement"
+        var out = "    " ++ cc_lbrace() ++ " " ++ key_ty ++ " __with_k = " ++ key_text ++ "; " ++ fn_name ++ "((void*)(intptr_t)(" ++ recv ++ "), &__with_k, " ++ is_str_key ++ "); " ++ cc_rbrace() ++ "\n"
+        out = out ++ f"    goto bb{next_bb};"
+        return out
+
+    if kind == CcBuiltin.MAP_UPDATE:
+        self.fail("emit-c: HashMap.update requires closure lowering")
+        var out = "    abort();\n"
         out = out ++ f"    goto bb{next_bb};"
         return out
 

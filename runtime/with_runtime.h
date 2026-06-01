@@ -119,6 +119,8 @@ int64_t with_hashmap_len(void *handle);
 void with_hashmap_clear(void *handle);
 void with_hashmap_keys_out(with_vec *out, void *handle, int64_t key_size);
 void with_hashmap_free(void *handle);
+void with_hashmap_increment(void *handle, const void *key, int64_t is_str_key);
+void with_hashmap_decrement(void *handle, const void *key, int64_t is_str_key);
 
 // ── F-string formatting ─────────────────────────────────────────────
 

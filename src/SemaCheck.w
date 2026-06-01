@@ -6042,7 +6042,8 @@ fn Sema.pipeline_generic_builtin_method_exists(self: Sema, owner_sym: i32, field
             return 1
         if self.is_collection_len_method(field) or field == self.syms.keys or field == self.syms.entry:
             return 1
-        if self.pool_resolve(field) == "increment":
+        let method_name = self.pool_resolve(field)
+        if method_name == "increment" or method_name == "decrement" or method_name == "update":
             return 1
     if owner_sym == self.syms.hashmapentry:
         if field == self.syms.or_insert or field == self.syms.get:
@@ -8346,7 +8347,7 @@ fn Sema.builtin_intrinsic_method_return_type(self: Sema, recv_type: i32, owner_s
     if owner_sym == self.syms.hashmap:
         if field == self.syms.new:
             return self.generic_constructor_return_type(owner_sym, recv_type)
-        if method_name == "increment":
+        if method_name == "increment" or method_name == "decrement" or method_name == "update":
             return self.ty_void as i32
     if owner_sym == self.syms.hashset:
         if field == self.syms.new:
@@ -8476,10 +8477,18 @@ fn Sema.method_expected_arg_type(self: Sema, recv_type: i32, field: i32, arg_ind
         if (field == self.syms.insert or field == self.syms.contains or field == self.syms.remove) and arg_index == 0:
             return self.get_generic_inst_arg(resolved as i32, 0)
     if owner_sym == self.syms.hashmap:
-        if (field == self.syms.insert or field == self.syms.get or field == self.syms.contains or field == self.syms.remove or method_name == "increment") and arg_index == 0:
+        if (field == self.syms.insert or field == self.syms.get or field == self.syms.contains or field == self.syms.remove or method_name == "increment" or method_name == "decrement" or method_name == "update") and arg_index == 0:
             return self.get_generic_inst_arg(resolved as i32, 0)
         if field == self.syms.insert and arg_index == 1:
             return self.get_generic_inst_arg(resolved as i32, 1)
+        if method_name == "update":
+            let update_value_ty = self.get_generic_inst_arg(resolved as i32, 1)
+            if arg_index == 1:
+                return update_value_ty
+            if arg_index == 2:
+                let update_params: Vec[i32] = Vec.new()
+                update_params.push(update_value_ty)
+                return self.ensure_fn_type(update_params, 1, update_value_ty as TypeId) as i32
     if owner_name == "Sender" and method_name == "send" and arg_index == 0:
         return self.get_generic_inst_arg(resolved as i32, 0)
     if owner_sym == self.syms.option:
@@ -8520,6 +8529,8 @@ fn Sema.method_arg_stores_value(self: Sema, recv_type: i32, field: i32, arg_inde
             return 1
     if owner_sym == self.syms.hashmap:
         if field == self.syms.insert and (arg_index == 0 or arg_index == 1):
+            return 1
+        if method_name == "update" and (arg_index == 0 or arg_index == 1):
             return 1
     if owner_sym == self.syms.hashmapentry:
         if field == self.syms.or_insert and arg_index == 0:
@@ -8784,6 +8795,9 @@ fn Sema.builtin_method_requires_mutable_receiver(self: Sema, type_name_sym: i32,
             return 1
     if type_name_sym == self.syms.hashmap:
         if field == self.syms.insert or field == self.syms.remove or field == self.syms.clear:
+            return 1
+        let method_name = self.pool_resolve(field)
+        if method_name == "increment" or method_name == "decrement" or method_name == "update":
             return 1
     if type_name_sym == self.syms.hashset:
         if field == self.syms.insert or field == self.syms.remove or field == self.syms.clear:
@@ -9238,6 +9252,37 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                 if key_ty != 0 and a0_ty != 0:
                     if self.builtin_arg_type_compatible(key_ty, a0_ty) == 0:
                             self.emit_argument_type_mismatch(mc_call_name, 0, 0, 0, key_ty, a0_ty, self.ast.get_extra(extra_start))
+        else if type_name_sym == self.syms.hashmap and (mc_method_name_raw == "increment" or mc_method_name_raw == "decrement"):
+            // HashMap.increment/decrement(key: K) — arg[0] must be K
+            if arg_count >= 1:
+                let inc_key_ty = self.get_generic_inst_arg(recv_type, 0)
+                let inc_a0_ty = arg_types.get(0)
+                if inc_key_ty != 0 and inc_a0_ty != 0:
+                    if self.builtin_arg_type_compatible(inc_key_ty, inc_a0_ty) == 0:
+                            self.emit_argument_type_mismatch(mc_call_name, 0, 0, 0, inc_key_ty, inc_a0_ty, self.ast.get_extra(extra_start))
+        else if type_name_sym == self.syms.hashmap and mc_method_name_raw == "update":
+            // HashMap.update(key: K, default: V, f: fn(V) -> V)
+            if arg_count >= 1:
+                let update_key_ty = self.get_generic_inst_arg(recv_type, 0)
+                let update_a0_ty = arg_types.get(0)
+                if update_key_ty != 0 and update_a0_ty != 0:
+                    if self.builtin_arg_type_compatible(update_key_ty, update_a0_ty) == 0:
+                            self.emit_argument_type_mismatch(mc_call_name, 0, 0, 0, update_key_ty, update_a0_ty, self.ast.get_extra(extra_start))
+            if arg_count >= 2:
+                let update_val_ty = self.get_generic_inst_arg(recv_type, 1)
+                let update_a1_ty = arg_types.get(1)
+                if update_val_ty != 0 and update_a1_ty != 0:
+                    if self.builtin_arg_type_compatible(update_val_ty, update_a1_ty) == 0:
+                            self.emit_argument_type_mismatch(mc_call_name, 0, 1, 1, update_val_ty, update_a1_ty, self.ast.get_extra(extra_start + 1))
+            if arg_count >= 3:
+                let update_val_ty2 = self.get_generic_inst_arg(recv_type, 1)
+                let updater_ty = self.resolve_alias(arg_types.get(2) as TypeId)
+                if self.get_type_kind(updater_ty) != TypeKind.TY_FN:
+                    self.emit_error("HashMap.update() expects a function as its third argument", self.ast.get_extra(extra_start + 2))
+                else:
+                    let updater_ret_ty = self.get_type_d2(updater_ty)
+                    if update_val_ty2 != 0 and updater_ret_ty != 0 and self.builtin_arg_type_compatible(update_val_ty2, updater_ret_ty) == 0:
+                        self.emit_argument_type_mismatch(mc_call_name, 0, 2, 2, update_val_ty2, updater_ret_ty, self.ast.get_extra(extra_start + 2))
         else if type_name_sym == self.syms.hashset and (field == self.syms.insert or field == self.syms.contains or field == self.syms.remove):
             // HashSet.insert/contains/remove(value: T) — arg[0] must be T
             if arg_count >= 1:
@@ -9420,7 +9465,7 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
         if type_name_sym == self.syms.hashmap:
             if field == self.syms.insert or field == self.syms.clear:
                 return self.ty_void as i32
-            if mc_method_name_raw == "increment":
+            if mc_method_name_raw == "increment" or mc_method_name_raw == "decrement" or mc_method_name_raw == "update":
                 return self.ty_void as i32
             if field == self.syms.get:
                 return self.get_generic_inst_arg(recv_type, 1)
