@@ -4794,6 +4794,38 @@ fn Sema.check_struct_literal(self: Sema, node: i32) -> i32:
                 if not self.ephemeral_types.contains(name):
                     self.check_ephemeral_task_storage(f_value, "non-ephemeral struct")
                 val_types.push(val_ty as i32)
+            if self.type_decl_nodes.contains(name):
+                let defaults_td_node = self.type_decl_nodes.get(name).unwrap()
+                let defaults_td_extra = self.ast.get_data1(defaults_td_node)
+                let defaults_td_packed = self.ast.get_data2(defaults_td_node)
+                if type_decl_sub_kind(defaults_td_packed) == TypeDeclKind.Struct:
+                    let decl_field_count = self.ast.get_extra(defaults_td_extra)
+                    let positional = if field_count > 0: self.ast.get_extra(extra_start) == 0 else: false
+                    for dfi in 0..decl_field_count:
+                        let decl_base = defaults_td_extra + 1 + dfi * 3
+                        let decl_field_name = self.ast.get_extra(decl_base)
+                        let decl_default = self.ast.get_extra(decl_base + 2)
+                        var present = false
+                        if positional:
+                            present = dfi < field_count
+                        else:
+                            for li in 0..field_count:
+                                let lit_f = self.ast.get_extra(extra_start + li * 2)
+                                if lit_f == decl_field_name:
+                                    present = true
+                                    break
+                        if not present:
+                            if decl_default == 0:
+                                self.emit_error("missing field '" ++ self.pool_resolve(decl_field_name) ++ "' in struct literal", node)
+                            else:
+                                var default_expected = 0
+                                if expected_struct_ty != 0:
+                                    let info = self.struct_field_info_by_index(expected_struct_ty as i32, dfi)
+                                    default_expected = (info / 4294967296) as i32
+                                let default_ty = if default_expected != 0: self.check_expr_with_expected(decl_default, default_expected as TypeId) else: self.check_expr(decl_default)
+                                if not self.ephemeral_types.contains(name):
+                                    self.check_ephemeral_task_storage(decl_default, "non-ephemeral struct")
+                                let _ = default_ty
             // Check if struct has type params — infer GenericInst
             if self.type_decl_nodes.contains(name):
                 let td_node = self.type_decl_nodes.get(name).unwrap()
