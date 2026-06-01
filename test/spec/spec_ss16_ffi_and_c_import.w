@@ -4,9 +4,10 @@ use c_import("stdio.h")
 use c_import("time.h")
 use c_import("limits.h")
 use c_import("math.h", link: "m")
+use c_import("string.h")
 use c_import("typedef struct Hidden279 Hidden279;\nstruct Hidden279 { int value; };\ntypedef struct Holder279 { Hidden279 *hidden; int value; } Holder279;\n")
 
-extern "C" fn strlen(s: *const u8) -> usize
+extern "C" fn atoi(s: *const u8) -> i32
 
 fn test_c_import_functions_callable_directly:
     assert(printf(c"".ptr) == 0)
@@ -20,7 +21,15 @@ fn test_c_import_structs_are_usable:
     assert(result != -1)
 
 fn test_manual_extern_c_declaration:
-    assert(unsafe { strlen(c"hello".ptr) } == 5usize)
+    assert(unsafe { atoi(c"42".ptr) } == 42)
+
+fn test_c_import_heap_str_to_const_char_ptr:
+    let s = f"hello{1}"
+    assert(strlen(s) == 6usize)
+
+fn test_c_import_str_slice_to_const_char_ptr:
+    let s = "xxhelloyy".slice(2, 7)
+    assert(strlen(s) == 5usize)
 
 fn test_c_import_forward_typedef_definition_order:
     var hidden = Hidden279 { value: 42 }
@@ -36,6 +45,8 @@ fn main:
     test_c_import_link_directive()
     test_c_import_structs_are_usable()
     test_manual_extern_c_declaration()
+    test_c_import_heap_str_to_const_char_ptr()
+    test_c_import_str_slice_to_const_char_ptr()
     test_c_import_forward_typedef_definition_order()
     test_c_import_constants_available()
     print("ok")

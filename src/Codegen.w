@@ -708,6 +708,11 @@ type DynArgInfo {
     use_ptr: i32,
 }
 
+type CallArgValue {
+    value: i64,
+    cleanup_ptr: i64,
+}
+
 type LoopState {
     break_bbs: Vec[i64],
     continue_bbs: Vec[i64],
@@ -1698,7 +1703,7 @@ fn Codegen.coerce_call_arg_to_param(self: Codegen, arg_node: i32, arg_val: i64, 
     var out = arg_val
     let arg_ty = wl_type_of(out)
     let param_kind = wl_get_type_kind(param_ty)
-    if param_kind == wl_pointer_type_kind() and wl_get_type_kind(arg_ty) == wl_struct_type_kind():
+    if param_kind == wl_pointer_type_kind() and wl_get_type_kind(arg_ty) == wl_struct_type_kind() and not self.is_str_type(arg_ty):
         let ptr = self.arg_lvalue_ptr_for_autoref(arg_node, arg_ty, out)
         if ptr != 0:
             out = ptr
