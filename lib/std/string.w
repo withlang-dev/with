@@ -23,6 +23,54 @@ extern fn with_lines_out(out: *void, s: str) -> void
 extern fn with_parse_i64(s: str) -> i64
 extern fn with_str_len(s: str) -> i64
 extern fn with_str_eq(a: str, b: str) -> i32
+extern fn with_str_from_vec_u8(bytes: *const Vec[u8]) -> str
+
+/// Amortized string builder for code that appends in loops.
+///
+/// `++` is fine for short expressions, but repeated `out = out ++ part`
+/// copies the whole prefix on every append. StringBuilder stores bytes in a
+/// Vec[u8], so appending N total bytes grows geometrically and finishes with
+/// one materialized str.
+type StringBuilder {
+    bytes: Vec[u8],
+}
+
+/// Create an empty builder.
+pub fn StringBuilder.new() -> Self:
+    StringBuilder { bytes: Vec[u8].new() }
+
+/// Create an empty builder with room for at least `capacity` bytes.
+pub fn StringBuilder.with_capacity(capacity: i64) -> Self:
+    let cap = if capacity > 0: capacity else: 0
+    StringBuilder { bytes: Vec[u8].with_capacity(cap) }
+
+/// Append raw UTF-8 bytes from a string.
+pub fn StringBuilder.push_str(mut self: Self, s: str):
+    for i in 0..s.len():
+        self.bytes.push(s.byte_at(i) as u8)
+    return
+
+/// Append one byte.
+pub fn StringBuilder.push_byte(mut self: Self, b: u8):
+    self.bytes.push(b)
+    return
+
+/// Append one byte from an integer code point.
+pub fn StringBuilder.push_char(mut self: Self, b: i32):
+    self.bytes.push(b as u8)
+    return
+
+/// Number of bytes appended so far.
+pub fn StringBuilder.len(self: &Self) -> i64:
+    self.bytes.len
+
+/// True when no bytes have been appended.
+pub fn StringBuilder.is_empty(self: &Self) -> bool:
+    self.bytes.len == 0
+
+/// Materialize the accumulated bytes as an owned str.
+pub fn StringBuilder.to_str(self: &Self) -> str:
+    with_str_from_vec_u8(&self.bytes)
 
 /// String length (same as `s.len()`).
 pub fn string_len(s: str) -> i64:
