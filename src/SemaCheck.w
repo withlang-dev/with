@@ -2744,7 +2744,9 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
 
     if kind == NodeKind.NK_OPTIONAL_CHAIN:
         let base = self.check_expr(self.ast.get_data0(node))
-        return self.optional_chain_result_type(base as i32, self.ast.get_data1(node)) as TypeId
+        let result = self.optional_chain_result_type(base as i32, self.ast.get_data1(node))
+        self.typed_expr_types.insert(node, result)
+        return result as TypeId
 
     if kind == NodeKind.NK_POISONED_EXPR:
         return 0 as TypeId
