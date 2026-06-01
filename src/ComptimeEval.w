@@ -47,6 +47,7 @@ extern fn with_str_byte_at(s: str, index: i64) -> i32
 extern fn with_str_slice(s: str, start: i64, end: i64) -> str
 extern fn with_str_contains(haystack: str, needle: str) -> i32
 extern fn with_str_concat(a: str, b: str) -> str
+extern fn with_str_concat_n(parts: *const str, count: i64) -> str
 extern fn with_str_from_byte(byte: i32) -> str
 extern fn with_str_starts_with(s: str, prefix: str) -> i32
 extern fn with_str_ends_with(s: str, suffix: str) -> i32
@@ -4232,6 +4233,37 @@ fn ComptimeEvaluator.eval_binary_membership(self: ComptimeEvaluator, node: i32, 
         matched = if matched != 0: 0 else: 1
     comptime_control_value(comptime_value_bool(matched))
 
+fn ComptimeEvaluator.is_comptime_concat_node(self: ComptimeEvaluator, node: i32) -> bool:
+    if node == 0:
+        return false
+    self.ast.kind(node) == NodeKind.NK_BINARY and self.ast.get_data0(node) == BinaryOp.OP_CONCAT
+
+fn ComptimeEvaluator.collect_left_comptime_concat_parts(self: ComptimeEvaluator, node: i32) -> Vec[i32]:
+    let rev: Vec[i32] = Vec.new()
+    var cur = node
+    while self.is_comptime_concat_node(cur):
+        rev.push(self.ast.get_data2(cur))
+        cur = self.ast.get_data1(cur)
+    rev.push(cur)
+
+    let out: Vec[i32] = Vec.new()
+    var i = rev.len() as i32 - 1
+    while i >= 0:
+        out.push(rev.get(i as i64))
+        i = i - 1
+    out
+
+fn ComptimeEvaluator.eval_concat_chain(self: ComptimeEvaluator, node: i32, parts: Vec[i32]) -> ComptimeControl:
+    let texts: Vec[str] = Vec.new()
+    for i in 0..parts.len() as i32:
+        let signal = self.eval_expr(parts.get(i as i64))
+        if signal.kind != ComptimeControlKind.CTL_VALUE:
+            return signal
+        if signal.value.kind != ComptimeValueKind.CV_STR:
+            return self.fail(node, "string concatenation requires comptime strings")
+        texts.push(signal.value.text)
+    comptime_control_value(comptime_value_str(with_str_concat_n(texts.ptr, texts.len())))
+
 fn ComptimeEvaluator.eval_binary(self: ComptimeEvaluator, node: i32) -> ComptimeControl:
     let op = self.ast.get_data0(node)
     if op == BinaryOp.OP_AND or op == BinaryOp.OP_OR:
@@ -4252,6 +4284,11 @@ fn ComptimeEvaluator.eval_binary(self: ComptimeEvaluator, node: i32) -> Comptime
         if rhs_truthy < 0:
             return self.fail(node, "logical operators require bool or integer comptime values")
         return comptime_control_value(comptime_value_bool(rhs_truthy))
+
+    if op == BinaryOp.OP_CONCAT:
+        let parts = self.collect_left_comptime_concat_parts(node)
+        if parts.len() as i32 > 2:
+            return self.eval_concat_chain(node, parts)
 
     let lhs_signal = self.eval_expr(self.ast.get_data1(node))
     if lhs_signal.kind != ComptimeControlKind.CTL_VALUE:

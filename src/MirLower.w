@@ -2272,6 +2272,53 @@ fn MirBuilder.assign_operand_to_place(self: MirBuilder, place: i32, operand_id: 
     let rval = self.body.new_rvalue(RvalueKind.RK_USE, operand_id, 0, 0)
     self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rval, span)
 
+fn MirBuilder.is_string_concat_node(self: MirBuilder, node: i32) -> bool:
+    if node == 0:
+        return false
+    if self.ast.kind(node) != NodeKind.NK_BINARY:
+        return false
+    if self.ast.get_data0(node) != BinaryOp.OP_CONCAT:
+        return false
+    if self.sema.operator_method_calls.contains(node):
+        return false
+    let ty = self.expr_type(node)
+    if ty == 0:
+        return false
+    self.sema.resolve_alias(ty) == self.sema.ty_str
+
+fn MirBuilder.collect_left_string_concat_parts(self: MirBuilder, node: i32) -> Vec[i32]:
+    let rev: Vec[i32] = Vec.new()
+    var cur = node
+    while self.is_string_concat_node(cur):
+        rev.push(self.ast.get_data2(cur))
+        cur = self.ast.get_data1(cur)
+    rev.push(cur)
+
+    let out: Vec[i32] = Vec.new()
+    var i = rev.len() as i32 - 1
+    while i >= 0:
+        out.push(rev.get(i as i64))
+        i = i - 1
+    out
+
+fn MirBuilder.lower_str_concat_chain(self: MirBuilder, node: i32, parts: Vec[i32]) -> i32:
+    let saved_expected = self.expected_type
+    self.expected_type = self.sema.ty_str as i32
+    let operands: Vec[i32] = Vec.new()
+    for i in 0..parts.len() as i32:
+        operands.push(self.lower_expr(parts.get(i as i64)))
+    self.expected_type = saved_expected
+
+    let args_id = self.body.new_call_args(operands)
+    let rv = self.body.new_rvalue(RvalueKind.RK_STR_CONCAT_N, args_id, operands.len() as i32, 0)
+    let ty = self.expr_type(node)
+    let temp = self.new_temp(ty)
+    let place = self.place_for_local(temp)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, self.ast.get_start(node))
+    if self.sema.is_copy(ty) != 0:
+        return self.body.new_operand(OperandKind.OK_COPY, place)
+    self.body.new_operand(OperandKind.OK_MOVE, place)
+
 fn MirBuilder.lower_bin_op(self: MirBuilder, op: i32, lhs_expr: i32, rhs_expr: i32, node: i32) -> i32:
     // Short-circuit evaluation for logical and/or
     if op == 11 or op == 12:
@@ -2312,6 +2359,10 @@ fn MirBuilder.lower_bin_op(self: MirBuilder, op: i32, lhs_expr: i32, rhs_expr: i
                     let rhs_sig = self.sema.get_sig(rhs_method_sym)
                     if rhs_sig >= 0:
                         return self.lower_method_bin_op(rhs_expr, lhs_expr, rhs_method_sym, node)
+    if op == BinaryOp.OP_CONCAT and self.is_string_concat_node(node):
+        let parts = self.collect_left_string_concat_parts(node)
+        if parts.len() as i32 > 2:
+            return self.lower_str_concat_chain(node, parts)
     let saved_expected = self.expected_type
     if self.is_bare_none(lhs_expr) and (rhs_tk == TypeKind.TY_PTR or rhs_tk == TypeKind.TY_REF):
         self.expected_type = rhs_ty

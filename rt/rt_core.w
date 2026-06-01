@@ -1144,6 +1144,27 @@ pub fn str_concat(a: str, b: str) -> str:
     unsafe *((out as i64 + total) as *mut u8) = 0
     make_str(out as *const u8, total)
 
+@[c_export("with_str_concat_n")]
+pub fn str_concat_n(parts: *const str, count: i64) -> str:
+    var total: i64 = 0
+    for i in 0..count:
+        let part = unsafe parts[i]
+        total = total + str_length(part)
+    if total == 0:
+        return make_str("" as *const u8, 0)
+
+    let out = rt_alloc(total + 1)
+    var offset: i64 = 0
+    for i in 0..count:
+        let part = unsafe parts[i]
+        let part_len = str_length(part)
+        let part_data = str_data(part)
+        if part_data as i64 != 0 and part_len > 0:
+            rt_memcpy((out as i64 + offset) as *mut u8, part_data, part_len)
+        offset = offset + part_len
+    unsafe *((out as i64 + total) as *mut u8) = 0
+    make_str(out as *const u8, total)
+
 @[c_export("with_str_eq")]
 pub fn str_eq(a: str, b: str) -> i32:
     let al = str_length(a)
