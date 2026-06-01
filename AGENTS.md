@@ -255,6 +255,7 @@ with build :stage2      # stage1 → stage2
 with build :stage3      # stage2 → stage3
 with build :fixpoint    # verify stage2 == stage3 (byte-identical)
 with build :test        # run test suite
+with build :test-green  # verify/record current test evidence
 with build :prune       # report stale build artifacts
 ```
 
@@ -274,9 +275,11 @@ Resolution order: `WITH=<path>` → `with` on PATH → `src/main`
 `src/main` is not checked into git. It is the local seed path fetched
 from the `with-darwin-aarch64` GitHub release asset. Run `with build :seed`
 to fetch it. After `with build`, `with build :fixpoint`, and
-`with build :test` all pass, run `with build :last-green`, then update
-the local bootstrap seed with `with build :update-seed` and the installed
-user compiler with `with build :install-user`.
+`with build :test` all pass, run `with build :test-green` and
+`with build :last-green`, then update the local bootstrap seed with
+`with build :update-seed` and the installed user compiler with
+`with build :install-user`. `with build :test-green` records evidence from a
+completed test run; it is not a substitute for running `with build :test`.
 
 If the seed, installed compiler, and release binaries are all
 broken, the compiler cannot be recovered.
@@ -508,11 +511,12 @@ A change is acceptable only if:
 with build              # compiles
 with build :fixpoint    # stage2 == stage3
 with build :test        # no regressions
+with build :test-green  # current test evidence recorded
 ```
 
 If any step fails, continue debugging until it passes.
 
-After all three steps pass, deploy the verified compiler to
+After these steps pass, deploy the verified compiler to
 `~/.local/bin/with` with `with build :install-user`. Do not deploy a
 compiler that has not passed the full checklist.
 

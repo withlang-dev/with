@@ -210,6 +210,8 @@ pub fn run_embedded_runtime_regression_action(ctx: ActionCtx) -> i32:
     let output = bs_trim_trailing_line_endings(run_result.stdout)
     if output != "hello":
         return bs_fail(ctx, "embedded runtime output produced unexpected stdout: " ++ output)
+    if fs.exists(copied_compiler) and fs.remove_file(copied_compiler) != 0:
+        return bs_fail(ctx, "could not remove copied compiler after embedded runtime regression")
     0
 
 fn bs_run_cli_expect_success(ctx: ActionCtx, compiler_path: str, label: str, args: Vec[str]) -> SelfhostRunResult:

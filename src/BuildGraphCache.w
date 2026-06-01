@@ -14,6 +14,15 @@ pub fn build_cache_state_dir(root: str) -> str:
 fn build_cache_state_path(root: str, target_name: str) -> str:
     build_cache_state_dir(root) ++ "/" ++ target_name ++ ".state"
 
+fn build_cache_test_success_path(root: str, target_name: str) -> str:
+    build_cache_state_dir(root) ++ "/" ++ target_name ++ ".test-pass"
+
+fn build_cache_project_relative(root: str, path: str) -> str:
+    let prefix = root ++ "/"
+    if path.starts_with(prefix):
+        return path.slice(prefix.len(), path.len())
+    path
+
 pub fn build_cache_is_cacheable(kind: i32) -> bool:
     if kind == 0: return true
     if kind == 1: return true
@@ -197,6 +206,43 @@ fn build_cache_hash_build_graph_sources(root: str) -> i64:
     combined = combined ++ "std.build:" ++ f"{build_cache_fingerprint_file(root ++ "/lib/std/build.w")}" ++ "\n"
     with_str_hash(combined)
 
+fn build_cache_test_success_manifest(root: str, target: BuildGraphTarget, test_files: Vec[str], test_compiler: str) -> str:
+    var text = "v1\n"
+    text = text ++ "target:" ++ target.name ++ "\n"
+    text = text ++ f"kind:{target.kind}\n"
+    text = text ++ "entry:" ++ target.entry ++ "\n"
+    text = text ++ "output:" ++ target.output ++ "\n"
+    text = text ++ f"opt:{target.optimize_mode}\n"
+    text = text ++ f"target-kind:{target.target_kind}\n"
+    for i in 0..target.args.len() as i32:
+        text = text ++ "arg:" ++ target.args.get(i as i64) ++ "\n"
+    for i in 0..target.defines.len() as i32:
+        text = text ++ "define:" ++ target.defines.get(i as i64) ++ "\n"
+    for i in 0..target.include_paths.len() as i32:
+        text = text ++ "include:" ++ target.include_paths.get(i as i64) ++ "\n"
+    for i in 0..target.system_libs.len() as i32:
+        text = text ++ "lib:" ++ target.system_libs.get(i as i64) ++ "\n"
+    let compiler_rel = build_cache_project_relative(root, test_compiler)
+    if compiler_rel.len() > 0:
+        text = text ++ "compiler:" ++ compiler_rel ++ "\n"
+    else:
+        text = text ++ "compiler:\n"
+    let rel_files: Vec[str] = Vec.new()
+    for i in 0..test_files.len() as i32:
+        rel_files.push(build_cache_project_relative(root, test_files.get(i as i64)))
+    let sorted = build_cache_sorted_strings(rel_files)
+    for i in 0..sorted.len() as i32:
+        let path = sorted.get(i as i64)
+        text = text ++ "file:" ++ path ++ "\n"
+    text
+
+pub fn build_cache_record_test_success(root: str, target: BuildGraphTarget, test_files: Vec[str], test_compiler: str):
+    let state_dir = build_cache_state_dir(root)
+    let _mkdir = build_graph_rt_mkdir_p(state_dir)
+    let marker_path = build_cache_test_success_path(root, target.name)
+    let marker = build_cache_test_success_manifest(root, target, test_files, test_compiler)
+    let _write = build_graph_rt_write_file(marker_path, marker)
+
 fn build_cache_compute_signature(target: BuildGraphTarget, root: str) -> i64:
     var sig = f"{target.kind}:{target.name}:{target.entry}:{target.output}"
     sig = sig ++ f":{target.optimize_mode}:{target.target_kind}"
@@ -244,7 +290,7 @@ fn build_cache_collect_output_paths(root: str, target: BuildGraphTarget) -> Vec[
 pub fn build_cache_check_fresh(root: str, target: BuildGraphTarget, dep_rebuilt: bool) -> bool:
     if target.name == "prune" or target.name == "prune-apply":
         return false
-    if target.name == "last-green" or target.name == "require-last-green" or target.name == "check-committed-state":
+    if target.name == "last-green" or target.name == "test-green" or target.name == "require-last-green" or target.name == "check-committed-state":
         return false
     if dep_rebuilt:
         return false

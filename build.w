@@ -258,6 +258,9 @@ fn issue61_regression_action(ctx: ActionCtx) -> i32:
 
     if fs.copy_tree("src", build_project_join(repo_copy, "src")) != 0:
         return issue61_fail(ctx, "could not copy src into repo fixture")
+    let copied_seed = build_project_join(repo_copy, "src/main")
+    if fs.exists(copied_seed) and fs.remove_file(copied_seed) != 0:
+        return issue61_fail(ctx, "could not remove copied seed from repo fixture")
     if fs.symlink("lib", build_project_join(repo_copy, "lib")) != 0:
         return issue61_fail(ctx, "could not link lib into repo fixture")
 
@@ -742,6 +745,12 @@ pub fn build(ctx: BuildCtx) -> Build:
     emit_c_smoke = emit_c_smoke.dep("runtime")
     out = out.add_target(emit_c_smoke)
 
+    var test_green = target_new(.Action, "test-green", "").output("out/.build-state/test-green.json")
+    test_green.action = run_test_green_action
+    test_green = test_green.write_scope("out/.build-state")
+    test_green = test_green.write_scope("out/command/test-green")
+    out = out.add_target(test_green)
+
     var tests = target_new(.Group, "test", "")
     tests = tests.dep("behavior-tests")
     tests = tests.dep("native-compile-error-tests")
@@ -759,6 +768,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("issue61-regression")
     tests = tests.dep("embedded-runtime-regression")
     tests = tests.dep("emit-c-smoke")
+    tests = tests.dep("test-green")
     out = out.add_target(tests)
 
     var last_green = target_new(.Action, "last-green", "").output("out/.build-state/last-green.json")
@@ -774,7 +784,6 @@ pub fn build(ctx: BuildCtx) -> Build:
     last_green = last_green.write_scope("out/seed-archive")
     last_green = last_green.write_scope("out/command/last-green")
     last_green = last_green.dep("fixpoint")
-    last_green = last_green.dep("test")
     out = out.add_target(last_green)
 
     var require_last_green = target_new(.Action, "require-last-green", "").output("out/command/require-last-green/ok")
@@ -964,6 +973,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     prune = prune.write_scope("out/bootstrap-lib")
     prune = prune.write_scope("out/.build-state")
     prune = prune.write_scope("out/seed-archive")
+    prune = prune.write_scope("out/test-graph")
     prune = prune.write_scope("out/command/prune")
     out = out.add_target(prune)
 
@@ -978,6 +988,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     prune_apply = prune_apply.write_scope("out/bootstrap-lib")
     prune_apply = prune_apply.write_scope("out/.build-state")
     prune_apply = prune_apply.write_scope("out/seed-archive")
+    prune_apply = prune_apply.write_scope("out/test-graph")
     prune_apply = prune_apply.write_scope("out/command/prune-apply")
     out = out.add_target(prune_apply)
 
