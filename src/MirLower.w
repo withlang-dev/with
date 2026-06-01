@@ -5277,6 +5277,12 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
     if enum_accessor_variant != 0:
         return self.lower_enum_accessor_call(self_expr, method_sym, node)
 
+    if self.is_option_type(enum_accessor_recv_type) != 0 and (method_name == "map" or method_name == "and_then"):
+        return self.lower_option_combinator_method(self_expr, method_name, arg_start, arg_count, node)
+
+    if self.is_result_type(enum_accessor_recv_type) != 0 and (method_name == "map" or method_name == "map_err"):
+        return self.lower_result_combinator_method(self_expr, method_name, arg_start, arg_count, node)
+
     if method_name == "unwrap_or" and self.is_option_or_result_type(enum_accessor_recv_type) != 0:
         return self.lower_unwrap_or_method(self_expr, arg_start, arg_count, node)
 
@@ -5721,6 +5727,152 @@ fn MirBuilder.is_option_or_result_type(self: MirBuilder, type_id: i32) -> i32:
     let base = self.sema.get_generic_inst_base(resolved as i32)
     if base == self.sema.syms.option or base == self.sema.syms.result: 1 else: 0
 
+fn MirBuilder.is_option_type(self: MirBuilder, type_id: i32) -> i32:
+    if type_id == 0:
+        return 0
+    let resolved = self.sema.resolve_alias(type_id as TypeId)
+    if self.sema.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return 0
+    if self.sema.get_generic_inst_base(resolved as i32) == self.sema.syms.option: 1 else: 0
+
+fn MirBuilder.is_result_type(self: MirBuilder, type_id: i32) -> i32:
+    if type_id == 0:
+        return 0
+    let resolved = self.sema.resolve_alias(type_id as TypeId)
+    if self.sema.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return 0
+    if self.sema.get_generic_inst_base(resolved as i32) == self.sema.syms.result: 1 else: 0
+
+fn MirBuilder.lower_option_combinator_method(self: MirBuilder, self_expr: i32, method_name: str, arg_start: i32, arg_count: i32, node: i32) -> i32:
+    if arg_count != 1:
+        self.mark_unsupported()
+        return self.unit_operand()
+
+    let span = self.ast.get_start(node)
+    var value_ty = self.expr_type(self_expr)
+    if value_ty == 0 or value_ty == self.sema.ty_void:
+        value_ty = self.type_receiver_type(self_expr)
+    let payload_ty = self.generic_inst_arg_type(value_ty, self.sema.syms.option, 0)
+    let result_ty = self.expr_type(node)
+    if payload_ty == 0 or result_ty == 0:
+        self.mark_unsupported()
+        return self.unit_operand()
+
+    let saved_expected = self.expected_type
+    self.expected_type = value_ty
+    let value_op = self.lower_expr(self_expr)
+    self.expected_type = saved_expected
+    let value_place = self.materialize_operand(value_op, value_ty, self.ast.get_start(self_expr))
+    let mapper_op = self.lower_expr(self.ast.get_extra(arg_start))
+
+    let some_bb = self.new_block()
+    let none_bb = self.new_block()
+    let join_bb = self.new_block()
+    let result_local = self.new_temp(result_ty)
+    let result_place = self.place_for_local(result_local)
+
+    let disc = self.lower_enum_discriminant(value_place)
+    let vals: Vec[i32] = Vec.new()
+    vals.push(self.enum_variant_discriminant_for_type(value_ty, self.sema.syms.some))
+    let targets: Vec[i32] = Vec.new()
+    targets.push(some_bb as i32)
+    let table = self.body.new_switch_table(vals, targets)
+    self.terminate(TermKind.TK_SWITCH_INT, disc, table, none_bb, 0)
+
+    self.switch_to(none_bb)
+    let none_fields: Vec[i32] = Vec.new()
+    self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.none, none_fields, span)
+    self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+
+    self.switch_to(some_bb)
+    let some_idx = self.enum_variant_index_for_type(value_ty, self.sema.syms.some)
+    let downcast_place = self.body.new_downcast_place(value_place, some_idx, value_ty)
+    let payload_place = self.body.new_field_place(downcast_place, 0, payload_ty)
+    let call_args: Vec[i32] = Vec.new()
+    call_args.push(self.operand_for_place(payload_place, payload_ty))
+    let raw_ret_ty = if method_name == "and_then": result_ty else: self.generic_inst_arg_type(result_ty, self.sema.syms.option, 0)
+    let mapped_op = self.lower_call_with_operand_args(mapper_op, call_args, raw_ret_ty, node)
+    if method_name == "and_then":
+        self.assign_operand_to_place(result_place, mapped_op, span)
+    else:
+        let some_fields: Vec[i32] = Vec.new()
+        some_fields.push(mapped_op)
+        self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.some, some_fields, span)
+    self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+
+    self.switch_to(join_bb)
+    self.operand_for_place(result_place, result_ty)
+
+fn MirBuilder.lower_result_combinator_method(self: MirBuilder, self_expr: i32, method_name: str, arg_start: i32, arg_count: i32, node: i32) -> i32:
+    if arg_count != 1:
+        self.mark_unsupported()
+        return self.unit_operand()
+
+    let span = self.ast.get_start(node)
+    var value_ty = self.expr_type(self_expr)
+    if value_ty == 0 or value_ty == self.sema.ty_void:
+        value_ty = self.type_receiver_type(self_expr)
+    let source_ok_ty = self.generic_inst_arg_type(value_ty, self.sema.syms.result, 0)
+    let source_err_ty = self.generic_inst_arg_type(value_ty, self.sema.syms.result, 1)
+    let result_ty = self.expr_type(node)
+    let result_ok_ty = self.generic_inst_arg_type(result_ty, self.sema.syms.result, 0)
+    let result_err_ty = self.generic_inst_arg_type(result_ty, self.sema.syms.result, 1)
+    if source_ok_ty == 0 or source_err_ty == 0 or result_ok_ty == 0 or result_err_ty == 0:
+        self.mark_unsupported()
+        return self.unit_operand()
+
+    let saved_expected = self.expected_type
+    self.expected_type = value_ty
+    let value_op = self.lower_expr(self_expr)
+    self.expected_type = saved_expected
+    let value_place = self.materialize_operand(value_op, value_ty, self.ast.get_start(self_expr))
+    let mapper_op = self.lower_expr(self.ast.get_extra(arg_start))
+
+    let ok_bb = self.new_block()
+    let err_bb = self.new_block()
+    let join_bb = self.new_block()
+    let result_local = self.new_temp(result_ty)
+    let result_place = self.place_for_local(result_local)
+
+    let disc = self.lower_enum_discriminant(value_place)
+    let vals: Vec[i32] = Vec.new()
+    vals.push(self.enum_variant_discriminant_for_type(value_ty, self.sema.syms.ok))
+    let targets: Vec[i32] = Vec.new()
+    targets.push(ok_bb as i32)
+    let table = self.body.new_switch_table(vals, targets)
+    self.terminate(TermKind.TK_SWITCH_INT, disc, table, err_bb, 0)
+
+    self.switch_to(ok_bb)
+    let ok_idx = self.enum_variant_index_for_type(value_ty, self.sema.syms.ok)
+    let ok_downcast = self.body.new_downcast_place(value_place, ok_idx, value_ty)
+    let ok_payload_place = self.body.new_field_place(ok_downcast, 0, source_ok_ty)
+    let ok_fields: Vec[i32] = Vec.new()
+    if method_name == "map":
+        let ok_call_args: Vec[i32] = Vec.new()
+        ok_call_args.push(self.operand_for_place(ok_payload_place, source_ok_ty))
+        ok_fields.push(self.lower_call_with_operand_args(mapper_op, ok_call_args, result_ok_ty, node))
+    else:
+        ok_fields.push(self.operand_for_place(ok_payload_place, source_ok_ty))
+    self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.ok, ok_fields, span)
+    self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+
+    self.switch_to(err_bb)
+    let err_idx = self.enum_variant_index_for_type(value_ty, self.sema.syms.err)
+    let err_downcast = self.body.new_downcast_place(value_place, err_idx, value_ty)
+    let err_payload_place = self.body.new_field_place(err_downcast, 0, source_err_ty)
+    let err_fields: Vec[i32] = Vec.new()
+    if method_name == "map_err":
+        let err_call_args: Vec[i32] = Vec.new()
+        err_call_args.push(self.operand_for_place(err_payload_place, source_err_ty))
+        err_fields.push(self.lower_call_with_operand_args(mapper_op, err_call_args, result_err_ty, node))
+    else:
+        err_fields.push(self.operand_for_place(err_payload_place, source_err_ty))
+    self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.err, err_fields, span)
+    self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
+
+    self.switch_to(join_bb)
+    self.operand_for_place(result_place, result_ty)
+
 fn MirBuilder.lower_method_arg_or_unit(self: MirBuilder, node: i32, arg_start: i32, arg_count: i32, idx: i32) -> i32:
     if self.sema.has_resolved_call_args(node) != 0:
         if idx >= self.sema.get_resolved_call_arg_count(node):
@@ -5988,6 +6140,18 @@ fn MirBuilder.option_payload_type(self: MirBuilder, option_ty: i32) -> i32:
         return 0
     self.sema.get_generic_inst_arg(resolved as i32, 0)
 
+fn MirBuilder.generic_inst_arg_type(self: MirBuilder, type_id: i32, base_sym: i32, index: i32) -> i32:
+    if type_id == 0:
+        return 0
+    let resolved = self.sema.resolve_alias(type_id as TypeId)
+    if self.sema.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return 0
+    if self.sema.get_generic_inst_base(resolved as i32) != base_sym:
+        return 0
+    if self.sema.get_generic_inst_arg_count(resolved as i32) <= index:
+        return 0
+    self.sema.get_generic_inst_arg(resolved as i32, index)
+
 fn MirBuilder.option_some_index(self: MirBuilder, option_ty: i32) -> i32:
     let idx = self.enum_variant_index_for_type(option_ty, self.sema.syms.some)
     if idx >= 0:
@@ -6049,6 +6213,22 @@ fn MirBuilder.lower_optional_chain_receiver_operand(self: MirBuilder, payload_pl
             return self.body.new_operand(OperandKind.OK_COPY, temp_place)
     let op_kind = if self.sema.is_copy(payload_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE
     self.body.new_operand(op_kind, payload_place)
+
+fn MirBuilder.operand_for_place(self: MirBuilder, place: i32, type_id: i32) -> i32:
+    let op_kind = if self.sema.is_copy(type_id) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE
+    self.body.new_operand(op_kind, place)
+
+fn MirBuilder.lower_call_with_operand_args(self: MirBuilder, fn_op: i32, args: Vec[i32], ret_type: i32, node: i32) -> i32:
+    let args_id = self.body.new_call_args(args)
+    self.body.set_call_ast_node(args_id, node)
+    let result_local = self.new_temp(ret_type)
+    let result_place = self.place_for_local(result_local)
+    let next_bb = self.new_block()
+    self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
+    self.switch_to(next_bb)
+    if self.sema.is_copy(ret_type) != 0:
+        return self.body.new_operand(OperandKind.OK_COPY, result_place)
+    self.body.new_operand(OperandKind.OK_MOVE, result_place)
 
 fn MirBuilder.lower_call_with_receiver_operand(self: MirBuilder, fn_op: i32, callee_sym: i32, recv_op: i32, arg_start: i32, arg_count: i32, ret_type: i32, node: i32) -> i32:
     let sig_idx = self.call_sig_for_sym(callee_sym)

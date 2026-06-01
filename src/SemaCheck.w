@@ -6067,10 +6067,12 @@ fn Sema.pipeline_generic_builtin_method_exists(self: Sema, owner_sym: i32, field
         if field == self.syms.get or self.pool_resolve(field) == "set":
             return 1
     if owner_sym == self.syms.option:
-        if field == self.syms.unwrap or field == self.syms.is_some or field == self.syms.is_none or field == self.syms.filter or self.pool_resolve(field) == "unwrap_or":
+        let option_method_name = self.pool_resolve(field)
+        if field == self.syms.unwrap or field == self.syms.is_some or field == self.syms.is_none or field == self.syms.filter or field == self.syms.map or option_method_name == "and_then" or option_method_name == "unwrap_or":
             return 1
     if owner_sym == self.syms.result:
-        if field == self.syms.unwrap or field == self.syms.is_ok or field == self.syms.is_err or self.pool_resolve(field) == "unwrap_or":
+        let result_method_name = self.pool_resolve(field)
+        if field == self.syms.unwrap or field == self.syms.is_ok or field == self.syms.is_err or field == self.syms.map or result_method_name == "map_err" or result_method_name == "unwrap_or":
             return 1
     if owner_sym == self.syms.vecslot or owner_sym == self.syms.vecrange:
         if field == self.syms.get or self.pool_resolve(field) == "set" or self.is_collection_len_method(field):
@@ -8263,6 +8265,59 @@ fn Sema.ensure_option_type_for(self: Sema, elem_ty: i32) -> i32:
     args.push(elem_ty)
     self.ensure_generic_inst_type(self.syms.option, args, 1) as i32
 
+fn Sema.ensure_result_type_for(self: Sema, ok_ty: i32, err_ty: i32) -> i32:
+    let args: Vec[i32] = Vec.new()
+    args.push(ok_ty)
+    args.push(err_ty)
+    self.ensure_generic_inst_type(self.syms.result, args, 2) as i32
+
+fn Sema.fn_return_type(self: Sema, fn_ty: i32) -> i32:
+    let resolved = self.resolve_alias(fn_ty as TypeId)
+    if self.get_type_kind(resolved) != TypeKind.TY_FN:
+        return 0
+    self.get_type_d2(resolved)
+
+fn Sema.option_combinator_return_type(self: Sema, recv_type: i32, method_name: str, arg_types: Vec[i32], arg_count: i32, node: i32) -> i32:
+    if method_name == "map":
+        if arg_count != 1:
+            self.emit_error("Option.map() expects exactly one argument", node)
+            return 0
+        let mapped_ty = self.fn_return_type(arg_types.get(0))
+        if mapped_ty == 0:
+            self.emit_error("Option.map() expects a function argument", node)
+            return 0
+        return self.ensure_option_type_for(mapped_ty)
+    if method_name == "and_then":
+        if arg_count != 1:
+            self.emit_error("Option.and_then() expects exactly one argument", node)
+            return 0
+        let chained_ty = self.fn_return_type(arg_types.get(0))
+        if chained_ty == 0:
+            self.emit_error("Option.and_then() expects a function argument", node)
+            return 0
+        let chained_resolved = self.resolve_alias(chained_ty as TypeId)
+        if self.get_type_kind(chained_resolved) != TypeKind.TY_GENERIC_INST or self.get_type_d0(chained_resolved) != self.syms.option:
+            self.emit_error("Option.and_then() function must return Option", node)
+            return 0
+        return chained_ty
+    0
+
+fn Sema.result_combinator_return_type(self: Sema, recv_type: i32, method_name: str, arg_types: Vec[i32], arg_count: i32, node: i32) -> i32:
+    if method_name != "map" and method_name != "map_err":
+        return 0
+    if arg_count != 1:
+        self.emit_error("Result." ++ method_name ++ "() expects exactly one argument", node)
+        return 0
+    let mapped_ty = self.fn_return_type(arg_types.get(0))
+    if mapped_ty == 0:
+        self.emit_error("Result." ++ method_name ++ "() expects a function argument", node)
+        return 0
+    let ok_ty = self.get_generic_inst_arg(recv_type, 0)
+    let err_ty = self.get_generic_inst_arg(recv_type, 1)
+    if method_name == "map":
+        return self.ensure_result_type_for(mapped_ty, err_ty)
+    self.ensure_result_type_for(ok_ty, mapped_ty)
+
 fn Sema.collection_len_method_return_type(self: Sema, method_name: str) -> i32:
     if method_name == "len":
         return self.ty_usize as i32
@@ -8427,6 +8482,23 @@ fn Sema.method_expected_arg_type(self: Sema, recv_type: i32, field: i32, arg_ind
             return self.get_generic_inst_arg(resolved as i32, 1)
     if owner_name == "Sender" and method_name == "send" and arg_index == 0:
         return self.get_generic_inst_arg(resolved as i32, 0)
+    if owner_sym == self.syms.option:
+        if (field == self.syms.map or method_name == "and_then") and arg_index == 0:
+            let option_elem = self.get_generic_inst_arg(resolved as i32, 0)
+            let params: Vec[i32] = Vec.new()
+            params.push(option_elem)
+            return self.ensure_fn_type(params, 1, 0 as TypeId) as i32
+        if field == self.syms.filter and arg_index == 0:
+            let option_elem2 = self.get_generic_inst_arg(resolved as i32, 0)
+            let params2: Vec[i32] = Vec.new()
+            params2.push(option_elem2)
+            return self.ensure_fn_type(params2, 1, self.ty_bool) as i32
+    if owner_sym == self.syms.result:
+        if (field == self.syms.map or method_name == "map_err") and arg_index == 0:
+            let result_arg = if field == self.syms.map: self.get_generic_inst_arg(resolved as i32, 0) else: self.get_generic_inst_arg(resolved as i32, 1)
+            let result_params: Vec[i32] = Vec.new()
+            result_params.push(result_arg)
+            return self.ensure_fn_type(result_params, 1, 0 as TypeId) as i32
     if (owner_sym == self.syms.option or owner_sym == self.syms.result) and method_name == "unwrap_or" and arg_index == 0:
         return self.get_generic_inst_arg(resolved as i32, 0)
     0
@@ -9415,6 +9487,9 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
         if type_name_sym == self.syms.option:
             if field == self.syms.unwrap:
                 return self.get_generic_inst_arg(recv_type, 0)
+            let option_combinator_ret = self.option_combinator_return_type(recv_type, mc_method_name_raw, arg_types, mc_resolved_arg_count, node)
+            if option_combinator_ret != 0:
+                return option_combinator_ret
             if mc_method_name_raw == "unwrap_or":
                 if mc_resolved_arg_count != 1:
                     self.emit_error("Option.unwrap_or() expects exactly one argument", node)
@@ -9422,9 +9497,17 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                 return self.get_generic_inst_arg(recv_type, 0)
             if field == self.syms.is_some or field == self.syms.is_none:
                 return self.ty_bool as i32
+            if field == self.syms.filter:
+                if mc_resolved_arg_count != 1:
+                    self.emit_error("Option.filter() expects exactly one argument", node)
+                    return 0
+                return recv_type as i32
         if type_name_sym == self.syms.result:
             if field == self.syms.unwrap:
                 return self.get_generic_inst_arg(recv_type, 0)
+            let result_combinator_ret = self.result_combinator_return_type(recv_type, mc_method_name_raw, arg_types, mc_resolved_arg_count, node)
+            if result_combinator_ret != 0:
+                return result_combinator_ret
             if mc_method_name_raw == "unwrap_or":
                 if mc_resolved_arg_count != 1:
                     self.emit_error("Result.unwrap_or() expects exactly one argument", node)
