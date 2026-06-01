@@ -581,7 +581,9 @@ fn bs_check_build_rejects_imperative_manifest(ctx: ActionCtx, compiler_path: str
 fn bs_check_run_project_targets(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "rundemo")
     if rc != 0: return rc
-    rc = bs_write_fixture(ctx, bs_join(case_dir, "src/main.w"), "fn main:\n    print(\"default-run\")\n", "run project default main")
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "src/Foo.w"), "pub fn add(a: i32, b: i32) -> i32: a + b\n", "run project imported module")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "src/main.w"), "use Foo\n\nfn main:\n    let n = add(2, 3)\n    print(f\"default-run-{n}\")\n", "run project default main")
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(case_dir, "src/tool.w"), "fn main:\n    print(\"tool-run\")\n", "run project tool main")
     if rc != 0: return rc
@@ -590,7 +592,7 @@ fn bs_check_run_project_targets(ctx: ActionCtx, compiler_path: str, case_dir: st
 
     let default_result = bs_project_expect_success(ctx, compiler_path, case_dir, "run-project-default", bs_project_args("run"))
     if default_result.rc != 0: return default_result.rc
-    rc = bs_assert_stdout_exact(ctx, default_result, "default-run", "run_project_default")
+    rc = bs_assert_stdout_exact(ctx, default_result, "default-run-5", "run_project_default")
     if rc != 0: return rc
 
     var target_args: Vec[str] = Vec.new()
