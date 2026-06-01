@@ -1177,6 +1177,9 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
     if kind == NodeKind.NK_OPTIONAL_CHAIN:
         let base_node = self.ast.get_data0(node)
         let base_ty = self.expr_type(base_node)
+        let extra_start = self.ast.get_data2(node)
+        if self.ast.optional_chain_is_call(extra_start) != 0:
+            return self.sema.optional_chain_method_result_type_no_check(base_ty, self.ast.get_data1(node)) as i32
         self.sema.optional_chain_result_type(base_ty, self.ast.get_data1(node)) as i32
     if kind == NodeKind.NK_INT_LIT:
         let suffix_ty = self.sema.literal_suffix_type(self.ast.literal_suffix(node as NodeId))
@@ -6016,6 +6019,97 @@ fn MirBuilder.lower_optional_chain_field(self: MirBuilder, result_place: i32, re
     some_fields.push(field_op)
     self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.some, some_fields, span)
 
+fn MirBuilder.lower_intrinsic_call_with_receiver_operand(self: MirBuilder, intrinsic: MirIntrinsic, recv_op: i32, method_sym: i32, arg_start: i32, arg_count: i32, ret_type: i32, node: i32) -> i32:
+    let fn_op = self.const_operand(ConstKind.CK_FN, method_sym, self.sema.ty_void)
+    let call_args: Vec[i32] = Vec.new()
+    call_args.push(recv_op)
+    for ai in 0..arg_count:
+        call_args.push(self.lower_expr(self.ast.get_extra(arg_start + ai)))
+
+    let args_id = self.body.new_call_args(call_args)
+    self.body.set_call_ast_node(args_id, node)
+    let result_local = self.new_temp(ret_type)
+    let result_place = self.place_for_local(result_local)
+    let next_bb = self.new_block()
+    self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
+    self.switch_to(next_bb)
+    self.body.set_call_intrinsic(args_id, intrinsic)
+    if self.sema.is_copy(ret_type) != 0:
+        return self.body.new_operand(OperandKind.OK_COPY, result_place)
+    self.body.new_operand(OperandKind.OK_MOVE, result_place)
+
+fn MirBuilder.lower_optional_chain_receiver_operand(self: MirBuilder, payload_place: i32, payload_ty: i32, sig_idx: i32, span: i32) -> i32:
+    if sig_idx >= 0 and self.sema.sig_get_param_count(sig_idx) > 0:
+        let expected_ty = self.sema.sig_param_type(sig_idx, 0)
+        if expected_ty != 0 and self.sema.can_auto_ref_arg(expected_ty, payload_ty) != 0:
+            let rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, payload_place, 0)
+            let temp = self.new_temp(expected_ty)
+            let temp_place = self.place_for_local(temp)
+            self.body.push_stmt(self.cur_bb, StmtKind.Assign, temp_place, rv, span)
+            return self.body.new_operand(OperandKind.OK_COPY, temp_place)
+    let op_kind = if self.sema.is_copy(payload_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE
+    self.body.new_operand(op_kind, payload_place)
+
+fn MirBuilder.lower_call_with_receiver_operand(self: MirBuilder, fn_op: i32, callee_sym: i32, recv_op: i32, arg_start: i32, arg_count: i32, ret_type: i32, node: i32) -> i32:
+    let sig_idx = self.call_sig_for_sym(callee_sym)
+    let args: Vec[i32] = Vec.new()
+    args.push(recv_op)
+    for ai in 0..arg_count:
+        args.push(self.lower_call_arg(self.ast.get_extra(arg_start + ai), sig_idx, 0, ai + 1))
+    let args_id = self.body.new_call_args(args)
+    self.body.set_call_ast_node(args_id, node)
+    let result_local = self.new_temp(ret_type)
+    let result_place = self.place_for_local(result_local)
+    let next_bb = self.new_block()
+    self.terminate(TermKind.TK_CALL, fn_op, args_id, result_place, next_bb)
+    self.switch_to(next_bb)
+    if self.sema.is_copy(ret_type) != 0:
+        return self.body.new_operand(OperandKind.OK_COPY, result_place)
+    self.body.new_operand(OperandKind.OK_MOVE, result_place)
+
+fn MirBuilder.lower_optional_chain_method(self: MirBuilder, result_place: i32, result_ty: i32, base_place: i32, base_ty: i32, member_sym: i32, extra_start: i32, node: i32):
+    let payload_ty = self.option_payload_type(base_ty)
+    if payload_ty == 0:
+        self.mark_unsupported()
+        return
+    let raw_ret_ty = self.sema.optional_chain_method_raw_result_type(payload_ty, member_sym)
+    if raw_ret_ty == 0:
+        self.mark_unsupported()
+        return
+
+    let some_idx = self.option_some_index(base_ty)
+    let downcast_place = self.body.new_downcast_place(base_place, some_idx, base_ty)
+    let payload_place = self.body.new_field_place(downcast_place, 0, payload_ty)
+    let method_name = self.pool.resolve_symbol(member_sym)
+    let arg_count = self.ast.optional_chain_arg_count(extra_start)
+    let arg_start = self.ast.optional_chain_arg_start(extra_start)
+    var raw_op = 0
+
+    let intrinsic = self.classify_intrinsic(payload_ty, method_name)
+    if intrinsic != MirIntrinsic.NONE:
+        let payload_op_kind = if self.sema.is_copy(payload_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE
+        let payload_op = self.body.new_operand(payload_op_kind, payload_place)
+        raw_op = self.lower_intrinsic_call_with_receiver_operand(intrinsic, payload_op, member_sym, arg_start, arg_count, raw_ret_ty, node)
+    else:
+        let recv_resolved = self.sema.auto_deref_ref_ptr_type(payload_ty as TypeId) as i32
+        let owner_sym = self.sema.method_owner_symbol_for_type(recv_resolved)
+        let callee_sym = if owner_sym != 0: self.sema.lookup_method_fn(owner_sym, member_sym) else: 0
+        if callee_sym == 0:
+            self.mark_unsupported()
+            return
+        let fn_op = self.lower_var(callee_sym, 0, 0)
+        let sig_idx = self.call_sig_for_sym(callee_sym)
+        let recv_op = self.lower_optional_chain_receiver_operand(payload_place, payload_ty, sig_idx, self.ast.get_start(node))
+        raw_op = self.lower_call_with_receiver_operand(fn_op, callee_sym, recv_op, arg_start, arg_count, raw_ret_ty, node)
+
+    if raw_ret_ty == result_ty:
+        self.assign_operand_to_place(result_place, raw_op, self.ast.get_start(node))
+        return
+
+    let some_fields: Vec[i32] = Vec.new()
+    some_fields.push(raw_op)
+    self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.some, some_fields, self.ast.get_start(node))
+
 fn MirBuilder.lower_pipeline(self: MirBuilder, lhs_expr: i32, fn_expr: i32, args_start: i32, args_count: i32, node: i32) -> i32:
     if self.sema.pipeline_method_calls.contains(node):
         let method_sym = self.sema.pipeline_method_calls.get(node).unwrap()
@@ -6050,7 +6144,7 @@ fn MirBuilder.lower_optional_chain(self: MirBuilder, node: i32) -> i32:
     let base_expr = self.ast.get_data0(node)
     let member_sym = self.ast.get_data1(node)
     let extra_start = self.ast.get_data2(node)
-    let arg_count = if extra_start >= 0 and extra_start < self.ast.extra_len(): self.ast.get_extra(extra_start) else: 0
+    let is_call = self.ast.optional_chain_is_call(extra_start)
 
     let base_op = self.lower_expr(base_expr)
     let base_ty = self.expr_type(base_expr)
@@ -6073,10 +6167,8 @@ fn MirBuilder.lower_optional_chain(self: MirBuilder, node: i32) -> i32:
     let result_place = self.place_for_local(result_local)
 
     self.switch_to(some_bb)
-    if arg_count > 0:
-        self.mark_unsupported()
-        let none_fields: Vec[i32] = Vec.new()
-        self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.none, none_fields, self.ast.get_start(node))
+    if is_call != 0:
+        self.lower_optional_chain_method(result_place, result_ty, base_place, base_ty, member_sym, extra_start, node)
     else:
         self.lower_optional_chain_field(result_place, result_ty, base_place, base_ty, member_sym, self.ast.get_start(node))
     self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)

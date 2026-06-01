@@ -706,9 +706,10 @@ fn ResolveState.walk_expr(self: ResolveState, pool: AstPool, module_id: i32, par
     if kind == NodeKind.NK_OPTIONAL_CHAIN:
         self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data0(node))
         let extra_start = pool.get_data2(node)
-        let arg_count = resolve_extra_or_zero(pool, extra_start)
+        let arg_count = pool.optional_chain_arg_count(extra_start)
+        let arg_start = pool.optional_chain_arg_start(extra_start)
         for ai in 0..arg_count:
-            self.walk_expr(pool, module_id, parent_def, current_scope, resolve_extra_or_zero(pool, extra_start + 1 + ai))
+            self.walk_expr(pool, module_id, parent_def, current_scope, resolve_extra_or_zero(pool, arg_start + ai))
         return
 
     if kind == NodeKind.NK_PIPELINE:

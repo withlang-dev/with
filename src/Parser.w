@@ -4433,7 +4433,9 @@ fn Parser.parse_optional_chain(self: Parser, lhs: i32) -> NodeId:
     else:
         member = self.expect_ident()
     var args: Vec[i32] = Vec.new()
+    var has_call = 0
     if self.peek() == TokenKind.TK_L_PAREN:
+        has_call = 1
         self.advance()
         self.skip_newlines()
         while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
@@ -4445,9 +4447,11 @@ fn Parser.parse_optional_chain(self: Parser, lhs: i32) -> NodeId:
         self.expect(TokenKind.TK_R_PAREN)
     let extra_start = self.pool.extra_len()
     let arg_count = args.len() as i32
-    self.pool.add_extra(arg_count)
-    for ai in 0..arg_count:
-        self.pool.add_extra(args.get(ai as i64))
+    self.pool.add_extra(has_call)
+    if has_call != 0:
+        self.pool.add_extra(arg_count)
+        for ai in 0..arg_count:
+            self.pool.add_extra(args.get(ai as i64))
     self.pool.add_node(NodeKind.NK_OPTIONAL_CHAIN, self.pool.get_start(lhs), self.prev_end(), lhs, member, extra_start)
 
 // ── Variant shorthand ────────────────────────────────────────────

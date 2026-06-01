@@ -647,11 +647,12 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
         let extra_start = self.ast.get_data2(node)
         if extra_start < 0 or extra_start >= self.ast.extra_len():
             return out
-        let arg_count = self.ast.get_extra(extra_start)
-        let safe_arg_count = self.clamp_extra_span_count(extra_start + 1, arg_count, 1, 64)
+        let arg_count = self.ast.optional_chain_arg_count(extra_start)
+        let arg_start = self.ast.optional_chain_arg_start(extra_start)
+        let safe_arg_count = self.clamp_extra_span_count(arg_start, arg_count, 1, 64)
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         for ai in 0..safe_arg_count:
-            out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(extra_start + 1 + ai), indent + 1)
+            out = out ++ self.dump_typed_expr_tree(self.ast.get_extra(arg_start + ai), indent + 1)
         return out
 
     if kind == NodeKind.NK_INDEX:
@@ -915,11 +916,12 @@ fn Sema.emit_typed_expr_tree(self: Sema, node: i32, indent: i32):
         let extra_start = self.ast.get_data2(node)
         if extra_start < 0 or extra_start >= self.ast.extra_len():
             return
-        let arg_count = self.ast.get_extra(extra_start)
-        let safe_arg_count = self.clamp_extra_span_count(extra_start + 1, arg_count, 1, 64)
+        let arg_count = self.ast.optional_chain_arg_count(extra_start)
+        let arg_start = self.ast.optional_chain_arg_start(extra_start)
+        let safe_arg_count = self.clamp_extra_span_count(arg_start, arg_count, 1, 64)
         self.emit_typed_expr_tree(self.ast.get_data0(node), indent + 1)
         for ai in 0..safe_arg_count:
-            self.emit_typed_expr_tree(self.ast.get_extra(extra_start + 1 + ai), indent + 1)
+            self.emit_typed_expr_tree(self.ast.get_extra(arg_start + ai), indent + 1)
         return
 
     if kind == NodeKind.NK_INDEX:

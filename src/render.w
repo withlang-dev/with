@@ -374,13 +374,14 @@ fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
         let member = intern.resolve(pool.get_data1(node))
         let extra_start = pool.get_data2(node)
         var out = prefix ++ render_expr(pool, intern, (expr) as NodeId, 0) ++ "?." ++ member
-        let arg_count = pool.get_extra(extra_start)
-        if arg_count > 0:
+        if pool.optional_chain_is_call(extra_start) != 0:
+            let arg_count = pool.optional_chain_arg_count(extra_start)
+            let arg_start = pool.optional_chain_arg_start(extra_start)
             out = out ++ "("
             for ai in 0..arg_count:
                 if ai > 0:
                     out = out ++ ", "
-                out = out ++ render_expr(pool, intern, (pool.get_extra(extra_start + 1 + ai)) as NodeId, 0)
+                out = out ++ render_expr(pool, intern, (pool.get_extra(arg_start + ai)) as NodeId, 0)
             out = out ++ ")"
         return out
 
