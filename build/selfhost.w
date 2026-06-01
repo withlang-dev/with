@@ -1151,7 +1151,7 @@ fn bs_check_emit_c_array_fill_rvalue(ctx: ActionCtx, compiler_path: str, case_di
         "        return 1\n" ++
         "    if buf[127] != 7u8:\n" ++
         "        return 2\n" ++
-        "    with_print_str(\"ok\")\n" ++
+        "    unsafe { with_print_str(\"ok\") }\n" ++
         "    0\n"
     var rc = bs_write_fixture(ctx, src, source, "emit-c array fill rvalue source")
     if rc != 0: return rc
