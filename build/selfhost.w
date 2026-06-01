@@ -1031,6 +1031,7 @@ fn bs_compile_emit_c_output(ctx: ActionCtx, root: str, case_dir: str, c_path: st
     cc_args |> push(bs_abs(root, "out/lib/" ++ platform_obj))
     cc_args |> push(bs_abs(root, "out/lib/compat_runtime.o"))
     cc_args |> push(bs_abs(root, "out/lib/panic_runtime.o"))
+    cc_args |> push(bs_abs(root, "out/lib/regex_runtime.o"))
     cc_args |> push(bs_abs(root, "out/lib/fiber_stubs.o"))
     cc_args |> push(bs_abs(root, "out/lib/cimport_stubs.o"))
     cc_args |> push(bs_abs(root, "out/lib/embedded_objects.o"))
@@ -1320,6 +1321,7 @@ pub fn run_emit_c_smoke_action(ctx: ActionCtx) -> i32:
     cc_args |> push(bs_abs(root, "out/lib/" ++ platform_obj))
     cc_args |> push(bs_abs(root, "out/lib/compat_runtime.o"))
     cc_args |> push(bs_abs(root, "out/lib/panic_runtime.o"))
+    cc_args |> push(bs_abs(root, "out/lib/regex_runtime.o"))
     cc_args |> push(bs_abs(root, "out/lib/fiber_stubs.o"))
     cc_args |> push(bs_abs(root, "out/lib/cimport_stubs.o"))
     cc_args |> push(bs_abs(root, "out/lib/embedded_objects.o"))
@@ -1337,7 +1339,35 @@ pub fn run_emit_c_smoke_action(ctx: ActionCtx) -> i32:
     let output = bs_trim_trailing_line_endings(run_result.stdout)
     if output != "hello":
         return bs_fail(ctx, "emitted C binary output mismatch: " ++ output)
-    var rc = bs_check_emit_c_hashmap_new_field(ctx, compiler_path, bs_join(output_dir, "emit_c_hashmap_new_field_case"))
+
+    let prelude_c_path = bs_join(output_dir, "prelude_runtime.c")
+    let prelude_bin_path = bs_join(output_dir, "prelude_runtime")
+    let prelude_src = bs_join(output_dir, "prelude_runtime.w")
+    var rc = bs_write_fixture(ctx, prelude_src, "fn main:\n    print(\"hello\")\n", "emit-c prelude runtime source")
+    if rc != 0: return rc
+    let prelude_workspace = ctx.create_workspace("emit-c-smoke-prelude-runtime")
+    prelude_workspace.add_file(prelude_src)
+    var prelude_options = prelude_workspace.options()
+    prelude_options.output_kind = BuildOutputKind.C
+    prelude_options.output_path = prelude_c_path
+    prelude_workspace.set_options(prelude_options)
+    let prelude_emit_result = prelude_workspace.compile()
+    if prelude_emit_result.rc != 0:
+        return bs_fail(ctx, f"prelude emit-c workspace compile failed with exit code {prelude_emit_result.rc}")
+    if not fs.exists(prelude_c_path):
+        return bs_fail(ctx, "prelude emit-c did not produce " ++ prelude_c_path)
+    rc = bs_compile_emit_c_output(ctx, root, output_dir, prelude_c_path, prelude_bin_path, "emit-c-prelude-runtime")
+    if rc != 0: return rc
+    if not fs.exists(prelude_bin_path):
+        return bs_fail(ctx, "prelude emitted C compiler did not produce " ++ prelude_bin_path)
+    let prelude_run_result = bs_run_binary_capture(ctx, prelude_bin_path, "emit-c-prelude-runtime-run", 120000)
+    if prelude_run_result.rc != 0:
+        return bs_fail(ctx, f"prelude emitted C binary failed with exit code {prelude_run_result.rc}: " ++ prelude_run_result.stderr)
+    let prelude_output = bs_trim_trailing_line_endings(prelude_run_result.stdout)
+    if prelude_output != "hello":
+        return bs_fail(ctx, "prelude emitted C binary output mismatch: " ++ prelude_output)
+
+    rc = bs_check_emit_c_hashmap_new_field(ctx, compiler_path, bs_join(output_dir, "emit_c_hashmap_new_field_case"))
     if rc != 0: return rc
     print("EMIT-C SMOKE OK")
     0
