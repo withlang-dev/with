@@ -3613,6 +3613,20 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
         if unwrapped == 0:
             self.emit_error("? operator requires an Option or Result with a single success payload", node)
             return 0
+        let source_err_ty = self.result_error_type(operand as i32)
+        if source_err_ty != 0:
+            let target_err_ty = self.result_error_type(self.current_return_type as i32)
+            if target_err_ty == 0:
+                self.emit_error("? on Result requires the enclosing function to return Result", node)
+                return 0
+            if self.error_conversion_variant(target_err_ty, source_err_ty) < 0:
+                self.emit_error("? cannot convert error type '" ++ self.type_name(source_err_ty) ++ "' to '" ++ self.type_name(target_err_ty) ++ "'", node)
+                return 0
+        else:
+            let source_some_ty = self.option_payload_type_for_try(operand as i32)
+            if source_some_ty != 0 and self.option_payload_type_for_try(self.current_return_type as i32) == 0:
+                self.emit_error("? on Option requires the enclosing function to return Option", node)
+                return 0
         self.typed_expr_types.insert(node, unwrapped)
         return unwrapped
 
@@ -5439,6 +5453,53 @@ fn Sema.resolve_generic_enum_payload(self: Sema, gi_tid: i32, base_sym: i32, var
             return result
         epos = epos + pc
     result
+
+fn Sema.result_error_type(self: Sema, result_tid: i32) -> i32:
+    if result_tid <= 0:
+        return 0
+    let resolved = self.resolve_alias(result_tid as TypeId)
+    if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return 0
+    if self.get_generic_inst_base(resolved as i32) != self.syms.result:
+        return 0
+    if self.get_generic_inst_arg_count(resolved as i32) != 2:
+        return 0
+    self.get_generic_inst_arg(resolved as i32, 1)
+
+fn Sema.option_payload_type_for_try(self: Sema, option_tid: i32) -> i32:
+    if option_tid <= 0:
+        return 0
+    let resolved = self.resolve_alias(option_tid as TypeId)
+    if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return 0
+    if self.get_generic_inst_base(resolved as i32) != self.syms.option:
+        return 0
+    if self.get_generic_inst_arg_count(resolved as i32) != 1:
+        return 0
+    self.get_generic_inst_arg(resolved as i32, 0)
+
+// Returns 0 when no wrapper is needed, a variant symbol when target_err wraps
+// source_err, and -1 when `?` cannot convert source_err to target_err.
+fn Sema.error_conversion_variant(self: Sema, target_err_ty: i32, source_err_ty: i32) -> i32:
+    if target_err_ty <= 0 or source_err_ty <= 0:
+        return -1
+    if self.types_compatible(target_err_ty as TypeId, source_err_ty as TypeId) != 0:
+        return 0
+    let enum_decl = self.enum_variant_decl_type(target_err_ty)
+    if enum_decl == 0:
+        return -1
+    let te_start = self.get_type_d1(enum_decl)
+    let variant_count = self.get_type_d2(enum_decl)
+    var pos = te_start
+    for _ in 0..variant_count:
+        let variant_sym = self.type_extra.get(pos as i64)
+        let payload_count = self.type_extra.get((pos + 1) as i64)
+        if payload_count == 1:
+            let payloads = self.enum_variant_payload_types(target_err_ty, variant_sym)
+            if payloads.len() as i32 == 1 and self.types_compatible(payloads.get(0) as TypeId, source_err_ty as TypeId) != 0:
+                return variant_sym
+        pos = pos + 2 + payload_count
+    -1
 
 fn Sema.enum_variant_payload_types(self: Sema, enum_tid: i32, variant_name: i32) -> Vec[i32]:
     var result: Vec[i32] = Vec.new()

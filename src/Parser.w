@@ -2430,6 +2430,11 @@ fn Parser.parse_const_decl(self: Parser, is_pub: i32, start: i32) -> NodeId:
 
 // ── error decl (desugars to enum) ────────────────────────────────
 
+fn parser_error_from_variant_name(source_name: str) -> str:
+    if source_name.len() > 5 and source_name.ends_with("Error"):
+        return source_name.slice(0, source_name.len() - 5)
+    source_name
+
 fn Parser.parse_error_decl(self: Parser, is_pub: i32, start: i32) -> NodeId:
     self.advance()  // consume 'error'
     let err_name = self.expect_ident()
@@ -2443,11 +2448,16 @@ fn Parser.parse_error_decl(self: Parser, is_pub: i32, start: i32) -> NodeId:
         var variant_count = 0
         let count_idx = self.pool.add_extra(0)
         while true:
+            let src_start = self.current_start()
             let src_sym = self.expect_ident()
             if src_sym == 0:
                 break
-            self.pool.add_extra(src_sym)
-            self.pool.add_extra(0)  // payload count = 0
+            let src_name = self.intern.resolve(src_sym)
+            let variant_sym = self.intern.intern(parser_error_from_variant_name(src_name))
+            let payload_ty = self.pool.add_node(NodeKind.NK_TYPE_NAMED, src_start, self.prev_end(), src_sym, 0, 0)
+            self.pool.add_extra(variant_sym)
+            self.pool.add_extra(1)
+            self.pool.add_extra(payload_ty as i32)
             variant_count = variant_count + 1
             if self.peek() != TokenKind.TK_COMMA:
                 break

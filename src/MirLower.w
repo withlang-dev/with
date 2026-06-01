@@ -5653,8 +5653,45 @@ fn MirBuilder.lower_question_mark(self: MirBuilder, expr: i32, node: i32) -> i32
 
     self.switch_to(fail_bb)
     let ret_place = self.place_for_local(0)
-    let fail_op = self.body.new_operand(OperandKind.OK_MOVE, value_place)
-    self.assign_operand_to_place(ret_place, fail_op, self.ast.get_start(expr))
+    let ret_ty = self.body.local_type_ids.get(0)
+    let source_err_ty = self.generic_inst_arg_type(value_ty, self.sema.syms.result, 1)
+    let target_err_ty = self.generic_inst_arg_type(ret_ty, self.sema.syms.result, 1)
+    let source_option_ty = self.generic_inst_arg_type(value_ty, self.sema.syms.option, 0)
+    let target_option_ty = self.generic_inst_arg_type(ret_ty, self.sema.syms.option, 0)
+    if source_err_ty != 0:
+        if target_err_ty == 0:
+            self.mark_unsupported()
+        else:
+            let err_idx = self.enum_variant_index_for_type(value_ty, self.sema.syms.err)
+            if err_idx < 0:
+                self.mark_unsupported()
+            else:
+                let err_downcast = self.body.new_downcast_place(value_place, err_idx, value_ty)
+                let err_payload_place = self.body.new_field_place(err_downcast, 0, source_err_ty)
+                var target_err_op = self.operand_for_place(err_payload_place, source_err_ty)
+                let conversion_variant = self.sema.error_conversion_variant(target_err_ty, source_err_ty)
+                if conversion_variant > 0:
+                    let wrapped_err_local = self.new_temp(target_err_ty)
+                    let wrapped_err_place = self.place_for_local(wrapped_err_local)
+                    let wrapped_fields: Vec[i32] = Vec.new()
+                    wrapped_fields.push(target_err_op)
+                    self.assign_enum_variant_to_place(wrapped_err_place, target_err_ty, conversion_variant, wrapped_fields, self.ast.get_start(expr))
+                    target_err_op = self.operand_for_place(wrapped_err_place, target_err_ty)
+                else if conversion_variant < 0:
+                    self.mark_unsupported()
+                if conversion_variant >= 0:
+                    let err_fields: Vec[i32] = Vec.new()
+                    err_fields.push(target_err_op)
+                    self.assign_enum_variant_to_place(ret_place, ret_ty, self.sema.syms.err, err_fields, self.ast.get_start(expr))
+    else if source_option_ty != 0:
+        if target_option_ty == 0:
+            self.mark_unsupported()
+        else:
+            let none_fields: Vec[i32] = Vec.new()
+            self.assign_enum_variant_to_place(ret_place, ret_ty, self.sema.syms.none, none_fields, self.ast.get_start(expr))
+    else:
+        let fail_op = self.body.new_operand(OperandKind.OK_MOVE, value_place)
+        self.assign_operand_to_place(ret_place, fail_op, self.ast.get_start(expr))
     self.emit_errdefers_for_return()
     self.emit_defers_for_return()
     self.emit_drops_for_return()
