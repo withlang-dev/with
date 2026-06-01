@@ -249,9 +249,13 @@ const TYPE_TRAIT_OBJECT_DYN: i32 = 1
 const TYPE_TRAIT_OBJECT_IMPL: i32 = 2
 
 // NK_UNSAFE_BLOCK.d1 distinguishes a true unsafe block from the narrow
-// `unsafe *p` / `unsafe p[i]` raw-access prefix form.
+// `unsafe *p` / `unsafe p[i]` raw-access prefix form. d2 marks parser-inserted
+// unsafe-function body wrappers, which are not subject to the unnecessary-block
+// diagnostic.
 const UNSAFE_KIND_BLOCK: i32 = 0
 const UNSAFE_KIND_PREFIX: i32 = 1
+const UNSAFE_ORIGIN_EXPR: i32 = 0
+const UNSAFE_ORIGIN_FN_BODY: i32 = 1
 
 fn fn_param_is_noalias(flags: i32) -> i32:
     (flags / FN_PARAM_FLAG_NOALIAS) % 2

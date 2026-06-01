@@ -1100,7 +1100,7 @@ fn Parser.parse_fn_decl(self: Parser, is_pub: i32, start: i32, is_async: i32, is
     // For unsafe fn, wrap body in NodeKind.NK_UNSAFE_BLOCK
     var final_body = body
     if self.pending_unsafe_fn != 0:
-        final_body = self.pool.add_node(NodeKind.NK_UNSAFE_BLOCK, self.pool.get_start(body), self.pool.get_end(body), body, 0, 0)
+        final_body = self.pool.add_node(NodeKind.NK_UNSAFE_BLOCK, self.pool.get_start(body), self.pool.get_end(body), body, UNSAFE_KIND_BLOCK, UNSAFE_ORIGIN_FN_BODY)
     let fn_node = self.pool.add_node(NodeKind.NK_FN_DECL, start, self.pool.get_end(body), name, final_body, flags)
     let meta_flags = flags + required_param_count * FN_META_REQUIRED_UNIT
     // @[c_export("name")] on non-extern fn: store callconv in tp_start slot
@@ -4759,7 +4759,7 @@ fn Parser.parse_unsafe(self: Parser) -> NodeId:
         // Binary operators bind outside the unsafe marker, so
         // `unsafe *p + 1` parses as `(unsafe *p) + 1`.
         body = self.parse_precedence(13)
-    self.pool.add_node(NodeKind.NK_UNSAFE_BLOCK, start, self.prev_end(), body, unsafe_kind, 0)
+    self.pool.add_node(NodeKind.NK_UNSAFE_BLOCK, start, self.prev_end(), body, unsafe_kind, UNSAFE_ORIGIN_EXPR)
 
 fn Parser.parse_asm_expr(self: Parser) -> NodeId:
     // asm("template" : outputs : inputs : clobbers)

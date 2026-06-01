@@ -2208,6 +2208,35 @@ fn Sema.type_is_raw_pointer_value(self: Sema, ty: i32) -> i32:
             return 1
     0
 
+fn Sema.note_unsafe_operation(self: Sema):
+    for i in 0..self.unsafe_scope_used.len() as i32:
+        self.unsafe_scope_used.set_i32(i as i64, 1)
+
+fn Sema.require_unsafe_operation(self: Sema, msg: str, node: i32) -> i32:
+    if self.in_unsafe == 0:
+        self.emit_error(msg, node)
+        return 0
+    self.note_unsafe_operation()
+    1
+
+fn Sema.fn_symbol_is_unsafe(self: Sema, fn_sym: i32) -> i32:
+    let fn_node = self.fn_symbol_decl_node(fn_sym)
+    if fn_node == 0:
+        return 0
+    let body = self.ast.get_data1(fn_node)
+    if body == 0 or self.ast.kind(body) != NodeKind.NK_UNSAFE_BLOCK:
+        return 0
+    if self.ast.get_data2(body) == UNSAFE_ORIGIN_FN_BODY:
+        return 1
+    0
+
+fn Sema.fn_symbol_is_manual_extern(self: Sema, fn_sym: i32) -> i32:
+    if not self.extern_fn_names.contains(fn_sym):
+        return 0
+    if self.ci_syms.contains(fn_sym):
+        return 0
+    1
+
 fn Sema.unsafe_prefix_has_raw_access(self: Sema, node: i32) -> i32:
     if node == 0:
         return 0
@@ -2218,6 +2247,10 @@ fn Sema.unsafe_prefix_has_raw_access(self: Sema, node: i32) -> i32:
         return self.unsafe_prefix_has_raw_access(self.ast.get_data0(node))
     if kind == NodeKind.NK_UNSAFE_BLOCK:
         return self.unsafe_prefix_has_raw_access(self.ast.get_data0(node))
+    if kind == NodeKind.NK_CALL:
+        if self.is_transmute_call(self.ast.get_data0(node)) != 0:
+            return 1
+        return 0
     if kind == NodeKind.NK_UNARY:
         let op = self.ast.get_data0(node)
         if op == UnaryOp.UOP_DEREF:
@@ -2514,21 +2547,30 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         if self.in_comptime_fn != 0:
             self.emit_error("unsafe is not allowed in comptime", node)
         let is_prefix = self.ast.get_data1(node) == UNSAFE_KIND_PREFIX
+        let is_fn_body = self.ast.get_data2(node) == UNSAFE_ORIGIN_FN_BODY
+        let tracks_use = if is_prefix or is_fn_body: 0 else: 1
         let saved_unsafe = self.in_unsafe
         if is_prefix and saved_unsafe != 0:
             self.emit_warning("redundant unsafe prefix inside unsafe context", node)
+        if tracks_use != 0:
+            self.unsafe_scope_used.push(0)
         self.in_unsafe = 1
         let body = self.ast.get_data0(node)
         // Propagate expected type through unsafe block
         let unsafe_result = if self.has_expected_type != 0: self.check_expr_with_expected(body, self.expected_expr_type) else: self.check_expr(body)
         self.in_unsafe = saved_unsafe
+        if tracks_use != 0:
+            let used_idx = self.unsafe_scope_used.len() as i32 - 1
+            let used = if used_idx >= 0: self.unsafe_scope_used.get(used_idx as i64) else: 0
+            let _ = self.unsafe_scope_used.pop()
+            if unsafe_result != 0 and used == 0:
+                self.emit_error("unsafe block contains no unsafe operations", node)
         if is_prefix and unsafe_result != 0 and self.unsafe_prefix_has_raw_access(body) == 0:
             self.emit_error("unsafe prefix requires a raw pointer dereference or raw pointer index; use unsafe { ... } for compound unsafe expressions", node)
         return unsafe_result
 
     if kind == NodeKind.NK_ASM_EXPR:
-        if self.in_unsafe == 0:
-            self.emit_error("asm requires unsafe context", node)
+        self.require_unsafe_operation("asm requires unsafe context", node)
         return self.ty_void
 
     if kind == NodeKind.NK_COMPTIME_ERROR:
@@ -3552,8 +3594,7 @@ fn Sema.check_unary(self: Sema, node: i32) -> i32:
         if tk == TypeKind.TY_REF:
             return self.get_type_d0(resolved)
         if tk == TypeKind.TY_PTR:
-            if self.in_unsafe == 0:
-                self.emit_error("raw pointer dereference requires unsafe context", node)
+            self.require_unsafe_operation("raw pointer dereference requires unsafe context", node)
             return self.get_type_d0(resolved)
         // docs/mut.md Rev 8 §15.16 — deref-precedence diagnostic.
         // `*x.field` parses as `*(x.field)`; if the field type is not a
@@ -4592,6 +4633,8 @@ fn Sema.check_field_access(self: Sema, node: i32) -> i32:
         return 0
 
     let field_base = self.auto_deref_ref_ptr_type(obj_type)
+    if self.in_unsafe != 0 and self.type_is_raw_pointer_value(obj_type as i32) != 0:
+        self.note_unsafe_operation()
 
     if self.is_tool_capability_type(field_base as i32) and not self.can_access_tool_capability_internals():
         self.emit_error("tool capability fields are private; use capability methods instead", node)
@@ -4701,8 +4744,7 @@ fn Sema.check_index(self: Sema, node: i32) -> i32:
     let tk = self.get_type_kind(resolved)
     if tk == TypeKind.TY_PTR:
         self.check_runtime_index_operand(index)
-        if self.in_unsafe == 0:
-            self.emit_error("raw pointer indexing requires unsafe context", node)
+        if self.require_unsafe_operation("raw pointer indexing requires unsafe context", node) == 0:
             return 0
         let elem_ty = self.get_type_d0(resolved)
         self.typed_expr_types.insert(node, elem_ty)
@@ -4714,8 +4756,7 @@ fn Sema.check_index(self: Sema, node: i32) -> i32:
         container_tk = self.get_type_kind(container_tid)
         if container_tk == TypeKind.TY_PTR:
             self.check_runtime_index_operand(index)
-            if self.in_unsafe == 0:
-                self.emit_error("raw pointer indexing requires unsafe context", node)
+            if self.require_unsafe_operation("raw pointer indexing requires unsafe context", node) == 0:
                 return 0
             let elem_ty = self.get_type_d0(container_tid)
             self.typed_expr_types.insert(node, elem_ty)
@@ -6665,6 +6706,8 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
     if self.is_nameof_call(callee) != 0:
         return self.ty_str as i32
     if self.is_transmute_call(callee) != 0:
+        if self.require_unsafe_operation("transmute requires unsafe context", node) == 0:
+            return 0
         return self.transmute_target_type(callee)
     if self.is_chan_call(callee) != 0:
         return self.chan_return_type(callee)
@@ -6979,6 +7022,11 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
 
     if self.check_comptime_call_restriction(fn_sym, node) != 0:
         return 0
+    if self.fn_symbol_is_unsafe(fn_sym) != 0:
+        if self.require_unsafe_operation("unsafe function call requires unsafe context", node) == 0:
+            return 0
+    else if self.fn_symbol_is_manual_extern(fn_sym) != 0 and self.in_unsafe != 0:
+        self.note_unsafe_operation()
 
     // std.builtins.drop is a prelude-resolved builtin: it consumes its single
     // argument without requiring call-site `move`, then lowers to an immediate
@@ -9259,6 +9307,9 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
     if type_name_sym != 0:
         let generic_method_fn = self.lookup_generic_method_fn(type_name_sym, field)
         if generic_method_fn != 0:
+            if self.fn_symbol_is_unsafe(generic_method_fn) != 0:
+                if self.require_unsafe_operation("unsafe function call requires unsafe context", node) == 0:
+                    return 0
             self.emit_no_await_guard_may_suspend_call(node, generic_method_fn)
             let generic_ret = self.check_generic_method_call(type_name_sym, recv_type as i32, generic_method_fn, is_static_receiver, arg_types, extra_start, mc_resolved_arg_count, node)
             return generic_ret
@@ -9270,6 +9321,9 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
             if self.check_comptime_method_restriction(method_fn_sym, node) != 0:
                 return 0
             if method_fn_sym != 0:
+                if self.fn_symbol_is_unsafe(method_fn_sym) != 0:
+                    if self.require_unsafe_operation("unsafe function call requires unsafe context", node) == 0:
+                        return 0
                 self.comp_resolved.insert(node, method_fn_sym)
                 self.emit_no_await_guard_may_suspend_call(node, method_fn_sym)
             let mc_ret = self.sig_return_type(sig_idx)
