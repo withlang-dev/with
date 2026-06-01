@@ -430,27 +430,27 @@ fn cli_one_liner_scan(argc: i32) -> CliOneLiner:
     result
 
 fn cli_escape_with_string(value: str) -> str:
-    var out = ""
+    var out = StringBuilder.with_capacity(value.len())
     for i in 0..value.len() as i32:
         let ch = value.byte_at(i as i64)
         if ch == 92:
-            out = out ++ "\\\\"
+            out.push_str("\\\\")
         else if ch == 34:
-            out = out ++ "\\\""
+            out.push_str("\\\"")
         else if ch == 10:
-            out = out ++ "\\n"
+            out.push_str("\\n")
         else if ch == 13:
-            out = out ++ "\\r"
+            out.push_str("\\r")
         else if ch == 9:
-            out = out ++ "\\t"
+            out.push_str("\\t")
         else:
-            out = out ++ value.slice(i as i64, (i + 1) as i64)
-    out
+            out.push_str(value.slice(i as i64, (i + 1) as i64))
+    out.to_str()
 
 fn cli_rewrite_semicolons(code: str) -> str:
     var lexer = Lexer.init(code, 0)
     let tokens = lexer.tokenize()
-    var out = ""
+    var out = StringBuilder.with_capacity(code.len())
     var cursor = 0
     for i in 0..tokens.len():
         let tag = tokens.get_tag(i)
@@ -461,21 +461,22 @@ fn cli_rewrite_semicolons(code: str) -> str:
         let start = tokens.get_start(i)
         let end = tokens.get_end(i)
         if start > cursor:
-            out = out ++ code.slice(cursor as i64, start as i64)
-        out = out ++ "\n"
+            out.push_str(code.slice(cursor as i64, start as i64))
+        out.push_str("\n")
         cursor = end
     if cursor < code.len() as i32:
-        out = out ++ code.slice(cursor as i64, code.len())
-    out
+        out.push_str(code.slice(cursor as i64, code.len()))
+    out.to_str()
 
 fn cli_indent_code(code: str, indent: str) -> str:
-    var out = indent
+    var out = StringBuilder.with_capacity(code.len() + indent.len())
+    out.push_str(indent)
     for i in 0..code.len() as i32:
         let ch = code.byte_at(i as i64)
-        out = out ++ code.slice(i as i64, (i + 1) as i64)
+        out.push_str(code.slice(i as i64, (i + 1) as i64))
         if ch == 10 and i + 1 < code.len() as i32:
-            out = out ++ indent
-    out
+            out.push_str(indent)
+    out.to_str()
 
 fn cli_one_liner_source_name(mode: i32, count: i32) -> str:
     let name = cli_one_liner_mode_name(mode)
@@ -484,11 +485,14 @@ fn cli_one_liner_source_name(mode: i32, count: i32) -> str:
     "<cli " ++ name ++ ">"
 
 fn cli_build_args_binding(args: Vec[str]) -> str:
-    var out = "let args: Vec[str] = Vec.new()\n"
+    var out = StringBuilder.new()
+    out.push_str("let args: Vec[str] = Vec.new()\n")
     for i in 0..args.len() as i32:
         let escaped = cli_escape_with_string(args.get(i as i64))
-        out = out ++ "args.push(\"" ++ escaped ++ "\")\n"
-    out
+        out.push_str("args.push(\"")
+        out.push_str(escaped)
+        out.push_str("\")\n")
+    out.to_str()
 
 fn cli_synthetic_source_new -> CliSyntheticSource:
     CliSyntheticSource {
@@ -508,45 +512,48 @@ fn cli_synthetic_add_mapping(mut syn: CliSyntheticSource, start: i32, text: str,
 
 fn cli_build_synthetic_source(one: CliOneLiner) -> CliSyntheticSource:
     var syn = cli_synthetic_source_new()
-    var source = ""
-    source = source ++ "use std.io\n"
-    source = source ++ "use std.str\n"
-    source = source ++ "use std.regex\n"
-    source = source ++ "use std.math\n"
-    source = source ++ "use std.collections\n"
-    source = source ++ "use std.builtins\n\n"
-    source = source ++ cli_build_args_binding(one.args)
+    var source = StringBuilder.new()
+    source.push_str("use std.io\n")
+    source.push_str("use std.str\n")
+    source.push_str("use std.regex\n")
+    source.push_str("use std.math\n")
+    source.push_str("use std.collections\n")
+    source.push_str("use std.builtins\n\n")
+    source.push_str(cli_build_args_binding(one.args))
     if one.mode == CliOneLinerMode.Eval:
         for i in 0..one.code_parts.len() as i32:
             let rewritten = cli_rewrite_semicolons(one.code_parts.get(i as i64))
             let start = source.len() as i32
-            source = source ++ rewritten ++ "\n"
+            source.push_str(rewritten)
+            source.push_str("\n")
             syn = cli_synthetic_add_mapping(syn, start, rewritten, "<cli -e #" ++ f"{i + 1}" ++ ">")
-        syn.source = source
+        syn.source = source.to_str()
         return syn
-    source = source ++ "var nr: i64 = 0\n"
+    source.push_str("var nr: i64 = 0\n")
     if one.mode == CliOneLinerMode.Lines:
-        source = source ++ "for line in stdin.lines():\n"
-        source = source ++ "    nr = nr + 1\n"
+        source.push_str("for line in stdin.lines():\n")
+        source.push_str("    nr = nr + 1\n")
         for i in 0..one.code_parts.len() as i32:
             let rewritten = cli_rewrite_semicolons(one.code_parts.get(i as i64))
             let indented = cli_indent_code(rewritten, "    ")
             let start = source.len() as i32 + 4
-            source = source ++ indented ++ "\n"
+            source.push_str(indented)
+            source.push_str("\n")
             syn = cli_synthetic_add_mapping(syn, start, rewritten, "<cli -n #" ++ f"{i + 1}" ++ ">")
-        syn.source = source
+        syn.source = source.to_str()
         return syn
-    source = source ++ "for __line in stdin.lines():\n"
-    source = source ++ "    nr = nr + 1\n"
-    source = source ++ "    var line = __line\n"
+    source.push_str("for __line in stdin.lines():\n")
+    source.push_str("    nr = nr + 1\n")
+    source.push_str("    var line = __line\n")
     for i in 0..one.code_parts.len() as i32:
         let rewritten = cli_rewrite_semicolons(one.code_parts.get(i as i64))
         let indented = cli_indent_code(rewritten, "    ")
         let start = source.len() as i32 + 4
-        source = source ++ indented ++ "\n"
+        source.push_str(indented)
+        source.push_str("\n")
         syn = cli_synthetic_add_mapping(syn, start, rewritten, "<cli -p #" ++ f"{i + 1}" ++ ">")
-    source = source ++ "    print(line)\n"
-    syn.source = source
+    source.push_str("    print(line)\n")
+    syn.source = source.to_str()
     syn
 
 fn cli_one_liner_bin_path -> str:
@@ -1598,7 +1605,7 @@ fn dump_async_mir_artifact(source_file: str, no_std: bool, alloc_mode: bool, run
     0
 
 fn escape_dump_lexeme(text: str) -> str:
-    var out = ""
+    var out = StringBuilder.with_capacity(text.len())
     var run_start = 0
     for i in 0..text.len():
         let ch = text.byte_at(i as i64)
@@ -1617,13 +1624,13 @@ fn escape_dump_lexeme(text: str) -> str:
             continue
         // Flush the non-special run before this escape.
         if i > run_start:
-            out = out ++ text.slice(run_start as i64, i as i64)
-        out = out ++ esc
+            out.push_str(text.slice(run_start as i64, i as i64))
+        out.push_str(esc)
         run_start = i + 1
     // Flush any remaining non-special run.
     if run_start < text.len():
-        out = out ++ text.slice(run_start as i64, text.len())
-    out
+        out.push_str(text.slice(run_start as i64, text.len()))
+    out.to_str()
 
 fn dump_tag_name(tag: i32, lexeme: str) -> str:
     // Keep deterministic dump names identical to Stage0 for brace delimiters.
@@ -1695,48 +1702,63 @@ fn discover_bench_functions(text: str) -> BenchDiscovery:
     BenchDiscovery { parse_ok: true, has_main, bench_names }
 
 fn synthesize_bench_main_source(text: str, bench_names: Vec[str]) -> str:
-    var out = text
-    if out.len() > 0 and with_str_byte_at(out, with_str_len(out) - 1) != 10:
-        out = out ++ "\n"
-    out = out ++ "\nuse test.bench\n"
-    out = out ++ "extern fn with_getenv_str(name: str) -> str\n"
-    out = out ++ "extern fn with_str_contains(s: str, needle: str) -> i32\n"
-    out = out ++ "\nfn main:\n"
-    out = out ++ "    let __with_bench_filter = with_getenv_str(\"WITH_BENCH_FILTER\")\n"
+    var out = StringBuilder.with_capacity(text.len())
+    out.push_str(text)
+    if text.len() > 0 and with_str_byte_at(text, with_str_len(text) - 1) != 10:
+        out.push_str("\n")
+    out.push_str("\nuse test.bench\n")
+    out.push_str("extern fn with_getenv_str(name: str) -> str\n")
+    out.push_str("extern fn with_str_contains(s: str, needle: str) -> i32\n")
+    out.push_str("\nfn main:\n")
+    out.push_str("    let __with_bench_filter = with_getenv_str(\"WITH_BENCH_FILTER\")\n")
     for bi in 0..bench_names.len() as i32:
         let bench_name = bench_names.get(bi as i64)
-        out = out ++ "    if __with_bench_filter.len() == 0 or with_str_contains(\"" ++ bench_name ++ "\", __with_bench_filter) != 0:\n"
-        out = out ++ "        var __b = Bench.new()\n"
-        out = out ++ "        __b.run(" ++ bench_name ++ ")\n"
-        out = out ++ "        __b.report(\"" ++ bench_name ++ "\")\n"
-    out
+        out.push_str("    if __with_bench_filter.len() == 0 or with_str_contains(\"")
+        out.push_str(bench_name)
+        out.push_str("\", __with_bench_filter) != 0:\n")
+        out.push_str("        var __b = Bench.new()\n")
+        out.push_str("        __b.run(")
+        out.push_str(bench_name)
+        out.push_str(")\n")
+        out.push_str("        __b.report(\"")
+        out.push_str(bench_name)
+        out.push_str("\")\n")
+    out.to_str()
 
 fn synthesize_test_main_source(text: str, test_names: Vec[str]) -> str:
-    var out = text
-    if out.len() > 0 and with_str_byte_at(out, with_str_len(out) - 1) != 10:
-        out = out ++ "\n"
-    out = out ++ "\nextern fn with_getenv_str(name: str) -> str\n"
-    out = out ++ "extern fn with_str_eq(a: str, b: str) -> i32\n"
-    out = out ++ "extern fn exit(code: i32) -> void\n"
-    out = out ++ "\nfn __with_test_eq(a: str, b: str) -> bool:\n"
-    out = out ++ "    with_str_eq(a, b) != 0\n"
-    out = out ++ "\nfn main:\n"
-    out = out ++ "    let __with_test_filter = with_getenv_str(\"WITH_TEST_FILTER\")\n"
-    out = out ++ "    if __with_test_filter.len() > 0:\n"
+    var out = StringBuilder.with_capacity(text.len())
+    out.push_str(text)
+    if text.len() > 0 and with_str_byte_at(text, with_str_len(text) - 1) != 10:
+        out.push_str("\n")
+    out.push_str("\nextern fn with_getenv_str(name: str) -> str\n")
+    out.push_str("extern fn with_str_eq(a: str, b: str) -> i32\n")
+    out.push_str("extern fn exit(code: i32) -> void\n")
+    out.push_str("\nfn __with_test_eq(a: str, b: str) -> bool:\n")
+    out.push_str("    with_str_eq(a, b) != 0\n")
+    out.push_str("\nfn main:\n")
+    out.push_str("    let __with_test_filter = with_getenv_str(\"WITH_TEST_FILTER\")\n")
+    out.push_str("    if __with_test_filter.len() > 0:\n")
     for ti in 0..test_names.len() as i32:
         let test_name = test_names.get(ti as i64)
         var prefix = "        else if "
         if ti == 0:
             prefix = "        if "
-        out = out ++ prefix ++ "__with_test_eq(__with_test_filter, \"" ++ test_name ++ "\"):\n"
-        out = out ++ "            " ++ test_name ++ "()\n"
-        out = out ++ "            return\n"
-    out = out ++ "        else:\n"
-    out = out ++ "            exit(1)\n"
-    out = out ++ "            return\n"
+        out.push_str(prefix)
+        out.push_str("__with_test_eq(__with_test_filter, \"")
+        out.push_str(test_name)
+        out.push_str("\"):\n")
+        out.push_str("            ")
+        out.push_str(test_name)
+        out.push_str("()\n")
+        out.push_str("            return\n")
+    out.push_str("        else:\n")
+    out.push_str("            exit(1)\n")
+    out.push_str("            return\n")
     for ti in 0..test_names.len() as i32:
-        out = out ++ "    " ++ test_names.get(ti as i64) ++ "()\n"
-    out
+        out.push_str("    ")
+        out.push_str(test_names.get(ti as i64))
+        out.push_str("()\n")
+    out.to_str()
 
 fn discover_tests_for_target(target: str) -> TestDiscovery:
     if not target.ends_with(".w"):
@@ -2346,15 +2368,15 @@ fn run_migrate_command(argc: i32) -> i32:
     migrate_c_file(source_path, output_path)
 
 fn cli_read_all_stdin() -> str:
-    var out = ""
+    var out = StringBuilder.new()
     while true:
         let chunk = with_read_bytes_stdin(4096)
         if chunk.len() == 0:
-            return out
-        out = out ++ chunk
+            return out.to_str()
+        out.push_str(chunk)
         if chunk.len() < 4096:
-            return out
-    out
+            return out.to_str()
+    out.to_str()
 
 fn run_fmt_command(argc: i32) -> i32:
     let write_mode = cli_has_flag(argc, "-w")

@@ -57,9 +57,9 @@ fn ci_migrate_is_width_family_name(name: str) -> bool:
 //   2. Redirects duplicated top-level declarations to a shared buffer
 //   3. After all files, emits a defs.w containing preamble + shared decls
 var g_migrate_shared_defs_prefix: str = ""
-var g_migrate_shared_decl_buf: str = ""
+var g_migrate_shared_decl_buf: Vec[str] = Vec.new()
 var g_migrate_shared_decl_keys: str = ""
-var g_migrate_shared_decl_records: str = ""
+var g_migrate_shared_decl_records: Vec[str] = Vec.new()
 var g_migrate_directory_one_basename: str = ""
 var g_migrate_shared_fragment_path: str = ""
 var g_migrate_include_paths: Vec[str] = Vec.new()
@@ -113,9 +113,9 @@ fn ci_migrate_shared_defs_active() -> bool:
     g_migrate_shared_defs_prefix.len() > 0
 
 fn ci_migrate_shared_defs_reset:
-    g_migrate_shared_decl_buf = ""
+    g_migrate_shared_decl_buf = Vec.new()
     g_migrate_shared_decl_keys = ""
-    g_migrate_shared_decl_records = ""
+    g_migrate_shared_decl_records = Vec.new()
     g_migrate_shared_pending_extern_vars = Vec.new()
     g_migrate_shared_usage_idents = ""
 
@@ -137,8 +137,8 @@ fn ci_migrate_shared_decl_add(kind: str, name: str, rendered: str) -> bool:
     if ci_find_str(g_migrate_shared_decl_keys, key) >= 0:
         return true
     g_migrate_shared_decl_keys = g_migrate_shared_decl_keys ++ key
-    g_migrate_shared_decl_buf = g_migrate_shared_decl_buf ++ rendered ++ "\n"
-    g_migrate_shared_decl_records = g_migrate_shared_decl_records ++ f"@@DECL|{kind}|{name}\n{rendered}\n@@END\n"
+    g_migrate_shared_decl_buf.push(rendered ++ "\n")
+    g_migrate_shared_decl_records.push(f"@@DECL|{kind}|{name}\n{rendered}\n@@END\n")
     true
 
 fn ci_migrate_shared_ownerless_extern_add(kind: str, name: str, rendered: str) -> bool:
@@ -296,26 +296,32 @@ fn ci_migrate_render_preamble_fn(signature: str, colon_expr: str, brace_expr: st
 // Write the shared defs module (defs.w) to output_dir.
 // Contains: preamble + hardcoded extras + shared declarations.
 fn ci_migrate_write_shared_defs(output_dir: str):
-    var defs = "// " ++ g_migrate_shared_defs_prefix ++ " — shared definitions for migrated PCRE2\n\n"
-    defs = defs ++ ci_migrate_preamble_text()
+    var defs = StringBuilder.new()
+    defs.push_str("// ")
+    defs.push_str(g_migrate_shared_defs_prefix)
+    defs.push_str(" — shared definitions for migrated PCRE2\n\n")
+    defs.push_str(ci_migrate_preamble_text())
     // Hardcoded extras from pcre2_internal.h
-    defs = defs ++ "// PCRE2 string constants (from pcre2_internal.h macros)\n"
-    defs = defs ++ "let STRING_MARK: *const u8 = \"MARK\"\n"
-    defs = defs ++ "let STRING_DEFINE: *const u8 = \"DEFINE\"\n"
-    defs = defs ++ "let STRING_VERSION: *const u8 = \"VERSION\"\n"
-    defs = defs ++ "let STRING_WEIRD_STARTWORD: *const u8 = \"[:<:]]\"\n"
-    defs = defs ++ "let STRING_WEIRD_ENDWORD: *const u8 = \"[:>:]]\"\n"
+    defs.push_str("// PCRE2 string constants (from pcre2_internal.h macros)\n")
+    defs.push_str("let STRING_MARK: *const u8 = \"MARK\"\n")
+    defs.push_str("let STRING_DEFINE: *const u8 = \"DEFINE\"\n")
+    defs.push_str("let STRING_VERSION: *const u8 = \"VERSION\"\n")
+    defs.push_str("let STRING_WEIRD_STARTWORD: *const u8 = \"[:<:]]\"\n")
+    defs.push_str("let STRING_WEIRD_ENDWORD: *const u8 = \"[:>:]]\"\n")
     // Shared declarations collected during migration.
     if g_migrate_shared_decl_buf.len() > 0:
-        defs = defs ++ "\n" ++ g_migrate_shared_decl_buf
+        defs.push_str("\n")
+        for di in 0..g_migrate_shared_decl_buf.len() as i32:
+            defs.push_str(g_migrate_shared_decl_buf.get(di as i64))
     var pending_i = 0
     while pending_i < g_migrate_shared_pending_extern_vars.len() as i32:
         let pending = g_migrate_shared_pending_extern_vars.get(pending_i as i64)
         if ci_find_str(g_migrate_shared_usage_idents, "|" ++ pending.name ++ "|") >= 0:
-            defs = defs ++ pending.rendered ++ "\n"
+            defs.push_str(pending.rendered)
+            defs.push_str("\n")
         pending_i = pending_i + 1
     let defs_path = output_dir ++ "/defs.w"
-    let rc = with_fs_write_file(defs_path, ci_migrate_normalize_output(defs))
+    let rc = with_fs_write_file(defs_path, ci_migrate_normalize_output(defs.to_str()))
     if rc != 0:
         eprint("migrate: failed to write shared defs: " ++ defs_path)
     else:
@@ -327,14 +333,16 @@ fn ci_migrate_write_shared_fragment(path: str):
         eprint(f"migrate: failed to write shared fragment: {path}")
 
 fn ci_migrate_shared_fragment_text() -> str:
-    var fragment = g_migrate_shared_decl_records
+    var fragment = StringBuilder.new()
+    for di in 0..g_migrate_shared_decl_records.len() as i32:
+        fragment.push_str(g_migrate_shared_decl_records.get(di as i64))
     var pending_i = 0
     while pending_i < g_migrate_shared_pending_extern_vars.len() as i32:
         let pending = g_migrate_shared_pending_extern_vars.get(pending_i as i64)
-        fragment = fragment ++ f"@@PENDING|{pending.kind}|{pending.name}\n{pending.rendered}\n@@END\n"
+        fragment.push_str(f"@@PENDING|{pending.kind}|{pending.name}\n{pending.rendered}\n@@END\n")
         pending_i = pending_i + 1
-    fragment = fragment ++ f"@@USES\n{g_migrate_shared_usage_idents}\n@@END\n"
-    fragment
+    fragment.push_str(f"@@USES\n{g_migrate_shared_usage_idents}\n@@END\n")
+    fragment.to_str()
 
 fn ci_migrate_merge_usage_keys(keys: str):
     var i = 0
@@ -1517,7 +1525,7 @@ fn ci_migrate_translate_var(session: i64, idx: i32, count: i32, primary_path: st
     rendered
 
 fn ci_migrate_translate_vars(session: i64, count: i32, primary_path: str, project_active: bool, project: &CiProject) -> str:
-    var output = ""
+    var output = StringBuilder.new()
     var i = 0
     while i < count:
         if with_cimport_decl_kind(session, i) == CK_VAR:
@@ -1526,7 +1534,7 @@ fn ci_migrate_translate_vars(session: i64, count: i32, primary_path: str, projec
                 let cursor = with_cimport_decl_cursor(session, i)
                 let loc = if cursor >= 0: with_ci_cursor_location(session, cursor) else: ""
                 if not ci_is_system_decl(name) and not (loc.len() > 0 and ci_is_system_path(loc)):
-                    output = output ++ ci_migrate_translate_var(session, i, count, primary_path, true, project_active, project)
+                    output.push_str(ci_migrate_translate_var(session, i, count, primary_path, true, project_active, project))
         i = i + 1
     i = 0
     while i < count:
@@ -1536,9 +1544,9 @@ fn ci_migrate_translate_vars(session: i64, count: i32, primary_path: str, projec
                 let cursor = with_cimport_decl_cursor(session, i)
                 let loc = if cursor >= 0: with_ci_cursor_location(session, cursor) else: ""
                 if not ci_is_system_decl(name) and not (loc.len() > 0 and ci_is_system_path(loc)):
-                    output = output ++ ci_migrate_translate_var(session, i, count, primary_path, false, project_active, project)
+                    output.push_str(ci_migrate_translate_var(session, i, count, primary_path, false, project_active, project))
         i = i + 1
-    output
+    output.to_str()
 
 // ── Migrate-only globals and setters (moved from CImport.w in D3) ─────
 

@@ -10,11 +10,12 @@ use InternPool
 extern fn str_from_byte(b: i32) -> str
 
 fn render_module(pool: AstPool, intern: InternPool) -> str:
-    var out = ""
+    var out = StringBuilder.new()
     for i in 0..pool.decl_count():
         let decl = pool.get_decl(i)
-        out = out ++ render_decl(pool, intern, (decl) as NodeId, 0) ++ "\n"
-    out
+        out.push_str(render_decl(pool, intern, (decl) as NodeId, 0))
+        out.push_str("\n")
+    out.to_str()
 
 fn render_decl(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> str:
     let kind = pool.kind(node)
@@ -404,18 +405,22 @@ fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
         let extra_start = pool.get_data0(node)
         let stmt_count = pool.get_data1(node)
         let tail = pool.get_data2(node)
-        var out = ""
+        var out = StringBuilder.new()
         let block_meta = pool.find_block_meta(node)
         let block_label = if block_meta >= 0: pool.block_meta_label(block_meta) else: 0
         var body_indent = indent
         if block_label != 0:
-            out = out ++ make_indent(indent) ++ "'" ++ intern.resolve(block_label) ++ ":\n"
+            out.push_str(make_indent(indent))
+            out.push_str("'")
+            out.push_str(intern.resolve(block_label))
+            out.push_str(":\n")
             body_indent = indent + 2
         for i in 0..stmt_count:
-            out = out ++ render_expr(pool, intern, (pool.get_extra(extra_start + i)) as NodeId, body_indent) ++ "\n"
+            out.push_str(render_expr(pool, intern, (pool.get_extra(extra_start + i)) as NodeId, body_indent))
+            out.push_str("\n")
         if tail != 0:
-            out = out ++ render_expr(pool, intern, (tail) as NodeId, body_indent)
-        return out
+            out.push_str(render_expr(pool, intern, (tail) as NodeId, body_indent))
+        return out.to_str()
 
     if kind == NodeKind.NK_LABEL:
         let label = pool.get_data0(node)
@@ -476,13 +481,24 @@ fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
         let extra_start = pool.get_data0(node)
         let arm_count = pool.get_data1(node)
         let biased = pool.get_data2(node)
-        var out = if biased != 0: prefix ++ "select await biased:\n" else: prefix ++ "select await:\n"
+        var out = StringBuilder.new()
+        out.push_str(prefix)
+        if biased != 0:
+            out.push_str("select await biased:\n")
+        else:
+            out.push_str("select await:\n")
         for ai in 0..arm_count:
             let name_sym = pool.get_extra(extra_start + ai * 3)
             let task = pool.get_extra(extra_start + ai * 3 + 1)
             let body = pool.get_extra(extra_start + ai * 3 + 2)
-            out = out ++ "    " ++ intern.resolve(name_sym) ++ " = " ++ render_expr(pool, intern, (task) as NodeId, 0) ++ " -> " ++ render_expr(pool, intern, (body) as NodeId, 0) ++ "\n"
-        return out
+            out.push_str("    ")
+            out.push_str(intern.resolve(name_sym))
+            out.push_str(" = ")
+            out.push_str(render_expr(pool, intern, (task) as NodeId, 0))
+            out.push_str(" -> ")
+            out.push_str(render_expr(pool, intern, (body) as NodeId, 0))
+            out.push_str("\n")
+        return out.to_str()
 
     if kind == NodeKind.NK_LET_ELSE:
         let pattern = pool.get_data0(node)
@@ -515,12 +531,15 @@ fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
     if kind == NodeKind.NK_TUPLE:
         let extra_start = pool.get_data0(node)
         let count = pool.get_data1(node)
-        var out = prefix ++ "("
+        var out = StringBuilder.new()
+        out.push_str(prefix)
+        out.push_str("(")
         for i in 0..count:
             if i > 0:
-                out = out ++ ", "
-            out = out ++ render_expr(pool, intern, (pool.get_extra(extra_start + i)) as NodeId, 0)
-        return out ++ ")"
+                out.push_str(", ")
+            out.push_str(render_expr(pool, intern, (pool.get_extra(extra_start + i)) as NodeId, 0))
+        out.push_str(")")
+        return out.to_str()
 
     if kind == NodeKind.NK_RANGE:
         let start_expr = pool.get_data0(node)

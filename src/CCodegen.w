@@ -391,26 +391,26 @@ fn cc_hex_digit(v: i32) -> str:
     "F"
 
 fn cc_escape_c_string(text: str) -> str:
-    var out = ""
+    var out = StringBuilder.with_capacity(text.len())
     for i in 0..text.len():
         let b = text.byte_at(i as i64)
         if b == 92: // '\'
-            out = out ++ "\\\\"
+            out.push_str("\\\\")
             continue
         if b == 34: // '"'
-            out = out ++ "\\\""
+            out.push_str("\\\"")
             continue
         if b == 10:
-            out = out ++ "\\n"
+            out.push_str("\\n")
             continue
         if b == 13:
-            out = out ++ "\\r"
+            out.push_str("\\r")
             continue
         if b == 9:
-            out = out ++ "\\t"
+            out.push_str("\\t")
             continue
         if b >= 32 and b <= 126:
-            out = out ++ text.slice(i as i64, (i + 1) as i64)
+            out.push_str(text.slice(i as i64, (i + 1) as i64))
             continue
         // Octal escapes for non-ASCII bytes: no hex continuation ambiguity,
         // and handles signed byte_at values (byte > 127 returns negative i32).
@@ -418,8 +418,8 @@ fn cc_escape_c_string(text: str) -> str:
         let d2 = ub / 64
         let d1 = (ub % 64) / 8
         let d0 = ub % 8
-        out = out ++ "\\" ++ f"{d2}" ++ f"{d1}" ++ f"{d0}"
-    out
+        out.push_str("\\" ++ f"{d2}" ++ f"{d1}" ++ f"{d0}")
+    out.to_str()
 
 fn cc_hex_digit_value(ch: i32) -> i32:
     if ch >= 48 and ch <= 57:
