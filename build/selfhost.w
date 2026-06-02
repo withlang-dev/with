@@ -103,6 +103,21 @@ fn bs_run_cli_capture(ctx: ActionCtx, compiler_path: str, label: str, args: Vec[
         let _remove_stderr = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stderr"))
     SelfhostRunResult { result.rc, result.stdout, result.stderr }
 
+fn bs_run_cli_capture_with_env(ctx: ActionCtx, compiler_path: str, label: str, args: Vec[str], timeout_ms: i32, process_env: ProcessEnv) -> SelfhostRunResult:
+    let root = ctx.project_info().project_root()
+    let output_dir = ctx.output()
+    let stdout_path = bs_capture_path(root, output_dir, label, "stdout")
+    let stderr_path = bs_capture_path(root, output_dir, label, "stderr")
+    var argv: Vec[str] = Vec.new()
+    argv |> push(compiler_path)
+    for i in 0..args.len() as i32:
+        argv |> push(args.get(i as i64))
+    let result = ctx.process_runner().run_capture_with_env(argv, stdout_path, stderr_path, timeout_ms, process_env)
+    if result.rc == 0:
+        let _remove_stdout = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stdout"))
+        let _remove_stderr = ctx.fs().remove_file(bs_join(output_dir, label ++ ".stderr"))
+    SelfhostRunResult { result.rc, result.stdout, result.stderr }
+
 fn bs_run_cli_capture_input(ctx: ActionCtx, compiler_path: str, label: str, args: Vec[str], stdin_text: str, timeout_ms: i32) -> SelfhostRunResult:
     let root = ctx.project_info().project_root()
     let output_dir = ctx.output()
@@ -3445,6 +3460,31 @@ fn bs_check_build_w_generated_source(ctx: ActionCtx, compiler_path: str, base_di
         return 1
     bs_assert_contains(ctx, toolfs_tree_escape.stderr, "ToolFs path escapes project root", "build_w_toolfs_tree_escape")
 
+fn bs_check_comptime_string_budget(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
+    let source =
+        "comptime fn blow() -> str:\n" ++
+        "    var out = \"\"\n" ++
+        "    for i in 0..20:\n" ++
+        "        out = out ++ \"xxxxxxxxxxxxxxxx\"\n" ++
+        "    out\n\n" ++
+        "const S: str = comptime blow()\n\n" ++
+        "fn main:\n" ++
+        "    print(S)\n"
+    let source_path = bs_join(case_dir, "budget.w")
+    var rc = bs_write_fixture(ctx, source_path, source, "comptime string budget source")
+    if rc != 0: return rc
+    var args: Vec[str] = Vec.new()
+    args |> push("check")
+    args |> push(source_path)
+    var child_env = process_env()
+    child_env = child_env.set("WITH_COMPTIME_STRING_BUDGET_BYTES", "128")
+    let result = bs_run_cli_capture_with_env(ctx, compiler_path, "comptime-string-budget", args, 120000, child_env)
+    if result.rc == 0:
+        return bs_fail(ctx, "comptime string budget check unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, result.stderr, "comptime string construction budget exceeded", "comptime_string_budget")
+    if rc != 0: return rc
+    bs_assert_contains(ctx, result.stderr, "use StringBuilder or collect pieces", "comptime_string_budget")
+
 fn bs_graph_build_file() -> str:
     "use std.build\n\n" ++
     "pub fn build(ctx: BuildCtx) -> Build:\n" ++
@@ -3908,6 +3948,8 @@ pub fn run_cli_selfhost_build_w_action(ctx: ActionCtx) -> i32:
     rc = bs_check_build_w_library_and_targets(ctx, compiler_path, base_dir)
     if rc != 0: return rc
     rc = bs_check_build_w_generated_source(ctx, compiler_path, base_dir)
+    if rc != 0: return rc
+    rc = bs_check_comptime_string_budget(ctx, compiler_path, bs_join(base_dir, "comptime_string_budget"))
     if rc != 0: return rc
     rc = bs_check_build_w_graph_v2(ctx, compiler_path, bs_join(base_dir, "graph_v2"))
     if rc != 0: return rc

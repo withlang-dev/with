@@ -4051,6 +4051,23 @@ fn Sema.fn_symbol_is_tool_comptime_allowed(self: Sema, fn_sym: i32) -> i32:
         return 1
     0
 
+fn sema_is_string_builder_comptime_method_name(name: str) -> i32:
+    if name == "new" or name.ends_with(".new"): return 1
+    if name == "with_capacity" or name.ends_with(".with_capacity"): return 1
+    if name == "push_str" or name.ends_with(".push_str"): return 1
+    if name == "push_byte" or name.ends_with(".push_byte"): return 1
+    if name == "push_char" or name.ends_with(".push_char"): return 1
+    if name == "len" or name.ends_with(".len"): return 1
+    if name == "is_empty" or name.ends_with(".is_empty"): return 1
+    if name == "to_str" or name.ends_with(".to_str"): return 1
+    0
+
+fn Sema.fn_symbol_is_std_string_builder_comptime_allowed(self: Sema, fn_sym: i32) -> i32:
+    let source_path = self.fn_symbol_source_path(fn_sym)
+    if not source_path.ends_with("string.w"):
+        return 0
+    sema_is_string_builder_comptime_method_name(self.pool_resolve(fn_sym))
+
 fn Sema.check_comptime_call_restriction(self: Sema, fn_sym: i32, node: i32) -> i32:
     if self.in_comptime_fn == 0 or fn_sym == 0:
         return 0
@@ -4065,6 +4082,8 @@ fn Sema.check_comptime_call_restriction(self: Sema, fn_sym: i32, node: i32) -> i
     if self.fn_decl_nodes.contains(fn_sym) or self.generic_fn_nodes.contains(fn_sym):
         if self.fn_symbol_is_tool_comptime_allowed(fn_sym) != 0:
             return 0
+        if self.fn_symbol_is_std_string_builder_comptime_allowed(fn_sym) != 0:
+            return 0
         if self.fn_symbol_is_comptime(fn_sym) == 0:
             self.emit_error("comptime can only call comptime functions", node)
             return 1
@@ -4074,6 +4093,8 @@ fn Sema.check_comptime_method_restriction(self: Sema, method_sym: i32, node: i32
     if self.in_comptime_fn == 0 or method_sym == 0:
         return 0
     if self.fn_symbol_is_tool_comptime_allowed(method_sym) != 0:
+        return 0
+    if self.fn_symbol_is_std_string_builder_comptime_allowed(method_sym) != 0:
         return 0
     if self.fn_symbol_is_comptime(method_sym) == 0:
         self.emit_error("comptime can only call comptime functions", node)

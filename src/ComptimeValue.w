@@ -19,6 +19,8 @@ enum ComptimeValueKind: i32:
     CV_FN = 12
     CV_ENUM = 13
     CV_BYTES = 14
+    CV_STRING_BUILDER = 15
+    CV_STRING_CHUNK = 16
 
 type ComptimeValue {
     kind: i32,
@@ -195,6 +197,28 @@ fn comptime_value_bytes(type_id: i32, data: str) -> ComptimeValue:
         extra_count: 0,
     }
 
+fn comptime_value_string_builder(type_id: i32, head: i32, chunk_count: i32, byte_count: i64) -> ComptimeValue:
+    ComptimeValue {
+        kind: ComptimeValueKind.CV_STRING_BUILDER,
+        type_id,
+        data0: byte_count,
+        data1: 0,
+        text: "",
+        extra_start: head,
+        extra_count: chunk_count,
+    }
+
+fn comptime_value_string_chunk(prev: i32, data: str) -> ComptimeValue:
+    ComptimeValue {
+        kind: ComptimeValueKind.CV_STRING_CHUNK,
+        type_id: 0,
+        data0: prev as i64,
+        data1: 0,
+        text: data,
+        extra_start: 0,
+        extra_count: 0,
+    }
+
 fn comptime_value_is_valid(value: ComptimeValue) -> i32:
     if value.kind == ComptimeValueKind.CV_INVALID:
         return 0
@@ -230,6 +254,8 @@ fn comptime_value_kind_name(kind: i32) -> str:
     if kind == ComptimeValueKind.CV_FN: return "function"
     if kind == ComptimeValueKind.CV_ENUM: return "enum"
     if kind == ComptimeValueKind.CV_BYTES: return "bytes"
+    if kind == ComptimeValueKind.CV_STRING_BUILDER: return "StringBuilder"
+    if kind == ComptimeValueKind.CV_STRING_CHUNK: return "string chunk"
     "invalid"
 
 fn comptime_value_format(value: ComptimeValue, extras: Vec[ComptimeValue], sema: Sema) -> str:
@@ -301,6 +327,10 @@ fn comptime_value_format(value: ComptimeValue, extras: Vec[ComptimeValue], sema:
         return out
     if value.kind == ComptimeValueKind.CV_BYTES:
         return f"Vec[u8]({value.text.len()} bytes)"
+    if value.kind == ComptimeValueKind.CV_STRING_BUILDER:
+        return f"StringBuilder({value.data0} bytes)"
+    if value.kind == ComptimeValueKind.CV_STRING_CHUNK:
+        return "<string chunk>"
     if value.type_id != 0:
         return "<" ++ sema.type_name(value.type_id) ++ ">"
     "<invalid>"
@@ -382,4 +412,12 @@ fn comptime_values_equal(lhs: ComptimeValue, rhs: ComptimeValue, extras: Vec[Com
         return 1
     if lhs.kind == ComptimeValueKind.CV_BYTES:
         return with_str_eq(lhs.text, rhs.text)
+    if lhs.kind == ComptimeValueKind.CV_STRING_BUILDER:
+        if lhs.type_id == rhs.type_id and lhs.extra_start == rhs.extra_start and lhs.extra_count == rhs.extra_count and lhs.data0 == rhs.data0:
+            return 1
+        return 0
+    if lhs.kind == ComptimeValueKind.CV_STRING_CHUNK:
+        if lhs.data0 == rhs.data0:
+            return with_str_eq(lhs.text, rhs.text)
+        return 0
     0
