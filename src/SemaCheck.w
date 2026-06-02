@@ -137,6 +137,8 @@ fn sema_path_is_user_lint_source(path: str) -> i32:
         return 0
     if sema_path_is_runtime_implementation(path) != 0:
         return 0
+    if path.starts_with("src/") or path.starts_with("build/"):
+        return 0
     1
 
 fn sema_extern_is_compiler_implementation(name: str, path: str) -> i32:
@@ -2313,7 +2315,10 @@ fn Sema.fn_symbol_is_manual_extern(self: Sema, fn_sym: i32) -> i32:
         return 0
     if self.ci_syms.contains(fn_sym):
         return 0
-    if sema_extern_is_compiler_implementation(self.pool_resolve(fn_sym), self.fn_symbol_source_path(fn_sym)) != 0:
+    let fn_name = self.pool_resolve(fn_sym)
+    if sema_extern_is_compiler_implementation(fn_name, self.current_module_path) != 0:
+        return 0
+    if sema_extern_is_compiler_implementation(fn_name, self.fn_symbol_source_path(fn_sym)) != 0:
         return 0
     1
 
