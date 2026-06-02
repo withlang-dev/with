@@ -48,18 +48,18 @@ extern fn malloc(size: c_ulong) -> *mut c_void
 extern fn free(ptr: *mut c_void)
 
 fn pcre2_malloc(size: c_ulong, data: *mut c_void) -> *mut c_void:
-    malloc(size)
+    unsafe { malloc(size) }
 
 fn pcre2_free(ptr: *mut c_void, data: *mut c_void):
-    free(ptr)
+    unsafe { free(ptr) }
 
 fn main:
-    if with_arg_count() < 3:
+    if unsafe { with_arg_count() } < 3:
         print("usage: pcre2_verify <pattern> <subject>\n")
         return
 
-    let pattern = with_arg_at(1)
-    let subject = with_arg_at(2)
+    let pattern = unsafe { with_arg_at(1) }
+    let subject = unsafe { with_arg_at(2) }
 
     // Runtime init: set context defaults by hand. These steps are independent
     // of the pattern/subject under test — they set up PCRE2's runtime state.

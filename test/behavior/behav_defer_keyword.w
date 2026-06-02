@@ -1,7 +1,5 @@
 //! expect-stdout: ok
 
-extern fn with_eprint(s: str)
-
 var cleanup_count: i32 = 0
 
 fn with_cleanup:

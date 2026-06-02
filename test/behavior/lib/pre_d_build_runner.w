@@ -73,7 +73,7 @@ pub fn p7_run(case_dir: str, label: str, args_blob: str) -> P7Run:
     var argv = ""
     argv = p7_argv_append(argv, p7_compiler_path())
     argv = argv ++ args_blob
-    let rc = with_exec_argv_capture_cwd(argv, stdout_path, stderr_path, 300000, case_dir)
+    let rc = unsafe { with_exec_argv_capture_cwd(argv, stdout_path, stderr_path, 300000, case_dir) }
     P7Run { rc: rc, stdout: read_file(stdout_path), stderr: read_file(stderr_path) }
 
 pub fn p7_build_args -> str:

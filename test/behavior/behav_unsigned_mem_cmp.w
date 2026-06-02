@@ -8,7 +8,7 @@
 extern fn getpid() -> i32
 
 fn opaque_u32(v: u32) -> u32:
-    v + ((getpid() * 0) as u32)
+    v + ((unsafe { getpid() } * 0) as u32)
 
 fn test_u32_local_cmp:
     let a: u32 = opaque_u32(97)

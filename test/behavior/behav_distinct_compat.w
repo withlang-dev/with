@@ -3,8 +3,6 @@
 type NodeId = distinct i32
 type TypeId = distinct i32
 
-extern fn with_eprint(s: str) -> void
-
 var pass_count: i32 = 0
 var fail_count: i32 = 0
 
@@ -12,7 +10,7 @@ fn check(name: str, ok: bool):
     if ok:
         pass_count = pass_count + 1
     else:
-        with_eprint(f"FAIL: {name}")
+        eprint(f"FAIL: {name}")
         fail_count = fail_count + 1
 
 fn main:

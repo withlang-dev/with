@@ -1,7 +1,5 @@
 //! expect-stdout: ok
 
-extern fn with_eprint(s: str)
-
 var errdefer_ran: i32 = 0
 
 fn might_fail:

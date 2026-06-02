@@ -8,4 +8,4 @@ async fn process(value: &i32) -> i32:
 fn main:
     let value = 42
     let task = process(&value)
-    inspect_task(&task)
+    unsafe { inspect_task(&task) }
