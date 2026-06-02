@@ -239,6 +239,9 @@ enum CiExprKind: i32:
     CIE_INIT_LIST = 70         // d0 = extra_start, d1 = count
     CIE_DESIGNATED_INIT = 71   // d0 = extra_start (alt [field_sym_idx, expr_id]), d1 = field_count
 
+    // Safety boundary
+    CIE_UNSAFE = 80            // d0 = inner expr
+
 
 enum CiBinOp: i32:
     CIBO_ADD = 0

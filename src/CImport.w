@@ -2749,7 +2749,10 @@ fn ci_parse_postfix_expr(s: str, params: str, known: str) -> str:
             if ci_str_contains(params, "|" ++ fn_name ++ "|") or with_cimport_is_name_emitted(fn_name) != 0:
                 let translated_args = ci_translate_call_args(args_str, params, known)
                 if translated_args.len() > 0:
-                    return fn_name ++ "(" ++ translated_args ++ ")"
+                    let call_text = fn_name ++ "(" ++ translated_args ++ ")"
+                    if ci_migrate_extern_fn_call_requires_unsafe(fn_name) or ci_migrate_preamble_extern_call_requires_unsafe(fn_name):
+                        return "unsafe { " ++ call_text ++ " }"
+                    return call_text
             return ""
     // Comma operator in parens: (a, b, c) — handled by strip_parens + recursion
     // Literal values
@@ -6311,7 +6314,7 @@ fn CiExprPool.lower_glibc_ctype_mask_macro(self: CiExprPool, session: i64, curso
     let args: Vec[i32] = Vec.new()
     args.push(arg_id as i32)
     ci_migrate_note_libc_symbol(ctype_fn)
-    self.build_named_call_expr(ctype_fn, &args)
+    self.unsafe_expr(self.build_named_call_expr(ctype_fn, &args))
 
 fn ci_glibc_ctype_case_function(cursor_name: str) -> str:
     if cursor_name == "__ctype_tolower_loc": return "tolower"
@@ -6340,7 +6343,7 @@ fn CiExprPool.lower_glibc_ctype_case_macro(self: CiExprPool, session: i64, curso
     let args: Vec[i32] = Vec.new()
     args.push(arg_id as i32)
     ci_migrate_note_libc_symbol(ctype_fn)
-    self.build_named_call_expr(ctype_fn, &args)
+    self.unsafe_expr(self.build_named_call_expr(ctype_fn, &args))
 
 fn CiExprPool.lower_binary_pointer(self: CiExprPool, session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
     self.lower_plain_value_expr_ir(session, cursor, types, scope)
@@ -7099,7 +7102,29 @@ fn CiExprPool.build_named_call_expr(self: CiExprPool, name: str, arg_ids: &Vec[i
     while i < arg_ids.len():
         let _ = self.add_extra(arg_ids.get(i))
         i = i + 1
-    self.add(CiExprKind.CIE_CALL, callee_id as i32, args_start, arg_ids.len() as i32, 0 as CiTypeId)
+    var call = self.add(CiExprKind.CIE_CALL, callee_id as i32, args_start, arg_ids.len() as i32, 0 as CiTypeId)
+    if ci_migrate_preamble_extern_call_requires_unsafe(name):
+        call = self.unsafe_expr(call)
+    call
+
+fn CiExprPool.unsafe_expr(self: CiExprPool, inner: CiExprId) -> CiExprId:
+    if self.kind(inner) == CiExprKind.CIE_UNSAFE:
+        return inner
+    self.add(CiExprKind.CIE_UNSAFE, inner as i32, 0, 0, self.get_type(inner))
+
+fn ci_migrate_preamble_extern_call_requires_unsafe(name: str) -> bool:
+    if name == "strncmp" or name == "memchr": return true
+    if name == "isalpha" or name == "isdigit" or name == "isalnum" or name == "isspace": return true
+    if name == "isupper" or name == "islower" or name == "isxdigit" or name == "isprint": return true
+    if name == "isgraph" or name == "ispunct" or name == "iscntrl": return true
+    if name == "tolower" or name == "toupper": return true
+    if ci_is_libm_fn(name): return true
+    if name == "with_clz" or name == "with_ctz" or name == "with_popcount": return true
+    if name == "with_bswap16" or name == "with_bswap32" or name == "with_bswap64": return true
+    if name == "with_clzl" or name == "with_clzll" or name == "with_ctzl" or name == "with_ctzll": return true
+    if name == "with_abs" or name == "with_alloc" or name == "with_realloc" or name == "with_free": return true
+    if name == "with_memcpy" or name == "with_memmove" or name == "with_memset" or name == "with_memcmp": return true
+    false
 
 fn CiExprPool.decay_array_value_expr(self: CiExprPool, session: i64, original_cursor: i32, value_id: CiExprId, target_ty: CiTypeId, types: CiTypePool) -> CiExprId:
     let peeled = ci_peel_transparent(session, original_cursor)
@@ -7513,7 +7538,7 @@ fn CiExprPool.build_libc_call_value_expr(self: CiExprPool, session: i64, cursor:
         let wa_callee = self.ident(wa_idx, 0 as CiTypeId)
         let args_start = self.extra_len() as i32
         let _ = self.add_extra(arg_as_i64 as i32)
-        let call_id = self.add(CiExprKind.CIE_CALL, wa_callee as i32, args_start, 1, 0 as CiTypeId)
+        let call_id = self.unsafe_expr(self.add(CiExprKind.CIE_CALL, wa_callee as i32, args_start, 1, 0 as CiTypeId))
         let void_ptr_ty = types.ty_pointer(c_void_ty, 0)
         return self.cast(void_ptr_ty, call_id)
     if callee_text == "free":
@@ -7528,7 +7553,7 @@ fn CiExprPool.build_libc_call_value_expr(self: CiExprPool, session: i64, cursor:
         let wf_callee = self.ident(wf_idx, 0 as CiTypeId)
         let args_start = self.extra_len() as i32
         let _ = self.add_extra(arg_cast as i32)
-        return self.add(CiExprKind.CIE_CALL, wf_callee as i32, args_start, 1, 0 as CiTypeId)
+        return self.unsafe_expr(self.add(CiExprKind.CIE_CALL, wf_callee as i32, args_start, 1, 0 as CiTypeId))
     if callee_text == "calloc":
         return self.build_named_call_expr("alloc_zeroed", arg_ids)
     if callee_text == "realloc":
@@ -8080,9 +8105,12 @@ fn CiStmtPool.lower_value_expr_ir(self: CiStmtPool, session: i64, cursor: i32, e
         while j < arg_ids.len():
             let _ = exprs.add_extra(arg_ids.get(j))
             j = j + 1
+        var call_id = exprs.add(CiExprKind.CIE_CALL, callee.value_expr as i32, args_start, arg_ids.len() as i32, 0 as CiTypeId)
+        if ci_migrate_extern_fn_call_requires_unsafe(callee_text) or ci_migrate_preamble_extern_call_requires_unsafe(callee_text):
+            call_id = exprs.unsafe_expr(call_id)
         return CiValueExprIR {
             setup_stmt: setup,
-            value_expr: exprs.add(CiExprKind.CIE_CALL, callee.value_expr as i32, args_start, arg_ids.len() as i32, 0 as CiTypeId),
+            value_expr: call_id,
         }
 
     if kind == CXK_MEMBER_REF and nc > 0:
@@ -13608,7 +13636,7 @@ fn CiExprPool.lower_libc_call_structural(self: CiExprPool, session: i64, cursor:
         // Push arg.
         let args_start = self.extra_len() as i32
         let _ = self.add_extra(arg_as_i64 as i32)
-        let call_id = self.add(CiExprKind.CIE_CALL, wa_callee as i32, args_start, 1, 0 as CiTypeId)
+        let call_id = self.unsafe_expr(self.add(CiExprKind.CIE_CALL, wa_callee as i32, args_start, 1, 0 as CiTypeId))
         // Wrap in *mut c_void cast.
         let cvoid_idx = types.add_string("c_void")
         let cvoid_ty = types.ty_named(cvoid_idx)
@@ -13631,7 +13659,7 @@ fn CiExprPool.lower_libc_call_structural(self: CiExprPool, session: i64, cursor:
         let wf_callee = self.ident(wf_idx, 0 as CiTypeId)
         let args_start = self.extra_len() as i32
         let _ = self.add_extra(arg_cast as i32)
-        return self.add(CiExprKind.CIE_CALL, wf_callee as i32, args_start, 1, 0 as CiTypeId)
+        return self.unsafe_expr(self.add(CiExprKind.CIE_CALL, wf_callee as i32, args_start, 1, 0 as CiTypeId))
     // calloc / realloc / memcpy / memmove / memset / memcmp /
     // __builtin_* still need dedicated structural lowering.
     0 as CiExprId
@@ -13643,38 +13671,38 @@ fn ci_map_libc_call(callee: str, args: str) -> str:
     // of doing it as a post-process text rewrite (which can't
     // handle nested parens in the arg text).
     if callee == "malloc":
-        return "(with_alloc((" ++ args ++ ") as i64) as *mut c_void)"
+        return "(unsafe { with_alloc((" ++ args ++ ") as i64) } as *mut c_void)"
     if callee == "free":
-        return "with_free((" ++ args ++ ") as *mut u8)"
+        return "unsafe { with_free((" ++ args ++ ") as *mut u8) }"
     if callee == "calloc":
         let count_arg = ci_extract_first_arg(args)
         let size_arg = ci_after_first_arg(args)
         if count_arg.len() == 0 or size_arg.len() == 0:
             return ""
-        return "(with_alloc_zeroed((" ++ count_arg ++ ") as i64, (" ++ size_arg ++ ") as i64) as *mut c_void)"
+        return "(unsafe { with_alloc_zeroed((" ++ count_arg ++ ") as i64, (" ++ size_arg ++ ") as i64) } as *mut c_void)"
     if callee == "realloc":
         let ptr_arg = ci_extract_first_arg(args)
         let size_arg = ci_after_first_arg(args)
         if ptr_arg.len() == 0 or size_arg.len() == 0:
             return ""
-        return "(with_realloc((" ++ ptr_arg ++ ") as *mut u8, 0, (" ++ size_arg ++ ") as i64) as *mut c_void)"
+        return "(unsafe { with_realloc((" ++ ptr_arg ++ ") as *mut u8, 0, (" ++ size_arg ++ ") as i64) } as *mut c_void)"
 
     // Memory operations — cast pointer args to *mut u8 / *const u8
     if callee == "memcpy":
-        return "with_memcpy(" ++ ci_cast_memcpy_args(args) ++ ")"
+        return "unsafe { with_memcpy(" ++ ci_cast_memcpy_args(args) ++ ") }"
     if callee == "memmove":
-        return "with_memmove(" ++ ci_cast_memcpy_args(args) ++ ")"
+        return "unsafe { with_memmove(" ++ ci_cast_memcpy_args(args) ++ ") }"
     if callee == "memset":
-        return "with_memset(" ++ ci_cast_memset_args(args) ++ ")"
+        return "unsafe { with_memset(" ++ ci_cast_memset_args(args) ++ ") }"
     if callee == "memcmp":
-        return "with_memcmp(" ++ ci_cast_memcmp_args(args) ++ ")"
+        return "unsafe { with_memcmp(" ++ ci_cast_memcmp_args(args) ++ ") }"
     if callee == "memchr":
         let first = ci_extract_first_arg(args)
         let rest_start = first.len() as i32 + 1
         if rest_start < args.len() as i32:
             let rest = ci_trim(args.slice(rest_start as i64, args.len()))
-            return "(memchr((" ++ first ++ " as *const c_void), " ++ rest ++ ") as *const u8)"
-        return "(memchr((" ++ first ++ " as *const c_void)) as *const u8)"
+            return "(unsafe { memchr((" ++ first ++ " as *const c_void), " ++ rest ++ ") } as *const u8)"
+        return "(unsafe { memchr((" ++ first ++ " as *const c_void)) } as *const u8)"
 
     // String operations
     if callee == "strlen":

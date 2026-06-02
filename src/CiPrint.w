@@ -534,9 +534,12 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
         if wants_ptr != 0 and (base_ty as i32) != 0 and types.kind(base_ty) == CiTypeKind.CT_POINTER:
             let base_text = ci_print_expr(exprs, types, base, 0, 0)
             return f"(unsafe *{base_text}).{field}"
+        if wants_ptr == 0 and (base_ty as i32) != 0 and types.kind(base_ty) == CiTypeKind.CT_POINTER:
+            let base_text = ci_print_expr(exprs, types, base, 0, 0)
+            return f"(unsafe *{base_text}).{field}"
         if wants_ptr == 0 and ci_field_base_needs_borrow(types, base_ty):
             let base_text = ci_print_expr(exprs, types, base, 0, 1)
-            return f"(&raw const {base_text} as *const {ci_print_type(types, base_ty)}).{field}"
+            return f"(unsafe *(&raw const {base_text} as *const {ci_print_type(types, base_ty)})).{field}"
         let base_text = ci_print_expr(exprs, types, base, 0, wants_ptr)
         return f"{base_text}.{field}"
     if kind == CiExprKind.CIE_INDEX:
@@ -662,6 +665,9 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
         if ty_text.len() > 0 and ty_text != "i32" and not ci_starts_with_str(ty_text, "__UNSUPPORTED"):
             return ty_text ++ " { " ++ fields ++ " }"
         return "{ " ++ fields ++ " }"
+    if kind == CiExprKind.CIE_UNSAFE:
+        let inner = (exprs.get_d0(id)) as CiExprId
+        return "unsafe { " ++ ci_print_expr(exprs, types, inner, 0, wants_ptr) ++ " }"
 
     "<ci:expr:unknown>"
 
