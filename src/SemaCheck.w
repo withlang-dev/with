@@ -5647,6 +5647,7 @@ fn Sema.error_conversion_variant(self: Sema, target_err_ty: i32, source_err_ty: 
 
 fn Sema.enum_variant_payload_types(self: Sema, enum_tid: i32, variant_name: i32) -> Vec[i32]:
     var result: Vec[i32] = Vec.new()
+    let bare_variant_name = self.unqualified_enum_variant_sym(variant_name)
     let resolved = self.resolve_alias(enum_tid)
     let kind = self.get_type_kind(resolved)
     if kind == TypeKind.TY_ENUM:
@@ -5656,7 +5657,7 @@ fn Sema.enum_variant_payload_types(self: Sema, enum_tid: i32, variant_name: i32)
         for vi in 0..variant_count:
             let name_sym = self.type_extra.get(pos as i64)
             let payload_count = self.type_extra.get((pos + 1) as i64)
-            if name_sym == variant_name:
+            if name_sym == variant_name or name_sym == bare_variant_name:
                 for pi in 0..payload_count:
                     result.push(self.type_extra.get((pos + 2 + pi) as i64))
                 return result
@@ -5675,8 +5676,8 @@ fn Sema.enum_variant_payload_types(self: Sema, enum_tid: i32, variant_name: i32)
         for vi in 0..variant_count:
             let name_sym = self.type_extra.get(pos as i64)
             let payload_count = self.type_extra.get((pos + 1) as i64)
-            if name_sym == variant_name:
-                let generic_payloads = self.resolve_generic_enum_payload(resolved, base_sym, variant_name, payload_count)
+            if name_sym == variant_name or name_sym == bare_variant_name:
+                let generic_payloads = self.resolve_generic_enum_payload(resolved, base_sym, bare_variant_name, payload_count)
                 if generic_payloads.len() as i32 > 0:
                     return generic_payloads
                 for pi in 0..payload_count:
@@ -5789,13 +5790,14 @@ fn Sema.enum_variant_index_for_type(self: Sema, enum_tid: i32, variant_sym: i32)
     let enum_decl = self.enum_variant_decl_type(enum_tid)
     if enum_decl == 0 or variant_sym == 0:
         return -1
+    let bare_variant_sym = self.unqualified_enum_variant_sym(variant_sym)
     let te_start = self.get_type_d1(enum_decl)
     let variant_count = self.get_type_d2(enum_decl)
     var pos = te_start
     for vi in 0..variant_count:
         let cur_sym = self.type_extra.get(pos as i64)
         let payload_count = self.type_extra.get((pos + 1) as i64)
-        if cur_sym == variant_sym:
+        if cur_sym == variant_sym or cur_sym == bare_variant_sym:
             return vi
         pos = pos + 2 + payload_count
     -1
@@ -5804,14 +5806,15 @@ fn Sema.enum_variant_discriminant_for_type(self: Sema, enum_tid: i32, variant_sy
     let enum_decl = self.enum_variant_decl_type(enum_tid)
     if enum_decl == 0:
         return -1
-    let index = self.enum_variant_index_for_type(enum_decl, variant_sym)
+    let bare_variant_sym = self.unqualified_enum_variant_sym(variant_sym)
+    let index = self.enum_variant_index_for_type(enum_decl, bare_variant_sym)
     if index < 0:
         return -1
-    let qualified = self.qualified_enum_variant_sym(enum_decl, variant_sym)
+    let qualified = self.qualified_enum_variant_sym(enum_decl, bare_variant_sym)
     if self.disc_values.contains(qualified):
         return self.disc_values.get(qualified).unwrap()
-    if self.disc_values.contains(variant_sym):
-        return self.disc_values.get(variant_sym).unwrap()
+    if self.disc_values.contains(bare_variant_sym):
+        return self.disc_values.get(bare_variant_sym).unwrap()
     index
 
 fn Sema.enum_accessor_return_type(self: Sema, enum_tid: i32, variant_sym: i32, accessor_kind: i32) -> i32:
@@ -5858,13 +5861,26 @@ fn Sema.expected_variant_constructor_type(self: Sema, variant_name: i32) -> i32:
 fn Sema.qualified_enum_variant_sym(self: Sema, enum_tid: i32, variant_name: i32) -> i32:
     if enum_tid == 0 or variant_name == 0:
         return variant_name
+    let bare_variant_name = self.unqualified_enum_variant_sym(variant_name)
     let owner_sym = self.enum_pattern_owner_sym(enum_tid)
     if owner_sym == 0:
-        return variant_name
-    let qual_name = self.pool_resolve(owner_sym) ++ "." ++ self.pool_resolve(variant_name)
+        return bare_variant_name
+    let qual_name = self.pool_resolve(owner_sym) ++ "." ++ self.pool_resolve(bare_variant_name)
     let qual_sym = self.pool_intern(qual_name)
     if self.variant_lookup.contains(qual_sym):
         return qual_sym
+    bare_variant_name
+
+fn Sema.unqualified_enum_variant_sym(self: Sema, variant_name: i32) -> i32:
+    if variant_name == 0:
+        return 0
+    let text = self.pool_resolve(variant_name)
+    var dot = -1
+    for i in 0..text.len() as i32:
+        if text.byte_at(i as i64) == 46:
+            dot = i
+    if dot >= 0 and dot + 1 < text.len() as i32:
+        return self.pool_intern(text.slice((dot + 1) as i64, text.len() as i64))
     variant_name
 
 fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
@@ -6390,7 +6406,7 @@ fn Sema.pipeline_generic_builtin_method_exists(self: Sema, owner_sym: i32, field
             return 1
         if field == self.syms.range_method or field == self.syms.iter_ref or field == self.syms.iter_place:
             return 1
-        if field == self.syms.filter or field == self.syms.map or field == self.syms.fold:
+        if field == self.syms.filter or field == self.syms.map or field == self.syms.fold or field == self.syms.sequence or field == self.syms.traverse:
             return 1
     if owner_sym == self.syms.hashmap:
         if field == self.syms.insert or field == self.syms.clear:
@@ -6426,11 +6442,11 @@ fn Sema.pipeline_generic_builtin_method_exists(self: Sema, owner_sym: i32, field
             return 1
     if owner_sym == self.syms.option:
         let option_method_name = self.pool_resolve(field)
-        if field == self.syms.unwrap or field == self.syms.is_some or field == self.syms.is_none or field == self.syms.filter or field == self.syms.map or option_method_name == "and_then" or option_method_name == "unwrap_or":
+        if field == self.syms.unwrap or field == self.syms.is_some or field == self.syms.is_none or field == self.syms.filter or field == self.syms.map or field == self.syms.transpose or option_method_name == "and_then" or option_method_name == "unwrap_or":
             return 1
     if owner_sym == self.syms.result:
         let result_method_name = self.pool_resolve(field)
-        if field == self.syms.unwrap or field == self.syms.is_ok or field == self.syms.is_err or field == self.syms.map or result_method_name == "map_err" or result_method_name == "unwrap_or" or result_method_name == "context" or result_method_name == "with_context":
+        if field == self.syms.unwrap or field == self.syms.is_ok or field == self.syms.is_err or field == self.syms.map or field == self.syms.transpose or result_method_name == "map_err" or result_method_name == "unwrap_or" or result_method_name == "context" or result_method_name == "with_context":
             return 1
     if owner_sym == self.syms.vecslot or owner_sym == self.syms.vecrange:
         if field == self.syms.get or self.pool_resolve(field) == "set" or self.is_collection_len_method(field):
@@ -7584,6 +7600,7 @@ fn Sema.check_expr_with_expected(self: Sema, node: i32, expected: TypeId) -> Typ
 fn Sema.enum_has_variant(self: Sema, enum_tid: i32, variant_sym: i32) -> i32:
     let resolved = self.resolve_alias(enum_tid)
     let resolved_kind = self.get_type_kind(resolved)
+    let bare_variant_sym = self.unqualified_enum_variant_sym(variant_sym)
     if resolved_kind == TypeKind.TY_GENERIC_INST:
         let base_sym = self.get_generic_inst_base(resolved)
         let base_tid = self.lookup_named_type_visible(base_sym)
@@ -7598,7 +7615,7 @@ fn Sema.enum_has_variant(self: Sema, enum_tid: i32, variant_sym: i32) -> i32:
     for vi in 0..variant_count:
         let v_name = self.type_extra.get(pos as i64)
         let payload_count = self.type_extra.get((pos + 1) as i64)
-        if v_name == variant_sym:
+        if v_name == variant_sym or v_name == bare_variant_sym:
             return 1
         pos = pos + 2 + payload_count
     0
@@ -8596,6 +8613,14 @@ fn Sema.ensure_vec_str_type(self: Sema) -> i32:
     args.push(self.ty_str as i32)
     self.ensure_generic_inst_type(self.syms.vec, args, 1) as i32
 
+fn Sema.ensure_vec_type_for(self: Sema, elem_ty: i32) -> i32:
+    let found = self.find_generic_inst(self.syms.vec, elem_ty)
+    if found != 0:
+        return found
+    let args: Vec[i32] = Vec.new()
+    args.push(elem_ty)
+    self.ensure_generic_inst_type(self.syms.vec, args, 1) as i32
+
 fn Sema.ensure_handle_type_for(self: Sema, elem_ty: i32) -> i32:
     let found = self.find_generic_inst(self.syms.handle, elem_ty)
     if found != 0:
@@ -8651,7 +8676,68 @@ fn Sema.fn_return_type(self: Sema, fn_ty: i32) -> i32:
         return 0
     self.get_type_d2(resolved)
 
+fn Sema.callable_return_type(self: Sema, callable_ty: i32) -> i32:
+    let fn_ty = self.callable_fn_type(callable_ty as TypeId)
+    if fn_ty == 0:
+        return 0
+    self.get_type_d2(fn_ty)
+
+fn Sema.vec_sequence_return_type(self: Sema, recv_type: i32, arg_count: i32, node: i32) -> i32:
+    if arg_count != 0:
+        self.emit_error("Vec.sequence() expects no arguments", node)
+        return 0
+    let elem_ty = self.get_generic_inst_arg(recv_type, 0)
+    let resolved_elem = self.resolve_alias(elem_ty as TypeId)
+    if self.get_type_kind(resolved_elem) != TypeKind.TY_GENERIC_INST:
+        self.emit_error("Vec.sequence() requires Vec[Option[T]] or Vec[Result[T, E]]", node)
+        return 0
+    let elem_base = self.get_generic_inst_base(resolved_elem as i32)
+    if elem_base == self.syms.option:
+        let inner_ty = self.get_generic_inst_arg(resolved_elem as i32, 0)
+        return self.ensure_option_type_for(self.ensure_vec_type_for(inner_ty))
+    if elem_base == self.syms.result:
+        let ok_ty = self.get_generic_inst_arg(resolved_elem as i32, 0)
+        let err_ty = self.get_generic_inst_arg(resolved_elem as i32, 1)
+        return self.ensure_result_type_for(self.ensure_vec_type_for(ok_ty), err_ty)
+    self.emit_error("Vec.sequence() requires Vec[Option[T]] or Vec[Result[T, E]]", node)
+    0
+
+fn Sema.vec_traverse_return_type(self: Sema, recv_type: i32, arg_types: Vec[i32], arg_count: i32, node: i32) -> i32:
+    if arg_count != 1:
+        self.emit_error("Vec.traverse() expects exactly one argument", node)
+        return 0
+    let mapped_wrapper_ty = self.callable_return_type(arg_types.get(0))
+    if mapped_wrapper_ty == 0:
+        self.emit_error("Vec.traverse() expects a function argument", node)
+        return 0
+    let resolved_wrapper = self.resolve_alias(mapped_wrapper_ty as TypeId)
+    if self.get_type_kind(resolved_wrapper) != TypeKind.TY_GENERIC_INST:
+        self.emit_error("Vec.traverse() function must return Option or Result", node)
+        return 0
+    let wrapper_base = self.get_generic_inst_base(resolved_wrapper as i32)
+    if wrapper_base == self.syms.option:
+        let inner_ty = self.get_generic_inst_arg(resolved_wrapper as i32, 0)
+        return self.ensure_option_type_for(self.ensure_vec_type_for(inner_ty))
+    if wrapper_base == self.syms.result:
+        let ok_ty = self.get_generic_inst_arg(resolved_wrapper as i32, 0)
+        let err_ty = self.get_generic_inst_arg(resolved_wrapper as i32, 1)
+        return self.ensure_result_type_for(self.ensure_vec_type_for(ok_ty), err_ty)
+    self.emit_error("Vec.traverse() function must return Option or Result", node)
+    0
+
 fn Sema.option_combinator_return_type(self: Sema, recv_type: i32, method_name: str, arg_types: Vec[i32], arg_count: i32, node: i32) -> i32:
+    if method_name == "transpose":
+        if arg_count != 0:
+            self.emit_error("Option.transpose() expects no arguments", node)
+            return 0
+        let payload_ty = self.get_generic_inst_arg(recv_type, 0)
+        let payload_resolved = self.resolve_alias(payload_ty as TypeId)
+        if self.get_type_kind(payload_resolved) != TypeKind.TY_GENERIC_INST or self.get_generic_inst_base(payload_resolved as i32) != self.syms.result:
+            self.emit_error("Option.transpose() requires Option[Result[T, E]]", node)
+            return 0
+        let ok_ty = self.get_generic_inst_arg(payload_resolved as i32, 0)
+        let err_ty = self.get_generic_inst_arg(payload_resolved as i32, 1)
+        return self.ensure_result_type_for(self.ensure_option_type_for(ok_ty), err_ty)
     if method_name == "map":
         if arg_count != 1:
             self.emit_error("Option.map() expects exactly one argument", node)
@@ -8677,6 +8763,18 @@ fn Sema.option_combinator_return_type(self: Sema, recv_type: i32, method_name: s
     0
 
 fn Sema.result_combinator_return_type(self: Sema, recv_type: i32, method_name: str, arg_types: Vec[i32], arg_count: i32, node: i32) -> i32:
+    if method_name == "transpose":
+        if arg_count != 0:
+            self.emit_error("Result.transpose() expects no arguments", node)
+            return 0
+        let ok_ty = self.get_generic_inst_arg(recv_type, 0)
+        let err_ty = self.get_generic_inst_arg(recv_type, 1)
+        let ok_resolved = self.resolve_alias(ok_ty as TypeId)
+        if self.get_type_kind(ok_resolved) != TypeKind.TY_GENERIC_INST or self.get_generic_inst_base(ok_resolved as i32) != self.syms.option:
+            self.emit_error("Result.transpose() requires Result[Option[T], E]", node)
+            return 0
+        let inner_ty = self.get_generic_inst_arg(ok_resolved as i32, 0)
+        return self.ensure_option_type_for(self.ensure_result_type_for(inner_ty, err_ty))
     if method_name != "map" and method_name != "map_err" and method_name != "context" and method_name != "with_context":
         return 0
     if arg_count != 1:
@@ -8852,12 +8950,12 @@ fn Sema.method_expected_arg_type(self: Sema, recv_type: i32, field: i32, arg_ind
     if owner_sym == self.syms.vec:
         if (field == self.syms.push or field == self.syms.contains) and arg_index == 0:
             return self.get_generic_inst_arg(resolved as i32, 0)
-        // `map`'s closure parameter is the element type; push `fn(elem) -> _`
+        // `map`/`traverse` closure parameters are the element type; push `fn(elem) -> _`
         // as the expected arg type so the closure param is typed from the Vec's
         // element instead of defaulting to i32 (#306). The closure return is
         // left to inference (ret = 0), so the mapped element type comes from the
         // closure body, not the input element.
-        if field == self.syms.map and arg_index == 0:
+        if (field == self.syms.map or field == self.syms.traverse) and arg_index == 0:
             let map_elem = self.get_generic_inst_arg(resolved as i32, 0)
             if map_elem != 0:
                 let map_params: Vec[i32] = Vec.new()
@@ -9816,6 +9914,10 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                 if arg_count >= 1:
                     return arg_types.get(0)
                 return self.get_generic_inst_arg(recv_type, 0)
+            if field == self.syms.sequence:
+                return self.vec_sequence_return_type(recv_type, mc_resolved_arg_count, node)
+            if field == self.syms.traverse:
+                return self.vec_traverse_return_type(recv_type, arg_types, mc_resolved_arg_count, node)
         if type_name_sym == self.syms.vecslot:
             if field == self.syms.get:
                 return self.get_generic_inst_arg(recv_type, 0)

@@ -152,6 +152,9 @@ type SemaBuiltinSymbols {
     filter: i32,
     map: i32,
     fold: i32,
+    sequence: i32,
+    traverse: i32,
+    transpose: i32,
     clear: i32,
     pop: i32,
     set_i32: i32,
@@ -728,6 +731,9 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         filter: 0,
         map: 0,
         fold: 0,
+        sequence: 0,
+        traverse: 0,
+        transpose: 0,
         clear: 0,
         pop: 0,
         set_i32: 0,
@@ -1334,6 +1340,9 @@ fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.syms.filter = self.pool_intern("filter")
     self.syms.map = self.pool_intern("map")
     self.syms.fold = self.pool_intern("fold")
+    self.syms.sequence = self.pool_intern("sequence")
+    self.syms.traverse = self.pool_intern("traverse")
+    self.syms.transpose = self.pool_intern("transpose")
     self.syms.clear = self.pool_intern("clear")
     self.syms.pop = self.pool_intern("pop")
     self.syms.set_i32 = self.pool_intern("set_i32")
