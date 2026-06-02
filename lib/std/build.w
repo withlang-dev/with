@@ -914,10 +914,11 @@ pub fn SourceEmitter.generated_source(self: &Self, path: str, contents: str) -> 
     GeneratedSource { path, contents }
 
 fn tool_process_argv(args: Vec[str]) -> str:
-    var out = ""
+    var out = StringBuilder.new()
     for i in 0..args.len() as i32:
-        out = out ++ args.get(i as i64) ++ "\0"
-    out
+        out.push_str(args.get(i as i64))
+        out.push_byte(0)
+    out.to_str()
 
 type ToolProcessEnv {
     tool_token: str,
@@ -1111,20 +1112,20 @@ pub fn ActionCtx.network(self: &Self) -> bool:
     self.network_value
 
 fn build_graph_escape(value: str) -> str:
-    var out = ""
+    var out = StringBuilder.with_capacity(value.len())
     for i in 0..value.len() as i32:
         let ch = value.byte_at(i as i64)
         if ch == 92:
-            out = out ++ "\\\\"
+            out.push_str("\\\\")
         else if ch == 9:
-            out = out ++ "\\t"
+            out.push_str("\\t")
         else if ch == 10:
-            out = out ++ "\\n"
+            out.push_str("\\n")
         else if ch == 13:
-            out = out ++ "\\r"
+            out.push_str("\\r")
         else:
-            out = out ++ value.slice(i as i64, (i + 1) as i64)
-    out
+            out.push_str(value.slice(i as i64, (i + 1) as i64))
+    out.to_str()
 
 pub fn new_build(package: Package) -> Build:
     Build {
@@ -1548,34 +1549,69 @@ pub fn __driver_exit(code: i32):
     exit(code)
 
 pub fn Build.emit_graph(self: Build) -> str:
-    var out = "WITH_BUILD_GRAPH\t2\n"
-    out = out ++ "package\t" ++ build_graph_escape(self.package.name) ++ "\t" ++ build_graph_escape(self.package.version) ++ "\n"
+    var out = StringBuilder.new()
+    out.push_str("WITH_BUILD_GRAPH\t2\n")
+    out.push_str("package\t")
+    out.push_str(build_graph_escape(self.package.name))
+    out.push_str("\t")
+    out.push_str(build_graph_escape(self.package.version))
+    out.push_str("\n")
     if self.default_target.len() > 0:
-        out = out ++ "default_target\t" ++ build_graph_escape(self.default_target) ++ "\n"
+        out.push_str("default_target\t")
+        out.push_str(build_graph_escape(self.default_target))
+        out.push_str("\n")
     for gi in 0..self.generated_sources.len() as i32:
         let generated = self.generated_sources.get(gi as i64)
-        out = out ++ "generated_source\t" ++ build_graph_escape(generated.path) ++ "\t" ++ build_graph_escape(generated.contents) ++ "\n"
+        out.push_str("generated_source\t")
+        out.push_str(build_graph_escape(generated.path))
+        out.push_str("\t")
+        out.push_str(build_graph_escape(generated.contents))
+        out.push_str("\n")
     for ti in 0..self.targets.len() as i32:
         let target = self.targets.get(ti as i64)
-        out = out ++ "target\t"
-        out = out ++ f"{target.kind as i32}\t"
-        out = out ++ build_graph_escape(target.name) ++ "\t"
-        out = out ++ build_graph_escape(target.entry) ++ "\t"
-        out = out ++ f"{target.target_kind as i32}\t"
-        out = out ++ f"{target.optimize_mode as i32}\t"
-        out = out ++ build_graph_escape(target.output) ++ "\n"
+        out.push_str("target\t")
+        out.push_str(f"{target.kind as i32}\t")
+        out.push_str(build_graph_escape(target.name))
+        out.push_str("\t")
+        out.push_str(build_graph_escape(target.entry))
+        out.push_str("\t")
+        out.push_str(f"{target.target_kind as i32}\t")
+        out.push_str(f"{target.optimize_mode as i32}\t")
+        out.push_str(build_graph_escape(target.output))
+        out.push_str("\n")
         for li in 0..target.system_libs.len() as i32:
-            out = out ++ "system_lib\t" ++ f"{ti}\t" ++ build_graph_escape(target.system_libs.get(li as i64)) ++ "\n"
+            out.push_str("system_lib\t")
+            out.push_str(f"{ti}\t")
+            out.push_str(build_graph_escape(target.system_libs.get(li as i64)))
+            out.push_str("\n")
         for ii in 0..target.include_paths.len() as i32:
-            out = out ++ "include_path\t" ++ f"{ti}\t" ++ build_graph_escape(target.include_paths.get(ii as i64)) ++ "\n"
+            out.push_str("include_path\t")
+            out.push_str(f"{ti}\t")
+            out.push_str(build_graph_escape(target.include_paths.get(ii as i64)))
+            out.push_str("\n")
         for di in 0..target.defines.len() as i32:
-            out = out ++ "define\t" ++ f"{ti}\t" ++ build_graph_escape(target.defines.get(di as i64)) ++ "\n"
+            out.push_str("define\t")
+            out.push_str(f"{ti}\t")
+            out.push_str(build_graph_escape(target.defines.get(di as i64)))
+            out.push_str("\n")
         for ini in 0..target.inputs.len() as i32:
-            out = out ++ "input\t" ++ f"{ti}\t" ++ build_graph_escape(target.inputs.get(ini as i64)) ++ "\n"
+            out.push_str("input\t")
+            out.push_str(f"{ti}\t")
+            out.push_str(build_graph_escape(target.inputs.get(ini as i64)))
+            out.push_str("\n")
         for outi in 0..target.extra_outputs.len() as i32:
-            out = out ++ "extra_output\t" ++ f"{ti}\t" ++ build_graph_escape(target.extra_outputs.get(outi as i64)) ++ "\n"
+            out.push_str("extra_output\t")
+            out.push_str(f"{ti}\t")
+            out.push_str(build_graph_escape(target.extra_outputs.get(outi as i64)))
+            out.push_str("\n")
         for depi in 0..target.deps.len() as i32:
-            out = out ++ "dep\t" ++ f"{ti}\t" ++ build_graph_escape(target.deps.get(depi as i64)) ++ "\n"
+            out.push_str("dep\t")
+            out.push_str(f"{ti}\t")
+            out.push_str(build_graph_escape(target.deps.get(depi as i64)))
+            out.push_str("\n")
         for ai in 0..target.args.len() as i32:
-            out = out ++ "arg\t" ++ f"{ti}\t" ++ build_graph_escape(target.args.get(ai as i64)) ++ "\n"
-    out
+            out.push_str("arg\t")
+            out.push_str(f"{ti}\t")
+            out.push_str(build_graph_escape(target.args.get(ai as i64)))
+            out.push_str("\n")
+    out.to_str()
