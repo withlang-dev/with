@@ -4918,6 +4918,18 @@ fn MirBuilder.lower_call_arg(self: MirBuilder, arg_node: i32, sig_idx: i32, call
     self.expected_type = saved_expected
     lowered
 
+fn MirBuilder.lower_method_arg_with_expected(self: MirBuilder, recv_type: i32, method_sym: i32, arg_node: i32, arg_index: i32) -> i32:
+    let saved_expected = self.expected_type
+    var expected_ty = 0
+    if recv_type != 0:
+        let resolved_recv = self.sema.auto_deref_ref_ptr_type(recv_type as TypeId) as i32
+        expected_ty = self.sema.method_expected_arg_type(resolved_recv, method_sym, arg_index)
+        if expected_ty != 0 and expected_ty != self.sema.ty_void as i32:
+            self.expected_type = expected_ty
+    let lowered = self.lower_expr(arg_node)
+    self.expected_type = saved_expected
+    lowered
+
 fn MirBuilder.lower_auto_ref_call_arg(self: MirBuilder, arg_node: i32, expected_ty: i32) -> i32:
     if arg_node == 0 or expected_ty == 0:
         return -1
@@ -5417,8 +5429,10 @@ fn MirBuilder.lower_intrinsic_call(self: MirBuilder, intrinsic: MirIntrinsic, se
     // the receiver is a type ident — skip it. For instance methods, include it.
     let is_static = intrinsic == MirIntrinsic.VEC_NEW or intrinsic == MirIntrinsic.VEC_WITH_CAPACITY or intrinsic == MirIntrinsic.MAP_NEW or intrinsic == MirIntrinsic.SLOTMAP_NEW
     let call_args: Vec[i32] = Vec.new()
+    var recv_type_for_args = 0
     if not is_static:
         let recv_ty = self.expr_type(self_expr)
+        recv_type_for_args = recv_ty
         let recv_resolved = if recv_ty != 0: self.sema.resolve_alias(recv_ty as TypeId) else: 0
         let recv_kind = self.sema.get_type_kind(recv_resolved)
         let raw_pointer_option_receiver = recv_kind == TypeKind.TY_PTR and (intrinsic == MirIntrinsic.OPT_UNWRAP or intrinsic == MirIntrinsic.OPT_IS_SOME or intrinsic == MirIntrinsic.OPT_IS_NONE or intrinsic == MirIntrinsic.OPT_FILTER)
@@ -5428,7 +5442,7 @@ fn MirBuilder.lower_intrinsic_call(self: MirBuilder, intrinsic: MirIntrinsic, se
             call_args.push(self.lower_receiver_with_method_autoderef(self_expr))
     for i in 0..arg_count:
         let arg_node = self.ast.get_extra(arg_start + i)
-        call_args.push(self.lower_expr(arg_node))
+        call_args.push(self.lower_method_arg_with_expected(recv_type_for_args, method_sym, arg_node, i))
 
     let args_id = self.body.new_call_args(call_args)
     var ret_type = self.expr_type(node)
@@ -6251,12 +6265,12 @@ fn MirBuilder.lower_optional_chain_field(self: MirBuilder, result_place: i32, re
     some_fields.push(field_op)
     self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.some, some_fields, span)
 
-fn MirBuilder.lower_intrinsic_call_with_receiver_operand(self: MirBuilder, intrinsic: MirIntrinsic, recv_op: i32, method_sym: i32, arg_start: i32, arg_count: i32, ret_type: i32, node: i32) -> i32:
+fn MirBuilder.lower_intrinsic_call_with_receiver_operand(self: MirBuilder, intrinsic: MirIntrinsic, recv_op: i32, recv_type: i32, method_sym: i32, arg_start: i32, arg_count: i32, ret_type: i32, node: i32) -> i32:
     let fn_op = self.const_operand(ConstKind.CK_FN, method_sym, self.sema.ty_void)
     let call_args: Vec[i32] = Vec.new()
     call_args.push(recv_op)
     for ai in 0..arg_count:
-        call_args.push(self.lower_expr(self.ast.get_extra(arg_start + ai)))
+        call_args.push(self.lower_method_arg_with_expected(recv_type, method_sym, self.ast.get_extra(arg_start + ai), ai))
 
     let args_id = self.body.new_call_args(call_args)
     self.body.set_call_ast_node(args_id, node)
@@ -6337,7 +6351,7 @@ fn MirBuilder.lower_optional_chain_method(self: MirBuilder, result_place: i32, r
     if intrinsic != MirIntrinsic.NONE:
         let payload_op_kind = if self.sema.is_copy(payload_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE
         let payload_op = self.body.new_operand(payload_op_kind, payload_place)
-        raw_op = self.lower_intrinsic_call_with_receiver_operand(intrinsic, payload_op, member_sym, arg_start, arg_count, raw_ret_ty, node)
+        raw_op = self.lower_intrinsic_call_with_receiver_operand(intrinsic, payload_op, payload_ty, member_sym, arg_start, arg_count, raw_ret_ty, node)
     else:
         let recv_resolved = self.sema.auto_deref_ref_ptr_type(payload_ty as TypeId) as i32
         let owner_sym = self.sema.method_owner_symbol_for_type(recv_resolved)
