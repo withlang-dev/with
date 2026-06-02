@@ -5282,7 +5282,7 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
     if self.is_option_type(enum_accessor_recv_type) != 0 and (method_name == "map" or method_name == "and_then"):
         return self.lower_option_combinator_method(self_expr, method_name, arg_start, arg_count, node)
 
-    if self.is_result_type(enum_accessor_recv_type) != 0 and (method_name == "map" or method_name == "map_err"):
+    if self.is_result_type(enum_accessor_recv_type) != 0 and (method_name == "map" or method_name == "map_err" or method_name == "context" or method_name == "with_context"):
         return self.lower_result_combinator_method(self_expr, method_name, arg_start, arg_count, node)
 
     if method_name == "unwrap_or" and self.is_option_or_result_type(enum_accessor_recv_type) != 0:
@@ -5558,6 +5558,20 @@ fn MirBuilder.assign_enum_variant_to_place(self: MirBuilder, result_place: i32, 
     let tag = self.enum_variant_discriminant_for_type(result_ty, variant_sym)
     let rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, fid, tag)
     self.body.push_stmt(self.cur_bb, StmtKind.Assign, result_place, rv, span)
+
+fn MirBuilder.lower_context_error_operand(self: MirBuilder, message_op: i32, source_op: i32, context_error_ty: i32, span: i32) -> i32:
+    let fields: Vec[i32] = Vec.new()
+    fields.push(message_op)
+    fields.push(source_op)
+    let names: Vec[i32] = Vec.new()
+    names.push(self.pool.intern("message"))
+    names.push(self.pool.intern("source"))
+    let fid = self.body.new_agg_fields(fields, names)
+    let rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, fid, 0)
+    let tmp = self.new_temp(context_error_ty)
+    let place = self.place_for_local(tmp)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, span)
+    self.operand_for_place(place, context_error_ty)
 
 fn MirBuilder.lower_enum_accessor_call(self: MirBuilder, self_expr: i32, method_sym: i32, node: i32) -> i32:
     var enum_ty = self.expr_type(self_expr)
@@ -5865,7 +5879,15 @@ fn MirBuilder.lower_result_combinator_method(self: MirBuilder, self_expr: i32, m
     let value_op = self.lower_expr(self_expr)
     self.expected_type = saved_expected
     let value_place = self.materialize_operand(value_op, value_ty, self.ast.get_start(self_expr))
-    let mapper_op = self.lower_expr(self.ast.get_extra(arg_start))
+    var mapper_op = 0
+    var context_message_op = 0
+    var context_fn_op = 0
+    if method_name == "context":
+        context_message_op = self.lower_expr(self.ast.get_extra(arg_start))
+    else if method_name == "with_context":
+        context_fn_op = self.lower_expr(self.ast.get_extra(arg_start))
+    else:
+        mapper_op = self.lower_expr(self.ast.get_extra(arg_start))
 
     let ok_bb = self.new_block()
     let err_bb = self.new_block()
@@ -5904,6 +5926,13 @@ fn MirBuilder.lower_result_combinator_method(self: MirBuilder, self_expr: i32, m
         let err_call_args: Vec[i32] = Vec.new()
         err_call_args.push(self.operand_for_place(err_payload_place, source_err_ty))
         err_fields.push(self.lower_call_with_operand_args(mapper_op, err_call_args, result_err_ty, node))
+    else if method_name == "context" or method_name == "with_context":
+        var message_op = context_message_op
+        if method_name == "with_context":
+            let no_context_args: Vec[i32] = Vec.new()
+            message_op = self.lower_call_with_operand_args(context_fn_op, no_context_args, self.sema.ty_str as i32, node)
+        let source_op = self.operand_for_place(err_payload_place, source_err_ty)
+        err_fields.push(self.lower_context_error_operand(message_op, source_op, result_err_ty, span))
     else:
         err_fields.push(self.operand_for_place(err_payload_place, source_err_ty))
     self.assign_enum_variant_to_place(result_place, result_ty, self.sema.syms.err, err_fields, span)

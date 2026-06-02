@@ -1,30 +1,33 @@
-//! skip: non-executable spec sketch for Section 10.6 — Error Context (formerly 25.43); contains pseudo-code for unimplemented feature work
 // Spec test: Section 10.6 — Error Context (formerly 25.43)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
 
-// PASS: basic .context()
-fn load(path: &str) -> Result[str, ContextError[IoError]]:
-    let text = fs.read_to_string(path)
-        .context("failed to read config")?
-    Ok(text)
+fn fallible(value: i32) -> Result[i32, str]:
+    if value < 0:
+        Err("negative")
+    else:
+        Ok(value)
 
-fn test:
-    match load("/nonexistent"):
+fn add_context(value: i32) -> Result[i32, ContextError[str]]:
+    fallible(value).context("outer")?
+
+fn test_context_wraps_error:
+    let result = add_context(-1)
+    match result:
+        Ok(_) => assert(false)
         Err(e) =>
-            assert(e.message == "failed to read config")
-            assert(e.source.is_not_found())
-        Ok(_) => panic("expected error")
+            assert(e.message == "outer")
+            assert(e.source == "negative")
 
-// PASS: chained context
-fn load_and_parse(path: &str) -> Result[Config, AppError]:
-    let text = fs.read_to_string(path)
-        .context("reading config file")?
-    let config = toml.parse(text)
-        .context("parsing config")?
-    Ok(config)
+fn test_context_preserves_ok:
+    assert(add_context(7).unwrap() == 7)
 
-// PASS: lazy context with .with_context()
-fn find_user(id: UserId) -> Result[User, ContextError[DbError]]:
-    db.query_one("SELECT * FROM users WHERE id = $1", &[&id])
-        .with_context(() => "failed to find user {id}")?
+fn test_with_context_wraps_error:
+    let result = fallible(-2).with_context(() => "lazy")
+    match result:
+        Ok(_) => assert(false)
+        Err(e) =>
+            assert(e.message == "lazy")
+            assert(e.source == "negative")
+
+fn test_with_context_is_lazy_on_ok:
+    let result = fallible(3).with_context(() => unreachable("with_context closure ran on Ok"))
+    assert(result.unwrap() == 3)

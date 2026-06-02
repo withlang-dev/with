@@ -2353,7 +2353,7 @@ fn Codegen.resolve_type(self: Codegen, type_node: i32) -> i64:
             if self.pool.kind(inner_node) == NodeKind.NK_TYPE_TRAIT_OBJ:
                 return self.get_dyn_fat_ptr_type()
             return wl_ptr_type(self.context)
-        // ContextError[E] = { str, E }
+        // ContextError[E] = { message: str, source: E }
         if name_sym == self.sym_context_error and g_count == 1:
             let src_node = self.pool.get_extra(g_extra)
             let src_ty = self.resolve_type(src_node)
@@ -4280,7 +4280,7 @@ fn Codegen.get_or_create_result_type(self: Codegen, sema_tid: i32, ok_ty: i64, e
     res_type
 
 fn Codegen.get_or_create_context_error_type(self: Codegen, source_ty: i64) -> i64:
-    // ContextError[E] = { str, E }
+    // ContextError[E] = { message: str, source: E }
     let body: Vec[i64] = Vec.new()
     let str_sym = self.intern.intern("str")
     let st_opt = self.struct_type_map.get(str_sym)

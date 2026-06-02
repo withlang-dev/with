@@ -126,6 +126,7 @@ type SemaBuiltinSymbols {
     or_insert: i32,
     option: i32,
     result: i32,
+    context_error: i32,
     hashmap: i32,
     hashset: i32,
     handle: i32,
@@ -701,6 +702,7 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         or_insert: 0,
         option: 0,
         result: 0,
+        context_error: 0,
         hashmap: 0,
         hashset: 0,
         handle: 0,
@@ -1307,6 +1309,7 @@ fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.syms.or_insert = self.pool_intern("or_insert")
     self.syms.option = self.pool_intern("Option")
     self.syms.result = self.pool_intern("Result")
+    self.syms.context_error = self.pool_intern("ContextError")
     self.syms.hashmap = self.pool_intern("HashMap")
     self.syms.hashset = self.pool_intern("HashSet")
     self.syms.handle = self.pool_intern("Handle")

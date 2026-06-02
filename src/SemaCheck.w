@@ -4795,34 +4795,45 @@ fn Sema.check_field_access(self: Sema, node: i32) -> i32:
 
     if ftk == TypeKind.TY_STRUCT:
         let _ = self.get_type_d0(field_base)
-        return self.struct_field_type(field_base as i32, field)
+        let field_ty = self.struct_field_type(field_base as i32, field)
+        if field_ty == 0:
+            self.emit_error("unknown field '" ++ self.pool_resolve(field) ++ "' for type '" ++ self.type_name(field_base as i32) ++ "'", node)
+        return field_ty
 
     if ftk == TypeKind.TY_GENERIC_INST:
-        return self.struct_field_type(field_base as i32, field)
+        let field_ty2 = self.struct_field_type(field_base as i32, field)
+        if field_ty2 == 0:
+            self.emit_error("unknown field '" ++ self.pool_resolve(field) ++ "' for type '" ++ self.type_name(field_base as i32) ++ "'", node)
+        return field_ty2
 
     if ftk == TypeKind.TY_TUPLE:
         let te_start = self.get_type_d0(field_base)
         let elem_count = self.get_type_d1(field_base)
         let field_name = self.pool_resolve(field)
-        // Parse field index
+        var valid_index = if field_name.len() > 0: 1 else: 0
         var idx = 0
         for vi in 0..field_name.len() as i32:
             let ch = field_name[vi]
             if ch >= 48 and ch <= 57:
                 idx = idx * 10 + ch - 48
-        if idx < elem_count:
+            else:
+                valid_index = 0
+        if valid_index != 0 and idx < elem_count:
             return self.type_extra.get((te_start + idx) as i64)
+        self.emit_error("unknown field '" ++ field_name ++ "' for type '" ++ self.type_name(field_base as i32) ++ "'", node)
         return 0
 
     if ftk == TypeKind.TY_ARRAY or ftk == TypeKind.TY_SLICE or ftk == TypeKind.TY_STR:
         let field_name = self.pool_resolve(field)
         if field_name == "len":
             return self.ty_i64 as i32
+        self.emit_error("unknown field '" ++ field_name ++ "' for type '" ++ self.type_name(field_base as i32) ++ "'", node)
         return 0
 
     if ftk == TypeKind.TY_ENUM:
         if self.static_receiver_type_is_known(expr) != 0 and self.enum_has_variant(obj_type as i32, field) != 0:
             return field_base as i32
+        self.emit_error("unknown field '" ++ self.pool_resolve(field) ++ "' for type '" ++ self.type_name(field_base as i32) ++ "'", node)
         return 0
 
     0
@@ -6419,7 +6430,7 @@ fn Sema.pipeline_generic_builtin_method_exists(self: Sema, owner_sym: i32, field
             return 1
     if owner_sym == self.syms.result:
         let result_method_name = self.pool_resolve(field)
-        if field == self.syms.unwrap or field == self.syms.is_ok or field == self.syms.is_err or field == self.syms.map or result_method_name == "map_err" or result_method_name == "unwrap_or":
+        if field == self.syms.unwrap or field == self.syms.is_ok or field == self.syms.is_err or field == self.syms.map or result_method_name == "map_err" or result_method_name == "unwrap_or" or result_method_name == "context" or result_method_name == "with_context":
             return 1
     if owner_sym == self.syms.vecslot or owner_sym == self.syms.vecrange:
         if field == self.syms.get or self.pool_resolve(field) == "set" or self.is_collection_len_method(field):
@@ -8626,6 +8637,14 @@ fn Sema.ensure_result_type_for(self: Sema, ok_ty: i32, err_ty: i32) -> i32:
     args.push(err_ty)
     self.ensure_generic_inst_type(self.syms.result, args, 2) as i32
 
+fn Sema.ensure_context_error_type_for(self: Sema, source_err_ty: i32) -> i32:
+    let found = self.find_generic_inst(self.syms.context_error, source_err_ty)
+    if found != 0:
+        return found
+    let args: Vec[i32] = Vec.new()
+    args.push(source_err_ty)
+    self.ensure_generic_inst_type(self.syms.context_error, args, 1) as i32
+
 fn Sema.fn_return_type(self: Sema, fn_ty: i32) -> i32:
     let resolved = self.resolve_alias(fn_ty as TypeId)
     if self.get_type_kind(resolved) != TypeKind.TY_FN:
@@ -8658,17 +8677,34 @@ fn Sema.option_combinator_return_type(self: Sema, recv_type: i32, method_name: s
     0
 
 fn Sema.result_combinator_return_type(self: Sema, recv_type: i32, method_name: str, arg_types: Vec[i32], arg_count: i32, node: i32) -> i32:
-    if method_name != "map" and method_name != "map_err":
+    if method_name != "map" and method_name != "map_err" and method_name != "context" and method_name != "with_context":
         return 0
     if arg_count != 1:
         self.emit_error("Result." ++ method_name ++ "() expects exactly one argument", node)
         return 0
+    let ok_ty = self.get_generic_inst_arg(recv_type, 0)
+    let err_ty = self.get_generic_inst_arg(recv_type, 1)
+    if method_name == "context":
+        let msg_ty = arg_types.get(0)
+        if msg_ty != 0 and self.builtin_arg_type_compatible(self.ty_str as i32, msg_ty) == 0:
+            self.emit_argument_type_mismatch("Result.context", 0, 0, 0, self.ty_str as i32, msg_ty, node)
+        return self.ensure_result_type_for(ok_ty, self.ensure_context_error_type_for(err_ty))
+    if method_name == "with_context":
+        let fn_ty = self.callable_fn_type(arg_types.get(0) as TypeId)
+        if fn_ty == 0:
+            self.emit_error("Result.with_context() expects a function argument", node)
+            return 0
+        if self.get_type_d1(fn_ty) != 0:
+            self.emit_error("Result.with_context() expects a zero-argument function", node)
+            return 0
+        let msg_ty2 = self.get_type_d2(fn_ty)
+        if msg_ty2 != 0 and self.builtin_arg_type_compatible(self.ty_str as i32, msg_ty2) == 0:
+            self.emit_argument_type_mismatch("Result.with_context", 0, 0, 0, self.ty_str as i32, msg_ty2, node)
+        return self.ensure_result_type_for(ok_ty, self.ensure_context_error_type_for(err_ty))
     let mapped_ty = self.fn_return_type(arg_types.get(0))
     if mapped_ty == 0:
         self.emit_error("Result." ++ method_name ++ "() expects a function argument", node)
         return 0
-    let ok_ty = self.get_generic_inst_arg(recv_type, 0)
-    let err_ty = self.get_generic_inst_arg(recv_type, 1)
     if method_name == "map":
         return self.ensure_result_type_for(mapped_ty, err_ty)
     self.ensure_result_type_for(ok_ty, mapped_ty)
@@ -8862,6 +8898,11 @@ fn Sema.method_expected_arg_type(self: Sema, recv_type: i32, field: i32, arg_ind
             let result_params: Vec[i32] = Vec.new()
             result_params.push(result_arg)
             return self.ensure_fn_type(result_params, 1, 0 as TypeId) as i32
+        if method_name == "context" and arg_index == 0:
+            return self.ty_str as i32
+        if method_name == "with_context" and arg_index == 0:
+            let context_params: Vec[i32] = Vec.new()
+            return self.ensure_fn_type(context_params, 0, self.ty_str) as i32
     if (owner_sym == self.syms.option or owner_sym == self.syms.result) and method_name == "unwrap_or" and arg_index == 0:
         return self.get_generic_inst_arg(resolved as i32, 0)
     0

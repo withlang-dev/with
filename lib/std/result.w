@@ -19,6 +19,6 @@ error BuilderError =
 
 /// An error with a message and an underlying source error.
 type ContextError[E]  {
-    msg: str
+    message: str
     source: E
 }
