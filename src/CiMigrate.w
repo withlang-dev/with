@@ -74,6 +74,7 @@ type CiMigratePendingSharedExternVar {
 var g_migrate_shared_pending_extern_vars: Vec[CiMigratePendingSharedExternVar] = Vec.new()
 var g_migrate_shared_usage_idents: str = ""
 var g_migrate_libc_symbols_used: str = ""
+var g_migrate_unsafe_extern_fn_names: str = ""
 
 pub fn migrate_set_shared_defs(prefix: str):
     g_migrate_shared_defs_prefix = prefix
@@ -207,6 +208,23 @@ fn ci_migrate_note_libc_symbol(name: str):
 
 fn ci_migrate_needs_libc -> bool:
     g_migrate_libc_symbols_used.len() > 0
+
+fn ci_migrate_reset_unsafe_extern_fns():
+    g_migrate_unsafe_extern_fn_names = ""
+    return
+
+fn ci_migrate_note_unsafe_extern_fn(name: str):
+    if name.len() == 0:
+        return
+    let key = "|" ++ name ++ "|"
+    if ci_find_str(g_migrate_unsafe_extern_fn_names, key) < 0:
+        g_migrate_unsafe_extern_fn_names = g_migrate_unsafe_extern_fn_names ++ key
+    return
+
+pub fn ci_migrate_extern_fn_call_requires_unsafe(name: str) -> bool:
+    if name.len() == 0:
+        return false
+    ci_find_str(g_migrate_unsafe_extern_fn_names, "|" ++ name ++ "|") >= 0
 
 fn ci_migrate_insert_libc_use(output: str) -> str:
     if not ci_migrate_needs_libc():
@@ -451,9 +469,9 @@ fn ci_migrate_preamble_text() -> str:
     p = p ++ "extern fn acos(x: f64) -> f64\n"
     p = p ++ "extern fn atan(x: f64) -> f64\n"
     p = p ++ "extern fn atan2(y: f64, x: f64) -> f64\n"
-    p = p ++ ci_migrate_render_preamble_fn("fn string_len(s: *const i8) -> i64", "strlen(s)", "strlen(s)")
-    p = p ++ ci_migrate_render_preamble_fn("fn string_cmp(a: *const i8, b: *const i8) -> i32", "strcmp(a, b)", "strcmp(a, b)")
-    p = p ++ ci_migrate_render_preamble_fn("fn string_find_char(s: *const i8, c: i32) -> *const i8", "(memchr((s as *const c_void), c, strlen(s)) as *const i8)", "(memchr((s as *const c_void), c, strlen(s)) as *const i8)")
+    p = p ++ ci_migrate_render_preamble_fn("fn string_len(s: *const i8) -> i64", "unsafe { strlen(s) }", "unsafe { strlen(s) }")
+    p = p ++ ci_migrate_render_preamble_fn("fn string_cmp(a: *const i8, b: *const i8) -> i32", "unsafe { strcmp(a, b) }", "unsafe { strcmp(a, b) }")
+    p = p ++ ci_migrate_render_preamble_fn("fn string_find_char(s: *const i8, c: i32) -> *const i8", "unsafe { (memchr((s as *const c_void), c, strlen(s)) as *const i8) }", "unsafe { (memchr((s as *const c_void), c, strlen(s)) as *const i8) }")
     p = p ++ "\ntype c_void = opaque\n"
     p = p ++ "type c_char = i8\n"
     p = p ++ "type c_short = i16\n"
@@ -668,6 +686,32 @@ fn CiProject.migrate_scan_file(self: &CiProject, input_path: str) -> i32:
                 symbol.resolved_ty_text = owner_type
                 symbol.resolved_ty = self.migrate_var_type_id(session, i, owner_type)
                 self.update_symbol(symbol_id, symbol)
+        else if with_cimport_decl_kind(session, i) == CK_FUNCTION:
+            let name = with_cimport_decl_name(session, i)
+            let cursor = with_cimport_decl_cursor(session, i)
+            let loc = if cursor >= 0: with_ci_cursor_location(session, cursor) else: ""
+            if name.len() == 0 or ci_is_system_decl(name) or (loc.len() > 0 and ci_is_system_path(loc)):
+                i = i + 1
+                continue
+            if with_cimport_fn_storage_class(session, i) == CX_SC_STATIC:
+                i = i + 1
+                continue
+            let symbol_id = self.ensure_symbol(CiProjectSymbolKind.CIPS_FN, name)
+            var symbol = self.symbols.get(symbol_id as i64)
+            symbol.add_consumer(module_id)
+            self.update_symbol(symbol_id, symbol)
+            if cursor < 0 or with_ci_cursor_is_definition(session, cursor) == 0:
+                i = i + 1
+                continue
+            let existing_path = self.owner_module_path(symbol_id)
+            if symbol.owner_module >= 0 and existing_path != input_path:
+                eprint("migrate: duplicate function definition for " ++ name ++ " in " ++ existing_path ++ " and " ++ input_path)
+                with_cimport_dispose(session)
+                return 1
+            symbol.owner_module = module_id
+            symbol.owner_rank = 1
+            symbol.owner_definition_kind = 1
+            self.update_symbol(symbol_id, symbol)
         i = i + 1
 
     with_cimport_dispose(session)
@@ -686,6 +730,7 @@ fn ci_migrate_file_inner(input_path: str, output_path: str, project_active: bool
     g_migrate_macro_session = 0
     ci_migrate_reset_fn_counts()
     ci_migrate_libc_reset()
+    ci_migrate_reset_unsafe_extern_fns()
     g_migrate_preprocessed_source = ""
     g_migrate_current_input_path = ""
 
@@ -740,6 +785,7 @@ fn ci_migrate_file_inner(input_path: str, output_path: str, project_active: bool
         output_parts.push(ci_migrate_preamble_text())
 
     let count = with_cimport_decl_count(session)
+    ci_migrate_collect_unsafe_extern_fns(session, count, input_path, project_active, project)
 
     // Pre-scan: collect demoted types and prepopulate names
     let demoted_types = ci_collect_demoted_types(session, count)
@@ -1334,6 +1380,43 @@ fn ci_migrate_project_var_resolved_type(project_active: bool, project: &CiProjec
     if (symbol.resolved_ty as i32) != 0:
         return ci_print_type(project.types, symbol.resolved_ty)
     ""
+
+fn ci_migrate_project_fn_symbol(project_active: bool, project: &CiProject, name: str) -> i32:
+    if not project_active or name.len() == 0:
+        return -1
+    project.find_symbol(CiProjectSymbolKind.CIPS_FN, name)
+
+fn ci_migrate_project_fn_owner_path(project_active: bool, project: &CiProject, name: str) -> str:
+    let symbol_id = ci_migrate_project_fn_symbol(project_active, project, name)
+    if symbol_id < 0:
+        return ""
+    project.owner_module_path(symbol_id)
+
+fn ci_migrate_collect_unsafe_extern_fns(session: i64, count: i32, primary_path: str, project_active: bool, project: &CiProject):
+    ci_migrate_reset_unsafe_extern_fns()
+    var i = 0
+    while i < count:
+        if with_cimport_decl_kind(session, i) != CK_FUNCTION:
+            i = i + 1
+            continue
+        let name = with_cimport_decl_name(session, i)
+        let cursor = with_cimport_decl_cursor(session, i)
+        let loc = if cursor >= 0: with_ci_cursor_location(session, cursor) else: ""
+        if name.len() == 0 or ci_is_system_decl(name) or (loc.len() > 0 and ci_is_system_path(loc)):
+            i = i + 1
+            continue
+        if ci_migrate_is_width_family_name(name):
+            i = i + 1
+            continue
+        if with_cimport_fn_storage_class(session, i) == CX_SC_STATIC:
+            i = i + 1
+            continue
+        let owner_path = ci_migrate_project_fn_owner_path(project_active, project, name)
+        let local_def = ci_find_fn_cursor(session, name)
+        if (owner_path.len() > 0 and owner_path != primary_path) or local_def < 0:
+            ci_migrate_note_unsafe_extern_fn(ci_escape_reserved(name))
+        i = i + 1
+    return
 
 fn ci_migrate_var_emits_definition(session: i64, idx: i32, primary_path: str, project_active: bool, project: &CiProject) -> bool:
     if ci_migrate_var_definition_kind(session, idx) == CI_VAR_DECL_ONLY:
