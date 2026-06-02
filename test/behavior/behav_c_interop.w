@@ -4,8 +4,8 @@
 // TODO: c"hello" string literals and c_import() not yet implemented.
 // Tests extern fn, which is the current C interop mechanism.
 
-extern fn with_str_len(s: str) -> i64
+extern fn getpid() -> i32
 
 fn main:
-    let n = with_str_len("hello")
-    assert(n == 5)
+    let pid = unsafe { getpid() }
+    assert(pid >= 0)

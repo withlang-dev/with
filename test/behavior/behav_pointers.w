@@ -59,7 +59,7 @@ fn counter_inc(c: *mut Counter):
     unsafe (*c).value = unsafe (*c).value + 1
 
 fn counter_get(c: *const Counter) -> i32:
-    c.value
+    unsafe { c.value }
 
 fn test_pointer_to_struct:
     var c = Counter { value: 0 }

@@ -38,10 +38,10 @@ extern fn malloc(size: c_ulong) -> *mut c_void
 extern fn free(ptr: *mut c_void)
 
 fn pcre2_malloc(size: c_ulong, data: *mut c_void) -> *mut c_void:
-    malloc(size)
+    unsafe { malloc(size) }
 
 fn pcre2_free(ptr: *mut c_void, data: *mut c_void):
-    free(ptr)
+    unsafe { free(ptr) }
 
 fn main:
     // Create contexts with real malloc/free (bypasses zero-initialized defaults)

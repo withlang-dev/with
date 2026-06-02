@@ -16,8 +16,8 @@ fn main:
     let F: *mut Frame = &raw mut frame
     let mb: *mut MatchBlock = &raw mut mbv
     let offset: u64 = 1 as u64
-    let p = mb.start_subject + (unsafe (&F.ovector[0] as *mut u64)[offset])
-    let delta = (p as usize -% mb.start_subject as usize)
+    let p = unsafe { mb.start_subject + ((&F.ovector[0] as *mut u64)[offset]) }
+    let delta = unsafe { p as usize -% mb.start_subject as usize }
     assert(delta == 2 as usize)
 
     var x: u32 = 2149384192 as u32

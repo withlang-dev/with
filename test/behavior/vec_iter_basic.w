@@ -9,7 +9,7 @@ extern fn with_ptr_get_i32(ptr: i64, index: i64) -> i32
 fn VecIter_i32.next(self: VecIter_i32) -> Option[i32]:
     if self.idx >= self.len:
         return .None
-    let val = with_ptr_get_i32(self.data_ptr, self.idx)
+    let val = unsafe { with_ptr_get_i32(self.data_ptr, self.idx) }
     self.idx = self.idx + 1
     .Some(val)
 

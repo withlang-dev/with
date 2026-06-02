@@ -6,8 +6,8 @@ async fn value(n: i32) -> i32:
     n
 
 fn complete_two_ready_tasks():
-    with_runtime_run_one_step()
-    with_runtime_run_one_step()
+    unsafe { with_runtime_run_one_step() }
+    unsafe { with_runtime_run_one_step() }
 
 fn test_fair_select:
     var left_wins = 0
