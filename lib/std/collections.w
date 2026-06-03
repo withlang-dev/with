@@ -110,6 +110,26 @@ type HashMapEntry[K, V]  { map_ptr: i64, key: K }
 /// Call `.next()` to get `Option[T]` — `Some(val)` or `None`.
 type VecIter[T]  { data_ptr: i64, len: i64, idx: i64 }
 
+/// Lazy iterator adapter produced by `.map(f)`.
+type MapIter[I, T, U] { iter: I, f: fn(T) -> U }
+
+/// Lazy iterator adapter produced by `.filter(pred)`.
+type FilterIter[I, T] { iter: I, pred: fn(T) -> bool }
+
+/// Lazy iterator adapter produced by `.take(n)`.
+type TakeIter[I, T] { iter: I, remaining: i64 }
+
+/// Lazy iterator adapter produced by `.zip(other)`.
+type ZipIter[A, B, T, U] { left: A, right: B }
+
+/// Lazy iterator adapter produced by `.flat_map(f)`.
+type FlatMapIter[I, C, J, T, U] {
+    iter: I,
+    f: fn(T) -> C,
+    current: J,
+    has_current: bool,
+}
+
 impl[T] Iter[T] for VecIter[T] =
     fn next(mut self: Self) -> Option[T]:
         self.next()

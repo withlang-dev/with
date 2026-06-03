@@ -5151,6 +5151,36 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
         return MirIntrinsic.NONE
     if type_name == "VecIter":
         if method_name == "next": return MirIntrinsic.VECITER_NEXT
+        if method_name == "map": return MirIntrinsic.ITER_MAP
+        if method_name == "filter": return MirIntrinsic.ITER_FILTER
+        if method_name == "take": return MirIntrinsic.ITER_TAKE
+        if method_name == "zip": return MirIntrinsic.ITER_ZIP
+        if method_name == "flat_map": return MirIntrinsic.ITER_FLAT_MAP
+        if method_name == "fold": return MirIntrinsic.ITER_FOLD
+        if method_name == "reduce": return MirIntrinsic.ITER_REDUCE
+        if method_name == "sum": return MirIntrinsic.ITER_SUM
+        if method_name == "count": return MirIntrinsic.ITER_COUNT
+        if method_name == "collect": return MirIntrinsic.ITER_COLLECT_VEC
+        if method_name == "partition": return MirIntrinsic.ITER_PARTITION
+        return MirIntrinsic.NONE
+    if type_name == "MapIter" or type_name == "FilterIter" or type_name == "TakeIter" or type_name == "ZipIter" or type_name == "FlatMapIter":
+        if method_name == "next":
+            if type_name == "MapIter": return MirIntrinsic.MAPITER_NEXT
+            if type_name == "FilterIter": return MirIntrinsic.FILTERITER_NEXT
+            if type_name == "TakeIter": return MirIntrinsic.TAKEITER_NEXT
+            if type_name == "ZipIter": return MirIntrinsic.ZIPITER_NEXT
+            if type_name == "FlatMapIter": return MirIntrinsic.FLATMAPITER_NEXT
+        if method_name == "map": return MirIntrinsic.ITER_MAP
+        if method_name == "filter": return MirIntrinsic.ITER_FILTER
+        if method_name == "take": return MirIntrinsic.ITER_TAKE
+        if method_name == "zip": return MirIntrinsic.ITER_ZIP
+        if method_name == "flat_map": return MirIntrinsic.ITER_FLAT_MAP
+        if method_name == "fold": return MirIntrinsic.ITER_FOLD
+        if method_name == "reduce": return MirIntrinsic.ITER_REDUCE
+        if method_name == "sum": return MirIntrinsic.ITER_SUM
+        if method_name == "count": return MirIntrinsic.ITER_COUNT
+        if method_name == "collect": return MirIntrinsic.ITER_COLLECT_VEC
+        if method_name == "partition": return MirIntrinsic.ITER_PARTITION
         return MirIntrinsic.NONE
     if type_name == "VecSlot":
         if method_name == "get": return MirIntrinsic.VECSLOT_GET
