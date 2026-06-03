@@ -3,13 +3,20 @@
 Status: active checkpoint for agents. Update this file when phase status,
 blockers, or the next work queue changes.
 
-Last updated: 2026-05-31.
+Last updated: 2026-06-03.
 
 Read this file immediately after `AGENTS.md`. It exists so long-running build
 system and bootstrap work does not have to be reconstructed from git history or
 conversation context after compaction.
 
 ## Current Focus
+
+#221 core `@[no_await_guard]` enforcement is implemented as a deterministic
+MIR liveness pass: direct guard locals live across scheduler-yielding
+suspension points now produce E0701, while last-use-before-await and explicit
+drop-before-await are accepted. The verified slice deliberately excludes
+derived-borrow/view alias propagation (#331) and an explicit `no_suspend:`
+escape-hatch block (#332), which are tracked as separate follow-on designs.
 
 Build and release flow now treats `with build` as canonical. `with build
 :test` records `out/.build-state/test-green.json` after the full suite passes.

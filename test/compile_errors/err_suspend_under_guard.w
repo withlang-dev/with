@@ -11,5 +11,5 @@ async fn work() -> i32:
 async fn main:
     let held = Guard { value: 1 }
     let t = work()
-    assert(held.value == 1)
-    t.await
+    let value = t.await
+    assert(held.value == value - 41)

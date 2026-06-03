@@ -1722,18 +1722,14 @@ fn Sema.has_live_await_guard(self: Sema) -> i32:
     0
 
 fn Sema.emit_no_await_guard_may_suspend_call(self: Sema, node: i32, fn_sym: i32):
-    if self.has_live_await_guard() == 0:
-        return
-    let visiting: HashMap[i32, i32] = HashMap.new()
-    if self.fn_symbol_may_suspend(fn_sym, visiting) != 0:
-        self.emit_error("E0701: may_suspend call while no_await_guard value is live", node)
+    // Precise `@[no_await_guard]` suspension checks run after MIR lowering,
+    // where NLL liveness at the actual suspension point is available.
+    return
 
 fn Sema.emit_no_await_guard_may_suspend_expr(self: Sema, node: i32, expr: i32):
-    if self.has_live_await_guard() == 0:
-        return
-    let visiting: HashMap[i32, i32] = HashMap.new()
-    if self.expr_may_suspend(expr, visiting) != 0:
-        self.emit_error("E0701: may_suspend call while no_await_guard value is live", node)
+    // Precise `@[no_await_guard]` suspension checks run after MIR lowering,
+    // where NLL liveness at the actual suspension point is available.
+    return
 
 fn Sema.with_trait_payload_type(self: Sema, source_ty: i32, trait_sym: i32) -> i32:
     if source_ty == 0 or trait_sym == 0:
@@ -2822,8 +2818,6 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         self.require_async_runtime(node, "await")
         if self.in_comptime_fn != 0:
             self.emit_error("await is not allowed in comptime", node)
-        if self.has_live_await_guard() != 0:
-            self.emit_error("E0701: may_suspend call while no_await_guard value is live", node)
         let inner = self.ast.get_data0(node)
         let inner_ty = self.check_expr(inner)
         if self.ast.kind(inner) == NodeKind.NK_TUPLE:
@@ -2953,8 +2947,6 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
 
     if kind == NodeKind.NK_SELECT_AWAIT:
         self.require_async_runtime(node, "select await")
-        if self.has_live_await_guard() != 0:
-            self.emit_error("E0701: may_suspend call while no_await_guard value is live", node)
         let extra_start = self.ast.get_data0(node)
         let arm_count = self.ast.get_data1(node)
         if arm_count <= 0:
