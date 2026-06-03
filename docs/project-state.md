@@ -19,9 +19,9 @@ live derived view are accepted. #332 is implemented: `no_suspend:` /
 `no_suspend { ... }` is an expert assertion block that typechecks like its
 body while rejecting direct awaits/select awaits, transitive `may_suspend`
 calls, async-scope await-all, and implicit ephemeral-task cleanup awaits with
-E0702. #333 tracks the separate `with test` CLI bug where additional file
-arguments are silently ignored and `with test --help` runs the default test
-target instead of printing help.
+E0702. #333 is implemented: `with test --help` prints test-specific usage,
+and explicit multi-file or directory test invocations run each listed target
+in order instead of silently ignoring everything after the first file.
 
 Build and release flow now treats `with build` as canonical. `with build
 :test` records `out/.build-state/test-green.json` after the full suite passes.

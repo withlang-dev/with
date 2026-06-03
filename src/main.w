@@ -700,6 +700,9 @@ fn run_cli(argc: i32) -> i32:
             return 1
         return dump_tokens(source, deterministic_mode)
     if cli_command(argc) == "test":
+        if cli_has_flag(argc, "--help") or cli_has_flag(argc, "-h"):
+            print_test_usage()
+            return 0
         return run_test_command(argc, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info)
     if cli_command(argc) == "bench":
         return run_bench_command(argc, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info)
@@ -2167,15 +2170,48 @@ fn run_test_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, ru
     let link_libs: Vec[str] = Vec.new()
     run_test_file_with_build_settings(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, filter, include_paths, defines, link_libs)
 
+fn test_command_option_takes_value(arg: str) -> bool:
+    arg == "-o" or arg == "--output" or arg == "-f" or arg == "--filter"
+
+fn test_command_collect_targets(argc: i32) -> Vec[str]:
+    let targets: Vec[str] = Vec.new()
+    var i = 2
+    while i < argc:
+        let arg = with_arg_at(i)
+        if test_command_option_takes_value(arg):
+            i = i + 2
+            continue
+        if arg.len() > 0 and arg.byte_at(0) == 45:
+            i = i + 1
+            continue
+        if not cli_is_build_target_selector(arg):
+            targets.push(arg)
+        i = i + 1
+    targets
+
+fn run_test_target(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, filter: str) -> i32:
+    if test_target_is_directory(target):
+        let test_files = collect_test_files(target)
+        if test_files.len() == 0:
+            with_eprint(f"error: no test sources found in '{target}'")
+            return 1
+        for ti in 0..test_files.len() as i32:
+            let test_file = test_files.get(ti as i64)
+            let run_rc = run_test_file(test_file, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, filter)
+            if run_rc != 0:
+                with_eprint(f"error: test failed in '{test_file}'")
+                return run_rc
+        return 0
+    run_test_file(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, filter)
+
 fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool) -> i32:
     let verbose = cli_test_verbose(argc)
     var quiet = cli_test_quiet(argc)
     if verbose:
         quiet = false
     let filter = cli_test_filter(argc)
-    // Find test file/dir argument
-    let target = find_source_arg(argc)
-    if target == "":
+    let targets = test_command_collect_targets(argc)
+    if targets.len() == 0:
         var build_options = build_command_options_default()
         build_options.opt_level = opt_level
         build_options.no_std = no_std
@@ -2186,19 +2222,12 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, r
         var graph_options = build_graph_command_options_default()
         graph_options.selected_target = "test"
         return run_build_command(build_options, graph_options)
-    if test_target_is_directory(target):
-        let test_files = collect_test_files(target)
-        if test_files.len() == 0:
-            with_eprint("error: no test sources found in '" ++ target ++ "'")
-            return 1
-        for ti in 0..test_files.len() as i32:
-            let test_file = test_files.get(ti as i64)
-            let run_rc = run_test_file(test_file, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, filter)
-            if run_rc != 0:
-                with_eprint("error: test failed in '" ++ test_file ++ "'")
-                return run_rc
-        return 0
-    run_test_file(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, filter)
+    for ti in 0..targets.len() as i32:
+        let target = targets.get(ti as i64)
+        let rc = run_test_target(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, filter)
+        if rc != 0:
+            return rc
+    0
 
 fn run_bench_file(target: str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, filter: str) -> i32:
     let text = with_fs_read_file(target)
@@ -2514,6 +2543,35 @@ fn print_build_usage:
     with_write("  --dry-run        Print planned build actions without running them\n")
     with_write("  --no-deps        Build only the selected target\n")
     with_write("  --explain <name> Explain a build graph target\n")
+    with_write("  --no-std         Disable standard library support\n")
+    with_write("  --no-runtime     Disable the fiber runtime; async constructs are errors\n")
+    with_write("  --no-prelude     Disable implicit prelude import\n")
+    with_write("  --prelude=<mode> Select prelude mode: full, core, none\n")
+    with_write("  --freestanding   Alias for --no-std --no-runtime --no-prelude\n")
+
+fn print_test_usage:
+    with_write("Usage: with test [source.w|directory ...] [options]\n")
+    with_write("\n")
+    with_write("Builds and runs explicit test files or all tests in explicit directories.\n")
+    with_write("With no explicit source or directory, runs the build.w :test target.\n")
+    with_write("\n")
+    with_write("Examples:\n")
+    with_write("\n")
+    with_write("  with test test/behavior/example.w\n")
+    with_write("  with test test/behavior/a.w test/behavior/b.w\n")
+    with_write("  with test test/behavior\n")
+    with_write("  with test\n")
+    with_write("\n")
+    with_write("Test Options:\n")
+    with_write("\n")
+    with_write("  -h, --help       Print this help and exit\n")
+    with_write("  -v, --verbose    Print each discovered test name\n")
+    with_write("  -q, --quiet      Suppress per-file summaries\n")
+    with_write("  -f, --filter     Run discovered tests whose name contains the filter\n")
+    with_write("  --filter=<text>  Same as --filter <text>\n")
+    with_write("  -O0|-O1|-O2|-O3  Set optimization level\n")
+    with_write("  -o, --output     Write output to path\n")
+    with_write("  --release        Enable release defaults\n")
     with_write("  --no-std         Disable standard library support\n")
     with_write("  --no-runtime     Disable the fiber runtime; async constructs are errors\n")
     with_write("  --no-prelude     Disable implicit prelude import\n")
