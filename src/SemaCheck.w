@@ -6000,6 +6000,30 @@ fn Sema.unqualified_enum_variant_sym(self: Sema, variant_name: i32) -> i32:
         return self.pool_intern(text.slice((dot + 1) as i64, text.len() as i64))
     variant_name
 
+fn Sema.pattern_subject_shape_type(self: Sema, subject_type: i32) -> i32:
+    if subject_type == 0:
+        return 0
+    let resolved = self.resolve_alias(subject_type as TypeId)
+    if self.get_type_kind(resolved) == TypeKind.TY_REF:
+        return self.get_type_d0(resolved)
+    subject_type
+
+fn Sema.pattern_subject_ref_mutability(self: Sema, subject_type: i32) -> i32:
+    if subject_type == 0:
+        return -1
+    let resolved = self.resolve_alias(subject_type as TypeId)
+    if self.get_type_kind(resolved) != TypeKind.TY_REF:
+        return -1
+    self.get_type_d1(resolved)
+
+fn Sema.pattern_child_subject_type(self: Sema, parent_subject_type: i32, child_type: i32) -> i32:
+    if child_type == 0:
+        return 0
+    let ref_mut = self.pattern_subject_ref_mutability(parent_subject_type)
+    if ref_mut < 0:
+        return child_type
+    self.ensure_exact_type(TypeKind.TY_REF, child_type, ref_mut, 0) as i32
+
 fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
     if node == 0:
         return
@@ -6044,11 +6068,12 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
     if kind == NodeKind.NK_PAT_VARIANT or kind == NodeKind.NK_PAT_ENUM_SHORTHAND:
         var v_name = self.ast.get_data0(node)
         let bind_count = self.ast.get_data2(node)
-        let subject_enum_ty = self.enum_pattern_type(subject_type)
+        let subject_shape_type = self.pattern_subject_shape_type(subject_type)
+        let subject_enum_ty = self.enum_pattern_type(subject_shape_type)
         // Resolve for-comprehension markers: _Payload → Some/Ok, _Empty → None/Err
         let v_name_str = self.pool_resolve(v_name)
         if v_name_str == "_Payload" or v_name_str == "_Empty":
-            let resolved_st = self.resolve_alias(subject_type)
+            let resolved_st = self.resolve_alias(subject_shape_type as TypeId)
             let is_payload = v_name_str == "_Payload"
             let try_sym = if is_payload: self.syms.some else: self.syms.none
             if self.enum_has_variant(resolved_st as i32, try_sym) != 0:
@@ -6060,9 +6085,9 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
             self.comp_resolved.insert(node, v_name)
         if kind == NodeKind.NK_PAT_VARIANT and bind_count == 0 and subject_enum_ty == 0 and self.ast.pattern_qualifier(node) == 0:
             let value_sym = self.pattern_variant_value_sym(node, v_name)
-            if self.try_mark_value_pattern(node, subject_type, value_sym) != 0:
+            if self.try_mark_value_pattern(node, subject_shape_type, value_sym) != 0:
                 return
-        let pattern_enum_ty = self.resolve_variant_pattern_enum_type(node, subject_type, v_name)
+        let pattern_enum_ty = self.resolve_variant_pattern_enum_type(node, subject_shape_type, v_name)
         if pattern_enum_ty == 0:
             return
         let resolved_variant_sym = self.qualified_enum_variant_sym(pattern_enum_ty, v_name)
@@ -6140,7 +6165,7 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
                     let gi_ty = gi_payload_types.get(bi as i64)
                     if gi_ty != 0:
                         inner_ty = gi_ty
-                self.check_pattern(inner_pat, inner_ty)
+                self.check_pattern(inner_pat, self.pattern_child_subject_type(subject_type, inner_ty))
             return
         var unit_elided_payload_pattern = 0
         if bind_count == 0 and payload_count == 1:
@@ -6160,7 +6185,7 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
                 let gi_ty = gi_payload_types.get(bi as i64)
                 if gi_ty != 0:
                     inner_ty = gi_ty
-            self.check_pattern(inner_pat, inner_ty)
+            self.check_pattern(inner_pat, self.pattern_child_subject_type(subject_type, inner_ty))
         return
 
     if kind == NodeKind.NK_PAT_OR:
@@ -6182,7 +6207,8 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
         let t_count = self.ast.get_data1(node)
         if subject_type == 0:
             return
-        let resolved = self.resolve_alias(subject_type)
+        let subject_shape_type = self.pattern_subject_shape_type(subject_type)
+        let resolved = self.resolve_alias(subject_shape_type as TypeId)
         let resolved_kind = self.get_type_kind(resolved)
         if resolved_kind == TypeKind.TY_ERR:
             return
@@ -6196,7 +6222,7 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
             return
         for ti in 0..t_count:
             let elem_ty = self.type_extra.get((elem_start + ti) as i64)
-            self.check_pattern(self.ast.get_extra(t_extra + ti), elem_ty)
+            self.check_pattern(self.ast.get_extra(t_extra + ti), self.pattern_child_subject_type(subject_type, elem_ty))
         return
 
     if kind == NodeKind.NK_PAT_SLICE:
@@ -6230,7 +6256,8 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
         let has_rest = self.ast.get_extra(sp_extra)
         var field_start = 0
         var field_count = 0
-        let resolved = self.resolve_alias(subject_type)
+        let subject_shape_type = self.pattern_subject_shape_type(subject_type)
+        let resolved = self.resolve_alias(subject_shape_type as TypeId)
         if self.get_type_kind(resolved) == TypeKind.TY_STRUCT:
             field_start = self.get_type_d1(resolved)
             field_count = self.get_type_d2(resolved)
@@ -6243,10 +6270,11 @@ fn Sema.check_pattern(self: Sema, node: i32, subject_type: i32):
                 if name_sym == f_name:
                     field_ty = self.type_extra.get((field_start + fi * 3 + 1) as i64)
                     break
+            let binding_ty = self.pattern_child_subject_type(subject_type, field_ty)
             if f_pat != 0:
-                self.check_pattern(f_pat, field_ty)
+                self.check_pattern(f_pat, binding_ty)
             else:
-                self.scope_put(f_name, field_ty, 0)
+                self.scope_put(f_name, binding_ty, 0)
         return
 
 fn Sema.check_enum_variant(self: Sema, node: i32) -> i32:

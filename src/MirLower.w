@@ -4666,6 +4666,35 @@ fn MirBuilder.pattern_payload_node(self: MirBuilder, owner_pat: i32, payload_ent
         return 0
     payload_entry
 
+fn MirBuilder.pattern_subject_ref_mutability(self: MirBuilder, place: i32) -> i32:
+    let ty = self.place_local_type(place)
+    if ty == 0:
+        return -1
+    let resolved = self.sema.resolve_alias(ty as TypeId)
+    if self.sema.get_type_kind(resolved) != TypeKind.TY_REF:
+        return -1
+    self.sema.get_type_d1(resolved)
+
+fn MirBuilder.pattern_shape_place(self: MirBuilder, place: i32) -> i32:
+    if self.pattern_subject_ref_mutability(place) >= 0:
+        return self.body.new_deref_place(place)
+    place
+
+fn MirBuilder.pattern_child_subject_place(self: MirBuilder, parent_place: i32, child_place: i32, span: i32) -> i32:
+    let ref_mut = self.pattern_subject_ref_mutability(parent_place)
+    if ref_mut < 0:
+        return child_place
+    let child_ty = self.place_local_type(child_place)
+    if child_ty == 0 or child_ty == self.sema.ty_void as i32:
+        return child_place
+    let ref_ty = self.sema.ensure_exact_type(TypeKind.TY_REF, child_ty, ref_mut, 0) as i32
+    let borrow_kind = if ref_mut != 0: BorrowKind.EXCLUSIVE else: BorrowKind.SHARED
+    let ref_rv = self.body.new_rvalue(RvalueKind.RK_REF, borrow_kind, child_place, 0)
+    let ref_local = self.new_temp(ref_ty)
+    let ref_place = self.place_for_local(ref_local)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, ref_place, ref_rv, span)
+    ref_place
+
 fn MirBuilder.lower_regex_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_node: i32, arm_bb: i32, fail_bb: i32):
     let regex_ty = self.sema.lookup_named_type_visible(self.sema.syms.regex)
     let regex_val = self.lower_regex_literal(pat_node)
@@ -4714,14 +4743,15 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
         return
 
     if pk == NodeKind.NK_PAT_VARIANT or pk == NodeKind.NK_PAT_ENUM_SHORTHAND:
+        let variant_subject_place = self.pattern_shape_place(scrutinee_place)
         if self.sema.pattern_value_syms.contains(pat_node):
             let value_sym = self.sema.pattern_value_syms.get(pat_node).unwrap()
-            let scrutinee_ty = self.place_local_type(scrutinee_place)
+            let scrutinee_ty = self.place_local_type(variant_subject_place)
             let saved_expected = self.expected_type
             self.expected_type = scrutinee_ty
             let value_op = self.lower_var(value_sym, scrutinee_ty, 0)
             self.expected_type = saved_expected
-            self.lower_pattern_eq_operand(scrutinee_place, value_op, pat_node, arm_bb, fail_bb)
+            self.lower_pattern_eq_operand(variant_subject_place, value_op, pat_node, arm_bb, fail_bb)
             return
         let variant_sym = self.resolve_variant_sym(pat_node)
         let payload_start = self.ast.get_data1(pat_node)
@@ -4734,7 +4764,7 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
                 disc_idx = self.sema.disc_values.get(variant_sym).unwrap()
         var success_bb = arm_bb
         var needs_payload_checks = false
-        let variant_place = self.body.new_downcast_place(scrutinee_place, variant_idx, 0)
+        let variant_place = self.body.new_downcast_place(variant_subject_place, variant_idx, 0)
         for bi in 0..payload_count:
             let inner_pat = self.pattern_payload_node(pat_node, self.ast.get_extra(payload_start + bi))
             if inner_pat == 0:
@@ -4746,7 +4776,7 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
             break
         if needs_payload_checks:
             success_bb = self.new_block() as i32
-        let disc = self.lower_enum_discriminant(scrutinee_place)
+        let disc = self.lower_enum_discriminant(variant_subject_place)
         let vals: Vec[i32] = Vec.new()
         vals.push(disc_idx)
         let targets: Vec[i32] = Vec.new()
@@ -4773,16 +4803,17 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
         return
 
     if pk == NodeKind.NK_PAT_REGEX:
-        self.lower_regex_pattern_match(scrutinee_place, pat_node, arm_bb, fail_bb)
+        self.lower_regex_pattern_match(self.pattern_shape_place(scrutinee_place), pat_node, arm_bb, fail_bb)
         return
 
-    let scrutinee_op = self.body.new_operand(OperandKind.OK_COPY, scrutinee_place)
+    let value_subject_place = self.pattern_shape_place(scrutinee_place)
+    let scrutinee_op = self.body.new_operand(OperandKind.OK_COPY, value_subject_place)
     // Lower int-literal patterns at the scrutinee's type, not hardcoded i32.
     // Hardcoding i32 truncated values >= 2^31 (e.g. PCRE2's META_END = 0x80000000)
     // to negative i32, so the comparison against a u32 scrutinee always failed
     // and every meta-code match fell through to the default — surfacing as
     // ERR89 ("unknown code in parsed pattern") on every PCRE2 compile.
-    let scrut_ty = self.place_local_type(scrutinee_place)
+    let scrut_ty = self.place_local_type(value_subject_place)
     let pat_int_ty = if scrut_ty != 0 and scrut_ty != self.sema.ty_void as i32: scrut_ty else: self.sema.ty_i32
     if pk == NodeKind.NK_PAT_INT or pk == NodeKind.NK_PAT_BOOL or pk == NodeKind.NK_PAT_STRING:
         let lit = if pk == NodeKind.NK_PAT_INT:
@@ -4791,7 +4822,7 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
             self.lower_bool_lit(self.ast.get_data0(pat_node))
         else:
             self.lower_str_lit(self.ast.get_data0(pat_node))
-        self.lower_pattern_eq_operand(scrutinee_place, lit, pat_node, arm_bb, fail_bb)
+        self.lower_pattern_eq_operand(value_subject_place, lit, pat_node, arm_bb, fail_bb)
         return
 
     if pk == NodeKind.NK_PAT_RANGE:
@@ -4813,7 +4844,7 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
         let ge_table = self.body.new_switch_table(ge_vals, ge_targets)
         self.terminate(TermKind.TK_SWITCH_INT, ge_op, ge_table, fail_bb, 0)
         self.switch_to(range_hi_bb)
-        let scrutinee_op2 = self.body.new_operand(OperandKind.OK_COPY, scrutinee_place)
+        let scrutinee_op2 = self.body.new_operand(OperandKind.OK_COPY, value_subject_place)
         let hi_cmp_op = if inclusive != 0: BinaryOp.OP_LTE else: BinaryOp.OP_LT
         let le_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, hi_cmp_op, scrutinee_op2, hi_lit)
         let le_tmp = self.new_temp(self.sema.ty_bool)
@@ -4831,7 +4862,8 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
     if pk == NodeKind.NK_PAT_TUPLE:
         let tup_start = self.ast.get_data0(pat_node)
         let tup_count = self.ast.get_data1(pat_node)
-        let tuple_scrut_ty = self.place_local_type(scrutinee_place)
+        let tuple_subject_place = self.pattern_shape_place(scrutinee_place)
+        let tuple_scrut_ty = self.place_local_type(tuple_subject_place)
         let tuple_scrut_resolved = self.sema.resolve_alias(tuple_scrut_ty)
         if self.sema.get_type_kind(tuple_scrut_resolved) != TypeKind.TY_TUPLE:
             with_eprint("error: tuple pattern reached MIR lowering with non-tuple subject")
@@ -4853,7 +4885,7 @@ fn MirBuilder.lower_pattern_match(self: MirBuilder, scrutinee_place: i32, pat_no
             if elem_pk == NodeKind.NK_PAT_WILDCARD or elem_pk == NodeKind.NK_PAT_IDENT:
                 continue
             let elem_ty = self.sema.type_extra.get((elem_start + ti) as i64)
-            let elem_place = self.body.new_field_place(scrutinee_place, ti, elem_ty)
+            let elem_place = self.body.new_field_place(tuple_subject_place, ti, elem_ty)
             let next_test = self.new_block()
             self.switch_to(cur_test_bb)
             self.lower_pattern_match(elem_place, elem_pat, next_test, fail_bb)
@@ -4970,34 +5002,37 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
         let variant_sym = self.resolve_variant_sym(pat_node)
         let bind_start = self.ast.get_data1(pat_node)
         let bind_count = self.ast.get_data2(pat_node)
-        let variant_place = self.body.new_downcast_place(scrutinee_place, self.variant_index(variant_sym), 0)
+        let variant_subject_place = self.pattern_shape_place(scrutinee_place)
+        let variant_place = self.body.new_downcast_place(variant_subject_place, self.variant_index(variant_sym), 0)
         for bi in 0..bind_count:
             let raw = self.ast.get_extra(bind_start + bi)
             let inner_pat = self.pattern_payload_node(pat_node, raw)
             if inner_pat != 0 and self.ast.kind(inner_pat) == NodeKind.NK_PAT_REST:
                 continue
             let field_place = self.body.new_field_place(variant_place, bi, 0)
+            let child_place = self.pattern_child_subject_place(scrutinee_place, field_place, self.ast.get_start(pat_node))
             if inner_pat != 0:
-                let inner = self.lower_pattern(inner_pat, field_place)
+                let inner = self.lower_pattern(inner_pat, child_place)
                 for i in 0..inner.len() as i32:
                     out.push(inner.get(i as i64))
                 continue
-            let bind_ty = self.place_local_type(field_place)
+            let bind_ty = self.place_local_type(child_place)
             let local_id = self.body.new_local(bind_ty, 0, raw, 1)
             self.bind_local(raw, local_id)
             self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(pat_node))
             if self.sema.is_copy(bind_ty) == 0:
                 self.schedule_drop(local_id, DropKind.DK_VALUE)
-            let src_op = self.body.new_operand(if self.sema.is_copy(bind_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, field_place)
+            let src_op = self.body.new_operand(if self.sema.is_copy(bind_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, child_place)
             self.assign_operand_to_place(self.place_for_local(local_id), src_op, self.ast.get_start(pat_node))
             out.push(local_id)
-            out.push(field_place)
+            out.push(child_place)
         return out
 
     if pk == NodeKind.NK_PAT_TUPLE:
         let t_start = self.ast.get_data0(pat_node)
         let t_count = self.ast.get_data1(pat_node)
-        let tuple_bind_scrut_ty = self.place_local_type(scrutinee_place)
+        let tuple_subject_place = self.pattern_shape_place(scrutinee_place)
+        let tuple_bind_scrut_ty = self.place_local_type(tuple_subject_place)
         let tuple_bind_scrut_resolved = self.sema.resolve_alias(tuple_bind_scrut_ty)
         if self.sema.get_type_kind(tuple_bind_scrut_resolved) != TypeKind.TY_TUPLE:
             with_eprint("error: tuple pattern reached MIR binding lowering with non-tuple subject")
@@ -5013,8 +5048,9 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
         for ti in 0..t_count:
             let elem_pat = self.ast.get_extra(t_start + ti)
             let elem_ty = self.sema.type_extra.get((elem_start + ti) as i64)
-            let field_place = self.body.new_field_place(scrutinee_place, ti, elem_ty)
-            let inner = self.lower_pattern(elem_pat, field_place)
+            let field_place = self.body.new_field_place(tuple_subject_place, ti, elem_ty)
+            let child_place = self.pattern_child_subject_place(scrutinee_place, field_place, self.ast.get_start(pat_node))
+            let inner = self.lower_pattern(elem_pat, child_place)
             for i in 0..inner.len() as i32:
                 out.push(inner.get(i as i64))
         return out
@@ -5022,25 +5058,27 @@ fn MirBuilder.lower_pattern(self: MirBuilder, pat_node: i32, scrutinee_place: i3
     if pk == NodeKind.NK_PAT_STRUCT:
         let s_start = self.ast.get_data1(pat_node)
         let s_count = self.ast.get_data2(pat_node)
+        let struct_subject_place = self.pattern_shape_place(scrutinee_place)
         for si in 0..s_count:
             let field_name = self.ast.get_extra(s_start + 1 + si * 2)
             let field_pat = self.ast.get_extra(s_start + 1 + si * 2 + 1)
-            let field_place = self.body.new_field_place(scrutinee_place, field_name, 0)
+            let field_place = self.body.new_field_place(struct_subject_place, field_name, 0)
+            let child_place = self.pattern_child_subject_place(scrutinee_place, field_place, self.ast.get_start(pat_node))
             if field_pat != 0:
-                let inner = self.lower_pattern(field_pat, field_place)
+                let inner = self.lower_pattern(field_pat, child_place)
                 for i in 0..inner.len() as i32:
                     out.push(inner.get(i as i64))
             else:
-                let bind_ty = self.place_local_type(field_place)
+                let bind_ty = self.place_local_type(child_place)
                 let local_id = self.body.new_local(bind_ty, 0, field_name, 1)
                 self.bind_local(field_name, local_id)
                 self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(pat_node))
                 if self.sema.is_copy(bind_ty) == 0:
                     self.schedule_drop(local_id, DropKind.DK_VALUE)
-                let src_op = self.body.new_operand(if self.sema.is_copy(bind_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, field_place)
+                let src_op = self.body.new_operand(if self.sema.is_copy(bind_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, child_place)
                 self.assign_operand_to_place(self.place_for_local(local_id), src_op, self.ast.get_start(pat_node))
                 out.push(local_id)
-                out.push(field_place)
+                out.push(child_place)
         return out
 
     if pk == NodeKind.NK_PAT_OR:
