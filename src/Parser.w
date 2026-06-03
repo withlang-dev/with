@@ -393,7 +393,8 @@ fn Parser.recover_to_statement(self: Parser):
            t == TokenKind.TK_KW_FOR or t == TokenKind.TK_KW_WHILE or t == TokenKind.TK_KW_DO or
            t == TokenKind.TK_KW_MATCH or t == TokenKind.TK_KW_BREAK or
            t == TokenKind.TK_KW_CONTINUE or t == TokenKind.TK_KW_GOTO or
-           t == TokenKind.TK_LABEL or t == TokenKind.TK_KW_DEFER:
+           t == TokenKind.TK_LABEL or t == TokenKind.TK_KW_DEFER or
+           t == TokenKind.TK_KW_NO_SUSPEND:
             // Check this is at the start of a line (preceded by newline or BOF)
             if tok_start == 0:
                 return
@@ -3125,6 +3126,7 @@ fn Parser.parse_primary(self: Parser) -> NodeId:
     if t == TokenKind.TK_KW_GOTO: return self.parse_goto()
     if t == TokenKind.TK_LABEL: return self.parse_labeled_statement()
     if t == TokenKind.TK_KW_UNSAFE: return self.parse_unsafe()
+    if t == TokenKind.TK_KW_NO_SUSPEND: return self.parse_no_suspend_expr()
     if t == TokenKind.TK_KW_ASM: return self.parse_asm_expr()
     if t == TokenKind.TK_KW_DEFER: return self.parse_defer()
     if t == TokenKind.TK_KW_ERRDEFER: return self.parse_errdefer()
@@ -4900,6 +4902,12 @@ fn Parser.parse_comptime_expr(self: Parser) -> NodeId:
         inner = self.parse_expr()
     self.pool.add_node(NodeKind.NK_COMPTIME, start, self.prev_end(), inner, 0, 0)
 
+fn Parser.parse_no_suspend_expr(self: Parser) -> NodeId:
+    let start = self.current_start()
+    self.advance()
+    let body = self.parse_body()
+    self.pool.add_node(NodeKind.NK_NO_SUSPEND, start, self.prev_end(), body, 0, 0)
+
 fn Parser.parse_spawn(self: Parser) -> NodeId:
     let start = self.current_start()
     self.advance()
@@ -6458,7 +6466,7 @@ fn Parser.parse_block_or_expr(self: Parser) -> NodeId:
         // (not a newline). Check column to decide if it's still in this block.
         if cur != TokenKind.TK_NEWLINE and cur != TokenKind.TK_SEMICOLON:
             let cur_col = column_of(self.source, self.current_start())
-            if cur_col >= block_col and (cur == TokenKind.TK_KW_LET or cur == TokenKind.TK_KW_VAR or cur == TokenKind.TK_KW_RETURN or cur == TokenKind.TK_KW_IF or cur == TokenKind.TK_KW_FOR or cur == TokenKind.TK_KW_WHILE or cur == TokenKind.TK_KW_DO or cur == TokenKind.TK_KW_MATCH or cur == TokenKind.TK_KW_BREAK or cur == TokenKind.TK_KW_CONTINUE or cur == TokenKind.TK_KW_GOTO or cur == TokenKind.TK_LABEL or cur == TokenKind.TK_KW_DEFER):
+            if cur_col >= block_col and (cur == TokenKind.TK_KW_LET or cur == TokenKind.TK_KW_VAR or cur == TokenKind.TK_KW_RETURN or cur == TokenKind.TK_KW_IF or cur == TokenKind.TK_KW_FOR or cur == TokenKind.TK_KW_WHILE or cur == TokenKind.TK_KW_DO or cur == TokenKind.TK_KW_MATCH or cur == TokenKind.TK_KW_BREAK or cur == TokenKind.TK_KW_CONTINUE or cur == TokenKind.TK_KW_GOTO or cur == TokenKind.TK_LABEL or cur == TokenKind.TK_KW_DEFER or cur == TokenKind.TK_KW_NO_SUSPEND):
                 stmts.push(last_expr as i32)
                 last_expr = self.parse_expr()
                 continue

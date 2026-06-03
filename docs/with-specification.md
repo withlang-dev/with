@@ -5829,6 +5829,11 @@ on callee color:
    error — even if the `.await` is buried three calls deep.
 2. **FFI callback safety:** Functions passed as `extern "C"`
    callbacks must not be `may_suspend` (see §14.19).
+3. **`no_suspend` blocks:** Expert code may assert that a region
+   contains no operation that yields to the scheduler. The compiler
+   rejects direct `.await`/`select await`, transitive `may_suspend`
+   calls, async-scope await-all, and implicit cleanup awaits in that
+   region.
 
 Programmers do not declare or annotate `may_suspend`. The compiler
 computes it internally; it may appear in diagnostics when a safety
@@ -5844,6 +5849,40 @@ with lock.write() as data:
                            // while @[no_await_guard] WriteGuard is live
     data.x = 1             // OK: no suspension
 ```
+
+#### 14.3.1 `no_suspend` Blocks
+
+`no_suspend` is an expert assertion for code that must not yield to
+the fiber scheduler:
+
+```
+no_suspend:
+    update_intrusive_state()
+    poll_fast_path()
+
+let value = no_suspend {
+    compute_without_waiting()
+}
+```
+
+The body is otherwise an ordinary expression block: it has the type of
+its tail expression and participates in inference normally. Creating an
+async task handle is allowed because calling an `async fn` returns a
+`Task[T]` immediately; actually awaiting that task inside the block is
+not allowed.
+
+The compiler rejects any scheduler-yielding operation inside the block,
+including:
+
+- direct `.await` or `select await`
+- calls to functions whose body is `may_suspend`
+- async-scope await-all
+- implicit cleanup await for an ephemeral `Task`
+
+This check exists because suspending inside such a region can deadlock
+or expose partially-updated state to other fibers. It is independent of
+whether the compiler implements fibers with real stacks or state
+machines.
 
 ### 14.4 `async fn` Semantics
 

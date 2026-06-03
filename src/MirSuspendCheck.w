@@ -647,6 +647,43 @@ fn suspend_reported_site(reported_starts: &Vec[i32], reported_ends: &Vec[i32], r
             return true
     false
 
+fn suspend_no_suspend_site_span(ast: AstPool, body: &MirBody, bb: i32, no_suspend_node: i32) -> SuspendSiteSpan:
+    var site = suspend_site_span(ast, body, bb)
+    if site.start <= 0 and no_suspend_node != 0:
+        site.start = ast.get_start(no_suspend_node)
+        site.end = ast.get_end(no_suspend_node)
+        if site.end <= site.start:
+            site.end = site.start + 1
+    site
+
+fn suspend_reported_no_suspend_site(reported_starts: &Vec[i32], reported_ends: &Vec[i32], reported_nodes: &Vec[i32], site: SuspendSiteSpan, no_suspend_node: i32) -> bool:
+    let count = reported_starts.len() as i32
+    for i in 0..count:
+        if reported_starts.get(i as i64) == site.start and reported_ends.get(i as i64) == site.end and reported_nodes.get(i as i64) == no_suspend_node:
+            return true
+    false
+
+fn suspend_emit_no_suspend_error(diags: DiagnosticList, sema: Sema, body: &MirBody, body_by_fn: HashMap[i32, i32], body_may_suspend: Vec[i32], site: SuspendSiteSpan, bb: i32) -> DiagnosticList:
+    var out = diags
+    var diag = Diagnostic.err("E0702: suspension is not allowed inside no_suspend block", Span { file: sema.local_file_id, start: site.start, end: site.end })
+    let call_id = body.term_data1(bb)
+    let intrinsic = body.call_intrinsic(call_id)
+    if suspend_is_scheduler_yield_intrinsic(intrinsic) != 0:
+        if intrinsic == MirIntrinsic.FIBER_CLEANUP_AWAIT:
+            diag.add_note("implicit cleanup of an ephemeral Task may yield here")
+        else:
+            diag.add_note("this operation may yield the current fiber")
+    else:
+        let callee = suspend_callee_sym(body, body.term_data0(bb))
+        let callee_idx = suspend_body_index_for_sym(body_by_fn, callee)
+        if callee != 0 and callee_idx >= 0 and callee_idx < body_may_suspend.len() as i32 and body_may_suspend.get(callee_idx as i64) != 0:
+            diag.add_note("call to may_suspend function `" ++ sema.pool_resolve(callee) ++ "` occurs here")
+        else:
+            diag.add_note("this call may yield the current fiber")
+    diag.add_help("move the suspension outside the no_suspend block, or remove the no_suspend assertion")
+    out.emit(diag)
+    out
+
 fn suspend_emit_guard_error(diags: DiagnosticList, sema: Sema, body: &MirBody, site: SuspendSiteSpan, guard_local: i32) -> DiagnosticList:
     var out = diags
     let guard_ty = if guard_local >= 0 and guard_local < body.local_type_ids.len() as i32: body.local_type_ids.get(guard_local as i64) else: 0
@@ -759,11 +796,32 @@ fn suspend_check_body(ast: AstPool, sema: Sema, body_by_fn: HashMap[i32, i32], b
                 break
     out
 
+fn suspend_check_no_suspend_body(ast: AstPool, sema: Sema, body_by_fn: HashMap[i32, i32], body_may_suspend: Vec[i32], body: &MirBody, diags: DiagnosticList) -> DiagnosticList:
+    var out = diags
+    let reported_starts: Vec[i32] = Vec.new()
+    let reported_ends: Vec[i32] = Vec.new()
+    let reported_nodes: Vec[i32] = Vec.new()
+    for bb in 0..body.block_count():
+        let no_suspend_node = body.term_no_suspend_node(bb)
+        if no_suspend_node == 0:
+            continue
+        if suspend_term_may_suspend(body, body_by_fn, body_may_suspend, bb) == 0:
+            continue
+        let site = suspend_no_suspend_site_span(ast, body, bb, no_suspend_node)
+        if suspend_reported_no_suspend_site(&reported_starts, &reported_ends, &reported_nodes, site, no_suspend_node):
+            continue
+        reported_starts.push(site.start)
+        reported_ends.push(site.end)
+        reported_nodes.push(no_suspend_node)
+        out = suspend_emit_no_suspend_error(out, sema, body, body_by_fn, body_may_suspend, site, bb)
+    out
+
 fn check_no_await_guard_suspends(mir_mod: MirModule, ast: AstPool, sema: Sema, diags: DiagnosticList) -> DiagnosticList:
     var out = diags
     let body_by_fn = suspend_build_body_index(mir_mod)
     let body_may_suspend = suspend_compute_may_suspend(mir_mod, body_by_fn)
     for bi in 0..mir_mod.bodies.len() as i32:
         let body = mir_mod.bodies.get(bi as i64)
+        out = suspend_check_no_suspend_body(ast, sema, body_by_fn, body_may_suspend, &body, out)
         out = suspend_check_body(ast, sema, body_by_fn, body_may_suspend, &body, out)
     out
