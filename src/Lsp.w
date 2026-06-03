@@ -1557,6 +1557,7 @@ fn lsp_keywords() -> Vec[str]:
     k.push("async")
     k.push("await")
     k.push("spawn")
+    k.push("no_suspend")
     k.push("comptime")
     k.push("error")
     k

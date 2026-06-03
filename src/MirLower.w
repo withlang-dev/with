@@ -89,6 +89,7 @@ type MirBuilder {
 
     string_alias_local_ids: Vec[i32],
     string_alias_flags: Vec[i32],
+    no_suspend_nodes: Vec[i32],
 
     sema: Sema,
     ast: AstPool,
@@ -138,6 +139,7 @@ fn MirBuilder.init(sema: Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> M
         regex_capture_opt_places: Vec.new(),
         string_alias_local_ids: Vec.new(),
         string_alias_flags: Vec.new(),
+        no_suspend_nodes: Vec.new(),
         sema,
         ast,
         pool,
@@ -149,12 +151,25 @@ fn MirBuilder.new_block(self: MirBuilder) -> BlockId:
 fn MirBuilder.switch_to(self: MirBuilder, bb: BlockId):
     self.cur_bb = bb
 
+fn MirBuilder.active_no_suspend_node(self: MirBuilder) -> i32:
+    let depth = self.no_suspend_nodes.len() as i32
+    if depth == 0:
+        return 0
+    self.no_suspend_nodes.get((depth - 1) as i64)
+
+fn MirBuilder.mark_no_suspend_terminator(self: MirBuilder):
+    let node = self.active_no_suspend_node()
+    if node != 0:
+        self.body.set_term_no_suspend_node(self.cur_bb, node)
+
 fn MirBuilder.terminate(self: MirBuilder, kind: i32, d0: i32, d1: i32, d2: i32, d3: i32):
     let span = if self.cur_node > 0: self.ast.get_start(self.cur_node) else: 0
     self.body.set_terminator(self.cur_bb, kind, d0, d1, d2, d3, span)
+    self.mark_no_suspend_terminator()
 
 fn MirBuilder.terminate_with_span(self: MirBuilder, kind: i32, d0: i32, d1: i32, d2: i32, d3: i32, span: i32):
     self.body.set_terminator(self.cur_bb, kind, d0, d1, d2, d3, span)
+    self.mark_no_suspend_terminator()
 
 fn MirBuilder.push_scope(self: MirBuilder) -> void:
     self.drop_scope_starts.push(self.drop_local_ids.len() as i32)
@@ -552,7 +567,7 @@ fn MirBuilder.collect_goto_label_depths(self: MirBuilder, node: i32, scope_depth
         self.collect_goto_label_depths(self.ast.get_data2(node), scope_depth)
         self.collect_goto_label_depths(self.ast.get_data1(node), scope_depth)
         return
-    if kind == NodeKind.NK_RETURN or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG:
+    if kind == NodeKind.NK_RETURN or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_NO_SUSPEND:
         self.collect_goto_label_depths(self.ast.get_data0(node), scope_depth)
         return
     if kind == NodeKind.NK_BINARY:
@@ -1270,7 +1285,7 @@ fn MirBuilder.fallback_expr_type(self: MirBuilder, node: i32) -> i32:
         return self.sema.ty_str as i32
     if kind == NodeKind.NK_NULL_LIT:
         return self.sema.ty_i32 as i32
-    if kind == NodeKind.NK_UNSAFE_BLOCK:
+    if kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_NO_SUSPEND:
         return self.expr_type(self.ast.get_data0(node))
     if kind == NodeKind.NK_ASM_EXPR:
         let asm_d2 = self.ast.get_data2(node)
@@ -1532,7 +1547,7 @@ fn MirBuilder.try_eval_const(self: MirBuilder, node: i32) -> i64:
         return fast.value
     if kind == NodeKind.NK_COMPTIME:
         return self.try_eval_const(self.ast.get_data0(node))
-    if kind == NodeKind.NK_GROUPED:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
         return self.try_eval_const(self.ast.get_data0(node))
     if kind == NodeKind.NK_BOOL_LIT:
         return self.ast.get_data0(node) as i64
@@ -3245,7 +3260,7 @@ fn MirBuilder.lower_expr_place(self: MirBuilder, node: i32) -> i32:
     if kind == NodeKind.NK_UNARY and self.ast.get_data0(node) == UnaryOp.UOP_DEREF:
         return self.lower_deref(self.ast.get_data1(node))
 
-    if kind == NodeKind.NK_GROUPED:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
         return self.lower_expr_place(self.ast.get_data0(node))
 
     // Transparent pass-through. lower_expr already does this for the rvalue
@@ -7633,6 +7648,12 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         // Transparent pass-through: just lower the inner body
         return self.lower_expr(self.ast.get_data0(node))
 
+    if kind == NodeKind.NK_NO_SUSPEND:
+        self.no_suspend_nodes.push(node)
+        let result = self.lower_expr(self.ast.get_data0(node))
+        self.no_suspend_nodes.pop()
+        return result
+
     if kind == NodeKind.NK_ASM_EXPR:
         // Inline assembly — emit as a call with MirIntrinsic.ASM marker
         // Lower input expression values as MIR args
@@ -9059,7 +9080,7 @@ fn tailrec_verify_recursive_edges(sema: &Sema, node: i32, scc: &Vec[i32], in_tai
         return tailrec_verify_recursive_edges(sema, sema.ast.get_data2(node), scc, 0, active_cleanup)
     if kind == NodeKind.NK_UNARY or kind == NodeKind.NK_ASSIGN:
         return tailrec_verify_recursive_edges(sema, sema.ast.get_data1(node), scc, 0, active_cleanup)
-    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_UNSAFE_BLOCK:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_NO_SUSPEND:
         return tailrec_verify_recursive_edges(sema, sema.ast.get_data0(node), scc, in_tail, active_cleanup)
     tailrec_no_violation()
 

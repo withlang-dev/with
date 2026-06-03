@@ -161,6 +161,7 @@ enum TokenKind: i32:
     TK_EQ_TILDE = 137
     TK_BANG_TILDE = 138
     TK_KW_DO = 139
+    TK_KW_NO_SUSPEND = 140
 
 // Lookup table: keyword string -> tag. Returns -1 if not a keyword.
 fn tag_from_keyword(s: str) -> i32:
@@ -221,6 +222,7 @@ fn tag_from_keyword(s: str) -> i32:
     if s == "global": return TokenKind.TK_KW_GLOBAL
     if s == "copy": return TokenKind.TK_KW_COPY
     if s == "do": return TokenKind.TK_KW_DO
+    if s == "no_suspend": return TokenKind.TK_KW_NO_SUSPEND
     -1
 
 // Returns a human-readable name for a token tag (for diagnostics).
@@ -304,6 +306,7 @@ fn tag_name(tag: i32) -> str:
     if tag == TokenKind.TK_KW_GLOBAL: return "'global'"
     if tag == TokenKind.TK_KW_COPY: return "'copy'"
     if tag == TokenKind.TK_KW_DO: return "'do'"
+    if tag == TokenKind.TK_KW_NO_SUSPEND: return "'no_suspend'"
     if tag == TokenKind.TK_REGEX_LIT: return "regex literal"
     if tag == TokenKind.TK_EQ: return "'='"
     if tag == TokenKind.TK_EQ_EQ: return "'=='"

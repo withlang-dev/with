@@ -15,11 +15,13 @@ conversation context after compaction.
 deterministic MIR dataflow: direct guard locals and derived references/views
 live across scheduler-yielding suspension points now produce E0701, while
 last-use-before-await, owned snapshots, and explicit drop-before-await with no
-live derived view are accepted. The verified slice deliberately excludes an
-explicit `no_suspend:` escape-hatch block (#332), which is tracked as a
-separate follow-on design. #333 tracks the separate `with test` CLI bug where
-additional file arguments are silently ignored and `with test --help` runs the
-default test target instead of printing help.
+live derived view are accepted. #332 is implemented: `no_suspend:` /
+`no_suspend { ... }` is an expert assertion block that typechecks like its
+body while rejecting direct awaits/select awaits, transitive `may_suspend`
+calls, async-scope await-all, and implicit ephemeral-task cleanup awaits with
+E0702. #333 tracks the separate `with test` CLI bug where additional file
+arguments are silently ignored and `with test --help` runs the default test
+target instead of printing help.
 
 Build and release flow now treats `with build` as canonical. `with build
 :test` records `out/.build-state/test-green.json` after the full suite passes.

@@ -343,6 +343,7 @@ type MirBody {
     bb_term_d3: Vec[i32],
     bb_is_cleanup: Vec[i32],
     bb_term_spans: Vec[i32],
+    bb_no_suspend_nodes: Vec[i32],
 
     // Statements
     stmt_kinds: Vec[i32],
@@ -536,6 +537,7 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
         bb_term_d3: Vec.new(),
         bb_is_cleanup: Vec.new(),
         bb_term_spans: Vec.new(),
+        bb_no_suspend_nodes: Vec.new(),
         stmt_kinds: Vec.new(),
         stmt_d0: Vec.new(),
         stmt_d1: Vec.new(),
@@ -593,6 +595,7 @@ fn MirBody.new_block(mut self: MirBody) -> BlockId:
     self.bb_term_d3.push(0)
     self.bb_is_cleanup.push(0)
     self.bb_term_spans.push(0)
+    self.bb_no_suspend_nodes.push(0)
     BlockId(id)
 
 fn MirBody.push_stmt(mut self: MirBody, bb: i32, kind: i32, d0: i32, d1: i32, span: i32):
@@ -617,6 +620,11 @@ fn MirBody.set_terminator(mut self: MirBody, bb: i32, kind: i32, d0: i32, d1: i3
     self.bb_term_d2.set_i32(bb, d2)
     self.bb_term_d3.set_i32(bb, d3)
     self.bb_term_spans.set_i32(bb, span)
+
+fn MirBody.set_term_no_suspend_node(mut self: MirBody, bb: i32, node: i32):
+    if bb < 0 or bb >= self.bb_no_suspend_nodes.len() as i32:
+        return
+    self.bb_no_suspend_nodes.set_i32(bb, node)
 
 fn MirBody.new_local(mut self: MirBody, type_id: i32, mutable: i32, name: i32, is_user_var: i32) -> i32:
     let id = self.local_type_ids.len() as i32
@@ -831,6 +839,11 @@ fn MirBody.term_data3(self: &MirBody, bb: i32) -> i32:
     if bb < 0 or bb >= self.bb_term_d3.len() as i32:
         return 0
     self.bb_term_d3.get(bb as i64)
+
+fn MirBody.term_no_suspend_node(self: &MirBody, bb: i32) -> i32:
+    if bb < 0 or bb >= self.bb_no_suspend_nodes.len() as i32:
+        return 0
+    self.bb_no_suspend_nodes.get(bb as i64)
 
 // ── Deterministic dump rendering ─────────────────────────────────
 
@@ -1323,6 +1336,8 @@ fn validate_mir_body(body: MirBody) -> str:
         return "bb cleanup flag length mismatch"
     if bb_count != body.bb_term_spans.len() as i32:
         return "bb_term_spans length mismatch"
+    if bb_count != body.bb_no_suspend_nodes.len() as i32:
+        return "bb_no_suspend_nodes length mismatch"
 
     let stmt_count = body.stmt_kinds.len() as i32
     if stmt_count != body.stmt_d0.len() as i32 or

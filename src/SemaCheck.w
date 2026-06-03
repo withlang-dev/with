@@ -971,7 +971,7 @@ fn Sema.collect_function_labels(self: Sema, node: i32):
         self.collect_function_labels(self.ast.get_data1(node))
         return
 
-    if kind == NodeKind.NK_RETURN or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_UNSAFE_BLOCK:
+    if kind == NodeKind.NK_RETURN or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_NO_SUSPEND:
         self.collect_function_labels(self.ast.get_data0(node))
         return
 
@@ -1288,7 +1288,7 @@ fn Sema.check_expr_reachable_comptime_errors(self: Sema, node: i32):
         self.check_expr_reachable_comptime_errors(self.ast.get_data1(node))
         return
 
-    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_RETURN or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_UNSAFE_BLOCK:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_RETURN or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_NO_SUSPEND:
         self.check_expr_reachable_comptime_errors(self.ast.get_data0(node))
         return
 
@@ -1631,7 +1631,7 @@ fn Sema.expr_is_task_value(self: Sema, node: i32) -> i32:
     if node == 0:
         return 0
     let kind = self.ast.kind(node)
-    if kind == NodeKind.NK_GROUPED:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
         return self.expr_is_task_value(self.ast.get_data0(node))
     if kind == NodeKind.NK_ASYNC_BLOCK:
         return 1
@@ -1672,7 +1672,7 @@ fn Sema.expr_is_scoped_task_value(self: Sema, node: i32) -> i32:
     if node == 0:
         return 0
     let kind = self.ast.kind(node)
-    if kind == NodeKind.NK_GROUPED:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
         return self.expr_is_scoped_task_value(self.ast.get_data0(node))
     if kind == NodeKind.NK_IDENT:
         return self.scope_lookup_is_scoped_task(self.ast.get_data0(node))
@@ -1852,7 +1852,7 @@ fn Sema.expr_may_suspend(self: Sema, node: i32, visiting: HashMap[i32, i32]) -> 
             if self.expr_may_suspend(self.ast.get_extra(extra_start + si), visiting) != 0:
                 return 1
         return self.expr_may_suspend(self.ast.get_data2(node), visiting)
-    if kind == NodeKind.NK_CLOSURE or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_LABEL or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG:
+    if kind == NodeKind.NK_CLOSURE or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_LABEL or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_NO_SUSPEND:
         return self.expr_may_suspend(self.ast.get_data0(node), visiting)
     if kind == NodeKind.NK_UNARY or kind == NodeKind.NK_RETURN:
         return self.expr_may_suspend(self.ast.get_data1(node), visiting)
@@ -2043,7 +2043,7 @@ fn Sema.callable_expr_creates_ephemeral_task(self: Sema, node: i32, visiting: Ha
     if node == 0:
         return 0
     let kind = self.ast.kind(node)
-    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_NO_SUSPEND:
         return self.callable_expr_creates_ephemeral_task(self.ast.get_data0(node), visiting)
     if kind == NodeKind.NK_CLOSURE:
         return self.expr_creates_ephemeral_task(self.ast.get_data0(node), visiting)
@@ -2111,7 +2111,7 @@ fn Sema.expr_creates_ephemeral_task(self: Sema, node: i32, visiting: HashMap[i32
         return self.expr_creates_ephemeral_task(self.ast.get_data2(node), visiting)
     if kind == NodeKind.NK_CLOSURE:
         return 0
-    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_LABEL or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_LABEL or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_NO_SUSPEND:
         return self.expr_creates_ephemeral_task(self.ast.get_data0(node), visiting)
     if kind == NodeKind.NK_UNARY or kind == NodeKind.NK_RETURN:
         return self.expr_creates_ephemeral_task(self.ast.get_data1(node), visiting)
@@ -2265,7 +2265,7 @@ fn Sema.expr_is_ephemeral_task(self: Sema, node: i32) -> i32:
     if node == 0:
         return 0
     let kind = self.ast.kind(node)
-    if kind == NodeKind.NK_GROUPED:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
         return self.expr_is_ephemeral_task(self.ast.get_data0(node))
     if kind == NodeKind.NK_IDENT:
         return self.scope_lookup_is_ephemeral_task(self.ast.get_data0(node))
@@ -2306,7 +2306,7 @@ fn Sema.expr_is_ephemeral_value(self: Sema, node: i32) -> i32:
     if node == 0:
         return 0
     let kind = self.ast.kind(node)
-    if kind == NodeKind.NK_GROUPED:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
         return self.expr_is_ephemeral_value(self.ast.get_data0(node))
     if kind == NodeKind.NK_IDENT:
         let sym = self.ast.get_data0(node)
@@ -2742,6 +2742,13 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         if is_prefix and unsafe_result != 0 and self.unsafe_prefix_has_raw_access(body) == 0:
             self.emit_error("unsafe prefix requires a raw pointer dereference or raw pointer index; use unsafe { ... } for compound unsafe expressions", node)
         return unsafe_result
+
+    if kind == NodeKind.NK_NO_SUSPEND:
+        let body = self.ast.get_data0(node)
+        let result = if self.has_expected_type != 0: self.check_expr_with_expected(body, self.expected_expr_type) else: self.check_expr(body)
+        if result != 0:
+            self.typed_expr_types.insert(node, result as i32)
+        return result
 
     if kind == NodeKind.NK_ASM_EXPR:
         self.require_unsafe_operation("asm requires unsafe context", node)
@@ -3932,7 +3939,7 @@ fn Sema.check_block(self: Sema, node: i32) -> i32:
         let stmt_kind = self.ast.kind(stmt)
         if stmt_kind == NodeKind.NK_RETURN or stmt_kind == NodeKind.NK_BREAK or stmt_kind == NodeKind.NK_CONTINUE:
             block_diverged = 1
-        let can_discard_task = stmt_kind == NodeKind.NK_CALL or stmt_kind == NodeKind.NK_IDENT or stmt_kind == NodeKind.NK_GROUPED or stmt_kind == NodeKind.NK_ASYNC_BLOCK or stmt_kind == NodeKind.NK_TUPLE
+        let can_discard_task = stmt_kind == NodeKind.NK_CALL or stmt_kind == NodeKind.NK_IDENT or stmt_kind == NodeKind.NK_GROUPED or stmt_kind == NodeKind.NK_ASYNC_BLOCK or stmt_kind == NodeKind.NK_TUPLE or stmt_kind == NodeKind.NK_NO_SUSPEND
         let is_discarded_task = can_discard_task and stmt_kind != NodeKind.NK_SPAWN and self.expr_is_task_value(stmt) != 0 and self.expr_is_scoped_task_value(stmt) == 0
         if is_discarded_task:
             self.emit_error("E0801: unused Task value", stmt)
@@ -4290,7 +4297,7 @@ fn Sema.collect_expr_view_deps(self: Sema, node: i32, out: Vec[i32]):
             if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
                 self.push_unique_i32(out, sym)
         return
-    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COMPTIME:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_NO_SUSPEND:
         self.collect_expr_view_deps(self.ast.get_data0(node), out)
         return
     if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_INDEX:
@@ -4325,7 +4332,7 @@ fn Sema.compute_expr_view_origin_mask(self: Sema, node: i32) -> i32:
         if direct_pi >= 0:
             return ((1 as i64) << (direct_pi as u32)) as i32
         return self.binding_view_origin_mask(sym)
-    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COMPTIME:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_NO_SUSPEND:
         return self.compute_expr_view_origin_mask(self.ast.get_data0(node))
     if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_INDEX:
         return self.compute_expr_view_origin_mask(self.ast.get_data0(node))
@@ -4490,7 +4497,7 @@ fn Sema.expr_is_symbol_value(self: Sema, node: i32, sym: i32) -> i32:
     let kind = self.ast.kind(node)
     if kind == NodeKind.NK_IDENT:
         return if self.ast.get_data0(node) == sym: 1 else: 0
-    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_NO_SUSPEND:
         return self.expr_is_symbol_value(self.ast.get_data0(node), sym)
     0
 
@@ -4500,7 +4507,7 @@ fn Sema.concat_expr_includes_symbol_value(self: Sema, node: i32, sym: i32) -> i3
     if node == 0 or sym == 0:
         return 0
     let kind = self.ast.kind(node)
-    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_NO_SUSPEND:
         return self.concat_expr_includes_symbol_value(self.ast.get_data0(node), sym)
     if kind == NodeKind.NK_BINARY and self.ast.get_data0(node) == BinaryOp.OP_CONCAT:
         if self.concat_expr_includes_symbol_value(self.ast.get_data1(node), sym) != 0:
@@ -4514,7 +4521,7 @@ fn Sema.concat_expr_starts_with_symbol_value(self: Sema, node: i32, sym: i32) ->
     if node == 0 or sym == 0:
         return 0
     let kind = self.ast.kind(node)
-    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_NO_SUSPEND:
         return self.concat_expr_starts_with_symbol_value(self.ast.get_data0(node), sym)
     if kind == NodeKind.NK_BINARY and self.ast.get_data0(node) == BinaryOp.OP_CONCAT:
         return self.concat_expr_starts_with_symbol_value(self.ast.get_data1(node), sym)
@@ -4529,7 +4536,7 @@ fn Sema.warn_loop_string_concat_accumulation(self: Sema, node: i32, target: i32,
         return
     if self.resolve_alias(target_type) != self.ty_str:
         return
-    if self.ast.kind(value) == NodeKind.NK_GROUPED or self.ast.kind(value) == NodeKind.NK_CAST or self.ast.kind(value) == NodeKind.NK_COMPTIME or self.ast.kind(value) == NodeKind.NK_COPY_ARG or self.ast.kind(value) == NodeKind.NK_MOVE_ARG:
+    if self.ast.kind(value) == NodeKind.NK_GROUPED or self.ast.kind(value) == NodeKind.NK_CAST or self.ast.kind(value) == NodeKind.NK_COMPTIME or self.ast.kind(value) == NodeKind.NK_COPY_ARG or self.ast.kind(value) == NodeKind.NK_MOVE_ARG or self.ast.kind(value) == NodeKind.NK_NO_SUSPEND:
         self.warn_loop_string_concat_accumulation(node, target, self.ast.get_data0(value), target_type)
         return
     if self.ast.kind(value) != NodeKind.NK_BINARY or self.ast.get_data0(value) != BinaryOp.OP_CONCAT:
@@ -5058,7 +5065,7 @@ fn Sema.index_expr_is_type_level(self: Sema, expr: i32) -> bool:
     if kind == NodeKind.NK_IDENT:
         let sym = self.ast.get_data0(expr)
         return self.has_named_type_visible(sym) != 0
-    if kind == NodeKind.NK_INDEX or kind == NodeKind.NK_GROUPED:
+    if kind == NodeKind.NK_INDEX or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
         return self.index_expr_is_type_level(self.ast.get_data0(expr))
     false
 
@@ -11023,7 +11030,7 @@ fn Sema.borrow_root_place(self: Sema, node: i32) -> i32:
         return self.borrow_root_place(self.ast.get_data0(node))
     if kind == NodeKind.NK_INDEX:
         return self.borrow_root_place(self.ast.get_data0(node))
-    if kind == NodeKind.NK_GROUPED:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
         return self.borrow_root_place(self.ast.get_data0(node))
     0
 
@@ -11282,7 +11289,7 @@ fn Sema.expr_uses_symbol(self: Sema, node: i32, sym: i32) -> i32:
         return self.expr_uses_symbol(self.ast.get_data1(node), sym)
     if kind == NodeKind.NK_UNARY:
         return self.expr_uses_symbol(self.ast.get_data1(node), sym)
-    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_COMPTIME:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_AWAIT or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_SPAWN or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_NO_SUSPEND:
         return self.expr_uses_symbol(self.ast.get_data0(node), sym)
     if kind == NodeKind.NK_LABEL:
         return self.expr_uses_symbol(self.ast.get_data1(node), sym)
@@ -11578,7 +11585,7 @@ fn Sema.expr_indexed_into(self: Sema, node: i32) -> i32:
     let kind = self.ast.kind(node)
     if kind == NodeKind.NK_INDEX:
         return self.place_root_sym(self.ast.get_data0(node))
-    if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_GROUPED:
+    if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
         return self.expr_indexed_into(self.ast.get_data0(node))
     if kind == NodeKind.NK_UNSAFE_BLOCK:
         return self.expr_indexed_into(self.ast.get_data0(node))
@@ -11634,7 +11641,7 @@ fn Sema.expr_has_nested_mutating_call_on(self: Sema, node: i32, recv_sym: i32) -
         return self.expr_has_nested_mutating_call_on(self.ast.get_data1(node), recv_sym)
     if kind == NodeKind.NK_UNARY:
         return self.expr_has_nested_mutating_call_on(self.ast.get_data1(node), recv_sym)
-    if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_INDEX or kind == NodeKind.NK_GROUPED:
+    if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_INDEX or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
         return self.expr_has_nested_mutating_call_on(self.ast.get_data0(node), recv_sym)
     if kind == NodeKind.NK_CAST:
         return self.expr_has_nested_mutating_call_on(self.ast.get_data0(node), recv_sym)
@@ -11647,7 +11654,7 @@ fn Sema.place_root_sym(self: Sema, node: i32) -> i32:
     let kind = self.ast.kind(node)
     if kind == NodeKind.NK_IDENT:
         return self.ast.get_data0(node)
-    if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_INDEX or kind == NodeKind.NK_MULTI_INDEX or kind == NodeKind.NK_GROUPED:
+    if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_INDEX or kind == NodeKind.NK_MULTI_INDEX or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
         return self.place_root_sym(self.ast.get_data0(node))
     // &x.field — strip the reference operator to get the underlying place's root
     if kind == NodeKind.NK_UNARY:
@@ -11790,7 +11797,7 @@ fn Sema.classify_place(self: Sema, node: i32) -> i64:
             return pack_place(unpack_place_kind(base_packed), PlaceMut.PM_ReadOnly)
         return base_packed
     // Parenthesized: classify inner.
-    if kind == NodeKind.NK_GROUPED:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
         return self.classify_place(self.ast.get_data0(node))
     // `unsafe *p` / `unsafe p[i]` wraps a single place expression; classify
     // the inner. Block form (NK_UNSAFE_BLOCK over NK_BLOCK) won't classify as
@@ -11935,7 +11942,7 @@ fn Sema.capture_is_field_only(self: Sema, node: i32, sym: i32) -> i32:
         if self.capture_is_field_only(self.ast.get_data0(node), sym) == 0:
             return 0
         return self.capture_is_field_only(self.ast.get_data1(node), sym)
-    if kind == NodeKind.NK_GROUPED:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
         return self.capture_is_field_only(self.ast.get_data0(node), sym)
     1
 
@@ -12056,7 +12063,7 @@ fn Sema.collect_capture_fields(self: Sema, node: i32, sym: i32):
         self.collect_capture_fields(self.ast.get_data0(node), sym)
         self.collect_capture_fields(self.ast.get_data1(node), sym)
         return
-    if kind == NodeKind.NK_GROUPED:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
         self.collect_capture_fields(self.ast.get_data0(node), sym)
 
 fn Sema.expire_dead_borrows_in_block(self: Sema, block_extra_start: i32, stmt_count: i32, next_stmt_index: i32, tail_node: i32):
@@ -12202,7 +12209,7 @@ fn Sema.mark_moved_if_consumed(self: Sema, node: i32):
                         f"[move] sym={name} tid={tid} resolved={resolved as i32} kind={self.get_type_kind(resolved)}"
                     )
                 self.scope_set_state(sym, VarState.MOVED)
-    if kind == NodeKind.NK_GROUPED:
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
         self.mark_moved_if_consumed(self.ast.get_data0(node))
     // copy: source remains valid — do not mark as consumed.
     if kind == NodeKind.NK_COPY_ARG:

@@ -112,6 +112,8 @@ enum NodeKind: i32:
     // NK_NEG_MATCH_OP: d0=lhs(str expr), d1=regex expr, d2=0
     NK_MATCH_OP = 123
     NK_NEG_MATCH_OP = 124
+    // NK_NO_SUSPEND: d0=body(node), d1=0, d2=0
+    NK_NO_SUSPEND = 126
     // Type expressions
     NK_TYPE_NAMED = 80
     NK_TYPE_GENERIC = 81
@@ -1496,6 +1498,7 @@ fn AstPool.comprehension_binding_is_pattern(self: AstPool, node: NodeId, binding
 // NodeKind.NK_SPAWN:         d0=expr(node), d1=0, d2=0
 // NodeKind.NK_YIELD:         d0=expr(node), d1=0, d2=0
 // NodeKind.NK_COMPTIME:      d0=expr(node), d1=0, d2=0
+// NodeKind.NK_NO_SUSPEND:    d0=body(node), d1=0, d2=0
 // NodeKind.NK_ASYNC_SCOPE:   d0=name(sym), d1=body(node), d2=0
 // NodeKind.NK_SELECT_AWAIT:  d0=extra_start, d1=arm_count, d2=biased(0/1)
 //
