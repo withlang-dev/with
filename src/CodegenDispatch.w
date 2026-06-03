@@ -1457,7 +1457,7 @@ fn Codegen.mir_str_concat(self: Codegen, lhs: i64, rhs: i64) -> i64:
     args.push(rhs_v)
     wl_build_call(self.builder, fn_type, func, vec_data_i64(&args), 2)
 
-fn Codegen.mir_str_concat_n(self: Codegen, body: MirBody, args_id: i32) -> i64:
+fn Codegen.mir_str_concat_n(self: Codegen, body: MirBody, args_id: i32, move_first: i32) -> i64:
     let str_ty = self.resolve_named_type(self.intern.intern("str"))
     if args_id < 0 or args_id >= body.call_arg_starts.len() as i32:
         with_eprint("error: invalid MIR str_concat_n argument table")
@@ -1486,7 +1486,8 @@ fn Codegen.mir_str_concat_n(self: Codegen, body: MirBody, args_id: i32) -> i64:
     data_indices.push(wl_const_int(wl_i32_type(self.context), 0, 0))
     let parts_ptr = wl_build_gep(self.builder, arr_ty, arr_alloca, vec_data_i64(&data_indices), 2)
 
-    let concat_sym = self.intern.intern("with_str_concat_n")
+    let concat_name = if move_first != 0: "with_str_concat_n_move_first" else: "with_str_concat_n"
+    let concat_sym = self.intern.intern(concat_name)
     let fv = self.fn_values.get(concat_sym)
     let ft = self.fn_fn_types.get(concat_sym)
     if fv.is_some() and ft.is_some():
@@ -1499,7 +1500,7 @@ fn Codegen.mir_str_concat_n(self: Codegen, body: MirBody, args_id: i32) -> i64:
     param_types.push(wl_ptr_type(self.context))
     param_types.push(wl_i64_type(self.context))
     let fn_type = wl_function_type(str_ty, vec_data_i64(&param_types), 2, 0)
-    let func = wl_add_function(self.llmod, "with_str_concat_n", fn_type)
+    let func = wl_add_function(self.llmod, concat_name, fn_type)
     self.fn_values.insert(concat_sym, func)
     self.fn_fn_types.insert(concat_sym, fn_type)
     let args: Vec[i64] = Vec.new()
@@ -2251,7 +2252,7 @@ fn Codegen.mir_eval_rvalue(self: Codegen, body: MirBody, rval_id: i32, dest_ty: 
         return val
 
     if rk == RvalueKind.RK_STR_CONCAT_N:
-        return self.mir_str_concat_n(body, d0)
+        return self.mir_str_concat_n(body, d0, d2)
 
     if rk == RvalueKind.RK_BIN_OP:
         let lhs = self.mir_eval_operand(body, d1, 0)

@@ -274,6 +274,7 @@ let RT_PAGE_SIZE: i64 = 65536
 let RT_LARGE_THRESHOLD: i64 = 4096
 let RT_NUM_SIZE_CLASSES: i32 = 9
 let RT_ALLOC_HEADER_SIZE: i64 = 16
+let RT_ALLOC_RANGE_CAP: i32 = 8192
 
 enum Order: i32:
     Relaxed = 0
@@ -329,6 +330,40 @@ var freelists_8: i64 = 0
 // Current slab for carving small allocations
 var slab_ptr: i64 = 0
 var slab_remaining: i64 = 0
+
+var rt_slab_range_starts: [8192]i64 = [0 as i64; 8192]
+var rt_slab_range_ends: [8192]i64 = [0 as i64; 8192]
+var rt_slab_range_count: i32 = 0
+
+var rt_large_range_starts: [8192]i64 = [0 as i64; 8192]
+var rt_large_range_ends: [8192]i64 = [0 as i64; 8192]
+var rt_large_range_count: i32 = 0
+
+fn rt_record_slab_range(start: i64, size: i64):
+    if rt_slab_range_count >= RT_ALLOC_RANGE_CAP:
+        return
+    rt_slab_range_starts[rt_slab_range_count as i64] = start
+    rt_slab_range_ends[rt_slab_range_count as i64] = start + size
+    rt_slab_range_count = rt_slab_range_count + 1
+
+fn rt_record_large_range(start: i64, size: i64):
+    if rt_large_range_count >= RT_ALLOC_RANGE_CAP:
+        return
+    rt_large_range_starts[rt_large_range_count as i64] = start
+    rt_large_range_ends[rt_large_range_count as i64] = start + size
+    rt_large_range_count = rt_large_range_count + 1
+
+fn rt_forget_large_range(start: i64):
+    var i: i32 = 0
+    while i < rt_large_range_count:
+        if rt_large_range_starts[i as i64] == start:
+            rt_large_range_count = rt_large_range_count - 1
+            rt_large_range_starts[i as i64] = rt_large_range_starts[rt_large_range_count as i64]
+            rt_large_range_ends[i as i64] = rt_large_range_ends[rt_large_range_count as i64]
+            rt_large_range_starts[rt_large_range_count as i64] = 0
+            rt_large_range_ends[rt_large_range_count as i64] = 0
+            return
+        i = i + 1
 
 fn get_freelist(idx: i32) -> i64:
     if idx == 0: return freelists_0
@@ -395,6 +430,35 @@ fn alloc_store_small_header(block: i64, size: i64):
 fn small_block_ptr(block: i64) -> *mut u8:
     (block + RT_ALLOC_HEADER_SIZE) as *mut u8
 
+fn rt_payload_start_is_owned(ptr: *const u8) -> i32:
+    if ptr as i64 == 0:
+        return 0
+    let payload = ptr as i64
+    let header = payload - RT_ALLOC_HEADER_SIZE
+    for i in 0..rt_slab_range_count:
+        let start = rt_slab_range_starts[i as i64]
+        let end = rt_slab_range_ends[i as i64]
+        if header >= start and header + RT_ALLOC_HEADER_SIZE <= end:
+            let size = unsafe *(header as *const i64)
+            if size <= 0 or size > RT_LARGE_THRESHOLD:
+                return 0
+            let idx = size_class_index(size)
+            let cls_size = size_class_size(idx)
+            if size != cls_size:
+                return 0
+            let block_size = size_class_block_size(idx)
+            if ((header - start) % block_size) != 0:
+                return 0
+            if header + block_size > end:
+                return 0
+            return 1
+    for i in 0..rt_large_range_count:
+        let start = rt_large_range_starts[i as i64]
+        let end = rt_large_range_ends[i as i64]
+        if header == start and payload < end:
+            return 1
+    0
+
 fn free_small_block(block: i64, idx: i32):
     let old_head = get_freelist(idx)
     unsafe *(block as *mut i64) = old_head
@@ -411,6 +475,7 @@ fn rt_alloc_unlocked(size_arg: i64) -> *mut u8:
             rt_exit(99)
         // Store allocation size in header
         unsafe *(p as *mut i64) = size
+        rt_record_large_range(p as i64, total)
         return (p as i64 + RT_ALLOC_HEADER_SIZE) as *mut u8
 
     // Small allocation: check freelist keyed by payload size class.
@@ -435,6 +500,7 @@ fn rt_alloc_unlocked(size_arg: i64) -> *mut u8:
             rt_exit(99)
         slab_ptr = new_slab as i64
         slab_remaining = RT_PAGE_SIZE
+        rt_record_slab_range(slab_ptr, RT_PAGE_SIZE)
 
     let block = slab_ptr
     slab_ptr = slab_ptr + block_size
@@ -454,6 +520,7 @@ fn rt_free_unlocked(ptr: *mut u8):
     let block = alloc_header_ptr(ptr as *const u8) as i64
     let size = unsafe *(block as *const i64)
     if size > RT_LARGE_THRESHOLD:
+        rt_forget_large_range(block)
         rt_munmap(block as *mut u8, (size + RT_ALLOC_HEADER_SIZE) as u64)
         return
     let idx = size_class_index(size)
@@ -1144,15 +1211,17 @@ pub fn str_concat(a: str, b: str) -> str:
     unsafe *((out as i64 + total) as *mut u8) = 0
     make_str(out as *const u8, total)
 
-@[c_export("with_str_concat_n")]
-pub fn str_concat_n(parts: *const str, count: i64) -> str:
-    var total: i64 = 0
-    for i in 0..count:
-        let part = unsafe parts[i]
-        total = total + str_length(part)
-    if total == 0:
-        return make_str("" as *const u8, 0)
+fn str_owned_capacity_from_ptr(ptr: *const u8) -> i64:
+    if ptr as i64 == 0:
+        return 0
+    if rt_payload_start_is_owned(ptr) == 0:
+        return 0
+    let payload_size = alloc_payload_size(ptr)
+    if payload_size <= 0:
+        return 0
+    payload_size - 1
 
+fn str_concat_n_copy(parts: *const str, count: i64, total: i64) -> str:
     let out = rt_alloc(total + 1)
     var offset: i64 = 0
     for i in 0..count:
@@ -1164,6 +1233,49 @@ pub fn str_concat_n(parts: *const str, count: i64) -> str:
         offset = offset + part_len
     unsafe *((out as i64 + total) as *mut u8) = 0
     make_str(out as *const u8, total)
+
+@[c_export("with_str_concat_n")]
+pub fn str_concat_n(parts: *const str, count: i64) -> str:
+    var total: i64 = 0
+    for i in 0..count:
+        let part = unsafe parts[i]
+        total = total + str_length(part)
+    if total == 0:
+        return make_str("" as *const u8, 0)
+    str_concat_n_copy(parts, count, total)
+
+@[c_export("with_str_concat_n_move_first")]
+pub fn str_concat_n_move_first(parts: *const str, count: i64) -> str:
+    var total: i64 = 0
+    for i in 0..count:
+        let part = unsafe parts[i]
+        total = total + str_length(part)
+    if total == 0:
+        return make_str("" as *const u8, 0)
+    if count <= 0:
+        return make_str("" as *const u8, 0)
+
+    let first = unsafe parts[0]
+    let first_len = str_length(first)
+    let first_ptr = str_data(first)
+    let first_owned = rt_payload_start_is_owned(first_ptr)
+    let first_cap = str_owned_capacity_from_ptr(first_ptr)
+    if first_owned != 0 and first_ptr as i64 != 0 and first_cap >= total:
+        var offset = first_len
+        for i in 1..count:
+            let part = unsafe parts[i]
+            let part_len = str_length(part)
+            let part_data = str_data(part)
+            if part_data as i64 != 0 and part_len > 0:
+                rt_memcpy((first_ptr as i64 + offset) as *mut u8, part_data, part_len)
+            offset = offset + part_len
+        unsafe *((first_ptr as i64 + total) as *mut u8) = 0
+        return make_str(first_ptr, total)
+
+    let result = str_concat_n_copy(parts, count, total)
+    if first_owned != 0 and first_ptr as i64 != 0:
+        rt_free(first_ptr as *mut u8)
+    result
 
 @[c_export("with_str_eq")]
 pub fn str_eq(a: str, b: str) -> i32:

@@ -2245,7 +2245,7 @@ fn CCodegen.rvalue_text(self: CCodegen, body: MirBody, rval_id: i32) -> str:
         self.fail("array fill rvalue requires an array assignment destination")
         return "0"
     if rk == RvalueKind.RK_STR_CONCAT_N:
-        return self.str_concat_n_text(body, d0)
+        return self.str_concat_n_text(body, d0, d2)
     if rk == RvalueKind.RK_BIN_OP:
         let lhs = self.operand_text(body, d1)
         let rhs = self.operand_text(body, d2)
@@ -2507,7 +2507,7 @@ fn CCodegen.call_arg_operand(self: CCodegen, body: MirBody, args_id: i32, idx: i
         return 0
     body.call_arg_operands.get(at as i64)
 
-fn CCodegen.str_concat_n_text(self: CCodegen, body: MirBody, args_id: i32) -> str:
+fn CCodegen.str_concat_n_text(self: CCodegen, body: MirBody, args_id: i32, move_first: i32) -> str:
     if args_id < 0 or args_id >= body.call_arg_starts.len() as i32:
         self.fail(f"invalid str_concat_n args id {args_id}")
         return "WITH_STR_LIT(\"\")"
@@ -2517,7 +2517,8 @@ fn CCodegen.str_concat_n_text(self: CCodegen, body: MirBody, args_id: i32) -> st
         return "WITH_STR_LIT(\"\")"
     if count == 1:
         return self.operand_text(body, body.call_arg_operands.get(start as i64))
-    var out = "with_str_concat_n((const with_str[]){"
+    let concat_name = if move_first != 0: "with_str_concat_n_move_first" else: "with_str_concat_n"
+    var out = concat_name ++ "((const with_str[]){"
     for i in 0..count:
         if i > 0:
             out = out ++ ", "
@@ -7605,6 +7606,7 @@ fn CCodegen.emit_module(self: CCodegen) -> str:
     out.write("#ifdef WITH_BOOTSTRAP_TYPES_H\n")
     out.write("extern with_str with_str_concat(with_str, with_str);\n")
     out.write("extern with_str with_str_concat_n(const with_str*, int64_t);\n")
+    out.write("extern with_str with_str_concat_n_move_first(const with_str*, int64_t);\n")
     out.write("extern int64_t with_str_len(with_str);\n")
     out.write("extern int32_t with_str_byte_at(with_str, int64_t);\n")
     out.write("extern int32_t with_str_contains_char(with_str, int32_t);\n")

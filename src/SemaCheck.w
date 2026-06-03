@@ -4440,6 +4440,18 @@ fn Sema.concat_expr_includes_symbol_value(self: Sema, node: i32, sym: i32) -> i3
         return self.concat_expr_includes_symbol_value(self.ast.get_data2(node), sym)
     0
 
+fn Sema.concat_expr_starts_with_symbol_value(self: Sema, node: i32, sym: i32) -> i32:
+    if self.expr_is_symbol_value(node, sym) != 0:
+        return 1
+    if node == 0 or sym == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG:
+        return self.concat_expr_starts_with_symbol_value(self.ast.get_data0(node), sym)
+    if kind == NodeKind.NK_BINARY and self.ast.get_data0(node) == BinaryOp.OP_CONCAT:
+        return self.concat_expr_starts_with_symbol_value(self.ast.get_data1(node), sym)
+    0
+
 fn Sema.warn_loop_string_concat_accumulation(self: Sema, node: i32, target: i32, value: i32, target_type: TypeId):
     if self.loop_depth <= 0 or target == 0 or value == 0 or target_type == 0:
         return
@@ -4456,6 +4468,8 @@ fn Sema.warn_loop_string_concat_accumulation(self: Sema, node: i32, target: i32,
         return
     let target_sym = self.ast.get_data0(target)
     if self.concat_expr_includes_symbol_value(value, target_sym) == 0:
+        return
+    if self.concat_expr_starts_with_symbol_value(value, target_sym) != 0:
         return
     self.emit_warning("string concatenation with ++ inside a loop repeatedly copies the accumulator; use StringBuilder or collect pieces and concatenate once", node)
 
