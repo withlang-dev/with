@@ -1,27 +1,48 @@
-//! skip: non-executable spec sketch for Section 9.7 — Reference Pattern Ergonomics (formerly 25.60); contains pseudo-code for unimplemented feature work
-// Spec test: Section 9.7 — Reference Pattern Ergonomics (formerly 25.60)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+//! expect-stdout: ok
+// Spec test: Section 9.7 - Reference Pattern Ergonomics.
 
-// PASS: for loop destructuring auto-borrows
-fn test:
-    let items = vec![("alice", 1), ("bob", 2)]
-    for (name, val) in items:        // yields &(str, i32)
-        assert(name.len() > 0)       // name: &str
-        assert(*val > 0)              // val: &i32
+type Point { x: i32, y: i32 }
 
-// PASS: match on borrowed Option
-fn describe(opt: &Option[String]) -> &str:
+fn describe(opt: &Option[str]) -> str:
     match opt:
-        Some(s) => s.as_str()         // s: &String
-        None    => "none"
+        Some(s) => *s
+        None => "none"
 
-fn test:
-    let x = Some("hello".to_string())
+fn test_match_on_borrowed_option:
+    let x: Option[str] = Some("hello")
+    let y: Option[str] = None
     assert(describe(&x) == "hello")
+    assert(describe(&y) == "none")
 
-// PASS: nested tuple destructuring through reference
-fn test:
-    let pairs: Vec[(i32, i32)] = vec![(1, 2), (3, 4)]
-    for (a, b) in pairs:
-        assert(*a + *b > 0)           // a: &i32, b: &i32
+fn test_borrowed_tuple_let:
+    let pair = (1, 2)
+    let (a, b) = &pair
+    assert(*a + *b == 3)
+
+fn test_for_loop_destructuring_auto_borrows:
+    let items: Vec[(i32, i32)] = Vec.new()
+    items.push((1, 2))
+    items.push((3, 4))
+
+    var total = 0
+    for (a, b) in items.iter_ref():
+        total = total + *a + *b
+    assert(total == 10)
+
+fn test_nested_tuple_destructuring_through_reference:
+    let nested = ((1, 2), 3)
+    let ((a, b), c) = &nested
+    assert(*a + *b + *c == 6)
+
+fn test_borrowed_struct_pattern:
+    let point = Point { x: 4, y: 5 }
+    let { x, y } = &point
+    assert(*x + *y == 9)
+
+fn main:
+    test_match_on_borrowed_option()
+    test_borrowed_tuple_let()
+    test_for_loop_destructuring_auto_borrows()
+    test_nested_tuple_destructuring_through_reference()
+    test_borrowed_struct_pattern()
+    print("ok")
