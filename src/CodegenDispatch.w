@@ -4071,8 +4071,9 @@ fn Codegen.classify_generic_call_intrinsic(self: Codegen, recv_type: i32, method
         if method_name == "contains": return MirIntrinsic.VEC_CONTAINS
         if method_name == "join": return MirIntrinsic.VEC_JOIN
         return MirIntrinsic.NONE
-    if type_name == "VecIter":
+    if type_name == "VecIter" or type_name == "VecIterRef":
         if method_name == "next":
+            if type_name == "VecIterRef": return MirIntrinsic.VECITERREF_NEXT
             return MirIntrinsic.VECITER_NEXT
         if method_name == "map": return MirIntrinsic.ITER_MAP
         if method_name == "filter": return MirIntrinsic.ITER_FILTER
@@ -4104,10 +4105,6 @@ fn Codegen.classify_generic_call_intrinsic(self: Codegen, recv_type: i32, method
         if method_name == "count": return MirIntrinsic.ITER_COUNT
         if method_name == "collect": return MirIntrinsic.ITER_COLLECT_VEC
         if method_name == "partition": return MirIntrinsic.ITER_PARTITION
-        return MirIntrinsic.NONE
-    if type_name == "VecIterRef":
-        if method_name == "next":
-            return MirIntrinsic.VECITERREF_NEXT
         return MirIntrinsic.NONE
     if type_name == "VecSlot":
         if method_name == "get": return MirIntrinsic.VECSLOT_GET
@@ -7039,6 +7036,9 @@ fn Codegen.mir_iter_elem_tid(self: Codegen, iter_sema: i32) -> i32:
     let name = self.mir_generic_base_name(iter_sema)
     if name == "VecIter":
         return self.mir_generic_arg_tid(iter_sema, 0)
+    if name == "VecIterRef":
+        let elem_tid = self.mir_generic_arg_tid(iter_sema, 0)
+        return self.sema.ensure_exact_type(TypeKind.TY_REF, elem_tid, 0, 0) as i32
     if name == "MapIter":
         return self.mir_generic_arg_tid(iter_sema, 2)
     if name == "FilterIter" or name == "TakeIter":
@@ -7143,6 +7143,48 @@ fn Codegen.mir_emit_veciter_next_from_ptr(self: Codegen, iter_ptr: i64, elem_ty:
     wl_add_incoming(phi, vec_data_i64(&vals), vec_data_i64(&bbs), 2)
     phi
 
+fn Codegen.mir_emit_veciterref_next_from_ptr(self: Codegen, iter_ptr: i64, elem_ty: i64) -> i64:
+    let i64_ty = wl_i64_type(self.context)
+    let ptr_ty = wl_ptr_type(self.context)
+    let iter_fields: Vec[i64] = Vec.new()
+    iter_fields.push(i64_ty)
+    iter_fields.push(i64_ty)
+    iter_fields.push(i64_ty)
+    let iter_struct_ty = wl_struct_type(self.context, vec_data_i64(&iter_fields), 3, 0)
+    let data_ptr_ptr = wl_build_struct_gep(self.builder, iter_struct_ty, iter_ptr, 0)
+    let data_ptr = wl_build_load(self.builder, i64_ty, data_ptr_ptr)
+    let len_ptr = wl_build_struct_gep(self.builder, iter_struct_ty, iter_ptr, 1)
+    let len = wl_build_load(self.builder, i64_ty, len_ptr)
+    let idx_ptr = wl_build_struct_gep(self.builder, iter_struct_ty, iter_ptr, 2)
+    let idx = wl_build_load(self.builder, i64_ty, idx_ptr)
+    let cond = wl_build_icmp(self.builder, wl_int_slt(), idx, len)
+    let some_bb = wl_append_bb(self.context, self.current_function, "iterref.some")
+    let none_bb = wl_append_bb(self.context, self.current_function, "iterref.none")
+    let merge_bb = wl_append_bb(self.context, self.current_function, "iterref.merge")
+    wl_build_cond_br(self.builder, cond, some_bb, none_bb)
+    wl_position_at_end(self.builder, some_bb)
+    let typed_ptr = wl_build_int_to_ptr(self.builder, data_ptr, ptr_ty)
+    let gep_indices: Vec[i64] = Vec.new()
+    gep_indices.push(idx)
+    let elem_ptr = wl_build_gep(self.builder, elem_ty, typed_ptr, vec_data_i64(&gep_indices), 1)
+    wl_build_store(self.builder, wl_build_add(self.builder, idx, wl_const_int(i64_ty, 1, 0)), idx_ptr)
+    wl_build_br(self.builder, merge_bb)
+    let some_end = wl_get_insert_block(self.builder)
+    wl_position_at_end(self.builder, none_bb)
+    let null_ptr = wl_const_null(ptr_ty)
+    wl_build_br(self.builder, merge_bb)
+    let none_end = wl_get_insert_block(self.builder)
+    wl_position_at_end(self.builder, merge_bb)
+    let phi = wl_build_phi(self.builder, ptr_ty)
+    let vals: Vec[i64] = Vec.new()
+    let bbs: Vec[i64] = Vec.new()
+    vals.push(elem_ptr)
+    vals.push(null_ptr)
+    bbs.push(some_end)
+    bbs.push(none_end)
+    wl_add_incoming(phi, vec_data_i64(&vals), vec_data_i64(&bbs), 2)
+    phi
+
 fn Codegen.mir_emit_iter_next_from_ptr(self: Codegen, iter_ptr: i64, iter_sema: i32, elem_tid: i32) -> i64:
     let name = self.mir_generic_base_name(iter_sema)
     let elem_ty0 = self.mir_sema_type_to_llvm(elem_tid)
@@ -7150,6 +7192,11 @@ fn Codegen.mir_emit_iter_next_from_ptr(self: Codegen, iter_ptr: i64, iter_sema: 
     let opt_type = self.get_or_create_option_type(0, elem_ty)
     if name == "VecIter":
         return self.mir_emit_veciter_next_from_ptr(iter_ptr, elem_ty)
+    if name == "VecIterRef":
+        let raw_elem_tid = self.mir_generic_arg_tid(iter_sema, 0)
+        let raw_elem_ty0 = self.mir_sema_type_to_llvm(raw_elem_tid)
+        let raw_elem_ty = if raw_elem_ty0 != 0: raw_elem_ty0 else: self.type_fallback()
+        return self.mir_emit_veciterref_next_from_ptr(iter_ptr, raw_elem_ty)
     let iter_ty = self.mir_sema_type_to_llvm(iter_sema)
     if iter_ty == 0:
         with_eprint("error: iterator codegen missing LLVM type for iterator '" ++ name ++ "'")
@@ -10658,17 +10705,29 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
     if capture_count > 0:
         cap_struct_type = wl_struct_type(self.context, vec_data_i64(&cap_types), capture_count, 0)
 
-    // Build parameter types: context ptr first, then user params
+    // Build parameter types: context ptr first, then user params. Keep the
+    // semantic types in lockstep with the LLVM signature so closure-local MIR
+    // can recover pointee types for reference parameters.
+    let closure_param_sema_types: Vec[i32] = Vec.new()
     let param_types: Vec[i64] = Vec.new()
     param_types.push(ptr_ty)
     for i in 0..param_count:
         let p_type = self.pool.get_extra(extra_start + i * 2 + 1)
+        var p_sema_ty = self.sema.ty_i32 as i32
         if p_type != 0:
-            param_types.push(self.resolve_type(p_type))
+            let resolved_p = self.sema.resolve_type_expr(p_type)
+            if resolved_p != 0:
+                p_sema_ty = resolved_p as i32
         else if closure_fn_tid != 0 and i < closure_fn_param_count:
-            let p_sema_ty = self.sema.type_extra.get((closure_fn_param_start + i) as i64)
-            let p_llvm_ty = self.sema_type_to_llvm(p_sema_ty)
-            param_types.push(if p_llvm_ty != 0: p_llvm_ty else: i32_ty)
+            let expected_p_sema_ty = self.sema.type_extra.get((closure_fn_param_start + i) as i64)
+            if expected_p_sema_ty != 0:
+                p_sema_ty = expected_p_sema_ty
+        closure_param_sema_types.push(p_sema_ty)
+        let p_llvm_ty = self.sema_type_to_llvm(p_sema_ty)
+        if p_llvm_ty != 0:
+            param_types.push(p_llvm_ty)
+        else if p_type != 0:
+            param_types.push(self.resolve_type(p_type))
         else:
             param_types.push(i32_ty)
     // Determine return type (infer from context or use i32)
@@ -10737,6 +10796,8 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
         let alloca = self.create_entry_alloca(param_ty)
         wl_build_store(self.builder, param_val, alloca)
         self.record_local(p_name, alloca, param_ty, 1)
+        if i < closure_param_sema_types.len() as i32:
+            self.record_local_sema_type(p_name, closure_param_sema_types.get(i as i64))
     // ── MIR-based closure body compilation ──────────────────────
     // Save outer MIR state (gen_closure is called from within MIR codegen)
     let saved_mir_locals = self.mir_local_ptrs
@@ -10786,7 +10847,11 @@ fn Codegen.gen_closure(self: Codegen, node: i32) -> i64:
         let cl_p_name = self.pool.get_extra(extra_start + cl_pi * 2)
         let cl_p_type_node = self.pool.get_extra(extra_start + cl_pi * 2 + 1)
         var cl_p_sema_ty = self.sema.ty_i32 as i32
-        if cl_p_type_node > 0:
+        if cl_pi < closure_param_sema_types.len() as i32:
+            let cached_cl_p_ty = closure_param_sema_types.get(cl_pi as i64)
+            if cached_cl_p_ty != 0:
+                cl_p_sema_ty = cached_cl_p_ty
+        else if cl_p_type_node > 0:
             if self.sema.typed_expr_types.contains(cl_p_type_node):
                 let cl_tt = self.sema.typed_expr_types.get(cl_p_type_node).unwrap()
                 if cl_tt > 0:

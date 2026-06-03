@@ -112,6 +112,19 @@ fn test_complex_pipeline:
 
     assert(result == 56)
 
+fn test_membership_filter_pipeline:
+    let nums = vec_1_to_10()
+    let values = nums.iter()
+        |> filter(x => x in [2, 4, 6])
+        |> collect[Vec]()
+    assert_vec_i32(values, 2, 4, 6)
+
+    let refs = nums.iter_ref()
+        |> filter(x => *x in [2, 4, 6])
+        |> map(x => *x)
+        |> collect[Vec]()
+    assert_vec_i32(refs, 2, 4, 6)
+
 fn test_adapter_next:
     let nums = vec_123()
     let mapped = nums.iter()
@@ -138,5 +151,6 @@ fn main:
     test_zip()
     test_partition()
     test_complex_pipeline()
+    test_membership_filter_pipeline()
     test_adapter_next()
     print("ok")

@@ -9,11 +9,11 @@
 // membership, `not in`, integer and char ranges, substring-in-string,
 // char-in-string, Vec / HashMap / HashSet membership, user-defined Contains
 // dispatch, enum-variant-in-array, compound conditions, `in` match patterns,
-// the literal-array optimization's semantic equivalence, and the distinction
-// between a `for ... in` loop and a membership `in` test.
+// membership filters inside comprehensions / pipeline `filter`, the literal-array
+// optimization's semantic equivalence, and the distinction between a
+// `for ... in` loop and a membership `in` test.
 //
 // Deferred to follow-up issues (not yet implemented):
-//   - membership filters inside comprehensions / pipeline `filter`
 //   - negative case: `in` is non-associative
 
 enum Color { Red | Green | Blue | Yellow }
@@ -109,6 +109,27 @@ fn test_compound_conditions:
     let role = "admin"
     let action = "delete"
     assert(role in ["admin", "moderator"] and action in ["read", "write", "delete"])
+
+fn test_comprehension_membership_filter:
+    let primes = [2, 3, 5, 7, 11, 13]
+    let prime_squares = [x * x for x in 1..=15 if x in primes]
+    assert(prime_squares.len() == 6)
+    assert(prime_squares.get(0) == 4)
+    assert(prime_squares.get(5) == 169)
+
+fn test_pipeline_membership_filter:
+    let nums: Vec[i32] = Vec.new()
+    nums.push(1)
+    nums.push(2)
+    nums.push(4)
+    nums.push(8)
+    let evens = nums.iter_ref()
+        |> filter(x => *x in [2, 4, 6])
+        |> map(x => *x)
+        |> collect[Vec]()
+    assert(evens.len() == 2)
+    assert(evens.get(0) == 2)
+    assert(evens.get(1) == 4)
 
 fn test_match_in_pattern_array:
     let method = "filter"
