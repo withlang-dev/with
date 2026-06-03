@@ -5165,7 +5165,10 @@ fn Parser.parse_for_comprehension(self: Parser, start: i32, first_binding: i32, 
         if self.peek() == TokenKind.TK_KW_IF:
             self.advance()
             self.skip_newlines()
+            let saved_guard_sb = self.suppress_brace
+            self.suppress_brace = 1
             let guard_expr = self.parse_expr()
+            self.suppress_brace = saved_guard_sb
             bind_syms.push(0)
             bind_exprs.push(guard_expr as i32)
             bind_kinds.push(1)
@@ -5175,7 +5178,10 @@ fn Parser.parse_for_comprehension(self: Parser, start: i32, first_binding: i32, 
         if self.expect(TokenKind.TK_KW_IN) == 0:
             return self.poisoned_expr()
         self.skip_newlines()
+        let saved_sb = self.suppress_brace
+        self.suppress_brace = 1
         let bexpr = self.parse_expr()
+        self.suppress_brace = saved_sb
         bind_syms.push(bsym)
         bind_exprs.push(bexpr as i32)
         bind_kinds.push(0)
