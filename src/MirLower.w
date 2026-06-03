@@ -84,6 +84,9 @@ type MirBuilder {
     regex_capture_pat_nodes: Vec[i32],
     regex_capture_opt_places: Vec[i32],
 
+    string_alias_local_ids: Vec[i32],
+    string_alias_flags: Vec[i32],
+
     sema: Sema,
     ast: AstPool,
     pool: InternPool,
@@ -127,6 +130,8 @@ fn MirBuilder.init(sema: Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> M
         expected_type: 0,
         regex_capture_pat_nodes: Vec.new(),
         regex_capture_opt_places: Vec.new(),
+        string_alias_local_ids: Vec.new(),
+        string_alias_flags: Vec.new(),
         sema,
         ast,
         pool,
@@ -2189,6 +2194,8 @@ fn MirBuilder.lower_var(self: MirBuilder, sym: i32, type_id: i32, node_id: i32) 
     if local >= 0:
         let place = self.body.new_place(local)
         if self.sema.is_copy(type_id) != 0:
+            if self.local_type_is_str(local) != 0:
+                self.mark_string_local_copied(local)
             return self.body.new_operand(OperandKind.OK_COPY, place)
         return self.body.new_operand(OperandKind.OK_MOVE, place)
     let alias_place = self.lookup_alias_place(sym)
@@ -2282,8 +2289,93 @@ fn MirBuilder.lower_var(self: MirBuilder, sym: i32, type_id: i32, node_id: i32) 
     self.unit_operand()
 
 fn MirBuilder.assign_operand_to_place(self: MirBuilder, place: i32, operand_id: i32, span: i32):
+    self.update_string_local_alias_after_assignment(place, operand_id)
     let rval = self.body.new_rvalue(RvalueKind.RK_USE, operand_id, 0, 0)
     self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rval, span)
+
+fn MirBuilder.direct_place_local(self: MirBuilder, place: i32) -> i32:
+    if place < 0 or place >= self.body.place_locals.len() as i32:
+        return -1
+    if self.body.place_proj_counts.get(place as i64) != 0:
+        return -1
+    self.body.place_locals.get(place as i64)
+
+fn MirBuilder.local_type_is_str(self: MirBuilder, local_id: i32) -> i32:
+    if local_id < 0 or local_id >= self.body.local_type_ids.len() as i32:
+        return 0
+    let tid = self.body.local_type_ids.get(local_id as i64)
+    self.type_id_is_str(tid)
+
+fn MirBuilder.type_id_is_str(self: MirBuilder, tid: i32) -> i32:
+    if tid == 0:
+        return 0
+    let resolved = self.sema.resolve_alias(tid as TypeId)
+    if self.sema.get_type_kind(resolved) == TypeKind.TY_STR: 1 else: 0
+
+fn MirBuilder.string_alias_index(self: MirBuilder, local_id: i32) -> i32:
+    for i in 0..self.string_alias_local_ids.len() as i32:
+        if self.string_alias_local_ids.get(i as i64) == local_id:
+            return i
+    -1
+
+fn MirBuilder.set_string_local_flags(self: MirBuilder, local_id: i32, flags: i32):
+    if self.local_type_is_str(local_id) == 0:
+        return
+    let idx = self.string_alias_index(local_id)
+    if idx >= 0:
+        self.string_alias_flags.set_i32(idx as i64, flags)
+        return
+    self.string_alias_local_ids.push(local_id)
+    self.string_alias_flags.push(flags)
+
+fn MirBuilder.string_local_flags(self: MirBuilder, local_id: i32) -> i32:
+    if self.local_type_is_str(local_id) == 0:
+        return 1
+    let idx = self.string_alias_index(local_id)
+    if idx < 0:
+        return 0
+    self.string_alias_flags.get(idx as i64)
+
+fn MirBuilder.set_string_local_may_alias(self: MirBuilder, local_id: i32, flag: i32):
+    let old = self.string_local_flags(local_id)
+    let owned = old & 2
+    self.set_string_local_flags(local_id, owned | (if flag != 0: 1 else: 0))
+
+fn MirBuilder.string_local_may_alias(self: MirBuilder, local_id: i32) -> i32:
+    self.string_local_flags(local_id) & 1
+
+fn MirBuilder.string_local_owned(self: MirBuilder, local_id: i32) -> i32:
+    if (self.string_local_flags(local_id) & 2) != 0: 1 else: 0
+
+fn MirBuilder.mark_string_local_copied(self: MirBuilder, local_id: i32):
+    self.set_string_local_may_alias(local_id, 1)
+
+fn MirBuilder.forget_string_flow_facts(self: MirBuilder):
+    for i in 0..self.string_alias_flags.len() as i32:
+        self.string_alias_flags.set_i32(i as i64, 1)
+
+fn MirBuilder.operand_string_source_local(self: MirBuilder, operand_id: i32) -> i32:
+    if operand_id < 0 or operand_id >= self.body.operand_kinds.len() as i32:
+        return -1
+    if self.body.operand_kinds.get(operand_id as i64) != OperandKind.OK_COPY:
+        return -1
+    let place = self.body.operand_d0.get(operand_id as i64)
+    let local = self.direct_place_local(place)
+    if local < 0 or self.local_type_is_str(local) == 0:
+        return -1
+    local
+
+fn MirBuilder.update_string_local_alias_after_assignment(self: MirBuilder, dest_place: i32, operand_id: i32):
+    let dest_local = self.direct_place_local(dest_place)
+    if dest_local < 0 or self.local_type_is_str(dest_local) == 0:
+        return
+    let source_local = self.operand_string_source_local(operand_id)
+    if source_local >= 0:
+        let source_is_named = if source_local < self.body.local_names.len() as i32 and self.body.local_names.get(source_local as i64) != 0: 1 else: 0
+        let source_may_alias = if source_is_named != 0: 1 else: self.string_local_may_alias(source_local)
+        self.set_string_local_flags(dest_local, source_may_alias | (if self.string_local_owned(source_local) != 0: 2 else: 0))
+        return
+    self.set_string_local_flags(dest_local, 0)
 
 fn MirBuilder.is_string_concat_node(self: MirBuilder, node: i32) -> bool:
     if node == 0:
@@ -2328,9 +2420,50 @@ fn MirBuilder.lower_str_concat_chain(self: MirBuilder, node: i32, parts: Vec[i32
     let temp = self.new_temp(ty)
     let place = self.place_for_local(temp)
     self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, self.ast.get_start(node))
+    self.set_string_local_flags(temp, 2)
     if self.sema.is_copy(ty) != 0:
         return self.body.new_operand(OperandKind.OK_COPY, place)
     self.body.new_operand(OperandKind.OK_MOVE, place)
+
+fn MirBuilder.same_ident_symbol(self: MirBuilder, lhs: i32, rhs: i32) -> i32:
+    if lhs == 0 or rhs == 0:
+        return 0
+    if self.ast.kind(lhs) != NodeKind.NK_IDENT or self.ast.kind(rhs) != NodeKind.NK_IDENT:
+        return 0
+    if self.ast.get_data0(lhs) == self.ast.get_data0(rhs): 1 else: 0
+
+fn MirBuilder.try_lower_string_self_concat_assign(self: MirBuilder, place_expr: i32, rhs_expr: i32) -> i32:
+    if place_expr == 0 or rhs_expr == 0:
+        return -1
+    let dest_ty = self.expr_type(place_expr)
+    if dest_ty == 0 or self.sema.resolve_alias(dest_ty as TypeId) != self.sema.ty_str:
+        return -1
+    if not self.is_string_concat_node(rhs_expr):
+        return -1
+    let parts = self.collect_left_string_concat_parts(rhs_expr)
+    if parts.len() as i32 < 2:
+        return -1
+    if self.same_ident_symbol(place_expr, parts.get(0)) == 0:
+        return -1
+
+    let dest_place = self.lower_expr_place(place_expr)
+    let dest_local = self.direct_place_local(dest_place)
+    if dest_local < 0 or self.string_local_may_alias(dest_local) != 0:
+        return -1
+
+    let saved_expected = self.expected_type
+    self.expected_type = self.sema.ty_str as i32
+    let operands: Vec[i32] = Vec.new()
+    operands.push(self.body.new_operand(OperandKind.OK_MOVE, dest_place))
+    for i in 1..parts.len() as i32:
+        operands.push(self.lower_expr(parts.get(i as i64)))
+    self.expected_type = saved_expected
+
+    let args_id = self.body.new_call_args(operands)
+    let rv = self.body.new_rvalue(RvalueKind.RK_STR_CONCAT_N, args_id, operands.len() as i32, 1)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, dest_place, rv, self.ast.get_start(place_expr))
+    self.set_string_local_flags(dest_local, 2)
+    dest_place
 
 fn MirBuilder.lower_bin_op(self: MirBuilder, op: i32, lhs_expr: i32, rhs_expr: i32, node: i32) -> i32:
     // Short-circuit evaluation for logical and/or
@@ -2393,6 +2526,8 @@ fn MirBuilder.lower_bin_op(self: MirBuilder, op: i32, lhs_expr: i32, rhs_expr: i
     let temp = self.new_temp(ty)
     let place = self.place_for_local(temp)
     self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, self.ast.get_start(node))
+    if op == BinaryOp.OP_CONCAT and self.type_id_is_str(ty) != 0:
+        self.set_string_local_flags(temp, 2)
     if self.sema.is_copy(ty) != 0:
         return self.body.new_operand(OperandKind.OK_COPY, place)
     self.body.new_operand(OperandKind.OK_MOVE, place)
@@ -2405,7 +2540,12 @@ fn MirBuilder.lower_rvalue_to_temp(self: MirBuilder, rv: i32, type_id: i32, span
 
 fn MirBuilder.lower_bin_op_operand(self: MirBuilder, op: i32, lhs: i32, rhs: i32, type_id: i32, span: i32) -> i32:
     let rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, op, lhs, rhs)
-    self.lower_rvalue_to_temp(rv, type_id, span)
+    let temp = self.new_temp(type_id)
+    let place = self.place_for_local(temp)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, place, rv, span)
+    if op == BinaryOp.OP_CONCAT and self.type_id_is_str(type_id) != 0:
+        self.set_string_local_flags(temp, 2)
+    self.body.new_operand(OperandKind.OK_COPY, place)
 
 fn MirBuilder.lower_not_operand(self: MirBuilder, operand: i32, span: i32) -> i32:
     let rv = self.body.new_rvalue(RvalueKind.RK_UN_OP, UnaryOp.UOP_NOT, operand, 0)
@@ -2957,6 +3097,9 @@ fn MirBuilder.lower_assign(self: MirBuilder, place_expr: i32, rhs_expr: i32):
     // NK_ASSIGN(target, NK_BINARY(op, target, rhs)) sharing the same AST
     // node for both occurrences of target.  Detect this and lower as a
     // single read-modify-write through the place.
+    if self.try_lower_string_self_concat_assign(place_expr, rhs_expr) >= 0:
+        return
+
     if self.ast.kind(rhs_expr) == NodeKind.NK_BINARY and self.ast.get_data1(rhs_expr) == place_expr:
         let ca_op = self.ast.get_data0(rhs_expr)
         let ca_inc_expr = self.ast.get_data2(rhs_expr)
@@ -3323,6 +3466,7 @@ fn MirBuilder.lower_if(self: MirBuilder, cond_expr: i32, then_expr: i32, else_ex
     self.expected_type = saved_expected
 
     self.switch_to(join_bb)
+    self.forget_string_flow_facts()
     if want_result == 0:
         return self.unit_operand()
     if self.sema.is_copy(result_ty) != 0:
@@ -3362,6 +3506,7 @@ fn MirBuilder.lower_if_let(self: MirBuilder, pat: i32, scrutinee_expr: i32, then
     self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
     self.switch_to(join_bb)
+    self.forget_string_flow_facts()
     if self.sema.is_copy(result_ty) != 0:
         return self.body.new_operand(OperandKind.OK_COPY, result_place)
     self.body.new_operand(OperandKind.OK_MOVE, result_place)
@@ -3385,6 +3530,7 @@ fn MirBuilder.lower_loop(self: MirBuilder, body_expr: i32, node: i32) -> i32:
 
     self.pop_control_target()
     self.switch_to(break_bb)
+    self.forget_string_flow_facts()
     self.unit_operand()
 
 fn MirBuilder.lower_while(self: MirBuilder, cond_expr: i32, body_expr: i32, node: i32) -> i32:
@@ -3428,6 +3574,7 @@ fn MirBuilder.lower_while(self: MirBuilder, cond_expr: i32, body_expr: i32, node
 
     self.pop_control_target()
     self.switch_to(exit_bb)
+    self.forget_string_flow_facts()
     self.unit_operand()
 
 fn MirBuilder.lower_do_while(self: MirBuilder, body_expr: i32, cond_expr: i32, node: i32) -> i32:
@@ -3454,6 +3601,7 @@ fn MirBuilder.lower_do_while(self: MirBuilder, body_expr: i32, cond_expr: i32, n
 
     self.pop_control_target()
     self.switch_to(exit_bb)
+    self.forget_string_flow_facts()
     self.unit_operand()
 
 fn MirBuilder.lower_for(self: MirBuilder, for_node: i32) -> i32:
@@ -3592,6 +3740,7 @@ fn MirBuilder.lower_for(self: MirBuilder, for_node: i32) -> i32:
 
     self.pop_control_target()
     self.switch_to(exit_bb)
+    self.forget_string_flow_facts()
     self.unit_operand()
 
 fn MirBuilder.for_label(self: MirBuilder, for_node: i32) -> i32:
@@ -3724,6 +3873,7 @@ fn MirBuilder.lower_comprehension_range_var(self: MirBuilder, comp_node: i32, cl
     self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
 
     self.switch_to(exit_bb)
+    self.forget_string_flow_facts()
 
 fn MirBuilder.lower_comprehension_range(self: MirBuilder, comp_node: i32, clause_index: i32, out_place: i32, out_elem_ty: i32, pat_or_sym: i32, range_node: i32):
     let start_node = self.ast.get_data0(range_node)
@@ -3778,6 +3928,7 @@ fn MirBuilder.lower_comprehension_range(self: MirBuilder, comp_node: i32, clause
     self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
 
     self.switch_to(exit_bb)
+    self.forget_string_flow_facts()
 
 fn MirBuilder.lower_comprehension_slice(self: MirBuilder, comp_node: i32, clause_index: i32, out_place: i32, out_elem_ty: i32, pat_or_sym: i32, iter_expr: i32):
     let iter_op = self.lower_expr(iter_expr)
@@ -3834,6 +3985,7 @@ fn MirBuilder.lower_comprehension_slice(self: MirBuilder, comp_node: i32, clause
     self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
 
     self.switch_to(exit_bb)
+    self.forget_string_flow_facts()
 
 fn MirBuilder.lower_comprehension_vec(self: MirBuilder, comp_node: i32, clause_index: i32, out_place: i32, out_elem_ty: i32, pat_or_sym: i32, iter_expr: i32):
     let iter_op = self.lower_expr(iter_expr)
@@ -3887,6 +4039,7 @@ fn MirBuilder.lower_comprehension_vec(self: MirBuilder, comp_node: i32, clause_i
     self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
 
     self.switch_to(exit_bb)
+    self.forget_string_flow_facts()
 
 fn MirBuilder.lower_comprehension_generic_iter(self: MirBuilder, comp_node: i32, clause_index: i32, out_place: i32, out_elem_ty: i32, pat_or_sym: i32, iter_expr: i32, iter_ty: i32):
     let next_sym = self.pool.intern("next")
@@ -3946,6 +4099,7 @@ fn MirBuilder.lower_comprehension_generic_iter(self: MirBuilder, comp_node: i32,
     self.lower_comprehension_body(comp_node, clause_index, out_place, out_elem_ty, header_bb)
 
     self.switch_to(exit_bb)
+    self.forget_string_flow_facts()
 
 fn MirBuilder.lower_comprehension_clause(self: MirBuilder, comp_node: i32, clause_index: i32, out_place: i32, out_elem_ty: i32):
     let comp_start = self.ast.get_data1(comp_node)
@@ -4090,6 +4244,7 @@ fn MirBuilder.lower_for_range_var(self: MirBuilder, for_node: i32, pat_or_sym: i
 
     self.pop_control_target()
     self.switch_to(exit_bb)
+    self.forget_string_flow_facts()
     self.unit_operand()
 
 fn MirBuilder.lower_for_range(self: MirBuilder, for_node: i32, pat_or_sym: i32, range_node: i32, body_expr: i32) -> i32:
@@ -4157,6 +4312,7 @@ fn MirBuilder.lower_for_range(self: MirBuilder, for_node: i32, pat_or_sym: i32, 
 
     self.pop_control_target()
     self.switch_to(exit_bb)
+    self.forget_string_flow_facts()
     self.unit_operand()
 
 fn MirBuilder.lower_for_slice(self: MirBuilder, for_node: i32, pat_or_sym: i32, iter_expr: i32, body_expr: i32) -> i32:
@@ -4229,6 +4385,7 @@ fn MirBuilder.lower_for_slice(self: MirBuilder, for_node: i32, pat_or_sym: i32, 
 
     self.pop_control_target()
     self.switch_to(exit_bb)
+    self.forget_string_flow_facts()
     self.unit_operand()
 
 fn MirBuilder.lower_for_vec(self: MirBuilder, for_node: i32, pat_or_sym: i32, iter_expr: i32, body_expr: i32) -> i32:
@@ -4311,6 +4468,7 @@ fn MirBuilder.lower_for_vec(self: MirBuilder, for_node: i32, pat_or_sym: i32, it
 
     self.pop_control_target()
     self.switch_to(exit_bb)
+    self.forget_string_flow_facts()
     self.unit_operand()
 
 fn MirBuilder.lower_for_iter_place(self: MirBuilder, for_node: i32, pat_or_sym: i32, vec_expr: i32, body_expr: i32) -> i32:
@@ -4374,6 +4532,7 @@ fn MirBuilder.lower_for_iter_place(self: MirBuilder, for_node: i32, pat_or_sym: 
     self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
     self.pop_control_target()
     self.switch_to(exit_bb)
+    self.forget_string_flow_facts()
     self.unit_operand()
 
 fn MirBuilder.lower_for_iter_ref(self: MirBuilder, for_node: i32, pat_or_sym: i32, vec_expr: i32, body_expr: i32) -> i32:
@@ -4443,6 +4602,7 @@ fn MirBuilder.lower_for_iter_ref(self: MirBuilder, for_node: i32, pat_or_sym: i3
     self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
     self.pop_control_target()
     self.switch_to(exit_bb)
+    self.forget_string_flow_facts()
     self.unit_operand()
 
 fn MirBuilder.lower_break(self: MirBuilder, node: i32) -> i32:
@@ -5224,6 +5384,7 @@ fn MirBuilder.lower_match(self: MirBuilder, scrutinee_expr: i32, arms_start: i32
         dispatch_bb = fail_bb
 
     self.switch_to(join_bb)
+    self.forget_string_flow_facts()
     if result_is_void != 0:
         return self.unit_operand()
     if self.sema.is_copy(result_ty) != 0:
@@ -6164,6 +6325,7 @@ fn MirBuilder.lower_enum_accessor_call(self: MirBuilder, self_expr: i32, method_
     self.terminate(TermKind.TK_GOTO, join_bb as i32, 0, 0, 0)
 
     self.switch_to(join_bb)
+    self.forget_string_flow_facts()
     self.body.new_operand(if self.sema.is_copy(result_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, result_place)
 
 fn MirBuilder.lower_question_mark(self: MirBuilder, expr: i32, node: i32) -> i32:
@@ -6243,6 +6405,7 @@ fn MirBuilder.lower_question_mark(self: MirBuilder, expr: i32, node: i32) -> i32
     self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
     self.switch_to(join_bb)
+    self.forget_string_flow_facts()
     if self.sema.is_copy(result_ty) != 0:
         return self.body.new_operand(OperandKind.OK_COPY, result_place)
     self.body.new_operand(OperandKind.OK_MOVE, result_place)
@@ -6285,6 +6448,7 @@ fn MirBuilder.lower_double_question(self: MirBuilder, expr: i32, default_expr: i
     self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
     self.switch_to(join_bb)
+    self.forget_string_flow_facts()
     if self.sema.is_copy(result_ty) != 0:
         return self.body.new_operand(OperandKind.OK_COPY, result_place)
     self.body.new_operand(OperandKind.OK_MOVE, result_place)
@@ -6456,6 +6620,7 @@ fn MirBuilder.lower_option_transpose_method(self: MirBuilder, self_expr: i32, ar
     self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
     self.switch_to(join_bb)
+    self.forget_string_flow_facts()
     self.operand_for_place(result_place, result_ty)
 
 fn MirBuilder.lower_result_transpose_method(self: MirBuilder, self_expr: i32, arg_count: i32, node: i32) -> i32:
@@ -6538,6 +6703,7 @@ fn MirBuilder.lower_result_transpose_method(self: MirBuilder, self_expr: i32, ar
     self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
     self.switch_to(join_bb)
+    self.forget_string_flow_facts()
     self.operand_for_place(result_place, result_ty)
 
 fn MirBuilder.lower_vec_sequence_or_traverse_method(self: MirBuilder, self_expr: i32, method_name: str, arg_start: i32, arg_count: i32, node: i32) -> i32:
@@ -6674,6 +6840,7 @@ fn MirBuilder.lower_vec_sequence_or_traverse_method(self: MirBuilder, self_expr:
     self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
     self.switch_to(join_bb)
+    self.forget_string_flow_facts()
     self.operand_for_place(result_place, result_ty)
 
 fn MirBuilder.lower_option_combinator_method(self: MirBuilder, self_expr: i32, method_name: str, arg_start: i32, arg_count: i32, node: i32) -> i32:
@@ -6734,6 +6901,7 @@ fn MirBuilder.lower_option_combinator_method(self: MirBuilder, self_expr: i32, m
     self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
     self.switch_to(join_bb)
+    self.forget_string_flow_facts()
     self.operand_for_place(result_place, result_ty)
 
 fn MirBuilder.lower_result_combinator_method(self: MirBuilder, self_expr: i32, method_name: str, arg_start: i32, arg_count: i32, node: i32) -> i32:
@@ -6819,6 +6987,7 @@ fn MirBuilder.lower_result_combinator_method(self: MirBuilder, self_expr: i32, m
     self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
     self.switch_to(join_bb)
+    self.forget_string_flow_facts()
     self.operand_for_place(result_place, result_ty)
 
 fn MirBuilder.lower_method_arg_or_unit(self: MirBuilder, node: i32, arg_start: i32, arg_count: i32, idx: i32) -> i32:
@@ -6867,6 +7036,7 @@ fn MirBuilder.lower_unwrap_or_method(self: MirBuilder, self_expr: i32, arg_start
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
         self.switch_to(join_bb)
+        self.forget_string_flow_facts()
         return self.unit_operand()
 
     let result_local = self.new_temp(result_ty)
@@ -6885,6 +7055,7 @@ fn MirBuilder.lower_unwrap_or_method(self: MirBuilder, self_expr: i32, arg_start
     self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
     self.switch_to(join_bb)
+    self.forget_string_flow_facts()
     if self.sema.is_copy(result_ty) != 0:
         return self.body.new_operand(OperandKind.OK_COPY, result_place)
     self.body.new_operand(OperandKind.OK_MOVE, result_place)
@@ -7307,6 +7478,7 @@ fn MirBuilder.lower_optional_chain(self: MirBuilder, node: i32) -> i32:
     self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
     self.switch_to(join_bb)
+    self.forget_string_flow_facts()
     if self.sema.is_copy(result_ty) != 0:
         return self.body.new_operand(OperandKind.OK_COPY, result_place)
     self.body.new_operand(OperandKind.OK_MOVE, result_place)
@@ -7553,6 +7725,12 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
     if kind == NodeKind.NK_ASSIGN:
         let target = self.ast.get_data0(node)
         let rhs_node = self.ast.get_data1(node)
+        let append_place = self.try_lower_string_self_concat_assign(target, rhs_node)
+        if append_place >= 0:
+            let append_local = self.direct_place_local(append_place)
+            if append_local >= 0:
+                self.mark_string_local_copied(append_local)
+            return self.body.new_operand(OperandKind.OK_COPY, append_place)
         // Lower the RHS first so we have its value available, then perform the
         // assignment. The expression value of `lhs = rhs` is `rhs` per C/With
         // semantics — NOT a re-load of `*lhs`. The previous code did
@@ -8268,6 +8446,7 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
             self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
         self.switch_to(join_bb)
+        self.forget_string_flow_facts()
         return self.body.new_operand(OperandKind.OK_COPY, result_place)
 
     self.mark_unsupported()

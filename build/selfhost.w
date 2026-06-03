@@ -916,8 +916,9 @@ fn bs_check_loop_string_concat_warning(ctx: ActionCtx, compiler_path: str, case_
     let source =
         "fn main:\n" ++
         "    var acc = \"\"\n" ++
+        "    let prefix = \"x\"\n" ++
         "    for i in 0..3:\n" ++
-        "        acc = acc ++ \"x\"\n" ++
+        "        acc = prefix ++ acc\n" ++
         "    let done = acc\n"
     var rc = bs_write_fixture(ctx, src, source, "loop string concat warning source")
     if rc != 0: return rc
