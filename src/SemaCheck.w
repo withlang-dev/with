@@ -3335,6 +3335,65 @@ fn Sema.membership_rhs_uses_special_lowering(self: Sema, rhs_node: i32, rhs_ty: 
         return 1
     0
 
+fn Sema.membership_array_element_type(self: Sema, rhs_node: i32, rhs_ty: i32) -> i32:
+    if rhs_ty != 0:
+        let resolved = self.resolve_alias(rhs_ty as TypeId)
+        if self.get_type_kind(resolved) == TypeKind.TY_ARRAY:
+            return self.get_type_d0(resolved)
+    if self.ast.kind(rhs_node) == NodeKind.NK_ARRAY_LIT:
+        let elem_count = self.ast.get_data1(rhs_node)
+        if elem_count > 0:
+            let extra_start = self.ast.get_data0(rhs_node)
+            let first = self.ast.get_extra(extra_start)
+            if self.typed_expr_types.contains(first):
+                return self.typed_expr_types.get(first).unwrap()
+    0
+
+fn Sema.membership_range_element_type(self: Sema, rhs_node: i32, rhs_ty: i32) -> i32:
+    if rhs_ty != 0:
+        let resolved = self.resolve_alias(rhs_ty as TypeId)
+        if self.get_type_kind(resolved) == TypeKind.TY_RANGE:
+            return self.get_type_d0(resolved)
+    if self.ast.kind(rhs_node) == NodeKind.NK_RANGE:
+        let start_node = self.ast.get_data0(rhs_node)
+        let end_node = self.ast.get_data1(rhs_node)
+        if start_node != 0 and self.typed_expr_types.contains(start_node):
+            return self.typed_expr_types.get(start_node).unwrap()
+        if end_node != 0 and self.typed_expr_types.contains(end_node):
+            return self.typed_expr_types.get(end_node).unwrap()
+    0
+
+fn Sema.validate_special_membership_element(self: Sema, lhs_node: i32, lhs_ty: i32, elem_ty: i32, label: str) -> i32:
+    if lhs_ty == 0 or elem_ty == 0:
+        return 1
+    if self.call_arg_type_compatible(elem_ty, lhs_ty) != 0:
+        return 1
+    self.emit_error("`in` left operand type '" ++ self.type_name(lhs_ty) ++ "' is not compatible with " ++ label ++ " type '" ++ self.type_name(elem_ty) ++ "'", lhs_node)
+    0
+
+fn Sema.validate_special_membership_operator(self: Sema, _node: i32, lhs_node: i32, rhs_node: i32, lhs_ty: i32, rhs_ty: i32) -> i32:
+    let rhs_kind = self.ast.kind(rhs_node)
+    if rhs_kind == NodeKind.NK_ARRAY_LIT:
+        return self.validate_special_membership_element(lhs_node, lhs_ty, self.membership_array_element_type(rhs_node, rhs_ty), "array element")
+    if rhs_kind == NodeKind.NK_RANGE:
+        return self.validate_special_membership_element(lhs_node, lhs_ty, self.membership_range_element_type(rhs_node, rhs_ty), "range element")
+    if rhs_ty == 0:
+        return 1
+    let resolved = self.resolve_alias(rhs_ty as TypeId)
+    let kind = self.get_type_kind(resolved)
+    if kind == TypeKind.TY_ARRAY:
+        return self.validate_special_membership_element(lhs_node, lhs_ty, self.get_type_d0(resolved), "array element")
+    if kind == TypeKind.TY_RANGE:
+        return self.validate_special_membership_element(lhs_node, lhs_ty, self.get_type_d0(resolved), "range element")
+    if kind == TypeKind.TY_STR:
+        let lhs_resolved = self.resolve_alias(lhs_ty as TypeId)
+        let lhs_kind = self.get_type_kind(lhs_resolved)
+        if lhs_kind == TypeKind.TY_STR or lhs_kind == TypeKind.TY_INT:
+            return 1
+        self.emit_error("`in` left operand for string membership must be str or char/integer, got '" ++ self.type_name(lhs_ty) ++ "'", lhs_node)
+        return 0
+    1
+
 fn Sema.membership_has_contains(self: Sema, rhs_ty: i32, contains_sym: i32) -> i32:
     if rhs_ty == 0 or contains_sym == 0:
         return 0
@@ -3410,6 +3469,8 @@ fn Sema.validate_membership_contains_signature(self: Sema, node: i32, lhs_node: 
 
 fn Sema.check_membership_operator(self: Sema, node: i32, lhs_node: i32, rhs_node: i32, lhs_ty: i32, rhs_ty: i32) -> i32:
     if self.membership_rhs_uses_special_lowering(rhs_node, rhs_ty) != 0:
+        if self.validate_special_membership_operator(node, lhs_node, rhs_node, lhs_ty, rhs_ty) == 0:
+            return 0
         self.typed_expr_types.insert(node, self.ty_bool as i32)
         return self.ty_bool as i32
     let contains_sym = self.syms.contains
@@ -6536,7 +6597,7 @@ fn Sema.pipeline_generic_builtin_method_exists(self: Sema, owner_sym: i32, field
     if owner_sym == self.syms.veciter or owner_sym == self.syms.veciterref or owner_sym == self.syms.veciterplace:
         if field == self.syms.next:
             return 1
-        if owner_sym == self.syms.veciter:
+        if owner_sym == self.syms.veciter or owner_sym == self.syms.veciterref:
             if field == self.syms.map or field == self.syms.filter or field == self.syms.take or field == self.syms.zip or field == self.syms.flat_map:
                 return 1
             if field == self.syms.fold or field == self.syms.reduce or field == self.syms.sum or field == self.syms.count or field == self.syms.partition or field == self.syms.collect:
@@ -8769,7 +8830,7 @@ fn Sema.iterator_owner_symbol(self: Sema, tid: i32) -> i32:
     if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
         return 0
     let owner = self.get_generic_inst_base(resolved as i32)
-    if owner == self.syms.veciter or owner == self.syms.mapiter or owner == self.syms.filteriter or owner == self.syms.takeiter or owner == self.syms.zipiter or owner == self.syms.flatmapiter:
+    if owner == self.syms.veciter or owner == self.syms.veciterref or owner == self.syms.mapiter or owner == self.syms.filteriter or owner == self.syms.takeiter or owner == self.syms.zipiter or owner == self.syms.flatmapiter:
         return owner
     0
 
@@ -8788,6 +8849,9 @@ fn Sema.iterator_element_type(self: Sema, tid: i32) -> i32:
     let owner = self.get_generic_inst_base(resolved as i32)
     if owner == self.syms.veciter:
         return self.get_generic_inst_arg(resolved as i32, 0)
+    if owner == self.syms.veciterref:
+        let ref_elem_ty = self.get_generic_inst_arg(resolved as i32, 0)
+        return self.ensure_exact_type(TypeKind.TY_REF, ref_elem_ty, 0, 0) as i32
     if owner == self.syms.mapiter:
         return self.get_generic_inst_arg(resolved as i32, 2)
     if owner == self.syms.filteriter or owner == self.syms.takeiter:

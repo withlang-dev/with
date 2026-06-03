@@ -5547,8 +5547,10 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
         if method_name == "contains": return MirIntrinsic.VEC_CONTAINS
         if method_name == "join": return MirIntrinsic.VEC_JOIN
         return MirIntrinsic.NONE
-    if type_name == "VecIter":
-        if method_name == "next": return MirIntrinsic.VECITER_NEXT
+    if type_name == "VecIter" or type_name == "VecIterRef":
+        if method_name == "next":
+            if type_name == "VecIterRef": return MirIntrinsic.VECITERREF_NEXT
+            return MirIntrinsic.VECITER_NEXT
         if method_name == "map": return MirIntrinsic.ITER_MAP
         if method_name == "filter": return MirIntrinsic.ITER_FILTER
         if method_name == "take": return MirIntrinsic.ITER_TAKE
@@ -5605,9 +5607,6 @@ fn MirBuilder.classify_intrinsic(self: MirBuilder, recv_type: i32, method_name: 
         if method_name == "set": return MirIntrinsic.VECRANGE_SET
         let vecrange_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.VECRANGE_LEN, method_name)
         if vecrange_len_intrinsic != MirIntrinsic.NONE: return vecrange_len_intrinsic
-        return MirIntrinsic.NONE
-    if type_name == "VecIterRef":
-        if method_name == "next": return MirIntrinsic.VECITERREF_NEXT
         return MirIntrinsic.NONE
     if type_name == "VecIterPlace":
         if method_name == "next": return MirIntrinsic.VECITERPLACE_NEXT

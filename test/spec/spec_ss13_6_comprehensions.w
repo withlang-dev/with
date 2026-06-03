@@ -24,6 +24,14 @@ fn test_filter:
     assert(evens.get(2) == 4)
     assert(evens.get(3) == 6)
 
+fn test_membership_filter:
+    let primes = [2, 3, 5, 7, 11, 13]
+    let prime_squares = [x * x for x in 1..=15 if x in primes]
+    assert(prime_squares.len() == 6)
+    assert(prime_squares.get(0) == 4)
+    assert(prime_squares.get(1) == 9)
+    assert(prime_squares.get(5) == 169)
+
 fn test_nested:
     let pairs = [x * 10 + y for x in 0..3 for y in 0..3 if x != y]
     assert(pairs.len() == 6)
@@ -50,6 +58,7 @@ fn test_pattern_binding:
 fn main:
     test_basic_range()
     test_filter()
+    test_membership_filter()
     test_nested()
     test_vec_source()
     test_pattern_binding()
