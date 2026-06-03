@@ -5860,6 +5860,8 @@ no_suspend:
     update_intrusive_state()
     poll_fast_path()
 
+let inline_value = no_suspend: compute_without_waiting()
+
 let value = no_suspend {
     compute_without_waiting()
 }

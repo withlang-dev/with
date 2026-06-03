@@ -15,6 +15,9 @@ fn main:
         value + 1
     assert(from_colon == 42)
 
+    let from_inline_colon = no_suspend: add_one(41)
+    assert(from_inline_colon == 42)
+
     let from_braces = no_suspend { add_one(41) }
     assert(from_braces == 42)
 
