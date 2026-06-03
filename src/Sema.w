@@ -212,6 +212,11 @@ const EFF_CONSUME: i32      = 4   // parameter is moved/consumed in the body
 const EFF_ESCAPE_VALUE: i32 = 8   // owned value escapes the call (return / global store)
 const EFF_ESCAPE_VIEW: i32  = 16  // view into parameter escapes (return &param.field)
 
+enum WithFormKind: i32:
+    Binding = 0
+    Guarded = 1
+    GuardedMut = 2
+
 // ── Sema state ───────────────────────────────────────────────────
 
 type Sema {
@@ -434,6 +439,11 @@ type Sema {
     // Implicit parameter bindings stack: pairs of (type_id, binding_sym)
     implicit_binding_types: Vec[i32],
     implicit_binding_syms: Vec[i32],
+    with_form_kinds: HashMap[i32, i32],
+    with_payload_types: HashMap[i32, i32],
+    with_enter_methods: HashMap[i32, i32],
+    with_exit_methods: HashMap[i32, i32],
+    no_await_guard_scope_depth: i32,
 
     // For-comprehension resolved variants: node → resolved variant sym.
     // Maps _Payload/_Empty marker nodes to Some/None or Ok/Err.
@@ -1001,6 +1011,11 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         magic_ident_kinds: sema_new_map_i32_i32(),
         implicit_binding_types: Vec.new(),
         implicit_binding_syms: Vec.new(),
+        with_form_kinds: sema_new_map_i32_i32(),
+        with_payload_types: sema_new_map_i32_i32(),
+        with_enter_methods: sema_new_map_i32_i32(),
+        with_exit_methods: sema_new_map_i32_i32(),
+        no_await_guard_scope_depth: 0,
         comp_resolved: sema_new_map_i32_i32(),
         pipeline_method_calls: sema_new_map_i32_i32(),
         operator_method_calls: sema_new_map_i32_i32(),
@@ -1414,6 +1429,8 @@ fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.lang_trait_syms.insert(self.syms.drop, 1)
     self.lang_trait_syms.insert(self.pool_intern("Send"), 1)
     self.lang_trait_syms.insert(self.pool_intern("ScopedSend"), 1)
+    self.lang_trait_syms.insert(self.pool_intern("Scoped"), 1)
+    self.lang_trait_syms.insert(self.pool_intern("ScopedMut"), 1)
 
 fn sema_is_name_char(ch: i32) -> i32:
     if ch >= 48 and ch <= 57:

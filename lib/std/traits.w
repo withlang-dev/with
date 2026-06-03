@@ -57,6 +57,16 @@ pub trait IntoIter[T] =
 pub trait Contains[T] =
     fn contains(self: &Self, value: &T) -> bool
 
+/// Scoped read access protocol used by guarded `with` blocks.
+pub trait Scoped[T] =
+    fn with_enter(self: &Self) -> T
+    fn with_exit(self: &Self) -> void
+
+/// Scoped mutable access protocol used by guarded `with ... as mut`.
+pub trait ScopedMut[T] =
+    fn with_enter_mut(self: &Self) -> T
+    fn with_exit_mut(mut self: Self, value: T) -> void
+
 // IntoIter for Vec — enables `for x in vec.iter()` via trait dispatch.
 // docs/mut.md Rev 8 §15.8 — `@[iter_of_self]` registers a SHARED borrow on
 // the receiver place root for the duration of the enclosing call, so a

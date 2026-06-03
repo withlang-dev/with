@@ -42,6 +42,9 @@ type MirBuilder {
     drop_local_ids: Vec[i32],
     drop_kinds: Vec[i32],
     drop_scope_starts: Vec[i32],
+    with_cleanup_guard_locals: Vec[i32],
+    with_cleanup_payload_locals: Vec[i32],
+    with_cleanup_method_syms: Vec[i32],
 
     // Lexical local bindings (sym -> local id), scoped.
     bind_syms: Vec[i32],
@@ -101,6 +104,9 @@ fn MirBuilder.init(sema: Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> M
         drop_local_ids: Vec.new(),
         drop_kinds: Vec.new(),
         drop_scope_starts: Vec.new(),
+        with_cleanup_guard_locals: Vec.new(),
+        with_cleanup_payload_locals: Vec.new(),
+        with_cleanup_method_syms: Vec.new(),
         bind_syms: Vec.new(),
         bind_local_ids: Vec.new(),
         bind_scope_starts: Vec.new(),
@@ -161,6 +167,55 @@ fn MirBuilder.schedule_drop(self: MirBuilder, local_id: i32, drop_kind: i32) -> 
     self.drop_local_ids.push(local_id)
     self.drop_kinds.push(drop_kind)
 
+fn MirBuilder.schedule_with_guard_cleanup(self: MirBuilder, guard_local: i32, payload_local: i32, method_sym: i32, drop_kind: i32) -> void:
+    self.with_cleanup_guard_locals.push(guard_local)
+    self.with_cleanup_payload_locals.push(payload_local)
+    self.with_cleanup_method_syms.push(method_sym)
+    self.schedule_drop(guard_local, drop_kind)
+
+fn MirBuilder.with_cleanup_index_for_guard(self: MirBuilder, guard_local: i32) -> i32:
+    var i = self.with_cleanup_guard_locals.len() as i32 - 1
+    while i >= 0:
+        if self.with_cleanup_guard_locals.get(i as i64) == guard_local:
+            return i
+        i = i - 1
+    -1
+
+fn MirBuilder.operand_for_place_arg(self: MirBuilder, place: i32, actual_ty: i32, expected_ty: i32, span: i32) -> i32:
+    if expected_ty != 0 and self.sema.can_auto_ref_arg(expected_ty, actual_ty) != 0:
+        let rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, place, 0)
+        let temp = self.new_temp(expected_ty)
+        let temp_place = self.place_for_local(temp)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, temp_place, rv, span)
+        return self.body.new_operand(OperandKind.OK_COPY, temp_place)
+    self.operand_for_place(place, actual_ty)
+
+fn MirBuilder.emit_with_guard_cleanup(self: MirBuilder, guard_local: i32, drop_kind: i32):
+    let cleanup_idx = self.with_cleanup_index_for_guard(guard_local)
+    if cleanup_idx < 0:
+        return
+    let method_sym = self.with_cleanup_method_syms.get(cleanup_idx as i64)
+    let payload_local = self.with_cleanup_payload_locals.get(cleanup_idx as i64)
+    let sig_idx = self.call_sig_for_sym(method_sym)
+    let guard_ty = self.local_type(guard_local)
+    let guard_place = self.place_for_local(guard_local)
+    let guard_expected = if sig_idx >= 0 and self.sema.sig_get_param_count(sig_idx) > 0: self.sema.sig_param_type(sig_idx, 0) else: 0
+    let args: Vec[i32] = Vec.new()
+    args.push(self.operand_for_place_arg(guard_place, guard_ty, guard_expected, 0))
+    if drop_kind == DropKind.DK_WITH_GUARD_MUT:
+        let payload_ty = self.local_type(payload_local)
+        let payload_place = self.place_for_local(payload_local)
+        let payload_expected = if sig_idx >= 0 and self.sema.sig_get_param_count(sig_idx) > 1: self.sema.sig_param_type(sig_idx, 1) else: 0
+        args.push(self.operand_for_place_arg(payload_place, payload_ty, payload_expected, 0))
+    let args_id = self.body.new_call_args(args)
+    let fn_op = self.const_operand(ConstKind.CK_FN, method_sym, self.sema.ty_void as i32)
+    let next_bb = self.new_block()
+    self.terminate(TermKind.TK_CALL, fn_op, args_id, self.place_for_local(0), next_bb)
+    self.switch_to(next_bb)
+    if payload_local > 0:
+        self.body.push_stmt(self.cur_bb, StmtKind.StorageDead, payload_local, 0, 0)
+    self.body.push_stmt(self.cur_bb, StmtKind.StorageDead, guard_local, 0, 0)
+
 fn MirBuilder.drop_kind_owns_value(self: MirBuilder, drop_kind: i32) -> i32:
     let _ = self
     if drop_kind == DropKind.DK_VALUE or drop_kind == DropKind.DK_TASK_DETACHED or drop_kind == DropKind.DK_TASK_EPHEMERAL:
@@ -195,6 +250,9 @@ fn MirBuilder.emit_task_cancel_call(self: MirBuilder, task_op: i32, intrinsic: M
     self.switch_to(after_cancel_bb)
 
 fn MirBuilder.emit_drop_entry(self: MirBuilder, local_id: i32, drop_kind: i32):
+    if drop_kind == DropKind.DK_WITH_GUARD or drop_kind == DropKind.DK_WITH_GUARD_MUT:
+        self.emit_with_guard_cleanup(local_id, drop_kind)
+        return
     if drop_kind == DropKind.DK_STORAGE:
         self.body.push_stmt(self.cur_bb, StmtKind.StorageDead, local_id, 0, 0)
         return
@@ -7067,6 +7125,48 @@ fn MirBuilder.lower_with_form1(self: MirBuilder, guard_expr: i32, body_expr: i32
     self.pop_scope_inline()
     result
 
+fn MirBuilder.lower_with_guarded(self: MirBuilder, node: i32) -> i32:
+    let source = self.ast.get_data0(node)
+    let body = self.ast.get_data1(node)
+    let encoded = self.ast.get_data2(node)
+    let name = decode_with_binding_sym(encoded)
+    let is_mut = decode_with_binding_is_mut(encoded)
+    let source_ty = self.expr_type(source)
+    let payload_ty = self.sema.with_payload_types.get(node).unwrap()
+    let enter_fn = self.sema.with_enter_methods.get(node).unwrap()
+    let exit_fn = self.sema.with_exit_methods.get(node).unwrap()
+    let span = self.ast.get_start(node)
+
+    self.push_scope()
+
+    let guard_local = self.body.new_local(source_ty, 0, 0, 0)
+    self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, guard_local, 0, span)
+    let source_op = self.lower_expr(source)
+    self.assign_operand_to_place(self.place_for_local(guard_local), source_op, self.ast.get_start(source))
+
+    let payload_local = self.body.new_local(payload_ty, is_mut, name, 1)
+    if name != 0 and self.pool.resolve_symbol(name) != "_":
+        self.bind_local(name, payload_local)
+    self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, payload_local, 0, span)
+
+    let enter_sig = self.call_sig_for_sym(enter_fn)
+    let guard_expected = if enter_sig >= 0 and self.sema.sig_get_param_count(enter_sig) > 0: self.sema.sig_param_type(enter_sig, 0) else: 0
+    let enter_args: Vec[i32] = Vec.new()
+    enter_args.push(self.operand_for_place_arg(self.place_for_local(guard_local), source_ty, guard_expected, span))
+    let enter_args_id = self.body.new_call_args(enter_args)
+    self.body.set_call_ast_node(enter_args_id, node)
+    let enter_op = self.const_operand(ConstKind.CK_FN, enter_fn, self.sema.ty_void as i32)
+    let after_enter = self.new_block()
+    self.terminate(TermKind.TK_CALL, enter_op, enter_args_id, self.place_for_local(payload_local), after_enter)
+    self.switch_to(after_enter)
+
+    let drop_kind = if is_mut != 0: DropKind.DK_WITH_GUARD_MUT else: DropKind.DK_WITH_GUARD
+    self.schedule_with_guard_cleanup(guard_local, payload_local, exit_fn, drop_kind)
+
+    let result = self.lower_expr(body)
+    self.pop_scope_inline()
+    result
+
 fn MirBuilder.lower_with_binding(self: MirBuilder, sym: i32, rhs_expr: i32, body_expr: i32, span: i32) -> i32:
     // Recover mutability from the encoded d2 value passed via the caller.
     // The caller extracts sym via decode_with_binding_sym, but we need
@@ -7973,6 +8073,10 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         let source = self.ast.get_data0(node)
         let body = self.ast.get_data1(node)
         let name = decode_with_binding_sym(self.ast.get_data2(node))
+        if self.sema.with_form_kinds.contains(node):
+            let form = self.sema.with_form_kinds.get(node).unwrap()
+            if form == WithFormKind.Guarded or form == WithFormKind.GuardedMut:
+                return self.lower_with_guarded(node)
         if name != 0:
             return self.lower_with_binding(name, source, body, self.ast.get_start(node))
         return self.lower_with_form1(source, body)

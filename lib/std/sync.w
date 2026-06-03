@@ -61,6 +61,20 @@ pub fn MutexGuard.exit(self: MutexGuard) -> i64:
 pub fn MutexGuardMut.exit(self: MutexGuardMut) -> i64:
     self.value
 
+impl Scoped[i64] for MutexGuard =
+    fn with_enter(self: &Self) -> i64:
+        self.value
+
+    fn with_exit(self: &Self) -> void:
+        ()
+
+impl ScopedMut[i64] for MutexGuardMut =
+    fn with_enter_mut(self: &Self) -> i64:
+        self.value
+
+    fn with_exit_mut(mut self: Self, value: i64) -> void:
+        self.value = value
+
 /// Read the value inside a Mutex.
 pub fn mutex_get(m: Mutex) -> i64:
     m.value

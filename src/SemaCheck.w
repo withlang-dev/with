@@ -1710,6 +1710,8 @@ fn Sema.type_is_no_await_guard(self: Sema, tid: i32) -> i32:
     0
 
 fn Sema.has_live_await_guard(self: Sema) -> i32:
+    if self.no_await_guard_scope_depth > 0:
+        return 1
     var i = self.bind_names.len() as i32 - 1
     while i >= 0:
         if self.bind_states.get(i as i64) == VarState.LIVE:
@@ -1732,6 +1734,80 @@ fn Sema.emit_no_await_guard_may_suspend_expr(self: Sema, node: i32, expr: i32):
     let visiting: HashMap[i32, i32] = HashMap.new()
     if self.expr_may_suspend(expr, visiting) != 0:
         self.emit_error("E0701: may_suspend call while no_await_guard value is live", node)
+
+fn Sema.with_trait_payload_type(self: Sema, source_ty: i32, trait_sym: i32) -> i32:
+    if source_ty == 0 or trait_sym == 0:
+        return 0
+    let recv_type = self.auto_deref_ref_ptr_type(source_ty as TypeId) as i32
+    let owner_sym = self.method_owner_symbol_for_type(recv_type)
+    if owner_sym == 0:
+        return 0
+    for di in 0..self.ast.decl_count():
+        let decl = self.ast.get_decl(di)
+        if self.ast.kind(decl) != NodeKind.NK_IMPL_DECL:
+            continue
+        if self.ast.get_data0(decl) != owner_sym or self.ast.get_data2(decl) != trait_sym:
+            continue
+        let tta_idx = self.ast.find_impl_trait_type_args(decl as NodeId)
+        if tta_idx < 0:
+            return 0
+        let arg_start = self.ast.state.impl_trait_type_args.get((tta_idx + 1) as i64)
+        let arg_count = self.ast.state.impl_trait_type_args.get((tta_idx + 2) as i64)
+        if arg_count <= 0:
+            return 0
+        return self.resolve_type_expr(self.ast.get_extra(arg_start)) as i32
+    0
+
+fn Sema.validate_with_method(self: Sema, node: i32, owner_sym: i32, method_sym: i32, expected_ret: i32, expected_payload_param: i32) -> i32:
+    if owner_sym == 0 or method_sym == 0:
+        return 0
+    let sig_idx = self.lookup_method_sig(owner_sym, method_sym)
+    if sig_idx < 0:
+        self.emit_error("guarded with type is missing required method '" ++ self.pool_resolve(method_sym) ++ "'", node)
+        return 0
+    let fn_sym = self.lookup_method_fn(owner_sym, method_sym)
+    if fn_sym == 0:
+        self.emit_error("guarded with type is missing required method '" ++ self.pool_resolve(method_sym) ++ "'", node)
+        return 0
+    let param_count = self.sig_get_param_count(sig_idx)
+    let expected_count = if expected_payload_param != 0: 2 else: 1
+    if param_count != expected_count:
+        self.emit_error("guarded with protocol method '" ++ self.pool_resolve(method_sym) ++ "' has the wrong parameter count", node)
+        return 0
+    let actual_ret = self.sig_return_type(sig_idx)
+    if self.types_compatible(expected_ret, actual_ret) == 0:
+        self.emit_error("guarded with protocol method '" ++ self.pool_resolve(method_sym) ++ "' has the wrong return type", node)
+        return 0
+    if expected_payload_param != 0:
+        let actual_payload = self.sig_param_type(sig_idx, 1)
+        if self.types_compatible(expected_payload_param, actual_payload) == 0:
+            self.emit_error("guarded with protocol method '" ++ self.pool_resolve(method_sym) ++ "' has the wrong payload parameter type", node)
+            return 0
+    fn_sym
+
+fn Sema.classify_guarded_with(self: Sema, node: i32, source_ty: i32, is_mut: i32) -> i32:
+    let trait_sym = if is_mut != 0: self.pool_lookup_symbol("ScopedMut") else: self.pool_lookup_symbol("Scoped")
+    if trait_sym == 0:
+        return WithFormKind.Binding
+    if self.type_implements_trait(source_ty, trait_sym) == 0:
+        return WithFormKind.Binding
+    let payload_ty = self.with_trait_payload_type(source_ty, trait_sym)
+    if payload_ty == 0:
+        self.emit_error("guarded with trait implementation must specify a payload type", node)
+        return WithFormKind.Binding
+    let owner_sym = self.method_owner_symbol_for_type(self.auto_deref_ref_ptr_type(source_ty as TypeId) as i32)
+    let enter_sym = if is_mut != 0: self.pool_lookup_symbol("with_enter_mut") else: self.pool_lookup_symbol("with_enter")
+    let exit_sym = if is_mut != 0: self.pool_lookup_symbol("with_exit_mut") else: self.pool_lookup_symbol("with_exit")
+    let enter_fn = self.validate_with_method(node, owner_sym, enter_sym, payload_ty, 0)
+    let exit_fn = self.validate_with_method(node, owner_sym, exit_sym, self.ty_void as i32, if is_mut != 0: payload_ty else: 0)
+    if enter_fn == 0 or exit_fn == 0:
+        return WithFormKind.Binding
+    let form = if is_mut != 0: WithFormKind.GuardedMut else: WithFormKind.Guarded
+    self.with_form_kinds.insert(node, form)
+    self.with_payload_types.insert(node, payload_ty)
+    self.with_enter_methods.insert(node, enter_fn)
+    self.with_exit_methods.insert(node, exit_fn)
+    form
 
 fn Sema.fn_symbol_may_suspend(self: Sema, fn_sym: i32, visiting: HashMap[i32, i32]) -> i32:
     if fn_sym == 0:
@@ -6725,6 +6801,26 @@ fn Sema.check_with_expr(self: Sema, node: i32) -> i32:
     let name = decode_with_binding_sym(encoded_name)
     let is_mut = decode_with_binding_is_mut(encoded_name)
     var source_ty = self.check_expr(source)
+    let form = self.classify_guarded_with(node, source_ty as i32, is_mut)
+    if form == WithFormKind.Guarded or form == WithFormKind.GuardedMut:
+        let payload_ty = self.with_payload_types.get(node).unwrap()
+        self.push_scope()
+        let had_binding = self.scope_has(name)
+        self.scope_put(name, payload_ty, is_mut)
+        if had_binding == 0:
+            self.register_pending_generic_binding(name, 0, source, payload_ty)
+        if self.type_is_no_await_guard(source_ty as i32) != 0:
+            self.no_await_guard_scope_depth = self.no_await_guard_scope_depth + 1
+        let body_ty = self.check_expr(body)
+        if self.type_is_no_await_guard(source_ty as i32) != 0:
+            self.no_await_guard_scope_depth = self.no_await_guard_scope_depth - 1
+        self.pop_scope()
+        if body_ty != 0 and self.type_is_ephemeral_value(body_ty as i32) != 0:
+            self.emit_error("guarded with result cannot be ephemeral; clone or copy the value before it leaves the block", body)
+        if self.expr_is_ephemeral_value(body) != 0:
+            self.emit_error("guarded with result cannot be ephemeral; clone or copy the value before it leaves the block", body)
+        return body_ty as i32
+    self.with_form_kinds.insert(node, WithFormKind.Binding)
     self.push_scope()
     let had_binding = self.scope_has(name)
     self.scope_put(name, source_ty as i32, is_mut)

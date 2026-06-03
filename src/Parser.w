@@ -6056,50 +6056,80 @@ fn Parser.parse_with_expr(self: Parser) -> NodeId:
             return self.pool.add_node(NodeKind.NK_WITH_IMPLICIT, start, self.prev_end(), source, body, binding_name)
         self.pos = save
     // Existing syntax: with expr as name: body
-    self.suppress_as = 1
-    let source = self.parse_expr()
-    self.suppress_as = 0
-    if self.peek() != TokenKind.TK_KW_AS:
-        self.emit_error("expected 'as' in with expression")
-        return self.poisoned_expr()
-    self.advance()
-    var is_mut = 0
-    if self.peek() == TokenKind.TK_KW_MUT:
-        is_mut = 1
+    // Multi-binding syntax is represented as nested single-binding nodes so
+    // sema and MIR only need to reason about one scoped binding at a time.
+    let item_sources: Vec[i32] = Vec.new()
+    let item_payloads: Vec[i32] = Vec.new()
+    let item_is_tuple: Vec[i32] = Vec.new()
+
+    var keep_parsing_items = 1
+    while keep_parsing_items != 0:
+        self.suppress_as = 1
+        let source = self.parse_expr()
+        self.suppress_as = 0
+        if self.peek() != TokenKind.TK_KW_AS:
+            self.emit_error("expected 'as' in with expression")
+            return self.poisoned_expr()
         self.advance()
-    if self.peek() == TokenKind.TK_L_PAREN:
-        self.advance()
-        self.skip_newlines()
-        let names: Vec[i32] = Vec.new()
-        while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
-            if self.peek() == TokenKind.TK_IDENT:
-                let n_sym = self.intern_current()
-                self.advance()
-                if self.intern.resolve(n_sym) == "_":
-                    names.push(0)
-                else:
-                    names.push(n_sym)
-            else:
-                self.emit_error("tuple destructuring in 'with' requires identifier bindings")
-                break
+        var is_mut = 0
+        if self.peek() == TokenKind.TK_KW_MUT:
+            is_mut = 1
+            self.advance()
+        if self.peek() == TokenKind.TK_L_PAREN:
+            self.advance()
             self.skip_newlines()
-            if self.peek() == TokenKind.TK_COMMA:
-                self.advance()
+            let names: Vec[i32] = Vec.new()
+            while self.peek() != TokenKind.TK_R_PAREN and self.peek() != TokenKind.TK_EOF:
+                if self.peek() == TokenKind.TK_IDENT:
+                    let n_sym = self.intern_current()
+                    self.advance()
+                    if self.intern.resolve(n_sym) == "_":
+                        names.push(0)
+                    else:
+                        names.push(n_sym)
+                else:
+                    self.emit_error("tuple destructuring in 'with' requires identifier bindings")
+                    break
                 self.skip_newlines()
-            else:
-                break
-        self.expect(TokenKind.TK_R_PAREN)
-        let tbody = self.parse_body()
-        let extra_start = self.pool.extra_len()
-        self.pool.add_extra(names.len() as i32)
-        self.pool.add_extra(is_mut)
-        for ni in 0..names.len() as i32:
-            self.pool.add_extra(names.get(ni as i64))
-        return self.pool.add_node(NodeKind.NK_WITH_TUPLE, start, self.prev_end(), source, tbody, extra_start)
-    let name = self.expect_ident()
-    let body = self.parse_body()
-    let encoded_name = encode_with_binding(name, is_mut)
-    self.pool.add_node(NodeKind.NK_WITH_EXPR, start, self.prev_end(), source, body, encoded_name)
+                if self.peek() == TokenKind.TK_COMMA:
+                    self.advance()
+                    self.skip_newlines()
+                else:
+                    break
+            self.expect(TokenKind.TK_R_PAREN)
+            let extra_start = self.pool.extra_len()
+            self.pool.add_extra(names.len() as i32)
+            self.pool.add_extra(is_mut)
+            for ni in 0..names.len() as i32:
+                self.pool.add_extra(names.get(ni as i64))
+            item_sources.push(source as i32)
+            item_payloads.push(extra_start)
+            item_is_tuple.push(1)
+        else:
+            let name = self.expect_ident()
+            item_sources.push(source as i32)
+            item_payloads.push(encode_with_binding(name, is_mut))
+            item_is_tuple.push(0)
+
+        self.skip_newlines()
+        if self.peek() == TokenKind.TK_COMMA:
+            self.advance()
+            self.skip_newlines()
+        else:
+            keep_parsing_items = 0
+
+    var body = self.parse_body() as i32
+    let final_end = self.prev_end()
+    var i = item_sources.len() as i32 - 1
+    while i >= 0:
+        let item_source = item_sources.get(i as i64)
+        let item_start = if i == 0: start else: self.pool.get_start(item_source as NodeId)
+        if item_is_tuple.get(i as i64) != 0:
+            body = self.pool.add_node(NodeKind.NK_WITH_TUPLE, item_start, final_end, item_source as NodeId, body as NodeId, item_payloads.get(i as i64)) as i32
+        else:
+            body = self.pool.add_node(NodeKind.NK_WITH_EXPR, item_start, final_end, item_source as NodeId, body as NodeId, item_payloads.get(i as i64)) as i32
+        i = i - 1
+    body as NodeId
 
 // ── Brace expression (block expr or record update) ──────────────
 

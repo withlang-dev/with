@@ -308,6 +308,8 @@ enum DropKind: i32:
     DK_STORAGE = 1
     DK_TASK_DETACHED = 2
     DK_TASK_EPHEMERAL = 3
+    DK_WITH_GUARD = 4
+    DK_WITH_GUARD_MUT = 5
 
 // ── Data records ─────────────────────────────────────────────────
 
