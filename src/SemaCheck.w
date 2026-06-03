@@ -2700,7 +2700,8 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
             if self.enum_has_variant(exp_resolved as i32, self.syms.none) != 0:
                 name = self.syms.none
             else if self.enum_has_variant(exp_resolved as i32, self.syms.err) != 0:
-                name = self.syms.err
+                self.emit_error("Result for-comprehension guards are not allowed because guard failure has no implicit Err value", node)
+                return 0 as TypeId
             self.comp_resolved.insert(node, name)
         let expected_variant_ty = self.expected_variant_constructor_type(name)
         if expected_variant_ty != 0:

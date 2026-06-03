@@ -3330,8 +3330,14 @@ fn MirBuilder.lower_if(self: MirBuilder, cond_expr: i32, then_expr: i32, else_ex
     self.body.new_operand(OperandKind.OK_MOVE, result_place)
 
 fn MirBuilder.lower_if_let(self: MirBuilder, pat: i32, scrutinee_expr: i32, then_expr: i32, else_expr_opt: i32, node: i32) -> i32:
-    let scrutinee_op = self.lower_expr(scrutinee_expr)
     let scrutinee_ty = self.expr_type(scrutinee_expr)
+    let saved_expected = self.expected_type
+    if scrutinee_ty != 0 and scrutinee_ty != self.sema.ty_void as i32:
+        self.expected_type = scrutinee_ty
+    else:
+        self.expected_type = 0
+    let scrutinee_op = self.lower_expr(scrutinee_expr)
+    self.expected_type = saved_expected
     let scrutinee_place = self.materialize_operand(scrutinee_op, scrutinee_ty, self.ast.get_start(scrutinee_expr))
 
     let then_bb = self.new_block()
@@ -5125,13 +5131,22 @@ fn MirBuilder.lower_match(self: MirBuilder, scrutinee_expr: i32, arms_start: i32
     if arms_count == 0:
         return self.unit_operand()
 
-    let scrutinee_op = self.lower_expr(scrutinee_expr)
     let scrutinee_ty = self.expr_type(scrutinee_expr)
+    let saved_scrutinee_expected = self.expected_type
+    if scrutinee_ty != 0 and scrutinee_ty != self.sema.ty_void as i32:
+        self.expected_type = scrutinee_ty
+    else:
+        self.expected_type = 0
+    let scrutinee_op = self.lower_expr(scrutinee_expr)
+    self.expected_type = saved_scrutinee_expected
     let scrutinee_place = self.materialize_operand(scrutinee_op, scrutinee_ty, self.ast.get_start(scrutinee_expr))
 
     let result_ty = self.expr_type(node)
-    let result_local = self.new_temp(result_ty)
-    let result_place = self.place_for_local(result_local)
+    let result_is_void = if result_ty == 0 or result_ty == self.sema.ty_void as i32: 1 else: 0
+    var result_place = -1
+    if result_is_void == 0:
+        let result_local = self.new_temp(result_ty)
+        result_place = self.place_for_local(result_local)
     let join_bb = self.new_block()
 
     var dispatch_bb = self.cur_bb
@@ -5161,13 +5176,18 @@ fn MirBuilder.lower_match(self: MirBuilder, scrutinee_expr: i32, arms_start: i32
             self.terminate(TermKind.TK_SWITCH_INT, guard_op, table, fail_bb, 0)
             self.switch_to(guard_pass_bb)
 
-        let arm_value = self.lower_expr(body_node)
-        self.assign_operand_to_place(result_place, arm_value, self.ast.get_start(body_node))
+        if result_is_void != 0:
+            let _ = self.lower_expr_discard(body_node)
+        else:
+            let arm_value = self.lower_expr(body_node)
+            self.assign_operand_to_place(result_place, arm_value, self.ast.get_start(body_node))
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
 
         dispatch_bb = fail_bb
 
     self.switch_to(join_bb)
+    if result_is_void != 0:
+        return self.unit_operand()
     if self.sema.is_copy(result_ty) != 0:
         return self.body.new_operand(OperandKind.OK_COPY, result_place)
     self.body.new_operand(OperandKind.OK_MOVE, result_place)
