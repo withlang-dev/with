@@ -627,6 +627,9 @@ fn run_cli(argc: i32) -> i32:
         return run_run_command(cli_command(argc), "", opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info)
 
     if cli_command(argc) == "build":
+        if cli_has_flag(argc, "--help") or cli_has_flag(argc, "-h"):
+            print_build_usage()
+            return 0
         let parsed_build = parse_build_command_options(argc)
         if not parsed_build.ok:
             with_eprint("error: " ++ parsed_build.error_msg)
@@ -2483,6 +2486,35 @@ fn print_usage:
     with_write("  --emit-obj       Emit an object file instead of a binary\n")
     with_write("  --dump-project-info\n")
     with_write("                   Print resolved project metadata from 'check'\n")
+    with_write("  --no-std         Disable standard library support\n")
+    with_write("  --no-runtime     Disable the fiber runtime; async constructs are errors\n")
+    with_write("  --no-prelude     Disable implicit prelude import\n")
+    with_write("  --prelude=<mode> Select prelude mode: full, core, none\n")
+    with_write("  --freestanding   Alias for --no-std --no-runtime --no-prelude\n")
+
+fn print_build_usage:
+    with_write("Usage: with build [source.w|:target] [options]\n")
+    with_write("\n")
+    with_write("Builds a source file or a target from build.w.\n")
+    with_write("\n")
+    with_write("Examples:\n")
+    with_write("\n")
+    with_write("  with build src/main.w\n")
+    with_write("  with build :test\n")
+    with_write("  with build :fixpoint\n")
+    with_write("\n")
+    with_write("Build Options:\n")
+    with_write("\n")
+    with_write("  -h, --help       Print this help and exit\n")
+    with_write("  -O0|-O1|-O2|-O3  Set optimization level\n")
+    with_write("  -o, --output     Write output to path\n")
+    with_write("  --release        Enable release defaults\n")
+    with_write("  --emit-c         Emit C instead of a binary\n")
+    with_write("  --emit-obj       Emit an object file instead of a binary\n")
+    with_write("  --graph          Print the build graph and exit\n")
+    with_write("  --dry-run        Print planned build actions without running them\n")
+    with_write("  --no-deps        Build only the selected target\n")
+    with_write("  --explain <name> Explain a build graph target\n")
     with_write("  --no-std         Disable standard library support\n")
     with_write("  --no-runtime     Disable the fiber runtime; async constructs are errors\n")
     with_write("  --no-prelude     Disable implicit prelude import\n")

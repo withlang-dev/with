@@ -294,7 +294,35 @@ fn bs_check_help(ctx: ActionCtx, compiler_path: str) -> i32:
     let forbid_help_use = bs_assert_not_contains(ctx, result.stdout, "with help use", "top_level_help")
     if forbid_help_use != 0:
         return forbid_help_use
-    bs_assert_not_contains(ctx, result.stdout, "--prefer-curly", "top_level_help")
+    let forbid_prefer_curly = bs_assert_not_contains(ctx, result.stdout, "--prefer-curly", "top_level_help")
+    if forbid_prefer_curly != 0:
+        return forbid_prefer_curly
+
+    var build_args: Vec[str] = Vec.new()
+    build_args |> push("build")
+    build_args |> push("--help")
+    let build_help = bs_run_cli_expect_success(ctx, compiler_path, "build-help", build_args)
+    if build_help.rc != 0:
+        return build_help.rc
+    let build_checks: Vec[str] = Vec.new()
+    build_checks |> push("Usage: with build [source.w|:target] [options]")
+    build_checks |> push("  --graph          Print the build graph and exit")
+    build_checks |> push("  --emit-c         Emit C instead of a binary")
+    for bi in 0..build_checks.len() as i32:
+        let brc = bs_assert_contains(ctx, build_help.stdout, build_checks.get(bi as i64), "build_help")
+        if brc != 0:
+            return brc
+    let forbid_build_run = bs_assert_not_contains(ctx, build_help.stdout, "[build] wrote", "build_help")
+    if forbid_build_run != 0:
+        return forbid_build_run
+
+    var build_short_args: Vec[str] = Vec.new()
+    build_short_args |> push("build")
+    build_short_args |> push("-h")
+    let build_short_help = bs_run_cli_expect_success(ctx, compiler_path, "build-help-short", build_short_args)
+    if build_short_help.rc != 0:
+        return build_short_help.rc
+    bs_assert_contains(ctx, build_short_help.stdout, "Usage: with build [source.w|:target] [options]", "build_help_short")
 
 fn bs_test_args(source_path: str) -> Vec[str]:
     let args: Vec[str] = Vec.new()
