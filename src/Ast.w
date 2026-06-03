@@ -1402,6 +1402,18 @@ fn AstPool.for_binding_is_pattern(self: AstPool, node: NodeId) -> bool:
     let for_end = self.get_end(node)
     self.get_start(bind_node) >= for_start and self.get_end(bind_node) <= for_end
 
+fn AstPool.comprehension_binding_is_pattern(self: AstPool, node: NodeId, binding: i32) -> bool:
+    if node <= 0 or node >= self.node_count():
+        return false
+    if self.kind(node) != NodeKind.NK_ARRAY_COMPREHENSION:
+        return false
+    if not self.is_pattern_node(binding):
+        return false
+    let bind_node = binding as NodeId
+    let comp_start = self.get_start(node)
+    let comp_end = self.get_end(node)
+    self.get_start(bind_node) >= comp_start and self.get_end(bind_node) <= comp_end
+
 // ── Node Data Layout Reference ───────────────────────────────────
 //
 // NodeKind.NK_FN_DECL:       d0=name(sym), d1=body(node), d2=flags
@@ -1462,8 +1474,8 @@ fn AstPool.for_binding_is_pattern(self: AstPool, node: NodeId) -> bool:
 // NodeKind.NK_MATCH_ARM:     d0=pattern(node), d1=body(node), d2=guard(node,0=none)
 // NodeKind.NK_TUPLE:         d0=extra_start, d1=elem_count, d2=0
 // NodeKind.NK_ARRAY_LIT:     d0=extra_start, d1=elem_count, d2=0
-// NodeKind.NK_ARRAY_COMPREHENSION: d0=expr(node), d1=binding(sym), d2=iterable(node)
-//                   extra: [filter(node,0=none)]
+// NodeKind.NK_ARRAY_COMPREHENSION: d0=expr(node), d1=extra_start, d2=clause_count
+//                   extra per clause: [binding(pattern or sym), iterable(node), filter(node,0=none)]
 // NodeKind.NK_STRUCT_LIT:    d0=name(sym), d1=extra_start, d2=field_count
 // NodeKind.NK_CLOSURE:       d0=body(node), d1=extra_start, d2=param_count
 // NodeKind.NK_CAST:          d0=expr(node), d1=target_type(node), d2=0

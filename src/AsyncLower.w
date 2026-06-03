@@ -259,7 +259,12 @@ fn AsyncLower.walk_expr(self: AsyncLower, node: i32):
         return
 
     if kind == NodeKind.NK_ARRAY_COMPREHENSION:
-        self.walk_expr(async_ast_get_data2(self.ast, node))
+        let comp_start = async_ast_get_data1(self.ast, node)
+        let clause_count = async_ast_get_data2(self.ast, node)
+        for ci in 0..clause_count:
+            let base = comp_start + ci * 3
+            self.walk_expr(async_extra_or_zero(self.ast, base + 1))
+            self.walk_expr(async_extra_or_zero(self.ast, base + 2))
         self.walk_expr(async_ast_get_data0(self.ast, node))
         return
 

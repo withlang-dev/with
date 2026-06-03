@@ -665,11 +665,24 @@ fn ResolveState.walk_expr(self: ResolveState, pool: AstPool, module_id: i32, par
         return
 
     if kind == NodeKind.NK_ARRAY_COMPREHENSION:
-        self.walk_expr(pool, module_id, parent_def, current_scope, pool.get_data2(node))
-        let comp_scope = self.add_scope(module_id, current_scope, parent_def, ScopeKind.SK_COMPREHENSION)
-        let binding = pool.get_data1(node)
-        let bdef = self.add_def(module_id, parent_def, DefKind.DK_LOCAL, binding, pool.get_start(node), pool.get_end(node))
-        self.add_binding(comp_scope, binding, bdef)
+        let comp_start = pool.get_data1(node)
+        let clause_count = pool.get_data2(node)
+        var comp_scope = current_scope
+        for ci in 0..clause_count:
+            let base = comp_start + ci * 3
+            let binding = resolve_extra_or_zero(pool, base)
+            let iterable = resolve_extra_or_zero(pool, base + 1)
+            let filter = resolve_extra_or_zero(pool, base + 2)
+            self.walk_expr(pool, module_id, parent_def, comp_scope, iterable)
+            let clause_scope = self.add_scope(module_id, comp_scope, parent_def, ScopeKind.SK_COMPREHENSION)
+            if pool.comprehension_binding_is_pattern(node, binding):
+                self.bind_pattern(pool, module_id, parent_def, clause_scope, binding)
+            else if binding > 0:
+                let bdef = self.add_def(module_id, parent_def, DefKind.DK_LOCAL, binding, pool.get_start(node), pool.get_end(node))
+                self.add_binding(clause_scope, binding, bdef)
+            if filter != 0:
+                self.walk_expr(pool, module_id, parent_def, clause_scope, filter)
+            comp_scope = clause_scope
         self.walk_expr(pool, module_id, parent_def, comp_scope, pool.get_data0(node))
         return
 

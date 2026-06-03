@@ -3609,6 +3609,404 @@ fn MirBuilder.bind_for_element(self: MirBuilder, for_node: i32, pat_or_sym: i32,
         let item_op = self.body.new_operand(OperandKind.OK_COPY, item_place)
         self.assign_operand_to_place(bind_place, item_op, self.ast.get_start(body_expr))
 
+fn MirBuilder.bind_comprehension_element(self: MirBuilder, comp_node: i32, pat_or_sym: i32, item_place: i32, elem_ty: i32, span_node: i32):
+    if self.ast.comprehension_binding_is_pattern(comp_node, pat_or_sym):
+        let _ = self.lower_pattern(pat_or_sym, item_place)
+        return
+    if pat_or_sym != 0:
+        let bind_local = self.body.new_local(elem_ty, 0, pat_or_sym, 1)
+        self.bind_local(pat_or_sym, bind_local)
+        self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, bind_local, 0, self.ast.get_start(span_node))
+        if self.sema.is_copy(elem_ty) == 0:
+            self.schedule_drop(bind_local, DropKind.DK_VALUE)
+        let bind_place = self.place_for_local(bind_local)
+        let item_op = self.body.new_operand(OperandKind.OK_COPY, item_place)
+        self.assign_operand_to_place(bind_place, item_op, self.ast.get_start(span_node))
+
+fn MirBuilder.lower_comprehension_leaf(self: MirBuilder, comp_node: i32, out_place: i32, out_elem_ty: i32):
+    let expr = self.ast.get_data0(comp_node)
+    let saved_expected = self.expected_type
+    if out_elem_ty > 0 and out_elem_ty != self.sema.ty_void:
+        self.expected_type = out_elem_ty
+    let elem_op = self.lower_expr(expr)
+    self.expected_type = saved_expected
+    self.emit_vec_push(out_place, elem_op, self.ast.get_start(expr))
+
+fn MirBuilder.lower_comprehension_next_or_push(self: MirBuilder, comp_node: i32, clause_index: i32, out_place: i32, out_elem_ty: i32):
+    let clause_count = self.ast.get_data2(comp_node)
+    if clause_index >= clause_count:
+        self.lower_comprehension_leaf(comp_node, out_place, out_elem_ty)
+        return
+    self.lower_comprehension_clause(comp_node, clause_index, out_place, out_elem_ty)
+
+fn MirBuilder.lower_comprehension_body(self: MirBuilder, comp_node: i32, clause_index: i32, out_place: i32, out_elem_ty: i32, continue_bb: i32):
+    let comp_start = self.ast.get_data1(comp_node)
+    let filter = self.ast.get_extra(comp_start + clause_index * 3 + 2)
+    if filter != 0:
+        let pass_bb = self.new_block()
+        let skip_bb = self.new_block()
+        let cond_op = self.lower_expr(filter)
+        let vals: Vec[i32] = Vec.new()
+        vals.push(1)
+        let targets: Vec[i32] = Vec.new()
+        targets.push(pass_bb as i32)
+        let table = self.body.new_switch_table(vals, targets)
+        self.terminate(TermKind.TK_SWITCH_INT, cond_op, table, skip_bb, 0)
+
+        self.switch_to(pass_bb)
+        self.lower_comprehension_next_or_push(comp_node, clause_index + 1, out_place, out_elem_ty)
+        self.terminate(TermKind.TK_GOTO, continue_bb, 0, 0, 0)
+
+        self.switch_to(skip_bb)
+        self.terminate(TermKind.TK_GOTO, continue_bb, 0, 0, 0)
+        return
+
+    self.lower_comprehension_next_or_push(comp_node, clause_index + 1, out_place, out_elem_ty)
+    self.terminate(TermKind.TK_GOTO, continue_bb, 0, 0, 0)
+
+fn MirBuilder.lower_comprehension_range_var(self: MirBuilder, comp_node: i32, clause_index: i32, out_place: i32, out_elem_ty: i32, pat_or_sym: i32, iter_expr: i32, range_ty: i32):
+    let elem_ty = self.sema.get_type_d0(range_ty)
+    let range_op = self.lower_expr(iter_expr)
+    let range_place = self.materialize_operand(range_op, range_ty, self.ast.get_start(iter_expr))
+
+    let start_place = self.body.new_field_place(range_place, 0, elem_ty)
+    let end_place_field = self.body.new_field_place(range_place, 1, elem_ty)
+
+    let start_op = self.body.new_operand(OperandKind.OK_COPY, start_place)
+    let end_op = self.body.new_operand(OperandKind.OK_COPY, end_place_field)
+
+    let counter_local = self.new_temp(elem_ty)
+    let counter_place = self.place_for_local(counter_local)
+    self.assign_operand_to_place(counter_place, start_op, self.ast.get_start(iter_expr))
+
+    let end_local = self.new_temp(elem_ty)
+    let end_place = self.place_for_local(end_local)
+    self.assign_operand_to_place(end_place, end_op, self.ast.get_start(iter_expr))
+
+    let header_bb = self.new_block()
+    let body_bb = self.new_block()
+    let inc_bb = self.new_block()
+    let exit_bb = self.new_block()
+
+    self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
+    self.switch_to(header_bb)
+    let counter_read = self.body.new_operand(OperandKind.OK_COPY, counter_place)
+    let end_read = self.body.new_operand(OperandKind.OK_COPY, end_place)
+    let inclusive = self.sema.get_type_d1(range_ty)
+    let cmp_op = if inclusive != 0: BinaryOp.OP_LTE else: BinaryOp.OP_LT
+    let cmp_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, cmp_op, counter_read, end_read)
+    let cmp_local = self.new_temp(self.sema.ty_bool)
+    let cmp_place = self.place_for_local(cmp_local)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(iter_expr))
+    let cmp_result = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
+    let vals: Vec[i32] = Vec.new()
+    vals.push(1)
+    let targets: Vec[i32] = Vec.new()
+    targets.push(body_bb as i32)
+    let table = self.body.new_switch_table(vals, targets)
+    self.terminate(TermKind.TK_SWITCH_INT, cmp_result, table, exit_bb, 0)
+
+    self.switch_to(body_bb)
+    self.bind_comprehension_element(comp_node, pat_or_sym, counter_place, elem_ty, iter_expr)
+    self.lower_comprehension_body(comp_node, clause_index, out_place, out_elem_ty, inc_bb)
+
+    self.switch_to(inc_bb)
+    let cur_op = self.body.new_operand(OperandKind.OK_COPY, counter_place)
+    let one_op = self.int_const_operand(1, elem_ty)
+    let add_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_ADD, cur_op, one_op)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, add_rv, self.ast.get_start(iter_expr))
+    self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
+
+    self.switch_to(exit_bb)
+
+fn MirBuilder.lower_comprehension_range(self: MirBuilder, comp_node: i32, clause_index: i32, out_place: i32, out_elem_ty: i32, pat_or_sym: i32, range_node: i32):
+    let start_node = self.ast.get_data0(range_node)
+    let end_node = self.ast.get_data1(range_node)
+    let inclusive = self.ast.get_data2(range_node)
+    let elem_ty = self.sema.infer_for_element_type(self.expr_type(range_node))
+
+    let start_op = if start_node != 0: self.lower_expr(start_node) else: self.int_const_operand(0, elem_ty)
+    let end_op = self.lower_expr(end_node)
+
+    let counter_local = self.new_temp(elem_ty)
+    let counter_place = self.place_for_local(counter_local)
+    let start_rv = self.body.new_rvalue(RvalueKind.RK_USE, start_op, 0, 0)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, start_rv, self.ast.get_start(range_node))
+
+    let end_local = self.new_temp(elem_ty)
+    let end_place = self.place_for_local(end_local)
+    let end_rv = self.body.new_rvalue(RvalueKind.RK_USE, end_op, 0, 0)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, end_place, end_rv, self.ast.get_start(range_node))
+
+    let header_bb = self.new_block()
+    let body_bb = self.new_block()
+    let inc_bb = self.new_block()
+    let exit_bb = self.new_block()
+
+    self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
+    self.switch_to(header_bb)
+    let counter_op = self.body.new_operand(OperandKind.OK_COPY, counter_place)
+    let end_read_op = self.body.new_operand(OperandKind.OK_COPY, end_place)
+    let cmp_op = if inclusive != 0: BinaryOp.OP_LTE else: BinaryOp.OP_LT
+    let cmp_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, cmp_op, counter_op, end_read_op)
+    let cmp_local = self.new_temp(self.sema.ty_bool)
+    let cmp_place = self.place_for_local(cmp_local)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(range_node))
+    let cmp_result = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
+    let vals: Vec[i32] = Vec.new()
+    vals.push(1)
+    let targets: Vec[i32] = Vec.new()
+    targets.push(body_bb as i32)
+    let table = self.body.new_switch_table(vals, targets)
+    self.terminate(TermKind.TK_SWITCH_INT, cmp_result, table, exit_bb, 0)
+
+    self.switch_to(body_bb)
+    self.bind_comprehension_element(comp_node, pat_or_sym, counter_place, elem_ty, range_node)
+    self.lower_comprehension_body(comp_node, clause_index, out_place, out_elem_ty, inc_bb)
+
+    self.switch_to(inc_bb)
+    let cur_op2 = self.body.new_operand(OperandKind.OK_COPY, counter_place)
+    let one_op = self.int_const_operand(1, elem_ty)
+    let add_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_ADD, cur_op2, one_op)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, add_rv, self.ast.get_start(range_node))
+    self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
+
+    self.switch_to(exit_bb)
+
+fn MirBuilder.lower_comprehension_slice(self: MirBuilder, comp_node: i32, clause_index: i32, out_place: i32, out_elem_ty: i32, pat_or_sym: i32, iter_expr: i32):
+    let iter_op = self.lower_expr(iter_expr)
+    let iter_ty = self.expr_type(iter_expr)
+    let elem_ty = self.sema.infer_for_element_type(iter_ty)
+    let slice_place = self.materialize_operand(iter_op, iter_ty, self.ast.get_start(iter_expr))
+
+    let len_local = self.new_temp(self.sema.ty_i64)
+    let len_place = self.place_for_local(len_local)
+    let len_rv = self.body.new_rvalue(RvalueKind.RK_LEN, slice_place, 0, 0)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, len_place, len_rv, self.ast.get_start(iter_expr))
+
+    let counter_local = self.new_temp(self.sema.ty_i64)
+    let counter_place = self.place_for_local(counter_local)
+    let zero_op = self.int_const_operand(0, self.sema.ty_i64)
+    let zero_rv = self.body.new_rvalue(RvalueKind.RK_USE, zero_op, 0, 0)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, zero_rv, self.ast.get_start(iter_expr))
+
+    let header_bb = self.new_block()
+    let body_bb = self.new_block()
+    let inc_bb = self.new_block()
+    let exit_bb = self.new_block()
+
+    self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
+    self.switch_to(header_bb)
+    let counter_op = self.body.new_operand(OperandKind.OK_COPY, counter_place)
+    let len_op = self.body.new_operand(OperandKind.OK_COPY, len_place)
+    let cmp_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_LT, counter_op, len_op)
+    let cmp_local = self.new_temp(self.sema.ty_bool)
+    let cmp_place = self.place_for_local(cmp_local)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(iter_expr))
+    let cmp_read = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
+    let vals: Vec[i32] = Vec.new()
+    vals.push(1)
+    let targets: Vec[i32] = Vec.new()
+    targets.push(body_bb as i32)
+    let table = self.body.new_switch_table(vals, targets)
+    self.terminate(TermKind.TK_SWITCH_INT, cmp_read, table, exit_bb, 0)
+
+    self.switch_to(body_bb)
+    let idx_place = self.body.new_index_place(slice_place, counter_local, 0)
+    let elem_op = self.body.new_operand(OperandKind.OK_COPY, idx_place)
+    let elem_local = self.new_temp(elem_ty)
+    let elem_place = self.place_for_local(elem_local)
+    self.assign_operand_to_place(elem_place, elem_op, self.ast.get_start(iter_expr))
+    self.bind_comprehension_element(comp_node, pat_or_sym, elem_place, elem_ty, iter_expr)
+    self.lower_comprehension_body(comp_node, clause_index, out_place, out_elem_ty, inc_bb)
+
+    self.switch_to(inc_bb)
+    let cur_op2 = self.body.new_operand(OperandKind.OK_COPY, counter_place)
+    let one_op = self.int_const_operand(1, self.sema.ty_i64)
+    let add_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_ADD, cur_op2, one_op)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, add_rv, self.ast.get_start(iter_expr))
+    self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
+
+    self.switch_to(exit_bb)
+
+fn MirBuilder.lower_comprehension_vec(self: MirBuilder, comp_node: i32, clause_index: i32, out_place: i32, out_elem_ty: i32, pat_or_sym: i32, iter_expr: i32):
+    let iter_op = self.lower_expr(iter_expr)
+    let iter_ty = self.expr_type(iter_expr)
+    let elem_ty = self.sema.infer_for_element_type(iter_ty)
+    let vec_place = self.materialize_operand(iter_op, iter_ty, self.ast.get_start(iter_expr))
+
+    let len_local = self.new_temp(self.sema.ty_i64)
+    let len_place = self.place_for_local(len_local)
+    self.emit_vec_len_into(vec_place, len_place, self.ast.get_start(iter_expr))
+
+    let counter_local = self.new_temp(self.sema.ty_i64)
+    let counter_place = self.place_for_local(counter_local)
+    let zero_op = self.int_const_operand(0, self.sema.ty_i64)
+    let zero_rv = self.body.new_rvalue(RvalueKind.RK_USE, zero_op, 0, 0)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, zero_rv, self.ast.get_start(iter_expr))
+
+    let header_bb = self.new_block()
+    let body_bb = self.new_block()
+    let inc_bb = self.new_block()
+    let exit_bb = self.new_block()
+
+    self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
+    self.switch_to(header_bb)
+    let counter_op = self.body.new_operand(OperandKind.OK_COPY, counter_place)
+    let len_op = self.body.new_operand(OperandKind.OK_COPY, len_place)
+    let cmp_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_LT, counter_op, len_op)
+    let cmp_local = self.new_temp(self.sema.ty_bool)
+    let cmp_place = self.place_for_local(cmp_local)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, cmp_place, cmp_rv, self.ast.get_start(iter_expr))
+    let cmp_read = self.body.new_operand(OperandKind.OK_COPY, cmp_place)
+    let vals: Vec[i32] = Vec.new()
+    vals.push(1)
+    let targets: Vec[i32] = Vec.new()
+    targets.push(body_bb as i32)
+    let table = self.body.new_switch_table(vals, targets)
+    self.terminate(TermKind.TK_SWITCH_INT, cmp_read, table, exit_bb, 0)
+
+    self.switch_to(body_bb)
+    let elem_local = self.new_temp(elem_ty)
+    let elem_place = self.place_for_local(elem_local)
+    self.emit_vec_get_into(vec_place, counter_place, elem_place, self.ast.get_start(iter_expr))
+    self.bind_comprehension_element(comp_node, pat_or_sym, elem_place, elem_ty, iter_expr)
+    self.lower_comprehension_body(comp_node, clause_index, out_place, out_elem_ty, inc_bb)
+
+    self.switch_to(inc_bb)
+    let cur_op2 = self.body.new_operand(OperandKind.OK_COPY, counter_place)
+    let one_op = self.int_const_operand(1, self.sema.ty_i64)
+    let add_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_ADD, cur_op2, one_op)
+    self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, add_rv, self.ast.get_start(iter_expr))
+    self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
+
+    self.switch_to(exit_bb)
+
+fn MirBuilder.lower_comprehension_generic_iter(self: MirBuilder, comp_node: i32, clause_index: i32, out_place: i32, out_elem_ty: i32, pat_or_sym: i32, iter_expr: i32, iter_ty: i32):
+    let next_sym = self.pool.intern("next")
+    let callee_sym = self.resolve_method_callee_sym(iter_expr, next_sym)
+    if callee_sym == next_sym:
+        self.mark_unsupported()
+        return
+
+    let iter_op = self.lower_expr(iter_expr)
+    let iter_place = self.materialize_operand(iter_op, iter_ty, self.ast.get_start(iter_expr))
+    let elem_ty = self.sema.infer_for_element_type(iter_ty)
+
+    let resolved_iter = self.sema.resolve_alias(iter_ty)
+    let owner_sym = self.sema.method_owner_symbol_for_type(resolved_iter as i32)
+    let sema_next_sym = self.sema.pool_lookup_symbol("next")
+    var next_ret_ty = 0
+    if owner_sym != 0 and sema_next_sym > 0:
+        let sig_idx = self.sema.lookup_method_sig(owner_sym, sema_next_sym)
+        if sig_idx >= 0:
+            next_ret_ty = self.sema.sig_return_type(sig_idx)
+    if next_ret_ty == 0:
+        next_ret_ty = iter_ty
+
+    let fn_op = self.const_operand(ConstKind.CK_FN, callee_sym, self.sema.ty_void)
+    let header_bb = self.new_block()
+    let body_bb = self.new_block()
+    let exit_bb = self.new_block()
+
+    self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
+    self.switch_to(header_bb)
+    let next_args: Vec[i32] = Vec.new()
+    next_args.push(self.body.new_operand(OperandKind.OK_COPY, iter_place))
+    let args_id = self.body.new_call_args(next_args)
+    let next_local = self.new_temp(next_ret_ty)
+    let next_place = self.place_for_local(next_local)
+    let after_next_bb = self.new_block()
+    self.terminate(TermKind.TK_CALL, fn_op, args_id, next_place, after_next_bb)
+
+    self.switch_to(after_next_bb)
+    let disc = self.lower_enum_discriminant(next_place)
+    let some_idx = self.success_variant_index()
+    let vals: Vec[i32] = Vec.new()
+    vals.push(some_idx)
+    let targets: Vec[i32] = Vec.new()
+    targets.push(body_bb as i32)
+    let table = self.body.new_switch_table(vals, targets)
+    self.terminate(TermKind.TK_SWITCH_INT, disc, table, exit_bb, 0)
+
+    self.switch_to(body_bb)
+    let item_local = self.new_temp(elem_ty)
+    let item_place = self.place_for_local(item_local)
+    let downcast_place = self.body.new_downcast_place(next_place, some_idx, next_ret_ty)
+    let payload_place = self.body.new_field_place(downcast_place, 0, elem_ty)
+    let next_payload = self.body.new_operand(OperandKind.OK_COPY, payload_place)
+    self.assign_operand_to_place(item_place, next_payload, self.ast.get_start(iter_expr))
+    self.bind_comprehension_element(comp_node, pat_or_sym, item_place, elem_ty, iter_expr)
+    self.lower_comprehension_body(comp_node, clause_index, out_place, out_elem_ty, header_bb)
+
+    self.switch_to(exit_bb)
+
+fn MirBuilder.lower_comprehension_clause(self: MirBuilder, comp_node: i32, clause_index: i32, out_place: i32, out_elem_ty: i32):
+    let comp_start = self.ast.get_data1(comp_node)
+    let base = comp_start + clause_index * 3
+    let pat_or_sym = self.ast.get_extra(base)
+    let iter_expr = self.ast.get_extra(base + 1)
+
+    if self.ast.kind(iter_expr) == NodeKind.NK_RANGE:
+        self.lower_comprehension_range(comp_node, clause_index, out_place, out_elem_ty, pat_or_sym, iter_expr)
+        return
+
+    let iter_ty = self.expr_type(iter_expr)
+    if iter_ty != 0:
+        let range_resolved = self.sema.resolve_alias(iter_ty)
+        if self.sema.get_type_kind(range_resolved) == TypeKind.TY_RANGE:
+            self.lower_comprehension_range_var(comp_node, clause_index, out_place, out_elem_ty, pat_or_sym, iter_expr, range_resolved)
+            return
+
+        let resolved = self.sema.resolve_alias(iter_ty)
+        let tk = self.sema.get_type_kind(resolved)
+        if tk == TypeKind.TY_SLICE or tk == TypeKind.TY_ARRAY:
+            self.lower_comprehension_slice(comp_node, clause_index, out_place, out_elem_ty, pat_or_sym, iter_expr)
+            return
+        if tk == TypeKind.TY_GENERIC_INST:
+            let type_name_sym = self.sema.get_type_name(resolved)
+            if type_name_sym != 0:
+                let type_name = self.pool.resolve(type_name_sym)
+                if type_name == "Vec":
+                    self.lower_comprehension_vec(comp_node, clause_index, out_place, out_elem_ty, pat_or_sym, iter_expr)
+                    return
+
+    if self.ast.kind(iter_expr) == NodeKind.NK_CALL:
+        let call_callee = self.ast.get_data0(iter_expr)
+        if self.ast.kind(call_callee) == NodeKind.NK_FIELD_ACCESS:
+            let recv = self.ast.get_data0(call_callee)
+            let msym = self.ast.get_data1(call_callee)
+            let mname = self.pool.resolve(msym)
+            if mname == "iter":
+                let recv_ty = self.expr_type(recv)
+                if recv_ty != 0:
+                    let recv_resolved = self.sema.resolve_alias(recv_ty)
+                    if self.sema.get_type_kind(recv_resolved) == TypeKind.TY_GENERIC_INST:
+                        let recv_name_sym = self.sema.get_type_name(recv_resolved)
+                        if recv_name_sym != 0 and self.pool.resolve(recv_name_sym) == "Vec":
+                            self.lower_comprehension_vec(comp_node, clause_index, out_place, out_elem_ty, pat_or_sym, recv)
+                            return
+
+    self.lower_comprehension_generic_iter(comp_node, clause_index, out_place, out_elem_ty, pat_or_sym, iter_expr, iter_ty)
+
+fn MirBuilder.lower_array_comprehension(self: MirBuilder, comp_node: i32) -> i32:
+    var vec_ty = self.expr_type(comp_node)
+    if vec_ty == 0 or vec_ty == self.sema.ty_void:
+        self.mark_unsupported()
+        return self.unit_operand()
+    var elem_ty = self.generic_inst_arg_type(vec_ty, self.sema.syms.vec, 0)
+    if elem_ty == 0:
+        elem_ty = self.sema.ty_i32 as i32
+
+    let vec_local = self.new_temp(vec_ty)
+    let vec_place = self.place_for_local(vec_local)
+    self.emit_vec_new_into(vec_place, self.ast.get_start(comp_node))
+    self.lower_comprehension_clause(comp_node, 0, vec_place, elem_ty)
+
+    if self.sema.is_copy(vec_ty) != 0:
+        return self.body.new_operand(OperandKind.OK_COPY, vec_place)
+    self.body.new_operand(OperandKind.OK_MOVE, vec_place)
+
 fn MirBuilder.lower_for_range_var(self: MirBuilder, for_node: i32, pat_or_sym: i32, iter_expr: i32, body_expr: i32, range_ty: i32) -> i32:
     // for i in range_var → extract start/end/inclusive from the range struct,
     // then generate the same counter-based loop as lower_for_range.
@@ -7138,6 +7536,9 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
 
     if kind == NodeKind.NK_FOR:
         return self.lower_for(node)
+
+    if kind == NodeKind.NK_ARRAY_COMPREHENSION:
+        return self.lower_array_comprehension(node)
 
     if kind == NodeKind.NK_BREAK:
         return self.lower_break(node)
