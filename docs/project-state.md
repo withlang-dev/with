@@ -11,12 +11,15 @@ conversation context after compaction.
 
 ## Current Focus
 
-#221 core `@[no_await_guard]` enforcement is implemented as a deterministic
-MIR liveness pass: direct guard locals live across scheduler-yielding
-suspension points now produce E0701, while last-use-before-await and explicit
-drop-before-await are accepted. The verified slice deliberately excludes
-derived-borrow/view alias propagation (#331) and an explicit `no_suspend:`
-escape-hatch block (#332), which are tracked as separate follow-on designs.
+#221 and #331 core `@[no_await_guard]` enforcement is implemented as
+deterministic MIR dataflow: direct guard locals and derived references/views
+live across scheduler-yielding suspension points now produce E0701, while
+last-use-before-await, owned snapshots, and explicit drop-before-await with no
+live derived view are accepted. The verified slice deliberately excludes an
+explicit `no_suspend:` escape-hatch block (#332), which is tracked as a
+separate follow-on design. #333 tracks the separate `with test` CLI bug where
+additional file arguments are silently ignored and `with test --help` runs the
+default test target instead of printing help.
 
 Build and release flow now treats `with build` as canonical. `with build
 :test` records `out/.build-state/test-green.json` after the full suite passes.
