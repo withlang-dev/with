@@ -672,11 +672,26 @@ fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
 
     if kind == NodeKind.NK_ARRAY_COMPREHENSION:
         let expr = pool.get_data0(node)
-        let binding = pool.get_data1(node)
-        let iterable = pool.get_data2(node)
-        var out = prefix ++ "[" ++ render_expr(pool, intern, (expr) as NodeId, 0)
-        out = out ++ " for " ++ intern.resolve(binding) ++ " in " ++ render_expr(pool, intern, (iterable) as NodeId, 0)
-        return out ++ "]"
+        let comp_start = pool.get_data1(node)
+        let clause_count = pool.get_data2(node)
+        let rendered_expr = render_expr(pool, intern, (expr) as NodeId, 0)
+        var out = f"{prefix}[{rendered_expr}"
+        for ci in 0..clause_count:
+            let base = comp_start + ci * 3
+            let binding = pool.get_extra(base)
+            let iterable = pool.get_extra(base + 1)
+            var binding_text = ""
+            if pool.comprehension_binding_is_pattern(node, binding):
+                binding_text = render_pattern(pool, intern, (binding) as NodeId)
+            else:
+                binding_text = intern.resolve(binding)
+            let iterable_text = render_expr(pool, intern, (iterable) as NodeId, 0)
+            out = f"{out} for {binding_text} in {iterable_text}"
+            let filter = pool.get_extra(base + 2)
+            if filter != 0:
+                let filter_text = render_expr(pool, intern, (filter) as NodeId, 0)
+                out = f"{out} if {filter_text}"
+        return f"{out}]"
 
     if kind == NodeKind.NK_STRUCT_LIT:
         let name = intern.resolve(pool.get_data0(node))

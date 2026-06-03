@@ -814,8 +814,15 @@ fn AstPool.ct_clone_tree_with_subst(self: AstPool, node: i32, subst_sym: i32, su
 
     if kind == NodeKind.NK_ARRAY_COMPREHENSION:
         let expr = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
-        let iterable = self.ct_clone_tree_with_subst(self.get_data2(node), subst_sym, subst_node, index_sym, index_node)
-        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), expr, self.get_data1(node), iterable, self.literal_suffix(node))
+        let comp_start = self.get_data1(node)
+        let clause_count = self.get_data2(node)
+        let new_extra = self.extra_len()
+        for ci in 0..clause_count:
+            let base = comp_start + ci * 3
+            self.add_extra(self.get_extra(base))
+            self.add_extra(self.ct_clone_tree_with_subst(self.get_extra(base + 1), subst_sym, subst_node, index_sym, index_node))
+            self.add_extra(self.ct_clone_tree_with_subst(self.get_extra(base + 2), subst_sym, subst_node, index_sym, index_node))
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), expr, new_extra, clause_count, self.literal_suffix(node))
 
     if kind == NodeKind.NK_ASYNC_SCOPE:
         let body = self.ct_clone_tree_with_subst(self.get_data1(node), subst_sym, subst_node, index_sym, index_node)
@@ -1159,7 +1166,12 @@ fn Sema.ct_transform_expr(mut self: Sema, source_ast: AstPool, pool: AstPool, in
 
     if kind == NodeKind.NK_ARRAY_COMPREHENSION:
         pool.set_data0(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data0(node)))
-        pool.set_data2(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data2(node)))
+        let comp_start = pool.get_data1(node)
+        let clause_count = pool.get_data2(node)
+        for ci in 0..clause_count:
+            let base = comp_start + ci * 3
+            pool.state.extra.set_i32((base + 1) as i64, self.ct_transform_expr(source_ast, pool, intern, pool.get_extra(base + 1)))
+            pool.state.extra.set_i32((base + 2) as i64, self.ct_transform_expr(source_ast, pool, intern, pool.get_extra(base + 2)))
         return node
 
     if kind == NodeKind.NK_ASYNC_SCOPE:

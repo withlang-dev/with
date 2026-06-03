@@ -1445,8 +1445,13 @@ fn Sema.check_expr_reachable_comptime_errors(self: Sema, node: i32):
         return
 
     if kind == NodeKind.NK_ARRAY_COMPREHENSION:
+        let comp_start = self.ast.get_data1(node)
+        let clause_count = self.ast.get_data2(node)
+        for ci in 0..clause_count:
+            let base = comp_start + ci * 3
+            self.check_expr_reachable_comptime_errors(self.ast.get_extra(base + 1))
+            self.check_expr_reachable_comptime_errors(self.ast.get_extra(base + 2))
         self.check_expr_reachable_comptime_errors(self.ast.get_data0(node))
-        self.check_expr_reachable_comptime_errors(self.ast.get_data2(node))
         return
 
     if kind == NodeKind.NK_ASYNC_SCOPE:
@@ -1856,9 +1861,15 @@ fn Sema.expr_may_suspend(self: Sema, node: i32, visiting: HashMap[i32, i32]) -> 
                 return 1
         return 0
     if kind == NodeKind.NK_ARRAY_COMPREHENSION:
-        if self.expr_may_suspend(self.ast.get_data0(node), visiting) != 0:
-            return 1
-        return self.expr_may_suspend(self.ast.get_data2(node), visiting)
+        let comp_start = self.ast.get_data1(node)
+        let clause_count = self.ast.get_data2(node)
+        for ci in 0..clause_count:
+            let base = comp_start + ci * 3
+            if self.expr_may_suspend(self.ast.get_extra(base + 1), visiting) != 0:
+                return 1
+            if self.expr_may_suspend(self.ast.get_extra(base + 2), visiting) != 0:
+                return 1
+        return self.expr_may_suspend(self.ast.get_data0(node), visiting)
     if kind == NodeKind.NK_STRUCT_LIT:
         let extra_start = self.ast.get_data1(node)
         let field_count = self.ast.get_data2(node)
@@ -2109,9 +2120,15 @@ fn Sema.expr_creates_ephemeral_task(self: Sema, node: i32, visiting: HashMap[i32
                 return 1
         return 0
     if kind == NodeKind.NK_ARRAY_COMPREHENSION:
-        if self.expr_creates_ephemeral_task(self.ast.get_data0(node), visiting) != 0:
-            return 1
-        return self.expr_creates_ephemeral_task(self.ast.get_data2(node), visiting)
+        let comp_start = self.ast.get_data1(node)
+        let clause_count = self.ast.get_data2(node)
+        for ci in 0..clause_count:
+            let base = comp_start + ci * 3
+            if self.expr_creates_ephemeral_task(self.ast.get_extra(base + 1), visiting) != 0:
+                return 1
+            if self.expr_creates_ephemeral_task(self.ast.get_extra(base + 2), visiting) != 0:
+                return 1
+        return self.expr_creates_ephemeral_task(self.ast.get_data0(node), visiting)
     if kind == NodeKind.NK_STRUCT_LIT:
         let extra_start = self.ast.get_data1(node)
         let field_count = self.ast.get_data2(node)
@@ -2885,15 +2902,32 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
 
     if kind == NodeKind.NK_ARRAY_COMPREHENSION:
         let expr = self.ast.get_data0(node)
-        let binding = self.ast.get_data1(node)
-        let iterable = self.ast.get_data2(node)
-        self.push_scope()
-        let iter_ty = self.check_expr(iterable)
-        let elem_ty = self.infer_for_element_type(iter_ty as i32)
-        self.scope_put(binding, elem_ty, 0)
+        let comp_start = self.ast.get_data1(node)
+        let clause_count = self.ast.get_data2(node)
+        var pushed_scopes = 0
+        for ci in 0..clause_count:
+            let base = comp_start + ci * 3
+            let binding = self.ast.get_extra(base)
+            let iterable = self.ast.get_extra(base + 1)
+            let filter = self.ast.get_extra(base + 2)
+            let iter_ty = self.check_expr(iterable)
+            let elem_ty = self.infer_for_element_type(iter_ty as i32)
+            self.push_scope()
+            pushed_scopes = pushed_scopes + 1
+            if self.ast.comprehension_binding_is_pattern(node, binding):
+                self.check_pattern(binding, elem_ty)
+            else:
+                self.scope_put(binding, elem_ty, 0)
+            if filter != 0:
+                let filter_ty = self.check_expr(filter)
+                if filter_ty != 0 and self.types_compatible(self.ty_bool as i32, filter_ty as i32) == 0:
+                    self.emit_error("comprehension filter must be bool", filter)
         let result_elem = self.check_expr(expr)
-        self.pop_scope()
-        return self.add_type(TypeKind.TY_ARRAY, result_elem as i32, 0, 0)
+        for _ in 0..pushed_scopes:
+            self.pop_scope()
+        let result_ty = self.ensure_vec_type_for(result_elem as i32)
+        self.typed_expr_types.insert(node, result_ty)
+        return result_ty as TypeId
 
     if kind == NodeKind.NK_OPTIONAL_CHAIN:
         let base = self.check_expr(self.ast.get_data0(node))
@@ -11200,9 +11234,15 @@ fn Sema.expr_uses_symbol(self: Sema, node: i32, sym: i32) -> i32:
     if kind == NodeKind.NK_CLOSURE or kind == NodeKind.NK_CAST:
         return self.expr_uses_symbol(self.ast.get_data0(node), sym)
     if kind == NodeKind.NK_ARRAY_COMPREHENSION:
+        let comp_start = self.ast.get_data1(node)
+        let clause_count = self.ast.get_data2(node)
+        for ci in 0..clause_count:
+            let base = comp_start + ci * 3
+            if self.expr_uses_symbol(self.ast.get_extra(base + 1), sym) != 0:
+                return 1
+            if self.expr_uses_symbol(self.ast.get_extra(base + 2), sym) != 0:
+                return 1
         if self.expr_uses_symbol(self.ast.get_data0(node), sym) != 0:
-            return 1
-        if self.expr_uses_symbol(self.ast.get_data2(node), sym) != 0:
             return 1
         return 0
     if kind == NodeKind.NK_ASYNC_SCOPE:

@@ -6196,18 +6196,41 @@ fn Parser.parse_array_literal(self: Parser) -> NodeId:
                 self.pool.add_extra(first as i32)
             return self.pool.add_node(NodeKind.NK_ARRAY_LIT, start, self.prev_end(), extra_start, fill_count, 0)
 
-        // Comprehension: [expr for x in iter]
+        // Comprehension: [expr for pattern in iter ... if filter]
         if self.peek() == TokenKind.TK_KW_FOR:
-            self.advance()
-            let binding = self.expect_ident()
-            self.expect(TokenKind.TK_KW_IN)
-            let iterable = self.parse_expr()
+            let patterns: Vec[i32] = Vec.new()
+            let iterables: Vec[i32] = Vec.new()
             var filter: NodeId = 0 as NodeId
+
+            while self.peek() == TokenKind.TK_KW_FOR:
+                self.advance()
+                self.skip_newlines()
+                let binding = self.parse_pattern()
+                if self.expect(TokenKind.TK_KW_IN) == 0:
+                    return self.poisoned_expr()
+                self.skip_newlines()
+                let saved_sb = self.suppress_brace
+                self.suppress_brace = 1
+                let iterable = self.parse_expr()
+                self.suppress_brace = saved_sb
+                patterns.push(binding as i32)
+                iterables.push(iterable as i32)
+                self.skip_newlines()
+
             if self.peek() == TokenKind.TK_KW_IF:
                 self.advance()
+                self.skip_newlines()
                 filter = self.parse_expr()
+                self.skip_newlines()
+
             self.expect(TokenKind.TK_R_BRACKET)
-            return self.pool.add_node(NodeKind.NK_ARRAY_COMPREHENSION, start, self.prev_end(), first, binding, iterable)
+            let clause_count = patterns.len() as i32
+            let extra_start = self.pool.extra_len()
+            for ci in 0..clause_count:
+                self.pool.add_extra(patterns.get(ci as i64))
+                self.pool.add_extra(iterables.get(ci as i64))
+                self.pool.add_extra(if ci == clause_count - 1: filter as i32 else: 0)
+            return self.pool.add_node(NodeKind.NK_ARRAY_COMPREHENSION, start, self.prev_end(), first, extra_start, clause_count)
 
         elems.push(first as i32)
 
