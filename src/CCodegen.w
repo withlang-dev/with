@@ -4675,6 +4675,12 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.VEC_MAP: return CcBuiltin.VEC_MAP
     if intrinsic == MirIntrinsic.VEC_FILTER: return CcBuiltin.VEC_FILTER
     if intrinsic == MirIntrinsic.VEC_FOLD: return CcBuiltin.VEC_FOLD
+    if intrinsic == MirIntrinsic.ITER_MAP or intrinsic == MirIntrinsic.ITER_FILTER or intrinsic == MirIntrinsic.ITER_TAKE or intrinsic == MirIntrinsic.ITER_ZIP or intrinsic == MirIntrinsic.ITER_FLAT_MAP:
+        return CcBuiltin.GENERIC_CALL
+    if intrinsic == MirIntrinsic.ITER_FOLD or intrinsic == MirIntrinsic.ITER_REDUCE or intrinsic == MirIntrinsic.ITER_SUM or intrinsic == MirIntrinsic.ITER_COUNT or intrinsic == MirIntrinsic.ITER_COLLECT_VEC or intrinsic == MirIntrinsic.ITER_PARTITION:
+        return CcBuiltin.GENERIC_CALL
+    if intrinsic == MirIntrinsic.MAPITER_NEXT or intrinsic == MirIntrinsic.FILTERITER_NEXT or intrinsic == MirIntrinsic.TAKEITER_NEXT or intrinsic == MirIntrinsic.ZIPITER_NEXT or intrinsic == MirIntrinsic.FLATMAPITER_NEXT:
+        return CcBuiltin.GENERIC_CALL
     if intrinsic == MirIntrinsic.VEC_CONTAINS: return CcBuiltin.VEC_CONTAINS
     if intrinsic == MirIntrinsic.STR_REPEAT: return CcBuiltin.STR_REPEAT
     if intrinsic == MirIntrinsic.ARR_LEN: return CcBuiltin.ARR_LEN

@@ -6384,8 +6384,17 @@ fn Sema.check_pipeline(self: Sema, node: i32) -> i32:
     if rhs != 0:
         if self.ast.kind(rhs) == NodeKind.NK_CALL:
             let rhs_callee = self.ast.get_data0(rhs)
+            var rhs_method = 0
             if self.ast.kind(rhs_callee) == NodeKind.NK_IDENT:
-                let method = self.ast.get_data0(rhs_callee)
+                rhs_method = self.ast.get_data0(rhs_callee)
+            else if self.ast.kind(rhs_callee) == NodeKind.NK_TYPE_GENERIC:
+                rhs_method = self.ast.get_data0(rhs_callee)
+            else if self.ast.kind(rhs_callee) == NodeKind.NK_INDEX:
+                let indexed_base = self.ast.get_data0(rhs_callee)
+                if self.ast.kind(indexed_base) == NodeKind.NK_IDENT:
+                    rhs_method = self.ast.get_data0(indexed_base)
+            if rhs_method != 0:
+                let method = rhs_method
                 if self.pipeline_method_exists(lhs_ty as i32, method) != 0:
                     let ret = self.check_method_call_parts(lhs, method, self.ast.get_data1(rhs), self.ast.get_data2(rhs), node)
                     if ret != 0:
@@ -6400,6 +6409,24 @@ fn Sema.check_pipeline(self: Sema, node: i32) -> i32:
                     self.pipeline_method_calls.insert(node, method)
                     self.typed_expr_types.insert(node, ret2)
                 return ret2
+        else if self.ast.kind(rhs) == NodeKind.NK_TYPE_GENERIC:
+            let method2 = self.ast.get_data0(rhs)
+            if method2 != 0 and self.pipeline_method_exists(lhs_ty as i32, method2) != 0:
+                let ret3 = self.check_method_call_parts(lhs, method2, -1, 0, node)
+                if ret3 != 0:
+                    self.pipeline_method_calls.insert(node, method2)
+                    self.typed_expr_types.insert(node, ret3)
+                return ret3
+        else if self.ast.kind(rhs) == NodeKind.NK_INDEX:
+            let rhs_indexed_base = self.ast.get_data0(rhs)
+            if self.ast.kind(rhs_indexed_base) == NodeKind.NK_IDENT:
+                let method3 = self.ast.get_data0(rhs_indexed_base)
+                if method3 != 0 and self.pipeline_method_exists(lhs_ty as i32, method3) != 0:
+                    let ret4 = self.check_method_call_parts(lhs, method3, -1, 0, node)
+                    if ret4 != 0:
+                        self.pipeline_method_calls.insert(node, method3)
+                        self.typed_expr_types.insert(node, ret4)
+                    return ret4
     let saved = self.in_pipeline_rhs
     self.in_pipeline_rhs = 1
     let rhs_ty = self.check_expr(rhs)
@@ -6474,6 +6501,18 @@ fn Sema.pipeline_generic_builtin_method_exists(self: Sema, owner_sym: i32, field
             return 1
     if owner_sym == self.syms.veciter or owner_sym == self.syms.veciterref or owner_sym == self.syms.veciterplace:
         if field == self.syms.next:
+            return 1
+        if owner_sym == self.syms.veciter:
+            if field == self.syms.map or field == self.syms.filter or field == self.syms.take or field == self.syms.zip or field == self.syms.flat_map:
+                return 1
+            if field == self.syms.fold or field == self.syms.reduce or field == self.syms.sum or field == self.syms.count or field == self.syms.partition or field == self.syms.collect:
+                return 1
+    if owner_sym == self.syms.mapiter or owner_sym == self.syms.filteriter or owner_sym == self.syms.takeiter or owner_sym == self.syms.zipiter or owner_sym == self.syms.flatmapiter:
+        if field == self.syms.next:
+            return 1
+        if field == self.syms.map or field == self.syms.filter or field == self.syms.take or field == self.syms.zip or field == self.syms.flat_map:
+            return 1
+        if field == self.syms.fold or field == self.syms.reduce or field == self.syms.sum or field == self.syms.count or field == self.syms.partition or field == self.syms.collect:
             return 1
     0
 
@@ -8642,6 +8681,92 @@ fn Sema.ensure_vec_type_for(self: Sema, elem_ty: i32) -> i32:
     args.push(elem_ty)
     self.ensure_generic_inst_type(self.syms.vec, args, 1) as i32
 
+fn Sema.ensure_veciter_type_for(self: Sema, elem_ty: i32) -> i32:
+    let found = self.find_generic_inst(self.syms.veciter, elem_ty)
+    if found != 0:
+        return found
+    let args: Vec[i32] = Vec.new()
+    args.push(elem_ty)
+    self.ensure_generic_inst_type(self.syms.veciter, args, 1) as i32
+
+fn Sema.ensure_mapiter_type_for(self: Sema, iter_ty: i32, in_ty: i32, out_ty: i32) -> i32:
+    let args: Vec[i32] = Vec.new()
+    args.push(iter_ty)
+    args.push(in_ty)
+    args.push(out_ty)
+    self.ensure_generic_inst_type(self.syms.mapiter, args, 3) as i32
+
+fn Sema.ensure_filteriter_type_for(self: Sema, iter_ty: i32, elem_ty: i32) -> i32:
+    let args: Vec[i32] = Vec.new()
+    args.push(iter_ty)
+    args.push(elem_ty)
+    self.ensure_generic_inst_type(self.syms.filteriter, args, 2) as i32
+
+fn Sema.ensure_takeiter_type_for(self: Sema, iter_ty: i32, elem_ty: i32) -> i32:
+    let args: Vec[i32] = Vec.new()
+    args.push(iter_ty)
+    args.push(elem_ty)
+    self.ensure_generic_inst_type(self.syms.takeiter, args, 2) as i32
+
+fn Sema.ensure_zipiter_type_for(self: Sema, left_ty: i32, right_ty: i32, left_elem_ty: i32, right_elem_ty: i32) -> i32:
+    let args: Vec[i32] = Vec.new()
+    args.push(left_ty)
+    args.push(right_ty)
+    args.push(left_elem_ty)
+    args.push(right_elem_ty)
+    self.ensure_generic_inst_type(self.syms.zipiter, args, 4) as i32
+
+fn Sema.ensure_flatmapiter_type_for(self: Sema, iter_ty: i32, collection_ty: i32, inner_ty: i32, in_ty: i32, out_ty: i32) -> i32:
+    let args: Vec[i32] = Vec.new()
+    args.push(iter_ty)
+    args.push(collection_ty)
+    args.push(inner_ty)
+    args.push(in_ty)
+    args.push(out_ty)
+    self.ensure_generic_inst_type(self.syms.flatmapiter, args, 5) as i32
+
+fn Sema.iterator_owner_symbol(self: Sema, tid: i32) -> i32:
+    if tid == 0:
+        return 0
+    var resolved = self.resolve_alias(tid as TypeId)
+    let tk = self.get_type_kind(resolved)
+    if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
+        resolved = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
+    if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return 0
+    let owner = self.get_generic_inst_base(resolved as i32)
+    if owner == self.syms.veciter or owner == self.syms.mapiter or owner == self.syms.filteriter or owner == self.syms.takeiter or owner == self.syms.zipiter or owner == self.syms.flatmapiter:
+        return owner
+    0
+
+fn Sema.is_iterator_type(self: Sema, tid: i32) -> bool:
+    self.iterator_owner_symbol(tid) != 0
+
+fn Sema.iterator_element_type(self: Sema, tid: i32) -> i32:
+    if tid == 0:
+        return 0
+    var resolved = self.resolve_alias(tid as TypeId)
+    let tk = self.get_type_kind(resolved)
+    if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
+        resolved = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
+    if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return 0
+    let owner = self.get_generic_inst_base(resolved as i32)
+    if owner == self.syms.veciter:
+        return self.get_generic_inst_arg(resolved as i32, 0)
+    if owner == self.syms.mapiter:
+        return self.get_generic_inst_arg(resolved as i32, 2)
+    if owner == self.syms.filteriter or owner == self.syms.takeiter:
+        return self.get_generic_inst_arg(resolved as i32, 1)
+    if owner == self.syms.zipiter:
+        let elems: Vec[i32] = Vec.new()
+        elems.push(self.get_generic_inst_arg(resolved as i32, 2))
+        elems.push(self.get_generic_inst_arg(resolved as i32, 3))
+        return self.ensure_tuple_type(elems, 2) as i32
+    if owner == self.syms.flatmapiter:
+        return self.get_generic_inst_arg(resolved as i32, 4)
+    0
+
 fn Sema.ensure_handle_type_for(self: Sema, elem_ty: i32) -> i32:
     let found = self.find_generic_inst(self.syms.handle, elem_ty)
     if found != 0:
@@ -8850,6 +8975,29 @@ fn Sema.builtin_intrinsic_method_return_type(self: Sema, recv_type: i32, owner_s
     let method_name = self.pool_resolve(field)
     let len_method_ret = self.collection_len_method_return_type(method_name)
 
+    let iter_elem_ty = self.iterator_element_type(recv_type)
+    if iter_elem_ty != 0:
+        if field == self.syms.next:
+            return self.ensure_option_type_for(iter_elem_ty)
+        if field == self.syms.map:
+            return recv_type
+        if field == self.syms.filter or field == self.syms.take or field == self.syms.zip or field == self.syms.flat_map:
+            return recv_type
+        if field == self.syms.fold or field == self.syms.sum:
+            return iter_elem_ty
+        if field == self.syms.reduce:
+            return self.ensure_option_type_for(iter_elem_ty)
+        if field == self.syms.count:
+            return self.ty_usize as i32
+        if field == self.syms.collect:
+            return self.ensure_vec_type_for(iter_elem_ty)
+        if field == self.syms.partition:
+            let part_vec_ty = self.ensure_vec_type_for(iter_elem_ty)
+            let part_elems: Vec[i32] = Vec.new()
+            part_elems.push(part_vec_ty)
+            part_elems.push(part_vec_ty)
+            return self.ensure_tuple_type(part_elems, 2) as i32
+
     if owner_sym == self.syms.vec:
         if field == self.syms.new or method_name == "with_capacity":
             return self.generic_constructor_return_type(owner_sym, recv_type)
@@ -8968,6 +9116,23 @@ fn Sema.method_expected_arg_type(self: Sema, recv_type: i32, field: i32, arg_ind
     let owner_sym = self.get_generic_inst_base(resolved as i32)
     let owner_name = self.pool_resolve(owner_sym)
     let method_name = self.pool_resolve(field)
+    let iter_elem = self.iterator_element_type(recv_type)
+    if iter_elem != 0:
+        if (field == self.syms.map or field == self.syms.flat_map) and arg_index == 0:
+            let params: Vec[i32] = Vec.new()
+            params.push(iter_elem)
+            return self.ensure_fn_type(params, 1, 0 as TypeId) as i32
+        if (field == self.syms.filter or field == self.syms.partition) and arg_index == 0:
+            let params2: Vec[i32] = Vec.new()
+            params2.push(iter_elem)
+            return self.ensure_fn_type(params2, 1, self.ty_bool) as i32
+        if field == self.syms.reduce and arg_index == 0:
+            let params3: Vec[i32] = Vec.new()
+            params3.push(iter_elem)
+            params3.push(iter_elem)
+            return self.ensure_fn_type(params3, 2, iter_elem as TypeId) as i32
+        if field == self.syms.take and arg_index == 0:
+            return self.ty_i64 as i32
     if owner_sym == self.syms.vec:
         if (field == self.syms.push or field == self.syms.contains) and arg_index == 0:
             return self.get_generic_inst_arg(resolved as i32, 0)
@@ -8982,6 +9147,12 @@ fn Sema.method_expected_arg_type(self: Sema, recv_type: i32, field: i32, arg_ind
                 let map_params: Vec[i32] = Vec.new()
                 map_params.push(map_elem)
                 return self.ensure_fn_type(map_params, 1, 0 as TypeId) as i32
+        if field == self.syms.filter and arg_index == 0:
+            let filter_elem = self.get_generic_inst_arg(resolved as i32, 0)
+            if filter_elem != 0:
+                let filter_params: Vec[i32] = Vec.new()
+                filter_params.push(filter_elem)
+                return self.ensure_fn_type(filter_params, 1, self.ty_bool) as i32
     if owner_sym == self.syms.hashset:
         if (field == self.syms.insert or field == self.syms.contains or field == self.syms.remove) and arg_index == 0:
             return self.get_generic_inst_arg(resolved as i32, 0)
@@ -9412,6 +9583,21 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
         var mc_expected = self.atomic_method_expected_arg_type(mc_order_type, field, ai)
         if mc_expected == 0:
             mc_expected = self.method_expected_arg_type(obj_type as i32, field, ai)
+        if mc_expected == 0 and field == self.syms.fold and ai == 1 and arg_types.len() > 0:
+            let fold_elem = if self.iterator_element_type(obj_type as i32) != 0:
+                self.iterator_element_type(obj_type as i32)
+            else:
+                let fold_resolved = self.resolve_alias(obj_type)
+                if self.get_type_kind(fold_resolved) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(fold_resolved as i32) == self.syms.vec:
+                    self.get_generic_inst_arg(fold_resolved as i32, 0)
+                else:
+                    0
+            let fold_acc = arg_types.get(0)
+            if fold_elem != 0 and fold_acc != 0:
+                let fold_params: Vec[i32] = Vec.new()
+                fold_params.push(fold_acc)
+                fold_params.push(fold_elem)
+                mc_expected = self.ensure_fn_type(fold_params, 2, fold_acc as TypeId) as i32
         if mc_expected == 0 and ai < mc_static_variant_payload_tys.len() as i32:
             mc_expected = mc_static_variant_payload_tys.get(ai as i64)
         let mc_arg_ty = if mc_expected != 0: self.check_expr_with_expected(mc_arg_node, mc_expected as TypeId) else: self.check_expr(mc_arg_node)
@@ -9974,6 +10160,62 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
                 let next_args: Vec[i32] = Vec.new()
                 next_args.push(next_elem_ty)
                 return self.ensure_generic_inst_type(self.syms.option, next_args, 1) as i32
+        if self.is_iterator_type(recv_type) != 0:
+            let iter_elem_ty = self.iterator_element_type(recv_type)
+            if iter_elem_ty != 0:
+                if field == self.syms.next:
+                    return self.ensure_option_type_for(iter_elem_ty)
+                if field == self.syms.map:
+                    if arg_count >= 1:
+                        let mapper_ty = self.resolve_alias(arg_types.get(0) as TypeId)
+                        if self.get_type_kind(mapper_ty) == TypeKind.TY_FN:
+                            let mapped_elem_ty = self.get_type_d2(mapper_ty)
+                            return self.ensure_mapiter_type_for(recv_type, iter_elem_ty, mapped_elem_ty)
+                    return self.ensure_mapiter_type_for(recv_type, iter_elem_ty, iter_elem_ty)
+                if field == self.syms.filter:
+                    return self.ensure_filteriter_type_for(recv_type, iter_elem_ty)
+                if field == self.syms.take:
+                    return self.ensure_takeiter_type_for(recv_type, iter_elem_ty)
+                if field == self.syms.zip:
+                    if arg_count >= 1:
+                        let other_iter_ty = arg_types.get(0)
+                        let other_elem_ty = self.iterator_element_type(other_iter_ty)
+                        if other_elem_ty != 0:
+                            return self.ensure_zipiter_type_for(recv_type, other_iter_ty, iter_elem_ty, other_elem_ty)
+                    return 0
+                if field == self.syms.flat_map:
+                    if arg_count >= 1:
+                        let fm_ty = self.resolve_alias(arg_types.get(0) as TypeId)
+                        if self.get_type_kind(fm_ty) == TypeKind.TY_FN:
+                            let fm_inner_ty = self.get_type_d2(fm_ty)
+                            var fm_iter_ty = fm_inner_ty
+                            var fm_elem_ty = self.iterator_element_type(fm_inner_ty)
+                            if fm_elem_ty == 0:
+                                let fm_inner_resolved = self.resolve_alias(fm_inner_ty as TypeId)
+                                if self.get_type_kind(fm_inner_resolved) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(fm_inner_resolved as i32) == self.syms.vec:
+                                    fm_elem_ty = self.get_generic_inst_arg(fm_inner_resolved as i32, 0)
+                                    fm_iter_ty = self.ensure_veciter_type_for(fm_elem_ty)
+                            if fm_elem_ty != 0:
+                                return self.ensure_flatmapiter_type_for(recv_type, fm_inner_ty, fm_iter_ty, iter_elem_ty, fm_elem_ty)
+                    return 0
+                if field == self.syms.fold:
+                    if arg_count >= 1:
+                        return arg_types.get(0)
+                    return iter_elem_ty
+                if field == self.syms.reduce:
+                    return self.ensure_option_type_for(iter_elem_ty)
+                if field == self.syms.sum:
+                    return iter_elem_ty
+                if field == self.syms.count:
+                    return self.ty_usize as i32
+                if field == self.syms.collect:
+                    return self.ensure_vec_type_for(iter_elem_ty)
+                if field == self.syms.partition:
+                    let part_vec_ty = self.ensure_vec_type_for(iter_elem_ty)
+                    let part_elems: Vec[i32] = Vec.new()
+                    part_elems.push(part_vec_ty)
+                    part_elems.push(part_vec_ty)
+                    return self.ensure_tuple_type(part_elems, 2) as i32
         if type_name_sym == self.syms.veciterref:
             if field == self.syms.next:
                 let ref_elem_ty = self.get_generic_inst_arg(recv_type, 0)

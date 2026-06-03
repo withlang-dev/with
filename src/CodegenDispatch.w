@@ -4074,6 +4074,36 @@ fn Codegen.classify_generic_call_intrinsic(self: Codegen, recv_type: i32, method
     if type_name == "VecIter":
         if method_name == "next":
             return MirIntrinsic.VECITER_NEXT
+        if method_name == "map": return MirIntrinsic.ITER_MAP
+        if method_name == "filter": return MirIntrinsic.ITER_FILTER
+        if method_name == "take": return MirIntrinsic.ITER_TAKE
+        if method_name == "zip": return MirIntrinsic.ITER_ZIP
+        if method_name == "flat_map": return MirIntrinsic.ITER_FLAT_MAP
+        if method_name == "fold": return MirIntrinsic.ITER_FOLD
+        if method_name == "reduce": return MirIntrinsic.ITER_REDUCE
+        if method_name == "sum": return MirIntrinsic.ITER_SUM
+        if method_name == "count": return MirIntrinsic.ITER_COUNT
+        if method_name == "collect": return MirIntrinsic.ITER_COLLECT_VEC
+        if method_name == "partition": return MirIntrinsic.ITER_PARTITION
+        return MirIntrinsic.NONE
+    if type_name == "MapIter" or type_name == "FilterIter" or type_name == "TakeIter" or type_name == "ZipIter" or type_name == "FlatMapIter":
+        if method_name == "next":
+            if type_name == "MapIter": return MirIntrinsic.MAPITER_NEXT
+            if type_name == "FilterIter": return MirIntrinsic.FILTERITER_NEXT
+            if type_name == "TakeIter": return MirIntrinsic.TAKEITER_NEXT
+            if type_name == "ZipIter": return MirIntrinsic.ZIPITER_NEXT
+            if type_name == "FlatMapIter": return MirIntrinsic.FLATMAPITER_NEXT
+        if method_name == "map": return MirIntrinsic.ITER_MAP
+        if method_name == "filter": return MirIntrinsic.ITER_FILTER
+        if method_name == "take": return MirIntrinsic.ITER_TAKE
+        if method_name == "zip": return MirIntrinsic.ITER_ZIP
+        if method_name == "flat_map": return MirIntrinsic.ITER_FLAT_MAP
+        if method_name == "fold": return MirIntrinsic.ITER_FOLD
+        if method_name == "reduce": return MirIntrinsic.ITER_REDUCE
+        if method_name == "sum": return MirIntrinsic.ITER_SUM
+        if method_name == "count": return MirIntrinsic.ITER_COUNT
+        if method_name == "collect": return MirIntrinsic.ITER_COLLECT_VEC
+        if method_name == "partition": return MirIntrinsic.ITER_PARTITION
         return MirIntrinsic.NONE
     if type_name == "VecIterRef":
         if method_name == "next":
@@ -6551,6 +6581,26 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         result = self.mir_emit_vec_fold(body, args_id)
     else if intrinsic == MirIntrinsic.VEC_CONTAINS:
         result = self.mir_emit_vec_contains(body, args_id)
+    else if intrinsic == MirIntrinsic.ITER_MAP or intrinsic == MirIntrinsic.ITER_FILTER or intrinsic == MirIntrinsic.ITER_TAKE or intrinsic == MirIntrinsic.ITER_ZIP or intrinsic == MirIntrinsic.ITER_FLAT_MAP:
+        result = self.mir_emit_iter_adapter(body, args_id, dest_place, intrinsic)
+    else if intrinsic == MirIntrinsic.MAPITER_NEXT or intrinsic == MirIntrinsic.FILTERITER_NEXT or intrinsic == MirIntrinsic.TAKEITER_NEXT or intrinsic == MirIntrinsic.ZIPITER_NEXT or intrinsic == MirIntrinsic.FLATMAPITER_NEXT:
+        let next_arg_start = body.call_arg_starts.get(args_id as i64)
+        let next_recv_op = body.call_arg_operands.get(next_arg_start as i64)
+        let next_recv_sema = self.mir_operand_sema_type(body, next_recv_op)
+        let next_elem_tid = self.mir_iter_elem_tid(next_recv_sema)
+        result = self.mir_emit_iter_next_from_ptr(self.mir_intrinsic_recv_ptr(body, args_id), next_recv_sema, next_elem_tid)
+    else if intrinsic == MirIntrinsic.ITER_FOLD:
+        result = self.mir_emit_iter_fold(body, args_id)
+    else if intrinsic == MirIntrinsic.ITER_REDUCE:
+        result = self.mir_emit_iter_reduce(body, args_id, dest_place)
+    else if intrinsic == MirIntrinsic.ITER_COLLECT_VEC:
+        result = self.mir_emit_iter_collect_vec(body, args_id, dest_place)
+    else if intrinsic == MirIntrinsic.ITER_COUNT:
+        result = self.mir_emit_iter_count(body, args_id, dest_place)
+    else if intrinsic == MirIntrinsic.ITER_SUM:
+        result = self.mir_emit_iter_sum(body, args_id)
+    else if intrinsic == MirIntrinsic.ITER_PARTITION:
+        result = self.mir_emit_iter_partition(body, args_id, dest_place)
 
     else if intrinsic == MirIntrinsic.VEC_JOIN:
         let vj_recv = self.mir_intrinsic_recv_vec_value(body, args_id)
@@ -6958,6 +7008,683 @@ fn Codegen.mir_emit_opt_filter(self: Codegen, body: MirBody, args_id: i32) -> i6
     wl_add_incoming(filt_phi, vec_data_i64(&phi_vals), vec_data_i64(&phi_bbs), 2)
     filt_phi
 
+fn Codegen.mir_generic_base_name(self: Codegen, sema_ty: i32) -> str:
+    if sema_ty <= 0:
+        return ""
+    let resolved = self.mir_unwrap_ref_like_sema_type(sema_ty)
+    if resolved <= 0:
+        return ""
+    if self.mir_input.mir_get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return ""
+    let base_sym = self.mir_input.mir_get_type_d0(resolved)
+    let cg_sym = self.sema_sym_to_codegen_sym(base_sym)
+    if cg_sym != 0:
+        return self.intern.resolve(cg_sym)
+    self.sema_symbol_text(base_sym)
+
+fn Codegen.mir_generic_arg_tid(self: Codegen, sema_ty: i32, idx: i32) -> i32:
+    if sema_ty <= 0:
+        return 0
+    let resolved = self.mir_unwrap_ref_like_sema_type(sema_ty)
+    if resolved <= 0:
+        return 0
+    if self.mir_input.mir_get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        return 0
+    if idx < 0 or idx >= self.mir_input.mir_get_type_d2(resolved):
+        return 0
+    let start = self.mir_input.mir_get_type_d1(resolved)
+    self.mir_input.mir_get_type_extra(start + idx)
+
+fn Codegen.mir_iter_elem_tid(self: Codegen, iter_sema: i32) -> i32:
+    let name = self.mir_generic_base_name(iter_sema)
+    if name == "VecIter":
+        return self.mir_generic_arg_tid(iter_sema, 0)
+    if name == "MapIter":
+        return self.mir_generic_arg_tid(iter_sema, 2)
+    if name == "FilterIter" or name == "TakeIter":
+        return self.mir_generic_arg_tid(iter_sema, 1)
+    if name == "ZipIter":
+        let left = self.mir_generic_arg_tid(iter_sema, 2)
+        let right = self.mir_generic_arg_tid(iter_sema, 3)
+        if left != 0 and right != 0:
+            let elems: Vec[i32] = Vec.new()
+            elems.push(left)
+            elems.push(right)
+            return self.sema.ensure_tuple_type(elems, 2) as i32
+        return 0
+    if name == "FlatMapIter":
+        return self.mir_generic_arg_tid(iter_sema, 4)
+    0
+
+fn Codegen.mir_option_is_some_value(self: Codegen, opt_val: i64) -> i64:
+    let opt_ty = wl_type_of(opt_val)
+    if wl_get_type_kind(opt_ty) == wl_pointer_type_kind():
+        return wl_build_icmp(self.builder, wl_int_ne(), opt_val, wl_const_null(opt_ty))
+    let tag = wl_build_extract_value(self.builder, opt_val, 0)
+    wl_build_icmp(self.builder, wl_int_eq(), tag, wl_const_int(wl_type_of(tag), 0, 0))
+
+fn Codegen.mir_option_payload_value(self: Codegen, opt_val: i64, payload_ty: i64) -> i64:
+    let opt_ty = wl_type_of(opt_val)
+    if wl_get_type_kind(opt_ty) == wl_pointer_type_kind():
+        return self.coerce_value_to_type(opt_val, payload_ty)
+    if wl_count_struct_elem_types(opt_ty) > 1:
+        let payload = wl_build_extract_value(self.builder, opt_val, 1)
+        return self.coerce_value_to_type(payload, payload_ty)
+    self.build_default_value(payload_ty)
+
+fn Codegen.mir_call_fn_value(self: Codegen, fn_val: i64, ret_ty: i64, args: Vec[i64], arg_count: i32) -> i64:
+    let ptr_ty = wl_ptr_type(self.context)
+    let cty = wl_type_of(fn_val)
+    var fn_ptr = fn_val
+    var ctx_ptr: i64 = 0
+    var is_fat = 0
+    if wl_get_type_kind(cty) == wl_struct_type_kind() and wl_count_struct_elem_types(cty) == 2:
+        fn_ptr = wl_build_extract_value(self.builder, fn_val, 0)
+        ctx_ptr = wl_build_extract_value(self.builder, fn_val, 1)
+        is_fat = 1
+    var fn_ty: i64 = 0
+    let call_args: Vec[i64] = Vec.new()
+    let param_tys: Vec[i64] = Vec.new()
+    if is_fat != 0:
+        call_args.push(ctx_ptr)
+        param_tys.push(ptr_ty)
+    for ai in 0..arg_count:
+        let av = args.get(ai as i64)
+        call_args.push(av)
+        param_tys.push(wl_type_of(av))
+    if is_fat != 0:
+        fn_ty = wl_function_type(ret_ty, vec_data_i64(&param_tys), arg_count + 1, 0)
+    else:
+        fn_ty = wl_global_get_value_type(fn_ptr)
+    wl_build_call(self.builder, fn_ty, fn_ptr, vec_data_i64(&call_args), arg_count + is_fat)
+
+fn Codegen.mir_emit_veciter_next_from_ptr(self: Codegen, iter_ptr: i64, elem_ty: i64) -> i64:
+    let i64_ty = wl_i64_type(self.context)
+    let ptr_ty = wl_ptr_type(self.context)
+    let iter_fields: Vec[i64] = Vec.new()
+    iter_fields.push(i64_ty)
+    iter_fields.push(i64_ty)
+    iter_fields.push(i64_ty)
+    let iter_struct_ty = wl_struct_type(self.context, vec_data_i64(&iter_fields), 3, 0)
+    let data_ptr_ptr = wl_build_struct_gep(self.builder, iter_struct_ty, iter_ptr, 0)
+    let data_ptr = wl_build_load(self.builder, i64_ty, data_ptr_ptr)
+    let len_ptr = wl_build_struct_gep(self.builder, iter_struct_ty, iter_ptr, 1)
+    let len = wl_build_load(self.builder, i64_ty, len_ptr)
+    let idx_ptr = wl_build_struct_gep(self.builder, iter_struct_ty, iter_ptr, 2)
+    let idx = wl_build_load(self.builder, i64_ty, idx_ptr)
+    let cond = wl_build_icmp(self.builder, wl_int_slt(), idx, len)
+    let opt_type = self.get_or_create_option_type(0, elem_ty)
+    let some_bb = wl_append_bb(self.context, self.current_function, "iter.some")
+    let none_bb = wl_append_bb(self.context, self.current_function, "iter.none")
+    let merge_bb = wl_append_bb(self.context, self.current_function, "iter.merge")
+    wl_build_cond_br(self.builder, cond, some_bb, none_bb)
+    wl_position_at_end(self.builder, some_bb)
+    let typed_ptr = wl_build_int_to_ptr(self.builder, data_ptr, ptr_ty)
+    let gep_indices: Vec[i64] = Vec.new()
+    gep_indices.push(idx)
+    let elem_ptr = wl_build_gep(self.builder, elem_ty, typed_ptr, vec_data_i64(&gep_indices), 1)
+    let val = wl_build_load(self.builder, elem_ty, elem_ptr)
+    wl_build_store(self.builder, wl_build_add(self.builder, idx, wl_const_int(i64_ty, 1, 0)), idx_ptr)
+    let some_val = self.build_option_some(val, opt_type)
+    wl_build_br(self.builder, merge_bb)
+    let some_end = wl_get_insert_block(self.builder)
+    wl_position_at_end(self.builder, none_bb)
+    let none_val = self.build_option_none(opt_type)
+    wl_build_br(self.builder, merge_bb)
+    let none_end = wl_get_insert_block(self.builder)
+    wl_position_at_end(self.builder, merge_bb)
+    let phi = wl_build_phi(self.builder, opt_type)
+    let vals: Vec[i64] = Vec.new()
+    let bbs: Vec[i64] = Vec.new()
+    vals.push(some_val)
+    vals.push(none_val)
+    bbs.push(some_end)
+    bbs.push(none_end)
+    wl_add_incoming(phi, vec_data_i64(&vals), vec_data_i64(&bbs), 2)
+    phi
+
+fn Codegen.mir_emit_iter_next_from_ptr(self: Codegen, iter_ptr: i64, iter_sema: i32, elem_tid: i32) -> i64:
+    let name = self.mir_generic_base_name(iter_sema)
+    let elem_ty0 = self.mir_sema_type_to_llvm(elem_tid)
+    let elem_ty = if elem_ty0 != 0: elem_ty0 else: self.type_fallback()
+    let opt_type = self.get_or_create_option_type(0, elem_ty)
+    if name == "VecIter":
+        return self.mir_emit_veciter_next_from_ptr(iter_ptr, elem_ty)
+    let iter_ty = self.mir_sema_type_to_llvm(iter_sema)
+    if iter_ty == 0:
+        with_eprint("error: iterator codegen missing LLVM type for iterator '" ++ name ++ "'")
+        self.had_error = 1
+        return self.build_option_none(opt_type)
+    if name == "MapIter":
+        let upstream_tid = self.mir_generic_arg_tid(iter_sema, 0)
+        let in_tid = self.mir_generic_arg_tid(iter_sema, 1)
+        let in_ty0 = self.mir_sema_type_to_llvm(in_tid)
+        let in_ty = if in_ty0 != 0: in_ty0 else: self.type_fallback()
+        let up_ptr = wl_build_struct_gep(self.builder, iter_ty, iter_ptr, 0)
+        let fn_ptr = wl_build_struct_gep(self.builder, iter_ty, iter_ptr, 1)
+        let fn_ty = wl_struct_get_type_at(iter_ty, 1)
+        let fn_val = wl_build_load(self.builder, fn_ty, fn_ptr)
+        let next = self.mir_emit_iter_next_from_ptr(up_ptr, upstream_tid, in_tid)
+        let cond = self.mir_option_is_some_value(next)
+        let some_bb = wl_append_bb(self.context, self.current_function, "map.some")
+        let none_bb = wl_append_bb(self.context, self.current_function, "map.none")
+        let merge_bb = wl_append_bb(self.context, self.current_function, "map.merge")
+        wl_build_cond_br(self.builder, cond, some_bb, none_bb)
+        wl_position_at_end(self.builder, some_bb)
+        let payload = self.mir_option_payload_value(next, in_ty)
+        let call_args: Vec[i64] = Vec.new()
+        call_args.push(payload)
+        let mapped = self.mir_call_fn_value(fn_val, elem_ty, call_args, 1)
+        let some_val = self.build_option_some(mapped, opt_type)
+        wl_build_br(self.builder, merge_bb)
+        let some_end = wl_get_insert_block(self.builder)
+        wl_position_at_end(self.builder, none_bb)
+        let none_val = self.build_option_none(opt_type)
+        wl_build_br(self.builder, merge_bb)
+        let none_end = wl_get_insert_block(self.builder)
+        wl_position_at_end(self.builder, merge_bb)
+        let phi = wl_build_phi(self.builder, opt_type)
+        let vals: Vec[i64] = Vec.new()
+        let bbs: Vec[i64] = Vec.new()
+        vals.push(some_val)
+        vals.push(none_val)
+        bbs.push(some_end)
+        bbs.push(none_end)
+        wl_add_incoming(phi, vec_data_i64(&vals), vec_data_i64(&bbs), 2)
+        return phi
+    if name == "FilterIter":
+        let upstream_tid2 = self.mir_generic_arg_tid(iter_sema, 0)
+        let up_ptr2 = wl_build_struct_gep(self.builder, iter_ty, iter_ptr, 0)
+        let pred_ptr = wl_build_struct_gep(self.builder, iter_ty, iter_ptr, 1)
+        let pred_ty = wl_struct_get_type_at(iter_ty, 1)
+        let pred_val = wl_build_load(self.builder, pred_ty, pred_ptr)
+        let loop_bb = wl_append_bb(self.context, self.current_function, "filter.loop")
+        let test_bb = wl_append_bb(self.context, self.current_function, "filter.test")
+        let some_bb2 = wl_append_bb(self.context, self.current_function, "filter.some")
+        let none_bb2 = wl_append_bb(self.context, self.current_function, "filter.none")
+        let merge_bb2 = wl_append_bb(self.context, self.current_function, "filter.merge")
+        wl_build_br(self.builder, loop_bb)
+        wl_position_at_end(self.builder, loop_bb)
+        let next2 = self.mir_emit_iter_next_from_ptr(up_ptr2, upstream_tid2, elem_tid)
+        let cond2 = self.mir_option_is_some_value(next2)
+        wl_build_cond_br(self.builder, cond2, test_bb, none_bb2)
+        wl_position_at_end(self.builder, test_bb)
+        let payload2 = self.mir_option_payload_value(next2, elem_ty)
+        let pred_args: Vec[i64] = Vec.new()
+        pred_args.push(payload2)
+        let pred_raw = self.mir_call_fn_value(pred_val, wl_i1_type(self.context), pred_args, 1)
+        var pred_bool = pred_raw
+        if wl_type_of(pred_raw) != wl_i1_type(self.context):
+            pred_bool = wl_build_icmp(self.builder, wl_int_ne(), pred_raw, wl_const_int(wl_type_of(pred_raw), 0, 0))
+        wl_build_cond_br(self.builder, pred_bool, some_bb2, loop_bb)
+        wl_position_at_end(self.builder, some_bb2)
+        let some_val2 = self.build_option_some(payload2, opt_type)
+        wl_build_br(self.builder, merge_bb2)
+        let some_end2 = wl_get_insert_block(self.builder)
+        wl_position_at_end(self.builder, none_bb2)
+        let none_val2 = self.build_option_none(opt_type)
+        wl_build_br(self.builder, merge_bb2)
+        let none_end2 = wl_get_insert_block(self.builder)
+        wl_position_at_end(self.builder, merge_bb2)
+        let phi2 = wl_build_phi(self.builder, opt_type)
+        let vals2: Vec[i64] = Vec.new()
+        let bbs2: Vec[i64] = Vec.new()
+        vals2.push(some_val2)
+        vals2.push(none_val2)
+        bbs2.push(some_end2)
+        bbs2.push(none_end2)
+        wl_add_incoming(phi2, vec_data_i64(&vals2), vec_data_i64(&bbs2), 2)
+        return phi2
+    if name == "TakeIter":
+        let upstream_tid3 = self.mir_generic_arg_tid(iter_sema, 0)
+        let up_ptr3 = wl_build_struct_gep(self.builder, iter_ty, iter_ptr, 0)
+        let rem_ptr = wl_build_struct_gep(self.builder, iter_ty, iter_ptr, 1)
+        let i64_ty = wl_i64_type(self.context)
+        let remaining = wl_build_load(self.builder, i64_ty, rem_ptr)
+        let has_remaining = wl_build_icmp(self.builder, wl_int_sgt(), remaining, wl_const_int(i64_ty, 0, 0))
+        let next_bb3 = wl_append_bb(self.context, self.current_function, "take.next")
+        let none_bb3 = wl_append_bb(self.context, self.current_function, "take.none")
+        let merge_bb3 = wl_append_bb(self.context, self.current_function, "take.merge")
+        wl_build_cond_br(self.builder, has_remaining, next_bb3, none_bb3)
+        wl_position_at_end(self.builder, next_bb3)
+        let next3 = self.mir_emit_iter_next_from_ptr(up_ptr3, upstream_tid3, elem_tid)
+        if wl_type_of(next3) != opt_type:
+            // Type aliases for Option[T] may materialize equivalent shapes;
+            // leave the value unchanged when LLVM already has the right shape.
+            0
+        let some3 = self.mir_option_is_some_value(next3)
+        let dec_bb3 = wl_append_bb(self.context, self.current_function, "take.dec")
+        wl_build_cond_br(self.builder, some3, dec_bb3, none_bb3)
+        wl_position_at_end(self.builder, dec_bb3)
+        wl_build_store(self.builder, wl_build_sub(self.builder, remaining, wl_const_int(i64_ty, 1, 0)), rem_ptr)
+        wl_build_br(self.builder, merge_bb3)
+        let dec_end3 = wl_get_insert_block(self.builder)
+        wl_position_at_end(self.builder, none_bb3)
+        let none3 = self.build_option_none(opt_type)
+        wl_build_br(self.builder, merge_bb3)
+        let none_end3 = wl_get_insert_block(self.builder)
+        wl_position_at_end(self.builder, merge_bb3)
+        let phi3 = wl_build_phi(self.builder, opt_type)
+        let vals3: Vec[i64] = Vec.new()
+        let bbs3: Vec[i64] = Vec.new()
+        vals3.push(next3)
+        vals3.push(none3)
+        bbs3.push(dec_end3)
+        bbs3.push(none_end3)
+        wl_add_incoming(phi3, vec_data_i64(&vals3), vec_data_i64(&bbs3), 2)
+        return phi3
+    if name == "ZipIter":
+        let left_tid = self.mir_generic_arg_tid(iter_sema, 0)
+        let right_tid = self.mir_generic_arg_tid(iter_sema, 1)
+        let left_elem_tid = self.mir_generic_arg_tid(iter_sema, 2)
+        let right_elem_tid = self.mir_generic_arg_tid(iter_sema, 3)
+        let left_ty0 = self.mir_sema_type_to_llvm(left_elem_tid)
+        let right_ty0 = self.mir_sema_type_to_llvm(right_elem_tid)
+        let left_ty = if left_ty0 != 0: left_ty0 else: self.type_fallback()
+        let right_ty = if right_ty0 != 0: right_ty0 else: self.type_fallback()
+        let left_ptr = wl_build_struct_gep(self.builder, iter_ty, iter_ptr, 0)
+        let right_ptr = wl_build_struct_gep(self.builder, iter_ty, iter_ptr, 1)
+        let ln = self.mir_emit_iter_next_from_ptr(left_ptr, left_tid, left_elem_tid)
+        let lsome = self.mir_option_is_some_value(ln)
+        let right_bb = wl_append_bb(self.context, self.current_function, "zip.right")
+        let some_bb4 = wl_append_bb(self.context, self.current_function, "zip.some")
+        let none_bb4 = wl_append_bb(self.context, self.current_function, "zip.none")
+        let merge_bb4 = wl_append_bb(self.context, self.current_function, "zip.merge")
+        wl_build_cond_br(self.builder, lsome, right_bb, none_bb4)
+        wl_position_at_end(self.builder, right_bb)
+        let rn = self.mir_emit_iter_next_from_ptr(right_ptr, right_tid, right_elem_tid)
+        let rsome = self.mir_option_is_some_value(rn)
+        wl_build_cond_br(self.builder, rsome, some_bb4, none_bb4)
+        wl_position_at_end(self.builder, some_bb4)
+        let lv = self.mir_option_payload_value(ln, left_ty)
+        let rv = self.mir_option_payload_value(rn, right_ty)
+        let pair_alloc = wl_build_alloca(self.builder, elem_ty)
+        wl_build_store(self.builder, self.build_default_value(elem_ty), pair_alloc)
+        let p0 = wl_build_struct_gep(self.builder, elem_ty, pair_alloc, 0)
+        wl_build_store(self.builder, lv, p0)
+        let p1 = wl_build_struct_gep(self.builder, elem_ty, pair_alloc, 1)
+        wl_build_store(self.builder, rv, p1)
+        let pair_val = wl_build_load(self.builder, elem_ty, pair_alloc)
+        let some_val4 = self.build_option_some(pair_val, opt_type)
+        wl_build_br(self.builder, merge_bb4)
+        let some_end4 = wl_get_insert_block(self.builder)
+        wl_position_at_end(self.builder, none_bb4)
+        let none_val4 = self.build_option_none(opt_type)
+        wl_build_br(self.builder, merge_bb4)
+        let none_end4 = wl_get_insert_block(self.builder)
+        wl_position_at_end(self.builder, merge_bb4)
+        let phi4 = wl_build_phi(self.builder, opt_type)
+        let vals4: Vec[i64] = Vec.new()
+        let bbs4: Vec[i64] = Vec.new()
+        vals4.push(some_val4)
+        vals4.push(none_val4)
+        bbs4.push(some_end4)
+        bbs4.push(none_end4)
+        wl_add_incoming(phi4, vec_data_i64(&vals4), vec_data_i64(&bbs4), 2)
+        return phi4
+    if name == "FlatMapIter":
+        let outer_tid = self.mir_generic_arg_tid(iter_sema, 0)
+        let collection_tid = self.mir_generic_arg_tid(iter_sema, 1)
+        let inner_tid = self.mir_generic_arg_tid(iter_sema, 2)
+        let in_tid = self.mir_generic_arg_tid(iter_sema, 3)
+        let in_ty0 = self.mir_sema_type_to_llvm(in_tid)
+        let in_ty = if in_ty0 != 0: in_ty0 else: self.type_fallback()
+        let collection_ty0 = self.mir_sema_type_to_llvm(collection_tid)
+        let collection_ty = if collection_ty0 != 0: collection_ty0 else: self.type_fallback()
+        let outer_ptr = wl_build_struct_gep(self.builder, iter_ty, iter_ptr, 0)
+        let fn_ptr5 = wl_build_struct_gep(self.builder, iter_ty, iter_ptr, 1)
+        let fn_ty5 = wl_struct_get_type_at(iter_ty, 1)
+        let fn_val5 = wl_build_load(self.builder, fn_ty5, fn_ptr5)
+        let current_ptr = wl_build_struct_gep(self.builder, iter_ty, iter_ptr, 2)
+        let has_ptr = wl_build_struct_gep(self.builder, iter_ty, iter_ptr, 3)
+        let loop_bb5 = wl_append_bb(self.context, self.current_function, "flatmap.loop")
+        let inner_bb5 = wl_append_bb(self.context, self.current_function, "flatmap.inner")
+        let inner_some_bb5 = wl_append_bb(self.context, self.current_function, "flatmap.inner_some")
+        let inner_done_bb5 = wl_append_bb(self.context, self.current_function, "flatmap.inner_done")
+        let outer_bb5 = wl_append_bb(self.context, self.current_function, "flatmap.outer")
+        let produce_bb5 = wl_append_bb(self.context, self.current_function, "flatmap.produce")
+        let none_bb5 = wl_append_bb(self.context, self.current_function, "flatmap.none")
+        let merge_bb5 = wl_append_bb(self.context, self.current_function, "flatmap.merge")
+        wl_build_br(self.builder, loop_bb5)
+        wl_position_at_end(self.builder, loop_bb5)
+        let has_cur = wl_build_load(self.builder, wl_i1_type(self.context), has_ptr)
+        wl_build_cond_br(self.builder, has_cur, inner_bb5, outer_bb5)
+        wl_position_at_end(self.builder, inner_bb5)
+        let inner_next = self.mir_emit_iter_next_from_ptr(current_ptr, inner_tid, elem_tid)
+        wl_build_cond_br(self.builder, self.mir_option_is_some_value(inner_next), inner_some_bb5, inner_done_bb5)
+        wl_position_at_end(self.builder, inner_some_bb5)
+        wl_build_br(self.builder, merge_bb5)
+        let inner_some_end = wl_get_insert_block(self.builder)
+        wl_position_at_end(self.builder, inner_done_bb5)
+        wl_build_store(self.builder, wl_const_int(wl_i1_type(self.context), 0, 0), has_ptr)
+        wl_build_br(self.builder, loop_bb5)
+        wl_position_at_end(self.builder, outer_bb5)
+        let outer_next = self.mir_emit_iter_next_from_ptr(outer_ptr, outer_tid, in_tid)
+        wl_build_cond_br(self.builder, self.mir_option_is_some_value(outer_next), produce_bb5, none_bb5)
+        wl_position_at_end(self.builder, produce_bb5)
+        let outer_payload = self.mir_option_payload_value(outer_next, in_ty)
+        let fm_args: Vec[i64] = Vec.new()
+        fm_args.push(outer_payload)
+        let produced = self.mir_call_fn_value(fn_val5, collection_ty, fm_args, 1)
+        let collection_name = self.mir_generic_base_name(collection_tid)
+        if collection_name == "Vec":
+            let current_ty = wl_struct_get_type_at(iter_ty, 2)
+            let data_raw = wl_build_extract_value(self.builder, produced, 0)
+            let len_raw = wl_build_extract_value(self.builder, produced, 1)
+            let c0 = wl_build_struct_gep(self.builder, current_ty, current_ptr, 0)
+            wl_build_store(self.builder, wl_build_ptr_to_int(self.builder, data_raw, wl_i64_type(self.context)), c0)
+            let c1 = wl_build_struct_gep(self.builder, current_ty, current_ptr, 1)
+            wl_build_store(self.builder, len_raw, c1)
+            let c2 = wl_build_struct_gep(self.builder, current_ty, current_ptr, 2)
+            wl_build_store(self.builder, wl_const_int(wl_i64_type(self.context), 0, 0), c2)
+        else:
+            let current_ty2 = wl_struct_get_type_at(iter_ty, 2)
+            wl_build_store(self.builder, self.coerce_value_to_type(produced, current_ty2), current_ptr)
+        wl_build_store(self.builder, wl_const_int(wl_i1_type(self.context), 1, 0), has_ptr)
+        wl_build_br(self.builder, loop_bb5)
+        wl_position_at_end(self.builder, none_bb5)
+        let none_val5 = self.build_option_none(opt_type)
+        wl_build_br(self.builder, merge_bb5)
+        let none_end5 = wl_get_insert_block(self.builder)
+        wl_position_at_end(self.builder, merge_bb5)
+        let phi5 = wl_build_phi(self.builder, opt_type)
+        let vals5: Vec[i64] = Vec.new()
+        let bbs5: Vec[i64] = Vec.new()
+        vals5.push(inner_next)
+        vals5.push(none_val5)
+        bbs5.push(inner_some_end)
+        bbs5.push(none_end5)
+        wl_add_incoming(phi5, vec_data_i64(&vals5), vec_data_i64(&bbs5), 2)
+        return phi5
+    with_eprint("error: iterator codegen does not support iterator type '" ++ name ++ "'")
+    self.had_error = 1
+    self.build_option_none(opt_type)
+
+fn Codegen.mir_emit_iter_adapter(self: Codegen, body: MirBody, args_id: i32, dest_place: i32, kind: MirIntrinsic) -> i64:
+    let dest_sema = self.mir_intrinsic_dest_sema_type(body, dest_place)
+    let adapter_ty0 = self.mir_sema_type_to_llvm(dest_sema)
+    let adapter_ty = if adapter_ty0 != 0: adapter_ty0 else: self.type_fallback()
+    let alloca = wl_build_alloca(self.builder, adapter_ty)
+    wl_build_store(self.builder, self.build_default_value(adapter_ty), alloca)
+    let recv = self.mir_intrinsic_arg(body, args_id, 0)
+    let f0 = wl_build_struct_gep(self.builder, adapter_ty, alloca, 0)
+    wl_build_store(self.builder, self.coerce_value_to_type(recv, wl_struct_get_type_at(adapter_ty, 0)), f0)
+    if kind == MirIntrinsic.ITER_MAP or kind == MirIntrinsic.ITER_FILTER or kind == MirIntrinsic.ITER_FLAT_MAP:
+        let fn_val = self.mir_intrinsic_arg(body, args_id, 1)
+        let f1 = wl_build_struct_gep(self.builder, adapter_ty, alloca, 1)
+        wl_build_store(self.builder, self.coerce_value_to_type(fn_val, wl_struct_get_type_at(adapter_ty, 1)), f1)
+    else if kind == MirIntrinsic.ITER_TAKE:
+        let n_raw = self.mir_intrinsic_arg(body, args_id, 1)
+        let f1t = wl_build_struct_gep(self.builder, adapter_ty, alloca, 1)
+        wl_build_store(self.builder, self.coerce_value_to_type(n_raw, wl_i64_type(self.context)), f1t)
+    else if kind == MirIntrinsic.ITER_ZIP:
+        let other = self.mir_intrinsic_arg(body, args_id, 1)
+        let f1z = wl_build_struct_gep(self.builder, adapter_ty, alloca, 1)
+        wl_build_store(self.builder, self.coerce_value_to_type(other, wl_struct_get_type_at(adapter_ty, 1)), f1z)
+    if kind == MirIntrinsic.ITER_FLAT_MAP and wl_count_struct_elem_types(adapter_ty) > 3:
+        let has_ptr = wl_build_struct_gep(self.builder, adapter_ty, alloca, 3)
+        wl_build_store(self.builder, wl_const_int(wl_i1_type(self.context), 0, 0), has_ptr)
+    wl_build_load(self.builder, adapter_ty, alloca)
+
+fn Codegen.mir_emit_iter_fold(self: Codegen, body: MirBody, args_id: i32) -> i64:
+    let arg_start = body.call_arg_starts.get(args_id as i64)
+    let recv_op = body.call_arg_operands.get(arg_start as i64)
+    let recv_sema = self.mir_operand_sema_type(body, recv_op)
+    let elem_tid = self.mir_iter_elem_tid(recv_sema)
+    let elem_ty0 = self.mir_sema_type_to_llvm(elem_tid)
+    let elem_ty = if elem_ty0 != 0: elem_ty0 else: self.type_fallback()
+    let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+    let init = self.mir_intrinsic_arg(body, args_id, 1)
+    let fn_val = self.mir_intrinsic_arg(body, args_id, 2)
+    let acc_ty = wl_type_of(init)
+    let acc_ptr = wl_build_alloca(self.builder, acc_ty)
+    wl_build_store(self.builder, init, acc_ptr)
+    let loop_bb = wl_append_bb(self.context, self.current_function, "iterfold.loop")
+    let body_bb = wl_append_bb(self.context, self.current_function, "iterfold.body")
+    let end_bb = wl_append_bb(self.context, self.current_function, "iterfold.end")
+    wl_build_br(self.builder, loop_bb)
+    wl_position_at_end(self.builder, loop_bb)
+    let next = self.mir_emit_iter_next_from_ptr(recv_ptr, recv_sema, elem_tid)
+    wl_build_cond_br(self.builder, self.mir_option_is_some_value(next), body_bb, end_bb)
+    wl_position_at_end(self.builder, body_bb)
+    let elem = self.mir_option_payload_value(next, elem_ty)
+    let cur = wl_build_load(self.builder, acc_ty, acc_ptr)
+    let call_args: Vec[i64] = Vec.new()
+    call_args.push(cur)
+    call_args.push(elem)
+    let updated = self.mir_call_fn_value(fn_val, acc_ty, call_args, 2)
+    wl_build_store(self.builder, updated, acc_ptr)
+    wl_build_br(self.builder, loop_bb)
+    wl_position_at_end(self.builder, end_bb)
+    wl_build_load(self.builder, acc_ty, acc_ptr)
+
+fn Codegen.mir_emit_iter_collect_vec(self: Codegen, body: MirBody, args_id: i32, dest_place: i32) -> i64:
+    let i64_ty = wl_i64_type(self.context)
+    let ptr_ty = wl_ptr_type(self.context)
+    let void_ty = wl_void_type(self.context)
+    let arg_start = body.call_arg_starts.get(args_id as i64)
+    let recv_op = body.call_arg_operands.get(arg_start as i64)
+    let recv_sema = self.mir_operand_sema_type(body, recv_op)
+    let elem_tid = self.mir_iter_elem_tid(recv_sema)
+    let elem_ty0 = self.mir_sema_type_to_llvm(elem_tid)
+    let elem_ty = if elem_ty0 != 0: elem_ty0 else: self.type_fallback()
+    let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+    let vec_ty0 = self.mir_sema_type_to_llvm(self.mir_intrinsic_dest_sema_type(body, dest_place))
+    let vec_ty = if vec_ty0 != 0: vec_ty0 else: self.get_or_create_vec_type(0, elem_ty)
+    let out_ptr = wl_build_alloca(self.builder, vec_ty)
+    wl_build_store(self.builder, self.build_default_value(vec_ty), out_ptr)
+    let new_fn = self.ensure_vec_runtime_fn("with_vec_new_out", void_ty, 2)
+    let new_ty = self.get_vec_fn_type("with_vec_new_out", void_ty, 2)
+    let new_args: Vec[i64] = Vec.new()
+    new_args.push(out_ptr)
+    new_args.push(wl_const_int(i64_ty, self.abi_size_of(elem_ty), 0))
+    let _ = wl_build_call(self.builder, new_ty, new_fn, vec_data_i64(&new_args), 2)
+    let tmp = wl_build_alloca(self.builder, elem_ty)
+    let loop_bb = wl_append_bb(self.context, self.current_function, "itercollect.loop")
+    let push_bb = wl_append_bb(self.context, self.current_function, "itercollect.push")
+    let end_bb = wl_append_bb(self.context, self.current_function, "itercollect.end")
+    wl_build_br(self.builder, loop_bb)
+    wl_position_at_end(self.builder, loop_bb)
+    let next = self.mir_emit_iter_next_from_ptr(recv_ptr, recv_sema, elem_tid)
+    wl_build_cond_br(self.builder, self.mir_option_is_some_value(next), push_bb, end_bb)
+    wl_position_at_end(self.builder, push_bb)
+    let elem = self.mir_option_payload_value(next, elem_ty)
+    wl_build_store(self.builder, elem, tmp)
+    let push_fn = self.ensure_vec_runtime_fn("with_vec_push", void_ty, 2)
+    let push_ty = self.get_vec_fn_type("with_vec_push", void_ty, 2)
+    let push_args: Vec[i64] = Vec.new()
+    push_args.push(out_ptr)
+    push_args.push(tmp)
+    let _p = wl_build_call(self.builder, push_ty, push_fn, vec_data_i64(&push_args), 2)
+    wl_build_br(self.builder, loop_bb)
+    wl_position_at_end(self.builder, end_bb)
+    wl_build_load(self.builder, vec_ty, out_ptr)
+
+fn Codegen.mir_emit_iter_count(self: Codegen, body: MirBody, args_id: i32, dest_place: i32) -> i64:
+    let i64_ty = wl_i64_type(self.context)
+    let arg_start = body.call_arg_starts.get(args_id as i64)
+    let recv_op = body.call_arg_operands.get(arg_start as i64)
+    let recv_sema = self.mir_operand_sema_type(body, recv_op)
+    let elem_tid = self.mir_iter_elem_tid(recv_sema)
+    let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+    let count_ptr = wl_build_alloca(self.builder, i64_ty)
+    wl_build_store(self.builder, wl_const_int(i64_ty, 0, 0), count_ptr)
+    let loop_bb = wl_append_bb(self.context, self.current_function, "itercount.loop")
+    let inc_bb = wl_append_bb(self.context, self.current_function, "itercount.inc")
+    let end_bb = wl_append_bb(self.context, self.current_function, "itercount.end")
+    wl_build_br(self.builder, loop_bb)
+    wl_position_at_end(self.builder, loop_bb)
+    let next = self.mir_emit_iter_next_from_ptr(recv_ptr, recv_sema, elem_tid)
+    wl_build_cond_br(self.builder, self.mir_option_is_some_value(next), inc_bb, end_bb)
+    wl_position_at_end(self.builder, inc_bb)
+    let cur = wl_build_load(self.builder, i64_ty, count_ptr)
+    wl_build_store(self.builder, wl_build_add(self.builder, cur, wl_const_int(i64_ty, 1, 0)), count_ptr)
+    wl_build_br(self.builder, loop_bb)
+    wl_position_at_end(self.builder, end_bb)
+    let raw = wl_build_load(self.builder, i64_ty, count_ptr)
+    let dst_ty = self.mir_dest_llvm_type(body, dest_place)
+    if dst_ty != 0:
+        return self.coerce_value_to_type(raw, dst_ty)
+    raw
+
+fn Codegen.mir_emit_iter_sum(self: Codegen, body: MirBody, args_id: i32) -> i64:
+    let arg_start = body.call_arg_starts.get(args_id as i64)
+    let recv_op = body.call_arg_operands.get(arg_start as i64)
+    let recv_sema = self.mir_operand_sema_type(body, recv_op)
+    let elem_tid = self.mir_iter_elem_tid(recv_sema)
+    let elem_ty0 = self.mir_sema_type_to_llvm(elem_tid)
+    let elem_ty = if elem_ty0 != 0: elem_ty0 else: self.type_fallback()
+    let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+    let acc_ptr = wl_build_alloca(self.builder, elem_ty)
+    wl_build_store(self.builder, self.build_default_value(elem_ty), acc_ptr)
+    let loop_bb = wl_append_bb(self.context, self.current_function, "itersum.loop")
+    let add_bb = wl_append_bb(self.context, self.current_function, "itersum.add")
+    let end_bb = wl_append_bb(self.context, self.current_function, "itersum.end")
+    wl_build_br(self.builder, loop_bb)
+    wl_position_at_end(self.builder, loop_bb)
+    let next = self.mir_emit_iter_next_from_ptr(recv_ptr, recv_sema, elem_tid)
+    wl_build_cond_br(self.builder, self.mir_option_is_some_value(next), add_bb, end_bb)
+    wl_position_at_end(self.builder, add_bb)
+    let elem = self.mir_option_payload_value(next, elem_ty)
+    let cur = wl_build_load(self.builder, elem_ty, acc_ptr)
+    let next_acc = if wl_get_type_kind(elem_ty) == wl_float_type_kind():
+        wl_build_fadd(self.builder, cur, elem)
+    else:
+        wl_build_add(self.builder, cur, elem)
+    wl_build_store(self.builder, next_acc, acc_ptr)
+    wl_build_br(self.builder, loop_bb)
+    wl_position_at_end(self.builder, end_bb)
+    wl_build_load(self.builder, elem_ty, acc_ptr)
+
+fn Codegen.mir_emit_iter_reduce(self: Codegen, body: MirBody, args_id: i32, dest_place: i32) -> i64:
+    let arg_start = body.call_arg_starts.get(args_id as i64)
+    let recv_op = body.call_arg_operands.get(arg_start as i64)
+    let recv_sema = self.mir_operand_sema_type(body, recv_op)
+    let elem_tid = self.mir_iter_elem_tid(recv_sema)
+    let elem_ty0 = self.mir_sema_type_to_llvm(elem_tid)
+    let elem_ty = if elem_ty0 != 0: elem_ty0 else: self.type_fallback()
+    let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+    let fn_val = self.mir_intrinsic_arg(body, args_id, 1)
+    let acc_ptr = wl_build_alloca(self.builder, elem_ty)
+    wl_build_store(self.builder, self.build_default_value(elem_ty), acc_ptr)
+    let seen_ptr = wl_build_alloca(self.builder, wl_i1_type(self.context))
+    wl_build_store(self.builder, wl_const_int(wl_i1_type(self.context), 0, 0), seen_ptr)
+    let loop_bb = wl_append_bb(self.context, self.current_function, "iterreduce.loop")
+    let body_bb = wl_append_bb(self.context, self.current_function, "iterreduce.body")
+    let first_bb = wl_append_bb(self.context, self.current_function, "iterreduce.first")
+    let combine_bb = wl_append_bb(self.context, self.current_function, "iterreduce.combine")
+    let end_bb = wl_append_bb(self.context, self.current_function, "iterreduce.end")
+    wl_build_br(self.builder, loop_bb)
+    wl_position_at_end(self.builder, loop_bb)
+    let next = self.mir_emit_iter_next_from_ptr(recv_ptr, recv_sema, elem_tid)
+    wl_build_cond_br(self.builder, self.mir_option_is_some_value(next), body_bb, end_bb)
+    wl_position_at_end(self.builder, body_bb)
+    let elem = self.mir_option_payload_value(next, elem_ty)
+    let seen = wl_build_load(self.builder, wl_i1_type(self.context), seen_ptr)
+    wl_build_cond_br(self.builder, seen, combine_bb, first_bb)
+    wl_position_at_end(self.builder, first_bb)
+    wl_build_store(self.builder, elem, acc_ptr)
+    wl_build_store(self.builder, wl_const_int(wl_i1_type(self.context), 1, 0), seen_ptr)
+    wl_build_br(self.builder, loop_bb)
+    wl_position_at_end(self.builder, combine_bb)
+    let cur = wl_build_load(self.builder, elem_ty, acc_ptr)
+    let call_args: Vec[i64] = Vec.new()
+    call_args.push(cur)
+    call_args.push(elem)
+    let updated = self.mir_call_fn_value(fn_val, elem_ty, call_args, 2)
+    wl_build_store(self.builder, updated, acc_ptr)
+    wl_build_br(self.builder, loop_bb)
+    wl_position_at_end(self.builder, end_bb)
+    let opt_ty0 = self.mir_dest_llvm_type(body, dest_place)
+    let opt_ty = if opt_ty0 != 0: opt_ty0 else: self.get_or_create_option_type(0, elem_ty)
+    let has_value = wl_build_load(self.builder, wl_i1_type(self.context), seen_ptr)
+    let some_bb = wl_append_bb(self.context, self.current_function, "iterreduce.some")
+    let none_bb = wl_append_bb(self.context, self.current_function, "iterreduce.none")
+    let merge_bb = wl_append_bb(self.context, self.current_function, "iterreduce.merge")
+    wl_build_cond_br(self.builder, has_value, some_bb, none_bb)
+    wl_position_at_end(self.builder, some_bb)
+    let some_val = self.build_option_some(wl_build_load(self.builder, elem_ty, acc_ptr), opt_ty)
+    wl_build_br(self.builder, merge_bb)
+    let some_end = wl_get_insert_block(self.builder)
+    wl_position_at_end(self.builder, none_bb)
+    let none_val = self.build_option_none(opt_ty)
+    wl_build_br(self.builder, merge_bb)
+    let none_end = wl_get_insert_block(self.builder)
+    wl_position_at_end(self.builder, merge_bb)
+    let phi = wl_build_phi(self.builder, opt_ty)
+    let vals: Vec[i64] = Vec.new()
+    let bbs: Vec[i64] = Vec.new()
+    vals.push(some_val)
+    vals.push(none_val)
+    bbs.push(some_end)
+    bbs.push(none_end)
+    wl_add_incoming(phi, vec_data_i64(&vals), vec_data_i64(&bbs), 2)
+    phi
+
+fn Codegen.mir_emit_iter_partition(self: Codegen, body: MirBody, args_id: i32, dest_place: i32) -> i64:
+    let i64_ty = wl_i64_type(self.context)
+    let void_ty = wl_void_type(self.context)
+    let arg_start = body.call_arg_starts.get(args_id as i64)
+    let recv_op = body.call_arg_operands.get(arg_start as i64)
+    let recv_sema = self.mir_operand_sema_type(body, recv_op)
+    let elem_tid = self.mir_iter_elem_tid(recv_sema)
+    let elem_ty0 = self.mir_sema_type_to_llvm(elem_tid)
+    let elem_ty = if elem_ty0 != 0: elem_ty0 else: self.type_fallback()
+    let recv_ptr = self.mir_intrinsic_recv_ptr(body, args_id)
+    let pred_val = self.mir_intrinsic_arg(body, args_id, 1)
+    let tuple_ty0 = self.mir_dest_llvm_type(body, dest_place)
+    let tuple_ty = if tuple_ty0 != 0: tuple_ty0 else: self.type_fallback()
+    let out_ptr = wl_build_alloca(self.builder, tuple_ty)
+    wl_build_store(self.builder, self.build_default_value(tuple_ty), out_ptr)
+    let left_ptr = wl_build_struct_gep(self.builder, tuple_ty, out_ptr, 0)
+    let right_ptr = wl_build_struct_gep(self.builder, tuple_ty, out_ptr, 1)
+    let new_fn = self.ensure_vec_runtime_fn("with_vec_new_out", void_ty, 2)
+    let new_ty = self.get_vec_fn_type("with_vec_new_out", void_ty, 2)
+    let left_new_args: Vec[i64] = Vec.new()
+    left_new_args.push(left_ptr)
+    left_new_args.push(wl_const_int(i64_ty, self.abi_size_of(elem_ty), 0))
+    let _ln = wl_build_call(self.builder, new_ty, new_fn, vec_data_i64(&left_new_args), 2)
+    let right_new_args: Vec[i64] = Vec.new()
+    right_new_args.push(right_ptr)
+    right_new_args.push(wl_const_int(i64_ty, self.abi_size_of(elem_ty), 0))
+    let _rn = wl_build_call(self.builder, new_ty, new_fn, vec_data_i64(&right_new_args), 2)
+    let tmp = wl_build_alloca(self.builder, elem_ty)
+    let loop_bb = wl_append_bb(self.context, self.current_function, "iterpart.loop")
+    let pred_bb = wl_append_bb(self.context, self.current_function, "iterpart.pred")
+    let left_bb = wl_append_bb(self.context, self.current_function, "iterpart.left")
+    let right_bb = wl_append_bb(self.context, self.current_function, "iterpart.right")
+    let end_bb = wl_append_bb(self.context, self.current_function, "iterpart.end")
+    wl_build_br(self.builder, loop_bb)
+    wl_position_at_end(self.builder, loop_bb)
+    let next = self.mir_emit_iter_next_from_ptr(recv_ptr, recv_sema, elem_tid)
+    wl_build_cond_br(self.builder, self.mir_option_is_some_value(next), pred_bb, end_bb)
+    wl_position_at_end(self.builder, pred_bb)
+    let elem = self.mir_option_payload_value(next, elem_ty)
+    wl_build_store(self.builder, elem, tmp)
+    let pred_args: Vec[i64] = Vec.new()
+    pred_args.push(elem)
+    let pred_raw = self.mir_call_fn_value(pred_val, wl_i1_type(self.context), pred_args, 1)
+    var pred_bool = pred_raw
+    if wl_type_of(pred_raw) != wl_i1_type(self.context):
+        pred_bool = wl_build_icmp(self.builder, wl_int_ne(), pred_raw, wl_const_int(wl_type_of(pred_raw), 0, 0))
+    wl_build_cond_br(self.builder, pred_bool, left_bb, right_bb)
+    let push_fn = self.ensure_vec_runtime_fn("with_vec_push", void_ty, 2)
+    let push_ty = self.get_vec_fn_type("with_vec_push", void_ty, 2)
+    wl_position_at_end(self.builder, left_bb)
+    let la: Vec[i64] = Vec.new()
+    la.push(left_ptr)
+    la.push(tmp)
+    let _lp = wl_build_call(self.builder, push_ty, push_fn, vec_data_i64(&la), 2)
+    wl_build_br(self.builder, loop_bb)
+    wl_position_at_end(self.builder, right_bb)
+    let ra: Vec[i64] = Vec.new()
+    ra.push(right_ptr)
+    ra.push(tmp)
+    let _rp = wl_build_call(self.builder, push_ty, push_fn, vec_data_i64(&ra), 2)
+    wl_build_br(self.builder, loop_bb)
+    wl_position_at_end(self.builder, end_bb)
+    wl_build_load(self.builder, tuple_ty, out_ptr)
+
 fn Codegen.mir_emit_vec_map(self: Codegen, body: MirBody, args_id: i32) -> i64:
     let i64_ty = wl_i64_type(self.context)
     let i32_ty = wl_i32_type(self.context)
@@ -7077,6 +7804,10 @@ fn Codegen.mir_emit_vec_filter(self: Codegen, body: MirBody, args_id: i32) -> i6
     var elem_ty = i32_ty
     var pred_ret_ty = i32_ty
     let arg_start_for_pred = body.call_arg_starts.get(args_id as i64)
+    let filter_recv_op = body.call_arg_operands.get(arg_start_for_pred as i64)
+    let filter_elem_ty = self.mir_vec_elem_type(body, filter_recv_op)
+    if filter_elem_ty != 0:
+        elem_ty = filter_elem_ty
     let pred_op = body.call_arg_operands.get((arg_start_for_pred + 1) as i64)
     let pred_sema_ty = self.mir_operand_sema_type(body, pred_op)
     if pred_sema_ty > 0:
@@ -7212,17 +7943,21 @@ fn Codegen.mir_emit_vec_fold(self: Codegen, body: MirBody, args_id: i32) -> i64:
         ctx_ptr = wl_build_extract_value(self.builder, fn_val, 1)
         is_fat = 1
     var fn_ty: i64 = 0
-    if is_fat != 0:
-        // Fat pointer closure: fn(ptr, acc, elem) -> i32
-        let fp: Vec[i64] = Vec.new()
-        fp.push(ptr_ty)
-        fp.push(i32_ty)
-        fp.push(i32_ty)
-        fn_ty = wl_function_type(i32_ty, vec_data_i64(&fp), 3, 0)
-    else:
-        fn_ty = wl_global_get_value_type(fn_ptr)
     let at = wl_type_of(init)
     var elem_ty = i32_ty
+    let fold_arg_start = body.call_arg_starts.get(args_id as i64)
+    let fold_recv_op = body.call_arg_operands.get(fold_arg_start as i64)
+    let fold_elem_ty = self.mir_vec_elem_type(body, fold_recv_op)
+    if fold_elem_ty != 0:
+        elem_ty = fold_elem_ty
+    if is_fat != 0:
+        let fp: Vec[i64] = Vec.new()
+        fp.push(ptr_ty)
+        fp.push(at)
+        fp.push(elem_ty)
+        fn_ty = wl_function_type(at, vec_data_i64(&fp), 3, 0)
+    else:
+        fn_ty = wl_global_get_value_type(fn_ptr)
     let len = wl_build_extract_value(self.builder, recv, 1)
     let sa = self.create_entry_alloca(wl_type_of(recv))
     wl_build_store(self.builder, recv, sa)

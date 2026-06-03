@@ -112,6 +112,11 @@ type SemaBuiltinSymbols {
     self_type: i32,
     vec: i32,
     veciter: i32,
+    mapiter: i32,
+    filteriter: i32,
+    takeiter: i32,
+    zipiter: i32,
+    flatmapiter: i32,
     vecslot: i32,
     veciterplace: i32,
     vecrange: i32,
@@ -152,6 +157,14 @@ type SemaBuiltinSymbols {
     filter: i32,
     map: i32,
     fold: i32,
+    collect: i32,
+    reduce: i32,
+    take: i32,
+    zip: i32,
+    flat_map: i32,
+    sum: i32,
+    count: i32,
+    partition: i32,
     sequence: i32,
     traverse: i32,
     transpose: i32,
@@ -691,6 +704,11 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         self_type: 0,
         vec: 0,
         veciter: 0,
+        mapiter: 0,
+        filteriter: 0,
+        takeiter: 0,
+        zipiter: 0,
+        flatmapiter: 0,
         vecslot: 0,
         veciterplace: 0,
         vecrange: 0,
@@ -731,6 +749,14 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         filter: 0,
         map: 0,
         fold: 0,
+        collect: 0,
+        reduce: 0,
+        take: 0,
+        zip: 0,
+        flat_map: 0,
+        sum: 0,
+        count: 0,
+        partition: 0,
         sequence: 0,
         traverse: 0,
         transpose: 0,
@@ -1301,6 +1327,11 @@ fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.syms.self_type = self.pool_intern("Self")
     self.syms.vec = self.pool_intern("Vec")
     self.syms.veciter = self.pool_intern("VecIter")
+    self.syms.mapiter = self.pool_intern("MapIter")
+    self.syms.filteriter = self.pool_intern("FilterIter")
+    self.syms.takeiter = self.pool_intern("TakeIter")
+    self.syms.zipiter = self.pool_intern("ZipIter")
+    self.syms.flatmapiter = self.pool_intern("FlatMapIter")
     self.syms.vecslot = self.pool_intern("VecSlot")
     self.syms.veciterplace = self.pool_intern("VecIterPlace")
     self.syms.vecrange = self.pool_intern("VecRange")
@@ -1340,6 +1371,14 @@ fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.syms.filter = self.pool_intern("filter")
     self.syms.map = self.pool_intern("map")
     self.syms.fold = self.pool_intern("fold")
+    self.syms.collect = self.pool_intern("collect")
+    self.syms.reduce = self.pool_intern("reduce")
+    self.syms.take = self.pool_intern("take")
+    self.syms.zip = self.pool_intern("zip")
+    self.syms.flat_map = self.pool_intern("flat_map")
+    self.syms.sum = self.pool_intern("sum")
+    self.syms.count = self.pool_intern("count")
+    self.syms.partition = self.pool_intern("partition")
     self.syms.sequence = self.pool_intern("sequence")
     self.syms.traverse = self.pool_intern("traverse")
     self.syms.transpose = self.pool_intern("transpose")
