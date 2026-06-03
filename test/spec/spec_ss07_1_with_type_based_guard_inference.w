@@ -1,17 +1,14 @@
-//! skip: non-executable spec sketch for Section 7.1 — With Type-Based Guard Inference (formerly 25.89); contains pseudo-code for unimplemented feature work
-// Spec test: Section 7.1 — With Type-Based Guard Inference (formerly 25.89)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+// Spec test: Section 7.1 - With Type-Based Guard Inference
 
-// PASS: Scoped type auto-detected
-fn test:
-    let lock = Mutex.new(42)
-    let val = with lock.read() as data:    // auto-detected as guard
-        *data
-    assert(val == 42)
+use std.sync
 
-// PASS: non-Scoped type → builder
-fn test:
+fn test_scoped_type_binds_payload:
+    let lock = mutex_new(42)
+    let val = with lock.enter() as data:
+        data + 1
+    assert(val == 43)
+
+fn test_non_scoped_mut_binding_is_builder:
     let v = with Vec.new() as mut v:
         v.push(1)
         v.push(2)

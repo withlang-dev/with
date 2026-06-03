@@ -1,98 +1,63 @@
-//! skip: non-executable spec sketch for Section 7 — `with` Blocks (formerly 25.7); contains pseudo-code for unimplemented feature work
-// Spec test: Section 7 — `with` Blocks (formerly 25.7)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+// Spec test: Section 7 - `with` Blocks
 
-// PASS: basic
-fn test(lock: &Mutex[HashMap[str, i32]]):
-    with lock.lock() as mut map:
-        map.insert("key", 42)
+use std.sync
 
-// PASS: multi
-fn test(a: &RwLock[Vec[i32]], b: &RwLock[Vec[i32]]):
-    with a.read() as xs, b.read() as ys:
-        print(xs.len() + ys.len())
+type LocalGuard {
+    value: i32,
+}
 
-// PASS: expression returning owned
-fn test(lock: &Mutex[HashMap[str, i32]]) -> Option[i32]:
-    with lock.lock() as map:
-        map.get("key").cloned()
+impl Scoped[i32] for LocalGuard =
+    fn with_enter(self: &Self) -> i32:
+        self.value
 
-// FAIL: expression returning ephemeral
-fn test(lock: &Mutex[Vec[i32]]):
-    let r = with lock.lock() as data:
-        &data[0]                  // ERROR
+    fn with_exit(self: &Self) -> void:
+        ()
 
-// PASS: collect pipeline escapes
-fn test(store: &Shared[SlotMap[Texture]]) -> Vec[Handle[Texture]]:
-    with store.read() as textures:
-        textures.iter()
-        |> filter((_h, t) => t.width > 1024)
-        |> map((h, _) => h)
-        |> collect()
+fn test_guarded_read_block:
+    let lock = mutex_new(40)
+    let val = with lock.enter() as data:
+        data + 2
+    assert(val == 42)
 
-// PASS: error propagation with implicit Ok wrapping
-fn test(lock: &Mutex[File]) -> Result[Unit, IoError]:
-    with lock.lock() as mut f:
-        f.write_all(b"hello")?
-        f.flush()?
-    // implicit Ok(())
+fn test_guarded_mut_block:
+    let lock = mutex_new(40)
+    var seen = 0
+    with lock.enter_mut() as mut data:
+        data = data + 2
+        seen = data
+    assert(seen == 42)
 
-// PASS: non-local return from with block
-fn find_val(lock: &Mutex[HashMap[str, i32]], key: &str) -> Option[i32]:
-    with lock.lock() as map:
-        match map.get(key):
-            Some(v) => return Some(v)    // returns from find_val
-            None    => ()
-    None
+fn test_multi_with_nests_left_to_right:
+    let a = LocalGuard { value: 10 }
+    let b = LocalGuard { value: 32 }
+    let val = with a as x, b as y:
+        x + y
+    assert(val == 42)
 
-// PASS: break/continue inside with block inside loop
-fn process(lock: &Mutex[Vec[Item]]):
-    for i in 0..10:
-        with lock.lock() as items:
-            if items[i].is_done():
-                continue                  // continues enclosing for loop
-            items[i].process()
+type Config {
+    timeout: i32,
+    retries: i32,
+}
 
-// --- Form 2: Builder pattern (scoped mutation) ---
-
-// PASS: basic builder
-type Config { timeout: i32, retries: i32, verbose: bool }
-fn test:
-    let c = with Config { timeout: 0, retries: 0, verbose: false } as mut c:
+fn test_builder_form:
+    let c = with Config { timeout: 0, retries: 0 } as mut c:
         c.timeout = 30
         c.retries = 3
-        c.verbose = true
     assert(c.timeout == 30)
     assert(c.retries == 3)
 
-// PASS: builder is an expression
-fn make_config -> Config:
-    with Config { timeout: 0, retries: 0, verbose: false } as mut c:
-        c.timeout = 30
+fn test_scoped_binding_form:
+    let area = with 6 as width:
+        width * 7
+    assert(area == 42)
 
-// PASS: nested with in builder
-fn test:
-    let sprite = with Sprite.new() as mut s:
-        s.position = Vec2.new(100.0, 200.0)
-        s.health = with difficulty_mult() as mult:
-            base_health * mult
+fn find_val(flag: bool) -> i32:
+    let guard = LocalGuard { value: 42 }
+    with guard as data:
+        if flag:
+            return data
+    0
 
-// --- Form 3: Scoped binding ---
-
-// PASS: basic scoped binding
-fn test:
-    let area = with shape.bounding_box() as bb:
-        bb.width * bb.height
-    assert(area > 0.0)
-
-// PASS: scoped binding avoids name leakage
-fn test:
-    let x = with expensive_compute() as result:
-        result + 1
-    // `result` is not visible here
-
-// PASS: scoped binding in pipeline context
-fn test:
-    let label = with user.display_name.unwrap_or(user.username) as name:
-        "{name} ({user.role})"
+fn test_non_local_return:
+    assert(find_val(true) == 42)
+    assert(find_val(false) == 0)

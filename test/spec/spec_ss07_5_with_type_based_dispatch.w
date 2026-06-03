@@ -1,16 +1,35 @@
-//! skip: non-executable spec sketch for Section 7.5 — With Type-Based Dispatch (formerly 25.69); contains pseudo-code for unimplemented feature work
-// Spec test: Section 7.5 — With Type-Based Dispatch (formerly 25.69)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+// Spec test: Section 7.5 - With Type-Based Dispatch
 
-// PASS: Scoped type → automatic guarded access
-fn test:
-    let lock = Mutex.new(vec![1, 2, 3])
-    with lock.lock() as data:          // Mutex implements Scoped → guard
-        assert(data.len() == 3)
+use std.sync
 
-// PASS: non-Scoped type → simple builder binding
-fn test:
-    let config = with Config.default() as mut c:
-        c.retries = 3                  // Config is not Scoped → builder
+type TestGuard {
+    value: i32,
+}
+
+impl Scoped[i32] for TestGuard =
+    fn with_enter(self: &Self) -> i32:
+        self.value
+
+    fn with_exit(self: &Self) -> void:
+        ()
+
+type Config {
+    retries: i32,
+}
+
+fn test_scoped_type_uses_guarded_form:
+    let guard = TestGuard { value: 7 }
+    let out = with guard as data:
+        data + 5
+    assert(out == 12)
+
+fn test_std_sync_guard_uses_guarded_form:
+    let lock = mutex_new(3)
+    let out = with lock.enter() as data:
+        data * 4
+    assert(out == 12)
+
+fn test_non_scoped_type_uses_builder_form:
+    let config = with Config { retries: 0 } as mut c:
+        c.retries = 3
     assert(config.retries == 3)
