@@ -1,15 +1,36 @@
-//! skip: non-executable spec sketch for Section 7.9 — NLL-Based @[no_await_guard] (formerly 25.82); contains pseudo-code for unimplemented feature work
+//! expect-stdout: ok
+
 // Spec test: Section 7.9 — NLL-Based @[no_await_guard] (formerly 25.82)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
 
-// FAIL: guard live across .await via plain let binding
-fn test_fail:
-    let guard = lock.lock()        // @[no_await_guard] type
-    fetch(url).await               // ERROR E0701: guard is live
+@[no_await_guard]
+type LocalGuard {
+    value: i32,
+}
 
-// PASS: guard dropped before .await
-fn test:
-    let data = with lock.read() as d:
-        d.clone()
-    fetch(data.url).await          // OK: guard already dropped
+async fn work() -> i32:
+    42
+
+fn test_last_use_before_await:
+    let held = LocalGuard { value: 1 }
+    assert(held.value == 1)
+    let task = work()
+    assert(task.await == 42)
+
+fn test_explicit_drop_before_await:
+    let held = LocalGuard { value: 2 }
+    assert(held.value == 2)
+    drop(held)
+    let task = work()
+    assert(task.await == 42)
+
+fn test_scoped_binding_before_await:
+    with LocalGuard { value: 3 } as held:
+        assert(held.value == 3)
+    let task = work()
+    assert(task.await == 42)
+
+fn main:
+    test_last_use_before_await()
+    test_explicit_drop_before_await()
+    test_scoped_binding_before_await()
+    print("ok")

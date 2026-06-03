@@ -6,6 +6,7 @@ use Sema
 use Span
 use Mir
 use MirLower
+use MirSuspendCheck
 use AsyncMir
 use AsyncLower
 use CCodegen
@@ -785,7 +786,10 @@ fn Compilation.check_pool(self: Compilation, pool: AstPool, source_path: str) ->
     if pool.decl_count() == 0:
         return false
     let prepared_pool = self.prepare_pool_after_typecheck_hooks(pool, source_path)
-    prepared_pool.decl_count() != 0
+    if prepared_pool.decl_count() == 0:
+        return false
+    let _ = self.run_mir_lower(prepared_pool)
+    not self.has_errors()
 
 fn Compilation.check_file_with_build_settings(self: Compilation, source_path: str, include_paths: Vec[str], defines: Vec[str], link_libs: Vec[str]) -> bool:
     var cfg = self.project_config_for_source(source_path)
@@ -1200,6 +1204,18 @@ fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
         return self.zcu.last_mir_module
     if do_profile:
         profile_emit("mir.lower", t_mir, f"bodies={mir_mod.body_count()}")
+    let t_suspend_check = profile_now()
+    sema.diags = check_no_await_guard_suspends(mir_mod, active_pool, sema, sema.diags)
+    if do_profile:
+        profile_emit("mir.suspend_check", t_suspend_check, "")
+    if sema.diags.has_errors():
+        zcu.sync_from_sema(sema)
+        compilation_debug_pool_flow("run_mir_lower:after_sync", zcu.pool, active_pool, zcu.last_sema)
+        zcu.render_all_diagnostics_frontend()
+        zcu.set_codegen_snapshot(MirModule.init(), "", AsyncMirModule.init(), "")
+        self.zcu = zcu
+        return self.zcu.last_mir_module
+    zcu.sync_from_sema(sema)
     let t_mir_validate = profile_now()
     let mir_err = validate_typed_mir_module(mir_mod)
     if do_profile:
