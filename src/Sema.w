@@ -671,6 +671,63 @@ fn Sema.pool_intern(mut self: Sema, name: str) -> i32:
     self.pool.state.symbol_map.insert(owned, id)
     id
 
+fn sema_tier_path_is_std_implementation(path: str) -> i32:
+    if path.starts_with("lib/std/") or path.starts_with("<embedded-std>/"):
+        return 1
+    if path.contains("/lib/std/"):
+        return 1
+    0
+
+fn Sema.current_module_is_std_implementation(self: Sema) -> i32:
+    sema_tier_path_is_std_implementation(self.current_module_path)
+
+fn Sema.core_without_alloc(self: Sema) -> i32:
+    if self.no_std == 0:
+        return 0
+    if self.alloc != 0:
+        return 0
+    1
+
+fn Sema.symbol_requires_alloc_tier(self: Sema, sym: i32) -> i32:
+    if sym == self.syms.vec or sym == self.syms.hashmap or sym == self.syms.hashset or sym == self.syms.slotmap or sym == self.syms.box:
+        return 1
+    let name = self.pool_resolve_symbol(sym)
+    if name == "String" or name == "StringBuilder":
+        return 1
+    0
+
+fn Sema.symbol_requires_std_tier(self: Sema, sym: i32) -> i32:
+    if sym == self.syms.regex:
+        return 1
+    let name = self.pool_resolve_symbol(sym)
+    if name == "print" or name == "eprint" or name == "write" or name == "ewrite":
+        return 1
+    if name == "print_i32" or name == "print_i64" or name == "print_bool":
+        return 1
+    0
+
+fn Sema.require_alloc_tier_for_symbol(self: Sema, sym: i32, node: i32) -> i32:
+    if self.core_without_alloc() == 0:
+        return 1
+    if self.current_module_is_std_implementation() != 0:
+        return 1
+    if self.symbol_requires_alloc_tier(sym) == 0:
+        return 1
+    let name = self.pool_resolve_symbol(sym)
+    self.emit_error(name ++ " requires alloc; use --alloc or set alloc = true with std = false", node)
+    0
+
+fn Sema.require_std_tier_for_symbol(self: Sema, sym: i32, node: i32) -> i32:
+    if self.no_std == 0:
+        return 1
+    if self.current_module_is_std_implementation() != 0:
+        return 1
+    if self.symbol_requires_std_tier(sym) == 0:
+        return 1
+    let name = self.pool_resolve_symbol(sym)
+    self.emit_error(name ++ " requires std", node)
+    0
+
 fn sema_new_map_i32_i32 -> HashMap[i32, i32]:
     HashMap.new()
 
@@ -1951,6 +2008,10 @@ fn Sema.resolve_generic_type(self: Sema, node: i32) -> i32:
             let gi_name = self.pool_resolve_symbol(gi_base_sym)
             self.emit_error("unknown type: " ++ gi_name, node)
             return 0
+    if self.require_alloc_tier_for_symbol(gi_base_sym, node) == 0:
+        return 0
+    if self.require_std_tier_for_symbol(gi_base_sym, node) == 0:
+        return 0
     let gi_arg_count = self.ast.get_data2(node)
     let gi_extra_start = self.ast.get_data1(node)
     let gi_args: Vec[i32] = Vec.new()
@@ -2780,6 +2841,7 @@ fn Sema.set_sig_return_type(self: Sema, idx: i32, ret: i32):
 
 fn Sema.check_module(self: Sema):
     self.prepare_for_comptime_transform()
+    self.validate_no_std_requirements()
     self.check_top_level_comptime_let_values()
     self.check_bodies()
     self.check_reachable_comptime_errors()

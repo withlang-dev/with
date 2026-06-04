@@ -349,7 +349,13 @@ fn Compilation.configure_options(self: Compilation, options: BuildCommandOptions
 
 fn Compilation.apply_runtime_config(self: Compilation, cfg: ProjectConfig) -> ProjectConfig:
     var out = cfg
+    if self.config.no_std:
+        out.no_std = true
+    if self.config.alloc_mode:
+        out.alloc_mode = true
     if not self.config.runtime_available:
+        out.runtime_available = false
+    if out.no_std:
         out.runtime_available = false
     out
 
@@ -1078,9 +1084,9 @@ fn Compilation.emit_typed(self: Compilation, pool: AstPool) -> bool:
     sema.source_text = zcu.current_source_text
     sema.tool_mode_entry_path = zcu.tool_mode_entry_path
     sema.runtime_available = if zcu.project_config.runtime_available: 1 else: 0
-    if self.config.no_std:
+    if zcu.project_config.no_std or self.config.no_std:
         sema.no_std = 1
-    if self.config.alloc_mode:
+    if zcu.project_config.alloc_mode or self.config.alloc_mode:
         sema.alloc = 1
     sema.check_module()
 
@@ -1154,9 +1160,9 @@ fn Compilation.run_mir_lower(self: Compilation, pool: AstPool) -> MirModule:
     sema.tool_mode_entry_path = zcu.tool_mode_entry_path
     sema.runtime_available = if zcu.project_config.runtime_available: 1 else: 0
     sema.init_module_graph(&zcu.last_resolved)
-    if self.config.no_std:
+    if zcu.project_config.no_std or self.config.no_std:
         sema.no_std = 1
-    if self.config.alloc_mode:
+    if zcu.project_config.alloc_mode or self.config.alloc_mode:
         sema.alloc = 1
     let t_sema = profile_now()
     sema.check_module()

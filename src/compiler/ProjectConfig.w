@@ -12,6 +12,8 @@ type ProjectConfig {
     link_search_paths: Vec[str],
     dep_link_libs: Vec[str],
     dep_link_args: Vec[str],
+    no_std: bool,
+    alloc_mode: bool,
     runtime_available: bool,
 }
 
@@ -27,6 +29,8 @@ fn project_config_default -> ProjectConfig:
         link_search_paths: Vec.new(),
         dep_link_libs: Vec.new(),
         dep_link_args: Vec.new(),
+        no_std: false,
+        alloc_mode: false,
         runtime_available: true,
     }
 
@@ -110,6 +114,20 @@ fn project_config_apply_entry(cfg: ProjectConfig, section: str, key: str, value:
         out.package_name = project_config_strip_quotes(value)
     else if (section == "project" or section == "package") and key == "version":
         out.package_version = project_config_strip_quotes(value)
+    else if (section == "" or section == "project" or section == "package") and key == "std":
+        let parsed_std = project_config_parse_bool(value)
+        if parsed_std < 0:
+            if out.manifest_error.len() == 0:
+                out.manifest_error = "std must be true or false"
+        else:
+            out.no_std = parsed_std == 0
+    else if (section == "" or section == "project" or section == "package") and key == "alloc":
+        let parsed_alloc = project_config_parse_bool(value)
+        if parsed_alloc < 0:
+            if out.manifest_error.len() == 0:
+                out.manifest_error = "alloc must be true or false"
+        else:
+            out.alloc_mode = parsed_alloc != 0
     else if (section == "" or section == "project" or section == "package") and key == "runtime":
         let parsed_runtime = project_config_parse_bool(value)
         if parsed_runtime < 0:
@@ -221,7 +239,7 @@ fn project_config_json_str_array(json: str, key: str) -> Vec[str]:
 fn project_config_wants_key(section: str, key: str) -> bool:
     if (section == "project" or section == "package") and (key == "name" or key == "version"):
         return true
-    if (section == "" or section == "project" or section == "package") and key == "runtime":
+    if (section == "" or section == "project" or section == "package") and (key == "std" or key == "alloc" or key == "runtime"):
         return true
     if section == "c_import" and key == "include_paths":
         return true

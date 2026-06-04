@@ -5110,6 +5110,8 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
 // ── Wrap main for exit ────────────────────────────────────────────
 
 fn Codegen.wrap_main_for_exit(self: Codegen) -> void:
+    if self.sema.no_std != 0:
+        return
     // Create an OS-facing wrapper that preserves argv/runtime setup before
     // calling the user's `main`.
     let main_fn = wl_get_named_function(self.llmod, "main")

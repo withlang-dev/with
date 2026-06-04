@@ -19,13 +19,26 @@ impl Copy for CompilationConfig
 fn PRELUDE_FULL -> i32: 0
 fn PRELUDE_CORE -> i32: 1
 fn PRELUDE_NONE -> i32: 2
+fn PRELUDE_ALLOC -> i32: 3
 
 fn compilation_normalize_prelude_mode(mode: i32) -> i32:
     if mode == PRELUDE_CORE():
         return PRELUDE_CORE()
     if mode == PRELUDE_NONE():
         return PRELUDE_NONE()
+    if mode == PRELUDE_ALLOC():
+        return PRELUDE_ALLOC()
     PRELUDE_FULL()
+
+fn compilation_effective_prelude_mode(mode: i32, no_std: bool, alloc_mode: bool) -> i32:
+    let normalized = compilation_normalize_prelude_mode(mode)
+    if normalized == PRELUDE_NONE():
+        return PRELUDE_NONE()
+    if no_std:
+        if alloc_mode:
+            return PRELUDE_ALLOC()
+        return PRELUDE_CORE()
+    normalized
 
 fn compilation_config_default -> CompilationConfig:
     CompilationConfig {

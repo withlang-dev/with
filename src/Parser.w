@@ -30,6 +30,7 @@ type Parser {
     pending_panic_handler: i32,
     pending_entry: i32,
     pending_no_main: i32,
+    pending_global_allocator: i32,
     pending_test: i32,
     pending_before: i32,
     pending_after: i32,
@@ -101,6 +102,7 @@ fn Parser.init_with_pool(tokens: TokenList, source: str, file_id: i32, intern: I
         pending_panic_handler: 0,
         pending_entry: 0,
         pending_no_main: 0,
+        pending_global_allocator: 0,
         pending_test: 0,
         pending_before: 0,
         pending_after: 0,
@@ -445,6 +447,7 @@ fn Parser.skip_attributes(self: Parser):
     self.pending_panic_handler = 0
     self.pending_entry = 0
     self.pending_no_main = 0
+    self.pending_global_allocator = 0
     self.pending_test = 0
     self.pending_before = 0
     self.pending_after = 0
@@ -535,6 +538,9 @@ fn Parser.skip_attributes(self: Parser):
             self.advance()
         else if self.is_ident_named("no_main"):
             self.pending_no_main = 1
+            self.advance()
+        else if self.is_ident_named("global_allocator"):
+            self.pending_global_allocator = 1
             self.advance()
         else if self.is_ident_named("test"):
             self.pending_test = 1
@@ -776,6 +782,10 @@ fn Parser.parse_decl(self: Parser) -> NodeId:
        t != TokenKind.TK_KW_GEN:
         self.emit_error("compiler_hook attribute can only be used on functions")
         self.pending_compiler_hook_phase = 0
+    if self.pending_global_allocator != 0 and
+       t != TokenKind.TK_KW_LET and t != TokenKind.TK_KW_VAR and t != TokenKind.TK_KW_GLOBAL:
+        self.emit_error("global_allocator attribute can only be used on global bindings")
+        self.pending_global_allocator = 0
     if t == TokenKind.TK_KW_FN:
         return self.parse_fn_decl(is_pub, start, 0, 0, 0)
     if t == TokenKind.TK_KW_UNSAFE:
@@ -2371,7 +2381,11 @@ fn Parser.parse_top_level_let(self: Parser, is_pub: i32, start: i32) -> NodeId:
             let type_extra = self.pool.extra_len()
             self.pool.add_extra(type_ann)
             flags = flags + (type_extra + 1) * 16
-            return self.pool.add_node(NodeKind.NK_LET_DECL, start, self.prev_end(), name, 0, flags)
+            let decl = self.pool.add_node(NodeKind.NK_LET_DECL, start, self.prev_end(), name, 0, flags)
+            if self.pending_global_allocator != 0:
+                self.pool.mark_global_allocator_decl(decl)
+                self.pending_global_allocator = 0
+            return decl
         if not is_mut:
             self.emit_error("let binding requires initializer")
             return self.poisoned_expr()
@@ -2396,7 +2410,11 @@ fn Parser.parse_top_level_let(self: Parser, is_pub: i32, start: i32) -> NodeId:
         // Lower 4 bits: mut, pub, GLOBAL, GLOBAL_VAR. Type-extra at bit 4+.
         flags = flags + (type_extra + 1) * 16
 
-    self.pool.add_node(NodeKind.NK_LET_DECL, start, self.prev_end(), name, value, flags)
+    let decl = self.pool.add_node(NodeKind.NK_LET_DECL, start, self.prev_end(), name, value, flags)
+    if self.pending_global_allocator != 0:
+        self.pool.mark_global_allocator_decl(decl)
+        self.pending_global_allocator = 0
+    decl
 
 fn Parser.parse_const_decl(self: Parser, is_pub: i32, start: i32) -> NodeId:
     self.advance()  // consume 'const'

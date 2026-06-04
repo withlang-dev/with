@@ -1003,7 +1003,7 @@ fn bs_check_build_options_cli(ctx: ActionCtx, compiler_path: str, case_dir: str)
     let bad_prelude = bs_run_cli_capture_cwd(ctx, compiler_path, "build-options-bad-prelude", bad_prelude_args, 120000, case_dir)
     if bad_prelude.rc == 0:
         return bs_fail(ctx, "build options bad prelude unexpectedly succeeded")
-    bs_assert_contains(ctx, bad_prelude.stderr, "invalid --prelude value 'bogus' (expected full|core|none)", "build_options_bad_prelude")
+    bs_assert_contains(ctx, bad_prelude.stderr, "invalid --prelude value 'bogus' (expected full|alloc|core|none)", "build_options_bad_prelude")
 
 fn bs_check_whole_program_extern_var_redecl(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
@@ -1151,7 +1151,7 @@ fn bs_check_emit_c_hashmap_new_field(ctx: ActionCtx, compiler_path: str, case_di
     let src = bs_join(case_dir, "hashmap_new_field.w")
     let c_path = bs_join(case_dir, "hashmap_new_field.c")
     let bin = bs_join(case_dir, "hashmap_new_field")
-    let source = "use std.prelude_core\n\n" ++
+    let source = "use std.prelude_alloc\n\n" ++
         "extern fn with_print_str(s: str) -> void\n\n" ++
         "type Registry {\n" ++
         "    names: HashMap[str, i32],\n" ++

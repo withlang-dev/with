@@ -11,6 +11,20 @@ conversation context after compaction.
 
 ## Current Focus
 
+#284 tier substrate is implemented for the user-facing compiler surface.
+`std = false` / `--no-std` now selects the core prelude by default,
+`alloc = true` / `--alloc` selects the alloc prelude, and
+`--prelude=alloc` is a first-class prelude mode. Core prelude no longer
+exports allocation-backed collections or owned-string helpers; alloc prelude
+adds those back without enabling OS/fiber/std features. Sema enforces direct
+no_std tier errors for std-only printing/regex, alloc-only containers, owned
+string literals in core no_std, missing `@[panic_handler]`, missing
+`@[entry]`/`@[no_main]`, and missing `@[global_allocator]` when alloc is
+enabled under no_std. no_std codegen skips the normal runtime `main` wrapper,
+so a minimal `@[entry]` no_std binary links as a direct `main` without
+`with_runtime_*` symbols. Full build, fixpoint, test, last-green, and
+install-user passed on 2026-06-03 for this checkpoint.
+
 #221 and #331 core `@[no_await_guard]` enforcement is implemented as
 deterministic MIR dataflow: direct guard locals and derived references/views
 live across scheduler-yielding suspension points now produce E0701, while

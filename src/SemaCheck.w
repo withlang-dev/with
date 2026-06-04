@@ -272,24 +272,36 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> TypeId:
         let sym = self.ast.get_data0(node)
         let prim = self.primitive_type_by_sym(sym)
         if prim != 0:
+            if self.require_alloc_tier_for_symbol(sym, node) == 0:
+                return 0 as TypeId
             return prim as TypeId
         let subst = self.lookup_generic_subst(sym)
         if subst != 0:
             return subst as TypeId
         let named_tid = self.lookup_named_type_visible(sym)
         if named_tid != 0 and (self.collecting_types != 0 or self.is_ci_visible(sym) != 0):
+            if self.require_alloc_tier_for_symbol(sym, node) == 0:
+                return 0 as TypeId
+            if self.require_std_tier_for_symbol(sym, node) == 0:
+                return 0 as TypeId
             return named_tid as TypeId
         let sym_text = self.pool_resolve_symbol(sym)
         let canonical_sym = if sym_text.len() > 0: self.pool_lookup_symbol(sym_text) else: 0
         if canonical_sym != 0 and canonical_sym != sym:
             let canonical_prim = self.primitive_type_by_sym(canonical_sym)
             if canonical_prim != 0:
+                if self.require_alloc_tier_for_symbol(canonical_sym, node) == 0:
+                    return 0 as TypeId
                 return canonical_prim as TypeId
             let canonical_subst = self.lookup_generic_subst(canonical_sym)
             if canonical_subst != 0:
                 return canonical_subst as TypeId
             let canonical_tid = self.lookup_named_type_visible(canonical_sym)
             if canonical_tid != 0 and (self.collecting_types != 0 or self.is_ci_visible(canonical_sym) != 0):
+                if self.require_alloc_tier_for_symbol(canonical_sym, node) == 0:
+                    return 0 as TypeId
+                if self.require_std_tier_for_symbol(canonical_sym, node) == 0:
+                    return 0 as TypeId
                 return canonical_tid as TypeId
             if canonical_sym == self.syms.self_type:
                 return 0 as TypeId
@@ -485,6 +497,51 @@ fn Sema.update_decl_source_context(self: Sema, di: i32):
     if di >= 0 and di < self.decl_source_file_ids.len() as i32:
         self.local_file_id = self.decl_source_file_ids.get(di as i64)
     self.update_module_context(di)
+
+fn Sema.no_std_decl_is_user_code(self: Sema, di: i32) -> i32:
+    if di >= 0 and di < self.decl_source_paths.len() as i32:
+        if sema_tier_path_is_std_implementation(self.decl_source_paths.get(di as i64)) != 0:
+            return 0
+    1
+
+fn Sema.validate_no_std_requirements(self: Sema):
+    if self.no_std == 0:
+        return
+
+    var has_user_decl = 0
+    var fallback_node: NodeId = 0 as NodeId
+    var has_panic_handler = 0
+    var has_entry = 0
+    var has_no_main = 0
+    var has_global_allocator = 0
+
+    for di in 0..self.ast.decl_count():
+        if self.no_std_decl_is_user_code(di) == 0:
+            continue
+        let decl = self.ast.get_decl(di)
+        if fallback_node == 0:
+            fallback_node = decl
+        has_user_decl = 1
+        if self.ast.is_global_allocator_decl(decl) != 0:
+            has_global_allocator = 1
+        if self.ast.kind(decl) != NodeKind.NK_FN_DECL:
+            continue
+        let flags = self.ast.get_data2(decl)
+        if (flags / FnFlags.PANIC_HANDLER) % 2 == 1:
+            has_panic_handler = 1
+        if (flags / FnFlags.ENTRY) % 2 == 1:
+            has_entry = 1
+        if (flags / FnFlags.NO_MAIN) % 2 == 1:
+            has_no_main = 1
+
+    if has_user_decl == 0:
+        return
+    if has_panic_handler == 0:
+        self.emit_error("no_std requires @[panic_handler]", fallback_node)
+    if has_no_main == 0 and has_entry == 0:
+        self.emit_error("no_std requires @[entry] or @[no_main]", fallback_node)
+    if self.alloc != 0 and has_global_allocator == 0:
+        self.emit_error("alloc in no_std requires @[global_allocator]", fallback_node)
 
 fn Sema.check_bodies(self: Sema):
     for di in 0..self.ast.decl_count():
@@ -2499,9 +2556,19 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
                 if self.get_type_kind(inner) == TypeKind.TY_STR:
                     self.typed_expr_types.insert(node, self.expected_expr_type as i32)
                     return self.expected_expr_type
+            if self.core_without_alloc() != 0 and self.current_module_is_std_implementation() == 0 and self.get_type_kind(expected) == TypeKind.TY_STR:
+                self.emit_error("str requires alloc; use &str in core no_std or enable alloc", node)
+                self.typed_expr_types.insert(node, self.ty_str as i32)
+                return self.ty_str
+        if self.core_without_alloc() != 0 and self.current_module_is_std_implementation() == 0:
+            self.typed_expr_types.insert(node, self.ty_str_view as i32)
+            return self.ty_str_view
         return self.ty_str
 
     if kind == NodeKind.NK_REGEX_LIT:
+        if self.no_std != 0 and self.current_module_is_std_implementation() == 0:
+            self.emit_error("regex literals require std", node)
+            return 0 as TypeId
         let regex_ty = self.lookup_named_type_visible(self.syms.regex)
         if regex_ty == 0:
             self.emit_error("Regex type is not available; import std.regex", node)
@@ -2528,6 +2595,10 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         return self.check_ident(self.ast.get_data0(node), node) as TypeId
 
     if kind == NodeKind.NK_MATCH_OP or kind == NodeKind.NK_NEG_MATCH_OP:
+        if self.no_std != 0 and self.current_module_is_std_implementation() == 0:
+            self.emit_error("regex match requires std", node)
+            self.typed_expr_types.insert(node, self.ty_bool as i32)
+            return self.ty_bool
         let lhs = self.ast.get_data0(node)
         let rhs = self.ast.get_data1(node)
         let lhs_ty = self.check_expr(lhs)
@@ -7255,6 +7326,8 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         fn_sym = self.ast.get_data0(callee)
         // Resolve for-comprehension _Payload marker to Some or Ok
         let call_name = self.pool_resolve(fn_sym)
+        if self.require_std_tier_for_symbol(fn_sym, callee) == 0:
+            return self.ty_void as i32
         if call_name == "_Payload":
             // Try expected type first, then fall back to Some (most common)
             if self.has_expected_type != 0:
