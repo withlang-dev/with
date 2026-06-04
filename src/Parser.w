@@ -3110,6 +3110,8 @@ fn Parser.parse_primary(self: Parser) -> NodeId:
         // comptime_error("msg") → NodeKind.NK_COMPTIME_ERROR
         if self.is_ident_named("comptime_error"):
             return self.parse_comptime_error_expr()
+        if self.is_scope_expr_start():
+            return self.parse_scope_expr()
         if self.suppress_fat_arrow_closure == 0 and self.pos + 1 < self.tokens.len():
             if self.tokens.get_tag(self.pos + 1) == TokenKind.TK_FAT_ARROW:
                 return self.parse_fat_arrow_single()
@@ -4930,6 +4932,40 @@ fn Parser.parse_spawn(self: Parser) -> NodeId:
     self.advance()
     let value = self.parse_expr()
     self.pool.add_node(NodeKind.NK_SPAWN, start, self.prev_end(), value, 0, 0)
+
+fn Parser.is_scope_expr_start(self: Parser) -> bool:
+    if not self.is_ident_named("scope"):
+        return false
+    if self.pos + 1 >= self.tokens.len():
+        return false
+    let next = self.tokens.get_tag(self.pos + 1)
+    if next == TokenKind.TK_FAT_ARROW or next == TokenKind.TK_L_BRACE:
+        return true
+    if next == TokenKind.TK_IDENT and self.pos + 2 < self.tokens.len():
+        let after_name = self.tokens.get_tag(self.pos + 2)
+        if after_name == TokenKind.TK_FAT_ARROW or after_name == TokenKind.TK_L_BRACE:
+            return true
+    false
+
+fn Parser.parse_scope_expr(self: Parser) -> NodeId:
+    let start = self.current_start()
+    self.advance()
+    var scope_name = self.intern.intern("s")
+    if self.peek() == TokenKind.TK_IDENT:
+        scope_name = self.expect_ident()
+        if self.peek() == TokenKind.TK_FAT_ARROW:
+            self.advance()
+    else if self.peek() == TokenKind.TK_FAT_ARROW:
+        self.advance()
+    var body: NodeId = 0 as NodeId
+    if self.peek() == TokenKind.TK_L_BRACE:
+        self.advance()
+        body = self.parse_braced_body()
+    else:
+        if self.peek() == TokenKind.TK_COLON:
+            self.advance()
+        body = self.parse_block_or_expr()
+    self.pool.add_node(NodeKind.NK_SCOPE, start, self.prev_end(), scope_name, body, 0)
 
 fn Parser.parse_async_expr(self: Parser) -> NodeId:
     let start = self.current_start()

@@ -1,23 +1,40 @@
-//! skip: non-executable spec sketch for Section 14.16 — ScopedSend (formerly 25.63); contains pseudo-code for unimplemented feature work
+//! expect-stdout: ok
 // Spec test: Section 14.16 — ScopedSend (formerly 25.63)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
 
-// PASS: scoped thread can use &mut local
-fn test:
-    var data = vec![1, 2, 3]
+async fn read_ref(value: &i32) -> i32:
+    *value
+
+fn test_scoped_worker_reads_local:
+    let base = 40
+    let result = scope s =>:
+        let handle = s.spawn(() => base + 2)
+        handle.join()
+    assert(result == 42)
+
+fn test_scoped_worker_mutates_local:
+    var value = 40
     scope s =>
-        s.spawn(() => data.push(4))     // OK: &mut data is ScopedSend
-    assert(data.len() == 4)
+        let handle = s.spawn(() => { value = value + 2; 0 })
+        let _ = handle.join()
+    assert(value == 42)
 
-// PASS: async scope can track ephemeral tasks
-async fn test:
-    var data = vec![1, 2, 3]
-    async scope s =>
-        s.track(process(&mut data))  // OK: ScopedSend
-    assert(data.len() > 0)
+fn test_scope_exit_joins_worker:
+    var value = 1
+    scope s =>:
+        let handle = s.spawn(() => { value = 42; 0 })
+    assert(value == 42)
 
-// FAIL: unscoped thread.spawn_os rejects ephemeral
-fn test_fail:
-    var data = vec![1, 2, 3]
-    thread.spawn_os(() => data.push(4)) // ERROR: &mut Vec is not Send
+async fn test_async_scope_tracks_borrowing_task:
+    let value = 42
+    let result =
+        async scope s =>:
+            let task = s.track(read_ref(&value))
+            task.await
+    assert(result == 42)
+
+fn main:
+    test_scoped_worker_reads_local()
+    test_scoped_worker_mutates_local()
+    test_scope_exit_joins_worker()
+    test_async_scope_tracks_borrowing_task().await
+    print("ok")

@@ -6174,6 +6174,16 @@ async scope s =>
     body
 ```
 
+As with other block-introducing constructs, the body may use an
+inline expression, an indented colon block, or a braced block:
+
+```
+async scope s => fetch().await
+async scope s =>:
+    fetch().await
+async scope s { fetch().await }
+```
+
 desugars to:
 
 ```
@@ -6206,6 +6216,8 @@ like `Task[T]` (supports `.await`, `cancel`, `is_done`) but is
 **exempt from `@[must_use]`**. The scope guarantees cleanup: when
 the scope exits (normally or via early `?` return), all tracked
 tasks that haven't been awaited are cancelled and joined.
+`ScopedTask[T]` is ephemeral: it may be used inside the scope, but
+the scope body may not return it or store it in non-ephemeral data.
 
 This solves the `?` interaction problem:
 
@@ -6230,6 +6242,8 @@ async scope s =>
    the panic propagates to the scope.
 3. The scope is an expression — it returns the value of `body`.
 4. `s` cannot escape the scope. It is ephemeral.
+5. The scope result cannot be ephemeral. Await or copy the value
+   before it leaves the scope.
 
 ```
 async fn handle_batch(ids: Vec[UserId]) -> Vec[Result[User, ApiError]]:
@@ -6252,7 +6266,12 @@ scope s =>
 
 The non-async `scope` uses `s.spawn(() => closure)` because OS-thread
 work items are sync closures — no eager fiber spawning occurs.
-`scope` is available in `no_runtime` builds.
+`s.spawn(worker)` returns a `ScopedJoinHandle`, which supports
+`.join() -> i32` and is joined automatically at scope exit if it has
+not already been joined. `ScopedJoinHandle` is ephemeral: it may not
+leave the `scope` result or be stored in non-ephemeral data. `scope`
+supports the same inline, colon, and braced body forms and is
+available in `no_runtime` builds.
 
 ### 14.10 Select Await
 

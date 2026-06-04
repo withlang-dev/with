@@ -2935,60 +2935,76 @@ pub fn sysinfo_impl(out: *mut u8) -> i32:
     rt_sysinfo(out)
 
 // ── Async Scopes (structured concurrency) ──────────────────────────
-// Scope holds a heap-allocated array of fiber IDs.
-// Layout: [count: i32, capacity: i32, ids: *mut i32]
-// Packed into a single heap allocation: 8 bytes header + ids array.
+// Stable scope handle layout: [count: i32, capacity: i32, entries: *mut u8]
+// Async entry layout: [fiber_id: i32, pad: i32, result_buf: *mut u8]
 
 extern fn with_fiber_await(fiber_id: i32) -> void
+extern fn with_fiber_cleanup_await(fiber_id: i32) -> void
+extern fn with_fiber_cancel(fiber_id: i32) -> void
+
+fn scope_count_ptr(handle: i64) -> *mut i32:
+    handle as *mut i32
+
+fn scope_capacity_ptr(handle: i64) -> *mut i32:
+    (handle + 4) as *mut i32
+
+fn scope_entries_ptr(handle: i64) -> *mut *mut u8:
+    (handle + 8) as *mut *mut u8
 
 @[c_export("with_scope_create")]
 pub fn scope_create() -> i64:
-    // Allocate: 8 bytes header (count + capacity) + 16 * 4 bytes for IDs
     let cap = 16
-    let size = 8 + cap * 4
-    let ptr = rt_alloc(size as i64)
+    let entry_size = 16
+    let ptr = rt_alloc(16)
     if ptr as i64 == 0:
         return 0
-    // count = 0
+    let entries = rt_alloc((cap * entry_size) as i64)
+    if entries as i64 == 0:
+        rt_free(ptr)
+        return 0
     let count_ptr = ptr as *mut i32
     unsafe:
         *count_ptr = 0
-    // capacity = 16
     let cap_ptr = (ptr as i64 + 4) as *mut i32
     unsafe:
         *cap_ptr = cap
+    let entries_ptr = (ptr as i64 + 8) as *mut *mut u8
+    unsafe:
+        *entries_ptr = entries
     ptr as i64
 
 @[c_export("with_scope_track")]
-pub fn scope_track(handle: i64, fiber_id: i32):
+pub fn scope_track(handle: i64, fiber_id: i32, result_buf: *mut u8):
     if handle == 0:
         return
-    let count_ptr = handle as *mut i32
-    let cap_ptr = (handle + 4) as *mut i32
+    let count_ptr = scope_count_ptr(handle)
+    let cap_ptr = scope_capacity_ptr(handle)
+    let entries_ptr = scope_entries_ptr(handle)
     let count = unsafe *count_ptr
     let cap = unsafe *cap_ptr
+    var entries = unsafe *entries_ptr
+    let entry_size = 16
     if count >= cap:
-        // Grow: allocate new buffer, copy, free old
         let new_cap = cap * 2
-        let new_size = 8 + new_cap * 4
+        let new_size = new_cap * entry_size
         let new_ptr = rt_alloc(new_size as i64)
         if new_ptr as i64 == 0:
             return
-        // Copy header + existing IDs
-        let old_size = 8 + count * 4
-        rt_memcpy(new_ptr, handle as *const u8, old_size as i64)
-        rt_free(handle as *mut u8)
-        // Update capacity in new buffer
-        let new_cap_ptr = (new_ptr as i64 + 4) as *mut i32
+        let old_size = count * entry_size
+        rt_memcpy(new_ptr, entries as *const u8, old_size as i64)
+        rt_free(entries)
+        entries = new_ptr
         unsafe:
-            *new_cap_ptr = new_cap
-        // Recurse with new handle (now has room)
-        scope_track(new_ptr as i64, fiber_id)
-        return
-    // Store fiber_id at offset 8 + count * 4
-    let slot = (handle + 8 + count as i64 * 4) as *mut i32
+            *entries_ptr = entries
+        unsafe:
+            *cap_ptr = new_cap
+    let entry = entries as i64 + count as i64 * entry_size
+    let slot = entry as *mut i32
     unsafe:
         *slot = fiber_id
+    let rbuf_slot = (entry + 8) as *mut *mut u8
+    unsafe:
+        *rbuf_slot = result_buf
     unsafe:
         *count_ptr = count + 1
 
@@ -2996,15 +3012,140 @@ pub fn scope_track(handle: i64, fiber_id: i32):
 pub fn scope_await_all(handle: i64):
     if handle == 0:
         return
-    let count_ptr = handle as *mut i32
+    let count_ptr = scope_count_ptr(handle)
     let count = unsafe *count_ptr
+    let entries = unsafe *scope_entries_ptr(handle)
+    if entries as i64 == 0:
+        return
+    let entry_size = 16
     for i in 0..count:
-        let slot = (handle + 8 + i as i64 * 4) as *const i32
+        let entry = entries as i64 + i as i64 * entry_size
+        let slot = entry as *const i32
         let fid = unsafe *slot
-        with_fiber_await(fid)
+        with_fiber_cancel(fid)
+        with_fiber_cleanup_await(fid)
+        let rbuf_slot = (entry + 8) as *const *mut u8
+        let rbuf = unsafe *rbuf_slot
+        if rbuf as i64 != 0:
+            rt_free(rbuf)
 
 @[c_export("with_scope_destroy")]
 pub fn scope_destroy(handle: i64):
     if handle == 0:
         return
+    let entries = unsafe *scope_entries_ptr(handle)
+    if entries as i64 != 0:
+        rt_free(entries)
     rt_free(handle as *mut u8)
+
+// ── OS-thread Scopes ──────────────────────────────────────────────
+// Stable thread scope handle layout is the same as async scope.
+// Thread entry layout: [handle: i64, joined: i32, result: i32]
+
+@[c_export("with_thread_scope_create")]
+pub fn thread_scope_create() -> i64:
+    let cap = 16
+    let entry_size = 16
+    let ptr = rt_alloc(16)
+    if ptr as i64 == 0:
+        return 0
+    let entries = rt_alloc((cap * entry_size) as i64)
+    if entries as i64 == 0:
+        rt_free(ptr)
+        return 0
+    unsafe:
+        *(ptr as *mut i32) = 0
+    unsafe:
+        *((ptr as i64 + 4) as *mut i32) = cap
+    unsafe:
+        *((ptr as i64 + 8) as *mut *mut u8) = entries
+    ptr as i64
+
+@[c_export("with_thread_scope_track")]
+pub fn thread_scope_track(scope: i64, handle: i64) -> i32:
+    if scope == 0:
+        return -1
+    let count_ptr = scope_count_ptr(scope)
+    let cap_ptr = scope_capacity_ptr(scope)
+    let entries_ptr = scope_entries_ptr(scope)
+    let count = unsafe *count_ptr
+    let cap = unsafe *cap_ptr
+    var entries = unsafe *entries_ptr
+    let entry_size = 16
+    if count >= cap:
+        let new_cap = cap * 2
+        let new_ptr = rt_alloc((new_cap * entry_size) as i64)
+        if new_ptr as i64 == 0:
+            return -1
+        rt_memcpy(new_ptr, entries as *const u8, (count * entry_size) as i64)
+        rt_free(entries)
+        entries = new_ptr
+        unsafe:
+            *entries_ptr = entries
+        unsafe:
+            *cap_ptr = new_cap
+    let entry = entries as i64 + count as i64 * entry_size
+    unsafe:
+        *(entry as *mut i64) = handle
+    unsafe:
+        *((entry + 8) as *mut i32) = 0
+    unsafe:
+        *((entry + 12) as *mut i32) = 0
+    unsafe:
+        *count_ptr = count + 1
+    count
+
+@[c_export("with_thread_scope_join")]
+pub fn thread_scope_join(scope: i64, index: i32, handle: i64) -> i32:
+    if scope == 0:
+        return thread_join_impl(handle)
+    let count = unsafe *scope_count_ptr(scope)
+    if index < 0 or index >= count:
+        return thread_join_impl(handle)
+    let entries = unsafe *scope_entries_ptr(scope)
+    if entries as i64 == 0:
+        return thread_join_impl(handle)
+    let entry = entries as i64 + index as i64 * 16
+    let joined_ptr = (entry + 8) as *mut i32
+    if unsafe *joined_ptr != 0:
+        return unsafe *((entry + 12) as *mut i32)
+    let stored_handle = unsafe *(entry as *mut i64)
+    let join_handle = if stored_handle != 0: stored_handle else: handle
+    let result = thread_join_impl(join_handle)
+    unsafe:
+        *joined_ptr = 1
+    unsafe:
+        *((entry + 12) as *mut i32) = result
+    unsafe:
+        *(entry as *mut i64) = 0
+    result
+
+@[c_export("with_thread_scope_join_all")]
+pub fn thread_scope_join_all(scope: i64):
+    if scope == 0:
+        return
+    let count = unsafe *scope_count_ptr(scope)
+    let entries = unsafe *scope_entries_ptr(scope)
+    if entries as i64 == 0:
+        return
+    for i in 0..count:
+        let entry = entries as i64 + i as i64 * 16
+        let joined_ptr = (entry + 8) as *mut i32
+        if unsafe *joined_ptr == 0:
+            let handle = unsafe *(entry as *mut i64)
+            let result = thread_join_impl(handle)
+            unsafe:
+                *joined_ptr = 1
+            unsafe:
+                *((entry + 12) as *mut i32) = result
+            unsafe:
+                *(entry as *mut i64) = 0
+
+@[c_export("with_thread_scope_destroy")]
+pub fn thread_scope_destroy(scope: i64):
+    if scope == 0:
+        return
+    let entries = unsafe *scope_entries_ptr(scope)
+    if entries as i64 != 0:
+        rt_free(entries)
+    rt_free(scope as *mut u8)

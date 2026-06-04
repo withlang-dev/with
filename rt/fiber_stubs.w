@@ -55,6 +55,11 @@ pub fn fiber_await(fiber_id: i32):
 pub fn fiber_cleanup_await(fiber_id: i32):
     let _ = fiber_id
 
+@[c_export("with_fiber_cancel")]
+pub fn fiber_cancel(fiber_id: i32) -> i32:
+    let _ = fiber_id
+    0
+
 @[c_export("with_runtime_request_cancel")]
 pub fn runtime_request_cancel(fiber_id: i32) -> i32:
     let _ = fiber_id

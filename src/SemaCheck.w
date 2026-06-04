@@ -1088,7 +1088,7 @@ fn Sema.collect_function_labels(self: Sema, node: i32):
     if kind == NodeKind.NK_LET_BINDING or kind == NodeKind.NK_LET_ELSE or kind == NodeKind.NK_TUPLE_DESTRUCTURE or kind == NodeKind.NK_DEFER or kind == NodeKind.NK_ERRDEFER:
         self.register_init_barrier(node, order)
 
-    if kind == NodeKind.NK_CLOSURE or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_ASYNC_SCOPE:
+    if kind == NodeKind.NK_CLOSURE or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_ASYNC_SCOPE or kind == NodeKind.NK_SCOPE:
         return
 
     if kind == NodeKind.NK_LET_BINDING:
@@ -1658,6 +1658,10 @@ fn Sema.check_expr_reachable_comptime_errors(self: Sema, node: i32):
         self.check_expr_reachable_comptime_errors(self.ast.get_data1(node))
         return
 
+    if kind == NodeKind.NK_SCOPE:
+        self.check_expr_reachable_comptime_errors(self.ast.get_data1(node))
+        return
+
     if kind == NodeKind.NK_SELECT_AWAIT:
         let extra_start8 = self.ast.get_data0(node)
         let arm_count2 = self.ast.get_data1(node)
@@ -1808,11 +1812,6 @@ fn Sema.is_call_expr_task(self: Sema, node: i32) -> i32:
         let fn_sym = self.ast.get_data0(callee)
         if self.task_fns.contains(fn_sym):
             return 1
-    if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS:
-        let recv = self.ast.get_data0(callee)
-        let method = self.ast.get_data1(callee)
-        if self.ast.kind(recv) == NodeKind.NK_IDENT and self.is_active_async_scope_symbol(self.ast.get_data0(recv)) != 0 and method == self.syms.track:
-            return 1
     0
 
 fn Sema.expr_is_tuple_of_tasks(self: Sema, node: i32) -> i32:
@@ -1823,7 +1822,7 @@ fn Sema.expr_is_tuple_of_tasks(self: Sema, node: i32) -> i32:
     if elem_count < 2 or elem_count > 12:
         return 0
     for ei in 0..elem_count:
-        if self.expr_is_task_value(self.ast.get_extra(extra_start + ei)) == 0:
+        if self.expr_is_awaitable_task_value(self.ast.get_extra(extra_start + ei)) == 0:
             return 0
     1
 
@@ -1854,7 +1853,7 @@ fn Sema.unwrap_task_type(self: Sema, ty: TypeId) -> TypeId:
     let resolved = self.resolve_alias(ty)
     if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
         let base_sym = self.get_generic_inst_base(resolved as i32)
-        if base_sym == self.syms.task:
+        if base_sym == self.syms.task or base_sym == self.syms.scoped_task:
             let arg_count = self.get_generic_inst_arg_count(resolved as i32)
             if arg_count > 0:
                 return self.get_generic_inst_arg(resolved as i32, 0) as TypeId
@@ -1868,6 +1867,31 @@ fn Sema.type_is_task(self: Sema, ty: i32) -> i32:
             return 1
     0
 
+fn Sema.type_is_scoped_task(self: Sema, ty: i32) -> i32:
+    let resolved = self.resolve_alias(ty as TypeId)
+    if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
+        let base_sym = self.get_generic_inst_base(resolved as i32)
+        if base_sym == self.syms.scoped_task:
+            return 1
+    0
+
+fn Sema.type_is_awaitable_task(self: Sema, ty: i32) -> i32:
+    if self.type_is_task(ty) != 0:
+        return 1
+    self.type_is_scoped_task(ty)
+
+fn Sema.type_is_scoped_join_handle(self: Sema, ty: i32) -> i32:
+    let resolved = self.resolve_alias(ty as TypeId)
+    let type_name = self.get_type_name(resolved)
+    if type_name == self.syms.scoped_join_handle:
+        return 1
+    0
+
+fn Sema.expr_is_awaitable_task_value(self: Sema, node: i32) -> i32:
+    if self.expr_is_task_value(node) != 0:
+        return 1
+    self.expr_is_scoped_task_value(node)
+
 fn Sema.expr_is_scoped_task_value(self: Sema, node: i32) -> i32:
     if node == 0:
         return 0
@@ -1875,7 +1899,17 @@ fn Sema.expr_is_scoped_task_value(self: Sema, node: i32) -> i32:
     if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
         return self.expr_is_scoped_task_value(self.ast.get_data0(node))
     if kind == NodeKind.NK_IDENT:
-        return self.scope_lookup_is_scoped_task(self.ast.get_data0(node))
+        let sym = self.ast.get_data0(node)
+        if self.scope_lookup_is_scoped_task(sym) != 0:
+            return 1
+        let tid = self.scope_lookup(sym)
+        if tid >= 0:
+            return self.type_is_scoped_task(tid)
+        return 0
+    if kind == NodeKind.NK_INDEX or kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_OPTIONAL_CHAIN:
+        if self.typed_expr_types.contains(node):
+            return self.type_is_scoped_task(self.typed_expr_types.get(node).unwrap())
+        return 0
     if kind == NodeKind.NK_CALL:
         let callee = self.ast.get_data0(node)
         if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS:
@@ -2527,6 +2561,26 @@ fn Sema.expr_is_ephemeral_value(self: Sema, node: i32) -> i32:
         return self.expr_is_ephemeral_task(node)
     0
 
+fn Sema.scope_body_tail_is_method_call(self: Sema, node: i32, scope_sym: i32, method_sym: i32) -> i32:
+    if node == 0 or scope_sym == 0 or method_sym == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
+        return self.scope_body_tail_is_method_call(self.ast.get_data0(node), scope_sym, method_sym)
+    if kind == NodeKind.NK_BLOCK:
+        return self.scope_body_tail_is_method_call(self.ast.get_data2(node), scope_sym, method_sym)
+    if kind != NodeKind.NK_CALL:
+        return 0
+    let callee = self.ast.get_data0(node)
+    if self.ast.kind(callee) != NodeKind.NK_FIELD_ACCESS:
+        return 0
+    let recv = self.ast.get_data0(callee)
+    if self.ast.kind(recv) != NodeKind.NK_IDENT or self.ast.get_data0(recv) != scope_sym:
+        return 0
+    if self.ast.get_data1(callee) == method_sym:
+        return 1
+    0
+
 fn Sema.cached_or_checked_expr_type(self: Sema, node: i32) -> i32:
     if node == 0:
         return 0
@@ -3066,7 +3120,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
             let unwrapped_tuple = self.add_type(TypeKind.TY_TUPLE, te_start, elem_count, 0)
             self.typed_expr_types.insert(node, unwrapped_tuple as i32)
             return unwrapped_tuple as TypeId
-        if self.expr_is_task_value(inner) == 0:
+        if self.expr_is_awaitable_task_value(inner) == 0:
             self.emit_error("await requires a Task value", node)
         // Unwrap Task[T] → T for the .await expression type
         let await_result_ty = self.unwrap_task_type(inner_ty)
@@ -3174,12 +3228,48 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         self.collect_function_labels(body)
         self.validate_function_gotos()
         self.push_label_boundary()
-        let result = self.check_expr(body)
+        var result = self.check_expr(body)
         self.pop_label_frame()
         self.emit_unused_label_warnings()
         self.restore_label_registry(as_saved_label_registry)
         self.async_scope_names.pop()
         self.pop_scope()
+        let async_scope_default_tail = self.scope_body_tail_is_method_call(body, name, self.syms.track)
+        if async_scope_default_tail != 0:
+            result = self.ty_void
+        else:
+            if result != 0 and self.type_is_ephemeral_value(result as i32) != 0:
+                self.emit_error("async scope result cannot be ephemeral; await or copy the value before it leaves the scope", body)
+            if self.expr_is_ephemeral_value(body) != 0:
+                self.emit_error("async scope result cannot be ephemeral; await or copy the value before it leaves the scope", body)
+        return result
+
+    if kind == NodeKind.NK_SCOPE:
+        let body = self.ast.get_data1(node)
+        let name = self.ast.get_data0(node)
+        self.push_scope()
+        self.scope_put(name, self.ty_i64, 0)
+        self.sync_scope_names.push(name)
+        let scope_saved_label_registry = self.save_label_registry()
+        self.reset_label_registry()
+        self.collect_function_labels(body)
+        self.validate_function_gotos()
+        self.push_label_boundary()
+        var result = self.check_expr(body)
+        self.pop_label_frame()
+        self.emit_unused_label_warnings()
+        self.restore_label_registry(scope_saved_label_registry)
+        self.check_sync_scope_worker_capture_liveness(body, name)
+        self.sync_scope_names.pop()
+        self.pop_scope()
+        let sync_scope_default_tail = self.scope_body_tail_is_method_call(body, name, self.syms.spawn_method)
+        if sync_scope_default_tail != 0:
+            result = self.ty_void
+        else:
+            if result != 0 and self.type_is_ephemeral_value(result as i32) != 0:
+                self.emit_error("scope result cannot be ephemeral; join or copy the value before it leaves the scope", body)
+            if self.expr_is_ephemeral_value(body) != 0:
+                self.emit_error("scope result cannot be ephemeral; join or copy the value before it leaves the scope", body)
         return result
 
     if kind == NodeKind.NK_SELECT_AWAIT:
@@ -3196,7 +3286,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
             let task = self.ast.get_extra(extra_start + ai * 3 + 1)
             let arm_body = self.ast.get_extra(extra_start + ai * 3 + 2)
             let task_ty = self.check_expr(task)
-            if self.expr_is_task_value(task) == 0:
+            if self.expr_is_awaitable_task_value(task) == 0:
                 self.emit_error("select await arm requires a Task value", task)
             let arm_result_ty = self.unwrap_task_type(task_ty)
             self.push_scope()
@@ -4302,7 +4392,10 @@ fn Sema.check_let_binding(self: Sema, node: i32) -> i32:
     if is_task_val == 0:
         is_task_val = self.type_is_task(bind_type as i32)
     self.scope_set_is_task(name, is_task_val)
-    self.scope_set_is_scoped_task(name, self.expr_is_scoped_task_value(value))
+    var is_scoped_task_val = self.expr_is_scoped_task_value(value)
+    if is_scoped_task_val == 0:
+        is_scoped_task_val = self.type_is_scoped_task(bind_type as i32)
+    self.scope_set_is_scoped_task(name, is_scoped_task_val)
     let is_ephemeral_task = self.expr_is_ephemeral_task(value)
     self.scope_set_is_ephemeral_task(name, is_ephemeral_task)
     if is_task_val != 0 and is_ephemeral_task != 0:
@@ -6762,6 +6855,27 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
     if expected_fn_tid != 0:
         expected_ret_ty = self.get_type_d2(expected_fn_tid)
     let body_ty = if expected_ret_ty != 0: self.check_expr_with_expected(body, expected_ret_ty as TypeId) else: self.check_expr(body)
+    if expected_ret_ty != 0 and expected_ret_ty != self.ty_void and body_ty != 0 and body_ty != self.ty_never:
+        if body_ty == self.ty_void:
+            if self.type_has_default_value(expected_ret_ty) == 0:
+                self.emit_error("closure return type mismatch", body)
+        else if self.types_compatible(expected_ret_ty, body_ty as i32) == 0 and self.arithmetic_result_type(expected_ret_ty, body_ty) == 0:
+            var closure_ok_wrapped = false
+            let closure_ret_resolved = self.resolve_alias(expected_ret_ty as TypeId)
+            if self.get_type_kind(closure_ret_resolved) == TypeKind.TY_GENERIC_INST:
+                let closure_base_sym = self.get_generic_inst_base(closure_ret_resolved as i32)
+                if closure_base_sym == self.syms.result and self.get_generic_inst_arg_count(closure_ret_resolved as i32) == 2:
+                    let closure_ok_type = self.get_generic_inst_arg(closure_ret_resolved as i32, 0)
+                    if self.types_compatible(closure_ok_type, body_ty) != 0 or self.arithmetic_result_type(closure_ok_type, body_ty) != 0:
+                        closure_ok_wrapped = true
+            var closure_default_from_side_effect = false
+            if self.type_has_default_value(expected_ret_ty) != 0:
+                for closure_bi in 0..self.bind_names.len() as i32:
+                    if self.expr_mutates_place(body, self.bind_names.get(closure_bi as i64)) != 0:
+                        closure_default_from_side_effect = true
+                        break
+            if not closure_ok_wrapped and not closure_default_from_side_effect:
+                self.emit_error("closure return type mismatch", body)
     self.pop_label_frame()
     self.emit_unused_label_warnings()
     self.restore_label_registry(saved_label_registry)
@@ -10122,6 +10236,10 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
         var mc_expected = self.atomic_method_expected_arg_type(mc_order_type, field, ai)
         if mc_expected == 0:
             mc_expected = self.method_expected_arg_type(obj_type as i32, field, ai)
+        if mc_expected == 0 and field == self.syms.spawn_method and ai == 0:
+            if self.ast.kind(expr) == NodeKind.NK_IDENT and self.is_active_sync_scope_symbol(self.ast.get_data0(expr)) != 0:
+                let spawn_params: Vec[i32] = Vec.new()
+                mc_expected = self.ensure_fn_type(spawn_params, 0, self.ty_i32) as i32
         if mc_expected == 0 and field == self.syms.fold and ai == 1 and arg_types.len() > 0:
             let fold_elem = if self.iterator_element_type(obj_type as i32) != 0:
                 self.iterator_element_type(obj_type as i32)
@@ -10171,7 +10289,7 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
 
     // Task/ScopedTask surface methods (spec §14.7): cancel(), is_done().
     if field == self.syms.cancel or field == self.syms.is_done:
-        if self.expr_is_task_value(expr) == 0 and self.expr_is_scoped_task_value(expr) == 0:
+        if self.expr_is_awaitable_task_value(expr) == 0:
             return 0
         if mc_resolved_arg_count != 0:
             self.emit_error("task method expects zero arguments", node)
@@ -10190,7 +10308,36 @@ fn Sema.check_method_call_parts(self: Sema, expr: i32, field: i32, extra_start: 
         let task_arg = self.ast.get_extra(extra_start)
         if self.expr_is_task_value(task_arg) == 0:
             self.emit_error("track() requires a Task value", task_arg)
-        return arg_types.get(0)
+        let task_ty = arg_types.get(0)
+        let scoped_args: Vec[i32] = Vec.new()
+        scoped_args.push(self.unwrap_task_type(task_ty as TypeId) as i32)
+        return self.ensure_generic_inst_type(self.syms.scoped_task, scoped_args, 1) as i32
+
+    if field == self.syms.spawn_method:
+        if self.ast.kind(expr) != NodeKind.NK_IDENT or self.is_active_sync_scope_symbol(self.ast.get_data0(expr)) == 0:
+            self.emit_error("spawn() is only available inside scope", node)
+            return 0
+        if mc_resolved_arg_count != 1:
+            self.emit_error("spawn() requires one worker closure", node)
+            return 0
+        let worker_ty = if arg_types.len() > 0: arg_types.get(0) else: 0
+        let worker_fn_ty = self.callable_fn_type(worker_ty as TypeId)
+        if worker_fn_ty == 0:
+            self.emit_error("spawn() requires a fn() -> i32 worker", node)
+        else:
+            if self.get_type_d1(worker_fn_ty) != 0 or self.get_type_d2(worker_fn_ty) != self.ty_i32:
+                self.emit_error("spawn() requires a fn() -> i32 worker", node)
+        if self.named_types.contains(self.syms.scoped_join_handle):
+            return self.named_types.get(self.syms.scoped_join_handle).unwrap()
+        self.emit_error("ScopedJoinHandle is missing from the prelude", node)
+        return 0
+
+    if field == self.syms.join:
+        if self.type_is_scoped_join_handle(obj_type as i32) != 0:
+            if mc_resolved_arg_count != 0:
+                self.emit_error("join() expects zero arguments", node)
+                return 0
+            return self.ty_i32 as i32
 
     if obj_type == 0:
         return 0
@@ -11752,6 +11899,8 @@ fn Sema.expr_uses_symbol(self: Sema, node: i32, sym: i32) -> i32:
         return 0
     if kind == NodeKind.NK_ASYNC_SCOPE:
         return self.expr_uses_symbol(self.ast.get_data1(node), sym)
+    if kind == NodeKind.NK_SCOPE:
+        return self.expr_uses_symbol(self.ast.get_data1(node), sym)
     if kind == NodeKind.NK_SELECT_AWAIT:
         let extra_start = self.ast.get_data0(node)
         let arm_count = self.ast.get_data1(node)
@@ -11762,6 +11911,137 @@ fn Sema.expr_uses_symbol(self: Sema, node: i32, sym: i32) -> i32:
                 return 1
         return 0
     0
+
+fn Sema.sync_scope_spawn_worker(self: Sema, node: i32, scope_sym: i32) -> i32:
+    if node == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
+        return self.sync_scope_spawn_worker(self.ast.get_data0(node), scope_sym)
+    if kind != NodeKind.NK_CALL:
+        return 0
+    let callee = self.ast.get_data0(node)
+    if self.ast.kind(callee) != NodeKind.NK_FIELD_ACCESS:
+        return 0
+    let recv = self.ast.get_data0(callee)
+    if self.ast.kind(recv) != NodeKind.NK_IDENT or self.ast.get_data0(recv) != scope_sym:
+        return 0
+    if self.ast.get_data1(callee) != self.syms.spawn_method:
+        return 0
+    let arg_count = self.ast.get_data2(node)
+    if arg_count <= 0:
+        return 0
+    let worker = self.ast.get_extra(self.ast.get_data1(node))
+    if worker > 0 and self.ast.kind(worker) == NodeKind.NK_CLOSURE:
+        return worker
+    0
+
+fn Sema.expr_is_join_on_symbol(self: Sema, node: i32, handle_sym: i32) -> i32:
+    if node == 0 or handle_sym == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
+        return self.expr_is_join_on_symbol(self.ast.get_data0(node), handle_sym)
+    if kind == NodeKind.NK_LET_BINDING or kind == NodeKind.NK_LET_DECL:
+        return self.expr_is_join_on_symbol(self.ast.get_data1(node), handle_sym)
+    if kind == NodeKind.NK_CALL:
+        let callee = self.ast.get_data0(node)
+        if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS:
+            let recv = self.ast.get_data0(callee)
+            if self.ast.kind(recv) == NodeKind.NK_IDENT and self.ast.get_data0(recv) == handle_sym and self.ast.get_data1(callee) == self.syms.join:
+                return 1
+        let args_start = self.ast.get_data1(node)
+        let arg_count = self.ast.get_data2(node)
+        if self.expr_is_join_on_symbol(callee, handle_sym) != 0:
+            return 1
+        for ai in 0..arg_count:
+            if self.expr_is_join_on_symbol(self.ast.get_extra(args_start + ai), handle_sym) != 0:
+                return 1
+        return 0
+    if kind == NodeKind.NK_BLOCK:
+        let extra_start = self.ast.get_data0(node)
+        let stmt_count = self.ast.get_data1(node)
+        for si in 0..stmt_count:
+            if self.expr_is_join_on_symbol(self.ast.get_extra(extra_start + si), handle_sym) != 0:
+                return 1
+        return self.expr_is_join_on_symbol(self.ast.get_data2(node), handle_sym)
+    0
+
+fn Sema.check_sync_scope_capture_rest(self: Sema, cap_sym: i32, mutating_capture: i32, handle_sym: i32, extra_start: i32, stmt_count: i32, next_stmt_index: i32, tail: i32, err_node: i32):
+    let cap_name = self.pool_resolve(cap_sym)
+    var si = next_stmt_index
+    while si < stmt_count:
+        let stmt = self.ast.get_extra(extra_start + si)
+        if handle_sym != 0 and self.expr_is_join_on_symbol(stmt, handle_sym) != 0:
+            return
+        if mutating_capture != 0:
+            if self.expr_uses_symbol(stmt, cap_sym) != 0:
+                self.emit_error("scoped thread worker mutably captures `" ++ cap_name ++ "`; use it after join or after the scope", stmt)
+                return
+        else:
+            if self.expr_mutates_place(stmt, cap_sym) != 0:
+                self.emit_error("cannot mutate `" ++ cap_name ++ "` before scoped thread worker joins", stmt)
+                return
+        si = si + 1
+    if tail != 0:
+        if handle_sym != 0 and self.expr_is_join_on_symbol(tail, handle_sym) != 0:
+            return
+        if mutating_capture != 0:
+            if self.expr_uses_symbol(tail, cap_sym) != 0:
+                self.emit_error("scoped thread worker mutably captures `" ++ cap_name ++ "`; use it after join or after the scope", tail)
+        else:
+            if self.expr_mutates_place(tail, cap_sym) != 0:
+                self.emit_error("cannot mutate `" ++ cap_name ++ "` before scoped thread worker joins", tail)
+
+fn Sema.check_sync_scope_spawn_expr_captures(self: Sema, node: i32, scope_sym: i32, handle_sym: i32, extra_start: i32, stmt_count: i32, next_stmt_index: i32, tail: i32):
+    if node == 0:
+        return
+    let worker = self.sync_scope_spawn_worker(node, scope_sym)
+    if worker != 0:
+        let worker_body = self.ast.get_data0(worker)
+        for bi in 0..self.bind_names.len() as i32:
+            let cap_sym = self.bind_names.get(bi as i64)
+            if cap_sym == scope_sym or cap_sym == handle_sym:
+                continue
+            if self.expr_uses_symbol(worker_body, cap_sym) != 0:
+                let mutating_capture = self.expr_mutates_place(worker_body, cap_sym)
+                self.check_sync_scope_capture_rest(cap_sym, mutating_capture, handle_sym, extra_start, stmt_count, next_stmt_index, tail, worker)
+        return
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_LET_BINDING or kind == NodeKind.NK_LET_DECL:
+        let name = self.ast.get_data0(node)
+        let value = self.ast.get_data1(node)
+        let value_handle = if self.sync_scope_spawn_worker(value, scope_sym) != 0: name else: handle_sym
+        self.check_sync_scope_spawn_expr_captures(value, scope_sym, value_handle, extra_start, stmt_count, next_stmt_index, tail)
+        return
+    if kind == NodeKind.NK_BLOCK:
+        let inner_start = self.ast.get_data0(node)
+        let inner_count = self.ast.get_data1(node)
+        let inner_tail = self.ast.get_data2(node)
+        for si in 0..inner_count:
+            let stmt = self.ast.get_extra(inner_start + si)
+            self.check_sync_scope_spawn_expr_captures(stmt, scope_sym, 0, inner_start, inner_count, si + 1, inner_tail)
+            self.check_sync_scope_spawn_expr_captures(stmt, scope_sym, 0, extra_start, stmt_count, next_stmt_index, tail)
+        if inner_tail != 0:
+            self.check_sync_scope_spawn_expr_captures(inner_tail, scope_sym, 0, extra_start, stmt_count, next_stmt_index, tail)
+        return
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
+        self.check_sync_scope_spawn_expr_captures(self.ast.get_data0(node), scope_sym, handle_sym, extra_start, stmt_count, next_stmt_index, tail)
+
+fn Sema.check_sync_scope_worker_capture_liveness(self: Sema, body: i32, scope_sym: i32):
+    if body == 0:
+        return
+    if self.ast.kind(body) != NodeKind.NK_BLOCK:
+        self.check_sync_scope_spawn_expr_captures(body, scope_sym, 0, 0, 0, 0, 0)
+        return
+    let extra_start = self.ast.get_data0(body)
+    let stmt_count = self.ast.get_data1(body)
+    let tail = self.ast.get_data2(body)
+    for si in 0..stmt_count:
+        let stmt = self.ast.get_extra(extra_start + si)
+        self.check_sync_scope_spawn_expr_captures(stmt, scope_sym, 0, extra_start, stmt_count, si + 1, tail)
+    if tail != 0:
+        self.check_sync_scope_spawn_expr_captures(tail, scope_sym, 0, extra_start, stmt_count, stmt_count, 0)
 
 // Check if an expression mutates a variable rooted at `sym`.
 // Returns 1 if any subexpression assigns to or takes &mut of the variable.

@@ -327,6 +327,10 @@ fn AsyncLower.walk_expr(self: AsyncLower, node: i32):
         self.walk_expr(async_ast_get_data1(self.ast, node))
         return
 
+    if kind == NodeKind.NK_SCOPE:
+        self.walk_expr(async_ast_get_data1(self.ast, node))
+        return
+
 fn async_node_valid(ast: AstPool, node: i32) -> bool:
     node > 0 and node < ast.node_count()
 

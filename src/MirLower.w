@@ -237,7 +237,7 @@ fn MirBuilder.emit_with_guard_cleanup(self: MirBuilder, guard_local: i32, drop_k
 
 fn MirBuilder.drop_kind_owns_value(self: MirBuilder, drop_kind: i32) -> i32:
     let _ = self
-    if drop_kind == DropKind.DK_VALUE or drop_kind == DropKind.DK_TASK_DETACHED or drop_kind == DropKind.DK_TASK_EPHEMERAL:
+    if drop_kind == DropKind.DK_VALUE or drop_kind == DropKind.DK_TASK_DETACHED or drop_kind == DropKind.DK_TASK_EPHEMERAL or drop_kind == DropKind.DK_ASYNC_SCOPE or drop_kind == DropKind.DK_THREAD_SCOPE:
         return 1
     0
 
@@ -288,6 +288,54 @@ fn MirBuilder.emit_drop_entry(self: MirBuilder, local_id: i32, drop_kind: i32):
         let await_place = self.place_for_local(local_id)
         let await_op = self.body.new_operand(OperandKind.OK_COPY, await_place)
         self.lower_cleanup_await(await_op, 0)
+        self.body.push_stmt(self.cur_bb, StmtKind.StorageDead, local_id, 0, 0)
+        return
+    if drop_kind == DropKind.DK_ASYNC_SCOPE:
+        let scope_place = self.place_for_local(local_id)
+        let scope_op = self.body.new_operand(OperandKind.OK_COPY, scope_place)
+        let await_all_args: Vec[i32] = Vec.new()
+        await_all_args.push(scope_op)
+        let await_all_call_id = self.body.new_call_args(await_all_args)
+        self.body.set_call_intrinsic(await_all_call_id, MirIntrinsic.SCOPE_AWAIT_ALL)
+        let await_all_result = self.new_temp(0)
+        let await_all_place = self.place_for_local(await_all_result)
+        let after_await_all_bb = self.new_block()
+        self.terminate(TermKind.TK_CALL, self.unit_operand(), await_all_call_id, await_all_place, after_await_all_bb)
+        self.switch_to(after_await_all_bb)
+
+        let destroy_args: Vec[i32] = Vec.new()
+        destroy_args.push(self.body.new_operand(OperandKind.OK_COPY, scope_place))
+        let destroy_call_id = self.body.new_call_args(destroy_args)
+        self.body.set_call_intrinsic(destroy_call_id, MirIntrinsic.SCOPE_DESTROY)
+        let destroy_result = self.new_temp(0)
+        let destroy_place = self.place_for_local(destroy_result)
+        let after_destroy_bb = self.new_block()
+        self.terminate(TermKind.TK_CALL, self.unit_operand(), destroy_call_id, destroy_place, after_destroy_bb)
+        self.switch_to(after_destroy_bb)
+        self.body.push_stmt(self.cur_bb, StmtKind.StorageDead, local_id, 0, 0)
+        return
+    if drop_kind == DropKind.DK_THREAD_SCOPE:
+        let scope_place = self.place_for_local(local_id)
+        let scope_op = self.body.new_operand(OperandKind.OK_COPY, scope_place)
+        let join_all_args: Vec[i32] = Vec.new()
+        join_all_args.push(scope_op)
+        let join_all_call_id = self.body.new_call_args(join_all_args)
+        self.body.set_call_intrinsic(join_all_call_id, MirIntrinsic.THREAD_SCOPE_JOIN_ALL)
+        let join_all_result = self.new_temp(0)
+        let join_all_place = self.place_for_local(join_all_result)
+        let after_join_all_bb = self.new_block()
+        self.terminate(TermKind.TK_CALL, self.unit_operand(), join_all_call_id, join_all_place, after_join_all_bb)
+        self.switch_to(after_join_all_bb)
+
+        let destroy_args: Vec[i32] = Vec.new()
+        destroy_args.push(self.body.new_operand(OperandKind.OK_COPY, scope_place))
+        let destroy_call_id = self.body.new_call_args(destroy_args)
+        self.body.set_call_intrinsic(destroy_call_id, MirIntrinsic.THREAD_SCOPE_DESTROY)
+        let destroy_result = self.new_temp(0)
+        let destroy_place = self.place_for_local(destroy_result)
+        let after_destroy_bb = self.new_block()
+        self.terminate(TermKind.TK_CALL, self.unit_operand(), destroy_call_id, destroy_place, after_destroy_bb)
+        self.switch_to(after_destroy_bb)
         self.body.push_stmt(self.cur_bb, StmtKind.StorageDead, local_id, 0, 0)
         return
     let place = self.body.new_place(local_id)
@@ -531,7 +579,7 @@ fn MirBuilder.collect_goto_label_depths(self: MirBuilder, node: i32, scope_depth
         let _ = self.ensure_goto_label(self.ast.get_data0(node), scope_depth)
         self.collect_goto_label_depths(self.ast.get_data1(node), scope_depth)
         return
-    if kind == NodeKind.NK_CLOSURE or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_ASYNC_SCOPE:
+    if kind == NodeKind.NK_CLOSURE or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_ASYNC_SCOPE or kind == NodeKind.NK_SCOPE:
         return
     if kind == NodeKind.NK_BLOCK:
         let stmt_start = self.ast.get_data0(node)
@@ -3392,6 +3440,26 @@ fn MirBuilder.lower_expr_discard(self: MirBuilder, node: i32) -> i32:
     self.expected_type = saved_expected
     let _ = result
     self.unit_operand()
+
+fn MirBuilder.scope_body_tail_is_method_call(self: MirBuilder, node: i32, scope_sym: i32, method_sym: i32) -> i32:
+    if node == 0 or scope_sym == 0 or method_sym == 0:
+        return 0
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
+        return self.scope_body_tail_is_method_call(self.ast.get_data0(node), scope_sym, method_sym)
+    if kind == NodeKind.NK_BLOCK:
+        return self.scope_body_tail_is_method_call(self.ast.get_data2(node), scope_sym, method_sym)
+    if kind != NodeKind.NK_CALL:
+        return 0
+    let callee = self.ast.get_data0(node)
+    if self.ast.kind(callee) != NodeKind.NK_FIELD_ACCESS:
+        return 0
+    let recv = self.ast.get_data0(callee)
+    if self.ast.kind(recv) != NodeKind.NK_IDENT or self.ast.get_data0(recv) != scope_sym:
+        return 0
+    if self.ast.get_data1(callee) == method_sym:
+        return 1
+    0
 
 fn MirBuilder.lower_block(self: MirBuilder, node: i32) -> i32:
     self.lower_block_mode(node, 1)
@@ -8434,9 +8502,11 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         self.body.set_call_ast_node(create_call_id, node)
         let scope_local = self.new_temp(self.sema.ty_i64)
         let scope_place = self.place_for_local(scope_local)
+        self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, scope_local, 0, span)
         let after_create_bb = self.new_block()
         self.terminate(TermKind.TK_CALL, self.unit_operand(), create_call_id, scope_place, after_create_bb)
         self.switch_to(after_create_bb)
+        self.schedule_drop(scope_local, DropKind.DK_ASYNC_SCOPE)
         // Bind scope handle to scope variable name
         if scope_sym > 0:
             let bind_local = self.body.new_local(self.sema.ty_i64 as i32, 0, scope_sym, 1)
@@ -8448,29 +8518,45 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         let scope_body = self.ast.get_data1(node)
         var body_result = self.unit_operand()
         if scope_body != 0:
-            body_result = self.lower_expr(scope_body)
-        // 3. Await all tracked tasks: with_scope_await_all(handle)
-        let await_all_args: Vec[i32] = Vec.new()
-        await_all_args.push(self.body.new_operand(OperandKind.OK_COPY, scope_place))
-        let await_all_call_id = self.body.new_call_args(await_all_args)
-        self.body.set_call_intrinsic(await_all_call_id, MirIntrinsic.SCOPE_AWAIT_ALL)
-        self.body.set_call_ast_node(await_all_call_id, node)
-        let await_all_result = self.new_temp(0)
-        let await_all_place = self.place_for_local(await_all_result)
-        let after_await_all_bb = self.new_block()
-        self.terminate(TermKind.TK_CALL, self.unit_operand(), await_all_call_id, await_all_place, after_await_all_bb)
-        self.switch_to(after_await_all_bb)
-        // 4. Destroy scope: with_scope_destroy(handle)
-        let destroy_args: Vec[i32] = Vec.new()
-        destroy_args.push(self.body.new_operand(OperandKind.OK_COPY, scope_place))
-        let destroy_call_id = self.body.new_call_args(destroy_args)
-        self.body.set_call_intrinsic(destroy_call_id, MirIntrinsic.SCOPE_DESTROY)
-        self.body.set_call_ast_node(destroy_call_id, node)
-        let destroy_result = self.new_temp(0)
-        let destroy_place = self.place_for_local(destroy_result)
-        let after_destroy_bb = self.new_block()
-        self.terminate(TermKind.TK_CALL, self.unit_operand(), destroy_call_id, destroy_place, after_destroy_bb)
-        self.switch_to(after_destroy_bb)
+            if self.scope_body_tail_is_method_call(scope_body, scope_sym, self.sema.syms.track) != 0:
+                body_result = self.lower_expr_discard(scope_body)
+            else:
+                body_result = self.lower_expr(scope_body)
+        // 3. Cleanup is a scheduled scope drop so return/?/break/continue
+        // paths run the same await-all/destroy sequence as fallthrough.
+        self.cancel_scheduled_value_drop_for_local(scope_local)
+        self.emit_drop_entry(scope_local, DropKind.DK_ASYNC_SCOPE)
+        return body_result
+
+    if kind == NodeKind.NK_SCOPE:
+        let scope_sym = self.ast.get_data0(node)
+        let span = self.ast.get_start(node)
+        let create_args: Vec[i32] = Vec.new()
+        let create_call_id = self.body.new_call_args(create_args)
+        self.body.set_call_intrinsic(create_call_id, MirIntrinsic.THREAD_SCOPE_CREATE)
+        self.body.set_call_ast_node(create_call_id, node)
+        let scope_local = self.new_temp(self.sema.ty_i64)
+        let scope_place = self.place_for_local(scope_local)
+        self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, scope_local, 0, span)
+        let after_create_bb = self.new_block()
+        self.terminate(TermKind.TK_CALL, self.unit_operand(), create_call_id, scope_place, after_create_bb)
+        self.switch_to(after_create_bb)
+        self.schedule_drop(scope_local, DropKind.DK_THREAD_SCOPE)
+        if scope_sym > 0:
+            let bind_local = self.body.new_local(self.sema.ty_i64 as i32, 0, scope_sym, 1)
+            self.bind_local(scope_sym, bind_local)
+            let bind_place = self.place_for_local(bind_local)
+            let scope_op = self.body.new_operand(OperandKind.OK_COPY, scope_place)
+            self.assign_operand_to_place(bind_place, scope_op, span)
+        let scope_body = self.ast.get_data1(node)
+        var body_result = self.unit_operand()
+        if scope_body != 0:
+            if self.scope_body_tail_is_method_call(scope_body, scope_sym, self.sema.syms.spawn_method) != 0:
+                body_result = self.lower_expr_discard(scope_body)
+            else:
+                body_result = self.lower_expr(scope_body)
+        self.cancel_scheduled_value_drop_for_local(scope_local)
+        self.emit_drop_entry(scope_local, DropKind.DK_THREAD_SCOPE)
         return body_result
 
     if kind == NodeKind.NK_ASYNC_BLOCK:
@@ -8662,7 +8748,7 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody
                 // No sig — resolve param type from type annotation AST node
                 let p_type_node = builder.ast.fn_param_type(param_start, i)
                 if p_type_node > 0:
-                    p_ty = builder.expr_type(p_type_node)
+                    p_ty = builder.sema.resolve_type_expr(p_type_node) as i32
                 if p_ty == 0:
                     p_ty = builder.sema.ty_i32 as i32
             let local_id = builder.body.new_local(p_ty, 0, p_name, 1)
