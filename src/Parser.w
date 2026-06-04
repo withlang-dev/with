@@ -4612,9 +4612,7 @@ fn Parser.parse_if_else_body(self: Parser, use_then: bool) -> NodeId:
         return self.parse_if_expr()
     if use_then:
         return self.parse_expr()
-    if self.peek() == TokenKind.TK_L_BRACE or self.peek() == TokenKind.TK_COLON:
-        return self.parse_body()
-    self.parse_expr()
+    self.parse_body()
 
 fn Parser.parse_if_expr(self: Parser) -> NodeId:
     let start = self.current_start()
