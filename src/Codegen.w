@@ -3177,8 +3177,25 @@ fn codegen_canonical_module_path(path: str) -> str:
         return resolve_normalize_path(path)
     resolve_join(cwd, path)
 
+fn codegen_is_runtime_source_file(source_path: str) -> bool:
+    source_path.starts_with("rt/") or source_path.contains("/rt/") or
+        source_path == "out/gen/compat_runtime.w" or
+        source_path.ends_with("/out/gen/compat_runtime.w")
+
+fn codegen_is_runtime_abi_symbol(base_name: str) -> bool:
+    if base_name.starts_with("with_") or base_name.starts_with("rt_") or base_name.starts_with("wl_"):
+        return true
+    base_name == "__error" or base_name == "__open" or
+        base_name == "i32_to_str" or base_name == "i64_to_string" or
+        base_name == "str_from_byte"
+
+fn codegen_preserve_runtime_link_name(source_path: str, base_name: str) -> bool:
+    codegen_is_runtime_source_file(source_path) and codegen_is_runtime_abi_symbol(base_name)
+
 fn Codegen.module_link_name_for_path(self: Codegen, source_path: str, base_name: str) -> str:
     if self.module_object_mode == 0:
+        return base_name
+    if codegen_preserve_runtime_link_name(source_path, base_name):
         return base_name
     let canonical_path = codegen_canonical_module_path(source_path)
     if canonical_path.len() == 0 or canonical_path == "<unknown>":
@@ -3496,7 +3513,8 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
     if (flags / FnFlags.ENTRY) % 2 == 1:
         effective_name = "main"
     else if self.module_object_mode != 0:
-        if not (cc_name.len() > 9 and cc_name.slice(0, 9) == "c_export:"):
+        if not codegen_preserve_runtime_link_name(self.current_decl_source_file, effective_name) and
+            not (cc_name.len() > 9 and cc_name.slice(0, 9) == "c_export:"):
             effective_name = self.current_decl_module_link_name(effective_name)
 
     let function = wl_add_function(self.llmod, effective_name, fn_type)
@@ -3516,6 +3534,8 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
     // @[weak] — set weak linkage (LLVMWeakAnyLinkage = 5)
     // Must be checked before c_export which also sets linkage.
     let is_weak = self.pool.state.fn_weak_flags.contains(fn_node)
+    if is_weak:
+        wl_set_linkage(function, 5)
 
     // @[c_export] overrides internal linkage to external for C/linker visibility
     if cc_name.len() > 0:
@@ -3567,7 +3587,8 @@ fn Codegen.declare_function_from_sig(self: Codegen, fn_sym: i32, sig_idx: i32, f
             sema_name
         else:
             self.function_symbol_name(cg_sym)
-    if self.module_object_mode != 0 and force_internal == 0:
+    if self.module_object_mode != 0 and force_internal == 0 and
+        not codegen_preserve_runtime_link_name(self.current_decl_source_file, effective_name):
         effective_name = self.current_decl_module_link_name(effective_name)
 
     var ret_ty = self.sema_type_to_llvm(self.sema.sig_return_type(sig_idx))
