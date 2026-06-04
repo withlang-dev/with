@@ -392,8 +392,7 @@ fn interrupt_signal_handler(signo: i32):
         let _ = kill(-active_child_pgid, signo)
     _exit(128 + signo)
 
-@[c_export("with_setenv_str")]
-pub fn setenv_str(name: str, value: str) -> i32:
+pub fn with_setenv_str(name: str, value: str) -> i32:
     let name_buf = str_to_c_buf(name)
     if name_buf as i64 == 0:
         return -1
@@ -406,8 +405,7 @@ pub fn setenv_str(name: str, value: str) -> i32:
     with_free(value_buf)
     rc
 
-@[c_export("with_install_interrupt_handlers")]
-pub fn install_interrupt_handlers():
+pub fn with_install_interrupt_handlers():
     var sa: [16]u8 = [0 as u8; 16]
     let sa_base = (&raw mut sa) as *mut [16]u8 as i64
     with_memset(sa_base as *mut u8, 0, SIGACTION_SIZE)
@@ -416,8 +414,7 @@ pub fn install_interrupt_handlers():
     let _ = sigaction(SIGTERM, sa_base as *const u8, 0 as *mut u8)
     let _ = sigaction(SIGHUP, sa_base as *const u8, 0 as *mut u8)
 
-@[c_export("with_raise_stack_limit")]
-pub fn raise_stack_limit():
+pub fn with_raise_stack_limit():
     var lim: [16]u8 = [0 as u8; 16]
     let lim_base = (&raw mut lim) as *mut [16]u8 as i64
     if getrlimit(RLIMIT_STACK, lim_base as *mut u8) != 0:
@@ -431,12 +428,10 @@ pub fn raise_stack_limit():
         store_i64(lim_base, RLIMIT_OFF_CUR, want as i64)
         let _ = setrlimit(RLIMIT_STACK, lim_base as *const u8)
 
-@[c_export("with_interrupt_requested")]
-pub fn interrupt_requested() -> i32:
+pub fn with_interrupt_requested() -> i32:
     interrupt_flag
 
-@[c_export("with_exec_binary")]
-pub fn exec_binary(path: str) -> i32:
+pub fn with_exec_binary(path: str) -> i32:
     let buf = str_to_c_buf(path)
     if buf as i64 == 0:
         return -1
@@ -450,8 +445,7 @@ pub fn exec_binary(path: str) -> i32:
     with_free(buf)
     rc
 
-@[c_export("with_exec_argv")]
-pub fn exec_argv(args: str) -> i32:
+pub fn with_exec_argv(args: str) -> i32:
     let buf = str_to_c_buf(args)
     if buf as i64 == 0:
         return -1
@@ -465,8 +459,7 @@ pub fn exec_argv(args: str) -> i32:
     with_free(buf)
     rc
 
-@[c_export("with_exec_argv_cwd")]
-pub fn exec_argv_cwd(args: str, cwd: str) -> i32:
+pub fn with_exec_argv_cwd(args: str, cwd: str) -> i32:
     let arg_buf = str_to_c_buf(args)
     if arg_buf as i64 == 0:
         return -1
@@ -486,8 +479,7 @@ pub fn exec_argv_cwd(args: str, cwd: str) -> i32:
     with_free(cwd_buf)
     rc
 
-@[c_export("with_exec_argv_capture")]
-pub fn exec_argv_capture(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32) -> i32:
+pub fn with_exec_argv_capture(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32) -> i32:
     let arg_buf = str_to_c_buf(args)
     if arg_buf as i64 == 0:
         return -1
@@ -514,8 +506,7 @@ pub fn exec_argv_capture(args: str, stdout_path: str, stderr_path: str, timeout_
     with_free(err_buf)
     rc
 
-@[c_export("with_exec_argv_capture_input")]
-pub fn exec_argv_capture_input(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, stdin_path: str) -> i32:
+pub fn with_exec_argv_capture_input(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, stdin_path: str) -> i32:
     let arg_buf = str_to_c_buf(args)
     if arg_buf as i64 == 0:
         return -1
@@ -550,8 +541,7 @@ pub fn exec_argv_capture_input(args: str, stdout_path: str, stderr_path: str, ti
     with_free(in_buf)
     rc
 
-@[c_export("with_exec_argv_capture_cwd")]
-pub fn exec_argv_capture_cwd(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str) -> i32:
+pub fn with_exec_argv_capture_cwd(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str) -> i32:
     let arg_buf = str_to_c_buf(args)
     if arg_buf as i64 == 0:
         return -1
@@ -586,8 +576,7 @@ pub fn exec_argv_capture_cwd(args: str, stdout_path: str, stderr_path: str, time
     with_free(cwd_buf)
     rc
 
-@[c_export("with_exec_argv_capture_spawn")]
-pub fn exec_argv_capture_spawn(args: str, stdout_path: str, stderr_path: str) -> i32:
+pub fn with_exec_argv_capture_spawn(args: str, stdout_path: str, stderr_path: str) -> i32:
     let arg_buf = str_to_c_buf(args)
     if arg_buf as i64 == 0:
         return -1
@@ -614,8 +603,7 @@ pub fn exec_argv_capture_spawn(args: str, stdout_path: str, stderr_path: str) ->
     with_free(err_buf)
     pid
 
-@[c_export("with_exec_wait")]
-pub fn exec_wait(pid: i32, timeout_ms: i32) -> i32:
+pub fn with_exec_wait(pid: i32, timeout_ms: i32) -> i32:
     if pid <= 0:
         return -1
     active_child_pgid = pid

@@ -57,8 +57,7 @@ fn regex_to_cstr(s: str) -> *const u8:
     unsafe *((out as i64 + s.len()) as *mut u8) = 0
     out as *const u8
 
-@[c_export("with_regex_error_message")]
-pub fn regex_error_message_impl(code: i32) -> str:
+pub fn with_regex_error_message(code: i32) -> str:
     let buf = with_alloc(256)
     let rc = pcre2_get_error_message_8(code, buf as *mut u8, 256)
     if rc < 0:
@@ -68,8 +67,7 @@ pub fn regex_error_message_impl(code: i32) -> str:
     with_free(buf)
     text
 
-@[c_export("with_regex_compile")]
-pub fn regex_compile_impl(pattern: str, options: i32, err_code: *mut i32, err_offset: *mut i32) -> *const i8:
+pub fn with_regex_compile(pattern: str, options: i32, err_code: *mut i32, err_offset: *mut i32) -> *const i8:
     let gcontext = pcre2_general_context_create_8(regex_runtime_malloc, regex_runtime_free, null)
     if gcontext as i64 == 0:
         with_panic("with_regex_compile(): general context creation failed", "", 0)
@@ -104,19 +102,16 @@ pub fn regex_compile_impl(pattern: str, options: i32, err_code: *mut i32, err_of
         unsafe *err_offset = raw_err_offset as i32
     compiled as *const i8
 
-@[c_export("with_regex_code_copy")]
-pub fn regex_code_copy_impl(code: *const i8) -> *const i8:
+pub fn with_regex_code_copy(code: *const i8) -> *const i8:
     if code as i64 == 0:
         return null
     pcre2_code_copy_8(code as *const pcre2_real_code_8) as *const i8
 
-@[c_export("with_regex_code_free")]
-pub fn regex_code_free_impl(code: *const i8):
+pub fn with_regex_code_free(code: *const i8):
     if code as i64 != 0:
         pcre2_code_free_8(code as *mut pcre2_real_code_8)
 
-@[c_export("with_regex_capture_count")]
-pub fn regex_capture_count_impl(code: *const i8) -> i32:
+pub fn with_regex_capture_count(code: *const i8) -> i32:
     if code as i64 == 0:
         return 0
     var capture_count: c_uint = 0
@@ -130,12 +125,10 @@ pub fn regex_capture_count_impl(code: *const i8) -> i32:
         return 0
     capture_count as i32
 
-@[c_export("with_regex_match_spans_alloc")]
-pub fn regex_match_spans_alloc_impl(code: *const i8, text: str, out_count: *mut i32) -> *const i32:
-    regex_match_spans_alloc_at_impl(code, text, 0, out_count)
+pub fn with_regex_match_spans_alloc(code: *const i8, text: str, out_count: *mut i32) -> *const i32:
+    with_regex_match_spans_alloc_at(code, text, 0, out_count)
 
-@[c_export("with_regex_match_spans_alloc_at")]
-pub fn regex_match_spans_alloc_at_impl(code: *const i8, text: str, start_offset: i32, out_count: *mut i32) -> *const i32:
+pub fn with_regex_match_spans_alloc_at(code: *const i8, text: str, start_offset: i32, out_count: *mut i32) -> *const i32:
     if out_count as i64 != 0:
         unsafe *out_count = 0
     if code as i64 == 0 or start_offset < 0 or start_offset as i64 > text.len():
@@ -184,8 +177,7 @@ pub fn regex_match_spans_alloc_at_impl(code: *const i8, text: str, start_offset:
         unsafe *out_count = ints_count
     out as *const i32
 
-@[c_export("with_regex_capture_name_count")]
-pub fn regex_capture_name_count_impl(code: *const i8) -> i32:
+pub fn with_regex_capture_name_count(code: *const i8) -> i32:
     if code as i64 == 0:
         return 0
     var name_count: c_uint = 0
@@ -199,8 +191,7 @@ pub fn regex_capture_name_count_impl(code: *const i8) -> i32:
         return 0
     name_count as i32
 
-@[c_export("with_regex_capture_name_at")]
-pub fn regex_capture_name_at_impl(code: *const i8, index: i32) -> str:
+pub fn with_regex_capture_name_at(code: *const i8, index: i32) -> str:
     if code as i64 == 0 or index < 0:
         return ""
     var name_count: c_uint = 0
@@ -235,8 +226,7 @@ pub fn regex_capture_name_at_impl(code: *const i8, index: i32) -> str:
     let entry = (table as i64 + index as i64 * entry_size as i64 + 2) as *const u8
     with_str_clone(with_str_from_cstr(entry))
 
-@[c_export("with_regex_group_name_to_index")]
-pub fn regex_group_name_to_index_impl(code: *const i8, name: str) -> i32:
+pub fn with_regex_group_name_to_index(code: *const i8, name: str) -> i32:
     if code as i64 == 0:
         return -1
     let cname = regex_to_cstr(name)
@@ -246,8 +236,7 @@ pub fn regex_group_name_to_index_impl(code: *const i8, name: str) -> i32:
         return -1
     out
 
-@[c_export("with_regex_substitute")]
-pub fn regex_substitute_impl(code: *const i8, text: str, repl: str, replace_all: i32) -> str:
+pub fn with_regex_substitute(code: *const i8, text: str, repl: str, replace_all: i32) -> str:
     if code as i64 == 0:
         return text
     let gcontext = pcre2_general_context_create_8(regex_runtime_malloc, regex_runtime_free, null)
@@ -297,7 +286,7 @@ pub fn regex_substitute_impl(code: *const i8, text: str, repl: str, replace_all:
             &raw mut buffer_len
         )
     if rc < 0:
-        let msg = "with_regex_substitute(): " ++ regex_error_message_impl(rc as i32)
+        let msg = "with_regex_substitute(): " ++ with_regex_error_message(rc as i32)
         with_free(c_repl as *i8)
         with_free(buffer as *mut u8)
         pcre2_match_data_free_8(match_data)

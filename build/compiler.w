@@ -312,18 +312,7 @@ fn comp_count_actual_c_export_attrs(text: str) -> i32:
     count
 
 fn comp_c_export_budget(path: str) -> i32:
-    if path == "src/compiler/EmbeddedClangResource.w": return 1
-    if path == "rt/panic_runtime.w": return 1
-    if path == "rt/channel_runtime.w": return 6
-    if path == "rt/regex_runtime.w": return 11
-    if path == "rt/compat_runtime.w": return 12
-    if path == "rt/cimport_stubs.w": return 118
-    if path == "rt/fiber_runtime.w": return 15
-    if path == "rt/fiber_stubs.w": return 21
-    if path == "rt/fiber_core_darwin.w": return 27
-    if path == "rt/darwin_aarch64.w": return 42
-    if path == "rt/linux_x86_64.w": return 44
-    if path == "rt/rt_core.w": return 198
+    let _ = path
     -1
 
 fn comp_check_c_export_path(ctx: ActionCtx, path: str) -> i32:
