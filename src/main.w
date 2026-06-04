@@ -283,17 +283,19 @@ fn cli_prelude_mode(argc: i32) -> i32:
         if arg == "--no-prelude":
             mode = PreludeMode.NoneMode
         else if arg == "--freestanding":
-            mode = PreludeMode.NoneMode
+            mode = PreludeMode.CoreMode
         else if with_str_starts_with(arg, "--prelude=") != 0:
             let value = with_str_slice(arg, 10, with_str_len(arg))
             if value == "core":
                 mode = PreludeMode.CoreMode
+            else if value == "alloc":
+                mode = PRELUDE_ALLOC()
             else if value == "full":
                 mode = PreludeMode.FullMode
             else if value == "none":
                 mode = PreludeMode.NoneMode
             else:
-                with_eprint("error: invalid --prelude value '" ++ value ++ "' (expected full|core|none)")
+                with_eprint("error: invalid --prelude value '" ++ value ++ "' (expected full|alloc|core|none)")
                 exit(1)
                 return PreludeMode.FullMode
         i = i + 1
@@ -2100,9 +2102,10 @@ fn run_test_file_with_build_settings(target: str, opt_level: i32, no_std: bool, 
     let effective_opt_level = test_effective_opt_level(opt_level, directives.extra_args)
     let effective_no_std = no_std or test_extra_arg_present(directives.extra_args, "--no-std") or test_extra_arg_present(directives.extra_args, "--freestanding")
     let effective_runtime_available = runtime_available and not test_extra_arg_present(directives.extra_args, "--no-runtime") and not test_extra_arg_present(directives.extra_args, "--freestanding")
+    let effective_alloc_mode = alloc_mode or test_extra_arg_present(directives.extra_args, "--alloc")
     let effective_prelude_mode = test_effective_prelude_mode(prelude_mode, directives.extra_args)
     var comp = Compilation.init()
-    comp.configure(effective_opt_level, effective_no_std, alloc_mode, effective_runtime_available)
+    comp.configure(effective_opt_level, effective_no_std, effective_alloc_mode, effective_runtime_available)
     comp.set_prelude_mode(effective_prelude_mode)
     comp.set_debug_info(debug_info)
     let synthetic_source = maybe_synthesize_test_source(target)
@@ -2517,8 +2520,8 @@ fn print_usage:
     with_write("  --no-std         Disable standard library support\n")
     with_write("  --no-runtime     Disable the fiber runtime; async constructs are errors\n")
     with_write("  --no-prelude     Disable implicit prelude import\n")
-    with_write("  --prelude=<mode> Select prelude mode: full, core, none\n")
-    with_write("  --freestanding   Alias for --no-std --no-runtime --no-prelude\n")
+    with_write("  --prelude=<mode> Select prelude mode: full, alloc, core, none\n")
+    with_write("  --freestanding   Alias for --no-std --no-runtime --prelude=core\n")
 
 fn print_build_usage:
     with_write("Usage: with build [source.w|:target] [options]\n")
@@ -2546,8 +2549,8 @@ fn print_build_usage:
     with_write("  --no-std         Disable standard library support\n")
     with_write("  --no-runtime     Disable the fiber runtime; async constructs are errors\n")
     with_write("  --no-prelude     Disable implicit prelude import\n")
-    with_write("  --prelude=<mode> Select prelude mode: full, core, none\n")
-    with_write("  --freestanding   Alias for --no-std --no-runtime --no-prelude\n")
+    with_write("  --prelude=<mode> Select prelude mode: full, alloc, core, none\n")
+    with_write("  --freestanding   Alias for --no-std --no-runtime --prelude=core\n")
 
 fn print_test_usage:
     with_write("Usage: with test [source.w|directory ...] [options]\n")
@@ -2575,8 +2578,8 @@ fn print_test_usage:
     with_write("  --no-std         Disable standard library support\n")
     with_write("  --no-runtime     Disable the fiber runtime; async constructs are errors\n")
     with_write("  --no-prelude     Disable implicit prelude import\n")
-    with_write("  --prelude=<mode> Select prelude mode: full, core, none\n")
-    with_write("  --freestanding   Alias for --no-std --no-runtime --no-prelude\n")
+    with_write("  --prelude=<mode> Select prelude mode: full, alloc, core, none\n")
+    with_write("  --freestanding   Alias for --no-std --no-runtime --prelude=core\n")
 
 fn run_help_command(argc: i32) -> i32:
     let topic = cli_help_topic(argc)

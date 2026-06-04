@@ -936,7 +936,7 @@ fn Zcu.inject_prelude_frontend(self: Zcu, pool: AstPool) -> AstPool:
     if self.prelude_mode == PRELUDE_NONE():
         return pool
 
-    let prelude_module = if self.prelude_mode == PRELUDE_CORE(): "std.prelude_core" else: "std.prelude"
+    let prelude_module = if self.prelude_mode == PRELUDE_CORE(): "std.prelude_core" else if self.prelude_mode == PRELUDE_ALLOC(): "std.prelude_alloc" else: "std.prelude"
     let synthetic = "use " ++ prelude_module ++ "\n"
 
     var lexer = Lexer.init(synthetic, 0)
@@ -952,7 +952,7 @@ fn Zcu.inject_prelude_frontend(self: Zcu, pool: AstPool) -> AstPool:
 // This ensures prelude-provided types (Vec, HashMap, etc.) are imported
 // before any user modules that depend on them.
 fn Zcu.parse_with_prelude_first_mode(self: Zcu, text: str, file_id: i32, implicit_main_mode: i32) -> AstPool:
-    let prelude_module = if self.prelude_mode == PRELUDE_CORE(): "std.prelude_core" else: "std.prelude"
+    let prelude_module = if self.prelude_mode == PRELUDE_CORE(): "std.prelude_core" else if self.prelude_mode == PRELUDE_ALLOC(): "std.prelude_alloc" else: "std.prelude"
     let synthetic = "use " ++ prelude_module ++ "\n"
 
     // Step 1: parse prelude USE into a fresh pool
@@ -987,6 +987,7 @@ fn Zcu.compile_file_frontend_with_config(self: Zcu, path: str, cfg: ProjectConfi
     let source_dir = frontend_dirname(path)
     self.reset_for_new_invocation(source_dir, path, "")
     self.project_config = cfg
+    self.set_prelude_mode(compilation_effective_prelude_mode(self.prelude_mode, self.project_config.no_std, self.project_config.alloc_mode))
     if self.project_config.manifest_error.len() > 0:
         runtime_eprint("error: invalid with.toml: " ++ self.project_config.manifest_error)
         self.set_resolve_snapshot(ResolveResult.init(), path)
@@ -1020,6 +1021,7 @@ fn Zcu.compile_file_frontend_entry_with_config(self: Zcu, path: str, cfg: Projec
     let source_dir = frontend_dirname(path)
     self.reset_for_new_invocation(source_dir, path, "")
     self.project_config = cfg
+    self.set_prelude_mode(compilation_effective_prelude_mode(self.prelude_mode, self.project_config.no_std, self.project_config.alloc_mode))
     if self.project_config.manifest_error.len() > 0:
         runtime_eprint("error: invalid with.toml: " ++ self.project_config.manifest_error)
         self.set_resolve_snapshot(ResolveResult.init(), path)
@@ -1183,6 +1185,10 @@ fn Zcu.compile_source_frontend_mode(self: Zcu, text: str, name: str, file_id: i3
     sema.decl_is_c_import = self.decl_is_c_import
     sema.tool_mode_entry_path = self.tool_mode_entry_path
     sema.runtime_available = if self.project_config.runtime_available: 1 else: 0
+    if self.project_config.no_std:
+        sema.no_std = 1
+    if self.project_config.alloc_mode:
+        sema.alloc = 1
     sema.init_module_graph(&self.last_resolved)
     sema.check_module()
     if do_profile:
