@@ -3,13 +3,18 @@
 Status: active checkpoint for agents. Update this file when phase status,
 blockers, or the next work queue changes.
 
-Last updated: 2026-06-03.
+Last updated: 2026-06-04.
 
 Read this file immediately after `AGENTS.md`. It exists so long-running build
 system and bootstrap work does not have to be reconstructed from git history or
 conversation context after compaction.
 
 ## Current Focus
+
+#334 is implemented. Final `else expr` is now accepted in mixed-form `if`
+chains after colon or braced arms while `else if` remains a chain
+continuation. The spec, parser fixture, and behavior coverage were updated;
+full build, fixpoint, and test passed on 2026-06-04.
 
 #252 and #253 are implemented as the first generator vertical slice.
 `gen fn f(...) -> T` now semantically returns a compiler-generated state
