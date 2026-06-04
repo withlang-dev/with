@@ -6555,9 +6555,9 @@ fn CCodegen.collect_struct_types_from_tid(self: CCodegen, mut acc: CollectStruct
                 acc.seen_names.insert(resolved as i32, 1)
                 acc.out.push(resolved as i32)
             var generic_acc = acc
-            let arg_count = self.sema.get_generic_inst_arg_count(resolved as i32)
-            for ai in 0..arg_count:
-                generic_acc = self.collect_struct_types_from_tid(generic_acc, self.sema.get_generic_inst_arg(resolved as i32, ai))
+            let field_tids = self.synthetic_generic_struct_field_tids(resolved as i32)
+            for fi in 0..field_tids.len() as i32:
+                generic_acc = self.collect_struct_types_from_tid(generic_acc, field_tids.get(fi as i64))
             return generic_acc
         if base_name == "Vec" or base_name == "HashMap" or base_name == "HashSet":
             return acc
@@ -6565,6 +6565,20 @@ fn CCodegen.collect_struct_types_from_tid(self: CCodegen, mut acc: CollectStruct
         let inner_tid = self.sema.get_type_d0(resolved)
         return self.collect_struct_types_from_tid(acc, inner_tid)
     acc
+
+fn CCodegen.synthetic_generic_struct_field_tids(self: CCodegen, tid: i32) -> Vec[i32]:
+    let fields: Vec[i32] = Vec.new()
+    let resolved = self.sema.resolve_alias(tid as TypeId) as i32
+    if self.sema.get_type_kind(resolved as TypeId) != TypeKind.TY_GENERIC_INST:
+        return fields
+    let base_name = self.generic_inst_base_name(resolved)
+    if base_name == "HashMapEntry":
+        if self.sema.get_generic_inst_arg_count(resolved) > 0:
+            fields.push(self.sema.get_generic_inst_arg(resolved, 0))
+    else if base_name == "Atomic":
+        if self.sema.get_generic_inst_arg_count(resolved) > 0:
+            fields.push(self.sema.get_generic_inst_arg(resolved, 0))
+    fields
 
 fn CCodegen.collect_fn_types_from_tid(self: CCodegen, acc: CollectFnTypes, tid: i32) -> CollectFnTypes:
     var cur = acc
@@ -6670,8 +6684,28 @@ fn CCodegen.collect_used_struct_types(self: CCodegen) -> Vec[i32]:
             return acc.out
         let tid = acc.out.get(i as i64)
         i = i + 1
-        let start = self.sema.get_type_d1(tid)
-        let count = self.sema.get_type_d2(tid)
+        let resolved = self.sema.resolve_alias(tid as TypeId) as i32
+        let tk = self.sema.get_type_kind(resolved as TypeId)
+        if tk == TypeKind.TY_GENERIC_INST and self.generic_inst_needs_struct_def(resolved) != 0:
+            let field_tids = self.synthetic_generic_struct_field_tids(resolved)
+            for fi in 0..field_tids.len() as i32:
+                if self.check_interrupted() != 0:
+                    return acc.out
+                acc = self.collect_struct_types_from_tid(acc, field_tids.get(fi as i64))
+            continue
+        if self.type_is_payload_enum(resolved) != 0:
+            let variant_count = self.sema.type_reflection_variant_count(resolved)
+            for vi in 0..variant_count:
+                let payload_count = self.sema.type_reflection_variant_payload_count(resolved, vi)
+                for pi in 0..payload_count:
+                    if self.check_interrupted() != 0:
+                        return acc.out
+                    acc = self.collect_struct_types_from_tid(acc, self.sema.type_reflection_variant_payload_type(resolved, vi, pi))
+            continue
+        if tk != TypeKind.TY_STRUCT:
+            continue
+        let start = self.sema.get_type_d1(resolved as TypeId)
+        let count = self.sema.get_type_d2(resolved as TypeId)
         for fi in 0..count:
             if self.check_interrupted() != 0:
                 return acc.out

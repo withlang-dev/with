@@ -828,6 +828,10 @@ fn AstPool.ct_clone_tree_with_subst(self: AstPool, node: i32, subst_sym: i32, su
         let body = self.ct_clone_tree_with_subst(self.get_data1(node), subst_sym, subst_node, index_sym, index_node)
         return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), self.get_data0(node), body, 0, self.literal_suffix(node))
 
+    if kind == NodeKind.NK_SCOPE:
+        let body = self.ct_clone_tree_with_subst(self.get_data1(node), subst_sym, subst_node, index_sym, index_node)
+        return self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), self.get_data0(node), body, 0, self.literal_suffix(node))
+
     if kind == NodeKind.NK_SELECT_AWAIT:
         let extra_start = self.get_data0(node)
         let arm_count = self.get_data1(node)
@@ -1175,6 +1179,10 @@ fn Sema.ct_transform_expr(mut self: Sema, source_ast: AstPool, pool: AstPool, in
         return node
 
     if kind == NodeKind.NK_ASYNC_SCOPE:
+        pool.set_data1(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data1(node)))
+        return node
+
+    if kind == NodeKind.NK_SCOPE:
         pool.set_data1(node, self.ct_transform_expr(source_ast, pool, intern, pool.get_data1(node)))
         return node
 

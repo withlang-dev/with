@@ -12,6 +12,11 @@ use std.result
 /// writes its return value. Await loads from it and frees it.
 pub type Task[T] { fiber_id: i32, result_buf: *mut u8 }
 
+/// Scope-owned task handle returned by `async scope`'s `s.track(...)`.
+/// It has the same ABI as Task[T], but its cleanup is owned by the scope,
+/// so dropping the handle itself does not cancel the fiber.
+pub type ScopedTask[T] ephemeral { fiber_id: i32, result_buf: *mut u8 }
+
 /// Await all tasks. Returns Vec[T] in input order.
 /// Fails fast on first Err.
 pub async fn await_all[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Result[Vec[T], E]:

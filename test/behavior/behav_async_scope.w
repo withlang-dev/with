@@ -9,5 +9,6 @@ async fn main:
         let t2 = compute(4)
         s.track(t1)
         s.track(t2)
+        0
     // Scope exit: all tracked tasks completed
     print("ok")

@@ -11,6 +11,21 @@ conversation context after compaction.
 
 ## Current Focus
 
+#260 and #271 are implemented as the first scoped-concurrency substrate.
+`async scope s => ...` now returns scope-owned `ScopedTask[T]` handles
+from `s.track(Task[T])`; they are awaitable like `Task[T]`, exempt from
+unused-task diagnostics, and ephemeral so they cannot escape the scope
+result or be stored in ordinary data. Async-scope cleanup is represented
+as a scheduled MIR drop for early exits and as an explicit fallthrough
+cleanup; scope drop kinds are cancellable so normal fallthrough does not
+double-run cleanup. Non-async `scope s => ...` now supports scoped
+OS-thread workers via `s.spawn(fn() -> i32) -> ScopedJoinHandle`, with
+`.join() -> i32` and automatic join/destroy at scope exit. The new scope
+surface supports inline, colon, and braced bodies. Focused behavior and
+compile-error coverage exists for scoped task await/drop, scoped thread
+spawn/join, block forms, method misuse, and escape/storage rejection. Full
+build, fixpoint, and test passed on 2026-06-04 for this checkpoint.
+
 #334 is implemented. Final `else expr` is now accepted in mixed-form `if`
 chains after colon or braced arms while `else if` remains a chain
 continuation. The spec, parser fixture, and behavior coverage were updated;

@@ -1,41 +1,55 @@
-//! skip: non-executable spec sketch for Section 14.8 — Scoped Task Tracking (formerly 25.53); contains pseudo-code for unimplemented feature work
+//! expect-stdout: ok
 // Spec test: Section 14.8 — Scoped Task Tracking (formerly 25.53)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
 
-// PASS: s.track registers task with scope
-async fn test:
-    async scope s =>
-        let t = s.track(fetch_data("http://example.com"))
-        let result = t.await
-        assert(result.is_ok())
+extern fn with_fiber_live_fibers() -> i32
 
-// PASS: ScopedTask is exempt from @[must_use] — scope handles cleanup
-async fn test:
-    async scope s =>
-        s.track(fire_and_forget_in_scope())
-        // ScopedTask dropped — no compile error
-        // scope will cancel+join it on exit
+async fn fetch_data(id: i32) -> Result[i32, str]:
+    id + 1
 
-// PASS: early ? return with ScopedTask — no E0801
-async fn test -> Result[i32, AppError]:
-    async scope s =>
-        let task_a = s.track(compute_a())
-        let task_b = s.track(compute_b())
-        // If task_a.await? fails, task_b is cancelled by scope
-        let a = task_a.await?
-        let b = task_b.await?
-        Ok(a + b)
+async fn compute(id: i32) -> i32:
+    id + 1
 
-// PASS: scatter-gather pattern
-async fn test:
-    let results = async scope s =>
-        let tasks = vec![1, 2, 3].iter()
-            |> map(id => s.track(fetch_user(id)))
-            |> collect[Vec]()
-        tasks |> map(t => t.await) |> collect[Vec]()
-    assert(results.len() == 3)
+async fn fallible(value: i32) -> Result[i32, str]:
+    value
 
-// FAIL: bare Task (not ScopedTask) is still @[must_use]
-async fn test_fail:
-    fetch_data("http://example.com")    // ERROR E0801: unused Task
+async fn tick() -> i32:
+    1
+
+async fn borrow_until_scope_cancel(value: &i32) -> i32:
+    assert(*value == 41)
+    while true:
+        let _ = tick().await
+    0
+
+async fn test_track_registers_and_awaits:
+    let result = async scope s =>:
+        let task = s.track(fetch_data(41))
+        task.await.unwrap()
+    assert(result == 42)
+
+async fn test_scoped_task_drop_is_scope_owned:
+    async scope s =>:
+        s.track(compute(1))
+        0
+
+async fn test_question_return_keeps_scope_cleanup -> Result[i32, str]:
+    let total = async scope s =>:
+        let left = s.track(fallible(20))
+        let right = s.track(fallible(22))
+        left.await? + right.await?
+    total
+
+fn test_scope_exit_cancels_unawaited_task:
+    let baseline = unsafe { with_fiber_live_fibers() }
+    let value = 41
+    async scope s =>:
+        s.track(borrow_until_scope_cancel(&value))
+        0
+    assert(unsafe { with_fiber_live_fibers() } == baseline)
+
+fn main:
+    test_track_registers_and_awaits().await
+    test_scoped_task_drop_is_scope_owned().await
+    assert(test_question_return_keeps_scope_cleanup().await.unwrap() == 42)
+    test_scope_exit_cancels_unawaited_task()
+    print("ok")

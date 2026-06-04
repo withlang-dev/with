@@ -13,6 +13,13 @@ type JoinHandle  {
     handle: i64
 }
 
+/// Scope-owned OS-thread handle returned by `scope`'s `s.spawn(...)`.
+pub type ScopedJoinHandle ephemeral {
+    scope: i64,
+    index: i32,
+    handle: i64,
+}
+
 /// Spawn an OS thread running `worker`. Returns a JoinHandle.
 @[effect(worker = [read, escape_value])]
 pub fn spawn_os(worker: fn() -> i32) -> JoinHandle:

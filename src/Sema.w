@@ -92,6 +92,8 @@ enum SemaMagicIdentKind: i32:
 
 type SemaBuiltinSymbols {
     task: i32,
+    scoped_task: i32,
+    scoped_join_handle: i32,
     channel: i32,
     send: i32,
     recv: i32,
@@ -101,6 +103,8 @@ type SemaBuiltinSymbols {
     todo: i32,
     unreachable: i32,
     track: i32,
+    spawn_method: i32,
+    join: i32,
     src: i32,
     file_magic: i32,
     line_magic: i32,
@@ -403,6 +407,7 @@ type Sema {
     pending_generic_binding_call: HashMap[i32, i32],
     pending_generic_binding_decl: HashMap[i32, i32],
     async_scope_names: Vec[i32],
+    sync_scope_names: Vec[i32],
     label_syms: Vec[i32],
     label_kinds: Vec[i32],
     label_nodes: Vec[i32],
@@ -763,6 +768,8 @@ fn sema_pair_key(a: i32, b: i32) -> i64:
 fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
     SemaBuiltinSymbols {
         task: 0,
+        scoped_task: 0,
+        scoped_join_handle: 0,
         channel: 0,
         send: 0,
         recv: 0,
@@ -772,6 +779,8 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         todo: 0,
         unreachable: 0,
         track: 0,
+        spawn_method: 0,
+        join: 0,
         src: 0,
         file_magic: 0,
         line_magic: 0,
@@ -1059,6 +1068,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         pending_generic_binding_call: sema_new_map_i32_i32(),
         pending_generic_binding_decl: sema_new_map_i32_i32(),
         async_scope_names: Vec.new(),
+        sync_scope_names: Vec.new(),
         label_syms: Vec.new(),
         label_kinds: Vec.new(),
         label_nodes: Vec.new(),
@@ -1408,6 +1418,8 @@ fn Sema.init_builtin_reflection_types(mut self: Sema):
 
 fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.syms.task = self.pool_intern("Task")
+    self.syms.scoped_task = self.pool_intern("ScopedTask")
+    self.syms.scoped_join_handle = self.pool_intern("ScopedJoinHandle")
     self.syms.channel = self.pool_intern("Channel")
     self.syms.send = self.pool_intern("send")
     self.syms.recv = self.pool_intern("recv")
@@ -1417,6 +1429,8 @@ fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.syms.todo = self.pool_intern("todo")
     self.syms.unreachable = self.pool_intern("unreachable")
     self.syms.track = self.pool_intern("track")
+    self.syms.spawn_method = self.pool_intern("spawn")
+    self.syms.join = self.pool_intern("join")
     self.syms.src = self.pool_intern("src")
     self.syms.file_magic = self.pool_intern("__FILE__")
     self.syms.line_magic = self.pool_intern("__LINE__")
@@ -2727,6 +2741,14 @@ fn Sema.is_active_async_scope_symbol(self: Sema, sym: i32) -> i32:
     var i = self.async_scope_names.len() as i32 - 1
     while i >= 0:
         if self.async_scope_names.get(i as i64) == sym:
+            return 1
+        i = i - 1
+    0
+
+fn Sema.is_active_sync_scope_symbol(self: Sema, sym: i32) -> i32:
+    var i = self.sync_scope_names.len() as i32 - 1
+    while i >= 0:
+        if self.sync_scope_names.get(i as i64) == sym:
             return 1
         i = i - 1
     0

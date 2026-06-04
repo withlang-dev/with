@@ -3,10 +3,9 @@
 Test cases extracted from `docs/with-specification.md` section 25.
 Each file tests one or more rules from the corresponding spec section.
 
-All files are currently marked `//! skip` because they contain
-pseudo-code from the specification. As compiler features are
-implemented, convert the pseudo-code to runnable tests and
-remove the skip directive.
+Spec files started as pseudo-code sketches marked `//! skip`. As compiler
+features are implemented, convert the pseudo-code to runnable tests and remove
+the skip directive.
 
 ## Mapping
 
