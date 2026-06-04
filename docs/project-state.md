@@ -32,6 +32,16 @@ before its direct bridge parses, which fixes the previous `stdarg.h` lookup
 regression. Full `with build`, `with build :fixpoint`, `with build :test`, and
 `with build :test-green` passed on 2026-06-04 for this slice.
 
+The runtime-object bootstrap substrate is in place. In module-object mode,
+runtime source files (`rt/*.w` and generated `out/gen/compat_runtime.w`) now
+preserve raw link names only for runtime ABI-shaped symbols (`with_*`, `rt_*`,
+`wl_*`, and the few current non-prefixed shims) while private runtime helpers
+remain path-mangled to avoid cross-object collisions. `@[weak]` also applies
+independently of `@[c_export]`. Full `with build`, `with build :fixpoint`,
+`with build :test`, and `with build :test-green` passed on 2026-06-04 for this
+slice. Before removing runtime `@[c_export]` attributes, update the local seed
+to include this substrate.
+
 Remaining #335 work is the budgeted compiler-owned runtime surface
 (`rt_core.w`, platform runtime files, fiber stubs, regex runtime, and related
 stubs). Do not change general import semantics as part of #335. Bare
