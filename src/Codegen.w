@@ -2881,6 +2881,114 @@ fn Codegen.predeclare_struct_type(self: Codegen, name_sym: i32):
     self.struct_field_counts.push(0)
     self.struct_type_map.insert(name_sym, idx)
 
+fn Codegen.codegen_sym_for_sema_sym(self: Codegen, sema_sym: i32) -> i32:
+    let text = self.sema_symbol_text(sema_sym)
+    if text.len() > 0:
+        return self.intern.intern(text)
+    sema_sym
+
+fn Codegen.codegen_resolve_sema_type(self: Codegen, tid: i32) -> i32:
+    let resolved = self.mir_input.mir_resolve_alias(tid)
+    if resolved > 0 and self.mir_input.mir_get_type_kind(resolved) != 0:
+        return resolved
+    self.sema.resolve_alias(tid as TypeId) as i32
+
+fn Codegen.codegen_get_type_kind(self: Codegen, tid: i32) -> i32:
+    if tid >= 0 and tid < self.mir_input.sema_type_kinds.len() as i32:
+        return self.mir_input.mir_get_type_kind(tid)
+    self.sema.get_type_kind(tid)
+
+fn Codegen.codegen_get_type_d0(self: Codegen, tid: i32) -> i32:
+    if tid >= 0 and tid < self.mir_input.sema_type_d0.len() as i32:
+        return self.mir_input.mir_get_type_d0(tid)
+    self.sema.get_type_d0(tid)
+
+fn Codegen.codegen_get_type_d1(self: Codegen, tid: i32) -> i32:
+    if tid >= 0 and tid < self.mir_input.sema_type_d1.len() as i32:
+        return self.mir_input.mir_get_type_d1(tid)
+    self.sema.get_type_d1(tid)
+
+fn Codegen.codegen_get_type_d2(self: Codegen, tid: i32) -> i32:
+    if tid >= 0 and tid < self.mir_input.sema_type_d2.len() as i32:
+        return self.mir_input.mir_get_type_d2(tid)
+    self.sema.get_type_d2(tid)
+
+fn Codegen.codegen_get_type_extra(self: Codegen, idx: i32) -> i32:
+    if idx >= 0 and idx < self.mir_input.sema_type_extra.len() as i32:
+        return self.mir_input.mir_get_type_extra(idx)
+    if idx >= 0 and idx < self.sema.type_extra.len() as i32:
+        return self.sema.type_extra.get(idx as i64)
+    0
+
+fn Codegen.codegen_generator_state_field_count(self: Codegen, state_tid: i32) -> i32:
+    if self.sema.generator_state_field_counts.contains(state_tid):
+        return self.sema.generator_state_field_counts.get(state_tid).unwrap()
+    self.codegen_get_type_d2(state_tid)
+
+fn Codegen.codegen_generator_state_field_sym(self: Codegen, state_tid: i32, field_i: i32, extra_start: i32) -> i32:
+    let key = sema_pair_key(state_tid, field_i)
+    if self.sema.generator_state_field_names.contains(key):
+        return self.sema.generator_state_field_names.get(key).unwrap()
+    self.codegen_get_type_extra(extra_start + field_i * 3)
+
+fn Codegen.codegen_generator_state_field_type(self: Codegen, state_tid: i32, field_i: i32, extra_start: i32) -> i32:
+    let key = sema_pair_key(state_tid, field_i)
+    if self.sema.generator_state_field_types.contains(key):
+        return self.sema.generator_state_field_types.get(key).unwrap()
+    self.codegen_get_type_extra(extra_start + field_i * 3 + 1)
+
+fn Codegen.predeclare_generator_state_types(self: Codegen):
+    for si in 0..self.sema.sig_names.len() as i32:
+        let fn_sym = self.sema.sig_names.get(si as i64)
+        if not self.sema.generator_fn_state_types.contains(fn_sym):
+            continue
+        let state_tid = self.sema.generator_fn_state_types.get(fn_sym).unwrap()
+        let resolved = self.codegen_resolve_sema_type(state_tid)
+        if resolved <= 0 or self.codegen_get_type_kind(resolved) != TypeKind.TY_STRUCT:
+            continue
+        let state_sym = self.codegen_get_type_d0(resolved)
+        let cg_state_sym = self.codegen_sym_for_sema_sym(state_sym)
+        self.predeclare_struct_type(cg_state_sym)
+
+fn Codegen.declare_generator_state_type(self: Codegen, state_tid: i32):
+    let resolved = self.codegen_resolve_sema_type(state_tid)
+    if resolved <= 0 or self.codegen_get_type_kind(resolved) != TypeKind.TY_STRUCT:
+        return
+    let state_sym = self.codegen_get_type_d0(resolved)
+    let cg_state_sym = self.codegen_sym_for_sema_sym(state_sym)
+    if not self.struct_type_map.get(cg_state_sym).is_some():
+        self.predeclare_struct_type(cg_state_sym)
+    let idx = self.struct_type_map.get(cg_state_sym).unwrap()
+    let existing_count = self.struct_field_counts.get(idx as i64)
+    if existing_count > 0:
+        return
+    let st_type = self.struct_llvm_types.get(idx as i64)
+    let extra_start = self.codegen_get_type_d1(resolved)
+    let field_count = self.codegen_generator_state_field_count(resolved)
+    self.struct_field_starts.set_i32(idx as i64, self.struct_field_names.len() as i32)
+    self.struct_field_counts.set_i32(idx as i64, field_count)
+
+    let field_types: Vec[i64] = Vec.new()
+    for fi in 0..field_count:
+        let field_sym = self.codegen_generator_state_field_sym(resolved, fi, extra_start)
+        let field_tid = self.codegen_generator_state_field_type(resolved, fi, extra_start)
+        var field_ty = self.mir_sema_type_to_llvm(field_tid)
+        if field_ty == 0:
+            field_ty = self.type_fallback()
+        self.struct_field_names.push(field_sym)
+        self.struct_field_types.push(field_ty)
+        self.struct_field_type_nodes.push(0)
+        self.struct_field_defaults.push(0)
+        self.struct_llvm_field_indices.push(fi)
+        field_types.push(field_ty)
+    wl_struct_set_body(st_type, vec_data_i64(&field_types), field_count, 0)
+
+fn Codegen.declare_generator_state_types(self: Codegen):
+    for si in 0..self.sema.sig_names.len() as i32:
+        let fn_sym = self.sema.sig_names.get(si as i64)
+        if self.sema.generator_fn_state_types.contains(fn_sym):
+            self.declare_generator_state_type(self.sema.generator_fn_state_types.get(fn_sym).unwrap())
+
 fn Codegen.predeclare_enum_type(self: Codegen, name_sym: i32):
     if self.enum_type_map.get(name_sym).is_some():
         return
@@ -3467,6 +3575,11 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
     let flags = self.pool.get_data2(fn_node)
     let meta = self.pool.find_fn_meta(fn_node)
     if meta < 0: return
+    if (flags / FnFlags.GEN) % 2 == 1:
+        let sig_idx = self.sema.get_sig(name_sym)
+        if sig_idx >= 0:
+            self.declare_function_from_sig(name_sym, sig_idx, 0)
+        return
 
     let ret_type_node = self.pool.fn_meta_ret(meta)
     let param_start = self.pool.fn_meta_param_start(meta)
@@ -3718,6 +3831,59 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
         self.fn_fn_types.insert(method_key_sym, fn_type)
 
     self.current_method_owner_sym = saved_owner
+
+fn Codegen.declare_function_from_sig(self: Codegen, fn_sym: i32, sig_idx: i32, force_internal: i32):
+    if fn_sym == 0 or sig_idx < 0:
+        return
+    let cg_sym = self.codegen_sym_for_sema_sym(fn_sym)
+    let sema_name = self.sema_symbol_text(fn_sym)
+    var effective_name =
+        if sema_name.len() > 0:
+            sema_name
+        else:
+            self.function_symbol_name(cg_sym)
+    if self.module_object_mode != 0 and force_internal == 0:
+        effective_name = self.current_decl_module_link_name(effective_name)
+
+    var ret_ty = self.sema_type_to_llvm(self.sema.sig_return_type(sig_idx))
+    if ret_ty == 0:
+        ret_ty = self.type_fallback()
+    let param_count = self.sema.sig_get_param_count(sig_idx)
+    let param_types: Vec[i64] = Vec.new()
+    for pi in 0..param_count:
+        var p_ty = self.sema_type_to_llvm(self.sema.sig_param_type(sig_idx, pi))
+        if p_ty == 0:
+            p_ty = self.type_fallback()
+        if wl_get_type_kind(p_ty) == wl_void_type_kind():
+            p_ty = wl_i32_type(self.context)
+        if self.sema.sig_param_uses_value_ref_abi(sig_idx, pi) != 0:
+            p_ty = wl_ptr_type(self.context)
+            self.record_ref_param(cg_sym, pi, param_count)
+            if cg_sym != fn_sym:
+                self.record_ref_param(fn_sym, pi, param_count)
+        param_types.push(p_ty)
+
+    let fn_type = wl_function_type(ret_ty, vec_data_i64(&param_types), param_count, self.sema.sig_is_variadic(sig_idx))
+    let existing = wl_get_named_function(self.llmod, effective_name)
+    let function = if existing != 0: existing else: wl_add_function(self.llmod, effective_name, fn_type)
+    if force_internal != 0:
+        wl_set_linkage(function, wl_internal_linkage())
+    else if self.module_object_mode == 0:
+        if effective_name != "main" and not self.current_decl_source_file.contains("lib/std/"):
+            wl_set_linkage(function, wl_internal_linkage())
+
+    self.fn_values.insert(cg_sym, function)
+    self.fn_fn_types.insert(cg_sym, fn_type)
+    if cg_sym != fn_sym:
+        self.fn_values.insert(fn_sym, function)
+        self.fn_fn_types.insert(fn_sym, fn_type)
+
+fn Codegen.declare_generator_next_functions(self: Codegen):
+    for si in 0..self.sema.sig_names.len() as i32:
+        let fn_sym = self.sema.sig_names.get(si as i64)
+        if not self.sema.generator_next_fn_syms.contains(fn_sym):
+            continue
+        self.declare_function_from_sig(fn_sym, si, 1)
 
 fn Codegen.is_method_on_generic_struct(self: Codegen, name_sym: i32) -> bool:
     if name_sym <= 0:
@@ -4935,6 +5101,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
     // Declare built-in string view types before user types.
     self.declare_builtin_str_type()
     self.declare_builtin_cstr_type()
+    self.predeclare_generator_state_types()
 
     // Pass 0a: predeclare all struct/enum names so forward references resolve.
     for i in 0..self.pool.decl_count():
@@ -5010,6 +5177,9 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
 
     if self.had_error != 0:
         return 1
+    self.declare_generator_state_types()
+    if self.had_error != 0:
+        return 1
 
     // Pass 0.5: collect trait declarations
     for i in 0..self.pool.decl_count():
@@ -5051,6 +5221,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
                 self.declare_async_function(decl)
             else:
                 self.declare_function(decl)
+    self.declare_generator_next_functions()
 
     // Pass 1.3: synthesize missing impl methods from trait defaults.
     self.generate_default_trait_methods()
@@ -5090,6 +5261,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
                 let is_generic_struct_method = self.is_method_on_generic_struct(name_sym)
                 if tp_count == 0 and not self.sema.generic_fn_nodes.contains(name_sym) and not is_generic_struct_method:
                     self.gen_function_dispatch(decl)
+    self.gen_generator_next_functions_from_mir()
 
     if self.had_error != 0:
         return 1

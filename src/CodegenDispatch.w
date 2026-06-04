@@ -64,6 +64,15 @@ fn Codegen.gen_function_dispatch(self: Codegen, fn_node: i32):
         return
     self.fail_mir_codegen_for_function(fn_node, "no-body")
 
+fn Codegen.gen_generator_next_functions_from_mir(self: Codegen):
+    for bi in 0..self.mir_input.body_fn_syms.len() as i32:
+        let raw_sym = self.mir_input.body_fn_syms.get(bi as i64)
+        if not self.sema.generator_next_fn_syms.contains(raw_sym):
+            continue
+        let body = self.mir_input.bodies.get(bi as i64)
+        let cg_sym = self.codegen_sym_for_sema_sym(raw_sym)
+        self.gen_function_mir_mono(cg_sym, 0, body)
+
 fn Codegen.mir_sema_type_to_llvm(self: Codegen, sema_ty: i32) -> i64:
     // Use MIR module's snapshot of sema type tables — the original sema's
     // type Vecs may have been freed by MirLower's by-value copy realloc.
@@ -9578,7 +9587,9 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
 // instead of extracting the name from the AST node (which has the generic name).
 
 fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, body: MirBody):
-    let name_str = self.intern.resolve(mono_sym)
+    let intern_name = self.intern.resolve(mono_sym)
+    let sema_name = self.sema_symbol_text(mono_sym)
+    let name_str = if intern_name.len() > 0: intern_name else: sema_name
     let fv = self.fn_values.get(mono_sym)
     if not fv.is_some():
         with_eprint("error: no fn_value for MIR mono function: " ++ name_str)
@@ -9706,12 +9717,14 @@ fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, bod
     self.mir_local_ptrs.insert(0, ret_alloca)
     self.mir_local_types.insert(0, ret_store_ty)
 
-    let meta = self.pool.find_fn_meta(fn_node)
+    let meta = if fn_node > 0: self.pool.find_fn_meta(fn_node) else: -1
     var param_start = 0
     var param_count = 0
     if meta >= 0:
         param_start = self.pool.fn_meta_param_start(meta)
         param_count = self.pool.fn_meta_param_count(meta)
+    else:
+        param_count = body.n_params
     let fn_byval_mask_opt = self.extern_fn_byval_params.get(mono_sym)
     let fn_byval_mask = if fn_byval_mask_opt.is_some(): fn_byval_mask_opt.unwrap() as i64 else: 0
     var fn_byval_types: Vec[i64] = Vec.new()
@@ -9735,8 +9748,18 @@ fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, bod
 
     let max_params = param_count
     for pi in 0..max_params:
-        let p_name = self.pool.fn_param_name(param_start, pi)
-        let p_type_node = self.pool.fn_param_type(param_start, pi)
+        let p_name =
+            if meta >= 0:
+                self.pool.fn_param_name(param_start, pi)
+            else if pi + 1 < body.local_names.len() as i32:
+                body.local_names.get((pi + 1) as i64)
+            else:
+                0
+        let p_type_node =
+            if meta >= 0:
+                self.pool.fn_param_type(param_start, pi)
+            else:
+                0
         let actual_pi = pi + (if fn_has_sret != 0: 1 else: 0)
         let param_val = wl_get_param(function, actual_pi)
         var param_type = wl_type_of(param_val)

@@ -11,6 +11,18 @@ conversation context after compaction.
 
 ## Current Focus
 
+#252 and #253 are implemented as the first generator vertical slice.
+`gen fn f(...) -> T` now semantically returns a compiler-generated state
+struct with a synthetic `.next(mut self) -> Option[T]`, supports direct manual
+`.next()` calls and `for` iteration, preserves parameters and locals across
+yield points, and rejects `async`/`await` inside generator functions. Yielded
+local references are rejected with a loud diagnostic while owned values may
+cross yield. The generator MIR transform preserves block statement contiguity
+while inserting resume-state saves and `Some`/`None` returns, and the state
+field collector now follows documented AST child layouts instead of recursing
+through symbol fields. Full build, fixpoint, test, last-green, update-seed,
+and install-user passed on 2026-06-04 for this checkpoint.
+
 #284 tier substrate is implemented for the user-facing compiler surface.
 `std = false` / `--no-std` now selects the core prelude by default,
 `alloc = true` / `--alloc` selects the alloc prelude, and
