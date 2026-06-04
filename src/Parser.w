@@ -4605,6 +4605,15 @@ fn is_first_on_line(source: str, pos: i32) -> i32:
         p = p - 1
     1
 
+fn Parser.parse_if_else_body(self: Parser, use_then: bool) -> NodeId:
+    if self.peek() == TokenKind.TK_KW_IF:
+        return self.parse_if_expr()
+    if use_then:
+        return self.parse_expr()
+    if self.peek() == TokenKind.TK_L_BRACE or self.peek() == TokenKind.TK_COLON:
+        return self.parse_body()
+    self.parse_expr()
+
 fn Parser.parse_if_expr(self: Parser) -> NodeId:
     let start = self.current_start()
     self.advance()  // consume if
@@ -4638,12 +4647,7 @@ fn Parser.parse_if_expr(self: Parser) -> NodeId:
             self.pos = save
         else:
             self.advance()
-            if self.peek() == TokenKind.TK_KW_IF:
-                else_body = self.parse_if_expr()
-            else if use_then:
-                else_body = self.parse_expr()
-            else:
-                else_body = self.parse_body()
+            else_body = self.parse_if_else_body(use_then)
     else:
         self.pos = save
 
@@ -4713,12 +4717,7 @@ fn Parser.parse_if_let(self: Parser, start: i32) -> NodeId:
             self.pos = save
         else:
             self.advance()
-            if self.peek() == TokenKind.TK_KW_IF:
-                else_body = self.parse_if_expr()
-            else if use_then:
-                else_body = self.parse_expr()
-            else:
-                else_body = self.parse_body()
+            else_body = self.parse_if_else_body(use_then)
     else:
         self.pos = save
     if else_body == 0:
