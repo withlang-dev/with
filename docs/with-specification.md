@@ -11,8 +11,8 @@ indented colon, and braced — now apply to every block-introducing construct
 including `defer`, `errdefer`, `comptime`, and `unsafe`. `if` additionally
 retains the `then` form as a pure expression shorthand (`if cond then expr
 else expr`). `else if` is a two-token keyword pair parsed as a chain
-continuation. A final `else expr` may omit the body introducer in any
-`if` chain; other missing body introducers are parse errors.
+continuation. Non-`then` `if` chains require a body introducer after every
+`if`, `else if`, and `else` arm.
 **Changelog v6.7:** Reorganized — extracted test cases to `test/spec/`,
 roadmap to `docs/roadmap.md`, design rationale to `docs/design-rationale.md`,
 stdlib API tables to `docs/libstd-spec.md`. Added grammar appendix (§30).
@@ -2838,9 +2838,9 @@ if x < 0 { handle_negative() } else if x == 0 { handle_zero() } else { handle_po
 
 The `then` form is strictly an expression form: `if cond then expr`.
 The body after `then` is a single expression (not a block), and the
-`else` clause is `else expr` with no body introducer. The final `else`
-of a colon or braced `if` chain may also use `else expr` as shorthand
-for a single expression body:
+`else` clause is `else expr` with no body introducer. Colon and braced
+`if` chains use normal body introducers for every arm, including the
+final `else`:
 
 ```
 let clamped =
@@ -2848,7 +2848,7 @@ let clamped =
         lo
     else if x > hi:
         hi
-    else x
+    else: x
 ```
 
 `else if` is always parsed as a chain continuation — the parser
@@ -9813,9 +9813,8 @@ construct unless that construct states a narrower syntax.
 block, `unsafe { ... }` is the inline block expression form, and
 `unsafe *p` / `unsafe p[i]` is the narrow raw-access prefix form.
 
-`if`/`else if`/`else` support all three forms and additionally the
-`then` expression shorthand. A final `else` may also use `else EXPR`
-without a body introducer; see §9.1 for the full `if` syntax.
+`if`/`else if`/`else` support all three forms. `if` additionally supports
+the `then` expression shorthand; see §9.1 for the full `if` syntax.
 
 **Form 1 — Inline colon.** A colon immediately followed by content
 on the same line.
@@ -10122,9 +10121,9 @@ STMT        := LABEL_STMT | LET_STMT | VAR_STMT | IF_STMT | MATCH_STMT
               | RETURN_STMT | BREAK_STMT | CONTINUE_STMT | GOTO_STMT
               | DEFER_STMT | EXPR
 LABEL_STMT  := LABEL ( STMT | COLON_BODY | BRACE_BODY )
-IF_STMT     := 'if' EXPR BODY { 'else' 'if' EXPR BODY } [ 'else' ( BODY | EXPR ) ]
+IF_STMT     := 'if' EXPR BODY { 'else' 'if' EXPR BODY } [ 'else' BODY ]
               | 'if' EXPR 'then' EXPR { 'else' 'if' EXPR 'then' EXPR } [ 'else' EXPR ]
-              | 'if' 'let' PATTERN '=' EXPR BODY [ 'else' ( BODY | EXPR ) ]
+              | 'if' 'let' PATTERN '=' EXPR BODY [ 'else' BODY ]
 MATCH_STMT  := 'match' EXPR BODY_ARMS
 MATCH_ARM   := PATTERN [ 'if' EXPR ] '=>' EXPR
 FOR_STMT    := 'for' PATTERN 'in' EXPR BODY
@@ -10217,9 +10216,8 @@ BRACE_BODY    := '{' [ STMT { ( NEWLINE | ';' ) STMT } ] '}'
 All three forms are interchangeable for every block-introducing
 construct: `fn`, `else`, `while`, `for`, `loop`, `with`, `defer`,
 `errdefer`, `comptime`, `unsafe`, labeled blocks, and match arms.
-`if` and `else if` additionally accept `then EXPR`; a final `else` in
-an `if` chain may be `else EXPR` with no body introducer (see IF_STMT
-in §30.4). Any other missing body introducer is a parse error.
+`if` and `else if` additionally accept `then EXPR`. Missing body
+introducers are parse errors.
 
 ### 30.9 Reserved Keywords
 

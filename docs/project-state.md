@@ -67,10 +67,12 @@ compile-error coverage exists for scoped task await/drop, scoped thread
 spawn/join, block forms, method misuse, and escape/storage rejection. Full
 build, fixpoint, and test passed on 2026-06-04 for this checkpoint.
 
-#334 is implemented. Final `else expr` is now accepted in mixed-form `if`
-chains after colon or braced arms while `else if` remains a chain
-continuation. The spec, parser fixture, and behavior coverage were updated;
-full build, fixpoint, and test passed on 2026-06-04.
+#334 is implemented, then tightened: non-`then` `if` chains now require a
+normal body introducer after every arm, including final `else` (`else: expr`
+or `else { ... }`, not bare `else expr`). `else if` remains a chain
+continuation. The spec, parser fixture, behavior coverage, and compile-error
+coverage were updated; full build, fixpoint, and test passed on 2026-06-04
+for the original #334 checkpoint.
 
 #252 and #253 are implemented as the first generator vertical slice.
 `gen fn f(...) -> T` now semantically returns a compiler-generated state
