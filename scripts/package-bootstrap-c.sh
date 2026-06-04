@@ -31,8 +31,8 @@ escaped_version="$(printf '%s' "$version" | sed 's/[\/&]/\\&/g')"
 sed "s|WITH_VERSION_PLACEHOLDER|$escaped_version|g" src/main.w > out/gen/main.w
 printf '%s\n' "$version" > out/gen/version.txt
 "$compiler" build out/gen/main.w --emit-c -o "$work_dir/src/with_compiler.c"
-"$compiler" build rt/llvm_bridge.w --emit-c --no-prelude -o "$work_dir/src/llvm_bridge.c"
-"$compiler" build rt/clang_bridge.w --emit-c --no-prelude -o "$work_dir/src/clang_bridge.c"
+"$compiler" build src/compiler/LlvmBridge.w --emit-c --no-prelude -o "$work_dir/src/llvm_bridge.c"
+"$compiler" build src/compiler/ClangBridge.w --emit-c --no-prelude -o "$work_dir/src/clang_bridge.c"
 "$compiler" build rt/rt_core.w --emit-c --no-prelude -o "$work_dir/src/rt_core.c"
 "$compiler" build rt/panic_runtime.w --emit-c --no-prelude -o "$work_dir/src/panic_runtime.c"
 "$compiler" build rt/regex_runtime.w --emit-c --no-prelude -o "$work_dir/src/regex_runtime.c"
