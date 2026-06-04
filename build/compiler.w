@@ -287,6 +287,86 @@ fn comp_first_field(text: str) -> str:
             return line.slice(0, i as i64)
     line
 
+fn comp_count_actual_c_export_attrs(text: str) -> i32:
+    var count = 0
+    var line_start = 0
+    var i = 0
+    while i <= text.len() as i32:
+        let at_end = i == text.len() as i32
+        if at_end or text.byte_at(i as i64) == 10:
+            var p = line_start
+            while p < i:
+                let ch = text.byte_at(p as i64)
+                if ch != 9 and ch != 32:
+                    break
+                p = p + 1
+            if p < i and text.byte_at(p as i64) == 64:
+                var q = p
+                while q + 11 <= i:
+                    if text.slice(q as i64, (q + 11) as i64) == "@[c_export(":
+                        count = count + 1
+                        break
+                    q = q + 1
+            line_start = i + 1
+        i = i + 1
+    count
+
+fn comp_c_export_budget(path: str) -> i32:
+    if path == "src/compiler/EmbeddedClangResource.w": return 1
+    if path == "rt/panic_runtime.w": return 1
+    if path == "rt/channel_runtime.w": return 6
+    if path == "rt/regex_runtime.w": return 11
+    if path == "rt/compat_runtime.w": return 12
+    if path == "rt/cimport_stubs.w": return 118
+    if path == "rt/fiber_runtime.w": return 15
+    if path == "rt/fiber_stubs.w": return 21
+    if path == "rt/fiber_core_darwin.w": return 27
+    if path == "rt/darwin_aarch64.w": return 42
+    if path == "rt/linux_x86_64.w": return 44
+    if path == "rt/clang_bridge.w": return 142
+    if path == "rt/rt_core.w": return 198
+    if path == "rt/llvm_bridge.w": return 239
+    -1
+
+fn comp_check_c_export_path(ctx: ActionCtx, path: str) -> i32:
+    if not path.ends_with(".w"):
+        return 0
+    let text = ctx.fs().read_text(path)
+    let count = comp_count_actual_c_export_attrs(text)
+    if count == 0:
+        return 0
+    let budget = comp_c_export_budget(path)
+    if budget < 0:
+        ctx.diagnostics().error(path ++ ": compiler-owned source has forbidden @[c_export] attributes")
+        return 1
+    if count > budget:
+        ctx.diagnostics().error(path ++ f": @[c_export] count increased from budget {budget} to {count}")
+        return 1
+    if count < budget:
+        ctx.diagnostics().warn(path ++ f": @[c_export] count is now {count}; tighten compiler c_export budget from {budget}")
+    0
+
+pub fn run_check_compiler_no_new_c_export_action(ctx: ActionCtx) -> i32:
+    let roots: Vec[str] = Vec.new()
+    roots.push("src")
+    roots.push("rt")
+    roots.push("lib/std")
+    var errors = 0
+    for ri in 0..roots.len() as i32:
+        let files = ctx.fs().list_files(roots.get(ri as i64))
+        for fi in 0..files.len() as i32:
+            errors = errors + comp_check_c_export_path(ctx, files.get(fi as i64))
+    if errors != 0:
+        return 1
+    let output = ctx.output()
+    if output.len() > 0:
+        let dir = comp_dirname(output)
+        if ctx.fs().mkdir_all(dir) != 0:
+            return comp_fail(ctx, "could not create output directory: " ++ dir)
+        if ctx.fs().write_text(output, "ok\n") != 0:
+            return comp_fail(ctx, "could not write: " ++ output)
+    0
+
 fn comp_json_escape(text: str) -> str:
     var out = ""
     for i in 0..text.len() as i32:

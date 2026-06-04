@@ -627,12 +627,12 @@ fn link_stage_make_archive_to_path(obj_path: str, ar_path: str) -> str:
 
 fn link_stage_should_use_rt_core_from_undef(undef: str) -> bool:
     // Use the libc-free runtime for user programs that don't need LLVM bridge
-    // or c_import. The compiler itself (which needs wl_* symbols) always uses
-    // the libc-backed cimport_stubs.o runtime.
+    // or c_import. The compiler itself needs LLVM/libclang symbols and always
+    // uses the libc-backed cimport_stubs.o runtime.
     if undef == "<probe-failed>":
         return false
-    // If it needs LLVM bridge, it's the compiler — use libc runtime
-    if link_stage_undef_contains_symbol(undef, "wl_"):
+    // If it needs LLVM/libclang, it's the compiler — use libc runtime.
+    if link_stage_undefined_symbols_need_llvm_bridge(undef):
         return false
     // If it uses c_import symbols or libc functions directly, use libc runtime
     if link_stage_undef_contains_symbol(undef, "fopen"):
@@ -651,7 +651,9 @@ fn link_stage_should_use_rt_core_from_undef(undef: str) -> bool:
     false
 
 fn link_stage_undefined_symbols_need_llvm_bridge(undef: str) -> bool:
-    link_stage_undef_contains_symbol(undef, "wl_")
+    link_stage_undef_contains_symbol(undef, "wl_") or
+        link_stage_undef_contains_symbol(undef, "LLVM") or
+        link_stage_undef_contains_symbol(undef, "clang_")
 
 fn link_stage_dirname(path: str) -> str:
     var last_slash = -1

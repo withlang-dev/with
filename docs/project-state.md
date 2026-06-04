@@ -11,6 +11,25 @@ conversation context after compaction.
 
 ## Current Focus
 
+#335 is in progress. The policy baseline is encoded in AGENTS.md/CLAUDE.md:
+`@[c_export]` is foreign ABI only, not compiler-internal linkage. The first
+implementation slice added `with build :compiler-no-c-export`, a budgeted audit
+that scans compiler-owned With sources (`src/`, `rt/`, `lib/std/`) and fails on
+new actual `@[c_export]` attributes while allowing the current removal budget to
+shrink. `with build` now depends on this audit before stage1. `Link.w` also now
+recognizes direct LLVM/libclang undefined symbols, not only `wl_*`, as compiler
+static-link triggers. Full `with build`, `with build :fixpoint`, `with build
+:test`, and `with build :test-green` passed on 2026-06-04 for this slice.
+
+Important #335 bootstrap finding: directly changing `rt/clang_bridge.w` to
+import `compiler.EmbeddedClangResource` while it is still compiled as a separate
+module object fails stage1 with an undefined module-mangled
+`ensure_clang_resource_dir` symbol. Imported module definitions are referenced,
+not emitted, in module-object mode. Removing that `c_export` safely requires the
+full inline-bridge conversion after the seed has the broader LLVM/libclang link
+trigger, or a deliberate combined-object step. Do not repeat the naive direct
+import slice.
+
 #260 and #271 are implemented as the first scoped-concurrency substrate.
 `async scope s => ...` now returns scope-owned `ScopedTask[T]` handles
 from `s.track(Task[T])`; they are awaitable like `Task[T]`, exempt from

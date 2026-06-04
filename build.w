@@ -90,6 +90,20 @@ fn target_with_embedded_stdlib_inputs(target: Target, ctx: BuildCtx) -> Target:
             out = out.input(path)
     out
 
+fn target_with_compiler_c_export_audit_inputs(target: Target, ctx: BuildCtx) -> Target:
+    var out = target
+    let roots: Vec[str] = Vec.new()
+    roots.push("src")
+    roots.push("rt")
+    roots.push("lib/std")
+    for ri in 0..roots.len() as i32:
+        let files = ctx.fs().list_files(roots.get(ri as i64))
+        for fi in 0..files.len() as i32:
+            let path = files.get(fi as i64)
+            if path.ends_with(".w"):
+                out = out.input(path)
+    out
+
 fn build_project_trim_line(text: str) -> str:
     var end = 0
     while end < text.len() as i32:
@@ -332,6 +346,12 @@ pub fn build(ctx: BuildCtx) -> Build:
     clang_resource.action = generate_embedded_clang_resource_action
     out = out.add_target(clang_resource)
 
+    var compiler_no_c_export = target_new(.Action, "compiler-no-c-export", "").output("out/.build-state/compiler-no-c-export.txt")
+    compiler_no_c_export.action = run_check_compiler_no_new_c_export_action
+    compiler_no_c_export = compiler_no_c_export.write_scope("out/.build-state")
+    compiler_no_c_export = target_with_compiler_c_export_audit_inputs(compiler_no_c_export, ctx)
+    out = out.add_target(compiler_no_c_export)
+
     out = out.add_target(with_object_target("bootstrap-llvm-bridge-object", "seed", "rt/llvm_bridge.w", "out/bootstrap-lib/llvm_bridge.o", "-O0", ""))
     out = out.add_target(with_object_target("bootstrap-clang-bridge-object", "seed", "rt/clang_bridge.w", "out/bootstrap-lib/clang_bridge.o", "-O0", ""))
 
@@ -450,6 +470,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stage1 = stage1.dep("compiler-sources")
     stage1 = stage1.dep("compat-runtime-source")
     stage1 = stage1.dep("embedded-clang-resource-source")
+    stage1 = stage1.dep("compiler-no-c-export")
     stage1 = stage1.dep("prepare-bootstrap-link-root")
     out = out.add_target(stage1)
 

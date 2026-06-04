@@ -171,9 +171,27 @@ Linking rules:
 - Compiler build: `helpers.o` + `support_runtime.o` (no rt_core.o)
 
 **Direction is always: With replaces C. Never duplicate in C.**
-When a runtime function is needed, implement it in `rt_core.w`
-with `@[c_export("symbol_name")]`. Never add new code to
-`helpers.c`.
+When compiler-owned runtime behavior is needed, implement it as ordinary
+With code behind normal module/private-function boundaries. Never add new
+code to `helpers.c`.
+
+### `@[c_export]` is foreign ABI only
+
+`@[c_export]` means: **this With function is intentionally exported as a
+C ABI surface for non-With callers** (C, Rust, Zig, Python FFI, etc.).
+It is not a With-to-With linkage tool.
+
+- With-to-With libraries use With modules and `pub` APIs, not `@[c_export]`.
+- The With compiler and compiler-owned runtime use normal modules/private
+  functions, not `@[c_export]`.
+- With libraries should use `@[c_export]` only when they explicitly want to
+  expose a foreign-language ABI surface.
+
+Any actual `@[c_export]` attribute on a With declaration compiled into the
+compiler executable is a bug. During #335, remove the existing occurrences;
+after #335, any compiler-codebase `@[c_export]` occurrence is a regression,
+not precedent. Do not copy or rename them into another internal export
+mechanism.
 
 ### `with_*` is compiler-internal — user programs never call it
 
@@ -488,7 +506,8 @@ flag on `NK_LET_DECL`.
 - **Guessing APIs.** Read the source.
 - **Working around compiler bugs.** Fix the root cause.
 - **Writing C when With works.** The runtime is being migrated
-  to With. Use `@[c_export]` for exported symbols.
+  to With. Compiler-owned With code must use modules/private functions,
+  not `@[c_export]`, for internal boundaries.
 - **Guessing linker flags.** Understand which link path you're
   on (cc vs lld) before changing anything.
 - **Using `with build` as a debugging tool.** It takes 5 minutes.
