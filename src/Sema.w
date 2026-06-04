@@ -350,6 +350,18 @@ type Sema {
     result_option_fns: HashMap[i32, i32],
     task_fns: HashMap[i32, i32],
     fn_stack_sizes: HashMap[i32, i32],
+    // Generator metadata. A `gen fn f(...) -> T` semantically returns an
+    // internal state struct and exposes an internal `next(mut self)` method
+    // returning Option[T].
+    generator_fn_yield_types: HashMap[i32, i32],
+    generator_fn_state_types: HashMap[i32, i32],
+    generator_fn_state_syms: HashMap[i32, i32],
+    generator_fn_next_syms: HashMap[i32, i32],
+    generator_next_fn_syms: HashMap[i32, i32],
+    generator_state_yield_types: HashMap[i32, i32],
+    generator_state_field_counts: HashMap[i32, i32],
+    generator_state_field_names: HashMap[i64, i32],
+    generator_state_field_types: HashMap[i64, i32],
     mutable_global_syms: HashMap[i32, i32],
     // docs/mut.md Rev 8 §12 / §15.12 — symbols declared via `global X = ...`
     // (stable) recorded here. Used by check_assign to emit a specific
@@ -897,6 +909,15 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let result_option_fns = sema_new_map_i32_i32()
     let task_fns = sema_new_map_i32_i32()
     let fn_stack_sizes = sema_new_map_i32_i32()
+    let generator_fn_yield_types = sema_new_map_i32_i32()
+    let generator_fn_state_types = sema_new_map_i32_i32()
+    let generator_fn_state_syms = sema_new_map_i32_i32()
+    let generator_fn_next_syms = sema_new_map_i32_i32()
+    let generator_next_fn_syms = sema_new_map_i32_i32()
+    let generator_state_yield_types = sema_new_map_i32_i32()
+    let generator_state_field_counts = sema_new_map_i32_i32()
+    let generator_state_field_names = sema_new_map_i64_i32()
+    let generator_state_field_types = sema_new_map_i64_i32()
     let mutable_global_syms = sema_new_map_i32_i32()
     let stable_global_syms = sema_new_map_i32_i32()
     let global_value_decl_kinds = sema_new_map_i32_i32()
@@ -998,6 +1019,15 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         result_option_fns,
         task_fns,
         fn_stack_sizes,
+        generator_fn_yield_types,
+        generator_fn_state_types,
+        generator_fn_state_syms,
+        generator_fn_next_syms,
+        generator_next_fn_syms,
+        generator_state_yield_types,
+        generator_state_field_counts,
+        generator_state_field_names,
+        generator_state_field_types,
         mutable_global_syms,
         stable_global_syms,
         global_value_decl_kinds,

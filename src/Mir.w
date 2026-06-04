@@ -38,6 +38,9 @@ enum TermKind: i32:
     TK_SWITCH_INT = 3
     TK_CALL = 4
     TK_DROP_AND_GOTO = 5
+    // Temporary terminator used only before generator lowering. Backends must
+    // not receive MIR containing TK_YIELD.
+    TK_YIELD = 6
 
 // ── Rvalue kinds ─────────────────────────────────────────────────
 

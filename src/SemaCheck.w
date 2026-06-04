@@ -585,6 +585,142 @@ fn Sema.check_bodies(self: Sema):
                         self.update_module_context(di)
                         self.check_fn_body(decl)
 
+fn Sema.generator_push_state_field(self: Sema, state_tid: i32, field_count: i32, sym: i32, tid: i32, report_node: i32) -> i32:
+    if sym == 0 or sym == self.discard_sym:
+        return field_count
+    for i in 0..field_count:
+        let seen_key = sema_pair_key(state_tid, i)
+        if self.generator_state_field_names.contains(seen_key) and self.generator_state_field_names.get(seen_key).unwrap() == sym:
+            let name = self.pool_resolve(sym)
+            self.emit_error("duplicate generator state binding '" ++ name ++ "'", report_node)
+            return field_count
+    let key = sema_pair_key(state_tid, field_count)
+    self.generator_state_field_names.insert(key, sym)
+    self.generator_state_field_types.insert(key, tid)
+    field_count + 1
+
+fn Sema.generator_collect_state_fields(self: Sema, state_tid: i32, node: i32, field_count_in: i32) -> i32:
+    var field_count = field_count_in
+    if node == 0:
+        return field_count
+    let kind = self.ast.kind(node)
+    if kind == NodeKind.NK_LET_BINDING or kind == NodeKind.NK_LET_DECL:
+        let sym = self.ast.get_data0(node)
+        let tid = if self.typed_binding_types.contains(node): self.typed_binding_types.get(node).unwrap() else: self.ty_void as i32
+        field_count = self.generator_push_state_field(state_tid, field_count, sym, tid, node)
+        field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data1(node), field_count)
+        return field_count
+    if kind == NodeKind.NK_BLOCK:
+        let start = self.ast.get_data0(node)
+        let count = self.ast.get_data1(node)
+        for i in 0..count:
+            field_count = self.generator_collect_state_fields(state_tid, self.ast.get_extra(start + i), field_count)
+        field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data2(node), field_count)
+        return field_count
+    if kind == NodeKind.NK_IF_EXPR:
+        field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data0(node), field_count)
+        field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data1(node), field_count)
+        field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data2(node), field_count)
+        return field_count
+    if kind == NodeKind.NK_WHILE:
+        field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data0(node), field_count)
+        field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data1(node), field_count)
+        return field_count
+    if kind == NodeKind.NK_LOOP:
+        field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data0(node), field_count)
+        return field_count
+    if kind == NodeKind.NK_FOR:
+        field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data1(node), field_count)
+        field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data2(node), field_count)
+        return field_count
+    if kind == NodeKind.NK_MATCH:
+        field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data0(node), field_count)
+        let arm_start = self.ast.get_data1(node)
+        let arm_count = self.ast.get_data2(node)
+        for ai in 0..arm_count:
+            let arm = self.ast.get_extra(arm_start + ai)
+            field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data2(arm), field_count)
+            field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data1(arm), field_count)
+        return field_count
+    if kind == NodeKind.NK_RETURN or kind == NodeKind.NK_YIELD or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_NO_SUSPEND:
+        field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data0(node), field_count)
+        return field_count
+    if kind == NodeKind.NK_ASSIGN:
+        field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data0(node), field_count)
+        field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data1(node), field_count)
+        return field_count
+    if kind == NodeKind.NK_BINARY:
+        field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data1(node), field_count)
+        field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data2(node), field_count)
+        return field_count
+    if kind == NodeKind.NK_UNARY:
+        field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data1(node), field_count)
+        return field_count
+    if kind == NodeKind.NK_CALL:
+        field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data0(node), field_count)
+        let start = self.ast.get_data1(node)
+        let count = self.ast.get_data2(node)
+        for ai in 0..count:
+            field_count = self.generator_collect_state_fields(state_tid, self.ast.get_extra(start + ai), field_count)
+        return field_count
+    if kind == NodeKind.NK_FIELD_ACCESS:
+        field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data0(node), field_count)
+        return field_count
+    if kind == NodeKind.NK_COMPUTED_FIELD_ACCESS:
+        field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data0(node), field_count)
+        field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data1(node), field_count)
+        return field_count
+    if kind == NodeKind.NK_INDEX:
+        field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data0(node), field_count)
+        field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data1(node), field_count)
+        let second = self.ast.get_data2(node)
+        if second != 0:
+            field_count = self.generator_collect_state_fields(state_tid, second, field_count)
+        return field_count
+    if kind == NodeKind.NK_SLICE:
+        field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data0(node), field_count)
+        field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data1(node), field_count)
+        field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data2(node), field_count)
+        return field_count
+    field_count
+
+fn Sema.finalize_generator_state_type(self: Sema, fn_node: i32, sig_idx: i32):
+    let fn_sym = self.ast.get_data0(fn_node)
+    if not self.generator_fn_state_types.contains(fn_sym):
+        return
+    let state_tid = self.generator_fn_state_types.get(fn_sym).unwrap()
+    if state_tid <= 0 or state_tid >= self.type_kinds.len() as i32:
+        return
+
+    var field_count = 0
+    let resume_sym = self.pool_intern("__with_generator_resume")
+    field_count = self.generator_push_state_field(state_tid, field_count, resume_sym, self.ty_i32 as i32, fn_node)
+
+    let meta = self.ast.find_fn_meta(fn_node)
+    if meta >= 0:
+        let param_start = self.ast.fn_meta_param_start(meta)
+        let param_count = self.ast.fn_meta_param_count(meta)
+        for pi in 0..param_count:
+            let p_sym = self.ast.fn_param_name(param_start, pi)
+            let p_ty = self.sig_param_type(sig_idx, pi)
+            field_count = self.generator_push_state_field(state_tid, field_count, p_sym, p_ty, fn_node)
+
+    field_count = self.generator_collect_state_fields(state_tid, self.ast.get_data1(fn_node), field_count)
+
+    let field_start = self.type_extra.len() as i32
+    self.generator_state_field_counts.insert(state_tid, field_count)
+    for fi in 0..field_count:
+        let key = sema_pair_key(state_tid, fi)
+        let field_sym = self.generator_state_field_names.get(key).unwrap()
+        let field_ty = self.generator_state_field_types.get(key).unwrap()
+        self.type_extra.push(field_sym)
+        self.type_extra.push(field_ty)
+        self.type_extra.push(0)
+    for _ in 0..field_count:
+        self.type_extra.push(0)
+    self.type_d1.set_i32(state_tid as i64, field_start)
+    self.type_d2.set_i32(state_tid as i64, field_count)
+
 fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
     let fn_name = self.ast.get_data0(node)
     let body = self.ast.get_data1(node)
@@ -659,8 +795,13 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
     let saved_has_gen_yield_type = self.has_gen_yield_type
     let is_gen = (flags / FnFlags.GEN) % 2
     if is_gen == 1:
+        let yield_ty =
+            if self.generator_fn_yield_types.contains(fn_name):
+                self.generator_fn_yield_types.get(fn_name).unwrap()
+            else:
+                ret_type
         self.current_return_type = self.ty_void
-        self.current_gen_yield_type = ret_type as TypeId
+        self.current_gen_yield_type = yield_ty as TypeId
         self.has_gen_yield_type = 1
     else:
         // For async functions, the sig return type is Task[T] but the
@@ -711,6 +852,8 @@ fn Sema.check_fn_body_with_sig(self: Sema, node: i32, sig_idx: i32):
     self.expected_expr_type = saved_expected_et
     self.has_expected_type = saved_has_et
     self.typed_expr_types.insert(body, body_ty as i32)
+    if is_gen == 1:
+        self.finalize_generator_state_type(node, sig_idx)
     // Tail expression bodies participate in effect inference the same way an
     // explicit `return expr` does. Without this, `fn id(x: T) -> T: x` fails
     // to record escape_value/escape_view on `x`.
@@ -2896,6 +3039,8 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         self.require_async_runtime(node, "await")
         if self.in_comptime_fn != 0:
             self.emit_error("await is not allowed in comptime", node)
+        if self.has_gen_yield_type != 0:
+            self.emit_error("await is not allowed in generator function", node)
         let inner = self.ast.get_data0(node)
         let inner_ty = self.check_expr(inner)
         if self.ast.kind(inner) == NodeKind.NK_TUPLE:
@@ -2963,9 +3108,23 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
     if kind == NodeKind.NK_YIELD:
         if self.in_comptime_fn != 0:
             self.emit_error("yield is not allowed in comptime", node)
-        let inner = self.check_expr(self.ast.get_data0(node))
         if self.has_gen_yield_type == 0:
             self.emit_error("yield used outside generator function", node)
+            let _ = self.check_expr(self.ast.get_data0(node))
+            return self.ty_void
+        let inner_node = self.ast.get_data0(node)
+        let inner = if self.current_gen_yield_type != 0:
+            self.check_expr_with_expected(inner_node, self.current_gen_yield_type)
+        else:
+            self.check_expr(inner_node)
+        if self.current_gen_yield_type != 0 and inner != 0:
+            let compat = self.types_compatible(self.current_gen_yield_type as i32, inner as i32)
+            let arith = if compat == 0: self.arithmetic_result_type(self.current_gen_yield_type, inner) else: 1 as TypeId
+            if compat == 0 and arith == 0:
+                self.emit_error("yield type mismatch", node)
+        let inner_kind = self.get_type_kind(self.resolve_alias(inner))
+        if inner_kind == TypeKind.TY_REF:
+            self.check_yielded_view_origins(inner_node, node)
         return self.ty_void
 
     if kind == NodeKind.NK_COMPTIME:
@@ -4437,6 +4596,73 @@ fn Sema.view_origin_is_stack_local(self: Sema, sym: i32) -> i32:
     if self.scope_has(sym) != 0:
         return 1
     0
+
+fn Sema.check_yielded_view_origins(self: Sema, expr_node: i32, report_node: i32):
+    if expr_node == 0:
+        return
+    if self.ast.kind(expr_node) == NodeKind.NK_UNARY and self.ast.get_data0(expr_node) == UnaryOp.UOP_REF:
+        let origin_sym = self.place_root_sym(self.ast.get_data1(expr_node))
+        if self.view_origin_is_stack_local(origin_sym) != 0:
+            let origin_name = self.pool_resolve(origin_sym)
+            self.emit_error("yielded view may outlive its origin '" ++ origin_name ++ "'", report_node)
+            return
+    if self.ast.kind(expr_node) == NodeKind.NK_CALL:
+        let callee = self.ast.get_data0(expr_node)
+        if self.ast.kind(callee) == NodeKind.NK_IDENT:
+            let fn_sym = if self.comp_resolved.contains(expr_node): self.comp_resolved.get(expr_node).unwrap() else: self.ast.get_data0(callee)
+            var sig_idx = self.get_sig(fn_sym)
+            if sig_idx < 0:
+                let sema_fn_sym = self.pool_lookup_symbol(self.pool_resolve(fn_sym))
+                sig_idx = self.get_sig(sema_fn_sym)
+            if sig_idx >= 0:
+                let has_resolved = self.has_resolved_call_args(expr_node)
+                let extra_start = self.ast.get_data1(expr_node)
+                let arg_count = if has_resolved != 0: self.get_resolved_call_arg_count(expr_node) else: self.ast.get_data2(expr_node)
+                let param_count = self.sig_get_param_count(sig_idx)
+                for pi in 0..param_count:
+                    if (self.sig_param_effect(sig_idx, pi) & EFF_ESCAPE_VIEW) == 0:
+                        continue
+                    let origin_mask = self.sig_param_view_origin(sig_idx, pi)
+                    for origin_pi in 0..param_count:
+                        if (origin_mask & (((1 as i64) << (origin_pi as u32)) as i32)) == 0:
+                            continue
+                        if origin_pi >= arg_count:
+                            continue
+                        let origin_arg = if has_resolved != 0: self.get_resolved_call_arg(expr_node, origin_pi) else: self.ast.get_extra(extra_start + origin_pi)
+                        let origin_sym = self.place_root_sym(origin_arg)
+                        if self.view_origin_is_stack_local(origin_sym) != 0:
+                            let origin_name = self.pool_resolve(origin_sym)
+                            self.emit_error("yielded view may outlive its origin '" ++ origin_name ++ "'", report_node)
+                            return
+    if self.ast.kind(expr_node) == NodeKind.NK_IDENT:
+        let view_sym = self.ast.get_data0(expr_node)
+        let view_ty = self.scope_lookup(view_sym)
+        if view_ty > 0:
+            let view_tk = self.get_type_kind(self.resolve_alias(view_ty as TypeId))
+            if view_tk == TypeKind.TY_REF and self.param_index_for_sym(view_sym) < 0 and self.binding_view_origin_mask(view_sym) == 0 and self.binding_view_dep_count(view_sym) == 0:
+                if self.binding_value_nodes.contains(view_sym):
+                    let init_node = self.binding_value_nodes.get(view_sym).unwrap()
+                    let init_kind = self.ast.kind(init_node)
+                    if init_kind == NodeKind.NK_UNARY and self.ast.get_data0(init_node) == UnaryOp.UOP_REF:
+                        let origin_sym = self.place_root_sym(self.ast.get_data1(init_node))
+                        if self.view_origin_is_stack_local(origin_sym) != 0:
+                            let origin_name = self.pool_resolve(origin_sym)
+                            self.emit_error("yielded view may outlive its origin '" ++ origin_name ++ "'", report_node)
+                            return
+                    if init_kind == NodeKind.NK_CALL or init_kind == NodeKind.NK_FIELD_ACCESS or init_kind == NodeKind.NK_UNARY:
+                        let view_name = self.pool_resolve(view_sym)
+                        self.emit_error("yielded view may outlive its origin via local binding '" ++ view_name ++ "'", report_node)
+                        return
+    let deps: Vec[i32] = Vec.new()
+    self.collect_expr_view_deps(expr_node, deps)
+    for i in 0..deps.len() as i32:
+        let origin_sym = deps.get(i as i64)
+        if origin_sym == 0:
+            continue
+        if self.view_origin_is_stack_local(origin_sym) != 0:
+            let origin_name = self.pool_resolve(origin_sym)
+            self.emit_error("yielded view may outlive its origin '" ++ origin_name ++ "'", report_node)
+            return
 
 fn Sema.check_returned_view_origins(self: Sema, expr_node: i32, report_node: i32):
     if expr_node == 0:
@@ -9039,6 +9265,8 @@ fn Sema.iterator_owner_symbol(self: Sema, tid: i32) -> i32:
     if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
         resolved = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
     if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        if self.generator_state_yield_types.contains(resolved as i32):
+            return self.get_type_name(resolved)
         return 0
     let owner = self.get_generic_inst_base(resolved as i32)
     if owner == self.syms.veciter or owner == self.syms.veciterref or owner == self.syms.mapiter or owner == self.syms.filteriter or owner == self.syms.takeiter or owner == self.syms.zipiter or owner == self.syms.flatmapiter:
@@ -9056,6 +9284,8 @@ fn Sema.iterator_element_type(self: Sema, tid: i32) -> i32:
     if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
         resolved = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
     if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
+        if self.generator_state_yield_types.contains(resolved as i32):
+            return self.generator_state_yield_types.get(resolved as i32).unwrap()
         return 0
     let owner = self.get_generic_inst_base(resolved as i32)
     if owner == self.syms.veciter:
@@ -12554,6 +12784,8 @@ fn Sema.method_has_mut_self_flag(self: Sema, type_sym: i32, method_sym: i32) -> 
     let fn_sym = self.lookup_method_fn(type_sym, method_sym)
     if fn_sym == 0:
         return 0
+    if self.generator_next_fn_syms.contains(fn_sym):
+        return 1
     if not self.fn_decl_nodes.contains(fn_sym):
         return 0
     let fn_node = self.fn_decl_nodes.get(fn_sym).unwrap()

@@ -1,34 +1,58 @@
-//! skip: non-executable spec sketch for Section 13.4 — Generators (formerly 25.16); contains pseudo-code for unimplemented feature work
-// Spec test: Section 13.4 — Generators (formerly 25.16)
-// These are pseudo-code test cases from the specification.
-// Remove the //! skip directive once the features are implemented.
+//! expect-stdout: ok
+// Spec test: Section 13.4 — Generators.
 
-// PASS: basic
 gen fn countdown(from: i32) -> i32:
     var i = from
-    while i >= 0: yield i; i -= 1
+    while i >= 0:
+        yield i
+        i -= 1
 
-fn test:
-    let result = countdown(3) |> collect[Vec]()
-    assert(result == vec![3, 2, 1, 0])
+gen fn two_step -> i32:
+    var a = 1
+    var b = 10
+    yield a + b
+    a += 1
+    b += 10
+    yield a + b
 
-// PASS: infinite with take
-gen fn naturals -> Int:
-    var n = 0
-    loop: yield n; n += 1
+fn test_next_resumes_from_each_yield:
+    var iter = countdown(3)
+    match iter.next():
+        Some(v) => assert(v == 3)
+        None => assert(false)
+    match iter.next():
+        Some(v) => assert(v == 2)
+        None => assert(false)
+    match iter.next():
+        Some(v) => assert(v == 1)
+        None => assert(false)
+    match iter.next():
+        Some(v) => assert(v == 0)
+        None => assert(false)
+    match iter.next():
+        Some(_) => assert(false)
+        None => assert(true)
 
-fn test:
-    let first_5 = naturals() |> take(5) |> collect[Vec]()
-    assert(first_5 == vec![0, 1, 2, 3, 4])
+fn test_locals_persist_across_yield:
+    var iter = two_step()
+    match iter.next():
+        Some(v) => assert(v == 11)
+        None => assert(false)
+    match iter.next():
+        Some(v) => assert(v == 22)
+        None => assert(false)
+    match iter.next():
+        Some(_) => assert(false)
+        None => assert(true)
 
-// PASS: compose with pipeline
-gen fn fibonacci -> Int:
-    var a = 0; var b = 1
-    loop: yield a; let n = a + b; a = b; b = n
+fn test_generator_is_iterable:
+    var sum = 0
+    for n in countdown(4):
+        sum += n
+    assert(sum == 10)
 
-fn test:
-    let even_fibs = fibonacci()
-        |> take_while(x => x < 100)
-        |> filter(x => x % 2 == 0)
-        |> collect[Vec]()
-    assert(even_fibs == vec![0, 2, 8, 34])
+fn main:
+    test_next_resumes_from_each_yield()
+    test_locals_persist_across_yield()
+    test_generator_is_iterable()
+    print("ok")

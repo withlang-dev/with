@@ -83,6 +83,8 @@ type MirBuilder {
     next_temp: i32,
     cur_node: i32,
     expected_type: i32,
+    in_generator: i32,
+    generator_yield_count: i32,
 
     regex_capture_pat_nodes: Vec[i32],
     regex_capture_opt_places: Vec[i32],
@@ -135,6 +137,8 @@ fn MirBuilder.init(sema: Sema, ast: AstPool, pool: InternPool, fn_sym: i32) -> M
         next_temp: 0,
         cur_node: 0,
         expected_type: 0,
+        in_generator: 0,
+        generator_yield_count: 0,
         regex_capture_pat_nodes: Vec.new(),
         regex_capture_opt_places: Vec.new(),
         string_alias_local_ids: Vec.new(),
@@ -3392,6 +3396,16 @@ fn MirBuilder.lower_expr_discard(self: MirBuilder, node: i32) -> i32:
 fn MirBuilder.lower_block(self: MirBuilder, node: i32) -> i32:
     self.lower_block_mode(node, 1)
 
+fn MirBuilder.lower_generator_yield(self: MirBuilder, node: i32) -> i32:
+    let inner = self.ast.get_data0(node)
+    let value_op = if inner != 0: self.lower_expr(inner) else: self.unit_operand()
+    let resume_bb = self.new_block()
+    let yield_idx = self.generator_yield_count
+    self.generator_yield_count = self.generator_yield_count + 1
+    self.terminate_with_span(TermKind.TK_YIELD, value_op, resume_bb, yield_idx, 0, self.ast.get_start(node))
+    self.switch_to(resume_bb)
+    self.unit_operand()
+
 fn MirBuilder.lower_block_mode(self: MirBuilder, node: i32, want_result: i32) -> i32:
     let stmt_start = self.ast.get_data0(node)
     let stmt_count = self.ast.get_data1(node)
@@ -3432,6 +3446,10 @@ fn MirBuilder.lower_block_mode(self: MirBuilder, node: i32, want_result: i32) ->
         if sk == NodeKind.NK_LABEL:
             let _ = self.lower_label(stmt)
             continue
+        if sk == NodeKind.NK_YIELD:
+            if self.in_generator != 0:
+                let _ = self.lower_generator_yield(stmt)
+                continue
         
         if sk == NodeKind.NK_DEFER:
             let defer_body = self.ast.get_data0(stmt)
@@ -8397,11 +8415,12 @@ fn MirBuilder.lower_expr(self: MirBuilder, node: i32) -> i32:
         let task_inner_ty = self.expr_type(inner)
         return self.lower_single_await(task_op, result_ty, task_inner_ty, node)
 
-    // yield expr → for now, just evaluate the expression (state machine transform is future work)
     if kind == NodeKind.NK_YIELD:
         let inner = self.ast.get_data0(node)
+        if self.in_generator != 0:
+            return self.lower_generator_yield(node)
         if inner != 0:
-            return self.lower_expr(inner)
+            let _ = self.lower_expr(inner)
         return self.unit_operand()
 
     if kind == NodeKind.NK_ASYNC_SCOPE:
@@ -8608,6 +8627,8 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> MirBody
         var body_ret_ty = builder.sema.sig_return_type(sig_idx)
         if (fn_flags / FnFlags.ASYNC) % 2 == 1:
             body_ret_ty = builder.sema.unwrap_task_type(body_ret_ty as TypeId) as i32
+        if (fn_flags / FnFlags.GEN) % 2 == 1 and builder.in_generator != 0:
+            body_ret_ty = builder.sema.ty_void as i32
         builder.body.local_type_ids.set_i32(0, body_ret_ty)
     else:
         // No sig — try to get return type from typed_expr_types on body expression
@@ -8792,6 +8813,337 @@ fn MirBody.optimize_self_tail_calls(mut self: MirBody):
         self.set_terminator(bb, TermKind.TK_GOTO, 0, 0, 0, 0, span)
         bb = bb + 1
 
+fn mir_gen_resume_field_sym(sema: Sema) -> i32:
+    sema.pool_lookup_symbol("__with_generator_resume")
+
+fn mir_gen_state_field_start(sema: Sema, state_tid: i32) -> i32:
+    let resolved = sema.resolve_alias(state_tid as TypeId) as i32
+    if resolved <= 0 or resolved >= sema.type_d1.len() as i32:
+        return 0
+    sema.type_d1.get(resolved as i64)
+
+fn mir_gen_state_field_count(sema: Sema, state_tid: i32) -> i32:
+    let resolved = sema.resolve_alias(state_tid as TypeId) as i32
+    if sema.generator_state_field_counts.contains(resolved):
+        return sema.generator_state_field_counts.get(resolved).unwrap()
+    if resolved <= 0 or resolved >= sema.type_d2.len() as i32:
+        return 0
+    sema.type_d2.get(resolved as i64)
+
+fn mir_gen_state_field_sym(sema: Sema, state_tid: i32, field_i: i32) -> i32:
+    let resolved = sema.resolve_alias(state_tid as TypeId) as i32
+    let key = sema_pair_key(resolved, field_i)
+    if sema.generator_state_field_names.contains(key):
+        return sema.generator_state_field_names.get(key).unwrap()
+    let start = mir_gen_state_field_start(sema, state_tid)
+    sema.type_extra.get((start + field_i * 3) as i64)
+
+fn mir_gen_state_field_type(sema: Sema, state_tid: i32, field_i: i32) -> i32:
+    let resolved = sema.resolve_alias(state_tid as TypeId) as i32
+    let key = sema_pair_key(resolved, field_i)
+    if sema.generator_state_field_types.contains(key):
+        return sema.generator_state_field_types.get(key).unwrap()
+    let start = mir_gen_state_field_start(sema, state_tid)
+    sema.type_extra.get((start + field_i * 3 + 1) as i64)
+
+fn mir_gen_find_local_by_sym(body: MirBody, sym: i32) -> i32:
+    if sym == 0:
+        return -1
+    for li in 1..body.local_names.len() as i32:
+        if body.local_names.get(li as i64) == sym:
+            return li
+    -1
+
+fn MirBody.gen_self_field_place(mut self: MirBody, field_sym: i32, field_ty: i32) -> i32:
+    let self_place = self.new_place(1)
+    self.new_field_place(self_place, field_sym, field_ty)
+
+fn MirBody.gen_assign_operand(mut self: MirBody, bb: i32, place: i32, op: i32, span: i32):
+    let rv = self.new_rvalue(RvalueKind.RK_USE, op, 0, 0)
+    self.push_stmt(bb, StmtKind.Assign, place, rv, span)
+
+fn MirBody.gen_zero_operand(mut self: MirBody, tid: i32) -> i32:
+    let c = self.new_const(ConstKind.CK_ZERO_SIZED, 0, 0, 0, tid)
+    self.new_operand(OperandKind.OK_CONSTANT, c)
+
+fn MirBody.gen_assign_option_some(mut self: MirBody, bb: i32, opt_ty: i32, value_op: i32, span: i32):
+    let fields: Vec[i32] = Vec.new()
+    let names: Vec[i32] = Vec.new()
+    fields.push(value_op)
+    names.push(0)
+    let fid = self.new_agg_fields(fields, names)
+    let rv = self.new_rvalue(RvalueKind.RK_AGGREGATE, 1, fid, 0)
+    let ret_place = self.new_place(0)
+    let _ = opt_ty
+    self.push_stmt(bb, StmtKind.Assign, ret_place, rv, span)
+
+fn MirBody.gen_assign_option_none(mut self: MirBody, bb: i32, opt_ty: i32, span: i32):
+    let fields: Vec[i32] = Vec.new()
+    let names: Vec[i32] = Vec.new()
+    let fid = self.new_agg_fields(fields, names)
+    let rv = self.new_rvalue(RvalueKind.RK_AGGREGATE, 1, fid, 1)
+    let ret_place = self.new_place(0)
+    let _ = opt_ty
+    self.push_stmt(bb, StmtKind.Assign, ret_place, rv, span)
+
+fn MirBody.gen_store_resume_state(mut self: MirBody, bb: i32, sema: Sema, state_tid: i32, value: i64, span: i32):
+    let resume_sym = mir_gen_resume_field_sym(sema)
+    let resume_place = self.gen_self_field_place(resume_sym, sema.ty_i32 as i32)
+    let c = self.new_const(ConstKind.CK_INT, ast_int_part0(value), ast_int_part1(value), ast_int_part2(value), sema.ty_i32 as i32)
+    let op = self.new_operand(OperandKind.OK_CONSTANT, c)
+    self.gen_assign_operand(bb, resume_place, op, span)
+
+fn MirBody.gen_save_generator_fields(mut self: MirBody, bb: i32, sema: Sema, state_tid: i32, span: i32):
+    let resume_sym = mir_gen_resume_field_sym(sema)
+    let field_count = mir_gen_state_field_count(sema, state_tid)
+    for fi in 0..field_count:
+        let field_sym = mir_gen_state_field_sym(sema, state_tid, fi)
+        if field_sym == resume_sym:
+            continue
+        let local_id = mir_gen_find_local_by_sym(self, field_sym)
+        if local_id < 0:
+            continue
+        let field_ty = mir_gen_state_field_type(sema, state_tid, fi)
+        let dst = self.gen_self_field_place(field_sym, field_ty)
+        let src_place = self.new_place(local_id)
+        let op = self.new_operand(OperandKind.OK_COPY, src_place)
+        self.gen_assign_operand(bb, dst, op, span)
+
+fn MirBody.gen_restore_generator_fields(mut self: MirBody, bb: i32, sema: Sema, state_tid: i32, span: i32):
+    let resume_sym = mir_gen_resume_field_sym(sema)
+    let field_count = mir_gen_state_field_count(sema, state_tid)
+    for fi in 0..field_count:
+        let field_sym = mir_gen_state_field_sym(sema, state_tid, fi)
+        if field_sym == resume_sym:
+            continue
+        let local_id = mir_gen_find_local_by_sym(self, field_sym)
+        if local_id < 0:
+            continue
+        let field_ty = mir_gen_state_field_type(sema, state_tid, fi)
+        let src = self.gen_self_field_place(field_sym, field_ty)
+        let dst = self.new_place(local_id)
+        let op = self.new_operand(OperandKind.OK_COPY, src)
+        self.gen_assign_operand(bb, dst, op, span)
+
+fn mir_gen_remap_local(local_map: Vec[i32], local_id: i32) -> i32:
+    if local_id < 0 or local_id >= local_map.len() as i32:
+        return local_id
+    local_map.get(local_id as i64)
+
+fn mir_gen_remap_place_projection_data(source: MirBody, local_map: Vec[i32], proj_i: i32) -> i32:
+    let kind = source.proj_kinds.get(proj_i as i64)
+    let data = source.proj_d0.get(proj_i as i64)
+    if kind == ProjKind.PK_INDEX:
+        return mir_gen_remap_local(local_map, data)
+    data
+
+fn mir_gen_remap_rvalue(source: MirBody, local_map: Vec[i32], rv_id: i32, d_index: i32) -> i32:
+    let rk = source.rval_kinds.get(rv_id as i64)
+    let raw =
+        if d_index == 0: source.rval_d0.get(rv_id as i64)
+        else if d_index == 1: source.rval_d1.get(rv_id as i64)
+        else: source.rval_d2.get(rv_id as i64)
+    if rk == RvalueKind.RK_REF or rk == RvalueKind.RK_ADDR_OF:
+        if d_index == 1 or (rk == RvalueKind.RK_ADDR_OF and d_index == 0):
+            return raw
+    let _ = local_map
+    raw
+
+fn lower_generator_constructor(sema: Sema, ast_pool: AstPool, pool: InternPool, fn_node: i32, sig_idx: i32) -> MirBody:
+    let fn_sym = ast_pool.get_data0(fn_node)
+    let state_tid = sema.generator_fn_state_types.get(fn_sym).unwrap()
+    var builder = MirBuilder.init(sema, ast_pool, pool, fn_sym)
+    builder.body.local_type_ids.set_i32(0, state_tid)
+    builder.push_scope()
+
+    let meta = ast_pool.find_fn_meta(fn_node)
+    if meta >= 0:
+        let param_start = ast_pool.fn_meta_param_start(meta)
+        let param_count = ast_pool.fn_meta_param_count(meta)
+        for pi in 0..param_count:
+            let p_name = ast_pool.fn_param_name(param_start, pi)
+            let p_ty = sema.sig_param_type(sig_idx, pi)
+            let local_id = builder.body.new_local(p_ty, 0, p_name, 1)
+            builder.bind_local(p_name, local_id)
+        builder.body.n_params = param_count
+
+    let fields: Vec[i32] = Vec.new()
+    let names: Vec[i32] = Vec.new()
+    let resume_sym = mir_gen_resume_field_sym(sema)
+    let field_count = mir_gen_state_field_count(sema, state_tid)
+    for fi in 0..field_count:
+        let field_sym = mir_gen_state_field_sym(sema, state_tid, fi)
+        let field_ty = mir_gen_state_field_type(sema, state_tid, fi)
+        names.push(field_sym)
+        if field_sym == resume_sym:
+            fields.push(builder.int_const_operand(0, sema.ty_i32 as i32))
+        else:
+            let local_id = builder.lookup_local(field_sym)
+            if local_id >= 0:
+                fields.push(builder.body.new_operand(OperandKind.OK_COPY, builder.place_for_local(local_id)))
+            else:
+                fields.push(builder.body.gen_zero_operand(field_ty))
+    let fid = builder.body.new_agg_fields(fields, names)
+    let rv = builder.body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, fid, 0)
+    let ret_place = builder.place_for_local(0)
+    builder.body.push_stmt(builder.cur_bb, StmtKind.Assign, ret_place, rv, ast_pool.get_start(fn_node))
+    builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
+    builder.body
+
+fn lower_generator_next_body(sema: Sema, source: MirBody, fn_node: i32) -> MirBody:
+    let fn_sym = source.fn_sym
+    let next_sym = sema.generator_fn_next_syms.get(fn_sym).unwrap()
+    let state_tid = sema.generator_fn_state_types.get(fn_sym).unwrap()
+    let yield_ty = sema.generator_fn_yield_types.get(fn_sym).unwrap()
+    let opt_ty = sema.ensure_option_type_for(yield_ty)
+    var out = MirBody.init(next_sym, sema)
+    out.local_type_ids.set_i32(0, opt_ty)
+    let entry_bb = out.new_block()
+    let self_sym = sema.pool_lookup_symbol("self")
+    let _self_local = out.new_local(state_tid, 1, self_sym, 1)
+    out.n_params = 1
+
+    let local_map: Vec[i32] = Vec.new()
+    local_map.push(0)
+    for li in 1..source.local_count():
+        let mapped = out.new_local(
+            source.local_type_ids.get(li as i64),
+            source.local_mutables.get(li as i64),
+            source.local_names.get(li as i64),
+            source.local_is_user_var.get(li as i64),
+        )
+        local_map.push(mapped)
+
+    for ci in 0..source.const_kinds.len() as i32:
+        out.const_kinds.push(source.const_kinds.get(ci as i64))
+        out.const_d0.push(source.const_d0.get(ci as i64))
+        out.const_d1.push(source.const_d1.get(ci as i64))
+        out.const_d2.push(source.const_d2.get(ci as i64))
+        out.const_types.push(source.const_types.get(ci as i64))
+
+    for pi in 0..source.place_locals.len() as i32:
+        let base_local = mir_gen_remap_local(local_map, source.place_locals.get(pi as i64))
+        let proj_start = source.place_proj_starts.get(pi as i64)
+        let proj_count = source.place_proj_counts.get(pi as i64)
+        let new_proj_start = out.proj_kinds.len() as i32
+        for ppi in 0..proj_count:
+            let src_proj = proj_start + ppi
+            out.proj_kinds.push(source.proj_kinds.get(src_proj as i64))
+            out.proj_d0.push(mir_gen_remap_place_projection_data(source, local_map, src_proj))
+        out.place_locals.push(base_local)
+        out.place_sema_types.push(source.place_sema_types.get(pi as i64))
+        out.place_proj_starts.push(new_proj_start)
+        out.place_proj_counts.push(proj_count)
+
+    for oi in 0..source.operand_kinds.len() as i32:
+        let ok = source.operand_kinds.get(oi as i64)
+        out.operand_kinds.push(ok)
+        out.operand_d0.push(source.operand_d0.get(oi as i64))
+
+    for ai in 0..source.agg_field_starts.len() as i32:
+        let start = source.agg_field_starts.get(ai as i64)
+        let count = source.agg_field_counts.get(ai as i64)
+        out.agg_field_starts.push(out.agg_field_operands.len() as i32)
+        out.agg_field_counts.push(count)
+        for fi in 0..count:
+            out.agg_field_operands.push(source.agg_field_operands.get((start + fi) as i64))
+            out.agg_field_name_syms.push(source.agg_field_name_syms.get((start + fi) as i64))
+
+    for ca in 0..source.call_arg_starts.len() as i32:
+        let start = source.call_arg_starts.get(ca as i64)
+        let count = source.call_arg_counts.get(ca as i64)
+        out.call_arg_starts.push(out.call_arg_operands.len() as i32)
+        out.call_arg_counts.push(count)
+        out.call_intrinsic_kinds.push(source.call_intrinsic_kinds.get(ca as i64))
+        out.call_ast_nodes.push(source.call_ast_nodes.get(ca as i64))
+        for ai in 0..count:
+            out.call_arg_operands.push(source.call_arg_operands.get((start + ai) as i64))
+
+    for ri in 0..source.rval_kinds.len() as i32:
+        out.rval_kinds.push(source.rval_kinds.get(ri as i64))
+        out.rval_d0.push(mir_gen_remap_rvalue(source, local_map, ri, 0))
+        out.rval_d1.push(mir_gen_remap_rvalue(source, local_map, ri, 1))
+        out.rval_d2.push(mir_gen_remap_rvalue(source, local_map, ri, 2))
+
+    for bb in 0..source.block_count():
+        let _ = out.new_block()
+
+    let switch_vals: Vec[i32] = Vec.new()
+    let switch_targets: Vec[i32] = Vec.new()
+    switch_vals.push(0)
+    switch_targets.push(1)
+
+    for bb in 0..source.block_count():
+        let new_bb = bb + 1
+        let start = source.bb_stmt_starts.get(bb as i64)
+        let count = source.bb_stmt_counts.get(bb as i64)
+        for si in 0..count:
+            let stmt_id = start + si
+            let sk = source.stmt_kinds.get(stmt_id as i64)
+            var sd0 = source.stmt_d0.get(stmt_id as i64)
+            let sd1 = source.stmt_d1.get(stmt_id as i64)
+            if sk == StmtKind.StorageLive or sk == StmtKind.StorageDead or sk == StmtKind.Drop:
+                sd0 = mir_gen_remap_local(local_map, sd0)
+            out.push_stmt(new_bb, sk, sd0, sd1, source.stmt_spans.get(stmt_id as i64))
+
+        let tk = source.term_kind(bb)
+        let d0 = source.term_data0(bb)
+        let d1 = source.term_data1(bb)
+        let d2 = source.term_data2(bb)
+        let d3 = source.term_data3(bb)
+        let span = source.bb_term_spans.get(bb as i64)
+        if tk == TermKind.TK_YIELD:
+            out.gen_save_generator_fields(new_bb, sema, state_tid, span)
+            out.gen_store_resume_state(new_bb, sema, state_tid, (d2 + 1) as i64, span)
+            out.gen_assign_option_some(new_bb, opt_ty, d0, span)
+            out.set_terminator(new_bb, TermKind.TK_RETURN, 0, 0, 0, 0, span)
+            switch_vals.push(d2 + 1)
+            switch_targets.push(d1 + 1)
+            continue
+        if tk == TermKind.TK_RETURN:
+            out.gen_store_resume_state(new_bb, sema, state_tid, -1, span)
+            out.gen_assign_option_none(new_bb, opt_ty, span)
+            out.set_terminator(new_bb, TermKind.TK_RETURN, 0, 0, 0, 0, span)
+            continue
+        if tk == TermKind.TK_GOTO:
+            out.set_terminator(new_bb, tk, d0 + 1, d1, d2, d3, span)
+            continue
+        if tk == TermKind.TK_SWITCH_INT:
+            let vals: Vec[i32] = Vec.new()
+            let targets: Vec[i32] = Vec.new()
+            let sw_start = source.switch_table_starts.get(d1 as i64)
+            let sw_count = source.switch_table_counts.get(d1 as i64)
+            for si in 0..sw_count:
+                vals.push(source.switch_table_vals.get((sw_start + si) as i64))
+                targets.push(source.switch_table_targets.get((sw_start + si) as i64) + 1)
+            let new_table = out.new_switch_table(vals, targets)
+            out.set_terminator(new_bb, tk, d0, new_table, d2 + 1, d3, span)
+            continue
+        if tk == TermKind.TK_CALL:
+            out.set_terminator(new_bb, tk, d0, d1, d2, d3 + 1, span)
+            continue
+        if tk == TermKind.TK_DROP_AND_GOTO:
+            out.set_terminator(new_bb, tk, d0, d1 + 1, d2, d3, span)
+            continue
+        out.set_terminator(new_bb, tk, d0, d1, d2, d3, span)
+
+    let done_bb = out.new_block()
+    out.gen_assign_option_none(done_bb as i32, opt_ty, 0)
+    out.set_terminator(done_bb as i32, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+
+    out.gen_restore_generator_fields(entry_bb as i32, sema, state_tid, 0)
+    let resume_sym = mir_gen_resume_field_sym(sema)
+    let resume_place = out.gen_self_field_place(resume_sym, sema.ty_i32 as i32)
+    let resume_tmp = out.new_temp(sema.ty_i32 as i32)
+    let resume_tmp_place = out.new_place(resume_tmp)
+    let resume_op = out.new_operand(OperandKind.OK_COPY, resume_place)
+    out.gen_assign_operand(entry_bb as i32, resume_tmp_place, resume_op, 0)
+    let switch_op = out.new_operand(OperandKind.OK_COPY, resume_tmp_place)
+    let dispatch_table = out.new_switch_table(switch_vals, switch_targets)
+    out.set_terminator(entry_bb as i32, TermKind.TK_SWITCH_INT, switch_op, dispatch_table, done_bb as i32, 0, 0)
+
+    out
+
 fn lower_module(sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirModule:
     var mir_mod = MirModule.init()
     // Snapshot sema type tables before any MirBuilder copy can realloc/free the buffer
@@ -8809,6 +9161,19 @@ fn lower_module(sema: Sema, ast_pool: AstPool, pool: InternPool) -> MirModule:
 
         var fn_sema = sema
         fn_sema.update_decl_source_context(di)
+        let fn_flags = ast_pool.get_data2(decl)
+        if (fn_flags / FnFlags.GEN) % 2 == 1:
+            let sig_idx = fn_sema.get_sig(fn_sym)
+            if sig_idx < 0:
+                continue
+            var source_builder = MirBuilder.init(fn_sema, ast_pool, pool, fn_sym)
+            source_builder.in_generator = 1
+            let source_body = lower_fn_with_sig(source_builder, decl as i32, sig_idx)
+            let ctor_body = lower_generator_constructor(fn_sema, ast_pool, pool, decl as i32, sig_idx)
+            let next_body = lower_generator_next_body(fn_sema, source_body, decl as i32)
+            mir_mod.add_body(ctor_body)
+            mir_mod.add_body(next_body)
+            continue
         var builder = MirBuilder.init(fn_sema, ast_pool, pool, fn_sym)
         let body = lower_fn(builder, decl as i32)
         mir_mod.add_body(body)
