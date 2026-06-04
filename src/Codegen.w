@@ -3528,7 +3528,8 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
     // keep owner definitions externally linkable and let importers reference them.
     if self.module_object_mode == 0:
         let is_prelude = self.current_decl_source_file.contains("lib/std/")
-        if effective_name != "main" and not is_prelude:
+        if effective_name != "main" and not is_prelude and
+            not codegen_preserve_runtime_link_name(self.current_decl_source_file, effective_name):
             wl_set_linkage(function, wl_internal_linkage())
 
     // @[weak] — set weak linkage (LLVMWeakAnyLinkage = 5)
@@ -3615,7 +3616,8 @@ fn Codegen.declare_function_from_sig(self: Codegen, fn_sym: i32, sig_idx: i32, f
     if force_internal != 0:
         wl_set_linkage(function, wl_internal_linkage())
     else if self.module_object_mode == 0:
-        if effective_name != "main" and not self.current_decl_source_file.contains("lib/std/"):
+        if effective_name != "main" and not self.current_decl_source_file.contains("lib/std/") and
+            not codegen_preserve_runtime_link_name(self.current_decl_source_file, effective_name):
             wl_set_linkage(function, wl_internal_linkage())
 
     self.fn_values.insert(cg_sym, function)
