@@ -1,6 +1,6 @@
 // CImport — C header import via libclang bridge.
 //
-// Parses C headers using libclang (via clang_bridge.c) and generates
+// Parses C headers using libclang (via rt.clang_bridge) and generates
 // synthetic extern fn / type declarations as .w source text.
 // Falls back gracefully when libclang is unavailable.
 
@@ -8,134 +8,18 @@ use CiIR
 use CiPrint
 use CiMigrate
 use std.cfg.stackify
+use compiler.ClangBridge.*
+use compiler.EmbeddedClangResource
 
-extern fn with_cimport_add_include_path(path: str) -> void
-extern fn with_cimport_clear_include_paths() -> void
 extern fn with_parse_float(s: str) -> f64
-extern fn with_cimport_available() -> i32
-extern fn with_cimport_parse(header_code: str) -> i64
-extern fn with_cimport_dispose(session: i64) -> void
-extern fn with_cimport_error(session: i64) -> str
-extern fn with_cimport_decl_count(session: i64) -> i32
-extern fn with_cimport_decl_kind(session: i64, idx: i32) -> i32
-extern fn with_cimport_decl_name(session: i64, idx: i32) -> str
-extern fn with_cimport_decl_cursor(session: i64, idx: i32) -> i32
-extern fn with_cimport_fn_return_type(session: i64, idx: i32) -> str
-extern fn with_cimport_fn_param_count(session: i64, idx: i32) -> i32
-extern fn with_cimport_fn_param_name(session: i64, idx: i32, param: i32) -> str
-extern fn with_cimport_fn_param_type(session: i64, idx: i32, param: i32) -> str
-extern fn with_cimport_param_is_restrict(session: i64, idx: i32, param: i32) -> i32
-extern fn with_cimport_fn_is_variadic(session: i64, idx: i32) -> i32
-extern fn with_cimport_fn_is_noreturn(session: i64, idx: i32) -> i32
-extern fn with_cimport_struct_has_definition(session: i64, idx: i32) -> i32
-extern fn with_cimport_var_alignment(session: i64, idx: i32) -> i32
-extern fn with_cimport_hex_float_to_decimal(hex_str: str) -> str
-extern fn with_cimport_struct_field_count(session: i64, idx: i32) -> i32
-extern fn with_cimport_struct_field_name(session: i64, idx: i32, field: i32) -> str
-extern fn with_cimport_struct_field_type(session: i64, idx: i32, field: i32) -> str
-extern fn with_cimport_struct_is_opaque(session: i64, idx: i32) -> i32
-extern fn with_cimport_struct_field_is_bitfield(session: i64, idx: i32, field: i32) -> i32
-extern fn with_cimport_enum_const_count(session: i64, idx: i32) -> i32
-extern fn with_cimport_enum_const_name(session: i64, idx: i32, ci: i32) -> str
-extern fn with_cimport_enum_const_value(session: i64, idx: i32, ci: i32) -> i64
-extern fn with_cimport_enum_int_type(session: i64, idx: i32) -> str
-extern fn with_cimport_typedef_underlying(session: i64, idx: i32) -> str
-extern fn with_cimport_parse_macros(header_code: str) -> i64
-extern fn with_cimport_parse_macro_probe(header_code: str, macro_name: str) -> i64
-extern fn with_cimport_realpath(path: str) -> str
-extern fn with_cimport_collect_object_macro_types(header_code: str, macro_names: str) -> str
-extern fn with_cimport_preprocess_text(header_code: str) -> str
-extern fn with_cimport_macro_count(session: i64) -> i32
-extern fn with_cimport_macro_name(session: i64, idx: i32) -> str
-extern fn with_cimport_macro_value(session: i64, idx: i32) -> str
-extern fn with_cimport_macro_location(session: i64, idx: i32) -> str
-extern fn with_cimport_macro_is_system(session: i64, idx: i32) -> i32
-extern fn with_cimport_macro_is_fn_like(session: i64, idx: i32) -> i32
-extern fn with_cimport_dispose_macros(session: i64) -> void
-extern fn with_cimport_is_name_emitted(name: str) -> i32
-extern fn with_cimport_mark_name_emitted(name: str) -> void
-extern fn with_cimport_reset_names() -> void
-extern fn with_cimport_var_type(session: i64, idx: i32) -> str
-extern fn with_cimport_var_is_const(session: i64, idx: i32) -> i32
-extern fn with_cimport_var_storage_class(session: i64, idx: i32) -> i32
-extern fn with_cimport_var_definition_kind(session: i64, idx: i32) -> i32
-extern fn with_cimport_var_is_threadlocal(session: i64, idx: i32) -> i32
-extern fn with_cimport_fn_param_type_translated(session: i64, idx: i32, param: i32) -> str
-extern fn with_cimport_fn_return_type_translated(session: i64, idx: i32) -> str
-extern fn with_cimport_struct_field_type_translated(session: i64, idx: i32, field: i32) -> str
-extern fn with_cimport_var_type_translated(session: i64, idx: i32) -> str
-extern fn with_cimport_var_storage_type_translated(session: i64, idx: i32) -> str
-extern fn with_cimport_typedef_underlying_translated(session: i64, idx: i32) -> str
-extern fn with_cimport_struct_field_is_anonymous_record(session: i64, idx: i32, field: i32) -> i32
-extern fn with_cimport_struct_field_anon_field_count(session: i64, idx: i32, field: i32) -> i32
-extern fn with_cimport_struct_field_anon_field_name(session: i64, idx: i32, field: i32, sub_field: i32) -> str
-extern fn with_cimport_struct_field_anon_field_type(session: i64, idx: i32, field: i32, sub_field: i32) -> str
-extern fn with_cimport_struct_is_packed(session: i64, idx: i32) -> i32
-extern fn with_cimport_struct_field_offset(session: i64, idx: i32, field: i32) -> i64
 
 var g_ci_realpath_cache_paths: Vec[str] = Vec.new()
 var g_ci_realpath_cache_values: Vec[str] = Vec.new()
 var g_cimport_last_error: str = ""
 var g_cimport_untranslated_macros: str = ""
 var g_cimport_report_untranslated_macros: i32 = 0
-extern fn with_cimport_record_field_offset_by_name(session: i64, type_name: str, field_name: str) -> i64
-extern fn with_cimport_struct_size(session: i64, idx: i32) -> i64
-extern fn with_cimport_struct_field_size(session: i64, idx: i32, field: i32) -> i64
-extern fn with_cimport_fn_storage_class(session: i64, idx: i32) -> i32
-extern fn with_cimport_fn_is_inline(session: i64, idx: i32) -> i32
-extern fn with_cimport_fn_calling_conv(session: i64, idx: i32) -> str
-extern fn with_cimport_macro_param_count(session: i64, idx: i32) -> i32
-extern fn with_cimport_macro_param_name(session: i64, idx: i32, param: i32) -> str
-extern fn with_cimport_typedef_anon_record_field_count(session: i64, idx: i32) -> i32
-extern fn with_cimport_typedef_anon_field_name(session: i64, idx: i32, field: i32) -> str
-extern fn with_cimport_typedef_anon_field_type(session: i64, idx: i32, field: i32) -> str
-extern fn with_cimport_typedef_anon_field_is_bitfield(session: i64, idx: i32, field: i32) -> i32
-extern fn with_cimport_typedef_anon_is_union(session: i64, idx: i32) -> i32
-// ── AST traversal API (Phase 1) ─────────────────────────────
-extern fn with_ci_root_cursor(session: i64) -> i32
-extern fn with_ci_num_children(session: i64, cursor: i32) -> i32
-extern fn with_ci_child(session: i64, cursor: i32, index: i32) -> i32
-extern fn with_ci_cursor_kind(session: i64, cursor: i32) -> i32
-extern fn with_ci_cursor_spelling(session: i64, cursor: i32) -> str
-extern fn with_ci_cursor_type(session: i64, cursor: i32) -> i32
-extern fn with_ci_type_kind(session: i64, ty: i32) -> i32
-extern fn with_ci_type_array_element(session: i64, ty: i32) -> i32
-extern fn with_ci_type_array_size(session: i64, ty: i32) -> i64
-extern fn with_ci_type_declaration(session: i64, ty: i32) -> i32
-extern fn with_ci_type_translated(session: i64, ty: i32) -> str
-extern fn with_ci_type_pointee(session: i64, ty: i32) -> i32
-extern fn with_ci_type_is_const(session: i64, ty: i32) -> i32
-extern fn with_ci_type_canonical(session: i64, ty: i32) -> i32
-extern fn with_ci_type_result(session: i64, ty: i32) -> i32
-extern fn with_ci_type_arg_count(session: i64, ty: i32) -> i32
-extern fn with_ci_type_arg(session: i64, ty: i32, idx: i32) -> i32
-extern fn with_ci_cursor_is_definition(session: i64, cursor: i32) -> i32
-extern fn with_ci_cursor_in_file(session: i64, cursor: i32, path: str) -> i32
-extern fn with_ci_cursor_location(session: i64, cursor: i32) -> str
-extern fn with_ci_cursor_referenced_location(session: i64, cursor: i32) -> str
-extern fn with_ci_cursor_source_text(session: i64, cursor: i32) -> str
-extern fn with_ci_cursor_expansion_text(session: i64, cursor: i32) -> str
-extern fn with_ci_cursor_spelling_text(session: i64, cursor: i32) -> str
-extern fn with_ci_cursor_token_text(session: i64, cursor: i32) -> str
-extern fn with_ci_cursor_start_offset(session: i64, cursor: i32) -> i32
-extern fn with_ci_binary_op(session: i64, cursor: i32) -> i32
-extern fn with_ci_unary_op(session: i64, cursor: i32) -> i32
-extern fn with_ci_eval_int_value(session: i64, cursor: i32) -> i64
-extern fn with_ci_eval_int_valid(session: i64, cursor: i32) -> i32
-extern fn with_ci_eval_int_is_unsigned(session: i64, cursor: i32) -> i32
-extern fn with_ci_eval_as_str(session: i64, cursor: i32) -> str
-extern fn with_ci_member_field_name(session: i64, cursor: i32) -> str
+
 extern fn with_getenv_str(name: str) -> str
-extern fn with_ci_cursor_expansion_location(session: i64, cursor: i32) -> str
-extern fn with_ci_cursor_spelling_location(session: i64, cursor: i32) -> str
-extern fn with_ci_implicit_cast_kind(session: i64, cursor: i32) -> i32
-extern fn with_ci_type_is_unsigned(session: i64, cursor: i32) -> i32
-extern fn with_ci_type_is_pointer(session: i64, cursor: i32) -> i32
-extern fn with_ci_type_is_float(session: i64, cursor: i32) -> i32
-extern fn with_ci_type_is_bool(session: i64, cursor: i32) -> i32
-extern fn with_ci_cursor_pointee_type(session: i64, cursor: i32) -> str
-extern fn with_cimport_struct_field_align(session: i64, idx: i32, field: i32) -> i64
-extern fn with_cimport_struct_align(session: i64, idx: i32) -> i64
 
 extern fn i64_to_string(n: i64) -> str
 extern fn with_eprint(s: str) -> void
@@ -233,7 +117,7 @@ let BO_COMMA: i32 = 30
 
 // Implicit cast kind constants
 // CI_CAST_* values must match the CIC_* constants in
-// rt/clang_bridge.w — with_ci_implicit_cast_kind returns CIC_*
+// compiler.ClangBridge — with_ci_implicit_cast_kind returns CIC_*
 // values and CImport.w dispatches on them. Kinds the bridge
 // does not emit are set to distinct sentinels < 0 so they never
 // accidentally match a real return value.
@@ -279,6 +163,11 @@ let UO_POST_DEC: i32 = 10
 
 // Process a c_import header spec and return synthetic .w source text.
 // Returns "" if the bridge is unavailable or parsing fails.
+pub fn ci_prepare_clang_resource_dir():
+    let dir = ensure_clang_resource_dir()
+    if dir.len() > 0:
+        with_cimport_set_resource_dir(dir)
+
 fn ci_set_include_paths(paths: Vec[str]):
     with_cimport_clear_include_paths()
     for i in 0..paths.len() as i32:
@@ -423,6 +312,7 @@ fn process_c_import_with_defines(header_spec: str, defines: Vec[str]) -> str:
         return ""
 
     let include_text = ci_build_define_prefix(defines) ++ ci_build_include_text(header_spec)
+    ci_prepare_clang_resource_dir()
     let session = with_cimport_parse(include_text)
     if session == 0:
         g_cimport_last_error = "failed to create c_import parse session"
@@ -2027,6 +1917,7 @@ fn ci_collect_object_macro_type_map(session: i64, macro_source: str) -> str:
         i = i + 1
     if names.len() == 0:
         return ""
+    ci_prepare_clang_resource_dir()
     with_cimport_collect_object_macro_types(macro_source, names)
 
 fn ci_collect_object_macro_values(session: i64) -> str:
@@ -2120,6 +2011,7 @@ fn ci_object_macro_value_is_type_like(raw: str) -> bool:
 
 fn ci_try_translate_object_macro_probe(macro_source: str, name: str) -> str:
     ci_record_field_caches_clear()
+    ci_prepare_clang_resource_dir()
     let probe_session = with_cimport_parse_macro_probe(macro_source, name)
     if probe_session == 0:
         return ""
@@ -5288,7 +5180,7 @@ fn ci_literal_token_text(session: i64, cursor: i32) -> str:
 // Returns 0 (the null sentinel) when structural lowering fails.
 
 // ── libclang CXType kind constants (subset) ────────────────
-// Mirror `rt/clang_bridge.w` CXType_* values; kept inline so
+// Mirror `compiler.ClangBridge` CXType_* values; kept inline so
 // ci_type_from_libclang can switch on them without re-importing
 // the bridge's let-constants.
 let CXT_Void: i32 = 2

@@ -311,8 +311,8 @@ fn emitc_function_proto(fn_sig: EmitCFunction) -> str:
 
 fn emitc_generate_stub_files(ctx: ActionCtx) -> i32:
     let bridge_sources: Vec[str] = Vec.new()
-    bridge_sources |> push("rt/llvm_bridge.w")
-    bridge_sources |> push("rt/clang_bridge.w")
+    bridge_sources |> push("src/compiler/LlvmBridge.w")
+    bridge_sources |> push("src/compiler/ClangBridge.w")
     let stub_exports = emitc_collect_exports(ctx, bridge_sources)
     if stub_exports.len() == 0:
         return emitc_fail(ctx, "found no bridge exports")

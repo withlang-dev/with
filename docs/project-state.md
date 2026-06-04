@@ -18,17 +18,25 @@ that scans compiler-owned With sources (`src/`, `rt/`, `lib/std/`) and fails on
 new actual `@[c_export]` attributes while allowing the current removal budget to
 shrink. `with build` now depends on this audit before stage1. `Link.w` also now
 recognizes direct LLVM/libclang undefined symbols, not only `wl_*`, as compiler
-static-link triggers. Full `with build`, `with build :fixpoint`, `with build
-:test`, and `with build :test-green` passed on 2026-06-04 for this slice.
+static-link triggers.
 
-Important #335 bootstrap finding: directly changing `rt/clang_bridge.w` to
-import `compiler.EmbeddedClangResource` while it is still compiled as a separate
-module object fails stage1 with an undefined module-mangled
-`ensure_clang_resource_dir` symbol. Imported module definitions are referenced,
-not emitted, in module-object mode. Removing that `c_export` safely requires the
-full inline-bridge conversion after the seed has the broader LLVM/libclang link
-trigger, or a deliberate combined-object step. Do not repeat the naive direct
-import slice.
+The LLVM and Clang bridge slice is complete. `rt/llvm_bridge.w` and
+`rt/clang_bridge.w` moved to `src/compiler/LlvmBridge.w` and
+`src/compiler/ClangBridge.w`, the bridge wrappers are normal `pub` With module
+functions instead of `@[c_export]` ABI exports, and `Codegen.w`/`CImport.w`
+use explicit bridge globs for this large internal API. `EmbeddedClangResource`
+is also called as an ordinary compiler module: CImport materializes the
+embedded clang resource dir and passes it into ClangBridge through
+`with_cimport_set_resource_dir`. The C migrator calls the same preparation path
+before its direct bridge parses, which fixes the previous `stdarg.h` lookup
+regression. Full `with build`, `with build :fixpoint`, `with build :test`, and
+`with build :test-green` passed on 2026-06-04 for this slice.
+
+Remaining #335 work is the budgeted compiler-owned runtime surface
+(`rt_core.w`, platform runtime files, fiber stubs, regex runtime, and related
+stubs). Do not change general import semantics as part of #335. Bare
+`use Foo` vs `use Foo.*` semantics and ClangBridge/CImport constant
+deduplication are separate follow-up slices.
 
 #260 and #271 are implemented as the first scoped-concurrency substrate.
 `async scope s => ...` now returns scope-owned `ScopedTask[T]` handles

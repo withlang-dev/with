@@ -323,9 +323,7 @@ fn comp_c_export_budget(path: str) -> i32:
     if path == "rt/fiber_core_darwin.w": return 27
     if path == "rt/darwin_aarch64.w": return 42
     if path == "rt/linux_x86_64.w": return 44
-    if path == "rt/clang_bridge.w": return 142
     if path == "rt/rt_core.w": return 198
-    if path == "rt/llvm_bridge.w": return 239
     -1
 
 fn comp_check_c_export_path(ctx: ActionCtx, path: str) -> i32:
