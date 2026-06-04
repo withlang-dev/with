@@ -20,8 +20,7 @@ fn panic_render(msg: str, file: str, line: i32) -> str:
         return "panic at " ++ file ++ ": " ++ msg
     "panic: " ++ msg
 
-@[c_export("with_panic")]
-pub fn panic_impl(msg: str, file: str, line: i32):
+pub fn with_panic(msg: str, file: str, line: i32):
     let rendered = panic_render(msg, file, line)
     if with_fiber_in_fiber() != 0:
         with_fiber_panic_capture(str_data(rendered), rendered.len() as i32)

@@ -11,14 +11,15 @@ conversation context after compaction.
 
 ## Current Focus
 
-#335 is in progress. The policy baseline is encoded in AGENTS.md/CLAUDE.md:
+#335 is implemented. The policy baseline is encoded in AGENTS.md/CLAUDE.md:
 `@[c_export]` is foreign ABI only, not compiler-internal linkage. The first
 implementation slice added `with build :compiler-no-c-export`, a budgeted audit
 that scans compiler-owned With sources (`src/`, `rt/`, `lib/std/`) and fails on
 new actual `@[c_export]` attributes while allowing the current removal budget to
-shrink. `with build` now depends on this audit before stage1. `Link.w` also now
-recognizes direct LLVM/libclang undefined symbols, not only `wl_*`, as compiler
-static-link triggers.
+shrink. The budget is now zero: actual `@[c_export]` declarations in
+compiler-owned source are hard errors. `with build` depends on this audit before
+stage1. `Link.w` also now recognizes direct LLVM/libclang undefined symbols,
+not only `wl_*`, as compiler static-link triggers.
 
 The LLVM and Clang bridge slice is complete. `rt/llvm_bridge.w` and
 `rt/clang_bridge.w` moved to `src/compiler/LlvmBridge.w` and
@@ -40,15 +41,16 @@ remain path-mangled to avoid cross-object collisions. Those runtime ABI symbols
 also bypass whole-program internalization when runtime files are compiled as
 standalone objects. `@[weak]` applies independently of `@[c_export]`. Full
 `with build`, `with build :fixpoint`, `with build :test`, and
-`with build :test-green` passed on 2026-06-04 for the initial naming slice;
-the internalization half must be verified and seeded before removing runtime
-`@[c_export]` attributes.
-
-Remaining #335 work is the budgeted compiler-owned runtime surface
-(`rt_core.w`, platform runtime files, fiber stubs, regex runtime, and related
-stubs). Do not change general import semantics as part of #335. Bare
-`use Foo` vs `use Foo.*` semantics and ClangBridge/CImport constant
-deduplication are separate follow-up slices.
+`with build :test-green` passed on 2026-06-04 for the initial naming slice and
+for the internalization half. The runtime removal slice removed all actual
+runtime `@[c_export]` declarations from `rt_core.w`, platform runtime files,
+fiber stubs/runtime, channel runtime, regex runtime, panic runtime, compat
+runtime, and c_import stubs while keeping the same runtime ABI spellings as
+normal function names. Full `with build`, `with build :fixpoint`,
+`with build :test`, and `with build :test-green` passed on 2026-06-04 for the
+runtime removal slice. General import semantics were not changed as part of
+#335. Bare `use Foo` vs `use Foo.*` semantics and ClangBridge/CImport constant
+deduplication remain separate follow-up slices.
 
 #260 and #271 are implemented as the first scoped-concurrency substrate.
 `async scope s => ...` now returns scope-owned `ScopedTask[T]` handles

@@ -432,8 +432,7 @@ fn fiber_write_i32(fd: i32, n: i32):
         let _ = write(fd, (&buf as i64 + j as i64) as *const u8, 1)
         j = j - 1
 
-@[c_export("with_fiber_stack_overflow_handler")]
-pub fn fiber_stack_overflow_handler(sig: i32, info: *const u8, ucontext: *mut u8):
+pub fn with_fiber_stack_overflow_handler(sig: i32, info: *const u8, ucontext: *mut u8):
     let _ = ucontext
     let fault_addr = rt_fiber_fault_addr(info)
     if current_fiber != 0:
@@ -452,10 +451,9 @@ pub fn fiber_stack_overflow_handler(sig: i32, info: *const u8, ucontext: *mut u8
     let _ = raise(sig)
 
 fn fiber_install_signal_handlers():
-    rt_fiber_install_signal_handlers(alt_stack_ptr(), FIBER_ALT_STACK_SIZE, fiber_stack_overflow_handler as i64)
+    rt_fiber_install_signal_handlers(alt_stack_ptr(), FIBER_ALT_STACK_SIZE, with_fiber_stack_overflow_handler as i64)
 
-@[c_export("with_fiber_bootstrap_load")]
-pub fn fiber_bootstrap_load(entry_out: *mut i64, arg_out: *mut i64, result_out: *mut i64):
+pub fn with_fiber_bootstrap_load(entry_out: *mut i64, arg_out: *mut i64, result_out: *mut i64):
     if current_fiber == 0:
         unsafe:
             *entry_out = 0
@@ -467,8 +465,7 @@ pub fn fiber_bootstrap_load(entry_out: *mut i64, arg_out: *mut i64, result_out: 
         *arg_out = fiber_arg_ptr(current_fiber)
         *result_out = fiber_result_buf(current_fiber) as i64
 
-@[c_export("with_fiber_bootstrap_finish")]
-pub fn fiber_bootstrap_finish():
+pub fn with_fiber_bootstrap_finish():
     if current_fiber == 0:
         abort()
     fiber_set_state(current_fiber, FIBER_STATE_DONE)
@@ -490,18 +487,15 @@ fn run_one_fiber():
             enqueue(f)
         scheduler_round = scheduler_round + 1
 
-@[c_export("with_fiber_in_fiber")]
-pub fn fiber_in_fiber() -> i32:
+pub fn with_fiber_in_fiber() -> i32:
     if current_fiber != 0: 1 else: 0
 
-@[c_export("with_runtime_current_cancel_requested")]
-pub fn runtime_current_cancel_requested() -> i32:
+pub fn with_runtime_current_cancel_requested() -> i32:
     if current_fiber == 0:
         return 0
     if fiber_cancel_requested(current_fiber) != 0: 1 else: 0
 
-@[c_export("with_runtime_core_init")]
-pub fn runtime_core_init():
+pub fn with_runtime_core_init():
     current_fiber = 0
     fiber_page_size = guard_page_size()
     fiber_pool_reuse_count = 0
@@ -527,8 +521,7 @@ pub fn runtime_core_init():
         i = i + 1
     fiber_install_signal_handlers()
 
-@[c_export("with_fiber_spawn")]
-pub fn fiber_spawn(entry_fn: *const u8, arg: *mut u8, result_buf: *mut u8, result_size: i32, stack_size: i32) -> i32:
+pub fn with_fiber_spawn(entry_fn: *const u8, arg: *mut u8, result_buf: *mut u8, result_size: i32, stack_size: i32) -> i32:
     if live_fiber_count >= MAX_FIBERS:
         return -1
     let slot = allocate_fiber_slot()
@@ -576,15 +569,13 @@ pub fn fiber_spawn(entry_fn: *const u8, arg: *mut u8, result_buf: *mut u8, resul
         enqueue(f)
     return fiber_id
 
-@[c_export("with_fiber_yield")]
-pub fn fiber_yield():
+pub fn with_fiber_yield():
     if current_fiber == 0:
         return
     fiber_set_state(current_fiber, FIBER_STATE_SUSPENDED)
     with_fiber_switch(current_fiber as *mut u8, scheduler_ctx_ptr())
 
-@[c_export("with_runtime_take_completed_fiber")]
-pub fn runtime_take_completed_fiber(fiber_id: i32, panic_msg_out: *mut *const u8, panic_msg_len_out: *mut i32, cancelled_return_out: *mut i32) -> i32:
+pub fn with_runtime_take_completed_fiber(fiber_id: i32, panic_msg_out: *mut *const u8, panic_msg_len_out: *mut i32, cancelled_return_out: *mut i32) -> i32:
     unsafe:
         *panic_msg_out = 0 as *const u8
         *panic_msg_len_out = 0
@@ -608,8 +599,7 @@ pub fn runtime_take_completed_fiber(fiber_id: i32, panic_msg_out: *mut *const u8
     recycle_fiber(f)
     1
 
-@[c_export("with_runtime_take_panicked_fiber")]
-pub fn runtime_take_panicked_fiber(fiber_id_out: *mut i32, panic_msg_out: *mut *const u8, panic_msg_len_out: *mut i32) -> i32:
+pub fn with_runtime_take_panicked_fiber(fiber_id_out: *mut i32, panic_msg_out: *mut *const u8, panic_msg_len_out: *mut i32) -> i32:
     unsafe:
         *fiber_id_out = 0
         *panic_msg_out = 0 as *const u8
@@ -636,38 +626,32 @@ pub fn runtime_take_panicked_fiber(fiber_id_out: *mut i32, panic_msg_out: *mut *
         return 1
     0
 
-@[c_export("with_runtime_request_cancel")]
-pub fn runtime_request_cancel(fiber_id: i32) -> i32:
+pub fn with_runtime_request_cancel(fiber_id: i32) -> i32:
     let f = fiber_lookup(fiber_id)
     if f == 0 or fiber_state(f) == FIBER_STATE_DONE:
         return 0
     fiber_set_cancel_requested(f, 1)
     1
 
-@[c_export("with_fiber_set_result")]
-pub fn fiber_set_result(value: i64):
+pub fn with_fiber_set_result(value: i64):
     if current_fiber != 0:
         store_i64(current_fiber, FIBER_OFF_RESULT, value)
 
-@[c_export("with_runtime_current_set_cancelled_return")]
-pub fn runtime_current_set_cancelled_return():
+pub fn with_runtime_current_set_cancelled_return():
     if current_fiber != 0:
         fiber_set_cancelled_return_flag(current_fiber, 1)
 
-@[c_export("with_runtime_completed_cancelled_return")]
-pub fn runtime_completed_cancelled_return(fiber_id: i32) -> i32:
+pub fn with_runtime_completed_cancelled_return(fiber_id: i32) -> i32:
     let f = fiber_lookup(fiber_id)
     if f == 0 or fiber_state(f) != FIBER_STATE_DONE:
         return 0
     fiber_cancelled_return(f)
 
-@[c_export("with_runtime_current_set_cancel_requested")]
-pub fn runtime_current_set_cancel_requested():
+pub fn with_runtime_current_set_cancel_requested():
     if current_fiber != 0:
         fiber_set_cancel_requested(current_fiber, 1)
 
-@[c_export("with_fiber_panic_capture")]
-pub fn fiber_panic_capture(msg: *const u8, msg_len: i32):
+pub fn with_fiber_panic_capture(msg: *const u8, msg_len: i32):
     if current_fiber == 0:
         return
     fiber_set_has_panic(current_fiber, 1)
@@ -685,8 +669,7 @@ pub fn fiber_panic_capture(msg: *const u8, msg_len: i32):
     with_fiber_switch(current_fiber as *mut u8, scheduler_ctx_ptr())
     abort()
 
-@[c_export("with_runtime_core_shutdown")]
-pub fn runtime_core_shutdown():
+pub fn with_runtime_core_shutdown():
     var i = 0
     while i < MAX_FIBERS:
         let f = load_i64_index(fibers_by_slot_base(), i)
@@ -703,49 +686,39 @@ pub fn runtime_core_shutdown():
     panicked_fiber_count = 0
     free_fiber_pool()
 
-@[c_export("with_runtime_core_has_fibers")]
-pub fn runtime_core_has_fibers() -> i32:
+pub fn with_runtime_core_has_fibers() -> i32:
     if ready_queue_count > 0 or steal_queue_count > 0: 1 else: 0
 
-@[c_export("with_runtime_core_run_one_step")]
-pub fn runtime_core_run_one_step():
+pub fn with_runtime_core_run_one_step():
     if ready_queue_count > 0 or steal_queue_count > 0:
         run_one_fiber()
 
-@[c_export("with_runtime_fiber_is_completed")]
-pub fn runtime_fiber_is_completed(fiber_id: i32) -> i32:
+pub fn with_runtime_fiber_is_completed(fiber_id: i32) -> i32:
     let f = fiber_lookup(fiber_id)
     if f == 0:
         return 0
     if fiber_state(f) == FIBER_STATE_DONE: 1 else: 0
 
-@[c_export("with_runtime_fiber_is_live")]
-pub fn runtime_fiber_is_live(fiber_id: i32) -> i32:
+pub fn with_runtime_fiber_is_live(fiber_id: i32) -> i32:
     let f = fiber_lookup(fiber_id)
     if f == 0:
         return 0
     1
 
-@[c_export("with_fiber_pool_reuses")]
-pub fn fiber_pool_reuses() -> i64:
+pub fn with_fiber_pool_reuses() -> i64:
     fiber_pool_reuse_count
 
-@[c_export("with_fiber_pool_allocs")]
-pub fn fiber_pool_allocs() -> i64:
+pub fn with_fiber_pool_allocs() -> i64:
     fiber_pool_alloc_count
 
-@[c_export("with_fiber_stack_size_bytes")]
-pub fn fiber_stack_size_bytes() -> i64:
+pub fn with_fiber_stack_size_bytes() -> i64:
     FIBER_STACK_SIZE
 
-@[c_export("with_fiber_max_fibers")]
-pub fn fiber_max_fibers() -> i32:
+pub fn with_fiber_max_fibers() -> i32:
     MAX_FIBERS
 
-@[c_export("with_fiber_live_fibers")]
-pub fn fiber_live_fibers() -> i32:
+pub fn with_fiber_live_fibers() -> i32:
     live_fiber_count
 
-@[c_export("with_fiber_steal_events")]
-pub fn fiber_steal_events_fn() -> i64:
+pub fn with_fiber_steal_events() -> i64:
     fiber_steal_events
