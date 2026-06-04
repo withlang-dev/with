@@ -352,8 +352,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     compiler_no_c_export = target_with_compiler_c_export_audit_inputs(compiler_no_c_export, ctx)
     out = out.add_target(compiler_no_c_export)
 
-    out = out.add_target(with_object_target("bootstrap-llvm-bridge-object", "seed", "rt/llvm_bridge.w", "out/bootstrap-lib/llvm_bridge.o", "-O0", ""))
-    out = out.add_target(with_object_target("bootstrap-clang-bridge-object", "seed", "rt/clang_bridge.w", "out/bootstrap-lib/clang_bridge.o", "-O0", ""))
+    out = out.add_target(with_object_target("bootstrap-llvm-bridge-object", "seed", "src/compiler/LlvmBridge.w", "out/bootstrap-lib/llvm_bridge.o", "-O0", ""))
+    out = out.add_target(with_object_target("bootstrap-clang-bridge-object", "seed", "src/compiler/ClangBridge.w", "out/bootstrap-lib/clang_bridge.o", "-O0", ""))
 
     var bootstrap_llvm_link_metadata = target_new(.Action, "bootstrap-llvm-link-metadata", "").output("out/bootstrap-lib/.llvm-link-ready")
     bootstrap_llvm_link_metadata.action = run_generate_llvm_link_metadata_action
@@ -433,8 +433,8 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     var prepare_bootstrap_link_root = target_new(.Action, "prepare-bootstrap-link-root", "").output("out/bootstrap-lib/.prepared-link-root")
     prepare_bootstrap_link_root.action = run_prepare_bootstrap_link_root_action
-    prepare_bootstrap_link_root = prepare_bootstrap_link_root.input("rt/llvm_bridge.w")
-    prepare_bootstrap_link_root = prepare_bootstrap_link_root.input("rt/clang_bridge.w")
+    prepare_bootstrap_link_root = prepare_bootstrap_link_root.input("src/compiler/LlvmBridge.w")
+    prepare_bootstrap_link_root = prepare_bootstrap_link_root.input("src/compiler/ClangBridge.w")
     prepare_bootstrap_link_root = prepare_bootstrap_link_root.input("rt/cimport_stubs.w")
     prepare_bootstrap_link_root = prepare_bootstrap_link_root.input("rt/rt_core.w")
     prepare_bootstrap_link_root = prepare_bootstrap_link_root.input(host_runtime.platform_source)
@@ -443,8 +443,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     prepare_bootstrap_link_root = prepare_bootstrap_link_root.dep("bootstrap-runtime")
     out = out.add_target(prepare_bootstrap_link_root)
 
-    out = out.add_target(with_object_target("llvm-bridge-object", "out/bin/with-stage2", "rt/llvm_bridge.w", "out/lib/llvm_bridge.o", "-O0", "stage2"))
-    out = out.add_target(with_object_target("clang-bridge-object", "out/bin/with-stage2", "rt/clang_bridge.w", "out/lib/clang_bridge.o", "-O0", "stage2"))
+    out = out.add_target(with_object_target("llvm-bridge-object", "out/bin/with-stage2", "src/compiler/LlvmBridge.w", "out/lib/llvm_bridge.o", "-O0", "stage2"))
+    out = out.add_target(with_object_target("clang-bridge-object", "out/bin/with-stage2", "src/compiler/ClangBridge.w", "out/lib/clang_bridge.o", "-O0", "stage2"))
 
     var llvm_link_metadata = target_new(.Action, "llvm-link-metadata", "").output("out/lib/.llvm-link-ready")
     llvm_link_metadata.action = run_generate_llvm_link_metadata_action

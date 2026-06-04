@@ -612,6 +612,7 @@ fn CiProject.migrate_var_type_id(self: &CiProject, session: i64, idx: i32, owner
 
 fn CiProject.migrate_scan_file(self: &CiProject, input_path: str) -> i32:
     ci_migrate_prepare_include_path(input_path)
+    ci_prepare_clang_resource_dir()
     let source = ci_migrate_wrapped_source(input_path)
     if source.len() == 0:
         eprint("migrate: cannot read " ++ input_path)
@@ -723,6 +724,7 @@ fn ci_migrate_file_inner(input_path: str, output_path: str, project_active: bool
         return 1
 
     ci_migrate_prepare_include_path(input_path)
+    ci_prepare_clang_resource_dir()
 
     g_migrate_file_error = ""
     g_migrate_macro_values = ""
