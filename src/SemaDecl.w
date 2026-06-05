@@ -181,7 +181,7 @@ fn Sema.type_has_unresolved_parts(self: Sema, tid: i32) -> i32:
                 return 1
         return 0
 
-    if kind == TypeKind.TY_FN:
+    if kind == TypeKind.TY_FN or kind == TypeKind.TY_EXTERN_FN:
         let extra_start = self.get_type_d0(resolved)
         let param_count = self.get_type_d1(resolved)
         for pi in 0..param_count:
@@ -774,7 +774,7 @@ fn Sema.collect_value_type_deps(self: Sema, type_node: i32):
         self.collect_value_type_deps(self.ast.get_data0(type_node))
         return
     // NodeKind.NK_TYPE_PTR, NodeKind.NK_TYPE_REF, NodeKind.NK_TYPE_SLICE, NodeKind.NK_TYPE_GENERIC,
-    // NodeKind.NK_TYPE_FN: all provide indirection — do not follow.
+    // NodeKind.NK_TYPE_FN, NodeKind.NK_TYPE_EXTERN_FN: all provide indirection — do not follow.
 
 fn Sema.check_type_cycles(self: Sema):
     // Build directed graph: for each type decl, find value-type deps.
@@ -1781,7 +1781,7 @@ fn Sema.type_node_mentions_self(self: Sema, type_node: i32) -> i32:
             if self.type_node_mentions_self(self.ast.get_extra(extra_start + ei)) != 0:
                 return 1
         return 0
-    if kind == NodeKind.NK_TYPE_FN:
+    if kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_EXTERN_FN:
         let extra_start = self.ast.get_data0(type_node)
         let param_count = self.ast.get_data1(type_node)
         let ret_node = self.ast.get_data2(type_node)
@@ -1887,7 +1887,7 @@ fn Sema.validate_type_expr_with_type_params(self: Sema, node: i32, tp_start: i32
         self.validate_type_expr_with_type_params(self.ast.get_data0(node), tp_start, tp_count)
         return
 
-    if kind == NodeKind.NK_TYPE_FN:
+    if kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_EXTERN_FN:
         let extra_start = self.ast.get_data0(node)
         let param_count = self.ast.get_data1(node)
         let ret_node = self.ast.get_data2(node)
@@ -2153,7 +2153,7 @@ fn Sema.type_expr_mentions_type_param(self: Sema, type_node: i32, tp_sym: i32) -
             if self.type_expr_mentions_type_param(self.ast.get_extra(extra_start + ei), tp_sym) != 0:
                 return 1
         return 0
-    if kind == NodeKind.NK_TYPE_FN:
+    if kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_EXTERN_FN:
         let extra_start = self.ast.get_data0(type_node)
         let param_count = self.ast.get_data1(type_node)
         for pi in 0..param_count:

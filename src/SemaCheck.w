@@ -357,7 +357,7 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> TypeId:
             self.emit_error("`&mut T` is not part of safe With (§15.1); use mut self / *mut T (unsafe) / owned-by-value parameter", node)
         return self.ensure_exact_type(TypeKind.TY_REF, pointee as i32, is_mut, 0)
 
-    if kind == NodeKind.NK_TYPE_FN:
+    if kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_EXTERN_FN:
         let extra_start = self.ast.get_data0(node)
         let param_count = self.ast.get_data1(node)
         let ret_node = self.ast.get_data2(node)
@@ -366,6 +366,8 @@ fn Sema.resolve_type_expr(self: Sema, node: i32) -> TypeId:
             let p_node = self.ast.get_extra(extra_start + pi)
             param_types.push(self.resolve_type_expr(p_node) as i32)
         let ret = self.resolve_type_expr(ret_node)
+        if kind == NodeKind.NK_TYPE_EXTERN_FN:
+            return self.ensure_extern_fn_type(param_types, param_count, ret)
         return self.ensure_fn_type(param_types, param_count, ret)
 
     if kind == NodeKind.NK_TYPE_ARRAY:
@@ -2784,7 +2786,7 @@ fn Sema.check_expr(self: Sema, node: i32) -> TypeId:
         if self.has_expected_type != 0 and self.expected_expr_type != 0:
             let expected = self.resolve_alias(self.expected_expr_type)
             let expected_kind = self.get_type_kind(expected)
-            if expected_kind == TypeKind.TY_PTR or expected_kind == TypeKind.TY_REF or self.is_option_pointer_type(expected) != 0:
+            if expected_kind == TypeKind.TY_PTR or expected_kind == TypeKind.TY_REF or expected_kind == TypeKind.TY_EXTERN_FN or self.is_option_pointer_type(expected) != 0:
                 return expected
         return self.ty_const_i8_ptr
 
@@ -3384,6 +3386,11 @@ fn Sema.check_ident(self: Sema, sym: i32, node: i32) -> i32:
     let sig_idx = self.get_sig(sym)
     if sig_idx >= 0 and self.is_ci_visible(sym) != 0:
         let fn_tid = self.sig_type_ids.get(sig_idx as i64)
+        if self.has_expected_type != 0 and self.expected_expr_type != 0:
+            let expected = self.resolve_alias(self.expected_expr_type)
+            if self.get_type_kind(expected) == TypeKind.TY_EXTERN_FN and self.fn_types_compatible(expected, fn_tid) != 0:
+                self.typed_expr_types.insert(node, expected as i32)
+                return expected as i32
         self.typed_expr_types.insert(node, fn_tid)
         return fn_tid
 
@@ -3981,8 +3988,8 @@ fn Sema.check_binary(self: Sema, node: i32) -> i32:
         let bool_int_cmp = (lhs_cmp_kind == TypeKind.TY_BOOL and rhs_cmp_kind == TypeKind.TY_INT) or (lhs_cmp_kind == TypeKind.TY_INT and rhs_cmp_kind == TypeKind.TY_BOOL)
         let lhs_option_ptr = self.is_option_pointer_type(lhs as i32) != 0
         let rhs_option_ptr = self.is_option_pointer_type(rhs as i32) != 0
-        let lhs_ptr_like = lhs_cmp_kind == TypeKind.TY_PTR or lhs_cmp_kind == TypeKind.TY_REF or lhs_cmp_kind == TypeKind.TY_FN or lhs_cmp_kind == TypeKind.TY_GENERIC_FN or lhs_option_ptr
-        let rhs_ptr_like = rhs_cmp_kind == TypeKind.TY_PTR or rhs_cmp_kind == TypeKind.TY_REF or rhs_cmp_kind == TypeKind.TY_FN or rhs_cmp_kind == TypeKind.TY_GENERIC_FN or rhs_option_ptr
+        let lhs_ptr_like = lhs_cmp_kind == TypeKind.TY_PTR or lhs_cmp_kind == TypeKind.TY_REF or lhs_cmp_kind == TypeKind.TY_FN or lhs_cmp_kind == TypeKind.TY_EXTERN_FN or lhs_cmp_kind == TypeKind.TY_GENERIC_FN or lhs_option_ptr
+        let rhs_ptr_like = rhs_cmp_kind == TypeKind.TY_PTR or rhs_cmp_kind == TypeKind.TY_REF or rhs_cmp_kind == TypeKind.TY_FN or rhs_cmp_kind == TypeKind.TY_EXTERN_FN or rhs_cmp_kind == TypeKind.TY_GENERIC_FN or rhs_option_ptr
         let ptr_like_cmp = lhs_ptr_like and rhs_ptr_like
         let ptr_zero_cmp = (lhs_ptr_like and rhs_cmp_kind == TypeKind.TY_INT and sema_node_is_zero_int_literal(self.ast, rhs_node)) or (rhs_ptr_like and lhs_cmp_kind == TypeKind.TY_INT and sema_node_is_zero_int_literal(self.ast, lhs_node))
         let lhs_none = (self.ast.kind(lhs_node) == NodeKind.NK_VARIANT_SHORTHAND or self.ast.kind(lhs_node) == NodeKind.NK_IDENT) and self.ast.get_data0(lhs_node) == self.syms.none
@@ -6797,7 +6804,8 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
 
     var expected_fn_tid = 0
     if self.has_expected_type != 0 and self.expected_expr_type != 0:
-        expected_fn_tid = self.callable_fn_type(self.expected_expr_type)
+        expected_fn_tid = self.callable_any_fn_type(self.expected_expr_type)
+    let expected_extern_fn = expected_fn_tid != 0 and self.get_type_kind(expected_fn_tid) == TypeKind.TY_EXTERN_FN
 
     // `it` arity validation: if this is an implicit `it` closure (param_count==1,
     // param name is "__it") and the expected type is a fn with != 1 params, error.
@@ -6830,7 +6838,7 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
             if explicit_ty != 0:
                 p_ty = explicit_ty as i32
         else if expected_fn_tid != 0 and pi < self.get_type_d1(expected_fn_tid):
-            let expected_param_ty = self.callable_fn_param_type(expected_fn_tid as TypeId, pi)
+            let expected_param_ty = self.fn_type_param_type(expected_fn_tid, pi)
             if expected_param_ty != 0:
                 p_ty = expected_param_ty
         // For partial app, find which call arg position this placeholder occupies.
@@ -6855,6 +6863,15 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
     if expected_fn_tid != 0:
         expected_ret_ty = self.get_type_d2(expected_fn_tid)
     let body_ty = if expected_ret_ty != 0: self.check_expr_with_expected(body, expected_ret_ty as TypeId) else: self.check_expr(body)
+    if expected_extern_fn != 0:
+        if closure_capture_syms.len() as i32 > 0:
+            self.emit_error("capturing closure cannot coerce to extern \"C\" fn pointer", node)
+        let callback_visiting: HashMap[i32, i32] = HashMap.new()
+        if self.expr_may_suspend(body, callback_visiting) != 0:
+            self.emit_error("may_suspend in extern C callback", body)
+        let callback_task_visiting: HashMap[i32, i32] = HashMap.new()
+        if self.callable_expr_creates_ephemeral_task(body, callback_task_visiting) != 0:
+            self.emit_error("ephemeral Task cannot be created in extern C callback", body)
     if expected_ret_ty != 0 and expected_ret_ty != self.ty_void and body_ty != 0 and body_ty != self.ty_never:
         if body_ty == self.ty_void:
             if self.type_has_default_value(expected_ret_ty) == 0:
@@ -6997,7 +7014,8 @@ fn Sema.check_closure(self: Sema, node: i32) -> i32:
         closure_ret_ty = self.sig_return_type(partial_sig)
     else if expected_ret_ty != 0:
         closure_ret_ty = expected_ret_ty
-    let closure_ty = self.add_type(TypeKind.TY_FN, te_start, param_count, closure_ret_ty) as i32
+    let closure_kind = if expected_extern_fn != 0: TypeKind.TY_EXTERN_FN else: TypeKind.TY_FN
+    let closure_ty = self.add_type(closure_kind, te_start, param_count, closure_ret_ty) as i32
     self.typed_expr_types.insert(node, closure_ty)
     closure_ty
 
@@ -7569,7 +7587,7 @@ fn Sema.check_callable_value_call(self: Sema, call_name: str, fn_tid: i32, closu
         let param_i = ai + param_offset
         if param_i >= expected:
             break
-        let expected_ty = self.callable_fn_param_type(fn_tid as TypeId, param_i)
+        let expected_ty = self.fn_type_param_type(fn_tid, param_i)
         let arg_ty = arg_types.get(ai as i64)
         if expected_ty != 0 and arg_ty != 0:
             let exp_resolved = self.resolve_alias(expected_ty)
@@ -7639,14 +7657,14 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
 
     // Method call or callable field: callee is field_access
     if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS:
-        let callable_tid = self.callable_fn_type(self.field_access_type_no_diagnostic(callee) as TypeId)
+        let callable_tid = self.callable_any_fn_type(self.field_access_type_no_diagnostic(callee) as TypeId)
         if callable_tid != 0:
             if self.ast.has_call_named_args(node) != 0:
                 self.emit_error("named arguments are not supported for closures or function pointers", node)
             let arg_types_for_callable: Vec[i32] = Vec.new()
             for cai in 0..arg_count:
                 let arg_node = self.ast.get_extra(extra_start + cai)
-                let expected_ty = self.callable_fn_param_type(callable_tid as TypeId, cai)
+                let expected_ty = self.fn_type_param_type(callable_tid, cai)
                 let arg_ty = if expected_ty != 0: self.check_expr_with_expected(arg_node, expected_ty as TypeId) else: self.check_expr(arg_node)
                 arg_types_for_callable.push(arg_ty as i32)
             for cai2 in 0..arg_count:
@@ -7681,11 +7699,11 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
             self.comp_resolved.insert(node, fn_sym)
         local_tid = self.scope_lookup(fn_sym)
         if local_tid >= 0:
-            callable_value_tid = self.callable_fn_type(local_tid as TypeId)
+            callable_value_tid = self.callable_any_fn_type(local_tid as TypeId)
             if self.binding_closure_nodes.contains(fn_sym):
                 callable_closure_node = self.binding_closure_nodes.get(fn_sym).unwrap()
     else:
-        callable_value_tid = self.callable_fn_type(self.check_expr(callee) as TypeId)
+        callable_value_tid = self.callable_any_fn_type(self.check_expr(callee) as TypeId)
         if self.ast.kind(callee) == NodeKind.NK_CLOSURE:
             callable_closure_node = callee
 
@@ -7852,7 +7870,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         else if callable_value_tid != 0:
             let callable_param_count = self.get_type_d1(callable_value_tid as TypeId)
             if callable_param_count - param_offset == 1:
-                let expected_callable_ty = self.callable_fn_param_type(callable_value_tid as TypeId, param_offset)
+                let expected_callable_ty = self.fn_type_param_type(callable_value_tid, param_offset)
                 if self.try_unit_elide_call_arg(node, arg_count, expected_callable_ty) != 0:
                     resolved_arg_count = 1
         else if variant_payload_tys.len() as i32 == 1:
@@ -7887,7 +7905,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
         else if ai < variant_payload_tys.len() as i32:
             expected_ty = variant_payload_tys.get(ai as i64)
         else if callable_value_tid != 0:
-            expected_ty = self.callable_fn_param_type(callable_value_tid as TypeId, ai + param_offset)
+            expected_ty = self.fn_type_param_type(callable_value_tid, ai + param_offset)
         if arg_node == 0:
             arg_types.push(0)
             continue
@@ -7912,7 +7930,7 @@ fn Sema.check_call(self: Sema, node: i32) -> i32:
             self.closure_direct_arg_depth = self.closure_direct_arg_depth - 1
         if sig_idx >= 0 and self.extern_fn_names.contains(fn_sym) and expected_ty != 0:
             let callback_expected = self.resolve_alias(expected_ty as TypeId)
-            if self.get_type_kind(callback_expected) == TypeKind.TY_FN:
+            if self.get_type_kind(callback_expected) == TypeKind.TY_EXTERN_FN:
                 let callback_visiting: HashMap[i32, i32] = HashMap.new()
                 if self.expr_may_suspend(arg_node, callback_visiting) != 0:
                     self.emit_error("may_suspend in extern C callback", arg_node)
@@ -11416,7 +11434,7 @@ fn Sema.type_expr_contains_ref(self: Sema, node: i32) -> i32:
         return 0
     if kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_OPTIONAL:
         return self.type_expr_contains_ref(self.ast.get_data0(node))
-    if kind == NodeKind.NK_TYPE_FN:
+    if kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_EXTERN_FN:
         let extra_start = self.ast.get_data0(node)
         let param_count = self.ast.get_data1(node)
         for pi in 0..param_count:
@@ -11450,7 +11468,7 @@ fn Sema.type_expr_is_collection_with_ref(self: Sema, node: i32) -> i32:
         return 0
     if kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_OPTIONAL:
         return self.type_expr_is_collection_with_ref(self.ast.get_data0(node))
-    if kind == NodeKind.NK_TYPE_FN:
+    if kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_EXTERN_FN:
         let extra_start = self.ast.get_data0(node)
         let param_count = self.ast.get_data1(node)
         for pi in 0..param_count:

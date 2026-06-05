@@ -854,7 +854,7 @@ fn MirBuilder.type_receiver_type(self: MirBuilder, node: i32) -> i32:
     // Used for intrinsic classification (Vec, HashMap, etc.)
     // Handles: Vec (NodeKind.NK_IDENT), Vec[i32] (NodeKind.NK_INDEX of NodeKind.NK_IDENT)
     let kind = self.ast.kind(node)
-    if kind == NodeKind.NK_TYPE_NAMED or kind == NodeKind.NK_TYPE_GENERIC or kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_ARRAY or kind == NodeKind.NK_TYPE_SLICE or kind == NodeKind.NK_TYPE_TUPLE or kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_TRAIT_OBJ:
+    if kind == NodeKind.NK_TYPE_NAMED or kind == NodeKind.NK_TYPE_GENERIC or kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_ARRAY or kind == NodeKind.NK_TYPE_SLICE or kind == NodeKind.NK_TYPE_TUPLE or kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_EXTERN_FN or kind == NodeKind.NK_TYPE_TRAIT_OBJ:
         return self.sema.resolve_type_expr(node) as i32
     if self.ast.kind(node) == NodeKind.NK_IDENT:
         let sym = self.ast.get_data0(node)
@@ -2312,7 +2312,7 @@ fn MirBuilder.lower_var(self: MirBuilder, sym: i32, type_id: i32, node_id: i32) 
     if self.pool.resolve(sym) == "None" and hinted_ty != 0:
         let hinted_resolved = self.sema.resolve_alias(hinted_ty)
         let hinted_tk = self.sema.get_type_kind(hinted_resolved)
-        if hinted_tk == TypeKind.TY_PTR or hinted_tk == TypeKind.TY_REF:
+        if hinted_tk == TypeKind.TY_PTR or hinted_tk == TypeKind.TY_REF or hinted_tk == TypeKind.TY_EXTERN_FN:
             return self.const_operand(ConstKind.CK_INT, 0, self.sema.ty_i32)
 
     let local = self.lookup_local(sym)
@@ -5679,7 +5679,7 @@ fn MirBuilder.callable_fn_type_for_expr(self: MirBuilder, fn_expr: i32) -> i32:
     let expr_tid = self.expr_type(fn_expr)
     if expr_tid == 0:
         return 0
-    self.sema.callable_fn_type(expr_tid as TypeId)
+    self.sema.callable_any_fn_type(expr_tid as TypeId)
 
 fn MirBuilder.lower_call_arg(self: MirBuilder, arg_node: i32, sig_idx: i32, callable_fn_tid: i32, arg_i: i32) -> i32:
     let saved_expected = self.expected_type
@@ -5689,7 +5689,7 @@ fn MirBuilder.lower_call_arg(self: MirBuilder, arg_node: i32, sig_idx: i32, call
         if expected_ty != 0 and expected_ty != self.sema.ty_void:
             self.expected_type = expected_ty
     else if callable_fn_tid != 0:
-        expected_ty = self.sema.callable_fn_param_type(callable_fn_tid as TypeId, arg_i)
+        expected_ty = self.sema.fn_type_param_type(callable_fn_tid, arg_i)
         if expected_ty != 0 and expected_ty != self.sema.ty_void:
             self.expected_type = expected_ty
     let autoref_op = self.lower_auto_ref_call_arg(arg_node, expected_ty)
@@ -5822,7 +5822,7 @@ fn MirBuilder.receiver_is_static_type_expr(self: MirBuilder, expr: i32) -> i32:
         let sym = self.ast.get_data0(expr)
         if self.lookup_local(sym) < 0 and self.sema.named_types.contains(sym):
             return 1
-    if kind == NodeKind.NK_TYPE_NAMED or kind == NodeKind.NK_TYPE_GENERIC or kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_ARRAY or kind == NodeKind.NK_TYPE_SLICE or kind == NodeKind.NK_TYPE_TUPLE or kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_TRAIT_OBJ:
+    if kind == NodeKind.NK_TYPE_NAMED or kind == NodeKind.NK_TYPE_GENERIC or kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_ARRAY or kind == NodeKind.NK_TYPE_SLICE or kind == NodeKind.NK_TYPE_TUPLE or kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_EXTERN_FN or kind == NodeKind.NK_TYPE_TRAIT_OBJ:
         return 1
     if kind == NodeKind.NK_INDEX:
         return self.receiver_is_static_type_expr(self.ast.get_data0(expr))
@@ -6190,7 +6190,7 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
                 let gc_id_sym = self.ast.get_data0(self_expr)
                 if self.lookup_local(gc_id_sym) < 0 and self.sema.named_types.contains(gc_id_sym):
                     gc_is_static = true
-            if self.ast.kind(self_expr) == NodeKind.NK_TYPE_NAMED or self.ast.kind(self_expr) == NodeKind.NK_TYPE_GENERIC or self.ast.kind(self_expr) == NodeKind.NK_TYPE_PTR or self.ast.kind(self_expr) == NodeKind.NK_TYPE_REF or self.ast.kind(self_expr) == NodeKind.NK_TYPE_ARRAY or self.ast.kind(self_expr) == NodeKind.NK_TYPE_SLICE or self.ast.kind(self_expr) == NodeKind.NK_TYPE_TUPLE or self.ast.kind(self_expr) == NodeKind.NK_TYPE_FN or self.ast.kind(self_expr) == NodeKind.NK_TYPE_TRAIT_OBJ:
+            if self.ast.kind(self_expr) == NodeKind.NK_TYPE_NAMED or self.ast.kind(self_expr) == NodeKind.NK_TYPE_GENERIC or self.ast.kind(self_expr) == NodeKind.NK_TYPE_PTR or self.ast.kind(self_expr) == NodeKind.NK_TYPE_REF or self.ast.kind(self_expr) == NodeKind.NK_TYPE_ARRAY or self.ast.kind(self_expr) == NodeKind.NK_TYPE_SLICE or self.ast.kind(self_expr) == NodeKind.NK_TYPE_TUPLE or self.ast.kind(self_expr) == NodeKind.NK_TYPE_FN or self.ast.kind(self_expr) == NodeKind.NK_TYPE_EXTERN_FN or self.ast.kind(self_expr) == NodeKind.NK_TYPE_TRAIT_OBJ:
                 gc_is_static = true
             if self.ast.kind(self_expr) == NodeKind.NK_INDEX:
                 let gc_idx_base = self.ast.get_data0(self_expr)
@@ -6228,7 +6228,7 @@ fn MirBuilder.lower_method_call(self: MirBuilder, self_expr: i32, method_sym: i3
         let recv_sym = self.ast.get_data0(self_expr)
         if self.lookup_local(recv_sym) < 0 and self.sema.named_types.contains(recv_sym):
             is_static_call = true
-    if self.ast.kind(self_expr) == NodeKind.NK_TYPE_NAMED or self.ast.kind(self_expr) == NodeKind.NK_TYPE_GENERIC or self.ast.kind(self_expr) == NodeKind.NK_TYPE_PTR or self.ast.kind(self_expr) == NodeKind.NK_TYPE_REF or self.ast.kind(self_expr) == NodeKind.NK_TYPE_ARRAY or self.ast.kind(self_expr) == NodeKind.NK_TYPE_SLICE or self.ast.kind(self_expr) == NodeKind.NK_TYPE_TUPLE or self.ast.kind(self_expr) == NodeKind.NK_TYPE_FN or self.ast.kind(self_expr) == NodeKind.NK_TYPE_TRAIT_OBJ:
+    if self.ast.kind(self_expr) == NodeKind.NK_TYPE_NAMED or self.ast.kind(self_expr) == NodeKind.NK_TYPE_GENERIC or self.ast.kind(self_expr) == NodeKind.NK_TYPE_PTR or self.ast.kind(self_expr) == NodeKind.NK_TYPE_REF or self.ast.kind(self_expr) == NodeKind.NK_TYPE_ARRAY or self.ast.kind(self_expr) == NodeKind.NK_TYPE_SLICE or self.ast.kind(self_expr) == NodeKind.NK_TYPE_TUPLE or self.ast.kind(self_expr) == NodeKind.NK_TYPE_FN or self.ast.kind(self_expr) == NodeKind.NK_TYPE_EXTERN_FN or self.ast.kind(self_expr) == NodeKind.NK_TYPE_TRAIT_OBJ:
         is_static_call = true
     // Also detect Vec[i32].method() as static
     if self.ast.kind(self_expr) == NodeKind.NK_INDEX:

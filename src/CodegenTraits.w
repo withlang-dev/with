@@ -103,7 +103,7 @@ fn codegen_type_node_mentions_self(pool: AstPool, self_sym: i32, type_node: i32)
             if codegen_type_node_mentions_self(pool, self_sym, pool.get_extra(extra_start + ei)) != 0:
                 return 1
         return 0
-    if kind == NodeKind.NK_TYPE_FN:
+    if kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_EXTERN_FN:
         let extra_start = pool.get_data0(type_node)
         let param_count = pool.get_data1(type_node)
         let ret_node = pool.get_data2(type_node)
