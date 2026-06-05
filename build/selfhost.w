@@ -86,6 +86,8 @@ fn bs_host_platform_runtime_object() -> str:
         return "rt_linux_x86_64.o"
     if host_os == "Macos" and (host_arch == "armv8" or host_arch == "aarch64"):
         return "rt_darwin_aarch64.o"
+    if host_os == "Windows" and host_arch == "x86_64":
+        return "rt_windows_x86_64.o"
     ""
 
 fn bs_run_cli_capture(ctx: ActionCtx, compiler_path: str, label: str, args: Vec[str], timeout_ms: i32) -> SelfhostRunResult:

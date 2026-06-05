@@ -62,7 +62,8 @@ cmake.exe -S (Join-Path $SRC_DIR "$sourceDir\llvm") `
   -DCLANG_INCLUDE_TESTS=OFF `
   -DCLANG_BUILD_EXAMPLES=OFF `
   -DLLVM_ENABLE_ZLIB=OFF `
-  -DLLVM_ENABLE_ZSTD=OFF
+  -DLLVM_ENABLE_ZSTD=OFF `
+  -DLLVM_ENABLE_DIA_SDK=OFF
 
 cmake.exe --build $BUILD_DIR --target install --parallel
 
