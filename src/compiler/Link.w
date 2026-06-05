@@ -25,6 +25,8 @@ extern let with_embedded_rt_darwin_aarch64_o_start: u8
 extern let with_embedded_rt_darwin_aarch64_o_end: u8
 extern let with_embedded_rt_linux_x86_64_o_start: u8
 extern let with_embedded_rt_linux_x86_64_o_end: u8
+extern let with_embedded_rt_windows_x86_64_o_start: u8
+extern let with_embedded_rt_windows_x86_64_o_end: u8
 
 var link_stage_temp_archives: Vec[str] = Vec.new()
 
@@ -340,6 +342,52 @@ fn link_stage_make_linux_llvm_link_command(llvm_ld: str, obj_path: str, bin_path
     let cleanup_files = link_stage_collect_cleanup_files(extras)
     LinkStageCommand { linker: llvm_ld, args, cwd: "", env, inputs, outputs, cleanup_files }
 
+fn link_stage_make_windows_llvm_link_command(llvm_ld: str, obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str], link_args: Vec[str]) -> LinkStageCommand:
+    let args: Vec[str] = Vec.new()
+    let env: Vec[LinkStageEnvVar] = Vec.new()
+    let inputs: Vec[str] = Vec.new()
+    let outputs: Vec[str] = Vec.new()
+    args.push("/nologo")
+    args.push("/subsystem:console")
+    args.push("/opt:ref")
+    args.push("/opt:icf")
+    args.push("/out:" ++ bin_path)
+    outputs.push(bin_path)
+    args.push(obj_path)
+    inputs.push(obj_path)
+    for i in 0..extras.len() as i32:
+        let extra = extras.get(i as i64)
+        if extra.starts_with("-L"):
+            args.push("/libpath:" ++ extra.slice(2, extra.len()))
+        else:
+            args.push(extra)
+            inputs.push(extra)
+    for i in 0..link_libs.len() as i32:
+        let lib = link_libs.get(i as i64)
+        if lib.ends_with(".lib"):
+            args.push(lib)
+        else:
+            args.push(lib ++ ".lib")
+    for i in 0..link_args.len() as i32:
+        args.push(link_args.get(i as i64))
+    args.push("libcpmt.lib")
+    args.push("libcmt.lib")
+    args.push("oldnames.lib")
+    args.push("kernel32.lib")
+    args.push("advapi32.lib")
+    args.push("bcrypt.lib")
+    args.push("shell32.lib")
+    args.push("user32.lib")
+    args.push("ole32.lib")
+    args.push("oleaut32.lib")
+    args.push("uuid.lib")
+    args.push("ws2_32.lib")
+    args.push("version.lib")
+    args.push("psapi.lib")
+    args.push("dbghelp.lib")
+    let cleanup_files = link_stage_collect_cleanup_files(extras)
+    LinkStageCommand { linker: llvm_ld, args, cwd: "", env, inputs, outputs, cleanup_files }
+
 fn link_stage_make_llvm_link_command(llvm_ld: str, obj_path: str, bin_path: str, extras: Vec[str], link_libs: Vec[str], link_args: Vec[str]) -> LinkStageCommand:
     let os = runtime_sysinfo_os()
     let arch = runtime_sysinfo_arch()
@@ -347,6 +395,8 @@ fn link_stage_make_llvm_link_command(llvm_ld: str, obj_path: str, bin_path: str,
         return link_stage_make_linux_llvm_link_command(llvm_ld, obj_path, bin_path, extras, link_libs, link_args)
     if os == "Macos" and (arch == "armv8" or arch == "aarch64"):
         return link_stage_make_darwin_llvm_link_command(llvm_ld, obj_path, bin_path, extras, link_libs, link_args)
+    if os == "Windows" and arch == "x86_64":
+        return link_stage_make_windows_llvm_link_command(llvm_ld, obj_path, bin_path, extras, link_libs, link_args)
     with_eprint("error: unsupported host LLVM linker platform: " ++ os ++ "/" ++ arch)
     LinkStageCommand { linker: "", args: Vec.new(), cwd: "", env: Vec.new(), inputs: Vec.new(), outputs: Vec.new(), cleanup_files: Vec.new() }
 
@@ -391,6 +441,8 @@ fn link_stage_embedded_runtime_object(name: str) -> str:
         return link_stage_embedded_obj_slice(&with_embedded_rt_darwin_aarch64_o_start as *const u8, &with_embedded_rt_darwin_aarch64_o_end as *const u8)
     if name == "rt_linux_x86_64.o":
         return link_stage_embedded_obj_slice(&with_embedded_rt_linux_x86_64_o_start as *const u8, &with_embedded_rt_linux_x86_64_o_end as *const u8)
+    if name == "rt_windows_x86_64.o":
+        return link_stage_embedded_obj_slice(&with_embedded_rt_windows_x86_64_o_start as *const u8, &with_embedded_rt_windows_x86_64_o_end as *const u8)
     ""
 
 fn link_stage_extract_runtime_obj(name: str, path: str) -> i32:
@@ -469,11 +521,12 @@ fn link_stage_undef_contains_symbol(undef: str, name: str) -> bool:
 
 fn link_stage_undefined_symbols_for_object(obj_path: str) -> str:
     let report_path = obj_path ++ ".undef"
+    let null_path = if runtime_sysinfo_os() == "Windows": "NUL" else: "/dev/null"
     var argv = ""
     argv = link_stage_argv_append(argv, "nm")
     argv = link_stage_argv_append(argv, "-u")
     argv = link_stage_argv_append(argv, obj_path)
-    let probe_rc = runtime_exec_argv_capture(argv, report_path, "/dev/null", 0)
+    let probe_rc = runtime_exec_argv_capture(argv, report_path, null_path, 0)
     if probe_rc != 0:
         let _ = runtime_remove_file(report_path)
         return "<probe-failed>"
@@ -605,10 +658,14 @@ fn link_stage_host_platform_runtime_object() -> str:
         return "rt_linux_x86_64.o"
     if os == "Macos" and (arch == "armv8" or arch == "aarch64"):
         return "rt_darwin_aarch64.o"
+    if os == "Windows" and arch == "x86_64":
+        return "rt_windows_x86_64.o"
     with_eprint("error: unsupported host runtime platform: " ++ os ++ "/" ++ arch)
     ""
 
 fn link_stage_make_archive(obj_path: str) -> str:
+    if runtime_sysinfo_os() == "Windows":
+        return obj_path
     // Wrap a .o file in a .a archive so the linker treats it as a library
     // (only pulling in symbols that aren't already defined).
     let ar_path = obj_path ++ f".{runtime_getpid()}.{runtime_clock_nanos()}.a"
@@ -704,7 +761,10 @@ fn link_stage_output_dir_for_source(source_path: str) -> str:
     artifact_root ++ "/" ++ dir
 
 fn link_stage_output_path_for_source(source_path: str) -> str:
-    link_stage_output_dir_for_source(source_path) ++ "/" ++ link_stage_source_stem(source_path)
+    let base = link_stage_output_dir_for_source(source_path) ++ "/" ++ link_stage_source_stem(source_path)
+    if runtime_sysinfo_os() == "Windows":
+        return base ++ ".exe"
+    base
 
 fn link_stage_link_object_to_binary(obj_path: str, bin_path: str, link_libs: Vec[str], link_search_paths: Vec[str], needs_async_runtime: bool) -> bool:
     let link_args: Vec[str] = Vec.new()

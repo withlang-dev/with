@@ -180,7 +180,7 @@ pub fn run_seed_download_action(ctx: ActionCtx) -> i32:
 // and a release published, instead of rebuilding LLVM from source or trusting a
 // system LLVM. Mirrors run_seed_download_action, plus tar.zst extraction into
 // `.deps/<sdk_base>`. Args: repo, asset_name, sdk_base (= "llvm-<ver>-<host>").
-// Output: the SDK marker `.deps/<sdk_base>/lib/libclang.a`.
+// Output: the SDK marker `.deps/<sdk_base>/lib/libclang.a` or `libclang.lib`.
 pub fn run_deps_download_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let args = ctx.args()

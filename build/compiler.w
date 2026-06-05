@@ -120,6 +120,8 @@ fn comp_default_llvm_prefix() -> str:
         return ".deps/llvm-" ++ COMPILER_LLVM_VERSION ++ "-darwin-arm64"
     if host_os == "Linux" and host_arch == "x86_64":
         return ".deps/llvm-" ++ COMPILER_LLVM_VERSION ++ "-linux-x86_64"
+    if host_os == "Windows" and host_arch == "x86_64":
+        return ".deps/llvm-" ++ COMPILER_LLVM_VERSION ++ "-windows-x86_64-msvc"
     COMPILER_FALLBACK_LLVM_PREFIX
 
 fn comp_llvm_prefix() -> str:
@@ -143,7 +145,12 @@ fn comp_llvm_clang_tool(llvm_prefix: str) -> str:
     comp_tool_from_env("WITH_LLVM_CC", "LLVM_CC", llvm_prefix ++ "/bin/clang")
 
 fn comp_llvm_lld_tool(llvm_prefix: str) -> str:
-    let fallback = if os() == "Linux": llvm_prefix ++ "/bin/ld.lld" else: llvm_prefix ++ "/bin/ld64.lld"
+    let fallback = if os() == "Linux":
+        llvm_prefix ++ "/bin/ld.lld"
+    else if os() == "Windows":
+        llvm_prefix ++ "/bin/lld-link.exe"
+    else:
+        llvm_prefix ++ "/bin/ld64.lld"
     comp_tool_from_env("WITH_LLVM_LD", "LLVM_LD", fallback)
 
 fn comp_libclang_path(llvm_prefix: str) -> str:
@@ -153,6 +160,8 @@ fn comp_libclang_path(llvm_prefix: str) -> str:
     let legacy = env("LIBCLANG_FILE")
     if legacy.len() > 0:
         return legacy
+    if os() == "Windows":
+        return llvm_prefix ++ "/lib/libclang.lib"
     llvm_prefix ++ "/lib/libclang.dylib"
 
 fn comp_select_libclang_path(fs: ToolFs, llvm_prefix: str) -> str:
@@ -165,10 +174,19 @@ fn comp_select_libclang_path(fs: ToolFs, llvm_prefix: str) -> str:
     let static_libclang = llvm_prefix ++ "/lib/libclang.a"
     if fs.host_exists(static_libclang):
         return static_libclang
+    let windows_libclang = llvm_prefix ++ "/lib/libclang.lib"
+    if fs.host_exists(windows_libclang):
+        return windows_libclang
     ""
 
 fn comp_link_path_is_dynamic(path: str) -> bool:
-    not path.ends_with(".a")
+    not path.ends_with(".a") and not path.ends_with(".lib")
+
+pub fn compiler_default_libclang_archive_path() -> str:
+    let prefix = compiler_default_llvm_prefix()
+    if os() == "Windows":
+        return prefix ++ "/lib/libclang.lib"
+    prefix ++ "/lib/libclang.a"
 
 fn comp_host_sdk_path(ctx: ActionCtx) -> str:
     let sdkroot = env("SDKROOT")
@@ -193,23 +211,34 @@ fn comp_arg_value(args: Vec[str], prefix: str) -> str:
 fn comp_arg_allowed_for_compiler(arg: str) -> bool:
     not arg.starts_with("compiler=")
 
+fn comp_host_exe_suffix() -> str:
+    if os() == "Windows":
+        return ".exe"
+    ""
+
+fn comp_path_separator() -> i32:
+    if os() == "Windows":
+        return 59
+    58
+
 fn comp_resolve_seed_compiler(ctx: ActionCtx) -> str:
     let explicit = env("WITH")
     if explicit.len() > 0:
         return explicit
     let fs = ctx.fs()
-    if fs.exists("out/bin/with"):
-        return "out/bin/with"
+    let local_compiler = "out/bin/with" ++ comp_host_exe_suffix()
+    if fs.exists(local_compiler):
+        return local_compiler
     let path_env = env("PATH")
     if path_env.len() > 0:
         var start = 0
         for i in 0..path_env.len() as i32 + 1:
             let at_end = i == path_env.len() as i32
-            let is_sep = not at_end and path_env.byte_at(i as i64) == 58
+            let is_sep = not at_end and path_env.byte_at(i as i64) == comp_path_separator()
             if is_sep or at_end:
                 if i > start:
                     let dir = path_env.slice(start as i64, i as i64)
-                    let candidate = dir ++ "/with"
+                    let candidate = dir ++ "/with" ++ comp_host_exe_suffix()
                     if fs.host_exists(candidate):
                         return candidate
                 start = i + 1
@@ -462,9 +491,13 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     if not fs.host_exists(llvm_ld):
         return comp_fail(ctx, "missing LLVM linker: " ++ llvm_ld)
     if libclang.len() == 0:
-        return comp_fail(ctx, "missing static libclang archive: " ++ llvm_prefix ++ "/lib/libclang.a")
-    if not libclang.ends_with(".a"):
-        return comp_fail(ctx, "libclang must be linked statically; expected libclang.a, got: " ++ libclang)
+        return comp_fail(ctx, "missing static libclang archive: " ++ compiler_default_libclang_archive_path())
+    if os() == "Windows":
+        if not libclang.ends_with(".lib"):
+            return comp_fail(ctx, "libclang must be linked statically; expected libclang.lib, got: " ++ libclang)
+    else:
+        if not libclang.ends_with(".a"):
+            return comp_fail(ctx, "libclang must be linked statically; expected libclang.a, got: " ++ libclang)
     if not fs.host_exists(libclang):
         return comp_fail(ctx, "missing static libclang archive: " ++ libclang)
     let llvm_lib_dir = llvm_prefix ++ "/lib"
@@ -476,11 +509,11 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
     for i in 0..lib_files.len() as i32:
         let path = lib_files.get(i as i64)
         let name = comp_path_basename(path)
-        if name.ends_with(".a"):
+        if name.ends_with(".a") or name.ends_with(".lib"):
             if name.starts_with("libclang") and path != libclang:
                 clang_archives.push(path)
             else:
-                if name.starts_with("libLLVM"):
+                if name.starts_with("libLLVM") or name.starts_with("LLVM"):
                     llvm_archives.push(path)
     var rsp = ""
     var ld_rsp = ""
@@ -525,6 +558,37 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
         ld_rsp = ld_rsp ++ "-lz\n"
         ld_rsp = ld_rsp ++ "-lzstd\n"
         ld_rsp = ld_rsp ++ "-lxml2\n"
+    else if os() == "Windows":
+        rsp = rsp ++ "libcpmt.lib\n"
+        rsp = rsp ++ "libcmt.lib\n"
+        rsp = rsp ++ "oldnames.lib\n"
+        rsp = rsp ++ "kernel32.lib\n"
+        rsp = rsp ++ "advapi32.lib\n"
+        rsp = rsp ++ "bcrypt.lib\n"
+        rsp = rsp ++ "shell32.lib\n"
+        rsp = rsp ++ "user32.lib\n"
+        rsp = rsp ++ "ole32.lib\n"
+        rsp = rsp ++ "oleaut32.lib\n"
+        rsp = rsp ++ "uuid.lib\n"
+        rsp = rsp ++ "ws2_32.lib\n"
+        rsp = rsp ++ "version.lib\n"
+        rsp = rsp ++ "psapi.lib\n"
+        rsp = rsp ++ "dbghelp.lib\n"
+        ld_rsp = ld_rsp ++ "libcpmt.lib\n"
+        ld_rsp = ld_rsp ++ "libcmt.lib\n"
+        ld_rsp = ld_rsp ++ "oldnames.lib\n"
+        ld_rsp = ld_rsp ++ "kernel32.lib\n"
+        ld_rsp = ld_rsp ++ "advapi32.lib\n"
+        ld_rsp = ld_rsp ++ "bcrypt.lib\n"
+        ld_rsp = ld_rsp ++ "shell32.lib\n"
+        ld_rsp = ld_rsp ++ "user32.lib\n"
+        ld_rsp = ld_rsp ++ "ole32.lib\n"
+        ld_rsp = ld_rsp ++ "oleaut32.lib\n"
+        ld_rsp = ld_rsp ++ "uuid.lib\n"
+        ld_rsp = ld_rsp ++ "ws2_32.lib\n"
+        ld_rsp = ld_rsp ++ "version.lib\n"
+        ld_rsp = ld_rsp ++ "psapi.lib\n"
+        ld_rsp = ld_rsp ++ "dbghelp.lib\n"
     else:
         return comp_fail(ctx, "unsupported host for LLVM link metadata: " ++ os() ++ "/" ++ arch())
     if comp_link_path_is_dynamic(libclang):

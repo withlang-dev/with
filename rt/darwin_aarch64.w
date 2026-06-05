@@ -669,3 +669,333 @@ pub fn rt_sysinfo_arch_impl() -> str:
 @[c_export("rt_getenv")]
 pub fn rt_getenv_impl(name: *const u8) -> *const u8:
     getenv(name)
+
+// ---- Compiler compatibility process/env adapter ----
+
+extern fn with_alloc(size: i64) -> *mut u8
+extern fn with_free(ptr: *mut u8) -> void
+extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> void
+extern fn with_memset(dst: *mut u8, val: i32, len: i64) -> void
+extern fn setenv(name: *const u8, value: *const u8, overwrite: i32) -> i32
+extern fn sigprocmask(how: i32, set: *const u32, old: *mut u32) -> i32
+extern fn fork() -> i32
+extern fn setpgid(pid: i32, pgid: i32) -> i32
+extern fn execv(path: *const u8, argv: *const *const u8) -> i32
+extern fn execvp(file: *const u8, argv: *const *const u8) -> i32
+extern fn waitpid(pid: i32, status: *mut i32, options: i32) -> i32
+extern fn chdir(path: *const u8) -> i32
+extern fn dup2(oldfd: i32, newfd: i32) -> i32
+extern fn getrlimit(resource: i32, lim: *mut u8) -> i32
+extern fn setrlimit(resource: i32, lim: *const u8) -> i32
+extern fn with_clock_nanos() -> i64
+extern fn with_usleep(usecs: i32) -> i32
+
+let POSIX_SIGINT: i32 = 2
+let POSIX_SIGQUIT: i32 = 3
+let POSIX_SIGTERM: i32 = 15
+let POSIX_SIGHUP: i32 = 1
+let POSIX_SIG_BLOCK: i32 = 1
+let POSIX_SIG_SETMASK: i32 = 3
+let POSIX_RLIMIT_STACK: i32 = 3
+let POSIX_RLIM_INFINITY: u64 = 9223372036854775807 as u64
+let POSIX_EINTR: i32 = 4
+let POSIX_SIGACTION_SIZE: i64 = 16
+let POSIX_WNOHANG: i32 = 1
+let POSIX_CAPTURE_TIMEOUT_RC: i32 = 124
+
+var posix_interrupt_flag: i32 = 0
+var posix_active_child_pgid: i32 = 0
+
+fn posix_store_i64(base: i64, offset: i64, value: i64):
+    unsafe *((base + offset) as *mut i64) = value
+
+fn posix_load_u64(base: i64, offset: i64) -> u64:
+    unsafe *((base + offset) as *const u64)
+
+fn posix_signal_bit(signo: i32) -> u32:
+    if signo <= 0:
+        return 0 as u32
+    (1 as u32) << ((signo - 1) as u32)
+
+fn posix_str_to_c_buf(s: str) -> *mut u8:
+    let out = with_alloc(s.len() + 1)
+    if out as i64 == 0:
+        return 0 as *mut u8
+    if s.len() > 0:
+        let sp = &s as *const *const u8
+        with_memcpy(out, unsafe *sp, s.len())
+    unsafe *((out as i64 + s.len()) as *mut u8) = 0
+    out
+
+fn posix_restore_default_signal_handler(signo: i32):
+    var sa: [16]u8 = [0 as u8; 16]
+    let sa_base = (&raw mut sa) as *mut [16]u8 as i64
+    with_memset(sa_base as *mut u8, 0, POSIX_SIGACTION_SIZE)
+    let _ = sigaction(signo, sa_base as *const u8, 0 as *mut u8)
+
+fn posix_block_interrupt_signals(prev_mask: *mut u32) -> i32:
+    var blocked: u32 = 0 as u32
+    blocked = blocked | posix_signal_bit(POSIX_SIGINT)
+    blocked = blocked | posix_signal_bit(POSIX_SIGTERM)
+    blocked = blocked | posix_signal_bit(POSIX_SIGHUP)
+    sigprocmask(POSIX_SIG_BLOCK, &blocked as *const u32, prev_mask)
+
+fn posix_restore_signal_mask(prev_mask: *const u32):
+    if prev_mask as i64 != 0:
+        let _ = sigprocmask(POSIX_SIG_SETMASK, prev_mask, 0 as *mut u32)
+
+fn posix_wait_child(pid: i32, timeout_ms: i32) -> i32:
+    var status: i32 = -1
+    let start_ns = with_clock_nanos()
+    let timeout_ns = timeout_ms as i64 * 1000000
+    while true:
+        let waited = if timeout_ms > 0: waitpid(pid, &raw mut status, POSIX_WNOHANG) else: waitpid(pid, &raw mut status, 0)
+        if waited == pid:
+            let termsig = status & 0x7f
+            if termsig == 0:
+                return (status >> 8) & 0xff
+            if termsig != 0x7f:
+                return 128 + termsig
+            return status
+        if waited < 0:
+            if get_errno() == POSIX_EINTR:
+                continue
+            return -1
+        if timeout_ms > 0 and with_clock_nanos() - start_ns >= timeout_ns:
+            let _term = kill(-pid, POSIX_SIGTERM)
+            let _sleep = with_usleep(10000)
+            let waited_after_term = waitpid(pid, &raw mut status, POSIX_WNOHANG)
+            if waited_after_term != pid:
+                let _kill = kill(-pid, 9)
+                let _wait = waitpid(pid, &raw mut status, 0)
+            return POSIX_CAPTURE_TIMEOUT_RC
+        if timeout_ms > 0:
+            let _sleep_poll = with_usleep(10000)
+
+fn posix_argv_blob_count(blob: *const u8, len: i64) -> i32:
+    if len <= 0:
+        return 0
+    var count = 0
+    var offset: i64 = 0
+    while offset < len:
+        count += 1
+        while offset < len and (unsafe *((blob as i64 + offset) as *const u8)) != 0:
+            offset += 1
+        offset += 1
+    count
+
+fn posix_fill_argv(blob: *const u8, len: i64, argv: *mut *const u8) -> i32:
+    var argi = 0
+    var offset: i64 = 0
+    while offset < len and argi < 255:
+        unsafe *((argv as i64 + argi as i64 * 8) as *mut *const u8) = (blob as i64 + offset) as *const u8
+        argi += 1
+        while offset < len and (unsafe *((blob as i64 + offset) as *const u8)) != 0:
+            offset += 1
+        offset += 1
+    unsafe *((argv as i64 + argi as i64 * 8) as *mut *const u8) = 0 as *const u8
+    argi
+
+fn posix_redirect_fd_to_path(path: *const u8, fd: i32) -> i32:
+    let out_fd = rt_open_impl(path, 1 | 0x200 | 0x400, 0o644)
+    if out_fd < 0:
+        return -1
+    if dup2(out_fd, fd) < 0:
+        let _ = rt_close_impl(out_fd)
+        return -1
+    let _ = rt_close_impl(out_fd)
+    0
+
+fn posix_redirect_fd_from_path(path: *const u8, fd: i32) -> i32:
+    let in_fd = rt_open_impl(path, 0, 0)
+    if in_fd < 0:
+        return -1
+    if dup2(in_fd, fd) < 0:
+        let _ = rt_close_impl(in_fd)
+        return -1
+    let _ = rt_close_impl(in_fd)
+    0
+
+fn posix_child_common(mask_rc: i32, prev_mask: *const u32):
+    if mask_rc == 0:
+        posix_restore_signal_mask(prev_mask)
+    let _ = setpgid(0, 0)
+    posix_restore_default_signal_handler(POSIX_SIGINT)
+    posix_restore_default_signal_handler(POSIX_SIGTERM)
+    posix_restore_default_signal_handler(POSIX_SIGHUP)
+    posix_restore_default_signal_handler(POSIX_SIGQUIT)
+
+fn posix_run_argv(blob: *const u8, len: i64, stdout_path: *const u8, stderr_path: *const u8, stdin_path: *const u8, cwd: *const u8, timeout_ms: i32, wait: bool) -> i32:
+    let argc = posix_argv_blob_count(blob, len)
+    if argc <= 0 or argc >= 256:
+        return -1
+    var prev_mask: u32 = 0 as u32
+    let mask_rc = posix_block_interrupt_signals(&raw mut prev_mask)
+    let pid = fork()
+    if pid == 0:
+        posix_child_common(mask_rc, &prev_mask as *const u32)
+        if stdin_path as i64 != 0 and posix_redirect_fd_from_path(stdin_path, 0) != 0:
+            _exit(127)
+        if stdout_path as i64 != 0 and posix_redirect_fd_to_path(stdout_path, 1) != 0:
+            _exit(127)
+        if stderr_path as i64 != 0 and posix_redirect_fd_to_path(stderr_path, 2) != 0:
+            _exit(127)
+        if cwd as i64 != 0:
+            if chdir(cwd) != 0:
+                _exit(127)
+            let _ = setenv("PWD" as *const u8, cwd, 1)
+        var argv: [256]*const u8 = [0 as *const u8; 256]
+        let _argc2 = posix_fill_argv(blob, len, (&raw mut argv) as *mut [256]*const u8 as *mut *const u8)
+        let _ = execvp(argv[0], (&argv) as *const [256]*const u8 as *const *const u8)
+        _exit(127)
+    if pid < 0:
+        if mask_rc == 0:
+            posix_restore_signal_mask(&prev_mask as *const u32)
+        return -1
+    let _ = setpgid(pid, pid)
+    if mask_rc == 0:
+        posix_restore_signal_mask(&prev_mask as *const u32)
+    if not wait:
+        return pid
+    posix_active_child_pgid = pid
+    let rc = posix_wait_child(pid, timeout_ms)
+    posix_active_child_pgid = 0
+    rc
+
+fn posix_interrupt_signal_handler(signo: i32):
+    posix_interrupt_flag = 1
+    if posix_active_child_pgid > 0:
+        let _ = kill(-posix_active_child_pgid, signo)
+    _exit(128 + signo)
+
+fn posix_interrupted() -> bool:
+    posix_interrupt_flag != 0
+
+@[c_export("rt_compat_setenv_str")]
+pub fn rt_compat_setenv_str_impl(name: str, value: str) -> i32:
+    let name_buf = posix_str_to_c_buf(name)
+    if name_buf as i64 == 0:
+        return -1
+    let value_buf = posix_str_to_c_buf(value)
+    if value_buf as i64 == 0:
+        with_free(name_buf)
+        return -1
+    let rc = setenv(name_buf as *const u8, value_buf as *const u8, 1)
+    with_free(name_buf)
+    with_free(value_buf)
+    rc
+
+@[c_export("rt_compat_install_interrupt_handlers")]
+pub fn rt_compat_install_interrupt_handlers_impl():
+    var sa: [16]u8 = [0 as u8; 16]
+    let sa_base = (&raw mut sa) as *mut [16]u8 as i64
+    with_memset(sa_base as *mut u8, 0, POSIX_SIGACTION_SIZE)
+    posix_store_i64(sa_base, 0, posix_interrupt_signal_handler as i64)
+    let _ = sigaction(POSIX_SIGINT, sa_base as *const u8, 0 as *mut u8)
+    let _ = sigaction(POSIX_SIGTERM, sa_base as *const u8, 0 as *mut u8)
+    let _ = sigaction(POSIX_SIGHUP, sa_base as *const u8, 0 as *mut u8)
+
+@[c_export("rt_compat_raise_stack_limit")]
+pub fn rt_compat_raise_stack_limit_impl():
+    var lim: [16]u8 = [0 as u8; 16]
+    let lim_base = (&raw mut lim) as *mut [16]u8 as i64
+    if getrlimit(POSIX_RLIMIT_STACK, lim_base as *mut u8) != 0:
+        return
+    var want: u64 = (64 * 1024 * 1024) as u64
+    let lim_max = posix_load_u64(lim_base, 8)
+    if lim_max != POSIX_RLIM_INFINITY and want > lim_max:
+        want = lim_max
+    let lim_cur = posix_load_u64(lim_base, 0)
+    if want > lim_cur:
+        posix_store_i64(lim_base, 0, want as i64)
+        let _ = setrlimit(POSIX_RLIMIT_STACK, lim_base as *const u8)
+
+@[c_export("rt_compat_interrupt_requested")]
+pub fn rt_compat_interrupt_requested_impl() -> i32:
+    posix_interrupt_flag
+
+@[c_export("rt_compat_exec_binary")]
+pub fn rt_compat_exec_binary_impl(path: str) -> i32:
+    let buf = posix_str_to_c_buf(path)
+    if buf as i64 == 0:
+        return -1
+    let rc = if posix_interrupted(): -1 else: posix_run_argv(buf as *const u8, path.len(), 0 as *const u8, 0 as *const u8, 0 as *const u8, 0 as *const u8, 0, true)
+    with_free(buf)
+    rc
+
+@[c_export("rt_compat_exec_argv")]
+pub fn rt_compat_exec_argv_impl(args: str) -> i32:
+    let buf = posix_str_to_c_buf(args)
+    if buf as i64 == 0:
+        return -1
+    let rc = if posix_interrupted(): -1 else: posix_run_argv(buf as *const u8, args.len(), 0 as *const u8, 0 as *const u8, 0 as *const u8, 0 as *const u8, 0, true)
+    with_free(buf)
+    rc
+
+@[c_export("rt_compat_exec_argv_cwd")]
+pub fn rt_compat_exec_argv_cwd_impl(args: str, cwd: str) -> i32:
+    let arg_buf = posix_str_to_c_buf(args)
+    let cwd_buf = posix_str_to_c_buf(cwd)
+    if arg_buf as i64 == 0 or cwd_buf as i64 == 0:
+        return -1
+    let rc = if posix_interrupted(): -1 else: posix_run_argv(arg_buf as *const u8, args.len(), 0 as *const u8, 0 as *const u8, 0 as *const u8, cwd_buf as *const u8, 0, true)
+    with_free(arg_buf)
+    with_free(cwd_buf)
+    rc
+
+@[c_export("rt_compat_exec_argv_capture")]
+pub fn rt_compat_exec_argv_capture_impl(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32) -> i32:
+    rt_compat_exec_argv_capture_cwd_impl(args, stdout_path, stderr_path, timeout_ms, "")
+
+@[c_export("rt_compat_exec_argv_capture_input")]
+pub fn rt_compat_exec_argv_capture_input_impl(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, stdin_path: str) -> i32:
+    let arg_buf = posix_str_to_c_buf(args)
+    let out_buf = posix_str_to_c_buf(stdout_path)
+    let err_buf = posix_str_to_c_buf(stderr_path)
+    let in_buf = posix_str_to_c_buf(stdin_path)
+    if arg_buf as i64 == 0 or out_buf as i64 == 0 or err_buf as i64 == 0 or in_buf as i64 == 0:
+        return -1
+    let rc = if posix_interrupted(): -1 else: posix_run_argv(arg_buf as *const u8, args.len(), out_buf as *const u8, err_buf as *const u8, in_buf as *const u8, 0 as *const u8, timeout_ms, true)
+    with_free(arg_buf)
+    with_free(out_buf)
+    with_free(err_buf)
+    with_free(in_buf)
+    rc
+
+@[c_export("rt_compat_exec_argv_capture_cwd")]
+pub fn rt_compat_exec_argv_capture_cwd_impl(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str) -> i32:
+    let arg_buf = posix_str_to_c_buf(args)
+    let out_buf = posix_str_to_c_buf(stdout_path)
+    let err_buf = posix_str_to_c_buf(stderr_path)
+    let cwd_buf = if cwd.len() > 0: posix_str_to_c_buf(cwd) else: 0 as *mut u8
+    if arg_buf as i64 == 0 or out_buf as i64 == 0 or err_buf as i64 == 0:
+        return -1
+    let rc = if posix_interrupted(): -1 else: posix_run_argv(arg_buf as *const u8, args.len(), out_buf as *const u8, err_buf as *const u8, 0 as *const u8, cwd_buf as *const u8, timeout_ms, true)
+    with_free(arg_buf)
+    with_free(out_buf)
+    with_free(err_buf)
+    if cwd_buf as i64 != 0:
+        with_free(cwd_buf)
+    rc
+
+@[c_export("rt_compat_exec_argv_capture_spawn")]
+pub fn rt_compat_exec_argv_capture_spawn_impl(args: str, stdout_path: str, stderr_path: str) -> i32:
+    let arg_buf = posix_str_to_c_buf(args)
+    let out_buf = posix_str_to_c_buf(stdout_path)
+    let err_buf = posix_str_to_c_buf(stderr_path)
+    if arg_buf as i64 == 0 or out_buf as i64 == 0 or err_buf as i64 == 0:
+        return -1
+    let rc = if posix_interrupted(): -1 else: posix_run_argv(arg_buf as *const u8, args.len(), out_buf as *const u8, err_buf as *const u8, 0 as *const u8, 0 as *const u8, 0, false)
+    with_free(arg_buf)
+    with_free(out_buf)
+    with_free(err_buf)
+    rc
+
+@[c_export("rt_compat_exec_wait")]
+pub fn rt_compat_exec_wait_impl(pid: i32, timeout_ms: i32) -> i32:
+    if pid <= 0:
+        return -1
+    posix_active_child_pgid = pid
+    let rc = posix_wait_child(pid, timeout_ms)
+    posix_active_child_pgid = 0
+    rc
