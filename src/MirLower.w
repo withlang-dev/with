@@ -9658,7 +9658,7 @@ fn MirModule.verify_tailrec_contracts(self: &MirModule, sema: &Sema, ast_pool: A
         let leader_sym = scc_syms.get(0)
         for si in 1..scc_syms.len() as i32:
             let member_sym = scc_syms.get(si as i64)
-            if mir_tailrec_sig_compatible(sema, ast_pool, leader_sym, member_sym) == 0:
+            if mir_tailrec_sig_compatible(unsafe *sema, ast_pool, leader_sym, member_sym) == 0:
                 compatible = 0
                 break
         if compatible == 0:
