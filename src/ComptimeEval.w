@@ -423,9 +423,10 @@ fn comptime_tool_path_normalize(path: str) -> str:
         return "."
     let parts: Vec[str] = Vec.new()
     var start = 0
-    var is_absolute = path.byte_at(0) == 47
+    var is_absolute = path.byte_at(0) == 47 or path.byte_at(0) == 92
     for i in 0..path.len() as i32:
-        if path.byte_at(i as i64) == 47:
+        let ch = path.byte_at(i as i64)
+        if ch == 47 or ch == 92:
             if i > start:
                 let part = path.slice(start as i64, i as i64)
                 if part == "..":
@@ -486,7 +487,8 @@ fn comptime_glob_split_by_slash(path: str) -> Vec[str]:
     let parts: Vec[str] = Vec.new()
     var start = 0
     for i in 0..path.len() as i32:
-        if path.byte_at(i as i64) == 47:
+        let ch = path.byte_at(i as i64)
+        if ch == 47 or ch == 92:
             if i > start:
                 parts.push(path.slice(start as i64, i as i64))
             start = i + 1
@@ -2164,12 +2166,14 @@ fn ComptimeEvaluator.capability_require_mkdir_allowed(self: ComptimeEvaluator, r
     true
 
 fn ComptimeEvaluator.capability_project_relative_path(self: ComptimeEvaluator, record: ComptimeCapabilityRecord, path: str) -> str:
+    let normalized = comptime_tool_path_normalize(path)
     if record.project_root.len() == 0 or record.project_root == ".":
-        return path
-    let prefix = if record.project_root.ends_with("/"): record.project_root else: record.project_root ++ "/"
-    if path.starts_with(prefix):
-        return path.slice(prefix.len(), path.len())
-    path
+        return normalized
+    let root = comptime_tool_path_normalize(record.project_root)
+    let prefix = if root.ends_with("/"): root else: root ++ "/"
+    if normalized.starts_with(prefix):
+        return normalized.slice(prefix.len(), normalized.len())
+    normalized
 
 fn ComptimeEvaluator.str_vec_value(self: ComptimeEvaluator, values: Vec[str], node: i32) -> ComptimeValue:
     let vec_type = self.node_type_or(node, 0)

@@ -6359,7 +6359,7 @@ fn CCodegen.emit_stmt_line(self: CCodegen, body: MirBody, stmt_id: i32) -> str:
                 return "    /* dead aggregate temp */"
         let dst_place = self.place_text(body, d0)
         if self.is_unit_rvalue(body, d1) != 0:
-            return "    " ++ dst_place ++ " = (__typeof__(" ++ dst_place ++ "))" ++ cc_lbrace() ++ "0" ++ cc_rbrace() ++ ";"
+            return "    " ++ dst_place ++ " = " ++ self.zero_value_text(self.place_tid(body, d0)) ++ ";"
         let dst_tid = self.place_tid(body, d0)
         let dst_resolved = self.sema.resolve_alias(dst_tid)
         let dst_tk = self.sema.get_type_kind(dst_resolved)
@@ -7044,7 +7044,7 @@ fn CCodegen.should_emit_extern_fn_decl(self: CCodegen, fn_sym: i32, referenced: 
         return 0
     if name == "malloc" or name == "free":
         return 0
-    if name == "mkstemp" or name == "strtod" or name == "realpath":
+    if name == "mkstemp" or name == "strtod" or name == "realpath" or name == "getenv":
         return 0
     if name == "strlen" or name == "strcmp" or name == "strncmp" or name == "memchr":
         return 0
@@ -7630,6 +7630,7 @@ fn CCodegen.emit_module(self: CCodegen) -> str:
     out.write("#include <fcntl.h>\n")
     out.write("#include <locale.h>\n")
     out.write("#include <stdio.h>\n")
+    out.write("#include \"undef_stdio_macros.h\"\n")
     out.write("#include <time.h>\n")
     out.write("#include <unistd.h>\n")
     out.write("#include <sys/resource.h>\n")
