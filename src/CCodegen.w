@@ -936,6 +936,12 @@ fn CCodegen.place_tid(self: CCodegen, body: MirBody, place_id: i32) -> i32:
                     return 0
                 tid = ft
                 continue
+            if tk == TypeKind.TY_GENERIC_INST:
+                let ft = self.vec_synthetic_field_tid(resolved as i32, pd)
+                if ft != 0:
+                    tid = ft
+                    continue
+                return 0
             if tk == TypeKind.TY_STR:
                 let field_name = cc_intern_resolve(self.intern, pd)
                 if field_name == "len":
@@ -995,6 +1001,12 @@ fn CCodegen.place_tid_no_infer(self: CCodegen, body: MirBody, place_id: i32) -> 
                     return 0
                 tid = ft
                 continue
+            if tk == TypeKind.TY_GENERIC_INST:
+                let ft = self.vec_synthetic_field_tid(resolved as i32, pd)
+                if ft != 0:
+                    tid = ft
+                    continue
+                return 0
             if tk == TypeKind.TY_STR:
                 let field_name = cc_intern_resolve(self.intern, pd)
                 if field_name == "len":
@@ -1184,6 +1196,28 @@ fn CCodegen.vec_element_tid(self: CCodegen, tid: i32) -> i32:
     if self.sema.get_generic_inst_arg_count(resolved as i32) <= 0:
         return 0
     self.sema.get_generic_inst_arg(resolved as i32, 0)
+
+fn CCodegen.vec_synthetic_field_tid(self: CCodegen, vec_tid: i32, field_sym: i32) -> i32:
+    let resolved = self.sema.resolve_alias(vec_tid as TypeId) as i32
+    if self.sema.get_type_kind(resolved as TypeId) != TypeKind.TY_GENERIC_INST:
+        return 0
+    if self.generic_inst_base_name(resolved) != "Vec":
+        return 0
+    let field_name = cc_intern_resolve(self.intern, field_sym)
+    if field_name == "len" or field_name == "cap" or field_name == "elem_size":
+        return self.sema.ty_i64 as i32
+    if field_name != "ptr":
+        return 0
+    let elem_tid = self.vec_element_tid(resolved)
+    if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
+        return 0
+    let const_ptr = self.sema.find_exact_type(TypeKind.TY_PTR, elem_tid, 0, 0) as i32
+    if const_ptr != 0:
+        return const_ptr
+    let mut_ptr = self.sema.find_exact_type(TypeKind.TY_PTR, elem_tid, 1, 0) as i32
+    if mut_ptr != 0:
+        return mut_ptr
+    self.sema.ensure_exact_type(TypeKind.TY_PTR, elem_tid, 0, 0) as i32
 
 fn CCodegen.vec_new_elem_size_text(self: CCodegen, body: MirBody, dest_place: i32) -> str:
     var vec_tid = self.place_tid_no_infer(body, dest_place)
@@ -1970,6 +2004,8 @@ fn CCodegen.place_text(self: CCodegen, body: MirBody, place_id: i32) -> str:
                 let ft_raw = self.struct_field_tid(resolved as i32, pd)
                 let ft = self.effective_field_tid(resolved as i32, pd, ft_raw)
                 current_tid = ft
+            else if tk == TypeKind.TY_GENERIC_INST:
+                current_tid = self.vec_synthetic_field_tid(resolved as i32, pd)
             else:
                 current_tid = 0
             continue
