@@ -17,6 +17,7 @@ pub enum DriverPreludeMode: i32:
     Full = 0
     Core = 1
     None = 2
+    Alloc = 3
 
 pub type BuildCommandOptions {
     source_path: str,
@@ -228,12 +229,16 @@ fn driver_parse_prelude_mode(argc: i32) -> DriverPreludeParseResult:
     var i = 2
     while i < argc:
         let arg = with_arg_at(i)
-        if arg == "--no-prelude" or arg == "--freestanding":
+        if arg == "--no-prelude":
             mode = DriverPreludeMode.None
+        else if arg == "--freestanding":
+            mode = DriverPreludeMode.Core
         else if with_str_starts_with(arg, "--prelude=") != 0:
             let value = with_str_slice(arg, 10, with_str_len(arg))
             if value == "core":
                 mode = DriverPreludeMode.Core
+            else if value == "alloc":
+                mode = DriverPreludeMode.Alloc
             else if value == "full":
                 mode = DriverPreludeMode.Full
             else if value == "none":
@@ -258,7 +263,7 @@ pub fn parse_build_command_options(argc: i32) -> BuildCommandParseResult:
     if not prelude.ok:
         return BuildCommandParseResult {
             ok: false,
-            error_msg: "invalid --prelude value '" ++ prelude.invalid_value ++ "' (expected full|core|none)",
+            error_msg: "invalid --prelude value '" ++ prelude.invalid_value ++ "' (expected full|alloc|core|none)",
             build,
             graph,
         }

@@ -11,7 +11,8 @@ indented colon, and braced — now apply to every block-introducing construct
 including `defer`, `errdefer`, `comptime`, and `unsafe`. `if` additionally
 retains the `then` form as a pure expression shorthand (`if cond then expr
 else expr`). `else if` is a two-token keyword pair parsed as a chain
-continuation. A missing body introducer is now a parse error.
+continuation. A final `else expr` may omit the body introducer in any
+`if` chain; other missing body introducers are parse errors.
 **Changelog v6.7:** Reorganized — extracted test cases to `test/spec/`,
 roadmap to `docs/roadmap.md`, design rationale to `docs/design-rationale.md`,
 stdlib API tables to `docs/libstd-spec.md`. Added grammar appendix (§30).
@@ -2837,8 +2838,18 @@ if x < 0 { handle_negative() } else if x == 0 { handle_zero() } else { handle_po
 
 The `then` form is strictly an expression form: `if cond then expr`.
 The body after `then` is a single expression (not a block), and the
-`else` clause is `else expr` with no body introducer. This makes
-`if/then/else` chains read like mathematical expressions.
+`else` clause is `else expr` with no body introducer. The final `else`
+of a colon or braced `if` chain may also use `else expr` as shorthand
+for a single expression body:
+
+```
+let clamped =
+    if x < lo:
+        lo
+    else if x > hi:
+        hi
+    else x
+```
 
 `else if` is always parsed as a chain continuation — the parser
 consumes `else`, sees `if`, and continues the same chain rather than
@@ -6163,6 +6174,16 @@ async scope s =>
     body
 ```
 
+As with other block-introducing constructs, the body may use an
+inline expression, an indented colon block, or a braced block:
+
+```
+async scope s => fetch().await
+async scope s =>:
+    fetch().await
+async scope s { fetch().await }
+```
+
 desugars to:
 
 ```
@@ -6195,6 +6216,8 @@ like `Task[T]` (supports `.await`, `cancel`, `is_done`) but is
 **exempt from `@[must_use]`**. The scope guarantees cleanup: when
 the scope exits (normally or via early `?` return), all tracked
 tasks that haven't been awaited are cancelled and joined.
+`ScopedTask[T]` is ephemeral: it may be used inside the scope, but
+the scope body may not return it or store it in non-ephemeral data.
 
 This solves the `?` interaction problem:
 
@@ -6219,6 +6242,8 @@ async scope s =>
    the panic propagates to the scope.
 3. The scope is an expression — it returns the value of `body`.
 4. `s` cannot escape the scope. It is ephemeral.
+5. The scope result cannot be ephemeral. Await or copy the value
+   before it leaves the scope.
 
 ```
 async fn handle_batch(ids: Vec[UserId]) -> Vec[Result[User, ApiError]]:
@@ -6241,7 +6266,12 @@ scope s =>
 
 The non-async `scope` uses `s.spawn(() => closure)` because OS-thread
 work items are sync closures — no eager fiber spawning occurs.
-`scope` is available in `no_runtime` builds.
+`s.spawn(worker)` returns a `ScopedJoinHandle`, which supports
+`.join() -> i32` and is joined automatically at scope exit if it has
+not already been joined. `ScopedJoinHandle` is ephemeral: it may not
+leave the `scope` result or be stored in non-ephemeral data. `scope`
+supports the same inline, colon, and braced body forms and is
+available in `no_runtime` builds.
 
 ### 14.10 Select Await
 
@@ -9784,7 +9814,8 @@ block, `unsafe { ... }` is the inline block expression form, and
 `unsafe *p` / `unsafe p[i]` is the narrow raw-access prefix form.
 
 `if`/`else if`/`else` support all three forms and additionally the
-`then` expression shorthand — see §9.1 for the full `if` syntax.
+`then` expression shorthand. A final `else` may also use `else EXPR`
+without a body introducer; see §9.1 for the full `if` syntax.
 
 **Form 1 — Inline colon.** A colon immediately followed by content
 on the same line.
@@ -10091,9 +10122,9 @@ STMT        := LABEL_STMT | LET_STMT | VAR_STMT | IF_STMT | MATCH_STMT
               | RETURN_STMT | BREAK_STMT | CONTINUE_STMT | GOTO_STMT
               | DEFER_STMT | EXPR
 LABEL_STMT  := LABEL ( STMT | COLON_BODY | BRACE_BODY )
-IF_STMT     := 'if' EXPR BODY { 'else' 'if' EXPR BODY } [ 'else' BODY ]
+IF_STMT     := 'if' EXPR BODY { 'else' 'if' EXPR BODY } [ 'else' ( BODY | EXPR ) ]
               | 'if' EXPR 'then' EXPR { 'else' 'if' EXPR 'then' EXPR } [ 'else' EXPR ]
-              | 'if' 'let' PATTERN '=' EXPR BODY [ 'else' BODY ]
+              | 'if' 'let' PATTERN '=' EXPR BODY [ 'else' ( BODY | EXPR ) ]
 MATCH_STMT  := 'match' EXPR BODY_ARMS
 MATCH_ARM   := PATTERN [ 'if' EXPR ] '=>' EXPR
 FOR_STMT    := 'for' PATTERN 'in' EXPR BODY
@@ -10186,8 +10217,9 @@ BRACE_BODY    := '{' [ STMT { ( NEWLINE | ';' ) STMT } ] '}'
 All three forms are interchangeable for every block-introducing
 construct: `fn`, `else`, `while`, `for`, `loop`, `with`, `defer`,
 `errdefer`, `comptime`, `unsafe`, labeled blocks, and match arms.
-`if` and `else if` additionally accept `then EXPR` (see IF_STMT in
-§30.4). A missing body introducer is a parse error.
+`if` and `else if` additionally accept `then EXPR`; a final `else` in
+an `if` chain may be `else EXPR` with no body introducer (see IF_STMT
+in §30.4). Any other missing body introducer is a parse error.
 
 ### 30.9 Reserved Keywords
 

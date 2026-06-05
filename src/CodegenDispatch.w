@@ -64,6 +64,15 @@ fn Codegen.gen_function_dispatch(self: Codegen, fn_node: i32):
         return
     self.fail_mir_codegen_for_function(fn_node, "no-body")
 
+fn Codegen.gen_generator_next_functions_from_mir(self: Codegen):
+    for bi in 0..self.mir_input.body_fn_syms.len() as i32:
+        let raw_sym = self.mir_input.body_fn_syms.get(bi as i64)
+        if not self.sema.generator_next_fn_syms.contains(raw_sym):
+            continue
+        let body = self.mir_input.bodies.get(bi as i64)
+        let cg_sym = self.codegen_sym_for_sema_sym(raw_sym)
+        self.gen_function_mir_mono(cg_sym, 0, body)
+
 fn Codegen.mir_sema_type_to_llvm(self: Codegen, sema_ty: i32) -> i64:
     // Use MIR module's snapshot of sema type tables — the original sema's
     // type Vecs may have been freed by MirLower's by-value copy realloc.
@@ -4029,26 +4038,60 @@ fn Codegen.ast_static_type_expr(self: Codegen, node: i32) -> i32:
         return self.sema.find_generic_inst_type(base_sym, args, arg_count) as i32
     0
 
+fn Codegen.codegen_method_symbol_text(self: Codegen, method_sym: i32) -> str:
+    let text = self.intern.resolve(method_sym)
+    if text.len() > 0:
+        return text
+    self.sema_symbol_text(method_sym)
+
+fn Codegen.codegen_ast_method_symbol_text(self: Codegen, method_sym: i32) -> str:
+    let text = self.sema.pool_resolve_symbol(method_sym)
+    if text.len() > 0:
+        return text
+    self.codegen_method_symbol_text(method_sym)
+
 fn Codegen.classify_generic_call_intrinsic(self: Codegen, recv_type: i32, method_sym: i32) -> MirIntrinsic:
     if recv_type == 0 or method_sym == 0:
         return MirIntrinsic.NONE
-    let resolved = self.sema.resolve_alias(recv_type as TypeId)
-    let tk = self.sema.get_type_kind(resolved)
-    let method_name = self.intern.resolve(method_sym)
+    let resolved = self.mir_unwrap_ref_like_sema_type(recv_type)
+    var tk = self.mir_input.mir_get_type_kind(resolved)
+    if tk == 0 and resolved >= self.mir_input.sema_type_kinds.len() as i32 and resolved > 0:
+        tk = self.sema.get_type_kind(self.sema.resolve_alias(resolved as TypeId))
+    let method_name = self.codegen_method_symbol_text(method_sym)
     if tk == TypeKind.TY_STR:
         let str_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.STR_LEN, method_name)
         if str_len_intrinsic != MirIntrinsic.NONE:
             return str_len_intrinsic
+        if method_name == "byte_at": return MirIntrinsic.STR_BYTE_AT
+        if method_name == "slice": return MirIntrinsic.STR_SLICE
+        if method_name == "contains": return MirIntrinsic.STR_CONTAINS
+        if method_name == "starts_with": return MirIntrinsic.STR_STARTS_WITH
+        if method_name == "ends_with": return MirIntrinsic.STR_ENDS_WITH
+        if method_name == "find": return MirIntrinsic.STR_FIND
+        if method_name == "split": return MirIntrinsic.STR_SPLIT
+        if method_name == "trim": return MirIntrinsic.STR_TRIM
+        if method_name == "to_upper" or method_name == "upper": return MirIntrinsic.STR_TO_UPPER
+        if method_name == "to_lower" or method_name == "lower": return MirIntrinsic.STR_TO_LOWER
+        if method_name == "replace": return MirIntrinsic.STR_REPLACE
+        if method_name == "index_of": return MirIntrinsic.STR_INDEX_OF
+        if method_name == "repeat": return MirIntrinsic.STR_REPEAT
         return MirIntrinsic.NONE
     if tk == TypeKind.TY_ARRAY:
         let arr_len_intrinsic = mir_len_method_intrinsic(MirIntrinsic.ARR_LEN, method_name)
         if arr_len_intrinsic != MirIntrinsic.NONE:
             return arr_len_intrinsic
         return MirIntrinsic.NONE
-    let type_name_sym = self.sema.get_type_name(resolved)
+    var type_name_sym = 0
+    if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST:
+        if resolved > 0 and resolved < self.mir_input.sema_type_kinds.len() as i32:
+            type_name_sym = self.mir_input.mir_get_type_d0(resolved)
+        else:
+            type_name_sym = self.sema.get_type_d0(resolved as TypeId)
     if type_name_sym == 0:
         return MirIntrinsic.NONE
-    let type_name = self.intern.resolve(type_name_sym)
+    var type_name = self.sema_symbol_text(type_name_sym)
+    if type_name.len() == 0:
+        type_name = self.intern.resolve(type_name_sym)
     if type_name == "Vec":
         if method_name == "new": return MirIntrinsic.VEC_NEW
         if method_name == "with_capacity": return MirIntrinsic.VEC_WITH_CAPACITY
@@ -4200,7 +4243,7 @@ fn Codegen.classify_generic_call_intrinsic(self: Codegen, recv_type: i32, method
 fn Codegen.classify_generic_call_intrinsic_by_llvm(self: Codegen, recv_ty: i64, method_sym: i32) -> MirIntrinsic:
     if recv_ty == 0 or method_sym == 0:
         return MirIntrinsic.NONE
-    let method_name = self.intern.resolve(method_sym)
+    let method_name = self.codegen_method_symbol_text(method_sym)
     if self.vec_is_vec.contains(recv_ty):
         if method_name == "push": return MirIntrinsic.VEC_PUSH
         if method_name == "get": return MirIntrinsic.VEC_GET
@@ -5940,6 +5983,10 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: MirI
         let fid = wl_build_load(self.builder, wl_i32_type(self.context), fid_ptr)
         let rbuf_ptr = wl_build_struct_gep(self.builder, task_ty, task_alloca, 1)
         let rbuf = wl_build_load(self.builder, wl_ptr_type(self.context), rbuf_ptr)
+        var scoped_task_await = false
+        let await_task_sema_ty = self.mir_operand_sema_type(body, await_op_id)
+        if self.mir_generic_base_name(await_task_sema_ty) == "ScopedTask":
+            scoped_task_await = true
         // Call the appropriate runtime await helper.
         let await_fn_name = if intrinsic == MirIntrinsic.FIBER_CLEANUP_AWAIT: "with_fiber_cleanup_await" else: "with_fiber_await"
         var await_fn = wl_get_named_function(self.llmod, await_fn_name)
@@ -5983,17 +6030,19 @@ fn Codegen.mir_emit_intrinsic_call(self: Codegen, body: MirBody, intrinsic: MirI
             let dst_local = body.place_locals.get(dest_place as i64)
             self.mir_local_ptrs.insert(dst_local, dst_alloca)
             self.mir_local_types.insert(dst_local, dst_llvm_ty)
-        // Free result buffer
-        var free_fn = wl_get_named_function(self.llmod, "with_free")
-        if free_fn == 0:
-            let fp: Vec[i64] = Vec.new()
-            fp.push(wl_ptr_type(self.context))
-            let fft = wl_function_type(wl_void_type(self.context), vec_data_i64(&fp), 1, 0)
-            free_fn = wl_add_function(self.llmod, "with_free", fft)
-        let free_ft = wl_global_get_value_type(free_fn)
-        let fa: Vec[i64] = Vec.new()
-        fa.push(rbuf)
-        wl_build_call(self.builder, free_ft, free_fn, vec_data_i64(&fa), 1)
+        // Raw Task await consumes the result buffer. ScopedTask await leaves
+        // the buffer owned by the async scope cleanup entry.
+        if not scoped_task_await:
+            var free_fn = wl_get_named_function(self.llmod, "with_free")
+            if free_fn == 0:
+                let fp: Vec[i64] = Vec.new()
+                fp.push(wl_ptr_type(self.context))
+                let fft = wl_function_type(wl_void_type(self.context), vec_data_i64(&fp), 1, 0)
+                free_fn = wl_add_function(self.llmod, "with_free", fft)
+            let free_ft = wl_global_get_value_type(free_fn)
+            let fa: Vec[i64] = Vec.new()
+            fa.push(rbuf)
+            wl_build_call(self.builder, free_ft, free_fn, vec_data_i64(&fa), 1)
         if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
             wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
         return true
@@ -6886,6 +6935,42 @@ fn Codegen.mir_emit_intrinsic_call_ext(self: Codegen, body: MirBody, intrinsic: 
         wl_build_call(self.builder, sdft2, sd_fn, vec_data_i64(&sda), 1)
         result = wl_const_int(wl_i32_type(self.context), 0, 0)
 
+    else if intrinsic == MirIntrinsic.THREAD_SCOPE_CREATE:
+        var tsc_fn = wl_get_named_function(self.llmod, "with_thread_scope_create")
+        if tsc_fn == 0:
+            let tscft = wl_function_type(wl_i64_type(self.context), 0, 0, 0)
+            tsc_fn = wl_add_function(self.llmod, "with_thread_scope_create", tscft)
+        let tscft2 = wl_global_get_value_type(tsc_fn)
+        result = wl_build_call(self.builder, tscft2, tsc_fn, 0, 0)
+
+    else if intrinsic == MirIntrinsic.THREAD_SCOPE_JOIN_ALL:
+        let tsj_handle = self.mir_intrinsic_arg(body, args_id, 0)
+        var tsj_fn = wl_get_named_function(self.llmod, "with_thread_scope_join_all")
+        if tsj_fn == 0:
+            let tsjp: Vec[i64] = Vec.new()
+            tsjp.push(wl_i64_type(self.context))
+            let tsjft = wl_function_type(wl_void_type(self.context), vec_data_i64(&tsjp), 1, 0)
+            tsj_fn = wl_add_function(self.llmod, "with_thread_scope_join_all", tsjft)
+        let tsjft2 = wl_global_get_value_type(tsj_fn)
+        let tsja: Vec[i64] = Vec.new()
+        tsja.push(tsj_handle)
+        wl_build_call(self.builder, tsjft2, tsj_fn, vec_data_i64(&tsja), 1)
+        result = wl_const_int(wl_i32_type(self.context), 0, 0)
+
+    else if intrinsic == MirIntrinsic.THREAD_SCOPE_DESTROY:
+        let tsd_handle = self.mir_intrinsic_arg(body, args_id, 0)
+        var tsd_fn = wl_get_named_function(self.llmod, "with_thread_scope_destroy")
+        if tsd_fn == 0:
+            let tsdp: Vec[i64] = Vec.new()
+            tsdp.push(wl_i64_type(self.context))
+            let tsdft = wl_function_type(wl_void_type(self.context), vec_data_i64(&tsdp), 1, 0)
+            tsd_fn = wl_add_function(self.llmod, "with_thread_scope_destroy", tsdft)
+        let tsdft2 = wl_global_get_value_type(tsd_fn)
+        let tsda: Vec[i64] = Vec.new()
+        tsda.push(tsd_handle)
+        wl_build_call(self.builder, tsdft2, tsd_fn, vec_data_i64(&tsda), 1)
+        result = wl_const_int(wl_i32_type(self.context), 0, 0)
+
     else if intrinsic == MirIntrinsic.FIBER_IS_CANCELLED:
         var ic_fn = wl_get_named_function(self.llmod, "with_fiber_is_cancelled")
         if ic_fn == 0:
@@ -7019,6 +7104,15 @@ fn Codegen.mir_generic_base_name(self: Codegen, sema_ty: i32) -> str:
     if cg_sym != 0:
         return self.intern.resolve(cg_sym)
     self.sema_symbol_text(base_sym)
+
+fn Codegen.mir_type_name(self: Codegen, sema_ty: i32) -> str:
+    let sym = self.mir_struct_sym_from_sema_type(sema_ty)
+    if sym == 0:
+        return ""
+    let text = self.intern.resolve(sym)
+    if text.len() > 0:
+        return text
+    self.sema_symbol_text(sym)
 
 fn Codegen.mir_generic_arg_tid(self: Codegen, sema_ty: i32, idx: i32) -> i32:
     if sema_ty <= 0:
@@ -8430,6 +8524,12 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
             if self.pool.kind(gc_callee_field) == NodeKind.NK_FIELD_ACCESS:
                 let gc_self_expr_node = self.pool.get_data0(gc_callee_field)
                 let gc_method_sym = self.pool.get_data1(gc_callee_field)
+                let gc_method_text = self.codegen_ast_method_symbol_text(gc_method_sym)
+                let gc_method_dispatch_sym =
+                    if gc_method_text.len() > 0:
+                        gc_method_sym
+                    else:
+                        gc_callee_sym
                 let gc_mir_start = body.call_arg_starts.get(args_id as i64)
                 let gc_mir_count = body.call_arg_counts.get(args_id as i64)
                 var gc_recv_type = self.ast_static_type_expr(gc_self_expr_node)
@@ -8443,16 +8543,20 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                     let gc_recv_tk = self.mir_input.mir_get_type_kind(self.mir_input.mir_resolve_alias(gc_recv_type_unwrapped))
                     if gc_recv_tk == TypeKind.TY_REF or gc_recv_tk == TypeKind.TY_PTR:
                         gc_recv_type_unwrapped = self.mir_input.mir_get_type_d0(self.mir_input.mir_resolve_alias(gc_recv_type_unwrapped))
-                let gc_intrinsic = self.classify_generic_call_intrinsic(gc_recv_type_unwrapped, gc_method_sym)
+                let gc_intrinsic = self.classify_generic_call_intrinsic(gc_recv_type_unwrapped, gc_method_dispatch_sym)
                 if gc_intrinsic != MirIntrinsic.NONE:
                     return self.mir_emit_intrinsic_call(body, gc_intrinsic, args_id, dest_place, next_bb)
-                let gc_method_name = self.intern.resolve(gc_method_sym)
+                let gc_method_name =
+                    if gc_method_text.len() > 0:
+                        gc_method_text
+                    else:
+                        self.codegen_method_symbol_text(gc_method_dispatch_sym)
                 // Eval receiver from MIR operand 0
                 if gc_mir_count > 0:
                     let gc_recv_op = body.call_arg_operands.get(gc_mir_start as i64)
                     let gc_recv_val = self.mir_eval_operand(body, gc_recv_op, 0)
                     let gc_recv_ty = wl_type_of(gc_recv_val)
-                    let gc_llvm_intrinsic = self.classify_generic_call_intrinsic_by_llvm(gc_recv_ty, gc_method_sym)
+                    let gc_llvm_intrinsic = self.classify_generic_call_intrinsic_by_llvm(gc_recv_ty, gc_method_dispatch_sym)
                     if gc_llvm_intrinsic != MirIntrinsic.NONE:
                         return self.mir_emit_intrinsic_call(body, gc_llvm_intrinsic, args_id, dest_place, next_bb)
                     var gc_recv_type_sym = self.mir_struct_sym_from_sema_type(gc_recv_type_unwrapped)
@@ -8684,6 +8788,133 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
 
             // async scope s.track(task_expr) — register task with scope
             let gc_name = if gc_callee_sym > 0: self.intern.resolve(gc_callee_sym) else: "?"
+            if gc_name == "spawn":
+                let gc_mir_start_spawn = body.call_arg_starts.get(args_id as i64)
+                let gc_mir_count_spawn = body.call_arg_counts.get(args_id as i64)
+                if gc_mir_count_spawn > 1:
+                    let spawn_recv_op = body.call_arg_operands.get(gc_mir_start_spawn as i64)
+                    let spawn_scope_val = self.mir_eval_operand(body, spawn_recv_op, 0)
+                    let spawn_worker_op = body.call_arg_operands.get((gc_mir_start_spawn + gc_mir_count_spawn - 1) as i64)
+                    var spawn_worker_node = 0
+                    let spawn_call_node = body.call_ast_node(args_id)
+                    if spawn_call_node > 0 and self.pool.kind(spawn_call_node) == NodeKind.NK_CALL:
+                        let spawn_arg_start = self.pool.get_data1(spawn_call_node)
+                        let spawn_arg_count = self.pool.get_data2(spawn_call_node)
+                        if spawn_arg_count > 0:
+                            spawn_worker_node = self.pool.get_extra(spawn_arg_start)
+                    var spawn_worker_val: i64 = 0
+                    if spawn_worker_node > 0 and self.pool.kind(spawn_worker_node) == NodeKind.NK_CLOSURE:
+                        for spawn_li in 0..body.local_count():
+                            let spawn_name_sym = body.local_names.get(spawn_li as i64)
+                            if spawn_name_sym != 0:
+                                let spawn_ptr_opt = self.mir_local_ptrs.get(spawn_li)
+                                if spawn_ptr_opt.is_some():
+                                    self.local_allocas.insert(spawn_name_sym, spawn_ptr_opt.unwrap())
+                                    let spawn_ty_opt = self.mir_local_types.get(spawn_li)
+                                    if spawn_ty_opt.is_some():
+                                        self.local_types.insert(spawn_name_sym, spawn_ty_opt.unwrap())
+                                let spawn_sema_ty = body.local_type_ids.get(spawn_li as i64)
+                                if spawn_sema_ty != 0:
+                                    self.local_sema_types.insert(spawn_name_sym, spawn_sema_ty)
+                        spawn_worker_val = self.gen_closure(spawn_worker_node)
+                    else:
+                        spawn_worker_val = self.mir_eval_operand(body, spawn_worker_op, 0)
+                    let spawn_worker_ty = wl_type_of(spawn_worker_val)
+                    let spawn_worker_alloca = self.create_entry_alloca(spawn_worker_ty)
+                    wl_build_store(self.builder, spawn_worker_val, spawn_worker_alloca)
+                    let spawn_fn_ptr_ptr = wl_build_struct_gep(self.builder, spawn_worker_ty, spawn_worker_alloca, 0)
+                    let spawn_fn_ptr = wl_build_load(self.builder, wl_ptr_type(self.context), spawn_fn_ptr_ptr)
+                    let spawn_ctx_ptr_ptr = wl_build_struct_gep(self.builder, spawn_worker_ty, spawn_worker_alloca, 1)
+                    let spawn_ctx_ptr = wl_build_load(self.builder, wl_ptr_type(self.context), spawn_ctx_ptr_ptr)
+
+                    var spawn_fn = wl_get_named_function(self.llmod, "with_thread_spawn")
+                    if spawn_fn == 0:
+                        let spawn_params: Vec[i64] = Vec.new()
+                        spawn_params.push(wl_ptr_type(self.context))
+                        spawn_params.push(wl_ptr_type(self.context))
+                        let spawn_ft = wl_function_type(wl_i64_type(self.context), vec_data_i64(&spawn_params), 2, 0)
+                        spawn_fn = wl_add_function(self.llmod, "with_thread_spawn", spawn_ft)
+                    let spawn_ft2 = wl_global_get_value_type(spawn_fn)
+                    let spawn_args: Vec[i64] = Vec.new()
+                    spawn_args.push(spawn_fn_ptr)
+                    spawn_args.push(spawn_ctx_ptr)
+                    let thread_handle = wl_build_call(self.builder, spawn_ft2, spawn_fn, vec_data_i64(&spawn_args), 2)
+
+                    var track_fn = wl_get_named_function(self.llmod, "with_thread_scope_track")
+                    if track_fn == 0:
+                        let track_params: Vec[i64] = Vec.new()
+                        track_params.push(wl_i64_type(self.context))
+                        track_params.push(wl_i64_type(self.context))
+                        let track_ft = wl_function_type(wl_i32_type(self.context), vec_data_i64(&track_params), 2, 0)
+                        track_fn = wl_add_function(self.llmod, "with_thread_scope_track", track_ft)
+                    let track_ft2 = wl_global_get_value_type(track_fn)
+                    let track_args: Vec[i64] = Vec.new()
+                    track_args.push(spawn_scope_val)
+                    track_args.push(thread_handle)
+                    let thread_index = wl_build_call(self.builder, track_ft2, track_fn, vec_data_i64(&track_args), 2)
+
+                    if dest_place >= 0:
+                        var sjh_ty: i64 = 0
+                        if dest_place < body.place_locals.len() as i32:
+                            let sjh_local = body.place_locals.get(dest_place as i64)
+                            if sjh_local >= 0 and sjh_local < body.local_type_ids.len() as i32:
+                                sjh_ty = self.mir_sema_type_to_llvm(body.local_type_ids.get(sjh_local as i64))
+                        if sjh_ty == 0:
+                            let sjh_fields: Vec[i64] = Vec.new()
+                            sjh_fields.push(wl_i64_type(self.context))
+                            sjh_fields.push(wl_i32_type(self.context))
+                            sjh_fields.push(wl_i64_type(self.context))
+                            sjh_ty = wl_struct_type(self.context, vec_data_i64(&sjh_fields), 3, 0)
+                        var sjh_val = wl_get_undef(sjh_ty)
+                        sjh_val = wl_build_insert_value(self.builder, sjh_val, spawn_scope_val, 0)
+                        sjh_val = wl_build_insert_value(self.builder, sjh_val, thread_index, 1)
+                        sjh_val = wl_build_insert_value(self.builder, sjh_val, thread_handle, 2)
+                        let sjh_dst_ptr = self.mir_place_ptr(body, dest_place, false, sjh_ty)
+                        if sjh_dst_ptr != 0:
+                            wl_build_store(self.builder, sjh_val, sjh_dst_ptr)
+                    if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                        wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
+                    return true
+
+            if gc_name == "join":
+                let join_mir_start = body.call_arg_starts.get(args_id as i64)
+                let join_mir_count = body.call_arg_counts.get(args_id as i64)
+                if join_mir_count > 0:
+                    let join_recv_op = body.call_arg_operands.get(join_mir_start as i64)
+                    let join_recv_sema = self.mir_operand_sema_type(body, join_recv_op)
+                    if self.mir_type_name(join_recv_sema) == "ScopedJoinHandle":
+                        let join_recv_val = self.mir_eval_operand(body, join_recv_op, 0)
+                        let join_recv_ty = wl_type_of(join_recv_val)
+                        let join_alloca = self.create_entry_alloca(join_recv_ty)
+                        wl_build_store(self.builder, join_recv_val, join_alloca)
+                        let join_scope_ptr = wl_build_struct_gep(self.builder, join_recv_ty, join_alloca, 0)
+                        let join_scope = wl_build_load(self.builder, wl_i64_type(self.context), join_scope_ptr)
+                        let join_index_ptr = wl_build_struct_gep(self.builder, join_recv_ty, join_alloca, 1)
+                        let join_index = wl_build_load(self.builder, wl_i32_type(self.context), join_index_ptr)
+                        let join_handle_ptr = wl_build_struct_gep(self.builder, join_recv_ty, join_alloca, 2)
+                        let join_handle = wl_build_load(self.builder, wl_i64_type(self.context), join_handle_ptr)
+                        var join_fn = wl_get_named_function(self.llmod, "with_thread_scope_join")
+                        if join_fn == 0:
+                            let join_params: Vec[i64] = Vec.new()
+                            join_params.push(wl_i64_type(self.context))
+                            join_params.push(wl_i32_type(self.context))
+                            join_params.push(wl_i64_type(self.context))
+                            let join_ft = wl_function_type(wl_i32_type(self.context), vec_data_i64(&join_params), 3, 0)
+                            join_fn = wl_add_function(self.llmod, "with_thread_scope_join", join_ft)
+                        let join_ft2 = wl_global_get_value_type(join_fn)
+                        let join_args: Vec[i64] = Vec.new()
+                        join_args.push(join_scope)
+                        join_args.push(join_index)
+                        join_args.push(join_handle)
+                        let join_result = wl_build_call(self.builder, join_ft2, join_fn, vec_data_i64(&join_args), 3)
+                        if dest_place >= 0:
+                            let join_dst_ptr = self.mir_place_ptr(body, dest_place, false, wl_i32_type(self.context))
+                            if join_dst_ptr != 0:
+                                wl_build_store(self.builder, join_result, join_dst_ptr)
+                        if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
+                            wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
+                        return true
+
             if gc_name == "track":
                 let gc_mir_start2 = body.call_arg_starts.get(args_id as i64)
                 let gc_mir_count2 = body.call_arg_counts.get(args_id as i64)
@@ -8693,30 +8924,44 @@ fn Codegen.mir_emit_call_term(self: Codegen, body: MirBody, callee_operand: i32,
                     let gc_recv_val = self.mir_eval_operand(body, gc_recv_op, 0)
                     let gc_arg_op = body.call_arg_operands.get((gc_mir_start2 + gc_mir_count2 - 1) as i64)
                     let gc_arg_val = self.mir_eval_operand(body, gc_arg_op, 0)
-                    // Extract fiber_id from Task { i32, ptr }
+                    // Extract fiber_id and result_buf from Task { i32, ptr }
                     let gc_task_ty = wl_type_of(gc_arg_val)
                     let gc_task_alloca = self.create_entry_alloca(gc_task_ty)
                     wl_build_store(self.builder, gc_arg_val, gc_task_alloca)
                     let gc_fid_ptr = wl_build_struct_gep(self.builder, gc_task_ty, gc_task_alloca, 0)
                     let gc_fid = wl_build_load(self.builder, wl_i32_type(self.context), gc_fid_ptr)
-                    // Call with_scope_track(scope_handle, fiber_id)
+                    let gc_rbuf_ptr = wl_build_struct_gep(self.builder, gc_task_ty, gc_task_alloca, 1)
+                    let gc_rbuf = wl_build_load(self.builder, wl_ptr_type(self.context), gc_rbuf_ptr)
+                    // Call with_scope_track(scope_handle, fiber_id, result_buf)
                     var gc_track_fn = wl_get_named_function(self.llmod, "with_scope_track")
                     if gc_track_fn == 0:
                         let gtp: Vec[i64] = Vec.new()
                         gtp.push(wl_i64_type(self.context))
                         gtp.push(wl_i32_type(self.context))
-                        let gtft = wl_function_type(wl_void_type(self.context), vec_data_i64(&gtp), 2, 0)
+                        gtp.push(wl_ptr_type(self.context))
+                        let gtft = wl_function_type(wl_void_type(self.context), vec_data_i64(&gtp), 3, 0)
                         gc_track_fn = wl_add_function(self.llmod, "with_scope_track", gtft)
                     let gtft2 = wl_global_get_value_type(gc_track_fn)
                     let gta: Vec[i64] = Vec.new()
                     gta.push(gc_recv_val)
                     gta.push(gc_fid)
-                    wl_build_call(self.builder, gtft2, gc_track_fn, vec_data_i64(&gta), 2)
-                    // Store Task value to dest (so caller can still use it)
+                    gta.push(gc_rbuf)
+                    wl_build_call(self.builder, gtft2, gc_track_fn, vec_data_i64(&gta), 3)
+                    // Store the ABI-identical ScopedTask value to dest.
                     if dest_place >= 0 and gc_arg_val != 0:
-                        let gc_dst_ptr = self.mir_place_ptr(body, dest_place, false, 0)
+                        var gc_dst_ty: i64 = 0
+                        if dest_place < body.place_locals.len() as i32:
+                            let gc_dst_local = body.place_locals.get(dest_place as i64)
+                            if gc_dst_local >= 0 and gc_dst_local < body.local_type_ids.len() as i32:
+                                gc_dst_ty = self.mir_sema_type_to_llvm(body.local_type_ids.get(gc_dst_local as i64))
+                        if gc_dst_ty == 0:
+                            gc_dst_ty = gc_task_ty
+                        var gc_scoped_val = wl_get_undef(gc_dst_ty)
+                        gc_scoped_val = wl_build_insert_value(self.builder, gc_scoped_val, gc_fid, 0)
+                        gc_scoped_val = wl_build_insert_value(self.builder, gc_scoped_val, gc_rbuf, 1)
+                        let gc_dst_ptr = self.mir_place_ptr(body, dest_place, true, gc_dst_ty)
                         if gc_dst_ptr != 0:
-                            wl_build_store(self.builder, gc_arg_val, gc_dst_ptr)
+                            wl_build_store(self.builder, gc_scoped_val, gc_dst_ptr)
                 if next_bb >= 0 and next_bb < self.mir_bb_values.len() as i32:
                     wl_build_br(self.builder, self.mir_bb_values.get(next_bb as i64))
                 return true
@@ -9578,7 +9823,9 @@ fn Codegen.gen_function_mir(self: Codegen, fn_node: i32, body: MirBody):
 // instead of extracting the name from the AST node (which has the generic name).
 
 fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, body: MirBody):
-    let name_str = self.intern.resolve(mono_sym)
+    let intern_name = self.intern.resolve(mono_sym)
+    let sema_name = self.sema_symbol_text(mono_sym)
+    let name_str = if intern_name.len() > 0: intern_name else: sema_name
     let fv = self.fn_values.get(mono_sym)
     if not fv.is_some():
         with_eprint("error: no fn_value for MIR mono function: " ++ name_str)
@@ -9706,12 +9953,14 @@ fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, bod
     self.mir_local_ptrs.insert(0, ret_alloca)
     self.mir_local_types.insert(0, ret_store_ty)
 
-    let meta = self.pool.find_fn_meta(fn_node)
+    let meta = if fn_node > 0: self.pool.find_fn_meta(fn_node) else: -1
     var param_start = 0
     var param_count = 0
     if meta >= 0:
         param_start = self.pool.fn_meta_param_start(meta)
         param_count = self.pool.fn_meta_param_count(meta)
+    else:
+        param_count = body.n_params
     let fn_byval_mask_opt = self.extern_fn_byval_params.get(mono_sym)
     let fn_byval_mask = if fn_byval_mask_opt.is_some(): fn_byval_mask_opt.unwrap() as i64 else: 0
     var fn_byval_types: Vec[i64] = Vec.new()
@@ -9735,8 +9984,18 @@ fn Codegen.gen_function_mir_mono(self: Codegen, mono_sym: i32, fn_node: i32, bod
 
     let max_params = param_count
     for pi in 0..max_params:
-        let p_name = self.pool.fn_param_name(param_start, pi)
-        let p_type_node = self.pool.fn_param_type(param_start, pi)
+        let p_name =
+            if meta >= 0:
+                self.pool.fn_param_name(param_start, pi)
+            else if pi + 1 < body.local_names.len() as i32:
+                body.local_names.get((pi + 1) as i64)
+            else:
+                0
+        let p_type_node =
+            if meta >= 0:
+                self.pool.fn_param_type(param_start, pi)
+            else:
+                0
         let actual_pi = pi + (if fn_has_sret != 0: 1 else: 0)
         let param_val = wl_get_param(function, actual_pi)
         var param_type = wl_type_of(param_val)

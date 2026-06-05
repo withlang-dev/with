@@ -92,6 +92,8 @@ enum SemaMagicIdentKind: i32:
 
 type SemaBuiltinSymbols {
     task: i32,
+    scoped_task: i32,
+    scoped_join_handle: i32,
     channel: i32,
     send: i32,
     recv: i32,
@@ -101,6 +103,8 @@ type SemaBuiltinSymbols {
     todo: i32,
     unreachable: i32,
     track: i32,
+    spawn_method: i32,
+    join: i32,
     src: i32,
     file_magic: i32,
     line_magic: i32,
@@ -350,6 +354,18 @@ type Sema {
     result_option_fns: HashMap[i32, i32],
     task_fns: HashMap[i32, i32],
     fn_stack_sizes: HashMap[i32, i32],
+    // Generator metadata. A `gen fn f(...) -> T` semantically returns an
+    // internal state struct and exposes an internal `next(mut self)` method
+    // returning Option[T].
+    generator_fn_yield_types: HashMap[i32, i32],
+    generator_fn_state_types: HashMap[i32, i32],
+    generator_fn_state_syms: HashMap[i32, i32],
+    generator_fn_next_syms: HashMap[i32, i32],
+    generator_next_fn_syms: HashMap[i32, i32],
+    generator_state_yield_types: HashMap[i32, i32],
+    generator_state_field_counts: HashMap[i32, i32],
+    generator_state_field_names: HashMap[i64, i32],
+    generator_state_field_types: HashMap[i64, i32],
     mutable_global_syms: HashMap[i32, i32],
     // docs/mut.md Rev 8 §12 / §15.12 — symbols declared via `global X = ...`
     // (stable) recorded here. Used by check_assign to emit a specific
@@ -391,6 +407,7 @@ type Sema {
     pending_generic_binding_call: HashMap[i32, i32],
     pending_generic_binding_decl: HashMap[i32, i32],
     async_scope_names: Vec[i32],
+    sync_scope_names: Vec[i32],
     label_syms: Vec[i32],
     label_kinds: Vec[i32],
     label_nodes: Vec[i32],
@@ -671,6 +688,63 @@ fn Sema.pool_intern(mut self: Sema, name: str) -> i32:
     self.pool.state.symbol_map.insert(owned, id)
     id
 
+fn sema_tier_path_is_std_implementation(path: str) -> i32:
+    if path.starts_with("lib/std/") or path.starts_with("<embedded-std>/"):
+        return 1
+    if path.contains("/lib/std/"):
+        return 1
+    0
+
+fn Sema.current_module_is_std_implementation(self: Sema) -> i32:
+    sema_tier_path_is_std_implementation(self.current_module_path)
+
+fn Sema.core_without_alloc(self: Sema) -> i32:
+    if self.no_std == 0:
+        return 0
+    if self.alloc != 0:
+        return 0
+    1
+
+fn Sema.symbol_requires_alloc_tier(self: Sema, sym: i32) -> i32:
+    if sym == self.syms.vec or sym == self.syms.hashmap or sym == self.syms.hashset or sym == self.syms.slotmap or sym == self.syms.box:
+        return 1
+    let name = self.pool_resolve_symbol(sym)
+    if name == "String" or name == "StringBuilder":
+        return 1
+    0
+
+fn Sema.symbol_requires_std_tier(self: Sema, sym: i32) -> i32:
+    if sym == self.syms.regex:
+        return 1
+    let name = self.pool_resolve_symbol(sym)
+    if name == "print" or name == "eprint" or name == "write" or name == "ewrite":
+        return 1
+    if name == "print_i32" or name == "print_i64" or name == "print_bool":
+        return 1
+    0
+
+fn Sema.require_alloc_tier_for_symbol(self: Sema, sym: i32, node: i32) -> i32:
+    if self.core_without_alloc() == 0:
+        return 1
+    if self.current_module_is_std_implementation() != 0:
+        return 1
+    if self.symbol_requires_alloc_tier(sym) == 0:
+        return 1
+    let name = self.pool_resolve_symbol(sym)
+    self.emit_error(name ++ " requires alloc; use --alloc or set alloc = true with std = false", node)
+    0
+
+fn Sema.require_std_tier_for_symbol(self: Sema, sym: i32, node: i32) -> i32:
+    if self.no_std == 0:
+        return 1
+    if self.current_module_is_std_implementation() != 0:
+        return 1
+    if self.symbol_requires_std_tier(sym) == 0:
+        return 1
+    let name = self.pool_resolve_symbol(sym)
+    self.emit_error(name ++ " requires std", node)
+    0
+
 fn sema_new_map_i32_i32 -> HashMap[i32, i32]:
     HashMap.new()
 
@@ -694,6 +768,8 @@ fn sema_pair_key(a: i32, b: i32) -> i64:
 fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
     SemaBuiltinSymbols {
         task: 0,
+        scoped_task: 0,
+        scoped_join_handle: 0,
         channel: 0,
         send: 0,
         recv: 0,
@@ -703,6 +779,8 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         todo: 0,
         unreachable: 0,
         track: 0,
+        spawn_method: 0,
+        join: 0,
         src: 0,
         file_magic: 0,
         line_magic: 0,
@@ -840,6 +918,15 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
     let result_option_fns = sema_new_map_i32_i32()
     let task_fns = sema_new_map_i32_i32()
     let fn_stack_sizes = sema_new_map_i32_i32()
+    let generator_fn_yield_types = sema_new_map_i32_i32()
+    let generator_fn_state_types = sema_new_map_i32_i32()
+    let generator_fn_state_syms = sema_new_map_i32_i32()
+    let generator_fn_next_syms = sema_new_map_i32_i32()
+    let generator_next_fn_syms = sema_new_map_i32_i32()
+    let generator_state_yield_types = sema_new_map_i32_i32()
+    let generator_state_field_counts = sema_new_map_i32_i32()
+    let generator_state_field_names = sema_new_map_i64_i32()
+    let generator_state_field_types = sema_new_map_i64_i32()
     let mutable_global_syms = sema_new_map_i32_i32()
     let stable_global_syms = sema_new_map_i32_i32()
     let global_value_decl_kinds = sema_new_map_i32_i32()
@@ -941,6 +1028,15 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         result_option_fns,
         task_fns,
         fn_stack_sizes,
+        generator_fn_yield_types,
+        generator_fn_state_types,
+        generator_fn_state_syms,
+        generator_fn_next_syms,
+        generator_next_fn_syms,
+        generator_state_yield_types,
+        generator_state_field_counts,
+        generator_state_field_names,
+        generator_state_field_types,
         mutable_global_syms,
         stable_global_syms,
         global_value_decl_kinds,
@@ -972,6 +1068,7 @@ fn sema_empty_state(pool: InternPool, diags: DiagnosticList, ast: AstPool) -> Se
         pending_generic_binding_call: sema_new_map_i32_i32(),
         pending_generic_binding_decl: sema_new_map_i32_i32(),
         async_scope_names: Vec.new(),
+        sync_scope_names: Vec.new(),
         label_syms: Vec.new(),
         label_kinds: Vec.new(),
         label_nodes: Vec.new(),
@@ -1321,6 +1418,8 @@ fn Sema.init_builtin_reflection_types(mut self: Sema):
 
 fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.syms.task = self.pool_intern("Task")
+    self.syms.scoped_task = self.pool_intern("ScopedTask")
+    self.syms.scoped_join_handle = self.pool_intern("ScopedJoinHandle")
     self.syms.channel = self.pool_intern("Channel")
     self.syms.send = self.pool_intern("send")
     self.syms.recv = self.pool_intern("recv")
@@ -1330,6 +1429,8 @@ fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.syms.todo = self.pool_intern("todo")
     self.syms.unreachable = self.pool_intern("unreachable")
     self.syms.track = self.pool_intern("track")
+    self.syms.spawn_method = self.pool_intern("spawn")
+    self.syms.join = self.pool_intern("join")
     self.syms.src = self.pool_intern("src")
     self.syms.file_magic = self.pool_intern("__FILE__")
     self.syms.line_magic = self.pool_intern("__LINE__")
@@ -1951,6 +2052,10 @@ fn Sema.resolve_generic_type(self: Sema, node: i32) -> i32:
             let gi_name = self.pool_resolve_symbol(gi_base_sym)
             self.emit_error("unknown type: " ++ gi_name, node)
             return 0
+    if self.require_alloc_tier_for_symbol(gi_base_sym, node) == 0:
+        return 0
+    if self.require_std_tier_for_symbol(gi_base_sym, node) == 0:
+        return 0
     let gi_arg_count = self.ast.get_data2(node)
     let gi_extra_start = self.ast.get_data1(node)
     let gi_args: Vec[i32] = Vec.new()
@@ -2640,6 +2745,14 @@ fn Sema.is_active_async_scope_symbol(self: Sema, sym: i32) -> i32:
         i = i - 1
     0
 
+fn Sema.is_active_sync_scope_symbol(self: Sema, sym: i32) -> i32:
+    var i = self.sync_scope_names.len() as i32 - 1
+    while i >= 0:
+        if self.sync_scope_names.get(i as i64) == sym:
+            return 1
+        i = i - 1
+    0
+
 // ── Function signature management ────────────────────────────────
 
 fn Sema.add_sig(self: Sema, name: i32, fn_tid: i32, ret: i32, param_start: i32, param_count: i32, variadic: i32):
@@ -2780,6 +2893,7 @@ fn Sema.set_sig_return_type(self: Sema, idx: i32, ret: i32):
 
 fn Sema.check_module(self: Sema):
     self.prepare_for_comptime_transform()
+    self.validate_no_std_requirements()
     self.check_top_level_comptime_let_values()
     self.check_bodies()
     self.check_reachable_comptime_errors()

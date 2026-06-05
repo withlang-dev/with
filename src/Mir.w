@@ -38,6 +38,9 @@ enum TermKind: i32:
     TK_SWITCH_INT = 3
     TK_CALL = 4
     TK_DROP_AND_GOTO = 5
+    // Temporary terminator used only before generator lowering. Backends must
+    // not receive MIR containing TK_YIELD.
+    TK_YIELD = 6
 
 // ── Rvalue kinds ─────────────────────────────────────────────────
 
@@ -184,6 +187,9 @@ enum MirIntrinsic: i32:
     SCOPE_CREATE
     SCOPE_AWAIT_ALL
     SCOPE_DESTROY
+    THREAD_SCOPE_CREATE
+    THREAD_SCOPE_JOIN_ALL
+    THREAD_SCOPE_DESTROY
     ATOMIC_LOAD
     ATOMIC_STORE
     ATOMIC_SWAP
@@ -310,6 +316,8 @@ enum DropKind: i32:
     DK_TASK_EPHEMERAL = 3
     DK_WITH_GUARD = 4
     DK_WITH_GUARD_MUT = 5
+    DK_ASYNC_SCOPE = 6
+    DK_THREAD_SCOPE = 7
 
 // ── Data records ─────────────────────────────────────────────────
 

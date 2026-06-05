@@ -592,6 +592,11 @@ fn render_expr(pool: AstPool, intern: InternPool, node: NodeId, indent: i32) -> 
         let body = pool.get_data1(node)
         return prefix ++ "async scope |" ++ name ++ "|:\n" ++ render_expr(pool, intern, (body) as NodeId, indent + 2)
 
+    if kind == NodeKind.NK_SCOPE:
+        let name = intern.resolve(pool.get_data0(node))
+        let body = pool.get_data1(node)
+        return prefix ++ "scope " ++ name ++ ":\n" ++ render_expr(pool, intern, (body) as NodeId, indent + 2)
+
     if kind == NodeKind.NK_PIPELINE:
         let lhs = pool.get_data0(node)
         let rhs = pool.get_data1(node)

@@ -175,6 +175,7 @@ fn typed_expr_kind_name(kind: i32) -> str:
     if kind == NodeKind.NK_YIELD: return "yield_expr"
     if kind == NodeKind.NK_COMPTIME: return "comptime_expr"
     if kind == NodeKind.NK_ASYNC_SCOPE: return "async_scope"
+    if kind == NodeKind.NK_SCOPE: return "scope"
     if kind == NodeKind.NK_SELECT_AWAIT: return "select_await"
     if kind == NodeKind.NK_OPTIONAL_CHAIN: return "optional_chain"
     if kind == NodeKind.NK_POISONED_EXPR: return "poisoned"
@@ -845,6 +846,10 @@ fn Sema.dump_typed_expr_tree(self: Sema, node: i32, indent: i32) -> str:
         out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         return out
 
+    if kind == NodeKind.NK_SCOPE:
+        out = out ++ self.dump_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        return out
+
     if kind == NodeKind.NK_SELECT_AWAIT:
         let extra_start = self.ast.get_data0(node)
         let arm_count = self.ast.get_data1(node)
@@ -1110,6 +1115,10 @@ fn Sema.emit_typed_expr_tree(self: Sema, node: i32, indent: i32):
         return
 
     if kind == NodeKind.NK_ASYNC_SCOPE:
+        self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
+        return
+
+    if kind == NodeKind.NK_SCOPE:
         self.emit_typed_expr_tree(self.ast.get_data1(node), indent + 1)
         return
 

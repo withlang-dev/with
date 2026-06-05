@@ -721,23 +721,23 @@ fn bs_check_get_raylib_versions(ctx: ActionCtx, compiler_path: str, case_dir: st
     rc = bs_expect_file_contains(ctx, bs_join(latest_dir, "with.toml"), "c.raylib = \"6.0\"", "get raylib latest manifest dep")
     if rc != 0: return rc
 
-    let pinned_dir = bs_join(case_dir, "pinned_5_5")
-    rc = bs_write_project_manifest(ctx, pinned_dir, "getraylib55")
+    let pinned_dir = bs_join(case_dir, "pinned_6_0")
+    rc = bs_write_project_manifest(ctx, pinned_dir, "getraylib60")
     if rc != 0: return rc
     var pinned_args: Vec[str] = Vec.new()
     pinned_args |> push("get")
-    pinned_args |> push("c.raylib@5.5")
-    let pinned = bs_run_cli_capture_cwd(ctx, compiler_path, "get-raylib-5-5", pinned_args, 300000, pinned_dir)
+    pinned_args |> push("c.raylib@6.0")
+    let pinned = bs_run_cli_capture_cwd(ctx, compiler_path, "get-raylib-6-0", pinned_args, 300000, pinned_dir)
     if pinned.rc != 0:
-        ctx.diagnostics().error(ctx.target_name() ++ f": project selfhost case 'get-raylib-5-5' failed with exit code {pinned.rc}")
+        ctx.diagnostics().error(ctx.target_name() ++ f": project selfhost case 'get-raylib-6-0' failed with exit code {pinned.rc}")
         return pinned.rc
-    rc = bs_assert_contains(ctx, pinned.stderr, "resolving raylib/5.5", "get_raylib_5_5")
+    rc = bs_assert_contains(ctx, pinned.stderr, "resolving raylib/6.0", "get_raylib_6_0")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, pinned.stderr, "added c.raylib@5.5", "get_raylib_5_5")
+    rc = bs_assert_contains(ctx, pinned.stderr, "added c.raylib@6.0", "get_raylib_6_0")
     if rc != 0: return rc
-    rc = bs_expect_file(ctx, bs_join(pinned_dir, ".with/deps/c/raylib/5.5/metadata.json"), "get raylib 5.5 metadata")
+    rc = bs_expect_file(ctx, bs_join(pinned_dir, ".with/deps/c/raylib/6.0/metadata.json"), "get raylib 6.0 metadata")
     if rc != 0: return rc
-    bs_expect_file_contains(ctx, bs_join(pinned_dir, "with.toml"), "c.raylib = \"5.5\"", "get raylib 5.5 manifest dep")
+    bs_expect_file_contains(ctx, bs_join(pinned_dir, "with.toml"), "c.raylib = \"6.0\"", "get raylib 6.0 manifest dep")
 
 fn bs_check_build_cache_tracks_compiler(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "cachecompiler")
@@ -1005,7 +1005,7 @@ fn bs_check_build_options_cli(ctx: ActionCtx, compiler_path: str, case_dir: str)
     let bad_prelude = bs_run_cli_capture_cwd(ctx, compiler_path, "build-options-bad-prelude", bad_prelude_args, 120000, case_dir)
     if bad_prelude.rc == 0:
         return bs_fail(ctx, "build options bad prelude unexpectedly succeeded")
-    bs_assert_contains(ctx, bad_prelude.stderr, "invalid --prelude value 'bogus' (expected full|core|none)", "build_options_bad_prelude")
+    bs_assert_contains(ctx, bad_prelude.stderr, "invalid --prelude value 'bogus' (expected full|alloc|core|none)", "build_options_bad_prelude")
 
 fn bs_check_whole_program_extern_var_redecl(ctx: ActionCtx, compiler_path: str, case_dir: str) -> i32:
     let root = ctx.project_info().project_root()
@@ -1153,7 +1153,7 @@ fn bs_check_emit_c_hashmap_new_field(ctx: ActionCtx, compiler_path: str, case_di
     let src = bs_join(case_dir, "hashmap_new_field.w")
     let c_path = bs_join(case_dir, "hashmap_new_field.c")
     let bin = bs_join(case_dir, "hashmap_new_field")
-    let source = "use std.prelude_core\n\n" ++
+    let source = "use std.prelude_alloc\n\n" ++
         "extern fn with_print_str(s: str) -> void\n\n" ++
         "type Registry {\n" ++
         "    names: HashMap[str, i32],\n" ++

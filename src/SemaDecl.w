@@ -984,6 +984,47 @@ fn Sema.fn_param_uses_value_ref_abi(self: Sema, param_start: i32, param_idx: i32
         return 1
     0
 
+fn Sema.ensure_generator_state_type(self: Sema, fn_sym: i32, yield_ty: i32) -> i32:
+    if self.generator_fn_state_types.contains(fn_sym):
+        return self.generator_fn_state_types.get(fn_sym).unwrap()
+
+    let state_name = f"__with_generator_state_{fn_sym}"
+    let state_sym = self.pool_intern(state_name)
+    let state_tid = self.add_type(TypeKind.TY_STRUCT, state_sym, 0, 0)
+    self.record_named_type(state_sym, state_tid as i32)
+    self.pretty_symbol_names.insert(state_sym, sema_owned_text(state_name))
+    self.generator_fn_yield_types.insert(fn_sym, yield_ty)
+    self.generator_fn_state_types.insert(fn_sym, state_tid as i32)
+    self.generator_fn_state_syms.insert(fn_sym, state_sym)
+    self.generator_state_yield_types.insert(state_tid as i32, yield_ty)
+    state_tid as i32
+
+fn Sema.register_generator_next_method(self: Sema, fn_sym: i32, state_sym: i32, state_tid: i32, yield_ty: i32):
+    if self.generator_fn_next_syms.contains(fn_sym):
+        return
+
+    let next_fn_name = f"__with_generator_next_{fn_sym}"
+    let next_fn_sym = self.pool_intern(next_fn_name)
+    let opt_yield_ty = self.ensure_option_type_for(yield_ty)
+
+    let next_param_start = self.sig_params.len() as i32
+    self.sig_params.push(state_tid)
+    let next_fn_extra = self.type_extra.len() as i32
+    self.type_extra.push(state_tid)
+    let next_fn_tid = self.add_type(TypeKind.TY_FN, next_fn_extra, 1, opt_yield_ty)
+    self.add_sig(next_fn_sym, next_fn_tid as i32, opt_yield_ty, next_param_start, 1, 0)
+    let next_sig_idx = self.get_sig(next_fn_sym)
+    if next_sig_idx >= 0:
+        self.set_sig_param_value_ref_abi(next_sig_idx, 0, 1)
+        let key = sema_pair_key(state_sym, self.syms.next)
+        self.method_lookup.sig_lookup.insert(key, next_sig_idx)
+        self.method_lookup.fn_lookup.insert(key, next_fn_sym)
+
+    self.generator_fn_next_syms.insert(fn_sym, next_fn_sym)
+    self.generator_next_fn_syms.insert(next_fn_sym, fn_sym)
+    self.method_symbol_flags.insert(next_fn_sym, 1)
+    self.fn_decl_source_paths.insert(next_fn_sym, self.current_module_path)
+
 fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
     let fn_name = self.ast.get_data0(node)
     if is_local != 0:
@@ -1125,8 +1166,21 @@ fn Sema.collect_fn_decl(self: Sema, node: i32, is_local: i32):
         // no return type annotation → void
         let _ = 0
 
-    // For async functions, wrap return type in Task[T]
     var sig_ret_type = ret_type
+
+    // For generator functions, the public call returns an internal state value.
+    // The declared return type remains the yield type tracked for `yield expr`.
+    if (flags / FnFlags.GEN) % 2 == 1:
+        if (flags / FnFlags.ASYNC) % 2 == 1:
+            self.emit_error("gen fn cannot also be async", node)
+        if ret_node == 0:
+            self.emit_error("generator function requires a yield type", node)
+        let state_tid = self.ensure_generator_state_type(fn_name, ret_type as i32)
+        let state_sym = self.generator_fn_state_syms.get(fn_name).unwrap()
+        self.register_generator_next_method(fn_name, state_sym, state_tid, ret_type as i32)
+        sig_ret_type = state_tid as TypeId
+
+    // For async functions, wrap return type in Task[T]
     if (flags / FnFlags.ASYNC) % 2 == 1:
         let task_sym = self.pool_intern("Task")
         let task_args: Vec[i32] = Vec.new()

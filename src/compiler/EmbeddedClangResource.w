@@ -6,8 +6,9 @@
 //
 // libclang reads headers from real files, so the embedded bytes must be written
 // to disk; we cache them under <cache>/with/clang-resource/<v>/include and skip
-// the work once a completion stamp exists. clang_bridge calls the exported
-// with_ensure_clang_resource_dir() via extern.
+// the work once a completion stamp exists. Compiler code calls
+// ensure_clang_resource_dir() directly and passes the resulting path to the
+// libclang bridge.
 
 use compiler.EmbeddedClangResourceData
 
@@ -36,7 +37,6 @@ fn ecr_cache_root() -> str:
             base = home ++ "/.cache"
     base ++ "/with/clang-resource/" ++ version
 
-@[c_export("with_ensure_clang_resource_dir")]
 pub fn ensure_clang_resource_dir() -> str:
     let root = ecr_cache_root()
     let include_dir = root ++ "/include"
