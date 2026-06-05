@@ -72,7 +72,7 @@ typedef struct {
 EOF
 
 if [ ! -f out/gen/wl_decls.h ]; then
-    echo "error: missing out/gen/wl_decls.h; run make emit-c-test first" >&2
+    echo "error: missing out/gen/wl_decls.h; run with build :emit-c-test first" >&2
     exit 1
 fi
 cp out/gen/wl_decls.h "$work_dir/runtime/wl_decls.h"
@@ -401,9 +401,9 @@ It contains emitted C for:
 The bootstrap compiler is temporary. Use it only to run the normal With stage
 chain on the target platform:
 
-    WITH=/path/to/with-bootstrap make build
-    make fixpoint
-    make test
+    WITH=/path/to/with-bootstrap with build
+    with build :fixpoint
+    with build :test
 
 ## Linux x86_64 Compile Sketch
 
