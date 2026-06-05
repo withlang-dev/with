@@ -6,6 +6,7 @@ use c_import("limits.h")
 use c_import("math.h", link: "m")
 use c_import("string.h")
 use c_import("typedef struct Hidden279 Hidden279;\nstruct Hidden279 { int value; };\ntypedef struct Holder279 { Hidden279 *hidden; int value; } Holder279;\n")
+use c_import("typedef int (*With299Callback)(int);\ntypedef struct With299Holder { With299Callback cb; } With299Holder;\n")
 
 extern "C" fn atoi(s: *const u8) -> i32
 
@@ -40,6 +41,10 @@ fn test_c_import_forward_typedef_definition_order:
 fn test_c_import_constants_available:
     assert(INT_MAX == 2147483647)
 
+fn test_c_import_callback_field_uses_extern_fn_pointer:
+    let holder = With299Holder { cb: value => value + 1 }
+    assert(holder.cb(41) == 42)
+
 fn main:
     test_c_import_functions_callable_directly()
     test_c_import_link_directive()
@@ -49,4 +54,5 @@ fn main:
     test_c_import_str_slice_to_const_char_ptr()
     test_c_import_forward_typedef_definition_order()
     test_c_import_constants_available()
+    test_c_import_callback_field_uses_extern_fn_pointer()
     print("ok")

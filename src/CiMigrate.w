@@ -76,6 +76,15 @@ var g_migrate_shared_usage_idents: str = ""
 var g_migrate_libc_symbols_used: str = ""
 var g_migrate_unsafe_extern_fn_names: str = ""
 
+fn ci_migrate_text_is_blank(text: str) -> bool:
+    var i: i64 = 0
+    while i < text.len():
+        let ch = text.byte_at(i)
+        if ch != 32 and ch != 9 and ch != 10 and ch != 13:
+            return false
+        i = i + 1
+    true
+
 pub fn migrate_set_shared_defs(prefix: str):
     g_migrate_shared_defs_prefix = prefix
 
@@ -1301,9 +1310,10 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: str) -> 
     if body.len() > 0:
         g_migrate_fn_translated = g_migrate_fn_translated + 1
         let ret_suffix = if ret == "void": "" else: " -> " ++ ret
+        let body_for_emit = if ret == "void" and ci_migrate_text_is_blank(body): "    return\n" else: body
         if migrate_prefer_brace():
-            return export_prefix ++ "fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ " {\n" ++ body ++ "}\n\n"
-        return export_prefix ++ "fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ ":\n" ++ body ++ "\n"
+            return export_prefix ++ "fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ " {\n" ++ body_for_emit ++ "}\n\n"
+        return export_prefix ++ "fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ ":\n" ++ body_for_emit ++ "\n"
 
     // Body translation failed. Unsupported non-local/computed control flow is
     // a hard migration error; other legacy failure paths still render an

@@ -763,11 +763,7 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
         if can_pointee.kind == CXType_FunctionProto or can_pointee.kind == CXType_FunctionNoProto:
             let fn_str = translate_fn_type(s, can_pointee, depth + 1)
             if fn_str as i64 == 0: return session_strdup(s, "*const i8\0" as *const u8)
-            var buf: [2048]u8 = [0 as u8; 2048]
-            var pos: i64 = 0
-            buf_append_str(&raw mut buf as *mut [2048]u8 as *mut u8, &raw mut pos, 2048, "*const \0" as *const u8)
-            buf_append_str(&raw mut buf as *mut [2048]u8 as *mut u8, &raw mut pos, 2048, fn_str as *const u8)
-            return session_strdup(s, &buf as *const [2048]u8 as *const u8)
+            return fn_str
         let qual = if is_volatile != 0: "volatile\0" as *const u8 else: if is_const != 0: "const\0" as *const u8 else: "mut\0" as *const u8
         // void pointer
         if can_pointee.kind == CXType_Void:
@@ -948,7 +944,7 @@ unsafe fn translate_fn_type(s: *mut CImportSession, fn_type: CXType, depth: i32)
         ret_str = session_strdup(s, "i32\0" as *const u8)
     var buf: [8192]u8 = [0 as u8; 8192]
     var bpos: i64 = 0
-    buf_append_str(&raw mut buf as *mut [8192]u8 as *mut u8, &raw mut bpos, 8192, "fn(\0" as *const u8)
+    buf_append_str(&raw mut buf as *mut [8192]u8 as *mut u8, &raw mut bpos, 8192, "extern \"C\" fn(\0" as *const u8)
     buf_append_str(&raw mut buf as *mut [8192]u8 as *mut u8, &raw mut bpos, 8192, &params as *const [4096]u8 as *const u8)
     buf_append_str(&raw mut buf as *mut [8192]u8 as *mut u8, &raw mut bpos, 8192, ") -> \0" as *const u8)
     buf_append_str(&raw mut buf as *mut [8192]u8 as *mut u8, &raw mut bpos, 8192, ret_str as *const u8)

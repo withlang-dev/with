@@ -3,13 +3,26 @@
 Status: active checkpoint for agents. Update this file when phase status,
 blockers, or the next work queue changes.
 
-Last updated: 2026-06-04.
+Last updated: 2026-06-05.
 
 Read this file immediately after `AGENTS.md`. It exists so long-running build
 system and bootstrap work does not have to be reconstructed from git history or
 conversation context after compaction.
 
 ## Current Focus
+
+#299 is implemented. With now has a distinct `extern "C" fn(...) -> T` type
+node and `TY_EXTERN_FN` sema type for raw C ABI function pointers, while
+ordinary `fn(...) -> T` remains With's context-carrying callable value. The
+slice parses optional parameter names in function pointer types, makes the raw
+type pointer-sized and Copy, accepts matching named functions and
+non-capturing closures, rejects capturing/suspending/ephemeral-task callbacks,
+lowers raw callbacks as LLVM pointers, and teaches c_import to emit C function
+pointer typedefs as `extern "C" fn` instead of `*const fn`. The migrator now
+preserves C `(void)expr` discard statements without turning pure discards into
+With tail expressions, and emits a bare `return` for translated void functions
+whose body lowers to no statements. Full `with build`, `with build :fixpoint`,
+`with build :test`, and `with build :test-green` passed on 2026-06-05.
 
 #335 is implemented. The policy baseline is encoded in AGENTS.md/CLAUDE.md:
 `@[c_export]` is foreign ABI only, not compiler-internal linkage. The first

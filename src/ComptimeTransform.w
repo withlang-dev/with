@@ -260,7 +260,7 @@ fn Sema.ct_build_type_expr(self: Sema, pool: AstPool, intern: InternPool, type_i
             return 0
         return pool.add_node(NodeKind.NK_TYPE_REF, start, end, pointee, self.get_type_d1(resolved), 0) as i32
 
-    if tk == TypeKind.TY_FN:
+    if tk == TypeKind.TY_FN or tk == TypeKind.TY_EXTERN_FN:
         let param_start = self.get_type_d0(resolved)
         let param_count = self.get_type_d1(resolved)
         let param_nodes: Vec[i32] = Vec.new()
@@ -276,7 +276,8 @@ fn Sema.ct_build_type_expr(self: Sema, pool: AstPool, intern: InternPool, type_i
         let ret_node = self.ct_build_type_expr(pool, intern, self.get_type_d2(resolved), node)
         if ret_node == 0:
             return 0
-        return pool.add_node(NodeKind.NK_TYPE_FN, start, end, new_extra, param_count, ret_node) as i32
+        let node_kind = if tk == TypeKind.TY_EXTERN_FN: NodeKind.NK_TYPE_EXTERN_FN else: NodeKind.NK_TYPE_FN
+        return pool.add_node(node_kind, start, end, new_extra, param_count, ret_node) as i32
 
     if tk == TypeKind.TY_TRAIT_OBJ:
         let trait_sym = intern.intern(self.pool_resolve(self.get_type_d0(resolved)))
