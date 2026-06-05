@@ -473,6 +473,16 @@ fn emitc_build_compiler_c_workspace(ctx: ActionCtx, source_w: str, main_c: str) 
         return emitc_fail(ctx, "workspace emit-C did not produce output: " ++ main_c)
     0
 
+pub fn run_bootstrap_c_emit_sources_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let main_c = ctx.output()
+    let out_dir = emitc_dirname(main_c)
+    if fs.mkdir_all(out_dir) != 0:
+        return emitc_fail(ctx, "could not create output directory: " ++ out_dir)
+    var rc = emitc_build_compiler_c_workspace(ctx, "out/gen/main.w", main_c)
+    if rc != 0: return rc
+    emitc_generate_stub_files(ctx)
+
 fn emitc_compile_c_compiler(ctx: ActionCtx, main_c: str, output_path: str) -> i32:
     let root = ctx.project_info().project_root()
     let platform_obj = emitc_host_platform_runtime_object()

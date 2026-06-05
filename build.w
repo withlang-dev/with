@@ -372,6 +372,17 @@ pub fn build(ctx: BuildCtx) -> Build:
     compiler_sources = target_with_version_inputs(compiler_sources, ctx)
     out = out.add_target(compiler_sources)
 
+    var bootstrap_c_emit_sources = target_new(.Action, "bootstrap-c-emit-sources", "").output("out/bootstrap-c/src/with_compiler.c")
+    bootstrap_c_emit_sources.action = run_bootstrap_c_emit_sources_action
+    bootstrap_c_emit_sources = bootstrap_c_emit_sources.extra_output("out/gen/wl_decls.h")
+    bootstrap_c_emit_sources = bootstrap_c_emit_sources.extra_output("out/gen/wl_stubs.c")
+    bootstrap_c_emit_sources = bootstrap_c_emit_sources.extra_output("out/command/bootstrap-c-emit-sources")
+    bootstrap_c_emit_sources = bootstrap_c_emit_sources.write_scope("out/bootstrap-c/src")
+    bootstrap_c_emit_sources = bootstrap_c_emit_sources.write_scope("out/gen")
+    bootstrap_c_emit_sources = bootstrap_c_emit_sources.write_scope("out/command/bootstrap-c-emit-sources")
+    bootstrap_c_emit_sources = bootstrap_c_emit_sources.dep("compiler-sources")
+    out = out.add_target(bootstrap_c_emit_sources)
+
     var compat_runtime = target_new(.Action, "compat-runtime-source", "").output("out/gen/compat_runtime.w")
     compat_runtime = compat_runtime.extra_output("out/gen/compiler/EmbeddedStdlibData.w")
     compat_runtime = compat_runtime.input(host_runtime.compat_source)
