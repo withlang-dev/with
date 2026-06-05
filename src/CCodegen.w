@@ -4576,6 +4576,7 @@ fn CCodegen.call_args_text(self: CCodegen, body: MirBody, args_id: i32, callee_o
     let count = body.call_arg_counts.get(args_id as i64)
     // Resolve callee signature to know which params expect pointers
     let callee_sig = self.callee_sig_from_operand(body, callee_operand)
+    let callee_extern_name = self.callee_extern_name_from_operand(body, callee_operand)
     let callee_fn_tid = if callee_sig >= 0: 0 else: self.callee_fn_type_from_operand(body, callee_operand)
     let callee_param_count = if callee_sig >= 0: self.sema.sig_get_param_count(callee_sig) else if callee_fn_tid != 0: self.sema.get_type_d1(callee_fn_tid) else: 0
     var out = ""
@@ -4584,6 +4585,9 @@ fn CCodegen.call_args_text(self: CCodegen, body: MirBody, args_id: i32, callee_o
             out = out ++ ", "
         let op_id = body.call_arg_operands.get((start + i) as i64)
         let arg_text = self.operand_text(body, op_id)
+        if callee_extern_name == "strtod" and i == 1:
+            out = out ++ "((char **)" ++ arg_text ++ ")"
+            continue
         if self.call_param_expects_c_pointer(body, callee_operand, i) != 0:
             if arg_text == "0" or arg_text == "NULL":
                 out = out ++ "NULL"
@@ -4632,6 +4636,19 @@ fn CCodegen.call_args_text(self: CCodegen, body: MirBody, args_id: i32, callee_o
                     continue
         out = out ++ arg_text
     out
+
+fn CCodegen.callee_extern_name_from_operand(self: CCodegen, body: MirBody, callee_op: i32) -> str:
+    if callee_op < 0 or callee_op >= body.operand_kinds.len() as i32:
+        return ""
+    let ok = body.operand_kinds.get(callee_op as i64)
+    if ok == OperandKind.OK_CONSTANT:
+        let cd = body.operand_d0.get(callee_op as i64)
+        if cd >= 0 and cd < body.const_kinds.len() as i32:
+            let ck = body.const_kinds.get(cd as i64)
+            if ck == ConstKind.CK_FN:
+                let fn_sym = body.const_d0.get(cd as i64)
+                return self.canonical_extern_name(cc_intern_resolve(self.intern, fn_sym))
+    ""
 
 fn CCodegen.callee_sig_from_operand(self: CCodegen, body: MirBody, callee_op: i32) -> i32:
     if callee_op < 0 or callee_op >= body.operand_kinds.len() as i32:
