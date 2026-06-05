@@ -143,15 +143,14 @@ with build :prune-apply
 The prune target removes stale `out/bin/*.tmp.*.dSYM` directories, stale
 temporary runtime archive wrappers in `out/lib/` and `out/bootstrap-lib/`, stale
 build-state files, stale retained test-graph compiler copies, stale
-issue61-regression fixture directories, and seed archives beyond the retention
-window. It does not remove `.deps/` or `out/release/`.
+issue61-regression fixture directories, seed archives beyond the retention
+window, and versioned release byproducts in `out/release/` beyond the five most
+recent release versions. It does not remove `.deps/`, unversioned release
+binaries, `install.sh`, or platform SDK archives.
 
-Run the emitted-C self-host check before publishing a platform for the first
-time, and whenever emit-C or bootstrap packaging changed:
-
-```sh
-with build :emit-c-fixpoint
-```
+`with build :emit-c-fixpoint` is optional manual verification for emit-C feature
+work. Do not treat it as a normal release gate unless the release scope
+explicitly includes emit-C self-hosting changes.
 
 ### Linux Release Host
 
@@ -310,7 +309,6 @@ WITH_VERSION=v0.14.3 with build :fixpoint
 WITH_VERSION=v0.14.3 with build :test
 WITH_VERSION=v0.14.3 with build :test-green
 WITH_VERSION=v0.14.3 with build :last-green
-WITH_VERSION=v0.14.3 with build :emit-c-fixpoint
 ```
 
 Do not list Make compatibility wrapper commands on the release page.
