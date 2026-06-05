@@ -123,8 +123,10 @@ and `with build :install-user` installs the same verified final compiler to
 `~/.local/bin/with`. `with build :prune` is a dry-run report for stale build
 artifacts; `with build :prune-apply` removes stale temporary dSYM bundles,
 runtime archive wrappers, stale build state, stale retained test-graph compiler
-copies, stale issue61 regression fixture directories, and old seed archives
-without touching `.deps/` or `out/release/`.
+copies, stale issue61 regression fixture directories, old seed archives, and
+versioned `out/release/` byproducts beyond the five most recent release
+versions, without touching `.deps/`, current unversioned release binaries,
+`install.sh`, or platform SDK archives.
 
 Phase C extraction work is complete. Pre-Phase-D preparation is complete
 through P9, including the follow-up source-location diagnostic gap. Phase D

@@ -5,6 +5,7 @@ use std.sysinfo
 use std.process
 
 const RET_SEED_KEEP: i32 = 5
+const RET_RELEASE_VERSION_KEEP: i32 = 5
 
 fn ret_fail(ctx: ActionCtx, message: str) -> i32:
     ctx.diagnostics().error(ctx.target_name() ++ ": " ++ message)
@@ -255,6 +256,70 @@ fn ret_sorted_strings(items: Vec[str]) -> Vec[str]:
         sorted = next
     sorted
 
+fn ret_release_version_component(version: str, part: i32) -> i32:
+    var start = 0
+    if version.starts_with("v"):
+        start = 1
+    var current = 0
+    while current < part:
+        var dot = -1
+        for i in start..version.len() as i32:
+            if version.byte_at(i as i64) == 46:
+                dot = i
+                break
+        if dot < 0:
+            return -1
+        start = dot + 1
+        current = current + 1
+    var end = version.len() as i32
+    for i in start..version.len() as i32:
+        if version.byte_at(i as i64) == 46:
+            end = i
+            break
+    if end <= start:
+        return -1
+    var value = 0
+    for i in start..end:
+        let ch = version.byte_at(i as i64)
+        if ch < 48 or ch > 57:
+            return -1
+        value = value * 10 + (ch - 48)
+    value
+
+fn ret_release_version_compare(a: str, b: str) -> i32:
+    let a_major = ret_release_version_component(a, 0)
+    let a_minor = ret_release_version_component(a, 1)
+    let a_patch = ret_release_version_component(a, 2)
+    let b_major = ret_release_version_component(b, 0)
+    let b_minor = ret_release_version_component(b, 1)
+    let b_patch = ret_release_version_component(b, 2)
+    if a_major >= 0 and a_minor >= 0 and a_patch >= 0 and b_major >= 0 and b_minor >= 0 and b_patch >= 0:
+        if a_major != b_major:
+            return a_major - b_major
+        if a_minor != b_minor:
+            return a_minor - b_minor
+        if a_patch != b_patch:
+            return a_patch - b_patch
+        return 0
+    ret_str_compare(a, b)
+
+fn ret_sorted_release_versions(items: Vec[str]) -> Vec[str]:
+    var sorted: Vec[str] = Vec.new()
+    for i in 0..items.len() as i32:
+        let item = items.get(i as i64)
+        var inserted = false
+        let next: Vec[str] = Vec.new()
+        for j in 0..sorted.len() as i32:
+            let existing = sorted.get(j as i64)
+            if not inserted and ret_release_version_compare(item, existing) < 0:
+                next.push(item)
+                inserted = true
+            next.push(existing)
+        if not inserted:
+            next.push(item)
+        sorted = next
+    sorted
+
 fn ret_direct_w_files(fs: ToolFs, dir: str) -> Vec[str]:
     let out: Vec[str] = Vec.new()
     let files = fs.list_files(dir)
@@ -423,11 +488,17 @@ fn ret_vec_contains(items: Vec[str], item: str) -> bool:
             return true
     false
 
-fn ret_add_unique(items: Vec[str], item: str):
-    if item.len() == 0:
-        return
-    if not ret_vec_contains(items, item):
-        items.push(item)
+fn ret_add_unique(items: Vec[str], item: str) -> Vec[str]:
+    let out: Vec[str] = Vec.new()
+    var found = item.len() == 0
+    for i in 0..items.len() as i32:
+        let existing = items.get(i as i64)
+        if existing == item:
+            found = true
+        out.push(existing)
+    if not found:
+        out.push(item)
+    out
 
 fn ret_manifest_lines_without(manifest: Vec[str], skip: str) -> Vec[str]:
     let out: Vec[str] = Vec.new()
@@ -646,32 +717,88 @@ fn ret_state_target_name(path: str) -> str:
     let base = ret_basename(path)
     base.slice(0, base.len() - 6)
 
-fn ret_add_stale_state_files(fs: ToolFs, live_targets: Vec[str], candidates: Vec[str]):
+fn ret_add_stale_state_files(fs: ToolFs, live_targets: Vec[str], candidates: Vec[str]) -> Vec[str]:
+    var out = candidates
     if live_targets.len() == 0 or not fs.exists("out/.build-state"):
-        return
+        return out
     let files = fs.list_files("out/.build-state")
     for i in 0..files.len() as i32:
         let path = files.get(i as i64)
         let target_name = ret_state_target_name(path)
         if target_name.len() > 0 and not ret_vec_contains(live_targets, target_name):
-            ret_add_unique(candidates, path)
+            out = ret_add_unique(out, path)
+    out
 
-fn ret_add_old_seed_archives(fs: ToolFs, candidates: Vec[str]):
+fn ret_add_old_seed_archives(fs: ToolFs, candidates: Vec[str]) -> Vec[str]:
+    var out = candidates
     let entries = ret_seed_manifest_entries(fs)
     var keep_from = entries.len() as i32 - RET_SEED_KEEP
     if keep_from <= 0:
-        return
+        return out
     for i in 0..keep_from:
         let path = entries.get(i as i64)
         if fs.exists(path):
-            ret_add_unique(candidates, path)
+            out = ret_add_unique(out, path)
+    out
+
+fn ret_release_artifact_version(path: str) -> str:
+    if ret_dirname(path) != "out/release":
+        return ""
+    let base = ret_basename(path)
+    let notes_prefix = "notes-"
+    let notes_suffix = ".md"
+    if base.starts_with(notes_prefix) and base.ends_with(notes_suffix):
+        let version = base.slice(notes_prefix.len(), base.len() - notes_suffix.len())
+        if version.starts_with("v"):
+            return version
+    let bootstrap_prefix = "with-bootstrap-c-"
+    let bootstrap_suffix = ".tar.zst"
+    if base.starts_with(bootstrap_prefix) and base.ends_with(bootstrap_suffix):
+        let version = base.slice(bootstrap_prefix.len(), base.len() - bootstrap_suffix.len())
+        if version.starts_with("v"):
+            return version
+    ""
+
+fn ret_release_artifact_versions(fs: ToolFs) -> Vec[str]:
+    var versions: Vec[str] = Vec.new()
+    if not fs.exists("out/release"):
+        return versions
+    let files = fs.list_files("out/release")
+    for i in 0..files.len() as i32:
+        let version = ret_release_artifact_version(files.get(i as i64))
+        versions = ret_add_unique(versions, version)
+    ret_sorted_release_versions(versions)
+
+fn ret_stale_release_artifact_versions(fs: ToolFs) -> Vec[str]:
+    let versions = ret_release_artifact_versions(fs)
+    let stale: Vec[str] = Vec.new()
+    let stale_count = versions.len() as i32 - RET_RELEASE_VERSION_KEEP
+    if stale_count <= 0:
+        return stale
+    for i in 0..stale_count:
+        stale.push(versions.get(i as i64))
+    stale
+
+fn ret_add_old_release_artifacts(fs: ToolFs, candidates: Vec[str]) -> Vec[str]:
+    var out = candidates
+    let stale_versions = ret_stale_release_artifact_versions(fs)
+    if stale_versions.len() == 0 or not fs.exists("out/release"):
+        return out
+    let files = fs.list_files("out/release")
+    for i in 0..files.len() as i32:
+        let path = files.get(i as i64)
+        let version = ret_release_artifact_version(path)
+        if ret_vec_contains(stale_versions, version):
+            out = ret_add_unique(out, path)
+    out
 
 fn ret_small_prune_candidates(ctx: ActionCtx) -> Vec[str]:
     let fs = ctx.fs()
-    let candidates: Vec[str] = Vec.new()
-    ret_add_stale_state_files(fs, ret_live_targets(ctx.args()), candidates)
-    ret_add_old_seed_archives(fs, candidates)
-    candidates
+    var candidates: Vec[str] = Vec.new()
+    candidates = ret_add_stale_state_files(fs, ret_live_targets(ctx.args()), candidates)
+    candidates = ret_add_old_seed_archives(fs, candidates)
+    candidates = ret_add_old_release_artifacts(fs, candidates)
+    ret_sorted_strings(candidates)
 
 fn ret_apply_small_prune(ctx: ActionCtx, candidates: Vec[str]) -> i32:
     let fs = ctx.fs()
@@ -685,7 +812,7 @@ fn ret_apply_small_prune(ctx: ActionCtx, candidates: Vec[str]) -> i32:
             rc = fs.remove_file(path)
         if rc == 0:
             removed = removed + 1
-    print(f"[prune] removed {removed} stale build artifact(s)")
+    print(f"[prune] removed {removed} stale retained artifact(s)")
     0
 
 fn ret_apply_large_prune(ctx: ActionCtx) -> i32:
@@ -781,7 +908,7 @@ fn ret_apply_large_prune(ctx: ActionCtx) -> i32:
     0
 
 fn ret_report_prune(candidates: Vec[str]):
-    print(f"[prune] {candidates.len()} stale state/seed artifact(s) would be removed")
+    print(f"[prune] {candidates.len()} stale state/seed/release artifact(s) would be removed")
     var shown = 0
     for i in 0..candidates.len() as i32:
         if shown >= 50:
