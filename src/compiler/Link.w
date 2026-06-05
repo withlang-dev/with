@@ -239,6 +239,7 @@ fn link_stage_linux_crt_object(name: str) -> str:
 
 fn link_stage_linux_gcc_dir() -> str:
     let candidates: Vec[str] = Vec.new()
+    candidates.push("/usr/lib/gcc/x86_64-linux-gnu/15")
     candidates.push("/usr/lib/gcc/x86_64-linux-gnu/14")
     candidates.push("/usr/lib/gcc/x86_64-linux-gnu/13")
     candidates.push("/usr/lib/gcc/x86_64-linux-gnu/12")
