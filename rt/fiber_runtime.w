@@ -66,27 +66,22 @@ fn fiber_report_unhandled_panics() -> i32:
             with_ewrite("(null)")
         with_ewrite("\n")
 
-@[c_export("with_runtime_init")]
-pub fn runtime_init():
+pub fn with_runtime_init():
     with_runtime_core_init()
 
-@[c_export("with_runtime_shutdown")]
-pub fn runtime_shutdown():
+pub fn with_runtime_shutdown():
     fiber_drain_detached_ready()
     fiber_clear_detached_buffers()
     with_runtime_core_shutdown()
 
-@[c_export("with_runtime_has_fibers")]
-pub fn runtime_has_fibers() -> i32:
+pub fn with_runtime_has_fibers() -> i32:
     with_runtime_core_has_fibers()
 
-@[c_export("with_runtime_run_one_step")]
-pub fn runtime_run_one_step():
+pub fn with_runtime_run_one_step():
     with_runtime_core_run_one_step()
     fiber_drain_detached_ready()
 
-@[c_export("with_runtime_run")]
-pub fn runtime_run():
+pub fn with_runtime_run():
     while with_runtime_core_has_fibers() != 0:
         with_runtime_core_run_one_step()
         fiber_drain_detached_ready()
@@ -158,8 +153,7 @@ fn fiber_select_ready_index(fiber_ids: *const i32, count: i32, biased: i32) -> i
         i = i + 1
     chosen
 
-@[c_export("with_fiber_select_mode")]
-pub fn fiber_select_mode(fiber_ids: *const i32, count: i32, biased: i32, result_index: *mut i32):
+pub fn with_fiber_select_mode(fiber_ids: *const i32, count: i32, biased: i32, result_index: *mut i32):
     while true:
         let selected = fiber_select_ready_index(fiber_ids, count, biased)
         if selected >= 0:
@@ -176,12 +170,10 @@ pub fn fiber_select_mode(fiber_ids: *const i32, count: i32, biased: i32, result_
                 *result_index = -1
             return
 
-@[c_export("with_fiber_select")]
-pub fn fiber_select(fiber_ids: *const i32, count: i32, result_index: *mut i32):
-    fiber_select_mode(fiber_ids, count, 0, result_index)
+pub fn with_fiber_select(fiber_ids: *const i32, count: i32, result_index: *mut i32):
+    with_fiber_select_mode(fiber_ids, count, 0, result_index)
 
-@[c_export("with_fiber_await")]
-pub fn fiber_await(fiber_id: i32):
+pub fn with_fiber_await(fiber_id: i32):
     while true:
         var panic_msg: *const u8 = 0 as *const u8
         var panic_msg_len: i32 = 0
@@ -212,8 +204,7 @@ pub fn fiber_await(fiber_id: i32):
             last_await_cancelled_return = 0
             return
 
-@[c_export("with_fiber_cleanup_await")]
-pub fn fiber_cleanup_await(fiber_id: i32):
+pub fn with_fiber_cleanup_await(fiber_id: i32):
     while true:
         var panic_msg: *const u8 = 0 as *const u8
         var panic_msg_len: i32 = 0
@@ -240,14 +231,12 @@ pub fn fiber_cleanup_await(fiber_id: i32):
             last_await_cancelled_return = 0
             return
 
-@[c_export("with_fiber_cancel")]
-pub fn fiber_cancel(fiber_id: i32) -> i32:
+pub fn with_fiber_cancel(fiber_id: i32) -> i32:
     if with_runtime_fiber_is_completed(fiber_id) != 0:
         return 1
     with_runtime_request_cancel(fiber_id)
 
-@[c_export("with_fiber_detach_cancel")]
-pub fn fiber_detach_cancel(fiber_id: i32, result_buf: *mut u8) -> i32:
+pub fn with_fiber_detach_cancel(fiber_id: i32, result_buf: *mut u8) -> i32:
     if fiber_id <= 0:
         if result_buf as i64 != 0:
             with_free(result_buf)
@@ -270,20 +259,16 @@ pub fn fiber_detach_cancel(fiber_id: i32, result_buf: *mut u8) -> i32:
     detached_fiber_count = detached_fiber_count + 1
     1
 
-@[c_export("with_fiber_is_cancelled")]
-pub fn fiber_is_cancelled() -> i32:
+pub fn with_fiber_is_cancelled() -> i32:
     with_runtime_current_cancel_requested()
 
-@[c_export("with_fiber_set_cancelled_return")]
-pub fn fiber_set_cancelled_return():
+pub fn with_fiber_set_cancelled_return():
     with_runtime_current_set_cancelled_return()
 
-@[c_export("with_fiber_was_cancelled_return")]
-pub fn fiber_was_cancelled_return(fiber_id: i32) -> i32:
+pub fn with_fiber_was_cancelled_return(fiber_id: i32) -> i32:
     if last_await_fiber_id == fiber_id:
         return last_await_cancelled_return
     with_runtime_completed_cancelled_return(fiber_id)
 
-@[c_export("with_fiber_request_cancel_self")]
-pub fn fiber_request_cancel_self():
+pub fn with_fiber_request_cancel_self():
     with_runtime_current_set_cancel_requested()

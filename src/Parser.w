@@ -30,6 +30,7 @@ type Parser {
     pending_panic_handler: i32,
     pending_entry: i32,
     pending_no_main: i32,
+    pending_global_allocator: i32,
     pending_test: i32,
     pending_before: i32,
     pending_after: i32,
@@ -101,6 +102,7 @@ fn Parser.init_with_pool(tokens: TokenList, source: str, file_id: i32, intern: I
         pending_panic_handler: 0,
         pending_entry: 0,
         pending_no_main: 0,
+        pending_global_allocator: 0,
         pending_test: 0,
         pending_before: 0,
         pending_after: 0,
@@ -445,6 +447,7 @@ fn Parser.skip_attributes(self: Parser):
     self.pending_panic_handler = 0
     self.pending_entry = 0
     self.pending_no_main = 0
+    self.pending_global_allocator = 0
     self.pending_test = 0
     self.pending_before = 0
     self.pending_after = 0
@@ -535,6 +538,9 @@ fn Parser.skip_attributes(self: Parser):
             self.advance()
         else if self.is_ident_named("no_main"):
             self.pending_no_main = 1
+            self.advance()
+        else if self.is_ident_named("global_allocator"):
+            self.pending_global_allocator = 1
             self.advance()
         else if self.is_ident_named("test"):
             self.pending_test = 1
@@ -776,6 +782,10 @@ fn Parser.parse_decl(self: Parser) -> NodeId:
        t != TokenKind.TK_KW_GEN:
         self.emit_error("compiler_hook attribute can only be used on functions")
         self.pending_compiler_hook_phase = 0
+    if self.pending_global_allocator != 0 and
+       t != TokenKind.TK_KW_LET and t != TokenKind.TK_KW_VAR and t != TokenKind.TK_KW_GLOBAL:
+        self.emit_error("global_allocator attribute can only be used on global bindings")
+        self.pending_global_allocator = 0
     if t == TokenKind.TK_KW_FN:
         return self.parse_fn_decl(is_pub, start, 0, 0, 0)
     if t == TokenKind.TK_KW_UNSAFE:
@@ -2371,7 +2381,11 @@ fn Parser.parse_top_level_let(self: Parser, is_pub: i32, start: i32) -> NodeId:
             let type_extra = self.pool.extra_len()
             self.pool.add_extra(type_ann)
             flags = flags + (type_extra + 1) * 16
-            return self.pool.add_node(NodeKind.NK_LET_DECL, start, self.prev_end(), name, 0, flags)
+            let decl = self.pool.add_node(NodeKind.NK_LET_DECL, start, self.prev_end(), name, 0, flags)
+            if self.pending_global_allocator != 0:
+                self.pool.mark_global_allocator_decl(decl)
+                self.pending_global_allocator = 0
+            return decl
         if not is_mut:
             self.emit_error("let binding requires initializer")
             return self.poisoned_expr()
@@ -2396,7 +2410,11 @@ fn Parser.parse_top_level_let(self: Parser, is_pub: i32, start: i32) -> NodeId:
         // Lower 4 bits: mut, pub, GLOBAL, GLOBAL_VAR. Type-extra at bit 4+.
         flags = flags + (type_extra + 1) * 16
 
-    self.pool.add_node(NodeKind.NK_LET_DECL, start, self.prev_end(), name, value, flags)
+    let decl = self.pool.add_node(NodeKind.NK_LET_DECL, start, self.prev_end(), name, value, flags)
+    if self.pending_global_allocator != 0:
+        self.pool.mark_global_allocator_decl(decl)
+        self.pending_global_allocator = 0
+    decl
 
 fn Parser.parse_const_decl(self: Parser, is_pub: i32, start: i32) -> NodeId:
     self.advance()  // consume 'const'
@@ -3092,6 +3110,8 @@ fn Parser.parse_primary(self: Parser) -> NodeId:
         // comptime_error("msg") → NodeKind.NK_COMPTIME_ERROR
         if self.is_ident_named("comptime_error"):
             return self.parse_comptime_error_expr()
+        if self.is_scope_expr_start():
+            return self.parse_scope_expr()
         if self.suppress_fat_arrow_closure == 0 and self.pos + 1 < self.tokens.len():
             if self.tokens.get_tag(self.pos + 1) == TokenKind.TK_FAT_ARROW:
                 return self.parse_fat_arrow_single()
@@ -4587,6 +4607,15 @@ fn is_first_on_line(source: str, pos: i32) -> i32:
         p = p - 1
     1
 
+fn Parser.parse_if_else_body(self: Parser, use_then: bool) -> NodeId:
+    if self.peek() == TokenKind.TK_KW_IF:
+        return self.parse_if_expr()
+    if use_then:
+        return self.parse_expr()
+    if self.peek() == TokenKind.TK_L_BRACE or self.peek() == TokenKind.TK_COLON:
+        return self.parse_body()
+    self.parse_expr()
+
 fn Parser.parse_if_expr(self: Parser) -> NodeId:
     let start = self.current_start()
     self.advance()  // consume if
@@ -4620,12 +4649,7 @@ fn Parser.parse_if_expr(self: Parser) -> NodeId:
             self.pos = save
         else:
             self.advance()
-            if self.peek() == TokenKind.TK_KW_IF:
-                else_body = self.parse_if_expr()
-            else if use_then:
-                else_body = self.parse_expr()
-            else:
-                else_body = self.parse_body()
+            else_body = self.parse_if_else_body(use_then)
     else:
         self.pos = save
 
@@ -4695,12 +4719,7 @@ fn Parser.parse_if_let(self: Parser, start: i32) -> NodeId:
             self.pos = save
         else:
             self.advance()
-            if self.peek() == TokenKind.TK_KW_IF:
-                else_body = self.parse_if_expr()
-            else if use_then:
-                else_body = self.parse_expr()
-            else:
-                else_body = self.parse_body()
+            else_body = self.parse_if_else_body(use_then)
     else:
         self.pos = save
     if else_body == 0:
@@ -4913,6 +4932,40 @@ fn Parser.parse_spawn(self: Parser) -> NodeId:
     self.advance()
     let value = self.parse_expr()
     self.pool.add_node(NodeKind.NK_SPAWN, start, self.prev_end(), value, 0, 0)
+
+fn Parser.is_scope_expr_start(self: Parser) -> bool:
+    if not self.is_ident_named("scope"):
+        return false
+    if self.pos + 1 >= self.tokens.len():
+        return false
+    let next = self.tokens.get_tag(self.pos + 1)
+    if next == TokenKind.TK_FAT_ARROW or next == TokenKind.TK_L_BRACE:
+        return true
+    if next == TokenKind.TK_IDENT and self.pos + 2 < self.tokens.len():
+        let after_name = self.tokens.get_tag(self.pos + 2)
+        if after_name == TokenKind.TK_FAT_ARROW or after_name == TokenKind.TK_L_BRACE:
+            return true
+    false
+
+fn Parser.parse_scope_expr(self: Parser) -> NodeId:
+    let start = self.current_start()
+    self.advance()
+    var scope_name = self.intern.intern("s")
+    if self.peek() == TokenKind.TK_IDENT:
+        scope_name = self.expect_ident()
+        if self.peek() == TokenKind.TK_FAT_ARROW:
+            self.advance()
+    else if self.peek() == TokenKind.TK_FAT_ARROW:
+        self.advance()
+    var body: NodeId = 0 as NodeId
+    if self.peek() == TokenKind.TK_L_BRACE:
+        self.advance()
+        body = self.parse_braced_body()
+    else:
+        if self.peek() == TokenKind.TK_COLON:
+            self.advance()
+        body = self.parse_block_or_expr()
+    self.pool.add_node(NodeKind.NK_SCOPE, start, self.prev_end(), scope_name, body, 0)
 
 fn Parser.parse_async_expr(self: Parser) -> NodeId:
     let start = self.current_start()

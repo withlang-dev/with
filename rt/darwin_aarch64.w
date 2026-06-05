@@ -59,41 +59,33 @@ type RtStatBuf:
 var rt_argc: i32 = 0
 var rt_argv_raw: i64 = 0
 
-@[c_export("rt_store_args")]
-pub fn store_args(argc_val: i32, argv_val: *const *const u8):
+pub fn rt_store_args(argc_val: i32, argv_val: *const *const u8):
     rt_argc = argc_val
     rt_argv_raw = argv_val as i64
 
-@[c_export("rt_fill_random")]
-pub fn rt_fill_random_impl(buf: *mut u8, len: u64):
+pub fn rt_fill_random(buf: *mut u8, len: u64):
     arc4random_buf(buf, len)
 
-@[c_export("rt_libc_stdin")]
-pub fn rt_libc_stdin_impl() -> *mut u8:
+pub fn rt_libc_stdin() -> *mut u8:
     __stdinp
 
-@[c_export("rt_libc_stdout")]
-pub fn rt_libc_stdout_impl() -> *mut u8:
+pub fn rt_libc_stdout() -> *mut u8:
     __stdoutp
 
-@[c_export("rt_libc_stderr")]
-pub fn rt_libc_stderr_impl() -> *mut u8:
+pub fn rt_libc_stderr() -> *mut u8:
     __stderrp
 
-@[c_export("rt_fiber_page_size")]
-pub fn rt_fiber_page_size_impl() -> i64:
+pub fn rt_fiber_page_size() -> i64:
     let page_size = sysconf(29)
     if page_size > 0:
         return page_size
     16384
 
-@[c_export("rt_fiber_mmap_flags")]
-pub fn rt_fiber_mmap_flags_impl() -> i32:
+pub fn rt_fiber_mmap_flags() -> i32:
     // Darwin: MAP_PRIVATE | MAP_ANON.
     0x1002
 
-@[c_export("rt_fiber_fault_addr")]
-pub fn rt_fiber_fault_addr_impl(info: *const u8) -> i64:
+pub fn rt_fiber_fault_addr(info: *const u8) -> i64:
     if info as i64 == 0:
         return 0
     unsafe:
@@ -112,12 +104,10 @@ fn darwin_zero_sigaction(sig: i32):
     let sa_base = (&raw mut sa) as *mut [16]u8 as i64
     let _ = sigaction(sig, sa_base as *const u8, 0 as *mut u8)
 
-@[c_export("rt_fiber_reset_signal_handler")]
-pub fn rt_fiber_reset_signal_handler_impl(sig: i32):
+pub fn rt_fiber_reset_signal_handler(sig: i32):
     darwin_zero_sigaction(sig)
 
-@[c_export("rt_fiber_install_signal_handlers")]
-pub fn rt_fiber_install_signal_handlers_impl(alt_stack: *mut u8, alt_stack_size: i64, handler: i64):
+pub fn rt_fiber_install_signal_handlers(alt_stack: *mut u8, alt_stack_size: i64, handler: i64):
     var ss: [24]u8 = [0 as u8; 24]
     let ss_base = (&raw mut ss) as *mut [24]u8 as i64
     darwin_store_i64(ss_base, 0, alt_stack as i64)
@@ -134,8 +124,7 @@ pub fn rt_fiber_install_signal_handlers_impl(alt_stack: *mut u8, alt_stack_size:
 
 // ── I/O ─────────────────────────────────────────────────────────
 
-@[c_export("rt_write")]
-pub fn rt_write_impl(fd: i32, buf: *const u8, len: i64) -> i64:
+pub fn rt_write(fd: i32, buf: *const u8, len: i64) -> i64:
     var r: i64 = 0
     loop:
         r = write(fd, buf, len as u64)
@@ -145,8 +134,7 @@ pub fn rt_write_impl(fd: i32, buf: *const u8, len: i64) -> i64:
         return -(get_errno() as i64)
     r
 
-@[c_export("rt_read")]
-pub fn rt_read_impl(fd: i32, buf: *mut u8, len: i64) -> i64:
+pub fn rt_read(fd: i32, buf: *mut u8, len: i64) -> i64:
     var r: i64 = 0
     loop:
         r = read(fd, buf, len as u64)
@@ -156,8 +144,7 @@ pub fn rt_read_impl(fd: i32, buf: *mut u8, len: i64) -> i64:
         return -(get_errno() as i64)
     r
 
-@[c_export("rt_open")]
-pub fn rt_open_impl(path: *const u8, flags: i32, mode: i32) -> i32:
+pub fn rt_open(path: *const u8, flags: i32, mode: i32) -> i32:
     // Map canonical flags to native darwin flags
     // Canonical: O_RDONLY=0, O_WRONLY=1, O_RDWR=2, O_CREAT=0x200, O_TRUNC=0x400, O_APPEND=0x800
     // Darwin:    O_RDONLY=0, O_WRONLY=1, O_RDWR=2, O_CREAT=0x200, O_TRUNC=0x400, O_APPEND=0x008
@@ -174,8 +161,7 @@ pub fn rt_open_impl(path: *const u8, flags: i32, mode: i32) -> i32:
         return -get_errno()
     r
 
-@[c_export("rt_close")]
-pub fn rt_close_impl(fd: i32) -> i32:
+pub fn rt_close(fd: i32) -> i32:
     var r: i32 = 0
     loop:
         r = close(fd)
@@ -185,15 +171,13 @@ pub fn rt_close_impl(fd: i32) -> i32:
         return -get_errno()
     0
 
-@[c_export("rt_seek")]
-pub fn rt_seek_impl(fd: i32, offset: i64, whence: i32) -> i64:
+pub fn rt_seek(fd: i32, offset: i64, whence: i32) -> i64:
     let r = lseek(fd, offset, whence)
     if r < 0:
         return -(get_errno() as i64)
     r
 
-@[c_export("rt_stat")]
-pub fn rt_stat_impl(path: *const u8, out: *mut RtStatBuf) -> i32:
+pub fn rt_stat(path: *const u8, out: *mut RtStatBuf) -> i32:
     var native_buf: [144]u8 = [0 as u8; 144]
     let r = stat(path, &native_buf as *mut u8)
     if r < 0:
@@ -212,15 +196,13 @@ pub fn rt_stat_impl(path: *const u8, out: *mut RtStatBuf) -> i32:
     (unsafe *out).modified_ns = mtime_sec * 1000000000 + mtime_nsec
     0
 
-@[c_export("rt_chmod")]
-pub fn rt_chmod_impl(path: *const u8, mode: i32) -> i32:
+pub fn rt_chmod(path: *const u8, mode: i32) -> i32:
     let r = chmod(path, mode)
     if r < 0:
         return -get_errno()
     0
 
-@[c_export("rt_getcwd")]
-pub fn rt_getcwd_impl(buf: *mut u8, size: i64) -> i32:
+pub fn rt_getcwd(buf: *mut u8, size: i64) -> i32:
     let r = getcwd(buf, size as u64)
     if r as i64 == 0:
         return -get_errno()
@@ -228,26 +210,22 @@ pub fn rt_getcwd_impl(buf: *mut u8, size: i64) -> i32:
 
 // ── Memory ──────────────────────────────────────────────────────
 
-@[c_export("rt_mmap")]
-pub fn rt_mmap_impl(size: i64) -> *mut u8:
+pub fn rt_mmap(size: i64) -> *mut u8:
     // PROT_READ|PROT_WRITE = 3, MAP_PRIVATE|MAP_ANON = 0x1002
     let p = mmap(0 as *mut u8, size as u64, 3, 0x1002, -1, 0)
     if p as i64 == -1:  // MAP_FAILED
         return 0 as *mut u8
     p
 
-@[c_export("rt_munmap")]
-pub fn rt_munmap_impl(ptr: *mut u8, size: i64):
+pub fn rt_munmap(ptr: *mut u8, size: i64):
     let _ = munmap(ptr, size as u64)
 
 // ── Process ─────────────────────────────────────────────────────
 
-@[c_export("rt_exit")]
-pub fn rt_exit_impl(code: i32):
+pub fn rt_exit(code: i32):
     _exit(code)
 
-@[c_export("rt_args")]
-pub fn rt_args_impl() -> (*const *const u8, i32):
+pub fn rt_args() -> (*const *const u8, i32):
     (rt_argv_raw as *const *const u8, rt_argc)
 
 // ── Time ────────────────────────────────────────────────────────
@@ -255,8 +233,7 @@ pub fn rt_args_impl() -> (*const *const u8, i32):
 var timebase_numer: i64 = 0
 var timebase_denom: i64 = 0
 
-@[c_export("rt_clock_ns")]
-pub fn rt_clock_ns_impl() -> i64:
+pub fn rt_clock_ns() -> i64:
     if timebase_denom == 0:
         var info = MachTimebaseInfo { numer: 0, denom: 0 }
         let _ = mach_timebase_info(&raw mut info)
@@ -273,8 +250,7 @@ type Timespec:
 
 extern fn nanosleep(req: *const Timespec, rem: *mut Timespec) -> i32
 
-@[c_export("rt_nanosleep")]
-pub fn rt_nanosleep_impl(ns: i64) -> i32:
+pub fn rt_nanosleep(ns: i64) -> i32:
     var req = Timespec { tv_sec: ns / 1000000000, tv_nsec: ns % 1000000000 }
     var rem = Timespec { tv_sec: 0, tv_nsec: 0 }
     var r: i32 = 0
@@ -299,26 +275,22 @@ extern fn pthread_attr_destroy(attr: *mut u8) -> i32
 extern fn pthread_create(thread: *mut i64, attr: *const u8, start_routine: *mut u8, arg: *mut u8) -> i32
 extern fn pthread_join(thread: i64, retval: *mut *mut u8) -> i32
 
-@[c_export("rt_getpid")]
-pub fn rt_getpid_impl() -> i32:
+pub fn rt_getpid() -> i32:
     getpid()
 
-@[c_export("rt_kill")]
-pub fn rt_kill_impl(pid: i32, sig: i32) -> i32:
+pub fn rt_kill(pid: i32, sig: i32) -> i32:
     let r = kill(pid, sig)
     if r < 0:
         return -get_errno()
     0
 
-@[c_export("rt_raise")]
-pub fn rt_raise_impl(sig: i32) -> i32:
+pub fn rt_raise(sig: i32) -> i32:
     let r = raise(sig)
     if r < 0:
         return -get_errno()
     0
 
-@[c_export("rt_thread_spawn")]
-pub fn rt_thread_spawn_impl(start_routine: *mut u8, arg: *mut u8) -> i64:
+pub fn rt_thread_spawn(start_routine: *mut u8, arg: *mut u8) -> i64:
     var handle: i64 = 0
     var attr: [64]u8 = [0 as u8; 64]
     var rc = pthread_attr_init(&raw mut attr[0])
@@ -336,8 +308,7 @@ pub fn rt_thread_spawn_impl(start_routine: *mut u8, arg: *mut u8) -> i64:
         return -(rc as i64)
     handle
 
-@[c_export("rt_thread_join")]
-pub fn rt_thread_join_impl(handle: i64) -> i32:
+pub fn rt_thread_join(handle: i64) -> i32:
     var retval: *mut u8 = 0 as *mut u8
     let rc = pthread_join(handle, &raw mut retval)
     if rc != 0:
@@ -426,8 +397,7 @@ fn rt_lstat_is_dir(path: *const u8) -> bool:
         return false
     (mode & S_IFMT) == S_IFDIR
 
-@[c_export("rt_mkdir")]
-pub fn rt_mkdir_impl(path: *const u8, mode: i32) -> i32:
+pub fn rt_mkdir(path: *const u8, mode: i32) -> i32:
     var r: i32 = 0
     loop:
         r = mkdir(path, mode as u16)
@@ -437,35 +407,31 @@ pub fn rt_mkdir_impl(path: *const u8, mode: i32) -> i32:
         return -get_errno()
     0
 
-@[c_export("rt_unlink")]
-pub fn rt_unlink_impl(path: *const u8) -> i32:
+pub fn rt_unlink(path: *const u8) -> i32:
     let r = unlink(path)
     if r < 0:
         return -get_errno()
     0
 
-@[c_export("rt_rmdir")]
-pub fn rt_rmdir_impl(path: *const u8) -> i32:
+pub fn rt_rmdir(path: *const u8) -> i32:
     let r = rmdir(path)
     if r < 0:
         return -get_errno()
     0
 
-@[c_export("rt_rename")]
-pub fn rt_rename_impl(old_path: *const u8, new_path: *const u8) -> i32:
+pub fn rt_rename(old_path: *const u8, new_path: *const u8) -> i32:
     let r = rename(old_path, new_path)
     if r < 0:
         return -get_errno()
     0
 
-@[c_export("rt_remove_tree")]
-pub fn rt_remove_tree_impl(path: *const u8) -> i32:
+pub fn rt_remove_tree(path: *const u8) -> i32:
     var mode: i32 = 0
     let stat_rc = rt_lstat_mode(path, &mode as *mut i32)
     if stat_rc != 0:
         return stat_rc
     if (mode & S_IFMT) != S_IFDIR:
-        return rt_unlink_impl(path)
+        return rt_unlink(path)
 
     let dir = opendir(path)
     if dir as i64 == 0:
@@ -482,54 +448,53 @@ pub fn rt_remove_tree_impl(path: *const u8) -> i32:
         if join_rc != 0:
             let _close_on_join = closedir(dir)
             return join_rc
-        let child_rc = rt_remove_tree_impl(&child as *const [4096]u8 as *const u8)
+        let child_rc = rt_remove_tree(&child as *const [4096]u8 as *const u8)
         if child_rc != 0:
             let _close_on_child = closedir(dir)
             return child_rc
     let close_rc = closedir(dir)
     if close_rc < 0:
         return -get_errno()
-    rt_rmdir_impl(path)
+    rt_rmdir(path)
 
 fn rt_copy_file_impl(src: *const u8, dst: *const u8, mode: i32) -> i32:
-    let in_fd = rt_open_impl(src, 0, 0)
+    let in_fd = rt_open(src, 0, 0)
     if in_fd < 0:
         return in_fd
-    let out_fd = rt_open_impl(dst, 1 | 0x200 | 0x400, mode & 0o777)
+    let out_fd = rt_open(dst, 1 | 0x200 | 0x400, mode & 0o777)
     if out_fd < 0:
-        let _close_in_on_open = rt_close_impl(in_fd)
+        let _close_in_on_open = rt_close(in_fd)
         return out_fd
     var buf: [65536]u8 = [0 as u8; 65536]
     while true:
-        let read_count = rt_read_impl(in_fd, &buf as *mut [65536]u8 as *mut u8, 65536)
+        let read_count = rt_read(in_fd, &buf as *mut [65536]u8 as *mut u8, 65536)
         if read_count < 0:
-            let _close_in_on_read = rt_close_impl(in_fd)
-            let _close_out_on_read = rt_close_impl(out_fd)
+            let _close_in_on_read = rt_close(in_fd)
+            let _close_out_on_read = rt_close(out_fd)
             return read_count as i32
         if read_count == 0:
             break
         var written: i64 = 0
         while written < read_count:
-            let write_count = rt_write_impl(out_fd, (&buf as i64 + written) as *const u8, read_count - written)
+            let write_count = rt_write(out_fd, (&buf as i64 + written) as *const u8, read_count - written)
             if write_count < 0:
-                let _close_in_on_write = rt_close_impl(in_fd)
-                let _close_out_on_write = rt_close_impl(out_fd)
+                let _close_in_on_write = rt_close(in_fd)
+                let _close_out_on_write = rt_close(out_fd)
                 return write_count as i32
             if write_count == 0:
-                let _close_in_on_zero = rt_close_impl(in_fd)
-                let _close_out_on_zero = rt_close_impl(out_fd)
+                let _close_in_on_zero = rt_close(in_fd)
+                let _close_out_on_zero = rt_close(out_fd)
                 return -5
             written = written + write_count
-    let close_in = rt_close_impl(in_fd)
-    let close_out = rt_close_impl(out_fd)
+    let close_in = rt_close(in_fd)
+    let close_out = rt_close(out_fd)
     if close_in != 0:
         return close_in
     if close_out != 0:
         return close_out
-    rt_chmod_impl(dst, mode & 0o777)
+    rt_chmod(dst, mode & 0o777)
 
-@[c_export("rt_copy_tree")]
-pub fn rt_copy_tree_impl(src: *const u8, dst: *const u8) -> i32:
+pub fn rt_copy_tree(src: *const u8, dst: *const u8) -> i32:
     var mode: i32 = 0
     let stat_rc = rt_lstat_mode(src, &mode as *mut i32)
     if stat_rc != 0:
@@ -537,7 +502,7 @@ pub fn rt_copy_tree_impl(src: *const u8, dst: *const u8) -> i32:
     if (mode & S_IFMT) != S_IFDIR:
         return rt_copy_file_impl(src, dst, mode)
 
-    let mkdir_rc = rt_mkdir_impl(dst, mode & 0o777)
+    let mkdir_rc = rt_mkdir(dst, mode & 0o777)
     if mkdir_rc != 0 and not rt_lstat_is_dir(dst):
         return mkdir_rc
 
@@ -561,17 +526,16 @@ pub fn rt_copy_tree_impl(src: *const u8, dst: *const u8) -> i32:
         if dst_join_rc != 0:
             let _close_on_dst_join = closedir(dir)
             return dst_join_rc
-        let child_rc = rt_copy_tree_impl(&child_src as *const [4096]u8 as *const u8, &child_dst as *const [4096]u8 as *const u8)
+        let child_rc = rt_copy_tree(&child_src as *const [4096]u8 as *const u8, &child_dst as *const [4096]u8 as *const u8)
         if child_rc != 0:
             let _close_on_child = closedir(dir)
             return child_rc
     let close_rc = closedir(dir)
     if close_rc < 0:
         return -get_errno()
-    rt_chmod_impl(dst, mode & 0o777)
+    rt_chmod(dst, mode & 0o777)
 
-@[c_export("rt_symlink")]
-pub fn rt_symlink_impl(target: *const u8, link_path: *const u8) -> i32:
+pub fn rt_symlink(target: *const u8, link_path: *const u8) -> i32:
     let r = symlink(target, link_path)
     if r < 0:
         return -get_errno()
@@ -617,12 +581,10 @@ fn rt_list_files_walk(path: *const u8, out: str) -> str:
     let _close = closedir(dir)
     result
 
-@[c_export("rt_list_files")]
-pub fn rt_list_files_impl(path: *const u8) -> str:
+pub fn rt_list_files(path: *const u8) -> str:
     rt_list_files_walk(path, rt_empty_str())
 
-@[c_export("rt_access")]
-pub fn rt_access_impl(path: *const u8, mode: i32) -> i32:
+pub fn rt_access(path: *const u8, mode: i32) -> i32:
     let r = access(path, mode)
     if r < 0:
         return -get_errno()
@@ -637,8 +599,7 @@ type RtSysInfo:
 
 extern fn sysctlbyname(name: *const u8, oldp: *mut u8, oldlenp: *mut i64, newp: *const u8, newlen: i64) -> i32
 
-@[c_export("rt_sysinfo")]
-pub fn rt_sysinfo_impl(out: *mut RtSysInfo) -> i32:
+pub fn rt_sysinfo(out: *mut RtSysInfo) -> i32:
     // CPU cores: sysctl hw.logicalcpu
     var cores: i32 = 0
     var cores_len: i64 = 4
@@ -656,18 +617,15 @@ pub fn rt_sysinfo_impl(out: *mut RtSysInfo) -> i32:
     (unsafe *out).page_size = ps
     0
 
-@[c_export("rt_sysinfo_os")]
-pub fn rt_sysinfo_os_impl() -> str:
+pub fn rt_sysinfo_os() -> str:
     with_str_from_cstr("Macos" as *const u8)
 
-@[c_export("rt_sysinfo_arch")]
-pub fn rt_sysinfo_arch_impl() -> str:
+pub fn rt_sysinfo_arch() -> str:
     with_str_from_cstr("armv8" as *const u8)
 
 // ── Environment ─────────────────────────────────────────────────
 
-@[c_export("rt_getenv")]
-pub fn rt_getenv_impl(name: *const u8) -> *const u8:
+pub fn rt_getenv(name: *const u8) -> *const u8:
     getenv(name)
 
 // ---- Compiler compatibility process/env adapter ----

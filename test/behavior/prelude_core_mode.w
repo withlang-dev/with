@@ -1,11 +1,9 @@
 //! expect-stdout: ok
 //! args: --prelude=core
 
-// Test: --prelude=core provides core types (Vec, assert, print)
-// but does not provide std.iter functions (map, filter, sum).
+// Test: --prelude=core provides non-alloc core types and builtins.
 
 fn main:
-    let v: Vec[i32] = Vec.new()
-    v.push(1)
-    assert(v.len() == 1)
+    let opt: Option[i32] = Some(1)
+    assert(opt.unwrap() == 1)
     print("ok")

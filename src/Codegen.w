@@ -1,7 +1,7 @@
 // Codegen — LLVM IR code generation from the With AST.
 //
 // Translates parsed AST nodes into LLVM IR using the LLVM-C API
-// via the wl_* bridge functions (runtime/llvm_bridge.c), then emits
+// via the rt.llvm_bridge module, then emits
 // object files via the LLVM target machine.
 //
 // Direct port of bootstrap/src/Codegen.zig to With.
@@ -15,6 +15,7 @@ use Sema
 use Diagnostic
 use Source
 use Resolve
+use compiler.LlvmBridge.*
 
 extern fn exit(code: i32) -> void
 extern fn with_fs_read_file(path: str) -> str
@@ -31,238 +32,6 @@ extern fn with_codegen_loop_set_result(idx: i32, value: i64) -> void
 extern fn with_codegen_loop_get_break(idx: i32) -> i64
 extern fn with_codegen_loop_get_continue(idx: i32) -> i64
 extern fn with_codegen_loop_get_result(idx: i32) -> i64
-
-// ── Bridge function declarations (runtime/llvm_bridge.c) ────────
-
-// Lifecycle
-extern fn wl_context_create() -> i64
-extern fn wl_context_dispose(c: i64) -> void
-extern fn wl_module_create(name: str, ctx: i64) -> i64
-extern fn wl_module_dispose(m: i64) -> void
-extern fn wl_builder_create(ctx: i64) -> i64
-extern fn wl_builder_dispose(b: i64) -> void
-
-// Target
-extern fn wl_init_native_target() -> i32
-extern fn wl_init_native_asm_printer() -> i32
-extern fn wl_init_native_asm_parser() -> i32
-extern fn wl_init_target_machine(m: i64, level: i32) -> i64
-extern fn wl_dispose_target_machine(tm: i64) -> void
-
-// Types
-extern fn wl_i1_type(c: i64) -> i64
-extern fn wl_i8_type(c: i64) -> i64
-extern fn wl_i16_type(c: i64) -> i64
-extern fn wl_i32_type(c: i64) -> i64
-extern fn wl_i64_type(c: i64) -> i64
-extern fn wl_i128_type(c: i64) -> i64
-extern fn wl_int_type_n(c: i64, bits: i32) -> i64
-extern fn wl_f32_type(c: i64) -> i64
-extern fn wl_f64_type(c: i64) -> i64
-extern fn wl_void_type(c: i64) -> i64
-extern fn wl_ptr_type(c: i64) -> i64
-extern fn wl_array_type(elem: i64, size: i64) -> i64
-extern fn wl_function_type(ret: i64, params_ptr: i64, count: i32, is_vararg: i32) -> i64
-extern fn wl_struct_type(ctx: i64, elems_ptr: i64, count: i32, packed: i32) -> i64
-extern fn wl_struct_create_named(ctx: i64, name: str) -> i64
-extern fn wl_struct_set_body(ty: i64, elems_ptr: i64, count: i32, packed: i32) -> void
-extern fn wl_struct_set_body_2(ty: i64, t0: i64, t1: i64, packed: i32) -> void
-extern fn wl_struct_get_type_at(ty: i64, idx: i32) -> i64
-extern fn wl_count_struct_elem_types(ty: i64) -> i32
-extern fn wl_get_element_type(ty: i64) -> i64
-extern fn wl_get_array_length(ty: i64) -> i64
-
-// Type queries
-extern fn wl_type_of(v: i64) -> i64
-extern fn wl_get_type_kind(ty: i64) -> i32
-extern fn wl_get_return_type(ft: i64) -> i64
-extern fn wl_count_params(f: i64) -> i32
-extern fn wl_count_param_types(ft: i64) -> i32
-extern fn wl_get_fn_param_type(ft: i64, index: i32) -> i64
-extern fn wl_global_get_value_type(v: i64) -> i64
-extern fn wl_get_param(f: i64, i: i32) -> i64
-extern fn wl_get_int_type_width(ty: i64) -> i32
-extern fn wl_is_fn_var_arg(ft: i64) -> i32
-extern fn wl_global_get_value_type(v: i64) -> i64
-extern fn wl_get_allocated_type(v: i64) -> i64
-
-// Type kind constants
-extern fn wl_void_type_kind() -> i32
-extern fn wl_float_type_kind() -> i32
-extern fn wl_double_type_kind() -> i32
-extern fn wl_integer_type_kind() -> i32
-extern fn wl_function_type_kind() -> i32
-extern fn wl_struct_type_kind() -> i32
-extern fn wl_array_type_kind() -> i32
-extern fn wl_pointer_type_kind() -> i32
-extern fn wl_function_value_kind() -> i32
-
-// Constants
-extern fn wl_const_int(ty: i64, val: i64, sign_ext: i32) -> i64
-extern fn wl_const_int_words(ty: i64, lo: i64, hi: i64, word_count: i32) -> i64
-extern fn wl_const_real(ty: i64, val: f64) -> i64
-extern fn wl_const_null(ty: i64) -> i64
-extern fn wl_get_undef(ty: i64) -> i64
-extern fn wl_const_string(ctx: i64, s: str, dont_null: i32) -> i64
-extern fn wl_const_struct(ctx: i64, vals_ptr: i64, count: i32, packed: i32) -> i64
-extern fn wl_const_named_struct(ty: i64, vals_ptr: i64, count: i32) -> i64
-extern fn wl_const_array(elem_ty: i64, vals_ptr: i64, count: i32) -> i64
-extern fn wl_const_bitcast(val: i64, ty: i64) -> i64
-extern fn wl_const_int_sext_val(v: i64) -> i64
-extern fn wl_is_constant(v: i64) -> i32
-extern fn wl_size_of(ty: i64) -> i64
-
-// ICmp predicates
-extern fn wl_int_eq() -> i32
-extern fn wl_int_ne() -> i32
-extern fn wl_int_slt() -> i32
-extern fn wl_int_sgt() -> i32
-extern fn wl_int_sle() -> i32
-extern fn wl_int_sge() -> i32
-extern fn wl_int_ult() -> i32
-extern fn wl_int_ule() -> i32
-extern fn wl_int_uge() -> i32
-extern fn wl_int_ugt() -> i32
-
-// FCmp predicates
-extern fn wl_real_oeq() -> i32
-extern fn wl_real_one() -> i32
-extern fn wl_real_olt() -> i32
-extern fn wl_real_ogt() -> i32
-extern fn wl_real_ole() -> i32
-extern fn wl_real_oge() -> i32
-
-// Functions
-extern fn wl_add_function(m: i64, name: str, fn_type: i64) -> i64
-extern fn wl_get_named_function(m: i64, name: str) -> i64
-extern fn wl_get_named_global(m: i64, name: str) -> i64
-extern fn wl_get_first_function(m: i64) -> i64
-extern fn wl_get_next_function(v: i64) -> i64
-extern fn wl_is_declaration(v: i64) -> i32
-extern fn wl_add_fn_attr(ctx: i64, f: i64, attr_name: str) -> void
-extern fn wl_add_param_attr(ctx: i64, f: i64, param_idx: i32, attr_name: str) -> void
-extern fn wl_add_param_byval_attr(ctx: i64, f: i64, param_idx: i32, ty: i64) -> void
-extern fn wl_add_sret_attr(ctx: i64, f: i64, param_idx: i32, ty: i64) -> void
-extern fn wl_add_call_param_byval_attr(ctx: i64, call: i64, param_idx: i32, ty: i64) -> void
-extern fn wl_add_call_sret_attr(ctx: i64, call: i64, param_idx: i32, ty: i64) -> void
-
-// Basic blocks
-extern fn wl_append_bb(ctx: i64, f: i64, name: str) -> i64
-extern fn wl_position_at_end(b: i64, bb: i64) -> void
-extern fn wl_position_before(b: i64, instr: i64) -> void
-extern fn wl_get_insert_block(b: i64) -> i64
-extern fn wl_get_bb_terminator(bb: i64) -> i64
-extern fn wl_get_entry_bb(f: i64) -> i64
-extern fn wl_get_first_instr(bb: i64) -> i64
-extern fn wl_bb_as_value(bb: i64) -> i64
-
-// Builder: binary arithmetic
-extern fn wl_build_add(b: i64, l: i64, r: i64) -> i64
-extern fn wl_build_sub(b: i64, l: i64, r: i64) -> i64
-extern fn wl_build_mul(b: i64, l: i64, r: i64) -> i64
-extern fn wl_build_nsw_add(b: i64, l: i64, r: i64) -> i64
-extern fn wl_build_nsw_sub(b: i64, l: i64, r: i64) -> i64
-extern fn wl_build_nsw_mul(b: i64, l: i64, r: i64) -> i64
-extern fn wl_build_sdiv(b: i64, l: i64, r: i64) -> i64
-extern fn wl_build_srem(b: i64, l: i64, r: i64) -> i64
-extern fn wl_build_udiv(b: i64, l: i64, r: i64) -> i64
-extern fn wl_build_urem(b: i64, l: i64, r: i64) -> i64
-extern fn wl_build_fadd(b: i64, l: i64, r: i64) -> i64
-extern fn wl_build_fsub(b: i64, l: i64, r: i64) -> i64
-extern fn wl_build_fmul(b: i64, l: i64, r: i64) -> i64
-extern fn wl_build_fdiv(b: i64, l: i64, r: i64) -> i64
-extern fn wl_build_frem(b: i64, l: i64, r: i64) -> i64
-extern fn wl_build_and(b: i64, l: i64, r: i64) -> i64
-extern fn wl_build_or(b: i64, l: i64, r: i64) -> i64
-extern fn wl_build_xor(b: i64, l: i64, r: i64) -> i64
-extern fn wl_build_shl(b: i64, l: i64, r: i64) -> i64
-extern fn wl_build_ashr(b: i64, l: i64, r: i64) -> i64
-extern fn wl_build_lshr(b: i64, l: i64, r: i64) -> i64
-
-// Builder: unary
-extern fn wl_build_neg(b: i64, v: i64) -> i64
-extern fn wl_build_not(b: i64, v: i64) -> i64
-extern fn wl_build_fneg(b: i64, v: i64) -> i64
-
-// Builder: comparison
-extern fn wl_build_icmp(b: i64, pred: i32, l: i64, r: i64) -> i64
-extern fn wl_build_fcmp(b: i64, pred: i32, l: i64, r: i64) -> i64
-
-// Builder: memory
-extern fn wl_build_alloca(b: i64, ty: i64) -> i64
-extern fn wl_build_alloca_named(b: i64, ty: i64, name: str) -> i64
-extern fn wl_build_load(b: i64, ty: i64, ptr: i64) -> i64
-extern fn wl_build_store(b: i64, val: i64, ptr: i64) -> i64
-extern fn wl_build_gep(b: i64, ty: i64, ptr: i64, idx_ptr: i64, cnt: i32) -> i64
-extern fn wl_build_struct_gep(b: i64, ty: i64, ptr: i64, idx: i32) -> i64
-extern fn wl_build_global_string_ptr(b: i64, s: str) -> i64
-
-// Builder: globals
-extern fn wl_add_global(m: i64, ty: i64, name: str) -> i64
-extern fn wl_set_initializer(g: i64, v: i64) -> void
-extern fn wl_set_global_constant(g: i64, c: i32) -> void
-extern fn wl_set_linkage(g: i64, link: i32) -> void
-extern fn wl_set_call_conv(f: i64, cc: i32) -> void
-extern fn wl_cc_c() -> i32
-extern fn wl_cc_fast() -> i32
-extern fn wl_cc_x86_stdcall() -> i32
-extern fn wl_cc_x86_fastcall() -> i32
-extern fn wl_cc_x86_thiscall() -> i32
-extern fn wl_cc_win64() -> i32
-extern fn wl_cc_aarch64_vfabi() -> i32
-extern fn wl_internal_linkage() -> i32
-extern fn wl_private_linkage() -> i32
-
-// Builder: control flow
-extern fn wl_build_br(b: i64, bb: i64) -> i64
-extern fn wl_build_cond_br(b: i64, cond: i64, then_bb: i64, else_bb: i64) -> i64
-extern fn wl_build_ret(b: i64, val: i64) -> i64
-extern fn wl_build_ret_void(b: i64) -> i64
-extern fn wl_build_unreachable(b: i64) -> i64
-extern fn wl_build_switch(b: i64, val: i64, else_bb: i64, n: i32) -> i64
-extern fn wl_add_case(sw: i64, val: i64, bb: i64) -> void
-
-// Builder: cast
-extern fn wl_build_zext(b: i64, v: i64, ty: i64) -> i64
-extern fn wl_build_sext(b: i64, v: i64, ty: i64) -> i64
-extern fn wl_build_trunc(b: i64, v: i64, ty: i64) -> i64
-extern fn wl_build_si_to_fp(b: i64, v: i64, ty: i64) -> i64
-extern fn wl_build_ui_to_fp(b: i64, v: i64, ty: i64) -> i64
-extern fn wl_build_fp_to_si(b: i64, v: i64, ty: i64) -> i64
-extern fn wl_build_fp_to_ui(b: i64, v: i64, ty: i64) -> i64
-extern fn wl_build_bitcast(b: i64, v: i64, ty: i64) -> i64
-extern fn wl_build_int_to_ptr(b: i64, v: i64, ty: i64) -> i64
-extern fn wl_build_ptr_to_int(b: i64, v: i64, ty: i64) -> i64
-extern fn wl_build_fp_cast(b: i64, v: i64, ty: i64) -> i64
-extern fn wl_build_fp_ext(b: i64, v: i64, ty: i64) -> i64
-
-// Builder: phi / select / extract / insert
-extern fn wl_build_phi(b: i64, ty: i64) -> i64
-extern fn wl_add_incoming(phi: i64, vals_ptr: i64, bbs_ptr: i64, count: i32) -> void
-extern fn wl_build_select(b: i64, cond: i64, then_v: i64, else_v: i64) -> i64
-extern fn wl_build_extract_value(b: i64, agg: i64, idx: i32) -> i64
-extern fn wl_build_insert_value(b: i64, agg: i64, val: i64, idx: i32) -> i64
-
-// Builder: call
-extern fn wl_build_call(b: i64, fn_ty: i64, f: i64, args_ptr: i64, cnt: i32) -> i64
-extern fn wl_set_tail_call(call_inst: i64) -> void
-extern fn wl_set_musttail_call(call_inst: i64) -> void
-
-// Misc
-extern fn wl_instruction_erase(v: i64) -> void
-extern fn wl_get_value_kind(v: i64) -> i32
-extern fn wl_get_first_use(v: i64) -> i64
-extern fn wl_set_value_name(v: i64, name: str) -> void
-
-// Intrinsics
-extern fn wl_lookup_intrinsic_id(name: str) -> i32
-extern fn wl_get_intrinsic_decl(m: i64, id: i32, tys_ptr: i64, cnt: i32) -> i64
-extern fn wl_intrinsic_get_type(ctx: i64, id: i32, tys_ptr: i64, cnt: i32) -> i64
-
-// Data layout
-extern fn wl_get_module_data_layout(m: i64) -> i64
-extern fn wl_abi_size_of(dl: i64, ty: i64) -> i64
-extern fn wl_abi_align_of(dl: i64, ty: i64) -> i32
 
 // Atomic operations
 enum AtomicRmwOp: i32:
@@ -284,64 +53,20 @@ enum AtomicOrdering: i32:
     ACQ_REL = 3
     SEQ_CST = 4
 
-extern fn wl_build_atomic_load(b: i64, ty: i64, ptr: i64, order: i32) -> i64
-extern fn wl_build_atomic_store(b: i64, val: i64, ptr: i64, order: i32) -> void
-extern fn wl_build_atomic_rmw(b: i64, rmw_op: i32, ptr: i64, val: i64, order: i32) -> i64
-extern fn wl_build_cmpxchg(b: i64, ptr: i64, expected: i64, desired: i64, success_order: i32, failure_order: i32, is_weak: i32) -> i64
-extern fn wl_extract_value(b: i64, agg: i64, index: i32) -> i64
-extern fn wl_build_fence(b: i64, order: i32) -> void
 
 // Inline assembly
-extern fn wl_get_inline_asm(fn_ty: i64, asm_str: str, constraints: str, has_side_effects: i32, is_align_stack: i32) -> i64
 
 // Struct name
-extern fn wl_get_struct_name(ty: i64) -> str
 
 // Param types
-extern fn wl_get_param_types(fn_ty: i64, out_ptr: i64) -> void
 
 // Verification / emission
-extern fn wl_verify_module(m: i64) -> i32
-extern fn wl_emit_object(tm: i64, m: i64, path: str) -> i32
-extern fn wl_optimize(m: i64, tm: i64, level: i32) -> void
-extern fn wl_promote_allocas(fn_val: i64, tm: i64) -> void
-extern fn wl_print_ir(m: i64) -> void
 
 // Vec data pointer
-extern fn wl_vec_data_ptr(v: &Vec[i64]) -> i64
 
 // Entry alloca helper
-extern fn wl_create_entry_alloca(builder: i64, f: i64, ty: i64) -> i64
 
 // Debug info (DWARF)
-extern fn wl_di_create_builder(m: i64) -> i64
-extern fn wl_di_dispose_builder(b: i64) -> void
-extern fn wl_di_finalize(b: i64) -> void
-extern fn wl_debug_metadata_version() -> i32
-extern fn wl_add_module_flag_int(m: i64, key: str, val: i32) -> void
-extern fn wl_di_create_file(b: i64, filename: str, directory: str) -> i64
-extern fn wl_di_create_compile_unit(b: i64, file: i64, producer: str, is_optimized: i32, dwarf_version: i32, lang: i32) -> i64
-extern fn wl_dwarf_lang_with() -> i32
-extern fn wl_di_create_subroutine_type(b: i64, file: i64, param_types_ptr: i64, count: i32) -> i64
-extern fn wl_di_create_function(b: i64, scope: i64, name: str, linkage_name: str, file: i64, line: i32, ty: i64, is_definition: i32, scope_line: i32, is_optimized: i32) -> i64
-extern fn wl_di_set_subprogram(f: i64, subprogram: i64) -> void
-extern fn wl_di_create_debug_location(ctx: i64, line: i32, col: i32, scope: i64) -> i64
-extern fn wl_di_set_current_location(b: i64, location: i64) -> void
-extern fn wl_di_clear_current_location(b: i64) -> void
-extern fn wl_dwarf_ate_boolean() -> i32
-extern fn wl_dwarf_ate_float() -> i32
-extern fn wl_dwarf_ate_signed() -> i32
-extern fn wl_dwarf_ate_unsigned() -> i32
-extern fn wl_di_create_basic_type(b: i64, name: str, size_in_bits: i64, encoding: i32) -> i64
-extern fn wl_di_create_pointer_type(b: i64, pointee_ty: i64, size_in_bits: i64) -> i64
-extern fn wl_di_create_struct_type(b: i64, scope: i64, name: str, file: i64, line: i32, size_in_bits: i64, align_in_bits: i32, elements: i64, num_elements: i32) -> i64
-extern fn wl_di_create_member_type(b: i64, scope: i64, name: str, file: i64, line: i32, size_in_bits: i64, align_in_bits: i32, offset_in_bits: i64, ty: i64) -> i64
-extern fn wl_di_create_unspecified_type(b: i64, name: str) -> i64
-extern fn wl_di_create_auto_variable(b: i64, scope: i64, name: str, file: i64, line: i32, ty: i64) -> i64
-extern fn wl_di_create_parameter_variable(b: i64, scope: i64, name: str, file: i64, line: i32, ty: i64, arg_no: i32) -> i64
-extern fn wl_di_create_expression(b: i64) -> i64
-extern fn wl_di_insert_declare_at_end(b: i64, storage: i64, var_info: i64, expr: i64, loc: i64, block: i64) -> void
-extern fn wl_di_create_lexical_block(b: i64, scope: i64, file: i64, line: i32, col: i32) -> i64
 
 // Runtime helpers
 extern fn with_str_concat(a: str, b: str) -> str
@@ -2239,7 +1964,7 @@ fn Codegen.create_entry_alloca(self: Codegen, ty: i64) -> i64:
     wl_create_entry_alloca(self.builder, self.current_function, ty)
 
 fn vec_data_i64(v: &Vec[i64]) -> i64:
-    wl_vec_data_ptr(v)
+    wl_vec_data_ptr(v as i64)
 
 fn codegen_owned_text(text: str) -> str:
     if text.len() == 0:
@@ -2881,6 +2606,114 @@ fn Codegen.predeclare_struct_type(self: Codegen, name_sym: i32):
     self.struct_field_counts.push(0)
     self.struct_type_map.insert(name_sym, idx)
 
+fn Codegen.codegen_sym_for_sema_sym(self: Codegen, sema_sym: i32) -> i32:
+    let text = self.sema_symbol_text(sema_sym)
+    if text.len() > 0:
+        return self.intern.intern(text)
+    sema_sym
+
+fn Codegen.codegen_resolve_sema_type(self: Codegen, tid: i32) -> i32:
+    let resolved = self.mir_input.mir_resolve_alias(tid)
+    if resolved > 0 and self.mir_input.mir_get_type_kind(resolved) != 0:
+        return resolved
+    self.sema.resolve_alias(tid as TypeId) as i32
+
+fn Codegen.codegen_get_type_kind(self: Codegen, tid: i32) -> i32:
+    if tid >= 0 and tid < self.mir_input.sema_type_kinds.len() as i32:
+        return self.mir_input.mir_get_type_kind(tid)
+    self.sema.get_type_kind(tid)
+
+fn Codegen.codegen_get_type_d0(self: Codegen, tid: i32) -> i32:
+    if tid >= 0 and tid < self.mir_input.sema_type_d0.len() as i32:
+        return self.mir_input.mir_get_type_d0(tid)
+    self.sema.get_type_d0(tid)
+
+fn Codegen.codegen_get_type_d1(self: Codegen, tid: i32) -> i32:
+    if tid >= 0 and tid < self.mir_input.sema_type_d1.len() as i32:
+        return self.mir_input.mir_get_type_d1(tid)
+    self.sema.get_type_d1(tid)
+
+fn Codegen.codegen_get_type_d2(self: Codegen, tid: i32) -> i32:
+    if tid >= 0 and tid < self.mir_input.sema_type_d2.len() as i32:
+        return self.mir_input.mir_get_type_d2(tid)
+    self.sema.get_type_d2(tid)
+
+fn Codegen.codegen_get_type_extra(self: Codegen, idx: i32) -> i32:
+    if idx >= 0 and idx < self.mir_input.sema_type_extra.len() as i32:
+        return self.mir_input.mir_get_type_extra(idx)
+    if idx >= 0 and idx < self.sema.type_extra.len() as i32:
+        return self.sema.type_extra.get(idx as i64)
+    0
+
+fn Codegen.codegen_generator_state_field_count(self: Codegen, state_tid: i32) -> i32:
+    if self.sema.generator_state_field_counts.contains(state_tid):
+        return self.sema.generator_state_field_counts.get(state_tid).unwrap()
+    self.codegen_get_type_d2(state_tid)
+
+fn Codegen.codegen_generator_state_field_sym(self: Codegen, state_tid: i32, field_i: i32, extra_start: i32) -> i32:
+    let key = sema_pair_key(state_tid, field_i)
+    if self.sema.generator_state_field_names.contains(key):
+        return self.sema.generator_state_field_names.get(key).unwrap()
+    self.codegen_get_type_extra(extra_start + field_i * 3)
+
+fn Codegen.codegen_generator_state_field_type(self: Codegen, state_tid: i32, field_i: i32, extra_start: i32) -> i32:
+    let key = sema_pair_key(state_tid, field_i)
+    if self.sema.generator_state_field_types.contains(key):
+        return self.sema.generator_state_field_types.get(key).unwrap()
+    self.codegen_get_type_extra(extra_start + field_i * 3 + 1)
+
+fn Codegen.predeclare_generator_state_types(self: Codegen):
+    for si in 0..self.sema.sig_names.len() as i32:
+        let fn_sym = self.sema.sig_names.get(si as i64)
+        if not self.sema.generator_fn_state_types.contains(fn_sym):
+            continue
+        let state_tid = self.sema.generator_fn_state_types.get(fn_sym).unwrap()
+        let resolved = self.codegen_resolve_sema_type(state_tid)
+        if resolved <= 0 or self.codegen_get_type_kind(resolved) != TypeKind.TY_STRUCT:
+            continue
+        let state_sym = self.codegen_get_type_d0(resolved)
+        let cg_state_sym = self.codegen_sym_for_sema_sym(state_sym)
+        self.predeclare_struct_type(cg_state_sym)
+
+fn Codegen.declare_generator_state_type(self: Codegen, state_tid: i32):
+    let resolved = self.codegen_resolve_sema_type(state_tid)
+    if resolved <= 0 or self.codegen_get_type_kind(resolved) != TypeKind.TY_STRUCT:
+        return
+    let state_sym = self.codegen_get_type_d0(resolved)
+    let cg_state_sym = self.codegen_sym_for_sema_sym(state_sym)
+    if not self.struct_type_map.get(cg_state_sym).is_some():
+        self.predeclare_struct_type(cg_state_sym)
+    let idx = self.struct_type_map.get(cg_state_sym).unwrap()
+    let existing_count = self.struct_field_counts.get(idx as i64)
+    if existing_count > 0:
+        return
+    let st_type = self.struct_llvm_types.get(idx as i64)
+    let extra_start = self.codegen_get_type_d1(resolved)
+    let field_count = self.codegen_generator_state_field_count(resolved)
+    self.struct_field_starts.set_i32(idx as i64, self.struct_field_names.len() as i32)
+    self.struct_field_counts.set_i32(idx as i64, field_count)
+
+    let field_types: Vec[i64] = Vec.new()
+    for fi in 0..field_count:
+        let field_sym = self.codegen_generator_state_field_sym(resolved, fi, extra_start)
+        let field_tid = self.codegen_generator_state_field_type(resolved, fi, extra_start)
+        var field_ty = self.mir_sema_type_to_llvm(field_tid)
+        if field_ty == 0:
+            field_ty = self.type_fallback()
+        self.struct_field_names.push(field_sym)
+        self.struct_field_types.push(field_ty)
+        self.struct_field_type_nodes.push(0)
+        self.struct_field_defaults.push(0)
+        self.struct_llvm_field_indices.push(fi)
+        field_types.push(field_ty)
+    wl_struct_set_body(st_type, vec_data_i64(&field_types), field_count, 0)
+
+fn Codegen.declare_generator_state_types(self: Codegen):
+    for si in 0..self.sema.sig_names.len() as i32:
+        let fn_sym = self.sema.sig_names.get(si as i64)
+        if self.sema.generator_fn_state_types.contains(fn_sym):
+            self.declare_generator_state_type(self.sema.generator_fn_state_types.get(fn_sym).unwrap())
+
 fn Codegen.predeclare_enum_type(self: Codegen, name_sym: i32):
     if self.enum_type_map.get(name_sym).is_some():
         return
@@ -3344,8 +3177,25 @@ fn codegen_canonical_module_path(path: str) -> str:
         return resolve_normalize_path(path)
     resolve_join(cwd, path)
 
+fn codegen_is_runtime_source_file(source_path: str) -> bool:
+    source_path.starts_with("rt/") or source_path.contains("/rt/") or
+        source_path == "out/gen/compat_runtime.w" or
+        source_path.ends_with("/out/gen/compat_runtime.w")
+
+fn codegen_is_runtime_abi_symbol(base_name: str) -> bool:
+    if base_name.starts_with("with_") or base_name.starts_with("rt_") or base_name.starts_with("wl_"):
+        return true
+    base_name == "__error" or base_name == "__open" or
+        base_name == "i32_to_str" or base_name == "i64_to_string" or
+        base_name == "str_from_byte"
+
+fn codegen_preserve_runtime_link_name(source_path: str, base_name: str) -> bool:
+    codegen_is_runtime_source_file(source_path) and codegen_is_runtime_abi_symbol(base_name)
+
 fn Codegen.module_link_name_for_path(self: Codegen, source_path: str, base_name: str) -> str:
     if self.module_object_mode == 0:
+        return base_name
+    if codegen_preserve_runtime_link_name(source_path, base_name):
         return base_name
     let canonical_path = codegen_canonical_module_path(source_path)
     if canonical_path.len() == 0 or canonical_path == "<unknown>":
@@ -3467,6 +3317,11 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
     let flags = self.pool.get_data2(fn_node)
     let meta = self.pool.find_fn_meta(fn_node)
     if meta < 0: return
+    if (flags / FnFlags.GEN) % 2 == 1:
+        let sig_idx = self.sema.get_sig(name_sym)
+        if sig_idx >= 0:
+            self.declare_function_from_sig(name_sym, sig_idx, 0)
+        return
 
     let ret_type_node = self.pool.fn_meta_ret(meta)
     let param_start = self.pool.fn_meta_param_start(meta)
@@ -3658,7 +3513,8 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
     if (flags / FnFlags.ENTRY) % 2 == 1:
         effective_name = "main"
     else if self.module_object_mode != 0:
-        if not (cc_name.len() > 9 and cc_name.slice(0, 9) == "c_export:"):
+        if not codegen_preserve_runtime_link_name(self.current_decl_source_file, effective_name) and
+            not (cc_name.len() > 9 and cc_name.slice(0, 9) == "c_export:"):
             effective_name = self.current_decl_module_link_name(effective_name)
 
     let function = wl_add_function(self.llmod, effective_name, fn_type)
@@ -3672,12 +3528,15 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
     // keep owner definitions externally linkable and let importers reference them.
     if self.module_object_mode == 0:
         let is_prelude = self.current_decl_source_file.contains("lib/std/")
-        if effective_name != "main" and not is_prelude:
+        if effective_name != "main" and not is_prelude and
+            not codegen_preserve_runtime_link_name(self.current_decl_source_file, effective_name):
             wl_set_linkage(function, wl_internal_linkage())
 
     // @[weak] — set weak linkage (LLVMWeakAnyLinkage = 5)
     // Must be checked before c_export which also sets linkage.
     let is_weak = self.pool.state.fn_weak_flags.contains(fn_node)
+    if is_weak:
+        wl_set_linkage(function, 5)
 
     // @[c_export] overrides internal linkage to external for C/linker visibility
     if cc_name.len() > 0:
@@ -3718,6 +3577,61 @@ fn Codegen.declare_function(self: Codegen, fn_node: i32):
         self.fn_fn_types.insert(method_key_sym, fn_type)
 
     self.current_method_owner_sym = saved_owner
+
+fn Codegen.declare_function_from_sig(self: Codegen, fn_sym: i32, sig_idx: i32, force_internal: i32):
+    if fn_sym == 0 or sig_idx < 0:
+        return
+    let cg_sym = self.codegen_sym_for_sema_sym(fn_sym)
+    let sema_name = self.sema_symbol_text(fn_sym)
+    var effective_name =
+        if sema_name.len() > 0:
+            sema_name
+        else:
+            self.function_symbol_name(cg_sym)
+    if self.module_object_mode != 0 and force_internal == 0 and
+        not codegen_preserve_runtime_link_name(self.current_decl_source_file, effective_name):
+        effective_name = self.current_decl_module_link_name(effective_name)
+
+    var ret_ty = self.sema_type_to_llvm(self.sema.sig_return_type(sig_idx))
+    if ret_ty == 0:
+        ret_ty = self.type_fallback()
+    let param_count = self.sema.sig_get_param_count(sig_idx)
+    let param_types: Vec[i64] = Vec.new()
+    for pi in 0..param_count:
+        var p_ty = self.sema_type_to_llvm(self.sema.sig_param_type(sig_idx, pi))
+        if p_ty == 0:
+            p_ty = self.type_fallback()
+        if wl_get_type_kind(p_ty) == wl_void_type_kind():
+            p_ty = wl_i32_type(self.context)
+        if self.sema.sig_param_uses_value_ref_abi(sig_idx, pi) != 0:
+            p_ty = wl_ptr_type(self.context)
+            self.record_ref_param(cg_sym, pi, param_count)
+            if cg_sym != fn_sym:
+                self.record_ref_param(fn_sym, pi, param_count)
+        param_types.push(p_ty)
+
+    let fn_type = wl_function_type(ret_ty, vec_data_i64(&param_types), param_count, self.sema.sig_is_variadic(sig_idx))
+    let existing = wl_get_named_function(self.llmod, effective_name)
+    let function = if existing != 0: existing else: wl_add_function(self.llmod, effective_name, fn_type)
+    if force_internal != 0:
+        wl_set_linkage(function, wl_internal_linkage())
+    else if self.module_object_mode == 0:
+        if effective_name != "main" and not self.current_decl_source_file.contains("lib/std/") and
+            not codegen_preserve_runtime_link_name(self.current_decl_source_file, effective_name):
+            wl_set_linkage(function, wl_internal_linkage())
+
+    self.fn_values.insert(cg_sym, function)
+    self.fn_fn_types.insert(cg_sym, fn_type)
+    if cg_sym != fn_sym:
+        self.fn_values.insert(fn_sym, function)
+        self.fn_fn_types.insert(fn_sym, fn_type)
+
+fn Codegen.declare_generator_next_functions(self: Codegen):
+    for si in 0..self.sema.sig_names.len() as i32:
+        let fn_sym = self.sema.sig_names.get(si as i64)
+        if not self.sema.generator_next_fn_syms.contains(fn_sym):
+            continue
+        self.declare_function_from_sig(fn_sym, si, 1)
 
 fn Codegen.is_method_on_generic_struct(self: Codegen, name_sym: i32) -> bool:
     if name_sym <= 0:
@@ -4935,6 +4849,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
     // Declare built-in string view types before user types.
     self.declare_builtin_str_type()
     self.declare_builtin_cstr_type()
+    self.predeclare_generator_state_types()
 
     // Pass 0a: predeclare all struct/enum names so forward references resolve.
     for i in 0..self.pool.decl_count():
@@ -5010,6 +4925,9 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
 
     if self.had_error != 0:
         return 1
+    self.declare_generator_state_types()
+    if self.had_error != 0:
+        return 1
 
     // Pass 0.5: collect trait declarations
     for i in 0..self.pool.decl_count():
@@ -5051,6 +4969,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
                 self.declare_async_function(decl)
             else:
                 self.declare_function(decl)
+    self.declare_generator_next_functions()
 
     // Pass 1.3: synthesize missing impl methods from trait defaults.
     self.generate_default_trait_methods()
@@ -5090,6 +5009,7 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
                 let is_generic_struct_method = self.is_method_on_generic_struct(name_sym)
                 if tp_count == 0 and not self.sema.generic_fn_nodes.contains(name_sym) and not is_generic_struct_method:
                     self.gen_function_dispatch(decl)
+    self.gen_generator_next_functions_from_mir()
 
     if self.had_error != 0:
         return 1
@@ -5110,6 +5030,8 @@ fn Codegen.gen_module(self: Codegen, pool: AstPool) -> i32:
 // ── Wrap main for exit ────────────────────────────────────────────
 
 fn Codegen.wrap_main_for_exit(self: Codegen) -> void:
+    if self.sema.no_std != 0:
+        return
     // Create an OS-facing wrapper that preserves argv/runtime setup before
     // calling the user's `main`.
     let main_fn = wl_get_named_function(self.llmod, "main")

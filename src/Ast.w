@@ -92,6 +92,8 @@ enum NodeKind: i32:
     NK_MULTI_INDEX = 77
     // NK_INDEX_SPEC: d0=start_or_expr, d1=stop, d2=step_and_kind (kind * INDEX_KIND_SHIFT + step_node)
     NK_INDEX_SPEC = 78
+    // NK_SCOPE: d0=name(sym), d1=body(node), d2=0
+    NK_SCOPE = 79
     // Labels and unstructured jumps. Values are appended after existing
     // expression/pattern nodes to avoid renumbering bootstrap-visible kinds.
     // NK_LABEL: d0=label_sym, d1=statement, d2=0
@@ -417,6 +419,7 @@ type AstPoolState {
     non_escaping_closure_nodes: Vec[i32],
     compiler_hook_fn_nodes: Vec[i32],
     compiler_hook_phase_syms: Vec[i32],
+    global_allocator_decl_nodes: Vec[i32],
     where_meta: Vec[i32],
     impl_type_params: Vec[i32],
     impl_target_type_nodes: Vec[i32],
@@ -445,6 +448,7 @@ type AstPoolState {
     non_escaping_closure_set: HashMap[i32, i32],
     compiler_hook_fn_set: HashMap[i32, i32],
     compiler_hook_phase_map: HashMap[i32, i32],
+    global_allocator_decl_set: HashMap[i32, i32],
     call_named_args: HashMap[i32, i32],
     fn_stack_sizes: HashMap[i32, i32],
     fn_weak_flags: HashMap[i32, i32],
@@ -494,6 +498,7 @@ fn AstPool.new -> AstPool:
             non_escaping_closure_nodes: Vec.new(),
             compiler_hook_fn_nodes: Vec.new(),
             compiler_hook_phase_syms: Vec.new(),
+            global_allocator_decl_nodes: Vec.new(),
             where_meta: Vec.new(),
             impl_type_params: Vec.new(),
             impl_target_type_nodes: Vec.new(),
@@ -519,6 +524,7 @@ fn AstPool.new -> AstPool:
             non_escaping_closure_set: HashMap.new(),
             compiler_hook_fn_set: HashMap.new(),
             compiler_hook_phase_map: HashMap.new(),
+            global_allocator_decl_set: HashMap.new(),
             call_named_args: HashMap.new(),
             fn_stack_sizes: HashMap.new(),
             fn_weak_flags: HashMap.new(),
@@ -1014,6 +1020,14 @@ fn AstPool.compiler_hook_node(self: AstPool, idx: i32) -> NodeId:
 fn AstPool.compiler_hook_phase_at(self: AstPool, idx: i32) -> i32:
     self.state.compiler_hook_phase_syms.get(idx as i64)
 
+fn AstPool.mark_global_allocator_decl(self: AstPool, node: NodeId):
+    self.state.global_allocator_decl_nodes.push(node as i32)
+    self.state.global_allocator_decl_set.insert(node as i32, 1)
+
+fn AstPool.is_global_allocator_decl(self: AstPool, node: NodeId) -> i32:
+    if self.state.global_allocator_decl_set.contains(node as i32): return 1
+    0
+
 fn AstPool.get_extra(self: AstPool, idx: i32) -> i32:
     self.state.extra.get(idx as i64)
 
@@ -1500,6 +1514,7 @@ fn AstPool.comprehension_binding_is_pattern(self: AstPool, node: NodeId, binding
 // NodeKind.NK_COMPTIME:      d0=expr(node), d1=0, d2=0
 // NodeKind.NK_NO_SUSPEND:    d0=body(node), d1=0, d2=0
 // NodeKind.NK_ASYNC_SCOPE:   d0=name(sym), d1=body(node), d2=0
+// NodeKind.NK_SCOPE:         d0=name(sym), d1=body(node), d2=0
 // NodeKind.NK_SELECT_AWAIT:  d0=extra_start, d1=arm_count, d2=biased(0/1)
 //
 // Type expression nodes:

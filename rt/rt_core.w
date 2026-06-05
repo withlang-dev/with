@@ -542,8 +542,7 @@ fn rt_thread_entry(arg: *mut u8) -> *mut u8:
     (unsafe *start).result = worker(0 as *mut u8)
     arg
 
-@[c_export("with_thread_spawn")]
-pub fn thread_spawn_impl(fn_ptr: *mut u8, ctx: *mut u8) -> i64:
+pub fn with_thread_spawn(fn_ptr: *mut u8, ctx: *mut u8) -> i64:
     if fn_ptr as i64 == 0:
         return -1
     let start = rt_alloc(sizeof[RtThreadStart]()) as *mut RtThreadStart
@@ -558,8 +557,7 @@ pub fn thread_spawn_impl(fn_ptr: *mut u8, ctx: *mut u8) -> i64:
     (unsafe *start).handle = handle
     start as i64
 
-@[c_export("with_thread_join")]
-pub fn thread_join_impl(handle: i64) -> i32:
+pub fn with_thread_join(handle: i64) -> i32:
     if handle == 0:
         return -1
     if handle < 0:
@@ -607,43 +605,35 @@ fn str_to_cstr(s: str) -> *const u8:
     unsafe *((buf as i64 + slen) as *mut u8) = 0
     buf as *const u8
 
-@[c_export("with_str_to_cstr")]
-pub fn str_to_cstr_export(s: str) -> *mut u8:
+pub fn with_str_to_cstr(s: str) -> *mut u8:
     str_to_cstr(s) as *mut u8
 
 // ── Exported allocator/memory API for std/mem.w ───────────────────
 
-@[c_export("with_alloc")]
-pub fn alloc_export(size: i64) -> *mut u8:
+pub fn with_alloc(size: i64) -> *mut u8:
     rt_alloc(size)
 
-@[c_export("with_alloc_zeroed")]
-pub fn alloc_zeroed_export(count: i64, size: i64) -> *mut u8:
+pub fn with_alloc_zeroed(count: i64, size: i64) -> *mut u8:
     let total = count * size
     let ptr = rt_alloc(total)
     if ptr as i64 != 0 and total > 0:
         rt_memset(ptr, 0, total)
     ptr
 
-@[c_export("with_realloc")]
-pub fn realloc_export(ptr: *mut u8, old_size: i64, new_size: i64) -> *mut u8:
+pub fn with_realloc(ptr: *mut u8, old_size: i64, new_size: i64) -> *mut u8:
     rt_realloc(ptr, old_size, new_size)
 
-@[c_export("with_free")]
-pub fn free_export(ptr: *mut u8):
+pub fn with_free(ptr: *mut u8):
     rt_free(ptr)
 
-@[c_export("with_free_sized")]
-pub fn free_sized_export(ptr: *mut u8, size: i64):
+pub fn with_free_sized(ptr: *mut u8, size: i64):
     rt_free_sized(ptr, size)
 
-@[c_export("with_memcpy")]
-pub fn memcpy_export(dst: *mut u8, src: *const u8, n: i64) -> *mut u8:
+pub fn with_memcpy(dst: *mut u8, src: *const u8, n: i64) -> *mut u8:
     rt_memcpy(dst, src, n)
     return dst
 
-@[c_export("with_memmove")]
-pub fn memmove_export(dst: *mut u8, src: *const u8, n: i64) -> *mut u8:
+pub fn with_memmove(dst: *mut u8, src: *const u8, n: i64) -> *mut u8:
     // Simple: copy to temp buffer then to dst (handles overlap)
     if n <= 0: return dst
     let tmp = rt_alloc(n)
@@ -652,13 +642,11 @@ pub fn memmove_export(dst: *mut u8, src: *const u8, n: i64) -> *mut u8:
     rt_free_sized(tmp, n)
     return dst
 
-@[c_export("with_memset")]
-pub fn memset_export(dst: *mut u8, c: i32, n: i64) -> *mut u8:
+pub fn with_memset(dst: *mut u8, c: i32, n: i64) -> *mut u8:
     rt_memset(dst, c as u8, n)
     return dst
 
-@[c_export("with_memcmp")]
-pub fn memcmp_export(a: *const u8, b: *const u8, n: i64) -> i32:
+pub fn with_memcmp(a: *const u8, b: *const u8, n: i64) -> i32:
     rt_memcmp(a, b, n)
 
 // Allocate a new str from a buffer
@@ -683,8 +671,7 @@ fn write_all(fd: i32, buf: *const u8, len: i64):
 var saved_argc: i32 = 0
 var saved_argv_raw: i64 = 0
 
-@[c_export("with_runtime_set_argv")]
-pub fn runtime_set_argv(argc: i32, argv: *const *const u8):
+pub fn with_runtime_set_argv(argc: i32, argv: *const *const u8):
     saved_argc = argc
     saved_argv_raw = argv as i64
     rt_store_args(argc, argv)
@@ -695,69 +682,59 @@ pub fn runtime_set_argv(argc: i32, argv: *const *const u8):
 
 // ── Print functions ────────────────────────────────────────────────
 
-@[c_export("with_print_str")]
-pub fn print_str(s: str):
+pub fn with_print_str(s: str):
     let p = str_data(s)
     let n = str_length(s)
     if p as i64 != 0 and n > 0:
         write_all(1, p, n)
 
-@[c_export("with_println_str")]
-pub fn println_str(s: str):
+pub fn with_println_str(s: str):
     let p = str_data(s)
     let n = str_length(s)
     if p as i64 != 0 and n > 0:
         write_all(1, p, n)
     let _ = rt_write(1, "\n" as *const u8, 1)
 
-@[c_export("with_println_i32")]
-pub fn println_i32(n: i32):
+pub fn with_println_i32(n: i32):
     var buf: [16]u8 = [0 as u8; 16]
     let len = i64_to_buf(n as i64, &buf as *mut u8)
     write_all(1, &buf as *const u8, len)
     let _ = rt_write(1, "\n" as *const u8, 1)
 
-@[c_export("with_println_i64")]
-pub fn println_i64(n: i64):
+pub fn with_println_i64(n: i64):
     var buf: [24]u8 = [0 as u8; 24]
     let len = i64_to_buf(n, &buf as *mut u8)
     write_all(1, &buf as *const u8, len)
     let _ = rt_write(1, "\n" as *const u8, 1)
 
-@[c_export("with_println_bool")]
-pub fn println_bool(b: i32):
+pub fn with_println_bool(b: i32):
     if b != 0:
         write_all(1, "true\n" as *const u8, 5)
     else:
         write_all(1, "false\n" as *const u8, 6)
 
-@[c_export("with_write")]
-pub fn write_str(s: str):
-    print_str(s)
+pub fn with_write(s: str):
+    with_print_str(s)
 
-@[c_export("with_ewrite")]
-pub fn ewrite(s: str):
+pub fn with_ewrite(s: str):
     let p = str_data(s)
     let n = str_length(s)
     if p as i64 != 0 and n > 0:
         write_all(2, p, n)
 
-@[c_export("with_eprintln")]
-pub fn eprintln(s: str):
+pub fn with_eprintln(s: str):
     let p = str_data(s)
     let n = str_length(s)
     if p as i64 != 0 and n > 0:
         write_all(2, p, n)
     let _ = rt_write(2, "\n" as *const u8, 1)
 
-@[c_export("with_eprint")]
-pub fn eprint(s: str):
-    eprintln(s)
+pub fn with_eprint(s: str):
+    with_eprintln(s)
 
 // ── Panic / assert ─────────────────────────────────────────────────
 
-@[c_export("with_panic_core")]
-pub fn panic_impl(msg: str, file: str, line: i32):
+pub fn with_panic_core(msg: str, file: str, line: i32):
     write_all(2, "panic: " as *const u8, 7)
     let mp = str_data(msg)
     let ml = str_length(msg)
@@ -776,11 +753,10 @@ pub fn panic_impl(msg: str, file: str, line: i32):
     let _ = rt_write(2, "\n" as *const u8, 1)
     rt_exit(1)
 
-@[c_export("with_assert")]
-pub fn assert_impl(cond: i32, msg: str):
+pub fn with_assert(cond: i32, msg: str):
     if cond == 0:
         let empty = make_str("" as *const u8, 0)
-        panic_impl(msg, empty, 0)
+        with_panic_core(msg, empty, 0)
 
 // ── Integer formatting ─────────────────────────────────────────────
 
@@ -851,42 +827,35 @@ fn u64_base_to_buf(n_arg: u64, base: i32, uppercase: i32, buf: *mut u8) -> i64:
 
 // ── with_fmt_* functions ───────────────────────────────────────────
 
-@[c_export("with_fmt_i32")]
-pub fn fmt_i32(n: i32) -> str:
+pub fn with_fmt_i32(n: i32) -> str:
     var buf: [16]u8 = [0 as u8; 16]
     let len = i64_to_buf(n as i64, &buf as *mut u8)
     alloc_str(&buf as *const u8, len)
 
-@[c_export("with_fmt_i64")]
-pub fn fmt_i64(n: i64) -> str:
+pub fn with_fmt_i64(n: i64) -> str:
     var buf: [24]u8 = [0 as u8; 24]
     let len = i64_to_buf(n, &buf as *mut u8)
     alloc_str(&buf as *const u8, len)
 
-@[c_export("with_fmt_u32")]
-pub fn fmt_u32(n: u32) -> str:
+pub fn with_fmt_u32(n: u32) -> str:
     var buf: [16]u8 = [0 as u8; 16]
     let len = u64_to_buf(n as u64, &buf as *mut u8)
     alloc_str(&buf as *const u8, len)
 
-@[c_export("with_fmt_u64")]
-pub fn fmt_u64(n: u64) -> str:
+pub fn with_fmt_u64(n: u64) -> str:
     var buf: [24]u8 = [0 as u8; 24]
     let len = u64_to_buf(n, &buf as *mut u8)
     alloc_str(&buf as *const u8, len)
 
-@[c_export("with_fmt_bool")]
-pub fn fmt_bool(b: i32) -> str:
+pub fn with_fmt_bool(b: i32) -> str:
     if b != 0:
         return make_str("true" as *const u8, 4)
     make_str("false" as *const u8, 5)
 
-@[c_export("with_fmt_str")]
-pub fn fmt_str(s: str) -> str:
+pub fn with_fmt_str(s: str) -> str:
     s
 
-@[c_export("with_fmt_str_debug")]
-pub fn fmt_str_debug(s: str) -> str:
+pub fn with_fmt_str_debug(s: str) -> str:
     let slen = str_length(s)
     let out_len = slen + 2
     let out = rt_alloc(out_len + 1)
@@ -900,15 +869,13 @@ pub fn fmt_str_debug(s: str) -> str:
 
 // ── Float formatting ───────────────────────────────────────────────
 
-@[c_export("with_fmt_f64")]
-pub fn fmt_f64(n: f64) -> str:
+pub fn with_fmt_f64(n: f64) -> str:
     var buf: [64]u8 = [0 as u8; 64]
     let len = rt_f64_to_buf(n, &buf as *mut u8, 64)
     alloc_str(&buf as *const u8, len)
 
-@[c_export("with_f64_to_string")]
-pub fn f64_to_string(n: f64) -> str:
-    fmt_f64(n)
+pub fn with_f64_to_string(n: f64) -> str:
+    with_fmt_f64(n)
 
 // ── FmtBuffer (f-string formatting via buffer) ────────────────────
 //
@@ -956,69 +923,58 @@ fn fb_append(b: *mut u8, data: *const u8, len: i64):
     rt_memcpy((p as i64 + cur) as *mut u8, data, len)
     fb_set_len(b, cur + len)
 
-@[c_export("with_fmt_buf_new")]
-pub fn fmt_buf_new() -> *mut u8:
+pub fn with_fmt_buf_new() -> *mut u8:
     let b = rt_alloc(FMT_BUF_SIZE)
     fb_set_ptr(b, rt_alloc(64))
     fb_set_len(b, 0)
     fb_set_cap(b, 64)
     b
 
-@[c_export("with_fmt_buf_write_str")]
-pub fn fmt_buf_write_str(b: *mut u8, s: str):
+pub fn with_fmt_buf_write_str(b: *mut u8, s: str):
     let slen = str_length(s)
     if slen > 0:
         fb_append(b, str_data(s), slen)
 
-@[c_export("with_fmt_buf_write_i64")]
-pub fn fmt_buf_write_i64(b: *mut u8, val: i64):
+pub fn with_fmt_buf_write_i64(b: *mut u8, val: i64):
     var tmp: [24]u8 = [0 as u8; 24]
     let len = i64_to_buf(val, &tmp as *mut u8)
     fb_append(b, &tmp as *const u8, len)
 
-@[c_export("with_fmt_buf_write_f64")]
-pub fn fmt_buf_write_f64(b: *mut u8, val: f64):
+pub fn with_fmt_buf_write_f64(b: *mut u8, val: f64):
     var tmp: [64]u8 = [0 as u8; 64]
     let len = rt_f64_to_buf(val, &tmp as *mut u8, 64)
     fb_append(b, &tmp as *const u8, len)
 
-@[c_export("with_fmt_buf_write_bool")]
-pub fn fmt_buf_write_bool(b: *mut u8, val: i32):
+pub fn with_fmt_buf_write_bool(b: *mut u8, val: i32):
     if val != 0:
         fb_append(b, "true" as *const u8, 4)
     else:
         fb_append(b, "false" as *const u8, 5)
 
-@[c_export("with_fmt_buf_write_char")]
-pub fn fmt_buf_write_char(b: *mut u8, c: u8):
+pub fn with_fmt_buf_write_char(b: *mut u8, c: u8):
     fb_grow(b, 1)
     let p = fb_ptr(b)
     let cur = fb_len(b)
     unsafe *((p as i64 + cur) as *mut u8) = c
     fb_set_len(b, cur + 1)
 
-@[c_export("with_fmt_buf_write_i64_spec")]
-pub fn fmt_buf_write_i64_spec(b: *mut u8, val: i64, is_unsigned: i32, flags: i64, width: i32, precision: i32, mode: i32):
-    let s = fmt_int_spec(val, is_unsigned, flags, width, precision, mode)
-    fmt_buf_write_str(b, s)
+pub fn with_fmt_buf_write_i64_spec(b: *mut u8, val: i64, is_unsigned: i32, flags: i64, width: i32, precision: i32, mode: i32):
+    let s = with_fmt_int_spec(val, is_unsigned, flags, width, precision, mode)
+    with_fmt_buf_write_str(b, s)
 
-@[c_export("with_fmt_buf_write_f64_spec")]
-pub fn fmt_buf_write_f64_spec(b: *mut u8, val: f64, flags: i64, width: i32, precision: i32, mode: i32):
-    let s = fmt_f64_spec(val, flags, width, precision, mode)
-    fmt_buf_write_str(b, s)
+pub fn with_fmt_buf_write_f64_spec(b: *mut u8, val: f64, flags: i64, width: i32, precision: i32, mode: i32):
+    let s = with_fmt_f64_spec(val, flags, width, precision, mode)
+    with_fmt_buf_write_str(b, s)
 
-@[c_export("with_fmt_buf_write_str_spec")]
-pub fn fmt_buf_write_str_spec(b: *mut u8, val: str, flags: i64, width: i32, precision: i32):
-    let s = fmt_str_spec(val, flags, width, precision)
-    fmt_buf_write_str(b, s)
+pub fn with_fmt_buf_write_str_spec(b: *mut u8, val: str, flags: i64, width: i32, precision: i32):
+    let s = with_fmt_str_spec(val, flags, width, precision)
+    with_fmt_buf_write_str(b, s)
 
-@[c_export("with_fmt_buf_write_debug")]
-pub fn fmt_buf_write_debug(b: *mut u8, val: str):
-    let s = fmt_str_debug(val)
-    fmt_buf_write_str(b, s)
+pub fn with_fmt_buf_write_debug(b: *mut u8, val: str):
+    let s = with_fmt_str_debug(val)
+    with_fmt_buf_write_str(b, s)
 
-@[c_export("with_fmt_buf_finish")]
-pub fn fmt_buf_finish(b: *mut u8) -> str:
+pub fn with_fmt_buf_finish(b: *mut u8) -> str:
     let p = fb_ptr(b)
     let len = fb_len(b)
     // Null-terminate
@@ -1059,8 +1015,7 @@ fn pad_str(content: *const u8, clen: i64, width: i64, fill_char: i32, align_mode
 
 // ── with_fmt_int_spec ──────────────────────────────────────────────
 
-@[c_export("with_fmt_int_spec")]
-pub fn fmt_int_spec(val_arg: i64, is_unsigned: i32, flags: i64, width: i32, precision: i32, mode: i32) -> str:
+pub fn with_fmt_int_spec(val_arg: i64, is_unsigned: i32, flags: i64, width: i32, precision: i32, mode: i32) -> str:
     let _ = precision
     let fill_char = ((flags >> 8) & 255) as i32
     let align_mode = ((flags >> 16) & 3) as i32
@@ -1133,8 +1088,7 @@ pub fn fmt_int_spec(val_arg: i64, is_unsigned: i32, flags: i64, width: i32, prec
 
 // ── with_fmt_f64_spec ──────────────────────────────────────────────
 
-@[c_export("with_fmt_f64_spec")]
-pub fn fmt_f64_spec(val: f64, flags: i64, width: i32, precision: i32, mode: i32) -> str:
+pub fn with_fmt_f64_spec(val: f64, flags: i64, width: i32, precision: i32, mode: i32) -> str:
     let _ = mode
     var buf: [64]u8 = [0 as u8; 64]
     var len: i64 = 0
@@ -1177,8 +1131,7 @@ pub fn fmt_f64_spec(val: f64, flags: i64, width: i32, precision: i32, mode: i32)
 
 // ── with_fmt_str_spec ──────────────────────────────────────────────
 
-@[c_export("with_fmt_str_spec")]
-pub fn fmt_str_spec(val: str, flags: i64, width: i32, precision: i32) -> str:
+pub fn with_fmt_str_spec(val: str, flags: i64, width: i32, precision: i32) -> str:
     var sp = str_data(val)
     var slen = str_length(val)
     if precision >= 0 and precision as i64 < slen:
@@ -1194,8 +1147,7 @@ pub fn fmt_str_spec(val: str, flags: i64, width: i32, precision: i32) -> str:
 
 // ── String operations ──────────────────────────────────────────────
 
-@[c_export("with_str_concat")]
-pub fn str_concat(a: str, b: str) -> str:
+pub fn with_str_concat(a: str, b: str) -> str:
     let al = str_length(a)
     let bl = str_length(b)
     let total = al + bl
@@ -1234,8 +1186,7 @@ fn str_concat_n_copy(parts: *const str, count: i64, total: i64) -> str:
     unsafe *((out as i64 + total) as *mut u8) = 0
     make_str(out as *const u8, total)
 
-@[c_export("with_str_concat_n")]
-pub fn str_concat_n(parts: *const str, count: i64) -> str:
+pub fn with_str_concat_n(parts: *const str, count: i64) -> str:
     var total: i64 = 0
     for i in 0..count:
         let part = unsafe parts[i]
@@ -1244,8 +1195,7 @@ pub fn str_concat_n(parts: *const str, count: i64) -> str:
         return make_str("" as *const u8, 0)
     str_concat_n_copy(parts, count, total)
 
-@[c_export("with_str_concat_n_move_first")]
-pub fn str_concat_n_move_first(parts: *const str, count: i64) -> str:
+pub fn with_str_concat_n_move_first(parts: *const str, count: i64) -> str:
     var total: i64 = 0
     for i in 0..count:
         let part = unsafe parts[i]
@@ -1277,8 +1227,7 @@ pub fn str_concat_n_move_first(parts: *const str, count: i64) -> str:
         rt_free(first_ptr as *mut u8)
     result
 
-@[c_export("with_str_eq")]
-pub fn str_eq(a: str, b: str) -> i32:
+pub fn with_str_eq(a: str, b: str) -> i32:
     let al = str_length(a)
     let bl = str_length(b)
     if al != bl:
@@ -1291,8 +1240,7 @@ pub fn str_eq(a: str, b: str) -> i32:
         return 1
     if rt_memcmp(ap, bp, al) == 0: 1 else: 0
 
-@[c_export("with_str_clone")]
-pub fn str_clone(s: str) -> str:
+pub fn with_str_clone(s: str) -> str:
     let slen = str_length(s)
     if slen == 0:
         return make_str("" as *const u8, 0)
@@ -1301,20 +1249,17 @@ pub fn str_clone(s: str) -> str:
     unsafe *((out as i64 + slen) as *mut u8) = 0
     make_str(out as *const u8, slen)
 
-@[c_export("with_str_len")]
-pub fn str_len_export(s: str) -> i64:
+pub fn with_str_len(s: str) -> i64:
     str_length(s)
 
-@[c_export("with_str_byte_at")]
-pub fn str_byte_at(s: str, idx: i64) -> i32:
+pub fn with_str_byte_at(s: str, idx: i64) -> i32:
     let slen = str_length(s)
     if idx < 0 or idx >= slen:
         return 0
     let p = str_data(s)
     (unsafe p[idx]) as i32
 
-@[c_export("with_str_slice")]
-pub fn str_slice(s: str, start_arg: i64, end_arg: i64) -> str:
+pub fn with_str_slice(s: str, start_arg: i64, end_arg: i64) -> str:
     let slen = str_length(s)
     var start = start_arg
     var end = end_arg
@@ -1324,8 +1269,7 @@ pub fn str_slice(s: str, start_arg: i64, end_arg: i64) -> str:
         return make_str("" as *const u8, 0)
     make_str((str_data(s) as i64 + start) as *const u8, end - start)
 
-@[c_export("with_str_substr")]
-pub fn str_substr(s: str, start_arg: i64, length_arg: i64) -> str:
+pub fn with_str_substr(s: str, start_arg: i64, length_arg: i64) -> str:
     let slen = str_length(s)
     var start = start_arg
     var length = length_arg
@@ -1336,23 +1280,20 @@ pub fn str_substr(s: str, start_arg: i64, length_arg: i64) -> str:
         length = slen - start
     make_str((str_data(s) as i64 + start) as *const u8, length)
 
-@[c_export("with_str_starts_with")]
-pub fn str_starts_with(s: str, prefix: str) -> i32:
+pub fn with_str_starts_with(s: str, prefix: str) -> i32:
     let pl = str_length(prefix)
     let sl = str_length(s)
     if pl > sl: return 0
     if rt_memcmp(str_data(s), str_data(prefix), pl) == 0: 1 else: 0
 
-@[c_export("with_str_ends_with")]
-pub fn str_ends_with(s: str, suffix: str) -> i32:
+pub fn with_str_ends_with(s: str, suffix: str) -> i32:
     let sufl = str_length(suffix)
     let sl = str_length(s)
     if sufl > sl: return 0
     let offset = sl - sufl
     if rt_memcmp((str_data(s) as i64 + offset) as *const u8, str_data(suffix), sufl) == 0: 1 else: 0
 
-@[c_export("with_str_contains")]
-pub fn str_contains(hay: str, needle: str) -> i32:
+pub fn with_str_contains(hay: str, needle: str) -> i32:
     let nl = str_length(needle)
     let hl = str_length(hay)
     if nl == 0: return 1
@@ -1368,8 +1309,7 @@ pub fn str_contains(hay: str, needle: str) -> i32:
 
 // Byte/codepoint membership: `ch in some_str`. Chars lower to ints, so the
 // needle arrives as an i32 byte value (#234, §9.9).
-@[c_export("with_str_contains_char")]
-pub fn str_contains_char(hay: str, ch: i32) -> i32:
+pub fn with_str_contains_char(hay: str, ch: i32) -> i32:
     let hl = str_length(hay)
     let hp = str_data(hay)
     let target = (ch & 0xff) as u8
@@ -1380,8 +1320,7 @@ pub fn str_contains_char(hay: str, ch: i32) -> i32:
         i = i + 1
     0
 
-@[c_export("with_str_index_of")]
-pub fn str_index_of(hay: str, needle: str) -> i64:
+pub fn with_str_index_of(hay: str, needle: str) -> i64:
     let nl = str_length(needle)
     let hl = str_length(hay)
     if nl == 0: return 0
@@ -1395,8 +1334,7 @@ pub fn str_index_of(hay: str, needle: str) -> i64:
         i = i + 1
     -1
 
-@[c_export("with_str_trim")]
-pub fn str_trim(s: str) -> str:
+pub fn with_str_trim(s: str) -> str:
     let slen = str_length(s)
     let sp = str_data(s)
     var start: i64 = 0
@@ -1415,8 +1353,7 @@ pub fn str_trim(s: str) -> str:
         return s
     make_str((sp as i64 + start) as *const u8, end - start)
 
-@[c_export("with_str_to_upper")]
-pub fn str_to_upper(s: str) -> str:
+pub fn with_str_to_upper(s: str) -> str:
     let slen = str_length(s)
     if slen == 0: return s
     let out = rt_alloc(slen + 1)
@@ -1432,8 +1369,7 @@ pub fn str_to_upper(s: str) -> str:
     unsafe *((out as i64 + slen) as *mut u8) = 0
     make_str(out as *const u8, slen)
 
-@[c_export("with_str_to_lower")]
-pub fn str_to_lower(s: str) -> str:
+pub fn with_str_to_lower(s: str) -> str:
     let slen = str_length(s)
     if slen == 0: return s
     let out = rt_alloc(slen + 1)
@@ -1449,8 +1385,7 @@ pub fn str_to_lower(s: str) -> str:
     unsafe *((out as i64 + slen) as *mut u8) = 0
     make_str(out as *const u8, slen)
 
-@[c_export("with_str_repeat")]
-pub fn str_repeat(s: str, count: i64) -> str:
+pub fn with_str_repeat(s: str, count: i64) -> str:
     let slen = str_length(s)
     if count <= 0 or slen == 0:
         return make_str("" as *const u8, 0)
@@ -1464,8 +1399,7 @@ pub fn str_repeat(s: str, count: i64) -> str:
     unsafe *((out as i64 + total) as *mut u8) = 0
     make_str(out as *const u8, total)
 
-@[c_export("with_str_replace")]
-pub fn str_replace(s: str, old: str, new_s: str) -> str:
+pub fn with_str_replace(s: str, old: str, new_s: str) -> str:
     let sl = str_length(s)
     let ol = str_length(old)
     let nl = str_length(new_s)
@@ -1500,58 +1434,47 @@ pub fn str_replace(s: str, old: str, new_s: str) -> str:
     unsafe *((out as i64 + new_len) as *mut u8) = 0
     make_str(out as *const u8, new_len)
 
-@[c_export("with_str_from_cstr")]
-pub fn str_from_cstr(s: *const u8) -> str:
+pub fn with_str_from_cstr(s: *const u8) -> str:
     let len = cstr_len(s)
     make_str(s, len)
 
-@[c_export("with_str_from_bytes")]
-pub fn str_from_bytes(s: *const u8, len: i64) -> str:
+pub fn with_str_from_bytes(s: *const u8, len: i64) -> str:
     alloc_str(s, len)
 
-@[c_export("with_str_from_vec_u8")]
-pub fn str_from_vec_u8(v: *const u8) -> str:
+pub fn with_str_from_vec_u8(v: *const u8) -> str:
     let vp = v as *mut u8
     let len = vec_get_len(vp)
     if len <= 0:
         return make_str("" as *const u8, 0)
     alloc_str(vec_get_ptr_field(vp), len)
 
-@[c_export("with_str_hash")]
-pub fn str_hash(s: str) -> u64:
+pub fn with_str_hash(s: str) -> u64:
     fnv_hash(str_data(s), str_length(s))
 
 // ── Conversion functions ───────────────────────────────────────────
 
-@[c_export("with_i32_to_str")]
+pub fn with_i32_to_str(n: i32) -> str:
+    with_fmt_i32(n)
+
 pub fn i32_to_str(n: i32) -> str:
-    fmt_i32(n)
+    with_fmt_i32(n)
 
-@[c_export("i32_to_str")]
-pub fn i32_to_str_alias(n: i32) -> str:
-    fmt_i32(n)
+pub fn with_i64_to_str(n: i64) -> str:
+    with_fmt_i64(n)
 
-@[c_export("with_i64_to_str")]
-pub fn i64_to_str(n: i64) -> str:
-    fmt_i64(n)
+pub fn i64_to_string(n: i64) -> str:
+    with_fmt_i64(n)
 
-@[c_export("i64_to_string")]
-pub fn i64_to_string_alias(n: i64) -> str:
-    fmt_i64(n)
+pub fn with_bool_to_str(b: i32) -> str:
+    with_fmt_bool(b)
 
-@[c_export("with_bool_to_str")]
-pub fn bool_to_str(b: i32) -> str:
-    fmt_bool(b)
-
-@[c_export("str_from_byte")]
-pub fn str_from_byte_export(b: i32) -> str:
+pub fn str_from_byte(b: i32) -> str:
     let buf = rt_alloc(2)
     unsafe *buf = (b & 255) as u8
     unsafe *((buf as i64 + 1) as *mut u8) = 0
     make_str(buf as *const u8, 1)
 
-@[c_export("with_parse_i64")]
-pub fn parse_i64(s: str) -> i64:
+pub fn with_parse_i64(s: str) -> i64:
     let slen = str_length(s)
     if slen == 0: return 0
     let sp = str_data(s)
@@ -1572,8 +1495,7 @@ pub fn parse_i64(s: str) -> i64:
         i = i + 1
     if neg != 0: 0 - result else: result
 
-@[c_export("with_parse_float")]
-pub fn parse_float(s: str) -> f64:
+pub fn with_parse_float(s: str) -> f64:
     let slen = str_length(s)
     if slen == 0: return 0.0
     let sp = str_data(s)
@@ -1608,28 +1530,24 @@ pub fn parse_float(s: str) -> f64:
 
 // ── Args and environment ───────────────────────────────────────────
 
-@[c_export("with_arg_count")]
-pub fn arg_count() -> i32:
+pub fn with_arg_count() -> i32:
     saved_argc
 
-@[c_export("with_arg_at")]
-pub fn arg_at(idx: i32) -> str:
+pub fn with_arg_at(idx: i32) -> str:
     if idx < 0 or idx >= saved_argc or saved_argv_raw == 0:
         return make_str("" as *const u8, 0)
     let s = unsafe *((saved_argv_raw + idx as i64 * 8) as *const *const u8)
     make_str(s, cstr_len(s))
 
-@[c_export("with_getenv_str")]
-pub fn getenv_str(name: str) -> str:
+pub fn with_getenv_str(name: str) -> str:
     let cname = str_to_cstr(name)
     let val = rt_getenv(cname)
     if val as i64 == 0:
         return make_str("" as *const u8, 0)
     make_str(val, cstr_len(val))
 
-@[c_export("with_getenv")]
-pub fn getenv_impl(name: str) -> str:
-    getenv_str(name)
+pub fn with_getenv(name: str) -> str:
+    with_getenv_str(name)
 
 // with_setenv_str: provided by compat_runtime.w (needs libc)
 
@@ -1665,20 +1583,17 @@ fn vec_get_elem_size(v: *mut u8) -> i64:
 fn vec_set_elem_size(v: *mut u8, n: i64):
     unsafe *((v as i64 + 24) as *mut i64) = n
 
-@[c_export("with_vec_new_out")]
-pub fn vec_new_out(out: *mut u8, elem_size: i64):
+pub fn with_vec_new_out(out: *mut u8, elem_size: i64):
     vec_set_ptr_field(out, 0 as *mut u8)
     vec_set_len(out, 0)
     vec_set_cap(out, 0)
     vec_set_elem_size(out, elem_size)
 
-@[c_export("with_vec_new")]
-pub fn vec_new(elem_size: i64) -> (*mut u8, i64, i64, i64):
+pub fn with_vec_new(elem_size: i64) -> (*mut u8, i64, i64, i64):
     // Return a tuple that matches Vec layout
     (0 as *mut u8, 0 as i64, 0 as i64, elem_size)
 
-@[c_export("with_vec_new_with_capacity_out")]
-pub fn vec_new_with_capacity_out(out: *mut u8, elem_size: i64, cap: i64):
+pub fn with_vec_new_with_capacity_out(out: *mut u8, elem_size: i64, cap: i64):
     vec_set_elem_size(out, elem_size)
     vec_set_len(out, 0)
     vec_set_cap(out, cap)
@@ -1701,8 +1616,7 @@ fn vec_grow(v: *mut u8):
     vec_set_ptr_field(v, new_ptr)
     vec_set_cap(v, new_cap)
 
-@[c_export("with_vec_push")]
-pub fn vec_push(v: *mut u8, elem: *const u8):
+pub fn with_vec_push(v: *mut u8, elem: *const u8):
     let vlen = vec_get_len(v)
     let vcap = vec_get_cap(v)
     if vlen >= vcap:
@@ -1712,83 +1626,68 @@ pub fn vec_push(v: *mut u8, elem: *const u8):
     rt_memcpy(dst, elem, es)
     vec_set_len(v, vlen + 1)
 
-@[c_export("with_vec_get_ptr")]
-pub fn vec_get_ptr(v: *mut u8, idx: i64) -> *mut u8:
+pub fn with_vec_get_ptr(v: *mut u8, idx: i64) -> *mut u8:
     let vlen = vec_get_len(v)
     if idx < 0 or idx >= vlen:
         return 0 as *mut u8
     let es = vec_get_elem_size(v)
     (vec_get_ptr_field(v) as i64 + idx * es) as *mut u8
 
-@[c_export("with_vec_len")]
-pub fn vec_len(v: *mut u8) -> i64:
+pub fn with_vec_len(v: *mut u8) -> i64:
     vec_get_len(v)
 
-@[c_export("with_vec_clear")]
-pub fn vec_clear(v: *mut u8):
+pub fn with_vec_clear(v: *mut u8):
     vec_set_len(v, 0)
 
-@[c_export("with_vec_push_i32")]
-pub fn vec_push_i32(v: *mut u8, val: i32):
-    vec_push(v, &val as *const u8)
+pub fn with_vec_push_i32(v: *mut u8, val: i32):
+    with_vec_push(v, &val as *const u8)
 
-@[c_export("with_vec_get_i32")]
-pub fn vec_get_i32(v: *mut u8, idx: i64) -> i32:
-    let p = vec_get_ptr(v, idx)
+pub fn with_vec_get_i32(v: *mut u8, idx: i64) -> i32:
+    let p = with_vec_get_ptr(v, idx)
     if p as i64 != 0:
         return unsafe *(p as *const i32)
     0
 
-@[c_export("with_vec_push_i64")]
-pub fn vec_push_i64(v: *mut u8, val: i64):
-    vec_push(v, &val as *const u8)
+pub fn with_vec_push_i64(v: *mut u8, val: i64):
+    with_vec_push(v, &val as *const u8)
 
-@[c_export("with_vec_get_i64")]
-pub fn vec_get_i64(v: *mut u8, idx: i64) -> i64:
-    let p = vec_get_ptr(v, idx)
+pub fn with_vec_get_i64(v: *mut u8, idx: i64) -> i64:
+    let p = with_vec_get_ptr(v, idx)
     if p as i64 != 0:
         return unsafe *(p as *const i64)
     0
 
-@[c_export("with_vec_push_str")]
-pub fn vec_push_str(v: *mut u8, val: str):
-    vec_push(v, &val as *const u8)
+pub fn with_vec_push_str(v: *mut u8, val: str):
+    with_vec_push(v, &val as *const u8)
 
-@[c_export("with_vec_get_str")]
-pub fn vec_get_str(v: *mut u8, idx: i64) -> str:
-    let p = vec_get_ptr(v, idx)
+pub fn with_vec_get_str(v: *mut u8, idx: i64) -> str:
+    let p = with_vec_get_ptr(v, idx)
     if p as i64 != 0:
         return unsafe *(p as *const str)
     make_str("" as *const u8, 0)
 
-@[c_export("with_vec_push_bool")]
-pub fn vec_push_bool(v: *mut u8, val: i32):
-    vec_push(v, &val as *const u8)
+pub fn with_vec_push_bool(v: *mut u8, val: i32):
+    with_vec_push(v, &val as *const u8)
 
-@[c_export("with_vec_get_bool")]
-pub fn vec_get_bool(v: *mut u8, idx: i64) -> i32:
-    vec_get_i32(v, idx)
+pub fn with_vec_get_bool(v: *mut u8, idx: i64) -> i32:
+    with_vec_get_i32(v, idx)
 
-@[c_export("with_ptr_get_i32")]
-pub fn ptr_get_i32(ptr: *const u8, index: i64) -> i32:
+pub fn with_ptr_get_i32(ptr: *const u8, index: i64) -> i32:
     unsafe *((ptr as i64 + index * 4) as *const i32)
 
-@[c_export("with_vec_set_i32")]
-pub fn vec_set_i32(v: *mut u8, idx: i64, val: i32):
+pub fn with_vec_set_i32(v: *mut u8, idx: i64, val: i32):
     let vlen = vec_get_len(v)
     if idx >= 0 and idx < vlen:
         let es = vec_get_elem_size(v)
         unsafe *((vec_get_ptr_field(v) as i64 + idx * es) as *mut i32) = val
 
-@[c_export("with_vec_set_i64")]
-pub fn vec_set_i64(v: *mut u8, idx: i64, val: i64):
+pub fn with_vec_set_i64(v: *mut u8, idx: i64, val: i64):
     let vlen = vec_get_len(v)
     if idx >= 0 and idx < vlen:
         let es = vec_get_elem_size(v)
         unsafe *((vec_get_ptr_field(v) as i64 + idx * es) as *mut i64) = val
 
-@[c_export("with_vec_remove")]
-pub fn vec_remove(v: *mut u8, idx: i64):
+pub fn with_vec_remove(v: *mut u8, idx: i64):
     let vlen = vec_get_len(v)
     if idx < 0 or idx >= vlen: return
     let base = vec_get_ptr_field(v)
@@ -1799,8 +1698,7 @@ pub fn vec_remove(v: *mut u8, idx: i64):
         i = i + 1
     vec_set_len(v, vlen - 1)
 
-@[c_export("with_vec_pop_i32")]
-pub fn vec_pop_i32(v: *mut u8) -> i32:
+pub fn with_vec_pop_i32(v: *mut u8) -> i32:
     let vlen = vec_get_len(v)
     if vlen == 0: return 0
     vec_set_len(v, vlen - 1)
@@ -1906,8 +1804,7 @@ fn sm_valid(m: i64, index: u32, generation: u32) -> i32:
         return 0
     1
 
-@[c_export("with_slotmap_new")]
-pub fn slotmap_new(elem_size: i64) -> *mut u8:
+pub fn with_slotmap_new(elem_size: i64) -> *mut u8:
     let m = rt_alloc(SM_SIZE)
     sm_set_values(m as i64, 0 as *mut u8)
     sm_set_occ(m as i64, 0 as *mut u8)
@@ -1917,8 +1814,7 @@ pub fn slotmap_new(elem_size: i64) -> *mut u8:
     sm_set_elem_size(m as i64, elem_size)
     m
 
-@[c_export("with_slotmap_insert_out")]
-pub fn slotmap_insert_out(map: *mut u8, val: *const u8, out: *mut u8):
+pub fn with_slotmap_insert_out(map: *mut u8, val: *const u8, out: *mut u8):
     let m = map as i64
     if sm_len(m) >= sm_cap(m):
         sm_grow(m)
@@ -1933,27 +1829,23 @@ pub fn slotmap_insert_out(map: *mut u8, val: *const u8, out: *mut u8):
             sm_write_handle(out, idx as u32, generation_value)
             return
         idx = idx + 1
-    panic_impl(make_str("SlotMap insert failed to find a free slot" as *const u8, 41), make_str("" as *const u8, 0), 0)
+    with_panic_core(make_str("SlotMap insert failed to find a free slot" as *const u8, 41), make_str("" as *const u8, 0), 0)
 
-@[c_export("with_slotmap_get_ptr")]
-pub fn slotmap_get_ptr(map: *mut u8, index: u32, generation: u32) -> *mut u8:
+pub fn with_slotmap_get_ptr(map: *mut u8, index: u32, generation: u32) -> *mut u8:
     let m = map as i64
     if sm_valid(m, index, generation) == 0:
         return 0 as *mut u8
     sm_value_ptr_at(m, index as i64)
 
-@[c_export("with_slotmap_contains")]
-pub fn slotmap_contains(map: *mut u8, index: u32, generation: u32) -> i32:
+pub fn with_slotmap_contains(map: *mut u8, index: u32, generation: u32) -> i32:
     sm_valid(map as i64, index, generation)
 
-@[c_export("with_slotmap_len")]
-pub fn slotmap_len(map: *mut u8) -> i64:
+pub fn with_slotmap_len(map: *mut u8) -> i64:
     if map as i64 == 0:
         return 0
     sm_len(map as i64)
 
-@[c_export("with_slotmap_remove")]
-pub fn slotmap_remove(map: *mut u8, index: u32, generation: u32, out: *mut u8) -> i32:
+pub fn with_slotmap_remove(map: *mut u8, index: u32, generation: u32, out: *mut u8) -> i32:
     let m = map as i64
     if sm_valid(m, index, generation) == 0:
         return 0
@@ -1968,8 +1860,7 @@ pub fn slotmap_remove(map: *mut u8, index: u32, generation: u32, out: *mut u8) -
     sm_set_len(m, sm_len(m) - 1)
     1
 
-@[c_export("with_slotmap_replace")]
-pub fn slotmap_replace(map: *mut u8, index: u32, generation: u32, val: *const u8, out: *mut u8) -> i32:
+pub fn with_slotmap_replace(map: *mut u8, index: u32, generation: u32, val: *const u8, out: *mut u8) -> i32:
     let m = map as i64
     if sm_valid(m, index, generation) == 0:
         return 0
@@ -1979,8 +1870,7 @@ pub fn slotmap_replace(map: *mut u8, index: u32, generation: u32, val: *const u8
     rt_memcpy(dst, val, sm_elem_size(m))
     1
 
-@[c_export("with_slotmap_set")]
-pub fn slotmap_set(map: *mut u8, index: u32, generation: u32, val: *const u8) -> i32:
+pub fn with_slotmap_set(map: *mut u8, index: u32, generation: u32, val: *const u8) -> i32:
     let m = map as i64
     if sm_valid(m, index, generation) == 0:
         return 0
@@ -2108,8 +1998,7 @@ fn hm_grow(m: i64):
     rt_free_sized(old_vals, old_cap * vsz)
     rt_free_sized(old_occ, old_cap)
 
-@[c_export("with_hashmap_new")]
-pub fn hashmap_new(key_size: i64, val_size: i64) -> *mut u8:
+pub fn with_hashmap_new(key_size: i64, val_size: i64) -> *mut u8:
     let m = rt_alloc(HM_SIZE)
     let mi = m as i64
     hm_set_cap(mi, 16)
@@ -2124,17 +2013,14 @@ pub fn hashmap_new(key_size: i64, val_size: i64) -> *mut u8:
     rt_memset(hm_occ(mi), 0, 16)
     m
 
-@[c_export("with_hashmap_new_out")]
-pub fn hashmap_new_out(out: *mut *mut u8, key_size: i64, val_size: i64):
-    unsafe *out = hashmap_new(key_size, val_size)
+pub fn with_hashmap_new_out(out: *mut *mut u8, key_size: i64, val_size: i64):
+    unsafe *out = with_hashmap_new(key_size, val_size)
 
-@[c_export("with_hashmap_new_at")]
-pub fn hashmap_new_at(base: *mut u8, offset: i64, key_size: i64, val_size: i64):
+pub fn with_hashmap_new_at(base: *mut u8, offset: i64, key_size: i64, val_size: i64):
     let slot = (base as i64 + offset) as *mut *mut u8
-    unsafe *slot = hashmap_new(key_size, val_size)
+    unsafe *slot = with_hashmap_new(key_size, val_size)
 
-@[c_export("with_hashmap_insert")]
-pub fn hashmap_insert(map: *mut u8, key: *const u8, val: *const u8, is_str_key: i64):
+pub fn with_hashmap_insert(map: *mut u8, key: *const u8, val: *const u8, is_str_key: i64):
     let m = map as i64
     // Store is_str_key if first insert
     if is_str_key != 0:
@@ -2161,8 +2047,7 @@ pub fn hashmap_insert(map: *mut u8, key: *const u8, val: *const u8, is_str_key: 
     unsafe *((hm_occ(m) as i64 + h) as *mut u8) = 1
     hm_set_len(m, hm_len(m) + 1)
 
-@[c_export("with_hashmap_get")]
-pub fn hashmap_get(map: *mut u8, key: *const u8, val_out: *mut u8, is_str_key: i64) -> i32:
+pub fn with_hashmap_get(map: *mut u8, key: *const u8, val_out: *mut u8, is_str_key: i64) -> i32:
     let _ = is_str_key  // key type already stored in struct
     let m = map as i64
     if hm_len(m) == 0: return 0
@@ -2183,12 +2068,10 @@ pub fn hashmap_get(map: *mut u8, key: *const u8, val_out: *mut u8, is_str_key: i
         probes = probes + 1
     0
 
-@[c_export("with_hashmap_contains")]
-pub fn hashmap_contains(map: *mut u8, key: *const u8, is_str_key: i64) -> i32:
-    hashmap_get(map, key, 0 as *mut u8, is_str_key)
+pub fn with_hashmap_contains(map: *mut u8, key: *const u8, is_str_key: i64) -> i32:
+    with_hashmap_get(map, key, 0 as *mut u8, is_str_key)
 
-@[c_export("with_hashmap_remove")]
-pub fn hashmap_remove(map: *mut u8, key: *const u8, val_out: *mut u8, is_str_key: i64) -> i32:
+pub fn with_hashmap_remove(map: *mut u8, key: *const u8, val_out: *mut u8, is_str_key: i64) -> i32:
     let _ = is_str_key  // key type already stored in struct
     let m = map as i64
     if hm_len(m) == 0: return 0
@@ -2216,7 +2099,7 @@ pub fn hashmap_remove(map: *mut u8, key: *const u8, val_out: *mut u8, is_str_key
                 rt_memcpy(tmpv, (hm_vals(m) as i64 + next * vsz) as *const u8, vsz)
                 unsafe *((hm_occ(m) as i64 + next) as *mut u8) = 0
                 hm_set_len(m, hm_len(m) - 1)
-                hashmap_insert(map, tmpk as *const u8, tmpv as *const u8, hm_is_str_key(m) as i64)
+                with_hashmap_insert(map, tmpk as *const u8, tmpv as *const u8, hm_is_str_key(m) as i64)
                 rt_free_sized(tmpk, ksz)
                 rt_free_sized(tmpv, vsz)
                 next = ((next + 1) as u64 % (cap as u64)) as i64
@@ -2225,34 +2108,30 @@ pub fn hashmap_remove(map: *mut u8, key: *const u8, val_out: *mut u8, is_str_key
         probes = probes + 1
     0
 
-@[c_export("with_hashmap_len")]
-pub fn hashmap_len(map: *mut u8) -> i64:
+pub fn with_hashmap_len(map: *mut u8) -> i64:
     hm_len(map as i64)
 
-@[c_export("with_hashmap_clear")]
-pub fn hashmap_clear(map: *mut u8):
+pub fn with_hashmap_clear(map: *mut u8):
     let m = map as i64
     rt_memset(hm_occ(m), 0, hm_cap(m))
     hm_set_len(m, 0)
 
-@[c_export("with_hashmap_keys_out")]
-pub fn hashmap_keys_out(out: *mut u8, map: *mut u8, key_size: i64):
+pub fn with_hashmap_keys_out(out: *mut u8, map: *mut u8, key_size: i64):
     let m = map as i64
     if m == 0:
-        vec_new_out(out, key_size)
+        with_vec_new_out(out, key_size)
         return
     let cap = hm_cap(m)
     let ksz = hm_key_size(m)
     let effective_ksz = if ksz > 0: ksz else: key_size
-    vec_new_out(out, effective_ksz)
+    with_vec_new_out(out, effective_ksz)
     var i: i64 = 0
     while i < cap:
         if (unsafe hm_occ(m)[i]) != 0:
-            vec_push(out, (hm_keys(m) as i64 + i * ksz) as *const u8)
+            with_vec_push(out, (hm_keys(m) as i64 + i * ksz) as *const u8)
         i = i + 1
 
-@[c_export("with_hashmap_free")]
-pub fn hashmap_free(map: *mut u8):
+pub fn with_hashmap_free(map: *mut u8):
     if map as i64 == 0: return
     let m = map as i64
     let cap = hm_cap(m)
@@ -2261,19 +2140,17 @@ pub fn hashmap_free(map: *mut u8):
     rt_free_sized(hm_occ(m), cap)
     rt_free_sized(map, HM_SIZE)
 
-@[c_export("with_hashmap_increment")]
-pub fn hashmap_increment(map: *mut u8, key: *const u8, is_str_key: i64):
+pub fn with_hashmap_increment(map: *mut u8, key: *const u8, is_str_key: i64):
     var val: i64 = 0
-    let _ = hashmap_get(map, key, &val as *mut u8, is_str_key)
+    let _ = with_hashmap_get(map, key, &val as *mut u8, is_str_key)
     val = val + 1
-    hashmap_insert(map, key, &val as *const u8, is_str_key)
+    with_hashmap_insert(map, key, &val as *const u8, is_str_key)
 
-@[c_export("with_hashmap_decrement")]
-pub fn hashmap_decrement(map: *mut u8, key: *const u8, is_str_key: i64):
+pub fn with_hashmap_decrement(map: *mut u8, key: *const u8, is_str_key: i64):
     var val: i64 = 0
-    let _ = hashmap_get(map, key, &val as *mut u8, is_str_key)
+    let _ = with_hashmap_get(map, key, &val as *mut u8, is_str_key)
     val = val - 1
-    hashmap_insert(map, key, &val as *const u8, is_str_key)
+    with_hashmap_insert(map, key, &val as *const u8, is_str_key)
 
 // ── StringBuilder ──────────────────────────────────────────────────
 //
@@ -2284,13 +2161,11 @@ let SB_OFF_LEN: i64 = 8
 let SB_OFF_CAP: i64 = 16
 let SB_SIZE: i64 = 24
 
-@[c_export("with_sb_new")]
-pub fn sb_new() -> (*mut u8, i64, i64):
+pub fn with_sb_new() -> (*mut u8, i64, i64):
     let buf = rt_alloc(64)
     (buf, 0 as i64, 64 as i64)
 
-@[c_export("with_sb_append")]
-pub fn sb_append(sb: *mut u8, s: str):
+pub fn with_sb_append(sb: *mut u8, s: str):
     let slen = str_length(s)
     if slen == 0: return
     let sp = str_data(s)
@@ -2311,8 +2186,7 @@ pub fn sb_append(sb: *mut u8, s: str):
     unsafe *((sb as i64 + SB_OFF_LEN) as *mut i64) = sb_len
     unsafe *((sb as i64 + SB_OFF_CAP) as *mut i64) = sb_cap
 
-@[c_export("with_sb_build")]
-pub fn sb_build(sb: *mut u8) -> str:
+pub fn with_sb_build(sb: *mut u8) -> str:
     let sb_buf = unsafe *(sb as *const *mut u8)
     let sb_len = unsafe *((sb as i64 + SB_OFF_LEN) as *const i64)
     let out = rt_alloc(sb_len + 1)
@@ -2335,8 +2209,7 @@ fn fs_mkdir_component(path: *const u8, mode: i32) -> i32:
         return 0
     rc
 
-@[c_export("with_fs_read_file")]
-pub fn fs_read_file(path: str) -> str:
+pub fn with_fs_read_file(path: str) -> str:
     let cpath = str_to_cstr(path)
     let fd = rt_open(cpath, 0, 0)  // O_RDONLY
     if fd < 0:
@@ -2359,8 +2232,7 @@ pub fn fs_read_file(path: str) -> str:
     unsafe *((buf as i64 + total) as *mut u8) = 0
     make_str(buf as *const u8, total)
 
-@[c_export("with_fs_write_file")]
-pub fn fs_write_file(path: str, data: str) -> i32:
+pub fn with_fs_write_file(path: str, data: str) -> i32:
     let cpath = str_to_cstr(path)
     // O_WRONLY=1, O_CREAT=0x200, O_TRUNC=0x400
     let fd = rt_open(cpath, 1 | 0x200 | 0x400, 0o644)
@@ -2375,23 +2247,20 @@ pub fn fs_write_file(path: str, data: str) -> i32:
     let _ = rt_close(fd)
     0
 
-@[c_export("with_fs_file_exists")]
-pub fn fs_file_exists(path: str) -> i32:
+pub fn with_fs_file_exists(path: str) -> i32:
     let cpath = str_to_cstr(path)
     let fd = rt_open(cpath, 0, 0)
     if fd < 0: return 0
     let _ = rt_close(fd)
     1
 
-@[c_export("with_fs_is_dir")]
-pub fn fs_is_dir(path: str) -> i32:
+pub fn with_fs_is_dir(path: str) -> i32:
     let cpath = str_to_cstr(path)
     if fs_path_is_dir_c(cpath):
         return 1
     0
 
-@[c_export("with_fs_mkdir_p")]
-pub fn fs_mkdir_p(path: str) -> i32:
+pub fn with_fs_mkdir_p(path: str) -> i32:
     let cpath = str_to_cstr(path)
     // Create each directory component
     let slen = str_length(path)
@@ -2406,58 +2275,48 @@ pub fn fs_mkdir_p(path: str) -> i32:
         i = i + 1
     fs_mkdir_component(cpath, 493)
 
-@[c_export("with_fs_remove_file")]
-pub fn fs_remove_file(path: str) -> i32:
+pub fn with_fs_remove_file(path: str) -> i32:
     let cpath = str_to_cstr(path)
     rt_unlink(cpath)
 
-@[c_export("with_fs_chmod")]
-pub fn fs_chmod(path: str, mode: i32) -> i32:
+pub fn with_fs_chmod(path: str, mode: i32) -> i32:
     let cpath = str_to_cstr(path)
     rt_chmod(cpath, mode)
 
-@[c_export("with_fs_rename_file")]
-pub fn fs_rename_file(old_path: str, new_path: str) -> i32:
+pub fn with_fs_rename_file(old_path: str, new_path: str) -> i32:
     let cold = str_to_cstr(old_path)
     let cnew = str_to_cstr(new_path)
     rt_rename(cold, cnew)
 
-@[c_export("with_fs_create_dir")]
-pub fn fs_create_dir(path: str) -> i32:
+pub fn with_fs_create_dir(path: str) -> i32:
     let cpath = str_to_cstr(path)
     rt_mkdir(cpath, 493)  // 0755
 
-@[c_export("with_fs_remove_dir")]
-pub fn fs_remove_dir(path: str) -> i32:
+pub fn with_fs_remove_dir(path: str) -> i32:
     let cpath = str_to_cstr(path)
     rt_rmdir(cpath)
 
-@[c_export("with_fs_remove_tree")]
-pub fn fs_remove_tree(path: str) -> i32:
+pub fn with_fs_remove_tree(path: str) -> i32:
     let cpath = str_to_cstr(path)
     rt_remove_tree(cpath)
 
-@[c_export("with_fs_copy_tree")]
-pub fn fs_copy_tree(src: str, dst: str) -> i32:
+pub fn with_fs_copy_tree(src: str, dst: str) -> i32:
     let csrc = str_to_cstr(src)
     let cdst = str_to_cstr(dst)
     rt_copy_tree(csrc, cdst)
 
-@[c_export("with_fs_symlink")]
-pub fn fs_symlink(target: str, link_path: str) -> i32:
+pub fn with_fs_symlink(target: str, link_path: str) -> i32:
     let ctarget = str_to_cstr(target)
     let clink = str_to_cstr(link_path)
     rt_symlink(ctarget, clink)
 
-@[c_export("with_fs_list_files")]
-pub fn fs_list_files(path: str) -> str:
+pub fn with_fs_list_files(path: str) -> str:
     let cpath = str_to_cstr(path)
     rt_list_files(cpath)
 
 // ── stdin I/O ──────────────────────────────────────────────────────
 
-@[c_export("with_read_line_stdin")]
-pub fn read_line_stdin() -> str:
+pub fn with_read_line_stdin() -> str:
     var buf: [4096]u8 = [0 as u8; 4096]
     var len: i64 = 0
     while len < 4095:
@@ -2469,8 +2328,7 @@ pub fn read_line_stdin() -> str:
         return make_str("" as *const u8, 0)
     alloc_str(&buf as *const u8, len)
 
-@[c_export("with_read_bytes_stdin")]
-pub fn read_bytes_stdin(count: i32) -> str:
+pub fn with_read_bytes_stdin(count: i32) -> str:
     if count <= 0:
         return make_str("" as *const u8, 0)
     let buf = rt_alloc(count as i64 + 1)
@@ -2482,19 +2340,16 @@ pub fn read_bytes_stdin(count: i32) -> str:
     unsafe *((buf as i64 + total) as *mut u8) = 0
     make_str(buf as *const u8, total)
 
-@[c_export("with_write_stdout")]
-pub fn write_stdout(s: str):
-    print_str(s)
+pub fn with_write_stdout(s: str):
+    with_print_str(s)
 
-@[c_export("with_flush_stdout")]
-pub fn flush_stdout():
+pub fn with_flush_stdout():
     // No buffering in rt_write
     let _ = 0
 
 // ── String split/lines ─────────────────────────────────────────────
 
-@[c_export("with_str_split")]
-pub fn str_split(s: str, delim: str, out: *mut u8, count: *mut i64):
+pub fn with_str_split(s: str, delim: str, out: *mut u8, count: *mut i64):
     let sl = str_length(s)
     let dl = str_length(delim)
     if sl == 0 or dl == 0:
@@ -2527,9 +2382,8 @@ pub fn str_split(s: str, delim: str, out: *mut u8, count: *mut i64):
     n = n + 1
     unsafe *count = n
 
-@[c_export("with_lines_out")]
-pub fn lines_out(out: *mut u8, s: str):
-    vec_new_out(out, 16)  // sizeof(str) = 16
+pub fn with_lines_out(out: *mut u8, s: str):
+    with_vec_new_out(out, 16)  // sizeof(str) = 16
     let sp = str_data(s)
     let sl = str_length(s)
     var start: i64 = 0
@@ -2537,26 +2391,24 @@ pub fn lines_out(out: *mut u8, s: str):
     while i < sl:
         if (unsafe sp[i]) == 10:  // '\n'
             let line = make_str((sp as i64 + start) as *const u8, i - start)
-            vec_push(out, &line as *const u8)
+            with_vec_push(out, &line as *const u8)
             start = i + 1
         i = i + 1
     if start < sl:
         let line = make_str((sp as i64 + start) as *const u8, sl - start)
-        vec_push(out, &line as *const u8)
+        with_vec_push(out, &line as *const u8)
 
-@[c_export("with_lines")]
-pub fn lines_fn(s: str) -> (*mut u8, i64, i64, i64):
+pub fn with_lines(s: str) -> (*mut u8, i64, i64, i64):
     // Allocate a Vec on the stack-return area
     var v: (i64, i64, i64, i64) = (0, 0, 0, 0)
-    lines_out(&v as *mut u8, s)
+    with_lines_out(&v as *mut u8, s)
     let vp = &v as *const *mut u8
     let vl = unsafe *((&v as i64 + 8) as *const i64)
     let vc = unsafe *((&v as i64 + 16) as *const i64)
     let ve = unsafe *((&v as i64 + 24) as *const i64)
     (unsafe *vp, vl, vc, ve)
 
-@[c_export("with_str_join")]
-pub fn str_join(parts: *mut u8, sep: str) -> str:
+pub fn with_str_join(parts: *mut u8, sep: str) -> str:
     let plen = vec_get_len(parts)
     if plen == 0:
         return make_str("" as *const u8, 0)
@@ -2566,7 +2418,7 @@ pub fn str_join(parts: *mut u8, sep: str) -> str:
     var total: i64 = 0
     var i: i64 = 0
     while i < plen:
-        let p = vec_get_ptr(parts, i)
+        let p = with_vec_get_ptr(parts, i)
         let part_len = unsafe *((p as i64 + 8) as *const i64)
         total = total + part_len
         if i > 0:
@@ -2579,7 +2431,7 @@ pub fn str_join(parts: *mut u8, sep: str) -> str:
         if i > 0 and sep_l > 0:
             rt_memcpy((out as i64 + pos) as *mut u8, sep_p, sep_l)
             pos = pos + sep_l
-        let p = vec_get_ptr(parts, i)
+        let p = with_vec_get_ptr(parts, i)
         let part_ptr = unsafe *(p as *const *const u8)
         let part_len = unsafe *((p as i64 + 8) as *const i64)
         if part_len > 0:
@@ -2589,18 +2441,16 @@ pub fn str_join(parts: *mut u8, sep: str) -> str:
     unsafe *((out as i64 + total) as *mut u8) = 0
     make_str(out as *const u8, total)
 
-@[c_export("with_vec_str_join")]
-pub fn vec_str_join(parts: *mut u8, sep: str) -> str:
-    str_join(parts, sep)
+pub fn with_vec_str_join(parts: *mut u8, sep: str) -> str:
+    with_str_join(parts, sep)
 
-@[c_export("with_str_split_vec")]
-pub fn str_split_vec(out: *mut u8, s: str, delim: str):
-    vec_new_out(out, 16)  // sizeof(str) = 16
+pub fn with_str_split_vec(out: *mut u8, s: str, delim: str):
+    with_vec_new_out(out, 16)  // sizeof(str) = 16
     let sl = str_length(s)
     if sl == 0: return
     let dl = str_length(delim)
     if dl == 0:
-        vec_push(out, &s as *const u8)
+        with_vec_push(out, &s as *const u8)
         return
     let sp = str_data(s)
     let dp = str_data(delim)
@@ -2609,54 +2459,45 @@ pub fn str_split_vec(out: *mut u8, s: str, delim: str):
     while i <= sl - dl:
         if rt_memcmp((sp as i64 + i) as *const u8, dp, dl) == 0:
             let part = make_str((sp as i64 + start) as *const u8, i - start)
-            vec_push(out, &part as *const u8)
+            with_vec_push(out, &part as *const u8)
             start = i + dl
             i = start
         else:
             i = i + 1
     let last = make_str((sp as i64 + start) as *const u8, sl - start)
-    vec_push(out, &last as *const u8)
+    with_vec_push(out, &last as *const u8)
 
 // ── Time ───────────────────────────────────────────────────────────
 
-@[c_export("with_time_now")]
-pub fn time_now() -> i64:
+pub fn with_time_now() -> i64:
     rt_clock_ns()
 
-@[c_export("with_clock_nanos")]
-pub fn clock_nanos() -> i64:
+pub fn with_clock_nanos() -> i64:
     rt_clock_ns()
 
-@[c_export("with_nanosleep")]
-pub fn nanosleep_impl(ns: i64) -> i32:
+pub fn with_nanosleep(ns: i64) -> i32:
     rt_nanosleep(ns)
 
-@[c_export("with_usleep")]
-pub fn usleep_impl(usecs: i32) -> i32:
+pub fn with_usleep(usecs: i32) -> i32:
     rt_nanosleep(usecs as i64 * 1000)
 
-@[c_export("with_getpid")]
-pub fn getpid_impl() -> i32:
+pub fn with_getpid() -> i32:
     rt_getpid()
 
-@[c_export("with_raise")]
-pub fn raise_impl(sig: i32) -> i32:
+pub fn with_raise(sig: i32) -> i32:
     rt_raise(sig)
 
-@[c_export("with_process_alive")]
-pub fn process_alive_impl(pid: i32) -> i32:
+pub fn with_process_alive(pid: i32) -> i32:
     if pid <= 0:
         return 0
     let rc = rt_kill(pid, 0)
     if rc == 0: 1 else: 0
 
-@[c_export("with_fs_mkdir")]
-pub fn fs_mkdir_impl(path: str) -> i32:
+pub fn with_fs_mkdir(path: str) -> i32:
     let cpath = str_to_cstr(path)
     rt_mkdir(cpath, 493)
 
-@[c_export("with_str_from_byte")]
-pub fn str_from_byte_impl(byte: i32) -> str:
+pub fn with_str_from_byte(byte: i32) -> str:
     let buf = rt_alloc(2) as *mut u8
     unsafe *buf = byte as u8
     unsafe *((buf as i64 + 1) as *mut u8) = 0
@@ -2664,8 +2505,7 @@ pub fn str_from_byte_impl(byte: i32) -> str:
 
 // ── Bitwise builtins ───────────────────────────────────────────────
 
-@[c_export("with_clz")]
-pub fn clz_i32(n: i32) -> i32:
+pub fn with_clz(n: i32) -> i32:
     if n == 0: return 32
     var x = n as u32
     var count: i32 = 0
@@ -2686,8 +2526,7 @@ pub fn clz_i32(n: i32) -> i32:
         count = count + 1
     count
 
-@[c_export("with_ctz")]
-pub fn ctz_i32(n: i32) -> i32:
+pub fn with_ctz(n: i32) -> i32:
     if n == 0: return 32
     var x = n as u32
     var count: i32 = 0
@@ -2707,8 +2546,7 @@ pub fn ctz_i32(n: i32) -> i32:
         count = count + 1
     count
 
-@[c_export("with_popcount")]
-pub fn popcount_i32(n: i32) -> i32:
+pub fn with_popcount(n: i32) -> i32:
     var x = n as u32
     // Standard bit-parallel popcount
     x = x - ((x >> 1) & 0x55555555)
@@ -2716,18 +2554,15 @@ pub fn popcount_i32(n: i32) -> i32:
     x = (x + (x >> 4)) & 0x0F0F0F0F
     ((x * 0x01010101) >> 24) as i32
 
-@[c_export("with_bswap16")]
-pub fn bswap16(n: i16) -> i16:
+pub fn with_bswap16(n: i16) -> i16:
     let x = n as u16
     (((x >> 8) & 0xFF) | ((x & 0xFF) << 8)) as i16
 
-@[c_export("with_bswap32")]
-pub fn bswap32(n: i32) -> i32:
+pub fn with_bswap32(n: i32) -> i32:
     let x = n as u32
     (((x >> 24) & 0xFF) | ((x >> 8) & 0xFF00) | ((x & 0xFF00) << 8) | ((x & 0xFF) << 24)) as i32
 
-@[c_export("with_bswap64")]
-pub fn bswap64(n: i64) -> i64:
+pub fn with_bswap64(n: i64) -> i64:
     let x = n as u64
     // Extract each byte
     let b0 = x & 0xFF                // byte 0 (least significant)
@@ -2742,8 +2577,7 @@ pub fn bswap64(n: i64) -> i64:
     let r = (b0 << 56) | (b1 << 48) | (b2 << 40) | (b3 << 32) | (b4 << 24) | (b5 << 16) | (b6 << 8) | b7
     r as i64
 
-@[c_export("with_clzl")]
-pub fn clzl(n: i64) -> i32:
+pub fn with_clzl(n: i64) -> i32:
     if n == 0: return 64
     var x = n as u64
     var count: i32 = 0
@@ -2766,12 +2600,10 @@ pub fn clzl(n: i64) -> i32:
         count = count + 1
     count
 
-@[c_export("with_clzll")]
-pub fn clzll(n: i64) -> i32:
-    clzl(n)
+pub fn with_clzll(n: i64) -> i32:
+    with_clzl(n)
 
-@[c_export("with_ctzl")]
-pub fn ctzl(n: i64) -> i32:
+pub fn with_ctzl(n: i64) -> i32:
     if n == 0: return 64
     var x = n as u64
     var count: i32 = 0
@@ -2794,18 +2626,15 @@ pub fn ctzl(n: i64) -> i32:
         count = count + 1
     count
 
-@[c_export("with_ctzll")]
-pub fn ctzll(n: i64) -> i32:
-    ctzl(n)
+pub fn with_ctzll(n: i64) -> i32:
+    with_ctzl(n)
 
-@[c_export("with_abs")]
-pub fn abs_i32(n: i32) -> i32:
+pub fn with_abs(n: i32) -> i32:
     if n < 0: 0 - n else: n
 
 // ── Misc ───────────────────────────────────────────────────────────
 
-@[c_export("with_fill_random")]
-pub fn fill_random(buf: *mut u8, len: i64):
+pub fn with_fill_random(buf: *mut u8, len: i64):
     rt_fill_random(buf, len as u64)
 
 // ── Codegen loop state ─────────────────────────────────────────────
@@ -2815,35 +2644,29 @@ var loop_break_bbs: [256]i64 = [0 as i64; 256]
 var loop_continue_bbs: [256]i64 = [0 as i64; 256]
 var loop_result_bbs: [256]i64 = [0 as i64; 256]
 
-@[c_export("with_codegen_loop_set_break")]
-pub fn codegen_loop_set_break(idx: i32, bb: i64):
+pub fn with_codegen_loop_set_break(idx: i32, bb: i64):
     if idx >= 0 and idx < 256:
         loop_break_bbs[idx] = bb
 
-@[c_export("with_codegen_loop_set_continue")]
-pub fn codegen_loop_set_continue(idx: i32, bb: i64):
+pub fn with_codegen_loop_set_continue(idx: i32, bb: i64):
     if idx >= 0 and idx < 256:
         loop_continue_bbs[idx] = bb
 
-@[c_export("with_codegen_loop_set_result")]
-pub fn codegen_loop_set_result(idx: i32, val: i64):
+pub fn with_codegen_loop_set_result(idx: i32, val: i64):
     if idx >= 0 and idx < 256:
         loop_result_bbs[idx] = val
 
-@[c_export("with_codegen_loop_get_break")]
-pub fn codegen_loop_get_break(idx: i32) -> i64:
+pub fn with_codegen_loop_get_break(idx: i32) -> i64:
     if idx >= 0 and idx < 256:
         return loop_break_bbs[idx]
     0
 
-@[c_export("with_codegen_loop_get_continue")]
-pub fn codegen_loop_get_continue(idx: i32) -> i64:
+pub fn with_codegen_loop_get_continue(idx: i32) -> i64:
     if idx >= 0 and idx < 256:
         return loop_continue_bbs[idx]
     0
 
-@[c_export("with_codegen_loop_get_result")]
-pub fn codegen_loop_get_result(idx: i32) -> i64:
+pub fn with_codegen_loop_get_result(idx: i32) -> i64:
     if idx >= 0 and idx < 256:
         return loop_result_bbs[idx]
     0
@@ -2853,42 +2676,35 @@ pub fn codegen_loop_get_result(idx: i32) -> i64:
 
 // ── Network stubs ──────────────────────────────────────────────────
 
-@[c_export("with_net_tcp_listen")]
-pub fn net_tcp_listen(port: i32, backlog: i32) -> i32:
+pub fn with_net_tcp_listen(port: i32, backlog: i32) -> i32:
     let _ = port
     let _ = backlog
     -1
 
-@[c_export("with_net_tcp_accept")]
-pub fn net_tcp_accept(sock: i32) -> i32:
+pub fn with_net_tcp_accept(sock: i32) -> i32:
     let _ = sock
     -1
 
-@[c_export("with_net_tcp_connect")]
-pub fn net_tcp_connect(host: str, port: i32) -> i32:
+pub fn with_net_tcp_connect(host: str, port: i32) -> i32:
     let _ = host
     let _ = port
     -1
 
-@[c_export("with_net_send")]
-pub fn net_send(sock: i32, data: str) -> i64:
+pub fn with_net_send(sock: i32, data: str) -> i64:
     let _ = sock
     let _ = data
     -1
 
-@[c_export("with_net_recv")]
-pub fn net_recv(sock: i32, max_len: i64) -> str:
+pub fn with_net_recv(sock: i32, max_len: i64) -> str:
     let _ = sock
     let _ = max_len
     make_str("" as *const u8, 0)
 
-@[c_export("with_net_close")]
-pub fn net_close(sock: i32) -> i32:
+pub fn with_net_close(sock: i32) -> i32:
     let _ = sock
     -1
 
-@[c_export("with_net_udp_bind")]
-pub fn net_udp_bind(port: i32) -> i32:
+pub fn with_net_udp_bind(port: i32) -> i32:
     let _ = port
     -1
 
@@ -2899,8 +2715,7 @@ pub fn net_udp_bind(port: i32) -> i32:
 
 // with_cimport_available: provided by helpers.o (weak) / clang_bridge.o (strong)
 
-@[c_export("with_extract_runtime_obj")]
-pub fn extract_runtime_obj(name: str, path: str) -> i32:
+pub fn with_extract_runtime_obj(name: str, path: str) -> i32:
     let _ = name
     let _ = path
     // The real extractor is compiler-owned and linked into the self-contained
@@ -2912,16 +2727,13 @@ pub fn extract_runtime_obj(name: str, path: str) -> i32:
 extern fn rt_sysinfo_os() -> str
 extern fn rt_sysinfo_arch() -> str
 
-@[c_export("with_sysinfo_os")]
-pub fn sysinfo_os() -> str:
+pub fn with_sysinfo_os() -> str:
     rt_sysinfo_os()
 
-@[c_export("with_sysinfo_arch")]
-pub fn sysinfo_arch() -> str:
+pub fn with_sysinfo_arch() -> str:
     rt_sysinfo_arch()
 
-@[c_export("with_sysinfo_hostname")]
-pub fn sysinfo_hostname() -> str:
+pub fn with_sysinfo_hostname() -> str:
     var buf: [256]u8 = [0 as u8; 256]
     let buf_ptr = (&raw mut buf) as *mut [256]u8 as *mut u8
     if gethostname(buf_ptr, 256 as u64) != 0:
@@ -2930,81 +2742,212 @@ pub fn sysinfo_hostname() -> str:
     alloc_str(buf_ptr as *const u8, cstr_len(buf_ptr as *const u8))
 
 // rt_sysinfo wrapper — fills {cpu_cores: i32, memory_total: i64, page_size: i64}
-@[c_export("with_sysinfo")]
-pub fn sysinfo_impl(out: *mut u8) -> i32:
+pub fn with_sysinfo(out: *mut u8) -> i32:
     rt_sysinfo(out)
 
 // ── Async Scopes (structured concurrency) ──────────────────────────
-// Scope holds a heap-allocated array of fiber IDs.
-// Layout: [count: i32, capacity: i32, ids: *mut i32]
-// Packed into a single heap allocation: 8 bytes header + ids array.
+// Stable scope handle layout: [count: i32, capacity: i32, entries: *mut u8]
+// Async entry layout: [fiber_id: i32, pad: i32, result_buf: *mut u8]
 
 extern fn with_fiber_await(fiber_id: i32) -> void
+extern fn with_fiber_cleanup_await(fiber_id: i32) -> void
+extern fn with_fiber_cancel(fiber_id: i32) -> void
 
-@[c_export("with_scope_create")]
-pub fn scope_create() -> i64:
-    // Allocate: 8 bytes header (count + capacity) + 16 * 4 bytes for IDs
+fn scope_count_ptr(handle: i64) -> *mut i32:
+    handle as *mut i32
+
+fn scope_capacity_ptr(handle: i64) -> *mut i32:
+    (handle + 4) as *mut i32
+
+fn scope_entries_ptr(handle: i64) -> *mut *mut u8:
+    (handle + 8) as *mut *mut u8
+
+pub fn with_scope_create() -> i64:
     let cap = 16
-    let size = 8 + cap * 4
-    let ptr = rt_alloc(size as i64)
+    let entry_size = 16
+    let ptr = rt_alloc(16)
     if ptr as i64 == 0:
         return 0
-    // count = 0
+    let entries = rt_alloc((cap * entry_size) as i64)
+    if entries as i64 == 0:
+        rt_free(ptr)
+        return 0
     let count_ptr = ptr as *mut i32
     unsafe:
         *count_ptr = 0
-    // capacity = 16
     let cap_ptr = (ptr as i64 + 4) as *mut i32
     unsafe:
         *cap_ptr = cap
+    let entries_ptr = (ptr as i64 + 8) as *mut *mut u8
+    unsafe:
+        *entries_ptr = entries
     ptr as i64
 
-@[c_export("with_scope_track")]
-pub fn scope_track(handle: i64, fiber_id: i32):
+pub fn with_scope_track(handle: i64, fiber_id: i32, result_buf: *mut u8):
     if handle == 0:
         return
-    let count_ptr = handle as *mut i32
-    let cap_ptr = (handle + 4) as *mut i32
+    let count_ptr = scope_count_ptr(handle)
+    let cap_ptr = scope_capacity_ptr(handle)
+    let entries_ptr = scope_entries_ptr(handle)
     let count = unsafe *count_ptr
     let cap = unsafe *cap_ptr
+    var entries = unsafe *entries_ptr
+    let entry_size = 16
     if count >= cap:
-        // Grow: allocate new buffer, copy, free old
         let new_cap = cap * 2
-        let new_size = 8 + new_cap * 4
+        let new_size = new_cap * entry_size
         let new_ptr = rt_alloc(new_size as i64)
         if new_ptr as i64 == 0:
             return
-        // Copy header + existing IDs
-        let old_size = 8 + count * 4
-        rt_memcpy(new_ptr, handle as *const u8, old_size as i64)
-        rt_free(handle as *mut u8)
-        // Update capacity in new buffer
-        let new_cap_ptr = (new_ptr as i64 + 4) as *mut i32
+        let old_size = count * entry_size
+        rt_memcpy(new_ptr, entries as *const u8, old_size as i64)
+        rt_free(entries)
+        entries = new_ptr
         unsafe:
-            *new_cap_ptr = new_cap
-        // Recurse with new handle (now has room)
-        scope_track(new_ptr as i64, fiber_id)
-        return
-    // Store fiber_id at offset 8 + count * 4
-    let slot = (handle + 8 + count as i64 * 4) as *mut i32
+            *entries_ptr = entries
+        unsafe:
+            *cap_ptr = new_cap
+    let entry = entries as i64 + count as i64 * entry_size
+    let slot = entry as *mut i32
     unsafe:
         *slot = fiber_id
+    let rbuf_slot = (entry + 8) as *mut *mut u8
+    unsafe:
+        *rbuf_slot = result_buf
     unsafe:
         *count_ptr = count + 1
 
-@[c_export("with_scope_await_all")]
-pub fn scope_await_all(handle: i64):
+pub fn with_scope_await_all(handle: i64):
     if handle == 0:
         return
-    let count_ptr = handle as *mut i32
+    let count_ptr = scope_count_ptr(handle)
     let count = unsafe *count_ptr
+    let entries = unsafe *scope_entries_ptr(handle)
+    if entries as i64 == 0:
+        return
+    let entry_size = 16
     for i in 0..count:
-        let slot = (handle + 8 + i as i64 * 4) as *const i32
+        let entry = entries as i64 + i as i64 * entry_size
+        let slot = entry as *const i32
         let fid = unsafe *slot
-        with_fiber_await(fid)
+        with_fiber_cancel(fid)
+        with_fiber_cleanup_await(fid)
+        let rbuf_slot = (entry + 8) as *const *mut u8
+        let rbuf = unsafe *rbuf_slot
+        if rbuf as i64 != 0:
+            rt_free(rbuf)
 
-@[c_export("with_scope_destroy")]
-pub fn scope_destroy(handle: i64):
+pub fn with_scope_destroy(handle: i64):
     if handle == 0:
         return
+    let entries = unsafe *scope_entries_ptr(handle)
+    if entries as i64 != 0:
+        rt_free(entries)
     rt_free(handle as *mut u8)
+
+// ── OS-thread Scopes ──────────────────────────────────────────────
+// Stable thread scope handle layout is the same as async scope.
+// Thread entry layout: [handle: i64, joined: i32, result: i32]
+
+pub fn with_thread_scope_create() -> i64:
+    let cap = 16
+    let entry_size = 16
+    let ptr = rt_alloc(16)
+    if ptr as i64 == 0:
+        return 0
+    let entries = rt_alloc((cap * entry_size) as i64)
+    if entries as i64 == 0:
+        rt_free(ptr)
+        return 0
+    unsafe:
+        *(ptr as *mut i32) = 0
+    unsafe:
+        *((ptr as i64 + 4) as *mut i32) = cap
+    unsafe:
+        *((ptr as i64 + 8) as *mut *mut u8) = entries
+    ptr as i64
+
+pub fn with_thread_scope_track(scope: i64, handle: i64) -> i32:
+    if scope == 0:
+        return -1
+    let count_ptr = scope_count_ptr(scope)
+    let cap_ptr = scope_capacity_ptr(scope)
+    let entries_ptr = scope_entries_ptr(scope)
+    let count = unsafe *count_ptr
+    let cap = unsafe *cap_ptr
+    var entries = unsafe *entries_ptr
+    let entry_size = 16
+    if count >= cap:
+        let new_cap = cap * 2
+        let new_ptr = rt_alloc((new_cap * entry_size) as i64)
+        if new_ptr as i64 == 0:
+            return -1
+        rt_memcpy(new_ptr, entries as *const u8, (count * entry_size) as i64)
+        rt_free(entries)
+        entries = new_ptr
+        unsafe:
+            *entries_ptr = entries
+        unsafe:
+            *cap_ptr = new_cap
+    let entry = entries as i64 + count as i64 * entry_size
+    unsafe:
+        *(entry as *mut i64) = handle
+    unsafe:
+        *((entry + 8) as *mut i32) = 0
+    unsafe:
+        *((entry + 12) as *mut i32) = 0
+    unsafe:
+        *count_ptr = count + 1
+    count
+
+pub fn with_thread_scope_join(scope: i64, index: i32, handle: i64) -> i32:
+    if scope == 0:
+        return with_thread_join(handle)
+    let count = unsafe *scope_count_ptr(scope)
+    if index < 0 or index >= count:
+        return with_thread_join(handle)
+    let entries = unsafe *scope_entries_ptr(scope)
+    if entries as i64 == 0:
+        return with_thread_join(handle)
+    let entry = entries as i64 + index as i64 * 16
+    let joined_ptr = (entry + 8) as *mut i32
+    if unsafe *joined_ptr != 0:
+        return unsafe *((entry + 12) as *mut i32)
+    let stored_handle = unsafe *(entry as *mut i64)
+    let join_handle = if stored_handle != 0: stored_handle else: handle
+    let result = with_thread_join(join_handle)
+    unsafe:
+        *joined_ptr = 1
+    unsafe:
+        *((entry + 12) as *mut i32) = result
+    unsafe:
+        *(entry as *mut i64) = 0
+    result
+
+pub fn with_thread_scope_join_all(scope: i64):
+    if scope == 0:
+        return
+    let count = unsafe *scope_count_ptr(scope)
+    let entries = unsafe *scope_entries_ptr(scope)
+    if entries as i64 == 0:
+        return
+    for i in 0..count:
+        let entry = entries as i64 + i as i64 * 16
+        let joined_ptr = (entry + 8) as *mut i32
+        if unsafe *joined_ptr == 0:
+            let handle = unsafe *(entry as *mut i64)
+            let result = with_thread_join(handle)
+            unsafe:
+                *joined_ptr = 1
+            unsafe:
+                *((entry + 12) as *mut i32) = result
+            unsafe:
+                *(entry as *mut i64) = 0
+
+pub fn with_thread_scope_destroy(scope: i64):
+    if scope == 0:
+        return
+    let entries = unsafe *scope_entries_ptr(scope)
+    if entries as i64 != 0:
+        rt_free(entries)
+    rt_free(scope as *mut u8)

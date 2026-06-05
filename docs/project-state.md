@@ -3,13 +3,100 @@
 Status: active checkpoint for agents. Update this file when phase status,
 blockers, or the next work queue changes.
 
-Last updated: 2026-06-03.
+Last updated: 2026-06-04.
 
 Read this file immediately after `AGENTS.md`. It exists so long-running build
 system and bootstrap work does not have to be reconstructed from git history or
 conversation context after compaction.
 
 ## Current Focus
+
+#335 is implemented. The policy baseline is encoded in AGENTS.md/CLAUDE.md:
+`@[c_export]` is foreign ABI only, not compiler-internal linkage. The first
+implementation slice added `with build :compiler-no-c-export`, a budgeted audit
+that scans compiler-owned With sources (`src/`, `rt/`, `lib/std/`) and fails on
+new actual `@[c_export]` attributes while allowing the current removal budget to
+shrink. The budget is now zero: actual `@[c_export]` declarations in
+compiler-owned source are hard errors. `with build` depends on this audit before
+stage1. `Link.w` also now recognizes direct LLVM/libclang undefined symbols,
+not only `wl_*`, as compiler static-link triggers.
+
+The LLVM and Clang bridge slice is complete. `rt/llvm_bridge.w` and
+`rt/clang_bridge.w` moved to `src/compiler/LlvmBridge.w` and
+`src/compiler/ClangBridge.w`, the bridge wrappers are normal `pub` With module
+functions instead of `@[c_export]` ABI exports, and `Codegen.w`/`CImport.w`
+use explicit bridge globs for this large internal API. `EmbeddedClangResource`
+is also called as an ordinary compiler module: CImport materializes the
+embedded clang resource dir and passes it into ClangBridge through
+`with_cimport_set_resource_dir`. The C migrator calls the same preparation path
+before its direct bridge parses, which fixes the previous `stdarg.h` lookup
+regression. Full `with build`, `with build :fixpoint`, `with build :test`, and
+`with build :test-green` passed on 2026-06-04 for this slice.
+
+The runtime-object bootstrap substrate is in place. In module-object mode,
+runtime source files (`rt/*.w` and generated `out/gen/compat_runtime.w`) now
+preserve raw link names only for runtime ABI-shaped symbols (`with_*`, `rt_*`,
+`wl_*`, and the few current non-prefixed shims) while private runtime helpers
+remain path-mangled to avoid cross-object collisions. Those runtime ABI symbols
+also bypass whole-program internalization when runtime files are compiled as
+standalone objects. `@[weak]` applies independently of `@[c_export]`. Full
+`with build`, `with build :fixpoint`, `with build :test`, and
+`with build :test-green` passed on 2026-06-04 for the initial naming slice and
+for the internalization half. The runtime removal slice removed all actual
+runtime `@[c_export]` declarations from `rt_core.w`, platform runtime files,
+fiber stubs/runtime, channel runtime, regex runtime, panic runtime, compat
+runtime, and c_import stubs while keeping the same runtime ABI spellings as
+normal function names. Full `with build`, `with build :fixpoint`,
+`with build :test`, and `with build :test-green` passed on 2026-06-04 for the
+runtime removal slice. General import semantics were not changed as part of
+#335. Bare `use Foo` vs `use Foo.*` semantics and ClangBridge/CImport constant
+deduplication remain separate follow-up slices.
+
+#260 and #271 are implemented as the first scoped-concurrency substrate.
+`async scope s => ...` now returns scope-owned `ScopedTask[T]` handles
+from `s.track(Task[T])`; they are awaitable like `Task[T]`, exempt from
+unused-task diagnostics, and ephemeral so they cannot escape the scope
+result or be stored in ordinary data. Async-scope cleanup is represented
+as a scheduled MIR drop for early exits and as an explicit fallthrough
+cleanup; scope drop kinds are cancellable so normal fallthrough does not
+double-run cleanup. Non-async `scope s => ...` now supports scoped
+OS-thread workers via `s.spawn(fn() -> i32) -> ScopedJoinHandle`, with
+`.join() -> i32` and automatic join/destroy at scope exit. The new scope
+surface supports inline, colon, and braced bodies. Focused behavior and
+compile-error coverage exists for scoped task await/drop, scoped thread
+spawn/join, block forms, method misuse, and escape/storage rejection. Full
+build, fixpoint, and test passed on 2026-06-04 for this checkpoint.
+
+#334 is implemented. Final `else expr` is now accepted in mixed-form `if`
+chains after colon or braced arms while `else if` remains a chain
+continuation. The spec, parser fixture, and behavior coverage were updated;
+full build, fixpoint, and test passed on 2026-06-04.
+
+#252 and #253 are implemented as the first generator vertical slice.
+`gen fn f(...) -> T` now semantically returns a compiler-generated state
+struct with a synthetic `.next(mut self) -> Option[T]`, supports direct manual
+`.next()` calls and `for` iteration, preserves parameters and locals across
+yield points, and rejects `async`/`await` inside generator functions. Yielded
+local references are rejected with a loud diagnostic while owned values may
+cross yield. The generator MIR transform preserves block statement contiguity
+while inserting resume-state saves and `Some`/`None` returns, and the state
+field collector now follows documented AST child layouts instead of recursing
+through symbol fields. Full build, fixpoint, test, last-green, update-seed,
+and install-user passed on 2026-06-04 for this checkpoint.
+
+#284 tier substrate is implemented for the user-facing compiler surface.
+`std = false` / `--no-std` now selects the core prelude by default,
+`alloc = true` / `--alloc` selects the alloc prelude, and
+`--prelude=alloc` is a first-class prelude mode. Core prelude no longer
+exports allocation-backed collections or owned-string helpers; alloc prelude
+adds those back without enabling OS/fiber/std features. Sema enforces direct
+no_std tier errors for std-only printing/regex, alloc-only containers, owned
+string literals in core no_std, missing `@[panic_handler]`, missing
+`@[entry]`/`@[no_main]`, and missing `@[global_allocator]` when alloc is
+enabled under no_std. no_std codegen skips the normal runtime `main` wrapper,
+so a minimal `@[entry]` no_std binary links as a direct `main` without
+`with_runtime_*` symbols. Full build, fixpoint, test, last-green, and
+install-user passed on 2026-06-03 for this checkpoint.
 
 #221 and #331 core `@[no_await_guard]` enforcement is implemented as
 deterministic MIR dataflow: direct guard locals and derived references/views

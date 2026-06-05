@@ -92,8 +92,7 @@ fn channel_block_until_progress():
     if with_runtime_has_fibers() != 0:
         with_runtime_run_one_step()
 
-@[c_export("with_channel_create")]
-pub fn channel_create(capacity: i32, elem_size: i32) -> i64:
+pub fn with_channel_create(capacity: i32, elem_size: i32) -> i64:
     let ch = with_alloc(CHAN_SIZE)
     if ch as i64 == 0:
         return 0
@@ -112,8 +111,7 @@ pub fn channel_create(capacity: i32, elem_size: i32) -> i64:
     chan_set_i32(ch as i64, CHAN_OFF_BOUNDED_CAPACITY, if capacity > 0: capacity else: 0)
     ch as i64
 
-@[c_export("with_channel_send")]
-pub fn channel_send(ch_handle: i64, value_ptr: *const u8):
+pub fn with_channel_send(ch_handle: i64, value_ptr: *const u8):
     if ch_handle == 0:
         return
     let buffer = chan_buffer(ch_handle)
@@ -140,8 +138,7 @@ pub fn channel_send(ch_handle: i64, value_ptr: *const u8):
     chan_set_i32(ch_handle, CHAN_OFF_TAIL, (tail + 1) % cap)
     chan_set_i32(ch_handle, CHAN_OFF_COUNT, chan_field_i32(ch_handle, CHAN_OFF_COUNT) + 1)
 
-@[c_export("with_channel_recv")]
-pub fn channel_recv(ch_handle: i64, out_ptr: *mut u8) -> i32:
+pub fn with_channel_recv(ch_handle: i64, out_ptr: *mut u8) -> i32:
     if ch_handle == 0:
         return -1
     let buffer = chan_buffer(ch_handle)
@@ -164,8 +161,7 @@ pub fn channel_recv(ch_handle: i64, out_ptr: *mut u8) -> i32:
     chan_set_i32(ch_handle, CHAN_OFF_COUNT, chan_field_i32(ch_handle, CHAN_OFF_COUNT) - 1)
     0
 
-@[c_export("with_channel_try_recv")]
-pub fn channel_try_recv(ch_handle: i64, out_ptr: *mut u8) -> i32:
+pub fn with_channel_try_recv(ch_handle: i64, out_ptr: *mut u8) -> i32:
     if ch_handle == 0:
         return 0
     let buffer = chan_buffer(ch_handle)
@@ -182,14 +178,12 @@ pub fn channel_try_recv(ch_handle: i64, out_ptr: *mut u8) -> i32:
     chan_set_i32(ch_handle, CHAN_OFF_COUNT, chan_field_i32(ch_handle, CHAN_OFF_COUNT) - 1)
     1
 
-@[c_export("with_channel_close")]
-pub fn channel_close(ch_handle: i64):
+pub fn with_channel_close(ch_handle: i64):
     if ch_handle == 0:
         return
     chan_set_i32(ch_handle, CHAN_OFF_CLOSED, 1)
 
-@[c_export("with_channel_destroy")]
-pub fn channel_destroy(ch_handle: i64):
+pub fn with_channel_destroy(ch_handle: i64):
     if ch_handle == 0:
         return
     let buffer = chan_buffer(ch_handle)
