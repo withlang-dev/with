@@ -19,7 +19,8 @@ fn cr_fail(ctx: ActionCtx, message: str) -> i32:
 fn cr_dirname(path: str) -> str:
     var last = -1
     for i in 0..path.len() as i32:
-        if path.byte_at(i as i64) == 47:
+        let ch = path.byte_at(i as i64)
+        if ch == 47 or ch == 92:
             last = i
     if last <= 0:
         return "."
@@ -28,11 +29,22 @@ fn cr_dirname(path: str) -> str:
 fn cr_basename(path: str) -> str:
     var last = -1
     for i in 0..path.len() as i32:
-        if path.byte_at(i as i64) == 47:
+        let ch = path.byte_at(i as i64)
+        if ch == 47 or ch == 92:
             last = i
     if last < 0:
         return path
     path.slice((last + 1) as i64, path.len())
+
+fn cr_normalize_path_separators(path: str) -> str:
+    var out = ""
+    for i in 0..path.len() as i32:
+        let ch = path.byte_at(i as i64)
+        if ch == 92:
+            out = out ++ "/"
+        else:
+            out = out ++ path.slice(i as i64, (i + 1) as i64)
+    out
 
 fn cr_str_compare(a: str, b: str) -> i32:
     let n = if a.len() < b.len(): a.len() else: b.len()
@@ -130,7 +142,7 @@ fn cr_find_include_dir(ctx: ActionCtx) -> str:
     let clang_root = prefix ++ "/lib/clang"
     let all = ctx.fs().list_files(clang_root)
     for i in 0..all.len() as i32:
-        let path = all.get(i as i64)
+        let path = cr_normalize_path_separators(all.get(i as i64))
         let marker = "/include/"
         var pos = -1
         var k = 0
@@ -186,7 +198,7 @@ pub fn generate_embedded_clang_resource_action(ctx: ActionCtx) -> i32:
     let all = cr_sorted(fs.list_files(include_dir))
     let files: Vec[str] = Vec.new()
     for i in 0..all.len() as i32:
-        let path = all.get(i as i64)
+        let path = cr_normalize_path_separators(all.get(i as i64))
         if cr_should_embed(cr_basename(path)):
             files.push(path)
     if files.len() == 0:

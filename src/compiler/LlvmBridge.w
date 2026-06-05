@@ -158,6 +158,7 @@ extern fn LLVMGetParam(fn_val: *mut u8, idx: u32) -> *mut u8
 extern fn LLVMGetIntTypeWidth(ty: *mut u8) -> u32
 extern fn LLVMIsFunctionVarArg(ft: *mut u8) -> i32
 extern fn LLVMGlobalGetValueType(v: *mut u8) -> *mut u8
+extern fn LLVMIsAAllocaInst(v: *mut u8) -> *mut u8
 extern fn LLVMGetAllocatedType(v: *mut u8) -> *mut u8
 
 // Constants
@@ -605,7 +606,12 @@ pub fn wl_global_get_value_type(v: i64) -> i64:
         if kind != LLVM_FunctionValueKind and kind != LLVM_GlobalAliasValueKind and kind != LLVM_GlobalIFuncValueKind and kind != LLVM_GlobalVariableValueKind:
             return 0
         LLVMGlobalGetValueType(v as *mut u8) as i64
-pub fn wl_get_allocated_type(v: i64) -> i64: unsafe { LLVMGetAllocatedType(v as *mut u8) as i64 }
+pub fn wl_get_allocated_type(v: i64) -> i64:
+    unsafe:
+        let value = v as *mut u8
+        if LLVMIsAAllocaInst(value) as i64 == 0:
+            return 0
+        LLVMGetAllocatedType(value) as i64
 
 // Type kind constants
 pub fn wl_void_type_kind() -> i32: LLVM_VoidTypeKind

@@ -594,9 +594,10 @@ fn tool_path_normalize(path: str) -> str:
         return "."
     let parts: Vec[str] = Vec.new()
     var start = 0
-    var is_absolute = path.byte_at(0) == 47
+    var is_absolute = path.byte_at(0) == 47 or path.byte_at(0) == 92
     for i in 0..path.len() as i32:
-        if path.byte_at(i as i64) == 47:
+        let ch = path.byte_at(i as i64)
+        if ch == 47 or ch == 92:
             if i > start:
                 let part = path.slice(start as i64, i as i64)
                 if part == "..":
@@ -633,7 +634,8 @@ fn tool_split_by_slash(path: str) -> Vec[str]:
     let parts: Vec[str] = Vec.new()
     var start = 0
     for i in 0..path.len() as i32:
-        if path.byte_at(i as i64) == 47:
+        let ch = path.byte_at(i as i64)
+        if ch == 47 or ch == 92:
             if i > start:
                 parts.push(path.slice(start as i64, i as i64))
             start = i + 1
@@ -774,12 +776,14 @@ fn tool_split_nonempty_lines(text: str) -> Vec[str]:
     lines
 
 fn ToolFs.project_relative_path(self: &Self, path: str) -> str:
+    let normalized = tool_path_normalize(path)
     if self.root.len() == 0 or self.root == ".":
-        return path
-    let prefix = if self.root.ends_with("/"): self.root else: self.root ++ "/"
-    if path.starts_with(prefix):
-        return path.slice(prefix.len(), path.len())
-    path
+        return normalized
+    let root = tool_path_normalize(self.root)
+    let prefix = if root.ends_with("/"): root else: root ++ "/"
+    if normalized.starts_with(prefix):
+        return normalized.slice(prefix.len(), normalized.len())
+    normalized
 
 pub fn ToolFs.exists(self: &Self, path: str) -> bool:
     with_fs_file_exists(self.resolve_path(path)) != 0

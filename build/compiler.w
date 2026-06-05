@@ -20,15 +20,30 @@ fn comp_join(left: str, right: str) -> str:
         return left ++ right
     left ++ "/" ++ right
 
+fn comp_is_absolute_path(path: str) -> bool:
+    if path.len() == 0:
+        return false
+    if path.byte_at(0) == 47 or path.byte_at(0) == 92:
+        return true
+    if os() == "Windows" and path.len() >= 3:
+        let drive = path.byte_at(0)
+        let colon = path.byte_at(1)
+        let slash = path.byte_at(2)
+        if colon == 58 and (slash == 47 or slash == 92):
+            if (drive >= 65 and drive <= 90) or (drive >= 97 and drive <= 122):
+                return true
+    false
+
 fn comp_abs(root: str, path: str) -> str:
-    if path.len() > 0 and path.byte_at(0) == 47:
+    if comp_is_absolute_path(path):
         return path
     comp_join(root, path)
 
 fn comp_dirname(path: str) -> str:
     var last_slash = -1
     for i in 0..path.len() as i32:
-        if path.byte_at(i as i64) == 47:
+        let ch = path.byte_at(i as i64)
+        if ch == 47 or ch == 92:
             last_slash = i
     if last_slash < 0:
         return "."
@@ -39,7 +54,8 @@ fn comp_dirname(path: str) -> str:
 fn comp_path_basename(path: str) -> str:
     var last_slash: i64 = -1
     for i in 0..path.len() as i32:
-        if path.byte_at(i as i64) == 47:
+        let ch = path.byte_at(i as i64)
+        if ch == 47 or ch == 92:
             last_slash = i as i64
     if last_slash >= 0:
         return path.slice(last_slash + 1, path.len())
@@ -254,12 +270,14 @@ fn comp_compiler_path(ctx: ActionCtx, compiler: str) -> str:
 fn comp_path_exists(ctx: ActionCtx, path: str) -> bool:
     if path == "with":
         return true
-    if path.len() > 0 and path.byte_at(0) == 47:
+    if comp_is_absolute_path(path):
         return ctx.fs().host_exists(path)
     ctx.fs().exists(path)
 
 fn comp_path_for_process(root: str, path: str) -> str:
     if path == "with":
+        return path
+    if comp_is_absolute_path(path):
         return path
     comp_abs(root, path)
 
@@ -274,6 +292,9 @@ fn comp_run_compiler_capture(ctx: ActionCtx, label: str, argv: Vec[str], stdout_
         if result.stderr.len() > 0:
             ctx.diagnostics().error(result.stderr)
         return comp_fail(ctx, "step '" ++ label ++ f"' failed with exit code {result.rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+    let fs = ctx.fs()
+    let _stdout = fs.write_text(stdout_path, result.stdout ++ "\n")
+    let _stderr = fs.write_text(stderr_path, result.stderr ++ "\n")
     0
 
 fn comp_compile_args(ctx: ActionCtx, command: str, compiler_path: str, source_path: str) -> Vec[str]:
@@ -413,6 +434,23 @@ fn comp_resolve_command_file(ctx: ActionCtx, capture_dir: str, path: str) -> str
     path
 
 fn comp_sha256_file(ctx: ActionCtx, capture_dir: str, label: str, path: str) -> str:
+    if os() == "Windows":
+        let certutil_args: Vec[str] = Vec.new()
+        certutil_args.push("certutil")
+        certutil_args.push("-hashfile")
+        certutil_args.push(path)
+        certutil_args.push("SHA256")
+        let raw = comp_run_first_line(ctx, capture_dir, label ++ "-certutil", certutil_args, 30000)
+        let certutil_text = ctx.fs().read_text(comp_join(capture_dir, label ++ "-certutil.stdout"))
+        var line_start: i64 = 0
+        for i in 0..certutil_text.len() as i32:
+            if certutil_text.byte_at(i as i64) == 10:
+                let line = comp_trim(certutil_text.slice(line_start, i as i64))
+                if line.len() == 64:
+                    return line
+                line_start = i as i64 + 1
+        if raw.len() == 64:
+            return raw
     let shasum_args: Vec[str] = Vec.new()
     shasum_args.push("shasum")
     shasum_args.push("-a")
@@ -577,7 +615,7 @@ pub fn run_generate_llvm_link_metadata_action(ctx: ActionCtx) -> i32:
         let path = lib_files.get(i as i64)
         let name = comp_path_basename(path)
         if name.ends_with(".a") or name.ends_with(".lib"):
-            if name.starts_with("libclang") and path != libclang:
+            if (name.starts_with("libclang") or (os() == "Windows" and name.starts_with("clang"))) and path != libclang:
                 clang_archives.push(path)
             else:
                 if name.starts_with("libLLVM") or name.starts_with("LLVM"):

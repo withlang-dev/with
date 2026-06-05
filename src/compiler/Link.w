@@ -349,8 +349,13 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: str, obj_path: str, bin_pa
     let outputs: Vec[str] = Vec.new()
     args.push("/nologo")
     args.push("/subsystem:console")
+    args.push("/debug")
+    args.push("/pdb:" ++ bin_path ++ ".pdb")
     args.push("/opt:ref")
     args.push("/opt:icf")
+    args.push("/libpath:C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/um/x64")
+    args.push("/libpath:C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/ucrt/x64")
+    args.push("/libpath:C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.29.30133/lib/x64")
     args.push("/out:" ++ bin_path)
     outputs.push(bin_path)
     args.push(obj_path)
@@ -359,6 +364,8 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: str, obj_path: str, bin_pa
         let extra = extras.get(i as i64)
         if extra.starts_with("-L"):
             args.push("/libpath:" ++ extra.slice(2, extra.len()))
+        else if extra.starts_with("@"):
+            args.push(extra)
         else:
             args.push(extra)
             inputs.push(extra)
@@ -523,7 +530,15 @@ fn link_stage_undefined_symbols_for_object(obj_path: str) -> str:
     let report_path = obj_path ++ ".undef"
     let null_path = if runtime_sysinfo_os() == "Windows": "NUL" else: "/dev/null"
     var argv = ""
-    argv = link_stage_argv_append(argv, "nm")
+    var nm_tool = "nm"
+    if runtime_sysinfo_os() == "Windows":
+        let root = link_stage_resolve_runtime_root()
+        let ld_path = link_stage_read_file_trimmed(root ++ "/llvm_ld")
+        if ld_path.len() > 0:
+            nm_tool = link_stage_dirname(ld_path) ++ "/llvm-nm.exe"
+        else:
+            nm_tool = "llvm-nm.exe"
+    argv = link_stage_argv_append(argv, nm_tool)
     argv = link_stage_argv_append(argv, "-u")
     argv = link_stage_argv_append(argv, obj_path)
     let probe_rc = runtime_exec_argv_capture(argv, report_path, null_path, 0)

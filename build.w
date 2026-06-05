@@ -28,7 +28,7 @@ fn with_object_target(name: str, compiler: str, source: str, output: str, opt: s
     target = target.arg("--emit-obj")
     target = target.arg("--no-prelude")
     target = target.arg(opt)
-    target = target.extra_output("out/command/" ++ name)
+    target = target.write_scope("out/command/" ++ name)
     target = target.write_scope(build_project_dirname(output))
     if dep.len() > 0:
         target = target.dep(dep)

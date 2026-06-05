@@ -40,6 +40,10 @@ printf '%s\n' "$version" > out/gen/version.txt
 "$compiler" build rt/compat_runtime.w --emit-c --no-prelude -o "$work_dir/src/compat_runtime.c"
 
 cp runtime/with_runtime.h "$work_dir/runtime/with_runtime.h"
+cp runtime/unistd.h "$work_dir/runtime/unistd.h"
+cp runtime/undef_stdio_macros.h "$work_dir/runtime/undef_stdio_macros.h"
+mkdir -p "$work_dir/runtime/sys"
+cp runtime/sys/resource.h "$work_dir/runtime/sys/resource.h"
 cat >"$work_dir/runtime/bootstrap_types.h" <<'EOF'
 #ifndef WITH_BOOTSTRAP_TYPES_H
 #define WITH_BOOTSTRAP_TYPES_H
@@ -366,7 +370,12 @@ WITH_EMPTY_EMBEDDED_OBJECT(fiber_asm_o);
 WITH_EMPTY_EMBEDDED_OBJECT(rt_core_o);
 WITH_EMPTY_EMBEDDED_OBJECT(rt_darwin_aarch64_o);
 WITH_EMPTY_EMBEDDED_OBJECT(rt_linux_x86_64_o);
+WITH_EMPTY_EMBEDDED_OBJECT(rt_windows_x86_64_o);
 EOF
+
+cp scripts/bootstrap/windows_platform.c "$work_dir/src/windows_platform.c"
+cp scripts/bootstrap/windows_compat_runtime.c "$work_dir/src/windows_compat_runtime.c"
+cp scripts/bootstrap/empty_embedded_windows.s "$work_dir/src/empty_embedded_windows.s"
 
 cat >"$work_dir/README.bootstrap.md" <<EOF
 # With $version Bootstrap C Bundle
@@ -385,6 +394,9 @@ It contains emitted C for:
 - src/fiber_stubs.c: non-async fiber/runtime lifecycle stubs
 - src/compat_runtime.c: compiler process/env compatibility runtime
 - src/linux_platform.c: temporary Linux x86_64 libc platform shim
+- src/windows_platform.c: temporary Windows x86_64 Win32 platform shim
+- src/windows_compat_runtime.c: Windows process/env compatibility runtime shim
+- src/empty_embedded_windows.s: empty embedded-object symbols for Windows bootstrap
 
 The bootstrap compiler is temporary. Use it only to run the normal With stage
 chain on the target platform:

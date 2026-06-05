@@ -36,6 +36,16 @@ fn br_split_nonempty_lines(text: str) -> Vec[str]:
         lines.push(text.slice(start as i64, text.len()))
     lines
 
+fn br_normalize_path_separators(path: str) -> str:
+    var out = ""
+    for i in 0..path.len() as i32:
+        let ch = path.byte_at(i as i64)
+        if ch == 92:
+            out = out ++ "/"
+        else:
+            out = out ++ path.slice(i as i64, (i + 1) as i64)
+    out
+
 fn br_str_compare(a: str, b: str) -> i32:
     let n = if a.len() < b.len(): a.len() else: b.len()
     var i = 0
@@ -72,7 +82,7 @@ fn br_collect_stdlib_files(ctx: ActionCtx) -> Vec[str]:
     let files: Vec[str] = Vec.new()
     let all_files = br_sorted_paths(ctx.fs().list_files("lib/std"))
     for i in 0..all_files.len() as i32:
-        let path = all_files.get(i as i64)
+        let path = br_normalize_path_separators(all_files.get(i as i64))
         if path.ends_with(".w") and not path.starts_with("lib/std/re/"):
             files.push(path)
     files
