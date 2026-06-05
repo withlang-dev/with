@@ -4,6 +4,5 @@
 // This object exists so the build graph mirrors Linux/Darwin until the real
 // Windows fiber backend is implemented.
 
-@[c_export("with_windows_fiber_core_stub")]
-pub fn windows_fiber_core_stub() -> i32:
+pub fn with_windows_fiber_core_stub() -> i32:
     0

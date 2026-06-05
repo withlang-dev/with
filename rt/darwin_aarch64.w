@@ -457,7 +457,7 @@ pub fn rt_remove_tree(path: *const u8) -> i32:
         return -get_errno()
     rt_rmdir(path)
 
-fn rt_copy_file_impl(src: *const u8, dst: *const u8, mode: i32) -> i32:
+fn rt_copy_file(src: *const u8, dst: *const u8, mode: i32) -> i32:
     let in_fd = rt_open(src, 0, 0)
     if in_fd < 0:
         return in_fd
@@ -500,7 +500,7 @@ pub fn rt_copy_tree(src: *const u8, dst: *const u8) -> i32:
     if stat_rc != 0:
         return stat_rc
     if (mode & S_IFMT) != S_IFDIR:
-        return rt_copy_file_impl(src, dst, mode)
+        return rt_copy_file(src, dst, mode)
 
     let mkdir_rc = rt_mkdir(dst, mode & 0o777)
     if mkdir_rc != 0 and not rt_lstat_is_dir(dst):
@@ -755,23 +755,23 @@ fn posix_fill_argv(blob: *const u8, len: i64, argv: *mut *const u8) -> i32:
     argi
 
 fn posix_redirect_fd_to_path(path: *const u8, fd: i32) -> i32:
-    let out_fd = rt_open_impl(path, 1 | 0x200 | 0x400, 0o644)
+    let out_fd = rt_open(path, 1 | 0x200 | 0x400, 0o644)
     if out_fd < 0:
         return -1
     if dup2(out_fd, fd) < 0:
-        let _ = rt_close_impl(out_fd)
+        let _ = rt_close(out_fd)
         return -1
-    let _ = rt_close_impl(out_fd)
+    let _ = rt_close(out_fd)
     0
 
 fn posix_redirect_fd_from_path(path: *const u8, fd: i32) -> i32:
-    let in_fd = rt_open_impl(path, 0, 0)
+    let in_fd = rt_open(path, 0, 0)
     if in_fd < 0:
         return -1
     if dup2(in_fd, fd) < 0:
-        let _ = rt_close_impl(in_fd)
+        let _ = rt_close(in_fd)
         return -1
-    let _ = rt_close_impl(in_fd)
+    let _ = rt_close(in_fd)
     0
 
 fn posix_child_common(mask_rc: i32, prev_mask: *const u32):
@@ -829,8 +829,7 @@ fn posix_interrupt_signal_handler(signo: i32):
 fn posix_interrupted() -> bool:
     posix_interrupt_flag != 0
 
-@[c_export("rt_compat_setenv_str")]
-pub fn rt_compat_setenv_str_impl(name: str, value: str) -> i32:
+pub fn rt_compat_setenv_str(name: str, value: str) -> i32:
     let name_buf = posix_str_to_c_buf(name)
     if name_buf as i64 == 0:
         return -1
@@ -843,8 +842,7 @@ pub fn rt_compat_setenv_str_impl(name: str, value: str) -> i32:
     with_free(value_buf)
     rc
 
-@[c_export("rt_compat_install_interrupt_handlers")]
-pub fn rt_compat_install_interrupt_handlers_impl():
+pub fn rt_compat_install_interrupt_handlers():
     var sa: [16]u8 = [0 as u8; 16]
     let sa_base = (&raw mut sa) as *mut [16]u8 as i64
     with_memset(sa_base as *mut u8, 0, POSIX_SIGACTION_SIZE)
@@ -853,8 +851,7 @@ pub fn rt_compat_install_interrupt_handlers_impl():
     let _ = sigaction(POSIX_SIGTERM, sa_base as *const u8, 0 as *mut u8)
     let _ = sigaction(POSIX_SIGHUP, sa_base as *const u8, 0 as *mut u8)
 
-@[c_export("rt_compat_raise_stack_limit")]
-pub fn rt_compat_raise_stack_limit_impl():
+pub fn rt_compat_raise_stack_limit():
     var lim: [16]u8 = [0 as u8; 16]
     let lim_base = (&raw mut lim) as *mut [16]u8 as i64
     if getrlimit(POSIX_RLIMIT_STACK, lim_base as *mut u8) != 0:
@@ -868,12 +865,10 @@ pub fn rt_compat_raise_stack_limit_impl():
         posix_store_i64(lim_base, 0, want as i64)
         let _ = setrlimit(POSIX_RLIMIT_STACK, lim_base as *const u8)
 
-@[c_export("rt_compat_interrupt_requested")]
-pub fn rt_compat_interrupt_requested_impl() -> i32:
+pub fn rt_compat_interrupt_requested() -> i32:
     posix_interrupt_flag
 
-@[c_export("rt_compat_exec_binary")]
-pub fn rt_compat_exec_binary_impl(path: str) -> i32:
+pub fn rt_compat_exec_binary(path: str) -> i32:
     let buf = posix_str_to_c_buf(path)
     if buf as i64 == 0:
         return -1
@@ -881,8 +876,7 @@ pub fn rt_compat_exec_binary_impl(path: str) -> i32:
     with_free(buf)
     rc
 
-@[c_export("rt_compat_exec_argv")]
-pub fn rt_compat_exec_argv_impl(args: str) -> i32:
+pub fn rt_compat_exec_argv(args: str) -> i32:
     let buf = posix_str_to_c_buf(args)
     if buf as i64 == 0:
         return -1
@@ -890,8 +884,7 @@ pub fn rt_compat_exec_argv_impl(args: str) -> i32:
     with_free(buf)
     rc
 
-@[c_export("rt_compat_exec_argv_cwd")]
-pub fn rt_compat_exec_argv_cwd_impl(args: str, cwd: str) -> i32:
+pub fn rt_compat_exec_argv_cwd(args: str, cwd: str) -> i32:
     let arg_buf = posix_str_to_c_buf(args)
     let cwd_buf = posix_str_to_c_buf(cwd)
     if arg_buf as i64 == 0 or cwd_buf as i64 == 0:
@@ -901,12 +894,10 @@ pub fn rt_compat_exec_argv_cwd_impl(args: str, cwd: str) -> i32:
     with_free(cwd_buf)
     rc
 
-@[c_export("rt_compat_exec_argv_capture")]
-pub fn rt_compat_exec_argv_capture_impl(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32) -> i32:
-    rt_compat_exec_argv_capture_cwd_impl(args, stdout_path, stderr_path, timeout_ms, "")
+pub fn rt_compat_exec_argv_capture(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32) -> i32:
+    rt_compat_exec_argv_capture_cwd(args, stdout_path, stderr_path, timeout_ms, "")
 
-@[c_export("rt_compat_exec_argv_capture_input")]
-pub fn rt_compat_exec_argv_capture_input_impl(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, stdin_path: str) -> i32:
+pub fn rt_compat_exec_argv_capture_input(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, stdin_path: str) -> i32:
     let arg_buf = posix_str_to_c_buf(args)
     let out_buf = posix_str_to_c_buf(stdout_path)
     let err_buf = posix_str_to_c_buf(stderr_path)
@@ -920,8 +911,7 @@ pub fn rt_compat_exec_argv_capture_input_impl(args: str, stdout_path: str, stder
     with_free(in_buf)
     rc
 
-@[c_export("rt_compat_exec_argv_capture_cwd")]
-pub fn rt_compat_exec_argv_capture_cwd_impl(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str) -> i32:
+pub fn rt_compat_exec_argv_capture_cwd(args: str, stdout_path: str, stderr_path: str, timeout_ms: i32, cwd: str) -> i32:
     let arg_buf = posix_str_to_c_buf(args)
     let out_buf = posix_str_to_c_buf(stdout_path)
     let err_buf = posix_str_to_c_buf(stderr_path)
@@ -936,8 +926,7 @@ pub fn rt_compat_exec_argv_capture_cwd_impl(args: str, stdout_path: str, stderr_
         with_free(cwd_buf)
     rc
 
-@[c_export("rt_compat_exec_argv_capture_spawn")]
-pub fn rt_compat_exec_argv_capture_spawn_impl(args: str, stdout_path: str, stderr_path: str) -> i32:
+pub fn rt_compat_exec_argv_capture_spawn(args: str, stdout_path: str, stderr_path: str) -> i32:
     let arg_buf = posix_str_to_c_buf(args)
     let out_buf = posix_str_to_c_buf(stdout_path)
     let err_buf = posix_str_to_c_buf(stderr_path)
@@ -949,8 +938,7 @@ pub fn rt_compat_exec_argv_capture_spawn_impl(args: str, stdout_path: str, stder
     with_free(err_buf)
     rc
 
-@[c_export("rt_compat_exec_wait")]
-pub fn rt_compat_exec_wait_impl(pid: i32, timeout_ms: i32) -> i32:
+pub fn rt_compat_exec_wait(pid: i32, timeout_ms: i32) -> i32:
     if pid <= 0:
         return -1
     posix_active_child_pgid = pid

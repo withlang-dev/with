@@ -104,7 +104,6 @@ type SemaBuiltinSymbols {
     unreachable: i32,
     track: i32,
     spawn_method: i32,
-    join: i32,
     src: i32,
     file_magic: i32,
     line_magic: i32,
@@ -780,7 +779,6 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         unreachable: 0,
         track: 0,
         spawn_method: 0,
-        join: 0,
         src: 0,
         file_magic: 0,
         line_magic: 0,
@@ -1430,7 +1428,6 @@ fn Sema.init_intrinsic_symbols(mut self: Sema):
     self.syms.unreachable = self.pool_intern("unreachable")
     self.syms.track = self.pool_intern("track")
     self.syms.spawn_method = self.pool_intern("spawn")
-    self.syms.join = self.pool_intern("join")
     self.syms.src = self.pool_intern("src")
     self.syms.file_magic = self.pool_intern("__FILE__")
     self.syms.line_magic = self.pool_intern("__LINE__")
