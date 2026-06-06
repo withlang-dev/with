@@ -1,11 +1,15 @@
 # Problematic Requirements Audit
 
-This file lists requirements from `docs/requirements.md` that I do not
-agree with as written after reviewing them against the With philosophy and
-the specification as a whole.
+This file records a first-pass targeted audit of requirements from
+`docs/requirements.md` that I do not agree with as written after checking
+them against the With philosophy and the specification as a whole.
 
-Requirements not listed here are not flagged by this pass. "Problematic"
-means one of:
+This is not a complete requirement-by-requirement approval pass over all
+2,567 generated requirements. Absence from this file means only that this
+targeted pass did not flag the requirement; it is not a claim that the
+requirement is correct, normative, or philosophically aligned.
+
+"Problematic" means one of:
 
 - the requirement contradicts another normative part of the spec
 - the requirement is stale relative to the compiler architecture
