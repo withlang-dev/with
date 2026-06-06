@@ -4,6 +4,13 @@ This file records a methodical audit of all 2,567 generated requirements in
 `docs/requirements.md` against the With philosophy and the specification as a
 whole.
 
+This audit was rechecked against `docs/mission.md`. An objection does not
+belong here if it merely preserves ceremony, makes the user spell something the
+compiler can safely infer, or weakens the core `with init` / `with get c.*` /
+`with migrate` experience. The entries below survive that check because they
+either preserve safety, remove stale architecture claims, or ask the compiler
+to prove more instead of asking the user to write more.
+
 Absence from this file means the requirement was not flagged by this audit.
 It is not a permanent proof that the requirement can never be revised, but it
 does mean this pass did not find a true contradiction, stale architecture
@@ -97,6 +104,13 @@ of the language has converged on the three universal body forms. That is extra
 surface area for the 90% path without adding capability. It also weakens the
 relationship between `if` and `match`: both should make the boundary between
 condition/pattern and result visible.
+
+This is not an argument for extra ceremony. The mission argues against making
+users write unnecessary characters, but it also argues for a coherent surface
+where the compiler pays complexity so users do not have to remember special
+cases. `:` and `{` already provide the explicit consequent marker for all block
+forms. A separate `then` spelling and a naked `else expr` exception make the
+common path larger, not smaller.
 
 Preferred requirement shape:
 
@@ -489,7 +503,7 @@ Preferred requirement shape:
 - Generated bindings must never contain stubs that pretend an untranslatable C
   construct is part of the usable With surface.
 
-## 16. Heuristic C destructor auto-defer is too magical
+## 16. Heuristic-only C destructor auto-defer is unsafe
 
 Affected requirements:
 
@@ -500,24 +514,31 @@ Affected requirements:
 
 Argument:
 
-The goal, ergonomic C interop, is right. The mechanism is too dangerous.
-Ownership conventions in C are not reliably encoded in names. A `new`-looking
-function may return a borrowed pointer, a retained pointer, a reference-counted
-object, a singleton, memory freed by another API, or a handle whose close
-function has preconditions. Automatically inserting cleanup based on a name
-heuristic can introduce double-free, use-after-free, or incorrect reference
-counting.
+The goal, ergonomic C interop, is exactly right. The mission says the compiler
+should infer, import, generate, and make code safe when it can. Automatic C
+resource cleanup is a good With feature when the compiler has enough ownership
+evidence to own the cleanup decision.
 
-This is especially out of line with With's "do the right thing" philosophy:
-the compiler would be guessing a semantic fact it does not actually know.
+The problematic part is the heuristic-only rule. Ownership conventions in C are
+not reliably encoded in names. A `new`-looking function may return a borrowed
+pointer, a retained pointer, a reference-counted object, a singleton, memory
+freed by another API, or a handle whose close function has preconditions.
+Automatically inserting cleanup based only on a name heuristic can introduce
+double-free, use-after-free, or incorrect reference counting.
+
+This is the boundary the mission itself implies: the compiler should eliminate
+ceremony when it can prove the fact or safely synthesize the mechanism. It
+should not guess ownership it does not know.
 
 Preferred requirement shape:
 
 - `c_import` may generate method-style wrappers for C functions.
+- It may infer or generate automatic cleanup when ownership is known from
+  trusted metadata, source analysis, annotations, a known-safe C convention
+  database, or a safe With wrapper type that owns the resource and implements
+  `Drop`.
 - It may suggest likely destructor functions in diagnostics or generated
-  metadata.
-- Automatic cleanup requires explicit ownership metadata, user annotation, or a
-  safe With wrapper type that owns the resource and implements `Drop`.
+  metadata when ownership is plausible but unproven.
 - Name heuristics alone must not insert `defer` calls.
 
 ## 17. `str`/`c_char`/`c_void` auto-coercions are unsound as written
@@ -540,8 +561,15 @@ These conversions cross from ergonomic into unsound.
 contain interior NUL bytes. Passing a raw pointer to string data as
 `*const c_char` is only valid if the compiler has produced a NUL-terminated
 temporary with a correct lifetime, or the value is already `CStr`/`CString`.
-The `*mut c_char` rule is worse: a hidden allocation that the caller must free
-is not honest ownership.
+That compiler-generated temporary is a mission-aligned feature when the
+lifetime is bounded and the compiler owns the allocation/free path. The
+problem is not automatic conversion; the problem is an underspecified
+conversion that pretends ordinary `str` storage is already a C string.
+
+The `*mut c_char` rule is worse as written: a hidden allocation that the caller
+must free is not honest ownership. If the compiler generates a writable buffer,
+it must also own the lifetime contract and define how mutated contents flow
+back, if they do at all.
 
 The `c_void` return coercions are also unsafe. A `void*` is opaque; expected
 type context does not prove it points to a NUL-terminated string. Calling
@@ -553,10 +581,13 @@ Preferred requirement shape:
 - `str -> *const u8` may pass pointer/length-compatible string bytes only for C
   APIs that do not expect NUL termination and where lifetime is bounded by the
   call.
-- `str -> *const c_char` requires `CStr`/`CString`, or an explicit compiler
-  temporary whose allocation and lifetime are specified. Prefer explicit
-  `.to_cstring()` when allocation matters.
-- No implicit `str -> *mut c_char` caller-must-free conversion.
+- `str -> *const c_char` may use a compiler-generated call-scoped
+  NUL-terminated temporary when allocation, interior-NUL behavior, and lifetime
+  are specified. `CStr`/`CString` remain available when the user needs stable
+  storage or explicit control.
+- No implicit `str -> *mut c_char` caller-must-free conversion. A compiler
+  generated mutable temporary is acceptable only when the binding contract
+  specifies ownership, lifetime, size, and whether mutations are copied back.
 - `void*` return values remain typed as `*mut c_void` / `*const c_void` unless
   the user explicitly casts or a binding has trustworthy metadata.
 - Null pointer results should map to `Option`, not `""`.
@@ -591,7 +622,7 @@ Preferred requirement shape:
 - Build-system effects belong only in capability-bearing comptime, never in
   ordinary pure comptime.
 
-## 19. Allocation visibility is overstated
+## 19. Allocation visibility wording is too absolute
 
 Affected requirement:
 
@@ -612,19 +643,25 @@ owned string literals may allocate, `async fn` calls allocate fibers, `async:`
 allocates a fiber, comprehensions allocate collections, and f-strings allocate
 strings.
 
-Most of these are good With design choices. The problematic part is promising
-"no allocation hides" instead of specifying which syntax owns/allocates and
-why that cost is considered visible enough.
+Most of these are good With design choices. The mission explicitly says the
+compiler should generate and link what it can instead of forcing users to spell
+mechanical details. That means "no allocation hides behind innocent syntax" is
+not the right absolute. The better promise is that allocation-producing
+constructs have a clear semantic shape, documented cost model, and safe
+ownership/lifetime behavior.
 
 Preferred requirement shape:
 
 - Allocation should be syntactically or semantically visible through owning
-  result types or allocation-oriented constructs.
+  result types, allocation-oriented constructs, or well-documented
+  compiler-generated temporaries whose lifetime the compiler owns.
 - The spec should enumerate allocation-producing constructs: `Vec.new`,
   `.to_owned`, comprehensions, f-strings, owned string literals when not
   elided, `async fn` calls, and `async:` blocks.
-- Hidden allocation in FFI coercions or cleanup heuristics should not be added
-  unless the ownership/lifetime contract is explicit.
+- Compiler-generated allocation in FFI coercions is acceptable when the
+  compiler owns the allocation/free path or the binding contract makes
+  ownership explicit. It should not create caller-must-free obligations
+  invisibly.
 
 ## 20. Ephemerality is not purely structural and dataflow-free
 
