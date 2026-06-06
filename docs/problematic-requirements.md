@@ -1,13 +1,13 @@
 # Problematic Requirements Audit
 
-This file records a first-pass targeted audit of requirements from
-`docs/requirements.md` that I do not agree with as written after checking
-them against the With philosophy and the specification as a whole.
+This file records a methodical audit of all 2,567 generated requirements in
+`docs/requirements.md` against the With philosophy and the specification as a
+whole.
 
-This is not a complete requirement-by-requirement approval pass over all
-2,567 generated requirements. Absence from this file means only that this
-targeted pass did not flag the requirement; it is not a claim that the
-requirement is correct, normative, or philosophically aligned.
+Absence from this file means the requirement was not flagged by this audit.
+It is not a permanent proof that the requirement can never be revised, but it
+does mean this pass did not find a true contradiction, stale architecture
+claim, unsafe broad wording, or philosophical mismatch worth listing.
 
 "Problematic" means one of:
 
@@ -137,8 +137,8 @@ Preferred requirement shape:
 - Calls through `c_import` bindings are direct calls by default.
 - Manual `extern "C"` declarations and calls remain unsafe unless explicitly
   modeled otherwise.
-- Raw pointer dereference, pointer indexing, pointer arithmetic, transmutes,
-  and other unsafe operations remain unsafe even when the pointer came from a
+- Raw pointer dereference, pointer indexing, transmutes, and other unsafe
+  memory-touching operations remain unsafe even when the pointer came from a
   `c_import` function.
 - The unsafe boundary for C interop is the wrapper API and the operations that
   actually perform unsafe memory effects, not a blanket wrapper around every
@@ -243,3 +243,474 @@ Preferred requirement shape:
   30 entries as informative trace links only.
 - For grammar requirements, point to the normative sections that define the
   construct.
+
+## 8. Mixed-width bitwise promotion bypasses numeric conversion rules
+
+Affected requirement:
+
+- `4.2.4.2` - `Mixed-width operands are promoted to the wider type.`
+
+Related requirements I agree with:
+
+- `4.2.6.1` - implicit widening is only allowed for lossless numeric conversions.
+- `4.2.6.6` - no other implicit numeric conversion is allowed.
+- `4.2.6.9` - signed/unsigned conversions require `as`, even at the same width.
+
+Argument:
+
+The bitwise requirement is too broad. "Promoted to the wider type" is harmless
+for `u8 | u32` and `i8 & i32`, but it becomes wrong for mixed signedness and
+same-width signed/unsigned cases. The numeric conversion section is explicit:
+With does not inherit C's silent integer-conversion traps, and signed/unsigned
+conversion requires intent.
+
+Preferred requirement shape:
+
+- Bitwise operands may be implicitly widened only when the conversion is
+  permitted by the ordinary lossless numeric-conversion rules.
+- Mixed signedness that cannot be converted losslessly requires an explicit
+  `as`.
+- The result type is the common type selected by those rules.
+
+## 9. Fixed-size arrays are not always copied on assignment
+
+Affected requirement:
+
+- `4.3.2.4` - `Passed by value (copied on assignment). For large arrays, pass by reference.`
+
+Related requirement I agree with:
+
+- `4.3.2.6` - fixed arrays are `Copy` if the element type is `Copy`.
+
+Argument:
+
+This contradicts the ownership model. Assignment moves by default, and copying
+requires `Copy`. A fixed-size array is a value type, but `[T; N]` cannot be
+implicitly copied when `T` is not `Copy`. Otherwise arrays would become a
+backdoor around move semantics for owning elements.
+
+Preferred requirement shape:
+
+- Fixed-size arrays are value types.
+- Assignment and argument passing follow normal ownership rules.
+- `[T; N]` is `Copy` only when `T` is `Copy`; otherwise assignment moves.
+- Large arrays should generally be passed by reference for performance.
+
+## 10. `const` declarations require redundant type annotations
+
+Affected requirements:
+
+- `9.1.3.2` - `Syntax: const NAME: TYPE = EXPR`
+- `9.1.3.3` - `The type annotation is required.`
+
+Argument:
+
+Requiring a type annotation for every `const` is out of line with With's core
+ergonomic rule: do not make the user write what the compiler already knows.
+The initializer often fully determines the type, especially for local and
+private constants.
+
+There are good reasons to require explicit types at public API boundaries or
+when the initializer is ambiguous. That does not justify requiring ceremony in
+all const declarations.
+
+Preferred requirement shape:
+
+- Allow `const NAME = EXPR` when the type is unambiguous from the initializer
+  and context.
+- Require or strongly prefer explicit types for public exported constants and
+  cases where the literal/default type would be surprising.
+- Keep `const NAME: TYPE = EXPR` available for API clarity and disambiguation.
+
+## 11. Suspension points are described too narrowly
+
+Affected requirements:
+
+- `14.3.1.34` - a function is `may_suspend` if it directly contains `.await`, or calls any function whose body is `may_suspend`.
+- `14.5.1.6` - `.await` is the only point where a fiber can suspend.
+- `14.5.1.7` - suspension is always visible in the source code.
+- `20.1.1.5` - suspension is always marked with `await`.
+
+Related requirements I agree with:
+
+- `14.3.1.39` - calling any `may_suspend` function while a `@[no_await_guard]` guard is live is a compile error.
+- `14.3.1.48` through `14.3.1.52` - `no_suspend` rejects `.await`, calls to `may_suspend` functions, async-scope await-all, and implicit cleanup await.
+- `14.17.1.6` - contended fiber-aware locks yield the fiber, not the OS thread.
+
+Argument:
+
+The visibility goal is right, but the absolute wording is wrong. The spec
+itself defines scheduler-yielding operations beyond a syntactic `.await`:
+calls to functions whose execution may suspend in the current fiber, async
+scope await-all, implicit cleanup await for ephemeral tasks, and contended
+fiber-aware lock operations.
+
+The `may_suspend` rule also needs to distinguish "calling an async function"
+from "calling a function that suspends in the current fiber." Calling an
+`async fn` eagerly creates a `Task` and does not suspend the caller unless the
+caller awaits or otherwise joins it. Treating every call to an async function
+as a current-fiber suspension would contradict the no-colored-functions model.
+
+Preferred requirement shape:
+
+- `.await` is the primary explicit suspension operator and the only way to
+  extract a `Task[T]` result.
+- A current fiber may also suspend at operations the compiler classifies as
+  `may_suspend`: calls to non-async functions that suspend in the current
+  fiber, select/collection await, fiber-aware blocking primitives, and
+  implicit cleanup await.
+- Calling an `async fn` without awaiting the returned `Task` is not itself a
+  current-fiber suspension.
+- Diagnostics should name the operation that may yield, even when it is buried
+  behind a call.
+
+## 12. Ephemeral return rules are inconsistent
+
+Affected requirements:
+
+- `4.8.2.4` - slices are ephemeral and cannot be returned from functions.
+- `8.3.1.8` - containers borrowing an allocator can only be local and cannot be returned.
+- `14.7.1.8` - ephemeral tasks cannot be returned.
+- `22.1.1.14` - an ephemeral `Vec` can be local but cannot be returned.
+
+Related requirements I agree with:
+
+- `3.4.1.1` - a function may return a reference or type containing a reference.
+- `3.4.1.2` - the returned value is ephemeral and restricted at the call site.
+- `5.1.1.3` - ephemeral values may be returned from functions with propagation.
+- `22.1.1.10` - functions returning ephemeral types make callers inherit the restriction.
+- `14.22.1.14` - ephemeral tasks can be returned from functions and remain ephemeral at the call site.
+
+Argument:
+
+Several specific sections accidentally restate "ephemeral" as "local only."
+That is too restrictive and contradicts the core model. With intentionally
+allows borrowed/reference-bearing values to cross a function boundary when the
+ephemeral restriction propagates to the caller. That is how the language avoids
+lifetime annotations without banning useful APIs like `first(xs) -> Option[&T]`.
+
+The forbidden operation is not "returning an ephemeral value." The forbidden
+operation is allowing that value to outlive the origin it borrows from, or
+erasing the ephemerality behind storage, threads, escaping closures, opaque
+trait objects, or non-ephemeral containers.
+
+Preferred requirement shape:
+
+- Ephemeral values may be returned when the return type/binding remains
+  ephemeral and the compiler can track the origin.
+- Ephemeral values may not be stored in non-ephemeral structs, globals,
+  long-lived containers, detached tasks, channels, or escaping closures.
+- Specific sections for slices, allocator-backed containers, `Task`, and
+  `Vec` should refer back to the general propagation rule instead of saying
+  "cannot be returned" categorically.
+
+## 13. Ephemeral escape diagnostics are too weak
+
+Affected requirements:
+
+- `14.22.1.10` - compiler tracks ephemerality and warns if a value might escape its safe scope.
+- `14.22.1.11` - compiler catches clear bugs.
+- `14.22.1.12` - ambiguous cases warn rather than block.
+- `14.22.1.13` - users can read a warning.
+
+Argument:
+
+For ordinary weird-but-safe code, warning is fine. For ephemeral escape, a
+warning is not enough. If the compiler cannot prove that an ephemeral value
+stays within its valid scope, accepting the program risks dangling references,
+cross-thread borrowed data, or a task outliving captured stack state.
+
+This is the same mistake as the global "warn, don't block" slogan: it is good
+as a social posture, but not as a safety rule.
+
+Preferred requirement shape:
+
+- Clear ephemeral escapes are hard errors.
+- Unknown or ambiguous ephemeral escape cases are also hard errors unless the
+  program crosses an explicit `unsafe` boundary or converts/copies into owned
+  data.
+- Warnings are appropriate for performance or style guidance, not for cases
+  where accepting the code could violate memory safety.
+
+## 14. `Task[T]` storability contradicts task ephemerality
+
+Affected requirement:
+
+- `14.20.1.9` - `Task[T] is always storable`.
+
+Related requirements I agree with:
+
+- `14.7.1.4` - `Task[T]` is `Send` when `T: Send` and the task is not ephemeral.
+- `14.7.1.7` - a `Task[T]` that captures references is ephemeral.
+- `14.22.1.3` - a task is ephemeral if its spawned fiber environment contains ephemeral values.
+
+Argument:
+
+The table entry is wrong as written. The type spelling `Task[T]` is the same
+for storable and ephemeral tasks, but storability is a per-binding property.
+A task that captures references or other ephemeral values cannot be stored in
+long-lived data structures or sent to other threads.
+
+Preferred requirement shape:
+
+- `Task[T]` has one type spelling.
+- A `Task[T]` value is storable only when its captured environment contains no
+  ephemeral values and its result satisfies the relevant `Send`/storage rules.
+- Tables comparing generators and async should say "Task handle; storable only
+  when non-ephemeral."
+
+## 15. `c_import` must not emit `comptime_error` stubs for failed translation
+
+Affected requirements:
+
+- `16.2.1.10` - untranslatable macros emit a stub with `comptime_error`.
+- `16.2.1.14` - untranslatable constructs produce a diagnostic or a loud `comptime_error` stub.
+- `17.5.1.8` - `c_import` uses `comptime_error` for untranslatable C constructs.
+
+Argument:
+
+This conflicts with the repository's no-silent-fallback rule. A generated
+binding that contains a placeholder body, even a loud `comptime_error`, still
+lets translation appear to succeed and pushes failure to a later use site. For
+C migration/import tooling, that lies about completeness.
+
+`comptime_error` is a valid language feature for user-authored concept checks.
+It is not an acceptable fallback for compiler-generated bindings when the
+translator could not produce correct output.
+
+Preferred requirement shape:
+
+- If `c_import` encounters an untranslatable construct outside an explicit
+  allow-list, it emits a diagnostic naming the construct and source location
+  and exits non-zero.
+- Explicitly allow-listed omissions may be omitted from the generated binding
+  surface or represented as intentionally unavailable metadata, but not as
+  callable placeholder APIs.
+- Generated bindings must never contain stubs that pretend an untranslatable C
+  construct is part of the usable With surface.
+
+## 16. Heuristic C destructor auto-defer is too magical
+
+Affected requirements:
+
+- `16.2.2.11` - destructor detection and auto-defer.
+- `16.2.2.12` - functions matching `prefix_destroy`, `prefix_free`, `prefix_close`, `prefix_unref`, or `prefix_release` are considered destructors.
+- `16.2.2.13` - when a constructor result is bound to a non-escaping `let`, the compiler inserts `defer prefix_destroy(value)`.
+- `16.2.2.14` - auto-defer does not apply when the value escapes.
+
+Argument:
+
+The goal, ergonomic C interop, is right. The mechanism is too dangerous.
+Ownership conventions in C are not reliably encoded in names. A `new`-looking
+function may return a borrowed pointer, a retained pointer, a reference-counted
+object, a singleton, memory freed by another API, or a handle whose close
+function has preconditions. Automatically inserting cleanup based on a name
+heuristic can introduce double-free, use-after-free, or incorrect reference
+counting.
+
+This is especially out of line with With's "do the right thing" philosophy:
+the compiler would be guessing a semantic fact it does not actually know.
+
+Preferred requirement shape:
+
+- `c_import` may generate method-style wrappers for C functions.
+- It may suggest likely destructor functions in diagnostics or generated
+  metadata.
+- Automatic cleanup requires explicit ownership metadata, user annotation, or a
+  safe With wrapper type that owns the resource and implements `Drop`.
+- Name heuristics alone must not insert `defer` calls.
+
+## 17. `str`/`c_char`/`c_void` auto-coercions are unsound as written
+
+Affected requirements:
+
+- `16.3.4.10` - `str` to `*const u8` passes a pointer to string data.
+- `16.3.4.11` - `str` to `*const c_char` passes a null-terminated pointer to string data.
+- `16.3.4.12` - `str` to `*mut c_char` passes a copy that the caller must free.
+- `16.3.4.20` - `*mut c_void` / `*const c_void` returns can be coerced based on expected type.
+- `16.3.4.21` and `16.3.4.23` - `*void` to `str` uses null-check plus `strlen` to produce a string view.
+- `16.3.4.28` - `*mut c_void` to `str` always inserts a null check.
+- `16.3.4.29` - null becomes `""`.
+
+Argument:
+
+These conversions cross from ergonomic into unsound.
+
+`str` is not inherently a C string. It may not be NUL-terminated, and it may
+contain interior NUL bytes. Passing a raw pointer to string data as
+`*const c_char` is only valid if the compiler has produced a NUL-terminated
+temporary with a correct lifetime, or the value is already `CStr`/`CString`.
+The `*mut c_char` rule is worse: a hidden allocation that the caller must free
+is not honest ownership.
+
+The `c_void` return coercions are also unsafe. A `void*` is opaque; expected
+type context does not prove it points to a NUL-terminated string. Calling
+`strlen` on arbitrary `void*` can read invalid memory. Converting null to
+`""` erases a semantically important distinction and can hide C API errors.
+
+Preferred requirement shape:
+
+- `str -> *const u8` may pass pointer/length-compatible string bytes only for C
+  APIs that do not expect NUL termination and where lifetime is bounded by the
+  call.
+- `str -> *const c_char` requires `CStr`/`CString`, or an explicit compiler
+  temporary whose allocation and lifetime are specified. Prefer explicit
+  `.to_cstring()` when allocation matters.
+- No implicit `str -> *mut c_char` caller-must-free conversion.
+- `void*` return values remain typed as `*mut c_void` / `*const c_void` unless
+  the user explicitly casts or a binding has trustworthy metadata.
+- Null pointer results should map to `Option`, not `""`.
+
+## 18. Pure comptime and capability-bearing comptime are conflated
+
+Affected requirements:
+
+- `17.1.1.7` - comptime is deterministic and side-effect-free.
+- `17.1.1.9` - comptime cannot perform I/O, allocate heap memory that persists to runtime, or call FFI functions.
+- `17.6.2.2` - `embed_file(path)` reads a file at compile time.
+- `17.7.1.3` - comptime code cannot read files, make network calls, or access the environment.
+- `18.5.2.22` - `build.w` runs as capability-bearing comptime, not ordinary pure comptime.
+
+Argument:
+
+The safety boundary is right, but the wording is inconsistent. Pure comptime
+should be deterministic and effect-limited. But the spec also defines
+`embed_file`, which reads source-relative files at compile time, and
+capability-bearing comptime for build orchestration, which intentionally
+performs controlled filesystem/process effects through driver-minted
+capabilities.
+
+Preferred requirement shape:
+
+- Pure comptime is deterministic and cannot perform ambient I/O, access the
+  environment, call FFI, or mint capabilities.
+- Deterministic compiler-owned intrinsics such as `embed_file` are explicit
+  compile-time inputs and participate in dependency tracking.
+- Capability-bearing comptime is a separate mode whose effects are explicit in
+  the required capability set and mediated by driver-provided values.
+- Build-system effects belong only in capability-bearing comptime, never in
+  ordinary pure comptime.
+
+## 19. Allocation visibility is overstated
+
+Affected requirement:
+
+- `20.1.1.1` - allocations are obvious; no allocation hides behind innocent syntax.
+
+Related requirements:
+
+- `14.4.1.2` - calling an async function allocates a fiber with its own stack.
+- `14.6.1.2` - `async:` allocates a fiber.
+- `15.3.1.1` through `15.3.1.4` - string literals default to owned `str`, with allocation sometimes elided.
+- `15.4.1.17` - f-strings always allocate.
+
+Argument:
+
+The intended performance principle is excellent, but the absolute wording is
+false. Some allocations are intentionally hidden behind ergonomic constructs:
+owned string literals may allocate, `async fn` calls allocate fibers, `async:`
+allocates a fiber, comprehensions allocate collections, and f-strings allocate
+strings.
+
+Most of these are good With design choices. The problematic part is promising
+"no allocation hides" instead of specifying which syntax owns/allocates and
+why that cost is considered visible enough.
+
+Preferred requirement shape:
+
+- Allocation should be syntactically or semantically visible through owning
+  result types or allocation-oriented constructs.
+- The spec should enumerate allocation-producing constructs: `Vec.new`,
+  `.to_owned`, comprehensions, f-strings, owned string literals when not
+  elided, `async fn` calls, and `async:` blocks.
+- Hidden allocation in FFI coercions or cleanup heuristics should not be added
+  unless the ownership/lifetime contract is explicit.
+
+## 20. Ephemerality is not purely structural and dataflow-free
+
+Affected requirement:
+
+- `22.1.1.2` - no dataflow required; ephemerality is determined structurally by types.
+
+Related requirements:
+
+- `3.4.1.7` and `3.4.1.8` - returned ephemeral origin sets are inferred from function bodies and enforced at call sites.
+- `14.22.1.5` through `14.22.1.8` - task ephemerality is a per-binding property inferred at creation and propagated through assignments and calls.
+- `21.1.1.9` - returned-view origin tracking is part of borrow checking.
+
+Argument:
+
+Base ephemerality is structural, but the whole system is not. With needs
+provenance/origin tracking for returned references, binding-level task
+ephemerality, propagation through assignments and function calls, and escape
+checks at use sites. Calling this "no dataflow required" is misleading and
+would push an implementer toward an unsound or incomplete checker.
+
+Preferred requirement shape:
+
+- Type-level ephemerality is determined structurally: references, declared
+  ephemeral types, and generic containers of ephemeral types are ephemeral.
+- Binding-level ephemerality and origin/provenance require local dataflow or
+  equivalent analysis.
+- The implementation should keep this analysis simple and deterministic, but
+  the spec should not claim it does not exist.
+
+## 21. `with` dispatch is underspecified in the later semantics section
+
+Affected requirements:
+
+- `23.1.1.1` - compiler desugars `with` based on the `mut` keyword.
+- `23.1.1.2` - `with e as mut x` desugars to scoped mutation.
+- `23.1.1.3` - `with e as x` desugars to scoped binding.
+
+Related requirement I agree with:
+
+- `7.5.1.1` - the `with` block form is determined by the type of the expression.
+
+Argument:
+
+Section 23 only describes the non-guarded binding forms, but it is titled as
+the `with` dispatch rule. That conflicts with Section 7, where `with` has
+guarded access, scoped mutation, scoped binding, implicit context, and record
+update forms. For guarded access, the type/protocol of the expression matters;
+`mut` is not the whole dispatch rule.
+
+Preferred requirement shape:
+
+- Section 23 should say it is specifying the desugaring for non-guarded
+  binding forms only, or it should restate the complete dispatch order.
+- Full `with` dispatch should first distinguish syntax/form and guard
+  protocol, then use `mut` to choose scoped mutation versus immutable scoped
+  binding for the plain binding forms.
+
+## 22. Raw pointer arithmetic has conflicting unsafe requirements
+
+Affected requirement:
+
+- `16.1.1.19` - unsafe is required for raw pointer operations including pointer arithmetic.
+
+Related requirements I agree with:
+
+- `16.11.1.12` - some raw pointer operations are safe and do not require unsafe.
+- `16.11.1.13` - raw pointer arithmetic is safe.
+- `16.11.1.23` - computing a pointer value cannot by itself read or write invalid memory.
+- `16.11.1.24` - unsafe is required at the access site, not every intermediate computation.
+- `16.11.1.25` - unsafe is required when touching memory through a raw pointer, not merely computing one.
+
+Argument:
+
+Section 16.1 uses the older broad phrase "raw pointer operations" and includes
+pointer arithmetic in the unsafe list. Section 16.11 gives the better, more
+precise rule: computing raw pointer values is allowed in safe code; touching
+memory through them requires unsafe.
+
+The precise rule fits With's philosophy. It keeps the real danger visible
+without forcing unsafe ceremony around address calculation.
+
+Preferred requirement shape:
+
+- Raw pointer dereference, raw pointer indexing, transmute, and unsafe calls
+  require unsafe.
+- Raw pointer arithmetic and comparison are safe computations, provided the
+  compiler lowers them without introducing backend undefined behavior.
+- Any later memory access through the computed pointer requires unsafe.
